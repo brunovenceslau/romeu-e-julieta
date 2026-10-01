@@ -55,7 +55,7 @@ Module ids are stable; the plan selects work by them.
 
 | Module id | Responsibility | Depends on |
 |---|---|---|
-| `ci-bootstrap` | a green CI workflow on the public repo, plus the day-one middleware: `tools/new`, `go generate` wiring and `tools/ci generated`, `.githooks/pre-push` with `tools/ci fast`, `tools/ci pr`, `.github/ask-first.yaml` with generated CODEOWNERS, `ARCHITECTURE.md` and `CONTRIBUTING.md` skeletons (first task) | - |
+| `ci-bootstrap` | in this order: `tools/ci hygiene` with the forbidden-name denylist (10 10.2), so it reads each later commit; then a green CI workflow on the public repo with `tools/ci workflows`; then the rest of the day-one middleware: `tools/new`, `go generate` wiring and `tools/ci generated`, `tools/ci sequences`, `.githooks/pre-push` with `tools/ci fast`, `tools/ci pr`, `.github/ask-first.yaml` with generated CODEOWNERS, `ARCHITECTURE.md` and `CONTRIBUTING.md` skeletons (first task) | - |
 | `probes` | probe harness (pure core + exec layer), `probe-result.v1`, redacted sbx recordings, `tools/ci probes` lifecycle | - |
 | `canon` | canonical JSON, typed domain-separated digests | - |
 | `spec` | project spec, run layout and host settings types with gate/apply tags; `rules.go`; strict decode; generated validators and schemas (`tools/schemagen`) | canon |
@@ -107,14 +107,18 @@ a diff. Nobody hand-edits a generated file.
 | command definitions | `docs/reference/<command>.md` |
 | `internal/state` transition tables | state-machine tests; the diagrams in `ARCHITECTURE.md` |
 | `.github/ask-first.yaml` | `.github/CODEOWNERS`, `docs/reference/ask-first.md`, the `mutate` trigger |
-| the vocabulary table (01 1.7) | the `tools/ci vocabulary` denylist |
+| the vocabulary table (01 1.7) | the `tools/ci vocabulary` denylist; the spell-check word list `docs/spelling/vocabulary.txt` (ADR 0001 rule 5) |
 | ADR titles and statuses (`docs/adr/*.md`) | the ADR index `docs/adr/README.md` |
+
+A generated `docs/reference/` page carries a generated-file header and
+the front matter of ADR 0001 rule 1 (`type: reference`, `reader:`),
+both written by its generator.
 
 `go run ./tools/new <kind> <name>` scaffolds with the next free id:
 
 | Kind | Creates |
 |---|---|
-| `adr` | `docs/adr/NNNN-<name>.md` with the ADR layout of ADR 0001 (rule 6), status Proposed |
+| `adr` | `docs/adr/NNNN-<name>.md` with the layout of rule 6 in [ADR 0001, the documentation standard](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md): the next free number, the `Date:` line from the injected clock (10 10.4), the `# N. Title` line derived from `<name>`, status Proposed |
 | `invariant` | the next `I<n>`: a guard stub and a failing test, both tagged, and the table row to fill |
 | `probe` | a probe definition with `expect`, decision table and `affects` to fill |
 | `kit` | `kits/<name>/` with a descriptor on the pinned frontend |
@@ -128,10 +132,20 @@ or produced this, and does it exist now?" is answered mechanically:
 
 | When | Mechanism | Enforces |
 |---|---|---|
-| before push | tracked `.githooks/pre-push` runs `go run ./tools/ci fast` (contributors enable it with `git config core.hooksPath .githooks`; inside a sandbox, julieta's dispatcher runs it automatically) | format, vet, lint, unit tests, generated files, hygiene, sequences, vocabulary |
+| before push | tracked `.githooks/pre-push` runs `go run ./tools/ci fast` (contributors enable it with `git config core.hooksPath .githooks`; inside a sandbox, julieta's dispatcher runs it automatically) | format, vet, lint, unit tests, generated files, hygiene, sequences, vocabulary, workflows |
 | every PR | `go run ./tools/ci all` in CI | the full list in [10 10.2](10-testing-style.md#102-ci) |
-| every PR | `tools/ci pr` reads the pull request event payload | the body has non-empty **Why**, **What changed**, **Evidence** and **Lessons** sections; a **Middleware** line of the form `check: <tools/ci subcommand or test>`, `generator: <tools/new kind or go:generate source>`, or `none: <reason>`; every changed golden listed under Evidence; a quoted maintainer approval when the diff touches a path in `.github/ask-first.yaml`; commit subjects in Conventional Commit form; the prose rules of ADR 0001 (rule 4) in the body and the commit messages |
+| every PR | `tools/ci pr` reads the pull request event payload | the body has non-empty **Why**, **What changed**, **Evidence** and **Lessons** sections; a **Middleware** line of the form `check: <tools/ci subcommand or test>`, `generator: <tools/new kind or go:generate source>`, or `none: <reason>`; every changed golden listed under Evidence; a quoted maintainer approval when the diff touches a path in `.github/ask-first.yaml`, and when it changes an ADR's Status section or adds an ADR whose status is not Proposed (ADR 0001 rule 8); commit subjects in Conventional Commit form; the prose rules of ADR 0001 (rule 4) in the body and the commit messages; the forbidden-name denylist (10 10.2) over the title, body, branch name and commit messages |
 | merge | branch protection | CI green; code-owner review for ask-first paths |
+
+Each `tools/ci` gate in this table also runs locally, from the same
+source. The
+workflows only call `tools/ci` and `tools/release` subcommands, and
+`tools/ci workflows` fails when one does anything else, so equivalence
+is a property of the code, not a promise. GitHub Actions is the default
+runner. If the Actions quota runs out, the maintainer may choose the
+local gates, provided they are equivalent; what equivalent means and
+what evidence it leaves is in
+[10 10.2](10-testing-style.md#102-ci).
 
 ## 12.5 Decisions and history
 
@@ -140,7 +154,8 @@ or produced this, and does it exist now?" is answered mechanically:
 - Decisions live in ADRs under `docs/adr/`, one decision per record.
   Layout, sections, statuses, supersede links and sign-off follow
   [ADR 0001](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
-  (rules 6-9); `tools/ci sequences` checks them.
+  (rules 6-9); `tools/ci sequences` checks layout, statuses and links,
+  and `tools/ci pr` checks the sign-off quote.
 - An accepted ADR is never rewritten. A spec change that reverses a
   decision adds a new ADR that supersedes the old one, and the old ADR
   gains only its `Superseded by` status line.
@@ -158,8 +173,8 @@ is listed first. Nobody writes release notes by hand.
 ## 12.7 Text standard and lessons
 
 - Commits: Conventional Commits; the body says why and cites evidence
-  where a claim can be checked; no filler, no boilerplate footers;
-  English; no em dash.
+  where a claim can be checked; English. The prose rules of ADR 0001
+  (rule 4) apply to commit messages, checked by `tools/ci pr`.
 - PRs and issues: the PR template sections Why / What changed / Evidence
   / Middleware / Lessons, checked by `tools/ci pr`.
 - `docs/lessons.md`: one entry per lesson (date, what happened, the
@@ -180,6 +195,6 @@ product-specific content.
 |---|---|---|
 | `README.md` | a developer deciding whether to use the product; explanation + quick start | the heading order of ADR 0001 rule 12, filled with: what it is and who it is for; when not to use it; prerequisites (macOS host, sbx, git floor); install and verify (checksums, attestation); first run (J1 in six commands); the trust model in one paragraph with a link to `ARCHITECTURE.md`; links to guides, reference and ADRs |
 | `ARCHITECTURE.md` | a contributor or reviewer; explanation, one page | components and their single jobs; the trust boundaries A-F; the gates; the state machines (candidate, promotion commit, generation, probe) as generated diagrams; where each invariant is enforced; module dependency direction |
-| `CONTRIBUTING.md` | a contributor; how-to | the dev loop (`tools/new`, `go generate`, `tools/ci fast`, `tools/ci all`); enabling the pre-push hook; how to add a command, invariant, probe or kit; what counts as ask-first and how approval is recorded; the PR template and the Middleware line; the text standard; a link to the documentation standard (ADR 0001), including its request to write with a voice; ADRs and superseding |
-| `docs/guide/*` | the operator; how-to, one page per journey | the steps of the journey in [09](09-journeys.md) with expected output and recovery from each expected error id |
-| `docs/reference/*` | anyone looking up a fact; reference, generated | commands, file formats, errors, exit codes, ask-first surfaces |
+| `CONTRIBUTING.md` | a contributor; how-to | the dev loop (`tools/new`, `go generate`, `tools/ci fast`, `tools/ci all`); enabling the pre-push hook; running the gates locally; how to add a command, invariant, probe or kit; what counts as ask-first and how approval is recorded; the PR template and the Middleware line; a link to the documentation standard (ADR 0001), which holds the text standard for commits and PRs (12.7) and the request to write with a voice; ADRs and superseding |
+| `docs/guide/*` | the operator; how-to, one page per journey, named in front matter (`journey: J<n>`) | the steps of the journey in [09](09-journeys.md) with expected output and recovery from each expected error id |
+| `docs/reference/*` | anyone looking up a fact; reference, generated with its front matter | commands, file formats, errors, exit codes, ask-first surfaces |

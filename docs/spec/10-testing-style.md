@@ -9,7 +9,7 @@ test, coverage and review rules as `internal/*`.
 
 | Level | Location | Runs where | Covers |
 |---|---|---|---|
-| Unit | `internal/**`, `tools/**`, `e2e/probes/**`, `e2e/fakesbx/**` `_test.go` | CI, dev | validators generated from `rules.go` (table + fuzz seeds committed), digests, widening-set and toolchain diffs, the generated state-machine tables (every row, every illegal pair), egress split, `termsafe`, shell quoter, sbx output parsers over every recorded sbx version, error-id table, doctor checks with `HOME` in a temp dir, the probe harness core and its sbx exec layer (against a helper binary re-executed from the test), the recorder's redaction, the fake sbx's placeholder normalizer, CI tools themselves (hygiene denylist self-test, invariants/mutate, acceptance against a recorded GitHub API fixture, `pr` against recorded event payloads) |
+| Unit | `internal/**`, `tools/**`, `e2e/probes/**`, `e2e/fakesbx/**` `_test.go` | CI, dev | validators generated from `rules.go` (table + fuzz seeds committed), digests, widening-set and toolchain diffs, the generated state-machine tables (every row, every illegal pair), egress split, `termsafe`, shell quoter, sbx output parsers over every recorded sbx version, error-id table, doctor checks with `HOME` in a temp dir, the probe harness core and its sbx exec layer (against a helper binary re-executed from the test), the recorder's redaction, the fake sbx's placeholder normalizer, CI tools themselves (hygiene denylist self-test, `workflows` against fixture workflow files, invariants/mutate, acceptance against a recorded GitHub API fixture, `pr` against recorded event payloads) |
 | Golden | `internal/render/testdata/`, `internal/layout/testdata/`, `internal/gate/testdata/` | CI, dev | `sbxenv.yaml`, workspace files, `render.json`, gate diff text, herdr `layout.apply` requests (`layout up --dry-run`), handoff front matter |
 | Schema | `tools/ci schema` | CI | generated schemas equal the committed ones; examples and testdata validate |
 | E2E (git + fake sbx) | `e2e/*_test.go`, tag `e2e` | CI (linux amd64, linux arm64, macOS Intel, macOS arm64) | romeu commands against a temp `$ROMEU_ROOT`; origins served by `git http-backend` behind `httptest` TLS (host settings `gitHosts[].caFile` points at the test CA; gitsafe has no test override); the sandbox daemon served by `git daemon` on `127.0.0.1`; journeys J2, J3b, J7, J10, J11 (scenario functions shared with the host suite); promotion fault injection; invariants marked E in [05](05-security.md), including the I27 hostile trees on the macOS runners |
@@ -41,15 +41,15 @@ Additional required tests:
   with the registry and origins unreachable after `sync`, and succeeds.
 - **Fuzz**: validators, `termsafe`, ref-name checks, YAML round-trip,
   descriptor grammar; short runs in every CI; long runs in the scheduled
-  `fuzz.yml`.
+  `fuzz.yml`, which calls `go run ./tools/ci fuzz`.
 
 Rules: tests never touch the real `$HOME` (`HOME`, `XDG_*`,
 `ROMEU_SETTINGS` in `t.TempDir()`); network only for the container
 e2e's mise install (pinned, checksum-verified, cache keyed by the
 fixture `mise.lock` sha256; download failures are reported as
 infrastructure errors, not test failures), the host suite, and
-`tools/ci acceptance` outside `all`; flaky tests are fixed, never
-skipped.
+`tools/ci acceptance` and `tools/ci links` outside `all`; flaky tests
+are fixed, never skipped.
 
 ## 10.2 CI
 
@@ -57,15 +57,37 @@ skipped.
 what developers run locally before a PR; the tracked `.githooks/pre-push`
 runs the `fast` subset. Actions are pinned by commit SHA.
 
+**Every gate also runs locally.** A gate is a check whose failure blocks
+a merge or a release. Workflows hold no check logic of their own: each
+`run:` step is one `go run ./tools/ci <subcommand>` or
+`go run ./tools/release <subcommand>` call, and `tools/ci workflows`
+fails on any other `run:` step and on an action that is not pinned by
+commit SHA. A workflow and a developer's shell therefore run the same
+code, at the same commit, with the tools pinned in `mise.lock`; nothing
+has to be kept in step by hand. `tools/ci pr` takes the event payload
+as a file, so a local run reads one fetched with `gh api`.
+
+GitHub Actions is the default runner. If the Actions quota runs out,
+the maintainer may choose the local gates instead, provided they are
+equivalent: the same subcommands at the same commit, on each OS and
+architecture of the runner list below. The evidence is one recorded run
+per platform (command, commit, platform, output digest) under the PR's
+Evidence section, and a platform that no local run covered is named
+there as not covered. Build provenance is the one thing a local run
+cannot produce, because the attestation is signed with the Actions
+runner's identity: local gates qualify a merge, and a release still
+needs Actions (S1, S2).
+
 | Step | Command | In `fast` |
 |---|---|---|
 | format, vet | `gofmt -l` empty; `go vet ./...` | yes |
-| generated | `tools/ci generated`: `go generate ./...` leaves no diff (schemas, reference docs, errors, exit codes, spec field and rule tables, CODEOWNERS, vocabulary denylist, state-machine tests) | yes |
-| lint | `golangci-lint run` over the whole module, `tools/` included | yes |
+| generated | `tools/ci generated`: `go generate ./...` leaves no diff (every consumer in the table of [12 12.3](12-engineering.md#123-generators): schemas, reference docs with their front matter, errors, exit codes, spec field and rule tables, CODEOWNERS, vocabulary denylist, spell-check word list, ADR index, state-machine tests and diagrams) | yes |
+| lint | `golangci-lint run` over the whole module, `tools/` included; its configuration enables the doc-comment, error-string and commented-out-code checkers (ADR 0001 rule 14) | yes |
 | unit | `go test ./internal/... ./tools/...` | yes |
-| hygiene | `tools/ci hygiene`: no U+2014; the prose rules and `TODO(#<issue>)` form of ADR 0001 (rules 4, 14); no personal absolute paths; forbidden-name denylist stored as sha256 of lowercased tokens (with a self-test); scans `e2e/testdata/sbx/**` too | yes |
-| sequences | `tools/ci sequences`: ADR numbers contiguous and unique; ADR layout and statuses per ADR 0001 (rules 6-7); every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; spec section, invariant, probe, question and journey ids unique; every referenced id and journey range (for example "J1-J13" in a success criterion) exists | yes |
+| hygiene | `tools/ci hygiene`: no U+2014; the prose rules and `TODO(#<issue>)` form of [ADR 0001, the documentation standard](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md) (rules 4, 14); no personal absolute paths; the forbidden-name denylist (below); scans `e2e/testdata/sbx/**` too | yes |
+| sequences | `tools/ci sequences`: ADR numbers contiguous and unique; ADR layout and statuses per ADR 0001 (rules 6-7); every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; every ADR that `docs/spec.md` or `docs/spec/` cites has status Accepted; spec section, invariant, probe, question and journey ids unique; every referenced id and journey range (for example "J1-J13" in a success criterion) exists | yes |
 | vocabulary | `tools/ci vocabulary` (01 1.7) | yes |
+| workflows | `tools/ci workflows`: every `run:` step in `.github/workflows/*.yml` is one `go run ./tools/ci <subcommand>` or `go run ./tools/release <subcommand>` call; every `uses:` is pinned by commit SHA | yes |
 | vulnerabilities | `govulncheck ./...` | |
 | unit + golden + race | `go test -race -coverprofile=cover.out ./...` | |
 | coverage | `tools/ci coverage` (S9) | |
@@ -81,9 +103,9 @@ runs the `fast` subset. Actions are pinned by commit SHA.
 | mise | `tools/ci mise` (`julieta lock --check` logic on this repo's and the examples' locks) | |
 | probes | `tools/ci probes` (11 11.4) | |
 | license | `reuse lint` (REUSE 3.3) | |
-| docs | `tools/ci docs` (S10; `--help` output vs `docs/reference/`; the checks ADR 0001 assigns to it: rules 1, 5, 12, 13, 17, 20) | |
-| lessons | `tools/ci lessons`: every `docs/lessons.md` entry names an existing `tools/ci` subcommand or test name, or says "no check possible: <reason>" | |
-| pr | `tools/ci pr` (pull requests only; reads the event payload, 12 12.4) | |
+| docs | `tools/ci docs` (S10; `--help` output vs `docs/reference/`; the checks ADR 0001 assigns to it: rules 1, 5 without external URLs, 12, 13, 17, 20) | |
+| lessons | `tools/ci lessons`: every `docs/lessons.md` entry, read after the file's front matter, names an existing `tools/ci` subcommand or test name, or says "no check possible: <reason>" | |
+| pr | `tools/ci pr` (pull requests only; reads the event payload, 12 12.4; ADR 0001 rules 4, 8, 11) | |
 
 Runners: `ubuntu-latest`, `ubuntu-24.04-arm`, an Intel macOS runner (the
 label is verified to exist and to report `x86_64` in the `ci-bootstrap`
@@ -93,6 +115,25 @@ task) and `macos-latest` (arm64).
 of `all`: it runs in the final plan task and in `release.yml`, and its
 unit tests use a recorded API fixture.
 
+`tools/ci links` needs the network too: it fetches every external URL
+the docs cite (ADR 0001 rule 5). It is not part of `all`; the scheduled
+`links.yml` calls it, and so can a developer. Relative links and
+anchors stay in `tools/ci docs`, offline.
+
+The forbidden-name denylist lists names this repository must not
+contain. An entry is the length and the sha256 of the lowercased name,
+never the name; `tools/ci hygiene` hashes each lowercased substring of
+that length in the tracked files and fails on a match, so a name inside
+a path or a longer word is caught too. `tools/ci pr` applies the same
+list to the PR title, body, branch name and commit messages. The
+self-test plants a made-up name in a fixture and expects the failure.
+What the hash buys is small, and we say so: an unkeyed hash of a short,
+guessable name hides nothing from someone who guesses the name and
+hashes it. It only keeps the plaintext out of the tree, so a search of
+the repository does not find it. We accept a plain hash and reject a
+keyed HMAC, because the key would be a CI secret that a local run does
+not have, and the gate would stop being the same check locally.
+
 `release.yml` on tag `v*`: runs `ci`; `tools/release` builds julieta
 linux binaries, embeds them, the kits and the catalog into romeu, builds
 romeu for darwin, writes archives and `checksums.txt`, attests with
@@ -101,14 +142,15 @@ romeu for darwin, writes archives and `checksums.txt`, attests with
 `tools/ci acceptance`, generates the release notes (12 12.6), then
 creates the GitHub release.
 
-`ci-bootstrap` (first plan task): a green workflow on the public repo,
-proving runners, labels and permissions, plus the day-one middleware of
+`ci-bootstrap` (first plan task): `tools/ci hygiene` with the
+forbidden-name denylist lands first, so it reads each later commit of
+the task; then a green workflow on the public repo, proving runners,
+labels and permissions, plus the day-one middleware of
 [12 12.3](12-engineering.md#123-generators) and
 [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change).
-If Actions cannot run, interim evidence is a recorded local
-`go run ./tools/ci all` (command, commit, output digest) in
-`docs/acceptance.json`, marked interim; S2 still requires a real green
-run for release.
+If Actions cannot run, the local gates above stand in, and the
+criterion's evidence in `docs/acceptance.json` is the recorded local
+run, marked interim; S2 still requires a real green run for release.
 
 ## 10.3 Fake sbx fidelity contract
 

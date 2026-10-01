@@ -12,6 +12,9 @@ becomes one, and a spec change that reverses one adds an ADR that
 supersedes it ([12 12.5](spec/12-engineering.md#125-decisions-and-history)).
 Every document follows the documentation standard of
 [ADR 0001](adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md).
+That record is Proposed. The spec is written as if it were Accepted,
+and its acceptance comes before the plan's first task
+([10 10.2](spec/10-testing-style.md#102-ci), the `sequences` check).
 
 romeu e julieta organizes development environments built on Docker
 Sandboxes (`sbx`). **romeu** runs on the host: a deterministic,
@@ -123,7 +126,9 @@ and verified by `go run ./tools/ci acceptance`, the last plan task.
   - Scaffold with `go run ./tools/new ...` and regenerate with
     `go generate ./...`; the tracked pre-push hook runs
     `go run ./tools/ci fast`; run `go run ./tools/ci all` before opening
-    a PR; review golden diffs.
+    a PR; review golden diffs. Every gate CI runs also runs locally,
+    from the same `tools/ci` code
+    ([10 10.2](spec/10-testing-style.md#102-ci)).
   - English, Conventional Commits, no em dash character, SPDX headers;
     commit, PR, issue and review text follow the text standard
     ([12 12.7](spec/12-engineering.md#127-text-standard-and-lessons)).

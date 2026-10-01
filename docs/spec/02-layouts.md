@@ -49,7 +49,7 @@ romeu-e-julieta/
 ├─ examples/                   example config repo (projects/*.yaml, kits/) used by tests and docs (CC0-1.0)
 ├─ e2e/
 │  ├─ *_test.go                //go:build e2e - git + docker, fake sbx
-│  ├─ scenarios/               journey scenario functions shared by the CI and host suites
+│  ├─ scenarios/               journey scenario functions shared by the CI and host suites; commands.yaml, each journey's command lines (one source for scenarios and guides)
 │  ├─ host/*_test.go           //go:build host - real sbx, maintainer only
 │  ├─ probes/                  host probe harness (go run ./e2e/probes): pure core + thin sbx exec layer
 │  ├─ fakesbx/                 fake sbx that replays recorded sessions only
@@ -65,6 +65,7 @@ romeu-e-julieta/
 │  ├─ reviews/                 review rounds of the specification (history)
 │  ├─ adr/                     decisions (adr-tools layout, .adr-dir -> docs/adr); immutable once accepted
 │  ├─ guide/                   one page per journey
+│  ├─ spelling/                spell-check word lists: vocabulary.txt (generated from the vocabulary table), accepted.txt (hand-written)
 │  ├─ reference/               generated: one page per command and per file format, errors.md, exit-codes.md
 │  ├─ probes/                  committed probe-result.v1 files (blocks A, B and C)
 │  ├─ acceptance.json          evidence per success criterion (acceptance.v1)
@@ -72,7 +73,7 @@ romeu-e-julieta/
 ├─ .githooks/pre-push          runs go run ./tools/ci fast
 ├─ .github/ask-first.yaml      the single list of ask-first paths (05 5.3)
 ├─ .github/CODEOWNERS          generated from ask-first.yaml
-├─ .github/workflows/ci.yml, release.yml, fuzz.yml (scheduled)
+├─ .github/workflows/ci.yml, release.yml, fuzz.yml (scheduled), links.yml (scheduled; external links)
 ├─ .github/pull_request_template.md   Why / What changed / Evidence / Middleware / Lessons
 ├─ COPYING (with the first code change), REUSE.toml, LICENSES/, README.md, SECURITY.md
 ```
