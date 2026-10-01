@@ -118,8 +118,8 @@ blocks" lists what can proceed while a block is waited for.
   `tools/ci` checks that 10 10.2 lists and `ci-bootstrap` does not:
   each lands with the first code it checks, and `ci-release` keeps the
   ones with no earlier input. The specification says `ci-release`
-  holds "the remaining" checks (12 12.2), which this reading fits; it
-  is question 2 under
+  holds "the remaining" checks (12 12.2), which this reading fits; the
+  maintainer confirmed it as question 2 under
   [Questions for the maintainer](#questions-for-the-maintainer).
 - **Scenarios grow with the commands.** The task that adds a
   host-facing command adds its journey's scenario function and its
@@ -295,7 +295,7 @@ the specification first. No task here carries it; it is question 13.
 
 | Phase | Tasks | Modules | Checkpoint: what must be true before the next phase |
 |---|---|---|---|
-| 0 Bootstrap | T001 to T006 | `ci-bootstrap` | C0: the hook and CI run the same `tools/ci`; the rulesets refuse the sandbox's token (O1, O2); a pull request without its sections fails `pr`. One network step belongs here: the sandbox that builds T012 and T013 must reach the registry that holds the pinned images and the release API (`api.github.com`), which a default-deny sandbox does not, so the maintainer runs one `sbx policy allow network` command scoped to that sandbox (`--sandbox`) with every host in it, exact hosts and no wildcard, after reading the list the agent that writes T012 names. The maintainer answers questions 3 to 9 here; question 1 comes before the first task and question 2 before T002 |
+| 0 Bootstrap | T001 to T006 | `ci-bootstrap` | C0: the hook and CI run the same `tools/ci`; the rulesets refuse the sandbox's token (O1, O2); a pull request without its sections fails `pr`. One network step belongs here: the sandbox that builds T012 and T013 must reach the registry that holds the pinned images and the release API (`api.github.com`), which a default-deny sandbox does not, so the maintainer runs one `sbx policy allow network` command scoped to that sandbox (`--sandbox`) with every host in it, exact hosts and no wildcard, after reading the list the agent that writes T012 names. Questions 1 and 2 are answered. The maintainer answers questions 3 to 9 here |
 | 1 The skeleton and the probe harness | T007 to T020 | `termsafe`, `romeu-cli`, `julieta-core`, `ci-release`, `kits`, `probes`, `canon` | C1: both binaries print `version` on the four runners; the handshake passes on the synthetic session; the harness passes `tools/ci all` before any host run (11, opening). Then block O3 |
 | 2 First build layer | T021 to T025 | `spec`, `gitsafe`, `signing` | C2: block A results from both hosts are merged (T026), and `tools/ci probes` passes on them |
 | 3 Block A applied; second layer | T026 to T035 | `probes`, `gitsafe`, `sbxdrv`, `romeu-cli`, `catalog`, `oci`, `state`, `memstore` | C3: the handshake passes on the recorded session on both Linux runners |
@@ -2692,9 +2692,11 @@ the first task that waits for the answer.
 1. **The plan's place** (index, 02 2.1). Needed before: now, with this
    page. The specification says "first plan task" and "last plan task",
    and names no path, format or task shape for the plan; the tree of 02
-   2.1 has no entry for it.
+   2.1 had no entry for it.
    Recommendation: Accept `docs/plan.md` as one page and add it to the
    tree of 02 2.1.
+   Answered (maintainer, 2026-10-01): accepted - `docs/plan.md` as one
+   page, added to the tree of 02 2.1.
 
 2. **Where the checks land** (12 12.2, 10 10.2). Needed before: T002.
    The checks of 10 10.2 that `ci-bootstrap` does not list (`coverage`,
@@ -2707,6 +2709,8 @@ the first task that waits for the answer.
    asks each task to pass `all` with its tags in place. The module
    column of T010 and T011 stays `ci-release`, where 12 12.2 puts the
    check, whenever the task lands.
+   Answered (maintainer, 2026-10-01): each check lands with its first
+   input.
 
 3. **The pieces that land early** (12 12.2, 04 4.1, 10 10.6, 06 6.1, 11
    11.1, 02 2.1, 10 10.2). Needed before: T008. The map puts the error
@@ -2788,11 +2792,11 @@ the first task that waits for the answer.
    maintainer is the bypass actor, and a direct push to `main` is public
    before any check reads it; the recordings hold output of the
    maintainer's real host. The plan also adds to the recorder (T018) a
-   filter that keeps real values only for its own sandboxes and env
-   dirs in a listing and gives every other row typed placeholders, a positive scrub of the host's own identifiers, wider than
-   the four 10 10.3 names, and typed parsers for the git config, the
-   trust settings and the key listing, which change what A1 and A12
-   record (11 11.1).
+   filter that keeps real values only for its own sandboxes and env dirs
+   in a listing and gives every other row typed placeholders, a positive
+   scrub of the host's own identifiers, wider than the four 10 10.3
+   names, and typed parsers for the git config, the trust settings and
+   the key listing, which change what A1 and A12 record (11 11.1).
    Recommendation: A pull request from a branch pushed through the hook,
    as this plan has it, and one line in 11 that says so; and the
    recorder's filter, scrub and typed parsers named in 10 10.3's

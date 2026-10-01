@@ -65,6 +65,7 @@ romeu-e-julieta/
 │  └─ kitpin/                  rewrites pinned versions/digests across kits
 ├─ docs/
 │  ├─ spec.md, spec/           this specification (current state)
+│  ├─ plan.md                  the build plan, as one page
 │  ├─ reviews/                 review rounds of the specification (history)
 │  ├─ adr/                     decisions (adr-tools layout, .adr-dir -> docs/adr); README.md is the generated index; an ask-first surface
 │  ├─ guide/                   one page per journey
