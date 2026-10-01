@@ -499,9 +499,10 @@ once:
 - every `## J<n>` heading of 09 is named by the `journey:` of at least
   one page under `docs/guide/` (S10);
 - each block B result counts for v1.0.0: between the candidate's
-  commit, which B1's result of the same host records, and the v1.0.0
-  tag, the only paths that differ are under `docs/` or are Markdown
-  files at the repository root (11 11.2).
+  commit, which every block B result records, and the v1.0.0 tag, the
+  only paths that differ are under `docs/` or are Markdown files at
+  the repository root (11 11.2); results of one host that name
+  different candidates fail.
 
 `--file` validates any `acceptance.v1` file, so an operator keeps
 their own acceptance file (for example `julieta memory verify` per

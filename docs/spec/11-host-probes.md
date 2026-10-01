@@ -81,9 +81,11 @@ B5's is the S8 bound. Each writes a `probe-result.v1` file,
 artifact whose sha256 the result records, and the result has one
 observation per journey. That artifact is
 `docs/probes/B3-<host>-test.json`, one JSON object per line, written
-through the recorder's redaction (10 10.3) before it is hashed. B1's
-result has two more observations: the candidate's tag and the commit
-that tag names, which is the release it installed. Block B records
+through the recorder's redaction (10 10.3) before it is hashed. Every
+block B result, the sandbox-side checks included, carries two more
+observations: the candidate's tag and the commit that tag names,
+copied by the harness from the release B1 installed in the same run.
+Block B records
 nothing under `e2e/testdata/`; its outputs are the results and
 artifacts under `docs/probes/`, so committing them does not break the
 rule below.
@@ -97,8 +99,9 @@ metrics do not count a prerelease as a deployment (12 12.10). A result
 measured on the candidate counts for v1.0.0 when, from the candidate's
 commit to the v1.0.0 tag, the only paths that differ are under `docs/`
 or are Markdown files at the repository root. The candidate's commit
-is the one B1's result of the same host records, not the result's own
-`commit`, which names the checkout the harness ran from.
+is the one each block B result records, not the result's own
+`commit`, which names the checkout the harness ran from; results of
+one host that name different candidates fail.
 `tools/ci acceptance` checks that for each block B
 result ([10 10.5](10-testing-style.md#105-acceptance-evidence)). Any
 other change, a fix to a kit or to the catalog included, needs a new
@@ -111,8 +114,9 @@ second build the same as the first, and a change to any of them fails
 the rule. So after the v1.0.0 tag the maintainer runs B1 once more, on
 v1.0.0 and on one host, before the acceptance commit (12 12.2). That
 run's `--out` is a directory outside the repository, so the candidate's
-B1 result stays; its output goes under the Evidence of the acceptance
-PR and is **[review]**.
+B1 result stays: the run is not a block B result of a candidate, and
+the comparison above does not read it. Its output goes under the
+Evidence of the acceptance PR and is **[review]**.
 
 **Sandbox-side checks.** Five checks run inside a sandbox. They are
 part of block B and of its sitting: the same harness runs them through

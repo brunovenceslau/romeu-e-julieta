@@ -45,6 +45,18 @@ mechanism added.
 | B8 `tools/ci acceptance` ran the argv of a tracked file on no ask-first surface | A | `docs/acceptance.json` is on the `checks` globs (05 5.3) |
 | B-info herdr: who checks that the digest matches the bytes | A | `tools/kitpin` takes the digest without downloading, so the build's `sha256sum -c` is that check, and it fails closed (06 6.4) |
 
+The re-audit then confirmed the five fixes that had to be made. It
+closed three and left two partial, each a gap inside the fix. Both are
+the re-audit's findings too:
+
+| Finding | Status | Resolution |
+|---|---|---|
+| M5, confirmation (Medium) results of an older candidate passed `acceptance` beside a newer B1 of the same host | A | every block B result, the sandbox-side checks included, carries the candidate's tag and commit, copied by the harness from the release B1 installed in the same run; results of one host that name different candidates fail. No field is added. The run of B1 on v1.0.0 is not a block B result of a candidate, and the comparison does not read it (11 11.2, 10 10.5) |
+| M2, confirmation (Medium) S1's asset list had no evidence kind | L | no kind is added: S1's evidence is the `ci-run` of `release.yml`, whose `success` conclusion is the evidence that the assets exist, and the asset list itself is **[review]** under the acceptance PR's Evidence (index, S1) |
+
+The two rows replace what the M5 and M2 rows above say about B1's
+result alone and about the asset list read through the API.
+
 Two notes on what the fixes touch elsewhere:
 
 - M1 adds to round 6's count of what was added: the `README.md`
@@ -59,7 +71,7 @@ The maintainer has not ruled on these. The next review should look at
 each:
 
 - The name of B3's artifact, `docs/probes/B3-<host>-test.json` (A3).
-- B1's candidate tag and commit are two observations of its result,
+- The candidate's tag and commit are two observations of a result,
   so the `probe-result.v1` format gains no field (M5).
 - The run of B1 on v1.0.0 writes outside the repository, so that it
   does not replace the candidate's B1 result, and its output is
@@ -107,7 +119,8 @@ that is built changed in between"; the gate 1 check at step 9 of
 `sync`; "acceptance evidence" in the `docs` row.
 
 Added, counted as the index asks: two rows of the generation machine;
-one maintainer step, B1 on v1.0.0; two observations in B1's result;
+one maintainer step, B1 on v1.0.0; two observations in each block B
+result;
 one glob on the `checks` surface; the `README.md` skeleton in
 `ci-release`. No package, command, file format field or check
 subcommand is new.

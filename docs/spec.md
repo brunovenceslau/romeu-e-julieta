@@ -138,7 +138,7 @@ block B are measured on the release candidate and count for v1.0.0
 
 | ID | Criterion | Evidence |
 |---|---|---|
-| S1 | v1.0.0 released: `romeu` darwin/amd64 + darwin/arm64, `julieta` linux/amd64 + linux/arm64, `checksums.txt`, build provenance attestations | release asset list, read through the GitHub API; a `ci-run` of `release.yml` on the tagged commit, whose `tools/release verify` step runs `gh attestation verify --signer-workflow .../release.yml` on each archive (10 10.2) |
+| S1 | v1.0.0 released: `romeu` darwin/amd64 + darwin/arm64, `julieta` linux/amd64 + linux/arm64, `checksums.txt`, build provenance attestations | a `ci-run` of `release.yml` on the tagged commit, whose `tools/release build` step wrote the archives and `checksums.txt`, whose attestation step signed them, and whose `tools/release verify` step ran `gh attestation verify --signer-workflow .../release.yml` on each archive (10 10.2); a `success` conclusion is the evidence that the assets exist, and the asset list itself is **[review]** under the acceptance PR's Evidence |
 | S2 | CI on GitHub Actions green on the release commit (all jobs, all runners in 10.2) | workflow run id with conclusion `success` |
 | S3 | local v3 kits (`julieta`, `julieta-claude`, `os-base`, `git-ssh-sign`) build and start a sandbox on both sandbox arches: linux/amd64 on an Intel Mac host and linux/arm64 on an Apple silicon Mac host | probe results `docs/probes/B2-<host>.json` from both hosts |
 | S4 | the egress catalog covers every `backend:tool` in the reference config repo's projects | a `ci-run` item that names the config repo and its run: `julieta spec validate --catalog projects/*.yaml` exits 0 there, and it exits 1 on an unknown |
