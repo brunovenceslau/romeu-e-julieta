@@ -4,7 +4,7 @@ Date: 2026-09-30
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -210,7 +210,21 @@ not a permanent state.
    ruleset for the review.
 9. **[review]** Every decision that is expensive to reverse gets an
    ADR, with the alternatives considered and, for any borrowed pattern,
-   its source and why it fits this project.
+   its source and why it fits this project. A new record's title starts
+   with a verb, not with an acronym or a name, so that the lowercased
+   first letter of the check below reads correctly. **[check]** For
+   each record, the first `ADR` plus that record's four-digit number in
+   a file starts an inline link to the record's file under `docs/adr/`,
+   whose text is that mention, a comma, a space and the record's title
+   with its first letter lowercased (a line break and the indentation
+   after it count as one space); a later mention may be the number
+   alone. A first mention in a heading, in front matter or inside
+   another link's text fails, and so do a number with no record and a
+   plural form (`ADRs` plus a four-digit number): name each record. The
+   check reads the Markdown files of rule 1's path set, `README.md` and
+   the records in `docs/adr/`, skips code spans and fenced blocks
+   throughout, and exempts a record's own number in its own file.
+   Owner: `tools/ci docs`.
 10. **[check]** Reference pages are generated from their single source
     (12 12.3), carry a generated-file header and the front matter of
     rule 1, both written by the generator, and are never hand-edited;
@@ -349,8 +363,8 @@ not reserve the number for anything else.
 ## Consequences
 
 - Most of the standard becomes a failing check instead of a review
-  comment. Reviews get shorter and spend their time on rules 2, 3, 9,
-  15, 16, 18 and 19 and the review halves of rules 12 and 17, which
+  comment. Reviews get shorter and spend their time on rules 2, 3,
+  15, 16, 18 and 19 and the review halves of rules 9, 12 and 17, which
   only judgment can cover.
 - `tools/ci docs`, `tools/ci hygiene`, `tools/ci sequences` and
   `tools/ci pr` grow, and `tools/ci links` is new. Markdown lint, link
@@ -385,6 +399,3 @@ not reserve the number for anything else.
 - Rule 19 cannot be checked. A page can pass every check and still read
   like a form; the voice line that rule 19 adds to the rule 18 review
   report is the only guard, and we accept that.
-- This record stays Proposed until the maintainer signs it off (rule
-  8). What holds until then, and what follows if it is declined, is
-  Q24 in the spec's [Open questions](../spec.md#open-questions).

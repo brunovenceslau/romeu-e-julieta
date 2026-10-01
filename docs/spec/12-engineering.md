@@ -140,7 +140,7 @@ approval line.
 
 A generated `docs/reference/` page carries a generated-file header and
 the front matter of rule 1 in
-[ADR 0001, the documentation standard](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
+[ADR 0001, adopt a documentation standard with checkable rules and a voice](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
 (`type: reference`, `reader:`), both written by its generator.
 
 `go run ./tools/new <kind> <name>` scaffolds with the next free id.
@@ -221,8 +221,9 @@ must have that form; a merge commit's subject is not checked.
   Layout, sections, statuses, supersede links and sign-off follow
   [ADR 0001](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
   (rules 6-9); `tools/ci sequences` checks layout, statuses and links,
-  and `tools/ci pr` checks the approval line that each ADR change
-  needs (12.4).
+  `tools/ci docs` checks that a file cites a record by its title at its
+  first mention (rule 9), and `tools/ci pr` checks the approval line
+  that each ADR change needs (12.4).
 - An accepted ADR is not rewritten. A spec change that reverses a
   decision adds a new ADR that supersedes the old one, and the old ADR
   gains only its `Superseded by` status line. No check compares an

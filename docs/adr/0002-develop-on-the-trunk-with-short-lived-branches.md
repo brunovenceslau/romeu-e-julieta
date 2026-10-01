@@ -4,7 +4,7 @@ Date: 2026-10-01
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -116,6 +116,3 @@ is the cheapest one.
 - With no stacking, a change that depends on an unmerged pull request
   waits for it. With one reviewer that wait is real, and ADR 0004
   measures it.
-- This record stays Proposed until the maintainer signs it off. What
-  holds until then is Q24 in the spec's
-  [Open questions](../spec.md#open-questions).

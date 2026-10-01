@@ -4,7 +4,7 @@ Date: 2026-10-01
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -78,7 +78,7 @@ We decide at the last responsible moment:
 4. **When the event happens, the decision is made** and the row
    leaves the table. If the decision is expensive to reverse, it
    becomes an ADR
-   ([ADR 0001, the documentation standard](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md),
+   ([ADR 0001, adopt a documentation standard with checkable rules and a voice](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md),
    rule 9).
 
 The principle is in the spec's
@@ -109,6 +109,3 @@ one review round into a rule the next contributor can read.
 - If someone checks a copy of either book and finds that it says
   something else, the correction is a new record that supersedes this
   one.
-- This record stays Proposed until the maintainer signs it off. What
-  holds until then is Q24 in the spec's
-  [Open questions](../spec.md#open-questions).
