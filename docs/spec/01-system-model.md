@@ -211,11 +211,13 @@ A generation is one sandbox lifetime, identified by a ULID.
 | From | Event | To | Effect |
 |---|---|---|---|
 | (none) | `run` finds the sandbox absent and is about to create it | open | record id, recreate digest, workspace path, the repo set, written before `sbx env run` |
-| open | the `sbx env run` of that same command returns non-zero | (none) | the record just written is removed |
+| open | the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows no sandbox | (none) | the record just written is removed; exit 1 |
+| open | the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows the sandbox | open | the record is kept; exit 1 |
 | (none) | `adopt` on TTY, workspace path matches | open | record as above with `adopted: true` and an unknown recreate digest |
 | open | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half | salvaging | new salvage id |
 | salvaging | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command was interrupted or failed) | salvaging | new salvage id |
 | open | `salvage --from-host` | open | refs and snapshot bundles imported under a new salvage id; salvage record `result: lost`, `reasons: [sandbox-lost]` |
+| salvaging | `salvage --from-host` | salvaging | as the open row |
 | salvaging | salvage verified; command was `salvage` | open | salvage record `result: complete` |
 | salvaging | salvage incomplete, no `--accept-loss` | open | salvage record `result: incomplete` with reasons; exit 5 |
 | salvaging | salvage complete or `--accept-loss`; command removes the sandbox | closed-removed | `sbx env rm`, egress rules removed |

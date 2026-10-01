@@ -86,9 +86,11 @@ signature; each is marked immutable; the release API returns a sha256
 digest for each asset; and the release workflow has no signing or
 build-attestation step. So the pin is a version and a sha256 per
 architecture, and `go run ./tools/kitpin herdr <version>` writes both:
-it takes each hash from the release API's digest and refuses a release
-that is not marked immutable. The kit's install step checks the
-download against that hash. What the hash does not prove is a residual
+it takes each hash from the release API's digest, without downloading
+the binary, and refuses a release that is not marked immutable. The
+kit's install step checks the download against that hash with
+`sha256sum -c`, which is therefore the check that the digest matches
+the bytes; it fails closed. What the hash does not prove is a residual
 risk ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1)).
 mise's pin, which has a signed checksum file, is in
 [07 7.4](07-mise-egress.md#74-mise-bootstrap-and-its-own-egress).

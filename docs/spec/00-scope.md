@@ -76,7 +76,7 @@ is marked v1.1.
 | attestations | S1 |
 | `julieta pin check` | pin determinism (principle) |
 | `julieta layout up --dry-run` | golden tests of the herdr requests |
-| `julieta memory import`, `julieta memory verify`, and `tools/ci acceptance --file` with the `repo` evidence kind | adopting v1 with memory that already exists: the maintainer decided that memory entries written before v1 are imported when v1 is adopted, once, and that the import is verified from the operator's own acceptance file (10 10.5) |
+| `julieta memory import`, `julieta memory verify`, and `tools/ci acceptance --file` with the `repo` evidence kind | adopting v1 with memory that already exists: the maintainer decided that memory entries written before v1 are imported when v1 is adopted, once, and kept `tools/ci acceptance --file` with the `repo` kind for verifying that import (10 10.5) |
 | `julieta handoff list` | seeing which handoffs a repo holds, from inside the sandbox; kept in v1 by the maintainer |
 | generators and `go generate` | the middleware principle; S10 |
 | v1.1 | listing sbx's native egress approval queue in `status`; `romeu handoff --list` filters; Remote-SSH helper command; an explicit registry credential (Q23) |

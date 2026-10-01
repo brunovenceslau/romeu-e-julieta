@@ -150,7 +150,7 @@ local-gate run is recorded is a
 | generated | `tools/ci generated`: `go generate ./...` changes no consumer of the table in [12 12.3](12-engineering.md#123-generators). It compares the working tree, tracked and untracked files by content, before and after the run, so a changed, a new and a removed generated file each fail and a tree with uncommitted work can be checked. A generated file that exists and is not tracked passes locally and fails in CI, whose checkout holds no untracked file | yes |
 | lint | `golangci-lint run` over the whole module, `tools/` included; `.golangci.yml` enables the doc-comment, error-string and commented-out-code checkers of ADR 0001 (rule 14), and a fixture test proves it still does (10.1) | yes |
 | unit | `go test ./internal/... ./tools/...` | yes |
-| hygiene | `tools/ci hygiene`: no U+2014; the prose rules of ADR 0001 (rule 4); the `TODO(#<issue>)` form in Go files (rule 14); no personal absolute path (below); no tracked `go.work`, `go.work.sum` or `vendor/`; `.githooks/pre-push` tracked with mode 100755; the forbidden-name check over the path and content of each tracked file, which fails on a denylist that is missing or has no entry (below); scans `e2e/testdata/sbx/**` too | yes |
+| hygiene | `tools/ci hygiene`: no U+2014; the prose rules of ADR 0001 (rule 4); the `TODO(#<issue>)` form in Go files (rule 14); no personal absolute path (below); no tracked `go.work`, `go.work.sum` or `vendor/`; `.githooks/` holds exactly `pre-push`, tracked with mode 100755; the forbidden-name check over the path and content of each tracked file, which fails on a denylist that is missing or has no entry (below); scans `e2e/testdata/sbx/**` too | yes |
 | pushed range | `tools/ci fast` with the pre-push hook's arguments: the forbidden-name check over the remote ref names and the commits of a push (below) | in the hook only |
 | sequences | `tools/ci sequences`: ADR numbers contiguous and unique; ADR layout and statuses per ADR 0001 (rules 6-7), the filename compared through the `slug` function `tools/new adr` uses; every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; every ADR that `docs/spec.md` or `docs/spec/` cites has status Accepted; every row of the index's Deferred decisions table has its three cells filled ([ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md)); the ids below unique, and every referenced id and id range (for example "J1-J13" in a success criterion) defined | yes |
 | vocabulary | `tools/ci vocabulary` (01 1.7) | yes |
@@ -166,7 +166,7 @@ local-gate run is recorded is a
 | invariants | `tools/ci invariants` (the guard and test tags found in the code pair up, and each tagged id is a row of 05 5.2; that each row has both is checked by `acceptance`, 10.5) | |
 | mutation | `tools/ci mutate` on PRs touching a `.go` file on a path in `.github/ask-first.yaml`; the scheduled `fuzz.yml` runs it too | |
 | catalog | `tools/ci catalog` (explicit upload flags, key syntax) | |
-| kits | `tools/ci kits` (one frontend pin; install steps <= 5 lines; every download has a sha256: a download is a step line whose first word is `curl` or `wget`, and the same step has a `sha256sum -c` or `shasum -a 256 -c` line after it. A download written with another tool is not seen by the check; the review of the `kits` surface covers it) | |
+| kits | `tools/ci kits` (one frontend pin; install steps <= 5 lines; every download has a sha256: a download is a step line whose first word is `curl` or `wget`, and the same step has a `sha256sum -c` or `shasum -a 256 -c` line after it; a download line holds no `\|`, `;`, `&&` or `$(`, and the file `-c` reads is a kit file, not one the step downloaded. A download written with another tool is not seen by the check; the review of the `kits` surface covers it) | |
 | mise | `tools/ci mise` (`julieta lock --check` logic on this repo's and the examples' locks) | |
 | probes | `tools/ci probes` (11 11.4: the results that are committed, and the A5 golden hashes; that every probe has a result is checked by `acceptance`, 10.5) | |
 | license | `reuse lint` (REUSE 3.3) | |
@@ -375,42 +375,59 @@ step 2. The maintainer runs every item. The output of each goes under
 the Evidence of the PR it belongs to; no check reads that text, so it
 is **[review]**.
 
-The sitting starts before anything of step 1 is pushed. The agent that
-wrote step 1 does not push its branch. The maintainer fetches the
-branch from the sandbox into a plain clone on the host and reads its
-diff there before checking it out, because items a and b run code and
-a hook of that branch on the host, outside any sandbox and any agent
-session.
+The sitting starts with item a, before the sandbox that writes step 1
+receives its token, or at the latest before item b: until the rulesets
+exist, nothing refuses that token a push to the default branch, a push
+of a `v*` tag or a merge. Nothing of step 1 is pushed before the
+sitting. The agent that wrote step 1 does not push its branch. The
+maintainer fetches the branch from the sandbox into a plain clone on
+the host and reads its diff there before checking it out, because
+items b and c run code and a hook of that branch on the host, outside
+any sandbox and any agent session.
 
-- a. In that clone, run `go run ./tools/ci hygiene add` once for each
-  forbidden name, and commit `tools/ci/denylist.yaml`.
-- b. Enable the hook in that clone (`git config core.hooksPath
-  .githooks`), push the branch, so the hook reads the bootstrap
-  commits themselves (their messages, identities, paths and ref name),
-  and open step 1's PR.
-- c. Set the repository up and save the API's answer for each setting.
+- a. Set the repository up and save the API's answer for each setting.
   Two rulesets. On the default branch: changes arrive by pull request,
   with one approving review and a code-owner review; an approval is
   dismissed when a new commit is pushed, and the most recent
   reviewable push must be approved; a merge commit is the only merge
-  method; force pushes and deletion are refused. On tags matching
+  method; force pushes and deletion are refused; updates to the
+  default branch are restricted to the bypass actor, so a merge by any
+  other account is refused whether or not it is approved (a GitHub
+  behaviour that is not tested here). On tags matching
   `v*`: creation, update and deletion are refused. The maintainer is
   the one bypass actor of both. Two repository settings, which bind a
   bypass actor too: squash merging and rebase merging off, so every
   merge is a merge commit (12 12.9); and private vulnerability
-  reporting on, the channel `SECURITY.md` names (12 12.8).
+  reporting on, the channel `SECURITY.md` names (12 12.8). If GitHub
+  refuses a branch ruleset on a repository whose default branch does
+  not exist yet (not tested against GitHub), the maintainer creates
+  the repository with an empty initial commit first.
+- b. In that clone, run `go run ./tools/ci hygiene add` once for each
+  forbidden name, and commit `tools/ci/denylist.yaml`.
+- c. Enable the hook in that clone (`git config core.hooksPath
+  .githooks`), push the branch, so the hook reads the bootstrap
+  commits themselves (their messages, identities, paths and ref name),
+  and open step 1's PR.
 - d. From inside the sandbox, where the one credential is the
   sandbox's token, try four things with throwaway payloads and save
   the four refusals: a push of an empty commit to the default branch;
   a push of the tag `v0.0.0-try`; the merge of a throwaway pull
-  request, not step 1's; and a change to a ruleset. A try that is not
-  refused took effect. The maintainer undoes what can be undone (the
-  tag deleted, the merge reverted, the ruleset restored; an empty
-  commit stays and harms nothing), and the try is
-  [Q25](../spec.md#open-questions). If Q25's fallback is taken, the
-  four tries are repeated with the second account's token, and a fifth
-  with them: on a pull request the maintainer approved, push a commit
-  and try to merge, which the dismissed approval must refuse.
+  request, not step 1's; and a change to a ruleset. A refusal is
+  proved on the host, not by the sandbox's output: after the four
+  tries the maintainer checks from their own session that the default
+  branch head has not moved, that no `v0.0.0-try` tag exists, that the
+  throwaway pull request is not merged, and that each ruleset's JSON
+  equals the answer saved in item a. A try took effect when one of
+  those checks shows it, whatever the sandbox printed. The maintainer
+  undoes what can be undone (the tag deleted, the merge reverted, the
+  ruleset restored; an empty commit stays and harms nothing), and the
+  try is [Q25](../spec.md#open-questions). After the checks the
+  maintainer closes the throwaway pull request and deletes its branch.
+  If Q25's fallback is taken, the four tries are repeated with the
+  second account's token, and a fifth with them: on a pull request the
+  maintainer approved, push a commit and try to merge, which the
+  dismissed approval must refuse. The same host checks prove those
+  refusals.
 - e. After step 2: add the CI jobs of the green run to the
   default-branch ruleset as required status checks, and save the API's
   answer.
@@ -481,9 +498,10 @@ once:
   arch-sensitive (11 11.4);
 - every `## J<n>` heading of 09 is named by the `journey:` of at least
   one page under `docs/guide/` (S10);
-- each block B result counts for v1.0.0: between the result's `commit`
-  and the v1.0.0 tag, the only paths that differ are under `docs/` or
-  are Markdown files at the repository root (11 11.2).
+- each block B result counts for v1.0.0: between the candidate's
+  commit, which B1's result of the same host records, and the v1.0.0
+  tag, the only paths that differ are under `docs/` or are Markdown
+  files at the repository root (11 11.2).
 
 `--file` validates any `acceptance.v1` file, so an operator keeps
 their own acceptance file (for example `julieta memory verify` per

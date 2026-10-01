@@ -52,7 +52,9 @@ dir`, see J13).
 ### How `romeu sync` renders, gates and promotes
 
 1. Take the lock (runs promotion recovery). Load and validate host
-   settings (exit 2).
+   settings (exit 2). Check gate 1 (01 1.4; exit 3): `sbx version` is
+   a read, and 01 1.5 holds back only a mutating sbx call, so a stale
+   toolchain stops `sync` before it promotes.
 2. Hardened fetch of the config repo's origin into
    `refs/romeu/origin/<cfg-dir>/*`. The spec commit is the head of the
    config ref, or with `--from <sha>` that commit, which must be
@@ -83,8 +85,7 @@ dir`, see J13).
 8. Gate 2 and the candidate state machine
    ([01 1.6](01-system-model.md#candidate)); promotion commit on
    approval or when unchanged.
-9. The first sbx call of `sync` is here, so gate 1 is checked here
-   (01 1.4; exit 3). Then `sbx ls --json`. If the sandbox is running:
+9. `sbx ls --json`. If the sandbox is running:
    the rest of the preflight (01 1.5), then reconcile egress live; if the `secrets`
    field is tagged `apply:"live"` (A10, Q18), `sbx secret set <svc>
    --sandbox <name> --command <rendered command>` (never a value); report
@@ -108,7 +109,9 @@ dir`, see J13).
 3. If the sandbox is absent, record a new generation first (01 1.6).
    Then `sbx env run -d --clone <dir>` (never `--auto-approve`; sbx's
    own prompt appears in this terminal when needed). If sbx returns
-   non-zero on that create, remove the record just written and exit 1,
+   non-zero on that create, read `sbx ls --json`: with the sandbox
+   absent, remove the record just written; with it present, half
+   built, keep the open record. Exit 1 in both cases,
    so only a crash leaves a record without a sandbox, and the next
    `run` closes it as lost.
 4. Reconcile egress: `sbx policy allow network --sandbox <name> <d>` for

@@ -62,7 +62,7 @@ Module ids are stable; the plan selects work by them.
 
 | Module id | Responsibility | Depends on |
 |---|---|---|
-| `ci-bootstrap` | in this order ([10 10.2](10-testing-style.md#release-and-bootstrap)): one PR with `tools/ci hygiene`, the forbidden-name denylist, `tools/ci fast` and `.githooks/pre-push`, finished by the maintainer block (denylist entries, hook enabled, rulesets, the sandbox token's refusals); then `tools/ci workflows` and a green CI workflow on the public repo; then the day-one middleware: `tools/new adr`, `go generate` wiring and `tools/ci generated` (the ADR index and CODEOWNERS), `tools/ci sequences`, `tools/ci pr`, `.github/ask-first.yaml`, `ARCHITECTURE.md` and `CONTRIBUTING.md` skeletons (first task). A `tools/new` kind and a generator row land in the first PR of the module that owns their first input, not here | - |
+| `ci-bootstrap` | in this order ([10 10.2](10-testing-style.md#release-and-bootstrap)): one PR with `tools/ci hygiene`, the forbidden-name denylist, `tools/ci fast` and `.githooks/pre-push`, finished by the maintainer block (rulesets first, denylist entries, hook enabled, the sandbox token's refusals, checked on the host); then `tools/ci workflows` and a green CI workflow on the public repo; then the day-one middleware: `tools/new adr`, `go generate` wiring and `tools/ci generated` (the ADR index and CODEOWNERS), `tools/ci sequences`, `tools/ci pr`, `.github/ask-first.yaml`, `ARCHITECTURE.md` and `CONTRIBUTING.md` skeletons (first task). A `tools/new` kind and a generator row land in the first PR of the module that owns their first input, not here | - |
 | `probes` | probe harness (pure core + exec layer), `probe-result.v1`, redacted sbx recordings, `tools/ci probes` lifecycle | - |
 | `canon` | canonical JSON, typed domain-separated digests | - |
 | `spec` | project spec, run layout and host settings types with gate/apply tags; `rules.go`; strict decode; generated validators and schemas (`tools/schemagen`) | canon |
@@ -85,8 +85,8 @@ Module ids are stable; the plan selects work by them.
 | `ledger` | the runtime ledger ([13](13-runtime-ledger.md)): event schema and generated tables, julieta's emit and drain (`ledger/emit`) and `event` commands; romeu's spool reader, ingest, entries, view, `ledger` commands and doctor checks | spec, canon, catalog, memstore, julieta-core |
 | `kits` | `kits/*` sources, embedding, `tools/kitpin` | julieta-core |
 | `skills` | `skills/julieta`, `skills/handoff` | handoff, memstore |
-| `ci-release` | the remaining `tools/ci` checks, workflows, `tools/release` and release notes; `tools/ci dora` with its fixtures (12.10); `SECURITY.md`, in or before the PR that lands `tools/ci docs`, whose rule 20 check needs the page | all |
-| `docs` | README, guide, ADRs for the decisions in this spec, acceptance evidence; reference pages are generated | all |
+| `ci-release` | the remaining `tools/ci` checks, workflows, `tools/release` and release notes; `tools/ci dora` with its fixtures (12.10); `SECURITY.md`, in or before the PR that lands `tools/ci docs`, whose rule 20 check needs the page, and the `README.md` skeleton with the heading order of rule 12, since both put their heading lists in `tools/ci/headings.yaml`, which the rule of 11 11.2 does not let change after the candidate | all |
+| `docs` | README text, guide, ADRs for the decisions in this spec; reference pages are generated | all |
 
 "Depends on" is plan order between modules, not Go imports: the import
 rule is [10 10.7](10-testing-style.md#107-module-boundaries-enforced-by-toolsci-imports).
@@ -102,7 +102,9 @@ parallel with) `canon`, `spec`, `termsafe`, `gitsafe`, `signing` ->
 ledger) -> `kits`, `skills`
 -> `ci-release` -> the release candidate tag (maintainer) -> block B
 (acceptance on real hosts, with its sandbox-side checks) -> `docs` ->
-the v1.0.0 tag (maintainer) -> `tools/ci acceptance`. The two tags are
+the v1.0.0 tag (maintainer) -> B1 on v1.0.0, on one host (maintainer)
+-> `tools/ci acceptance`, which commits `docs/acceptance.json`. The two
+tags are
 maintainer steps because the tag ruleset refuses a `v*` tag from
 anyone else; what may change between them is in
 [11 11.2](11-host-probes.md#112-block-b---acceptance-on-real-hosts-last).
@@ -475,7 +477,8 @@ change and counts in no metric.
   `tools/release publish`; the tool computes the output and uploads it
   to that release as the asset `dora.json`, replacing one that is
   there. So each release holds the whole history up to itself, written
-  by the workflow. `dora.json` is a report, not a build output: it is
+  by the workflow; a prerelease's `dora.json` holds the history up to
+  the last deployment before it. `dora.json` is a report, not a build output: it is
   not in `checksums.txt` and has no attestation (S1 lists the build
   outputs).
 - Anyone can run the tool at any time and read stdout. Before the
