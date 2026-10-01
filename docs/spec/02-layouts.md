@@ -55,23 +55,23 @@ romeu-e-julieta/
 │  ├─ fakesbx/                 fake sbx that replays recorded sessions only
 │  └─ testdata/sbx/<version>/  redacted sbx help text and argv/stdout/stderr/exit sessions (*.jsonl)
 ├─ tools/
-│  ├─ ci/                      every check CI runs, and their committed data: denylist.yaml (forbidden names, hashed), testdata/
+│  ├─ ci/                      every check CI runs, and their committed data: denylist.yaml (forbidden names, hashed), prose.yaml, headings.yaml, testdata/
 │  ├─ new/                     scaffolding: adr, invariant, probe, kit, command, lesson
 │  ├─ schemagen/               reflect-based JSON Schema generator from the Go types and rules.go
-│  ├─ release/                 release subcommands: build (two stages), verify, notes, publish
+│  ├─ release/                 release subcommands (10 10.2)
 │  └─ kitpin/                  rewrites pinned versions/digests across kits
 ├─ docs/
 │  ├─ spec.md, spec/           this specification (current state)
 │  ├─ reviews/                 review rounds of the specification (history)
 │  ├─ adr/                     decisions (adr-tools layout, .adr-dir -> docs/adr); README.md is the generated index; an ask-first surface
 │  ├─ guide/                   one page per journey
-│  ├─ reference/               generated: one page per command and per file format, errors.md, exit-codes.md
+│  ├─ reference/               generated reference pages (12 12.3)
 │  ├─ probes/                  committed probe-result.v1 files (blocks A, B and C)
 │  ├─ acceptance.json          evidence per success criterion (acceptance.v1)
 │  └─ lessons.md               one entry per lesson, with the check that enforces it
-├─ .githooks/pre-push          runs go run ./tools/ci fast with git's arguments and stdin
+├─ .githooks/pre-push          mode 100755; runs go run ./tools/ci fast with git's arguments and stdin
 ├─ .golangci.yml               linter configuration (10 10.2, lint)
-├─ .github/ask-first.yaml      the single list of ask-first paths (05 5.3)
+├─ .github/ask-first.yaml      the single list of ask-first paths and their owner (05 5.3)
 ├─ .github/CODEOWNERS          generated from ask-first.yaml
 ├─ .github/workflows/ci.yml, release.yml, fuzz.yml (scheduled; long fuzz runs and tools/ci mutate)
 ├─ .github/pull_request_template.md   Why / What changed / Evidence / Middleware / Lessons

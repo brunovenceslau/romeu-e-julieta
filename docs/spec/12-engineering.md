@@ -48,6 +48,7 @@ E2E (host): go test -tags host -json ./e2e/host/... # maintainer machine only; r
 Fast:       go run ./tools/ci fast                  # what the pre-push hook runs; the hook adds the pushed range
 All checks: go run ./tools/ci all                   # what CI runs; CI adds the pr step on a pull request
 PR checks:  go run ./tools/ci pr <payload file>     # the pr step, on a saved pull request payload
+Denylist:   go run ./tools/ci hygiene add           # maintainer only, in a terminal; reads one forbidden name, echo off
 Probes:     go run ./e2e/probes --block A --out docs/probes/
 Release:    go run ./tools/release build --version v1.0.0 --dry-run
 ```
@@ -56,7 +57,7 @@ Module ids are stable; the plan selects work by them.
 
 | Module id | Responsibility | Depends on |
 |---|---|---|
-| `ci-bootstrap` | in this order ([10 10.2](10-testing-style.md#release-and-bootstrap)): one commit with `tools/ci hygiene`, the forbidden-name denylist, `tools/ci fast` and `.githooks/pre-push`, so an enabled hook reads each later push; then `tools/ci workflows` and a green CI workflow on the public repo; then the rest of the day-one middleware: `tools/new`, `go generate` wiring and `tools/ci generated`, `tools/ci sequences`, `tools/ci pr`, `.github/ask-first.yaml` with generated CODEOWNERS, `ARCHITECTURE.md` and `CONTRIBUTING.md` skeletons (first task) | - |
+| `ci-bootstrap` | in this order ([10 10.2](10-testing-style.md#release-and-bootstrap)): one PR with `tools/ci hygiene`, the forbidden-name denylist, `tools/ci fast` and `.githooks/pre-push`, finished by the maintainer block (denylist entries, hook enabled, rulesets, the sandbox token's refusals); then `tools/ci workflows` and a green CI workflow on the public repo; then the rest of the day-one middleware: `tools/new`, `go generate` wiring and `tools/ci generated`, `tools/ci sequences`, `tools/ci pr`, `.github/ask-first.yaml` with generated CODEOWNERS, `ARCHITECTURE.md` and `CONTRIBUTING.md` skeletons (first task) | - |
 | `probes` | probe harness (pure core + exec layer), `probe-result.v1`, redacted sbx recordings, `tools/ci probes` lifecycle | - |
 | `canon` | canonical JSON, typed domain-separated digests | - |
 | `spec` | project spec, run layout and host settings types with gate/apply tags; `rules.go`; strict decode; generated validators and schemas (`tools/schemagen`) | canon |
@@ -109,7 +110,7 @@ a diff. Nobody hand-edits a generated file.
 | `internal/state` transition tables | state-machine tests; the diagrams in `ARCHITECTURE.md` |
 | `.github/ask-first.yaml` | `.github/CODEOWNERS`, `docs/reference/ask-first.md`, the `mutate` trigger |
 | the vocabulary table (01 1.7) | the `tools/ci vocabulary` denylist |
-| ADR titles and statuses (`docs/adr/*.md`) | the ADR index `docs/adr/README.md` |
+| ADR titles and statuses (`docs/adr/NNNN-*.md`) | the ADR index `docs/adr/README.md` |
 
 A generated `docs/reference/` page carries a generated-file header and
 the front matter of rule 1 in
@@ -137,11 +138,21 @@ or produced this, and does it exist now?" is answered mechanically:
 | before push | tracked `.githooks/pre-push` runs `go run ./tools/ci fast` with git's pre-push arguments and stdin (contributors enable it with `git config core.hooksPath .githooks`; inside a sandbox, julieta's dispatcher runs it automatically and passes both through) | the steps marked in the `In fast` column of [10 10.2](10-testing-style.md#102-ci), and the forbidden-name check over the pushed ref names and commits |
 | every PR | `go run ./tools/ci all` in CI | the full list in [10 10.2](10-testing-style.md#102-ci) |
 | every PR | `tools/ci pr` reads the pull request event payload | the body has non-empty **Why**, **What changed**, **Evidence** and **Lessons** sections; a **Middleware** line of the form `check: <tools/ci subcommand or test>`, `generator: <tools/new kind or go:generate source>`, or `none: <reason>`; every changed golden listed under Evidence; an approval line (below) for each ask-first surface the diff touches, ADRs included (ADR 0001 rule 8); the title and the commit subjects in Conventional Commit form; the prose rules of ADR 0001 (rule 4) in the title, the body and the commit messages; the forbidden-name check ([10 10.2](10-testing-style.md#forbidden-names)) over the title, the body, the head ref name, and the message and added lines of each commit |
-| merge | branch protection | CI green; code-owner review for ask-first paths |
+| merge | the default-branch ruleset (below) | CI green; one approving review; code-owner review for ask-first paths |
 
-Each merge gate in this table also runs locally, from the same
-`tools/ci` code; how that is enforced, and when local runs may stand in
-for GitHub Actions, is in [10 10.2](10-testing-style.md#102-ci).
+The first three rows run locally, from the same `tools/ci` code; how
+that is enforced, and when local runs may stand in for GitHub Actions,
+is in [10 10.2](10-testing-style.md#102-ci). The ruleset is GitHub
+configuration and has no local form.
+
+**The rulesets.** No file in the repository sets them: the maintainer
+creates them in the maintainer block of `ci-bootstrap`
+([10 10.2](10-testing-style.md#release-and-bootstrap)), which also
+lists what they require and saves the proof. `.github/CODEOWNERS` is
+generated from `owner` and the globs of `.github/ask-first.yaml`
+(12.3). What the review is worth while the project has one account,
+and that nothing reads the rulesets again, are residual risks in
+[05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1).
 
 **The approval line.** A PR whose diff touches a path of an ask-first
 surface ([05 5.3](05-security.md#53-ask-first-surfaces)) carries one
@@ -151,14 +162,24 @@ line per touched surface in its body:
 Approval: <surface id> - "<the maintainer's words>"
 ```
 
-`<surface id>` is an `id` in `.github/ask-first.yaml`, and the quoted
-text is not empty. `tools/ci pr` derives the touched surfaces from the
-changed paths of base..head. It fails when a touched surface has no
-line, and when a line names an id that the list does not have. This is
-the one form of a recorded approval; ADR 0001 rule 8 and 05 5.3 point
-here. The line is typed by the PR's author, so the check proves that it
-is there, not who said it. The code-owner review that branch protection
-requires for the same paths, and the merge, are the maintainer's own.
+A line is a whole line of the body that matches
+`^Approval: ([a-z0-9-]+) - "(.+)"$`. `tools/ci pr` reads
+`.github/ask-first.yaml` at the base commit and at the head commit and
+uses the union of the two lists, so a PR that removes a surface or a
+glob still needs that surface's line. A surface is touched when a
+changed path (10 10.2) matches one of its globs; in a glob, `**`
+matches any number of path segments, `*` matches inside one segment,
+and each other character matches itself. `pr` fails when a touched
+surface has no line, and when a line names an id that neither list
+has. This is the one form of a recorded approval; ADR 0001 rule 8 and
+05 5.3 point here. The line is typed by the PR's author, so the check
+proves that it is there, not who said it.
+
+A Conventional Commit subject, for `pr`, is
+`<type>[(<scope>)][!]: <description>` with `<type>` one of `feat`,
+`fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore` and
+`revert`. The PR title and the subject of each commit with one parent
+must have that form; a merge commit's subject is not checked.
 
 ## 12.5 Decisions and history
 
@@ -175,7 +196,8 @@ requires for the same paths, and the merge, are the maintainer's own.
   gains only its `Superseded by` status line. No check compares an
   accepted record with its earlier text; each change to it needs the
   approval line and the code-owner review of the `decisions` surface,
-  and that review is where a rewrite is refused.
+  and that review is where a rewrite is refused (05 5.4 says what the
+  review is worth with one account).
 - A settled open question becomes an ADR; the `docs` module writes the
   initial set from this spec's decisions (listed in
   [reviews/round-2.md](../reviews/round-2.md#settled-questions) and

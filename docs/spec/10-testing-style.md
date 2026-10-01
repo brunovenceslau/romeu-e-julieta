@@ -60,7 +60,8 @@ runs the `fast` subset.
 **Every merge gate also runs locally.** A merge gate is a check whose
 failure blocks a merge. Workflows hold no check logic of their own, and
 `tools/ci workflows` enforces that with a closed grammar over
-`.github/workflows/*.yml`. A key or a value outside it fails:
+`.github/workflows/*.yml`. A key or a value outside it fails, and so
+does a file in that directory with another name ending:
 
 | Level | Allowed |
 |---|---|
@@ -78,14 +79,31 @@ same commit. `tools/ci` starts `golangci-lint`, `govulncheck` and
 `reuse` through `mise exec`, so the versions locked in `mise.lock` are
 the ones used in both places.
 
+Three consequences of the grammar:
+
+- A step that applies to some runners only (the hybrid and container
+  e2e on Linux, the I27 hostile trees on macOS) is selected inside
+  `tools/ci`, from the OS and architecture it runs on: there is no `if`
+  to select it in the workflow.
+- `ci.yml` lists `edited` among its `pull_request` types, so a change
+  to a PR's title or body runs `pr` again; `tools/ci workflows` fails a
+  `ci.yml` without it.
+- The grammar bounds keys and `run` lines, not each value: the scopes
+  under `permissions`, the owner of a `uses` action, and `with` and
+  `env` values are free. They are reviewed, not checked:
+  `.github/workflows/**` is an ask-first surface (05 5.3).
+
 `tools/ci all` runs the `pr` step when `GITHUB_EVENT_NAME` is
 `pull_request`, on the file that `GITHUB_EVENT_PATH` names. A local run
 is `go run ./tools/ci pr <file>`, on a payload saved beforehand (with
-`gh api`, for example); `pr` itself makes no network call. The title,
-the body, the head ref and the base and head SHAs come from that file,
-which is the event or the pull request object that is the event's
-`pull_request` member. Commit messages, added lines and changed paths
-come from git over base..head. A file with neither shape fails.
+`gh api`, for example); `pr` itself makes no network call. The file is
+the pull request object, or the event whose `pull_request` member is
+that object, and `pr` reads five fields of the object: `title`, `body`,
+`head.ref`, `head.sha` and `base.sha`. A file with neither shape, or
+without one of the five, fails. The rest comes from git: the commits
+reachable from `head.sha` and not from `base.sha`, read by the walk of
+[Forbidden names](#forbidden-names); the changed paths are the paths
+those commits touch, both names of a rename included.
 
 GitHub Actions is the default runner. If the Actions quota runs out,
 the maintainer may choose the local gates instead, provided they are
@@ -104,9 +122,9 @@ local-gate run is recorded is a
 | generated | `tools/ci generated`: `go generate ./...` leaves no diff in any consumer of the table in [12 12.3](12-engineering.md#123-generators) | yes |
 | lint | `golangci-lint run` over the whole module, `tools/` included; `.golangci.yml` enables the doc-comment, error-string and commented-out-code checkers of ADR 0001 (rule 14), and a fixture test proves it still does (10.1) | yes |
 | unit | `go test ./internal/... ./tools/...` | yes |
-| hygiene | `tools/ci hygiene`: no U+2014; the prose rules and `TODO(#<issue>)` form of ADR 0001 (rules 4, 14); no personal absolute paths; the forbidden-name check over the path and content of each tracked file (below); scans `e2e/testdata/sbx/**` too | yes |
-| pushed range | `tools/ci fast` with the pre-push hook's arguments: the forbidden-name check over the ref names and commits of a push (below) | in the hook only |
-| sequences | `tools/ci sequences`: ADR numbers contiguous and unique; ADR layout and statuses per ADR 0001 (rules 6-7), the filename compared through the `slug` function `tools/new adr` uses; every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; every ADR that `docs/spec.md` or `docs/spec/` cites has status Accepted; spec section, invariant, probe, question and journey ids unique; every referenced id and journey range (for example "J1-J13" in a success criterion) exists | yes |
+| hygiene | `tools/ci hygiene`: no U+2014; the prose rules of ADR 0001 (rule 4); the `TODO(#<issue>)` form in Go files (rule 14); no personal absolute path (below); no tracked `go.work`, `go.work.sum` or `vendor/`; `.githooks/pre-push` tracked with mode 100755; the forbidden-name check over the path and content of each tracked file, which fails on a denylist that is missing or has no entry (below); scans `e2e/testdata/sbx/**` too | yes |
+| pushed range | `tools/ci fast` with the pre-push hook's arguments: the forbidden-name check over the remote ref names and the commits of a push (below) | in the hook only |
+| sequences | `tools/ci sequences`: ADR numbers contiguous and unique; ADR layout and statuses per ADR 0001 (rules 6-7), the filename compared through the `slug` function `tools/new adr` uses; every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; every ADR that `docs/spec.md` or `docs/spec/` cites has status Accepted; the ids below unique, and every referenced id and id range (for example "J1-J13" in a success criterion) defined | yes |
 | vocabulary | `tools/ci vocabulary` (01 1.7) | yes |
 | workflows | `tools/ci workflows`: the grammar above | yes |
 | vulnerabilities | `govulncheck ./...` | |
@@ -118,7 +136,7 @@ local-gate run is recorded is a
 | cross-build | darwin amd64/arm64 (`romeu`), linux amd64/arm64 (`julieta`) | |
 | imports | `tools/ci imports` (I1, I2, I11, I24 call sites, 10.7) | |
 | invariants | `tools/ci invariants` (every I-id has a guard tag and a test tag) | |
-| mutation | `tools/ci mutate` on PRs touching a path in `.github/ask-first.yaml`; the scheduled `fuzz.yml` runs it too | |
+| mutation | `tools/ci mutate` on PRs touching a `.go` file on a path in `.github/ask-first.yaml`; the scheduled `fuzz.yml` runs it too | |
 | catalog | `tools/ci catalog` (explicit upload flags, key syntax) | |
 | kits | `tools/ci kits` (one frontend pin; install steps <= 5 lines; every download has a sha256) | |
 | mise | `tools/ci mise` (`julieta lock --check` logic on this repo's and the examples' locks) | |
@@ -127,6 +145,28 @@ local-gate run is recorded is a
 | docs | `tools/ci docs` (S10; `--help` output vs `docs/reference/`; the checks ADR 0001 assigns to it: rules 1, 5 without external URLs, 12, 13, 17, 20) | |
 | lessons | `tools/ci lessons`: every `docs/lessons.md` entry, read after the file's front matter, names an existing `tools/ci` subcommand or test name, or says "no check possible: <reason>" | |
 | pr | `tools/ci pr` (pull requests only; inputs as described above; 12 12.4; ADR 0001 rules 4, 8, 11; the forbidden-name check, below) | |
+
+A personal absolute path, for `hygiene`, is `/Users/<name>/` or
+`/home/<name>/` where `<name>` is one path segment other than `agent`
+(the sandbox user in this spec's examples) and is not written as a
+`<placeholder>`.
+
+The ids `sequences` reads, in `docs/spec.md` and `docs/spec/`:
+
+| Id | Form | Defined by |
+|---|---|---|
+| invariant | `I<n>` | the first cell of a row in [05 5.2](05-security.md#52-invariants-and-their-tests) |
+| success criterion | `S<n>` | the first cell of a row in the index's criteria table |
+| question | `Q<n>` | the first cell of a row in the index's Open questions |
+| journey, variant | `J<n>`, `J<n><lowercase letter>` | a `## J<n>` heading in [09](09-journeys.md); a variant is defined where that heading names it |
+| probe | `A<n>`, `B<n>`, `C<n>` | the first cell of a row in a table of [11](11-host-probes.md) |
+| section | `<n>.<m>` | a `## <n>.<m>` heading of file `<n>` |
+
+A reference is another occurrence of an id as a whole word, inside a
+code span too; `X<a>-X<b>` stands for each id from a to b. A section is
+referenced only as a link anchor, which the link check of `tools/ci
+docs` resolves. Uniqueness and existence are checked; only ADR numbers
+must be contiguous.
 
 Runners: `ubuntu-latest`, `ubuntu-24.04-arm`, an Intel macOS runner (the
 label is verified to exist and to report `x86_64` in the `ci-bootstrap`
@@ -139,7 +179,9 @@ Three subcommands are outside `all`:
   recorded API fixture.
 - `tools/ci links` needs the network too: it fetches every external URL
   the docs cite (ADR 0001 rule 5). No workflow calls it in v1; a person
-  runs it. Relative links and anchors stay in `tools/ci docs`, offline.
+  runs it, and the final plan task runs it once, next to
+  `tools/ci acceptance`. Relative links and anchors stay in
+  `tools/ci docs`, offline.
 - `tools/ci fuzz` runs each fuzz target for a fixed time, longer than
   the short runs inside `go test`. The scheduled `fuzz.yml` calls it,
   and then `tools/ci mutate`.
@@ -147,7 +189,8 @@ Three subcommands are outside `all`:
 ### Forbidden names
 
 `tools/ci/denylist.yaml` lists names this repository must not contain:
-in a file, a path, a commit message, a ref name or the text of a PR.
+in a file, a path, a commit message, a commit's author or committer
+identity, a ref name or the text of a PR.
 This page does not write them and calls them the denylist entries.
 There is one definition of a match and one function that applies it;
 `hygiene`, `fast` and `pr` all call that function.
@@ -167,40 +210,62 @@ There is one definition of a match and one function that applies it;
   spaces. It does not match them joined by a slash: that shape is a
   registry or repository path of another product, such as the upstream
   workload image of [06](06-kits.md), and not the name.
-- Text is matched one line at a time. A ref name is one line.
+- A two-segment entry also matches two unrelated words that happen to
+  be its halves and stand next to each other; such a line is reworded.
+- Text is matched one line at a time. A ref name, a path, and a name
+  with its email are each one line.
+- A hit is reported by its location: the file and line, the commit and
+  the field, or the PR field. The matched text and its line are not
+  printed, because CI logs are public and the output is pasted under
+  Evidence.
 
 | Surface | Checked by | When |
 |---|---|---|
 | the path and the content of each tracked file at HEAD | `tools/ci hygiene` | in `fast` and in `all` |
-| each pushed ref name; the message and the added lines of each pushed commit | `tools/ci fast`, called by the pre-push hook | before the push leaves the machine |
-| the PR title, body and head ref name; the message and the added lines of each commit in base..head | `tools/ci pr` | on the pull request |
+| the name each pushed ref gets on the remote; of each pushed commit: the message, the author and committer names and emails, the paths it adds or renames to, and the lines it adds | `tools/ci fast`, called by the pre-push hook | before the push leaves the machine |
+| the PR title, body and head ref name; the same four readings of each commit in base..head | `tools/ci pr` | on the pull request |
 
 The hook is `exec go run ./tools/ci fast "$@"`. Git gives a pre-push
 hook the remote's name and URL as arguments and, on stdin, one line per
 pushed ref: local ref, local sha, remote ref, remote sha. Called with
-those arguments, `fast` reads the lines and walks, for each, the
-commits reachable from the local sha and not from the remote sha; for
-a ref the remote does not have yet, the commits not reachable from any
-remote-tracking ref of that remote. A line that deletes a ref adds no
-commits and is skipped. Called without arguments, `fast` checks the
-tracked files and no range. `pr` uses the same walk over base..head.
-Reading the lines each commit adds, and not only the final tree, is
-what catches a name that one commit adds and a later commit removes.
+those arguments, `fast` reads the lines, checks the remote ref name of
+each, and walks the commits reachable from the local sha and not from
+the remote sha. For a ref the remote does not have yet, or a remote
+sha that the local repository does not hold, it walks the commits not
+reachable from any remote-tracking ref of that remote. A merge commit
+is compared with its first parent. A line that deletes a ref adds no
+commits and is skipped, name included, so a ref with a forbidden name
+can be deleted. A git command that fails stops the push. Called without
+arguments, `fast` checks the tracked files and no range. `pr` uses the
+same walk over base..head.
+Reading what each commit adds, and not only the final tree, is what
+catches a line or a path that one commit adds and a later commit
+removes.
 
 The limits, stated plainly:
 
 - Outside a sandbox the hook is opt-in (12 12.4), and
   `git push --no-verify` skips it. `pr` is the backstop, and it runs
   after the push: a name pushed without the hook is on the remote
-  before any check reads it.
-- Matching works on bytes with ASCII lowercasing. A name written with
-  look-alike characters of another script, or split across two lines,
-  is not matched.
+  before any check reads it. A branch pushed that way and not opened as
+  a PR is read by no check.
+- Matching works on bytes with ASCII lowercasing. It does not match a
+  name written with look-alike characters of another script, with a
+  zero-width character inside it, split across two lines, written as an
+  escape or an entity, or encoded (base64, a UTF-16 file).
 - The messages of annotated tags and git notes are not read.
+- `hygiene` proves that the denylist has an entry, not that it has the
+  right ones.
 
-An entry is written by `go run ./tools/ci hygiene add`. It reads the
-name from stdin, one line with a space between segments; it takes no
-name as an argument and prints none. It lowercases the name, writes the
+An entry is written by `go run ./tools/ci hygiene add`. The maintainer
+runs it, in a terminal outside an agent session, because an agent must
+not hold the names. It reads the name from the terminal with echo off,
+one line with a space between segments, and refuses to start when stdin
+is not a terminal; it takes no name as an argument and prints none, so
+the name is in no argument list and no shell history. It refuses a
+segment that holds a character other than an ASCII letter or digit, so
+no segment starts or ends with a separator. It lowercases the name,
+writes the
 segments through the matcher's own code, and before writing proves that
 the matcher finds the name in a buffer in memory. A hand-computed entry
 that is wrong matches nothing, and no test can see that, because the
@@ -210,8 +275,9 @@ together, with each separator and with a slash, and expects a failure
 for each form except the slash.
 
 What the hash buys is small, and we say so. It is a plain hash, not a
-keyed one, so it hides nothing from someone who guesses a name and
-hashes it. It only keeps the plaintext out of the tree, so that a
+keyed one, and each segment's length is in the file, so a short segment
+is recovered by trying each string of that length, in seconds on a
+laptop. The hash only keeps the plaintext out of the tree, so that a
 search of the repository does not find it. The maintainer decided on
 the plain hash knowing this
 ([round 3](../reviews/round-3.md#maintainer-decisions)).
@@ -232,11 +298,10 @@ step, so the file passes `tools/ci workflows`.
 
 `ci-bootstrap` (first plan task), in this order:
 
-1. One commit adds `tools/ci hygiene` with the denylist, `tools/ci
-   fast` and `.githooks/pre-push`. Nothing can check the commit that
-   adds the checker, so its author runs `go run ./tools/ci fast` on it
-   and puts the output under the PR's Evidence. From the next push on,
-   an enabled hook reads each pushed commit.
+1. One PR adds `tools/ci hygiene` with `tools/ci/denylist.yaml`,
+   `tools/ci fast` and `.githooks/pre-push`. Its author can neither
+   write the denylist entries nor push it past a hook that is not
+   enabled yet, so the maintainer block below finishes and pushes it.
 2. `tools/ci workflows` and a green workflow on the public repo,
    proving runners, labels and permissions.
 3. The rest of the day-one middleware of
@@ -244,9 +309,34 @@ step, so the file passes `tools/ci workflows`.
    [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change),
    `tools/ci pr` included.
 
-Between steps 1 and 3 the hook is the one check on commit messages and
-ref names, and julieta's dispatcher does not exist yet, so the hook is
-opt-in for each clone of that period.
+**The maintainer block.** The parts of `ci-bootstrap` that only the
+maintainer can do are one sitting, before step 1 is pushed, and one
+call after step 2. The output of each item goes under the Evidence of
+the PR it belongs to.
+
+- a. In the branch of step 1, run `go run ./tools/ci hygiene add` once
+  for each forbidden name, and commit `tools/ci/denylist.yaml`.
+- b. Enable the hook in that clone (`git config core.hooksPath
+  .githooks`) and push the branch, so the hook reads the bootstrap
+  commits themselves: their messages, identities, paths and ref name.
+- c. Create two rulesets and save the API's answer for each. On the
+  default branch: changes arrive by pull request, with one approving
+  review and a code-owner review; force pushes and deletion are
+  refused. On tags matching `v*`: creation, update and deletion are
+  refused. The maintainer is the one bypass actor of both.
+- d. With the sandbox's token, try four things and save the four
+  refusals: a push to the default branch, a push of a `v*` tag, the
+  merge of step 1's PR, and a change to a ruleset. A try that is not
+  refused is [Q25](../spec.md#open-questions).
+- e. After step 2: add the CI jobs of the green run to the
+  default-branch ruleset as required status checks, and save the API's
+  answer.
+
+Between steps 1 and 3 the hook is the one check on commit messages,
+identities and ref names, and julieta's dispatcher does not exist yet,
+so the hook is opt-in for each clone of that period. Nothing checks PR
+text or the approval line in that period, the line for the `checks`
+surface included; the maintainer's review of those PRs is the guard.
 If Actions cannot run, the local gates above stand in, and the
 criterion's evidence in `docs/acceptance.json` is the recorded local
 run, marked interim; S2 still requires a real green run for release.

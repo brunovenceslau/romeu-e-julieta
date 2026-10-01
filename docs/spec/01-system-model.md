@@ -219,7 +219,8 @@ stored. `status` is a projection of these records.
 
 One word per concept. `tools/ci vocabulary` is generated from this
 table and fails when a phrase from the "Not" column appears in docs
-(except `docs/reviews/`), help text or error messages.
+(except `docs/reviews/` and the "Not" column of this table), help text
+or error messages.
 
 | Word | Meaning | Not |
 |---|---|---|

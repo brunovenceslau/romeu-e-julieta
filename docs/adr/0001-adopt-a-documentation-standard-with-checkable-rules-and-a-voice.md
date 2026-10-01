@@ -121,8 +121,9 @@ not a permanent state.
    primary reader in YAML front matter (`type:` one of `tutorial`,
    `how-to`, `reference`, `explanation`; `reader:` a phrase naming one
    reader), and has one type. A page under `docs/guide/` also names its
-   journey (`journey: J<n>`, the id of a section of
-   [09](../spec/09-journeys.md)). The check covers a path set:
+   journey (`journey: J<n>`, the id of a `## J<n>` section of
+   [09](../spec/09-journeys.md)); a value that is not such an id
+   fails. The check covers a path set:
    `ARCHITECTURE.md`, `CONTRIBUTING.md`, `SECURITY.md` and the Markdown
    files under `docs/`, minus `docs/adr/` and `docs/reviews/` (ADRs and
    review rounds are historical records, and the path says what they
@@ -141,21 +142,27 @@ not a permanent state.
    and commit messages: no em dash character (U+2014), no hype words, no AI
    meta-commentary, no attribution footer, no paired
    `not only ... but also` construction. The word lists are committed
-   data with a self-test; they skip code spans, so a rule can quote what
-   it bans. The em dash check skips nothing.
+   data with a self-test, in `tools/ci/prose.yaml`. A listed word or
+   phrase matches as whole words, with ASCII case ignored, outside code
+   spans and fenced blocks, so a rule can quote what it bans. The em
+   dash check skips nothing.
    Owner: `tools/ci hygiene` for files, `tools/ci pr` for the PR
    title, the PR body and the PR's commit messages.
-5. **[check]** Markdown lint, link check and spell check. Relative links
-   and anchors are checked offline in every run. The spell check reads
+5. **[check]**, external URLs excepted. Markdown lint, link check and
+   spell check. Relative links and anchors are checked offline in every
+   run; text inside a code span or a fenced block is not a link, so a
+   rule can show a link form. The spell check reads
    one accepted-words list; its format and path are fixed in the plan
    task that picks the tool. External URLs are the exception:
    `tools/ci all` stays offline (10 10.1), so they are fetched by
-   `tools/ci links`, which a person runs. That half of the rule is not
-   a gate in v1, and nothing reminds anyone to run it; Consequences
-   says what reopens it. Owner: `tools/ci docs`; `tools/ci links` for
+   `tools/ci links`, which a person runs and the final plan task runs
+   once. That half of the rule is not a gate in v1, and between those
+   runs nothing reminds anyone; Consequences says what reopens it.
+   Owner: `tools/ci docs`; `tools/ci links` for
    external URLs.
 6. **[check]** ADRs use the adr-tools layout: `.adr-dir` contains
-   `docs/adr`; files are `NNNN-kebab-title.md`; the first line is
+   `docs/adr`; files are `NNNN-kebab-title.md`, and the generated
+   `README.md` of rule 7 is the one other file there; the first line is
    `# N. Title`; then a `Date: YYYY-MM-DD` line, then the sections
    `## Status`, `## Context`, `## Decision`, `## Consequences`, in that
    order. Alternatives go in `### Alternatives considered` inside
@@ -165,7 +172,8 @@ not a permanent state.
    digits into one hyphen, and trims hyphens from both ends.
    `tools/new adr` takes the title and writes the number, the date, the
    title line and the filename (12 12.3), so nobody types them, and
-   `tools/ci sequences` calls the same `slug`. The date is checked for
+   `tools/ci sequences` calls the same `slug`, which lives under
+   `tools/ci/` and so on the `checks` surface. The date is checked for
    its shape and no further: a commit date is set by its author, so it
    proves nothing about the day. Owner: `tools/ci sequences`.
 7. **[check]** ADR status is one of Proposed, Accepted, Rejected,
@@ -183,18 +191,23 @@ not a permanent state.
    sign-off, and changes after that only with it. The mechanism is the
    ask-first list: `docs/adr/**` and `.adr-dir` are one of its surfaces
    ([05 5.3](../spec/05-security.md#53-ask-first-surfaces)). A PR that
-   touches an ADR in any way (a new record, a status change, an edit
-   to a record whose status is no longer Proposed) therefore needs an
-   approval line for that surface in its body, in the one form 12 12.4
+   touches an ADR in any way (a new record, a status change, any other
+   edit) therefore needs an approval line for that surface in its
+   body, in the one form
+   [12 12.4](../spec/12-engineering.md#124-middleware-before-and-after-every-change)
    defines, and a code-owner review before it merges. The intent is
    that an agent does not promote or rewrite a record on its own. The
    approval line is typed by the PR's author, so `tools/ci pr` proves
    it is there, not who said it. The code-owner review and the merge
-   are what an author cannot type, and the code of these checks is an
-   ask-first surface too, so a PR cannot quietly switch them off.
+   are what an author cannot type. The default-branch ruleset requires
+   them; 12 12.4 says who sets it up, and
+   [05 5.4](../spec/05-security.md#54-known-residual-risks-accepted-in-v1)
+   says what the review is worth while the project has one account.
+   The code of these checks is an ask-first surface too, so a PR that
+   switches one off needs the same line and review.
    Whether the decision is sound stays a review judgment (rule 9).
-   Owner: `tools/ci pr` for the approval line; branch protection for
-   the review.
+   Owner: `tools/ci pr` for the approval line; the default-branch
+   ruleset for the review.
 9. **[review]** Every decision that is expensive to reverse gets an
    ADR, with the alternatives considered and, for any borrowed pattern,
    its source and why it fits this project.
@@ -209,24 +222,41 @@ not a permanent state.
     for the sections of 12 12.4. Owner: `tools/ci pr`.
 12. **[check]** `README.md` uses this heading order: what it is and who
     it is for; when not to use it; prerequisites; install and verify;
-    first run; trust model; links to guides, reference and ADRs.
-    Command and settings tables are links to the generated reference,
-    not copies. Owner: `tools/ci docs`.
+    first run; trust model; links to guides, reference and ADRs. The
+    check compares the page's level-2 headings with an ordered list in
+    `tools/ci/headings.yaml`; a heading that is missing, extra or out of
+    order fails. The plan task that writes the page's skeleton fixes
+    the strings. **[review]** Command and settings tables are links to
+    the generated reference, not copies. Owner: `tools/ci docs`.
 13. **[check]** The `romeu` and `julieta` commands shown in `README.md`
-    and `docs/guide/` are executed. A guide page names its journey in
+    and `docs/guide/` are command lines the scenario functions run. A
+    guide page names its journey in
     front matter (rule 1); `README.md` belongs to J1. The commands have
     one committed source, `e2e/scenarios/commands.yaml`: scenario id to
-    ordered command lines. A scenario id is a journey id, or one of the
-    variants 09 names inside a journey (J3a and J3b inside J3). The
+    ordered command lines. A scenario id is a journey id (`J<n>`), or a
+    variant that 09 names inside a journey, written as the journey id
+    and one lowercase letter (J3a and J3b inside J3). The
     scenario functions read their command lines from that table.
-    In those pages every fenced block names its language (`tools/ci
-    docs` fails one that does not), and an `sh` block holds commands.
-    The check splits each line of an `sh` block at `&&`, `||`, `;` and `|` and drops leading `NAME=value`
-    words; a part whose first word is `romeu` or `julieta` must equal
-    an entry of the page's journey or of one of its variants, word by
-    word, or the build fails. Inside an entry, a `<placeholder>` token
-    matches one or more characters that are not whitespace, so the
-    entry word `sandbox/<branch>` matches `sandbox/fix-login`.
+    In those pages every fenced block names its language, one of `sh`,
+    `text`, `yaml`, `json`, `toml` and `mermaid`; `tools/ci docs` fails
+    a block with another language or none, `bash` and `console`
+    included. An `sh` block holds commands.
+    The check reads each line of an `sh` block as text: it interprets
+    no quotes and no shell syntax. It splits the line into parts at
+    `&&`, `||`, `;` and `|`, and each part into words at ASCII
+    whitespace. A command word is `romeu` or `julieta`, or a word that
+    ends in one of them after a character other than an ASCII letter, a
+    digit, `-`, `_` or `.` (`./romeu`, `bin/julieta`, `$(romeu`). In a
+    part that has a command word, the words from the first command word
+    to the end of the part, with that word read as the bare name, must
+    equal an entry of the page's journey or of one of its variants,
+    word by word, or the build fails. Inside an entry, a `<placeholder>`
+    token matches one or more characters that are not whitespace, so
+    the entry word `sandbox/<branch>` matches `sandbox/fix-login`.
+    So a prompt, an assignment or `sudo` before the command does not
+    hide it. A command inside quotes or `$( )`, or followed by a
+    comment, is found and then equals no entry: the check fails closed,
+    and these pages show commands bare.
     A table entry that no scenario function reads fails the scenario
     package's own test, which drives each function against a recording
     runner and executes nothing. Reading is not running: the CI suite
@@ -236,14 +266,14 @@ not a permanent state.
     by the host suite and not in CI. The maintainer decided to keep
     that alternative, because CI is offline and has no real sbx.
     Two limits. A block in another language is output or data and is
-    not matched, so a command shown there is not executed. A part that
-    starts with another program (the checksum and attestation commands
+    not matched, so a command shown there is not checked. A part with
+    no command word (the checksum and attestation commands
     of install and verify, for example) is outside this check: it needs
     the network and a published release, and `release.yml` runs that
     verification (10 10.2). Owner: `tools/ci docs`.
 14. **[check]** Every exported Go identifier has a doc comment; error
     strings follow Go style (lowercase, no trailing punctuation); no
-    commented-out code; the only accepted TODO form is
+    commented-out code; the only accepted TODO form in a Go file is
     `TODO(#<issue>)`. Owner: `golangci-lint` for the first three,
     `tools/ci hygiene` for the TODO form. The three checkers are
     switched on in the linter configuration, and a unit test runs the
@@ -256,10 +286,12 @@ not a permanent state.
     a doc comment cannot show the call contract on its own.
 16. **[review]** Error messages and CLI help say what failed, why, and
     what to do next; the fix hint in the error table (04) is the "next".
-17. **[check]** Diagrams are text (Mermaid or ASCII) and appear only
-    where prose cannot explain; no binary media under `docs/` or in
-    `README.md`. The state-machine diagrams in `ARCHITECTURE.md` are
-    generated (12 12.3). Owner: `tools/ci docs`.
+17. **[check]** Diagrams are text (Mermaid or ASCII): a file under
+    `docs/` has the extension `.md`, `.json` or `.yaml`, and no page of
+    rule 1's path set, nor `README.md`, holds Markdown image syntax or
+    an `<img` tag. The state-machine diagrams in `ARCHITECTURE.md` are
+    generated (12 12.3). **[review]** A diagram appears only where
+    prose cannot explain. Owner: `tools/ci docs`.
 18. **[review]** A docs review scores the page on ten dimensions, each 0
     to 2: audience fit, task success, content-type discipline, accuracy,
     structure, examples, terminology, AI retrievability, maintenance and
@@ -281,7 +313,9 @@ not a permanent state.
     these sections, in order: supported versions, how to report a
     vulnerability (a private channel, never a public issue), and
     response expectations (when the reporter hears back and what
-    happens next). Owner: `tools/ci docs`.
+    happens next). The check is the one of rule 12: the level-2
+    headings against the list for this file in
+    `tools/ci/headings.yaml`. Owner: `tools/ci docs`.
 
 This record is 0001. adr-tools' `adr init` would write a first record
 titled "Record architecture decisions"; rules 6 to 9 make that decision
@@ -312,7 +346,8 @@ not reserve the number for anything else.
 
 - Most of the standard becomes a failing check instead of a review
   comment. Reviews get shorter and spend their time on rules 2, 3, 9,
-  15, 16, 18 and 19, which only judgment can cover.
+  15, 16, 18 and 19 and the review halves of rules 12 and 17, which
+  only judgment can cover.
 - `tools/ci docs`, `tools/ci hygiene`, `tools/ci sequences` and
   `tools/ci pr` grow, and `tools/ci links` is new. Markdown lint, link
   check and spell check may need
@@ -346,15 +381,6 @@ not reserve the number for anything else.
 - Rule 19 cannot be checked. A page can pass every check and still read
   like a form; the voice line that rule 19 adds to the rule 18 review
   report is the only guard, and we accept that.
-- This record stays Proposed until the maintainer signs it off (rule 8;
-  the pending decision is Q24 in the spec's
-  [Open questions](../spec.md#open-questions)). The spec is written as
-  if it were Accepted, so that the two do not disagree about which
-  checks exist. Acceptance comes before the implementation plan's first
-  task: `tools/ci sequences` fails when the spec cites an ADR whose
-  status is not Accepted (10 10.2), and that check lands in
-  `ci-bootstrap`. The spec cites this Proposed record, so it fails that
-  clause today; that is the intended state until the sign-off. If the
-  maintainer declines this record, the PR that marks it Rejected also
-  restores the spec text it replaced. No check enforces that last
-  step; it is a sentence here and a row in Q24.
+- This record stays Proposed until the maintainer signs it off (rule
+  8). What holds until then, and what follows if it is declined, is
+  Q24 in the spec's [Open questions](../spec.md#open-questions).

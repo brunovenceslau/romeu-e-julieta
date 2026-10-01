@@ -99,26 +99,33 @@ container, CI), C = container (CI), H = host.
 | I26 | **Sandbox identity**: romeu acts only on sandboxes with an open generation it recorded (at create or by `adopt`) and whose workspace path equals `<name>-env/<primary>` | E: a foreign same-name sandbox exits 2 with `RJ-203` naming `romeu adopt`, before any mutation; a path mismatch exits 2; `adopt` without TTY, with a path mismatch, or with an open generation exits 2; after `adopt`, `salvage` and `rm` succeed |
 | I27 | **Kit materialization cannot escape or smuggle**: `git fsck --strict` on the commit, then the walk's own validation, independent of fsck: only modes 100644, 100755, 040000; symlinks and gitlinks rejected; names `.`, `..`, `.git` and case-insensitive or HFS-ignorable variants (for example `.GIT`, or `.git` with a U+200C ZERO WIDTH NON-JOINER inserted after the dot) rejected; case collisions under case-insensitive comparison rejected; written through `os.Root` into the candidate only; `sync --from <sha>` refuses commits not reachable from `refs/romeu/origin/*` or `refs/sandboxes/*` | U: table of hostile trees; E: a personal kit with each hostile entry fails sync before any file is written outside `.romeu/candidates/`; E: a hostile tree delivered by a bundle is refused as `--from <sha>`, and refused by the walk when made reachable; the E cases also run on the macOS runners (case-insensitive APFS) |
 | I28 | **Kit and workload capabilities are in the gate, and romeu parses them the way sbx does**: descriptors parsed with the strict subset grammar (no anchors, aliases, merge keys or includes; any unmodeled key or capability type refused); normalized capability set digested; personal kits may not declare network, mount, volume or credential capabilities; `internal/oci` verifies the digest of every hop (index, platform manifest, annotation), reads anonymously (never Docker config credential helpers), over HTTPS only, follows only HTTPS redirects, and caps every response size | U: descriptor fixtures; U: one conformance fixture per capability type, recorded against the pinned frontend in probes A11 and A12, parsed identically by romeu; U: `oci` table (digest mismatch at each hop, HTTP URL, HTTPS-to-HTTP redirect, oversize body, credential helper present in a fake Docker config) all refused; E: adding a capability to a kit flips gate 2 |
-| I29 | **All host output is escaped, and the gate diff is complete**: the CLI writer escapes by default; C0/C1 controls, bidi codepoints, zero-width characters (U+200B-U+200D, U+2060, U+FEFF), tag characters (U+E0000-U+E007F) and U+2028/U+2029 are rendered visibly in gate diffs, julieta reports, handoff bodies and ref names; the gate diff is never truncated and shows binaries as size + sha256, flagged | U: fuzz `termsafe`; U: every escaped class has a table row; E: a handoff and a branch name with ESC sequences print escaped; E: a 10 000-line kit file change appears in full in the gate diff, with the summary above the prompt; a binary kit file is shown flagged with its size and sha256 |
+| I29 | **All host output is escaped, and the gate diff is complete**: the CLI writer escapes by default; control characters (U+0000-U+001F, U+007F-U+009F), bidi codepoints, zero-width characters (U+200B-U+200D, U+2060, U+FEFF), tag characters (U+E0000-U+E007F) and U+2028/U+2029 are rendered visibly in gate diffs, julieta reports, handoff bodies and ref names; the gate diff is never truncated and shows binaries as size + sha256, flagged | U: fuzz `termsafe`; U: every escaped class has a table row; E: a handoff and a branch name with ESC sequences print escaped; E: a 10 000-line kit file change appears in full in the gate diff, with the summary above the prompt; a binary kit file is shown flagged with its size and sha256 |
 | I30 | **julieta runs only as delivered**: romeu invokes julieta by absolute path in the read-only `.romeu/bin` mount and continues past the compatibility check only when the protocol is accepted, the binary sha256 equals `render.json`, and julieta reports its directory read-only | X: protocol mismatch, `SHA256SUMS` mismatch and a writable bin mount each make `run` exit 2 before `layout up`; a 32 KiB manifest round-trips; H: probe A3 |
 
 ## 5.3 Ask-first surfaces
 
 `.github/ask-first.yaml` is the single list of paths whose changes need
 the maintainer's explicit approval. `go generate` derives from it the
-table in `docs/reference/ask-first.md` and `.github/CODEOWNERS`
-(branch protection requires a code-owner review); `tools/ci mutate`
-reads it to decide which PRs run mutation testing; `tools/ci pr`
+table in `docs/reference/ask-first.md` and `.github/CODEOWNERS`, which
+names `owner` for each glob; `tools/ci mutate` reads it to decide which
+PRs run mutation testing (a `.go` file on a listed path); `tools/ci pr`
 requires an approval line in the PR body for each surface the diff
-touches, in the form that
-[12 12.4](12-engineering.md#124-middleware-before-and-after-every-change)
-defines. The file lists itself. The maintainer decided that the
+touches. The approval line, the ruleset that requires the code-owner
+review, and which revision of this file `pr` reads are defined in one
+place,
+[12 12.4](12-engineering.md#124-middleware-before-and-after-every-change).
+The file lists itself. `owner` is the maintainer's GitHub handle, the
+`<owner>` of the module path (02 2.1), which is public already. The maintainer decided that the
 decision records and the code of the checks are surfaces
 ([round 3](../reviews/round-3.md#maintainer-decisions)): the workflows
-only call `tools/ci` (10 10.2), so the check code is the gate.
+only call `tools/ci` (10 10.2), so the check code is the gate. One
+piece of gate logic sits outside these globs and is reviewed like any
+other code: the test in `e2e/scenarios` that fails a command-table
+entry no scenario reads (ADR 0001 rule 13).
 
 ```yaml
 version: 1
+owner: "@<owner>"
 surfaces:
   - id: gates
     globs: [internal/gate/**, internal/state/**, internal/spec/project.go]
@@ -145,8 +152,8 @@ surfaces:
     globs: [.github/workflows/release.yml, tools/release/**]
     reason: release and publishing paths
   - id: dependencies
-    globs: [go.mod, go.sum, .github/workflows/**]
-    reason: Go dependencies and CI actions
+    globs: [go.mod, go.sum, mise.toml, mise.lock, .github/workflows/**]
+    reason: Go dependencies, the pinned tools the gates run, and CI actions
   - id: contracts
     globs: [internal/cli/errors.go, internal/spec/versions.go]
     reason: exit codes, error ids and file format versions
@@ -174,5 +181,8 @@ surfaces:
 | The final `sbx env exec -it ... layout up` passes raw bytes between the sandbox and the host terminal | it is the interactive session itself; escaping it would break the terminal | romeu exec's into it as its last act and prints nothing after; the host terminal is the only consumer |
 | Secondary repos have no independent daemon cross-check at salvage | sbx runs a git daemon only for the primary repo | bundle verification, the manifest's ref list, and host-provided bases; J13 keeps a removed repo in the generation's repo set |
 | Between a run and the next `sync`/`run`, an agent can plant files in a memory dir; an operator who opens that dir with host tools sees them | memory dirs are shared by design and checked only when romeu reads them | read memory only through `romeu handoff`; memory dirs are never workspace folders; doctor and the preflight check trust settings (I23) |
-| The approval line in a PR body is typed by the PR's author | a check can prove the line is there, not who said it | branch protection requires a code-owner review for each ask-first path, the decision records and the check code included; the merge is the maintainer's |
+| The approval line in a PR body is typed by the PR's author | a check can prove the line is there, not who said it | the default-branch ruleset requires a code-owner review for each ask-first path, the decision records and the check code included ([12 12.4](12-engineering.md#124-middleware-before-and-after-every-change)); the next row says what that review is worth today |
+| With one GitHub account the code-owner review is not independent: agents push and open PRs as the maintainer, GitHub does not count an author's approval of their own PR, and the maintainer merges as the rulesets' bypass actor | a second account is a cost v1 does not need in order to start | the sandbox's token must not merge, push to the default branch, push a `v*` tag or change a ruleset; the maintainer block of `ci-bootstrap` saves a refusal of each (10 10.2), and Q25 holds the fallback if one is not refused |
+| Nothing reads the rulesets again after the maintainer block | `tools/ci all` is offline, and a ruleset is repository configuration, not a tracked file | changing a ruleset needs the Administration permission, which the sandbox's token must not have; the same block saves the refusal |
+| A `v*` tag runs `release.yml` from the tagged commit, whether or not that commit is on the default branch or was reviewed | a tag ruleset limits who pushes a tag, not which commit it names | the tag ruleset refuses a `v*` tag from anyone but its bypass actor, the maintainer, and the same block saves the refusal of the sandbox's token; `release.yml` runs `tools/ci all` on the tagged commit before it builds |
 | The compatibility check executes the binary it checks | a check run inside the sandbox cannot attest itself | integrity comes from the read-only mount and the host-side drift check of `.romeu/bin`; the check only proves compatibility |

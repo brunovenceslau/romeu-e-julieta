@@ -135,11 +135,8 @@ and verified by `go run ./tools/ci acceptance`, the last plan task.
     `tools/ci` check when it can be one.
 - **Ask first**
   - Any change to a path listed in `.github/ask-first.yaml`
-    ([05 5.3](spec/05-security.md#53-ask-first-surfaces)); it covers the
-    gates, gitsafe, termsafe, digests, signing, the catalog's upload
-    flags, kits and pins, release and publishing paths, Go dependencies,
-    CI actions, file format versions, the exit-code and error table,
-    the decision records, and the code of the CI checks.
+    ([05 5.3](spec/05-security.md#53-ask-first-surfaces)), which is
+    the one list of those surfaces.
 - **Never**
   - Add a code path in `romeu` that configures git hooks, runs mise,
     executes repository content, or opens a terminal pane on the host.
@@ -183,6 +180,7 @@ maintainer decision, and in both cases it becomes an ADR.
 | Q22 | Claude Code hook order on `/clear` | SessionEnd fires before SessionStart; the handoff rules of [08 8.3](spec/08-memory-handoff-salvage.md#83-handoff) hold in either order, the probe confirms the tested order is real | C5, B3 |
 | Q23 | Registry access for descriptors | anonymous HTTPS reads only, cached by digest; an explicit host-settings credential is added only if a private workload registry is needed | maintainer |
 | Q24 | Is ADR 0001, the documentation standard, accepted | **written as if Accepted**. The record is Proposed, so this spec fails the `sequences` clause "every cited ADR is Accepted" ([10 10.2](spec/10-testing-style.md#102-ci)) until the sign-off, which comes before the plan's first task. If it is declined, the PR that marks it Rejected restores the spec text it replaced (no check enforces that) | maintainer |
+| Q25 | With one GitHub account, do the rulesets refuse the sandbox's token while the maintainer still merges and tags | the sandbox's token is a fine-grained token without the Administration permission, and the maintainer, as the rulesets' one bypass actor, merges and tags from their own session. If the maintainer block of `ci-bootstrap` ([10 10.2](spec/10-testing-style.md#release-and-bootstrap)) shows a try that is not refused, agents push from a second account that is not a bypass actor | the maintainer, on the output of that block |
 
 ## Deferred decisions
 
@@ -192,8 +190,8 @@ A row leaves the table when its event happens and the decision is made.
 
 | Deferred | Until then | Reopened by |
 |---|---|---|
-| a scheduled workflow that checks external links (ADR 0001 rule 5) | `tools/ci links` is run by hand; nothing reminds anyone to | the first dead external link found in a review or at a release |
+| a scheduled workflow that checks external links (ADR 0001 rule 5) | `tools/ci links` is run by hand, and once by the final plan task; between those runs nothing reminds anyone to | a dead link in the final plan task's run, or the first one reported after it |
 | generating part of the spell-check word list from the vocabulary table (ADR 0001 rule 5) | one accepted-words list; its format and path are fixed in the plan task that picks the spell checker | the vocabulary table gains a term the chosen checker rejects |
 | docs versioning per release: which docs a reader of an older release sees | the docs on the default branch are the only docs | the first change to a user-facing page after the v1.0.0 tag |
-| generating the step table of [10 10.2](spec/10-testing-style.md#102-ci) from `tools/ci` | the table is hand-written and 12 12.4 links to it instead of copying it | the first time the `fast` set in the code and in the table are found to differ |
-| how a local-gate run is recorded, and what satisfies branch protection's "CI green" when Actions cannot run | no per-PR record format (the `ci-bootstrap` fallback keeps its `interim` item, 10 10.2). One constraint is fixed: `tools/ci` writes the record as an `acceptance.v1` `command` item with the commit and the platform, and nobody types it | the first time the maintainer chooses the local gates for a merge |
+| generating the step table of [10 10.2](spec/10-testing-style.md#102-ci) from `tools/ci` | the table is hand-written and 12 12.4 links to it instead of copying it | the first PR that changes which steps `fast` runs |
+| how a local-gate run is recorded, and what satisfies the ruleset's required checks when Actions cannot run | no per-PR record format (the `ci-bootstrap` fallback keeps its `interim` item, 10 10.2). One constraint is fixed: `tools/ci` writes the record, and nobody types it | the first time the maintainer chooses the local gates for a merge |
