@@ -24,14 +24,14 @@ says what the sources decided, what it cost them, and what we take.
 |---|---|---|---|
 | Paul Hammant, [trunkbaseddevelopment.com](https://trunkbaseddevelopment.com/) | "A source-control branching model, where developers collaborate on code in a single branch called 'trunk' and resist any pressure to create other long-lived development branches by employing documented techniques." | the same page names the long-lived branch as the thing to resist | the "documented techniques" are the price: the two below |
 | the same site, [short-lived feature branches](https://trunkbaseddevelopment.com/short-lived-feature-branches/) | "the branch should only last a couple of days" | "Any longer than two days, and there is a risk of the branch becoming a long-lived feature branch (the antithesis of trunk-based development)." | - |
-| DORA, [trunk-based development](https://dora.dev/capabilities/trunk-based-development/) | "branches in trunk-based development typically last no more than a few hours"; "Have three or fewer active branches in the application's code repository."; "Merge branches to trunk at least once a day." | the page describes "branches and forks having very short lifetimes (e.g., less than a day) before being merged into `main`" | - |
+| DORA, [trunk-based development](https://dora.dev/capabilities/trunk-based-development/) | "branches in trunk-based development typically last no more than a few hours"; "Have three or fewer active branches in the application's code repository."; "Merge branches to trunk at least once a day." | the page counts how often branches and forks are merged to trunk and asks for at least once a day; that wording is our paraphrase, not a sentence of the page | - |
 | Martin Fowler, [FeatureToggle](https://martinfowler.com/bliki/FeatureToggle.html), 29 October 2010 | hide unfinished work on the mainline instead of branching | "How do you use Continuous Integration to keep everyone working on the mainline without revealing a half-implemented feature on your releases?" | see the next row |
 | Pete Hodgson, [Feature Toggles (aka Feature Flags)](https://martinfowler.com/articles/feature-toggles.html), 09 October 2017 | release toggles: "feature flags used to enable trunk-based development for teams practicing Continuous Delivery" | the same sentence | "Release Toggles allow incomplete and un-tested codepaths to be shipped to production as latent code which may never be turned on." |
 | Martin Fowler, [BranchByAbstraction](https://martinfowler.com/bliki/BranchByAbstraction.html), 7 January 2014; steps at [trunkbaseddevelopment.com](https://trunkbaseddevelopment.com/branch-by-abstraction/) | "a technique for making a large-scale change to a software system in gradual way that allows you to release the system regularly while the change is still in-progress" | the same sentence | the steps add an abstraction, a second implementation, a switch, and two removals; that extra work is our reading of the steps, not a sentence of theirs |
 | trunkbaseddevelopment.com, [release from trunk](https://trunkbaseddevelopment.com/release-from-trunk/); DORA, [continuous delivery](https://dora.dev/capabilities/continuous-delivery/) | "Teams with a very high release cadence do not need (and cannot use) release branches at all. They have to release from the trunk." | DORA asks "Is our software in a deployable state throughout its lifecycle?" | - |
 
 The two sources give different ceilings for a branch's life: a couple
-of days on one, a few hours and less than a day on the other. We state
+of days on one, a few hours and a merge at least once a day on the other. We state
 both and pick neither as a gate.
 
 Does their constraint hold for us? Their constraint is many writers on
@@ -77,7 +77,7 @@ We develop on the trunk. The rules, with their checks, are in
    it. `tools/ci pr` fails a pull request with another base.
 2. A branch carries one pull request and lives until that pull request
    merges. v1 defines no stack of pull requests.
-3. `main` is releasable at every commit: a merge needs the full check
+3. `main` is releasable at every merge: a merge needs the full check
    list to pass (10 10.2), and a release is a tag on a commit that
    passed it.
 4. Work that is not finished merges dark, in small pieces, instead of
@@ -85,6 +85,9 @@ We develop on the trunk. The rules, with their checks, are in
    tests. Replacing something that is in use goes through branch by
    abstraction, at an interface the code already has.
 5. Batches are small. We measure pull request size and set no limit.
+6. A merge is a merge commit. Squash and rebase merges are switched
+   off, so the commits of a pull request reach `main` as they were
+   written. The maintainer decided the method.
 
 Why this fits us: the checks run from one tool at one commit (10
 10.2), so "releasable" is a thing a machine says about `main`, not a
@@ -99,9 +102,17 @@ is the cheapest one.
   lived a week or a pull request of two thousand lines; the delivery
   metrics show both, and the review is where they are refused.
 - Dark code is the cost Hodgson names: it ships and may never be
-  turned on. Ours is bounded by the linter, which reports code nothing
-  uses, and by coverage (S9), which counts it. A dark path is tested
-  or it does not merge.
+  turned on. Ours is counted by coverage (S9): a dark path is tested
+  or it does not merge. No linter bounds it. A dark package's entry
+  points are exported identifiers, which a dead-code checker treats as
+  used. A check that bounds how long a package stays dark is deferred
+  with its trigger.
+- Merge commits keep each pull request's commits on `main`, which the
+  fix marker and the release notes read
+  ([ADR 0004, measure delivery with the five DORA metrics computed by a tool](0004-measure-delivery-with-the-five-dora-metrics-computed-by-a-tool.md)).
+  The cost: the commits inside a merge were gated together, as that
+  merge, and not one by one, so "releasable" is a statement about
+  merges.
 - With no stacking, a change that depends on an unmerged pull request
   waits for it. With one reviewer that wait is real, and ADR 0004
   measures it.

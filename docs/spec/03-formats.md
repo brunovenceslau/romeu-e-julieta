@@ -21,8 +21,8 @@ schemas cannot drift. The tables below are the v1 design input to
 | Field | Rule |
 |---|---|
 | project `name` | `^[a-z][a-z0-9-]{0,38}[a-z0-9]$`; unique across the config repo; equals the file stem (satisfies sbx's <= 63 chars, no trailing `-` or `.`) |
-| repo `dir` | `^[a-z0-9][a-z0-9._-]{0,62}$`, not `.` or `..`, no `/`, not `memory`, `review`, `.romeu`, `sbxenv.yaml`, `.git` (compared case-insensitively); unique within the project, also case-insensitively |
-| repo `url` | `https://<host>/<owner>/<repo>[.git]` only; `<host>` must be a host-settings `gitHosts` entry; a URL may appear in at most one project |
+| repo `dir` | `^[a-z0-9][a-z0-9._-]{0,62}$`, not `.` or `..`, no `/`, not `memory`, `review`, `ledger`, `.romeu`, `sbxenv.yaml`, `.git` (compared case-insensitively); unique within the project, also case-insensitively |
+| repo `url` | `https://<host>/<owner>/<repo>[.git]` only; `<host>` must be a host-settings `gitHosts` entry; a URL may appear in at most one project, compared after one normalization: host and path lowercased, a trailing `.git` removed |
 | repo `ref` | a branch name valid under `git check-ref-format --branch` rules, implemented in Go |
 | kit id | `^[a-z0-9][a-z0-9-]{0,62}$` |
 | secret name | `^[a-z0-9][a-z0-9_-]{0,62}$` |
@@ -125,7 +125,7 @@ exec'd; a failing step prints its exit status and drops to a login shell
 in the pane dir. No steps = login shell. Every pane id appears exactly
 once across all tabs.
 
-*Why for us:* dekit and mise daemons add `ready`/`deps`, which is
+*Why for us:* mise daemons add `ready`/`deps`, which is
 supervisor territory; a layout-and-steps list is what we need, and a
 later version could delegate readiness to mise daemons.
 

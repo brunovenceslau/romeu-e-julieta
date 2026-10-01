@@ -24,8 +24,8 @@ place where deferrals live, the
 missing is the principle itself, written where a contributor reads
 it, with its sources.
 
-The phrase "last responsible moment" is the maintainer's wording for
-this principle. We attribute it to no source.
+The principle is the maintainer's. The phrase "last responsible
+moment" is ours, a heading for it, and we attribute it to no source.
 
 | Source | Their decision | Their why | What it cost them |
 |---|---|---|---|
@@ -78,7 +78,7 @@ We decide at the last responsible moment:
 4. **When the event happens, the decision is made** and the row
    leaves the table. If the decision is expensive to reverse, it
    becomes an ADR
-   ([ADR 0001](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md),
+   ([ADR 0001, the documentation standard](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md),
    rule 9).
 
 The principle is in the spec's

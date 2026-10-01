@@ -19,7 +19,7 @@ romeu-e-julieta/
 │  ├─ canon/                   canonical JSON and typed, domain-separated digests
 │  ├─ termsafe/                escaping of control, bidi, zero-width and tag characters for host output
 │  ├─ gitsafe/                 hardened git runner, bundle, create-only refs, validated tree walk
-│  ├─ oci/                     read and verify v3 descriptors by digest (stdlib net/http)
+│  ├─ oci/                     read and verify v3 descriptors by digest (stdlib net/http); shared: julieta's pin commands use it
 │  ├─ catalog/                 embedded catalog (go:embed ../../catalog/egress.yaml) + lookups
 │  ├─ egress/                  derivation from mise files at pinned SHAs
 │  ├─ render/                  candidates, promotion commit, workspace files, render.json, kit materialization via os.Root
@@ -27,11 +27,13 @@ romeu-e-julieta/
 │  ├─ gate/                    widening set, diff, prompt
 │  ├─ signing/                 ssh-agent identity listing for the git-ssh-sign rule (romeu only)
 │  ├─ sbxdrv/                  sbx argv builders and output parsing (romeu only)
-│  ├─ memstore/                memory Store interface, fs backend (os.Root), layout allowlist, JSONL import/verify
+│  ├─ memstore/                memory readers on os.Root, layout allowlist, caps (shared)
+│  ├─ memstore/write/          the Store interface with Put and Delete, fs backend writes, store lock, JSONL import/verify (julieta only)
 │  ├─ handoff/                 handoff files and the handoff reader
 │  ├─ salvage/                 snapshot/salvage (julieta side) and verify/import (romeu side)
-│  ├─ ledger/                  runtime ledger: event schema and its generated tables, emit and drain (julieta side), spool reader, ingest, entries, view (romeu side)
-│  ├─ tools/                   mise driver (julieta only)
+│  ├─ ledger/                  runtime ledger: event schema and its generated tables (shared), spool reader, ingest, entries, view (romeu side)
+│  ├─ ledger/emit/             emit and drain (julieta only)
+│  ├─ mise/                    mise driver (julieta only)
 │  ├─ hooks/                   git hook dispatcher (julieta only)
 │  ├─ layout/                  run layout -> herdr layout.apply, pane step runner (julieta only)
 │  ├─ agent/claude/            the only Claude-aware code: salvage paths, process names
@@ -46,7 +48,7 @@ romeu-e-julieta/
 ├─ skills/
 │  ├─ julieta/SKILL.md         general rule: how to use julieta, memory instead of built-in memory
 │  └─ handoff/SKILL.md         /handoff and /handoff --final
-├─ schemas/                    generated JSON Schema 2020-12 (CC0-1.0): project.v1, host-settings.v1, catalog.v1, render.v1, state-*.v1, handoff.v1, memory-entry.v1, manifest.v1, salvage.v1, probe-result.v1, acceptance.v1, runtime-event.v1
+├─ schemas/                    generated JSON Schema 2020-12 (CC0-1.0): project.v1, host-settings.v1, catalog.v1, render.v1, state-*.v1, handoff.v1, memory-entry.v1, manifest.v1, salvage.v1, probe-result.v1, acceptance.v1, runtime-event.v1, run-timings.v1
 ├─ examples/                   example config repo (projects/*.yaml, kits/) used by tests and docs (CC0-1.0)
 ├─ e2e/
 │  ├─ *_test.go                //go:build e2e - git + docker, fake sbx
@@ -67,7 +69,7 @@ romeu-e-julieta/
 │  ├─ adr/                     decisions (adr-tools layout, .adr-dir -> docs/adr); README.md is the generated index; an ask-first surface
 │  ├─ guide/                   one page per journey
 │  ├─ reference/               generated reference pages (12 12.3)
-│  ├─ probes/                  committed probe-result.v1 files (blocks A, B and C)
+│  ├─ probes/                  committed probe-result.v1 files (blocks A and B)
 │  ├─ acceptance.json          evidence per success criterion (acceptance.v1)
 │  └─ lessons.md               one entry per lesson, with the check that enforces it
 ├─ .githooks/pre-push          mode 100755; runs go run ./tools/ci fast with git's arguments and stdin
@@ -214,5 +216,6 @@ a plain operator clone used for navigation and egress derivation.
 The decision rests on documented sbx behavior (additional workspaces are
 direct mounts) and does not wait for a probe. Probe A3 measures what
 still is mounted: that memory dirs refuse or survive planted content as
-08 expects, that a hostile spool is read as 13 expects, and that
-`readOnly` mounts (`.romeu/bin`, `ledger/view`) are enforced.
+08 expects, that a hostile spool is read as 13 expects, that
+`readOnly` mounts (`.romeu/bin`, `ledger/view`) are enforced, and that
+a write from the sandbox to the primary host clone is refused.

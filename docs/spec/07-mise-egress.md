@@ -34,9 +34,10 @@ via shims and `mise exec -C`.
 
 ## 7.3 Lockfile rules
 
-- `mise.lock` must list `linux-x64` and `linux-arm64` (plus `macos-x64`,
-  `macos-arm64` so the same lock serves a macOS CI or host if wanted);
-  `julieta lock` always passes all four platforms.
+- `mise.lock` must list `linux-x64` and `linux-arm64`, the platforms a
+  sandbox runs. `julieta lock` always passes all four platforms, so the
+  same lock also serves a macOS CI; `--check` requires the two linux
+  ones and reports a missing macOS entry as a warning.
 - `julieta install` runs `mise install` with `MISE_LOCKED=1`; a repo with
   `mise.toml` but no `mise.lock` fails with "run `julieta lock`".
 - Backends whose artifacts mise cannot URL-lock (`go:`, `cargo:`,
@@ -50,7 +51,7 @@ via shims and `mise exec -C`.
   overrides).
 - Freshness is checked deterministically, not remembered: `julieta lock
   --check` (every tool in `mise.toml` has a lock entry; every lockable
-  entry covers the four platforms) runs in the git hook dispatcher's
+  entry covers the two linux platforms) runs in the git hook dispatcher's
   `pre-commit` when `mise.toml` or `mise.lock` is staged, and in the
   product repo's CI (`tools/ci mise`).
 - julieta sets `MISE_TRUSTED_CONFIG_PATHS` to the manifest's repo paths
@@ -125,7 +126,9 @@ cannot know.
   (01 1.4). A project sees gate 2 only when its gated egress changes.
 - `julieta spec validate --catalog projects/*.yaml` fetches every
   project's repos' `mise.lock` at their `ref` and lists unknown
-  `backend:tool` keys and lock hosts missing from the catalog; it runs in
-  the config repo's CI from a pinned julieta release.
+  `backend:tool` keys and lock hosts missing from the catalog, and
+  exits 1 when it lists one; it runs in the config repo's CI from a
+  pinned julieta release, so that CI is red until the unknown is resolved (7.5, step 2, names
+  the two fixes).
 - Every domain used anywhere has an explicit `upload` flag (CI check);
   multi-tenant object stores are `upload: true`.

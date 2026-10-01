@@ -33,10 +33,11 @@ model is wrong.
 | Truth, machine-local | host settings; host state, the runtime ledger included | operator (settings); romeu (state) | never mounted into any sandbox |
 | Generated, in git | `schemas/*.json`, `docs/reference/*`, `.github/CODEOWNERS`, the field and rule tables of this spec's implementation | `go generate ./...` | `tools/ci generated` fails on any diff; never hand-edited |
 | Candidate (unapproved) | `<name>-env/.romeu/candidates/<candidate-id>/` (rendered files and materialized kits) | romeu `sync` | the gate; promoted only on approval (1.6) |
-| Derived, live | `<name>-env/sbxenv.yaml`, `.romeu/render.json`, `.romeu/kits/*`, `.romeu/bin/*`, `$ROMEU_ROOT/dev.code-workspace`, `$ROMEU_ROOT/review.code-workspace` | romeu (promotion) | drift-checked by hash before every overwrite and before every sbx call |
+| Derived, live | `<name>-env/sbxenv.yaml`, `.romeu/render.json`, `.romeu/kits/*`, `.romeu/bin/*` | romeu (promotion) | drift-checked by hash before every overwrite and before every sbx call of a **P** command (1.5) |
+| Derived from state | `$ROMEU_ROOT/dev.code-workspace`, `$ROMEU_ROOT/review.code-workspace` | romeu (each promotion and `retire`) | written again whole from host state each time; no record holds their hash, so they are not drift-checked and a hand edit is overwritten |
 | Derived from the ledger | `<name>-env/ledger/view/*` | romeu (ingest) | `doctor` derives it again and compares byte for byte ([13 13.6](13-runtime-ledger.md#136-view)) |
 | Derived, in sandbox | secondary clones, installed tools, julieta manifest cache, herdr layout, the `julieta` link on `PATH` | julieta | disposable; recreated by `julieta setup` |
-| sbx-owned facts romeu reads | sandbox existence, state and workspace path (`sbx ls --json`), `remote.sandbox-<name>` URL, sbx version | sbx | read only |
+| sbx-owned facts romeu reads | sandbox existence, state and workspace path (`sbx ls --json`); the `remote.sandbox-<name>.*` keys sbx writes into the primary host clone's `.git/config`, of which romeu reads the URL; sbx version | sbx | read only |
 | Agent output that reaches the host | memory dir files; git objects via fetch or bundle; spool files of the runtime ledger | agents / julieta | data only: validated, escaped for display, stored in romeu namespaces or as ledger entries; never executed, never checked out outside a hardened review checkout |
 
 *Why for us (drift rule):* chezmoi refuses to overwrite a target that
@@ -74,8 +75,8 @@ version change and the catalog diff (domains added or removed per
 `backend:tool`, upload flags changed) with the projects each change
 affects. Every command that invokes sbx compares the live
 `sbx version`, its own version and its embedded catalog digest to the
-record and exits 3 on a mismatch; `romeu status` reports the mismatch
-instead of exiting 3. This keeps an sbx or romeu upgrade from turning
+record and exits 3 on a mismatch; `romeu status` and `romeu doctor`
+report the mismatch instead of exiting 3. This keeps an sbx or romeu upgrade from turning
 into a gate on every project.
 
 ### Gate 2: project widening (per project)
@@ -109,9 +110,11 @@ phase, mounts and volumes, credentials/secrets, ssh-agent use, privileges
 strict subset grammar: no YAML anchors, aliases, merge keys or includes,
 and any key or capability type the model does not know is a sync error
 (fail closed). Kit-declared network domains go through `egress.Split`,
-so upload-capable ones appear in `egressGated`. Personal kits may not
-declare network, mount, volume or credential capabilities (sync error);
-they carry files and agent context only.
+so upload-capable ones appear in `egressGated`. A personal kit that
+declares a network, mount, volume, credential or ssh-agent capability
+is refused (sync error). Its other capabilities (install steps,
+privileges, lifecycle hooks) are not refused: they are shown in the
+gate 2 diff.
 
 The gate diff is never truncated. It starts with a summary (each changed
 field, file counts and line counts per kit), then shows every changed
@@ -126,10 +129,12 @@ Approvals are per machine by design. *Why for us:* Codespaces
 authorizes extra repo access at create, per user; ours is per machine
 because secrets resolve on that machine.
 
-## 1.5 Preflight on every sbx path
+## 1.5 Preflight before every mutating sbx call
 
 Every romeu command marked **P** in [04](04-cli.md#42-romeu-host) runs,
-in this order, before invoking sbx, and stops at the first failure:
+in this order, before any mutating sbx call, and stops at the first
+failure. Steps 1, 5 and 6 read from sbx (`sbx version`, its settings
+and policies, `sbx ls --json`) and change nothing:
 
 | Step | Check | Exit |
 |---|---|---|
@@ -138,7 +143,7 @@ in this order, before invoking sbx, and stops at the first failure:
 | 3 | drift of every live derived file against `render.json` | 4 |
 | 4 | widening digest recomputed from the live files equals the approval (gate 2) | 3 |
 | 5 | host checks shared with `doctor` that can widen a sandbox behind romeu's back: sbx global secrets and broad allow rules (I22), host tools that auto-trust `$ROMEU_ROOT` (I23), and, for a project using `git-ssh-sign`, the signing socket rule of [06 6.4](06-kits.md#64-product-kits) | 2 |
-| 6 | sandbox identity (I26) | 2 |
+| 6 | sandbox identity (I26): an absent sandbox passes; a present one must have an open generation romeu recorded (`RJ-203 unknown-sandbox` otherwise) and the workspace path `$ROMEU_ROOT/<name>-env/<primary>` | 2 |
 
 The preflight never touches the network: descriptors come from the
 content-addressed cache in host state, filled only by `sync`. Destructive
@@ -177,8 +182,11 @@ a crashed `sync`) is deleted by the next `sync`.
 
 ### Promotion commit
 
-Promotion is crash-safe without a rollback copy: nothing the live
-`sbxenv.yaml` references is modified before the commit point.
+Promotion is crash-safe without a rollback copy: nothing gate 2
+covers is modified before the commit point. `.romeu/bin` is not in
+gate 2 (it is a fixed mount whose content may change, 06 6.3); step 2
+rewrites it, under a running sandbox too, and a crash there is rolled
+forward by the recovery below.
 
 1. Write `render.json` (atomic rename) with `promoting: <candidateId>`.
 2. Copy kits into content-addressed, immutable dirs
@@ -202,14 +210,23 @@ A generation is one sandbox lifetime, identified by a ULID.
 
 | From | Event | To | Effect |
 |---|---|---|---|
-| (none) | `run` creates the sandbox | open | record id, recreate digest, workspace path, the repo set |
+| (none) | `run` finds the sandbox absent and is about to create it | open | record id, recreate digest, workspace path, the repo set, written before `sbx env run` |
+| open | the `sbx env run` of that same command returns non-zero | (none) | the record just written is removed |
 | (none) | `adopt` on TTY, workspace path matches | open | record as above with `adopted: true` and an unknown recreate digest |
 | open | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half | salvaging | new salvage id |
+| salvaging | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command was interrupted or failed) | salvaging | new salvage id |
+| open | `salvage --from-host` | open | refs and snapshot bundles imported under a new salvage id; salvage record `result: lost`, `reasons: [sandbox-lost]` |
 | salvaging | salvage verified; command was `salvage` | open | salvage record `result: complete` |
 | salvaging | salvage incomplete, no `--accept-loss` | open | salvage record `result: incomplete` with reasons; exit 5 |
 | salvaging | salvage complete or `--accept-loss`; command removes the sandbox | closed-removed | `sbx env rm`, egress rules removed |
 | open | `run` or `rm` finds the sandbox absent | closed-lost | refs and snapshots preserved as a salvage record `result: lost` |
 | salvaging | sandbox found absent (crash recovery) | closed-lost | as above |
+
+A romeu killed between the first row's record and the end of
+`sbx env run` leaves an open generation: the next `run` finds the
+sandbox absent and closes it as lost, or finds it present and goes on.
+`salvage --from-host` does not close a generation; closing stays with
+the row that finds the sandbox absent.
 
 Salvage always uses the generation's recorded repo set, not the current
 spec, so a repo removed from the spec (J13) is still salvaged. Whether
@@ -251,7 +268,7 @@ or error messages.
 | widening set | gate 2's digested content | - |
 | recreate-class | fields tagged `apply:"recreate"`: repos, kits, workload, ports, sandbox options, agent, and (until probe A10 says otherwise) secrets | - |
 | review checkout | a hardened checkout of sandbox work under `<name>-env/review/<dir>/` | - |
-| sandbox probe | a check run inside a sandbox by the maintainer, ids `C1..C5` | - |
+| sandbox probe | a block B check that the probe harness runs inside a sandbox, ids `C1..C5` | - |
 | runtime ledger | the per-machine, add-only store of runtime events under host state; "the ledger" on its own means this | - |
 | spool | a project's agent-writable directory where julieta writes events until romeu ingests them | - |
 | ingest | romeu reads one project's spool and creates ledger entries | - |

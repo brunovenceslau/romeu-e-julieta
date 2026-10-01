@@ -13,7 +13,7 @@ and `oci`. Type: reference with the decision record for each choice.
 | Build | **local directory sources**: on approval romeu promotes kit sources into content-addressed dirs `<name>-env/.romeu/kits/<kit>-<digest12>/`; sbx builds them at create and reuses its cache when unchanged | no registry needed in v1; a kit change applies on recreate; immutable dirs make promotion crash-safe (01 1.6) |
 | Materialization | product kits from romeu's embedded copy; personal kits from the config commit's tree through `git fsck --strict` and `gitsafe.WalkTree` (I27), written with `os.Root` into the candidate | agent-authored trees never reach a live path before the gate |
 | Capabilities | romeu parses every descriptor (local kits from their files, the workload from its image annotation via `internal/oci`, verified by digest at every hop) with a strict subset grammar into a normalized capability set that enters gate 2 (I28); kit-declared domains go through `egress.Split`; parsed descriptors are cached by digest in host state | a kit is a capability grant, so its capabilities are what the gate must show; romeu and sbx must read the same descriptor the same way |
-| Personal kits | may carry files and agent context only; network, mount, volume and credential capabilities are refused | personal kits should not widen a sandbox silently |
+| Personal kits | network, mount, volume, credential and ssh-agent capabilities are refused (sync error). The other capability types, install steps, privileges and lifecycle hooks, are not refused: a personal kit that declares one is shown in the gate 2 diff | personal kits should not widen a sandbox silently, and a refusal we state is one the code makes |
 | Signing | **none in v1** (local v3 kits cannot be signed); trust = romeu release + approved config commits | honest about the limit; the gate hashes kit content |
 | Kit sets | not used (they need published refs) | - |
 
@@ -74,8 +74,24 @@ render `git-ssh-sign` (exit 2, `RJ-204 signing-socket`) unless
 that key equals the kit's `signingKey` arg. The full host agent is never
 forwarded. `internal/signing` checks this with the ssh-agent protocol's
 identity listing (no dependency, no subprocess); the same check runs in
-`doctor` and in the preflight of every sbx call for that project. How
+`doctor` and in the preflight of that project's **P** commands (01 1.5). How
 sbx is made to forward that socket is Q19.
+
+**herdr.** herdr is the terminal multiplexer that runs inside the
+sandbox and that julieta renders a run layout into (01 1.1). Its
+upstream is [github.com/herdrdev/herdr](https://github.com/herdrdev/herdr).
+Measured there on 2026-10-01, over its last three releases: each
+publishes one binary per platform, with no checksum file and no
+signature; each is marked immutable; the release API returns a sha256
+digest for each asset; and the release workflow has no signing or
+build-attestation step. So the pin is a version and a sha256 per
+architecture, and `go run ./tools/kitpin herdr <version>` writes both:
+it takes each hash from the release API's digest and refuses a release
+that is not marked immutable. The kit's install step checks the
+download against that hash. What the hash does not prove is a residual
+risk ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1)).
+mise's pin, which has a signed checksum file, is in
+[07 7.4](07-mise-egress.md#74-mise-bootstrap-and-its-own-egress).
 
 The `julieta` mixin carries nothing agent-specific, so a future
 `julieta-<agent>` mixin is all another agent needs.

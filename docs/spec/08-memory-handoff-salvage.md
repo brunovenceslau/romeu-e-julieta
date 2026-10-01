@@ -16,10 +16,9 @@ merely present.
 | Mount | direct rw into that project's sandbox only; never mounted by two sandboxes; never a VS Code folder |
 | Layout allowlist | top level contains only `entries/`, `handoff/`, `snapshot/`, `salvage/`, `import/`; regular files only (checked with Lstat); no dotfiles, no `.git`, no symlinks, FIFOs or devices; caps: 1 MiB per entry or handoff file, 10 000 entries, snapshot and salvage payloads bounded by the salvage cap |
 | Enforcement | `julieta memory check` fails on a violation; romeu `sync` and `run` refuse (exit 2) and name the offending path; romeu reads memory only through `memstore`'s `os.Root` readers and never extracts archives from it (I24) |
-| Interface | `memstore.Store`: `List(filter)`, `Get(id)`, `Put(entry)`, `Delete(id)`, `Search(query)` |
+| Interface | two packages, split by what each side needs. `memstore`, linked by both binaries, holds the readers on `os.Root`, `List(filter)`, `Get(id)` and `Search(query)`, with the layout allowlist and the caps. `memstore/write`, linked by julieta only, holds `Store`, which adds `Put(entry)` and `Delete(id)`, the store lock, and import and verify. romeu links no code that can delete a memory entry, so the I16 scan needs no exception for one |
 | v1 backend | `fs` on `os.Root`; atomic writes (temp + rename); a file lock per store for concurrent julieta processes |
 | Stamping | julieta assigns the ULID `id` and the `created`/`updated` timestamps on `add` and `edit`; callers cannot supply them (principle: deterministic) |
-| Swappable | backends register by name; v1 accepts only `fs` |
 | Portability | machine-local in v1 (Q14) |
 | Agent neutrality | markdown + YAML front matter; no agent-specific fields |
 
@@ -59,7 +58,7 @@ run every time, never remembered.
 
 | Hook | Command | Prints or writes |
 |---|---|---|
-| SessionStart | `julieta handoff show --hook` | the latest narrative handoff and the facts that changed since it (branch moved, new commits, dirty count); open memory entries; entries tagged `lesson`; julieta's warnings: a stale `mise.lock`, snapshots disabled for a repo, the agent's own memory dir writable or not empty, and every hook failure recorded since the last session |
+| SessionStart | `julieta handoff show --hook` | the latest narrative handoff and the facts that changed since it (branch moved, new commits, dirty count); open memory entries; entries tagged `lesson`; julieta's warnings: a stale `mise.lock`, snapshots disabled for a repo, the agent's own memory dir writable or not empty, and every recorded hook failure (shown until a later run of the same hook succeeds, below) |
 | SessionEnd | `julieta handoff write --facts` | a `facts` handoff, so a session that ends without `/handoff` still leaves stamped git facts |
 
 julieta records every failing git hook run (hook, repo, exit status,
@@ -121,7 +120,9 @@ that does not finish is recorded in the salvage record's `reasons` as
 `ledger-incomplete`. It is not a skipped item: it changes no `result`
 and no exit status, so it never makes `rm` exit 5. Events julieta
 writes during the sandbox half stay in the spool, which is a host
-directory and outlives the sandbox, for the next ingest.
+directory and outlives the sandbox, for the next ingest. `retire` has
+no next ingest, because it moves the spool away, so it ingests once
+more after the sandbox half and before the move.
 
 ### Sandbox half: `julieta salvage` (run by romeu via `sbx env exec`)
 
@@ -130,6 +131,9 @@ manifest.
 
 1. `--stop-agents`: SIGTERM to the agent's processes (names from
    `internal/agent/<agent>`), wait up to 10 s, then SIGKILL; record it.
+   `cmd/julieta` passes the agent profile (process names, state paths)
+   to `salvage`; the `salvage` package, which romeu links too, does
+   not import `agent/*`.
 2. For each repo in the manifest, for each worktree from
    `git worktree list --porcelain`:
    - uncommitted tracked and untracked (non-ignored) changes: tree

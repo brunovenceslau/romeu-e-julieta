@@ -120,8 +120,8 @@ romeu e julieta keeps a runtime ledger, specified in
    edits or removes one (I31). No tombstone, no redaction event.
 3. **No free text in a v1 event.** `type`, `tool` and `ref` are valid
    by membership in tables generated from the release's own code and
-   data, never from a project file. `path` is the one wide value and
-   does not cross projects.
+   data, never from a project file. An event names no file: a field
+   for a path is deferred with its trigger.
 4. **The spool is untrusted input** and is read under the regime the
    memory directories have (I32). A file that fails a check becomes a
    rejected entry; a failed ingest never blocks `salvage` or `rm`.
@@ -130,9 +130,9 @@ romeu e julieta keeps a runtime ledger, specified in
    full ledger is read on the host (I33).
 6. **Versioned.** The event format has a version and romeu ingests
    versions N and N-1. The view policy has its own version.
-7. **A leaked secret is handled by rotating the credential.** A
-   pattern check rejects an event that matches, as defense in depth,
-   and rewrites nothing.
+7. **A leaked secret is handled by rotating the credential.** Nothing
+   is rewritten. v1 has no pattern check: with no field wider than an
+   id, it would have nothing to find.
 8. **v1 detects a content mismatch of ingested event bytes, and a
    removal goes undetected.** The spec says so where it states the
    rule.
@@ -171,7 +171,8 @@ drain.
   hard size limit, a hash chain, cross-machine sync, finer visibility
   per project, analysis beyond `query`, a free-text note, keeping
   rejected bytes, a cleaner for skipped spool files, more event types
-  and fields, tuning the starting values, and a record of gate runs.
+  and fields, a `path` field, removing a member from a membership
+  table, tuning the starting values, and a record of gate runs.
 - This record stays Proposed until the maintainer signs it off. What
   holds until then is Q24 in the spec's
   [Open questions](../spec.md#open-questions).

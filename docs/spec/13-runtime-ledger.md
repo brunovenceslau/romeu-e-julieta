@@ -79,10 +79,12 @@ One event is one JSON file in the spool, schema `runtime-event/v1`. An
 event has closed fields and no free text, for the writing project's
 own events as much as for other projects'. That is what lets the
 absolute rule hold: a field that cannot carry a sentence cannot carry
-a pasted token, so there is nothing to redact later.
+a pasted token, so there is nothing to redact later. The widest value
+an agent chooses is `id`, 26 characters of a fixed alphabet, and it
+stays out of the cross-project view.
 
 ```json
-{"schema":"runtime-event/v1","id":"01j9zc2q8x7w4t6y3r5e1v9k0p","observed":"2026-10-02T09:20:00Z","type":"command-failed","tool":"core:go","exit_code":1,"duration_ms":4210,"path":"mise.toml"}
+{"schema":"runtime-event/v1","id":"01j9zc2q8x7w4t6y3r5e1v9k0p","observed":"2026-10-02T09:20:00Z","type":"command-failed","tool":"core:go","exit_code":1,"duration_ms":4210}
 ```
 
 Fields julieta writes. Each is a claim of the sandbox:
@@ -90,14 +92,13 @@ Fields julieta writes. Each is a claim of the sandbox:
 | Field | Domain | In the cross-project view |
 |---|---|---|
 | `schema` | `runtime-event/v<n>` | yes |
-| `id` | a ULID in the lowercase Crockford alphabet (26 characters), from julieta's injected entropy ([10 10.4](10-testing-style.md#104-determinism-seams-and-golden-governance)); equals the spool file's name without `.json` | yes |
+| `id` | a ULID in the lowercase Crockford alphabet (26 characters), from julieta's injected entropy ([10 10.4](10-testing-style.md#104-determinism-seams-and-golden-governance)); equals the spool file's name without `.json` | no: it is 26 characters an agent chose, and no consumer in another project needs it |
 | `observed` | RFC 3339, UTC, the `Z` suffix, whole seconds, from julieta's injected clock | yes |
 | `type` | a member of the event-type table: `command-failed`, `hook-failed`, `note` | yes |
 | `tool` | a member of the tool table: a julieta command name, a key of the embedded catalog's `tools`, or `other` | yes |
 | `ref` | a member of the id table: an invariant id, a probe id or an error id | yes |
 | `exit_code` | an integer in the range of [13.8](#138-starting-values) | yes |
 | `duration_ms` | an integer in the range of 13.8 | yes |
-| `path` | one path relative to the repo julieta ran in: bytes from `A-Z a-z 0-9 . _ - /`; no leading or trailing `/`; no empty, `.` or `..` segment; length within 13.8 | no |
 
 Fields romeu stamps at ingest. They are never read from the spool:
 
@@ -108,11 +109,11 @@ Fields romeu stamps at ingest. They are never read from the spool:
 
 Which fields a type carries:
 
-| `type` | `tool` | `ref` | `exit_code`, `duration_ms` | `path` | Producer |
-|---|---|---|---|---|---|
-| `command-failed` | required | optional: the error id the command failed with | required | optional | julieta, when one of its commands exits non-zero |
-| `hook-failed` | required: `hooks run` | absent | required | absent | julieta's hook dispatcher, when a hook exits non-zero |
-| `note` | optional | optional | absent | optional | `julieta event add`; at least one of the three is present |
+| `type` | `tool` | `ref` | `exit_code`, `duration_ms` | Producer |
+|---|---|---|---|---|
+| `command-failed` | required | optional: the error id the command failed with | required | julieta, when one of its commands exits non-zero |
+| `hook-failed` | required: `hooks run` | absent | required | julieta's hook dispatcher, when a hook exits non-zero |
+| `note` | optional | optional | absent | `julieta event add`; at least one of the two is present |
 
 An optional field that does not apply is absent. `null` is outside
 every domain.
@@ -127,7 +128,10 @@ Rules:
   `internal/cli` error table
   ([12 12.3](12-engineering.md#123-generators)). No table reads a
   project's spec, manifest or repository. A string an agent chose
-  therefore has no way into `type`, `tool` or `ref`.
+  therefore has no way into `type`, `tool` or `ref`. A julieta command
+  name is the full command path as `--help` prints it, words separated
+  by one space (`setup`, `hooks run`, `memory add`). In v1 a table only
+  gains members (13.7).
 - **`tool: other`** is the one member that stands for "a tool the
   catalog does not know". julieta writes it when a tool that fails is
   only in a project's own `egress.tools` or `mise.toml`. We added the
@@ -156,18 +160,10 @@ Rules:
   `project`, then entry key, and a test pins that order (13.10). v1
   has no host decision that reads `id` or `observed`. A consumer that
   computes a duration from `observed` computes with a claim.
-- **`path` is the widest value in v1** and stays out of the
-  cross-project view. Inside its own project it is prompt-injection
-  surface in the way a memory entry is (05 5.4).
-- **The secret-pattern check** runs over each string value before an
-  entry is written, as defense in depth. With the closed sets above,
-  `path` is the one field where it can find something. A hit rejects
-  the event with reason `secret-pattern`. It is a check, not a
-  redaction: nothing is rewritten, so stored bytes always equal hashed
-  bytes. The pattern list is committed data in `internal/ledger`, on
-  the `ledger` surface
-  ([05 5.3](05-security.md#53-ask-first-surfaces)); the plan task
-  that builds the ingester writes its entries.
+- **An event names no file.** v1 has no field for a path: a field
+  wide enough for one is wide enough for a token, and no consumer of
+  13.9 reads one. It is a
+  [deferred decision](../spec.md#deferred-decisions) with its trigger.
 - **A secret that still lands in the ledger stays there.** The remedy
   is to rotate the credential (05 5.4).
 
@@ -191,7 +187,13 @@ also write a spool file by hand, which is why the spool is a claim
 - `julieta event add` emits `note`.
 - romeu writes rejected entries (13.5) and no event.
 
-julieta emits only when the manifest names a spool
+julieta's emit and drain live in `internal/ledger/emit`, a package
+only julieta links
+([10 10.7](10-testing-style.md#107-module-boundaries-enforced-by-toolsci-imports)),
+so the code that deletes spool files is outside what romeu links and
+outside the scan of 13.5. The validator is in the parent package,
+shared by emit and ingest. julieta emits only when the manifest names
+a spool
 ([03 3.6](03-formats.md#36-julieta-manifest-schema-manifestv1)), and
 emitting is best effort: it validates the event with the same
 generated validator romeu uses, writes it to a temporary name in the
@@ -246,12 +248,6 @@ has one implementation.
   Each ingest and `doctor` report a count per reason and the first
   paths of each reason, in name order, up to the reporting limit of
   13.8. v1 has no cleaner for them (a deferred decision).
-- **The count cap** (13.8) applies to layout-valid files. Violations
-  are counted apart, so they cannot use it up. Past the cap, ingest
-  takes files in name order up to the cap and reports the number left
-  as `over-cap`; they are read by the next ingest after julieta
-  drains. An agent that fills the spool with low names can delay its
-  own project's events, which is the same power as deleting them.
 - **Draining.** romeu deletes nothing it does not own (I16), and
   julieta owns the spool. The view lists the keys that have an entry
   (13.6). `julieta setup` hashes each spool file and deletes it when
@@ -269,13 +265,18 @@ inside four commands, at the step each one names:
 `romeu sync` (for each target project), `romeu run`, `romeu salvage`
 (before the sandbox half, so also in `rm`, `recreate` and `retire`),
 and `romeu ledger ingest`
-([04 4.2](04-cli.md#42-romeu-host)). The spool is a host directory,
-so ingest needs no sandbox.
+([04 4.2](04-cli.md#42-romeu-host)). `retire` ingests a second time,
+after the sandbox half and before it moves `<name>-env/` away: the
+spool moves with that directory, so the events julieta wrote during
+its last salvage would otherwise have no next ingest. The spool is a
+host directory, so ingest needs no sandbox.
 
 **A failed ingest never blocks.** An ingest that could not finish (a
 bad spool root, an entry that could not be written, an entry whose
 name exists with other content) is reported with the error id
-`ledger-incomplete`, and the command it runs inside continues with its
+`ledger-incomplete`, the one id an ingest ends with; its details carry
+the reason of each file or entry, `ledger-entry-mismatch` for the
+last case (04 4.4). The command it runs inside continues with its
 exit status unchanged. `salvage` records `ledger-incomplete` in the
 salvage record's `reasons` without changing `result`
 ([08 8.5](08-memory-handoff-salvage.md#85-salvage-complete-before-destruction)).
@@ -306,7 +307,6 @@ For each file the spool reader hands over:
    | 3 | the keys are those of that version and of the event's `type`: none unknown, none missing | `event-keys` |
    | 4 | `id` equals the file name | `event-id` |
    | 5 | each field is inside its domain (13.2) | `event-domain` |
-   | 6 | the secret-pattern check | `secret-pattern` |
 
    The version is read before the keys, so an event of a newer version
    that carries a field this romeu does not know is skipped and kept,
@@ -322,6 +322,11 @@ ingested.
 Mutating romeu commands hold `romeu.lock` (04 4.1), so two ingests do
 not overlap in normal use and view derivation is serialized by that
 lock. I31 does not depend on the lock: it holds for writers that race.
+One thing does depend on it: a temporary name a crash left in the
+ledger directory is unlinked by the command, under the lock, before
+its first ingest. The ingest function itself removes only the
+temporary name it created, so one racing ingest cannot unlink a file
+another is about to link.
 
 ## 13.5 Entries
 
@@ -333,7 +338,9 @@ $XDG_STATE_HOME/romeu/ledger/<project>.<key>.entry
 ```
 
 `<project>` is a project name (03 3.1, no `.`) and `<key>` is 64
-lowercase hex characters. Entries of a retired project stay.
+lowercase hex characters. Entries of a retired project stay. A project
+created later under a retired project's name reads those entries as
+its own, because in v1 the name is the identity.
 
 An entry is one header line and, for an ingested entry, the event
 bytes:
@@ -363,15 +370,17 @@ the guard:
 2. Write it, sync it to disk and close it.
 3. Hard-link it to the entry's name. A link fails when the name
    exists, so an entry is never replaced.
-4. Unlink the temporary name. A leftover from a crash is unlinked at
-   the start of the next ingest.
+4. Unlink the temporary name. A leftover from a crash is unlinked by
+   the next command that ingests, under `romeu.lock` and before its
+   first ingest (13.4), never by the ingest function.
 
 When the link fails because the name exists (in Go,
 `errors.Is(err, fs.ErrExist)`), romeu compares the new entry with the
 existing one: for an ingested entry, `kind` and the event region; for
 a rejected entry, `kind`, the key and the reason id. Equal means the
-entry is present. Different is the error `ledger-entry-mismatch`,
-which fails the ingest and which `doctor` reports. The headers are
+entry is present. Different is the reason `ledger-entry-mismatch`:
+the ingest ends with `ledger-incomplete`, and `doctor` reports the
+mismatch under its own id (04 4.4). The headers are
 not compared whole: the `ingested` stamp of two racing writers
 differs, so a whole-file compare would call each race a mismatch.
 
@@ -385,7 +394,9 @@ What enforces "created once, never written again", stated plainly:
   entry: it admits, in that package, a write-open only with
   `O_CREATE|O_EXCL` on a temporary name, `os.Link` only in the create
   function, `os.Remove` only on a temporary name, and a rename only
-  inside a view directory.
+  inside a view directory. Each is a named function in the table of
+  admitted call sites (05 5.2). `internal/ledger/emit` is not in this
+  scan: romeu does not link it.
 - Neither proves that another package, another program or a person on
   the host leaves the directory alone. That part is a promise.
 
@@ -409,7 +420,8 @@ ingest that added nothing writes nothing.
 
 Lines are ordered by `ingested`, then `project`, then key. The key of
 another project's entry is left out because it is the digest of bytes
-that include `path`, and a sandbox could test guesses against it.
+that include `id`, which does not cross projects, and a sandbox could
+test guesses against it.
 
 **View policy.** The cross-project allowlist is one current policy
 with its own version, `ledger-view/v<n>`. It is the struct tags on the
@@ -432,6 +444,16 @@ generated allowlist.
   writes the current version. Stored entries are never migrated: that
   would be an edit. A new version is additive; a breaking change is a
   new major with its own ADR.
+- **Membership tables only grow.** The tables of `type`, `tool` and
+  `ref` are bound to the release, and the ingest window to the event
+  version alone. So a release that removed a member (a catalog `tools`
+  key, an error id, a probe id, a command) would reject, on the first
+  `run` after the upgrade, each spool file an older julieta wrote with
+  that member. In v1 a member is only ever added; removing one is a
+  breaking change of the event format. The cost is that a dead key
+  stays in its table until a major. Validating against the previous
+  release's tables is a
+  [deferred decision](../spec.md#deferred-decisions).
 - **Ingest window.** romeu at version N ingests N and N-1, the rule
   the manifest protocol has (03 3.6). A version older than the window
   is rejected (`event-version`). A newer one is skipped as
@@ -451,12 +473,10 @@ what reopens them. This table is the one place they are written.
 | Value | Default |
 |---|---|
 | size cap of one spool file | 64 KiB |
-| count cap: layout-valid files taken by one ingest | 10 000 |
 | names examined by one ingest | 20 000 |
 | paths reported per violation reason | 10 |
 | `exit_code` | -1 to 255 |
 | `duration_ms` | 0 to 86 400 000 (one day) |
-| `path` length | 1 to 256 bytes |
 | ledger size at which `doctor` warns | 64 MiB |
 
 The ledger only grows. Past the size in the last row `doctor` warns,
@@ -490,7 +510,7 @@ The hostile spool table (U; I32):
 
 | Spool content | Outcome |
 |---|---|
-| a symlink, a FIFO, a directory, a device node, each named `<id>.json` | skip `type`; the FIFO does not block |
+| a symlink, a FIFO, a directory, each named `<id>.json` | skip `type`; the FIFO does not block. A device node has the same outcome and needs root to create, so probe A3 plants it and no unit row does |
 | a dotfile; a name containing `..`; another extension; an uppercase `<id>` | skip `name` |
 | two names that differ in case alone | the lowercase one has its own outcome; the uppercase one is skip `name` |
 | a valid event padded with whitespace to the size cap | entry |
@@ -499,8 +519,6 @@ The hostile spool table (U; I32):
 | a file replaced by rename after the open, through the same hook | the outcome of the bytes of the file that was opened |
 | a file rewritten in place after the open, through the same hook | the outcome of the bytes read; the stored region hashes to the key |
 | more violations of one reason than the reporting limit | the exact count; the first paths in name order, up to the limit |
-| layout-valid files at the count cap | each has its outcome; `over-cap` is 0 |
-| one more | the first ones in name order up to the cap; `over-cap` is 1 |
 | more names than the listing bound | `listing-truncated`; no more names than the bound were examined |
 | a zero-byte file; a truncated document; invalid UTF-8; a byte-order mark; a duplicate key; a top-level array | rejected `event-syntax` |
 | no `schema`; a malformed `schema`; version N-2 | rejected `event-version`, one entry however often it is ingested |
@@ -524,9 +542,7 @@ Per field (U; I33):
 | `exit_code` of -2 and the upper bound plus one; `duration_ms` of -1 and the upper bound plus one | rejected `event-domain` |
 | `1.0`, `1e2`, `"1"`, `-0`, `null` for a number | rejected `event-domain` |
 | `01` for a number | rejected `event-syntax` |
-| `path`: absolute; a `..` segment; an empty segment; a byte outside the set; one byte over the length | rejected `event-domain` |
-| each secret pattern planted in `path` | rejected `secret-pattern`; the planted value is in no ledger file and no view file |
-| an in-domain `path` | in `own.jsonl`; absent from another project's `others.jsonl` |
+| an in-domain `id` | in `own.jsonl`; absent from another project's `others.jsonl` |
 | each field of the event type | `others.jsonl` holds it only when its tag puts it on the allowlist |
 
 Entries (U; I31):
@@ -537,7 +553,8 @@ Entries (U; I31):
 | name exists, same event region | present; no error |
 | name exists, different event region or another `kind` | `ledger-entry-mismatch` |
 | rejected entry exists, same key and reason; a different reason | present; `ledger-entry-mismatch` |
-| N processes call the ingest function on one spool at once, without the lock | each returns without error; one entry per key; its event region equals the spool bytes; no temporary name is left; then one derivation gives the golden view |
+| N processes call the ingest function on one spool at once, without the lock | each returns without error; one entry per key; its event region equals the spool bytes; no temporary name is left, since each racer unlinks its own; then one derivation gives the golden view |
+| a temporary name left in the ledger directory by a crash | the next command that ingests unlinks it under the lock, before its first ingest; the ingest function called alone leaves it |
 | the same bytes in two projects | two entries |
 | ingest the same spool twice | one set of entries; the second run writes nothing |
 | a crash after the entries and before the view | the next ingest derives the view; no entry is duplicated |
@@ -560,7 +577,7 @@ Other rows:
   again the next ingest writes and reports nothing.
 - **Golden**: the two views of a fixed ledger fixture with entries of
   versions N and N-1 from two projects, under the current policy. It
-  pins the order, the absence of the other project's `path` and key,
+  pins the order, the absence of the other project's `id` and key,
   and escaping through the CLI writer in `ledger query` (I29). The
   view is byte-identical across romeu versions unless the policy
   version changed.

@@ -8,13 +8,21 @@ Legend: **[H]** romeu on the host, **[X]** sbx invoked by romeu, **[J]**
 julieta in the sandbox, **[A]** agent, **[O]** operator. Each journey is a scenario function in `e2e/scenarios/`
 run by the host suite (`e2e/host`, real sbx) and, for J2, J3b, J7, J10,
 J11, also by CI with the fake sbx; each has a guide page in
-`docs/guide/`.
+`docs/guide/`. A scenario function runs the [H], [X] and [J] steps,
+replays an [A] step as commits on the fixture origin, and treats an
+[O] step that installs something or opens an editor as a precondition
+it checks. J12 runs J1 steps 3-6 under a fresh root, settings and
+state on the same host, after the first run's sandboxes are removed;
+a second physical machine stays a documented path. In CI a journey
+that reaches a julieta call runs at the hybrid level, on the Linux
+runners ([10 10.1](10-testing-style.md#101-test-levels)).
 
 ## J1 Onboarding (new machine, first time)
 
-1. [O] Install sbx (>= v0.46.0) and git at or above the floor of
+1. [O] Install sbx (>= v0.46.0), git at or above the floor of
    [05 5.1](05-security.md#51-hardened-git-internalgitsafe) (initial
-   floor 2.45.4).
+   floor 2.45.4), and a `gh` that has the `attestation` command, which
+   step 2 needs (12 12.1).
 2. [O] Download the `romeu` darwin archive for the host arch, verify with
    `shasum -a 256 -c checksums.txt` and
    `gh attestation verify <archive> --repo <owner>/romeu-e-julieta
@@ -39,8 +47,9 @@ J11, also by CI with the fake sbx; each has a guide page in
    `julieta spec validate projects/foo.yaml`, commit, push a branch, open
    a PR.
 2. [O] either after merge `romeu sync foo`, or before merge
-   `romeu sync foo --from sandbox/<branch>` (reads the spec from the
-   config sandbox's branch, never a working tree).
+   `romeu sync --from <sha> foo`, with the head of the branch pushed
+   in step 1 (the spec is read from a commit of origin, never from a
+   working tree).
 3. [H] clones repos, creates memory dirs and the ledger's spool and
    view dirs, ingests the spool (empty on a first sync,
    [13 13.4](13-runtime-ledger.md#134-ingest)), derives egress,
@@ -78,8 +87,6 @@ work as usual.
    detached; print path and commit.
 4. [O] open `review.code-workspace` in VS Code Restricted Mode (never
    trusted).
-5. Optional live view (Q11, settled by probe A7): `sbx setup ssh`, then VS
-   Code Remote-SSH to `<name>.sbx`.
 
 ## J5 Handoff before `/clear` (sandbox survives)
 
@@ -92,7 +99,8 @@ work as usual.
    the facts that changed since, open memory entries, `lesson` entries
    and julieta's warnings; the agent resumes. Without `/handoff`, the
    facts handoff is still there. The container e2e runs the two hooks in
-   the order Claude Code fires them (Q22).
+   both orders, so the rule does not wait for Q22; the guide describes
+   the order probe C5 records.
 
 ## J6 Handoff and salvage before recreate or rm (nothing lost)
 
@@ -120,9 +128,10 @@ work as usual.
    per repo: dirty tree, stashes, branches not on origin, salvage refs
    not reachable from origin; confirm on TTY; move `foo-env/` to
    `$ROMEU_ROOT/.attic/foo/<ts>/`; drop from workspace files; move state
-   and approvals to the state attic. The spool and the view move
-   with `foo-env/`; the project's ledger entries stay in the ledger
-   (13 13.5).
+   and approvals to the state attic. Before the move romeu ingests
+   the spool once more, for the events julieta wrote during the
+   sandbox half. The spool and the view then move with `foo-env/`;
+   the project's ledger entries stay in the ledger (13 13.5).
 
 ## J8 Tool bump (inside a repo)
 
@@ -173,6 +182,10 @@ work as usual.
    --sandbox foo --command <rendered command>` instead (never a value).
 4. If host settings lack `npm@foo`: exit 2 naming the key; the operator
    adds it and reruns.
+5. When `sync` ran without a TTY, the candidate is awaiting and
+   `romeu approve foo` promotes it. `approve` makes no sbx call, so it
+   prints that the live changes of step 3 apply on the next
+   `romeu run` or `romeu sync`.
 
 ## J12 Second machine
 

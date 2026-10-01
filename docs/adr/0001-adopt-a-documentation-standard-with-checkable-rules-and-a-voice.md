@@ -252,7 +252,7 @@ not a permanent state.
     equal an entry of the page's journey or of one of its variants,
     word by word, or the build fails. Inside an entry, a `<placeholder>`
     token matches one or more characters that are not whitespace, so
-    the entry word `sandbox/<branch>` matches `sandbox/fix-login`.
+    the entry word `projects/<name>.yaml` matches `projects/foo.yaml`.
     So a prompt, an assignment or `sudo` before the command does not
     hide it. A command inside quotes or `$( )`, or followed by a
     comment, is found and then equals no entry: the check fails closed,
@@ -265,7 +265,11 @@ not a permanent state.
     (10 10.1). A command of a journey outside that CI list is exercised
     by the host suite and not in CI. The maintainer decided to keep
     that alternative, because CI is offline and has no real sbx.
-    Two limits. A block in another language is output or data and is
+    Three limits. A line that names a binary as a file and does not
+    run it (`mv romeu ...`, `chmod u+x romeu`, `| grep julieta`, a
+    path that ends in `cmd/romeu`) has a command word and equals no
+    entry, so it fails; such lines go in a `text` block. A block in
+    another language is output or data and is
     not matched, so a command shown there is not checked. A part with
     no command word (the checksum and attestation commands
     of install and verify, for example) is outside this check: it needs

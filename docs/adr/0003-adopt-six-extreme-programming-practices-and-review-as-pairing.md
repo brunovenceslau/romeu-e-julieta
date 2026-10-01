@@ -9,8 +9,9 @@ Proposed
 ## Context
 
 The maintainer works in the Extreme Programming (XP) tradition and
-asked for its practices to be written into the spec: test-first,
-simple design, continuous refactoring, continuous integration, small
+asked for it to be written into the spec. Which practices, and how
+many, is our selection, put to the maintainer: test-first, simple
+design, continuous refactoring, continuous integration, small
 releases, collective ownership, and the loop of an agent and a
 reviewer as the analogue of pairing.
 
@@ -21,9 +22,8 @@ practices differently. We say plainly what we could check:
   Embrace Change*, 2nd ed., Addison-Wesley, 2004 (ISBN 0-321-27865-8),
   and the first edition of the same book. Both are cited as
   bibliography only. We have not checked a copy of either, so this
-  record quotes no sentence, gives no page and no chapter, and the
-  second-edition practice names below come from secondary
-  descriptions of the book.
+  record quotes no sentence, gives no page and no chapter, and takes
+  no practice name from an edition: the names below are ours.
 - One mapping between the editions has a primary source we read:
   Martin Fowler, [Yagni](https://martinfowler.com/bliki/Yagni.html),
   26 May 2015: "Yagni is a way to refer to the XP practice of Simple
@@ -38,14 +38,14 @@ practices differently. We say plainly what we could check:
   (including test) to detect integration errors as quickly as
   possible."
 
-| Practice the maintainer named | Edition and name | Their decision, as far as we could check |
+| Practice | What we could check of its source | The practice, as we take it |
 |---|---|---|
-| test-first | 2nd ed., Test-First Programming (primary practice) | the test is written before the code it tests |
-| simple design | 1st ed., Simple Design; 2nd ed., Incremental Design (primary practice); the one first-edition name we could check, on Fowler's page | design for today's need and grow it (Fowler's page, above) |
-| continuous refactoring | 2nd ed., Incremental Design (primary practice), which is where the secondary descriptions place it | improve the design of existing code as part of each change |
-| continuous integration | 2nd ed., Continuous Integration (primary practice) | a cadence: integrate and test every couple of hours. It is not a rule about when to release. Fowler's definition says at least daily, each integration verified by an automated build |
-| small releases | 2nd ed., Incremental Deployment and Daily Deployment (corollary practices) | release often, in small steps |
-| collective ownership | 2nd ed., Shared Code (corollary practice) | anyone on the team may change any code |
+| test-first | nothing | the test is written before the code it tests |
+| simple design | Fowler's page, above: the first edition calls it Simple Design and the second refers to "incremental design" | design for today's need and grow it |
+| continuous refactoring | nothing | improve the design of existing code as part of each change |
+| continuous integration | Fowler's definition, above: at least daily, each integration verified by an automated build | a cadence of integrating and testing. It is not a rule about when to release |
+| small releases | nothing | release often, in small steps |
+| collective ownership | nothing | anyone on the team may change any code |
 
 Their why, and what it cost them: we cannot state either in the
 book's words without a copy, and we will not invent them. What we can
@@ -138,9 +138,9 @@ these six split cleanly along that line.
 - The review that stands in for pairing is worth what the reviewer is
   worth. With one GitHub account it is not independent, which the
   spec records as a residual risk (05 5.4).
-- If someone checks a copy of the book and a practice name or an
-  edition above is wrong, the correction is a new record that
-  supersedes this one.
+- If someone checks a copy of the book and finds that a practice
+  above is not what the book describes, the correction is a new record
+  that supersedes this one.
 - This record stays Proposed until the maintainer signs it off. What
   holds until then is Q24 in the spec's
   [Open questions](../spec.md#open-questions).

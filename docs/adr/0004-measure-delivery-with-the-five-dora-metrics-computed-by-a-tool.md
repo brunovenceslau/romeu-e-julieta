@@ -9,8 +9,9 @@ Proposed
 ## Context
 
 The maintainer's workflow uses DORA metrics, and asked for them in the
-spec with one condition: a tool computes them from GitHub data, and
-nobody computes them by hand. Our first principle already says why
+spec. The condition is ours, put to the maintainer: a tool computes
+them from GitHub data, and nobody computes them by hand. It follows
+from our first principle, which is the maintainer's
 ([index](../spec.md#deterministic-where-it-can-be-the-model-where-it-adds-value)):
 a number someone types is a number someone can round.
 
@@ -28,8 +29,8 @@ The definitions we use are DORA's, quoted from the guide:
 
 - "Change lead time: The amount of time it takes for a change to go
   from committed to version control to deployed in production."
-- Deployment frequency: how often application changes are deployed to
-  production.
+- "Deployment frequency: The number of deployments over a given
+  period or the time between deployments."
 - "Failed deployment recovery time: The time it takes to recover from
   a deployment that fails and requires immediate intervention."
 - "Change fail rate: The ratio of deployments that require immediate
@@ -47,9 +48,8 @@ the instability beside it.
 
 ### Alternatives considered
 
-- **Compute the numbers by hand, in a lesson or a review.** That is
-  the thing the maintainer ruled out, and it breaks the first
-  principle. Rejected.
+- **Compute the numbers by hand, in a lesson or a review.** That
+  breaks the first principle. Rejected.
 - **Adopt an existing tool.** We looked at four, each measured through
   the GitHub API on 2026-09-30:
   [Apache DevLake](https://github.com/apache/devlake), a platform with
@@ -86,18 +86,22 @@ decisions that are ours:
 
 1. **A deployment is a published GitHub release of this repository
    whose tag matches `v*`**, drafts and prereleases excluded. That is
-   what `release.yml` produces.
+   what `release.yml` produces for a tag with no suffix; a tag with
+   one, a release candidate, is published as a prerelease and is not a
+   deployment.
 2. **A change is a pull request merged into `main`.** Its lead time
    runs from its earliest commit to the publication of the first
    deployment that contains it. We report the median.
 3. **A failed deployment is one that a later commit names** in a
-   `Fixes-release: v<x.y.z>` trailer. Whether a problem needed
+   `Fixes-release: v<x.y.z>` trailer. The commits of a deployment are
+   those of its pull requests, read from GitHub, so the result does
+   not depend on how a merge was made. Whether a problem needed
    immediate intervention is a judgment, made by whoever writes the
    fix and whoever reviews it; the tool only counts the trailers.
 4. **Recovery is the publication of the first later deployment that
-   contains such a commit**, because a user of a command-line program
+   has such a commit**, because a user of a command-line program
    recovers by installing the release that fixes it.
-5. **A rework deployment is one that contains such a commit and no
+5. **A rework deployment is one that has such a commit and no
    `feat` commit**: a release cut to repair, not one that was planned
    and also carries a repair.
 6. **A throughput figure is never shown without the change fail rate
@@ -119,7 +123,15 @@ every check, tested against a recorded API fixture like `acceptance`
 
 - `tools/ci` gains the `dora` subcommand, outside `all` because it
   needs the network, and `tools/ci pr` gains a shape check for the
-  trailer. `release.yml` gains one step.
+  trailer. `release.yml` gains one step. The tool lives under
+  `tools/ci/**`, an ask-first surface
+  ([05 5.3](../spec/05-security.md#53-ask-first-surfaces)), so each
+  change to it needs an approval line and a code-owner review, though
+  it is a report and gates nothing. It lands with the release tooling
+  and not on day one: every run reads the whole history, so nothing
+  is lost by the wait.
+- A commit that reaches `main` outside a pull request belongs to no
+  change and counts in no metric.
 - Before the first release there is no deployment, so the five
   metrics are empty and the baseline is pull request size and the
   maintainer's wait. We say "empty", never zero.
