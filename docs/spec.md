@@ -4,17 +4,16 @@ Reader: the planner and implementers of romeu e julieta v1, and
 reviewers of the design. Type: reference index; start here, then read
 [01](spec/01-system-model.md).
 
-Status: **draft v1 specification, review round 2 applied**. It is the
+Status: **draft v1 specification, review round 3 applied**. It is the
 source of truth for the implementation plan and describes the current
-state only. How it got here lives in [reviews/](reviews/round-2.md);
+state only. How it got here lives in [reviews/](reviews/round-3.md);
 decisions live in ADRs under [adr/](adr/), every settled decision
 becomes one, and a spec change that reverses one adds an ADR that
 supersedes it ([12 12.5](spec/12-engineering.md#125-decisions-and-history)).
 Every document follows the documentation standard of
 [ADR 0001](adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md).
-That record is Proposed. The spec is written as if it were Accepted,
-and its acceptance comes before the plan's first task
-([10 10.2](spec/10-testing-style.md#102-ci), the `sequences` check).
+The spec is written as if that record were Accepted; whether it is, is
+the open question [Q24](#open-questions).
 
 romeu e julieta organizes development environments built on Docker
 Sandboxes (`sbx`). **romeu** runs on the host: a deterministic,
@@ -27,7 +26,7 @@ layout. No agent and no LLM ever runs on the host.
 
 | # | File | Covers |
 |---|---|---|
-| - | this file | principles, success criteria, boundaries, open questions |
+| - | this file | principles, success criteria, boundaries, open questions, deferred decisions |
 | 0 | [spec/00-scope.md](spec/00-scope.md) | objective, users, non-goals, license, scope justification |
 | 1 | [spec/01-system-model.md](spec/01-system-model.md) | components, sources of truth, trust boundaries, gates, preflight, state machines, vocabulary |
 | 2 | [spec/02-layouts.md](spec/02-layouts.md) | repositories and directory layouts, in-sandbox paths, multi-repo decision |
@@ -126,8 +125,8 @@ and verified by `go run ./tools/ci acceptance`, the last plan task.
   - Scaffold with `go run ./tools/new ...` and regenerate with
     `go generate ./...`; the tracked pre-push hook runs
     `go run ./tools/ci fast`; run `go run ./tools/ci all` before opening
-    a PR; review golden diffs. Every gate CI runs also runs locally,
-    from the same `tools/ci` code
+    a PR; review golden diffs. Every merge gate CI runs also runs
+    locally, from the same `tools/ci` code
     ([10 10.2](spec/10-testing-style.md#102-ci)).
   - English, Conventional Commits, no em dash character, SPDX headers;
     commit, PR, issue and review text follow the text standard
@@ -139,7 +138,8 @@ and verified by `go run ./tools/ci acceptance`, the last plan task.
     ([05 5.3](spec/05-security.md#53-ask-first-surfaces)); it covers the
     gates, gitsafe, termsafe, digests, signing, the catalog's upload
     flags, kits and pins, release and publishing paths, Go dependencies,
-    CI actions, file format versions, and the exit-code and error table.
+    CI actions, file format versions, the exit-code and error table,
+    the decision records, and the code of the CI checks.
 - **Never**
   - Add a code path in `romeu` that configures git hooks, runs mise,
     executes repository content, or opens a terminal pane on the host.
@@ -148,7 +148,10 @@ and verified by `go run ./tools/ci acceptance`, the last plan task.
     personal path in the product repo.
   - Delete a clone, a memory directory or a salvage ref from romeu.
   - Hand-edit a generated file.
-  - Add a name listed in the `tools/ci hygiene` denylist.
+  - Write a name the forbidden-name denylist holds, in any form it
+    matches, in a file, a path, a commit message, a branch or tag name,
+    or the text of a PR
+    ([10 10.2](spec/10-testing-style.md#forbidden-names)).
 
 ## Open questions
 
@@ -179,3 +182,18 @@ maintainer decision, and in both cases it becomes an ADR.
 | Q21 | Sandbox arch equals host arch | romeu selects `julieta-linux-<GOARCH>` from its own `GOARCH`; the compatibility check fails closed otherwise | A4 |
 | Q22 | Claude Code hook order on `/clear` | SessionEnd fires before SessionStart; the handoff rules of [08 8.3](spec/08-memory-handoff-salvage.md#83-handoff) hold in either order, the probe confirms the tested order is real | C5, B3 |
 | Q23 | Registry access for descriptors | anonymous HTTPS reads only, cached by digest; an explicit host-settings credential is added only if a private workload registry is needed | maintainer |
+| Q24 | Is ADR 0001, the documentation standard, accepted | **written as if Accepted**. The record is Proposed, so this spec fails the `sequences` clause "every cited ADR is Accepted" ([10 10.2](spec/10-testing-style.md#102-ci)) until the sign-off, which comes before the plan's first task. If it is declined, the PR that marks it Rejected restores the spec text it replaced (no check enforces that) | maintainer |
+
+## Deferred decisions
+
+A mechanism that v1 does not need in order to start is left out and
+listed here, with what holds until then and the event that reopens it.
+A row leaves the table when its event happens and the decision is made.
+
+| Deferred | Until then | Reopened by |
+|---|---|---|
+| a scheduled workflow that checks external links (ADR 0001 rule 5) | `tools/ci links` is run by hand; nothing reminds anyone to | the first dead external link found in a review or at a release |
+| generating part of the spell-check word list from the vocabulary table (ADR 0001 rule 5) | one accepted-words list; its format and path are fixed in the plan task that picks the spell checker | the vocabulary table gains a term the chosen checker rejects |
+| docs versioning per release: which docs a reader of an older release sees | the docs on the default branch are the only docs | the first change to a user-facing page after the v1.0.0 tag |
+| generating the step table of [10 10.2](spec/10-testing-style.md#102-ci) from `tools/ci` | the table is hand-written and 12 12.4 links to it instead of copying it | the first time the `fast` set in the code and in the table are found to differ |
+| how a local-gate run is recorded, and what satisfies branch protection's "CI green" when Actions cannot run | no per-PR record format (the `ci-bootstrap` fallback keeps its `interim` item, 10 10.2). One constraint is fixed: `tools/ci` writes the record as an `acceptance.v1` `command` item with the commit and the platform, and nobody types it | the first time the maintainer chooses the local gates for a merge |

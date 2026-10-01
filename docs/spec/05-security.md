@@ -109,8 +109,13 @@ the maintainer's explicit approval. `go generate` derives from it the
 table in `docs/reference/ask-first.md` and `.github/CODEOWNERS`
 (branch protection requires a code-owner review); `tools/ci mutate`
 reads it to decide which PRs run mutation testing; `tools/ci pr`
-requires a quoted maintainer approval in the PR body when the diff
-touches a listed path. The file lists itself.
+requires an approval line in the PR body for each surface the diff
+touches, in the form that
+[12 12.4](12-engineering.md#124-middleware-before-and-after-every-change)
+defines. The file lists itself. The maintainer decided that the
+decision records and the code of the checks are surfaces
+([round 3](../reviews/round-3.md#maintainer-decisions)): the workflows
+only call `tools/ci` (10 10.2), so the check code is the gate.
 
 ```yaml
 version: 1
@@ -145,6 +150,12 @@ surfaces:
   - id: contracts
     globs: [internal/cli/errors.go, internal/spec/versions.go]
     reason: exit codes, error ids and file format versions
+  - id: decisions
+    globs: [docs/adr/**, .adr-dir]
+    reason: decision records; one leaves Proposed, or changes after that, with the maintainer's approval
+  - id: checks
+    globs: [tools/ci/**, .githooks/**, .golangci.yml]
+    reason: the code of the gates, with the forbidden-name denylist (tools/ci/denylist.yaml) and the linter configuration
   - id: ask-first
     globs: [.github/ask-first.yaml]
     reason: this list
@@ -163,4 +174,5 @@ surfaces:
 | The final `sbx env exec -it ... layout up` passes raw bytes between the sandbox and the host terminal | it is the interactive session itself; escaping it would break the terminal | romeu exec's into it as its last act and prints nothing after; the host terminal is the only consumer |
 | Secondary repos have no independent daemon cross-check at salvage | sbx runs a git daemon only for the primary repo | bundle verification, the manifest's ref list, and host-provided bases; J13 keeps a removed repo in the generation's repo set |
 | Between a run and the next `sync`/`run`, an agent can plant files in a memory dir; an operator who opens that dir with host tools sees them | memory dirs are shared by design and checked only when romeu reads them | read memory only through `romeu handoff`; memory dirs are never workspace folders; doctor and the preflight check trust settings (I23) |
+| The approval line in a PR body is typed by the PR's author | a check can prove the line is there, not who said it | branch protection requires a code-owner review for each ask-first path, the decision records and the check code included; the merge is the maintainer's |
 | The compatibility check executes the binary it checks | a check run inside the sandbox cannot attest itself | integrity comes from the read-only mount and the host-side drift check of `.romeu/bin`; the check only proves compatibility |

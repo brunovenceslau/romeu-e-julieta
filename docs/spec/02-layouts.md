@@ -49,31 +49,31 @@ romeu-e-julieta/
 ├─ examples/                   example config repo (projects/*.yaml, kits/) used by tests and docs (CC0-1.0)
 ├─ e2e/
 │  ├─ *_test.go                //go:build e2e - git + docker, fake sbx
-│  ├─ scenarios/               journey scenario functions shared by the CI and host suites; commands.yaml, each journey's command lines (one source for scenarios and guides)
+│  ├─ scenarios/               journey scenario functions shared by the CI and host suites; commands.yaml, each scenario's command lines (one source for scenarios and guides)
 │  ├─ host/*_test.go           //go:build host - real sbx, maintainer only
 │  ├─ probes/                  host probe harness (go run ./e2e/probes): pure core + thin sbx exec layer
 │  ├─ fakesbx/                 fake sbx that replays recorded sessions only
 │  └─ testdata/sbx/<version>/  redacted sbx help text and argv/stdout/stderr/exit sessions (*.jsonl)
 ├─ tools/
-│  ├─ ci/                      every check CI runs
+│  ├─ ci/                      every check CI runs, and their committed data: denylist.yaml (forbidden names, hashed), testdata/
 │  ├─ new/                     scaffolding: adr, invariant, probe, kit, command, lesson
 │  ├─ schemagen/               reflect-based JSON Schema generator from the Go types and rules.go
-│  ├─ release/                 two-stage release build; release notes
+│  ├─ release/                 release subcommands: build (two stages), verify, notes, publish
 │  └─ kitpin/                  rewrites pinned versions/digests across kits
 ├─ docs/
 │  ├─ spec.md, spec/           this specification (current state)
 │  ├─ reviews/                 review rounds of the specification (history)
-│  ├─ adr/                     decisions (adr-tools layout, .adr-dir -> docs/adr); immutable once accepted
+│  ├─ adr/                     decisions (adr-tools layout, .adr-dir -> docs/adr); README.md is the generated index; an ask-first surface
 │  ├─ guide/                   one page per journey
-│  ├─ spelling/                spell-check word lists: vocabulary.txt (generated from the vocabulary table), accepted.txt (hand-written)
 │  ├─ reference/               generated: one page per command and per file format, errors.md, exit-codes.md
 │  ├─ probes/                  committed probe-result.v1 files (blocks A, B and C)
 │  ├─ acceptance.json          evidence per success criterion (acceptance.v1)
 │  └─ lessons.md               one entry per lesson, with the check that enforces it
-├─ .githooks/pre-push          runs go run ./tools/ci fast
+├─ .githooks/pre-push          runs go run ./tools/ci fast with git's arguments and stdin
+├─ .golangci.yml               linter configuration (10 10.2, lint)
 ├─ .github/ask-first.yaml      the single list of ask-first paths (05 5.3)
 ├─ .github/CODEOWNERS          generated from ask-first.yaml
-├─ .github/workflows/ci.yml, release.yml, fuzz.yml (scheduled), links.yml (scheduled; external links)
+├─ .github/workflows/ci.yml, release.yml, fuzz.yml (scheduled; long fuzz runs and tools/ci mutate)
 ├─ .github/pull_request_template.md   Why / What changed / Evidence / Middleware / Lessons
 ├─ COPYING (with the first code change), REUSE.toml, LICENSES/, README.md, SECURITY.md
 ```

@@ -78,6 +78,14 @@ comes from one of them, the table above says which and why it fits.
   guides answer questions we do not have and leave the ones we do (ADR
   layout, generated reference, command execution) open. They are also
   too large to check mechanically. Rejected.
+- **Generate the guide's command blocks, or the command table, from
+  the scenario functions.** That would reuse the generator and drift
+  check of 12 12.3 and need no matcher (rule 13). But a guide is a
+  hand-written page, and a generator that writes blocks into it has to
+  inject text between markers in a file people edit, which is the
+  opposite of rule 10's model (a generated file is never hand-edited).
+  Rejected; one committed table that both the guides and the scenarios
+  read keeps each file either written or generated, never both.
 
 ## Decision
 
@@ -113,7 +121,7 @@ not a permanent state.
    primary reader in YAML front matter (`type:` one of `tutorial`,
    `how-to`, `reference`, `explanation`; `reader:` a phrase naming one
    reader), and has one type. A page under `docs/guide/` also names its
-   journey (`journey: J<n>`, an id from
+   journey (`journey: J<n>`, the id of a section of
    [09](../spec/09-journeys.md)). The check covers a path set:
    `ARCHITECTURE.md`, `CONTRIBUTING.md`, `SECURITY.md` and the Markdown
    files under `docs/`, minus `docs/adr/` and `docs/reviews/` (ADRs and
@@ -129,32 +137,37 @@ not a permanent state.
    detail after, unless safety needs them earlier.
 3. **[review]** Every claim is grounded in code, tests, the spec or
    measured behavior. Stale content is deleted, not caveated.
-4. **[check]** Prose rules, repository-wide and in PR bodies and commit
-   messages: no em dash character (U+2014), no hype words, no AI
+4. **[check]** Prose rules, repository-wide and in PR titles, PR bodies
+   and commit messages: no em dash character (U+2014), no hype words, no AI
    meta-commentary, no attribution footer, no paired
    `not only ... but also` construction. The word lists are committed
    data with a self-test; they skip code spans, so a rule can quote what
    it bans. The em dash check skips nothing.
-   Owner: `tools/ci hygiene` for files, `tools/ci pr` for the PR body
-   and the PR's commit messages.
+   Owner: `tools/ci hygiene` for files, `tools/ci pr` for the PR
+   title, the PR body and the PR's commit messages.
 5. **[check]** Markdown lint, link check and spell check. Relative links
-   and anchors are checked offline in every run; external URLs are
-   checked by `tools/ci links` in a scheduled workflow (`links.yml`),
-   because `tools/ci all` stays offline (10 10.1). The spell check
-   reads two word lists: `docs/spelling/vocabulary.txt`, generated from
-   the vocabulary table
-   ([01 1.7](../spec/01-system-model.md#17-vocabulary)) as a consumer in
-   12 12.3, and `docs/spelling/accepted.txt`, the one hand-written list
-   of other accepted words. Owner: `tools/ci docs`; `tools/ci links`
-   for external URLs; `tools/ci generated` for the generated list.
+   and anchors are checked offline in every run. The spell check reads
+   one accepted-words list; its format and path are fixed in the plan
+   task that picks the tool. External URLs are the exception:
+   `tools/ci all` stays offline (10 10.1), so they are fetched by
+   `tools/ci links`, which a person runs. That half of the rule is not
+   a gate in v1, and nothing reminds anyone to run it; Consequences
+   says what reopens it. Owner: `tools/ci docs`; `tools/ci links` for
+   external URLs.
 6. **[check]** ADRs use the adr-tools layout: `.adr-dir` contains
    `docs/adr`; files are `NNNN-kebab-title.md`; the first line is
-   `# N. Title` and matches the filename; then a `Date: YYYY-MM-DD` line,
-   then the sections `## Status`, `## Context`, `## Decision`,
-   `## Consequences`, in that order. Alternatives go in
-   `### Alternatives considered` inside Context. `tools/new adr` writes
-   the number, the date and the title line (12 12.3), so nobody types
-   them. Owner: `tools/ci sequences`.
+   `# N. Title`; then a `Date: YYYY-MM-DD` line, then the sections
+   `## Status`, `## Context`, `## Decision`, `## Consequences`, in that
+   order. Alternatives go in `### Alternatives considered` inside
+   Context. The title matches the filename through one function: the
+   filename is `NNNN-` plus `slug(Title)`, where `slug` lowercases the
+   title, turns each run of characters other than ASCII letters and
+   digits into one hyphen, and trims hyphens from both ends.
+   `tools/new adr` takes the title and writes the number, the date, the
+   title line and the filename (12 12.3), so nobody types them, and
+   `tools/ci sequences` calls the same `slug`. The date is checked for
+   its shape and no further: a commit date is set by its author, so it
+   proves nothing about the day. Owner: `tools/ci sequences`.
 7. **[check]** ADR status is one of Proposed, Accepted, Rejected,
    Deprecated, Superseded. A Proposed record the maintainer declines
    becomes Rejected, stays in the repository, and gains one line in its
@@ -167,14 +180,21 @@ not a permanent state.
    generated from the titles and statuses. Owner: `tools/ci sequences`
    for links and numbers, `tools/ci generated` for the index.
 8. **[check]** An ADR leaves Proposed on the maintainer's explicit
-   sign-off, quoted in the PR that changes its status. A PR whose diff
-   changes an ADR's Status section, or adds an ADR whose status is not
-   Proposed, fails without a quoted maintainer approval in its body, in
-   the form 12 12.4 requires for ask-first paths. The intent is that an
-   agent does not promote its own record. The check proves the quote is
-   there, not who typed it; the merge is still the maintainer's.
+   sign-off, and changes after that only with it. The mechanism is the
+   ask-first list: `docs/adr/**` and `.adr-dir` are one of its surfaces
+   ([05 5.3](../spec/05-security.md#53-ask-first-surfaces)). A PR that
+   touches an ADR in any way (a new record, a status change, an edit
+   to a record whose status is no longer Proposed) therefore needs an
+   approval line for that surface in its body, in the one form 12 12.4
+   defines, and a code-owner review before it merges. The intent is
+   that an agent does not promote or rewrite a record on its own. The
+   approval line is typed by the PR's author, so `tools/ci pr` proves
+   it is there, not who said it. The code-owner review and the merge
+   are what an author cannot type, and the code of these checks is an
+   ask-first surface too, so a PR cannot quietly switch them off.
    Whether the decision is sound stays a review judgment (rule 9).
-   Owner: `tools/ci pr`.
+   Owner: `tools/ci pr` for the approval line; branch protection for
+   the review.
 9. **[review]** Every decision that is expensive to reverse gets an
    ADR, with the alternatives considered and, for any borrowed pattern,
    its source and why it fits this project.
@@ -184,7 +204,8 @@ not a permanent state.
     drift fails the build. Owner: `tools/ci generated`.
 11. **[check]** Release notes are generated from Conventional Commit
     subjects (12 12.6); nobody writes a CHANGELOG by hand. Commit
-    subjects are checked for the Conventional Commit form, and PR bodies
+    subjects and the PR title are checked for the Conventional Commit
+    form (a squash merge can make the title a subject), and PR bodies
     for the sections of 12 12.4. Owner: `tools/ci pr`.
 12. **[check]** `README.md` uses this heading order: what it is and who
     it is for; when not to use it; prerequisites; install and verify;
@@ -193,26 +214,42 @@ not a permanent state.
     not copies. Owner: `tools/ci docs`.
 13. **[check]** The `romeu` and `julieta` commands shown in `README.md`
     and `docs/guide/` are executed. A guide page names its journey in
-    front matter (rule 1); `README.md` belongs to J1. Each journey's
-    commands have one committed source, `e2e/scenarios/commands.yaml`
-    (journey id to ordered command lines, with `<placeholder>` tokens),
-    and the scenario functions read their command lines from it. In a
-    `sh` block of those pages, a line whose first word is `romeu` or
-    `julieta` must equal an entry of the page's journey, word by word,
-    a placeholder matching any one word; otherwise the build fails. A
-    table entry that no scenario function runs fails the scenario
-    package's own test. So the CI suite runs the command against the
-    fake sbx, or the host suite runs it against real sbx (10 10.1). A
-    line that starts with another program (the checksum and attestation
-    commands of install and verify, for example) is outside this check:
-    it needs the network and a published release, and `release.yml`
-    runs that verification (10 10.2). Owner: `tools/ci docs`.
+    front matter (rule 1); `README.md` belongs to J1. The commands have
+    one committed source, `e2e/scenarios/commands.yaml`: scenario id to
+    ordered command lines. A scenario id is a journey id, or one of the
+    variants 09 names inside a journey (J3a and J3b inside J3). The
+    scenario functions read their command lines from that table.
+    In those pages every fenced block names its language (`tools/ci
+    docs` fails one that does not), and an `sh` block holds commands.
+    The check splits each line of an `sh` block at `&&`, `||`, `;` and `|` and drops leading `NAME=value`
+    words; a part whose first word is `romeu` or `julieta` must equal
+    an entry of the page's journey or of one of its variants, word by
+    word, or the build fails. Inside an entry, a `<placeholder>` token
+    matches one or more characters that are not whitespace, so the
+    entry word `sandbox/<branch>` matches `sandbox/fix-login`.
+    A table entry that no scenario function reads fails the scenario
+    package's own test, which drives each function against a recording
+    runner and executes nothing. Reading is not running: the CI suite
+    runs J2, J3b, J7, J10 and J11 against the fake sbx, and the host
+    suite runs each journey against real sbx on maintainer machines
+    (10 10.1). A command of a journey outside that CI list is exercised
+    by the host suite and not in CI. The maintainer decided to keep
+    that alternative, because CI is offline and has no real sbx.
+    Two limits. A block in another language is output or data and is
+    not matched, so a command shown there is not executed. A part that
+    starts with another program (the checksum and attestation commands
+    of install and verify, for example) is outside this check: it needs
+    the network and a published release, and `release.yml` runs that
+    verification (10 10.2). Owner: `tools/ci docs`.
 14. **[check]** Every exported Go identifier has a doc comment; error
     strings follow Go style (lowercase, no trailing punctuation); no
     commented-out code; the only accepted TODO form is
-    `TODO(#<issue>)`. Owner: `golangci-lint` for the first three (its
-    commented-out-code checker is enabled in the linter configuration),
-    `tools/ci hygiene` for the TODO form.
+    `TODO(#<issue>)`. Owner: `golangci-lint` for the first three,
+    `tools/ci hygiene` for the TODO form. The three checkers are
+    switched on in the linter configuration, and a unit test runs the
+    linter with that configuration over a fixture holding one violation
+    of each, so a configuration that stops reporting them fails the
+    build (10 10.1).
 15. **[review]** Comments explain why, not what. A comment at a trap
     cites the ADR or lesson behind it. Every package lives under
     `internal/`, so Example tests are written where
@@ -259,9 +296,9 @@ not reserve the number for anything else.
 | ADR title: `# ADR-001: Title` vs `# N. Title` with `NNNN-kebab-title.md` | the adr-tools form | one scheme, the one the tooling writes |
 | Section order: the spec listed Status, Date, then a top-level Alternatives considered section | adr-tools' template order: `Date:` line, Status, Context, Decision, Consequences; alternatives inside Context | the spec gave no reason for its order, and tools that read ADRs expect the template's |
 | Status set: one source dropped Deprecated, and none gave a declined proposal a status | Proposed, Accepted, Rejected, Deprecated, Superseded | Nygard's post and the spec both keep Deprecated for a decision withdrawn without a replacement; without Rejected, a declined record that is never deleted would read as pending forever. MADR's template ([adr.github.io/madr](https://adr.github.io/madr/)) has the same status |
-| Supersede link: the spec wrote `Supersedes: NNNN` | adr-tools' `Supersedes [N. Title](file)` in the Status section | the link is clickable, and it is what `adr new -s` writes |
+| Supersede link: the spec wrote `Supersedes: NNNN`; adr-tools' `adr new -s` writes the link forms `Supercedes` and `Superceded by`, misspelled ([src/adr-new](https://github.com/npryce/adr-tools/blob/master/src/adr-new)) | `Supersedes [N. Title](file)` and `Superseded by [M. Title](file)` in the Status section, correctly spelled (rule 7) | the link is clickable and checked in both directions. We keep adr-tools' link shape and not its spelling; that is a recorded divergence, so a record written by `adr new -s` itself fails `tools/ci sequences` until the word is corrected |
 | Screenshots allowed by one source, no media in another | text diagrams only (rule 17) | binary media rot silently and cannot be diffed or retrieved as text |
-| Em dash used by two sources | banned everywhere, commits and PR bodies included | the spec already bans it (12 12.7) |
+| Em dash used by two sources | banned everywhere, commits and PR text included | the spec's Boundaries banned it before this record ([index](../spec.md#boundaries-for-everyone-who-changes-this-repo)). We keep the ban because one dash form makes the check a byte search that skips nothing (rule 4) |
 | Hand-written CHANGELOG in one source | generated release notes (rule 11) | the spec generates them (12 12.6); a hand-written file duplicates that source |
 | Three README shapes | one order (rule 12), prerequisites before the first run | the first run needs a macOS host with sbx; a reader who lacks them must find out before step one |
 | "No TODO comments" in one source | `TODO(#<issue>)` only | a TODO with an issue is tracked work; one without is a wish |
@@ -269,7 +306,7 @@ not reserve the number for anything else.
 | Motivational tone in one source | the prose rules (rule 4) and the voice rule (rule 19) | personality comes from choices, not from enthusiasm |
 | Page type: the spec pages state reader and type in their opening line | YAML front matter (rule 1) | a check reads front matter without parsing prose |
 | Which pages the front matter check covers | a path set (rule 1): the root contributor pages and `docs/`, minus ADRs, review rounds and generated reference | "every Markdown page" would put front matter into files another consumer parses: a PR template GitHub copies into each PR body, and `SKILL.md` files the agent runtime reads |
-| Executing documented commands: an earlier draft of this standard ran each one in CI against the built binaries | the CI suite against the fake sbx, or the host suite against real sbx (rule 13) | CI is offline and has no sbx (10 10.1). J1 and the other host-only journeys cannot run there, and a rule that only CI can satisfy would leave their guides unexecuted or unwritten. The cost: a host-only command runs on maintainer machines in block B, not on each PR |
+| Executing documented commands: an earlier draft of this standard ran each one in CI against the built binaries | the CI suite against the fake sbx, or the host suite against real sbx (rule 13) | CI is offline and has no sbx (10 10.1). J1 and the other host-only journeys cannot run there, and a rule that only CI can satisfy would leave their guides unexecuted or unwritten. The maintainer decided to keep the host-suite alternative for that reason. The cost: a host-only command runs on maintainer machines in block B, not on each PR |
 
 ## Consequences
 
@@ -282,18 +319,11 @@ not reserve the number for anything else.
   an external tool; it enters pinned through `mise.lock` like `reuse`,
   and a Go module dependency goes through the ask-first list. The
   implementation plan picks the tools; this record picks the checks.
-- The scheduled link check (rule 5) is a new workflow, `links.yml`,
-  and the one check here with outbound network access: it fetches
-  every external URL the docs cite. It lands on an ask-first path, the
-  `dependencies` surface (`.github/workflows/**`,
-  [05 5.3](../spec/05-security.md#53-ask-first-surfaces)), so the PR
-  that adds it carries the maintainer's quoted approval, and any action
-  it uses is pinned by commit SHA (10 10.2).
-- Rule 8 checks for the sign-off quote through `tools/ci pr`. It does
-  not put `docs/adr/` on the ask-first list, so a code-owner review of
-  an ADR change is not required by branch protection. Adding that
-  surface is a change to the ask-first list, which is the maintainer's
-  to make.
+- Rule 8 puts `docs/adr/**` and `.adr-dir` on the ask-first list, and
+  the list also gains the code of the checks themselves (`tools/ci/**`,
+  `.githooks/**`, the linter configuration). The maintainer decided
+  both. The cost: a PR that adds a Proposed record needs an approval
+  line and a code-owner review like any other ADR change.
 - Rule 13 couples guides to scenario functions through
   `e2e/scenarios/commands.yaml`: changing a guide's commands means
   changing that table, and so the scenario. We accept that cost,
@@ -304,20 +334,27 @@ not reserve the number for anything else.
   matter. They move to front matter in the same change that lands the
   rule 1 check. The review rounds in `docs/reviews/` stay as they were
   written: like ADRs they are history, and rule 1 exempts them.
-- The generated ADR index (rule 7) and the generated spell-check word
-  list (rule 5) are new generators in 12 12.3; they appear with
-  `tools/new adr` in the `ci-bootstrap` task.
-- Docs versioning per release (which docs a reader of v1.2 sees once
-  v1.3 exists) is not decided here. The implementation plan decides it,
-  and records the choice as an ADR if it is expensive to reverse.
+- The generated ADR index (rule 7) is a new generator in 12 12.3; it
+  appears with `tools/new adr` in the `ci-bootstrap` task.
+- Three things are deferred, not decided, each with what holds until
+  then and the event that reopens it, in the spec's
+  [Deferred decisions](../spec.md#deferred-decisions) table: a
+  scheduled workflow that checks external links (rule 5), generating
+  part of the spell-check word list from the vocabulary table (rule 5),
+  and docs versioning per release (which docs a reader of v1.2 sees
+  once v1.3 exists).
 - Rule 19 cannot be checked. A page can pass every check and still read
   like a form; the voice line that rule 19 adds to the rule 18 review
   report is the only guard, and we accept that.
-- This record stays Proposed until the maintainer signs it off (rule 8).
-  The spec is written as if it were Accepted, so that the two do not
-  disagree about which checks exist. Acceptance comes before the
-  implementation plan's first task: `tools/ci sequences` fails when the
-  spec cites an ADR whose status is not Accepted (10 10.2), and that
-  check lands in `ci-bootstrap`. If the maintainer declines this
-  record, the PR that marks it Rejected also restores the spec text it
-  replaced.
+- This record stays Proposed until the maintainer signs it off (rule 8;
+  the pending decision is Q24 in the spec's
+  [Open questions](../spec.md#open-questions)). The spec is written as
+  if it were Accepted, so that the two do not disagree about which
+  checks exist. Acceptance comes before the implementation plan's first
+  task: `tools/ci sequences` fails when the spec cites an ADR whose
+  status is not Accepted (10 10.2), and that check lands in
+  `ci-bootstrap`. The spec cites this Proposed record, so it fails that
+  clause today; that is the intended state until the sign-off. If the
+  maintainer declines this record, the PR that marks it Rejected also
+  restores the spec text it replaced. No check enforces that last
+  step; it is a sentence here and a row in Q24.
