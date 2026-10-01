@@ -30,6 +30,7 @@ romeu-e-julieta/
 │  ├─ memstore/                memory Store interface, fs backend (os.Root), layout allowlist, JSONL import/verify
 │  ├─ handoff/                 handoff files and the handoff reader
 │  ├─ salvage/                 snapshot/salvage (julieta side) and verify/import (romeu side)
+│  ├─ ledger/                  runtime ledger: event schema and its generated tables, emit and drain (julieta side), spool reader, ingest, entries, view (romeu side)
 │  ├─ tools/                   mise driver (julieta only)
 │  ├─ hooks/                   git hook dispatcher (julieta only)
 │  ├─ layout/                  run layout -> herdr layout.apply, pane step runner (julieta only)
@@ -45,7 +46,7 @@ romeu-e-julieta/
 ├─ skills/
 │  ├─ julieta/SKILL.md         general rule: how to use julieta, memory instead of built-in memory
 │  └─ handoff/SKILL.md         /handoff and /handoff --final
-├─ schemas/                    generated JSON Schema 2020-12 (CC0-1.0): project.v1, host-settings.v1, catalog.v1, render.v1, state-*.v1, handoff.v1, memory-entry.v1, manifest.v1, salvage.v1, probe-result.v1, acceptance.v1
+├─ schemas/                    generated JSON Schema 2020-12 (CC0-1.0): project.v1, host-settings.v1, catalog.v1, render.v1, state-*.v1, handoff.v1, memory-entry.v1, manifest.v1, salvage.v1, probe-result.v1, acceptance.v1, runtime-event.v1
 ├─ examples/                   example config repo (projects/*.yaml, kits/) used by tests and docs (CC0-1.0)
 ├─ e2e/
 │  ├─ *_test.go                //go:build e2e - git + docker, fake sbx
@@ -97,7 +98,7 @@ verona/
 ├─ kits/
 │  └─ <kit>/                  personal v3 kits (same format as product kits)
 ├─ mise.toml, mise.lock       tools for agents editing this repo (julieta comes from the sandbox)
-├─ acceptance.json            optional: the operator's own acceptance ledger (acceptance.v1), verified from a product checkout
+├─ acceptance.json            optional: the operator's own acceptance file (acceptance.v1), verified from a product checkout
 ├─ .github/workflows/validate.yml   runs `julieta spec validate --catalog projects/*.yaml` from a pinned julieta release (checked by `julieta pin check`)
 └─ README.md
 ```
@@ -123,13 +124,19 @@ $ROMEU_ROOT/                            default $HOME/dev; never a VS Code trust
    │  └─ bin/                           julieta-linux-amd64, julieta-linux-arm64, SHA256SUMS; mounted read-only into the sandbox
    ├─ <dir>/                            host clone of each repo (primary is the sbx workspace, clone mode)
    ├─ review/<dir>/                     hardened review checkout (created by `romeu pull`)
-   └─ memory/<dir>/                     per-repo memory, mounted rw into this project's sandbox only
+   ├─ memory/<dir>/                     per-repo memory, mounted rw into this project's sandbox only
+   └─ ledger/                           runtime ledger, this project's part (13); the directory itself is outside every mount
+      ├─ spool/                         events julieta wrote, not yet ingested; mounted rw into this project's sandbox only
+      └─ view/                          derived by romeu from the ledger; mounted read-only into this project's sandbox only
 ```
 
 Mounts: the sandbox sees `./<primary>` (clone mode: sbx clones it; the
 host clone is read-only from the sandbox), `./memory/<dir>` for every
-repo (direct, rw) and `./.romeu/bin` (direct, read-only). `sbxenv.yaml`
-and the rest of `.romeu/` sit outside every mount; paths in the file are
+repo (direct, rw), `./.romeu/bin` (direct, read-only), `./ledger/spool`
+(direct, rw) and `./ledger/view` (direct, read-only). The last three
+are fixed mounts: no spec field names them and each project has them
+([13 13.1](13-runtime-ledger.md#131-stores)). `sbxenv.yaml`, the rest
+of `.romeu/` and `ledger/` itself sit outside every mount; paths in the file are
 `./x`, relative to the file; no `..`, no absolute path. Confirmed by
 probes A3 and A5.
 
@@ -161,6 +168,7 @@ $XDG_STATE_HOME/romeu/                  (default $HOME/.local/state/romeu/), mod
 ├─ toolchain.json                       gate 1 record, including the acknowledged catalog
 ├─ projects/<name>.json                 one record per project: approval, awaiting candidate, generations, applied egress
 ├─ descriptors/<digest>.json            content-addressed cache of parsed workload and kit descriptors
+├─ ledger/<project>.<key>.entry         the runtime ledger: one file per entry, created once (13 13.5); directory 0700, files 0600
 └─ attic/<name>/<UTC-ts>/               records of retired projects
 ```
 
@@ -178,6 +186,8 @@ root comes only from the settings file.
 | `julieta` on `PATH` | `$HOME/.local/bin/julieta`, a symlink to the running binary, created by `julieta setup` at runtime | julieta |
 | secondary repos | `$HOME/src/<name>/<dir>` | julieta (`julieta setup`) |
 | memory dirs | same absolute path as on the host (direct mount) | host tree |
+| ledger spool | same absolute path as `<name>-env/ledger/spool/` (direct mount, read-write) | julieta |
+| ledger view | same absolute path as `<name>-env/ledger/view/` (read-only mount) | romeu |
 | julieta state | `$HOME/.local/state/julieta/` (manifest cache, install digests, snapshot timestamps, recorded hook failures) | julieta |
 | julieta hook dispatcher | `$HOME/.local/share/julieta/hooks/` (global `core.hooksPath`) | julieta |
 | mise | `$HOME/.local/bin/mise`, data in `$HOME/.local/share/mise` | julieta mixin |
@@ -204,4 +214,5 @@ a plain operator clone used for navigation and egress derivation.
 The decision rests on documented sbx behavior (additional workspaces are
 direct mounts) and does not wait for a probe. Probe A3 measures what
 still is mounted: that memory dirs refuse or survive planted content as
-08 expects, and that `readOnly` mounts (`.romeu/bin`) are enforced.
+08 expects, that a hostile spool is read as 13 expects, and that
+`readOnly` mounts (`.romeu/bin`, `ledger/view`) are enforced.

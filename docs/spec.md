@@ -8,7 +8,8 @@ Status: **draft v1 specification, review round 3 applied**. It is the
 source of truth for the implementation plan and describes the current
 state only. How it got here lives in [reviews/](reviews/round-3.md),
 and what was folded in after round 3 in
-[reviews/round-4.md](reviews/round-4.md);
+[reviews/round-4.md](reviews/round-4.md) and
+[reviews/round-5.md](reviews/round-5.md);
 decisions live in ADRs under [adr/](adr/), every settled decision
 becomes one, and a spec change that reverses one adds an ADR that
 supersedes it ([12 12.5](spec/12-engineering.md#125-decisions-and-history)).
@@ -17,15 +18,16 @@ Every document follows the documentation standard of
 The spec is written as if that record were Accepted, and the four
 records on engineering practice with it (ADRs 0002 to 0005: trunk-based
 development, the XP practices, the delivery metrics, and deciding at
-the last responsible moment);
+the last responsible moment), and the record of the runtime ledger
+(ADR 0006);
 whether they are is the open question [Q24](#open-questions).
 
 romeu e julieta organizes development environments built on Docker
 Sandboxes (`sbx`). **romeu** runs on the host: a deterministic,
 auditable binary that turns reviewed project specs into one directory
 tree and drives `sbx`. **julieta** runs inside each sandbox: tools (via
-mise), git hooks, memory, handoff, salvage and the in-sandbox terminal
-layout. No agent and no LLM ever runs on the host.
+mise), git hooks, memory, handoff, salvage, runtime events and the
+in-sandbox terminal layout. No agent and no LLM ever runs on the host.
 
 ## Index
 
@@ -45,6 +47,7 @@ layout. No agent and no LLM ever runs on the host.
 | 10 | [spec/10-testing-style.md](spec/10-testing-style.md) | test levels, CI, fake-sbx contract, acceptance evidence, code style, module boundaries |
 | 11 | [spec/11-host-probes.md](spec/11-host-probes.md) | host probes, the probe result format and its lifecycle |
 | 12 | [spec/12-engineering.md](spec/12-engineering.md) | tech stack, dev commands, capability map, generators, middleware, contributor docs, text standard, delivery practices, delivery metrics |
+| 13 | [spec/13-runtime-ledger.md](spec/13-runtime-ledger.md) | the runtime ledger: spool, events, ingest, entries, view, versions, starting values, consumers, tests |
 
 ## Principles
 
@@ -176,6 +179,9 @@ and verified by `go run ./tools/ci acceptance`, the last plan task.
   - Put a secret value, a host command, a local user name or an absolute
     personal path in the product repo.
   - Delete a clone, a memory directory or a salvage ref from romeu.
+  - Edit or delete a runtime ledger entry, or give an event a
+    free-text field
+    ([13](spec/13-runtime-ledger.md)).
   - Hand-edit a generated file.
   - Write a name the forbidden-name denylist holds, in any form it
     matches, in a file, a path, a commit message, a branch or tag name,
@@ -211,7 +217,7 @@ maintainer decision, and in both cases it becomes an ADR.
 | Q21 | Sandbox arch equals host arch | romeu selects `julieta-linux-<GOARCH>` from its own `GOARCH`; the compatibility check fails closed otherwise | A4 |
 | Q22 | Claude Code hook order on `/clear` | SessionEnd fires before SessionStart; the handoff rules of [08 8.3](spec/08-memory-handoff-salvage.md#83-handoff) hold in either order, the probe confirms the tested order is real | C5, B3 |
 | Q23 | Registry access for descriptors | anonymous HTTPS reads only, cached by digest; an explicit host-settings credential is added only if a private workload registry is needed | maintainer |
-| Q24 | Are the Proposed records the spec cites accepted: ADR 0001, the documentation standard, and ADRs 0002 to 0005, the engineering practices (trunk-based development, the XP practices, the delivery metrics, the last responsible moment) | **written as if Accepted**. The five records are Proposed, so this spec fails the `sequences` clause "every cited ADR is Accepted" ([10 10.2](spec/10-testing-style.md#102-ci)) until each is signed off, which comes before the plan's first task. If one is declined, the PR that marks it Rejected restores the spec text it replaced, or for ADRs 0002 to 0005 removes the text that cites it (no check enforces that) | maintainer |
+| Q24 | Are the Proposed records the spec cites accepted: ADR 0001, the documentation standard, ADRs 0002 to 0005, the engineering practices (trunk-based development, the XP practices, the delivery metrics, the last responsible moment), and ADR 0006, the runtime ledger | **written as if Accepted**. The six records are Proposed, so this spec fails the `sequences` clause "every cited ADR is Accepted" ([10 10.2](spec/10-testing-style.md#102-ci)) until each is signed off, which comes before the plan's first task. If one is declined, the PR that marks it Rejected restores the spec text it replaced, or for ADRs 0002 to 0006 removes the text that cites it (no check enforces that) | maintainer |
 | Q25 | With one GitHub account, do the rulesets refuse the sandbox's token while the maintainer still merges and tags | the sandbox's token is a fine-grained token without the Administration permission, and the maintainer, as the rulesets' one bypass actor, merges and tags from their own session. If the maintainer block of `ci-bootstrap` ([10 10.2](spec/10-testing-style.md#release-and-bootstrap)) shows a try that is not refused, agents push from a second account that is not a bypass actor. The maintainer accepted that fallback, and accepted for v1 the three residual risks this question rests on ([05 5.4](spec/05-security.md#54-known-residual-risks-accepted-in-v1)); the token test of that block confirms whether the fallback is needed | the maintainer, on the output of that block |
 
 ## Deferred decisions
@@ -231,6 +237,16 @@ A row leaves the table when its event happens and the decision is made.
 | a runtime feature-flag mechanism in `romeu` or `julieta` | unfinished work merges dark: on the default branch, reached by no command (12 12.9) | the first capability that must be in a release before it is finished and that a user has to be able to turn on |
 | targets or performance levels for the delivery metrics | `tools/ci dora` reports and compares with nothing; no number gates a merge (12 12.10) | three releases exist, so each of the five metrics has a value, and the maintainer asks for a target |
 | a check that a lesson which cites delivery metrics names two periods of the tool's output | the rule is a review judgment (12 12.10) | the first `docs/lessons.md` entry that cites a metric |
-| a record of each gate run (which gate, which round, the verdict, counts by severity, duration) | no record; the review's text is all there is. It depends on a runtime ledger, which this spec does not have yet, and on a join key from a gate run to a change, which is unresolved: a PR number does not exist when a gate runs before the PR opens, and a commit id is rewritten by a rebase | the runtime ledger enters this spec, or the first question about the cost of one change |
+| a record of each gate run (which gate, which round, the verdict, counts by severity, duration) | no record; the review's text is all there is. The runtime ledger ([13](spec/13-runtime-ledger.md)) has no gate-run event type. It would have closed fields only, and two things are unresolved. No deterministic producer exists: a gate is run by an agent, an event that depends on an agent remembering to emit it is what 13 13.2 rules out, and the verdict would have to come from a machine-readable line of each reviewer's report, not from prose. And the join key from a gate run to a change is unresolved: a PR number does not exist when a gate runs before the PR opens, and a commit id is rewritten by a rebase | a tool runs a gate and reads its verdict, so a deterministic producer exists; or the first question about the cost of one change |
 | a finding-class field on gate findings, and a count of repeated classes | findings are free text. Cost of waiting: gate runs before the field exists are never classified, so that baseline starts when the field does | `docs/lessons.md` records the same class of finding twice by hand, once the gate-run record above exists |
 | recording, for a team, the inputs of a return-on-investment model (00 0.6): dated change markers, activity per project, time per change, cost per change | the product records none of them and computes no return on investment. It needs data from more than one machine, which this spec does not have | the first team that runs the product on more than one machine and asks for a metric |
+| rotation of the runtime ledger, and a hard size limit that refuses an ingest. Under the rule that nothing is edited or deleted, rotation may not delete or rewrite an entry; how is decided then | the ledger only grows; `doctor` warns past the size in [13 13.8](spec/13-runtime-ledger.md#138-starting-values), and no ingest is refused | `doctor`'s size warning fires for the first time |
+| a hash chain or an anchored head over the ledger's entries, to detect a removed entry | a removed entry is undetected, so "never deleted" is a promise; `doctor` detects a content mismatch of ingested event bytes and nothing else (13 13.1) | the ledger is restored from a backup or copied between machines; or it is used as evidence off the machine; or a second writer of the ledger is proposed. The maintainer observes these |
+| cross-machine sync of the ledger | one ledger per machine | a lesson has to be learned again on a second machine. The maintainer observes it |
+| finer visibility per project in the cross-project view | each sandbox on a machine sees the other projects' names, their activity timing and the allowlisted fields (05 5.4) | the first private project on a machine that also runs a public one |
+| analysis of the ledger beyond `romeu ledger query` and `julieta event list` | those two commands (13 13.9) | the first question about the ledger that `query` cannot answer |
+| a free-text note, for a project's own view only | a `note` event carries closed fields (13 13.2) | an agent needs to record something no id expresses, and the need is written as an issue |
+| keeping the bytes of a rejected spool file, for debugging | a rejected entry holds the key and the reason id, and julieta deletes the file (13 13.5) | the first rejection that cannot be diagnosed from its reason id |
+| a cleaner for the spool files ingest skips: path-level violations, and events newer than the version window | they stay in the spool; each ingest examines a bounded number of names and, like `doctor`, reports them (13 13.3) | ingest reports one in real use |
+| more event types and fields: romeu-side events, successes and probes; the hook and the repo of a `hook-failed`; the signal behind an `exit_code` of -1 | three event types with the fields of 13 13.2; julieta state holds the hook and the repo for the session | a consumer needs one; each is an additive format version |
+| tuning the ledger's starting values (13 13.8), and writing more secret patterns | the proposed defaults, and the pattern list of the plan task that builds the ingester | ingest reports the count cap, the size cap or the listing bound reached; or `doctor`'s size warning fires; or a secret reaches the ledger |

@@ -64,7 +64,10 @@ run every time, never remembered.
 
 julieta records every failing git hook run (hook, repo, exit status,
 time) in its state; SessionStart, `julieta status` and `romeu status`
-surface them until a later run of the same hook succeeds.
+surface them until a later run of the same hook succeeds. The
+dispatcher also emits each failure as a `hook-failed` event of the
+runtime ledger ([13 13.2](13-runtime-ledger.md#132-events)); julieta
+state stays the record a session reads.
 
 ## 8.3 Handoff
 
@@ -111,6 +114,14 @@ plumbing.
 
 Salvage covers the generation's recorded repo set
 ([01 1.6](01-system-model.md#generation)), not the current spec.
+
+Before the sandbox half, romeu ingests the project's spool into the
+runtime ledger ([13 13.4](13-runtime-ledger.md#134-ingest)). An ingest
+that does not finish is recorded in the salvage record's `reasons` as
+`ledger-incomplete`. It is not a skipped item: it changes no `result`
+and no exit status, so it never makes `rm` exit 5. Events julieta
+writes during the sandbox half stay in the spool, which is a host
+directory and outlives the sandbox, for the next ingest.
 
 ### Sandbox half: `julieta salvage` (run by romeu via `sbx env exec`)
 

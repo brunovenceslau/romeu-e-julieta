@@ -9,11 +9,11 @@ test, coverage and review rules as `internal/*`.
 
 | Level | Location | Runs where | Covers |
 |---|---|---|---|
-| Unit | `internal/**`, `tools/**`, `e2e/probes/**`, `e2e/fakesbx/**` `_test.go` | CI, dev | validators generated from `rules.go` (table + fuzz seeds committed), digests, widening-set and toolchain diffs, the generated state-machine tables (every row, every illegal pair), egress split, `termsafe`, shell quoter, sbx output parsers over every recorded sbx version, error-id table, doctor checks with `HOME` in a temp dir, the probe harness core and its sbx exec layer (against a helper binary re-executed from the test), the recorder's redaction, the fake sbx's placeholder normalizer, CI tools themselves (the forbidden-name matcher and its pushed-range walk over a fixture repository, `workflows` against fixture workflow files, the linter configuration against a fixture package with one violation per checker of rule 14 in [ADR 0001, the documentation standard](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md), invariants/mutate, acceptance against a recorded GitHub API fixture, `dora` against a recorded GitHub API fixture and a fixture repository, `pr` against recorded event payloads) |
-| Golden | `internal/render/testdata/`, `internal/layout/testdata/`, `internal/gate/testdata/` | CI, dev | `sbxenv.yaml`, workspace files, `render.json`, gate diff text, herdr `layout.apply` requests (`layout up --dry-run`), handoff front matter |
+| Unit | `internal/**`, `tools/**`, `e2e/probes/**`, `e2e/fakesbx/**` `_test.go` | CI, dev | validators generated from `rules.go` (table + fuzz seeds committed), digests, widening-set and toolchain diffs, the generated state-machine tables (every row, every illegal pair), egress split, `termsafe`, shell quoter, sbx output parsers over every recorded sbx version, error-id table, doctor checks with `HOME` in a temp dir, the probe harness core and its sbx exec layer (against a helper binary re-executed from the test), the recorder's redaction, the fake sbx's placeholder normalizer, CI tools themselves (the forbidden-name matcher and its pushed-range walk over a fixture repository, `workflows` against fixture workflow files, the linter configuration against a fixture package with one violation per checker of rule 14 in [ADR 0001, the documentation standard](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md), invariants/mutate, acceptance against a recorded GitHub API fixture, `dora` against a recorded GitHub API fixture and a fixture repository, `pr` against recorded event payloads), the runtime ledger's tables ([13 13.10](13-runtime-ledger.md#1310-tests): the hostile spool, each field, entries and their races, the drain, the doctor checks on fixtures) |
+| Golden | `internal/render/testdata/`, `internal/layout/testdata/`, `internal/gate/testdata/`, `internal/ledger/testdata/` | CI, dev | `sbxenv.yaml`, workspace files, `render.json`, gate diff text, herdr `layout.apply` requests (`layout up --dry-run`), handoff front matter, the two ledger views of a two-project fixture |
 | Schema | `tools/ci schema` | CI | generated schemas equal the committed ones; examples and testdata validate |
 | E2E (git + fake sbx) | `e2e/*_test.go`, tag `e2e` | CI (linux amd64, linux arm64, macOS Intel, macOS arm64) | romeu commands against a temp `$ROMEU_ROOT`; origins served by `git http-backend` behind `httptest` TLS (host settings `gitHosts[].caFile` points at the test CA; gitsafe has no test override); the sandbox daemon served by `git daemon` on `127.0.0.1`; journeys J2, J3b, J7, J10, J11 (scenario functions shared with the host suite); promotion fault injection; invariants marked E in [05](05-security.md), including the I27 hostile trees on the macOS runners |
-| E2E (hybrid) | `e2e/hybrid_test.go`, tag `e2e` | CI on `ubuntu-latest` and `ubuntu-24.04-arm` | the romeu-julieta contract: the fake sbx forwards `env exec` into the julieta container with `.romeu/bin` bind-mounted read-only at the host path; protocol mismatch, `SHA256SUMS` mismatch and a writable bin mount each stop `run` before `layout up`; a 32 KiB manifest round-trips (I30) |
+| E2E (hybrid) | `e2e/hybrid_test.go`, tag `e2e` | CI on `ubuntu-latest` and `ubuntu-24.04-arm` | the romeu-julieta contract: the fake sbx forwards `env exec` into the julieta container with `.romeu/bin` bind-mounted read-only at the host path; protocol mismatch, `SHA256SUMS` mismatch and a writable bin mount each stop `run` before `layout up`; a 32 KiB manifest round-trips (I30); a writable ledger view mount stops `run` the same way (I33) |
 | E2E (container) | `e2e/container_test.go`, tag `e2e` | CI on `ubuntu-latest` (amd64) and `ubuntu-24.04-arm` (arm64), native, no QEMU | julieta in the workload's Debian base: `setup` (PATH link, dispatcher, secondary clone, ff of default branch) and its no-op timing, `install` skip rule, `lock --check`, hooks dispatcher, chaining and recorded failures, memory (stamping, allowlist, import, verify incl. status), handoff (all kinds; SessionEnd then SessionStart as on `/clear`), snapshot, salvage completeness cases, `layout up --dry-run` golden and `layout up` against the pinned herdr |
 | Host | `e2e/host/*_test.go`, tag `host` | maintainer machines (Intel and Apple silicon) | the same scenario functions against real sbx for J1-J13; S3, S5, S8 confirmation; results as `probe-result.v1` per block B step (11) |
 | Probes | `e2e/probes` | maintainer machines | [11](11-host-probes.md); `probe-result.v1` files in `docs/probes/` |
@@ -29,6 +29,14 @@ Additional required tests:
 - **Concurrency**: two romeu processes (flock; second exits 1 with
   `RJ-101`); two julieta processes writing memory (store lock; no lost
   entry); snapshot racing a commit (bundle always valid).
+- **Runtime ledger**: the rows of
+  [13 13.10](13-runtime-ledger.md#1310-tests), each with its stated
+  outcome. Two seams are named there: the spool reader's `afterOpen`
+  test hook, for a file that changes after it was opened, and a
+  version table the test injects, since v1 has one event version. The
+  racing ingests call the ingest function without `romeu.lock`; under
+  the lock the second romeu exits with `RJ-101`, as the row above
+  says.
 - **Promotion fault injection**: a test hook kills romeu after each step
   of the promotion commit (01 1.6); every **P** command then finishes
   the promotion or refuses with exit 4, and a re-sync converges.
@@ -136,7 +144,7 @@ local-gate run is recorded is a
 | schema | `tools/ci schema` | |
 | e2e | `go test -tags e2e ./e2e/...` | |
 | cross-build | darwin amd64/arm64 (`romeu`), linux amd64/arm64 (`julieta`) | |
-| imports | `tools/ci imports` (I1, I2, I11, I24 call sites, 10.7) | |
+| imports | `tools/ci imports` (I1, I2, I11, I24 call sites, I32 call sites, 10.7) | |
 | invariants | `tools/ci invariants` (every I-id has a guard tag and a test tag) | |
 | mutation | `tools/ci mutate` on PRs touching a `.go` file on a path in `.github/ask-first.yaml`; the scheduled `fuzz.yml` runs it too | |
 | catalog | `tools/ci catalog` (explicit upload flags, key syntax) | |
@@ -384,7 +392,7 @@ sha256), `probe` (probe-result id, verdict), `repo` (full name, expected
 verifies each item mechanically (files exist with the hash, probe
 verdicts are `pass`, CI runs are `success` and repo flags match via the
 GitHub API). `--file` validates any `acceptance.v1` file, so an
-operator keeps their own acceptance ledger (for example
+operator keeps their own acceptance file (for example
 `julieta memory verify` per repo, `romeu status --json`, repositories
 that must be archived) in their config repo and verifies it from a
 product checkout; the product names no such repository. The product's
@@ -431,7 +439,7 @@ func (g *Git) Fetch(ctx context.Context, repo, url string, dst RefPrefix) error 
 |---|---|---|
 | `sbxdrv`, `oci`, `render`, `gate`, `state`, `egress`, `signing` | `cmd/romeu`, `tools/ci` | `tools`, `hooks`, `layout` |
 | `tools`, `hooks`, `layout`, `agent/*` | `cmd/julieta` only | `sbxdrv` |
-| `gitsafe`, `spec`, `canon`, `catalog`, `memstore`, `handoff`, `salvage`, `shquote`, `termsafe`, `cli` | both | `sbxdrv`, `layout` |
+| `gitsafe`, `spec`, `canon`, `catalog`, `memstore`, `handoff`, `salvage`, `ledger`, `shquote`, `termsafe`, `cli` | both | `sbxdrv`, `layout` |
 
 ## 10.8 Definition of done for implementing agents
 

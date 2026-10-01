@@ -10,8 +10,8 @@ model is wrong.
 
 | Component | Single responsibility | Runs where | Language |
 |---|---|---|---|
-| **romeu** | Turns reviewed specs into host state: materializes the tree, owns the gates, drives `sbx`, delivers julieta, verifies and imports salvage. Deterministic; never an agent; never executes repository content. | macOS host | Go |
-| **julieta** | Does chores inside a sandbox: secondary clones, tools (mise), git hooks, memory, handoff, snapshot/salvage, run layout, pin bumps and checks, spec and catalog validation. Never widens what the sandbox can do. | sandbox (linux amd64/arm64); also the config repo's CI | Go |
+| **romeu** | Turns reviewed specs into host state: materializes the tree, owns the gates, drives `sbx`, delivers julieta, verifies and imports salvage, ingests the runtime ledger. Deterministic; never an agent; never executes repository content. | macOS host | Go |
+| **julieta** | Does chores inside a sandbox: secondary clones, tools (mise), git hooks, memory, handoff, snapshot/salvage, runtime events, run layout, pin bumps and checks, spec and catalog validation. Never widens what the sandbox can do. | sandbox (linux amd64/arm64); also the config repo's CI | Go |
 | **product repo** (`romeu-e-julieta`, public) | Source of both binaries, product kits, egress catalog, skills, schemas, docs | GitHub | Go, YAML, Markdown |
 | **config repo** (reference instance `verona`) | `projects/<name>.yaml` specs and personal kits. Agents author it; merges are reviewed. It is also a project like any other (the config project). | GitHub; cloned into the host tree | YAML |
 | **worked-on repos** | The code being developed; each may carry `mise.toml` + `mise.lock` | GitHub; plain clones in the host tree (never submodules) | - |
@@ -21,6 +21,7 @@ model is wrong.
 | **host state** | Machine-local trust and lifecycle records: the toolchain acknowledgement and one record per project (approval, awaiting candidate, generations, applied egress), a descriptor cache, a lock | `$XDG_STATE_HOME/romeu/` | JSON |
 | **sandbox** | One sbx microVM per project, named after the project, clone mode on the primary repo | sbx | - |
 | **memory** | One directory per repo per project: memory entries, handoffs, snapshots and salvage payloads, in a fixed layout. Plain files, format owned by julieta, agent-neutral. | host disk, mounted read-write into its sandbox only | - |
+| **runtime ledger** | The per-machine, add-only record of runtime events: julieta writes events to a per-project spool, romeu ingests them into the ledger and derives a per-project view ([13](13-runtime-ledger.md)) | spool and view: host tree, mounted into their own sandbox only (read-write and read-only); ledger: host state, never mounted | JSON |
 | **kits** | v3 kit sources built locally by sbx at create: product mixins (embedded in romeu) and personal kits (from the config repo) plus a workload pinned by digest | host tree `.romeu/kits/` | v3 descriptors, sh |
 | **run layout** | Multiplexer-neutral panes and command steps per project; rendered by julieta into herdr `layout.apply` | spec `run:` | YAML |
 
@@ -29,13 +30,14 @@ model is wrong.
 | Class | Items | Who writes | Reviewed how |
 |---|---|---|---|
 | Truth, in git | config repo `projects/*.yaml`, `kits/*`; each repo's `mise.toml`/`mise.lock`; product kits, catalog, skills, `.github/ask-first.yaml`, the Go spec types with their tags and `internal/spec/rules.go` | agents (sandbox) and humans | PR review; romeu reads config and repo content only at a named commit |
-| Truth, machine-local | host settings; host state | operator (settings); romeu (state) | never mounted into any sandbox |
+| Truth, machine-local | host settings; host state, the runtime ledger included | operator (settings); romeu (state) | never mounted into any sandbox |
 | Generated, in git | `schemas/*.json`, `docs/reference/*`, `.github/CODEOWNERS`, the field and rule tables of this spec's implementation | `go generate ./...` | `tools/ci generated` fails on any diff; never hand-edited |
 | Candidate (unapproved) | `<name>-env/.romeu/candidates/<candidate-id>/` (rendered files and materialized kits) | romeu `sync` | the gate; promoted only on approval (1.6) |
 | Derived, live | `<name>-env/sbxenv.yaml`, `.romeu/render.json`, `.romeu/kits/*`, `.romeu/bin/*`, `$ROMEU_ROOT/dev.code-workspace`, `$ROMEU_ROOT/review.code-workspace` | romeu (promotion) | drift-checked by hash before every overwrite and before every sbx call |
+| Derived from the ledger | `<name>-env/ledger/view/*` | romeu (ingest) | `doctor` derives it again and compares byte for byte ([13 13.6](13-runtime-ledger.md#136-view)) |
 | Derived, in sandbox | secondary clones, installed tools, julieta manifest cache, herdr layout, the `julieta` link on `PATH` | julieta | disposable; recreated by `julieta setup` |
 | sbx-owned facts romeu reads | sandbox existence, state and workspace path (`sbx ls --json`), `remote.sandbox-<name>` URL, sbx version | sbx | read only |
-| Agent output that reaches the host | memory dir files; git objects via fetch or bundle | agents / julieta | data only: validated, escaped for display, stored in romeu namespaces; never executed, never checked out outside a hardened review checkout |
+| Agent output that reaches the host | memory dir files; git objects via fetch or bundle; spool files of the runtime ledger | agents / julieta | data only: validated, escaped for display, stored in romeu namespaces or as ledger entries; never executed, never checked out outside a hardened review checkout |
 
 *Why for us (drift rule):* chezmoi refuses to overwrite a target that
 changed since it last wrote it; we keep that because a hand edit of
@@ -45,7 +47,7 @@ changed since it last wrote it; we keep that because a hand edit of
 
 | Boundary | Rule | Invariants |
 |---|---|---|
-| **A. sandbox -> host** | Anything an agent wrote reaches the host only as data. romeu never runs mise, hooks, filters, tasks or scripts from repo content; never checks out agent-sourced content except into a hardened review checkout; escapes every agent-originated string before printing it | I1-I6, I24, I27, I29 |
+| **A. sandbox -> host** | Anything an agent wrote reaches the host only as data. romeu never runs mise, hooks, filters, tasks or scripts from repo content; never checks out agent-sourced content except into a hardened review checkout; escapes every agent-originated string before printing it | I1-I6, I24, I27, I29, I31-I33 |
 | **B. spec -> host commands** | A spec names secrets; the command resolving a name lives in host settings, keyed `name@project`. romeu never handles a secret value. | I8, I25 |
 | **C. spec -> sandbox capability** | Every widening goes through the per-project gate; toolchain changes go through the per-machine acknowledgement. Nothing unapproved is ever at a live path. julieta runs only as delivered. | I7, I15, I28, I30 |
 | **D. host UI -> agent trees** | No host tool is pointed at an agent-writable tree. Workspace files list host clones and review checkouts only, both to be opened in Restricted Mode (host clones carry origin content that agents can push); memory dirs are never workspace folders. | I13, I14, I23 |
@@ -250,3 +252,7 @@ or error messages.
 | recreate-class | fields tagged `apply:"recreate"`: repos, kits, workload, ports, sandbox options, agent, and (until probe A10 says otherwise) secrets | - |
 | review checkout | a hardened checkout of sandbox work under `<name>-env/review/<dir>/` | - |
 | sandbox probe | a check run inside a sandbox by the maintainer, ids `C1..C5` | - |
+| runtime ledger | the per-machine, add-only store of runtime events under host state; "the ledger" on its own means this | - |
+| spool | a project's agent-writable directory where julieta writes events until romeu ingests them | - |
+| ingest | romeu reads one project's spool and creates ledger entries | - |
+| ledger view | a project's read-only directory that romeu derives from the runtime ledger | - |

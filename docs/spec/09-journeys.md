@@ -41,8 +41,10 @@ J11, also by CI with the fake sbx; each has a guide page in
 2. [O] either after merge `romeu sync foo`, or before merge
    `romeu sync foo --from sandbox/<branch>` (reads the spec from the
    config sandbox's branch, never a working tree).
-3. [H] clones repos, creates memory dirs, derives egress, renders, gate
-   -> [O] approve.
+3. [H] clones repos, creates memory dirs and the ledger's spool and
+   view dirs, ingests the spool (empty on a first sync,
+   [13 13.4](13-runtime-ledger.md#134-ingest)), derives egress,
+   renders, gate -> [O] approve.
 4. [O] `romeu run foo`.
 
 ## J3 Run, sandbox exists (J3a) and absent (J3b)
@@ -53,7 +55,10 @@ sandbox's herdr client. Nothing else runs on the host. See `romeu run` in
 [04](04-cli.md). J3a: `sbx env run -d` starts or
 reattaches without re-provisioning; `julieta setup` is a no-op when
 locks are unchanged (S8). J3b: create, record generation, egress,
-`julieta setup` installs everything, then attach. If the tree has an
+`julieta setup` installs everything, then attach. In both, romeu
+ingests the project's spool right after the preflight, and
+`julieta setup` drains the spool files that now have an entry; an
+ingest that fails is reported and `run` goes on (13 13.4). If the tree has an
 open generation with no sandbox, romeu preserves it first (J10). If a
 sandbox of the project's name exists that romeu has no generation for
 (for example after the host state was lost), `run` exits 2 with
@@ -95,7 +100,9 @@ work as usual.
 2. [O] `romeu recreate foo` (or `romeu rm foo`).
 3. [H] `romeu salvage foo` (mandatory, deterministic): [H] preflight,
    generation `open -> salvaging`, new salvage id and host base SHAs for
-   the generation's recorded repo set; [X->J] `julieta salvage
+   the generation's recorded repo set; [H] ingest the spool (a failed
+   ingest is recorded as `ledger-incomplete` and blocks nothing,
+   13 13.4); [X->J] `julieta salvage
    --stop-agents`; [H] verify, unbundle, cross-check daemon heads,
    import; the handoff reader warns if the generation has no `final`
    handoff.
@@ -113,7 +120,9 @@ work as usual.
    per repo: dirty tree, stashes, branches not on origin, salvage refs
    not reachable from origin; confirm on TTY; move `foo-env/` to
    `$ROMEU_ROOT/.attic/foo/<ts>/`; drop from workspace files; move state
-   and approvals to the state attic.
+   and approvals to the state attic. The spool and the view move
+   with `foo-env/`; the project's ledger entries stay in the ledger
+   (13 13.5).
 
 ## J8 Tool bump (inside a repo)
 
@@ -146,6 +155,8 @@ work as usual.
    `refs/sandboxes/foo/*` and every `snapshot/heads.bundle` into
    `refs/romeu/salvage/foo/<G>/<salvage-id>/`), moves it to
    `closed-lost` with `result: lost`, creates a new sandbox (new ULID).
+   The dead sandbox's spool is a host directory, so the same `run`
+   ingests the events it left (13 13.4).
 3. [O] recover a branch on the host:
    `git -C <clone> branch recover/<b> refs/romeu/salvage/foo/<G>/<salvage-id>/<dir>/<b>`
    and push it (docs show the hardened form).

@@ -26,19 +26,21 @@ sbx.
 | Command | Purpose | Reads | Writes | Runs | Exit codes |
 |---|---|---|---|---|---|
 | `romeu init --config-url <url> [--config-project <name>] [--root <abs>] [--config-ref <ref>]` | create host settings; clone the config repo into `<root>/<cfg>-env/<dir>` | nothing prior | host settings (refuses to overwrite), one clone | host: git | 0, 1, 2 |
-| `romeu sync [<name>...\|--all] [--from origin\|sandbox/<branch>\|<sha>] [--overwrite-drift]` | render specs at a named commit into candidates; run gate 2; promote; apply live changes | host settings, config repo objects, repo objects, registries (descriptors not cached), state | clones (missing only), `refs/romeu/origin/*`, candidates, live derived files on promotion, memory dirs (create only), workspace files, project records, descriptor cache, live egress | host: git, sbx (P for `--from sandbox/...` and live changes) | 0, 1, 2, 3, 4 |
+| `romeu sync [<name>...\|--all] [--from origin\|sandbox/<branch>\|<sha>] [--overwrite-drift]` | render specs at a named commit into candidates; run gate 2; promote; apply live changes | host settings, config repo objects, repo objects, registries (descriptors not cached), state | clones (missing only), `refs/romeu/origin/*`, candidates, live derived files on promotion, memory dirs and ledger dirs (create only), ledger entries and views (ingest), workspace files, project records, descriptor cache, live egress | host: git, sbx (P for `--from sandbox/...` and live changes) | 0, 1, 2, 3, 4 |
 | `romeu approve <name>` / `romeu approve --toolchain` | gate 2 for the awaiting candidate / gate 1; TTY required | project record, candidate, live `sbx version` | project record, promotion / `toolchain.json` | host | 0, 1, 2 (no TTY or nothing awaiting), 4 (candidate changed) |
-| `romeu run <name> [--no-attach] [--timings [--json]]` **P** | ensure sandbox, egress, julieta, setup; attach to the run layout | everything above | project record (generation, lastRun, egressApplied), salvage refs when preserving a lost generation | host: sbx, git; sandbox: julieta | 0-5 |
+| `romeu run <name> [--no-attach] [--timings [--json]]` **P** | ensure sandbox, egress, julieta, setup; attach to the run layout | everything above | project record (generation, lastRun, egressApplied), salvage refs when preserving a lost generation, ledger entries and the view (ingest) | host: sbx, git; sandbox: julieta | 0-5 |
 | `romeu adopt <name>` | record an existing sandbox named `<name>` as an open generation; TTY required | `sbx ls --json`, project record | project record | host: sbx | 0, 1, 2 (no TTY, open generation exists, workspace path differs, no such sandbox) |
 | `romeu stop <name>` **P** | `julieta snapshot --all`, then `sbx stop` | project record | memory (via julieta) | host: sbx; sandbox: julieta | 0, 1, 2, 3, 4 |
-| `romeu salvage <name> [--from-host] [--include-transcripts]` **P** | capture everything sandbox-only; verify and import on host | project record, memory dir | memory (via julieta), `refs/romeu/salvage/...`, project record | host: sbx, git; sandbox: julieta | 0-5 |
+| `romeu salvage <name> [--from-host] [--include-transcripts]` **P** | capture everything sandbox-only; verify and import on host | project record, memory dir | memory (via julieta), `refs/romeu/salvage/...`, project record, ledger entries and the view (ingest) | host: sbx, git; sandbox: julieta | 0-5 |
 | `romeu rm <name> [--accept-loss]` **P** | salvage, then remove the sandbox; tree kept; warns when the generation has no `final` handoff | project record, memory handoff dir | as salvage; sbx removal; egress rules removed; generation closed | host: sbx, git | 0-5 |
 | `romeu recreate <name> [--accept-loss]` **P** | rm then run | as rm + run | as rm + run | as rm + run | 0-5 |
 | `romeu retire <name> [--force]` **P** | rm if needed; report unpushed/salvage-only work; move `<name>-env/` to `.attic/`; drop from workspace files | spec (project must be absent unless `--force`), clones | `.attic/`, workspace files, state attic | host: git, sbx | 0-5 (5: TTY confirm declined, or non-TTY without `--force`) |
 | `romeu status [<name>] [--json]` | per project: sandbox state, spec vs synced commit, drift, interrupted promotion, awaiting candidate, toolchain acknowledgement state, recreate needed, generations and their states, salvage records, unimported snapshots, orphaned projects and repo dirs; for a running sandbox also julieta's warnings and recorded hook failures (via `julieta status --json`) | read only | nothing | host: sbx, git (read); sandbox: julieta (read) | 0, 1 (never 3) |
-| `romeu doctor [--json]` | host health and security checks (below) | host settings, git config, sbx settings and policies, `$HOME` symlinks, tool configs, the signing socket | nothing | host | 0 (all pass), 1 (any fail) |
+| `romeu doctor [--json]` | host health and security checks (below) | host settings, git config, sbx settings and policies, `$HOME` symlinks, tool configs, the signing socket, the ledger and each spool and view | nothing | host | 0 (all pass), 1 (any fail) |
 | `romeu pull [-C <dir>] [--branch <b>]` **P** | fetch the sandbox's current work for the repo containing `<dir>` and update its review checkout | project record, remote URL, `julieta status --json` | `refs/sandboxes/<name>/*` (primary), `refs/romeu/snapshots/<name>/*` (secondary), `review/<dir>/` | host: git, sbx; sandbox: julieta | 0-4 |
 | `romeu handoff <name> [--repo <dir>] [--json]` | print the latest narrative handoff and the newest facts; read through the handoff reader (I24) | memory dir via `os.Root` | nothing | host | 0, 1 |
+| `romeu ledger ingest [<name>...\|--all]` | ingest the spools of the named projects into the runtime ledger and derive their views ([13 13.4](13-runtime-ledger.md#134-ingest)); the same ingest runs inside `sync`, `run` and `salvage` | spools, the ledger | ledger entries (create only), views | host | 0, 1 (`ledger-incomplete`), 2 |
+| `romeu ledger query [--project <name>] [--type <t>] [--tool <key>] [--ref <id>] [--rejected] [--since <time>] [--until <time>] [--json]` | print ledger entries, each field of each project (the full view, host only), ordered by `ingested`, project, key; `--since` and `--until` compare `ingested`; `--json` prints one object per line | the ledger | nothing | host | 0, 1, 2 |
 | `romeu version` | | | | | 0 |
 
 Removed projects: `sync` never deletes, so there is no `--prune` flag;
@@ -61,12 +63,16 @@ dir`, see J13).
 3. `git fsck --strict` on the spec commit; read `projects/*.yaml` via
    `git cat-file`; strict decode and validate all specs (cross-project
    rules: unique names, unique URLs); exit 2 listing every error.
-4. For each target project: create `<name>-env/` and `memory/<dir>/`
-   (create only, with the fixed subdirectories); hardened clone of
+4. For each target project: create `<name>-env/`, `memory/<dir>/`
+   (create only, with the fixed subdirectories) and `ledger/spool/`
+   and `ledger/view/` (create only); hardened clone of
    missing repos; hardened fetch of each repo's origin into
    `refs/romeu/origin/<dir>/*`; resolve `egressCommit` from
    `refs/romeu/origin/<dir>/<ref>`.
 5. Refuse (exit 2) if any memory dir violates the layout allowlist (I24).
+   Then ingest each target project's spool
+   ([13 13.4](13-runtime-ledger.md#134-ingest)); a failed ingest is
+   reported and does not stop `sync`.
 6. Read workload and kit descriptors: the cache in host state first;
    `internal/oci` by digest only on a cache miss; local kits from the
    config commit's tree via `git fsck --strict` and the validated walk
@@ -88,7 +94,8 @@ dir`, see J13).
 
 ### How `romeu run` reaches the run layout
 
-1. Preflight (01 1.5).
+1. Preflight (01 1.5). Then ingest the project's spool (13 13.4); a
+   failed ingest is reported and `run` continues.
 2. `sbx ls --json`:
    - a sandbox named `<name>` that romeu has no open generation for:
      `RJ-203 unknown-sandbox`, fix hint "check its workspace, then
@@ -152,15 +159,18 @@ implementation serves both.
 | secret `argv[0]` missing or not absolute; entries for unknown projects | fail / warn |
 | signing: a project uses `git-ssh-sign` and `signing.agentSocket` is unset, unreachable, or holds a number of keys other than one, or its one key differs from the kit's `signingKey` arg | fail **pre** |
 | tree: live derived files drifted; interrupted promotion; memory dir violating the layout allowlist | fail |
+| ledger: directory not 0700 or an entry not 0600; an ingested entry whose event region does not hash to the key in its name, or an entry that does not parse (`ledger-entry-mismatch`); a project's view that differs from the one derived again | fail |
+| ledger: a spool root missing, a symlink or not a directory | fail |
+| ledger: spool files ingest skips, as counts per reason with the first paths (13 13.3); a leftover temporary name; the ledger's size past the warning size (13 13.8) | warn |
 
 ## 4.3 julieta (sandbox)
 
 | Command | Purpose | Reads | Writes | Exit codes |
 |---|---|---|---|---|
-| `julieta setup [--json]` | idempotent: point `$HOME/.local/bin/julieta` at the running binary; install the hook dispatcher (global `core.hooksPath`); clone missing secondary repos from origin; fetch origin in every repo and fast-forward the local default branch when it is checked out, clean and fast-forwardable (otherwise report); `install`; `memory check`; agent memory dir check | manifest | `$HOME/.local/bin/julieta`, `$HOME/src/...`, repos (ff only), git global config (sandbox), dispatcher dir, mise data, julieta state | 0, 1, 2 |
+| `julieta setup [--json]` | idempotent: point `$HOME/.local/bin/julieta` at the running binary; install the hook dispatcher (global `core.hooksPath`); clone missing secondary repos from origin; fetch origin in every repo and fast-forward the local default branch when it is checked out, clean and fast-forwardable (otherwise report); `install`; `memory check`; agent memory dir check; the ledger view must not be writable (`ledger-view-writable`, exit 2); drain the spool (13 13.3) | manifest, the ledger view | `$HOME/.local/bin/julieta`, `$HOME/src/...`, repos (ff only), git global config (sandbox), dispatcher dir, mise data, julieta state, the spool (drain) | 0, 1, 2 |
 | `julieta install [--repo <dir>] [--force]` | `mise install` (locked) in every repo; skip when the `lock-set` digest equals the last success | manifest, locks | mise data, julieta state | 0, 1 (names the tool and the blocked host) |
 | `julieta lock [--repo <dir>] [--check]` | `mise lock --platform linux-x64,linux-arm64,macos-x64,macos-arm64`; `--check` verifies freshness without writing (every tool in `mise.toml` has a lock entry and every lockable entry covers the 4 platforms) | `mise.toml`, `mise.lock` | `mise.lock` (not with `--check`) | 0, 1 |
-| `julieta hooks run <hook> [args]` | dispatcher: julieta's own action (`pre-commit`: `lock --check` when `mise.toml` or `mise.lock` is staged; `post-commit`, `post-rewrite`, `post-merge`: `snapshot`), then the repo's tracked `.githooks/<hook>` if executable, then `$GIT_DIR/hooks/<hook>` if executable; the hook's arguments go to each, and its stdin to the first of the two that exists; the first non-zero status stops; a failure is recorded in julieta state | repo | as the hooks do; julieta state | hook's status |
+| `julieta hooks run <hook> [args]` | dispatcher: julieta's own action (`pre-commit`: `lock --check` when `mise.toml` or `mise.lock` is staged; `post-commit`, `post-rewrite`, `post-merge`: `snapshot`), then the repo's tracked `.githooks/<hook>` if executable, then `$GIT_DIR/hooks/<hook>` if executable; the hook's arguments go to each, and its stdin to the first of the two that exists; the first non-zero status stops; a failure is recorded in julieta state and emitted as a `hook-failed` event (13 13.2) | repo | as the hooks do; julieta state; the spool | hook's status |
 | `julieta memory add\|list\|show\|edit\|rm\|search [--repo <dir>] [--json]` | memory entries of the repo containing cwd (or `--repo`); `edit --status done` closes an entry; julieta stamps id and timestamps | memory dir | memory dir | 0, 1, 2 |
 | `julieta memory import --format jsonl <file>` | import entries, idempotent by content digest; report `read`, `imported`, `skipped-duplicate`, `invalid` | file | memory dir | 0, 1 (`invalid > 0`), 2 |
 | `julieta memory verify --against <file>` | set equality between the JSONL file's content digests and the store's, then equality of `status` for every matched entry | file, memory | nothing | 0, 1 |
@@ -168,6 +178,8 @@ implementation serves both.
 | `julieta handoff write [--final\|--facts]` | read the narrative on stdin (not for `--facts`), validate headings, stamp facts, write `handoff/<ULID>-<kind>.md` | stdin, repos | memory handoff dir | 0, 1, 2 |
 | `julieta handoff show [--hook] [--repo <dir>]` | print the latest narrative handoff, the facts that changed since, and open memory entries; `--hook` (SessionStart) also prints `lesson` entries and julieta's warnings (08 8.2) | memory, repos, julieta state | nothing | 0, 1 |
 | `julieta handoff list [--json]` | list handoffs | memory | nothing | 0 |
+| `julieta event add [--tool <key>] [--ref <id>] [--path <path>]` | write a `note` event to the spool; each value is validated as 13 13.2 says, and at least one is given; no flag takes free text | manifest | the spool | 0, 1, 2 (a rejection reason of 4.4) |
+| `julieta event list [--others] [--json]` | print this project's entries from the ledger view, rejected ones included; `--others` prints the other projects' entries, with the fields the view policy allows | the ledger view | nothing | 0, 1 |
 | `julieta snapshot [--repo <dir>\|--all]` | bundle unpushed work into `memory/<dir>/snapshot/` (no debounce) | repos, manifest | memory | 0, 1 |
 | `julieta salvage [--stop-agents] [--include-transcripts] [--json]` | full salvage for the `salvageRun` id in the manifest | manifest, repos, agent dirs | memory dirs, `salvage/*` branches (create only) | 0, 1, 5 |
 | `julieta layout up [--dry-run [--json]]` | start the herdr server if absent, apply missing tabs, report "layout stale" when the live layout's `run` digest differs from `runDigest`, attach; `--dry-run` prints the `layout.apply` requests without applying (golden tests) | manifest | herdr state (not with `--dry-run`) | 0, 1, 2 |
@@ -187,3 +199,21 @@ Environment julieta sets for mise calls: `MISE_LOCKED=1`,
 `MISE_AUTO_INSTALL=false`, `MISE_YES=1`, and
 `MISE_TRUSTED_CONFIG_PATHS` set to the manifest's repo paths (nothing
 else is trusted).
+
+A julieta command that exits non-zero also writes a `command-failed`
+event to the spool when the manifest names one; which commands do not,
+and why emitting never changes a command's exit status, is in
+[13 13.2](13-runtime-ledger.md#132-events).
+
+## 4.4 Error ids of the runtime ledger
+
+The ledger has no message catalog of its own. Its errors are rows of
+the one table of 4.1, named here by slug; the table assigns the
+numbers.
+
+| Slug | Exit | Raised by |
+|---|---|---|
+| `event-syntax`, `event-version`, `event-keys`, `event-id`, `event-domain`, `secret-pattern` | 2 | `julieta event add`, for its own input. romeu's ingest records the same id as the reason of a rejected entry and does not exit on it ([13 13.4](13-runtime-ledger.md#134-ingest)) |
+| `ledger-view-writable` | 2 | `julieta setup` |
+| `ledger-incomplete` | 1 | `romeu ledger ingest`. Inside `sync`, `run` and `salvage` it is reported and the exit status does not change |
+| `ledger-entry-mismatch` | 1 | ingest, when an entry's name exists with other content; `romeu doctor` |

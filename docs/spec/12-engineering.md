@@ -78,6 +78,7 @@ Module ids are stable; the plan selects work by them.
 | `layout` | run layout to herdr `layout.apply`, pane step runner | spec |
 | `handoff` | handoff write/show/list, the handoff reader, SessionStart output | memstore, gitsafe |
 | `salvage` | julieta snapshot/salvage; romeu verification and ref import | gitsafe, memstore, state |
+| `ledger` | the runtime ledger ([13](13-runtime-ledger.md)): event schema and generated tables, julieta's emit, `event` commands and drain; romeu's spool reader, ingest, entries, view, `ledger` commands and doctor checks | spec, canon, catalog, memstore, julieta-core |
 | `kits` | `kits/*` sources, embedding, `tools/kitpin` | julieta-core |
 | `skills` | `skills/julieta`, `skills/handoff` | handoff, memstore |
 | `ci-release` | the remaining `tools/ci` checks, workflows, `tools/release` and release notes | all |
@@ -87,8 +88,9 @@ Build order: `ci-bootstrap`, `probes` -> probe block A (maintainer, in
 parallel with) `canon`, `spec`, `termsafe`, `gitsafe`, `signing` ->
 `catalog`, `oci`, `state`, `sbxdrv`, `memstore` -> `egress` -> `render`
 -> `gate` -> `romeu-cli` (init, sync, approve, status, doctor, adopt) ->
-`julieta-core`, `layout` -> `handoff`, `salvage` -> `romeu-cli` (run,
-stop, salvage, rm, recreate, retire, pull, handoff) -> `kits`, `skills`
+`julieta-core`, `layout` -> `handoff`, `salvage`, `ledger` ->
+`romeu-cli` (run, stop, salvage, rm, recreate, retire, pull, handoff,
+ledger) -> `kits`, `skills`
 -> `ci-release` -> block B (acceptance on real hosts) -> `docs` ->
 `tools/ci acceptance`. Block A settles every sbx fact the code depends
 on before `sbxdrv` and `render` are finalized; block B only accepts
@@ -108,6 +110,7 @@ a diff. Nobody hand-edits a generated file.
 | `internal/spec/rules.go` + Go types | validators, the rule table in the reference docs, `schemas/*.json` (`tools/schemagen`) |
 | `internal/cli` error table | `--help` exit-code sections, `docs/reference/errors.md`, `docs/reference/exit-codes.md` |
 | command definitions | `docs/reference/<command>.md` |
+| the event type in `internal/ledger` with its `view` tags; the event types, the command definitions, the embedded catalog, the invariant tags, the probe definitions and the error table | the event validator, the membership tables of `type`, `tool` and `ref`, the cross-project allowlist, `schemas/runtime-event.v1.json`, `docs/reference/runtime-event.md` (13 13.2) |
 | `internal/state` transition tables | state-machine tests; the diagrams in `ARCHITECTURE.md` |
 | `.github/ask-first.yaml` | `.github/CODEOWNERS`, `docs/reference/ask-first.md`, the `mutate` trigger |
 | the vocabulary table (01 1.7) | the `tools/ci vocabulary` denylist |
@@ -204,7 +207,8 @@ must have that form; a merge commit's subject is not checked.
   [reviews/round-2.md](../reviews/round-2.md#settled-questions) and
   [reviews/round-3.md](../reviews/round-3.md#maintainer-decisions));
   later maintainer decisions are in
-  [reviews/round-4.md](../reviews/round-4.md#maintainer-decisions).
+  [reviews/round-4.md](../reviews/round-4.md#maintainer-decisions) and
+  [reviews/round-5.md](../reviews/round-5.md#maintainer-decisions).
 
 ## 12.6 Release notes
 
@@ -226,7 +230,9 @@ is listed first. Nobody writes release notes by hand.
   check possible: <reason>"), checked by `tools/ci lessons`; a lesson
   that can become a deterministic check becomes one in the same PR.
   A lesson that says a change made delivery better or worse cites the
-  metrics of 12.10, the way that section says.
+  metrics of 12.10, the way that section says. A lesson about
+  something that failed inside a sandbox may cite the runtime ledger's
+  events ([13 13.9](13-runtime-ledger.md#139-consumers)).
 
 ## 12.8 Contributor docs (outlines)
 
@@ -318,6 +324,9 @@ no DORA text covers that case.
 The tool measures this repository. It is not part of `romeu` or
 `julieta` and gives a user's team nothing
 ([00 0.6](00-scope.md#06-teams-adopting-ai-assisted-development)).
+It does not read the runtime ledger: each input below is GitHub data
+or git history, and the ledger owns no metric
+([13 13.9](13-runtime-ledger.md#139-consumers)).
 
 **Inputs.**
 

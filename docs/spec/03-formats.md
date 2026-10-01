@@ -148,6 +148,9 @@ additionalWorkspaces:
   - ./memory/shop-web
   - path: ./.romeu/bin
     readOnly: true
+  - ./ledger/spool
+  - path: ./ledger/view
+    readOnly: true
 kits:
   - source: docker.io/docker/sbx-kit-claude@sha256:<64 hex>
   - source: ./.romeu/kits/julieta-<digest12>
@@ -169,7 +172,9 @@ hooks (they re-prompt on every invocation and `preRemove` only warns);
 the secret command is built with `internal/shquote` from host-settings
 argv with a scrubbed environment; romeu only ever renders `command`,
 never a literal value; clone mode comes from romeu's `sbx env run
---clone`.
+--clone`. `./.romeu/bin`, `./ledger/spool` and `./ledger/view` are
+fixed mounts, rendered for each project from no spec field
+([13 13.1](13-runtime-ledger.md#131-stores)).
 
 ## 3.4 Host settings (`settings.yaml`, schema `host-settings.v1`)
 
@@ -266,6 +271,7 @@ by julieta at `$HOME/.local/state/julieta/manifest.json`.
   ],
   "salvage": {"excludeIgnored": ["node_modules/", ".venv/", "target/"], "capBytes": 1073741824},
   "salvageRun": {"id": "01J9ZD0A1B2C3D4E5F6G7H8J9K"},
+  "ledger": {"spool": "/abs/root/shop-env/ledger/spool", "view": "/abs/root/shop-env/ledger/view"},
   "run": {"...": "the validated run layout"},
   "runDigest": "<hex>",
   "agent": "sbx-kit-claude"
@@ -277,6 +283,7 @@ by julieta at `$HOME/.local/state/julieta/manifest.json`.
 | `protocol` | the romeu/julieta contract number; julieta accepts a manifest of protocol N (its own) or N-1 (a cached manifest written before a romeu upgrade) and refuses anything else |
 | `repos[].base` | origin SHAs the host clone already has; snapshot and salvage bundles exclude objects reachable from them (08) |
 | `salvageRun` | present only on salvage calls: the salvage id romeu expects back |
+| `ledger` | the mount paths of the project's spool and view ([13](13-runtime-ledger.md)); julieta emits events only when it is present |
 
 The compatibility check that precedes the first call of a session is
 described in [06 6.3](06-kits.md#63-julieta-delivery).
@@ -355,7 +362,7 @@ generation state machines of [01 1.6](01-system-model.md#16-state-machines)):
 | `candidate` | `null`, or the awaiting record `{"id", "state": "awaiting", "wideningDigest", "filesDigest", "specCommit", "renderedAt"}` |
 | `generations[].state` | `open`, `salvaging`, `closed-removed`, `closed-lost` |
 | `generations[].createdWith` | the recreate digest at create; `null` for an adopted generation (status reports "recreate digest unknown") |
-| `salvage[].result` | `complete`, `incomplete`, `lost`; `reasons[]` lists each skipped item or `sandbox-lost` |
+| `salvage[].result` | `complete`, `incomplete`, `lost`; `reasons[]` lists each skipped item or `sandbox-lost`, and `ledger-incomplete` when the ingest before the sandbox half did not finish, which changes no `result` (13 13.4) |
 
 Files are written atomically (temp file in the same dir, fsync, rename),
 mode 0600. `descriptors/<digest>.json` holds the parsed, normalized
@@ -442,7 +449,8 @@ Structured values are digested with one function,
 and the canonical JSON of `v` (keys sorted, UTF-8, no insignificant
 whitespace). Each Go type has exactly one kind, so a value of one kind
 can never be compared with a digest of another. Raw file bytes
-(`sbxenv.yaml`, binaries, bundles, payload files, probe artifacts) use
+(`sbxenv.yaml`, binaries, bundles, payload files, probe artifacts,
+spool files of the runtime ledger) use
 plain sha256, because external tools (`sha256sum`, `shasum`) must
 reproduce them.
 
@@ -464,3 +472,8 @@ reproduce them.
 
 `probe-result.v1` is defined in [11](11-host-probes.md#113-probe-result-format);
 `acceptance.v1` in [10](10-testing-style.md#105-acceptance-evidence).
+The runtime ledger's three formats are defined in
+[13](13-runtime-ledger.md): the event (`runtime-event.v1`, written in
+an event as `runtime-event/v1`, [13.2](13-runtime-ledger.md#132-events)),
+the ledger entry ([13.5](13-runtime-ledger.md#135-entries)) and the
+view files ([13.6](13-runtime-ledger.md#136-view)).
