@@ -108,12 +108,13 @@ a diff. Nobody hand-edits a generated file.
 | `internal/state` transition tables | state-machine tests; the diagrams in `ARCHITECTURE.md` |
 | `.github/ask-first.yaml` | `.github/CODEOWNERS`, `docs/reference/ask-first.md`, the `mutate` trigger |
 | the vocabulary table (01 1.7) | the `tools/ci vocabulary` denylist |
+| ADR titles and statuses (`docs/adr/*.md`) | the ADR index `docs/adr/README.md` |
 
 `go run ./tools/new <kind> <name>` scaffolds with the next free id:
 
 | Kind | Creates |
 |---|---|
-| `adr` | `docs/adr/NNNN-<name>.md` with the ADR sections (12.5) |
+| `adr` | `docs/adr/NNNN-<name>.md` with the ADR layout of ADR 0001 (rule 6), status Proposed |
 | `invariant` | the next `I<n>`: a guard stub and a failing test, both tagged, and the table row to fill |
 | `probe` | a probe definition with `expect`, decision table and `affects` to fill |
 | `kit` | `kits/<name>/` with a descriptor on the pinned frontend |
@@ -129,22 +130,20 @@ or produced this, and does it exist now?" is answered mechanically:
 |---|---|---|
 | before push | tracked `.githooks/pre-push` runs `go run ./tools/ci fast` (contributors enable it with `git config core.hooksPath .githooks`; inside a sandbox, julieta's dispatcher runs it automatically) | format, vet, lint, unit tests, generated files, hygiene, sequences, vocabulary |
 | every PR | `go run ./tools/ci all` in CI | the full list in [10 10.2](10-testing-style.md#102-ci) |
-| every PR | `tools/ci pr` reads the pull request event payload | the body has non-empty **Why**, **What changed**, **Evidence** and **Lessons** sections; a **Middleware** line of the form `check: <tools/ci subcommand or test>`, `generator: <tools/new kind or go:generate source>`, or `none: <reason>`; every changed golden listed under Evidence; a quoted maintainer approval when the diff touches a path in `.github/ask-first.yaml` |
+| every PR | `tools/ci pr` reads the pull request event payload | the body has non-empty **Why**, **What changed**, **Evidence** and **Lessons** sections; a **Middleware** line of the form `check: <tools/ci subcommand or test>`, `generator: <tools/new kind or go:generate source>`, or `none: <reason>`; every changed golden listed under Evidence; a quoted maintainer approval when the diff touches a path in `.github/ask-first.yaml`; commit subjects in Conventional Commit form; the prose rules of ADR 0001 (rule 4) in the body and the commit messages |
 | merge | branch protection | CI green; code-owner review for ask-first paths |
 
 ## 12.5 Decisions and history
 
 - The spec (`docs/spec.md`, `docs/spec/`) describes the current state
   only. Review history lives in `docs/reviews/round-<n>.md`.
-- Decisions live in ADRs under `docs/adr/` (adr-tools layout,
-  `.adr-dir` -> `docs/adr`), one decision per record, file
-  `NNNN-<title>.md`, sections Status, Date, Context, Decision,
-  Alternatives considered, Consequences. Status moves Proposed ->
-  Accepted -> Superseded by NNNN or Deprecated.
+- Decisions live in ADRs under `docs/adr/`, one decision per record.
+  Layout, sections, statuses, supersede links and sign-off follow
+  [ADR 0001](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
+  (rules 6-9); `tools/ci sequences` checks them.
 - An accepted ADR is never rewritten. A spec change that reverses a
-  decision adds a new ADR with `Supersedes: NNNN`, and the old ADR gains
-  only its status line `Superseded by NNNN`. `tools/ci sequences` checks
-  both links.
+  decision adds a new ADR that supersedes the old one, and the old ADR
+  gains only its `Superseded by` status line.
 - A settled open question becomes an ADR; the `docs` module writes the
   initial set from this spec's decisions (listed in
   [reviews/round-2.md](../reviews/round-2.md#settled-questions)).
@@ -170,24 +169,17 @@ is listed first. Nobody writes release notes by hand.
 
 ## 12.8 Contributor docs (outlines)
 
-Every document in the repo follows one documentation standard, stated
-in `CONTRIBUTING.md`:
-
-- each page names its reader and the task it serves, and has one content
-  type (tutorial, how-to, reference or explanation);
-- headings describe what the section answers;
-- each section stands on its own when read alone, by a person or an AI
-  agent; terms, acronyms, trust boundaries and prerequisites are
-  defined before they are used, and each concept has one name (01 1.7);
-- examples are complete and copyable, with expected output where it
-  helps;
-- prose is concise and active; no marketing language, no em dash;
-- decisions go in ADRs (12.5), never in page prose that later rots.
+Every document in the repo follows the documentation standard in
+[ADR 0001](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md):
+a lead practice per artifact, twenty rules tagged as checks or review
+items, and the voice rule. `CONTRIBUTING.md` links to
+it rather than restating it. The outlines below give each file's
+product-specific content.
 
 | File | Reader and type | Outline |
 |---|---|---|
-| `README.md` | a developer deciding whether to use the product; explanation + quick start | what it is and who it is for; when not to use it; prerequisites (macOS host, sbx, git floor); install and verify (checksums, attestation); first run (J1 in six commands); the trust model in one paragraph with a link to `ARCHITECTURE.md`; links to guides and reference |
+| `README.md` | a developer deciding whether to use the product; explanation + quick start | the heading order of ADR 0001 rule 12, filled with: what it is and who it is for; when not to use it; prerequisites (macOS host, sbx, git floor); install and verify (checksums, attestation); first run (J1 in six commands); the trust model in one paragraph with a link to `ARCHITECTURE.md`; links to guides, reference and ADRs |
 | `ARCHITECTURE.md` | a contributor or reviewer; explanation, one page | components and their single jobs; the trust boundaries A-F; the gates; the state machines (candidate, promotion commit, generation, probe) as generated diagrams; where each invariant is enforced; module dependency direction |
-| `CONTRIBUTING.md` | a contributor; how-to | the dev loop (`tools/new`, `go generate`, `tools/ci fast`, `tools/ci all`); enabling the pre-push hook; how to add a command, invariant, probe or kit; what counts as ask-first and how approval is recorded; the PR template and the Middleware line; the text standard; the documentation standard above; ADRs and superseding |
+| `CONTRIBUTING.md` | a contributor; how-to | the dev loop (`tools/new`, `go generate`, `tools/ci fast`, `tools/ci all`); enabling the pre-push hook; how to add a command, invariant, probe or kit; what counts as ask-first and how approval is recorded; the PR template and the Middleware line; the text standard; a link to the documentation standard (ADR 0001), including its request to write with a voice; ADRs and superseding |
 | `docs/guide/*` | the operator; how-to, one page per journey | the steps of the journey in [09](09-journeys.md) with expected output and recovery from each expected error id |
 | `docs/reference/*` | anyone looking up a fact; reference, generated | commands, file formats, errors, exit codes, ask-first surfaces |

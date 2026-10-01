@@ -7,9 +7,11 @@ reviewers of the design. Type: reference index; start here, then read
 Status: **draft v1 specification, review round 2 applied**. It is the
 source of truth for the implementation plan and describes the current
 state only. How it got here lives in [reviews/](reviews/round-2.md);
-once the product has ADRs, every settled decision is an ADR and a spec
-change that reverses one adds an ADR that supersedes it
-([12 12.5](spec/12-engineering.md#125-decisions-and-history)).
+decisions live in ADRs under [adr/](adr/), every settled decision
+becomes one, and a spec change that reverses one adds an ADR that
+supersedes it ([12 12.5](spec/12-engineering.md#125-decisions-and-history)).
+Every document follows the documentation standard of
+[ADR 0001](adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md).
 
 romeu e julieta organizes development environments built on Docker
 Sandboxes (`sbx`). **romeu** runs on the host: a deterministic,
@@ -103,7 +105,7 @@ and verified by `go run ./tools/ci acceptance`, the last plan task.
 | S7 | every journey in [09](spec/09-journeys.md) passes: J2, J3b, J7, J10, J11 in CI with the fake sbx; J1-J13 on a real host | CI run; probe results `docs/probes/B3-<host>.json` |
 | S8 | `romeu run <p>` on a running sandbox with unchanged locks: romeu's own overhead <= 2 s (median of 5, excluding time inside `sbx` subprocesses); `julieta setup` no-op <= 3 s (median of 5) | CI: `run --timings --json` with the fake sbx, and the timed container e2e; host confirmation in `docs/probes/B5-<host>.json` |
 | S9 | coverage >= 80% statements across `internal/...`, `tools/...`, `e2e/probes/...` and `e2e/fakesbx/...`; >= 90% for `gitsafe`, `gate`, `spec`, `render`, `egress`, `termsafe`, `state`, `canon` | `tools/ci coverage` |
-| S10 | docs: README, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `docs/guide/*` per journey, generated `docs/reference/*` per command, file format, error id and exit code, `docs/adr/*` for the decisions in this spec | `tools/ci docs` and `tools/ci generated` |
+| S10 | docs: README, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `SECURITY.md`, `docs/guide/*` per journey, generated `docs/reference/*` per command, file format, error id and exit code, `docs/adr/*` for the decisions in this spec | `tools/ci docs` and `tools/ci generated` |
 | S11 | REUSE 3.3 compliant; every file has an SPDX header or a `REUSE.toml` entry | `reuse lint` inside `tools/ci` |
 
 ## Boundaries (for everyone who changes this repo)

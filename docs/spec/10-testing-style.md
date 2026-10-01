@@ -63,8 +63,8 @@ runs the `fast` subset. Actions are pinned by commit SHA.
 | generated | `tools/ci generated`: `go generate ./...` leaves no diff (schemas, reference docs, errors, exit codes, spec field and rule tables, CODEOWNERS, vocabulary denylist, state-machine tests) | yes |
 | lint | `golangci-lint run` over the whole module, `tools/` included | yes |
 | unit | `go test ./internal/... ./tools/...` | yes |
-| hygiene | `tools/ci hygiene`: no U+2014; no personal absolute paths; forbidden-name denylist stored as sha256 of lowercased tokens (with a self-test); scans `e2e/testdata/sbx/**` too | yes |
-| sequences | `tools/ci sequences`: ADR numbers contiguous and unique; every `Supersedes: NNNN` in an ADR matches a `Superseded by` link in NNNN and the reverse; spec section, invariant, probe, question and journey ids unique; every referenced id and journey range (for example "J1-J13" in a success criterion) exists | yes |
+| hygiene | `tools/ci hygiene`: no U+2014; the prose rules and `TODO(#<issue>)` form of ADR 0001 (rules 4, 14); no personal absolute paths; forbidden-name denylist stored as sha256 of lowercased tokens (with a self-test); scans `e2e/testdata/sbx/**` too | yes |
+| sequences | `tools/ci sequences`: ADR numbers contiguous and unique; ADR layout and statuses per ADR 0001 (rules 6-7); every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; spec section, invariant, probe, question and journey ids unique; every referenced id and journey range (for example "J1-J13" in a success criterion) exists | yes |
 | vocabulary | `tools/ci vocabulary` (01 1.7) | yes |
 | vulnerabilities | `govulncheck ./...` | |
 | unit + golden + race | `go test -race -coverprofile=cover.out ./...` | |
@@ -81,7 +81,7 @@ runs the `fast` subset. Actions are pinned by commit SHA.
 | mise | `tools/ci mise` (`julieta lock --check` logic on this repo's and the examples' locks) | |
 | probes | `tools/ci probes` (11 11.4) | |
 | license | `reuse lint` (REUSE 3.3) | |
-| docs | `tools/ci docs` (S10; `--help` output vs `docs/reference/`) | |
+| docs | `tools/ci docs` (S10; `--help` output vs `docs/reference/`; the checks ADR 0001 assigns to it: rules 1, 5, 12, 13, 17, 20) | |
 | lessons | `tools/ci lessons`: every `docs/lessons.md` entry names an existing `tools/ci` subcommand or test name, or says "no check possible: <reason>" | |
 | pr | `tools/ci pr` (pull requests only; reads the event payload, 12 12.4) | |
 
