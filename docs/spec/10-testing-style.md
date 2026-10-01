@@ -9,7 +9,7 @@ test, coverage and review rules as `internal/*`.
 
 | Level | Location | Runs where | Covers |
 |---|---|---|---|
-| Unit | `internal/**`, `tools/**`, `e2e/probes/**`, `e2e/fakesbx/**` `_test.go` | CI, dev | validators generated from `rules.go` (table + fuzz seeds committed), digests, widening-set and toolchain diffs, the generated state-machine tables (every row, every illegal pair), egress split, `termsafe`, shell quoter, sbx output parsers over every recorded sbx version, error-id table, doctor checks with `HOME` in a temp dir, the probe harness core and its sbx exec layer (against a helper binary re-executed from the test), the recorder's redaction, the fake sbx's placeholder normalizer, CI tools themselves (the forbidden-name matcher and its pushed-range walk over a fixture repository, `workflows` against fixture workflow files, the linter configuration against a fixture package with one violation per checker of rule 14 in [ADR 0001, the documentation standard](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md), invariants/mutate, acceptance against a recorded GitHub API fixture, `pr` against recorded event payloads) |
+| Unit | `internal/**`, `tools/**`, `e2e/probes/**`, `e2e/fakesbx/**` `_test.go` | CI, dev | validators generated from `rules.go` (table + fuzz seeds committed), digests, widening-set and toolchain diffs, the generated state-machine tables (every row, every illegal pair), egress split, `termsafe`, shell quoter, sbx output parsers over every recorded sbx version, error-id table, doctor checks with `HOME` in a temp dir, the probe harness core and its sbx exec layer (against a helper binary re-executed from the test), the recorder's redaction, the fake sbx's placeholder normalizer, CI tools themselves (the forbidden-name matcher and its pushed-range walk over a fixture repository, `workflows` against fixture workflow files, the linter configuration against a fixture package with one violation per checker of rule 14 in [ADR 0001, the documentation standard](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md), invariants/mutate, acceptance against a recorded GitHub API fixture, `dora` against a recorded GitHub API fixture and a fixture repository, `pr` against recorded event payloads) |
 | Golden | `internal/render/testdata/`, `internal/layout/testdata/`, `internal/gate/testdata/` | CI, dev | `sbxenv.yaml`, workspace files, `render.json`, gate diff text, herdr `layout.apply` requests (`layout up --dry-run`), handoff front matter |
 | Schema | `tools/ci schema` | CI | generated schemas equal the committed ones; examples and testdata validate |
 | E2E (git + fake sbx) | `e2e/*_test.go`, tag `e2e` | CI (linux amd64, linux arm64, macOS Intel, macOS arm64) | romeu commands against a temp `$ROMEU_ROOT`; origins served by `git http-backend` behind `httptest` TLS (host settings `gitHosts[].caFile` points at the test CA; gitsafe has no test override); the sandbox daemon served by `git daemon` on `127.0.0.1`; journeys J2, J3b, J7, J10, J11 (scenario functions shared with the host suite); promotion fault injection; invariants marked E in [05](05-security.md), including the I27 hostile trees on the macOS runners |
@@ -48,7 +48,8 @@ Rules: tests never touch the real `$HOME` (`HOME`, `XDG_*`,
 e2e's mise install (pinned, checksum-verified, cache keyed by the
 fixture `mise.lock` sha256; download failures are reported as
 infrastructure errors, not test failures), the host suite, and
-`tools/ci acceptance` and `tools/ci links` outside `all`; flaky tests
+`tools/ci acceptance`, `tools/ci links` and `tools/ci dora` outside
+`all`; flaky tests
 are fixed, never skipped.
 
 ## 10.2 CI
@@ -98,9 +99,10 @@ Three consequences of the grammar:
 is `go run ./tools/ci pr <file>`, on a payload saved beforehand (with
 `gh api`, for example); `pr` itself makes no network call. The file is
 the pull request object, or the event whose `pull_request` member is
-that object, and `pr` reads five fields of the object: `title`, `body`,
-`head.ref`, `head.sha` and `base.sha`. A file with neither shape, or
-without one of the five, fails. The rest comes from git: the commits
+that object, and `pr` reads seven fields of the object: `title`, `body`,
+`head.ref`, `head.sha`, `base.sha`, `base.ref` and
+`base.repo.default_branch`. A file with neither shape, or without one
+of the seven, fails. The rest comes from git: the commits
 reachable from `head.sha` and not from `base.sha`, read by the walk of
 [Forbidden names](#forbidden-names); the changed paths are the paths
 those commits touch, both names of a rename included.
@@ -124,7 +126,7 @@ local-gate run is recorded is a
 | unit | `go test ./internal/... ./tools/...` | yes |
 | hygiene | `tools/ci hygiene`: no U+2014; the prose rules of ADR 0001 (rule 4); the `TODO(#<issue>)` form in Go files (rule 14); no personal absolute path (below); no tracked `go.work`, `go.work.sum` or `vendor/`; `.githooks/pre-push` tracked with mode 100755; the forbidden-name check over the path and content of each tracked file, which fails on a denylist that is missing or has no entry (below); scans `e2e/testdata/sbx/**` too | yes |
 | pushed range | `tools/ci fast` with the pre-push hook's arguments: the forbidden-name check over the remote ref names and the commits of a push (below) | in the hook only |
-| sequences | `tools/ci sequences`: ADR numbers contiguous and unique; ADR layout and statuses per ADR 0001 (rules 6-7), the filename compared through the `slug` function `tools/new adr` uses; every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; every ADR that `docs/spec.md` or `docs/spec/` cites has status Accepted; the ids below unique, and every referenced id and id range (for example "J1-J13" in a success criterion) defined | yes |
+| sequences | `tools/ci sequences`: ADR numbers contiguous and unique; ADR layout and statuses per ADR 0001 (rules 6-7), the filename compared through the `slug` function `tools/new adr` uses; every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; every ADR that `docs/spec.md` or `docs/spec/` cites has status Accepted; every row of the index's Deferred decisions table has its three cells filled ([ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md)); the ids below unique, and every referenced id and id range (for example "J1-J13" in a success criterion) defined | yes |
 | vocabulary | `tools/ci vocabulary` (01 1.7) | yes |
 | workflows | `tools/ci workflows`: the grammar above | yes |
 | vulnerabilities | `govulncheck ./...` | |
@@ -144,7 +146,7 @@ local-gate run is recorded is a
 | license | `reuse lint` (REUSE 3.3) | |
 | docs | `tools/ci docs` (S10; `--help` output vs `docs/reference/`; the checks ADR 0001 assigns to it: rules 1, 5 without external URLs, 12, 13, 17, 20) | |
 | lessons | `tools/ci lessons`: every `docs/lessons.md` entry, read after the file's front matter, names an existing `tools/ci` subcommand or test name, or says "no check possible: <reason>" | |
-| pr | `tools/ci pr` (pull requests only; inputs as described above; 12 12.4; ADR 0001 rules 4, 8, 11; the forbidden-name check, below) | |
+| pr | `tools/ci pr` (pull requests only; inputs as described above; 12 12.4; ADR 0001 rules 4, 8, 11; the base branch, 12 12.9; the fix marker's form, 12 12.10; the forbidden-name check, below) | |
 
 A personal absolute path, for `hygiene`, is `/Users/<name>/` or
 `/home/<name>/` where `<name>` is one path segment other than `agent`
@@ -172,7 +174,7 @@ Runners: `ubuntu-latest`, `ubuntu-24.04-arm`, an Intel macOS runner (the
 label is verified to exist and to report `x86_64` in the `ci-bootstrap`
 task) and `macos-latest` (arm64).
 
-Three subcommands are outside `all`:
+Four subcommands are outside `all`:
 
 - `tools/ci acceptance` needs the network (GitHub API). It runs in the
   final plan task and in `release.yml`, and its unit tests use a
@@ -185,6 +187,11 @@ Three subcommands are outside `all`:
 - `tools/ci fuzz` runs each fuzz target for a fixed time, longer than
   the short runs inside `go test`. The scheduled `fuzz.yml` calls it,
   and then `tools/ci mutate`.
+- `tools/ci dora` needs the network (GitHub API): it computes the
+  delivery metrics of [12 12.10](12-engineering.md#1210-delivery-metrics).
+  It is a report and no merge gate: nothing fails on a number.
+  `release.yml` calls it, anyone runs it by hand, and its unit tests
+  use a recorded API fixture.
 
 ### Forbidden names
 
@@ -236,7 +243,7 @@ reachable from any remote-tracking ref of that remote. A merge commit
 is compared with its first parent. A line that deletes a ref adds no
 commits and is skipped, name included, so a ref with a forbidden name
 can be deleted. A git command that fails stops the push. Called without
-arguments, `fast` checks the tracked files and no range. `pr` uses the
+arguments, `fast` runs the `In fast` steps and no range. `pr` uses the
 same walk over base..head.
 Reading what each commit adds, and not only the final tree, is what
 catches a line or a path that one commit adds and a later commit
@@ -292,7 +299,9 @@ writes the archives and `checksums.txt`;
 **verifies** each archive with
 `gh attestation verify --signer-workflow .../release.yml`;
 `tools/ci acceptance` runs; `tools/release notes` generates the release
-notes (12 12.6); `tools/release publish` creates the GitHub release.
+notes (12 12.6); `tools/release publish` creates the GitHub release;
+`tools/ci dora --attach "$TAG"` adds the delivery metrics to it
+(12 12.10), with the tag passed through `env`.
 The attestation is a `uses` step and each of the others is one `run`
 step, so the file passes `tools/ci workflows`.
 
@@ -307,7 +316,7 @@ step, so the file passes `tools/ci workflows`.
 3. The rest of the day-one middleware of
    [12 12.3](12-engineering.md#123-generators) and
    [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change),
-   `tools/ci pr` included.
+   `tools/ci pr` and `tools/ci dora` (12 12.10) included.
 
 **The maintainer block.** The parts of `ci-bootstrap` that only the
 maintainer can do are one sitting, before step 1 is pushed, and one

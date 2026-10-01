@@ -1,4 +1,4 @@
-# 12. Engineering: stack, capability map, middleware, contributor docs
+# 12. Engineering: stack, capability map, middleware, practices, metrics
 
 Back to [index](../spec.md). Reader: implementers and contributors of
 the product repo; the planner selecting work by module id. Type:
@@ -48,6 +48,7 @@ E2E (host): go test -tags host -json ./e2e/host/... # maintainer machine only; r
 Fast:       go run ./tools/ci fast                  # what the pre-push hook runs; the hook adds the pushed range
 All checks: go run ./tools/ci all                   # what CI runs; CI adds the pr step on a pull request
 PR checks:  go run ./tools/ci pr <payload file>     # the pr step, on a saved pull request payload
+Metrics:    go run ./tools/ci dora [--out <file>]   # delivery metrics from GitHub data (12.10); needs the network
 Denylist:   go run ./tools/ci hygiene add           # maintainer only, in a terminal; reads one forbidden name, echo off
 Probes:     go run ./e2e/probes --block A --out docs/probes/
 Release:    go run ./tools/release build --version v1.0.0 --dry-run
@@ -57,7 +58,7 @@ Module ids are stable; the plan selects work by them.
 
 | Module id | Responsibility | Depends on |
 |---|---|---|
-| `ci-bootstrap` | in this order ([10 10.2](10-testing-style.md#release-and-bootstrap)): one PR with `tools/ci hygiene`, the forbidden-name denylist, `tools/ci fast` and `.githooks/pre-push`, finished by the maintainer block (denylist entries, hook enabled, rulesets, the sandbox token's refusals); then `tools/ci workflows` and a green CI workflow on the public repo; then the rest of the day-one middleware: `tools/new`, `go generate` wiring and `tools/ci generated`, `tools/ci sequences`, `tools/ci pr`, `.github/ask-first.yaml` with generated CODEOWNERS, `ARCHITECTURE.md` and `CONTRIBUTING.md` skeletons (first task) | - |
+| `ci-bootstrap` | in this order ([10 10.2](10-testing-style.md#release-and-bootstrap)): one PR with `tools/ci hygiene`, the forbidden-name denylist, `tools/ci fast` and `.githooks/pre-push`, finished by the maintainer block (denylist entries, hook enabled, rulesets, the sandbox token's refusals); then `tools/ci workflows` and a green CI workflow on the public repo; then the rest of the day-one middleware: `tools/new`, `go generate` wiring and `tools/ci generated`, `tools/ci sequences`, `tools/ci pr`, `.github/ask-first.yaml` with generated CODEOWNERS, `tools/ci dora` (12.10), `ARCHITECTURE.md` and `CONTRIBUTING.md` skeletons (first task) | - |
 | `probes` | probe harness (pure core + exec layer), `probe-result.v1`, redacted sbx recordings, `tools/ci probes` lifecycle | - |
 | `canon` | canonical JSON, typed domain-separated digests | - |
 | `spec` | project spec, run layout and host settings types with gate/apply tags; `rules.go`; strict decode; generated validators and schemas (`tools/schemagen`) | canon |
@@ -137,7 +138,7 @@ or produced this, and does it exist now?" is answered mechanically:
 |---|---|---|
 | before push | tracked `.githooks/pre-push` runs `go run ./tools/ci fast` with git's pre-push arguments and stdin (contributors enable it with `git config core.hooksPath .githooks`; inside a sandbox, julieta's dispatcher runs it automatically and passes both through) | the steps marked in the `In fast` column of [10 10.2](10-testing-style.md#102-ci), and the forbidden-name check over the pushed ref names and commits |
 | every PR | `go run ./tools/ci all` in CI | the full list in [10 10.2](10-testing-style.md#102-ci) |
-| every PR | `tools/ci pr` reads the pull request event payload | the body has non-empty **Why**, **What changed**, **Evidence** and **Lessons** sections; a **Middleware** line of the form `check: <tools/ci subcommand or test>`, `generator: <tools/new kind or go:generate source>`, or `none: <reason>`; every changed golden listed under Evidence; an approval line (below) for each ask-first surface the diff touches, ADRs included (ADR 0001 rule 8); the title and the commit subjects in Conventional Commit form; the prose rules of ADR 0001 (rule 4) in the title, the body and the commit messages; the forbidden-name check ([10 10.2](10-testing-style.md#forbidden-names)) over the title, the body, the head ref name, and the message and added lines of each commit |
+| every PR | `tools/ci pr` reads the pull request event payload | the body has non-empty **Why**, **What changed**, **Evidence** and **Lessons** sections; a **Middleware** line of the form `check: <tools/ci subcommand or test>`, `generator: <tools/new kind or go:generate source>`, or `none: <reason>`; every changed golden listed under Evidence; an approval line (below) for each ask-first surface the diff touches, ADRs included (ADR 0001 rule 8); the title and the commit subjects in Conventional Commit form; the prose rules of ADR 0001 (rule 4) in the title, the body and the commit messages; the base is the default branch (12.9); a `Fixes-release:` trailer has the form of 12.10; the forbidden-name check ([10 10.2](10-testing-style.md#forbidden-names)) over the title, the body, the head ref name, and the four readings of each commit (the message, the author and committer identities, the paths it adds or renames to, and the lines it adds) |
 | merge | the default-branch ruleset (below) | CI green; one approving review; code-owner review for ask-first paths |
 
 The first three rows run locally, from the same `tools/ci` code; how
@@ -201,7 +202,9 @@ must have that form; a merge commit's subject is not checked.
 - A settled open question becomes an ADR; the `docs` module writes the
   initial set from this spec's decisions (listed in
   [reviews/round-2.md](../reviews/round-2.md#settled-questions) and
-  [reviews/round-3.md](../reviews/round-3.md#maintainer-decisions)).
+  [reviews/round-3.md](../reviews/round-3.md#maintainer-decisions));
+  later maintainer decisions are in
+  [reviews/round-4.md](../reviews/round-4.md#maintainer-decisions).
 
 ## 12.6 Release notes
 
@@ -222,6 +225,8 @@ is listed first. Nobody writes release notes by hand.
   rule, and the enforcing `tools/ci` subcommand or test name, or "no
   check possible: <reason>"), checked by `tools/ci lessons`; a lesson
   that can become a deterministic check becomes one in the same PR.
+  A lesson that says a change made delivery better or worse cites the
+  metrics of 12.10, the way that section says.
 
 ## 12.8 Contributor docs (outlines)
 
@@ -236,6 +241,203 @@ product-specific content.
 |---|---|---|
 | `README.md` | a developer deciding whether to use the product; explanation + quick start | the heading order of ADR 0001 rule 12, filled with: what it is and who it is for; when not to use it; prerequisites (macOS host, sbx, git floor); install and verify (checksums, attestation); first run (J1 in six commands); the trust model in one paragraph with a link to `ARCHITECTURE.md`; links to guides, reference and ADRs |
 | `ARCHITECTURE.md` | a contributor or reviewer; explanation, one page | components and their single jobs; the trust boundaries A-F; the gates; the state machines (candidate, promotion commit, generation, probe) as generated diagrams; where each invariant is enforced; module dependency direction |
-| `CONTRIBUTING.md` | a contributor; how-to | the dev loop (`tools/new`, `go generate`, `tools/ci fast`, `tools/ci all`); enabling the pre-push hook; running the gates locally; how to add a command, invariant, probe or kit; what counts as ask-first and how approval is recorded; the PR template and the Middleware line; a link to the documentation standard (ADR 0001), which holds the text standard for commits and PRs (12.7) and the request to write with a voice; ADRs and superseding |
+| `CONTRIBUTING.md` | a contributor; how-to | the dev loop (`tools/new`, `go generate`, `tools/ci fast`, `tools/ci all`); enabling the pre-push hook; running the gates locally; how to add a command, invariant, probe or kit; the delivery practices (12.9); what counts as ask-first and how approval is recorded; the PR template and the Middleware line; a link to the documentation standard (ADR 0001), which holds the text standard for commits and PRs (12.7) and the request to write with a voice; ADRs and superseding |
 | `docs/guide/*` | the operator; how-to, one page per journey, named in front matter (`journey: J<n>`) | the steps of the journey in [09](09-journeys.md) with expected output and recovery from each expected error id |
 | `docs/reference/*` | anyone looking up a fact; reference, generated with its front matter | commands, file formats, errors, exit codes, ask-first surfaces |
+
+## 12.9 Delivery practices
+
+How this project works day to day: on the trunk, in small pieces, with
+six practices of Extreme Programming (XP). The decisions, their
+sources and what we did not take are in two records:
+[ADR 0002, develop on the trunk with short-lived branches](../adr/0002-develop-on-the-trunk-with-short-lived-branches.md)
+and
+[ADR 0003, adopt six Extreme Programming practices and review as pairing](../adr/0003-adopt-six-extreme-programming-practices-and-review-as-pairing.md).
+This section holds the rules. Each names the check that enforces it,
+or is tagged **[review]**: a reviewer, human or agent, judges it.
+
+**Trunk-based development.** The trunk is the default branch, `main`.
+
+| Rule | Enforced by |
+|---|---|
+| Every pull request targets `main` | `tools/ci pr`: the payload's `base.ref` equals its `base.repo.default_branch` |
+| A branch carries one pull request and ends when it merges. v1 has no stack of pull requests: a change that depends on an unmerged pull request waits for it, or is part of it | **[review]**; the first half is how GitHub works, the second is a judgment. Stacking is a [deferred decision](../spec.md#deferred-decisions) |
+| A branch is short-lived. Our sources give two ceilings, a couple of days and less than a day (ADR 0002); we adopt neither as a gate | **[review]**; `tools/ci dora` shows the time from a pull request's first commit to its merge inside change lead time, and the maintainer wait (12.10) |
+| `main` is releasable at every commit | the default-branch ruleset (12.4): no merge without the full list of [10 10.2](10-testing-style.md#102-ci) green; `release.yml` runs the same list on the tagged commit before it builds |
+| Batches are small. Pull request size is measured, and v1 sets no limit | **[review]**; `tools/ci dora` reports the size (12.10) |
+| Unfinished work merges dark, in small pieces, and does not wait on a branch | **[review]**; `lint` reports code nothing uses and `coverage` (S9) counts it, so a dark path merges with its tests |
+
+Merging dark, for these two CLIs, means: the code is on `main` and no
+command reaches it. A new command is not in the command definitions
+(12.3) until it works; a new field is not in the spec types until its
+validation and its gate tag exist. That is our form of a release
+toggle, and it needs no flag: v1 has no runtime feature-flag
+mechanism, which is a
+[deferred decision](../spec.md#deferred-decisions).
+
+Replacing something that is in use goes through branch by abstraction
+and not through a long-lived branch: put the new implementation behind
+an interface the code already has (the memory `Store`, the run-layout
+renderer, the `sbxdrv` argv builders), switch, then delete the old
+one. Each step is its own pull request and leaves `main` releasable.
+**[review]**.
+
+**XP practices.** Each row names the edition of Beck's book the
+practice name comes from; ADR 0003 says what we could and could not
+check about them.
+
+| Practice | Rule here | Enforced by |
+|---|---|---|
+| Test-first (2nd ed., Test-First Programming) | The test is written before the code it tests. A bug fix starts with a test that fails for the bug, and the pull request's Evidence says which | **[review]** for the order, which no check can see. What a check can see, it does: `invariants` and `mutate` (each guard has a test that fails without it), `coverage` (S9), and `tools/new invariant`, which scaffolds the failing test first |
+| Simple, incremental design (1st ed., Simple Design; 2nd ed., Incremental Design) | Build what the task in hand needs; count concepts; defer the rest with a trigger | **[review]**, by the principles "Simple and explicit" and "Decide at the last responsible moment" of the [index](../spec.md#principles); `sequences` checks the shape of each deferral row |
+| Continuous refactoring (2nd ed., Incremental Design) | Each change leaves the code it touches better, in the same pull request, with the tests green before and after | **[review]**; `tools/ci pr` requires the Middleware line (12.4), which is where an improved check or generator is named |
+| Continuous integration (2nd ed., Continuous Integration) | Integrate into `main` and test often: small pull requests, each run through the full list, each merged. This is a cadence of integrating and testing. It is not the rule "do not release until the tests pass", which is the row "releasable" above | the trunk rules above; the pre-push hook runs `fast` on every push (12.4) |
+| Small releases (2nd ed., Incremental Deployment, Daily Deployment) | A release is one `v*` tag built by `release.yml`; two small releases are better than one large | **[review]**; `tools/ci dora` reports deployment frequency and the changes in each release (12.10) |
+| Collective ownership (2nd ed., Shared Code) | No file belongs to a person or to the agent that wrote it; anyone changes any code through a pull request. `.github/CODEOWNERS` is the approval gate of the ask-first paths (05 5.3), not a claim of ownership | **[review]**; the generators (12.3) and `ARCHITECTURE.md` are what let a newcomer change code they did not write |
+
+**The agent and the reviewer.** XP has pair programming. We do not,
+and we do not pretend to. What we have is a loop: the agent that
+writes a change is not its only reader, and a reviewer, another agent
+or a person, reads it before it merges. We treat that loop as our
+analogue of pairing. The analogy is ours and is cited to no one. Its
+check is the one approving review that the default-branch ruleset
+requires (12.4), and what that review is worth with one account is in
+[05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1).
+
+## 12.10 Delivery metrics
+
+`go run ./tools/ci dora` computes this repository's delivery metrics
+from GitHub data. Nobody computes or types them. The decision, the
+sources and the rejected alternatives are in
+[ADR 0004, measure delivery with the five DORA metrics computed by a tool](../adr/0004-measure-delivery-with-the-five-dora-metrics-computed-by-a-tool.md).
+The names and definitions are those of DORA, a research program run by
+Google Cloud ([DORA's software delivery metrics](https://dora.dev/guides/dora-metrics/)).
+The mapping of each one to a CLI released from tags is our decision:
+no DORA text covers that case.
+
+The tool measures this repository. It is not part of `romeu` or
+`julieta` and gives a user's team nothing
+([00 0.6](00-scope.md#06-teams-adopting-ai-assisted-development)).
+
+**Inputs.**
+
+| Input | From |
+|---|---|
+| the repository, `<owner>/<name>` | `--repo`, or `GITHUB_REPOSITORY` |
+| releases: tag, `published_at`, `draft`, `prerelease` | the GitHub REST API |
+| pull requests merged into `main`: `number`, `created_at`, `merged_at`, `merge_commit_sha`, `additions`, `deletions`, `changed_files`, `draft`; each one's commits; its `ready_for_review` timeline events | the GitHub REST API |
+| which release first contains a commit; commit messages and their trailers | git, in the checkout the tool runs in, with tags fetched |
+| the time of the run | the injected clock (10 10.4) |
+
+A token is read from `GITHUB_TOKEN` when it is set; the repository is
+public, so the tool also runs without one. It makes read requests
+only, except with `--attach` (below). Its unit tests run it against a
+recorded API fixture and a fixture repository, offline (10 10.1).
+
+**Terms.**
+
+- A **deployment** is a published GitHub release of this repository
+  whose tag matches `v*`, with `draft` and `prerelease` false.
+- A **change** is a pull request merged into `main`. It belongs to the
+  first deployment whose tag contains its merge commit.
+- A **fix marker** is a commit message trailer, a whole line of the
+  form `Fixes-release: v<major>.<minor>.<patch>`. It says that the
+  commit repairs a problem in that release that needed immediate
+  intervention. The author of the fix writes it, and whether the
+  problem qualified is **[review]**. `tools/ci pr` fails a commit
+  whose message has a line that starts with `Fixes-release:` and does
+  not match `^Fixes-release: v[0-9]+\.[0-9]+\.[0-9]+$`. A marker that
+  names a tag with no deployment is listed in the output under
+  `unmatched` and counts in no metric.
+- A deployment is **failed** when a later deployment contains a commit
+  with a fix marker that names it.
+- A period is a calendar month in UTC. A deployment counts in the
+  month it was published, a change in the month it merged.
+- A median over an even number of values is the lower of the two
+  middle values, so every figure is a whole number.
+
+**The five metrics.**
+
+| Metric (DORA's name) | DORA's definition | Computed here as |
+|---|---|---|
+| change lead time | "The amount of time it takes for a change to go from committed to version control to deployed in production." | per change: from the earliest committer date among the pull request's commits to the `published_at` of its deployment. Reported: the median, in seconds, over the changes of the period's deployments |
+| deployment frequency | how often application changes are deployed to production | the number of deployments in the period |
+| failed deployment recovery time | "The time it takes to recover from a deployment that fails and requires immediate intervention." | per failed deployment: from its `published_at` to the `published_at` of the first later deployment that contains a commit whose fix marker names it. Reported: the median, in seconds |
+| change fail rate | "The ratio of deployments that require immediate intervention following a deployment." | failed deployments over deployments, both as whole numbers |
+| deployment rework rate | "The ratio of deployments that are unplanned but happen as a result of an incident in production." | rework deployments over deployments. A rework deployment contains a commit with a fix marker and no commit of type `feat` (12.4) |
+
+DORA groups the first three as throughput and the last two as
+instability.
+
+**Two more numbers**, which are not DORA's:
+
+| Number | Computed as |
+|---|---|
+| pull request size | per change: `additions + deletions`, and `changed_files`. Reported: the median of each over the period's changes |
+| maintainer wait | per change: from the moment it was ready to `merged_at`. Ready is `created_at`, or the time of the last `ready_for_review` event for a pull request opened as a draft. Reported: the median, in seconds; and `pushedAfterReady`, the number of changes with a commit whose committer date is later than that moment |
+
+The wait means something because of a rule that already exists: a
+pull request is opened after `tools/ci all` passed
+([index](../spec.md#boundaries-for-everyone-who-changes-this-repo)).
+A pull request that received a push after it was ready was not ready,
+and the count says how often.
+
+**Output.** JSON in the format `dora.v1`, on stdout or in the file
+`--out` names: `schema`, `repo`, `asOf`, `head` (the commit of `main`
+the run read), `periods[]`, `deployments[]` (tag, `publishedAt`, the
+numbers of its changes, `failed`, `rework`, `recoveredBy`) and
+`unmatched[]`. A period object has `period` (`YYYY-MM`),
+`deployments`, `changeLeadTimeSeconds`,
+`failedDeploymentRecoverySeconds`, `failedDeployments`,
+`reworkDeployments`, `changes`, `prSizeLines`, `prSizeFiles`,
+`maintainerWaitSeconds` and `pushedAfterReady`. `--text` prints one
+line per period instead. The same input gives the same bytes.
+
+Four rules about what the output says:
+
+1. **Throughput is never shown without instability.** A period is one
+   object and one text line, written whole from one type, and no flag
+   selects a metric. A unit test renders a fixture and fails when an
+   output that has a lead time or a deployment count for a period
+   lacks that period's failed and rework counts.
+2. **Empty is not zero.** A period with no deployment has `null` for
+   the two times, and the text line says `n/a`. Until the first
+   release the five metrics are empty, and pull request size and the
+   maintainer wait are all the tool reports.
+3. **Every run is a backfill.** The tool has no incremental mode: it
+   reads the history from the first commit each time. Its first output
+   is therefore the baseline, and it holds every period before any
+   change one might want to judge.
+4. **No target.** The tool prints no performance level and compares
+   with no other team. Targets are a
+   [deferred decision](../spec.md#deferred-decisions).
+
+Stated limits: a committer date is set by the machine that commits
+and is rewritten by a rebase, so lead time is understated for a
+rebased pull request, and `pushedAfterReady` is overstated for one;
+`published_at` and `merged_at` are GitHub's. A failure nobody marks is
+not counted.
+
+**Where the numbers live.** In two places, and in no tracked file:
+
+- Each release carries them. `release.yml` runs
+  `go run ./tools/ci dora --attach "$TAG"` as its last step, after
+  `tools/release publish`; the tool computes the output and uploads it
+  to that release as the asset `dora.json`, replacing one that is
+  there. So each release holds the whole history up to itself, written
+  by the workflow. `dora.json` is a report, not a build output: it is
+  not in `checksums.txt` and has no attestation (S1 lists the build
+  outputs).
+- Anyone can run the tool at any time and read stdout. Before the
+  first release this is the only place.
+
+**How they feed the lessons loop.** A lesson (12.7) that says a change
+made delivery better or worse cites two periods of the tool's output,
+one from before the change, and names where they came from: a
+release's `dora.json`, or a run's `asOf` and `head`. It quotes the
+instability figures with any throughput figure, as the tool does. A
+lesson that cites no period attributes nothing. **[review]**; the
+check on `tools/ci lessons` that would enforce it is a
+[deferred decision](../spec.md#deferred-decisions). What the numbers
+do not decide: they do not gate a merge, and nothing fails when one
+gets worse. They are where a lesson starts.

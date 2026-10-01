@@ -121,7 +121,8 @@ decision records and the code of the checks are surfaces
 only call `tools/ci` (10 10.2), so the check code is the gate. One
 piece of gate logic sits outside these globs and is reviewed like any
 other code: the test in `e2e/scenarios` that fails a command-table
-entry no scenario reads (ADR 0001 rule 13).
+entry no scenario reads (rule 13 of
+[ADR 0001, the documentation standard](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)).
 
 ```yaml
 version: 1
@@ -182,7 +183,17 @@ surfaces:
 | Secondary repos have no independent daemon cross-check at salvage | sbx runs a git daemon only for the primary repo | bundle verification, the manifest's ref list, and host-provided bases; J13 keeps a removed repo in the generation's repo set |
 | Between a run and the next `sync`/`run`, an agent can plant files in a memory dir; an operator who opens that dir with host tools sees them | memory dirs are shared by design and checked only when romeu reads them | read memory only through `romeu handoff`; memory dirs are never workspace folders; doctor and the preflight check trust settings (I23) |
 | The approval line in a PR body is typed by the PR's author | a check can prove the line is there, not who said it | the default-branch ruleset requires a code-owner review for each ask-first path, the decision records and the check code included ([12 12.4](12-engineering.md#124-middleware-before-and-after-every-change)); the next row says what that review is worth today |
-| With one GitHub account the code-owner review is not independent: agents push and open PRs as the maintainer, GitHub does not count an author's approval of their own PR, and the maintainer merges as the rulesets' bypass actor | a second account is a cost v1 does not need in order to start | the sandbox's token must not merge, push to the default branch, push a `v*` tag or change a ruleset; the maintainer block of `ci-bootstrap` saves a refusal of each (10 10.2), and Q25 holds the fallback if one is not refused |
+| With one GitHub account the code-owner review is not independent: agents push and open PRs as the maintainer, GitHub does not count an author's approval of their own PR, and the maintainer merges as the rulesets' bypass actor | a second account is a cost v1 does not need in order to start | the sandbox's token must not merge, push to the default branch, push a `v*` tag or change a ruleset; the maintainer block of `ci-bootstrap` saves a refusal of each (10 10.2), and Q25 holds the fallback if one is not refused. Until then the maintainer's merge is the only control |
 | Nothing reads the rulesets again after the maintainer block | `tools/ci all` is offline, and a ruleset is repository configuration, not a tracked file | changing a ruleset needs the Administration permission, which the sandbox's token must not have; the same block saves the refusal |
 | A `v*` tag runs `release.yml` from the tagged commit, whether or not that commit is on the default branch or was reviewed | a tag ruleset limits who pushes a tag, not which commit it names | the tag ruleset refuses a `v*` tag from anyone but its bypass actor, the maintainer, and the same block saves the refusal of the sandbox's token; `release.yml` runs `tools/ci all` on the tagged commit before it builds |
 | The compatibility check executes the binary it checks | a check run inside the sandbox cannot attest itself | integrity comes from the read-only mount and the host-side drift check of `.romeu/bin`; the check only proves compatibility |
+
+The maintainer accepted three of these rows for v1 by name
+([round 4](../reviews/round-4.md#maintainer-decisions)): the
+code-owner review that is not independent with one account, where the
+maintainer's merge is the only control; the rulesets that no check
+reads again after they are created; and the `v*` tag, whose release
+depends on the tag ruleset. The maintainer also accepted the fallback
+of Q25: a second account without bypass rights, for agents. It is
+confirmed, or found unnecessary, when the token test of the
+maintainer block runs (10 10.2, item d).

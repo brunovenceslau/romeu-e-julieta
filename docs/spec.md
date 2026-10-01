@@ -6,14 +6,19 @@ reviewers of the design. Type: reference index; start here, then read
 
 Status: **draft v1 specification, review round 3 applied**. It is the
 source of truth for the implementation plan and describes the current
-state only. How it got here lives in [reviews/](reviews/round-3.md);
+state only. How it got here lives in [reviews/](reviews/round-3.md),
+and what was folded in after round 3 in
+[reviews/round-4.md](reviews/round-4.md);
 decisions live in ADRs under [adr/](adr/), every settled decision
 becomes one, and a spec change that reverses one adds an ADR that
 supersedes it ([12 12.5](spec/12-engineering.md#125-decisions-and-history)).
 Every document follows the documentation standard of
 [ADR 0001](adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md).
-The spec is written as if that record were Accepted; whether it is, is
-the open question [Q24](#open-questions).
+The spec is written as if that record were Accepted, and the four
+records on engineering practice with it (ADRs 0002 to 0005: trunk-based
+development, the XP practices, the delivery metrics, and deciding at
+the last responsible moment);
+whether they are is the open question [Q24](#open-questions).
 
 romeu e julieta organizes development environments built on Docker
 Sandboxes (`sbx`). **romeu** runs on the host: a deterministic,
@@ -27,7 +32,7 @@ layout. No agent and no LLM ever runs on the host.
 | # | File | Covers |
 |---|---|---|
 | - | this file | principles, success criteria, boundaries, open questions, deferred decisions |
-| 0 | [spec/00-scope.md](spec/00-scope.md) | objective, users, non-goals, license, scope justification |
+| 0 | [spec/00-scope.md](spec/00-scope.md) | objective, users, non-goals, license, scope justification, teams adopting AI-assisted development |
 | 1 | [spec/01-system-model.md](spec/01-system-model.md) | components, sources of truth, trust boundaries, gates, preflight, state machines, vocabulary |
 | 2 | [spec/02-layouts.md](spec/02-layouts.md) | repositories and directory layouts, in-sandbox paths, multi-repo decision |
 | 3 | [spec/03-formats.md](spec/03-formats.md) | file formats, validation rules, digests |
@@ -39,7 +44,7 @@ layout. No agent and no LLM ever runs on the host.
 | 9 | [spec/09-journeys.md](spec/09-journeys.md) | developer journeys, step by step |
 | 10 | [spec/10-testing-style.md](spec/10-testing-style.md) | test levels, CI, fake-sbx contract, acceptance evidence, code style, module boundaries |
 | 11 | [spec/11-host-probes.md](spec/11-host-probes.md) | host probes, the probe result format and its lifecycle |
-| 12 | [spec/12-engineering.md](spec/12-engineering.md) | tech stack, dev commands, capability map, generators, middleware, contributor docs, text standard |
+| 12 | [spec/12-engineering.md](spec/12-engineering.md) | tech stack, dev commands, capability map, generators, middleware, contributor docs, text standard, delivery practices, delivery metrics |
 
 ## Principles
 
@@ -90,6 +95,30 @@ to contributors: a newcomer reads `ARCHITECTURE.md`, runs one command
 to scaffold what they add, and gets a precise error id with a fix hint
 when something is wrong.
 
+### Decide at the last responsible moment
+
+Build what v1 needs in order to start, as soon as it is needed. A
+mechanism the start does not need is left out, and the decision about
+it waits until use has given us more context; that is very often the
+better moment to decide. What waits is written down: one row in
+[Deferred decisions](#deferred-decisions), with what holds until then
+and the observable event that reopens it. A deferral without a row is
+an oversight, and a row without an event is a wish. A security
+invariant, a merge gate and anything a later step depends on are needs
+of the start and are never deferred.
+
+This is the same discipline as "Simple and explicit", applied in time:
+that principle counts the concepts we add, and this one says when a
+concept may be added at all. The Deferred decisions table is its
+mechanism, and `tools/ci sequences` checks that each row has all three
+cells; whether an event is observable is a review judgment. The
+principle is the maintainer's. Its nearest written relative is XP's
+"You Aren't Gonna Need It", as Martin Fowler describes it
+([Yagni](https://martinfowler.com/bliki/Yagni.html), 26 May 2015). The
+sources, and the two books we name without having checked a copy, are
+in
+[ADR 0005, decide at the last responsible moment and record the trigger](adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md).
+
 ## Success criteria (measurable)
 
 Evidence for each criterion is listed in `docs/acceptance.json` (schema
@@ -133,6 +162,9 @@ and verified by `go run ./tools/ci acceptance`, the last plan task.
     ([12 12.7](spec/12-engineering.md#127-text-standard-and-lessons)).
   - Record what a change taught in `docs/lessons.md` and turn it into a
     `tools/ci` check when it can be one.
+  - Open each PR against the default branch, from a short-lived branch,
+    and merge unfinished work dark instead of keeping it on a branch
+    ([12 12.9](spec/12-engineering.md#129-delivery-practices)).
 - **Ask first**
   - Any change to a path listed in `.github/ask-first.yaml`
     ([05 5.3](spec/05-security.md#53-ask-first-surfaces)), which is
@@ -141,7 +173,7 @@ and verified by `go run ./tools/ci acceptance`, the last plan task.
   - Add a code path in `romeu` that configures git hooks, runs mise,
     executes repository content, or opens a terminal pane on the host.
   - Pass `--auto-approve` to sbx.
-  - Put a secret value, a host command, a user name or an absolute
+  - Put a secret value, a host command, a local user name or an absolute
     personal path in the product repo.
   - Delete a clone, a memory directory or a salvage ref from romeu.
   - Hand-edit a generated file.
@@ -179,8 +211,8 @@ maintainer decision, and in both cases it becomes an ADR.
 | Q21 | Sandbox arch equals host arch | romeu selects `julieta-linux-<GOARCH>` from its own `GOARCH`; the compatibility check fails closed otherwise | A4 |
 | Q22 | Claude Code hook order on `/clear` | SessionEnd fires before SessionStart; the handoff rules of [08 8.3](spec/08-memory-handoff-salvage.md#83-handoff) hold in either order, the probe confirms the tested order is real | C5, B3 |
 | Q23 | Registry access for descriptors | anonymous HTTPS reads only, cached by digest; an explicit host-settings credential is added only if a private workload registry is needed | maintainer |
-| Q24 | Is ADR 0001, the documentation standard, accepted | **written as if Accepted**. The record is Proposed, so this spec fails the `sequences` clause "every cited ADR is Accepted" ([10 10.2](spec/10-testing-style.md#102-ci)) until the sign-off, which comes before the plan's first task. If it is declined, the PR that marks it Rejected restores the spec text it replaced (no check enforces that) | maintainer |
-| Q25 | With one GitHub account, do the rulesets refuse the sandbox's token while the maintainer still merges and tags | the sandbox's token is a fine-grained token without the Administration permission, and the maintainer, as the rulesets' one bypass actor, merges and tags from their own session. If the maintainer block of `ci-bootstrap` ([10 10.2](spec/10-testing-style.md#release-and-bootstrap)) shows a try that is not refused, agents push from a second account that is not a bypass actor | the maintainer, on the output of that block |
+| Q24 | Are the Proposed records the spec cites accepted: ADR 0001, the documentation standard, and ADRs 0002 to 0005, the engineering practices (trunk-based development, the XP practices, the delivery metrics, the last responsible moment) | **written as if Accepted**. The five records are Proposed, so this spec fails the `sequences` clause "every cited ADR is Accepted" ([10 10.2](spec/10-testing-style.md#102-ci)) until each is signed off, which comes before the plan's first task. If one is declined, the PR that marks it Rejected restores the spec text it replaced, or for ADRs 0002 to 0005 removes the text that cites it (no check enforces that) | maintainer |
+| Q25 | With one GitHub account, do the rulesets refuse the sandbox's token while the maintainer still merges and tags | the sandbox's token is a fine-grained token without the Administration permission, and the maintainer, as the rulesets' one bypass actor, merges and tags from their own session. If the maintainer block of `ci-bootstrap` ([10 10.2](spec/10-testing-style.md#release-and-bootstrap)) shows a try that is not refused, agents push from a second account that is not a bypass actor. The maintainer accepted that fallback, and accepted for v1 the three residual risks this question rests on ([05 5.4](spec/05-security.md#54-known-residual-risks-accepted-in-v1)); the token test of that block confirms whether the fallback is needed | the maintainer, on the output of that block |
 
 ## Deferred decisions
 
@@ -195,3 +227,10 @@ A row leaves the table when its event happens and the decision is made.
 | docs versioning per release: which docs a reader of an older release sees | the docs on the default branch are the only docs | the first change to a user-facing page after the v1.0.0 tag |
 | generating the step table of [10 10.2](spec/10-testing-style.md#102-ci) from `tools/ci` | the table is hand-written and 12 12.4 links to it instead of copying it | the first PR that changes which steps `fast` runs |
 | how a local-gate run is recorded, and what satisfies the ruleset's required checks when Actions cannot run | no per-PR record format (the `ci-bootstrap` fallback keeps its `interim` item, 10 10.2). One constraint is fixed: `tools/ci` writes the record, and nobody types it | the first time the maintainer chooses the local gates for a merge |
+| stacked pull requests: a pull request based on another one's branch | each pull request targets the default branch, and a change that depends on an unmerged one waits for it or is part of it (12 12.9) | the second time a merged pull request's Lessons section records that it waited on another pull request |
+| a runtime feature-flag mechanism in `romeu` or `julieta` | unfinished work merges dark: on the default branch, reached by no command (12 12.9) | the first capability that must be in a release before it is finished and that a user has to be able to turn on |
+| targets or performance levels for the delivery metrics | `tools/ci dora` reports and compares with nothing; no number gates a merge (12 12.10) | three releases exist, so each of the five metrics has a value, and the maintainer asks for a target |
+| a check that a lesson which cites delivery metrics names two periods of the tool's output | the rule is a review judgment (12 12.10) | the first `docs/lessons.md` entry that cites a metric |
+| a record of each gate run (which gate, which round, the verdict, counts by severity, duration) | no record; the review's text is all there is. It depends on a runtime ledger, which this spec does not have yet, and on a join key from a gate run to a change, which is unresolved: a PR number does not exist when a gate runs before the PR opens, and a commit id is rewritten by a rebase | the runtime ledger enters this spec, or the first question about the cost of one change |
+| a finding-class field on gate findings, and a count of repeated classes | findings are free text. Cost of waiting: gate runs before the field exists are never classified, so that baseline starts when the field does | `docs/lessons.md` records the same class of finding twice by hand, once the gate-run record above exists |
+| recording, for a team, the inputs of a return-on-investment model (00 0.6): dated change markers, activity per project, time per change, cost per change | the product records none of them and computes no return on investment. It needs data from more than one machine, which this spec does not have | the first team that runs the product on more than one machine and asks for a metric |

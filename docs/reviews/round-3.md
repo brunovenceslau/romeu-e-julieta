@@ -57,7 +57,7 @@ recommendation, in one block, and the maintainer accepted the block.
 | op-equivalence | local gates are equivalent when the same subcommands run at the same commit on each OS and architecture of the runner list; a release still needs the hosted runner, for the attestation | 10 10.2 |
 | op-accepted-only | the spec may cite only Accepted ADRs; the spec fails that check until ADR 0001 is signed off | 10 10.2, Q24 |
 | op-entry-form | a denylist entry is a length and a sha256, matched against each substring of that length, and applies to the PR title, body, branch name and commit messages | 10 10.2 |
-| op-declined | if ADR 0001 is declined, the PR that marks it Rejected restores the spec text; prose only, no check | ADR 0001 Consequences, Q24 |
+| op-declined | if ADR 0001 is declined, the PR that marks it Rejected restores the spec text; prose only, no check | Q24 |
 | op-links | the scheduled external-links workflow leaves v1 and is deferred; `tools/ci links` stays, run by hand | index, Deferred decisions |
 
 One reconciliation is the writer's, not the maintainer's: op-entry-form

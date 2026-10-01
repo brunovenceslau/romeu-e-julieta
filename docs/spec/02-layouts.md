@@ -55,7 +55,7 @@ romeu-e-julieta/
 │  ├─ fakesbx/                 fake sbx that replays recorded sessions only
 │  └─ testdata/sbx/<version>/  redacted sbx help text and argv/stdout/stderr/exit sessions (*.jsonl)
 ├─ tools/
-│  ├─ ci/                      every check CI runs, and their committed data: denylist.yaml (forbidden names, hashed), prose.yaml, headings.yaml, testdata/
+│  ├─ ci/                      every check CI runs, the delivery metrics report (12 12.10), and their committed data: denylist.yaml (forbidden names, hashed), prose.yaml, headings.yaml, testdata/
 │  ├─ new/                     scaffolding: adr, invariant, probe, kit, command, lesson
 │  ├─ schemagen/               reflect-based JSON Schema generator from the Go types and rules.go
 │  ├─ release/                 release subcommands (10 10.2)
