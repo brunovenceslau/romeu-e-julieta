@@ -244,7 +244,8 @@ of T088, so it stays here.
 hook, `go run ./tools/ci fast`, the staged diff read by the maintainer,
 and a pull request, not with a push to `main`. Two reasons. The
 recordings and results hold output of the maintainer's real host: the
-harness keeps the values of its own sandboxes only and scrubs the
+harness keeps real values only for its own sandboxes, gives every
+other row typed placeholders and scrubs the
 host's own identifiers (T018), and the maintainer's read of
 the staged diff is the one review of what the filter let through. And
 this repository has names it must not contain (index, Boundaries): a
@@ -727,9 +728,9 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     its field names and its scope marker with every value replaced by a
     typed placeholder, so the shape of a row survives and no name does.
     A placeholder parses as the type it replaces, so a recording still
-    parses; the test round-trips each placeholder through the parser of
-    T029, and the placeholder types are listed when T029 fixes the row
-    types.
+    parses; T029 round-trips each placeholder through its parsers and
+    lists the placeholder types, and the test here uses a stand-in
+    parser until then.
     The reason: a name on that host may be one this repository must not
     hold (index, Boundaries).
   - The host global git config, the editor's trust settings and an
@@ -816,10 +817,11 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     is ever wanted is question 7. It lists once while its own scoped
     rule still exists, and A10's scoped secret too when A10 ran first in
     the run and its sandbox is still live, before its `rm --resource` and
-    `env rm` steps. The spec gives no order between A9 and A10; the
-    listing point and that order are the plan's addition to A9, since
-    11 11.1 lists after the removals and the recording would then hold
-    no row to tell a global one from a scoped one. It records two observations,
+    `env rm` steps; if A10 runs second, only the scoped rule is listed.
+    The spec gives no order between A9 and A10; the listing point and
+    that order are the plan's addition to A9. 11 11.1 lists after the
+    removals, and the recording would then hold no row that tells a
+    global one from a scoped one. It records two observations,
     `globalRuleRowSeen` and `globalSecretRowSeen`. The recorded shape of
     that listing is what the synthesized I22 fixtures of T046 and T049
     must parse as.
@@ -849,11 +851,10 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     run of block O7; a fixture with one host's result fails. It also
     takes `--dir <dir>`, which reads the results of a directory instead
     of `docs/probes/`, for a run whose output is not committed. A result
-    marked `rehearsal` never satisfies `--require-pass B1`, with or
-    without `--hosts 1`. All
-    three flags are this plan's additions: they are the pass criteria
-    of blocks O3, O5, O6 and O7, one command whose exit status the
-    maintainer reads.
+    or observation marked `rehearsal` never satisfies
+    `--require-pass B1`, with or without `--hosts 1`. All three flags
+    are this plan's additions: they are the pass criteria of blocks O3,
+    O5, O6 and O7, one command whose exit status the maintainer reads.
 - Verify: `go test ./tools/ci/... -run '^TestProbes'`, which runs the
   fixture rows; `go run ./tools/ci probes`.
 
@@ -1040,7 +1041,10 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
     the table of T019 has a builder per row.
   - A scan finds no builder that emits `--auto-approve` (I4); the
     builder table rejects a value form of `sbx secret set` (I25).
-  - The parsers run over each recorded `sbx` version.
+  - The parsers run over each recorded `sbx` version. Each typed
+    placeholder of the recorder (T018) round-trips through them, and
+    the placeholder types are listed here; T018's own test uses a
+    stand-in parser until then.
   - `sbx` runs by absolute path with the scrubbed environment of 04 4.1
     and a timeout (10 10.6).
 - Verify: `go test ./internal/sbxdrv/...`.
@@ -2784,8 +2788,8 @@ the first task that waits for the answer.
    maintainer is the bypass actor, and a direct push to `main` is public
    before any check reads it; the recordings hold output of the
    maintainer's real host. The plan also adds to the recorder (T018) a
-   filter that keeps the values of its own sandboxes and env dirs only
-   in a listing, a positive scrub of the host's own identifiers, wider than
+   filter that keeps real values only for its own sandboxes and env
+   dirs in a listing and gives every other row typed placeholders, a positive scrub of the host's own identifiers, wider than
    the four 10 10.3 names, and typed parsers for the git config, the
    trust settings and the key listing, which change what A1 and A12
    record (11 11.1).
