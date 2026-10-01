@@ -228,10 +228,11 @@ number. T091 is in the list and still waits for block O4.
 `go run ./tools/release build --version v1.0.0-rc.1 --dry-run`, then,
 on one host against that build, run
 `go test -tags host -json ./e2e/host/...` and
-`go run ./e2e/probes --block B --out <a directory outside the repository>`
-without B1, which needs a published release. It is the first run of
-the product against real `sbx`, and it includes C3, whose result can
-change a kit (Q8). It is not a block B result and is committed nowhere.
+`go run ./e2e/probes --block B --version v1.0.0-rc.1 --out <a directory outside the repository>`
+which leaves B1 out, as it needs a published release (T082). It is the
+first run of the product against real `sbx`, and it includes C3, whose
+result can change a kit (Q8). It is not a block B result and is
+committed nowhere.
 Pass is one command on that directory,
 `go run ./tools/ci probes --require-pass B2,B3,B4,B5,C1,C2,C3,C4,C5 --hosts 1 --dir <it>`
 (T020), after the host suite exited 0; a result that overturns
@@ -243,7 +244,8 @@ of T088, so it stays here.
 hook, `go run ./tools/ci fast`, the staged diff read by the maintainer,
 and a pull request, not with a push to `main`. Two reasons. The
 recordings and results hold output of the maintainer's real host: the
-harness keeps only its own throwaway sandboxes in them and scrubs the
+harness keeps real values only for its own sandboxes, gives every
+other row typed placeholders and scrubs the
 host's own identifiers (T018), and the maintainer's read of
 the staged diff is the one review of what the filter let through. And
 this repository has names it must not contain (index, Boundaries): a
@@ -343,7 +345,7 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     `.githooks/`, and a missing or empty denylist.
   - The matcher also reads one file given as `go run ./tools/ci hygiene
     --file <path>`, with a fixture for a file that holds a listed name
-    and one that does not.
+    and one that does not; that flag is the plan's addition.
   - The matcher's self-test plants a made-up name written together, with
     each separator and with a slash, against its own denylist, and
     expects a failure for each form except the slash.
@@ -641,7 +643,8 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
   - `go run ./tools/new probe` writes a definition with `expect`, a
     decision table and `affects` to fill.
   - `<host>` in a result's file name (`docs/probes/<id>-<host>.json`) is
-    `<os>-<arch>`, never the host's name.
+    `<os>-<arch>`, never the host's name; that reading is the plan's
+    addition.
 - Verify: `go test ./e2e/probes/...`; `go run ./tools/ci schema`.
 
 #### T015 - The fake `sbx`
@@ -724,6 +727,10 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     throwaway sandboxes and env dirs and keeps, for each of the rest,
     its field names and its scope marker with every value replaced by a
     typed placeholder, so the shape of a row survives and no name does.
+    A placeholder parses as the type it replaces, so a recording still
+    parses; T029 round-trips each placeholder through its parsers and
+    lists the placeholder types, and the test here uses a stand-in
+    parser until then.
     The reason: a name on that host may be one this repository must not
     hold (index, Boundaries).
   - The host global git config, the editor's trust settings and an
@@ -752,7 +759,8 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     is not `.githooks`. A failed or interrupted run removes its
     sandboxes, scoped rules and scoped secrets, and a start-of-run sweep
     by prefix removes leftovers; both are tested against the helper
-    binary.
+    binary. The refusal, the cleanup and the sweep are the plan's
+    additions.
   - It keeps stdout only for the allowlist of read commands whose output
     the parsers need, and no secret output (10 10.3).
 - Verify: `go test ./e2e/probes/...`.
@@ -807,9 +815,12 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
   - A9 lists the global secrets and the global allow rules as `doctor`
     would read them (11 11.1), and plants nothing; whether a live plant
     is ever wanted is question 7. It lists once while its own scoped
-    rule and secret still exist, before its `rm --resource` and `env rm`
-    steps: that is the plan's addition to A9, since 11 11.1 lists after
-    the removals and the recording would then hold no row to tell a
+    rule still exists, and A10's scoped secret too when A10 ran first in
+    the run and its sandbox is still live, before its `rm --resource` and
+    `env rm` steps; if A10 runs second, only the scoped rule is listed.
+    The spec gives no order between A9 and A10; the listing point and
+    that order are the plan's addition to A9. 11 11.1 lists after the
+    removals, and the recording would then hold no row that tells a
     global one from a scoped one. It records two observations,
     `globalRuleRowSeen` and `globalSecretRowSeen`. The recorded shape of
     that listing is what the synthesized I22 fixtures of T046 and T049
@@ -838,10 +849,12 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     id, a `pass` result from each of the two host architectures, and
     `--hosts 1` relaxes that for the rehearsal of block O5 and the B1
     run of block O7; a fixture with one host's result fails. It also
-    takes `--dir <dir>` reads the results of a directory instead of
-    `docs/probes/`, for a run whose output is not committed. Both are
-    this plan's additions: they are the pass criteria of blocks O3, O5,
-    O6 and O7, one command whose exit status the maintainer reads.
+    takes `--dir <dir>`, which reads the results of a directory instead
+    of `docs/probes/`, for a run whose output is not committed. A result
+    or observation marked `rehearsal` never satisfies
+    `--require-pass B1`, with or without `--hosts 1`. All three flags
+    are this plan's additions: they are the pass criteria of blocks O3,
+    O5, O6 and O7, one command whose exit status the maintainer reads.
 - Verify: `go test ./tools/ci/... -run '^TestProbes'`, which runs the
   fixture rows; `go run ./tools/ci probes`.
 
@@ -1028,7 +1041,10 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
     the table of T019 has a builder per row.
   - A scan finds no builder that emits `--auto-approve` (I4); the
     builder table rejects a value form of `sbx secret set` (I25).
-  - The parsers run over each recorded `sbx` version.
+  - The parsers run over each recorded `sbx` version. Each typed
+    placeholder of the recorder (T018) round-trips through them, and
+    the placeholder types are listed here; T018's own test uses a
+    stand-in parser until then.
   - `sbx` runs by absolute path with the scrubbed environment of 04 4.1
     and a timeout (10 10.6).
 - Verify: `go test ./internal/sbxdrv/...`.
@@ -1372,7 +1388,10 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
     sandbox counts as global and the preflight exits 2; a fixture row of
     an unknown shape proves it. The preflight exits 2 on each (01 1.5,
     step 5); it passes on the A9 recording itself and on a global secret
-    for a service no project uses.
+    for a service no project uses. Two fixtures, asserted separately: a
+    recording with no global row passes. A recording with a global row
+    of placeholder values passes only because they name no used service
+    and no broad pattern.
   - Step 6 refuses a sandbox romeu has no open generation for, with
     `RJ-203` naming `romeu adopt`, and one whose workspace path differs
     (I26).
@@ -2121,9 +2140,10 @@ blocks" for what may start early.
     observations from it, the candidate's tag and the commit that tag
     names. `--only <id>` runs one probe of a block, for the B1 run on
     v1.0.0 (11 11.2); the plan's addition.
-  - With a `--version <tag>` flag and no B1 in the run, the two
+  - With a `--version <tag>` flag, B1 is not run, and the two
     observations B1 would give are taken from the flag and marked
-    `rehearsal`; tested against the helper binary.
+    `rehearsal`; tested against the helper binary: B1 is absent from the
+    result set and both observations carry `rehearsal`.
   - B3 runs `go test -tags host -json ./e2e/host/...`, writes the output
     through the recorder's redaction, the positive scrubbing of T018
     included, to `docs/probes/B3-<host>-test.json`, records its sha256
@@ -2142,7 +2162,8 @@ blocks" for what may start early.
     candidate tag because the harness is outside `docs/`: a definition
     added after the tag would need a new candidate (11 11.2).
 - Verify: `go run ./e2e/probes --block B --out <dir>` against the helper
-  binary in a test.
+  binary in a test, and the same with `--version v1.0.0-rc.1`, the
+  command line of block O5, which must parse and exit 0.
 
 #### T083 - The promotion-commit and probe diagrams of `ARCHITECTURE.md`
 
@@ -2767,8 +2788,8 @@ the first task that waits for the answer.
    maintainer is the bypass actor, and a direct push to `main` is public
    before any check reads it; the recordings hold output of the
    maintainer's real host. The plan also adds to the recorder (T018) a
-   filter that keeps only the harness's own sandboxes and env dirs from
-   a listing, a positive scrub of the host's own identifiers, wider than
+   filter that keeps real values only for its own sandboxes and env
+   dirs in a listing and gives every other row typed placeholders, a positive scrub of the host's own identifiers, wider than
    the four 10 10.3 names, and typed parsers for the git config, the
    trust settings and the key listing, which change what A1 and A12
    record (11 11.1).
