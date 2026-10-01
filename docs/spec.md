@@ -16,13 +16,7 @@ decisions live in ADRs under [adr/](adr/), every settled decision
 becomes one, and a spec change that reverses one adds an ADR that
 supersedes it ([12 12.5](spec/12-engineering.md#125-decisions-and-history)).
 Every document follows the documentation standard of
-[ADR 0001](adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md).
-The spec is written as if that record were Accepted, and the four
-records on engineering practice with it (ADRs 0002 to 0005: trunk-based
-development, the XP practices, the delivery metrics, and deciding at
-the last responsible moment), and the record of the runtime ledger
-(ADR 0006);
-whether they are is the open question [Q24](#open-questions).
+[ADR 0001, adopt a documentation standard with checkable rules and a voice](adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md).
 
 romeu e julieta organizes development environments built on Docker
 Sandboxes (`sbx`). **romeu** runs on the host: a deterministic,
@@ -225,9 +219,7 @@ which question; 11 does not repeat it.
 | Q21 | Sandbox arch equals host arch | romeu selects `julieta-linux-<GOARCH>` from its own `GOARCH`; the compatibility check fails closed otherwise | A4 |
 | Q22 | Claude Code hook order on `/clear` | SessionEnd fires before SessionStart; the handoff rules of [08 8.3](spec/08-memory-handoff-salvage.md#83-handoff) hold in either order, and the container e2e runs both. The probe says which order the guide describes | C5, B3 |
 | Q23 | Registry access for descriptors | anonymous HTTPS reads only, cached by digest; an explicit host-settings credential is added only if a private workload registry is needed | maintainer |
-| Q24 | Are the Proposed records the spec cites accepted: ADR 0001, the documentation standard, ADRs 0002 to 0005, the engineering practices (trunk-based development, the XP practices, the delivery metrics, the last responsible moment), and ADR 0006, the runtime ledger | **written as if Accepted**. The six records are Proposed, so this spec fails the `sequences` clause "every cited ADR is Accepted" ([10 10.2](spec/10-testing-style.md#102-ci)) until each is signed off, which comes before the plan's first task. If one is declined, the PR that marks it Rejected restores the spec text it replaced, or for ADRs 0002 to 0006 removes the text that cites it (no check enforces that) | maintainer |
 | Q25 | With one GitHub account, do the rulesets refuse the sandbox's token while the maintainer still merges and tags | the sandbox's token is a fine-grained token without the Administration permission, and the maintainer, as the rulesets' one bypass actor, merges and tags from their own session. If the maintainer block of `ci-bootstrap` ([10 10.2](spec/10-testing-style.md#release-and-bootstrap)) shows a try that took effect, agents push from a second account that is not a bypass actor. The maintainer accepted that fallback, and accepted for v1 the three residual risks this question rests on ([05 5.4](spec/05-security.md#54-known-residual-risks-accepted-in-v1)); the token test of that block confirms whether the fallback is needed | the maintainer, on the output of that block |
-| Q26 | Is an ADR cited by its title at a file's first mention | **followed as a habit**: the spec pages and the ADRs link a record by its title where a file first mentions it. No rule of ADR 0001 says so and no check reads it. The choice is between one **[review]** sentence beside rule 9 of that record and dropping the habit | maintainer |
 
 ## Deferred decisions
 

@@ -4,7 +4,7 @@ Date: 2026-10-01
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -173,6 +173,3 @@ drain.
   rejected bytes, a cleaner for skipped spool files, more event types
   and fields, a `path` field, removing a member from a membership
   table, tuning the starting values, and a record of gate runs.
-- This record stays Proposed until the maintainer signs it off. What
-  holds until then is Q24 in the spec's
-  [Open questions](../spec.md#open-questions).

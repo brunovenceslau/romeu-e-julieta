@@ -4,7 +4,7 @@ Date: 2026-10-01
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -154,6 +154,3 @@ every check, tested against a recorded API fixture like `acceptance`
   finding-class field, and the inputs a team would need for a return
   on investment model. We compute no return on investment and run no
   scenario analysis.
-- This record stays Proposed until the maintainer signs it off. What
-  holds until then is Q24 in the spec's
-  [Open questions](../spec.md#open-questions).

@@ -157,7 +157,7 @@ only call `tools/ci` (10 10.2), so the check code is the gate. One
 piece of gate logic sits outside these globs and is reviewed like any
 other code: the test in `e2e/scenarios` that fails a command-table
 entry no scenario reads (rule 13 of
-[ADR 0001, the documentation standard](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)).
+[ADR 0001, adopt a documentation standard with checkable rules and a voice](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)).
 
 ```yaml
 version: 1
