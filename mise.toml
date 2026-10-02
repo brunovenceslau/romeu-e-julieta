@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Dev tools for this repository. Each version is exact, and mise.lock
+# holds the checksums for linux-x64, linux-arm64, macos-x64 and
+# macos-arm64.
+
+[settings]
+lockfile = true
+
+[tools]
+go = "1.27.0"
+golangci-lint = "2.14.0"
