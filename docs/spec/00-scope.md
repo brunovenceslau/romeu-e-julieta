@@ -49,10 +49,13 @@ organizer for all their environments:
 
 Decided by the maintainer:
 
-- **GPL-3.0-or-later** for the product. The license text goes in
-  `COPYING` at the repository root together with the first code change.
+- **GPL-3.0-only** for the product: version 3 of the GPL only, with no
+  "or any later version" option. The license text goes in `COPYING` at
+  the repository root together with the first code change.
 - **CC0-1.0** for `examples/` and `schemas/`, which users copy into
-  their own config repos. `REUSE.toml` records the split.
+  their own config repos. `REUSE.toml` records the split; the CC0-1.0
+  text joins `LICENSES/` with the first file under either directory,
+  since `reuse lint` fails on a license text that no file uses.
 - Every file carries an SPDX header (`SPDX-License-Identifier` plus
   `SPDX-FileCopyrightText`) or is covered by `REUSE.toml`; the repo is
   REUSE 3.3 compliant and `reuse lint` runs in `tools/ci`.

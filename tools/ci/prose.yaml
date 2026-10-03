@@ -1,0 +1,76 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The word lists of the documentation standard (ADR 0001, rule 4).
+# A phrase matches as whole words, with ASCII case ignored, outside code
+# spans and fenced blocks. A pair matches when its second part follows
+# its first in one paragraph.
+#
+# The self-test: each line under "fails" must break its rule, each line
+# under "passes" must break no rule, and each phrase and pair needs a
+# line under "fails" that reaches it. The lists do not load otherwise.
+# This file is the one place the hygiene check does not apply them to.
+
+rules:
+  - id: hype
+    phrases:
+      - blazingly
+      - game-changing
+      - revolutionary
+      - cutting-edge
+      - world-class
+      - best-in-class
+      - state-of-the-art
+      - seamlessly
+      - effortlessly
+      - supercharge
+    fails:
+      - a blazingly fast tool
+      - a game-changing release
+      - a revolutionary design
+      - a cutting-edge parser
+      - a world-class linter
+      - the best-in-class hook
+      - a State-of-the-Art matcher
+      - it works seamlessly
+      - it installs effortlessly
+      - supercharge your sandbox
+    passes:
+      - a fast tool with a measured run time
+      - the edge of the cutting board
+      - the state of the lock file
+
+  - id: ai-meta-commentary
+    phrases:
+      - as an AI
+      - as a language model
+      - I hope this helps
+      - my knowledge cutoff
+    fails:
+      - As an AI, I read the file.
+      - as a language model I guess
+      - I hope this helps!
+      - true as of my knowledge cutoff
+    passes:
+      - the helper reads the file
+      - a model of the state machine
+
+  - id: attribution-footer
+    phrases:
+      - generated with Claude Code
+      - "co-authored-by: Claude"
+    fails:
+      - Generated with Claude Code
+      - "Co-Authored-By: Claude <agent@example.invalid>"
+    passes:
+      - the reference pages are generated with their front matter
+      - a commit may name a second human author
+
+  - id: paired-construction
+    pairs:
+      - [not only, but also]
+    fails:
+      - it not only reads the tree but also the commits
+    passes:
+      - it reads the commits, and not only the final tree
+      - but also the commits, not only the tree

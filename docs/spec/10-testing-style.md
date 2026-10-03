@@ -253,12 +253,14 @@ There is one definition of a match and one function that applies it;
 - A hit is reported by its location: the file and line, the commit and
   the field, or the PR field. The matched text and its line are not
   printed, because CI logs are public and the output is pasted under
-  Evidence.
+  Evidence. A path that is printed is quoted, in Go's ASCII-quoted
+  form, when it is not valid UTF-8 or holds a character that does not
+  print; a withheld path stays withheld.
 
 | Surface | Checked by | When |
 |---|---|---|
 | the path and the content of each tracked file at HEAD | `tools/ci hygiene` | in `fast` and in `all` |
-| the name each pushed ref gets on the remote; of each pushed commit: the message, the author and committer names and emails, the paths it adds or renames to, and the lines it adds | `tools/ci fast`, called by the pre-push hook | before the push leaves the machine |
+| the name each pushed ref gets on the remote; of each pushed annotated tag: the name it was created with, its tagger and its message; of each pushed commit: the message, the author and committer names and emails, the paths it adds or renames to, the lines it adds, and the name, tagger and message of each tag it embeds in a `mergetag` header | `tools/ci fast`, called by the pre-push hook | before the push leaves the machine |
 | the PR title, body and head ref name; the same four readings of each commit in base..head | `tools/ci pr` | on the pull request |
 
 The hook is `exec go run ./tools/ci fast "$@"`. Git gives a pre-push
@@ -273,12 +275,26 @@ that is no configured remote has no such ref, and then it walks every
 commit reachable from the local sha. A merge commit
 is compared with its first parent. A line that deletes a ref adds no
 commits and is skipped, name included, so a ref with a forbidden name
-can be deleted. A git command that fails stops the push. Called without
+can be deleted. A git command that fails stops the push, and so does a
+pushed ref that leads to no commit, such as a tag on a blob or a tree:
+both end with exit status 2. The objects are read as the push sends
+them: replace refs are ignored, and grafts (`info/grafts`) are
+honoured by the reader and by `git push` alike, so the two agree.
+Called without
 arguments, `fast` runs the `In fast` steps and no range. `pr` uses the
 same walk over base..head.
 Reading what each commit adds, and not only the final tree, is what
 catches a line or a path that one commit adds and a later commit
 removes.
+
+A push is judged by the denylist at HEAD together with the denylist
+at each pushed tip, so a branch pushed from another checkout is held
+to the entries it adds. A tip without the file adds nothing, and a tip
+whose file cannot be read stops the push. A finding says whether the
+name is listed at HEAD or at a pushed tip. Entries that exist only at
+a commit inside the range, and not at its tip, are not applied. The
+hook knows only the denylist this clone holds: an entry pushed from
+another clone applies once it is fetched and merged here.
 
 The limits, stated plainly:
 
@@ -291,8 +307,18 @@ The limits, stated plainly:
   name written with look-alike characters of another script, with a
   zero-width character inside it, split across two lines, written as an
   escape or an entity, or encoded (base64, a UTF-16 file).
-- The messages of annotated tags and git notes are not read, and
-  neither are issues and review comments: no check sees their text.
+- Git notes, issues and review comments are not read: no check sees
+  their text. Of a pushed annotated tag the hook reads the name it was
+  created with, its tagger and its message, signature lines included;
+  `pr` reads no tag ref. A tag that a merge commit embeds in a
+  `mergetag` header, as `git merge` of a signed tag does, is read the
+  same way, by the hook and by `pr`. The other headers of a commit are
+  not read: its signature, `encoding`, and any extra header. Nor are
+  the headers of a tag other than `tag` and `tagger`. Git writes the
+  `author`, `committer`, `object`, `tag` and `tagger` headers once
+  each, so an object that repeats one stops the push. An identity is
+  read up to its email when git's date and zone follow it, and whole
+  otherwise.
 - An identity is matched as a line, so a contributor whose name or
   email holds an entry as a substring cannot commit under that
   identity. That is a cost of the check, not an oversight.
@@ -531,7 +557,7 @@ is the final plan task.
   invariant tag.
 
 ```go
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 
 // Fetch copies refs from a sandbox's git daemon into a romeu-owned
 // namespace. It never uses a remote name, so remote config (prune,

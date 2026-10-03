@@ -328,7 +328,7 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
 
 #### T001 - Hygiene, the denylist, `fast` and the pre-push hook
 
-- [ ] Merged
+- [x] Merged
 - Module: `ci-bootstrap`. Implements: 10 10.2 (step 1; "Forbidden
   names"), 00 0.4, 12 12.1, 12 12.4, S11.
 - Depends on: nothing. Operator: block O1 finishes and pushes it.

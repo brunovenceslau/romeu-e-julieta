@@ -171,7 +171,11 @@ or produced this, and does it exist now?" is answered mechanically:
 The first three rows run locally, from the same `tools/ci` code; how
 that is enforced, and when local runs may stand in for GitHub Actions,
 is in [10 10.2](10-testing-style.md#102-ci). The ruleset is GitHub
-configuration and has no local form.
+configuration and has no local form. The hook runs `go run` and
+`go test` from the tree that is checked out, so a push from a branch
+runs that branch's `tools/ci` and its tests; the denylist and the
+files that `hygiene` checks are read from commits, not from the
+working tree.
 
 **The rulesets.** No file in the repository sets them: the maintainer
 creates them in the maintainer block of `ci-bootstrap`
