@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 
 // Command ci is the one entry point for the checks of this repository:
 // the pre-push hook, a developer and the hosted workflow all run this

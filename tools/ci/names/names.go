@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 
 // Package names holds the denylist of forbidden names and the one
 // definition of a match (10 10.2, "Forbidden names"). Every check that
@@ -32,7 +32,7 @@ const Path = "tools/ci/denylist.yaml"
 // header opens the file Marshal writes, so the denylist carries its own
 // license line however it was produced.
 const header = `# SPDX-FileCopyrightText: 2026 Bruno Venceslau
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: GPL-3.0-only
 
 # Names this repository must not contain, hashed. Add an entry with
 # "go run ./tools/ci hygiene add", on the host, in a terminal.
@@ -149,6 +149,13 @@ func (l *List) Add(e Entry) bool {
 	}
 	l.entries = append(l.entries, e)
 	return true
+}
+
+// Merge adds each entry of o that l does not hold yet.
+func (l *List) Merge(o *List) {
+	for _, e := range o.entries {
+		l.Add(e)
+	}
 }
 
 func (e Entry) equal(o Entry) bool {

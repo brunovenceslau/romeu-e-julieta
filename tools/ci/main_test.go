@@ -1,11 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 
 package main
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"os"
 	"os/exec"
@@ -73,7 +72,7 @@ func runCI(t *testing.T, r *gittest.Repo, stdin io.Reader, steps []step, args ..
 		stdin = strings.NewReader("")
 	}
 	e := env{dir: r.Dir, gitEnv: r.Env, stdin: stdin, stdout: &out, stderr: &out, steps: steps}
-	return run(context.Background(), e, args), out.String()
+	return run(t.Context(), e, args), out.String()
 }
 
 func TestUsage(t *testing.T) {

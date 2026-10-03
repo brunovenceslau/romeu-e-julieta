@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Bruno Venceslau
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: GPL-3.0-only
 
 # The word lists of the documentation standard (ADR 0001, rule 4).
 # A phrase matches as whole words, with ASCII case ignored, outside code

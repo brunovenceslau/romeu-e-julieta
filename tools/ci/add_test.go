@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 
 //go:build linux || darwin
 
@@ -7,7 +7,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"os"
@@ -53,7 +52,7 @@ func typeAtTerminal(t *testing.T, r *gittest.Repo, typed ...string) (code int, p
 	var out bytes.Buffer
 	e := env{dir: r.Dir, gitEnv: r.Env, stdin: terminal, stdout: &out, stderr: &out}
 	runDone := make(chan int, 1)
-	go func() { runDone <- run(context.Background(), e, []string{"hygiene", "add"}) }()
+	go func() { runDone <- run(t.Context(), e, []string{"hygiene", "add"}) }()
 
 	// The name is typed once the command has switched echo off. Typed
 	// earlier it would still be read, but the terminal would show it,

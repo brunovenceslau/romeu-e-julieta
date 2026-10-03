@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 
 package main
 
@@ -86,7 +86,7 @@ func hygiene(ctx context.Context, repo git.Repo) ([]finding, error) {
 	findings = append(findings, hookFindings(files)...)
 	for i, f := range files {
 		// A path that holds a listed name is not printed either.
-		where := f.path
+		where := git.Printable(f.path)
 		if list.Match([]byte(f.path)) {
 			where = fmt.Sprintf("(path withheld, tree entry %d)", i+1)
 			findings = append(findings, finding{where, "name", "the path holds a listed name"})
@@ -155,16 +155,12 @@ func hygieneFile(ctx context.Context, repo git.Repo, path string) ([]finding, er
 // one who can add an entry.
 func loadDenylist(ctx context.Context, repo git.Repo) (*names.List, []finding, error) {
 	const how = `; the maintainer adds entries with "go run ./tools/ci hygiene add" and commits the file`
-	data, found, err := headBlob(ctx, repo, names.Path)
-	if err != nil {
-		return nil, nil, err
-	}
-	if !found {
-		return &names.List{}, []finding{{names.Path, "denylist", "the denylist is missing at HEAD" + how}}, nil
-	}
-	list, err := names.Parse(data)
+	list, found, err := denylistAt(ctx, repo, "HEAD")
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", names.Path, err)
+	}
+	if !found {
+		return list, []finding{{names.Path, "denylist", "the denylist is missing at HEAD" + how}}, nil
 	}
 	if list.Len() == 0 {
 		return list, []finding{{names.Path, "denylist", "the denylist has no entry at HEAD" + how}}, nil
@@ -172,9 +168,25 @@ func loadDenylist(ctx context.Context, repo git.Repo) (*names.List, []finding, e
 	return list, nil, nil
 }
 
+// denylistAt reads the denylist committed at rev, and reports whether
+// rev has one; without one the list is empty. A denylist that is there
+// and cannot be read is an error, never an empty list: the caller would
+// pass a check that matched nothing.
+func denylistAt(ctx context.Context, repo git.Repo, rev string) (*names.List, bool, error) {
+	data, found, err := blobAt(ctx, repo, rev, names.Path)
+	if err != nil || !found {
+		return &names.List{}, false, err
+	}
+	list, err := names.Parse(data)
+	if err != nil {
+		return nil, false, err
+	}
+	return list, true, nil
+}
+
 // loadProse reads the word lists committed at HEAD.
 func loadProse(ctx context.Context, repo git.Repo) (*prose.Rules, error) {
-	data, found, err := headBlob(ctx, repo, prose.Path)
+	data, found, err := blobAt(ctx, repo, "HEAD", prose.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -188,12 +200,13 @@ func loadProse(ctx context.Context, repo git.Repo) (*prose.Rules, error) {
 	return rules, nil
 }
 
-// headBlob returns the content of one file of the tree at HEAD, and
-// whether it is there. It asks with cat-file's batch mode, which
-// answers "missing" with exit 0, so a file that is absent is told
-// apart from a git command that failed.
-func headBlob(ctx context.Context, repo git.Repo, path string) ([]byte, bool, error) {
-	out, err := repo.Run(ctx, []byte("HEAD:"+path+"\n"), "cat-file", "--batch")
+// blobAt returns the content of one file of the tree at rev, and
+// whether it is there. rev is HEAD or an object id, never text a push
+// supplies unchecked. It asks with cat-file's batch mode, which answers
+// "missing" with exit 0, so a file that is absent is told apart from a
+// git command that failed.
+func blobAt(ctx context.Context, repo git.Repo, rev, path string) ([]byte, bool, error) {
+	out, err := repo.Run(ctx, []byte(rev+":"+path+"\n"), "cat-file", "--batch")
 	if err != nil {
 		return nil, false, err
 	}
@@ -204,11 +217,11 @@ func headBlob(ctx context.Context, repo git.Repo, path string) ([]byte, bool, er
 	// "<id> blob <size>"
 	f := strings.Fields(string(head))
 	if len(f) != 3 || f[1] != "blob" {
-		return nil, false, fmt.Errorf("read %s at HEAD: not a file", path)
+		return nil, false, fmt.Errorf("read %s at %s: not a file", path, rev)
 	}
 	size, err := strconv.Atoi(f[2])
 	if err != nil || size > len(rest) {
-		return nil, false, fmt.Errorf("read %s at HEAD: unexpected size", path)
+		return nil, false, fmt.Errorf("read %s at %s: unexpected size", path, rev)
 	}
 	return rest[:size], true, nil
 }
@@ -236,7 +249,7 @@ func headTree(ctx context.Context, repo git.Repo) ([]treeFile, error) {
 	}
 	var files []treeFile
 	var ids bytes.Buffer
-	for _, entry := range strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00") {
+	for entry := range strings.SplitSeq(strings.TrimSuffix(string(out), "\x00"), "\x00") {
 		if entry == "" {
 			continue
 		}

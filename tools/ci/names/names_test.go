@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 
 package names
 
@@ -178,6 +178,44 @@ func TestRoundTrip(t *testing.T) {
 	}
 	if !l.Match([]byte("Zorvex-Quimby")) || !l.Match([]byte("plimsor")) {
 		t.Error("a loaded list does not match its own names")
+	}
+}
+
+// TestEntrySegments covers the count "hygiene add" reports: one per
+// piece of the typed name, however many spaces stand between two.
+func TestEntrySegments(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		want int
+	}{{"zorvex", 1}, {"zorvex quimby", 2}, {" zorvex   quimby  blorp ", 3}} {
+		e, err := NewEntry(tt.name)
+		if err != nil {
+			t.Fatalf("NewEntry(%q): %v", tt.name, err)
+		}
+		if got := e.Segments(); got != tt.want {
+			t.Errorf("NewEntry(%q).Segments() = %d, want %d", tt.name, got, tt.want)
+		}
+	}
+}
+
+// TestMerge covers the list a check builds from two files: every entry
+// of both, each once.
+func TestMerge(t *testing.T) {
+	l := listOf(t, "zorvex quimby")
+	l.Merge(listOf(t, "zorvex quimby", "blorptang"))
+	l.Merge(&List{})
+	if l.Len() != 2 {
+		t.Errorf("Len = %d, want 2", l.Len())
+	}
+	for _, line := range []string{"a zorvex-quimby b", "a blorptang b"} {
+		if !l.Match([]byte(line)) {
+			t.Errorf("the merged list does not match %q", line)
+		}
+	}
+	empty := &List{}
+	empty.Merge(l)
+	if empty.Len() != 2 {
+		t.Errorf("Len of a merge into the zero value = %d, want 2", empty.Len())
 	}
 }
 

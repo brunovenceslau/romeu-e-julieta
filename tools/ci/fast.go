@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 
 package main
 
@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
 )
 
@@ -109,7 +111,7 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 		case err != nil:
 			return false, err
 		case !checked:
-			say(e.stdout, "--    pushed range: not checked, the denylist has no entry\n")
+			say(e.stdout, "--    pushed range: not checked, no denylist entry at HEAD or at a pushed tip\n")
 		default:
 			report("pushed range", len(findings) == 0, lines(findings))
 		}
@@ -126,34 +128,71 @@ func lines(findings []finding) string {
 }
 
 // pushedRange applies the name matcher to what a push would publish:
-// the remote ref names and the four readings of each pushed commit.
-// Without a denylist entry there is nothing to match with: it reports
-// that it checked nothing, and hygiene has failed the run already.
+// the remote ref names, the text of each pushed annotated tag and the
+// four readings of each pushed commit.
+//
+// The push is judged by the denylist at HEAD together with the one at
+// each pushed tip. A push need not come from the branch that is checked
+// out, and the entries a pushed branch adds are part of what it
+// publishes, so they hold for it. A tip without a denylist adds
+// nothing; a tip whose denylist cannot be read stops the push. A
+// finding says which of the two lists holds the name. Without an entry
+// in any of them there is nothing to match with, and it reports that it
+// checked nothing.
 func pushedRange(ctx context.Context, e env, remote string) (findings []finding, checked bool, err error) {
-	list, missing, err := loadDenylist(ctx, e.repo())
-	if err != nil || len(missing) > 0 {
+	push, err := pushed.Parse(e.stdin)
+	if err != nil {
 		return nil, false, err
 	}
-	err = pushed.Walk(ctx, e.repo(), remote, e.stdin, func(r pushed.Reading) {
+	// A list that is missing or empty at HEAD is hygiene's finding.
+	head, _, err := loadDenylist(ctx, e.repo())
+	if err != nil {
+		return nil, false, err
+	}
+	list := &names.List{}
+	list.Merge(head)
+	for _, tip := range push.Tips() {
+		at, _, err := denylistAt(ctx, e.repo(), tip)
+		if err != nil {
+			return nil, false, fmt.Errorf("%s at pushed tip %s: %w", names.Path, tip, err)
+		}
+		list.Merge(at)
+	}
+	if list.Len() == 0 {
+		return nil, false, nil
+	}
+	err = pushed.Walk(ctx, e.repo(), remote, push, func(r pushed.Reading) {
 		if !list.Match(r.Text) {
 			return
 		}
-		commit := "commit " + r.Commit + ": "
+		listed := "a name listed at HEAD"
+		if !head.Match(r.Text) {
+			listed = "a name listed at a pushed tip"
+		}
+		of := "commit " + r.Commit + ": "
+		if r.Tag != "" {
+			of = "tag " + r.Tag + ": "
+		}
+		if r.Mergetag > 0 {
+			of += "mergetag " + strconv.Itoa(r.Mergetag) + " "
+		}
 		switch r.Field {
 		case pushed.FieldRef:
-			findings = append(findings, finding{"pushed ref " + strconv.Itoa(r.Line), "name", "the remote ref name holds a listed name"})
+			findings = append(findings, finding{"pushed ref " + strconv.Itoa(r.Line), "name", "the remote ref name holds " + listed})
 		case pushed.FieldMessage:
-			findings = append(findings, finding{commit + "message line " + strconv.Itoa(r.Line), "name", "the line holds a listed name"})
-		case pushed.FieldAuthor, pushed.FieldCommitter:
-			findings = append(findings, finding{commit + r.Field, "name", "the name and email hold a listed name"})
+			findings = append(findings, finding{of + "message line " + strconv.Itoa(r.Line), "name", "the line holds " + listed})
+		case pushed.FieldAuthor, pushed.FieldCommitter, pushed.FieldTagger:
+			findings = append(findings, finding{of + r.Field, "name", "the name and email hold " + listed})
+		case pushed.FieldTagName:
+			findings = append(findings, finding{of + r.Field, "name", "the tag's name holds " + listed})
 		case pushed.FieldPath:
-			findings = append(findings, finding{commit + "added path (withheld)", "name", "the path holds a listed name"})
+			findings = append(findings, finding{of + "added path (withheld)", "name", "the path holds " + listed})
 		case pushed.FieldLine:
-			path := r.Path
-			if list.Match([]byte(path)) {
+			path := git.Printable(r.Path)
+			if list.Match([]byte(r.Path)) {
 				path = "(path withheld)"
 			}
-			findings = append(findings, finding{commit + path + ":" + strconv.Itoa(r.Line), "name", "the added line holds a listed name"})
+			findings = append(findings, finding{of + path + ":" + strconv.Itoa(r.Line), "name", "the added line holds " + listed})
 		}
 	})
 	return findings, true, err

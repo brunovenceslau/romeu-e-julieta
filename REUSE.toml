@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 Bruno Venceslau
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: GPL-3.0-only
 
 # The license of each file that carries no SPDX header of its own
-# (REUSE 3.3). The product is GPL-3.0-or-later; examples/ and schemas/
+# (REUSE 3.3). The product is GPL-3.0-only; examples/ and schemas/
 # are CC0-1.0, because users copy them into their own config repos.
 
 version = 1
@@ -18,7 +18,7 @@ path = [
     "mise.lock",
 ]
 SPDX-FileCopyrightText = "2026 Bruno Venceslau"
-SPDX-License-Identifier = "GPL-3.0-or-later"
+SPDX-License-Identifier = "GPL-3.0-only"
 
 [[annotations]]
 path = ["examples/**", "schemas/**"]
@@ -28,4 +28,4 @@ SPDX-License-Identifier = "CC0-1.0"
 [[annotations]]
 path = "COPYING"
 SPDX-FileCopyrightText = "2007 Free Software Foundation, Inc. <https://fsf.org/>"
-SPDX-License-Identifier = "GPL-3.0-or-later"
+SPDX-License-Identifier = "GPL-3.0-only"

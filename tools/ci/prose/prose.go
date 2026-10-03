@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 
 // Package prose applies the word lists of the documentation standard
 // (ADR 0001, rule 4): words and phrases this repository does not use.

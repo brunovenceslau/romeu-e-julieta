@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 
 package main
 
@@ -236,6 +236,38 @@ func TestHygieneRules(t *testing.T) {
 			}
 			if t.Failed() {
 				t.Logf("output:\n%s", out)
+			}
+		})
+	}
+}
+
+// TestHygienePrintsPathsSafely shows that a path is printed quoted when
+// it holds a control character, so it cannot move the terminal or add a
+// line of its own to the output.
+func TestHygienePrintsPathsSafely(t *testing.T) {
+	tests := []struct{ name, path, want string }{
+		{"an escape sequence", "docs/a\x1b[2Jb.md", `"docs/a\x1b[2Jb.md":1: em-dash:`},
+		{"a newline", "docs/a\nhygiene: ok\n.md", `"docs/a\nhygiene: ok\n.md":1: em-dash:`},
+		{"a zero-width space", "docs/a\u200bb.md", `"docs/a\u200bb.md":1: em-dash:`},
+		{"a plain path outside ASCII", "docs/caf\u00e9.md", "docs/caf\u00e9.md:1: em-dash:"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newTree(t)
+			r.Write(tt.path, "a "+emDash+" b\n")
+			r.Commit("fixture")
+			code, out := runCI(t, r, nil, nil, "hygiene")
+			if code != exitFail {
+				t.Errorf("exit = %d, want %d", code, exitFail)
+			}
+			if !strings.Contains(out, tt.want) {
+				t.Errorf("the output lacks %q", tt.want)
+			}
+			if strings.Contains(out, "\x1b") || strings.Contains(out, "\nhygiene: ok") || strings.Contains(out, "\u200b") {
+				t.Error("the output holds a control character of the path")
+			}
+			if t.Failed() {
+				t.Logf("output:\n%q", out)
 			}
 		})
 	}

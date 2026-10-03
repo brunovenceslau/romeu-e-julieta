@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 
 // Package pushed reads what a push would publish: the name each pushed
 // ref gets on the remote and, of each pushed commit, its message, its
 // two identities, the paths it adds or renames to, and the lines it
 // adds (10 10.2, "Forbidden names"). It reads what each commit adds and
 // not only the final tree, which is what catches a line that one commit
-// adds and a later commit removes.
+// adds and a later commit removes. Of a pushed annotated tag it reads
+// the tag's own text as well: its name, its tagger and its message.
 //
 // The package finds and reads; what counts as a hit is the caller's
 // business.
@@ -19,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -29,17 +31,27 @@ import (
 // The fields of a Reading.
 const (
 	FieldRef       = "ref"       // the name a pushed ref gets on the remote
-	FieldMessage   = "message"   // one line of a commit message
+	FieldMessage   = "message"   // one line of a commit message or of a tag message
 	FieldAuthor    = "author"    // the author's name and email
 	FieldCommitter = "committer" // the committer's name and email
 	FieldPath      = "path"      // a path the commit adds or renames to
 	FieldLine      = "line"      // a line the commit adds
+	FieldTagName   = "tag name"  // the name an annotated tag was created with
+	FieldTagger    = "tagger"    // the tagger's name and email
 )
 
 // Reading is one line of text a push would publish, with where it is.
 type Reading struct {
-	// Commit is the commit id; empty for FieldRef.
+	// Commit is the commit id; empty for FieldRef and for a reading of
+	// an annotated tag.
 	Commit string
+	// Tag is the id of the tag object, for a reading of an annotated
+	// tag: FieldTagName, FieldTagger, and FieldMessage of its message.
+	Tag string
+	// Mergetag numbers, from 1, the mergetag header of commit Commit
+	// that a reading comes from: a tag that merge embeds, read as
+	// FieldTagName, FieldTagger and FieldMessage. It is 0 otherwise.
+	Mergetag int
 	// Field is one of the Field constants.
 	Field string
 	// Path is the file, for FieldPath and FieldLine.
@@ -56,26 +68,55 @@ type ref struct {
 	localSHA, remoteRef, remoteSHA string
 }
 
-// Walk reads the lines git gives a pre-push hook on standard input, one
-// per pushed ref, and calls visit for the remote name of each ref and
-// for the four readings of each commit the push would publish.
+// Push is what one run of a pre-push hook is asked to publish: the
+// lines git gives the hook on standard input, one per pushed ref.
+type Push struct {
+	refs []ref
+}
+
+// Parse reads the standard input of a pre-push hook. An error means
+// the input is not a hook's, and the caller stops the push.
+func Parse(stdin io.Reader) (Push, error) {
+	refs, err := parseRefs(stdin)
+	return Push{refs: refs}, err
+}
+
+// Tips returns the object each pushed ref points at locally, once
+// each, in the order of the input. A line that deletes a ref names no
+// object and adds none. A tip is a commit or, for an annotated tag, the
+// tag object; git reads "<tip>:<path>" through either.
+func (p Push) Tips() []string {
+	var tips []string
+	for _, r := range p.refs {
+		if !isZero(r.localSHA) && !slices.Contains(tips, r.localSHA) {
+			tips = append(tips, r.localSHA)
+		}
+	}
+	return tips
+}
+
+// Walk calls visit for the remote name of each pushed ref, for the
+// readings of each annotated tag a ref points at, and for the four
+// readings of each commit the push would publish.
 //
 // remote is the hook's first argument: the remote's name, or the URL
 // when the push names no configured remote. A line that deletes a ref
 // adds no commit and is skipped, name included, so a ref with a
 // forbidden name can be deleted. An error means the push could not be
 // read, and the caller stops the push.
-func Walk(ctx context.Context, repo git.Repo, remote string, stdin io.Reader, visit func(Reading)) error {
-	refs, err := parseRefs(stdin)
-	if err != nil {
-		return err
-	}
-	read := map[string]bool{} // commits already read, when two refs share them
-	for i, r := range refs {
+func Walk(ctx context.Context, repo git.Repo, remote string, p Push, visit func(Reading)) error {
+	read := map[string]bool{} // tags and commits already read, when two refs share them
+	for i, r := range p.refs {
 		if isZero(r.localSHA) {
 			continue
 		}
 		visit(Reading{Field: FieldRef, Line: i + 1, Text: []byte(r.remoteRef)})
+		if err := wantCommit(ctx, repo, r.localSHA); err != nil {
+			return err
+		}
+		if err := tagReadings(ctx, repo, r.localSHA, read, visit); err != nil {
+			return err
+		}
 		commits, err := commitsOf(ctx, repo, remote, r)
 		if err != nil {
 			return err
@@ -121,9 +162,6 @@ func parseRefs(stdin io.Reader) ([]ref, error) {
 // stand in; a URL that is no configured remote has no such ref, and
 // then every commit the local sha reaches is read.
 func commitsOf(ctx context.Context, repo git.Repo, remote string, r ref) ([]string, error) {
-	if err := wantCommit(ctx, repo, r.localSHA); err != nil {
-		return nil, err
-	}
 	var exclude []string
 	held := false
 	if !isZero(r.remoteSHA) {
@@ -171,6 +209,87 @@ func wantCommit(ctx context.Context, repo git.Repo, sha string) error {
 	return nil
 }
 
+// tagReadings calls visit for the readings of the annotated tag sha
+// names, and of each tag that one tags in turn, down to the commit. A
+// sha that names a commit has none. A push publishes a tag object with
+// the commit it leads to, so its text is read like a commit's: the name
+// it was created with, which need not be the name it is pushed under,
+// its tagger and each line of its message. A signed tag carries its
+// signature at the end of the message, and that is read as lines too.
+func tagReadings(ctx context.Context, repo git.Repo, sha string, read map[string]bool, visit func(Reading)) error {
+	for !read[sha] {
+		out, err := repo.Run(ctx, []byte(sha+"\n"), "cat-file", "--batch-check")
+		if err != nil {
+			return err
+		}
+		// "<id> <type> <size>"
+		if f := strings.Fields(string(out)); len(f) != 3 || f[1] != "tag" {
+			return nil
+		}
+		read[sha] = true
+		raw, err := repo.Run(ctx, nil, "cat-file", "tag", sha)
+		if err != nil {
+			return err
+		}
+		t, err := parseTag(raw)
+		if err != nil {
+			return fmt.Errorf("tag %s: %w", sha, err)
+		}
+		if !isObjectID(t.object) {
+			return fmt.Errorf("tag %s: no object id in its header", sha)
+		}
+		visitTag(t, Reading{Tag: sha}, visit)
+		sha = t.object
+	}
+	return nil
+}
+
+// visitTag calls visit for the three readings of a tag: its name, its
+// tagger and each line of its message. at says where the tag is: a
+// tag object, or a mergetag header of a commit.
+func visitTag(t tag, at Reading, visit func(Reading)) {
+	r := at
+	r.Field, r.Text = FieldTagName, t.name
+	visit(r)
+	r.Field, r.Text = FieldTagger, t.tagger
+	visit(r)
+	for i, line := range bytes.Split(bytes.TrimRight(t.message, "\n"), []byte{'\n'}) {
+		r.Field, r.Line, r.Text = FieldMessage, i+1, line
+		visit(r)
+	}
+}
+
+type tag struct {
+	object       string // what the tag tags: a commit, or another tag
+	name, tagger []byte // tagger is "Name <email>"
+	message      []byte
+}
+
+// parseTag reads a raw tag object: header lines, a blank line, the
+// message. An object, tag or tagger header that appears twice is an
+// error (see once).
+func parseTag(raw []byte) (tag, error) {
+	var t tag
+	head, message, _ := bytes.Cut(raw, []byte("\n\n"))
+	t.message = message
+	seen := map[string]bool{}
+	for line := range bytes.SplitSeq(head, []byte{'\n'}) {
+		key, value, _ := bytes.Cut(line, []byte{' '})
+		if err := once(seen, string(key), "object", "tag", "tagger"); err != nil {
+			return tag{}, err
+		}
+		switch string(key) {
+		case "object":
+			t.object = string(value)
+		case "tag":
+			t.name = value
+		case "tagger":
+			t.tagger = identity(value)
+		}
+	}
+	return t, nil
+}
+
 // holdsCommit reports whether the repository has the commit. It asks
 // with cat-file's batch mode, which answers "missing" with exit 0, so a
 // commit that is absent is told apart from a git command that failed.
@@ -210,12 +329,25 @@ func Readings(ctx context.Context, repo git.Repo, sha string, visit func(Reading
 	if err != nil {
 		return err
 	}
-	c := parseCommit(raw)
+	c, err := parseCommit(raw)
+	if err != nil {
+		return fmt.Errorf("commit %s: %w", sha, err)
+	}
 	for i, line := range bytes.Split(bytes.TrimRight(c.message, "\n"), []byte{'\n'}) {
 		visit(Reading{Commit: sha, Field: FieldMessage, Line: i + 1, Text: line})
 	}
 	visit(Reading{Commit: sha, Field: FieldAuthor, Text: c.author})
 	visit(Reading{Commit: sha, Field: FieldCommitter, Text: c.committer})
+	for i, raw := range c.mergetags {
+		t, err := parseTag(raw)
+		if err == nil && !isObjectID(t.object) {
+			err = errors.New("no object id in its header")
+		}
+		if err != nil {
+			return fmt.Errorf("commit %s: mergetag %d: %w", sha, i+1, err)
+		}
+		visitTag(t, Reading{Commit: sha, Mergetag: i + 1}, visit)
+	}
 
 	base := c.firstParent
 	if base == "" {
@@ -251,19 +383,41 @@ func Readings(ctx context.Context, repo git.Repo, sha string, visit func(Reading
 
 type commit struct {
 	firstParent       string
-	author, committer []byte // "Name <email>"
+	author, committer []byte   // "Name <email>"
+	mergetags         [][]byte // each a raw tag object, unfolded
 	message           []byte
 }
 
 // parseCommit reads a raw commit object: header lines, a blank line,
-// the message.
-func parseCommit(raw []byte) commit {
+// the message. A header goes on over the lines after it that begin
+// with one space; of those, a mergetag header is kept, unfolded: it is
+// a whole tag object that "git merge" of a signed tag embeds. The other
+// folded headers, such as a signature, are not read. An author or a
+// committer header that appears twice is an error (see once).
+func parseCommit(raw []byte) (commit, error) {
 	var c commit
 	head, message, _ := bytes.Cut(raw, []byte("\n\n"))
 	c.message = message
-	for _, line := range bytes.Split(head, []byte{'\n'}) {
-		key, value, _ := bytes.Cut(line, []byte{' '})
-		switch string(key) {
+	var key string
+	seen := map[string]bool{}
+	for line := range bytes.SplitSeq(head, []byte{'\n'}) {
+		if more, ok := bytes.CutPrefix(line, []byte{' '}); ok {
+			if key == "mergetag" {
+				last := &c.mergetags[len(c.mergetags)-1]
+				*last = append(append(*last, '\n'), more...)
+			}
+			continue
+		}
+		k, value, _ := bytes.Cut(line, []byte{' '})
+		key = string(k)
+		if err := once(seen, key, "author", "committer"); err != nil {
+			return commit{}, err
+		}
+		switch key {
+		case "mergetag":
+			// A copy, so that the lines appended to it can never reach
+			// raw, however the line it came from was cut.
+			c.mergetags = append(c.mergetags, bytes.Clone(value))
 		case "parent":
 			if c.firstParent == "" {
 				c.firstParent = string(value)
@@ -274,12 +428,33 @@ func parseCommit(raw []byte) commit {
 			c.committer = identity(value)
 		}
 	}
-	return c
+	return c, nil
 }
 
-// identity cuts the date off an author or committer header.
+// once records key in seen and refuses a key of the read ones that
+// was seen before. Git writes each of these headers once; with two,
+// keeping either would leave the other unread. The error names the
+// header and repeats nothing of its value.
+func once(seen map[string]bool, key string, read ...string) error {
+	if !slices.Contains(read, key) {
+		return nil
+	}
+	if seen[key] {
+		return fmt.Errorf("the %s header appears twice", key)
+	}
+	seen[key] = true
+	return nil
+}
+
+// dateAndZone is what git writes after the email of an identity: the
+// seconds since the epoch and the zone.
+var dateAndZone = regexp.MustCompile(`^ [0-9]+ [+-][0-9]+$`)
+
+// identity cuts the date off an author, committer or tagger header.
+// Only a date in git's form is cut: any other text after the email is
+// read with the rest.
 func identity(value []byte) []byte {
-	if i := bytes.LastIndexByte(value, '>'); i >= 0 {
+	if i := bytes.LastIndexByte(value, '>'); i >= 0 && dateAndZone.Match(value[i+1:]) {
 		return value[:i+1]
 	}
 	return value
@@ -330,7 +505,10 @@ func addedLines(patch []byte, add func(path string, line int, text []byte)) erro
 		}
 		switch {
 		case bytes.HasPrefix(line, []byte("+++ ")):
-			path = strings.TrimPrefix(strings.TrimRight(string(line[4:]), "\t"), "b/")
+			var err error
+			if path, err = patchPath(line[4:]); err != nil {
+				return fmt.Errorf("read patch: the path header after hunk %d: %w", hunk, err)
+			}
 		case bytes.HasPrefix(line, []byte("@@ ")):
 			hunk++
 			var ok bool
@@ -343,6 +521,23 @@ func addedLines(patch []byte, add func(path string, line int, text []byte)) erro
 		return fmt.Errorf("read patch: hunk %d does not have the lines its header announces", hunk)
 	}
 	return nil
+}
+
+// patchPath returns the path of a "+++ " header without its "b/". Git
+// ends a path that holds a space with a tab, and writes a path that
+// holds a byte outside printable ASCII, a double quote or a backslash
+// in double quotes with C escapes; such a path is unquoted, so that it
+// reads as the same bytes as the path of the tree. The error repeats
+// nothing of the header.
+func patchPath(header []byte) (string, error) {
+	path := strings.TrimRight(string(header), "\t")
+	if strings.HasPrefix(path, `"`) {
+		var err error
+		if path, err = strconv.Unquote(path); err != nil {
+			return "", errors.New("a quoted path that does not unquote")
+		}
+	}
+	return strings.TrimPrefix(path, "b/"), nil
 }
 
 // hunkHeader reads "@@ -a[,b] +c[,d] @@" and returns b, c and d; a

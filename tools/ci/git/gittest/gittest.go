@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 
 // Package gittest builds fixture repositories for tests. A fixture runs
 // git with an environment of its own, so it reads no configuration of
@@ -44,7 +44,7 @@ func Env(t testing.TB) []string {
 // New creates an empty repository whose first branch is main.
 func New(t testing.TB) *Repo {
 	t.Helper()
-	r := &Repo{Repo: git.Repo{Dir: t.TempDir(), Env: Env(t)}, t: t}
+	r := &Repo{Dir: t.TempDir(), Env: Env(t), t: t}
 	r.Git("init", "--quiet", "--initial-branch=main")
 	return r
 }
@@ -52,7 +52,7 @@ func New(t testing.TB) *Repo {
 // NewBare creates an empty bare repository, to push to.
 func NewBare(t testing.TB) *Repo {
 	t.Helper()
-	r := &Repo{Repo: git.Repo{Dir: t.TempDir(), Env: Env(t)}, t: t}
+	r := &Repo{Dir: t.TempDir(), Env: Env(t), t: t}
 	r.Git("init", "--quiet", "--bare", "--initial-branch=main")
 	return r
 }
@@ -61,18 +61,35 @@ func NewBare(t testing.TB) *Repo {
 // commit under another identity.
 func (r *Repo) WithEnv(vars ...string) *Repo {
 	env := append(append([]string{}, r.Env...), vars...)
-	return &Repo{Repo: git.Repo{Dir: r.Dir, Env: env}, t: r.t}
+	return &Repo{Dir: r.Dir, Env: env, t: r.t}
 }
 
 // Git runs one git command, fails the test when it fails, and returns
 // its output without the final newline.
 func (r *Repo) Git(args ...string) string {
 	r.t.Helper()
+	// Not t.Context(): that context ends before the test's cleanups
+	// run, and a cleanup may still call git.
 	out, err := r.Run(context.Background(), nil, args...)
 	if err != nil {
 		r.t.Fatalf("fixture: %v", err)
 	}
 	return strings.TrimSuffix(string(out), "\n")
+}
+
+// WriteObject writes a raw object of the given type and returns its id.
+// Git checks it as it checks what it writes itself. It makes a fixture
+// that git's porcelain would need a signing key or a crafted history to
+// make, such as a merge commit that embeds a signed tag.
+func (r *Repo) WriteObject(kind, raw string) string {
+	r.t.Helper()
+	// Not t.Context(): that context ends before the test's cleanups
+	// run, and a cleanup may still call git.
+	out, err := r.Run(context.Background(), []byte(raw), "hash-object", "-t", kind, "-w", "--stdin")
+	if err != nil {
+		r.t.Fatalf("fixture: %v", err)
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // Write writes one file of the working tree, with its directories.
