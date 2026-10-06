@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Names this repository must not contain, hashed. Add an entry with
+# "go run ./tools/ci hygiene add", on the host, in a terminal.
+entries:
+  - segments:
+      - length: 6
+        sha256: d548c5b83fa61d8e3bd86ad42a7ffea9b7c86e3f9d8095c1577d3e1270bb9420
+      - length: 3
+        sha256: c98a5865f0e7eee4c5f77ccbc5cb81117c168e28333f6273c1d3b17f9bcff0d4
+  - segments:
+      - length: 5
+        sha256: 4a604872a5dd19a05c272f77f9a4277f6b7a6554d54f7abd4d229317ec36aeba
