@@ -5,9 +5,10 @@ package prose
 
 import (
 	"os"
-	"reflect"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // fixture is a made-up list: the tests of the matcher do not depend on
@@ -35,9 +36,7 @@ rules:
 func mustParse(t *testing.T, data string) *Rules {
 	t.Helper()
 	r, err := Parse([]byte(data))
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
+	require.NoError(t, err, "Parse")
 	return r
 }
 
@@ -81,10 +80,7 @@ func TestFind(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := r.Find([]byte(tt.text))
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Find(%q) = %v, want %v", tt.text, got, tt.want)
-			}
+			assert.Equal(t, tt.want, r.Find([]byte(tt.text)), "Find(%q)", tt.text)
 		})
 	}
 }
@@ -114,12 +110,7 @@ func TestSelfTest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := Parse([]byte(tt.yaml))
-			if err == nil {
-				t.Fatal("Parse succeeded, want an error")
-			}
-			if !strings.Contains(err.Error(), tt.want) {
-				t.Errorf("error %q does not mention %q", err, tt.want)
-			}
+			require.ErrorContains(t, err, tt.want)
 		})
 	}
 }
@@ -129,12 +120,8 @@ func TestSelfTest(t *testing.T) {
 // ADR 0001 rule 4.
 func TestCommittedList(t *testing.T) {
 	data, err := os.ReadFile("../prose.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	r := mustParse(t, string(data))
 	want := []string{"hype", "ai-meta-commentary", "attribution-footer", "paired-construction"}
-	if got := r.IDs(); !reflect.DeepEqual(got, want) {
-		t.Errorf("rule ids = %v, want %v", got, want)
-	}
+	assert.Equal(t, want, r.IDs(), "rule ids")
 }
