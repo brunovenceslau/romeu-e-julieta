@@ -84,7 +84,7 @@ func Parse(stdin io.Reader) (Push, error) {
 // Tips returns the object each pushed ref points at locally, once
 // each, in the order of the input. A line that deletes a ref names no
 // object and adds none. A tip is a commit or, for an annotated tag, the
-// tag object; git reads "<tip>:<path>" through either.
+// tag object.
 func (p Push) Tips() []string {
 	var tips []string
 	for _, r := range p.refs {

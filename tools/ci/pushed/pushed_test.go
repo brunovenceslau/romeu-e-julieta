@@ -6,10 +6,12 @@ package pushed
 import (
 	"bytes"
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 )
@@ -71,9 +73,7 @@ func walk(t *testing.T, f fixture, remote, stdin string) (commits, refs []string
 		}
 	})
 	for c, n := range reads {
-		if n != 1 {
-			t.Errorf("commit %s was read %d times, want once", c, n)
-		}
+		assert.Equal(t, 1, n, "times commit %s was read", c)
 		commits = append(commits, c)
 	}
 	slices.Sort(commits)
@@ -195,15 +195,9 @@ func TestWalkRanges(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			commits, refs, err := walk(t, f, tt.remote, tt.stdin)
-			if err != nil {
-				t.Fatalf("Walk: %v", err)
-			}
-			if !reflect.DeepEqual(commits, tt.commits) {
-				t.Errorf("commits = %v, want %v", commits, tt.commits)
-			}
-			if !reflect.DeepEqual(refs, tt.refs) {
-				t.Errorf("refs = %v, want %v", refs, tt.refs)
-			}
+			require.NoError(t, err, "Walk")
+			assert.Equal(t, tt.commits, commits, "commits")
+			assert.Equal(t, tt.refs, refs, "refs")
 		})
 	}
 }
@@ -228,9 +222,8 @@ func TestWalkStops(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, _, err := walk(t, f, "origin", tt.stdin); err == nil {
-				t.Error("Walk succeeded, want an error")
-			}
+			_, _, err := walk(t, f, "origin", tt.stdin)
+			require.Error(t, err, "Walk")
 		})
 	}
 }
@@ -289,25 +282,17 @@ func TestWalkTags(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p, err := Parse(strings.NewReader(tt.stdin))
-			if err != nil {
-				t.Fatalf("Parse: %v", err)
-			}
+			require.NoError(t, err, "Parse")
 			var got []string
 			err = Walk(t.Context(), r.Repo, "origin", p, func(rd Reading) {
 				if rd.Tag == "" {
 					return
 				}
-				if rd.Commit != "" {
-					t.Errorf("a reading of tag %s names commit %s", rd.Tag, rd.Commit)
-				}
+				assert.Empty(t, rd.Commit, "a reading of tag %s names a commit", rd.Tag)
 				got = append(got, fmt.Sprintf("%s|%s|%d|%s", rd.Tag, rd.Field, rd.Line, rd.Text))
 			})
-			if err != nil {
-				t.Fatalf("Walk: %v", err)
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("tag readings:\n got %q\nwant %q", got, tt.want)
-			}
+			require.NoError(t, err, "Walk")
+			assert.Equal(t, tt.want, got, "tag readings")
 		})
 	}
 }
@@ -319,17 +304,11 @@ func TestTagReadingsCraftedTag(t *testing.T) {
 	f := newFixture(t)
 	raw := "object refs/heads/main\ntype commit\ntag v-crafted\ntagger T <t@example.invalid> 0 +0000\n\nmessage\n"
 	out, err := f.repo.Run(t.Context(), []byte(raw), "hash-object", "-t", "tag", "-w", "--literally", "--stdin")
-	if err != nil {
-		t.Fatalf("fixture: %v", err)
-	}
+	require.NoError(t, err, "fixture")
 	crafted := strings.TrimSpace(string(out))
 	err = tagReadings(t.Context(), f.repo.Repo, crafted, map[string]bool{}, func(Reading) {})
-	if err == nil {
-		t.Fatal("tagReadings succeeded, want an error")
-	}
-	if strings.Contains(err.Error(), "refs/heads/main") {
-		t.Errorf("the error repeats the header: %v", err)
-	}
+	require.Error(t, err, "tagReadings")
+	assert.NotContains(t, err.Error(), "refs/heads/main", "the error repeats the header")
 }
 
 // TestDuplicatedHeaders shows that a commit or a tag that names one of
@@ -361,24 +340,17 @@ func TestDuplicatedHeaders(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			out, err := f.repo.Run(t.Context(), []byte(tt.raw), "hash-object", "-t", tt.kind, "-w", "--literally", "--stdin")
-			if err != nil {
-				t.Fatalf("fixture: %v", err)
-			}
+			require.NoError(t, err, "fixture")
 			sha := strings.TrimSpace(string(out))
 			if tt.kind == "commit" {
 				err = Readings(t.Context(), f.repo.Repo, sha, func(Reading) {})
 			} else {
 				err = tagReadings(t.Context(), f.repo.Repo, sha, map[string]bool{}, func(Reading) {})
 			}
-			if err == nil {
-				t.Fatal("read without an error, want one")
-			}
-			if !strings.Contains(err.Error(), "the "+tt.header+" header appears twice") {
-				t.Errorf("error = %v, want one that names the %s header", err, tt.header)
-			}
-			if low := strings.ToLower(err.Error()); strings.Contains(low, "quimby") || strings.Contains(low, "v-x") {
-				t.Errorf("the error repeats a value: %v", err)
-			}
+			require.ErrorContains(t, err, "the "+tt.header+" header appears twice")
+			low := strings.ToLower(err.Error())
+			assert.NotContains(t, low, "quimby", "the error repeats a value")
+			assert.NotContains(t, low, "v-x", "the error repeats a value")
 		})
 	}
 }
@@ -393,16 +365,11 @@ func TestMergetagCraftedObject(t *testing.T) {
 		"mergetag object refs/heads/main\n type commit\n tag v-crafted\n tagger T <t@example.invalid> 0 +0000\n \n m\n" +
 		"\nmessage\n"
 	out, err := f.repo.Run(t.Context(), []byte(raw), "hash-object", "-t", "commit", "-w", "--literally", "--stdin")
-	if err != nil {
-		t.Fatalf("fixture: %v", err)
-	}
+	require.NoError(t, err, "fixture")
 	err = Readings(t.Context(), f.repo.Repo, strings.TrimSpace(string(out)), func(Reading) {})
-	if err == nil {
-		t.Fatal("Readings succeeded, want an error")
-	}
-	if strings.Contains(err.Error(), "refs/heads/main") || strings.Contains(err.Error(), "v-crafted") {
-		t.Errorf("the error repeats the header: %v", err)
-	}
+	require.Error(t, err, "Readings")
+	assert.NotContains(t, err.Error(), "refs/heads/main", "the error repeats the header")
+	assert.NotContains(t, err.Error(), "v-crafted", "the error repeats the header")
 }
 
 // TestParseCommitLeavesRaw shows that reading a mergetag, whose lines
@@ -415,18 +382,12 @@ func TestParseCommitLeavesRaw(t *testing.T) {
 		"committer T <t@example.invalid> 0 +0000\n\nmessage\n")
 	before := bytes.Clone(raw)
 	c, err := parseCommit(raw)
-	if err != nil {
-		t.Fatalf("parseCommit: %v", err)
-	}
-	if !bytes.Equal(raw, before) {
-		t.Errorf("parseCommit changed the object it read:\n%q\nwant\n%q", raw, before)
-	}
-	if want := "object " + id + "\ntype commit\ntag v-a\ntagger T <t@example.invalid> 0 +0000\n\nnotes"; len(c.mergetags) != 1 || string(c.mergetags[0]) != want {
-		t.Errorf("mergetags = %q, want [%q]", c.mergetags, want)
-	}
-	if string(c.committer) != "T <t@example.invalid>" {
-		t.Errorf("committer = %q", c.committer)
-	}
+	require.NoError(t, err, "parseCommit")
+	assert.Equal(t, before, raw, "parseCommit changed the object it read")
+	want := "object " + id + "\ntype commit\ntag v-a\ntagger T <t@example.invalid> 0 +0000\n\nnotes"
+	require.Len(t, c.mergetags, 1, "mergetags")
+	assert.Equal(t, want, string(c.mergetags[0]), "mergetag")
+	assert.Equal(t, "T <t@example.invalid>", string(c.committer), "committer")
 }
 
 // TestPatchPathMalformed shows that a quoted path header that does not
@@ -435,17 +396,13 @@ func TestPatchPathMalformed(t *testing.T) {
 	for _, header := range []string{`"b/zorvex quimby`, `"b/zorvex\quimby"`, `"b/zorvex\400quimby"`} {
 		t.Run(header, func(t *testing.T) {
 			_, err := patchPath([]byte(header))
-			if err == nil {
-				t.Fatal("patchPath succeeded, want an error")
-			}
-			if strings.Contains(err.Error(), "zorvex") || strings.Contains(err.Error(), "quimby") {
-				t.Errorf("the error repeats the header: %v", err)
-			}
+			require.Error(t, err, "patchPath")
+			assert.NotContains(t, err.Error(), "zorvex", "the error repeats the header")
+			assert.NotContains(t, err.Error(), "quimby", "the error repeats the header")
 			patch := "diff --git a/x b/x\n+++ " + header + "\n@@ -0,0 +1 @@\n+zorvex\n"
 			err = addedLines([]byte(patch), func(string, int, []byte) {})
-			if err == nil || strings.Contains(err.Error(), "zorvex") {
-				t.Errorf("addedLines error = %v, want one that repeats nothing", err)
-			}
+			require.Error(t, err, "addedLines")
+			assert.NotContains(t, err.Error(), "zorvex", "the error repeats the header")
 		})
 	}
 }
@@ -457,23 +414,15 @@ func TestPushTips(t *testing.T) {
 	stdin := fmt.Sprintf("refs/heads/x %s refs/heads/x %s\n(delete) %s refs/heads/y %s\nrefs/heads/z %s refs/heads/z %s\nrefs/heads/w %s refs/heads/w %s\n",
 		b, zero, zero, a, a, b, b, zero)
 	p, err := Parse(strings.NewReader(stdin))
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if got, want := p.Tips(), []string{b, a}; !reflect.DeepEqual(got, want) {
-		t.Errorf("Tips = %v, want %v", got, want)
-	}
-	if got := (Push{}).Tips(); len(got) != 0 {
-		t.Errorf("Tips of an empty push = %v, want none", got)
-	}
+	require.NoError(t, err, "Parse")
+	assert.Equal(t, []string{b, a}, p.Tips())
+	assert.Empty(t, (Push{}).Tips(), "Tips of an empty push")
 }
 
 func mustParseTag(t *testing.T, raw []byte) tag {
 	t.Helper()
 	got, err := parseTag(raw)
-	if err != nil {
-		t.Fatalf("parseTag: %v", err)
-	}
+	require.NoError(t, err, "parseTag")
 	return got
 }
 
@@ -482,25 +431,19 @@ func mustParseTag(t *testing.T, raw []byte) tag {
 func TestParseTag(t *testing.T) {
 	id := strings.Repeat("c", 40)
 	got := mustParseTag(t, []byte("object "+id+"\ntype commit\ntag v-old\n\nthe message\n\nwith a blank line\n"))
-	if got.object != id || string(got.name) != "v-old" || got.tagger != nil {
-		t.Errorf("header = %q %q %q", got.object, got.name, got.tagger)
-	}
-	if want := "the message\n\nwith a blank line\n"; string(got.message) != want {
-		t.Errorf("message = %q, want %q", got.message, want)
-	}
-	if got := mustParseTag(t, []byte("tag v-none\n\nmessage\n")); got.object != "" {
-		t.Errorf("object = %q, want none", got.object)
-	}
+	assert.Equal(t, id, got.object, "object")
+	assert.Equal(t, "v-old", string(got.name), "name")
+	assert.Nil(t, got.tagger, "tagger")
+	assert.Equal(t, "the message\n\nwith a blank line\n", string(got.message), "message")
+	assert.Empty(t, mustParseTag(t, []byte("tag v-none\n\nmessage\n")).object, "object of a tag without one")
 	// A tag with an empty message has no blank line after its header.
 	got = mustParseTag(t, []byte("object "+id+"\ntype commit\ntag v-empty\ntagger T <t@example.invalid> 0 +0000\n"))
-	if got.message != nil || string(got.tagger) != "T <t@example.invalid>" || string(got.name) != "v-empty" {
-		t.Errorf("empty message: %q %q %q", got.message, got.tagger, got.name)
-	}
+	assert.Nil(t, got.message, "empty message")
+	assert.Equal(t, "T <t@example.invalid>", string(got.tagger), "tagger")
+	assert.Equal(t, "v-empty", string(got.name), "name")
 	// A message without a final newline keeps its last line.
 	got = mustParseTag(t, []byte("object "+id+"\ntag v-short\n\nno newline"))
-	if string(got.message) != "no newline" {
-		t.Errorf("message = %q, want %q", got.message, "no newline")
-	}
+	assert.Equal(t, "no newline", string(got.message), "message")
 }
 
 // TestIdentity covers an identity header without an email: there is no
@@ -518,9 +461,7 @@ func TestIdentity(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := string(identity([]byte(tt.value))); got != tt.want {
-				t.Errorf("identity(%q) = %q, want %q", tt.value, got, tt.want)
-			}
+			assert.Equal(t, tt.want, string(identity([]byte(tt.value))), "identity(%q)", tt.value)
 		})
 	}
 }
@@ -530,14 +471,10 @@ func readings(t *testing.T, r *gittest.Repo, sha string) []string {
 	t.Helper()
 	var out []string
 	err := Readings(t.Context(), r.Repo, sha, func(rd Reading) {
-		if rd.Commit != sha {
-			t.Errorf("reading of commit %s, want %s", rd.Commit, sha)
-		}
+		assert.Equal(t, sha, rd.Commit, "commit of a reading")
 		out = append(out, fmt.Sprintf("%s|%s|%d|%s", rd.Field, rd.Path, rd.Line, rd.Text))
 	})
-	if err != nil {
-		t.Fatalf("Readings: %v", err)
-	}
+	require.NoError(t, err, "Readings")
 	return out
 }
 
@@ -609,10 +546,7 @@ func TestReadings(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := readings(t, r, tt.sha)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readings:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(tt.want, "\n"))
-			}
+			assert.Equal(t, tt.want, readings(t, r, tt.sha), "readings")
 		})
 	}
 }
@@ -631,9 +565,7 @@ func TestReadingsMerge(t *testing.T) {
 		"line|d.txt|1|d one",
 		"line|d.txt|2|d two",
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("readings:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
-	}
+	assert.Equal(t, want, got, "readings")
 }
 
 // TestReadingsMergetag covers the tags a merge commit embeds: merging a
@@ -668,16 +600,13 @@ func TestReadingsMergetag(t *testing.T) {
 	merge := f.repo.WriteObject("commit", raw)
 	var got []string
 	err := Readings(t.Context(), f.repo.Repo, merge, func(rd Reading) {
-		if rd.Commit != merge || rd.Tag != "" {
-			t.Errorf("reading names commit %q and tag %q, want commit %s", rd.Commit, rd.Tag, merge)
-		}
+		assert.Equal(t, merge, rd.Commit, "commit of a reading")
+		assert.Empty(t, rd.Tag, "tag of a reading")
 		if rd.Mergetag > 0 {
 			got = append(got, fmt.Sprintf("%d|%s|%d|%s", rd.Mergetag, rd.Field, rd.Line, rd.Text))
 		}
 	})
-	if err != nil {
-		t.Fatalf("Readings: %v", err)
-	}
+	require.NoError(t, err, "Readings")
 	want := []string{
 		"1|tag name|0|v-side",
 		"1|tagger|0|Tag Maker <maker@example.invalid>",
@@ -689,9 +618,7 @@ func TestReadingsMergetag(t *testing.T) {
 		"2|tagger|0|Other Maker <other@example.invalid>",
 		"2|message|1|b notes",
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("mergetag readings:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
-	}
+	assert.Equal(t, want, got, "mergetag readings")
 }
 
 // TestReadingsQuotedPath covers a path git quotes in a patch: one with a
@@ -713,15 +640,12 @@ func TestReadingsQuotedPath(t *testing.T) {
 			added = append(added, rd.Path)
 		}
 	})
-	if err != nil {
-		t.Fatalf("Readings: %v", err)
-	}
+	require.NoError(t, err, "Readings")
 	slices.Sort(lines)
 	slices.Sort(added)
 	want := slices.Sorted(slices.Values(paths))
-	if !reflect.DeepEqual(lines, want) || !reflect.DeepEqual(added, want) {
-		t.Errorf("line paths %q, added paths %q, want %q", lines, added, want)
-	}
+	assert.Equal(t, want, lines, "line paths")
+	assert.Equal(t, want, added, "added paths")
 
 	// With core.quotePath off, git leaves bytes outside ASCII unescaped
 	// inside the quotes, and a byte that is no UTF-8 would not survive
@@ -738,20 +662,14 @@ func TestReadingsQuotedPath(t *testing.T) {
 			oddLines = append(oddLines, rd.Path)
 		}
 	})
-	if err != nil {
-		t.Fatalf("Readings: %v", err)
-	}
-	if !reflect.DeepEqual(oddLines, []string{odd}) {
-		t.Errorf("line paths %q, want %q", oddLines, []string{odd})
-	}
+	require.NoError(t, err, "Readings")
+	assert.Equal(t, []string{odd}, oddLines, "line paths")
 }
 
 func TestReadingsUnknownCommit(t *testing.T) {
 	f := newFixture(t)
 	err := Readings(t.Context(), f.repo.Repo, strings.Repeat("12", 20), func(Reading) {})
-	if err == nil {
-		t.Error("Readings of a commit the repository lacks succeeded")
-	}
+	require.Error(t, err, "Readings of a commit the repository lacks")
 }
 
 func TestIsObjectID(t *testing.T) {
@@ -773,9 +691,7 @@ func TestIsObjectID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isObjectID(tt.id); got != tt.want {
-				t.Errorf("isObjectID(%q) = %v, want %v", tt.id, got, tt.want)
-			}
+			assert.Equal(t, tt.want, isObjectID(tt.id), "isObjectID(%q)", tt.id)
 		})
 	}
 }
@@ -796,15 +712,9 @@ func TestPatchErrorsHoldNoContent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := addedLines([]byte(tt.patch), func(string, int, []byte) {})
-			if err == nil {
-				t.Fatal("addedLines succeeded, want an error")
-			}
-			if !strings.Contains(err.Error(), "hunk 1") {
-				t.Errorf("the error does not name the hunk: %v", err)
-			}
-			if strings.Contains(err.Error(), "zorvex") || strings.Contains(err.Error(), "quimby") {
-				t.Errorf("the error repeats the patch: %v", err)
-			}
+			require.ErrorContains(t, err, "hunk 1", "the error names the hunk")
+			assert.NotContains(t, err.Error(), "zorvex", "the error repeats the patch")
+			assert.NotContains(t, err.Error(), "quimby", "the error repeats the patch")
 		})
 	}
 }
