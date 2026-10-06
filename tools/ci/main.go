@@ -49,7 +49,7 @@ type env struct {
 	stdin  io.Reader // the hook's input, or the terminal of "hygiene add"
 	stdout io.Writer
 	stderr io.Writer
-	steps  []step // the command steps of fast; nil means fastSteps
+	steps  []step // the command steps of fast; nil means fastSteps with the tools of resolveLintTools
 }
 
 func main() {
@@ -103,7 +103,7 @@ func runHygiene(ctx context.Context, e env, args []string) (bool, error) {
 	if *file != "" {
 		findings, err = hygieneFile(ctx, e.repo(), *file)
 	} else {
-		findings, err = hygiene(ctx, e.repo())
+		findings, err = hygiene(ctx, e.repo(), "HEAD")
 	}
 	if err != nil {
 		return false, err

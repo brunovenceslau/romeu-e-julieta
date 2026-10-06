@@ -69,17 +69,19 @@ type treeFile struct {
 // content of each file of the tree at HEAD. The tree that is committed
 // is the one a push publishes, so work in progress is not read, and
 // that holds for the two data files too: the denylist and the word
-// lists are the ones committed at HEAD.
-func hygiene(ctx context.Context, repo git.Repo) ([]finding, error) {
-	words, err := loadProse(ctx, repo)
+// lists are the ones committed at HEAD. head is "HEAD", or the id of
+// the commit a pre-push run judged HEAD to be (judgeCommit), so that a
+// commit made while fast runs is not the one it reads.
+func hygiene(ctx context.Context, repo git.Repo, head string) ([]finding, error) {
+	words, err := loadProse(ctx, repo, head)
 	if err != nil {
 		return nil, err
 	}
-	list, findings, err := loadDenylist(ctx, repo)
+	list, findings, err := loadDenylist(ctx, repo, head)
 	if err != nil {
 		return nil, err
 	}
-	files, err := headTree(ctx, repo)
+	files, err := headTree(ctx, repo, head)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +135,7 @@ func hygiene(ctx context.Context, repo git.Repo) ([]finding, error) {
 // The denylist rule holds here too, so a clone without entries does
 // not report a file as clean.
 func hygieneFile(ctx context.Context, repo git.Repo, path string) ([]finding, error) {
-	list, findings, err := loadDenylist(ctx, repo)
+	list, findings, err := loadDenylist(ctx, repo, "HEAD")
 	if err != nil {
 		return nil, err
 	}
@@ -147,15 +149,17 @@ func hygieneFile(ctx context.Context, repo git.Repo, path string) ([]finding, er
 	return findings, nil
 }
 
-// loadDenylist reads the denylist committed at HEAD. Every check that
-// matches names reads it there and nowhere else: a denylist that is
-// written and not committed is in no push, so it must not turn a check
-// green. A list that is missing or has no entry is a finding and not
-// an error: the check then proves nothing, and the maintainer is the
-// one who can add an entry.
-func loadDenylist(ctx context.Context, repo git.Repo) (*names.List, []finding, error) {
+// loadDenylist reads the denylist committed at head, which is HEAD or
+// the id of the commit judged to be HEAD (hygiene). Every check that
+// matches names reads it there, and a pre-push run also at the
+// remote's default branch (pushedRange): a denylist that is written
+// and not committed is in no push, so it must not turn a check green.
+// A list that is missing or has no entry is a finding and not an
+// error: the check then proves nothing, and the maintainer is the one
+// who can add an entry.
+func loadDenylist(ctx context.Context, repo git.Repo, head string) (*names.List, []finding, error) {
 	const how = `; the maintainer adds entries with "go run ./tools/ci hygiene add" and commits the file`
-	list, found, err := denylistAt(ctx, repo, "HEAD")
+	list, found, err := denylistAt(ctx, repo, head)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", names.Path, err)
 	}
@@ -184,9 +188,9 @@ func denylistAt(ctx context.Context, repo git.Repo, rev string) (*names.List, bo
 	return list, true, nil
 }
 
-// loadProse reads the word lists committed at HEAD.
-func loadProse(ctx context.Context, repo git.Repo) (*prose.Rules, error) {
-	data, found, err := blobAt(ctx, repo, "HEAD", prose.Path)
+// loadProse reads the word lists committed at head (hygiene).
+func loadProse(ctx context.Context, repo git.Repo, head string) (*prose.Rules, error) {
+	data, found, err := blobAt(ctx, repo, head, prose.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -240,10 +244,10 @@ func hookFindings(files []treeFile) []finding {
 	return []finding{{hookPath, "githooks", "the hook is not tracked"}}
 }
 
-// headTree returns the files of the tree at HEAD with their content,
-// in the order git lists them.
-func headTree(ctx context.Context, repo git.Repo) ([]treeFile, error) {
-	out, err := repo.Run(ctx, nil, "ls-tree", "-r", "-z", "--full-tree", "HEAD")
+// headTree returns the files of the tree at head (hygiene) with their
+// content, in the order git lists them.
+func headTree(ctx context.Context, repo git.Repo, head string) ([]treeFile, error) {
+	out, err := repo.Run(ctx, nil, "ls-tree", "-r", "-z", "--full-tree", head)
 	if err != nil {
 		return nil, err
 	}

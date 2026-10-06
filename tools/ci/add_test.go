@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
@@ -61,9 +63,7 @@ func typeAtTerminal(t *testing.T, r *gittest.Repo, typed ...string) (code int, p
 	ended := false
 	for !ended {
 		tio, err := unix.IoctlGetTermios(int(terminal.Fd()), getTermios)
-		if err != nil {
-			t.Fatalf("read the terminal's settings: %v", err)
-		}
+		require.NoError(t, err, "read the terminal's settings")
 		if tio.Lflag&unix.ECHO == 0 {
 			break
 		}
@@ -72,30 +72,25 @@ func typeAtTerminal(t *testing.T, r *gittest.Repo, typed ...string) (code int, p
 			ended = true
 		default:
 		}
-		if time.Now().After(deadline) {
-			t.Fatal("the command did not switch echo off")
-		}
+		require.False(t, time.Now().After(deadline), "the command did not switch echo off")
 		time.Sleep(time.Millisecond)
 	}
 	if !ended {
 		// Both lines go in at once: the terminal holds the second
 		// until the command asks for it.
-		if _, err := io.WriteString(master, strings.Join(typed, "\n")+"\n"); err != nil {
-			t.Fatalf("type the name: %v", err)
-		}
+		_, err := io.WriteString(master, strings.Join(typed, "\n")+"\n")
+		require.NoError(t, err, "type the name")
 		select {
 		case code = <-runDone:
 		case <-time.After(10 * time.Second):
-			t.Fatal("the command did not end")
+			require.FailNow(t, "the command did not end")
 		}
 	}
-	if err := terminal.Close(); err != nil {
-		t.Fatalf("close the terminal: %v", err)
-	}
+	require.NoError(t, terminal.Close(), "close the terminal")
 	select {
 	case <-readDone:
 	case <-time.After(10 * time.Second):
-		t.Fatal("the terminal did not close")
+		require.FailNow(t, "the terminal did not close")
 	}
 	mu.Lock()
 	defer mu.Unlock()
@@ -108,7 +103,7 @@ func closeAtEnd(t *testing.T, f *os.File) {
 	t.Helper()
 	t.Cleanup(func() {
 		if err := f.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
-			t.Errorf("close %s: %v", f.Name(), err)
+			require.NoError(t, err, "close %s", f.Name())
 		}
 	})
 }
@@ -116,18 +111,14 @@ func closeAtEnd(t *testing.T, f *os.File) {
 func loadDenylistFile(t *testing.T, r *gittest.Repo) *names.List {
 	t.Helper()
 	l, err := names.Load(filepath.Join(r.Dir, filepath.FromSlash(names.Path)))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return l
 }
 
 // TestAddAtATerminal drives "hygiene add" through /dev/ptmx (10 10.1).
 func TestAddAtATerminal(t *testing.T) {
 	r := newTree(t)
-	if err := os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
 	r.Commit("fixture")
 
 	// The name is typed twice, because it is typed blind: a slip of
@@ -148,41 +139,29 @@ func TestAddAtATerminal(t *testing.T) {
 	}
 	for _, s := range steps {
 		code, printed, shown := typeAtTerminal(t, r, s.typed...)
-		if code != s.code {
-			t.Errorf("%s: exit = %d, want %d\n%s", s.name, code, s.code, printed)
-		}
-		if got := loadDenylistFile(t, r).Len(); got != s.entries {
-			t.Errorf("%s: the denylist holds %d entries, want %d", s.name, got, s.entries)
-		}
+		assert.Equal(t, s.code, code, "%s: exit status\n%s", s.name, printed)
+		assert.Equal(t, s.entries, loadDenylistFile(t, r).Len(), "%s: entries in the denylist", s.name)
 		// The name is neither echoed by the terminal nor printed by
 		// the command.
 		for _, piece := range []string{"zorvex", "quimby", "plimsor", "brimlow", "brimlaw"} {
-			if strings.Contains(strings.ToLower(printed+shown), piece) {
-				t.Errorf("%s: the name was shown:\nprinted: %q\nterminal: %q", s.name, printed, shown)
-			}
+			assert.NotContains(t, strings.ToLower(printed+shown), piece,
+				"%s: the name was shown, in what the command printed and the terminal showed", s.name)
 		}
 	}
 
 	l := loadDenylistFile(t, r)
 	for _, line := range []string{"zorvex-quimby", "ZORVEXQUIMBY", "a plimsor b"} {
-		if !l.Match([]byte(line)) {
-			t.Errorf("the written denylist does not match %q", line)
-		}
+		assert.True(t, l.Match([]byte(line)), "the written denylist matches %q", line)
 	}
 	data, err := os.ReadFile(filepath.Join(r.Dir, filepath.FromSlash(names.Path)))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, piece := range []string{"zorvex", "quimby", "plimsor"} {
-		if strings.Contains(strings.ToLower(string(data)), piece) {
-			t.Errorf("the denylist file holds %q", piece)
-		}
+		assert.NotContains(t, strings.ToLower(string(data)), piece, "the denylist file")
 	}
 	// With the entries written, the tree passes.
 	r.Commit("denylist")
-	if code, out := runCI(t, r, nil, nil, "hygiene"); code != exitOK {
-		t.Errorf("hygiene after add: exit = %d\n%s", code, out)
-	}
+	code, out := runCI(t, r, nil, nil, "hygiene")
+	assert.Equal(t, exitOK, code, "hygiene after add\n%s", out)
 }
 
 // TestAddKeepsADenylistItCannotRead shows that a denylist that does
@@ -193,16 +172,10 @@ func TestAddKeepsADenylistItCannotRead(t *testing.T) {
 	const damaged = "entries: [\n"
 	r.Write(names.Path, damaged)
 	code, printed, _ := typeAtTerminal(t, r, "zorvex quimby", "zorvex quimby")
-	if code != exitError {
-		t.Errorf("exit = %d, want %d\n%s", code, exitError, printed)
-	}
+	assert.Equal(t, exitError, code, "exit status\n%s", printed)
 	got, err := os.ReadFile(filepath.Join(r.Dir, filepath.FromSlash(names.Path)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != damaged {
-		t.Errorf("the denylist was rewritten: %q", got)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, damaged, string(got), "the denylist was rewritten")
 }
 
 // TestWriteFile covers the three promises of the denylist's writer:
@@ -212,73 +185,43 @@ func TestWriteFile(t *testing.T) {
 	leftovers := func(t *testing.T, dir string) []string {
 		t.Helper()
 		found, err := filepath.Glob(filepath.Join(dir, ".denylist-*"))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		return found
 	}
 
 	t.Run("content and mode", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "denylist.yaml")
-		if err := writeFile(path, []byte("new\n")); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, writeFile(path, []byte("new\n")))
 		got, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if string(got) != "new\n" {
-			t.Errorf("content = %q", got)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "new\n", string(got), "content")
 		info, err := os.Stat(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if info.Mode().Perm() != 0o644 {
-			t.Errorf("mode = %o, want 644", info.Mode().Perm())
-		}
-		if l := leftovers(t, dir); len(l) != 0 {
-			t.Errorf("temporary files left: %v", l)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o644), info.Mode().Perm(), "mode")
+		assert.Empty(t, leftovers(t, dir), "temporary files left")
 	})
 
 	t.Run("the old file is replaced, not edited", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "denylist.yaml")
 		other := filepath.Join(dir, "other-name")
-		if err := os.WriteFile(path, []byte("old\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(path, []byte("old\n"), 0o644))
 		// A second name for the old file still reads the old content
 		// after a rename, and the new content after a write in place.
-		if err := os.Link(path, other); err != nil {
-			t.Fatal(err)
-		}
-		if err := writeFile(path, []byte("new\n")); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Link(path, other))
+		require.NoError(t, writeFile(path, []byte("new\n")))
 		got, err := os.ReadFile(other)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if string(got) != "old\n" {
-			t.Errorf("the old file was edited in place: %q", got)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "old\n", string(got), "the old file was edited in place")
 	})
 
 	t.Run("a failed write leaves nothing behind", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "denylist.yaml")
-		if err := os.Mkdir(path, 0o755); err != nil { // a directory cannot be replaced by a file
-			t.Fatal(err)
-		}
-		if err := writeFile(path, []byte("new\n")); err == nil {
-			t.Error("writeFile over a directory succeeded")
-		}
-		if l := leftovers(t, dir); len(l) != 0 {
-			t.Errorf("temporary files left: %v", l)
-		}
+		require.NoError(t, os.Mkdir(path, 0o755)) // a directory cannot be replaced by a file
+		require.Error(t, writeFile(path, []byte("new\n")), "writeFile over a directory")
+		assert.Empty(t, leftovers(t, dir), "temporary files left")
 	})
 }
 
@@ -287,27 +230,19 @@ func TestWriteFile(t *testing.T) {
 // terminal.
 func TestAddRefuses(t *testing.T) {
 	pipeRead, pipeWrite, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := pipeWrite.WriteString("zorvex quimby\n"); err != nil {
-		t.Fatal(err)
-	}
-	if err := pipeWrite.Close(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	_, err = pipeWrite.WriteString("zorvex quimby\n")
+	require.NoError(t, err)
+	require.NoError(t, pipeWrite.Close())
 	closeAtEnd(t, pipeRead)
 	file, err := os.Open(os.DevNull)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	closeAtEnd(t, file)
 	// An empty line waits in the terminal, so a command that read it
 	// after all would end with another message, and not wait for ever.
 	master, terminal := openPTY(t)
-	if _, err := io.WriteString(master, "\n"); err != nil {
-		t.Fatal(err)
-	}
+	_, err = io.WriteString(master, "\n")
+	require.NoError(t, err)
 
 	tests := []struct {
 		name  string
@@ -325,18 +260,10 @@ func TestAddRefuses(t *testing.T) {
 			r := newTree(t)
 			before := loadDenylistFile(t, r).Marshal()
 			code, out := runCI(t, r, tt.stdin, nil, append([]string{"hygiene", "add"}, tt.args...)...)
-			if code != exitError {
-				t.Errorf("exit = %d, want %d", code, exitError)
-			}
-			if !strings.Contains(out, tt.want) {
-				t.Errorf("the output lacks %q:\n%s", tt.want, out)
-			}
-			if strings.Contains(out, "zorvex") {
-				t.Errorf("the output repeats the argument:\n%s", out)
-			}
-			if after := loadDenylistFile(t, r).Marshal(); !bytes.Equal(before, after) {
-				t.Error("the denylist changed")
-			}
+			assert.Equal(t, exitError, code, "exit status")
+			assert.Contains(t, out, tt.want)
+			assert.NotContains(t, out, "zorvex", "the output repeats the argument")
+			assert.Equal(t, before, loadDenylistFile(t, r).Marshal(), "the denylist changed")
 		})
 	}
 }
