@@ -7,7 +7,7 @@ reader: the implementer picking the next task of romeu e julieta v1
 
 This is the implementation plan of v1. Its source of truth is the
 specification, [spec.md](spec.md) with the fourteen pages under
-`spec/`, and the six decision records under `adr/`. Where this plan and
+`spec/`, and the seven decision records under `adr/`. Where this plan and
 the specification disagree, the specification is right and this page
 has a defect.
 
@@ -266,7 +266,7 @@ task lands it.
 | Pin | Form | Section | Task |
 |---|---|---|---|
 | Go | version in `mise.toml`, locked in `mise.lock` | 12 12.1, 02 2.1 | T001 |
-| `golangci-lint`, `govulncheck`, `reuse` | `mise.lock`, started through `mise exec` | 12 12.1, 10 10.2 | T001, T002 |
+| `golangci-lint`, `govulncheck`, `reuse` | `mise.lock`; `govulncheck` and `reuse` started through `mise exec`, `golangci-lint` run from the path `mise which` resolves | 12 12.1, 10 10.2 | T001, T002 |
 | `gh`, for `tools/release verify` | `mise.lock`, started through `mise exec` | 12 12.1, 10 10.2 | T088 |
 | GitHub Actions | `uses` with a 40-hex commit SHA | 10 10.2 | T002, T088 |
 | mise on the CI runners | one `uses` step with a 40-hex commit SHA, the mise version and its sha256 in `with`; Go and the other tools come from `mise.lock` through it | 10 10.2 | T002 |
@@ -372,16 +372,29 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     is not `go run ./tools/ci` or `go run ./tools/release`, a file with
     another name ending), and fails a `ci.yml` without `edited`.
   - `go run ./tools/ci all` runs the steps of 10 10.2 that have code to
-    check at this point: format and vet, lint (with `.golangci.yml` and
-    the fixture test of ADR 0001 rule 14), unit, hygiene, workflows,
+    check at this point: format and vet, lint, unit, hygiene, workflows,
     `govulncheck`, the race run with its cover profile, `coverage`,
-    `reuse lint`.
+    `reuse lint`. The lint row of this task moved to the change that
+    adopted testify in tests ([ADR 0007, adopt testify assert and require in tests](adr/0007-adopt-testify-assert-and-require-in-tests.md)):
+    that change added `.golangci.yml`, the fixture test of ADR 0001 rule
+    14 and the lint step of `go run ./tools/ci fast`, so `all` only has
+    to run the step that `fast` already runs. `ci.yml` runs `mise
+    trust` before `go run ./tools/ci all`: the steps of `tools/ci` keep
+    only the variables that say where things are, so neither `CI` nor
+    `MISE_TRUSTED_CONFIG_PATHS` reaches `mise which`, and it sets
+    neither `MISE_DATA_DIR` nor `XDG_DATA_HOME`, which `tools/ci`
+    refuses.
   - `tools/ci coverage` enforces the two thresholds of S9 and reports
     the packages below them. It lands here because `tools/...` is its
     first input.
-  - `ci.yml` passes on `ubuntu-latest`, `ubuntu-24.04-arm`,
-    `macos-latest` and an Intel macOS runner whose label is verified to
-    exist and to report `x86_64` (10 10.2, Runners).
+  - `ci.yml` passes on `ubuntu-26.04`, `ubuntu-26.04-arm`,
+    `macos-26` and `macos-26-intel`; the first run verifies that the
+    arm64 and Intel labels exist and that `uname -m` reports `x86_64`
+    on `ubuntu-26.04`, `aarch64` on `ubuntu-26.04-arm`, `arm64` on
+    `macos-26` and `x86_64` on `macos-26-intel` (10 10.2, Runners).
+  - `tools/ci workflows` has a fixture that fails a `runs-on` with a
+    `*-latest` label, so that "never `*-latest`" is a check and not a
+    habit (10 10.2, Runners).
   - How mise and Go reach each runner is one `uses` step pinned to a
     40-hex commit SHA, with the mise version and its sha256 in `with`;
     Go and every tool of `mise.lock` come through that mise. No step
@@ -614,7 +627,7 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
 - Acceptance:
   - The container e2e runs `julieta version --json` in the workload's
     Debian base, pulled by the digest of the pin file, on
-    `ubuntu-latest` and `ubuntu-24.04-arm`, native.
+    `ubuntu-26.04` and `ubuntu-26.04-arm`, native.
   - A pull that fails on transport (DNS, a timeout, a 5xx) is reported
     as an infrastructure error, the way 10 10.1 treats a failed mise
     download: a red job with its own exit code, never a skip, and a
@@ -2672,7 +2685,6 @@ for the task that has the context to make it.
 | Deferred | Until then | Reopened by |
 |---|---|---|
 | splitting this page into one file per phase | one page, maintained by pull requests | the page passes 3 000 lines, or two open pull requests conflict on it twice |
-| the label of the Intel macOS runner | none chosen | T002, which verifies that the label exists and reports `x86_64` (10 10.2) |
 | the frontend milestone, the workload digest and the herdr version | none chosen | T012, which writes the pin file |
 | whether agents push from a second account | the sandbox's fine-grained token (Q25) | the output of block O1, item d |
 | the `apply` tag of `secrets` | recreate-class (Q18) | the A10 result, in T026 |
