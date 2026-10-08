@@ -275,3 +275,4 @@ or error messages.
 | spool | a project's agent-writable directory where julieta writes events until romeu ingests them | - |
 | ingest | romeu reads one project's spool and creates ledger entries | - |
 | ledger view | a project's read-only directory that romeu derives from the runtime ledger | - |
+| pin freshness | whether each tool pin of [12 12.1](12-engineering.md#121-tech-stack) is the newest published version of its tool; `tools/ci pins` reports it. Not the freshness of a `mise.lock`, which `julieta lock --check` verifies against `mise.toml` (07 7.3) | - |

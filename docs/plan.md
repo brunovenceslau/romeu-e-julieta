@@ -287,11 +287,12 @@ needs the probe that read it run again.
 **The rule for `gh` and every pinned tool** (12 12.1). Each tool pin is
 an exact version with a sha256 per architecture, never "latest", and
 a pin-freshness check reports each pin for which a newer version is
-published. The rows above already have that form, except the two
-whose form 12 12.1 keeps (`govulncheck` and `reuse`). T088
-builds the check: it is the last task that adds a tool pin, so every
-pin exists when it lands. The check reads the network and runs by
-hand; its scheduled run is a
+published. The tool rows above already have that form, except the two
+whose form 12 12.1 keeps (`govulncheck` and `reuse`); 12 12.1 holds
+the one list of tool pins. T088 builds the check, `tools/ci pins`: it
+is the last task that adds a tool pin, so every pin exists when it
+lands. The check reads the network and runs by hand; its scheduled
+run is a
 [deferred decision](spec.md#deferred-decisions).
 
 ## Phases and checkpoints
@@ -2309,7 +2310,7 @@ blocks" for what may start early.
 
 - [ ] Merged
 - Module: `ci-release`. Implements: 10 10.2 ("Release and bootstrap"),
-  12 12.6, 12 12.1, 02 2.1 (Embedding), S1.
+  12 12.6, 12 12.1, 02 2.1 (Embedding), S1, 10 10.2 (`tools/ci pins`).
 - Depends on: T079, T081, T087. Operator: no. Ask-first: `release`,
   `dependencies`, `checks`.
 - Acceptance:
@@ -2328,15 +2329,26 @@ blocks" for what may start early.
     tag, which the tag ruleset lets nobody retry under the same name, is
     not their first run.
   - `release.yml` passes `tools/ci workflows`.
-  - A read-only pin-freshness check (12 12.1) lists each tool pin
-    (the tools of `mise.lock`, `mise` and `herdr` in the pin file, and
-    the `reuse` image) with the newest published version, and marks
-    each pin a newer version exists for; it is tested against
-    a recorded API fixture, and run once by hand on the real releases
-    before this task merges.
+  - `gh` enters `mise.toml` at the version `mise.lock` locks, with a
+    sha256 for each of the four platforms, and the lint row of 10 10.2
+    admits it.
+  - `tools/ci pins` reports the pin freshness of each tool pin in the
+    list of [12 12.1](spec/12-engineering.md#121-tech-stack), with the
+    columns pin, source, pinned, newest and status, the rules of that
+    section for "newest" and the status, GET requests only and no
+    credential. Its tests run against a recorded fixture that covers
+    each source kind of that list, with one row each for a pin behind,
+    current and ahead; an API error, reported as `unknown`; a
+    prerelease and a draft newer than the pin, which do not mark it; a
+    tag that is not a version; and a tag with control characters,
+    printed through `termsafe`. They show that each file that holds
+    a pin of that list is byte-identical after a run, and that `all` does not start the
+    check. It is run once by hand on the real releases before this
+    task merges, and its output is in the pull request body.
 - Verify: `go test ./tools/release/...`, which lists the per-subcommand
-  tests by name; `go run ./tools/release build --version v1.0.0
-  --dry-run`.
+  tests by name; `go test ./tools/ci/... -run '^TestPins'`, which lists
+  the tests by name; `go run ./tools/release build --version v1.0.0
+  --dry-run`; `go run ./tools/ci pins`.
 
 #### T089 - `tools/ci dora`
 
@@ -2687,8 +2699,7 @@ helper command; an explicit registry credential (Q23).
 **Designed and not built** (06 6.6): the publishing path for kits.
 
 **Deferred decisions** (index, [Deferred decisions](spec.md#deferred-decisions)).
-The table has 28 rows at the commit this plan was written from. Each
-has what holds until then and the event that reopens it; the table is
+Each row has what holds until then and the event that reopens it; the table is
 the one place they are written, and this page does not copy them.
 Six rows meet a task of this plan:
 

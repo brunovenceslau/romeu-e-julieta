@@ -222,9 +222,13 @@ has one implementation.
   with Lstat, that it exists and is a directory. A root that is
   missing, a symlink or another file type fails that project's ingest
   (13.4) and nothing in it is read.
-- **Listing**: romeu reads at most the number of names in 13.8, sorts
-  them, and examines those. A spool that holds more names is reported
-  as `listing-truncated`. This bounds the work of one ingest whatever
+- **Listing**: romeu reads at most one name more than the bound in
+  13.8, sorts the names it read, and examines the first of them, up to
+  the bound; a name outside the layout counts toward it. When that one
+  extra name is read, the spool holds more names than the bound and is
+  reported as `listing-truncated`. The directory hands its names over
+  in the filesystem's order, so the names examined are the first in
+  name order of those read, not of the whole spool. This bounds the work of one ingest whatever
   the names are: a file that is skipped stays in the spool and would
   otherwise be read again by each ingest without limit.
 - **Reading one file**: opened once through the root, without
@@ -512,7 +516,7 @@ The hostile spool table (U; I32):
 |---|---|
 | a symlink, a FIFO, a directory, each named `<id>.json` | skip `type`; the FIFO does not block. A device node has the same outcome and needs root to create, so probe A3 plants it and no unit row does |
 | a dotfile; a name containing `..`; another extension; an uppercase `<id>` | skip `name` |
-| a name holding a newline, another control character or a bidi codepoint | skip `name`; the report prints the path escaped (I29) |
+| a valid-shaped `<id>.json` name with one added newline, control character (U+0001-U+001F, U+007F-U+009F) or bidi codepoint (the I29 set), one case per class | skip `name`; the report prints the path in `termsafe`'s escaped form (I29) |
 | two names that differ in case alone | the lowercase one has its own outcome; the uppercase one is skip `name` |
 | a valid event padded with whitespace to the size cap | entry |
 | the same, one byte over | skip `size` |
@@ -520,8 +524,8 @@ The hostile spool table (U; I32):
 | a file replaced by rename after the open, through the same hook | the outcome of the bytes of the file that was opened |
 | a file rewritten in place after the open, through the same hook | the outcome of the bytes read; the stored region hashes to the key |
 | more violations of one reason than the reporting limit | the exact count; the first paths in name order, up to the limit |
-| exactly as many names as the listing bound | each name is examined; no `listing-truncated` |
-| more names than the listing bound | `listing-truncated`; no more names than the bound were examined |
+| N names, where N is the listing bound of 13.8 read from its constant, some of them outside the layout | each name is examined, those outside the layout counted toward N; no `listing-truncated` |
+| N+1 names | `listing-truncated`; the first N in name order are examined, and no more |
 | a zero-byte file; a truncated document; invalid UTF-8; a byte-order mark; a duplicate key; a top-level array | rejected `event-syntax` |
 | no `schema`; a malformed `schema`; version N-2 | rejected `event-version`, one entry however often it is ingested |
 | version N+1, with and without a key N does not know | skip `version-newer`; no entry; ingested after the window moves |

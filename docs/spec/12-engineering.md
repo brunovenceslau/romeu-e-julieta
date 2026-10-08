@@ -52,20 +52,44 @@ operator's install-and-verify step (J1) also needs a `gh` that has the
 `attestation` command; a packaged `gh` may be older and lack it.
 romeu itself never starts `gh`.
 
-**Tool pins.** Each tool the product pins, `gh` among them, is held at
-an exact version, never at "latest" or a range, with a sha256 for each
-architecture it runs on: the four platforms of `mise.lock` for the
-tools of `mise.toml`, and the two linux architectures for `mise` and
-`herdr` in the `julieta` kit
-([06 6.4](06-kits.md#64-product-kits),
-[07 7.4](07-mise-egress.md#74-mise-bootstrap-and-its-own-egress)).
-Two pins keep the form stated above, since neither is one binary per
-architecture: `govulncheck`, built from source, and the `reuse` image,
-pinned by its digest. A pin-freshness check compares each of these
-pins with the published releases and reports each one for which a
-newer version exists. It changes no pin, so a bump stays a reviewed
-diff. It reads the network, so it is outside the offline `tools/ci
-all` and is run by hand; a scheduled run is a
+**Tool pins.** The product pins the tools of this table, and this is
+the one list of them. Each is held at an exact version, never at
+"latest" or a range, with a sha256 for each architecture it runs on,
+except where the form column says otherwise.
+
+| Tool | Where the pin lives | Form | Source of published versions |
+|---|---|---|---|
+| `go`, `golangci-lint`, `gh` | `mise.toml` and `mise.lock` | the version; a sha256 for each of the four platforms of `mise.lock` | the Go release list on go.dev for `go`; the GitHub releases of the tool for the other two |
+| `govulncheck` | `mise.toml` and `mise.lock` | the version, and no sha256: the mise `go` backend builds it from source, and its integrity rests on the Go checksum database (below) | the Go module proxy |
+| `mise` and `herdr` in the sandbox | the `julieta` kit, written by `tools/kitpin` ([06 6.4](06-kits.md#64-product-kits), [07 7.4](07-mise-egress.md#74-mise-bootstrap-and-its-own-egress)) | the version; a sha256 for each linux architecture | the GitHub releases of the tool |
+| `mise` on the CI runners | the matrix of `ci.yml` ([10 10.2](10-testing-style.md#102-ci)) | the version; a sha256 for each runner | the GitHub releases of mise |
+| `reuse` | `tools/ci` | the tag `6.2.0` and the digest of its image index, which names one manifest for linux/amd64 and one for linux/arm64 | the tags of the image in its registry |
+
+The checksum database guards `govulncheck` under a condition. `tools/ci
+setup` runs `mise install` in an environment built from nothing, so no
+`GO` variable of the caller reaches that build: not `GOSUMDB`,
+`GONOSUMDB` or `GOPRIVATE`, which turn the database off for a module,
+nor `GOINSECURE`, `GOPROXY` or `GOFLAGS`. It does not set `GOENV=off`
+for that command, so a `go env -w` file in the user's configuration
+directory still applies, and the guarantee holds when that file sets
+none of those variables. A `mise install` started by hand runs in the
+caller's environment and has neither property.
+
+**Pin freshness** ([01 1.7](01-system-model.md#17-vocabulary)) is
+whether each pin of the table is the newest published version of its
+tool. `go run ./tools/ci pins` reports it: for each pin, the pinned
+version, the newest one its source publishes, and one status,
+`behind`, `current`, `ahead` or `unknown`. The newest version is the
+highest in numeric order of major, minor and patch among the releases
+that are neither drafts nor prereleases; a tag that is not of that
+form after a leading `v` or `go` is not a version and changes no
+status. For the image the version is the tag's, never the digest. A
+source that cannot be read gives `unknown`, never `current`. The
+command sends GET requests only, with no credential, and writes no
+file, so a bump stays a reviewed diff. It is not a step of `all`: its
+result depends on what upstream published on the day it runs, and it
+gates no merge, so, like `links` and `dora`, it runs by hand (10
+10.2). A scheduled run is a
 [deferred decision](../spec.md#deferred-decisions).
 
 ## 12.2 Development commands and capability map
@@ -83,6 +107,7 @@ Fast:       go run ./tools/ci fast                  # what the pre-push hook run
 All checks: go run ./tools/ci all                   # what CI runs; CI adds the pr step on a pull request
 PR checks:  go run ./tools/ci pr <payload file>     # the pr step, on a saved pull request payload
 Metrics:    go run ./tools/ci dora [--out <file>]   # delivery metrics from GitHub data (12.10); needs the network
+Pins:       go run ./tools/ci pins                  # pin freshness of the tools of 12.1; needs the network
 Denylist:   go run ./tools/ci hygiene add           # maintainer only, in a terminal; reads one forbidden name, echo off
 Probes:     go run ./e2e/probes --block A --out docs/probes/
 Release:    go run ./tools/release build --version v1.0.0 --dry-run
