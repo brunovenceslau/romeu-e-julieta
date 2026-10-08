@@ -64,6 +64,87 @@ Stage B accepts that another session ticks checkboxes in `plan.md`
 while it runs; the baseline is a commit, and that column is the only
 expected conflict.
 
+### How stage A runs, and when the spec counts as validated
+
+1. **Baseline.** One commit of the default branch, read from a
+   detached clone outside the repository that nothing writes to. This
+   page is cited at its own commit.
+2. **Reading, in parallel.** L0 to L16, plus the noise probe: L2 and
+   L13 run twice, by independent reviewers, because they decide the
+   most and are the most expensive to get wrong. Every reviewer gets
+   the two-part brief above and writes its report as one JSON file in
+   a scratch directory, with the fields of "What a reviewer returns",
+   so the merge is mechanical.
+3. **Consolidation, one reviewer on the strongest tier.** Findings are
+   merged by section and defect, every lens that raised one kept on its
+   row; per lens, the `listed` to `own` ratio; the findings only L0
+   raised; the overlap of each noise-probe pair; and each finding
+   checked against the resolutions of the earlier rounds, because round
+   7 recorded a polish that reopened an escape an earlier round had
+   closed. The output is the draft of the round page, in the shape of
+   [round-7.md](round-7.md): one row per finding with a proposed
+   resolution and its status (A, M or L).
+4. **One decision block.** Everything the consolidation cannot decide
+   goes to the operator at once, each item with a recommendation: a
+   Blocking or Required finding that changes a decision record, an
+   accepted risk or the scope. Advisory findings are applied by
+   default.
+5. **One write pass, one pull request**: the corrected spec and the
+   round page, with the approval line of every ask-first surface the
+   diff touches. A large diff is split by page across worktrees with
+   disjoint file sets and lands as one pull request.
+6. **A targeted re-audit** (the next round number): only the lenses
+   whose findings drove the delta, reading only the sections the write
+   pass changed; clean verdicts are carried forward.
+
+The spec is validated for the plan tasks that follow when all of these
+hold, and the round page says so in one line with the numbers:
+
+- no Blocking finding open; every Required finding fixed, or declined
+  with the operator's words quoted next to the rationale;
+- every report has its coverage table complete, and every page,
+  criterion and journey has a finding or an explicit "nothing for this
+  lens" from at least two lenses;
+- every open question and deferred decision of the index has a valid
+  shape: a trigger, and what holds until it fires;
+- the three measurements are recorded: the `listed` to `own` ratio per
+  lens, the count of findings only L0 raised, the overlap of each
+  noise-probe pair. They decide which lenses are rewritten before stage
+  B;
+- the targeted re-audit raises no new Required finding.
+
+### From stage A to stage B
+
+Three artifacts leave stage A and are the input of stage B:
+
+1. the round page: findings, resolutions, measurements;
+2. the list of sections the write pass changed, by number as the spec
+   cites itself ("04 4.3");
+3. the delta to the plan: for each changed section, the tasks whose
+   "Implements" field cites it. It is a search of `plan.md` for the
+   section numbers, and it says which of the tasks must be read again.
+   It joins the pending `tools/lenses` command.
+
+Stage B's reviewers receive the three artifacts in part two of their
+brief, after their own read of the plan, for the reason the brief
+section gives. Stage B judges the plan by criteria of its own, derived
+from what the plan says of itself ("How to read this plan") and from
+the rules of the spec that govern it (12 12.2, 12 12.9, 10 10.8). The
+candidates, each checkable, written in the form of this page before B
+runs:
+
+- a task is implementable from its own text by someone who did not
+  write the plan, and its Verify line runs without the author;
+- traceability both ways: every section of the spec has a task, every
+  task has a section, and the counts the page keeps by hand are true;
+- "Depends on" is minimal and true, and each task has a file set, so
+  the parallel-execution lens can draw the real critical path;
+- one task is one pull request, and its ask-first forecast is right;
+- the operator blocks are as few as the spec allows, and the plan says
+  what proceeds around each;
+- "What v1 leaves out" agrees with 00 0.3, and every question to the
+  maintainer is answered or routed to stage C.
+
 ### The brief, in order
 
 The order matters as much as the content; the next section says why.
