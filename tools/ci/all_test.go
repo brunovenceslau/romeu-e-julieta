@@ -156,7 +156,11 @@ func TestWorkflowsCommand(t *testing.T) {
 // proxy too, and the license step those of the Docker daemon, and no
 // other step keeps either.
 func TestAllSteps(t *testing.T) {
+	root := newTree(t).Dir
+	gitPath, err := exec.LookPath("git")
+	require.NoError(t, err)
 	f := newFakeMise(t)
+	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.bin, "git")))
 	goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
 	linter := f.tool(t, "golangci-lint", "2.14.0", "golangci-lint")
 	vuln := f.tool(t, execTools["govulncheck"], "1.8.0", "bin", "govulncheck")
@@ -166,7 +170,8 @@ func TestAllSteps(t *testing.T) {
 		t.Setenv(key, "from-the-process")
 	}
 
-	root := t.TempDir()
+	common, err := gitCommonDir(t.Context(), root)
+	require.NoError(t, err)
 	tools := lintTools{linter: linter, goDir: filepath.Dir(goCmd)}
 	env := stepEnv(tools.goDir)
 	steps := allSteps(t.Context(), root, tools, "/tmp/p/cover.out")
@@ -177,7 +182,7 @@ func TestAllSteps(t *testing.T) {
 	vulnStep, race, license := steps[len(fast)], steps[len(fast)+1], steps[len(fast)+2]
 	assert.Equal(t, step{name: "vulnerabilities", argv: []string{"mise", "exec", "--", "govulncheck", "./..."}, environ: withProcessEnv(env, networkPassThrough)}, vulnStep)
 	assert.Equal(t, step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=/tmp/p/cover.out", "./..."}, environ: env}, race)
-	assert.Equal(t, licenseStep(root, runtime.GOOS, withProcessEnv(env, dockerPassThrough)), license)
+	assert.Equal(t, licenseStep(root, common, runtime.GOOS, withProcessEnv(env, dockerPassThrough)), license)
 
 	keys := func(s step) []string {
 		var out []string
@@ -239,18 +244,23 @@ func TestLicenseStep(t *testing.T) {
 		name: "license",
 		argv: []string{"docker", "run", "--rm", "--network", "none",
 			"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--user", "65534",
-			"--env", "GIT_CONFIG_COUNT=1", "--env", "GIT_CONFIG_KEY_0=safe.directory", "--env", "GIT_CONFIG_VALUE_0=/data",
-			"--mount", "type=bind,source=/src/repo,target=/data,readonly",
+			"--env", "GIT_CONFIG_COUNT=2",
+			"--env", "GIT_CONFIG_KEY_0=safe.directory", "--env", "GIT_CONFIG_VALUE_0=/src/repo",
+			"--env", "GIT_CONFIG_KEY_1=safe.directory", "--env", "GIT_CONFIG_VALUE_1=/src/main/.git",
+			"--mount", "type=bind,source=/src/repo,target=/src/repo,readonly",
+			"--mount", "type=bind,source=/src/main/.git,target=/src/main/.git,readonly",
+			"--workdir", "/src/repo",
 			"fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e7662577c8427429e11e1b9f25a992e", "lint"},
 		environ: env,
-	}, licenseStep("/src/repo", "linux", env))
+	}, licenseStep("/src/repo", "/src/main/.git", "linux", env))
 	assert.Regexp(t, `@sha256:[0-9a-f]{64}$`, reuseImage)
 
-	darwin := licenseStep("/src/repo", "darwin", env)
+	darwin := licenseStep("/src/repo", "/src/repo/.git", "darwin", env)
 	assert.Equal(t, "not run on darwin: reuse runs from a Linux container image; the hosted Linux runners run it", darwin.skip)
 	assert.Empty(t, darwin.argv, "nothing is started")
 
-	require.Error(t, licenseStep("/src/a,b", "linux", env).unavailable, "a path the mount option cannot name")
+	require.Error(t, licenseStep("/src/a,b", "/src/a,b/.git", "linux", env).unavailable, "a path the mount option cannot name")
+	require.Error(t, licenseStep("/src/a", "/src/b=c/.git", "linux", env).unavailable, "a git directory the mount option cannot name")
 
 	var out bytes.Buffer
 	c := newChecks(&out)
@@ -348,7 +358,7 @@ func TestSetup(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(goCmd), 0o755))
 	require.NoError(t, os.WriteFile(goCmd, []byte("#!/bin/sh\necho \"go $* GOPROXY=${GOPROXY-unset} GOFLAGS=$GOFLAGS HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '"+log+"'\n"), 0o700))
 	linter := f.tool(t, "golangci-lint", "2.14.0", "golangci-lint")
-	script := "#!/bin/sh\nif [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset}\" >> '" + log + "'\n"
+	script := "#!/bin/sh\nif [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '" + log + "'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
 	t.Setenv("HTTPS_PROXY", "http://proxy.invalid")
 	t.Setenv("DOCKER_HOST", "unix:///nowhere")
@@ -362,8 +372,8 @@ func TestSetup(t *testing.T) {
 	require.NoError(t, err)
 	root, err := filepath.EvalSymlinks(r.Dir)
 	require.NoError(t, err)
-	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset\n"+
-		"mise install HTTPS_PROXY=http://proxy.invalid\n"+
+	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset DOCKER_HOST=unset\n"+
+		"mise install HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n"+
 		"go mod download GOPROXY=unset GOFLAGS=-mod=readonly HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n", string(data))
 
 	t.Run("a failing mise stops before the download", func(t *testing.T) {
@@ -373,4 +383,19 @@ func TestSetup(t *testing.T) {
 		assert.Contains(t, out, "FAIL  mise trust")
 		assert.NotContains(t, out, "go mod download")
 	})
+}
+
+// TestPassThroughLists pins the two lists of variables a step may keep
+// from the process, and the way withProcessEnv adds them: in the order
+// of the list, a variable that is empty or unset left out.
+func TestPassThroughLists(t *testing.T) {
+	assert.Equal(t, []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}, networkPassThrough)
+	assert.Equal(t, []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"}, dockerPassThrough)
+
+	t.Setenv("DOCKER_HOST", "unix:///a")
+	t.Setenv("DOCKER_CONTEXT", "")
+	t.Setenv("DOCKER_CONFIG", "/c")
+	base := []string{"PATH=/x"}
+	assert.Equal(t, []string{"PATH=/x", "DOCKER_HOST=unix:///a", "DOCKER_CONFIG=/c"}, withProcessEnv(base, dockerPassThrough), "an empty variable is left out")
+	assert.Equal(t, []string{"PATH=/x"}, base, "the base is not changed")
 }

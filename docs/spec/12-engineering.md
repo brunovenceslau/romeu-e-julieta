@@ -499,7 +499,7 @@ change and counts in no metric.
 **Where the numbers live.** In two places, and in no tracked file:
 
 - Each release carries them. `release.yml` runs
-  `go run ./tools/ci dora --attach "$TAG"` as its last step, after
+  `go run ./tools/ci dora --attach "$GITHUB_REF_NAME"` as its last step, after
   `tools/release publish`; the tool computes the output and uploads it
   to that release as the asset `dora.json`, replacing one that is
   there. So each release holds the whole history up to itself, written

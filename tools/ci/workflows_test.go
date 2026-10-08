@@ -44,7 +44,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-26.04
-            sum: aa
+            mise_sha256: aa
     steps:
       - name: Check out
         uses: actions/checkout@` + sha + `
@@ -52,7 +52,7 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action/sub/path@` + sha + `
         with:
-          sha256: ${{ matrix.sum }}
+          sha256: ${{ matrix.mise_sha256 }}
       - name: All checks
         run: go run ./tools/ci all
       - run: go run ./tools/release notes --tag "$GITHUB_REF_NAME" --out=notes.md
@@ -100,7 +100,7 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"an env on a run step: PATH", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        env:\n          PATH: /tmp\n", `"env" is outside the grammar of a run step`},
 		{"an env on a job", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    env:\n      BASH_ENV: /tmp/x\n", `"env" is outside the grammar of a job`},
 		{"an input checkout does not take here", "          persist-credentials: false\n", "          persist-credentials: false\n          fetch-depth: 0\n", `the input "fetch-depth" is not one this repository uses for actions/checkout`},
-		{"an input mise-action does not take here", "          sha256: ${{ matrix.sum }}\n", "          sha256: ${{ matrix.sum }}\n          install_args: x\n", `the input "install_args" is not one this repository uses for jdx/mise-action`},
+		{"an input mise-action does not take here", "          sha256: ${{ matrix.mise_sha256 }}\n", "          sha256: ${{ matrix.mise_sha256 }}\n          install_args: x\n", `the input "install_args" is not one this repository uses for jdx/mise-action`},
 		{"an input of an action not listed", "uses: jdx/mise-action/sub/path@", "uses: owner/repo/sub/path@", `the input "sha256" is not one this repository uses for owner/repo`},
 		{"a with on a run step", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        with:\n          a: b\n", `"with" is outside the grammar of a run step`},
 		{"a step with uses and run", "          persist-credentials: false\n", "          persist-credentials: false\n        run: go run ./tools/ci all\n", `"run" is outside the grammar of a uses step`},
@@ -126,6 +126,25 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a self-hosted runs-on", "runs-on: ${{ matrix.os }}", "runs-on: self-hosted", "never *-latest"},
 		{"a self-hosted runs-on list", "runs-on: ${{ matrix.os }}", "runs-on: [self-hosted]", "never *-latest"},
 		{"a runs-on with a pinned label", "runs-on: ${{ matrix.os }}", "runs-on: macos-26-intel", ""},
+		{"a matrix key in capitals", "      matrix:\n", "      matrix:\n        OS: [self-hosted]\n", `the matrix key "OS" is outside the grammar`},
+		{"a matrix key of another kind", "      matrix:\n", "      matrix:\n        node: [1]\n", `the matrix key "node" is outside the grammar`},
+		{"an include key in mixed case", "            mise_sha256: aa\n", "            mise_sha256: aa\n            Os: self-hosted\n", `the include key "Os" is outside the grammar`},
+		{"an include key of another kind", "            mise_sha256: aa\n", "            mise_sha256: aa\n            sum: bb\n", `the include key "sum" is outside the grammar`},
+		{"a matrix that is an expression", "      matrix:\n        include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n", "      matrix: ${{ github.event.inputs.m }}\n", "a matrix is a written mapping"},
+		{"an include that is an expression", "        include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n", "        include: ${{ github.event.inputs.m }}\n", "include is a written list"},
+		{"a matrix without os", "          - os: ubuntu-26.04\n            mise_sha256: aa\n", "          - mise_sha256: aa\n", "the matrix names os"},
+		{"a with that is a scalar", "        with:\n          persist-credentials: false\n", "        with: x\n", "with is a mapping"},
+		{"a with that is a list", "        with:\n          persist-credentials: false\n", "        with: [ref]\n", "with is a mapping"},
+		{"a uses with a path that starts with a dot", "uses: actions/checkout@" + sha, "uses: ./x@sha", "40-hex commit SHA"},
+		{"a uses that is a root path", "uses: actions/checkout@" + sha, "uses: /x@" + sha, "40-hex commit SHA"},
+		{"a uses with a parent as repository", "uses: actions/checkout@" + sha, "uses: owner/..@" + sha, "40-hex commit SHA"},
+		{"a uses with an empty path segment", "uses: actions/checkout@" + sha, "uses: actions/checkout/@" + sha, "40-hex commit SHA"},
+		{"a uses with a 41-hex ref", "uses: actions/checkout@" + sha, "uses: actions/checkout@" + sha + "a", "40-hex commit SHA"},
+		{"a comment after the SHA", "uses: actions/checkout@" + sha, "uses: actions/checkout@" + sha + " # v6", ""},
+		{"a uses with a word after the SHA", "uses: actions/checkout@" + sha, "uses: \"actions/checkout@" + sha + " x\"", "40-hex commit SHA"},
+		{"a runs-on with a larger macos image", "runs-on: ${{ matrix.os }}", "runs-on: macos-26-xlarge", "never *-latest"},
+		{"a runs-on with a windows image", "runs-on: ${{ matrix.os }}", "runs-on: windows-2025", "never *-latest"},
+		{"a runs-on with a prefix before the name", "runs-on: ${{ matrix.os }}", "runs-on: x-ubuntu-22.04", "never *-latest"},
 		{"an anchor", "permissions:\n  contents: read\nconcurrency", "permissions: &p\n  contents: read\nconcurrency", "an anchor or an alias"},
 		{"a merge key where keys are free", "  contents: read\nconcurrency", "  contents: read\n  <<: {a: b}\nconcurrency", `the tag "!!merge"`},
 		{"a custom tag", "    timeout-minutes: 60\n", "    timeout-minutes: !custom 60\n", `the tag "!custom"`},

@@ -39,7 +39,9 @@ const (
 //     read from a variable), and an env table, whose keys could make a
 //     tools/ci run start other code (BASH_ENV, LD_PRELOAD, PATH,
 //     GOFLAGS=-toolexec). An action takes only the with keys listed
-//     for it (actionInputs).
+//     for it (actionInputs). A matrix is a written mapping of the keys
+//     os and include, and an include entry holds os and mise_sha256
+//     only, so the label a job runs on is always one that is checked.
 //  2. A file that reads as one thing and runs as another: an anchor,
 //     an alias, a merge key, a tag YAML does not resolve on its own, a
 //     key written twice, and a second document.
@@ -281,6 +283,7 @@ func (c *grammar) job(n *yaml.Node) {
 		c.add(n, "a job is a mapping")
 		return
 	}
+	osKnown := false
 	for key, value := range pairs(n) {
 		switch key.Value {
 		case "runs-on":
@@ -288,10 +291,7 @@ func (c *grammar) job(n *yaml.Node) {
 				c.add(value, "runs-on is "+matrixRunner+" or a pinned GitHub-hosted label such as ubuntu-26.04, never *-latest")
 			}
 		case "strategy":
-			c.matrixLabels(field(field(value, "matrix"), "os"))
-			for _, entry := range seqContent(field(field(value, "matrix"), "include")) {
-				c.matrixLabels(field(entry, "os"))
-			}
+			osKnown = c.matrix(field(value, "matrix"))
 		case "steps":
 			c.steps(value)
 		}
@@ -299,6 +299,59 @@ func (c *grammar) job(n *yaml.Node) {
 			c.add(key, "the key "+strconv.Quote(key.Value)+" is outside the grammar of a job")
 		}
 	}
+	if runsOn := field(n, "runs-on"); runsOn != nil && runsOn.Value == matrixRunner && !osKnown {
+		c.add(runsOn, "runs-on is "+matrixRunner+", so the matrix names os, in every include entry or as a key")
+	}
+}
+
+// matrixKeys and includeKeys are the only keys a matrix and an entry of
+// its include may hold, matched exactly: the runner label is read from
+// os alone, so a key that differs in case from it (OS) is no label.
+var (
+	matrixKeys  = []string{"os", "include"}
+	includeKeys = []string{"os", "mise_sha256"}
+)
+
+// matrix checks a job's matrix: a written mapping of the matrixKeys,
+// never an expression that computes one, with the runner labels of os
+// and of each include entry checked. It reports whether every runner
+// the matrix makes has an os.
+func (c *grammar) matrix(n *yaml.Node) bool {
+	if n == nil {
+		return false
+	}
+	if n.Kind != yaml.MappingNode {
+		c.add(n, "a matrix is a written mapping, not an expression")
+		return true
+	}
+	osNode := field(n, "os")
+	c.matrixLabels(osNode)
+	for key := range pairs(n) {
+		if !slices.Contains(matrixKeys, key.Value) {
+			c.add(key, "the matrix key "+strconv.Quote(key.Value)+" is outside the grammar: os and include")
+		}
+	}
+	include := field(n, "include")
+	if include != nil && include.Kind != yaml.SequenceNode {
+		c.add(include, "include is a written list, not an expression")
+		return true
+	}
+	every := include != nil && len(include.Content) > 0
+	for _, entry := range seqContent(include) {
+		if entry.Kind != yaml.MappingNode {
+			c.add(entry, "an include entry is a mapping")
+			every = false
+			continue
+		}
+		for key := range pairs(entry) {
+			if !slices.Contains(includeKeys, key.Value) {
+				c.add(key, "the include key "+strconv.Quote(key.Value)+" is outside the grammar: os and mise_sha256")
+			}
+		}
+		c.matrixLabels(field(entry, "os"))
+		every = every && field(entry, "os") != nil
+	}
+	return osNode != nil || every
 }
 
 // matrixLabels checks the runner labels of a matrix's os key, one
@@ -359,7 +412,9 @@ func (c *grammar) step(n *yaml.Node) {
 				c.add(value, "uses names <owner>/<repo>[/<path>]@<a 40-hex commit SHA>")
 			}
 		case "with":
-			if uses := field(n, "uses"); uses.Kind == yaml.ScalarNode && usesForm.MatchString(uses.Value) {
+			if value.Kind != yaml.MappingNode {
+				c.add(value, "with is a mapping")
+			} else if uses := field(n, "uses"); uses.Kind == yaml.ScalarNode && usesForm.MatchString(uses.Value) {
 				c.inputs(uses, value)
 			}
 		case "run":

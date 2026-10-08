@@ -12,6 +12,8 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 )
 
 // coverFile is the name of the cover profile the race step writes, in
@@ -51,6 +53,7 @@ const reuseImage = "fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e76
 // holds. A tool that is not found fails its step and no other.
 func allSteps(ctx context.Context, root string, tools lintTools, profile string) []step {
 	env := stepEnv(tools.goDir)
+	gitCommon, gitErr := gitCommonDir(ctx, root)
 	viaMise := func(name, tool string, args ...string) step {
 		s := step{name: name, argv: append([]string{"mise", "exec", "--", tool}, args...), environ: withProcessEnv(env, networkPassThrough)}
 		if _, err := whichPinned(ctx, root, tool, execTools[tool]); err != nil {
@@ -59,35 +62,55 @@ func allSteps(ctx context.Context, root string, tools lintTools, profile string)
 		return s
 	}
 	goCmd := filepath.Join(tools.goDir, "go")
+	license := licenseStep(root, gitCommon, runtime.GOOS, withProcessEnv(env, dockerPassThrough))
+	if gitErr != nil && license.skip == "" {
+		license.unavailable = gitErr
+	}
 	return append(fastSteps(root, tools),
 		viaMise("vulnerabilities", "govulncheck", "./..."),
 		step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env},
-		licenseStep(root, runtime.GOOS, withProcessEnv(env, dockerPassThrough)),
+		license,
 	)
+}
+
+// gitCommonDir returns the absolute path of the git directory that
+// holds the repository's objects and configuration: root/.git in a
+// clone, and the main clone's .git in a linked worktree.
+func gitCommonDir(ctx context.Context, root string) (string, error) {
+	out, err := git.Repo{Dir: root}.Run(ctx, nil, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(string(out), "\n"), nil
 }
 
 // licenseStep runs "reuse lint" (REUSE 3.3, S11) from reuseImage on
 // linux, the platform its image is built for, with the working tree
-// mounted read-only and no network for the container. The container
-// runs as the user nobody (65534), with no capability, no way to gain
-// privileges, and a read-only root file system. Its git is told that
-// /data is safe: the tree belongs to another user, and without it git
-// refuses the repository and reuse reads ignored files too (measured
-// with reuse 6.2.0: an ignored file without a header then fails). On another
-// platform it is not run, and all says so in its output with a "--"
-// line instead of "ok": the check reads file content only, which is
-// the same on every platform, and the Linux runners of the same commit
-// run it.
+// and the git directory mounted read-only, each at its own path, and no
+// network for the container. The container runs as the user nobody
+// (65534), with no capability, no way to gain privileges, and a
+// read-only root file system. Its git is told that both paths are safe:
+// the tree belongs to another user, and without it git refuses the
+// repository and reuse reads ignored files too (measured with reuse
+// 6.2.0: an ignored file without a header then fails). The git
+// directory is mounted because a linked worktree's ".git" file points
+// to it, outside the tree: without it git fails the same way, and a
+// worktree is where agents work (measured with reuse 6.2.0: an ignored
+// file without a header failed there). In a clone it lies inside the
+// tree, and the second mount repeats a part of the first. On another
+// platform the step is not run, and all says so in its output with a
+// "--" line instead of "ok": the check reads file content only, which
+// is the same on every platform, and the Linux runners of the same
+// commit run it.
 //
 // Threat model of the step. The image is named by its digest, so the
 // code that runs is the code that was reviewed, whatever the tag points
-// at later. The container reads the tree through a read-only mount, so
-// it cannot change what the other checks read, and it has no network,
-// so it can neither fetch code nor send the tree anywhere. The code
-// inside the image is out of scope, as the code of a pinned action is:
-// the review of the pin covers it. In a linked worktree, whose git
-// directory is outside the mount, reuse reads ignored files as well.
-func licenseStep(root, goos string, env []string) step {
+// at later. The container reads the tree and the git directory through
+// read-only mounts, so it cannot change what the other checks read, and
+// it has no network, so it can neither fetch code nor send what it
+// reads anywhere. The code inside the image is out of scope, as the
+// code of a pinned action is: the review of the pin covers it.
+func licenseStep(root, gitCommon, goos string, env []string) step {
 	s := step{name: "license"}
 	if goos != "linux" {
 		s.skip = "not run on " + goos + ": reuse runs from a Linux container image; the hosted Linux runners run it"
@@ -95,11 +118,17 @@ func licenseStep(root, goos string, env []string) step {
 	}
 	s.argv = []string{"docker", "run", "--rm", "--network", "none",
 		"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--user", "65534",
-		"--env", "GIT_CONFIG_COUNT=1", "--env", "GIT_CONFIG_KEY_0=safe.directory", "--env", "GIT_CONFIG_VALUE_0=/data",
-		"--mount", "type=bind,source=" + root + ",target=/data,readonly", reuseImage, "lint"}
+		"--env", "GIT_CONFIG_COUNT=2",
+		"--env", "GIT_CONFIG_KEY_0=safe.directory", "--env", "GIT_CONFIG_VALUE_0=" + root,
+		"--env", "GIT_CONFIG_KEY_1=safe.directory", "--env", "GIT_CONFIG_VALUE_1=" + gitCommon,
+		"--mount", "type=bind,source=" + root + ",target=" + root + ",readonly",
+		"--mount", "type=bind,source=" + gitCommon + ",target=" + gitCommon + ",readonly",
+		"--workdir", root, reuseImage, "lint"}
 	s.environ = env
-	if strings.ContainsAny(root, ",=") {
-		s.unavailable = fmt.Errorf("the working tree's path holds \",\" or \"=\", which the bind mount of the license step cannot name: %s", root)
+	for _, path := range []string{root, gitCommon} {
+		if strings.ContainsAny(path, ",=") {
+			s.unavailable = fmt.Errorf("a path holds \",\" or \"=\", which the bind mount of the license step cannot name: %s", path)
+		}
 	}
 	return s
 }

@@ -84,8 +84,8 @@ does a file in that directory with another name ending:
 | Level | Allowed |
 |---|---|
 | file | the keys `name`, `on`, `permissions`, `concurrency`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters |
-| job | the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `runs-on` is `${{ matrix.os }}` or a pinned GitHub-hosted label (`ubuntu-<version>` or `macos-<version>`, with an optional `-arm` or `-intel`), and so is each `os` of the matrix |
-| `uses` step | the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, each name starting with a letter or a digit, so no path of the repository (a local action) fits; `with` holds only the inputs listed for that action in `tools/ci` |
+| job | the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `runs-on` is `${{ matrix.os }}` or a pinned GitHub-hosted label (`ubuntu-<version>` or `macos-<version>`, with an optional `-arm` or `-intel`), and so is each `os` of the matrix; the matrix is a written mapping with the keys `os` and `include` only, each `include` entry holds `os` and `mise_sha256` only (names matched exactly), and an expression there fails; with `runs-on: ${{ matrix.os }}` every runner of the matrix names an `os` |
+| `uses` step | the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, each name starting with a letter or a digit, so no path of the repository (a local action) fits; `with` is a mapping that holds only the inputs listed for that action in `tools/ci` |
 | `run` step | the keys `name`, `run`; `run` is one line, `go run ./tools/ci <subcommand> [<argument>...]` or `go run ./tools/release <subcommand> [<argument>...]`; each word is made of ASCII letters, digits and `._/=:-`, or is `"$NAME"` |
 
 So a workflow has no `if`, no `continue-on-error`, no `shell`, no
@@ -119,7 +119,7 @@ Three consequences of the grammar:
 - The grammar bounds keys, `run` lines, runner labels, the inputs of
   each action and expressions, not each value: the scopes under
   `permissions`, the owner of a `uses` action, the filters under `on`,
-  the rest of `strategy`, and the values of the listed `with` inputs
+  the rest of `strategy` (outside `matrix`), and the values of the listed `with` inputs
   are free. They are reviewed, not checked:
   `.github/workflows/**` is an ask-first surface (05 5.3).
 
@@ -175,7 +175,7 @@ local-gate run is recorded is a
 | kits | `tools/ci kits` (one frontend pin; install steps <= 5 lines; every download has a sha256: a download is a step line whose first word is `curl` or `wget`, and the same step has a `sha256sum -c` or `shasum -a 256 -c` line after it; a download line holds no `\|`, `;`, `&&` or `$(`, and the file `-c` reads is a kit file, not one the step downloaded. A download written with another tool is not seen by the check; the review of the `kits` surface covers it) | |
 | mise | `tools/ci mise` (`julieta lock --check` logic on this repo's and the examples' locks) | |
 | probes | `tools/ci probes` (11 11.4: the results that are committed, and the A5 golden hashes; that every probe has a result is checked by `acceptance`, 10.5) | |
-| license | `reuse lint` (REUSE 3.3), from the image `fsfe/reuse:6.2.0` pinned by digest in `tools/ci`, with the working tree mounted read-only and no network for the container; on Linux only, since the check reads file content alone and the image is built for Linux. On macOS the output of `all` shows `--    license: not run on darwin`, neither `ok` nor `FAIL` | |
+| license | `reuse lint` (REUSE 3.3), from the image `fsfe/reuse:6.2.0` pinned by digest in `tools/ci`, with the working tree and the git directory (`git rev-parse --git-common-dir`) mounted read-only, each at its own path, and no network for the container, so that a linked worktree, whose git directory lies outside the tree, ignores the same files as a clone; on Linux only, since the check reads file content alone and the image is built for Linux. On macOS the output of `all` shows `--    license: not run on darwin`, neither `ok` nor `FAIL` | |
 | docs | `tools/ci docs` (S10; the checks ADR 0001 assigns to it: rules 1, 5 without external URLs, 9 for the title at a first mention, 12, 13, 17, 20). The Markdown lint and the spell check of rule 5 check nothing until their tools are picked, a [deferred decision](../spec.md#deferred-decisions). The reference pages are compared with their source by `generated`, not here | |
 | lessons | `tools/ci lessons`: every `docs/lessons.md` entry, read after the file's front matter, names an existing `tools/ci` subcommand or test name, or says "no check possible: <reason>" | |
 | pr | `tools/ci pr` (pull requests only; inputs as described above; 12 12.4; ADR 0001 rules 4, 8, 11; the base branch, 12 12.9; the fix marker's form, 12 12.10; the forbidden-name check, below) | |
@@ -441,7 +441,7 @@ writes the archives and `checksums.txt`;
 notes (12 12.6); `tools/release publish` creates the GitHub release,
 published and never a draft, and marks it a prerelease when the tag
 has a suffix after the patch number (`v1.0.0-rc.1`);
-`tools/ci dora --attach "$TAG"` adds the delivery metrics to it
+`tools/ci dora --attach "$GITHUB_REF_NAME"` adds the delivery metrics to it
 (12 12.10), with the tag read from the runner's `"$GITHUB_REF_NAME"`.
 The attestation is a `uses` step and each of the others is one `run`
 step, so the file passes `tools/ci workflows`. `tools/ci acceptance`
