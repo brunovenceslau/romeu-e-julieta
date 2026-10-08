@@ -52,6 +52,84 @@ operator's install-and-verify step (J1) also needs a `gh` that has the
 `attestation` command; a packaged `gh` may be older and lack it.
 romeu itself never starts `gh`.
 
+**Tool pins.** The product pins the tools of this table, and this is
+the one list of them. Each is held at an exact version, never at
+"latest" or a range, with a sha256 for each architecture it runs on,
+except where the form column says otherwise.
+
+| Tool | Where the pin lives | Form | Source of published versions |
+|---|---|---|---|
+| `go`, `golangci-lint`, `gh` | `mise.toml` and `mise.lock` | the version; a sha256 for each of the four platforms of `mise.lock` | the Go release list for `go`; the GitHub releases of the tool for the other two |
+| `govulncheck` | `mise.toml` and `mise.lock` | the version, and no sha256: the mise `go` backend builds it from source, and its integrity rests on the Go checksum database (below) | the Go module proxy |
+| `mise` and `herdr` in the sandbox | the `julieta` kit, written by `tools/kitpin` ([06 6.4](06-kits.md#64-product-kits), [07 7.4](07-mise-egress.md#74-mise-bootstrap-and-its-own-egress)) | the version; a sha256 for each linux architecture | the GitHub releases of the tool |
+| `mise` on the CI runners | the mise step of `ci.yml` ([10 10.2](10-testing-style.md#102-ci)) | the version in `with`; a sha256 per runner in the matrix | the GitHub releases of mise |
+| `reuse` | `tools/ci` | the tag `6.2.0` and the digest of its image index, which names one manifest for linux/amd64 and one for linux/arm64 | the tags of the image on Docker Hub |
+
+Each source is read through one endpoint, whole:
+
+- the Go release list: `https://go.dev/dl/?mode=json&include=all`,
+  one response; a release whose `stable` is false is a prerelease;
+- GitHub releases: `GET /repos/<owner>/<repo>/releases` on
+  `api.github.com`, every page, following the `Link` header; each
+  release carries `draft` and `prerelease`;
+- the Go module proxy: `https://proxy.golang.org/<module>/@v/list`, one
+  response that lists every version;
+- Docker Hub: `https://hub.docker.com/v2/repositories/<namespace>/<name>/tags`,
+  every page, following `next`. The registry's own tag list asks for a
+  token even for a public image; this endpoint does not.
+
+A source without a prerelease flag (the module proxy, Docker Hub)
+counts a version with a `-` suffix as a prerelease.
+
+The checksum database guards `govulncheck` under a condition, on the
+install that builds it. In hosted CI that is the mise action's step of
+`ci.yml`, which runs before `tools/ci setup`, so `setup` finds the
+tools installed; it runs in the runner's environment, and the
+guarantee rests on that environment setting none of the variables
+below. On a developer machine it is `tools/ci setup`, which runs `mise
+install` in an environment built from nothing, so no `GO` variable of
+the caller reaches it: not `GOSUMDB`, `GONOSUMDB` or `GOPRIVATE`, which
+turn the database off for a module, nor `GOINSECURE`, `GOPROXY`,
+`GOFLAGS`, `GOTOOLCHAIN` or `GOVCS`. Three inputs still reach both
+installs, so the guarantee holds when none of them changes the build:
+a `go env -w` file in the user's configuration directory, since
+neither install sets `GOENV=off` (`GOENV=off` and `GOTOOLCHAIN=local`
+are set only for the go steps of `tools/ci`, through `stepEnv`, never
+for an install); a mise configuration other than the
+project's `mise.toml`, such as a global one whose `[env]` table sets
+`GOFLAGS` or `GOPROXY`, since `HOME` and `MISE_CONFIG_DIR` pass
+through; and a module cache seeded beforehand, since `GOPATH` and
+`GOMODCACHE` pass through. A `mise install` started by hand runs in
+the caller's environment and has none of these properties.
+
+**Pin freshness** ([01 1.7](01-system-model.md#17-vocabulary)) is
+whether each pin of the table is the newest published version of its
+tool. `go run ./tools/ci pins` reports it.
+
+- **Versions.** The pinned version and each published one are read
+  the same way: after a leading `v` or `go`, `major.minor.patch`, with
+  an optional `-` suffix, compared in numeric order. So `v1.8.0` and
+  `1.8.0` are equal. A published tag that does not parse is not a
+  version and changes no status.
+- **Newest** is the highest version among the releases that are
+  neither drafts nor prereleases. For the image the version is the
+  tag's, never the digest.
+- **Status**, lowercase: `behind` when the pin is lower than the
+  newest, `current` when equal, `ahead` when higher, and `unknown`
+  when the pin does not parse or its source cannot be read whole. An
+  unread source is never `current`.
+- **Output**: plain text, one line per pin in the order of the table,
+  with the columns pin, source, pinned, newest and status. The command
+  exits 0 whatever the statuses, and non-zero only on a usage or
+  internal error.
+- **Reach**: GET requests only, with no credential, and no file
+  written, so a bump stays a reviewed diff.
+
+It is not a step of `all`: its result depends on what upstream
+published on the day it runs, and it gates no merge, so, like `links`
+and `dora`, it runs by hand (10 10.2). A scheduled run is a
+[deferred decision](../spec.md#deferred-decisions).
+
 ## 12.2 Development commands and capability map
 
 ```
@@ -67,6 +145,7 @@ Fast:       go run ./tools/ci fast                  # what the pre-push hook run
 All checks: go run ./tools/ci all                   # what CI runs; CI adds the pr step on a pull request
 PR checks:  go run ./tools/ci pr <payload file>     # the pr step, on a saved pull request payload
 Metrics:    go run ./tools/ci dora [--out <file>]   # delivery metrics from GitHub data (12.10); needs the network
+Pins:       go run ./tools/ci pins                  # pin freshness of the tools of 12.1; needs the network
 Denylist:   go run ./tools/ci hygiene add           # maintainer only, in a terminal; reads one forbidden name, echo off
 Probes:     go run ./e2e/probes --block A --out docs/probes/
 Release:    go run ./tools/release build --version v1.0.0 --dry-run

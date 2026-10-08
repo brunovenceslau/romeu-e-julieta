@@ -269,7 +269,7 @@ task lands it.
 | Go | version in `mise.toml`, locked in `mise.lock` | 12 12.1, 02 2.1 | T001 |
 | `golangci-lint`, `govulncheck` | `mise.lock`; `govulncheck` and `golangci-lint` run from the paths `mise which` resolves, at the version `mise.lock` locks; the `govulncheck` lock entry has no checksum (it rests on the Go checksum database) | 12 12.1, 10 10.2 | T001, T002 |
 | `reuse` | the container image `fsfe/reuse:6.2.0@sha256:<digest>` in `tools/ci`, run on Linux only | 12 12.1, 10 10.2 | T002 |
-| `gh`, for `tools/release verify` | `mise.lock`, started through `mise exec` | 12 12.1, 10 10.2 | T088 |
+| `gh`, for `tools/release verify` | an exact version in `mise.toml`, with a sha256 per platform in `mise.lock`; started through `mise exec` | 12 12.1, 10 10.2 | T088 |
 | GitHub Actions | `uses` with a 40-hex commit SHA | 10 10.2 | T002, T088 |
 | mise on the CI runners | one `uses` step with a 40-hex commit SHA, the mise version and its sha256 in `with`; Go and the other tools come from `mise.lock` through it | 10 10.2 | T002 |
 | Go dependencies | `go.mod`, `go.sum`; the complete v1 list is in 12 12.1 | 12 12.1 | first use |
@@ -284,14 +284,16 @@ the kits. They live in one file, written by `tools/kitpin`, so what
 block A probed is what the kits use. A pin that changes after block O3
 needs the probe that read it run again.
 
-**The rule for `gh`.** A rule this plan considered is: `gh` is pinned
-to an exact release with a sha256 per architecture, never to a floating
-latest, and a freshness check compares the pin with the latest release.
-The first two parts follow from 12 12.1 and 02 2.1: `gh` is "pinned in
-`mise.lock`", and that lock covers four platforms. The freshness check
-is not in the specification, and by the rule under
-[What v1 leaves out](#what-v1-leaves-out) it enters through a change to
-the specification first. No task here carries it; it is question 13.
+**The rule for `gh` and every pinned tool** (12 12.1). Each tool pin is
+an exact version with a sha256 per architecture, never "latest", and
+a pin-freshness check reports each pin for which a newer version is
+published. The tool rows above already have that form, except the two
+whose form 12 12.1 keeps (`govulncheck` and `reuse`); 12 12.1 holds
+the one list of tool pins. T088 builds the check, `tools/ci pins`: it
+is the last task that adds a tool pin, so every pin exists when it
+lands. The check reads the network and runs by hand; its scheduled
+run is a
+[deferred decision](spec.md#deferred-decisions).
 
 ## Phases and checkpoints
 
@@ -1777,7 +1779,8 @@ blocks" for what may start early.
   `checks`.
 - Acceptance:
   - The hostile spool table of 13 13.10 passes row by row, with the
-    `afterOpen` hook and an injected version table (I32).
+    `afterOpen` and `listNames` hooks and an injected version table
+    (I32).
   - The entries table of 13 13.10 passes, the racing ingests without the
     lock included (I31).
   - The I16 scan fails a fixture of `internal/ledger` with each call 13
@@ -2308,7 +2311,7 @@ blocks" for what may start early.
 
 - [ ] Merged
 - Module: `ci-release`. Implements: 10 10.2 ("Release and bootstrap"),
-  12 12.6, 12 12.1, 02 2.1 (Embedding), S1.
+  12 12.6, 12 12.1, 02 2.1 (Embedding), S1, 10 10.2 (`tools/ci pins`).
 - Depends on: T079, T081, T087. Operator: no. Ask-first: `release`,
   `dependencies`, `checks`.
 - Acceptance:
@@ -2327,9 +2330,36 @@ blocks" for what may start early.
     tag, which the tag ruleset lets nobody retry under the same name, is
     not their first run.
   - `release.yml` passes `tools/ci workflows`.
+  - `gh` enters `mise.toml` at the version `mise.lock` locks, with a
+    sha256 for each of the four platforms, and the lint row of 10 10.2
+    admits it.
+  - `tools/ci pins` reports the pin freshness of each tool pin in the
+    list of [12 12.1](spec/12-engineering.md#121-tech-stack), by the
+    rules of that section: its sources and endpoints, every page read,
+    the version parse, "newest", the lowercase status, plain text with
+    one line per pin in table order, and exit 0 whatever the statuses,
+    non-zero only on a usage or internal error.
+  - Its requests are GET over HTTPS only, to a fixed list of hosts (the
+    sources of 12 12.1: `go.dev`, `api.github.com`,
+    `proxy.golang.org`, `hub.docker.com`), each with a body-size cap
+    and a timeout, and none carries an `Authorization` header.
+  - Its tests use one fixture per source, with rows for a pin behind,
+    current and ahead; an API error, reported as `unknown`; a pin that
+    does not parse, reported as `unknown`; a pin and a release equal
+    but for a leading `v`, reported as `current`; a prerelease and a
+    draft newer than the pin, and a suffixed version on a source with
+    no prerelease flag, none of which marks it; a tag that is not a
+    version; a tag with control characters, printed through
+    `termsafe`; and, for the GitHub releases and the image tags, the
+    newest release on the second page. They show that each file that
+    holds a pin of that list is byte-identical after a run, and that
+    `all` does not start the check. It is run once by hand on the real
+    releases before this task merges, and its output is in the pull
+    request body.
 - Verify: `go test ./tools/release/...`, which lists the per-subcommand
-  tests by name; `go run ./tools/release build --version v1.0.0
-  --dry-run`.
+  tests by name; `go test ./tools/ci/... -run '^TestPins'`, which lists
+  the tests by name; `go run ./tools/release build --version v1.0.0
+  --dry-run`; `go run ./tools/ci pins`.
 
 #### T089 - `tools/ci dora`
 
@@ -2680,16 +2710,17 @@ helper command; an explicit registry credential (Q23).
 **Designed and not built** (06 6.6): the publishing path for kits.
 
 **Deferred decisions** (index, [Deferred decisions](spec.md#deferred-decisions)).
-The table has 28 rows at the commit this plan was written from. Each
-has what holds until then and the event that reopens it; the table is
-the one place they are written, and this page does not copy them.
-Five rows meet a task of this plan:
+Each row has what holds until then and the event that reopens it;
+the table is the one place they are written, and this page does not
+copy them.
+Six rows meet a task of this plan:
 
 | Row | Task | What happens there |
 |---|---|---|
 | which Markdown linter and spell checker `tools/ci docs` runs | T085 | the row's event is that pull request, which picks both |
 | generating part of the spell-check word list from the vocabulary table | T085 | the list's format and path are fixed there; the generation stays deferred |
 | a scheduled workflow that checks external links | T102 | a dead link in that run reopens it |
+| a scheduled run of the pin-freshness check | T088 | the task builds the check and runs it once by hand |
 | tuning the ledger's starting values | T064 | the plan may tune them (13 13.8) and keeps the proposed defaults |
 | how a local-gate run is recorded | each task | reopened the first time the maintainer chooses the local gates for a merge (10 10.2) |
 
@@ -2893,6 +2924,9 @@ the first task that waits for the answer.
    Recommendation: The rule needs a change to the specification first,
    by the rule under "What v1 leaves out". Until then the release task
    builds what 12 12.1 says and carries no freshness criterion.
+   Answered (2026-10-08): the rule is in 12 12.1, the specification
+   change it needed; T088 builds the freshness check, and its scheduled
+   run is a deferred decision.
 
 **The other gaps.** No task waits on these; the reading is in the last
 column.
