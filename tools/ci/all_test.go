@@ -505,7 +505,7 @@ func TestAllWiring(t *testing.T) {
 			}
 		}
 	}
-	want := []string{"gofmt -l", "go vet", "lint run", "lint run", "lint run", "lint run", "go test", "govulncheck ./...", "go test"}
+	want := []string{"gofmt -l", "go vet", "go run", "lint run", "lint run", "lint run", "lint run", "go test", "govulncheck ./...", "go test"}
 	if runtime.GOOS == "linux" {
 		want = append(want, "docker run")
 	}

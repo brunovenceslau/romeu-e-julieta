@@ -14,6 +14,8 @@
 //	go run ./tools/ci hygiene                 the hygiene rules over the tree at HEAD
 //	go run ./tools/ci hygiene --file <path>   the name matcher over one file
 //	go run ./tools/ci hygiene add             add a denylist entry, from a terminal
+//	go run ./tools/ci generated               go generate ./... changes no generated file
+//	go run ./tools/ci generate                write the generated files (what go generate runs)
 //
 // It exits 0 when every check passes, 1 when a check fails, and 2 when
 // it could not run a check at all. Started through "go run", every
@@ -49,6 +51,8 @@ const usage = `usage:
   go run ./tools/ci workflows
   go run ./tools/ci hygiene [--file <path>]
   go run ./tools/ci hygiene add
+  go run ./tools/ci generated
+  go run ./tools/ci generate
 `
 
 // env is what a run reads and writes. Tests fill it with a fixture;
@@ -105,6 +109,10 @@ func run(ctx context.Context, e env, args []string) int {
 		ok, err = runWorkflows(ctx, e, args[1:])
 	case "hygiene":
 		ok, err = runHygiene(ctx, e, args[1:])
+	case "generated":
+		ok, err = runGenerated(ctx, e, args[1:])
+	case "generate":
+		ok, err = runGenerate(ctx, e, args[1:])
 	default:
 		err = fmt.Errorf("unknown subcommand %q\n%s", args[0], usage)
 	}

@@ -13,6 +13,8 @@ path = [
     "docs/**",
     ".adr-dir",
     ".githooks/pre-push",
+    ".github/CODEOWNERS",
+    ".github/pull_request_template.md",
     "go.mod",
     "go.sum",
     "mise.lock",

@@ -49,8 +49,8 @@ type step struct {
 }
 
 // fastSteps returns the command steps of fast, from the In fast column
-// of 10 10.2: format, vet, lint (once per lintTargets) and unit. The
-// other rows of that column join with the code they check.
+// of 10 10.2: format, vet, generated, lint (once per lintTargets) and
+// unit. The other rows of that column join with the code they check.
 //
 // Every step runs a pinned tool by its path: gofmt and go from the
 // directory of the go command that mise resolves, and the golangci-lint
@@ -81,6 +81,7 @@ func fastSteps(root string, tools lintTools) []step {
 	steps := []step{
 		{name: "format", argv: []string{filepath.Join(tools.goDir, "gofmt"), "-l", "."}, quiet: true, environ: stepEnv(tools.goDir)},
 		{name: "vet", argv: []string{goCmd, "vet", "./..."}, environ: stepEnv(tools.goDir)},
+		{name: "generated", argv: []string{goCmd, "run", "./tools/ci", "generated"}, environ: stepEnv(tools.goDir)},
 	}
 	for _, target := range lintTargets {
 		steps = append(steps, step{
