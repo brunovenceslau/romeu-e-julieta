@@ -401,15 +401,17 @@ func TestAllArchitectureTranslated(t *testing.T) {
 }
 
 // TestProcTranslated is false off macOS, where there is no such key,
-// and on macOS it is what sysctl says.
+// and on macOS it is what sysctl says. An Intel Mac has no such key
+// either (measured on the macos-26-intel runner), so a sysctl error
+// means "not translated".
 func TestProcTranslated(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		assert.False(t, procTranslated(t.Context()))
 		return
 	}
 	out, err := exec.CommandContext(t.Context(), "sysctl", "-n", "sysctl.proc_translated").Output()
-	require.NoError(t, err)
-	assert.Equal(t, strings.TrimSpace(string(out)) == "1", procTranslated(t.Context()))
+	want := err == nil && strings.TrimSpace(string(out)) == "1"
+	assert.Equal(t, want, procTranslated(t.Context()))
 }
 
 // TestLicenseStep pins the license step: reuse from the image pinned
