@@ -105,12 +105,15 @@ func TestReferencePage(t *testing.T) {
 // the committed consumers are what it produces, so a hand edit of either
 // fails here before it fails "generated".
 func TestAskFirstOfThisRepository(t *testing.T) {
-	root := moduleRoot(t)
+	dir := moduleRoot(t)
+	root, err := os.OpenRoot(dir)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = root.Close() })
 	outputs, err := generateOutputs(root)
 	require.NoError(t, err)
 	require.Len(t, outputs, 3)
 	for _, out := range outputs {
-		got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(out.path)))
+		got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(out.path)))
 		require.NoError(t, err, out.path)
 		assert.Equal(t, string(out.content), string(got), "%s is current", out.path)
 	}
@@ -127,4 +130,41 @@ func TestPullRequestTemplate(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{"Why", "What changed", "Evidence", "Middleware", "Lessons"}, got)
+}
+
+// specAskFirstList returns the YAML fence under "5.3 Ask-first surfaces"
+// in the security chapter of the specification: the first fence after
+// that heading and before the next one.
+func specAskFirstList(t *testing.T) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(moduleRoot(t), "docs", "spec", "05-security.md"))
+	require.NoError(t, err)
+	_, section, found := strings.Cut(string(b), "\n## 5.3 Ask-first surfaces\n")
+	require.True(t, found, "the heading of 5.3")
+	if end := strings.Index(section, "\n## "); end >= 0 {
+		section = section[:end]
+	}
+	_, fence, found := strings.Cut(section, "\n```yaml\n")
+	require.True(t, found, "a yaml fence under 5.3")
+	list, _, found := strings.Cut(fence, "\n```\n")
+	require.True(t, found, "the fence ends")
+	return list + "\n"
+}
+
+// TestSpecListIsTheCommittedList checks that the list that 05 5.3 shows
+// and .github/ask-first.yaml say the same: the same surfaces, in the
+// same order, with the same globs and reasons. The spec writes the owner
+// as the placeholder "@<owner>" (the module path's owner, 02 2.1), so
+// the committed owner stands in for it. Two copies of a list drift
+// unless a test holds them together.
+func TestSpecListIsTheCommittedList(t *testing.T) {
+	committed, err := os.ReadFile(filepath.Join(moduleRoot(t), filepath.FromSlash(askFirstPath)))
+	require.NoError(t, err)
+	want, err := parseAskFirst(committed)
+	require.NoError(t, err)
+	fence := specAskFirstList(t)
+	require.Contains(t, fence, `owner: "@<owner>"`, "the spec names the owner by its placeholder")
+	got, err := parseAskFirst([]byte(strings.Replace(fence, "@<owner>", want.Owner, 1)))
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
 }

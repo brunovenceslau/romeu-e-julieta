@@ -168,8 +168,9 @@ not a permanent state.
    order. Alternatives go in `### Alternatives considered` inside
    Context. The title matches the filename through one function: the
    filename is `NNNN-` plus `slug(Title)`, where `slug` lowercases the
-   title, turns each run of characters other than ASCII letters and
-   digits into one hyphen, and trims hyphens from both ends.
+   ASCII letters of the title, turns each run of characters other than
+   ASCII letters and digits into one hyphen, and trims hyphens from
+   both ends.
    `tools/new adr` takes the title and writes the number, the date, the
    title line and the filename (12 12.3), so nobody types them, and
    `tools/ci sequences` calls the same `slug`, which lives under

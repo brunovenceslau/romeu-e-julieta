@@ -99,9 +99,9 @@ func TestUsage(t *testing.T) {
 func TestOutsideARepository(t *testing.T) {
 	r := &gittest.Repo{}
 	r.Dir = t.TempDir()
-	// The ceiling keeps git from finding a repository above the
+	// Env's ceiling keeps git from finding a repository above the
 	// temporary directory, when TMPDIR is inside a working tree.
-	r.Env = append(gittest.Env(t), "GIT_CEILING_DIRECTORIES="+filepath.Dir(r.Dir))
+	r.Env = gittest.Env(t)
 	for _, args := range [][]string{{"hygiene"}, {"fast"}} {
 		code, out := runCI(t, r, nil, nil, args...)
 		assert.Equal(t, exitError, code, "%v: exit status\n%s", args, out)

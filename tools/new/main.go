@@ -21,12 +21,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/adrdir"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/slug"
 )
@@ -41,16 +41,12 @@ const usage = `usage:
   go run ./tools/new adr <title>
 `
 
-// adrDirFile names, relative to the repository root, the file that says
-// where the decision records live (rule 6 of ADR 0001).
-const adrDirFile = ".adr-dir"
-
 // env is what a run reads and writes. Tests fill it with a fixture and a
 // fixed clock; main fills it with the process's own.
 type env struct {
 	dir    string           // where the command was started
 	gitEnv []string         // the environment of git; nil means this process's
-	now    func() time.Time // the clock: the only source of the date
+	now    func() time.Time // the clock: the only source of the date; main's is time.Now, so the date is the local day
 	stdout io.Writer
 	stderr io.Writer
 }
@@ -86,14 +82,14 @@ func say(w io.Writer, format string, args ...any) {
 	_, _ = fmt.Fprintf(w, format, args...)
 }
 
-// adrFile matches the name of a decision record: four digits, a
-// hyphen, and the rest.
-var adrFile = regexp.MustCompile(`^(\d{4})-.+\.md$`)
-
 // newADR writes the next decision record, with the layout of rule 6 of
 // ADR 0001: the title line, the date from the clock, and the four
 // sections, with the status Proposed. The file is created and never
-// overwritten, so a name that exists is an error.
+// overwritten, so a name that exists is an error. It reads and writes
+// through the root of the repository, so a symbolic link cannot send it
+// outside. Two runs that take the same number at once each see the
+// other's file after they create their own, and both remove theirs and
+// fail: the number is unique or nothing is written.
 func newADR(e env, args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("adr takes the title as one argument\n%s", usage)
@@ -106,75 +102,113 @@ func newADR(e env, args []string) error {
 	if name == "" {
 		return fmt.Errorf("the title %q has no ASCII letter or digit, so its filename would be empty", title)
 	}
-	root, err := repoRoot(e)
+	top, err := repoRoot(e)
 	if err != nil {
 		return err
 	}
-	dirBytes, err := os.ReadFile(filepath.Join(root, adrDirFile))
+	root, err := os.OpenRoot(top)
 	if err != nil {
 		return err
 	}
-	rel := strings.TrimSpace(string(dirBytes))
-	if !filepath.IsLocal(rel) {
-		return fmt.Errorf("%s names %q, which is not a directory inside the repository", adrDirFile, rel)
-	}
-	dir := filepath.Join(root, rel)
-	n, err := nextNumber(dir)
+	defer func() { _ = root.Close() }()
+	rel, err := adrdir.Dir(root)
 	if err != nil {
 		return err
+	}
+	byNumber, err := recordsByNumber(root, rel)
+	if err != nil {
+		return err
+	}
+	n := nextNumber(byNumber)
+	if n > adrdir.MaxNumber {
+		return fmt.Errorf("%s holds record %04d, the last number a filename has room for", rel, adrdir.MaxNumber)
 	}
 	file := fmt.Sprintf("%04d-%s.md", n, name)
+	path := filepath.Join(rel, file)
 	body := fmt.Sprintf("# %d. %s\n\nDate: %s\n\n## Status\n\nProposed\n\n## Context\n\n## Decision\n\n## Consequences\n",
 		n, title, e.now().Format(time.DateOnly))
-	f, err := os.OpenFile(filepath.Join(dir, file), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err := create(root, path, body); err != nil {
+		return err
+	}
+	after, err := recordsByNumber(root, rel)
+	if err == nil && len(after[n]) > 1 {
+		err = fmt.Errorf("another record took number %04d at the same time (%s); run the command again", n, strings.Join(after[n], ", "))
+	}
+	if err != nil {
+		// Not ours to keep: the number is not unique, or not known to be.
+		if rmErr := root.Remove(path); rmErr != nil {
+			err = errors.Join(err, rmErr)
+		}
+		return err
+	}
+	say(e.stdout, "%s\n", filepath.ToSlash(path))
+	return nil
+}
+
+// create writes content to a new file at path below root, and removes
+// the file when the write fails. A file that exists is an error.
+func create(root *os.Root, path, content string) error {
+	f, err := root.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		return err
 	}
-	if _, err := f.WriteString(body); err != nil {
-		_ = f.Close()
-		return err
+	_, err = f.WriteString(content)
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
 	}
-	if err := f.Close(); err != nil {
-		return err
+	if err != nil {
+		return errors.Join(err, root.Remove(path))
 	}
-	say(e.stdout, "%s\n", filepath.ToSlash(filepath.Join(rel, file)))
 	return nil
 }
 
 // checkTitle refuses a title that cannot be the first line of a record:
-// one with a control character, a line break included.
+// one with a control character (a line break included), or with a
+// character that moves or hides text where it is shown, such as a
+// right-to-left override, a zero-width space or a line separator.
 func checkTitle(title string) error {
 	if title == "" {
 		return errors.New("the title is empty")
 	}
 	for _, r := range title {
-		if unicode.IsControl(r) {
-			return fmt.Errorf("the title %q holds a control character", title)
+		if unicode.IsControl(r) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp) {
+			return fmt.Errorf("the title %q holds a control or invisible character (%U)", title, r)
 		}
 	}
 	return nil
 }
 
-// nextNumber returns one more than the highest number among the records
-// in dir, and 1 for a directory with none.
-func nextNumber(dir string) (int, error) {
-	entries, err := os.ReadDir(dir)
+// recordsByNumber maps each record number in the directory rel below
+// root to the filenames that carry it. A directory with a record's name
+// is not a record.
+func recordsByNumber(root *os.Root, rel string) (map[int][]string, error) {
+	entries, err := fs.ReadDir(root.FS(), filepath.ToSlash(rel))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	highest := 0
+	byNumber := map[int][]string{}
 	for _, entry := range entries {
-		m := adrFile.FindStringSubmatch(entry.Name())
+		m := adrdir.Name.FindStringSubmatch(entry.Name())
 		if m == nil || entry.Type()&fs.ModeDir != 0 {
 			continue
 		}
 		n, err := strconv.Atoi(m[1])
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
+		byNumber[n] = append(byNumber[n], entry.Name())
+	}
+	return byNumber, nil
+}
+
+// nextNumber returns one more than the highest number of the records,
+// and 1 when there are none.
+func nextNumber(byNumber map[int][]string) int {
+	highest := 0
+	for n := range byNumber {
 		highest = max(highest, n)
 	}
-	return highest + 1, nil
+	return highest + 1
 }
 
 // repoRoot returns the top of the working tree the command runs in.

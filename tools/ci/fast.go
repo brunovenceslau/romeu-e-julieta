@@ -49,8 +49,8 @@ type step struct {
 }
 
 // fastSteps returns the command steps of fast, from the In fast column
-// of 10 10.2: format, vet, generated, lint (once per lintTargets) and unit. The
-// other rows of that column join with the code they check.
+// of 10 10.2: format, vet, generated, lint (once per lintTargets) and
+// unit. The other rows of that column join with the code they check.
 //
 // Every step runs a pinned tool by its path: gofmt and go from the
 // directory of the go command that mise resolves, and the golangci-lint

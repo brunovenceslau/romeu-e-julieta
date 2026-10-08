@@ -27,11 +27,25 @@ type Repo struct {
 
 // Env returns the environment a fixture runs git with. The identities
 // and dates are fixed, so the same steps give the same commit ids.
+//
+// GIT_CEILING_DIRECTORIES names the directory that holds the temporary
+// directories of t, so git never looks above them for a repository. A
+// fixture that is not a repository (its .git removed, to test the
+// error) would otherwise find the work tree that TMPDIR may lie in, and
+// a tool under test would write there. The directory is listed as made
+// and with its symbolic links resolved, since git compares physical
+// paths.
 func Env(t testing.TB) []string {
 	t.Helper()
+	home := t.TempDir()
+	ceiling := filepath.Dir(home)
+	if resolved, err := filepath.EvalSymlinks(ceiling); err == nil && resolved != ceiling {
+		ceiling += string(os.PathListSeparator) + resolved
+	}
 	return []string{
 		"PATH=" + os.Getenv("PATH"),
-		"HOME=" + t.TempDir(),
+		"HOME=" + home,
+		"GIT_CEILING_DIRECTORIES=" + ceiling,
 		"GIT_CONFIG_GLOBAL=" + os.DevNull,
 		"GIT_CONFIG_NOSYSTEM=1",
 		"GIT_AUTHOR_NAME=Test Author",

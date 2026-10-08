@@ -422,7 +422,7 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
 
 #### T003 - The ask-first list, `tools/new adr` and `tools/ci generated`
 
-- [ ] Merged
+- [x] Merged
 - Module: `ci-bootstrap`. Implements: 05 5.3, 12 12.3, 10 10.2 (step 3;
   the `generated` step).
 - Depends on: T002, O2. Operator: no. Ask-first: none exists before this

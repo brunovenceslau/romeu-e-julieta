@@ -2,8 +2,8 @@
 
 # Decision records
 
-Each record holds one decision with its context and consequences. A record is never
-rewritten: a later one supersedes it. The layout and the statuses are the ones of rules 6 and 7 of
+Each record holds one decision with its context and consequences. A record changes only
+with the maintainer's approval; a reversal is a new record that supersedes it. The layout and the statuses are the ones of rules 6 and 7 of
 [ADR 0001, adopt a documentation standard with checkable rules and a voice](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md).
 
 | Number | Title | Status |

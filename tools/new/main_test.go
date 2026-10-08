@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -139,7 +140,15 @@ func TestNewADRRefuses(t *testing.T) {
 		{"no title", []string{"adr"}, nil, "adr takes the title as one argument"},
 		{"two arguments", []string{"adr", "a", "b"}, nil, "adr takes the title as one argument"},
 		{"an empty title", []string{"adr", "  "}, nil, "the title is empty"},
-		{"a line break in the title", []string{"adr", "a\nb"}, nil, "control character"},
+		{"a line break in the title", []string{"adr", "a\nb"}, nil, "control or invisible character (U+000A)"},
+		{"a right-to-left override in the title", []string{"adr", "Adopt \u202eX"}, nil, "invisible character (U+202E)"},
+		{"a zero-width space in the title", []string{"adr", "Adopt\u200bX"}, nil, "invisible character (U+200B)"},
+		{"a line separator in the title", []string{"adr", "Adopt\u2028X"}, nil, "invisible character (U+2028)"},
+		{"a paragraph separator in the title", []string{"adr", "Adopt\u2029X"}, nil, "invisible character (U+2029)"},
+		{"an .adr-dir that links outside the repository", []string{"adr", "T"}, func(t *testing.T, f fixture) {
+			require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(f.repo.Dir, "out")))
+			f.repo.Write(".adr-dir", "out\n")
+		}, "out"},
 		{"a title with no ASCII letter or digit", []string{"adr", "?!"}, nil, "filename would be empty"},
 		{"an unknown kind", []string{"rule", "x"}, nil, `unknown kind "rule"`},
 		{"no kind", nil, nil, "usage:"},
@@ -187,4 +196,58 @@ func TestNewADRNeverOverwrites(t *testing.T) {
 	assert.Equal(t, exitError, run(f.e, []string{"adr", "T"}))
 	assert.Equal(t, "mine\n", f.read(t, "docs/adr/0002-t.md"))
 	assert.Contains(t, f.stderr.String(), "file exists")
+}
+
+// TestNewADRWithAMixedTitle checks a title that holds letters outside
+// ASCII: they separate the words of the filename and stay in the heading.
+func TestNewADRWithAMixedTitle(t *testing.T) {
+	f := newFixture(t)
+	require.Equal(t, exitOK, run(f.e, []string{"adr", "Decis\u00e3o sobre X"}), f.stderr.String())
+	assert.Equal(t, "docs/adr/0001-decis-o-sobre-x.md\n", f.stdout.String())
+	assert.True(t, strings.HasPrefix(f.read(t, "docs/adr/0001-decis-o-sobre-x.md"), "# 1. Decis\u00e3o sobre X\n\nDate: 2026-10-08\n"))
+}
+
+// TestNewADRNumberCeiling checks the number 9999: a record may take it,
+// and the next one is refused, since a fifth digit would not match the
+// name of a record and the numbers would start again at 10000.
+func TestNewADRNumberCeiling(t *testing.T) {
+	f := newFixture(t, "9998-a.md")
+	require.Equal(t, exitOK, run(f.e, []string{"adr", "T"}), f.stderr.String())
+	assert.Equal(t, "docs/adr/9999-t.md\n", f.stdout.String())
+	f.stdout.Reset()
+	assert.Equal(t, exitError, run(f.e, []string{"adr", "U"}))
+	assert.Contains(t, f.stderr.String(), "last number a filename has room for")
+	assert.NoFileExists(t, filepath.Join(f.repo.Dir, "docs", "adr", "10000-u.md"))
+}
+
+// TestNewADRFailsOnADuplicateNumber checks the run that loses a race: a
+// second session creates a record with the same number between the scan
+// and the check after the write (the clock runs between the scan and the
+// create, so the test plants the other record there, under another name,
+// which O_EXCL cannot see). The run removes its own file and fails, and
+// the other record stays.
+func TestNewADRFailsOnADuplicateNumber(t *testing.T) {
+	f := newFixture(t, "0001-a.md")
+	f.e.now = func() time.Time {
+		f.repo.Write("docs/adr/0002-other.md", "other\n")
+		return fixedDay
+	}
+	assert.Equal(t, exitError, run(f.e, []string{"adr", "T"}))
+	assert.Contains(t, f.stderr.String(), "another record took number 0002")
+	assert.Empty(t, f.stdout.String())
+	assert.NoFileExists(t, filepath.Join(f.repo.Dir, "docs", "adr", "0002-t.md"))
+	assert.Equal(t, "other\n", f.read(t, "docs/adr/0002-other.md"))
+}
+
+// TestNewADRStaysInsideTheRepository checks that a record directory that
+// is a link to a directory outside the repository is not written to.
+func TestNewADRStaysInsideTheRepository(t *testing.T) {
+	f := newFixture(t)
+	outside := t.TempDir()
+	require.NoError(t, os.RemoveAll(filepath.Join(f.repo.Dir, "docs", "adr")))
+	require.NoError(t, os.Symlink(outside, filepath.Join(f.repo.Dir, "docs", "adr")))
+	assert.Equal(t, exitError, run(f.e, []string{"adr", "T"}))
+	entries, err := os.ReadDir(outside)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "nothing was written outside")
 }

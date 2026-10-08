@@ -22,9 +22,9 @@ func TestSlug(t *testing.T) {
 		{"trims both ends", "  --Decide now!?  ", "decide-now"},
 		{"digits stay", "Adopt six XP practices in 2026", "adopt-six-xp-practices-in-2026"},
 		{"punctuation inside a word separates", "Let the sandbox act as the maintainer on GitHub's side", "let-the-sandbox-act-as-the-maintainer-on-github-s-side"},
-		{"a letter outside ASCII is a separator", "Café e KK", "cafe-e-k"},
-		{"a multi-byte letter between words", "aéb", "a-b"},
-		{"nothing to keep", "!?- é", ""},
+		{"a letter outside ASCII is a separator (e with a combining accent, and the Kelvin sign)", "Cafe\u0301 e K\u212a", "cafe-e-k"},
+		{"a multi-byte letter between words", "a\u00e9b", "a-b"},
+		{"nothing to keep", "!?- \u00e9", ""},
 		{"empty", "", ""},
 		{"already a slug", "keep-it", "keep-it"},
 	}

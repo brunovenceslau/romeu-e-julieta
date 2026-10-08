@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/build"
 	"go/parser"
@@ -316,13 +317,57 @@ func TestLintConfigLowersNothing(t *testing.T) {
 	assert.Equal(t, []string{"exported", "error-strings"}, names, "the revive rules of ADR 0001, rule 14")
 }
 
-// allowedDirectives are the directives a comment of this repository
-// may hold, as "tool:name". go:build is the build constraint
-// (add_test.go), and go:generate is the one directive of generate.go,
-// which "go generate ./..." runs (12 12.3). Every other directive, of
-// any tool, is a decision to review here first, because the readers of
-// directives include the linters, and theirs turn findings off.
-var allowedDirectives = []string{"go:build", "go:generate"}
+// allowedDirectives are the directives a comment of any Go file of this
+// repository may hold, as "tool:name". go:build is the build
+// constraint (add_test.go). Every other directive, of any tool, is a
+// decision to review here first, because the readers of directives
+// include the linters, and theirs turn findings off.
+var allowedDirectives = []string{"go:build"}
+
+// generateDirective is the one go:generate directive of the repository
+// (12 12.3, 10 10.2), the site it stands at, and its exact text. "go
+// generate ./..." runs every such directive, with no sandbox, so a
+// second one anywhere would run under the "generated" step: only the
+// site below may hold one, and only this text.
+const (
+	generateSite      = "tools/ci/generate.go"
+	generateDirective = "go:generate go run . generate"
+)
+
+// generateDirectiveLines returns each line of a comment of src that
+// starts a go:generate directive, as directiveText reads it, so that
+// the test sees at least what "go generate" runs.
+func generateDirectiveLines(src []byte) ([]string, error) {
+	f, err := parser.ParseFile(token.NewFileSet(), "", src, parser.ParseComments|parser.SkipObjectResolution)
+	if err != nil {
+		return nil, err
+	}
+	var found []string
+	for _, group := range f.Comments {
+		for _, c := range group.List {
+			for line := range strings.SplitSeq(c.Text, "\n") {
+				if text := directiveText(line); strings.HasPrefix(text, "go:generate") {
+					found = append(found, strings.TrimRightFunc(text, unicode.IsSpace))
+				}
+			}
+		}
+	}
+	return found, nil
+}
+
+// checkGenerateSite returns what is wrong with the go:generate
+// directives of the file at generateSite: there must be exactly one,
+// with exactly the text of generateDirective.
+func checkGenerateSite(src []byte) (string, error) {
+	lines, err := generateDirectiveLines(src)
+	if err != nil {
+		return "", err
+	}
+	if len(lines) != 1 || lines[0] != generateDirective {
+		return fmt.Sprintf("holds %q, and the one directive of the repository is %q", lines, generateDirective), nil
+	}
+	return "", nil
+}
 
 // toolDirective matches the start of a directive of the "tool:name"
 // form after directiveText has normalised the line: the shape go/ast
@@ -520,6 +565,9 @@ func TestDisallowed(t *testing.T) {
 		{"clean", "//go:build linux\n\n// Package p is it.\npackage p\n", nil},
 		{"a nolint", "package p\n\nvar _ = 1 //" + nl + "\n", []string{"directive " + nl}},
 		{"revive after a form feed", "package p\n\n// Doc.\n// \f" + rv + "\nfunc F() {}\n", []string{"directive " + rv}},
+		{"a stray go:generate", "package p\n\n//go:generate echo hi\nvar _ = 1\n", []string{"directive go:generate"}},
+		{"go:embed", "package p\n\n//go:embed data.txt\nvar data string\n", []string{"directive go:embed"}},
+		{"go:linkname", "package p\n\n//go:linkname f runtime.f\nfunc f()\n", []string{"directive go:linkname"}},
 		{"generated", "// Code gener" + "ated by x. DO NOT ED" + "IT.\n\npackage p\n", []string{"a generated-code header"}},
 	}
 	for _, tt := range tests {
@@ -543,9 +591,44 @@ func TestOnlyAllowedDirectives(t *testing.T) {
 	files := repoFiles(t, root, "*.go")
 	require.NotEmpty(t, files, "the Go files of the repository")
 	for _, f := range files {
-		bad, err := disallowed(filepath.Join(root, f), allowedDirectives)
+		allowed := allowedDirectives
+		if f == generateSite {
+			allowed = append(slices.Clone(allowed), "go:generate")
+		}
+		bad, err := disallowed(filepath.Join(root, f), allowed)
 		require.NoError(t, err, "read %s", f)
 		assert.Empty(t, bad, "%s holds what makes the linters skip a finding", f)
+	}
+	src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(generateSite)))
+	require.NoError(t, err)
+	problem, err := checkGenerateSite(src)
+	require.NoError(t, err)
+	assert.Empty(t, problem, "%s", generateSite)
+}
+
+// TestCheckGenerateSite pins the rule of the one go:generate directive
+// on the forms that break it.
+func TestCheckGenerateSite(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		ok   bool
+	}{
+		{"the directive", "package p\n\n//go:generate go run . generate\n", true},
+		{"with trailing space", "package p\n\n//go:generate go run . generate \n", true},
+		{"none", "package p\n", false},
+		{"another command", "package p\n\n//go:generate go run . generated\n", false},
+		{"an added argument", "package p\n\n//go:generate go run . generate x\n", false},
+		{"twice", "package p\n\n//go:generate go run . generate\n//go:generate go run . generate\n", false},
+		{"a second command", "package p\n\n//go:generate go run . generate\n\n// A.\n//go:generate echo hi\n", false},
+		{"in a block comment", "package p\n\n/*\ngo:generate echo hi\n*/\n//go:generate go run . generate\n", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			problem, err := checkGenerateSite([]byte(tt.src))
+			require.NoError(t, err)
+			assert.Equal(t, tt.ok, problem == "", problem)
+		})
 	}
 }
 

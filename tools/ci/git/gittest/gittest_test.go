@@ -4,13 +4,16 @@
 package gittest_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 )
 
@@ -68,4 +71,24 @@ func TestEnv(t *testing.T) {
 	env := gittest.Env(t)
 	assert.Contains(t, env, "GIT_CONFIG_GLOBAL="+os.DevNull)
 	assert.Contains(t, env, "GIT_CONFIG_NOSYSTEM=1")
+}
+
+// TestEnvStopsGitAtTheTemporaryDirectories checks that a fixture that is
+// not a repository is not one by accident of where TMPDIR lies: with the
+// temporary directories inside a work tree, git run with Env finds no
+// repository above them, while git run without the ceiling does.
+func TestEnvStopsGitAtTheTemporaryDirectories(t *testing.T) {
+	outer := gittest.New(t)
+	t.Setenv("TMPDIR", outer.Dir) // before the first TempDir of the subtest
+	t.Run("inside", func(t *testing.T) {
+		env := gittest.Env(t)
+		dir := t.TempDir()
+		require.True(t, strings.HasPrefix(dir, outer.Dir), "the fixture directory lies in the outer work tree")
+		inner := git.Repo{Dir: dir, Env: env}
+		_, err := inner.Run(context.Background(), nil, "rev-parse", "--show-toplevel")
+		require.Error(t, err, "the ceiling hides the outer repository")
+		without := git.Repo{Dir: dir, Env: []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_GLOBAL=" + os.DevNull}}
+		_, err = without.Run(context.Background(), nil, "rev-parse", "--show-toplevel")
+		require.NoError(t, err, "without the ceiling git finds it, so the test above proves something")
+	})
 }

@@ -11,14 +11,14 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/adrdir"
 )
 
 // adrStatuses are the statuses of rule 7 of ADR 0001.
 var adrStatuses = []string{"Proposed", "Accepted", "Rejected", "Deprecated", "Superseded"}
 
 var (
-	// adrName is the filename of a record: NNNN, a hyphen, the slug.
-	adrName = regexp.MustCompile(`^(\d{4})-.+\.md$`)
 	// adrTitleLine is the first line of a record: "# N. Title".
 	adrTitleLine = regexp.MustCompile(`^# (\d+)\. (.+)$`)
 )
@@ -33,11 +33,14 @@ type adr struct {
 
 // parseADR reads the title line and the status of the record in
 // content. The number of the title line must be the one of the filename.
-// The status is the first word of the first line of the Status section;
-// a line that starts with "Superseded by" makes it Superseded, since
-// rule 7 adds that line to a record a later one replaces.
+// The status is the first word of the first line of the Status section,
+// so a note on that line ("Accepted, with a note") is an error: rule 7
+// puts a note on a line of its own. A line that starts with "Superseded
+// by" at the left margin makes it Superseded, since rule 7 adds that
+// line to a record a later one replaces; an indented one is part of a
+// quotation or a list and does not count.
 func parseADR(file string, content []byte) (adr, error) {
-	m := adrName.FindStringSubmatch(file)
+	m := adrdir.Name.FindStringSubmatch(file)
 	if m == nil {
 		return adr{}, fmt.Errorf("%s: the name is not NNNN-slug.md", file)
 	}
@@ -88,8 +91,8 @@ func adrIndex(records []adr) []byte {
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "<!-- %s -->\n\n", generatedNotice("the titles and statuses of the records in this directory"))
 	b.WriteString("# Decision records\n\n")
-	b.WriteString("Each record holds one decision with its context and consequences. A record is never\n")
-	b.WriteString("rewritten: a later one supersedes it. The layout and the statuses are the ones of rules 6 and 7 of\n")
+	b.WriteString("Each record holds one decision with its context and consequences. A record changes only\n")
+	b.WriteString("with the maintainer's approval; a reversal is a new record that supersedes it. The layout and the statuses are the ones of rules 6 and 7 of\n")
 	b.WriteString("[ADR 0001, adopt a documentation standard with checkable rules and a voice](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md).\n\n")
 	b.WriteString("| Number | Title | Status |\n|---|---|---|\n")
 	escape := strings.NewReplacer("|", `\|`, "[", `\[`, "]", `\]`)

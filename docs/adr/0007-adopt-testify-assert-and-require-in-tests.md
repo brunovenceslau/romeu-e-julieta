@@ -161,8 +161,11 @@ rules:
 8. **No finding is silenced.** The configuration disables no linter,
    lowers no setting and excludes no path, and no Go file has a
    generated-code header. A finding is fixed in the code. Directives
-   are held to an allowlist, which today is `go:build` alone: a comment
-   holds no other directive of the `tool:name` form (the shape of
+   are held to an allowlist, which today is `go:build`, and
+   `go:generate` at one site only: the one directive
+   `go:generate go run . generate` in `tools/ci/generate.go`, which
+   `go generate ./...` runs (12 12.3). A comment holds no other
+   directive of the `tool:name` form (the shape of
    `isDirective` in `go/ast`, which `nolint:`, `revive:disable` and
    `lint:ignore` have), read in every line of every comment after
    the leading `/`, `*` and white space (every rune of
