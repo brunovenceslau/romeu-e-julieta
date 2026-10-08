@@ -139,10 +139,11 @@ func licenseStep(root, gitCommon, goos string, env []string) step {
 	return s
 }
 
-// runAll runs every check of 10 10.2 that has code to check today, on
-// the working tree as it is: the command steps (allSteps), then
-// hygiene and workflows on HEAD, then coverage on the profile of the
-// race step. It is what the hosted workflow runs, and what a developer
+// runAll runs every check of 10 10.2 that has code to check today: the
+// command steps (allSteps) on the working tree as it is, then hygiene
+// and workflows on the commit HEAD names, read and judged before any
+// step starts (commitChecks, as in runFast), then coverage on the
+// profile of the race step. It is what the hosted workflow runs, and what a developer
 // runs before a pull request. The pr step joins with tools/ci pr.
 //
 // It first prints the platform it runs on, as the go command and "uname
@@ -159,6 +160,16 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	repo := e.repo()
 	repo.Dir = root
 	if err := nestedModules(ctx, repo); err != nil {
+		return false, err
+	}
+	head, err := commitOf(ctx, repo, "HEAD")
+	if err != nil {
+		return false, err
+	}
+	// The commit is read and judged before mise or any step runs code
+	// of the change (commitChecks).
+	verdicts, err := commitChecks(ctx, repo, head)
+	if err != nil {
 		return false, err
 	}
 	machine := e.machine
@@ -198,20 +209,9 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	c.report("architecture", archDetail == "", archDetail)
 	c.run(ctx, root, steps)
 
-	for _, check := range []struct {
-		name string
-		find func() ([]finding, error)
-	}{
-		{"hygiene", func() ([]finding, error) { return hygiene(ctx, repo, "HEAD") }},
-		{"workflows", func() ([]finding, error) { return workflows(ctx, repo, "HEAD") }},
-		{"coverage", func() ([]finding, error) { return coverageAt(root, profile) }},
-	} {
-		findings, err := check.find()
-		if err != nil {
-			c.report(check.name, false, err.Error()+"\n")
-			continue
-		}
-		c.report(check.name, len(findings) == 0, lines(findings))
+	findings, err := coverageAt(root, profile)
+	for _, v := range append(verdicts, verdict{name: "coverage", findings: findings, err: err}) {
+		c.verdict(v)
 	}
 	return c.ok, nil
 }
@@ -318,6 +318,10 @@ func runWorkflows(ctx context.Context, e env, args []string) (bool, error) {
 // of tools/ci keeps (passThrough), and installs the tools already, so
 // the second step finds nothing to do.
 //
+// Both mise steps run with miseEnv, at the top of the tree. In the
+// hosted workflow, setup first checks that the workflow ran it, and
+// mise-action before it, with miseEnv too (hostedMiseEnv).
+//
 // The download runs the pinned go command in stepEnv with the proxy
 // the go command uses by default, the one step of tools/ci that
 // fetches modules; go.sum checks what it fetches. It and "mise
@@ -330,10 +334,13 @@ func runSetup(ctx context.Context, e env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if err := hostedMiseEnv(); err != nil {
+		return false, err
+	}
 	c := newChecks(e.stdout)
 	mise := []step{
-		{name: "mise trust", argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, environ: passThroughEnv()},
-		{name: "mise install", argv: []string{"mise", "install"}, environ: withProcessEnv(passThroughEnv(), networkPassThrough)},
+		{name: "mise trust", argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, environ: miseEnviron(passThroughEnv())},
+		{name: "mise install", argv: []string{"mise", "install"}, environ: miseEnviron(withProcessEnv(passThroughEnv(), networkPassThrough))},
 	}
 	c.run(ctx, root, mise)
 	if !c.ok {

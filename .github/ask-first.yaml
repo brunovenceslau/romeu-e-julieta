@@ -33,8 +33,8 @@ surfaces:
     globs: [.github/workflows/release.yml, tools/release/**]
     reason: release and publishing paths
   - id: dependencies
-    globs: [go.mod, go.sum, mise.toml, mise.lock, .github/workflows/**]
-    reason: Go dependencies, the pinned tools the gates run, and CI actions
+    globs: [go.mod, go.sum, mise.toml, mise.lock, .mise.toml, mise.*.toml, .mise.*.toml, mise/**, .mise/**, .config/mise.toml, .config/mise.*.toml, .config/mise/**, .tool-versions, .miserc.toml, .miserc.local.toml, .config/miserc.toml, .github/workflows/**]
+    reason: Go dependencies, the pinned tools the gates run with every file mise reads as its configuration, and CI actions
   - id: contracts
     globs: [internal/cli/errors.go, internal/spec/versions.go]
     reason: exit codes, error ids and file format versions
@@ -48,5 +48,5 @@ surfaces:
     globs: [tools/ci/**, .githooks/**, .golangci.yml, docs/acceptance.json]
     reason: the code of the gates and reports, with the forbidden-name denylist (tools/ci/denylist.yaml), the linter configuration, and the acceptance file, whose command items tools/ci acceptance runs
   - id: ask-first
-    globs: [.github/ask-first.yaml]
-    reason: this list
+    globs: [.github/ask-first.yaml, .github/CODEOWNERS]
+    reason: this list, and the CODEOWNERS file generated from it

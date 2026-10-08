@@ -18,7 +18,9 @@
 //	go run ./tools/ci generate                write the generated files (what go generate runs)
 //
 // It exits 0 when every check passes, 1 when a check fails, and 2 when
-// it could not run a check at all. Started through "go run", every
+// it could not run a check at all. Inside fast and all, hygiene or
+// workflows that cannot judge the commit it read (a denylist that does
+// not parse, say) is a failed check, exit 1. Started through "go run", every
 // status other than 0 reaches the caller as 1, with the real one in the
 // "exit status" line that go prints; a built binary returns it as is.
 package main

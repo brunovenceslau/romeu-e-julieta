@@ -5,7 +5,9 @@ package main
 
 import (
 	"bytes"
+	"compress/zlib"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -79,7 +81,7 @@ func TestAll(t *testing.T) {
 			},
 			profile: "tools/ci 1 1",
 			code:    exitFail,
-			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:17: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
+			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:22: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
 		},
 		{
 			name:    "a hygiene finding",
@@ -540,10 +542,12 @@ func TestSetup(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(goCmd), 0o755))
 	require.NoError(t, os.WriteFile(goCmd, []byte("#!/bin/sh\necho \"go $* GOPROXY=${GOPROXY-unset} GOFLAGS=$GOFLAGS HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '"+log+"'\n"), 0o700))
 	linter := f.tool(t, "golangci-lint", "2.14.0", "golangci-lint")
-	script := "#!/bin/sh\nif [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '" + log + "'\n"
+	script := "#!/bin/sh\nif [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset} MISE=${MISE_OVERRIDE_CONFIG_FILENAMES-unset},${MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES-unset},${MISE_ENV-unset},${MISE_AUTO_ENV-unset}\" >> '" + log + "'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
 	t.Setenv("HTTPS_PROXY", "http://proxy.invalid")
 	t.Setenv("DOCKER_HOST", "unix:///nowhere")
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("MISE_ENV", "ci")
 
 	code, out := runCI(t, r, nil, nil, "setup")
 	assert.Equal(t, exitOK, code, out)
@@ -554,9 +558,19 @@ func TestSetup(t *testing.T) {
 	require.NoError(t, err)
 	root, err := filepath.EvalSymlinks(r.Dir)
 	require.NoError(t, err)
-	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset DOCKER_HOST=unset\n"+
-		"mise install HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n"+
+	// Both mise steps run with miseEnv, whatever the process holds.
+	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset DOCKER_HOST=unset MISE=mise.toml,none,,false\n"+
+		"mise install HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset MISE=mise.toml,none,,false\n"+
 		"go mod download GOPROXY=unset GOFLAGS=-mod=readonly HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n", string(data))
+
+	t.Run("a hosted run without the mise environment stops before mise", func(t *testing.T) {
+		require.NoError(t, os.Remove(log))
+		t.Setenv("GITHUB_ACTIONS", "true")
+		code, out := runCI(t, r, nil, nil, "setup")
+		assert.Equal(t, exitError, code, out)
+		assert.Contains(t, out, "the workflow sets MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml for every mise run")
+		assert.NoFileExists(t, log, "no mise command ran")
+	})
 
 	t.Run("a failing mise stops before the download", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\nexit 1\n"), 0o700))
@@ -580,4 +594,79 @@ func TestPassThroughLists(t *testing.T) {
 	base := []string{"PATH=/x"}
 	assert.Equal(t, []string{"PATH=/x", "DOCKER_HOST=unix:///a", "DOCKER_CONFIG=/c"}, withProcessEnv(base, dockerPassThrough), "an empty variable is left out")
 	assert.Equal(t, []string{"PATH=/x"}, base, "the base is not changed")
+}
+
+// overwriteObject returns a step that overwrites the loose object of
+// the blob that rev names with a compressed blob of other bytes, under
+// the same id: git cat-file does not hash what it reads, so a check
+// that reads the blob after the step reads the other bytes. It is what
+// a test of a change could do while a step runs it.
+func overwriteObject(t *testing.T, r *gittest.Repo, rev, other string) step {
+	t.Helper()
+	id := strings.TrimSpace(r.Git("rev-parse", "--verify", rev))
+	object := filepath.Join(r.Dir, ".git", "objects", id[:2], id[2:])
+	require.FileExists(t, object, "the blob is a loose object")
+	var b bytes.Buffer
+	z := zlib.NewWriter(&b)
+	_, err := fmt.Fprintf(z, "blob %d\x00%s", len(other), other)
+	require.NoError(t, err)
+	require.NoError(t, z.Close())
+	src := filepath.Join(t.TempDir(), "object")
+	require.NoError(t, os.WriteFile(src, b.Bytes(), 0o600))
+	return step{name: "rewrites", argv: []string{"sh", "-c", `chmod u+w "$1" && cat "$2" > "$1"`, "sh", object, src}, environ: r.Env}
+}
+
+// TestCommitChecksReadBeforeTheSteps shows that hygiene, workflows and
+// the pushed range judge the commit as it was before any step ran: a
+// step that rewrites the objects of the commit, as a test of the
+// change could, changes no verdict, in all, in fast by hand and in a
+// pre-push run.
+func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
+	dash := "a line with " + emDash + "\n"
+	floating := strings.Replace(goodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1)
+	fixture := func(t *testing.T) (*gittest.Repo, []step) {
+		t.Helper()
+		r := newTree(t)
+		r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+		r.Write("docs/x.md", dash)
+		r.Write(".github/workflows/ci.yml", floating)
+		r.Commit("fixture")
+		return r, []step{overwriteObject(t, r, "HEAD:docs/x.md", "a plain line\n"), overwriteObject(t, r, "HEAD:.github/workflows/ci.yml", goodWorkflow)}
+	}
+	t.Run("all", func(t *testing.T) {
+		r, steps := fixture(t)
+		profile := filepath.Join(t.TempDir(), "cover.out")
+		require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
+		code, out := runAllIn(t, r, append(steps, passing), profile)
+		assert.Equal(t, exitFail, code, out)
+		assert.Contains(t, out, "ok    rewrites")
+		assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
+		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:22: workflows: runs-on")
+	})
+	t.Run("fast by hand", func(t *testing.T) {
+		r, steps := fixture(t)
+		code, out := runCI(t, r, nil, steps, "fast")
+		assert.Equal(t, exitFail, code, out)
+		assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
+		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:22: workflows: runs-on")
+	})
+	t.Run("the pushed range of a pre-push run", func(t *testing.T) {
+		const zero = "0000000000000000000000000000000000000000"
+		r := newTree(t)
+		r.Git("remote", "add", "origin", gittest.NewBare(t).Dir)
+		r.Commit("fixture")
+		r.Git("push", "--quiet", "origin", "main")
+		r.Git("fetch", "--quiet", "origin")
+		named := "see zorvex-quimby\n"
+		r.Write("docs/page.md", named)
+		r.Commit("docs: a page")
+		require.NoError(t, os.Remove(filepath.Join(r.Dir, "docs", "page.md")))
+		tip := strings.TrimSpace(r.Commit("docs: no page"))
+		stdin := strings.NewReader("refs/heads/main " + tip + " refs/heads/main " + zero + "\n")
+		code, out := runCI(t, r, stdin, []step{overwriteObject(t, r, "HEAD~1:docs/page.md", "plain\n")}, "fast", "origin", "url")
+		assert.Equal(t, exitFail, code, out)
+		assert.Contains(t, out, "ok    hygiene")
+		assert.Contains(t, out, "FAIL  pushed range")
+		assert.Contains(t, out, "docs/page.md:1: name:")
+	})
 }

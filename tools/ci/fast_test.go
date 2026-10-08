@@ -930,6 +930,31 @@ func TestFastSteps(t *testing.T) {
 	assert.Equal(t, []string{goCmd, "test", "-count=1", "./internal/...", "./tools/..."}, unit, "unit")
 }
 
+// TestGeneratedRunsBeforeTheTests holds the order the threat model of
+// tools/ci/misefiles.go relies on: in fast and in all, the generated
+// step, which judges the index, runs before every step that runs code
+// of the change (its tests), so that code cannot stage a good copy of
+// a generated file before it is judged.
+func TestGeneratedRunsBeforeTheTests(t *testing.T) {
+	tools := lintTools{linter: "/pinned/golangci-lint", goDir: "/pinned/go/bin"}
+	for name, steps := range map[string][]step{
+		"fast": fastSteps(moduleRoot(t), tools),
+		"all":  allSteps(t.Context(), moduleRoot(t), tools, filepath.Join(t.TempDir(), coverFile)),
+	} {
+		names := make([]string, len(steps))
+		for i, s := range steps {
+			names[i] = s.name
+		}
+		generated := slices.Index(names, "generated")
+		require.GreaterOrEqual(t, generated, 0, "%s: %v", name, names)
+		for _, tests := range []string{"unit", "race"} {
+			if i := slices.Index(names, tests); i >= 0 {
+				assert.Less(t, generated, i, "%s: generated runs before %s: %v", name, tests, names)
+			}
+		}
+	}
+}
+
 // pinnedLintTools returns resolveLintTools for this repository, run in
 // a mise state directory of the test's own, where the test first
 // trusts the repository's mise configuration. mise keeps its trust
@@ -1253,11 +1278,13 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 }
 
 // TestResolveLintToolsEnvironment checks that "mise which" runs in
-// passThroughEnv: a fake mise writes its environment to a file, and
-// every variable of passThrough reaches it and nothing else, with the
-// ones a shell adds itself, whatever else this process holds. Each
-// variable of passThrough is set here, so the result does not depend
-// on the caller's environment (a TMPDIR or a MISE_STATE_DIR of its own).
+// passThroughEnv with miseEnv, at the top of the tree: a fake mise
+// writes its environment and its working directory to files, and every
+// variable of passThrough and of miseEnv reaches it and nothing else,
+// with the ones a shell adds itself, whatever else this process holds;
+// a value of miseEnv is the list's, never the process's. Each variable
+// of passThrough is set here, so the result does not depend on the
+// caller's environment (a TMPDIR or a MISE_STATE_DIR of its own).
 func TestResolveLintToolsEnvironment(t *testing.T) {
 	envPath, err := exec.LookPath("env")
 	require.NoError(t, err)
@@ -1270,21 +1297,35 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 			t.Setenv(key, "/from/"+key)
 		}
 	}
-	dump := filepath.Join(t.TempDir(), "env")
-	f.script(t, "'"+envPath+"' > '"+dump+"'\n", f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go"))
-	_, err = resolveLintTools(t.Context(), lockedRoot(t, lockFixture))
+	dump, cwd := filepath.Join(t.TempDir(), "env"), filepath.Join(t.TempDir(), "cwd")
+	f.script(t, "'"+envPath+"' > '"+dump+"'\npwd -P > '"+cwd+"'\n", f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go"))
+	root := lockedRoot(t, lockFixture)
+	_, err = resolveLintTools(t.Context(), root)
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(dump)
 	require.NoError(t, err)
 	var keys []string
+	values := map[string]string{}
 	for line := range strings.Lines(string(data)) {
-		key, _, _ := strings.Cut(line, "=")
+		key, value, _ := strings.Cut(strings.TrimSuffix(line, "\n"), "=")
 		if !slices.Contains([]string{"PWD", "OLDPWD", "SHLVL", "_"}, key) {
 			keys = append(keys, key)
+			values[key] = value
 		}
 	}
-	assert.Equal(t, slices.Sorted(slices.Values(passThrough)), slices.Sorted(slices.Values(keys)), "the variables mise gets")
+	want := slices.Clone(passThrough)
+	for _, kv := range miseEnv {
+		key, value, _ := strings.Cut(kv, "=")
+		want = append(want, key)
+		assert.Equal(t, value, values[key], key)
+	}
+	assert.Equal(t, slices.Sorted(slices.Values(want)), slices.Sorted(slices.Values(keys)), "the variables mise gets")
+	dir, err := os.ReadFile(cwd)
+	require.NoError(t, err)
+	real, err := filepath.EvalSymlinks(root)
+	require.NoError(t, err)
+	assert.Equal(t, real+"\n", string(dir), "mise starts at the top of the tree, where it finds .miserc.toml")
 }
 
 // TestMiseInstalls holds miseInstalls to the data directory that mise
@@ -1337,10 +1378,12 @@ func TestIsGateInput(t *testing.T) {
 	for _, path := range []string{"x.go", "tools/ci/x_test.go", "go.work", "go.work.sum", "vendor/modules.txt",
 		"vendor/example.com/m/m.go", "mise.toml", ".mise.toml", "mise.local.toml", ".mise.local.toml", "mise.ci.toml",
 		".config/mise.toml", ".config/mise/config.toml", ".config/mise/conf.d/x.toml", ".mise/config.toml",
-		"mise/config.toml", ".tool-versions", "tools/.tool-versions", "tools/ci/evil/", "nested/"} {
+		"mise/config.toml", ".tool-versions", "tools/.tool-versions", "tools/ci/evil/", "nested/",
+		"mise.lock", "Mise.Local.toml", ".TOOL-VERSIONS", ".miserc.toml", ".miserc.local.toml", ".config/miserc.toml",
+		"tools/ci/.miserc.toml", "tools/ci/.config/mise/conf.d/x.toml"} {
 		assert.True(t, isGateInput(path), path)
 	}
-	for _, path := range []string{"README.md", "go.mod", "go.sum", "mise.lock", "docs/promise.toml", "REUSE.toml",
+	for _, path := range []string{"README.md", "go.mod", "go.sum", "docs/promise.toml", "REUSE.toml",
 		"tools/vendor/notes.md", "docs/go.md", "x.gox"} {
 		assert.False(t, isGateInput(path), path)
 	}

@@ -30,9 +30,9 @@ says why each surface is on the list.
 | `catalog` | `catalog/egress.yaml` | upload flags and the base and meta sets |
 | `kits` | `kits/**`, `tools/kitpin/**` | what enters every sandbox, and its pins |
 | `release` | `.github/workflows/release.yml`, `tools/release/**` | release and publishing paths |
-| `dependencies` | `go.mod`, `go.sum`, `mise.toml`, `mise.lock`, `.github/workflows/**` | Go dependencies, the pinned tools the gates run, and CI actions |
+| `dependencies` | `go.mod`, `go.sum`, `mise.toml`, `mise.lock`, `.mise.toml`, `mise.*.toml`, `.mise.*.toml`, `mise/**`, `.mise/**`, `.config/mise.toml`, `.config/mise.*.toml`, `.config/mise/**`, `.tool-versions`, `.miserc.toml`, `.miserc.local.toml`, `.config/miserc.toml`, `.github/workflows/**` | Go dependencies, the pinned tools the gates run with every file mise reads as its configuration, and CI actions |
 | `contracts` | `internal/cli/errors.go`, `internal/spec/versions.go` | exit codes, error ids and file format versions |
 | `ledger` | `internal/ledger/**` | the runtime ledger's code, its event schema, and the tags that decide which fields cross projects |
 | `decisions` | `docs/adr/**`, `.adr-dir` | decision records; one leaves Proposed, or changes after that, with the maintainer's approval |
 | `checks` | `tools/ci/**`, `.githooks/**`, `.golangci.yml`, `docs/acceptance.json` | the code of the gates and reports, with the forbidden-name denylist (tools/ci/denylist.yaml), the linter configuration, and the acceptance file, whose command items tools/ci acceptance runs |
-| `ask-first` | `.github/ask-first.yaml` | this list |
+| `ask-first` | `.github/ask-first.yaml`, `.github/CODEOWNERS` | this list, and the CODEOWNERS file generated from it |

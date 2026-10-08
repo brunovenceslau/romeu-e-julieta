@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"regexp"
 	"strings"
 
@@ -127,6 +128,34 @@ func checkGlob(g string) error {
 		}
 	}
 	return nil
+}
+
+// globMatch reports whether a glob of the dialect above (checkGlob)
+// matches name, both relative to the top of the tree with forward
+// slashes: "**" matches zero or more whole segments, and "*" any run of
+// characters inside one segment (path.Match, which checkGlob leaves
+// nothing else to read).
+func globMatch(glob, name string) bool {
+	return segmentsMatch(strings.Split(glob, "/"), strings.Split(name, "/"))
+}
+
+func segmentsMatch(glob, name []string) bool {
+	if len(glob) == 0 {
+		return len(name) == 0
+	}
+	if glob[0] == "**" {
+		for i := 0; i <= len(name); i++ {
+			if segmentsMatch(glob[1:], name[i:]) {
+				return true
+			}
+		}
+		return false
+	}
+	if len(name) == 0 {
+		return false
+	}
+	ok, err := path.Match(glob[0], name[0])
+	return err == nil && ok && segmentsMatch(glob[1:], name[1:])
 }
 
 // generatedNotice is the line that every generated file carries (12

@@ -82,7 +82,8 @@ func TestHygieneRules(t *testing.T) {
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("docs/a"+emDash+"b.md", "text\n")
 			},
-			want: []string{"em-dash: the path holds U+2014"},
+			// The byte rule of the path reports it too.
+			want: []string{"em-dash: the path holds U+2014", "path: the path holds a byte outside printable ASCII"},
 		},
 		{
 			name: "a listed prose word",
@@ -199,6 +200,46 @@ func TestHygieneRules(t *testing.T) {
 				require.NoError(t, os.Remove(filepath.Join(r.Dir, ".githooks", "pre-push")))
 			},
 			want: []string{".githooks/pre-push: githooks: the hook is not tracked"},
+		},
+		{
+			name: "a mise configuration other than mise.toml, in any case",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("mise.local.toml", "[settings]\n")
+				r.Write("Mise.Ci.toml", "[settings]\n")
+				r.Write(".TOOL-VERSIONS", "go 1.27.0\n")
+				r.Write(".config/mise/conf.d/x.toml", "[settings]\n")
+				r.Write(".miserc.toml", "env = []\n")
+			},
+			want: []string{
+				".TOOL-VERSIONS: mise:", ".config/mise/conf.d/x.toml: mise:", ".miserc.toml: mise:",
+				"Mise.Ci.toml: mise:", "mise.local.toml: mise:",
+			},
+		},
+		{
+			name: "a path with a byte outside printable ASCII",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("mi\u017fe.local.toml", "[settings]\n")
+				r.Write("docs/tab\tname.md", "text\n")
+			},
+			want: []string{`"docs/tab\tname.md": path:`, "mi\u017fe.local.toml: path:"},
+		},
+		{
+			name: "a symbolic link",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("realconf/mise/conf.d/x.md", "text\n")
+				require.NoError(t, os.Symlink("realconf", filepath.Join(r.Dir, ".config")))
+			},
+			want: []string{".config: mode: the mode is 120000"},
+		},
+		{
+			name: "a submodule",
+			change: func(t *testing.T, r *gittest.Repo) {
+				// The directory keeps "git add --all" from staging the
+				// removal of the entry.
+				require.NoError(t, os.Mkdir(filepath.Join(r.Dir, "lib"), 0o755))
+				r.Git("update-index", "--add", "--cacheinfo", "160000,0123456789abcdef0123456789abcdef01234567,lib")
+			},
+			want: []string{"lib: mode: the mode is 160000"},
 		},
 		{
 			name: "a missing denylist",
@@ -468,8 +509,7 @@ func TestHygieneFile(t *testing.T) {
 	})
 }
 
-// TestJudgedCommitIsPinned shows that hygiene, loadProse and
-// pushedRange read the commit they are given and not HEAD: X is the
+// TestJudgedCommitIsPinned shows that hygiene and pushedRange read the commit they are given and not HEAD: X is the
 // commit judged, and HEAD has moved on to a Y that adds a listed name,
 // or drops the denylist or the word lists. Each callee is asked for X
 // and for "HEAD", and the two answers differ.
@@ -504,15 +544,10 @@ func TestJudgedCommitIsPinned(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, lines(got), "denylist: the denylist is missing")
 	})
-	t.Run("loadProse and hygiene: word lists that Y drops", func(t *testing.T) {
+	t.Run("hygiene: word lists that Y drops", func(t *testing.T) {
 		r, x := moved(t)
 		require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(prose.Path))))
 		r.Commit("Y")
-		rules, err := loadProse(t.Context(), r.Repo, x)
-		require.NoError(t, err)
-		assert.NotNil(t, rules)
-		_, err = loadProse(t.Context(), r.Repo, "HEAD")
-		require.Error(t, err)
 		got, err := hygiene(t.Context(), r.Repo, x)
 		require.NoError(t, err)
 		assert.Empty(t, got)

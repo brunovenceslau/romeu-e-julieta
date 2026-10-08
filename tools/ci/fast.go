@@ -101,7 +101,7 @@ type lintTools struct {
 
 // resolveLintTools asks "mise which" for the paths of the versions that
 // mise.toml pins and mise.lock locks, in the environment of
-// passThroughEnv. "mise which" runs no tool and installs none: a tool
+// passThroughEnv with miseEnv. "mise which" runs no tool and installs none: a tool
 // that is not installed is an error that names the two commands a new
 // machine runs first, so fast fails closed and never falls back to
 // another golangci-lint or go on the search path.
@@ -132,7 +132,7 @@ func resolveLintTools(ctx context.Context, root string) (lintTools, error) {
 // tool's name in the lock), so that a stale install left beside the
 // locked one is refused; a tool locked at two different versions is an error, as
 // the lock then holds no one version to hold an install to. It runs in
-// passThroughEnv.
+// passThroughEnv with miseEnv, at the top of the tree.
 func whichPinned(ctx context.Context, root, name, key, dir string) (string, error) {
 	installsDir, err := miseInstalls()
 	if err != nil {
@@ -143,7 +143,9 @@ func whichPinned(ctx context.Context, root, name, key, dir string) (string, erro
 		return "", fmt.Errorf("the mise installs directory %s: %w; run \"mise trust\" and \"mise install\" in %s", installsDir, err, root)
 	}
 	cmd := exec.CommandContext(ctx, "mise", "-C", root, "which", name)
-	cmd.Env = passThroughEnv()
+	// mise finds .miserc.toml from its working directory (misefiles.go).
+	cmd.Dir = root
+	cmd.Env = miseEnviron(passThroughEnv())
 	out, err := cmd.Output()
 	if errors.Is(err, exec.ErrNotFound) {
 		return "", fmt.Errorf("mise is not on the search path: install mise, then run \"mise trust\" and \"mise install\" in %s", root)
@@ -394,12 +396,19 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 }
 
 // runFast runs the fast checks: the command steps, then hygiene and
-// workflows. Every check runs, so one run shows everything there is to
-// fix.
+// workflows, and in a pre-push run the pushed range. Every check runs,
+// so one run shows everything there is to fix.
 //
-// Run by hand, with no argument, fast checks the working tree as it is,
-// staged, modified and untracked files included: development stays
-// free, and nothing leaves the machine.
+// Hygiene, workflows and the pushed range judge one commit, which
+// runFast resolves to its id, reads and judges before mise or any step
+// starts (commitChecks), and reports after the steps: nothing a step
+// does to the working tree, the index, HEAD or the object store while
+// it runs changes what they judged.
+//
+// Run by hand, with no argument, fast judges the commit HEAD names,
+// and its steps run on the working tree as it is, staged, modified and
+// untracked files included: development stays free, and nothing leaves
+// the machine.
 //
 // Run by the pre-push hook, with the two arguments git gives it (the
 // remote's name and its URL) and one line per pushed ref on standard
@@ -409,8 +418,7 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 // differs from HEAD in a file the checks read. The steps take minutes,
 // and the tree may change meanwhile, so after the last step it judges
 // the tree again and refuses the push when HEAD moved or a refusal
-// appeared. Hygiene, workflows and the pushed range read the commit
-// judged, by its id, and not HEAD again.
+// appeared.
 //
 // In both modes it refuses a go.mod below the module root
 // (nestedModules).
@@ -456,6 +464,24 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	// The commit, and in a pre-push run the range, are read and judged
+	// before mise or any step runs code of the change (commitChecks).
+	verdicts, err := commitChecks(ctx, repo, head)
+	if err != nil {
+		return false, err
+	}
+	if hook {
+		findings, checked, err := pushedRange(ctx, repo, args[0], push, head)
+		if err != nil {
+			return false, err
+		}
+		if checked || len(findings) > 0 {
+			verdicts = append(verdicts, verdict{name: "pushed range", findings: findings})
+		}
+		if !checked {
+			verdicts = append(verdicts, verdict{name: "pushed range", note: "not checked against names, no denylist entry at HEAD or at the remote's default branch"})
+		}
+	}
 	steps := e.steps
 	if steps == nil {
 		tools, err := resolveLintTools(ctx, root)
@@ -476,31 +502,8 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 		}
 	}
 
-	// Equivalent mutant, accepted: reading "HEAD" here instead of head
-	// changes nothing in a sequential run, because the re-judge above
-	// forces HEAD == head and no step runs between it and this call.
-	// hygiene itself is pinned to its argument (TestJudgedCommitIsPinned).
-	findings, err := hygiene(ctx, repo, head)
-	if err != nil {
-		return false, err
-	}
-	c.report("hygiene", len(findings) == 0, lines(findings))
-	if findings, err = workflows(ctx, repo, head); err != nil {
-		return false, err
-	}
-	c.report("workflows", len(findings) == 0, lines(findings))
-
-	if hook {
-		findings, checked, err := pushedRange(ctx, repo, args[0], push, head)
-		if err != nil {
-			return false, err
-		}
-		if checked || len(findings) > 0 {
-			c.report("pushed range", len(findings) == 0, lines(findings))
-		}
-		if !checked {
-			say(e.stdout, "--    pushed range: not checked against names, no denylist entry at HEAD or at the remote's default branch\n")
-		}
+	for _, v := range verdicts {
+		c.verdict(v)
 	}
 	return c.ok, nil
 }
@@ -524,6 +527,54 @@ func (c *checks) report(name string, passed bool, detail string) {
 		verdict, c.ok = "FAIL", false
 	}
 	say(c.out, "%s  %s\n%s", verdict, name, detail)
+}
+
+// verdict is what one check of the commit judged found: its findings,
+// or why it could not judge (err), or, with a note, why it did not
+// check and so neither passed nor failed.
+type verdict struct {
+	name     string
+	findings []finding
+	err      error
+	note     string
+}
+
+// commitChecks judges commit with hygiene and workflows, from one read
+// of its tree with every blob in it. fast and all call it before they
+// start mise or any step, and report its verdicts after the steps
+// (checks.verdict). The steps run code of the change under test, and
+// that code could rewrite the working tree, the index, HEAD or an
+// object of the store (git cat-file does not hash what it reads, so a
+// rewritten loose object is read as the commit's: measured with git
+// 2.53.0), so the checks judge what was read before any of it ran. A
+// tree that cannot be read is an error; a check that cannot judge
+// what was read is a verdict with its error. git and the object store
+// are trusted up to that read; what mise may run before it is the
+// threat model of misefiles.go.
+func commitChecks(ctx context.Context, repo git.Repo, commit string) ([]verdict, error) {
+	files, err := headTree(ctx, repo, commit)
+	if err != nil {
+		return nil, err
+	}
+	findings, err := hygieneOf(files)
+	return []verdict{
+		{name: "hygiene", findings: findings, err: err},
+		{name: "workflows", findings: workflowsOf(files)},
+	}, nil
+}
+
+// verdict reports one verdict of commitChecks: one that could not
+// judge fails with its reason, and one with a note prints it with
+// "--".
+func (c *checks) verdict(v verdict) {
+	switch {
+	case v.note != "":
+		say(c.out, "--    %s: %s\n", v.name, v.note)
+	case v.err != nil:
+		c.report(v.name, false, v.err.Error()+"\n")
+	default:
+		c.report(v.name, len(v.findings) == 0, lines(v.findings))
+	}
 }
 
 // moduleLookupOff is what the go command prints when a step needs a
@@ -673,30 +724,18 @@ func untrackedInputs(ctx context.Context, repo git.Repo) ([]string, error) {
 // working tree and with forward slashes as git prints it, names an
 // untracked file that the go command or the checks read: a Go file (an
 // untracked TestMain could end a test run early), a go.work or
-// go.work.sum file, a vendor directory at the root, a mise
-// configuration (a toml file whose name starts with "mise" or ".mise",
-// or that lies below a "mise" or ".mise" directory: every place where
-// "mise config ls" of mise 2026.10.3 finds one), a .tool-versions file,
-// or a nested repository, which git lists as a directory ending in "/"
-// while "go list" still reads the packages inside it.
+// go.work.sum file, a vendor directory at the root, a file mise reads
+// when it starts in the directory that holds it or above
+// (isMiseFileAtAnyDepth), or a nested repository, which git lists as a
+// directory ending in "/" while "go list" still reads the packages
+// inside it.
 func isGateInput(path string) bool {
 	base := filepath.Base(filepath.FromSlash(path))
-	switch {
-	case strings.HasSuffix(path, "/"),
-		strings.HasSuffix(base, ".go"),
-		base == "go.work", base == "go.work.sum", base == ".tool-versions",
-		strings.HasPrefix(path, "vendor/"):
-		return true
-	case strings.HasSuffix(base, ".toml"):
-		parts := strings.Split(path, "/")
-		for _, dir := range parts[:len(parts)-1] {
-			if dir == "mise" || dir == ".mise" {
-				return true
-			}
-		}
-		return strings.HasPrefix(base, "mise") || strings.HasPrefix(base, ".mise")
-	}
-	return false
+	return strings.HasSuffix(path, "/") ||
+		strings.HasSuffix(base, ".go") ||
+		base == "go.work" || base == "go.work.sum" ||
+		strings.HasPrefix(path, "vendor/") ||
+		isMiseFileAtAnyDepth(path)
 }
 
 // nestedModules refuses a go.mod below the root of the working tree,

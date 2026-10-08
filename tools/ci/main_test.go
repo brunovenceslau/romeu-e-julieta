@@ -33,8 +33,9 @@ const fixtureProse = `rules:
 `
 
 // hookLine is the hook of 12 12.1, with the line that makes it a
-// script.
-const hookLine = "#!/bin/sh\nexec go run ./tools/ci fast \"$@\"\n"
+// script: it starts go, and so the mise shim, with miseEnv
+// (tools/ci/misefiles.go), each variable a word of env.
+var hookLine = "#!/bin/sh\nexec env " + strings.Join(miseEnv, " ") + " go run ./tools/ci fast \"$@\"\n"
 
 // newTree returns a fixture repository that passes hygiene: the hook,
 // the two data files, a denylist with the made-up name, and one page.
