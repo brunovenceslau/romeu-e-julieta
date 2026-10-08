@@ -46,6 +46,24 @@ chose. A lens whose findings decide security, architecture or scope
 runs on the strongest tier available; no lens runs on the smallest
 tier, because a lens that misses a finding costs a review round later.
 
+### What each round reads
+
+The specification, the plan and the open items are reviewed in three
+stages, in this order, because each derives from the one before it: a
+finding on the plan made against a specification that changes the next
+week is wasted, and the plan's 102 tasks would double every reviewer's
+reading.
+
+| Stage | Text under review | Lenses | What the others are for |
+|---|---|---|---|
+| A. Specification | the index, the pages under `spec/`, the records under `adr/` | L0 to L16 | `plan.md` is reading context for L9 and L12 only; a finding they make on the plan is marked `parked for B`. The open questions and deferred decisions in the index are reviewed for shape (a trigger, what holds until then, still open, not a duplicate), never answered |
+| B. Plan | `plan.md`, against the specification as corrected by A | L3, L6, L9, L11, L12, plus plan-specific lenses defined before B runs | the implementer picking the next task, the traceability auditor, the pull-request reviewer, the hunter of unknowns, the owner of the operator's calendar are the candidates; each is written in the form of this page before it runs |
+| C. Open items | the open questions and deferred decisions of the index and of `plan.md` | none; one preparer, then the operator | the preparer groups the items, marks duplicates and dependencies, and recommends one of three outcomes per item: decide now, defer with the trigger rewritten, delete. The operator decides in one block |
+
+Stage B accepts that another session ticks checkboxes in `plan.md`
+while it runs; the baseline is a commit, and that column is the only
+expected conflict.
+
 ### The brief, in order
 
 The order matters as much as the content; the next section says why.
@@ -68,8 +86,10 @@ Part one:
    decision records and `plan.md`, with raw notes per page. The
    instruction is to refute: find where the spec fails this role's
    definition of success, not where it meets it.
-5. The postmortem of the first incident this product has after v1.0.0,
-   as this person would write it, one page at most.
+5. The postmortem: the brief states that the product has failed, after
+   v1.0.0, as this person would see it fail, and asks for every reason,
+   especially the ones this person would not normally say out loud; one
+   page at most, with the sections it crosses.
 6. The section "What is missing": what this person expected to find
    and did not.
 
@@ -81,8 +101,10 @@ Part two:
    worth less than one the bullets did not predict.
 8. Reconcile: for each bullet, confirm, refute or mark unanswerable,
    citing the section; then fold the notes of part one into findings.
-9. The question "what does this lens get wrong about success for this
-   product?", answered in a few lines.
+9. Two questions, answered in a few lines each: "what does this lens
+   get wrong about success for this product?", and, given only the
+   titles of the lenses in this page, "which viewpoint is missing from
+   this set?".
 10. The report, in the shape of the next section.
 
 ### Why the brief is shaped this way
@@ -103,11 +125,16 @@ that a round that goes wrong can say which mechanism to change.
 | The postmortem (step 5) | findings that stay inside one section | a scenario runs end to end across pages, which is where the gaps between sections live |
 | The self-refutation (step 9) | a lens that is itself wrong about success | the cheapest evidence for rewriting a lens before the next round |
 | Origin per finding, listed or own (report) | anchoring that nobody can see | the ratio per lens is a measurement; a lens that returns mostly "listed" was badly written or badly briefed, and the round page records which. Deterministic where it fits |
-| The control reviewer L0 | a blind spot shared by all twelve lenses | what only L0 finds is what no lens was shaped to see; what only the lenses find is their value. Both are recorded in the round page |
+| The control reviewer L0 | a blind spot shared by every lens | what only L0 finds is what no lens was shaped to see; what only the lenses find is their value. Both are recorded in the round page |
+| The missing-viewpoint question (step 9) | a set of lenses that is the list of whoever wrote it | each reviewer answers it from a different seat; an answer that repeats across reviewers is evidence for a lens, and the coverage measurement below is the other half of that evidence |
+| The coverage measurement, run before each round | a source of success in the spec that no lens owns | a zero in the matrix is a decision written down or a lens added, never an oversight; the rule is traceability in both directions, as in architecture-description standards: every concern framed by a lens, every lens naming its person |
+| "Out of scope, and why" in the report | the reader of a round not knowing what was not looked at | the next round starts from what was left, not from a clean sheet; a stated scope is also what keeps a lens from drifting into its neighbours' |
+| The noise probe: in one round, two lenses each run twice, by two reviewers, and the overlap of their findings is counted | the assumption that one reviewer per lens is enough | a measurement decides the rule; two lenses is the smallest probe that tells a reviewer effect from a lens effect |
+| A finding class that repeats across rounds becomes a check, not a lens | the review pool growing with every round | a check runs on every change at no reviewer cost; a lens runs once a round. The lessons rule of the spec (12 12.7) is the same move |
 | At most three incidents per lens, about a mechanism, not a component | the incident list growing into a second checklist | an incident about trust, drift or a barrier transfers to sections the author did not think of; one about a named component does not |
 
 The last row is guidance for whoever writes or edits a lens. The others
-are guidance for whoever writes a brief.
+are guidance for whoever writes a brief or runs a round.
 
 ## What a reviewer returns
 
@@ -120,8 +147,8 @@ The first line of the report is `<lens id> · <role> · <model>`. Then:
 | Coverage | one line per page: the index, 00 to 13, the ADRs as one line, `plan.md`; each says `nothing for this lens` or lists finding ids. A page without a line fails the format |
 | What is missing | what this person expected to find and did not, each with where it would belong |
 | Postmortem | the first incident after v1.0.0 as this person sees it, one page at most, with the sections it crosses |
-| Lens critique | what this lens gets wrong about success for this product |
-| Not tested | what the lens could not judge from the text alone, and what evidence would settle it |
+| Lens critique | what this lens gets wrong about success for this product, and which viewpoint the set of lens titles lacks |
+| Out of scope, and why | what the lens did not judge: what the text alone cannot settle, with the evidence that would, and what this person chose not to look at, with the reason |
 | Confidence | one line |
 
 Severity scale for every lens, so the merge is mechanical:
@@ -182,7 +209,8 @@ As this person you care about:
 - **What happens on the second machine** (J12) because this person has
   a laptop and a desktop, and the machine-local state does not travel.
 
-Where to confirm, read last: 00, 09 (J1, J3, J11, J12), 04 4.2, 01 1.3 and 1.8, S8.
+Where to confirm, read last: 00, 09 (J1, J3, J11, J12, J13), 04 4.2,
+01 1.3 and 1.8, S8.
 Model: opus.
 
 ### L2 The security engineer who has watched a host fall
@@ -223,7 +251,9 @@ As this person you care about:
   renamed workspace path plus a reused project name is how a destructive
   command lands on the wrong tree.
 
-Where to confirm, read last: 05 whole, 01 1.2 and 1.6, 13, 08 8.1, ADR 0008.
+Where to confirm, read last: 05 whole, 01 1.2 and 1.6 (boundary D and
+J4, the review checkout on the host), 06 6.4 (the signing agent and
+its socket rule), 13, 08 8.1, ADR 0008.
 Model: fable.
 
 ### L3 The maintainer three years from now
@@ -293,8 +323,8 @@ As this person you care about:
   can be wrong about state needs one command that compares every
   derived file against its source, byte for byte, and says so.
 
-Where to confirm, read last: 01 1.5 to 1.7, 09 (J6, J10, J12), 04 4.2 (`doctor`,
-`salvage`, `retire`), 08 8.4, 13 13.6.
+Where to confirm, read last: 01 1.5 to 1.7, 09 (J6, J7, J10, J12,
+J13), 04 4.2 (`doctor`, `salvage`, `retire`), 08 8.4, 13 13.6.
 Model: opus.
 
 ### L5 The agent as a user
@@ -329,8 +359,8 @@ As this person you care about:
 - **Skills that ask the agent to remember a mechanical step** because
   each is a defect by the spec's own principle; the lens lists them.
 
-Where to confirm, read last: 08 whole, 04 4.3, 13 13.2, 06 (the `julieta-claude`
-mixin), S5.
+Where to confirm, read last: 08 whole, 09 (J5), 04 4.3, 13 13.2, 06
+(the `julieta-claude` mixin), S5.
 Model: opus.
 
 ### L6 The test architect who has seen coverage lie
@@ -362,7 +392,8 @@ As this person you care about:
 - **A race run that excludes e2e** (10 10.2) because the code with the
   most goroutines is the code that talks to subprocesses.
 
-Where to confirm, read last: 10 whole, 11, S6 to S9, 05 5.2 (the test column).
+Where to confirm, read last: 10 whole, 11, S2, S6 to S9, 05 5.2 (the
+test column).
 Model: fable.
 
 ### L7 The release and supply-chain engineer
@@ -394,8 +425,8 @@ As this person you care about:
   runs in CI and the spec should say whether the same tag built twice
   gives the same bytes, and if not, why that is acceptable.
 
-Where to confirm, read last: S1, S11, 12 12.1, 12 12.6, 10 10.2 ("Release and
-bootstrap"), 06 6.3 (digests), plan.md "Toolchain pins".
+Where to confirm, read last: S1, S2, S11, 12 12.1, 12 12.6, 10 10.2
+("Release and bootstrap"), 06 6.3 (digests), plan.md "Toolchain pins".
 Model: opus.
 
 ### L8 The technical writer who maintains generated docs
@@ -433,8 +464,12 @@ Model: opus.
 
 ### L9 The delivery manager who has seen hundred-task plans
 
-Role: the owner of ADR 0002 to ADR 0005, 12 12.9, 12 12.10 and
-plan.md. Success is: the plan lands, the operator is never the idle
+Role: the owner of
+[ADR 0002, develop on the trunk with short-lived branches](../adr/0002-develop-on-the-trunk-with-short-lived-branches.md),
+[ADR 0003, adopt six extreme programming practices and review as pairing](../adr/0003-adopt-six-extreme-programming-practices-and-review-as-pairing.md),
+[ADR 0004, measure delivery with the five DORA metrics computed by a tool](../adr/0004-measure-delivery-with-the-five-dora-metrics-computed-by-a-tool.md),
+[ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md),
+12 12.9, 12 12.10 and plan.md. Success is: the plan lands, the operator is never the idle
 bottleneck, and every deferral has a trigger that fires.
 
 As this person you care about:
@@ -459,6 +494,11 @@ As this person you care about:
 - **The size of a task** because one logical change per pull request is
   the rule, and the lens checks a sample of tasks for the ones that are
   three.
+- **Feasibility as a concern of its own** because architecture
+  description standards list it next to purpose and suitability, and
+  this set of lenses otherwise reaches it only through the plan's
+  realism; the lens names the three claims of the spec that would be
+  hardest to build and asks what evidence the spec offers for each.
 
 Where to confirm, read last: plan.md whole, ADR 0002 to ADR 0005, 12 12.9 and 12.10,
 index (Deferred decisions, Open questions).
@@ -565,8 +605,268 @@ Where to confirm, read last: plan.md (dependencies, phases, Ask-first fields), 1
 10 10.7, 05 5.3, 04 4.4.
 Model: fable.
 
+### L13 The reader who holds the spec against itself
+
+Role: someone who reads the specification as one system, not as pages.
+Success is: one problem, one mechanism, one name, on every page; and
+every feature passing the principles and the Boundaries of the index
+with no exception that is not written down.
+
+As this person you care about:
+
+- **One problem solved two ways** because that is where contributors
+  diverge. Candidates in the text: two romeu approvals plus sbx's own
+  for "widening"; hash verification on some derived files and not on
+  the workspace files (01 1.5 states the exception, and it is an
+  exception); three stores (memory in plain files, ledger in JSON,
+  state in JSON) with their own conventions for ids, timestamps and
+  digests. Incident: a system with three id formats, noticed only when
+  one log had to join them.
+- **Conventions of 04 4.1 that the command tables do not honour**
+  because an exit code is a contract. Does 2 always mean a failed
+  precondition? Does `--json` exist where the caller is a program, and
+  only there? Incident: a CLI where exit 1 meant both "failed" and
+  "found differences", and a CI script that ignored the differences for
+  years.
+- **Names that change between pages** because the vocabulary of 01 1.8
+  is the one source and not every page uses it; operator and maintainer
+  is one case, and the lens lists the others.
+- **A feature against a principle** because "deterministic where it can
+  be", "simple and explicit" and "decide at the last responsible moment"
+  are claims testable against each feature of 00 0.5; a feature that
+  fails one with no written exception is the finding.
+- **Promises that cross** because one section states what another
+  contradicts, and rounds 6 and 7 found several; the lens looks for what
+  is left, above all between 04, 09 and 13, which describe the same
+  commands from three angles.
+- **Exceptions with no owner** because every "except" and "unless" is a
+  partial rule; the lens counts them and asks of each whether it is a
+  decision or an accident.
+
+Where to confirm, read last: 04 4.1 and the command tables, 01 1.8,
+index (Principles, Boundaries), 00 0.5, 09 against 04 and 13.
+Model: fable, because it is a cross-reading of the whole text.
+
+### L14 The maintainer on duty
+
+Role: the person who receives a bug report from a stranger, and the
+first pull request from a stranger. Success is: a failure reported by
+someone who did not write the code becomes a fix in an afternoon, by
+someone who did not write it either, and both want to come back.
+
+As this person you care about:
+
+- **What a user can paste into an issue** because diagnosis starts with
+  what arrives. The spec has error ids with fix hints, `--timings
+  --json`, `doctor` and the ledger view; it has no log level, no verbose
+  mode and no command that gathers evidence already redacted (I29, the
+  redaction of 11). Incident: two hundred issues saying "it does not
+  work" with nothing reproducible, until a command existed that packed
+  the evidence.
+- **Silent hooks and chores** because julieta runs after every commit,
+  and a snapshot that fails quietly for months is the failure nobody
+  reports. 13 records `hook-failed` and `command-failed`; the lens asks
+  who reads them and when.
+- **Tracing one critical flow end to end** because `sync` has nine
+  steps and a commit point, `run` ends in an exec and `salvage` crosses
+  two machines; a maintainer needs to see in which step the time and
+  the failure went. `--timings` exists for S8; profiling does not, so a
+  regression is found by the user.
+- **The contributor's local loop** because `tools/ci fast`, the fake
+  sbx, the goldens with `-update` and the scaffolds decide whether the
+  first fix takes an afternoon or a week. Incident: a project whose CI
+  took forty minutes received one pull request per contributor and
+  never the second.
+- **The critical flows as teaching material** because `ARCHITECTURE.md`
+  with generated state machines and the error table are what a newcomer
+  learns from; the lens asks for a "read this first" path per flow, and
+  whether each error id leads to a runbook (a guide per journey, S10).
+- **Open source as a relationship, not a license** because
+  `CONTRIBUTING.md`, issue templates, a stated response expectation
+  (`SECURITY.md` has one; ordinary issues do not), release notes that
+  name who contributed and a release cadence decide whether anyone
+  returns. Incident: a well-built tool with no contributors because
+  every pull request waited three weeks.
+- **Reliability engineering with no server** because the failure modes
+  in the field are disk, denied egress, sbx version skew and mount
+  permissions; the lens asks whether each has an error id, a runbook and
+  a safe way to collect evidence without leaking a secret.
+
+Where to confirm, read last: 04 (the error table, `--timings`,
+`doctor`), 12 12.2 to 12.4 and 12.8, 10 10.1, 13, S8, S10, rule 16 and
+rule 20 of ADR 0001. L3 keeps decay over time, L8 the quality of a
+page, L10 adoption; L14 keeps the day something breaks and the day
+someone arrives. Model: opus.
+
+### L15 The ground that moves
+
+Role: the person who maintains integrations with other people's tools
+and has woken up to a renamed `--json` field. Success is: a change in
+sbx, mise, herdr, Docker Desktop or the GitHub API is caught by a probe,
+a pin check or a recording before a user meets it, and the spec says
+what happens when it is not.
+
+As this person you care about:
+
+- **Facts owned by someone else** because `sbx ls --json`, the
+  `remote.sandbox-<name>.*` keys, the kit descriptor grammar and the
+  herdr `layout.apply` request are all read or written by code we do
+  not control (01 1.1, 06, 02); the lens lists each and asks which probe
+  of 11 covers it, and what `doctor` says when one changes shape.
+- **A version floor without a ceiling** because `sbxdrv` has a version
+  floor and the toolchain acknowledgement (01 1.3) records a version;
+  neither says what a version above the one tested means. Incident: a
+  tool that accepted every newer version of its dependency until the
+  dependency changed an exit code.
+- **The egress catalog as a mirror of the world** (07, S4) because
+  backends add hosts, mise adds backends, and the catalog is embedded in
+  a release; the lens asks how a user whose tool is missing finds out
+  and gets unblocked without a release.
+- **Pins that someone must bump** (J8, J9, `pin check`) because a
+  digest pin is only as fresh as the person who bumps it, and a stale
+  pin is a security finding waiting to be filed; the lens asks what
+  notices staleness.
+- **A renderer owned by a small project** because herdr is on the path
+  of `romeu run`, and the renderer interface of 02 is the only hedge;
+  the lens asks whether the interface is real enough to carry a second
+  renderer, or a shape on paper.
+- **Recordings as the contract with the upstream** (10 10.3, 11)
+  because a recorded `sbx` conversation is a fact at one version; the
+  lens asks how a recording is dated, and how many of them a version
+  bump invalidates.
+
+Where to confirm, read last: 07, 06, 02, 11, 01 1.1 (sbx-owned facts),
+04 4.2 (`doctor`), 09 (J8, J9), S3, S4. Model: opus.
+
+### L16 The owner of the data
+
+Role: the developer, and the employer whose code it is, who notice that
+their repositories, memory entries, handoffs, saved transcripts and
+runtime events now live in directories a tool manages. Success is: they
+know what is where, who can read it, how to export it, how to delete
+it, and how to stop using romeu while keeping every clone and every
+note as plain files.
+
+As this person you care about:
+
+- **Transcripts saved on request** (`salvage --include-transcripts`, 08)
+  because an agent transcript holds the code, the secrets a developer
+  pasted and the employer's prompts; the lens asks who reads the
+  salvage directory, whether it enters a machine backup, and whether
+  the spec says so to the user.
+- **A ledger that is never redacted and never deleted** (13, 05 5.4)
+  because the spec's rule is absolute and the remedy is to rotate a
+  credential; the lens asks what a user does when the value in the
+  ledger is not a credential but a name.
+- **An attic that never empties** (`retire`, 01 1.8) because "never
+  deletes" is a promise to the data and a liability to its owner; the
+  lens asks for the one command, or the one sentence, that tells the
+  owner how to delete what they own.
+- **Cross-project visibility by design** (I33) because a sandbox reads
+  other projects' names, timings and allowlisted fields; one developer
+  with a work project and a personal project is the case the lens
+  checks, and the employer is the reader who would object.
+- **Leaving** because plain clones, no submodules and an agent-neutral
+  memory format are the spec's promise of a clean exit (00 0.1, 08
+  8.1); the lens asks for the journey that proves it, and finds that 09
+  has none.
+- **Where the memory format is specified** because "format owned by
+  julieta, agent-neutral" (01 1.1) is a claim about portability; the
+  lens asks what a second tool would need to read it.
+
+Where to confirm, read last: 08, 13, 05 5.4, 01 1.1 and 1.8, 00 0.1,
+09 (J6, J7). L2 keeps the attacker; L16 keeps the owner. Model: opus.
+
+## Measuring the set of lenses
+
+A set of viewpoints is always the list of whoever wrote it. The
+measurement below replaces the feeling that something is missing with
+a matrix, run before each round, whose zeros are decisions or lenses.
+
+**What is counted.** For the lens sections (L1 onward), the mentions of
+each source of success the spec defines: the index and each page (00 to
+13, `plan.md`); each criterion S1 to S11; each journey J1 to J13; each
+party in the component table of 01 1.1 (sbx, mise, herdr, GitHub, the
+signing agent, the agent runtime); and two lists from outside the spec,
+kept because two independent frames pointing at the same gap is the
+signal that justifies a lens: the stakeholder classes of Rozanski and
+Woods (acquirers, assessors, communicators, developers, maintainers,
+production engineers, suppliers, support staff, system administrators,
+testers, users) and the minimum concerns of ISO/IEC/IEEE 42010
+(purpose, suitability, feasibility, life-cycle risks, maintainability).
+
+**What a zero means.** Every row with no lens gets one of two
+outcomes, written in this page: a lens, or one line saying why none is
+needed. A row with one lens is reviewed for whether that lens's
+definition of success reaches it, or only its reading list.
+
+**The measurement before round 8** (on the twelve lenses L1 to L12 as
+first written): pages 02 and 07 had no lens; criteria S2 and S4 had
+none; journeys J4, J5, J7, J8, J9 and J13 had none; of the external
+parties, mise and herdr had one mention each, sbx five against forty in
+01, the signing agent none; the themes privacy, transcripts, backups,
+export and leaving had none. Against the 42010 concerns, feasibility
+had no lens. Against the stakeholder classes, suppliers had none. The
+zeros clustered into two viewpoints, L15 and L16, and into reading
+lines added to L1, L2, L4, L5, L6 and L7 (the signing agent went to
+L2), and a bullet in L9; the measurement is why they exist. The script
+counts the lens sections only, so this page's own measurement text does
+not count as coverage.
+
+**Rows with no lens, by decision.** Accessibility and colour of the
+terminal output: the spec defines no colour semantics and no
+interactive interface beyond two TTY prompts, and I29 fixes what the
+output may contain; reopen when 04 gains colour, a progress display or
+an interactive command. Deprecation and migration of the product's own
+formats: the spec versions its file formats (03) and the plan starts at
+v1.0.0 with nothing to migrate from; reopen at the first format bump.
+
+**How it is run.** By a script that reads this page and the spec and
+prints the matrix. Until that script lives in the repository, the
+round's orchestrator runs it from a scratch directory and pastes its
+output in the round page. Pending item: a `tools/lenses coverage`
+command in Go, with the lists above as committed data, so the matrix
+is a check and not a habit; it is written with the first round page
+that needs it, by the rule of the spec that a scaffold lands with the
+module that owns its first input (12 12.2).
+
+**Bound.** This page stops adding lenses at the point where a new one
+cannot name a source of success that the matrix shows uncovered, or a
+cluster of findings that only L0 raised. Above about fifteen lenses the
+move is to merge two, not to add a third, by the same rule the spec
+applies to its concepts.
+
+## What we learned from others
+
+Each practice below was read from its primary source and recorded in
+the form the project uses for anything borrowed: their decision, the
+constraint that probably produced it, what it cost them, whether the
+same constraint holds here, and what we decided. "Tool X does it" is
+not a reason; a divergence is recorded with its reason.
+
+| Practice and source | Their decision | Probable why | What it cost them | Holds here? | Our decision |
+|---|---|---|---|---|---|
+| IETF: RFC 3552 (BCP 72), RFC 6973, the Security Directorate and Gen-ART pages at wiki.ietf.org | one section is mandatory in every RFC, Security Considerations, with a floor: name the attacks out of scope "and why", consider a fixed list of attack classes. Privacy came later as an Informational questionnaire, needed case by case. Separately, area directorates review every document the IESG sees, and Gen-ART reviews what is "no area's special interest"; reviews are advisory and do not block | "Historically, such sections have been relatively weak" (RFC 3552, 1); directorates exist so area directors can focus on troublesome documents | about 50 reviewers for about 20 documents a month; a document can come back two or more times; RFC 6973 admits designers cannot foresee "all of the privacy implications" | partly. We have one document and one maintainer, not thousands of drafts and an IESG, so a mandatory section per document and an advisory review do not transfer. The catch-all reviewer and "out of scope, and why" transfer whole | L0 is our Gen-ART; the report carries "Out of scope, and why"; our must-fix severities stay binding, because nothing sits above the round to decide what an advisory review leaves open |
+| Rozanski and Woods, viewpoints-and-perspectives.info (viewpoints, perspectives, stakeholders) | a fixed catalogue in two axes: viewpoints that partition the description, and perspectives for qualities that cut across every view; a fixed list of eleven stakeholder classes to catch what is missing. They retired a Security viewpoint when experience showed security cuts across every view | one all-in-one model "is often incomplete, incorrect, or out-of-date" | the set is aimed at "large-scale information systems"; the pages read give no rule for adding or dropping a perspective beyond the stakeholder check | the two-axis split holds: the spec's pages are the partition, and every lens here is a perspective applied across them. The stakeholder-class list holds as a completeness check | the stakeholder classes join the coverage measurement; we do not adopt the viewpoint catalogue, because the spec already partitions itself by page |
+| ISO/IEC/IEEE 42010, the overview at iso-architecture.org (Clause 5 of the 2011 edition; the 2022 conceptual model) | stakeholders hold concerns, concerns are framed by viewpoints; completeness is traceability: every identified concern "must be framed by at least one viewpoint"; a minimum list of stakeholders and of concerns to consider | the standard "does not specify one set of views", so completeness has to be defined against the concern list | not stated in the pages read | yes, directly: our sources of success are the concerns, our lenses the viewpoints | the coverage measurement is a two-way traceability rule; the standard's minimum concerns join the lists it reads, which is how feasibility reached L9 |
+| SEI ATAM, Kazman, Klein and Clements (CMU/SEI-2000-TR-004) | not read: both SEI hosts redirect to www.sei.cmu.edu, which was not reachable from the sandbox | - | - | - | pending; the row is filled when the report is read. It matters because ATAM elicits scenarios from stakeholders rather than from evaluators, which is the one move this page has not borrowed |
+| Nielsen Norman Group, "How to Conduct a Heuristic Evaluation" (2023) and "Why You Only Need to Test with 5 Users" (2000) | three to five evaluators who evaluate independently and do not see each other's notes until done, then merge by affinity; the measured curve: one participant finds about 31% of problems, five about 85%, fifteen nearly all; three rounds of five beat one of fifteen; the curve holds only for comparable users, and each distinct group needs its own three to four | "each individual (no matter how experienced or expert) is likely to miss some" problems | each extra evaluator adds less; the method is "not a replacement for user research" | partly. Each lens here is a distinct group, so one reviewer per lens is below their floor; but a reviewer here costs minutes, not a day, and the overlap between two reviewers of one lens has never been measured | independence before merging stays; the noise probe (two lenses run twice in one round) measures whether one reviewer per lens is enough, and the rule is decided from that number |
+| Gary Klein, "Performing a Project Premortem", Harvard Business Review, September 2007 (read from the article body the publisher serves; the rendered page is paywalled) | announce that the project "has failed spectacularly"; each member writes every reason independently, "especially the kinds of things they ordinarily wouldn't mention"; then round-robin until every reason is recorded | people are "reluctant to speak up about their reservations" while planning; prospective hindsight makes dissent safe | minutes per session; the article reports no criticism | yes | step 5 of the brief states failure as a fact and asks for the reasons this person would not normally say; the source is cited so the wording is not rediscovered |
+| Google SRE, "Evolving the SRE Engagement Model", Site Reliability Engineering, chapter 32 | one to three SREs run a Production Readiness Review against a checklist "specific to the service", drawn from domain expertise, similar systems and past postmortems; recurring concerns were later built into frameworks | design changes found late "come at a high cost" | two to three quarters per onboarding, serialization of takeovers, lead times of months, "cognitive burden" on reviewers; staleness of the checklist is not discussed | partly. A review per launch with months of lead time is the cost we avoid; "read the past postmortems" and "recurring concern becomes a framework" transfer | the consolidator, not the reviewers, checks new findings against previous rounds, so the reviewers stay unanchored; a finding class that repeats across rounds becomes a `tools/ci` check, not a lens |
+| Kahneman, Rosenfield, Gandhi and Blaser, "Noise", Harvard Business Review, October 2016 (read as the Klein article was; the 2021 book was not read) | a noise audit: members of a unit judge a common set of cases independently and the spread between them is measured; in a case roundtable each participant forms a defensible opinion alone and sends it to the leader before the meeting | discussion produces "spurious agreement" as people "converge on the opinions stated first or most confidently"; executives are "completely unaware" of the noise | executives expected 5 to 10% disagreement and the audits measured 48% and 60%; the authors call the discipline "not at all easy" and say professionals "drift" | yes | reviewers never see each other before the merge; the consolidator records a disagreement between two reviewers of one lens as data for the round page, never resolves it by confidence; the noise probe is our noise audit |
+
+Across the seven sources read, three things recur and are now in this
+page: independence before pooling (Nielsen, Klein, Kahneman and
+colleagues), a stated out-of-scope with its reason (RFC 3552, 42010),
+and completeness as traceability against a list rather than as a
+feeling (42010, Rozanski and Woods). One thing recurs that we did not
+take: viewpoints after the first are added as guidance more often than
+as mandates (RFC 6973, the retired Security viewpoint). Here every
+lens runs every round, because a round costs minutes and a lens that
+sits out costs the round that would have needed it.
+
 ## Rounds that used these lenses
 
 | Round | Baseline | Lenses | Page |
 |---|---|---|---|
-| 8 | the default branch at the commit this page was added | L0 to L12 | round-8.md, when written |
+| 8 | the default branch at the commit this page was added | L0 to L16, with the noise probe on two lenses the round names | round-8.md, when written |
