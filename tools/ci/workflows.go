@@ -39,7 +39,10 @@ const (
 //     read from a variable), and an env table, whose keys could make a
 //     tools/ci run start other code (BASH_ENV, LD_PRELOAD, PATH,
 //     GOFLAGS=-toolexec). An action takes only the with keys listed
-//     for it (actionInputs). A matrix is a written mapping of the keys
+//     for it (actionInputs), each a literal or an exact matrix
+//     reference whose values are literals, so no value an event can
+//     write reaches an input, and no expression reads the token or a
+//     secret. A matrix is a written mapping of the keys
 //     os and include, and an include entry holds os and mise_sha256
 //     only, so the label a job runs on is always one that is checked.
 //  2. A file that reads as one thing and runs as another: an anchor,
@@ -48,8 +51,8 @@ const (
 //
 // Out of scope, and left to the review of the ask-first surface
 // .github/workflows/** (05 5.3): the values the grammar leaves free
-// (permissions, the owner of an action, the values of the with keys
-// listed for an action, the filters of an event), what a pinned
+// (the owner of an action, the filters of an event, the strategy values
+// outside the matrix), what a pinned
 // action's code does, and a pull
 // request that edits the workflow or this check itself, since the run
 // it starts uses the files of that pull request.
@@ -64,7 +67,26 @@ var (
 	jobKeys      = []string{"name", "runs-on", "needs", "strategy", "permissions", "timeout-minutes", "steps"}
 	usesStepKeys = []string{"name", "uses", "with"}
 	runStepKeys  = []string{"name", "run"}
+	strategyKeys = []string{"matrix", "fail-fast", "max-parallel"}
 )
+
+// The grammar is made of allowlists, and what a list does not name is
+// refused: a denylist always misses a variant (10 10.2).
+//
+// allowedRunners are the hosted labels of 10 10.2, Runners: the only
+// labels runs-on and the os of a matrix may hold.
+//
+// allowedSecrets are the secrets a workflow may read, as
+// ${{ secrets.<name> }}, by lower-case name: none today. A secret joins
+// the list with the operator's approval. The token of the run
+// (${{ github.token }}) is read through no expression either.
+var (
+	allowedRunners = []string{"ubuntu-26.04", "ubuntu-26.04-arm", "macos-26", "macos-26-intel"}
+	allowedSecrets []string
+)
+
+// checkoutAction is the action whose step must not keep the token.
+const checkoutAction = "actions/checkout"
 
 // actionInputs are the with keys each action may take, by its
 // "<owner>/<repo>": the inputs the workflows of this repository use.
@@ -77,18 +99,20 @@ var actionInputs = map[string][]string{
 }
 
 // matrixRunner is the one expression runs-on may hold; the labels it
-// takes come from the os key of the job's matrix, each a runnerLabel.
+// takes come from the os key of the job's matrix, each one of
+// allowedRunners.
 const matrixRunner = "${{ matrix.os }}"
 
 var (
 	// usesForm is an action pinned to a commit: owner, repository, an
 	// optional path inside it, and 40 hex digits after the "@".
-	// Each name starts with a letter or a digit, so no "." or ".."
-	// segment can turn it into a path of the repository.
-	usesForm = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9][A-Za-z0-9_.-]*(/[A-Za-z0-9][A-Za-z0-9_.-]*)*@[0-9a-f]{40}$`)
-	// runnerLabel is a GitHub-hosted runner image with a pinned version
-	// (10 10.2, Runners): never *-latest, never self-hosted.
-	runnerLabel = regexp.MustCompile(`^(ubuntu|macos)-[0-9]+(\.[0-9]+)?(-arm|-intel)?$`)
+	// The owner and the repository start with a letter or a digit, and
+	// so does each path segment or it starts with "_", so no "." or ".."
+	// segment can turn the value into a path of the repository.
+	usesForm = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*@[0-9a-f]{40}$`)
+	// matrixRef is the one expression a literal input may hold: a key
+	// of the job's matrix, alone.
+	matrixRef = regexp.MustCompile(`^\$\{\{ matrix\.([A-Za-z0-9_-]+) \}\}$`)
 	// runWord is one word of a run line, and runVar the other form a
 	// word may take: a variable of the runner's environment, quoted.
 	runWord = regexp.MustCompile(`^[A-Za-z0-9._/=:-]+$`)
@@ -201,6 +225,10 @@ func (c *grammar) walk(n *yaml.Node) {
 				c.add(key, "a key is a plain name")
 				continue
 			}
+			// A tag outside plainTags is already a finding of its own.
+			if key.Tag != "!!str" && slices.Contains(plainTags, key.Tag) {
+				c.add(key, "a key is written as a plain string, never as another kind")
+			}
 			if slices.Contains(seen, key.Value) {
 				c.add(key, "the key "+strconv.Quote(key.Value)+" is written twice")
 			}
@@ -226,8 +254,14 @@ func (c *grammar) expressions(n *yaml.Node) {
 			c.add(n, "an expression is not closed")
 			return
 		}
-		if !contextPath.MatchString(inner) {
+		path := strings.ToLower(strings.TrimSpace(inner))
+		switch name, isSecret := strings.CutPrefix(path, "secrets."); {
+		case !contextPath.MatchString(inner):
 			c.add(n, "an expression is one context path, as matrix.os, with no operator, call or literal")
+		case isSecret && !slices.Contains(allowedSecrets, name):
+			c.add(n, "a secret is read only from the list of allowed secrets, which is empty")
+		case path == "github.token":
+			c.add(n, "the token is read through no expression, as the list of allowed secrets is empty")
 		}
 		rest = tail
 	}
@@ -241,8 +275,25 @@ func (c *grammar) file(doc *yaml.Node) {
 			c.add(key, "the key "+strconv.Quote(key.Value)+" is outside the grammar of a file")
 		case key.Value == "on":
 			c.events(value)
+		case key.Value == "permissions":
+			c.permissions(value)
 		case key.Value == "jobs":
 			c.jobs(value)
+		}
+	}
+}
+
+// permissions checks the scopes of a permissions key, at the top or in
+// a job: a mapping whose values are read or none. A word (read-all,
+// write-all) and any write, id-token included, are outside the grammar.
+func (c *grammar) permissions(n *yaml.Node) {
+	if n.Kind != yaml.MappingNode {
+		c.add(n, "permissions is a mapping of scopes, with no read-all or write-all")
+		return
+	}
+	for _, scope := range pairs(n) {
+		if scope.Kind != yaml.ScalarNode || (scope.Value != "read" && scope.Value != "none") {
+			c.add(scope, "a permission is read or none, never a write")
 		}
 	}
 }
@@ -287,13 +338,16 @@ func (c *grammar) job(n *yaml.Node) {
 	for key, value := range pairs(n) {
 		switch key.Value {
 		case "runs-on":
-			if value.Kind != yaml.ScalarNode || (value.Value != matrixRunner && !runnerLabel.MatchString(value.Value)) {
-				c.add(value, "runs-on is "+matrixRunner+" or a pinned GitHub-hosted label such as ubuntu-26.04, never *-latest")
+			if value.Kind != yaml.ScalarNode || (value.Value != matrixRunner && !slices.Contains(allowedRunners, value.Value)) {
+				c.add(value, "runs-on is "+matrixRunner+" or one of "+strings.Join(allowedRunners, ", ")+", never *-latest")
 			}
 		case "strategy":
+			c.strategy(value)
 			osKnown = c.matrix(field(value, "matrix"))
+		case "permissions":
+			c.permissions(value)
 		case "steps":
-			c.steps(value)
+			c.steps(value, field(n, "strategy"))
 		}
 		if !slices.Contains(jobKeys, key.Value) {
 			c.add(key, "the key "+strconv.Quote(key.Value)+" is outside the grammar of a job")
@@ -354,6 +408,50 @@ func (c *grammar) matrix(n *yaml.Node) bool {
 	return osNode != nil || every
 }
 
+// strategy checks the keys of a job's strategy against strategyKeys.
+func (c *grammar) strategy(n *yaml.Node) {
+	if n.Kind != yaml.MappingNode {
+		c.add(n, "strategy is a mapping")
+		return
+	}
+	for key := range pairs(n) {
+		if !slices.Contains(strategyKeys, key.Value) {
+			c.add(key, "the strategy key "+strconv.Quote(key.Value)+" is outside the grammar: matrix, fail-fast and max-parallel")
+		}
+	}
+}
+
+// matrixValues returns the values the matrix of strategy gives to key:
+// the key itself, a scalar or a list, and the key of each include entry.
+// ok is false when there is none, or when one is not a scalar free of
+// expressions, since then the value an input receives is not a literal.
+func matrixValues(strategy *yaml.Node, key string) (values []string, ok bool) {
+	matrix := field(strategy, "matrix")
+	ok = true
+	add := func(v *yaml.Node) {
+		if v.Kind != yaml.ScalarNode || strings.Contains(v.Value, "${{") {
+			ok = false
+			return
+		}
+		values = append(values, v.Value)
+	}
+	if v := field(matrix, key); v != nil && key != "include" {
+		if v.Kind == yaml.SequenceNode {
+			for _, item := range v.Content {
+				add(item)
+			}
+		} else {
+			add(v)
+		}
+	}
+	for _, entry := range seqContent(field(matrix, "include")) {
+		if v := field(entry, key); v != nil {
+			add(v)
+		}
+	}
+	return values, ok && len(values) > 0
+}
+
 // matrixLabels checks the runner labels of a matrix's os key, one
 // label or a list of them: each a pinned GitHub-hosted label.
 func (c *grammar) matrixLabels(n *yaml.Node) {
@@ -365,8 +463,8 @@ func (c *grammar) matrixLabels(n *yaml.Node) {
 		labels = n.Content
 	}
 	for _, l := range labels {
-		if l.Kind != yaml.ScalarNode || !runnerLabel.MatchString(l.Value) {
-			c.add(l, "a runner label of the matrix is a pinned GitHub-hosted label such as ubuntu-26.04, never *-latest")
+		if l.Kind != yaml.ScalarNode || !slices.Contains(allowedRunners, l.Value) {
+			c.add(l, "a runner label of the matrix is one of "+strings.Join(allowedRunners, ", ")+", never *-latest")
 		}
 	}
 }
@@ -380,19 +478,19 @@ func seqContent(n *yaml.Node) []*yaml.Node {
 	return n.Content
 }
 
-func (c *grammar) steps(n *yaml.Node) {
+func (c *grammar) steps(n, strategy *yaml.Node) {
 	if n.Kind != yaml.SequenceNode {
 		c.add(n, "steps is a list")
 		return
 	}
 	for _, s := range n.Content {
-		c.step(s)
+		c.step(s, strategy)
 	}
 }
 
 // step checks one step: a uses step or a run step, never both, each
 // with its own keys and the form of its one command.
-func (c *grammar) step(n *yaml.Node) {
+func (c *grammar) step(n, strategy *yaml.Node) {
 	if n.Kind != yaml.MappingNode {
 		c.add(n, "a step is a mapping")
 		return
@@ -415,7 +513,7 @@ func (c *grammar) step(n *yaml.Node) {
 			if value.Kind != yaml.MappingNode {
 				c.add(value, "with is a mapping")
 			} else if uses := field(n, "uses"); uses.Kind == yaml.ScalarNode && usesForm.MatchString(uses.Value) {
-				c.inputs(uses, value)
+				c.inputs(uses, value, strategy)
 			}
 		case "run":
 			if value.Kind != yaml.ScalarNode || !runLine(value.Value) {
@@ -423,22 +521,76 @@ func (c *grammar) step(n *yaml.Node) {
 			}
 		}
 	}
+	if uses := field(n, "uses"); uses != nil && uses.Kind == yaml.ScalarNode && usesForm.MatchString(uses.Value) {
+		c.checkout(n, uses)
+	}
 	if kind == "run" && field(n, "run") == nil {
 		c.add(n, "a step has uses or run")
 	}
 }
 
-// inputs checks the with keys of a uses step against actionInputs.
-func (c *grammar) inputs(uses, with *yaml.Node) {
+// actionName returns "<owner>/<repo>" of a uses value, in lower case:
+// GitHub reads the owner and the repository without case.
+func actionName(uses *yaml.Node) string {
 	action, _, _ := strings.Cut(uses.Value, "@")
 	if parts := strings.SplitN(action, "/", 3); len(parts) >= 2 {
 		action = parts[0] + "/" + parts[1]
 	}
+	return strings.ToLower(action)
+}
+
+// inputs checks the with keys of a uses step against actionInputs, and
+// each value: a literal, or one ${{ matrix.<key> }} alone whose values
+// are literals, so that nothing an event can write reaches an input.
+func (c *grammar) inputs(uses, with, strategy *yaml.Node) {
+	action := actionName(uses)
 	allowed := actionInputs[action]
-	for key := range pairs(with) {
+	for key, value := range pairs(with) {
 		if !slices.Contains(allowed, key.Value) {
 			c.add(key, "the input "+strconv.Quote(key.Value)+" is not one this repository uses for "+action)
+			continue
 		}
+		if value.Kind != yaml.ScalarNode {
+			c.add(value, "a with value is a scalar")
+		} else if strings.Contains(value.Value, "${{") && !literalMatrixRef(value.Value, strategy) && matrixReadable(strategy) {
+			c.add(value, "this with input is a literal, or one ${{ matrix.<key> }} alone whose values are literals")
+		}
+	}
+}
+
+// matrixReadable reports whether the matrix of strategy is in the form
+// matrix checks, so that a value it gives is read: a written mapping
+// whose include is a written list. A matrix in another form is a finding
+// of its own already.
+func matrixReadable(strategy *yaml.Node) bool {
+	matrix := field(strategy, "matrix")
+	include := field(matrix, "include")
+	return matrix != nil && matrix.Kind == yaml.MappingNode && (include == nil || include.Kind == yaml.SequenceNode)
+}
+
+// literalMatrixRef reports whether s is exactly ${{ matrix.<key> }} and
+// every value the matrix gives to key is a literal.
+func literalMatrixRef(s string, strategy *yaml.Node) bool {
+	m := matrixRef.FindStringSubmatch(s)
+	if m == nil {
+		return false
+	}
+	_, ok := matrixValues(strategy, m[1])
+	return ok
+}
+
+// checkout fails a checkout step that does not set persist-credentials:
+// false, so that no later step holds the token. The action is matched
+// without case, as GitHub reads it.
+func (c *grammar) checkout(step, uses *yaml.Node) {
+	if actionName(uses) != checkoutAction {
+		return
+	}
+	if with := field(step, "with"); with != nil && with.Kind != yaml.MappingNode {
+		return // "with is a mapping" is the finding
+	}
+	if v := field(field(step, "with"), "persist-credentials"); v == nil || v.Kind != yaml.ScalarNode || v.Value != "false" {
+		c.add(step, "a checkout step sets persist-credentials: false, so that no later step holds the token")
 	}
 }
 

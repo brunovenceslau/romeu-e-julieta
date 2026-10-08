@@ -1019,35 +1019,13 @@ func tomlKey(name string) string {
 // numbers.
 var lockedVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
-// lockedVersions returns the version mise.lock locks for each tool: the
-// "version" key that follows each "[[tools.<name>]]" header.
-func lockedVersions(data []byte) map[string]string {
-	locked := map[string]string{}
-	tool := ""
-	for line := range strings.SplitSeq(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if name, ok := strings.CutPrefix(line, "[[tools."); ok {
-			tool = strings.Trim(strings.TrimSuffix(name, "]]"), `"`)
-			continue
-		}
-		if strings.HasPrefix(line, "[") {
-			continue
-		}
-		key, value, ok := strings.Cut(line, "=")
-		if ok && tool != "" && strings.TrimSpace(key) == "version" {
-			locked[tool] = strings.Trim(strings.TrimSpace(value), `"`)
-			tool = ""
-		}
-	}
-	return locked
-}
-
 // TestLockedVersions checks that mise.lock locks the pinnedTools and no
 // other, each at an exact version.
 func TestLockedVersions(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(moduleRoot(t), "mise.lock"))
 	require.NoError(t, err)
-	locked := lockedVersions(data)
+	locked, err := lockedVersions(data)
+	require.NoError(t, err)
 	assert.ElementsMatch(t, pinnedTools, slices.Collect(maps.Keys(locked)), "the tools of mise.lock")
 	for tool, version := range locked {
 		assert.Regexp(t, lockedVersion, version, "the version of %s in mise.lock", tool)
@@ -1138,7 +1116,8 @@ func TestMiseConfigs(t *testing.T) {
 	root := moduleRoot(t)
 	lock, err := os.ReadFile(filepath.Join(root, "mise.lock"))
 	require.NoError(t, err)
-	locked := lockedVersions(lock)
+	locked, err := lockedVersions(lock)
+	require.NoError(t, err)
 	var configs []string
 	for _, f := range repoFiles(t, root, "*mise*") {
 		if strings.HasSuffix(f, ".toml") {

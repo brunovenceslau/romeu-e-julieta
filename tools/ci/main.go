@@ -61,6 +61,8 @@ type env struct {
 	// profile is the cover profile that coverage reads in all when
 	// steps is set; with the real steps, all writes one of its own.
 	profile string
+	// machine returns what "uname -m" prints; nil means the command.
+	machine func(context.Context) string
 }
 
 func main() {

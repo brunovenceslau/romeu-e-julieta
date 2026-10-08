@@ -4,6 +4,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -1001,6 +1002,36 @@ func (f fakeMise) script(t *testing.T, prelude, linter, goCmd string) {
 	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
 }
 
+// lockFixture is the mise.lock of the fakes: the versions the fake
+// installs below carry.
+const lockFixture = `[[tools.go]]
+version = "1.27.0"
+
+[[tools."go:golang.org/x/vuln/cmd/govulncheck"]]
+version = "1.8.0"
+
+[[tools.golangci-lint]]
+version = "2.14.0"
+`
+
+// lockedRoot returns a directory that holds a mise.lock with lock.
+func lockedRoot(t *testing.T, lock string) string {
+	t.Helper()
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.lock"), []byte(lock), 0o600))
+	return root
+}
+
+// TestLockedVersionsFixture reads the versions of a lock, and refuses a
+// tool locked at two.
+func TestLockedVersionsFixture(t *testing.T) {
+	got, err := lockedVersions([]byte(lockFixture))
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"go": "1.27.0", "go:golang.org/x/vuln/cmd/govulncheck": "1.8.0", "golangci-lint": "2.14.0"}, got)
+	_, err = lockedVersions([]byte(lockFixture + "[[tools.go]]\nversion = \"1.26.0\"\n"))
+	require.ErrorContains(t, err, "mise.lock locks go at more than one version")
+}
+
 // TestResolveLintToolsFailsClosed runs resolveLintTools against a fake
 // mise (newFakeMise). Every case that names an error fails, and none
 // falls back to a tool on the search path.
@@ -1014,8 +1045,49 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		setup  func(t *testing.T, f fakeMise) (linter, goCmd string)
 		noMise bool
 		fails  bool
-		want   string
+		// lock is the mise.lock of the root; "" means lockFixture, and
+		// "none" no file.
+		lock string
+		want string
 	}{
+		{
+			name: "a linter at a version beside the locked one",
+			setup: func(t *testing.T, f fakeMise) (string, string) {
+				return f.tool(t, "golangci-lint", "2.13.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
+			},
+			want: "mise which golangci-lint: the install is not the version 2.14.0 that mise.lock locks: run \"mise install\" in ",
+		},
+		{
+			name: "a go at a version beside the locked one",
+			setup: func(t *testing.T, f fakeMise) (string, string) {
+				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.26.0", "bin", "go")
+			},
+			want: "mise which go: the install is not the version 1.27.0 that mise.lock locks",
+		},
+		{
+			name: "no mise.lock",
+			lock: "none",
+			setup: func(t *testing.T, f fakeMise) (string, string) {
+				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
+			},
+			want: "mise which golangci-lint: mise.lock: ",
+		},
+		{
+			name: "a tool the lock does not hold",
+			lock: "[[tools.go]]\nversion = \"1.27.0\"\n",
+			setup: func(t *testing.T, f fakeMise) (string, string) {
+				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
+			},
+			want: "mise.lock locks no version of golangci-lint",
+		},
+		{
+			name: "a tool locked at two versions",
+			lock: lockFixture + "[[tools.golangci-lint]]\nversion = \"2.13.0\"\n",
+			setup: func(t *testing.T, f fakeMise) (string, string) {
+				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
+			},
+			want: "mise.lock locks golangci-lint at more than one version",
+		},
 		{name: "no mise on the search path", noMise: true, want: "mise is not on the search path"},
 		{
 			name:  "mise which fails, with what mise wrote to standard error",
@@ -1118,7 +1190,11 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 			case !tt.noMise:
 				f.script(t, "", linter, goCmd)
 			}
-			tools, err := resolveLintTools(t.Context(), t.TempDir())
+			root := t.TempDir()
+			if tt.lock != "none" {
+				root = lockedRoot(t, cmp.Or(tt.lock, lockFixture))
+			}
+			tools, err := resolveLintTools(t.Context(), root)
 			if tt.want != "" {
 				installs, evalErr := filepath.EvalSymlinks(f.installs())
 				if evalErr != nil {
@@ -1161,7 +1237,7 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 	}
 	dump := filepath.Join(t.TempDir(), "env")
 	f.script(t, "'"+envPath+"' > '"+dump+"'\n", f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go"))
-	_, err = resolveLintTools(t.Context(), t.TempDir())
+	_, err = resolveLintTools(t.Context(), lockedRoot(t, lockFixture))
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(dump)

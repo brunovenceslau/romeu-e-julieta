@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 )
@@ -21,13 +22,22 @@ import (
 // working tree.
 const coverFile = "cover.out"
 
-// execTools are the tools of all that tools/ci starts through "mise
-// exec" (10 10.2), each with the directory below the mise installs
-// directory where mise puts it: the name of its backend with ":", "/"
-// and "." written as "-" (measured with mise 2026.10.3).
-var execTools = map[string]string{
-	"govulncheck": "go-golang-org-x-vuln-cmd-govulncheck",
-}
+// govulncheckLock and govulncheckDir name govulncheck in mise.lock and
+// the directory below the mise installs directory where mise puts it:
+// the name of its backend with ":", "/" and "." written as "-" (measured
+// with mise 2026.10.3). It runs by the path "mise which" resolves, and
+// not through "mise exec": with the tool missing, "mise exec" warned and
+// ran a govulncheck of the search path, exit status 0 (measured with mise
+// 2026.10.3), which is not the version mise.lock locks.
+const (
+	govulncheckLock = "go:golang.org/x/vuln/cmd/govulncheck"
+	govulncheckDir  = "go-golang-org-x-vuln-cmd-govulncheck"
+)
+
+// raceTimeout bounds the race run, which builds every package with the
+// race detector and runs every test: a budget of its own, and not the
+// stepTimeout of a fast step. The job of ci.yml has 60 minutes.
+const raceTimeout = 40 * time.Minute
 
 // reuseImage is the container image of the license step: reuse 6.2.0,
 // with its Python and every dependency, pinned by the digest of the
@@ -44,22 +54,18 @@ const reuseImage = "fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e76
 //
 // The race run passes "-count=1" for the reason the unit step does:
 // a test that scans the repository would otherwise be served from the
-// test cache. govulncheck is started through "mise exec", in stepEnv
-// with networkPassThrough, since it reads the Go vulnerability
-// database,
-// once whichPinned has found it below the directory where mise
-// installs it: "mise exec" runs a program of the search path when the
-// configuration does not pin it, and that would be a tool no lock
-// holds. A tool that is not found fails its step and no other.
+// test cache. govulncheck runs in stepEnv with networkPassThrough, since
+// it reads the Go vulnerability database, from the path whichPinned
+// finds below the directory where mise installs it and at the version
+// mise.lock locks. A tool that is not found fails its step and no other.
 func allSteps(ctx context.Context, root string, tools lintTools, profile string) []step {
 	env := stepEnv(tools.goDir)
 	gitCommon, gitErr := gitCommonDir(ctx, root)
-	viaMise := func(name, tool string, args ...string) step {
-		s := step{name: name, argv: append([]string{"mise", "exec", "--", tool}, args...), environ: withProcessEnv(env, networkPassThrough)}
-		if _, err := whichPinned(ctx, root, tool, execTools[tool]); err != nil {
-			s.unavailable = err
-		}
-		return s
+	vuln := step{name: "vulnerabilities", environ: withProcessEnv(env, networkPassThrough)}
+	if path, err := whichPinned(ctx, root, "govulncheck", govulncheckLock, govulncheckDir); err != nil {
+		vuln.unavailable = err
+	} else {
+		vuln.argv = []string{path, "./..."}
 	}
 	goCmd := filepath.Join(tools.goDir, "go")
 	license := licenseStep(root, gitCommon, runtime.GOOS, withProcessEnv(env, dockerPassThrough))
@@ -67,8 +73,8 @@ func allSteps(ctx context.Context, root string, tools lintTools, profile string)
 		license.unavailable = gitErr
 	}
 	return append(fastSteps(root, tools),
-		viaMise("vulnerabilities", "govulncheck", "./..."),
-		step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env},
+		vuln,
+		step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env, timeout: raceTimeout},
 		license,
 	)
 }
@@ -155,7 +161,12 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	if err := nestedModules(ctx, repo); err != nil {
 		return false, err
 	}
-	say(e.stdout, "platform  %s/%s, uname -m %s\n", runtime.GOOS, runtime.GOARCH, unameMachine(ctx))
+	machine := e.machine
+	if machine == nil {
+		machine = unameMachine
+	}
+	uname := machine(ctx)
+	say(e.stdout, "platform  %s/%s, uname -m %s\n", runtime.GOOS, runtime.GOARCH, uname)
 
 	profile := e.profile
 	steps := e.steps
@@ -173,6 +184,11 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 		steps = allSteps(ctx, root, tools, profile)
 	}
 	c := newChecks(e.stdout)
+	archDetail := ""
+	if !archMatches(uname, runtime.GOARCH) {
+		archDetail = fmt.Sprintf("uname -m reports %s and this binary runs as %s: the tools of this run are not the ones of the machine\n", uname, runtime.GOARCH)
+	}
+	c.report("architecture", archDetail == "", archDetail)
 	c.run(ctx, root, steps)
 
 	for _, check := range []struct {
@@ -201,6 +217,21 @@ func unameMachine(ctx context.Context) string {
 		return "unknown (" + err.Error() + ")"
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// archMatches reports whether what "uname -m" prints (x86_64, aarch64 or
+// arm64) is the architecture goarch names: a Go built for the other
+// architecture, or run under translation, is not a run on the machine
+// the runner label names. Anything else, "unknown" included, does not
+// match.
+func archMatches(uname, goarch string) bool {
+	switch uname {
+	case "x86_64":
+		return goarch == "amd64"
+	case "aarch64", "arm64":
+		return goarch == "arm64"
+	}
+	return false
 }
 
 // coverageAt applies coverage to the profile at path, for the module of

@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -40,6 +41,8 @@ type step struct {
 	// unavailable, when set, says why the step's tool could not be
 	// resolved: the step fails with it and starts nothing.
 	unavailable error
+	// timeout, when set, replaces stepTimeout for this step.
+	timeout time.Duration
 	// skip, when set, says why the step does not run on this platform:
 	// it is reported with "--", neither passed nor failed.
 	skip string
@@ -109,11 +112,11 @@ type lintTools struct {
 // configuration); such a tool is no pinned one, and it is an error here
 // too.
 func resolveLintTools(ctx context.Context, root string) (lintTools, error) {
-	linter, err := whichPinned(ctx, root, "golangci-lint", "golangci-lint")
+	linter, err := whichPinned(ctx, root, "golangci-lint", "golangci-lint", "golangci-lint")
 	if err != nil {
 		return lintTools{}, err
 	}
-	goBin, err := whichPinned(ctx, root, "go", "go")
+	goBin, err := whichPinned(ctx, root, "go", "go", "go")
 	if err != nil {
 		return lintTools{}, err
 	}
@@ -123,8 +126,13 @@ func resolveLintTools(ctx context.Context, root string) (lintTools, error) {
 // whichPinned returns the path "mise which" resolves for the program
 // name, once its symbolic links are resolved, and fails unless it lies
 // in dir, the directory below the installs directory (miseInstalls)
-// where mise installs that tool. It runs in passThroughEnv.
-func whichPinned(ctx context.Context, root, name, dir string) (string, error) {
+// where mise installs that tool. The next path segment, the version
+// directory, must equal the version mise.lock locks under key (the
+// tool's name in the lock), so that a stale install left beside the
+// locked one is refused; a tool locked at two versions is an error, as
+// the lock then holds no one version to hold an install to. It runs in
+// passThroughEnv.
+func whichPinned(ctx context.Context, root, name, key, dir string) (string, error) {
 	installsDir, err := miseInstalls()
 	if err != nil {
 		return "", err
@@ -154,8 +162,60 @@ func whichPinned(ctx context.Context, root, name, dir string) (string, error) {
 	want := filepath.Join(installs, dir)
 	if rel, err := filepath.Rel(want, path); err != nil || !filepath.IsLocal(rel) {
 		return "", fmt.Errorf("mise which %s: %s is outside %s, where mise installs it: the mise configuration names a tool mise did not install", name, path, want)
+	} else if err := lockedInstall(root, name, key, filepath.ToSlash(rel)); err != nil {
+		return "", fmt.Errorf("%w: %s", err, path)
 	}
 	return path, nil
+}
+
+// lockedInstall fails unless the first segment of rel, the path of a
+// tool below its install directory, is the version mise.lock locks for
+// key.
+func lockedInstall(root, name, key, rel string) error {
+	lock, err := os.ReadFile(filepath.Join(root, "mise.lock"))
+	if err != nil {
+		return fmt.Errorf("mise which %s: mise.lock: %w; the version a tool runs at is the one it locks", name, err)
+	}
+	versions, err := lockedVersions(lock)
+	if err != nil {
+		return fmt.Errorf("mise which %s: %w", name, err)
+	}
+	version, ok := versions[key]
+	if !ok {
+		return fmt.Errorf("mise which %s: mise.lock locks no version of %s", name, key)
+	}
+	if first, _, _ := strings.Cut(rel, "/"); first != version {
+		return fmt.Errorf("mise which %s: the install is not the version %s that mise.lock locks: run \"mise install\" in %s", name, version, root)
+	}
+	return nil
+}
+
+// lockedVersions returns the version mise.lock locks for each tool: the
+// "version" key that follows each "[[tools.<name>]]" header. A tool
+// locked at more than one version is an error.
+func lockedVersions(data []byte) (map[string]string, error) {
+	locked := map[string]string{}
+	tool := ""
+	for line := range strings.SplitSeq(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if name, ok := strings.CutPrefix(line, "[[tools."); ok {
+			tool = strings.Trim(strings.TrimSuffix(name, "]]"), `"`)
+			continue
+		}
+		if strings.HasPrefix(line, "[") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if ok && tool != "" && strings.TrimSpace(key) == "version" {
+			version := strings.Trim(strings.TrimSpace(value), `"`)
+			if prev, dup := locked[tool]; dup && prev != version {
+				return nil, fmt.Errorf("mise.lock locks %s at more than one version", tool)
+			}
+			locked[tool] = version
+			tool = ""
+		}
+	}
+	return locked, nil
 }
 
 // miseInstalls returns the directory where mise installs tools:
@@ -307,12 +367,22 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 	if s.unavailable != nil {
 		return nil, s.unavailable
 	}
-	ctx, cancel := context.WithTimeout(ctx, stepTimeout)
+	limit := cmp.Or(s.timeout, stepTimeout)
+	parent := ctx
+	ctx, cancel := context.WithTimeout(parent, limit)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, s.argv[0], s.argv[1:]...)
 	cmd.Dir = dir
 	cmd.Env = append([]string{}, s.environ...)
 	out, err := cmd.CombinedOutput()
+	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if errors.Is(parent.Err(), context.DeadlineExceeded) {
+			// The deadline of the caller fired, before the limit of the step.
+			err = fmt.Errorf("%w at the deadline of the run: %w", context.DeadlineExceeded, err)
+		} else {
+			err = fmt.Errorf("%w after %s: %w", context.DeadlineExceeded, limit, err)
+		}
+	}
 	if err == nil && s.quiet && len(bytes.TrimSpace(out)) > 0 {
 		err = errors.New("the command printed what it found")
 	}
