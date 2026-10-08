@@ -4,8 +4,9 @@
 
 ## What changed
 
-<!-- What the diff does, in a few lines. For each ask-first surface it touches, add one line:
-Approval: <surface id> - <what was approved, in a few words, without quotation marks>
+<!-- What the diff does, in a few lines. For each ask-first surface it touches, add one line
+of the form Approval: <surface id> - <what was approved>, where the phrase names what was approved,
+in a few neutral words, and no person, and holds no double quotation mark.
 The surfaces are listed in docs/reference/ask-first.md. -->
 
 ## Evidence

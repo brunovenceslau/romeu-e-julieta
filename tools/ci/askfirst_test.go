@@ -100,6 +100,7 @@ func TestReferencePage(t *testing.T) {
 	assert.Contains(t, page, "| `ask-first` | `.github/ask-first.yaml` | this list |\n")
 	assert.Contains(t, page, "| `mods` | `go.mod`, `internal/x/**` | a \\| b |\n")
 	assert.Contains(t, page, "`@someone`")
+	assert.Contains(t, page, "```text\n"+approvalForm+"\n```\n", "the form of 12 12.4")
 }
 
 // TestAskFirstOfThisRepository parses the committed list and checks that
@@ -120,7 +121,10 @@ func TestAskFirstOfThisRepository(t *testing.T) {
 	}
 }
 
-// TestPullRequestTemplate checks the five sections of 12 12.7, in order.
+// TestPullRequestTemplate checks the five sections of 12 12.7, in order,
+// and the approval hint: the template shows the form of 12 12.4 inside a
+// sentence, so a body that keeps the hint has no line that starts with
+// "Approval: ", which pr would read as a malformed approval line.
 func TestPullRequestTemplate(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join(moduleRoot(t), ".github", "pull_request_template.md"))
 	require.NoError(t, err)
@@ -129,8 +133,57 @@ func TestPullRequestTemplate(t *testing.T) {
 		if h, ok := strings.CutPrefix(line, "## "); ok {
 			got = append(got, h)
 		}
+		assert.False(t, strings.HasPrefix(line, "Approval: "), "a line that starts with the prefix: %q", line)
 	}
 	assert.Equal(t, []string{"Why", "What changed", "Evidence", "Middleware", "Lessons"}, got)
+	assert.Contains(t, string(b), approvalForm)
+}
+
+// TestApprovalLineOfTheSpec checks that 12 12.4 shows the form and the
+// regular expression that approvalLine holds, and that the form itself
+// is not an approval line.
+func TestApprovalLineOfTheSpec(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join(moduleRoot(t), "docs", "spec", "12-engineering.md"))
+	require.NoError(t, err)
+	spec := strings.ReplaceAll(string(b), "\r\n", "\n")
+	assert.Contains(t, spec, "```text\n"+approvalForm+"\n```\n")
+	assert.Contains(t, spec, "```text\n"+approvalLine.String()+"\n```\n")
+	assert.False(t, approvalLine.MatchString(approvalForm))
+}
+
+// TestApprovalLine checks approvalLine on one line at a time; how pr
+// reads the lines of a whole body is T005's.
+func TestApprovalLine(t *testing.T) {
+	cases := []struct {
+		name, line string
+		match      bool
+	}{
+		{"a valid line", "Approval: decisions - amend rule 8", true},
+		{"an apostrophe", "Approval: decisions - the record\u2019s rule 8", true},
+		{"a single straight quote", "Approval: decisions - the 'rule 8' text", true},
+		{"a lowercase prefix", "approval: decisions - amend rule 8", false},
+		{"an uppercase id", "Approval: Decisions - amend rule 8", false},
+		{"an en dash separator", "Approval: decisions \u2013 amend rule 8", false},
+		{"an empty phrase", "Approval: decisions - ", false},
+		{"a straight quote around the phrase", "Approval: decisions - \"amend rule 8\"", false},
+		{"a straight quote inside the phrase", "Approval: decisions - amend \"rule 8", false},
+		{"a left curly quote alone", "Approval: decisions - \u201camend rule 8", false},
+		{"a right curly quote alone", "Approval: decisions - amend rule 8\u201d", false},
+		{"a low double quote", "Approval: decisions - \u201eamend rule 8", false},
+		{"guillemets", "Approval: decisions - \u00abamend rule 8\u00bb", false},
+		{"a double prime", "Approval: decisions - amend rule 8\u2033", false},
+		{"a fullwidth quote", "Approval: decisions - \uff02amend rule 8", false},
+		{"a CJK double prime quote", "Approval: decisions - \u301damend rule 8\u301e", false},
+		{"a leading no-break space", "Approval: decisions - \u00a0amend rule 8", false},
+		{"a leading tab", "Approval: decisions - \tamend rule 8", false},
+		{"a trailing CR", "Approval: decisions - amend rule 8\r", false},
+		{"an embedded LF", "Approval: decisions - amend\nrule 8", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.match, approvalLine.MatchString(c.line))
+		})
+	}
 }
 
 // specAskFirstList returns the YAML fence under "5.3 Ask-first surfaces"

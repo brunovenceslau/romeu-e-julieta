@@ -297,14 +297,23 @@ Approval: <surface id> - <what was approved>
 
 The phrase after the dash names what was approved, in a few neutral
 words, and no person: for example
-`Approval: decisions - amend rule 8 of ADR 0001`. It carries no
-quotation marks. A line is a whole line of the body that matches the
-Go regular expression
-`^Approval: ([a-z0-9-]+) - ([^"\x{201C}\x{201D}\s][^"\x{201C}\x{201D}]*)$`,
-read without a trailing carriage return, so a body with CR LF line ends
-matches. The phrase starts with a character that is not whitespace, and
-it holds no straight or curly double quotation mark anywhere, so a
-quoted phrase is refused rather than read as an approval. `tools/ci pr` reads
+`Approval: decisions - amend rule 8 of ADR 0001`. The body is split on
+LF, and one trailing CR is removed from each line, so a body with CR LF
+line ends reads the same. An approval line is a line that matches the
+Go regular expression `approvalLine` in `tools/ci/askfirst.go`:
+
+```text
+^Approval: ([a-z0-9-]+) - ([^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\s\p{Z}][^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\r\n]*)$
+```
+
+The prefix and the id are lowercase ASCII and the separator is a space,
+a hyphen-minus and a space. The phrase is not empty, and its first
+character is not an ASCII space or control character of `\s` and not a
+Unicode space of `\p{Z}`, such as U+00A0. The phrase holds no double
+quotation mark anywhere: not U+0022, and not the look-alikes U+00AB,
+U+00BB, U+201C to U+201F, U+2033, U+301D to U+301F and U+FF02. Single
+quotation marks are allowed, because U+2019 is also the apostrophe, and
+other look-alikes are left to review. `tools/ci pr` reads
 `.github/ask-first.yaml` at the base commit and at the head commit and
 uses the union of the two lists, so a PR that removes a surface or a
 glob still needs that surface's line. A surface is touched when a
@@ -312,9 +321,22 @@ changed path matches one of its globs. The changed paths are those
 that differ between the merge base and the head (10 10.2), so merging
 the default branch into the pull request touches nothing. In a glob,
 `**` matches zero or more path segments, `*` matches inside one
-segment, and each other character matches itself. `pr` fails when a touched
-surface has no line, and when a line names an id that neither list
-has. This is the one form of a recorded approval; ADR 0001 rule 8 and
+segment, and each other character matches itself. Across the lines of
+one body, `pr`:
+
+- fails on a line that starts with `Approval: ` and is not an approval
+  line, with the message "malformed approval line", even when another
+  line approves the same surface;
+- fails on an approval line whose id neither list has;
+- fails on two approval lines with the same id;
+- fails when a touched surface has no approval line;
+- accepts an approval line for a known surface the diff does not
+  touch, so an approval given early is not an error.
+
+A line that starts otherwise, such as `approval: ` in lowercase, is not
+read, so its surface counts as without a line. The pull request
+template shows the form inside a sentence, so a body that keeps the
+hint has no line that starts with `Approval: `. This is the one form of a recorded approval; ADR 0001 rule 8 and
 05 5.3 point here. The line is typed by the PR's author, so the check
 proves that the approval was recorded, not who gave it. While one
 account and one token act for everyone

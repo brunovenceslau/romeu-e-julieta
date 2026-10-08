@@ -197,8 +197,8 @@ not a permanent state.
    body, in the one form
    [12 12.4](../spec/12-engineering.md#124-middleware-before-and-after-every-change)
    defines, and a code-owner review before it merges. The line names
-   the surface and, in a short neutral phrase without quotation marks,
-   what was approved; it names no person. The intent is that an agent
+   the surface and, in a short neutral phrase that holds no double
+   quotation mark, what was approved; it names no person. The intent is that an agent
    does not promote or rewrite a record on its own. The approval line
    is typed by the PR's author, so `tools/ci pr` proves that the
    approval was recorded, not who gave it. While one account and one
