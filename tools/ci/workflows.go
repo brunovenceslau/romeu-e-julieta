@@ -573,7 +573,7 @@ func (c *grammar) inputs(uses, with, strategy *yaml.Node) {
 		}
 		if value.Kind != yaml.ScalarNode {
 			c.add(value, "a with value is a scalar")
-		} else if strings.Contains(value.Value, "${{") && !literalMatrixRef(value.Value, strategy) && !(matrixRef.MatchString(value.Value) && matrixUnreadable(strategy)) {
+		} else if strings.Contains(value.Value, "${{") && !literalMatrixRef(value.Value, strategy) && (!matrixRef.MatchString(value.Value) || !matrixUnreadable(strategy)) {
 			c.add(value, "this with input is a literal, or one ${{ matrix.<key> }} alone whose values are literals")
 		}
 	}
@@ -583,7 +583,8 @@ func (c *grammar) inputs(uses, with, strategy *yaml.Node) {
 // does not read, so that the value an input gets from it is unknown: a
 // matrix that is not a written mapping, an include that is not a written
 // list, or an include value that is not a literal. Each is a finding of
-// its own already. A job with no strategy, or a strategy with no matrix,
+// its own already; it excuses only a matrix reference, never another
+// expression. A job with no strategy, or a strategy with no matrix,
 // is not unreadable: nothing there gives an input a literal, so a
 // matrix reference or any other expression in with is a finding.
 func matrixUnreadable(strategy *yaml.Node) bool {
