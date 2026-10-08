@@ -22,6 +22,8 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 )
 
 // runAllIn runs "all" in the fixture with stub steps and the cover
@@ -155,8 +157,9 @@ func TestWorkflowsCommand(t *testing.T) {
 	assert.Equal(t, ".github/workflows/extra.yaml: workflows: a file here ends in .yml\nworkflows: 1 finding(s)\n", out)
 }
 
-// TestAllSteps pins the command steps of all: the steps of fast, then
-// vulnerabilities, race and license. Each runs in stepEnv; the one
+// TestAllSteps pins the command steps of all: the steps of fast, with
+// vulnerabilities and license before unit, since neither runs code of
+// the change, then race. Each runs in stepEnv; the one
 // that reads the Go vulnerability database keeps the variables of a
 // proxy too, and the license step those of the Docker daemon, and no
 // other step keeps either.
@@ -182,10 +185,13 @@ func TestAllSteps(t *testing.T) {
 	env := stepEnv(tools.goDir)
 	steps := allSteps(t.Context(), root, tools, "/tmp/p/cover.out")
 	fast := fastSteps(root, tools)
+	unit := len(fast) - 1
+	require.Equal(t, "unit", fast[unit].name)
 	require.Len(t, steps, len(fast)+3)
-	assert.Equal(t, fast, steps[:len(fast)])
+	assert.Equal(t, fast[:unit], steps[:unit])
+	assert.Equal(t, fast[unit], steps[unit+2])
 
-	vulnStep, race, license := steps[len(fast)], steps[len(fast)+1], steps[len(fast)+2]
+	vulnStep, license, race := steps[unit], steps[unit+1], steps[unit+3]
 	assert.Equal(t, step{name: "vulnerabilities", argv: []string{evalOrSelf(vuln), "./..."}, environ: withProcessEnv(env, networkPassThrough)}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")
 	assert.Equal(t, 40*time.Minute, raceTimeout)
 	assert.Less(t, raceTimeout, ciJobTimeout(t), "the race run ends before the job of ci.yml does")
@@ -462,6 +468,7 @@ func TestAllWiring(t *testing.T) {
 	r := newTree(t)
 	r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
 	r.Write("mise.lock", lockFixture)
+	r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
 	r.Commit("fixture")
 	gitPath, err := exec.LookPath("git")
 	require.NoError(t, err)
@@ -488,7 +495,7 @@ func TestAllWiring(t *testing.T) {
 		"golangci-lint) echo '" + filepath.Join(f.installs(), "golangci-lint", "2.14.0", "golangci-lint") + "' ;;\n" +
 		"govulncheck) echo '" + filepath.Join(f.installs(), govulncheckDir, "1.8.0", "bin", "govulncheck") + "' ;;\n" +
 		"esac\nexit 0\nfi\n"
-	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\n"+which+"echo \"mise $*\" >> '"+log+"'\n"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\n"+answerVersion+which+"echo \"mise $*\" >> '"+log+"'\n"), 0o700))
 
 	code, out := runCI(t, r, nil, nil, "all")
 	assert.Equal(t, exitFail, code, out)
@@ -507,10 +514,11 @@ func TestAllWiring(t *testing.T) {
 			}
 		}
 	}
-	want := []string{"gofmt -l", "go vet", "go run", "lint run", "lint run", "lint run", "lint run", "go test", "govulncheck ./...", "go test"}
+	want := []string{"gofmt -l", "go vet", "go run", "lint run", "lint run", "lint run", "lint run", "govulncheck ./..."}
 	if runtime.GOOS == "linux" {
 		want = append(want, "docker run")
 	}
+	want = append(want, "go test", "go test")
 	assert.Equal(t, want, firstWords, "the order of the steps")
 	require.NotEmpty(t, profile, "the race step names its profile")
 	assert.Equal(t, coverFile, filepath.Base(profile))
@@ -532,6 +540,7 @@ func evalOrSelf(path string) string {
 func TestSetup(t *testing.T) {
 	r := newTree(t)
 	r.Write("mise.lock", lockFixture)
+	r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
 	r.Commit("fixture")
 	gitPath, err := exec.LookPath("git")
 	require.NoError(t, err)
@@ -542,7 +551,7 @@ func TestSetup(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(goCmd), 0o755))
 	require.NoError(t, os.WriteFile(goCmd, []byte("#!/bin/sh\necho \"go $* GOPROXY=${GOPROXY-unset} GOFLAGS=$GOFLAGS HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '"+log+"'\n"), 0o700))
 	linter := f.tool(t, "golangci-lint", "2.14.0", "golangci-lint")
-	script := "#!/bin/sh\nif [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset} MISE=${MISE_OVERRIDE_CONFIG_FILENAMES-unset},${MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES-unset},${MISE_ENV-unset},${MISE_AUTO_ENV-unset}\" >> '" + log + "'\n"
+	script := "#!/bin/sh\n" + answerVersion + "if [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset} MISE=${MISE_OVERRIDE_CONFIG_FILENAMES-unset},${MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES-unset},${MISE_ENV-unset},${MISE_AUTO_ENV-unset}\" >> '" + log + "'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
 	t.Setenv("HTTPS_PROXY", "http://proxy.invalid")
 	t.Setenv("DOCKER_HOST", "unix:///nowhere")
@@ -572,8 +581,24 @@ func TestSetup(t *testing.T) {
 		assert.NoFileExists(t, log, "no mise command ran")
 	})
 
+	t.Run("a mise of another version stops before mise runs anything else", func(t *testing.T) {
+		require.NoError(t, os.WriteFile(log, nil, 0o600))
+		r.Write(pinnedMiseWorkflow, miseWorkflow(t, "2026.10.4"))
+		r.Commit("pins another mise")
+		t.Cleanup(func() {
+			r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
+			r.Commit("pins the fake's mise again")
+		})
+		code, out := runCI(t, r, nil, nil, "setup")
+		assert.Equal(t, exitError, code, out)
+		assert.Contains(t, out, "ci: mise is at version "+fakeMiseVersion+", and .github/workflows/ci.yml pins 2026.10.4")
+		data, err := os.ReadFile(log)
+		require.NoError(t, err)
+		assert.Empty(t, string(data), "no mise trust, no mise install")
+	})
+
 	t.Run("a failing mise stops before the download", func(t *testing.T) {
-		require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\nexit 1\n"), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\n"+answerVersion+"exit 1\n"), 0o700))
 		code, out := runCI(t, r, nil, nil, "setup")
 		assert.Equal(t, exitFail, code, out)
 		assert.Contains(t, out, "FAIL  mise trust")
@@ -669,4 +694,160 @@ func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
 		assert.Contains(t, out, "FAIL  pushed range")
 		assert.Contains(t, out, "docs/page.md:1: name:")
 	})
+}
+
+// TestCommitCheckThatCannotJudgeFails holds the rule of commitChecks
+// in fast by hand, in all and in a pre-push run: a check of the commit
+// that cannot judge what it read fails, with exit status 1 and its
+// reason on the FAIL line, and the other checks still report. Either
+// mutation of that rule, back to an error that stops the run (exit 2)
+// or to a verdict that drops the error (a broken denylist read as
+// "ok"), fails this test.
+func TestCommitCheckThatCannotJudgeFails(t *testing.T) {
+	const zero = "0000000000000000000000000000000000000000"
+	broken := []struct{ name, path, content string }{
+		{"a denylist that does not parse", names.Path, "entries: [\n"},
+		{"word lists whose self-test fails", prose.Path, "rules:\n  - id: a\n    phrases: [zappy]\n    fails: [plain]\n    passes: [plain]\n"},
+	}
+	modes := []struct {
+		name string
+		run  func(t *testing.T, r *gittest.Repo, origin string) (int, string)
+	}{
+		{"fast by hand", func(t *testing.T, r *gittest.Repo, _ string) (int, string) {
+			return runCI(t, r, nil, []step{passing}, "fast")
+		}},
+		{"all", func(t *testing.T, r *gittest.Repo, _ string) (int, string) {
+			profile := filepath.Join(t.TempDir(), "cover.out")
+			require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
+			return runAllIn(t, r, []step{passing}, profile)
+		}},
+		{"fast as the pre-push hook", func(t *testing.T, r *gittest.Repo, origin string) (int, string) {
+			tip := strings.TrimSpace(r.Git("rev-parse", "HEAD"))
+			stdin := strings.NewReader("refs/heads/main " + tip + " refs/heads/main " + zero + "\n")
+			return runCI(t, r, stdin, []step{passing}, "fast", "origin", origin)
+		}},
+	}
+	for _, b := range broken {
+		for _, m := range modes {
+			t.Run(b.name+", "+m.name, func(t *testing.T) {
+				origin := gittest.NewBare(t)
+				r := newTree(t)
+				r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+				r.Git("remote", "add", "origin", origin.Dir)
+				r.Commit("a good base")
+				r.Git("push", "--quiet", "origin", "main")
+				r.Git("fetch", "--quiet", "origin")
+				r.Write(b.path, b.content)
+				r.Commit("breaks " + b.path)
+				code, out := m.run(t, r, origin.Dir)
+				assert.Equal(t, exitFail, code, "exit status\n%s", out)
+				assert.Contains(t, out, "FAIL  hygiene\n"+b.path+": ", "the reason is on the FAIL line")
+				assert.Contains(t, out, "ok    passes")
+				assert.Contains(t, out, "ok    workflows", "the other checks still report")
+			})
+		}
+	}
+}
+
+// TestAllStepsLeaveTheTree holds the check that all runs after its
+// steps: the steps leave HEAD, the index and the working tree as they
+// found them, or all fails. The first case is the attack the check
+// closes: a test of the change, run by a step, prepends an SPDX header
+// to a file that has none, so that a check after it would pass a
+// commit whose file still lacks one. A file that already differed from
+// HEAD is compared by its content too, and a change that is there
+// before the steps and stays is no finding.
+func TestAllStepsLeaveTheTree(t *testing.T) {
+	sh, err := exec.LookPath("sh")
+	require.NoError(t, err)
+	// The tag is put together at run time, so that reuse does not read
+	// this file as one that declares a license.
+	header := "<!-- SPDX-" + "License-Identifier: GPL-3.0-only -->"
+	tests := []struct {
+		name   string
+		before func(t *testing.T, r *gittest.Repo) // after the commit, before all
+		script string                              // what the step runs, at the top of the tree
+		want   []string
+	}{
+		{name: "a test prepends an SPDX header to a file that has none",
+			script: `{ printf '%s\n' '` + header + `'; cat README.md; } > x && mv x README.md`,
+			want:   []string{"FAIL  working tree\n", "\nREADME.md\n"}},
+		{name: "a file appears", script: "echo x > late.txt", want: []string{"FAIL  working tree\n", "\nlate.txt\n"}},
+		{name: "a file is staged", script: "echo more >> README.md && git add README.md", want: []string{"FAIL  working tree\n", "the index changed"}},
+		{name: "HEAD moves", script: "git commit --quiet --allow-empty --message late", want: []string{"FAIL  working tree\n", "HEAD is now "}},
+		{name: "a file that differed before is changed again",
+			before: func(t *testing.T, r *gittest.Repo) { r.Write("README.md", "# A fixture\n\nWork in progress.\n") },
+			script: "echo more >> README.md", want: []string{"FAIL  working tree\n", "\nREADME.md\n"}},
+		{name: "work in progress that the steps leave as it was",
+			before: func(t *testing.T, r *gittest.Repo) {
+				r.Write("README.md", "# A fixture\n\nWork in progress.\n")
+				r.Write("notes.txt", "untracked\n")
+			},
+			script: "true", want: []string{"ok    working tree\n"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newTree(t)
+			r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+			r.Commit("fixture")
+			if tt.before != nil {
+				tt.before(t, r)
+			}
+			profile := filepath.Join(t.TempDir(), "cover.out")
+			require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
+			mutate := step{name: "mutates", argv: []string{sh, "-c", tt.script}, environ: r.Env}
+			code, out := runAllIn(t, r, []step{mutate, passing}, profile)
+			want := exitFail
+			if strings.HasPrefix(tt.want[0], "ok") {
+				want = exitOK
+			}
+			assert.Equal(t, want, code, "exit status\n%s", out)
+			for _, w := range tt.want {
+				assert.Contains(t, out, w)
+			}
+			assert.Contains(t, out, "ok    hygiene", "the checks of the commit still report")
+		})
+	}
+}
+
+// TestCommitChecksReadBeforeMise runs fast and all with their real
+// steps (no stubs, so resolveLintTools starts mise) against a fake
+// mise that rewrites the loose object of a judged file whenever it
+// runs: hygiene still reports the finding of the commit as it was, so
+// the commit is read before "mise --version" and "mise which" run.
+func TestCommitChecksReadBeforeMise(t *testing.T) {
+	for _, mode := range []string{"fast", "all"} {
+		t.Run(mode, func(t *testing.T) {
+			chmod, err := exec.LookPath("chmod")
+			require.NoError(t, err)
+			cat, err := exec.LookPath("cat")
+			require.NoError(t, err)
+			gitPath, err := exec.LookPath("git")
+			require.NoError(t, err)
+			r := newTree(t)
+			r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+			r.Write("mise.lock", lockFixture)
+			r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
+			r.Write("docs/x.md", "a line with "+emDash+"\n")
+			r.Commit("fixture")
+			rewrite := overwriteObject(t, r, "HEAD:docs/x.md", "a plain line\n").argv
+			object, src := rewrite[4], rewrite[5]
+
+			f := newFakeMise(t)
+			require.NoError(t, os.Symlink(gitPath, filepath.Join(f.bin, "git")))
+			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "docker"), []byte("#!/bin/sh\n"), 0o700))
+			goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
+			f.tool(t, "go", "1.27.0", "bin", "gofmt")
+			f.tool(t, govulncheckDir, "1.8.0", "bin", "govulncheck")
+			prelude := "'" + chmod + "' u+w '" + object + "' && '" + cat + "' '" + src + "' > '" + object + "'\n" + answerVersion +
+				"if [ \"$4\" = govulncheck ]; then echo '" + filepath.Join(f.installs(), govulncheckDir, "1.8.0", "bin", "govulncheck") + "'; exit 0; fi\n"
+			f.script(t, prelude, f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), goCmd)
+
+			code, out := runCI(t, r, nil, nil, mode)
+			assert.Equal(t, exitFail, code, out)
+			assert.Contains(t, out, "ok    unit", "the real steps ran, after mise")
+			assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
+			assert.Equal(t, "a plain line", strings.TrimSpace(r.Git("cat-file", "blob", "HEAD:docs/x.md")), "mise did rewrite the object")
+		})
+	}
 }

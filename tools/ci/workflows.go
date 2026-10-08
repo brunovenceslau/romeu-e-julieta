@@ -41,13 +41,14 @@ const (
 //     miseEnv and nothing else, since other keys could make a tools/ci
 //     run start other code (BASH_ENV, LD_PRELOAD, PATH,
 //     GOFLAGS=-toolexec), and without it the mise of the workflow would
-//     read every mise file of the change (tools/ci/misefiles.go). An action takes only the with keys listed
-//     for it (actionInputs), each a literal or an exact matrix
-//     reference whose values are literals, so no value an event can
-//     write reaches an input, and no expression reads the token or a
-//     secret. A matrix is a written mapping of the keys
-//     os and include, and an include entry holds os and mise_sha256
-//     only, so the label a job runs on is always one that is checked.
+//     read every mise file of the change (tools/ci/misefiles.go). An
+//     action takes only the with keys listed for it (actionInputs),
+//     each a literal or an exact matrix reference whose values are
+//     literals, so no value an event can write reaches an input, and
+//     no expression reads the token or a secret. A matrix is a written
+//     mapping of the keys os and include, and an include entry holds
+//     os and mise_sha256 only, so the label a job runs on is always
+//     one that is checked.
 //  2. A file that reads as one thing and runs as another: an anchor,
 //     an alias, a merge key, a tag YAML does not resolve on its own, a
 //     key written twice, and a second document.

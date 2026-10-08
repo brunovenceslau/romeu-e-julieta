@@ -151,11 +151,11 @@ The generator that reads `.github/ask-first.yaml` is a `tools/ci`
 subcommand, so the code that writes `.github/CODEOWNERS` is on the
 `checks` surface (05 5.3). `generated` refuses a hand edit of
 CODEOWNERS, and a change to its source needs the approval line.
-CODEOWNERS is on the `ask-first` surface as well: a change to it asks
-for the review even where `generated` cannot see it, as when a mise
-configuration of the change could stage a good copy before
-`generated` ran, until the mise environment of 10 10.2 closed that
-channel.
+CODEOWNERS is on the `ask-first` surface as well, as defence in depth:
+a change to it asks for the review even where `generated` cannot see
+it, which is the case of any step or tool that runs before `generated`
+and could stage a good copy. The mise environment of 10 10.2 closes
+the one such channel known today, a mise configuration of the change.
 
 A generated `docs/reference/` page carries a generated-file header and
 the front matter of rule 1 in

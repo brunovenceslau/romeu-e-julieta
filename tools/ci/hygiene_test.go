@@ -209,10 +209,13 @@ func TestHygieneRules(t *testing.T) {
 				r.Write(".TOOL-VERSIONS", "go 1.27.0\n")
 				r.Write(".config/mise/conf.d/x.toml", "[settings]\n")
 				r.Write(".miserc.toml", "env = []\n")
+				// The pinned files are exempt by their exact name only.
+				r.Write("MISE.TOML", "[settings]\n")
+				r.Write("Mise.lock", "\n")
 			},
 			want: []string{
 				".TOOL-VERSIONS: mise:", ".config/mise/conf.d/x.toml: mise:", ".miserc.toml: mise:",
-				"Mise.Ci.toml: mise:", "mise.local.toml: mise:",
+				"MISE.TOML: mise:", "Mise.Ci.toml: mise:", "Mise.lock: mise:", "mise.local.toml: mise:",
 			},
 		},
 		{
@@ -220,8 +223,9 @@ func TestHygieneRules(t *testing.T) {
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("mi\u017fe.local.toml", "[settings]\n")
 				r.Write("docs/tab\tname.md", "text\n")
+				r.Write("docs/del\x7fname.md", "text\n")
 			},
-			want: []string{`"docs/tab\tname.md": path:`, "mi\u017fe.local.toml: path:"},
+			want: []string{`"docs/del\x7fname.md": path:`, `"docs/tab\tname.md": path:`, "mi\u017fe.local.toml: path:"},
 		},
 		{
 			name: "a symbolic link",
@@ -509,10 +513,11 @@ func TestHygieneFile(t *testing.T) {
 	})
 }
 
-// TestJudgedCommitIsPinned shows that hygiene and pushedRange read the commit they are given and not HEAD: X is the
-// commit judged, and HEAD has moved on to a Y that adds a listed name,
-// or drops the denylist or the word lists. Each callee is asked for X
-// and for "HEAD", and the two answers differ.
+// TestJudgedCommitIsPinned shows that hygiene and pushedRange read the
+// commit they are given and not HEAD: X is the commit judged, and HEAD
+// has moved on to a Y that adds a listed name, or drops the denylist or
+// the word lists. Each callee is asked for X and for "HEAD", and the
+// two answers differ.
 func TestJudgedCommitIsPinned(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
 	// moved returns a fixture whose commit X is clean, and the id of X;
@@ -576,4 +581,26 @@ func TestJudgedCommitIsPinned(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, checked, "Y has none, and neither has the default branch")
 	})
+}
+
+// TestPrintableASCII pins the bounds of the path rule: 0x20 and 0x7E
+// are in, 0x1F and 0x7F are out. A Windows file system reads a name
+// with a trailing dot as the name without it, and the rule passes such
+// a name: the accepted gap the threat model of tools/ci/misefiles.go
+// names, here to be seen.
+func TestPrintableASCII(t *testing.T) {
+	for _, tt := range []struct {
+		path string
+		want bool
+	}{
+		{"a\x1fb", false},
+		{"a b", true},
+		{"a~b", true},
+		{"a\x7fb", false},
+		{"caf\u00e9", false},
+		{"mise.local.toml.", true},
+	} {
+		assert.Equal(t, tt.want, printableASCII(tt.path), "%q", tt.path)
+	}
+	assert.False(t, isMiseFile("mise.local.toml."), "nor does isMiseFile match it")
 }

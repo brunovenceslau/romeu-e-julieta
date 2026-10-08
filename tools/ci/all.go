@@ -46,11 +46,22 @@ const raceTimeout = 40 * time.Minute
 // does not build the others from source.
 const reuseImage = "fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e7662577c8427429e11e1b9f25a992e"
 
-// allSteps returns the command steps of all: the steps of fast, then
-// the rows of 10 10.2 that have code to check today and are not in
-// fast: vulnerabilities, the race run that writes the cover profile,
-// and license. The coverage step reads that profile in this process,
-// after them (runAll).
+// allSteps returns the command steps of all: the steps of fast and the
+// rows of 10 10.2 that have code to check today and are not in fast,
+// vulnerabilities, license and the race run that writes the cover
+// profile. The coverage step reads that profile in this process, after
+// them (runAll).
+//
+// The order keeps every step that judges the tree before the first
+// one that runs code of the change, unit: vulnerabilities and license
+// read the tree and run none of its code, so they run after lint and
+// before unit, and a test of the change cannot rewrite what they read
+// (a test that prepends an SPDX header to a file without one passed
+// license when it ran after unit: measured at cab976e). race and
+// coverage come last, and they measure code of the change, which can
+// game its own result: a test can write the cover profile itself, or
+// exercise less than it claims. The review of the change is what
+// covers that; runAll fails a run whose steps changed the tree.
 //
 // The race run passes "-count=1" for the reason the unit step does:
 // a test that scans the repository would otherwise be served from the
@@ -72,10 +83,12 @@ func allSteps(ctx context.Context, root string, tools lintTools, profile string)
 	if gitErr != nil && license.skip == "" {
 		license.unavailable = gitErr
 	}
-	return append(fastSteps(root, tools),
-		vuln,
-		step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env, timeout: raceTimeout},
-		license,
+	fast := fastSteps(root, tools)
+	unit := slices.IndexFunc(fast, func(s step) bool { return s.name == "unit" })
+	return slices.Concat(fast[:unit],
+		[]step{vuln, license},
+		fast[unit:],
+		[]step{{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env, timeout: raceTimeout}},
 	)
 }
 
@@ -114,8 +127,11 @@ func gitCommonDir(ctx context.Context, root string) (string, error) {
 // at later. The container reads the tree and the git directory through
 // read-only mounts, so it cannot change what the other checks read, and
 // it has no network, so it can neither fetch code nor send what it
-// reads anywhere. The code inside the image is out of scope, as the
-// code of a pinned action is: the review of the pin covers it.
+// reads anywhere. It runs before unit and race (allSteps), so no test
+// of the change can rewrite a file before reuse reads it, and runAll
+// fails a run whose steps left the tree changed. The code inside the
+// image is out of scope, as the code of a pinned action is: the review
+// of the pin covers it.
 func licenseStep(root, gitCommon, goos string, env []string) step {
 	s := step{name: "license"}
 	if goos != "linux" {
@@ -143,8 +159,15 @@ func licenseStep(root, gitCommon, goos string, env []string) step {
 // command steps (allSteps) on the working tree as it is, then hygiene
 // and workflows on the commit HEAD names, read and judged before any
 // step starts (commitChecks, as in runFast), then coverage on the
-// profile of the race step. It is what the hosted workflow runs, and what a developer
-// runs before a pull request. The pr step joins with tools/ci pr.
+// profile of the race step. It is what the hosted workflow runs, and
+// what a developer runs before a pull request. The pr step joins with
+// tools/ci pr.
+//
+// It reads HEAD, the index and the working tree before mise and the
+// steps run (treeState), and the "working tree" check fails when they
+// differ after the steps (changedSince): a step that ran code of the
+// change and rewrote a file, staged one or moved HEAD may have left a
+// check that judged the tree a copy that is not the commit's.
 //
 // It first prints the platform it runs on, as the go command and "uname
 // -m" name it, so that a run's log shows which machine each runner
@@ -179,6 +202,12 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	uname := machine(ctx)
 	say(e.stdout, "platform  %s/%s, uname -m %s\n", runtime.GOOS, runtime.GOARCH, uname)
 
+	// The steps must leave the tree as they found it (changedSince,
+	// after them), mise included.
+	before, err := readTreeState(ctx, repo)
+	if err != nil {
+		return false, err
+	}
 	profile := e.profile
 	steps := e.steps
 	if steps == nil {
@@ -188,6 +217,9 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 		}
 		defer func() { _ = os.RemoveAll(dir) }()
 		profile = filepath.Join(dir, coverFile)
+		if err := checkMiseVersion(ctx, root); err != nil {
+			return false, err
+		}
 		tools, err := resolveLintTools(ctx, root)
 		if err != nil {
 			return false, err
@@ -208,6 +240,11 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	}
 	c.report("architecture", archDetail == "", archDetail)
 	c.run(ctx, root, steps)
+	tree := ""
+	if err := changedSince(ctx, repo, before); err != nil {
+		tree = "the steps changed HEAD, the index or the working tree, so a check may not have judged the commit; what changed:\n" + err.Error() + "\n"
+	}
+	c.report("working tree", tree == "", tree)
 
 	findings, err := coverageAt(root, profile)
 	for _, v := range append(verdicts, verdict{name: "coverage", findings: findings, err: err}) {
@@ -319,8 +356,10 @@ func runWorkflows(ctx context.Context, e env, args []string) (bool, error) {
 // the second step finds nothing to do.
 //
 // Both mise steps run with miseEnv, at the top of the tree. In the
-// hosted workflow, setup first checks that the workflow ran it, and
-// mise-action before it, with miseEnv too (hostedMiseEnv).
+// hosted workflow, setup first checks that its own environment holds
+// miseEnv, as the workflow's env table gives every step
+// (hostedMiseEnv), and before any mise step it refuses a mise of
+// another version than the one ci.yml pins (checkMiseVersion).
 //
 // The download runs the pinned go command in stepEnv with the proxy
 // the go command uses by default, the one step of tools/ci that
@@ -335,6 +374,9 @@ func runSetup(ctx context.Context, e env, args []string) (bool, error) {
 		return false, err
 	}
 	if err := hostedMiseEnv(); err != nil {
+		return false, err
+	}
+	if err := checkMiseVersion(ctx, root); err != nil {
 		return false, err
 	}
 	c := newChecks(e.stdout)

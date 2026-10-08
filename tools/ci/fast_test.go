@@ -826,9 +826,9 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 		{name: "a clean ref and the checked-out one: every tip must be HEAD", head: listing,
 			stdin: push(clean, "refs/heads/clean") + push(listing, "refs/heads/listing"), code: exitError,
 			want: []string{"ci: fast tests the commit checked out", "\n" + clean}, lacks: []string{"\n" + listing, "pushed range"}},
-		{name: "a denylist that cannot be read at HEAD stops the push",
-			stdin: push(broken, "refs/heads/broken"), code: exitError,
-			want: []string{"ci: " + names.Path + ": "}, lacks: []string{"pushed range"}},
+		{name: "a denylist that cannot be read at HEAD fails hygiene and the pushed range",
+			stdin: push(broken, "refs/heads/broken"), code: exitFail,
+			want: []string{"FAIL  hygiene\n" + names.Path + ": ", "FAIL  pushed range\n" + names.Path + ": "}},
 		{name: "a deleted ref names no tip",
 			stdin: fmt.Sprintf("(delete) %s refs/heads/listing %s\n", zero, listing), code: exitOK,
 			want: []string{"ok    pushed range"}},
@@ -960,18 +960,34 @@ func TestGeneratedRunsBeforeTheTests(t *testing.T) {
 // trusts the repository's mise configuration. mise keeps its trust
 // records in the state directory (https://mise.jdx.dev/directories.html),
 // so the tests do not depend on a "mise trust" of the person who runs
-// them, and leave no trust behind.
+// them, and leave no trust behind. The configuration directories are
+// the test's own too (isolateMiseConfig).
 func pinnedLintTools(t *testing.T) lintTools {
 	t.Helper()
 	root := moduleRoot(t)
-	t.Setenv("MISE_STATE_DIR", t.TempDir())
+	isolateMiseConfig(t)
 	cmd := exec.CommandContext(t.Context(), "mise", "-C", root, "trust")
-	cmd.Env = passThroughEnv()
+	cmd.Dir = root
+	cmd.Env = miseEnviron(passThroughEnv())
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "mise trust\n%s", out)
 	tools, err := resolveLintTools(t.Context(), root)
 	require.NoError(t, err)
 	return tools
+}
+
+// isolateMiseConfig gives the real mise that a test starts through
+// passThroughEnv a state directory and configuration directories of
+// the test's own, new and empty, so no global configuration of the
+// person who runs the tests (a "paranoid = true", say) changes what
+// the test measures. HOME stays: the pinned tools are installed below
+// it (miseInstalls). The system configuration file is not among the
+// variables of passThroughEnv, and stays what the machine holds.
+func isolateMiseConfig(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{"MISE_STATE_DIR", "XDG_CONFIG_HOME", "MISE_CONFIG_DIR"} {
+		t.Setenv(key, t.TempDir())
+	}
 }
 
 // TestResolveLintTools checks that the tools of fast are the ones
@@ -1334,8 +1350,9 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 func TestMiseInstalls(t *testing.T) {
 	t.Setenv("MISE_DATA_DIR", "")
 	t.Setenv("XDG_DATA_HOME", "")
+	isolateMiseConfig(t)
 	cmd := exec.CommandContext(t.Context(), "mise", "-C", t.TempDir(), "doctor", "--json")
-	cmd.Env = passThroughEnv()
+	cmd.Env = miseEnviron(passThroughEnv())
 	out, err := cmd.Output()
 	require.NoError(t, err, "mise doctor")
 	var doctor struct{ Dirs struct{ Data string } }

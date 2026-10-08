@@ -101,10 +101,10 @@ type lintTools struct {
 
 // resolveLintTools asks "mise which" for the paths of the versions that
 // mise.toml pins and mise.lock locks, in the environment of
-// passThroughEnv with miseEnv. "mise which" runs no tool and installs none: a tool
-// that is not installed is an error that names the two commands a new
-// machine runs first, so fast fails closed and never falls back to
-// another golangci-lint or go on the search path.
+// passThroughEnv with miseEnv. "mise which" runs no tool and installs
+// none: a tool that is not installed is an error that names the two
+// commands a new machine runs first, so fast fails closed and never
+// falls back to another golangci-lint or go on the search path.
 //
 // Each path must lie, once its symbolic links are resolved, in the
 // directory where mise installs that tool (miseInstalls), and the error
@@ -130,9 +130,9 @@ func resolveLintTools(ctx context.Context, root string) (lintTools, error) {
 // where mise installs that tool. The next path segment, the version
 // directory, must equal the version mise.lock locks under key (the
 // tool's name in the lock), so that a stale install left beside the
-// locked one is refused; a tool locked at two different versions is an error, as
-// the lock then holds no one version to hold an install to. It runs in
-// passThroughEnv with miseEnv, at the top of the tree.
+// locked one is refused; a tool locked at two different versions is an
+// error, as the lock then holds no one version to hold an install to.
+// It runs in passThroughEnv with miseEnv, at the top of the tree.
 func whichPinned(ctx context.Context, root, name, key, dir string) (string, error) {
 	installsDir, err := miseInstalls()
 	if err != nil {
@@ -417,8 +417,9 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 // judgeCommit, a push whose tip is not HEAD and a working tree that
 // differs from HEAD in a file the checks read. The steps take minutes,
 // and the tree may change meanwhile, so after the last step it judges
-// the tree again and refuses the push when HEAD moved or a refusal
-// appeared.
+// the tree again and refuses the push when a refusal appeared or when
+// HEAD, the index or the working tree differ from what it read before
+// the steps (changedSince).
 //
 // In both modes it refuses a go.mod below the module root
 // (nestedModules).
@@ -472,18 +473,34 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 	}
 	if hook {
 		findings, checked, err := pushedRange(ctx, repo, args[0], push, head)
-		if err != nil {
+		var unjudged *cannotJudge
+		switch {
+		case errors.As(err, &unjudged):
+			verdicts = append(verdicts, verdict{name: "pushed range", err: err})
+		case err != nil:
 			return false, err
+		default:
+			if checked || len(findings) > 0 {
+				verdicts = append(verdicts, verdict{name: "pushed range", findings: findings})
+			}
+			if !checked {
+				verdicts = append(verdicts, verdict{name: "pushed range", note: "not checked against names, no denylist entry at HEAD or at the remote's default branch"})
+			}
 		}
-		if checked || len(findings) > 0 {
-			verdicts = append(verdicts, verdict{name: "pushed range", findings: findings})
-		}
-		if !checked {
-			verdicts = append(verdicts, verdict{name: "pushed range", note: "not checked against names, no denylist entry at HEAD or at the remote's default branch"})
+	}
+	// In a pre-push run the steps must leave the tree as judgeCommit
+	// judged it (changedSince, after them).
+	var before treeState
+	if hook {
+		if before, err = readTreeState(ctx, repo); err != nil {
+			return false, err
 		}
 	}
 	steps := e.steps
 	if steps == nil {
+		if err := checkMiseVersion(ctx, root); err != nil {
+			return false, err
+		}
 		tools, err := resolveLintTools(ctx, root)
 		if err != nil {
 			return false, err
@@ -493,9 +510,9 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 	c := newChecks(e.stdout)
 	c.run(ctx, root, steps)
 	if hook {
-		again, err := judge()
-		if err == nil && again != head {
-			err = fmt.Errorf("HEAD is now %s", again)
+		_, err := judge()
+		if err == nil {
+			err = changedSince(ctx, repo, before)
 		}
 		if err != nil {
 			return false, fmt.Errorf("the working tree changed while the steps ran, so they may not have tested commit %s; push again once nothing changes it:\n%w", head, err)
@@ -562,6 +579,16 @@ func commitChecks(ctx context.Context, repo git.Repo, commit string) ([]verdict,
 		{name: "workflows", findings: workflowsOf(files)},
 	}, nil
 }
+
+// cannotJudge is the error of a check that read the commit and cannot
+// judge what it read, such as a denylist that does not parse: fast and
+// all report it as a verdict that fails (checks.verdict), with exit
+// status 1, and not as an error that stops the run, so the other
+// checks still report.
+type cannotJudge struct{ err error }
+
+func (e *cannotJudge) Error() string { return e.err.Error() }
+func (e *cannotJudge) Unwrap() error { return e.err }
 
 // verdict reports one verdict of commitChecks: one that could not
 // judge fails with its reason, and one with a note prints it with
@@ -694,6 +721,78 @@ func judgeCommit(ctx context.Context, repo git.Repo, push pushed.Push) (string, 
 		strings.Join(found, "\n"))
 }
 
+// treeState is what the steps of a run must leave as they found it:
+// the commit HEAD names, the index (each entry's mode, blob and path),
+// and the snapshot of the working tree that generated takes too (each
+// file, tracked or untracked, by its type, mode and content). A file
+// that differed from HEAD before the steps is compared by its content,
+// so a change on top of work in progress is seen. A file that git
+// ignores is not compared: no step that judges the tree runs after the
+// first step that runs code of the change (allSteps).
+type treeState struct {
+	head, index string
+	files       map[string]string
+}
+
+// readTreeState reads the treeState of the repository at repo.Dir.
+func readTreeState(ctx context.Context, repo git.Repo) (treeState, error) {
+	head, err := commitOf(ctx, repo, "HEAD")
+	if err != nil {
+		return treeState{}, err
+	}
+	index, err := repo.Run(ctx, nil, "ls-files", "--stage", "-z")
+	if err != nil {
+		return treeState{}, err
+	}
+	root, err := os.OpenRoot(repo.Dir)
+	if err != nil {
+		return treeState{}, err
+	}
+	defer func() { _ = root.Close() }()
+	files, err := snapshot(ctx, repo, root)
+	if err != nil {
+		return treeState{}, err
+	}
+	return treeState{head: head, index: string(index), files: files}, nil
+}
+
+// changedSince returns nil when the repository is in the state before
+// was read in, and otherwise an error that says what changed: HEAD,
+// the index, and each path whose file changed, appeared or went away,
+// printable and sorted.
+func changedSince(ctx context.Context, repo git.Repo, before treeState) error {
+	after, err := readTreeState(ctx, repo)
+	if err != nil {
+		return fmt.Errorf("read the tree after the steps: %w", err)
+	}
+	var what []string
+	if after.head != before.head {
+		what = append(what, "HEAD is now "+after.head)
+	}
+	if after.index != before.index {
+		what = append(what, "the index changed")
+	}
+	var paths []string
+	for path, digest := range before.files {
+		if after.files[path] != digest {
+			paths = append(paths, path)
+		}
+	}
+	for path := range after.files {
+		if _, ok := before.files[path]; !ok {
+			paths = append(paths, path)
+		}
+	}
+	slices.Sort(paths)
+	for _, path := range paths {
+		what = append(what, git.Printable(path))
+	}
+	if len(what) == 0 {
+		return nil
+	}
+	return errors.New(strings.Join(what, "\n"))
+}
+
 // commitOf returns the commit that rev names.
 func commitOf(ctx context.Context, repo git.Repo, rev string) (string, error) {
 	out, err := repo.Run(ctx, nil, "rev-parse", "--verify", "--end-of-options", rev+"^{commit}")
@@ -783,10 +882,11 @@ func lines(findings []finding) string {
 // checked is false: it means "names were matched", and the prologue
 // rule ran all the same.
 func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.Push, head string) (findings []finding, checked bool, err error) {
-	// A list that is missing or empty at head is hygiene's finding.
+	// A list that is missing or empty at head is hygiene's finding, and
+	// one that cannot be read leaves the range unjudged (cannotJudge).
 	atHead, _, err := loadDenylist(ctx, repo, head)
 	if err != nil {
-		return nil, false, err
+		return nil, false, &cannotJudge{err}
 	}
 	atDefault, err := defaultBranchDenylist(ctx, repo, remote)
 	if err != nil {
