@@ -986,8 +986,9 @@ func TestOnlyAllowedGoModDirectives(t *testing.T) {
 
 // pinnedTools are the tools the mise configuration of this repository
 // pins, each at the version mise.lock locks: the go command and
-// golangci-lint, the two that fast runs (resolveLintTools).
-var pinnedTools = []string{"go", "golangci-lint"}
+// golangci-lint, the two that fast runs (resolveLintTools), and
+// govulncheck, which all starts through "mise exec" (allSteps).
+var pinnedTools = []string{"go", "golangci-lint", "go:golang.org/x/vuln/cmd/govulncheck"}
 
 // allowedMiseTables are the tables a mise configuration file of this
 // repository may hold, with the keys each may hold. The [env] table,
@@ -999,6 +1000,19 @@ var pinnedTools = []string{"go", "golangci-lint"}
 var allowedMiseTables = map[string][]string{
 	"settings": {"lockfile"},
 	"tools":    pinnedTools,
+}
+
+// bareKey matches a TOML key that needs no quotes
+// (https://toml.io/en/v1.0.0#keys).
+var bareKey = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// tomlKey writes a tool name as a key of mise.toml: bare when TOML
+// allows it, quoted otherwise, as a backend name with ":" or "/" is.
+func tomlKey(name string) string {
+	if bareKey.MatchString(name) {
+		return name
+	}
+	return `"` + name + `"`
 }
 
 // lockedVersion matches a version as mise.lock holds one: exact, three
@@ -1139,7 +1153,7 @@ func TestMiseConfigs(t *testing.T) {
 		if f == "mise.toml" {
 			lines := strings.Split(string(data), "\n")
 			for _, tool := range pinnedTools {
-				assert.Contains(t, lines, tool+` = "`+locked[tool]+`"`, "mise.toml pins %s", tool)
+				assert.Contains(t, lines, tomlKey(tool)+` = "`+locked[tool]+`"`, "mise.toml pins %s", tool)
 			}
 		}
 	}

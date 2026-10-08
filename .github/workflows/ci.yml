@@ -1,0 +1,63 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Every check lives in tools/ci, so a developer runs the same code at
+# the same commit (10 10.2). This file only names the runners, pins the
+# two actions by commit, and calls tools/ci; "go run ./tools/ci
+# workflows" holds it to that grammar.
+name: ci
+
+on:
+  pull_request:
+    # edited: a change to the title or the body runs the checks again.
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  all:
+    name: all on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      # Each runner reports on its own, so one red platform does not
+      # hide the state of the others.
+      fail-fast: false
+      matrix:
+        # mise_sha256 is the sha256 of the mise binary of that platform,
+        # mise 2026.10.3, as its signed SHASUMS256.txt lists it.
+        include:
+          - os: ubuntu-26.04
+            mise_sha256: 8d48bc510b7d844fad0bc7156c0855c2a1e7230c51e498a7f6b63b021f8b57c5
+          - os: ubuntu-26.04-arm
+            mise_sha256: 357260e28904569a6e7124d33b65cef6d043846c07bb8f4906ddf22cc353d61d
+          - os: macos-26
+            mise_sha256: 0999bd4943523ccdbd149b5ad4080281536801b3f6406ac4495699bd0310969c
+          - os: macos-26-intel
+            mise_sha256: 38cdd1d904b25e66ec2fff3b5c88930853ab929b63e72c70e77198f82d6ac144
+    steps:
+      - name: Check out
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install mise and the tools of mise.lock
+        # jdx/mise-action v5.1.1
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca
+        with:
+          version: 2026.10.3
+          sha256: ${{ matrix.mise_sha256 }}
+          # No actions cache: an install restored from a cache is not
+          # checked again against the checksums of mise.lock.
+          cache: false
+          # No export of the mise environment: the steps reach go
+          # through the mise shims, and tools/ci builds the environment
+          # of each check itself.
+          env: false
+      - name: Trust mise.toml and fill the module cache
+        run: go run ./tools/ci setup
+      - name: All checks
+        run: go run ./tools/ci all

@@ -1,0 +1,508 @@
+// SPDX-FileCopyrightText: 2026 Bruno Venceslau
+// SPDX-License-Identifier: GPL-3.0-only
+
+package main
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"iter"
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
+
+	"go.yaml.in/yaml/v3"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+)
+
+// workflowsDir holds the workflows, and workflowExt is the one name
+// ending a file there may have.
+const (
+	workflowsDir = ".github/workflows/"
+	workflowExt  = ".yml"
+)
+
+// Threat model of the workflows check. It guards against two things:
+//
+//  1. A hosted run that differs from a local one: check logic written
+//     in a workflow (an if, a shell, continue-on-error, a container, a
+//     called workflow, an expression that computes), a step that starts
+//     a program other than tools/ci or tools/release, an action named
+//     by a tag or a branch, which can move, a local action (a path in
+//     the repository, which runs any shell), a runner label that is not
+//     a pinned GitHub-hosted one (*-latest, a self-hosted label, a label
+//     read from a variable), and an env table, whose keys could make a
+//     tools/ci run start other code (BASH_ENV, LD_PRELOAD, PATH,
+//     GOFLAGS=-toolexec). An action takes only the with keys listed
+//     for it (actionInputs). A matrix is a written mapping of the keys
+//     os and include, and an include entry holds os and mise_sha256
+//     only, so the label a job runs on is always one that is checked.
+//  2. A file that reads as one thing and runs as another: an anchor,
+//     an alias, a merge key, a tag YAML does not resolve on its own, a
+//     key written twice, and a second document.
+//
+// Out of scope, and left to the review of the ask-first surface
+// .github/workflows/** (05 5.3): the values the grammar leaves free
+// (permissions, the owner of an action, the values of the with keys
+// listed for an action, the filters of an event), what a pinned
+// action's code does, and a pull
+// request that edits the workflow or this check itself, since the run
+// it starts uses the files of that pull request.
+
+// The grammar of 10 10.2: the keys each level may hold. A key outside
+// its list is a finding, and so is any value that the rules below do
+// not admit. Everything a workflow does lives in tools/ci, so that a
+// developer's shell and a runner run the same code at the same commit.
+var (
+	fileKeys     = []string{"name", "on", "permissions", "concurrency", "jobs"}
+	eventNames   = []string{"pull_request", "push", "schedule", "workflow_dispatch"}
+	jobKeys      = []string{"name", "runs-on", "needs", "strategy", "permissions", "timeout-minutes", "steps"}
+	usesStepKeys = []string{"name", "uses", "with"}
+	runStepKeys  = []string{"name", "run"}
+)
+
+// actionInputs are the with keys each action may take, by its
+// "<owner>/<repo>": the inputs the workflows of this repository use.
+// An action that is not listed takes none. An input that changes what
+// runs (mise-action's install_args, mise_toml, tool_versions) stays
+// out of a workflow this way.
+var actionInputs = map[string][]string{
+	"actions/checkout": {"persist-credentials"},
+	"jdx/mise-action":  {"version", "sha256", "cache", "env"},
+}
+
+// matrixRunner is the one expression runs-on may hold; the labels it
+// takes come from the os key of the job's matrix, each a runnerLabel.
+const matrixRunner = "${{ matrix.os }}"
+
+var (
+	// usesForm is an action pinned to a commit: owner, repository, an
+	// optional path inside it, and 40 hex digits after the "@".
+	// Each name starts with a letter or a digit, so no "." or ".."
+	// segment can turn it into a path of the repository.
+	usesForm = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9][A-Za-z0-9_.-]*(/[A-Za-z0-9][A-Za-z0-9_.-]*)*@[0-9a-f]{40}$`)
+	// runnerLabel is a GitHub-hosted runner image with a pinned version
+	// (10 10.2, Runners): never *-latest, never self-hosted.
+	runnerLabel = regexp.MustCompile(`^(ubuntu|macos)-[0-9]+(\.[0-9]+)?(-arm|-intel)?$`)
+	// runWord is one word of a run line, and runVar the other form a
+	// word may take: a variable of the runner's environment, quoted.
+	runWord = regexp.MustCompile(`^[A-Za-z0-9._/=:-]+$`)
+	runVar  = regexp.MustCompile(`^"\$[A-Za-z_][A-Za-z0-9_]*"$`)
+	// contextPath is the one form the text between "${{" and "}}" may
+	// take: names joined by dots, with spaces around them. Each name
+	// starts with a letter, and there are two at least, so no literal
+	// (true, null, 1) and no bare context fits, and neither does an
+	// operator or a function call.
+	contextPath = regexp.MustCompile(`^ *[A-Za-z][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)+ *$`)
+)
+
+// runPrograms are the two programs a run line may start: the first
+// three words of the line.
+var runPrograms = [][]string{
+	{"go", "run", "./tools/ci"},
+	{"go", "run", "./tools/release"},
+}
+
+// workflows applies the grammar to every file below .github/workflows
+// in the tree at head, as hygiene does: the tree that is committed is
+// the one a runner checks out.
+func workflows(ctx context.Context, repo git.Repo, head string) ([]finding, error) {
+	files, err := headTree(ctx, repo, head)
+	if err != nil {
+		return nil, err
+	}
+	var findings []finding
+	for _, f := range files {
+		if strings.HasPrefix(f.path, workflowsDir) {
+			findings = append(findings, workflowFindings(f.path, f.content)...)
+		}
+	}
+	return findings, nil
+}
+
+// workflowFindings returns what one file breaks of the grammar. It
+// reads the YAML as a tree of nodes, so a key is seen as it is
+// written, with its line, and no value is converted.
+func workflowFindings(path string, src []byte) []finding {
+	where := git.Printable(path)
+	if !strings.HasSuffix(path, workflowExt) {
+		return []finding{{where, "workflows", "a file here ends in " + workflowExt}}
+	}
+	doc, err := parseWorkflow(src)
+	if err != nil {
+		return []finding{{where, "workflows", err.Error()}}
+	}
+	c := &grammar{where: where}
+	c.walk(doc)
+	c.file(doc)
+	if strings.TrimPrefix(path, workflowsDir) == "ci.yml" {
+		c.edited(doc)
+	}
+	return c.findings
+}
+
+// parseWorkflow reads exactly one YAML document whose root is a
+// mapping.
+func parseWorkflow(src []byte) (*yaml.Node, error) {
+	dec := yaml.NewDecoder(bytes.NewReader(src))
+	var doc yaml.Node
+	if err := dec.Decode(&doc); err != nil {
+		return nil, fmt.Errorf("not YAML: %w", err)
+	}
+	var more yaml.Node
+	if err := dec.Decode(&more); !errors.Is(err, io.EOF) {
+		return nil, errors.New("a workflow is one YAML document")
+	}
+	if len(doc.Content) != 1 || doc.Content[0].Kind != yaml.MappingNode {
+		return nil, errors.New("a workflow is a mapping")
+	}
+	return doc.Content[0], nil
+}
+
+// grammar collects the findings of one file.
+type grammar struct {
+	where    string
+	findings []finding
+}
+
+func (c *grammar) add(n *yaml.Node, msg string) {
+	c.findings = append(c.findings, finding{c.where + ":" + strconv.Itoa(n.Line), "workflows", msg})
+}
+
+// plainTags are the tags YAML resolves on its own. Any other tag, as
+// "!!binary", a custom one or "!!merge", the tag of a "<<" key that
+// copies another mapping's keys in, would make a value mean something
+// the grammar does not read.
+var plainTags = []string{"!!str", "!!int", "!!float", "!!bool", "!!null", "!!timestamp", "!!map", "!!seq"}
+
+// walk visits every node once, for the rules that hold at any depth:
+// no anchor, alias, merge key or unusual tag, no key written twice, and
+// each expression a context path.
+func (c *grammar) walk(n *yaml.Node) {
+	switch {
+	case n.Kind == yaml.AliasNode || n.Anchor != "":
+		c.add(n, "an anchor or an alias is outside the grammar")
+		return
+	case !slices.Contains(plainTags, n.Tag):
+		c.add(n, "the tag "+strconv.Quote(n.Tag)+" is outside the grammar")
+	case n.Kind == yaml.ScalarNode:
+		c.expressions(n)
+	}
+	if n.Kind == yaml.MappingNode {
+		var seen []string
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			key := n.Content[i]
+			if key.Kind != yaml.ScalarNode {
+				c.add(key, "a key is a plain name")
+				continue
+			}
+			if slices.Contains(seen, key.Value) {
+				c.add(key, "the key "+strconv.Quote(key.Value)+" is written twice")
+			}
+			seen = append(seen, key.Value)
+		}
+	}
+	for _, child := range n.Content {
+		c.walk(child)
+	}
+}
+
+// expressions checks each "${{ ... }}" of a scalar: the text between
+// the braces is one context path.
+func (c *grammar) expressions(n *yaml.Node) {
+	rest := n.Value
+	for {
+		_, after, found := strings.Cut(rest, "${{")
+		if !found {
+			return
+		}
+		inner, tail, closed := strings.Cut(after, "}}")
+		if !closed {
+			c.add(n, "an expression is not closed")
+			return
+		}
+		if !contextPath.MatchString(inner) {
+			c.add(n, "an expression is one context path, as matrix.os, with no operator, call or literal")
+		}
+		rest = tail
+	}
+}
+
+// file checks the keys of the file, the events, and each job.
+func (c *grammar) file(doc *yaml.Node) {
+	for key, value := range pairs(doc) {
+		switch {
+		case !slices.Contains(fileKeys, key.Value):
+			c.add(key, "the key "+strconv.Quote(key.Value)+" is outside the grammar of a file")
+		case key.Value == "on":
+			c.events(value)
+		case key.Value == "jobs":
+			c.jobs(value)
+		}
+	}
+}
+
+// events checks the names under "on", in each form YAML allows: one
+// name, a list of names, or a mapping of names to their filters.
+func (c *grammar) events(n *yaml.Node) {
+	var names []*yaml.Node
+	switch n.Kind {
+	case yaml.ScalarNode:
+		names = []*yaml.Node{n}
+	case yaml.SequenceNode:
+		names = n.Content
+	case yaml.MappingNode:
+		for key := range pairs(n) {
+			names = append(names, key)
+		}
+	}
+	for _, name := range names {
+		if name.Kind != yaml.ScalarNode || !slices.Contains(eventNames, name.Value) {
+			c.add(name, "the event "+strconv.Quote(name.Value)+" is outside the grammar")
+		}
+	}
+}
+
+func (c *grammar) jobs(n *yaml.Node) {
+	if n.Kind != yaml.MappingNode {
+		c.add(n, "jobs is a mapping")
+		return
+	}
+	for _, job := range pairs(n) {
+		c.job(job)
+	}
+}
+
+func (c *grammar) job(n *yaml.Node) {
+	if n.Kind != yaml.MappingNode {
+		c.add(n, "a job is a mapping")
+		return
+	}
+	osKnown := false
+	for key, value := range pairs(n) {
+		switch key.Value {
+		case "runs-on":
+			if value.Kind != yaml.ScalarNode || (value.Value != matrixRunner && !runnerLabel.MatchString(value.Value)) {
+				c.add(value, "runs-on is "+matrixRunner+" or a pinned GitHub-hosted label such as ubuntu-26.04, never *-latest")
+			}
+		case "strategy":
+			osKnown = c.matrix(field(value, "matrix"))
+		case "steps":
+			c.steps(value)
+		}
+		if !slices.Contains(jobKeys, key.Value) {
+			c.add(key, "the key "+strconv.Quote(key.Value)+" is outside the grammar of a job")
+		}
+	}
+	if runsOn := field(n, "runs-on"); runsOn != nil && runsOn.Value == matrixRunner && !osKnown {
+		c.add(runsOn, "runs-on is "+matrixRunner+", so the matrix names os, in every include entry or as a key")
+	}
+}
+
+// matrixKeys and includeKeys are the only keys a matrix and an entry of
+// its include may hold, matched exactly: the runner label is read from
+// os alone, so a key that differs in case from it (OS) is no label.
+var (
+	matrixKeys  = []string{"os", "include"}
+	includeKeys = []string{"os", "mise_sha256"}
+)
+
+// matrix checks a job's matrix: a written mapping of the matrixKeys,
+// never an expression that computes one, with the runner labels of os
+// and of each include entry checked. It reports whether every runner
+// the matrix makes has an os.
+func (c *grammar) matrix(n *yaml.Node) bool {
+	if n == nil {
+		return false
+	}
+	if n.Kind != yaml.MappingNode {
+		c.add(n, "a matrix is a written mapping, not an expression")
+		return true
+	}
+	osNode := field(n, "os")
+	c.matrixLabels(osNode)
+	for key := range pairs(n) {
+		if !slices.Contains(matrixKeys, key.Value) {
+			c.add(key, "the matrix key "+strconv.Quote(key.Value)+" is outside the grammar: os and include")
+		}
+	}
+	include := field(n, "include")
+	if include != nil && include.Kind != yaml.SequenceNode {
+		c.add(include, "include is a written list, not an expression")
+		return true
+	}
+	every := include != nil && len(include.Content) > 0
+	for _, entry := range seqContent(include) {
+		if entry.Kind != yaml.MappingNode {
+			c.add(entry, "an include entry is a mapping")
+			every = false
+			continue
+		}
+		for key := range pairs(entry) {
+			if !slices.Contains(includeKeys, key.Value) {
+				c.add(key, "the include key "+strconv.Quote(key.Value)+" is outside the grammar: os and mise_sha256")
+			}
+		}
+		c.matrixLabels(field(entry, "os"))
+		every = every && field(entry, "os") != nil
+	}
+	return osNode != nil || every
+}
+
+// matrixLabels checks the runner labels of a matrix's os key, one
+// label or a list of them: each a pinned GitHub-hosted label.
+func (c *grammar) matrixLabels(n *yaml.Node) {
+	labels := []*yaml.Node{n}
+	if n == nil {
+		return
+	}
+	if n.Kind == yaml.SequenceNode {
+		labels = n.Content
+	}
+	for _, l := range labels {
+		if l.Kind != yaml.ScalarNode || !runnerLabel.MatchString(l.Value) {
+			c.add(l, "a runner label of the matrix is a pinned GitHub-hosted label such as ubuntu-26.04, never *-latest")
+		}
+	}
+}
+
+// seqContent returns the items of a sequence node, and nothing for
+// another node.
+func seqContent(n *yaml.Node) []*yaml.Node {
+	if n == nil || n.Kind != yaml.SequenceNode {
+		return nil
+	}
+	return n.Content
+}
+
+func (c *grammar) steps(n *yaml.Node) {
+	if n.Kind != yaml.SequenceNode {
+		c.add(n, "steps is a list")
+		return
+	}
+	for _, s := range n.Content {
+		c.step(s)
+	}
+}
+
+// step checks one step: a uses step or a run step, never both, each
+// with its own keys and the form of its one command.
+func (c *grammar) step(n *yaml.Node) {
+	if n.Kind != yaml.MappingNode {
+		c.add(n, "a step is a mapping")
+		return
+	}
+	keys, kind := usesStepKeys, "uses"
+	if field(n, "uses") == nil {
+		keys, kind = runStepKeys, "run"
+	}
+	for key, value := range pairs(n) {
+		if !slices.Contains(keys, key.Value) {
+			c.add(key, "the key "+strconv.Quote(key.Value)+" is outside the grammar of a "+kind+" step")
+			continue
+		}
+		switch key.Value {
+		case "uses":
+			if value.Kind != yaml.ScalarNode || !usesForm.MatchString(value.Value) {
+				c.add(value, "uses names <owner>/<repo>[/<path>]@<a 40-hex commit SHA>")
+			}
+		case "with":
+			if value.Kind != yaml.MappingNode {
+				c.add(value, "with is a mapping")
+			} else if uses := field(n, "uses"); uses.Kind == yaml.ScalarNode && usesForm.MatchString(uses.Value) {
+				c.inputs(uses, value)
+			}
+		case "run":
+			if value.Kind != yaml.ScalarNode || !runLine(value.Value) {
+				c.add(value, "run is one line: go run ./tools/ci or ./tools/release, a subcommand, and plain words")
+			}
+		}
+	}
+	if kind == "run" && field(n, "run") == nil {
+		c.add(n, "a step has uses or run")
+	}
+}
+
+// inputs checks the with keys of a uses step against actionInputs.
+func (c *grammar) inputs(uses, with *yaml.Node) {
+	action, _, _ := strings.Cut(uses.Value, "@")
+	if parts := strings.SplitN(action, "/", 3); len(parts) >= 2 {
+		action = parts[0] + "/" + parts[1]
+	}
+	allowed := actionInputs[action]
+	for key := range pairs(with) {
+		if !slices.Contains(allowed, key.Value) {
+			c.add(key, "the input "+strconv.Quote(key.Value)+" is not one this repository uses for "+action)
+		}
+	}
+}
+
+// runLine reports whether s is a run line of the grammar: one line of
+// words split by single spaces, starting with one of runPrograms and a
+// subcommand, each word plain or a quoted variable.
+func runLine(s string) bool {
+	words := strings.Split(s, " ")
+	if len(words) < 4 {
+		return false
+	}
+	known := slices.ContainsFunc(runPrograms, func(p []string) bool { return slices.Equal(p, words[:3]) })
+	if !known || !runWord.MatchString(words[3]) {
+		return false
+	}
+	for _, w := range words[4:] {
+		if !runWord.MatchString(w) && !runVar.MatchString(w) {
+			return false
+		}
+	}
+	return true
+}
+
+// edited fails a ci.yml that a change to a pull request's title or body
+// does not run again: its pull_request event lists the type "edited".
+func (c *grammar) edited(doc *yaml.Node) {
+	on := field(doc, "on")
+	if on == nil {
+		c.add(doc, "ci.yml runs on pull_request, with the type edited")
+		return
+	}
+	pr := field(on, "pull_request")
+	types := field(pr, "types")
+	if types != nil && types.Kind == yaml.SequenceNode {
+		for _, t := range types.Content {
+			if t.Value == "edited" {
+				return
+			}
+		}
+	}
+	c.add(on, "ci.yml lists edited among its pull_request types, so a change to the title or body runs pr again")
+}
+
+// pairs yields the keys and values of a mapping node, in order, and
+// nothing for another node.
+func pairs(n *yaml.Node) iter.Seq2[*yaml.Node, *yaml.Node] {
+	return func(yield func(key, value *yaml.Node) bool) {
+		if n == nil || n.Kind != yaml.MappingNode {
+			return
+		}
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			if !yield(n.Content[i], n.Content[i+1]) {
+				return
+			}
+		}
+	}
+}
+
+// field returns the value of a key of a mapping node, or nil.
+func field(n *yaml.Node, key string) *yaml.Node {
+	for k, v := range pairs(n) {
+		if k.Value == key {
+			return v
+		}
+	}
+	return nil
+}

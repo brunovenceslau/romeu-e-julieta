@@ -5,8 +5,12 @@
 // the pre-push hook, a developer and the hosted workflow all run this
 // code, so there is no second list of checks to keep in step (10 10.2).
 //
+//	go run ./tools/ci all                     every check, as the hosted workflow runs it
 //	go run ./tools/ci fast [<remote> <url>]   the fast checks; with the
 //	                                          hook's arguments, the pushed range too
+//	go run ./tools/ci setup                   trust mise.toml, install the tools, fill the module cache
+//	go run ./tools/ci coverage <profile>      the thresholds of S9 over a cover profile
+//	go run ./tools/ci workflows               the workflow grammar over the tree at HEAD
 //	go run ./tools/ci hygiene                 the hygiene rules over the tree at HEAD
 //	go run ./tools/ci hygiene --file <path>   the name matcher over one file
 //	go run ./tools/ci hygiene add             add a denylist entry, from a terminal
@@ -36,7 +40,11 @@ const (
 )
 
 const usage = `usage:
+  go run ./tools/ci all
   go run ./tools/ci fast [<remote> <url>]
+  go run ./tools/ci setup
+  go run ./tools/ci coverage <profile>
+  go run ./tools/ci workflows
   go run ./tools/ci hygiene [--file <path>]
   go run ./tools/ci hygiene add
 `
@@ -49,7 +57,10 @@ type env struct {
 	stdin  io.Reader // the hook's input, or the terminal of "hygiene add"
 	stdout io.Writer
 	stderr io.Writer
-	steps  []step // the command steps of fast; nil means fastSteps with the tools of resolveLintTools
+	steps  []step // the command steps of fast or all; nil means fastSteps or allSteps with the tools of resolveLintTools
+	// profile is the cover profile that coverage reads in all when
+	// steps is set; with the real steps, all writes one of its own.
+	profile string
 }
 
 func main() {
@@ -66,8 +77,16 @@ func run(ctx context.Context, e env, args []string) int {
 	var ok bool
 	var err error
 	switch args[0] {
+	case "all":
+		ok, err = runAll(ctx, e, args[1:])
 	case "fast":
 		ok, err = runFast(ctx, e, args[1:])
+	case "setup":
+		ok, err = runSetup(ctx, e, args[1:])
+	case "coverage":
+		ok, err = runCoverage(ctx, e, args[1:])
+	case "workflows":
+		ok, err = runWorkflows(ctx, e, args[1:])
 	case "hygiene":
 		ok, err = runHygiene(ctx, e, args[1:])
 	default:
