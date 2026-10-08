@@ -5,7 +5,7 @@
 ## What changed
 
 <!-- What the diff does, in a few lines. For each ask-first surface it touches, add one line:
-Approval: <surface id> - "<the maintainer's words>"
+Approval: <surface id> - <what was approved, in a few words, without quotation marks>
 The surfaces are listed in docs/reference/ask-first.md. -->
 
 ## Evidence

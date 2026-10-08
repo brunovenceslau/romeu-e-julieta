@@ -64,7 +64,7 @@ request. It carries:
 | Implements | the sections of the specification, by number |
 | Depends on | the tasks and operator blocks that come first |
 | Operator | `no`, or the block (O1 to O7) or the question the task waits for or feeds |
-| Ask-first | the surfaces of 05 5.3 we expect the diff to touch. `tools/ci pr` computes the real list from the diff (12 12.4); this field is a forecast, so the maintainer can give the approval words early |
+| Ask-first | the surfaces of 05 5.3 we expect the diff to touch. `tools/ci pr` computes the real list from the diff (12 12.4); this field is a forecast, so the maintainer can give the approvals early |
 | Acceptance | what a test or a command checks |
 | Verify | the command that shows it |
 
@@ -255,9 +255,10 @@ read by the hook, by `hygiene` and by `pr` first (10 10.2).
 
 **Outside the blocks.** Each merge waits for the maintainer (12 12.4),
 and a pull request that touches an ask-first surface needs the
-maintainer's words in an approval line (12 12.4). The "Ask-first"
-field of each task is there so those words can be given per phase, at
-the checkpoint, instead of one pull request at a time.
+maintainer's approval, recorded in an approval line that names what was
+approved (12 12.4). The "Ask-first" field of each task is there so
+those approvals can be given per phase, at the checkpoint, instead of
+one pull request at a time.
 
 ## Toolchain pins
 
@@ -477,7 +478,10 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     without a well-formed Middleware line, fails.
   - A touched ask-first surface without its approval line fails, with
     the list read at the base and at the head and joined; a line that
-    names an unknown id fails; a body with CR LF line ends passes.
+    names an unknown id fails; a body with CR LF line ends passes; a
+    line whose phrase starts with whitespace, or holds a straight or
+    curly double quotation mark anywhere, is not an approval line, so
+    its surface fails as unapproved.
   - A changed golden whose repository path is not written verbatim under
     Evidence fails (10 10.4).
   - A title or a one-parent commit subject outside the Conventional

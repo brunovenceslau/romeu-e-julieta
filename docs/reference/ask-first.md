@@ -14,8 +14,10 @@ in the form that
 defines:
 
 ```text
-Approval: <surface id> - "<the maintainer's words>"
+Approval: <surface id> - <what was approved>
 ```
+
+The phrase names what was approved, in a few neutral words without quotation marks, and no person.
 
 The code-owner review is requested from `@brunovenceslau`. [05 5.3](../spec/05-security.md#53-ask-first-surfaces)
 says why each surface is on the list.
