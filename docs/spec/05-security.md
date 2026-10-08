@@ -212,8 +212,8 @@ surfaces:
 | Risk | Why accepted | Mitigation |
 |---|---|---|
 | The operator runs plain `git` in a review checkout or host clone with a risky global config | romeu cannot control later manual commands | local hardening keys in review repos; doctor warns; Restricted Mode guidance. A review checkout of a secondary repo is checked with `git fsck --strict` before it is written (04, `romeu pull`); names that collide on a case-insensitive disk are left to git's checkout and to Restricted Mode |
-| Host clones carry origin content that agents may have pushed | agents push through the project's token | open both workspaces in Restricted Mode; per-project fine-grained tokens (Q13) |
-| A domain-only allow on `github.com` permits push exfiltration of anything the agent can read | the sandbox legitimately pushes | per-project tokens; egress is not containment |
+| Host clones carry origin content that agents may have pushed | agents push through the project's token | open both workspaces in Restricted Mode; the token is today the operator's own, not per-project (ADR 0008), and narrowing it is deferred |
+| A domain-only allow on `github.com` permits push exfiltration of anything the agent can read | the sandbox legitimately pushes | egress is not containment; the token is today the operator's own, not per-project (ADR 0008), and narrowing it is deferred |
 | A "Verified" signature on a commit made in the sandbox means the signing key was used, not that a human wrote it | the agent commits with the forwarded signing agent | `sync` refuses `git-ssh-sign` unless the dedicated socket holds exactly one key equal to `signingKey` (06 6.4); confirm-on-use where the agent supports it; salvage commits are never signed |
 | The workload image is unsigned | upstream does not sign it yet | digest pin; repository allowlist; capability set in the gate |
 | Local v3 kits are unsigned | local v3 kits cannot be signed | trust = romeu release + config commits at an approved digest; publishing path in [06](06-kits.md) |
@@ -222,10 +222,8 @@ surfaces:
 | Salvage proves that nothing the sandbox still holds is lost. It does not prove what an agent removed before salvage: the manifest, the bundles, the snapshots and the daemon's repository all live inside the sandbox, where the agent is root | the threat model lists hidden and destroyed work, and nothing inside a sandbox can witness the agent | a push to origin is the only copy an agent cannot take back; I17 holds against loss and against a forged manifest |
 | `herdr` is pinned by version and per-arch sha256, and its upstream publishes no checksum file and no signature: the hash proves the binary has not changed since publication, not who built it | the upstream offers nothing stronger (measured 2026-10-01, 06 6.4) | `tools/kitpin` takes the hash from the release API's digest and refuses a release that is not marked immutable; the pin is a reviewed diff on the `kits` surface; herdr runs inside the sandbox only |
 | Between a run and the next `sync`/`run`, an agent can plant files in a memory dir; an operator who opens that dir with host tools sees them | memory dirs are shared by design and checked only when romeu reads them | read memory only through `romeu handoff`; memory dirs are never workspace folders; doctor and the preflight check trust settings (I23) |
-| The approval line in a PR body is typed by the PR's author | a check can prove the line is there, not who said it | the default-branch ruleset requires a code-owner review for each ask-first path, the decision records and the check code included ([12 12.4](12-engineering.md#124-middleware-before-and-after-every-change)); the next row says what that review is worth today |
-| With one GitHub account the code-owner review is not independent: agents push and open PRs as the maintainer, GitHub does not count an author's approval of their own PR, and the maintainer merges as the rulesets' bypass actor | a second account is a cost v1 does not need in order to start | the sandbox's token must not merge, push to the default branch, push a `v*` tag or change a ruleset; the maintainer block of `ci-bootstrap` saves a refusal of each, proved on the host (10 10.2), and Q25 holds the fallback if one is not refused. Until then the maintainer's merge is the only control |
-| Nothing reads the rulesets again after the maintainer block | `tools/ci all` is offline, and a ruleset is repository configuration, not a tracked file | changing a ruleset needs the Administration permission, which the sandbox's token must not have; the same block saves the refusal |
-| A `v*` tag runs `release.yml` from the tagged commit, whether or not that commit is on the default branch or was reviewed | a tag ruleset limits who pushes a tag, not which commit it names | the tag ruleset refuses a `v*` tag from anyone but its bypass actor, the maintainer, and the same block saves the refusal of the sandbox's token; `release.yml` runs `tools/ci all` on the tagged commit before it builds |
+| The approval line in a PR body is typed by the PR's author | a check can prove the line is there, not who said it | the default-branch ruleset requires a code-owner review for each ask-first path, the decision records and the check code included ([12 12.4](12-engineering.md#124-middleware-before-and-after-every-change)); the next row says what that review is worth |
+| The sandbox's GitHub token is the operator's own: a merge, a `v*` tag and a change to a ruleset or a repository setting are process only against an agent that holds it, and so is the independence of the code-owner review | the operator decided it, for now, and declined a second account; a narrower token is deferred by the operator. The record is [ADR 0008, let the sandbox act as the maintainer on GitHub](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md). It collides with rule 1 of [ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md), which says a merge gate is never deferred: the operator accepted that collision by name on 2026-10-07. Measured that day with that token (the evidence is kept outside this repository; [10 10.2](10-testing-style.md#release-and-bootstrap), item d): of four tries, only a direct push to the default branch was refused, a control only against an agent that does not edit the ruleset or the repository settings; a merge through the API without a bypass request, a `v*` tag create and delete, and a ruleset update with its own unchanged body were accepted. That an agent can disable the ruleset or change the settings is inferred, not measured. | the operator reads the GitHub security log at each sitting (a judgment, no check); whether that log covers merges, tag pushes and ruleset updates on a personal account is unverified, so the decision also returns to the operator by time, every 2 autonomous work sessions on the product (a session runs from a resume to its handoff checkpoint), and later every 10 once review is cheap; the narrowing of the token is deferred, and what narrows it, and when, is in the [Deferred decisions](../spec.md#deferred-decisions) and in the ADR above; what the token can reach is listed in classes in [ADR 0008](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md#decision) |
 | The compatibility check executes the binary it checks | a check run inside the sandbox cannot attest itself | integrity comes from the read-only mount and the host-side drift check of `.romeu/bin`; the check only proves compatibility |
 | Between a write in the sandbox and ingest on the host, an event can be forged, altered or dropped in the spool, and a dropped one leaves no trace | nothing inside a sandbox can make julieta the one writer of a directory the agent can also write | the ledger is add-only from ingest onward (I31); an entry is read as data an agent may have written; romeu stamps `project` and `ingested` itself and orders by those stamps (13 13.2) |
 | A removed ledger entry is undetected in v1, so "never deleted" is a promise; nothing protects the ledger from the host | the threat model trusts the host, and a chain on the same disk is rewritten by whoever can remove an entry | romeu has no code that removes an entry (I31); the directory is 0700 under host state (I20); a hash chain is a deferred decision with three triggers |
@@ -234,15 +232,25 @@ surfaces:
 | Each sandbox on a machine sees the other projects' names, their activity timing and the allowlisted fields of their events. The numbers and the time among those fields are values an agent chose, so they are a low-rate channel between projects | the maintainer accepted cross-project reads | closed sets by membership (I33); `id` and the key stay out; finer visibility is a deferred decision |
 | The ledger only grows, and an agent can mint rejected entries, one per distinct invalid spool file | v1 warns and does not refuse, because refusing would drop events | the spool caps bound what one ingest takes (13 13.8); a rejected entry is one short line; `doctor` warns on size; rotation and a hard limit are a deferred decision |
 
-The maintainer accepted three of these rows for v1 by name
-([round 4](../reviews/round-4.md#maintainer-decisions)): the
-code-owner review that is not independent with one account, where the
-maintainer's merge is the only control; the rulesets that no check
-reads again after they are created; and the `v*` tag, whose release
-depends on the tag ruleset. The maintainer also accepted the fallback
-of Q25: a second account without bypass rights, for agents. It is
-confirmed, or found unnecessary, when the token test of the
-maintainer block runs (10 10.2, item d).
+[Round 4](../reviews/round-4.md#maintainer-decisions) recorded the
+acceptance of three rows that the row above replaces. The fallback of
+a second account is rejected, and the refusals of a merge, a tag and a
+ruleset change that those rows relied on were not found against an
+agent. Item d of
+[10 10.2](10-testing-style.md#release-and-bootstrap) records the
+result.
+
+**Release signing.** The credential that signs release artifacts is
+held outside GitHub and out of the sandbox's reach. Signing is an
+operator step, and a release workflow may not hold that credential.
+GitHub's keyless provenance attestation
+(`actions/attest-build-provenance`, [10 10.2](10-testing-style.md#release-and-bootstrap))
+is an extra record of where an archive was built, not the signing
+credential. This is written now and not left to the pull request that
+adds `release.yml`: "from `main` only" would stop a stray tag and not
+the token, which merges into `main` through the API
+([ADR 0008, let the sandbox act as the maintainer on GitHub](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md),
+decision 6).
 
 Of the six ledger rows, the maintainer decided four by name
 ([round 5](../reviews/round-5.md#maintainer-decisions)): the time
