@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,9 +13,11 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 )
@@ -76,7 +79,7 @@ func TestAll(t *testing.T) {
 			},
 			profile: "tools/ci 1 1",
 			code:    exitFail,
-			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:17: workflows: runs-on is ${{ matrix.os }} or a pinned GitHub-hosted label such as ubuntu-26.04, never *-latest\n", "ok    coverage"},
+			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:17: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
 		},
 		{
 			name:    "a hygiene finding",
@@ -157,13 +160,14 @@ func TestWorkflowsCommand(t *testing.T) {
 // other step keeps either.
 func TestAllSteps(t *testing.T) {
 	root := newTree(t).Dir
+	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.lock"), []byte(lockFixture), 0o600))
 	gitPath, err := exec.LookPath("git")
 	require.NoError(t, err)
 	f := newFakeMise(t)
 	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.bin, "git")))
 	goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
 	linter := f.tool(t, "golangci-lint", "2.14.0", "golangci-lint")
-	vuln := f.tool(t, execTools["govulncheck"], "1.8.0", "bin", "govulncheck")
+	vuln := f.tool(t, govulncheckDir, "1.8.0", "bin", "govulncheck")
 	script := "#!/bin/sh\ncase \"$4\" in\ngovulncheck) echo '" + vuln + "' ;;\nesac\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
 	for _, key := range slices.Concat(networkPassThrough, dockerPassThrough) {
@@ -180,8 +184,13 @@ func TestAllSteps(t *testing.T) {
 	assert.Equal(t, fast, steps[:len(fast)])
 
 	vulnStep, race, license := steps[len(fast)], steps[len(fast)+1], steps[len(fast)+2]
-	assert.Equal(t, step{name: "vulnerabilities", argv: []string{"mise", "exec", "--", "govulncheck", "./..."}, environ: withProcessEnv(env, networkPassThrough)}, vulnStep)
-	assert.Equal(t, step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=/tmp/p/cover.out", "./..."}, environ: env}, race)
+	assert.Equal(t, step{name: "vulnerabilities", argv: []string{evalOrSelf(vuln), "./..."}, environ: withProcessEnv(env, networkPassThrough)}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")
+	assert.Equal(t, 40*time.Minute, raceTimeout)
+	assert.Less(t, raceTimeout, ciJobTimeout(t), "the race run ends before the job of ci.yml does")
+	assert.Equal(t, step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=/tmp/p/cover.out", "./..."}, environ: env, timeout: raceTimeout}, race)
+	for _, s := range steps {
+		assert.Equal(t, s.name == "race", s.timeout != 0, "%s has a budget of its own only if it is the race run", s.name)
+	}
 	assert.Equal(t, licenseStep(root, common, runtime.GOOS, withProcessEnv(env, dockerPassThrough)), license)
 
 	keys := func(s step) []string {
@@ -207,31 +216,202 @@ func TestAllSteps(t *testing.T) {
 	}
 }
 
-// TestAllStepsToolOutsideInstalls checks, for each tool all starts
-// through "mise exec", that a path mise resolves outside the directory
-// where it installs that tool fails its own step, which starts nothing.
-func TestAllStepsToolOutsideInstalls(t *testing.T) {
-	steps := map[string]string{"govulncheck": "vulnerabilities"}
-	require.Len(t, steps, len(execTools), "a step name for each tool of execTools")
-	for tool, dir := range execTools {
-		t.Run(tool, func(t *testing.T) {
+// ciJobTimeout returns the timeout-minutes of the job of ci.yml.
+func ciJobTimeout(t *testing.T) time.Duration {
+	t.Helper()
+	src, err := os.ReadFile(filepath.Join(moduleRoot(t), filepath.FromSlash(workflowsDir), "ci.yml"))
+	require.NoError(t, err)
+	var wf struct {
+		Jobs map[string]struct {
+			Minutes int `yaml:"timeout-minutes"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal(src, &wf))
+	job, ok := wf.Jobs["all"]
+	require.True(t, ok)
+	require.Positive(t, job.Minutes)
+	return time.Duration(job.Minutes) * time.Minute
+}
+
+// TestAllStepsVulnFailsClosed checks that govulncheck, which all starts
+// by path, fails its own step and starts nothing when mise resolves it
+// outside the directory where it installs the tool, at a version
+// beside the locked one, or not at all. The last case is the one
+// "mise exec" ran anyway, with a fake of the search path.
+func TestAllStepsVulnFailsClosed(t *testing.T) {
+	tests := []struct {
+		name string
+		// resolve returns what the fake mise prints for govulncheck; ""
+		// makes it fail, as for a tool that is not installed.
+		resolve func(t *testing.T, f fakeMise) string
+		want    string
+	}{
+		{
+			name:    "outside the installs directory",
+			resolve: func(t *testing.T, _ fakeMise) string { return executable(t, filepath.Join(t.TempDir(), "govulncheck")) },
+			want:    "is outside " + filepath.Join("{installs}", govulncheckDir) + ", where mise installs it",
+		},
+		{
+			name:    "at a version beside the locked one",
+			resolve: func(t *testing.T, f fakeMise) string { return f.tool(t, govulncheckDir, "1.7.0", "bin", "govulncheck") },
+			want:    "the install is not the version 1.8.0 that mise.lock locks",
+		},
+		{
+			name:    "not installed, with a fake on the search path",
+			resolve: func(t *testing.T, _ fakeMise) string { return "" },
+			want:    "mise which govulncheck: ",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			f := newFakeMise(t)
 			goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
 			tools := lintTools{linter: f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), goDir: filepath.Dir(goCmd)}
-			elsewhere := executable(t, filepath.Join(t.TempDir(), tool))
-			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\necho '"+elsewhere+"'\n"), 0o700))
-			root := t.TempDir()
+			marker := filepath.Join(t.TempDir(), "ran")
+			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "govulncheck"), []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0o700))
+			script := "#!/bin/sh\nexit 1\n"
+			if path := tt.resolve(t, f); path != "" {
+				script = "#!/bin/sh\necho '" + path + "'\n"
+			}
+			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
+			root := lockedRoot(t, lockFixture)
 			var got step
 			for _, s := range allSteps(t.Context(), root, tools, "/tmp/p/cover.out") {
-				if s.name == steps[tool] {
+				if s.name == "vulnerabilities" {
 					got = s
 				}
 			}
-			require.ErrorContains(t, got.unavailable, "is outside "+filepath.Join(evalOrSelf(f.installs()), dir)+", where mise installs it")
+			require.ErrorContains(t, got.unavailable, strings.ReplaceAll(tt.want, "{installs}", evalOrSelf(f.installs())))
 			_, err := got.run(t.Context(), root)
 			require.ErrorIs(t, err, got.unavailable, "an unavailable tool fails its step")
+			assert.NoFileExists(t, marker, "no govulncheck of the search path ran")
 		})
 	}
+}
+
+// TestStepRunDeadline checks that a step that outlives its limit fails
+// with context.DeadlineExceeded and a message that names the limit,
+// where the bare error of the killed command says only "signal: killed".
+func TestStepRunDeadline(t *testing.T) {
+	sleep := []string{"sleep", "30"}
+	t.Run("the limit of the step", func(t *testing.T) {
+		_, err := step{name: "slow", argv: sleep, timeout: 50 * time.Millisecond, environ: []string{"PATH=" + os.Getenv("PATH")}}.run(t.Context(), t.TempDir())
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.ErrorContains(t, err, "context deadline exceeded after 50ms: ")
+	})
+	t.Run("the deadline of the run, before the limit", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+		defer cancel()
+		_, err := step{name: "slow", argv: sleep, environ: []string{"PATH=" + os.Getenv("PATH")}}.run(ctx, t.TempDir())
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.ErrorContains(t, err, "at the deadline of the run: ")
+		assert.NotContains(t, err.Error(), "after 15m")
+	})
+	t.Run("a grandchild that holds the output pipe", func(t *testing.T) {
+		// sh forks sleep, which inherits the pipe and outlives sh: only
+		// killing the process group, or WaitDelay, ends the wait.
+		start := time.Now()
+		_, err := step{name: "slow", argv: []string{"sh", "-c", "sleep 30; true"}, timeout: 200 * time.Millisecond, environ: []string{"PATH=" + os.Getenv("PATH")}}.run(t.Context(), t.TempDir())
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Less(t, time.Since(start), 5*time.Second, "the step returns at its deadline, not when the grandchild ends")
+	})
+	t.Run("a failure that is not a deadline", func(t *testing.T) {
+		_, err := step{name: "fails", argv: []string{"false"}, timeout: time.Minute, environ: []string{"PATH=" + os.Getenv("PATH")}}.run(t.Context(), t.TempDir())
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, context.DeadlineExceeded)
+	})
+}
+
+// TestArchMatches maps uname -m to the architecture of the Go binary.
+func TestArchMatches(t *testing.T) {
+	for _, tt := range []struct {
+		uname, goarch string
+		want          bool
+	}{
+		{"x86_64", "amd64", true}, {"x86_64", "arm64", false},
+		{"aarch64", "arm64", true}, {"arm64", "arm64", true}, {"aarch64", "amd64", false},
+		{"unknown", "amd64", false}, {"", "arm64", false}, {"i686", "amd64", false},
+	} {
+		assert.Equal(t, tt.want, archMatches(tt.uname, tt.goarch), "%s with %s", tt.uname, tt.goarch)
+	}
+}
+
+// TestAllArchitecture reports the verdict of the architecture check: ok
+// when uname -m names the architecture of the binary, FAIL, with both
+// named, when it does not, and the other checks still run.
+func TestAllArchitecture(t *testing.T) {
+	other := map[string]string{"amd64": "aarch64", "arm64": "x86_64"}[runtime.GOARCH]
+	if other == "" {
+		t.Skip("no uname -m to compare with on " + runtime.GOARCH)
+	}
+	same := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}[runtime.GOARCH]
+	for _, tt := range []struct {
+		uname, want string
+		code        int
+	}{
+		{same, "ok    architecture\n", exitOK},
+		{other, "FAIL  architecture\nuname -m reports " + other + " and this binary runs as " + runtime.GOARCH + ": ", exitFail},
+		{"unknown", "FAIL  architecture\nuname -m reports unknown", exitFail},
+	} {
+		t.Run(tt.uname, func(t *testing.T) {
+			r := newTree(t)
+			r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+			r.Commit("fixture")
+			profile := filepath.Join(t.TempDir(), "cover.out")
+			require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
+			var out bytes.Buffer
+			e := env{dir: r.Dir, gitEnv: r.Env, stdin: strings.NewReader(""), stdout: &out, stderr: &out, steps: []step{passing}, profile: profile,
+				machine: func(context.Context) string { return tt.uname }}
+			assert.Equal(t, tt.code, run(t.Context(), e, []string{"all"}), "%s", out.String())
+			assert.Contains(t, out.String(), tt.want)
+			assert.Contains(t, out.String(), "ok    passes", "the other checks run")
+			assert.Contains(t, out.String(), "ok    coverage")
+		})
+	}
+}
+
+// TestAllArchitectureTranslated fails the verdict of a binary that runs
+// under Rosetta, where uname -m prints the architecture it emulates and
+// so matches.
+func TestAllArchitectureTranslated(t *testing.T) {
+	same := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}[runtime.GOARCH]
+	if same == "" {
+		t.Skip("no uname -m to compare with on " + runtime.GOARCH)
+	}
+	for _, translated := range []bool{false, true} {
+		r := newTree(t)
+		r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+		r.Commit("fixture")
+		profile := filepath.Join(t.TempDir(), "cover.out")
+		require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
+		var out bytes.Buffer
+		e := env{dir: r.Dir, gitEnv: r.Env, stdin: strings.NewReader(""), stdout: &out, stderr: &out, steps: []step{passing}, profile: profile,
+			machine:    func(context.Context) string { return same },
+			translated: func(context.Context) bool { return translated }}
+		code := run(t.Context(), e, []string{"all"})
+		if translated {
+			assert.Equal(t, exitFail, code, "%s", out.String())
+			assert.Contains(t, out.String(), "FAIL  architecture\nsysctl.proc_translated is 1: ")
+			assert.Contains(t, out.String(), "ok    passes", "the other checks run")
+		} else {
+			assert.Equal(t, exitOK, code, "%s", out.String())
+			assert.Contains(t, out.String(), "ok    architecture\n")
+		}
+	}
+}
+
+// TestProcTranslated is false off macOS, where there is no such key,
+// and on macOS it is what sysctl says. An Intel Mac has no such key
+// either (measured on the macos-26-intel runner), so a sysctl error
+// means "not translated".
+func TestProcTranslated(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		assert.False(t, procTranslated(t.Context()))
+		return
+	}
+	out, err := exec.CommandContext(t.Context(), "sysctl", "-n", "sysctl.proc_translated").Output()
+	want := err == nil && strings.TrimSpace(string(out)) == "1"
+	assert.Equal(t, want, procTranslated(t.Context()))
 }
 
 // TestLicenseStep pins the license step: reuse from the image pinned
@@ -279,6 +459,7 @@ func TestLicenseStep(t *testing.T) {
 func TestAllWiring(t *testing.T) {
 	r := newTree(t)
 	r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+	r.Write("mise.lock", lockFixture)
 	r.Commit("fixture")
 	gitPath, err := exec.LookPath("git")
 	require.NoError(t, err)
@@ -292,10 +473,10 @@ func TestAllWiring(t *testing.T) {
 	writeProfile := "for a in \"$@\"; do case \"$a\" in -coverprofile=*) printf 'mode: set\\n" + fixtureModule + "/tools/ci/f.go:1.2,3.4 1 0\\n' > \"${a#-coverprofile=}\" ;; esac; done\n"
 	for path, script := range map[string]string{
 		goCmd: logged("go", writeProfile),
-		filepath.Join(filepath.Dir(goCmd), "gofmt"):                                          logged("gofmt", ""),
-		filepath.Join(f.installs(), "golangci-lint", "2.14.0", "golangci-lint"):              logged("lint", ""),
-		filepath.Join(f.installs(), execTools["govulncheck"], "1.8.0", "bin", "govulncheck"): logged("govulncheck", ""),
-		filepath.Join(f.bin, "docker"):                                                       logged("docker", ""),
+		filepath.Join(filepath.Dir(goCmd), "gofmt"):                                logged("gofmt", ""),
+		filepath.Join(f.installs(), "golangci-lint", "2.14.0", "golangci-lint"):    logged("lint", ""),
+		filepath.Join(f.installs(), govulncheckDir, "1.8.0", "bin", "govulncheck"): logged("govulncheck", ""),
+		filepath.Join(f.bin, "docker"):                                             logged("docker", ""),
 	} {
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 		require.NoError(t, os.WriteFile(path, []byte(script), 0o700))
@@ -303,7 +484,7 @@ func TestAllWiring(t *testing.T) {
 	which := "if [ \"$3\" = which ]; then\ncase \"$4\" in\n" +
 		"go) echo '" + goCmd + "' ;;\n" +
 		"golangci-lint) echo '" + filepath.Join(f.installs(), "golangci-lint", "2.14.0", "golangci-lint") + "' ;;\n" +
-		"govulncheck) echo '" + filepath.Join(f.installs(), execTools["govulncheck"], "1.8.0", "bin", "govulncheck") + "' ;;\n" +
+		"govulncheck) echo '" + filepath.Join(f.installs(), govulncheckDir, "1.8.0", "bin", "govulncheck") + "' ;;\n" +
 		"esac\nexit 0\nfi\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\n"+which+"echo \"mise $*\" >> '"+log+"'\n"), 0o700))
 
@@ -324,7 +505,7 @@ func TestAllWiring(t *testing.T) {
 			}
 		}
 	}
-	want := []string{"gofmt -l", "go vet", "lint run", "lint run", "lint run", "lint run", "go test", "mise exec", "go test"}
+	want := []string{"gofmt -l", "go vet", "lint run", "lint run", "lint run", "lint run", "go test", "govulncheck ./...", "go test"}
 	if runtime.GOOS == "linux" {
 		want = append(want, "docker run")
 	}
@@ -348,6 +529,7 @@ func evalOrSelf(path string) string {
 // command's default proxy.
 func TestSetup(t *testing.T) {
 	r := newTree(t)
+	r.Write("mise.lock", lockFixture)
 	r.Commit("fixture")
 	gitPath, err := exec.LookPath("git")
 	require.NoError(t, err)

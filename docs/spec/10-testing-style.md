@@ -84,8 +84,8 @@ does a file in that directory with another name ending:
 | Level | Allowed |
 |---|---|
 | file | the keys `name`, `on`, `permissions`, `concurrency`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters |
-| job | the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `runs-on` is `${{ matrix.os }}` or a pinned GitHub-hosted label (`ubuntu-<version>` or `macos-<version>`, with an optional `-arm` or `-intel`), and so is each `os` of the matrix; the matrix is a written mapping with the keys `os` and `include` only, each `include` entry holds `os` and `mise_sha256` only (names matched exactly), and an expression there fails; with `runs-on: ${{ matrix.os }}` every runner of the matrix names an `os` |
-| `uses` step | the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, each name starting with a letter or a digit, so no path of the repository (a local action) fits; `with` is a mapping that holds only the inputs listed for that action in `tools/ci` |
+| job | the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `runs-on` is `${{ matrix.os }}` or one of the four labels of Runners below, and so is each `os` of the matrix (`runs-on` as a list or a mapping fails); `permissions`, at the top and in a job, is a mapping whose values are `read` or `none`, and the file sets it at the top or in every job, so no scope is left to the default; `strategy` holds `matrix`, `fail-fast` and `max-parallel` only; the matrix is a written mapping with the keys `os` and `include` only, each `include` entry holds `os` and `mise_sha256` only (names matched exactly), and a `${{` in the value of an `include` entry fails (the `os` value is held to the four labels); with `runs-on: ${{ matrix.os }}` every runner of the matrix names an `os` |
+| `uses` step | the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, the owner and the repository start with a letter or a digit, and so does each path segment or it starts with `_`, so no `.` or `..` segment, no `./` path of the repository (a local action) and no `docker://` image fits; `with` is a mapping that holds only the inputs listed for that action in `tools/ci` (the action is matched without case), each value a literal or one `${{ matrix.<key> }}` alone whose values are all literals; an `actions/checkout` step sets `persist-credentials: false`, written exactly so (the case of the action name is ignored, the case of the value is not) |
 | `run` step | the keys `name`, `run`; `run` is one line, `go run ./tools/ci <subcommand> [<argument>...]` or `go run ./tools/release <subcommand> [<argument>...]`; each word is made of ASCII letters, digits and `._/=:-`, or is `"$NAME"` |
 
 So a workflow has no `if`, no `continue-on-error`, no `shell`, no
@@ -95,17 +95,23 @@ a value may hold an expression (`runs-on`, `with`,
 `concurrency`, a `strategy` matrix), the text between the braces is
 one context path: names of ASCII letters, digits, `_` and `-`, joined
 by dots (`matrix.os`, `github.ref_name`). An operator, a function call
-or a literal there fails. No level holds `env`: its keys could make a
+or a literal there fails, and so does `github.token` and any
+`secrets.<name>` (the list of allowed secrets is empty; a secret joins
+it with the operator's approval), whatever the case. An anchor, an
+alias and a tag other than `!!str` on a key fail. No level holds `env`: its keys could make a
 `run` step start other code (`BASH_ENV`, `LD_PRELOAD`, `PATH`,
 `GOFLAGS=-toolexec`). A value a command needs from the event reaches
 it as a variable the runner sets, a `"$NAME"` word such as
 `"$GITHUB_REF_NAME"`. A
 workflow and a developer's shell therefore run the same code at the
-same commit. `tools/ci` starts `govulncheck` through `mise exec`,
-runs `reuse` from a container image pinned by digest (the license
-row), and runs the `golangci-lint` and the go command whose paths
-`mise which` resolves, so the versions locked in `mise.lock` are the
-ones used in both places.
+same commit. `tools/ci` runs `reuse` from a container image pinned by digest (the
+license row), and runs `govulncheck`, `golangci-lint` and the go
+command by the paths `mise which` resolves, never through `mise exec`:
+with the tool not installed, `mise exec` warned and ran a program of the
+search path, exit status 0 (measured with mise 2026.10.3). A path must
+lie below the install directory of the tool, in the directory of the
+version `mise.lock` locks (a tool locked at two different versions is an error; the same version twice is not), so the
+versions locked in `mise.lock` are the ones used in both places.
 
 Three consequences of the grammar:
 
@@ -117,10 +123,9 @@ Three consequences of the grammar:
   to a PR's title or body runs `pr` again; `tools/ci workflows` fails a
   `ci.yml` without it.
 - The grammar bounds keys, `run` lines, runner labels, the inputs of
-  each action and expressions, not each value: the scopes under
-  `permissions`, the owner of a `uses` action, the filters under `on`,
-  the rest of `strategy` (outside `matrix`), and the values of the listed `with` inputs
-  are free. They are reviewed, not checked:
+  each action and expressions, not each value: the owner of a `uses`
+  action, the filters under `on` and the values under `strategy` other
+  than `matrix` are free. They are reviewed, not checked:
   `.github/workflows/**` is an ask-first surface (05 5.3).
 
 `tools/ci all` runs the `pr` step when `GITHUB_EVENT_NAME` is
@@ -228,8 +233,10 @@ Runners: `ubuntu-26.04` (x64), `ubuntu-26.04-arm` (arm64), `macos-26`
 verified to exist, and every label to report, by `uname -m`, as `aarch64`
 (`ubuntu-26.04-arm`), `arm64` (`macos-26`) and `x86_64` (`ubuntu-26.04`
 and `macos-26-intel`), on the first run of `ci.yml` (T002). Labels are
-pinned, never `*-latest`: `tools/ci workflows` fails a `runs-on` with a
-`*-latest` label. They are bumped deliberately; the images are listed at
+pinned, never `*-latest`: `tools/ci workflows` fails a `runs-on` or a
+matrix `os` that is not one of the four. `tools/ci all` reports the
+architecture of the Go binary next to `uname -m`, and fails when they
+differ (`x86_64` is `amd64`; `aarch64` and `arm64` are `arm64`). On macOS it also reads `sysctl -n sysctl.proc_translated`, which `uname -m` cannot show (a binary under Rosetta sees the architecture it emulates), and fails when it is `1`. They are bumped deliberately; the images are listed at
 <https://github.com/actions/runner-images>.
 
 Four subcommands are outside `all`:
