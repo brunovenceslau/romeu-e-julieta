@@ -267,7 +267,7 @@ task lands it.
 | Pin | Form | Section | Task |
 |---|---|---|---|
 | Go | version in `mise.toml`, locked in `mise.lock` | 12 12.1, 02 2.1 | T001 |
-| `golangci-lint`, `govulncheck` | `mise.lock`; `govulncheck` started through `mise exec`, its lock entry without a checksum (it rests on the Go checksum database), `golangci-lint` run from the path `mise which` resolves | 12 12.1, 10 10.2 | T001, T002 |
+| `golangci-lint`, `govulncheck` | `mise.lock`; `govulncheck` and `golangci-lint` run from the paths `mise which` resolves, at the version `mise.lock` locks; the `govulncheck` lock entry has no checksum (it rests on the Go checksum database) | 12 12.1, 10 10.2 | T001, T002 |
 | `reuse` | the container image `fsfe/reuse:6.2.0@sha256:<digest>` in `tools/ci`, run on Linux only | 12 12.1, 10 10.2 | T002 |
 | `gh`, for `tools/release verify` | `mise.lock`, started through `mise exec` | 12 12.1, 10 10.2 | T088 |
 | GitHub Actions | `uses` with a 40-hex commit SHA | 10 10.2 | T002, T088 |
@@ -373,6 +373,16 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     with an operator, a `uses` without a 40-hex SHA, a `run` line that
     is not `go run ./tools/ci` or `go run ./tools/release`, a file with
     another name ending), and fails a `ci.yml` without `edited`.
+  - Hardening after the merge (operator decision, 2026-10-08): the
+    grammar is made of allowlists (the four runner labels, `with` keys
+    per action with literal values, `permissions` of `read` or `none`,
+    no `github.token` and no `secrets.*`, `persist-credentials: false`
+    on a checkout, a closed `strategy`, keys tagged `!!str`), and
+    `tools/ci` runs `govulncheck`, `golangci-lint` and `go` by the
+    path `mise which` resolves, at the version `mise.lock` locks, with
+    a step timeout that names its limit, a 40-minute budget for the
+    race run, and an architecture verdict (`uname -m` against the Go
+    binary).
   - `go run ./tools/ci all` runs the steps of 10 10.2 that have code to
     check at this point: format and vet, lint, unit, hygiene, workflows,
     `govulncheck`, the race run with its cover profile, `coverage`,
