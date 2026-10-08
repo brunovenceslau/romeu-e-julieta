@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,6 +37,12 @@ type step struct {
 	// environment of this process never reaches it, so an empty one is
 	// an empty environment.
 	environ []string
+	// unavailable, when set, says why the step's tool could not be
+	// resolved: the step fails with it and starts nothing.
+	unavailable error
+	// skip, when set, says why the step does not run on this platform:
+	// it is reported with "--", neither passed nor failed.
+	skip string
 }
 
 // fastSteps returns the command steps of fast, from the In fast column
@@ -102,48 +109,53 @@ type lintTools struct {
 // configuration); such a tool is no pinned one, and it is an error here
 // too.
 func resolveLintTools(ctx context.Context, root string) (lintTools, error) {
-	installsDir, err := miseInstalls()
+	linter, err := whichPinned(ctx, root, "golangci-lint", "golangci-lint")
 	if err != nil {
 		return lintTools{}, err
 	}
-	installs, err := filepath.EvalSymlinks(installsDir)
-	if err != nil {
-		return lintTools{}, fmt.Errorf("the mise installs directory %s: %w; run \"mise trust\" and \"mise install\" in %s", installsDir, err, root)
-	}
-	which := func(name string) (string, error) {
-		cmd := exec.CommandContext(ctx, "mise", "-C", root, "which", name)
-		cmd.Env = passThroughEnv()
-		out, err := cmd.Output()
-		if errors.Is(err, exec.ErrNotFound) {
-			return "", fmt.Errorf("mise is not on the search path: install mise, then run \"mise trust\" and \"mise install\" in %s", root)
-		}
-		if err != nil {
-			detail := ""
-			var exit *exec.ExitError
-			if errors.As(err, &exit) {
-				detail = "\n" + string(bytes.TrimSpace(exit.Stderr))
-			}
-			return "", fmt.Errorf("mise which %s: %w; the tool is not installed or the configuration is not trusted: run \"mise trust\" and \"mise install\" in %s%s", name, err, root, detail)
-		}
-		path, err := filepath.EvalSymlinks(string(bytes.TrimSpace(out)))
-		if err != nil {
-			return "", fmt.Errorf("mise which %s: %w", name, err)
-		}
-		dir := filepath.Join(installs, name)
-		if rel, err := filepath.Rel(dir, path); err != nil || !filepath.IsLocal(rel) {
-			return "", fmt.Errorf("mise which %s: %s is outside %s, where mise installs it: the mise configuration names a tool mise did not install", name, path, dir)
-		}
-		return path, nil
-	}
-	linter, err := which("golangci-lint")
-	if err != nil {
-		return lintTools{}, err
-	}
-	goBin, err := which("go")
+	goBin, err := whichPinned(ctx, root, "go", "go")
 	if err != nil {
 		return lintTools{}, err
 	}
 	return lintTools{linter: linter, goDir: filepath.Dir(goBin)}, nil
+}
+
+// whichPinned returns the path "mise which" resolves for the program
+// name, once its symbolic links are resolved, and fails unless it lies
+// in dir, the directory below the installs directory (miseInstalls)
+// where mise installs that tool. It runs in passThroughEnv.
+func whichPinned(ctx context.Context, root, name, dir string) (string, error) {
+	installsDir, err := miseInstalls()
+	if err != nil {
+		return "", err
+	}
+	installs, err := filepath.EvalSymlinks(installsDir)
+	if err != nil {
+		return "", fmt.Errorf("the mise installs directory %s: %w; run \"mise trust\" and \"mise install\" in %s", installsDir, err, root)
+	}
+	cmd := exec.CommandContext(ctx, "mise", "-C", root, "which", name)
+	cmd.Env = passThroughEnv()
+	out, err := cmd.Output()
+	if errors.Is(err, exec.ErrNotFound) {
+		return "", fmt.Errorf("mise is not on the search path: install mise, then run \"mise trust\" and \"mise install\" in %s", root)
+	}
+	if err != nil {
+		detail := ""
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			detail = "\n" + string(bytes.TrimSpace(exit.Stderr))
+		}
+		return "", fmt.Errorf("mise which %s: %w; the tool is not installed or the configuration is not trusted: run \"mise trust\" and \"mise install\" in %s%s", name, err, root, detail)
+	}
+	path, err := filepath.EvalSymlinks(string(bytes.TrimSpace(out)))
+	if err != nil {
+		return "", fmt.Errorf("mise which %s: %w", name, err)
+	}
+	want := filepath.Join(installs, dir)
+	if rel, err := filepath.Rel(want, path); err != nil || !filepath.IsLocal(rel) {
+		return "", fmt.Errorf("mise which %s: %s is outside %s, where mise installs it: the mise configuration names a tool mise did not install", name, path, want)
+	}
+	return path, nil
 }
 
 // miseInstalls returns the directory where mise installs tools:
@@ -266,6 +278,9 @@ func lintEnv(target lintTarget, goDir string) []string {
 // exactly s.environ: os/exec gives a nil Cmd.Env the environment of
 // this process, so a nil environ becomes an empty, non-nil one.
 func (s step) run(ctx context.Context, dir string) ([]byte, error) {
+	if s.unavailable != nil {
+		return nil, s.unavailable
+	}
 	ctx, cancel := context.WithTimeout(ctx, stepTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, s.argv[0], s.argv[1:]...)
@@ -278,8 +293,9 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 	return out, err
 }
 
-// runFast runs the fast checks: the command steps, then hygiene. Every
-// check runs, so one run shows everything there is to fix.
+// runFast runs the fast checks: the command steps, then hygiene and
+// workflows. Every check runs, so one run shows everything there is to
+// fix.
 //
 // Run by hand, with no argument, fast checks the working tree as it is,
 // staged, modified and untracked files included: development stays
@@ -293,8 +309,8 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 // differs from HEAD in a file the checks read. The steps take minutes,
 // and the tree may change meanwhile, so after the last step it judges
 // the tree again and refuses the push when HEAD moved or a refusal
-// appeared. Hygiene and the pushed range read the commit judged, by
-// its id, and not HEAD again.
+// appeared. Hygiene, workflows and the pushed range read the commit
+// judged, by its id, and not HEAD again.
 //
 // In both modes it refuses a go.mod below the module root
 // (nestedModules).
@@ -348,22 +364,8 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 		}
 		steps = fastSteps(root, tools)
 	}
-	ok := true
-	report := func(name string, passed bool, detail string) {
-		verdict := "ok  "
-		if !passed {
-			verdict, ok = "FAIL", false
-		}
-		say(e.stdout, "%s  %s\n%s", verdict, name, detail)
-	}
-	for _, s := range steps {
-		out, err := s.run(ctx, root)
-		detail := ""
-		if err != nil {
-			detail = fmt.Sprintf("%s%v\n", out, err)
-		}
-		report(s.name, err == nil, detail)
-	}
+	c := newChecks(e.stdout)
+	c.run(ctx, root, steps)
 	if hook {
 		again, err := judge()
 		if err == nil && again != head {
@@ -382,7 +384,11 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	report("hygiene", len(findings) == 0, lines(findings))
+	c.report("hygiene", len(findings) == 0, lines(findings))
+	if findings, err = workflows(ctx, repo, head); err != nil {
+		return false, err
+	}
+	c.report("workflows", len(findings) == 0, lines(findings))
 
 	if hook {
 		findings, checked, err := pushedRange(ctx, repo, args[0], push, head)
@@ -390,13 +396,60 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 			return false, err
 		}
 		if checked || len(findings) > 0 {
-			report("pushed range", len(findings) == 0, lines(findings))
+			c.report("pushed range", len(findings) == 0, lines(findings))
 		}
 		if !checked {
 			say(e.stdout, "--    pushed range: not checked against names, no denylist entry at HEAD or at the remote's default branch\n")
 		}
 	}
-	return ok, nil
+	return c.ok, nil
+}
+
+// checks prints the verdict of each check as it ends, and remembers
+// whether every one passed. Every check runs, so one run shows
+// everything there is to fix.
+type checks struct {
+	out io.Writer
+	ok  bool
+}
+
+func newChecks(out io.Writer) *checks {
+	return &checks{out: out, ok: true}
+}
+
+// report prints one verdict, with what the check found below it.
+func (c *checks) report(name string, passed bool, detail string) {
+	verdict := "ok  "
+	if !passed {
+		verdict, c.ok = "FAIL", false
+	}
+	say(c.out, "%s  %s\n%s", verdict, name, detail)
+}
+
+// moduleLookupOff is what the go command prints when a step needs a
+// module that the module cache does not hold: the steps run with
+// GOPROXY=off (stepEnv).
+const moduleLookupOff = "module lookup disabled by GOPROXY=off"
+
+// run runs each step in root and reports it. A step that failed for a
+// module missing from the module cache names the command that fills
+// the cache.
+func (c *checks) run(ctx context.Context, root string, steps []step) {
+	for _, s := range steps {
+		if s.skip != "" {
+			say(c.out, "--    %s: %s\n", s.name, s.skip)
+			continue
+		}
+		out, err := s.run(ctx, root)
+		detail := ""
+		if err != nil {
+			detail = fmt.Sprintf("%s%v\n", out, err)
+			if bytes.Contains(out, []byte(moduleLookupOff)) {
+				detail += "the module cache lacks a module of go.sum, and the steps never reach the network: run \"go run ./tools/ci setup\", which runs \"go mod download\", then run this again\n"
+			}
+		}
+		c.report(s.name, err == nil, detail)
+	}
 }
 
 // repoLocalEnv are the variables that tell git which repository, index,
@@ -565,7 +618,7 @@ func nestedModules(ctx context.Context, repo git.Repo) error {
 	if len(found) == 0 {
 		return nil
 	}
-	return fmt.Errorf("fast checks one module, and a go.mod below its root takes a directory out of it; remove these files:\n%s",
+	return fmt.Errorf("the checks read one module, and a go.mod below its root takes a directory out of it; remove these files:\n%s",
 		strings.Join(found, "\n"))
 }
 

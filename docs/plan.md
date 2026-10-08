@@ -267,7 +267,8 @@ task lands it.
 | Pin | Form | Section | Task |
 |---|---|---|---|
 | Go | version in `mise.toml`, locked in `mise.lock` | 12 12.1, 02 2.1 | T001 |
-| `golangci-lint`, `govulncheck`, `reuse` | `mise.lock`; `govulncheck` and `reuse` started through `mise exec`, `golangci-lint` run from the path `mise which` resolves | 12 12.1, 10 10.2 | T001, T002 |
+| `golangci-lint`, `govulncheck` | `mise.lock`; `govulncheck` started through `mise exec`, `golangci-lint` run from the path `mise which` resolves | 12 12.1, 10 10.2 | T001, T002 |
+| `reuse` | the container image `fsfe/reuse:6.2.0@sha256:<digest>` in `tools/ci`, run on Linux only | 12 12.1, 10 10.2 | T002 |
 | `gh`, for `tools/release verify` | `mise.lock`, started through `mise exec` | 12 12.1, 10 10.2 | T088 |
 | GitHub Actions | `uses` with a 40-hex commit SHA | 10 10.2 | T002, T088 |
 | mise on the CI runners | one `uses` step with a 40-hex commit SHA, the mise version and its sha256 in `with`; Go and the other tools come from `mise.lock` through it | 10 10.2 | T002 |
@@ -379,8 +380,9 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     adopted testify in tests ([ADR 0007, adopt testify assert and require in tests](adr/0007-adopt-testify-assert-and-require-in-tests.md)):
     that change added `.golangci.yml`, the fixture test of ADR 0001 rule
     14 and the lint step of `go run ./tools/ci fast`, so `all` only has
-    to run the step that `fast` already runs. `ci.yml` runs `mise
-    trust` before `go run ./tools/ci all`: the steps of `tools/ci` keep
+    to run the step that `fast` already runs. `ci.yml` runs `go run
+    ./tools/ci setup`, which runs `mise trust`, before `go run ./tools/ci
+    all`: the steps of `tools/ci` keep
     only the variables that say where things are, so neither `CI` nor
     `MISE_TRUSTED_CONFIG_PATHS` reaches `mise which`, and it sets
     neither `MISE_DATA_DIR` nor `XDG_DATA_HOME`, which `tools/ci`

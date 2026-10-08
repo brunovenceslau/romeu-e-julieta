@@ -23,6 +23,11 @@ url = "https://dl.google.com/go/go1.27.0.darwin-arm64.tar.gz"
 checksum = "sha256:d3314e25496e4381d71a5c51d2907e7af655d199f6780b549f015bd85fef4986"
 url = "https://dl.google.com/go/go1.27.0.darwin-amd64.tar.gz"
 
+[[tools."go:golang.org/x/vuln/cmd/govulncheck"]]
+version = "1.8.0"
+backend = "go:golang.org/x/vuln/cmd/govulncheck"
+specifiers = ["1.8.0"]
+
 [[tools.golangci-lint]]
 version = "2.14.0"
 backend = "aqua:golangci/golangci-lint"

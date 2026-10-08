@@ -106,7 +106,7 @@ func TestFast(t *testing.T) {
 				r.Write("tools/inner/go.mod", "module example.invalid/inner\n")
 			},
 			code:  exitError,
-			want:  []string{"ci: fast checks one module", "\ntools/inner/go.mod"},
+			want:  []string{"ci: the checks read one module", "\ntools/inner/go.mod"},
 			lacks: []string{"ok  ", "FAIL"},
 		},
 		{
@@ -119,7 +119,7 @@ func TestFast(t *testing.T) {
 				r.Write("inner/go.mod", "module example.invalid/inner\n")
 			},
 			code:  exitError,
-			want:  []string{"ci: fast checks one module", "\ninner/go.mod"},
+			want:  []string{"ci: the checks read one module", "\ninner/go.mod"},
 			lacks: []string{"ok  ", "FAIL"},
 		},
 		{
@@ -268,7 +268,7 @@ func TestFastJudgesTheCommit(t *testing.T) {
 				r.Git("rm", "--quiet", "README.md")
 				return nil
 			}},
-		{name: "an untracked go.mod below the module root", code: exitError, want: []string{"ci: fast checks one module", "\ninner/go.mod"},
+		{name: "an untracked go.mod below the module root", code: exitError, want: []string{"ci: the checks read one module", "\ninner/go.mod"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
 				r.Write("inner/go.mod", "module example.invalid/inner\n")
 				return nil
@@ -1389,7 +1389,7 @@ func TestFastHookReadsTheProcessGitEnv(t *testing.T) {
 	r.Write("inner/go.mod", "module example.invalid/inner\n")
 	code, out := run()
 	assert.Equal(t, exitError, code, "exit status\n%s", out)
-	assert.Contains(t, out, "ci: fast checks one module")
+	assert.Contains(t, out, "ci: the checks read one module")
 	assert.Contains(t, out, "\ninner/go.mod")
 
 	require.NoError(t, os.Remove(filepath.Join(r.Dir, "inner", "go.mod")))
