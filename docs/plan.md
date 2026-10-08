@@ -362,7 +362,7 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
 
 #### T002 - `tools/ci workflows`, `tools/ci all`, `coverage` and a green `ci.yml`
 
-- [ ] Merged
+- [x] Merged
 - Module: `ci-bootstrap`. Implements: 10 10.2 (step 2; the workflow
   grammar; Runners; the `coverage` step), S2, S9, S11.
 - Depends on: T001, O1. Operator: block O2 follows its green run.
