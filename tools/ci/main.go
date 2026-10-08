@@ -27,7 +27,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 )
@@ -63,11 +65,19 @@ type env struct {
 	profile string
 	// machine returns what "uname -m" prints; nil means the command.
 	machine func(context.Context) string
+	// translated reports whether the process runs under Rosetta; nil
+	// means procTranslated.
+	translated func(context.Context) bool
 }
 
 func main() {
 	e := env{dir: ".", stdin: os.Stdin, stdout: os.Stdout, stderr: os.Stderr}
-	os.Exit(run(context.Background(), e, os.Args[1:]))
+	// A step runs in a process group of its own, which a terminal's
+	// interrupt does not reach; cancelling the context kills it.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	code := run(ctx, e, os.Args[1:])
+	stop()
+	os.Exit(code)
 }
 
 // run dispatches one subcommand and returns the exit status.

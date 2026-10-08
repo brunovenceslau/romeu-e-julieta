@@ -184,9 +184,16 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 		steps = allSteps(ctx, root, tools, profile)
 	}
 	c := newChecks(e.stdout)
+	translated := e.translated
+	if translated == nil {
+		translated = procTranslated
+	}
 	archDetail := ""
-	if !archMatches(uname, runtime.GOARCH) {
+	switch {
+	case !archMatches(uname, runtime.GOARCH):
 		archDetail = fmt.Sprintf("uname -m reports %s and this binary runs as %s: the tools of this run are not the ones of the machine\n", uname, runtime.GOARCH)
+	case translated(ctx):
+		archDetail = fmt.Sprintf("sysctl.proc_translated is 1: this %s binary runs under Rosetta, and the tools of this run are not the ones of the machine\n", runtime.GOARCH)
 	}
 	c.report("architecture", archDetail == "", archDetail)
 	c.run(ctx, root, steps)
@@ -219,11 +226,24 @@ func unameMachine(ctx context.Context) string {
 	return strings.TrimSpace(string(out))
 }
 
+// procTranslated reports whether this process runs under Rosetta: on
+// macOS "sysctl -n sysctl.proc_translated" prints 1 then, while uname
+// -m prints the architecture the process emulates, so archMatches
+// cannot see it. Elsewhere, and where the key does not exist (an Intel
+// Mac), it is false.
+func procTranslated(ctx context.Context) bool {
+	if runtime.GOOS != "darwin" {
+		return false
+	}
+	out, err := exec.CommandContext(ctx, "sysctl", "-n", "sysctl.proc_translated").Output()
+	return err == nil && strings.TrimSpace(string(out)) == "1"
+}
+
 // archMatches reports whether what "uname -m" prints (x86_64, aarch64 or
 // arm64) is the architecture goarch names: a Go built for the other
-// architecture, or run under translation, is not a run on the machine
-// the runner label names. Anything else, "unknown" included, does not
-// match.
+// architecture is not a run on the machine the runner label names.
+// Anything else, "unknown" included, does not match. A run under
+// Rosetta passes this check, and procTranslated catches it.
 func archMatches(uname, goarch string) bool {
 	switch uname {
 	case "x86_64":

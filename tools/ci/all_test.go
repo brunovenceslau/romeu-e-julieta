@@ -17,6 +17,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 )
@@ -184,6 +185,8 @@ func TestAllSteps(t *testing.T) {
 
 	vulnStep, race, license := steps[len(fast)], steps[len(fast)+1], steps[len(fast)+2]
 	assert.Equal(t, step{name: "vulnerabilities", argv: []string{evalOrSelf(vuln), "./..."}, environ: withProcessEnv(env, networkPassThrough)}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")
+	assert.Equal(t, 40*time.Minute, raceTimeout)
+	assert.Less(t, raceTimeout, ciJobTimeout(t), "the race run ends before the job of ci.yml does")
 	assert.Equal(t, step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=/tmp/p/cover.out", "./..."}, environ: env, timeout: raceTimeout}, race)
 	for _, s := range steps {
 		assert.Equal(t, s.name == "race", s.timeout != 0, "%s has a budget of its own only if it is the race run", s.name)
@@ -211,6 +214,23 @@ func TestAllSteps(t *testing.T) {
 	for _, key := range slices.Concat(networkPassThrough, dockerPassThrough) {
 		assert.NotContains(t, []string{"MISE_DATA_DIR", "XDG_DATA_HOME"}, key)
 	}
+}
+
+// ciJobTimeout returns the timeout-minutes of the job of ci.yml.
+func ciJobTimeout(t *testing.T) time.Duration {
+	t.Helper()
+	src, err := os.ReadFile(filepath.Join(moduleRoot(t), filepath.FromSlash(workflowsDir), "ci.yml"))
+	require.NoError(t, err)
+	var wf struct {
+		Jobs map[string]struct {
+			Minutes int `yaml:"timeout-minutes"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal(src, &wf))
+	job, ok := wf.Jobs["all"]
+	require.True(t, ok)
+	require.Positive(t, job.Minutes)
+	return time.Duration(job.Minutes) * time.Minute
 }
 
 // TestAllStepsVulnFailsClosed checks that govulncheck, which all starts
@@ -287,6 +307,14 @@ func TestStepRunDeadline(t *testing.T) {
 		require.ErrorContains(t, err, "at the deadline of the run: ")
 		assert.NotContains(t, err.Error(), "after 15m")
 	})
+	t.Run("a grandchild that holds the output pipe", func(t *testing.T) {
+		// sh forks sleep, which inherits the pipe and outlives sh: only
+		// killing the process group, or WaitDelay, ends the wait.
+		start := time.Now()
+		_, err := step{name: "slow", argv: []string{"sh", "-c", "sleep 30; true"}, timeout: 200 * time.Millisecond, environ: []string{"PATH=" + os.Getenv("PATH")}}.run(t.Context(), t.TempDir())
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Less(t, time.Since(start), 5*time.Second, "the step returns at its deadline, not when the grandchild ends")
+	})
 	t.Run("a failure that is not a deadline", func(t *testing.T) {
 		_, err := step{name: "fails", argv: []string{"false"}, timeout: time.Minute, environ: []string{"PATH=" + os.Getenv("PATH")}}.run(t.Context(), t.TempDir())
 		require.Error(t, err)
@@ -340,6 +368,44 @@ func TestAllArchitecture(t *testing.T) {
 			assert.Contains(t, out.String(), "ok    coverage")
 		})
 	}
+}
+
+// TestAllArchitectureTranslated fails the verdict of a binary that runs
+// under Rosetta, where uname -m prints the architecture it emulates and
+// so matches.
+func TestAllArchitectureTranslated(t *testing.T) {
+	same := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}[runtime.GOARCH]
+	if same == "" {
+		t.Skip("no uname -m to compare with on " + runtime.GOARCH)
+	}
+	for _, translated := range []bool{false, true} {
+		r := newTree(t)
+		r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+		r.Commit("fixture")
+		profile := filepath.Join(t.TempDir(), "cover.out")
+		require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
+		var out bytes.Buffer
+		e := env{dir: r.Dir, gitEnv: r.Env, stdin: strings.NewReader(""), stdout: &out, stderr: &out, steps: []step{passing}, profile: profile,
+			machine:    func(context.Context) string { return same },
+			translated: func(context.Context) bool { return translated }}
+		code := run(t.Context(), e, []string{"all"})
+		if translated {
+			assert.Equal(t, exitFail, code, "%s", out.String())
+			assert.Contains(t, out.String(), "FAIL  architecture\nsysctl.proc_translated is 1: ")
+			assert.Contains(t, out.String(), "ok    passes", "the other checks run")
+		} else {
+			assert.Equal(t, exitOK, code, "%s", out.String())
+			assert.Contains(t, out.String(), "ok    architecture\n")
+		}
+	}
+}
+
+// TestProcTranslated is false off macOS, where there is no such key.
+func TestProcTranslated(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("macOS answers for itself; a run under Rosetta is true there")
+	}
+	assert.False(t, procTranslated(t.Context()))
 }
 
 // TestLicenseStep pins the license step: reuse from the image pinned

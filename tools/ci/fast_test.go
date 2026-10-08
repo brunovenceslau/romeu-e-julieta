@@ -1022,14 +1022,48 @@ func lockedRoot(t *testing.T, lock string) string {
 	return root
 }
 
-// TestLockedVersionsFixture reads the versions of a lock, and refuses a
-// tool locked at two.
+// TestLockedVersionsFixture reads the versions of a lock, refuses a
+// tool locked at two different versions, and accepts the same version
+// written twice.
 func TestLockedVersionsFixture(t *testing.T) {
 	got, err := lockedVersions([]byte(lockFixture))
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"go": "1.27.0", "go:golang.org/x/vuln/cmd/govulncheck": "1.8.0", "golangci-lint": "2.14.0"}, got)
 	_, err = lockedVersions([]byte(lockFixture + "[[tools.go]]\nversion = \"1.26.0\"\n"))
 	require.ErrorContains(t, err, "mise.lock locks go at more than one version")
+	got, err = lockedVersions([]byte(lockFixture + "[[tools.go]]\nversion = \"1.27.0\"\n"))
+	require.NoError(t, err, "the same version twice")
+	assert.Equal(t, "1.27.0", got["go"])
+}
+
+// TestLockedVersionsOtherTable shows that a "version" key below a table
+// header other than [[tools.<name>]] is no tool's.
+func TestLockedVersionsOtherTable(t *testing.T) {
+	got, err := lockedVersions([]byte("[[tools.go]]\n[tools.go.options]\nversion = \"9.9.9\"\n"))
+	require.NoError(t, err)
+	assert.Empty(t, got)
+}
+
+// TestWhichPinnedThroughLinks resolves a tool when both the root and
+// HOME are reached through a link, as on macOS, where the temporary
+// directory is below /var, a link to /private/var.
+func TestWhichPinnedThroughLinks(t *testing.T) {
+	f := newFakeMise(t)
+	homeLink := filepath.Join(t.TempDir(), "home")
+	require.NoError(t, os.Symlink(f.home, homeLink))
+	t.Setenv("HOME", homeLink)
+	goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
+	f.script(t, "", "", strings.Replace(goCmd, f.home, homeLink, 1))
+
+	realRoot := lockedRoot(t, lockFixture)
+	rootLink := filepath.Join(t.TempDir(), "root")
+	require.NoError(t, os.Symlink(realRoot, rootLink))
+
+	got, err := whichPinned(t.Context(), rootLink, "go", "go", "go")
+	require.NoError(t, err)
+	want, err := filepath.EvalSymlinks(goCmd)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
 }
 
 // TestResolveLintToolsFailsClosed runs resolveLintTools against a fake

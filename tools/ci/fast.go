@@ -129,7 +129,7 @@ func resolveLintTools(ctx context.Context, root string) (lintTools, error) {
 // where mise installs that tool. The next path segment, the version
 // directory, must equal the version mise.lock locks under key (the
 // tool's name in the lock), so that a stale install left beside the
-// locked one is refused; a tool locked at two versions is an error, as
+// locked one is refused; a tool locked at two different versions is an error, as
 // the lock then holds no one version to hold an install to. It runs in
 // passThroughEnv.
 func whichPinned(ctx context.Context, root, name, key, dir string) (string, error) {
@@ -191,8 +191,9 @@ func lockedInstall(root, name, key, rel string) error {
 }
 
 // lockedVersions returns the version mise.lock locks for each tool: the
-// "version" key that follows each "[[tools.<name>]]" header. A tool
-// locked at more than one version is an error.
+// "version" key that follows each "[[tools.<name>]]" header, until any
+// other table header. A tool locked at two different versions is an
+// error; the same version written twice is not.
 func lockedVersions(data []byte) (map[string]string, error) {
 	locked := map[string]string{}
 	tool := ""
@@ -203,6 +204,7 @@ func lockedVersions(data []byte) (map[string]string, error) {
 			continue
 		}
 		if strings.HasPrefix(line, "[") {
+			tool = "" // a version below another table is no tool's
 			continue
 		}
 		key, value, ok := strings.Cut(line, "=")
@@ -374,6 +376,7 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, s.argv[0], s.argv[1:]...)
 	cmd.Dir = dir
 	cmd.Env = append([]string{}, s.environ...)
+	killWithGroup(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		if errors.Is(parent.Err(), context.DeadlineExceeded) {
