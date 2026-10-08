@@ -6,7 +6,8 @@
 
 <!-- What the diff does, in a few lines. For each ask-first surface it touches, add one line
 of the form Approval: <surface id> - <what was approved>, where the phrase names what was approved,
-in a few neutral words, and no person, and holds no double quotation mark.
+in a few neutral words, and no person, and holds none of the double quotation marks
+that docs/spec/12-engineering.md lists in 12.4.
 The surfaces are listed in docs/reference/ask-first.md. -->
 
 ## Evidence

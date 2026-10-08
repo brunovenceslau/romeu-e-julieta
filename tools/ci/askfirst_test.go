@@ -151,8 +151,9 @@ func TestApprovalLineOfTheSpec(t *testing.T) {
 	assert.False(t, approvalLine.MatchString(approvalForm))
 }
 
-// TestApprovalLine checks approvalLine on one line at a time; how pr
-// reads the lines of a whole body is T005's.
+// TestApprovalLine checks approvalLine on one line at a time. How pr
+// reads the lines of a whole body is T005's: its TestPRApprovalLine uses
+// the case titles of the table under T005 in docs/plan.md.
 func TestApprovalLine(t *testing.T) {
 	cases := []struct {
 		name, line string
@@ -161,21 +162,28 @@ func TestApprovalLine(t *testing.T) {
 		{"a valid line", "Approval: decisions - amend rule 8", true},
 		{"an apostrophe", "Approval: decisions - the record\u2019s rule 8", true},
 		{"a single straight quote", "Approval: decisions - the 'rule 8' text", true},
+		{"a phrase that starts with punctuation", "Approval: decisions - (amend) rule 8", true},
 		{"a lowercase prefix", "approval: decisions - amend rule 8", false},
+		{"a list item", "- Approval: decisions - amend rule 8", false},
+		{"a leading space", " Approval: decisions - amend rule 8", false},
+		{"text before the prefix", "see Approval: decisions - amend rule 8", false},
 		{"an uppercase id", "Approval: Decisions - amend rule 8", false},
+		{"an underscore in the id", "Approval: a_b - x", false},
+		{"an empty id", "Approval:  - x", false},
+		{"two spaces before the separator", "Approval: decisions  - x", false},
 		{"an en dash separator", "Approval: decisions \u2013 amend rule 8", false},
 		{"an empty phrase", "Approval: decisions - ", false},
-		{"a straight quote around the phrase", "Approval: decisions - \"amend rule 8\"", false},
-		{"a straight quote inside the phrase", "Approval: decisions - amend \"rule 8", false},
-		{"a left curly quote alone", "Approval: decisions - \u201camend rule 8", false},
-		{"a right curly quote alone", "Approval: decisions - amend rule 8\u201d", false},
-		{"a low double quote", "Approval: decisions - \u201eamend rule 8", false},
-		{"guillemets", "Approval: decisions - \u00abamend rule 8\u00bb", false},
-		{"a double prime", "Approval: decisions - amend rule 8\u2033", false},
-		{"a fullwidth quote", "Approval: decisions - \uff02amend rule 8", false},
-		{"a CJK double prime quote", "Approval: decisions - \u301damend rule 8\u301e", false},
 		{"a leading no-break space", "Approval: decisions - \u00a0amend rule 8", false},
 		{"a leading tab", "Approval: decisions - \tamend rule 8", false},
+		{"a leading vertical tab", "Approval: decisions - \vamend rule 8", false},
+		{"a leading U+0001", "Approval: decisions - \x01amend rule 8", false},
+		{"a leading zero-width space", "Approval: decisions - \u200bamend rule 8", false},
+		{"a leading byte order mark", "Approval: decisions - \ufeffamend rule 8", false},
+		{"a leading combining mark", "Approval: decisions - \u0301amend rule 8", false},
+		{"a leading unassigned code point", "Approval: decisions - \u0378amend rule 8", false},
+		{"a leading private-use character", "Approval: decisions - \ue000amend rule 8", false},
+		{"a next line inside the phrase", "Approval: decisions - amend\u0085rule 8", false},
+		{"a zero-width space inside the phrase", "Approval: decisions - amend\u200brule 8", false},
 		{"a trailing CR", "Approval: decisions - amend rule 8\r", false},
 		{"an embedded LF", "Approval: decisions - amend\nrule 8", false},
 	}
@@ -183,6 +191,27 @@ func TestApprovalLine(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			assert.Equal(t, c.match, approvalLine.MatchString(c.line))
 		})
+	}
+}
+
+// refusedQuotes are the double quotation marks that 12 12.4 lists, each
+// refused anywhere in the phrase.
+var refusedQuotes = []rune{
+	'"', '\u00ab', '\u00bb', '\u201c', '\u201d', '\u201e', '\u201f',
+	'\u2033', '\u301d', '\u301e', '\u301f', '\uff02',
+}
+
+// TestApprovalLineRefusesEachQuote tries each refused quotation mark at
+// the head, in the middle and at the tail of the phrase.
+func TestApprovalLineRefusesEachQuote(t *testing.T) {
+	for _, q := range refusedQuotes {
+		for _, line := range []string{
+			"Approval: decisions - " + string(q) + "amend rule 8",
+			"Approval: decisions - amend " + string(q) + " rule 8",
+			"Approval: decisions - amend rule 8" + string(q),
+		} {
+			assert.False(t, approvalLine.MatchString(line), "%U in %q", q, line)
+		}
 	}
 }
 

@@ -481,8 +481,8 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     names an unknown id fails; a line that starts with `Approval: `
     and is not an approval line fails as a malformed approval line,
     not as a surface without a line. `TestPRApprovalLine` holds one
-    case per row of the table below, and each outcome is the one 12
-    12.4 states.
+    case per row of the table below, titled with the row's case title
+    verbatim, and each outcome is the one 12 12.4 states.
 
     | Case title | Body lines (diff touches `decisions`) | Outcome |
     |---|---|---|
@@ -499,6 +499,7 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     | an apostrophe | U+2019 inside the phrase | passes |
     | a leading no-break space | U+00A0 before the phrase | fails: malformed |
     | CR LF line ends | a valid line ending in CR LF | passes |
+    | a line inside an HTML comment | a valid line between `<!--` and `-->` | fails: no line for `decisions` |
     | a duplicate id | two valid lines for `decisions` | fails: duplicate |
     | an untouched known surface | a valid line, and one for `kits` | passes |
     | a refused line next to a valid one | a valid line, and one with a quoted phrase | fails: malformed |

@@ -18,7 +18,7 @@ Approval: <surface id> - <what was approved>
 ```
 
 The phrase names what was approved, in a few neutral words, and no person.
-It holds no double quotation mark and none of the look-alikes 12 12.4 lists; single quotation marks are left to review.
+It holds none of the double quotation marks 12 12.4 lists; single quotation marks and other look-alikes are left to review.
 
 The code-owner review is requested from `@brunovenceslau`. [05 5.3](../spec/05-security.md#53-ask-first-surfaces)
 says why each surface is on the list.
