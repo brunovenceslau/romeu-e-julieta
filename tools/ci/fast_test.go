@@ -908,6 +908,7 @@ func TestFastSteps(t *testing.T) {
 	want := []step{
 		{name: "format", argv: []string{filepath.Join(goDir, "gofmt"), "-l", "."}, quiet: true, environ: stepEnv(goDir)},
 		{name: "vet", argv: []string{goCmd, "vet", "./..."}, environ: stepEnv(goDir)},
+		{name: "generated", argv: []string{goCmd, "run", "./tools/ci", "generated"}, environ: stepEnv(goDir)},
 		{name: "lint linux/amd64", argv: lintArgv, environ: lintEnv(lintTarget{"linux", "amd64"}, goDir)},
 		{name: "lint linux/arm64", argv: lintArgv, environ: lintEnv(lintTarget{"linux", "arm64"}, goDir)},
 		{name: "lint darwin/amd64", argv: lintArgv, environ: lintEnv(lintTarget{"darwin", "amd64"}, goDir)},

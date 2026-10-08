@@ -318,10 +318,11 @@ func TestLintConfigLowersNothing(t *testing.T) {
 
 // allowedDirectives are the directives a comment of this repository
 // may hold, as "tool:name". go:build is the build constraint
-// (add_test.go). Every other directive, of any tool, is a decision to
-// review here first, because the readers of directives include the
-// linters, and theirs turn findings off.
-var allowedDirectives = []string{"go:build"}
+// (add_test.go), and go:generate is the one directive of generate.go,
+// which "go generate ./..." runs (12 12.3). Every other directive, of
+// any tool, is a decision to review here first, because the readers of
+// directives include the linters, and theirs turn findings off.
+var allowedDirectives = []string{"go:build", "go:generate"}
 
 // toolDirective matches the start of a directive of the "tool:name"
 // form after directiveText has normalised the line: the shape go/ast
