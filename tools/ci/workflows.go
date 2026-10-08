@@ -420,7 +420,7 @@ func (c *grammar) matrix(n *yaml.Node) bool {
 		// The os value is held to the runner labels by matrixLabels.
 		for key, value := range pairs(entry) {
 			if key.Value != "os" && !literal(value) {
-				c.add(value, "a matrix value is a literal scalar, never an expression")
+				c.add(value, "a matrix value is a literal scalar")
 			}
 		}
 		c.matrixLabels(field(entry, "os"))
@@ -573,7 +573,7 @@ func (c *grammar) inputs(uses, with, strategy *yaml.Node) {
 		}
 		if value.Kind != yaml.ScalarNode {
 			c.add(value, "a with value is a scalar")
-		} else if strings.Contains(value.Value, "${{") && !literalMatrixRef(value.Value, strategy) && !matrixUnreadable(strategy) {
+		} else if strings.Contains(value.Value, "${{") && !literalMatrixRef(value.Value, strategy) && !(matrixRef.MatchString(value.Value) && matrixUnreadable(strategy)) {
 			c.add(value, "this with input is a literal, or one ${{ matrix.<key> }} alone whose values are literals")
 		}
 	}

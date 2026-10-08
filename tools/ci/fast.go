@@ -211,7 +211,7 @@ func lockedVersions(data []byte) (map[string]string, error) {
 		if ok && tool != "" && strings.TrimSpace(key) == "version" {
 			version := strings.Trim(strings.TrimSpace(value), `"`)
 			if prev, dup := locked[tool]; dup && prev != version {
-				return nil, fmt.Errorf("mise.lock locks %s at more than one version", tool)
+				return nil, fmt.Errorf("mise.lock locks %s at two different versions", tool)
 			}
 			locked[tool] = version
 			tool = ""

@@ -1030,7 +1030,7 @@ func TestLockedVersionsFixture(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"go": "1.27.0", "go:golang.org/x/vuln/cmd/govulncheck": "1.8.0", "golangci-lint": "2.14.0"}, got)
 	_, err = lockedVersions([]byte(lockFixture + "[[tools.go]]\nversion = \"1.26.0\"\n"))
-	require.ErrorContains(t, err, "mise.lock locks go at more than one version")
+	require.ErrorContains(t, err, "mise.lock locks go at two different versions")
 	got, err = lockedVersions([]byte(lockFixture + "[[tools.go]]\nversion = \"1.27.0\"\n"))
 	require.NoError(t, err, "the same version twice")
 	assert.Equal(t, "1.27.0", got["go"])
@@ -1120,7 +1120,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 			setup: func(t *testing.T, f fakeMise) (string, string) {
 				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
 			},
-			want: "mise.lock locks golangci-lint at more than one version",
+			want: "mise.lock locks golangci-lint at two different versions",
 		},
 		{name: "no mise on the search path", noMise: true, want: "mise is not on the search path"},
 		{

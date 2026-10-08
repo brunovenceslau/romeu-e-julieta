@@ -400,12 +400,16 @@ func TestAllArchitectureTranslated(t *testing.T) {
 	}
 }
 
-// TestProcTranslated is false off macOS, where there is no such key.
+// TestProcTranslated is false off macOS, where there is no such key,
+// and on macOS it is what sysctl says.
 func TestProcTranslated(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("macOS answers for itself; a run under Rosetta is true there")
+	if runtime.GOOS != "darwin" {
+		assert.False(t, procTranslated(t.Context()))
+		return
 	}
-	assert.False(t, procTranslated(t.Context()))
+	out, err := exec.CommandContext(t.Context(), "sysctl", "-n", "sysctl.proc_translated").Output()
+	require.NoError(t, err)
+	assert.Equal(t, strings.TrimSpace(string(out)) == "1", procTranslated(t.Context()))
 }
 
 // TestLicenseStep pins the license step: reuse from the image pinned

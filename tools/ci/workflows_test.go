@@ -188,6 +188,9 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a step in flow style", "      - run: go run ./tools/release notes --tag \"$GITHUB_REF_NAME\" --out=notes.md\n", "      - {run: \"go run ./tools/ci all\", if: true}\n", `"if" is outside the grammar of a run step`},
 		{"a key with a tag that is not a string", "    timeout-minutes: 60\n", "    !!int timeout-minutes: 60\n", "key is written as a plain string"},
 		{"a key with the string tag", "    timeout-minutes: 60\n", "    !!str timeout-minutes: 60\n", ""},
+		{"a strategy with a bad first key", "    strategy:\n      fail-fast: false\n", "    strategy:\n      other: 1\n      fail-fast: false\n", `the strategy key "other"`},
+		{"steps in flow style", "    steps:\n      - name: Check out\n        uses: actions/checkout@" + sha + "\n        with:\n          persist-credentials: false\n      - uses: jdx/mise-action/sub/path@" + sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n      - name: All checks\n        run: go run ./tools/ci all\n      - run: go run ./tools/release notes --tag \"$GITHUB_REF_NAME\" --out=notes.md\n", "    steps: [{uses: actions/checkout@" + sha + ", with: {persist-credentials: false}}, {uses: jdx/mise-action/sub/path@" + sha + ", with: {sha256: \"${{ matrix.mise_sha256 }}\"}}, {run: \"go run ./tools/ci all\"}]\n", ""},
+		{"steps in flow style with a key outside the grammar", "    steps:\n      - name: Check out\n        uses: actions/checkout@" + sha + "\n        with:\n          persist-credentials: false\n      - uses: jdx/mise-action/sub/path@" + sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n      - name: All checks\n        run: go run ./tools/ci all\n      - run: go run ./tools/release notes --tag \"$GITHUB_REF_NAME\" --out=notes.md\n", "    steps: [{uses: actions/checkout@" + sha + ", with: {persist-credentials: false}}, {uses: jdx/mise-action/sub/path@" + sha + ", with: {sha256: \"${{ matrix.mise_sha256 }}\"}}, {run: \"go run ./tools/ci all\", if: true}]\n", `"if" is outside the grammar of a run step`},
 		{"an include entry key with a tag that is not a string", "          - os: ubuntu-26.04\n", "          - !!int os: ubuntu-26.04\n", "key is written as a plain string"},
 	}
 	for _, tt := range tests {
@@ -455,4 +458,38 @@ func TestWorkflowsPermissionsRequired(t *testing.T) {
 			assert.Contains(t, got[0].msg, tt.want)
 		})
 	}
+}
+
+// TestWorkflowInputWithUnreadableMatrix checks that a matrix that cannot
+// be read excuses only a ${{ matrix.<key> }} reference, whose finding is
+// the matrix's own: any other expression in a with value is still found.
+func TestWorkflowInputWithUnreadableMatrix(t *testing.T) {
+	unreadable := strings.Replace(goodWorkflow,
+		"        include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n",
+		"        include: ${{ github.event.inputs.m }}\n", 1)
+	require.NotEqual(t, goodWorkflow, unreadable)
+	findings := func(with string) string {
+		src := strings.Replace(unreadable, "sha256: ${{ matrix.mise_sha256 }}", "sha256: "+with, 1)
+		var msgs []string
+		for _, f := range workflowFindings(".github/workflows/x.yml", []byte(src)) {
+			msgs = append(msgs, f.msg)
+		}
+		return strings.Join(msgs, "\n")
+	}
+	assert.NotContains(t, findings("${{ matrix.mise_sha256 }}"), "a literal", "the reference is the matrix's finding")
+	assert.Contains(t, findings("${{ github.event.pull_request.title }}"), "a literal")
+	assert.Contains(t, findings("a${{ matrix.mise_sha256 }}"), "a literal")
+}
+
+// TestWorkflowInputFromMatrixListValue checks that an expression inside
+// a list value of the matrix (matrixValues) makes a reference to that
+// key a finding, whatever else is found about the list.
+func TestWorkflowInputFromMatrixListValue(t *testing.T) {
+	src := strings.Replace(goodWorkflow, "      matrix:\n", "      matrix:\n        os: [ubuntu-26.04, \"${{ github.event.pull_request.title }}\"]\n", 1)
+	src = strings.Replace(src, "sha256: ${{ matrix.mise_sha256 }}", "sha256: ${{ matrix.os }}", 1)
+	var msgs []string
+	for _, f := range workflowFindings(".github/workflows/x.yml", []byte(src)) {
+		msgs = append(msgs, f.msg)
+	}
+	assert.Contains(t, strings.Join(msgs, "\n"), "this with input is a literal")
 }
