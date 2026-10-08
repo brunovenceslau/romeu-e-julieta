@@ -172,7 +172,7 @@ or produced this, and does it exist now?" is answered mechanically:
 | before push | tracked `.githooks/pre-push` runs `go run ./tools/ci fast` with git's pre-push arguments and stdin (contributors enable it with `git config core.hooksPath .githooks`; inside a sandbox, julieta's dispatcher runs it automatically and passes both through) | the steps marked in the `In fast` column of [10 10.2](10-testing-style.md#102-ci), the forbidden-name check over the pushed ref names and commits, and the `PROLOGUE.md` rule over the paths they add |
 | every PR | `go run ./tools/ci all` in CI | the full list in [10 10.2](10-testing-style.md#102-ci) |
 | every PR | `tools/ci pr` reads the pull request event payload | the body has non-empty **Why**, **What changed**, **Evidence** and **Lessons** sections; a **Middleware** line of the form `check: <tools/ci subcommand or test>`, `generator: <tools/new kind or go:generate source>`, or `none: <reason>`; every changed golden listed under Evidence; an approval line (below) for each ask-first surface the diff touches, ADRs included (ADR 0001 rule 8); the title and the commit subjects in Conventional Commit form; the prose rules of ADR 0001 (rule 4) in the title, the body and the commit messages; the base is the default branch (12.9); a `Fixes-release:` trailer has the form of 12.10; the forbidden-name check ([10 10.2](10-testing-style.md#forbidden-names)) over the title, the body, the head ref name, and the four readings of each commit (the message, the author and committer identities, the paths it adds or renames to, and the lines it adds) |
-| merge | the default-branch ruleset (below) | CI green; one approving review, dismissed by a later push; code-owner review for ask-first paths; a merge commit, the one merge method (12.9) |
+| merge | the default-branch ruleset (below) | CI green; one approving review, dismissed by a later push; code-owner review for ask-first paths; a merge commit, the one merge method (12.9); as measured on 2026-10-08 the ruleset requires no review ([10 10.2](10-testing-style.md#release-and-bootstrap), item a) |
 
 The first three rows run locally, from the same `tools/ci` code; how
 that is enforced, and when local runs may stand in for GitHub Actions,
@@ -359,6 +359,10 @@ analogue of pairing. The analogy is ours and is cited to no one. Its
 check is the one approving review that the default-branch ruleset
 requires (12.4), and what that review is worth with one account is in
 [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1).
+As measured on 2026-10-08 the ruleset requires no review
+([10 10.2](10-testing-style.md#release-and-bootstrap), item a), so the loop
+has no check until the approval decision in the
+[Deferred decisions](../spec.md#deferred-decisions) table is made.
 
 ## 12.10 Delivery metrics
 
