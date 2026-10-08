@@ -196,10 +196,17 @@ not a permanent state.
    edit) therefore needs an approval line for that surface in its
    body, in the one form
    [12 12.4](../spec/12-engineering.md#124-middleware-before-and-after-every-change)
-   defines, and a code-owner review before it merges. The intent is
-   that an agent does not promote or rewrite a record on its own. The
-   approval line is typed by the PR's author, so `tools/ci pr` proves
-   it is there, not who said it. The code-owner review and the merge
+   defines, and a code-owner review before it merges. The line names
+   the surface and, in a short neutral phrase that holds none of the
+   double quotation marks 12 12.4 lists, what was approved; it names
+   no person. The intent is that an agent does not promote or rewrite
+   a record on its own. The approval line
+   is typed by the PR's author, so `tools/ci pr` proves that the
+   approval was recorded, not who gave it. While one account and one
+   token act for everyone
+   ([ADR 0008, let the sandbox act as the maintainer on GitHub](0008-let-the-sandbox-act-as-the-maintainer-on-github.md),
+   decision 4), the line is a record and a guard against mistakes, not
+   a barrier against an agent. The code-owner review and the merge
    are what an author cannot type. The default-branch ruleset requires
    them; 12 12.4 says who sets it up, and
    [05 5.4](../spec/05-security.md#54-known-residual-risks-accepted-in-v1)

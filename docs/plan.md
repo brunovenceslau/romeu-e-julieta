@@ -64,7 +64,7 @@ request. It carries:
 | Implements | the sections of the specification, by number |
 | Depends on | the tasks and operator blocks that come first |
 | Operator | `no`, or the block (O1 to O7) or the question the task waits for or feeds |
-| Ask-first | the surfaces of 05 5.3 we expect the diff to touch. `tools/ci pr` computes the real list from the diff (12 12.4); this field is a forecast, so the maintainer can give the approval words early |
+| Ask-first | the surfaces of 05 5.3 we expect the diff to touch. `tools/ci pr` computes the real list from the diff (12 12.4); this field is a forecast, so the maintainer can give the approvals early |
 | Acceptance | what a test or a command checks |
 | Verify | the command that shows it |
 
@@ -255,9 +255,10 @@ read by the hook, by `hygiene` and by `pr` first (10 10.2).
 
 **Outside the blocks.** Each merge waits for the maintainer (12 12.4),
 and a pull request that touches an ask-first surface needs the
-maintainer's words in an approval line (12 12.4). The "Ask-first"
-field of each task is there so those words can be given per phase, at
-the checkpoint, instead of one pull request at a time.
+maintainer's approval, recorded in an approval line that names what was
+approved (12 12.4). The "Ask-first" field of each task is there so
+those approvals can be given per phase, at the checkpoint, instead of
+one pull request at a time.
 
 ## Toolchain pins
 
@@ -477,7 +478,35 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     without a well-formed Middleware line, fails.
   - A touched ask-first surface without its approval line fails, with
     the list read at the base and at the head and joined; a line that
-    names an unknown id fails; a body with CR LF line ends passes.
+    names an unknown id fails; a line that starts with `Approval: `
+    and is not an approval line fails as a malformed approval line,
+    not as a surface without a line. `TestPRApprovalLine` holds one
+    case per row of the table below, titled with the row's case title
+    verbatim, and each outcome is the one 12 12.4 states.
+
+    | Case title | Body lines (diff touches `decisions`) | Outcome |
+    |---|---|---|
+    | a valid line | `Approval: decisions - amend rule 8` | passes |
+    | a lowercase prefix | `approval: decisions - amend rule 8` | fails: no line for `decisions` |
+    | an uppercase id | `Approval: Decisions - amend rule 8` | fails: malformed |
+    | an en dash separator | `Approval: decisions` U+2013 `amend rule 8` | fails: malformed |
+    | an empty phrase | `Approval: decisions - ` | fails: malformed |
+    | a straight quote around the phrase | the phrase in U+0022 | fails: malformed |
+    | a straight quote inside the phrase | U+0022 after the first word | fails: malformed |
+    | a left curly quote alone | U+201C before the phrase | fails: malformed |
+    | a right curly quote alone | U+201D after the phrase | fails: malformed |
+    | a look-alike quote | the phrase in U+00AB and U+00BB | fails: malformed |
+    | an apostrophe | U+2019 inside the phrase | passes |
+    | a leading no-break space | U+00A0 before the phrase | fails: malformed |
+    | CR LF line ends | a valid line ending in CR LF | passes |
+    | a line inside an HTML comment | a valid line between `<!--` and `-->` | fails: no line for `decisions` |
+    | a duplicate id | two valid lines for `decisions` | fails: duplicate |
+    | an untouched known surface | a valid line, and one for `kits` | passes |
+    | a refused line next to a valid one | a valid line, and one with a quoted phrase | fails: malformed |
+    | an unknown id | a valid line, and one for `nosuch` | fails: unknown id |
+    | an id with a double hyphen | `Approval: a--b - x`, and a valid line | fails: unknown id |
+    | a surface removed in the head | the head's list drops `decisions`; a valid line | passes, by the union |
+    | a surface removed in the head, no line | as above, without the line | fails: no line for `decisions` |
   - A changed golden whose repository path is not written verbatim under
     Evidence fails (10 10.4).
   - A title or a one-parent commit subject outside the Conventional
@@ -2713,7 +2742,7 @@ helper command; an explicit registry credential (Q23).
 Each row has what holds until then and the event that reopens it;
 the table is the one place they are written, and this page does not
 copy them.
-Six rows meet a task of this plan:
+Seven rows meet a task of this plan:
 
 | Row | Task | What happens there |
 |---|---|---|
@@ -2723,6 +2752,7 @@ Six rows meet a task of this plan:
 | a scheduled run of the pin-freshness check | T088 | the task builds the check and runs it once by hand |
 | tuning the ledger's starting values | T064 | the plan may tune them (13 13.8) and keeps the proposed defaults |
 | how a local-gate run is recorded | each task | reopened the first time the maintainer chooses the local gates for a merge (10 10.2) |
+| what replaces the code-owner review | T005 | decided at the start of the task, which builds the approval line's check |
 
 ## Decisions this plan defers
 

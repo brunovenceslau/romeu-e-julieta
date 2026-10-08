@@ -292,25 +292,70 @@ surface ([05 5.3](05-security.md#53-ask-first-surfaces)) carries one
 line per touched surface in its body:
 
 ```text
-Approval: <surface id> - "<the maintainer's words>"
+Approval: <surface id> - <what was approved>
 ```
 
-A line is a whole line of the body that matches
-`^Approval: ([a-z0-9-]+) - "(.+)"$`, read without a trailing carriage
-return, so a body with CR LF line ends matches; the quoted part must
-hold at least one character that is not whitespace. `tools/ci pr` reads
-`.github/ask-first.yaml` at the base commit and at the head commit and
-uses the union of the two lists, so a PR that removes a surface or a
-glob still needs that surface's line. A surface is touched when a
-changed path matches one of its globs. The changed paths are those
-that differ between the merge base and the head (10 10.2), so merging
-the default branch into the pull request touches nothing. In a glob,
-`**` matches zero or more path segments, `*` matches inside one
-segment, and each other character matches itself. `pr` fails when a touched
-surface has no line, and when a line names an id that neither list
-has. This is the one form of a recorded approval; ADR 0001 rule 8 and
+The phrase after the dash names what was approved, in a few neutral
+words, and no person: for example
+`Approval: decisions - amend rule 8 of ADR 0001`. Before the body is
+read, each HTML comment is removed, from `<!--` to the next `-->`, or
+to the end of the body when no `-->` follows: a reviewer reads the
+rendered pull request, where a comment does not show, so a line inside
+a comment does not count. The body is then split on LF, and one
+trailing CR is removed from each line, so a body with CR LF line ends
+reads the same. An approval line is a line that matches the Go regular
+expression `approvalLine` in `tools/ci/askfirst.go`:
+
+```text
+^Approval: ([a-z0-9-]+) - ([^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{C}\p{M}\p{Z}][^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{Cc}\p{Cf}]*)$
+```
+
+The line starts with the prefix, with nothing before it. The prefix
+and the id are lowercase ASCII and the separator is a space, a
+hyphen-minus and a space. The phrase is not empty. Its first character
+is a letter, a number, a punctuation mark or a symbol: the first class
+excludes the other Unicode categories, `\p{C}` (control, format,
+private use, surrogate and, in Go's tables, unassigned), `\p{M}`
+(marks) and `\p{Z}` (separators), because RE2 has no class
+subtraction. No character of the phrase is a control or format
+character (`\p{Cc}`, `\p{Cf}`, which include CR, LF, U+0085, U+200B and
+U+FEFF), and none is one of these double quotation marks: U+0022,
+U+00AB, U+00BB, U+201C to U+201F, U+2033, U+301D to U+301F and U+FF02.
+Single quotation marks are allowed, because U+2019 is also the
+apostrophe, and other look-alikes, such as U+275D and U+275E, are left
+to review. `tools/ci pr` reads `.github/ask-first.yaml` at the base
+commit and at the head commit and uses the union of the two lists, so
+a PR that removes a surface or a glob still needs that surface's line.
+A surface is touched when a changed path matches one of its globs. The
+changed paths are those that differ between the merge base and the
+head (10 10.2), so merging the default branch into the pull request
+touches nothing. In a glob, `**` matches zero or more path segments,
+`*` matches inside one segment, and each other character matches
+itself. Across the lines of one body, `pr`:
+
+- fails on a line that starts with `Approval: ` and is not an approval
+  line, with the message "malformed approval line", even when another
+  line approves the same surface;
+- fails on an approval line whose id neither list has;
+- fails on two approval lines with the same id;
+- fails when a touched surface has no approval line;
+- accepts an approval line for a known surface the diff does not
+  touch, so an approval given early is not an error.
+
+A line that starts otherwise, such as `approval: ` in lowercase, is not
+read, so its surface counts as without a line. The pull request
+template keeps its hint inside an HTML comment and shows the form
+inside a sentence, so a body that keeps the hint has no approval line.
+This is the one form of a recorded approval; ADR 0001 rule 8 and
 05 5.3 point here. The line is typed by the PR's author, so the check
-proves that it is there, not who said it.
+proves that the approval was recorded, not who gave it. While one
+account and one token act for everyone
+([ADR 0008, let the sandbox act as the maintainer on GitHub](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md),
+decision 4), an approval line is a record and a guard against mistakes,
+not a barrier against an agent. A signed approval record kept on the
+host, with a key the sandbox never reaches, is deferred to the
+narrowing of the token (the
+[Deferred decisions](../spec.md#deferred-decisions)).
 
 A Conventional Commit subject, for `pr`, is
 `<type>[(<scope>)][!]: <description>` with `<type>` one of `feat`,
@@ -453,8 +498,9 @@ requires (12.4), and what that review is worth with one account is in
 [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1).
 As measured on 2026-10-08 the ruleset requires no review
 ([10 10.2](10-testing-style.md#release-and-bootstrap), item a), so the loop
-has no check until the approval decision in the
-[Deferred decisions](../spec.md#deferred-decisions) table is made.
+has no check until the decision on what replaces the code-owner review,
+in the [Deferred decisions](../spec.md#deferred-decisions) table, is
+made.
 
 ## 12.10 Delivery metrics
 

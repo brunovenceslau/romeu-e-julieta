@@ -589,9 +589,9 @@ any sandbox and any agent session.
   the most recent push, and a push dismisses nothing; that requirement
   was removed. The rest of this item is as measured when it was set
   up. The rules that lean on the code-owner review (05 5.4, 12 12.4,
-  12 12.9, ADR 0001 rule 8) stand as written until the approval
-  decision in the [Deferred decisions](../spec.md#deferred-decisions)
-  table is made.
+  12 12.9, ADR 0001 rule 8) stand as written until the decision on
+  what replaces the code-owner review, in the
+  [Deferred decisions](../spec.md#deferred-decisions) table, is made.
 - b. In that clone, run `go run ./tools/ci hygiene add` once for each
   forbidden name, and commit `tools/ci/denylist.yaml`.
 - c. Enable the hook in that clone (`git config core.hooksPath

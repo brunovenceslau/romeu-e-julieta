@@ -46,7 +46,19 @@ var (
 	// themselves, and "*" inside a segment. A segment of "**" alone is
 	// checked apart.
 	globSegment = regexp.MustCompile(`^[A-Za-z0-9._*-]+$`)
+	// approvalLine is one line of a pull request body that records an
+	// approval (12 12.4): a surface id, then a phrase. The first
+	// character of the phrase is a letter, number, punctuation or symbol,
+	// written as the complement of the other categories (C, M and Z)
+	// because RE2 has no class subtraction; the phrase holds no control
+	// or format character and none of the double quotation marks the
+	// two classes list.
+	approvalLine = regexp.MustCompile(`^Approval: ([a-z0-9-]+) - ([^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{C}\p{M}\p{Z}][^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{Cc}\p{Cf}]*)$`)
 )
+
+// approvalForm is the form of an approval line, as 12 12.4, the
+// reference page and the pull request template show it.
+const approvalForm = "Approval: <surface id> - <what was approved>"
 
 // parseAskFirst reads .github/ask-first.yaml and checks it: the keys are
 // the ones of 05 5.3, the version is 1, every id is unique and has the
@@ -193,7 +205,9 @@ func (a *askFirst) referencePage() []byte {
 	b.WriteString("A change to a path below needs the maintainer's explicit approval.\n")
 	b.WriteString("The pull request body carries one approval line for each surface the change touches,\n")
 	b.WriteString("in the form that\n[12 12.4](../spec/12-engineering.md#124-middleware-before-and-after-every-change)\ndefines:\n\n")
-	b.WriteString("```text\nApproval: <surface id> - \"<the maintainer's words>\"\n```\n\n")
+	b.WriteString("```text\n" + approvalForm + "\n```\n\n")
+	b.WriteString("The phrase names what was approved, in a few neutral words, and no person.\n")
+	b.WriteString("It holds none of the double quotation marks 12 12.4 lists; single quotation marks and other look-alikes are left to review.\n\n")
 	fmt.Fprintf(&b, "The code-owner review is requested from `%s`. [05 5.3](../spec/05-security.md#53-ask-first-surfaces)\nsays why each surface is on the list.\n\n", a.Owner)
 	b.WriteString("| Surface | Paths | Why |\n|---|---|---|\n")
 	for _, s := range a.Surfaces {
