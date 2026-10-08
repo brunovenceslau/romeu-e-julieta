@@ -87,9 +87,10 @@ func say(w io.Writer, format string, args ...any) {
 // sections, with the status Proposed. The file is created and never
 // overwritten, so a name that exists is an error. It reads and writes
 // through the root of the repository, so a symbolic link cannot send it
-// outside. Two runs that take the same number at once each see the
-// other's file after they create their own, and both remove theirs and
-// fail: the number is unique or nothing is written.
+// outside. Two runs that take the same number at once each create their
+// own file and then scan again: the run whose re-scan sees two files
+// with its number removes its own and fails, so at most one record keeps
+// the number.
 func newADR(e env, args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("adr takes the title as one argument\n%s", usage)
@@ -162,16 +163,25 @@ func create(root *os.Root, path, content string) error {
 	return nil
 }
 
+// blankRendering is the small set of characters that draw as a blank
+// and are not in Cf, Zl or Zp: the Hangul fillers (U+115F, U+1160,
+// U+3164, U+FFA0) and the empty Braille pattern (U+2800). A title made
+// of them would look empty or hide the text next to it.
+const blankRendering = "\u115f\u1160\u3164\uffa0\u2800"
+
 // checkTitle refuses a title that cannot be the first line of a record:
 // one with a control character (a line break included), or with a
 // character that moves or hides text where it is shown, such as a
-// right-to-left override, a zero-width space or a line separator.
+// right-to-left override, a zero-width space or a line separator. That
+// is the format category (Cf) and the two separators of Unicode, and
+// blankRendering: the letters and the symbol that draw as blank but are
+// outside them.
 func checkTitle(title string) error {
 	if title == "" {
 		return errors.New("the title is empty")
 	}
 	for _, r := range title {
-		if unicode.IsControl(r) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp) {
+		if unicode.IsControl(r) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp) || strings.ContainsRune(blankRendering, r) {
 			return fmt.Errorf("the title %q holds a control or invisible character (%U)", title, r)
 		}
 	}

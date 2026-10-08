@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -259,4 +260,46 @@ func TestFileDigestStaysInsideTheRoot(t *testing.T) {
 	require.NoError(t, os.Symlink(outside, filepath.Join(dir, "sub")))
 	_, _, err := fileDigest(rootOf(t, dir), "sub/secret")
 	require.Error(t, err)
+}
+
+// TestRunGeneratedRefusesAStrayDirectiveBeforeRunningAnything is the
+// round-2 attack: a go:generate line that only go generate reads, in a
+// raw string, must stop "generated" before the go command runs, so the
+// command on the line never runs. The fixture holds no go.mod and no
+// pinned go command, so a run that got past the refusal would end in an
+// error (exit 2), not in findings (exit 1).
+func TestRunGeneratedRefusesAStrayDirectiveBeforeRunningAnything(t *testing.T) {
+	r := gittest.New(t)
+	r.Write(generateSite, "package main\n\n"+generateDirective+"\n")
+	r.Write("zz/z.go", "package z\n\nvar s = `\n//go:generate touch marker\n`\n")
+	var out, errOut bytes.Buffer
+	e := env{dir: r.Dir, gitEnv: r.Env, stdout: &out, stderr: &errOut}
+	assert.Equal(t, exitFail, run(t.Context(), e, []string{"generated"}), errOut.String())
+	assert.Contains(t, out.String(), "zz/z.go: generate-directive: ")
+	assert.NoFileExists(t, filepath.Join(r.Dir, "marker"))
+}
+
+// TestGeneratedOutputsAreNotConverted checks that .gitattributes sets
+// "-text" for each file that generate writes: a "text eol=crlf" rule
+// would otherwise make a clean checkout differ from the bytes that
+// generate gives, and "generated" would fail with no defect to fix.
+func TestGeneratedOutputsAreNotConverted(t *testing.T) {
+	root := moduleRoot(t)
+	r, err := os.OpenRoot(root)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = r.Close() })
+	outs, err := generateOutputs(r)
+	require.NoError(t, err)
+	args := []string{"-C", root, "check-attr", "-z", "text", "--"}
+	for _, o := range outs {
+		args = append(args, o.path)
+	}
+	got, err := exec.CommandContext(t.Context(), "git", args...).Output()
+	require.NoError(t, err, "git check-attr")
+	// "<path>\0<attribute>\0<value>\0", one record for each path.
+	fields := strings.Split(strings.TrimSuffix(string(got), "\x00"), "\x00")
+	require.Len(t, fields, 3*len(outs))
+	for i, o := range outs {
+		assert.Equal(t, []string{o.path, "text", "unset"}, fields[3*i:3*i+3], "%s", o.path)
+	}
 }

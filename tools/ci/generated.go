@@ -19,7 +19,9 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 )
 
-// runGenerated is the "generated" subcommand (10 10.2): it runs
+// runGenerated is the "generated" subcommand (10 10.2): it first checks
+// that the tree holds no go:generate line but the one of the repository
+// (checkGenerateDirectives), then runs
 // "go generate ./..." with the go command that mise.lock locks and
 // fails when that changed, created or removed a file of the working
 // tree, or when a file that generate writes is not tracked as a regular
@@ -31,6 +33,16 @@ func runGenerated(ctx context.Context, e env, args []string) (bool, error) {
 	root, err := repoRoot(ctx, e)
 	if err != nil {
 		return false, err
+	}
+	// Before anything runs: go generate runs every directive it finds, so
+	// the tree must hold the one directive of the repository first.
+	problems, err := checkGenerateDirectives(root)
+	if err != nil {
+		return false, err
+	}
+	if len(problems) != 0 {
+		say(e.stdout, "%s%s\n", lines(problems), summary("generated", len(problems)))
+		return false, nil
 	}
 	goBin, err := whichPinned(ctx, root, "go", "go", "go")
 	if err != nil {

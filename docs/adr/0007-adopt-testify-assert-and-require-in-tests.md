@@ -164,7 +164,15 @@ rules:
    are held to an allowlist, which today is `go:build`, and
    `go:generate` at one site only: the one directive
    `go:generate go run . generate` in `tools/ci/generate.go`, which
-   `go generate ./...` runs (12 12.3). A comment holds no other
+   `go generate ./...` runs (12 12.3). That directive is judged on raw
+   lines, as `go generate` reads them (`isGoGenerate` in
+   `cmd/go/internal/generate`: a line that starts with `//go:generate`
+   and a space or a tab, in a comment, a raw string or a block
+   comment alike), in every `.go` file below the root but `.git`, with
+   no regard for build constraints, `testdata` or nested modules: the
+   repository holds exactly one such line, the directive above, and
+   `tools/ci generated` refuses to run `go generate` while that does
+   not hold. A comment holds no other
    directive of the `tool:name` form (the shape of
    `isDirective` in `go/ast`, which `nolint:`, `revive:disable` and
    `lint:ignore` have), read in every line of every comment after

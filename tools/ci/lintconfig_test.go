@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"go/ast"
 	"go/build"
 	"go/parser"
@@ -324,51 +323,6 @@ func TestLintConfigLowersNothing(t *testing.T) {
 // include the linters, and theirs turn findings off.
 var allowedDirectives = []string{"go:build"}
 
-// generateDirective is the one go:generate directive of the repository
-// (12 12.3, 10 10.2), the site it stands at, and its exact text. "go
-// generate ./..." runs every such directive, with no sandbox, so a
-// second one anywhere would run under the "generated" step: only the
-// site below may hold one, and only this text.
-const (
-	generateSite      = "tools/ci/generate.go"
-	generateDirective = "go:generate go run . generate"
-)
-
-// generateDirectiveLines returns each line of a comment of src that
-// starts a go:generate directive, as directiveText reads it, so that
-// the test sees at least what "go generate" runs.
-func generateDirectiveLines(src []byte) ([]string, error) {
-	f, err := parser.ParseFile(token.NewFileSet(), "", src, parser.ParseComments|parser.SkipObjectResolution)
-	if err != nil {
-		return nil, err
-	}
-	var found []string
-	for _, group := range f.Comments {
-		for _, c := range group.List {
-			for line := range strings.SplitSeq(c.Text, "\n") {
-				if text := directiveText(line); strings.HasPrefix(text, "go:generate") {
-					found = append(found, strings.TrimRightFunc(text, unicode.IsSpace))
-				}
-			}
-		}
-	}
-	return found, nil
-}
-
-// checkGenerateSite returns what is wrong with the go:generate
-// directives of the file at generateSite: there must be exactly one,
-// with exactly the text of generateDirective.
-func checkGenerateSite(src []byte) (string, error) {
-	lines, err := generateDirectiveLines(src)
-	if err != nil {
-		return "", err
-	}
-	if len(lines) != 1 || lines[0] != generateDirective {
-		return fmt.Sprintf("holds %q, and the one directive of the repository is %q", lines, generateDirective), nil
-	}
-	return "", nil
-}
-
 // toolDirective matches the start of a directive of the "tool:name"
 // form after directiveText has normalised the line: the shape go/ast
 // reads (isDirective in go/ast/ast.go, Go 1.27: "[a-z0-9]+:[a-z0-9]"),
@@ -599,37 +553,105 @@ func TestOnlyAllowedDirectives(t *testing.T) {
 		require.NoError(t, err, "read %s", f)
 		assert.Empty(t, bad, "%s holds what makes the linters skip a finding", f)
 	}
+	// The raw lines that go generate runs: exactly one in the repository,
+	// at its site (directives.go). The comments are read above for the
+	// other directives and here for the lenient forms of this one.
+	problems, err := checkGenerateDirectives(root)
+	require.NoError(t, err)
+	assert.Empty(t, problems, "the go:generate lines of the repository")
 	src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(generateSite)))
 	require.NoError(t, err)
-	problem, err := checkGenerateSite(src)
+	found, err := directives(src)
 	require.NoError(t, err)
-	assert.Empty(t, problem, "%s", generateSite)
+	assert.Equal(t, 1, strings.Count(strings.Join(found, " "), "go:generate"), "%s", generateSite)
 }
 
-// TestCheckGenerateSite pins the rule of the one go:generate directive
-// on the forms that break it.
-func TestCheckGenerateSite(t *testing.T) {
+// TestGenerateProblems pins the rule of the one go:generate line on the
+// forms that break it, among them the ones a reader of comments does
+// not see and go generate runs: a line in a raw string or in a block
+// comment.
+func TestGenerateProblems(t *testing.T) {
+	line := "//go:generate go run . generate"
+	site := "package main\n\n" + line + "\n"
 	tests := []struct {
-		name string
-		src  string
-		ok   bool
+		name  string
+		files map[string]string
+		ok    bool
 	}{
-		{"the directive", "package p\n\n//go:generate go run . generate\n", true},
-		{"with trailing space", "package p\n\n//go:generate go run . generate \n", true},
-		{"none", "package p\n", false},
-		{"another command", "package p\n\n//go:generate go run . generated\n", false},
-		{"an added argument", "package p\n\n//go:generate go run . generate x\n", false},
-		{"twice", "package p\n\n//go:generate go run . generate\n//go:generate go run . generate\n", false},
-		{"a second command", "package p\n\n//go:generate go run . generate\n\n// A.\n//go:generate echo hi\n", false},
-		{"in a block comment", "package p\n\n/*\ngo:generate echo hi\n*/\n//go:generate go run . generate\n", false},
+		{"the directive", map[string]string{generateSite: site}, true},
+		{"with trailing space", map[string]string{generateSite: site[:len(site)-1] + " \n"}, true},
+		{"a CRLF line", map[string]string{generateSite: "package main\r\n\r\n" + line + "\r\n"}, true},
+		{"none", map[string]string{generateSite: "package main\n"}, false},
+		{"no site file", map[string]string{"a.go": "package a\n"}, false},
+		{"another command", map[string]string{generateSite: "package main\n\n//go:generate go run . generated\n"}, false},
+		{"an added argument", map[string]string{generateSite: "package main\n\n" + line + " x\n"}, false},
+		{"a tab after the word", map[string]string{generateSite: "package main\n\n//go:generate\tgo run . generate\n"}, false},
+		{"twice", map[string]string{generateSite: site + line + "\n"}, false},
+		{"a second command", map[string]string{generateSite: site + "\n// A.\n//go:generate echo hi\n"}, false},
+		{"a second directive in a raw string of the site", map[string]string{generateSite: site + "\nvar s = `\n//go:generate echo hi\n`\n"}, false},
+		{"a stray comment", map[string]string{generateSite: site, "a/a.go": "package a\n\n//go:generate echo hi\n"}, false},
+		{"a stray in a raw string", map[string]string{generateSite: site, "zz/z.go": "package z\n\nvar s = `\n//go:generate echo hi\n`\n"}, false},
+		{"a stray in a block comment", map[string]string{generateSite: site, "zz/z.go": "package z\n\n/*\n//go:generate echo hi\n*/\n"}, false},
+		{"a stray with CRLF", map[string]string{generateSite: site, "zz/z.go": "package z\r\n\r\n//go:generate echo hi\r\n"}, false},
+		{"the text is not a line start", map[string]string{generateSite: site, "zz/z.go": "package z\n\nvar s = \"//go:generate echo hi\"\n"}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			problem, err := checkGenerateSite([]byte(tt.src))
-			require.NoError(t, err)
-			assert.Equal(t, tt.ok, problem == "", problem)
+			files := map[string][]byte{}
+			for name, src := range tt.files {
+				files[name] = []byte(src)
+			}
+			problems := generateProblems(files)
+			assert.Equal(t, tt.ok, len(problems) == 0, "%v", problems)
 		})
 	}
+}
+
+// TestCheckGenerateDirectivesReadsEveryGoFile pins that the scan on disk
+// reads what go generate would skip or might reach: testdata, vendor, a
+// "_" directory, a file with a build constraint that excludes it, a
+// test file and a link to a file; and leaves out only .git.
+func TestCheckGenerateDirectivesReadsEveryGoFile(t *testing.T) {
+	stray := "package z\n\nvar s = `\n//go:generate echo hi\n`\n"
+	site := "package main\n\n//go:generate go run . generate\n"
+	for _, rel := range []string{
+		"testdata/z.go", "vendor/z.go", "_x/z.go", ".hidden/z.go", "z_test.go",
+		"z_windows.go", "sub/mod/z.go", "link.go",
+	} {
+		t.Run(rel, func(t *testing.T) {
+			dir := t.TempDir()
+			write := func(rel, src string) {
+				require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, rel)), 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, rel), []byte(src), 0o644))
+			}
+			write(generateSite, site)
+			switch rel {
+			case "link.go":
+				write("real.txt", stray)
+				require.NoError(t, os.Symlink("real.txt", filepath.Join(dir, rel)))
+			case "sub/mod/z.go":
+				write("sub/mod/go.mod", "module m\n")
+				write(rel, stray)
+			default:
+				write(rel, stray)
+			}
+			problems, err := checkGenerateDirectives(dir)
+			require.NoError(t, err)
+			require.Len(t, problems, 1)
+			assert.Equal(t, rel, problems[0].where)
+		})
+	}
+	t.Run("the .git directory and a dangling link are left out", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".git", "z.go"), []byte(stray), 0o644))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, filepath.Dir(generateSite)), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, generateSite), []byte(site), 0o644))
+		require.NoError(t, os.Symlink("missing", filepath.Join(dir, "dangling.go")))
+		problems, err := checkGenerateDirectives(dir)
+		require.NoError(t, err)
+		assert.Empty(t, problems)
+	})
 }
 
 // forbiddenTestImports are the packages of testify that ADR 0007, rule

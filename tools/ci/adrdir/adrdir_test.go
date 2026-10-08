@@ -52,9 +52,17 @@ func TestDir(t *testing.T) {
 	}{
 		{"a directory", ptr("docs/adr\n"), "docs/adr", ""},
 		{"white space around it", ptr("  decisions \r\n"), "decisions", ""},
+		{"a trailing slash", ptr("docs/adr/\n"), "docs/adr", ""},
+		{"a leading dot", ptr("./docs/adr\n"), "docs/adr", ""},
+		{"a doubled slash", ptr("docs//adr\n"), "docs/adr", ""},
 		{"no file", nil, "", ".adr-dir"},
 		{"an absolute path", ptr("/etc\n"), "", "not a directory inside the repository"},
 		{"a path that climbs out", ptr("../out\n"), "", "not a directory inside the repository"},
+		{"the .git directory", ptr(".git\n"), "", "inside the .git directory"},
+		{"below .git", ptr(".git/adr\n"), "", "inside the .git directory"},
+		{"below .git by a dot", ptr("./.git/adr\n"), "", "inside the .git directory"},
+		{"below .GIT", ptr(".GIT/adr\n"), "", "inside the .git directory"},
+		{"a name that starts like .git", ptr(".github/adr\n"), ".github/adr", ""},
 		{"an empty file", ptr(""), "", "not a directory inside the repository"},
 	}
 	for _, tt := range tests {

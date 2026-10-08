@@ -143,12 +143,17 @@ func TestNewADRRefuses(t *testing.T) {
 		{"a line break in the title", []string{"adr", "a\nb"}, nil, "control or invisible character (U+000A)"},
 		{"a right-to-left override in the title", []string{"adr", "Adopt \u202eX"}, nil, "invisible character (U+202E)"},
 		{"a zero-width space in the title", []string{"adr", "Adopt\u200bX"}, nil, "invisible character (U+200B)"},
+		{"a Hangul filler in the title", []string{"adr", "Adopt\u3164X"}, nil, "invisible character (U+3164)"},
+		{"a Hangul choseong filler in the title", []string{"adr", "Adopt\u115fX"}, nil, "invisible character (U+115F)"},
+		{"a Hangul jungseong filler in the title", []string{"adr", "Adopt\u1160X"}, nil, "invisible character (U+1160)"},
+		{"a halfwidth Hangul filler in the title", []string{"adr", "Adopt\uffa0X"}, nil, "invisible character (U+FFA0)"},
+		{"an empty Braille pattern in the title", []string{"adr", "Adopt\u2800X"}, nil, "invisible character (U+2800)"},
 		{"a line separator in the title", []string{"adr", "Adopt\u2028X"}, nil, "invisible character (U+2028)"},
 		{"a paragraph separator in the title", []string{"adr", "Adopt\u2029X"}, nil, "invisible character (U+2029)"},
 		{"an .adr-dir that links outside the repository", []string{"adr", "T"}, func(t *testing.T, f fixture) {
 			require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(f.repo.Dir, "out")))
 			f.repo.Write(".adr-dir", "out\n")
-		}, "out"},
+		}, "path escapes from parent"},
 		{"a title with no ASCII letter or digit", []string{"adr", "?!"}, nil, "filename would be empty"},
 		{"an unknown kind", []string{"rule", "x"}, nil, `unknown kind "rule"`},
 		{"no kind", nil, nil, "usage:"},

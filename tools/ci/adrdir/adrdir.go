@@ -29,16 +29,24 @@ const MaxNumber = 9999
 // hyphen, and the rest. The first submatch is the number.
 var Name = regexp.MustCompile(`^(\d{4})-.+\.md$`)
 
-// Dir returns the directory that .adr-dir names, relative to root. The
-// file is read through root, and the directory must lie inside it.
+// Dir returns the directory that .adr-dir names, cleaned, relative to
+// root. The file is read through root, and the directory must lie inside
+// it and outside .git.
 func Dir(root *os.Root) (string, error) {
 	data, err := root.ReadFile(File)
 	if err != nil {
 		return "", err
 	}
-	dir := strings.TrimSpace(string(data))
-	if !filepath.IsLocal(dir) {
-		return "", fmt.Errorf("%s names %q, which is not a directory inside the repository", File, dir)
+	named := strings.TrimSpace(string(data))
+	if !filepath.IsLocal(named) {
+		return "", fmt.Errorf("%s names %q, which is not a directory inside the repository", File, named)
+	}
+	// Clean, so that "docs/adr/" and "./docs/adr" read as the directory
+	// they name (fs.ReadDir takes neither), and so that the first
+	// element is the real one.
+	dir := filepath.Clean(named)
+	if first, _, _ := strings.Cut(filepath.ToSlash(dir), "/"); strings.EqualFold(first, ".git") {
+		return "", fmt.Errorf("%s names %q, which is inside the .git directory, not a place for records", File, named)
 	}
 	return dir, nil
 }
