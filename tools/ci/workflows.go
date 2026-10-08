@@ -281,6 +281,21 @@ func (c *grammar) file(doc *yaml.Node) {
 			c.jobs(value)
 		}
 	}
+	c.permissionsSet(doc)
+}
+
+// permissionsSet requires a permissions mapping at the top of the file,
+// or in every job: the token of a run then never has the default scopes
+// of the repository's settings.
+func (c *grammar) permissionsSet(doc *yaml.Node) {
+	if field(doc, "permissions") != nil {
+		return
+	}
+	for key, job := range pairs(field(doc, "jobs")) {
+		if job.Kind == yaml.MappingNode && field(job, "permissions") == nil {
+			c.add(key, "permissions is set at the top of the file or in every job, so that no scope is left to the default")
+		}
+	}
 }
 
 // permissions checks the scopes of a permissions key, at the top or in
@@ -402,6 +417,12 @@ func (c *grammar) matrix(n *yaml.Node) bool {
 				c.add(key, "the include key "+strconv.Quote(key.Value)+" is outside the grammar: os and mise_sha256")
 			}
 		}
+		// The os value is held to the runner labels by matrixLabels.
+		for key, value := range pairs(entry) {
+			if key.Value != "os" && !literal(value) {
+				c.add(value, "a matrix value is a literal scalar, never an expression")
+			}
+		}
 		c.matrixLabels(field(entry, "os"))
 		every = every && field(entry, "os") != nil
 	}
@@ -429,7 +450,7 @@ func matrixValues(strategy *yaml.Node, key string) (values []string, ok bool) {
 	matrix := field(strategy, "matrix")
 	ok = true
 	add := func(v *yaml.Node) {
-		if v.Kind != yaml.ScalarNode || strings.Contains(v.Value, "${{") {
+		if !literal(v) {
 			ok = false
 			return
 		}
@@ -552,20 +573,41 @@ func (c *grammar) inputs(uses, with, strategy *yaml.Node) {
 		}
 		if value.Kind != yaml.ScalarNode {
 			c.add(value, "a with value is a scalar")
-		} else if strings.Contains(value.Value, "${{") && !literalMatrixRef(value.Value, strategy) && matrixReadable(strategy) {
+		} else if strings.Contains(value.Value, "${{") && !literalMatrixRef(value.Value, strategy) && !matrixUnreadable(strategy) {
 			c.add(value, "this with input is a literal, or one ${{ matrix.<key> }} alone whose values are literals")
 		}
 	}
 }
 
-// matrixReadable reports whether the matrix of strategy is in the form
-// matrix checks, so that a value it gives is read: a written mapping
-// whose include is a written list. A matrix in another form is a finding
-// of its own already.
-func matrixReadable(strategy *yaml.Node) bool {
+// matrixUnreadable reports whether strategy has a matrix that matrix
+// does not read, so that the value an input gets from it is unknown: a
+// matrix that is not a written mapping, an include that is not a written
+// list, or an include value that is not a literal. Each is a finding of
+// its own already. A job with no strategy, or a strategy with no matrix,
+// is not unreadable: nothing there gives an input a literal, so a
+// matrix reference or any other expression in with is a finding.
+func matrixUnreadable(strategy *yaml.Node) bool {
 	matrix := field(strategy, "matrix")
+	if matrix == nil {
+		return false
+	}
 	include := field(matrix, "include")
-	return matrix != nil && matrix.Kind == yaml.MappingNode && (include == nil || include.Kind == yaml.SequenceNode)
+	if matrix.Kind != yaml.MappingNode || (include != nil && include.Kind != yaml.SequenceNode) {
+		return true
+	}
+	for _, entry := range seqContent(include) {
+		for key, value := range pairs(entry) {
+			if key.Value != "os" && !literal(value) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// literal reports whether n is a scalar with no expression in it.
+func literal(n *yaml.Node) bool {
+	return n.Kind == yaml.ScalarNode && !strings.Contains(n.Value, "${{")
 }
 
 // literalMatrixRef reports whether s is exactly ${{ matrix.<key> }} and

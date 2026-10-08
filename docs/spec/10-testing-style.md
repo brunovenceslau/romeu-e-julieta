@@ -84,8 +84,8 @@ does a file in that directory with another name ending:
 | Level | Allowed |
 |---|---|
 | file | the keys `name`, `on`, `permissions`, `concurrency`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters |
-| job | the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `runs-on` is `${{ matrix.os }}` or one of the four labels of Runners below, and so is each `os` of the matrix (a list or a mapping there fails); `permissions`, at the top and in a job, is a mapping whose values are `read` or `none`; `strategy` holds `matrix`, `fail-fast` and `max-parallel` only; the matrix is a written mapping with the keys `os` and `include` only, each `include` entry holds `os` and `mise_sha256` only (names matched exactly), and an expression there fails; with `runs-on: ${{ matrix.os }}` every runner of the matrix names an `os` |
-| `uses` step | the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, the owner and the repository start with a letter or a digit, and so does each path segment or it starts with `_`, so no `.` or `..` segment, no `./` path of the repository (a local action) and no `docker://` image fits; `with` is a mapping that holds only the inputs listed for that action in `tools/ci` (the action is matched without case), each value a literal or one `${{ matrix.<key> }}` alone whose values are all literals; a `actions/checkout` step sets `persist-credentials: false` |
+| job | the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `runs-on` is `${{ matrix.os }}` or one of the four labels of Runners below, and so is each `os` of the matrix (`runs-on` as a list or a mapping fails); `permissions`, at the top and in a job, is a mapping whose values are `read` or `none`, and the file sets it at the top or in every job, so no scope is left to the default; `strategy` holds `matrix`, `fail-fast` and `max-parallel` only; the matrix is a written mapping with the keys `os` and `include` only, each `include` entry holds `os` and `mise_sha256` only (names matched exactly), and a `${{` in the value of an `include` entry fails (the `os` value is held to the four labels); with `runs-on: ${{ matrix.os }}` every runner of the matrix names an `os` |
+| `uses` step | the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, the owner and the repository start with a letter or a digit, and so does each path segment or it starts with `_`, so no `.` or `..` segment, no `./` path of the repository (a local action) and no `docker://` image fits; `with` is a mapping that holds only the inputs listed for that action in `tools/ci` (the action is matched without case), each value a literal or one `${{ matrix.<key> }}` alone whose values are all literals; an `actions/checkout` step sets `persist-credentials: false`, written exactly so (the case of the action name is ignored, the case of the value is not) |
 | `run` step | the keys `name`, `run`; `run` is one line, `go run ./tools/ci <subcommand> [<argument>...]` or `go run ./tools/release <subcommand> [<argument>...]`; each word is made of ASCII letters, digits and `._/=:-`, or is `"$NAME"` |
 
 So a workflow has no `if`, no `continue-on-error`, no `shell`, no
@@ -110,7 +110,7 @@ command by the paths `mise which` resolves, never through `mise exec`:
 with the tool not installed, `mise exec` warned and ran a program of the
 search path, exit status 0 (measured with mise 2026.10.3). A path must
 lie below the install directory of the tool, in the directory of the
-version `mise.lock` locks (a tool locked twice is an error), so the
+version `mise.lock` locks (a tool locked at two different versions is an error; the same version twice is not), so the
 versions locked in `mise.lock` are the ones used in both places.
 
 Three consequences of the grammar:
@@ -236,7 +236,7 @@ and `macos-26-intel`), on the first run of `ci.yml` (T002). Labels are
 pinned, never `*-latest`: `tools/ci workflows` fails a `runs-on` or a
 matrix `os` that is not one of the four. `tools/ci all` reports the
 architecture of the Go binary next to `uname -m`, and fails when they
-differ (`x86_64` is `amd64`; `aarch64` and `arm64` are `arm64`). They are bumped deliberately; the images are listed at
+differ (`x86_64` is `amd64`; `aarch64` and `arm64` are `arm64`). On macOS it also reads `sysctl -n sysctl.proc_translated`, which `uname -m` cannot show (a binary under Rosetta sees the architecture it emulates), and fails when it is `1`. They are bumped deliberately; the images are listed at
 <https://github.com/actions/runner-images>.
 
 Four subcommands are outside `all`:

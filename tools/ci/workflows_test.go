@@ -156,7 +156,8 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a runs-on that is a mapping", "runs-on: ${{ matrix.os }}", "runs-on: {group: big}", "never *-latest"},
 		{"a with value read from the event", "sha256: ${{ matrix.mise_sha256 }}", "sha256: ${{ github.event.pull_request.title }}", "a literal"},
 		{"a with value that mixes text and an expression", "sha256: ${{ matrix.mise_sha256 }}", "sha256: a${{ matrix.mise_sha256 }}", "a literal"},
-		{"a with value that is a matrix key with an expression value", "            mise_sha256: aa\n", "            mise_sha256: ${{ github.event.pull_request.title }}\n", "a literal"},
+		{"a matrix include value with an expression", "            mise_sha256: aa\n", "            mise_sha256: ${{ github.event.pull_request.title }}\n", "a matrix value is a literal scalar"},
+		{"a matrix include value that is a list", "            mise_sha256: aa\n", "            mise_sha256: [aa]\n", "a matrix value is a literal scalar"},
 		{"a with value that is a matrix key no entry gives", "sha256: ${{ matrix.mise_sha256 }}", "sha256: ${{ matrix.other }}", "a literal"},
 		{"the token in an expression", "group: ci-${{ github.ref }}", "group: ci-${{ github.token }}", "the token"},
 		{"the token in an expression, in capitals", "group: ci-${{ github.ref }}", "group: ci-${{ GitHub.Token }}", "the token"},
@@ -169,13 +170,22 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a none permission at the top", "permissions:\n  contents: read\nconcurrency", "permissions:\n  contents: none\nconcurrency", ""},
 		{"a checkout without persist-credentials", "        with:\n          persist-credentials: false\n", "", "persist-credentials: false"},
 		{"a checkout that keeps the credentials", "persist-credentials: false", "persist-credentials: true", "persist-credentials: false"},
+		{"a checkout with persist-credentials in capitals", "persist-credentials: false", "persist-credentials: False", "persist-credentials: false"},
 		{"a checkout in capitals without persist-credentials", "        uses: actions/checkout@" + sha + "\n        with:\n          persist-credentials: false\n", "        uses: Actions/CheckOut@" + sha + "\n", "persist-credentials: false"},
 		{"a checkout in capitals with persist-credentials", "uses: actions/checkout@" + sha, "uses: Actions/CheckOut@" + sha, ""},
 		{"a path segment that starts with an underscore", "uses: jdx/mise-action/sub/path@", "uses: jdx/mise-action/_sub/path@", ""},
 		{"an owner that starts with an underscore", "uses: actions/checkout@" + sha, "uses: _x/checkout@" + sha, "40-hex commit SHA"},
 		{"a repository that starts with an underscore", "uses: actions/checkout@" + sha, "uses: actions/_checkout@" + sha, "40-hex commit SHA"},
 		{"a strategy key outside the grammar", "      fail-fast: false\n", "      fail-fast: false\n      other: 1\n", `the strategy key "other"`},
+		{"a second strategy key outside the grammar", "      fail-fast: false\n", "      fail-fast: false\n      name: x\n", `the strategy key "name"`},
 		{"a strategy with max-parallel", "      fail-fast: false\n", "      fail-fast: false\n      max-parallel: 2\n", ""},
+		{"a uses path segment of a single underscore", "uses: actions/checkout@" + sha, "uses: actions/checkout/_x@" + sha, ""},
+		{"a uses path segment that starts with two dots", "uses: actions/checkout@" + sha, "uses: actions/checkout/..x@" + sha, "40-hex commit SHA"},
+		{"a job key written quoted", "    timeout-minutes: 60\n", "    \"if\": true\n", `"if" is outside the grammar of a job`},
+		{"a quoted key that is allowed", "    timeout-minutes: 60\n", "    \"timeout-minutes\": 60\n", ""},
+		{"a strategy in flow style", "    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n", "    strategy: {fail-fast: false, matrix: {include: [{os: ubuntu-26.04, mise_sha256: aa}]}}\n", ""},
+		{"a strategy in flow style with a latest label", "    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n", "    strategy: {matrix: {include: [{os: ubuntu-latest, mise_sha256: aa}]}}\n", "never *-latest"},
+		{"a step in flow style", "      - run: go run ./tools/release notes --tag \"$GITHUB_REF_NAME\" --out=notes.md\n", "      - {run: \"go run ./tools/ci all\", if: true}\n", `"if" is outside the grammar of a run step`},
 		{"a key with a tag that is not a string", "    timeout-minutes: 60\n", "    !!int timeout-minutes: 60\n", "key is written as a plain string"},
 		{"a key with the string tag", "    timeout-minutes: 60\n", "    !!str timeout-minutes: 60\n", ""},
 		{"an include entry key with a tag that is not a string", "          - os: ubuntu-26.04\n", "          - !!int os: ubuntu-26.04\n", "key is written as a plain string"},
@@ -339,4 +349,110 @@ func TestWorkflowsCIFile(t *testing.T) {
 	require.Len(t, index, 3, "the mise, setup and all steps: %v", index)
 	assert.Less(t, index["mise"], index["setup"])
 	assert.Less(t, index["setup"], index["all"])
+}
+
+// edits returns goodWorkflow with each pair of olds and news replaced.
+func edits(t *testing.T, pairs ...string) string {
+	t.Helper()
+	src := goodWorkflow
+	for i := 0; i+1 < len(pairs); i += 2 {
+		require.Contains(t, src, pairs[i], "the fixture's text to replace")
+		src = strings.Replace(src, pairs[i], pairs[i+1], 1)
+	}
+	return src
+}
+
+const (
+	goodStrategy = "    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n"
+	onRunner     = "runs-on: ${{ matrix.os }}"
+)
+
+// TestWorkflowsWithValues holds a with value to a literal when the job
+// has no matrix that could give it one: no strategy, or a strategy with
+// no matrix. A matrix reference there names nothing, and so does an
+// expression of the event.
+func TestWorkflowsWithValues(t *testing.T) {
+	const sha256 = "sha256: ${{ matrix.mise_sha256 }}"
+	noStrategy := []string{goodStrategy, "", onRunner, "runs-on: ubuntu-26.04"}
+	noMatrix := []string{goodStrategy, "    strategy:\n      fail-fast: false\n", onRunner, "runs-on: ubuntu-26.04"}
+	tests := []struct {
+		name  string
+		pairs []string
+		want  string
+	}{
+		{"no strategy, an event value", append([]string{sha256, "sha256: ${{ github.head_ref }}"}, noStrategy...), "a literal"},
+		{"no strategy, a matrix reference", noStrategy, "a literal"},
+		{"no strategy, a literal", append([]string{sha256, "sha256: aa"}, noStrategy...), ""},
+		{"a strategy without a matrix, an event value", append([]string{sha256, "sha256: ${{ github.head_ref }}"}, noMatrix...), "a literal"},
+		{"a strategy without a matrix, a matrix reference", noMatrix, "a literal"},
+		{"a strategy without a matrix, a literal", append([]string{sha256, "sha256: aa"}, noMatrix...), ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := workflowFindings(".github/workflows/x.yml", []byte(edits(t, tt.pairs...)))
+			if tt.want == "" {
+				assert.Empty(t, got)
+				return
+			}
+			require.Len(t, got, 1, "%v", got)
+			assert.Contains(t, got[0].msg, tt.want)
+		})
+	}
+}
+
+// TestWorkflowsWrongKinds fails a value of the wrong kind where the
+// grammar asks for a mapping or a list, with one finding each.
+func TestWorkflowsWrongKinds(t *testing.T) {
+	tests := []struct {
+		name  string
+		pairs []string
+		want  string
+	}{
+		{"jobs as a list", []string{goodWorkflow[strings.Index(goodWorkflow, "jobs:"):], "jobs: []\n"}, "jobs is a mapping"},
+		{"steps as a word", []string{goodWorkflow[strings.Index(goodWorkflow, "    steps:"):], "    steps: foo\n"}, "steps is a list"},
+		{"a strategy as a list", []string{goodStrategy, "    strategy: [a]\n", onRunner, "runs-on: ubuntu-26.04", "sha256: ${{ matrix.mise_sha256 }}", "sha256: aa"}, "strategy is a mapping"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := workflowFindings(".github/workflows/x.yml", []byte(edits(t, tt.pairs...)))
+			require.Len(t, got, 1, "%v", got)
+			assert.Contains(t, got[0].msg, tt.want)
+		})
+	}
+}
+
+// TestWorkflowsPermissionsRequired wants a permissions mapping at the
+// top of the file, or in every job.
+func TestWorkflowsPermissionsRequired(t *testing.T) {
+	const (
+		top  = "permissions:\n  contents: read\nconcurrency"
+		job  = "    permissions:\n      contents: read\n"
+		bare = "  other:\n    runs-on: ubuntu-26.04\n    steps:\n      - run: go run ./tools/ci all\n"
+		set  = "  other:\n    runs-on: ubuntu-26.04\n" + job + "    steps:\n      - run: go run ./tools/ci all\n"
+	)
+	tests := []struct {
+		name  string
+		pairs []string
+		extra string // a second job, appended
+		want  string
+	}{
+		{"at the top, in the job too", nil, "", ""},
+		{"at the top only", []string{job, ""}, "", ""},
+		{"at the top, and a job without", []string{job, ""}, bare, ""},
+		{"in every job only", []string{top, "concurrency"}, "", ""},
+		{"in both of two jobs", []string{top, "concurrency"}, set, ""},
+		{"nowhere", []string{top, "concurrency", job, ""}, "", "permissions is set at the top of the file or in every job"},
+		{"in one of two jobs", []string{top, "concurrency"}, bare, "permissions is set at the top of the file or in every job"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := workflowFindings(".github/workflows/x.yml", []byte(edits(t, tt.pairs...)+tt.extra))
+			if tt.want == "" {
+				assert.Empty(t, got)
+				return
+			}
+			require.Len(t, got, 1, "%v", got)
+			assert.Contains(t, got[0].msg, tt.want)
+		})
+	}
 }
