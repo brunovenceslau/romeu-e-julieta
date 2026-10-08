@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The user's agreement file lives outside product repositories
+# (hygiene refuses a tracked one, in any case; this pattern is exact).
+PROLOGUE.md

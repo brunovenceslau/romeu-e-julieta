@@ -466,6 +466,14 @@ func TestFastPushedRange(t *testing.T) {
 		r.Write("docs/page.md", "one\nzorvex_quimby\n")
 		return r.Commit("docs: add a line")
 	})
+	prologue := branch("prologue", func() string {
+		r.Write("docs/Prologue.md", "plain\n")
+		return r.Commit("docs: add a page")
+	})
+	prologueNamed := branch("prologuenamed", func() string {
+		r.Write("docs/zorvex-quimby/PROLOGUE.md", "plain\n")
+		return r.Commit("docs: add a page")
+	})
 	var removed string
 	branch("removed", func() string {
 		r.Write("docs/page.md", "one\nzorvexquimby\n")
@@ -519,6 +527,10 @@ func TestFastPushedRange(t *testing.T) {
 			[]string{"commit " + committer + ": committer: name:"}, ""},
 		{"an added path", push(path, "refs/heads/path", zero), exitFail,
 			[]string{"commit " + path + ": added path (withheld): name:"}, ""},
+		{"an added PROLOGUE.md in another case", push(prologue, "refs/heads/prologue", zero), exitFail,
+			[]string{"FAIL  pushed range", "commit " + prologue + ": added path docs/Prologue.md: prologue:"}, ""},
+		{"an added PROLOGUE.md under a listed name keeps the path withheld", push(prologueNamed, "refs/heads/prologuenamed", zero), exitFail,
+			[]string{"commit " + prologueNamed + ": added path (withheld): prologue:"}, ""},
 		{"an added line", push(line, "refs/heads/line", zero), exitFail,
 			[]string{"commit " + line + ": docs/page.md:2: name:"}, ""},
 		{"a line one commit adds and the next removes", push(removedTip, "refs/heads/removed", zero), exitFail,

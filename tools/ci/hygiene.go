@@ -10,6 +10,7 @@ import (
 	"go/scanner"
 	"go/token"
 	"os"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -40,6 +41,23 @@ var (
 	toDo      = regexp.MustCompile(`\bTODO\b`)
 	issueForm = regexp.MustCompile(`^\(#[0-9]+\)`)
 )
+
+// prologueName is the one file name no product path may carry. The
+// user's agreement file lives outside product repositories, so the
+// name is refused at any depth. It is compared without regard to case
+// (isPrologue) because a macOS checkout holds prologue.md and
+// PROLOGUE.md as one file, so the case a contributor typed says nothing
+// about the file that other clones see.
+const prologueName = "PROLOGUE.md"
+
+// prologueMsg is the reason the rule gives, and repeats no path.
+const prologueMsg = "the user's agreement file lives outside product repositories"
+
+// isPrologue reports whether the last element of a git path is
+// prologueName in any case.
+func isPrologue(p string) bool {
+	return strings.EqualFold(path.Base(p), prologueName)
+}
 
 // sandboxUser is the one name a home directory may carry: the user
 // inside a sandbox, the same on every machine.
@@ -100,6 +118,9 @@ func hygiene(ctx context.Context, repo git.Repo, head string) ([]finding, error)
 		// the directory, with no rule of 10 10.2 covering it.
 		if strings.HasPrefix(f.path, hookDir) && f.path != hookPath {
 			findings = append(findings, finding{where, "githooks", hookDir + " holds exactly pre-push"})
+		}
+		if isPrologue(f.path) {
+			findings = append(findings, finding{where, "prologue", prologueMsg})
 		}
 		if f.path == "go.work" || f.path == "go.work.sum" || strings.HasPrefix(f.path, "vendor/") {
 			findings = append(findings, finding{where, "workspace", "go.work, go.work.sum and vendor/ are not tracked"})

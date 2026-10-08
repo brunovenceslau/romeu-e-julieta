@@ -10,7 +10,6 @@ version = 1
 [[annotations]]
 path = [
     "README.md",
-    "PROLOGUE.md",
     "docs/**",
     ".adr-dir",
     ".githooks/pre-push",
