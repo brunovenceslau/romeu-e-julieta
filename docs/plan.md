@@ -267,7 +267,7 @@ task lands it.
 | Pin | Form | Section | Task |
 |---|---|---|---|
 | Go | version in `mise.toml`, locked in `mise.lock` | 12 12.1, 02 2.1 | T001 |
-| `golangci-lint`, `govulncheck` | `mise.lock`; `govulncheck` started through `mise exec`, `golangci-lint` run from the path `mise which` resolves | 12 12.1, 10 10.2 | T001, T002 |
+| `golangci-lint`, `govulncheck` | `mise.lock`; `govulncheck` started through `mise exec`, its lock entry without a checksum (it rests on the Go checksum database), `golangci-lint` run from the path `mise which` resolves | 12 12.1, 10 10.2 | T001, T002 |
 | `reuse` | the container image `fsfe/reuse:6.2.0@sha256:<digest>` in `tools/ci`, run on Linux only | 12 12.1, 10 10.2 | T002 |
 | `gh`, for `tools/release verify` | `mise.lock`, started through `mise exec` | 12 12.1, 10 10.2 | T088 |
 | GitHub Actions | `uses` with a 40-hex commit SHA | 10 10.2 | T002, T088 |

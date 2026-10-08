@@ -50,6 +50,13 @@ jobs:
         with:
           version: 2026.10.3
           sha256: ${{ matrix.mise_sha256 }}
+          # No actions cache: an install restored from a cache is not
+          # checked again against the checksums of mise.lock.
+          cache: false
+          # No export of the mise environment: the steps reach go
+          # through the mise shims, and tools/ci builds the environment
+          # of each check itself.
+          env: false
       - name: Trust mise.toml and fill the module cache
         run: go run ./tools/ci setup
       - name: All checks

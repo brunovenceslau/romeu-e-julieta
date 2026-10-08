@@ -84,19 +84,22 @@ does a file in that directory with another name ending:
 | Level | Allowed |
 |---|---|
 | file | the keys `name`, `on`, `permissions`, `concurrency`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters |
-| job | the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps` |
-| `uses` step | the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA |
-| `run` step | the keys `name`, `run`, `env`; `run` is one line, `go run ./tools/ci <subcommand> [<argument>...]` or `go run ./tools/release <subcommand> [<argument>...]`; each word is made of ASCII letters, digits and `._/=:-`, or is `"$NAME"` |
+| job | the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `runs-on` is `${{ matrix.os }}` or a pinned GitHub-hosted label (`ubuntu-<version>` or `macos-<version>`, with an optional `-arm` or `-intel`), and so is each `os` of the matrix |
+| `uses` step | the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, each name starting with a letter or a digit, so no path of the repository (a local action) fits; `with` holds only the inputs listed for that action in `tools/ci` |
+| `run` step | the keys `name`, `run`; `run` is one line, `go run ./tools/ci <subcommand> [<argument>...]` or `go run ./tools/release <subcommand> [<argument>...]`; each word is made of ASCII letters, digits and `._/=:-`, or is `"$NAME"` |
 
 So a workflow has no `if`, no `continue-on-error`, no `shell`, no
 `container`, no job that calls another workflow, and no `${{ }}`
 expression inside a `run` line: none of them is in the grammar. Where
-a value may hold an expression (`runs-on`, `with`, `env`,
+a value may hold an expression (`runs-on`, `with`,
 `concurrency`, a `strategy` matrix), the text between the braces is
 one context path: names of ASCII letters, digits, `_` and `-`, joined
 by dots (`matrix.os`, `github.ref_name`). An operator, a function call
-or a literal there fails. A
-value a command needs from the event reaches it through `env`. A
+or a literal there fails. No level holds `env`: its keys could make a
+`run` step start other code (`BASH_ENV`, `LD_PRELOAD`, `PATH`,
+`GOFLAGS=-toolexec`). A value a command needs from the event reaches
+it as a variable the runner sets, a `"$NAME"` word such as
+`"$GITHUB_REF_NAME"`. A
 workflow and a developer's shell therefore run the same code at the
 same commit. `tools/ci` starts `govulncheck` through `mise exec`,
 runs `reuse` from a container image pinned by digest (the license
@@ -113,10 +116,11 @@ Three consequences of the grammar:
 - `ci.yml` lists `edited` among its `pull_request` types, so a change
   to a PR's title or body runs `pr` again; `tools/ci workflows` fails a
   `ci.yml` without it.
-- The grammar bounds keys, `run` lines and expressions, not each
-  value: the scopes under `permissions`, the owner of a `uses` action,
-  the filters under `on`, the content of `strategy`, and `with` and
-  `env` values are free. They are reviewed, not checked:
+- The grammar bounds keys, `run` lines, runner labels, the inputs of
+  each action and expressions, not each value: the scopes under
+  `permissions`, the owner of a `uses` action, the filters under `on`,
+  the rest of `strategy`, and the values of the listed `with` inputs
+  are free. They are reviewed, not checked:
   `.github/workflows/**` is an ask-first surface (05 5.3).
 
 `tools/ci all` runs the `pr` step when `GITHUB_EVENT_NAME` is
@@ -157,9 +161,9 @@ local-gate run is recorded is a
 | sequences | `tools/ci sequences`: ADR numbers contiguous and unique; ADR layout and statuses per ADR 0001 (rules 6-7), the filename compared through the `slug` function `tools/new adr` uses; every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; every ADR that `docs/spec.md` or `docs/spec/` cites has status Accepted; every row of the index's Deferred decisions table has its three cells filled ([ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md)); the ids below unique, and every referenced id and id range (for example "J1-J13" in a success criterion) defined | yes |
 | vocabulary | `tools/ci vocabulary` (01 1.7) | yes |
 | workflows | `tools/ci workflows`: the grammar above | yes |
-| vulnerabilities | `govulncheck ./...` | |
+| vulnerabilities | `govulncheck ./...`; it reads the Go vulnerability database over the network, so its result depends on the date | |
 | unit + golden + race | `go test -race -count=1 -coverprofile=cover.out ./...`, with `cover.out` in a temporary directory, so no run leaves it in the working tree | |
-| coverage | `tools/ci coverage` (S9) | |
+| coverage | `tools/ci coverage` (S9), per package: each package below its threshold is a finding | |
 | golden governance | `tools/ci golden`: fails if `-update` appears in CI invocations; lists every changed golden in the job summary for review | |
 | schema | `tools/ci schema` | |
 | e2e | `go test -tags e2e ./e2e/...` | |
@@ -192,8 +196,9 @@ selects no test, or build tags), `go env -w` file or other variable of
 the caller changes what a step checks. Some unit
 tests need what the steps need: mise on the search path with the
 pinned tools installed and this repository trusted, a module cache
-that already holds the modules of `go.sum` (the steps never reach the
-network; `go mod download` fills it, and `go run ./tools/ci setup` runs it), and the `.git` directory of a
+that already holds the modules of `go.sum` (no step fetches a module,
+since the steps run with `GOPROXY=off`; `go mod download` fills the
+cache, and `go run ./tools/ci setup` runs it), and the `.git` directory of a
 clone, because they list the repository's files with `git ls-files`.
 
 A personal absolute path, for `hygiene`, is `/Users/<name>/` or
@@ -437,7 +442,7 @@ notes (12 12.6); `tools/release publish` creates the GitHub release,
 published and never a draft, and marks it a prerelease when the tag
 has a suffix after the patch number (`v1.0.0-rc.1`);
 `tools/ci dora --attach "$TAG"` adds the delivery metrics to it
-(12 12.10), with the tag passed through `env`.
+(12 12.10), with the tag read from the runner's `"$GITHUB_REF_NAME"`.
 The attestation is a `uses` step and each of the others is one `run`
 step, so the file passes `tools/ci workflows`. `tools/ci acceptance`
 is not among them: its evidence names the release and the run of the

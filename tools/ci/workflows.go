@@ -33,16 +33,22 @@ const (
 //     in a workflow (an if, a shell, continue-on-error, a container, a
 //     called workflow, an expression that computes), a step that starts
 //     a program other than tools/ci or tools/release, an action named
-//     by a tag or a branch, which can move, and a runner label that
-//     floats (*-latest).
+//     by a tag or a branch, which can move, a local action (a path in
+//     the repository, which runs any shell), a runner label that is not
+//     a pinned GitHub-hosted one (*-latest, a self-hosted label, a label
+//     read from a variable), and an env table, whose keys could make a
+//     tools/ci run start other code (BASH_ENV, LD_PRELOAD, PATH,
+//     GOFLAGS=-toolexec). An action takes only the with keys listed
+//     for it (actionInputs).
 //  2. A file that reads as one thing and runs as another: an anchor,
 //     an alias, a merge key, a tag YAML does not resolve on its own, a
 //     key written twice, and a second document.
 //
 // Out of scope, and left to the review of the ask-first surface
 // .github/workflows/** (05 5.3): the values the grammar leaves free
-// (permissions, the owner of an action, with and env values, the
-// filters of an event), what a pinned action's code does, and a pull
+// (permissions, the owner of an action, the values of the with keys
+// listed for an action, the filters of an event), what a pinned
+// action's code does, and a pull
 // request that edits the workflow or this check itself, since the run
 // it starts uses the files of that pull request.
 
@@ -55,15 +61,34 @@ var (
 	eventNames   = []string{"pull_request", "push", "schedule", "workflow_dispatch"}
 	jobKeys      = []string{"name", "runs-on", "needs", "strategy", "permissions", "timeout-minutes", "steps"}
 	usesStepKeys = []string{"name", "uses", "with"}
-	runStepKeys  = []string{"name", "run", "env"}
+	runStepKeys  = []string{"name", "run"}
 )
+
+// actionInputs are the with keys each action may take, by its
+// "<owner>/<repo>": the inputs the workflows of this repository use.
+// An action that is not listed takes none. An input that changes what
+// runs (mise-action's install_args, mise_toml, tool_versions) stays
+// out of a workflow this way.
+var actionInputs = map[string][]string{
+	"actions/checkout": {"persist-credentials"},
+	"jdx/mise-action":  {"version", "sha256", "cache", "env"},
+}
+
+// matrixRunner is the one expression runs-on may hold; the labels it
+// takes come from the os key of the job's matrix, each a runnerLabel.
+const matrixRunner = "${{ matrix.os }}"
 
 var (
 	// usesForm is an action pinned to a commit: owner, repository, an
 	// optional path inside it, and 40 hex digits after the "@".
-	usesForm = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}$`)
+	// Each name starts with a letter or a digit, so no "." or ".."
+	// segment can turn it into a path of the repository.
+	usesForm = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9][A-Za-z0-9_.-]*(/[A-Za-z0-9][A-Za-z0-9_.-]*)*@[0-9a-f]{40}$`)
+	// runnerLabel is a GitHub-hosted runner image with a pinned version
+	// (10 10.2, Runners): never *-latest, never self-hosted.
+	runnerLabel = regexp.MustCompile(`^(ubuntu|macos)-[0-9]+(\.[0-9]+)?(-arm|-intel)?$`)
 	// runWord is one word of a run line, and runVar the other form a
-	// word may take: a variable of the step's env, quoted.
+	// word may take: a variable of the runner's environment, quoted.
 	runWord = regexp.MustCompile(`^[A-Za-z0-9._/=:-]+$`)
 	runVar  = regexp.MustCompile(`^"\$[A-Za-z_][A-Za-z0-9_]*"$`)
 	// contextPath is the one form the text between "${{" and "}}" may
@@ -258,8 +283,15 @@ func (c *grammar) job(n *yaml.Node) {
 	}
 	for key, value := range pairs(n) {
 		switch key.Value {
-		case "runs-on", "strategy":
-			c.latest(value)
+		case "runs-on":
+			if value.Kind != yaml.ScalarNode || (value.Value != matrixRunner && !runnerLabel.MatchString(value.Value)) {
+				c.add(value, "runs-on is "+matrixRunner+" or a pinned GitHub-hosted label such as ubuntu-26.04, never *-latest")
+			}
+		case "strategy":
+			c.matrixLabels(field(field(value, "matrix"), "os"))
+			for _, entry := range seqContent(field(field(value, "matrix"), "include")) {
+				c.matrixLabels(field(entry, "os"))
+			}
 		case "steps":
 			c.steps(value)
 		}
@@ -269,16 +301,30 @@ func (c *grammar) job(n *yaml.Node) {
 	}
 }
 
-// latest fails a runner label that floats: runs-on, and the strategy a
-// label may come from through an expression, hold no scalar ending in
-// "-latest" (10 10.2, Runners).
-func (c *grammar) latest(n *yaml.Node) {
-	if n.Kind == yaml.ScalarNode && strings.HasSuffix(n.Value, "-latest") {
-		c.add(n, "a runner label is pinned, never *-latest")
+// matrixLabels checks the runner labels of a matrix's os key, one
+// label or a list of them: each a pinned GitHub-hosted label.
+func (c *grammar) matrixLabels(n *yaml.Node) {
+	labels := []*yaml.Node{n}
+	if n == nil {
+		return
 	}
-	for _, child := range n.Content {
-		c.latest(child)
+	if n.Kind == yaml.SequenceNode {
+		labels = n.Content
 	}
+	for _, l := range labels {
+		if l.Kind != yaml.ScalarNode || !runnerLabel.MatchString(l.Value) {
+			c.add(l, "a runner label of the matrix is a pinned GitHub-hosted label such as ubuntu-26.04, never *-latest")
+		}
+	}
+}
+
+// seqContent returns the items of a sequence node, and nothing for
+// another node.
+func seqContent(n *yaml.Node) []*yaml.Node {
+	if n == nil || n.Kind != yaml.SequenceNode {
+		return nil
+	}
+	return n.Content
 }
 
 func (c *grammar) steps(n *yaml.Node) {
@@ -312,6 +358,10 @@ func (c *grammar) step(n *yaml.Node) {
 			if value.Kind != yaml.ScalarNode || !usesForm.MatchString(value.Value) {
 				c.add(value, "uses names <owner>/<repo>[/<path>]@<a 40-hex commit SHA>")
 			}
+		case "with":
+			if uses := field(n, "uses"); uses.Kind == yaml.ScalarNode && usesForm.MatchString(uses.Value) {
+				c.inputs(uses, value)
+			}
 		case "run":
 			if value.Kind != yaml.ScalarNode || !runLine(value.Value) {
 				c.add(value, "run is one line: go run ./tools/ci or ./tools/release, a subcommand, and plain words")
@@ -320,6 +370,20 @@ func (c *grammar) step(n *yaml.Node) {
 	}
 	if kind == "run" && field(n, "run") == nil {
 		c.add(n, "a step has uses or run")
+	}
+}
+
+// inputs checks the with keys of a uses step against actionInputs.
+func (c *grammar) inputs(uses, with *yaml.Node) {
+	action, _, _ := strings.Cut(uses.Value, "@")
+	if parts := strings.SplitN(action, "/", 3); len(parts) >= 2 {
+		action = parts[0] + "/" + parts[1]
+	}
+	allowed := actionInputs[action]
+	for key := range pairs(with) {
+		if !slices.Contains(allowed, key.Value) {
+			c.add(key, "the input "+strconv.Quote(key.Value)+" is not one this repository uses for "+action)
+		}
 	}
 }
 

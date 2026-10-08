@@ -42,7 +42,9 @@ const reuseImage = "fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e76
 //
 // The race run passes "-count=1" for the reason the unit step does:
 // a test that scans the repository would otherwise be served from the
-// test cache. govulncheck is started through "mise exec", in stepEnv,
+// test cache. govulncheck is started through "mise exec", in stepEnv
+// with networkPassThrough, since it reads the Go vulnerability
+// database,
 // once whichPinned has found it below the directory where mise
 // installs it: "mise exec" runs a program of the search path when the
 // configuration does not pin it, and that would be a tool no lock
@@ -50,7 +52,7 @@ const reuseImage = "fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e76
 func allSteps(ctx context.Context, root string, tools lintTools, profile string) []step {
 	env := stepEnv(tools.goDir)
 	viaMise := func(name, tool string, args ...string) step {
-		s := step{name: name, argv: append([]string{"mise", "exec", "--", tool}, args...), environ: env}
+		s := step{name: name, argv: append([]string{"mise", "exec", "--", tool}, args...), environ: withProcessEnv(env, networkPassThrough)}
 		if _, err := whichPinned(ctx, root, tool, execTools[tool]); err != nil {
 			s.unavailable = err
 		}
@@ -60,13 +62,18 @@ func allSteps(ctx context.Context, root string, tools lintTools, profile string)
 	return append(fastSteps(root, tools),
 		viaMise("vulnerabilities", "govulncheck", "./..."),
 		step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env},
-		licenseStep(root, runtime.GOOS, env),
+		licenseStep(root, runtime.GOOS, withProcessEnv(env, dockerPassThrough)),
 	)
 }
 
 // licenseStep runs "reuse lint" (REUSE 3.3, S11) from reuseImage on
 // linux, the platform its image is built for, with the working tree
-// mounted read-only and no network for the container. On another
+// mounted read-only and no network for the container. The container
+// runs as the user nobody (65534), with no capability, no way to gain
+// privileges, and a read-only root file system. Its git is told that
+// /data is safe: the tree belongs to another user, and without it git
+// refuses the repository and reuse reads ignored files too (measured
+// with reuse 6.2.0: an ignored file without a header then fails). On another
 // platform it is not run, and all says so in its output with a "--"
 // line instead of "ok": the check reads file content only, which is
 // the same on every platform, and the Linux runners of the same commit
@@ -78,14 +85,17 @@ func allSteps(ctx context.Context, root string, tools lintTools, profile string)
 // it cannot change what the other checks read, and it has no network,
 // so it can neither fetch code nor send the tree anywhere. The code
 // inside the image is out of scope, as the code of a pinned action is:
-// the review of the pin covers it.
+// the review of the pin covers it. In a linked worktree, whose git
+// directory is outside the mount, reuse reads ignored files as well.
 func licenseStep(root, goos string, env []string) step {
 	s := step{name: "license"}
 	if goos != "linux" {
-		s.skip = "not run on " + goos + ": reuse runs from a Linux container image, and the Linux runners run it on the same commit"
+		s.skip = "not run on " + goos + ": reuse runs from a Linux container image; the hosted Linux runners run it"
 		return s
 	}
 	s.argv = []string{"docker", "run", "--rm", "--network", "none",
+		"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--user", "65534",
+		"--env", "GIT_CONFIG_COUNT=1", "--env", "GIT_CONFIG_KEY_0=safe.directory", "--env", "GIT_CONFIG_VALUE_0=/data",
 		"--mount", "type=bind,source=" + root + ",target=/data,readonly", reuseImage, "lint"}
 	s.environ = env
 	if strings.ContainsAny(root, ",=") {
@@ -230,7 +240,8 @@ func runWorkflows(ctx context.Context, e env, args []string) (bool, error) {
 //
 // The download runs the pinned go command in stepEnv with the proxy
 // the go command uses by default, the one step of tools/ci that
-// reaches the network for modules; go.sum checks what it fetches.
+// fetches modules; go.sum checks what it fetches. It and "mise
+// install" keep networkPassThrough.
 func runSetup(ctx context.Context, e env, args []string) (bool, error) {
 	if len(args) != 0 {
 		return false, fmt.Errorf("setup takes no argument\n%s", usage)
@@ -242,7 +253,7 @@ func runSetup(ctx context.Context, e env, args []string) (bool, error) {
 	c := newChecks(e.stdout)
 	mise := []step{
 		{name: "mise trust", argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, environ: passThroughEnv()},
-		{name: "mise install", argv: []string{"mise", "install"}, environ: passThroughEnv()},
+		{name: "mise install", argv: []string{"mise", "install"}, environ: withProcessEnv(passThroughEnv(), networkPassThrough)},
 	}
 	c.run(ctx, root, mise)
 	if !c.ok {
@@ -255,7 +266,7 @@ func runSetup(ctx context.Context, e env, args []string) (bool, error) {
 	download := step{
 		name:    "go mod download",
 		argv:    []string{filepath.Join(tools.goDir, "go"), "mod", "download"},
-		environ: slices.DeleteFunc(stepEnv(tools.goDir), func(kv string) bool { return kv == "GOPROXY=off" }),
+		environ: withProcessEnv(slices.DeleteFunc(stepEnv(tools.goDir), func(kv string) bool { return kv == "GOPROXY=off" }), networkPassThrough),
 	}
 	c.run(ctx, root, []step{download})
 	return c.ok, nil

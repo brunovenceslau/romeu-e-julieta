@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 )
 
 // sha is a made-up commit id, 40 hex digits.
@@ -49,14 +50,12 @@ jobs:
         uses: actions/checkout@` + sha + `
         with:
           persist-credentials: false
-      - uses: owner/repo/sub/path@` + sha + `
+      - uses: jdx/mise-action/sub/path@` + sha + `
         with:
           sha256: ${{ matrix.sum }}
       - name: All checks
         run: go run ./tools/ci all
-      - run: go run ./tools/release notes --tag "$TAG" --out=notes.md
-        env:
-          TAG: ${{ github.ref_name }}
+      - run: go run ./tools/release notes --tag "$GITHUB_REF_NAME" --out=notes.md
 `
 
 // TestWorkflowsGrammar fails a fixture for each construct outside the
@@ -77,7 +76,7 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a job that calls a workflow", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    uses: owner/repo/.github/workflows/x.yml@" + sha + "\n", `"uses" is outside the grammar of a job`},
 		{"a key of the file", "permissions:\n  contents: read\nconcurrency", "env:\n  A: b\npermissions:\n  contents: read\nconcurrency", `"env" is outside the grammar of a file`},
 		{"an event outside the list", "  workflow_dispatch:\n", "  pull_request_target:\n", `the event "pull_request_target"`},
-		{"an expression with an operator", "${{ matrix.os }}\n    needs", "${{ matrix.os || 'ubuntu-26.04' }}\n    needs", "one context path"},
+		{"an expression with an operator", "group: ci-${{ github.ref }}", "group: ci-${{ github.ref || 'main' }}", "one context path"},
 		{"an expression with a function call", "group: ci-${{ github.ref }}", "group: ci-${{ format('{0}', github.ref) }}", "one context path"},
 		{"an expression with a literal", "group: ci-${{ github.ref }}", "group: ci-${{ true }}", "one context path"},
 		{"an expression with a number", "group: ci-${{ github.ref }}", "group: ci-${{ 1 }}", "one context path"},
@@ -88,8 +87,21 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a uses with a short SHA", "uses: actions/checkout@" + sha, "uses: actions/checkout@" + sha[:39], "40-hex commit SHA"},
 		{"a uses with an upper-case SHA", "uses: actions/checkout@" + sha, "uses: actions/checkout@" + strings.ToUpper(sha), "40-hex commit SHA"},
 		{"a local action", "uses: actions/checkout@" + sha, "uses: ./.github/actions/x", "40-hex commit SHA"},
+		{"a local action with a SHA", "uses: actions/checkout@" + sha, "uses: ./.github/actions/x@" + sha, "40-hex commit SHA"},
+		{"a parent directory with a SHA", "uses: actions/checkout@" + sha, "uses: ../x@" + sha, "40-hex commit SHA"},
+		{"two parent directories with a SHA", "uses: actions/checkout@" + sha, "uses: ../..@" + sha, "40-hex commit SHA"},
+		{"a dot path segment", "uses: actions/checkout@" + sha, "uses: actions/checkout/../x@" + sha, "40-hex commit SHA"},
 		{"a docker action", "uses: actions/checkout@" + sha, "uses: docker://alpine@sha256:" + sha + sha[:24], "40-hex commit SHA"},
 		{"an env on a uses step", "          persist-credentials: false\n", "          persist-credentials: false\n        env:\n          A: b\n", `"env" is outside the grammar of a uses step`},
+		{"an env on a run step: BASH_ENV", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        env:\n          BASH_ENV: /tmp/x\n", `"env" is outside the grammar of a run step`},
+		{"an env on a run step: an exported function", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        env:\n          BASH_FUNC_go%%: \"() { id; }\"\n", `"env" is outside the grammar of a run step`},
+		{"an env on a run step: GOFLAGS", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        env:\n          GOFLAGS: -toolexec=/tmp/x\n", `"env" is outside the grammar of a run step`},
+		{"an env on a run step: LD_PRELOAD", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        env:\n          LD_PRELOAD: /tmp/x.so\n", `"env" is outside the grammar of a run step`},
+		{"an env on a run step: PATH", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        env:\n          PATH: /tmp\n", `"env" is outside the grammar of a run step`},
+		{"an env on a job", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    env:\n      BASH_ENV: /tmp/x\n", `"env" is outside the grammar of a job`},
+		{"an input checkout does not take here", "          persist-credentials: false\n", "          persist-credentials: false\n          fetch-depth: 0\n", `the input "fetch-depth" is not one this repository uses for actions/checkout`},
+		{"an input mise-action does not take here", "          sha256: ${{ matrix.sum }}\n", "          sha256: ${{ matrix.sum }}\n          install_args: x\n", `the input "install_args" is not one this repository uses for jdx/mise-action`},
+		{"an input of an action not listed", "uses: jdx/mise-action/sub/path@", "uses: owner/repo/sub/path@", `the input "sha256" is not one this repository uses for owner/repo`},
 		{"a with on a run step", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        with:\n          a: b\n", `"with" is outside the grammar of a run step`},
 		{"a step with uses and run", "          persist-credentials: false\n", "          persist-credentials: false\n        run: go run ./tools/ci all\n", `"run" is outside the grammar of a uses step`},
 		{"a step with neither", "      - name: All checks\n        run: go run ./tools/ci all\n", "      - name: All checks\n", "a step has uses or run"},
@@ -103,13 +115,19 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a run line over two lines", "run: go run ./tools/ci all\n", "run: |\n          go run ./tools/ci all\n", "run is one line"},
 		{"a run line with two spaces", "run: go run ./tools/ci all\n", "run: go run  ./tools/ci all\n", "run is one line"},
 		{"a run line with a semicolon", "run: go run ./tools/ci all\n", "run: go run ./tools/ci all;id\n", "run is one line"},
-		{"a run line with a variable not quoted", `--tag "$TAG"`, "--tag $TAG", "run is one line"},
-		{"a run line with a command substitution", `--tag "$TAG"`, `--tag "$(id)"`, "run is one line"},
+		{"a run line with a variable not quoted", `--tag "$GITHUB_REF_NAME"`, "--tag $TAG", "run is one line"},
+		{"a run line with a command substitution", `--tag "$GITHUB_REF_NAME"`, `--tag "$(id)"`, "run is one line"},
 		{"a runs-on with a latest label", "runs-on: ${{ matrix.os }}", "runs-on: ubuntu-latest", "never *-latest"},
 		{"a matrix with a latest label", "- os: ubuntu-26.04", "- os: macos-latest", "never *-latest"},
+		{"a matrix list with a latest label", "      matrix:\n", "      matrix:\n        os: [ubuntu-26.04, ubuntu-latest]\n", "never *-latest"},
 		{"a runs-on list with a latest label", "runs-on: ${{ matrix.os }}", "runs-on: [self-hosted, ubuntu-latest]", "never *-latest"},
+		{"a runs-on with a latest label and a size", "runs-on: ${{ matrix.os }}", "runs-on: macos-latest-xlarge", "never *-latest"},
+		{"a runs-on from a variable", "runs-on: ${{ matrix.os }}", "runs-on: ${{ vars.RUNNER }}", "never *-latest"},
+		{"a self-hosted runs-on", "runs-on: ${{ matrix.os }}", "runs-on: self-hosted", "never *-latest"},
+		{"a self-hosted runs-on list", "runs-on: ${{ matrix.os }}", "runs-on: [self-hosted]", "never *-latest"},
+		{"a runs-on with a pinned label", "runs-on: ${{ matrix.os }}", "runs-on: macos-26-intel", ""},
 		{"an anchor", "permissions:\n  contents: read\nconcurrency", "permissions: &p\n  contents: read\nconcurrency", "an anchor or an alias"},
-		{"a merge key where keys are free", "          persist-credentials: false\n", "          persist-credentials: false\n          <<: {a: b}\n", `the tag "!!merge"`},
+		{"a merge key where keys are free", "  contents: read\nconcurrency", "  contents: read\n  <<: {a: b}\nconcurrency", `the tag "!!merge"`},
 		{"a custom tag", "    timeout-minutes: 60\n", "    timeout-minutes: !custom 60\n", `the tag "!custom"`},
 		{"a key written twice", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    timeout-minutes: 5\n", "written twice"},
 	}
@@ -215,4 +233,59 @@ func TestWorkflowsRepository(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, workflowFindings(workflowsDir+e.Name(), src), "%s", e.Name())
 	}
+}
+
+// TestWorkflowsCIFile reads the repository's ci.yml as data and holds
+// it to what T002 asks of it: the four pinned runners, mise installed
+// by a pinned version and a sha256 per platform before setup, and
+// setup before all.
+func TestWorkflowsCIFile(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join(moduleRoot(t), filepath.FromSlash(workflowsDir), "ci.yml"))
+	require.NoError(t, err)
+	var wf struct {
+		Jobs map[string]struct {
+			RunsOn   string `yaml:"runs-on"`
+			Strategy struct {
+				Matrix struct {
+					Include []map[string]string `yaml:"include"`
+				} `yaml:"matrix"`
+			} `yaml:"strategy"`
+			Steps []struct {
+				Uses string         `yaml:"uses"`
+				Run  string         `yaml:"run"`
+				With map[string]any `yaml:"with"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal(src, &wf))
+	require.Len(t, wf.Jobs, 1)
+	job, ok := wf.Jobs["all"]
+	require.True(t, ok, "the job is named all")
+	assert.Equal(t, matrixRunner, job.RunsOn)
+
+	var labels []string
+	for _, entry := range job.Strategy.Matrix.Include {
+		labels = append(labels, entry["os"])
+		assert.Regexp(t, `^[0-9a-f]{64}$`, entry["mise_sha256"], "the mise sha256 of %s", entry["os"])
+	}
+	assert.Equal(t, []string{"ubuntu-26.04", "ubuntu-26.04-arm", "macos-26", "macos-26-intel"}, labels)
+
+	index := map[string]int{}
+	for i, s := range job.Steps {
+		switch {
+		case strings.HasPrefix(s.Uses, "jdx/mise-action@"):
+			index["mise"] = i
+			assert.Equal(t, "2026.10.3", s.With["version"])
+			assert.Equal(t, "${{ matrix.mise_sha256 }}", s.With["sha256"])
+			assert.Equal(t, false, s.With["cache"])
+			assert.Equal(t, false, s.With["env"])
+		case s.Run == "go run ./tools/ci setup":
+			index["setup"] = i
+		case s.Run == "go run ./tools/ci all":
+			index["all"] = i
+		}
+	}
+	require.Len(t, index, 3, "the mise, setup and all steps: %v", index)
+	assert.Less(t, index["mise"], index["setup"])
+	assert.Less(t, index["setup"], index["all"])
 }

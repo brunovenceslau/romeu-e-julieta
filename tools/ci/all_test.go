@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -75,7 +76,7 @@ func TestAll(t *testing.T) {
 			},
 			profile: "tools/ci 1 1",
 			code:    exitFail,
-			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:17: workflows: a runner label is pinned, never *-latest\n", "ok    coverage"},
+			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:17: workflows: runs-on is ${{ matrix.os }} or a pinned GitHub-hosted label such as ubuntu-26.04, never *-latest\n", "ok    coverage"},
 		},
 		{
 			name:    "a hygiene finding",
@@ -150,10 +151,10 @@ func TestWorkflowsCommand(t *testing.T) {
 }
 
 // TestAllSteps pins the command steps of all: the steps of fast, then
-// vulnerabilities, race and license, each in stepEnv. govulncheck and
-// reuse run through "mise exec" once mise has found each below the
-// directory where it installs it; a tool it does not find there fails
-// its own step, and starts nothing.
+// vulnerabilities, race and license. Each runs in stepEnv; the one
+// that reads the Go vulnerability database keeps the variables of a
+// proxy too, and the license step those of the Docker daemon, and no
+// other step keeps either.
 func TestAllSteps(t *testing.T) {
 	f := newFakeMise(t)
 	goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
@@ -161,6 +162,9 @@ func TestAllSteps(t *testing.T) {
 	vuln := f.tool(t, execTools["govulncheck"], "1.8.0", "bin", "govulncheck")
 	script := "#!/bin/sh\ncase \"$4\" in\ngovulncheck) echo '" + vuln + "' ;;\nesac\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
+	for _, key := range slices.Concat(networkPassThrough, dockerPassThrough) {
+		t.Setenv(key, "from-the-process")
+	}
 
 	root := t.TempDir()
 	tools := lintTools{linter: linter, goDir: filepath.Dir(goCmd)}
@@ -171,29 +175,71 @@ func TestAllSteps(t *testing.T) {
 	assert.Equal(t, fast, steps[:len(fast)])
 
 	vulnStep, race, license := steps[len(fast)], steps[len(fast)+1], steps[len(fast)+2]
-	assert.Equal(t, step{name: "vulnerabilities", argv: []string{"mise", "exec", "--", "govulncheck", "./..."}, environ: env}, vulnStep)
+	assert.Equal(t, step{name: "vulnerabilities", argv: []string{"mise", "exec", "--", "govulncheck", "./..."}, environ: withProcessEnv(env, networkPassThrough)}, vulnStep)
 	assert.Equal(t, step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=/tmp/p/cover.out", "./..."}, environ: env}, race)
-	assert.Equal(t, licenseStep(root, runtime.GOOS, env), license)
+	assert.Equal(t, licenseStep(root, runtime.GOOS, withProcessEnv(env, dockerPassThrough)), license)
 
-	t.Run("a tool outside the installs directory fails its own step", func(t *testing.T) {
-		elsewhere := executable(t, filepath.Join(t.TempDir(), "govulncheck"))
-		require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\necho '"+elsewhere+"'\n"), 0o700))
-		vulnStep := allSteps(t.Context(), root, tools, "/tmp/p/cover.out")[len(fast)]
-		require.ErrorContains(t, vulnStep.unavailable, "is outside "+filepath.Join(evalOrSelf(f.installs()), execTools["govulncheck"])+", where mise installs it")
-		_, err := vulnStep.run(t.Context(), root)
-		require.ErrorIs(t, err, vulnStep.unavailable, "an unavailable tool fails its step")
-	})
+	keys := func(s step) []string {
+		var out []string
+		for _, kv := range s.environ {
+			key, _, _ := strings.Cut(kv, "=")
+			out = append(out, key)
+		}
+		return out
+	}
+	for _, s := range steps {
+		for _, key := range networkPassThrough {
+			assert.Equal(t, s.name == "vulnerabilities", slices.Contains(keys(s), key), "%s keeps %s", s.name, key)
+		}
+		for _, key := range dockerPassThrough {
+			assert.Equal(t, s.name == "license" && runtime.GOOS == "linux", slices.Contains(keys(s), key), "%s keeps %s", s.name, key)
+		}
+		assert.NotContains(t, keys(s), "MISE_DATA_DIR")
+		assert.NotContains(t, keys(s), "XDG_DATA_HOME")
+	}
+	for _, key := range slices.Concat(networkPassThrough, dockerPassThrough) {
+		assert.NotContains(t, []string{"MISE_DATA_DIR", "XDG_DATA_HOME"}, key)
+	}
+}
+
+// TestAllStepsToolOutsideInstalls checks, for each tool all starts
+// through "mise exec", that a path mise resolves outside the directory
+// where it installs that tool fails its own step, which starts nothing.
+func TestAllStepsToolOutsideInstalls(t *testing.T) {
+	steps := map[string]string{"govulncheck": "vulnerabilities"}
+	require.Len(t, steps, len(execTools), "a step name for each tool of execTools")
+	for tool, dir := range execTools {
+		t.Run(tool, func(t *testing.T) {
+			f := newFakeMise(t)
+			goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
+			tools := lintTools{linter: f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), goDir: filepath.Dir(goCmd)}
+			elsewhere := executable(t, filepath.Join(t.TempDir(), tool))
+			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\necho '"+elsewhere+"'\n"), 0o700))
+			root := t.TempDir()
+			var got step
+			for _, s := range allSteps(t.Context(), root, tools, "/tmp/p/cover.out") {
+				if s.name == steps[tool] {
+					got = s
+				}
+			}
+			require.ErrorContains(t, got.unavailable, "is outside "+filepath.Join(evalOrSelf(f.installs()), dir)+", where mise installs it")
+			_, err := got.run(t.Context(), root)
+			require.ErrorIs(t, err, got.unavailable, "an unavailable tool fails its step")
+		})
+	}
 }
 
 // TestLicenseStep pins the license step: reuse from the image pinned
-// by digest, on linux, with the tree mounted read-only and no network;
-// on another platform a step that is not run, which all reports with a
-// "--" line, and neither "ok" nor "FAIL".
+// by digest, on linux, with the tree mounted read-only, no network and
+// no privilege; on another platform a step that is not run, which all
+// reports with a "--" line, and neither "ok" nor "FAIL".
 func TestLicenseStep(t *testing.T) {
 	env := []string{"PATH=/x"}
 	assert.Equal(t, step{
 		name: "license",
 		argv: []string{"docker", "run", "--rm", "--network", "none",
+			"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--user", "65534",
+			"--env", "GIT_CONFIG_COUNT=1", "--env", "GIT_CONFIG_KEY_0=safe.directory", "--env", "GIT_CONFIG_VALUE_0=/data",
 			"--mount", "type=bind,source=/src/repo,target=/data,readonly",
 			"fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e7662577c8427429e11e1b9f25a992e", "lint"},
 		environ: env,
@@ -201,16 +247,81 @@ func TestLicenseStep(t *testing.T) {
 	assert.Regexp(t, `@sha256:[0-9a-f]{64}$`, reuseImage)
 
 	darwin := licenseStep("/src/repo", "darwin", env)
-	assert.Equal(t, "not run on darwin: reuse runs from a Linux container image, and the Linux runners run it on the same commit", darwin.skip)
+	assert.Equal(t, "not run on darwin: reuse runs from a Linux container image; the hosted Linux runners run it", darwin.skip)
 	assert.Empty(t, darwin.argv, "nothing is started")
 
 	require.Error(t, licenseStep("/src/a,b", "linux", env).unavailable, "a path the mount option cannot name")
 
 	var out bytes.Buffer
 	c := newChecks(&out)
-	c.run(t.Context(), t.TempDir(), []step{darwin, passing})
+	c.run(t.Context(), t.TempDir(), []step{passing, darwin})
 	assert.True(t, c.ok, "a step not run fails nothing")
-	assert.Equal(t, "--    license: "+darwin.skip+"\n", strings.Split(out.String(), "ok    passes")[0])
+	assert.Contains(t, out.String(), "--    license: "+darwin.skip+"\n")
+	assert.NotContains(t, out.String(), "ok    license")
+	assert.NotContains(t, out.String(), "FAIL  license")
+}
+
+// TestAllWiring runs all with its real steps against fake tools: a
+// fake mise, go, gofmt, golangci-lint and docker that log how they are
+// started. The steps run in the order of 10 10.2, the race step writes
+// its profile where coverage reads it, and the profile's directory is
+// gone after the run.
+func TestAllWiring(t *testing.T) {
+	r := newTree(t)
+	r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+	r.Commit("fixture")
+	gitPath, err := exec.LookPath("git")
+	require.NoError(t, err)
+	f := newFakeMise(t)
+	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.bin, "git")))
+	log := filepath.Join(t.TempDir(), "log")
+	logged := func(name string, extra string) string {
+		return "#!/bin/sh\necho \"" + name + " $*\" >> '" + log + "'\n" + extra
+	}
+	goCmd := filepath.Join(f.installs(), "go", "1.27.0", "bin", "go")
+	writeProfile := "for a in \"$@\"; do case \"$a\" in -coverprofile=*) printf 'mode: set\\n" + fixtureModule + "/tools/ci/f.go:1.2,3.4 1 0\\n' > \"${a#-coverprofile=}\" ;; esac; done\n"
+	for path, script := range map[string]string{
+		goCmd: logged("go", writeProfile),
+		filepath.Join(filepath.Dir(goCmd), "gofmt"):                                          logged("gofmt", ""),
+		filepath.Join(f.installs(), "golangci-lint", "2.14.0", "golangci-lint"):              logged("lint", ""),
+		filepath.Join(f.installs(), execTools["govulncheck"], "1.8.0", "bin", "govulncheck"): logged("govulncheck", ""),
+		filepath.Join(f.bin, "docker"):                                                       logged("docker", ""),
+	} {
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(script), 0o700))
+	}
+	which := "if [ \"$3\" = which ]; then\ncase \"$4\" in\n" +
+		"go) echo '" + goCmd + "' ;;\n" +
+		"golangci-lint) echo '" + filepath.Join(f.installs(), "golangci-lint", "2.14.0", "golangci-lint") + "' ;;\n" +
+		"govulncheck) echo '" + filepath.Join(f.installs(), execTools["govulncheck"], "1.8.0", "bin", "govulncheck") + "' ;;\n" +
+		"esac\nexit 0\nfi\n"
+	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\n"+which+"echo \"mise $*\" >> '"+log+"'\n"), 0o700))
+
+	code, out := runCI(t, r, nil, nil, "all")
+	assert.Equal(t, exitFail, code, out)
+	assert.Contains(t, out, "FAIL  coverage\ntools/ci: coverage: 0.0% of 1 statements covered, below 80% (S9)\n", "coverage read the profile the race step wrote")
+
+	data, err := os.ReadFile(log)
+	require.NoError(t, err)
+	var firstWords []string
+	var profile string
+	for line := range strings.Lines(string(data)) {
+		words := strings.Fields(line)
+		firstWords = append(firstWords, strings.Join(words[:min(2, len(words))], " "))
+		for _, w := range words {
+			if p, ok := strings.CutPrefix(w, "-coverprofile="); ok {
+				profile = p
+			}
+		}
+	}
+	want := []string{"gofmt -l", "go vet", "lint run", "lint run", "lint run", "lint run", "go test", "mise exec", "go test"}
+	if runtime.GOOS == "linux" {
+		want = append(want, "docker run")
+	}
+	assert.Equal(t, want, firstWords, "the order of the steps")
+	require.NotEmpty(t, profile, "the race step names its profile")
+	assert.Equal(t, coverFile, filepath.Base(profile))
+	assert.NoFileExists(t, profile, "the profile's directory is removed after the run")
 }
 
 // evalOrSelf resolves the symbolic links of a path that exists.
@@ -235,10 +346,12 @@ func TestSetup(t *testing.T) {
 	log := filepath.Join(t.TempDir(), "log")
 	goCmd := filepath.Join(f.installs(), "go", "1.27.0", "bin", "go")
 	require.NoError(t, os.MkdirAll(filepath.Dir(goCmd), 0o755))
-	require.NoError(t, os.WriteFile(goCmd, []byte("#!/bin/sh\necho \"go $* GOPROXY=${GOPROXY-unset} GOFLAGS=$GOFLAGS\" >> '"+log+"'\n"), 0o700))
+	require.NoError(t, os.WriteFile(goCmd, []byte("#!/bin/sh\necho \"go $* GOPROXY=${GOPROXY-unset} GOFLAGS=$GOFLAGS HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '"+log+"'\n"), 0o700))
 	linter := f.tool(t, "golangci-lint", "2.14.0", "golangci-lint")
-	script := "#!/bin/sh\nif [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $*\" >> '" + log + "'\n"
+	script := "#!/bin/sh\nif [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset}\" >> '" + log + "'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
+	t.Setenv("HTTPS_PROXY", "http://proxy.invalid")
+	t.Setenv("DOCKER_HOST", "unix:///nowhere")
 
 	code, out := runCI(t, r, nil, nil, "setup")
 	assert.Equal(t, exitOK, code, out)
@@ -249,7 +362,9 @@ func TestSetup(t *testing.T) {
 	require.NoError(t, err)
 	root, err := filepath.EvalSymlinks(r.Dir)
 	require.NoError(t, err)
-	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+"\nmise install\ngo mod download GOPROXY=unset GOFLAGS=-mod=readonly\n", string(data))
+	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset\n"+
+		"mise install HTTPS_PROXY=http://proxy.invalid\n"+
+		"go mod download GOPROXY=unset GOFLAGS=-mod=readonly HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n", string(data))
 
 	t.Run("a failing mise stops before the download", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\nexit 1\n"), 0o700))

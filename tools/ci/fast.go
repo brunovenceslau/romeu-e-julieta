@@ -215,6 +215,29 @@ var passThrough = []string{
 	"GOPATH", "GOCACHE", "GOMODCACHE",
 }
 
+// The variables of passThrough name where things are on this machine.
+// Two more sets say how to reach something, and only the steps that
+// reach it keep them (withProcessEnv): networkPassThrough, a proxy and
+// a certificate bundle, for the steps that use the network, and
+// dockerPassThrough, the Docker daemon, for the license step. Neither
+// holds MISE_DATA_DIR or XDG_DATA_HOME, which miseInstalls refuses.
+var (
+	networkPassThrough = []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}
+	dockerPassThrough  = []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"}
+)
+
+// withProcessEnv returns env with the variables of keys that are set in
+// this process, in the order of keys.
+func withProcessEnv(env []string, keys []string) []string {
+	out := slices.Clone(env)
+	for _, key := range keys {
+		if value := os.Getenv(key); value != "" {
+			out = append(out, key+"="+value)
+		}
+	}
+	return out
+}
+
 // passThroughEnv returns the variables of passThrough that are set in
 // this process, in the order of the list. An empty variable is left
 // out, as the go command reads an empty variable as an unset one.
@@ -243,8 +266,11 @@ func passThroughEnv() []string {
 //     downloaded.
 //   - GOWORK=off: a go.work file in a parent directory does not change
 //     the modules.
-//   - GOPROXY=off: no step reaches the network, so the module cache
-//     must hold the modules of go.sum (10 10.1).
+//   - GOPROXY=off: no step fetches a module, so the module cache must
+//     hold the modules of go.sum (10 10.1). Two steps of all reach the
+//     network for other reasons: vulnerabilities reads the Go
+//     vulnerability database, so its result depends on the date, and
+//     license may pull its image, by digest.
 //   - GOFLAGS=-mod=readonly: the go command builds from go.mod and the
 //     module cache, never from a vendor directory
 //     (https://go.dev/ref/mod#build-commands); in a pre-push run,
@@ -445,7 +471,7 @@ func (c *checks) run(ctx context.Context, root string, steps []step) {
 		if err != nil {
 			detail = fmt.Sprintf("%s%v\n", out, err)
 			if bytes.Contains(out, []byte(moduleLookupOff)) {
-				detail += "the module cache lacks a module of go.sum, and the steps never reach the network: run \"go run ./tools/ci setup\", which runs \"go mod download\", then run this again\n"
+				detail += "the module cache lacks a module of go.sum, and no step fetches one (GOPROXY=off): run \"go run ./tools/ci setup\", which runs \"go mod download\", then run this again\n"
 			}
 		}
 		c.report(s.name, err == nil, detail)
