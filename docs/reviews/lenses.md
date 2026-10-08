@@ -136,6 +136,18 @@ that a round that goes wrong can say which mechanism to change.
 The last row is guidance for whoever writes or edits a lens. The others
 are guidance for whoever writes a brief or runs a round.
 
+**The shape of a lens**, so that the set stays balanced and the
+reviewers get the same kind of prompt from each: five to seven
+bullets; one to three incidents, never none, because the incident is
+the strongest prompt in a lens; at least eight citations of the spec
+by section, criterion, journey or invariant, so the person is pointed
+at text and not at a feeling; at least two explicit questions, so the
+reviewer inherits an inquiry and not a verdict; and 280 to 400 words.
+The same script that measures coverage measures this shape, and a lens
+outside it is edited before a round, not during one. L1 to L12 were
+written before this protocol existed and were brought to this shape
+before round 8, with no change to their role or definition of success.
+
 ## What a reviewer returns
 
 The first line of the report is `<lens id> · <role> · <model>`. Then:
@@ -198,7 +210,8 @@ As this person you care about:
 - **S8 measured where it hurts** because a median with the fake sbx on a
   CI runner is not what this person feels on a Mac with corporate
   antivirus and a disk of clones. The budget excludes `sbx` time; the
-  user does not.
+  user does not. The lens asks which number the user can see, and
+  where the spec says what to do when it is over budget.
 - **J1 in one sitting** because a tool that needs the spec read before
   the first run is not adopted; the comparison in this person's head is
   one `brew install` and one `init`.
@@ -207,7 +220,9 @@ As this person you care about:
   become a prompt. Incident: a deploy tool that asked "are you sure?"
   on every change trained a team to type `y` before the diff rendered.
 - **What happens on the second machine** (J12) because this person has
-  a laptop and a desktop, and the machine-local state does not travel.
+  a laptop and a desktop, and the machine-local state does not travel;
+  the lens asks what the second `init` reads, what it asks again, and
+  whether J12 says which of the two approvals it repeats.
 
 Where to confirm, read last: 00, 09 (J1, J3, J11, J12, J13), 04 4.2,
 01 1.3 and 1.8, S8.
@@ -269,16 +284,17 @@ As this person you care about:
   candidate, generation, snapshot, salvage, three handoff kinds, spool,
   ledger, view, kit, mixin, workload and manifest. Incident: a project
   with fourteen nouns in its glossary where every review began with an
-  hour of "which of the two do you mean".
+  hour of "which of the two do you mean". The lens asks which two of
+  these could be one, and what 13 13.1 and 08 8.1 would lose.
 - **Generators that outlive their single source** (12 12.3) because a
   generator is a bet that the table it reads stays the only one.
   Incident: three generators abandoned after their output format
   changed; their outputs were edited by hand "just this once" until the
   drift check was deleted.
 - **Two names for one person** because the spec says "operator" where
-  it means the machine and "maintainer" where it means the process, and
-  neither is in the vocabulary. A new reader will see two roles and
-  invent a third.
+  it means the machine (01 1.1, 05 5.4) and "maintainer" where it means
+  the process (05 5.3, 10 10.2), and neither is in the vocabulary of
+  01 1.8. A new reader will see two roles and invent a third.
 - **Import boundaries enforced by a check** (10 10.7) because a module
   boundary in a document lasts until the first agent needs a shortcut;
   one in `tools/ci imports` lasts.
@@ -287,9 +303,12 @@ As this person you care about:
   last responsible moment. The lens asks which tasks disappear if half
   of 13 is deferred.
 - **Every "ask first" in a document and not in a file** because an
-  agent reads `.github/ask-first.yaml` and skips prose.
+  agent reads `.github/ask-first.yaml` (05 5.3) and skips prose; the
+  lens reads 12 12.4 and the Boundaries of the index for an approval
+  the file does not carry.
 
-Where to confirm, read last: index (principles), 01 1.8, 12 whole, 10 10.7, plan.md.
+Where to confirm, read last: index (principles, Boundaries), 01 1.8,
+12 whole, 10 10.7, 05 5.3, 00 0.5, plan.md.
 Model: fable.
 
 ### L4 The machine operator who has lost work
@@ -308,7 +327,9 @@ As this person you care about:
   itself.
 - **Disk full during `snapshot`** because bundles of unpushed work grow,
   the hook that writes them runs after every commit, and a snapshot that
-  fails quietly teaches people not to trust snapshots.
+  fails quietly teaches people not to trust snapshots. The lens asks
+  what the commit hook does when the bundle cannot be written, and
+  whether 08 8.4 says it.
 - **`retire` moves to `.attic/` and never deletes** (01 1.8) because it
   is the right call and it fills the disk; the lens asks who cleans it
   and when the spec says so.
@@ -318,7 +339,8 @@ As this person you care about:
   every sandbox as unknown.
 - **Two machines, one config repo** (J12) because `$XDG_STATE_HOME` does
   not travel, and two hosts will disagree on applied egress and on the
-  toolchain acknowledgement.
+  toolchain acknowledgement; the lens asks which of the two `doctor`
+  calls wrong, and what J12 tells the person to do about it.
 - **`doctor` as the only way to learn the truth** because a tool that
   can be wrong about state needs one command that compares every
   derived file against its source, byte for byte, and says so.
@@ -344,8 +366,9 @@ As this person you care about:
   human-written narrative sitting in the middle of it.
 - **The agent's own memory directory being read-only** (S5) because it
   is the decision that most contradicts the agent's default habits. The
-  agent will try to write, fail, and improvise a path; the spec has to
-  say what the failure looks like and what to do instead.
+  agent will try to write, fail, and improvise a path; the lens asks
+  what the failure looks like from inside, which hook or skill tells
+  the agent what to do instead, and where 06 or 08 says it.
 - **`julieta event add` with no free text** (13 13.2) because an agent
   that cannot say what happened stops recording. The lens checks that
   the closed sets of `type` and `tool` cover what an agent wants to
@@ -355,7 +378,9 @@ As this person you care about:
   three hooks failed or what the fix is.
 - **Three handoff kinds** (`clear`, `final`, `facts`) because the rule
   for which kind when has to be a hook, not a memory; the skill that
-  says "write a handoff before `/clear`" is a memory.
+  says "write a handoff before `/clear`" is a memory. The lens asks
+  which hook writes which kind (08 8.3), and what happens to a session
+  that ends without any.
 - **Skills that ask the agent to remember a mechanical step** because
   each is a defect by the spec's own principle; the lens lists them.
 
@@ -410,7 +435,9 @@ As this person you care about:
   downloaded something else on a Friday evening.
 - **A lock entry without a checksum** (`govulncheck`, plan "Toolchain
   pins") because "it rests on the checksum database" is true today and
-  is an exception someone will copy tomorrow.
+  is an exception someone will copy tomorrow; the lens asks which check
+  refuses the second one, and whether `julieta lock --check` (04 4.3)
+  counts it as a missing entry.
 - **Attestation verified by the workflow that signed it** (S1) because
   the verification that matters runs on the user's machine, after
   download, and the spec has to say how that user does it.
@@ -438,9 +465,12 @@ out of it, and no page is older than the code it describes.
 
 As this person you care about:
 
-- **Reference pages generated and drift-checked in the gate** (rule 10)
-  because generated docs that are not checked age faster than
-  hand-written ones: nobody feels responsible for them.
+- **Reference pages generated and drift-checked in the gate** (rule 10,
+  12 12.3) because generated docs that are not checked age faster than
+  hand-written ones: nobody feels responsible for them. Incident: a
+  reference page generated once, at launch, described flags removed two
+  releases later; every bug report cited the page, and the maintainers
+  answered each by hand for a year before anyone regenerated it.
 - **A guide per journey, read in a panic** (S10, J6, J10) because the
   guide for "salvage before recreate" is read by someone who has just
   lost a sandbox. The lens asks what the spec requires of that page
@@ -451,7 +481,9 @@ As this person you care about:
   break meanwhile.
 - **Citing sections by number** ("10 10.2") because renumbering breaks
   every citation silently; the spec cites tests by title for exactly
-  that reason, and sections by number.
+  that reason, and sections by number. The lens asks what check of
+  rule 5 catches a citation whose section moved, and whether the spec's
+  own pages pass it.
 - **The voice rule** (rule 19) because personality in choices is hard to
   review and easy to fake with adjectives; the lens checks that the
   spec pages themselves pass the rubric of rule 18.
@@ -514,22 +546,33 @@ is for them.
 As this person you care about:
 
 - **Personal values with nowhere to go** because the reference config
-  repo has a name and the host tree has a default path; the lens asks
-  what this person replaces, where, and how they find out.
+  repo has a name (01 1.1) and the host tree has a default path (00
+  0.1); the lens asks what this person replaces, where (03 3.4), and
+  how they find out. Incident: a tool whose default configuration
+  pointed at its author's home directory; every adopter's first issue
+  was the same path error, and the fix was one line nobody had been
+  told about.
 - **Linux hosts as a non-goal** (00 0.3) because half the potential
   adopters run Linux and the decision has to be visible on the first
   screen, not in a bullet of 0.3.
-- **`ARCHITECTURE.md` before the code** because this person contributes
-  only if the trust boundary is clear in twenty minutes.
-- **Secrets as `name@project -> argv` in host settings** (01, boundary
-  B) because this person's secret manager is not the maintainer's; the
-  lens asks what the spec assumes about it.
+- **`ARCHITECTURE.md` before the code** (12 12.8) because this person
+  contributes only if the trust boundary (01 1.2) is clear in twenty
+  minutes.
+- **Secrets as `name@project -> argv` in host settings** (01 1.2
+  boundary B, 03 3.4) because this person's secret manager is not the
+  maintainer's; the lens asks what the spec assumes about it.
+- **Their own kits next to the product's** (06 6.2, J9) because a
+  personal kit is where this person's machine differs, and the lens asks
+  what a kit can do, what a wrong one costs, and how the gate of 01 1.4
+  shows them the difference.
 - **The one onboarding doc that is also the trust pitch** because for
   this person the README's "trust model" section (rule 12) decides
-  whether they run a binary that drives their sandboxes.
+  whether they run a binary that drives their sandboxes; the lens asks
+  what J1 shows them before the first `sync` that would make them stop.
 
-Where to confirm, read last: 00, 03 (host settings), 06 (personal kits), 09 (J1, J2),
-the README rules of ADR 0001.
+Where to confirm, read last: 00 0.2 and 0.3, 03 3.4 (host settings),
+06 6.2 (personal kits), 09 (J1, J2, J9), 01 1.1 and 1.2, the README
+rules of ADR 0001.
 Model: opus.
 
 ### L11 The scope skeptic
@@ -545,18 +588,21 @@ As this person you care about:
 - **The runtime ledger in v1** (13) because it is the feature with the
   least direct line to the objective of 0.1 and the most new security
   surface (I33, the side channel of 05 5.4). 0.5 justifies it; the lens
-  asks for the trigger that would remove it.
+  asks for the trigger that would remove it. Incident: an audit log
+  added to a small tool "for later analysis" was never read by anyone,
+  and was the one component that shipped the tool's only security
+  advisory.
 - **Snapshot and salvage, complete and "not smaller"** (00 0.5) because
   the security review required it and the cost in julieta is high; the
   lens asks whether one bundle per commit is the simplest form of
   "nothing is lost".
-- **One renderer and it is a small project's** because herdr is on the
-  path of `romeu run`, and the lens asks what the spec says if it stops
-  being maintained.
-- **Six memory commands plus import and verify** (04 4.3) because a
-  store that an agent writes through a CLI competes with the agent's
-  own memory, and the lens asks what the agent would lose with half of
-  them.
+- **One renderer and it is a small project's** (02 2.5, J3) because
+  herdr is on the path of `romeu run`, and the lens asks what the spec
+  says if it stops being maintained.
+- **Six memory commands plus import and verify** (04 4.3, 08 8.1)
+  because a store that an agent writes through a CLI competes with the
+  agent's own memory, and the lens asks what the agent would lose with
+  half of them.
 - **A feature justified by a success criterion that it alone
   justifies** because 0.5 traces features to criteria, and a criterion
   written for one feature is a circle.
@@ -623,9 +669,9 @@ As this person you care about:
   digests. Incident: a system with three id formats, noticed only when
   one log had to join them.
 - **Conventions of 04 4.1 that the command tables do not honour**
-  because an exit code is a contract. Does 2 always mean a failed
-  precondition? Does `--json` exist where the caller is a program, and
-  only there? Incident: a CLI where exit 1 meant both "failed" and
+  (04 4.2, 04 4.3, 04 4.4) because an exit code is a contract. Does 2
+  always mean a failed precondition? Does `--json` exist where the
+  caller is a program, and only there? Incident: a CLI where exit 1 meant both "failed" and
   "found differences", and a CI script that ignored the differences for
   years.
 - **Names that change between pages** because the vocabulary of 01 1.8
@@ -651,52 +697,47 @@ Model: fable, because it is a cross-reading of the whole text.
 
 Role: the person who receives a bug report from a stranger, and the
 first pull request from a stranger. Success is: a failure reported by
-someone who did not write the code becomes a fix in an afternoon, by
-someone who did not write it either, and both want to come back.
+a stranger becomes a fix in an afternoon, by another stranger, and both
+want to come back.
 
 As this person you care about:
 
 - **What a user can paste into an issue** because diagnosis starts with
   what arrives. The spec has error ids with fix hints, `--timings
-  --json`, `doctor` and the ledger view; it has no log level, no verbose
-  mode and no command that gathers evidence already redacted (I29, the
-  redaction of 11). Incident: two hundred issues saying "it does not
-  work" with nothing reproducible, until a command existed that packed
-  the evidence.
-- **Silent hooks and chores** because julieta runs after every commit,
-  and a snapshot that fails quietly for months is the failure nobody
-  reports. 13 records `hook-failed` and `command-failed`; the lens asks
-  who reads them and when.
+  --json`, `doctor` and the ledger view, and no log level, no verbose
+  mode and no command that packs redacted evidence (I29, 11). Incident:
+  two hundred issues saying "it does not work", until a command existed
+  that packed the evidence.
 - **Tracing one critical flow end to end** because `sync` has nine
-  steps and a commit point, `run` ends in an exec and `salvage` crosses
-  two machines; a maintainer needs to see in which step the time and
-  the failure went. `--timings` exists for S8; profiling does not, so a
-  regression is found by the user.
+  steps, `run` ends in an exec and `salvage` crosses two machines; a
+  maintainer needs to see in which step the time and the failure went.
+  `--timings` exists for S8; profiling does not.
 - **The contributor's local loop** because `tools/ci fast`, the fake
-  sbx, the goldens with `-update` and the scaffolds decide whether the
-  first fix takes an afternoon or a week. Incident: a project whose CI
+  sbx and the scaffolds decide whether the first fix takes an afternoon
+  or a week. Incident: a project whose CI
   took forty minutes received one pull request per contributor and
   never the second.
 - **The critical flows as teaching material** because `ARCHITECTURE.md`
-  with generated state machines and the error table are what a newcomer
-  learns from; the lens asks for a "read this first" path per flow, and
-  whether each error id leads to a runbook (a guide per journey, S10).
+  and the error table are what a newcomer learns from; the lens asks for
+  a "read this first" path per flow, and whether each error id leads to
+  a runbook (S10).
 - **Open source as a relationship, not a license** because
-  `CONTRIBUTING.md`, issue templates, a stated response expectation
-  (`SECURITY.md` has one; ordinary issues do not), release notes that
-  name who contributed and a release cadence decide whether anyone
-  returns. Incident: a well-built tool with no contributors because
-  every pull request waited three weeks.
+  `CONTRIBUTING.md`, issue templates, a response expectation
+  (`SECURITY.md` has one; issues do not) and release notes that name
+  contributors decide whether anyone returns. Incident: a
+  well-built tool with no contributors because every pull request
+  waited three weeks.
 - **Reliability engineering with no server** because the failure modes
-  in the field are disk, denied egress, sbx version skew and mount
-  permissions; the lens asks whether each has an error id, a runbook and
-  a safe way to collect evidence without leaking a secret.
+  in the field are disk, denied egress, sbx version skew, mount
+  permissions, and the chore that fails quietly after every commit for
+  months (13 records `hook-failed`; the lens asks who reads it); for
+  each, the lens asks for an error id, a runbook and a safe way to
+  collect evidence without leaking a secret.
 
 Where to confirm, read last: 04 (the error table, `--timings`,
-`doctor`), 12 12.2 to 12.4 and 12.8, 10 10.1, 13, S8, S10, rule 16 and
-rule 20 of ADR 0001. L3 keeps decay over time, L8 the quality of a
-page, L10 adoption; L14 keeps the day something breaks and the day
-someone arrives. Model: opus.
+`doctor`), 12 12.2 to 12.4 and 12.8, 10 10.1, 13, S8, S10, rules 16
+and 20 of ADR 0001. L3 keeps decay, L8 the page, L10 adoption; L14
+keeps the day something breaks. Model: opus.
 
 ### L15 The ground that moves
 
@@ -753,7 +794,9 @@ As this person you care about:
   because an agent transcript holds the code, the secrets a developer
   pasted and the employer's prompts; the lens asks who reads the
   salvage directory, whether it enters a machine backup, and whether
-  the spec says so to the user.
+  the spec says so to the user. Incident: a support-bundle feature that
+  archived the home directory sent a developer's private keys to a
+  vendor's ticket system, and the vendor found them first.
 - **A ledger that is never redacted and never deleted** (13, 05 5.4)
   because the spec's rule is absolute and the remedy is to rotate a
   credential; the lens asks what a user does when the value in the
