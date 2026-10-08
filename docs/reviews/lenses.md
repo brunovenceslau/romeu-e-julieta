@@ -12,6 +12,14 @@ kind of incident that taught them to worry. A lens is not a job title:
 seen a terminal escape in a branch name paste text into an operator's
 clipboard" produces a finding with a section number.
 
+Each lens has two parts, and the brief keeps them apart. The **Role**
+paragraph is the person: who they are and what success means to them.
+The bullets are examples of what that person would notice, written so
+a reader can calibrate the sensibility; they are not the list of what
+to check, and a reviewer sees them only after reading the spec. The
+section "Why the brief is shaped this way" says what goes wrong when
+the two are mixed.
+
 Every lens is derived from what the spec itself calls success: the
 objective ([00 0.1](../spec/00-scope.md#01-objective)), the users
 ([00 0.2](../spec/00-scope.md#02-users)), the criteria S1 to S11
@@ -26,19 +34,10 @@ the journeys ([09](../spec/09-journeys.md)), the test strategy
 ## How a lens is run
 
 One reviewer per lens, in a fresh context, read-only, all in parallel
-on one commit of the default branch. The brief carries:
-
-- the lens section below, whole, and nothing from another lens;
-- the baseline commit, so every reviewer reads the same text;
-- the instruction to refute: find where the spec fails this lens's
-  definition of success, not where it meets it;
-- the output shape of the next section;
-- a scratch directory outside the repository, and the rule that the
-  reviewer creates no file inside the tree, even transiently.
-
-Nothing writes to that tree until every reviewer has reported. The
-reports are merged into one list, duplicates kept once with every lens
-that raised them (a finding raised by two lenses independently is
+on one commit of the default branch, plus one control reviewer (L0,
+below). Nothing writes to that tree until every reviewer has reported.
+The reports are merged into one list, duplicates kept once with every
+lens that raised them (a finding raised by two lenses independently is
 high-signal), and applied in one write pass, recorded as one review
 round under this directory.
 
@@ -47,6 +46,69 @@ chose. A lens whose findings decide security, architecture or scope
 runs on the strongest tier available; no lens runs on the smallest
 tier, because a lens that misses a finding costs a review round later.
 
+### The brief, in order
+
+The order matters as much as the content; the next section says why.
+A brief is delivered in two parts, and the second is sent only after
+the first has produced its notes. In a workflow, that is two messages
+to the same reviewer.
+
+Part one:
+
+1. The baseline commit, the scratch directory outside the repository,
+   and the rule that the reviewer creates no file inside the tree, even
+   transiently.
+2. The lens's **Role** paragraph and its definition of success, whole.
+   Nothing else from the lens: not the bulleted concerns, not the
+   "Where to confirm" line.
+3. Two incidents from the reviewer's own experience that fit this role,
+   written down before opening the spec, and what each would make them
+   look for here.
+4. A full read of the spec: the index, every page under `spec/`, the
+   decision records and `plan.md`, with raw notes per page. The
+   instruction is to refute: find where the spec fails this role's
+   definition of success, not where it meets it.
+5. The postmortem of the first incident this product has after v1.0.0,
+   as this person would write it, one page at most.
+6. The section "What is missing": what this person expected to find
+   and did not.
+
+Part two:
+
+7. The lens's bulleted concerns and its "Where to confirm" line, with
+   this sentence: the bullets are examples of the sensibility, not the
+   list of what to check; a finding that only restates a bullet is
+   worth less than one the bullets did not predict.
+8. Reconcile: for each bullet, confirm, refute or mark unanswerable,
+   citing the section; then fold the notes of part one into findings.
+9. The question "what does this lens get wrong about success for this
+   product?", answered in a few lines.
+10. The report, in the shape of the next section.
+
+### Why the brief is shaped this way
+
+A list of concerns read before the text becomes a checklist: the
+reviewer confirms the listed items and reports that the spec holds.
+That bias has two sources, what the lens lists and the order the
+reviewer reads in, and the brief addresses each with a mechanism, so
+that a round that goes wrong can say which mechanism to change.
+
+| Mechanism | What it counters | Why this form |
+|---|---|---|
+| Role and success first, concerns last (steps 2 and 7) | anchoring: what is read first decides what is searched for | the reviewer forms their own view of the text before seeing ours; the concerns then confirm or extend it instead of replacing it |
+| "Examples, not a checklist" said in the brief (step 7) | a lens read as a specification of the report | an agent optimizes for what the brief rewards; the sentence moves the reward to the unpredicted finding |
+| The reviewer's own two incidents (step 3) | the lens's incidents pulling toward their own failure class | an incident is the strongest prompt in a lens; two of the reviewer's own widen the set before ours narrow it |
+| The full read with notes per page (step 4) and the coverage table (report) | reading only the sections the lens names | a page with no line is a format failure, so 07 is read by the DX lens and 09 by the release lens; the table is checked mechanically after the round |
+| "What is missing" (step 6) | a checklist finding only what is written wrong | absence does not appear in a list of concerns; it appears to a person who has lived the incident |
+| The postmortem (step 5) | findings that stay inside one section | a scenario runs end to end across pages, which is where the gaps between sections live |
+| The self-refutation (step 9) | a lens that is itself wrong about success | the cheapest evidence for rewriting a lens before the next round |
+| Origin per finding, listed or own (report) | anchoring that nobody can see | the ratio per lens is a measurement; a lens that returns mostly "listed" was badly written or badly briefed, and the round page records which. Deterministic where it fits |
+| The control reviewer L0 | a blind spot shared by all twelve lenses | what only L0 finds is what no lens was shaped to see; what only the lenses find is their value. Both are recorded in the round page |
+| At most three incidents per lens, about a mechanism, not a component | the incident list growing into a second checklist | an incident about trust, drift or a barrier transfers to sections the author did not think of; one about a named component does not |
+
+The last row is guidance for whoever writes or edits a lens. The others
+are guidance for whoever writes a brief.
+
 ## What a reviewer returns
 
 The first line of the report is `<lens id> · <role> · <model>`. Then:
@@ -54,7 +116,11 @@ The first line of the report is `<lens id> · <role> · <model>`. Then:
 | Field | Content |
 |---|---|
 | Verdict | one line: does the spec meet this lens's definition of success, and what is the largest gap |
-| Findings | one row each: id (`<lens id>-<n>`), severity on the lens's own scale, the spec section cited as the spec cites itself ("04 4.3"), the defect in one sentence, the concrete failure scenario, the proposed change and what it costs |
+| Findings | one row each: id (`<lens id>-<n>`), severity on the scale below, origin (`listed` when a bullet of the lens prompted it, `own` otherwise), the spec section cited as the spec cites itself ("04 4.3"), the defect in one sentence, the concrete failure scenario, the proposed change and what it costs |
+| Coverage | one line per page: the index, 00 to 13, the ADRs as one line, `plan.md`; each says `nothing for this lens` or lists finding ids. A page without a line fails the format |
+| What is missing | what this person expected to find and did not, each with where it would belong |
+| Postmortem | the first incident after v1.0.0 as this person sees it, one page at most, with the sections it crosses |
+| Lens critique | what this lens gets wrong about success for this product |
 | Not tested | what the lens could not judge from the text alone, and what evidence would settle it |
 | Confidence | one line |
 
@@ -65,6 +131,22 @@ section), **Advisory** (improve when the section is next touched).
 A lens does not report what the spec already lists as a deferred
 decision, a non-goal or an accepted risk, unless the trigger or the
 acceptance is itself the defect.
+
+The round page records, per lens, the count of findings by origin and
+the findings only L0 raised. Those two numbers are how the next round
+decides which lens to rewrite.
+
+### L0 The control reviewer
+
+Role: a reviewer with no lens. The brief carries only the success
+criteria S1 to S11, the principles of the index and the objective of
+0.1, and the same ten steps above with step 7 empty. Success is the
+spec's own definition, read by someone we did not shape.
+
+L0 exists to measure the twelve lenses, not the spec: a finding only
+L0 raises names a blind spot the lenses share; a finding every lens
+raises and L0 does not shows what the lenses add. Model: the same
+tier as the strongest lens, because a weak control measures nothing.
 
 ## The lenses
 
@@ -100,7 +182,7 @@ As this person you care about:
 - **What happens on the second machine** (J12) because this person has
   a laptop and a desktop, and the machine-local state does not travel.
 
-Read first: 00, 09 (J1, J3, J11, J12), 04 4.2, 01 1.3 and 1.8, S8.
+Where to confirm, read last: 00, 09 (J1, J3, J11, J12), 04 4.2, 01 1.3 and 1.8, S8.
 Model: opus.
 
 ### L2 The security engineer who has watched a host fall
@@ -141,7 +223,7 @@ As this person you care about:
   renamed workspace path plus a reused project name is how a destructive
   command lands on the wrong tree.
 
-Read first: 05 whole, 01 1.2 and 1.6, 13, 08 8.1, ADR 0008.
+Where to confirm, read last: 05 whole, 01 1.2 and 1.6, 13, 08 8.1, ADR 0008.
 Model: fable.
 
 ### L3 The maintainer three years from now
@@ -177,7 +259,7 @@ As this person you care about:
 - **Every "ask first" in a document and not in a file** because an
   agent reads `.github/ask-first.yaml` and skips prose.
 
-Read first: index (principles), 01 1.8, 12 whole, 10 10.7, plan.md.
+Where to confirm, read last: index (principles), 01 1.8, 12 whole, 10 10.7, plan.md.
 Model: fable.
 
 ### L4 The machine operator who has lost work
@@ -211,7 +293,7 @@ As this person you care about:
   can be wrong about state needs one command that compares every
   derived file against its source, byte for byte, and says so.
 
-Read first: 01 1.5 to 1.7, 09 (J6, J10, J12), 04 4.2 (`doctor`,
+Where to confirm, read last: 01 1.5 to 1.7, 09 (J6, J10, J12), 04 4.2 (`doctor`,
 `salvage`, `retire`), 08 8.4, 13 13.6.
 Model: opus.
 
@@ -247,7 +329,7 @@ As this person you care about:
 - **Skills that ask the agent to remember a mechanical step** because
   each is a defect by the spec's own principle; the lens lists them.
 
-Read first: 08 whole, 04 4.3, 13 13.2, 06 (the `julieta-claude`
+Where to confirm, read last: 08 whole, 04 4.3, 13 13.2, 06 (the `julieta-claude`
 mixin), S5.
 Model: opus.
 
@@ -280,7 +362,7 @@ As this person you care about:
 - **A race run that excludes e2e** (10 10.2) because the code with the
   most goroutines is the code that talks to subprocesses.
 
-Read first: 10 whole, 11, S6 to S9, 05 5.2 (the test column).
+Where to confirm, read last: 10 whole, 11, S6 to S9, 05 5.2 (the test column).
 Model: fable.
 
 ### L7 The release and supply-chain engineer
@@ -312,7 +394,7 @@ As this person you care about:
   runs in CI and the spec should say whether the same tag built twice
   gives the same bytes, and if not, why that is acceptable.
 
-Read first: S1, S11, 12 12.1, 12 12.6, 10 10.2 ("Release and
+Where to confirm, read last: S1, S11, 12 12.1, 12 12.6, 10 10.2 ("Release and
 bootstrap"), 06 6.3 (digests), plan.md "Toolchain pins".
 Model: opus.
 
@@ -345,7 +427,7 @@ As this person you care about:
 - **The reader named in the front matter is the reader the page serves**
   because a page for "anyone" is a page for nobody.
 
-Read first: ADR 0001, S10, 12 12.7 and 12.8, 09 (as the source of the
+Where to confirm, read last: ADR 0001, S10, 12 12.7 and 12.8, 09 (as the source of the
 guides), the spec pages as pages.
 Model: opus.
 
@@ -378,7 +460,7 @@ As this person you care about:
   the rule, and the lens checks a sample of tasks for the ones that are
   three.
 
-Read first: plan.md whole, ADR 0002 to ADR 0005, 12 12.9 and 12.10,
+Where to confirm, read last: plan.md whole, ADR 0002 to ADR 0005, 12 12.9 and 12.10,
 index (Deferred decisions, Open questions).
 Model: opus.
 
@@ -406,7 +488,7 @@ As this person you care about:
   this person the README's "trust model" section (rule 12) decides
   whether they run a binary that drives their sandboxes.
 
-Read first: 00, 03 (host settings), 06 (personal kits), 09 (J1, J2),
+Where to confirm, read last: 00, 03 (host settings), 06 (personal kits), 09 (J1, J2),
 the README rules of ADR 0001.
 Model: opus.
 
@@ -441,7 +523,7 @@ As this person you care about:
 - **Everything the spec says is partial for teams** (00 0.6) because an
   honest "nothing" is cheaper than a partial that implies a roadmap.
 
-Read first: 00 0.3, 0.5 and 0.6, index (Deferred decisions), 13, 08,
+Where to confirm, read last: 00 0.3, 0.5 and 0.6, index (Deferred decisions), 13, 08,
 04 4.3.
 Model: fable.
 
@@ -479,7 +561,7 @@ As this person you care about:
   overlaps it; the lens counts how many tasks name those surfaces and
   whether the count can drop.
 
-Read first: plan.md (dependencies, phases, Ask-first fields), 12 12.2,
+Where to confirm, read last: plan.md (dependencies, phases, Ask-first fields), 12 12.2,
 10 10.7, 05 5.3, 04 4.4.
 Model: fable.
 
@@ -487,4 +569,4 @@ Model: fable.
 
 | Round | Baseline | Lenses | Page |
 |---|---|---|---|
-| 8 | the default branch at the commit this page was added | L1 to L12 | round-8.md, when written |
+| 8 | the default branch at the commit this page was added | L0 to L12 | round-8.md, when written |
