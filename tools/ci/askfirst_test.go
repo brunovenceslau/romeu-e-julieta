@@ -6,6 +6,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -167,4 +168,46 @@ func TestSpecListIsTheCommittedList(t *testing.T) {
 	got, err := parseAskFirst([]byte(strings.Replace(fence, "@<owner>", want.Owner, 1)))
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
+}
+
+// TestGlobMatch pins the matcher of the ask-first dialect: "**" is zero
+// or more whole segments, "*" a run inside one segment.
+func TestGlobMatch(t *testing.T) {
+	tests := []struct {
+		glob, name string
+		want       bool
+	}{
+		{"go.mod", "go.mod", true},
+		{"go.mod", "x/go.mod", false},
+		{"mise.*.toml", "mise.local.toml", true},
+		{"mise.*.toml", "mise.toml", false},
+		{"mise.*.toml", "mise.a/b.toml", false},
+		{".mise.*.toml", ".mise.ci.local.toml", true},
+		{"mise/**", "mise/config.toml", true},
+		{"mise/**", "mise/conf.d/x.toml", true},
+		{"mise/**", "mise", true},
+		{"mise/**", "x/mise/config.toml", false},
+		{"a/**/b", "a/b", true},
+		{"a/**/b", "a/x/y/b", true},
+		{"a/**/b", "a/x/y/c", false},
+		{"*", ".hidden", true},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, globMatch(tt.glob, tt.name), "%s ~ %s", tt.glob, tt.name)
+	}
+}
+
+// TestCodeownersAsksFirst holds the ask-first surface of the committed
+// list to the list itself and the CODEOWNERS file generated from it: a
+// change to CODEOWNERS asks for the review even where generated does
+// not judge the commit, as when a step that runs before it rewrote the
+// index (05 5.3).
+func TestCodeownersAsksFirst(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join(moduleRoot(t), askFirstPath))
+	require.NoError(t, err)
+	list, err := parseAskFirst(src)
+	require.NoError(t, err)
+	i := slices.IndexFunc(list.Surfaces, func(s surface) bool { return s.ID == "ask-first" })
+	require.GreaterOrEqual(t, i, 0, "the ask-first surface")
+	assert.Equal(t, []string{askFirstPath, codeownersPath}, list.Surfaces[i].Globs)
 }

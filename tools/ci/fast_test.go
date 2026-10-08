@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -334,9 +335,10 @@ func TestFastJudgesTheCommit(t *testing.T) {
 // while the steps of a pre-push run take their minutes: a step stub
 // changes it, and fast refuses the push after the last step, before
 // hygiene and the range, since the steps may have tested something
-// other than the commit judged. The last case pushes nothing, so no
-// tip ties HEAD down and only the comparison of the two commits sees
-// that HEAD moved.
+// other than the commit judged. The case "HEAD moves with nothing
+// pushed" pushes nothing, so no tip ties HEAD down and only the
+// comparison of the state before and after the steps (changedSince)
+// sees that HEAD moved; the last two cases are seen by it alone too.
 func TestFastJudgesAgainAfterTheSteps(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
 	sh, err := exec.LookPath("sh")
@@ -352,6 +354,11 @@ func TestFastJudgesAgainAfterTheSteps(t *testing.T) {
 		{"a go.mod appears below the module root", "mkdir inner && printf 'module example.invalid/inner\\n' > inner/go.mod", true, "\ninner/go.mod"},
 		{"HEAD moves to a commit that is not the pushed tip", "git commit --quiet --allow-empty --message late", true, "fast tests the commit checked out"},
 		{"HEAD moves with nothing pushed", "git commit --quiet --allow-empty --message late", false, "HEAD is now "},
+		// judgeCommit refuses neither of the two below (an untracked
+		// file that is no gate input, a change git status hides);
+		// changedSince does.
+		{"an untracked file that is no gate input appears", "echo late > notes.txt", true, "\nnotes.txt"},
+		{"a tracked file changes behind skip-worktree", "git update-index --skip-worktree README.md && echo changed >> README.md", true, "\nREADME.md"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -826,9 +833,9 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 		{name: "a clean ref and the checked-out one: every tip must be HEAD", head: listing,
 			stdin: push(clean, "refs/heads/clean") + push(listing, "refs/heads/listing"), code: exitError,
 			want: []string{"ci: fast tests the commit checked out", "\n" + clean}, lacks: []string{"\n" + listing, "pushed range"}},
-		{name: "a denylist that cannot be read at HEAD stops the push",
-			stdin: push(broken, "refs/heads/broken"), code: exitError,
-			want: []string{"ci: " + names.Path + ": "}, lacks: []string{"pushed range"}},
+		{name: "a denylist that cannot be read at HEAD fails hygiene and the pushed range",
+			stdin: push(broken, "refs/heads/broken"), code: exitFail,
+			want: []string{"FAIL  hygiene\n" + names.Path + ": ", "FAIL  pushed range\n" + names.Path + ": "}},
 		{name: "a deleted ref names no tip",
 			stdin: fmt.Sprintf("(delete) %s refs/heads/listing %s\n", zero, listing), code: exitOK,
 			want: []string{"ok    pushed range"}},
@@ -930,23 +937,99 @@ func TestFastSteps(t *testing.T) {
 	assert.Equal(t, []string{goCmd, "test", "-count=1", "./internal/...", "./tools/..."}, unit, "unit")
 }
 
+// TestGeneratedRunsBeforeTheTests holds the order the threat model of
+// tools/ci/misefiles.go relies on: in fast and in all, the generated
+// step, which judges the index, runs before every step that runs code
+// of the change (its tests), so that code cannot stage a good copy of
+// a generated file before it is judged.
+func TestGeneratedRunsBeforeTheTests(t *testing.T) {
+	tools := lintTools{linter: "/pinned/golangci-lint", goDir: "/pinned/go/bin"}
+	for name, steps := range map[string][]step{
+		"fast": fastSteps(moduleRoot(t), tools),
+		"all":  allSteps(t.Context(), moduleRoot(t), tools, filepath.Join(t.TempDir(), coverFile)),
+	} {
+		names := make([]string, len(steps))
+		for i, s := range steps {
+			names[i] = s.name
+		}
+		generated := slices.Index(names, "generated")
+		require.GreaterOrEqual(t, generated, 0, "%s: %v", name, names)
+		for _, tests := range []string{"unit", "race"} {
+			if i := slices.Index(names, tests); i >= 0 {
+				assert.Less(t, generated, i, "%s: generated runs before %s: %v", name, tests, names)
+			}
+		}
+	}
+}
+
 // pinnedLintTools returns resolveLintTools for this repository, run in
 // a mise state directory of the test's own, where the test first
 // trusts the repository's mise configuration. mise keeps its trust
 // records in the state directory (https://mise.jdx.dev/directories.html),
 // so the tests do not depend on a "mise trust" of the person who runs
-// them, and leave no trust behind.
+// them, and leave no trust behind. The configuration directories are
+// the test's own too (isolateMiseConfig).
 func pinnedLintTools(t *testing.T) lintTools {
 	t.Helper()
 	root := moduleRoot(t)
-	t.Setenv("MISE_STATE_DIR", t.TempDir())
+	isolateMiseConfig(t)
 	cmd := exec.CommandContext(t.Context(), "mise", "-C", root, "trust")
-	cmd.Env = passThroughEnv()
+	cmd.Dir = root
+	cmd.Env = miseEnviron(passThroughEnv())
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "mise trust\n%s", out)
 	tools, err := resolveLintTools(t.Context(), root)
 	require.NoError(t, err)
 	return tools
+}
+
+// isolateMiseConfig gives the real mise that a test starts through
+// passThroughEnv a state directory and configuration directories of
+// the test's own, new and empty, so no global configuration of the
+// person who runs the tests (a "paranoid = true", say) changes what
+// the test measures (TestIsolateMiseConfig). HOME stays: the pinned
+// tools are installed below it, and MISE_DATA_DIR and XDG_DATA_HOME
+// are cleared, as miseInstalls refuses either. The system
+// configuration file is not among the variables of passThroughEnv, and
+// stays what the machine holds. A test that builds the whole
+// environment of mise itself uses isolatedMiseEnv instead.
+func isolateMiseConfig(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{"MISE_STATE_DIR", "XDG_CONFIG_HOME", "MISE_CONFIG_DIR"} {
+		t.Setenv(key, t.TempDir())
+	}
+	t.Setenv("MISE_DATA_DIR", "")
+	t.Setenv("XDG_DATA_HOME", "")
+}
+
+// TestIsolateMiseConfig poisons the configuration directories of the
+// process with a global mise configuration whose [env] template writes
+// a marker: "mise env" in passThroughEnv runs it, and runs nothing
+// once isolateMiseConfig has run.
+func TestIsolateMiseConfig(t *testing.T) {
+	markers, poisoned := t.TempDir(), t.TempDir()
+	config := filepath.Join(poisoned, "mise", "config.toml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(config), 0o755))
+	template := `{{ exec(command="touch ` + filepath.ToSlash(filepath.Join(markers, "global")) + `") }}`
+	require.NoError(t, os.WriteFile(config, []byte("[env]\nX_GLOBAL = "+strconv.Quote(template)+"\n"), 0o600))
+	t.Setenv("MISE_STATE_DIR", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", poisoned)
+	t.Setenv("MISE_CONFIG_DIR", filepath.Join(poisoned, "mise"))
+	ran := func() bool {
+		t.Helper()
+		_ = os.Remove(filepath.Join(markers, "global"))
+		dir := t.TempDir()
+		cmd := exec.CommandContext(t.Context(), "mise", "-C", dir, "env")
+		cmd.Dir = dir
+		cmd.Env = append(miseEnviron(passThroughEnv()), "MISE_OFFLINE=1")
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "mise env\n%s", out)
+		_, err = os.Stat(filepath.Join(markers, "global"))
+		return err == nil
+	}
+	require.True(t, ran(), "the poisoned configuration runs its template")
+	isolateMiseConfig(t)
+	assert.False(t, ran(), "isolateMiseConfig keeps it out")
 }
 
 // TestResolveLintTools checks that the tools of fast are the ones
@@ -1253,11 +1336,13 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 }
 
 // TestResolveLintToolsEnvironment checks that "mise which" runs in
-// passThroughEnv: a fake mise writes its environment to a file, and
-// every variable of passThrough reaches it and nothing else, with the
-// ones a shell adds itself, whatever else this process holds. Each
-// variable of passThrough is set here, so the result does not depend
-// on the caller's environment (a TMPDIR or a MISE_STATE_DIR of its own).
+// passThroughEnv with miseEnv, at the top of the tree: a fake mise
+// writes its environment and its working directory to files, and every
+// variable of passThrough and of miseEnv reaches it and nothing else,
+// with the ones a shell adds itself, whatever else this process holds;
+// a value of miseEnv is the list's, never the process's. Each variable
+// of passThrough is set here, so the result does not depend on the
+// caller's environment (a TMPDIR or a MISE_STATE_DIR of its own).
 func TestResolveLintToolsEnvironment(t *testing.T) {
 	envPath, err := exec.LookPath("env")
 	require.NoError(t, err)
@@ -1270,21 +1355,35 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 			t.Setenv(key, "/from/"+key)
 		}
 	}
-	dump := filepath.Join(t.TempDir(), "env")
-	f.script(t, "'"+envPath+"' > '"+dump+"'\n", f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go"))
-	_, err = resolveLintTools(t.Context(), lockedRoot(t, lockFixture))
+	dump, cwd := filepath.Join(t.TempDir(), "env"), filepath.Join(t.TempDir(), "cwd")
+	f.script(t, "'"+envPath+"' > '"+dump+"'\npwd -P > '"+cwd+"'\n", f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go"))
+	root := lockedRoot(t, lockFixture)
+	_, err = resolveLintTools(t.Context(), root)
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(dump)
 	require.NoError(t, err)
 	var keys []string
+	values := map[string]string{}
 	for line := range strings.Lines(string(data)) {
-		key, _, _ := strings.Cut(line, "=")
+		key, value, _ := strings.Cut(strings.TrimSuffix(line, "\n"), "=")
 		if !slices.Contains([]string{"PWD", "OLDPWD", "SHLVL", "_"}, key) {
 			keys = append(keys, key)
+			values[key] = value
 		}
 	}
-	assert.Equal(t, slices.Sorted(slices.Values(passThrough)), slices.Sorted(slices.Values(keys)), "the variables mise gets")
+	want := slices.Clone(passThrough)
+	for _, kv := range miseEnv {
+		key, value, _ := strings.Cut(kv, "=")
+		want = append(want, key)
+		assert.Equal(t, value, values[key], key)
+	}
+	assert.Equal(t, slices.Sorted(slices.Values(want)), slices.Sorted(slices.Values(keys)), "the variables mise gets")
+	dir, err := os.ReadFile(cwd)
+	require.NoError(t, err)
+	real, err := filepath.EvalSymlinks(root)
+	require.NoError(t, err)
+	assert.Equal(t, real+"\n", string(dir), "mise starts at the top of the tree, where it finds .miserc.toml")
 }
 
 // TestMiseInstalls holds miseInstalls to the data directory that mise
@@ -1293,8 +1392,9 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 func TestMiseInstalls(t *testing.T) {
 	t.Setenv("MISE_DATA_DIR", "")
 	t.Setenv("XDG_DATA_HOME", "")
+	isolateMiseConfig(t)
 	cmd := exec.CommandContext(t.Context(), "mise", "-C", t.TempDir(), "doctor", "--json")
-	cmd.Env = passThroughEnv()
+	cmd.Env = miseEnviron(passThroughEnv())
 	out, err := cmd.Output()
 	require.NoError(t, err, "mise doctor")
 	var doctor struct{ Dirs struct{ Data string } }
@@ -1337,10 +1437,12 @@ func TestIsGateInput(t *testing.T) {
 	for _, path := range []string{"x.go", "tools/ci/x_test.go", "go.work", "go.work.sum", "vendor/modules.txt",
 		"vendor/example.com/m/m.go", "mise.toml", ".mise.toml", "mise.local.toml", ".mise.local.toml", "mise.ci.toml",
 		".config/mise.toml", ".config/mise/config.toml", ".config/mise/conf.d/x.toml", ".mise/config.toml",
-		"mise/config.toml", ".tool-versions", "tools/.tool-versions", "tools/ci/evil/", "nested/"} {
+		"mise/config.toml", ".tool-versions", "tools/.tool-versions", "tools/ci/evil/", "nested/",
+		"mise.lock", "Mise.Local.toml", ".TOOL-VERSIONS", ".miserc.toml", ".miserc.local.toml", ".config/miserc.toml",
+		"tools/ci/.miserc.toml", "tools/ci/.config/mise/conf.d/x.toml"} {
 		assert.True(t, isGateInput(path), path)
 	}
-	for _, path := range []string{"README.md", "go.mod", "go.sum", "mise.lock", "docs/promise.toml", "REUSE.toml",
+	for _, path := range []string{"README.md", "go.mod", "go.sum", "docs/promise.toml", "REUSE.toml",
 		"tools/vendor/notes.md", "docs/go.md", "x.gox"} {
 		assert.False(t, isGateInput(path), path)
 	}

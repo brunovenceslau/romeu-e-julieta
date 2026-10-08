@@ -83,7 +83,7 @@ does a file in that directory with another name ending:
 
 | Level | Allowed |
 |---|---|
-| file | the keys `name`, `on`, `permissions`, `concurrency`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters |
+| file | the keys `name`, `on`, `permissions`, `concurrency`, `env`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters; `env` is required and holds exactly the mise environment of `tools/ci` (`miseEnv` in `tools/ci/misefiles.go`), in its order, each value a YAML string |
 | job | the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `runs-on` is `${{ matrix.os }}` or one of the four labels of Runners below, and so is each `os` of the matrix (`runs-on` as a list or a mapping fails); `permissions`, at the top and in a job, is a mapping whose values are `read` or `none`, and the file sets it at the top or in every job, so no scope is left to the default; `strategy` holds `matrix`, `fail-fast` and `max-parallel` only; the matrix is a written mapping with the keys `os` and `include` only, each `include` entry holds `os` and `mise_sha256` only (names matched exactly), and a `${{` in the value of an `include` entry fails (the `os` value is held to the four labels); with `runs-on: ${{ matrix.os }}` every runner of the matrix names an `os` |
 | `uses` step | the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, the owner and the repository start with a letter or a digit, and so does each path segment or it starts with `_`, so no `.` or `..` segment, no `./` path of the repository (a local action) and no `docker://` image fits; `with` is a mapping that holds only the inputs listed for that action in `tools/ci` (the action is matched without case), each value a literal or one `${{ matrix.<key> }}` alone whose values are all literals; an `actions/checkout` step sets `persist-credentials: false`, written exactly so (the case of the action name is ignored, the case of the value is not) |
 | `run` step | the keys `name`, `run`; `run` is one line, `go run ./tools/ci <subcommand> [<argument>...]` or `go run ./tools/release <subcommand> [<argument>...]`; each word is made of ASCII letters, digits and `._/=:-`, or is `"$NAME"` |
@@ -98,9 +98,13 @@ by dots (`matrix.os`, `github.ref_name`). An operator, a function call
 or a literal there fails, and so does `github.token` and any
 `secrets.<name>` (the list of allowed secrets is empty; a secret joins
 it with the operator's approval), whatever the case. An anchor, an
-alias and a tag other than `!!str` on a key fail. No level holds `env`: its keys could make a
-`run` step start other code (`BASH_ENV`, `LD_PRELOAD`, `PATH`,
-`GOFLAGS=-toolexec`). A value a command needs from the event reaches
+alias and a tag other than `!!str` on a key fail. No job or step holds
+`env`, and the one at the top of the file holds nothing but the mise
+environment: another key could make a `run` step start other code
+(`BASH_ENV`, `LD_PRELOAD`, `PATH`, `GOFLAGS=-toolexec`). That table
+reaches every mise run of the workflow, the mise action's and the one
+of the mise shim that starts go, and `go run ./tools/ci setup` fails a
+hosted run whose environment does not hold it. A value a command needs from the event reaches
 it as a variable the runner sets, a `"$NAME"` word such as
 `"$GITHUB_REF_NAME"`. A
 workflow and a developer's shell therefore run the same code at the
@@ -158,17 +162,17 @@ local-gate run is recorded is a
 | Step | Command | In `fast` |
 |---|---|---|
 | format, vet | `gofmt -l` empty; `go vet ./...`, each the pinned tool, in the environment of the steps of `fast` (below) | yes |
-| generated | `tools/ci generated`: `go generate ./...` changes no consumer of the table in [12 12.3](12-engineering.md#123-generators). It compares the working tree, tracked and untracked files by content, before and after the run, so a changed, a new and a removed generated file each fail and a tree with uncommitted work can be checked. It then requires each file that `generate` writes to be tracked in the index as a regular file (mode 100644, so not a link and not executable) whose blob is the bytes `generate` gives, and to match no ignore rule, because the comparison above cannot see a generated file that is ignored, untracked or a link to a copy: the merged tree would not hold it. `generate` reads and writes through the root of the repository (`os.Root`), so a link cannot send it outside | yes |
+| generated | `tools/ci generated`: `go generate ./...` changes no consumer of the table in [12 12.3](12-engineering.md#123-generators). It compares the working tree, tracked and untracked files by content, before and after the run, so a changed, a new and a removed generated file each fail and a tree with uncommitted work can be checked. It then requires each file that `generate` writes to be tracked in the index as a regular file (mode 100644, so not a link and not executable) whose blob is the bytes `generate` gives, and to match no ignore rule, because the comparison above cannot see a generated file that is ignored, untracked or a link to a copy: the merged tree would not hold it. `generate` reads and writes through the root of the repository (`os.Root`), so a link cannot send it outside. It judges the index, so in `fast` and `all` it runs before every step that runs code of the change (`unit`, `race`), a test holds that order, and the mise it starts reads `mise.toml` alone (the mise environment, below) | yes |
 | lint | `golangci-lint run` over the whole module, `tools/` included; `.golangci.yml` enables the doc-comment, error-string and commented-out-code checkers of ADR 0001 (rule 14) and testifylint with `enable-all: true` (10.6), disables no linter and excludes no finding. A fixture test proves that each rule 14 checker and each testifylint checker that applies outside suites still reports (10.1), and tests read `.golangci.yml`, `go.mod`, the mise configuration files and the repository's Go files, tracked, not yet added and ignored, and fail on: a key of `.golangci.yml` outside a short list (so a `default` or `enable-all` key under `linters`, an exclusion or a disabled linter fails, while testifylint's `enable-all: true` is required), a second `.golangci.*` file, a directive outside the allowlist, which is `go:build` and, at one site only, `go:generate` (the one directive `go:generate go run . generate` of `tools/ci/generate.go`: exactly once in that file, and in no other, judged on the raw lines that `go generate` reads, in every `.go` file below the root but `.git`, and checked again by `tools/ci generated` before it runs `go generate`; the `tool:name` form of `isDirective` in `go/ast`, read in every line of every comment after the leading `/`, `*` and `unicode.IsSpace` runes are trimmed, golangci-lint's `nolint` word at the start of such a line, and the `line`, `extern` and `export` directives right after `//` or `/*`), a generated-code header, a file that builds with cgo off for none of the lint targets (build constraints with the tool tags the pinned go command reports for each target, file-name suffixes and an import of `"C"`, as `go/build` and `go/parser` read them), a file under `testdata`, `vendor`, a `_` or `.` directory or a nested `go.mod`, which `go list` skips, a `go.mod` directive other than `module`, `go` and `require` (an `ignore` takes a directory out of `./...`), a mise configuration table other than `[settings]` and `[tools]`, a setting other than `lockfile` (an `[env]` table among them), a tool in `[tools]` other than `go`, `golangci-lint` and `govulncheck` (the key `"go:golang.org/x/vuln/cmd/govulncheck"`), or a value other than the exact version `mise.lock` locks for it (a `path:` tool among them), and a `.tool-versions` file, which mise reads too. revive's `exported` reads only importable packages, so it skips package `main` and `_test.go` files (`File.IsImportable`, revive v1.17.0) and checks no doc comment in `tools/ci` today; no setting of the rule extends it to them. The linter sees only the files that build for the GOOS and GOARCH it runs under, so `tools/ci` starts it once for each lint target (linux and darwin, each on amd64 and arm64, one list that the tests read too), each as `<path> run --config .golangci.yml`, with the path of `golangci-lint` that `mise which` resolves and not through `mise exec`, which would add a mise `[env]` table, in the environment of the steps of `fast` (below) with the target's `GOOS` and `GOARCH` and `CGO_ENABLED=0` added; `mise which` installs nothing and fails when a tool is missing, so a new machine runs `go run ./tools/ci setup` first, which runs `mise trust`, `mise install` and `go mod download` | yes |
 | unit | `go test -count=1 ./internal/... ./tools/...`, the pinned go command, in the environment of the steps of `fast` (below); `-count=1` because tests that scan the repository would otherwise pass from the test cache | yes |
-| hygiene | `tools/ci hygiene`: no U+2014; the prose rules of ADR 0001 (rule 4); the `TODO(#<issue>)` form in Go files (rule 14); no personal absolute path (below); no tracked `go.work`, `go.work.sum` or `vendor/`; no tracked file named `PROLOGUE.md`, at any depth and in any case, because the user's agreement file lives outside product repositories; `.githooks/` holds exactly `pre-push`, tracked with mode 100755; the forbidden-name check over the path and content of each tracked file, which fails on a denylist that is missing or has no entry (below); scans `e2e/testdata/sbx/**` too | yes |
+| hygiene | `tools/ci hygiene`: no U+2014; the prose rules of ADR 0001 (rule 4); the `TODO(#<issue>)` form in Go files (rule 14); no personal absolute path (below); no tracked `go.work`, `go.work.sum` or `vendor/`; no tracked mise file but `mise.toml` and `mise.lock`, by their exact names: every other path where mise 2026.10.3, started at the top of the tree, reads configuration (the globs of the `dependencies` surface in 05 5.3, held to the list in `tools/ci/misefiles.go` by a test, whose threat model says what this stops and what it does not), matched in any case, as a case-insensitive file system reads them; no tracked path with a byte outside printable ASCII (0x20 to 0x7E), since a fold beyond ASCII, an accent composed or decomposed by the file system, or a control byte lets a name stand for another one; no tracked entry with a mode other than 100644 or 100755 (a symbolic link or a submodule), since either leads a path to content no rule reads by that path; no tracked file named `PROLOGUE.md`, at any depth and in any case, because the user's agreement file lives outside product repositories; `.githooks/` holds exactly `pre-push`, tracked with mode 100755; the forbidden-name check over the path and content of each tracked file, which fails on a denylist that is missing or has no entry (below); scans `e2e/testdata/sbx/**` too | yes |
 | pushed range | `tools/ci fast` with the pre-push hook's arguments: it first refuses a push it would not test as sent, then runs the forbidden-name check over the remote ref names and the commits of a push (below), and refuses a commit that adds or renames to a file named `PROLOGUE.md` even when a later commit removes it, with or without a denylist entry | in the hook only |
 | sequences | `tools/ci sequences`: ADR numbers contiguous and unique; ADR layout and statuses per ADR 0001 (rules 6-7), the filename compared through the `slug` function `tools/new adr` uses; every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; every ADR that `docs/spec.md` or `docs/spec/` cites has status Accepted; every row of the index's Deferred decisions table has its three cells filled ([ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md)); the ids below unique, and every referenced id and id range (for example "J1-J13" in a success criterion) defined | yes |
 | vocabulary | `tools/ci vocabulary` (01 1.7) | yes |
 | workflows | `tools/ci workflows`: the grammar above | yes |
-| vulnerabilities | `govulncheck ./...`; it reads the Go vulnerability database over the network, so its result depends on the date | |
-| unit + golden + race | `go test -race -count=1 -coverprofile=cover.out ./...`, with `cover.out` in a temporary directory, so no run leaves it in the working tree | |
-| coverage | `tools/ci coverage` (S9), per package: each package below its threshold is a finding | |
+| vulnerabilities | `govulncheck ./...`; it reads the Go vulnerability database over the network, so its result depends on the date. It runs before `unit` (below) | |
+| unit + golden + race | `go test -race -count=1 -coverprofile=cover.out ./...`, with `cover.out` in a temporary directory, so no run leaves it in the working tree; it runs code of the change, which can game its own result (below) | |
+| coverage | `tools/ci coverage` (S9), per package: each package below its threshold is a finding; it reads the profile that the race run's code of the change wrote, so a test can game it (below) | |
 | golden governance | `tools/ci golden`: fails if `-update` appears in CI invocations; lists every changed golden in the job summary for review | |
 | schema | `tools/ci schema` | |
 | e2e | `go test -tags e2e ./e2e/...` | |
@@ -180,7 +184,7 @@ local-gate run is recorded is a
 | kits | `tools/ci kits` (one frontend pin; install steps <= 5 lines; every download has a sha256: a download is a step line whose first word is `curl` or `wget`, and the same step has a `sha256sum -c` or `shasum -a 256 -c` line after it; a download line holds no `\|`, `;`, `&&` or `$(`, and the file `-c` reads is a kit file, not one the step downloaded. A download written with another tool is not seen by the check; the review of the `kits` surface covers it) | |
 | mise | `tools/ci mise` (`julieta lock --check` logic on this repo's and the examples' locks) | |
 | probes | `tools/ci probes` (11 11.4: the results that are committed, and the A5 golden hashes; that every probe has a result is checked by `acceptance`, 10.5) | |
-| license | `reuse lint` (REUSE 3.3), from the image `fsfe/reuse:6.2.0` pinned by digest in `tools/ci`, with the working tree and the git directory (`git rev-parse --git-common-dir`) mounted read-only, each at its own path, and no network for the container, so that a linked worktree, whose git directory lies outside the tree, ignores the same files as a clone; on Linux only, since the check reads file content alone and the image is built for Linux. On macOS the output of `all` shows `--    license: not run on darwin`, neither `ok` nor `FAIL` | |
+| license | `reuse lint` (REUSE 3.3), from the image `fsfe/reuse:6.2.0` pinned by digest in `tools/ci`, with the working tree and the git directory (`git rev-parse --git-common-dir`) mounted read-only, each at its own path, and no network for the container, so that a linked worktree, whose git directory lies outside the tree, ignores the same files as a clone; it runs before `unit` (below); on Linux only, since the check reads file content alone and the image is built for Linux. On macOS the output of `all` shows `--    license: not run on darwin`, neither `ok` nor `FAIL` | |
 | docs | `tools/ci docs` (S10; the checks ADR 0001 assigns to it: rules 1, 5 without external URLs, 9 for the title at a first mention, 12, 13, 17, 20). The Markdown lint and the spell check of rule 5 check nothing until their tools are picked, a [deferred decision](../spec.md#deferred-decisions). The reference pages are compared with their source by `generated`, not here | |
 | lessons | `tools/ci lessons`: every `docs/lessons.md` entry, read after the file's front matter, names an existing `tools/ci` subcommand or test name, or says "no check possible: <reason>" | |
 | pr | `tools/ci pr` (pull requests only; inputs as described above; 12 12.4; ADR 0001 rules 4, 8, 11; the base branch, 12 12.9; the fix marker's form, 12 12.10; the forbidden-name check, below) | |
@@ -198,8 +202,40 @@ directory first, `HOME`, `TMPDIR`, the XDG and mise directories,
 `GOTOOLCHAIN=local`, `GOWORK=off`, `GOPROXY=off` and
 `GOFLAGS=-mod=readonly`. So no `GOFLAGS` of the caller (a `-run` that
 selects no test, or build tags), `go env -w` file or other variable of
-the caller changes what a step checks. Some unit
-tests need what the steps need: mise on the search path with the
+the caller changes what a step checks. Every mise command `tools/ci`
+starts (`mise --version`, `mise trust`, `mise install` and `mise which`) runs at the top
+of the tree with the mise environment besides:
+`MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml`,
+`MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none`, `MISE_ENV` set and
+empty, and `MISE_AUTO_ENV=false`, so mise reads `mise.toml` as its one
+configuration file of the tree, and `mise.lock`, and runs nothing that
+another mise file of a change holds (the threat model in
+`tools/ci/misefiles.go` says what stays trusted). That environment is
+measured with one version of mise, the `version` input of the mise
+action in `ci.yml`, so `fast`, `all` and `setup` refuse, before any
+other mise command, a mise whose `mise --version` names another.
+
+The command steps of `all` are those of `fast` and `race`, in that
+order, with `vulnerabilities` and `license`, which read the tree and
+run none of its code, between `lint` and `unit`: no step that judges
+the tree runs after the first step that runs the change's tests, so a
+test cannot rewrite a file such a step reads (a test that prepended an
+SPDX header to a file without one, while `unit` ran, passed `license`
+when it ran after: measured at cab976e). That is all the order
+guarantees. The tests run in the same process tree and account as
+`tools/ci`, so an attack on the `tools/ci` process itself (ptrace, root
+on a hosted runner, the same account) is out of its reach: the review
+of the diff covers it, and a job of their own for the tests is a
+[deferred decision](../spec.md#deferred-decisions). `race` and
+`coverage` measure code of the change, which can game its own result
+(a test can write the cover profile itself); the review covers that
+too. Before mise and the steps run, `all`
+reads HEAD, the index and every file of the working tree that git does
+not ignore, by its mode and content, and its `working tree` check fails
+when the steps leave any of them changed; a pre-push run of `fast`
+refuses the push in that case.
+
+Some unit tests need what the steps need: mise on the search path with the
 pinned tools installed and this repository trusted, a module cache
 that already holds the modules of `go.sum` (no step fetches a module,
 since the steps run with `GOPROXY=off`; `go mod download` fills the
@@ -302,7 +338,10 @@ There is one definition of a match and one function that applies it;
 | the name each pushed ref gets on the remote; of each pushed annotated tag: the name it was created with, its tagger and its message; of each pushed commit: the message, the author and committer names and emails, the paths it adds or renames to, the lines it adds, and the name, tagger and message of each tag it embeds in a `mergetag` header | `tools/ci fast`, called by the pre-push hook | before the push leaves the machine |
 | the PR title, body and head ref name; the same four readings of each commit in base..head | `tools/ci pr` | on the pull request |
 
-The hook is `exec go run ./tools/ci fast "$@"`. Git gives a pre-push
+The hook is `exec env <the mise environment> go run ./tools/ci fast
+"$@"`, the mise environment being the four variables of the steps'
+mise commands (above), so the mise shim that starts go reads
+`mise.toml` alone. Git gives a pre-push
 hook the remote's name and URL as arguments and, on stdin, one line per
 pushed ref: local ref, local sha, remote ref, remote sha. Called with
 those arguments, `fast` reads the lines, checks the remote ref name of
@@ -335,22 +374,28 @@ and refuses to run any check, with exit status 2, when:
   modified in the working tree;
 - an untracked or ignored file is one the go command or the checks
   read: a Go file, `go.work`, `go.work.sum`, a root `vendor`
-  directory, a mise configuration, a `.tool-versions` file, or a nested
-  repository.
+  directory, a file mise reads when it starts in the directory that
+  holds it or above (the mise list of the hygiene row, in any case), or
+  a nested repository.
 
 The fix is to commit such a change or remove it. The steps take
 minutes, and the working tree can change while they run, so after the
 last step `fast` judges it again, the `go.mod` rule below included, and
 stops the push with exit status 2 when HEAD has moved or one of these
-refusals now holds. Hygiene and the range then read the commit judged,
-by its id, and not HEAD again. The git commands of
+refusals now holds. Hygiene, `workflows` and the range judge the commit
+judged, by its id, as read before the first step and before mise runs:
+a step runs code of the change, which could rewrite the working tree,
+the index, HEAD or an object of the store, and `git cat-file` does not
+hash what it reads. That order closes this file channel only; an
+attack on the `tools/ci` process itself is out of its reach, as the step order of `all` above says. The git commands of
 this check run without `GIT_DIR`, `GIT_INDEX_FILE`, `GIT_WORK_TREE`,
 `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, the other
 variables of `git rev-parse --local-env-vars` and every `GIT_CONFIG`
 variable, so they read the repository's own index, and with
 `GIT_OPTIONAL_LOCKS=0`, so `git status` writes nothing. Called without
-arguments, `fast` refuses none of this and checks the working tree as it
-is. In both modes it refuses a `go.mod` below the module root, tracked
+arguments, `fast` refuses none of this: its steps run on the working
+tree as it is, and hygiene and `workflows` judge the commit HEAD names,
+read before the first step, as `all` does. In both modes it refuses a `go.mod` below the module root, tracked
 or not.
 Reading what each commit adds, and not only the final tree, is what
 catches a line or a path that one commit adds and a later commit

@@ -82,7 +82,8 @@ func TestHygieneRules(t *testing.T) {
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("docs/a"+emDash+"b.md", "text\n")
 			},
-			want: []string{"em-dash: the path holds U+2014"},
+			// The byte rule of the path reports it too.
+			want: []string{"em-dash: the path holds U+2014", "path: the path holds a byte outside printable ASCII"},
 		},
 		{
 			name: "a listed prose word",
@@ -201,6 +202,50 @@ func TestHygieneRules(t *testing.T) {
 			want: []string{".githooks/pre-push: githooks: the hook is not tracked"},
 		},
 		{
+			name: "a mise configuration other than mise.toml, in any case",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("mise.local.toml", "[settings]\n")
+				r.Write("Mise.Ci.toml", "[settings]\n")
+				r.Write(".TOOL-VERSIONS", "go 1.27.0\n")
+				r.Write(".config/mise/conf.d/x.toml", "[settings]\n")
+				r.Write(".miserc.toml", "env = []\n")
+				// The pinned files are exempt by their exact name only.
+				r.Write("MISE.TOML", "[settings]\n")
+				r.Write("Mise.lock", "\n")
+			},
+			want: []string{
+				".TOOL-VERSIONS: mise:", ".config/mise/conf.d/x.toml: mise:", ".miserc.toml: mise:",
+				"MISE.TOML: mise:", "Mise.Ci.toml: mise:", "Mise.lock: mise:", "mise.local.toml: mise:",
+			},
+		},
+		{
+			name: "a path with a byte outside printable ASCII",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("mi\u017fe.local.toml", "[settings]\n")
+				r.Write("docs/tab\tname.md", "text\n")
+				r.Write("docs/del\x7fname.md", "text\n")
+			},
+			want: []string{`"docs/del\x7fname.md": path:`, `"docs/tab\tname.md": path:`, "mi\u017fe.local.toml: path:"},
+		},
+		{
+			name: "a symbolic link",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("realconf/mise/conf.d/x.md", "text\n")
+				require.NoError(t, os.Symlink("realconf", filepath.Join(r.Dir, ".config")))
+			},
+			want: []string{".config: mode: the mode is 120000"},
+		},
+		{
+			name: "a submodule",
+			change: func(t *testing.T, r *gittest.Repo) {
+				// The directory keeps "git add --all" from staging the
+				// removal of the entry.
+				require.NoError(t, os.Mkdir(filepath.Join(r.Dir, "lib"), 0o755))
+				r.Git("update-index", "--add", "--cacheinfo", "160000,0123456789abcdef0123456789abcdef01234567,lib")
+			},
+			want: []string{"lib: mode: the mode is 160000"},
+		},
+		{
 			name: "a missing denylist",
 			change: func(t *testing.T, r *gittest.Repo) {
 				require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
@@ -274,7 +319,7 @@ func TestPrologueInThePushedRange(t *testing.T) {
 	stdin := "refs/heads/main " + tip + " refs/heads/main " + zero + "\n"
 	push, err := pushed.Parse(strings.NewReader(stdin))
 	require.NoError(t, err)
-	got, checked, err := pushedRange(t.Context(), r.Repo, "origin", push, tip)
+	got, checked, err := rangeOf(pushedRange(t.Context(), r.Repo, "origin", push, tip))
 	require.NoError(t, err)
 	assert.False(t, checked, "no denylist entry: names are not checked")
 	assert.Equal(t, "commit "+added+": added path sub/prologue.md: prologue: the user's agreement file lives outside product repositories\n", lines(got))
@@ -468,11 +513,11 @@ func TestHygieneFile(t *testing.T) {
 	})
 }
 
-// TestJudgedCommitIsPinned shows that hygiene, loadProse and
-// pushedRange read the commit they are given and not HEAD: X is the
-// commit judged, and HEAD has moved on to a Y that adds a listed name,
-// or drops the denylist or the word lists. Each callee is asked for X
-// and for "HEAD", and the two answers differ.
+// TestJudgedCommitIsPinned shows that hygiene and pushedRange read the
+// commit they are given and not HEAD: X is the commit judged, and HEAD
+// has moved on to a Y that adds a listed name, or drops the denylist or
+// the word lists. Each callee is asked for X and for "HEAD", and the
+// two answers differ.
 func TestJudgedCommitIsPinned(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
 	// moved returns a fixture whose commit X is clean, and the id of X;
@@ -504,15 +549,10 @@ func TestJudgedCommitIsPinned(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, lines(got), "denylist: the denylist is missing")
 	})
-	t.Run("loadProse and hygiene: word lists that Y drops", func(t *testing.T) {
+	t.Run("hygiene: word lists that Y drops", func(t *testing.T) {
 		r, x := moved(t)
 		require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(prose.Path))))
 		r.Commit("Y")
-		rules, err := loadProse(t.Context(), r.Repo, x)
-		require.NoError(t, err)
-		assert.NotNil(t, rules)
-		_, err = loadProse(t.Context(), r.Repo, "HEAD")
-		require.Error(t, err)
 		got, err := hygiene(t.Context(), r.Repo, x)
 		require.NoError(t, err)
 		assert.Empty(t, got)
@@ -533,12 +573,51 @@ func TestJudgedCommitIsPinned(t *testing.T) {
 		r.Commit("Y")
 		push, err := pushed.Parse(strings.NewReader("refs/heads/main " + x + " refs/heads/main " + zero + "\n"))
 		require.NoError(t, err)
-		got, checked, err := pushedRange(t.Context(), r.Repo, "origin", push, x)
+		got, checked, err := rangeOf(pushedRange(t.Context(), r.Repo, "origin", push, x))
 		require.NoError(t, err)
 		assert.True(t, checked, "X holds an entry")
 		assert.Contains(t, lines(got), "the added line holds a name listed at HEAD")
-		_, checked, err = pushedRange(t.Context(), r.Repo, "origin", push, "HEAD")
+		_, checked, err = rangeOf(pushedRange(t.Context(), r.Repo, "origin", push, "HEAD"))
 		require.NoError(t, err)
 		assert.False(t, checked, "Y has none, and neither has the default branch")
 	})
+}
+
+// TestPrintableASCII pins the bounds of the path rule: 0x20 and 0x7E
+// are in, 0x1F and 0x7F are out. A Windows file system reads a name
+// with a trailing dot as the name without it, and the rule passes such
+// a name: the accepted gap the threat model of tools/ci/misefiles.go
+// names, here to be seen.
+func TestPrintableASCII(t *testing.T) {
+	for _, tt := range []struct {
+		path string
+		want bool
+	}{
+		{"a\x1fb", false},
+		{"a b", true},
+		{"a~b", true},
+		{"a\x7fb", false},
+		{"caf\u00e9", false},
+		{"mise.local.toml.", true},
+	} {
+		assert.Equal(t, tt.want, printableASCII(tt.path), "%q", tt.path)
+	}
+	assert.False(t, isMiseFile("mise.local.toml."), "nor does isMiseFile match it")
+}
+
+// rangeOf reads the verdicts of pushedRange back as its findings, and
+// whether names were matched: no verdict carries the "not checked"
+// note. A verdict that could not judge is returned as its error.
+func rangeOf(verdicts []verdict, err error) (findings []finding, checked bool, _ error) {
+	checked = true
+	for _, v := range verdicts {
+		switch {
+		case v.err != nil:
+			return nil, false, v.err
+		case v.note != "":
+			checked = false
+		}
+		findings = append(findings, v.findings...)
+	}
+	return findings, checked, err
 }

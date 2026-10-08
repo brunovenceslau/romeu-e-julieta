@@ -46,11 +46,27 @@ const raceTimeout = 40 * time.Minute
 // does not build the others from source.
 const reuseImage = "fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e7662577c8427429e11e1b9f25a992e"
 
-// allSteps returns the command steps of all: the steps of fast, then
-// the rows of 10 10.2 that have code to check today and are not in
-// fast: vulnerabilities, the race run that writes the cover profile,
-// and license. The coverage step reads that profile in this process,
-// after them (runAll).
+// allSteps returns the command steps of all: the steps of fast and the
+// rows of 10 10.2 that have code to check today and are not in fast,
+// vulnerabilities, license and the race run that writes the cover
+// profile. The coverage step reads that profile in this process, after
+// them (runAll).
+//
+// The order keeps every step that judges the tree before the first
+// one that runs the change's tests, unit: vulnerabilities and license
+// read the tree and run none of its code, so they run after lint and
+// before unit, and a test of the change cannot rewrite a file they
+// read (a test that prepends an SPDX header to a file without one
+// passed license when it ran after unit: measured at cab976e). That is
+// all the order guarantees: it closes the file channel. A test runs in
+// the same process tree and account as tools/ci, so it can reach the
+// tools/ci process itself (ptrace, root on a hosted runner) and forge
+// a verdict or the exit status; the order does not reach that, and the
+// review of the diff covers it (the threat model of misefiles.go, Not
+// covered). race and coverage come last, and they measure code of the
+// change, which can game its own result: a test can write the cover
+// profile itself, or exercise less than it claims. The review covers
+// that too; runAll fails a run whose steps left a file changed.
 //
 // The race run passes "-count=1" for the reason the unit step does:
 // a test that scans the repository would otherwise be served from the
@@ -72,11 +88,9 @@ func allSteps(ctx context.Context, root string, tools lintTools, profile string)
 	if gitErr != nil && license.skip == "" {
 		license.unavailable = gitErr
 	}
-	return append(fastSteps(root, tools),
-		vuln,
-		step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env, timeout: raceTimeout},
-		license,
-	)
+	before, unit := fastPhases(root, tools)
+	return slices.Concat(before, []step{vuln, license, unit,
+		{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env, timeout: raceTimeout}})
 }
 
 // gitCommonDir returns the absolute path of the git directory that
@@ -114,8 +128,11 @@ func gitCommonDir(ctx context.Context, root string) (string, error) {
 // at later. The container reads the tree and the git directory through
 // read-only mounts, so it cannot change what the other checks read, and
 // it has no network, so it can neither fetch code nor send what it
-// reads anywhere. The code inside the image is out of scope, as the
-// code of a pinned action is: the review of the pin covers it.
+// reads anywhere. It runs before unit and race (allSteps), so no test
+// of the change can rewrite a file before reuse reads it, and runAll
+// fails a run whose steps left the tree changed. The code inside the
+// image is out of scope, as the code of a pinned action is: the review
+// of the pin covers it.
 func licenseStep(root, gitCommon, goos string, env []string) step {
 	s := step{name: "license"}
 	if goos != "linux" {
@@ -139,11 +156,19 @@ func licenseStep(root, gitCommon, goos string, env []string) step {
 	return s
 }
 
-// runAll runs every check of 10 10.2 that has code to check today, on
-// the working tree as it is: the command steps (allSteps), then
-// hygiene and workflows on HEAD, then coverage on the profile of the
-// race step. It is what the hosted workflow runs, and what a developer
-// runs before a pull request. The pr step joins with tools/ci pr.
+// runAll runs every check of 10 10.2 that has code to check today: the
+// command steps (allSteps) on the working tree as it is, then hygiene
+// and workflows on the commit HEAD names, read and judged before any
+// step starts (commitChecks, as in runFast), then coverage on the
+// profile of the race step. It is what the hosted workflow runs, and
+// what a developer runs before a pull request. The pr step joins with
+// tools/ci pr.
+//
+// It reads HEAD, the index and the working tree before mise and the
+// steps run (treeState), and the "working tree" check fails when they
+// differ after the steps (changedSince): a step that ran code of the
+// change and rewrote a file, staged one or moved HEAD may have left a
+// check that judged the tree a copy that is not the commit's.
 //
 // It first prints the platform it runs on, as the go command and "uname
 // -m" name it, so that a run's log shows which machine each runner
@@ -161,6 +186,16 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	if err := nestedModules(ctx, repo); err != nil {
 		return false, err
 	}
+	head, err := commitOf(ctx, repo, "HEAD")
+	if err != nil {
+		return false, err
+	}
+	// The commit is read and judged before mise or any step runs code
+	// of the change (commitChecks).
+	verdicts, err := commitChecks(ctx, repo, head)
+	if err != nil {
+		return false, err
+	}
 	machine := e.machine
 	if machine == nil {
 		machine = unameMachine
@@ -168,6 +203,12 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	uname := machine(ctx)
 	say(e.stdout, "platform  %s/%s, uname -m %s\n", runtime.GOOS, runtime.GOARCH, uname)
 
+	// The steps must leave the tree as they found it (changedSince,
+	// after them), mise included.
+	before, err := readTreeState(ctx, repo)
+	if err != nil {
+		return false, err
+	}
 	profile := e.profile
 	steps := e.steps
 	if steps == nil {
@@ -177,6 +218,9 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 		}
 		defer func() { _ = os.RemoveAll(dir) }()
 		profile = filepath.Join(dir, coverFile)
+		if err := checkMiseVersion(ctx, root); err != nil {
+			return false, err
+		}
 		tools, err := resolveLintTools(ctx, root)
 		if err != nil {
 			return false, err
@@ -197,21 +241,15 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	}
 	c.report("architecture", archDetail == "", archDetail)
 	c.run(ctx, root, steps)
+	tree := ""
+	if err := changedSince(ctx, repo, before); err != nil {
+		tree = "the steps changed HEAD, the index or the working tree, so a check may not have judged the commit; what changed:\n" + err.Error() + "\n"
+	}
+	c.report("working tree", tree == "", tree)
 
-	for _, check := range []struct {
-		name string
-		find func() ([]finding, error)
-	}{
-		{"hygiene", func() ([]finding, error) { return hygiene(ctx, repo, "HEAD") }},
-		{"workflows", func() ([]finding, error) { return workflows(ctx, repo, "HEAD") }},
-		{"coverage", func() ([]finding, error) { return coverageAt(root, profile) }},
-	} {
-		findings, err := check.find()
-		if err != nil {
-			c.report(check.name, false, err.Error()+"\n")
-			continue
-		}
-		c.report(check.name, len(findings) == 0, lines(findings))
+	findings, err := coverageAt(root, profile)
+	for _, v := range append(verdicts, verdict{name: "coverage", findings: findings, err: err}) {
+		c.verdict(v)
 	}
 	return c.ok, nil
 }
@@ -318,6 +356,12 @@ func runWorkflows(ctx context.Context, e env, args []string) (bool, error) {
 // of tools/ci keeps (passThrough), and installs the tools already, so
 // the second step finds nothing to do.
 //
+// Both mise steps run with miseEnv, at the top of the tree. In the
+// hosted workflow, setup first checks that its own environment holds
+// miseEnv, as the workflow's env table gives every step
+// (hostedMiseEnv), and before any mise step it refuses a mise of
+// another version than the one ci.yml pins (checkMiseVersion).
+//
 // The download runs the pinned go command in stepEnv with the proxy
 // the go command uses by default, the one step of tools/ci that
 // fetches modules; go.sum checks what it fetches. It and "mise
@@ -330,10 +374,16 @@ func runSetup(ctx context.Context, e env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if err := hostedMiseEnv(); err != nil {
+		return false, err
+	}
+	if err := checkMiseVersion(ctx, root); err != nil {
+		return false, err
+	}
 	c := newChecks(e.stdout)
 	mise := []step{
-		{name: "mise trust", argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, environ: passThroughEnv()},
-		{name: "mise install", argv: []string{"mise", "install"}, environ: withProcessEnv(passThroughEnv(), networkPassThrough)},
+		{name: "mise trust", argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, environ: miseEnviron(passThroughEnv())},
+		{name: "mise install", argv: []string{"mise", "install"}, environ: miseEnviron(withProcessEnv(passThroughEnv(), networkPassThrough))},
 	}
 	c.run(ctx, root, mise)
 	if !c.ok {

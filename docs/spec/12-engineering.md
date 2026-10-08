@@ -13,7 +13,7 @@ reference, with the contributor docs as outlines.
 | shared packages (`internal/...`) | Go | see the capability map |
 | CI, release and dev tooling (`tools/ci`, `tools/new`, `tools/schemagen`, `tools/release`, `tools/kitpin`) | Go | one entry point for local and CI |
 | host probe harness (`e2e/probes`) | Go | runs probe steps, writes `probe-result.v1` JSON |
-| git hook in this repo (`.githooks/pre-push`) | POSIX sh, one line | `exec go run ./tools/ci fast "$@"` (git's pre-push arguments and stdin pass through, 10 10.2) |
+| git hook in this repo (`.githooks/pre-push`) | POSIX sh, one line | `exec env <the mise environment> go run ./tools/ci fast "$@"`: the four variables of `miseEnv` in `tools/ci/misefiles.go`, held to that list by a test, so the mise shim that starts go reads `mise.toml` alone; git's pre-push arguments and stdin pass through (10 10.2) |
 | kit install steps | POSIX sh, <= 5 lines per step | download + sha256 check + install only |
 | skills (`skills/*/SKILL.md`) | Markdown | Claude Code skills |
 | schemas | JSON Schema 2020-12 | generated into `schemas/*.json` |
@@ -149,9 +149,13 @@ a diff. Nobody hand-edits a generated file.
 
 The generator that reads `.github/ask-first.yaml` is a `tools/ci`
 subcommand, so the code that writes `.github/CODEOWNERS` is on the
-`checks` surface (05 5.3). CODEOWNERS itself needs no glob: `generated`
-refuses a hand edit of it, and a change to its source needs the
-approval line.
+`checks` surface (05 5.3). `generated` refuses a hand edit of
+CODEOWNERS, and a change to its source needs the approval line.
+CODEOWNERS is on the `ask-first` surface as well, as defence in depth:
+a change to it asks for the review even where `generated` cannot see
+it, which is the case of any step or tool that runs before `generated`
+and could stage a good copy. The mise environment of 10 10.2 closes
+the one such channel known today, a mise configuration of the change.
 
 A generated `docs/reference/` page carries a generated-file header and
 the front matter of rule 1 in

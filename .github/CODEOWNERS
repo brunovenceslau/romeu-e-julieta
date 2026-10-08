@@ -37,6 +37,18 @@
 /go.sum @brunovenceslau
 /mise.toml @brunovenceslau
 /mise.lock @brunovenceslau
+/.mise.toml @brunovenceslau
+/mise.*.toml @brunovenceslau
+/.mise.*.toml @brunovenceslau
+/mise/** @brunovenceslau
+/.mise/** @brunovenceslau
+/.config/mise.toml @brunovenceslau
+/.config/mise.*.toml @brunovenceslau
+/.config/mise/** @brunovenceslau
+/.tool-versions @brunovenceslau
+/.miserc.toml @brunovenceslau
+/.miserc.local.toml @brunovenceslau
+/.config/miserc.toml @brunovenceslau
 /.github/workflows/** @brunovenceslau
 
 # contracts
@@ -58,3 +70,4 @@
 
 # ask-first
 /.github/ask-first.yaml @brunovenceslau
+/.github/CODEOWNERS @brunovenceslau
