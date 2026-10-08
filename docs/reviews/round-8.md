@@ -1537,3 +1537,74 @@ pass changed, by number as the spec cites itself; and the plan delta,
 the tasks whose "Implements" field cites a changed section. The
 33 parked clusters above are stage B's first input beside
 those three.
+
+## Session checkpoint (2026-10-08)
+
+The session that ran this round ended here. The next one starts from
+this section and from the pull requests it names; branch heads and
+pull request states are not written here, the next session measures
+them with the handoff script of the house payload.
+
+**Decided by the operator** (quoted; typing fixed, wording kept):
+
+- The lens set: "Todas as lentes ficam" (answering the question which
+  lenses stay, 2026-10-08), after which L13 to L16 were added by the
+  measurement on this page's lens set, and "Vamos fazer as correções nas
+  lentes que estão insatisfatórias" (answering the balance measurement).
+- The protocol and the cost of the round: "Gostei do protocolo. Pode usar
+  quantos modelos fable, opus e sonnet quanto forem necessários" and,
+  before it, "só não recomendo usar haiku pra nada aqui".
+- Orchestration: "Rode com dynamic workflow nesta sessão sempre que
+  precisar. Sugira pra mim na duvida."
+- Nothing in the Decisions block above is decided yet.
+
+**Done, with the gate each passed:**
+
+- `docs/reviews/lenses.md`: ship gate GO WITH FIXES, fixes applied, two
+  targeted re-audits CLEAN; `tools/ci fast` green in the pre-push hook;
+  hosted CI green on the four runners (PR #22).
+- This page and `round-8/`: ship gate NO-GO on one High (a listed name in
+  a reviewer's free text, rewritten whole before any push) and eight
+  Required, all applied; targeted re-audit left one open item and two new
+  Required, applied in the next commit; `hygiene` and `pushed range`
+  green in the pre-push hook of every push (PR #25).
+
+**Open for the operator**, one block:
+
+1. The 48 items of "Decisions for the operator" above, by id;
+   recommendation: start with SC1, SC12 and DR1, which decide others.
+2. Merge of PR #22 (the lens page); recommendation: merge, it is
+   docs-only and both gates passed.
+3. The host `www.sei.cmu.edu` for the ATAM row of the lens page's
+   learned-from-others table; recommendation: approve, the research
+   agent's brief is in the session's record and the row is the one source
+   that elicits scenarios from stakeholders rather than evaluators.
+4. The `tools/ci` test `pinnedLintTools`, which refuses a worktree nested
+   under the checkout (surface `checks`); recommendation: a pending item
+   until the first task that edits `tools/ci/fast_test.go`.
+
+**Next steps, in order:**
+
+1. Record the operator's answers beside each decision item, quoted.
+2. Rebase `docs/review-lenses` and `docs/review-round-8` onto the current
+   default branch, signed.
+3. The write pass on the spec in PR #25: apply the A, M and L clusters
+   from `round-8/clusters-*.json`, re-read the clusters that cite pages
+   01, 05, 10, 12 and 13 against the text PRs #23 and #24 changed, apply
+   the answered decisions, add the approval lines for `docs/adr` if DR1 is
+   accepted; ship gate before the PR leaves draft.
+4. Round 9: the targeted re-audit of the changed sections by the lenses
+   that raised them; declare the spec validated for T004 on if the exit
+   criteria of the lens page hold.
+5. Before stage B: rewrite L12; add to the lenses the reading line the
+   L0-only clusters ask for; amend the lens page's step 3 and its rounds
+   table; write the plan lenses.
+6. Tooling, each in its own pull request: `tools/lenses coverage` in Go
+   (coverage and shape measurements, a link, anchor and section-citation
+   checker, a schema check of the reports); the nested-worktree fix of
+   `tools/ci`; the ATAM row once its host is reachable.
+
+The consolidation ran as a five-phase workflow (one clustering agent per
+page, statistics, regression check, draft, completeness critic); its
+script was session scratch and is reproducible from "How the round was
+run" above.
