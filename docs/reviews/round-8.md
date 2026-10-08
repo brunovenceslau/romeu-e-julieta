@@ -11,11 +11,11 @@ when the spec counts as validated": the first round read through the
 lens set L0 to L16, with the noise probe on L2 and L13. The baseline is
 commit 2cf36fa of the default branch, read from a detached export that
 nothing wrote to while the reviewers ran. lenses.md is cited at its own
-commit, as its step 1 asks: the second part of every brief carried the
-lens examples from lenses.md at commit 0845a3c; the Role paragraphs of
-the first part are unchanged since that page's first commit b419c5d; and
-its current commit bd67143 differs from 0845a3c only in two citations of
-L15 and one sentence of brief step 4. This page is the consolidation's
+commit, as its step 1 asks: both parts of every brief, the Role
+paragraph of the first and the lens examples of the second, came from
+lenses.md at commit 0845a3c; its current commit bd67143 differs from
+0845a3c only in two citations of L15 and one sentence of brief step 4.
+This page is the consolidation's
 draft: it records the findings as clusters, proposes a resolution per
 cluster, and sends to the operator, in one block, everything the
 consolidation cannot decide.
@@ -53,22 +53,22 @@ returns": 636 findings in all (54 Blocking, 289 Required, 293 Advisory;
 Consolidation ran in four steps, each by a separate agent reading only
 the reports and the spec export:
 
-1. 1. Clustering, one agent per page (the index, 00 to 13, adr, plan):
+1. Clustering, one agent per page (the index, 00 to 13, adr, plan):
    findings that name the same defect merged into one cluster with every
    lens and finding id kept, the cluster's severity the highest among
-   its members, and a proposed resolution. 636 findings became 503
+   its members, and a proposed resolution. The 636 findings became 503
    clusters, named `R8-<page>-<n>`. A finding that cites several pages
    sits on each page's cluster (57 findings sit on more than one; 748
    finding memberships in all; 30 of the 57 are L3's and 26 L11's, whose
    findings cross pages by nature), so one decision can appear under
    several ids; the Decisions section merges those.
-2. 2. Measurement: the per-lens counts, the coverage matrix and the
+2. Measurement: the per-lens counts, the coverage matrix and the
    missing-viewpoint answers grouped by theme.
-3. 3. The regression check: every cluster against the resolutions of
+3. The regression check: every cluster against the resolutions of
    rounds 1 to 7, asking whether an earlier round resolved the same
    defect and whether the proposed change reopens something an earlier
    round closed.
-4. 4. This draft, then a completeness critic (every finding id in a
+4. This draft, then a completeness critic (every finding id in a
    cluster, every cluster in this table).
 
 The regression check changed the table in two ways, both marked in the
@@ -256,7 +256,7 @@ rows.
 | **R8-02-1** (Required) 02 2.4; 02 2.5 (also 10 10.6, 04 4.1 via L3-21): Two universal claims on this page are refuted by its own tables: 2.5 'julieta never guesses paths' beside six $HOME-derived paths (julieta symlink, secondaries, state, hook dispatcher, mise, herdr) no manifest field carries, and 2.4 'ROMEU_SETTINGS is the only environment override' beside XDG_CONFIG_HOME and XDG_STATE_HOME locating settings and state. | L0, L3, L13b, L15 (high-signal) | A | Apply as proposed: reword the 2.5 and 2.4 claims to what is true, have the mixin set the mise and herdr paths explicitly, name the sandbox-home source in 03 3.6, date the 2.6 sbx behavior and tie it to A3. |
 | **R8-02-2** (Required) 02 2.1 (tree): The tree has one `cmd/<binary>/main.go` and one internal/cli dispatcher for about 36 commands built by about 25 tasks, so every command PR edits the same shared files and tools/new command writes into a file the spec never names. | L12 | M | Apply in the smaller form: no new generator, the existing 12 12.3 command-definitions row emits the dispatcher table; two tree lines and one sentence in 12 12.3. |
 | **R8-02-3** (Required) 02 2.1 (Embedding): Embedding says the julieta binaries are embedded 'at release time' but not what a plain source build (go build, go install @vX) embeds or whether it refuses to run. | L7 | M | Apply with the placeholder-plus-refusal form only; no second build path. |
-| **R8-02-4** (Required) 02 2.2 (validate.yml): The config repo's validate.yml runs a downloaded julieta release that nothing verifies by bytes; julieta pin check --workflows checks freshness only. | L7 | M | Apply with a sha256 pin and the checksums.txt comparison; the attestation check follows whatever 10 10.2 decides for release attestation, not a second contract here. |
+| **R8-02-4** (Required) 02 2.2 (validate.yml): The config repo's validate.yml runs a downloaded julieta release that nothing verifies by bytes; julieta pin check --workflows checks freshness only. | L7 | M | Apply with a sha256 pin and the checksums.txt comparison; the attestation check follows whatever 10 10.2 decides for release attestation, not a second contract here. See SC9. |
 | **R8-02-5** (Required) 02 2.3; 02 2.6: Salvage refs live only in host clones the spec calls plain operator clones, and the owner is told neither that deleting or re-cloning one loses them nor that git push --mirror publishes them (salvage commits can hold untracked files). | L4, L16 (high-signal) | M | Apply as one owner-facing statement in 2.3 plus the one doctor check; no new storage for salvage refs. |
 | **R8-02-6** (Required) 02 2.4 (Each record is one file...); 01 1.6: 'every state transition of a project is a single atomic write' is false for promotion, salvage and retire, and retire makes two moves (tree under $ROMEU_ROOT, record under $XDG_STATE_HOME) with no recovery rule. | L4 | A | Apply as proposed. |
 | **R8-02-7** (Required) 02 2.3 (host tree modes): No mode is fixed for the host tree that holds memory, salvage payloads, spool, view, .attic and review checkouts; only settings, state and the ledger have one and doctor checks only those. | L16 | M | Apply in the smaller form: fix the mode on the two parent directories (`<name>-env/`, .attic/) rather than on each subdirectory, so one doctor row covers the tree. |
@@ -338,7 +338,7 @@ rows.
 | **R8-04-25** (Required) 04 4.3 (julieta status); 03 3.6; 07 7.5: No julieta command shows the effective egress allowlist, so a blocked request reaches the agent only as sbx's proxy 403 and the agent cannot tell an unknown host from a gated one. | L5 | M | Smaller form: the manifest carries what was applied, not the pending gated set, which lives on the host and would be stale in the sandbox. |
 | **R8-04-26** (Required) 04 4.1 (Idempotency, Output): The appending julieta commands (memory add, handoff write, event add) print no defined success output and are not safe to retry, so an agent whose tool call timed out cannot tell whether the write landed. | L5 | M | Print the written id and path and dedupe memory add by content digest; no --key mechanism. |
 | **R8-04-27** (Required) 04 4.2 (recreate); J6: recreate removes the old sandbox before anything checks the new one can be built, and the spec does not describe the state or recovery when an upstream artifact (workload digest, frontend digest, kit download host) is gone. | L15 | L | State the limit and the recovery; the salvage before removal already makes the gap lossless. |
-| **R8-04-28** (Required) 04 4.3 (pin check); index Deferred decisions: The only freshness mechanism, pin check, covers spec workloads and the julieta release and nothing schedules it; the kit frontend, herdr, mise, gh, the action SHAs and the reuse image have no staleness signal and no Deferred row. | L15 | L | State it as a limit with an observable trigger, as ADR 0005 asks of an open hedge. |
+| **R8-04-28** (Required) 04 4.3 (pin check); index Deferred decisions: The only freshness mechanism, pin check, covers spec workloads and the julieta release and nothing schedules it; the kit frontend, herdr, mise, gh, the action SHAs and the reuse image have no staleness signal and no Deferred row. | L15 | L | State it as a limit with an observable trigger, as ADR 0005 asks of an open hedge. See SC9. |
 | **R8-04-29** (Advisory) 04 4.3 (julieta salvage); 04 4.2 (romeu salvage): julieta salvage takes an optional --stop-agents, J6 passes it for rm and recreate, and no row says whether a standalone romeu salvage passes it. | L0 | A | Apply as proposed. |
 | **R8-04-30** (Advisory) 04 4.1 (Locking): romeu.lock is machine-wide and held through sbx env run, so creating one project makes romeu run of another exit 1 with RJ-101 although they share no state. | L0 | L | Name the serialization as a chosen cost; no per-project lock. |
 | **R8-04-31** (Advisory) 04 4.2 (romeu run, exit codes): romeu run lists exit codes 0-5 and no step of run exits 5. | L0 | A | Apply together with R8-04-1. |
@@ -390,7 +390,7 @@ rows.
 | **R8-05-30** (Advisory) 05 5.2 (I22); 04 doctor: Common pre-existing setups (a global sbx GitHub secret, VS Code workspace trust off, an existing ~/dev) are refused at preflight with no fix hint stated. | L1 | A | Apply as written in 04. |
 | **R8-05-31** (Required) 05 5.4; 04 4.2; J4; 01 1.2; 02 2.3; I19: romeu pull, the hardened review checkout, both workspace files, I19 and two residual-risk rows exist for a host-side review path the start does not need, and dev.code-workspace is opened by no journey. | L11 | operator | Recommend the deferral with its trigger; it removes a command and two accepted-risk rows. Decision SC4. |
 | **R8-05-32** (Required) 05 5.4 (herdr row); 03 3.2; Q16: The run layout is multiplexer-neutral for non-goal renderers while nothing says what happens if herdr, pre-1.0 with no signed releases, stops being maintained. | L11 | M | Apply the row; leave 03 3.2 as is. |
-| **R8-05-33** (Advisory) 05 5.3 (signing); 06 6.4; 00 0.5: Commit signing from a dedicated host agent is a product kit with its own surface, setting, check and open question, and no sentence says why the start needs it. | L11 | M | Apply in 06 6.4 rather than 00 0.5, so the scope text does not change. |
+| **R8-05-33** (Advisory) 05 5.3 (signing); 06 6.4; 00 0.5: Commit signing from a dedicated host agent is a product kit with its own surface, setting, check and open question, and no sentence says why the start needs it. | L11 | M | Apply in 06 6.4 rather than 00 0.5, so the scope text does not change. See SC11. |
 | **R8-05-34** (Advisory) 05 5.3: .github/workflows/release.yml matches the release and dependencies surfaces, so tools/ci pr asks for two approval lines and the overlap is named nowhere. | L13b | A | Apply as written. |
 | **R8-05-35** (Advisory) 05 5.3 (dependencies); ADR 0007: The dependencies surface lists every path where mise reads its configuration as measured with mise 2026.10.3, and nothing re-measures mise's config discovery when the mise pin moves. | L15 | M | Apply the 05 5.3 sentence now; the ADR 0007 sentence goes to the operator with the next decisions batch. |
 | **R8-05-36** (Advisory) 05 5.3; 12 12.8: Every ask-first surface has one owner and no contribution path or continuity statement is given for outside contributors. | L10 | M | Apply as written; no continuity promise beyond what one person can keep. |
@@ -409,11 +409,11 @@ rows.
 | **R8-06-10** (Required) 06 6.4: The agent's own memory dir is made non-writable, but nothing tells the agent, at the moment its habitual write fails, to use julieta memory instead. | L5 | A | Apply as written. |
 | **R8-06-11** (Required) 06 6.4: Nothing checks at runtime that the SessionStart and SessionEnd hooks and the two skills are wired, and a personal kit installed after julieta-claude can replace them with no precedence rule. | L5 | M | Put the check in julieta status only (romeu status already reads it), not also in setup; the 06 6.5 sentence states the rule the check enforces. |
 | **R8-06-12** (Required) 06 6.4: The signing rule (RJ-204, preflight step 5, doctor row) is an ask-first security rule with no invariant id, so it has no guard tag, test tag, mutate stub or row in S6's acceptance check. | L6 | A | Apply as written. |
-| **R8-06-13** (Advisory) 06 6.4: The one-key signing socket bounds the key, but no rule says the key is registered on GitHub as a signing key only, and confirm-on-use is not a rule the guide states. | L2b | M | Apply the 06 6.4 sentence and the guide steps; leave the 05 5.4 Verified-signatures row unchanged, since editing an accepted risk needs the operator and the guidance closes the scenario without it. |
+| **R8-06-13** (Advisory) 06 6.4: The one-key signing socket bounds the key, but no rule says the key is registered on GitHub as a signing key only, and confirm-on-use is not a rule the guide states. | L2b | M | Apply the 06 6.4 sentence and the guide steps; leave the 05 5.4 Verified-signatures row unchanged, since editing an accepted risk needs the operator and the guidance closes the scenario without it. See AR9. |
 | **R8-06-14** (Required) 06 6.4: The product rule 'the full host agent is never forwarded' is contradicted by the measured development sandbox of this repository (ADR 0008 Context: its forwarded agent holds the signing key and a GitHub authentication key), and the index deferred row describes that sandbox as if it were the product. | L2 | operator | Recommend approving the 06 6.4 scope sentence, the ADR 0008 Context rewording and the dogfooding Deferred row as written. Decision AR16. |
-| **R8-06-15** (Advisory) 06 6.4: git-ssh-sign is a product kit with its own ask-first surface, settings field, preflight check and open question, and no sentence says why the start needs it. | L11 | M | Put the why-now clause in 06 6.4 instead of 00 0.5, so the scope page is untouched. |
+| **R8-06-15** (Advisory) 06 6.4: git-ssh-sign is a product kit with its own ask-first surface, settings field, preflight check and open question, and no sentence says why the start needs it. | L11 | M | Put the why-now clause in 06 6.4 instead of 00 0.5, so the scope page is untouched. See SC11. |
 | **R8-06-16** (Required) 06 6.4: os-base installs an apt delta at kit build time with no version pin or snapshot, so a sandbox's OS packages change under an unchanged kit-tree digest and gate 2 shows nothing. | L7 | operator | Recommend Option 1, the 05 5.4 row with its trigger plus a Deferred row, decided after R8-06-17 is applied. Decision AR15. |
-| **R8-06-17** (Advisory) 06 6.4: os-base is specified before probe A12 measures whether the workload lacks any package, so it may be an empty kit with a TZ arg. | L11 | A | Apply as written. |
+| **R8-06-17** (Advisory) 06 6.4: os-base is specified before probe A12 measures whether the workload lacks any package, so it may be an empty kit with a TZ arg. | L11 | A | Apply as written. See AR15. |
 | **R8-06-18** (Advisory) 06 6.4: kitpin herdr reads the release API's asset digest, but the spec does not say what a missing or malformed digest field does. | L15 | A | Apply as written. |
 | **R8-06-19** (Advisory) 06 6.1: A registry client, strict grammar, descriptor cache and conformance fixtures exist in v1 to decompose a workload already pinned by digest and allowlisted, and the spec does not say what the gate would lose without the workload half. | L11 | L | State the reason as one sentence and keep the mechanism; deferring the workload half would leave gate 2 showing only a digest for the one artifact built outside our review. |
 | **R8-06-20** (Advisory) 06 6.2: julieta pin workload and pin check are two sandbox-binary commands reading a registry and GitHub releases for a rare manual act. | L11 | M | Apply as stated. Regression check: follows the SC9 decision; pin check stays (D27, round 1; R8-02-4 and R8-04-28 lean on it). |
@@ -715,7 +715,7 @@ only lens whose examples prompted more than a third of its findings.
 
 ### Clusters only L0 raised
 
-17 clusters (16 in stage A, one parked) have L0
+Seventeen clusters (16 in stage A, one parked) have L0
 as their only lens. The count the lens page asks for, the count of
 findings only L0 raised, is 17 as well: the L0 findings whose every
 cluster has L0 as its only lens. The clusters:
@@ -990,10 +990,10 @@ product. In one line each:
 ### Regressions
 
 The regression check read all 503 clusters against the round pages of
-rounds 1 to 7. 238 clusters have an earlier round's resolution beside
+rounds 1 to 7. Of the clusters, 238 have an earlier round's resolution beside
 them; the check found no case where an earlier fix had failed to hold:
 each of them is a gap the earlier fix left open ("was never stated",
-"not considered then"), or one of the reversals below. 74 entries on 72
+"not considered then"), or one of the reversals below. There are 74 entries on 72
 clusters say the proposed change would reopen something an earlier round
 closed or supersede a decision; the table carries the outcome of each:
 63 rows are marked "Regression check", and the 9 whose status changed
@@ -1064,7 +1064,7 @@ at it); R8-index-23 against the four S8 clusters (SC3 decides).
 
 Everything the consolidation cannot decide, in one block, grouped by
 what it changes: the scope (SC), an accepted risk or the security model
-of 05 (AR), a decision record (DR). 48 items (17 SC, 23 AR, 8 DR) cover
+of 05 (AR), a decision record (DR). The 48 items (17 SC, 23 AR, 8 DR) cover
 the 96 operator rows of the table, because the same decision was raised
 under several cluster ids and is merged here. Each item names its
 clusters, what it changes, the earlier decision it would supersede, and
