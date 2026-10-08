@@ -1,0 +1,440 @@
+{
+ "page": "02",
+ "findings_read": 27,
+ "clusters": [
+  {
+   "id": "R8-02-1",
+   "section": "02 2.4; 02 2.5 (also 10 10.6, 04 4.1 via L3-21)",
+   "title": "Two universal claims on this page are refuted by its own tables: 2.5 'julieta never guesses paths' beside six $HOME-derived paths (julieta symlink, secondaries, state, hook dispatcher, mise, herdr) no manifest field carries, and 2.4 'ROMEU_SETTINGS is the only environment override' beside XDG_CONFIG_HOME and XDG_STATE_HOME locating settings and state.",
+   "severity": "Required",
+   "lenses": [
+    "L3",
+    "L0",
+    "L13b",
+    "L15"
+   ],
+   "finding_ids": [
+    "L3-21",
+    "L0-34",
+    "L13b-31",
+    "L15-18"
+   ],
+   "listed": 0,
+   "own": 4,
+   "scenario": "A contributor trusts 'never guesses paths' and adds a $HOME path outside the manifest; the workload user changes from agent and the manifest path romeu wrote (03 3.6) disagrees with $HOME; a herdr release moves its config dir and the 06 6.4 settings stop applying unnoticed; a test sets XDG_STATE_HOME and the sentence says nothing happens.",
+   "change": "02 2.5: replace the closing sentence with 'julieta takes repo, memory, spool, view and binary paths from the manifest (03 3.6) or its own executable path; the rows owned by julieta or the julieta mixin derive from $HOME by rule, and the mise and herdr rows are those tools' upstream defaults at the pinned versions, which the julieta mixin sets explicitly through the environment (MISE_DATA_DIR, the herdr config path) so a moved default changes nothing.' 03 3.6: name the source of the sandbox home romeu writes into the manifest (the workload's recorded user home, measured by probe A4 and stored with the pin). 02 2.4: write 'ROMEU_SETTINGS is the only romeu-specific environment variable; XDG_CONFIG_HOME and XDG_STATE_HOME are honoured as shown; the root comes only from the settings file.' 02 2.6: date the 'documented sbx behavior' (sbx version and doc date) and name A3 as the probe that re-confirms it. The 10 10.6 and 04 4.1 halves of L3-21 are resolved on those pages.",
+   "cost": "Four sentences; one measured fact recorded by A4.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed: reword the 2.5 and 2.4 claims to what is true, have the mixin set the mise and herdr paths explicitly, name the sandbox-home source in 03 3.6, date the 2.6 sbx behavior and tie it to A3."
+  },
+  {
+   "id": "R8-02-2",
+   "section": "02 2.1 (tree)",
+   "title": "The tree has one cmd/<binary>/main.go and one internal/cli dispatcher for about 36 commands built by about 25 tasks, so every command PR edits the same shared files and tools/new command writes into a file the spec never names.",
+   "severity": "Required",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-4"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Phase 4 builds sync, approve, status, doctor and adopt concurrently; each PR edits cmd/romeu/main.go and the dispatcher's list and conflicts with the next merge.",
+   "change": "02 2.1: add 'internal/cmd/romeu/<command>/ and internal/cmd/julieta/<command>/   one package per command; the dispatcher table in internal/cli is generated from them (12 12.3, command definitions)'. 12 12.3: one sentence that tools/new command creates the command's package and reference entry and edits no shared file; the existing command-definitions generator emits the table.",
+   "cost": "Two tree lines, one sentence; reuses the command-definitions generator.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply in the smaller form: no new generator, the existing 12 12.3 command-definitions row emits the dispatcher table; two tree lines and one sentence in 12 12.3."
+  },
+  {
+   "id": "R8-02-3",
+   "section": "02 2.1 (Embedding)",
+   "title": "Embedding says the julieta binaries are embedded 'at release time' but not what a plain source build (go build, go install @vX) embeds or whether it refuses to run.",
+   "severity": "Required",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-14"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A GPL user builds romeu from the tag; it fails to compile for a missing go:embed file, or embeds a julieta the release never produced, which render.json then trusts as delivered (I30).",
+   "change": "02 2.1, after Embedding: 'A source build without tools/release build embeds a placeholder; romeu built that way refuses run, sync and promotion with exit 2 and error id julieta-not-embedded, and every other command works. tools/release build is the only supported way to embed julieta; contributor e2e builds go through it (10 10.2).' Add the error id to the 04 error table.",
+   "cost": "A paragraph and one error id.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply with the placeholder-plus-refusal form only; no second build path."
+  },
+  {
+   "id": "R8-02-4",
+   "section": "02 2.2 (validate.yml)",
+   "title": "The config repo's validate.yml runs a downloaded julieta release that nothing verifies by bytes; julieta pin check --workflows checks freshness only.",
+   "severity": "Required",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-15"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A replaced release asset runs in the operator's config-repo CI with no checksum or attestation check.",
+   "change": "02 2.2: change the validate.yml line to 'runs julieta spec validate --catalog projects/*.yaml from a julieta release pinned by version and archive sha256, verified against the release's checksums.txt before it runs (checked by julieta pin check)'. 04 4.3: pin check --workflows compares the pinned sha256 with checksums.txt. examples/ ships that validate.yml.",
+   "cost": "One pin format, one check, one example workflow.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply with a sha256 pin and the checksums.txt comparison; the attestation check follows whatever 10 10.2 decides for release attestation, not a second contract here."
+  },
+  {
+   "id": "R8-02-5",
+   "section": "02 2.3; 02 2.6",
+   "title": "Salvage refs live only in host clones the spec calls plain operator clones, and the owner is told neither that deleting or re-cloning one loses them nor that git push --mirror publishes them (salvage commits can hold untracked files).",
+   "severity": "Required",
+   "lenses": [
+    "L4",
+    "L16"
+   ],
+   "finding_ids": [
+    "L4-11",
+    "L16-22"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "The operator re-clones a secondary's navigation clone (2.6) or follows J13 step 4; three generations of salvage refs go and status keeps reporting the salvage complete. Or, after leaving the product, a mirror push publishes refs/romeu/salvage/* with dirty files, possibly secrets.",
+   "change": "02 2.3, after the ref namespaces: 'These refs belong to the clone they are in: deleting or re-cloning it loses them, and git push --mirror publishes them. List them with git for-each-ref refs/romeu refs/sandboxes.' 02 2.6: drop 'plain' from 'a plain operator clone' and point to that sentence. doctor (04 4.2) fails, with a new error id naming the record, when a ref under a salvage record's refsPrefix is missing from its clone. J13 step 4: 'after status shows nothing unpushed and no salvage-only refs'. J14 gains the for-each-ref step for removal once nothing in them is needed.",
+   "cost": "Three sentences, one doctor row, one error id, two guide steps.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as one owner-facing statement in 2.3 plus the one doctor check; no new storage for salvage refs."
+  },
+  {
+   "id": "R8-02-6",
+   "section": "02 2.4 (Each record is one file...); 01 1.6",
+   "title": "'every state transition of a project is a single atomic write' is false for promotion, salvage and retire, and retire makes two moves (tree under $ROMEU_ROOT, record under $XDG_STATE_HOME) with no recovery rule.",
+   "severity": "Required",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-18"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "retire moves <name>-env to .attic and is killed before moving the record; the next sync finds a live record with no tree and recreates <name>-env with empty memory dirs beside the attic copy.",
+   "change": "02 2.4: replace the sentence with 'Each record write is atomic; a transition that changes more than one file follows its step list in 01 1.6.' 01 1.6: add the retire step list: write state retiring to the record, move the tree to .attic, move the record to attic/; any command that finds a record in retiring finishes the remaining steps before anything else, and sync never recreates a tree for a retiring record.",
+   "cost": "A sentence and a three-step list.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-02-7",
+   "section": "02 2.3 (host tree modes)",
+   "title": "No mode is fixed for the host tree that holds memory, salvage payloads, spool, view, .attic and review checkouts; only settings, state and the ledger have one and doctor checks only those.",
+   "severity": "Required",
+   "lenses": [
+    "L16"
+   ],
+   "finding_ids": [
+    "L16-8"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "On a Mac with a second local account, memory entries, handoffs and salvage payloads under $HOME/dev are world-readable under the default umask.",
+   "change": "02 2.3: 'romeu creates $ROMEU_ROOT/.attic/ and each <name>-env/ with mode 0700, so everything under them sits behind a closed parent; julieta writes memory and spool files 0600.' 04 4.2: a doctor row fails when $ROMEU_ROOT/<name>-env or .attic is group- or world-accessible. Add the case to I24. Probe A3 records that the direct mounts keep the modes as the sandbox sees them.",
+   "cost": "Two sentences, one doctor row, one test case, one A3 check.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply in the smaller form: fix the mode on the two parent directories (<name>-env/, .attic/) rather than on each subdirectory, so one doctor row covers the tree."
+  },
+  {
+   "id": "R8-02-8",
+   "section": "02 2.1; 10 10.7; 12 12.2; S9",
+   "title": "02 2.1's package tree and its '(romeu only)', '(julieta only)' and '(shared)' comments are a hand copy of 10 10.7's boundary table and 12 12.2's module map, with different names for the same code, and 10 10.7 is fail-open for a package no row names.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-25",
+    "L3-29"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A PR adds internal/notify imported by both binaries that imports sbxdrv; no 10 10.7 row covers it and tools/ci imports passes; or a package is renamed and tree, map and S9 list change in three PRs.",
+   "change": "02 2.1: drop the '(romeu only)', '(julieta only)' and '(shared)' annotations and add one line under the tree: 'Which binary may import each package is 10 10.7; module ids are 12 12.2.' 10 10.7: 'a package under internal/ that no row names fails tools/ci imports'. 12 12.2: 'module ids name directories one to one'; a tools/ci test holds the 02 2.1 tree, the 12 12.2 map and the S9 list to the same set of directories.",
+   "cost": "One sentence per page, one check behaviour, one test.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply with a test holding the three lists equal, not a generator; the 2.1 annotations go, 10 10.7 becomes the only home and fails closed."
+  },
+  {
+   "id": "R8-02-9",
+   "section": "02 2.1 (tree, schemas/); 03 (opening)",
+   "title": "The pin file read by four consumers is in no tree and no tools/kitpin subcommand writes its workload entry, and three formats (dora.v1, ledger-entry/v1, the view files) are missing from the schemas/ list though 03 says every format has a schema.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-34"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The workload digest is hand-edited in the pin file because no tool writes it; a reader looks for ledger-entry's schema in schemas/ and finds none.",
+   "change": "02 2.1: add the pin file to the tree with its writer ('tools/kitpin workload <digest> writes it'); add dora.v1, ledger-entry.v1 and view.v1 to the schemas/ list (or exempt them by name in 03's opening), applied in the same write as the schema-list edits of R8-02-1 (04 4.1 half) and R8-02-14 (run-timings.v1). The mutate-surface part of L3-34 (05 5.3, 10 10.2) is resolved on those pages.",
+   "cost": "Two tree lines, three schemas or one exemption sentence.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed for page 02; coordinate the schemas/ line with the other schema-list edits in one write."
+  },
+  {
+   "id": "R8-02-10",
+   "section": "02 2.3; 01 1.3 (boundary D); 05 5.4",
+   "title": "Memory dirs and the spool are agent-writable host directories under $HOME/dev that host indexers (Spotlight importers, Quick Look, Time Machine) parse without the operator opening anything, while 05 5.4 speaks only of an operator who opens the directory and boundary D's 'no host tool is pointed at an agent-writable tree' is false for them.",
+   "severity": "Required",
+   "lenses": [
+    "L2"
+   ],
+   "finding_ids": [
+    "L2-12"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An agent writes a crafted document into memory/<dir>/entries/; mdworker parses it within seconds; a parser defect runs with the operator's user; romeu never read the file.",
+   "change": "02 2.3: sync creates <name>-env/.metadata_never_index (outside every mount, so I24 is untouched) and the tree shows it with 'keeps Spotlight from parsing agent-written files'. 04 4.2: doctor warns when the marker is missing or $ROMEU_ROOT is inside a Time Machine-included or cloud-synced path. 05 5.4: widen the residual-risk row to host indexers. 01 1.3 boundary D: name what is checked.",
+   "cost": "One file written by sync, one doctor row, two sentences, one 5.4 row change.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend applying: the marker and the doctor warning are cheap and inside the spec; the 05 5.4 row widening is the operator's call.",
+   "operator_reason": "Widens an accepted residual-risk row in 05 5.4."
+  },
+  {
+   "id": "R8-02-11",
+   "section": "02 2.6 (Consequences); 07 7.4; 10 10.3",
+   "title": "'secondary repos need the project's git credential inside the sandbox' and 07 7.4's 'the github secret covers it' rest on a mechanism the spec never states (how a named secret becomes the credential git, gh and mise present to GitHub in the sandbox) and that no probe measures; 10 10.3 lists credential injection under Cannot model.",
+   "severity": "Required",
+   "lenses": [
+    "L0"
+   ],
+   "finding_ids": [
+    "L0-19"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The operator binds github@shop; the agent's push fails or succeeds for reasons the spec cannot name; B3 after the candidate tag is the first to see it.",
+   "change": "02 2.6 Consequences: state the mechanism as documented sbx behavior, dated: 'sbx's proxy injects the named secret into HTTPS requests to GitHub, so git, gh and mise authenticate without a credential file in the sandbox (sbx <version>, docs of <date>).' Add to probe A3 (not a new probe) a check that a sandbox with a scoped github secret can clone a private secondary, push a branch and call the GitHub API.",
+   "cost": "Two sentences and one probe check.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply with the check folded into A3 rather than a new probe."
+  },
+  {
+   "id": "R8-02-12",
+   "section": "02 2.4; 03 3.8; 04 4.2",
+   "title": "projects/<name>.json holds generations[] (each with salvage[]) appended forever in a file rewritten whole on every mutating command, with no bound and no compaction.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-11"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Years of recreate give several hundred generations; every run rewrites the record and status parses it on every call; S8 is measured against an empty record.",
+   "change": "03 3.8: 'The record keeps every generation in v1; it grows by one generation per recreate and has no bound.' Add a Deferred decisions row 'compact closed generations into the state attic', trigger 'the first record over 256 KiB, or status measured slower than S8 on a real record'; doctor warns past 256 KiB.",
+   "cost": "One sentence, one deferred row, one doctor row.",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the growth as a limit and defer compaction with a measured trigger; no move-on-close mechanism in v1."
+  },
+  {
+   "id": "R8-02-13",
+   "section": "02 2.3 (dev/review workspaces); 01 1.2; 04 4.2 (pull); J4; I13; I14; I19; 05 5.4",
+   "title": "The spec never says where the user edits and debugs day to day: dev.code-workspace is rewritten on every promotion, carries I13 and I14, is opened by no journey and only in Restricted Mode, while romeu pull, the review checkout and review.code-workspace serve a host review path the start does not need (ADR 0008 makes the PR the review barrier).",
+   "severity": "Required",
+   "lenses": [
+    "L11",
+    "L1"
+   ],
+   "finding_ids": [
+    "L11-6",
+    "L1-26"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "The user opens dev.code-workspace, gets no extensions and no debugger, trusts the folder to get work done, and doctor then fails I23 and every run blocks.",
+   "change": "Defer romeu pull, the review checkout and review.code-workspace as one Deferred decisions row ('until then the PR on GitHub is the review'; trigger: the first time the maintainer needs a sandbox branch on the host before it is pushed, written as an issue); I19 and the two 05 5.4 rows about review checkouts leave with it. Either delete dev.code-workspace or give it a J-step; in either case add to 02 2.3 one sentence naming the supported daily setup in v1: editing and debugging happen inside the sandbox (the agent's panes, or VS Code attached to the sandbox when Remote-SSH arrives in v1.1), and host clones are for reading in Restricted Mode only.",
+   "cost": "Deletions in 01, 02, 04, 05, 09; the plan loses most of T067; one sentence in 2.3.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend deferring pull and review.code-workspace and deleting dev.code-workspace, plus the one-sentence daily-setup statement in 2.3 (which can be applied on its own now).",
+   "operator_reason": "Removes a v1 command from scope (00 0.3) and two accepted residual-risk rows from 05 5.4."
+  },
+  {
+   "id": "R8-02-14",
+   "section": "02 2.1 (schemas/run-timings.v1); index S8; 00 0.5; 04 4.2; 03 3.13",
+   "title": "S8 and run --timings justify each other: the flag, the run-timings.v1 schema, a CI median-of-5 test and probe B5 exist to measure a 2 s / 3 s budget no user asked for and no measurement produced.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "No first user types --timings; a slow CI runner blocks a merge on a number chosen before any code ran.",
+   "change": "Keep S8 as a measured property of the host suite (B5 with plain timing in the harness, no product flag); drop --timings from 04 4.2, run-timings.v1 from 02 2.1's schemas/ list and 03 3.13, and the CI assertion from 10; state the origin of 2 s and 3 s or write 'the first B5 measurement sets the bound'.",
+   "cost": "Deletions in 04, 02, 03, 10; one sentence per criterion.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend applying: the criterion stays, measured by the harness.",
+   "operator_reason": "Changes a success criterion (S8) set in 00 0.5."
+  },
+  {
+   "id": "R8-02-15",
+   "section": "02 2.3 (tree, reserved names); 03 3.1; 05 5.1; I3; 04 4.2; I24; 08 8.1; 04 4.3; 07 7.3; 07 7.4; 04 4.4; 13 13.4",
+   "title": "Five lists two or more consumers must agree on are hand-written in two or three places each; on this page, the reserved names in the 2.3 tree repeat the 03 3.1 dir rule.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-6"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A new reserved directory is added to the 2.3 tree but not to 03 3.1's dir rule; a repo dir with that name is accepted and collides with it.",
+   "change": "02 2.3: under the tree, 'Names romeu reserves inside <name>-env/ are listed once in 03 3.1' and keep the tree as an illustration; 03 3.1 holds the list. The other four lists (dangerous git keys, memory layout allowlist, mise environment, ingesting commands) are resolved on their own pages: one home each, the rest link, and a test that I3's plant list equals 05 5.1's neutralized list.",
+   "cost": "Words in ten places; tests where two consumers are code.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply in the smaller form: one home per list and links elsewhere, tests only where both consumers are code; no new generator rows."
+  },
+  {
+   "id": "R8-02-16",
+   "section": "02 2.6; 12 12.5; 06 6.4; 08 8.1; 12 12.1",
+   "title": "The product's architecture decisions (including the 2.6 secondary-repo clone, herdr, v3 kits, memory as plain files) have no ADR, and 12 12.5 sends the docs module to review-round files, which the index calls history, to write them.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-20"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A contributor proposes tmux in year two; the only written reasons are a dated paragraph and a review transcript, so the discussion restarts from zero.",
+   "change": "12 12.5: add a table of the decisions that need an ADR (about ten rows), each naming the spec section that holds its current state (2.6 for the secondary repos, 06 6.4 for herdr, and so on); the docs module writes the ADRs from that table, and the review rounds stay history.",
+   "cost": "One table of about ten rows; the ADRs themselves are plan work.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as the table only; writing the ADRs stays plan work and goes through docs/adr's ask-first rule."
+  },
+  {
+   "id": "R8-02-17",
+   "section": "02 2.3 ($ROMEU_ROOT default); J1",
+   "title": "The default root $HOME/dev must not be inside a git repository, so a home that is itself a git repository (dotfiles in $HOME) fails the default at J1 and init does not say what happens.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0"
+   ],
+   "finding_ids": [
+    "L0-35"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A second adopter with a dotfiles repo at $HOME runs romeu init, and doctor then fails on the root init chose by default.",
+   "change": "J1 step 3: 'init applies doctor's root check before writing settings and refuses a root inside a git repository with that check's error id and a hint to pass another root.'",
+   "cost": "One sentence; the check already exists in doctor.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed, reusing doctor's check."
+  },
+  {
+   "id": "R8-02-18",
+   "section": "02 2.1 (Embedding); 02 2.3 (.romeu/bin); 06 6.3; Q21",
+   "title": "Every romeu embeds both julieta linux binaries and writes both into every .romeu/bin, while Q21 fixes sandbox arch equal to host arch, so one of the two is never invoked.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-30"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Twice the embedded size and two files per project for a path never taken.",
+   "change": "02 2.1 Embedding: 'the julieta linux binary of romeu's own GOARCH'. 02 2.3: bin/ holds 'julieta-linux-<GOARCH>, SHA256SUMS'. 06 6.3 the same. The release still builds both, one per romeu archive.",
+   "cost": "One sentence each in 02 2.1, 02 2.3 and 06 6.3.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-02-19",
+   "section": "02 2.4 (descriptors/); 01 1.4; 06 6.1; I28; Q20; Q23",
+   "title": "A registry client, strict descriptor grammar, content-addressed descriptor cache and per-capability conformance fixture exist in v1 to decompose a workload already pinned by digest and allowlisted by repository.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-8"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The gate 2 reviewer sees the digest change either way; the decomposition only improves the diff for a workload whose upstream is one image (Q2).",
+   "change": "06 6.1: one sentence stating what gate 2 loses without the decomposition for the one allowlisted workload (the capability-level diff a reviewer reads instead of a bare digest change). Deferring internal/oci's workload half goes to the operator only if that sentence cannot be written.",
+   "cost": "One sentence.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the smaller option: state the reason in 06 6.1; no deferral unless the reason is missing."
+  },
+  {
+   "id": "R8-02-20",
+   "section": "02 2.4 (ROMEU_SETTINGS)",
+   "title": "With ROMEU_SETTINGS described as a test-only override, a machine has one root, one state and one ledger, so an owner cannot keep employer and personal projects in separate trees and ledgers.",
+   "severity": "Advisory",
+   "lenses": [
+    "L16"
+   ],
+   "finding_ids": [
+    "L16-16"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A developer whose employer requires work code on a managed volume also runs side projects; both share one root and ledger, so every sandbox sees the other projects' names (13 13.6).",
+   "change": "Add a Deferred decisions row 'separate instances per machine (own root, state and ledger)', trigger 'the first user who asks to keep work and personal projects apart', and keep 02 2.4's wording that ROMEU_SETTINGS is for tests.",
+   "cost": "One deferred row.",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State as a limit with a deferred row; no second-instance support in v1."
+  },
+  {
+   "id": "R8-02-21",
+   "section": "02 2.2 (Rules); J1",
+   "title": "The config repo holds every project's repo URLs, secret names, egress extras and names, and the spec never says whether it should be private or what a public one discloses.",
+   "severity": "Advisory",
+   "lenses": [
+    "L16"
+   ],
+   "finding_ids": [
+    "L16-19"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A user copies the public reference layout, keeps a public config repo, and lists the employer's private repositories and internal domains in it.",
+   "change": "02 2.2 Rules: 'The config repo names private repositories, secret names and internal domains: keep it private unless every project in it is public.' Repeat the line in the J1 guide.",
+   "cost": "One sentence and a guide line.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  }
+ ]
+}

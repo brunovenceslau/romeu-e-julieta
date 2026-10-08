@@ -1,0 +1,474 @@
+{
+  "per_lens": [
+    {
+      "lens": "L0",
+      "findings": 52,
+      "blocking": 2,
+      "required": 17,
+      "advisory": 33,
+      "listed": 0,
+      "own": 52,
+      "parked": 7,
+      "verdict": "Read only against its own objective, principles and S1 to S11, the spec does not yet meet them: S1 cannot be produced under the 10 10.2 workflow grammar, the objective's two absolute sentences (nothing lost, nothing agent-written executed on the host) are wider than the mechanisms behind them and have no restore journey and no build-location measurement, and the merge gate is a convention stated as enforcement in four places that carry two states of one fact.",
+      "lens_critique": "Reading with only S1 to S11 measures the spec against targets it wrote for itself, and every one of them is a CI run, a probe on throwaway projects or a document: none is a user outcome, so this reading inherits the criteria's own blind spot and cannot fail the product for a bad first hour, a slow warm run, or a restore that needs raw git. It sees what the criteria do not name (the ledger, the restart path) only as a shape defect, not as a risk; it over-weights consistency (two states of one sentence) relative to design risk because consistency is what a text alone can prove; and it cannot weigh any sbx fact without a host. It is good at finding where the spec contradicts itself and weak at saying whether the thing it describes would be worth using.",
+      "missing_viewpoint": "The human at the gate prompt: the approver at a TTY who must read a ten-thousand-line kit diff, a secret's argv and a capability set and type y, and whose attention is the one control every security claim collapses onto (gate 2, the approval line, the security-log habit); no lens models approval fatigue or the cost of a wrong y. Close seconds: the platform vendor's view (what sbx, BuildKit and macOS actually do, which L15 covers as churn and not as present behaviour) and the person who does the restore after a loss, which L4 covers only up to the loss."
+    },
+    {
+      "lens": "L1",
+      "findings": 30,
+      "blocking": 3,
+      "required": 13,
+      "advisory": 14,
+      "listed": 5,
+      "own": 25,
+      "parked": 3,
+      "verdict": "No: the spec makes the system correct and safe, but it never measures or specifies the user's ordinary day. The largest gap is that 'one command per project' and 'nothing lost' (00 0.1) have no user-side criterion: salvaged work is never restored into the next sandbox, and stopped sandboxes, upgrades and reboots have no journey.",
+      "lens_critique": "This lens measures success as low friction for one person, and that can argue against the gates that are the product's reason to exist. Every refusal in 05 is correct, and a lens that counts prompts could trade them away. The real success for this product is that the safe path is also the short path. Read the friction findings as 'make the safe step cheaper and name the next command', never as 'skip the check'. The lens also takes the maintainer's own Tuesday as typical, while the secondary user of 00 0.2 has a different first week.",
+      "missing_viewpoint": "Missing is a cold newcomer: someone who tries the product from the README in one sitting, with only the tools a typical Mac developer has. L10 comes close but adopts deliberately, and L1 already knows the vocabulary. Also missing is a terminal-environment and accessibility viewpoint (screen readers, color, nested multiplexers, non-English locales) for a product whose whole interface is a terminal."
+    },
+    {
+      "lens": "L2",
+      "findings": 24,
+      "blocking": 2,
+      "required": 11,
+      "advisory": 11,
+      "listed": 2,
+      "own": 22,
+      "parked": 2,
+      "verdict": "The spec meets this lens's definition of success for romeu's own runtime paths (agent bytes are validated, escaped, stored as data and never executed, with tagged guards and mutation tests), and fails it for the two paths that surround romeu: the maintainer's host runs this repository's agent-written tooling at main with no standing control, and the romeu release that everything trusts is signed by a credential nothing verifies, so the widest decision (ADR 0008) is written down with a radius that stops at the GitHub account and a compensating control whose coverage is unverified.",
+      "lens_critique": "This lens treats 'agent bytes are data on the host' as the whole of success and would accept a product nobody can operate; it prices every convenience as an incident and would demand mechanisms where this product, built by one maintainer, has correctly chosen a human checkpoint and said so (ADR 0008's 'process only' is a decision, not an oversight, and the lens's instinct is to refuse it rather than make its radius and control explicit). It looks from the host inward and is nearly blind to what happens inside the sandbox, where this product's users lose work and are steered, and it undervalues availability (a host that swaps is a failure too). It also over-weights the macOS host as the crown jewel when, for the operator, the GitHub account's reach is already the larger asset and the spec treats it as such. Its definition of success is right for romeu's runtime and too narrow for a product whose development process is part of its trust chain.",
+      "missing_viewpoint": "The adversary who starts inside the sandbox: a red-teamer who is root in the microVM with the operator's token, the signing socket and a memory dir, and asks what to do next. L2 looks from the host inward, L5 plays the cooperative agent, L7 looks at the supply chain, L16 at the data; nobody plays the hostile agent whose first move is to steer the next session through a lesson entry, merge its own PR, or tag a release, and nobody therefore traces an attack from inside out across pages the way an attacker would."
+    },
+    {
+      "lens": "L2b",
+      "findings": 29,
+      "blocking": 4,
+      "required": 11,
+      "advisory": 14,
+      "listed": 6,
+      "own": 23,
+      "parked": 3,
+      "verdict": "The spec meets this lens where romeu parses the three agent inputs it names (memory, git objects, spool) and fails it everywhere else agent bytes or agent code cross out of the sandbox: julieta's own output, the kit builder, the release job and the maintainer's host loop are unnamed paths, and the one widening (ADR 0008) is written down with a compensating control that is a human memory and triggers that nothing produces.",
+      "lens_critique": "This lens defines success as 'everything an agent wrote reaches the host as data', and that definition is satisfiable while the product still hands the agent the operator's whole GitHub identity: the lens over-weights the parser attack (an alias bomb in a memory file) against the plain fact that the agent can already push, merge, tag and delete across the account with no exploit at all, which the spec names and accepts. It also mistakes a complete gate diff for a control: a diff that is 'never truncated' and shows ten thousand lines is read by nobody, and the lens counts it as success. And it treats the host as the macOS machine, when for this product the thing worth protecting is the operator's time and identity across host, sandbox and GitHub; a lens that only guards the wall between two of the three will pass a spec that loses the third. Finally, the lens is biased toward adding checks; the product's own principle says to count concepts, and several findings here would be better served by one decision (narrow the token now) than by five doctor rows.",
+      "missing_viewpoint": "The platform engineer who knows what sbx and Docker Desktop actually do: where local kits build, how an agent socket is forwarded, whether kit lifecycle hooks are host commands, what sbx ls --json identifies a sandbox by. Most of this lens's unknowns are platform facts the spec defers to probes that do not ask them; no listed lens owns the platform's semantics (L15 'the ground that moves' is the closest, but names change, not knowledge). A close second is the owner of the GitHub account and its organization policy, who is the real holder of the blast radius ADR 0008 widens."
+    },
+    {
+      "lens": "L3",
+      "findings": 34,
+      "blocking": 5,
+      "required": 20,
+      "advisory": 9,
+      "listed": 1,
+      "own": 33,
+      "parked": 1,
+      "verdict": "The spec does not yet meet this lens's definition of success: it plans its own staleness by keeping hand-written copies of facts that the product will generate (03's tables, 10 10.2's check prose, 05 5.2's Test cells) with nothing that compares the copy to the truth, and the same facts already live in two to four places, one of which (the merge ruleset) drifted inside round 8 itself; the largest gap is that there is no rule for how any stored file or any pinned external version evolves after v1.0.0.",
+      "lens_critique": "This lens prices stability above learning speed and treats every duplicated fact as a defect, which is right for a product in its third year and partly wrong for a v1 written before any code by one maintainer with agents: some duplication is the cost of a spec that is a design input meant to be replaced by generated reference, and 13 shows the authors know how to write the mechanism-versus-promise split when they choose to. The lens also assumes a human inherits; here agents inherit, and agents read tools/ci output and generated reference rather than prose, so prose staleness hurts less than this lens weighs it. Finally, the three-year horizon may be the wrong success test for a product whose premises (one developer, a v3 kit milestone, one agent's hook names) may not survive eighteen months: the better definition of success might be cheap to throw away and rebuild from the generated truth, not cheap to maintain, and this lens would then over-invest in single sources for things that should simply be deleted.",
+      "missing_viewpoint": "The first-time contributor, human or agent, writing pull request number thirty against CONTRIBUTING.md, tools/new and the generated reference: every lens in the set is a user, a guardian or a maintainer, and nobody is the person to whom the index's promise 'inviting to contributors: a newcomer reads ARCHITECTURE.md, runs one command to scaffold what they add' is made."
+    },
+    {
+      "lens": "L4",
+      "findings": 43,
+      "blocking": 5,
+      "required": 19,
+      "advisory": 19,
+      "listed": 5,
+      "own": 38,
+      "parked": 3,
+      "verdict": "No: the spec makes the promotion commit crash-safe and tests it, but the machine that guards work (generation, salvage, rm, recreate, retire) has no crash rule and no kill test, reads one empty sbx listing as a lost sandbox, sits behind the widening gates, and promises \"nothing sandbox-only is lost\" without saying what that covers, so the largest gap is that the objective's last line is neither scoped nor proven under a kill.",
+      "lens_critique": "This lens treats every byte in a sandbox as work and every loss as a defect, but for this product the agent is expected to be wrong and disposable, and much sandbox state (caches, scratch, transcripts with echoed tokens) is better lost than kept; a salvage that keeps everything also widens what reaches the host and what a hostile agent can plant there. The lens also undervalues push-early as the real defense: most of its findings shrink if the product makes pushing cheap and visible rather than salvage complete. And it judges completeness by what can go wrong on one machine, while the product's own premise (S3, J12) is that sandboxes are recreated freely.",
+      "missing_viewpoint": "No lens speaks for the agent's adversary within the operator's own accounts, the person who reviews and merges what agents push to GitHub and has to recover from a bad merge or a deleted branch there; recovery on the remote (origin, rulesets, the operator's token) falls between L2, L4 and L7."
+    },
+    {
+      "lens": "L5",
+      "findings": 37,
+      "blocking": 2,
+      "required": 22,
+      "advisory": 13,
+      "listed": 5,
+      "own": 32,
+      "parked": 2,
+      "verdict": "No: the spec makes everything the agent writes deterministic (stamped ids, closed events, validated handoffs) but leaves what the agent receives to chance - the SessionStart output has no bound, no order and nothing covering compaction, the hooks are never checked at runtime, and no channel tells the agent the gate outcome, its egress or its own recent failures; the largest gap is that the host-to-agent channel is not modeled at all (01 1.2).",
+      "lens_critique": "This lens treats the agent as the user to be served, but for this product the agent is also the adversary of 05, and several of my findings (show the agent its egress, its gate state, other projects' events) widen what an agent learns; the security model may rightly prefer the agent to know less, and the lens has no way to weigh that. It also assumes one agent behavior (Claude Code, a given hook API, compaction), so findings tied to the pinned version's hook semantics may be wrong until a probe measures them, and it over-weights the agent's comfort against the operator's time: each fact made visible in the sandbox is a mechanism the one maintainer must keep true.",
+      "missing_viewpoint": "The operator who reviews and approves the agent's work at the gate and the PR - the human in the loop whose attention every mechanism spends (L1 uses the tool, L14 is on duty, but no lens judges the approval and review load as the scarce resource the gates and ADR 0008 lean on)."
+    },
+    {
+      "lens": "L6",
+      "findings": 41,
+      "blocking": 2,
+      "required": 19,
+      "advisory": 20,
+      "listed": 3,
+      "own": 38,
+      "parked": 4,
+      "verdict": "Not yet: the spec names more tests than most products ship and still lets green be produced without the property being observed, because the gate runs the code under review, a mutation stub is unconstrained, a removed invariant goes red nowhere after the one-time acceptance, and nothing counts or forbids what did not run.",
+      "lens_critique": "This lens measures success by whether a gate turns red, and for this product that is an instrument, not the goal: success is that no operator loses work and no agent code runs on the host. Three ways the lens misjudges here. It assumes an adversarial author and an independent reader of red; ADR 0008 makes author and reviewer one account, so a red that nobody is obliged to read is worth less than the lens prices it, and a mechanism that stops the merge (which the lens does not ask for) is worth more. It prefers mechanisms to judgment and would happily add expected-test manifests, per-site stubs and positive controls to a 102-task plan for one maintainer; each is right in isolation and together they can cost more than the loss they prevent, which the delivery lens and the scope skeptic should weigh against this report. And it treats once-run host evidence as weak, where for a product whose real behaviour exists only on a Mac with sbx, a well-recorded single run on both hosts is the strongest evidence available and the fake is the approximation; the lens should ask for the host run to be re-runnable and recorded rather than for CI to pretend to be the host.",
+      "missing_viewpoint": "The forensic reader who arrives after the loss: the person who, given only docs/probes, the ledger, the salvage records, CI logs and a user's tree, must reconstruct what happened with no one who was there. L14 (on duty) is live and L4 (lost work) is the victim; neither asks whether the artifacts are designed for reconstruction rather than pass or fail. A second absence: the accountant of CI time, who prices four lint targets, a 40-minute race budget, mutate and the hybrid level per PR against one maintainer's day; L9 counts tasks, not minutes per merge."
+    },
+    {
+      "lens": "L7",
+      "findings": 34,
+      "blocking": 5,
+      "required": 20,
+      "advisory": 9,
+      "listed": 5,
+      "own": 29,
+      "parked": 4,
+      "verdict": "No: inside the build most pins hold (actions by SHA, images by digest, herdr and mise by sha256), but a reader on another machine cannot tell a v1.0.0 release apart from any other run of release.yml. J1's attestation check binds no ref, the operator signature ADR 0008 relies on is undefined, and nothing makes a release, its tag or its assets immutable.",
+      "lens_critique": "This lens defines success as a stranger verifying a download and bytes that never move. v1 serves one developer on their own machines, and for that user the boundary that matters is the host gate and sbx, not provenance. Much of the release machinery the lens asks for (reproducible builds, SBOMs, notarization) can fairly be deferred under the spec's own rule. The release risk that matters here is governance, an agent holding the maintainer's token, not build engineering. The lens also reads every unpinned thing as a defect, even where a pin costs more than the drift it stops (runner images, for example).",
+      "missing_viewpoint": "No lens owns incident response after a bad release or a leaked credential: recalling or superseding a release, revoking the token and the signing key, and telling users who already installed. L14, the maintainer on duty, is the nearest, but its title points at day-to-day duty rather than recall and revocation. An adopter's legal and compliance reviewer is missing as well."
+    },
+    {
+      "lens": "L8",
+      "findings": 31,
+      "blocking": 3,
+      "required": 12,
+      "advisory": 16,
+      "listed": 9,
+      "own": 22,
+      "parked": 2,
+      "verdict": "No: the spec keeps generated reference true to main's code, but nothing keeps the pages a reader acts on in a failure (fix hints, help, guides, skills) true to the release they run, and after v1.0.0 every docs-currency check stops running.",
+      "lens_critique": "This lens equates success with documentation that is current and recoverable, but for this product the strongest recovery path is the binary itself: deterministic preflight, exit codes, salvage that refuses to destroy, and status as a projection of state. A writer's lens over-weights pages and under-weights making the CLI self-explaining (status and doctor printing the next command, offline explain), which needs no versioned site at all. It also treats every stale sentence as a defect, while for a one-maintainer project some history in current-state text is cheaper than the machinery that would remove it.",
+      "missing_viewpoint": "No lens is the first-time reader who never opens the spec: an evaluator who meets only the README, the release page and the first error, judging whether to install and whether to trust the tool with their host and credentials (L10 adopts it; nobody judges the decision to adopt)."
+    },
+    {
+      "lens": "L9",
+      "findings": 30,
+      "blocking": 2,
+      "required": 15,
+      "advisory": 13,
+      "listed": 8,
+      "own": 22,
+      "parked": 4,
+      "verdict": "No: the spec cannot land v1 as written, because its release path is forbidden by its own workflow grammar and has an unspecified signing step, the built product first meets real sbx after 91 tasks with every fix restarting a two-host block B, and most deferral triggers have no watcher once spec review rounds stop.",
+      "lens_critique": "This lens measures success as the plan landing on time with an operator who never idles, but in this product the operator's sittings are the security control itself: TTY gates, untruncated diffs and ask-first words exist so that a person reads. Optimising operator idle time pushes toward batching and shortcuts that weaken the boundary the product sells. And with one maintainer and no deadline, the real failure is not a late v1 but a correct v1 that is abandoned because it costs too much to run; schedule and DORA throughput matter less here than the sustainability of the operator's effort, which this lens only partly sees.",
+      "missing_viewpoint": "The sponsor who pays: nobody in L0 to L16 owns cost and sustainability as one budget (agent compute and tokens, Actions quota, the maintainer's hours per release, and whether one person can keep this running a year after v1); L14 and L3 touch maintenance, not the economics that decide whether it survives."
+    },
+    {
+      "lens": "L10",
+      "findings": 32,
+      "blocking": 2,
+      "required": 12,
+      "advisory": 18,
+      "listed": 5,
+      "own": 27,
+      "parked": 4,
+      "verdict": "No: the product is generic in code but proven, documented and exemplified only for its author. The largest gap is that no success criterion, journey or starter lets a stranger without the private reference config repo get from install to a first run (00 0.2, 09 J1, S4).",
+      "lens_critique": "The lens defines success as 'nothing in the product is about one person', but v1 is explicitly for one developer (00 0.6), and an opinionated tool should carry its author's choices. The better test is whether a stranger can see, replace or refuse each opinion, not whether opinions are absent. The lens also reads the spec as an adopter's document, when its stated readers are implementers. The adopter's real surface is the README and the guides that do not exist yet, so some findings judge the wrong artifact. And with 'no support promise' in 00 0.2, asking for support matrices and governance can overreach.",
+      "missing_viewpoint": "The economic and legal viewpoint: what it costs in money and obligations to run and contribute (Docker Sandboxes plan, agent usage, Actions minutes, licence of kits and examples, third-party terms of the workload image). No lens title owns cost or legal fitness."
+    },
+    {
+      "lens": "L11",
+      "findings": 35,
+      "blocking": 2,
+      "required": 15,
+      "advisory": 18,
+      "listed": 2,
+      "own": 33,
+      "parked": 3,
+      "verdict": "The spec does not meet this lens's definition of success: its principle 'decide at the last responsible moment' is well written and then not applied to the spec itself, and the largest gap is the runtime ledger (13, ADR 0006), a full subsystem with security surface and twelve deferred rows that no success criterion, journey or scope row needs and whose ADR never considered leaving it out, followed by one person's migration and metrics tooling shipped inside a generic product.",
+      "lens_critique": "This lens measures success as 'nothing the start does not need', and for a tool that runs agent output next to a host that is the wrong unit twice. First, several needs of the start have no first-day user and still must exist on day one: a security invariant, complete salvage (I17), the hardened git; YAGNI applied to safety ships the advisory the lens says the ledger would. Second, the only v1 user is the maintainer, so a feature the maintainer uses daily (signing, DORA) is a present need of the one present user, and the lens can mistake 'I would not want it' for 'the start does not need it'. Third, the lens discounts the cost of adding later, which ADR 0005 itself names: a ledger mount added after v1 costs a recreate per project (13 13.1), and data a deferred mechanism would have recorded is gone. The right reading is the one the spec already half holds: defer by default, and for each thing kept, write the first-day user or the irreversibility that keeps it.",
+      "missing_viewpoint": "The human reviewer at the merge gate. The whole trust story leans on 'the review of the diff covers it' (05 5.4, ADR 0008, 10 10.2 twice), and no lens stands where that person stands: how many lines of agent-written Go and spec a one-person maintainer can read with attention per day, what the gate diffs and PR bodies cost to read, and what happens when review becomes a rubber stamp. L1 uses the product, L14 operates it, L9 counts tasks; nobody counts the reviewer's attention, which is the scarce resource the spec spends most freely."
+    },
+    {
+      "lens": "L12",
+      "findings": 30,
+      "blocking": 1,
+      "required": 15,
+      "advisory": 14,
+      "listed": 13,
+      "own": 17,
+      "parked": 5,
+      "verdict": "The spec does not meet this lens's definition of success: its build is one maintainer wide, because the no-stack rule, the manual merge and an approval line on about two tasks in three turn every dependency edge into a maintainer sitting, and its shared registries (one error table with unallocated ids, one dispatcher, one lessons file, contiguous ADR numbers, five-writer generated tables) make concurrent tasks overlap by construction.",
+      "lens_critique": "This lens scores success as a short critical path, disjoint file sets and mechanical merges, and for this product that is only half right. The product's value is the security model (05) and the determinism principle (index), and several things that lengthen the path are the point: an ask-first surface is supposed to make a person look; a reviewed denylist, a probe on a real host and a maintainer merge are controls, not waste. The lens also over-values width: with one maintainer as the reviewer, a wider graph produces more green pull requests waiting, and the honest optimization is fewer, well-ordered sittings, not more agents. And it under-values the cost the spec does price, correctness of each piece: a chain of singletons through egress, render and gate also means one agent holds the whole gate 2 contract in its head, which has caught more bugs than it has cost days. The right reading of this lens for this product is: shorten the path where a person adds no judgment (id allocation, lessons files, generated-file merges, registries), and leave the person where the judgment is.",
+      "missing_viewpoint": "The onboarding contributor who is not the maintainer and not an agent: a human second pair of hands who clones the repository, enables the hook, cannot pass the forbidden-names gate until the default branch is fetched, needs sbx on a Mac to run anything host-facing, and has to earn an approval line for almost every change. L10 (the second adopter) uses the product, L3 maintains it later, L14 is on duty; nobody in the set is the first outside contributor on day one, whose friction the delivery practices (12 12.9, ADR 0003 collective ownership) promise to serve and no page tests."
+    },
+    {
+      "lens": "L13",
+      "findings": 37,
+      "blocking": 4,
+      "required": 19,
+      "advisory": 14,
+      "listed": 6,
+      "own": 31,
+      "parked": 1,
+      "verdict": "The spec does not yet meet one-problem-one-mechanism-one-name: its largest gap is that the release path, the merge gate and julieta's git are each described by two pages that cannot both be true (10 10.2's workflow grammar forbids what its release.yml needs; 05 5.3 states a code-owner review that 10 10.2 says was removed; the index routes every git call through a gitsafe that 05 5.1 defines for romeu only), and the one measurement the no-loss objective rests on (sbx env run -d against a changed env file) is probed nowhere.",
+      "lens_critique": "This lens equates success with internal consistency, and a spec can be perfectly consistent and wrong for the developer, the host or the agent; it cannot tell a measured sbx fact from an invented one, so it accepts every probe-confirmed claim at face value. It also undervalues deliberate redundancy: two surfaces per path, a check stated twice as defence in depth, and history kept beside a current rule are sometimes the right call, and this reader scores each as two concepts for one. Finally it treats stands as written until the decision is made as a defect, when it is an honest and dated choice; the real cost is only that one of the four places lacks the date.",
+      "missing_viewpoint": "The outside contributor opening a first pull request who is neither the maintainer nor an agent: the trust model (one account, approval lines typed by the author, a denylist of names they are not allowed to know, ask-first surfaces, a hook they must opt into) is written for one person plus agents, and no lens reads the spec as the person who must get a change merged from outside that pair; L10 the second adopter uses the product, L3 maintains it, neither contributes to it. A second gap is a licensing and compliance reader for GPL-3.0-only, CC0, REUSE and the quoted DORA report."
+    },
+    {
+      "lens": "L13b",
+      "findings": 43,
+      "blocking": 4,
+      "required": 17,
+      "advisory": 22,
+      "listed": 9,
+      "own": 34,
+      "parked": 2,
+      "verdict": "The spec does not yet meet this lens's definition of success: the index lists its pages without binding them, and the largest gap is that the mechanism protecting the merge (a ruleset-required code-owner review) is stated as fact in six places, measured false in one, and caveated rather than deleted, while a release-signing credential is named in one paragraph that no criterion, journey, probe or workflow step consumes.",
+      "lens_critique": "This lens equates success with one mechanism and one name, and this product's security model wants the opposite in places: the forbidden-name check runs in the hook, in hygiene and in pr on purpose; CODEOWNERS is generated and also an ask-first path as defence in depth (12 12.3); gate 1, gate 2 and sbx's own prompt overlap by design (01 1.4). Counted by this lens those are three findings; counted by the product they are layers, and the lens cannot tell a redundant copy from an independent check without the threat model it does not read. The lens also rewards agreement over truth: the code-owner review was stated consistently in six places and was false in all six, which this lens only notices because one place disagreed; a spec that had deleted the measurement would have passed this lens better and protected the merge worse. And success for this product is a developer losing no work and a host not falling (00 0.1), which no cross-reading measures; the lens finds forks in the text, and most forks it finds cost a sentence to close, so its findings are many and its Blocking ones few, and a reader should weigh its count accordingly.",
+      "missing_viewpoint": "The implementing agent that reads one section cold: the spec scores pages on AI retrievability (ADR 0001 rule 18) and expects agents to build from it (00 0.2, 12 12.2), yet no lens is the reader who is handed 04 4.3 or 13 13.4 alone, without the index, and must act on it; L3 reads whole, L5 uses the product, L8 maintains generated docs, and none of them is the one-section reader whose misreadings are the defects the plan's 102 tasks will actually produce."
+    },
+    {
+      "lens": "L14",
+      "findings": 24,
+      "blocking": 2,
+      "required": 12,
+      "advisory": 10,
+      "listed": 4,
+      "own": 20,
+      "parked": 2,
+      "verdict": "No: the spec builds careful gates and error ids but gives a stranger no way to report a failure with usable evidence and no workable path to fix it, and the largest gap is that nothing produces or bounds what arrives in an issue while agents acting with the operator's account are the ones reading it.",
+      "lens_critique": "The lens judges success by strangers who report, fix and come back, but v1 is declared to serve one developer with no support promise (00 0.2), so part of what the lens asks for (response targets, contributor metrics, triage) is a cost the spec could rightly defer with triggers rather than build now. It also undervalues that the first field reports are the maintainer's own, on two Macs, and that the same diagnostic machinery serves them first; and it pulls toward verbose free-text logs, which collide with the no-free-text rule of 13, where closed-field, redacted evidence is the better answer.",
+      "missing_viewpoint": "The upstream partner: someone who reads the spec as the vendors of the sandbox runtime and of the agent would, to ask which unstable behaviours of the sandbox tool, the kit frontend and the agent the product leans on, and what channel back to those upstreams exists when one of them changes."
+    },
+    {
+      "lens": "L15",
+      "findings": 25,
+      "blocking": 2,
+      "required": 10,
+      "advisory": 13,
+      "listed": 2,
+      "own": 23,
+      "parked": 2,
+      "verdict": "No: the spec pins everything it builds and treats everything it runs against as constant. Probes, recordings and conformance fixtures are one-time facts at one upstream version, with no tested window, no staleness and no decoding rule for upstream output, so the largest gap is that a newer sbx is accepted on a blind acknowledgement and parsed by code tested only against the old one.",
+      "lens_critique": "This lens equates success with catching every upstream change before a user does, which for a one-maintainer product with host-only sbx and two Macs is not achievable, and chasing it would add machinery the 'decide at the last responsible moment' principle rightly resists. A truer bar is: every upstream change fails closed, with an error that names the upstream and the tested range, and costs no work. The lens also undervalues what the spec already does well (pins by digest, fail-closed protocol checks, salvage before destruction), which turns most upstream breaks into lost time rather than lost data.",
+      "missing_viewpoint": "The upstream itself as a party: someone who reads sbx, mise, herdr and Claude Code release notes and roadmaps (a vendor or ecosystem liaison) and asks what those projects are about to change and what they promise to keep stable. No lens owns the relationship and the forward-looking signal; L15 sees only what has already moved."
+    },
+    {
+      "lens": "L16",
+      "findings": 25,
+      "blocking": 2,
+      "required": 10,
+      "advisory": 13,
+      "listed": 6,
+      "own": 19,
+      "parked": 2,
+      "verdict": "No: the spec makes sure nothing sandbox-only is lost, but it never tells the owner what is stored where, who can read it, or how to export it, delete it or leave; the largest gap is that there is no inventory of stores and no leaving journey, while the tool is forbidden to delete and the owner is given no supported way to.",
+      "lens_critique": "The lens imports a multi-party data governance frame (an employer, deletion requests, other local users) into a v1 that serves one developer, who is owner, operator and maintainer at once, on his own Mac, with nothing sent off the machine. For that user 'nothing is lost' really is the success that matters, and every deletion path is a new way to lose work. Read strictly, the lens would push mechanisms (purge commands, per-project visibility, multi-instance roots) ahead of their last responsible moment. Most of its value here is in words, not mechanisms: an inventory, a leaving journey, modes and one sentence that says nothing leaves. The lens also undervalues what the spec already does well: no free text in events, plain-file formats with CC0 schemas, and plain clones instead of submodules.",
+      "missing_viewpoint": "The organization's IT or compliance administrator who decides whether the tool may run on a managed Mac at all (MDM and org policy over sbx, GPL-3.0-only licensing, approved egress, audit needs): no lens judges installability and policy fit from the organization's side, apart from the person whose data it is."
+    }
+  ],
+  "total_findings": 636,
+  "totals_by_severity": {
+    "blocking": 54,
+    "required": 289,
+    "advisory": 293
+  },
+  "totals_by_origin": {
+    "listed": 96,
+    "own": 540
+  },
+  "total_parked_for_b": 56,
+  "coverage_gaps": [],
+  "coverage_by_key": {
+    "index": {
+      "reports_with_finding": 19,
+      "reports_nothing_for_this_lens": 0,
+      "reports_neither": [],
+      "nothing_lenses": []
+    },
+    "00": {
+      "reports_with_finding": 17,
+      "reports_nothing_for_this_lens": 2,
+      "reports_neither": [],
+      "nothing_lenses": [
+        "L6",
+        "L12"
+      ]
+    },
+    "01": {
+      "reports_with_finding": 19,
+      "reports_nothing_for_this_lens": 0,
+      "reports_neither": [],
+      "nothing_lenses": []
+    },
+    "02": {
+      "reports_with_finding": 18,
+      "reports_nothing_for_this_lens": 1,
+      "reports_neither": [],
+      "nothing_lenses": [
+        "L8"
+      ]
+    },
+    "03": {
+      "reports_with_finding": 19,
+      "reports_nothing_for_this_lens": 0,
+      "reports_neither": [],
+      "nothing_lenses": []
+    },
+    "04": {
+      "reports_with_finding": 18,
+      "reports_nothing_for_this_lens": 1,
+      "reports_neither": [],
+      "nothing_lenses": [
+        "L9"
+      ]
+    },
+    "05": {
+      "reports_with_finding": 19,
+      "reports_nothing_for_this_lens": 0,
+      "reports_neither": [],
+      "nothing_lenses": []
+    },
+    "06": {
+      "reports_with_finding": 19,
+      "reports_nothing_for_this_lens": 0,
+      "reports_neither": [],
+      "nothing_lenses": []
+    },
+    "07": {
+      "reports_with_finding": 15,
+      "reports_nothing_for_this_lens": 4,
+      "reports_neither": [],
+      "nothing_lenses": [
+        "L4",
+        "L9",
+        "L12",
+        "L16"
+      ]
+    },
+    "08": {
+      "reports_with_finding": 16,
+      "reports_nothing_for_this_lens": 3,
+      "reports_neither": [],
+      "nothing_lenses": [
+        "L7",
+        "L9",
+        "L12"
+      ]
+    },
+    "09": {
+      "reports_with_finding": 19,
+      "reports_nothing_for_this_lens": 0,
+      "reports_neither": [],
+      "nothing_lenses": []
+    },
+    "10": {
+      "reports_with_finding": 19,
+      "reports_nothing_for_this_lens": 0,
+      "reports_neither": [],
+      "nothing_lenses": []
+    },
+    "11": {
+      "reports_with_finding": 19,
+      "reports_nothing_for_this_lens": 0,
+      "reports_neither": [],
+      "nothing_lenses": []
+    },
+    "12": {
+      "reports_with_finding": 19,
+      "reports_nothing_for_this_lens": 0,
+      "reports_neither": [],
+      "nothing_lenses": []
+    },
+    "13": {
+      "reports_with_finding": 14,
+      "reports_nothing_for_this_lens": 5,
+      "reports_neither": [],
+      "nothing_lenses": [
+        "L2",
+        "L2b",
+        "L4",
+        "L7",
+        "L15"
+      ]
+    },
+    "adr": {
+      "reports_with_finding": 19,
+      "reports_nothing_for_this_lens": 0,
+      "reports_neither": [],
+      "nothing_lenses": []
+    },
+    "plan": {
+      "reports_with_finding": 19,
+      "reports_nothing_for_this_lens": 0,
+      "reports_neither": [],
+      "nothing_lenses": []
+    }
+  },
+  "coverage_citations_without_finding": {},
+  "missing_viewpoints_grouped": [
+    {
+      "theme": "The human approver and reviewer at the gate and the merge, whose attention every security claim spends (approval fatigue, review load)",
+      "lenses": [
+        "L0",
+        "L5",
+        "L11"
+      ]
+    },
+    {
+      "theme": "The first outside contributor who is neither the maintainer nor an agent (onboarding, trust model for a third party, first PR)",
+      "lenses": [
+        "L3",
+        "L12",
+        "L13"
+      ]
+    },
+    {
+      "theme": "The cold newcomer or evaluator who meets only the README, the release page and the first error and decides whether to adopt",
+      "lenses": [
+        "L1",
+        "L8"
+      ]
+    },
+    {
+      "theme": "The platform and upstream vendors (sbx, Docker, Anthropic, mise): what they actually do now and what they will change, and the channel back to them",
+      "lenses": [
+        "L2b",
+        "L14",
+        "L15",
+        "L0"
+      ]
+    },
+    {
+      "theme": "Cost and sustainability as one budget (agent tokens, Actions minutes, CI time per merge, maintainer hours, Docker plan)",
+      "lenses": [
+        "L9",
+        "L10",
+        "L6"
+      ]
+    },
+    {
+      "theme": "Legal, licensing and organizational compliance (GPL-3.0-only, CC0, REUSE, third-party terms, MDM and org policy on a managed Mac)",
+      "lenses": [
+        "L10",
+        "L13",
+        "L16",
+        "L7"
+      ]
+    },
+    {
+      "theme": "Incident response and recovery on the remote (bad merge, deleted branch, bad release recall, token and key revocation, the GitHub account owner who holds the blast radius)",
+      "lenses": [
+        "L7",
+        "L4",
+        "L2b"
+      ]
+    },
+    {
+      "theme": "The reader after the loss: forensic reconstruction from probes, ledger, salvage and CI logs, and the person who does the restore",
+      "lenses": [
+        "L6",
+        "L0"
+      ]
+    },
+    {
+      "theme": "The hostile agent inside the sandbox, tracing an attack from the inside out across pages",
+      "lenses": [
+        "L2"
+      ]
+    },
+    {
+      "theme": "The implementing agent that reads one section cold, without the index",
+      "lenses": [
+        "L13b"
+      ]
+    },
+    {
+      "theme": "Terminal environment and accessibility (screen readers, color, nested multiplexers, non-English locales)",
+      "lenses": [
+        "L1"
+      ]
+    }
+  ]
+}

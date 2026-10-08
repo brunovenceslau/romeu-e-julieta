@@ -1,0 +1,383 @@
+{
+  "lens": "L14",
+  "role": "the maintainer on duty",
+  "model": "opus",
+  "verdict": "No: the spec builds careful gates and error ids but gives a stranger no way to report a failure with usable evidence and no workable path to fix it, and the largest gap is that nothing produces or bounds what arrives in an issue while agents acting with the operator's account are the ones reading it.",
+  "findings": [
+    {
+      "id": "L14-1",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "04 4.1",
+      "defect": "No command or rule produces evidence a user can paste into an issue: error details are unspecified, there is no verbose or trace mode, and no output is declared safe to share.",
+      "scenario": "A stranger's `romeu run` fails inside sbxdrv after an sbx update; stderr shows `error RJ-1nn ...: <message>` and a fix hint, with no argv, no sbx stderr and no versions; `doctor --json` would add project names and keychain argv; the maintainer can only ask round after round or reproduce on their own Macs.",
+      "change": "In 04 4.1 Output, state that the details of a subprocess failure carry the escaped argv, exit status, the first N KiB of stderr and the romeu, julieta and sbx versions. In 04 4.2 add `romeu doctor --report` (or `romeu report`), which writes one redacted file: the versions of romeu, julieta, sbx, git and mise, macOS and arch, the doctor results and the last failing command's details, passed through the probe recorder's scrubber (10 10.3 Redaction). Add a rule to 05 that it prints no project name, path, secret argv or ledger field outside the closed sets, and a row to 00 0.5.",
+      "cost": "One command, one 04 4.1 paragraph, one 05 rule; reuses the recorder's redaction; one plan task.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-2",
+      "severity": "Required",
+      "origin": "own",
+      "section": "04 4.1",
+      "defect": "The error table names no id for the failures field reports will be about, so most of them fall into a generic exit 1.",
+      "scenario": "sbx output no recorded parser accepts, a subprocess timeout, a registry fetch error or Docker Hub rate limit in sync step 6, a kit build failure inside `sbx env run`, each of the three compatibility-check causes (06 6.3) and each doctor check (04 4.2, J1 step 4) reach the user with no slug a maintainer can grep and no guide recovery.",
+      "change": "Add rows to the table of 04 4.1 by slug: sbx-output-unparsed, subprocess-timeout, registry-unreachable, kit-build-failed, julieta-protocol, julieta-digest, julieta-bin-writable, herdr-protocol; give each doctor check of 04 4.2 an id and a fix hint so the recovery per error id of 12 12.8 covers J1 step 4.",
+      "cost": "About ten table rows and their fixtures; a contracts approval.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-3",
+      "severity": "Required",
+      "origin": "own",
+      "section": "01 1.4",
+      "defect": "The spec does not say what romeu does with an sbx version that no recording covers, once gate 1 is acknowledged.",
+      "scenario": "Docker ships sbx 0.48, the operator runs `romeu approve --toolchain` as 01 1.4 tells them, and sbxdrv's parsers, tuned to recorded versions (10 10.3 Parsers), misread a renamed field of `sbx ls --json`; identity (I26) or egress reconcile acts on a wrong reading instead of stopping with an id.",
+      "change": "In 01 1.4 state that gate 1 prints whether the live sbx version has a recording set, and that every sbx parse error exits 2 with sbx-output-unparsed naming the command and the recorded versions; in 10 10.3 state whether an unrecorded version runs with that warning or is refused.",
+      "cost": "One decision and two paragraphs.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-4",
+      "severity": "Required",
+      "origin": "own",
+      "section": "13 13.9",
+      "defect": "13 13.9 lists 'improving romeu and julieta ... (which error ids users hit)' as a consumer, but the ledger never leaves the machine and records no romeu failure, so the named consumer cannot read what it claims.",
+      "scenario": "A user's `romeu sync` fails repeatedly on gate 1 and in sbxdrv; nothing is recorded because romeu-side events are deferred (index: Deferred decisions, 'more event types and fields'), and the user's julieta events stay on the user's machine; the maintainer reads only their own ledger and concludes users hit nothing.",
+      "change": "Reword 13 13.9 to 'which error ids this machine hit', or reopen the deferred row now, since its trigger 'a consumer needs one' is met by 13 13.9's own row, adding a closed-field romeu-command-failed event (command, error id, exit, duration) that romeu writes into the ledger directly.",
+      "cost": "A wording change, or one event type with its generated tables.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-5",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "05 5.4",
+      "defect": "Text from strangers on GitHub (issues, PR bodies, diffs) reaches agents acting with the operator's admin account, and no rule bounds what an agent may do with it; ADR 0008 names the class ('issue and PR text ... can steer the agent') and 05 has no row for it.",
+      "scenario": "A stranger opens an issue or a fork PR whose body tells a triaging agent to merge, re-run a workflow with secrets or edit a ruleset; the agent holds the operator's token (ADR 0008), so it takes effect; the token-narrowing trigger 'a second contributor' fires only after someone contributes, while the exposure starts with the first stranger's issue.",
+      "change": "Add a 05 5.4 row and a threat-model sentence in 05 for stranger text on GitHub; until the token is narrowed, state in 12 12.9 that agents read stranger issues and PRs as data only, take no merge, close, label or comment action on them in the operator's account without the maintainer's word, and mark any reply they write as an agent's; change the ADR 0008 trigger to 'the first issue or PR from an account other than the operator's'.",
+      "cost": "One residual-risk row, one working rule, one trigger change (an operator decision, an ADR 0008 follow-up record).",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-6",
+      "severity": "Required",
+      "origin": "own",
+      "section": "12 12.4",
+      "defect": "A stranger has no defined way to obtain the approval line every likely first PR needs: a catalog entry, an error id, a dependency bump or a check fix are all ask-first (05 5.3), and 07 7.5 step 2 itself sends users to 'a catalog PR'.",
+      "scenario": "A stranger follows the sync error and opens a catalog PR; `tools/ci pr` fails for the missing `Approval: catalog - \"...\"` line; the stranger cannot type the maintainer's words without inventing them, and docs/reference/ask-first.md does not say where to ask; the PR sits.",
+      "change": "In 12 12.4 state the stranger path: the author leaves the line out, `pr` names the surfaces that need it, and the maintainer adds the line as part of review (or comments it and the author pastes it verbatim); say the same in the generated ask-first page and the CONTRIBUTING outline of 12 12.8; in 07 7.6 state what a catalog PR's Evidence shows (the domains, how each upload flag was decided, the lock that names the tool).",
+      "cost": "Three paragraphs; message text in `pr`.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-7",
+      "severity": "Required",
+      "origin": "own",
+      "section": "10 10.2",
+      "defect": "tools/ci has no failure-output contract like the RJ table, and several of its refusals cannot be diagnosed by a stranger: a forbidden-name hit reported by location only, an identity that holds a denylist substring, the exact-mise refusal, prose-rule hits in old commit messages.",
+      "scenario": "A stranger's PR goes red in `pr` with 'commit abc, field author: forbidden name' because their own name holds a hashed segment; nothing says what to do, and 10 10.2 calls it 'a cost of the check'; their local `fast` had already refused to run because their packaged mise is one version off.",
+      "change": "In 10 10.2 require every tools/ci failure line to carry the step, a rule id, the location and a fix line: for forbidden names 'reword this line; if it is your identity, ask the maintainer, who re-authors the commit'; for mise the exact version and the install command; for a prose hit in a commit message the rebase instruction.",
+      "cost": "A message table in tools/ci and one paragraph; matchers unchanged.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-8",
+      "severity": "Required",
+      "origin": "own",
+      "section": "10 10.2",
+      "defect": "A merge gate whose result depends on the date (govulncheck in `all`) and the flake rule of 10 10.1 leave no owner for a red leg the change did not cause.",
+      "scenario": "An advisory for a dependency lands on a Tuesday and every open PR, the stranger's included, goes red in `vulnerabilities`; the stranger cannot fix go.mod (dependencies surface) and nothing says whether to wait, rebase or close.",
+      "change": "State in 10 10.2 that a red leg caused outside the change (an advisory, a flake, an upstream outage) is fixed on main first by the maintainer, the PR is rebased after, and CONTRIBUTING (12 12.8) says so.",
+      "cost": "Two sentences and a CONTRIBUTING line.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-9",
+      "severity": "Required",
+      "origin": "own",
+      "section": "10 10.3",
+      "defect": "The bug classes most likely in the field are under 'Cannot model' with no test seam, so test-first (12 12.9, ADR 0003) cannot apply to their fixes, and a stranger cannot contribute the recording that would make such a bug testable.",
+      "scenario": "A stranger reports `run` hanging on sbx 0.48 during create; a fix needs a recording of that version (10 10.3 Floor bumps) and only block A, run by the maintainer, records; the fix waits for a sitting on both Macs and its PR has no failing test.",
+      "change": "In 10 10.3 accept a recording any user makes with the probe harness through the recorder's redaction, attached to an issue and committed by the maintainer after reading it; in 12 12.9 state that a fix for a Cannot-model class starts from a scenario replaying such a recording, or says under Evidence why none exists.",
+      "cost": "Two rules; the harness already runs one probe (plan.md T082 --only).",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-10",
+      "severity": "Required",
+      "origin": "own",
+      "section": "11 11.2",
+      "defect": "The spec defines what v1.0.0 needs and is silent on a patch release: whether a kit or catalog fix after v1.0.0 needs a candidate and block B again, and who cuts it.",
+      "scenario": "A stranger's catalog fix merges in March; nothing says whether v1.0.1 needs two Macs and about 90 minutes each (11 11.2) or ships on CI alone, so the fix waits indefinitely, or the v1.0.0 bar drops without anyone saying so.",
+      "change": "Add to 11 11.2 or 12 12.9 the post-v1 rule: which changed paths require block B (kits, sbxdrv, render), which ship on CI alone (catalog data, docs, error text), and that the maintainer tags.",
+      "cost": "One decision and one table.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-11",
+      "severity": "Required",
+      "origin": "own",
+      "section": "03 3.8",
+      "defect": "Host state, render.json and host settings carry a version and strict decoding, but no rule says what a newer or older romeu does with them, so a rollback after a bad release becomes a decode failure on every command.",
+      "scenario": "A user upgrades to v1.1, which writes projects/<name>.json version 2, hits a regression and reinstalls v1.0; every command now exits 2 on an unknown version or key, with no id saying how to recover.",
+      "change": "In 03 3.4, 03 3.7 and 03 3.8 state a window like 03 3.6 and 13 13.7: romeu N reads N and N-1 and writes N, an older romeu refuses a newer record with a named id and a fix hint (reinstall the newer romeu), migrations are forward-only and atomic.",
+      "cost": "One paragraph per format and three error ids.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-12",
+      "severity": "Required",
+      "origin": "own",
+      "section": "12 12.7",
+      "defect": "Issues have no usable shape: ADR 0001 and 12 12.7 give them the PR template and Conventional Commits, no check reads them (10 10.2), 02 2.1 has no issue templates, and bugs and PRs have no response expectation while SECURITY.md has one (12 12.8).",
+      "scenario": "A stranger opens 'it does not work' with no form asking for versions, command or output and no word on when anyone looks; three deferred triggers rely on a need 'written as an issue' (index: Deferred decisions), and those issues arrive without the facts a decision needs.",
+      "change": "Add .github/ISSUE_TEMPLATE/ (bug, catalog gap) to 02 2.1 with fields asking for the report file of L14-1; give issues their own row in ADR 0001's lead-practice table (a follow-up record); add to the 12 12.8 outlines a best-effort response expectation for issues and PRs and a README heading for when something goes wrong.",
+      "cost": "Two templates, an ADR change, outline lines; the README heading list is fixed before the candidate (11 11.2).",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-13",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "12 12.6",
+      "defect": "Release notes credit no contributor and link no issue, and the fix marker links a fix only to a release (12 12.10), so a reporter is never told their failure is fixed.",
+      "scenario": "A stranger's report is fixed in v1.0.2; the notes list `fix: ...` with the PR's Why; neither the reporter nor the stranger who fixed it is named and the issue stays open.",
+      "change": "In 12 12.6 have tools/release notes add each change's author handles and any `Fixes #<n>` reference, and add that convention next to `Fixes-release:` in 12 12.10.",
+      "cost": "A few lines in tools/release notes.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-14",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "12 12.10",
+      "defect": "No delivery number shows the stranger's experience, and maintainerWaitSeconds mixes agent PRs and outside PRs in one median.",
+      "scenario": "Agent PRs merge in an hour while outside PRs wait a month; the median still looks healthy, and the deferred merge-checkpoint decision (index: Deferred decisions) is read from a number that hides the wait that drives contributors away.",
+      "change": "In 12 12.10 report the maintainer wait and merged versus closed PRs split by whether the author is the operator's account, and the time to first response on issues, among the numbers that are not DORA's.",
+      "cost": "Two fields in dora.v1 and a fixture.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-15",
+      "severity": "Required",
+      "origin": "listed",
+      "section": "04 4.2",
+      "defect": "Only `romeu run` has `--timings`, and only as romeuMs and sbxMs; `sync`, `salvage`, `rm` and `retire`, which cross many steps and two machines, have no per-step timing or trace, so a maintainer cannot see in which step the time or the failure went.",
+      "scenario": "A user reports that `romeu rm` takes ten minutes then exits 5; nothing shows whether ingest, `julieta salvage`, bundle verify or the daemon fetch took the time, or which step produced the skipped item.",
+      "change": "Generalize `--timings [--json]` in 04 4.1 to every mutating romeu command, with one entry per numbered step of 04 4.2 (sync 1-10, run 1-8, the two salvage halves) and the sbx and git subprocess time inside each, and include it in the report of L14-1.",
+      "cost": "A widening of run-timings.v1 and step markers in each command.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-16",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "12 12.8",
+      "defect": "The ARCHITECTURE.md outline gives no read-first path per critical flow, and nothing checks that each error id leads to a recovery (plan.md T094 marks it [review]; ADR 0001 rule 16 is review-only).",
+      "scenario": "A newcomer fixing a salvage bug opens ARCHITECTURE.md and finds components and state diagrams but no path from `romeu rm` to the packages and tests it crosses; an error id added later has no guide recovery and nothing notices.",
+      "change": "Add to the 12 12.8 ARCHITECTURE outline one short section per flow (sync, run, salvage, ingest) naming its entry function, packages, invariants and tests; add a docs check that every id of the error table appears in a docs/guide page or a committed exemption list.",
+      "cost": "Outline lines and one check in the docs step.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-17",
+      "severity": "Required",
+      "origin": "listed",
+      "section": "04 4.2",
+      "defect": "The field failure modes of a host tool with no server (a full disk during sync, salvage or a bundle write; a mount permission change; egress denied at runtime) have no error id, doctor check or runbook, apart from the ledger temporary file (13 13.10).",
+      "scenario": "The disk fills during `romeu salvage`; the bundle write fails with exit 1 and a Go error string, the salvage manifest's closed skipped reasons (03 3.11) have none for it, and J6 offers only --accept-loss.",
+      "change": "Add a disk-full id and skipped reason, a doctor row for free space under $ROMEU_ROOT and host state, and a guide recovery per reason of 08 8.5 (over-cap, unreadable, missing repo, daemon head mismatch, disk full).",
+      "cost": "Two ids, one doctor row, guide text.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-18",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "10 10.2",
+      "defect": "No time budget is stated for the contributor's local loop; 10 10.2 says only that 'the steps take minutes', so the loop that decides whether a first fix takes an afternoon can grow unnoticed.",
+      "scenario": "The pre-push `fast` grows to fifteen minutes as lint runs per target and tests multiply; no number fails, and contributors push with --no-verify, which 10 10.2 treats as the backstop case.",
+      "change": "State in 10 10.2 a budget for `fast` on a warm cache (for example three minutes); have tools/ci print each step's duration and warn when the total exceeds it.",
+      "cost": "One number and a duration line per step.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-19",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "index: Boundaries",
+      "defect": "The Always rule 'run go run ./tools/ci all before opening a PR' cannot be met by a contributor with one machine: license runs on Linux only, the hybrid and container e2e on Linux only, the I27 cases on macOS only (10 10.2).",
+      "scenario": "A contributor on a Mac runs `all`, gets 'license: not run on darwin' and no hybrid e2e, and either breaks the rule as written or opens no PR.",
+      "change": "Reword to 'run go run ./tools/ci all on your platform before opening a PR; CI runs the others', and list in 12 12.8 which levels each platform runs.",
+      "cost": "One sentence and an outline line.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-20",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "index: Open questions",
+      "defect": "Shape: Q25 is decided and still in the table against the table's own rule; the maintainer-settled questions Q4, Q6, Q9, Q12, Q13, Q14 and Q23 have no event that brings them to a decision; Q9's 'Homebrew tap later' is a deferral with no Deferred decisions row.",
+      "scenario": "Q6 (rename or split) is the report a stranger opens first ('I renamed my repo') and nothing brings it to the maintainer except plan.md T101.",
+      "change": "Move Q25 out now (ADR 0008 records it); give each maintainer row the event that forces the decision (for Q6 'the first issue reporting J13 failing') or name T101 as that event; add a Deferred decisions row for the Homebrew tap with a trigger.",
+      "cost": "Table edits only.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-21",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "ADR 0005",
+      "defect": "Several deferred triggers are fired by strangers (a second contributor, the first PR from outside, a need 'written as an issue', the first undiagnosable rejection), and ADR 0005 says the table is read only in review rounds, which end with v1.",
+      "scenario": "After v1.0.0 the first stranger PR arrives; three rows and the token row should reopen, no review round is scheduled and nothing reminds anyone.",
+      "change": "In the preamble of index: Deferred decisions, state who reads the table after v1 and when (for example at each release, by the release task, and on the first issue or PR from an outside account).",
+      "cost": "One sentence.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-22",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "ADR 0007",
+      "defect": "ADR 0007's threat model points to the plan's deferred row 'whether agents push from a second account', reopened by block O1 item d, which ADR 0008 has decided (Q25), so the pointer leads nowhere.",
+      "scenario": "A contributor following the threat model to learn when the go.work and GOFLAGS escapes reopen finds no such row in plan.md.",
+      "change": "Since an accepted record is not rewritten (12 12.5), state the current trigger for those two escapes in index: Deferred decisions (the next change to the hook, or the token-narrowing row) and cite ADR 0008 there.",
+      "cost": "One table row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L14-23",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "plan.md T008 and T029 carry no acceptance for error details (argv, status, stderr, versions) or for timeout values and messages, while T002 already has 'a step timeout that names its limit' for tools/ci.",
+      "scenario": "The binaries ship with timeouts of unknown length whose message is a Go context error: the unreproducible hang report.",
+      "change": "Add to T008 a criterion that a subprocess error's details carry argv, status, bounded stderr and versions, and to T029 the timeout values and a test that the message names the wait.",
+      "cost": "Two acceptance lines.",
+      "parked_for_b": true
+    },
+    {
+      "id": "L14-24",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "plan.md's opening says 'the seven decision records under adr/'; there are eight, and the plan cites ADR 0008 itself.",
+      "scenario": "A planner counts seven records and misses the one that decides Q25.",
+      "change": "Change 'seven' to 'eight', or drop the count.",
+      "cost": "One word.",
+      "parked_for_b": true
+    }
+  ],
+  "coverage": {
+    "index": "L14-19, L14-20; also L14-4, L14-5 touch its Deferred decisions",
+    "00": "L14-1 (00 0.5 has no diagnostic row)",
+    "01": "L14-3",
+    "02": "L14-12 (no issue templates in 02 2.1), L14-1 (02 2.4 has no debug override)",
+    "03": "L14-11",
+    "04": "L14-1, L14-2, L14-15, L14-17",
+    "05": "L14-5, L14-6 (05 5.3 surfaces)",
+    "06": "L14-2 (06 6.3 causes without ids, kit build failure)",
+    "07": "L14-6 (07 7.5 step 2, 07 7.6 catalog PR evidence)",
+    "08": "L14-17 (08 8.5 reasons without recovery)",
+    "09": "L14-2 (J1 step 4 doctor checks without ids); no journey for reporting or contributing, see missing",
+    "10": "L14-7, L14-8, L14-18, L14-9, L14-3 (10 10.3 Parsers)",
+    "11": "L14-10; L14-9 (probe harness for strangers)",
+    "12": "L14-6, L14-12, L14-13, L14-14, L14-16",
+    "13": "L14-4",
+    "adr": "L14-5 (ADR 0008), L14-12 (ADR 0001), L14-14 (ADR 0004), L14-21, L14-22",
+    "plan": "L14-23, L14-24 (parked for B)"
+  },
+  "missing": [
+    {
+      "what": "a command that packs redacted evidence for an issue",
+      "where": "04 4.2, 05, 00 0.5"
+    },
+    {
+      "what": "a details contract for subprocess failures (argv, status, stderr, versions)",
+      "where": "04 4.1"
+    },
+    {
+      "what": "timeout values and their messages for sbx, git and registry calls",
+      "where": "04 4.1, 10 10.6"
+    },
+    {
+      "what": "a host-side record of romeu's own failures",
+      "where": "13 13.2"
+    },
+    {
+      "what": "a version window and rollback rule for host state, render.json and host settings",
+      "where": "03 3.4, 03 3.7, 03 3.8"
+    },
+    {
+      "what": "issue templates, a support path and a response expectation for bugs and PRs",
+      "where": "02 2.1, 12 12.8"
+    },
+    {
+      "what": "a stranger's path to an approval line and the evidence a catalog PR needs",
+      "where": "12 12.4, 07 7.6"
+    },
+    {
+      "what": "rules for agents handling stranger issues and PRs in the operator's account",
+      "where": "05 5.4, 12 12.9"
+    },
+    {
+      "what": "what each platform's local run covers, the exact mise and the first-run steps",
+      "where": "10 10.2, 12 12.8"
+    },
+    {
+      "what": "a failure-output contract for tools/ci",
+      "where": "10 10.2"
+    },
+    {
+      "what": "user-contributed recordings for unrecorded sbx versions and a test seam for Cannot-model bugs",
+      "where": "10 10.3, 12 12.9"
+    },
+    {
+      "what": "the post-v1 patch release rule",
+      "where": "11 11.2, 12 12.9"
+    },
+    {
+      "what": "per-step timings for every mutating command",
+      "where": "04 4.1"
+    },
+    {
+      "what": "a read-first path per flow in ARCHITECTURE.md and a check that each error id has a recovery",
+      "where": "12 12.8"
+    },
+    {
+      "what": "journeys for reporting a failure and for a first contribution, and a success criterion for either",
+      "where": "09, index: Success criteria"
+    },
+    {
+      "what": "contributor credit and issue links in release notes, and a stranger-experience metric",
+      "where": "12 12.6, 12 12.10"
+    },
+    {
+      "what": "who watches stranger-fired deferred triggers after v1",
+      "where": "index: Deferred decisions, ADR 0005"
+    }
+  ],
+  "postmortem": "# Postmortem: romeu e julieta, after v1.0.0\n\nWritten by the maintainer on duty, as I would see it fail. One page.\n\n**What happened.** v1.0.0 shipped clean: S1-S11 green, block B passed on\nboth Macs. Over the next months a dozen strangers tried it. Three opened\nissues, one sent a PR. None came back. The project became what its spec\ndescribes: one developer and their agents.\n\n**Why, in the order it hurt.**\n\n1. **Docker moved and we could not see where.** sbx updated, gate 1\n   exited 3 everywhere (01 1.4), people ran `approve --toolchain`, and the\n   parsers tuned to recorded versions met an unrecorded one (04 4.2 step\n   4, 10 10.3 \"Floor bumps\"). The report said \"run fails, RJ-1xx\". The\n   error had no argv, no sbx stderr, no versions (04 4.1 Output). We\n   could only reproduce on the maintainer's Macs, at the next sitting.\n2. **Nobody could send us a report we could use.** There is no issue\n   form (02 2.1), no diagnostic command (04 4.2, 4.3), no rule for what\n   is safe to paste from `doctor`, `status` or `ledger query` (all print\n   project names and keychain argv). Issues were held to the PR template\n   (12 12.7, ADR 0001), which fits a report not at all. The ledger, built\n   \"for improving romeu\" (13 13.9, ADR 0006), never left the reporter's\n   machine and records nothing romeu itself does (13 13.2).\n3. **The obvious first PR was the most gated.** `sync` told the user to\n   send \"a catalog PR\" (07 7.5 step 2). The catalog is ask-first\n   (05 5.3), so is the error table (`contracts`), so is every check\n   (`checks`). The stranger needed an approval line of \"the maintainer's\n   words\" (12 12.4) and no page said how to get them. The PR sat.\n4. **CI was red for reasons outside the change.** `govulncheck` is date\n   dependent and in `all` (10 10.2); a flake had no named owner (10 10.1);\n   the stranger's own name could trip the hashed denylist, reported by\n   location only (10 10.2, Forbidden names). The local run refused their\n   mise version before checking anything (10 10.2). The failure output of\n   `tools/ci` had no contract like the RJ table. They closed the PR.\n5. **The fix could not be tested where the bug lived.** The bugs that\n   matter are in \"Cannot model\": VM boot, virtiofs, kit builds, network\n   policy, credential injection (10 10.3). Test-first (12 12.9, ADR 0003)\n   had no seam for them; host and probe levels are \"maintainer machines\"\n   (10 10.1, 11). A stranger's redacted recording was never invited.\n6. **Even a merged fix reached nobody quickly.** 11 11.2 ties a kit or\n   catalog fix to a new candidate and block B; nothing said what v1.0.1\n   needs. Fixes waited for a sitting with two Macs. Release notes did not\n   name the contributor or the issue (12 12.6, 12 12.10 fix marker links to\n   a release, not an issue). Docs on `main` described flags the reporter's\n   binary did not have (Deferred: docs versioning).\n7. **The thing I would not say out loud: an agent answered them.** The\n   sandbox acts as the maintainer on GitHub (ADR 0008, 05 5.4). Agents\n   triaged, labelled and reviewed stranger issues and PRs in the\n   maintainer's account. ADR 0008 itself lists \"issue and PR text ... can\n   steer the agent\", and no rule followed (05 threat model, 5.4). One\n   crafted issue was enough to make an agent with admin rights act on it;\n   the polite strangers just felt they were talking to a bot that never\n   said so.\n8. **No number told us.** `tools/ci dora` measured merges and releases\n   (12 12.10, ADR 0004); `maintainerWaitSeconds` mixed agent PRs and\n   stranger PRs. No metric of time to first response or of stranger PRs\n   merged. The deferred triggers that strangers fire (\"a second\n   contributor\", \"first PR from outside\", \"written as an issue\") were\n   watched by review rounds that ended with v1 (ADR 0005 Consequences,\n   index Deferred decisions).\n\n**Root cause.** The spec's reader is \"the planner and implementers of\nv1, and reviewers of the design\" (index). Its newcomer is a contributor\nwho scaffolds (index, Simple and explicit). The stranger who reports and\nthe stranger who fixes are not users of this spec, so v1 had no door for\neither, and every gate built for an agent with the operator's token\nlanded on them instead.\n",
+  "lens_critique": "The lens judges success by strangers who report, fix and come back, but v1 is declared to serve one developer with no support promise (00 0.2), so part of what the lens asks for (response targets, contributor metrics, triage) is a cost the spec could rightly defer with triggers rather than build now. It also undervalues that the first field reports are the maintainer's own, on two Macs, and that the same diagnostic machinery serves them first; and it pulls toward verbose free-text logs, which collide with the no-free-text rule of 13, where closed-field, redacted evidence is the better answer.",
+  "missing_viewpoint": "The upstream partner: someone who reads the spec as the vendors of the sandbox runtime and of the agent would, to ask which unstable behaviours of the sandbox tool, the kit frontend and the agent the product leans on, and what channel back to those upstreams exists when one of them changes.",
+  "out_of_scope": [
+    {
+      "what": "whether the starting values of 13 13.8 are right",
+      "why": "the text alone cannot settle it; ledgers of real size from the field would"
+    },
+    {
+      "what": "cryptographic soundness of the gates, digests and signing rule",
+      "why": "this person would not look at it; L2 and L7 own it"
+    },
+    {
+      "what": "whether the sbx behaviours block A records are stable",
+      "why": "the text alone cannot settle it; the block A results and later sbx releases would"
+    },
+    {
+      "what": "the plan's order and size beyond the parked notes",
+      "why": "this person would not look at it; L9 owns it"
+    }
+  ],
+  "confidence": "High that each gap exists (each checked against the cited text); medium on severities, since the one-developer scope of v1 makes some of them deferrable."
+}

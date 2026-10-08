@@ -1,0 +1,1050 @@
+{
+ "page": "index",
+ "findings_read": 89,
+ "clusters": [
+  {
+   "id": "R8-index-1",
+   "section": "index: Open questions",
+   "title": "The Open questions table holds rows that are not open: Q25 is decided and recorded in ADR 0008 yet stays, and the maintainer-settled rows (Q4, Q6, Q9, Q12, Q13, Q14, Q23) have no event that makes them due, against the table's own rule that a question leaves when it is settled.",
+   "severity": "Required",
+   "lenses": [
+    "L0",
+    "L1",
+    "L10",
+    "L11",
+    "L12",
+    "L13",
+    "L13b",
+    "L14",
+    "L2b",
+    "L4",
+    "L5",
+    "L8",
+    "L9"
+   ],
+   "finding_ids": [
+    "L0-11",
+    "L1-21",
+    "L10-14",
+    "L11-10",
+    "L12-21",
+    "L13-20",
+    "L13b-19",
+    "L14-20",
+    "L2b-21",
+    "L4-36",
+    "L5-25",
+    "L8-25",
+    "L9-7"
+   ],
+   "listed": 1,
+   "own": 12,
+   "scenario": "A reader counts open questions before block A and counts a closed one; Q12 or Q13 is answered at T101, after block B, and a changed default forces a new candidate (11 11.2); tools/ci acceptance meets prose in the Settled by cell of Q25.",
+   "change": "Delete the Q25 row now; ADR 0008 is its record and 05 5.4 states the rule. In the paragraph above the table, replace 'A question leaves this table when it is settled' with 'A question leaves this table in the change that writes its ADR', and give the Settled by cell a grammar: 'probe ids, or maintainer, before the first release-candidate tag'. Write that due point into the Settled by cell of Q4, Q6, Q9, Q12, Q13, Q14 and Q23, so a late answer cannot force a new candidate.",
+   "cost": "one row deleted, two sentences, seven cells; sequences reads the cell grammar",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply without a new 'decided, record pending' state: deleting Q25 and giving the maintainer rows one due point (the first release-candidate tag) merges the readers' two fixes into one rule. The plan task ids (T101, T005) leave the tables in the plan-task-id cluster; the duplicate interval row of L13-20 is in the interval cluster."
+  },
+  {
+   "id": "R8-index-2",
+   "section": "index: Open questions; index: Deferred decisions",
+   "title": "Q9's 'Homebrew tap later' and Q23's 'a credential only if a private registry is needed' are deferrals written as open-question defaults, with no Deferred row and no event, while the index says a deferral without a row is an oversight.",
+   "severity": "Advisory",
+   "lenses": [
+    "L7",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L7-26",
+    "L13b-22"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A tap or a registry credential appears one day with no verification contract and no record of what was decided, because no row reopened either; a contributor looks for Q23 in the wrong table.",
+   "change": "Q9 Default: drop 'Homebrew tap later'. Q23 Default: drop the clause after 'cached by digest'. Add two Deferred rows: 'a Homebrew tap | GitHub releases only, verified as in J1 step 2 | the first issue asking for a tap; the decision says how the formula verifies provenance' and 'a host-settings credential for a private workload registry | descriptors are read anonymously (03 3.4) | the first workload in a private registry, written as an issue'. Add under each table heading one sentence restating ADR 0005's criterion: a question has a default the spec follows; a deferral is absent until its event.",
+   "cost": "two cells shortened, two rows, two sentences",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply for Q9 and Q23. The other half of L13b-22 (moving the token review interval and the ledger tuning rows to Open questions) is declined: the interval folds into the token row and the tuning row merges with rotation (see those clusters), which removes both rows instead of moving them."
+  },
+  {
+   "id": "R8-index-3",
+   "section": "00 0.5; 07 7.5; index: Deferred decisions",
+   "title": "The 'v1.1' bucket of 00 0.5 holds four items (the native egress queue in status, handoff --list filters, a Remote-SSH helper, a registry credential) with no trigger and no 'until then', beside a principle that says a deferral without a row is an oversight; Q23 lives in two tables.",
+   "severity": "Required",
+   "lenses": [
+    "L11",
+    "L9"
+   ],
+   "finding_ids": [
+    "L11-3",
+    "L9-21"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "Nothing reopens any of the four; the registry credential carries two texts with two rules. L9-21's other halves (kit publishing, the shared ledger trigger, the finding-class row) are in those clusters.",
+   "change": "Replace the v1.1 row of 00 0.5 and the parenthesis of 07 7.5 with Deferred rows: the native egress queue in status (until then: sbx's own command; reopened by the first native approval a user resolves without knowing it existed, written as an issue), handoff --list filters (until then: the full list; reopened by the first issue asking for one), a Remote-SSH helper (until then: none; reopened by the first issue asking for one), and the registry credential (merged with the Q23 row of the Q9/Q23 cluster). Change the 00 0.5 sentence 'anything that does not is marked v1.1' to 'anything that does not is a row of Deferred decisions'.",
+   "cost": "one 00 0.5 row and sentence, one 07 7.5 parenthesis, three index rows",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the rows above. The text change is small, but it removes the 'v1.1' label from 00 0.5, the scope justification, so the operator decides whether those four items stay promised for v1.1 or become plain deferrals.",
+   "operator_reason": "changes the scope (00 0.5): the 'v1.1' label is a promise to a release, while a Deferred row promises nothing until its event"
+  },
+  {
+   "id": "R8-index-4",
+   "section": "06 6.6; 03 3.4; index: Deferred decisions",
+   "title": "The kit publishing path is a deferral outside the Deferred table: six rows of design, including a host-settings key kits.source that 03 3.4 does not define, reopened by 'a maintainer decision', which ADR 0005 rule 3 does not accept as an event.",
+   "severity": "Required",
+   "lenses": [
+    "L11",
+    "L3"
+   ],
+   "finding_ids": [
+    "L11-20",
+    "L3-23"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A reader of 06 6.6 writes kits.source into a settings file and the strict decoder of 03 3.4 refuses it; the Docker Hub limits written today will have changed when the trigger fires; promotion happens by no defined event.",
+   "change": "Replace the table and the Docker Hub paragraph of 06 6.6 with the sentences today's design depends on (gate 2 records a content hash for a local kit; a published kit would be recorded by digest) and one Deferred row: 'publishing and signing product kits | local builds only, trusted as the release plus the config commits (06 6.1) | the first issue from a user who cannot build the local kits, or sbx accepting a signature for a local kit'. Keep the 00 0.3 non-goal and repoint its '(designed in 06 6.6)' to the row.",
+   "cost": "one section shortened to a paragraph, one row, one citation",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply by deletion rather than an ADR in Proposed status: the design rows describe a registry and tags no code reads, and that decision is better taken when the trigger fires. The non-goal of 00 0.3 stays as it is; only its pointer moves."
+  },
+  {
+   "id": "R8-index-5",
+   "section": "index: Deferred decisions (narrowing the sandbox's GitHub token)",
+   "title": "The token-narrowing row, the acceptance of the widest decision in the project, has no producer for its triggers: 'every 2 autonomous work sessions' is counted by nothing (13 13.2 records no session start or end), and the security-log trigger depends on a log whose coverage the row itself calls unverified.",
+   "severity": "Blocking",
+   "lenses": [
+    "L2b",
+    "L5"
+   ],
+   "finding_ids": [
+    "L2b-4",
+    "L5-22"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "Six sessions pass and nobody counted; an agent merges and tags through the API and the security log of a personal account does not show it; the narrowing is never reconsidered while the operator's full reach stays with every sandbox.",
+   "change": "Give the session trigger a producer that already exists: a session ends at its final handoff (08 8.3), so write the trigger as 'the second final handoff of the product project since the date of the last review, written in this row; romeu handoff --list shows them'. Each review rewrites that date. Take the security-log clause out of the trigger list and keep it as a sentence: 'the GitHub security log is not a trigger, its coverage being unverified (05 5.4)'.",
+   "cost": "one cell rewritten; no new tool, the count is read from a list a command already prints",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the handoff-count form above: it keeps the operator's cadence and replaces memory with a command's output. The alternative, a calendar date, needs an exception to ADR 0005 rule 3 recorded in ADR 0005.",
+   "operator_reason": "the trigger is the operator's recorded decision in ADR 0008 and the risk it guards is accepted in 05 5.4; changing how it fires changes that decision record"
+  },
+  {
+   "id": "R8-index-6",
+   "section": "index: Deferred decisions (the review interval of the token narrowing)",
+   "title": "The row 'the review interval of the token narrowing' repeats the interval of the row above it and is reopened by 'the operator saying so', which no reader or check can see fire.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0",
+    "L5",
+    "L12"
+   ],
+   "finding_ids": [
+    "L0-12",
+    "L5-23",
+    "L12-22"
+   ],
+   "listed": 0,
+   "own": 3,
+   "scenario": "A reader updates the interval in one row and not the other; a reviewer cannot tell a fired trigger from an ignored one.",
+   "change": "Delete the row and add to the token-narrowing row's trigger cell: 'The interval becomes every 10 sessions once the panel or a ledger view shows the agent's GitHub actions per session; that view existing is the event, and the operator then decides the change (ADR 0008).'",
+   "cost": "one row deleted, one sentence added",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply: what ADR 0008 decided (2 sessions, then 10 once review is cheap) stays; only the duplicate row and its unobservable trigger go. L0-12's other half (triggers no one observes) is answered by the issue-label cluster."
+  },
+  {
+   "id": "R8-index-7",
+   "section": "index: Deferred decisions",
+   "title": "Many rows are reopened by events only a person notices ('The maintainer observes these', 'the first question about', 'written as an issue'), with no channel by which an adopter's event reaches anyone; no row names the check that detects its trigger, although ADR 0005 Consequences asks for it; and after round 8 no review round reads the table.",
+   "severity": "Required",
+   "lenses": [
+    "L10",
+    "L11",
+    "L3",
+    "L9",
+    "L6"
+   ],
+   "finding_ids": [
+    "L10-12",
+    "L11-11",
+    "L3-18",
+    "L9-5",
+    "L6-30"
+   ],
+   "listed": 1,
+   "own": 4,
+   "scenario": "An adopter restores the ledger from a backup, a hash-chain trigger, and nobody upstream learns of it; tools/ci sequences passes because all three cells are filled; the step-table and dark-package triggers never fire because nothing compares them.",
+   "change": "Add two sentences under the Deferred decisions heading: 'Where a check or a command output detects the event, the Reopened by cell names it. Any other event is reported, by whoever meets it, as an issue labelled deferred that names the row, and the table is read at each release-candidate tag.' Add the label to the CONTRIBUTING.md outline of 12 12.8. Rewrite the cells that say 'The maintainer observes these' or 'The maintainer observes it' as 'reported as an issue labelled deferred'. For the step-table row, name the check that detects drift: a test that the step names tools/ci all prints equal the rows of 10 10.2, whose landing also closes the row. For the dark-package row, name the check: a listing of packages no command reaches, read at each release-candidate tag.",
+   "cost": "two sentences, one label, a few cells; no fourth column",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply one issue label and one reading event instead of a 'Detected by' column: one channel for every human-observed trigger merges the per-row observers into one concept, and a release-candidate tag is an event, not a date."
+  },
+  {
+   "id": "R8-index-8",
+   "section": "index: Deferred decisions (finer visibility per project in the cross-project view)",
+   "title": "The trigger 'the first private project on a machine that also runs a public one' cannot be observed: the spec has no notion of a private or public project (03 3.2), it misses projects of different clients that are all private, and the row names no observer.",
+   "severity": "Required",
+   "lenses": [
+    "L10",
+    "L16"
+   ],
+   "finding_ids": [
+    "L10-11",
+    "L16-6"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "A consultant runs client A and client B projects on one Mac; A's sandbox lists B's project name and activity times (13 13.6); the trigger never fires, because neither project is public.",
+   "change": "Rewrite the trigger: 'projects whose repositories belong to more than one owner (a GitHub owner or a gitHosts entry) are synced on one machine, reported as an issue labelled deferred; or an issue asks that a project not be seen by the others'. Keep the until-then cell, which cites the accepted risk in 05 5.4.",
+   "cost": "one cell",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the trigger rewrite only; a sync notice or a host-settings switch is the decision the trigger reopens. The accepted risk in 05 5.4 is unchanged."
+  },
+  {
+   "id": "R8-index-9",
+   "section": "index: Deferred decisions (a free-text note)",
+   "title": "The free-text note is reopened when an agent's need is 'written as an issue', but the agent, the only observer, is told nowhere that an issue is the channel, so the trigger cannot fire.",
+   "severity": "Required",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-16"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "An agent finds a wrong guide step; julieta event add accepts only closed ids, so it records nothing, and the agent never learns to open an issue; the deferral waits forever.",
+   "change": "Rewrite the trigger as 'an issue labelled deferred asking for it', and add one sentence to the julieta skill's text: something no event id expresses goes into the handoff, and the agent opens an issue labelled deferred that names this row.",
+   "cost": "one cell, one sentence in the skill",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply without a CLI hint: the skill already carries the agent's instructions, and the label is the channel of the issue-label cluster."
+  },
+  {
+   "id": "R8-index-10",
+   "section": "index: Deferred decisions (docs versioning per release)",
+   "title": "The docs-versioning row's 'until then' is itself a defect once v1.0.0 ships: a user on release N reads main's generated error ids, exit codes and command pages, and the trigger fires the first week with nothing reporting it.",
+   "severity": "Required",
+   "lenses": [
+    "L8"
+   ],
+   "finding_ids": [
+    "L8-3"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "After v1.0.0 a PR rewrites two fix hints; a v1.0.0 user follows the reference on GitHub for an id their binary prints with a different hint.",
+   "change": "Change the until-then cell to 'the release notes and the README's install section link the docs at the release tag; the default branch's docs describe the next release', and state that tools/release writes the tag link into the notes. Keep the trigger.",
+   "cost": "one cell; one line in the release notes",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the link at the tag; attaching the docs as a release asset is a second mechanism for the same need and waits for the row's trigger."
+  },
+  {
+   "id": "R8-index-11",
+   "section": "index: Deferred decisions",
+   "title": "Several Reopened by cells name plan steps (the start of T005, item e) instead of the event the step produces, while plan.md says the spec is the plan's source of truth.",
+   "severity": "Required",
+   "lenses": [
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13b-20"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The plan renumbers or merges T005; the trigger points at nothing; sequences passes because the cell is filled.",
+   "change": "Rewrite 'the start of T005' as 'the first pull request that adds a check reading the approval line'; rewrite 'item e, when the jobs of the green run are added as required checks' as 'the jobs of the green run are added as required checks'; remove 'because T005 builds it' from the until-then cell. Add to 12 12.5: 'The spec names no plan task; the plan cites the spec.' The task ids in 10 10.2 are page 10's.",
+   "cost": "three cells, one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-12",
+   "section": "index: Principles (Decide at the last responsible moment); ADR 0005 rule 1",
+   "title": "The carve-out 'a security invariant, a merge gate and anything a later step depends on are never deferred' is open-ended (any text that adds a dependent step makes a need of the start) and is contradicted by five deferred rows that defer parts of the merge gate, only one of which records the collision.",
+   "severity": "Required",
+   "lenses": [
+    "L11",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L11-12",
+    "L13b-21"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A reviewer refuses the next merge-gate deferral while four stand unmarked; the ledger and dora become needs of the start because later sections were written to depend on them.",
+   "change": "Rewrite the sentence: 'A security invariant, a merge gate and anything the first-day path (J1 to J3, J5, J6) depends on are needs of the start. A part of one is deferred only as a risk the operator accepted by name in 05 5.4, and its row says so.' Add 'a merge-gate part, accepted in 05 5.4' to the four merge-gate rows (approval recording, required checks without the bypass, re-reading the rulesets, a separate test job). Mirror it in ADR 0005 with a superseding note.",
+   "cost": "one sentence, four cell clauses, one ADR note",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the rewrite: it bounds the carve-out and names the one exception path ADR 0008 already used.",
+   "operator_reason": "changes ADR 0005 rule 1, a decision record, and ties four rows to accepted risks in 05 5.4"
+  },
+  {
+   "id": "R8-index-13",
+   "section": "ADR 0007 (Threat model); index: Deferred decisions",
+   "title": "ADR 0007 defers two escapes (an untracked go.work, a caller's GOFLAGS -overlay) until the Q25 sandbox-token question is decided, through a row that exists in neither the index nor the plan; Q25 was decided on 2026-10-07, so the trigger fired and nothing reopened it.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-2"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A reader of Deferred decisions never sees the two escapes; the pre-push hook keeps starting tools/ci in a way both act on.",
+   "change": "Add one Deferred row: 'the hook starting tools/ci so that an untracked go.work or a caller's GOFLAGS cannot act on go run (ADR 0007) | the review covers them | the next change to .githooks/pre-push'. Record in ADR 0007, by a superseding note, that its trigger moved from Q25 to this row.",
+   "cost": "one row, one ADR note",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the row with the hook trigger, or deciding the guard now, since its first trigger has fired.",
+   "operator_reason": "moves a deferral trigger recorded in ADR 0007, a decision record"
+  },
+  {
+   "id": "R8-index-14",
+   "section": "index: Deferred decisions (a check that reads the rulesets again)",
+   "title": "The row says 'tools/ci all is offline', while 10 10.2 runs govulncheck over the network and pulls the reuse image, and 10 10.1's network rule lists neither.",
+   "severity": "Required",
+   "lenses": [
+    "L13"
+   ],
+   "finding_ids": [
+    "L13-7"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A local run without network fails in vulnerabilities and license and is read as a defect of the change; or a reviewer trusts the claim and adds a ruleset read because the network is already there.",
+   "change": "Replace 'tools/ci all is offline' with 'tools/ci all makes no GitHub API call; its network reads are the list in 10 10.1'. The list itself, and the same claim in ADR 0001 rule 5 and ADR 0008, belong to pages 10 and adr.",
+   "cost": "one clause",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-15",
+   "section": "index: Deferred decisions (running the change's tests in a separate job)",
+   "title": "The row says an attack on the tools/ci process is 'out of its reach, and the review of the diff covers it', while 05 5.4 and 10 10.2 item a record that the ruleset requires no review.",
+   "severity": "Advisory",
+   "lenses": [
+    "L2b"
+   ],
+   "finding_ids": [
+    "L2b-24"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A reader believes a review stands between a test and the CI token until the first outside contributor; nothing does.",
+   "change": "Replace 'and the review of the diff covers it (ADR 0008 already treats the review, not the token, as the barrier)' with 'and what holds is the read-only token permissions of ci.yml; the ruleset requires no review (05 5.4)'.",
+   "cost": "one clause",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed; adding release.yml to the trigger (L2b-8) is that finding's own cluster."
+  },
+  {
+   "id": "R8-index-16",
+   "section": "index: Deferred decisions (turning on the agent's own telemetry export)",
+   "title": "The telemetry row says romeu sets one variable in a sandbox and cites I1, which is about panes and the final argv, while 04 4.1 also sets SSH_AUTH_SOCK for the sbx process of a git-ssh-sign project.",
+   "severity": "Advisory",
+   "lenses": [
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13b-24"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A reader strengthens the citation into 'romeu passes exactly one variable' and writes a test that fails the day a git-ssh-sign project syncs.",
+   "change": "Replace the sentence with: 'romeu starts sbx with a scrubbed environment (plus SSH_AUTH_SOCK for a git-ssh-sign project) and passes one --env into a sandbox, JULIETA_MANIFEST (04 4.1)', dropping the I1 citation there; keep 'whether I1's argv gains a variable' in the trigger.",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-17",
+   "section": "index: Deferred decisions (ledger rotation, tuning, finding-class)",
+   "title": "Two rows share one subject and one trigger (rotation of the runtime ledger and tuning its starting values, both reopened by doctor's size warning), and the finding-class row can fire only once the gate-run row's mechanism exists.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11",
+    "L4"
+   ],
+   "finding_ids": [
+    "L11-33",
+    "L4-38"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "doctor's size warning fires and two rows reopen for one decision; the finding-class row never fires while the gate-run row stays deferred.",
+   "change": "Merge 'tuning the ledger's starting values' into the rotation row (subject: rotation, a hard size limit and the starting values of 13 13.8; trigger: the union of both cells). Fold the finding-class row into the gate-run row as its second sentence: 'with it, a finding-class field and a count of repeated classes; gate runs before it are never classified'.",
+   "cost": "two rows removed, two cells extended",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply by merging; a field that depends on the gate-run record needs no trigger of its own."
+  },
+  {
+   "id": "R8-index-18",
+   "section": "index: Deferred decisions (whether the maintainer's merge stays a manual checkpoint)",
+   "title": "The merge-checkpoint row fires on the first dora output with a non-null maintainerWaitSeconds, data the row itself says cannot tell the maintainer's merges from the sandbox's, and 12 12.10 names that number 'maintainer wait' although it covers CI, review and sandbox merges.",
+   "severity": "Required",
+   "lenses": [
+    "L9"
+   ],
+   "finding_ids": [
+    "L9-10"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "At the first dora run the trigger fires; the decision is due with no way to separate the merges, so it is made on a number that measures something else, or quietly postponed.",
+   "change": "Rename the 12 12.10 number and the dora.v1 field to 'ready-to-merge wait' (readyToMergeWaitSeconds). Rewrite the trigger: 'a way to attribute a merge exists (a trailer written by the tool that merges, or a second account) and three releases carry dora.json'; until then the merge stays manual by agreement, as the cell says.",
+   "cost": "one rename in 12 12.10 and dora.v1, one cell",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply; the rename is spec text (no code reads the field yet) and removes the cell's own disclaimer."
+  },
+  {
+   "id": "R8-index-19",
+   "section": "index: Deferred decisions",
+   "title": "No row records the loss mechanisms v1 leaves out (snapshot history, salvage of a sandbox that does not start, a host-visible time of the last good snapshot, host-state migration), although a deferral without a row is an oversight.",
+   "severity": "Advisory",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-37"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "v1 ships without them, and nothing reopens them before the first loss, because they were never written down as deferred.",
+   "change": "Add one row: 'snapshot history, salvage of a sandbox that does not start, a host-visible time of the last good snapshot, and host-state migration | the guarantee of 00 0.1 over a sandbox that starts, with one snapshot | the first salvage record whose reason says the sandbox half failed, or the first issue labelled deferred'. A mechanism another loss finding decides to build gets no row.",
+   "cost": "one row",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as one row instead of one per mechanism; they share a trigger."
+  },
+  {
+   "id": "R8-index-20",
+   "section": "index: Deferred decisions",
+   "title": "No row covers the disk growth that only the user feels: salvage payloads of up to 1 GiB each, snapshots, .attic and review checkouts, which romeu never deletes (I16) and no command reports.",
+   "severity": "Advisory",
+   "lenses": [
+    "L1"
+   ],
+   "finding_ids": [
+    "L1-20"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "After months of recreates the host disk fills; status and doctor say nothing; the user deletes directories by hand and risks the only copy of unpushed work.",
+   "change": "Add one row: 'reporting and reclaiming the space of salvage payloads, snapshots, .attic and review checkouts | they only grow; romeu deletes none of them (I16) and no command reports their size | the first issue labelled deferred that reports a full disk'.",
+   "cost": "one row",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the row without a size column in status now; a size report is the decision the row defers."
+  },
+  {
+   "id": "R8-index-21",
+   "section": "index: Deferred decisions",
+   "title": "The table mixes deferrals in the product with deferrals in how this repository is run, so an adopter scanning for what v1 leaves out reads a dozen rows about one maintainer's GitHub account.",
+   "severity": "Advisory",
+   "lenses": [
+    "L10"
+   ],
+   "finding_ids": [
+    "L10-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An adopter misses the three rows that touch them (docs versioning, ledger rotation, cross-project visibility).",
+   "change": "Split the section under two sub-headings with the same three columns, 'In the product' and 'In how this repository is run', and have tools/ci sequences check every table under the section.",
+   "cost": "two sub-headings; sequences reads two tables",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply; the merge of the interval row that L10-13 also asks for is in the interval cluster."
+  },
+  {
+   "id": "R8-index-22",
+   "section": "index: Success criteria",
+   "title": "The objective's user promises have no success criterion: one command per project with nothing to think about (00 0.1, 00 0.2), a product that carries real daily work, and 'nothing sandbox-only is lost'; S1 to S11 measure the producer, and S7 passes a journey of any length.",
+   "severity": "Blocking",
+   "lenses": [
+    "L1",
+    "L0",
+    "L4"
+   ],
+   "finding_ids": [
+    "L1-1",
+    "L0-24",
+    "L4-35"
+   ],
+   "listed": 0,
+   "own": 3,
+   "scenario": "v1.0.0 ships with every criterion green while adding a project is seven manual steps; the maintainer finds the restart path and the restore gap in the first week of real use; no evidence shows that a kill at each destructive step converges.",
+   "change": "Add S12: 'on both block B hosts, J1 from a clean host, J2 and the daily resume of a stopped sandbox record the count of operator commands and prompts and the wall clock, compared with 00 0.2 in the acceptance PR [review]; and the release candidate carries the maintainer's own work for 2 autonomous work sessions across 2 projects, each ending in a final handoff'. Evidence: docs/probes/B3-<host>.json and the handoff records. Name the fault-injection test of the destructive step list (01 1.6) as evidence of S6.",
+   "cost": "one criterion, one evidence clause on S6, fields in the B3 result",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "operator_reason": "Adds a success criterion (S12), which is scope and belongs to the operator per the round page's legend; R8-00-3 and R8-09-2 decline S12, so the three are one decision, SC16. Routed by the gate review of the round page.",
+   "resolution_text": "Apply with recorded counts and a review comparison instead of invented bounds; a bound is best set once the first measurement exists."
+  },
+  {
+   "id": "R8-index-23",
+   "section": "index: Success criteria (S8)",
+   "title": "S8 gates a number the user does not feel (romeu's overhead with sbx time excluded, on an empty ledger) and asserts a wall-clock bound on shared hosted runners with no noise budget, a designed flake, while the end-to-end wait of a run and the origin of 2 s and 3 s are stated nowhere.",
+   "severity": "Required",
+   "lenses": [
+    "L0",
+    "L1",
+    "L11",
+    "L6"
+   ],
+   "finding_ids": [
+    "L0-23",
+    "L1-8",
+    "L11-13",
+    "L6-21"
+   ],
+   "listed": 1,
+   "own": 3,
+   "scenario": "S8 is green at 1.2 s while every warm run takes 40 s; on a loaded runner romeuMs reads 2.3 s with no code change and the bound is raised to unblock a merge.",
+   "change": "Make B5 on a host the gate for both S8 figures, and have B5 also record, as observations, the wall clock of romeu run on a running and on a stopped sandbox, sbx time included (median of 5). In CI, record romeuMs of run --timings --json as an artifact and assert nothing on it. State that 2 s and 3 s are starting values that the first B5 measurement may move through review. Keep --timings, which is the rotation row's producer.",
+   "cost": "one criterion rewritten, one CI assertion removed, two more fields in B5",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply; dropping --timings (L11-13) is declined, because the ledger rotation trigger reads it and dropping it would change 00 0.5."
+  },
+  {
+   "id": "R8-index-24",
+   "section": "index: Success criteria (S1)",
+   "title": "S1's evidence says the attestation step signed the archives, while 05 5.4 says signing is an operator step with a credential outside GitHub, and its evidence is the same run's own verify, so nothing shows that a user who downloads the assets can verify them.",
+   "severity": "Blocking",
+   "lenses": [
+    "L13",
+    "L7"
+   ],
+   "finding_ids": [
+    "L13-2",
+    "L7-4"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "v1.0.0 ships with checksums and an attestation only; the J1 commands in the guide carry a wrong signer path; S1 is still green.",
+   "change": "Reword S1's evidence to 'whose attestation step attested them', and add an evidence item: the B1 result on v1.0.0 that runs the J1 commands from e2e/scenarios/commands.yaml against the downloaded assets and records each asset's sha256, which tools/ci acceptance compares with the release API. The mechanism of the operator signature (what is signed, with what, where it is published) is a 05 5.4 Release signing change, routed to the operator in page 05.",
+   "cost": "one cell reworded, one evidence item",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the S1 rewording and the consumer-side evidence; the missing signature mechanism belongs to 05 5.4, an accepted-risk section, and goes to the operator there."
+  },
+  {
+   "id": "R8-index-25",
+   "section": "J1; J9",
+   "title": "The user's release verification is underspecified: J1 step 2's gh attestation verify binds the repository and workflow path, not the tag or the commit; J9's upgrade has no verify steps; and J1 step 1 does not say that verify needs network access and an authenticated gh.",
+   "severity": "Blocking",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-1",
+    "L7-22",
+    "L7-23"
+   ],
+   "listed": 0,
+   "own": 3,
+   "scenario": "A run of an edited release.yml from a branch, or a recreated tag, yields an archive the J1 commands accept (inferred, not confirmed against the pinned gh); every upgrade after the first goes unverified.",
+   "change": "Add to 10 10.2 one verification contract, the single list J1 step 2, J9, B1, the README and tools/release verify derive from: repository, signer workflow, source ref refs/tags/<tag>, source commit, hosted runners only, with the gh flags read from the pinned gh's help before they enter the spec. J9's install and verify use the same commands.yaml entry as J1. J1 step 1 states the network and gh login requirement.",
+   "cost": "one contract list, two journey lines",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply; the residual risk (an agent holding the token can produce a release the contract accepts) is the existing 05 5.4 Release signing row, so no accepted risk is added. Publishing the attestation bundles for offline verify waits for a request."
+  },
+  {
+   "id": "R8-index-26",
+   "section": "J1",
+   "title": "No page decides code signing and notarization of the darwin binary, and J1 does not mention Gatekeeper, so the product's first step may teach users to remove the quarantine attribute.",
+   "severity": "Required",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-21"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A user downloads the archive in a browser, Gatekeeper refuses the unsigned binary (inferred), and the shared workaround is xattr -d com.apple.quarantine.",
+   "change": "J1 step 2 downloads with curl (which sets no quarantine attribute, inferred; B1 confirms it on both hosts) and says why. Add a Deferred row: 'signing and notarizing the darwin binary | not signed; installed with curl as in J1 | the first issue labelled deferred that reports a Gatekeeper refusal'.",
+   "cost": "one journey sentence, one row, one B1 check",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply; the Apple behaviour stays marked inferred until B1 measures it."
+  },
+  {
+   "id": "R8-index-27",
+   "section": "J1; J2",
+   "title": "J1 and J2 omit setup steps their commands require: J1 assumes a config repo already exists; J1 step 5 adds only secrets while 03 3.1 and 06 6.4 require gitHosts, workloadRepositories and signing.agentSocket; and J2 omits the name@project secret binding, so its sync exits 2.",
+   "severity": "Required",
+   "lenses": [
+    "L1",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L1-6",
+    "L13b-7",
+    "L1-7"
+   ],
+   "listed": 0,
+   "own": 3,
+   "scenario": "A new user has no config repo for romeu init --config-url; romeu sync exits 2 because github.com is not a gitHosts entry; J2's sync exits 2 naming github@foo and the user edits settings.yaml by hand.",
+   "change": "Add a J1 step before step 3: create the config repo from examples/ and push it, naming the fields filled by hand. In J1 step 5 name the host-settings keys the operator fills (gitHosts, workloadRepositories, signing when used, secrets), and say in the 04 4.2 init row and 03 3.4 which keys init writes. Add to J2 the binding step with the exact YAML and keychain command, and make sync's exit-2 fix hint print the entry to paste.",
+   "cost": "three journey steps, one 04 row sentence, one fix hint",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply without romeu init --scaffold and without a deferred row for a binding command: a documented copy and a printed entry meet the need with no new command."
+  },
+  {
+   "id": "R8-index-28",
+   "section": "J12",
+   "title": "09's opening says J12 runs J1 steps 3 to 6 while the J12 section says steps 1 to 5, and J12 does not say whether memory reaches the second machine.",
+   "severity": "Advisory",
+   "lenses": [
+    "L1",
+    "L13",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L1-22",
+    "L13-31",
+    "L13b-34"
+   ],
+   "listed": 2,
+   "own": 1,
+   "scenario": "The J12 scenario follows the opening and the guide follows the section; a user with two machines finds no memory or handoff from the other one.",
+   "change": "Make the J12 section say J1 steps 3 to 6 (install and download are preconditions on a second machine too; step 6 is the gate J12 step 2 needs), and add: 'agent memory and handoffs stay on the machine that wrote them (Q14)'.",
+   "cost": "two sentences",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-29",
+   "section": "J6",
+   "title": "J6 step 3 and 04 rm show the 'no final handoff' warning after julieta salvage --stop-agents has stopped the agent, so the one actor who could still write the final handoff is gone.",
+   "severity": "Required",
+   "lenses": [
+    "L13"
+   ],
+   "finding_ids": [
+    "L13-10"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The operator runs romeu rm, sees the warning after the sandbox half, and the session's narrative is lost although the salvage is complete.",
+   "change": "Move the handoff check before the sandbox half in 04 rm, 08 8.3 and J6 (after the preflight, before salvaging); on a TTY, rm asks whether to continue without a final handoff; without one, it warns and continues.",
+   "cost": "a step moved in three places, one prompt",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-30",
+   "section": "J6; J10",
+   "title": "Recovery of salvaged work has no documented, checked steps: J10 step 3 is a plain git command with '(docs show the hardened form)', outside ADR 0001 rule 13's check, and no journey shows how to restore a dirty-tree commit, stash commits or ignored.tar.gz.",
+   "severity": "Required",
+   "lenses": [
+    "L8",
+    "L4"
+   ],
+   "finding_ids": [
+    "L8-6",
+    "L4-33"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "An operator with a hostile global git config runs the plain line in a host clone; after a recreate the operator guesses at refs and untars on the host an archive I24 says is never extracted there.",
+   "change": "Write the hardened form in J10 step 3 and add it to e2e/scenarios/commands.yaml as a checked entry run by J10's CI scenario. Add to J6 the restore steps: push the salvage ref's worktree commit from the host into the new sandbox, apply stash-<n>, extract ignored.tar.gz inside the sandbox only; spell out 'the operator fixes it' per reason.",
+   "cost": "two journey steps, one commands.yaml entry",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply without a new romeu salvage --restore command; the checked command line closes the gate gap."
+  },
+  {
+   "id": "R8-index-31",
+   "section": "J8",
+   "title": "J8 step 3 says running sandboxes already have the tool installed from inside, contradicting 07 7.5: a new tool's domains reach the egress only after the change merges into ref and romeu sync applies it, so step 1's julieta install fails.",
+   "severity": "Required",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-11"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The agent adds core:python on a branch and runs julieta lock and install; both need pypi.org, which is not allowed; the agent concludes the tool is broken.",
+   "change": "Rewrite J8: the agent edits mise.toml, commits and opens the PR; install follows the operator's merge and sync, unless the tool's domains are already allowed. Add to 07 7.5 'egress follows ref, so a tool added on a branch installs once it merges', and the same sentence to julieta install's egress error.",
+   "cost": "one journey rewritten, two sentences",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-32",
+   "section": "J5",
+   "title": "Every journey is told from the operator's side; none shows what the agent sees when its context is compacted, its request is blocked by egress, its push is refused or its spec change waits at the gate.",
+   "severity": "Advisory",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-35"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "No scenario catches a regression in what the agent is told.",
+   "change": "Add one sentence to 09's opening: 'Journeys are told from the operator's side; what the agent is told is asserted by the hook and command tests of 08 and 13.' No new journey.",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State as a limit; an agent-side journey is worth adding when the first regression in agent-facing output reaches a user."
+  },
+  {
+   "id": "R8-index-33",
+   "section": "index: Open questions (Q13)",
+   "title": "Q13's default (per-project fine-grained tokens) and ADR 0008 decision 3 (the token in every project is the operator's own) disagree on what holds today.",
+   "severity": "Advisory",
+   "lenses": [
+    "L2"
+   ],
+   "finding_ids": [
+    "L2-21"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A second adopter reads Q13, binds one token per project and believes the projects are isolated on GitHub; the reference instance is not.",
+   "change": "Add to Q13's Default cell: 'the mechanism is per project; the reference instance binds the operator's own token in every project (ADR 0008)'.",
+   "cost": "one clause",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-34",
+   "section": "index: Success criteria (S9)",
+   "title": "S9 neither counts a package with no test file (absent from the profile) nor states where its thresholds and its 90 percent package list came from, and it leaves out cmd/ without a reason.",
+   "severity": "Required",
+   "lenses": [
+    "L6",
+    "L11"
+   ],
+   "finding_ids": [
+    "L6-11",
+    "L11-14"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "cmd/julieta's error-to-exit mapping has no test and tools/ci coverage reports every package above threshold; a renamed package fails acceptance by name.",
+   "change": "In S9 and the coverage row of 10 10.2: the package list comes from go list ./..., a package absent from the profile counts as 0 percent, and cmd/ is in scope; state that 80 and 90 percent are starting values that are only raised.",
+   "cost": "one criterion cell, one 10 10.2 row",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply; naming the 90 percent set by a property waits for the first coverage run, which shows which packages it fits."
+  },
+  {
+   "id": "R8-index-35",
+   "section": "index: Success criteria (S6)",
+   "title": "S6 is evidenced by tool names and no run; mutate is not a step of all and release.yml runs all, so the release commit never has a mutate result.",
+   "severity": "Required",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-4"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The last mutate run is a scheduled fuzz.yml run three weeks before the tag; acceptance records S6 as met.",
+   "change": "Make S6's evidence a ci-run item of a mutate run on the tagged commit, and have release.yml run go run ./tools/ci mutate before tools/release build (10 10.2, Release and bootstrap).",
+   "cost": "one evidence cell, one release step",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-36",
+   "section": "index: Success criteria (S7)",
+   "title": "J6, the nothing-lost journey, runs only in the host half, once, on the release candidate, though the hybrid level could reach it.",
+   "severity": "Required",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-9"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A salvage regression merges after v1.0.0; J6 never runs in CI; an rm exits 0 and a worktree branch is gone.",
+   "change": "Add J6 to the CI list of S7, the 09 opening and 10 10.1 at the hybrid level, with julieta salvage forwarded through env exec and the agent replaced by a fixture process; if the hybrid level cannot reach it, write the reason in 09.",
+   "cost": "one journey added to the CI list",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-37",
+   "section": "index: Success criteria (S4)",
+   "title": "S4's evidence is a green config-repo run, which cannot show its second clause, exit 1 on an unknown.",
+   "severity": "Advisory",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-29"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The exit-1 path is never evidenced; acceptance records S4 as met.",
+   "change": "Split S4's evidence: the ci-run for exit 0, and a named unit fixture for exit 1 on an unknown key.",
+   "cost": "one cell",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-38",
+   "section": "index: Success criteria (S10)",
+   "title": "S10 promises generated reference 'per command, file format, error id and exit code', while 04 4.1 and 12 12.3 generate one errors.md, one exit-codes.md and pages for two formats.",
+   "severity": "Advisory",
+   "lenses": [
+    "L8"
+   ],
+   "finding_ids": [
+    "L8-22"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "tools/ci acceptance checks S10 against a promise the generator table cannot meet, and the acceptance PR settles it by reinterpretation.",
+   "change": "Align S10 with 12 12.3 by naming the generated pages; generator rows for more formats are not added now.",
+   "cost": "one cell",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the alignment only; more generated pages wait for a reader who needs them."
+  },
+  {
+   "id": "R8-index-39",
+   "section": "index: Boundaries",
+   "title": "The Boundaries' local-gate sentences overclaim: 'run tools/ci all before opening a PR' cannot be met on one platform (license and the hybrid e2e are Linux only, the I27 cases macOS only), 'every merge gate CI runs also runs locally' ignores the ruleset, which has no local form, and S2 omits the administrator bypass.",
+   "severity": "Advisory",
+   "lenses": [
+    "L14",
+    "L6"
+   ],
+   "finding_ids": [
+    "L14-19",
+    "L6-32"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A contributor on a Mac breaks the rule as written or opens no PR; a reader takes green as what admits a merge, while 05 5.4 says the gate is advisory against the token.",
+   "change": "Reword to 'run go run ./tools/ci all on your platform before opening a PR; CI runs the other platforms' steps' and 'every tools/ci gate CI runs also runs locally'; list in 12 12.8 which levels each platform runs; add to S2 that the ruleset's required checks carry the administrator bypass (see its deferred row).",
+   "cost": "two sentences, one S2 clause, one 12 12.8 list",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-40",
+   "section": "10 10.5; index: Success criteria",
+   "title": "docs/acceptance.json is a one-shot v1.0.0 artifact, and nothing says how a later release states its criteria or which of S1 to S11 stay living.",
+   "severity": "Advisory",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-30"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "v1.1 ships with S8's budget exceeded; the acceptance file still says pass for v1.0.0.",
+   "change": "Add to 10 10.5: 'docs/acceptance.json records v1.0.0 only; the criteria of a later release are a spec change made with that release'.",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State as a limit; a per-release acceptance format waits for the first release after v1.0.0."
+  },
+  {
+   "id": "R8-index-41",
+   "section": "12 12.8; index: Principles",
+   "title": "ARCHITECTURE.md, the page 'Simple and explicit' promises a newcomer, has nothing mechanical keeping it true: headings.yaml covers README.md and SECURITY.md only, and only its diagrams are generated.",
+   "severity": "Advisory",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-32"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "After a hundred PRs the page still lists the invariants and modules of v1.0.0.",
+   "change": "Add ARCHITECTURE.md to headings.yaml, and a tools/ci docs rule that every invariant id of 05 5.2 and every module id of 12 12.2 appears in it.",
+   "cost": "one headings entry, one docs rule",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply; drift of this kind is mechanical and belongs to a static gate."
+  },
+  {
+   "id": "R8-index-42",
+   "section": "index (Status); 05 5.4; 10 10.2; 12 12.5",
+   "title": "History has moved into the current-state spec: the index's Status paragraph grows a clause per round, deferred rows carry reasoning paragraphs, and 05 5.4 and 10 10.2 carry dated measurements, while 12 12.5 says history lives in reviews and ADRs.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-16"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "In year three the Status paragraph lists twelve rounds, and a reader cannot find the current rule without reading what was measured on which day.",
+   "change": "Make the index Status one sentence and one link: 'draft v1 specification; its review history is in reviews/, its decisions in adr/'. Add under the Deferred decisions heading: 'a cell states what holds and the event; the reasoning goes to an ADR'. The 05 5.4 and 10 10.2 halves belong to pages 05 and 10.",
+   "cost": "one paragraph shortened, one sentence",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the index half without a cell-length bound in sequences; the sentence and review suffice until a row overflows again."
+  },
+  {
+   "id": "R8-index-43",
+   "section": "10 10.2; index: Deferred decisions; ADR 0007",
+   "title": "About 330 lines of 10 10.2 are check logic in prose with pinned versions and commit ids, while tools/ci is the truth and nothing holds the two equal; the index's deferred row covers generating the step table only.",
+   "severity": "Blocking",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-2"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "mise.lock bumps golangci-lint; the lint row still describes the old checkers; an agent implements against the stale row.",
+   "change": "For the index: widen the row 'generating the step table of 10 10.2 from tools/ci' to 'generating 10 10.2's step table and per-step detail from tools/ci', with the drift-check trigger of the issue-label cluster. Moving the detail to a generated docs/reference/ci.md is page 10's resolution.",
+   "cost": "one cell",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the index half; moving the prose is decided with page 10."
+  },
+  {
+   "id": "R8-index-44",
+   "section": "I7",
+   "title": "I7's E test says each gate 2 change makes run, stop, salvage, rm, retire and pull exit 3, but no defined gate 2 change produces exit 3 for stop: a new spec commit changes no live file until promoted, and a tampered live file is drift, exit 4.",
+   "severity": "Required",
+   "lenses": [
+    "L13"
+   ],
+   "finding_ids": [
+    "L13-9"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The test cannot fail for the right reason and is satisfied by a fixture that deletes the approval record.",
+   "change": "Define in I7 and 01 1.5 step 4 the gate 2 change the test means (an approval record whose digest no longer matches the live files, or live files with no approval), and state that an awaiting candidate does not block P commands.",
+   "cost": "two sentences",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-45",
+   "section": "I30",
+   "title": "Boundary C and I30 say julieta runs only as delivered by romeu, while 01 1.1, 02 2.2 and 07 7.6 run it in the config repo's CI from a pinned release with no compatibility check.",
+   "severity": "Required",
+   "lenses": [
+    "L13"
+   ],
+   "finding_ids": [
+    "L13-15"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A reviewer judges validate.yml against I30 and weakens the invariant or blocks the config repo's CI, which S4 depends on.",
+   "change": "Add to I30 and boundary C: 'in a sandbox; julieta also runs in the config repo's CI from a release pinned by version and checked by julieta pin check --workflows (02 2.2), where no romeu exists'.",
+   "cost": "one clause in two places",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-index-46",
+   "section": "I24",
+   "title": "The memory layout allowlist (I24, 08 8.1) reserves import/, and no command reads or writes it; julieta memory import reads a path given on the command line.",
+   "severity": "Advisory",
+   "lenses": [
+    "L13"
+   ],
+   "finding_ids": [
+    "L13-21"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An implementer invents a use for import/ and the sandbox gains an unreviewed path into romeu's memory readers.",
+   "change": "Remove import/ from the allowlist in I24 and 08 8.1.",
+   "cost": "one entry in two places",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply by deletion."
+  },
+  {
+   "id": "R8-index-47",
+   "section": "I26",
+   "title": "Sandbox identity is the name plus the workspace path plus an open generation, so a sandbox recreated by hand with sbx under the same name and path passes while romeu's open generation belongs to the removed one.",
+   "severity": "Advisory",
+   "lenses": [
+    "L2b"
+   ],
+   "finding_ids": [
+    "L2b-20"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "romeu run finds the sandbox present with the old generation, skips preservation, and salvage later imports from a sandbox that never held the lost work.",
+   "change": "Record in the generation the sandbox id or creation time if A4 shows that sbx ls --json reports one, and make I26 compare it; if A4 shows none, say so in I26 and add the hand-recreated case to its E tests as a known pass.",
+   "cost": "one field and one comparison, or one sentence",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply, settled by A4's result."
+  },
+  {
+   "id": "R8-index-48",
+   "section": "index: Open questions; plan.md",
+   "title": "The plan's Questions for the maintainer is a second list of open items about the spec (eleven unanswered), held outside the spec, and the index's Open questions neither holds them nor points at them.",
+   "severity": "Required",
+   "lenses": [
+    "L13",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13-37",
+    "L13b-41"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A question is answered in the plan while the spec is not changed, and the next round re-finds it; a review of the index misses that the diagram source, the workload base and A3's half are undecided.",
+   "change": "For each plan question that is a spec defect, fix the spec or add an Open questions row with the plan's recommendation as the default and maintainer as the settler; the plan's list keeps plan-side readings only; add one line under Open questions pointing at it.",
+   "cost": "about ten rows or fixes, one pointer",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply; it makes the index the one list of open questions about the spec."
+  }
+ ]
+}

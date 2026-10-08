@@ -1,0 +1,480 @@
+{
+  "lens": "L11",
+  "role": "the scope skeptic",
+  "model": "fable",
+  "verdict": "The spec does not meet this lens's definition of success: its principle 'decide at the last responsible moment' is well written and then not applied to the spec itself, and the largest gap is the runtime ledger (13, ADR 0006), a full subsystem with security surface and twelve deferred rows that no success criterion, journey or scope row needs and whose ADR never considered leaving it out, followed by one person's migration and metrics tooling shipped inside a generic product.",
+  "findings": [
+    {
+      "id": "L11-1",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "13; ADR 0006; 12 12.2; 00 0.5",
+      "defect": "The runtime ledger is a v1 feature with no success criterion, no journey, no row in 00 0.5 and no 'not in v1' alternative or removal trigger in its ADR, yet it sits on the build path before romeu run.",
+      "scenario": "ADR 0006's reason is 'this looks like very good data'; 13 13.9 names its consumers as 'later sessions and the maintainer'; 09 never runs ledger query, event list or event add; 12 12.2 orders ledger before romeu-cli (run). The first user's first run waits on three stores, two mounts in every sandbox, an ingest in four commands, I31 to I33, six residual-risk rows, four error ids and twelve deferred rows, for records nobody has needed yet. 08 8.2 already records hook failures in julieta state, so the hook-failed event has no in-sandbox reader.",
+      "change": "Move the ledger out of v1 as one Deferred row: 'the runtime ledger (13, ADR 0006 stays Accepted as the design); until then julieta state (08 8.2) and the command's own stderr are the record; reopened by the first lesson in docs/lessons.md that names a failure inside a sandbox the maintainer could not reconstruct from julieta state, or the second machine'. Remove the two fixed mounts from 03 3.3, the ingest steps from 04 4.2 and 08 8.5, the ledger rows of doctor, I31 to I33 and 04 4.4; keep 13 as a designed-not-built page like 06 6.6. If the maintainer keeps it, ADR 0006 gains the 'not now' alternative with the reason it was rejected, and 00 0.5 gains its row.",
+      "cost": "A decision by the maintainer; about a page of deletions across index, 03, 04, 05, 08, 12; the plan loses T063 to T065, T071, T072 and parts of T037, T043, T049, T073, T074. Cost of waiting, stated: events before the ledger exists are not recorded, and the two mounts need one recreate per project when added later (13 13.1).",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-4",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "00 0.5; 04 4.3; 08 8.1; 03 3.9; 03 3.12; 10 10.5; 11 11.2; I24",
+      "defect": "The generic product carries one person's migration and acceptance: julieta memory import and verify, the import/ directory, the memory-entry digest kind, the repo evidence kind with an archived flag, tools/ci acceptance --file, and the C1 hugo check.",
+      "scenario": "00 0.5 justifies import and verify by 'the maintainer decided that memory entries written before v1 are imported when v1 is adopted, once'; 10 10.5 says --file lets an operator verify 'repositories that must be archived'; C1 checks that aqua:gohugoio/hugo is the extended variant. The second adopter (00 0.2) installs a product whose reference pages document commands and an evidence kind that apply to nobody but the author, and whose acceptance includes a tool they do not use.",
+      "change": "Delete the import and verify commands, the import/ allowlist entry, the memory-entry digest kind, the repo evidence kind, the --file flag and C1 from the spec; do the one-time import with a script in the operator's config repo (02 2.2 already allows an operator acceptance.json there) and record the predecessor archiving as an operator step outside the product. If kept, 00 0.5 states why a generic product needs each, and the reference marks them operator-only.",
+      "cost": "Deletions in 00, 03, 04, 08, 10, 11; the plan loses T058 and parts of T090 and T082; one script outside the product repo.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-2",
+      "severity": "Required",
+      "origin": "own",
+      "section": "ADR 0007 (Threat model); index: Deferred decisions; plan.md",
+      "defect": "ADR 0007 defers two escapes (an untracked go.work, a caller's GOFLAGS -overlay) 'until the sandbox-token question (Q25) is decided, which is the plan's deferred-decisions row whether agents push from a second account', and that row exists in neither the plan nor the index while Q25 was decided on 2026-10-07 (ADR 0008).",
+      "scenario": "A reader of the Deferred decisions table never sees the two escapes; the trigger fired a day before this baseline; nothing reopened it; the hook keeps starting tools/ci in a way both escapes act on.",
+      "change": "Add one row to the index's Deferred decisions: 'the hook starting tools/ci so that an untracked go.work or a caller GOFLAGS cannot act on go run (ADR 0007); until then the review covers them; reopened by the next change to .githooks/pre-push' and, since the Q25 half has fired, decide it now or record in ADR 0008's Consequences that it was considered and left to the hook trigger. Fix ADR 0007's pointer by a superseding note, not a rewrite.",
+      "cost": "One table row, one sentence in an ADR Consequences section, one decision.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-3",
+      "severity": "Required",
+      "origin": "own",
+      "section": "00 0.5; 07 7.5; index: Deferred decisions",
+      "defect": "A 'v1.1' bucket holds four items (the native egress queue in status, handoff --list filters, a Remote-SSH helper, a registry credential) with no trigger and no interim, beside a principle that says a deferral without a row is an oversight.",
+      "scenario": "Nothing reopens any of the four; the registry credential also appears as Q23 with a different trigger text, so one item lives in two tables with two rules.",
+      "change": "Delete the v1.1 row of 00 0.5 and the parenthesis of 07 7.5; give each item a Deferred row with what holds until then and an observable event (for the egress queue: 'the first native approval a user resolves without knowing it existed, written as an issue'); merge Q23 into its row.",
+      "cost": "Four table rows, two deletions.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-5",
+      "severity": "Required",
+      "origin": "own",
+      "section": "12 12.10; ADR 0004; 10 10.2; 12 12.9",
+      "defect": "tools/ci dora, a five-metric delivery tool with its own output schema, trailer convention and release asset, is a v1 deliverable for a repository with one contributor and no release, and its own ADR argues that nothing is lost by waiting.",
+      "scenario": "ADR 0004: 'every run reads the whole history, so nothing is lost by the wait'; 12 12.10: 'until the first release the five metrics are empty'; the Deferred table waits for three releases before targets mean anything; the only team user is 'Future' (00 0.2). The tool lands at ci-release and gates the release candidate.",
+      "change": "Move tools/ci dora to the Deferred table: 'until then gh pr list --json by hand and the review judge the three rows of 12 12.9 that cite it; reopened by the third deployment, or the first lesson that wants to cite a delivery number'. Keep ADR 0004 Accepted as the design; keep the Fixes-release trailer form check in pr (it is cheap and its data cannot be backfilled).",
+      "cost": "One row; the plan loses T089 and one release.yml step; 12 12.9's three rows change their 'Enforced by' cell to review.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-6",
+      "severity": "Required",
+      "origin": "own",
+      "section": "04 4.2 (pull); J4; 01 1.2; 02 2.3; I13; I14; I19; 05 5.4",
+      "defect": "romeu pull, the hardened review checkout, both VS Code workspace files, I19 and two residual-risk rows exist for a host-side review path the start does not need, and dev.code-workspace is opened by no journey at all.",
+      "scenario": "2.6 says work reaches GitHub by push and ADR 0008 makes the PR the review barrier, so the first user reviews on GitHub; J4 is the one journey for pull and is not in S7's CI set; dev.code-workspace appears twice in the spec (01 1.2, 02 2.3) and never in 04, 09 or the plan, yet it is rewritten on every promotion and retire and carries I13 and I14.",
+      "change": "Defer romeu pull, the review checkout and review.code-workspace as one row ('until then the PR on GitHub is the review; reopened by the first time the maintainer needs a sandbox branch on the host before it is pushed, written as an issue'); delete dev.code-workspace or give it a journey step. I19 and the two residual rows leave with pull.",
+      "cost": "Deletions in 01, 02, 04, 05, 09; the plan loses most of T067.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-9",
+      "severity": "Required",
+      "origin": "own",
+      "section": "01 1.6 (Candidate); 04 4.2 (approve); J11 step 5",
+      "defect": "The awaiting state, the superseded transition and romeu approve <name> exist for a caller that runs romeu sync without a terminal, and no component, journey or user is that caller.",
+      "scenario": "01 1.1 puts romeu on the host under the operator; the config repo's CI runs julieta, not romeu; J11 step 5 says 'when sync ran without a TTY' and never who. A state, a command, a record shape and an exit path are specified for an actor the spec does not have.",
+      "change": "Either name the caller (a cron, a hook, a CI step) in 01 1.1 and J11, or make a non-TTY sync exit 3 with the digest and no awaiting record, delete the awaiting and superseded rows and approve <name>, and add a Deferred row 'approval of a candidate rendered without a terminal; reopened by the first scripted sync'.",
+      "cost": "Two state rows, one command, one record field; the plan loses T045.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-10",
+      "severity": "Required",
+      "origin": "own",
+      "section": "index: Open questions; ADR 0005 (Alternatives considered)",
+      "defect": "The Open questions table holds items in the wrong state: Q25 is marked decided and still listed; Q4, Q6, Q12, Q13 and Q14 are decisions with a default already taken and nothing but 'maintainer' to settle them; Q9 ('Homebrew tap later') and Q23 are deferrals with no trigger or a trigger written in the wrong table.",
+      "scenario": "ADR 0005 defines the two tables as two states (a default with a settling mechanism; an absence with a trigger). A reader cannot tell what is open: T101 turns the maintainer rows into ADRs last, so the table says 'open' for the whole plan about things decided in round 2.",
+      "change": "Move Q25 out now (ADR 0008 exists); turn Q4, Q6, Q12, Q13, Q14 into ADRs in the docs module's first task rather than the last, or mark them 'decided; record pending T101'; move Q9's Homebrew tap and Q23's credential to Deferred with triggers ('the first install report that asks for brew'; 'the first private workload registry').",
+      "cost": "Table edits and five short ADRs that T101 already owes.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-11",
+      "severity": "Required",
+      "origin": "own",
+      "section": "index: Deferred decisions; ADR 0005 (Consequences); ADR 0008",
+      "defect": "Most Deferred rows are reopened only by a human noticing ('the maintainer observes it', 'written as an issue', 'the first question about'), one is reopened by 'the operator saying so', which ADR 0005 rule 3 calls a wish, and no row says which check would detect its trigger although ADR 0005 asks for exactly that.",
+      "scenario": "35 rows; by my read about 24 have human-only triggers and 8 use the phrases above verbatim. ADR 0005 itself: 'A trigger nobody watches does not fire. The table is read in each review round, and nothing else reminds anyone.' After round 8 no review round reads it.",
+      "change": "Add a fourth column or a mark per row: 'detected by <check or command>' or 'human'; rewrite 'the operator saying so' into an event ('the fifth review of the token under the 2-session rule'); have tools/ci sequences require the mark. Where a check can detect the trigger (doctor's size warning, a dora field, a mise.toml bump), name it.",
+      "cost": "One column, 35 cells, one check clause; it makes the wish count measurable.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-12",
+      "severity": "Required",
+      "origin": "own",
+      "section": "index: Decide at the last responsible moment; ADR 0005 rule 1",
+      "defect": "The carve-out 'a security invariant, a merge gate and anything a later step depends on are needs of the start and are never deferred' is open-ended: anything becomes a need of the start by writing the later step that depends on it.",
+      "scenario": "The ledger (13) is depended on by salvage records (08 8.5), retire (04 4.2) and doctor; dora is depended on by three rows of 12 12.9; each was made a dependency by the text that introduced it. The principle cannot cut what its own carve-out admits.",
+      "change": "Narrow the sentence to 'a security invariant, a merge gate, and anything a step of the first-day path (J1 to J3, J5, J6) depends on', and add 'a dependency that exists only because a later section was written does not count'. Mirror in ADR 0005 rule 1 by a superseding note.",
+      "cost": "Two sentences.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-13",
+      "severity": "Required",
+      "origin": "own",
+      "section": "index S8; 00 0.5; 04 4.2 (run --timings); 02 2.1; 03 3.13",
+      "defect": "S8 and --timings justify each other: the flag exists only for the criterion (00 0.5) and the criterion's evidence is the flag's output, so a schema (run-timings.v1), a CI median-of-5 test and a probe (B5) exist to measure a budget no user asked for and no measurement produced.",
+      "scenario": "A first user never types --timings; the 2 s and 3 s figures have no stated origin; the CI test is asserted 'never a flake' (10 10.1), so a slow runner blocks a merge on a number chosen before any code ran.",
+      "change": "Keep S8 as a measured property of the host suite (B5 with plain timing in the harness, no product flag), drop --timings, run-timings.v1 and the CI assertion, and state where 2 s and 3 s came from or mark them 'first measurement sets the bound'.",
+      "cost": "Deletions in 04, 02, 03, 10; one sentence per criterion.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-15",
+      "severity": "Required",
+      "origin": "own",
+      "section": "00 0.2; 00 0.6",
+      "defect": "The scope page analyses a future user (teams) across a twelve-row report review and five 'partial' rows, which reads as a roadmap for a user v1 explicitly does not serve.",
+      "scenario": "A second adopter reads 0.6 as commitments; a planner reads 'partial' as half-done work to finish; the section produced one Deferred row (ROI inputs) and anchors ADR 0004's placement in v1.",
+      "change": "Replace 0.6 with three sentences: v1 serves one developer, no team feature exists, and the analysis of the DORA report lives in an ADR or a docs note. Write 'nothing' where 0.6 says 'partial' for anything a team cannot use as a team. Drop the 'Future: teams' row of 0.2 or mark its support 'none'.",
+      "cost": "Moves about 60 lines out of the scope page.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-16",
+      "severity": "Required",
+      "origin": "own",
+      "section": "00 0.5; 04 4.2; 04 4.3",
+      "defect": "The scope justification table says 'every v1 feature traces to a success criterion, an invariant, a journey or a need the maintainer named', and it lists six romeu commands of sixteen and justifies julieta handoff list by 'kept in v1 by the maintainer' alone.",
+      "scenario": "romeu pull, retire, recreate, ledger ingest, ledger query, julieta event add and list, pin workload and check, lock, layout up and handoff list have no row, so the sentence is unmeasured and the table cannot be used to cut anything.",
+      "change": "Give 0.5 a row per command of the command definitions with the need it serves on the first day, and a check (in sequences or acceptance) that each command has a row; replace 'kept by the maintainer' with the need, or remove handoff list (handoff show covers the agent's need).",
+      "cost": "About twelve rows and one check clause.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-17",
+      "severity": "Required",
+      "origin": "listed",
+      "section": "03 3.2 (Run layout); 00 0.3; Q16; 05 5.4; 06 6.4",
+      "defect": "The run layout is 'multiplexer-neutral' and a renderer interface exists for tmux and cmux, which are non-goals, while the spec says nothing about what happens if herdr, a pre-1.0 project with no signed releases, stops being maintained.",
+      "scenario": "herdr is on the path of every romeu run (J3); Q16 and 05 5.4 cover churn and provenance, not abandonment. The neutrality is paid now (a binary split tree, ratio, focus, a version 1 format) and the only event that would use it has no row.",
+      "change": "Add a Deferred row: 'a second run-layout renderer; until then herdr, pinned by version and sha256, is the one renderer; reopened by a herdr release that breaks the protocol number A13 recorded, or six months without a herdr release, or a CVE in it'. Then either keep the neutral format because the row exists, or simplify the format to what herdr needs and let the row carry the neutrality.",
+      "cost": "One row; optionally a smaller 03 3.2.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-20",
+      "severity": "Required",
+      "origin": "own",
+      "section": "06 6.6; index: Deferred decisions",
+      "defect": "The kit publishing path is designed in six rows (registry, tags, build, signing, consumer switch, Docker Hub limits) for something 'designed, not built in v1', with the trigger 'mandatory when the product is promoted for public use (maintainer decision)', outside the one Deferred table.",
+      "scenario": "A trigger that is a decision is not an observable event (ADR 0005 rule 3); the design fixes Docker Hub and tag shapes before the first kit exists; Docker Hub's limits will have changed by the time the trigger fires.",
+      "change": "Reduce 6.6 to one Deferred row ('publishing and signing of product kits; until then local builds and the trust of 6.1; reopened by the first adopter who cannot build local kits, or sbx signing becoming available for local kits') and drop the Docker Hub paragraph; keep the two sentences that constrain today's design (gate 2 records a digest instead of a content hash).",
+      "cost": "Deletes about 15 lines; one row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-25",
+      "severity": "Required",
+      "origin": "own",
+      "section": "12 12.4 (pr); 12 12.7",
+      "defect": "tools/ci pr requires a non-empty Lessons section on every pull request from T005 on, which forces a lesson to be written for each change before any change has taught one.",
+      "scenario": "From the sixth task on, each PR carries a Lessons sentence written to pass the check; docs/lessons.md fills with entries whose check is 'no check possible'; real lessons drown.",
+      "change": "Accept 'Lessons: none' as a valid section, and have pr require a lesson only when the PR body's Middleware line is 'none: <reason>' (a change with no check is the one that owes a lesson).",
+      "cost": "One clause in 12 12.4 and in the pr check.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-29",
+      "severity": "Required",
+      "origin": "own",
+      "section": "13 13.8; ADR 0006 (Context); 05 5.4 (last paragraph)",
+      "defect": "The spec records that parts of the ledger were accepted without being decided: six starting values 'the maintainer has not read one by one', a design 'accepted as a whole', and two residual risks that 'came with the design the maintainer accepted'.",
+      "scenario": "An accepted risk with no decision behind it is an acceptance that is itself the defect: a reviewer cannot tell a considered risk from an inherited one, and the block acceptance is how a feature the start does not need got in.",
+      "change": "Either the maintainer decides the two risks and the six values by name (one line each, quoted), or 05 5.4 marks the two rows 'inherited, undecided' and 13 13.8 marks the values 'proposed, undecided' so the next reader knows they are open.",
+      "cost": "Eight one-line decisions, or two words per row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-7",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "01 1.4 (Gate 1); 03 3.8; 04 4.2 (approve --toolchain)",
+      "defect": "Gate 1, a per-machine toolchain acknowledgement with its own record, diff printer, exit code and flag, guards against an sbx or romeu upgrade behind the operator's back, and on a one-operator machine the operator is the one who upgrades.",
+      "scenario": "J1 step 4 and J9 make the operator approve what they just installed; 'simple and explicit' says merge two into one.",
+      "change": "Fold gate 1 into doctor plus a version check: a mismatch of the recorded sbx or romeu version exits 3 with the diff printed and is cleared by romeu sync (which already shows the catalog diff in gate 2 when gated egress changes); delete toolchain.json's acknowledgedAt and approve --toolchain. Or state the threat gate 1 stops that doctor does not.",
+      "cost": "A record field, a flag and a prompt; one sentence either way.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-8",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "01 1.4 (Gate 2, capabilities); 06 6.1; I28; Q20; Q23; 02 2.4",
+      "defect": "A registry client, a strict descriptor grammar, a content-addressed descriptor cache and a conformance fixture per capability type exist in v1 to decompose a workload that is already pinned by digest and allowlisted by repository.",
+      "scenario": "The reviewer at gate 2 sees the digest change either way; the capability decomposition improves the diff for a workload whose upstream is one image (Q2).",
+      "change": "State in 06 6.1 what the gate loses without the decomposition for the one allowlisted workload, or defer internal/oci's workload half to 'the first second workload repository in host settings' and keep the local-kit parsing, which needs no network.",
+      "cost": "A decision; the plan loses part of T032.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-14",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "index S9",
+      "defect": "S9 fixes coverage thresholds (80 percent, and 90 percent for eight named packages) before a line of code exists, with no stated origin for the numbers or the package list.",
+      "scenario": "A package renamed or split fails acceptance by name; a threshold chosen without a measurement is a guess written as a gate.",
+      "change": "State the origin, or write 'thresholds set at the first coverage run and raised only'; name the 90 percent set by property ('every package on an ask-first surface') rather than by name.",
+      "cost": "One sentence.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-18",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "06 6.4 (os-base); A12",
+      "defect": "The os-base kit is specified before probe A12 measures whether the workload lacks any package; if A12 finds no gap it is an empty kit with a TZ arg.",
+      "scenario": "A kit, a digest, a gate entry and a mount for content that may not exist.",
+      "change": "Create os-base from the A12 result: 'if A12 reports a missing set, the os-base mixin carries it; otherwise TZ is set by the julieta mixin and os-base does not exist'.",
+      "cost": "One sentence; possibly one kit fewer.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-19",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "06 6.4 (git-ssh-sign); Q19; 05 5.3 (signing); 01 1.5 step 5",
+      "defect": "Commit signing from a dedicated host agent is a product kit with its own ask-first surface, host-settings field, preflight check and open question, and no sentence says why the start needs it.",
+      "scenario": "It is the maintainer's practice (a present need of the one present user), which is a fair reason; the spec does not give it, so a second adopter cannot tell whether to adopt the kit or ignore it.",
+      "change": "Add the 'why now' line to 00 0.5 ('the maintainer signs every commit and will not run an agent that cannot'), and mark the kit opt-in in the README outline.",
+      "cost": "Two sentences.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-21",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "04 4.3 (pin workload, pin check); 06 6.2",
+      "defect": "julieta pin workload and pin check [--workflows] are two commands in the sandbox binary, reading a registry and GitHub releases, for a rare manual act the first user does once.",
+      "scenario": "J9 needs a digest move; a documented one-line command (docker manifest inspect or gh) in the guide would do until the second bump.",
+      "change": "Defer pin check to 'the second time a pin is found behind by hand'; keep pin workload only if the manifest-list check (both arches) is the reason, and say so.",
+      "cost": "One row; the plan loses part of T055.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-22",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "04 4.3 (lock); 07 7.3; 03 3.4 (caFile); 05 5.1",
+      "defect": "Several hedges for futures the spec does not have carry no trigger: julieta lock locks macOS platforms the product never runs mise on, monorepo.lockfile is set for a mode no v1 repo uses, gitHosts caFile and its unit test serve private git hosts in a v1 whose only host is github.com.",
+      "scenario": "Each is small; together they are the shape ADR 0005 was written against (a hedge with no event).",
+      "change": "Lock the two linux platforms and let a repo add macOS itself; drop the monorepo sentence until a repo uses it; move caFile to a Deferred row 'reopened by the first gitHosts entry other than github.com'.",
+      "cost": "Three deletions and one row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-24",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "04 4.3 (memory); 08 8.1",
+      "defect": "Of the six memory subcommands, search and rm are the two the agent would not miss: list with a filter covers a store capped at 10 000 entries, and edit --status done already closes an entry, while rm is a delete path in a product that otherwise never deletes.",
+      "scenario": "An agent told 'never delete' by the principles has a command that deletes memory; search duplicates list.",
+      "change": "Drop rm (keep edit --status done) and fold search into list --query, or state the need each serves in 00 0.5.",
+      "cost": "Two commands fewer.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-26",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "10 10.2 (workflows grammar; lint row); ADR 0001",
+      "defect": "The gate tool is specified in final form with about 27 subcommands, including a closed grammar over three workflow files that are also an ask-first surface, a meta-lint of the linter configuration, and a 20-rule documentation standard adopted before a page exists.",
+      "scenario": "10 is the longest page of the spec (798 lines) for a product whose objective has five bullets; each check is defended, the count is not. The grammar and the review guard the same files.",
+      "change": "Mark in 10 10.2 which steps the first-day path needs (fast, hygiene, workflows minimal, unit, invariants) and let the rest land by the 'first input' rule the plan already follows, written as such in the spec rather than as a final list; in ADR 0001, adopt rules 1, 4, 6, 7, 9 now and list 12, 13, 17, 20 as landing with the first page that needs them.",
+      "cost": "Wording; no mechanism removed.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-27",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "11 11.3; 11 11.4; 10 10.2 (probes)",
+      "defect": "A probe-result schema, a four-state lifecycle, a computed decision, affects paths, resolvedBy commits and an ADR per overturned default are machinery for about twenty measurements one person runs once per host.",
+      "scenario": "The measurements are a start need; the lifecycle is built for a volume that will not recur after block B.",
+      "change": "Keep the result format (it feeds acceptance) and reduce the lifecycle to 'an overturned result is resolved in the same PR with its ADR' as a rule of 12 12.5, dropping the state machine and its generated diagram (T083).",
+      "cost": "A table and a generator fewer.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-30",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "06 6.3; Q21; 02 2.1 (Embedding)",
+      "defect": "Every romeu build embeds both julieta linux binaries and writes both into every .romeu/bin, while Q21 fixes sandbox arch equal to host arch, so each romeu invokes exactly one of the two it ships.",
+      "scenario": "Twice the embedded size and two files per project for a path never taken.",
+      "change": "Embed and write julieta-linux-<GOARCH> of romeu's own GOARCH; S3 is still measured per host.",
+      "cost": "One sentence in 06 6.3 and 02 2.1.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-31",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "03 3.6 (protocol); 13 13.7; 10 10.1",
+      "defect": "The manifest protocol window (N and N-1) and the event version window are specified and tested through injected seams before a second version of either exists.",
+      "scenario": "A compatibility rule decided before the first upgrade has taught what breaks; the test proves the seam, not the upgrade.",
+      "change": "Keep the version field; write the window as a Deferred row 'the accepted window; until then exact match; reopened by the first romeu release that changes the manifest' or state why N-1 is known to be right now.",
+      "cost": "One row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-32",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "12 12.6; 10 10.2 (release)",
+      "defect": "Release notes are generated from Conventional Commit subjects for v1.0.0, whose 'since the last tag that is not a prerelease' is the whole history of the repository.",
+      "scenario": "The first release's notes are a README paragraph; the generator gates the first release for a second release that does not exist.",
+      "change": "Defer tools/release notes to the second release ('reopened by the v1.1.0 tag'); hand-write the v1.0.0 notes.",
+      "cost": "One row; part of T088.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-33",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "index: Deferred decisions",
+      "defect": "Two rows share one trigger and one subject: 'rotation of the runtime ledger' and 'tuning the ledger's starting values' are both reopened by doctor's size warning.",
+      "scenario": "A duplicate row is read twice and decided once; the principle counts concepts.",
+      "change": "Merge the two rows, or give the tuning row its own event.",
+      "cost": "One row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-34",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "13 13.1 (last paragraph)",
+      "defect": "The spec reasons about 'a project created by a build older than this section', a pre-release history no reader of v1 has.",
+      "scenario": "Text that serves the spec's own drafting history, not its reader.",
+      "change": "Delete the sentence; v1.0.0 is the first build.",
+      "cost": "One sentence.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L11-35",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "plan.md (12 12.2 build order; T063 to T066)",
+      "defect": "romeu run (T066) depends on the ledger view (T065), so the first run against real sbx waits on three ledger tasks that no journey needs.",
+      "scenario": "Five tasks and parts of five more before the product's central command is exercised end to end.",
+      "change": "If L11-1 is accepted, remove T063 to T065, T071, T072 and the ledger clauses of T037, T043, T049, T073, T074; if not, move T063 to T065 after T075 so run is proven first.",
+      "cost": "A reordering of the plan.",
+      "parked_for_b": true
+    },
+    {
+      "id": "L11-36",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "plan.md (What v1 leaves out)",
+      "defect": "The plan says the Deferred decisions table 'has 28 rows at the commit this plan was written from'; the table has 35 rows at this baseline, and the plan admits its counts are kept by hand.",
+      "scenario": "A reader trusts a stale count; gap 25 of the plan names the cause and no check.",
+      "change": "Replace the number with a link and the sentence 'the index is the count', or add the count to tools/ci sequences' output.",
+      "cost": "One sentence.",
+      "parked_for_b": true
+    },
+    {
+      "id": "L11-37",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "plan.md (T012; The first slice)",
+      "defect": "The first slice needs a pin file; the plan lands the pin tool (release-API fixtures, the immutable-release check) with it.",
+      "scenario": "A tool with recorded fixtures lands before the first bump it serves.",
+      "change": "Land the file in T012 and the kitpin subcommands at the first pin change (J9), as 12 12.2's first-input rule says.",
+      "cost": "A task split.",
+      "parked_for_b": true
+    }
+  ],
+  "coverage": {
+    "index": "L11-2, L11-3, L11-10, L11-11, L11-12, L11-13, L11-14, L11-20, L11-33",
+    "00": "L11-1, L11-3, L11-4, L11-13, L11-15, L11-16, L11-19",
+    "01": "L11-6, L11-7, L11-8, L11-9",
+    "02": "L11-6, L11-13, L11-30",
+    "03": "L11-4, L11-13, L11-17, L11-22, L11-31",
+    "04": "L11-4, L11-6, L11-9, L11-13, L11-16, L11-21, L11-22, L11-24",
+    "05": "L11-6, L11-17, L11-19, L11-22, L11-29",
+    "06": "L11-8, L11-17, L11-18, L11-19, L11-20, L11-30",
+    "07": "L11-3, L11-22",
+    "08": "L11-1, L11-4, L11-24",
+    "09": "L11-6, L11-9",
+    "10": "L11-4, L11-5, L11-13, L11-26, L11-27",
+    "11": "L11-4, L11-18, L11-27",
+    "12": "L11-1, L11-5, L11-25, L11-32",
+    "13": "L11-1, L11-29, L11-31, L11-34",
+    "adr": "L11-1 (ADR 0006), L11-2 (ADR 0007), L11-5 (ADR 0004), L11-11 (ADR 0005, ADR 0008), L11-12 (ADR 0005), L11-26 (ADR 0001), L11-29 (ADR 0006)",
+    "plan": "L11-35, L11-36, L11-37 (parked for B)"
+  },
+  "missing": [
+    {
+      "what": "A first-day path: the journeys the first user walks on day one, with every v1 feature marked as on that path, feeding it, or neither.",
+      "where": "00 0.5 (a column) or a new 00 0.7"
+    },
+    {
+      "what": "A 'why now' line per v1 feature in the principle's own terms, so what stays is justified the way what waits is.",
+      "where": "00 0.5, one row per command of 04 4.2 and 04 4.3"
+    },
+    {
+      "what": "A 'not in v1' row in every ADR's Alternatives considered, with the reason it was rejected.",
+      "where": "ADR 0001 rule 9 or ADR 0005 decision 2"
+    },
+    {
+      "what": "A trigger-kind mark per Deferred row (detected by which check, or human), as ADR 0005 asks for.",
+      "where": "index: Deferred decisions; tools/ci sequences"
+    },
+    {
+      "what": "A sweep for deferrals whose trigger has already fired (ADR 0007's two escapes, keyed to Q25, have).",
+      "where": "12 12.5 as a review-round step; ADR 0005 Consequences"
+    },
+    {
+      "what": "One home for every deferral: Q9, Q23, 06 6.6, the v1.1 bucket and ADR 0007's escapes live outside the table the index calls 'the one place'.",
+      "where": "index: Deferred decisions"
+    },
+    {
+      "what": "A cost-of-waiting on each Deferred row where it is known; three of 35 rows have one.",
+      "where": "index: Deferred decisions ('Until then' cell)"
+    },
+    {
+      "what": "A concept count per module, so 'count concepts' is a number a reviewer can read; ADR 0006 counts seven for the ledger and nothing else is counted.",
+      "where": "12 12.2 (a column) or the ARCHITECTURE.md outline in 12 12.8"
+    },
+    {
+      "what": "The origin of each number in S8 and S9 (a measurement, a guess, a norm).",
+      "where": "index: Success criteria"
+    },
+    {
+      "what": "A statement that v1.0.0 is a release for one user and may be rough for the second adopter, which would license deferring the generic polish of S10.",
+      "where": "00 0.2 or the index status line"
+    },
+    {
+      "what": "A 'removed from v1' record: what was cut and why, so the next round does not re-propose it (probes A7 and A8 left the spec with no reason recorded).",
+      "where": "index, beside Deferred decisions"
+    }
+  ],
+  "postmortem": "# Postmortem, written after v1.0.0 - L11, the scope skeptic\n\nIt is some months after the v1.0.0 tag. The product has failed in the\nway this reviewer expected it to. Here is how, including the parts one\ndoes not usually say aloud. Each reason names the spec sections it\ncrosses.\n\n**1. v1.0.0 shipped late, and the lateness was spent on things no user\ntouched in the first month.** The first `romeu run` sat behind the\nruntime ledger (12 12.2 build order: `ledger` before `run`; 13 whole),\nthe review checkout (`pull`, J4, I19), the VS Code workspace files (01\n1.2, I13, I14), gate 1 (01 1.4), the OCI capability reader (01 1.4,\n06 6.1, I28), the DORA tool (12 12.10, ADR 0004), release-note\ngeneration (12 12.6), and a documentation standard with fourteen\nchecks (ADR 0001). None of these appears in J1, J2 or J3. The maintainer\nran `romeu run` for the first time against real `sbx` at block O5, after\n91 tasks (plan, block O5). By then `sbx` had moved past 0.46.0 twice and\nblock A's recordings were a version behind (10 10.3, \"Floor bumps\").\n\n**2. The ledger recorded 600 `command-failed` events and nobody read\none.** 13 13.9 names two consumers: \"the lessons loop\" and \"improving\nromeu and julieta\". Both are a human running `romeu ledger query` on a\nquiet afternoon. The afternoon did not come. Meanwhile the ledger cost:\nthree invariants (I31-I33), six residual-risk rows (05 5.4), twelve\ndeferred rows, four error ids (04 4.4), three `doctor` checks, two\nmounts in every sandbox (03 3.3), ingest in four commands (13 13.4),\nand the second-longest page of the spec. The `hook-failed` events\nduplicated what julieta state already showed in SessionStart (08 8.2).\nThe honest reason it was built: it sounded like good data (ADR 0006\nContext), and the ADR that forbids building on that reason (ADR 0005)\nwas accepted the same day without an alternatives row for \"not now\".\n\n**3. The Deferred decisions table became the graveyard it was meant to\nprevent.** 35 rows (index), most reopened by \"the maintainer observes\"\nor \"the first question about X, written as an issue\". Nobody re-read\nthe table after the review rounds ended, because ADR 0005 itself says\n\"The table is read in each review round, and nothing else reminds\nanyone.\" One trigger had already fired before v1.0.0: ADR 0007 defers\ntwo escapes \"until the sandbox-token question (Q25) is decided\", Q25\nwas decided on 2026-10-07 (ADR 0008), and the row ADR 0007 points at\nexists in neither the plan nor the index. A v1.1 bucket (00 0.5, 07\n7.5) sat beside the table with four items and no triggers at all. Q9's\n\"Homebrew tap later\" never got a trigger and never happened.\n\n**4. The generic product carried one person's migration.** `julieta\nmemory import`, `julieta memory verify`, the `import/` directory in\nthe memory layout (I24), the `memory-entry` digest kind (03 3.12), the\n`repo` evidence kind with an `archived` flag (10 10.5), and `tools/ci\nacceptance --file` exist so the maintainer could import pre-v1 memory\nonce and verify that predecessor repositories were archived (00 0.5).\nThe second user (00 0.2) found commands in the reference that applied to\nnobody but the author, and `os-base` was an empty kit with a `TZ` arg\nbecause A12 found no gap (06 6.4). `C1` checked that hugo was the\nextended build (11 11.2) for projects the second user did not have.\n\n**5. The success criteria measured the machinery, not the product.**\nS8 exists so that `--timings`, `run-timings.v1` and a median-of-5 CI\ntest exist; S9 fixed per-package thresholds for eight packages before\nthe packages existed; S10 made generated reference pages and a guide\nper journey a release blocker. When the first real defect came (a kit\nbuild failing on a new `sbx`), the fix needed a new candidate and block\nB again (11 11.2), ninety minutes per host, and the maintainer did it\nonce and then stopped cutting releases. Deployment frequency, which\n`tools/ci dora` faithfully reported, was one.\n\n**6. The gates gated the gates.** `tools/ci` grew to ~27 subcommands\n(10 10.2), with a closed grammar over its own workflow files, a\nmeta-lint of the lint configuration, a PR body linter requiring a\nLessons section on every PR from T005 on (12 12.4). Each PR carried a\nLessons section of one sentence, written to pass `pr`. The lessons\nfile had 140 entries and three lessons.\n\n**7. The thing we do not say aloud.** The spec was written by agents\nfor a maintainer who said yes to each page as a whole (13 13.8, ADR\n0006 \"accepted as a whole\"; 05 5.4 \"the other two came with the design\nthe maintainer accepted\"). An agent writes a mechanism in minutes (ADR\n0005 Context says exactly this), so each review round added mechanisms\nand each acceptance was a block. The principle that should have cut\nthem had a carve-out wide enough for anything: \"a security invariant,\na merge gate and anything a later step depends on are needs of the\nstart\" (index). Every feature was made a dependency of a later step by\nwriting the later step. Nobody asked, of each v1 feature, \"what does\nthe first user lose on the first day without it?\" because the table\nthat should hold that answer (00 0.5) cites criteria instead of\nanswering it, and it lists only the features someone argued about.\n\n**8. What did work.** The security model (05), the gates (01 1.4 gate\n2), salvage (08 8.5), derived egress (07), the probe-first method (11,\nblock A) and the hardened git (05 5.1) were right, and were the start's\nneeds. The failure was not building the wrong core. It was building\nthe core and three more products around it before anyone ran it.\n",
+  "lens_critique": "This lens measures success as 'nothing the start does not need', and for a tool that runs agent output next to a host that is the wrong unit twice. First, several needs of the start have no first-day user and still must exist on day one: a security invariant, complete salvage (I17), the hardened git; YAGNI applied to safety ships the advisory the lens says the ledger would. Second, the only v1 user is the maintainer, so a feature the maintainer uses daily (signing, DORA) is a present need of the one present user, and the lens can mistake 'I would not want it' for 'the start does not need it'. Third, the lens discounts the cost of adding later, which ADR 0005 itself names: a ledger mount added after v1 costs a recreate per project (13 13.1), and data a deferred mechanism would have recorded is gone. The right reading is the one the spec already half holds: defer by default, and for each thing kept, write the first-day user or the irreversibility that keeps it.",
+  "missing_viewpoint": "The human reviewer at the merge gate. The whole trust story leans on 'the review of the diff covers it' (05 5.4, ADR 0008, 10 10.2 twice), and no lens stands where that person stands: how many lines of agent-written Go and spec a one-person maintainer can read with attention per day, what the gate diffs and PR bodies cost to read, and what happens when review becomes a rubber stamp. L1 uses the product, L14 operates it, L9 counts tasks; nobody counts the reviewer's attention, which is the scarce resource the spec spends most freely.",
+  "out_of_scope": [
+    {
+      "what": "Whether the security invariants (05 5.2) are the right set or too many.",
+      "why": "this person would not look at it: the carve-out of the principle names them as needs of the start, and judging their count is L2's lens; I judged only the invariants that exist because a questioned feature exists."
+    },
+    {
+      "what": "Whether the maintainer named the ledger, DORA and signing as v1 needs in words that settle the question.",
+      "why": "the text alone cannot settle it: ADR 0004 and 0006 say 'the maintainer asked', with reasons translated; the operator's own quote, and whether 'is it needed now' was asked, would settle it."
+    },
+    {
+      "what": "The exact count of Deferred rows whose trigger a check can detect.",
+      "why": "the text alone cannot settle it without a stated rule for 'detectable'; I give a by-hand figure (about 24 of 35 human-only) and ask for the mark that makes it measurable."
+    },
+    {
+      "what": "Whether tools/ci's size is proportionate to the sandbox-token threat.",
+      "why": "this person would not look at it beyond the count: proportionality to a threat is L2 and L7's judgment."
+    }
+  ],
+  "confidence": "High on the shape findings (fired trigger, wrong-table items, missing rows: each is a grep or a cited sentence); medium on the scope cuts (ledger, pull, dora, import), which are judgments a maintainer who named them as needs may overrule; several 'own' findings coincide with bullets 1, 5 and 6 of the lens examples, which I read after writing the notes."
+}

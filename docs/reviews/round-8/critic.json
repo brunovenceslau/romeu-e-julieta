@@ -1,0 +1,58 @@
+{
+  "findings_in_reports": 636,
+  "findings_in_clusters": 636,
+  "finding_memberships_in_clusters": 748,
+  "clusters": 503,
+  "cluster_files": 17,
+  "unplaced": [],
+  "misfiled": [],
+  "verdict": "gaps",
+  "per_report": {
+    "L0": 52, "L1": 30, "L2": 24, "L2b": 29, "L3": 34, "L4": 43, "L5": 37, "L6": 41, "L7": 34, "L8": 31,
+    "L9": 30, "L10": 32, "L11": 35, "L12": 30, "L13": 37, "L13b": 43, "L14": 24, "L15": 25, "L16": 25
+  },
+  "ids_in_more_than_one_cluster": 57,
+  "ids_in_more_than_one_cluster_by_lens": {"L3": 30, "L11": 26, "L13": 1},
+  "ids_in_clusters_not_in_any_report": [],
+  "duplicate_finding_ids_in_reports": [],
+  "duplicate_cluster_ids": [],
+  "misfiled_method": "page: a cluster's page must be among the pages the finding's section string cites (00 to 13 by number, index via S/J/I/D/N ids and index table names, adr via ADR, plan via plan or T ids); every finding's section yielded at least one page. severity: Blocking > Required > Advisory; a cluster below any member finding would be misfiled. Both lists are empty.",
+  "draft_checks_passed": [
+    "every one of the 503 clusters has exactly one row: 470 in Findings and resolutions, 33 in Parked for stage B; the parked table equals the clusters with parked_for_b true (all on plan.md; R8-plan-3 correctly stays in the main table)",
+    "every row's severity equals the cluster's; every row's Lenses cell equals the cluster's lenses and the lenses of its finding ids; the high-signal marker is present exactly on rows with two or more lenses",
+    "counts in How the round was run: 636 findings (54 / 289 / 293; 96 listed, 540 own; 56 parked), 503 clusters, 57 findings on more than one cluster (30 L3, 26 L11), 748 memberships, 470 stage A (60 / 252 / 158), 136 A, 203 M, 40 L, 91 operator (85 before the regression check), 33 parked (10 Required, 23 Advisory), 119 high-signal stage A (28 / 74 / 17), 5 parked high-signal",
+    "the 9 rows whose status differs from the cluster json are exactly the 6 routed to the operator (R8-00-7, R8-01-21, R8-06-1, R8-10-4, R8-10-44, R8-11-7) and the 3 status changes (R8-04-24 A to M, R8-10-40 A to L, R8-10-52 A to M) the draft names",
+    "per-lens table: every row's model, findings, B/R/A, listed:own, listed share, parked and cluster memberships match the reports and clusters; the all row (636, 96:540, 15%, 56, 503 clusters, 729 lens memberships) matches; the fable/opus lists in the prose match the reports' model fields",
+    "clusters only L0 raised: 17 (16 stage A, 1 parked), list and severities match the clusters; R8-07-1 is L13 and L13b only, as the paragraph says",
+    "noise probe: L2/L2b 7 both over 46 either (0.15), 17 only L2, 22 only L2b; L13/L13b 16 over 65 (0.25), 22 only L13, 27 only L13b; both 'Both raised' lists match",
+    "coverage table: all 17 rows match the reports' coverage cells (L0's plan cell cites L0-P1 to L0-P7); no report misses a coverage key; no coverage cell cites an id that is not among that report's findings; every page has 14 or more reports with a finding",
+    "criterion and journey table: all 24 rows match a word-boundary S<n>/J<n> search over section, defect and scenario of every finding",
+    "missing viewpoints: every one of the 19 lenses appears; the 11 themes and their lenses match stats.json; lens critiques: one line for each of the 19 lenses",
+    "decisions block: 46 items (15 SC, 23 AR, 8 DR), no duplicate ids; every one of the 91 operator rows is cited by an item; every decision id named in a row has an item; no item cites an unknown cluster",
+    "regressions: 503 checked, 238 clusters with an earlier resolution, 74 entries on 72 clusters, all match regressions.json",
+    "no em dash in the draft or in any clusters-*.json (the em dash hits under consolidation/ are guard assertions in build scripts); no en dash; no section citation outside the spec's own forms"
+  ],
+  "draft_defects": [
+    "Row R8-06-24 (page 06) carries the section '12 12.5' only: its single finding L3-20 cites '12 12.5, 06 6.4, 02 2.6, 08 8.1, 12 12.1', so the cluster's own section field in clusters-06.json dropped the page's citation (06 6.4) and the row reads as a page-12 defect filed on page 06.",
+    "Decision item SC10 is labelled Advisory while it names R8-08-22 as 'its page-08 form'; R8-08-22 is Required with status M, so the same finding (L11-24) stands as Required and applied on page 08 and as Advisory and awaiting the operator on page 04.",
+    "Four findings that sit on several clusters have one cluster routed to the operator and another resolved A, M or L, with no cross-reference in either the resolved row or the decision item, although the draft says the Decisions section merges the ids of one decision: L3-24 (R8-00-9 M; R8-12-9 operator, SC12), L11-7 (R8-01-11 L and R8-03-36 L; R8-04-34 operator, SC8), L3-30 (R8-index-40 L; R8-10-4 operator, SC15), L3-26 (R8-adr-3 M; R8-12-26 operator, DR1). If the operator takes the recommended branch, the L and M rows stand on a decision they do not mention.",
+    "The Regressions paragraph says 74 entries 'marked \"Regression check\" in the row' and '68 rows carry an amended form or a note'; measured: 65 rows carry the literal mark 'Regression check' (63 of the 72 regression clusters plus the two conflict rows R8-01-22 and R8-03-19, which regressions.json holds under already_resolved, not regressions), and the 9 status-changed rows are marked 'Routed to the operator by the regression check' or 'Amended by the regression check' instead. 68 is reproducible only as 63 + 2 + 3; the text does not state that derivation.",
+    "Measurement wording: lenses.md asks for 'the count of findings only L0 raised'; the draft reports the clusters only L0 raised (17) and never states the finding-level count. It is also 17 (every L0 finding whose every cluster has L0 as its only lens), so the number is right but the measurement as named by the lens page is not reported."
+  ],
+  "notes_not_defects": [
+    "Report L0's coverage table does not cite L0-23 and L0-25 and cites L0-P1 to L0-P7 as a range; the draft's two coverage claims (no key missing; no id cited that is not a finding) stay true. A report-format gap, not a draft defect.",
+    "clusters-07.json says findings_read 15 and clusters-09.json says 13, while their clusters hold 16 and 14 finding memberships. Cluster-file metadata; the draft does not cite findings_read.",
+    "Parked findings L0-P7 and L2b-29 sit in the stage A cluster R8-plan-3; the row says so and why (L11-2 is a stage A finding on the index and ADR 0007).",
+    "L8-1's scenario mentions a hypothetical 'J14'; it is not a spec journey and the criterion/journey table correctly stops at J13.",
+    "Decision SC12 is Required while R8-10-3 (Blocking) 'follows' for its dora part; R8-10-3 itself is decided by DR6 (Blocking), so no severity is lost.",
+    "23 of the 57 multi-placed findings have clusters with differing row statuses; 19 of those differ only among A, M and L across pages, which the per-page forms explain. The four that cross the operator line are listed under draft_defects."
+  ],
+  "scripts": [
+    "count.py",
+    "misfiled.py",
+    "verify.py",
+    "verify2.py",
+    "verify3.py"
+  ],
+  "scripts_note": "scratch scripts of the completeness check, not committed"
+}

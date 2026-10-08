@@ -1,0 +1,453 @@
+{
+  "lens": "L1",
+  "role": "the developer who uses it every day",
+  "model": "opus",
+  "verdict": "No: the spec makes the system correct and safe, but it never measures or specifies the user's ordinary day. The largest gap is that 'one command per project' and 'nothing lost' (00 0.1) have no user-side criterion: salvaged work is never restored into the next sandbox, and stopped sandboxes, upgrades and reboots have no journey.",
+  "findings": [
+    {
+      "id": "L1-1",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "index: Success criteria",
+      "defect": "The objective's user promise, one command per project with nothing to think about (00 0.1, 00 0.2), has no success criterion; S1 to S11 measure the producer, and S7 passes a journey of any length.",
+      "scenario": "v1.0.0 ships with every criterion green, while an ordinary day is sync, approve, run, and adding a project is a config-repo PR, a merge, a hand edit of settings.yaml, a keychain item, sync, approve and run; nothing in acceptance.json would show it.",
+      "change": "Add a criterion S12, measured in block B on both hosts: the count of operator commands and prompts, and the wall clock, for J1 from a clean host, J2, and the daily resume of a stopped sandbox, each against a stated bound (for example J1 in at most N commands and M minutes; resume with no prompt); record the evidence as a probe result.",
+      "cost": "One criterion row, one block B probe (B6), a maintainer decision on the bounds, one plan task.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-2",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "08 8.5",
+      "defect": "Salvaged and lost-generation work is preserved into host refs and never brought back into the next sandbox, so after a recreate or a lost sandbox the agent starts from origin and the user recovers each branch by hand.",
+      "scenario": "romeu recreate foo after a workload bump: the unpushed branch feat/cart and two hours of uncommitted edits become refs under refs/romeu/salvage/foo/<G>/<salvage-id>/foo-api/. The new sandbox has neither. J10 step 3 asks for a hand git branch with two ULIDs in the path, then a push. Ignored files in ignored.tar.gz and agent state in agent/ are never restored.",
+      "change": "Specify a restore step. After a recreate, and after run closes a generation as lost, romeu offers the salvage it holds (TTY) or lists it (no TTY). A command, for example romeu restore <name> [--salvage <id>], brings the salvaged branches and salvage/* commits into the new sandbox through the daemon remote or a bundle that julieta unbundles, without overwriting existing branches. State in the run output what is not restored (ignored files, agent state). Update 01 1.6 Generation, 04 4.2, J6 and J10.",
+      "cost": "A new command or a run step, a julieta unbundle path, a state-machine row, an invariant that restore never overwrites a ref, two plan tasks.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-3",
+      "severity": "Blocking",
+      "origin": "listed",
+      "section": "01 1.5",
+      "defect": "Preflight step 1 applies gate 1 to every P command, so after a background sbx or romeu upgrade the data-protecting verbs stop, salvage, rm and pull exit 3 until the toolchain is acknowledged.",
+      "scenario": "Docker Desktop updates sbx overnight. The next evening romeu stop foo and romeu salvage foo exit 3 (the E test of I7 asserts exactly this), and the user must read a catalog diff in approve --toolchain before the work can be saved or pulled for review.",
+      "change": "In 01 1.5, let stop, salvage and pull (and rm through salvage) run with a stale toolchain when only the sbx or romeu version changed and no widening is involved, and print the mismatch. Keep exit 3 for run, the live changes of sync, and recreate. Amend the E list of I7 to match.",
+      "cost": "A preflight rule change on the gates surface, an I7 test row change, maintainer approval (ask-first: gates).",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-4",
+      "severity": "Required",
+      "origin": "own",
+      "section": "04 4.2",
+      "defect": "'How romeu run reaches the run layout' calls sbx env run only for an absent sandbox, while J3 says sbx env run -d starts or reattaches a sandbox that exists. The stopped sandbox, the most common daily case, has two descriptions.",
+      "scenario": "After romeu stop foo or a host reboot, the sandbox is present and stopped. Per 04 run step 3 no sbx env run happens, and step 5 execs into a stopped sandbox; per J3 the sandbox is started. The implementer picks one, and the user meets whichever was not tested.",
+      "change": "State the three cases in 04 run step 3 (absent: create; present and stopped: sbx env run -d to start, no provisioning; running: nothing) and make J3a cite it. Add the stopped case to probe A4 (start it through romeu's argv and record the time).",
+      "cost": "A step rewrite and one probe observation; the T075 acceptance follows.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-5",
+      "severity": "Required",
+      "origin": "listed",
+      "section": "04 4.1",
+      "defect": "A fix hint is required but need not be a command the user can run. Exit 3 has one example id (RJ-301 approval-required), and nothing says that gate 1 and gate 2 carry different ids and different hints.",
+      "scenario": "After an upgrade, run prints error RJ-301 approval-required with a hint written for gate 2 (romeu approve <name>), which exits 2 because nothing is awaiting. The user cannot tell the toolchain gate from the project gate.",
+      "change": "In 04 4.1, require each fix hint to begin with the exact command line to run, with placeholders filled from context, or with the word 'decide:' followed by the choice. Give gate 1 and gate 2 distinct ids (for example RJ-301 toolchain-approval-required and RJ-302 project-approval-required). Add a test that every hint of exit 3, 4 and 5 starts with a romeu or julieta command.",
+      "cost": "Two table rows, one rule sentence, one unit test over the error table (contracts surface).",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-6",
+      "severity": "Required",
+      "origin": "own",
+      "section": "J1",
+      "defect": "J1 assumes a config repo that already exists and already holds a spec for its own config project (02 2.2), so the first run of the product cannot be completed from the journey as written.",
+      "scenario": "A new user follows J1. Step 3, romeu init --config-url, needs a URL. They have no config repo; the agent that would author one lives in a sandbox that the config project's spec defines; and nothing tells them to start from examples/.",
+      "change": "Add a step before J1 step 3: create the config repo from examples/, either by a documented copy or with romeu init --scaffold <dir>, which writes a minimal projects/<cfg>.yaml for the operator to push. Say which fields the operator fills in by hand.",
+      "cost": "One journey step, a guide paragraph, optionally one init flag and its scenario.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-7",
+      "severity": "Required",
+      "origin": "own",
+      "section": "J2",
+      "defect": "J2 omits the host-settings secret binding, so for any project with a secret its step 3 ends in exit 2, as J11 step 4 shows. The need in 00 0.2, 'no hand-maintained env files', is met only by moving those files into settings.yaml.",
+      "scenario": "The agent writes projects/foo.yaml with secrets: [github], which is needed to clone private secondaries (02 2.6). The operator runs romeu sync foo as J2 says and gets exit 2 naming github@foo, then edits settings.yaml by hand and creates a keychain item that no journey describes.",
+      "change": "Add the binding step to J2 with the exact YAML and the keychain command. Make the exit-2 fix hint of sync print the entry to paste. Record a deferred decision for a command that writes a name@project binding, with its trigger.",
+      "cost": "One journey step, one hint text, one deferred row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-8",
+      "severity": "Required",
+      "origin": "listed",
+      "section": "S8",
+      "defect": "S8 bounds a number the user does not feel. It excludes time in sbx and on the network, is measured with the fake sbx on an empty ledger, and its host check B5 covers a warm run only. Nothing says what the user sees or does when the budget is exceeded.",
+      "scenario": "On a Mac with antivirus and a ledger several months old, romeu run on a stopped sandbox takes a minute. S8 stays green, and the rotation trigger in index: Deferred decisions never fires, because it needs someone to run romeu run --timings.",
+      "change": "Add to S8 a host-measured wall-clock figure for run on a stopped sandbox and on a running one, sbx time included, recorded in B5 as observations without gating. Make run print its elapsed time and the romeuMs share when it is over the S8 budget, so the rotation trigger becomes observable without --timings.",
+      "cost": "Two observations in B5, one output line in run, a reworded deferred trigger.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-9",
+      "severity": "Required",
+      "origin": "own",
+      "section": "08 8.4",
+      "defect": "The opening of 08 says nothing sandbox-only may be lost when a sandbox dies. But snapshots run only after a commit, a rewrite, a merge, a stop or a pull, so an unplanned death loses uncommitted work, and the user is never told this limit.",
+      "scenario": "Docker restarts during an agent session that holds three hours of uncommitted edits. run closes the generation as lost (J10), and the edits are gone. The user believed 00 0.1.",
+      "change": "Either reword the opening of 08 and 00 0.1 to 'nothing committed is lost when a sandbox dies; uncommitted work is lost', and say so in J10 and in the trust paragraph of the README; or add a periodic snapshot of uncommitted changes as salvage-style commits. A deferred decision with a trigger is acceptable.",
+      "cost": "A sentence in three places, or a julieta timer and a test.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-10",
+      "severity": "Required",
+      "origin": "own",
+      "section": "04 4.2",
+      "defect": "When run finds an open generation with no sandbox, it preserves the generation and creates a new sandbox (run step 2). Nothing requires it to tell the user, so a lost sandbox is discovered later, from missing work.",
+      "scenario": "After a host reboot, romeu run foo silently records result: lost and starts a fresh sandbox. The user learns an hour later that yesterday's branch is not there. J10 step 1 assumes they ran status first.",
+      "change": "Require run step 2 to print a fixed block before it creates the sandbox: the lost generation, the snapshot time, the branches and salvage id preserved, what was not preserved (uncommitted work), and the command that restores them (L1-2). On a TTY, ask before continuing.",
+      "cost": "A few lines of output, a golden, a TTY test.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-11",
+      "severity": "Required",
+      "origin": "own",
+      "section": "03 3.2",
+      "defect": "Every project spec repeats the product kits, the workload digest, the agent and the personal kits, and each is widening and recreate-class. So a workload or personal-kit bump is one PR edit, one approval and one recreate per project.",
+      "scenario": "With five projects, a Claude Code workload bump, or one line changed in the personal kit that carries the agent instructions, means five spec edits (julieta pin workload per file), five gate 2 prompts and five salvage-and-recreate cycles. The user stops updating.",
+      "change": "Either add a shared defaults file in the config repo, for example projects/_defaults.yaml merged under each spec and still gated per project, with a gate 2 summary line 'same change as approved for <project>'; or record it as a deferred decision with a trigger (the second workload bump across more than one project).",
+      "cost": "A format addition and a merge rule, or one deferred row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-12",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "01 1.4",
+      "defect": "Gate 2 shows every change at full length and in one form. Nothing separates a content-only kit change from a new capability, which trains the user to approve without reading.",
+      "scenario": "After the summary, a text edit to a personal kit and a kit that adds a privilege or a lifecycle hook look like the same kind of diff. After the fifth long diff, the user types y on the summary.",
+      "change": "Order the summary so changed capabilities, gated domains, secret argv and the workload repository come first and are marked, with content-only kits after them. Repeat that list above the prompt; the summary is already repeated there.",
+      "cost": "A summary layout rule and a golden.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-13",
+      "severity": "Required",
+      "origin": "own",
+      "section": "06 6.2",
+      "defect": "The spec never says what survives a recreate besides git work (agent login, shell history, caches, per-name volumes), so the user cannot judge the cost of the many recreates the design asks for.",
+      "scenario": "The user runs romeu recreate foo after a stale warning. The new sandbox may or may not ask for a Claude Code login (the spec is silent), tools download again, and the agent was stopped after 10 s (08 8.5 step 1).",
+      "change": "Add a table to 06 6.2 or 08 8.5 of what a recreate keeps and what it loses, with probe A12 or B2 recording whether agent auth survives. Make rm and recreate print that list before salvage starts.",
+      "cost": "One table, one probe observation, one output block.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-14",
+      "severity": "Required",
+      "origin": "own",
+      "section": "04 4.2",
+      "defect": "The product offers no supported way into the sandbox when the run layout fails, and herdr is pinned at a pre-1.0 version that fails closed on its protocol (Q16).",
+      "scenario": "A herdr protocol mismatch makes layout up exit non-zero. romeu run offers only --no-attach, and the user does not know the sbx env exec argv with JULIETA_MANIFEST and the absolute julieta path.",
+      "change": "Add romeu run --shell <name> (or romeu shell), which runs the preflight and execs sbx env exec -it <dir> -- a login shell. Print it as the fix hint when layout up fails.",
+      "cost": "One flag, one argv golden, an I1 amendment that the final exec is one of two fixed argvs.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-15",
+      "severity": "Required",
+      "origin": "own",
+      "section": "07 7.5",
+      "defect": "Egress is derived from mise.lock at the spec's ref branch only. An agent that adds a tool on a feature branch hits a blocked host. The durable fix needs a merge or a spec PR, and the quick fix, sbx's own approval queue, is not visible from romeu.",
+      "scenario": "The agent adds aqua:some/cli on feat/x, and julieta install fails naming the host. The user must find the sbx prompt alone, since status lists it only in v1.1 (00 0.5), or merge first; J8 says only 'after the PR merges'.",
+      "change": "In J8 and in the julieta install error, state the short path: the sbx command that approves the host once for this sandbox, the fact that the approval is lost at recreate, and the durable path. Either move the listing of sbx's pending approvals in status into v1, or add a deferred row with a trigger.",
+      "cost": "A journey paragraph, an error hint, a scope decision.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-16",
+      "severity": "Required",
+      "origin": "own",
+      "section": "11 11.1",
+      "defect": "No probe covers the routine events of a working month: a host reboot or Docker restart with a sandbox open, and an sbx upgrade under existing sandboxes.",
+      "scenario": "After an sbx upgrade, an existing sandbox may not start, or may keep running. Whether the generation stays open, whether gate 1 then blocks stop and salvage (L1-3), and whether the signing socket returns after a reboot all stay unmeasured until users report them.",
+      "change": "Add two block B probes: a reboot or Docker restart with a running sandbox (state afterwards, run behavior, signing socket), and an sbx upgrade with an existing sandbox (start, exec, salvage).",
+      "cost": "Two probes and maintainer time on both hosts.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-17",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "04 4.2",
+      "defect": "romeu run never compares the config repo's head with the synced spec commit, so a merged spec change is silently not applied until the next sync.",
+      "scenario": "An agent merges a new pane into projects/foo.yaml. The user runs romeu run foo and the pane is missing; only status reports spec vs synced commit.",
+      "change": "When refs/romeu/origin/<cfg>, as last fetched and with no network call, is ahead of the synced spec commit, make run print one line: 'spec moved: romeu sync foo'.",
+      "cost": "One line, one test.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-18",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "05 5.2",
+      "defect": "Common pre-existing setups (a global sbx GitHub secret, VS Code workspace trust turned off, an existing ~/dev) are refused at preflight with no migration command stated, so day one meets a wall of correct refusals.",
+      "scenario": "A developer who used sbx before has set the github secret globally, as sbx documents. Every romeu run exits 2 at preflight step 5 (I22), with a hint the spec does not define.",
+      "change": "For each pre check of 04 doctor, give the fix hint text in the spec: the exact sbx secret command per project, the VS Code setting to change, and what init does with a non-empty root.",
+      "cost": "Hint texts for about five checks.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-19",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "08 8.3",
+      "defect": "The narrative handoff depends on the operator remembering to type /handoff before /clear and /handoff --final before rm. The index principle calls that a defect when it is asked of an agent, and rm only warns.",
+      "scenario": "The user runs romeu recreate foo at night without /handoff --final. The facts handoff survives and the session's narrative does not, and the agent is stopped 10 s later.",
+      "change": "When the generation has no final handoff, make rm and recreate on a TTY ask whether to request one from the agent first; or state the limit plainly in J6.",
+      "cost": "A prompt and a TTY test, or a sentence.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-20",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "index: Deferred decisions",
+      "defect": "No row covers the disk growth that only the user feels: salvage payloads (up to 1 GiB each, one per salvage), snapshots, .attic and review checkouts, which romeu never deletes (I16) and no command reports.",
+      "scenario": "After months of recreates the host disk fills. status and doctor say nothing about the size of memory dirs or the attic. The user deletes directories by hand and risks the only copy of unpushed work.",
+      "change": "Add a deferred row for reporting and reclaiming salvage and attic space. Until then, status shows the size per project. The row reopens at the first doctor size warning or the first report of a full disk.",
+      "cost": "One row, one status field.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-21",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "index: Open questions",
+      "defect": "Several rows are settled by 'maintainer' with no event that brings them back, and Q25 is marked decided but stays in the open table, against the table's own rule.",
+      "scenario": "Q4, Q6, Q9, Q12, Q13, Q14 and Q23 have no trigger, so Q14 (memory is machine-local) stays open for good although J12 users lose memory today. A reader cannot tell whether Q25 is open or decided.",
+      "change": "Give each maintainer-settled question the event that brings it to the maintainer (for Q14: the first J12 on a machine that has memory to carry). Move Q25 out now, with its link to ADR 0008.",
+      "cost": "Seven cells and one row moved.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-22",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "J12",
+      "defect": "The opening of 09 says J12 runs J1 steps 3-6, J12 itself says steps 1 to 5, and J12 does not say how memory reaches the second machine.",
+      "scenario": "A user with a laptop and a desktop follows J12 and re-approves every project as it says, then finds no memory or handoff from the other machine and no instruction for copying them.",
+      "change": "Make the two sentences agree on one range. Add to J12 the supported way to carry memory dirs (copy, then julieta memory verify), or say plainly that agent memory does not travel in v1.",
+      "cost": "Two sentences.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-23",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "ADR 0008",
+      "defect": "The product user's default path binds github@<project> to whatever token they have. Nothing in J1, 03 3.4 or 05 5.4 guides them to a narrow fine-grained token per project, although ADR 0008 lists what a full personal token can reach.",
+      "scenario": "A user follows J1 with their personal token, and every sandbox can reach every repository, every setting and the gists of the account. The risk table they read is about the maintainer's own repository.",
+      "change": "Split the 05 5.4 rows about this repository's development from the risks of the product user. In J1 step 5 and J2, recommend one fine-grained token per project with the scopes it needs.",
+      "cost": "Moved rows and a journey sentence.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-24",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "12 12.6",
+      "defect": "Release notes are generated from commit subjects. They do not tell the upgrading user what the release will cost: a toolchain acknowledgement, which projects see gate 2, and which projects need a recreate.",
+      "scenario": "A user installs a release and discovers its cost one project at a time, through exit 3 and stale warnings.",
+      "change": "Add a generated 'Upgrade' section to the notes: a summary of the catalog diff, the kit digests that changed, any julieta protocol change, and the rule 'projects that use kit X need a recreate'.",
+      "cost": "A notes generator section, from data romeu already embeds.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-25",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "12 12.8",
+      "defect": "The README outline promises 'first run (J1 in six commands)' while J1 has seven steps, two manual verifications and a hand edit, and ADR 0001 promises a first run 'in minutes' that nothing measures.",
+      "scenario": "A README reader expects six commands, meets the config-repo gap and the doctor failures, and gives up at step 4.",
+      "change": "Make the README outline cite J1 without a count, or fix the count once the criterion of L1-1 exists.",
+      "cost": "A phrase.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-26",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "02 2.3",
+      "defect": "Host clones and review checkouts are opened only in Restricted Mode, and Remote-SSH is v1.1, so the spec does not describe where the user edits and debugs code day to day.",
+      "scenario": "The user opens dev.code-workspace and gets no extensions and no debugger. They trust the folder to get work done, which doctor then fails (I23), and every run is blocked.",
+      "change": "Add a short section, in 02 2.3 or as a journey, that names the supported daily editing setup in v1 and what not to do on the host.",
+      "cost": "A paragraph.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-27",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "06 6.4",
+      "defect": "herdr uses the tmux prefix ctrl+b inside the sandbox, which collides with a host tmux in which the user runs romeu run.",
+      "scenario": "The user runs romeu run inside host tmux. The outer tmux captures ctrl+b, and the herdr panes cannot be driven.",
+      "change": "State the collision and offer a configurable prefix as a julieta kit arg, or document the double prefix.",
+      "cost": "A kit arg or a sentence.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L1-28",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "The plan's opening says seven decision records; there are eight.",
+      "scenario": "An implementer counts the ADRs against the plan and finds ADR 0008 unaccounted for.",
+      "change": "Say eight, or drop the count.",
+      "cost": "A word.",
+      "parked_for_b": true
+    },
+    {
+      "id": "L1-29",
+      "severity": "Required",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "The J3a acceptance of T075 follows J3 (run starts the sandbox with sbx env run -d) and inherits the 04 4.2 contradiction.",
+      "scenario": "T075 passes against one reading of the stopped case while 04 says another.",
+      "change": "Rewrite the J3a bullet of T075 once L1-4 is settled.",
+      "cost": "A bullet.",
+      "parked_for_b": true
+    },
+    {
+      "id": "L1-30",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "No task walks someone other than the maintainer through J1 on a clean Mac, and none measures cold-create or resume time; T094 and T095 are scored by review only.",
+      "scenario": "v1.0.0 ships with guides whose commands ran as scenarios but that no newcomer ever followed.",
+      "change": "Add a block B task: a cold J1 by a second person or on a fresh account, timed, with the commands counted, feeding L1-1.",
+      "cost": "A task and operator time.",
+      "parked_for_b": true
+    }
+  ],
+  "coverage": {
+    "index": "L1-1, L1-8, L1-20, L1-21",
+    "00": "L1-1, L1-9",
+    "01": "L1-3, L1-12",
+    "02": "L1-26",
+    "03": "L1-11",
+    "04": "L1-4, L1-5, L1-10, L1-14, L1-17",
+    "05": "L1-18",
+    "06": "L1-13, L1-27",
+    "07": "L1-15",
+    "08": "L1-2, L1-9, L1-19",
+    "09": "L1-6, L1-7, L1-22, L1-2, L1-4, L1-10, L1-15",
+    "10": "L1-8 (S8 is measured only with the fake sbx; 10 10.3 states that what dominates the felt time cannot be modelled)",
+    "11": "L1-16",
+    "12": "L1-24, L1-25",
+    "13": "L1-8 (ingest on every run reads the whole ledger); cross-project visibility in 13 13.6 is an accepted risk and is not reported",
+    "adr": "L1-23",
+    "plan": "L1-28, L1-29, L1-30"
+  },
+  "missing": [
+    {
+      "what": "a user-felt success criterion: commands, prompts and wall clock for J1, J2 and a daily resume",
+      "where": "index: Success criteria; 11 11.2"
+    },
+    {
+      "what": "the daily resume journey for a stopped sandbox",
+      "where": "J3; 04 4.2 run step 3; 11 11.1 A4"
+    },
+    {
+      "what": "bootstrapping the config repo before the first sandbox exists",
+      "where": "J1; 04 4.2 init; 02 2.2"
+    },
+    {
+      "what": "restoring salvaged work into the new sandbox",
+      "where": "08 8.5; 04 4.2; J6; J10; 01 1.6"
+    },
+    {
+      "what": "run telling the user, unprompted, that a sandbox was lost and how to get the work back",
+      "where": "04 4.2 run step 2; J10"
+    },
+    {
+      "what": "upgrade journeys: romeu itself, sbx or Docker updating in the background, and Claude Code in the workload",
+      "where": "J9; 01 1.4; 12 12.6"
+    },
+    {
+      "what": "what happens on a host reboot or a Docker restart",
+      "where": "09; 11 11.1; 06 6.4"
+    },
+    {
+      "what": "whether the agent login survives a recreate, and what else a recreate costs",
+      "where": "06 6.2; 08 8.5"
+    },
+    {
+      "what": "a supported plain shell when the layout or herdr fails",
+      "where": "04 4.2"
+    },
+    {
+      "what": "shared defaults across project specs",
+      "where": "03 3.2"
+    },
+    {
+      "what": "adding a name@project secret binding without hand-editing YAML, and guidance toward a narrow token",
+      "where": "04 4.2; 03 3.4; J1; J2"
+    },
+    {
+      "what": "disk size reporting, and safe reclamation of salvage, snapshots and the attic",
+      "where": "04 4.2 status; 08; index: Deferred decisions"
+    },
+    {
+      "what": "a 'what needs my attention' line that names the next command",
+      "where": "04 4.2 status and run; 13 13.9"
+    },
+    {
+      "what": "the supported daily editing and debugging setup",
+      "where": "02 2.3; 09"
+    },
+    {
+      "what": "egress for a tool tried on a feature branch before merge",
+      "where": "07 7.5; J8"
+    },
+    {
+      "what": "uninstalling, and leaving the product with the work intact",
+      "where": "09; 04"
+    },
+    {
+      "what": "a user-facing summary of the privacy facts: other projects' names in each sandbox's view, the token's reach, not opening memory dirs on the host",
+      "where": "12 12.8 README outline; J1"
+    }
+  ],
+  "postmortem": "It is a few months after v1.0.0. I have stopped using romeu for daily work. These are the reasons, the ones I would say in a retro and the ones I would not. 1. **\"One command per project\" was never one command.** The ordinary day was `sync`, sometimes `approve`, then `run`; adding a project was a PR in the config repo, a merge, a hand edit of `settings.yaml`, a keychain item, `sync`, `approve`, `run`. I counted once and stopped counting. No success criterion ever measured the count, so nobody saw it go up. (00 0.1, 0.2; index S1-S11; 04 4.2; 09 J2; 03 3.4) 2. **Every upgrade stopped my evening.** Docker updated sbx in the background, and the next `romeu run` exited 3. So did `stop` and `salvage`. I had to read a catalog diff I had not asked for before I could even save my work. A new Claude Code meant pin, PR, merge, sync, approve and recreate, per project. After the third time I pinned everything and fell behind on purpose. (01 1.4 gate 1, 1.5 step 1; 04 4.2 P commands; 06 6.2; 09 J9; 12 12.6) 3. **Recreate felt like data loss, even though nothing was deleted.** After a recreate my unpushed branches and my uncommitted work sat in `refs/romeu/salvage/<name>/<ULID>/<ULID>/...` on the host and not in the new sandbox. My `.env` and local DB went into a tarball nobody unpacks. Getting the work back was archaeology. I started pushing WIP branches before every recreate. That habit was the product's guarantee moved back onto me. (0.1 \"nothing lost\"; 08 8.5; 09 J6, J10 step 3; 01 1.6) 4. **The night the sandbox died, nobody told me.** After a host reboot `run` quietly closed the generation as lost and made a fresh sandbox. I found out an hour later, when the agent did not know yesterday's branch. Uncommitted edits since the last commit were gone, because snapshots run only after commits. (08 intro vs 8.4; 09 J10 step 1-2; 04 run step 2; 11 no reboot probe) 5. **The agent kept getting stuck on egress, and the fix lived elsewhere.** A new tool on a feature branch needed a domain. The real fix was a catalog release by the maintainer or a spec edit through a PR. The quick fix was an sbx prompt I could not see from romeu (v1.1). (07 7.5, 7.6; 03 3.2 `ref`; 09 J8; 00 0.5 v1.1 row) 6. **My existing setup made it fail on day one.** I already had a global sbx GitHub secret, workspace trust turned off in VS Code, and an existing `~/dev`. Preflight refused all of them. Each refusal is correct, but together they were a wall, and J1 assumed I already had a config repo that I had to create by hand. (05 I22, I23, I14; 04 doctor; 02 2.3; 09 J1) 7. **When herdr broke I had no way in.** A herdr protocol bump failed closed. romeu had no \"just give me a shell\", and the spec never told me the raw `sbx env exec` line. (00 0.3; 04 4.2; Q16; 06 6.4) 8. **What I would not say out loud: it was built for its builder.** The spec spends more words on its own CI grammar, DORA, testify and the maintainer's GitHub token than on my Tuesday night. Every journey passed S7, but no criterion asked whether a journey was short. The ledger collected my failures for the maintainer and never showed them to me. It also made each `run` a little slower. Disk kept growing (salvage payloads, attic, ledger), and no command freed it. My client project's name showed up in my open-source project's sandbox. (10; 12; 13 13.6, 13.8, 13.9; 05 5.4; ADR 0006; I16) 9. **Trust erosion, quietly.** I was told memory is plain files I own, then told not to open them on the host. Then I was told to use Restricted Mode for code I edit every day. I worked around the product. Once I was working around it, it was no longer the organizer of my environments. (01 1.1; 05 5.4; 1.3 D; 02 2.3)",
+  "lens_critique": "This lens measures success as low friction for one person, and that can argue against the gates that are the product's reason to exist. Every refusal in 05 is correct, and a lens that counts prompts could trade them away. The real success for this product is that the safe path is also the short path. Read the friction findings as 'make the safe step cheaper and name the next command', never as 'skip the check'. The lens also takes the maintainer's own Tuesday as typical, while the secondary user of 00 0.2 has a different first week.",
+  "missing_viewpoint": "Missing is a cold newcomer: someone who tries the product from the README in one sitting, with only the tools a typical Mac developer has. L10 comes close but adopts deliberately, and L1 already knows the vocabulary. Also missing is a terminal-environment and accessibility viewpoint (screen readers, color, nested multiplexers, non-English locales) for a product whose whole interface is a terminal.",
+  "out_of_scope": [
+    {
+      "what": "whether each generated error id has a runnable fix hint",
+      "why": "the text alone cannot settle it: the error table is generated in internal/cli and is not in the spec; reading that table, or a test over it, would settle it"
+    },
+    {
+      "what": "real timings of cold create, resume and tool install on a Mac",
+      "why": "the text alone cannot settle it: only block B measurements on real hosts can"
+    },
+    {
+      "what": "cross-project visibility of project names in others.jsonl",
+      "why": "it is an accepted risk in 05 5.4 with a deferred row, and this lens would only restate it"
+    },
+    {
+      "what": "the CI workflow grammar, forbidden names, testify style, the DORA metrics and the ledger's internal format",
+      "why": "this person would not look at them: they do not change what the user does or feels"
+    },
+    {
+      "what": "docs/reviews/round-1.md to round-7.md",
+      "why": "history only, per the brief; not opened"
+    }
+  ],
+  "confidence": "Medium-high on the gaps between journeys and commands, which are cited against the text; medium on severity, because the felt cost depends on real sbx timings and prompt behavior that I could not measure."
+}

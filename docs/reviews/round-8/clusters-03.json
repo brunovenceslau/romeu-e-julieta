@@ -1,0 +1,776 @@
+{
+ "page": "03",
+ "findings_read": 51,
+ "clusters": [
+  {
+   "id": "R8-03-1",
+   "section": "03 (opening), 03 3.4, 03 3.7, 03 3.8, 03 3.6",
+   "title": "No stored format except the manifest and the event says what a reader does with another version, so an upgrade or a rollback turns strict decoding into exit 2 on every command, while the manifest's N-1 window is the one rule written down.",
+   "severity": "Blocking",
+   "lenses": [
+    "L3",
+    "L14",
+    "L4",
+    "L9",
+    "L10",
+    "L11"
+   ],
+   "finding_ids": [
+    "L3-3",
+    "L14-11",
+    "L4-19",
+    "L9-22",
+    "L10-18",
+    "L11-31"
+   ],
+   "listed": 0,
+   "own": 6,
+   "scenario": "romeu v1.1 writes projects/<name>.json version 2; the operator reinstalls v1.0 after a regression; every command, salvage included, exits 2 on an unknown version with no id saying how to recover (L14-11, L4-19). Or v1.1 adds a field and every v1 record is refused (L3-3, L9-22).",
+   "change": "Add one paragraph to 03's opening, for every format in 02 2.1's list: 'Any change to a format's fields bumps its version. A reader refuses a version newer than its own with E-format-newer and the fix hint \"install the release that wrote it\". The release that bumps a stored format reads the previous version and writes the new one on its next whole-file write (forward-only; read-only consumers such as romeu reading memory entries never rewrite). A record romeu cannot decode is never overwritten: status and doctor report it by id, and salvage --from-host still runs from the tree and the clones into a new record beside it. User-authored formats (project.v1, host-settings.v1) change only by a new version of their version field (see R8-03-7), announced first in the release notes (12 12.6).' Keep 03 3.6's N-1 for the manifest and name its reason there (a cached manifest written before a romeu upgrade, the one window known to be needed now); the event window stays in 13 13.7. No per-format migration table.",
+   "cost": "one paragraph, one error id, one sentence in 3.6",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "One rule in 03's opening replaces per-format windows: refuse newer with a named id, forward-only migration owned by the release that bumps, undecodable records never overwritten; the manifest keeps N-1 with its stated reason, which answers L11-31's second option. No generic N/N-1 machinery for host formats until a bump needs it."
+  },
+  {
+   "id": "R8-03-2",
+   "section": "03 (opening)",
+   "title": "Outputs the product does not own (sbx ls --json, sbx policy and secret listings, mise.lock, herdr replies, registry manifests, GitHub API JSON) have no decoding rule, so a renamed field can decode as a zero value that drives a 01 1.6 state transition.",
+   "severity": "Blocking",
+   "lenses": [
+    "L15"
+   ],
+   "finding_ids": [
+    "L15-2"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "sbx wraps the sbx ls --json list in an object; a lenient parser reads no sandbox; run takes 01 1.6's 'sandbox absent' row and closes a live generation as closed-lost.",
+   "change": "Add to 03's opening: 'Outputs of tools the product does not own are decoded tolerantly and checked strictly: unknown fields are allowed; every field romeu or julieta reads is required and typed; a missing or mistyped field is E-upstream-shape, naming the upstream and its live version; no parser returns absent, none or an empty list for a shape it did not recognize.' Name the two consumers where a zero value acts (01 1.6 Generation, 01 1.5 step 5) in one line linking this rule; one fixture per decoded upstream shape in 10 10.1's fixture list.",
+   "cost": "one paragraph, one error id, one fixture per upstream",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Rule in 03's opening plus a pointer from 01 1.6 and 01 1.5, and fixtures per upstream; no new 05 5.2 invariant."
+  },
+  {
+   "id": "R8-03-3",
+   "section": "03 (opening), 03 3.2, 01 1.4, 12 12.3",
+   "title": "03's field and rule tables are design input that the product later generates into docs/reference/, so after v1 the spec keeps a second, unmaintained copy of every table, and 01 1.4 and 12 12.3 send the 3.2 table to two destinations.",
+   "severity": "Blocking",
+   "lenses": [
+    "L3",
+    "L8"
+   ],
+   "finding_ids": [
+    "L3-1",
+    "L8-10"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "v1.1 adds a field; docs/reference/project.md regenerates; 03 3.2 keeps the old table; a contributor reading the spec writes the old shape and is refused.",
+   "change": "Replace the last sentence of 03's opening with: 'The tables below are the v1 design input to rules.go and the struct tags. The PR that lands a format's generator (T021 for project.v1) replaces that format's field and rule tables here by a link to its generated page under docs/reference/; this page then keeps only the intent, the annotated example and the rules that are design decisions.' Change 03 3.2's 'this table is generated' and 01 1.4's 'the field table in 03 3.2' to name docs/reference/project.md. Add the replacement to T021's acceptance criteria in plan.md; no tools/ci header-matching check.",
+   "cost": "three sentences and one plan acceptance line",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Tables are deleted in favour of links in the generator's PR, recorded as T021 acceptance; the proposed tools/ci docs header check is dropped, since the deletion leaves nothing for it to compare."
+  },
+  {
+   "id": "R8-03-4",
+   "section": "00 0.5, 03 3.9, 03 3.12, 04 4.3, 08 8.1, 10 10.5, 11 11.2, I24",
+   "title": "The generic product carries one person's migration and acceptance (memory import and verify, the import/ directory, the memory-entry digest kind, the repo evidence kind, tools/ci acceptance --file, the C1 hugo check).",
+   "severity": "Blocking",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-4"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A second adopter (00 0.2) installs reference pages and an acceptance suite that document commands and an evidence kind that apply to nobody but the author, and a check on a tool they do not use.",
+   "change": "Delete from the spec: julieta memory import and verify (03 3.9's JSONL paragraph and digest sentence, the 04 4.3 rows), import/ from I24 and 08 8.1, the memory-entry kind from 03 3.12, the repo evidence kind and --file from 10 10.5, and C1 from 11 11.2; record in 00 0.5 that the one-time import is a script in the operator's config repo (02 2.2 already allows an operator acceptance.json there) and the predecessor archiving an operator step outside the product. If the operator keeps them, 00 0.5 states per item why a generic product needs it and the reference marks them operator-only.",
+   "cost": "deletions across six pages; one 00 0.5 row rewritten",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Operator decision needed: It reverses a recorded maintainer decision in 00 0.5 ('memory entries written before v1 are imported when v1 is adopted, once') and changes the scope. Recommendation: delete and move the import to the operator's config repo; this also settles R8-03-27 (L0-28) and R8-03-28 (L16-13).",
+   "operator_reason": "It reverses a recorded maintainer decision in 00 0.5 ('memory entries written before v1 are imported when v1 is adopted, once') and changes the scope. Recommendation: delete and move the import to the operator's config repo; this also settles R8-03-27 (L0-28) and R8-03-28 (L16-13)."
+  },
+  {
+   "id": "R8-03-5",
+   "section": "03 (opening), 03 3.13, 02 2.1",
+   "title": "03's opening says every format has a version field, strict decoding, a JSON Schema and CI-validated examples, while the ledger entry, the view files, dora.v1, heads.json, SHA256SUMS, e2e/scenarios/commands.yaml and the pin file have no schema, and run-timings.v1 is in 02 2.1's schema list but defined nowhere in 03.",
+   "severity": "Required",
+   "lenses": [
+    "L0",
+    "L13",
+    "L13b",
+    "L3"
+   ],
+   "finding_ids": [
+    "L0-29",
+    "L13-17",
+    "L13b-25",
+    "L3-34"
+   ],
+   "listed": 0,
+   "own": 4,
+   "scenario": "tools/ci schema validates only the schemas that exist and passes; a reader of 03 trusts a universal; an implementer looks for run-timings.v1 in 03 and invents it.",
+   "change": "Change the opening's first sentence to 'Every format in 02 2.1's schema list has a version field, strict decoding, a JSON Schema in schemas/ and examples validated in CI.' Add to 03 3.13 a 'Formats without a schema' list naming the ledger entry, the view files, dora.v1, snapshot/heads.json, SHA256SUMS, e2e/scenarios/commands.yaml and the pin file, each with its reason (a header line and bytes; derived and pinned by a golden; a report read by one tool; read by one program and pinned by a golden). Add one 03 3.13 line pointing at 04 4.2 for run-timings.v1, unless R8-03-16 removes it. L3-34's other parts (the pin file's writer in 02 2.1, mutate coverage of the I4, I25 and I8 guards in 05 5.3 or 10 10.2) belong to those pages' clusters.",
+   "cost": "one sentence reworded, a short list",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Weaken the universal to the measured set and list the exceptions with reasons; add no new schemas."
+  },
+  {
+   "id": "R8-03-6",
+   "section": "03 3.1, 04 4.3",
+   "title": "Some 03 3.1 rules (gitHosts, workloadRepositories, name@project secret bindings) read host settings, which julieta spec validate in the config repo's CI cannot see, and no sentence says which validator skips which rule.",
+   "severity": "Required",
+   "lenses": [
+    "L13b",
+    "L5"
+   ],
+   "finding_ids": [
+    "L13b-5",
+    "L5-12"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "An agent adds a repo on gitlab.com and secrets: [npm]; julieta spec validate exits 0 in CI; the PR merges; romeu sync exits 2 twice on the host, each a round trip through a person.",
+   "change": "Add a 'Checked by' column to the 03 3.1 table (both | romeu only) and mark the gitHosts, workloadRepositories and secret-binding rules romeu only; in rules.go each rule carries that scope and the generated rule table shows it. In the 04 4.3 spec validate row add: 'prints one line naming the host-only rules it did not check'.",
+   "cost": "one column, one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-7",
+   "section": "03 (opening), 03 3.2, 03 3.4, 03 3.7, 03 3.8, 13 13.2",
+   "title": "The version is spelled three ways (apiVersion: romeu/v1, integer version: 1, string schema: runtime-event/v1), so a generic reader must know a file's family first and a new format can pick a fourth form.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-4"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A contributor adds dora.v1 and picks yet another form.",
+   "change": "Choose one form in 03's opening: every format the product owns carries 'schema: <name>/v<n>', where <name> is its 02 2.1 schema name (the one form that names both the format and its version); replace apiVersion: romeu/v1 and the integer version: 1 in every example of 03 and in 13 13.2; sbxenv.yaml's schemaVersion belongs to sbx and stays. The generated schemas carry the field as a const, so tools/schemagen enforces it with no separate check.",
+   "cost": "examples across 03 and 13 13.2 rewritten once, before any code",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-8",
+   "section": "03 3.8, 03 3.9, 03 3.10, 03 3.12, 13 13.3, I24",
+   "title": "ULID case differs between stores (uppercase for memory, handoffs and state; lowercase Crockford in the ledger for an APFS case-collision reason), timestamp field names follow no rule, and manifestSha256 is neither a canon kind nor in 03 3.12's raw list.",
+   "severity": "Required",
+   "lenses": [
+    "L13"
+   ],
+   "finding_ids": [
+    "L13-13"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "A query joining a handoff's generation id to a ledger entry lowercases one side by hand; a contributor adds a timestamp field under a seventh name.",
+   "change": "In 03 3.12 add: 'Every ULID the product writes is lowercase Crockford base32 (13 13.3's reason holds for every file on the host disk); decoders refuse uppercase.' Update the examples of 03 3.8, 3.9 and 3.10. Add one naming rule to 03's opening: 'A timestamp is RFC 3339 UTC and named <past participle>At (createdAt, updatedAt)'; rename created/updated, observed/ingested, at and lastRun now, since no format is released yet. Classify manifestSha256 in 03 3.12 (raw list, with what it covers).",
+   "cost": "examples and field names across 03 and 13, before any code",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "One ULID case and one timestamp naming rule, applied now while no format is released; the case rule reaches the memory allowlist I24 by consequence, not by a new check."
+  },
+  {
+   "id": "R8-03-9",
+   "section": "03 (opening), 01 1.4, 10 10.1",
+   "title": "The strict YAML subset (no anchors, aliases, merge keys, includes) is stated for descriptors only, while agent-authored memory entry and handoff front matter, heads.json and the TOML locks are parsed on the host with no limit beyond the 1 MiB file cap and are not in the fuzz list.",
+   "severity": "Required",
+   "lenses": [
+    "L2b"
+   ],
+   "finding_ids": [
+    "L2b-11"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A memory entry's front matter nests aliases that expand far past 1 MiB; romeu sync reads it and the host process exhausts memory before the allowlist check.",
+   "change": "Move the strict subset sentence from 01 1.4 to 03's opening as the rule for every format decoded from a mount or a repository, naming the memory entry, handoff, heads.json and mise.lock parsers, with a decoded-size bound equal to the file cap; 01 1.4 links to it. Add those four decoders to 10 10.1's fuzz list.",
+   "cost": "a moved sentence, one bound, four fuzz targets",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-10",
+   "section": "03 3.1, 07 7.5",
+   "title": "Kit args keys and values reach sbxenv.yaml and sbx's kit build with no validation rule, and the domain rule is stated for egress.extra only while lock-derived and kit-declared domains also become sbx policy argv.",
+   "severity": "Required",
+   "lenses": [
+    "L2b"
+   ],
+   "finding_ids": [
+    "L2b-12"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A kit arg of several kilobytes with newlines, or a kit-declared domain with a trailing dot or a port, passes validation and reaches sbx's build and policy argv in an untested shape.",
+   "change": "Add a 03 3.1 row 'kit args: key ^[a-z][a-zA-Z0-9_]{0,31}$; value printable UTF-8, no newline, <= 1 KiB'. Rename the row 'extra egress domain' to 'egress domain (every source of 07 7.5: egress.extra, catalog, lock-derived, kit-declared)'.",
+   "cost": "one row added, one row renamed",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-11",
+   "section": "03 3.4, I25",
+   "title": "Nothing forbids a secret value placed as an argv element, which the gate diff prints and sbx's process list and remembered host commands keep.",
+   "severity": "Required",
+   "lenses": [
+    "L2b"
+   ],
+   "finding_ids": [
+    "L2b-14"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "An operator binds github@shop to [/bin/echo, ghp_...] to get going; romeu renders it, the gate prints it, and it sits in the process list and in sbx settings.",
+   "change": "Add to 03 3.4 Rules: 'An argv is a command that fetches the value and never carries it.' Add a rules.go rule for host settings that refuses an argv element starting with ghp_, gho_, ghs_ or github_pat_, or matching ^[0-9a-f]{40}$, with an error id; note under I25 that this is why. No doctor row.",
+   "cost": "one sentence, one validation rule",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "A validation rule in rules.go replaces the proposed doctor row; the token shapes are a best-effort guard and are stated as such."
+  },
+  {
+   "id": "R8-03-12",
+   "section": "03 3.3, 03 3.4",
+   "title": "The environment a host helper runs in is unstated: a secret argv runs under env -i with HOME and PATH=/usr/bin:/bin, and gitCredentialHelper ('the only credential helper hardened git uses') does not say which values are accepted or where it runs, so a manager needing a session variable or a non-system PATH fails far from its cause.",
+   "severity": "Required",
+   "lenses": [
+    "L10"
+   ],
+   "finding_ids": [
+    "L10-7",
+    "L10-27"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "An adopter binds github@shop to [/opt/homebrew/bin/bw, get, password, x]; bw needs BW_SESSION, which env -i drops; the failure surfaces in the sandbox as a git auth error. Or an adopter sets gitCredentialHelper to gh's helper and the behaviour is unspecified.",
+   "change": "Add to 03 3.4 Rules: 'A secret argv and the credential helper run with exactly HOME and PATH=/usr/bin:/bin, so a manager must work from HOME alone (Keychain, or a CLI whose session lives in a file under HOME); a manager that needs a session variable is not supported in v1.' Reword the gitCredentialHelper comment to 'optional; a git-credential-<name> helper on /usr/bin:/bin or an absolute path; hardened git uses this helper and no other'. Have doctor run each secret argv once in that environment and fail on a non-zero exit or empty output, never printing the value; give one non-Keychain example (a 1Password CLI with desktop integration).",
+   "cost": "two sentences, one doctor row, one example",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "State the environment and the accepted helper values as a limit, plus one doctor row that runs each argv once."
+  },
+  {
+   "id": "R8-03-13",
+   "section": "03 3.1, 03 3.4, 01 1.1, 07 7.3",
+   "title": "The forge scope is unstated: the repo url rule allows only https://<host>/<owner>/<repo> (no GitLab subgroups) while 03 3.4 invites any gitHosts entry with a caFile, a hedge with no trigger in a v1 whose host is github.com.",
+   "severity": "Required",
+   "lenses": [
+    "L10",
+    "L11"
+   ],
+   "finding_ids": [
+    "L10-6",
+    "L11-22"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "An adopter on self-hosted GitLab adds the host to gitHosts with a caFile; their spec with https://git.corp/team/backend/api is refused with a name-rule error that does not say v1 is GitHub-shaped.",
+   "change": "State in 03 3.1's repo url row and in 01 1.1: 'v1 supports GitHub-shaped URLs (one owner segment) on the hosts in gitHosts; repos, CI and releases assume GitHub.' Move caFile out of 03 3.4 into an index Deferred row 'a git host other than github.com: until then gitHosts is github.com and private hosts are not supported; reopened by the first gitHosts entry other than github.com', and drop its unit test. L11-22's lock-platform and monorepo.lockfile parts belong to page 07's clusters. Listing 'a forge other than GitHub' under 00 0.3 is left to the operator as an optional scope line.",
+   "cost": "two sentences, one Deferred row, caFile removed",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the limit and defer caFile with a trigger; no widening of the URL rule."
+  },
+  {
+   "id": "R8-03-14",
+   "section": "03 3.5, 07 7.6, 12 12.8",
+   "title": "The v1 egress catalog is built only from the author's private reference config repo's locks, so any other stack fails its first sync on an uncatalogued backend:tool, and no page tells a stranger to expect it.",
+   "severity": "Required",
+   "lenses": [
+    "L10"
+   ],
+   "finding_ids": [
+    "L10-3"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An adopter with core:rust and aqua:hashicorp/terraform runs romeu sync and gets exit 2 twice; the hint offers a catalog PR to a one-owner ask-first surface, or gated egress.tools domains they must find themselves.",
+   "change": "Add to 03 3.5 after 'built from the reference config repo's locks': 'so it covers that stack only; a tool outside it is declared with egress.tools in the project spec (always gated) until a catalog entry ships in a release.' Repeat the limit in 12 12.8's README prerequisites. Add an index Deferred row 'seeding the catalog from a public, named set of common backends; reopened by the first adopter other than the maintainer'.",
+   "cost": "two sentences, one Deferred row",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the coverage limit and the existing way through (egress.tools); defer a public seed with a trigger; no new journey."
+  },
+  {
+   "id": "R8-03-15",
+   "section": "03 3.2",
+   "title": "Every project spec repeats the product kits, workload digest, agent and personal kits, each widening and recreate-class, so a workload or personal-kit bump costs one PR edit, one approval and one recreate per project.",
+   "severity": "Required",
+   "lenses": [
+    "L1"
+   ],
+   "finding_ids": [
+    "L1-11"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "With five projects a Claude Code workload bump means five spec edits, five gate 2 prompts and five salvage-and-recreate cycles.",
+   "change": "Add an index Deferred row: 'shared defaults across project specs (for example projects/_defaults.yaml merged under each spec, still gated per project); until then each spec carries its own workload and kits; reopened by the second workload bump that touches more than one project.'",
+   "cost": "one Deferred row",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Deferred with a trigger, per ADR 0005; no defaults file in v1."
+  },
+  {
+   "id": "R8-03-16",
+   "section": "index S8, 00 0.5, 04 4.2, 02 2.1, 03 3.13",
+   "title": "S8 and romeu run --timings justify each other: the flag exists only for the criterion and the criterion's evidence is the flag's output, with a schema (run-timings.v1), a CI median-of-5 test and probe B5 measuring budgets of unstated origin.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "No user types --timings; the 2 s and 3 s figures have no stated origin; the CI test, asserted never a flake, blocks a merge on a number chosen before code ran.",
+   "change": "Keep S8 as a measured property of the host suite (B5 with plain timing in the harness); drop --timings from 04 4.2, run-timings.v1 from 02 2.1 and the --timings row of 00 0.5; mark the 2 s and 3 s bounds 'set by the first measurement' in S8; reword the ledger Deferred row's trigger that cites romeu run --timings.",
+   "cost": "deletions in four pages, one S8 cell",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Operator decision needed: It removes a row of the 00 0.5 scope table (--timings, justified by S8) and changes a success criterion. Recommendation: accept; it also settles the run-timings.v1 part of R8-03-5.",
+   "operator_reason": "It removes a row of the 00 0.5 scope table (--timings, justified by S8) and changes a success criterion. Recommendation: accept; it also settles the run-timings.v1 part of R8-03-5."
+  },
+  {
+   "id": "R8-03-17",
+   "section": "03 3.2 (Run layout), index: Deferred decisions",
+   "title": "The run layout is called multiplexer-neutral and carries renderer neutrality for tmux and cmux, which are non-goals, while nothing says what happens if herdr, the one renderer and a pre-1.0 project, stops being maintained.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-17"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "herdr is on the path of every romeu run; Q16 and 05 5.4 cover churn and provenance, not abandonment; the neutrality is paid now with no event that would use it.",
+   "change": "Retitle '### Run layout (run, multiplexer-neutral)' to '### Run layout (run)' and drop 'renderers with n-ary splits nest it'; add an index Deferred row 'a second run-layout renderer: until then herdr, pinned by version and sha256, is the one renderer and the layout is romeu's own format that herdr's renderer reads; reopened by a herdr release that breaks the protocol number A13 recorded, six months without a herdr release, or a CVE in it'.",
+   "cost": "a heading, a clause, one Deferred row",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Delete the neutrality claim and carry it as a Deferred row; the format itself is unchanged."
+  },
+  {
+   "id": "R8-03-18",
+   "section": "03 3.1, 02 2.3, 05 5.1, I3, I24, 08 8.1, 04 4.2, 04 4.3, 04 4.4, 07 7.3, 07 7.4, 13 13.4",
+   "title": "Five lists that two or more consumers must agree on (dangerous git keys, memory layout allowlist, mise environment, ingesting commands, reserved names) are hand-written in two or three places each with no single home.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-6"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A git CVE names a new config key; a PR adds it to gitsafe's -c list and to I3's plant; the doctor row is forgotten and doctor passes a host whose global config carries the key.",
+   "change": "For 03's part: make 03 3.1's repo dir row the one home of the reserved names and have 02 2.3 link to it without repeating them. For each other list name one home (05 5.1 for git keys, I24 for the memory layout, 07 7.3 for the mise environment, 04 4.2 for ingesting commands) and replace the copies with links; add one test that I3's plant list equals 05 5.1's neutralized list, and have doctor read its key list from gitsafe's in code. No new 12 12.3 generator rows.",
+   "cost": "links in place of copies, one test",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "One home per list with links; a test only for the git-key pair shared by two code consumers; no generators."
+  },
+  {
+   "id": "R8-03-19",
+   "section": "01 1.6, 03 3.8",
+   "title": "The candidate machine has six states but the project record persists only awaiting, without saying which states live in process memory, and the generation machine has no row for stop, pull, retire or salvage finding the sandbox absent.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-9"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A sandbox dies; romeu stop exits 2 with an illegal-transition id naming no verb; the operator learns to use run, which creates a sandbox they did not want.",
+   "change": "In 03 3.8's candidate row add 'only awaiting persists; the other candidate states exist only while one command runs'. In 01 1.6 add one sentence: 'every P command other than run that finds the sandbox absent with an open generation leaves the generation open and exits with the sandbox-absent id, whose fix hint names romeu run and romeu salvage --from-host'.",
+   "cost": "two sentences",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "One sentence each instead of four new table rows."
+  },
+  {
+   "id": "R8-03-20",
+   "section": "03 3.8, 02 2.4",
+   "title": "generations[] grows by one element per recreate inside a file rewritten whole on every mutating command, with no bound and no compaction.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-11"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Years of recreate give several hundred generations; every run rewrites the record and status parses it; S8 is measured against an empty record.",
+   "change": "State in 03 3.8: 'generations[] only grows; v1 keeps every generation in the record.' Add an index Deferred row 'compaction of closed generations into the state attic; reopened when a project record passes 256 KiB, which doctor warns about'.",
+   "cost": "one sentence, one Deferred row, one doctor size check",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the growth as a limit and defer compaction with a measurable trigger."
+  },
+  {
+   "id": "R8-03-21",
+   "section": "06 6.6, 03 3.4, index: Deferred decisions",
+   "title": "The kit publishing path is a deferral written as six rows of design in 06 6.6, including a host-settings key kits.source: published that 03 3.4 does not have, with a trigger (a maintainer decision) that ADR 0005 rule 3 would not accept.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-23"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A reader of 03 3.4 writes a settings validator; a reader of 06 6.6 writes kits.source into a settings file; a strict decoder refuses the key.",
+   "change": "Replace 06 6.6's table with one index Deferred row: 'publishing kits: until then kits are built locally and trust is the release plus config commits; reopened by the first user who is not the maintainer asking to consume a kit without a config repo clone, or the first kit signature sbx accepts.' Delete the six design rows (they can be rebuilt when the row reopens); no kits.source key exists in v1.",
+   "cost": "one table replaced by one row",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Delete the design rows rather than moving them to a Proposed ADR, so no decision record is created."
+  },
+  {
+   "id": "R8-03-22",
+   "section": "03 3.6, 02 2.3, 08 8.5",
+   "title": "Snapshot and salvage bundles are thin against repos[].base, and on the host those prerequisites are held only by refs/romeu/origin, which a later fetch force-moves and gc can prune.",
+   "severity": "Required",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-12"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Origin is force-pushed; romeu sync moves refs/romeu/origin; git gc prunes the old objects; the dead sandbox's snapshot bundle no longer verifies and 08 8.5's fallback fetch cannot bring them back.",
+   "change": "In 03 3.6 and 02 2.3: romeu creates the create-only ref refs/romeu/base/<name>/<gen>/<dir> at each base SHA it puts in a manifest, kept for the life of the generation and of its salvage records, and deleted with them.",
+   "cost": "one ref family, one sentence in two pages",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-23",
+   "section": "03 3.6, 10 10.7, 12 12.2",
+   "title": "The manifest is the one type both binaries marshal and decode, and the spec names no Go package for it, so two agents in different phases can define two types.",
+   "severity": "Required",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-8"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "julieta-core defines the manifest type under internal/mise, romeu-cli another under internal/render; the hybrid handshake (T066) finds the drift six phases later.",
+   "change": "Name in 03 3.6 'the type lives in internal/manifest'; add internal/manifest to 10 10.7's 'both' row; do the same for probe-result.v1 (and run-timings.v1 unless R8-03-16 removes it); add to 12 12.2: 'a format's type lands with the first task on either side of its seam'.",
+   "cost": "one package name, one row, one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-24",
+   "section": "03 3.3, 11 11.4",
+   "title": "The sbxenv.yaml goldens are probe-confirmed by raw sha256 at block A, before render exists, so any byte the marshaller emits differently from the hand-written golden forces a two-host re-probe.",
+   "severity": "Required",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "T037 finds the marshaller orders a key differently from the golden; the fix moves A5's hash; both hosts sit again for a byte sbx env plan would accept either way.",
+   "change": "In 03 3.3: A5 records the hash of each golden's normalized form (decoded and re-encoded with sorted keys by one function in internal/canon), and tools/ci probes compares that normalized hash; render's own test keeps the raw golden.",
+   "cost": "one normalization function, one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-25",
+   "section": "03 3.3, 11 11.4",
+   "title": "The goldens are called probe-confirmed while 11 11.4 does not flag a golden with no recorded hash, so a golden added after block A is neither confirmed nor flagged.",
+   "severity": "Advisory",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-25"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A two-repo golden lands after block A, is never run through sbx env plan, and tools/ci probes says nothing.",
+   "change": "In 11 11.4, tools/ci probes flags a golden with no recorded hash as needing a probe; in 03 3.3 say 'the set is confirmed at block A; a golden added later needs a re-probe before it counts as confirmed'.",
+   "cost": "one rule change, one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-26",
+   "section": "03 3.5, 03 3.6, 03 3.9",
+   "title": "The manifest's 32 KiB cap has no stated check point or outcome, and 03 has two smaller explicitness gaps: a domain without a domains entry has two rules (treated as upload: true, and refused by CI), and the lesson tag switches behaviour in three homes with no list of tags that have behaviour.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0",
+    "L3"
+   ],
+   "finding_ids": [
+    "L0-36",
+    "L3-28"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A project with twelve repos and a large run layout exceeds 32 KiB and finds out at run, after approval, with an error the spec never named.",
+   "change": "03 3.6: 'romeu checks the encoded size at sync, before the gate, and refuses a manifest over 32 KiB with E-manifest-size; julieta spec validate reports the same rule.' 03 3.5: delete 'a domain without an entry is treated as upload: true' and keep the CI refusal as the one rule. 03 3.9: 'Tags with behaviour are a closed set: lesson (SessionStart prints the entry).'",
+   "cost": "three sentences, one error id",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-27",
+   "section": "03 3.9",
+   "title": "The memory entry digest is {title, body, created} and memory verify compares status only, so an entry whose tags (lesson among them) were stripped verifies equal.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0"
+   ],
+   "finding_ids": [
+    "L0-28"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A bulk import loses every lesson tag; verify passes; SessionStart prints no lessons.",
+   "change": "In 03 3.9 change 'status is compared as a separate field' to 'status and the sorted tags are compared as separate fields'. Moot if R8-03-4 deletes import and verify.",
+   "cost": "one field",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-28",
+   "section": "03 3.9, 09 J12",
+   "title": "Memory has an import format and a verify command but no export, so moving memory between machines has no defined round trip.",
+   "severity": "Advisory",
+   "lenses": [
+    "L16"
+   ],
+   "finding_ids": [
+    "L16-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A developer changes laptops and copies memory dirs by hand, unsure whether ULID names, the store lock or import/ must come along.",
+   "change": "State in 03 3.9: 'An entry file is self-contained; copying memory/<dir>/entries/ whole is a complete move, and the store lock is recreated on first use.' Add that sentence as a J12 note. No export command in v1.",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the copy as the move; no export command."
+  },
+  {
+   "id": "R8-03-29",
+   "section": "03 3.2",
+   "title": "03 3.2 says there is no field for an env var for the sandbox a few lines from panes[].env, and the index's telemetry Deferred row relies on a pane env, so the distinction between a pane process and the sandbox is unwritten.",
+   "severity": "Advisory",
+   "lenses": [
+    "L13",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13-16",
+    "L13b-33"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A reviewer refuses env: {ANTHROPIC_LOG: debug} on a pane citing 03 3.2; another allows it citing the same section's example.",
+   "change": "Reword the sentence to: 'There is no field for a host command, an absolute path, a mount, or an env var for the sandbox as a whole or for sbx; a pane's env reaches that pane's steps only, which is why PATH, HOME, LD_*, BASH_ENV and ENV are refused there.'",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-30",
+   "section": "03 3.8, 08 8.5, 13 13.4",
+   "title": "salvage[].reasons holds skipped items, which decide result, and ledger-incomplete, which changes no result, so one field has two meanings and three sections each explain the exception.",
+   "severity": "Advisory",
+   "lenses": [
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13b-36"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A status consumer counts reasons to predict whether rm exits 5, counts ledger-incomplete, and the operator reruns a complete salvage.",
+   "change": "Add a salvage record field 'ledger: complete | incomplete' in 03 3.8, remove ledger-incomplete from reasons[], and delete the explanatory paragraphs in 08 8.5 and 13 13.4, leaving a link to 03 3.8.",
+   "cost": "one field, two paragraphs deleted",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-31",
+   "section": "03 3.8, 08 8.1, 08 8.4, 13 13.5",
+   "title": "Atomic writes are temp, fsync and rename without a directory fsync in 03 3.8, temp and rename with no fsync in 08 8.1, and only 'written atomically' in 08 8.4.",
+   "severity": "Advisory",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-20"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A power loss right after the rename of a project record leaves the old record after reboot, and the generation just opened is gone.",
+   "change": "State one rule in 03 3.8: 'Every file the product writes in place is written as a temp file in the same dir, fsync of the file, rename, fsync of the dir.' Replace the wording in 08 8.1, 08 8.4 and 13 13.5 with a link to it.",
+   "cost": "one sentence, three links",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-32",
+   "section": "03 3.12",
+   "title": "03 3.12 lists eleven digest kinds on the ask-first digests surface without saying whether the table is closed and lands whole with internal/canon or grows per consumer.",
+   "severity": "Advisory",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-24"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "egress, render, gate, memstore and julieta install each add a kind constant and each needs the digests approval.",
+   "change": "Add to 03 3.12: 'The kinds table is closed for v1 and lands whole with internal/canon; a new kind is a change to this table first.'",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-33",
+   "section": "03 3.2",
+   "title": "The example spec's $schema points at a raw.githubusercontent.com URL addressed by a tag that can move.",
+   "severity": "Advisory",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-25"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Editors validate users' specs against whatever the tag names today.",
+   "change": "Add after the example: 'The $schema line is an editor hint only; julieta spec validate in the config repo's CI, at the pinned julieta, is the validation.'",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the hint's role as a limit; keep the readable tag URL."
+  },
+  {
+   "id": "R8-03-34",
+   "section": "03 3.4, 03 3.7, 01 1.1, 02 2.2",
+   "title": "The examples of the adopter's own files carry the author's instance (config project verona, Keychain service romeu/verona/github, root $HOME/dev), and no page lists the values an adopter must replace.",
+   "severity": "Advisory",
+   "lenses": [
+    "L10"
+   ],
+   "finding_ids": [
+    "L10-8"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "An adopter copies 03 3.4, keeps project: verona, and sync stops with a missing-binding error naming a project they never created.",
+   "change": "Use neutral names in 03's examples (my-config, romeu/my-config/github) and in 01 1.1 and 02 2.2; add to 03 3.4 a short 'Values you set' list: root, config url and project, gitHosts, secrets, signing socket. The cmux mentions in 09 J3 and 11 A13 belong to those pages.",
+   "cost": "renames in examples, a five-item list",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-03-35",
+   "section": "03 3.1, 03 3.2, 05 5.4",
+   "title": "sandboxOptions (cpus, memory) reaches a host resource with no gate and no bound, so a merged spec can claim the host's whole memory without a prompt.",
+   "severity": "Advisory",
+   "lenses": [
+    "L2"
+   ],
+   "finding_ids": [
+    "L2-17"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A spec sets memory to the host's total; recreate applies it; the host swaps; nothing asked.",
+   "change": "Add a 05 5.4 row: 'sandboxOptions is ungated: a merged spec can size the sandbox up to what sbx allows; accepted because every spec change is a reviewed PR the operator merges; reopened by the first spec merged without the operator's review.' Alternative: tag sandboxOptions widening so gate 2 shows it.",
+   "cost": "one accepted-risk row",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Operator decision needed: The fix is either an accepted risk in 05 5.4 or a change to the gate classification of 01 1.4 and I7; both need the operator. Recommendation: the 05 5.4 row.",
+   "operator_reason": "The fix is either an accepted risk in 05 5.4 or a change to the gate classification of 01 1.4 and I7; both need the operator. Recommendation: the 05 5.4 row."
+  },
+  {
+   "id": "R8-03-36",
+   "section": "01 1.4 (Gate 1), 03 3.8, 04 4.2",
+   "title": "Gate 1, a per-machine toolchain acknowledgement with its own record, diff, exit code and flag, guards against an sbx or romeu upgrade on a machine whose one operator is the one who upgrades, and the threat it stops beyond doctor is unstated.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-7"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "J1 step 4 and J9 make the operator approve what they just installed.",
+   "change": "State in 01 1.4 the threat gate 1 stops that doctor does not: an sbx or romeu upgrade performed by a package manager run (brew upgrade) rather than a deliberate install, and a catalog digest change that arrives with a romeu release, either of which changes egress before the operator has seen it. Keep the gate.",
+   "cost": "two sentences",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the threat; folding gate 1 into doctor would remove a part of I7 and is not proposed."
+  },
+  {
+   "id": "R8-03-37",
+   "section": "03 3.11, 08 8.5",
+   "title": "The salvage manifest's agent-chosen paths (bundles[].file, files[].path, worktrees[].path, embedded-repo path) have no rule beyond os.Root, and the bytes romeu hashes for files[] are unbounded.",
+   "severity": "Advisory",
+   "lenses": [
+    "L2b"
+   ],
+   "finding_ids": [
+    "L2b-22"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A manifest lists ten thousand files of 100 MiB each and romeu hashes them all before deciding completeness; a path with a symlink component is refused with an error indistinguishable from corruption.",
+   "change": "Add to 03 3.11: 'Every path is relative, cleaned, has no .. element and no symlink component, and resolves below the salvage dir (E-salvage-path); the total bytes romeu verifies are bounded by salvage.capBytes, and a manifest over it makes the salvage incomplete with reason over-cap.'",
+   "cost": "two sentences, one error id, one reason value",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  }
+ ]
+}

@@ -1,0 +1,589 @@
+{
+ "page": "08",
+ "findings_read": 39,
+ "clusters": [
+  {
+   "id": "R8-08-1",
+   "section": "08 8.5",
+   "title": "No page says how salvaged or lost-generation work gets back into the next sandbox; salvage proves preservation and stops there.",
+   "severity": "Blocking",
+   "lenses": [
+    "L0",
+    "L1"
+   ],
+   "finding_ids": [
+    "L0-4",
+    "L1-2"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "romeu recreate after a kit bump: the unpushed branch and the uncommitted edits sit under refs/romeu/salvage/<name>/<G>/<salvage-id>/<dir>/ on the host clone; the new sandbox has none of it; J6 ends at 'continue with J3b' and only J10 step 3 shows a hand git branch with two ULIDs in the path; ignored.tar.gz and agent/ are never restored.",
+   "change": "Add a closing paragraph 'Recovery' to 08 8.5: 'Salvage and preservation stop at the host. Recovery is the operator's in v1: a branch or salvage commit comes back by the J10 step 3 command (git branch recover/<b> <salvage ref>, then a push to origin, which the next sandbox fetches); ignored.tar.gz and agent/ are inspected on the host and copied in by hand. romeu has no restore command.' Add the same last step to J6 (pointing at J10 step 3), and print, at the end of rm, recreate and a run that closed a generation as lost, the salvage ref prefix it wrote. Add an index Deferred decisions row 'a romeu restore command', trigger: the operator recovers by hand more than once, or a recovery goes wrong.",
+   "cost": "a paragraph in 08 8.5, a step in J6, one printed line, one deferred-decision row",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "State recovery as the operator's manual step (J10 step 3) in 08 8.5 and J6, print the salvage ref prefix after each preservation, and defer a restore command with a trigger instead of specifying one now."
+  },
+  {
+   "id": "R8-08-2",
+   "section": "08 8.5",
+   "title": "Salvage payloads (ignored.tar.gz, agent/, opt-in transcripts) carry secrets into a host memory dir with no stated modes, readable by every later generation and taken by backups, and no 05 5.4 row says so.",
+   "severity": "Required",
+   "lenses": [
+    "L0",
+    "L16",
+    "L2"
+   ],
+   "finding_ids": [
+    "L0-5",
+    "L16-7",
+    "L2-20"
+   ],
+   "listed": 2,
+   "own": 1,
+   "scenario": "A repo's .env with a provider key is ignored; romeu rm tars it into memory/<dir>/salvage/<G>/ignored.tar.gz with a default umask; the next generation mounts that dir read-write, another local account reads it, and the host backup keeps it after the owner deletes it.",
+   "change": "Spec part (no decision needed): in 02 2.3 and 08 8.1 state that sync creates memory dirs 0700 and julieta writes files 0600; in 08 8.5 add 'Salvage payloads are secret-bearing: ignored.tar.gz, agent/ and transcripts can hold credentials and code; they stay until the owner deletes them and are part of any backup of $ROMEU_ROOT'; romeu salvage prints that sentence once when it stores ignored files or transcripts. Decision part: either add a 05 5.4 row 'salvage payloads of closed generations stay in the mounted memory dir, readable and writable by later sandboxes' with the maintainer's acceptance, or move salvage/ of a closed generation out of the mount (changes 02 2.3 and I24). Recommendation: accept the row now; the move is a deferred decision with trigger 'a second adopter or a shared host'.",
+   "cost": "two mode rules and their tests, one paragraph, one printed line, a 5.4 row",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Apply the modes and the paragraph in the spec; the operator decides between a new accepted-risk row in 05 5.4 and moving closed salvage out of the mount (recommended: accept the row, defer the move).",
+   "operator_reason": "Adds or changes an accepted risk in 05 5.4 (secret-bearing salvage in a mount later generations read and write)."
+  },
+  {
+   "id": "R8-08-3",
+   "section": "08 8.2",
+   "title": "SessionStart output has no size bound, no order and no truncation rule, and it prints every open entry and every lesson entry, which also makes agent-written text an unbounded channel into the next session.",
+   "severity": "Blocking",
+   "lenses": [
+    "L0",
+    "L5"
+   ],
+   "finding_ids": [
+    "L0-17",
+    "L5-1"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "Six months in: 300 open entries, 80 lesson entries and 40 hook failures print in an unspecified order at every SessionStart; the narrative lands in the middle and the agent acts on the first screen; or one planted lesson entry steers every later session.",
+   "change": "In 08 8.2 replace the SessionStart row's content with an ordered list: (1) julieta's warnings, one line each; (2) the latest narrative handoff; (3) the facts diff; (4) open entries, newest first; (5) lesson entries with status open only, newest first. The whole output is bounded (starting value 8 KiB, in the 13 13.8-style starting-values table); when it is cut, the last line is fixed text: '<n> more entries: julieta memory list'. Add one sentence: 'Memory, handoff and lesson text is written by agents and is shown to the next session as data; the bound limits its volume, not its content.' Add a golden for the truncated case in 10 10.1. Warnings come first so the bound never cuts them.",
+   "cost": "one ordered list, one starting value, one sentence, one golden",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Fix the order and an 8 KiB starting bound with a fixed truncation line, print open lesson entries only, and state the agent-written-text channel as a limit in 08 8.2 rather than adding a threat-model row."
+  },
+  {
+   "id": "R8-08-4",
+   "section": "08 8.2",
+   "title": "Only /clear re-runs SessionStart; compaction and resume, the common ways an agent loses context, re-assert no handoff, warnings or lessons.",
+   "severity": "Blocking",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-2"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Auto-compaction two hours in summarizes the SessionStart block away; 'snapshots disabled for shop-web' survives as paraphrase or not at all and the agent commits in that repo.",
+   "change": "In 08 8.2 and 06 6.4: the julieta-claude kit wires SessionStart for every source the pinned Claude Code fires (startup, resume, clear, compact) to the same 'julieta handoff show --hook'. Add an 11 11.2 probe row recording, for the pinned version, which sources fire and that the output reaches the context; one container e2e case.",
+   "cost": "hook entries in the kit, one probe row, one container case",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Wire SessionStart for all sources of the pinned version and probe it in 11 11.2."
+  },
+  {
+   "id": "R8-08-5",
+   "section": "08 8.2",
+   "title": "A failing session hook has no stated behavior (exit status, what it prints, where it is recorded), and the hooks call julieta through a link setup may not have made.",
+   "severity": "Required",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-3"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "julieta setup failed, so $HOME/.local/bin/julieta does not exist; SessionStart fails with 'not found', shown nowhere useful; the agent starts with no handoff and no warnings and believes the project is new.",
+   "change": "In 08 8.2 add: 'Both hooks invoke julieta by the absolute .romeu/bin path. A hook always exits 0; on failure it prints one stdout line naming the failure and julieta status, and records it as a hook failure.' Add the stdout injection, size limit, non-zero-exit behavior and SessionEnd timeout of the pinned version to the 11 11.2 probe row of R8-08-4.",
+   "cost": "a paragraph, part of one probe row, one container case",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "State the absolute path, exit 0 with one failure line, and record the pinned version's hook behavior in the same probe row."
+  },
+  {
+   "id": "R8-08-6",
+   "section": "08 8.3",
+   "title": "The narrative handoff exists only when the operator remembers /handoff or /handoff --final, and SessionStart presents an old narrative as the latest without saying a session's narrative is missing.",
+   "severity": "Required",
+   "lenses": [
+    "L1",
+    "L5"
+   ],
+   "finding_ids": [
+    "L1-19",
+    "L5-7"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "romeu recreate at night without /handoff --final: rm's warning scrolls by, the agent is stopped, and the next session reads a three-day-old narrative as current.",
+   "change": "In 08 8.3 Resume: 'When the newest facts file is newer than the latest narrative, SessionStart prints first: no narrative since <time>; the session ended without /handoff.' In the 'Before destruction' row keep the warning and add one sentence to J6: 'The narrative handoff is the operator's step; romeu cannot ask a stopped agent for one.' No TTY refusal and no new flag.",
+   "cost": "one output rule, one sentence, one golden",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Make the gap visible at the next SessionStart and state the operator's step as a limit in J6; no confirmation prompt."
+  },
+  {
+   "id": "R8-08-7",
+   "section": "08 (opening)",
+   "title": "The opening of 08 says nothing sandbox-only may be lost when a sandbox dies, but snapshots fire only on commits, rewrites, merges, stop and pull, so an unplanned death loses uncommitted work and the user is never told.",
+   "severity": "Required",
+   "lenses": [
+    "L1"
+   ],
+   "finding_ids": [
+    "L1-9"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Docker restarts during a session with three hours of uncommitted edits; run closes the generation as lost (J10) and the edits are gone; the user believed 00 0.1.",
+   "change": "Reword the opening of 08: 'Salvage preserves everything the sandbox holds before a planned destruction; when a sandbox dies unplanned, the snapshot preserves what was committed, and uncommitted work since the last snapshot is lost.' Say the same in J10 and wherever 00 0.1 states the objective. Add an index Deferred decisions row 'periodic snapshot of uncommitted changes', trigger: an operator loses uncommitted work to an unplanned death.",
+   "cost": "one sentence in three places, one deferred-decision row",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the limit for unplanned death and defer a periodic dirty-tree snapshot with a trigger."
+  },
+  {
+   "id": "R8-08-8",
+   "section": "08 8.4",
+   "title": "The host cannot tell that snapshots of a repo stopped (core.hooksPath set by a tool, or the snapshot write failing), and 8.4 says nothing about a failed snapshot write.",
+   "severity": "Required",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-16",
+    "L4-22"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "husky sets core.hooksPath and snapshots stop for weeks, or the host disk fills and every post-commit fails to write heads.bundle; the sandbox dies and J10 imports a snapshot weeks old; the operator learns it only from the loss.",
+   "change": "Add to 08 8.4: 'A snapshot that cannot be written never undoes the commit, keeps the previous bundle, and is recorded as a hook failure with its repo (8.2); the repo's own hooks still run. julieta setup writes disabled: true into snapshot/heads.json for a repo whose local core.hooksPath bypasses the dispatcher. romeu status shows, per repo, the created time of heads.json and disabled when set.' Change the 04 4.3 hooks rule so a julieta snapshot failure does not stop the chain. No new time trigger.",
+   "cost": "a paragraph, one heads.json field, a status column, one rule in 04 4.3",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Record failure and disablement where the host can read them (heads.json and the hook-failure record) and show snapshot age in status; no extra trigger."
+  },
+  {
+   "id": "R8-08-9",
+   "section": "08 8.4",
+   "title": "snapshot/heads.json has no schema, no 03 section and no version, and no rule says what romeu trusts when it disagrees with heads.bundle after a kill between the two writes.",
+   "severity": "Advisory",
+   "lenses": [
+    "L2b",
+    "L4"
+   ],
+   "finding_ids": [
+    "L2b-13",
+    "L4-39"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "The sandbox dies between the two renames; heads.json names SHAs the bundle lacks, or a ref name with a terminal escape reaches status output through an undefined decode.",
+   "change": "Add a 03 section and schemas/snapshot.v1.json for heads.json (version, ref name rules, hex SHA, created, disabled from R8-08-8) and list it in 02 2.1. In 08 8.4 add: 'heads.bundle is renamed into place first and heads.json after it; romeu trusts the bundle's own refs and reads heads.json for status only.'",
+   "cost": "one schema, one short section, one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Add the schema and section and state the write order and that the bundle is authoritative."
+  },
+  {
+   "id": "R8-08-10",
+   "section": "08 8.4",
+   "title": "Snapshot bundles stay only in the agent-writable memory dir until pull or preservation, so an accidental removal inside the sandbox leaves J10 nothing to import.",
+   "severity": "Required",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-14"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A cleanup script inside the sandbox removes memory/<dir>/snapshot/ by a wrong path; the next day the sandbox dies and J10 imports nothing for that repo.",
+   "change": "Add to the Purpose bullet of 08 8.4: 'The snapshot lives in the sandbox's memory mount until romeu pull or a preservation imports it; for the primary repo, refs/sandboxes/<name>/* is a second copy as of its last fetch; a secondary repo has no second copy, and a removal inside the sandbox loses its snapshot.' Add an index Deferred decisions row 'import snapshots at every sync and run', trigger: a lost snapshot is observed.",
+   "cost": "two sentences, one deferred-decision row",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State where the snapshot lives and what second copy exists, and defer importing at every sync and run."
+  },
+  {
+   "id": "R8-08-11",
+   "section": "08 8.4",
+   "title": "Snapshot and salvage bundles omit reflog-only commits, so the snapshot follows a destructive git operation instead of protecting against it.",
+   "severity": "Required",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-9"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The agent runs git reset --hard HEAD~3 and commits; post-commit rewrites heads.bundle without the three commits; the sandbox dies with the reflog that held them.",
+   "change": "In 08 8.4 Content and 08 8.5 step 3 add: 'plus, per branch, each reflog entry's commit not reachable from a bundled ref, as refs/salvage-reflog/<branch>/<n>'; list the class in 03 3.11 refs[] and in the I17 cases. No retention of older bundles.",
+   "cost": "one refs class, one I17 case, a slightly larger bundle",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Bundle reflog-only tips as a refs class in both snapshot and salvage; keep one bundle rather than keeping the last N."
+  },
+  {
+   "id": "R8-08-12",
+   "section": "08 8.5",
+   "title": "No behavior is stated for a stopped sandbox or one that fails mid sandbox half (full VM disk, broken boot), so the operator is left with --from-host without being told what it drops.",
+   "severity": "Required",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-10"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The VM disk fills; commit-tree fails with ENOSPC; julieta salvage exits 1 and the operator's only path is salvage --from-host, result lost, with dirty trees and stashes gone.",
+   "change": "In 04 4.2 salvage add: 'A stopped sandbox is started for the sandbox half and stopped again. When the start or the sandbox half fails, salvage exits 1 naming --from-host and what it does not recover: uncommitted changes, stashes, ignored files and agent state.' In 08 8.5 step 2 add: 'Salvage writes objects into the sandbox's repositories; a full sandbox disk fails step 2, and freeing space inside the sandbox is the recovery before --from-host.'",
+   "cost": "two sentences in 04 4.2, one in 08 8.5, one fake-sbx case",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "State the start-and-stop rule and the failure message with what --from-host loses; no alternate object directory."
+  },
+  {
+   "id": "R8-08-13",
+   "section": "08 8.5",
+   "title": "Salvage step 1 does not quiesce every writer before the capture: pane processes, other shells and the agent's own SessionEnd hook (fired by the SIGTERM) keep touching worktrees and index.lock while step 2 runs, and an in-progress rebase is captured silently.",
+   "severity": "Required",
+   "lenses": [
+    "L4",
+    "L5"
+   ],
+   "finding_ids": [
+    "L4-15",
+    "L5-8"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "SIGTERM fires SessionEnd, whose julieta handoff write --facts takes index.lock while salvage builds its temporary index; salvage reports the worktree unreadable and rm exits 5; or a second shell's rebase leaves a mixed tree recorded complete.",
+   "change": "In 08 8.5 step 1 add: 'After the agent stops, salvage waits for the julieta store lock, so a SessionEnd hook already running finishes first; a facts handoff written during salvage is allowed and not counted for completeness.' After step 2 add: 'Each worktree's HEAD and status are read again; if either moved, the capture repeats once, then the worktree is skipped as worktree-changing. A rebase, merge, cherry-pick or bisect in progress is skipped as in-progress-operation.' Add both reasons to 03 3.11 and the race to the 10 10.1 concurrency cases. Other processes are not stopped; the recheck is what catches them.",
+   "cost": "two sentences, two skip reasons, one concurrency case",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Wait on the store lock, recheck and repeat once, and record two new skip reasons instead of stopping every process of the sandbox user."
+  },
+  {
+   "id": "R8-08-14",
+   "section": "08 8.5",
+   "title": "The stop-agents path (SIGTERM, 10 s wait, SIGKILL, recorded) is named by no test level.",
+   "severity": "Advisory",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-35"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A refactor shortens the wait to 0; a dirty tree is captured mid-write; nothing is red until an operator's salvage holds a half-written file.",
+   "change": "Add a container e2e case in 10 10.1: a fixture process with the agent's process name ignores SIGTERM, is killed after the wait, and the manifest records the kill.",
+   "cost": "one container case",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Add the container case."
+  },
+  {
+   "id": "R8-08-15",
+   "section": "08 8.5",
+   "title": "The agent profile (process names, state paths) has no drift check: a renamed process makes --stop-agents stop nothing and a moved path makes step 5 copy nothing, and salvage still reports complete.",
+   "severity": "Required",
+   "lenses": [
+    "L15"
+   ],
+   "finding_ids": [
+    "L15-7"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A newer Claude Code moves its project memory dir and renames its process; romeu rm stops nothing, step 5 copies nothing, skipped[] is empty, result complete, and the agent's state is lost with the sandbox.",
+   "change": "Add skip reason agent-path-missing to 03 3.11 and count it as incomplete in 08 8.5 host half step 4; step 1 records the number of processes matched, and zero while the agent pane runs is skipped as agent-not-matched. julieta setup checks that each agent-profile path exists and SessionStart warns when one does not (08 8.2 warnings).",
+   "cost": "two skip reasons, one setup check, container cases",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Make drift visible as two skip reasons and a setup warning; no separate drift-check tool."
+  },
+  {
+   "id": "R8-08-16",
+   "section": "08 8.5",
+   "title": "Salvage refs are created under refs/heads/salvage/, so git push --all or --mirror publishes them with their untracked files, and every later snapshot re-bundles all past salvage refs.",
+   "severity": "Advisory",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-29"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "After three salvages the agent runs git push --mirror; nine salvage branches with .env-like untracked files reach origin.",
+   "change": "In 08 8.5 step 2 and 03 3.11 name salvage refs refs/salvage/<generation>/<salvage-id>/<worktree-n> and stash-<n> (outside refs/heads); step 3 and 08 8.4 Content include refs/salvage/<current generation>/* explicitly and no earlier generation's; update the I17 cases.",
+   "cost": "a ref name change in 08 8.4, 08 8.5, 03 3.11 and I17",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Move salvage refs out of refs/heads and bundle only the current generation's."
+  },
+  {
+   "id": "R8-08-17",
+   "section": "08 8.5",
+   "title": "Untracked non-ignored files have no cap while ignored files have 1 GiB, and a nested repository's dirty tree and stashes are not captured.",
+   "severity": "Advisory",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-30"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A 6 GiB untracked model file inflates the bundle or times out the exec; a nested repo with uncommitted work is bundled at HEAD only and the result is complete.",
+   "change": "In 08 8.5 step 2 add: 'Untracked files count against the salvage cap of step 4 and are listed over-cap beyond it. Nested repositories (step 3) get the same dirty-tree and stash capture as top-level ones.' Two container cases.",
+   "cost": "two sentences, two container cases",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-08-18",
+   "section": "08 8.5",
+   "title": "The host half unbundles salvage bundles into the host clone without the git fsck --strict that pull runs on an unbundled head, although 05 5.1 says transfer.fsckObjects does not cover unbundle.",
+   "severity": "Advisory",
+   "lenses": [
+    "L2"
+   ],
+   "finding_ids": [
+    "L2-16"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A malformed object in a salvage bundle lands in the host clone's object store and is reached later by the operator's plain git.",
+   "change": "In 08 8.5 host half step 2, after git bundle unbundle, add: 'then git fsck --strict on each unbundled head, as pull does (04 4.2)'; a failure is a skipped item fsck-failed.",
+   "cost": "one sentence, one call, one skip reason",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-08-19",
+   "section": "08 8.5",
+   "title": "Exit 5 lists skipped reasons whose only stated recovery is 'fix it or --accept-loss'; over-cap has no path to salvage.excludeIgnored shown and unreadable has none at all.",
+   "severity": "Required",
+   "lenses": [
+    "L8"
+   ],
+   "finding_ids": [
+    "L8-5"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "romeu recreate exits 5 with over-cap on a 3 GiB build cache; the operator finds only --accept-loss and loses ignored files they needed.",
+   "change": "Add to 08 8.5 a short table 'Skipped reasons and their recovery', one row per reason of 03 3.11: over-cap -> add the path to salvage.excludeIgnored (gate 2) or copy it out, then rerun; unreadable -> the path and git error are in the manifest, fix and rerun; missing repo or daemon mismatch -> rerun once the sandbox is reachable; the reasons added in R8-08-13 and R8-08-15 -> rerun; --accept-loss last. 03 3.11 links to it; no generator.",
+   "cost": "one table of about eight rows",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "A hand table in one home linked from 03 3.11, without a generator row."
+  },
+  {
+   "id": "R8-08-20",
+   "section": "08 8.1",
+   "title": "Temp files of atomic writes and the store lock have no stated path or name, so a julieta killed mid-write leaves a file that violates the allowlist, and sync and run then refuse with exit 2, blocking the J10 recovery.",
+   "severity": "Blocking",
+   "lenses": [
+    "L4",
+    "L16"
+   ],
+   "finding_ids": [
+    "L4-5",
+    "L16-14"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "The sandbox dies while post-commit writes its temp file next to heads.bundle; romeu run (J10 step 2) exits 2 naming the leftover, and the operator must delete files by hand in a dir the spec tells them never to touch; a second tool cannot find the lock.",
+   "change": "In 08 8.1 v1 backend: 'Temp files are named .tmp-<ULID> in the target's own directory; a name of that grammar is never read, is not an allowlist violation (memory check and sync warn, never refuse), and julieta setup removes any older than its own start. The store lock is a sandbox-local file, $HOME/.local/state/julieta/locks/<dir>.lock, because a memory dir is mounted into one sandbox only, so it is never in the memory dir.' Add the leftover-temp case to the I24 test cell and one container test. (The import/ half of L16-14 is in R8-08-21.)",
+   "cost": "a short rule in 08 8.1, one I24 row, one container test",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Fix the temp-name grammar as a non-violation cleaned by setup and move the lock out of the memory dir."
+  },
+  {
+   "id": "R8-08-21",
+   "section": "08 8.1; 00 0.5",
+   "title": "julieta memory import and verify, the import/ allowlist entry and the evidence kinds that serve them carry one maintainer's one-time migration into the generic product, and import/ is described nowhere (no content, writer or cap).",
+   "severity": "Blocking",
+   "lenses": [
+    "L11",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L11-4",
+    "L13b-30"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A second adopter installs a product whose reference documents import, verify, an import/ directory and a repo evidence kind that apply to nobody but the author; meanwhile an agent writes anything under memory/<dir>/import/, the one directory with no stated bound.",
+   "change": "Recommended: delete '### Import and verification' from 08 8.1, import/ from the Layout allowlist row and from I24, 'and import and verify' from the Interface row, the import and verify rows of 04 4.3, the memory-entry digest kind and the repo evidence kind, --file of 10 10.5 and C1 where it serves only this; do the one-time import with a script in the operator's config repo and record the predecessor archiving as an operator step. If the operator keeps them: describe import/ in 08 8.1 (holds the JSONL files memory import reads and keeps; writer julieta; 1 MiB per file, 10 files) and in 03 3.9.",
+   "cost": "deletions in 00, 03, 04, 08, 10, 11; plan loses T058 and parts of T082 and T090; one script outside the product",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "The operator decides whether the one-time migration leaves the product (recommended); either way import/ is described or removed in 08 8.1 and I24.",
+   "operator_reason": "Removes a row of 00 0.5 Scope justification that records a maintainer decision."
+  },
+  {
+   "id": "R8-08-22",
+   "section": "08 8.1",
+   "title": "julieta memory rm is a delete path with no history in a product that otherwise never deletes, and search duplicates list with a filter.",
+   "severity": "Required",
+   "lenses": [
+    "L11",
+    "L16"
+   ],
+   "finding_ids": [
+    "L11-24",
+    "L16-10"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "An agent decides ten old entries are stale and removes them; the owner's months of notes are gone with no trace, and no salvage, snapshot or residual-risk row covers it.",
+   "change": "Remove julieta memory rm and memory search from 04 4.3 and Delete(id) and Search(query) from the 08 8.1 Interface row; closing an entry is edit --status done; fold search into list --query. Delete the now-moot sentence 'romeu links no code that can delete a memory entry, so the I16 scan needs no exception for one' and keep memstore/write for Put. Add to 08 8.1: 'julieta never deletes a memory entry; backups of memory are the owner's.'",
+   "cost": "two commands fewer, one sentence",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Needs the operator: it removes commands from the v1 set (00 0.5), as R8-04-37 does. Recommendation: delete rm and search rather than adding a trash or a residual-risk row. Decision SC10."
+  },
+  {
+   "id": "R8-08-23",
+   "section": "08 8.4",
+   "title": "The bundle excludes only objects reachable from repos[].base, which moves only on sync, so after pushes every snapshot re-bundles already-pushed objects and 'small' holds only right after a sync.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0"
+   ],
+   "finding_ids": [
+    "L0-43"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A week of daily pushes and no sync: each commit rewrites a bundle of the whole week into the memory dir.",
+   "change": "In 08 8.4 Trigger replace '(the bundle holds only unpushed objects, so it is small)' with '(the bundle holds the objects not reachable from the last synced base; it grows with work since the last sync)'.",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the cost instead of refreshing base on run."
+  },
+  {
+   "id": "R8-08-24",
+   "section": "08 8.1",
+   "title": "Memory caps give no numbers for handoff/, while a facts file is written at every session end, so either a cap eventually makes sync and run refuse or the dir grows without bound.",
+   "severity": "Required",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-19"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A year of daily use leaves thousands of facts files; romeu run exits 2 naming the handoff dir, and the fix (julieta) runs inside the sandbox that will not start.",
+   "change": "In 08 8.1 caps: handoff/ holds at most 1 000 files (starting value); julieta keeps it under the cap by removing facts files beyond the newest 50, never the newest facts file and never a narrative file. A handoff-cap violation warns in sync and run and never refuses.",
+   "cost": "two starting values, one pruning rule, a test",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Give starting values and make julieta prune only facts files; the cap warns rather than refuses."
+  },
+  {
+   "id": "R8-08-25",
+   "section": "08 8.3",
+   "title": "In a multi-repo project a handoff or entry goes to the repo of the agent's cwd, and which repo's memory --hook reads is unstated, so cross-repo work is filed by where the shell happens to be.",
+   "severity": "Advisory",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-20"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The agent starts in shop-api, cds into shop-web and records an entry about shop-web; it lands in shop-api's store and a session started in shop-web never sees it.",
+   "change": "In 08 8.2 add: '--hook reads every manifest repo's memory dir and labels each entry with its repo, within the bound of 8.2.' In 04 4.3 memory add prints the repo it filed under.",
+   "cost": "two sentences, one output label",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-08-26",
+   "section": "08 8.1",
+   "title": "The memory layout allowlist is written out in 08 8.1 and in I24 (and in memstore) with no single home and no test that they agree.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-6"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A PR adds a directory to memstore and to 08 8.1; I24 keeps the old members; doctor and the I24 test disagree with the reference.",
+   "change": "For this page: 08 8.1 Layout allowlist is the one home; I24 says 'the layout of 08 8.1' without repeating the members; the memstore allowlist table test reads its expected members from one Go list that the reference renders. The other lists of L3-6 are resolved on their own pages.",
+   "cost": "words in I24, one test",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "One home in 08 8.1 and a link from I24; no generator row for this list."
+  },
+  {
+   "id": "R8-08-27",
+   "section": "08 8.4",
+   "title": "Which commands snapshot (and ingest, drain, take the lock) is a hand list in several sections that a new command must remember to join.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A later PR adds romeu prune; its author does not know stop and pull call julieta snapshot --all; the command skips it and the meta-test passes because it reads the same hand list.",
+   "change": "For this page: 08 8.4 Trigger keeps the git-hook triggers and replaces 'romeu stop and romeu pull call julieta snapshot --all' with a link to the per-command side-effects table that the 04 page resolution of L3-13 sets up. The table itself is decided on page 04.",
+   "cost": "one sentence here",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Link to the one side-effects table instead of listing the commands in 08 8.4."
+  },
+  {
+   "id": "R8-08-28",
+   "section": "08 8.1",
+   "title": "Architecture decisions the spec rests on (memory as plain files among them) have no ADR, and 12 12.5 sends the docs module to review-round history to write them.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-20"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A contributor proposes a memory server in year two; the only written reason is the 'Why for us' aside of 08 8.1, read as taste.",
+   "change": "For this page: add 'memory as plain per-repo files (08 8.1)' as a row of the decisions-needing-a-record table that the 12 page resolution of L3-20 adds to 12 12.5; the 'Why for us' aside stays until the ADR exists, then links to it.",
+   "cost": "one table row",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "One row in the 12 12.5 table; the ADR itself is plan work."
+  }
+ ]
+}

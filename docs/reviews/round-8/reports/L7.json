@@ -1,0 +1,497 @@
+{
+  "lens": "L7",
+  "role": "the release and supply-chain engineer",
+  "model": "opus",
+  "verdict": "No: inside the build most pins hold (actions by SHA, images by digest, herdr and mise by sha256), but a reader on another machine cannot tell a v1.0.0 release apart from any other run of release.yml. J1's attestation check binds no ref, the operator signature ADR 0008 relies on is undefined, and nothing makes a release, its tag or its assets immutable.",
+  "findings": [
+    {
+      "id": "L7-1",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "J1",
+      "defect": "J1 step 2's `gh attestation verify --repo ... --signer-workflow .../release.yml` binds the repository and a workflow path, not the source ref, the source commit or the workflow's ref, so it does not tell a release apart from any other run of that file.",
+      "scenario": "The sandbox's token (the operator's, ADR 0008) pushes a branch that edits `release.yml` and runs it, or deletes and recreates a `v*` tag (10 10.2 item d). The resulting archive carries an attestation from `.github/workflows/release.yml` in the repository, and the J1 commands accept it on every user machine (inferred from how keyless attestations bind identity; not confirmed against the pinned gh).",
+      "change": "Add to 10 10.2 one verification contract, the single list that J1, B1, the README and `tools/release verify` derive from: repository, signer workflow and its ref, source ref `refs/tags/<tag>`, source commit, OIDC issuer, and hosted runners only (for example gh's `--source-ref`, `--source-digest`, `--signer-digest`, `--deny-self-hosted-runners`, to be confirmed against the pinned gh's help). Add a 05 5.4 row for what remains: an agent holding the token can produce a release the contract accepts, unless the operator signature of L7-2 is also checked.",
+      "cost": "One subsection and one 05 5.4 row; `tools/release verify` and the J1 guide take extra flags; a probe of the pinned gh's flags.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-2",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "05 5.4",
+      "defect": "\"Release signing\" (05 5.4, ADR 0008 decision 6) requires a credential outside GitHub to sign release artifacts, but no page defines what is signed, the key or identity, where a reader gets it out of band, how J1, B1 or S1 check it, or how it is rotated, so to a reader on another machine it does not exist.",
+      "scenario": "v1.0.0 ships with archives, `checksums.txt` and attestations and no operator signature. S1 is green, J1 passes, and the one control ADR 0008 relies on against a token-driven release (its deferred item 2) was never exercised.",
+      "change": "Expand 05 5.4 \"Release signing\": the signed object (`checksums.txt`), the format and key type, the published verifying key or identity and its out-of-band location (the repository at a reviewed commit, the README, `SECURITY.md`), rotation and revocation, and a fail-closed verify command. Add the signature to S1's criterion and evidence, to J1 step 2 and to B1. Record the choice in an ADR.",
+      "cost": "One decision (an ADR), about a page of text, one operator step per release, one more J1 command.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-3",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "10 10.2",
+      "defect": "\"Release and bootstrap\" says `release.yml` passes `tools/ci workflows`, but that grammar allows only `read` or `none` permissions and forbids `github.token`, every `secrets.<name>` and step `env`, while the attestation needs `id-token: write` and `attestations: write`, and publishing and `dora --attach` need `contents: write` and a token in the process.",
+      "scenario": "The pull request that adds `release.yml` (T088) cannot pass the gate as specified. It either widens the grammar by hand under release pressure, on an ask-first surface with no written rule for the exception, or the release cannot run (permission needs inferred from the action's and the API's documentation, not read here).",
+      "change": "Add a release row to the grammar table of 10 10.2: which file may hold which write permission, in which one job, how the token reaches `tools/release` (for example the runner's `GITHUB_TOKEN` read by name in Go, never an expression), and a fixture for each refusal. Say which job runs `tools/ci all` and which builds and signs.",
+      "cost": "One grammar row with fixtures in `tools/ci workflows`; a decision on the release job's permission model.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-4",
+      "severity": "Blocking",
+      "origin": "listed",
+      "section": "S1",
+      "defect": "S1's evidence is the `success` of the run that built and attested the assets, verified by that same run's `tools/release verify`, so nothing in acceptance shows that a user who downloads the assets can verify them.",
+      "scenario": "The J1 command lines in the guide carry a wrong `--signer-workflow` path, or the published assets differ from the verified ones. S1 is still green, 10 10.5 never touches an asset's bytes, and the one consumer-side run (B1 on v1.0.0, 11 11.2) is on one host, outside the repository, [review].",
+      "change": "Give S1 a consumer-side evidence item: a `command` item, or a B1 result on v1.0.0 committed like the candidate's, that runs the exact J1 commands from `e2e/scenarios/commands.yaml` against the downloaded assets and records each asset's sha256. Add an acceptance check that each release asset's sha256, read through the API, equals the recorded one.",
+      "cost": "One evidence item, one acceptance check, and B1 on v1.0.0 becomes a committed result.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-5",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "10 10.2",
+      "defect": "No page makes a published release immutable: 12 12.10 replaces `dora.json` on every release by design, and \"published and never a draft\" leaves assets replaceable by the token, while 06 6.4 refuses a herdr release that is not marked immutable.",
+      "scenario": "An archive of v1.0.0 is re-uploaded to fix a packaging bug. Mirrors and taps that recorded the first sha256 fail, two sets of bytes carry one version, and S1's evidence describes assets that no longer exist.",
+      "change": "State in 10 10.2 that a published release never changes, a fix is a new version, and GitHub's immutable releases setting is on (an item of the maintainer block). Publish in the order that setting requires (draft, upload every asset, publish). Move `dora.json` to an asset written once before publishing, or out of the release (12 12.10, ADR 0004). Add the rule to the index's \"Never\" list.",
+      "cost": "A decision touching ADR 0004, one maintainer-block item, words in 10 10.2 and 12 12.10.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-6",
+      "severity": "Required",
+      "origin": "own",
+      "section": "10 10.5",
+      "defect": "The accepted risk that a `v*` tag is process only (05 5.4) states no consequence for release identity: nothing records the commit a release tag named at publication, and `docs/acceptance.json` is verified once and \"a later release does not verify it again\".",
+      "scenario": "The token deletes `v1.0.0` and recreates it on another commit (create and delete measured as accepted, 10 10.2 item d). `release.yml` builds and attests the new commit, and no check, record or acceptance item notices that the version moved.",
+      "change": "Record each release's tag commit where the token's edits are visible: the attested provenance already carries the source commit, so add an acceptance check that compares a release's tag commit with the provenance's source digest. State in the 05 5.4 token row that a moved tag goes undetected until that check runs.",
+      "cost": "One acceptance check and one sentence in 05 5.4.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-7",
+      "severity": "Required",
+      "origin": "own",
+      "section": "12 12.1",
+      "defect": "`gh` is \"pinned in `mise.lock`\" and started \"through `mise exec`\" (12 12.1, 10 10.2), but the lint row of 10 10.2 fails any `[tools]` entry other than `go`, `golangci-lint` and `govulncheck`, and 10 10.2 measured `mise exec` running a program of the search path with exit 0 when the tool is missing.",
+      "scenario": "`tools/release verify`, the release's own provenance check, runs the runner image's `gh` at whatever version the image carries. The \"pinned\" claim is false, and a gh that lacks a flag or behaves differently goes unseen.",
+      "change": "Either admit `gh` to the lint row's tool list at an exact locked version and start it by the `mise which` path rule `tools/ci` already uses, or have `tools/release verify` verify provenance in Go with no `gh`. Remove \"through `mise exec`\" from 12 12.1 and the plan.",
+      "cost": "One rule change in 10 10.2 and 12 12.1; small code in `tools/release`.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-8",
+      "severity": "Required",
+      "origin": "own",
+      "section": "10 10.2",
+      "defect": "The rule \"the release workflow file must not come from the tagged commit\" is fixed now, while its mechanism and its effect on verification wait for the pull request that adds `release.yml`. On a tag push GitHub runs the file as it is at the tagged commit (inferred), and each alternative changes what the contract of L7-1 must check.",
+      "scenario": "T088 picks a `workflow_dispatch` from `main`. The signer workflow's ref becomes `refs/heads/main` and the J1 flags that pin the tag have to change, but the journey, B1 and the guide were written earlier for the tag form.",
+      "change": "Name the mechanism now, in the deferred row's \"Until then\" cell or in 10 10.2 (for example: `release.yml` runs on `workflow_dispatch` from `main` with the tag as an input, or calls a reusable workflow pinned by SHA), and write the verification flags it implies into the contract of L7-1.",
+      "cost": "A decision now instead of at T088; a few sentences.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-9",
+      "severity": "Required",
+      "origin": "listed",
+      "section": "11 11.2",
+      "defect": "The one reproducibility claim (\"the pins ... are what makes the second build the same as the first\") has no check, and no page fixes the build flags, `CGO_ENABLED`, the time source of \"build date\" (04 4.1), archive determinism, or the environment of `tools/release` (the scrubbed environment of 10 10.2 is stated for the `tools/ci` steps only).",
+      "scenario": "Block B accepts the candidate's bytes, and v1.0.0 is a second build that differs by its version stamp and by anything else not pinned. Nobody can show the two are otherwise identical, and a GPL user rebuilding the tag cannot reproduce the published binary.",
+      "change": "Add to 10 10.2 a build contract for `tools/release build`: `-trimpath`, the commit stamp, a fixed build id, `CGO_ENABLED=0`, the build date taken from the commit time, deterministic tar and gzip, the `tools/ci` step environment. Add a check that builds the tag twice and compares the bytes, or state in 11 11.2 why bytes may differ.",
+      "cost": "A paragraph and a rebuild step in `release.yml` or `tools/ci`.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-10",
+      "severity": "Required",
+      "origin": "own",
+      "section": "10 10.2",
+      "defect": "`release.yml` runs `tools/ci all`, so every test of the tagged commit, before `tools/release build` and the attestation, and the spec does not separate the job that holds the attestation identity from the job that runs the change's code.",
+      "scenario": "A test of the tagged commit rewrites a file that `tools/release build` packs, or, if the OIDC token is reachable in that job, requests an attestation for other bytes. The provenance then truthfully names the workflow and attests the wrong thing.",
+      "change": "State in 10 10.2 that build and attestation run in a job of their own, after the jobs that run `tools/ci all`, which runs no test code, and name how archives pass between jobs (an action pinned by SHA, digests checked on arrival).",
+      "cost": "One more job, one artifact action on the grammar's list.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-11",
+      "severity": "Required",
+      "origin": "own",
+      "section": "10 10.2",
+      "defect": "\"`release.yml` on tag `v*` runs `tools/ci all` on each runner. Then `tools/release build` ...\" does not say on which runner or job the build, attestation and publish run, and the grammar has no `if` to pick one.",
+      "scenario": "Read literally, four runners each build, attest and try to publish. The release gets duplicate assets or a race, or `tools/release` silently picks one runner by a rule no page states.",
+      "change": "Say which job, on which pinned runner label, builds all four targets (Go cross-compiles), and how the four `all` jobs gate it (`needs`).",
+      "cost": "Two sentences.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-12",
+      "severity": "Required",
+      "origin": "own",
+      "section": "06 6.4",
+      "defect": "`os-base` installs an apt delta at kit build time with no version pin or snapshot, so the packages in a sandbox change under an unchanged `kit-tree` digest, and gate 2 shows nothing.",
+      "scenario": "Two sandboxes created a week apart from one approved render hold different OS packages. A Debian point release breaks J3b with no diff anywhere, and whoever controls a mirror path reaches every new sandbox without a gate.",
+      "change": "Pin the apt delta, with exact versions and a dated snapshot mirror in the kit args, moved by `tools/kitpin` as a reviewed diff. Otherwise add a 05 5.4 row stating that the OS layer floats, with a Deferred decisions row and its trigger.",
+      "cost": "One pin entry and a `kitpin` subcommand, or one residual-risk row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-13",
+      "severity": "Required",
+      "origin": "own",
+      "section": "01 1.4",
+      "defect": "Gate 1 identifies romeu and julieta by the version strings they report (`toolchain.json`, 03 3.8); no binary sha256 is recorded, and a downgrade is shown as an ordinary change.",
+      "scenario": "An operator replaces romeu with a source build or an older release. Gate 1 passes silently (same version string) or asks the same question as an upgrade, and the embedded catalog and julieta move backwards with the operator's approval.",
+      "change": "Record romeu's own sha256 and the embedded julieta sha256 values in `toolchain.json`. Gate 1 flips on them and prints \"downgrade\" when the version is lower, and `doctor` reports a binary not built by `release.yml`.",
+      "cost": "Two fields, one flip-table row, one doctor check.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-14",
+      "severity": "Required",
+      "origin": "own",
+      "section": "02 2.1",
+      "defect": "Embedding says romeu embeds the julieta binaries \"at release time\", but not what a source build (`go build ./cmd/romeu`, `go install ...@vX`) embeds, or whether such a romeu refuses to run.",
+      "scenario": "A GPL user or a contributor builds romeu from the tag. It fails to compile (no files for `go:embed`), or it embeds a julieta the release never produced, which `render.json` then trusts as the delivered binary (I30).",
+      "change": "State in 02 2.1 the source-build behaviour: `tools/release build` is the only supported build, `go build` alone embeds a placeholder that makes `run` exit 2 with an error id, and how a contributor's e2e gets julieta.",
+      "cost": "A paragraph and one error id.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-15",
+      "severity": "Required",
+      "origin": "own",
+      "section": "02 2.2",
+      "defect": "The config repo's `validate.yml` runs \"a pinned julieta release (checked by `julieta pin check`)\", but nothing says how that workflow verifies the julieta it downloads, and `pin check --workflows` (04 4.3) checks freshness, not bytes.",
+      "scenario": "The product's second distribution channel downloads a julieta archive in CI and runs it with no checksum and no attestation check. A replaced asset (L7-5) runs in the operator's config repo CI.",
+      "change": "Make the julieta release pin a version plus the archive's sha256, have `julieta pin check --workflows` compare it with `checksums.txt` and the attestation contract of L7-1, and give `examples/` a `validate.yml` that verifies before it runs.",
+      "cost": "One pin format, one check, one example workflow.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-16",
+      "severity": "Required",
+      "origin": "listed",
+      "section": "06 6.3",
+      "defect": "The compatibility check requires julieta's protocol to be \"one romeu accepts\", but no page defines that set; 03 3.6 defines only which manifest protocols julieta accepts, and the config repo CI's julieta can lag the host's romeu by any number of releases.",
+      "scenario": "After an upgrade and `approve --toolchain`, a `run` before `sync` meets the old julieta in `.romeu/bin`, and whether it passes is unspecified. Meanwhile `validate.yml` validates specs with a julieta whose rules differ from the host romeu's, so CI is green and `romeu sync` refuses, or the reverse.",
+      "change": "Define in 06 6.3 the protocols romeu accepts (N and N-1, symmetric with 03 3.6), and have `sync` and `doctor` report a config repo whose pinned julieta is not the version romeu embeds.",
+      "cost": "Two sentences and one doctor row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-17",
+      "severity": "Required",
+      "origin": "listed",
+      "section": "12 12.8",
+      "defect": "Neither the README outline (12 12.8) nor its heading order (ADR 0001 rule 12) has a license heading. The GPL-3.0-only product with CC0 `examples/` and `schemas/` (00 0.4) is stated in the spec and in `REUSE.toml`, not on the first page an adopter reads.",
+      "scenario": "An adopter's legal team asks what they may copy into their config repo, and the answer is in a TOML file. Once the candidate exists, `tools/ci/headings.yaml` cannot change without a new candidate (12 12.2, `ci-release` row), so the heading must be in place before T084.",
+      "change": "Add a \"License\" heading to the ordered list of ADR 0001 rule 12 and to the 12 12.8 outline: GPL-3.0-only for the product, CC0-1.0 for `examples/` and `schemas/`, and what that means for a config repo.",
+      "cost": "An ADR 0001 change (decisions surface) and two lines.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-18",
+      "severity": "Required",
+      "origin": "own",
+      "section": "00 0.4",
+      "defect": "0.4 and S11 cover the repository's files, not the release archives. Nothing says each archive carries `COPYING` and the notices of the statically linked modules, and nothing checks a new dependency's license against GPL-3.0-only.",
+      "scenario": "v1.0.0's darwin archive holds only the binary. The MIT and BSD notices of `go.yaml.in/yaml/v3`, `BurntSushi/toml` and `golang.org/x/*` (licenses inferred, not read) do not travel with the copy, and a later dependency with an incompatible license passes every check.",
+      "change": "Add to 00 0.4 and S1: each archive contains `COPYING` and a third-party notices file generated from `go.sum` at build time, and a `tools/ci` license step fails a module whose license is not on an allowlist compatible with GPL-3.0-only.",
+      "cost": "A generator in `tools/release`, an allowlist check, two sentences.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-19",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "04 4.3",
+      "defect": "`julieta lock --check` (04 4.3, 07 7.3) checks that lock entries cover the linux platforms, not that a lockable entry carries a checksum, and version-only backends only warn, so in a worked-on repo a checksumless entry is never refused (the product repo is bounded by the lint row's three-tool list).",
+      "scenario": "An agent adds a `ubi:` tool to a worked-on repo. `MISE_LOCKED=1` installs it in every sandbox with no hash, and nothing beyond a one-time warning says it is unverified.",
+      "change": "Have `lock --check` report each entry without a checksum by name, and have SessionStart and `romeu status` list them as they list hook failures.",
+      "cost": "One check and one warning class.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-20",
+      "severity": "Required",
+      "origin": "own",
+      "section": "07 7.4",
+      "defect": "mise's minisign signature is verified only \"at pin time (maintainer machine or CI)\", and the spec does not name the trusted public key (the plan adds a committed key in T052), and no CI step re-verifies a pin after it is written.",
+      "scenario": "A hand edit of mise's sha256 in the pin file passes `tools/ci kits`, which checks only that a `sha256sum -c` line exists, and the review of the `kits` surface is the only guard.",
+      "change": "Name in 07 7.4 the committed public key and its path, and add to the `kits` row of 10 10.2 a step that re-verifies a committed copy of the signed `SHASUMS256.txt` against the pinned hashes, offline, on every change to the pin file.",
+      "cost": "One committed file pair and one check.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-21",
+      "severity": "Required",
+      "origin": "own",
+      "section": "J1",
+      "defect": "J1 and the README outline do not mention macOS Gatekeeper, and no page decides code signing and notarization of the darwin binary, or the alternative.",
+      "scenario": "A user downloads the archive in a browser, Gatekeeper refuses the unsigned binary (Apple behaviour inferred), and the workaround users share is `xattr -d com.apple.quarantine`. The product's first step teaches users to switch off the host's own check.",
+      "change": "Decide in 05 5.4 or an ADR whether to sign and notarize. If not, J1 step 2 gives an install path that keeps Gatekeeper's meaning (a `curl` download, which sets no quarantine attribute, inferred) and says why, and a Deferred decisions row carries the trigger.",
+      "cost": "One decision; a few lines in J1 and 12 12.8.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-22",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "J9",
+      "defect": "J9's \"romeu release: install and verify it\" has no steps, so the upgrade path, where users stop verifying, does not repeat J1's commands.",
+      "scenario": "Every upgrade after the first is unverified in practice, and gate 1 accepts the new binary on its version string (L7-13).",
+      "change": "Write J9's install and verify as the same command lines as J1 step 2, from the same entry of `e2e/scenarios/commands.yaml`.",
+      "cost": "A few lines.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-23",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "J1",
+      "defect": "J1 step 1 asks only for \"a `gh` that has the `attestation` command\", not for network access to GitHub and an authenticated `gh` (an inferred requirement of `gh attestation verify` without a bundle), and S1 publishes no bundle for offline verification.",
+      "scenario": "A reader behind a proxy, or without a GitHub login, cannot complete J1 step 2 and skips it.",
+      "change": "State the requirement in J1 step 1, and publish each attestation bundle as a release asset so `--bundle` verification works offline.",
+      "cost": "One sentence; one asset per archive.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-24",
+      "severity": "Required",
+      "origin": "own",
+      "section": "05",
+      "defect": "The threat model of 05 trusts \"the romeu release (built from reviewed, signed commits, with verified attestations)\", and 02 2.1 calls \"one signed-commit release\" the trust root, but review is not required by the ruleset (10 10.2 item a, measured 2026-10-08), commits are signed by the agent's key (05 5.4, row \"Verified\"), and the attestation binds no ref (L7-1).",
+      "scenario": "A reader concludes the release is human-reviewed and human-signed. Neither holds today, so the trust root of the host side is an axiom the text does not support.",
+      "change": "Reword both sentences to what holds: the release is trusted because it verifies under the contract of L7-1 and the operator signature of L7-2. Cite 05 5.4 for what review and commit signatures are worth.",
+      "cost": "Two sentences.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-25",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "03 3.2",
+      "defect": "The example spec's `$schema` points at `raw.githubusercontent.com/<owner>/romeu-e-julieta/v1.0.0/...`, a URL addressed by a tag the token can move.",
+      "scenario": "Editors validate users' specs against whatever the tag names today.",
+      "change": "Point `$schema` at a commit-addressed URL, or at a release asset under the immutability rule of L7-5.",
+      "cost": "One line.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-26",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "index: Open questions",
+      "defect": "Q9's default contains a deferral (\"Homebrew tap later\") with no Deferred decisions row and no observable trigger, which the index's own principle calls an oversight.",
+      "scenario": "A tap appears one day with its own formula and checksum and no verification contract, because no row reopened the distribution decision under the rules of L7-1.",
+      "change": "Move \"Homebrew tap\" to a Deferred decisions row: until then GitHub releases only; reopened by the first request for a tap written as an issue; the decision says how the tap's formula verifies provenance.",
+      "cost": "One row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-27",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "10 10.2",
+      "defect": "`go run ./tools/ci setup` is the one step that fetches modules (`go mod download`), and unlike the other steps its environment is not stated (`GOPROXY`, `GOSUMDB`, `GONOSUMDB`, `GOFLAGS`, `go env -w`).",
+      "scenario": "A caller's `GONOSUMDB` or `GOFLAGS=-insecure` fills the module cache without checksum-database verification, and every later step trusts it under `GOPROXY=off`.",
+      "change": "Give `setup` the scrubbed environment of the steps, plus fixed `GOPROXY` and `GOSUMDB` values and `GOENV=off`.",
+      "cost": "One sentence and a test.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-28",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "10 10.2",
+      "defect": "Runner labels are pinned, but the images behind them change under a fixed label (inferred from GitHub's runner-images policy), and the spec neither accepts nor bounds that drift for the release environment (git, docker, gh, the container e2e).",
+      "scenario": "Two runs of `release.yml` on one tag, a week apart, run on different images, and with L7-7 they run a different `gh`.",
+      "change": "State in 10 10.2 Runners which tools the release takes from the image (ideally none beyond the kernel and shell) and that the image version is recorded with the run.",
+      "cost": "Two sentences.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-29",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "10 10.1",
+      "defect": "The container e2e's mise cache is \"keyed by the fixture `mise.lock` sha256\", but the spec does not say which cache action, how it is pinned, or whether a cache written by a branch run is read by a tag run.",
+      "scenario": "A branch workflow run by the token (ADR 0008) writes a poisoned cache entry and the release job's e2e restores it (Actions cache-scoping behaviour inferred).",
+      "change": "Name the cache action on the grammar's `with` list, and state that `release.yml` restores no cache.",
+      "cost": "Two sentences.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-30",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "ADR 0001",
+      "defect": "Rule 13 exempts the checksum and attestation commands of install and verify from the guide-commands check because `release.yml` \"runs that verification\", but it runs `tools/release verify`, not the guide's command lines.",
+      "scenario": "The guide ships a wrong `--signer-workflow` path, and nothing ever runs the lines users copy.",
+      "change": "Have `tools/release verify` take its command lines from the same `e2e/scenarios/commands.yaml` entry the guide renders, so rule 13 covers them.",
+      "cost": "One data source shared by two consumers.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L7-31",
+      "severity": "Required",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "The Toolchain pins row for `gh` (\"`mise.lock`, started through `mise exec`\") contradicts the lint row of 10 10.2 and its measured `mise exec` fallback.",
+      "scenario": "T088 implements the row as written, and the release verifies with an unpinned `gh`.",
+      "change": "Follow the fix of L7-7 in the row and in T088.",
+      "cost": "One row.",
+      "parked_for_b": true
+    },
+    {
+      "id": "L7-32",
+      "severity": "Required",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "T088 says the candidate tag is one \"the tag ruleset lets nobody retry under the same name\", but 10 10.2 item d measured that the token creates and deletes `v*` tags through the bypass.",
+      "scenario": "The plan relies on a refusal that does not exist, and a failed candidate is retried under the same name with different bytes.",
+      "change": "Correct T088, and add the tag-commit check of L7-6 to T090.",
+      "cost": "One sentence; one acceptance check.",
+      "parked_for_b": true
+    },
+    {
+      "id": "L7-33",
+      "severity": "Required",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "T088's acceptance has no line for the operator signature of 05 5.4, release immutability, the release job's permissions or a build contract, and it asserts that `release.yml` passes `tools/ci workflows`.",
+      "scenario": "T088 merges green with none of the release properties this lens needs.",
+      "change": "Add acceptance lines for L7-2, L7-3, L7-5, L7-9 and L7-10 once the spec states them.",
+      "cost": "Four or five lines.",
+      "parked_for_b": true
+    },
+    {
+      "id": "L7-34",
+      "severity": "Required",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "Block O7 pins `validate.yml` in the reference config repo to the release, but no task makes that workflow verify what it downloads, and mise's public key exists only in T052, not in 07 7.4.",
+      "scenario": "The second channel stays unverified after acceptance, and the mise trust root lives only in the plan.",
+      "change": "Add a task for L7-15 and move the key rule into 07 7.4 (L7-20).",
+      "cost": "One task.",
+      "parked_for_b": true
+    }
+  ],
+  "coverage": {
+    "index": "L7-4, L7-5, L7-26; Deferred decisions reviewed for shape: the release.yml row fixes a rule with no mechanism (L7-8); Q9 holds an unrecorded deferral (L7-26)",
+    "00": "L7-17, L7-18",
+    "01": "L7-13",
+    "02": "L7-14, L7-15, L7-24",
+    "03": "L7-25",
+    "04": "L7-19; the build date of 04 4.1 is folded into L7-9",
+    "05": "L7-1, L7-2, L7-24",
+    "06": "L7-12, L7-16",
+    "07": "L7-20",
+    "08": "nothing for this lens",
+    "09": "L7-1, L7-21, L7-22, L7-23",
+    "10": "L7-3, L7-5, L7-6, L7-8, L7-9, L7-10, L7-11, L7-27, L7-28, L7-29",
+    "11": "L7-4, L7-9",
+    "12": "L7-5, L7-7, L7-17",
+    "13": "nothing for this lens",
+    "adr": "ADR 0008: L7-2, L7-8; ADR 0004: L7-5; ADR 0001: L7-17, L7-30; ADR 0002, 0003, 0005, 0006, 0007: nothing for this lens",
+    "plan": "L7-31, L7-32, L7-33, L7-34, all parked for B"
+  },
+  "missing": [
+    {
+      "what": "one verification contract for the reader (repository, signer workflow and ref, source ref and commit, issuer, failure behaviour) as the single source of J1, B1, the README and tools/release verify",
+      "where": "10 10.2"
+    },
+    {
+      "what": "the design of the operator release signature: object, key, out-of-band publication, rotation, revocation, verify command",
+      "where": "05 5.4, S1, J1, an ADR"
+    },
+    {
+      "what": "release immutability and the publish order it requires",
+      "where": "10 10.2, 12 12.10, index: Boundaries"
+    },
+    {
+      "what": "a record of each release tag's commit and a check that it has not moved",
+      "where": "10 10.5, 05 5.4"
+    },
+    {
+      "what": "the release job's permission and token model, and isolation of build and signing from test code",
+      "where": "10 10.2"
+    },
+    {
+      "what": "a reproducible-build contract and a rebuild-and-compare check, or the decision not to",
+      "where": "10 10.2, 11 11.2, S1"
+    },
+    {
+      "what": "what a source build of romeu embeds",
+      "where": "02 2.1"
+    },
+    {
+      "what": "a macOS signing and notarization decision and an install path that keeps Gatekeeper",
+      "where": "J1, 05 5.4, 12 12.8"
+    },
+    {
+      "what": "the license payload of each archive and a dependency license check",
+      "where": "00 0.4, S11, 10 10.2"
+    },
+    {
+      "what": "an SBOM per archive, or a deferral row with its trigger",
+      "where": "S1, index: Deferred decisions"
+    },
+    {
+      "what": "binary identity and downgrade handling in gate 1",
+      "where": "01 1.4, 03 3.8, 04 4.2"
+    },
+    {
+      "what": "an upgrade journey with verification",
+      "where": "J9"
+    },
+    {
+      "what": "verification of the julieta that the config repo's CI downloads",
+      "where": "02 2.2, 04 4.3"
+    },
+    {
+      "what": "pinning of the os-base apt layer",
+      "where": "06 6.4"
+    },
+    {
+      "what": "CI re-verification of the mise signature, with the trusted key named in the spec",
+      "where": "07 7.4, 10 10.2"
+    },
+    {
+      "what": "a security-fix path for a released version and what SECURITY.md promises about releases",
+      "where": "12 12.8, ADR 0002"
+    },
+    {
+      "what": "an invariant for host delivery mirroring I30: every published archive verifies under the J1 commands",
+      "where": "05 5.2"
+    },
+    {
+      "what": "an Actions cache policy for CI and release runs",
+      "where": "10 10.1, 10 10.2"
+    }
+  ],
+  "postmortem": "It is some months after v1.0.0. The product did not fail through an\nexploit, though it could have. It failed because nobody outside the\nmaintainer's machine could say which bytes were v1.0.0, and once that\nbecame clear, trust in a tool whose whole pitch is \"nothing an agent\nwrote runs on your host\" went with it.\n\n**1. The release was made by the thing it was supposed to protect us\nfrom.** The sandbox held the operator's token. It could merge through\nthe API, delete and recreate `v*` tags, and run branch workflows (ADR\n0008; 10 10.2 item d). J1's `gh attestation verify --signer-workflow\n.../release.yml` checked the repository and a workflow *path*, not the\nref or the commit, so an attestation from any run of that file passed.\nWe had written \"the credential that signs release artifacts is held\noutside GitHub\" (05 5.4, ADR 0008 decision 6), but never designed that\nsignature or put it in J1, S1 or B1. On paper the hole was closed; in\nthe journey it stayed open. Crosses: 05 5.4, 09 J1, 10 10.2, S1, ADR\n0008.\n\n**2. `release.yml` never passed our own grammar the way the spec said.**\nThe workflow grammar allows only `read`/`none` permissions and no\ntokens (10 10.2); the attestation and publish steps need write\npermissions. The PR that added `release.yml` had to bend the grammar\nunder deadline, by hand, on an ask-first surface, with no rule written\nfor the exception. The one place the gate mattered most was the one\nplace it was waived. Crosses: 10 10.2, 12 12.10, T088.\n\n**3. The verifier ran a `gh` nobody pinned.** `tools/release verify`\nstarted `gh` through `mise exec`, which the spec itself had measured\nfalling back to the search path with exit 0 (10 10.2), and `gh` could\nnot be in `mise.toml` under the lint rule anyway. The release's \"verify\"\nstep was the runner image's `gh`. Crosses: 10 10.2, 12 12.1.\n\n**4. v1.0.0 changed after it was published.** `dora.json` was replaced\non each release by design (12 12.10), so immutable releases were never\nswitched on, and then an asset was re-uploaded to fix a broken archive.\nTwo hashes circulated for one version; the mirror that had recorded the\nfirst one broke. We demanded immutability of herdr (06 6.4) and never of\nourselves. Crosses: 12 12.10, 10 10.2, S1, ADR 0004.\n\n**5. No one could rebuild it.** 11 11.2 said the pins make a second\nbuild \"the same\", but there was no rebuild-and-compare, the build date\ncame from the clock (04 4.1), the archive format was unspecified, and a\nsource build did not embed julieta at all (02 2.1). A GPL user who asked\nfor the corresponding source got a tag the token could move. Crosses:\n11 11.2, 04 4.1, 02 2.1, 00 0.4.\n\n**6. macOS said no, and the README taught people to say yes anyway.**\nNothing decided signing or notarization; the first users met Gatekeeper,\nand the workaround everybody posted was `xattr -d com.apple.quarantine`.\nThe tool whose message is \"the host is sacred\" began with a step that\ndisabled the host's check. Crosses: 09 J1, 12 12.8, 00 0.2.\n\n**7. The sandboxes drifted under approved pins.** `os-base` ran apt at\nevery kit build (06 6.4); two sandboxes of one approved render had\ndifferent OS packages, and one Debian point release broke the J3b path\nfor a week. The gate showed nothing because the kit digest had not\nchanged. Crosses: 06 6.4, 01 1.4, 05 5.4.\n\n**8. The second channel was never verified.** The config repo's\n`validate.yml` downloaded a \"pinned\" julieta release (02 2.2) and ran\nit; `pin check` checked freshness, not bytes. Crosses: 02 2.2, 04 4.3.\n\n**9. What we would not say out loud.** The acceptance file proved the\nrelease *workflow* succeeded, not that a user could verify the\ndownload; we let a green run stand in for the user. Every hard release\ndecision was deferred to \"the pull request that adds `release.yml`\",\nwhich came last, under the most pressure, written by the same agent\nwhose reach it was meant to bound. And we spent our verification budget\non the ledger and the denylist (13, 10 10.2 \"Forbidden names\") while the\nartifact a stranger installs had one unpinned `gh` call between it and\ntrust. Crosses: 10 10.5, index Deferred decisions, 12 12.2.",
+  "lens_critique": "This lens defines success as a stranger verifying a download and bytes that never move. v1 serves one developer on their own machines, and for that user the boundary that matters is the host gate and sbx, not provenance. Much of the release machinery the lens asks for (reproducible builds, SBOMs, notarization) can fairly be deferred under the spec's own rule. The release risk that matters here is governance, an agent holding the maintainer's token, not build engineering. The lens also reads every unpinned thing as a defect, even where a pin costs more than the drift it stops (runner images, for example).",
+  "missing_viewpoint": "No lens owns incident response after a bad release or a leaked credential: recalling or superseding a release, revoking the token and the signing key, and telling users who already installed. L14, the maintainer on duty, is the nearest, but its title points at day-to-day duty rather than recall and revocation. An adopter's legal and compliance reviewer is missing as well.",
+  "out_of_scope": [
+    {
+      "what": "the permissions attest-build-provenance needs, gh attestation verify's flags and auth requirement, the semantics of GitHub immutable releases, which workflow file a tag push runs, Actions cache scoping",
+      "why": "the text alone cannot settle it: these are facts about outside systems, not read from primary sources in this pass; the action's README, gh's help at the pinned version and GitHub's docs would settle them"
+    },
+    {
+      "what": "Gatekeeper behaviour on an unsigned darwin binary",
+      "why": "the text alone cannot settle it: a run on a current macOS host would"
+    },
+    {
+      "what": "the ledger, memory, handoff and salvage designs (08, 13)",
+      "why": "this person would not look at them: they are runtime data paths, not release or pin paths"
+    },
+    {
+      "what": "the trustworthiness of sbx and of the upstream workload image",
+      "why": "this person would not look beyond noting them: the unsigned workload is an accepted risk in 05 5.4 and sbx is an outside product"
+    }
+  ],
+  "confidence": "medium-high on the contradictions inside the spec (grammar against the release's needs, the gh pin, the undefined signature, no immutability); medium on the GitHub and Apple behaviours marked inferred"
+}
