@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -83,26 +84,38 @@ type treeFile struct {
 	content []byte // nil for a submodule, which has no content here
 }
 
-// hygiene applies the hygiene rules of 10 10.2 to the path and the
-// content of each file of the tree at HEAD. The tree that is committed
-// is the one a push publishes, so work in progress is not read, and
-// that holds for the two data files too: the denylist and the word
-// lists are the ones committed at HEAD. head is "HEAD", or the id of
-// the commit a pre-push run judged HEAD to be (judgeCommit), so that a
-// commit made while fast runs is not the one it reads.
+// hygiene applies the hygiene rules of 10 10.2 to the tree of the
+// commit head names, for "tools/ci hygiene", which judges HEAD. The
+// tree that is committed is the one a push publishes, so work in
+// progress is not read, and that holds for the denylist and the word
+// lists too. fast and all judge through commitChecks instead, which
+// reads the tree before their steps.
 func hygiene(ctx context.Context, repo git.Repo, head string) ([]finding, error) {
-	words, err := loadProse(ctx, repo, head)
-	if err != nil {
-		return nil, err
-	}
-	list, findings, err := loadDenylist(ctx, repo, head)
-	if err != nil {
-		return nil, err
-	}
 	files, err := headTree(ctx, repo, head)
 	if err != nil {
 		return nil, err
 	}
+	return hygieneOf(files)
+}
+
+// hygieneOf applies the hygiene rules to files, the tree of one commit
+// as headTree reads it, with the word lists and the denylist of that
+// same tree. It reads nothing else, so a caller that read the tree
+// before running anything judges what it read (commitChecks).
+func hygieneOf(files []treeFile) ([]finding, error) {
+	data, found, err := fileIn(files, prose.Path)
+	if err != nil {
+		return nil, err
+	}
+	words, err := parseProse(data, found)
+	if err != nil {
+		return nil, err
+	}
+	list, found, err := denylistIn(files)
+	if err != nil {
+		return nil, err
+	}
+	findings := denylistFindings(list, found)
 	findings = append(findings, hookFindings(files)...)
 	for i, f := range files {
 		// A path that holds a listed name is not printed either.
@@ -110,6 +123,9 @@ func hygiene(ctx context.Context, repo git.Repo, head string) ([]finding, error)
 		if list.Match([]byte(f.path)) {
 			where = fmt.Sprintf("(path withheld, tree entry %d)", i+1)
 			findings = append(findings, finding{where, "name", "the path holds a listed name"})
+		}
+		if !printableASCII(f.path) {
+			findings = append(findings, finding{where, "path", asciiPathMsg})
 		}
 		if strings.Contains(f.path, emDash) {
 			findings = append(findings, finding{where, "em-dash", "the path holds U+2014; use a plain dash"})
@@ -121,6 +137,15 @@ func hygiene(ctx context.Context, repo git.Repo, head string) ([]finding, error)
 		}
 		if isPrologue(f.path) {
 			findings = append(findings, finding{where, "prologue", prologueMsg})
+		}
+		// A symbolic link or a submodule makes a path lead somewhere
+		// else, where no rule of this list reads by that path: a
+		// .config link to a directory that holds mise/conf.d, say.
+		if f.mode != "100644" && f.mode != "100755" {
+			findings = append(findings, finding{where, "mode", "the mode is " + f.mode + "; the repository tracks regular files only, of mode 100644 or 100755"})
+		}
+		if isMiseFile(f.path) && !slices.Contains(pinnedMiseFiles, f.path) {
+			findings = append(findings, finding{where, "mise", "mise reads this file as its configuration, and the repository tracks no mise file but mise.toml and mise.lock"})
 		}
 		if f.path == "go.work" || f.path == "go.work.sum" || strings.HasPrefix(f.path, "vendor/") {
 			findings = append(findings, finding{where, "workspace", "go.work, go.work.sum and vendor/ are not tracked"})
@@ -170,37 +195,50 @@ func hygieneFile(ctx context.Context, repo git.Repo, path string) ([]finding, er
 	return findings, nil
 }
 
-// loadDenylist reads the denylist committed at head, which is HEAD or
-// the id of the commit judged to be HEAD (hygiene). Every check that
-// matches names reads it there, and a pre-push run also at the
-// remote's default branch (pushedRange): a denylist that is written
-// and not committed is in no push, so it must not turn a check green.
-// A list that is missing or has no entry is a finding and not an
-// error: the check then proves nothing, and the maintainer is the one
-// who can add an entry.
+// loadDenylist reads the denylist committed at head, as hygieneOf
+// reads it from a tree (denylistFindings).
 func loadDenylist(ctx context.Context, repo git.Repo, head string) (*names.List, []finding, error) {
-	const how = `; the maintainer adds entries with "go run ./tools/ci hygiene add" and commits the file`
 	list, found, err := denylistAt(ctx, repo, head)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", names.Path, err)
 	}
-	if !found {
-		return list, []finding{{names.Path, "denylist", "the denylist is missing at HEAD" + how}}, nil
-	}
-	if list.Len() == 0 {
-		return list, []finding{{names.Path, "denylist", "the denylist has no entry at HEAD" + how}}, nil
-	}
-	return list, nil, nil
+	return list, denylistFindings(list, found), nil
 }
 
-// denylistAt reads the denylist committed at rev, and reports whether
-// rev has one; without one the list is empty. A denylist that is there
-// and cannot be read is an error, never an empty list: the caller would
-// pass a check that matched nothing.
+// denylistFindings says what is wrong with the denylist of the judged
+// commit: every check that matches names reads it there, and a
+// pre-push run also at the remote's default branch (pushedRange), so a
+// denylist that is written and not committed is in no push and must
+// not turn a check green. A list that is missing or has no entry is a
+// finding and not an error: the check then proves nothing, and the
+// maintainer is the one who can add an entry.
+func denylistFindings(list *names.List, found bool) []finding {
+	const how = `; the maintainer adds entries with "go run ./tools/ci hygiene add" and commits the file`
+	switch {
+	case !found:
+		return []finding{{names.Path, "denylist", "the denylist is missing in the judged commit" + how}}
+	case list.Len() == 0:
+		return []finding{{names.Path, "denylist", "the denylist has no entry in the judged commit" + how}}
+	}
+	return nil
+}
+
+// denylistAt reads the denylist committed at rev (parseDenylist).
 func denylistAt(ctx context.Context, repo git.Repo, rev string) (*names.List, bool, error) {
 	data, found, err := blobAt(ctx, repo, rev, names.Path)
-	if err != nil || !found {
-		return &names.List{}, false, err
+	if err != nil {
+		return nil, false, err
+	}
+	return parseDenylist(data, found)
+}
+
+// parseDenylist parses a denylist as a commit holds it, and reports
+// whether the commit has one; without one the list is empty. A
+// denylist that is there and cannot be read is an error, never an
+// empty list: the caller would pass a check that matched nothing.
+func parseDenylist(data []byte, found bool) (*names.List, bool, error) {
+	if !found {
+		return &names.List{}, false, nil
 	}
 	list, err := names.Parse(data)
 	if err != nil {
@@ -215,8 +253,14 @@ func loadProse(ctx context.Context, repo git.Repo, head string) (*prose.Rules, e
 	if err != nil {
 		return nil, err
 	}
+	return parseProse(data, found)
+}
+
+// parseProse parses the word lists of a commit, for loadProse and
+// hygieneOf.
+func parseProse(data []byte, found bool) (*prose.Rules, error) {
 	if !found {
-		return nil, fmt.Errorf("%s is not in the tree at HEAD", prose.Path)
+		return nil, fmt.Errorf("%s is not in the judged commit", prose.Path)
 	}
 	rules, err := prose.Parse(data)
 	if err != nil {
@@ -249,6 +293,54 @@ func blobAt(ctx context.Context, repo git.Repo, rev, path string) ([]byte, bool,
 		return nil, false, fmt.Errorf("read %s at %s: unexpected size", path, rev)
 	}
 	return rest[:size], true, nil
+}
+
+// denylistIn reads the denylist of files, the tree of one commit
+// (parseDenylist).
+func denylistIn(files []treeFile) (*names.List, bool, error) {
+	data, found, err := fileIn(files, names.Path)
+	if err == nil {
+		var list *names.List
+		if list, found, err = parseDenylist(data, found); err == nil {
+			return list, found, nil
+		}
+	}
+	return nil, false, fmt.Errorf("%s: %w", names.Path, err)
+}
+
+// fileIn returns the content of the file at path among files, the
+// tree of one commit, and whether it is there, as blobAt does for a
+// commit in the repository: a submodule at path is not a file.
+func fileIn(files []treeFile, path string) ([]byte, bool, error) {
+	for _, f := range files {
+		if f.path != path {
+			continue
+		}
+		if f.mode == "160000" {
+			return nil, false, fmt.Errorf("read %s: not a file", path)
+		}
+		return f.content, true, nil
+	}
+	return nil, false, nil
+}
+
+// asciiPathMsg is the reason of the path rule, which printableASCII
+// decides.
+const asciiPathMsg = "the path holds a byte outside printable ASCII (0x20 to 0x7E); name it with ASCII letters, digits and punctuation"
+
+// printableASCII reports whether every byte of a git path is printable
+// ASCII, 0x20 to 0x7E. A path outside that range can name, on another
+// file system, the file a rule refuses by its ASCII name: macOS folds
+// case beyond ASCII (the long s of miſe.toml folds to mise.toml) and
+// may compose or decompose accents, and a control byte hides in
+// output. With this rule, isMiseFile matches in ASCII lower case alone.
+func printableASCII(path string) bool {
+	for i := range len(path) {
+		if path[i] < 0x20 || path[i] > 0x7e {
+			return false
+		}
+	}
+	return true
 }
 
 // hookFindings checks that the hook is tracked as an executable file.

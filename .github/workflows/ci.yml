@@ -3,8 +3,8 @@
 
 # Every check lives in tools/ci, so a developer runs the same code at
 # the same commit (10 10.2). This file only names the runners, pins the
-# two actions by commit, and calls tools/ci; "go run ./tools/ci
-# workflows" holds it to that grammar.
+# two actions by commit, sets the mise environment, and calls tools/ci;
+# "go run ./tools/ci workflows" holds it to that grammar.
 name: ci
 
 on:
@@ -16,6 +16,16 @@ on:
 
 permissions:
   contents: read
+
+# The environment of every mise run, mise-action's and the shim's that
+# starts go included: mise reads mise.toml as its one configuration
+# file, and mise.lock. It is miseEnv in tools/ci/misefiles.go, which
+# says why, and the workflows check holds this table to that list.
+env:
+  MISE_OVERRIDE_CONFIG_FILENAMES: mise.toml
+  MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES: none
+  MISE_ENV: ""
+  MISE_AUTO_ENV: "false"
 
 jobs:
   all:

@@ -82,7 +82,42 @@ func TestHygieneRules(t *testing.T) {
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("docs/a"+emDash+"b.md", "text\n")
 			},
-			want: []string{"em-dash: the path holds U+2014"},
+			want: []string{"em-dash: the path holds U+2014", "path: " + asciiPathMsg},
+		},
+		{
+			name: "a path with a long s, which folds to s in a case-insensitive comparison",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("mi\u017fe.local.toml", "[tools]\n")
+			},
+			want: []string{"mi\u017fe.local.toml: path: the path holds a byte outside printable ASCII"},
+		},
+		{
+			name: "a path with a combining accent, a decomposed name",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("docs/cafe\u0301.md", "text\n")
+			},
+			want: []string{"docs/cafe\u0301.md: path: the path holds a byte outside printable ASCII"},
+		},
+		{
+			name: "a path with a tab",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("docs/a\tb.md", "text\n")
+			},
+			want: []string{`"docs/a\tb.md": path: the path holds a byte outside printable ASCII`},
+		},
+		{
+			name: "a path with a newline",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("docs/a\nb.md", "text\n")
+			},
+			want: []string{`"docs/a\nb.md": path: the path holds a byte outside printable ASCII`},
+		},
+		{
+			name: "a path with a delete byte",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("docs/a\x7fb.md", "text\n")
+			},
+			want: []string{`"docs/a\x7fb.md": path: the path holds a byte outside printable ASCII`},
 		},
 		{
 			name: "a listed prose word",
@@ -126,6 +161,48 @@ func TestHygieneRules(t *testing.T) {
 				r.Write("go.work.sum", "\n")
 			},
 			want: []string{"go.work: workspace:", "go.work.sum: workspace:"},
+		},
+		{
+			name: "a tracked mise configuration other than mise.toml",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("mise.toml", "[tools]\n")
+				r.Write("mise.lock", "\n")
+				r.Write("tools/mise.local.toml", "[tools]\n") // mise, at the top, does not read it
+				r.Write("mise.local.toml", "[tools]\n")
+				r.Write(".config/mise/conf.d/x.toml", "[tools]\n")
+				r.Write(".tool-versions", "go 1.20.1\n")
+				r.Write(".miserc.toml", "env = [\"ci\"]\n")
+			},
+			want: []string{".config/mise/conf.d/x.toml: mise: mise reads this file as its configuration, and the repository tracks no mise file but mise.toml and mise.lock",
+				".miserc.toml: mise:", ".tool-versions: mise:", "mise.local.toml: mise:"},
+		},
+		{
+			name: "a tracked mise configuration in another case, which a case-insensitive file system reads",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("Mise.local.toml", "[tools]\n")
+				r.Write(".TOOL-VERSIONS", "go 1.20.1\n")
+				r.Write(".Miserc.toml", "env = [\"ci\"]\n")
+				r.Write(".CONFIG/mise/conf.d/x.toml", "[tools]\n")
+			},
+			want: []string{".CONFIG/mise/conf.d/x.toml: mise:", ".Miserc.toml: mise:", ".TOOL-VERSIONS: mise:", "Mise.local.toml: mise:"},
+		},
+		{
+			name: "a tracked symbolic link, here one that would lead mise to a configuration",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("cfg/mise/conf.d/x.toml", "[tools]\n")
+				require.NoError(t, os.Symlink("cfg", filepath.Join(r.Dir, ".config")))
+			},
+			want: []string{".config: mode: the mode is 120000; the repository tracks regular files only, of mode 100644 or 100755"},
+		},
+		{
+			name: "a tracked submodule",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("sub/f.txt", "text\n")
+				r.Git("-C", "sub", "init", "--quiet")
+				r.Git("-C", "sub", "add", "f.txt")
+				r.Git("-C", "sub", "commit", "--quiet", "--message", "sub")
+			},
+			want: []string{"sub: mode: the mode is 160000; the repository tracks regular files only, of mode 100644 or 100755"},
 		},
 		{
 			name: "a tracked vendor directory",
@@ -227,7 +304,7 @@ func TestHygieneRules(t *testing.T) {
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("docs/zorvex_quimby/page.md", "see zorvex.quimby\n")
 			},
-			want: []string{"(path withheld, tree entry 3): name: the path holds a listed name", "(path withheld, tree entry 3):1: name:"},
+			want: []string{"(path withheld, tree entry 8): name: the path holds a listed name", "(path withheld, tree entry 8):1: name:"},
 		},
 	}
 	for _, tt := range tests {
@@ -274,7 +351,7 @@ func TestPrologueInThePushedRange(t *testing.T) {
 	stdin := "refs/heads/main " + tip + " refs/heads/main " + zero + "\n"
 	push, err := pushed.Parse(strings.NewReader(stdin))
 	require.NoError(t, err)
-	got, checked, err := pushedRange(t.Context(), r.Repo, "origin", push, tip)
+	got, checked, err := pushedRange(t.Context(), r.Repo, "origin", push, rangeAt(t, r, tip))
 	require.NoError(t, err)
 	assert.False(t, checked, "no denylist entry: names are not checked")
 	assert.Equal(t, "commit "+added+": added path sub/prologue.md: prologue: the user's agreement file lives outside product repositories\n", lines(got))
@@ -533,12 +610,23 @@ func TestJudgedCommitIsPinned(t *testing.T) {
 		r.Commit("Y")
 		push, err := pushed.Parse(strings.NewReader("refs/heads/main " + x + " refs/heads/main " + zero + "\n"))
 		require.NoError(t, err)
-		got, checked, err := pushedRange(t.Context(), r.Repo, "origin", push, x)
+		got, checked, err := pushedRange(t.Context(), r.Repo, "origin", push, rangeAt(t, r, x))
 		require.NoError(t, err)
 		assert.True(t, checked, "X holds an entry")
-		assert.Contains(t, lines(got), "the added line holds a name listed at HEAD")
-		_, checked, err = pushedRange(t.Context(), r.Repo, "origin", push, "HEAD")
+		assert.Contains(t, lines(got), "the added line holds a name listed in the pushed commit")
+		_, checked, err = pushedRange(t.Context(), r.Repo, "origin", push, rangeAt(t, r, "HEAD"))
 		require.NoError(t, err)
 		assert.False(t, checked, "Y has none, and neither has the default branch")
 	})
+}
+
+// rangeAt reads the denylists of pushedRange for the commit rev and the
+// default branch of origin, as fast does before its steps.
+func rangeAt(t *testing.T, r *gittest.Repo, rev string) rangeLists {
+	t.Helper()
+	files, err := headTree(t.Context(), r.Repo, rev)
+	require.NoError(t, err)
+	lists, err := readRangeLists(t.Context(), r.Repo, "origin", files)
+	require.NoError(t, err)
+	return lists
 }

@@ -317,11 +317,23 @@ func TestLintConfigLowersNothing(t *testing.T) {
 }
 
 // allowedDirectives are the directives a comment of this repository
-// may hold, as "tool:name". go:build is the build constraint
+// may hold, as "tool:name": go:build, the build constraint
 // (add_test.go). Every other directive, of any tool, is a decision to
 // review here first, because the readers of directives include the
-// linters, and theirs turn findings off.
+// linters, and theirs turn findings off. This is the one list; 10 10.2
+// and 10.6 point here.
 var allowedDirectives = []string{"go:build"}
+
+// generateDirective is the one go:generate line of the repository, and
+// generateFile the one file allowed to hold it (12 12.3). go generate
+// runs any such line in any Go file, so a new generator joins
+// generateFiles, the one entry that line and the generated step run,
+// and never brings a line of its own; how the generators still to come
+// join it is a deferred decision of docs/spec.md.
+const (
+	generateDirective = "//go:generate go run . generate"
+	generateFile      = "tools/ci/generate.go"
+)
 
 // toolDirective matches the start of a directive of the "tool:name"
 // form after directiveText has normalised the line: the shape go/ast
@@ -534,7 +546,8 @@ func TestDisallowed(t *testing.T) {
 
 // TestOnlyAllowedDirectives checks that each directive in the Go files
 // of the repository, the tracked ones and the ones not yet added, is one
-// of allowedDirectives, and that no file carries a generated-code
+// of allowedDirectives, or go:generate in generateFile, and that no
+// file carries a generated-code
 // header (ADR 0007, rule 8): a finding is fixed in the code, and a
 // directive or a header that makes the linters skip it hides findings.
 func TestOnlyAllowedDirectives(t *testing.T) {
@@ -542,10 +555,37 @@ func TestOnlyAllowedDirectives(t *testing.T) {
 	files := repoFiles(t, root, "*.go")
 	require.NotEmpty(t, files, "the Go files of the repository")
 	for _, f := range files {
-		bad, err := disallowed(filepath.Join(root, f), allowedDirectives)
+		allowed := allowedDirectives
+		if f == generateFile {
+			allowed = append(slices.Clone(allowed), "go:generate")
+		}
+		bad, err := disallowed(filepath.Join(root, f), allowed)
 		require.NoError(t, err, "read %s", f)
 		assert.Empty(t, bad, "%s holds what makes the linters skip a finding", f)
 	}
+}
+
+// TestGenerateDirective checks that the repository's Go files hold
+// one go:generate line, generateDirective, in generateFile. go generate
+// does not parse a file: it runs every line that starts with
+// "//go:generate", in a comment or inside a string alike
+// (cmd/go/internal/generate, Go 1.27), so this reads raw lines, every
+// one of every file, not comments. The line is built in parts so that
+// this file holds none.
+func TestGenerateDirective(t *testing.T) {
+	root := moduleRoot(t)
+	prefix := "//go:" + "generate"
+	var found []string
+	for _, f := range repoFiles(t, root, "*.go") {
+		data, err := os.ReadFile(filepath.Join(root, f))
+		require.NoError(t, err)
+		for line := range strings.Lines(string(data)) {
+			if strings.HasPrefix(line, prefix) {
+				found = append(found, f+": "+strings.TrimRight(line, "\r\n"))
+			}
+		}
+	}
+	assert.Equal(t, []string{generateFile + ": " + generateDirective}, found)
 }
 
 // forbiddenTestImports are the packages of testify that ADR 0007, rule
@@ -987,7 +1027,8 @@ func TestOnlyAllowedGoModDirectives(t *testing.T) {
 // pinnedTools are the tools the mise configuration of this repository
 // pins, each at the version mise.lock locks: the go command and
 // golangci-lint, the two that fast runs (resolveLintTools), and
-// govulncheck, which all starts through "mise exec" (allSteps).
+// govulncheck, which all runs by the path "mise which" resolves
+// (allSteps).
 var pinnedTools = []string{"go", "golangci-lint", "go:golang.org/x/vuln/cmd/govulncheck"}
 
 // allowedMiseTables are the tables a mise configuration file of this

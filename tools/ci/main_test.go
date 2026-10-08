@@ -33,12 +33,16 @@ const fixtureProse = `rules:
 `
 
 // hookLine is the hook of 12 12.1, with the line that makes it a
-// script.
-const hookLine = "#!/bin/sh\nexec go run ./tools/ci fast \"$@\"\n"
+// script: go, and through its mise shim mise, start with miseEnv.
+var hookLine = "#!/bin/sh\nexec env " + strings.Join(miseEnv, " ") + " go run ./tools/ci fast \"$@\"\n"
 
-// newTree returns a fixture repository that passes hygiene: the hook,
-// the two data files, a denylist with the made-up name, and one page.
-// Nothing is committed yet.
+// fixtureRecord is the one decision record of a fixture.
+const fixtureRecord = "# 1. Pick a thing\n\nDate: 2026-01-01\n\n## Status\n\nAccepted\n"
+
+// newTree returns a fixture repository that passes hygiene and
+// generated: the hook, the two data files, a denylist with the made-up
+// name, one page, the sources of the generators (go.mod, the ask-first
+// list, one record) and the files they write. Nothing is committed yet.
 func newTree(t *testing.T) *gittest.Repo {
 	t.Helper()
 	r := gittest.New(t)
@@ -47,6 +51,14 @@ func newTree(t *testing.T) *gittest.Repo {
 	r.Write("tools/ci/prose.yaml", fixtureProse)
 	r.Write(names.Path, string(denylist(t, madeUp)))
 	r.Write("README.md", "# A fixture\n\nPlain text.\n")
+	r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+	r.Write(askFirstPath, fixtureList)
+	r.Write("docs/adr/0001-pick-a-thing.md", fixtureRecord)
+	files, err := generateFiles(os.DirFS(r.Dir))
+	require.NoError(t, err)
+	for _, f := range files {
+		r.Write(f.path, string(f.data))
+	}
 	return r
 }
 
@@ -109,12 +121,35 @@ func TestOutsideARepository(t *testing.T) {
 }
 
 // TestHook checks the tracked hook against the one line of 12 12.1,
-// and the mode git records for it.
+// runs it with a fake go that prints what it gets (the variables of
+// miseEnv, set or not, and its arguments), and checks the mode git
+// records for it.
 func TestHook(t *testing.T) {
 	path := filepath.Join("..", "..", ".githooks", "pre-push")
 	got, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Equal(t, hookLine, string(got), "the hook")
+
+	envPath, err := exec.LookPath("env")
+	require.NoError(t, err)
+	bin := t.TempDir()
+	// The hook runs with each variable of miseEnv set to another
+	// value, and go gets the one of miseEnv.
+	environ := []string{"PATH=" + bin + string(os.PathListSeparator) + filepath.Dir(envPath)}
+	var printed []string
+	for _, kv := range miseEnv {
+		key, _, _ := strings.Cut(kv, "=")
+		printed = append(printed, key+"=${"+key+"-unset}")
+		environ = append(environ, key+"=from-the-process")
+	}
+	fake := "#!/bin/sh\necho \"" + strings.Join(printed, " ") + " $*\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "go"), []byte(fake), 0o700))
+	cmd := exec.CommandContext(t.Context(), "/bin/sh", path, "origin", "https://example.invalid/r.git")
+	cmd.Env = environ
+	ran, err := cmd.Output()
+	require.NoError(t, err)
+	assert.Equal(t, strings.Join(miseEnv, " ")+" run ./tools/ci fast origin https://example.invalid/r.git\n", string(ran), "what go gets from the hook")
+
 	// The index is read with this process's environment: inside the
 	// hook, git names the repository through it.
 	out, err := exec.Command("git", "ls-files", "--stage", "--", path).Output()
@@ -123,4 +158,19 @@ func TestHook(t *testing.T) {
 	}
 	mode, _, _ := strings.Cut(string(out), " ")
 	assert.Equal(t, hookMode, mode, "the mode git records for the hook")
+}
+
+// TestPullRequestTemplate checks the template's level-2 headings
+// against the five sections of 12 12.7, in their order, so that a
+// pull request starts with the sections the pr check reads.
+func TestPullRequestTemplate(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(moduleRoot(t), ".github", "pull_request_template.md"))
+	require.NoError(t, err)
+	var headings []string
+	for line := range strings.Lines(string(data)) {
+		if strings.HasPrefix(line, "## ") {
+			headings = append(headings, strings.TrimSpace(line))
+		}
+	}
+	assert.Equal(t, []string{"## Why", "## What changed", "## Evidence", "## Middleware", "## Lessons"}, headings)
 }

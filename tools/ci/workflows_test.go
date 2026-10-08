@@ -31,7 +31,7 @@ permissions:
   contents: read
 concurrency:
   group: ci-${{ github.ref }}
-jobs:
+` + miseEnvYAML + `jobs:
   all:
     name: all on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -58,6 +58,15 @@ jobs:
       - run: go run ./tools/release notes --tag "$GITHUB_REF_NAME" --out=notes.md
 `
 
+// miseEnvYAML is the env table every workflow holds: miseEnv, written
+// as YAML strings.
+const miseEnvYAML = `env:
+  MISE_OVERRIDE_CONFIG_FILENAMES: mise.toml
+  MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES: none
+  MISE_ENV: ""
+  MISE_AUTO_ENV: "false"
+`
+
 // TestWorkflowsGrammar fails a fixture for each construct outside the
 // grammar of 10 10.2, and passes the one that holds every construct
 // inside it. Each fixture changes one line of goodWorkflow.
@@ -74,7 +83,19 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"continue-on-error", "      - name: All checks\n", "      - name: All checks\n        continue-on-error: true\n", `"continue-on-error"`},
 		{"a container", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    container: alpine\n", `"container" is outside the grammar of a job`},
 		{"a job that calls a workflow", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    uses: owner/repo/.github/workflows/x.yml@" + sha + "\n", `"uses" is outside the grammar of a job`},
-		{"a key of the file", "permissions:\n  contents: read\nconcurrency", "env:\n  A: b\npermissions:\n  contents: read\nconcurrency", `"env" is outside the grammar of a file`},
+		{"a key of the file", "permissions:\n  contents: read\nconcurrency", "defaults:\n  run: {}\npermissions:\n  contents: read\nconcurrency", `"defaults" is outside the grammar of a file`},
+		{"no env", miseEnvYAML, "", "env holds exactly the mise environment of tools/ci"},
+		{"an env with another key", "  MISE_AUTO_ENV: \"false\"\n", "  MISE_AUTO_ENV: \"false\"\n  BASH_ENV: /tmp/x\n", "env holds exactly the mise environment of tools/ci"},
+		{"an env without one of the keys", "  MISE_ENV: \"\"\n", "", "env holds exactly the mise environment of tools/ci"},
+		{"an env with another value", "MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES: none", "MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES: .tool-versions", "env holds exactly the mise environment of tools/ci"},
+		{"an env with a null where the empty string is", `MISE_ENV: ""`, "MISE_ENV:", "env holds exactly the mise environment of tools/ci"},
+		{"an env with a boolean where a string is", `MISE_AUTO_ENV: "false"`, "MISE_AUTO_ENV: false", "env holds exactly the mise environment of tools/ci"},
+		{"an env with an expression", `MISE_ENV: ""`, "MISE_ENV: ${{ vars.MISE_ENV }}", "env holds exactly the mise environment of tools/ci"},
+		{"an env in another order", "  MISE_ENV: \"\"\n  MISE_AUTO_ENV: \"false\"\n", "  MISE_AUTO_ENV: \"false\"\n  MISE_ENV: \"\"\n", "env holds exactly the mise environment of tools/ci"},
+		{"an env that is a list", miseEnvYAML, "env: [MISE_ENV]\n", "env holds exactly the mise environment of tools/ci"},
+		{"an env with the keys in another case", "MISE_ENV:", "mise_env:", "env holds exactly the mise environment of tools/ci"},
+		{"an env key with the string tag", "  MISE_ENV: \"\"\n", "  !!str MISE_ENV: \"\"\n", ""},
+		{"an env key with a tag that is not a string", "  MISE_ENV: \"\"\n", "  !!int MISE_ENV: \"\"\n", "key is written as a plain string"},
 		{"an event outside the list", "  workflow_dispatch:\n", "  pull_request_target:\n", `the event "pull_request_target"`},
 		{"an expression with an operator", "group: ci-${{ github.ref }}", "group: ci-${{ github.ref || 'main' }}", "one context path"},
 		{"an expression with a function call", "group: ci-${{ github.ref }}", "group: ci-${{ format('{0}', github.ref) }}", "one context path"},
@@ -229,9 +250,9 @@ func TestWorkflowsFile(t *testing.T) {
 		{"empty", ".github/workflows/x.yml", "", "not YAML"},
 		{"a ci.yml without edited", ".github/workflows/ci.yml", strings.Replace(goodWorkflow, ", edited]", "]", 1), "edited"},
 		{"a ci.yml without pull_request", ".github/workflows/ci.yml", strings.Replace(goodWorkflow, "  pull_request:\n    types: [opened, synchronize, reopened, edited]\n", "", 1), "edited"},
-		{"a ci.yml without on", ".github/workflows/ci.yml", "name: ci\njobs: {}\n", "edited"},
-		{"a ci.yml whose on is one name", ".github/workflows/ci.yml", "on: pull_request\njobs: {}\n", "edited"},
-		{"a ci.yml whose on is a list", ".github/workflows/ci.yml", "on: [pull_request, push]\njobs: {}\n", "edited"},
+		{"a ci.yml without on", ".github/workflows/ci.yml", "name: ci\njobs: {}\n" + miseEnvYAML, "edited"},
+		{"a ci.yml whose on is one name", ".github/workflows/ci.yml", "on: pull_request\njobs: {}\n" + miseEnvYAML, "edited"},
+		{"a ci.yml whose on is a list", ".github/workflows/ci.yml", "on: [pull_request, push]\njobs: {}\n" + miseEnvYAML, "edited"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -253,10 +274,10 @@ func TestWorkflowsFile(t *testing.T) {
 // list of names, and a mapping.
 func TestWorkflowsEvents(t *testing.T) {
 	for _, on := range []string{"push", "[push, workflow_dispatch]", "{push: {branches: [main]}}"} {
-		assert.Empty(t, workflowFindings(".github/workflows/x.yml", []byte("on: "+on+"\njobs: {}\n")), "on: %s", on)
+		assert.Empty(t, workflowFindings(".github/workflows/x.yml", []byte("on: "+on+"\njobs: {}\n"+miseEnvYAML)), "on: %s", on)
 	}
 	for _, on := range []string{"issues", "[push, issues]", "{issues: {}}"} {
-		got := workflowFindings(".github/workflows/x.yml", []byte("on: "+on+"\njobs: {}\n"))
+		got := workflowFindings(".github/workflows/x.yml", []byte("on: "+on+"\njobs: {}\n"+miseEnvYAML))
 		require.Len(t, got, 1, "on: %s: %v", on, got)
 		assert.Contains(t, got[0].msg, `the event "issues"`)
 	}
@@ -282,7 +303,7 @@ func TestWorkflowsCommitted(t *testing.T) {
 	got, err = workflows(t.Context(), r.Repo, "HEAD")
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	assert.Equal(t, ".github/workflows/ci.yml:17", got[0].where)
+	assert.Equal(t, ".github/workflows/ci.yml:22", got[0].where)
 }
 
 // TestWorkflowsRepository checks the workflows of this repository, as
@@ -300,13 +321,15 @@ func TestWorkflowsRepository(t *testing.T) {
 }
 
 // TestWorkflowsCIFile reads the repository's ci.yml as data and holds
-// it to what T002 asks of it: the four pinned runners, mise installed
-// by a pinned version and a sha256 per platform before setup, and
-// setup before all.
+// it to what T002 and T003 ask of it: the mise environment of tools/ci
+// (miseEnv) for every step, the four pinned runners, mise installed by
+// a pinned version and a sha256 per platform before setup, and setup
+// before all.
 func TestWorkflowsCIFile(t *testing.T) {
 	src, err := os.ReadFile(filepath.Join(moduleRoot(t), filepath.FromSlash(workflowsDir), "ci.yml"))
 	require.NoError(t, err)
 	var wf struct {
+		Env  map[string]string `yaml:"env"`
 		Jobs map[string]struct {
 			RunsOn   string `yaml:"runs-on"`
 			Strategy struct {
@@ -322,6 +345,12 @@ func TestWorkflowsCIFile(t *testing.T) {
 		} `yaml:"jobs"`
 	}
 	require.NoError(t, yaml.Unmarshal(src, &wf))
+	want := map[string]string{}
+	for _, kv := range miseEnv {
+		key, value, _ := strings.Cut(kv, "=")
+		want[key] = value
+	}
+	assert.Equal(t, want, wf.Env, "the env of ci.yml is miseEnv, the environment of every mise run of tools/ci")
 	require.Len(t, wf.Jobs, 1)
 	job, ok := wf.Jobs["all"]
 	require.True(t, ok, "the job is named all")

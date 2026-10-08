@@ -88,9 +88,13 @@ func readBlind(e env, tty *os.File, prompt string) ([]byte, error) {
 }
 
 // writeFile replaces path through a temporary file in its directory,
-// so a run that is interrupted leaves the earlier denylist whole.
+// so a run that is interrupted leaves the earlier file whole. The file
+// gets mode 0644. A failed step removes the temporary file; a process
+// killed before the rename can leave it, hidden, named after the file
+// with a leading "." and a random suffix, and the next run does not
+// read it.
 func writeFile(path string, data []byte) (err error) {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".denylist-*")
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+"-*")
 	if err != nil {
 		return err
 	}

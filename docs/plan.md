@@ -436,7 +436,8 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
     third consumer of the ask-first file, the `mutate` trigger, lands
     with `mutate` in T007.
   - `tools/ci generated` fails a changed, a new and a removed generated
-    file, comparing content before and after the run (10 10.2).
+    file, judging the generator's output against one commit's objects
+    (10 10.2).
   - `go run ./tools/new adr <title>` writes the next number, the date
     from the injected clock and the filename from `slug(title)`, status
     Proposed (12 12.3; ADR 0001 rule 6).

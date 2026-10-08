@@ -13,7 +13,7 @@ reference, with the contributor docs as outlines.
 | shared packages (`internal/...`) | Go | see the capability map |
 | CI, release and dev tooling (`tools/ci`, `tools/new`, `tools/schemagen`, `tools/release`, `tools/kitpin`) | Go | one entry point for local and CI |
 | host probe harness (`e2e/probes`) | Go | runs probe steps, writes `probe-result.v1` JSON |
-| git hook in this repo (`.githooks/pre-push`) | POSIX sh, one line | `exec go run ./tools/ci fast "$@"` (git's pre-push arguments and stdin pass through, 10 10.2) |
+| git hook in this repo (`.githooks/pre-push`) | POSIX sh, one line | `exec env <the mise environment> go run ./tools/ci fast "$@"`: the four variables of `miseEnv` in `tools/ci/misefiles.go`, held to that list by a test, so the mise shim that starts go reads `mise.toml` alone; git's pre-push arguments and stdin pass through (10 10.2) |
 | kit install steps | POSIX sh, <= 5 lines per step | download + sha256 check + install only |
 | skills (`skills/*/SKILL.md`) | Markdown | Claude Code skills |
 | schemas | JSON Schema 2020-12 | generated into `schemas/*.json` |
@@ -132,8 +132,8 @@ is fixed in the kit, not in the architecture (see
 ## 12.3 Generators
 
 Every rule with more than one consumer has one source; the consumers are
-generated and `tools/ci generated` fails when `go generate ./...` leaves
-a diff. Nobody hand-edits a generated file.
+generated and `tools/ci generated` fails when a generated file differs
+from what its generator writes. Nobody hand-edits a generated file.
 
 | Source | Generated consumers |
 |---|---|
@@ -147,11 +147,18 @@ a diff. Nobody hand-edits a generated file.
 | the vocabulary table (01 1.7) | the `tools/ci vocabulary` denylist |
 | ADR titles and statuses (`docs/adr/NNNN-*.md`) | the ADR index `docs/adr/README.md` |
 
+Every generator runs inside `generateFiles` in `tools/ci`, the one entry
+`generated` judges, so the step checks each generated file of the table
+that has a generator today; how the generators still to come join it is
+a [deferred decision](../spec.md#deferred-decisions).
+
 The generator that reads `.github/ask-first.yaml` is a `tools/ci`
 subcommand, so the code that writes `.github/CODEOWNERS` is on the
-`checks` surface (05 5.3). CODEOWNERS itself needs no glob: `generated`
-refuses a hand edit of it, and a change to its source needs the
-approval line.
+`checks` surface (05 5.3). `generated` refuses a commit whose CODEOWNERS
+differs from what that code writes, and a change to its source needs
+the approval line. CODEOWNERS is on the `ask-first` surface as well, as
+defence in depth: a change to it asks for the review even where
+`generated` does not run.
 
 A generated `docs/reference/` page carries a generated-file header and
 the front matter of rule 1 in

@@ -149,7 +149,7 @@ touches. The approval line, the ruleset that requires the code-owner
 review, and which revision of this file `pr` reads are defined in one
 place,
 [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change).
-The file lists itself. `owner` is the maintainer's GitHub handle, the
+The file lists itself and `.github/CODEOWNERS`, which `tools/ci` generates from it. `owner` is the maintainer's GitHub handle, the
 `<owner>` of the module path (02 2.1), which is public already. The maintainer decided that the
 decision records and the code of the checks are surfaces
 ([round 3](../reviews/round-3.md#maintainer-decisions)): the workflows
@@ -188,8 +188,8 @@ surfaces:
     globs: [.github/workflows/release.yml, tools/release/**]
     reason: release and publishing paths
   - id: dependencies
-    globs: [go.mod, go.sum, mise.toml, mise.lock, .github/workflows/**]
-    reason: Go dependencies, the pinned tools the gates run, and CI actions
+    globs: [go.mod, go.sum, mise.toml, mise.lock, .mise.toml, mise.*.toml, .mise.*.toml, mise/**, .mise/**, .config/mise.toml, .config/mise.*.toml, .config/mise/**, .tool-versions, .miserc.toml, .miserc.local.toml, .config/miserc.toml, .github/workflows/**]
+    reason: Go dependencies, the pinned tools the gates run with every file mise reads as its configuration, and CI actions
   - id: contracts
     globs: [internal/cli/errors.go, internal/spec/versions.go]
     reason: exit codes, error ids and file format versions
@@ -203,8 +203,8 @@ surfaces:
     globs: [tools/ci/**, .githooks/**, .golangci.yml, docs/acceptance.json]
     reason: the code of the gates and reports, with the forbidden-name denylist (tools/ci/denylist.yaml), the linter configuration, and the acceptance file, whose command items tools/ci acceptance runs
   - id: ask-first
-    globs: [.github/ask-first.yaml]
-    reason: this list
+    globs: [.github/ask-first.yaml, .github/CODEOWNERS]
+    reason: this list, and the CODEOWNERS file generated from it
 ```
 
 ## 5.4 Known residual risks (accepted in v1)

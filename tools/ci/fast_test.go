@@ -50,7 +50,7 @@ func TestFast(t *testing.T) {
 			name:  "a denylist with an entry, every step passing",
 			steps: []step{passing},
 			code:  exitOK,
-			want:  []string{"ok    passes", "ok    hygiene"},
+			want:  []string{"ok    passes", "ok    hygiene", "ok    workflows", "ok    generated"},
 		},
 		{
 			name:  "a missing denylist",
@@ -69,6 +69,33 @@ func TestFast(t *testing.T) {
 			},
 			code: exitFail,
 			want: []string{"FAIL  hygiene", "denylist: the denylist has no entry"},
+		},
+		{
+			name:  "by hand, a denylist that does not parse fails hygiene, with exit 1",
+			steps: []step{passing},
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write(names.Path, "entries: [\n")
+			},
+			code: exitFail,
+			want: []string{"ok    passes", "FAIL  hygiene\n" + names.Path + ": "},
+		},
+		{
+			name:  "a stale generated file",
+			steps: []step{passing},
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write(".github/CODEOWNERS", "# nothing asks first\n")
+			},
+			code: exitFail,
+			want: []string{"ok    hygiene", "FAIL  generated\n.github/CODEOWNERS: generated: the file differs"},
+		},
+		{
+			name:  "a source that cannot be read fails generated and no other check",
+			steps: []step{passing},
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write(".github/ask-first.yaml", "version: [\n")
+			},
+			code: exitFail,
+			want: []string{"ok    hygiene", "ok    workflows", "FAIL  generated\n.github/ask-first.yaml: yaml:"},
 		},
 		{
 			name:  "a failing step does not hide the ones after it",
@@ -383,6 +410,111 @@ func TestFastJudgesAgainAfterTheSteps(t *testing.T) {
 	}
 }
 
+// TestChecksJudgeTheCommitResolvedFirst covers a step that, while it
+// runs, makes a weakened generated file look current, as a test of a
+// pull request could: it writes the file back and stages it, commits
+// it too, or overwrites the loose object of the weakened blob with the
+// object of the good one, which git cat-file returns without hashing
+// it. fast by hand and all read the commit before the steps
+// (commitChecks), so the weakened commit still fails.
+func TestChecksJudgeTheCommitResolvedFirst(t *testing.T) {
+	sh, err := exec.LookPath("sh")
+	require.NoError(t, err)
+	const forge = `obj() { echo ".git/objects/$(echo "$1" | cut -c1-2)/$(echo "$1" | cut -c3-)"; }; ` +
+		`weak=$(git rev-parse HEAD:.github/CODEOWNERS) && good=$(git rev-parse HEAD~1:.github/CODEOWNERS) && ` +
+		`chmod u+w "$(obj "$weak")" && cat "$(obj "$good")" > "$(obj "$weak")"`
+	for _, command := range []string{"fast", "all"} {
+		for name, change := range map[string]string{
+			"restore and stage":  "cat \"$GOOD\" > .github/CODEOWNERS && git add .github/CODEOWNERS",
+			"restore and commit": "cat \"$GOOD\" > .github/CODEOWNERS && git add .github/CODEOWNERS && git commit --quiet --message restore",
+			"forge the object":   forge,
+		} {
+			t.Run(command+": "+name, func(t *testing.T) {
+				r := newTree(t)
+				r.Commit("fixture")
+				good := filepath.Join(t.TempDir(), "CODEOWNERS")
+				data, err := os.ReadFile(filepath.Join(r.Dir, ".github", "CODEOWNERS"))
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(good, data, 0o644))
+				r.Write(".github/CODEOWNERS", "# nothing asks first\n")
+				weakened := r.Commit("weaken")
+				weakBlob := r.Git("rev-parse", "HEAD:.github/CODEOWNERS")
+				// The stub runs with the fixture's git environment, so a
+				// commit it makes has an identity.
+				changer := step{name: "changes", argv: []string{sh, "-c", change}, environ: append(slices.Clone(r.Env), "GOOD="+good)}
+				var code int
+				var out string
+				if command == "fast" {
+					code, out = runCI(t, r, nil, []step{changer}, "fast")
+				} else {
+					profile := filepath.Join(t.TempDir(), "cover.out")
+					require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
+					code, out = runAllIn(t, r, []step{changer}, profile)
+				}
+				assert.Equal(t, exitFail, code, out)
+				assert.Contains(t, out, "ok    changes")
+				assert.Contains(t, out, "FAIL  generated\n.github/CODEOWNERS: generated: the file differs")
+				assert.Contains(t, r.Git("log", "--format=%H", "-2"), weakened)
+				// The step did make the commit look current to a later
+				// read: of the working tree, or of the object store.
+				restored, err := os.ReadFile(filepath.Join(r.Dir, ".github", "CODEOWNERS"))
+				require.NoError(t, err)
+				if change == forge {
+					assert.Equal(t, string(data), r.Git("cat-file", "blob", weakBlob)+"\n", "the forged object reads as the good file")
+				} else {
+					assert.Equal(t, string(data), string(restored), "the step restored the working tree")
+				}
+			})
+		}
+	}
+}
+
+// TestFastHookJudgesGeneratedAtTheCommit covers generated in a
+// pre-push run, in both directions: a decision record written and not
+// committed is not read, so a good push passes; and a commit that
+// holds the index of a record it does not hold fails, though the
+// record is in the working tree.
+func TestFastHookJudgesGeneratedAtTheCommit(t *testing.T) {
+	const zero = "0000000000000000000000000000000000000000"
+	const record2 = "docs/adr/0002-pick-another.md"
+	tests := []struct {
+		name   string
+		change func(t *testing.T, r *gittest.Repo)
+		code   int
+		want   string
+	}{
+		{"an untracked record", func(t *testing.T, r *gittest.Repo) {
+			r.Write(record2, "# 2. Pick another\n\n## Status\n\nProposed\n")
+		}, exitOK, "ok    generated"},
+		{"the index committed without its record", func(t *testing.T, r *gittest.Repo) {
+			r.Write(record2, "# 2. Pick another\n\n## Status\n\nProposed\n")
+			files, err := generateFiles(os.DirFS(r.Dir))
+			require.NoError(t, err)
+			for _, f := range files {
+				r.Write(f.path, string(f.data))
+			}
+			r.Git("add", "docs/adr/README.md")
+			r.Git("commit", "--quiet", "--message", "the index alone")
+		}, exitFail, "FAIL  generated\ndocs/adr/README.md: generated: the file differs"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origin := gittest.NewBare(t)
+			r := newTree(t)
+			r.Git("remote", "add", "origin", origin.Dir)
+			r.Commit("fixture")
+			r.Git("push", "--quiet", "origin", "main")
+			r.Git("fetch", "--quiet", "origin")
+			tt.change(t, r)
+			head := r.Git("rev-parse", "HEAD")
+			stdin := "refs/heads/main " + head + " refs/heads/main " + zero + "\n"
+			code, out := runCI(t, r, strings.NewReader(stdin), []step{passing}, "fast", "origin", origin.Dir)
+			assert.Equal(t, tt.code, code, out)
+			assert.Contains(t, out, tt.want)
+		})
+	}
+}
+
 // TestHookGitEnv pins the variables that judgeCommit's git commands go
 // without: the list git itself gives for a repository's location,
 // every GIT_CONFIG variable, and a GIT_OPTIONAL_LOCKS of the caller,
@@ -397,7 +529,7 @@ func TestHookGitEnv(t *testing.T) {
 	for _, key := range repoLocalEnv {
 		base = append(base, key+"=/x")
 	}
-	assert.Equal(t, []string{"PATH=/bin", "HOME=/h", "GIT_AUTHOR_NAME=a", "GIT_OPTIONAL_LOCKS=0"}, hookGitEnv(base))
+	assert.Equal(t, []string{"PATH=/bin", "HOME=/h", "GIT_AUTHOR_NAME=a", "GIT_OPTIONAL_LOCKS=0", "GIT_NO_REPLACE_OBJECTS=1"}, hookGitEnv(base))
 
 	t.Setenv("GIT_INDEX_FILE", "/from/the/process")
 	assert.NotContains(t, hookGitEnv(nil), "GIT_INDEX_FILE=/from/the/process", "nil is this process's environment")
@@ -518,7 +650,7 @@ func TestFastPushedRange(t *testing.T) {
 		{"a clean push", push(clean, "refs/heads/clean", zero), exitOK, []string{"ok    pushed range"}, ""},
 		{"nothing to push", "", exitOK, []string{"ok    pushed range"}, ""},
 		{"a remote ref name", push(clean, "refs/heads/zorvex-quimby", zero), exitFail,
-			[]string{"FAIL  pushed range", "pushed ref 1: name: the remote ref name holds a name listed at HEAD"}, ""},
+			[]string{"FAIL  pushed range", "pushed ref 1: name: the remote ref name holds a name listed in the pushed commit"}, ""},
 		{"a ref name with a slash between the halves", push(clean, "refs/heads/zorvex/quimby", zero), exitOK, nil, ""},
 		{"a commit message", push(message, "refs/heads/message", zero), exitFail,
 			[]string{"commit " + message + ": message line 3: name:"}, ""},
@@ -819,16 +951,16 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 		{name: "an entry the pushed tip adds",
 			stdin: push(listing, "refs/heads/listing"), code: exitFail,
 			want: []string{"FAIL  pushed range",
-				"commit " + listing + ": docs/b.txt:1: name: the added line holds a name listed at HEAD"}},
+				"commit " + listing + ": docs/b.txt:1: name: the added line holds a name listed in the pushed commit"}},
 		{name: "the same tip pushed as an annotated tag",
 			stdin: push(listingTag, "refs/tags/v-listing"), code: exitFail,
-			want: []string{"commit " + listing + ": docs/b.txt:1: name: the added line holds a name listed at HEAD"}},
+			want: []string{"commit " + listing + ": docs/b.txt:1: name: the added line holds a name listed in the pushed commit"}},
 		{name: "a clean ref and the checked-out one: every tip must be HEAD", head: listing,
 			stdin: push(clean, "refs/heads/clean") + push(listing, "refs/heads/listing"), code: exitError,
 			want: []string{"ci: fast tests the commit checked out", "\n" + clean}, lacks: []string{"\n" + listing, "pushed range"}},
-		{name: "a denylist that cannot be read at HEAD stops the push",
+		{name: "a denylist that cannot be read at HEAD stops the push before any check, with exit 2",
 			stdin: push(broken, "refs/heads/broken"), code: exitError,
-			want: []string{"ci: " + names.Path + ": "}, lacks: []string{"pushed range"}},
+			want: []string{"ci: " + names.Path + ": "}, lacks: []string{"pushed range", "ok  ", "FAIL"}},
 		{name: "a deleted ref names no tip",
 			stdin: fmt.Sprintf("(delete) %s refs/heads/listing %s\n", zero, listing), code: exitOK,
 			want: []string{"ok    pushed range"}},
@@ -838,23 +970,23 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 				"commit " + unlistedLine + ": docs/b.txt:1: name: the added line holds a name listed at the remote's default branch"}},
 		{name: "a tag message",
 			stdin: push(tagMessage, "refs/tags/v-message"), code: exitFail,
-			want: []string{"tag " + tagMessage + ": message line 3: name: the line holds a name listed at HEAD"}},
+			want: []string{"tag " + tagMessage + ": message line 3: name: the line holds a name listed in the pushed commit"}},
 		{name: "a tagger",
 			stdin: push(tagTagger, "refs/tags/v-tagger"), code: exitFail,
-			want: []string{"tag " + tagTagger + ": tagger: name: the name and email hold a name listed at HEAD"}},
+			want: []string{"tag " + tagTagger + ": tagger: name: the name and email hold a name listed in the pushed commit"}},
 		{name: "the name a tag was created with, pushed under another",
 			stdin: push(tagName, "refs/tags/v-other"), code: exitFail,
-			want:  []string{"tag " + tagName + ": tag name: name: the tag's name holds a name listed at HEAD"},
+			want:  []string{"tag " + tagName + ": tag name: name: the tag's name holds a name listed in the pushed commit"},
 			lacks: []string{"pushed ref 1"}},
 		{name: "a signature line of a tag",
 			stdin: push(tagSigned, "refs/tags/v-signed"), code: exitFail,
-			want: []string{"tag " + tagSigned + ": message line 3: name: the line holds a name listed at HEAD"}},
+			want: []string{"tag " + tagSigned + ": message line 3: name: the line holds a name listed in the pushed commit"}},
 		{name: "an entry listed inside the range and dropped at its tip is not applied",
 			stdin: push(inRange, "refs/heads/inrange"), code: exitOK,
 			want: []string{"ok    pushed range"}},
 		{name: "a signed tag a merge commit embeds",
 			stdin: push(merged, "refs/heads/merged"), code: exitFail,
-			want: []string{"commit " + merged + ": mergetag 1 message line 3: name: the line holds a name listed at HEAD"}},
+			want: []string{"commit " + merged + ": mergetag 1 message line 3: name: the line holds a name listed in the pushed commit"}},
 		{name: "a path git quotes is withheld",
 			stdin: push(quoted, "refs/heads/quoted"), code: exitFail,
 			want: []string{"commit " + quoted + ": added path (withheld): name:", "commit " + quoted + ": (path withheld):1: name:"}},
@@ -940,7 +1072,7 @@ func pinnedLintTools(t *testing.T) lintTools {
 	root := moduleRoot(t)
 	t.Setenv("MISE_STATE_DIR", t.TempDir())
 	cmd := exec.CommandContext(t.Context(), "mise", "-C", root, "trust")
-	cmd.Env = passThroughEnv()
+	cmd.Env = miseEnviron(passThroughEnv())
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "mise trust\n%s", out)
 	tools, err := resolveLintTools(t.Context(), root)
@@ -1252,16 +1384,18 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 }
 
 // TestResolveLintToolsEnvironment checks that "mise which" runs in
-// passThroughEnv: a fake mise writes its environment to a file, and
-// every variable of passThrough reaches it and nothing else, with the
-// ones a shell adds itself, whatever else this process holds. Each
+// passThroughEnv with miseEnv: a fake mise writes its environment to a
+// file, and every variable of passThrough and of miseEnv reaches it
+// and nothing else, with the ones a shell adds itself, whatever else
+// this process holds, and each variable of miseEnv with its own value,
+// whatever this process holds for it. Each
 // variable of passThrough is set here, so the result does not depend
 // on the caller's environment (a TMPDIR or a MISE_STATE_DIR of its own).
 func TestResolveLintToolsEnvironment(t *testing.T) {
 	envPath, err := exec.LookPath("env")
 	require.NoError(t, err)
 	f := newFakeMise(t) // sets HOME and PATH
-	for _, key := range []string{"GOFLAGS", "MISE_INSTALLS_DIR", "MISE_TRUSTED_CONFIG_PATHS", "CI", "MISE_ENV"} {
+	for _, key := range []string{"GOFLAGS", "MISE_INSTALLS_DIR", "MISE_TRUSTED_CONFIG_PATHS", "CI", "MISE_ENV", "MISE_AUTO_ENV", "MISE_OVERRIDE_CONFIG_FILENAMES", "MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES"} {
 		t.Setenv(key, "from-the-process")
 	}
 	for _, key := range passThrough {
@@ -1276,14 +1410,21 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 
 	data, err := os.ReadFile(dump)
 	require.NoError(t, err)
-	var keys []string
+	var keys, lines []string
 	for line := range strings.Lines(string(data)) {
+		lines = append(lines, line)
 		key, _, _ := strings.Cut(line, "=")
 		if !slices.Contains([]string{"PWD", "OLDPWD", "SHLVL", "_"}, key) {
 			keys = append(keys, key)
 		}
 	}
-	assert.Equal(t, slices.Sorted(slices.Values(passThrough)), slices.Sorted(slices.Values(keys)), "the variables mise gets")
+	want := slices.Clone(passThrough)
+	for _, kv := range miseEnv {
+		key, _, _ := strings.Cut(kv, "=")
+		want = append(want, key)
+		assert.Contains(t, lines, kv+"\n", "mise gets %s, whatever this process holds", kv)
+	}
+	assert.Equal(t, slices.Sorted(slices.Values(want)), slices.Sorted(slices.Values(keys)), "the variables mise gets")
 }
 
 // TestMiseInstalls holds miseInstalls to the data directory that mise
@@ -1293,7 +1434,7 @@ func TestMiseInstalls(t *testing.T) {
 	t.Setenv("MISE_DATA_DIR", "")
 	t.Setenv("XDG_DATA_HOME", "")
 	cmd := exec.CommandContext(t.Context(), "mise", "-C", t.TempDir(), "doctor", "--json")
-	cmd.Env = passThroughEnv()
+	cmd.Env = miseEnviron(passThroughEnv())
 	out, err := cmd.Output()
 	require.NoError(t, err, "mise doctor")
 	var doctor struct{ Dirs struct{ Data string } }
@@ -1334,13 +1475,18 @@ func TestMiseInstalls(t *testing.T) {
 // nested repository among them, which git lists as its directory.
 func TestIsGateInput(t *testing.T) {
 	for _, path := range []string{"x.go", "tools/ci/x_test.go", "go.work", "go.work.sum", "vendor/modules.txt",
-		"vendor/example.com/m/m.go", "mise.toml", ".mise.toml", "mise.local.toml", ".mise.local.toml", "mise.ci.toml",
-		".config/mise.toml", ".config/mise/config.toml", ".config/mise/conf.d/x.toml", ".mise/config.toml",
-		"mise/config.toml", ".tool-versions", "tools/.tool-versions", "tools/ci/evil/", "nested/"} {
+		"vendor/example.com/m/m.go", "mise.toml", "mise.lock", ".mise.toml", "mise.local.toml", ".mise.local.toml", "mise.ci.toml",
+		".config/mise.toml", ".config/mise.local.toml", ".config/mise/config.toml", ".config/mise/conf.d/x.toml",
+		".mise/config.toml", ".mise/conf.d/x.toml", "mise/config.toml", "mise/conf.d/x/mise.toml", ".tool-versions",
+		".miserc.toml", ".miserc.local.toml", ".config/miserc.toml", "tools/ci/evil/", "nested/",
+		// A case-insensitive file system gives mise these too.
+		"Mise.local.toml", ".TOOL-VERSIONS", ".Miserc.toml", ".CONFIG/mise/conf.d/x.toml", "MISE.TOML"} {
 		assert.True(t, isGateInput(path), path)
 	}
-	for _, path := range []string{"README.md", "go.mod", "go.sum", "mise.lock", "docs/promise.toml", "REUSE.toml",
-		"tools/vendor/notes.md", "docs/go.md", "x.gox"} {
+	// mise, started at the top of the tree, reads no file of a
+	// subdirectory (misefiles.go).
+	for _, path := range []string{"README.md", "go.mod", "go.sum", "docs/promise.toml", "REUSE.toml",
+		"tools/vendor/notes.md", "docs/go.md", "x.gox", "tools/.tool-versions", "tools/mise.local.toml", "misery.toml"} {
 		assert.False(t, isGateInput(path), path)
 	}
 }

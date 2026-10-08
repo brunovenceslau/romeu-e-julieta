@@ -11,14 +11,22 @@
 //	go run ./tools/ci setup                   trust mise.toml, install the tools, fill the module cache
 //	go run ./tools/ci coverage <profile>      the thresholds of S9 over a cover profile
 //	go run ./tools/ci workflows               the workflow grammar over the tree at HEAD
+//	go run ./tools/ci generate                write the generated files from their sources
+//	go run ./tools/ci generated               the generated files against their sources
 //	go run ./tools/ci hygiene                 the hygiene rules over the tree at HEAD
 //	go run ./tools/ci hygiene --file <path>   the name matcher over one file
 //	go run ./tools/ci hygiene add             add a denylist entry, from a terminal
 //
-// It exits 0 when every check passes, 1 when a check fails, and 2 when
-// it could not run a check at all. Started through "go run", every
-// status other than 0 reaches the caller as 1, with the real one in the
-// "exit status" line that go prints; a built binary returns it as is.
+// It exits 0 when every check passes, 1 when a check fails, and 2
+// when it could not run a check at all. Inside fast and all, a check
+// of the judged commit that cannot judge it (a denylist that does not
+// parse, say) is reported as a failed check, with exit 1; in a
+// pre-push run, fast reads the denylists of the pushed commit and of
+// the remote's default branch before any check, and one that cannot be
+// read stops it there, with exit 2. Started
+// through "go run", every status other than 0 reaches the caller as
+// 1, with the real one in the "exit status" line that go prints; a
+// built binary returns it as is.
 package main
 
 import (
@@ -47,6 +55,8 @@ const usage = `usage:
   go run ./tools/ci setup
   go run ./tools/ci coverage <profile>
   go run ./tools/ci workflows
+  go run ./tools/ci generate
+  go run ./tools/ci generated
   go run ./tools/ci hygiene [--file <path>]
   go run ./tools/ci hygiene add
 `
@@ -103,6 +113,10 @@ func run(ctx context.Context, e env, args []string) int {
 		ok, err = runCoverage(ctx, e, args[1:])
 	case "workflows":
 		ok, err = runWorkflows(ctx, e, args[1:])
+	case "generate":
+		ok, err = runGenerate(ctx, e, args[1:])
+	case "generated":
+		ok, err = runGenerated(ctx, e, args[1:])
 	case "hygiene":
 		ok, err = runHygiene(ctx, e, args[1:])
 	default:

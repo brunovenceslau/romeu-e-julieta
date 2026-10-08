@@ -48,7 +48,7 @@ func TestAll(t *testing.T) {
 			steps:   []step{passing},
 			profile: "tools/ci 1 1",
 			code:    exitOK,
-			want:    []string{"platform  ", "ok    passes", "ok    hygiene", "ok    workflows", "ok    coverage"},
+			want:    []string{"platform  ", "ok    passes", "ok    hygiene", "ok    workflows", "ok    generated", "ok    coverage"},
 		},
 		{
 			name:    "a failing step does not hide the checks after it",
@@ -79,7 +79,15 @@ func TestAll(t *testing.T) {
 			},
 			profile: "tools/ci 1 1",
 			code:    exitFail,
-			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:17: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
+			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:22: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
+		},
+		{
+			name:    "a stale generated file",
+			steps:   []step{passing},
+			change:  func(t *testing.T, r *gittest.Repo) { r.Write(codeownersPath, "# nothing asks first\n") },
+			profile: "tools/ci 1 1",
+			code:    exitFail,
+			want:    []string{"FAIL  generated\n.github/CODEOWNERS: generated: the file differs", "ok    coverage"},
 		},
 		{
 			name:    "a hygiene finding",
@@ -540,10 +548,21 @@ func TestSetup(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(goCmd), 0o755))
 	require.NoError(t, os.WriteFile(goCmd, []byte("#!/bin/sh\necho \"go $* GOPROXY=${GOPROXY-unset} GOFLAGS=$GOFLAGS HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '"+log+"'\n"), 0o700))
 	linter := f.tool(t, "golangci-lint", "2.14.0", "golangci-lint")
-	script := "#!/bin/sh\nif [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '" + log + "'\n"
+	var miseVars string // each variable of miseEnv as the fake mise gets it
+	for _, kv := range miseEnv {
+		key, _, _ := strings.Cut(kv, "=")
+		miseVars += " " + key + "=${" + key + "-unset}"
+	}
+	miseVars = strings.TrimPrefix(miseVars, " ")
+	script := "#!/bin/sh\nif [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset} " + miseVars + "\" >> '" + log + "'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
 	t.Setenv("HTTPS_PROXY", "http://proxy.invalid")
 	t.Setenv("DOCKER_HOST", "unix:///nowhere")
+	t.Setenv("GITHUB_ACTIONS", "")
+	for _, kv := range miseEnv {
+		key, _, _ := strings.Cut(kv, "=")
+		t.Setenv(key, "from-the-process")
+	}
 
 	code, out := runCI(t, r, nil, nil, "setup")
 	assert.Equal(t, exitOK, code, out)
@@ -554,9 +573,47 @@ func TestSetup(t *testing.T) {
 	require.NoError(t, err)
 	root, err := filepath.EvalSymlinks(r.Dir)
 	require.NoError(t, err)
-	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset DOCKER_HOST=unset\n"+
-		"mise install HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n"+
+	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset DOCKER_HOST=unset "+strings.Join(miseEnv, " ")+"\n"+
+		"mise install HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset "+strings.Join(miseEnv, " ")+"\n"+
 		"go mod download GOPROXY=unset GOFLAGS=-mod=readonly HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n", string(data))
+
+	t.Run("a hosted run with the mise environment of the workflow", func(t *testing.T) {
+		t.Setenv("GITHUB_ACTIONS", "true")
+		for _, kv := range miseEnv {
+			key, value, _ := strings.Cut(kv, "=")
+			t.Setenv(key, value)
+		}
+		code, out := runCI(t, r, nil, nil, "setup")
+		assert.Equal(t, exitOK, code, out)
+	})
+
+	for _, kv := range miseEnv {
+		key, value, _ := strings.Cut(kv, "=")
+		t.Run("a hosted run whose workflow does not set "+key, func(t *testing.T) {
+			t.Setenv("GITHUB_ACTIONS", "true")
+			for _, other := range miseEnv {
+				k, v, _ := strings.Cut(other, "=")
+				t.Setenv(k, v)
+			}
+			require.NoError(t, os.Unsetenv(key))
+			code, out := runCI(t, r, nil, nil, "setup")
+			assert.Equal(t, exitError, code, out)
+			assert.Contains(t, out, "ci: setup: the workflow sets "+key+"="+value+" for every mise run, and this run has it unset")
+			assert.NotContains(t, out, "mise trust")
+		})
+		t.Run("a hosted run whose workflow sets "+key+" to another value", func(t *testing.T) {
+			t.Setenv("GITHUB_ACTIONS", "true")
+			for _, other := range miseEnv {
+				k, v, _ := strings.Cut(other, "=")
+				t.Setenv(k, v)
+			}
+			t.Setenv(key, "other")
+			code, out := runCI(t, r, nil, nil, "setup")
+			assert.Equal(t, exitError, code, out)
+			assert.Contains(t, out, "ci: setup: the workflow sets "+key+"="+value+" for every mise run, and this run has "+key+"=other")
+			assert.NotContains(t, out, "mise trust")
+		})
+	}
 
 	t.Run("a failing mise stops before the download", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\nexit 1\n"), 0o700))

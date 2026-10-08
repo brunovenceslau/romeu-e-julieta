@@ -13,8 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fixtureModule is the module path of the fixture cover profiles.
-const fixtureModule = "example.invalid/m"
+// fixtureModule is the module path of the fixtures: of their go.mod and
+// their cover profiles. Its <owner> owns the fixture ask-first list
+// (fixtureList).
+const fixtureModule = "github.com/someone-1/thing"
 
 // profileOf writes a cover profile with one block per entry: the
 // package path relative to the module, the statements, and the count.

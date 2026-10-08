@@ -36,13 +36,14 @@ const (
 //     by a tag or a branch, which can move, a local action (a path in
 //     the repository, which runs any shell), a runner label that is not
 //     a pinned GitHub-hosted one (*-latest, a self-hosted label, a label
-//     read from a variable), and an env table, whose keys could make a
-//     tools/ci run start other code (BASH_ENV, LD_PRELOAD, PATH,
-//     GOFLAGS=-toolexec). An action takes only the with keys listed
-//     for it (actionInputs), each a literal or an exact matrix
-//     reference whose values are literals, so no value an event can
-//     write reaches an input, and no expression reads the token or a
-//     secret. A matrix is a written mapping of the keys
+//     read from a variable), and an env table other than the one at the
+//     top of the file, which holds miseEnv and nothing else, since
+//     other keys could make a tools/ci run start other code (BASH_ENV,
+//     LD_PRELOAD, PATH, GOFLAGS=-toolexec). An action takes only the
+//     with keys listed for it (actionInputs), each a literal or an exact
+//     matrix reference whose values are literals, so no value an event
+//     can write reaches an input, and no expression reads the token or
+//     a secret. A matrix is a written mapping of the keys
 //     os and include, and an include entry holds os and mise_sha256
 //     only, so the label a job runs on is always one that is checked.
 //  2. A file that reads as one thing and runs as another: an anchor,
@@ -62,7 +63,7 @@ const (
 // not admit. Everything a workflow does lives in tools/ci, so that a
 // developer's shell and a runner run the same code at the same commit.
 var (
-	fileKeys     = []string{"name", "on", "permissions", "concurrency", "jobs"}
+	fileKeys     = []string{"name", "on", "permissions", "concurrency", "env", "jobs"}
 	eventNames   = []string{"pull_request", "push", "schedule", "workflow_dispatch"}
 	jobKeys      = []string{"name", "runs-on", "needs", "strategy", "permissions", "timeout-minutes", "steps"}
 	usesStepKeys = []string{"name", "uses", "with"}
@@ -140,13 +141,19 @@ func workflows(ctx context.Context, repo git.Repo, head string) ([]finding, erro
 	if err != nil {
 		return nil, err
 	}
+	return workflowsOf(files), nil
+}
+
+// workflowsOf applies the grammar to the workflows among files, the
+// tree of one commit as headTree reads it.
+func workflowsOf(files []treeFile) []finding {
 	var findings []finding
 	for _, f := range files {
 		if strings.HasPrefix(f.path, workflowsDir) {
 			findings = append(findings, workflowFindings(f.path, f.content)...)
 		}
 	}
-	return findings, nil
+	return findings
 }
 
 // workflowFindings returns what one file breaks of the grammar. It
@@ -267,12 +274,15 @@ func (c *grammar) expressions(n *yaml.Node) {
 	}
 }
 
-// file checks the keys of the file, the events, and each job.
+// file checks the keys of the file, the env table, the events, and
+// each job.
 func (c *grammar) file(doc *yaml.Node) {
 	for key, value := range pairs(doc) {
 		switch {
 		case !slices.Contains(fileKeys, key.Value):
 			c.add(key, "the key "+strconv.Quote(key.Value)+" is outside the grammar of a file")
+		case key.Value == "env":
+			c.env(value)
 		case key.Value == "on":
 			c.events(value)
 		case key.Value == "permissions":
@@ -281,7 +291,32 @@ func (c *grammar) file(doc *yaml.Node) {
 			c.jobs(value)
 		}
 	}
+	if field(doc, "env") == nil {
+		c.add(doc, envRule)
+	}
 	c.permissionsSet(doc)
+}
+
+// envRule is the finding of a file whose env table is not miseEnv.
+var envRule = "env holds exactly the mise environment of tools/ci, each value a YAML string, in this order: " + strings.Join(miseEnv, " ")
+
+// env checks the env table of the file: the variables of miseEnv, in
+// its order, each a YAML string with the value of the list, and no
+// other. Every workflow sets it, since every step of one reaches go
+// through the mise shims, and mise-action runs mise itself.
+func (c *grammar) env(n *yaml.Node) {
+	ok := n.Kind == yaml.MappingNode && len(n.Content) == 2*len(miseEnv)
+	for i, kv := range miseEnv {
+		if !ok {
+			break
+		}
+		key, value, _ := strings.Cut(kv, "=")
+		k, v := n.Content[2*i], n.Content[2*i+1]
+		ok = k.Value == key && v.Kind == yaml.ScalarNode && v.Tag == "!!str" && v.Value == value
+	}
+	if !ok {
+		c.add(n, envRule)
+	}
 }
 
 // permissionsSet requires a permissions mapping at the top of the file,
