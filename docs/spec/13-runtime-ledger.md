@@ -512,6 +512,7 @@ The hostile spool table (U; I32):
 |---|---|
 | a symlink, a FIFO, a directory, each named `<id>.json` | skip `type`; the FIFO does not block. A device node has the same outcome and needs root to create, so probe A3 plants it and no unit row does |
 | a dotfile; a name containing `..`; another extension; an uppercase `<id>` | skip `name` |
+| a name holding a newline, another control character or a bidi codepoint | skip `name`; the report prints the path escaped (I29) |
 | two names that differ in case alone | the lowercase one has its own outcome; the uppercase one is skip `name` |
 | a valid event padded with whitespace to the size cap | entry |
 | the same, one byte over | skip `size` |
@@ -519,6 +520,7 @@ The hostile spool table (U; I32):
 | a file replaced by rename after the open, through the same hook | the outcome of the bytes of the file that was opened |
 | a file rewritten in place after the open, through the same hook | the outcome of the bytes read; the stored region hashes to the key |
 | more violations of one reason than the reporting limit | the exact count; the first paths in name order, up to the limit |
+| exactly as many names as the listing bound | each name is examined; no `listing-truncated` |
 | more names than the listing bound | `listing-truncated`; no more names than the bound were examined |
 | a zero-byte file; a truncated document; invalid UTF-8; a byte-order mark; a duplicate key; a top-level array | rejected `event-syntax` |
 | no `schema`; a malformed `schema`; version N-2 | rejected `event-version`, one entry however often it is ingested |

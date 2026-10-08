@@ -52,6 +52,22 @@ operator's install-and-verify step (J1) also needs a `gh` that has the
 `attestation` command; a packaged `gh` may be older and lack it.
 romeu itself never starts `gh`.
 
+**Tool pins.** Each tool the product pins, `gh` among them, is held at
+an exact version, never at "latest" or a range, with a sha256 for each
+architecture it runs on: the four platforms of `mise.lock` for the
+tools of `mise.toml`, and the two linux architectures for `mise` and
+`herdr` in the `julieta` kit
+([06 6.4](06-kits.md#64-product-kits),
+[07 7.4](07-mise-egress.md#74-mise-bootstrap-and-its-own-egress)).
+Two pins keep the form stated above, since neither is one binary per
+architecture: `govulncheck`, built from source, and the `reuse` image,
+pinned by its digest. A pin-freshness check compares each of these
+pins with the published releases and reports each one for which a
+newer version exists. It changes no pin, so a bump stays a reviewed
+diff. It reads the network, so it is outside the offline `tools/ci
+all` and is run by hand; a scheduled run is a
+[deferred decision](../spec.md#deferred-decisions).
+
 ## 12.2 Development commands and capability map
 
 ```
