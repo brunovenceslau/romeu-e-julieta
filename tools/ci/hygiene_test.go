@@ -283,7 +283,7 @@ func TestPrologueInThePushedRange(t *testing.T) {
 	code, out := runCI(t, r, strings.NewReader(stdin), []step{passing}, "fast", "origin", origin.Dir)
 	assert.Equal(t, exitFail, code, "exit status")
 	assert.Contains(t, out, "FAIL  pushed range\ncommit "+added+": added path sub/prologue.md: prologue:")
-	assert.NotContains(t, out, "not checked")
+	assert.Contains(t, out, "pushed range: not checked against names")
 }
 
 // TestHygienePrintsPathsSafely shows that a path is printed quoted when

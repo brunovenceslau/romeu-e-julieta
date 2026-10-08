@@ -386,13 +386,14 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 
 	if hook {
 		findings, checked, err := pushedRange(ctx, repo, args[0], push, head)
-		switch {
-		case err != nil:
+		if err != nil {
 			return false, err
-		case !checked && len(findings) == 0:
-			say(e.stdout, "--    pushed range: not checked, no denylist entry at HEAD or at the remote's default branch\n")
-		default:
+		}
+		if checked || len(findings) > 0 {
 			report("pushed range", len(findings) == 0, lines(findings))
+		}
+		if !checked {
+			say(e.stdout, "--    pushed range: not checked against names, no denylist entry at HEAD or at the remote's default branch\n")
 		}
 	}
 	return ok, nil
@@ -578,15 +579,17 @@ func lines(findings []finding) string {
 
 // pushedRange applies the name matcher to what a push would publish:
 // the remote ref names, the text of each pushed annotated tag and the
-// four readings of each pushed commit.
+// four readings of each pushed commit. It applies the prologue rule to
+// the paths those commits add, which needs no denylist entry.
 //
 // The push is judged by the denylist at head, the commit judgeCommit
 // judged, together with the one at the remote's default branch
 // (defaultBranchDenylist): an entry that the pushed commit removes
 // stays in force until its removal reaches the default branch through
 // review. A finding says which of the two lists holds the name.
-// Without an entry in either there is nothing to match with, and it
-// reports that it checked nothing.
+// Without an entry in either there is nothing to match names with, and
+// checked is false: it means "names were matched", and the prologue
+// rule ran all the same.
 func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.Push, head string) (findings []finding, checked bool, err error) {
 	// A list that is missing or empty at head is hygiene's finding.
 	atHead, _, err := loadDenylist(ctx, repo, head)
@@ -602,7 +605,12 @@ func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.
 	list.Merge(atDefault)
 	err = pushed.Walk(ctx, repo, remote, push, func(r pushed.Reading) {
 		if r.Field == pushed.FieldPath && isPrologue(r.Path) {
-			findings = append(findings, finding{readingAt(r) + "added path " + git.Printable(r.Path), "prologue", prologueMsg})
+			// A path that holds a listed name is not printed.
+			where := git.Printable(r.Path)
+			if list.Match([]byte(r.Path)) {
+				where = "(withheld)"
+			}
+			findings = append(findings, finding{readingAt(r) + "added path " + where, "prologue", prologueMsg})
 		}
 		if !list.Match(r.Text) {
 			return
