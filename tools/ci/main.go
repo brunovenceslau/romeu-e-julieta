@@ -72,12 +72,16 @@ type env struct {
 
 func main() {
 	e := env{dir: ".", stdin: os.Stdin, stdout: os.Stdout, stderr: os.Stderr}
-	// A step runs in a process group of its own, which a terminal's
-	// interrupt does not reach; cancelling the context kills it.
+	os.Exit(runSignalled(e, os.Args[1:]))
+}
+
+// runSignalled runs the command with a context that SIGINT and SIGTERM
+// cancel. A step runs in a process group of its own, which a terminal's
+// interrupt does not reach; cancelling the context kills it.
+func runSignalled(e env, args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	code := run(ctx, e, os.Args[1:])
-	stop()
-	os.Exit(code)
+	defer stop()
+	return run(ctx, e, args)
 }
 
 // run dispatches one subcommand and returns the exit status.
