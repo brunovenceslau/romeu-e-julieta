@@ -12,6 +12,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 )
@@ -40,9 +43,7 @@ func newTree(t *testing.T) *gittest.Repo {
 	t.Helper()
 	r := gittest.New(t)
 	r.Write(".githooks/pre-push", hookLine)
-	if err := os.Chmod(filepath.Join(r.Dir, ".githooks", "pre-push"), 0o744); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Chmod(filepath.Join(r.Dir, ".githooks", "pre-push"), 0o744))
 	r.Write("tools/ci/prose.yaml", fixtureProse)
 	r.Write(names.Path, string(denylist(t, madeUp)))
 	r.Write("README.md", "# A fixture\n\nPlain text.\n")
@@ -54,9 +55,7 @@ func denylist(t *testing.T, madeUpNames ...string) []byte {
 	l := &names.List{}
 	for _, n := range madeUpNames {
 		e, err := names.NewEntry(n)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		l.Add(e)
 	}
 	return l.Marshal()
@@ -91,9 +90,8 @@ func TestUsage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if code, out := runCI(t, r, nil, nil, tt.args...); code != exitError {
-				t.Errorf("exit = %d, want %d\n%s", code, exitError, out)
-			}
+			code, out := runCI(t, r, nil, nil, tt.args...)
+			assert.Equal(t, exitError, code, "exit status\n%s", out)
 		})
 	}
 }
@@ -105,9 +103,8 @@ func TestOutsideARepository(t *testing.T) {
 	// temporary directory, when TMPDIR is inside a working tree.
 	r.Env = append(gittest.Env(t), "GIT_CEILING_DIRECTORIES="+filepath.Dir(r.Dir))
 	for _, args := range [][]string{{"hygiene"}, {"fast"}} {
-		if code, out := runCI(t, r, nil, nil, args...); code != exitError {
-			t.Errorf("%v: exit = %d, want %d\n%s", args, code, exitError, out)
-		}
+		code, out := runCI(t, r, nil, nil, args...)
+		assert.Equal(t, exitError, code, "%v: exit status\n%s", args, out)
 	}
 }
 
@@ -116,19 +113,14 @@ func TestOutsideARepository(t *testing.T) {
 func TestHook(t *testing.T) {
 	path := filepath.Join("..", "..", ".githooks", "pre-push")
 	got, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != hookLine {
-		t.Errorf("the hook is %q, want %q", got, hookLine)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, hookLine, string(got), "the hook")
 	// The index is read with this process's environment: inside the
 	// hook, git names the repository through it.
 	out, err := exec.Command("git", "ls-files", "--stage", "--", path).Output()
 	if err != nil {
 		t.Skipf("the mode is not checked: this copy of the source is not a git working tree (%v)", err)
 	}
-	if mode, _, _ := strings.Cut(string(out), " "); mode != hookMode {
-		t.Errorf("git records the mode %q for the hook, want %s", mode, hookMode)
-	}
+	mode, _, _ := strings.Cut(string(out), " ")
+	assert.Equal(t, hookMode, mode, "the mode git records for the hook")
 }

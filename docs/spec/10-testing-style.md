@@ -9,12 +9,12 @@ test, coverage and review rules as `internal/*`.
 
 | Level | Location | Runs where | Covers |
 |---|---|---|---|
-| Unit | `internal/**`, `tools/**`, `e2e/probes/**`, `e2e/fakesbx/**` `_test.go` | CI, dev | validators generated from `rules.go` (table + fuzz seeds committed), digests, widening-set and toolchain diffs, the generated state-machine tables (every row, every illegal pair), egress split, `termsafe`, shell quoter, sbx output parsers over every recorded sbx version, error-id table, doctor checks with `HOME` in a temp dir, the probe harness core and its sbx exec layer (against a helper binary re-executed from the test), the recorder's redaction, the fake sbx's placeholder normalizer, CI tools themselves (the forbidden-name matcher and its pushed-range walk over a fixture repository, `workflows` against fixture workflow files, `docs` against fixture Markdown files with one violation per case of rule 9, the linter configuration against a fixture package with one violation per checker of rule 14 in [ADR 0001, adopt a documentation standard with checkable rules and a voice](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md), invariants/mutate, acceptance against a recorded GitHub API fixture, `dora` against a recorded GitHub API fixture and a fixture repository, `pr` against recorded event payloads), the runtime ledger's tables ([13 13.10](13-runtime-ledger.md#1310-tests): the hostile spool, each field, entries and their races, the drain, the doctor checks on fixtures) |
+| Unit | `internal/**`, `tools/**`, `e2e/probes/**`, `e2e/fakesbx/**` `_test.go` | CI, dev | validators generated from `rules.go` (table + fuzz seeds committed), digests, widening-set and toolchain diffs, the generated state-machine tables (every row, every illegal pair), egress split, `termsafe`, shell quoter, sbx output parsers over every recorded sbx version, error-id table, doctor checks with `HOME` in a temp dir, the probe harness core and its sbx exec layer (against a helper binary re-executed from the test), the recorder's redaction, the fake sbx's placeholder normalizer, CI tools themselves (the forbidden-name matcher and its pushed-range walk over a fixture repository, `workflows` against fixture workflow files, `docs` against fixture Markdown files with one violation per case of rule 9, the linter configuration against a fixture package with one violation per checker of rule 14 in [ADR 0001, adopt a documentation standard with checkable rules and a voice](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md) and one per testifylint checker that applies outside suites, invariants/mutate, acceptance against a recorded GitHub API fixture, `dora` against a recorded GitHub API fixture and a fixture repository, `pr` against recorded event payloads), the runtime ledger's tables ([13 13.10](13-runtime-ledger.md#1310-tests): the hostile spool, each field, entries and their races, the drain, the doctor checks on fixtures) |
 | Golden | `internal/render/testdata/`, `internal/layout/testdata/`, `internal/gate/testdata/`, `internal/ledger/testdata/` | CI, dev | `sbxenv.yaml`, workspace files, `render.json`, gate diff text, herdr `layout.apply` requests (`layout up --dry-run`), handoff front matter, the two ledger views of a two-project fixture |
 | Schema | `tools/ci schema` | CI | generated schemas equal the committed ones; examples and testdata validate |
 | E2E (git + fake sbx) | `e2e/*_test.go`, tag `e2e` | CI (linux amd64, linux arm64, macOS Intel, macOS arm64) | romeu commands against a temp `$ROMEU_ROOT`; origins served by `git http-backend` behind `httptest` TLS (host settings `gitHosts[].caFile` points at the test CA; gitsafe has no test override); the sandbox daemon served by `git daemon` on `127.0.0.1`; journeys J2, J3b, J7, J10, J11 (scenario functions shared with the host suite), of which a journey that reaches a julieta call runs at the hybrid level below, on the Linux runners, while the macOS runners run the romeu commands that reach none; promotion fault injection; invariants marked E in [05](05-security.md), including the I27 hostile trees on the macOS runners |
-| E2E (hybrid) | `e2e/hybrid_test.go`, tag `e2e` | CI on `ubuntu-latest` and `ubuntu-24.04-arm` | the romeu-julieta contract: the fake sbx forwards `env exec` into the julieta container with `.romeu/bin` bind-mounted read-only at the host path; the journeys that reach a julieta call (julieta has no darwin build, 12 12.1); protocol mismatch, `SHA256SUMS` mismatch and a writable bin mount each stop `run` before `layout up`; a 32 KiB manifest round-trips (I30); a writable ledger view mount stops `run` the same way (I33) |
-| E2E (container) | `e2e/container_test.go`, tag `e2e` | CI on `ubuntu-latest` (amd64) and `ubuntu-24.04-arm` (arm64), native, no QEMU | julieta in the workload's Debian base: `setup` (PATH link, dispatcher, secondary clone, ff of default branch) and its no-op timing, `install` skip rule, `lock --check`, hooks dispatcher, chaining and recorded failures, memory (stamping, allowlist, import, verify incl. status), handoff (all kinds; SessionEnd and SessionStart in both orders, so the rule of 08 8.3 is tested in the order Q22 has not confirmed too), snapshot, salvage completeness cases, `layout up --dry-run` golden and `layout up` against the pinned herdr |
+| E2E (hybrid) | `e2e/hybrid_test.go`, tag `e2e` | CI on `ubuntu-26.04` and `ubuntu-26.04-arm` | the romeu-julieta contract: the fake sbx forwards `env exec` into the julieta container with `.romeu/bin` bind-mounted read-only at the host path; the journeys that reach a julieta call (julieta has no darwin build, 12 12.1); protocol mismatch, `SHA256SUMS` mismatch and a writable bin mount each stop `run` before `layout up`; a 32 KiB manifest round-trips (I30); a writable ledger view mount stops `run` the same way (I33) |
+| E2E (container) | `e2e/container_test.go`, tag `e2e` | CI on `ubuntu-26.04` (amd64) and `ubuntu-26.04-arm` (arm64), native, no QEMU | julieta in the workload's Debian base: `setup` (PATH link, dispatcher, secondary clone, ff of default branch) and its no-op timing, `install` skip rule, `lock --check`, hooks dispatcher, chaining and recorded failures, memory (stamping, allowlist, import, verify incl. status), handoff (all kinds; SessionEnd and SessionStart in both orders, so the rule of 08 8.3 is tested in the order Q22 has not confirmed too), snapshot, salvage completeness cases, `layout up --dry-run` golden and `layout up` against the pinned herdr |
 | Host | `e2e/host/*_test.go`, tag `host` | maintainer machines (Intel and Apple silicon) | the same scenario functions against real sbx for J1-J13; S3, S5, S8 confirmation; results as `probe-result.v1` per block B step (11) |
 | Probes | `e2e/probes` | maintainer machines | [11](11-host-probes.md); `probe-result.v1` files in `docs/probes/` |
 
@@ -98,9 +98,10 @@ by dots (`matrix.os`, `github.ref_name`). An operator, a function call
 or a literal there fails. A
 value a command needs from the event reaches it through `env`. A
 workflow and a developer's shell therefore run the same code at the
-same commit. `tools/ci` starts `golangci-lint`, `govulncheck` and
-`reuse` through `mise exec`, so the versions locked in `mise.lock` are
-the ones used in both places.
+same commit. `tools/ci` starts `govulncheck` and `reuse` through
+`mise exec`, and runs the `golangci-lint` and the go command whose paths
+`mise which` resolves, so the versions locked in `mise.lock` are the
+ones used in both places.
 
 Three consequences of the grammar:
 
@@ -146,12 +147,12 @@ local-gate run is recorded is a
 
 | Step | Command | In `fast` |
 |---|---|---|
-| format, vet | `gofmt -l` empty; `go vet ./...` | yes |
+| format, vet | `gofmt -l` empty; `go vet ./...`, each the pinned tool, in the environment of the steps of `fast` (below) | yes |
 | generated | `tools/ci generated`: `go generate ./...` changes no consumer of the table in [12 12.3](12-engineering.md#123-generators). It compares the working tree, tracked and untracked files by content, before and after the run, so a changed, a new and a removed generated file each fail and a tree with uncommitted work can be checked. A generated file that exists and is not tracked passes locally and fails in CI, whose checkout holds no untracked file | yes |
-| lint | `golangci-lint run` over the whole module, `tools/` included; `.golangci.yml` enables the doc-comment, error-string and commented-out-code checkers of ADR 0001 (rule 14), and a fixture test proves it still does (10.1) | yes |
-| unit | `go test ./internal/... ./tools/...` | yes |
+| lint | `golangci-lint run` over the whole module, `tools/` included; `.golangci.yml` enables the doc-comment, error-string and commented-out-code checkers of ADR 0001 (rule 14) and testifylint with `enable-all: true` (10.6), disables no linter and excludes no finding. A fixture test proves that each rule 14 checker and each testifylint checker that applies outside suites still reports (10.1), and tests read `.golangci.yml`, `go.mod`, the mise configuration files and the repository's Go files, tracked, not yet added and ignored, and fail on: a key of `.golangci.yml` outside a short list (so a `default` or `enable-all` key under `linters`, an exclusion or a disabled linter fails, while testifylint's `enable-all: true` is required), a second `.golangci.*` file, a directive outside the allowlist, which is `go:build` alone (the `tool:name` form of `isDirective` in `go/ast`, read in every line of every comment after the leading `/`, `*` and `unicode.IsSpace` runes are trimmed, golangci-lint's `nolint` word at the start of such a line, and the `line`, `extern` and `export` directives right after `//` or `/*`), a generated-code header, a file that builds with cgo off for none of the lint targets (build constraints with the tool tags the pinned go command reports for each target, file-name suffixes and an import of `"C"`, as `go/build` and `go/parser` read them), a file under `testdata`, `vendor`, a `_` or `.` directory or a nested `go.mod`, which `go list` skips, a `go.mod` directive other than `module`, `go` and `require` (an `ignore` takes a directory out of `./...`), a mise configuration table other than `[settings]` and `[tools]`, a setting other than `lockfile` (an `[env]` table among them), a tool in `[tools]` other than `go` and `golangci-lint`, or a value other than the exact version `mise.lock` locks for it (a `path:` tool among them), and a `.tool-versions` file, which mise reads too. revive's `exported` reads only importable packages, so it skips package `main` and `_test.go` files (`File.IsImportable`, revive v1.17.0) and checks no doc comment in `tools/ci` today; no setting of the rule extends it to them. The linter sees only the files that build for the GOOS and GOARCH it runs under, so `tools/ci` starts it once for each lint target (linux and darwin, each on amd64 and arm64, one list that the tests read too), each as `<path> run --config .golangci.yml`, with the path of `golangci-lint` that `mise which` resolves and not through `mise exec`, which would add a mise `[env]` table, in the environment of the steps of `fast` (below) with the target's `GOOS` and `GOARCH` and `CGO_ENABLED=0` added; `mise which` installs nothing and fails when a tool is missing, so a new machine runs `mise trust` and `mise install` first | yes |
+| unit | `go test -count=1 ./internal/... ./tools/...`, the pinned go command, in the environment of the steps of `fast` (below); `-count=1` because tests that scan the repository would otherwise pass from the test cache | yes |
 | hygiene | `tools/ci hygiene`: no U+2014; the prose rules of ADR 0001 (rule 4); the `TODO(#<issue>)` form in Go files (rule 14); no personal absolute path (below); no tracked `go.work`, `go.work.sum` or `vendor/`; `.githooks/` holds exactly `pre-push`, tracked with mode 100755; the forbidden-name check over the path and content of each tracked file, which fails on a denylist that is missing or has no entry (below); scans `e2e/testdata/sbx/**` too | yes |
-| pushed range | `tools/ci fast` with the pre-push hook's arguments: the forbidden-name check over the remote ref names and the commits of a push (below) | in the hook only |
+| pushed range | `tools/ci fast` with the pre-push hook's arguments: it first refuses a push it would not test as sent, then runs the forbidden-name check over the remote ref names and the commits of a push (below) | in the hook only |
 | sequences | `tools/ci sequences`: ADR numbers contiguous and unique; ADR layout and statuses per ADR 0001 (rules 6-7), the filename compared through the `slug` function `tools/new adr` uses; every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; every ADR that `docs/spec.md` or `docs/spec/` cites has status Accepted; every row of the index's Deferred decisions table has its three cells filled ([ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md)); the ids below unique, and every referenced id and id range (for example "J1-J13" in a success criterion) defined | yes |
 | vocabulary | `tools/ci vocabulary` (01 1.7) | yes |
 | workflows | `tools/ci workflows`: the grammar above | yes |
@@ -173,6 +174,26 @@ local-gate run is recorded is a
 | docs | `tools/ci docs` (S10; the checks ADR 0001 assigns to it: rules 1, 5 without external URLs, 9 for the title at a first mention, 12, 13, 17, 20). The Markdown lint and the spell check of rule 5 check nothing until their tools are picked, a [deferred decision](../spec.md#deferred-decisions). The reference pages are compared with their source by `generated`, not here | |
 | lessons | `tools/ci lessons`: every `docs/lessons.md` entry, read after the file's front matter, names an existing `tools/ci` subcommand or test name, or says "no check possible: <reason>" | |
 | pr | `tools/ci pr` (pull requests only; inputs as described above; 12 12.4; ADR 0001 rules 4, 8, 11; the base branch, 12 12.9; the fix marker's form, 12 12.10; the forbidden-name check, below) | |
+
+The command steps of `fast` (format, vet, lint, unit) run the pinned
+tools by their paths: `gofmt` and the go command from the directory of
+the go command that `mise which` resolves, and the `golangci-lint` it
+resolves. `tools/ci` refuses a path that, once its symbolic links are
+resolved, is not below the directory where mise installs that tool, so
+a mise configuration that names a tool by a path fails the run. Each
+step runs in an environment built from nothing, not from the caller's:
+the variables that say where things are (`PATH`, with that go
+directory first, `HOME`, `TMPDIR`, the XDG and mise directories,
+`GOPATH`, `GOCACHE` and `GOMODCACHE`), then `GOENV=off`,
+`GOTOOLCHAIN=local`, `GOWORK=off`, `GOPROXY=off` and
+`GOFLAGS=-mod=readonly`. So no `GOFLAGS` of the caller (a `-run` that
+selects no test, or build tags), `go env -w` file or other variable of
+the caller changes what a step checks. Some unit
+tests need what the steps need: mise on the search path with the
+pinned tools installed and this repository trusted, a module cache
+that already holds the modules of `go.sum` (the steps never reach the
+network; `go mod download` fills it), and the `.git` directory of a
+clone, because they list the repository's files with `git ls-files`.
 
 A personal absolute path, for `hygiene`, is `/Users/<name>/` or
 `/home/<name>/` where `<name>` is one path segment other than `agent`
@@ -196,9 +217,14 @@ referenced only as a link anchor, which the link check of `tools/ci
 docs` resolves. Uniqueness and existence are checked; only ADR numbers
 must be contiguous.
 
-Runners: `ubuntu-latest`, `ubuntu-24.04-arm`, an Intel macOS runner (the
-label is verified to exist and to report `x86_64` in the `ci-bootstrap`
-task) and `macos-latest` (arm64).
+Runners: `ubuntu-26.04` (x64), `ubuntu-26.04-arm` (arm64), `macos-26`
+(arm64) and `macos-26-intel` (x64). The arm64 and Intel labels are
+verified to exist, and every label to report, by `uname -m`, as `aarch64`
+(`ubuntu-26.04-arm`), `arm64` (`macos-26`) and `x86_64` (`ubuntu-26.04`
+and `macos-26-intel`), on the first run of `ci.yml` (T002). Labels are
+pinned, never `*-latest`: `tools/ci workflows` fails a `runs-on` with a
+`*-latest` label. They are bumped deliberately; the images are listed at
+<https://github.com/actions/runner-images>.
 
 Four subcommands are outside `all`:
 
@@ -271,8 +297,9 @@ each, and walks the commits reachable from the local sha and not from
 the remote sha. For a ref the remote does not have yet, or a remote
 sha that the local repository does not hold, it walks the commits not
 reachable from any remote-tracking ref of that remote. A push to a URL
-that is no configured remote has no such ref, and then it walks every
-commit reachable from the local sha. A merge commit
+that is no configured remote has no such ref, and `fast` stops it
+before the walk: the default branch whose denylist judges the push
+(below) is not known. A merge commit
 is compared with its first parent. A line that deletes a ref adds no
 commits and is skipped, name included, so a ref with a forbidden name
 can be deleted. A git command that fails stops the push, and so does a
@@ -283,18 +310,61 @@ honoured by the reader and by `git push` alike, so the two agree.
 Called without
 arguments, `fast` runs the `In fast` steps and no range. `pr` uses the
 same walk over base..head.
+
+The steps run on the working tree, and the review sees only commits,
+so with the hook's arguments `fast` judges the commit the push sends,
+and refuses to run any check, with exit status 2, when:
+
+- a pushed tip that does not delete a ref, followed through an
+  annotated tag to its commit, is not HEAD: the operator checks out
+  the ref and pushes again;
+- a tracked file differs from HEAD: staged, added with `git add -N`, or
+  modified in the working tree;
+- an untracked or ignored file is one the go command or the checks
+  read: a Go file, `go.work`, `go.work.sum`, a root `vendor`
+  directory, a mise configuration, a `.tool-versions` file, or a nested
+  repository.
+
+The fix is to commit such a change or remove it. The steps take
+minutes, and the working tree can change while they run, so after the
+last step `fast` judges it again, the `go.mod` rule below included, and
+stops the push with exit status 2 when HEAD has moved or one of these
+refusals now holds. Hygiene and the range then read the commit judged,
+by its id, and not HEAD again. The git commands of
+this check run without `GIT_DIR`, `GIT_INDEX_FILE`, `GIT_WORK_TREE`,
+`GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, the other
+variables of `git rev-parse --local-env-vars` and every `GIT_CONFIG`
+variable, so they read the repository's own index, and with
+`GIT_OPTIONAL_LOCKS=0`, so `git status` writes nothing. Called without
+arguments, `fast` refuses none of this and checks the working tree as it
+is. In both modes it refuses a `go.mod` below the module root, tracked
+or not.
 Reading what each commit adds, and not only the final tree, is what
 catches a line or a path that one commit adds and a later commit
 removes.
 
-A push is judged by the denylist at HEAD together with the denylist
-at each pushed tip, so a branch pushed from another checkout is held
-to the entries it adds. A tip without the file adds nothing, and a tip
-whose file cannot be read stops the push. A finding says whether the
-name is listed at HEAD or at a pushed tip. Entries that exist only at
-a commit inside the range, and not at its tip, are not applied. The
-hook knows only the denylist this clone holds: an entry pushed from
-another clone applies once it is fetched and merged here.
+A push is judged by the union of two denylists: the one at HEAD, the
+commit judged, and the one at the remote's default branch as this
+clone knows it, the commit of `refs/remotes/<remote>/HEAD`, which
+`git fetch` creates and `git remote set-head <remote> --auto` sets.
+An entry that the pushed commit removes therefore stays in force until
+its removal reaches the default branch through review. A push to no
+configured remote, a missing `refs/remotes/<remote>/HEAD` and a
+denylist there that cannot be read stop the push with exit status 2,
+and the message says to run `git fetch <remote>`, or, for a remote with
+no commit yet, that no fetch can succeed. In a brand-new repository,
+with no default branch yet, every hooked push therefore fails closed
+until the default branch exists on the remote and is fetched here, and
+the operator makes the first push of a new repository with
+`--no-verify`. A default branch
+that holds no denylist adds nothing, since the denylist itself arrives
+there by a pull request. A finding says which of the two lists holds
+the name. Entries that exist only at a commit inside the range, and
+neither at HEAD nor at the default branch, are not applied. The local
+refs and the git binary are trusted, as the toolchain is
+([ADR 0007, Threat model](../adr/0007-adopt-testify-assert-and-require-in-tests.md#threat-model)).
+The hook knows only the denylist this clone holds: an entry pushed
+from another clone applies once it is fetched here.
 
 The limits, stated plainly:
 
@@ -438,8 +508,10 @@ any sandbox and any agent session.
   sandbox's token, try four things with throwaway payloads and save
   the four refusals: a push of an empty commit to the default branch;
   a push of the tag `v0.0.0-try`; the merge of a throwaway pull
-  request, not step 1's; and a change to a ruleset. A refusal is
-  proved on the host, not by the sandbox's output: after the four
+  request, not step 1's; and a change to a ruleset. Each push is tried
+  from a clean working tree with HEAD at the commit it pushes, so that
+  `fast` passes and the refusal comes from GitHub, not from the hook.
+  A refusal is proved on the host, not by the sandbox's output: after the four
   tries the maintainer checks from their own session that the default
   branch head has not moved, that no `v0.0.0-try` tag exists, that the
   throwaway pull request is not merged, and that each ruleset's JSON
@@ -574,6 +646,42 @@ func (g *Git) Fetch(ctx context.Context, repo, url string, dst RefPrefix) error 
 	return err
 }
 ```
+
+### Tests
+
+Tests use the `assert` and `require` packages of
+`github.com/stretchr/testify`, as package functions, and no other
+package of it (no `suite`, `mock` or `http`, no `assert.New`).
+testifylint enforces most of what follows with `enable-all: true`. A
+unit test, `TestTestStyle`, reads every `_test.go` file and every file
+of a package whose name ends in `test` (as `gittest`), and fails on an
+import of `suite`, `mock` or `http` and on a reference to `assert.New`,
+`require.New` or `reflect.DeepEqual`.
+
+- `require` for a precondition and for every error assertion (`Error`,
+  `NoError`, `ErrorIs`, `ErrorAs`, `ErrorContains`): a setup step, a
+  value a later line depends on, a length before an index.
+- `assert` for an independent check, such as an exit code, an output
+  line or a final comparison, so that one run lists every problem.
+  Inside a goroutine other than the test's a test uses `assert`,
+  because `require` stops the test with `FailNow`, which only the
+  goroutine that runs the test may call.
+- The expected value comes first: `assert.Equal(t, want, got)`.
+- The precise assertion: `Contains` and `NotContains` for text, `Len`
+  and `Empty` for size, `True` and `False` for a boolean, `Equal` for a
+  comparison. A test has no `reflect.DeepEqual` and no hand-written
+  `if got != want`.
+- A message only when it adds information: a label for a fixture, or
+  the output that explains the failure. A test that logs its output
+  on failure keeps doing so.
+- A table test gives each case a `t.Run` that does not depend on
+  another: `go test -run 'TestName/case'` runs it alone and it passes.
+- A lint finding is fixed in the code: no directive outside the
+  allowlist of rule 8 of
+  [ADR 0007, adopt testify assert and require in tests](../adr/0007-adopt-testify-assert-and-require-in-tests.md)
+  (`go:build` alone), so no `nolint`, `revive:disable`, `lint:ignore`
+  or line directive, and no exclusion and no lowered setting in
+  `.golangci.yml`.
 
 ## 10.7 Module boundaries (enforced by `tools/ci imports`)
 

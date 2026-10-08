@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 )
 
@@ -64,6 +66,12 @@ func (r *Repo) WithEnv(vars ...string) *Repo {
 	return &Repo{Dir: r.Dir, Env: env, t: r.t}
 }
 
+// For returns the same repository bound to t, so that a subtest's
+// failure stops the subtest and not the test that made the repository.
+func (r *Repo) For(t testing.TB) *Repo {
+	return &Repo{Dir: r.Dir, Env: r.Env, t: t}
+}
+
 // Git runs one git command, fails the test when it fails, and returns
 // its output without the final newline.
 func (r *Repo) Git(args ...string) string {
@@ -71,9 +79,7 @@ func (r *Repo) Git(args ...string) string {
 	// Not t.Context(): that context ends before the test's cleanups
 	// run, and a cleanup may still call git.
 	out, err := r.Run(context.Background(), nil, args...)
-	if err != nil {
-		r.t.Fatalf("fixture: %v", err)
-	}
+	require.NoError(r.t, err, "fixture")
 	return strings.TrimSuffix(string(out), "\n")
 }
 
@@ -86,9 +92,7 @@ func (r *Repo) WriteObject(kind, raw string) string {
 	// Not t.Context(): that context ends before the test's cleanups
 	// run, and a cleanup may still call git.
 	out, err := r.Run(context.Background(), []byte(raw), "hash-object", "-t", kind, "-w", "--stdin")
-	if err != nil {
-		r.t.Fatalf("fixture: %v", err)
-	}
+	require.NoError(r.t, err, "fixture")
 	return strings.TrimSpace(string(out))
 }
 
@@ -96,12 +100,8 @@ func (r *Repo) WriteObject(kind, raw string) string {
 func (r *Repo) Write(path, content string) {
 	r.t.Helper()
 	full := filepath.Join(r.Dir, filepath.FromSlash(path))
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-		r.t.Fatal(err)
-	}
-	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-		r.t.Fatal(err)
-	}
+	require.NoError(r.t, os.MkdirAll(filepath.Dir(full), 0o755))
+	require.NoError(r.t, os.WriteFile(full, []byte(content), 0o644))
 }
 
 // Commit stages every change, commits it, and returns the commit id. A

@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The linter configuration of ADR 0001 (rule 14) and ADR 0007 (testify).
+# No linter is disabled and no finding is excluded: a finding is fixed
+# in the code. tools/ci/lintconfig_test.go proves that each checker
+# below still reports.
+version: "2"
+
+linters:
+  # The default set (errcheck, govet, ineffassign, staticcheck, unused)
+  # stays on; these are added to it.
+  enable:
+    - revive
+    - gocritic
+    - testifylint
+  settings:
+    revive:
+      # Only the two rules of ADR 0001, rule 14, that revive owns:
+      # a doc comment on every exported identifier, and Go style for
+      # error strings.
+      enable-all-rules: false
+      rules:
+        - name: exported
+        - name: error-strings
+    gocritic:
+      # Commented-out code, the third checker of ADR 0001, rule 14.
+      disable-all: true
+      enabled-checks:
+        - commentedOutCode
+    testifylint:
+      enable-all: true

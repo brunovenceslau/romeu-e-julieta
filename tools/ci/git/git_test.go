@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 )
@@ -32,17 +35,13 @@ func TestRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			out, err := r.Run(t.Context(), []byte(tt.stdin), tt.args...)
 			if tt.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), tt.wantErr) || !strings.Contains(err.Error(), "fatal") {
-					t.Fatalf("error = %v, want one that holds %q and git's message", err, tt.wantErr)
-				}
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				assert.Contains(t, err.Error(), "fatal", "git's own message")
 				return
 			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !strings.HasPrefix(string(out), tt.want) {
-				t.Errorf("output = %q, want prefix %q", out, tt.want)
-			}
+			require.NoError(t, err)
+			assert.True(t, strings.HasPrefix(string(out), tt.want), "output %q, want prefix %q", out, tt.want)
 		})
 	}
 }
@@ -61,12 +60,8 @@ func TestRunIgnoresReplaceRefs(t *testing.T) {
 	standIn := r.Commit("stand-in")
 	r.Git("replace", real, standIn)
 	out, err := r.Run(t.Context(), nil, "cat-file", "-p", real+":a.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(out) != "the real line\n" {
-		t.Errorf("read %q through a replace ref, want the real object", out)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "the real line\n", string(out), "read through a replace ref, want the real object")
 }
 
 // TestRunPrintableError shows that what git says on failure is kept,
@@ -78,12 +73,9 @@ func TestRunPrintableError(t *testing.T) {
 	r.Write("a.txt", "a\n")
 	r.Commit("a")
 	_, err := r.Run(t.Context(), nil, "cat-file", "-p", "HEAD:x\x1b[2Jy")
-	if err == nil {
-		t.Fatal("Run succeeded, want an error")
-	}
-	if strings.Contains(err.Error(), "\x1b") || !strings.Contains(err.Error(), "fatal") {
-		t.Errorf("error = %q, want git's message without the escape", err)
-	}
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "\x1b", "the escape of the path")
+	assert.Contains(t, err.Error(), "fatal", "git's message")
 }
 
 func TestPrintable(t *testing.T) {
@@ -100,9 +92,7 @@ func TestPrintable(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := git.Printable(tt.in); got != tt.want {
-				t.Errorf("Printable(%q) = %s, want %s", tt.in, got, tt.want)
-			}
+			assert.Equal(t, tt.want, git.Printable(tt.in))
 		})
 	}
 }
@@ -111,7 +101,6 @@ func TestRunStopsWithItsContext(t *testing.T) {
 	r := gittest.New(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, err := r.Run(ctx, nil, "rev-parse", "--git-dir"); err == nil {
-		t.Error("Run succeeded under a cancelled context")
-	}
+	_, err := r.Run(ctx, nil, "rev-parse", "--git-dir")
+	require.Error(t, err, "Run under a cancelled context")
 }
