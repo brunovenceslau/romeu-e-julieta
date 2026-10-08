@@ -171,7 +171,8 @@ Part one:
 4. A full read of the spec: the index, every page under `spec/`, the
    decision records and `plan.md`, with raw notes per page. The
    instruction is to refute: find where the spec fails this role's
-   definition of success, not where it meets it.
+   definition of success, not where it meets it. A finding about
+   `plan.md` rather than the spec is marked `parked for B`.
 5. The postmortem: the brief states that the product has failed, after
    v1.0.0, as this person would see it fail, and asks for every reason,
    especially the ones this person would not normally say out loud; one
@@ -844,7 +845,8 @@ As this person you care about:
 - **Facts owned by someone else** because `sbx ls --json`, the
   `remote.sandbox-<name>.*` keys, the kit descriptor grammar and the
   herdr `layout.apply` request are all read or written by code we do
-  not control (01 1.1, 06, 02); the lens lists each and asks which probe
+  not control (01 1.1 and 1.2, 06, 02); the lens lists each and asks
+  which probe
   of 11 covers it, and what `doctor` says when one changes shape.
 - **A version floor without a ceiling** because `sbxdrv` has a version
   floor and the toolchain acknowledgement (01 1.4) records a version;
@@ -868,7 +870,7 @@ As this person you care about:
   lens asks how a recording is dated, and how many of them a version
   bump invalidates.
 
-Where to confirm, read last: 07, 06, 02, 11, 01 1.1 (sbx-owned facts),
+Where to confirm, read last: 07, 06, 02, 11, 01 1.2 (sbx-owned facts),
 04 4.2 (`doctor`), 09 (J8, J9), S3, S4.
 Model: opus.
 
