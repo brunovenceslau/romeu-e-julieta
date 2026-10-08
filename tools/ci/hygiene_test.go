@@ -319,7 +319,7 @@ func TestPrologueInThePushedRange(t *testing.T) {
 	stdin := "refs/heads/main " + tip + " refs/heads/main " + zero + "\n"
 	push, err := pushed.Parse(strings.NewReader(stdin))
 	require.NoError(t, err)
-	got, checked, err := pushedRange(t.Context(), r.Repo, "origin", push, tip)
+	got, checked, err := rangeOf(pushedRange(t.Context(), r.Repo, "origin", push, tip))
 	require.NoError(t, err)
 	assert.False(t, checked, "no denylist entry: names are not checked")
 	assert.Equal(t, "commit "+added+": added path sub/prologue.md: prologue: the user's agreement file lives outside product repositories\n", lines(got))
@@ -573,11 +573,11 @@ func TestJudgedCommitIsPinned(t *testing.T) {
 		r.Commit("Y")
 		push, err := pushed.Parse(strings.NewReader("refs/heads/main " + x + " refs/heads/main " + zero + "\n"))
 		require.NoError(t, err)
-		got, checked, err := pushedRange(t.Context(), r.Repo, "origin", push, x)
+		got, checked, err := rangeOf(pushedRange(t.Context(), r.Repo, "origin", push, x))
 		require.NoError(t, err)
 		assert.True(t, checked, "X holds an entry")
 		assert.Contains(t, lines(got), "the added line holds a name listed at HEAD")
-		_, checked, err = pushedRange(t.Context(), r.Repo, "origin", push, "HEAD")
+		_, checked, err = rangeOf(pushedRange(t.Context(), r.Repo, "origin", push, "HEAD"))
 		require.NoError(t, err)
 		assert.False(t, checked, "Y has none, and neither has the default branch")
 	})
@@ -603,4 +603,21 @@ func TestPrintableASCII(t *testing.T) {
 		assert.Equal(t, tt.want, printableASCII(tt.path), "%q", tt.path)
 	}
 	assert.False(t, isMiseFile("mise.local.toml."), "nor does isMiseFile match it")
+}
+
+// rangeOf reads the verdicts of pushedRange back as its findings, and
+// whether names were matched: no verdict carries the "not checked"
+// note. A verdict that could not judge is returned as its error.
+func rangeOf(verdicts []verdict, err error) (findings []finding, checked bool, _ error) {
+	checked = true
+	for _, v := range verdicts {
+		switch {
+		case v.err != nil:
+			return nil, false, v.err
+		case v.note != "":
+			checked = false
+		}
+		findings = append(findings, v.findings...)
+	}
+	return findings, checked, err
 }

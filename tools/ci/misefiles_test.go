@@ -42,7 +42,8 @@ func TestMiseEnvList(t *testing.T) {
 // directories are new and empty, the system and global configuration
 // files do not exist, and it stays off the network. So no
 // configuration of the person who runs the tests (a global
-// "paranoid = true", say) changes what a test measures.
+// "paranoid = true", say) changes what a test measures. A test that
+// needs the pinned tools below HOME uses isolateMiseConfig instead.
 func isolatedMiseEnv(t *testing.T) []string {
 	t.Helper()
 	none := filepath.Join(t.TempDir(), "none.toml")
@@ -294,6 +295,10 @@ func TestCheckMiseVersion(t *testing.T) {
 
 	write("2026.10.4")
 	require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is at version 2026.10.4, and .github/workflows/ci.yml pins 2026.10.3")
+	for _, other := range []string{"2026.10.30", "2026.10", "2024.11.37"} {
+		write(other)
+		require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is at version "+other+",", "a version that only shares a prefix with the pin")
+	}
 	write("2024.11.37")
 	require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is at version 2024.11.37")
 

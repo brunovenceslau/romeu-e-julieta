@@ -96,10 +96,11 @@ import (
 //  6. fast and all read the commit that hygiene, workflows and the
 //     pushed range judge before they start mise or any step
 //     (commitChecks); the generated step, and in all the steps that
-//     judge the tree, run before any step that runs code of the change
+//     judge the tree, run before any step that runs the change's tests
 //     (TestGeneratedRunsBeforeTheTests, TestAllSteps); and all, like a
 //     pre-push run, fails when the steps leave the tree changed
-//     (changedSince).
+//     (changedSince). This order closes one channel, a test that
+//     rewrites a file a later judging step reads, and no other.
 //
 // Not covered: mise still reads a .miserc.toml of the tree. Of its
 // seven keys (the "rc" settings of settings.toml, mise 2026.10.3),
@@ -126,9 +127,34 @@ import (
 // .go-version and go.mod as well (measured with mise 2026.10.3 and
 // miseEnv: "mise config ls" lists both); mise.toml still decides the
 // version (the same "mise ls --current go"), neither file holds a
-// template, and whichPinned holds the install to mise.lock. mise itself,
-// its configuration below HOME, and the files of the directories above
-// the tree are trusted, as the toolchain is (ADR 0007).
+// template, and whichPinned holds the install to mise.lock.
+//
+// Not covered either: an attack of the change's tests on the tools/ci
+// process itself. A test runs in the same process tree and account as
+// tools/ci (a test of unit attached to the "ci all" process with
+// PtraceAttach and got no error: observed by the ship gate), and a
+// hosted runner gives that account sudo, so a test could forge a
+// verdict or the exit status that tools/ci computes. The order of the
+// steps does not reach that; the review of the diff covers it, and
+// running the tests in a job of their own is a deferred decision
+// (docs/spec.md, Deferred decisions). Refusing ptrace to the process
+// (PR_SET_DUMPABLE, PT_DENY_ATTACH) is not taken: it does not stop
+// root, which a hosted runner has. And the gate holds against a
+// hostile change only where the change's tests do not run on the same
+// machine and account as a later run of the gate: a test run on a
+// developer's machine can plant an ignored Go file in tools/ci, hidden
+// by .git/info/exclude, or poison GOCACHE, and so change later
+// pre-push runs there.
+//
+// Trusted, as the toolchain is (ADR 0007): mise itself, its
+// configuration below HOME, the system configuration of mise
+// (/etc/mise, or the file MISE_SYSTEM_CONFIG_FILE names, which mise
+// reads under miseEnv too, and whose exec() templates run: observed by
+// the ship gate), and the files of the directories above the tree. No
+// mise run of tools/ci comes after a step that runs the change's
+// tests, so no test can plant a system configuration that a later
+// mise run of the same gate reads; a decision to reopen if such a run
+// is ever added.
 
 // miseEnv is the environment of every mise run, as "KEY=value": the
 // configuration file mise reads is mise.toml alone, it reads no

@@ -71,6 +71,16 @@ type step struct {
 // otherwise be served from the test cache, which cannot see a file
 // added since the cached run.
 func fastSteps(root string, tools lintTools) []step {
+	before, unit := fastPhases(root, tools)
+	return append(before, unit)
+}
+
+// fastPhases returns the steps of fastSteps in two parts: the ones
+// that run none of the change's tests (generated runs the tools/ci of
+// the change, which the ask-first review of tools/ci covers), and
+// unit, the first that runs them. all puts its own steps that judge
+// the tree between the two (allSteps).
+func fastPhases(root string, tools lintTools) ([]step, step) {
 	goCmd := filepath.Join(tools.goDir, "go")
 	unit := []string{goCmd, "test", "-count=1"}
 	for _, dir := range []string{"internal", "tools"} {
@@ -90,7 +100,7 @@ func fastSteps(root string, tools lintTools) []step {
 			environ: lintEnv(target, tools.goDir),
 		})
 	}
-	return append(steps, step{name: "unit", argv: unit, environ: stepEnv(tools.goDir)})
+	return steps, step{name: "unit", argv: unit, environ: stepEnv(tools.goDir)}
 }
 
 // lintTools are the pinned tools of fast, as mise resolves them: the
@@ -402,8 +412,10 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 // Hygiene, workflows and the pushed range judge one commit, which
 // runFast resolves to its id, reads and judges before mise or any step
 // starts (commitChecks), and reports after the steps: nothing a step
-// does to the working tree, the index, HEAD or the object store while
-// it runs changes what they judged.
+// writes to the working tree, the index, HEAD or the object store
+// while it runs changes what they judged. A step that attacks the
+// tools/ci process itself is out of reach of that order (the threat
+// model of misefiles.go, Not covered).
 //
 // Run by hand, with no argument, fast judges the commit HEAD names,
 // and its steps run on the working tree as it is, staged, modified and
@@ -472,21 +484,11 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 		return false, err
 	}
 	if hook {
-		findings, checked, err := pushedRange(ctx, repo, args[0], push, head)
-		var unjudged *cannotJudge
-		switch {
-		case errors.As(err, &unjudged):
-			verdicts = append(verdicts, verdict{name: "pushed range", err: err})
-		case err != nil:
+		ranged, err := pushedRange(ctx, repo, args[0], push, head)
+		if err != nil {
 			return false, err
-		default:
-			if checked || len(findings) > 0 {
-				verdicts = append(verdicts, verdict{name: "pushed range", findings: findings})
-			}
-			if !checked {
-				verdicts = append(verdicts, verdict{name: "pushed range", note: "not checked against names, no denylist entry at HEAD or at the remote's default branch"})
-			}
 		}
+		verdicts = append(verdicts, ranged...)
 	}
 	// In a pre-push run the steps must leave the tree as judgeCommit
 	// judged it (changedSince, after them).
@@ -579,16 +581,6 @@ func commitChecks(ctx context.Context, repo git.Repo, commit string) ([]verdict,
 		{name: "workflows", findings: workflowsOf(files)},
 	}, nil
 }
-
-// cannotJudge is the error of a check that read the commit and cannot
-// judge what it read, such as a denylist that does not parse: fast and
-// all report it as a verdict that fails (checks.verdict), with exit
-// status 1, and not as an error that stops the run, so the other
-// checks still report.
-type cannotJudge struct{ err error }
-
-func (e *cannotJudge) Error() string { return e.err.Error() }
-func (e *cannotJudge) Unwrap() error { return e.err }
 
 // verdict reports one verdict of commitChecks: one that could not
 // judge fails with its reason, and one with a note prints it with
@@ -878,20 +870,24 @@ func lines(findings []finding) string {
 // (defaultBranchDenylist): an entry that the pushed commit removes
 // stays in force until its removal reaches the default branch through
 // review. A finding says which of the two lists holds the name.
-// Without an entry in either there is nothing to match names with, and
-// checked is false: it means "names were matched", and the prologue
-// rule ran all the same.
-func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.Push, head string) (findings []finding, checked bool, err error) {
-	// A list that is missing or empty at head is hygiene's finding, and
-	// one that cannot be read leaves the range unjudged (cannotJudge).
+// It returns the verdicts of the "pushed range" check: its findings,
+// and a note when neither list has an entry, as there is nothing to
+// match names with then (the prologue rule ran all the same). A
+// denylist at head that cannot be read is a verdict with its error,
+// as commitChecks reports a check that cannot judge what it read; a
+// missing or empty one is hygiene's finding. Any other failure, such
+// as a remote that is not configured, is an error.
+func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.Push, head string) ([]verdict, error) {
+	const name = "pushed range"
 	atHead, _, err := loadDenylist(ctx, repo, head)
 	if err != nil {
-		return nil, false, &cannotJudge{err}
+		return []verdict{{name: name, err: err}}, nil
 	}
 	atDefault, err := defaultBranchDenylist(ctx, repo, remote)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
+	var findings []finding
 	list := &names.List{}
 	list.Merge(atHead)
 	list.Merge(atDefault)
@@ -931,7 +927,18 @@ func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.
 			findings = append(findings, finding{of + path + ":" + strconv.Itoa(r.Line), "name", "the added line holds " + listed})
 		}
 	})
-	return findings, list.Len() > 0, err
+	if err != nil {
+		return nil, err
+	}
+	checked := list.Len() > 0
+	var verdicts []verdict
+	if checked || len(findings) > 0 {
+		verdicts = append(verdicts, verdict{name: name, findings: findings})
+	}
+	if !checked {
+		verdicts = append(verdicts, verdict{name: name, note: "not checked against names, no denylist entry at HEAD or at the remote's default branch"})
+	}
+	return verdicts, nil
 }
 
 // readingAt says where a reading is: its commit or its tag, and the

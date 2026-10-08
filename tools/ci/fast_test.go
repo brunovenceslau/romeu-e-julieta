@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -334,9 +335,10 @@ func TestFastJudgesTheCommit(t *testing.T) {
 // while the steps of a pre-push run take their minutes: a step stub
 // changes it, and fast refuses the push after the last step, before
 // hygiene and the range, since the steps may have tested something
-// other than the commit judged. The last case pushes nothing, so no
-// tip ties HEAD down and only the comparison of the two commits sees
-// that HEAD moved.
+// other than the commit judged. The case "HEAD moves with nothing
+// pushed" pushes nothing, so no tip ties HEAD down and only the
+// comparison of the state before and after the steps (changedSince)
+// sees that HEAD moved; the last two cases are seen by it alone too.
 func TestFastJudgesAgainAfterTheSteps(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
 	sh, err := exec.LookPath("sh")
@@ -352,6 +354,11 @@ func TestFastJudgesAgainAfterTheSteps(t *testing.T) {
 		{"a go.mod appears below the module root", "mkdir inner && printf 'module example.invalid/inner\\n' > inner/go.mod", true, "\ninner/go.mod"},
 		{"HEAD moves to a commit that is not the pushed tip", "git commit --quiet --allow-empty --message late", true, "fast tests the commit checked out"},
 		{"HEAD moves with nothing pushed", "git commit --quiet --allow-empty --message late", false, "HEAD is now "},
+		// judgeCommit refuses neither of the two below (an untracked
+		// file that is no gate input, a change git status hides);
+		// changedSince does.
+		{"an untracked file that is no gate input appears", "echo late > notes.txt", true, "\nnotes.txt"},
+		{"a tracked file changes behind skip-worktree", "git update-index --skip-worktree README.md && echo changed >> README.md", true, "\nREADME.md"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -980,14 +987,49 @@ func pinnedLintTools(t *testing.T) lintTools {
 // passThroughEnv a state directory and configuration directories of
 // the test's own, new and empty, so no global configuration of the
 // person who runs the tests (a "paranoid = true", say) changes what
-// the test measures. HOME stays: the pinned tools are installed below
-// it (miseInstalls). The system configuration file is not among the
-// variables of passThroughEnv, and stays what the machine holds.
+// the test measures (TestIsolateMiseConfig). HOME stays: the pinned
+// tools are installed below it, and MISE_DATA_DIR and XDG_DATA_HOME
+// are cleared, as miseInstalls refuses either. The system
+// configuration file is not among the variables of passThroughEnv, and
+// stays what the machine holds. A test that builds the whole
+// environment of mise itself uses isolatedMiseEnv instead.
 func isolateMiseConfig(t *testing.T) {
 	t.Helper()
 	for _, key := range []string{"MISE_STATE_DIR", "XDG_CONFIG_HOME", "MISE_CONFIG_DIR"} {
 		t.Setenv(key, t.TempDir())
 	}
+	t.Setenv("MISE_DATA_DIR", "")
+	t.Setenv("XDG_DATA_HOME", "")
+}
+
+// TestIsolateMiseConfig poisons the configuration directories of the
+// process with a global mise configuration whose [env] template writes
+// a marker: "mise env" in passThroughEnv runs it, and runs nothing
+// once isolateMiseConfig has run.
+func TestIsolateMiseConfig(t *testing.T) {
+	markers, poisoned := t.TempDir(), t.TempDir()
+	config := filepath.Join(poisoned, "mise", "config.toml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(config), 0o755))
+	template := `{{ exec(command="touch ` + filepath.ToSlash(filepath.Join(markers, "global")) + `") }}`
+	require.NoError(t, os.WriteFile(config, []byte("[env]\nX_GLOBAL = "+strconv.Quote(template)+"\n"), 0o600))
+	t.Setenv("MISE_STATE_DIR", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", poisoned)
+	t.Setenv("MISE_CONFIG_DIR", filepath.Join(poisoned, "mise"))
+	ran := func() bool {
+		t.Helper()
+		_ = os.Remove(filepath.Join(markers, "global"))
+		dir := t.TempDir()
+		cmd := exec.CommandContext(t.Context(), "mise", "-C", dir, "env")
+		cmd.Dir = dir
+		cmd.Env = append(miseEnviron(passThroughEnv()), "MISE_OFFLINE=1")
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "mise env\n%s", out)
+		_, err = os.Stat(filepath.Join(markers, "global"))
+		return err == nil
+	}
+	require.True(t, ran(), "the poisoned configuration runs its template")
+	isolateMiseConfig(t)
+	assert.False(t, ran(), "isolateMiseConfig keeps it out")
 }
 
 // TestResolveLintTools checks that the tools of fast are the ones

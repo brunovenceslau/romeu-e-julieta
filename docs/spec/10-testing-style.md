@@ -217,13 +217,19 @@ other mise command, a mise whose `mise --version` names another.
 
 The command steps of `all` are those of `fast` and `race`, in that
 order, with `vulnerabilities` and `license`, which read the tree and
-run none of its code, between `lint` and `unit`: no step that judges the tree runs after
-the first step that runs code of the change, so a test cannot rewrite
-what such a step reads (a test that prepended an SPDX header to a file
-without one, while `unit` ran, passed `license` when it ran after:
-measured at cab976e). `race` and `coverage` measure code of the change,
-which can game its own result (a test can write the cover profile
-itself); the review covers that. Before mise and the steps run, `all`
+run none of its code, between `lint` and `unit`: no step that judges
+the tree runs after the first step that runs the change's tests, so a
+test cannot rewrite a file such a step reads (a test that prepended an
+SPDX header to a file without one, while `unit` ran, passed `license`
+when it ran after: measured at cab976e). That is all the order
+guarantees. The tests run in the same process tree and account as
+`tools/ci`, so an attack on the `tools/ci` process itself (ptrace, root
+on a hosted runner, the same account) is out of its reach: the review
+of the diff covers it, and a job of their own for the tests is a
+[deferred decision](../spec.md#deferred-decisions). `race` and
+`coverage` measure code of the change, which can game its own result
+(a test can write the cover profile itself); the review covers that
+too. Before mise and the steps run, `all`
 reads HEAD, the index and every file of the working tree that git does
 not ignore, by its mode and content, and its `working tree` check fails
 when the steps leave any of them changed; a pre-push run of `fast`
@@ -380,7 +386,8 @@ refusals now holds. Hygiene, `workflows` and the range judge the commit
 judged, by its id, as read before the first step and before mise runs:
 a step runs code of the change, which could rewrite the working tree,
 the index, HEAD or an object of the store, and `git cat-file` does not
-hash what it reads. The git commands of
+hash what it reads. That order closes this file channel only; an
+attack on the `tools/ci` process itself is out of its reach, as the step order of `all` above says. The git commands of
 this check run without `GIT_DIR`, `GIT_INDEX_FILE`, `GIT_WORK_TREE`,
 `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, the other
 variables of `git rev-parse --local-env-vars` and every `GIT_CONFIG`

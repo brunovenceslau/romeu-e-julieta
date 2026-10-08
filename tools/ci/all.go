@@ -53,15 +53,20 @@ const reuseImage = "fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e76
 // them (runAll).
 //
 // The order keeps every step that judges the tree before the first
-// one that runs code of the change, unit: vulnerabilities and license
+// one that runs the change's tests, unit: vulnerabilities and license
 // read the tree and run none of its code, so they run after lint and
-// before unit, and a test of the change cannot rewrite what they read
-// (a test that prepends an SPDX header to a file without one passed
-// license when it ran after unit: measured at cab976e). race and
-// coverage come last, and they measure code of the change, which can
-// game its own result: a test can write the cover profile itself, or
-// exercise less than it claims. The review of the change is what
-// covers that; runAll fails a run whose steps changed the tree.
+// before unit, and a test of the change cannot rewrite a file they
+// read (a test that prepends an SPDX header to a file without one
+// passed license when it ran after unit: measured at cab976e). That is
+// all the order guarantees: it closes the file channel. A test runs in
+// the same process tree and account as tools/ci, so it can reach the
+// tools/ci process itself (ptrace, root on a hosted runner) and forge
+// a verdict or the exit status; the order does not reach that, and the
+// review of the diff covers it (the threat model of misefiles.go, Not
+// covered). race and coverage come last, and they measure code of the
+// change, which can game its own result: a test can write the cover
+// profile itself, or exercise less than it claims. The review covers
+// that too; runAll fails a run whose steps left a file changed.
 //
 // The race run passes "-count=1" for the reason the unit step does:
 // a test that scans the repository would otherwise be served from the
@@ -83,13 +88,9 @@ func allSteps(ctx context.Context, root string, tools lintTools, profile string)
 	if gitErr != nil && license.skip == "" {
 		license.unavailable = gitErr
 	}
-	fast := fastSteps(root, tools)
-	unit := slices.IndexFunc(fast, func(s step) bool { return s.name == "unit" })
-	return slices.Concat(fast[:unit],
-		[]step{vuln, license},
-		fast[unit:],
-		[]step{{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env, timeout: raceTimeout}},
-	)
+	before, unit := fastPhases(root, tools)
+	return slices.Concat(before, []step{vuln, license, unit,
+		{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env, timeout: raceTimeout}})
 }
 
 // gitCommonDir returns the absolute path of the git directory that
