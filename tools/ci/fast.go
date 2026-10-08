@@ -389,7 +389,7 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 		switch {
 		case err != nil:
 			return false, err
-		case !checked:
+		case !checked && len(findings) == 0:
 			say(e.stdout, "--    pushed range: not checked, no denylist entry at HEAD or at the remote's default branch\n")
 		default:
 			report("pushed range", len(findings) == 0, lines(findings))
@@ -600,10 +600,10 @@ func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.
 	list := &names.List{}
 	list.Merge(atHead)
 	list.Merge(atDefault)
-	if list.Len() == 0 {
-		return nil, false, nil
-	}
 	err = pushed.Walk(ctx, repo, remote, push, func(r pushed.Reading) {
+		if r.Field == pushed.FieldPath && isPrologue(r.Path) {
+			findings = append(findings, finding{readingAt(r) + "added path " + git.Printable(r.Path), "prologue", prologueMsg})
+		}
 		if !list.Match(r.Text) {
 			return
 		}
@@ -611,13 +611,7 @@ func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.
 		if !atHead.Match(r.Text) {
 			listed = "a name listed at the remote's default branch"
 		}
-		of := "commit " + r.Commit + ": "
-		if r.Tag != "" {
-			of = "tag " + r.Tag + ": "
-		}
-		if r.Mergetag > 0 {
-			of += "mergetag " + strconv.Itoa(r.Mergetag) + " "
-		}
+		of := readingAt(r)
 		switch r.Field {
 		case pushed.FieldRef:
 			findings = append(findings, finding{"pushed ref " + strconv.Itoa(r.Line), "name", "the remote ref name holds " + listed})
@@ -637,7 +631,20 @@ func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.
 			findings = append(findings, finding{of + path + ":" + strconv.Itoa(r.Line), "name", "the added line holds " + listed})
 		}
 	})
-	return findings, true, err
+	return findings, list.Len() > 0, err
+}
+
+// readingAt says where a reading is: its commit or its tag, and the
+// mergetag header it comes from, with the colon and space that follow.
+func readingAt(r pushed.Reading) string {
+	of := "commit " + r.Commit + ": "
+	if r.Tag != "" {
+		of = "tag " + r.Tag + ": "
+	}
+	if r.Mergetag > 0 {
+		of += "mergetag " + strconv.Itoa(r.Mergetag) + " "
+	}
+	return of
 }
 
 // defaultBranchDenylist reads the denylist at the default branch of

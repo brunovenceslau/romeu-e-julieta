@@ -47,6 +47,9 @@ func TestHygienePasses(t *testing.T) {
 		"",
 	}, "\n"))
 	r.Write("pkg/vendor/kept.txt", "a vendor directory below the root is not the module's\n")
+	r.Write("docs/PROLOGUE.md.txt", "only the exact name is the file\n")
+	r.Write("docs/NOT-PROLOGUE.md", "a longer name is another file\n")
+	r.Write("docs/PROLOGUE.md/page.txt", "a directory of that name holds files, not the file\n")
 	r.Commit("fixture")
 	code, out := runCI(t, r, nil, nil, "hygiene")
 	assert.Equal(t, exitOK, code, "exit status\n%s", out)
@@ -130,6 +133,27 @@ func TestHygieneRules(t *testing.T) {
 				r.Write("vendor/modules.txt", "\n")
 			},
 			want: []string{"vendor/modules.txt: workspace:"},
+		},
+		{
+			name: "a tracked PROLOGUE.md at the root",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("PROLOGUE.md", "text\n")
+			},
+			want: []string{"PROLOGUE.md: prologue: the user's agreement file lives outside product repositories"},
+		},
+		{
+			name: "a tracked PROLOGUE.md in a subdirectory",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("docs/notes/PROLOGUE.md", "text\n")
+			},
+			want: []string{"docs/notes/PROLOGUE.md: prologue:"},
+		},
+		{
+			name: "a tracked prologue.md in another case",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("Docs/Prologue.MD", "text\n")
+			},
+			want: []string{"Docs/Prologue.MD: prologue:"},
 		},
 		{
 			name: "a second file in .githooks",
@@ -229,6 +253,37 @@ func TestHygieneRules(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPrologueInThePushedRange shows that a pushed commit which adds
+// the file fails the pre-push run even when a later commit removes it,
+// and that it does so with no denylist entry to match names with.
+func TestPrologueInThePushedRange(t *testing.T) {
+	const zero = "0000000000000000000000000000000000000000"
+	r := newTree(t)
+	require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
+	r.Commit("base, no denylist")
+	origin := gittest.NewBare(t)
+	r.Git("remote", "add", "origin", origin.Dir)
+	r.Git("push", "--quiet", "origin", "main")
+	r.Git("fetch", "--quiet", "origin")
+	r.Write("sub/prologue.md", "text\n")
+	added := r.Commit("adds it")
+	require.NoError(t, os.Remove(filepath.Join(r.Dir, "sub", "prologue.md")))
+	tip := r.Commit("removes it again")
+	stdin := "refs/heads/main " + tip + " refs/heads/main " + zero + "\n"
+	push, err := pushed.Parse(strings.NewReader(stdin))
+	require.NoError(t, err)
+	got, checked, err := pushedRange(t.Context(), r.Repo, "origin", push, tip)
+	require.NoError(t, err)
+	assert.False(t, checked, "no denylist entry: names are not checked")
+	assert.Equal(t, "commit "+added+": added path sub/prologue.md: prologue: the user's agreement file lives outside product repositories\n", lines(got))
+
+	// The run reports the finding too, and not only "not checked".
+	code, out := runCI(t, r, strings.NewReader(stdin), []step{passing}, "fast", "origin", origin.Dir)
+	assert.Equal(t, exitFail, code, "exit status")
+	assert.Contains(t, out, "FAIL  pushed range\ncommit "+added+": added path sub/prologue.md: prologue:")
+	assert.NotContains(t, out, "not checked")
 }
 
 // TestHygienePrintsPathsSafely shows that a path is printed quoted when
