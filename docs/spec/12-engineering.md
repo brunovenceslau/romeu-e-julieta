@@ -93,8 +93,9 @@ turn the database off for a module, nor `GOINSECURE`, `GOPROXY`,
 `GOFLAGS`, `GOTOOLCHAIN` or `GOVCS`. Three inputs still reach both
 installs, so the guarantee holds when none of them changes the build:
 a `go env -w` file in the user's configuration directory, since
-neither install sets `GOENV=off` (and `GOTOOLCHAIN=local` is set only
-in the steps of `fast`); a mise configuration other than the
+neither install sets `GOENV=off` (`GOENV=off` and `GOTOOLCHAIN=local`
+are set only for the go steps of `tools/ci`, through `stepEnv`, never
+for an install); a mise configuration other than the
 project's `mise.toml`, such as a global one whose `[env]` table sets
 `GOFLAGS` or `GOPROXY`, since `HOME` and `MISE_CONFIG_DIR` pass
 through; and a module cache seeded beforehand, since `GOPATH` and
