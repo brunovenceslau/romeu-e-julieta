@@ -9,7 +9,7 @@ test, coverage and review rules as `internal/*`.
 
 | Level | Location | Runs where | Covers |
 |---|---|---|---|
-| Unit | `internal/**`, `tools/**`, `e2e/probes/**`, `e2e/fakesbx/**` `_test.go` | CI, dev | validators generated from `rules.go` (table + fuzz seeds committed), digests, widening-set and toolchain diffs, the generated state-machine tables (every row, every illegal pair), egress split, `termsafe`, shell quoter, sbx output parsers over every recorded sbx version, error-id table, doctor checks with `HOME` in a temp dir, the probe harness core and its sbx exec layer (against a helper binary re-executed from the test), the recorder's redaction, the fake sbx's placeholder normalizer, CI tools themselves (the forbidden-name matcher and its pushed-range walk over a fixture repository, `workflows` against fixture workflow files, `docs` against fixture Markdown files with one violation per case of rule 9, the linter configuration against a fixture package with one violation per checker of rule 14 in [ADR 0001, adopt a documentation standard with checkable rules and a voice](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md) and one per testifylint checker that applies outside suites, invariants/mutate, acceptance against a recorded GitHub API fixture, `dora` against a recorded GitHub API fixture and a fixture repository, `pr` against recorded event payloads), the runtime ledger's tables ([13 13.10](13-runtime-ledger.md#1310-tests): the hostile spool, each field, entries and their races, the drain, the doctor checks on fixtures) |
+| Unit | `internal/**`, `tools/**`, `e2e/probes/**`, `e2e/fakesbx/**` `_test.go` | CI, dev | validators generated from `rules.go` (table + fuzz seeds committed), digests, widening-set and toolchain diffs, the generated state-machine tables (every row, every illegal pair), egress split, `termsafe`, shell quoter, sbx output parsers over every recorded sbx version, error-id table, doctor checks with `HOME` in a temp dir, the probe harness core and its sbx exec layer (against a helper binary re-executed from the test), the recorder's redaction, the fake sbx's placeholder normalizer, CI tools themselves (the forbidden-name matcher and its pushed-range walk over a fixture repository, `workflows` against fixture workflow files, `docs` against fixture Markdown files with one violation per case of rule 9, the linter configuration against a fixture package with one violation per checker of rule 14 in [ADR 0001, adopt a documentation standard with checkable rules and a voice](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md) and one per testifylint checker that applies outside suites, invariants/mutate, acceptance against a recorded GitHub API fixture, `dora` against a recorded GitHub API fixture and a fixture repository, `pins` against one fixture per source, `pr` against recorded event payloads), the runtime ledger's tables ([13 13.10](13-runtime-ledger.md#1310-tests): the hostile spool, each field, entries and their races, the drain, the doctor checks on fixtures) |
 | Golden | `internal/render/testdata/`, `internal/layout/testdata/`, `internal/gate/testdata/`, `internal/ledger/testdata/` | CI, dev | `sbxenv.yaml`, workspace files, `render.json`, gate diff text, herdr `layout.apply` requests (`layout up --dry-run`), handoff front matter, the two ledger views of a two-project fixture |
 | Schema | `tools/ci schema` | CI | generated schemas equal the committed ones; examples and testdata validate |
 | E2E (git + fake sbx) | `e2e/*_test.go`, tag `e2e` | CI (linux amd64, linux arm64, macOS Intel, macOS arm64) | romeu commands against a temp `$ROMEU_ROOT`; origins served by `git http-backend` behind `httptest` TLS (host settings `gitHosts[].caFile` points at the test CA; gitsafe has no test override); the sandbox daemon served by `git daemon` on `127.0.0.1`; journeys J2, J3b, J7, J10, J11 (scenario functions shared with the host suite), of which a journey that reaches a julieta call runs at the hybrid level below, on the Linux runners, while the macOS runners run the romeu commands that reach none; promotion fault injection; invariants marked E in [05](05-security.md), including the I27 hostile trees on the macOS runners |
@@ -38,9 +38,11 @@ Additional required tests:
   `run` releases the lock before its final `exec` (04 4.1).
 - **Runtime ledger**: the rows of
   [13 13.10](13-runtime-ledger.md#1310-tests), each with its stated
-  outcome. Two seams are named there: the spool reader's `afterOpen`
-  test hook, for a file that changes after it was opened, and a
-  version table the test injects, since v1 has one event version. The
+  outcome. Three seams are named there: the spool reader's `afterOpen`
+  test hook, for a file that changes after it was opened; its
+  `listNames` test hook, which hands over the names of the spool in
+  the order the test chooses and counts the names read; and a version
+  table the test injects, since v1 has one event version. The
   racing ingests call the ingest function without `romeu.lock`; under
   the lock the second romeu exits with `RJ-101`, as the row above
   says.
@@ -297,8 +299,8 @@ Five subcommands are outside `all`:
   [12 12.1](12-engineering.md#121-tech-stack). It is a report and no
   merge gate, since its result depends on what upstream published that
   day. No workflow calls it in v1; a person runs it. Its unit tests use
-  a recorded fixture of each source, and a test shows that `all` does
-  not start it.
+  one fixture per source, and a test shows that `all` does not start
+  it.
 
 ### Forbidden names
 

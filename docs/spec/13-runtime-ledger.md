@@ -228,9 +228,10 @@ has one implementation.
   extra name is read, the spool holds more names than the bound and is
   reported as `listing-truncated`. The directory hands its names over
   in the filesystem's order, so the names examined are the first in
-  name order of those read, not of the whole spool. This bounds the work of one ingest whatever
-  the names are: a file that is skipped stays in the spool and would
-  otherwise be read again by each ingest without limit.
+  name order of those read, not of the whole spool. This bounds the
+  work of one ingest whatever the names are: a file that is skipped
+  stays in the spool and would otherwise be read again by each ingest
+  without limit.
 - **Reading one file**: opened once through the root, without
   following links and without blocking, then checked on the open
   descriptor: a regular file, within the size cap. romeu reads it once
@@ -525,7 +526,10 @@ The hostile spool table (U; I32):
 | a file rewritten in place after the open, through the same hook | the outcome of the bytes read; the stored region hashes to the key |
 | more violations of one reason than the reporting limit | the exact count; the first paths in name order, up to the limit |
 | N names, where N is the listing bound of 13.8 read from its constant, some of them outside the layout | each name is examined, those outside the layout counted toward N; no `listing-truncated` |
+| N-1 names | each name is examined; no `listing-truncated` |
 | N+1 names | `listing-truncated`; the first N in name order are examined, and no more |
+| N+1 names, through the reader's `listNames` test hook, which hands over last the name that sorts first | `listing-truncated`; that name is examined, and the one that sorts last is not |
+| N+k names with k > 1, through the same hook | `listing-truncated`; the hook counts N+1 names read, and N are examined |
 | a zero-byte file; a truncated document; invalid UTF-8; a byte-order mark; a duplicate key; a top-level array | rejected `event-syntax` |
 | no `schema`; a malformed `schema`; version N-2 | rejected `event-version`, one entry however often it is ingested |
 | version N+1, with and without a key N does not know | skip `version-newer`; no entry; ingested after the window moves |
@@ -533,7 +537,7 @@ The hostile spool table (U; I32):
 | an unknown key; a missing required key; a key the `type` does not carry | rejected `event-keys` |
 | an `id` that differs from the file name | rejected `event-id` |
 | the spool root missing, a symlink, or a regular file | that project's ingest fails with `ledger-incomplete`; no entry; other projects are ingested |
-| an empty spool | no entry; the view is derived |
+| an empty spool | no entry; no `listing-truncated`; the view is derived |
 
 The version rows use a version table injected by the test, since v1
 has one version.

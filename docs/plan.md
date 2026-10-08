@@ -1779,7 +1779,8 @@ blocks" for what may start early.
   `checks`.
 - Acceptance:
   - The hostile spool table of 13 13.10 passes row by row, with the
-    `afterOpen` hook and an injected version table (I32).
+    `afterOpen` and `listNames` hooks and an injected version table
+    (I32).
   - The entries table of 13 13.10 passes, the racing ingests without the
     lock included (I31).
   - The I16 scan fails a fixture of `internal/ledger` with each call 13
@@ -2333,18 +2334,28 @@ blocks" for what may start early.
     sha256 for each of the four platforms, and the lint row of 10 10.2
     admits it.
   - `tools/ci pins` reports the pin freshness of each tool pin in the
-    list of [12 12.1](spec/12-engineering.md#121-tech-stack), with the
-    columns pin, source, pinned, newest and status, the rules of that
-    section for "newest" and the status, GET requests only and no
-    credential. Its tests run against a recorded fixture that covers
-    each source kind of that list, with one row each for a pin behind,
-    current and ahead; an API error, reported as `unknown`; a
-    prerelease and a draft newer than the pin, which do not mark it; a
-    tag that is not a version; and a tag with control characters,
-    printed through `termsafe`. They show that each file that holds
-    a pin of that list is byte-identical after a run, and that `all` does not start the
-    check. It is run once by hand on the real releases before this
-    task merges, and its output is in the pull request body.
+    list of [12 12.1](spec/12-engineering.md#121-tech-stack), by the
+    rules of that section: its sources and endpoints, every page read,
+    the version parse, "newest", the lowercase status, plain text with
+    one line per pin in table order, and exit 0 whatever the statuses,
+    non-zero only on a usage or internal error.
+  - Its requests are GET over HTTPS only, to a fixed list of hosts (the
+    sources of 12 12.1: `go.dev`, `api.github.com`,
+    `proxy.golang.org`, `hub.docker.com`), each with a body-size cap
+    and a timeout, and none carries an `Authorization` header.
+  - Its tests use one fixture per source, with rows for a pin behind,
+    current and ahead; an API error, reported as `unknown`; a pin that
+    does not parse, reported as `unknown`; a pin and a release equal
+    but for a leading `v`, reported as `current`; a prerelease and a
+    draft newer than the pin, and a suffixed version on a source with
+    no prerelease flag, none of which marks it; a tag that is not a
+    version; a tag with control characters, printed through
+    `termsafe`; and, for the GitHub releases and the image tags, the
+    newest release on the second page. They show that each file that
+    holds a pin of that list is byte-identical after a run, and that
+    `all` does not start the check. It is run once by hand on the real
+    releases before this task merges, and its output is in the pull
+    request body.
 - Verify: `go test ./tools/release/...`, which lists the per-subcommand
   tests by name; `go test ./tools/ci/... -run '^TestPins'`, which lists
   the tests by name; `go run ./tools/release build --version v1.0.0
@@ -2699,8 +2710,9 @@ helper command; an explicit registry credential (Q23).
 **Designed and not built** (06 6.6): the publishing path for kits.
 
 **Deferred decisions** (index, [Deferred decisions](spec.md#deferred-decisions)).
-Each row has what holds until then and the event that reopens it; the table is
-the one place they are written, and this page does not copy them.
+Each row has what holds until then and the event that reopens it;
+the table is the one place they are written, and this page does not
+copy them.
 Six rows meet a task of this plan:
 
 | Row | Task | What happens there |
