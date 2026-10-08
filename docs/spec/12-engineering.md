@@ -67,7 +67,7 @@ Module ids are stable; the plan selects work by them.
 
 | Module id | Responsibility | Depends on |
 |---|---|---|
-| `ci-bootstrap` | in this order ([10 10.2](10-testing-style.md#release-and-bootstrap)): one PR with `tools/ci hygiene`, the forbidden-name denylist, `tools/ci fast` and `.githooks/pre-push`, finished by the maintainer block (rulesets first, denylist entries, hook enabled, the sandbox token's refusals, checked on the host); then `tools/ci workflows` and a green CI workflow on the public repo; then the day-one middleware: `tools/new adr`, `go generate` wiring and `tools/ci generated` (the ADR index and CODEOWNERS), `tools/ci sequences`, `tools/ci pr`, `.github/ask-first.yaml`, `ARCHITECTURE.md` and `CONTRIBUTING.md` skeletons (first task). A `tools/new` kind and a generator row land in the first PR of the module that owns their first input, not here | - |
+| `ci-bootstrap` | in this order ([10 10.2](10-testing-style.md#release-and-bootstrap)): one PR with `tools/ci hygiene`, the forbidden-name denylist, `tools/ci fast` and `.githooks/pre-push`, finished by the maintainer block (rulesets first, denylist entries, hook enabled, the four tries of the sandbox token, read on the host); then `tools/ci workflows` and a green CI workflow on the public repo; then the day-one middleware: `tools/new adr`, `go generate` wiring and `tools/ci generated` (the ADR index and CODEOWNERS), `tools/ci sequences`, `tools/ci pr`, `.github/ask-first.yaml`, `ARCHITECTURE.md` and `CONTRIBUTING.md` skeletons (first task). A `tools/new` kind and a generator row land in the first PR of the module that owns their first input, not here | - |
 | `probes` | probe harness (pure core + exec layer), `probe-result.v1`, redacted sbx recordings, `tools/ci probes` lifecycle | - |
 | `canon` | canonical JSON, typed domain-separated digests | - |
 | `spec` | project spec, run layout and host settings types with gate/apply tags; `rules.go`; strict decode; generated validators and schemas (`tools/schemagen`) | canon |
@@ -110,8 +110,9 @@ ledger) -> `kits`, `skills`
 the v1.0.0 tag (maintainer) -> B1 on v1.0.0, on one host (maintainer)
 -> `tools/ci acceptance`, which commits `docs/acceptance.json`. The two
 tags are
-maintainer steps because the tag ruleset refuses a `v*` tag from
-anyone else; what may change between them is in
+maintainer steps by working agreement: the tag ruleset does not bind
+the sandbox's token ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1));
+what may change between them is in
 [11 11.2](11-host-probes.md#112-block-b---acceptance-on-real-hosts-last).
 Block A settles every sbx fact the code depends
 on before `sbxdrv` and `render` are finalized; block B only accepts
@@ -187,9 +188,12 @@ creates them in the maintainer block of `ci-bootstrap`
 ([10 10.2](10-testing-style.md#release-and-bootstrap)), which also
 lists what they require and saves the proof. `.github/CODEOWNERS` is
 generated from `owner` and the globs of `.github/ask-first.yaml`
-(12.3). What the review is worth while the project has one account,
-and that nothing reads the rulesets again, are residual risks in
-[05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1).
+(12.3). What the review and the rulesets are worth against an agent
+that holds the operator's token is stated once, in
+[05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1). The
+refusal of a direct push holds against an agent that does not edit the
+ruleset or the repository settings, and an edit is inferred, not
+measured.
 
 **The approval line.** A PR whose diff touches a path of an ask-first
 surface ([05 5.3](05-security.md#53-ask-first-surfaces)) carries one
@@ -477,7 +481,7 @@ and is rewritten by a rebase, so lead time is understated for a
 rebased pull request, and `pushedAfterReady` is overstated for one;
 `published_at` and `merged_at` are GitHub's. A failure nobody marks is
 not counted. A commit that reaches `main` outside a pull request,
-which only the maintainer as bypass actor can push, belongs to no
+which no pull request carried, belongs to no
 change and counts in no metric.
 
 **Where the numbers live.** In two places, and in no tracked file:

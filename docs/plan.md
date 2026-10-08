@@ -195,10 +195,11 @@ place in the order.
 ## Operator blocks
 
 `sbx` runs only on the host (11, opening), so a step that needs it is
-the maintainer's. So are the two `v*` tags, which the tag ruleset
-refuses from anyone else (12 12.2), the denylist entries, which an agent
-must not hold (10 10.2, "Forbidden names"), and anything that reads the
-reference config repo. The maintainer works in sittings, so these steps
+the maintainer's. So are the two `v*` tags, which the maintainer pushes
+by working agreement, since the tag ruleset does not bind the operator's
+token, which the sandbox holds (05 5.4; 12 12.2), the denylist entries,
+which an agent must not hold (10 10.2, "Forbidden names"), and anything
+that reads the reference config repo. The maintainer works in sittings, so these steps
 are seven blocks, and each says what it needs, what it unblocks, what
 wait it puts on the critical path, and what pass means: one command
 whose exit status the maintainer reads, wherever one exists. Block A of
@@ -206,7 +207,7 @@ whose exit status the maintainer reads, wherever one exists. Block A of
 
 | Block | Needs merged first | What the maintainer does | Also needs | Unblocks | Wait on the critical path | Pass | Recommendation |
 |---|---|---|---|---|---|---|---|
-| O1 | T001, written and open: the block finishes it and merges it | the sitting of the maintainer block, items a to d (10 10.2): rulesets and the two repository settings first; one `go run ./tools/ci hygiene add` per forbidden name in a plain host clone; enable the hook, push the branch, open the pull request; then the four refusal tries from inside the sandbox, proved on the host | a host clone, the repository's admin rights, the sandbox's token created after item a. | T002 directly; 101 of 102 tasks have it in their dependencies | the specification gives no duration; nothing is pushed until it ends, so the whole plan waits. No task can proceed meanwhile | `go run ./tools/ci fast` exits 0 in that clone after item b and non-zero before it; the four refusals are the host checks of 10 10.2, item d, which no one command joins | do item a before the sandbox that writes the first task receives its token (10 10.2). Save each API answer in a file as you go: the pull request's Evidence needs them, and nothing checks that text until T005, so read each file for a host path or a name before you paste it. Its output settles Q25 |
+| O1 | T001, written and open: the block finishes it and merges it | the sitting of the maintainer block, items a to d (10 10.2): rulesets and the two repository settings first; one `go run ./tools/ci hygiene add` per forbidden name in a plain host clone; enable the hook, push the branch, open the pull request; then the four tries from inside the sandbox, read on the host (a measurement: 10 10.2, item d, which records the result) | a host clone, the repository's admin rights, the operator's token, which the sandbox holds, created after item a. | T002 directly; 101 of 102 tasks have it in their dependencies | the specification gives no duration; nothing is pushed until it ends, so the whole plan waits. No task can proceed meanwhile | `go run ./tools/ci fast` exits 0 in that clone after item b and non-zero before it; the four tries are read by the host checks of 10 10.2, item d, which no one command joins | do item a before the sandbox that writes the first task receives the operator's token (10 10.2): until then not even a push to the default branch is refused. Save each API answer in a file as you go: the pull request's Evidence needs them, and nothing checks that text until T005, so read each file for a host path or a name before you paste it. Its output is recorded in [ADR 0008, let the sandbox act as the maintainer on GitHub](adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md), which decides Q25. From now on the maintainer also reads the GitHub security log at each sitting, for an action by the operator's token that was not asked for; whether the log covers merges, tag pushes and ruleset updates is unverified (05 5.4) |
 | O2 | T002 | item e (10 10.2): add the jobs of the green run to the default-branch ruleset as required status checks, and save the API's answer | the green run's job names | T003 directly; 100 of 102 tasks have it in their dependencies | one call; do it in the sitting that merges that task, and it adds no wait. No task can proceed meanwhile | the saved answer lists each job name of the green run; no command reads a ruleset back (05 5.4), so this one is **[review]** | one call, in the same sitting as the merge |
 | O3 | T019, T020 | block A on both hosts, Intel and Apple silicon (11 11.1): `go run ./e2e/probes --block A --out docs/probes/`, which lists and plants nothing (question 7), apart from one global setting: A2 sets `env.rememberHostCommands` (11 11.1) and records the prior value in its result; then commit the results and the recordings on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | `sbx` at or above 0.46.0 on both hosts; question 6 answered; the pins of the pin file | T026 directly; 54 of 102 tasks have it in their dependencies | about 75 minutes per host (11 11.1), plus the wait for a sitting with both machines. Meanwhile 28 later tasks can proceed | `go run ./tools/ci probes --require-pass A1,A2,A3,A4,A5,A6,A9,A10,A11,A12,A13,A14` exits 0 on the branch with both hosts' results | run both hosts in one sitting: the arch-sensitive probes (A4, A5, A11, A12, A13) count only with both (11, opening). Read the diff of everything staged before the push: it is data from your host, and the recorder's scrubbing (T018) is a filter, not a reviewer. The second host's files reach the branch by a push from that host's own clone, through its hook, and the harness refuses an `--out` inside a clone whose hook is not enabled. A results-only branch runs `main`'s own `tools/ci` through the hook; if a resolution commit joins it (T026), read that diff in the clone before checking the branch out, as item c of block O1 requires (10 10.2) |
 | O4 | T055 | the catalog handover: build julieta for linux from `main`, run `julieta spec validate --catalog projects/*.yaml` on the reference config repo inside a Linux container, and hand over its output after reading and redacting it: it may name hosts, tool keys or project names that are not for the public repository | a Linux container with read-only access to the config repo's origins and no host credential mounted; julieta has no darwin build (12 12.1) | T091 directly; 6 of 102 tasks have it in their dependencies | minutes; it can happen any time after its one task, so it is off the critical path if done by checkpoint C5. Meanwhile 41 later tasks can proceed | `julieta spec validate --catalog projects/*.yaml` exits 0 or 1, and its output is the handover; an exit of 2 means a spec does not validate, and the block is not done; `go run ./tools/ci hygiene --file <output>` exits 0 on the output before it is handed over | do it at C5, not at the end: it is the only input the catalog task waits for |
@@ -295,7 +296,7 @@ the specification first. No task here carries it; it is question 13.
 
 | Phase | Tasks | Modules | Checkpoint: what must be true before the next phase |
 |---|---|---|---|
-| 0 Bootstrap | T001 to T006 | `ci-bootstrap` | C0: the hook and CI run the same `tools/ci`; the rulesets refuse the sandbox's token (O1, O2); a pull request without its sections fails `pr`. One network step belongs here: the sandbox that builds T012 and T013 must reach the registry that holds the pinned images and the release API (`api.github.com`), which a default-deny sandbox does not, so the maintainer runs one `sbx policy allow network` command scoped to that sandbox (`--sandbox`) with every host in it, exact hosts and no wildcard, after reading the list the agent that writes T012 names. Questions 1 and 2 are answered. The maintainer answers questions 3 to 9 here |
+| 0 Bootstrap | T001 to T006 | `ci-bootstrap` | C0: the hook and CI run the same `tools/ci`; the rulesets refuse a direct push to the default branch by the operator's token, a control against an agent that does not edit the ruleset or the repository settings (05 5.4), and the other tries of O1 are recorded ([ADR 0008, let the sandbox act as the maintainer on GitHub](adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md), 05 5.4) (O1, O2); a pull request without its sections fails `pr`. One network step belongs here: the sandbox that builds T012 and T013 must reach the registry that holds the pinned images and the release API (`api.github.com`), which a default-deny sandbox does not, so the maintainer runs one `sbx policy allow network` command scoped to that sandbox (`--sandbox`) with every host in it, exact hosts and no wildcard, after reading the list the agent that writes T012 names. Questions 1 and 2 are answered. The maintainer answers questions 3 to 9 here |
 | 1 The skeleton and the probe harness | T007 to T020 | `termsafe`, `romeu-cli`, `julieta-core`, `ci-release`, `kits`, `probes`, `canon` | C1: both binaries print `version` on the four runners; the handshake passes on the synthetic session; the harness passes `tools/ci all` before any host run (11, opening). Then block O3 |
 | 2 First build layer | T021 to T025 | `spec`, `gitsafe`, `signing` | C2: block A results from both hosts are merged (T026), and `tools/ci probes` passes on them |
 | 3 Block A applied; second layer | T026 to T035 | `probes`, `gitsafe`, `sbxdrv`, `romeu-cli`, `catalog`, `oci`, `state`, `memstore` | C3: the handshake passes on the recorded session on both Linux runners |
@@ -2546,7 +2547,10 @@ blocks" for what may start early.
 - Acceptance:
   - Each question whose "Settled by" cell is the maintainer has an ADR
     and leaves the table: Q4, Q6, Q9, Q12, Q13, Q14, Q23 and Q25. Q25 is
-    settled on the output of block O1.
+    decided by the operator and recorded in [ADR 0008, let the sandbox
+    act as the maintainer on
+    GitHub](adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md),
+    from the output of block O1.
   - After this task the Open questions table is empty, or each remaining
     row says what it waits for.
 - Verify: `go run ./tools/ci sequences`.
@@ -2686,7 +2690,6 @@ for the task that has the context to make it.
 |---|---|---|
 | splitting this page into one file per phase | one page, maintained by pull requests | the page passes 3 000 lines, or two open pull requests conflict on it twice |
 | the frontend milestone, the workload digest and the herdr version | none chosen | T012, which writes the pin file |
-| whether agents push from a second account | the sandbox's fine-grained token (Q25) | the output of block O1, item d |
 | the `apply` tag of `secrets` | recreate-class (Q18) | the A10 result, in T026 |
 | which hook order the J5 guide describes | SessionEnd before SessionStart (Q22) | the C5 result, in T094 |
 | whether the rehearsal of block O5 becomes a rule of the specification, and whether it moves earlier | a recommendation of this plan, before the candidate tag | the first candidate that block B fails for a reason the rehearsal would have shown |
@@ -2800,9 +2803,11 @@ the first task that waits for the answer.
 
 8. **How probe results reach `main`** (11 (opening), 11 11.3, 10 10.2,
    12 12.4, 10 10.3). Needed before: block O3. The specification says
-   results are "committed" and does not say by whom or how. The
-   maintainer is the bypass actor, and a direct push to `main` is public
-   before any check reads it; the recordings hold output of the
+   results are "committed" and does not say by whom or how. A direct
+   push to `main` is refused by the ruleset for the maintainer too (a
+   control against an agent that does not edit the ruleset or the
+   repository settings, 05 5.4), and a branch is public before any check
+   reads it; the recordings hold output of the
    maintainer's real host. The plan also adds to the recorder (T018) a
    filter that keeps real values only for its own sandboxes and env dirs
    in a listing and gives every other row typed placeholders, a positive

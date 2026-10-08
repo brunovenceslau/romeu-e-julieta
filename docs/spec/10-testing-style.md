@@ -445,6 +445,21 @@ A tag of the form `v<major>.<minor>.<patch>` is a release; the same
 with a suffix is a prerelease, which is what the release candidate of
 block B is ([11 11.2](11-host-probes.md#112-block-b---acceptance-on-real-hosts-last)).
 
+The sandbox's token (the operator's) can push a `v*` tag
+([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1)), so
+the pull request that adds `release.yml` decides how releases come from
+`main` only, and one constraint is fixed now: the release workflow file
+must not come from the tagged commit
+([Deferred decisions](../spec.md#deferred-decisions)). Releasing from
+`main` only blocks a stray tag and not the token, which merges through
+the API, so a second rule is fixed now: the credential that signs
+release artifacts is held outside GitHub and out of the sandbox's reach,
+signing is an operator step, and `release.yml` may not hold that
+credential; the attestation above is GitHub's keyless provenance record,
+an extra record and not the signing credential
+([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), "Release
+signing").
+
 `ci-bootstrap` (first plan task), in this order:
 
 1. One PR adds `tools/ci hygiene` with `tools/ci/denylist.yaml`,
@@ -474,7 +489,8 @@ is **[review]**.
 The sitting starts with item a, before the sandbox that writes step 1
 receives its token, or at the latest before item b: until the rulesets
 exist, nothing refuses that token a push to the default branch, a push
-of a `v*` tag or a merge. Nothing of step 1 is pushed before the
+of a `v*` tag or a merge. Once they exist, of the four tries only the
+push is refused (item d), a control against an agent that does not edit the ruleset or the repository settings (05 5.4). Nothing of step 1 is pushed before the
 sitting. The agent that wrote step 1 does not push its branch. The
 maintainer fetches the branch from the sandbox into a plain clone on
 the host and reads its diff there before checking it out, because
@@ -489,9 +505,12 @@ any sandbox and any agent session.
   method; force pushes and deletion are refused; updates to the
   default branch are restricted to the bypass actor, so a merge by any
   other account is refused whether or not it is approved (a GitHub
-  behaviour that is not tested here). On tags matching
-  `v*`: creation, update and deletion are refused. The maintainer is
-  the one bypass actor of both. Two repository settings, which bind a
+  behaviour that item d measured against the sandbox's token: it does
+  not hold for a merge through the API,
+  [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1)). On
+  tags matching `v*`: creation, update and deletion are refused for
+  everyone except the bypass actor. The administrator role is the
+  bypass actor of both, and the operator's token holds that role. Two repository settings, which bind a
   bypass actor too: squash merging and rebase merging off, so every
   merge is a merge commit (12 12.9); and private vulnerability
   reporting on, the channel `SECURITY.md` names (12 12.8). If GitHub
@@ -505,27 +524,30 @@ any sandbox and any agent session.
   commits themselves (their messages, identities, paths and ref name),
   and open step 1's PR.
 - d. From inside the sandbox, where the one credential is the
-  sandbox's token, try four things with throwaway payloads and save
-  the four refusals: a push of an empty commit to the default branch;
-  a push of the tag `v0.0.0-try`; the merge of a throwaway pull
-  request, not step 1's; and a change to a ruleset. Each push is tried
-  from a clean working tree with HEAD at the commit it pushes, so that
-  `fast` passes and the refusal comes from GitHub, not from the hook.
-  A refusal is proved on the host, not by the sandbox's output: after the four
-  tries the maintainer checks from their own session that the default
-  branch head has not moved, that no `v0.0.0-try` tag exists, that the
-  throwaway pull request is not merged, and that each ruleset's JSON
-  equals the answer saved in item a. A try took effect when one of
-  those checks shows it, whatever the sandbox printed. The maintainer
-  undoes what can be undone (the tag deleted, the merge reverted, the
-  ruleset restored; an empty commit stays and harms nothing), and the
-  try is [Q25](../spec.md#open-questions). After the checks the
-  maintainer closes the throwaway pull request and deletes its branch.
-  If Q25's fallback is taken, the four tries are repeated with the
-  second account's token, and a fifth with them: on a pull request the
-  maintainer approved, push a commit and try to merge, which the
-  dismissed approval must refuse. The same host checks prove those
-  refusals.
+  operator's token, try four things with throwaway payloads and read
+  what each does. Each push is tried from a clean working tree with HEAD
+  at the commit it pushes, so that `fast` passes and a refusal comes from
+  GitHub, not from the hook. The result is a measurement and not a gate: the
+  sandbox acts with the operator's account, and
+  [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1) states
+  the rule once. After the four tries the maintainer checks from their
+  own session what took effect: the default branch head, the tag list,
+  the throwaway pull request, and each ruleset's JSON against the answer
+  saved in item a, whatever the sandbox printed. The maintainer undoes
+  what can be undone (the tag deleted, the merge reverted, the ruleset
+  restored; an empty commit stays and harms nothing), and then closes
+  the throwaway pull request and deletes its branch. Measured on
+  2026-10-07 ([ADR 0008, let the sandbox act as the maintainer on GitHub](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md));
+  the evidence is kept outside this repository:
+
+  | Try | Result |
+  |---|---|
+  | push an empty commit to the default branch | refused; a control only against an agent that does not edit the ruleset or the repository settings (an edit is inferred, not measured) |
+  | merge a throwaway pull request through the API, without a bypass request | accepted |
+  | create and delete the tag `v0.0.0-try` | accepted, through the bypass |
+  | update the default-branch ruleset with its own unchanged body | accepted; the ruleset did not change |
+
+  Of the four tries, only the direct push was refused.
 - e. After step 2: add the CI jobs of the green run to the
   default-branch ruleset as required status checks, and save the API's
   answer.
