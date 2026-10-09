@@ -236,6 +236,9 @@ const miseNoSystemConfig = "/dev/null/mise-system.toml"
 // /private/var), so the parent is that of root with its symbolic links
 // resolved; a root that cannot be resolved keeps the parent it was given.
 func miseCeiling(root string) string {
+	// The fallback is safe: mise starts in this same directory, so a
+	// root that cannot be resolved here is not resolved by mise either
+	// and both name the same parent.
 	if real, err := filepath.EvalSymlinks(root); err == nil {
 		root = real
 	}
