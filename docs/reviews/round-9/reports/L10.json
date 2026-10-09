@@ -1,0 +1,73 @@
+{
+ "header": "L10 \u00b7 The second adopter \u00b7 sonnet",
+ "lens": "L10",
+ "role": "the second adopter",
+ "round": 9,
+ "verdict": "Round 8's changes mostly hold: of 28 L10 findings checked, 27 are resolved as stated. The stranger's path now exists as J1 step 0 with the examples/ starter, and the limits are stated (acceptance only with the maintainer's config repo, catalog reach, GitHub-shaped URLs, VS Code only, secret execution environment, release proof). The delta adds no Blocking or Required defect. Four Advisory items remain.",
+ "round8_checked": 28,
+ "round8_resolved_as_stated": 27,
+ "findings": [
+  {
+   "id": "L10-r9-1",
+   "kind": "unresolved",
+   "round8_ref": "L10-8 (R8-03-34, A)",
+   "severity": "Advisory",
+   "section": "11 11.1 A13",
+   "defect": "Round 8 applied L10-8 'as proposed', which included dropping cmux from the examples. J3 is clean and 03 3.4 now uses my-config and shop, but probe A13 still says 'OSC 9 reaching the host terminal/cmux'.",
+   "scenario": "An adopter whose terminal is not cmux reads A13 and cannot tell whether the probe tests a terminal they have or the maintainer's habit.",
+   "change": "In A13 write 'the host terminal (cmux is the one the maintainer runs)' or drop the name."
+  },
+  {
+   "id": "L10-r9-2",
+   "kind": "new",
+   "round8_ref": "",
+   "severity": "Advisory",
+   "section": "12 12.8 README row; 03 3.5",
+   "defect": "The README prerequisite and 3.5 say the catalog 'covers the reference config repo's stack'. That repository is private, so the sentence gives a stranger no way to tell whether their tools are covered.",
+   "scenario": "An adopter with a Rust stack reads the README, cannot see the reference stack, and learns the answer only from a failed first sync (07 7.5 step 2).",
+   "change": "Say 'covers the tools listed in catalog/egress.yaml' in the README outline and in 3.5, and keep the reference-repo origin as a note."
+  },
+  {
+   "id": "L10-r9-3",
+   "kind": "new",
+   "round8_ref": "",
+   "severity": "Advisory",
+   "section": "03 opening (Versions)",
+   "defect": "The new rule says user-authored formats change only by a new schema version announced in the release notes, and that the bumping release reads the previous version. It does not say how many versions a release reads for project.v1 and host-settings.v1, or who migrates a config repo.",
+   "scenario": "An adopter skips two releases; the release they install no longer reads the version in their config repo, and no page said the window or that agents edit the specs.",
+   "change": "One sentence in 03's opening: the window for user-authored formats (for example, current and previous), and that the release notes carry the edit to make."
+  },
+  {
+   "id": "L10-r9-4",
+   "kind": "new",
+   "round8_ref": "",
+   "severity": "Advisory",
+   "section": "05 5.4 row 'protective command'; spec.md Q13",
+   "defect": "Product-facing text carries review-record ids and a maintainer-instance default. The 5.4 row cites 'R8-01-16', and Q13's default says the reference instance binds the operator's own token (ADR 0008), the pointer L10-4 asked to remove from product text.",
+   "scenario": "An adopter reading 5.4 or Q13 meets an id they cannot resolve and an ADR about someone else's token.",
+   "change": "Cite the decision date only in the 5.4 row, and end Q13's default after 'written per project'."
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L10 section)",
+  "docs/reviews/round-8/reports/L10.json",
+  "docs/reviews/round-8.md (L10 rows, decisions SC2, SC16, AR6, AR23, DR2)",
+  "docs/reviews/round-8/write-pass.md",
+  "docs/spec.md",
+  "docs/spec/00-scope.md",
+  "docs/spec/02-layouts.md",
+  "docs/spec/03-formats.md",
+  "docs/spec/04-cli.md (init, doctor rows)",
+  "docs/spec/05-security.md (5.3, 5.4)",
+  "docs/spec/06-kits.md",
+  "docs/spec/07-mise-egress.md (7.6)",
+  "docs/spec/09-journeys.md (J1, J14)",
+  "docs/spec/10-testing-style.md (forbidden names, 10.3)",
+  "docs/spec/11-host-probes.md (A13, B3)",
+  "docs/spec/12-engineering.md (12.1, 12.8, 12.9)",
+  "docs/spec/13-runtime-ledger.md (opening)",
+  "docs/adr/0008, 0009 (scope line)"
+ ],
+ "out_of_scope": "Four parked plan findings (L10-29 to L10-32), carried to stage B. Deferred decisions, non-goals and accepted risks as written. Not run: whether the examples/ starter is complete and whether op works under env -i, which need code and a host.",
+ "confidence": "Medium-high. Every round-8 resolution was checked against the baseline text. The delta was skimmed outside the pages the lens names."
+}

@@ -1,0 +1,67 @@
+{
+ "header": "L12 · The parallel-execution engineer · sonnet",
+ "verdict": "The round-8 write pass resolved 21 of my 22 findings that were applied, modified or decided as stated (12 12.9 one-PR clause and cadence, docs/grants.yaml grant, command and manifest packages, lessons directory, RJ single sequence, ADR 0009 rule 7, generated-file merge rule, corrected Depends on edges). One is unresolved (the tools/ci step dispatcher) and three new defects remain: numbered records still collide under parallel scaffolding, the checkpoint grant has no plan task or acceptance, and the module table does not own the new packages.",
+ "round8_checked": 22,
+ "round8_resolved_as_stated": 21,
+ "findings": [
+  {
+   "id": "L12-R9-1",
+   "kind": "new",
+   "severity": "Required",
+   "section": "12 12.3 (tools/new adr and lesson); 04 4.1 (Error ids); ADR 0009 decision 4",
+   "defect": "ADR numbers, lesson numbers and RJ ids are all allocated as 'the next free number' or 'the next number after the highest'. Dropping contiguity only makes a gap legal; it does not stop two concurrent branches from taking the same number, and 10 10.2 states that v1 does not gate on the merge result.",
+   "scenario": "Two agents run tools/new lesson (or add an RJ id) on separate branches from the same base. Both pick the same N, the files differ in slug so there is no textual conflict, and each branch is green on its own. After the first merge the second still passes, because no merge-result gate exists. The duplicate lands on main, tools/ci sequences goes red there, and a fix PR is needed. Every lesson-bearing or error-adding PR in a phase has this exposure.",
+   "change": "State one allocation rule in 12 12.3: tools/new takes the next free number on the current base, and a PR that adds a numbered record (ADR, lesson, RJ id) is rebased and re-checked at the maintainer's merge sitting before it is merged. Alternatively give lessons a number-free key (date plus slug), since nothing cites a lesson by number.",
+   "round8_ref": "R8-12-13; R8-adr-10; R8-04-8"
+  },
+  {
+   "id": "L12-R9-2",
+   "kind": "new",
+   "severity": "Required",
+   "section": "plan.md T005 (tools/ci pr); 02 2.1 (docs tree)",
+   "defect": "12 12.4 defines the checkpoint grant in docs/grants.yaml and 05 5.3 lists it on the ask-first surface, but plan.md has no mention of grants. T005 'implements 12 12.4 ... lands whole' and its table of cases has none for a granted line. No task creates docs/grants.yaml, and 02 2.1 does not list the file.",
+   "scenario": "T005 merges with all its listed cases green and no grant handling. Phase 4 then has six contracts and checks PRs that each need a per-PR line, which is the queue the grant was meant to remove. A later agent adds grant reading to tools/ci pr, which is a checks-surface change with its own approval line, or invents the file's schema.",
+   "change": "Add to T005's acceptance the grant cases (a line 'granted at <checkpoint> for <task id>' passes only when docs/grants.yaml at the base commit holds that surface and task; a grant for another surface or task fails; a grant added in the same PR does not count). Name the task that creates docs/grants.yaml with its schema, and add the file to the docs tree in 02 2.1.",
+   "round8_ref": "R8-05-4"
+  },
+  {
+   "id": "L12-R9-3",
+   "kind": "unresolved",
+   "severity": "Advisory",
+   "section": "02 2.1 (tools/ci entry); 10 10.2",
+   "defect": "The tree now gives tools/ci one package per step, but says the steps are 'registered in one dispatcher table'. The resolution was to discover steps from a generated table or from one registration per package. As written, the table is one shared hand-edited file that about 25 step tasks all append to.",
+   "scenario": "Phase 0 and 1 tasks each add a step package and each edits the one table. Their PRs conflict pairwise even though the step packages are disjoint, and each such edit is on the checks surface.",
+   "change": "In 02 2.1 or 12 12.3 say the dispatcher table is generated from the step packages (a row in the generator inventory), or that each package registers itself, so adding a step edits no shared file.",
+   "round8_ref": "R8-10-21"
+  },
+  {
+   "id": "L12-R9-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "12 12.2 (module table and the directory-to-module test)",
+   "defect": "The new sentence says a package module owns internal/<id> and that a tools/ci test holds the tree, this table and the package list to the same set of directories. internal/manifest, internal/cmd/romeu/<command>, internal/cmd/julieta/<command>, internal/mise and internal/hooks have no module id of that name, and the table does not say which module owns them.",
+   "scenario": "The task that writes the directory test cannot decide whether internal/manifest belongs to spec, romeu-cli or julieta-core. Two agents then both claim or both skip it, which defeats the purpose of using module ids to select concurrent work.",
+   "change": "Add an 'Owns' note to the table rows (for example romeu-cli owns internal/cmd/romeu/*, julieta-core owns internal/cmd/julieta/*, internal/mise, internal/hooks, and spec owns internal/manifest), or state that the test checks only package modules named by an id.",
+   "round8_ref": "R8-03-23; R8-02-2"
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L12 section, What a reviewer returns, How stage A runs)",
+  "docs/reviews/round-8/reports/L12.json",
+  "docs/reviews/round-8.md (Status column, decisions SC14, AR14, AR16)",
+  "docs/reviews/round-8/clusters-*.json (L12 finding mapping, clusters-plan.json)",
+  "docs/reviews/round-8/write-pass.md",
+  "docs/spec/02-layouts.md (diff and tree)",
+  "docs/spec/03-formats.md (3.6 manifest, 3.12)",
+  "docs/spec/04-cli.md (4.1 Error ids, 4.4)",
+  "docs/spec/06-kits.md (6.1 Go/no-go)",
+  "docs/spec/10-testing-style.md (10.2, 10.3, 10.8, 10.7 row)",
+  "docs/spec/11-host-probes.md (A3, C6, argv shapes, acceptance)",
+  "docs/spec/12-engineering.md (12.2, 12.3, 12.4, 12.7, 12.9)",
+  "docs/spec.md (Deferred decisions)",
+  "docs/adr/0009 (decision 4, rule 7)",
+  "docs/plan.md (task shape, T005, checkpoints, O blocks)"
+ ],
+ "out_of_scope": "Round-8 plan findings R8-plan-13 to R8-plan-17 are parked for stage B and were not re-checked. L (later) items R8-05-29, R8-13-16 and R8-adr-13 were not re-reported. The full plan.md diff (826 lines) was skimmed only for grants, lessons paths and error ids. The contents of ADRs other than 0009 and the host-probe tables beyond A3, A5, A11 and C6 were not read in full.",
+ "confidence": "medium-high. The 21 resolved items were checked by grep and reading at the baseline. Not every 'Apply as proposed' item was read cell by cell (R8-10-41, R8-10-35 and R8-11-3 were confirmed from one or two sentences each). The three new findings are read directly from the text, but the plan's treatment of grants was judged from a grep for 'grant' that found nothing."
+}

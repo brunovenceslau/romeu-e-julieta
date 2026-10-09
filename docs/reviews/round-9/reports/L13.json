@@ -1,0 +1,142 @@
+{
+  "header": "L13 · The reader who holds the spec against itself · opus",
+  "verdict": "Mostly met: 64 of the 66 round-8 L13/L13b findings with status A or M read at 8ecfbb2 as their resolutions say (exit 6, --json scope, gitsafe sandbox mode, run step 3, the code-owner review, the vocabulary rows, the ULID and timestamp rules, I30 and boundary C, J6, J12 and the rest). The largest remaining gap is new and comes from the write pass itself: one unreadable sbx output now has three error ids and two exit codes (01 1.4 says exit 2 sbx-output-unparsed, 01 1.6 and 04 run step 2 say exit 1 sbx-unknown, 03 says exit 2 upstream-shape). Two more new Required findings: the gate 1 paragraph of 01 1.4 still says every sbx-invoking command exits 3, against the protective-command rule decided on 2026-10-09; and the release grammar gives tools/release build no token, although the same section has build read the fuzz.yml run status.",
+  "round8_checked": 66,
+  "round8_resolved_as_stated": 64,
+  "findings": [
+    {
+      "id": "L13-R9-1",
+      "kind": "new",
+      "severity": "Required",
+      "section": "01 1.4; 01 1.5; 01 1.6; 04 4.2 (run step 2); 04 4.4; 03 (opening)",
+      "defect": "An sbx output romeu cannot read has three ids and two exit codes: 01 1.4 says every sbx output romeu cannot parse exits 2 with sbx-output-unparsed (RJ-309), and 01 1.5 step 5 agrees; 01 1.6 and 04 run step 2 say any answer of sbx ls --json other than exit 0, parsed and not listing the sandbox exits 1 with sbx-unknown (RJ-308); the 03 opening says a missing or mistyped field of an upstream output is upstream-shape (RJ-310, exit 2).",
+      "scenario": "The sbxdrv task implements the decoder of sbx ls --json. An sbx release that renames one field hits all three rules at once. The implementer picks one, the table tests of 04 4.4 pin it, and a script or the guide page that tells exit 1 (retry) from exit 2 (fix the setup) gets the other. The error table landing in T008 has three rows for one condition.",
+      "change": "One rule in 01 1.4, cited by 1.5, 1.6 and 04: an sbx output that does not decode or lacks a read field is upstream-shape (exit 2), naming the command; sbx-unknown (exit 1) is kept only for the cases where sbx itself exits non-zero; sbx-output-unparsed either merges into upstream-shape or is defined as the sbx-specific slug of it. Update the Raised-by cells of RJ-308 to RJ-310. Cost: three sentences and three table cells."
+    },
+    {
+      "id": "L13-R9-2",
+      "kind": "new",
+      "severity": "Required",
+      "section": "01 1.4 (Gate 1); 01 1.5; 05 5.4; I7; 04 4.2",
+      "defect": "01 1.4 still says that every command that invokes sbx compares the toolchain record and exits 3 on a mismatch, with only status and doctor reporting instead; 01 1.5 (the protective paragraph), the I7 test, the 05 5.4 row decided on 2026-10-09 (R8-01-16) and the exit codes of stop, salvage and pull in 04 4.2 (no 3) say the protective commands print a failed gate 1 and go on. approve --toolchain, which reads sbx version, is also left out of the 1.4 exception.",
+      "scenario": "The gate 1 task reads 1.4, the gate's own section, and puts the exit-3 check in the shared sbx driver for every command. romeu salvage after an sbx self-update then refuses to save work, which the decision of 2026-10-09 exists to prevent, and the I7 E test that expects salvage to go on fails against code that follows 1.4.",
+      "change": "In 01 1.4 replace the sentence with: every command that invokes sbx compares ... and exits 3 on a mismatch, except approve --toolchain, which is gate 1 itself, status and doctor, which report it, and the protective commands of 1.5, which print it and go on (05 5.4). Cost: one sentence."
+    },
+    {
+      "id": "L13-R9-3",
+      "kind": "new",
+      "severity": "Required",
+      "section": "10 10.2 (grammar table, release publish job row; Release and bootstrap step 1); index S6",
+      "defect": "The new release publish job row lets only the run steps of tools/release publish and tools/release verify hold GH_TOKEN, while step 1 of the same section has tools/release build refuse to build when the latest scheduled fuzz.yml run on main is not success, which is a GitHub API read; S6 relies on that refusal.",
+      "scenario": "The PR that adds release.yml writes build without a token. On a public repository the read works anonymously on most runs (inferred, not measured) and fails on a runner whose shared IP has spent the unauthenticated rate limit, so a release fails at random; the fix then loosens the grammar on the release and checks surfaces under release pressure, the same class round 8 rated Blocking (L13-1).",
+      "change": "Add tools/release build to the steps of the release publish job row that may hold GH_TOKEN (read is enough, the job already holds contents: write), and name in step 1 that it reads the run with that token. Cost: one cell and one clause, plus one fixture of tools/ci workflows."
+    },
+    {
+      "id": "L13-R9-4",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "index: Deferred decisions (the runtime ledger row; the record of each gate run row); ADR 0001 (Where lessons live); 12 12.7",
+      "defect": "The write pass moved lessons to one file each under docs/lessons/ (12 12.7, 12 12.3, 10 10.2 lessons row, 01 1.7, the index Boundaries), but two Reopened-by cells it wrote still name docs/lessons.md, and ADR 0001's Where lessons live row says docs/lessons.md with no amendment in ADR 0009.",
+      "scenario": "The ledger row's event is the first docs/lessons.md entry naming an in-sandbox failure; no such file will ever exist, so a reader at a release-candidate tag finds the trigger unmet by construction, and a contributor following ADR 0001 creates docs/lessons.md beside docs/lessons/.",
+      "change": "Write 'the first lesson under docs/lessons/' in both cells, and add to ADR 0009 one amendment of ADR 0001's Where lessons live row (or a pointer from that row to 12 12.7). Cost: two cells and one ADR item on the decisions surface."
+    },
+    {
+      "id": "L13-R9-5",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "04 4.1 (Exit codes); 04 4.3 (julieta spec validate); index S4",
+      "defect": "Exit 6 now means the check ran and found what it checks for, and spec validate --catalog exits 6 on an unknown backend:tool, while the same command exits 2 (usage or precondition, invalid spec) when the check it exists for finds a schema or rule error, so one command reports its findings with two codes and 2 again carries two meanings.",
+      "scenario": "A config repo's validate.yml, pinned to a julieta release, or an agent in J2 step 1 reads exit 2 as a broken invocation and retries or reports a tool bug, when the spec it was asked to check is invalid; once the error table is on the contracts surface, the code is hard to change.",
+      "change": "Make spec validate exit 6 (check-findings) for every finding in the files it was given, keep 2 for a bad flag or an unreadable file, and add spec validate to the exit-6 list of 4.1 and to RJ-328's Raised-by cell. Cost: two cells and one row."
+    },
+    {
+      "id": "L13-R9-6",
+      "kind": "unresolved",
+      "round8_ref": "L13-14 (R8-01-33, M)",
+      "severity": "Advisory",
+      "section": "01 1.7; 04 4.2 (run step 3); 04 4.1 (Warnings); 04 4.4",
+      "defect": "R8-01-33 asked for the row recreate needed with Not: stale for the recreate digest; the row exists with an empty Not column, run step 3 still prints recreate-pending with the text 'stale: <fields> changed', and the one condition (the recreate digest differs from the generation's) carries two slugs, the warning recreate-pending on a running sandbox and the error recreate-needed (RJ-305) on a stopped one, beside status's 'recreate needed'.",
+      "scenario": "tools/ci vocabulary cannot flag 'stale' because it is not in the Not column, so help text and guide pages keep using it for three different things (toolchain-stale, layout-stale, the recreate digest); a reader of status JSON and of run's stderr matches two slugs for one condition.",
+      "change": "Fill the Not column of recreate needed with 'stale (for the recreate digest)', change the warning text to 'recreate needed: <fields> changed -> romeu recreate <name>', and name the warning recreate-needed too (a warning row and an error row may share a slug, as doctor's checks do), or state in 4.1 why they differ. Cost: one cell, one string, one slug."
+    },
+    {
+      "id": "L13-R9-7",
+      "kind": "unresolved",
+      "round8_ref": "L13-22 (R8-01-26, M)",
+      "severity": "Advisory",
+      "section": "04 4.2 (How romeu run reaches the run layout, step 2); 01 1.6 (Generation); J10 step 2",
+      "defect": "01 1.6 now keeps a lost record that salvage --from-host wrote for the generation and writes one only otherwise, but 04 run step 2 still imports into a new salvage id and records result: lost unconditionally, so the two texts still allow two lost records for one loss.",
+      "scenario": "The run task follows 04's numbered steps, the record test follows the generated 1.6 table, and an operator who ran salvage --from-host before run finds two lost records for one generation in status, which is the defect round 8 closed.",
+      "change": "In run step 2 write 'preserves it as the closed-lost row of 01 1.6 says (keeping a lost record salvage --from-host already wrote)' and drop the restated import list, or add the same clause. Cost: one sentence."
+    },
+    {
+      "id": "L13-R9-8",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "11 11.1 (A12, A15); 01 1.2 (Where data lives); 06 6.2",
+      "defect": "What of the workload's volumes survives sbx env rm is measured by two probes: A12 records the volumes and what survives sbx env rm and a recreate, A15 runs sbx env rm and lists the volumes; 01 1.2 cites A15 and 06 6.2 cites A12, and A15's Feeds cell does not name 06 6.2 or 01 1.2.",
+      "scenario": "The two probes run on different days or workload digests and record different survivors; rm's printed list (06 6.2, from A12) and the store table (01 1.2, from A15) then disagree, and a workload pin change re-runs only the probes 11 11.4 lists for it.",
+      "change": "Keep the observation in one probe (A12, which already holds the volume list), delete it from A15, and cite A12 in 01 1.2. Cost: one cell edit in each of two tables."
+    },
+    {
+      "id": "L13-R9-9",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "ADR 0009 decision 5; 10 10.1 (Rules); index Q27",
+      "defect": "ADR 0009 decision 5 says tools/ci all is offline except the vulnerabilities step, while 10 10.1, the list the index row on re-reading the rulesets points to, names the license step's image pull inside all as well; and Q27's default says the workload base image and the herdr download join 10 10.1's rule, while 10 10.1 ends 'Nothing else in a test or a step reads it'.",
+      "scenario": "A maintainer running all without the network reads ADR 0009, expects only vulnerabilities to fail, and gets a license failure classed as a test failure; the container e2e task reads 10.1 and treats the herdr download as forbidden although Q27's default admits it.",
+      "change": "Make 10 10.1 the one list: have ADR 0009 decision 5 say 'all reads the network only where 10 10.1 lists', and add the two Q27 reads to 10.1's list with Q27 cited as the default. Cost: one ADR clause (decisions surface) and one list item."
+    },
+    {
+      "id": "L13-R9-10",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "12 12.5; 03 (opening); 04 4.4",
+      "defect": "The write pass added to 12 12.5 the rule 'The spec names no plan task; the plan cites the spec', and 04 4.4 (the list stands until the table of 4.1 lands, T008) and the 03 opening (T021 for project.v1) name plan task ids.",
+      "scenario": "The plan renumbers in stage B; 04 4.4 and 03 then point at the wrong tasks, and the rule written to prevent that is broken on the day it lands.",
+      "change": "Replace each id with the event: 'until the error table of 4.1 lands in internal/cli' and 'the pull request that lands a format's generator'. Cost: two clauses."
+    },
+    {
+      "id": "L13-R9-11",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "07 7.5; 02 2.2; 03 3.5",
+      "defect": "02 2.2 and 07 7.5 have the config project list api.github.com in egress.extra for julieta pin check --workflows, while derivation step 4 adds the meta and base sets, which hold api.github.com for every project, and step 7 already gates it as upload: true, so one host is reached two ways.",
+      "scenario": "An operator removes api.github.com from the config spec's egress.extra and expects pin check to lose access, and it keeps it through the base set; a later catalog change that drops it from base then breaks pin check, although the spec still lists it.",
+      "change": "In 07 7.5 and 02 2.2 list only the registry hosts in egress.extra, and say that api.github.com comes from the base set. Cost: two clauses."
+    },
+    {
+      "id": "L13-R9-12",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "05 5.3; 12 12.4; 02 2.1; 03 3.13",
+      "defect": "docs/grants.yaml, a file tools/ci pr reads as a gate input, is absent from the 02 2.1 tree, from the schema list, and from 03 3.13's formats without a schema, which the 03 opening says together cover every format; and the set of grantable surfaces is written twice, in 05 5.3 and 12 12.4, although 05 5.3 says the approval rules are defined in one place, 12 12.4.",
+      "scenario": "The task that adds grants to tools/ci pr invents the file's shape; a later change to the grantable set (the pending G5 decision is one) edits one list and not the other.",
+      "change": "Add docs/grants.yaml to 02 2.1 and to 03 3.13 with its reason (read by one program, pinned by its test), and in 05 5.3 replace the surface list with a pointer to 12 12.4. Cost: two lines and one sentence."
+    }
+  ],
+  "pages_read": [
+    "docs/reviews/lenses.md (L13; What a reviewer returns; How stage A runs)",
+    "docs/reviews/round-8/reports/L13.json, L13b.json",
+    "docs/reviews/round-8/clusters-*.json (the clusters holding L13 and L13b findings)",
+    "docs/reviews/round-8.md (Status column of those clusters; session checkpoints)",
+    "docs/spec.md (full)",
+    "docs/spec/00-scope.md (0.3 to 0.6)",
+    "docs/spec/01-system-model.md (full)",
+    "docs/spec/02-layouts.md (2.1 tree, 2.2)",
+    "docs/spec/03-formats.md (opening, 3.5, 3.12, 3.13; timestamp and ULID examples)",
+    "docs/spec/04-cli.md (full)",
+    "docs/spec/05-security.md (5.1 sandbox mode, I7, I13, I24, I30, 5.3, 5.4)",
+    "docs/spec/06-kits.md (6.2)",
+    "docs/spec/07-mise-egress.md (7.4 GitHub rate limit row, 7.5)",
+    "docs/spec/09-journeys.md (full)",
+    "docs/spec/10-testing-style.md (10.1 rules, 10.2 grammar, Release and bootstrap)",
+    "docs/spec/11-host-probes.md (A12 to A15)",
+    "docs/spec/12-engineering.md (12.1 gh, 12.3 lesson rows, 12.4 approval line and grants, 12.5, 12.7, 12.9 merge row)",
+    "docs/adr/0008 (status), docs/adr/0009 (status, decisions 5 to 10), docs/adr/0001 (Where lessons live row)",
+    "docs/plan.md (Questions for the maintainer)",
+    "git diff f82eab6 8ecfbb2 for docs/spec.md, docs/spec, docs/adr, docs/plan.md (stat in full; hunks on lessons, fuzz.yml and the release job read)"
+  ],
+  "out_of_scope": "Round-8 findings with status operator (L13-5, L13-25, L13-27, L13-34; L13b-2, L13b-4, L13b-8, L13b-21, L13b-29, L13b-30), L (L13b-37, the L half of L13-23) and parked (L13-36, L13b-42, L13b-43) were not re-checked, as the brief says. Of the 66 A/M findings, these were read against their resolution text in full: exit 6, --json scope, approve, run step 3, gitsafe sandbox mode, the code-owner review, S1, the offline row, I7, I30 and boundary C, J6, J12, J1 step 5, the vocabulary rows, the ULID and timestamp rules, 03 3.13, Q25 and the Settled-by column, the plan's questions moved to the index, the merge-commit reason, PROLOGUE.md, gh by mise which, sync marked P, the workspace-file writers, sandboxOptions on the ungated list, the lifecycle tables. The rest (for example R8-11-12's diagram list, R8-05-23's cell edits, R8-12-23, R8-03-30) were checked by a search for the changed phrase only, not by a full reading. Pages 08 and 13 and the plan's task tables were skimmed in the diff stat only: 13 is now designed and not built, and plan findings are parked for stage B. Whether anonymous GitHub API reads from hosted runners hit the rate limit (L13-R9-3) is inferred, not measured. The G5 approvals-surface item, which is open for the operator, was not judged.",
+  "confidence": "High for the three Required findings and the two unresolved ones: each quotes text present at 8ecfbb2 on both sides. Medium for the count of 64 resolved findings, because about a third of them were confirmed by a phrase search rather than a full reading."
+}
