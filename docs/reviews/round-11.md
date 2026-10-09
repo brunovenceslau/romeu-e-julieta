@@ -258,10 +258,9 @@ None of the three clusters cites the `sequences` step of 10 10.2, the
 section T004 implements; the criteria are judged for the spec as a
 whole, so the answer stays no until they hold.
 
-What is left before T004, after the write pass below:
+What is left before T004, after the write pass below (D1 and D2 of
+this page, and D5 and D6 of round 10, were answered on 2026-10-09):
 
-- the answers to D1 and D2 of this page, given on 2026-10-09 (above),
-  and to D5 and D6 of round 10;
 - a targeted re-audit of the pass, round 12, by the lenses of the three
   Required clusters, L0, L2, L3, L6, L12, L13 and L14, reading only
   the sections it changes; the verdicts of the other lenses are carried
@@ -331,3 +330,41 @@ One command line a row names was checked before it was written:
 matched a nested `refs/romeu/salvage/<generation>/<salvage-id>/...`
 ref on a commit no branch holds, with git 2.53.0 in a scratch
 repository on 2026-10-09.
+
+## Session checkpoint (2026-10-09)
+
+Branch and pull request state is not recorded here; the next session
+measures it with `handoff_state.py`.
+
+### Done
+
+- Round 11 ran: seventeen lenses on d133542, then the consolidation.
+- Its write pass was applied on branch `docs/review-round-9`, the
+  branch of pull request #36, as described above.
+- [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md)
+  records the decisions of 2026-10-09 on the administrator bypass,
+  the token narrowing and the direct-push refusal, with the spec
+  texts they change.
+
+### Open for the maintainer
+
+Steps on the host and on GitHub, in this order:
+
+1. Remove "Repository admin" from the bypass list of ruleset 24611273,
+   `default-branch`, and save the API answer that shows no bypass actor
+   under the Evidence of the pull request that records it (ADR 0011,
+   decision 1).
+2. Create the fine-grained token of ADR 0011, decision 2, and set it as
+   the development sandbox's `github` secret with `sbx secret set`.
+3. Stop forwarding the GitHub authentication SSH key to the sandbox.
+4. Run probe A16 on the host again, and the four tries of item d of the
+   maintainer block (10 10.2), the direct push to the default branch
+   among them.
+5. The merges, each once its approval lines are ticked and its CI is
+   green.
+
+### Next steps
+
+- Round 12, the targeted re-audit of this write pass, limited to the
+  lenses that raised the round-11 Required clusters: L0, L2, L3, L6,
+  L12, L13 and L14.
