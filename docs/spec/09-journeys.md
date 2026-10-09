@@ -173,13 +173,16 @@ work as usual.
    `open -> salvaging`, new salvage id and host base SHAs for the
    generation's recorded repo set; [X->J] `julieta salvage
    --stop-agents`; [H] verify, unbundle, cross-check daemon heads,
-   import.
+   import; complete (or accepted, step 4) -> generation
+   `salvaging -> removing`, written before `sbx env rm`.
 4. [H] incomplete -> exit 5 listing what would be lost, each with its
    reason; the operator fixes each reason as the guide page says for it
    (pushes the work, frees the space, starts the sandbox) or reruns with
    `--accept-loss=<reason>[,<reason>]`, naming each reason it accepts.
 5. [X] `sbx env rm <dir>`; [H] remove romeu-applied egress rules;
-   generation `salvaging -> closed-removed`. For `recreate`, continue
+   generation `removing -> closed-removed`. If `sbx env rm` fails, the
+   generation stays `removing` and romeu exits 1; the same command run
+   again resumes at `sbx env rm`. For `recreate`, continue
    with J3b. If that create fails because an upstream artifact is gone
    (a workload digest, the frontend, a kit download host), the
    generation stays closed, the salvage refs and memory are intact and
@@ -254,7 +257,9 @@ work as usual.
 
 1. [O] `romeu status foo` shows `absent; generation <G> open; snapshot
    <T>; refs/sandboxes last fetched <T2>`.
-2. [O] `romeu run foo`: [H] preserves generation G (imports
+2. [O] `romeu run foo`: [H] preserves generation G as the closed-lost
+   row of [01 1.6](01-system-model.md#generation) says (it keeps a lost
+   record `salvage --from-host` already wrote, else imports
    `refs/sandboxes/foo/*` and every `snapshot/heads.bundle` into
    `refs/romeu/salvage/foo/<G>/<salvage-id>/`), moves it to
    `closed-lost` with `result: lost`, prints the lost record with its

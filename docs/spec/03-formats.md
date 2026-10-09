@@ -37,11 +37,15 @@ Outputs of tools the product does not own (`sbx ls --json`, sbx policy
 and secret listings, `mise.lock`, herdr replies, registry manifests,
 GitHub API JSON) are decoded tolerantly and checked strictly: unknown
 fields are allowed; every field romeu or julieta reads is required and
-typed; a missing or mistyped field is the error id `upstream-shape`,
-naming the upstream and its live version; no parser returns absent,
-none or an empty list for a shape it did not recognize. The generation
-machine and preflight step 5 rest on this rule
-([01 1.6](01-system-model.md#16-state-machines),
+typed; a body that does not decode, or a missing or mistyped field, is
+the error id `upstream-shape` (`RJ-310`, exit 2), naming the upstream
+and its live version; no parser returns absent, none or an empty list
+for a shape it did not recognize. An sbx call that exits non-zero is
+not a shape error: it is `sbx-unknown` (`RJ-308`, exit 1) where the
+command needs to know whether a sandbox is absent. Gate 1, the
+generation machine and preflight step 5 rest on this rule
+([01 1.4](01-system-model.md#gate-1-toolchain-acknowledgement-per-machine),
+[01 1.6](01-system-model.md#16-state-machines),
 [01 1.5](01-system-model.md#15-preflight-before-every-mutating-sbx-call)).
 
 Validation rules live as data in `internal/spec/rules.go`: each rule
@@ -160,7 +164,7 @@ The classification is the struct tags on the spec types
 | `egress.extra`, `egress.tools` | widening | live | |
 | `salvage.excludeIgnored` | widening | live | it defines acknowledged loss |
 | `sandboxOptions` (`cpus`, `memory` only) | - | recreate | `status` reports recreate needed; stripped from `renderDigest`; on the list of deliberately ungated fields (01 1.4), an accepted risk of [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1) |
-| `run` | - | live | pane commands run only inside the sandbox |
+| `run` | - | live | pane commands run only inside the sandbox; on the list of deliberately ungated fields (01 1.4) |
 
 There is no field for a host command, an absolute path, a mount, or an
 env var for the sandbox as a whole or for sbx; a pane's `env` reaches

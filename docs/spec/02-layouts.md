@@ -144,7 +144,7 @@ $ROMEU_ROOT/                            default $HOME/dev; never a VS Code trust
 ├─ review.code-workspace                derived: folders = every review checkout; open in Restricted Mode
 ├─ .attic/<name>/<UTC-ts>/              retired projects (moved, never deleted by romeu); .attic/ is mode 0700
 └─ <name>-env/                          one per project; <name> = sandbox name; mode 0700
-   ├─ .metadata_never_index             written by sync, outside every mount; keeps Spotlight from parsing agent-written files
+   ├─ .metadata_never_index             written by sync, outside every mount; keeps Spotlight from parsing agent-written files (probe A17)
    ├─ sbxenv.yaml                       derived, never hand-edited; the promotion commit point
    ├─ .romeu/
    │  ├─ render.json                    derived: spec source, SHAs, file digests, egress, digests, promotion marker

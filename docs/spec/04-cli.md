@@ -12,7 +12,7 @@ are derived from the same data this page specifies.
 | Output | human text on stdout; `--json` on every command a program calls, named in its row, emits one JSON document, or one object per line where the row says so, with a schema in `schemas/` named after the command (`<binary>-<command>.v1`, [02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public)); errors on stderr, one line first, details after. All output goes through the CLI writer, which escapes with `termsafe` by default (I29); raw output is an explicit, named exception (only the final `exec` of `romeu run`, see 05 5.4). Every document romeu decodes from a subprocess in a sandbox or from a mount is decoded strictly with a size cap, and no string from it becomes a path, a ref or an argv element without the validators of [03 3.1](03-formats.md#31-name-and-path-rules-shared) |
 | Exit codes | `0` ok; `1` operation failed; `2` usage or precondition (bad flags, invalid settings/spec, missing or too-old sbx/git, missing secret binding, incompatible julieta, unknown sandbox, illegal state transition); `3` approval required (gate 1 or 2); `4` drift detected, or an interrupted promotion abandoned; `5` refused to protect data (incomplete salvage, unrecovered or unpushed work, a stopped sandbox that needs a recreate); `6` the check ran and found what it checks for (`romeu doctor`, `julieta lock --check`, `julieta pin check`, `julieta spec validate --catalog`, `julieta memory check`), so `1` keeps the one meaning "the operation failed" |
 | Error ids | every error has a stable id `RJ-<nnn>`, a slug, an exit code, a message and a fix hint, defined in one data table in `internal/cli`. The number is one sequence and carries no meaning: the exit code is a field of the row, so an error moved to another exit keeps its id. An id is never reused or renumbered; a retired id stays in the table, marked retired, with its last text. The ids written before this rule keep their numbers, and a new id takes the next number after the highest. The text output prints `error RJ-301 project-approval-required: <message>` then `fix: <hint>`; `--json` errors carry `{"id", "slug", "exit", "message", "fix"}`; tests assert ids, never message text; `docs/reference/errors.md` and `exit-codes.md` are generated from the table. A fix hint begins with a command line the user can run, its placeholders filled from context, or with `decide:` and the choice; every command line in a fix hint and in a `--help` example is matched against the command definitions by the matcher of ADR 0001 rule 13; a hint that names `--overwrite-drift`, `--accept-loss` or `--force` says what that flag discards. The details of an error a failed subprocess raised carry its escaped argv, its exit status, the first 4 KiB of its stderr, the numbered step of 4.2 it ran in, and the romeu, julieta and sbx versions; they hold no secret value, since romeu never handles one (I25), so they can be pasted into an issue. A subsystem's reasons are rows of the same table, each row saying who raises it. The ids this specification names are listed in 4.4 |
-| Warnings | a warning is printed, escaped, and changes no exit code. Each is a row of the same table, by slug and with no id, as is each check of `romeu doctor` (4.2): `sbx-untested`, `spec-moved`, `recreate-pending`, `layout-stale`, `skills-stale`, `snapshots-disabled`, `no-final-handoff`, `version-only-tool`, `default-branch-moved`, `lock-no-checksum`, `lock-unknown-tool`, `agent-hooks-missing`, `julieta-pin-mismatch` |
+| Warnings | a warning is printed, escaped, and changes no exit code. Each is a row of the same table, by slug and with no id, as is each check of `romeu doctor` (4.2): `sbx-untested`, `spec-moved`, `recreate-needed`, `layout-stale`, `skills-stale`, `snapshots-disabled`, `no-final-handoff`, `version-only-tool`, `default-branch-moved`, `lock-no-checksum`, `lock-unknown-tool`, `agent-hooks-missing`, `julieta-pin-mismatch`. `recreate-needed` names one condition, the recreate digest differing from the generation's: a warning on a running sandbox and the error `RJ-305` on a stopped one, so the two rows share the slug |
 | Idempotency | a mutating command converges: a second run with no input change leaves every file's content and mode and every ref as they were, except the documented state timestamp `lastRunAt`. The appending commands add one thing per run by design, and this is the list: `romeu salvage`, and `rm`, `recreate` and `retire` through it (a salvage id with its record and refs); `romeu stop`, `romeu pull` and `julieta snapshot` (a rewritten `snapshot/heads.json`, whose `createdAt` moves); `julieta memory add` (an entry, unless an open entry with the same content digest exists: then it prints that entry's id and writes nothing); `julieta handoff write` (a handoff file). Each appending julieta command prints what it wrote, its id and path, in text and with `--json`, so a caller whose call timed out can tell whether the write landed. This list, the **P** marker of 4.2 and the lock of the next row are fields of each command definition, with no default, so a definition without them fails generation ([12 12.3](12-engineering.md#123-generators)); the meta-test of 10 10.1 reads the same fields |
 | Locking | mutating romeu commands take `$XDG_STATE_HOME/romeu/romeu.lock` (flock, non-blocking; `RJ-101 locked`, "another romeu is running"), then run promotion recovery (01 1.6). The lock is held for the whole command, sbx calls included, and released before the final `exec` of `run`, so an attached `run` blocks no other command. One lock per machine is a chosen cost: commands on different projects wait for each other, a create that builds kits included; a lock per project is a row of [Deferred decisions](../spec.md#in-the-product) |
 | Subprocesses | romeu: only `sbx` and `git` by absolute path from host settings, with a scrubbed env (`PATH=/usr/bin:/bin`, `HOME`, `LANG=C`, `TERM` for interactive calls, and `SSH_AUTH_SOCK=<signing.agentSocket>` for sbx calls of a project using `git-ssh-sign`). julieta: `git`, `mise`, `herdr`. `sbx version`, `sbx ls --json` and the settings and policy listings are reads; a mutating sbx call changes a sandbox, a policy or a secret. Every subprocess has a timeout (10 10.6), past which it fails with `subprocess-timeout`, except the salvage exec, which moves up to the salvage cap over the mount and stops only on an interrupt; an interrupted salvage leaves its dir without a `manifest.json`, which verification ignores and keeps (08 8.5) |
@@ -105,20 +105,23 @@ dir`, see J13).
    `sbx ls --json` and refused the two cases that are not this
    project's sandbox: one romeu has no open generation for
    (`RJ-203 unknown-sandbox`, fix hint "check its workspace, then
-   `romeu adopt <name>`") and one whose workspace path differs. Absent
-   means `sbx ls --json` exited 0, parsed, and did not list the
-   sandbox; any other answer exits 1 with `sbx-unknown` and changes
-   nothing. An absent sandbox with an open generation is preserved:
-   import `refs/sandboxes/<name>/*` and every `snapshot/` bundle into
-   `refs/romeu/salvage/<name>/<gen>/<new salvage id>/`, record
+   `romeu adopt <name>`") and one whose workspace path differs. Absent,
+   `sbx-unknown` and `upstream-shape` are as
+   [01 1.6](01-system-model.md#generation) defines them. An absent
+   sandbox with an open generation is preserved as the closed-lost row
+   of 01 1.6 says, keeping a lost record `salvage --from-host` already
+   wrote for the generation; otherwise romeu imports
+   `refs/sandboxes/<name>/*` and every `snapshot/` bundle into
+   `refs/romeu/salvage/<name>/<gen>/<new salvage id>/` and records
    `result: lost` with the newest facts' counts as the reasons
-   `dirty-at-last-facts:<n>` and `stashes-at-last-facts:<n>`, and move
-   the generation to `closed-lost`. `run` then prints a fixed block (the
-   lost generation, the time of its last snapshot, the branches and the
-   salvage id preserved with the salvage ref prefix it wrote, and the
-   dirty and stash counts as not preserved, with `romeu handoff <name>`
-   to read them and J10 step 3 to recover a branch) and exits 1; the
-   next `run` creates ([01 1.6](01-system-model.md#generation)).
+   `dirty-at-last-facts:<n>` and `stashes-at-last-facts:<n>`. Either
+   way the generation moves to `closed-lost`. `run` then prints a fixed
+   block (the lost generation, the time of its last snapshot, the
+   branches and the salvage id preserved with the salvage ref prefix it
+   wrote, and the dirty and stash counts as not preserved, with
+   `romeu handoff <name>` to read them and J10 step 3 to recover a
+   branch) and exits 1; the next `run` creates
+   ([01 1.6](01-system-model.md#generation)).
 3. Compare the recreate digest of the live render with the open
    generation's, then act on the sandbox's state:
    - absent: record a new generation first (01 1.6), then
@@ -136,8 +139,8 @@ dir`, see J13).
      (what sbx does with an env file that changed under a stopped
      sandbox is recorded by A15).
    - running: no `sbx env run`; when the digests differ, warn
-     `recreate-pending` ("stale: <fields> changed -> romeu recreate
-     <name>").
+     `recreate-needed` ("recreate needed: <fields> changed -> romeu
+     recreate <name>").
 
    romeu names the env file by path; whether sbx also reads a sandbox
    configuration from the workspace tree is recorded by probe A5, and
@@ -196,7 +199,7 @@ condition is also an error elsewhere (`drift-detected`,
 | sbx: `env.rememberHostCommands` not true | `sbx-remember-commands` | warn |
 | sbx: `kit.allowedSources` does not admit the workload registries | `sbx-allowed-sources` | fail |
 | root inside a git repo, equal to `$HOME`, not absolute, not owned by the user, or containing host settings/state | `root-unsafe` | fail |
-| root under `~/Library/Mobile Documents`, `~/Library/CloudStorage/` or `~/Dropbox`, or not excluded from Time Machine; a `<name>-env/` without its `.metadata_never_index` marker | `root-indexed` | warn |
+| root under `~/Library/Mobile Documents`, `~/Library/CloudStorage/` or `~/Dropbox`, or not excluded from Time Machine; a `<name>-env/` without its `.metadata_never_index` marker, the form probe A17 measures ([11 11.1](11-host-probes.md#111-block-a---sbx-and-runtime-facts-first-in-parallel-with-the-first-build-layer)) | `root-indexed` | warn |
 | `$ROMEU_ROOT/.attic` or a `<name>-env/` that its group or others can access | `tree-mode` | fail |
 | a symlink under `$HOME` (depth 1) or `$HOME/.config` (depth 2) resolving into `$ROMEU_ROOT` | `home-symlink` | fail (I23) **pre** |
 | mise `trusted_config_paths` or a direnv allow list covering `$ROMEU_ROOT` | `auto-trust` | fail (I23) **pre** |
@@ -280,12 +283,12 @@ and this section is a link to `docs/reference/errors.md`.
 | `RJ-302` | `toolchain-approval-required` | 3 | gate 1 ([01 1.4](01-system-model.md#gate-1-toolchain-acknowledgement-per-machine)); fix `romeu approve --toolchain` |
 | `RJ-303` | `drift-detected` | 4 | preflight step 3 and `sync` step 7 |
 | `RJ-304` | `interrupted-promotion-abandoned` | 4 | promotion recovery ([01 1.6](01-system-model.md#promotion-commit)); fix `romeu sync <name>` |
-| `RJ-305` | `recreate-needed` | 5 | `run` step 3, on a stopped sandbox |
+| `RJ-305` | `recreate-needed` | 5 | `run` step 3, on a stopped sandbox; on a running one the same slug is a warning (4.1, Warnings) |
 | `RJ-306` | `salvage-incomplete` | 5 | `salvage`, `rm`, `recreate`, `retire`; the details name each reason, and the hint the `--accept-loss=<reason>` that accepts it |
 | `RJ-307` | `salvage-path` | 5 | salvage verification ([03 3.11](03-formats.md#311-salvage-manifest-schema-salvagev1)) |
-| `RJ-308` | `sbx-unknown` | 1 | any command that needs to know whether a sandbox is absent ([01 1.6](01-system-model.md#generation)) |
-| `RJ-309` | `sbx-output-unparsed` | 2 | gate 1 and preflight step 5 ([01 1.4](01-system-model.md#gate-1-toolchain-acknowledgement-per-machine)) |
-| `RJ-310` | `upstream-shape` | 2 | every decoder of an output the product does not own ([03](03-formats.md), opening) |
+| `RJ-308` | `sbx-unknown` | 1 | any command that needs to know whether a sandbox is absent, when `sbx ls --json` exits non-zero ([01 1.6](01-system-model.md#generation)) |
+| `RJ-309` | `sbx-output-unparsed` | 2 | retired: merged into `RJ-310`; its last text was "gate 1 and preflight step 5" |
+| `RJ-310` | `upstream-shape` | 2 | every decoder of an output the product does not own, sbx outputs included: gate 1, preflight step 5 and the generation machine ([03](03-formats.md), opening) |
 | `RJ-311` | `format-newer` | 2 | every reader of a versioned format ([03](03-formats.md), opening) |
 | `RJ-312` | `julieta-not-embedded` | 2 | `run`, `sync` and promotion in a build without julieta ([02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public)) |
 | `RJ-313` | `manifest-size` | 2 | `sync` and `julieta spec validate` ([03 3.6](03-formats.md#36-julieta-manifest-schema-manifestv1)) |

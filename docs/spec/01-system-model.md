@@ -40,7 +40,7 @@ built in v1; it waits for its row in
 | Derived from state | `$ROMEU_ROOT/dev.code-workspace`, `$ROMEU_ROOT/review.code-workspace` | romeu (each promotion, `retire` and `pull`) | written again whole from host state each time; no record holds their hash, so they are not drift-checked; `doctor` derives them again from host state and reports a difference, and the next promotion, `retire` or `pull` overwrites a hand edit |
 | Derived, in sandbox | secondary clones, installed tools, julieta manifest cache, herdr layout, the `julieta` link on `PATH` | julieta | disposable; recreated by `julieta setup` |
 | sbx-owned facts romeu reads | sandbox existence, state and workspace path (`sbx ls --json`); the `remote.sandbox-<name>.*` keys sbx writes into the primary host clone's `.git/config`, of which romeu reads the URL; sbx version | sbx | read only |
-| Agent output that reaches the host | memory dir files, `snapshot/heads.json` among them; git objects via fetch or bundle; julieta's `--json` stdout read over `sbx env exec` (`version`, `setup`, `status`, `salvage`) | agents / julieta | data only: validated, escaped for display, stored in romeu namespaces or as ledger entries; never executed, never checked out outside a hardened review checkout |
+| Agent output that reaches the host | memory dir files, `snapshot/heads.json` among them; git objects via fetch or bundle; julieta's `--json` stdout read over `sbx env exec` (`version`, `setup`, `status`, `salvage`) | agents / julieta | data only: validated, escaped for display, stored in romeu namespaces; never executed, never checked out outside a hardened review checkout |
 | Host facts the agent reads | the project's live spec commit: `specCommit` in the manifest ([03 3.6](03-formats.md#36-julieta-manifest-schema-manifestv1)), fresh at each exec | romeu | the manifest schema. The candidate state is host-only: the agent compares `specCommit` with the commit it pushed to learn whether its spec change is live |
 
 *Why for us (drift rule):* chezmoi refuses to overwrite a target that
@@ -65,7 +65,7 @@ layouts are in [02 2.3](02-layouts.md#23-host-tree) and
 | host settings | `$XDG_CONFIG_HOME/romeu/settings.yaml` | the operator's | romeu; never mounted | until the operator deletes it | kept / kept |
 | host state | `$XDG_STATE_HOME/romeu/` (gate 1 record, project records, descriptor cache, lock) | romeu's records | romeu; never mounted | the machine's | generation closed / record moved to the state attic |
 | state attic | `$XDG_STATE_HOME/romeu/attic/<name>/<UTC-ts>/` | the operator's | nobody; romeu writes it once | until the owner deletes it (J7 step 4) | - / created |
-| sbx sandbox and its per-name volumes | sbx's storage | agent work inside the sandbox | sbx and the sandbox | one generation | removed after salvage; volumes as probe A15 records / the same |
+| sbx sandbox and its per-name volumes | sbx's storage | agent work inside the sandbox | sbx and the sandbox | one generation | removed after salvage; volumes as probe A12 records / the same |
 | romeu-applied egress rules | sbx policy, per sandbox | the operator's approvals | sbx | while the generation is open | removed / removed |
 | keychain entries | named by each secret argv in host settings | the operator's | the secret argv on the host; sbx injects the value | the operator's | kept / kept |
 | signing agent socket | `signing.agentSocket` | the operator's signing key | sbx forwards it into a `git-ssh-sign` sandbox | the operator's | kept / kept |
@@ -80,7 +80,7 @@ The table is written by hand; generating it is a row of
 | **A. sandbox -> host** | Anything an agent wrote reaches the host only as data. romeu never runs mise, hooks, filters, tasks or scripts from repo content; never checks out agent-sourced content except into a hardened review checkout; escapes every agent-originated string before printing it | I1-I6, I12, I17, I24, I27, I28, I29 |
 | **B. spec -> host commands** | A spec names secrets; the command resolving a name lives in host settings, keyed `name@project`. romeu never handles a secret value. | I8, I25 |
 | **C. spec -> sandbox capability** | Every widening goes through the per-project gate; toolchain changes go through the per-machine acknowledgement. Nothing unapproved is ever at a live path, except an adopted generation, which is accepted as it stands until it is recreated (1.6). julieta is delivered read-only into a sandbox and checked for compatibility there ([06 6.3](06-kits.md#63-julieta-delivery)); it also runs in the config repo's CI from a release pinned by version and checked by `julieta pin check --workflows` ([02 2.2](02-layouts.md#22-config-repo)), where no romeu exists. | I7, I15, I28, I30 |
-| **D. host UI -> agent trees** | No host tool romeu configures is pointed at an agent-writable tree. Workspace files list host clones and review checkouts only, both to be opened in Restricted Mode (host clones carry origin content that agents can push); memory dirs are never workspace folders. Host indexers are kept off by a `.metadata_never_index` marker `sync` writes in each `<name>-env/` ([02 2.3](02-layouts.md#23-host-tree)); `doctor` warns when the marker is missing or `$ROMEU_ROOT` is in a Time Machine-included or cloud-synced path, and what an indexer still reaches is a residual risk of [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1). Only VS Code's trust settings are checked ([04 4.2](04-cli.md#checks-run-by-romeu-doctor)); another editor's trust model is the operator's to verify. | I13, I14, I23 |
+| **D. host UI -> agent trees** | No host tool romeu configures is pointed at an agent-writable tree. Workspace files list host clones and review checkouts only, both to be opened in Restricted Mode (host clones carry origin content that agents can push); memory dirs are never workspace folders. Host indexers are kept off by a `.metadata_never_index` marker `sync` writes in each `<name>-env/` ([02 2.3](02-layouts.md#23-host-tree)), whose effect probe A17 measures; `doctor` warns when the marker is missing or `$ROMEU_ROOT` is in a Time Machine-included or cloud-synced path, and what an indexer still reaches is a residual risk of [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1). Only VS Code's trust settings are checked ([04 4.2](04-cli.md#checks-run-by-romeu-doctor)); another editor's trust model is the operator's to verify. | I13, I14, I23 |
 | **E. sandbox -> network** | Egress = catalog-derived domains from pinned commits plus gated extras; upload-capable domains are always gated. Defense in depth, not containment. | I9, I10, I22 |
 | **F. sandbox identity** | romeu acts only on sandboxes with an open generation (1.7) it recorded (by create or `adopt`), whose workspace path matches the project's primary clone | I19, I26 |
 
@@ -105,19 +105,24 @@ the projects each change affects, the live sbx version beside the
 newest recorded one, and `downgrade` beside any version lower than the
 recorded one. Every command that invokes sbx compares the live
 `sbx version`, its own version and sha256 and its embedded catalog
-digest to the record and exits 3 on a mismatch; `romeu status` and
-`romeu doctor` report the mismatch instead of exiting 3. This keeps an
-sbx or romeu upgrade from turning into a gate on every project.
+digest to the record and exits 3 on a mismatch, except
+`romeu approve --toolchain`, which is gate 1 itself, `romeu status` and
+`romeu doctor`, which report the mismatch, and the protective commands
+of 1.5, which print it and go on
+([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1)). This
+keeps an sbx or romeu upgrade from turning into a gate on every
+project.
 
 The tested window is the set of sbx versions with a recording set under
 `e2e/testdata/sbx/`. A live version outside it is reported by `status`
 and `doctor` as the warning `sbx-untested`, naming the version and the
-recorded range; **P** commands print it and go on. Every sbx output
-romeu cannot parse exits 2 with `sbx-output-unparsed`, naming the
-command and the recorded versions. A dev build carries the version
-`v0.0.0-dev+<commit>` and is acknowledged like any other version, once
-per build per machine; when julieta and the catalog are unchanged the
-prompt is a single line.
+recorded range; **P** commands print it and go on. An sbx output
+romeu cannot parse, or one that lacks a field romeu reads, is
+`upstream-shape` (exit 2) by the upstream rule of [03](03-formats.md)
+(opening), and its details name the recorded versions. A dev build
+carries the version `v0.0.0-dev+<commit>` and is acknowledged like any
+other version, once per build per machine; when julieta and the catalog
+are unchanged the prompt is a single line.
 
 *Why for us:* sbx updates itself, and romeu or sbx can be replaced by a
 package manager run or by another process or person on the machine; a
@@ -152,8 +157,9 @@ which `docs/reference/project.md` replaces once its generator lands.
 Fields deliberately left ungated are listed in one committed list
 beside the tags; `go generate` fails on a field that is on neither, so
 a forgotten tag is a generator failure, not a silent strip (I7). Today
-the list holds `sandboxOptions`. *Why for us:* resource limits change
-how much of the host the sandbox uses, not what it can reach or read.
+the list holds `sandboxOptions` and `run`. *Why for us:* resource limits
+change how much of the host the sandbox uses, not what it can reach or
+read, and the run layout's pane commands run only inside the sandbox.
 
 Normalized capability set (from v3 descriptors, parsed by one grammar
 in `internal/oci`, which `internal/render` calls for local kits): network
@@ -200,7 +206,7 @@ first mutating call.
 | 2 | an interrupted promotion is finished (1.6) or reported | 4 |
 | 3 | drift of every live derived file against `render.json` | 4 |
 | 4 | widening digest recomputed from the live files equals the approval (gate 2) | 3 |
-| 5 | host checks shared with `doctor` whose failure widens a sandbox or makes agent output executable on the host: sbx global secrets and broad allow rules (I22), host tools that auto-trust `$ROMEU_ROOT` (I23), and, for a project using `git-ssh-sign`, the signing socket rule of [06 6.4](06-kits.md#64-product-kits). A listing whose shape is not a recorded shape, or that cannot be parsed, fails the step (exit 2, `sbx-output-unparsed`) | 2 |
+| 5 | host checks shared with `doctor` whose failure widens a sandbox or makes agent output executable on the host: sbx global secrets and broad allow rules (I22), host tools that auto-trust `$ROMEU_ROOT` (I23), and, for a project using `git-ssh-sign`, the signing socket rule of [06 6.4](06-kits.md#64-product-kits). A listing whose shape is not a recorded shape, or that cannot be parsed, fails the step with `upstream-shape` ([03](03-formats.md), opening) | 2 |
 | 6 | sandbox identity (I26): an absent sandbox passes; a present one must have an open generation (1.7) romeu recorded (`RJ-203 unknown-sandbox` otherwise) and the workspace path `$ROMEU_ROOT/<name>-env/<primary>` | 2 |
 
 The preflight never touches the network: descriptors come from the
@@ -295,22 +301,24 @@ A generation is one sandbox lifetime, identified by a ULID.
 | (none) | `adopt` on TTY, workspace path matches | open | record as above with `adopted: true` and an unknown recreate digest; the generation is accepted as it stands until it is recreated, and `status` shows `adopted, not gated` |
 | open | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half | salvaging | new salvage id |
 | salvaging | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command was interrupted or failed) | salvaging | new salvage id |
-| salvaging | the sandbox half fails (julieta exits 1, a timeout, a full disk) | open | salvage record `result: incomplete`, `reasons: [sandbox-half-failed]`; exit 1 |
+| salvaging | the sandbox half fails (julieta exits 1, a full disk) or its exec is interrupted | open | salvage record `result: incomplete`, `reasons: [sandbox-half-failed]`; exit 1 |
 | open | `salvage --from-host`, the sandbox absent | open | refs and snapshot bundles imported under a new salvage id; salvage record `result: lost`, `reasons: [sandbox-lost]` |
 | salvaging | `salvage --from-host`, the sandbox absent | salvaging | as the open row |
 | salvaging | salvage verified; command was `salvage` | open | salvage record `result: complete` |
 | salvaging | salvage incomplete, no `--accept-loss` | open | salvage record `result: incomplete` with reasons; exit 5 |
 | salvaging | salvage complete or `--accept-loss`; command removes the sandbox | removing | state written before `sbx env rm` |
 | removing | `sbx env rm` succeeds | closed-removed | egress rules removed |
+| removing | `sbx env rm` fails, or the sandbox found present (a command killed before `sbx env rm`) | removing | the existing salvage record kept; exit 1; `rm`, `recreate` or `retire` run again resumes at `sbx env rm` |
 | removing | the sandbox found absent (crash recovery) | closed-removed | the existing salvage record kept; egress rules removed |
 | open | `run`, `rm`, `stop`, `pull`, `salvage` without `--from-host`, or `retire` finds the sandbox absent | closed-lost | keeps a lost record `salvage --from-host` wrote for this generation, else writes one: refs and snapshots preserved as a salvage record `result: lost` |
 | salvaging | the sandbox found absent (crash recovery) | closed-lost | as above |
 
 Absent means `sbx ls --json` exited 0, parsed, and did not list the
-sandbox; any other answer exits 1 with `sbx-unknown` and changes
-nothing. A `run` that closes an open generation as lost does not create
-in the same command: it prints the lost record and exits 1, and the
-next `run` creates.
+sandbox. A non-zero exit is `sbx-unknown` (exit 1), and an output that
+does not parse is `upstream-shape` (exit 2) by the upstream rule of
+[03](03-formats.md) (opening); either changes nothing. A `run` that
+closes an open generation as lost does not create in the same command:
+it prints the lost record and exits 1, and the next `run` creates.
 
 A romeu killed between the first row's record and the end of
 `sbx env run` leaves an open generation: the next `run` finds the
@@ -322,7 +330,8 @@ generation; closing stays with the row that finds the sandbox absent.
 Destructive commands write in this order: the refs per repo
 (create-only, so a rerun verifies them), the salvage record, the state
 `removing`, `sbx env rm`, `closed-removed`. Recovery: `removing` with
-the sandbox absent becomes `closed-removed`; `salvaging` with no
+the sandbox absent becomes `closed-removed`, and with it present the
+next `rm` resumes at `sbx env rm`; `salvaging` with no
 salvage record is resumed by the next salvage, which verifies the refs
 already created.
 
@@ -383,7 +392,7 @@ generated glossary page is a row of
 | preflight | the ordered checks of 1.5 before a mutating sbx call | - |
 | run | preflight, ensure sandbox, egress and tools, then attach to the run layout | - |
 | generation | one sandbox lifetime, identified by a ULID recorded by romeu | - |
-| open generation | a generation in state `open` or `salvaging` | - |
+| open generation | a generation in state `open` or `salvaging`; for the identity step of 1.5 (step 6), also `removing` | - |
 | adopt | record an existing sandbox of the right name and workspace as a generation | - |
 | snapshot | julieta's bundle of unpushed work into the memory dir's `snapshot/` after each commit | live salvage |
 | salvage | stop agents, capture everything sandbox-only into the memory dir's `salvage/`, verify and import it on the host | - |
@@ -395,7 +404,7 @@ generated glossary page is a row of
 | lesson | in a user's project, a memory entry tagged `lesson` ([08 8.1](08-memory-handoff-salvage.md#81-memory-store)), shown at SessionStart; in this repository, a file under `docs/lessons/` ([12 12.7](12-engineering.md#127-text-standard-and-lessons)), read by contributors and review. The two share the word only | - |
 | widening set | gate 2's digested content | - |
 | recreate-class | fields tagged `apply:"recreate"`: repos, kits, workload, ports, sandbox options, agent, and (until probe A10 says otherwise) secrets | - |
-| recreate needed | the live sandbox's recreate digest differs from the approved one; `status` reports it | - |
+| recreate needed | the live sandbox's recreate digest differs from the approved one; `status` reports it, and `run` raises `recreate-needed` ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3) | stale (for the recreate digest) |
 | review checkout | a hardened checkout of sandbox work under `<name>-env/review/<dir>/` | - |
 | sandbox probe | a block B check that the probe harness runs inside a sandbox, ids C2..C6 (C1 is retired, 11 11.2) | - |
 | runtime ledger | the per-machine, add-only store of runtime events under host state ([13](13-runtime-ledger.md), designed, not built in v1); "the ledger" on its own means this | - |
