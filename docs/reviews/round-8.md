@@ -1704,3 +1704,170 @@ left as written.
   when written.
 
 Next steps: step 1 above is done; the write pass (step 3) is next.
+
+## Session checkpoint (2026-10-09)
+
+The write pass ran, the ship gate found work for the next pass, and the
+operator merged the tooling pull requests. The checkpoints above are left
+as written. The write pass is described in `round-8/write-pass.md` and the
+ship gate's findings are in `round-8/ship-gate-2026-10-09.md`.
+
+### Decided
+
+Decisions of this session that are not already recorded beside the 48
+items above. The Go pin policy ("Pin exato + gatilho (Recommended)") and
+the `pinnedLintTools` pending item ("Sim, esse", confirming "3 ok deixemos
+como pendente") are already recorded in "Session of 2026-10-08, continued".
+
+- Tooling pull requests, answering the request to open the three tooling
+  pull requests with their approval lines. Operator: "Vou precisar afk por
+  cerca de 3 horas. Consigo ajudar com algo antes de ir? Vc continuará
+  trabalhando autonomamente. Use stacked PRs (os do github mesmo,
+  conferindo a integração dos PRs [que daí consigo aprovar todos de uma só
+  vez {é preciso usar o gh}]). Não precisa me esperar para fazer push ou
+  abrir/alterar PR que vc precisar abrir vc mesmo."
+- Stacked pull requests. Operator: "Use stacked PRs (gh stack) para
+  stacked PRs (com o --base correto para o suporte certo na UI web de PR).
+  E me explique o que é certo em --base e pq pq é confuso... . Vou nessa".
+  What the orchestrator did with it: no stack was needed, because AR13 was
+  folded into PR #25 and DR3 and DR7 were independent of each other and of
+  it. `gh stack` is to be used at the first real dependency, after
+  verifying the signing of its rebases and the retarget race (the research
+  is in `round-8/write-pass.md`, marked not adversarially verified). The
+  house payload rule that every pull request in a stack targets `main` is
+  to be amended in a payload pull request, which is ask-first. The
+  explanation of `--base` the operator asked for is still owed.
+- Round 9, answering whether to run it after the write pass. Operator:
+  "Sim, rodar a rodada 9 (Recommended)".
+- Merges done by the operator: PR #22, "pr 22 landed;" (after "Pode fazer
+  merge do 22 por favor."); PR #26, "pr 26 landed;"; PR #27, "27 landed;;".
+- Orchestrator decision, not an operator answer: AR13 (the `spec` surface)
+  landed in PR #25 and not in a tooling PR, because
+  `TestSpecListIsTheCommittedList` requires the YAML fence in 05 5.3 to
+  equal `.github/ask-first.yaml`, so the two copies cannot change in
+  separate pull requests.
+
+### Done
+
+- PR #26 "build: bump Go to 1.27.2": ship gate GO, CI green.
+- PR #27 (`gh` 2.102.0 locked in `mise.lock`, and a test that `go.mod`
+  equals `mise.toml`): ship gate GO, CI green; one macos-intel leg was
+  re-run after a runner DNS error during setup (see the CI flake item
+  below).
+- The write pass on this branch, six sequential opus groups, each with
+  `fast`, `all` and `hygiene` green:
+  - docs(spec): apply the round-8 resolutions to the index, 00, 09 and 11
+  - docs(spec): apply the round-8 resolutions to 01, 02 and 03
+  - docs(spec): apply the round-8 resolutions to 04, 06 and 07
+  - docs(spec): apply the round-8 resolutions to 05, 08 and 13
+  - docs(spec): apply the round-8 resolutions to 10, 11 and 12
+  - docs(adr): drop the required review and amend the records that assumed
+    it
+  - docs(spec): apply the round-8 record decisions to 05, 12, the index and
+    the plan
+- ADR 0009, "Drop the required review and amend the records that assumed
+  it" (DR1, with the operator's riders and the record parts of DR2 to DR8,
+  AR4, AR6, AR12 and AR16).
+- DR5 coverage researched and adversarially verified against
+  github/docs at 9f651797567230e844373870fce8b14427ad47ad: the security
+  log of a personal account keeps 90 days and records ruleset changes,
+  visibility and listed settings changes, and no merge, push, tag, branch
+  deletion or release change. A live account's log was not read. It is in
+  05 5.4 and the index token row.
+- DR3: the hook fix is on branch `fix/pre-push-go-env`, pushed, with no
+  pull request; its ship gate found two must-fix Mediums, which are the
+  first item below.
+- The ship gate of this branch: NO-GO at round 1, findings F1 to F23.
+
+### Open for the operator
+
+One block, each item with a recommendation.
+
+**(a) Items collected while the operator was away** (item 2 of that list,
+PR #27, is closed by the merge):
+
+1. DR3, the hook fix. The security-auditor (opus) reproduced two Mediums
+   on the checks surface: an empty `GOFLAGS` falls back to the `go env -w`
+   file (a planted `-overlay` ran, hook exit 0), and an untracked
+   `vendor/` makes `go run` default to `-mod=vendor` (a planted `init()`
+   ran). Options: (a) `GOENV=off`, `GOWORK=off` and
+   `GOFLAGS=-mod=readonly`, matching `stepEnv` in `tools/ci/fast.go`, with
+   the line `Approval: checks - start tools/ci from the pre-push hook with
+   GOENV=off, GOWORK=off and GOFLAGS=-mod=readonly`; (b) keep the hook and
+   record two open escapes; (c) an `env -i` allowlist, a bigger design.
+   Lows stay open either way: `GOCACHEPROG`, `GOTOOLCHAIN`, a `GOOS` plus
+   exec wrapper on `PATH`, `GOEXPERIMENT`, `CGO`, `GODEBUG`. Recommend (a).
+3. Design calls of the write pass to review in PR #25: the pin file
+   `kits/pins.yaml`; the new exit code 6 ("the check ran and found
+   something"); RJ-301 renamed `project-approval-required` and new ids
+   RJ-302 to RJ-328. Exit codes and error ids are the `contracts` surface
+   once code exists. The ship gate found them grounded in their clusters
+   (departures are F3 and F13). Recommend: accept them, with the F3 and
+   F13 fixes.
+4. R8-05-3: the `sbxdrv` surface and `skills/**` on `kits` were not
+   applied, because they need their own approval line. Recommend a small
+   tooling pull request after #25 lands, with the line `Approval:
+   ask-first - add the sbxdrv surface and skills/** to the kits surface`.
+5. New mechanism text in 06 6.4 (hooks call julieta by the absolute
+   `.romeu/bin` path, passed as a kit arg), page 13 marked designed, not
+   built, with the ledger risks in 13 13.11, and R8-05-30 (init with a
+   non-empty root) left unspecified. Recommend: accept, with the F12 fix
+   that makes the kit arg reserved and quoted.
+6. R8-05-35: the ADR 0007 Consequences half (the mise counterpart of the
+   golangci-lint sentence) is not applied, since it edits an accepted ADR
+   beyond the approved `decisions` line. Recommend: ride it in ADR 0009
+   under an extended line; the alternative is a pending item.
+7. Smoke step 2 (SC13) sits at C6 but needs `tools/release build
+   --dry-run`, which lands in phase 8. Recommend the ship gate's fix under
+   F2 below, not a plain `go build`, which the gate showed cannot work.
+
+**(b) Ship gate findings that need the operator's word** (all in
+`round-8/ship-gate-2026-10-09.md`):
+
+- F1: approval lines for the `ask-first` and `spec` surfaces. The
+  operator's tooling authorization above answered the request that
+  proposed `Approval: ask-first - add docs/spec.md,
+  docs/spec/01-system-model.md and docs/spec/05-security.md as an
+  ask-first surface`. Whether that suffices, and whether a `spec` line is
+  needed when the surface is added in the same pull request, is the
+  operator's call. Recommend: confirm the ask-first line as recorded and
+  give a `spec` line.
+- F2: recommend the gate's fix: a new T103 dry-run build in phase 4, and
+  smoke step 2 moved to C7.
+- F6: recommend the gate's rewording of the token-narrowing trigger in the
+  spec and in ADR 0009 decision 18 (the trigger counted by hand from the
+  handoff record, since julieta does not run in the development sandbox).
+- F7: recommend `docs/grants.yaml` on an ask-first surface, so that the
+  checkpoint grants no longer come from `docs/plan.md`.
+- F8: recommend accepting the weakened invariant with the 05 5.4 row the
+  gate drafted (protective commands go on past a failed gate 1 or step 5).
+
+**(c) CI flake.** macos-intel failed once on a runner DNS error
+(`proxy.golang.org` lookup during setup) and passed on re-run. Recommend:
+a pending item to harden the setup's module download against transient
+failures, never by skipping.
+
+**(d) AR22, the fifth ruleset try with the operator present.** Another
+session's branch `docs/ruleset-no-update` says the default-branch ruleset
+no longer restricts updates, so re-measure before the try. Recommend:
+re-measure first, then decide whether the try is still needed.
+
+### Next steps
+
+1. Answer the operator block above (as one quiz).
+2. Rebase PR #25 onto main; main moved (PRs #28 to #30 and possibly a spec
+   change about the ruleset), so re-read the conflicts.
+3. One write pass for F1 to F23 per the answers.
+4. A targeted re-audit (round 2 of the budget) by the personas whose
+   findings drove it.
+5. Rewrite the PR #25 body (Why, What changed, Evidence, Middleware,
+   Lessons, the approval lines, the F16 mapping of each "Superseded in
+   part" line to its answer) and leave the PR a draft.
+6. Round 9 per `lenses.md`.
+7. The DR3 hook pull request per the operator's answer.
+8. A payload pull request for the stack rule (ask-first).
+9. The R8-05-3 surface pull request.
+10. The stage-B items listed in `round-8/write-pass.md`.
+
+Branch and PR state is not recorded here: the next session measures it
+with ~/.sbx-kit/claude-home/bin/handoff_state.py.
