@@ -218,3 +218,29 @@ written:
 
 ADR 0011 is not edited. Nothing under `tools/**`, `.github/**` or
 `.githooks/**` changed.
+
+## Session checkpoint (2026-10-09, after round 13)
+
+### Done
+
+- Round 13 ran, and its write pass is applied on pull request #36
+  (branch `docs/review-round-9`).
+
+### Open for the maintainer
+
+The block is the one in round 11's
+[end-of-session checkpoint](round-11.md#session-checkpoint-2026-10-09-end-of-session),
+"Open for the maintainer". The try of item d after the narrowing is
+now named the required-name try, in three steps (R13-02).
+
+### Next steps
+
+1. Round 14, the targeted re-audit of this write pass by the lenses
+   that raised round-13 findings: L0, L2, L3, L6 and L13. L12's clean
+   verdict of round 13 carries forward, with the verdicts of L1, L4,
+   L5, L7 to L11 and L14 to L16.
+2. Pull request #34 is GO in its round-3 ship gate and green, and is
+   being rebased onto the default branch after pull request #39.
+3. The other next steps of round 12's checkpoint stand.
+
+Branch and PR state is measured by ~/.sbx-kit/claude-home/bin/handoff_state.py.
