@@ -641,8 +641,9 @@ func (c *checks) run(ctx context.Context, root string, steps []step) {
 			// readability; the unit step in particular lets the change print
 			// anything. A quiet step is the exception: gofmt -l prints paths
 			// of the repository and its parse errors about them, so escaping
-			// its output costs no readability and is defense in depth. err, the error of the
-			// run, may hold a path and is made safe too.
+			// its output costs no readability and is defense in depth.
+			// err, the error of the run, may hold a path and is made safe
+			// too.
 			text := string(out)
 			if s.quiet {
 				text = git.SafeLines(text)
