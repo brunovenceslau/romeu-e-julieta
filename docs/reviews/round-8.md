@@ -1488,7 +1488,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   The spec-side deletions (10 10.2 item a, 12 12.4, 12 12.9) land in
   the same write pass once the record is approved.
   Operator, 2026-10-08: "Aceitar (Recommended)" - one dated record supersedes in part ADR 0001 rule 8, ADR 0002 decision 3 and ADR 0003 on the review requirement, carrying the riders listed above.
-  Approval line for `docs/adr`, proposed as "Approval: decisions - add the record that supersedes in part ADRs 0001, 0002 and 0003 on the review requirement and amends ADR 0001". Operator, 2026-10-08: "Aprovo, mas gostaria de um pouco mais de contexto de cada item referenciado." Approved; the operator asked for more context on each referenced item, which the PR that adds the record gives. The approved text of the line: `Approval: decisions - add the record that supersedes in part ADRs 0001, 0002 and 0003 on the review requirement and amends ADR 0001`.
+  Approval line for `docs/adr`, proposed as "Approval: decisions - add the record that supersedes in part ADRs 0001, 0002 and 0003 on the review requirement and amends ADR 0001". Operator, 2026-10-08: "Aprovo, mas gostaria de um pouco mais de contexto de cada item referenciado." The approved text of the line: `Approval: decisions - add the record that supersedes in part ADRs 0001, 0002 and 0003 on the review requirement and amends ADR 0001`.
 - **DR2 Release signing** (R8-05-1, R8-10-2, R8-adr-4; Blocking;
   eight lenses on R8-05-1, both noise-probe readers of L2; R8-index-24
   and R8-index-25 follow). The 05 5.4 paragraph names an operator-held
