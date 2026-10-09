@@ -759,8 +759,11 @@ What they set up, and holds now:
 
 - a. Two rulesets. On the default branch: changes arrive by pull
   request; a merge commit is the only merge method; force pushes and
-  deletion are refused; updates to the default branch are restricted to
-  the bypass actor. On tags matching `v*`: creation, update and deletion
+  deletion are refused; a required-status-checks rule lists the four
+  `all on ...` checks. Updates are no longer restricted to the bypass
+  actor (removed, as read on 2026-10-09), so, read from the rules and
+  not tried, an account with write access can merge a pull request
+  whose required checks are green. On tags matching `v*`: creation, update and deletion
   are refused for everyone except the bypass actor. The administrator
   role is the bypass actor of both, and the operator's token holds that
   role. The merge requirements, and what they are worth, are in
@@ -792,7 +795,10 @@ Evidence:
   body back, and restore it. The result is recorded in 05 5.4 and in
   the next decision record. To do.
 - e. After step 2: add the CI jobs of the green run to the
-  default-branch ruleset as required status checks. To do.
+  default-branch ruleset as required status checks. As read on
+  2026-10-09, the rule lists the four `all on ...` checks (the note on
+  the maintainer block); saving the API's answer under Evidence is still
+  to do.
 - f. Before the first release candidate: turn on GitHub's immutable
   releases setting. To do.
 

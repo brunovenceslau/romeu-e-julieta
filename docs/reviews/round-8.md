@@ -1887,7 +1887,9 @@ no longer restricts updates, so re-measure before the try. Recommend:
 re-measure first, then decide whether the try is still needed.
 Answered on 2026-10-09: AR22 stays with PR #33 ("docs(spec): record that
 the default-branch ruleset no longer restricts updates"); this pull
-request does not change it.
+request does not change it. PR #33 has merged, and its reading of
+2026-10-09 is in the note on the maintainer block; whether the fifth try
+is still needed is not decided.
 
 **(e) The stack rule.** Answered on 2026-10-09: deferred, with its
 trigger, as recorded under Decided above.
