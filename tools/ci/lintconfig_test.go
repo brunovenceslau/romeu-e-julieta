@@ -205,8 +205,14 @@ func TestLintConfigReportsEachChecker(t *testing.T) {
 	tools := pinnedLintTools(t)
 
 	report := filepath.Join(t.TempDir(), "report.json")
-	cmd := exec.CommandContext(ctx, tools.linter, "run",
-		"--config", config, "--output.json.path", report, "--output.text.path", os.DevNull)
+	// The arguments are the ones of the lint step (lintArgs), with the
+	// config by its absolute path, as the run happens in dir.
+	args := slices.Clone(lintArgs)
+	at := slices.Index(args, ".golangci.yml")
+	require.NotEqual(t, -1, at, "lintArgs names .golangci.yml")
+	args[at] = config
+	args = append(args, "--output.json.path", report, "--output.text.path", os.DevNull)
+	cmd := exec.CommandContext(ctx, tools.linter, args...)
 	cmd.Dir = dir
 	cmd.Env = lintEnv(lintTargets[0], tools.goDir)
 	out, err := cmd.CombinedOutput()

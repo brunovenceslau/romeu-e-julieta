@@ -397,7 +397,17 @@ Four subcommands are outside `all`:
 - The linter sees only the files that build for the GOOS and GOARCH it
   runs under, so `tools/ci` starts it once for each lint target (linux
   and darwin, each on amd64 and arm64, one list that the tests read
-  too), each as `<path> run --config .golangci.yml`, with the path of
+  too), each as `<path> run --config .golangci.yml -j 1
+  --allow-parallel-runners`. `--allow-parallel-runners` skips the file
+  lock on `golangci-lint.lock` in the temporary directory, which fails a
+  run with "parallel golangci-lint is running" while any other run on
+  the machine holds it. `-j 1` limits golangci-lint's own Go threads to
+  one (`GOMAXPROCS`); child processes such as `go list` and the compiler
+  are not capped. It does not fix the lock failure and costs about 14s
+  for a cold run against about 7s by default, warm runs being about the
+  same; it is kept to limit CPU use when runs overlap. `lintArgs` in
+  `tools/ci/fast.go` is the one list, and the fixture test runs the
+  linter with it. Each run uses the path of
   `golangci-lint` that `mise which` resolves and not through
   `mise exec`, which would add a mise `[env]` table, in the environment
   of the steps of `fast` with the target's `GOOS` and `GOARCH` and

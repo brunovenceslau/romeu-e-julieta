@@ -913,15 +913,16 @@ func TestFastSteps(t *testing.T) {
 	goDir := filepath.Join("/pinned", "go", "bin")
 	goCmd := filepath.Join(goDir, "go")
 	tools := lintTools{linter: "/pinned/golangci-lint", goDir: goDir}
-	lintArgv := []string{"/pinned/golangci-lint", "run", "--config", ".golangci.yml"}
+	// Spelled out, not read from lintArgs: this test pins the list.
+	wantLint := []string{"/pinned/golangci-lint", "run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners"}
 	want := []step{
 		{name: "format", argv: []string{filepath.Join(goDir, "gofmt"), "-l", "."}, quiet: true, environ: stepEnv(goDir)},
 		{name: "vet", argv: []string{goCmd, "vet", "./..."}, environ: stepEnv(goDir)},
 		{name: "generated", argv: []string{goCmd, "run", "./tools/ci", "generated"}, environ: stepEnv(goDir)},
-		{name: "lint linux/amd64", argv: lintArgv, environ: lintEnv(lintTarget{"linux", "amd64"}, goDir)},
-		{name: "lint linux/arm64", argv: lintArgv, environ: lintEnv(lintTarget{"linux", "arm64"}, goDir)},
-		{name: "lint darwin/amd64", argv: lintArgv, environ: lintEnv(lintTarget{"darwin", "amd64"}, goDir)},
-		{name: "lint darwin/arm64", argv: lintArgv, environ: lintEnv(lintTarget{"darwin", "arm64"}, goDir)},
+		{name: "lint linux/amd64", argv: wantLint, environ: lintEnv(lintTarget{"linux", "amd64"}, goDir)},
+		{name: "lint linux/arm64", argv: wantLint, environ: lintEnv(lintTarget{"linux", "arm64"}, goDir)},
+		{name: "lint darwin/amd64", argv: wantLint, environ: lintEnv(lintTarget{"darwin", "amd64"}, goDir)},
+		{name: "lint darwin/arm64", argv: wantLint, environ: lintEnv(lintTarget{"darwin", "arm64"}, goDir)},
 		{name: "unit", argv: []string{goCmd, "test", "-count=1", "./tools/..."}, environ: stepEnv(goDir)},
 	}
 	assert.Equal(t, want, fastSteps(root, tools))
