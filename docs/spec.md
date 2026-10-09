@@ -230,7 +230,7 @@ effect on the spec, stay in
 | Q9 | romeu distribution | GitHub release + checksums + mandatory attestation verify | maintainer, before the first release-candidate tag |
 | Q10 | Host git floor | patched point release per series, initial floor 2.45.4 or newer; exact list verified in A1 | A1 |
 | Q12 | Salvage of ignored files and transcripts | ignored files included (1 GiB cap, spec excludes are acknowledged loss); transcripts excluded unless `--include-transcripts` | maintainer, before the first release-candidate tag |
-| Q13 | Per-project fine-grained tokens | `name@project` host-settings entries; sharing a command is allowed but written per project. The mechanism is per project; the reference instance binds the operator's own token in every project (ADR 0008) | maintainer, before the first release-candidate tag |
+| Q13 | Per-project fine-grained tokens | `name@project` host-settings entries; sharing a command is allowed but written per project | maintainer, before the first release-candidate tag |
 | Q14 | Memory across machines | machine-local in v1 | maintainer, before the first release-candidate tag |
 | Q15 | Manifest delivery | `sbx env exec --env JULIETA_MANIFEST=...`, with a compatibility check | A4 |
 | Q16 | herdr pre-1.0 churn | pinned by version + sha256; protocol number checked, fail closed | A13 |
@@ -325,7 +325,7 @@ can happen before the ledger is built.
 | Deferred | Until then | Reopened by |
 |---|---|---|
 | an authenticated fetch of a pull request's head in the `pr` job | the job fetches the head by `head.sha` without credentials (`persist-credentials: false`, no step names `github.token`), which works because the repository is public ([10 10.2](spec/10-testing-style.md#102-ci)) | the repository becomes private |
-| a mutation stub per guard site (`mutate_I<n>_<site>`) | one stub per invariant id covers one guard site ([05 5.2](spec/05-security.md#52-invariants-and-their-tests)) | the first invariant with a second guard site that a `mutate` run left unobserved |
+| a mutation stub per guard site (`mutate_I<n>_<site>`) | one stub per invariant id covers one guard site ([05 5.2](spec/05-security.md#52-invariants-and-their-tests)) | the first invariant whose guard tag sits in two or more functions, read at each release-candidate tag from the count of guard tags per id; `tools/ci invariants` printing that count is pending |
 | `ci.yml` running the base branch's `tools/ci` against the merge result for the steps of `all` (`pr` already runs the default branch's code, decided on 2026-10-09) | a change to `tools/ci` is checked by the changed `tools/ci` in the steps of `all`, and there its only check is the `checks` approval line ([05 5.3](spec/05-security.md#53-ask-first-surfaces)) | the first pull request that changes `tools/ci` and a package it checks together |
 | a second owner for the ask-first surfaces | one owner, the maintainer; an outside pull request on a surface is reviewed best effort (05 5.3) | the first outside pull request on a surface |
 | running the pre-push hook and `tools/ci` on the host from a trusted `hooksPath` checkout | the host runs `tools/ci` only from a commit whose diff since the last host run the maintainer has read, or from the last released tag (05 5.4) | the first `tools/ci` change the maintainer did not read before a host run, reported as an issue labelled `deferred` |

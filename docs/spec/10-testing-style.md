@@ -718,9 +718,9 @@ and the keyless build provenance attestation, and no other signature;
 what the attestation proves, and what it does not, is in
 [05 5.4](05-security.md#risks-of-running-romeu), "Release proof".
 
-`tools/ci acceptance` is not a step of the workflow: its pre-tag run
-and the comparison of the candidate's commit with the tag are
-maintainer steps of the release checklist of
+`tools/ci acceptance` is not a step of the workflow: its pre-tag run,
+the comparison of the candidate's commit with the tag, and its run at
+each later release are maintainer steps of the release checklist of
 [12 12.2](12-engineering.md#122-development-commands-and-capability-map),
 and its evidence names the release and the run, which exist only when
 this workflow has ended (10.5).
@@ -860,7 +860,9 @@ run is in the config repo); a `command` item is run again, its argv
 from the repository root, and its exit status and the sha256 of its
 stdout are compared. For each release it also checks that the tag's
 commit equals the source digest in the release's attested provenance,
-so a `v*` tag moved to another commit is found.
+so a `v*` tag moved to another commit is found. Step 7 of the release
+checklist of [12 12.2](12-engineering.md#122-development-commands-and-capability-map)
+runs it at every release after v1.0.0.
 
 It also checks four things that are complete only at the end of the
 plan. They read only the repository, and they join `all` once the

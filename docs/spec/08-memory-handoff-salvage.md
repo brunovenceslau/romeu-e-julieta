@@ -199,7 +199,11 @@ their files 0600; they stay until the owner deletes them and are part
 of any backup of `$ROMEU_ROOT`. `romeu salvage` prints that sentence
 once when it stores ignored files or transcripts. Keeping them in the
 mount is a risk accepted in
-[05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1).
+[05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1). A
+root excluded from Time Machine, as the `root-indexed` check of
+[04 4.2](04-cli.md#42-romeu-host) advises, is in no Time Machine
+backup, so its memory dirs and unpushed work need another copy, which
+that check's hint says.
 
 ### Host half: `romeu salvage`
 

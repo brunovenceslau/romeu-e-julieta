@@ -604,3 +604,4 @@ Formats without a schema, each with its reason:
 | `.romeu/bin/SHA256SUMS` | the `sha256sum` line format, which external tools read |
 | `e2e/scenarios/commands.yaml` | read by one program, the scenario runner, and pinned by its test |
 | `kits/pins.yaml` | written by `tools/kitpin` and read by the product's own consumers, pinned by their tests |
+| `docs/grants.yaml` | read by one program, `tools/ci pr`, and pinned by its test; its form is in [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change) |

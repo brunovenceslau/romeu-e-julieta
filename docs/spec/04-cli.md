@@ -201,7 +201,7 @@ mutating command with exit 2, so each has an id in 4.4.
 | sbx: `env.rememberHostCommands` not true | `sbx-remember-commands` | warn |
 | sbx: `kit.allowedSources` does not admit the workload registries | `sbx-allowed-sources` | fail |
 | root inside a git repo, equal to `$HOME`, not absolute, not owned by the user, or containing host settings/state | `root-unsafe` | fail |
-| root under `~/Library/Mobile Documents`, `~/Library/CloudStorage/` or `~/Dropbox`, or not excluded from Time Machine; a `<name>-env/` without its `.metadata_never_index` marker, the form probe A17 measures ([11 11.1](11-host-probes.md#111-block-a---sbx-and-runtime-facts-first-in-parallel-with-the-first-build-layer)) | `root-indexed` | warn |
+| root under `~/Library/Mobile Documents`, `~/Library/CloudStorage/` or `~/Dropbox`, or not excluded from Time Machine; a `<name>-env/` without its `.metadata_never_index` marker, the form probe A17 measures ([11 11.1](11-host-probes.md#111-block-a---sbx-and-runtime-facts-first-in-parallel-with-the-first-build-layer)) | `root-indexed` | warn; the hint adds that a root excluded from Time Machine needs another copy of its memory dirs, handoffs and unpushed work |
 | `$ROMEU_ROOT/.attic` or a `<name>-env/` that its group or others can access | `tree-mode` | fail |
 | a symlink under `$HOME` (depth 1) or `$HOME/.config` (depth 2) resolving into `$ROMEU_ROOT` | `home-symlink` | fail (I23) **pre** |
 | mise `trusted_config_paths` or a direnv allow list covering `$ROMEU_ROOT` | `auto-trust` | fail (I23) **pre** |

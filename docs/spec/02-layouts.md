@@ -76,6 +76,7 @@ romeu-e-julieta/
 │  ├─ reference/               generated reference pages (12 12.3)
 │  ├─ probes/                  committed probe-result.v1 files (blocks A and B)
 │  ├─ acceptance.json          evidence per success criterion (acceptance.v1)
+│  ├─ grants.yaml              checkpoint grants that stand in for approval lines (12 12.4); read by tools/ci pr alone; an ask-first surface
 │  └─ lessons/                 one file per lesson (NNNN-<slug>.md), with the check that enforces it; README.md is the generated index
 ├─ .githooks/pre-push          mode 100755; runs go run ./tools/ci fast with git's arguments and stdin
 ├─ .golangci.yml               linter configuration (10 10.2, lint)

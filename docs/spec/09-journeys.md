@@ -324,7 +324,10 @@ work as usual.
 2. [O] `romeu retire` each project (J7).
 3. What stays, on purpose: the host clones, as plain clones; memory, as
    plain Markdown ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1));
-   `$ROMEU_ROOT/.attic`.
+   `$ROMEU_ROOT/.attic`. A root excluded from Time Machine, as the
+   `root-indexed` check of [04 4.2](04-cli.md#42-romeu-host) advises, is
+   in no Time Machine backup, so the operator keeps another copy of the
+   memory dirs, the handoffs and any work not pushed.
 4. [O] What the operator removes by hand, as the guide page shows: host
    settings, host state, romeu-applied egress rules, the refs under
    `refs/romeu/` and `refs/sandboxes/` (`git for-each-ref`, then
