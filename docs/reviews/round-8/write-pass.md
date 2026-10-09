@@ -158,7 +158,11 @@ are in `ship-gate-2026-10-09.md`.
   workflow on `pull_request_target` (`contents: read`, no secret, base
   checkout, head fetched by sha and never run), the pr job row of the
   10 10.2 grammar with its refusal fixtures, and adds the job to the
-  required checks (10 10.2, item e).
+  required checks (10 10.2, item e). In `tools/ci/git`, every call on
+  head objects passes `--no-ext-diff`, `--no-textconv`,
+  `--no-recurse-submodules` and `-c core.hooksPath=/dev/null`, with no
+  `checkout` or `archive` of the head and tree-to-tree diffs that read
+  `.gitattributes` from the default branch's work tree (12 12.4).
 
 ### Tooling pull requests (each ask-first, with its own approval line)
 

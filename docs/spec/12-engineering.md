@@ -394,16 +394,26 @@ U+FEFF), and none is one of these double quotation marks: U+0022,
 U+00AB, U+00BB, U+201C to U+201F, U+2033, U+301D to U+301F and U+FF02.
 Single quotation marks are allowed, because U+2019 is also the
 apostrophe, and other look-alikes, such as U+275D and U+275E, are left
-to review. `tools/ci pr` builds and runs the code of the base commit
-against the head, so no pull request is judged by code it changes: the
-`pr` job checks out the base commit, with its `go.mod`, `go.sum`,
-`mise.toml` and `mise.lock`, and builds `tools/ci` there (decided on
-2026-10-09). That job is defined in the base: it runs on
-`pull_request_target`, under which GitHub runs the workflow file of the
-default branch, which is every pull request's base (12.9), with
-`permissions: contents: read` and no secret, and it reads the head only
-as git objects fetched by `head.sha`, never built or run
-([10 10.2](10-testing-style.md#102-ci)). It reads
+to review. `tools/ci pr` builds and runs the code of the default
+branch against the head, so no pull request is judged by code it
+changes (decided on 2026-10-09). The `pr` job is defined in the default
+branch: it runs on `pull_request_target` for pull requests into `main`,
+under which GitHub runs the workflow file of the default branch, with
+`permissions: contents: read` and no secret. It checks out the default
+branch's commit (`github.sha`), with its `go.mod`, `go.sum`,
+`mise.toml` and `mise.lock`, and builds `tools/ci` there; it never
+checks out `pull_request.base.sha`. The check that the base is the
+default branch (12.9) stays, but it is not what makes the code trusted.
+So a run judges a pull request with the current `main`, and a pull
+request opened before a fix to `pr` is judged by the fixed `pr` on its
+next run. The job reads the head only as git objects, fetched by
+`head.sha` without credentials, which relies on the repository being
+public ([10 10.2](10-testing-style.md#102-ci)), and never builds or
+runs them: every git call of `pr` on head objects passes
+`--no-ext-diff`, `--no-textconv` and `--no-recurse-submodules` with
+`-c core.hooksPath=/dev/null`, `pr` never runs `checkout` or `archive`
+on the head, and its diffs are tree to tree, with `.gitattributes` read
+from the default branch's work tree. It reads
 `.github/ask-first.yaml` at the base commit and at the head commit and
 uses the union of the two lists, so a PR that removes a surface or a
 glob still needs that surface's line.

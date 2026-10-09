@@ -1920,6 +1920,10 @@ The next re-audit found the workflow route open; decided on 2026-10-09
 that `pr` runs in a base-defined job on `pull_request_target`, read-only
 and without secrets, the head never built or run, and that the job joins
 the required checks when `pr` lands.
+A further re-audit pinned the job to the default branch on 2026-10-09:
+`branches: [main]`, a checkout of `github.sha` only, the git calls on
+head objects hardened, and a private repository as the trigger to
+revisit the unauthenticated head fetch.
 
 ### Next steps
 
