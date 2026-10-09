@@ -60,7 +60,7 @@ romeu-e-julieta/
 │  ├─ fakesbx/                 fake sbx that replays recorded sessions only
 │  └─ testdata/sbx/<version>/  redacted sbx help text and argv/stdout/stderr/exit sessions (*.jsonl)
 ├─ tools/
-│  ├─ ci/                      every check CI runs and its committed data: denylist.yaml (forbidden names, hashed), prose.yaml, headings.yaml, testdata/
+│  ├─ ci/                      every check CI runs and its committed data: denylist.yaml (forbidden names, hashed, and the never-tracked file names), prose.yaml, headings.yaml, testdata/; one package per step under tools/ci/internal/<step>/, registered in one dispatcher table, and generate.go calls one generator list per package
 │  ├─ new/                     scaffolding: adr, invariant, probe, kit, command, lesson
 │  ├─ schemagen/               reflect-based JSON Schema generator from the Go types and rules.go
 │  ├─ release/                 release subcommands (10 10.2)
@@ -70,23 +70,28 @@ romeu-e-julieta/
 │  ├─ plan.md                  the build plan, as one page
 │  ├─ reviews/                 review rounds of the specification (history)
 │  ├─ adr/                     decisions (adr-tools layout, .adr-dir -> docs/adr); README.md is the generated index; an ask-first surface
-│  ├─ guide/                   one page per journey
+│  ├─ guide/                   one page per journey, and recovery.md
+│  ├─ diagrams/                generated state diagrams (12 12.3), linked from ARCHITECTURE.md
+│  ├─ notes/                   explanations kept beside the specification: records of procedures that ran once, deferred designs
 │  ├─ reference/               generated reference pages (12 12.3)
 │  ├─ probes/                  committed probe-result.v1 files (blocks A and B)
 │  ├─ acceptance.json          evidence per success criterion (acceptance.v1)
-│  └─ lessons.md               one entry per lesson, with the check that enforces it
+│  └─ lessons/                 one file per lesson (NNNN-<slug>.md), with the check that enforces it; README.md is the generated index
 ├─ .githooks/pre-push          mode 100755; runs go run ./tools/ci fast with git's arguments and stdin
 ├─ .golangci.yml               linter configuration (10 10.2, lint)
 ├─ .github/ask-first.yaml      the single list of ask-first paths and their owner (05 5.3)
 ├─ .github/CODEOWNERS          generated from ask-first.yaml
 ├─ .github/workflows/ci.yml, release.yml, fuzz.yml (scheduled; long fuzz runs and tools/ci mutate)
 ├─ .github/pull_request_template.md   Why / What changed / Evidence / Middleware / Lessons
+├─ .github/ISSUE_TEMPLATE/     two issue forms: a bug, a catalog gap (12 12.7)
 ├─ COPYING (with the first code change), REUSE.toml, LICENSES/, README.md, SECURITY.md
 ```
 
 Which binary may import each package is
 [10 10.7](10-testing-style.md#107-module-boundaries-enforced-by-toolsci-imports);
-module ids are [12 12.2](12-engineering.md#122-development-commands-and-capability-map).
+module ids are [12 12.2](12-engineering.md#122-development-commands-and-capability-map);
+which files are generated is the inventory of
+[12 12.3](12-engineering.md#123-generators).
 
 Embedding: `romeu` embeds `catalog/egress.yaml`, `kits/*` and, at release
 time, the `julieta` linux binary of romeu's own `GOARCH` (the release
@@ -114,7 +119,7 @@ my-config/
 ├─ kits/
 │  └─ <kit>/                  personal v3 kits (same format as product kits)
 ├─ mise.toml, mise.lock       tools for agents editing this repo (julieta comes from the sandbox)
-├─ acceptance.json            optional: the operator's own acceptance file (acceptance.v1), verified from a product checkout
+├─ acceptance.json            optional: the operator's own acceptance file (acceptance.v1), checked by the config repo's own scripts; the product does not verify it
 ├─ .github/workflows/validate.yml   runs `julieta spec validate --catalog projects/*.yaml` from a julieta release pinned by version and archive sha256, verified against the release's checksums.txt before it runs (checked by `julieta pin check`)
 └─ README.md
 ```
@@ -214,8 +219,8 @@ $XDG_STATE_HOME/romeu/                  (default $HOME/.local/state/romeu/), mod
 Each record write is atomic; a transition that changes more than one
 file follows its step list in
 [01 1.6](01-system-model.md#16-state-machines). `ROMEU_SETTINGS` (path
-to `settings.yaml`, used by tests) is the only romeu-specific
-environment variable; `XDG_CONFIG_HOME` and `XDG_STATE_HOME` are
+to `settings.yaml`, used by tests) is the only romeu-specific override
+of the settings path; `XDG_CONFIG_HOME` and `XDG_STATE_HOME` are
 honoured as shown; the root comes only from the settings file. A
 machine has one root and one state; separate instances per machine are
 a row of [Deferred decisions](../spec.md#in-the-product). Who owns each

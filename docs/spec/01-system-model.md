@@ -34,7 +34,7 @@ built in v1; it waits for its row in
 |---|---|---|---|
 | Truth, in git | config repo `projects/*.yaml`, `kits/*`; each repo's `mise.toml`/`mise.lock`; product kits, catalog, skills, `.github/ask-first.yaml`, the Go spec types with their tags and `internal/spec/rules.go` | agents (sandbox) and humans | PR review, and what that review is worth: [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1); romeu reads config and repo content only at a named commit |
 | Truth, machine-local | host settings; host state | operator (settings); romeu (state) | never mounted into any sandbox |
-| Generated, in git | `schemas/*.json`, `.github/CODEOWNERS`, the `docs/reference/*` pages that replace the field and rule tables of [03](03-formats.md) once each format's generator lands (03, opening) | `go generate ./...` | `tools/ci generated` fails on any diff; never hand-edited |
+| Generated, in git | every file of the inventory in [12 12.3](12-engineering.md#123-generators), the `docs/reference/*` pages that replace the field and rule tables of [03](03-formats.md) once each format's generator lands among them (03, opening) | `go generate ./...` | `tools/ci generated` fails on any diff; never hand-edited |
 | Candidate (unapproved) | `<name>-env/.romeu/candidates/<candidate-id>/` (rendered files and materialized kits) | romeu `sync` | the gate; promoted only on approval (1.6) |
 | Derived, live | `<name>-env/sbxenv.yaml`, `.romeu/render.json`, `.romeu/kits/*`, `.romeu/bin/*` | romeu (promotion) | drift-checked by hash before every overwrite and before every sbx call of a **P** command (1.5) |
 | Derived from state | `$ROMEU_ROOT/dev.code-workspace`, `$ROMEU_ROOT/review.code-workspace` | romeu (each promotion, `retire` and `pull`) | written again whole from host state each time; no record holds their hash, so they are not drift-checked; `doctor` derives them again from host state and reports a difference, and the next promotion, `retire` or `pull` overwrites a hand edit |
@@ -392,6 +392,7 @@ generated glossary page is a row of
 | retire | the inverse of sync: rm, then move `<name>-env/` to `$ROMEU_ROOT/.attic/`; never deletes. What it moves is the owner's to delete by hand (J7 step 4) | - |
 | orphaned | a project or repo dir in the host tree that no spec names (J7, J13) | - |
 | handoff | agent narrative (`clear`, `final`) or julieta-stamped git facts (`facts`), a plain file in the memory dir | - |
+| lesson | in a user's project, a memory entry tagged `lesson` ([08 8.1](08-memory-handoff-salvage.md#81-memory-store)), shown at SessionStart; in this repository, a file under `docs/lessons/` ([12 12.7](12-engineering.md#127-text-standard-and-lessons)), read by contributors and review. The two share the word only | - |
 | widening set | gate 2's digested content | - |
 | recreate-class | fields tagged `apply:"recreate"`: repos, kits, workload, ports, sandbox options, agent, and (until probe A10 says otherwise) secrets | - |
 | recreate needed | the live sandbox's recreate digest differs from the approved one; `status` reports it | - |

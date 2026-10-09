@@ -69,6 +69,19 @@ the spec, and an id is not given a second meaning. An sbx upgrade under
 existing sandboxes cannot be staged on demand; it is measured when the
 floor moves, since the version rule of 11.4 then runs block A again.
 
+### Recorded sessions
+
+Block A records, besides each probe's own calls, the sessions the fake
+sbx replays ([10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract)).
+Each argv builder of `sbxdrv` has a row here; a builder with no row is
+found by a unit test before block A runs.
+
+| Kind | What is recorded |
+|---|---|
+| argv shapes | every sbx call of [04 4.2](04-cli.md#42-romeu-host) and [07 7.5](07-mise-egress.md#75-egress-derivation-internalegress): `sbx version`, `sbx ls --json`, `sbx env run -d --clone <dir>`, `sbx env run -d <dir>`, `sbx env exec` without a terminal (the julieta calls), `sbx env exec -it` (the run layout and the shell), `sbx env plan`, `sbx stop`, `sbx env rm`, `sbx policy allow`, `check` and `rm network --sandbox <name>`, `sbx policy ls`, `sbx secret set` and `sbx settings set` |
+| starting sessions | the journeys CI runs with the fake sbx (10 10.1), and `adopt`, `stop`, `pull`, `salvage` on its own and `recreate` |
+| failure sessions | one per failure row of [01 1.6](01-system-model.md#16-state-machines): an `sbx ls` error, an `sbx env exec` timeout, and a sandbox VM that does not start |
+
 ## 11.2 Block B - acceptance on real hosts (last)
 
 About 90 minutes per host for B1 to B5; the sandbox-side checks below
@@ -96,14 +109,17 @@ copied by the harness from the release B1 installed in the same run.
 Block B records
 nothing under `e2e/testdata/`; its outputs are the results and
 artifacts under `docs/probes/`, so committing them does not break the
-rule below.
+rule below. Block B also replays every argv shape of the recorded
+sessions (11.1) against the candidate's sbx and compares the shape of
+each output with its recording
+([10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract), the
+tested window).
 
 **The release candidate.** Block B accepts built artifacts, so it needs
 a release before v1.0.0 exists. The candidate is a `v*` tag with a
 suffix (`v1.0.0-rc.1`), which the maintainer pushes after `ci-release`
 ([12 12.2](12-engineering.md#122-development-commands-and-capability-map));
-`release.yml` publishes it as a prerelease (10 10.2), and the delivery
-metrics do not count a prerelease as a deployment (12 12.10). A result
+`release.yml` publishes it as a prerelease (10 10.2). A result
 measured on the candidate counts for v1.0.0 when, from the candidate's
 commit to the v1.0.0 tag, the only paths that differ are under `docs/`
 or are Markdown files at the repository root. The candidate's commit
@@ -144,7 +160,7 @@ declares its `kind` in the harness.
 | C2 | `mise exec -C <dir> -- <cmd>` vs shims in a fresh non-interactive zsh and bash |
 | C3 | the pinned Claude Code version's setting to disable its own memory, whether a non-writable memory dir is tolerated, and the error text it shows on a refused memory write, so the julieta skill can name it |
 | C4 | `git bundle verify`/`unbundle` under the hardened flags |
-| C5 | the order in which the pinned Claude Code version fires SessionEnd and SessionStart on `/clear` |
+| C5 | for the pinned Claude Code version: the order in which it fires SessionEnd and SessionStart on `/clear`; which SessionStart sources fire (startup, resume, clear, compact); that the hook's output reaches the agent's context, and the size at which it is cut; what a hook's non-zero exit does; and the time a SessionEnd hook is given |
 | C6 | from inside, the A3 plants in a memory dir; `julieta memory check` and the romeu checks report every plant. It settles I24 and julieta delivery (06 6.3) |
 
 C1 is not used: it named a check that left the spec.
@@ -227,13 +243,13 @@ history keeps the results it replaces.
 
 `tools/ci probes` checks the results that are committed and says
 nothing about the ones that are not: block B cannot run before a
-release exists. That every probe named in the index's "Settled by"
-column has a result, from both hosts when the probe is arch-sensitive,
+release exists. That every probe id of this page has a result, from
+both hosts when the probe is arch-sensitive,
 is checked by `tools/ci acceptance`
 ([10 10.5](10-testing-style.md#105-acceptance-evidence)), which joins
-`all` once the plan's last task has landed. Until then the Open
-questions table is the reminder, and a probe nobody ran is noticed only
-there.
+`all` once the plan's last task has landed. Until then the tables of
+this page are the reminder, and a probe nobody ran is noticed by
+reading them.
 
 `tools/ci probes` also flags an `sbxenv.yaml` golden whose normalized
 hash ([03 3.3](03-formats.md#33-rendered-sbxenvyaml-sbx-env-file-schemaversion-1))
