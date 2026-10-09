@@ -269,8 +269,15 @@ func TestMiseNeverReads(t *testing.T) {
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
-			l := layout{parent: t.TempDir(), home: t.TempDir(), elsewhere: t.TempDir()}
-			l.dir = filepath.Join(l.parent, "tree")
+			// The tree is reached through a symbolic link to its parent, as
+			// a temporary directory is on macOS (/var is /private/var) and
+			// a push from a linked directory is anywhere: mise walks the
+			// real path, so a ceiling computed from the path as given
+			// would never match.
+			l := layout{parent: mustEval(t, t.TempDir()), home: t.TempDir(), elsewhere: t.TempDir()}
+			link := filepath.Join(t.TempDir(), "link")
+			require.NoError(t, os.Symlink(l.parent, link))
+			l.dir = filepath.Join(link, "tree")
 			write(t, filepath.Join(l.dir, "mise.toml"), "[settings]\nlockfile = true\n")
 			t.Setenv("HOME", l.home)
 			t.Setenv("MISE_STATE_DIR", t.TempDir())
@@ -306,6 +313,18 @@ func TestMiseNeverReads(t *testing.T) {
 			assert.Equal(t, seen{"nothing", wantDir, "unset", "off"}, guarded, "with the allowlist")
 		})
 	}
+}
+
+// TestMiseCeiling holds the ceiling to the parent of the real path of
+// the tree: a root given through a symbolic link, which git can report
+// when the working tree is configured so, gives the same ceiling.
+func TestMiseCeiling(t *testing.T) {
+	real := mustEval(t, t.TempDir())
+	link := filepath.Join(t.TempDir(), "link")
+	require.NoError(t, os.Symlink(real, link))
+	assert.Equal(t, "MISE_CEILING_PATHS="+filepath.Dir(real), miseCeiling(link))
+	assert.Equal(t, "MISE_CEILING_PATHS="+filepath.Dir(real), miseCeiling(real))
+	assert.Equal(t, "MISE_CEILING_PATHS=/nonexistent", miseCeiling("/nonexistent/tree"), "a root that cannot be resolved keeps its own parent")
 }
 
 // TestMiseFilesLowercase holds every glob of miseFiles to lower case:

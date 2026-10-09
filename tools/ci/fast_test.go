@@ -986,20 +986,15 @@ func pinnedLintTools(t *testing.T) lintTools {
 }
 
 // isolateMiseConfig gives the real mise that a test starts through
-// passThroughEnv a state directory and configuration directories of
-// the test's own, new and empty, so no global configuration of the
-// person who runs the tests (a "paranoid = true", say) changes what
-// the test measures (TestIsolateMiseConfig). HOME stays: the pinned
-// tools are installed below it, and MISE_DATA_DIR and XDG_DATA_HOME
-// are cleared, as miseInstalls refuses either. The system
-// configuration file is not among the variables of passThroughEnv, and
-// stays what the machine holds. A test that builds the whole
-// environment of mise itself uses isolatedMiseEnv instead.
+// passThroughEnv a state directory of the test's own, new and empty, so
+// the trust records of the person who runs the tests do not change what
+// the test measures. HOME and the data directory variables stay: the
+// pinned tools are installed where mise puts them. No global or system
+// configuration reaches mise (miseEnv names none). A test that builds
+// the whole environment of mise itself uses isolatedMiseEnv instead.
 func isolateMiseConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("MISE_STATE_DIR", t.TempDir())
-	t.Setenv("MISE_DATA_DIR", "")
-	t.Setenv("XDG_DATA_HOME", "")
 }
 
 // TestResolveLintTools checks that the tools of fast are the ones

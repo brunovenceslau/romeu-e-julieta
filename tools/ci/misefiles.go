@@ -160,7 +160,8 @@ import (
 // starts with another mise or go replaces the tools), and an allowlisted
 // variable can still point at attacker data: HOME, PATH, GOPATH, GOCACHE,
 // GOMODCACHE, MISE_DATA_DIR or XDG_DATA_HOME name a module cache, a build
-// cache or an installs directory of the caller's choosing. The allowlist
+// cache or an installs directory of the caller's choosing, and a go
+// planted there runs, the same as a go planted first on PATH. The allowlist
 // closes the variables and files that act without the caller choosing to
 // bypass the hook, not those.
 
@@ -230,8 +231,14 @@ const miseNoSystemConfig = "/dev/null/mise-system.toml"
 // mise.toml in root and no file in a parent directory (a mise.toml
 // there, trusted or not, would apply its [env]: measured with mise
 // 2026.10.3, "mise exec" and so the shim of go read an untrusted
-// parent file, and persisted its trust).
+// parent file, and persisted its trust). mise walks the real path of its
+// working directory (on macOS a temporary directory under /var is
+// /private/var), so the parent is that of root with its symbolic links
+// resolved; a root that cannot be resolved keeps the parent it was given.
 func miseCeiling(root string) string {
+	if real, err := filepath.EvalSymlinks(root); err == nil {
+		root = real
+	}
 	return "MISE_CEILING_PATHS=" + filepath.Dir(root)
 }
 
