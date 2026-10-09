@@ -46,7 +46,7 @@
    "change": "Delete every hand-kept count rather than correcting it: 'the seven decision records under adr/' becomes 'the decision records under adr/'; in What v1 leaves out, replace 'The table has 28 rows at the commit this plan was written from' with 'The index's table is the count'; drop the count in 'the six accepted records' and '101 of 102 tasks'. Re-derive the deferred-row-to-task mapping against the index once, at the stage B rewrite. (The second-table half of L3-33 and L13-36 is cluster R8-plan-2.)",
    "cost": "a few word deletions and one mapping re-check",
    "parked_for_b": true,
-   "resolution": "M",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -66,7 +66,7 @@
    "change": "Delete the plan's Q18 row and leave a one-line pointer to the index's Q18; move T002's 'Hardening after the merge, operator decision 2026-10-08' note to the round record under docs/reviews/.",
    "cost": "one row and one paragraph moved",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -117,7 +117,7 @@
    "change": "After the 10 10.2 change (L0-1, L2b-8, L9-1) lands, T088 depends on it and its acceptance names the admitted exception (the two-job shape) plus a fixture that fails a second file using it; add acceptance lines for the release job's permissions, the operator signature and immutability as the spec states them, and the signing step in O7 if L9-2 chooses it.",
    "cost": "a dependency and three acceptance lines",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -139,7 +139,7 @@
    "change": "Once L1-4 settles 04 4.2, rewrite the J3a bullet of T075 to match, and add the restart of a stopped sandbox to A4's definition in T019 (and 11 11.1 per L0-7).",
    "cost": "two acceptance edits",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -161,7 +161,7 @@
    "change": "Add to O5 a rehearsal on a fresh macOS user account with only the release, the guides and examples/, run to J3b, timed, with the commands counted, recorded in the block's Evidence.",
    "cost": "one operator-block step",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -181,7 +181,7 @@
    "change": "Extend T022: examples/ is a copyable config repo with a config-project spec, validate.yml and a README naming the values to replace.",
    "cost": "one acceptance line",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -201,7 +201,7 @@
    "change": "Add to ci-bootstrap a README stub with status (draft, no release), audience and prerequisites under the rule 12 headings.",
    "cost": "one task line",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -225,7 +225,7 @@
    "change": "Each answer lands as a spec edit in the same change as its task (L0-29, L0-26, L0-15/L2-10 for a sbxdrv surface in 05 5.3 with T029 marked Ask-first: sbxdrv, a 01 1.4 sentence naming the untagged-field list), and the question is closed by pointing at that edit.",
    "cost": "a pointer per question",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -245,7 +245,7 @@
    "change": "Keep the list, add the spec rule of L0-18 to 10 10.5 and cite it from O3.",
    "cost": "one citation",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -265,7 +265,7 @@
    "change": "If L11-1 is accepted, remove T063 to T065, T071, T072 and the ledger clauses of T037, T043, T049, T073, T074; otherwise move T063 to T065 after T075.",
    "cost": "a reorder or a deletion",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -285,7 +285,7 @@
    "change": "Land the pin file in T012 and the kitpin subcommands at the first pin change (J9).",
    "cost": "a task split",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -305,7 +305,7 @@
    "change": "Once the spec fixes L12-1 and L12-7, merge consecutive single-agent chain tasks where 'or is part of it' allows, run T096 to T100 in parallel with reserved numbers, and state the critical path with its sitting count.",
    "cost": "a graph rewrite",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -325,7 +325,7 @@
    "change": "Add a Files field to each task and derive the concurrency check from it; split the page per phase before the trigger fires.",
    "cost": "a field per task",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -345,7 +345,7 @@
    "change": "Group the open questions into one block with a recommendation each, placed before O3 in the operator table with its own pass condition.",
    "cost": "one table row",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -365,7 +365,7 @@
    "change": "For each such task name the one runnable command and mark the rest as the operator's pass condition, as the operator blocks do.",
    "cost": "a line per task",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -385,7 +385,7 @@
    "change": "After L12-2 lands, make the checkpoint approval the mechanism the field feeds, and shrink the field by applying L12-3, L12-16 and L12-23.",
    "cost": "a field rule",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -405,7 +405,7 @@
    "change": "Add to T008 that a subprocess error carries argv, status, bounded stderr and versions, and to T029 the timeout values and a test that the message names the wait.",
    "cost": "two acceptance lines",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -425,7 +425,7 @@
    "change": "Once the spec adopts L15-5 and L15-6, make the rule a tools/ci probes check comparing the pin file at each result's commit with the current one.",
    "cost": "one check",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -445,7 +445,7 @@
    "change": "Add a dry run of release.yml against a reserved rehearsal prerelease tag pattern before the candidate.",
    "cost": "one task step",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -465,7 +465,7 @@
    "change": "When the spec gains L16-1, L16-2, L16-3 and L16-9, add tasks in Phase 6 (romeu memory, J14 scenario) and Phase 9 (the J14 guide page and README heading).",
    "cost": "two tasks",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -485,7 +485,7 @@
    "change": "In each of O1, O3, O6, T026 and T092 add: before running the hook, read git log -p <last host run>..main -- tools/ci .githooks mise.toml mise.lock go.mod and record the commit read in Evidence, or run a released tools/ci; follows the 10 10.2 rule of L2-1.",
    "cost": "one step per block",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -505,7 +505,7 @@
    "change": "Add destructive-command fault injection to T073 and adjust T074 after L4-4 is decided.",
    "cost": "one acceptance line",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -525,7 +525,7 @@
    "change": "Add a state migration task after T034, and feed T061 and T068 from the one I17 list.",
    "cost": "one task",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -545,7 +545,7 @@
    "change": "Add those acceptance rows to T059, T078 and T079 once the spec carries them.",
    "cost": "three acceptance lines",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -565,7 +565,7 @@
    "change": "Each task's Verify names its test functions in a committed list that tools/ci compares with go test -json output (the manifest of L6-7).",
    "cost": "a list per task and one check",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -585,7 +585,7 @@
    "change": "Add a T002 fixture for a package with no test file (expected 0 percent) and a T007 line that the stub is a pass-through and the red comes from a tagged assertion.",
    "cost": "two lines",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -605,7 +605,7 @@
    "change": "Move the host-tag vet into the cross-build step in T002 or the first task that creates e2e/host.",
    "cost": "one step",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -625,7 +625,7 @@
    "change": "Follow the fix of L7-7 in the row and in T088.",
    "cost": "one row",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -645,7 +645,7 @@
    "change": "Correct T088's sentence to the measured bypass, and add the tag-commit check of L7-6 to T090.",
    "cost": "one sentence and one check",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -665,7 +665,7 @@
    "change": "Add a task for L7-15 and move the key rule into 07 7.4 (L7-20).",
    "cost": "one task",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -685,7 +685,7 @@
    "change": "Make the guide task depend on the error-id map of L8-4 and move it before the candidate tag.",
    "cost": "a dependency",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -705,7 +705,7 @@
    "change": "Split each into tasks of one logical change.",
    "cost": "task splits",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   },
   {
@@ -725,7 +725,7 @@
    "change": "Name, per block, the work agents do meanwhile (spec-only drafting, fixture tables, probe definitions), and key the rehearsal deferral to the smoke steps of L9-3.",
    "cost": "one line per block",
    "parked_for_b": true,
-   "resolution": "A",
+   "resolution": "parked",
    "resolution_text": "parked for stage B"
   }
  ]

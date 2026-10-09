@@ -11,7 +11,7 @@ Six build nodes (opus) ran one after another, never at the same time, each
 in the same scratch clone of branch `docs/review-round-8`. A group read the
 carry-over of the groups before it, applied the clusters of its pages whose
 Status is A, M or L in the form the Status column states, applied the
-operator's answers of 2026-10-08 that land on its pages, skipped the
+decisions of 2026-10-08 that land on its pages, skipped the
 clusters parked for stage B, and re-read the clusters that cite pages 01,
 05, 10, 12 and 13 against the text PRs #23 and #24 had changed. No group
 edited `.github/workflows/**`, `tools/**`, `.githooks/**`, `go.mod` or
@@ -35,15 +35,15 @@ The commit bodies list every cluster id; this table only gives the shape.
 
 - Group 1. Index clusters R8-index-1 to 48 (the parts landing on the index
   and 09), R8-00-4 to 15 (minus the ones owned elsewhere), R8-09-1 to 11,
-  R8-11-2 to 16; operator answers SC1, SC2, SC3, SC6, SC7, SC11, SC15,
+  R8-11-2 to 16; decisions SC1, SC2, SC3, SC6, SC7, SC11, SC15,
   SC16, SC17, DR2, DR4, DR5, AR12. The delivery-metrics analysis of 00 0.6
   moved to `docs/notes/dora-roi-report.md`.
 - Group 2. R8-01 (about 30 clusters), R8-02 (about 20), R8-03 (about 30),
   plus the inbound R8-00-13, R8-09-6, R8-09-1, R8-index-27 and 45;
-  operator answers SC1, SC2, SC3, SC5, SC8, AR1, AR2, AR3, AR13. SC4 was
-  kept as the operator answered, so nothing of it was applied.
+  decisions SC1, SC2, SC3, SC5, SC8, AR1, AR2, AR3, AR13. SC4 was
+  kept, as decided, so nothing of it was applied.
 - Group 3. R8-04 (about 35), R8-06 (about 20), R8-07 (10) plus the inbound
-  items from groups 1 and 2; operator answers SC1, SC2, SC3, SC5, SC7,
+  items from groups 1 and 2; decisions SC1, SC2, SC3, SC5, SC7,
   SC10, AR15, AR16, AR18, AR23. Page 04 gained a general "Error ids"
   section (4.4) and the sequence RJ-302 to RJ-328.
 - Group 4. R8-05 (page 05 rewritten around one invariants table and a 5.4
@@ -59,7 +59,7 @@ The commit bodies list every cluster id; this table only gives the shape.
   word for word, to `docs/notes/delivery-metrics-design.md` and
   `docs/notes/maintainer-block-of-ci-bootstrap.md`.
 - Group 6. ADR 0009, "Drop the required review and amend the records that
-  assumed it" (decision DR1, with the riders the operator accepted), and
+  assumed it" (decision DR1, with the riders accepted on 2026-10-08), and
   the "Superseded in part by" line on ADRs 0001, 0002, 0003, 0005, 0007 and
   0008; the plan items of SC1, SC2, SC3, SC5, SC10, SC12, SC13, SC14,
   SC15, the questions Q26 to Q31 and the lessons path; the documented
@@ -100,8 +100,9 @@ These go beyond the cluster text; the ship gate checked them (answers in
 - R8-05-30 (init with a non-empty root): not applied, unspecified.
 - R8-05-3: only the `spec` surface was applied; `sbxdrv` and `skills/**`
   need their own approval line (see the leftovers).
-- R8-05-35: the ADR 0007 Consequences half is not applied; it is with the
-  operator.
+- R8-05-35: the ADR 0007 Consequences half was not applied by the
+  groups; it landed on 2026-10-09 as decision 21 of ADR 0009, under the
+  extended `decisions` approval line.
 - R8-plan-3 is a finding on the index and ADR 0007, routed to DR3.
 - 33 of the 34 plan clusters are parked for stage B and carry no change.
 
@@ -118,8 +119,11 @@ are in `ship-gate-2026-10-09.md`.
   T008, T012, T052, the phase table or "pieces that land early" (group 6 report).
 - T020 still tests the old 11 11.4 lifecycle fixtures (group 6 report).
 - J14 and I34 have no traceability rows in the plan (R8-06-12 for I34).
-- Smoke step 2 at C6 needs `tools/release build --dry-run`, which T088
-  lands in phase 8 (R8-11-6, group 6 report; ship gate F2).
+- Resolved on 2026-10-09 by the ship-gate fixes (F2): smoke step 2 at C6
+  needed `tools/release build --dry-run`, which T088 landed in phase 8;
+  the new T103 lands it in phase 4 and step 2 moved to C7 (R8-11-6).
+- Blocks O3 and O6 name no `--require-pass` for A15 and A16, and no plan
+  task defines either probe (ship gate F15).
 - Plan tasks for the new surfaces: `approve <name>` leaves, memory
   import/verify, ledger commands, `--timings` (SC1, SC2, SC3, SC5).
 - The plan line citing `RJ-<exit><nn>`, the line citing 06 6.6 and the
@@ -129,7 +133,17 @@ are in `ship-gate-2026-10-09.md`.
 - ADR 0008 narrowing trigger "the first issue or PR from an account other
   than the operator's" and its scope line, in DR1's record (AR4, AR6).
 - The index Deferred row for DR3 is not added; the hook PR is pending
-  (DR3).
+  (DR3), in the form decided on 2026-10-09.
+- `tools/ci pr` reads checkpoint grants from `docs/grants.yaml` at the
+  base commit (12 12.4; ship gate F7, decided on 2026-10-09). The file
+  lands with that change, on the `ask-first` surface that already lists
+  it; nothing reads it before then.
+- `tools/ci pr` and 12 12.4 aligned with the house approval checklist:
+  one `> [!IMPORTANT]` alert whose `> - [ ] Approval: ...` lines are
+  written unticked and ticked as the grant (surface `checks`).
+- `tools/ci setup` hardened against a transient DNS failure while it
+  downloads modules (seen once on macos-intel, on `proxy.golang.org`),
+  by a bounded retry and never by skipping the step (surface `checks`).
 
 ### Tooling pull requests (each ask-first, with its own approval line)
 
@@ -137,7 +151,7 @@ are in `ship-gate-2026-10-09.md`.
   on `kits`; the `ledger` surface stays although the ledger is deferred
   and is a candidate to drop (R8-05-3).
 - Pre-push hook environment (`GOENV=off`, `GOWORK=off`,
-  `GOFLAGS=-mod=readonly`) (DR3).
+  `GOFLAGS=-mod=readonly`) (DR3, the form decided on 2026-10-09).
 - `tools/ci` checks: one 00 0.5 row per command and every Deferred table;
   probes and acceptance rules of 11 11.3 and 11.4 (group 1 report).
 - The never-tracked list in `tools/ci/denylist.yaml` replacing the
@@ -153,7 +167,6 @@ are in `ship-gate-2026-10-09.md`.
 
 ### Later, by decision or trigger
 
-- The ADR 0007 mise re-measure sentence (R8-05-35): with the operator.
 - The 04 4.4 id list gives way to the table of 4.1 when T008 lands
   (R8-04-38; ship gate F13).
 - The `ledger` surface is a candidate to drop while the ledger is deferred

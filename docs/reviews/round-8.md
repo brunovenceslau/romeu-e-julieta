@@ -107,7 +107,10 @@ R8-10-10 to the operator as SC16 and SC17); 33 clusters parked for stage
 B (10 Required, 23 Advisory) in their own table. Of the stage A
 clusters, 119 were raised by two or more lenses independently and are
 marked high-signal (28 Blocking, 74 Required, 17 Advisory); 5 parked
-clusters are high-signal too.
+clusters are high-signal too. The ship gate of the write pass moved
+two rows from A to M on 2026-10-09 (R8-04-38 and R8-08-5, findings F13
+and F12), so the table now reads 134 A and 201 M; the counts above are
+those of the consolidation.
 
 Deviations from lenses.md. Three, recorded so that the lens page can
 take them in or refuse them. (a) Fourteen Advisory rows went to the
@@ -232,7 +235,7 @@ rows.
 | **R8-01-13** (Advisory) 01 1.4 (Gate 2): The gate 2 summary shows every change in one form, so a content-only kit edit and a new capability look alike and train the user to approve without reading. | L1 | A | Apply. |
 | **R8-01-14** (Required) 01 1.4; 06 6.1; I28; 12 12.2: The v3 descriptor grammar is parsed by two packages with no single owner, and nothing says what happens when sbx adds a capability type the strict grammar refuses. | L3 | M | Name internal/oci as the owner instead of a new package; state the fail-closed cost as a deferred row. |
 | **R8-01-15** (Advisory) 01 1.4 (Gate 2, capabilities); 06 6.1; I28; Q20; Q23; 02 2.4: A registry client, a strict descriptor grammar, a descriptor cache and per-type conformance fixtures exist in v1 to decompose a workload already pinned by digest and allowlisted by repository, and no sentence says what the gate loses without it. | L11 | L | State what the decomposition buys and keep it in v1; if that sentence cannot be written truthfully, the deferral goes to the operator as a scope change. |
-| **R8-01-16** (Blocking) 01 1.5: Preflight checks that cannot widen a sandbox block the commands whose job is to preserve data: gate 1, drift and the signing-socket check make stop, salvage, salvage --from-host, rm and pull exit before they can save work. | L0, L1, L4 (high-signal) | M | Apply as one rule for the protective commands, covering all three findings; keep the full preflight for run, the live changes of sync and any removal. Regression check: the exemption covers gate 1 (step 1), the signing-socket check (step 5) and the gate 2 digest that 01 1.5 already allows for destructive commands; drift (step 3) and the identity check (step 6) still stop every command, as sa H2 (round 1) ruled. T074 (plan) changes with it. |
+| **R8-01-16** (Blocking) 01 1.5: Preflight checks that cannot widen a sandbox block the commands whose job is to preserve data: gate 1, drift and the signing-socket check make stop, salvage, salvage --from-host, rm and pull exit before they can save work. | L0, L1, L4 (high-signal) | M | Apply as one rule for the protective commands, covering all three findings; keep the full preflight for run, the live changes of sync and any removal. Regression check: the exemption covers gate 1 (step 1), the signing-socket check (step 5) and the gate 2 digest that 01 1.5 already allows for destructive commands; drift (step 3) and the identity check (step 6) still stop every command, as sa H2 (round 1) ruled. T074 (plan) changes with it. Its consequence, that a protective command goes on past a failed gate 1, gate 2 or step 5 check, was decided on 2026-10-09 as a 05 5.4 row (ship gate F8). |
 | **R8-01-17** (Advisory) 01 1.5: Step 5 is justified as checks that 'can widen a sandbox behind romeu's back', yet it holds the VS Code trust check (I23), which widens no sandbox. | L0 | A | Apply. |
 | **R8-01-18** (Required) 01 1.5: 01 1.5 says every command marked P runs the preflight, but sync is not marked P in 04 4.2 although it runs step 1 first and the rest before its first mutating call. | L13b | A | Apply. |
 | **R8-01-19** (Required) 01 1.5; I22: Step 5's I22 check parses sbx listings and is not required to fail closed, so a changed or empty listing passes a security check on zero rows. | L15 | A | Apply; it uses the id introduced by R8-01-8. |
@@ -348,7 +351,7 @@ rows.
 | **R8-04-35** (Advisory) 04 4.3 (pin workload, pin check); 06 6.2: pin workload and pin check are two sandbox commands reading a registry and GitHub releases for a rare manual act the first user does once. | L11 | operator | Needs the operator: it removes a v1 command (00 0.5). Recommendation: keep pin workload with its stated reason, and keep pin check, since R8-04-28 leans on it as the existing freshness signal. Regression check: deferring pin check would remove D27 (round 1) and conflict with R8-02-4 and R8-04-28; the recommendation keeps it. Decision SC9. |
 | **R8-04-36** (Advisory) 04 4.3 (lock); 07 7.3; 03 3.4 (caFile); 05 5.1: Several hedges carry no trigger: julieta lock locks macOS platforms the product never runs mise on, monorepo.lockfile serves a mode no v1 repo uses, and gitHosts caFile serves private git hosts in a v1 whose only host is github.com. | L11 | M | Apply the lock and caFile parts; drop the monorepo sentence only after checking in 07 7.3 that no v1 repo sets it. Regression check: the caFile part is dropped (te C1, round 1; R8-05-21's form stands); the two-platform lock default supersedes the macOS warning of R3-simplicity-06 (round 6), recorded as such. |
 | **R8-04-37** (Advisory) 04 4.3 (memory); 08 8.1: Of the six memory subcommands, search duplicates list with a filter and rm is a delete path in a product that otherwise never deletes, while edit --status done already closes an entry. | L11 | operator | Needs the operator: it removes commands from the v1 set (00 0.5). Recommendation: drop rm and fold search into list. Decision SC10. |
-| **R8-04-38** (Advisory) 04 4.4: 4.4 is a per-subsystem copy, by slug, of rows of the one error table, although it says the ledger has no catalog of its own, and it invites a 4.5. | L3 | A | Apply as proposed; keep a one-line 4.4 pointer if any page cites the anchor (check the citers when applying). |
+| **R8-04-38** (Advisory) 04 4.4: 4.4 is a per-subsystem copy, by slug, of rows of the one error table, although it says the ledger has no catalog of its own, and it invites a 4.5. | L3 | M | Apply as proposed; keep a one-line 4.4 pointer if any page cites the anchor (check the citers when applying). M: the 4.4 list stays until the table of 4.1 lands (T008); from then the table is the source and 4.4 is a link to `docs/reference/errors.md` (ship gate F13). |
 | **R8-04-39** (Advisory) 07 7.5; 13 13.2; 04 4.2; 01 1.6: The escape hatches (egress.tools, egress.extra, tool: other, --accept-loss, --overwrite-drift, retire --force) are each bounded but none is counted, so nobody sees when one becomes the main road. | L3 | L | State the limit with a trigger; the ledger query already answers one of the counts. |
 | **R8-04-40** (Advisory) 04 4.2 (doctor): doctor compares derived files and the ledger view but not the project record with the facts sbx owns (generations against sbx ls, egressApplied against sbx policy ls). | L4 | A | Apply as proposed; the salvage-refs check of L4-11 is consolidated with its own page. |
 | **R8-04-41** (Advisory) 04 4.1 (Subprocesses); 08 8.5: The timeout of the salvage exec, which moves up to a GiB over virtiofs, and what a timeout leaves behind are unstated. | L4 | A | Apply as proposed. |
@@ -360,7 +363,7 @@ rows.
 | **R8-04-47** (Advisory) 04 4.2 (doctor, root row); 12 12.8: doctor refuses a root inside a git repo or equal to $HOME, but not one inside a synced folder, where salvage payloads and transcripts would leave the machine. | L16 | M | Check only paths readable without guessing iCloud state; the ~/Documents case is a README sentence. |
 | **R8-05-1** (Blocking) 05 5.4: The Release signing paragraph names an operator-held credential that signs release artifacts, but no page says what is signed, how, where it is published or how a user verifies it; S1, J1 step 2, B1 and 10 10.2 know only checksums.txt and the provenance attestation, and S1 calls the attestation the signature. | L0, L2, L2b, L3, L7, L9, L10, L13b (high-signal) | operator | Recommend (a): delete the Release signing paragraph, state that the attestation is the only release proof and what it does not prove, add the deferred row with its trigger, and reword ADR 0008 decision 6 in a short superseding record. (b) adds a key to keep and an operator step per release for a control no second user needs yet. Decision DR2. |
 | **R8-05-2** (Blocking) 05 5.3; 05 5.4; 10 10.2; 12 12.4; 12 12.9: The default-branch ruleset is said to require a code-owner review in 05 5.3, 05 5.4, 10 10.2 item a, 12 12.4 and 12 12.9 while the same cells say that, as measured on 2026-10-08, it requires none; the spec describes the removed gate several times and the gate that exists nowhere. | L0, L2, L3, L13, L13b (high-signal) | M | Apply the spec-text change as written; leave ADR 0001 rule 8 and [ADR 0003, adopt six Extreme Programming practices and review as pairing](../adr/0003-adopt-six-extreme-programming-practices-and-review-as-pairing.md) untouched in this pass and list "mark ADR 0001 rule 8 and ADR 0003 superseded in part by ADR 0008 for the review requirement" as an operator item, since it changes accepted decision records. Regression check: the superseding record names op-ruleset-approvals (round 6) and N1 (round 3) as superseded in part by the measurement of ADR 0008. Decision DR1. |
-| **R8-05-3** (Required) 05 5.3: internal/sbxdrv (the only code that runs sbx, holding the I4 and I25 guards), e2e/fakesbx and skills/** sit on no ask-first surface, while gitsafe is a surface for the same reason on the git side, and tools/ci mutate never runs on a PR that touches only those guards. | L0, L2, L2b, L13 (high-signal) | M | Apply in the smaller form: one new sbxdrv surface and skills/** on the kits surface, plus the mutate trigger on guard tags instead of the readers and drivers surfaces of L2b-3, so more guards are tested without more approval lines. |
+| **R8-05-3** (Required) 05 5.3: internal/sbxdrv (the only code that runs sbx, holding the I4 and I25 guards), e2e/fakesbx and skills/** sit on no ask-first surface, while gitsafe is a surface for the same reason on the git side, and tools/ci mutate never runs on a PR that touches only those guards. | L0, L2, L2b, L13 (high-signal) | M | Apply in the smaller form: one new sbxdrv surface and skills/** on the kits surface, plus the mutate trigger on guard tags instead of the readers and drivers surfaces of L2b-3, so more guards are tested without more approval lines. Only the `spec` surface (AR13) landed in this pull request; the `sbxdrv` surface and `skills/**` on `kits` moved to a tooling pull request with its own approval line (the plan's list of tooling pull requests; ship gate F19). |
 | **R8-05-4** (Required) 05 5.3; 12 12.4: The contracts and checks surfaces put an approval line in the maintainer's words on most PRs and no form approves a class of change or a phase, so the maintainer is the queue on the critical path. | L9, L12 (high-signal) | operator | Recommend the checkpoint grant for contracts, checks, dependencies, kits, catalog, ledger, digests and termsafe only; defer narrowing contracts to versions.go until the RJ uniqueness check exists. Regression check: names N2 (round 3), whose one approval-line form this adds a second to. Decision AR14. |
 | **R8-05-5** (Blocking) 05 5.4: Text from strangers on GitHub (issues, PR bodies, comments, diffs) reaches agents acting with the operator's admin token, ADR 0008 names that class, and 05 has no residual-risk row, no threat-model sentence and no rule bounding what an agent does with it. | L5, L14 (high-signal) | operator | Recommend the row, the 12 12.9 working rule and the earlier trigger as written. Decision AR4. |
 | **R8-05-6** (Advisory) 05 5.4: The token row accepts merges, v* tags and ruleset edits as process only, and the spec does not weigh the cheap deterministic guard against mistakes: a julieta-claude PreToolUse refusal of gh pr merge, a v* tag push and ruleset API calls. | L5 | operator | Recommend it: it moves a rule held in agent goodwill into a deterministic hook, and states its limit. Decision AR5. |
@@ -438,7 +441,7 @@ rows.
 | **R8-08-2** (Required) 08 8.5: Salvage payloads (ignored.tar.gz, agent/, opt-in transcripts) carry secrets into a host memory dir with no stated modes, readable by every later generation and taken by backups, and no 05 5.4 row says so. | L0, L2, L16 (high-signal) | operator | Apply the modes and the paragraph in the spec; the operator decides between a new accepted-risk row in 05 5.4 and moving closed salvage out of the mount (recommended: accept the row, defer the move). Decision AR17. |
 | **R8-08-3** (Blocking) 08 8.2: SessionStart output has no size bound, no order and no truncation rule, and it prints every open entry and every lesson entry, which also makes agent-written text an unbounded channel into the next session. | L0, L5 (high-signal) | M | Fix the order and an 8 KiB starting bound with a fixed truncation line, print open lesson entries only, and state the agent-written-text channel as a limit in 08 8.2 rather than adding a threat-model row. |
 | **R8-08-4** (Blocking) 08 8.2: Only /clear re-runs SessionStart; compaction and resume, the common ways an agent loses context, re-assert no handoff, warnings or lessons. | L5 | A | Wire SessionStart for all sources of the pinned version and probe it in 11 11.2. |
-| **R8-08-5** (Required) 08 8.2: A failing session hook has no stated behavior (exit status, what it prints, where it is recorded), and the hooks call julieta through a link setup may not have made. | L5 | A | State the absolute path, exit 0 with one failure line, and record the pinned version's hook behavior in the same probe row. |
+| **R8-08-5** (Required) 08 8.2: A failing session hook has no stated behavior (exit status, what it prints, where it is recorded), and the hooks call julieta through a link setup may not have made. | L5 | M | State the absolute path, exit 0 with one failure line, and record the pinned version's hook behavior in the same probe row. M: the path reaches the kit as a kit arg, `julietaBin`, reserved (a spec that sets it is a sync error) and written through `internal/shquote` (ship gate F12). |
 | **R8-08-6** (Required) 08 8.3: The narrative handoff exists only when the operator remembers /handoff or /handoff --final, and SessionStart presents an old narrative as the latest without saying a session's narrative is missing. | L1, L5 (high-signal) | M | Make the gap visible at the next SessionStart and state the operator's step as a limit in J6; no confirmation prompt. |
 | **R8-08-7** (Required) 08 (opening): The opening of 08 says nothing sandbox-only may be lost when a sandbox dies, but snapshots fire only on commits, rewrites, merges, stop and pull, so an unplanned death loses uncommitted work and the user is never told. | L1 | L | State the limit for unplanned death and defer a periodic dirty-tree snapshot with a trigger. |
 | **R8-08-8** (Required) 08 8.4: The host cannot tell that snapshots of a repo stopped (core.hooksPath set by a tool, or the snapshot write failing), and 8.4 says nothing about a failed snapshot write. | L4 | M | Record failure and disablement where the host can read them (heads.json and the hook-failure record) and show snapshot age in status; no extra trigger. |
@@ -1069,14 +1072,13 @@ the 96 operator rows of the table, because the same decision was raised
 under several cluster ids and is merged here. Each item names its
 clusters, what it changes, the earlier decision it would supersede, and
 the consolidation's recommendation. The recommendation is not a
-decision; the operator's words, when given, are recorded beside each
-item and in the spec text they change. Advisory findings outside this
+decision; the decision, when taken, is recorded beside each item, with
+its date, and in the spec text it changes. Advisory findings outside this
 block are applied by default, as the protocol says.
 
-The operator answered on 2026-10-08 through a multiple-choice round; a
-quoted label is the option the operator selected, and the line after it
-says what was decided. Where the operator wrote free text, it is quoted
-as written.
+All 48 items were decided on 2026-10-08 through a multiple-choice
+round; the line "Decided on <date>" beside each item says what was
+decided. Free-text answers are restated in English, in substance.
 
 Three items decide others: SC1 (the ledger) decides AR7, AR19 and
 AR20; SC12 (dora) decides the dora part of DR6 and R8-12-38; DR1 (the
@@ -1105,7 +1107,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   who needs events from the first run; three of the four clusters
   recommend deferral and the fourth recommends keeping only on that
   condition.
-  Operator, 2026-10-08: "(a) Adiar (Recommended)" - the runtime ledger is deferred out of v1 as option (a) proposes, with the Deferred row and the leaving items it lists; this also decides AR7, AR19 and AR20.
+  Decided on 2026-10-08: the runtime ledger is deferred out of v1 as option (a) proposes, with the Deferred row and the leaving items it lists; this also decides AR7, AR19 and AR20.
 - **SC2 The one-time migration set** (R8-00-2, R8-03-4, R8-04-3,
   R8-08-21, R8-10-9, R8-11-1; Blocking). `julieta memory import` and
   `verify`, the `import/` allowlist entry, the memory-entry digest
@@ -1120,7 +1122,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   Recommendation: (a), knowing it reverses the maintainer's words; six
   concepts for one run on one machine is the cost the scope skeptic and
   the second adopter both priced.
-  Operator, 2026-10-08: "Apagar os seis (Recommended)" - option (a): the six migration items are deleted and the one-time import runs as a script in the operator's config repo.
+  Decided on 2026-10-08: option (a): the six migration items are deleted and the one-time import runs as a script in the operator's config repo.
 - **SC3 S8 and `romeu run --timings`** (R8-00-8, R8-02-14, R8-03-16,
   R8-04-17; Required; R8-index-23 follows). The flag exists for the
   criterion and the criterion's evidence is the flag; the 2 s and 3 s
@@ -1132,7 +1134,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   (b) keep the flag. In both, S8 gains "the 2 s and 3 s bounds are
   starting values; the first B5 measurement confirms or resets them".
   Recommendation: (a).
-  Operator, 2026-10-08: "Largar `--timings` (Recommended)" - option (a): `--timings`, `run-timings.v1` and the CI assertion are dropped; S8 stays as a harness measurement (B5) with the 2 s and 3 s bounds marked as starting values.
+  Decided on 2026-10-08: option (a): `--timings`, `run-timings.v1` and the CI assertion are dropped; S8 stays as a harness measurement (B5) with the 2 s and 3 s bounds marked as starting values.
 - **SC4 `romeu pull`, the review checkout and the workspace files**
   (R8-01-5, R8-02-13, R8-04-18, R8-05-31; Required; R8-index-30 and
   R8-01-4 follow). A host-side review path the start does not need,
@@ -1147,7 +1149,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   issue"); delete `dev.code-workspace`; the one-sentence daily-setup
   statement in 02 2.3 (editing and debugging happen inside the sandbox;
   host clones are for reading in Restricted Mode) applies now.
-  Operator, 2026-10-08: "Manter como está" - KEEP, against the recommendation: `romeu pull`, the review checkout and the workspace files stay in v1 with the hardening rounds 1 and 6 built on them; the deferral, the deletion of `dev.code-workspace` and the 05 5.4 row removals proposed here are not taken.
+  Decided on 2026-10-08: keep, against the recommendation: `romeu pull`, the review checkout and the workspace files stay in v1 with the hardening rounds 1 and 6 built on them; the deferral, the deletion of `dev.code-workspace` and the 05 5.4 row removals proposed here are not taken.
 - **SC5 The awaiting state and `approve <name>`** (R8-04-19, R8-01-21;
   Required; R8-01-31 and R8-04-7 follow). The non-TTY sync path has no
   named caller. Supersedes: craft C2's state machine (round 2) in part.
@@ -1155,7 +1157,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   record; the awaiting and superseded rows and `approve <name>` leave;
   one Deferred row "approval of a candidate rendered without a terminal;
   reopened by the first scripted sync".
-  Operator, 2026-10-08: "Aceitar (Recommended)" - a non-TTY sync exits 3 with the digest and no awaiting record; the awaiting and superseded rows and `approve <name>` leave, with the proposed Deferred row.
+  Decided on 2026-10-08: a non-TTY sync exits 3 with the digest and no awaiting record; the awaiting and superseded rows and `approve <name>` leave, with the proposed Deferred row.
 - **SC6 The 00 0.5 scope table and `handoff list`** (R8-04-20;
   Required; R8-00-6's deletion branch). The table lists six of sixteen
   romeu commands and justifies `julieta handoff list` by "kept in v1 by
@@ -1164,8 +1166,8 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   it serves on the first day, checked by `tools/ci sequences`; for
   `handoff list` the operator writes the need in one line, and the
   command leaves only if the operator withdraws op-handoff-list.
-  Operator, 2026-10-08: "Uma linha por comando (Recommended)" - one 00 0.5 row per command, with the need it serves on the first day, checked by `tools/ci sequences`; `julieta handoff list` stays in v1.
-  Need line for `julieta handoff list`, the proposal the operator selected ("Usar a proposta"): "Ao retomar uma sessão num sandbox novo, ver quais handoffs o repositório tem antes de escolher qual retomar." In English: when resuming a session in a new sandbox, see which handoffs the repository has before choosing which one to resume.
+  Decided on 2026-10-08: one 00 0.5 row per command, with the need it serves on the first day, checked by `tools/ci sequences`; `julieta handoff list` stays in v1.
+  Need line for `julieta handoff list`, the proposal selected on 2026-10-08: when resuming a session in a new sandbox, see which handoffs the repository has before choosing which one to resume.
 - **SC7 The v1.1 bucket of 00 0.5** (R8-index-3, R8-07-3, R8-00-7;
   Required). Four items (the native egress queue in `status`, `handoff
   --list` filters, a Remote-SSH helper, a registry credential) are
@@ -1177,7 +1179,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   registry-credential row, the 00 0.5 sentence changed to "anything
   that does not is a row of Deferred decisions"; the 07 7.5 error hint
   and the J8 sentence apply now.
-  Operator, 2026-10-08: "Aceitar (Recommended)" - one Deferred row per v1.1 item with its interim and an observable trigger, Q23 merged into the registry-credential row, the 00 0.5 sentence changed as proposed.
+  Decided on 2026-10-08: one Deferred row per v1.1 item with its interim and an observable trigger, Q23 merged into the registry-credential row, the 00 0.5 sentence changed as proposed.
 - **SC8 Gate 1** (R8-04-34; Advisory; R8-01-11 and R8-03-36, both L,
   share its finding L11-7). Gate 1 guards against an
   upgrade behind the operator's back on a machine where the operator
@@ -1185,26 +1187,26 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   naming the threat it stops (an sbx or romeu binary replaced by
   another process or person on the machine); the fold-into-sync branch
   would remove D3, sa M5, sa N4 and te N10 and weaken a security gate.
-  Operator, 2026-10-08: "Manter e nomear (Recommended)" - gate 1 is kept and 01 1.4 gains one sentence naming the threat it stops.
+  Decided on 2026-10-08: gate 1 is kept and 01 1.4 gains one sentence naming the threat it stops.
 - **SC9 `pin workload` and `pin check`** (R8-04-35; Advisory;
   R8-06-20 follows). Two sandbox commands for a rare manual act.
   Recommendation: keep both; `pin check` is the one freshness signal
   R8-04-28 and R8-02-4 lean on (D27, round 1), and `pin workload`
   states the both-arch manifest-list check as its reason.
-  Operator, 2026-10-08: "Manter os dois (Recommended)" - `pin workload` and `pin check` both stay.
+  Decided on 2026-10-08: `pin workload` and `pin check` both stay.
 - **SC10 `memory rm` and `memory search`** (R8-04-37, R8-08-22;
   Required; R8-08-22 is its page-08 form). `rm` is a delete path in a
   product that otherwise never deletes; `search` duplicates `list` with
   a filter. Recommendation: drop `rm` (`edit --status done` stays) and
   fold `search` into `list --query`.
-  Operator, 2026-10-08: "Remover rm, fundir search (Recommended)" - `memory rm` is dropped (`edit --status done` stays) and `memory search` folds into `list --query`.
+  Decided on 2026-10-08: `memory rm` is dropped (`edit --status done` stays) and `memory search` folds into `list --query`.
 - **SC11 Why the start needs commit signing** (R8-01-20; Advisory;
   R8-05-33 and R8-06-15 put the clause in 06 6.4 regardless). A product
   kit, a surface, a setting, a check and an open question with no
   stated reason. Recommendation: the sentence "the maintainer signs
   every commit and will not run an agent that cannot" in 00 0.5, if it
   is the operator's reason; otherwise the 06 6.4 clause alone.
-  Operator, 2026-10-08: "Sim, é essa (Recommended)" - the sentence "the maintainer signs every commit and will not run an agent that cannot" is the operator's reason and goes in 00 0.5.
+  Decided on 2026-10-08: the sentence "the maintainer signs every commit and will not run an agent that cannot" is the reason, confirmed on 2026-10-08, and goes in 00 0.5.
 - **SC12 `tools/ci dora` in v1** (R8-10-19, R8-12-9, R8-adr-14;
   Required; the dora parts of R8-10-3 and R8-12-38 follow; R8-00-9, M,
   shares the finding L3-24 of R8-12-9). A
@@ -1220,13 +1222,13 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   Fixes-release trailer check in `pr` because its data cannot be
   backfilled, shorten 12 12.10 to one paragraph; the plan loses T089
   and one release.yml step.
-  Operator, 2026-10-08: "Adiar a ferramenta (Recommended)" - `tools/ci dora` is deferred as proposed (Deferred row, ADR 0004 stays Accepted as the design, the Fixes-release trailer check stays in `pr`); this decides the dora part of DR6 and R8-12-38.
+  Decided on 2026-10-08: `tools/ci dora` is deferred as proposed (Deferred row, ADR 0004 stays Accepted as the design, the Fixes-release trailer check stays in `pr`); this decides the dora part of DR6 and R8-12-38.
 - **SC13 Two real-host smoke steps in the build order** (R8-12-35;
   Required). The product meets real sbx only at the release candidate.
   Recommendation: accept the two one-host smoke steps (after the sync
   slice; after run), pasted under Evidence and not committed as probe
   results; two short sittings are cheaper than one extra block B.
-  Operator, 2026-10-08: "Aceitar os dois (Recommended)" - the two one-host smoke steps (after the sync slice; after run) join the build order, pasted under Evidence.
+  Decided on 2026-10-08: the two one-host smoke steps (after the sync slice; after run) join the build order, pasted under Evidence.
 - **SC14 Merge cadence and the one-PR clause** (R8-12-10; Blocking).
   The no-stack rule plus a maintainer merge per PR make the calendar
   path equal to the graph's depth in sittings. Recommendation: apply
@@ -1236,7 +1238,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   (a green PR with its approval lines merged in the next sitting; at
   least one sitting per working day) and N are the operator's, since
   they commit the operator's time.
-  Operator, 2026-10-08: "Aplicar: proposta (Recommended)" - the 12 12.9 one-PR clause and the changed trigger apply; cadence: a green PR with its approval lines is merged at the operator's next sitting, with at least one merge per business day; N = 3.
+  Decided on 2026-10-08: the 12 12.9 one-PR clause and the changed trigger apply; cadence: a green PR with its approval lines is merged at the operator's next sitting, with at least one merge per business day; N = 3.
 - **SC15 Where the end-of-plan completeness checks and the pre-tag
   checks run** (R8-10-4, R8-10-44, R8-11-7; Blocking; routed by the
   regression check; R8-index-40, L, shares the finding L3-30 of
@@ -1252,7 +1254,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   op-acceptance-after-release's "leaves the release workflow" holds);
   a post-tag failure is a patch release; R8-10-44's release.yml step is
   not taken.
-  Operator, 2026-10-08: "Aceitar (Recommended)" - the completeness checks join `all` only once the plan's last task has landed; the pre-tag `acceptance` run and the candidate comparison are maintainer steps of the 12 12.2 release checklist outside release.yml; a post-tag failure is a patch release.
+  Decided on 2026-10-08: the completeness checks join `all` only once the plan's last task has landed; the pre-tag `acceptance` run and the candidate comparison are maintainer steps of the 12 12.2 release checklist outside release.yml; a post-tag failure is a patch release.
 - **SC16 A user-facing success criterion (S12)** (R8-index-22, R8-00-3,
   R8-09-2; Blocking; routed by the gate review of this page). Three
   clusters take two positions on one scope question. R8-index-22 (L0,
@@ -1277,7 +1279,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   under S7. That is what the three texts support: one asks for the
   measurement before the bound, two decline the criterion, and a bound
   set from a measurement is the principle the proposals were judged by.
-  Operator, 2026-10-08: "Sem S12 na v1 (Recommended)" - no S12 in v1; the counts become fields of the B3 result, the 00 0.2 limit and the Deferred row land, J14 lands under S7.
+  Decided on 2026-10-08: no S12 in v1; the counts become fields of the B3 result, the 00 0.2 limit and the Deferred row land, J14 lands under S7.
 - **SC17 workflow_dispatch and the S1 evidence** (R8-10-10; Required;
   routed by the gate review of this page). 10 10.2 fixes "the release
   workflow file must not come from the tagged commit" while the index
@@ -1296,7 +1298,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   rule. Recommendation: (b); it removes the contradiction T088 would
   have to break and leaves the mechanism to the row's own trigger, at
   the cost of a less specific S1 evidence line until then.
-  Operator, 2026-10-08: "Manter adiamento (Recommended)" - option (b): the deferral stays and the smaller form applies (S1's evidence drops "on the tagged commit", J1 drops the ref-specific flags).
+  Decided on 2026-10-08: option (b): the deferral stays and the smaller form applies (S1's evidence drops "on the tagged commit", J1 drops the ref-specific flags).
 
 ### Accepted risks and the security model (05 5.3, 05 5.4)
 
@@ -1307,19 +1309,19 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   `.metadata_never_index` marker written by sync, the doctor warning
   and the boundary D wording now; widen the 05 5.4 row to host
   indexers.
-  Operator, 2026-10-08: "Aceitar (Recommended)" - `.metadata_never_index` written by sync, the doctor warning, the boundary D wording and the widened 05 5.4 row apply.
+  Decided on 2026-10-08: `.metadata_never_index` written by sync, the doctor warning, the boundary D wording and the widened 05 5.4 row apply.
 - **AR2 `adopt` records an ungated generation** (R8-01-27; Required;
   both noise-probe readers of L2). Recommendation: accept with the
   printed inventory before the prompt, the "adopted, not gated" status
   label and an A4 observation; refusing adopt would lose the J3
   recovery.
-  Operator, 2026-10-08: "Aceitar com mitigações (Recommended)" - `adopt` is accepted with the printed inventory before the prompt, the "adopted, not gated" status label and an A4 observation.
+  Decided on 2026-10-08: `adopt` is accepted with the printed inventory before the prompt, the "adopted, not gated" status label and an A4 observation.
 - **AR3 `sandboxOptions` ungated** (R8-03-35; Advisory). A merged spec
   can size the sandbox up to what sbx allows. Recommendation: the 05
   5.4 row ("accepted because every spec change is a reviewed PR the
   operator merges; reopened by the first spec merged without the
   operator's review"), not a gate-class change.
-  Operator, 2026-10-08: "Aceitar como risco (Recommended)" - accepted as a 05 5.4 row, with the amendment that the justification is "every spec change is a PR only the operator merges" (not "reviewed"); reopened by the first spec merged without the operator merging it.
+  Decided on 2026-10-08: accepted as a 05 5.4 row, with the amendment that the justification is "every spec change is a PR only the operator merges" (not "reviewed"); reopened by the first spec merged without the operator merging it.
 - **AR4 Text from strangers steering agents that hold the token**
   (R8-05-5; Blocking). Recommendation: the threat-paragraph clause, the
   05 5.4 row with the 12 12.9 working rule (agents read such text as
@@ -1327,46 +1329,46 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   it without the maintainer's word), and the earlier ADR 0008 trigger
   ("the first issue or PR from an account other than the operator's"),
   recorded in DR1.
-  Operator, 2026-10-08: "Aceitar (Recommended)" - the threat-paragraph clause, the 05 5.4 row with the 12 12.9 working rule and the ADR 0008 trigger apply, recorded in DR1.
+  Decided on 2026-10-08: the threat-paragraph clause, the 05 5.4 row with the 12 12.9 working rule and the ADR 0008 trigger apply, recorded in DR1.
 - **AR5 A PreToolUse refusal as a guard against mistakes** (R8-05-6;
   Advisory). Recommendation: accept; it moves a rule held in agent
   goodwill into a deterministic hook of the julieta-claude kit and
   states its limit (not against an agent that edits its own hook).
-  Operator, 2026-10-08: "Aceitar (Recommended)" - accepted: the PreToolUse refusal is a deterministic hook of the julieta-claude kit with its limit stated.
+  Decided on 2026-10-08: accepted: the PreToolUse refusal is a deterministic hook of the julieta-claude kit with its limit stated.
 - **AR6 Split 05 5.4 by whose risk it is** (R8-05-8; Required).
   Recommendation: accept the split into "running romeu" and "how this
   repository is developed", the two cell rewrites and the scope line in
   ADR 0008 (DR1); no acceptance becomes wider or narrower.
-  Operator, 2026-10-08: "Aceitar a divisão (Recommended)" - 05 5.4 is split into "running romeu" and "how this repository is developed", with the two cell rewrites and the scope line in ADR 0008 (DR1).
+  Decided on 2026-10-08: 05 5.4 is split into "running romeu" and "how this repository is developed", with the two cell rewrites and the scope line in ADR 0008 (DR1).
 - **AR7 The ledger's inherited risks and starting values** (R8-05-11,
   R8-13-4, R8-adr-15; Required). Two residual risks and six starting
   values were accepted "with the design as a whole". Recommendation:
   decide with SC1; if the ledger leaves v1 they leave with it; if it
   stays, decide the two risks by name now and leave the six values
   marked proposed, since the index already has a row that reopens them.
-  Operator, 2026-10-08: "Saem com o ledger (Recommended)" - moot: the ledger's inherited risks and starting values leave with it, since SC1 deferred the ledger (operator confirmed).
+  Decided on 2026-10-08: moot: the ledger's inherited risks and starting values leave with it, since SC1 deferred the ledger (confirmed on 2026-10-08).
 - **AR8 The salvage row's premise** (R8-05-12; Required). "A push to
   origin is the only copy an agent cannot take back" while the token
   can delete branches. Recommendation: the rewritten cell and the
   Deferred row for a create-only host ref; no new ref namespace now.
-  Operator, 2026-10-08: "Aceitar (Recommended)" - the rewritten cell and the Deferred row for a create-only host ref apply; no new ref namespace now.
+  Decided on 2026-10-08: the rewritten cell and the Deferred row for a create-only host ref apply; no new ref namespace now.
 - **AR9 The signature row's mitigation** (R8-05-13; Required).
   Recommendation: point the mitigation at the `ssh-add -c` guide step
   of 06 6.4 (R8-06-13) instead of deleting confirm-on-use (sa H5, round
   1), and add the Deferred row for a signing path that is not
   forwarded.
-  Operator, 2026-10-08: "Aceitar (Recommended)" - the mitigation points at the `ssh-add -c` guide step of 06 6.4, with the Deferred row for a signing path that is not forwarded.
+  Decided on 2026-10-08: the mitigation points at the `ssh-add -c` guide step of 06 6.4, with the Deferred row for a signing path that is not forwarded.
 - **AR10 How the owner reads lessons** (R8-05-14; Required). `romeu
   handoff` shows only handoffs. Recommendation: the smaller form (a
   pager that shows bytes and runs nothing; never a workspace folder)
   and a Deferred row for `romeu memory list|show`; the pager clause
   loosens D8 (round 1) and the operator decides it by name.
-  Operator, 2026-10-08: "Pager + Deferred (Recommended)" - the smaller form: a pager that shows bytes and runs nothing, plus the Deferred row for `romeu memory list|show`; this loosens D8 (round 1) for the byte-only pager, by name.
+  Decided on 2026-10-08: the smaller form: a pager that shows bytes and runs nothing, plus the Deferred row for `romeu memory list|show`; this loosens D8 (round 1) for the byte-only pager, by name.
 - **AR11 Memory as a steering channel** (R8-05-15; Advisory).
   Recommendation: one merged 05 5.4 row for the SessionStart print and
   `romeu handoff`, both labelled as agent-written text.
-  Operator, 2026-10-08: "Aceitar (Recommended)" - one merged 05 5.4 row for the SessionStart print and `romeu handoff`, both labelled as agent-written text; selected after the clarification that SessionStart already calls `julieta handoff show --hook` and that 04 already has `--json` with schemas.
-  Free-text answer that preceded it: "Vale chamar um comando específico que chame o romeu handoff. Seria mara se ao passar -o ou --output tanto romeu quanto julieta imprimissem resultados em schemas determinísticos pra ajudar llms e integrações. Mas talvez fique pra depois da v1." Follow-up selection on `--json` versus `-o`/`--output`: "Manter --json (Recommended)" - `--json` stays as 04 has it; a common `-o`/`--output` is left for after v1.
+  Decided on 2026-10-08: one merged 05 5.4 row for the SessionStart print and `romeu handoff`, both labelled as agent-written text; selected after the clarification that SessionStart already calls `julieta handoff show --hook` and that 04 already has `--json` with schemas.
+  A free-text answer preceded it, in substance: a specific command that calls `romeu handoff` is worth having, and deterministic schema output from both binaries behind `-o`/`--output` would help models and integrations, perhaps after v1. Decided on 2026-10-08 in a follow-up on `--json` versus `-o`/`--output`: `--json` stays as 04 has it; a common `-o`/`--output` is left for after v1.
 - **AR12 The maintainer runs agent-authored `tools/ci` on the host**
   (R8-05-16, R8-10-7; Blocking). The pre-push hook, `hygiene add` and
   blocks O3 and O6 run it at whatever main holds. Recommendation: one
@@ -1376,7 +1378,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   scoping of 00 0.1's host sentence to romeu's runtime, and the ADR
   0008 Consequences note (DR1); a trusted hooksPath checkout is a
   Deferred row.
-  Operator, 2026-10-08: "Aceitar (Recommended)" - the 05 5.4 row with the standing control, the index Never entry, the scoping of 00 0.1's host sentence and the ADR 0008 Consequences note (DR1) apply; the trusted hooksPath checkout is a Deferred row.
+  Decided on 2026-10-08: the 05 5.4 row with the standing control, the index Never entry, the scoping of 00 0.1's host sentence and the ADR 0008 Consequences note (DR1) apply; the trusted hooksPath checkout is a Deferred row.
 - **AR13 The spec as an ask-first surface** (R8-01-35, R8-05-38,
   R8-10-20, R8-12-30; Required). `docs/spec/**` is on no surface while
   `tools/ci vocabulary` and `sequences` read its tables and 05 holds
@@ -1388,19 +1390,21 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   data-file alternative (the two inputs under `tools/ci`, rendered into
   the spec) is the fallback if the operator wants no specification
   surface.
-  Operator, 2026-10-08: "Três arquivos (Recommended)" - the three-file specification surface (`docs/spec.md`, `docs/spec/01-system-model.md`, `docs/spec/05-security.md`), with the generated denylist path named outside `tools/ci`; writing it needs an ask-first approval line for `.github/ask-first.yaml`.
+  Decided on 2026-10-08: the three-file specification surface (`docs/spec.md`, `docs/spec/01-system-model.md`, `docs/spec/05-security.md`), with the generated denylist path named outside `tools/ci`; writing it needs an ask-first approval line for `.github/ask-first.yaml`.
+  Confirmed on 2026-10-09 (ship gate F1): the pull request that adds the surface carries three approval lines, `Approval: ask-first - add the spec surface of three specification pages and docs/grants.yaml`, `Approval: spec - apply the round-8 write pass and its ship-gate fixes to the index, 01 and 05`, and the `decisions` line of DR1 extended to cover ADR 0007 (R8-05-35) and ADR 0009 (F6, F16, F20).
 - **AR14 A checkpoint grant for approval lines** (R8-05-4; Required).
   The approval line in the maintainer's words sits on most PRs.
   Supersedes: N2's one form (round 3), by adding a second.
   Recommendation: the grant for contracts, checks, dependencies, kits,
   catalog, ledger, digests and termsafe only; gates, gitsafe, signing,
   release, decisions and ask-first keep per-PR words.
-  Operator, 2026-10-08: "Aceitar sem `kits` (Recommended)" - the checkpoint grant covers contracts, checks, dependencies, catalog, ledger, digests and termsafe, WITHOUT `kits` (the consolidation's variant: kits carries pins and stays per-PR); gates, gitsafe, signing, release, decisions and ask-first keep per-PR words.
+  Decided on 2026-10-08: the checkpoint grant covers contracts, checks, dependencies, catalog, ledger, digests and termsafe, WITHOUT `kits` (the consolidation's variant: kits carries pins and stays per-PR); gates, gitsafe, signing, release, decisions and ask-first keep per-PR words.
+  Decided on 2026-10-09 (ship gate F7): the grants are recorded in `docs/grants.yaml`, on the `ask-first` surface, and `tools/ci pr` reads them from that file at the base commit, not from `docs/plan.md`, which is on no surface.
 - **AR15 os-base's floating apt delta** (R8-06-16; Required).
   Recommendation: option 1, the 05 5.4 row with its trigger and a
   Deferred row for pinning, decided after R8-06-17 (os-base may be an
   empty kit once A12 reports).
-  Operator, 2026-10-08: "Linha + Deferred (Recommended)" - option 1: the 05 5.4 row with its trigger and the Deferred row for pinning, decided after R8-06-17.
+  Decided on 2026-10-08: option 1: the 05 5.4 row with its trigger and the Deferred row for pinning, decided after R8-06-17.
 - **AR16 Whose sandbox the token rows describe** (R8-adr-6, R8-adr-22,
   R8-06-14; Required). 05 5.4 and ADR 0008's Context describe the
   sandbox this repository is developed in, not a romeu sandbox; the
@@ -1411,25 +1415,25 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   scope sentence with the ADR 0008 Context rewording and the
   dogfooding Deferred row (R8-06-14; the Context rewording is a
   decision-record edit on the signing surface).
-  Operator, 2026-10-08: "Aceitar os três (Recommended)" - all three apply: the heading sentence and per-project token advice, the organizations clause, and the 06 6.4 scope sentence with the ADR 0008 Context rewording and the dogfooding Deferred row.
+  Decided on 2026-10-08: all three apply: the heading sentence and per-project token advice, the organizations clause, and the 06 6.4 scope sentence with the ADR 0008 Context rewording and the dogfooding Deferred row.
 - **AR17 Salvage payloads are secret-bearing** (R8-08-2; Required).
   Recommendation: the modes (dirs 0700, files 0600), the 08 8.5
   paragraph and the printed line apply now; accept the 05 5.4 row for
   closed-generation salvage in the mounted memory dir and defer moving
   it out of the mount ("a second adopter or a shared host").
-  Operator, 2026-10-08: "Aceitar (Recommended)" - the modes (dirs 0700, files 0600), the 08 8.5 paragraph and the printed line apply; the 05 5.4 row for closed-generation salvage is accepted and moving it out of the mount is deferred.
+  Decided on 2026-10-08: the modes (dirs 0700, files 0600), the 08 8.5 paragraph and the printed line apply; the 05 5.4 row for closed-generation salvage is accepted and moving it out of the mount is deferred.
 - **AR18 Measuring the sandbox token's reach** (R8-04-21; Required).
   05 5.4 and ADR 0008 call the reach inferred though it is readable.
   Recommendation, amended by the regression check: a block A probe run
   from the maintainer's own session that reads the token type and
   scopes, so "inferred" becomes measured; no doctor row, since it
   would have romeu read and transmit a secret (D12, I25).
-  Operator, 2026-10-08: "Probe do bloco A (Recommended)" - a block A probe run from the maintainer's own session reads the token type and scopes; no doctor row.
+  Decided on 2026-10-08: a block A probe run from the maintainer's own session reads the token type and scopes; no doctor row.
 - **AR19 A retired name reused in the ledger** (R8-13-2; Required).
   Recommendation: accept with the retire message, the I33 clause and a
   Deferred row for a project identity other than its name; moot if SC1
   defers the ledger.
-  Operator, 2026-10-08: "Cai com o ledger (Recommended)" - moot: falls with the ledger, since SC1 deferred it (operator confirmed).
+  Decided on 2026-10-08: moot: falls with the ledger, since SC1 deferred it (confirmed on 2026-10-08).
 - **AR20 Owner removal from the ledger** (R8-13-3, R8-adr-21;
   Required). The no-delete rule binds the owner too. Supersedes:
   op-ledger-absolute and op-ledger-secret (round 5) by name.
@@ -1437,17 +1441,17 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   (the host side of 13 13.5 is already called a promise), with the
   alternative recorded in ADR 0006 when it is next superseded; moot if
   SC1 defers the ledger.
-  Operator, 2026-10-08: "Cai com o ledger (Recommended)" - moot: falls with the ledger, since SC1 deferred it (operator confirmed).
+  Decided on 2026-10-08: moot: falls with the ledger, since SC1 deferred it (confirmed on 2026-10-08).
 - **AR21 A moved release tag** (R8-10-11; Required). Recommendation:
   the acceptance check "the tag's commit equals the source digest in
   its attested provenance" and the sentence in the token row; it runs
   where SC15 puts the checks.
-  Operator, 2026-10-08: "Aceitar (Recommended)" - the acceptance check "the tag's commit equals the source digest in its attested provenance" and the token-row sentence apply, running where SC15 puts the checks.
+  Decided on 2026-10-08: the acceptance check "the tag's commit equals the source digest in its attested provenance" and the token-row sentence apply, running where SC15 puts the checks.
 - **AR22 The ruleset body try** (R8-10-39; Advisory). "An agent can
   disable the ruleset" stays inferred. Recommendation: a fifth
   reversible try at the next sitting, recorded in 05 5.4 and the next
   record.
-  Operator, 2026-10-08: "Fazer, com você presente (Recommended)" - the fifth try is made, only with the operator present and confirming live, with the revert step ready; recorded in 05 5.4 and the next record.
+  Decided on 2026-10-08: the fifth try is made, only with the operator present and confirming live, with the revert step ready; recorded in 05 5.4 and the next record.
 - **AR23 Personal-kit install steps and lifecycle hooks** (R8-06-1;
   Blocking; routed by the regression check; both noise-probe readers of
   L2). Where a local kit builds and what its steps reach is measured by
@@ -1458,7 +1462,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   of install steps and lifecycle hooks in personal kits as the option
   the operator may take once A14 reports where they run, so the
   accepted cost is superseded knowingly or kept.
-  Operator, 2026-10-08: "Agora + decidir após A14 (Recommended)" - the 06 6.1 Build sentence and the A14 observations apply now; whether to refuse install steps and lifecycle hooks in personal kits is decided after A14 reports.
+  Decided on 2026-10-08: the 06 6.1 Build sentence and the A14 observations apply now; whether to refuse install steps and lifecycle hooks in personal kits is decided after A14 reports.
 
 ### Decision records (`docs/adr`)
 
@@ -1487,8 +1491,8 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   0008 Consequences notes of AR4, AR12 and DR3; the scope line of AR6.
   The spec-side deletions (10 10.2 item a, 12 12.4, 12 12.9) land in
   the same write pass once the record is approved.
-  Operator, 2026-10-08: "Aceitar (Recommended)" - one dated record supersedes in part ADR 0001 rule 8, ADR 0002 decision 3 and ADR 0003 on the review requirement, carrying the riders listed above.
-  Approval line for `docs/adr`, proposed as "Approval: decisions - add the record that supersedes in part ADRs 0001, 0002 and 0003 on the review requirement and amends ADR 0001". Operator, 2026-10-08: "Aprovo, mas gostaria de um pouco mais de contexto de cada item referenciado." The approved text of the line: `Approval: decisions - add the record that supersedes in part ADRs 0001, 0002 and 0003 on the review requirement and amends ADR 0001`.
+  Decided on 2026-10-08: one dated record supersedes in part ADR 0001 rule 8, ADR 0002 decision 3 and ADR 0003 on the review requirement, carrying the riders listed above.
+  Approval line for `docs/adr`, proposed as "Approval: decisions - add the record that supersedes in part ADRs 0001, 0002 and 0003 on the review requirement and amends ADR 0001". Approved on 2026-10-08, with a request for more context on each item the record references, which the pull request body answers with a map from each "Superseded in part" line to its decision (ship gate F16). The approved text of the line: `Approval: decisions - add the record that supersedes in part ADRs 0001, 0002 and 0003 on the review requirement and amends ADR 0001`.
 - **DR2 Release signing** (R8-05-1, R8-10-2, R8-adr-4; Blocking;
   eight lenses on R8-05-1, both noise-probe readers of L2; R8-index-24
   and R8-index-25 follow). The 05 5.4 paragraph names an operator-held
@@ -1506,7 +1510,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   command, an S1 evidence item and a B1 predicate. Recommendation: (a);
   (b) adds a key to keep and an operator step per release for a control
   no second user needs yet.
-  Operator, 2026-10-08: "(a) Sem assinatura extra (Recommended)" - option (a): v1 publishes no signature beyond `checksums.txt` and the keyless provenance attestation; "signed" leaves S1; ADR 0008 decision 6 is reworded in DR1's record.
+  Decided on 2026-10-08: option (a): v1 publishes no signature beyond `checksums.txt` and the keyless provenance attestation; "signed" leaves S1; ADR 0008 decision 6 is reworded in DR1's record.
 - **DR3 ADR 0007's fired trigger** (R8-adr-5, R8-index-13, R8-plan-3;
   Required; nine lenses, both noise-probe pairs). ADR 0007 defers the
   untracked `go.work` and caller `GOFLAGS` escapes to Q25 and to a row
@@ -1518,7 +1522,8 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   .githooks/pre-push" and the same pointer note. Recommendation: (a);
   it is cheaper than keeping the row alive. The index row itself is
   spec text and can be written now in either case.
-  Operator, 2026-10-08: "(a) Fechar agora (Recommended)" - option (a): the hook starts `tools/ci` with `GOWORK=off` and `GOFLAGS` unset. The `.githooks` change goes in a separate tooling PR that asks the operator for its own `checks` approval line; the spec text and the pointer note in DR1's record go with the spec.
+  Decided on 2026-10-08: option (a): the hook starts `tools/ci` with `GOWORK=off` and `GOFLAGS` unset. The `.githooks` change goes in a separate tooling PR that asks for its own `checks` approval line; the spec text and the pointer note in DR1's record go with the spec.
+  Decided on 2026-10-09, after the ship gate of the hook branch found that an empty `GOFLAGS` falls back to a `go env -w` file and that an untracked `vendor/` makes `go run` use it: the hook starts `tools/ci` with `GOENV=off`, `GOWORK=off` and `GOFLAGS=-mod=readonly`, matching `stepEnv` in `tools/ci/fast.go`, in a separate pull request on the `checks` surface. ADR 0009 decision 12 and the plan's list of tooling pull requests say so; the change is pending until that pull request lands.
 - **DR4 The carve-out of "decide at the last responsible moment"**
   (R8-index-12, R8-adr-9; Required). "A security invariant, a merge
   gate and anything a later step depends on" is open-ended and
@@ -1528,7 +1533,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   a later section was written does not count", a part of one deferred
   only as a risk accepted by name in 05 5.4, mirrored in ADR 0005 by a
   superseding note; it is the rule that makes SC1 and SC12 decidable.
-  Operator, 2026-10-08: "Estreitar a exceção (Recommended)" - the carve-out is narrowed as proposed, mirrored in ADR 0005 by a superseding note.
+  Decided on 2026-10-08: the carve-out is narrowed as proposed, mirrored in ADR 0005 by a superseding note.
 - **DR5 The token's review trigger and ADR 0008 decision 5**
   (R8-index-5, R8-05-7, R8-adr-7; Blocking; the security-log half of
   R8-11-7 follows). "Every 2 autonomous work sessions" is counted by
@@ -1543,7 +1548,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   worded as a judgment, not a detector, its documented coverage read now
   and recorded with its date; the collision with the first principle
   named in DR1's record.
-  Operator, 2026-10-08: "Aceitar (Recommended)" - the trigger counts final handoffs of the product project, the release-candidate trigger moves to checkpoint C7, and the security log is worded as a judgment.
+  Decided on 2026-10-08: the trigger counts final handoffs of the product project, the release-candidate trigger moves to checkpoint C7, and the security log is worded as a judgment.
 - **DR6 Release immutability and ADR 0004's dora.json** (R8-10-3;
   Blocking). Nothing makes a published release immutable; dora.json is
   replaced on every release by design. Recommendation: apply ("a
@@ -1553,7 +1558,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   publishes, reconciled with R3-critic-09's "never a draft"; "replace
   an asset of a published release" in the index Never list); the dora
   part falls away if SC12 defers the tool.
-  Operator, 2026-10-08: "Aplicar (Recommended)" - release immutability applies as proposed; the dora part falls away because SC12 deferred the tool.
+  Decided on 2026-10-08: release immutability applies as proposed; the dora part falls away because SC12 deferred the tool.
 - **DR7 What mise may install** (R8-10-6; Blocking; R8-12-17 follows).
   Four texts disagree (the lint row, ADR 0007 rule 8, 12 12.1, ADR
   0001 Consequences). Changes ADR 0007 rule 8 and ADR 0001
@@ -1562,12 +1567,12 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   the two records pointing at it in DR1's record, and `tools/release`
   starting `gh` by its resolved path rather than `mise exec` (recorded
   as superseding A-determinism-5 (a) for gh).
-  Operator, 2026-10-08: "Aceitar (Recommended)" - the spec part (the allowed `[tools]` set once in 12 12.1, the two records pointing at it in DR1's record) lands in this PR; `gh` in `mise.lock` goes in its own tooling PR, which asks the operator for its `dependencies` approval line. The `go.mod` = `mise.toml` equality test (a gap the PR #26 test-engineer found) goes in that same PR ("Junto do PR do DR7 (Recommended)").
+  Decided on 2026-10-08: the spec part (the allowed `[tools]` set once in 12 12.1, the two records pointing at it in DR1's record) lands in this PR; `gh` in `mise.lock` goes in its own tooling PR, which asks the operator for its `dependencies` approval line. The `go.mod` = `mise.toml` equality test (a gap the PR #26 test-engineer found) goes in that same PR, decided on 2026-10-08.
 - **DR8 `all` is offline except vulnerabilities** (R8-10-33;
   Advisory). govulncheck reads the network inside `all` while ADR 0001
   rule 5 says `all` stays offline. Recommendation: apply; the 10 10.2
   sentence lands now, the ADR 0001 rule 5 sentence in DR1's record.
-  Operator, 2026-10-08: "Aplicar (Recommended)" - the 10 10.2 sentence lands now and the ADR 0001 rule 5 sentence in DR1's record.
+  Decided on 2026-10-08: the 10 10.2 sentence lands now and the ADR 0001 rule 5 sentence in DR1's record.
 
 ## Exit criteria of stage A
 
@@ -1578,7 +1583,7 @@ explicit "nothing for this lens" from at least two lenses, nineteen
 reports, no coverage key missing; the per-criterion and per-journey half
 is measured only over finding text and shows J7 at one lens), and three
 wait: "no Blocking open, every Required fixed or declined with the
-operator's words" waits for the Decisions block and the write pass (60
+decision and its date" waits for the Decisions block and the write pass (60
 Blocking and 252 Required clusters; 96 operator rows, 82 of them
 Blocking or Required); the shape of every open question and deferred row
 waits for the write pass (R8-index-1 to R8-index-21 and R8-adr-16 found
@@ -1588,7 +1593,7 @@ re-audit has not run.
 ## From stage A to stage B
 
 Three artifacts leave this round once the write pass lands: this page
-with the operator's answers recorded; the list of sections the write
+with the decisions recorded; the list of sections the write
 pass changed, by number as the spec cites itself; and the plan delta,
 the tasks whose "Implements" field cites a changed section. The
 33 parked clusters above are stage B's first input beside
@@ -1601,17 +1606,17 @@ this section and from the pull requests it names; branch heads and
 pull request states are not written here, the next session measures
 them with the handoff script of the house payload.
 
-**Decided by the operator** (quoted; typing fixed, wording kept):
+**Decided** (on 2026-10-08):
 
-- The lens set: "Todas as lentes ficam" (answering the question which
-  lenses stay, 2026-10-08), after which L13 to L16 were added by the
-  measurement on this page's lens set, and "Vamos fazer as correções nas
-  lentes que estão insatisfatórias" (answering the balance measurement).
-- The protocol and the cost of the round: "Gostei do protocolo. Pode usar
-  quantos modelos fable, opus e sonnet quanto forem necessários" and,
-  before it, "só não recomendo usar haiku pra nada aqui".
-- Orchestration: "Rode com dynamic workflow nesta sessão sempre que
-  precisar. Sugira pra mim na duvida."
+- The lens set: every lens stays (answering the question which lenses
+  stay), after which L13 to L16 were added by the measurement on this
+  page's lens set; and the lenses the balance measurement found
+  unsatisfactory are to be corrected.
+- The protocol and the cost of the round: the protocol is accepted, with
+  as many fable, opus and sonnet models as needed and no haiku model for
+  this work.
+- Orchestration: dynamic workflows may run in this session whenever
+  needed, proposed first when in doubt.
 - Nothing in the Decisions block above is decided yet.
 
 **Done, with the gate each passed:**
@@ -1633,23 +1638,22 @@ them with the handoff script of the house payload.
    of 2026-10-08, continued" below.
 2. Merge of PR #22 (the lens page); recommendation: merge, it is
    docs-only and both gates passed.
-   Answered on 2026-10-08: "Pode fazer merge do 22 por favor."; PR #22
-   was merged.
+   Answered on 2026-10-08: merge approved; PR #22 was merged.
 3. The host `www.sei.cmu.edu` for the ATAM row of the lens page's
    learned-from-others table; recommendation: approve, the research
    agent's brief is in the session's record and the row is the one source
    that elicits scenarios from stakeholders rather than evaluators.
-   Answered on 2026-10-08: the operator approved the host (an sbx rule
-   was added).
+   Answered on 2026-10-08: the host was approved (an sbx rule was
+   added).
 4. The `tools/ci` test `pinnedLintTools`, which refuses a worktree nested
    under the checkout (surface `checks`); recommendation: a pending item
    until the first task that edits `tools/ci/fast_test.go`.
-   Answered on 2026-10-08: "3 ok deixemos como pendente", confirmed as
-   this item with "Sim, esse"; it stays a pending item.
+   Answered on 2026-10-08, and confirmed as this item: it stays a
+   pending item.
 
 **Next steps, in order:**
 
-1. Record the operator's answers beside each decision item, quoted.
+1. Record the answers beside each decision item.
 2. Rebase `docs/review-lenses` and `docs/review-round-8` onto the current
    default branch, signed.
 3. The write pass on the spec in PR #25: apply the A, M and L clusters
@@ -1678,27 +1682,27 @@ run" above.
 Facts measured in the same day's later session; the checkpoint above is
 left as written.
 
-- PR #22 (the lens page) was merged by the operator; main is at 2f5bb7a.
+- PR #22 (the lens page) was merged; main is at 2f5bb7a.
 - The PR #25 branch (`docs/review-round-8`) was rebased onto that main,
-  signed, after the operator's "Sim (Recommended)"; its head was
-  84bd17f before this answers commit.
+  signed, as approved on 2026-10-08; its head was 84bd17f before this
+  answers commit.
 - PR #26 "build: bump Go to 1.27.2" is open with CI green and awaits the
   operator's merge; until it lands, main's CI is red only on the
-  `vulnerabilities` leg. The operator on the Go version: "Queria Go
-  latest neles sempre faz sentido. Tipo qquer 1.27 é ok, 1.28 já
-  precisaria intervenção."
-- Go pin policy: the operator chose "Pin exato + gatilho (Recommended)".
+  `vulnerabilities` leg. On the Go version, decided on 2026-10-08: the
+  latest Go always makes sense; any 1.27 patch is fine, and 1.28 would
+  need a decision.
+- Go pin policy, decided on 2026-10-08: an exact pin with a trigger.
   The pin is exact, the `vulnerabilities` gate is the trigger for the
   next patch, and bump automation is deferred; it reopens if manual
   patch bumps become a burden or the gate warns too late.
-- The host `www.sei.cmu.edu` was approved by the operator (an sbx rule
+- The host `www.sei.cmu.edu` was approved on 2026-10-08 (an sbx rule
   was added) for the ATAM row of the lens page.
-- The `pinnedLintTools` nested-worktree issue: the operator's "3 ok
-  deixemos como pendente" is confirmed as this item, so it is pending
-  until the first task that edits `tools/ci/fast_test.go`.
+- The `pinnedLintTools` nested-worktree issue: the answer to keep it
+  pending is confirmed as this item, so it is pending until the first
+  task that edits `tools/ci/fast_test.go`.
 - All 48 decision items are answered and recorded beside each item
-  above. Three of them carry later PRs that ask the operator for their
-  own approval line: DR1 (the record in `docs/adr`, text approved above),
+  above. Three of them carry later PRs that ask for their own approval
+  line: DR1 (the record in `docs/adr`, text approved above),
   DR3 (`.githooks`), DR7 (`gh` in `mise.lock`, with the `go.mod` =
   `mise.toml` equality test); AR13 needs one for `.github/ask-first.yaml`
   when written.
@@ -1708,41 +1712,41 @@ Next steps: step 1 above is done; the write pass (step 3) is next.
 ## Session checkpoint (2026-10-09)
 
 The write pass ran, the ship gate found work for the next pass, and the
-operator merged the tooling pull requests. The checkpoints above are left
+tooling pull requests were merged. The checkpoints above are left
 as written. The write pass is described in `round-8/write-pass.md` and the
 ship gate's findings are in `round-8/ship-gate-2026-10-09.md`.
 
 ### Decided
 
 Decisions of this session that are not already recorded beside the 48
-items above. The Go pin policy ("Pin exato + gatilho (Recommended)") and
-the `pinnedLintTools` pending item ("Sim, esse", confirming "3 ok deixemos
-como pendente") are already recorded in "Session of 2026-10-08, continued".
+items above. The Go pin policy (an exact pin with a trigger) and the
+`pinnedLintTools` pending item are already recorded in "Session of
+2026-10-08, continued".
 
 - Tooling pull requests, answering the request to open the three tooling
-  pull requests with their approval lines. Operator: "Vou precisar afk por
-  cerca de 3 horas. Consigo ajudar com algo antes de ir? Vc continuará
-  trabalhando autonomamente. Use stacked PRs (os do github mesmo,
-  conferindo a integração dos PRs [que daí consigo aprovar todos de uma só
-  vez {é preciso usar o gh}]). Não precisa me esperar para fazer push ou
-  abrir/alterar PR que vc precisar abrir vc mesmo."
-- Stacked pull requests. Operator: "Use stacked PRs (gh stack) para
-  stacked PRs (com o --base correto para o suporte certo na UI web de PR).
-  E me explique o que é certo em --base e pq pq é confuso... . Vou nessa".
-  What the orchestrator did with it: no stack was needed, because AR13 was
+  pull requests with their approval lines, decided on 2026-10-09: work
+  goes on autonomously for about three hours; the pull requests are
+  stacked GitHub pull requests, checked for how they integrate, so that
+  they can be approved together with `gh`; pushing and opening or
+  editing the pull requests the work needs does not wait for an answer.
+- Stacked pull requests, decided on 2026-10-09: use `gh stack` for
+  stacked pull requests, with the `--base` that gives the web UI its
+  stack support, and explain which `--base` is right and why it is
+  confusing. What the orchestrator did with it: no stack was needed, because AR13 was
   folded into PR #25 and DR3 and DR7 were independent of each other and of
   it. `gh stack` is to be used at the first real dependency, after
   verifying the signing of its rebases and the retarget race (the research
   is in `round-8/write-pass.md`, marked not adversarially verified). The
-  house payload rule that every pull request in a stack targets `main` is
-  to be amended in a payload pull request, which is ask-first. The
-  explanation of `--base` the operator asked for was given in the session
-  chat on 2026-10-09.
-- Round 9, answering whether to run it after the write pass. Operator:
-  "Sim, rodar a rodada 9 (Recommended)".
-- Merges done by the operator: PR #22, "pr 22 landed;" (after "Pode fazer
-  merge do 22 por favor."); PR #26, "pr 26 landed;"; PR #27, "27 landed;;".
-- Orchestrator decision, not an operator answer: AR13 (the `spec` surface)
+  explanation of `--base` was given in the session chat on 2026-10-09.
+- Deferred on 2026-10-09: the amendment of the house payload rule that
+  every pull request in a stack targets `main`. Trigger: the first real
+  dependency between pull requests; then the `gh stack` research gets
+  adversarial verification first, and the amendment, a payload pull
+  request on an ask-first surface, follows from what it confirms.
+- Round 9, answering whether to run it after the write pass, decided on
+  2026-10-09: run round 9.
+- Merges: PR #22 (2026-10-08), PR #26 and PR #27 landed.
+- Orchestrator decision, not an answer to a question: AR13 (the `spec` surface)
   landed in PR #25 and not in a tooling PR, because
   `TestSpecListIsTheCommittedList` requires the YAML fence in 05 5.3 to
   equal `.github/ask-first.yaml`, so the two copies cannot change in
@@ -1822,16 +1826,16 @@ PR #27, is closed by the merge):
    --dry-run`, which lands in phase 8. Recommend the ship gate's fix under
    F2 below, not a plain `go build`, which the gate showed cannot work.
 
-**(b) Ship gate findings that need the operator's word** (all in
+**(b) Ship gate findings that need a decision** (all in
 `round-8/ship-gate-2026-10-09.md`):
 
 - F1: approval lines for the `ask-first` and `spec` surfaces. The
-  operator's tooling authorization above answered the request that
+  tooling authorization above answered the request that
   proposed `Approval: ask-first - add docs/spec.md,
   docs/spec/01-system-model.md and docs/spec/05-security.md as an
   ask-first surface`. Whether that suffices, and whether a `spec` line is
-  needed when the surface is added in the same pull request, is the
-  operator's call. Recommend: confirm the ask-first line as recorded and
+  needed when the surface is added in the same pull request, is open.
+  Recommend: confirm the ask-first line as recorded and
   give a `spec` line.
 - F2: recommend the gate's fix: a new T103 dry-run build in phase 4, and
   smoke step 2 moved to C7.
