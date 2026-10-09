@@ -73,8 +73,11 @@ type finding struct {
 	msg   string
 }
 
+// String prints a finding with its path passed through git.Printable,
+// so a newline or an escape in a tracked path cannot forge a line of the
+// log.
 func (f finding) String() string {
-	return f.where + ": " + f.rule + ": " + f.msg
+	return git.Printable(f.where) + ": " + f.rule + ": " + f.msg
 }
 
 // treeFile is one entry of the tree at HEAD.

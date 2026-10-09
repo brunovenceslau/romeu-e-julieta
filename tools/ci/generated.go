@@ -167,7 +167,7 @@ var checkoutAttrs = []string{"text", "eol", "ident", "filter", "working-tree-enc
 // info/attributes of the clone.
 func attributeProblems(ctx context.Context, repo git.Repo, outs []output) ([]finding, error) {
 	var findings []finding
-	listed, valued, err := scanAttributes(ctx, repo)
+	root, listed, valued, err := scanAttributes(ctx, repo)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func attributeProblems(ctx context.Context, repo git.Repo, outs []output) ([]fin
 	for _, o := range outs {
 		want[o.path] = true
 		if !listed[o.path] {
-			findings = append(findings, finding{o.path, "generated", attributesPath + " does not list this file with -text; add the line \"" + o.path + " -text\""})
+			findings = append(findings, finding{o.path, "generated", root + " does not list this file with -text; add the line \"" + o.path + " -text\""})
 		}
 	}
 	for _, path := range slices.Sorted(maps.Keys(listed)) {
@@ -247,11 +247,11 @@ const infoAttributes = "info/attributes"
 
 // scanAttributes reads every .gitattributes of the index, the root one
 // and the nested ones, and the info/attributes of the clone, and
-// returns the paths that the root file lists with -text and the
+// returns the name of the root file, the paths it lists with -text and the
 // problems of the lines of all of them.
 //
 // A file counts when its base name is ".gitattributes" in any case,
-// since a case-insensitive filesystem reads it so, and when the index
+// since git on a case-insensitive filesystem may read it, and when the index
 // holds it as a regular file (mode 100644 or 100755); an entry with a
 // stage other than 0 is a problem, "resolve it", and is not read. The
 // file is read from its blob in the index.
@@ -271,10 +271,10 @@ const infoAttributes = "info/attributes"
 // with core.autocrlf may convert the file. Another value, such as
 // text=auto, is not a problem here: on a line that matches an output
 // the effective check reports it.
-func scanAttributes(ctx context.Context, repo git.Repo) (map[string]bool, []finding, error) {
+func scanAttributes(ctx context.Context, repo git.Repo) (string, map[string]bool, []finding, error) {
 	staged, err := repo.Run(ctx, nil, "ls-files", "--stage", "-z")
 	if err != nil {
-		return nil, nil, err
+		return "", nil, nil, err
 	}
 	// The blob of the entry of each file at stage 0, and the files that
 	// have an entry at another stage.
@@ -296,6 +296,9 @@ func scanAttributes(ctx context.Context, repo git.Repo) (map[string]bool, []find
 			blobs[name] = object
 		}
 	}
+	// The name of the root file as the index holds it, the one the list
+	// is read from; the plain name when the index holds none.
+	rootName := attributesPath
 	listed := map[string]bool{}
 	var problems []finding
 	for _, file := range slices.Sorted(maps.Keys(unmerged)) {
@@ -304,23 +307,27 @@ func scanAttributes(ctx context.Context, repo git.Repo) (map[string]bool, []find
 	for _, file := range slices.Sorted(maps.Keys(blobs)) {
 		data, err := repo.Run(ctx, nil, "cat-file", "blob", blobs[file])
 		if err != nil {
-			return nil, nil, err
+			return "", nil, nil, err
 		}
 		root := strings.EqualFold(file, attributesPath)
+		if root {
+			rootName = file
+		}
 		scanLines(file, string(data), root, listed, &problems)
 	}
-	info, err := repo.Run(ctx, nil, "rev-parse", "--git-path", infoAttributes)
+	// Absolute, so that the path is the same from the main clone and from
+	// a linked worktree, where git gives the path in the common directory.
+	info, err := repo.Run(ctx, nil, "rev-parse", "--path-format=absolute", "--git-path", infoAttributes)
 	if err != nil {
-		return nil, nil, err
+		return "", nil, nil, err
 	}
-	infoPath := filepath.Join(repo.Dir, strings.TrimSpace(string(info)))
-	switch data, err := os.ReadFile(infoPath); {
+	switch data, err := os.ReadFile(strings.TrimSuffix(string(info), "\n")); {
 	case err == nil:
 		scanLines(infoAttributes, string(data), false, listed, &problems)
 	case !os.IsNotExist(err):
-		return nil, nil, err
+		return "", nil, nil, err
 	}
-	return listed, problems, nil
+	return rootName, listed, problems, nil
 }
 
 // scanLines reads the lines of one attributes file, called file in a
@@ -345,9 +352,13 @@ func scanLines(file, data string, root bool, listed map[string]bool, problems *[
 			listed[pattern] = true
 		}
 		for _, attr := range checkoutAttrs {
+			fix := "drop the value"
+			if attr == "text" {
+				fix = "use -text"
+			}
 			for _, state := range []string{"set", "unset", "unspecified"} {
 				if slices.Contains(fields, attr+"="+state) {
-					*problems = append(*problems, finding{file, "generated", fmt.Sprintf("gives %q the value %s=%s; git prints that string as it prints a state, so use -text", pattern, attr, state)})
+					*problems = append(*problems, finding{file, "generated", fmt.Sprintf("gives %q the value %s=%s; git prints that string as it prints a state, so %s", pattern, attr, state, fix)})
 				}
 			}
 		}

@@ -378,6 +378,15 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			r.Write("sub/.gitattributes", "x -text\n")
 			r.Commit("nested -text")
 		}, nil},
+		{"the message names a root file in other case", func(t *testing.T, r *gittest.Repo) {
+			r.Git("mv", attributesPath, ".GitAttributes")
+			r.Write(".GitAttributes", ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
+			r.Commit("rename")
+		}, []string{
+			codeowners + `: generated: has the text attribute "unspecified"`,
+			`docs/adr/README.md: generated: has the text attribute "unspecified"`,
+			askFirstPagePath + ": generated: .GitAttributes does not list this file",
+		}},
 		{"a root file named in other case is the list", func(t *testing.T, r *gittest.Repo) {
 			r.Git("mv", attributesPath, ".GitAttributes")
 			r.Commit("rename")
@@ -385,6 +394,45 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			codeowners + `: generated: has the text attribute "unspecified"`,
 			`docs/adr/README.md: generated: has the text attribute "unspecified"`,
 			askFirstPagePath + `: generated: has the text attribute "unspecified"`,
+		}},
+		{"info/attributes does not list an output", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
+			r.Commit("drop a line")
+			info := filepath.Join(r.Dir, ".git", "info")
+			require.NoError(t, os.MkdirAll(info, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(info, "attributes"), []byte(askFirstPagePath+" -text\n"), 0o644))
+		}, []string{askFirstPagePath + ": generated: .gitattributes does not list this file"}},
+		{"a nested file in other case does not list an output", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
+			r.Write("sub/.GitAttributes", askFirstPagePath+" -text\n")
+			r.Commit("nested")
+		}, []string{askFirstPagePath + ": generated: .gitattributes does not list this file"}},
+		{"a nested .gitattributes that is unmerged", func(t *testing.T, r *gittest.Repo) {
+			r.Write("sub/.gitattributes", "a -text\n")
+			r.Commit("base")
+			r.Git("checkout", "--quiet", "-b", "other")
+			r.Write("sub/.gitattributes", "b -text\n")
+			r.Commit("other")
+			r.Git("checkout", "--quiet", "main")
+			r.Write("sub/.gitattributes", "c -text\n")
+			r.Commit("main")
+			_, err := r.Run(t.Context(), nil, "merge", "other")
+			require.Error(t, err)
+		}, []string{"sub/.gitattributes: generated: has an unmerged entry"}},
+		{"a .gitattributes deleted on one side and edited on the other", func(t *testing.T, r *gittest.Repo) {
+			r.Git("checkout", "--quiet", "-b", "other")
+			r.Git("rm", "--quiet", attributesPath)
+			r.Git("commit", "--quiet", "--message", "delete")
+			r.Git("checkout", "--quiet", "main")
+			r.Write(attributesPath, goodAttributes+"a -text\n")
+			r.Commit("edit")
+			_, err := r.Run(t.Context(), nil, "merge", "other")
+			require.Error(t, err)
+		}, []string{
+			".gitattributes: generated: has an unmerged entry",
+			codeowners + ": generated: .gitattributes does not list this file",
+			"docs/adr/README.md: generated: .gitattributes does not list this file",
+			askFirstPagePath + ": generated: .gitattributes does not list this file",
 		}},
 		{"a .gitattributes that is a link is not scanned", func(t *testing.T, r *gittest.Repo) {
 			require.NoError(t, os.MkdirAll(filepath.Join(r.Dir, "sub"), 0o755))
@@ -417,6 +465,19 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			require.Error(t, err)
 		}, []string{codeowners + ": generated: has an unmerged entry"}},
 	}
+	for _, attr := range []string{"eol", "filter", "ident", "working-tree-encoding"} {
+		for _, state := range []string{"set", "unset", "unspecified"} {
+			line := "none.md " + attr + "=" + state + "\n"
+			tests = append(tests, struct {
+				name  string
+				setup func(t *testing.T, r *gittest.Repo)
+				want  []string
+			}{attr + "=" + state + " reads like a state", func(t *testing.T, r *gittest.Repo) {
+				r.Write(attributesPath, goodAttributes+line)
+				r.Commit("string")
+			}, []string{`.gitattributes: generated: gives "none.md" the value ` + attr + "=" + state}})
+		}
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := committedGenerateFixture(t).For(t)
@@ -428,6 +489,36 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGeneratedInfoAttributesOfALinkedWorktree checks that the
+// info/attributes of the common directory is read from a linked
+// worktree, where git prints its path as an absolute one.
+func TestGeneratedInfoAttributesOfALinkedWorktree(t *testing.T) {
+	r := committedGenerateFixture(t).For(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	r.Git("worktree", "add", "--quiet", "--detach", wt)
+	info := filepath.Join(r.Dir, ".git", "info")
+	require.NoError(t, os.MkdirAll(info, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(info, "attributes"), []byte(".github/CODEOWNERS text=unset\n"), 0o644))
+	findings, err := generated(t.Context(), git.Repo{Dir: wt, Env: r.Env}, fsOps(), generateOutputs)
+	require.NoError(t, err)
+	require.Len(t, findings, 1, "%v", findings)
+	assert.Equal(t, `info/attributes: generated: gives ".github/CODEOWNERS" the value text=unset; git prints that string as it prints a state, so use -text`, findings[0].String())
+}
+
+// TestGeneratedFindingsPrintHostilePaths checks that a tracked path with
+// a newline and an escape reaches a finding quoted, so it cannot forge a
+// workflow command or move the terminal.
+func TestGeneratedFindingsPrintHostilePaths(t *testing.T) {
+	r := committedGenerateFixture(t).For(t)
+	r.Write("d\n::error::forged\x1b[2J/.gitattributes", "x text=unset\n")
+	r.Commit("hostile")
+	got := gateOf(t, r)
+	require.Len(t, got, 1, "%v", got)
+	assert.NotContains(t, got[0], "\n")
+	assert.NotContains(t, got[0], "\x1b")
+	assert.True(t, strings.HasPrefix(got[0], `"d\n::error::forged\x1b[2J/.gitattributes": generated: gives "x"`), got[0])
 }
 
 // TestGeneratedInfoAttributesUnreadable checks that an info/attributes
