@@ -534,12 +534,18 @@ Kinds `clear` and `final` require the headings (six for `final`);
 `memory/<dir>/salvage/<generation>/<salvage-id>/manifest.json`:
 `salvageId` (must equal the id romeu passed), `generation`, `repo`,
 `worktrees[]` (path, HEAD, branch or detached, dirty), `refs[]` (every
-ref in the bundles with SHA: branches, `salvage/*`, tags, notes, each
-worktree HEAD), `bundles[]` (file, sha256, size, embedded-repo path if
-any), `files[]` (path, size, sha256), `skipped[]` (item, reason:
-`excluded-by-spec`, `over-cap`, `transcript-excluded`, `unreadable`,
-`disk-full`) and
-`complete`. romeu recomputes completeness itself; the field is advisory.
+ref in the bundles with SHA: branches, the current generation's
+`refs/salvage/<generation>/*`, the reflog-only commits as
+`refs/salvage-reflog/<branch>/<n>`, tags, notes, each worktree HEAD),
+`bundles[]` (file, sha256, size, embedded-repo path if any), `files[]`
+(path, size, sha256), `skipped[]` (item, reason: `excluded-by-spec`,
+`over-cap`, `transcript-excluded`, `unreadable`, `disk-full`,
+`worktree-changing`, `in-progress-operation`, `agent-not-matched`,
+`agent-path-missing`; the host half adds `fsck-failed` and
+`daemon-url-refused` to the salvage record's `reasons[]`, 3.8; the
+recovery of each is the table of
+[08 8.5](08-memory-handoff-salvage.md#skipped-reasons-and-their-recovery))
+and `complete`. romeu recomputes completeness itself; the field is advisory.
 Every path (`bundles[].file`, `files[].path`, `worktrees[].path`, an
 embedded-repo path) is relative, cleaned, has no `..` element and no
 symlink component, and resolves below the salvage dir (error id

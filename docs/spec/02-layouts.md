@@ -101,9 +101,9 @@ contributor e2e builds go through it
 content: romeu writes them to `<name>-env/.romeu/bin/` and the sandbox
 sees that directory through a read-only mount (see 2.3 and
 [06](06-kits.md#63-julieta-delivery)), so a romeu release does not
-change any kit digest. *Why for us:* one signed-commit release is the
-trust root for what enters a sandbox, without making every upgrade a
-recreate.
+change any kit digest. *Why for us:* one release, built and attested by `release.yml`
+([05](05-security.md), threat model), is the trust root for what
+enters a sandbox, without making every upgrade a recreate.
 
 ## 2.2 Config repo
 
@@ -148,7 +148,7 @@ $ROMEU_ROOT/                            default $HOME/dev; never a VS Code trust
    │  └─ bin/                           julieta-linux-<GOARCH>, SHA256SUMS; mounted read-only into the sandbox
    ├─ <dir>/                            host clone of each repo (primary is the sbx workspace, clone mode)
    ├─ review/<dir>/                     hardened review checkout (created by `romeu pull`)
-   └─ memory/<dir>/                     per-repo memory, mounted rw into this project's sandbox only; julieta writes its files 0600
+   └─ memory/<dir>/                     per-repo memory, mounted rw into this project's sandbox only; sync creates it 0700, julieta writes its files 0600
 ```
 
 The tree is an illustration: the names romeu reserves inside

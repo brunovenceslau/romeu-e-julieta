@@ -26,7 +26,9 @@ organizer for all their environments:
   removed: the recorded repos (worktrees, local refs, stashes, ignored
   files within the cap) and the agent's state paths
   ([08 8.5](08-memory-handoff-salvage.md#85-salvage-complete-before-destruction));
-  anything else in the sandbox is not kept.
+  anything else in the sandbox is not kept. A sandbox that dies
+  unplanned keeps what its last snapshot holds, its committed work
+  ([08 8.4](08-memory-handoff-salvage.md#84-snapshot-after-every-commit)).
 
 ## 0.2 Users
 

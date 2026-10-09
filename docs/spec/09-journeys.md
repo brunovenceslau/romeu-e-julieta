@@ -76,7 +76,10 @@ which names each step's command and output path.
    ([03 3.4](03-formats.md#34-host-settings-settingsyaml-schema-host-settingsv1)):
    `gitHosts`, `workloadRepositories`, `signing.agentSocket` when a
    project uses `git-ssh-sign`, and `secrets` entries named
-   `<name>@<project>` (romeu prints the missing names on sync). For a
+   `<name>@<project>` (romeu prints the missing names on sync). Prefer
+   one fine-grained token per project, limited to that project's
+   repositories and the scopes it needs: the sandbox holds whatever the
+   entry binds ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1)). For a
    project that uses `git-ssh-sign`, register the key on GitHub as a
    signing key and never as an authentication key, and start the
    dedicated signing agent with exactly that one key, added with
@@ -101,7 +104,8 @@ which names each step's command and output path.
    after storing the value with
    `security add-generic-password -s romeu/foo/github -a "$USER" -w`
    (a missing entry makes sync exit 2, and its fix hint prints the
-   entry to paste). Then either after merge `romeu sync foo`, or before
+   entry to paste); as in J1 step 5, prefer a fine-grained token limited
+   to `foo`'s repositories. Then either after merge `romeu sync foo`, or before
    merge `romeu sync --from <sha> foo`, with the head of the branch
    pushed in step 1 (the spec is read from a commit of origin, never
    from a working tree). On the `--from` path the gate 2 diff is the
@@ -159,6 +163,8 @@ work as usual.
 ## J6 Handoff and salvage before recreate or rm (nothing lost)
 
 1. [O] optional `/handoff --final` (agent half; the agent may be dead).
+   The narrative handoff is the operator's step: romeu cannot ask a
+   stopped agent for one.
 2. [O] `romeu recreate foo` (or `romeu rm foo`).
 3. [H] `romeu salvage foo` (mandatory, deterministic): [H] preflight;
    the handoff reader checks for a `final` handoff of the generation
@@ -181,8 +187,10 @@ work as usual.
    fixes the pin or the catalog, then runs `romeu run`.
 6. [O] restore salvaged work in the new sandbox: push the salvage
    ref's worktree commit from the host clone into the new sandbox's
-   daemon remote and check it out there; apply `stash-<n>`; extract
-   `ignored.tar.gz` inside the sandbox only, never on the host.
+   daemon remote and check it out there, or bring a branch back through
+   origin as J10 step 3 does; apply `stash-<n>`; extract
+   `ignored.tar.gz` inside the sandbox only, never on the host
+   ([08 8.5](08-memory-handoff-salvage.md#recovery)).
 
 ## J7 Retire a project
 
@@ -249,7 +257,11 @@ work as usual.
 2. [O] `romeu run foo`: [H] preserves generation G (imports
    `refs/sandboxes/foo/*` and every `snapshot/heads.bundle` into
    `refs/romeu/salvage/foo/<G>/<salvage-id>/`), moves it to
-   `closed-lost` with `result: lost`, creates a new sandbox (new ULID).
+   `closed-lost` with `result: lost`, prints the lost record with its
+   salvage ref prefix and exits 1; the next `romeu run foo` creates a
+   new sandbox (new ULID). What the last snapshot holds is kept:
+   committed work. Uncommitted work since that snapshot is lost
+   ([08](08-memory-handoff-salvage.md)).
 3. [O] recover a branch on the host, with the hooks, the fsmonitor and
    the protocols of [05 5.1](05-security.md#51-hardened-git-internalgitsafe)
    switched off on the command line:
