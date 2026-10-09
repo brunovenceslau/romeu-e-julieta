@@ -16,3 +16,4 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 6 | [Record runtime events in an add-only ledger ingested on the host](0006-record-runtime-events-in-an-add-only-ledger-ingested-on-the-host.md) | Accepted |
 | 7 | [Adopt testify assert and require in tests](0007-adopt-testify-assert-and-require-in-tests.md) | Accepted |
 | 8 | [Let the sandbox act as the maintainer on GitHub](0008-let-the-sandbox-act-as-the-maintainer-on-github.md) | Accepted |
+| 9 | [Drop the required review and amend the records that assumed it](0009-drop-the-required-review-and-amend-the-records-that-assumed-it.md) | Accepted |

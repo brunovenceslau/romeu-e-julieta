@@ -6,6 +6,8 @@ Date: 2026-10-07
 
 Accepted
 
+Superseded in part by [9. Drop the required review and amend the records that assumed it](0009-drop-the-required-review-and-amend-the-records-that-assumed-it.md)
+
 ## Context
 
 Inside the sandbox, GitHub sees the operator's own GitHub account, and
