@@ -18,9 +18,10 @@ Supersedes in part [9. Drop the required review and amend the records that assum
 
 Review round 9, the targeted re-audit of the round-8 write pass, sent
 five items to the operator
-([round 9](../reviews/round-9.md#decisions-for-the-operator)). Two of
-them land in decision records, and both were decided on 2026-10-09,
-with the recommendation of the round page in each case.
+([round 9](../reviews/round-9.md#decisions-for-the-operator)). Three of
+them land in decision records (D2, D4 and D5), and all three were
+decided on 2026-10-09, with the recommendation of the round page in
+each case.
 
 The first is a trigger that fired. Deferred item 4 of
 [ADR 0008, let the sandbox act as the maintainer on GitHub](0008-let-the-sandbox-act-as-the-maintainer-on-github.md),
@@ -35,9 +36,10 @@ the four `all on ...` checks, and the administrator role, which the
 development sandbox's token holds, is still its bypass actor. Item e
 has therefore happened, and the decision it reopens has not been taken.
 
-The second is four texts in accepted records that the spec has since
+The second is five texts in accepted records that the spec has since
 corrected, which round 9 found (L0-r9-4, L2-r9-5, L13-R9-4,
-L13-R9-9). An accepted record is not rewritten
+L13-R9-9, and R9-24, the record half of D2). An accepted record is not
+rewritten
 ([12 12.5](../spec/12-engineering.md#125-decisions-and-history)), so
 they change here.
 
@@ -46,7 +48,7 @@ they change here.
 - **Rewrite both triggers to a later event**, such as the token
   narrowing. It keeps the decision deferred, and it would hide that the
   event the record named has happened. Declined on 2026-10-09.
-- **One record per amended text.** Four records for one review round;
+- **One record per amended text.** Five records for one review round;
   one record that names each part keeps the cause in one place, as
   [ADR 0009, drop the required review and amend the records that assumed it](0009-drop-the-required-review-and-amend-the-records-that-assumed-it.md)
   did for round 8.
@@ -104,4 +106,4 @@ they change here.
 - The Deferred decisions row of the required checks says it is
   reopened by this record, and the decision waits for its item.
 - Nothing changes in the rulesets or in any check: this record moves a
-  decision from deferred to open and corrects four texts.
+  decision from deferred to open and corrects five texts.
