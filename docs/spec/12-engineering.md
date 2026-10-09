@@ -13,7 +13,7 @@ reference, with the contributor docs as outlines.
 | shared packages (`internal/...`) | Go | see the capability map |
 | CI, release and dev tooling (`tools/ci`, `tools/new`, `tools/schemagen`, `tools/release`, `tools/kitpin`) | Go | one entry point for local and CI |
 | host probe harness (`e2e/probes`) | Go | runs probe steps, writes `probe-result.v1` JSON |
-| git hook in this repo (`.githooks/pre-push`) | POSIX sh, one line | `exec env GOWORK=off GOFLAGS=-mod=readonly <the mise environment> go run ./tools/ci fast "$@"`: the variables of `miseEnv` in `tools/ci/misefiles.go`, held to that list by a test, so the mise shim that starts go reads `mise.toml` alone and a go command it starts reads no `go env -w` file, runs no other toolchain, uses no `go.work` file and, with the caller's `GOFLAGS` and an untracked `vendor` directory both out of play, builds from the module cache (the go settings are those of `stepEnv` except `GOPROXY=off`, left out so the first `go run` can fill the module cache; the mise environment gives mise no global configuration and no env file, so an `[env]` `GOFLAGS` there, or in a `.env` file a caller names with `MISE_ENV_FILE`, does not reach go, nor does a `MISE_CD` or a `MISE_TRUSTED_CONFIG_PATHS` of the caller (both are set empty); the system configuration of mise still applies); git's pre-push arguments and stdin pass through (10 10.2) |
+| git hook in this repo (`.githooks/pre-push`) | POSIX sh, one line | `exec env -i <the allowlist> <the fixed settings> go run ./tools/ci fast "$@"`: the go command and the mise shim that starts it get an environment built from nothing. The allowlist is `hookAllow` in `tools/ci/misefiles.go` (`PATH`, `HOME`, `TMPDIR`, the XDG and mise state and cache directories, `GOPATH`, `GOCACHE`, `GOMODCACHE`, the proxy variables and `SSL_CERT_FILE`, each kept only when the caller has set it); the fixed settings are `GOWORK=off`, `GOFLAGS=-mod=readonly`, `miseEnv` (which also names no global or system configuration of mise) and `MISE_CEILING_PATHS` as the parent of the tree, so mise reads no file above it. So no other `MISE_` or `GO` variable of the caller, a `go env -w` file, a `go.work` file, an untracked `vendor` directory, a mise configuration outside the tree (global, system, `MISE_CONFIG_DIR`, an env file, a parent directory's `mise.toml`) or `MISE_CD` reaches go. Tests hold the line to those lists and run the hook against a hostile environment; git's pre-push arguments and stdin pass through (10 10.2) |
 | kit install steps | POSIX sh, <= 5 lines per step | download + sha256 check + install only |
 | skills (`skills/*/SKILL.md`) | Markdown | Claude Code skills |
 | schemas | JSON Schema 2020-12 | generated into `schemas/*.json` |
@@ -99,20 +99,19 @@ tools installed. `miseEnv` ends with `goPinEnv`, `GOENV=off` and
 `GOTOOLCHAIN=local`, the two variables `stepEnv` sets for the go steps
 of `tools/ci` too, so both installs run with them: the hosted one
 through the `env` table of `ci.yml`, which the workflows check holds to
-`miseEnv`, and `tools/ci setup` through `miseEnviron`. So no `go env
--w` file is read and no other go is started, unless a mise
-configuration named below sets them. On a developer machine
+`miseEnv`, and `tools/ci setup` through `miseRunEnviron`. So no `go env
+-w` file is read and no other go is started. On a developer machine
 `tools/ci setup` runs `mise install` in an environment built from
 nothing, so no `GO` variable of the caller reaches it: not `GOSUMDB`,
 `GONOSUMDB` or `GOPRIVATE`, which turn the database off for a module,
 nor `GOINSECURE`, `GOPROXY`, `GOFLAGS` or `GOVCS`. In hosted CI the
 guarantee rests on the runner's environment setting none of those.
-Two inputs still reach both installs, so the guarantee holds when
-neither changes the build: a mise configuration other than the
-project's `mise.toml`, such as a global one whose `[env]` table sets
-`GOFLAGS` or `GOPROXY`, since `HOME` and `MISE_CONFIG_DIR` pass
-through; and a module cache seeded beforehand, since `GOPATH` and
-`GOMODCACHE` pass through. A `mise install` started by hand runs in
+One input still reaches both installs, so the guarantee holds when it
+does not change the build: a module cache seeded beforehand, since
+`GOPATH` and `GOMODCACHE` pass through. No mise configuration other
+than the project's `mise.toml` does (the global and system ones are
+named by a path that cannot exist, and mise stops at the parent of the
+tree). A `mise install` started by hand runs in
 the caller's environment and has none of these properties.
 
 **Pin freshness** ([01 1.7](01-system-model.md#17-vocabulary)) is

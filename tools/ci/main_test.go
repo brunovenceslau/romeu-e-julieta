@@ -35,9 +35,23 @@ const fixtureProse = `rules:
 `
 
 // hookLine is the hook of 12 12.1, with the line that makes it a
-// script: it starts go, and so the mise shim, with goBuildEnv and miseEnv
-// (tools/ci/misefiles.go), each variable a word of env.
-var hookLine = "#!/bin/sh\nexec env " + strings.Join(append(slices.Clone(goBuildEnv), miseEnv...), " ") + " go run ./tools/ci fast \"$@\"\n"
+// script: it starts go, and so the mise shim, in an environment built
+// from nothing ("env -i"): the variables of hookAllow that the caller
+// has set, each as ${K:+K="$K"} so an unset one stays unset and a value
+// with a space stays one word; then goBuildEnv, miseEnv and the ceiling
+// of the mise files (the parent of the tree, which is the working
+// directory of a hook), each variable a word of env.
+var hookLine = "#!/bin/sh\nexec env -i " + hookAllowWords() + " " +
+	strings.Join(slices.Concat(goBuildEnv, miseEnv), " ") +
+	` MISE_CEILING_PATHS="$(dirname -- "$PWD")" go run ./tools/ci fast "$@"` + "\n"
+
+func hookAllowWords() string {
+	words := make([]string, len(hookAllow))
+	for i, k := range hookAllow {
+		words[i] = "${" + k + `:+` + k + `="$` + k + `"}`
+	}
+	return strings.Join(words, " ")
+}
 
 // newTree returns a fixture repository that passes hygiene: the hook,
 // the two data files, a denylist with the made-up name, and one page.
@@ -141,25 +155,81 @@ func TestRunPrintsAnErrorAsSafeText(t *testing.T) {
 	assert.Contains(t, errOut.String(), `\x1b[2J`)
 }
 
-// TestGoBuildEnv pins goBuildEnv, and that stepEnv holds it. The hook
-// holds it through hookLine, which TestHook matches byte for byte.
-func TestGoBuildEnv(t *testing.T) {
-	assert.Equal(t, []string{"GOWORK=off", "GOFLAGS=-mod=readonly"}, goBuildEnv)
-	assert.Subset(t, stepEnv("/go"), goBuildEnv, "stepEnv holds goBuildEnv")
-}
-
-// TestHookStartsGoWithoutTheCallersGoEnv runs the tracked hook with a
-// go env file, a go work file, a GOFLAGS and a GOTOOLCHAIN in the
-// caller's environment, and a go stub that prints what it was started
-// with: all four are replaced, and the arguments of git pass through.
-func TestHookStartsGoWithoutTheCallersGoEnv(t *testing.T) {
-	bin := t.TempDir()
-	stub := "#!/bin/sh\nprintf 'GOENV=%s GOWORK=%s GOFLAGS=%s GOTOOLCHAIN=%s args=' \"${GOENV-unset}\" \"${GOWORK-unset}\" \"${GOFLAGS-unset}\" \"${GOTOOLCHAIN-unset}\"; for a; do printf '[%s]' \"$a\"; done; echo\n"
+// TestHookEnvIsTheAllowlist runs the tracked hook with a hostile
+// environment, every variable of the escapes the audits found (a go env
+// file, a go work file, GOFLAGS with -overlay, a GOTOOLCHAIN, a mise
+// global and system configuration, MISE_ENV_FILE, MISE_CD,
+// MISE_TRUSTED_CONFIG_PATHS, MISE_CONFIG_DIR, GIT_DIR, and a MISE_FOO
+// and a GOFOO that no list names) besides the variables of the
+// allowlist, one of them with a space, and a go stub that prints what it
+// was started with. The stub gets exactly the variables of the
+// allowlist that were set, the fixed settings and the ceiling, the
+// arguments of git pass through as they are, and nothing else reaches
+// it.
+func TestHookEnvIsTheAllowlist(t *testing.T) {
+	bin, tree := t.TempDir(), t.TempDir()
+	stub := "#!/bin/sh\nenv\nfor a; do printf 'ARG[%s]\\n' \"$a\"; done\n"
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "go"), []byte(stub), 0o700))
-	cmd := exec.Command("sh", filepath.Join("..", "..", ".githooks", "pre-push"), "origin", "https://example.test/a b.git")
-	cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
-		"GOENV=/elsewhere/env", "GOWORK=/elsewhere/go.work", "GOFLAGS=-overlay=/tmp/x.json", "GOTOOLCHAIN=go9.9")
+	allowed := map[string]string{
+		"PATH": bin + string(os.PathListSeparator) + os.Getenv("PATH"), "HOME": "/home/with a space", "TMPDIR": "/tmp/x",
+		"GOCACHE": "/cache/go", "HTTPS_PROXY": "http://proxy.invalid", "MISE_STATE_DIR": "/state",
+	}
+	hostile := map[string]string{
+		"GOENV": "/elsewhere/env", "GOWORK": "/elsewhere/go.work", "GOFLAGS": "-overlay=/tmp/x.json",
+		"GOTOOLCHAIN": "go9.9", "GOPROXY": "https://evil.invalid", "GOEXPERIMENT": "x", "GODEBUG": "x", "CGO_ENABLED": "1",
+		"GOFOO": "1", "MISE_FOO": "1", "MISE_ENV_FILE": ".env", "MISE_CD": "/elsewhere", "MISE_TRUSTED_CONFIG_PATHS": "/",
+		"MISE_CONFIG_DIR": "/elsewhere/cfg", "MISE_GLOBAL_CONFIG_FILE": "/elsewhere/g.toml",
+		"MISE_SYSTEM_CONFIG_FILE": "/elsewhere/s.toml", "MISE_CEILING_PATHS": "/", "MISE_OVERRIDE_CONFIG_FILENAMES": "x.toml",
+		"GIT_DIR": "/elsewhere/.git", "BASH_ENV": "/elsewhere/rc",
+	}
+	cmd := exec.Command("sh", mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push")), "origin", "https://example.test/a b.git")
+	cmd.Dir = tree
+	for _, m := range []map[string]string{allowed, hostile} {
+		for k, v := range m {
+			cmd.Env = append(cmd.Env, k+"="+v)
+		}
+	}
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
-	assert.Equal(t, "GOENV=off GOWORK=off GOFLAGS=-mod=readonly GOTOOLCHAIN=local args=[run][./tools/ci][fast][origin][https://example.test/a b.git]\n", string(out))
+	got := map[string]string{}
+	var args []string
+	for line := range strings.Lines(string(out)) {
+		line = strings.TrimSuffix(line, "\n")
+		if strings.HasPrefix(line, "ARG[") {
+			args = append(args, strings.TrimSuffix(strings.TrimPrefix(line, "ARG["), "]"))
+			continue
+		}
+		k, v, _ := strings.Cut(line, "=")
+		if !slices.Contains([]string{"PWD", "OLDPWD", "SHLVL", "_"}, k) {
+			got[k] = v
+		}
+	}
+	want := map[string]string{}
+	for k, v := range allowed {
+		want[k] = v
+	}
+	for _, kv := range slices.Concat(goBuildEnv, miseEnv) {
+		k, v, _ := strings.Cut(kv, "=")
+		want[k] = v
+	}
+	realTree, err := filepath.EvalSymlinks(tree)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Dir(realTree), mustEval(t, got["MISE_CEILING_PATHS"]), "the ceiling is the parent of the working directory")
+	want["MISE_CEILING_PATHS"] = got["MISE_CEILING_PATHS"]
+	assert.Equal(t, want, got, "the variables go gets")
+	assert.Equal(t, []string{"run", "./tools/ci", "fast", "origin", "https://example.test/a b.git"}, args)
+}
+
+func mustAbs(t *testing.T, p string) string {
+	t.Helper()
+	abs, err := filepath.Abs(p)
+	require.NoError(t, err)
+	return abs
+}
+
+func mustEval(t *testing.T, p string) string {
+	t.Helper()
+	real, err := filepath.EvalSymlinks(p)
+	require.NoError(t, err)
+	return real
 }

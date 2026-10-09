@@ -183,7 +183,7 @@ func whichPinned(ctx context.Context, root, name, key, dir string) (string, erro
 	cmd := exec.CommandContext(ctx, "mise", "-C", root, "which", name)
 	// mise finds .miserc.toml from its working directory (misefiles.go).
 	cmd.Dir = root
-	cmd.Env = miseEnviron(passThroughEnv())
+	cmd.Env = miseRunEnviron(passThroughEnv(), root)
 	out, err := cmd.Output()
 	if errors.Is(err, exec.ErrNotFound) {
 		return "", fmt.Errorf("mise is not on the search path: install mise, then run \"mise trust\" and \"mise install\" in %s", root)
@@ -314,7 +314,7 @@ var lintTargets = []lintTarget{
 var passThrough = []string{
 	"PATH", "HOME", "TMPDIR",
 	"XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME",
-	"MISE_CACHE_DIR", "MISE_CONFIG_DIR", "MISE_STATE_DIR",
+	"MISE_CACHE_DIR", "MISE_STATE_DIR",
 	"GOPATH", "GOCACHE", "GOMODCACHE",
 }
 

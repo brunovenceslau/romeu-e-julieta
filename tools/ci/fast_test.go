@@ -998,7 +998,7 @@ func pinnedLintTools(t *testing.T) lintTools {
 // environment of mise itself uses isolatedMiseEnv instead.
 func isolateMiseConfig(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"MISE_STATE_DIR", "XDG_CONFIG_HOME", "MISE_CONFIG_DIR"} {
+	for _, key := range []string{"MISE_STATE_DIR", "XDG_CONFIG_HOME"} {
 		t.Setenv(key, t.TempDir())
 	}
 	t.Setenv("MISE_DATA_DIR", "")
@@ -1019,7 +1019,6 @@ func TestIsolateMiseConfig(t *testing.T) {
 	require.NoError(t, os.WriteFile(config, []byte("[env]\nX_GLOBAL = "+strconv.Quote(template)+"\n"), 0o600))
 	t.Setenv("MISE_STATE_DIR", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", poisoned)
-	t.Setenv("MISE_CONFIG_DIR", filepath.Join(poisoned, "mise"))
 	t.Setenv("MISE_DATA_DIR", t.TempDir())
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	ran := func() bool {
@@ -1035,7 +1034,7 @@ func TestIsolateMiseConfig(t *testing.T) {
 		return err == nil
 	}
 	require.True(t, ran(), "the poisoned configuration runs its template")
-	moved := []string{"MISE_STATE_DIR", "XDG_CONFIG_HOME", "MISE_CONFIG_DIR"}
+	moved := []string{"MISE_STATE_DIR", "XDG_CONFIG_HOME"}
 	before := make(map[string]string, len(moved))
 	for _, key := range moved {
 		before[key] = os.Getenv(key)
@@ -1397,6 +1396,8 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 		want = append(want, key)
 		assert.Equal(t, value, values[key], key)
 	}
+	want = append(want, "MISE_CEILING_PATHS")
+	assert.Equal(t, strings.TrimPrefix(miseCeiling(root), "MISE_CEILING_PATHS="), values["MISE_CEILING_PATHS"], "the ceiling is the parent of the tree")
 	assert.Equal(t, slices.Sorted(slices.Values(want)), slices.Sorted(slices.Values(keys)), "the variables mise gets")
 	dir, err := os.ReadFile(cwd)
 	require.NoError(t, err)
@@ -1493,7 +1494,6 @@ func TestStepEnv(t *testing.T) {
 		"XDG_CACHE_HOME=/from/XDG_CACHE_HOME",
 		"XDG_CONFIG_HOME=/from/XDG_CONFIG_HOME",
 		"XDG_STATE_HOME=/from/XDG_STATE_HOME",
-		"MISE_CONFIG_DIR=/from/MISE_CONFIG_DIR",
 		"MISE_STATE_DIR=/from/MISE_STATE_DIR",
 		"GOPATH=/from/GOPATH",
 		"GOCACHE=/from/GOCACHE",

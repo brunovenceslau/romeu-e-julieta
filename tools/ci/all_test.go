@@ -83,7 +83,7 @@ func TestAll(t *testing.T) {
 			},
 			profile: "tools/ci 1 1",
 			code:    exitFail,
-			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:28: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
+			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:26: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
 		},
 		{
 			name:    "a hygiene finding",
@@ -592,6 +592,38 @@ func TestSetup(t *testing.T) {
 		assert.NoFileExists(t, log, "no mise command ran")
 	})
 
+	// The hosted run: the workflow's env table, and the variables that
+	// jdx/mise-action v5.1.1 exports to the steps after it with
+	// "env: false" (src/index.ts, setEnvVars: MISE_TRUSTED_CONFIG_PATHS
+	// as the workspace, since an empty value counts as unset there,
+	// MISE_YES=1 and MISE_LOG_LEVEL=info). The setup step needs the
+	// workspace trusted for the first "go run" through the shim, so none
+	// of them may stop it; and none reaches a mise run of tools/ci.
+	t.Run("a hosted run keeps what mise-action exports out of the mise runs", func(t *testing.T) {
+		dump := filepath.Join(t.TempDir(), "dump")
+		hosted := "#!/bin/sh\n" + answerVersion + "if [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\n" +
+			"echo \"TRUSTED=${MISE_TRUSTED_CONFIG_PATHS-unset} YES=${MISE_YES-unset} LOG=${MISE_LOG_LEVEL-unset} CD=${MISE_CD-unset} ENVFILE=${MISE_ENV_FILE-unset} CEILING=${MISE_CEILING_PATHS-unset}\" >> '" + dump + "'\n"
+		require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(hosted), 0o700))
+		t.Setenv("GITHUB_ACTIONS", "true")
+		for _, kv := range miseEnv {
+			key, value, _ := strings.Cut(kv, "=")
+			t.Setenv(key, value)
+		}
+		t.Setenv("MISE_TRUSTED_CONFIG_PATHS", r.Dir)
+		t.Setenv("MISE_YES", "1")
+		t.Setenv("MISE_LOG_LEVEL", "info")
+		t.Setenv("MISE_CD", "/elsewhere")
+		t.Setenv("MISE_ENV_FILE", ".env")
+		code, out := runCI(t, r, nil, nil, "setup")
+		assert.Equal(t, exitOK, code, out)
+		got, err := os.ReadFile(dump)
+		require.NoError(t, err)
+		root, err := filepath.EvalSymlinks(r.Dir)
+		require.NoError(t, err)
+		want := "TRUSTED=unset YES=unset LOG=unset CD=unset ENVFILE=unset CEILING=" + filepath.Dir(root) + "\n"
+		assert.Equal(t, want+want, string(got), "mise trust and mise install get the ceiling and none of what the action exported")
+	})
+
 	t.Run("a mise of another version stops before mise runs anything else", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(log, nil, 0o600))
 		r.Write(pinnedMiseWorkflow, miseWorkflow(t, "2026.10.4"))
@@ -677,14 +709,14 @@ func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
 		assert.Equal(t, exitFail, code, out)
 		assert.Contains(t, out, "ok    rewrites")
 		assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
-		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:28: workflows: runs-on")
+		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:26: workflows: runs-on")
 	})
 	t.Run("fast by hand", func(t *testing.T) {
 		r, steps := fixture(t)
 		code, out := runCI(t, r, nil, steps, "fast")
 		assert.Equal(t, exitFail, code, out)
 		assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
-		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:28: workflows: runs-on")
+		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:26: workflows: runs-on")
 	})
 	t.Run("the pushed range of a pre-push run", func(t *testing.T) {
 		const zero = "0000000000000000000000000000000000000000"

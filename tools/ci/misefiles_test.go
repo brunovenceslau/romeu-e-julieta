@@ -16,29 +16,53 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestMiseEnvList pins miseEnv, and holds the lists of variables a step
-// keeps from this process to none of its keys, so the value miseEnviron
-// appends is the only one a mise run gets.
+// TestMiseEnvList pins the allowlist of environment variables of every
+// mise run and of the pre-push hook, and its fixed part, miseEnv:
+//
+//   - passThrough: where things are on this machine (PATH to find mise
+//     and go, HOME for the installs, the caches and the git config,
+//     TMPDIR, the XDG directories for those of mise and git, the state
+//     and cache directories of mise, and the Go path and caches that
+//     hold the module cache);
+//   - networkPassThrough: the proxy and the certificate bundle for a
+//     download of a module or a tool;
+//   - miseEnv and goBuildEnv: the fixed settings.
+//
+// Every other variable of the caller is dropped, so none of the lists
+// holds a key of miseEnv or of goBuildEnv. TestHookEnvIsTheAllowlist
+// and TestMiseNeverReads measure what that closes.
 func TestMiseEnvList(t *testing.T) {
+	assert.Equal(t, []string{
+		"PATH", "HOME", "TMPDIR",
+		"XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME",
+		"MISE_CACHE_DIR", "MISE_STATE_DIR",
+		"GOPATH", "GOCACHE", "GOMODCACHE",
+	}, passThrough)
+	assert.Equal(t, []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}, networkPassThrough)
+	assert.Equal(t, slices.Concat(passThrough, networkPassThrough), hookAllow)
 	assert.Equal(t, []string{
 		"MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml",
 		"MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none",
 		"MISE_ENV=",
 		"MISE_AUTO_ENV=false",
 		"MISE_GLOBAL_CONFIG_FILE=/dev/null/mise-global.toml",
-		"MISE_ENV_FILE=",
-		"MISE_CD=",
-		"MISE_TRUSTED_CONFIG_PATHS=",
+		"MISE_SYSTEM_CONFIG_FILE=/dev/null/mise-system.toml",
 		"GOENV=off",
 		"GOTOOLCHAIN=local",
 	}, miseEnv)
+	assert.Equal(t, []string{"GOWORK=off", "GOFLAGS=-mod=readonly"}, goBuildEnv)
 	assert.Equal(t, []string{"GOENV=off", "GOTOOLCHAIN=local"}, goPinEnv)
 	assert.Subset(t, stepEnv("/go"), goPinEnv, "stepEnv holds goPinEnv")
-	for _, kv := range miseEnv {
+	assert.Subset(t, stepEnv("/go"), goBuildEnv, "stepEnv holds goBuildEnv")
+	assert.Equal(t, "MISE_CEILING_PATHS=/a/b", miseCeiling("/a/b/tree"))
+	for _, kv := range slices.Concat(miseEnv, goBuildEnv) {
 		key, _, _ := strings.Cut(kv, "=")
 		for _, list := range [][]string{passThrough, networkPassThrough, dockerPassThrough} {
 			assert.NotContains(t, list, key)
 		}
+	}
+	for _, key := range slices.Concat(passThrough, networkPassThrough, dockerPassThrough) {
+		assert.NotContains(t, []string{"MISE_CEILING_PATHS", "MISE_CD", "MISE_ENV_FILE", "MISE_TRUSTED_CONFIG_PATHS", "MISE_GLOBAL_CONFIG_FILE", "MISE_SYSTEM_CONFIG_FILE", "MISE_CONFIG_DIR", "GOFLAGS", "GOENV", "GOWORK", "GOTOOLCHAIN"}, key)
 	}
 	// A value of the caller's for a variable of miseEnv loses to the list's.
 	cmd := exec.CommandContext(t.Context(), "env")
@@ -49,6 +73,7 @@ func TestMiseEnvList(t *testing.T) {
 	assert.Contains(t, string(out), "GOTOOLCHAIN=local\n")
 	base := []string{"PATH=/x"}
 	assert.Equal(t, append([]string{"PATH=/x"}, miseEnv...), miseEnviron(base))
+	assert.Equal(t, append(append([]string{"PATH=/x"}, miseEnv...), "MISE_CEILING_PATHS=/a/b"), miseRunEnviron(base, "/a/b/tree"))
 	assert.Equal(t, []string{"PATH=/x"}, base, "the base is not changed")
 }
 
@@ -81,7 +106,7 @@ func isolatedMiseEnv(t *testing.T) []string {
 // one of them reached through a .config symbolic link. "mise env"
 // loads every one without miseEnv, and none with it; and each variable
 // of miseEnv, left out alone, lets a file through again, so none of
-// the four that name a file of the tree is there for nothing. mise
+// the four is there for nothing. mise
 // runs in isolatedMiseEnv.
 func TestMiseEnvStopsConfigs(t *testing.T) {
 	dir, markers := t.TempDir(), t.TempDir()
@@ -137,188 +162,129 @@ func TestMiseEnvStopsConfigs(t *testing.T) {
 
 	assert.Equal(t, []string{"ci", "confd", "link", "local", "tool-versions", "unix"}, written(base), "without miseEnv")
 	assert.Empty(t, written(miseEnviron(base)), "with miseEnv")
-	for _, kv := range miseEnv {
+	for _, kv := range miseEnv[:4] { // the four that name a file of the tree
 		key, _, _ := strings.Cut(kv, "=")
-		if !strings.HasPrefix(key, "MISE_") {
-			continue // a go variable, which mise does not read
-		}
-		if key == "MISE_GLOBAL_CONFIG_FILE" || key == "MISE_ENV_FILE" || key == "MISE_CD" || key == "MISE_TRUSTED_CONFIG_PATHS" {
-			continue // TestMiseGlobalConfigIsOff, TestMiseEnvFileIsOff and TestMiseCdAndTrustAreOff measure them
-		}
 		without := slices.DeleteFunc(miseEnviron(base), func(v string) bool { return v == kv })
 		assert.NotEmpty(t, written(without), "miseEnv without %s", key)
 	}
 }
 
-// TestMiseGlobalConfigIsOff measures, with the mise on the search path,
-// what MISE_GLOBAL_CONFIG_FILE=miseNoGlobalConfig is for: the global
-// configuration of mise holds an [env] table (a GOFLAGS there would
-// reach the go that the mise shim starts), and mise reads it from the
-// default directory under HOME, from the directory MISE_CONFIG_DIR
-// names, with the conf.d of each, and from the file the caller names.
-// Each holds a template that writes a marker when mise loads it. All
-// load without the variable, and none with miseEnv, whatever the
-// caller sets. mise runs in isolatedMiseEnv, less its own directories
-// and global file.
-func TestMiseGlobalConfigIsOff(t *testing.T) {
-	dir, markers := t.TempDir(), t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "mise.toml"), []byte("[settings]\nlockfile = true\n"), 0o600))
-	envFile := func(name string) string {
-		cmd := `{{ exec(command="touch ` + filepath.ToSlash(filepath.Join(markers, name)) + `") }}`
-		return "[env]\nX_" + strings.ToUpper(name) + " = " + strconv.Quote(cmd) + "\n"
-	}
-	write := func(path, name string) string {
+// TestMiseNeverReads measures, with the real mise, what the allowlist
+// closes: a variable of the caller, or a file it plants, that would put
+// an [env] into the go that the mise shim starts (a GOFLAGS=-overlay=...
+// reaches "go run ./tools/ci" and runs code before any check). Each row
+// plants one, and "mise exec" (what the shim does) prints it. Run in the
+// environment of the caller, every plant takes effect (the control, so
+// no row passes by planting nothing); run in the environment tools/ci
+// builds (passThroughEnv, then miseRunEnviron, with the allowlist of
+// the hook) none does. The rows are the escapes found by the audits of
+// the hook: a global or system configuration, a conf.d, a
+// MISE_CONFIG_DIR, a named global file, a .env file of MISE_ENV_FILE in
+// the tree or above it, MISE_CD, a trusted or an untrusted mise.toml in
+// a parent directory. mise runs with a new state directory for each
+// run, since "mise exec" trusts a file it reads for the runs after it.
+func TestMiseNeverReads(t *testing.T) {
+	envFile := func(name string) string { return "[env]\nPLANTED = \"" + name + "\"\n" }
+	type layout struct{ parent, dir, home, elsewhere string }
+	write := func(t *testing.T, path, content string) string {
+		t.Helper()
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-		require.NoError(t, os.WriteFile(path, []byte(envFile(name)), 0o600))
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 		return path
 	}
-	home, cfg, named := t.TempDir(), t.TempDir(), filepath.Join(t.TempDir(), "named.toml")
-	write(filepath.Join(home, ".config", "mise", "config.toml"), "home")
-	write(filepath.Join(home, ".config", "mise", "conf.d", "x.toml"), "homeconfd")
-	write(filepath.Join(cfg, "config.toml"), "cfg")
-	write(filepath.Join(cfg, "conf.d", "y.toml"), "cfgconfd")
-	write(named, "named")
-	base := slices.DeleteFunc(isolatedMiseEnv(t), func(kv string) bool {
-		return strings.HasPrefix(kv, "HOME=") || strings.HasPrefix(kv, "XDG_CONFIG_HOME=") ||
-			strings.HasPrefix(kv, "MISE_CONFIG_DIR=") || strings.HasPrefix(kv, "MISE_GLOBAL_CONFIG_FILE=")
-	})
-	scenarios := []struct {
+	rows := []struct {
 		name  string
-		env   []string
-		marks []string
+		plant func(t *testing.T, l layout) map[string]string
 	}{
-		{"the default directory", []string{"HOME=" + home}, []string{"home", "homeconfd"}},
-		{"MISE_CONFIG_DIR", []string{"HOME=" + t.TempDir(), "MISE_CONFIG_DIR=" + cfg}, []string{"cfg", "cfgconfd"}},
-		{"MISE_GLOBAL_CONFIG_FILE", []string{"HOME=" + t.TempDir(), "MISE_GLOBAL_CONFIG_FILE=" + named}, []string{"named"}},
+		{"a global configuration below HOME", func(t *testing.T, l layout) map[string]string {
+			write(t, filepath.Join(l.home, ".config", "mise", "config.toml"), envFile("a global configuration below HOME"))
+			return nil
+		}},
+		{"a conf.d below HOME", func(t *testing.T, l layout) map[string]string {
+			write(t, filepath.Join(l.home, ".config", "mise", "conf.d", "x.toml"), envFile("a conf.d below HOME"))
+			return nil
+		}},
+		{"MISE_CONFIG_DIR", func(t *testing.T, l layout) map[string]string {
+			cfg := t.TempDir()
+			write(t, filepath.Join(cfg, "config.toml"), envFile("MISE_CONFIG_DIR"))
+			return map[string]string{"MISE_CONFIG_DIR": cfg}
+		}},
+		{"a conf.d of MISE_CONFIG_DIR", func(t *testing.T, l layout) map[string]string {
+			cfg := t.TempDir()
+			write(t, filepath.Join(cfg, "conf.d", "y.toml"), envFile("a conf.d of MISE_CONFIG_DIR"))
+			return map[string]string{"MISE_CONFIG_DIR": cfg}
+		}},
+		{"MISE_GLOBAL_CONFIG_FILE", func(t *testing.T, l layout) map[string]string {
+			return map[string]string{"MISE_GLOBAL_CONFIG_FILE": write(t, filepath.Join(t.TempDir(), "g.toml"), envFile("MISE_GLOBAL_CONFIG_FILE"))}
+		}},
+		{"MISE_SYSTEM_CONFIG_FILE", func(t *testing.T, l layout) map[string]string {
+			return map[string]string{"MISE_SYSTEM_CONFIG_FILE": write(t, filepath.Join(t.TempDir(), "s.toml"), envFile("MISE_SYSTEM_CONFIG_FILE"))}
+		}},
+		{"MISE_ENV_FILE with a .env in the tree", func(t *testing.T, l layout) map[string]string {
+			write(t, filepath.Join(l.dir, ".env"), "PLANTED=MISE_ENV_FILE with a .env in the tree\n")
+			return map[string]string{"MISE_ENV_FILE": ".env"}
+		}},
+		{"MISE_ENV_FILE with a .env in a parent", func(t *testing.T, l layout) map[string]string {
+			write(t, filepath.Join(l.parent, ".env"), "PLANTED=MISE_ENV_FILE with a .env in a parent\n")
+			return map[string]string{"MISE_ENV_FILE": ".env"}
+		}},
+		{"MISE_TRUSTED_CONFIG_PATHS", func(t *testing.T, l layout) map[string]string {
+			write(t, filepath.Join(l.parent, "mise.toml"), envFile("MISE_TRUSTED_CONFIG_PATHS"))
+			return map[string]string{"MISE_TRUSTED_CONFIG_PATHS": l.parent}
+		}},
+		{"an untrusted mise.toml in a parent", func(t *testing.T, l layout) map[string]string {
+			write(t, filepath.Join(l.parent, "mise.toml"), envFile("an untrusted mise.toml in a parent"))
+			return nil
+		}},
+		{"MISE_CD", func(t *testing.T, l layout) map[string]string {
+			return map[string]string{"MISE_CD": l.elsewhere}
+		}},
 	}
-	written := func(env []string) []string {
+	printed := func(t *testing.T, env []string, dir string) (marker, pwd string) {
 		t.Helper()
-		entries, err := os.ReadDir(markers)
-		require.NoError(t, err)
-		for _, e := range entries {
-			require.NoError(t, os.Remove(filepath.Join(markers, e.Name())))
-		}
-		cmd := exec.CommandContext(t.Context(), "mise", "-C", dir, "env")
+		cmd := exec.CommandContext(t.Context(), "mise", "exec", "--", "sh", "-c", `printf '%s|%s' "${PLANTED:-nothing}" "$(pwd -P)"`)
 		cmd.Dir = dir
 		cmd.Env = env
-		out, err := cmd.CombinedOutput()
-		require.NoError(t, err, "mise env\n%s", out)
-		entries, err = os.ReadDir(markers)
-		require.NoError(t, err)
-		var names []string
-		for _, e := range entries {
-			names = append(names, e.Name())
-		}
-		return names
+		out, err := cmd.Output()
+		require.NoError(t, err, "mise exec")
+		marker, pwd, _ = strings.Cut(string(out), "|")
+		return marker, pwd
 	}
-	trust := exec.CommandContext(t.Context(), "mise", "-C", dir, "trust", filepath.Join(dir, "mise.toml"))
-	trust.Dir = dir
-	trust.Env = miseEnviron(slices.Concat(base, scenarios[0].env))
-	out, err := trust.CombinedOutput()
-	require.NoError(t, err, "mise trust\n%s", out)
-	for _, sc := range scenarios {
-		env := slices.Concat(base, sc.env)
-		without := slices.DeleteFunc(miseEnviron(env), func(kv string) bool {
-			return strings.HasPrefix(kv, "MISE_GLOBAL_CONFIG_FILE=") && strings.HasSuffix(kv, miseNoGlobalConfig)
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			l := layout{parent: t.TempDir(), home: t.TempDir(), elsewhere: t.TempDir()}
+			l.dir = filepath.Join(l.parent, "tree")
+			write(t, filepath.Join(l.dir, "mise.toml"), "[settings]\nlockfile = true\n")
+			t.Setenv("HOME", l.home)
+			t.Setenv("MISE_STATE_DIR", t.TempDir())
+			t.Setenv("MISE_CACHE_DIR", t.TempDir())
+			t.Setenv("XDG_CONFIG_HOME", "")
+			t.Setenv("MISE_OFFLINE", "1")
+			for k, v := range row.plant(t, l) {
+				t.Setenv(k, v)
+			}
+			wantDir, err := filepath.EvalSymlinks(l.dir)
+			require.NoError(t, err)
+
+			// The control: the environment of the caller, as it is.
+			t.Setenv("MISE_STATE_DIR", t.TempDir())
+			marker, pwd := printed(t, os.Environ(), l.dir)
+			if row.name == "MISE_CD" {
+				wantElsewhere, err := filepath.EvalSymlinks(l.elsewhere)
+				require.NoError(t, err)
+				assert.Equal(t, wantElsewhere, pwd, "without the allowlist")
+			} else {
+				assert.Equal(t, row.name, marker, "without the allowlist")
+			}
+
+			// The environment tools/ci builds, with MISE_OFFLINE added for the test.
+			t.Setenv("MISE_STATE_DIR", t.TempDir())
+			env := append(miseRunEnviron(passThroughEnv(), l.dir), "MISE_OFFLINE=1")
+			marker, pwd = printed(t, env, l.dir)
+			assert.Equal(t, "nothing", marker, "with the allowlist")
+			assert.Equal(t, wantDir, pwd, "with the allowlist")
 		})
-		assert.ElementsMatch(t, sc.marks, written(without), "%s, without the variable", sc.name)
-		assert.Empty(t, written(miseEnviron(env)), "%s, with miseEnv", sc.name)
 	}
-}
-
-// TestMiseEnvFileIsOff measures, with the mise on the search path, what
-// the empty MISE_ENV_FILE of miseEnv is for: a caller who sets
-// MISE_ENV_FILE=.env, with an untracked .env in the working directory or
-// in a parent of it, gets the variables of that file into the go that
-// the mise shim starts (a GOFLAGS=-overlay=..., say). The file holds the
-// variable PLANTED_MARKER. It loads without the variable, in both
-// places, and not with miseEnv, whatever the caller sets. mise runs in
-// isolatedMiseEnv.
-func TestMiseEnvFileIsOff(t *testing.T) {
-	parent := t.TempDir()
-	dir := filepath.Join(parent, "tree")
-	require.NoError(t, os.MkdirAll(dir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "mise.toml"), []byte("[settings]\nlockfile = true\n"), 0o600))
-	// A dotenv file holds no template, so its marker is its variable,
-	// which "mise env" prints when it loads the file.
-	dotenv := "PLANTED_MARKER=planted\n"
-	base := isolatedMiseEnv(t)
-	printed := func(env []string) bool {
-		t.Helper()
-		cmd := exec.CommandContext(t.Context(), "mise", "-C", dir, "env", "-J")
-		cmd.Dir = dir
-		cmd.Env = env
-		out, err := cmd.Output()
-		require.NoError(t, err, "mise env")
-		return strings.Contains(string(out), "PLANTED_MARKER")
-	}
-	trust := exec.CommandContext(t.Context(), "mise", "-C", dir, "trust", filepath.Join(dir, "mise.toml"))
-	trust.Dir = dir
-	trust.Env = miseEnviron(base)
-	out, err := trust.CombinedOutput()
-	require.NoError(t, err, "mise trust\n%s", out)
-	for _, place := range []string{dir, parent} {
-		path := filepath.Join(place, ".env")
-		require.NoError(t, os.WriteFile(path, []byte(dotenv), 0o600))
-		env := append(slices.Clone(base), "MISE_ENV_FILE=.env")
-		withoutVar := slices.DeleteFunc(miseEnviron(env), func(kv string) bool { return kv == "MISE_ENV_FILE=" })
-		assert.True(t, printed(withoutVar), "the .env in %s, without the variable", place)
-		assert.False(t, printed(miseEnviron(env)), "the .env in %s, with miseEnv", place)
-		require.NoError(t, os.Remove(path))
-	}
-}
-
-// TestMiseCdAndTrustAreOff measures, with the mise on the search path,
-// what the empty MISE_CD and MISE_TRUSTED_CONFIG_PATHS of miseEnv are
-// for. A caller's MISE_CD makes mise run its command (the go of the
-// shim) in another directory, and a caller's MISE_TRUSTED_CONFIG_PATHS
-// makes mise apply the [env] of an untracked mise.toml in a parent of
-// the tree. Both take effect without the variable and neither with
-// miseEnv, whatever the caller sets. mise runs in isolatedMiseEnv.
-func TestMiseCdAndTrustAreOff(t *testing.T) {
-	parent, elsewhere := t.TempDir(), t.TempDir()
-	dir := filepath.Join(parent, "tree")
-	require.NoError(t, os.MkdirAll(dir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "mise.toml"), []byte("[settings]\nlockfile = true\n"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(parent, "mise.toml"), []byte("[env]\nPLANTED_MARKER = \"planted\"\n"), 0o600))
-	base := isolatedMiseEnv(t)
-	run := func(env []string, args ...string) (string, error) {
-		t.Helper()
-		cmd := exec.CommandContext(t.Context(), "mise", args...)
-		cmd.Dir = dir
-		cmd.Env = env
-		out, err := cmd.Output()
-		return string(out), err
-	}
-	_, err := run(miseEnviron(base), "trust", filepath.Join(dir, "mise.toml"))
-	require.NoError(t, err)
-	without := func(env []string, key string) []string {
-		return slices.DeleteFunc(miseEnviron(env), func(kv string) bool { return kv == key+"=" })
-	}
-
-	cd := append(slices.Clone(base), "MISE_CD="+elsewhere)
-	want, err := filepath.EvalSymlinks(elsewhere)
-	require.NoError(t, err)
-	out, err := run(without(cd, "MISE_CD"), "exec", "--", "pwd", "-P")
-	require.NoError(t, err)
-	assert.Equal(t, want, strings.TrimSpace(out), "MISE_CD, without the variable")
-	here, err := filepath.EvalSymlinks(dir)
-	require.NoError(t, err)
-	out, err = run(miseEnviron(cd), "exec", "--", "pwd", "-P")
-	require.NoError(t, err)
-	assert.Equal(t, here, strings.TrimSpace(out), "MISE_CD, with miseEnv")
-
-	// A new state directory: a run of "mise exec" trusts the parent file
-	// for the runs after it (measured with mise 2026.10.3).
-	fresh := isolatedMiseEnv(t)
-	_, err = run(miseEnviron(fresh), "trust", filepath.Join(dir, "mise.toml"))
-	require.NoError(t, err)
-	trusted := append(slices.Clone(fresh), "MISE_TRUSTED_CONFIG_PATHS="+parent)
-	out, err = run(without(trusted, "MISE_TRUSTED_CONFIG_PATHS"), "env", "-J")
-	require.NoError(t, err)
-	assert.Contains(t, out, "PLANTED_MARKER", "MISE_TRUSTED_CONFIG_PATHS, without the variable")
-	out, _ = run(miseEnviron(trusted), "env", "-J") // mise may refuse the untrusted file
-	assert.NotContains(t, out, "PLANTED_MARKER", "MISE_TRUSTED_CONFIG_PATHS, with miseEnv")
 }
 
 // TestMiseFilesLowercase holds every glob of miseFiles to lower case:

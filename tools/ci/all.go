@@ -384,8 +384,8 @@ func runSetup(ctx context.Context, e env, args []string) (bool, error) {
 	}
 	c := newChecks(e.stdout)
 	mise := []step{
-		{name: "mise trust", argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, environ: miseEnviron(passThroughEnv())},
-		{name: "mise install", argv: []string{"mise", "install"}, environ: miseEnviron(withProcessEnv(passThroughEnv(), networkPassThrough))},
+		{name: "mise trust", argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, environ: miseRunEnviron(passThroughEnv(), root)},
+		{name: "mise install", argv: []string{"mise", "install"}, environ: miseRunEnviron(withProcessEnv(passThroughEnv(), networkPassThrough), root)},
 	}
 	c.run(ctx, root, mise)
 	if !c.ok {
