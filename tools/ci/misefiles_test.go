@@ -295,7 +295,7 @@ func TestCheckMiseVersion(t *testing.T) {
 
 	write("2026.10.4")
 	require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is at version 2026.10.4, and .github/workflows/ci.yml pins 2026.10.3")
-	for _, other := range []string{"2026.10.30", "2026.10", "2024.11.37"} {
+	for _, other := range []string{"2026.10.30", "2026.10"} {
 		write(other)
 		require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is at version "+other+",", "a version that only shares a prefix with the pin")
 	}

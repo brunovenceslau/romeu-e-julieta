@@ -182,6 +182,15 @@ func TestApprovalLine(t *testing.T) {
 		{"a leading combining mark", "Approval: decisions - \u0301amend rule 8", false},
 		{"a leading unassigned code point", "Approval: decisions - \u0378amend rule 8", false},
 		{"a leading private-use character", "Approval: decisions - \ue000amend rule 8", false},
+		{"a byte order mark inside the phrase", "Approval: decisions - amend\ufeffrule 8", false},
+		// Accepted, and left to review by 12 12.4: a separator inside or
+		// after the phrase.
+		{"a line separator inside the phrase", "Approval: decisions - amend\u2028rule 8", true},
+		{"a paragraph separator inside the phrase", "Approval: decisions - amend\u2029rule 8", true},
+		{"a leading line separator", "Approval: decisions - \u2028amend rule 8", false},
+		{"a leading paragraph separator", "Approval: decisions - \u2029amend rule 8", false},
+		{"a trailing line separator", "Approval: decisions - amend rule 8\u2028", true},
+		{"a trailing paragraph separator", "Approval: decisions - amend rule 8\u2029", true},
 		{"a next line inside the phrase", "Approval: decisions - amend\u0085rule 8", false},
 		{"a zero-width space inside the phrase", "Approval: decisions - amend\u200brule 8", false},
 		{"a trailing CR", "Approval: decisions - amend rule 8\r", false},

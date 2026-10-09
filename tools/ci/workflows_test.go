@@ -153,6 +153,7 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a with that is a scalar", "        with:\n          persist-credentials: false\n", "        with: x\n", "with is a mapping"},
 		{"a with that is a list", "        with:\n          persist-credentials: false\n", "        with: [ref]\n", "with is a mapping"},
 		{"a uses with a path that starts with a dot", "uses: actions/checkout@" + sha, "uses: ./x@sha", "40-hex commit SHA"},
+		{"a local action with a real SHA", "uses: actions/checkout@" + sha, "uses: ./x@" + sha, "40-hex commit SHA"},
 		{"a uses that is a root path", "uses: actions/checkout@" + sha, "uses: /x@" + sha, "40-hex commit SHA"},
 		{"a uses with a parent as repository", "uses: actions/checkout@" + sha, "uses: owner/..@" + sha, "40-hex commit SHA"},
 		{"a uses with an empty path segment", "uses: actions/checkout@" + sha, "uses: actions/checkout/@" + sha, "40-hex commit SHA"},
@@ -509,4 +510,38 @@ func TestWorkflowInputFromMatrixListValue(t *testing.T) {
 		msgs = append(msgs, f.msg)
 	}
 	assert.Contains(t, strings.Join(msgs, "\n"), "this with input is a literal")
+}
+
+// TestWorkflowsMatrixRunnerNeedsOS fails runs-on: ${{ matrix.os }} when
+// no matrix gives the job an os: no strategy at all, a strategy with no
+// matrix, an include that is empty, and an include whose entry is not a
+// mapping (the case "an include entry that is a word"), which also has
+// the finding of the entry.
+func TestWorkflowsMatrixRunnerNeedsOS(t *testing.T) {
+	const needsOS = "so the matrix names os"
+	tests := []struct {
+		name  string
+		pairs []string
+		want  []string
+	}{
+		{"no strategy", []string{goodStrategy, ""}, []string{needsOS}},
+		{"a strategy with no matrix", []string{goodStrategy, "    strategy:\n      fail-fast: false\n"}, []string{needsOS}},
+		{"an empty include", []string{"include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n", "include: []\n"}, []string{needsOS}},
+		{"an include entry that is a word", []string{"include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n", "include: [x]\n"}, []string{"an include entry is a mapping", needsOS}},
+		{"an os key beside an empty include", []string{"include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n", "os: [ubuntu-26.04]\n        include: []\n"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// A literal for the input keeps the matrix reference out of the findings.
+			pairs := append([]string{"sha256: ${{ matrix.mise_sha256 }}", "sha256: aa"}, tt.pairs...)
+			var msgs []string
+			for _, f := range workflowFindings(".github/workflows/x.yml", []byte(edits(t, pairs...))) {
+				msgs = append(msgs, f.msg)
+			}
+			require.Len(t, msgs, len(tt.want), "%v", msgs)
+			for i, want := range tt.want {
+				assert.Contains(t, msgs[i], want)
+			}
+		})
+	}
 }
