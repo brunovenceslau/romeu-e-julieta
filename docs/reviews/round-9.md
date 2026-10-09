@@ -250,6 +250,9 @@ and in the text it changes.
   18 of ADR 0009 (the triggers of ADR 0008's deferred item 1).
   Approval lines: `spec` (the index), `decisions` (the record).
   Decided on 2026-10-09: option (a). The index row names the record (a `## Session checkpoint (<date>)` heading in `docs/reviews/round-<n>.md`, then a `--final` handoff file), the command that counts them, and the count taken on 2026-10-09: three, so the trigger has fired and the review is due; decision 6 of ADR 0010 carries the record half.
+  Answered on 2026-10-09: the review was held, with four final handoffs
+  counted, and narrowing the token was decided
+  ([ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md), decision 2).
 - **D3 (R9-25), the `ssh-add -c` mitigation.** The mitigation of the
   Verified-signature row of 05 5.4, and of 06 6.4 and J1 step 5, rests
   on `ssh-add -c`, whose confirmation needs an askpass program that
@@ -278,6 +281,8 @@ and in the text it changes.
   leaves a fired trigger with nothing reopened. Recommendation: (a).
   Approval lines: `spec` (the index row), `decisions` (the record).
   Decided on 2026-10-09: option (a). ADR 0010, decision 1, records the decision as reopened with its options open, and the index row says so; the choice is the next decision block's item.
+  Answered on 2026-10-09: the required checks bind the administrator
+  too, and the index row leaves the table (ADR 0011, decision 1).
 - **D5, the decision-record halves of Advisory findings.** An accepted
   record is not rewritten (12 12.5), so these wait for one amending
   record: a status note on ADR 0006 pointing at the Deferred row of the

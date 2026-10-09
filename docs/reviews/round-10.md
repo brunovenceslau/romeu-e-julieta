@@ -200,6 +200,11 @@ date, when it comes; D5 and D6 wait for it.
   `.github/ask-first.yaml` lands with the task that builds `pr`.
   Approval lines: `spec` now; `ask-first` and `approvals` with that
   task.
+  Answered on 2026-10-09: option (a), then narrowed by round 11
+  (R11-01 to R11-03): the spec keeps the invariant of the `pr` job, and
+  the package, its closure test and the inputs left under the job are
+  acceptance requirements of plan T005
+  ([round 11](round-11.md#write-pass-2026-10-09)).
 - **D3 (L8-R10-1, L13-R10-2), the count in ADR 0010.** The record is in
   pull request #36 and not yet merged. Options: (a) correct the count
   and name round 9's D2 before the merge; (b) merge as is and correct it in the
@@ -216,6 +221,10 @@ date, when it comes; D5 and D6 wait for it.
   Recommendation: (a): the table's preamble keeps a row until its
   decision is made. Approval lines: `spec`, and `decisions` for the
   record half.
+  Answered on 2026-10-09: option (a), and both decisions were taken
+  that day in [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md): the required-checks row leaves the table
+  (decision 1), and the token-narrowing row stays, reviewed, until the
+  narrowing is applied (decision 2).
 - **D5 (L13-R10-6), the direct-push refusal in 05 5.4.** Options: (a)
   the row says the 2026-10-08 try predates the 2026-10-09 change and
   names the pull-request rule as the expected refusal, read and not
@@ -224,6 +233,8 @@ date, when it comes; D5 and D6 wait for it.
   at the sitting the ADR 0010 item already needs. Approval line:
   `spec`. Not applied in the write pass: the 05 5.4 row and item d of
   the maintainer block stay as they are until the measurement of D6.
+  Answered on 2026-10-09: option (a), with the try repeated with the
+  four tries after the token narrowing (ADR 0011, decision 3).
 - **D6 (D5's measurement), the direct-push refusal under the current
   ruleset.** The refusal in 05 5.4 and in item d was tried on
   2026-10-08, before the 2026-10-09 ruleset change, and has not been
@@ -233,6 +244,9 @@ date, when it comes; D5 and D6 wait for it.
   (b) state it as read from the rules and not tried, as D5 (a) says.
   Recommendation: re-measure, with the operator present. Approval
   line: `spec`, for the rewording that follows.
+  Answered on 2026-10-09: option (b), read from the rules and not
+  tried, as D5 (a) says; the try is repeated with the four tries after
+  the token narrowing (ADR 0011, decision 3).
 
 ## Exit criteria of stage A
 

@@ -829,8 +829,12 @@ What they set up, and holds now:
   not tried, an account with write access can merge a pull request
   whose required checks (item e) are green. On tags matching `v*`:
   creation, update and deletion are refused for everyone except the
-  bypass actor. The administrator role is the bypass actor of both, and
-  the operator's token holds that role. The merge requirements, and what they are worth, are in
+  bypass actor. The administrator role is the bypass actor of the tag
+  ruleset only, and the operator's token holds that role: the
+  default-branch ruleset has no bypass actor once the maintainer step
+  of [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md),
+  decision 1, removes it, and until that step the role bypasses it for
+  pull requests. The merge requirements, and what they are worth, are in
   [05 5.4](05-security.md#risks-of-how-this-repository-is-developed).
   Two repository settings, which bind a bypass actor too: squash
   merging and rebase merging off, so every merge is a merge commit
@@ -840,7 +844,9 @@ What they set up, and holds now:
   in a plain clone on the host ([Forbidden names](#forbidden-names)).
 - c. The pre-push hook, enabled in that clone.
 - d. Four tries with the sandbox's token; of the four, only the direct
-  push to the default branch was refused (05 5.4).
+  push to the default branch was refused (05 5.4; tried on 2026-10-08;
+  under the rules of 2026-10-09 it is read, not tried, and the try is
+  repeated with the four tries after the token narrowing).
 
 The host runs `tools/ci`, `hygiene add` included, only from a commit
 whose diff since the last host run the maintainer has read, or from the
@@ -862,8 +868,8 @@ Evidence:
   step records under that task's Evidence the `head_sha` the pr job's
   check run carries and whether a ruleset that requires it blocks a
   merge and then allows it. If the check cannot be required, that is
-  recorded under the item of
-  [ADR 0010, reopen the required checks without the bypass and amend the records of round 9](../adr/0010-reopen-the-required-checks-without-the-bypass-and-amend-the-records-of-round-9.md),
+  recorded under
+  [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md),
   decision 1.
 - f. Before the first release candidate: turn on GitHub's immutable
   releases setting. To do.

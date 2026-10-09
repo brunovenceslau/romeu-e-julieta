@@ -6,6 +6,8 @@ Date: 2026-10-09
 
 Accepted
 
+Superseded in part by [11. Bind the administrator to the required checks and narrow the sandbox's GitHub token](0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md)
+
 Supersedes in part [1. Adopt a documentation standard with checkable rules and a voice](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
 
 Supersedes in part [6. Record runtime events in an add-only ledger ingested on the host](0006-record-runtime-events-in-an-add-only-ledger-ingested-on-the-host.md)
