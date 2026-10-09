@@ -1011,3 +1011,4 @@ sits out costs the round that would have needed it.
 |---|---|---|---|
 | 8 | the default branch at the commit this page was added | L0 to L16, with the noise probe on L2 and L13 | round-8.md, when written |
 | 9 | 8ecfbb2, the head of pull request #25 (the round-8 write pass), for the targeted re-audit of step 6 | L0 to L16, with no noise probe | round-9.md |
+| 10 | d458f83, the head of pull request #36 (the round-9 write pass), for the targeted re-audit of step 6 | L0 to L16, with no noise probe | round-10.md |

@@ -1,0 +1,10 @@
+{
+ "header": "L7 · The release and supply-chain engineer · sonnet",
+ "verdict": "Yes. All five round-9 L7 findings (R9-02, R9-04, R9-05, L7-6r, L7-17r) read at the baseline as their resolutions say, and the delta (pr job on pull_request_target, ADR 0010, token-trigger and ssh-add decisions) introduced no release or supply-chain defect I could find.",
+ "prior_checked": 5,
+ "prior_resolved_as_stated": 5,
+ "findings": [],
+ "pages_read": ["docs/reviews/lenses.md (L7, What a reviewer returns, How stage A runs)", "docs/reviews/round-9/reports/L7.json", "docs/reviews/round-9.md (L7 and R9-02/04/05 rows)", "docs/spec/10-testing-style.md (grammar, Release and bootstrap, verification contract, 10.5 delta)", "docs/spec/12-engineering.md (release checklist step 7, README row, pr paragraph, 12.6)", "docs/spec/09-journeys.md (J1 step 2)", "docs/spec.md (S1, S6, Deferred rows delta)", "docs/spec/05-security.md (5.4 token row)", "docs/adr/0010 (grep for tag and release)", "docs/plan.md delta"],
+ "out_of_scope": "Not checked: the pinned gh's real attestation flags (needs the binary; the spec says they come from its --help), whether GitHub immutable releases also fix the tag, the pull_request_target job's non-release security (other lenses), and the rest of the delta beyond skim.",
+ "confidence": "Medium: resolutions checked by reading the cited text at the baseline; nothing was executed."
+}

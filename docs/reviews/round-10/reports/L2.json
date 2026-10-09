@@ -1,0 +1,90 @@
+{
+  "header": "L2 · The security engineer who has watched a host fall · opus",
+  "verdict": "Mostly met. All six round-9 L2 findings with Status A or M now read as their resolutions say, and the three operator items (D2, D3, D5) are applied as decided. The delta's main change is the base-defined pr job on pull_request_target. Its token and checkout limits are sound, but the claim that no checkpoint grant covers the approval check does not hold. The approvals surface globs one file, tools/ci/askfirst.go, while the pr job compiles and runs the whole tools/ci import graph, and that graph sits on the grantable checks and dependencies surfaces. Two smaller gaps: the accepted-risk mitigation 're-run the pr job' cannot pick up a fix, because a re-run keeps the original GITHUB_SHA. And making pr a required check 'the same way' is unmeasured under pull_request_target, where a check can also be spoofed by name.",
+  "prior_checked": 6,
+  "prior_resolved_as_stated": 6,
+  "findings": [
+    {
+      "id": "L2-r10-1",
+      "kind": "new",
+      "severity": "Required",
+      "section": "05 5.3 (the approvals surface and its YAML entry); 12 12.4 (the pr job); 02 2.1 (tools/ci layout)",
+      "defect": "The approvals surface is said to hold 'the check of approval lines and grants, which no checkpoint grant covers', but its globs name only tools/ci/askfirst.go (plus the denylist and the workflows). The pr job runs `go run ./tools/ci pr`, which compiles and links the whole tools/ci main package, every step package under tools/ci/internal/<step>/ through the generated dispatcher (02 2.1, 12 12.3), and the modules in go.mod and go.sum. It also installs the tools that mise.toml and mise.lock pin. All of these are on `checks` or `dependencies`, which a checkpoint grant covers.",
+      "scenario": "A task under a `checks` grant lands a step package whose init() or shared helper changes what pr computes. Examples: the changed-path list from merge base to head, the glob matcher, or a package-level variable askfirst.go reads. Or a granted `dependencies` bump swaps the YAML decoder pr uses on .github/ask-first.yaml. pr judges that pull request with the old code, so it passes on the grant. Once merged, every later pull request is judged by the weakened pr: a change to .github/workflows/** or to askfirst.go itself passes with no approval line, and no check turns red.",
+      "change": "Build the pr job from a binary whose whole import closure is on `approvals`. One way is a separate main package such as tools/ci/cmd/pr or tools/askfirst, importing only the standard library and packages under the approvals globs. A tools/ci test fails when its `go list -deps` closure holds a path outside the approvals globs. Name go.mod, go.sum and the mise files the job installs from as shared with `dependencies` and not grantable for that closure, or have the job verify the toolchain against a pin on `approvals`. Then reword 05 5.3 to say what is actually outside every grant. Cost: one package boundary, one import test, one glob line and a sentence; it lands with the task that builds pr."
+    },
+    {
+      "id": "L2-r10-2",
+      "kind": "new",
+      "severity": "Required",
+      "section": "05 5.4 (row 'Under a checks grant ... a green pr result from before a fix to pr landed still counts'); 12 12.4 ('judged by the fixed pr on its next run')",
+      "defect": "The mitigation is to 're-run the pr job of each open pull request when pr changes'. By GitHub's documentation on re-running workflows, a re-run uses the GITHUB_SHA and GITHUB_REF of the original event. Under pull_request_target, GITHUB_SHA is the default branch's commit at that event, and the job checks out `github.sha`. A re-run therefore rebuilds the old pr, and only a new event (a push to the head, or an `edited` or `reopened` event) runs the fixed one. The mitigation is also left to memory ('a step for the task'), not to a mechanism. This rests on GitHub's documentation and was not measured here.",
+      "scenario": "A fix to pr closes a bypass, and the maintainer re-runs the pr job on the open pull requests as 05 5.4 says. Each re-run checks out the pre-fix commit and stays green. The pull request that used the bypass merges with a green pr that the fix was meant to turn red.",
+      "change": "Replace 're-run' with an event that starts a new run, for example an edit of the body, which the job already listens to as `edited`, or close and reopen. Better, make it mechanical: a push-to-main job that, when the pr build inputs change, starts a new run for each open pull request (it needs `pull-requests: write` or an equivalent, so state that permission and keep it out of the pr job). Add a sentence to 12 12.4 that a re-run of an old run judges with the old code. Cost: two sentences now, and one small job or one checklist step with the task that builds pr."
+    },
+    {
+      "id": "L2-r10-3",
+      "kind": "new",
+      "severity": "Required",
+      "section": "10 10.2 (maintainer block item e: 'When the task that builds pr lands, its job joins the required checks, the same way'); 10 10.2 (workflow grammar, pr job row); ADR 0010 decision 1",
+      "defect": "Making pr a required check is stated as routine, but two facts are unmeasured. First, which commit a pull_request_target run's check is attached to. The run's GITHUB_SHA is the base commit, and a ruleset matches required checks on the pull request's head commit, so the check may never satisfy the rule, or it may need a different form. Second, a required status check is matched by name. The head's own `pull_request` workflows run from the head, so a head that adds a job carrying the pr job's name posts a green check of that name. The workflow grammar that would refuse it runs inside `all`, from the head's tools/ci. Both are inferred from how GitHub Actions and rulesets work, not measured.",
+      "scenario": "Once ADR 0010's open item is decided for option (a), an agent's pull request edits ci.yml to add a job named like the pr job that exits 0. The real pr job reports red, or its check is attached to a commit the rule does not read. The ruleset sees a green check of the required name and allows the merge. The approval line for `approvals`, which this very change needed, was never enforced.",
+      "change": "Add to item e, and to the Evidence of the task that builds pr, the measurement: open a test pull request, and record which head_sha the pr job's check run carries and whether a ruleset that requires it blocks and then allows the merge. Have pr, from the default branch's code, refuse a head whose .github/workflows/ give any job outside the pr workflow file the pr job's name, with a fixture. If the measurement shows the check cannot be required, record that under the ADR 0010 item instead of 'the same way'. Cost: one probe-like observation, one refusal in pr, one sentence."
+    },
+    {
+      "id": "L2-r10-4",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "12 12.4 (the pr job); 10 10.2 (pr job row)",
+      "defect": "The pr job now runs on pull_request_target and prints text that any pull request author controls: the title, body lines named in 'malformed approval line', and the head's commit subjects that fail the Conventional Commit check. The Actions runner reads stdout lines that start with `::` as workflow commands (for example ::stop-commands::, ::add-mask::, ::error). Nothing in the spec says pr escapes such lines, the way boundary A requires romeu to escape agent text before display.",
+      "scenario": "An author puts a line `::stop-commands::x` or `::add-mask::<text>` in the body or in a commit subject. pr echoes it while failing, and the rest of the job log loses its annotations or hides the text the maintainer would read to see why pr failed. With no secret and a read-only token, the harm is to the reviewer's view, not to the repository.",
+      "change": "State in 12 12.4 that pr prints author text only after neutralizing a leading `::` and control characters, with the termsafe rule or a one-line escape, and add a fixture 'pr escapes a workflow command in a PR body'. Cost: one sentence and one test."
+    }
+  ],
+  "prior_resolution_notes": {
+    "L2-r9-3": "holds: 07 7.4 GitHub rate limit row now says the sandbox holds whatever github@<project> binds, and the operator's own token only in this repository's development sandbox.",
+    "L2-r9-4 (R9-08, M)": "holds: 03 opening keeps mise.lock in the strict list only, states its TOML limits (no duplicate keys or tables, the file cap), a strict top level, and lock-unparsed (RJ-325).",
+    "L2-r9-6": "holds: probe A17 (11 11.1) plants a token file and runs mdfind with and without the marker, with a positive control; 01 1.3 D, 02 2.3, 04 4.2 and 05 5.4 point to it.",
+    "L2-r9-7": "holds: A16 runs in the maintainer's host shell, and a fine-grained token's repository list and permissions are recorded by hand, [review].",
+    "L2-r9-8": "holds: 03 3.4 lists ghp_, gho_, ghs_, ghu_, ghr_ and github_pat_.",
+    "L2-r9-9": "holds: the 01 1.2 row reads 'stored in romeu namespaces' with no ledger.",
+    "operator items, checked but not counted": "L2-r9-1 (D2): the index row names the heading, the grep command and the count of three, and says the review is due; it stays open for the operator. L2-r9-2 (D3): 05 5.4, 06 6.4, J1 step 5 and B2 carry the askpass wording. L2-r9-5 (D5): ADR 0010 decision 3 names the steps' environment as the guard and the tools/ci build as what stays open until PR #34."
+  },
+  "coverage": {
+    "index (spec.md)": "nothing for this lens (the new pr fetch row and the token row's count checked)",
+    "00": "nothing for this lens (not in the delta)",
+    "01": "nothing for this lens (removing state, preflight step 6 and RJ-336 checked against I26)",
+    "02": "L2-r10-1",
+    "03": "nothing for this lens",
+    "04": "nothing for this lens",
+    "05": "L2-r10-1, L2-r10-2",
+    "06": "nothing for this lens",
+    "07": "nothing for this lens",
+    "08": "nothing for this lens (PreToolUse fail-closed wrapper checked)",
+    "09": "nothing for this lens",
+    "10": "L2-r10-3, L2-r10-4",
+    "11": "nothing for this lens",
+    "12": "L2-r10-1, L2-r10-2, L2-r10-3, L2-r10-4",
+    "13": "nothing for this lens (not in the delta)",
+    "ADRs": "L2-r10-3 (ADR 0010 decision 1); ADR 0010 decisions 2 to 6 otherwise nothing for this lens",
+    "plan.md": "nothing for this lens"
+  },
+  "what_is_missing": "A statement of the pr job's whole trusted computing base (its import closure, toolchain and installed tools) with the surface each part is on, in 05 5.3 beside the approvals surface. A measured fact on how a pull_request_target check meets a ruleset's required check, in 10 10.2 item e.",
+  "postmortem": "Three weeks after v1.0.0, a plan task under a `checks` grant adds a step package. Its helper normalizes paths and is shared with the pr step, and it treats a leading './' differently. pr passes that pull request on the grant. From then on, a head that writes its workflow change as './.github/workflows/ci.yml' in a rename matches no approvals glob. An agent's next pull request edits ci.yml to skip the license step, and pr is green. Sections crossed: 05 5.3 (approvals globs), 12 12.4 (pr job), 02 2.1 (step packages), 05 5.4 (checks grant row).",
+  "lens_critique": "The lens looks at what reaches the host from an agent. Its CI view is the host-side tools/ci run. Since the G5 fix, the gate that guards every ask-first surface is a GitHub-side job built from the repository, and the lens has no bullet for 'which code judges the change, and who can change that code'. The set of lens titles still lacks a supply-chain or CI-platform viewpoint.",
+  "pages_read": [
+    "docs/reviews/lenses.md (L2, What a reviewer returns, How stage A runs)",
+    "docs/reviews/round-9/reports/L2.json",
+    "docs/reviews/round-9.md (L2 rows, R9-08, R9-24, R9-25, D1 to D6, session checkpoint 2026-10-09)",
+    "delta 8ecfbb2..d458f83 of docs/spec/05-security.md (word diff, whole)",
+    "delta of docs/spec/12-engineering.md (whole) and 12 12.4 at baseline",
+    "delta of docs/spec/10-testing-style.md (whole)",
+    "delta of docs/spec.md (whole)",
+    "docs/adr/0010 (whole); status-line diffs of ADR 0001, 0006, 0008, 0009",
+    "delta of docs/spec/01-system-model.md and 08-memory-handoff-salvage.md",
+    "delta of docs/spec/02, 03, 04, 06, 07, 09, 11 and docs/plan.md (skimmed, security-relevant hunks read)",
+    "docs/spec/03-formats.md opening and 3.4 at baseline; 06 6.4 signing text; 09 J1 step 5; 11 A16, A17, B2"
+  ],
+  "out_of_scope": "Not read: PR #34 and PR #33 themselves, and the note on the maintainer block (docs/notes), so the ruleset reading is taken as the spec states it. Three facts are inferred from GitHub's documentation and behavior and were not measured: re-runs keep the original GITHUB_SHA (L2-r10-2), which commit a pull_request_target check run attaches to and how a ruleset matches duplicate check names (L2-r10-3), and the runner's parsing of :: lines (L2-r10-4). The AR22 closure (the fifth ruleset try not made) and the token-narrowing review now due are operator decisions and were not re-judged. 13 and the non-security parts of 03, 04, 09 and 11 were only skimmed.",
+  "confidence": "High on the six resolution checks and on L2-r10-1, which can be checked against the text (askfirst.go glob against the tools/ci step layout and go run). Medium-high on L2-r10-2 (GitHub's documented re-run behavior). Medium on L2-r10-3 and L2-r10-4, which depend on platform behavior inferred here and not measured."
+}
