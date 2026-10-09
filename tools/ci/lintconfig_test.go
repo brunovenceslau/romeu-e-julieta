@@ -1092,9 +1092,12 @@ func TestOnlyAllowedGoModDirectives(t *testing.T) {
 
 // pinnedTools are the tools the mise configuration of this repository
 // pins, each at the version mise.lock locks: the go command and
-// golangci-lint, the two that fast runs (resolveLintTools), and
-// govulncheck, which all starts through "mise exec" (allSteps).
-var pinnedTools = []string{"go", "golangci-lint", "go:golang.org/x/vuln/cmd/govulncheck"}
+// golangci-lint, the two that fast runs (resolveLintTools), govulncheck,
+// which all starts through "mise exec" (allSteps), and gh, which the
+// release tool will start by its resolved path. This is the one list of
+// what mise may install: allowedMiseTables, TestLockedVersions and
+// TestMiseConfigs read it, and 12 12.1 names it.
+var pinnedTools = []string{"go", "gh", "golangci-lint", "go:golang.org/x/vuln/cmd/govulncheck"}
 
 // allowedMiseTables are the tables a mise configuration file of this
 // repository may hold, with the keys each may hold. The [env] table,
@@ -1243,4 +1246,65 @@ func TestMiseConfigs(t *testing.T) {
 		}
 	}
 	assert.Empty(t, repoFiles(t, root, "*.tool-versions"), "the .tool-versions files of the repository")
+}
+
+// TestGoDirectiveEqualsMisePin checks that the go directive of go.mod
+// is the go version mise.toml pins, so the toolchain the checks run
+// and the one the module declares cannot drift apart.
+func TestGoDirectiveEqualsMisePin(t *testing.T) {
+	root := moduleRoot(t)
+	mod, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	require.NoError(t, err)
+	toml, err := os.ReadFile(filepath.Join(root, "mise.toml"))
+	require.NoError(t, err)
+	directive, ok := goDirective(mod)
+	require.True(t, ok, "go.mod holds a go directive")
+	pin, ok := misePin(toml, "go")
+	require.True(t, ok, "mise.toml pins go")
+	assert.Equal(t, pin, directive, "the go directive of go.mod and the go pin of mise.toml")
+}
+
+// goDirective returns the version of the go directive of a go.mod.
+func goDirective(data []byte) (string, bool) {
+	for line := range strings.SplitSeq(string(data), "\n") {
+		if i := strings.Index(line, "//"); i >= 0 {
+			line = line[:i]
+		}
+		if f := strings.Fields(line); len(f) == 2 && f[0] == "go" {
+			return f[1], true
+		}
+	}
+	return "", false
+}
+
+// misePin returns the version a mise.toml pins for tool in [tools].
+func misePin(data []byte, tool string) (string, bool) {
+	inTools := false
+	for line := range strings.SplitSeq(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "[") {
+			inTools = line == "[tools]"
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if inTools && ok && strings.TrimSpace(key) == tomlKey(tool) {
+			return strings.Trim(strings.TrimSpace(value), `"`), true
+		}
+	}
+	return "", false
+}
+
+// TestGoDirectiveParsers pins goDirective and misePin on the forms they
+// must read and on the ones that must not match.
+func TestGoDirectiveParsers(t *testing.T) {
+	v, ok := goDirective([]byte("module x\n\ngo 1.27.2 // note\n\nrequire (\n\tgo 9.9.9\n)\n"))
+	assert.True(t, ok)
+	assert.Equal(t, "1.27.2", v)
+	_, ok = goDirective([]byte("module x\ntoolchain go1.27.2\n"))
+	assert.False(t, ok, "toolchain is no go directive")
+	v, ok = misePin([]byte("[settings]\ngo = \"0.0.0\"\n[tools]\ngo = \"1.27.2\"\n"), "go")
+	assert.True(t, ok)
+	assert.Equal(t, "1.27.2", v)
+	_, ok = misePin([]byte("[settings]\ngo = \"1.27.2\"\n"), "go")
+	assert.False(t, ok, "a go key outside [tools] is no pin")
 }
