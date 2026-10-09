@@ -36,7 +36,7 @@ A5, A11, A12, A13) count as settled only with results from both hosts
 probe definitions; `render`
 ([12 12.2](12-engineering.md#122-development-commands-and-capability-map))
 must reproduce them byte for byte, and `tools/ci probes` already flags
-a moved hash.
+a moved hash of their normalized form (03 3.3).
 
 The Settles column of the tables below names what a probe decides
 besides open questions: success criteria, invariants, formats. Which
@@ -51,13 +51,13 @@ At most about 75 minutes per host.
 |---|---|---|---|
 | A1 | `sbx version`, `git --version`, host global git config, VS Code trust settings and `task.allowAutomaticTasks`, symlinks from `$HOME` into the planned root; git CVE floor per series checked against the git release notes; the sbx settings read `doctor` uses, for `env.rememberHostCommands` and `kit.allowedSources` | sbx >= 0.46.0; git at or above the per-series patched release; the argv and output of the settings read recorded | the git floor, doctor checks |
 | A2 | `sbx settings set env.rememberHostCommands true`; env with a `secrets.<svc>.command`, the command a `security find-generic-password` call, started from a non-interactive script; `sbx env run -d` twice; change the command; run again | second run silent; changed command re-prompts; whether a keychain dialog appears recorded | never `--auto-approve` is workable; whether J1 or `doctor` must cover the keychain prompt |
-| A3 | memory dirs and the read-only mounts: from inside, plant a symlink, a FIFO, a dotfile, a `.git` dir and a `.vscode/tasks.json` in a memory dir; write to the `readOnly` `.romeu/bin` mount, also as root after `mount -o remount,rw`; write to the primary clone's source mount, as the agent and as root; check each mount path equals the host path | each plant is seen on the host as planted; no write reaches the host through a `readOnly` mount, also as root after the remount; no write reaches the primary host clone; each mount path equals the host path | the read-only host clone (02 2.3), I30, the mount half of I24 |
-| A4 | clone-mode env started with `sbx env run -d`; `sbx ls --json`; `sbx env exec -it <dir> --env K=<32 KiB value> -- sh -c ...`; two concurrent `exec -it`; `exec -- claude`; `uname -m` inside vs the host arch; `sbx stop`, then `sbx ls --json` again | exec works on a detached clone sandbox; `--env` delivers 32 KiB; concurrent execs coexist; the sandbox arch equals the host arch; `sbx ls --json` reports each sandbox's state and workspace path, field names recorded; the `sbx stop` argv recorded | `run` attach model; the fields I26 and boundary F read; the recording `romeu stop` replays |
-| A5 | the tree shape of 02 2.3 and the `sbxenv.yaml` goldens: relative paths, file outside mounts, `agent: sbx-kit-claude` + workload kit by digest, `readOnly` additional workspace; a top-level `x-probe` key; `sbx env plan` on each golden | goldens accepted; `x-*` rejected; golden sha256 recorded | render goldens |
+| A3 | memory dirs and the read-only mounts: from inside, plant a symlink, a FIFO, a dotfile, a `.git` dir and a `.vscode/tasks.json` in a memory dir; write to the `readOnly` `.romeu/bin` mount, also as root after `mount -o remount,rw`; write to the primary clone's source mount, as the agent and as root; check each mount path equals the host path; record the modes of `<name>-env/` and of the memory files as the sandbox sees them through the direct mounts; with a scoped `github` secret, clone a private secondary, push a branch and call the GitHub API | each plant is seen on the host as planted; no write reaches the host through a `readOnly` mount, also as root after the remount; no write reaches the primary host clone; each mount path equals the host path; the modes are recorded; the clone, the push and the API call succeed with no credential file in the sandbox | the read-only host clone (02 2.3), I30, the mount half of I24, the modes of 02 2.3, the secondary-repo credential of 02 2.6 |
+| A4 | clone-mode env started with `sbx env run -d`; `sbx ls --json`; `sbx env exec -it <dir> --env K=<32 KiB value> -- sh -c ...`; two concurrent `exec -it`; `exec -- claude`; `uname -m` inside vs the host arch; `echo $HOME` as the workload user; `sbx stop`, then `sbx ls --json` again | exec works on a detached clone sandbox; `--env` delivers 32 KiB; concurrent execs coexist; the sandbox arch equals the host arch; the workload user's home recorded; `sbx ls --json` reports each sandbox's state and workspace path, field names recorded, including the mount, secret and image fields `adopt` prints; the `sbx stop` argv recorded | `run` attach model; the fields I26 and boundary F read; the recording `romeu stop` replays |
+| A5 | the tree shape of 02 2.3 and the `sbxenv.yaml` goldens: relative paths, file outside mounts, `agent: sbx-kit-claude` + workload kit by digest, `readOnly` additional workspace; a top-level `x-probe` key; `sbx env plan` on each golden | goldens accepted; `x-*` rejected; the sha256 of each golden's normalized form recorded (03 3.3) | render goldens |
 | A6 | branches `feat` and `salvage/1` in the sandbox; host fetch; `sbx env rm`; list `refs/sandboxes`; same-name recreate; fetch and `fetch --prune` via the sbx remote; `mv` a clone dir with the sandbox removed, then `git fetch --all` | refs survive rm; the sbx refspec is forced; moved clone healthy | I6, `retire` move |
 | A9 | `sbx policy allow network --sandbox <p> example.test`; `check`; `curl` inside; `rm --resource`; `sbx env rm`; `sbx policy ls`; trigger a block; `sbx policy approval ls`; list global secrets and global allow rules as doctor would read them | immediate effect; exact argv; how globals are reported | egress application (07), I22 |
 | A10 | on a live env sandbox `sbx secret set <svc> --sandbox <p> --command '<new>'`; check inside; `sbx env run -d` again | recorded: live and kept, live and reverted, or re-plan prompt | the `apply` tag of `secrets` |
-| A11 | build a minimal local v3 mixin with the pinned frontend: files, a binary from the build context, `args`, one fixture per capability type, an unknown key (expect strict error), a YAML anchor (expect rejection or record acceptance); an install step that records where it runs | local v3 builds on this sbx; descriptor file name and capability names recorded; each capability fixture's sbx interpretation recorded as a conformance fixture for I28; where a kit install step executes (host engine or microVM) recorded, as far as the harness can observe it | go/no-go for the kits, kit format, I28 |
+| A11 | build a minimal local v3 kit (`kind: mixin`) with the pinned frontend: files, a binary from the build context, `args`, one fixture per capability type, an unknown key (expect strict error), a YAML anchor (expect rejection or record acceptance); an install step that records where it runs | local v3 builds on this sbx; descriptor file name and capability names recorded; each capability fixture's sbx interpretation recorded as a conformance fixture for I28; where a kit install step executes (host engine or microVM) recorded, as far as the harness can observe it | go/no-go for the kits, kit format, I28 |
 | A12 | inspect the workload by digest: descriptor annotation (and any `sbx kit inspect`-style command), declared capabilities and agent handle, missing apt packages vs `os-base`, skills path, agent memory dir location; with an ssh-agent capability and `SSH_AUTH_SOCK` set to a one-key agent for the `sbx` process, `ssh-add -L` inside, and again with `SSH_AUTH_SOCK` unset for the `sbx` process | capability set readable and recorded as conformance fixtures; handle is `sbx-kit-claude`; inside, only the one key is listed; with the variable unset, `ssh-add -L` lists no key | `os-base` list, I28, what holds for Q19 until it is settled |
 | A13 | hand-written herdr `layout.apply` through `sbx env exec -it <dir> -- herdr`; agent detection through the exec pty; OSC 9 reaching the host terminal/cmux; kill the host terminal, re-exec, check the agent process survived; host herdr cannot see sandbox processes; socket `protocol` number | layout applies; agent survives terminal loss; host herdr sees nothing | run-layout renderer, "no host panes" model |
 | A14 | a kit install step printing `$PWD` and listing the workspace, timestamped against the clone | install step does not see the clone | confirms the romeu-driven `julieta setup` ordering |
@@ -156,7 +156,7 @@ has `block: "B"`:
 
 ```json
 {
-  "version": 1,
+  "schema": "probe-result/v1",
   "id": "A10",
   "block": "A",
   "kind": "observe",
@@ -218,6 +218,8 @@ is checked by `tools/ci acceptance`
 questions table is the reminder, and a probe nobody ran is noticed only
 there.
 
-`tools/ci probes` also flags an `sbxenv.yaml` golden whose sha256 moved
-since probe A5 recorded it. A golden with no recorded hash yet is not
-flagged.
+`tools/ci probes` also flags an `sbxenv.yaml` golden whose normalized
+hash ([03 3.3](03-formats.md#33-rendered-sbxenvyaml-sbx-env-file-schemaversion-1))
+moved since probe A5 recorded it, and prints a notice, which does not
+fail the check, for a golden with no recorded hash yet: it needs a
+probe before it counts as confirmed.

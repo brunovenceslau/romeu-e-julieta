@@ -41,7 +41,9 @@ which names each step's command and output path.
    [00 0.4](00-scope.md#04-license)): copy it into a new repository,
    edit `projects/<cfg>.yaml` by hand (its name and the config repo's
    own entry under `repos`, [03 3.2](03-formats.md#32-project-spec-projectsnameyaml-schema-projectv1)),
-   push.
+   push. The config repo names private repositories, secret names and
+   internal domains: keep it private unless every project in it is
+   public ([02 2.2](02-layouts.md#22-config-repo)).
 1. [O] Read the README's trust paragraph. Install sbx at or above the
    floor of [10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract)
    (initial v0.46.0), git at or above the floor of
@@ -61,8 +63,12 @@ which names each step's command and output path.
    `e2e/scenarios/commands.yaml` that J9 uses too), put `romeu` on
    `PATH`.
 3. [O] `romeu init --config-url https://github.com/<owner>/<config-repo>`
-   - [H] writes host settings (root default `$HOME/dev`, absolute tool
-     paths), clones the config repo to `$ROMEU_ROOT/<cfg>-env/<dir>`.
+   - [H] applies `doctor`'s root check before writing settings and
+     refuses a root inside a git repository (a `$HOME` that holds
+     dotfiles in git, for example) with that check's error id and a hint
+     to pass another root; then writes host settings (root default
+     `$HOME/dev`, absolute tool paths) and clones the config repo to
+     `$ROMEU_ROOT/<cfg>-env/<dir>`.
 4. [O] `romeu doctor`; fix every failure; apply its recommendations
    (`sbx settings set env.rememberHostCommands true`);
    `romeu approve --toolchain` (gate 1).
@@ -178,6 +184,10 @@ work as usual.
    not reachable from origin; confirm on TTY; move `foo-env/` to
    `$ROMEU_ROOT/.attic/foo/<ts>/`; drop from workspace files; move state
    and approvals to the state attic.
+4. [O] Once `status` shows nothing unpushed for the project, the
+   operator may delete `$ROMEU_ROOT/.attic/foo/<ts>/` and
+   `$XDG_STATE_HOME/romeu/attic/foo/<ts>/`; romeu never does, and
+   `status` and `doctor` do not read them.
 
 ## J8 Tool bump (inside a repo)
 
@@ -244,10 +254,9 @@ work as usual.
    --sandbox foo --command <rendered command>` instead (never a value).
 4. If host settings lack `npm@foo`: exit 2 naming the key; the operator
    adds it and reruns.
-5. When `sync` ran without a TTY, the candidate is awaiting and
-   `romeu approve foo` promotes it. `approve` makes no sbx call, so it
-   prints that the live changes of step 3 apply on the next
-   `romeu run` or `romeu sync`.
+5. When `sync` ran without a TTY, it printed the widening digest and
+   exited 3 with nothing kept; the operator runs `romeu sync foo` again
+   on a terminal.
 
 ## J12 Second machine
 
@@ -256,6 +265,10 @@ work as usual.
    on the machine that wrote them (Q14).
 2. `romeu sync --all` -> one gate per project -> `romeu run <name>`.
 3. Unpushed work from the other machine is not available (push first).
+   A memory entry file is self-contained: copying
+   `memory/<dir>/entries/` whole is a complete move, and the store lock
+   is recreated on first use
+   ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1)).
 
 ## J13 Remove, rename or split a repo inside a project (v1 manual path)
 
@@ -267,9 +280,9 @@ work as usual.
 3. [H] new repos get new clone dirs; a removed repo's clone and memory
    dir stay in place and are reported by `status` as `orphaned repo dir`
    with any unpushed or salvage-only work listed.
-4. [O] after `status` shows nothing unpushed, the operator moves or
-   deletes the orphaned dirs by hand (romeu never does). A new command
-   for this is out of v1 (Q6).
+4. [O] after `status` shows nothing unpushed and no salvage-only refs,
+   the operator moves or deletes the orphaned dirs by hand (romeu never
+   does). A new command for this is out of v1 (Q6).
 
 ## J14 Stop using romeu and julieta
 

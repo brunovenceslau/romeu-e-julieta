@@ -51,7 +51,7 @@ tool stores about a repository, and where, is listed in
 - The runtime ledger (designed in [13](13-runtime-ledger.md), not
   built; a [deferred decision](../spec.md#deferred-decisions)).
 - tmux and cmux renderers. The run layout format
-  ([03 3.2](03-formats.md#run-layout-run-multiplexer-neutral)) names no
+  ([03 3.2](03-formats.md#run-layout-run)) names no
   multiplexer; herdr is the one renderer, and the renderer interface is
   designed with the second one.
 - herdr agent-team shims (Claude Code split-pane teammates).
