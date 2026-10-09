@@ -55,8 +55,13 @@ a recording set are the tested window,
 [10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract)), `git` (host and
 sandbox, floor in [05](05-security.md#51-hardened-git-internalgitsafe)),
 `mise` and `herdr` (sandbox, pinned by version and sha256). The
-operator's install-and-verify step (J1) also needs a `gh` that has the
-`attestation` command; a packaged `gh` may be older and lack it.
+operator's install-and-verify step (J1) also needs `gh` at or above a
+floor, initially 2.68.0: the first release whose `gh attestation
+verify` has both `--source-digest` and `--deny-self-hosted-runners`
+(read on 2026-10-09 in `pkg/cmd/attestation/verify/verify.go` of
+`cli/cli` at the tags v2.67.0 and v2.68.0); a packaged `gh` may be
+older, and an older one refuses the unknown flag and exits non-zero.
+Probe B1 records the `gh` version it ran.
 romeu itself never starts `gh`.
 
 **Tool pins.** The product pins the tools of this table, and this is
@@ -421,21 +426,42 @@ branch: it runs on `pull_request_target` for pull requests into `main`,
 under which GitHub runs the workflow file of the default branch, with
 `permissions: contents: read` and no secret. It checks out the default
 branch's commit (`github.sha`), with its `go.mod`, `go.sum`,
-`mise.toml` and `mise.lock`, and builds `tools/ci` there; it never
-checks out `pull_request.base.sha`. The check that the base is the
+`mise.toml` and `mise.lock`, and builds there the main package of `pr`,
+`tools/ci/pr`, whose import closure is the standard library and paths
+on `approvals`
+([05 5.3](05-security.md#53-ask-first-surfaces)); it never
+checks out `pull_request.base.sha`. Where this specification writes
+`tools/ci pr`, it means that package, run as `go run ./tools/ci/pr`. The check that the base is the
 default branch (12.9) stays, but it is not what makes the code trusted.
 So a run judges a pull request with the current `main`, and a pull
 request opened before a fix to `pr` is judged by the fixed `pr` on its
-next run. The job reads the head only as git objects, fetched by
-`head.sha` without credentials, which relies on the repository being
+next run, which a new event starts: a push to the head, an `edited`
+event from a change to the title or body, or a close and reopen. A
+re-run of an old run keeps the `GITHUB_SHA` of the original event, so
+it judges with the old code
+([re-running workflows and jobs](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs),
+read on 2026-10-09). The job reads the head only as git objects:
+`pr` fetches `head.sha` without credentials, only in the pr job and
+only when the object is missing, which relies on the repository being
 public ([10 10.2](10-testing-style.md#102-ci)), and never builds or
 runs them: every git call of `pr` on head objects passes
 `-c core.hooksPath=/dev/null`; `fetch` passes `--no-recurse-submodules`;
 `diff`, `log` and `show` pass `--no-ext-diff --no-textconv
---ignore-submodules=all` (git 2.53.0 rejects `--no-recurse-submodules`
-for `diff` and `log`); `pr` never runs `checkout` or `archive`
-on the head, and its diffs are tree to tree, with `.gitattributes` read
-from the default branch's work tree. It reads
+--ignore-submodules=all` (git 2.53.0, read on 2026-10-09, rejects
+`--no-recurse-submodules` for `diff` and `log`); `pr` never runs
+`checkout` or `archive` on the head, and its diffs are tree to tree,
+with `.gitattributes` read from the default branch's work tree. The job
+runs the runner image's git, which no pin holds, so a `pr` test runs
+each of these git calls against a hostile fixture repository (a
+submodule, a textconv driver, an external diff driver and hooks) and
+fails when a flag no longer holds. `pr` prints text the pull request's
+author controls (the title, body lines, commit subjects) only after
+neutralizing a leading `::` and control characters, because the runner
+reads a line that starts with `::` as a workflow command; fixture "pr
+escapes a workflow command in a PR body". A required check is matched
+by name, and the head's own `pull_request` workflows run from the head,
+so `pr` refuses a head whose `.github/workflows/` give a job outside
+the pr job's file the pr job's name, with a fixture. It reads
 `.github/ask-first.yaml` at the base commit and at the head commit and
 uses the union of the two lists, so a PR that removes a surface or a
 glob still needs that surface's line.

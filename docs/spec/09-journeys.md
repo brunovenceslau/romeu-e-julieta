@@ -48,8 +48,9 @@ which names each step's command and output path.
    floor of [10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract)
    (initial v0.46.0), git at or above the floor of
    [05 5.1](05-security.md#51-hardened-git-internalgitsafe) (initial
-   floor 2.45.4), and a `gh` that has the `attestation` command, which
-   step 2 needs (12 12.1). The verification of step 2 needs network
+   floor 2.45.4), and `gh` at or above the floor of 12 12.1 (initial
+   floor 2.68.0, the first with both flags of the `gh attestation
+   verify` line of step 2). The verification of step 2 needs network
    access and a `gh` logged in to GitHub.
 2. [O] Download the `romeu` darwin archive for the host arch and
    `checksums.txt` with `curl`, which sets no quarantine attribute, so
@@ -64,8 +65,11 @@ which names each step's command and output path.
    --source-digest <commit> --deny-self-hosted-runners`, `<commit>`
    being that output (both checks required; the verification contract
    of [10 10.2](10-testing-style.md#release-and-bootstrap), one entry of
-   `e2e/scenarios/commands.yaml` that J9 uses too), put `romeu` on
-   `PATH`.
+   `e2e/scenarios/commands.yaml` that J9 uses too, which gives the three
+   commands as one block to paste, with the tag as its one variable),
+   put `romeu` on `PATH`. Skipping the verification is the user's
+   choice; it costs the one proof that the archive is the one
+   `release.yml` built from the tagged commit.
 3. [O] `romeu init --config-url https://github.com/<owner>/<config-repo>`
    - [H] applies `doctor`'s root check before writing settings and
      refuses a root inside a git repository (a `$HOME` that holds
@@ -87,8 +91,10 @@ which names each step's command and output path.
    project that uses `git-ssh-sign`, register the key on GitHub as a
    signing key and never as an authentication key, and start the
    dedicated signing agent with exactly that one key, added with
-   `ssh-add -c` so each use asks for confirmation; that needs an askpass
-   program, which macOS does not ship, so install one first
+   `ssh-add -c` so each use asks for confirmation; that needs a program
+   `SSH_ASKPASS` can name, which macOS does not ship, so install one
+   first and set `SSH_ASKPASS` for the agent; what a signing use does
+   without one is the outcome probe B2 records
    ([06 6.4](06-kits.md#64-product-kits)); sync
    exits 2 with `RJ-204 signing-socket` until it is reachable and holds
    that key.
@@ -187,9 +193,10 @@ work as usual.
 5. [X] `sbx env rm <dir>`; [H] remove romeu-applied egress rules;
    generation `removing -> closed-removed`. If `sbx env rm` fails, the
    generation stays `removing` and romeu exits 1; the same command run
-   again resumes at `sbx env rm` when the daemon heads and each
-   worktree's HEAD and status equal those in the salvage record, and
-   otherwise salvages again first. For `recreate`, continue with J3b. If that create fails because an upstream artifact is gone
+   again resumes at `sbx env rm` when a fresh fingerprint of the daemon
+   heads and each worktree's HEAD and full status equals the one written
+   with `removing` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)),
+   and otherwise salvages again first. For `recreate`, continue with J3b. If that create fails because an upstream artifact is gone
    (a workload digest, the frontend, a kit download host), the
    generation stays closed, the salvage refs and memory are intact and
    no sandbox exists: the error is `kit-build-failed`, and the operator
@@ -210,10 +217,10 @@ work as usual.
    not reachable from origin; confirm on TTY; move `foo-env/` to
    `$ROMEU_ROOT/.attic/foo/<ts>/`; drop from workspace files; move state
    and approvals to the state attic.
-4. [O] Once the unpushed and salvage-only report that `retire` printed
-   and confirmed shows nothing left to keep, or `git -C <clone> status`
-   and `git -C <clone> for-each-ref` inside the attic clone show
-   nothing unpushed, the operator may delete
+4. [O] Once, in each attic clone, `git -C <clone> status` shows a clean
+   tree, `git -C <clone> log --branches --not --remotes --oneline`
+   prints nothing and `git -C <clone> for-each-ref refs/romeu/salvage/`
+   lists no ref whose work is kept nowhere else, the operator may delete
    `$ROMEU_ROOT/.attic/foo/<ts>/` and
    `$XDG_STATE_HOME/romeu/attic/foo/<ts>/`; romeu never does, and
    `status` and `doctor` do not read them.

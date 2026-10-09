@@ -28,7 +28,10 @@ from the tree and the clones into a new record beside it. The
 user-authored formats (`project.v1`, `host-settings.v1`) change only by
 a new version of their `schema` field, announced first in the release
 notes, which carry the edit to make. The window for these formats is
-the current and the previous version. The manifest keeps its own N-1
+the current and the previous version; a reader refuses an older one
+with the error `format-unsupported` (`RJ-337`,
+[04 4.4](04-cli.md#44-error-ids)) and the fix hint "apply the edit in
+the release notes of each skipped release". The manifest keeps its own N-1
 window, with its reason, in 3.6.
 
 Every format decoded from a mount or a repository (the memory entry,
@@ -461,7 +464,8 @@ says which states persist; the candidate states do not):
      "closedAt": null,
      "salvage": [{"id": "01j9zd0a1b2c3d4e5f6g7h8j9k", "createdAt": "2026-10-05T18:00:00Z", "manifestSha256": "<hex>",
                   "result": "complete", "reasons": [],
-                  "refsPrefix": "refs/romeu/salvage/shop/01j9zc2q.../01j9zd0a.../"}]}
+                  "refsPrefix": "refs/romeu/salvage/shop/01j9zc2q.../01j9zd0a.../",
+                  "fingerprint": null}]}
   ],
   "egressApplied": ["dl.google.com", "github.com"],
   "lastRunAt": "2026-10-05T17:00:00Z"
@@ -475,6 +479,7 @@ says which states persist; the candidate states do not):
 | `generations[].state` | `open`, `salvaging`, `removing`, `closed-removed`, `closed-lost` |
 | `generations[].createdWith` | the recreate digest at create; `null` for an adopted generation (status reports "recreate digest unknown") |
 | `salvage[].manifestSha256` | plain sha256 of the salvage `manifest.json` bytes (3.12, raw) |
+| `salvage[].fingerprint` | `null`, or, written in the same whole-file write as the state `removing` (01 1.6), the plain sha256 (3.12) of the daemon heads, each worktree's HEAD and a digest of its full status: tracked changes, untracked and ignored paths, each with the digest of its file. The rerun of `rm`, `recreate` or `retire` that finds the generation `removing` with its sandbox present computes it again and resumes at `sbx env rm` only when the two are equal. A field of the state format, under the version rule of the opening of this page |
 | `salvage[].result` | `complete`, `incomplete`, `lost`; `reasons[]` lists each skipped item, `sandbox-half-failed`, or `sandbox-lost`, and for a generation `run` closed as lost, `dirty-at-last-facts:<n>` and `stashes-at-last-facts:<n>` from the newest facts ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), run step 2); `acceptedLoss[]` lists the reasons `--accept-loss` named |
 
 Every file the product writes in place is written as a temp file in the

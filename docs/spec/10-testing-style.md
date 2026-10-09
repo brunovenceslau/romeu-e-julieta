@@ -78,7 +78,8 @@ Additional required tests:
   a sandbox or a mount (julieta's `--json` output read over
   `sbx env exec`, `snapshot/heads.json`, the memory entry, the handoff
   file and the `mise.lock` parser); short runs in every CI; long runs in
-  the scheduled `fuzz.yml`, which calls `go run ./tools/ci fuzz`.
+  the scheduled `fuzz.yml`, which calls `go run ./tools/ci fuzz` once a
+  day on `main`, from a `schedule` cron.
 
 Rules:
 
@@ -92,7 +93,9 @@ Rules:
   workload's base image and its herdr download, each pinned and
   checksum-verified the same way; by the host suite,
   `tools/ci acceptance`, `tools/ci links` and `tools/ci pins`, which
-  are outside `all`; and, inside `all`, by the `vulnerabilities` step
+  are outside `all`; by the pr job's unauthenticated fetch of a pull
+  request's `head.sha`, made by `pr` only when the object is missing
+  (10.2); and, inside `all`, by the `vulnerabilities` step
   and by the `license` step's pull of its pinned image (10.2). Nothing
   else in a test or a step reads it.
 - The container e2e restores its mise cache with `actions/cache`, pinned
@@ -122,8 +125,8 @@ does a file in that directory with another name ending:
 | file | the keys `name`, `on`, `permissions`, `concurrency`, `env`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters, and `pull_request_target` only as the pr job row below allows; `env` is required and holds exactly the mise environment of `tools/ci` (`miseEnv` in `tools/ci/misefiles.go`), in its order, each value a YAML string |
 | job | the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `runs-on` is `${{ matrix.os }}` or one of the four labels of Runners below, and so is each `os` of the matrix (`runs-on` as a list or a mapping fails); `permissions`, at the top and in a job, is a mapping whose values are `read` or `none`, and the file sets it at the top or in every job, so no scope is left to the default; `strategy` holds `matrix`, `fail-fast` and `max-parallel` only; the matrix is a written mapping with the keys `os` and `include` only, each `include` entry holds `os` and `mise_sha256` only (names matched exactly), and a `${{` in the value of an `include` entry fails (the `os` value is held to the four labels); with `runs-on: ${{ matrix.os }}` every runner of the matrix names an `os` |
 | `uses` step | the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, the owner and the repository start with a letter or a digit, and so does each path segment or it starts with `_`, so no `.` or `..` segment, no `./` path of the repository (a local action) and no `docker://` image fits; `with` is a mapping that holds only the inputs listed for that action in `tools/ci` (the action is matched without case), each value a literal or one `${{ matrix.<key> }}` alone whose values are all literals; an `actions/checkout` step sets `persist-credentials: false`, written exactly so (the case of the action name is ignored, the case of the value is not) |
-| `run` step | the keys `name`, `run`; `run` is one line, `go run ./tools/ci <subcommand> [<argument>...]` or `go run ./tools/release <subcommand> [<argument>...]`; each word is made of ASCII letters, digits and `._/=:-`, or is `"$NAME"` |
-| pr job | one workflow file whose `on` names `pull_request_target`, with `branches: [main]`, and no other event holds the one job that runs `go run ./tools/ci pr`; the file and the job set `permissions` to `contents: read` and nothing else, no step names a secret or `github.token`, its one checkout is of the default branch's commit (`github.sha`), never `pull_request.base.sha`, with `persist-credentials: false`, and the head is read only as git objects fetched by `head.sha`, never checked out to be built or run; `tools/ci workflows` refuses `pull_request_target` in any other file, the event without `branches: [main]`, and a checkout of any other ref, with a fixture per refusal. The head fetch is unauthenticated, so it relies on the repository being public; a private repository reopens it (the [Deferred decisions](../spec.md#in-how-this-repository-is-run)). Under that event GitHub runs the workflow file of the default branch, with a token that may write and with secrets, and warns against building or running pull request code ([events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows), [secure use](https://docs.github.com/en/actions/reference/security/secure-use), read on 2026-10-09), which is why every one of these limits is in the grammar |
+| `run` step | the keys `name`, `run`; `run` is one line, `go run ./tools/ci <subcommand> [<argument>...]` or `go run ./tools/release <subcommand> [<argument>...]`, and in the pr job only `go run ./tools/ci/pr [<argument>...]` (12 12.4); each word is made of ASCII letters, digits and `._/=:-`, or is `"$NAME"` |
+| pr job | one workflow file whose `on` names `pull_request_target`, with `branches: [main]`, and no other event holds the one job that runs `go run ./tools/ci/pr`; the file and the job set `permissions` to `contents: read` and nothing else, no step names a secret or `github.token`, its one checkout is of the default branch's commit (`github.sha`), never `pull_request.base.sha`, with `persist-credentials: false`, and the head is read only as git objects fetched by `head.sha` by `pr` itself, never checked out to be built or run; `tools/ci workflows` refuses `pull_request_target` in any other file, the event without `branches: [main]`, and a checkout of any other ref, with a fixture per refusal. The head fetch is unauthenticated, so it relies on the repository being public; a private repository reopens it (the [Deferred decisions](../spec.md#in-how-this-repository-is-run)). Under that event GitHub runs the workflow file of the default branch, with a token that may write and with secrets, and warns against building or running pull request code ([events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows), [secure use](https://docs.github.com/en/actions/reference/security/secure-use), read on 2026-10-09), which is why every one of these limits is in the grammar |
 | release publish job | in `.github/workflows/release.yml` only, one job, the publish job of [Release and bootstrap](#release-and-bootstrap), may set `contents: write`, `id-token: write` and `attestations: write` in its job `permissions`, and only its `run` steps of `tools/release build`, `tools/release notes`, `tools/release verify` and `tools/release publish` may hold `env` with the one key `GH_TOKEN: ${{ github.token }}`; `tools/ci workflows` refuses each of these in any other file, job or step (the `tools/ci setup` step of that job included), with a fixture per admitted step and per refused step |
 
 So a workflow has no `if`, no `continue-on-error`, no `shell`, no
@@ -181,11 +184,13 @@ Three consequences of the grammar:
 The `pr` step runs in its own job, the pr job of the grammar, from the
 default branch's code, on the file that `GITHUB_EVENT_PATH` names; `tools/ci
 all` does not run it. A local run
-is `go run ./tools/ci pr <file>`, on a payload saved beforehand (with
+is `go run ./tools/ci/pr <file>`, on a payload saved beforehand (with
 `gh api`, for example), or, before the pull request exists,
-`go run ./tools/ci pr --title <title> --body <file>`, which reads the
-local base..HEAD range in place of a payload; `pr` itself makes no
-network call. The file is
+`go run ./tools/ci/pr --title <title> --body <file>`, which reads the
+local base..HEAD range in place of a payload. `pr` reads the network
+only for the fetch of `head.sha` in the pr job, when the object is
+missing (12 12.4); a local run on a saved payload, or with `--title`
+and `--body`, reads none. The file is
 the pull request object, or the event whose `pull_request` member is
 that object, and `pr` reads seven fields of the object: `title`, `body`,
 `head.ref`, `head.sha`, `base.sha`, `base.ref` and
@@ -196,7 +201,8 @@ reachable from `head.sha` and not from `base.sha`, read by the walk of
 the approval lines, are the paths that differ between the merge base
 of `base.sha` and `head.sha`, and `head.sha` itself, both names of a
 rename included. So a merge of the default branch into the pull
-request brings in no surface the pull request did not change.
+request brings in no surface the pull request did not change. The
+step fails when the walk from `base.sha` to `head.sha` finds no commit.
 
 GitHub Actions is the default runner. If the Actions quota runs out,
 the maintainer may choose the local gates instead, provided they are
@@ -700,7 +706,10 @@ The workflow has two kinds of job:
      refuses to build when the latest scheduled `fuzz.yml` run on
      `main` is not `success`, or when that run's head commit is not an
      ancestor of the release commit, or when a file that holds a guard
-     or test tag of 05 5.2 changed between the two. It reads the run
+     or test tag of 05 5.2 changed between the two. Only a run whose
+     event is `schedule` counts: a `workflow_dispatch` run of
+     `fuzz.yml` does not, so a release that needs a newer run waits for
+     the next daily one. It reads the run
      through the GitHub API with the step's `GH_TOKEN` (the release
      publish job row) and the job's `actions: read` permission (the
      permissions are inferred until the first `release.yml` run reads
@@ -760,9 +769,12 @@ gh attestation verify <archive> --repo <owner>/romeu-e-julieta \
 The first line reads the commit the tag names from the repository on
 GitHub, and `<commit>` is its output. `--repo` and `--signer-workflow`
 hold the first two items of the list, `--source-digest` the commit and
-`--deny-self-hosted-runners` the hosted runners; the flags are those of
-the pinned `gh` ([12 12.1](12-engineering.md#121-tech-stack)), as its
-`gh attestation verify --help` shows them. The releases carry
+`--deny-self-hosted-runners` the hosted runners. The `gh` pinned in
+`mise.toml` fixes the flags in the development sandbox and in
+`tools/release verify`, as its `gh attestation verify --help` shows
+them; the `gh` floor of [12 12.1](12-engineering.md#121-tech-stack)
+fixes them for the operator. `commands.yaml` gives these lines and the
+checksum line as one block, with the tag as its one variable. The releases carry
 `checksums.txt` and the keyless build provenance attestation, and no
 other signature; what the attestation proves, and what it does not, is
 in [05 5.4](05-security.md#risks-of-running-romeu), "Release proof".
@@ -844,7 +856,13 @@ Evidence:
   2026-10-09, a required-status-checks rule lists the four
   `all on ...` checks (the note on the maintainer block). Saving the
   API's answer under Evidence is what is left to do. When the task that
-  builds `pr` lands, its job joins the required checks, the same way.
+  builds `pr` lands, its job is added to the required checks, and the
+  step records under that task's Evidence the `head_sha` the pr job's
+  check run carries and whether a ruleset that requires it blocks a
+  merge and then allows it. If the check cannot be required, that is
+  recorded under the item of
+  [ADR 0010, reopen the required checks without the bypass and amend the records of round 9](../adr/0010-reopen-the-required-checks-without-the-bypass-and-amend-the-records-of-round-9.md),
+  decision 1.
 - f. Before the first release candidate: turn on GitHub's immutable
   releases setting. To do.
 

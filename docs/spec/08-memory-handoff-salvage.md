@@ -45,7 +45,10 @@ backend possible later.
   `julieta memory` for anything worth keeping, and to tag an entry
   `lesson` when it records what a session taught. Something no event
   id expresses goes into the handoff, and the agent opens an issue
-  labelled `deferred` that names the row.
+  labelled `deferred` that names the row. When signing a commit fails,
+  or waits on a confirmation that does not come, the rule tells the
+  agent to ask the operator, and never to unset `commit.gpgsign` or
+  sign another way.
 
 ## 8.2 Session hooks (user-side middleware)
 
@@ -99,7 +102,7 @@ surface them until a later run of the same hook succeeds.
 | File name | `handoff/<ULID>-<kind>.md` (03 3.10); ULIDs sort by time |
 | Stamping | julieta writes all front matter (3.10) with git facts for every repo in the manifest |
 | Handoff reader | one function in `internal/handoff`, used by julieta and romeu: "latest narrative" = the greatest ULID among `clear` and `final` files; "newest facts" = the greatest ULID among `facts` files; a facts file never hides a narrative |
-| Resume | SessionStart prints the latest narrative plus the difference between its facts and the newest facts. The gap line `no narrative since <time>; the session ended without /handoff` prints first only when the newest facts file's git facts differ from the facts stamped in the latest narrative (new commits, a moved branch, a changed dirty count); a newer facts file with the same git facts, such as the one SessionEnd writes at `/clear` after `/handoff`, prints no gap line. Two goldens pin it: `/handoff` then `/clear` (no line), and a facts-only end with new commits (the line) |
+| Resume | SessionStart prints the latest narrative plus the difference between its facts and the newest facts. The gap line `the newest facts differ from the latest narrative of <time>: <changes>`, where `<changes>` lists the count of new commits, a moved branch and a changed dirty count, prints first only when the newest facts file's git facts differ from the facts stamped in the latest narrative (new commits, a moved branch, a changed dirty count); a newer facts file with the same git facts, such as the one SessionEnd writes at `/clear` after `/handoff`, prints no gap line. The line names what is measured, not how the session ended: it also prints when `/handoff` ran and a commit followed before `/clear`. Three goldens pin it: `/handoff` then `/clear` (no line), a facts-only end with new commits (the line), and `/handoff`, a commit, then `/clear` (the line) |
 | Before destruction | after the preflight and before the salvage half, `romeu rm` asks the handoff reader whether the open generation has a `final` handoff; on a TTY it asks whether to go on without one, and without a TTY it warns (`no-final-handoff`) and goes on (04 4.2). The narrative handoff is the operator's step: romeu cannot ask a stopped agent for one (J6) |
 | Host | `romeu handoff <name>` prints the latest narrative and newest facts (escaped), labelled as text an agent wrote |
 
@@ -224,8 +227,9 @@ root excluded from Time Machine, as the `root-indexed` check of
 [04 4.2](04-cli.md#42-romeu-host) advises, is in no Time Machine
 backup, so its memory dirs and unpushed work need another copy, which
 that check's hint says. Once `romeu salvage` has recorded its result on
-the generation, the owner may delete that salvage dir or any payload in
-it: `rm`, `recreate` and `retire` read the record, `doctor` checks the
+the generation, and the generation is not `removing`, the owner may
+delete that salvage dir or any payload in it; while the generation is
+`removing`, a rerun may salvage again (01 1.6), so the dir stays: `rm`, `recreate` and `retire` read the record, `doctor` checks the
 salvage refs on the host and no salvage dir, and `status` lists the
 records, so a deleted dir is no finding. The refs under
 `refs/romeu/salvage/` stay, since `doctor` fails on a missing one.

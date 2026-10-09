@@ -187,7 +187,9 @@ implementation serves both. Each check is a row of the table of 4.1 by
 its slug, which `--json` reports with its result; a check whose
 condition is also an error elsewhere (`drift-detected`,
 `signing-socket`) shares that error's slug. A **pre** check stops a
-mutating command with exit 2, so each has an id in 4.4.
+mutating command with exit 2, except the protective commands of
+[01 1.5](01-system-model.md#15-preflight-before-every-mutating-sbx-call),
+which print it and go on; so each has an id in 4.4.
 
 | Check | Slug | Result |
 |---|---|---|
@@ -214,7 +216,9 @@ mutating command with exit 2, so each has an id in 4.4.
 | tree: an interrupted promotion | `interrupted-promotion` | fail |
 | tree: a memory dir violating the layout allowlist | `memory-layout` | fail |
 | tree: a workspace file that differs from the one derived again from host state ([01 1.2](01-system-model.md#12-sources-of-truth-vs-derived)) | `workspace-files` | fail |
-| an open generation with no sandbox in `sbx ls --json`, or a sandbox a project names with no open generation | `generation-sandbox` | fail |
+| an open generation with no sandbox in `sbx ls --json`, or a sandbox a project names with no open generation, a generation in `removing` excluded | `generation-sandbox` | fail |
+| a `removing` generation with its sandbox present ([01 1.6](01-system-model.md#generation)); the hint is `romeu rm <name>` | `removal-pending` | fail |
+| a record of a format romeu knows that does not decode ([03](03-formats.md), opening); the hint is as in `RJ-334` | `record-unreadable` | fail |
 | a project's `egressApplied` differs from the per-sandbox rules `sbx policy ls` reports | `egress-applied` | fail |
 | a ref under a salvage record's `refsPrefix` missing from its clone, naming the record | `salvage-ref-missing` | fail |
 | a project record over 256 KiB ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)) | `record-size` | warn |
@@ -318,3 +322,4 @@ table is the source and this section is a link to
 | `RJ-334` | `record-unreadable` | 2 | every reader of a versioned format, for a file of a format it knows that does not decode ([03](03-formats.md), opening); the file is never overwritten, the details name it, and the hint is to restore it from a backup, with `romeu salvage --from-host <name>` to save the work first |
 | `RJ-335` | `generation-lost` | 1 | `run` step 2, after it preserves a lost generation; the hint is `romeu run <name>`, which creates the new sandbox |
 | `RJ-336` | `removal-pending` | 2 | preflight step 6 ([01 1.5](01-system-model.md#15-preflight-before-every-mutating-sbx-call)), for any mutating command but `rm`, `recreate` and `retire` that finds a `removing` generation with its sandbox present; `status` and `doctor` report it as `removal-pending` ([01 1.7](01-system-model.md#17-vocabulary)); the hint is `romeu rm <name>`, which finishes the removal |
+| `RJ-337` | `format-unsupported` | 2 | every reader of `project.v1` or `host-settings.v1`, for a file whose version is older than the window of the current and the previous version ([03](03-formats.md), opening); the hint is to apply the edit in the release notes of each skipped release |

@@ -86,13 +86,13 @@ found by a unit test before block A runs.
 
 ## 11.2 Block B - acceptance on real hosts (last)
 
-About 90 minutes per host for B1 to B5; the sandbox-side checks below
+About 90 minutes per host for B1 to B6; the sandbox-side checks below
 add to that.
 
 | ID | Step | Settles |
 |---|---|---|
-| B1 | install the release candidate from its GitHub release with the J1 commands of `e2e/scenarios/commands.yaml`; verify checksums and attestation; record each asset's sha256 and whether the downloaded archive carries a quarantine attribute | the install-and-verify step of J1, on the candidate |
-| B2 | product kits build and a sandbox starts: linux/amd64 on the Intel host, linux/arm64 on the Apple silicon host; skills, SessionStart/SessionEnd hooks and the non-writable agent memory dir present; `ssh-add -L` shows only the signing key when `git-ssh-sign` is used, and lists no key in a project without `git-ssh-sign`; with `git-ssh-sign`, a commit made in the sandbox with the key added by `ssh-add -c` asks for confirmation through the installed askpass and is signed (05 5.4) | S3, S5 |
+| B1 | install the release candidate from its GitHub release with the J1 commands of `e2e/scenarios/commands.yaml`; verify checksums and attestation; record the `gh` version, each asset's sha256 and whether the downloaded archive carries a quarantine attribute | the install-and-verify step of J1, on the candidate |
+| B2 | product kits build and a sandbox starts: linux/amd64 on the Intel host, linux/arm64 on the Apple silicon host; skills, SessionStart/SessionEnd hooks and the non-writable agent memory dir present; `ssh-add -L` shows only the signing key when `git-ssh-sign` is used, and lists no key in a project without `git-ssh-sign`; with `git-ssh-sign`, the harness starts the dedicated signing agent with `SSH_ASKPASS` pointing at a wrapper that records each call and answers yes, adds the key with `ssh-add -c`, makes a commit in the sandbox, and records the wrapper's calls and whether the commit is signed; it then records the outcome of the same signing use with no askpass installed: refused, or signed with no confirmation, and the error text the agent sees (05 5.4, [06 6.4](06-kits.md#64-product-kits)) | S3, S5 |
 | B3 | `go test -tags host -json ./e2e/host/...` (J1-J14 on throwaway projects, including `/clear` with the real agent); for J1 from a clean host, J2 and the daily resume of a stopped sandbox (J3a), the result records the count of operator commands and prompts and the wall clock, which the acceptance PR's review compares with [00 0.2](00-scope.md#02-users) | S7 |
 | B4 | `julieta setup` under the catalog-derived policy only, for the reference config repo's tools, on both arches, with and without a GitHub token | S4, catalog entries |
 | B5 | the harness times `romeu run` on a warm sandbox, median of 5, and records the wall clock and romeu's own share of it (the harness points the `sbx` path of its own host settings at a wrapper that times each `sbx` subprocess, and takes that time out); as an observation, the wall clock of `romeu run` on a stopped sandbox, `sbx` time included | S8, for the romeu figure |

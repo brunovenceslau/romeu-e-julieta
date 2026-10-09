@@ -306,9 +306,9 @@ A generation is one sandbox lifetime, identified by a ULID.
 | salvaging | `salvage --from-host`, the sandbox absent | salvaging | as the open row |
 | salvaging | salvage verified; command was `salvage` | open | salvage record `result: complete` |
 | salvaging | salvage incomplete, no `--accept-loss` | open | salvage record `result: incomplete` with reasons; exit 5 |
-| salvaging | salvage complete or `--accept-loss`; command removes the sandbox | removing | state written before `sbx env rm` |
+| salvaging | salvage complete or `--accept-loss`; command removes the sandbox | removing | state written, with the salvage entry's `fingerprint` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)), before `sbx env rm` |
 | removing | `sbx env rm` succeeds | closed-removed | egress rules removed |
-| removing | `sbx env rm` fails, or the sandbox found present (a command killed before `sbx env rm`) | removing | the existing salvage record kept; exit 1; a rerun of `rm`, `recreate` or `retire` resumes at `sbx env rm` only when the daemon heads and each worktree's HEAD and status equal those in the salvage record; otherwise `removing -> salvaging` with a new salvage id |
+| removing | `sbx env rm` fails, or the sandbox found present (a command killed before `sbx env rm`) | removing | the existing salvage record kept; exit 1; a rerun of `rm`, `recreate` or `retire` resumes at `sbx env rm` only when a fresh fingerprint of the daemon heads and each worktree's HEAD and full status equals the `fingerprint` of the state's salvage entry ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)); otherwise `removing -> salvaging` with a new salvage id |
 | removing | the sandbox found absent (crash recovery) | closed-removed | the existing salvage record kept; egress rules removed |
 | open | `run`, `rm`, `stop`, `pull`, `salvage` without `--from-host`, or `retire` finds the sandbox absent | closed-lost | keeps a lost record `salvage --from-host` wrote for this generation, else writes one: refs and snapshots preserved as a salvage record `result: lost` |
 | salvaging | the sandbox found absent (crash recovery) | closed-lost | as above |
@@ -329,10 +329,11 @@ generation; closing stays with the row that finds the sandbox absent.
 
 Destructive commands write in this order: the refs per repo
 (create-only, so a rerun verifies them), the salvage record, the state
-`removing`, `sbx env rm`, `closed-removed`. Recovery: `removing` with
-the sandbox absent becomes `closed-removed`, and with it present the
-next `rm` resumes at `sbx env rm` when the daemon heads and each
-worktree's HEAD and status equal those in the salvage record, and
+`removing` with the salvage entry's `fingerprint`, `sbx env rm`,
+`closed-removed`. Recovery: `removing` with the sandbox absent becomes
+`closed-removed`, and with it present the next `rm` resumes at
+`sbx env rm` when a fresh fingerprint of the daemon heads and each
+worktree's HEAD and full status equals that `fingerprint`, and
 otherwise salvages again under a new salvage id; any other mutating
 command exits 2 with `removal-pending`, and `status` and `doctor`
 report it as `removal-pending`
