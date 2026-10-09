@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -34,9 +35,24 @@ const fixtureProse = `rules:
 `
 
 // hookLine is the hook of 12 12.1, with the line that makes it a
-// script: it starts go, and so the mise shim, with miseEnv
-// (tools/ci/misefiles.go), each variable a word of env.
-var hookLine = "#!/bin/sh\nexec env " + strings.Join(miseEnv, " ") + " go run ./tools/ci fast \"$@\"\n"
+// script: it starts go, and so the mise shim, in an environment built
+// from nothing ("env -i"): the variables of hookAllow that the caller
+// has set, each as ${K:+K="$K"} so an unset one stays unset and a value
+// with a space stays one word; then goBuildEnv, miseEnv and the ceiling
+// of the mise files (the parent of the tree, which is the working
+// directory of a hook, with its symbolic links resolved: PWD is the path
+// as the caller typed it), each variable a word of env.
+var hookLine = "#!/bin/sh\nexec env -i " + hookAllowWords() + " " +
+	strings.Join(slices.Concat(goBuildEnv, miseEnv), " ") +
+	` MISE_CEILING_PATHS="$(dirname -- "$(pwd -P)")" go run ./tools/ci fast "$@"` + "\n"
+
+func hookAllowWords() string {
+	words := make([]string, len(hookAllow))
+	for i, k := range hookAllow {
+		words[i] = "${" + k + `:+` + k + `="$` + k + `"}`
+	}
+	return strings.Join(words, " ")
+}
 
 // newTree returns a fixture repository that passes hygiene: the hook,
 // the two data files, a denylist with the made-up name, and one page.
@@ -138,4 +154,88 @@ func TestRunPrintsAnErrorAsSafeText(t *testing.T) {
 		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
 	}
 	assert.Contains(t, errOut.String(), `\x1b[2J`)
+}
+
+// TestHookEnvIsTheAllowlist runs the tracked hook with a hostile
+// environment, every variable of the escapes the audits found (a go env
+// file, a go work file, GOFLAGS with -overlay, a GOTOOLCHAIN, a mise
+// global and system configuration, MISE_ENV_FILE, MISE_CD,
+// MISE_TRUSTED_CONFIG_PATHS, MISE_CONFIG_DIR, XDG_CONFIG_HOME, GIT_DIR,
+// and a MISE_FOO and a GOFOO that no list names) besides every variable
+// of hookAllow, one of them with a space, and a go stub that prints what
+// it was started with. The hook runs in a symbolic link to the tree,
+// with PWD as the caller typed it. The stub gets exactly what the
+// production lists build for a mise run at the top of the tree
+// (miseRunEnviron over passThroughEnv), the proxy and module variables
+// that were set, and goBuildEnv, with the ceiling the parent of the
+// resolved tree; and the arguments of git pass through as they are.
+func TestHookEnvIsTheAllowlist(t *testing.T) {
+	bin, real := t.TempDir(), mustEval(t, t.TempDir())
+	linkDir := t.TempDir()
+	link := filepath.Join(linkDir, "tree")
+	require.NoError(t, os.Symlink(real, link))
+	stub := "#!/bin/sh\nenv\nfor a; do printf 'ARG[%s]\\n' \"$a\"; done\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "go"), []byte(stub), 0o700))
+	path := bin + string(os.PathListSeparator) + os.Getenv("PATH")
+	for _, key := range hookAllow {
+		t.Setenv(key, "/allowed/"+key)
+	}
+	t.Setenv("PATH", path)
+	t.Setenv("HOME", "/home/with a space")
+	for k, v := range map[string]string{
+		"GOENV": "/elsewhere/env", "GOWORK": "/elsewhere/go.work", "GOFLAGS": "-overlay=/tmp/x.json",
+		"GOTOOLCHAIN": "go9.9", "GOEXPERIMENT": "x", "GODEBUG": "x", "CGO_ENABLED": "1",
+		"GOFOO": "1", "MISE_FOO": "1", "MISE_ENV_FILE": ".env", "MISE_CD": "/elsewhere", "MISE_TRUSTED_CONFIG_PATHS": "/",
+		"MISE_CONFIG_DIR": "/elsewhere/cfg", "MISE_GLOBAL_CONFIG_FILE": "/elsewhere/g.toml",
+		"MISE_SYSTEM_CONFIG_FILE": "/elsewhere/s.toml", "MISE_CEILING_PATHS": "/", "MISE_OVERRIDE_CONFIG_FILENAMES": "x.toml",
+		"XDG_CONFIG_HOME": "/elsewhere/xdg", "GIT_DIR": "/elsewhere/.git", "BASH_ENV": "/elsewhere/rc",
+	} {
+		t.Setenv(k, v)
+	}
+	// What the production lists build, from the same process environment.
+	want := map[string]string{}
+	for _, kv := range slices.Concat(
+		miseRunEnviron(withProcessEnv(passThroughEnv(), slices.Concat(networkPassThrough, goModulePassThrough)), real),
+		goBuildEnv,
+	) {
+		k, v, _ := strings.Cut(kv, "=")
+		want[k] = v
+	}
+	cmd := exec.Command("sh", mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push")), "origin", "https://example.test/a b.git")
+	cmd.Dir = link
+	cmd.Env = append(os.Environ(), "PWD="+link) // the path as the caller typed it
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	got := map[string]string{}
+	var args []string
+	for line := range strings.Lines(string(out)) {
+		line = strings.TrimSuffix(line, "\n")
+		if strings.HasPrefix(line, "ARG[") {
+			args = append(args, strings.TrimSuffix(strings.TrimPrefix(line, "ARG["), "]"))
+			continue
+		}
+		k, v, _ := strings.Cut(line, "=")
+		if !slices.Contains([]string{"PWD", "OLDPWD", "SHLVL", "_"}, k) {
+			got[k] = v
+		}
+	}
+	assert.Equal(t, "MISE_CEILING_PATHS="+filepath.Dir(real), "MISE_CEILING_PATHS="+got["MISE_CEILING_PATHS"],
+		"the ceiling is the parent of the resolved tree, not of the path typed")
+	assert.NotEqual(t, filepath.Dir(link), got["MISE_CEILING_PATHS"])
+	assert.Equal(t, want, got, "the variables go gets")
+	assert.Equal(t, []string{"run", "./tools/ci", "fast", "origin", "https://example.test/a b.git"}, args)
+}
+
+func mustAbs(t *testing.T, p string) string {
+	t.Helper()
+	abs, err := filepath.Abs(p)
+	require.NoError(t, err)
+	return abs
+}
+
+func mustEval(t *testing.T, p string) string {
+	t.Helper()
+	real, err := filepath.EvalSymlinks(p)
+	require.NoError(t, err)
+	return real
 }
