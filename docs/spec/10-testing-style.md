@@ -588,21 +588,25 @@ any sandbox and any agent session.
   As measured on 2026-10-08, the default-branch ruleset requires no
   review: no approving review, no code-owner review, no approval of
   the most recent push, and a push dismisses nothing; that requirement
-  was removed. As measured on 2026-10-09 (through the GitHub API), the
-  restriction of updates to the bypass actor was removed too: with it,
-  every merge needed the bypass, and GitHub's atomic merge of stacked
-  pull requests does not support a bypass, so a stack could not merge.
-  The ruleset (id 24611273) then holds exactly four rules: deletion and
-  non-fast-forward refused, a pull request required (no approving
-  review, no code-owner review, a merge commit the only method), and
-  the four `all on ...` status checks required; the bypass actor is
-  unchanged (administrator role, for pull requests). The open stacked
-  pull requests went from `BLOCKED` to `CLEAN`. By the pull-request
-  rule, a direct push to the default branch is still refused (the
-  rule's effect, not re-measured on that day). The rest of this item is
-  as measured when it was set up. The rules that lean on the code-owner
-  review (05 5.4, 12 12.4, 12 12.9, ADR 0001 rule 8) stand as written
-  until the decision on what replaces the code-owner review, in the
+  was removed. This note supersedes the rest of this item where they
+  differ. As measured on 2026-10-09 (through the GitHub API), the
+  restriction of updates to the bypass actor was removed too. With it
+  in place, pull requests showed `mergeStateStatus` `BLOCKED`, and
+  after it was removed they showed `CLEAN`, and the stack of #28, #29
+  and #30 then merged atomically as one merge commit. The ruleset (id 24611273) now holds these rules:
+  deletion and non-fast-forward refused, a pull request required (no
+  approving review, no code-owner review, a merge commit the only
+  method), and a required-status-checks rule that lists the four
+  `all on ...` checks. The bypass actor is unchanged (administrator
+  role, for pull requests). By the pull-request rule, a direct push to
+  the default branch is still refused (the rule's effect, not
+  re-measured on that day). Since the update restriction is gone and
+  the ruleset requires no review, any account with write access can
+  merge a pull request whose required checks are green. The rest of
+  this item is as measured when it was set up. The rules that lean on
+  the code-owner review (05 5.4, 12 12.4, 12 12.9, ADR 0001 rule 8)
+  stand as written until the decision on what replaces the code-owner
+  review, in the
   [Deferred decisions](../spec.md#deferred-decisions) table, is made.
 - b. In that clone, run `go run ./tools/ci hygiene add` once for each
   forbidden name, and commit `tools/ci/denylist.yaml`.
