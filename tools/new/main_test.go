@@ -140,20 +140,30 @@ func TestNewADRRefuses(t *testing.T) {
 		{"no title", []string{"adr"}, nil, "adr takes the title as one argument"},
 		{"two arguments", []string{"adr", "a", "b"}, nil, "adr takes the title as one argument"},
 		{"an empty title", []string{"adr", "  "}, nil, "the title is empty"},
-		{"a line break in the title", []string{"adr", "a\nb"}, nil, "control or invisible character (U+000A)"},
-		{"a right-to-left override in the title", []string{"adr", "Adopt \u202eX"}, nil, "invisible character (U+202E)"},
-		{"a zero-width space in the title", []string{"adr", "Adopt\u200bX"}, nil, "invisible character (U+200B)"},
-		{"a Hangul filler in the title", []string{"adr", "Adopt\u3164X"}, nil, "invisible character (U+3164)"},
-		{"a Hangul choseong filler in the title", []string{"adr", "Adopt\u115fX"}, nil, "invisible character (U+115F)"},
-		{"a Hangul jungseong filler in the title", []string{"adr", "Adopt\u1160X"}, nil, "invisible character (U+1160)"},
-		{"a halfwidth Hangul filler in the title", []string{"adr", "Adopt\uffa0X"}, nil, "invisible character (U+FFA0)"},
-		{"an empty Braille pattern in the title", []string{"adr", "Adopt\u2800X"}, nil, "invisible character (U+2800)"},
-		{"a line separator in the title", []string{"adr", "Adopt\u2028X"}, nil, "invisible character (U+2028)"},
-		{"a paragraph separator in the title", []string{"adr", "Adopt\u2029X"}, nil, "invisible character (U+2029)"},
+		{"a line break in the title", []string{"adr", "a\nb"}, nil, "character that does not show (U+000A)"},
+		{"a right-to-left override in the title", []string{"adr", "Adopt \u202eX"}, nil, "character that does not show (U+202E)"},
+		{"a zero-width space in the title", []string{"adr", "Adopt\u200bX"}, nil, "character that does not show (U+200B)"},
+		{"a Hangul filler in the title", []string{"adr", "Adopt\u3164X"}, nil, "character that does not show (U+3164)"},
+		{"a Hangul choseong filler in the title", []string{"adr", "Adopt\u115fX"}, nil, "character that does not show (U+115F)"},
+		{"a Hangul jungseong filler in the title", []string{"adr", "Adopt\u1160X"}, nil, "character that does not show (U+1160)"},
+		{"a halfwidth Hangul filler in the title", []string{"adr", "Adopt\uffa0X"}, nil, "character that does not show (U+FFA0)"},
+		{"an empty Braille pattern in the title", []string{"adr", "Adopt\u2800X"}, nil, "character that does not show (U+2800)"},
+		{"a combining grapheme joiner in the title", []string{"adr", "Adopt\u034fX"}, nil, "character that does not show (U+034F)"},
+		{"a Khmer inherent vowel in the title", []string{"adr", "Adopt\u17b4X"}, nil, "character that does not show (U+17B4)"},
+		{"an unassigned default-ignorable code point in the title", []string{"adr", "Adopt\u2065X"}, nil, "character that does not show (U+2065)"},
+		{"a Mongolian free variation selector in the title", []string{"adr", "Adopt\u180bX"}, nil, "character that does not show (U+180B)"},
+		{"a variation selector in the title", []string{"adr", "Adopt\ufe0fX"}, nil, "character that does not show (U+FE0F)"},
+		{"a supplementary variation selector in the title", []string{"adr", "Adopt\U000e0100X"}, nil, "character that does not show (U+E0100)"},
+		{"a zero width joiner in the title", []string{"adr", "Adopt\u200dX"}, nil, "character that does not show (U+200D)"},
+		{"a zero width non-joiner in the title", []string{"adr", "Adopt\u200cX"}, nil, "character that does not show (U+200C)"},
+		{"a no-break space only", []string{"adr", "\u00a0"}, nil, "the title is empty"},
+		{"spaces and a no-break space only", []string{"adr", " \u00a0\u3000 "}, nil, "the title is empty"},
+		{"a line separator in the title", []string{"adr", "Adopt\u2028X"}, nil, "character that does not show (U+2028)"},
+		{"a paragraph separator in the title", []string{"adr", "Adopt\u2029X"}, nil, "character that does not show (U+2029)"},
 		{"an .adr-dir that links outside the repository", []string{"adr", "T"}, func(t *testing.T, f fixture) {
 			require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(f.repo.Dir, "out")))
 			f.repo.Write(".adr-dir", "out\n")
-		}, "path escapes from parent"},
+		}, "a link leads out of the repository"},
 		{"a title with no ASCII letter or digit", []string{"adr", "?!"}, nil, "filename would be empty"},
 		{"an unknown kind", []string{"rule", "x"}, nil, `unknown kind "rule"`},
 		{"no kind", nil, nil, "usage:"},
@@ -255,4 +265,12 @@ func TestNewADRStaysInsideTheRepository(t *testing.T) {
 	entries, err := os.ReadDir(outside)
 	require.NoError(t, err)
 	assert.Empty(t, entries, "nothing was written outside")
+}
+
+// TestCheckTitleAccepts pins what a title may hold: accented and
+// non-Latin letters, a combining accent and ordinary spaces.
+func TestCheckTitleAccepts(t *testing.T) {
+	for _, title := range []string{"Adopt a café rule", "Café au lait", "日本語", "A  B"} {
+		assert.NoError(t, checkTitle(title), "%q", title)
+	}
 }

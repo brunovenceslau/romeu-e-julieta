@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 )
 
@@ -154,11 +154,16 @@ func TestRunGeneratedTakesNoArgument(t *testing.T) {
 	assert.Contains(t, errOut.String(), "generate takes no argument")
 }
 
+// goodAttributes is the list of the outputs of generate in the
+// .gitattributes of a clean checkout.
+const goodAttributes = ".github/CODEOWNERS -text\ndocs/reference/ask-first.md -text\ndocs/adr/README.md -text\n"
+
 // committedGenerateFixture is a repository whose generated files are
 // written by generate and committed: the state a clean checkout holds.
 func committedGenerateFixture(t *testing.T) *gittest.Repo {
 	t.Helper()
 	r := generateFixture(t)
+	r.Write(attributesPath, goodAttributes)
 	code, _, errOut := runGen(t, r)
 	require.Equal(t, exitOK, code, errOut)
 	r.Commit("fixture")
@@ -228,6 +233,117 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 		{"changed in the tree and not staged", func(t *testing.T, r *gittest.Repo) {
 			r.Write(codeowners, "# a hand edit\n")
 		}, nil}, // the index still holds the right bytes; the snapshots see no change either
+		{"an output missing from the list", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
+			r.Commit("drop a line")
+		}, []string{askFirstPagePath + ": generated: .gitattributes does not list this file"}},
+		{"no .gitattributes at all", func(t *testing.T, r *gittest.Repo) {
+			r.Git("rm", "--quiet", attributesPath)
+			r.Commit("drop the file")
+		}, []string{
+			codeowners + ": generated: .gitattributes does not list this file",
+			"docs/adr/README.md: generated: .gitattributes does not list this file",
+			askFirstPagePath + ": generated: .gitattributes does not list this file",
+		}},
+		{"a listed path that generate does not write", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+"stale.md -text\n")
+			r.Commit("list a stranger")
+		}, []string{`.gitattributes: generated: lists "stale.md" with -text`}},
+		{"a glob with -text is not the list", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+"*.bin -text\n")
+			r.Commit("add a glob")
+		}, []string{`.gitattributes: generated: lists "*.bin" with -text`}},
+		{"a comment that mentions -text is not an entry", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+"# stale.md -text\n")
+			r.Commit("comment")
+		}, nil},
+		{"a macro line with -text is not an entry", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+"[attr]plain -text\n")
+			r.Commit("macro")
+		}, nil},
+		{"another attribute on a stranger is not the list", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+"stale.md text\n")
+			r.Commit("text, not -text")
+		}, nil},
+		{"-text after another attribute still lists", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+"stale.md eol=lf -text\n")
+			r.Commit("two attributes")
+		}, []string{`.gitattributes: generated: lists "stale.md" with -text`}},
+		{"the index is judged, not HEAD", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
+			r.Git("add", attributesPath)
+		}, []string{askFirstPagePath + ": generated: .gitattributes does not list this file"}},
+		{"a .gitattributes with CRLF line endings", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, strings.ReplaceAll(goodAttributes, "\n", "\r\n"))
+			r.Commit("crlf")
+		}, nil},
+		{"a later !text resets the attribute", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+codeowners+" !text\n")
+			r.Commit("reset")
+		}, []string{codeowners + ": generated: has the text attribute \"unspecified\""}},
+		{"text=unset is not -text", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+codeowners+" text=unset\n")
+			r.Commit("value")
+		}, []string{`.gitattributes: generated: gives ".github/CODEOWNERS" the value text=unset`}},
+		{"text=auto before the list is not a state", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, "* text=auto\n"+goodAttributes)
+			r.Commit("auto")
+		}, nil},
+		{"text=unset before the list is flagged", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, "* text=unset\n"+goodAttributes)
+			r.Commit("unset")
+		}, []string{`.gitattributes: generated: gives "*" the value text=unset`}},
+		{"text=set and text=unspecified are flagged too", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, "* text=set\n* text=unspecified\n"+goodAttributes)
+			r.Commit("states")
+		}, []string{`.gitattributes: generated: gives "*" the value text=set`, `.gitattributes: generated: gives "*" the value text=unspecified`}},
+		{"a nested file with text=unset", func(t *testing.T, r *gittest.Repo) {
+			r.Write(".github/.gitattributes", "CODEOWNERS text=unset\n")
+			r.Commit("nested")
+		}, []string{`.github/.gitattributes: generated: gives "CODEOWNERS" the value text=unset`}},
+		{"a macro with text=unset used on an output", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, "[attr]m text=unset\n"+goodAttributes+codeowners+" m\n")
+			r.Commit("macro")
+		}, []string{`.gitattributes: generated: gives "[attr]m" the value text=unset`}},
+		{"a nested file that is not staged is not judged for text=unset", func(t *testing.T, r *gittest.Repo) {
+			r.Write(".github/.gitattributes", "CODEOWNERS text=unset\n")
+		}, nil},
+		{"a quoted pattern", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+"\"a b.md\" -text\n")
+			r.Commit("quoted")
+		}, []string{`.gitattributes: generated: quotes a pattern in "a b.md" -text; write the path unquoted`}},
+		{"ident", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+codeowners+" ident\n")
+			r.Commit("ident")
+		}, []string{codeowners + ": generated: has the ident attribute \"set\""}},
+		{"a filter", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+codeowners+" filter=foo\n")
+			r.Commit("filter")
+		}, []string{codeowners + ": generated: has the filter attribute \"foo\""}},
+		{"a working tree encoding", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+codeowners+" working-tree-encoding=UTF-8\n")
+			r.Commit("encoding")
+		}, []string{codeowners + ": generated: has the working-tree-encoding attribute \"UTF-8\""}},
+		{"an eol", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, ".github/CODEOWNERS eol=lf -text\ndocs/reference/ask-first.md -text\ndocs/adr/README.md -text\n")
+			r.Commit("eol")
+		}, []string{codeowners + ": generated: has the eol attribute \"lf\""}},
+		{"a later line sets text again", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+codeowners+" text\n")
+			r.Commit("override")
+		}, []string{codeowners + ": generated: has the text attribute \"set\""}},
+		{"a nested .gitattributes sets text again", func(t *testing.T, r *gittest.Repo) {
+			r.Write(".github/.gitattributes", "CODEOWNERS text\n")
+			r.Commit("override below")
+		}, []string{codeowners + ": generated: has the text attribute \"set\""}},
+		{"a nested .gitattributes that is not staged is not judged", func(t *testing.T, r *gittest.Repo) {
+			r.Write(".github/.gitattributes", "CODEOWNERS text\n")
+		}, nil},
+		{"info/attributes of the clone sets text again", func(t *testing.T, r *gittest.Repo) {
+			info := filepath.Join(r.Dir, ".git", "info")
+			require.NoError(t, os.MkdirAll(info, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(info, "attributes"), []byte(codeowners+" text\n"), 0o644))
+		}, []string{codeowners + ": generated: has the text attribute \"set\""}},
 		{"unmerged", func(t *testing.T, r *gittest.Repo) {
 			r.Git("checkout", "--quiet", "-b", "other")
 			r.Write(codeowners, "# other\n")
@@ -279,10 +395,33 @@ func TestRunGeneratedRefusesAStrayDirectiveBeforeRunningAnything(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(r.Dir, "marker"))
 }
 
-// TestGeneratedOutputsAreNotConverted checks that .gitattributes sets
-// "-text" for each file that generate writes: a "text eol=crlf" rule
-// would otherwise make a clean checkout differ from the bytes that
-// generate gives, and "generated" would fail with no defect to fix.
+// TestParseCheckAttr pins the reading of "git check-attr -z": a short or
+// long answer, or one for another path or attribute, is an error.
+func TestParseCheckAttr(t *testing.T) {
+	outs := []output{{path: "a"}}
+	record := func(path, attr, value string) string { return path + "\x00" + attr + "\x00" + value + "\x00" }
+	var good string
+	for _, attr := range checkoutAttrs {
+		good += record("a", attr, "unspecified")
+	}
+	values, err := parseCheckAttr([]byte(good), outs)
+	require.NoError(t, err)
+	assert.Equal(t, "unspecified", values[[2]string{"a", "text"}])
+	_, err = parseCheckAttr([]byte(good+record("a", "text", "set")), outs)
+	require.ErrorContains(t, err, "fields")
+	_, err = parseCheckAttr([]byte(""), outs)
+	require.ErrorContains(t, err, "fields")
+	_, err = parseCheckAttr([]byte(strings.ReplaceAll(good, "a\x00text", "b\x00text")), outs)
+	require.ErrorContains(t, err, "gave no text for a")
+}
+
+// TestGeneratedOutputsAreNotConverted runs attributeProblems on this
+// repository: the .gitattributes of the index lists each file that
+// generate writes with -text and nothing else, and no attribute that
+// changes a checkout is set on them. A "text eol=crlf" rule would
+// otherwise make a clean checkout differ from the bytes that generate
+// gives, and "generated" would fail with no defect to fix. The cases of
+// TestGeneratedRequiresTrackedRegularOutputs hold the failing side.
 func TestGeneratedOutputsAreNotConverted(t *testing.T) {
 	root := moduleRoot(t)
 	r, err := os.OpenRoot(root)
@@ -290,16 +429,7 @@ func TestGeneratedOutputsAreNotConverted(t *testing.T) {
 	t.Cleanup(func() { _ = r.Close() })
 	outs, err := generateOutputs(r)
 	require.NoError(t, err)
-	args := []string{"-C", root, "check-attr", "-z", "text", "--"}
-	for _, o := range outs {
-		args = append(args, o.path)
-	}
-	got, err := exec.CommandContext(t.Context(), "git", args...).Output()
-	require.NoError(t, err, "git check-attr")
-	// "<path>\0<attribute>\0<value>\0", one record for each path.
-	fields := strings.Split(strings.TrimSuffix(string(got), "\x00"), "\x00")
-	require.Len(t, fields, 3*len(outs))
-	for i, o := range outs {
-		assert.Equal(t, []string{o.path, "text", "unset"}, fields[3*i:3*i+3], "%s", o.path)
-	}
+	findings, err := attributeProblems(t.Context(), git.Repo{Dir: root}, outs)
+	require.NoError(t, err)
+	assert.Empty(t, findings)
 }

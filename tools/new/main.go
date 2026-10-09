@@ -163,26 +163,45 @@ func create(root *os.Root, path, content string) error {
 	return nil
 }
 
-// blankRendering is the small set of characters that draw as a blank
-// and are not in Cf, Zl or Zp: the Hangul fillers (U+115F, U+1160,
-// U+3164, U+FFA0) and the empty Braille pattern (U+2800). A title made
-// of them would look empty or hide the text next to it.
-const blankRendering = "\u115f\u1160\u3164\uffa0\u2800"
+// blankRendering is the one character that draws as a blank and is in
+// none of the tables of invisible: the empty Braille pattern (U+2800).
+// The Hangul fillers (U+115F, U+1160, U+3164, U+FFA0) are in
+// unicode.Other_Default_Ignorable_Code_Point.
+const blankRendering = "\u2800"
+
+// invisible reports whether r is a control character, or one that moves
+// or hides text where it is shown. The tables of the standard library
+// give Default_Ignorable_Code_Point as its definition in the Unicode
+// standard (DerivedCoreProperties) builds it: Other_Default_Ignorable_
+// Code_Point (the combining grapheme joiner U+034F and the Hangul
+// fillers among them), the format category (Cf) and the variation
+// selectors, less a few white space and format exceptions. Cf is refused
+// whole, so the exceptions are refused too, which is stricter and safe
+// for a title. The line and paragraph separators (Zl, Zp) and
+// blankRendering come on top.
+func invisible(r rune) bool {
+	return unicode.IsControl(r) ||
+		unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp, unicode.Other_Default_Ignorable_Code_Point, unicode.Variation_Selector) ||
+		strings.ContainsRune(blankRendering, r)
+}
 
 // checkTitle refuses a title that cannot be the first line of a record:
 // one with a control character (a line break included), or with a
 // character that moves or hides text where it is shown, such as a
-// right-to-left override, a zero-width space or a line separator. That
-// is the format category (Cf) and the two separators of Unicode, and
-// blankRendering: the letters and the symbol that draw as blank but are
-// outside them.
+// right-to-left override, a zero-width space, a line separator or a
+// default-ignorable code point (invisible). A title of spaces only, a
+// no-break space among them, is refused as empty earlier
+// (strings.TrimSpace in the caller). The zero width joiners (U+200C,
+// U+200D) and the variation selectors (such as the emoji selector
+// U+FE0F) are refused too: titles are English, the language of the
+// repository, and a joiner hides in a title.
 func checkTitle(title string) error {
 	if title == "" {
 		return errors.New("the title is empty")
 	}
 	for _, r := range title {
-		if unicode.IsControl(r) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp) || strings.ContainsRune(blankRendering, r) {
-			return fmt.Errorf("the title %q holds a control or invisible character (%U)", title, r)
+		if invisible(r) {
+			return fmt.Errorf("the title %q holds a character that does not show (%U)", title, r)
 		}
 	}
 	return nil

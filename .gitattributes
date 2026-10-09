@@ -4,9 +4,12 @@
 # The files that "go generate ./..." writes (12 12.3) are compared byte
 # for byte, in the working tree and in the index. "-text" keeps git from
 # converting their line endings, so a "text eol=crlf" rule of a user's
-# configuration or of a later line cannot make a checkout differ from what
-# generate gives. TestGeneratedOutputsAreNotConverted holds this list to
-# the outputs of generate.
+# configuration cannot make a checkout differ from what generate gives.
+# This list does not stop a later line, a .gitattributes in a directory
+# or a clone's .git/info/attributes from setting the attribute again;
+# "go run ./tools/ci generated" holds it instead: each line names an
+# output of generate and each output has a line, and "git check-attr
+# --cached" must report "unset" for every output, nested files included.
 .github/CODEOWNERS -text
 docs/reference/ask-first.md -text
 docs/adr/README.md -text

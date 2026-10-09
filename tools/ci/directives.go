@@ -35,13 +35,15 @@ func isGoGenerate(line []byte) bool {
 }
 
 // generateLines returns each line of src that go generate would run,
-// with the white space (a carriage return among it) trimmed from its
-// end.
+// with one carriage return and then the spaces and tabs trimmed from its
+// end, as go generate's split does (cmd/go/internal/generate): a form
+// feed or a vertical tab stays, because it ends up inside the last word
+// of the command.
 func generateLines(src []byte) []string {
 	var found []string
 	for line := range bytes.SplitSeq(src, []byte("\n")) {
 		if isGoGenerate(line) {
-			found = append(found, strings.TrimRight(string(line), " \t\r\f\v"))
+			found = append(found, strings.TrimRight(strings.TrimSuffix(string(line), "\r"), " \t"))
 		}
 	}
 	return found
@@ -76,8 +78,12 @@ func generateProblems(files map[string][]byte) []finding {
 // generateProblems for them. It is a superset of what "go generate
 // ./..." reads: it takes no account of build constraints, file-name
 // suffixes, testdata, vendor, "_" and "." directories or nested
-// modules, and it reads a symbolic link to a file as the file. Only the
-// .git directory is left out.
+// modules, and it reads a symbolic link to a file as the file. It leaves
+// out a directory named .git at any depth, a nested one included, a
+// symbolic link to a directory (it does not enter the target; a target
+// inside the tree is read once, through its real path) and a dangling
+// link. A link to a directory whose name ends in .go cannot be read as a
+// file, and that is an error, not a pass.
 func checkGenerateDirectives(root string) ([]finding, error) {
 	files := map[string][]byte{}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {

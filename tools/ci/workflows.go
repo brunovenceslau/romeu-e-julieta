@@ -611,10 +611,25 @@ func (c *grammar) inputs(uses, with, strategy *yaml.Node) {
 		}
 		if value.Kind != yaml.ScalarNode {
 			c.add(value, "a with value is a scalar")
-		} else if strings.Contains(value.Value, "${{") && !literalMatrixRef(value.Value, strategy) && (!matrixRef.MatchString(value.Value) || !matrixUnreadable(strategy)) {
+		} else if withExpressionFails(value.Value, strategy) {
 			c.add(value, "this with input is a literal, or one ${{ matrix.<key> }} alone whose values are literals")
 		}
 	}
+}
+
+// withExpressionFails reports whether a with value holds an expression
+// that the grammar does not allow: it has a ${{, it is not one matrix
+// reference whose values are all literals, and it is not a matrix
+// reference excused because the matrix is unreadable (matrixUnreadable,
+// whose own finding says what is wrong).
+func withExpressionFails(value string, strategy *yaml.Node) bool {
+	if !strings.Contains(value, "${{") {
+		return false
+	}
+	if literalMatrixRef(value, strategy) {
+		return false
+	}
+	return !matrixRef.MatchString(value) || !matrixUnreadable(strategy)
 }
 
 // matrixUnreadable reports whether strategy has a matrix that matrix

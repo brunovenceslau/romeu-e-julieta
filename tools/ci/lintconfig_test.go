@@ -563,7 +563,31 @@ func TestOnlyAllowedDirectives(t *testing.T) {
 	require.NoError(t, err)
 	found, err := directives(src)
 	require.NoError(t, err)
-	assert.Equal(t, 1, strings.Count(strings.Join(found, " "), "go:generate"), "%s", generateSite)
+	assert.Equal(t, 1, countEntries(found, "go:generate"), "%s", generateSite)
+}
+
+// countEntries returns how many entries of found are exactly name.
+func countEntries(found []string, name string) int {
+	n := 0
+	for _, f := range found {
+		if f == name {
+			n++
+		}
+	}
+	return n
+}
+
+// TestDirectiveCountIsPerEntry checks that the count of the go:generate
+// directives of a file is a count of entries, so a longer directive
+// such as go:generated does not pass for one.
+func TestDirectiveCountIsPerEntry(t *testing.T) {
+	found, err := directives([]byte("package p\n\n//go:generated x\n//go:generate y\n"))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"go:generated", "go:generate"}, found)
+	assert.Equal(t, 1, countEntries(found, "go:generate"))
+	found, err = directives([]byte("package p\n\n//go:generated x\n"))
+	require.NoError(t, err)
+	assert.Zero(t, countEntries(found, "go:generate"), "go:generated is another directive")
 }
 
 // TestGenerateProblems pins the rule of the one go:generate line on the
@@ -580,6 +604,10 @@ func TestGenerateProblems(t *testing.T) {
 	}{
 		{"the directive", map[string]string{generateSite: site}, true},
 		{"with trailing space", map[string]string{generateSite: site[:len(site)-1] + " \n"}, true},
+		{"trailing spaces and tabs before a CRLF", map[string]string{generateSite: "package main\r\n\r\n" + line + " \t\r\n"}, true},
+		{"a form feed at the end", map[string]string{generateSite: site[:len(site)-1] + "\f\n"}, false},
+		{"a vertical tab at the end", map[string]string{generateSite: site[:len(site)-1] + "\v\n"}, false},
+		{"a carriage return before a space is part of the word", map[string]string{generateSite: site[:len(site)-1] + "\r \n"}, false},
 		{"a CRLF line", map[string]string{generateSite: "package main\r\n\r\n" + line + "\r\n"}, true},
 		{"none", map[string]string{generateSite: "package main\n"}, false},
 		{"no site file", map[string]string{"a.go": "package a\n"}, false},
@@ -610,7 +638,8 @@ func TestGenerateProblems(t *testing.T) {
 // TestCheckGenerateDirectivesReadsEveryGoFile pins that the scan on disk
 // reads what go generate would skip or might reach: testdata, vendor, a
 // "_" directory, a file with a build constraint that excludes it, a
-// test file and a link to a file; and leaves out only .git.
+// test file and a link to a file; and leaves out the .git directories,
+// a link to a directory and a dangling link.
 func TestCheckGenerateDirectivesReadsEveryGoFile(t *testing.T) {
 	stray := "package z\n\nvar s = `\n//go:generate echo hi\n`\n"
 	site := "package main\n\n//go:generate go run . generate\n"
@@ -641,16 +670,48 @@ func TestCheckGenerateDirectivesReadsEveryGoFile(t *testing.T) {
 			assert.Equal(t, rel, problems[0].where)
 		})
 	}
-	t.Run("the .git directory and a dangling link are left out", func(t *testing.T) {
+	// What the scan leaves out: a .git directory at any depth (a nested
+	// one, of a submodule or a vendored checkout, included), a dangling
+	// link, and a link to a directory, which it does not enter: the
+	// files of the target are read once, through the real path.
+	t.Run("what the scan leaves out", func(t *testing.T) {
 		dir := t.TempDir()
-		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, ".git", "z.go"), []byte(stray), 0o644))
-		require.NoError(t, os.MkdirAll(filepath.Join(dir, filepath.Dir(generateSite)), 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, generateSite), []byte(site), 0o644))
+		write := func(rel, src string) {
+			require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, rel)), 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, rel), []byte(src), 0o644))
+		}
+		write(generateSite, site)
+		write(".git/z.go", stray)
+		write("sub/.git/z.go", stray)
 		require.NoError(t, os.Symlink("missing", filepath.Join(dir, "dangling.go")))
+		write("real/ok.go", "package ok\n")
+		require.NoError(t, os.Symlink("real", filepath.Join(dir, "dirlink")))
+		require.NoError(t, os.Symlink("dirlink", filepath.Join(dir, "chain")))
+		require.NoError(t, os.Symlink(".git", filepath.Join(dir, "gitlink")))
 		problems, err := checkGenerateDirectives(dir)
 		require.NoError(t, err)
 		assert.Empty(t, problems)
+	})
+	t.Run("a link to a directory is not entered", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "real"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "real", "z.go"), []byte(stray), 0o644))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, filepath.Dir(generateSite)), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, generateSite), []byte(site), 0o644))
+		require.NoError(t, os.Symlink("real", filepath.Join(dir, "dirlink")))
+		problems, err := checkGenerateDirectives(dir)
+		require.NoError(t, err)
+		require.Len(t, problems, 1, "the target is read once, by its real path")
+		assert.Equal(t, "real/z.go", problems[0].where)
+	})
+	t.Run("a link to a directory with a .go name is an error, not a pass", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "real"), 0o755))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, filepath.Dir(generateSite)), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, generateSite), []byte(site), 0o644))
+		require.NoError(t, os.Symlink("real", filepath.Join(dir, "dir.go")))
+		_, err := checkGenerateDirectives(dir)
+		require.Error(t, err)
 	})
 }
 
