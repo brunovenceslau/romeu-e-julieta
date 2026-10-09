@@ -403,9 +403,7 @@ are confirmed by the first `release.yml` run only, since a `--dry-run`
 build reads no network. The test cases of ship9-te-3 (the
 `root-indexed` row of 04 4.2) and ship9-te-4 (the `removing` and
 `salvaging` transitions, in I17 of 05 5.2) were added in the same
-commit. Pending, for the tooling that closes it: ship9-te-5, a
-`tools/lenses` check that each review report is well formed (valid
-JSON with the fields of "What a reviewer returns" in lenses.md).
+commit. ship9-te-5 is in the pending list below.
 
 The ship gate's round 2 on e93387c was NO-GO. Its must-fix findings
 ship9-cr-6 and ship9-cr-7, and its capped findings ship9-cr-8 to
@@ -415,3 +413,72 @@ round-2 fixes". `removal-pending` (RJ-336) is raised by preflight step 6
 for any mutating command, `salvage --from-host` included since it is
 marked **P** in 04 4.2, except `rm`, `recreate` and `retire`, and
 exits 2.
+
+The ship gate's round 3 on 43f2ccd was GO, with ship9-cr-11 left open
+after the round budget of three rounds.
+
+Pending, one line each:
+
+- ship9-cr-11 (code-reviewer, Optional, open after round 3): in the
+  recovery text of 01 1.6, in 01 1.7 and in the RJ-336 row of 04 4.4,
+  "any mutating command but `rm`, `recreate` and `retire`" becomes "any
+  **P** command (04 4.2) but `rm`, `recreate` and `retire`", because
+  `adopt` and `init` write state but never run step 6.
+- ship9-te-5 (test-engineer): a `tools/lenses` check that each report
+  under `docs/reviews/round-*/reports/` is well formed: valid JSON with
+  the fields of "What a reviewer returns" in lenses.md.
+
+## Session checkpoint (2026-10-09)
+
+Branch and pull request state is not recorded here; the next session
+measures it with `handoff_state.py`.
+
+### Done
+
+- Pull request #34, "fix(hooks): start tools/ci from pre-push with
+  GOWORK=off and GOFLAGS=-mod=readonly", is a draft. Its ship gate was
+  GO in round 2, and CI is green on four platforms.
+- Pull request #25 was rebased onto cecdd14, at d0bfdcc, and pushed.
+  Its ship gate ran rounds 1 to 3 and was GO in round 3. The rebase
+  delta was reviewed and approved. CI is green.
+- Round 9 ran: seventeen lenses, then the consolidation.
+- On branch `docs/review-round-9`: the write pass of this page, then
+  ship gate rounds 1 to 3, GO in round 3.
+
+### Open for the operator
+
+Each item carries a recommendation; none is a decision.
+
+- **G5 of pull request #25** (item f under "Open for the operator" in
+  round-8.md), an `approvals` surface for `tools/ci/askfirst.go` and
+  `tools/ci/denylist.yaml`. Recommend option (a) there: one surface
+  keeps the check of approvals out of the reach of a checkpoint grant.
+- **AR22, the fifth ruleset try.** The reading of 2026-10-09 (pull
+  request #33) measured the rules, not whether the development token
+  can change them. Recommend keeping the try, as item g of the
+  maintainer block (10 10.2) states it: it is the one measurement of
+  that claim, which 05 5.4 still marks as inferred.
+- **D2 to D6 of this page**, each with its recommendation above.
+- **S1 of pull request #34**: a mise global config whose `[env]` sets
+  `GOFLAGS` reaches the hook's `tools/ci`. Recommend setting
+  `MISE_GLOBAL_CONFIG_FILE` to a fixed path that does not exist in
+  `miseEnv`, with a test.
+- **Pushing `docs/review-round-9` and opening its pull request**,
+  stacked on #25 (the body says so; the base is `main`). Recommend yes:
+  the pass is gated and green locally.
+- **Round 10, the targeted re-audit** of this pass, a fan-out of about
+  seventeen reviewers. Recommend running it once the pull request is
+  open, so the reviewers read its head.
+- **The R8-05-3 tooling pull request** (the `sbxdrv` surface and
+  `skills/**` on `kits`, 05 5.3), after #25 lands. Recommend it before
+  the first task that adds a file under `e2e/fakesbx` (plan T015).
+- **The merges of #34 and #25.** Recommend each once its approval lines
+  are ticked and its CI is green.
+
+### Next steps
+
+- Push this branch and open its draft pull request, stacked on #25.
+- Round 10.
+- The declared validation of the spec for T004 onward, if round 10
+  raises no new Required finding.
+- The stage-B items of this page and of round-8.md.
