@@ -66,6 +66,7 @@ const workflowEnv = `env:
   MISE_ENV: ""
   MISE_AUTO_ENV: "false"
   MISE_GLOBAL_CONFIG_FILE: /dev/null/mise-global.toml
+  MISE_ENV_FILE: ""
   GOENV: "off"
   GOTOOLCHAIN: local
 `
@@ -303,7 +304,7 @@ func TestWorkflowsCommitted(t *testing.T) {
 	got, err = workflows(t.Context(), r.Repo, "HEAD")
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	assert.Equal(t, ".github/workflows/ci.yml:25", got[0].where)
+	assert.Equal(t, ".github/workflows/ci.yml:26", got[0].where)
 }
 
 // TestWorkflowsRepository checks the workflows of this repository, as

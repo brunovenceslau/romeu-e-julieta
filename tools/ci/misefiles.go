@@ -122,8 +122,8 @@ import (
 // a trailing space or dot for the name without it (mise.local.toml.);
 // no runner of the CI matrix is Windows and no rule refuses such a
 // name, a decision to reopen if Windows joins the matrix
-// (TestPrintableASCII shows the gap). A caller whose mise configuration
-// below HOME sets idiomatic_version_file_enable_tools makes mise read
+// (TestPrintableASCII shows the gap). A caller whose system configuration
+// of mise sets idiomatic_version_file_enable_tools makes mise read
 // .go-version and go.mod as well (measured with mise 2026.10.3 and
 // miseEnv: "mise config ls" lists both); mise.toml still decides the
 // version (the same "mise ls --current go"), neither file holds a
@@ -146,25 +146,31 @@ import (
 // by .git/info/exclude, or poison GOCACHE, and so change later
 // pre-push runs there.
 //
-// Trusted, as the toolchain is (ADR 0007): mise itself, its
-// configuration below HOME, the system configuration of mise
-// (/etc/mise, or the file MISE_SYSTEM_CONFIG_FILE names, which mise
-// reads under miseEnv too, and whose exec() templates run: observed by
-// the ship gate), and the files of the directories above the tree. No
+// Trusted, as the toolchain is (ADR 0007): mise itself, the system
+// configuration of mise (/etc/mise, or the file MISE_SYSTEM_CONFIG_FILE
+// names, which mise reads under miseEnv too, and whose exec() templates
+// run: observed by the ship gate), and the files of the directories
+// above the tree. The global configuration below HOME is not trusted:
+// miseEnv keeps it out (miseNoGlobalConfig). No
 // mise run of tools/ci comes after a step that runs the change's
 // tests, so no test can plant a system configuration that a later
 // mise run of the same gate reads; a decision to reopen if such a run
 // is ever added.
 
 // miseEnv is the environment of every mise run, as "KEY=value": the
-// five mise variables below, then goPinEnv. The configuration file
+// six mise variables below, then goPinEnv. The configuration file
 // mise reads is mise.toml alone, it reads no
 // .tool-versions ("none" is the empty list, src/env.rs of mise
 // 2026.10.3), and it selects no environment's files, neither one named
 // by MISE_ENV or a .miserc.toml (an empty MISE_ENV is set, so mise
 // does not fall back to the .miserc.toml) nor one of the platform
-// (auto_env), and it reads no global configuration (miseNoGlobalConfig). The workflow sets the same table (the workflows check),
-// and the pre-push hook the same variables (TestHook).
+// (auto_env). It reads no global configuration (miseNoGlobalConfig) and
+// no env file: a caller's MISE_ENV_FILE, such as ".env" (found in the
+// working directory or a parent), would set GOFLAGS for the go that the
+// mise shim starts, so an empty one is set. The system configuration
+// still applies (see the trusted list above). The workflow sets the same
+// table (the workflows check), and the pre-push hook the same variables
+// (TestHook).
 //
 // goPinEnv ends the list: "mise install" builds govulncheck with the go
 // command ("go install", the go: backend), so that build reads no "go
@@ -176,6 +182,7 @@ var miseEnv = slices.Concat([]string{
 	"MISE_ENV=",
 	"MISE_AUTO_ENV=false",
 	"MISE_GLOBAL_CONFIG_FILE=" + miseNoGlobalConfig,
+	"MISE_ENV_FILE=",
 }, goPinEnv)
 
 // miseNoGlobalConfig is the path miseEnv gives MISE_GLOBAL_CONFIG_FILE,

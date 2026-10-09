@@ -26,6 +26,7 @@ func TestMiseEnvList(t *testing.T) {
 		"MISE_ENV=",
 		"MISE_AUTO_ENV=false",
 		"MISE_GLOBAL_CONFIG_FILE=/dev/null/mise-global.toml",
+		"MISE_ENV_FILE=",
 		"GOENV=off",
 		"GOTOOLCHAIN=local",
 	}, miseEnv)
@@ -78,7 +79,8 @@ func isolatedMiseEnv(t *testing.T) []string {
 // one of them reached through a .config symbolic link. "mise env"
 // loads every one without miseEnv, and none with it; and each variable
 // of miseEnv, left out alone, lets a file through again, so none of
-// the four that name a file of the tree is there for nothing. mise runs in isolatedMiseEnv.
+// the four that name a file of the tree is there for nothing. mise
+// runs in isolatedMiseEnv.
 func TestMiseEnvStopsConfigs(t *testing.T) {
 	dir, markers := t.TempDir(), t.TempDir()
 	base := isolatedMiseEnv(t)
@@ -138,8 +140,8 @@ func TestMiseEnvStopsConfigs(t *testing.T) {
 		if !strings.HasPrefix(key, "MISE_") {
 			continue // a go variable, which mise does not read
 		}
-		if key == "MISE_GLOBAL_CONFIG_FILE" {
-			continue // isolatedMiseEnv sets it too: TestMiseGlobalConfigIsOff measures it
+		if key == "MISE_GLOBAL_CONFIG_FILE" || key == "MISE_ENV_FILE" {
+			continue // TestMiseGlobalConfigIsOff and TestMiseEnvFileIsOff measure them
 		}
 		without := slices.DeleteFunc(miseEnviron(base), func(v string) bool { return v == kv })
 		assert.NotEmpty(t, written(without), "miseEnv without %s", key)
@@ -219,6 +221,48 @@ func TestMiseGlobalConfigIsOff(t *testing.T) {
 		})
 		assert.ElementsMatch(t, sc.marks, written(without), "%s, without the variable", sc.name)
 		assert.Empty(t, written(miseEnviron(env)), "%s, with miseEnv", sc.name)
+	}
+}
+
+// TestMiseEnvFileIsOff measures, with the mise on the search path, what
+// the empty MISE_ENV_FILE of miseEnv is for: a caller who sets
+// MISE_ENV_FILE=.env, with an untracked .env in the working directory or
+// in a parent of it, gets the variables of that file into the go that
+// the mise shim starts (a GOFLAGS=-overlay=..., say). The file holds the
+// variable PLANTED_MARKER. It loads without the variable, in both
+// places, and not with miseEnv, whatever the caller sets. mise runs in
+// isolatedMiseEnv.
+func TestMiseEnvFileIsOff(t *testing.T) {
+	parent := t.TempDir()
+	dir := filepath.Join(parent, "tree")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "mise.toml"), []byte("[settings]\nlockfile = true\n"), 0o600))
+	// A dotenv file holds no template, so its marker is its variable,
+	// which "mise env" prints when it loads the file.
+	dotenv := "PLANTED_MARKER=planted\n"
+	base := isolatedMiseEnv(t)
+	printed := func(env []string) bool {
+		t.Helper()
+		cmd := exec.CommandContext(t.Context(), "mise", "-C", dir, "env", "-J")
+		cmd.Dir = dir
+		cmd.Env = env
+		out, err := cmd.Output()
+		require.NoError(t, err, "mise env")
+		return strings.Contains(string(out), "PLANTED_MARKER")
+	}
+	trust := exec.CommandContext(t.Context(), "mise", "-C", dir, "trust", filepath.Join(dir, "mise.toml"))
+	trust.Dir = dir
+	trust.Env = miseEnviron(base)
+	out, err := trust.CombinedOutput()
+	require.NoError(t, err, "mise trust\n%s", out)
+	for _, place := range []string{dir, parent} {
+		path := filepath.Join(place, ".env")
+		require.NoError(t, os.WriteFile(path, []byte(dotenv), 0o600))
+		env := append(slices.Clone(base), "MISE_ENV_FILE=.env")
+		withoutVar := slices.DeleteFunc(miseEnviron(env), func(kv string) bool { return kv == "MISE_ENV_FILE=" })
+		assert.True(t, printed(withoutVar), "the .env in %s, without the variable", place)
+		assert.False(t, printed(miseEnviron(env)), "the .env in %s, with miseEnv", place)
+		require.NoError(t, os.Remove(path))
 	}
 }
 
