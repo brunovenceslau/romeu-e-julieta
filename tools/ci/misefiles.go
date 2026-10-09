@@ -157,13 +157,13 @@ import (
 // is ever added.
 
 // miseEnv is the environment of every mise run, as "KEY=value": the
-// four mise variables below, then goPinEnv. The configuration file
+// five mise variables below, then goPinEnv. The configuration file
 // mise reads is mise.toml alone, it reads no
 // .tool-versions ("none" is the empty list, src/env.rs of mise
 // 2026.10.3), and it selects no environment's files, neither one named
 // by MISE_ENV or a .miserc.toml (an empty MISE_ENV is set, so mise
 // does not fall back to the .miserc.toml) nor one of the platform
-// (auto_env). The workflow sets the same table (the workflows check),
+// (auto_env), and it reads no global configuration (miseNoGlobalConfig). The workflow sets the same table (the workflows check),
 // and the pre-push hook the same variables (TestHook).
 //
 // goPinEnv ends the list: "mise install" builds govulncheck with the go
@@ -175,7 +175,20 @@ var miseEnv = slices.Concat([]string{
 	"MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none",
 	"MISE_ENV=",
 	"MISE_AUTO_ENV=false",
+	"MISE_GLOBAL_CONFIG_FILE=" + miseNoGlobalConfig,
 }, goPinEnv)
+
+// miseNoGlobalConfig is the path miseEnv gives MISE_GLOBAL_CONFIG_FILE,
+// so that mise reads no global configuration: its [env] table (a
+// GOFLAGS=-overlay=... there reaches the go that the mise shim starts,
+// and so go run ./tools/ci), its tools and its settings. A path under
+// /dev/null cannot exist for any user on Linux or macOS (/dev/null is
+// not a directory), so no file can be planted there; a nonexistent
+// file is read as empty, whereas /dev/null itself fails to parse
+// (measured with mise 2026.10.3). With it mise also reads no
+// conf.d of the default or a named configuration directory
+// (MISE_CONFIG_DIR), which TestMiseGlobalConfigIsOff measures.
+const miseNoGlobalConfig = "/dev/null/mise-global.toml"
 
 // miseEnviron returns env with miseEnv after it, for a mise command.
 // No list of variables a step keeps from this process holds a key of

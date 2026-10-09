@@ -1008,7 +1008,9 @@ func isolateMiseConfig(t *testing.T) {
 // TestIsolateMiseConfig poisons the configuration directories of the
 // process with a global mise configuration whose [env] template writes
 // a marker: "mise env" in passThroughEnv runs it, and runs nothing
-// once isolateMiseConfig has run.
+// once isolateMiseConfig has run. (miseEnv alone also keeps the global
+// configuration out, TestMiseGlobalConfigIsOff, so the run here is
+// without it.)
 func TestIsolateMiseConfig(t *testing.T) {
 	markers, poisoned := t.TempDir(), t.TempDir()
 	config := filepath.Join(poisoned, "mise", "config.toml")
@@ -1026,7 +1028,7 @@ func TestIsolateMiseConfig(t *testing.T) {
 		dir := t.TempDir()
 		cmd := exec.CommandContext(t.Context(), "mise", "-C", dir, "env")
 		cmd.Dir = dir
-		cmd.Env = append(miseEnviron(passThroughEnv()), "MISE_OFFLINE=1")
+		cmd.Env = append(passThroughEnv(), "MISE_OFFLINE=1")
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, "mise env\n%s", out)
 		_, err = os.Stat(filepath.Join(markers, "global"))

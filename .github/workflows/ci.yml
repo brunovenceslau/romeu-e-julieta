@@ -28,6 +28,7 @@ env:
   MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES: none
   MISE_ENV: ""
   MISE_AUTO_ENV: "false"
+  MISE_GLOBAL_CONFIG_FILE: /dev/null/mise-global.toml
   GOENV: "off"
   GOTOOLCHAIN: local
 

@@ -25,6 +25,7 @@ func TestMiseEnvList(t *testing.T) {
 		"MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none",
 		"MISE_ENV=",
 		"MISE_AUTO_ENV=false",
+		"MISE_GLOBAL_CONFIG_FILE=/dev/null/mise-global.toml",
 		"GOENV=off",
 		"GOTOOLCHAIN=local",
 	}, miseEnv)
@@ -77,7 +78,7 @@ func isolatedMiseEnv(t *testing.T) []string {
 // one of them reached through a .config symbolic link. "mise env"
 // loads every one without miseEnv, and none with it; and each variable
 // of miseEnv, left out alone, lets a file through again, so none of
-// the four is there for nothing. mise runs in isolatedMiseEnv.
+// the four that name a file of the tree is there for nothing. mise runs in isolatedMiseEnv.
 func TestMiseEnvStopsConfigs(t *testing.T) {
 	dir, markers := t.TempDir(), t.TempDir()
 	base := isolatedMiseEnv(t)
@@ -137,8 +138,87 @@ func TestMiseEnvStopsConfigs(t *testing.T) {
 		if !strings.HasPrefix(key, "MISE_") {
 			continue // a go variable, which mise does not read
 		}
+		if key == "MISE_GLOBAL_CONFIG_FILE" {
+			continue // isolatedMiseEnv sets it too: TestMiseGlobalConfigIsOff measures it
+		}
 		without := slices.DeleteFunc(miseEnviron(base), func(v string) bool { return v == kv })
 		assert.NotEmpty(t, written(without), "miseEnv without %s", key)
+	}
+}
+
+// TestMiseGlobalConfigIsOff measures, with the mise on the search path,
+// what MISE_GLOBAL_CONFIG_FILE=miseNoGlobalConfig is for: the global
+// configuration of mise holds an [env] table (a GOFLAGS there would
+// reach the go that the mise shim starts), and mise reads it from the
+// default directory under HOME, from the directory MISE_CONFIG_DIR
+// names, with the conf.d of each, and from the file the caller names.
+// Each holds a template that writes a marker when mise loads it. All
+// load without the variable, and none with miseEnv, whatever the
+// caller sets. mise runs in isolatedMiseEnv, less its own directories
+// and global file.
+func TestMiseGlobalConfigIsOff(t *testing.T) {
+	dir, markers := t.TempDir(), t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "mise.toml"), []byte("[settings]\nlockfile = true\n"), 0o600))
+	envFile := func(name string) string {
+		cmd := `{{ exec(command="touch ` + filepath.ToSlash(filepath.Join(markers, name)) + `") }}`
+		return "[env]\nX_" + strings.ToUpper(name) + " = " + strconv.Quote(cmd) + "\n"
+	}
+	write := func(path, name string) string {
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(envFile(name)), 0o600))
+		return path
+	}
+	home, cfg, named := t.TempDir(), t.TempDir(), filepath.Join(t.TempDir(), "named.toml")
+	write(filepath.Join(home, ".config", "mise", "config.toml"), "home")
+	write(filepath.Join(home, ".config", "mise", "conf.d", "x.toml"), "homeconfd")
+	write(filepath.Join(cfg, "config.toml"), "cfg")
+	write(filepath.Join(cfg, "conf.d", "y.toml"), "cfgconfd")
+	write(named, "named")
+	base := slices.DeleteFunc(isolatedMiseEnv(t), func(kv string) bool {
+		return strings.HasPrefix(kv, "HOME=") || strings.HasPrefix(kv, "XDG_CONFIG_HOME=") ||
+			strings.HasPrefix(kv, "MISE_CONFIG_DIR=") || strings.HasPrefix(kv, "MISE_GLOBAL_CONFIG_FILE=")
+	})
+	scenarios := []struct {
+		name  string
+		env   []string
+		marks []string
+	}{
+		{"the default directory", []string{"HOME=" + home}, []string{"home", "homeconfd"}},
+		{"MISE_CONFIG_DIR", []string{"HOME=" + t.TempDir(), "MISE_CONFIG_DIR=" + cfg}, []string{"cfg", "cfgconfd"}},
+		{"MISE_GLOBAL_CONFIG_FILE", []string{"HOME=" + t.TempDir(), "MISE_GLOBAL_CONFIG_FILE=" + named}, []string{"named"}},
+	}
+	written := func(env []string) []string {
+		t.Helper()
+		entries, err := os.ReadDir(markers)
+		require.NoError(t, err)
+		for _, e := range entries {
+			require.NoError(t, os.Remove(filepath.Join(markers, e.Name())))
+		}
+		cmd := exec.CommandContext(t.Context(), "mise", "-C", dir, "env")
+		cmd.Dir = dir
+		cmd.Env = env
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "mise env\n%s", out)
+		entries, err = os.ReadDir(markers)
+		require.NoError(t, err)
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		return names
+	}
+	trust := exec.CommandContext(t.Context(), "mise", "-C", dir, "trust", filepath.Join(dir, "mise.toml"))
+	trust.Dir = dir
+	trust.Env = miseEnviron(slices.Concat(base, scenarios[0].env))
+	out, err := trust.CombinedOutput()
+	require.NoError(t, err, "mise trust\n%s", out)
+	for _, sc := range scenarios {
+		env := slices.Concat(base, sc.env)
+		without := slices.DeleteFunc(miseEnviron(env), func(kv string) bool {
+			return strings.HasPrefix(kv, "MISE_GLOBAL_CONFIG_FILE=") && strings.HasSuffix(kv, miseNoGlobalConfig)
+		})
+		assert.ElementsMatch(t, sc.marks, written(without), "%s, without the variable", sc.name)
+		assert.Empty(t, written(miseEnviron(env)), "%s, with miseEnv", sc.name)
 	}
 }
 
