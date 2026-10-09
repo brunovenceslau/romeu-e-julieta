@@ -85,8 +85,13 @@ func TestCoverageThresholds(t *testing.T) {
 			},
 		},
 		{
+			name:    "a cmd package below the floor fails (S9)",
+			profile: profileOf("cmd/romeu 79 1", "cmd/romeu 21 0"),
+			want:    []string{"cmd/romeu: coverage: 79.0% of 100 statements covered, below 80% (S9)"},
+		},
+		{
 			name:    "a package outside the trees of S9 is not measured",
-			profile: profileOf("cmd/romeu 10 0", "e2e/host 10 0", "e2e 10 0"),
+			profile: profileOf("e2e/host 10 0", "e2e 10 0"),
 		},
 		{
 			name:    "a package with no statement passes",
