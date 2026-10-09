@@ -270,7 +270,7 @@ func TestNewADRStaysInsideTheRepository(t *testing.T) {
 // TestCheckTitleAccepts pins what a title may hold: accented and
 // non-Latin letters, a combining accent and ordinary spaces.
 func TestCheckTitleAccepts(t *testing.T) {
-	for _, title := range []string{"Adopt a café rule", "Café au lait", "日本語", "A  B"} {
+	for _, title := range []string{"Adopt a café rule", "Café au lait", "日本語", "नमस्ते", "A  B"} {
 		assert.NoError(t, checkTitle(title), "%q", title)
 	}
 }

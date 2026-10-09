@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"os/exec"
@@ -124,4 +125,17 @@ func TestHook(t *testing.T) {
 	}
 	mode, _, _ := strings.Cut(string(out), " ")
 	assert.Equal(t, hookMode, mode, "the mode git records for the hook")
+}
+
+// TestRunPrintsAnErrorAsSafeText checks that the error line of run does
+// not carry the control characters or the command line of an argument.
+func TestRunPrintsAnErrorAsSafeText(t *testing.T) {
+	var out, errOut bytes.Buffer
+	e := env{dir: t.TempDir(), stdout: &out, stderr: &errOut}
+	assert.Equal(t, exitError, run(context.Background(), e, []string{"hygiene", "--bad\x1b[2J\n::error::forged"}))
+	assert.NotContains(t, errOut.String(), "\x1b")
+	for _, line := range strings.Split(errOut.String(), "\n") {
+		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
+	}
+	assert.Contains(t, errOut.String(), `\x1b[2J`)
 }

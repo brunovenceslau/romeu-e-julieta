@@ -599,7 +599,7 @@ func (c *checks) verdict(v verdict) {
 	case v.note != "":
 		say(c.out, "--    %s: %s\n", v.name, v.note)
 	case v.err != nil:
-		c.report(v.name, false, v.err.Error()+"\n")
+		c.report(v.name, false, git.SafeLines(v.err.Error())+"\n")
 	default:
 		c.report(v.name, len(v.findings) == 0, lines(v.findings))
 	}
@@ -622,7 +622,11 @@ func (c *checks) run(ctx context.Context, root string, steps []step) {
 		out, err := s.run(ctx, root)
 		detail := ""
 		if err != nil {
-			detail = fmt.Sprintf("%s%v\n", out, err)
+			// out is the step's own output, which is printed as it is: a step
+			// runs the code of the change under test, so quoting its output
+			// would give an attacker nothing and cost readability. err is the
+			// error of the run and may hold a path, so it is made safe.
+			detail = fmt.Sprintf("%s%s\n", out, git.SafeLines(err.Error()))
 			if bytes.Contains(out, []byte(moduleLookupOff)) {
 				detail += "the module cache lacks a module of go.sum, and no step fetches one (GOPROXY=off): run \"go run ./tools/ci setup\", which runs \"go mod download\", then run this again\n"
 			}

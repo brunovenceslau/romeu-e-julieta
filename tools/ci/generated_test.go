@@ -311,7 +311,23 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 		{"a quoted pattern", func(t *testing.T, r *gittest.Repo) {
 			r.Write(attributesPath, goodAttributes+"\"a b.md\" -text\n")
 			r.Commit("quoted")
-		}, []string{`.gitattributes: generated: quotes a pattern in "a b.md" -text; write the path unquoted`}},
+		}, []string{`.gitattributes: generated: quotes a pattern in "\"a b.md\" -text"; write the path unquoted`}},
+		{"a quoted pattern with an escape is printed quoted", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+"\"a\x1b[31m\" -text\n")
+			r.Commit("quoted escape")
+		}, []string{`.gitattributes: generated: quotes a pattern in "\"a\x1b[31m\" -text"; write the path unquoted`}},
+		{"eol=unspecified reads like a state", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+codeowners+" eol=unspecified\n")
+			r.Commit("eol string")
+		}, []string{`.gitattributes: generated: gives ".github/CODEOWNERS" the value eol=unspecified`}},
+		{"filter, ident and encoding strings read like a state", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, goodAttributes+"none.md filter=unspecified ident=unspecified working-tree-encoding=unspecified\n")
+			r.Commit("strings")
+		}, []string{
+			`.gitattributes: generated: gives "none.md" the value ident=unspecified`,
+			`.gitattributes: generated: gives "none.md" the value filter=unspecified`,
+			`.gitattributes: generated: gives "none.md" the value working-tree-encoding=unspecified`,
+		}},
 		{"ident", func(t *testing.T, r *gittest.Repo) {
 			r.Write(attributesPath, goodAttributes+codeowners+" ident\n")
 			r.Commit("ident")
@@ -344,6 +360,100 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			require.NoError(t, os.MkdirAll(info, 0o755))
 			require.NoError(t, os.WriteFile(filepath.Join(info, "attributes"), []byte(codeowners+" text\n"), 0o644))
 		}, []string{codeowners + ": generated: has the text attribute \"set\""}},
+		{"info/attributes of the clone with text=unset", func(t *testing.T, r *gittest.Repo) {
+			info := filepath.Join(r.Dir, ".git", "info")
+			require.NoError(t, os.MkdirAll(info, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(info, "attributes"), []byte(codeowners+" text=unset\n"), 0o644))
+		}, []string{`info/attributes: generated: gives ".github/CODEOWNERS" the value text=unset`}},
+		{"a .gitattributes named in other case is scanned", func(t *testing.T, r *gittest.Repo) {
+			r.Write("sub/.GitAttributes", "x text=unset\n")
+			r.Commit("case")
+		}, []string{`sub/.GitAttributes: generated: gives "x" the value text=unset`}},
+		{"an executable .gitattributes is scanned", func(t *testing.T, r *gittest.Repo) {
+			r.Write("sub/.gitattributes", "x text=unset\n")
+			require.NoError(t, os.Chmod(filepath.Join(r.Dir, "sub", attributesPath), 0o755))
+			r.Commit("exec")
+		}, []string{`sub/.gitattributes: generated: gives "x" the value text=unset`}},
+		{"a nested -text line is not on the list", func(t *testing.T, r *gittest.Repo) {
+			r.Write("sub/.gitattributes", "x -text\n")
+			r.Commit("nested -text")
+		}, nil},
+		{"the message names a root file in other case", func(t *testing.T, r *gittest.Repo) {
+			r.Git("mv", attributesPath, ".GitAttributes")
+			r.Write(".GitAttributes", ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
+			r.Commit("rename")
+		}, []string{
+			codeowners + `: generated: has the text attribute "unspecified"`,
+			`docs/adr/README.md: generated: has the text attribute "unspecified"`,
+			askFirstPagePath + ": generated: .GitAttributes does not list this file with -text; rename it to .gitattributes",
+		}},
+		{"a root file named in other case is the list", func(t *testing.T, r *gittest.Repo) {
+			r.Git("mv", attributesPath, ".GitAttributes")
+			r.Commit("rename")
+		}, []string{
+			codeowners + `: generated: has the text attribute "unspecified"`,
+			`docs/adr/README.md: generated: has the text attribute "unspecified"`,
+			askFirstPagePath + `: generated: has the text attribute "unspecified"`,
+		}},
+		{"info/attributes does not list an output", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
+			r.Commit("drop a line")
+			info := filepath.Join(r.Dir, ".git", "info")
+			require.NoError(t, os.MkdirAll(info, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(info, "attributes"), []byte(askFirstPagePath+" -text\n"), 0o644))
+		}, []string{askFirstPagePath + ": generated: .gitattributes does not list this file"}},
+		{"a nested file in other case does not list an output", func(t *testing.T, r *gittest.Repo) {
+			r.Write(attributesPath, ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
+			r.Write("sub/.GitAttributes", askFirstPagePath+" -text\n")
+			r.Commit("nested")
+		}, []string{askFirstPagePath + ": generated: .gitattributes does not list this file"}},
+		{"a nested .gitattributes that is unmerged", func(t *testing.T, r *gittest.Repo) {
+			r.Write("sub/.gitattributes", "a -text\n")
+			r.Commit("base")
+			r.Git("checkout", "--quiet", "-b", "other")
+			r.Write("sub/.gitattributes", "b -text\n")
+			r.Commit("other")
+			r.Git("checkout", "--quiet", "main")
+			r.Write("sub/.gitattributes", "c -text\n")
+			r.Commit("main")
+			_, err := r.Run(t.Context(), nil, "merge", "other")
+			require.Error(t, err)
+		}, []string{"sub/.gitattributes: generated: has an unmerged entry"}},
+		{"a .gitattributes deleted on one side and edited on the other", func(t *testing.T, r *gittest.Repo) {
+			r.Git("checkout", "--quiet", "-b", "other")
+			r.Git("rm", "--quiet", attributesPath)
+			r.Git("commit", "--quiet", "--message", "delete")
+			r.Git("checkout", "--quiet", "main")
+			r.Write(attributesPath, goodAttributes+"a -text\n")
+			r.Commit("edit")
+			_, err := r.Run(t.Context(), nil, "merge", "other")
+			require.Error(t, err)
+		}, []string{
+			".gitattributes: generated: has an unmerged entry",
+			codeowners + ": generated: .gitattributes does not list this file",
+			"docs/adr/README.md: generated: .gitattributes does not list this file",
+			askFirstPagePath + ": generated: .gitattributes does not list this file",
+		}},
+		{"a .gitattributes that is a link is not scanned", func(t *testing.T, r *gittest.Repo) {
+			require.NoError(t, os.MkdirAll(filepath.Join(r.Dir, "sub"), 0o755))
+			require.NoError(t, os.Symlink("x text=unset", filepath.Join(r.Dir, "sub", attributesPath)))
+			r.Commit("link")
+		}, nil},
+		{"a conflicted .gitattributes is a finding, not an error", func(t *testing.T, r *gittest.Repo) {
+			r.Git("checkout", "--quiet", "-b", "other")
+			r.Write(attributesPath, goodAttributes+"a -text\n")
+			r.Commit("other")
+			r.Git("checkout", "--quiet", "main")
+			r.Write(attributesPath, goodAttributes+"b -text\n")
+			r.Commit("main")
+			_, err := r.Run(t.Context(), nil, "merge", "other")
+			require.Error(t, err)
+		}, []string{
+			".gitattributes: generated: has an unmerged entry",
+			codeowners + ": generated: .gitattributes does not list this file",
+			"docs/adr/README.md: generated: .gitattributes does not list this file",
+			askFirstPagePath + ": generated: .gitattributes does not list this file",
+		}},
 		{"unmerged", func(t *testing.T, r *gittest.Repo) {
 			r.Git("checkout", "--quiet", "-b", "other")
 			r.Write(codeowners, "# other\n")
@@ -354,6 +464,20 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			_, err := r.Run(t.Context(), nil, "merge", "other") // conflicts: that is the fixture
 			require.Error(t, err)
 		}, []string{codeowners + ": generated: has an unmerged entry"}},
+	}
+	for _, attr := range []string{"eol", "filter", "ident", "working-tree-encoding"} {
+		for _, state := range []string{"set", "unset", "unspecified"} {
+			line := "none.md " + attr + "=" + state + "\n"
+			tests = append(tests, struct {
+				name  string
+				setup func(t *testing.T, r *gittest.Repo)
+				want  []string
+			}{attr + "=" + state + " reads like a state", func(t *testing.T, r *gittest.Repo) {
+				r.Write(attributesPath, goodAttributes+line)
+				r.Commit("string")
+			}, []string{`.gitattributes: generated: gives "none.md" the value ` + attr + "=" + state +
+				"; git prints that string as it prints a state, so write the state as " + attr + ", -" + attr + " or !" + attr}})
+		}
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -366,6 +490,69 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGeneratedInfoAttributesOfALinkedWorktree checks that the
+// info/attributes of the common directory is read from a linked
+// worktree, where git prints its path as an absolute one.
+func TestGeneratedInfoAttributesOfALinkedWorktree(t *testing.T) {
+	r := committedGenerateFixture(t).For(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	r.Git("worktree", "add", "--quiet", "--detach", wt)
+	info := filepath.Join(r.Dir, ".git", "info")
+	require.NoError(t, os.MkdirAll(info, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(info, "attributes"), []byte(".github/CODEOWNERS text=unset\n"), 0o644))
+	findings, err := generated(t.Context(), git.Repo{Dir: wt, Env: r.Env}, fsOps(), generateOutputs)
+	require.NoError(t, err)
+	require.Len(t, findings, 1, "%v", findings)
+	assert.Equal(t, `info/attributes: generated: gives ".github/CODEOWNERS" the value text=unset; git prints that string as it prints a state, so write the state as text, -text or !text`, findings[0].String())
+}
+
+// TestGeneratedFindingsPrintHostilePaths checks that a tracked path with
+// a newline and an escape reaches a finding quoted, so it cannot forge a
+// workflow command or move the terminal.
+func TestGeneratedFindingsPrintHostilePaths(t *testing.T) {
+	r := committedGenerateFixture(t).For(t)
+	r.Write("d\n::error::forged\x1b[2J/.gitattributes", "x text=unset\n")
+	r.Commit("hostile")
+	got := gateOf(t, r)
+	require.Len(t, got, 1, "%v", got)
+	assert.NotContains(t, got[0], "\n")
+	assert.NotContains(t, got[0], "\x1b")
+	assert.True(t, strings.HasPrefix(got[0], `"d\n::error::forged\x1b[2J/.gitattributes": generated: gives "x"`), got[0])
+}
+
+// TestAttributeProblemsQuoteHostilePaths checks that an output path with a
+// newline and an escape (the path comes from .adr-dir) is quoted in the
+// message and in the error, so neither carries a raw control character.
+func TestAttributeProblemsQuoteHostilePaths(t *testing.T) {
+	r := committedGenerateFixture(t).For(t)
+	hostile := "d\n::error::forged\x1b[2J/README.md"
+	findings, err := attributeProblems(t.Context(), r.Repo, []output{{path: hostile}})
+	require.NoError(t, err)
+	require.NotEmpty(t, findings)
+	for _, f := range findings {
+		assert.NotContains(t, f.msg, "\n")
+		assert.NotContains(t, f.msg, "\x1b")
+	}
+	assert.Contains(t, findings[0].msg, `add the line "d\n::error::forged\x1b[2J/README.md -text"`)
+	var other string
+	for _, attr := range checkoutAttrs {
+		other += "b\x00" + attr + "\x00unspecified\x00"
+	}
+	_, err = parseCheckAttr([]byte(other), []output{{path: hostile}})
+	require.ErrorContains(t, err, "gave no text for")
+	assert.NotContains(t, err.Error(), "\n")
+	assert.NotContains(t, err.Error(), "\x1b")
+}
+
+// TestGeneratedInfoAttributesUnreadable checks that an info/attributes
+// that cannot be read is an error, not a pass.
+func TestGeneratedInfoAttributesUnreadable(t *testing.T) {
+	r := committedGenerateFixture(t).For(t)
+	require.NoError(t, os.MkdirAll(filepath.Join(r.Dir, ".git", "info", "attributes"), 0o755))
+	_, err := generated(t.Context(), r.Repo, fsOps(), generateOutputs)
+	assert.Error(t, err)
 }
 
 // TestFileDigestStaysInsideTheRoot checks that a path that goes through
@@ -412,7 +599,20 @@ func TestParseCheckAttr(t *testing.T) {
 	_, err = parseCheckAttr([]byte(""), outs)
 	require.ErrorContains(t, err, "fields")
 	_, err = parseCheckAttr([]byte(strings.ReplaceAll(good, "a\x00text", "b\x00text")), outs)
-	require.ErrorContains(t, err, "gave no text for a")
+	require.ErrorContains(t, err, `gave no text for "a"`)
+}
+
+// TestFindingPathCannotStartACommand checks that a path that is printable
+// and starts like a workflow command does not begin a line of the log
+// as one.
+func TestFindingPathCannotStartACommand(t *testing.T) {
+	for _, where := range []string{"::error::x/.gitattributes", "  ::stop-commands::tok/f", "##[error]x/f", "\t::error::x/f", "\u00a0::error::x/f", "\u200b::error::x/f", "a/##[error]x"} {
+		line := finding{where, "generated", "m"}.String()
+		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
+		assert.NotContains(t, line, "##[")
+		assert.Equal(t, line, git.SafeLines(line), "already safe: %q", line)
+	}
+	assert.Equal(t, "a/b: generated: m", finding{"a/b", "generated", "m"}.String())
 }
 
 // TestGeneratedOutputsAreNotConverted runs attributeProblems on this

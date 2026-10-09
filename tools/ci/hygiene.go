@@ -73,8 +73,11 @@ type finding struct {
 	msg   string
 }
 
+// String prints a finding with its path quoted by git.Printable when it
+// does not print, and the whole line passed through git.SafeLines, so
+// repository content cannot forge a line of the log or a workflow command.
 func (f finding) String() string {
-	return f.where + ": " + f.rule + ": " + f.msg
+	return git.SafeLines(git.Printable(f.where) + ": " + f.rule + ": " + f.msg)
 }
 
 // treeFile is one entry of the tree at HEAD.

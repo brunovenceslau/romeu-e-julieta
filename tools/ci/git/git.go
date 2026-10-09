@@ -71,3 +71,78 @@ func Printable(s string) string {
 	}
 	return s
 }
+
+// SafeLines returns text that may hold repository content, such as a path
+// in a message, so that it is safe to print line by line. Printable
+// serves one value that is quoted whole; SafeLines serves text that
+// keeps its lines. It is not reversible: a literal \xff and a raw 0xff
+// byte print the same.
+//
+// In each line every character that does not print (a control
+// character, a space other than " ", a line separator, a zero-width or
+// direction character) is written as a Go escape, except the tab, and
+// each byte that is not UTF-8 as \xNN. Then what the Actions runner
+// reads as a workflow command is broken (actions/runner at 67f01c2:
+// ActionCommand.cs:62-63 trims the start of the line and then tests
+// StartsWith("::"); TryParse, around line 121, finds the legacy "##["
+// with IndexOf anywhere in the line). Both comparisons are
+// culture-sensitive, and whether they skip printable but ignorable
+// characters (a combining mark, a variation selector, a filler) is
+// unverified. That does not matter, because the decision is made on the
+// ASCII skeleton of the line, the line with every character but the
+// printable ASCII and the tab dropped: a line whose skeleton starts,
+// after blanks, with "::" gets "./" in front; a line whose skeleton
+// holds "##[" has every non-ASCII character escaped as well, and "##["
+// written "##\[".
+func SafeLines(text string) string {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		var b strings.Builder
+		for j := 0; j < len(line); {
+			r, size := utf8.DecodeRuneInString(line[j:])
+			switch {
+			case r == utf8.RuneError && size == 1:
+				fmt.Fprintf(&b, `\x%02x`, line[j])
+			case r != '\t' && !unicode.IsPrint(r):
+				b.WriteString(escape(r))
+			default:
+				b.WriteRune(r)
+			}
+			j += size
+		}
+		l := b.String()
+		skel := strings.Map(func(r rune) rune {
+			if r == '\t' || (r >= 0x20 && r <= 0x7e) {
+				return r
+			}
+			return -1
+		}, l)
+		if strings.Contains(skel, "##[") {
+			l = strings.ReplaceAll(escapeNonASCII(l), "##[", `##\[`)
+		}
+		if strings.HasPrefix(strings.TrimLeft(skel, " \t"), "::") {
+			l = "./" + l
+		}
+		lines[i] = l
+	}
+	return strings.Join(lines, "\n")
+}
+
+// escape returns r as a Go escape, \u or \U, with only ASCII.
+func escape(r rune) string {
+	q := strconv.QuoteToASCII(string(r))
+	return q[1 : len(q)-1]
+}
+
+// escapeNonASCII writes each character above 0x7e of s as an escape.
+func escapeNonASCII(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r > 0x7e {
+			b.WriteString(escape(r))
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}

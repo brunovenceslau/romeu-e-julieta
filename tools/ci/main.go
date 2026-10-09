@@ -160,7 +160,7 @@ func run(ctx context.Context, e env, args []string) int {
 	}
 	switch {
 	case err != nil:
-		say(e.stderr, "ci: %v\n", strings.TrimSpace(err.Error()))
+		say(e.stderr, "ci: %s\n", git.SafeLines(strings.TrimSpace(err.Error())))
 		return exitError
 	case !ok:
 		return exitFail

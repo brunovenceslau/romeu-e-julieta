@@ -4,8 +4,10 @@
 package main
 
 import (
+	"bytes"
 	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -1625,4 +1627,23 @@ func TestFastHookReadsTheProcessGitEnv(t *testing.T) {
 	assert.Contains(t, out, "FAIL  pushed range")
 	assert.Contains(t, out, "commit "+tip+": docs/b.txt:1: name: the added line holds a name listed at the remote's default branch")
 	assert.NotContains(t, strings.ToLower(out), "wixelfrum", "the output repeats the matched text")
+}
+
+// TestChecksPrintErrorsAsSafeText checks that the error of a verdict and
+// the error of a step, which may hold a path of the repository, reach
+// the log with no raw control character and no line that starts a
+// workflow command, while the output of a step is printed as it is.
+func TestChecksPrintErrorsAsSafeText(t *testing.T) {
+	hostile := errors.New("x\x1b[2J\n\u00a0::error::forged\n::error::two ##[error]")
+	var out bytes.Buffer
+	c := newChecks(&out)
+	c.verdict(verdict{name: "v", err: hostile})
+	c.run(t.Context(), t.TempDir(), []step{{name: "s", unavailable: hostile}})
+	got := out.String()
+	assert.NotContains(t, got, "\x1b")
+	assert.NotContains(t, got, "##[")
+	for _, line := range strings.Split(got, "\n") {
+		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
+	}
+	assert.Contains(t, got, `\x1b[2J`)
 }
