@@ -611,7 +611,7 @@ there by a pull request. A finding says which of the two lists holds
 the name. Entries that exist only at a commit inside the range, and
 neither at HEAD nor at the default branch, are not applied. The local
 refs and the git binary are trusted, as the toolchain is
-([ADR 0007, Threat model](../adr/0007-adopt-testify-assert-and-require-in-tests.md#threat-model)).
+([ADR 0007, adopt testify assert and require in tests](../adr/0007-adopt-testify-assert-and-require-in-tests.md#threat-model)).
 The hook knows only the denylist this clone holds: an entry pushed
 from another clone applies once it is fetched here.
 

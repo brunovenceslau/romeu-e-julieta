@@ -168,7 +168,9 @@ Module ids are stable; the plan selects work by them. Each module id
 names the directories it owns, and a package module owns
 `internal/<id>`; a `tools/ci` test holds the tree of
 [02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public), this
-table and the package list of S9 to the same set of directories.
+table and the package list of S9 to the same set of directories. The
+test checks only the package modules that an id names; a module whose
+id is no directory name owns the paths its row gives.
 
 | Module id | Responsibility | Depends on |
 |---|---|---|
@@ -245,7 +247,11 @@ which review reads, so they are not covered by a check.
 ordered list; each step names its command and its output:
 
 1. Push the release candidate tag `v1.0.0-rc.<n>`; `release.yml`
-   publishes it as a prerelease (10 10.2).
+   publishes it as a prerelease (10 10.2). Read the Deferred decisions
+   tables of the [index](../spec.md#deferred-decisions) and the
+   listing of packages no command reaches (the dark-code row there) at
+   that tag; the output is the rows whose event happened, pasted under
+   the Evidence of the pull request of step 2.
 2. Block B on both hosts:
    `go run ./e2e/probes --block B --version v1.0.0-rc.<n> --out docs/probes/`;
    the results are committed by a pull request
@@ -322,6 +328,10 @@ the front matter of rule 1 in
 (`type: reference`, `reader:`), both written by its generator.
 
 `go run ./tools/new <kind> <name>` scaffolds with the next free id.
+Two branches from one base take the same number, so a pull request
+that adds a numbered record (an ADR, a lesson, an `RJ-nnn` id) is
+rebased on the current base, and its checks run again, before the
+merge.
 `adr` exists from day one; each other kind lands with the module that
 owns what it scaffolds (12.2):
 
@@ -548,7 +558,9 @@ must have that form; a merge commit's subject is not checked.
 `tools/release notes` generates the notes from the Conventional Commit
 subjects since the last tag that is not a prerelease (10 10.2), so
 the notes of v1.0.0 do not start at its release candidate. They open
-with an **Upgrading** section, generated from the differences, since
+with the link to `docs/` at the release tag, as the Deferred decisions
+row on docs versioning in the [index](../spec.md) says, then an
+**Upgrading** section, generated from the differences, since
 that tag, of the error table, `internal/spec/versions.go` and the
 embedded kit digests: the error ids and exit codes added or changed,
 the format versions changed, and the kits whose projects need a
@@ -575,7 +587,9 @@ else from git.
   lesson or the word `none`.
 - Issues: the forms in `.github/ISSUE_TEMPLATE/`: a bug (the romeu and
   sbx versions, the command, its output or the `doctor` report) and a
-  catalog gap (the tool and its domains).
+  catalog gap (the tool and its domains). The task that lands the forms
+  also creates the label `deferred`, which reports the event of a
+  deferred decision (index, Deferred decisions).
 - `docs/lessons/NNNN-<slug>.md`: one file per lesson, numbered as ADRs
   are, with the generated index `docs/lessons/README.md` (12.3). A
   lesson holds the date, what happened, the rule, and the enforcing
@@ -599,7 +613,7 @@ product-specific content.
 
 | File | Reader and type | Outline |
 |---|---|---|
-| `README.md` | a developer deciding whether to use the product; explanation + quick start | the heading order of ADR 0001 rule 12, filled with: what it is and who it is for, including the supported daily setup (edit and debug inside the sandbox; host clones are for reading in Restricted Mode) and that the `julieta-claude` kit replaces the agent's built-in memory with julieta memory; when not to use it; prerequisites, listed here once (a macOS host; sbx; the git floor; a `gh` with the `attestation` command; a Claude Code login, done inside the sandbox at the first run; a `mise.toml` in each repo whose tools `julieta setup` installs; a GitHub account for the config repo's CI; Keychain items for the secret names; a root outside iCloud Drive, Dropbox and other synced folders, knowing that `~/Documents` and `~/Desktop` are synced when iCloud's Desktop and Documents option is on; and the egress catalog's reach: it covers the tools listed in `catalog/egress.yaml` (built from the reference config repo's locks), and another tool is declared with `egress.tools` in the project spec, always gated, until a release ships its catalog entry); install and verify (checksums and the attestation, by the verification contract of 10 10.2); first run (the steps of J1, 09); the trust model in one paragraph: what romeu writes (host settings, the root tree, host state), what it never does (with links to the boundaries A-F of 01 1.3 and to I1-I3), a link to the product half of 05 5.4, and a link to `ARCHITECTURE.md`; the product kits, `git-ssh-sign` marked opt-in; data and uninstall: what romeu keeps on the machine, linking the table of 01 1.2 ("Where data lives"), that a root excluded from Time Machine (doctor's `root-indexed` check) needs another copy of its memory dirs, handoffs and unpushed work, and how to stop using it, linking the guide of J14; the license: GPL-3.0-only for the product, CC0-1.0 for `examples/` and `schemas/`, and what that means for a config repo; a best-effort response expectation for issues and pull requests; links to guides, reference and ADRs |
+| `README.md` | a developer deciding whether to use the product; explanation + quick start | the heading order of ADR 0001 rule 12, filled with: what it is and who it is for, including the supported daily setup (edit and debug inside the sandbox; host clones are for reading in Restricted Mode) and that the `julieta-claude` kit replaces the agent's built-in memory with julieta memory, and the license, whose sentence sits under this first heading, near the start of the page: GPL-3.0-only for the product, CC0-1.0 for `examples/` and `schemas/`, and what that means for a config repo; when not to use it; prerequisites, listed here once (a macOS host; sbx; the git floor; a `gh` with the `attestation` command; a Claude Code login, done inside the sandbox at the first run; a `mise.toml` in each repo whose tools `julieta setup` installs; a GitHub account for the config repo's CI; Keychain items for the secret names; a root outside iCloud Drive, Dropbox and other synced folders, knowing that `~/Documents` and `~/Desktop` are synced when iCloud's Desktop and Documents option is on; and the egress catalog's reach: it covers the tools listed in `catalog/egress.yaml` (built from the reference config repo's locks), and another tool is declared with `egress.tools` in the project spec, always gated, until a release ships its catalog entry); install and verify (checksums and the attestation, by the verification contract of 10 10.2); first run (the steps of J1, 09); the trust model in one paragraph: what romeu writes (host settings, the root tree, host state), what it never does (with links to the boundaries A-F of 01 1.3 and to I1-I3), a link to the product half of 05 5.4, and a link to `ARCHITECTURE.md`; the product kits, `git-ssh-sign` marked opt-in; data and uninstall: what romeu keeps on the machine, linking the table of 01 1.2 ("Where data lives"), that a root excluded from Time Machine (doctor's `root-indexed` check) needs another copy of its memory dirs, handoffs and unpushed work, and how to stop using it, linking the guide of J14; a best-effort response expectation for issues and pull requests; links to guides, reference and ADRs |
 | `ARCHITECTURE.md` | a contributor or reviewer; explanation, one page | components and their single jobs; the trust boundaries A-F and the gates, linked from 01 1.3 and 01 1.4 rather than copied; the candidate and generation state machines, as the generated diagrams under `docs/diagrams/` (12.3), which it links; the promotion commit as the numbered procedure of 01 1.6; one short section per flow (sync, run, salvage): its entry function, the packages it crosses, its invariants and their tests; where each invariant is enforced; module dependency direction. Every invariant id of 05 5.2 and every module id of 12.2 appears in it, which `tools/ci docs` checks |
 | `CONTRIBUTING.md` | a contributor; how-to | the dev loop (`tools/new`, `go generate`, `tools/ci fast`, `tools/ci all`); enabling the pre-push hook; running the gates locally, and which test levels each platform runs (macOS: unit, golden, the git and fake-sbx e2e and the I27 trees; Linux: those and the hybrid and container e2e and `license`; the host suite on a maintainer's Mac only); a red leg the change did not cause is fixed on `main` by one pull request (10 10.2); how to add a command, invariant, probe or kit; the delivery practices (12.9); what counts as ask-first, how approval is recorded, and how an outside contributor gets an approval line (12.4); outside pull requests to the catalog and the kits: the evidence such a pull request needs, reviewed by the one maintainer, best effort; the issue forms and the label `deferred`, which reports the event of a deferred decision (index); a best-effort response expectation for issues and pull requests; the PR template and the Middleware line; a link to the documentation standard (ADR 0001), which holds the text standard for commits and PRs (12.7) and the request to write with a voice; ADRs and superseding |
 | `SECURITY.md` | a person who found a vulnerability; how-to | the three headings of ADR 0001 rule 20. The channel is GitHub's private vulnerability reporting, which the maintainer block switches on (10 10.2). The response expectation the maintainer set: an acknowledgement within 30 days, best effort, and no promised time for a fix. The supported versions name the tested sbx window (10 10.3). What happens next is written with the page |

@@ -378,7 +378,7 @@ generated glossary page is a row of
 | config repo | The repo holding specs and personal kits; the only meaning of "config" on its own | - |
 | config project | The project whose primary repo is the config repo | - |
 | sandbox | an sbx sandbox romeu created or adopted for a project | - |
-| development sandbox | the sbx sandbox this repository is developed in, provisioned outside romeu with the operator's account and keys; [ADR 0008](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md) and the token rows of [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1) mean this | - |
+| development sandbox | the sbx sandbox this repository is developed in, provisioned outside romeu with the operator's account and keys; [ADR 0008, let the sandbox act as the maintainer on GitHub](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md) and the token rows of [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1) mean this | - |
 | host settings | The operator's machine-local `settings.yaml` | host config |
 | personal kit | A kit from the config repo's `kits/` (`personal:` in a spec) | config kit |
 | product kit | A kit from the product repo's `kits/`, embedded in romeu (`product:` in a spec); sbx's field value `kind: mixin` stays in code font | mixin |

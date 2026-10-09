@@ -74,7 +74,7 @@ via shims and `mise exec -C`.
 | Update checks | off (04 4.3): no request to the version host |
 | Tracking | off (04 4.3) |
 | Versions host | kept on (`mise-versions.jdx.dev` serves version lists and attestation bundles); it is in the catalog `meta` set |
-| GitHub rate limit | aqua/github downloads fall back to `api.github.com`; mise reads `GITHUB_TOKEN`. How sbx exposes the project's `github` secret (by name) as that variable is a fact probe B4 records, measuring behavior with and without it. The sandbox holds whatever `github@<project>` binds ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), [J1](09-journeys.md#j1-onboarding-new-machine-first-time) step 5); in the development sandbox of this repository that is the operator's own token until the token narrowing row of the index's [Deferred decisions](../spec.md#in-how-this-repository-is-run) fires (ADR 0008), so this download path carries its reach |
+| GitHub rate limit | aqua/github downloads fall back to `api.github.com`; mise reads `GITHUB_TOKEN`. How sbx exposes the project's `github` secret (by name) as that variable is a fact probe B4 records, measuring behavior with and without it. The sandbox holds whatever `github@<project>` binds ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), [J1](09-journeys.md#j1-onboarding-new-machine-first-time) step 5); in the development sandbox of this repository that is the operator's own token until the token narrowing row of the index's [Deferred decisions](../spec.md#in-how-this-repository-is-run) fires ([ADR 0008, let the sandbox act as the maintainer on GitHub](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md)), so this download path carries its reach |
 
 ## 7.5 Egress derivation (`internal/egress`)
 
