@@ -55,11 +55,15 @@ which names each step's command and output path.
    `checksums.txt` with `curl`, which sets no quarantine attribute, so
    Gatekeeper is not asked about an unsigned binary (inferred; B1
    confirms it on both hosts). Verify with
-   `shasum -a 256 -c checksums.txt` and
+   `shasum -a 256 -c checksums.txt`, then read the commit the release's
+   tag names from GitHub with
+   `gh api repos/<owner>/romeu-e-julieta/commits/<tag> --jq .sha` and
+   verify with
    `gh attestation verify <archive> --repo <owner>/romeu-e-julieta
-   --signer-workflow <owner>/romeu-e-julieta/.github/workflows/release.yml`
-   (both required; the verification contract of
-   [10 10.2](10-testing-style.md#release-and-bootstrap), one entry of
+   --signer-workflow <owner>/romeu-e-julieta/.github/workflows/release.yml
+   --source-digest <commit> --deny-self-hosted-runners`, `<commit>`
+   being that output (both checks required; the verification contract
+   of [10 10.2](10-testing-style.md#release-and-bootstrap), one entry of
    `e2e/scenarios/commands.yaml` that J9 uses too), put `romeu` on
    `PATH`.
 3. [O] `romeu init --config-url https://github.com/<owner>/<config-repo>`

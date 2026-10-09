@@ -60,7 +60,7 @@ romeu-e-julieta/
 │  ├─ fakesbx/                 fake sbx that replays recorded sessions only
 │  └─ testdata/sbx/<version>/  redacted sbx help text and argv/stdout/stderr/exit sessions (*.jsonl)
 ├─ tools/
-│  ├─ ci/                      every check CI runs and its committed data: denylist.yaml (forbidden names, hashed, and the never-tracked file names), prose.yaml, headings.yaml, testdata/; one package per step under tools/ci/internal/<step>/, registered in one dispatcher table, and generate.go calls one generator list per package
+│  ├─ ci/                      every check CI runs and its committed data: denylist.yaml (forbidden names, hashed, and the never-tracked file names), prose.yaml, headings.yaml, testdata/; one package per step under tools/ci/internal/<step>/, listed by a dispatcher table generated from those packages (12 12.3), so a new step edits no shared table, and generate.go calls one generator list per package
 │  ├─ new/                     scaffolding: adr, invariant, probe, kit, command, lesson
 │  ├─ schemagen/               reflect-based JSON Schema generator from the Go types and rules.go
 │  ├─ release/                 release subcommands (10 10.2)

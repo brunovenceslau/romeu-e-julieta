@@ -203,7 +203,12 @@ mount is a risk accepted in
 root excluded from Time Machine, as the `root-indexed` check of
 [04 4.2](04-cli.md#42-romeu-host) advises, is in no Time Machine
 backup, so its memory dirs and unpushed work need another copy, which
-that check's hint says.
+that check's hint says. Once `romeu salvage` has recorded its result on
+the generation, the owner may delete that salvage dir or any payload in
+it: `rm`, `recreate` and `retire` read the record, `doctor` checks the
+salvage refs on the host and no salvage dir, and `status` lists the
+records, so a deleted dir is no finding. The refs under
+`refs/romeu/salvage/` stay, since `doctor` fails on a missing one.
 
 ### Host half: `romeu salvage`
 

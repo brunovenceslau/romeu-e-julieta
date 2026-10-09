@@ -251,7 +251,9 @@ ordered list; each step names its command and its output:
    the results are committed by a pull request
    ([11 11.2](11-host-probes.md#112-block-b---acceptance-on-real-hosts-last)).
 3. `go run ./tools/ci acceptance --pre-tag` exits 0 on the commit to be
-   tagged ([10 10.5](10-testing-style.md#105-acceptance-evidence)).
+   tagged: it runs the six checks of
+   [10 10.5](10-testing-style.md#105-acceptance-evidence) that read
+   only the repository, the two of 11 11.4 among them.
 4. Push the tag `v1.0.0`.
 5. B1 and B2 once more, on v1.0.0 and on one host, with `--out` a
    directory outside the repository, so the candidate's results stay;
@@ -296,10 +298,13 @@ merged tree. This table is the one inventory of generated files;
 | `internal/state` transition tables | state-machine tests; the state diagrams, each in its own file under `docs/diagrams/`, which `ARCHITECTURE.md` links |
 | `.github/ask-first.yaml` | `.github/CODEOWNERS`, `docs/reference/ask-first.md`, the `mutate` trigger |
 | the vocabulary table (01 1.7) | `docs/reference/vocabulary.yaml`, the denylist `tools/ci vocabulary` reads |
+| the step packages of `tools/ci`, one per step under `tools/ci/internal/<step>/` (02 2.1) | the step dispatcher table of `tools/ci`, so adding a step adds its package and edits no shared table |
 | ADR titles and statuses (`docs/adr/NNNN-*.md`); lesson titles (`docs/lessons/NNNN-*.md`) | the ADR index `docs/adr/README.md`; the lessons index `docs/lessons/README.md` |
 
 Every julieta command and flag a `SKILL.md` names exists in the command
-definitions, checked by a test.
+definitions, and the headings the handoff skill names are the headings
+`julieta handoff write` requires for each kind, both checked by one
+test (the docs row of [10 10.2](10-testing-style.md#102-ci)).
 
 The generator that reads `.github/ask-first.yaml` is a `tools/ci`
 subcommand, so the code that writes `.github/CODEOWNERS` is on the
@@ -553,7 +558,11 @@ GitHub's closing keywords; a PR whose subject carries `!` or that
 touches the `contracts` surface (05 5.3) is listed first. Nobody
 writes release notes by hand. The notes of v1.0.0 cover the whole
 history and are long; that is accepted, and the generator's value
-starts at the second release.
+starts at the second release. It reads the merged pull requests, their
+authors and the issues they close through the GitHub API, with the
+`GH_TOKEN` of its step in the publish job
+([10 10.2](10-testing-style.md#release-and-bootstrap)), and everything
+else from git.
 
 ## 12.7 Text standard and lessons
 

@@ -96,11 +96,14 @@ add to that.
 | B3 | `go test -tags host -json ./e2e/host/...` (J1-J14 on throwaway projects, including `/clear` with the real agent); for J1 from a clean host, J2 and the daily resume of a stopped sandbox (J3a), the result records the count of operator commands and prompts and the wall clock, which the acceptance PR's review compares with [00 0.2](00-scope.md#02-users) | S7 |
 | B4 | `julieta setup` under the catalog-derived policy only, for the reference config repo's tools, on both arches, with and without a GitHub token | S4, catalog entries |
 | B5 | the harness times `romeu run` on a warm sandbox, median of 5, and records the wall clock and romeu's own share of it (the harness points the `sbx` path of its own host settings at a wrapper that times each `sbx` subprocess, and takes that time out); as an observation, the wall clock of `romeu run` on a stopped sandbox, `sbx` time included | S8, for the romeu figure |
+| B6 | the harness replays each argv shape of the recorded sessions (11.1) that only reads (`sbx version`, `sbx ls --json`, `sbx env plan`, `sbx policy ls`) against the candidate's sbx, in its own throwaway sandbox and env dir and in nothing else, and compares the shape of each output with its recording | the tested window of [10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract) at the candidate's sbx |
 
-Each of B1 to B5 is `kind: check` (11.3): its predicate is every
-property its Step cell names, B3's is that every journey passes, and
-B5's is the S8 bound. Each writes a `probe-result.v1` file,
-`docs/probes/B<n>-<host>.json`; for B3 the `go test -json` output is an
+Each of B1 to B6 is `kind: check` (11.3): its predicate is every
+property its Step cell names, B3's is that every journey passes,
+B5's is the S8 bound, and B6's is that every replayed shape matches.
+B6 records one observation per shape, the shape and the result of its
+comparison, and a fail names each shape that differs. Each writes a
+`probe-result.v1` file, `docs/probes/B<n>-<host>.json`; for B3 the `go test -json` output is an
 artifact whose sha256 the result records, and the result has one
 observation per journey. That artifact is
 `docs/probes/B3-<host>-test.json`, one JSON object per line, written
@@ -111,11 +114,7 @@ copied by the harness from the release B1 installed in the same run.
 Block B records
 nothing under `e2e/testdata/`; its outputs are the results and
 artifacts under `docs/probes/`, so committing them does not break the
-rule below. Block B also replays every argv shape of the recorded
-sessions (11.1) against the candidate's sbx and compares the shape of
-each output with its recording
-([10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract), the
-tested window).
+rule below.
 
 **The release candidate.** Block B accepts built artifacts, so it needs
 a release before v1.0.0 exists. The candidate is a `v*` tag with a
@@ -171,7 +170,9 @@ C1 is not used: it named a check that left the spec.
 
 `schemas/probe-result.v1.json`, one file per probe per host
 (`docs/probes/<id>-<host>.json`), for both blocks; a sandbox-side check
-has `block: "B"`:
+has `block: "B"`. A block A result at an sbx version above the floor,
+which widening the tested window records (11.4), sits at
+`docs/probes/<id>-<host>-<sbxVersion>.json` beside it:
 
 ```json
 {
@@ -196,7 +197,7 @@ has `block: "B"`:
 
 | Field | Rule |
 |---|---|
-| `host.upstream` | the version of each upstream the probe reads beyond sbx, recorded by the harness: the frontend pin for A11 to A13, the agent version for C3 and C5; empty for the others |
+| `host.upstream` | a map keyed by pin, `frontend`, `workload`, `herdr`, `mise` and `agent`, recorded by the harness: for every probe the table of 11.4 lists under a pin, the key of that pin holds the version or digest the probe read, and `agent` holds the agent version for C3 and C5; empty for the others |
 | `kind` | `check` (a predicate over observations) or `observe` (record what happens) |
 | `verdict` | `pass | fail | inconclusive`; a `check` passes when its predicate holds; an `observe` probe passes when every declared observation was recorded. A `check` records as observations the values its predicate evaluated (file names, versions, counts), through the recorder's redaction, so the verdict can be recomputed from the file |
 | `decision` | `default-kept | default-overturned`, computed, never typed: each probe declares in the harness, before the run, `onPass` and `onFail` decisions (`check`) or a table from observed values to decisions (`observe`) |
@@ -232,16 +233,21 @@ the next candidate:
 | the sbx floor | block A |
 
 `tools/ci probes` fails when a committed block A result of a probe this
-table lists records an upstream version or digest other than its
-current pin.
+table lists records, under any key of `host.upstream` (11.3), a version
+or digest other than that pin's current one; it compares each key on
+its own.
 
-`tools/ci acceptance` fails when a block A result's `sbxVersion`
-differs from the floor of
-[10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract), or a
-recorded `upstream` version differs from its current pin; a floor or
-pin bump therefore runs the probes that read it again before the next
-release, and the new result settles their open questions again. Git
-history keeps the results it replaces.
+`tools/ci acceptance` fails when a block A result's `sbxVersion` is
+outside the tested window of
+[10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract), when
+A4, A5 or A9 has no result at the window's newest version, or when a
+recorded `upstream` key differs from its current pin; a floor or pin
+bump therefore runs the probes that read it again before the next
+release, and the new result settles their open questions again.
+`acceptance --pre-tag` runs the `resolvedBy` check above and these
+checks as two of its six
+([10 10.5](10-testing-style.md#105-acceptance-evidence)). Git history
+keeps the results it replaces.
 
 `tools/ci probes` checks the results that are committed and says
 nothing about the ones that are not: block B cannot run before a
