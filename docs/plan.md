@@ -564,24 +564,31 @@ task list:
     - (b) the code `pr` builds imports only the standard library and
       packages under paths on `approvals`, and the `approvals` globs of
       `.github/ask-first.yaml` name those packages' directories (R11-01).
-      A test holds it: it maps each package of `go list -deps -test`
-      to its directory and matches the directory to an `approvals`
-      glob, reading a path whose first element has no dot as the
-      standard library; a fixture package that imports a path outside
-      the globs turns it red;
+      A test holds it: it reads each package of `go list -deps -test`
+      with its `Standard` field and its `Dir`, takes the standard
+      library from `Standard`, and matches the `Dir` of every other
+      package to an `approvals` glob; a fixture package that imports a
+      path outside the globs turns it red, and so does a fixture with a
+      module path without a dot under a local `replace` (round 13,
+      L2-r13-2, which replaces the dot rule of R12-06);
     - (c) `pr`, built from the default branch, applies the version-pin
       rules of `mise.toml` and `go.mod` of 10 10.2 to the head
-      (R11-03), and refuses a head that adds a tracked `go.work`,
+      (R11-03), and refuses a head that holds a tracked `go.work`,
       `go.work.sum` or `vendor/`, the hygiene rule of 10 10.2 applied
       from the base, since the go command reads those files from the
       checkout and the rule that refuses them runs from the head's
-      `tools/ci`; one fixture each (R12-02);
+      `tools/ci`; one fixture each, and one for a head that edits a
+      `go.work` already tracked on the base, and removing the path
+      pattern of its file turns each red (R12-02; round 13, R13-04);
     - (d) the mise toolchain and the `go` line of `go.mod` are the
       grantable inputs left under the job, each listed in 05 5.4;
     - (e) every committed `.github/ask-first.yaml` and
       `docs/grants.yaml` gives `pr` and the generator of 12 12.3 the
-      same surface set, held by a test, or both use one reader
-      (R12-05).
+      same surface set (R12-05). When each has its own reader, a test
+      holds it with a fixture pair: two files with the same ids and
+      different globs fail, identical files pass, and removing the glob
+      comparison turns the first red; when T005 takes one reader, the
+      test asserts that both call it (round 13, L6-r13-2).
   - Each fixture 12 12.4 names is an acceptance line here, and the
     removal written after it turns it red (R12-06):
     - the hostile fixture repository (a submodule, a textconv driver,

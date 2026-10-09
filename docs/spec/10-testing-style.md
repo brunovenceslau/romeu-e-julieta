@@ -852,12 +852,20 @@ What they set up, and holds now:
 - d. Four tries with the sandbox's token; of the four, only the direct
   push to the default branch was refused (05 5.4; tried on 2026-10-08;
   under the rules of 2026-10-09 it is read, not tried, and the try is
-  repeated with the four tries after the token narrowing). A fifth try
-  runs after the narrowing, to do: on a throwaway pull request, post a
-  commit status with the token, and a check from a workflow pushed on
-  a side branch, each under a required check's name on that pull
-  request's head, and record which of the two the ruleset counts
-  (05 5.4; round 12, D1, decided on 2026-10-09).
+  repeated with the four tries after the token narrowing). The four
+  tries repeated with the narrowed token, their API answers saved under
+  Evidence, record that the token is narrowed, the event of the
+  Deferred decisions rows whose trigger is "the token is narrowed"
+  (round 13, R13-03). The required-name try runs after the narrowing,
+  to do, in three steps on a throwaway pull request (05 5.4; round 12,
+  D1, decided on 2026-10-09; round 13, R13-02): (1) a workflow pushed
+  on a side branch, with `statuses: write` and `checks: write`, posts a
+  commit status and a check run, each under a required check's name,
+  on that pull request's head; record which of the two the ruleset
+  counts, and save the API answers under Evidence; (2) post a status
+  directly with the narrowed token, and record whether the token
+  refuses it; (3) close the pull request, and delete the side branch
+  and its workflow.
 
 The host runs `tools/ci`, `hygiene add` included, only from a commit
 whose diff since the last host run the maintainer has read, or from the
