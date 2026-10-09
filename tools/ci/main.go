@@ -101,9 +101,9 @@ func runSignalled(e env, args []string) int {
 	go func() {
 		select {
 		case sig := <-sigs:
-			signal.Stop(sigs)
 			caught <- sig.(syscall.Signal)
 			cancel()
+			signal.Stop(sigs)
 		case <-ctx.Done():
 		}
 	}()
