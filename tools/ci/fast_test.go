@@ -1657,6 +1657,12 @@ func TestQuietStepPrintsSafeText(t *testing.T) {
 	var out bytes.Buffer
 	c := newChecks(&out)
 	c.run(t.Context(), t.TempDir(), []step{
+		{name: "escape", argv: []string{"sh", "-c", `printf '\033[2J\nx.go\n'; exit 1`}, quiet: true},
+	})
+	assert.NotContains(t, out.String(), "\x1b", "a control character of the output is escaped")
+	assert.Contains(t, out.String(), `\x1b[2J`)
+	out.Reset()
+	c.run(t.Context(), t.TempDir(), []step{
 		{name: "listing", argv: []string{"sh", "-c", "printf '%s' \"$0\"; exit 1", hostile}, quiet: true},
 		{name: "code", argv: []string{"sh", "-c", "printf '%s' \"$0\"; exit 1", hostile}},
 	})

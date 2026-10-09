@@ -31,10 +31,10 @@ const stepTimeout = 15 * time.Minute
 type step struct {
 	name string
 	argv []string
-	// quiet marks a command whose output is its finding: it passes
-	// when it prints nothing, as "gofmt -l" does. That output lists
-	// files of the repository, so it is printed as safe text; the
-	// output of any other step is printed as it is (checks.run).
+	// quiet marks a command whose output is its finding, and it means
+	// two things: the step passes when it prints nothing, as "gofmt -l"
+	// does, and what it prints goes through git.SafeLines, because that
+	// output is paths of the repository (checks.run).
 	quiet bool
 	// environ is the whole environment of the command (stepEnv). The
 	// environment of this process never reaches it, so an empty one is
@@ -406,7 +406,11 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 	// that outlives a leader that ended, and holds the output pipe until
 	// WaitDelay, is still ours to kill. A group that is gone is not an
 	// error (ESRCH). While the group has members its pgid is not reused,
-	// so -pgid reaches only this group.
+	// so -pgid reaches only this group. The window after the group has
+	// fully emptied (between the last reap and the kill, which a reuse
+	// would need a full pid wrap to hit) is accepted, as it is on the
+	// Cancel path. Errors other than ESRCH are dropped on purpose: EPERM
+	// cannot occur for our own children.
 	if cmd.Process != nil {
 		_ = killGroup(cmd.Process.Pid)
 	}
@@ -632,12 +636,12 @@ func (c *checks) run(ctx context.Context, root string, steps []step) {
 		out, err := s.run(ctx, root)
 		detail := ""
 		if err != nil {
-			// out is the step's own output, which is printed as it is: a step
-			// runs the code of the change under test, so quoting its output
-			// would give an attacker nothing and cost readability. A quiet
-			// step runs none of it and prints names of files of the
-			// repository, so its output is made safe, as is err, the error
-			// of the run, which may hold a path.
+			// out is the step's own output, which is printed as it is, for
+			// readability; the unit step in particular lets the change print
+			// anything. A quiet step is the exception: gofmt -l prints only
+			// paths of the repository, so escaping its output costs no
+			// readability and is defense in depth. err, the error of the
+			// run, may hold a path and is made safe too.
 			text := string(out)
 			if s.quiet {
 				text = git.SafeLines(text)
