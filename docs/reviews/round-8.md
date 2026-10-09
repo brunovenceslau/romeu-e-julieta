@@ -1878,7 +1878,7 @@ PR #27, is closed by the merge):
 (`proxy.golang.org` lookup during setup) and passed on re-run. Recommend:
 a pending item to harden the setup's module download against transient
 failures, never by skipping.
-Answered on 2026-10-09: a pending item, in the stage-B list of
+Answered on 2026-10-09: a pending tooling pull request in
 `round-8/write-pass.md`.
 
 **(d) AR22, the fifth ruleset try with the operator present.** Another
@@ -1899,10 +1899,15 @@ Medium, on the ask-first floor). Surface `checks`; text at
 sentence, lines 209 to 214). Scenario: one standing checkpoint grant on `checks` lets an
 agent edit `tools/ci/denylist.yaml` or the grant check in
 `tools/ci/askfirst.go`, and CI runs the head's `tools/ci`, so the
-changed check judges its own change. Options: (a) add an `approvals`
-surface now for `tools/ci/askfirst.go` and `tools/ci/denylist.yaml`,
-outside `checks` and outside every grant; (b) move `denylist.yaml`
-alone; (c) accept the risk, reopened by the first grant written to
+changed check judges its own change. The grantable set was decided on
+2026-10-08 (AR14); (a) amends that decision. Options: (a) add an
+`approvals` surface now for `tools/ci/askfirst.go` and
+`tools/ci/denylist.yaml`, which no checkpoint grant covers (they stay on
+`checks` too): the surface in `.github/ask-first.yaml` and in the 05 5.3
+fence, the surface on the per-PR list of 12 12.4, `go generate` for
+CODEOWNERS and `docs/reference/ask-first.md`, and a test that `pr`
+refuses a grant for that surface; (b) move `denylist.yaml` alone; (c)
+accept the risk, reopened by the first grant written to
 `docs/grants.yaml`. Recommend (a): it costs one surface and keeps the
 check of approvals out of the reach of a grant.
 

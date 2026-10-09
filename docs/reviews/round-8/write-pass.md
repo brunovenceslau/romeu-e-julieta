@@ -142,9 +142,6 @@ are in `ship-gate-2026-10-09.md`.
 - `tools/ci pr` and 12 12.4 aligned with the house approval checklist:
   one `> [!IMPORTANT]` alert whose `> - [ ] Approval: ...` lines are
   written unticked and ticked as the grant (surface `checks`).
-- `tools/ci setup` hardened against a transient DNS failure while it
-  downloads modules (seen once on macos-intel, on `proxy.golang.org`),
-  by a bounded retry and never by skipping the step (surface `checks`).
 - With the task that builds `pr` (ship gate round 2, G10): a
   `grant: checkpoint` field per surface in `.github/ask-first.yaml`, so
   the list of surfaces a checkpoint grant may cover is data, not prose.
@@ -172,6 +169,9 @@ are in `ship-gate-2026-10-09.md`.
   (R8-12-18).
 - `tools/ci` checks that the ADR 0001 rule 9 matcher runs over the spec
   (R8-05-37).
+- `tools/ci setup` hardened against a transient DNS failure while it
+  downloads modules (seen once on macos-intel, on `proxy.golang.org`),
+  by a bounded retry and never by skipping the step (surface `checks`).
 - `pinnedLintTools` nested-worktree fix, pending until the first task that
   edits `tools/ci/fast_test.go`.
 
