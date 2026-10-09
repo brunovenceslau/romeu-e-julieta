@@ -98,11 +98,37 @@ func fastPhases(root string, tools lintTools) ([]step, step) {
 	for _, target := range lintTargets {
 		steps = append(steps, step{
 			name:    "lint " + target.String(),
-			argv:    []string{tools.linter, "run", "--config", ".golangci.yml"},
+			argv:    lintArgv(tools.linter),
 			environ: lintEnv(target, tools.goDir),
 		})
 	}
 	return steps, step{name: "unit", argv: unit, environ: stepEnv(tools.goDir)}
+}
+
+// lintArgs are the arguments of every golangci-lint run, the one list
+// that the lint steps and the tests that run the linter hold:
+//
+//   - "--config" names .golangci.yml, so that no other .golangci.* file
+//     takes its place.
+//   - "-j 1" (golangci-lint v2.14.0, pkg/commands/flagsets.go:
+//     --concurrency) limits golangci-lint's own Go threads to one
+//     (GOMAXPROCS, pkg/commands/run.go); child processes such as "go
+//     list" and the compiler are not capped. It does not fix the lock
+//     failure below. A cold run takes about 14s against about 7s by
+//     default, and warm runs are about the same. It stays to limit CPU
+//     use when runs overlap.
+//   - "--allow-parallel-runners" (same file) turns off the file lock
+//     that a run takes on golangci-lint.lock in the temporary directory
+//     (pkg/commands/run.go, acquireFileLock). Without it, a run fails
+//     with "parallel golangci-lint is running" after 5 seconds whenever
+//     any other run on the machine, of any repository, holds the lock.
+//     The lock is no check: it only keeps runs from overlapping.
+var lintArgs = []string{"run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners"}
+
+// lintArgv returns the command line of a golangci-lint run: the path of
+// the linter, then lintArgs.
+func lintArgv(linter string) []string {
+	return append([]string{linter}, lintArgs...)
 }
 
 // lintTools are the pinned tools of fast, as mise resolves them: the
