@@ -303,3 +303,23 @@ func TestCodeownersAsksFirst(t *testing.T) {
 	require.GreaterOrEqual(t, i, 0, "the ask-first surface")
 	assert.Equal(t, []string{askFirstPath, codeownersPath, "docs/grants.yaml"}, list.Surfaces[i].Globs)
 }
+
+// TestApprovalsSurface holds the approvals surface of the committed list
+// to the check of approval lines and grants and the forbidden-name
+// denylist, which no checkpoint grant covers, and holds both files on
+// the checks surface too (05 5.3).
+func TestApprovalsSurface(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join(moduleRoot(t), askFirstPath))
+	require.NoError(t, err)
+	list, err := parseAskFirst(src)
+	require.NoError(t, err)
+	i := slices.IndexFunc(list.Surfaces, func(s surface) bool { return s.ID == "approvals" })
+	require.GreaterOrEqual(t, i, 0, "the approvals surface")
+	want := []string{"tools/ci/askfirst.go", "tools/ci/denylist.yaml"}
+	assert.Equal(t, want, list.Surfaces[i].Globs)
+	j := slices.IndexFunc(list.Surfaces, func(s surface) bool { return s.ID == "checks" })
+	require.GreaterOrEqual(t, j, 0, "the checks surface")
+	for _, path := range want {
+		assert.True(t, slices.ContainsFunc(list.Surfaces[j].Globs, func(g string) bool { return globMatch(g, path) }), "%s on checks", path)
+	}
+}

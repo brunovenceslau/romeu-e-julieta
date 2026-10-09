@@ -67,6 +67,10 @@
 /docs/spec/01-system-model.md @brunovenceslau
 /docs/spec/05-security.md @brunovenceslau
 
+# approvals
+/tools/ci/askfirst.go @brunovenceslau
+/tools/ci/denylist.yaml @brunovenceslau
+
 # checks
 /tools/ci/** @brunovenceslau
 /.githooks/** @brunovenceslau

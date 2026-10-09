@@ -211,7 +211,12 @@ tasks on the `contracts`, `checks`, `dependencies`, `catalog`,
 `ledger`, `digests` and `termsafe` surfaces, recorded in
 `docs/grants.yaml`, which is on the `ask-first` surface, in the form 12
 12.4 defines; every other surface keeps an approval line in the
-maintainer's words on each pull request.
+maintainer's words on each pull request. The `approvals` surface holds
+`tools/ci/askfirst.go` and `tools/ci/denylist.yaml`, the check of
+approval lines and grants and the forbidden-name denylist, which no
+checkpoint grant covers (they stay on `checks` too), so a grant on
+`checks` never lets a change edit the check that judges it (round 8,
+G5, decided on 2026-10-09).
 
 The file lists itself and `.github/CODEOWNERS`, which `go generate`
 derives from it. The `dependencies` surface holds every path where
@@ -288,6 +293,9 @@ surfaces:
   - id: spec
     globs: [docs/spec.md, docs/spec/01-system-model.md, docs/spec/05-security.md]
     reason: the gates read tables in these pages (the vocabulary in 01 1.7 and the index), and 05 holds the security model
+  - id: approvals
+    globs: [tools/ci/askfirst.go, tools/ci/denylist.yaml]
+    reason: the approval-line and grant check, and the forbidden-name denylist
   - id: checks
     globs: [tools/ci/**, .githooks/**, .golangci.yml, docs/acceptance.json]
     reason: the code of the gates and reports, with the forbidden-name denylist (tools/ci/denylist.yaml), the linter configuration, and the acceptance file, whose command items tools/ci acceptance runs

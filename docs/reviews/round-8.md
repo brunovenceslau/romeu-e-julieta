@@ -1400,6 +1400,7 @@ DR5, DR7, DR8, AR4, AR6 and AR12 need.
   release, decisions and ask-first keep per-PR words.
   Decided on 2026-10-08: the checkpoint grant covers contracts, checks, dependencies, catalog, ledger, digests and termsafe, WITHOUT `kits` (the consolidation's variant: kits carries pins and stays per-PR); gates, gitsafe, signing, release, decisions and ask-first keep per-PR words.
   Decided on 2026-10-09 (ship gate F7): the grants are recorded in `docs/grants.yaml`, on the `ask-first` surface, and `tools/ci pr` reads them from that file at the base commit, not from `docs/plan.md`, which is on no surface.
+  Decided on 2026-10-09 (ship gate round 2, G5, option (a)), amending this item: a new `approvals` surface holds `tools/ci/askfirst.go` and `tools/ci/denylist.yaml`, which no checkpoint grant covers (they stay on `checks` too).
 - **AR15 os-base's floating apt delta** (R8-06-16; Required).
   Recommendation: option 1, the 05 5.4 row with its trigger and a
   Deferred row for pinning, decided after R8-06-17 (os-base may be an
@@ -1912,6 +1913,7 @@ refuses a grant for that surface; (b) move `denylist.yaml` alone; (c)
 accept the risk, reopened by the first grant written to
 `docs/grants.yaml`. Recommend (a): it costs one surface and keeps the
 check of approvals out of the reach of a grant.
+Answered on 2026-10-09: (a); it amends AR14 (decided on 2026-10-08).
 
 ### Next steps
 

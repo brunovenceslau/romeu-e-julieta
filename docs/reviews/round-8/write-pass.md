@@ -149,7 +149,9 @@ are in `ship-gate-2026-10-09.md`.
   ABNF, and a grant tied to a diff and given an expiry.
 - With the task that builds `pr` (G12): the tests TestGrantsFile and
   TestPRApprovalLine, a test that every non-glob path of the ask-first
-  list exists, and a `grantsPath` constant beside `askFirstPath`.
+  list exists, and a `grantsPath` constant beside `askFirstPath`; and a
+  test that `pr` refuses a checkpoint grant for the `approvals` surface
+  (G5, decided on 2026-10-09).
 
 ### Tooling pull requests (each ask-first, with its own approval line)
 
