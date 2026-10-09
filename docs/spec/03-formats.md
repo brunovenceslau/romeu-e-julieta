@@ -217,6 +217,7 @@ kits:
   - source: docker.io/docker/sbx-kit-claude@sha256:<64 hex>
   - source: ./.romeu/kits/julieta-<digest12>
   - source: ./.romeu/kits/julieta-claude-<digest12>
+    args: {julietaBin: "<abs root>/<name>-env/.romeu/bin"}
   - source: ./.romeu/kits/os-base-<digest12>
     args: {tz: Etc/UTC}
   - source: ./.romeu/kits/git-ssh-sign-<digest12>

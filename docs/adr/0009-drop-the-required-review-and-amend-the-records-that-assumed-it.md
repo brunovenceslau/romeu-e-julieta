@@ -40,17 +40,20 @@ Review round 8 found, in the same records and in
 [ADR 0007, adopt testify assert and require in tests](0007-adopt-testify-assert-and-require-in-tests.md),
 smaller texts that the spec has since corrected or that point at
 something that moved. Each is listed in Decision with the finding or
-the decision behind it, so a reader can see why it changed. The
-operator accepted them as one record, the decision DR1 of
+the decision behind it, so a reader can see why it changed. They were
+accepted as one record, the decision DR1 of
 [round 8](../reviews/round-8.md#decisions-for-the-operator), on
 2026-10-08, together with the decisions DR2 to DR8 and the items AR4,
-AR6, AR12 and AR16 whose record part lands here.
+AR6, AR12 and AR16 whose record part lands here. Decision 21, and new
+wording in decisions 12, 17 and 18, were added on 2026-10-09, after
+the ship gate of the pull request that carries this record (the form
+of DR3, F20, F6 and R8-05-35), under the same approval line, extended.
 
 ### Alternatives considered
 
 - **Keep the pointer notes of ADR 0008.** Cheapest today, and every
   later reader pays for it: the records keep a rule that no longer
-  holds. Declined by the operator.
+  holds. Declined on 2026-10-08.
 - **One new record per amended record.** Six records for one event,
   each restating the same measurement. A single record that names
   each part it replaces keeps the cause in one place.
@@ -93,7 +96,7 @@ AR6, AR12 and AR16 whose record part lands here.
    merge gate without a review rests on the exception to rule 1 of
    [ADR 0005, decide at the last responsible moment and record the trigger](0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md)
    that ADR 0008 recorded on 2026-10-07: a merge gate that does not
-   bind the token, which the operator accepted by name.
+   bind the token, accepted by name on that date.
 
 ### ADR 0001
 
@@ -173,9 +176,12 @@ AR6, AR12 and AR16 whose record part lands here.
     run` before `tools/ci` starts, an untracked `go.work` and a
     caller's `GOFLAGS`, were deferred to Q25 and to a plan row that
     exists nowhere. Q25 was decided by ADR 0008 on 2026-10-07, so the
-    trigger fired. The operator chose to close them (DR3): they are to
-    be closed by the pre-push hook change, pending, a tooling pull
-    request on the `checks` surface with its own approval line.
+    trigger fired. Closing them was decided on 2026-10-08 (DR3), and
+    the form on 2026-10-09: the pre-push hook starts `tools/ci` with
+    `GOENV=off`, `GOWORK=off` and `GOFLAGS=-mod=readonly`, which also
+    closes a `go env -w` file and an untracked `vendor/`. The change is
+    pending, a tooling pull request on the `checks` surface with its
+    own approval line.
 13. **Rule 8's tool list.** "`go` and `golangci-lint` the only tools"
     is replaced by a pointer to the one list in 12 12.1 (DR7).
 14. **Where mechanism lives.** ADR 0007 carries pinned versions,
@@ -204,7 +210,7 @@ AR6, AR12 and AR16 whose record part lands here.
     released tag; a trusted `hooksPath` checkout is a Deferred row
     (AR12).
 17. **Decision 5, the security log.** Its coverage was read on
-    2026-10-09 in GitHub's documentation (the page "Reviewing your
+    2026-10-09 (read after the decision) in GitHub's documentation (the page "Reviewing your
     security log" and the event list `src/audit-logs/data/fpt/user.json`
     of `github/docs` at commit
     `9f651797567230e844373870fce8b14427ad47ad`): the log of a personal
@@ -218,15 +224,17 @@ AR6, AR12 and AR16 whose record part lands here.
     releases. It stays a judgment, not a detector, and it is a habit,
     which the spec's
     [first principle](../spec.md#deterministic-where-it-can-be-the-model-where-it-adds-value)
-    does not count as a control: the operator accepted DR5, which names
-    that collision, on 2026-10-08. A live account's log was not read.
+    does not count as a control: DR5, which names that collision, was
+    accepted on 2026-10-08. A live account's log was not read.
 18. **Deferred item 1, its triggers.** "Every 2 autonomous work
-    sessions" is replaced by an event a command shows: the second final
-    handoff of the product project since the last review, whose date the
-    row holds and each review rewrites (`julieta handoff list` shows
-    them). The first release-candidate tag is
-    replaced by the plan's checkpoint before its last build phase (C7),
-    so the token is settled before the release work. The first issue
+    sessions" is replaced by a counted event: the second final handoff
+    of this repository's development sessions since the last review,
+    whose date the row holds and each review rewrites, counted by hand
+    from the handoff record those sessions keep until julieta runs in
+    the development sandbox. The count is of agent-written handoffs, and
+    checkpoint C7 is the backstop. The first release-candidate tag is
+    replaced by the plan's checkpoint before its last build phase
+    (checkpoint C7), so the token is settled before the release work. The first issue
     or pull request from an account other than the operator's is a new
     trigger (AR4). The row in the spec's Deferred decisions holds the
     list; the security log is read as a judgment and is not a trigger
@@ -244,6 +252,16 @@ AR6, AR12 and AR16 whose record part lands here.
     merge, close, label, workflow or settings action on it without the
     maintainer's word (12 12.9, AR4).
 
+### ADR 0007, its Consequences
+
+21. **Upgrading mise.** Beside the bullet on upgrading golangci-lint,
+    the counterpart for mise holds: upgrading mise can change which
+    files it reads as its configuration, so the upgrade measures that
+    discovery again at the new version, names the result in its
+    Evidence, and changes the `dependencies` surface in the same pull
+    request when the set changed ([05 5.3](../spec/05-security.md#53-ask-first-surfaces);
+    R8-05-35).
+
 ## Consequences
 
 - The six records named in Status gain a `Superseded in part by` line
@@ -257,7 +275,7 @@ AR6, AR12 and AR16 whose record part lands here.
   holds against an agent that holds the token is in 05 5.4; this
   record adds no control.
 - The pre-push hook change of decision 12 is pending. Until it lands,
-  ADR 0007's two escapes stay open, and the pull request's diff review
+  the escapes it closes stay open, and the pull request's diff review
   is the only guard against them.
 - [ADR 0004, measure delivery with the five DORA metrics computed by a tool](0004-measure-delivery-with-the-five-dora-metrics-computed-by-a-tool.md)
   stays Accepted as the design of a deferred tool, and

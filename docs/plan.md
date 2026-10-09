@@ -215,7 +215,7 @@ whose exit status the maintainer reads, wherever one exists. Block A of
 | O2 | T002 | item e (10 10.2): add the jobs of the green run to the default-branch ruleset as required status checks, and save the API's answer | the green run's job names | T003 directly; every task after T002 has it in its dependencies | one call; do it in the sitting that merges that task, and it adds no wait. No task can proceed meanwhile | the saved answer lists each job name of the green run; no command reads a ruleset back (05 5.4), so this one is **[review]** | one call, in the same sitting as the merge |
 | O3 | T019, T020 | block A on both hosts, Intel and Apple silicon (11 11.1): `go run ./e2e/probes --block A --out docs/probes/`, which lists and plants nothing (Q29), apart from one global setting: A2 sets `env.rememberHostCommands` (11 11.1) and records the prior value in its result; then commit the results and the recordings on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | `sbx` at or above 0.46.0 on both hosts; the pins of the pin file | T026 directly, and every task that reads a block A fact | about 75 minutes per host (11 11.1), plus the wait for a sitting with both machines. Meanwhile the tasks listed below the table can proceed | `go run ./tools/ci probes --require-pass A1,A2,A3,A4,A5,A6,A9,A10,A11,A12,A13,A14` exits 0 on the branch with both hosts' results | run both hosts in one sitting: the arch-sensitive probes (A4, A5, A11, A12, A13) count only with both (11, opening). Read the diff of everything staged before the push: it is data from your host, and the recorder's scrubbing (T018) is a filter, not a reviewer. The second host's files reach the branch by a push from that host's own clone, through its hook, and the harness refuses an `--out` inside a clone whose hook is not enabled. A results-only branch runs `main`'s own `tools/ci` through the hook; if a resolution commit joins it (T026), read that diff in the clone before checking the branch out, as item c of block O1 requires (10 10.2) |
 | O4 | T055 | the catalog handover: build julieta for linux from `main`, run `julieta spec validate --catalog projects/*.yaml` on the reference config repo inside a Linux container, and hand over its output after reading and redacting it: it may name hosts, tool keys or project names that are not for the public repository | a Linux container with read-only access to the config repo's origins and no host credential mounted; julieta has no darwin build (12 12.1) | T091 directly, and through it block O5 | minutes; it can happen any time after its one task, so it is off the critical path if done by checkpoint C5. Meanwhile every later task up to block O5 but T091 can proceed | `julieta spec validate --catalog projects/*.yaml` exits 0 or 1, and its output is the handover; an exit of 2 means a spec does not validate, and the block is not done; `go run ./tools/ci hygiene --file <output>` exits 0 on the output before it is handed over | do it at C5, not at the end: it is the only input the catalog task waits for |
-| O5 | every earlier task, T001 to T091 | the candidate: run `julieta spec validate --catalog` again, in the container of O4, and see it exit 0; the rehearsal on one host (below); then step 1 of the release checklist of 12 12.2, the tag `v1.0.0-rc.1` (11 11.2) | the same container as O4; one host with `sbx` | O6 directly, and through it T092 to T095 and T102 | the rehearsal is about one block B run on one host, 90 minutes plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go test -tags host -json ./e2e/host/...` exits 0, then `go run ./tools/ci probes --require-pass B2,B3,B4,B5,C2,C3,C4,C5,C6 --hosts 1 --dir <the rehearsal directory>` exits 0 | the rehearsal is this plan's addition, not the specification's. After the tag, a change outside `docs/` and the root Markdown files needs a new candidate and block B again (11 11.2) |
+| O5 | every earlier task, T001 to T091 and T103 | the candidate: run `julieta spec validate --catalog` again, in the container of O4, and see it exit 0; the rehearsal on one host (below); then step 1 of the release checklist of 12 12.2, the tag `v1.0.0-rc.1` (11 11.2) | the same container as O4; one host with `sbx` | O6 directly, and through it T092 to T095 and T102 | the rehearsal is about one block B run on one host, 90 minutes plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go test -tags host -json ./e2e/host/...` exits 0, then `go run ./tools/ci probes --require-pass B2,B3,B4,B5,C2,C3,C4,C5,C6 --hosts 1 --dir <the rehearsal directory>` exits 0 | the rehearsal is this plan's addition, not the specification's. After the tag, a change outside `docs/` and the root Markdown files needs a new candidate and block B again (11 11.2) |
 | O6 | O5 | step 2 of the release checklist of 12 12.2, block B on both hosts (11 11.2): B1 to B5 and the sandbox-side checks C2 to C6; then commit the results on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | the candidate's published release; both hosts | T092 directly, and through it T093 to T095 and T102 | about 90 minutes per host for B1 to B5, plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go run ./tools/ci probes --require-pass B1,B2,B3,B4,B5,C2,C3,C4,C5,C6` exits 0 on the branch with both hosts' results | run B1 first on each host: each other result copies the candidate's tag and commit from it (11 11.2). The reading rules of block O3 apply: the staged diff before the push, each host pushing from its own clone through its hook, and a resolution commit's diff before checkout |
 | O7 | T094, T095, T101, T093 | steps 3 to 5 of the release checklist of 12 12.2: `go run ./tools/ci acceptance --pre-tag` exits 0; push the tag `v1.0.0`; run B1 and B2 once more on v1.0.0, on one host, with `--out` outside the repository: `go run ./e2e/probes --block B --only B1 --out <dir>`, then the same with `--only B2` (11 11.2). Then pin `validate.yml` in the reference config repo to that release, run it and note its run id (S4) | the documentation tasks merged, each of them; the config repo | T102 directly; no other task | one B1 and one B2 run and one workflow run. No task can proceed meanwhile | `go run ./tools/ci probes --require-pass B1,B2 --hosts 1 --dir <dir>` exits 0 on that run | the pre-tag check is a command here, and `tools/ci acceptance` runs it again at the end (10 10.5); a check that fails after the tag is fixed by a patch release (12 12.2). The release exists only after the tag, so the pin comes after it. Paste under the Evidence of T102 the result files of those runs, which the harness wrote through its redaction, and no raw output |
 
@@ -311,10 +311,10 @@ run is a
 | 1 The skeleton and the probe harness | T007 to T020 | `termsafe`, `romeu-cli`, `julieta-core`, `ci-release`, `kits`, `probes`, `canon` | C1: both binaries print `version` on the four runners; the handshake passes on the synthetic session; the harness passes `tools/ci all` before any host run (11, opening). Then block O3 |
 | 2 First build layer | T021 to T025 | `spec`, `gitsafe`, `signing` | C2: block A results from both hosts are merged (T026), and `tools/ci probes` passes on them |
 | 3 Block A applied; second layer | T026 to T035 | `probes`, `gitsafe`, `sbxdrv`, `romeu-cli`, `catalog`, `oci`, `state`, `memstore` | C3: the handshake passes on the recorded session on both Linux runners |
-| 4 The `sync` slice | T036 to T050 | `egress`, `render`, `gate`, `romeu-cli` | C4: the J2 and J11 scenario functions run in CI with the fake `sbx`; the I27 hostile trees are refused on the macOS runners. Then smoke step 1 of 12 12.2: on one host, `init`, `sync` and `approve` with the host suite, the output pasted under the Evidence of the next pull request |
+| 4 The `sync` slice | T036 to T050, T103 | `egress`, `render`, `gate`, `romeu-cli`, `ci-release` | C4: the J2 and J11 scenario functions run in CI with the fake `sbx`; the I27 hostile trees are refused on the macOS runners. Then smoke step 1 of 12 12.2: on one host, `init`, `sync` and `approve` with the host suite, from a `go run ./tools/release build --version v1.0.0-smoke --dry-run` build of `main` (T103), the output pasted under the Evidence of the next pull request |
 | 5 julieta's chores | T051 to T065 | `julieta-core`, `kits`, `layout`, `memstore`, `handoff`, `salvage` | C5: the container e2e passes on amd64 and arm64, with the `julieta setup` no-op inside its S8 bound. Block O4 is done by here. The maintainer takes here the decisions that T101 records, so that task has no one left to wait for |
-| 6 `run` and the destructive commands | T066 to T075 | `romeu-cli` | C6: the five CI journeys of S7 pass; the meta-tests and the sweeps pass. Then smoke step 2 of 12 12.2: on one host, J1 to J3 with the host suite, from a `--dry-run` build of `main`, the output pasted under the Evidence of the next pull request |
-| 7 Kits, skills and the block B definitions | T076 to T083 | `kits`, `skills`, `romeu-cli`, `probes` | C7: `tools/ci kits` passes; romeu embeds the four product kits; a definition exists for each probe id of 11. The token narrowing row of the index reopens here (ADR 0009) |
+| 6 `run` and the destructive commands | T066 to T075 | `romeu-cli` | C6: the five CI journeys of S7 pass; the meta-tests and the sweeps pass |
+| 7 Kits, skills and the block B definitions | T076 to T083 | `kits`, `skills`, `romeu-cli`, `probes` | C7: `tools/ci kits` passes; romeu embeds the four product kits; a definition exists for each probe id of 11. Then smoke step 2 of 12 12.2: on one host, J1 to J3 with the host suite, from a `go run ./tools/release build --version v1.0.0-smoke --dry-run` build of `main`, the output pasted under the Evidence of the next pull request. The token narrowing row of the index reopens here (ADR 0009) |
 | 8 Release tooling | T084 to T091 | `ci-release`, `catalog` | C8: `go run ./tools/release build --version v1.0.0 --dry-run` succeeds; then block O5 |
 | 9 Acceptance | T092 to T102 | `probes`, `docs`, `ci-release` | `go run ./tools/ci acceptance` exits 0 on the committed `docs/acceptance.json` |
 
@@ -342,13 +342,11 @@ Review round 8 left changes to merged work that go in tooling pull
 requests of their own, each with its own approval line, outside the
 task list:
 
-- the pre-push hook starts `tools/ci` so that an untracked `go.work`
-  and a caller's `GOFLAGS` cannot act on `go run` (ADR 0007, Threat
-  model; round 8, DR3), on the `checks` surface; its form waits for the
-  operator;
-- `gh` in `mise.lock`, with a test that holds the Go version of
-  `go.mod` equal to the one of `mise.toml` (DR7), on the `dependencies`
-  surface;
+- the pre-push hook starts `tools/ci` with `GOENV=off`, `GOWORK=off`
+  and `GOFLAGS=-mod=readonly`, so that a `go env -w` file, an untracked
+  `go.work` or `vendor/` and a caller's `GOFLAGS` cannot act on
+  `go run` (ADR 0007, Threat model; round 8, DR3, its form decided on
+  2026-10-09), on the `checks` surface;
 - the list of never-tracked files read from `tools/ci/denylist.yaml`
   instead of a list written in the code (R8-10-34);
 - `tools/ci setup` setting `GOPROXY`, `GOSUMDB` and `GOENV=off` for the
@@ -625,6 +623,9 @@ task list:
     a slug, an exit code, a message and a fix hint in one data table,
     with the ids of 04 4.4; the text and `--json` forms match 04 4.1;
     tests assert ids, not message text.
+  - A test reads the rows of 04 4.4 and fails when the table in
+    `internal/cli` differs in id, slug or exit code; `check-findings`
+    maps to exit 6 and is the only id that does.
   - `go generate` writes the three consumers of the table (12 12.3): the
     exit-code sections of `--help`, `docs/reference/errors.md` and
     `docs/reference/exit-codes.md`, the pages with the generated-file
@@ -1550,8 +1551,8 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
     config, `env.rememberHostCommands`, `kit.allowedSources`, the root
     rules (I20), the file modes, the secret bindings and the tree rows.
   - The rows marked **pre** are the functions of T046, called from here
-    (I22, I23). The two I22 rows fail, and `doctor` exits 1, on each
-    synthesized fixture of T046, and pass on the A9 recording, with the
+    (I22, I23). The two I22 rows fail, and `doctor` exits 6 with
+    `check-findings`, on each synthesized fixture of T046, and pass on the A9 recording, with the
     same files.
   - A trusted root or disabled workspace trust fails (I14).
 - Verify: `go test ./internal/... -run '^TestDoctor'`, which lists the
@@ -1572,6 +1573,23 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
     sandbox they refused before.
   - That `salvage` and `rm` succeed after `adopt` is tested in T068.
 - Verify: `go test -tags e2e ./e2e/...`.
+
+#### T103 - `tools/release build --dry-run`
+
+- [ ] Merged
+- Module: `ci-release`. Implements: 10 10.2 ("Release and bootstrap"),
+  02 2.1 (Embedding), 12 12.2 (the smoke steps).
+- Depends on: T009, T012. Operator: no. Ask-first: `release`.
+- Acceptance:
+  - `tools/release build --version v1.0.0 --dry-run` builds the two
+    julieta binaries, embeds them with the kits and the catalog present
+    at that task, builds romeu for darwin and writes the archives and
+    `checksums.txt`.
+  - A romeu from that build runs `sync` past the `julieta-not-embedded`
+    refusal of a source build (02 2.1), so smoke step 1 of 12 12.2 can
+    run at checkpoint C4.
+- Verify: `go test ./tools/release/...`; `go run ./tools/release build
+  --version v1.0.0 --dry-run`.
 
 ### Phase 5 - julieta's chores
 
@@ -1636,8 +1654,8 @@ early.
     `install` (04 4.3).
   - `lock` passes the four platforms and rewrites `mise.lock`; `lock
     --check` writes nothing, fails a tool without a lock entry and a
-    lockable entry without both linux platforms, and warns on a missing
-    macOS entry.
+    lockable entry without both linux platforms with exit 6
+    (`check-findings`), and warns on a missing macOS entry.
   - `tools/ci mise` runs that logic on this repository's lock and the
     examples'.
   - The `julieta setup` no-op is at most 3 s, median of 5, in the
@@ -1680,13 +1698,15 @@ early.
 - Acceptance:
   - `spec validate` exits 2 on a decode or rule error, per file and
     across files; `--catalog` lists each unknown `backend:tool` and lock
-    host and exits 1 when it lists one.
+    host and exits 6 (`check-findings`) when it lists one; a decode error
+    stays exit 2.
   - `pin workload` rewrites the digest after it verifies that the
     manifest list covers linux/amd64 and linux/arm64, through the
     guarded client of `oci`.
   - `pin check` reports a pin that is not a digest or is behind, and
     with `--workflows` the julieta release pinned in the config repo's
-    workflows (04 4.3).
+    workflows (04 4.3); it exits 6 (`check-findings`) when it reports
+    one.
   - The J2 scenario function gains its step 1, `julieta spec validate`
     in the config project's sandbox, at the hybrid level.
 - Verify: `go test ./internal/... -run '^Test(SpecValidate|Pin)'`, which
@@ -1725,8 +1745,8 @@ early.
     Concurrency).
   - `list --query <text>` filters, and `edit --status done` closes an
     entry; there is no `memory rm` and no `memory search` (04 4.3).
-  - `memory check` exits 1 on an unmounted, unwritable or non-conforming
-    directory; `setup` gains `memory check` and the agent memory dir
+  - `memory check` exits 1 on an unmounted or unwritable directory, and
+    6 (`check-findings`) on one that breaks the layout allowlist; `setup` gains `memory check` and the agent memory dir
     check (04 4.3; 08 8.1).
 - Verify: `go test -tags e2e ./e2e/...`.
 
@@ -1753,6 +1773,8 @@ early.
     uses it.
   - `show --hook` prints the open entries, the `lesson` entries and
     julieta's warnings; the front matter has a golden (10 10.1).
+  - `julieta handoff show --hook` never prints more than 8 KiB, asserted
+    with an oversized store.
   - `list` prints one line per handoff file with its kind, and `--json`
     one document.
 - Verify: `go test -tags e2e ./e2e/...`.
@@ -2155,6 +2177,11 @@ early.
     each `kind: check` with the predicate its Step cell names, and C2,
     C3, C4, C5 and C6, each with its declared `kind`, `expect` and
     decision table.
+  - C5 is `kind: observe` with keys `sessionEndBeforeStart` (bool),
+    `sessionStartSources` (string list), `hookOutputReachesContext`
+    (bool), `hookOutputCutBytes` (int or null), `nonZeroExitEffect`
+    (string), `sessionEndTimeoutMs` (int or null); its decision table
+    has one row per key, each naming its own `affects`.
   - B1 installs the candidate from its GitHub release and verifies
     checksums and attestation; each other block B result copies two
     observations from it, the candidate's tag and the commit that tag
@@ -2281,12 +2308,12 @@ early.
 - [ ] Merged
 - Module: `ci-release`. Implements: 10 10.2 ("Release and bootstrap"),
   12 12.6, 12 12.1, 02 2.1 (Embedding), S1, 10 10.2 (`tools/ci pins`).
-- Depends on: T079, T081, T087. Operator: no. Ask-first: `release`,
-  `dependencies`, `checks`.
+- Depends on: T079, T081, T087, T103. Operator: no. Ask-first:
+  `release`, `dependencies`, `checks`.
 - Acceptance:
-  - `tools/release build --version v1.0.0 --dry-run` builds the two
-    julieta binaries, embeds them with the kits and the catalog, builds
-    romeu for darwin and writes the archives and `checksums.txt`.
+  - `tools/release build` is T103's; `release.yml` runs it, and
+    `go run ./tools/release build --version v1.0.0 --dry-run` embeds
+    the four product kits of T079 and the catalog.
   - `tools/release notes` groups Conventional Commit subjects since the
     last tag that is not a prerelease, with each pull request's Why.
   - `tools/release verify` runs `gh attestation verify` with the signer
@@ -2547,7 +2574,7 @@ early.
 - Acceptance:
   - Each question whose "Settled by" cell is the maintainer has an ADR
     and leaves the table: Q4, Q6, Q9, Q12, Q13, Q14, Q26, Q27, Q29, Q30
-    and Q31. Q25 left it when the operator decided it, recorded in [ADR
+    and Q31. Q25 left it when it was decided on 2026-10-07, recorded in [ADR
     0008, let the sandbox act as the maintainer on
     GitHub](adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md)
     from the output of block O1, and Q23 became the registry-credential

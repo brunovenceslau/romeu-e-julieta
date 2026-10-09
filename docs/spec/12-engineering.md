@@ -196,7 +196,7 @@ table and the package list of S9 to the same set of directories.
 | `salvage` | julieta snapshot/salvage; romeu verification and ref import | gitsafe, memstore, state |
 | `kits` | `kits/*` sources and their embedding | kitpin, julieta-core |
 | `skills` | `skills/julieta`, `skills/handoff` | handoff, memstore |
-| `ci-release` | the remaining `tools/ci` checks, workflows, `tools/release` and release notes; `SECURITY.md`, in or before the PR that lands `tools/ci docs`, whose rule 20 check needs the page, and the `README.md` skeleton with the heading order of rule 12, since both put their heading lists in `tools/ci/headings.yaml`, which the rule of 11 11.2 does not let change after the candidate | all |
+| `ci-release` | the remaining `tools/ci` checks, workflows, `tools/release` and release notes, except `tools/release build --dry-run`, which lands with the sync slice for smoke step 1; `SECURITY.md`, in or before the PR that lands `tools/ci docs`, whose rule 20 check needs the page, and the `README.md` skeleton with the heading order of rule 12, since both put their heading lists in `tools/ci/headings.yaml`, which the rule of 11 11.2 does not let change after the candidate | all |
 | `docs` | README text and guides before the release candidate, so block B runs each guide as written; then the ADRs this specification still owes (12.5); reference pages are generated | all |
 
 "Depends on" is plan order between modules, not Go imports: the import
@@ -209,10 +209,11 @@ Build order: `ci-bootstrap`, `probes`, `kitpin` -> probe block A
 (maintainer, in parallel with) `canon`, `spec`, `termsafe`, `cli`,
 `gitsafe`, `signing` -> `catalog`, `oci`, `state`, `sbxdrv`, `memstore`
 -> `egress`, `gate` -> `render` -> `romeu-cli` (init, sync, approve,
-status, doctor, adopt) -> smoke step 1 (maintainer) -> `julieta-core`,
+status, doctor, adopt) and the `--dry-run` build of `tools/release`
+(`ci-release`) -> smoke step 1 (maintainer) -> `julieta-core`,
 `layout` -> `handoff`, `salvage` -> `romeu-cli` (run, stop, salvage, rm,
-recreate, retire, pull, handoff) -> smoke step 2 (maintainer) ->
-`kits`, `skills` -> `ci-release` -> `docs` (README text and guides) ->
+recreate, retire, pull, handoff) -> `kits`, `skills` -> smoke step 2
+(maintainer) -> `ci-release` -> `docs` (README text and guides) ->
 the release checklist below. Block A settles every sbx fact the code
 depends on before `sbxdrv` and `render` are finalized; block B only
 accepts built artifacts.
@@ -226,9 +227,18 @@ host, whose output is pasted under the Evidence of the pull request
 that follows it and is not committed under `docs/probes/`, so neither
 is a block B result:
 
-1. after the sync slice: `init`, `sync` and `approve`;
-2. after `run`: J1 to J3, from a `--dry-run` build of `main`
-   (`go run ./tools/release build --version <v> --dry-run`).
+1. after the sync slice: `init`, `sync` and `approve`, from a
+   `--dry-run` build of `main`;
+2. after `run`, once the kits and skills are embedded: J1 to J3, from a
+   `--dry-run` build of `main`.
+
+A `--dry-run` build is
+`go run ./tools/release build --version <v> --dry-run`, which lands with
+the sync slice, since a source build refuses `run`, `sync` and
+promotion ([02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public),
+Embedding). No `tools/ci` check guards the smoke steps: that each ran
+is shown only by the Evidence of the pull request that follows it,
+which review reads, so they are not covered by a check.
 
 **The release checklist.** The maintainer's release flow is this
 ordered list; each step names its command and its output:

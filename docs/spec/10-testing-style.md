@@ -881,7 +881,10 @@ A check that fails after a tag is fixed by a new patch version.
 
 - Standard Go layout; small single-purpose packages; no `utils`.
 - Errors carry an id from the error table (`cli.Error{ID: "RJ-301"}`),
-  which fixes the exit code; `main` maps them; tests assert ids.
+  which fixes the exit code; `main` maps them; tests assert ids. A
+  table row that no test raises fails `go test ./internal/cli/...`; a
+  row measurable only on a real host (`kit-build-failed`, B2) is listed
+  as exempt with its reason.
 - `context.Context` first for anything that runs a subprocess; every
   subprocess has a timeout, except the salvage exec, which stops only
   on an interrupt ([04 4.1](04-cli.md#41-conventions-both-binaries)).

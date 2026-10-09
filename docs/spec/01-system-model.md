@@ -397,7 +397,7 @@ generated glossary page is a row of
 | recreate-class | fields tagged `apply:"recreate"`: repos, kits, workload, ports, sandbox options, agent, and (until probe A10 says otherwise) secrets | - |
 | recreate needed | the live sandbox's recreate digest differs from the approved one; `status` reports it | - |
 | review checkout | a hardened checkout of sandbox work under `<name>-env/review/<dir>/` | - |
-| sandbox probe | a block B check that the probe harness runs inside a sandbox, ids `C1..C5` | - |
+| sandbox probe | a block B check that the probe harness runs inside a sandbox, ids C2..C6 (C1 is retired, 11 11.2) | - |
 | runtime ledger | the per-machine, add-only store of runtime events under host state ([13](13-runtime-ledger.md), designed, not built in v1); "the ledger" on its own means this | - |
 | spool | a project's agent-writable directory where julieta writes events until romeu ingests them | - |
 | ingest | romeu reads one project's spool and creates ledger entries | - |
