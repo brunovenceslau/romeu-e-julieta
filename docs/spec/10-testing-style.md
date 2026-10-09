@@ -209,13 +209,14 @@ starts (`mise --version`, `mise trust`, `mise install` and `mise which`) runs at
 of the tree with the mise environment besides:
 `MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml`,
 `MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none`, `MISE_ENV` set and
-empty, and `MISE_AUTO_ENV=false`, so mise reads `mise.toml` as its one
-configuration file of the tree, and `mise.lock`, and runs nothing that
-another mise file of a change holds (the threat model in
-`tools/ci/misefiles.go` says what stays trusted). That environment is
-measured with one version of mise, the `version` input of the mise
-action in `ci.yml`, so `fast`, `all` and `setup` refuse, before any
-other mise command, a mise whose `mise --version` names another.
+empty, `MISE_AUTO_ENV=false`, `GOENV=off` and `GOTOOLCHAIN=local`, so
+mise reads `mise.toml` as its one configuration file of the tree, and
+`mise.lock`, and runs nothing that another mise file of a change holds
+(the threat model in `tools/ci/misefiles.go` says what stays trusted).
+That environment is measured with one version of mise, the `version`
+input of the mise action in `ci.yml`, so `fast`, `all` and `setup`
+refuse, before any other mise command, a mise whose `mise --version`
+names another.
 
 The command steps of `all` are those of `fast` and `race`, in that
 order, with `vulnerabilities` and `license`, which read the tree and
@@ -347,7 +348,7 @@ There is one definition of a match and one function that applies it;
 | the PR title, body and head ref name; the same four readings of each commit in base..head | `tools/ci pr` | on the pull request |
 
 The hook is `exec env <the mise environment> go run ./tools/ci fast
-"$@"`, the mise environment being the four variables of the steps'
+"$@"`, the mise environment being the variables of the steps'
 mise commands (above), so the mise shim that starts go reads
 `mise.toml` alone. Git gives a pre-push
 hook the remote's name and URL as arguments and, on stdin, one line per

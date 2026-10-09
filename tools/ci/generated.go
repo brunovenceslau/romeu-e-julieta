@@ -114,9 +114,199 @@ func generated(ctx context.Context, repo git.Repo, gen step, wanted func(*os.Roo
 			return nil, err
 		}
 		findings = append(findings, tracked...)
+		converted, err := attributeProblems(ctx, repo, outs)
+		if err != nil {
+			return nil, err
+		}
+		findings = append(findings, converted...)
 	}
 	slices.SortStableFunc(findings, func(a, b finding) int { return strings.Compare(a.where, b.where) })
 	return findings, nil
+}
+
+// attributesPath is the file that lists the outputs of generate, one
+// "<path> -text" line each, so that no line-ending rule converts them.
+const attributesPath = ".gitattributes"
+
+// checkoutAttrs are the attributes that can change the bytes of a file
+// between the blob and the checkout: the line-ending ones (text, eol),
+// the keyword expansion of ident, a filter (smudge) and the encoding of
+// the working tree. A generated file has text unset and the rest
+// unspecified.
+var checkoutAttrs = []string{"text", "eol", "ident", "filter", "working-tree-encoding"}
+
+// attributeProblems holds the list in the root .gitattributes and the
+// outputs of generate to each other, and then asks git what attribute
+// each output really has.
+//
+// The list is compared in both directions: an output with no
+// "<path> -text" line fails, and so does a "-text" line that names a
+// path generate does not write. Only a line whose pattern is a path
+// written out in full counts as a list entry; any other "-text" line
+// (a glob, say) is not on the list, and so it fails. The list uses bare
+// paths with an explicit -text; a macro line ("[attr]name ...") is not an
+// entry.
+//
+// The list alone guarantees nothing, because a later line, a
+// .gitattributes in a directory or a rule in a clone's
+// .git/info/attributes can set the attribute again. So the effective
+// "text" attribute of each output is read with "git check-attr
+// --cached": that reads the .gitattributes files of the index, nested
+// ones included, which is what a commit takes and what a fresh checkout
+// holds, in the same way trackedOutputs judges the index and not the
+// working tree. It also honours .git/info/attributes of this clone, which
+// outranks the tracked files and which no checkout carries, so such a
+// rule fails here on the machine that holds it. Each output must be
+// "unset", and the others of checkoutAttrs unspecified. The attribute
+// files of the user and of the system rank below the tracked ones, so
+// they cannot undo a "-text" the tracked files set. What the effective
+// check cannot see, a text=unset string that reads like -text, is
+// found by scanAttributes in every tracked .gitattributes.
+func attributeProblems(ctx context.Context, repo git.Repo, outs []output) ([]finding, error) {
+	var findings []finding
+	listed, valued, err := scanAttributes(ctx, repo)
+	if err != nil {
+		return nil, err
+	}
+	want := map[string]bool{}
+	for _, o := range outs {
+		want[o.path] = true
+		if !listed[o.path] {
+			findings = append(findings, finding{o.path, "generated", attributesPath + " does not list this file with -text; add the line \"" + o.path + " -text\""})
+		}
+	}
+	for _, path := range slices.Sorted(maps.Keys(listed)) {
+		if !want[path] {
+			findings = append(findings, finding{attributesPath, "generated", fmt.Sprintf("lists %q with -text, and go generate does not write it; remove the line", path)})
+		}
+	}
+	findings = append(findings, valued...)
+	if len(outs) == 0 {
+		return findings, nil
+	}
+	args := []string{"check-attr", "--cached", "-z"}
+	args = append(args, checkoutAttrs...)
+	args = append(args, "--")
+	for _, o := range outs {
+		args = append(args, o.path)
+	}
+	got, err := repo.Run(ctx, nil, args...)
+	if err != nil {
+		return nil, err
+	}
+	values, err := parseCheckAttr(got, outs)
+	if err != nil {
+		return nil, err
+	}
+	for _, o := range outs {
+		for _, attr := range checkoutAttrs {
+			value := values[[2]string{o.path, attr}]
+			want := "unspecified"
+			if attr == "text" {
+				want = "unset"
+			}
+			// An unlisted output with no text rule at all is said once, above.
+			if value == want || (attr == "text" && value == "unspecified" && !listed[o.path]) {
+				continue
+			}
+			findings = append(findings, finding{o.path, "generated", fmt.Sprintf("has the %s attribute %q, and a generated file has text unset and the others unspecified; a later line or another .gitattributes sets it", attr, value)})
+		}
+	}
+	return findings, nil
+}
+
+// parseCheckAttr reads the output of "git check-attr -z" for outs and
+// checkoutAttrs: "<path>\0<attribute>\0<value>\0", one record for each
+// path and attribute. It is an error unless every output has a value
+// for every attribute, under the path it was asked for.
+func parseCheckAttr(got []byte, outs []output) (map[[2]string]string, error) {
+	fields := strings.Split(strings.TrimSuffix(string(got), "\x00"), "\x00")
+	if len(fields) != 3*len(outs)*len(checkoutAttrs) {
+		return nil, fmt.Errorf("git check-attr gave %d fields for %d paths and %d attributes", len(fields), len(outs), len(checkoutAttrs))
+	}
+	values := map[[2]string]string{}
+	for i := 0; i < len(fields); i += 3 {
+		values[[2]string{fields[i], fields[i+1]}] = fields[i+2]
+	}
+	for _, o := range outs {
+		for _, attr := range checkoutAttrs {
+			if _, ok := values[[2]string{o.path, attr}]; !ok {
+				return nil, fmt.Errorf("git check-attr gave no %s for %s", attr, o.path)
+			}
+		}
+	}
+	return values, nil
+}
+
+// attributeFileName is the base name of the files whose lines set
+// attributes.
+const attributeFileName = ".gitattributes"
+
+// scanAttributes reads every .gitattributes of the index, the root one
+// and the nested ones, through ":0:" (the merged entry), and returns
+// the paths that the root file lists with -text and the problems of
+// the lines of all of them.
+//
+// A line is a pattern and attributes, or a macro definition
+// ("[attr]name attributes"); comment and blank lines are skipped. The
+// pattern of a list entry is a bare path, so a pattern in double quotes
+// (git's C-style quoting, whose escapes differ in small ways from
+// Go's) is a problem, "write the path unquoted", and the line is not
+// read further. The list is the pattern of each root line that has -text
+// among its attributes.
+//
+// A text attribute with the value set, unset or unspecified is a
+// problem on any line, a macro definition included: "git check-attr"
+// prints that string as it prints the state, so the effective check
+// cannot tell the string from the state, and a checkout with
+// core.autocrlf may convert the file. Another value, such as text=auto,
+// is not a problem here: on a line that matches an output the effective
+// check reports it.
+func scanAttributes(ctx context.Context, repo git.Repo) (map[string]bool, []finding, error) {
+	names, err := repo.Run(ctx, nil, "ls-files", "--cached", "-z")
+	if err != nil {
+		return nil, nil, err
+	}
+	var files []string
+	for name := range strings.SplitSeq(string(names), "\x00") {
+		if name == attributeFileName || strings.HasSuffix(name, "/"+attributeFileName) {
+			files = append(files, name)
+		}
+	}
+	slices.Sort(files)
+	files = slices.Compact(files)
+	listed := map[string]bool{}
+	var problems []finding
+	for _, file := range files {
+		data, err := repo.Run(ctx, nil, "cat-file", "blob", ":0:"+file)
+		if err != nil {
+			return nil, nil, err
+		}
+		for line := range strings.SplitSeq(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			if strings.HasPrefix(line, `"`) {
+				problems = append(problems, finding{file, "generated", fmt.Sprintf("quotes a pattern in %s; write the path unquoted", line)})
+				continue
+			}
+			pattern, attrs, _ := strings.Cut(line, " ")
+			if p, a, ok := strings.Cut(line, "\t"); ok && len(p) < len(pattern) {
+				pattern, attrs = p, a
+			}
+			fields := strings.Fields(attrs)
+			if file == attributeFileName && !strings.HasPrefix(pattern, "[attr]") && slices.Contains(fields, "-text") {
+				listed[pattern] = true
+			}
+			for _, state := range []string{"set", "unset", "unspecified"} {
+				if slices.Contains(fields, "text="+state) {
+					problems = append(problems, finding{file, "generated", fmt.Sprintf("gives %q the value text=%s; git prints that string as it prints a state, so use -text", pattern, state)})
+				}
+			}
+		}
+	}
+	return listed, problems, nil
 }
 
 // regularMode is the index mode of a regular file without the execute

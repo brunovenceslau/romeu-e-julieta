@@ -331,6 +331,110 @@ func TestPrologueInThePushedRange(t *testing.T) {
 	assert.Contains(t, out, "pushed range: not checked against names")
 }
 
+// TestPushedRangeVerdicts pins the verdicts of pushedRange, case by
+// case: a verdict with findings whenever a denylist is in force or a
+// finding exists, a "not checked" note whenever neither list has an
+// entry, a verdict with its error for a denylist at HEAD that cannot be
+// read, and an error for a remote that is not configured.
+func TestPushedRangeVerdicts(t *testing.T) {
+	const (
+		zero       = "0000000000000000000000000000000000000000"
+		name       = "pushed range"
+		notChecked = "not checked against names, no denylist entry at HEAD or at the remote's default branch"
+	)
+	tests := []struct {
+		name        string
+		baseList    bool              // the default branch holds a denylist with an entry
+		tip         map[string]string // files of the pushed commit; "" removes one
+		noRemote    bool
+		want        func(tip string) []verdict // nil for the rows that end in an error
+		wantErr     string
+		wantVerdict string // the error of a verdict
+	}{
+		{
+			name: "an entry at HEAD, nothing found", baseList: true,
+			tip:  map[string]string{"docs/page.md": "plain\n"},
+			want: func(string) []verdict { return []verdict{{name: name}} },
+		},
+		{
+			name: "an entry at HEAD, a listed name in an added line", baseList: true,
+			tip: map[string]string{"docs/page.md": "see " + madeUp + "\n"},
+			want: func(tip string) []verdict {
+				return []verdict{{name: name, findings: []finding{{"commit " + tip + ": docs/page.md:1", "name", "the added line holds a name listed at HEAD"}}}}
+			},
+		},
+		{
+			name: "an entry only at the default branch", baseList: true,
+			tip: map[string]string{names.Path: "", "docs/page.md": "see " + madeUp + "\n"},
+			want: func(tip string) []verdict {
+				return []verdict{{name: name, findings: []finding{{"commit " + tip + ": docs/page.md:1", "name", "the added line holds a name listed at the remote's default branch"}}}}
+			},
+		},
+		{
+			name: "no entry anywhere, nothing found",
+			tip:  map[string]string{"docs/page.md": "plain\n"},
+			want: func(string) []verdict { return []verdict{{name: name, note: notChecked}} },
+		},
+		{
+			name: "no entry anywhere, an added prologue file",
+			tip:  map[string]string{"sub/prologue.md": "text\n"},
+			want: func(tip string) []verdict {
+				return []verdict{
+					{name: name, findings: []finding{{"commit " + tip + ": added path sub/prologue.md", "prologue", prologueMsg}}},
+					{name: name, note: notChecked},
+				}
+			},
+		},
+		{
+			name: "a denylist at HEAD that cannot be read", baseList: true,
+			tip:         map[string]string{names.Path: "{not a denylist\n"},
+			wantVerdict: names.Path,
+		},
+		{
+			name: "a remote that is not configured", baseList: true, noRemote: true,
+			tip:     map[string]string{"docs/page.md": "plain\n"},
+			wantErr: "no configured remote",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newTree(t)
+			if !tt.baseList {
+				require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
+			}
+			r.Commit("base")
+			if !tt.noRemote {
+				r.Git("remote", "add", "origin", gittest.NewBare(t).Dir)
+				r.Git("push", "--quiet", "origin", "main")
+				r.Git("fetch", "--quiet", "origin")
+			}
+			for path, content := range tt.tip {
+				if content == "" {
+					require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(path))))
+					continue
+				}
+				r.Write(path, content)
+			}
+			tip := r.Commit("tip")
+			push, err := pushed.Parse(strings.NewReader("refs/heads/main " + tip + " refs/heads/main " + zero + "\n"))
+			require.NoError(t, err)
+			got, err := pushedRange(t.Context(), r.Repo, "origin", push, tip)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			if tt.wantVerdict != "" {
+				require.Len(t, got, 1)
+				assert.Equal(t, name, got[0].name)
+				require.ErrorContains(t, got[0].err, tt.wantVerdict)
+				return
+			}
+			assert.Equal(t, tt.want(tip), got)
+		})
+	}
+}
+
 // TestHygienePrintsPathsSafely shows that a path is printed quoted when
 // it holds a control character, so it cannot move the terminal or add a
 // line of its own to the output.

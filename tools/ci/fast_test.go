@@ -1015,6 +1015,8 @@ func TestIsolateMiseConfig(t *testing.T) {
 	t.Setenv("MISE_STATE_DIR", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", poisoned)
 	t.Setenv("MISE_CONFIG_DIR", filepath.Join(poisoned, "mise"))
+	t.Setenv("MISE_DATA_DIR", t.TempDir())
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	ran := func() bool {
 		t.Helper()
 		_ = os.Remove(filepath.Join(markers, "global"))
@@ -1028,8 +1030,20 @@ func TestIsolateMiseConfig(t *testing.T) {
 		return err == nil
 	}
 	require.True(t, ran(), "the poisoned configuration runs its template")
+	moved := []string{"MISE_STATE_DIR", "XDG_CONFIG_HOME", "MISE_CONFIG_DIR"}
+	before := make(map[string]string, len(moved))
+	for _, key := range moved {
+		before[key] = os.Getenv(key)
+		require.NotEmpty(t, before[key], key)
+	}
 	isolateMiseConfig(t)
 	assert.False(t, ran(), "isolateMiseConfig keeps it out")
+	for _, key := range []string{"MISE_DATA_DIR", "XDG_DATA_HOME"} {
+		assert.Empty(t, os.Getenv(key), "isolateMiseConfig clears %s", key)
+	}
+	for _, key := range moved {
+		assert.NotEqual(t, before[key], os.Getenv(key), "isolateMiseConfig moves %s to a directory of its own", key)
+	}
 }
 
 // TestResolveLintTools checks that the tools of fast are the ones

@@ -83,7 +83,7 @@ func TestAll(t *testing.T) {
 			},
 			profile: "tools/ci 1 1",
 			code:    exitFail,
-			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:22: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
+			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:24: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
 		},
 		{
 			name:    "a hygiene finding",
@@ -551,12 +551,18 @@ func TestSetup(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(goCmd), 0o755))
 	require.NoError(t, os.WriteFile(goCmd, []byte("#!/bin/sh\necho \"go $* GOPROXY=${GOPROXY-unset} GOFLAGS=$GOFLAGS HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '"+log+"'\n"), 0o700))
 	linter := f.tool(t, "golangci-lint", "2.14.0", "golangci-lint")
-	script := "#!/bin/sh\n" + answerVersion + "if [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset} MISE=${MISE_OVERRIDE_CONFIG_FILENAMES-unset},${MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES-unset},${MISE_ENV-unset},${MISE_AUTO_ENV-unset}\" >> '" + log + "'\n"
+	script := "#!/bin/sh\n" + answerVersion + "if [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset} MISE=${MISE_OVERRIDE_CONFIG_FILENAMES-unset},${MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES-unset},${MISE_ENV-unset},${MISE_AUTO_ENV-unset} GO=${GOENV-unset},${GOTOOLCHAIN-unset}\" >> '" + log + "'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
 	t.Setenv("HTTPS_PROXY", "http://proxy.invalid")
 	t.Setenv("DOCKER_HOST", "unix:///nowhere")
 	t.Setenv("GITHUB_ACTIONS", "")
 	t.Setenv("MISE_ENV", "ci")
+	// The install builds govulncheck with the go command, so it gets
+	// GOENV=off and GOTOOLCHAIN=local even when the process holds others.
+	// passThroughEnv already drops these two, so the override itself is
+	// held by TestMiseEnvList.
+	t.Setenv("GOENV", "/from/the/process")
+	t.Setenv("GOTOOLCHAIN", "go1.99.0")
 
 	code, out := runCI(t, r, nil, nil, "setup")
 	assert.Equal(t, exitOK, code, out)
@@ -568,13 +574,18 @@ func TestSetup(t *testing.T) {
 	root, err := filepath.EvalSymlinks(r.Dir)
 	require.NoError(t, err)
 	// Both mise steps run with miseEnv, whatever the process holds.
-	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset DOCKER_HOST=unset MISE=mise.toml,none,,false\n"+
-		"mise install HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset MISE=mise.toml,none,,false\n"+
+	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset DOCKER_HOST=unset MISE=mise.toml,none,,false GO=off,local\n"+
+		"mise install HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset MISE=mise.toml,none,,false GO=off,local\n"+
 		"go mod download GOPROXY=unset GOFLAGS=-mod=readonly HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n", string(data))
 
 	t.Run("a hosted run without the mise environment stops before mise", func(t *testing.T) {
 		require.NoError(t, os.Remove(log))
 		t.Setenv("GITHUB_ACTIONS", "true")
+		for _, kv := range miseEnv { // whatever the caller exports
+			key, _, _ := strings.Cut(kv, "=")
+			t.Setenv(key, "")
+			require.NoError(t, os.Unsetenv(key))
+		}
 		code, out := runCI(t, r, nil, nil, "setup")
 		assert.Equal(t, exitError, code, out)
 		assert.Contains(t, out, "the workflow sets MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml for every mise run")
@@ -666,14 +677,14 @@ func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
 		assert.Equal(t, exitFail, code, out)
 		assert.Contains(t, out, "ok    rewrites")
 		assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
-		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:22: workflows: runs-on")
+		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:24: workflows: runs-on")
 	})
 	t.Run("fast by hand", func(t *testing.T) {
 		r, steps := fixture(t)
 		code, out := runCI(t, r, nil, steps, "fast")
 		assert.Equal(t, exitFail, code, out)
 		assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
-		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:22: workflows: runs-on")
+		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:24: workflows: runs-on")
 	})
 	t.Run("the pushed range of a pre-push run", func(t *testing.T) {
 		const zero = "0000000000000000000000000000000000000000"
@@ -705,23 +716,29 @@ func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
 // "ok"), fails this test.
 func TestCommitCheckThatCannotJudgeFails(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
-	broken := []struct{ name, path, content string }{
-		{"a denylist that does not parse", names.Path, "entries: [\n"},
-		{"word lists whose self-test fails", prose.Path, "rules:\n  - id: a\n    phrases: [zappy]\n    fails: [plain]\n    passes: [plain]\n"},
+	// pushedFails is whether the pushed range check reads the file too,
+	// so that a pre-push run fails it as well as hygiene.
+	broken := []struct {
+		name, path, content string
+		pushedFails         bool
+	}{
+		{"a denylist that does not parse", names.Path, "entries: [\n", true},
+		{"word lists whose self-test fails", prose.Path, "rules:\n  - id: a\n    phrases: [zappy]\n    fails: [plain]\n    passes: [plain]\n", false},
 	}
 	modes := []struct {
-		name string
-		run  func(t *testing.T, r *gittest.Repo, origin string) (int, string)
+		name    string
+		prePush bool
+		run     func(t *testing.T, r *gittest.Repo, origin string) (int, string)
 	}{
-		{"fast by hand", func(t *testing.T, r *gittest.Repo, _ string) (int, string) {
+		{"fast by hand", false, func(t *testing.T, r *gittest.Repo, _ string) (int, string) {
 			return runCI(t, r, nil, []step{passing}, "fast")
 		}},
-		{"all", func(t *testing.T, r *gittest.Repo, _ string) (int, string) {
+		{"all", false, func(t *testing.T, r *gittest.Repo, _ string) (int, string) {
 			profile := filepath.Join(t.TempDir(), "cover.out")
 			require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
 			return runAllIn(t, r, []step{passing}, profile)
 		}},
-		{"fast as the pre-push hook", func(t *testing.T, r *gittest.Repo, origin string) (int, string) {
+		{"fast as the pre-push hook", true, func(t *testing.T, r *gittest.Repo, origin string) (int, string) {
 			tip := strings.TrimSpace(r.Git("rev-parse", "HEAD"))
 			stdin := strings.NewReader("refs/heads/main " + tip + " refs/heads/main " + zero + "\n")
 			return runCI(t, r, stdin, []step{passing}, "fast", "origin", origin)
@@ -742,6 +759,12 @@ func TestCommitCheckThatCannotJudgeFails(t *testing.T) {
 				code, out := m.run(t, r, origin.Dir)
 				assert.Equal(t, exitFail, code, "exit status\n%s", out)
 				assert.Contains(t, out, "FAIL  hygiene\n"+b.path+": ", "the reason is on the FAIL line")
+				if m.prePush && b.pushedFails {
+					assert.Contains(t, out, "FAIL  pushed range", "the pushed range cannot be judged either")
+				}
+				if m.prePush && !b.pushedFails {
+					assert.NotContains(t, out, "FAIL  pushed range", "the file is not one the pushed range reads")
+				}
 				assert.Contains(t, out, "ok    passes")
 				assert.Contains(t, out, "ok    workflows", "the other checks still report")
 			})

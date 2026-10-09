@@ -326,6 +326,17 @@ func passThroughEnv() []string {
 	return env
 }
 
+// goPinEnv holds the two variables that keep the go command on the
+// pinned go and on the process's own environment: GOENV=off (no "go
+// env -w" file is read) and GOTOOLCHAIN=local (no other go is
+// downloaded or run). It is the one list that stepEnv and miseEnv
+// (every mise run, "mise install" and its build of govulncheck
+// among them) both hold.
+var goPinEnv = []string{
+	"GOENV=off",
+	"GOTOOLCHAIN=local",
+}
+
 // stepEnv is the environment of every step of fast, built from nothing
 // rather than from this process's: PATH with goDir first, so that a go
 // command the linter or a test starts is the pinned one, the rest of
@@ -335,9 +346,9 @@ func passThroughEnv() []string {
 // "-run" or build tags, a GOLANGCI_ or GL_ variable, GOEXPERIMENT or
 // GOAMD64, which change the build tags) has no effect on it.
 //
-//   - GOENV=off: the go command reads no "go env -w" file, which could
-//     set GOFLAGS or any of the variables below.
-//   - GOTOOLCHAIN=local: the go of goDir runs, and no other is
+//   - goPinEnv: GOENV=off, so the go command reads no "go env -w" file,
+//     which could set GOFLAGS or any of the variables below, and
+//     GOTOOLCHAIN=local, so the go of goDir runs and no other is
 //     downloaded.
 //   - GOWORK=off: a go.work file in a parent directory does not change
 //     the modules.
@@ -356,9 +367,7 @@ func stepEnv(goDir string) []string {
 		path += string(os.PathListSeparator) + value
 	}
 	rest := slices.DeleteFunc(passThroughEnv(), func(kv string) bool { return strings.HasPrefix(kv, "PATH=") })
-	return slices.Concat([]string{"PATH=" + path}, rest, []string{
-		"GOENV=off",
-		"GOTOOLCHAIN=local",
+	return slices.Concat([]string{"PATH=" + path}, rest, goPinEnv, []string{
 		"GOWORK=off",
 		"GOPROXY=off",
 		"GOFLAGS=-mod=readonly",

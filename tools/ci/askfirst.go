@@ -52,7 +52,10 @@ var (
 	// written as the complement of the other categories (C, M and Z)
 	// because RE2 has no class subtraction; the phrase holds no control
 	// or format character and none of the double quotation marks the
-	// two classes list.
+	// two classes list. The first-character class leans on Go's \p{C}
+	// covering unassigned code points (Cn) as well as Cc, Cf, Co and
+	// Cs; the case "a leading unassigned code point" of TestApprovalLine
+	// fails if a Go or Unicode table update changes that.
 	approvalLine = regexp.MustCompile(`^Approval: ([a-z0-9-]+) - ([^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{C}\p{M}\p{Z}][^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{Cc}\p{Cf}]*)$`)
 )
 
@@ -207,7 +210,8 @@ func (a *askFirst) referencePage() []byte {
 	b.WriteString("in the form that\n[12 12.4](../spec/12-engineering.md#124-middleware-before-and-after-every-change)\ndefines:\n\n")
 	b.WriteString("```text\n" + approvalForm + "\n```\n\n")
 	b.WriteString("The phrase names what was approved, in a few neutral words, and no person.\n")
-	b.WriteString("It holds none of the double quotation marks 12 12.4 lists; single quotation marks and other look-alikes are left to review.\n\n")
+	b.WriteString("It holds none of the double quotation marks 12 12.4 lists;\n")
+	b.WriteString("single quotation marks and other look-alikes are left to review.\n\n")
 	fmt.Fprintf(&b, "The code-owner review is requested from `%s`. [05 5.3](../spec/05-security.md#53-ask-first-surfaces)\nsays why each surface is on the list.\n\n", a.Owner)
 	b.WriteString("| Surface | Paths | Why |\n|---|---|---|\n")
 	for _, s := range a.Surfaces {

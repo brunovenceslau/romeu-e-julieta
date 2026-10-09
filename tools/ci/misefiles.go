@@ -157,19 +157,25 @@ import (
 // is ever added.
 
 // miseEnv is the environment of every mise run, as "KEY=value": the
-// configuration file mise reads is mise.toml alone, it reads no
+// four mise variables below, then goPinEnv. The configuration file
+// mise reads is mise.toml alone, it reads no
 // .tool-versions ("none" is the empty list, src/env.rs of mise
 // 2026.10.3), and it selects no environment's files, neither one named
 // by MISE_ENV or a .miserc.toml (an empty MISE_ENV is set, so mise
 // does not fall back to the .miserc.toml) nor one of the platform
 // (auto_env). The workflow sets the same table (the workflows check),
 // and the pre-push hook the same variables (TestHook).
-var miseEnv = []string{
+//
+// goPinEnv ends the list: "mise install" builds govulncheck with the go
+// command ("go install", the go: backend), so that build reads no "go
+// env -w" file and starts no other go than the pinned one, as every go
+// step of tools/ci does (stepEnv).
+var miseEnv = slices.Concat([]string{
 	"MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml",
 	"MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none",
 	"MISE_ENV=",
 	"MISE_AUTO_ENV=false",
-}
+}, goPinEnv)
 
 // miseEnviron returns env with miseEnv after it, for a mise command.
 // No list of variables a step keeps from this process holds a key of
