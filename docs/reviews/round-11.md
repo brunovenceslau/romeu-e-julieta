@@ -331,40 +331,100 @@ matched a nested `refs/romeu/salvage/<generation>/<salvage-id>/...`
 ref on a commit no branch holds, with git 2.53.0 in a scratch
 repository on 2026-10-09.
 
-## Session checkpoint (2026-10-09)
+## Session checkpoint (2026-10-09, end of session)
 
-Branch and pull request state is not recorded here; the next session
-measures it with `handoff_state.py`.
+### Decided (2026-10-09)
+
+- The open block of the round-8 checkpoint: every recommendation was
+  accepted, with one change to G5. G5 option (a), the `approvals`
+  surface, was widened in four steps, each after a must-fix security
+  re-audit. The end state: `tools/ci pr` runs from a workflow defined
+  in the default branch (`pull_request_target`, `branches: [main]`,
+  `github.sha`, `contents: read`, no secret) and reads the head only as
+  data. From round 11 on, the spec states this as an invariant, and the
+  mechanism is acceptance requirements (a) to (d) of plan T005.
+- PR #34 (DR3): option (a) and then S1 (the mise global config) were
+  fixed. After four audit rounds, each of which found another
+  caller-set mise variable (N1 `MISE_ENV_FILE`, N3 `MISE_CD`, N4
+  `MISE_TRUSTED_CONFIG_PATHS`, plus `mise exec` trusting a parent
+  `mise.toml`), the hook and every mise run of tools/ci were moved to an
+  environment allowlist. That also closes N2 (`MISE_SYSTEM_CONFIG_FILE`).
+- Rounds 10 and 11 ran.
+- D2 to D6 of round 9 were all decided as recommended, and AR22 was
+  closed as not needed (PR #33 measured the ruleset).
+- D2, D4 and D6 (token narrowing, required checks without the admin
+  bypass, direct-push refusal) were decided by delegation and recorded
+  in [ADR 0011](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md).
+- The golangci-lint flake was fixed in PR #39 with
+  `--allow-parallel-runners`, plus `-j 1` on request. The measured cost
+  of `-j 1`: it does not fix the lock; a cold run takes about 14s
+  against about 7s; it is kept to limit CPU use when runs overlap.
+- Merges stay the maintainer's act. A pull request leaves draft when its
+  gates are done and its hosted CI is green.
 
 ### Done
 
-- Round 11 ran: seventeen lenses on d133542, then the consolidation.
-- Its write pass was applied on branch `docs/review-round-9`, the
-  branch of pull request #36, as described above.
-- [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md)
-  records the decisions of 2026-10-09 on the administrator bypass,
-  the token narrowing and the direct-push refusal, with the spec
-  texts they change.
+- PR #25 merged; ship gate rounds 1 to 3 plus five G5 security
+  re-audits GO, CI green at 3f29a9c.
+- PR #37 merged; ship gate GO, CI green at 3fda471.
+- PR #36: round-9 write pass, ship gate GO in round 3 at dc76fec; then
+  the decisions of 2026-10-09 and ADR 0010 (d458f83), the round-10 write
+  pass (d133542), and the round-11 write pass plus ADR 0011 (6fd6e60),
+  each re-audited by the next lens round. No ship gate has run yet on
+  the commits after dc76fec.
+- PR #39 at 439e406: ship gate GO in round 2.
+- PR #34 at edda3e3: the allowlist redesign. Every repro (escape 2, S1,
+  N1, N2, N3, N4) was blocked with a real push. A full ship gate and
+  hosted CI were running at handoff, with no result recorded.
 
 ### Open for the maintainer
 
-Steps on the host and on GitHub, in this order:
+One block, each item with a recommendation:
 
-1. Remove "Repository admin" from the bypass list of ruleset 24611273,
-   `default-branch`, and save the API answer that shows no bypass actor
-   under the Evidence of the pull request that records it (ADR 0011,
-   decision 1).
-2. Create the fine-grained token of ADR 0011, decision 2, and set it as
-   the development sandbox's `github` secret with `sbx secret set`.
-3. Stop forwarding the GitHub authentication SSH key to the sandbox.
-4. Run probe A16 on the host again, and the four tries of item d of the
-   maintainer block (10 10.2), the direct push to the default branch
-   among them.
-5. The merges, each once its approval lines are ticked and its CI is
-   green.
+- Merges, in the order #39, #34, #36, each once it is out of draft.
+- Host and GitHub steps of ADR 0011, recommended in one sitting:
+  - remove "Repository admin" from the bypass list of ruleset 24611273
+    and save the API answer under Evidence;
+  - create a fine-grained token for this repository only (Contents,
+    Pull requests and Workflows read-write; Actions, Checks and Metadata
+    read; no Administration) and set it with
+    `sbx secret set github --sandbox <name>`;
+  - stop forwarding the GitHub SSH auth key;
+  - then re-run probe A16 and the four tries, the direct push included.
+- A finding to know before that sitting: the current sandbox token is a
+  classic token with scopes `gist, read:org, repo, workflow`, read on
+  2026-10-09 from a response header, not on the host. It reaches every
+  repository of the account, private ones included.
 
 ### Next steps
 
-- Round 12, the targeted re-audit of this write pass, limited to the
-  lenses that raised the round-11 Required clusters: L0, L2, L3, L6,
-  L12, L13 and L14.
+1. Round 12, the targeted re-audit of round 11 by L0, L2, L3, L6, L12,
+   L13 and L14, on the head of PR #36. It was running at handoff;
+   re-run it if its result is not recorded in a
+   docs/reviews/round-12.md.
+2. If round 12 raises no new Required finding, declare the spec
+   validated for T004 onward in round-12.md, with the numbers.
+   Otherwise, one more write pass and round.
+3. A ship gate on PR #36's commits after dc76fec, then out of draft.
+4. PR #34: finish the full ship gate on its head and get hosted CI green
+   (the hosted mise action exports `MISE_TRUSTED_CONFIG_PATHS`,
+   `MISE_YES` and `MISE_LOG_LEVEL`), then out of draft.
+5. PR #39: hosted CI green, then out of draft. It overlaps PR #34 on
+   tools/ci/fast.go, so whichever lands second rebases.
+6. The R8-05-3 tooling PR (the `sbxdrv` surface and `skills/**` on
+   `kits`), after #36 lands, because both edit the 05 5.3 fence.
+7. The stage-B items in round-8/write-pass.md and the pending items of
+   rounds 9 to 11.
+
+### Pending items
+
+- The mise `HOME`, `PATH` and Go cache pass-throughs of the allowlist (a
+  poisoned module or build cache).
+- Several agents sharing one machine run tools/ci at the same time, so
+  any check that takes a machine-wide resource must be safe under that.
+- tools/lenses: a script that runs a lens round (the briefs of rounds 9
+  to 12 were generated by hand from lenses.md) and a well-formedness
+  check of review reports.
+
+Branch and PR state is not recorded here; the next session measures it
+with `~/.sbx-kit/claude-home/bin/handoff_state.py`.
