@@ -385,7 +385,7 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 		}, []string{
 			codeowners + `: generated: has the text attribute "unspecified"`,
 			`docs/adr/README.md: generated: has the text attribute "unspecified"`,
-			askFirstPagePath + ": generated: .GitAttributes does not list this file",
+			askFirstPagePath + ": generated: .GitAttributes does not list this file with -text; rename it to .gitattributes",
 		}},
 		{"a root file named in other case is the list", func(t *testing.T, r *gittest.Repo) {
 			r.Git("mv", attributesPath, ".GitAttributes")
@@ -475,7 +475,8 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			}{attr + "=" + state + " reads like a state", func(t *testing.T, r *gittest.Repo) {
 				r.Write(attributesPath, goodAttributes+line)
 				r.Commit("string")
-			}, []string{`.gitattributes: generated: gives "none.md" the value ` + attr + "=" + state}})
+			}, []string{`.gitattributes: generated: gives "none.md" the value ` + attr + "=" + state +
+				"; git prints that string as it prints a state, so write the state as " + attr + ", -" + attr + " or !" + attr}})
 		}
 	}
 	for _, tt := range tests {
@@ -519,6 +520,30 @@ func TestGeneratedFindingsPrintHostilePaths(t *testing.T) {
 	assert.NotContains(t, got[0], "\n")
 	assert.NotContains(t, got[0], "\x1b")
 	assert.True(t, strings.HasPrefix(got[0], `"d\n::error::forged\x1b[2J/.gitattributes": generated: gives "x"`), got[0])
+}
+
+// TestAttributeProblemsQuoteHostilePaths checks that an output path with a
+// newline and an escape (the path comes from .adr-dir) is quoted in the
+// message and in the error, so neither carries a raw control character.
+func TestAttributeProblemsQuoteHostilePaths(t *testing.T) {
+	r := committedGenerateFixture(t).For(t)
+	hostile := "d\n::error::forged\x1b[2J/README.md"
+	findings, err := attributeProblems(t.Context(), r.Repo, []output{{path: hostile}})
+	require.NoError(t, err)
+	require.NotEmpty(t, findings)
+	for _, f := range findings {
+		assert.NotContains(t, f.msg, "\n")
+		assert.NotContains(t, f.msg, "\x1b")
+	}
+	assert.Contains(t, findings[0].msg, `add the line "d\n::error::forged\x1b[2J/README.md -text"`)
+	var other string
+	for _, attr := range checkoutAttrs {
+		other += "b\x00" + attr + "\x00unspecified\x00"
+	}
+	_, err = parseCheckAttr([]byte(other), []output{{path: hostile}})
+	require.ErrorContains(t, err, "gave no text for")
+	assert.NotContains(t, err.Error(), "\n")
+	assert.NotContains(t, err.Error(), "\x1b")
 }
 
 // TestGeneratedInfoAttributesUnreadable checks that an info/attributes
@@ -574,7 +599,20 @@ func TestParseCheckAttr(t *testing.T) {
 	_, err = parseCheckAttr([]byte(""), outs)
 	require.ErrorContains(t, err, "fields")
 	_, err = parseCheckAttr([]byte(strings.ReplaceAll(good, "a\x00text", "b\x00text")), outs)
-	require.ErrorContains(t, err, "gave no text for a")
+	require.ErrorContains(t, err, `gave no text for "a"`)
+}
+
+// TestFindingPathCannotStartACommand checks that a path that is printable
+// and starts like a workflow command does not begin a line of the log
+// as one.
+func TestFindingPathCannotStartACommand(t *testing.T) {
+	for _, where := range []string{"::error::x/.gitattributes", "  ::stop-commands::tok/f", "##[error]x/f"} {
+		line := finding{where, "generated", "m"}.String()
+		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
+		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "##["), "%q", line)
+		assert.Contains(t, line, strings.TrimSpace(where))
+	}
+	assert.Equal(t, "a/b: generated: m", finding{"a/b", "generated", "m"}.String())
 }
 
 // TestGeneratedOutputsAreNotConverted runs attributeProblems on this

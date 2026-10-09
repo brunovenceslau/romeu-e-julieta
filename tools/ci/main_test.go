@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"os/exec"
@@ -124,4 +125,32 @@ func TestHook(t *testing.T) {
 	}
 	mode, _, _ := strings.Cut(string(out), " ")
 	assert.Equal(t, hookMode, mode, "the mode git records for the hook")
+}
+
+// TestSafeText checks that text about repository content, such as the
+// output of a generator, carries no control character and starts no line
+// as a workflow command, and that a tab and a plain line stay as they are.
+func TestSafeText(t *testing.T) {
+	assert.Equal(t, "a\tb\nplain", safeText("a\tb\nplain"))
+	got := safeText("x\x1b[2J\n::error::forged\n  ##[error]y\r")
+	assert.NotContains(t, got, "\x1b")
+	assert.NotContains(t, got, "\r")
+	for _, line := range strings.Split(got, "\n") {
+		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
+		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "##["), "%q", line)
+	}
+	assert.Contains(t, got, `\x1b`)
+}
+
+// TestRunPrintsAnErrorAsSafeText checks that the error line of run does
+// not carry the control characters or the command line of an argument.
+func TestRunPrintsAnErrorAsSafeText(t *testing.T) {
+	var out, errOut bytes.Buffer
+	e := env{dir: t.TempDir(), stdout: &out, stderr: &errOut}
+	assert.Equal(t, exitError, run(context.Background(), e, []string{"hygiene", "--bad\x1b[2J\n::error::forged"}))
+	assert.NotContains(t, errOut.String(), "\x1b")
+	for _, line := range strings.Split(errOut.String(), "\n") {
+		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
+	}
+	assert.Contains(t, errOut.String(), `\x1b[2J`)
 }

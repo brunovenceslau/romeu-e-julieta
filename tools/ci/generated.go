@@ -175,7 +175,12 @@ func attributeProblems(ctx context.Context, repo git.Repo, outs []output) ([]fin
 	for _, o := range outs {
 		want[o.path] = true
 		if !listed[o.path] {
-			findings = append(findings, finding{o.path, "generated", root + " does not list this file with -text; add the line \"" + o.path + " -text\""})
+			advice := fmt.Sprintf("add the line %q", o.path+" -text")
+			if root != attributesPath {
+				// Git on a case-sensitive filesystem ignores a root file in other case.
+				advice = "rename it to " + attributesPath + " and " + advice
+			}
+			findings = append(findings, finding{o.path, "generated", root + " does not list this file with -text; " + advice})
 		}
 	}
 	for _, path := range slices.Sorted(maps.Keys(listed)) {
@@ -234,7 +239,7 @@ func parseCheckAttr(got []byte, outs []output) (map[[2]string]string, error) {
 	for _, o := range outs {
 		for _, attr := range checkoutAttrs {
 			if _, ok := values[[2]string{o.path, attr}]; !ok {
-				return nil, fmt.Errorf("git check-attr gave no %s for %s", attr, o.path)
+				return nil, fmt.Errorf("git check-attr gave no %s for %q", attr, o.path)
 			}
 		}
 	}
@@ -352,7 +357,7 @@ func scanLines(file, data string, root bool, listed map[string]bool, problems *[
 			listed[pattern] = true
 		}
 		for _, attr := range checkoutAttrs {
-			fix := "drop the value"
+			fix := fmt.Sprintf("write the state as %s, -%s or !%s", attr, attr, attr)
 			if attr == "text" {
 				fix = "use -text"
 			}
