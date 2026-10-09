@@ -847,11 +847,6 @@ Evidence:
   builds `pr` lands, its job joins the required checks, the same way.
 - f. Before the first release candidate: turn on GitHub's immutable
   releases setting. To do.
-- g. A fifth try, at the next sitting, only with the operator present
-  and confirming live and the revert step ready: set the default-branch
-  ruleset's enforcement to disabled with the sandbox's token, read the
-  body back, and restore it. The result is recorded in 05 5.4 and in
-  the next decision record. To do.
 
 Between steps 1 and 3 the hook is the one check on commit messages,
 identities and ref names, and julieta's dispatcher does not exist yet,

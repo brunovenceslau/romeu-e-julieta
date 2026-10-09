@@ -87,7 +87,8 @@ which names each step's command and output path.
    project that uses `git-ssh-sign`, register the key on GitHub as a
    signing key and never as an authentication key, and start the
    dedicated signing agent with exactly that one key, added with
-   `ssh-add -c` so each use asks for confirmation
+   `ssh-add -c` so each use asks for confirmation; that needs an askpass
+   program, which macOS does not ship, so install one first
    ([06 6.4](06-kits.md#64-product-kits)); sync
    exits 2 with `RJ-204 signing-socket` until it is reachable and holds
    that key.

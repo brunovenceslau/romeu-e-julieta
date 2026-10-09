@@ -107,7 +107,8 @@ and in the preflight of that project's **P** commands (01 1.5). How sbx
 is made to forward that socket is Q19. `signingKey` is registered on
 GitHub as a signing key and never as an authentication key, and it is
 added to the dedicated agent with `ssh-add -c`, so each use asks for
-confirmation (J1 step 5).
+confirmation where an askpass program is installed (J1 step 5); probe
+B2 records it on both hosts.
 
 **herdr.** herdr is the terminal multiplexer that runs inside the
 sandbox and that julieta renders a run layout into (01 1.1). Its

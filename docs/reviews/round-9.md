@@ -127,8 +127,8 @@ member is, else `new`. Sections are cited as the spec cites itself.
 | **R9-20** | 10 10.5; 11 11.4; 12 12.2 (release checklist step 3) | L9 (L9-R9-3) | new | `acceptance --pre-tag` runs four checks, which leave out two that read only the repository: a `default-overturned` result with no `resolvedBy`, and a block A result recorded at another sbx or pin. | holds: 10 10.5 lists four; the two are in 11 11.4 | the pre-tag run adds both, and 10 10.5 lists six | A |
 | **R9-21** | 00 0.5; 10 10.2 (`sequences` row) | L11 (L11-r9-1) | new | 00 0.5 says `tools/ci sequences` checks that every command has a scope row (SC6, decided on 2026-10-08), but the `sequences` row of 10 10.2 has no such rule. | holds: the row lists ADR, deferred-row, id and plan rules only | the `sequences` row gains the rule both ways (every command of 04 4.2 and 4.3 has a row in 00 0.5, and every row names a command), with its fixtures; T004's acceptance line is parked for B, and the spec half lands before T004 | M: every row names a command is narrowed to rows written as a command, since 00 0.5 also holds feature rows |
 | **R9-22** | 12 12.3 (`tools/new`); 04 4.1 (Error ids) | L12 (L12-R9-1) | new | ADR numbers, lesson numbers and RJ ids take "the next free number", so two branches from one base take the same one, both pass on their own, and `sequences` goes red on main after the second merge. | holds: 12 12.3 and 04 4.1 read as stated; nothing reruns a branch against the new base | one rule in 12 12.3: a pull request that adds a numbered record is rebased on the current base and its checks run again before the merge | A |
-| **R9-24** | index Deferred decisions (narrowing the development sandbox's GitHub token); ADR 0009 decision 18 | L2 (L2-r9-1) | unresolved (R8-index-5, DR5) | The trigger "the second final handoff ... counted by hand from the handoff record those sessions keep" names no file and no mark of a final handoff, so nobody can count it, and the session checkpoints since 2026-10-07 may already reach two. | holds: the row names no file; round-8.md holds checkpoint sections of 2026-10-08 (and "continued") and 2026-10-09 | the row names the record (the "Session checkpoint" sections of `docs/reviews/round-<n>.md`, then the handoff files once julieta runs in the development sandbox), the mark of a final one, and the one command that counts them; the count is taken now. Needs the operator (D2) | operator (D2) |
-| **R9-25** | 06 6.4 (signing rule); J1 step 5; 05 5.4 (Verified signature row); 11 11.2 B2 | L2 (L2-r9-2) | new | The mitigation rests on `ssh-add -c`, whose confirmation needs an askpass program that macOS does not ship, so the first signed commit may fail and the operator may drop `-c`. Inferred, not measured. | holds as inferred: no probe exercises `-c`; B2 checks `ssh-add -L` only | B2 records, on both hosts, a commit in the sandbox with the key added by `-c`; J1 step 5 names the askpass prerequisite; until B2 has run, the 05 5.4 row says "confirm-on-use where an askpass is installed (B2)". Rewording the accepted risk needs the operator (D3) | operator (D3) |
+| **R9-24** | index Deferred decisions (narrowing the development sandbox's GitHub token); ADR 0009 decision 18 | L2 (L2-r9-1) | unresolved (R8-index-5, DR5) | The trigger "the second final handoff ... counted by hand from the handoff record those sessions keep" names no file and no mark of a final handoff, so nobody can count it, and the session checkpoints since 2026-10-07 may already reach two. | holds: the row names no file; round-8.md holds checkpoint sections of 2026-10-08 (and "continued") and 2026-10-09 | the row names the record (the "Session checkpoint" sections of `docs/reviews/round-<n>.md`, then the handoff files once julieta runs in the development sandbox), the mark of a final one, and the one command that counts them; the count is taken now. Needs the operator (D2) | operator (D2; decided on 2026-10-09 and applied) |
+| **R9-25** | 06 6.4 (signing rule); J1 step 5; 05 5.4 (Verified signature row); 11 11.2 B2 | L2 (L2-r9-2) | new | The mitigation rests on `ssh-add -c`, whose confirmation needs an askpass program that macOS does not ship, so the first signed commit may fail and the operator may drop `-c`. Inferred, not measured. | holds as inferred: no probe exercises `-c`; B2 checks `ssh-add -L` only | B2 records, on both hosts, a commit in the sandbox with the key added by `-c`; J1 step 5 names the askpass prerequisite; until B2 has run, the 05 5.4 row says "confirm-on-use where an askpass is installed (B2)". Rewording the accepted risk needs the operator (D3) | operator (D3; decided on 2026-10-09 and applied) |
 | **R9-26** | 04 4.1 (Error ids, the details) | L14 (L14-r9-1) | new | The details of a failed subprocess (its argv and the first 4 KiB of its stderr) are called safe to paste into an issue because romeu handles no secret, but I25 covers what romeu writes, not what git or sbx print, which can hold a token in a remote URL or a home path. | holds: 04 4.1 reads as stated | stderr in the details passes the recorder's redaction of 10 10.3; the paste claim covers argv, status, step and versions; home paths and host names are named as not covered | A |
 | **R9-27** | 03 (opening, Versions); 04 4.4 | L14 (L14-r9-2) | new | A record romeu cannot decode is reported "by id" by `status` and `doctor`, but 04 4.4 has no row for an undecodable own record: `format-newer` is for a newer version, `upstream-shape` for other tools' output. | holds: no row fits; "by id" can be read as the record's id, which still leaves the error with none | one row, `record-unreadable`, exit 2, raised by every reader of a versioned format, with its fix hint; 03 cites it | A |
 | **R9-28** | 11 11.3 (`host.upstream`); 11 11.4 | L15 (L15-R9-1) | new | `host.upstream` records "the frontend pin for A11 to A13", while the 11.4 table re-runs A12 for the workload digest and A13 for herdr, so the pin check of 11.4 cannot fire for those bumps. | holds: the field rule and the table differ as stated | `host.upstream` is a map keyed by pin (frontend, workload, herdr, mise, agent), filled for every probe the 11.4 table lists under that pin; the check compares each key | A |
@@ -152,11 +152,11 @@ rest.
 | Finding | Section | Kind | Defect | Resolution | Status |
 |---|---|---|---|---|---|
 | L0-r9-3 | 05 5.3 ask-first surfaces | unresolved | The round-8 row (status M) put `internal/sbxdrv` on a new surface and `skills/**` on the kits surface, but the write pass added only the `spec` surface, and 05 5.3 does not say the two are pending. | one sentence in 05 5.3 that `internal/sbxdrv` and `skills/**` join a surface in their own tooling pull request, with that pull request as the trigger; the surfaces themselves wait for it (approval line: `spec`) | M: the two paths are named as pending, with their tooling pull request as the trigger; the surfaces wait for it |
-| L0-r9-4 | ADR 0006 | new | The spec defers the runtime ledger, but ADR 0006 is still Accepted and speaks of 'a v1 event', 'Rejected for v1' and 'v1 defers'. | a status note on ADR 0006 pointing at the Deferred row of the ledger, in the next decision-record pass (approval line: `decisions`) | operator (D5) |
+| L0-r9-4 | ADR 0006 | new | The spec defers the runtime ledger, but ADR 0006 is still Accepted and speaks of 'a v1 event', 'Rejected for v1' and 'v1 defers'. | a status note on ADR 0006 pointing at the Deferred row of the ledger, in the next decision-record pass (approval line: `decisions`) | operator (D5; decided on 2026-10-09 and applied) |
 | L1-r9-2 | 02 2.3 | unresolved | The one-sentence statement of the supported daily setup (edit and debug inside the sandbox; host clones are for reading in Restricted Mode) is not in 02 2.3 or anywhere else. | apply the change the finding proposes | A |
 | L1-r9-3 | 04 4.2 (run step 2); 04 4.4 | new | The loss block that run prints before exiting 1 names the handoff command and J10 step 3 but not the command that creates the new sandbox (romeu run <name>), and the exit 1 has no row in the error table although 4.1 gives every error an id and a fix hint. | apply the change the finding proposes | A |
 | L2-r9-3 | 07 7.4 (GitHub rate limit row) | regression | The pointer added for L2b-17 says that, until the token-narrowing row fires, the project's github secret 'is the operator's own token'. | apply the change the finding proposes | A |
-| L2-r9-5 | ADR 0009 (Consequences, the pre-push hook bullet) | new | The record says that until PR #34 lands, 'the pull request's diff review is the only guard' against an untracked go.work or vendor/ and a caller's GOFLAGS. | in the record that next amends ADR 0009 (approval line: `decisions`) | operator (D5) |
+| L2-r9-5 | ADR 0009 (Consequences, the pre-push hook bullet) | new | The record says that until PR #34 lands, 'the pull request's diff review is the only guard' against an untracked go.work or vendor/ and a caller's GOFLAGS. | in the record that next amends ADR 0009 (approval line: `decisions`) | operator (D5; decided on 2026-10-09 and applied) |
 | L2-r9-6 | 02 2.3 (host tree); 01 1.3 boundary D; 04 4.2 (doctor, root-indexed) | new | The indexer control is a .metadata_never_index file inside each <name>-env/, and doctor checks only that the file exists. | apply the change the finding proposes | A |
 | L2-r9-7 | 11 11.1 (A16) | new | A16 reads the token's type 'from its prefix' and its scopes 'from the x-oauth-scopes header'. | apply the change the finding proposes | A |
 | L2-r9-8 | 03 3.4 (Rules: secret-in-argv) | new | The best-effort token shapes list ghp_, gho_, ghs_ and github_pat_, but leave out ghu_ and ghr_, GitHub's other two token prefixes, which the same refusal would catch at no cost. | apply the change the finding proposes | A |
@@ -229,6 +229,7 @@ and in the text it changes.
   ruleset, as read on 2026-10-09, has a required-status-checks rule
   that lists the four `all on ...` checks, so "requires CI green" in
   05 5.4, 12 12.4 and ADR 0009 holds. What that reading fired is D4.
+  Answered on 2026-10-09: closed, as stated.
 - **D2 (R9-24), the token-narrowing trigger.** The index row
   "narrowing the development sandbox's GitHub token" counts "the second
   final handoff ... counted by hand from the handoff record those
@@ -248,6 +249,7 @@ and in the text it changes.
   (a), and the same wording in the record that next amends decision
   18 of ADR 0009 (the triggers of ADR 0008's deferred item 1).
   Approval lines: `spec` (the index), `decisions` (the record).
+  Decided on 2026-10-09: option (a). The index row names the record (a `## Session checkpoint (<date>)` heading in `docs/reviews/round-<n>.md`, then a `--final` handoff file), the command that counts them, and the count taken on 2026-10-09: three, so the trigger has fired and the review is due; decision 6 of ADR 0010 carries the record half.
 - **D3 (R9-25), the `ssh-add -c` mitigation.** The mitigation of the
   Verified-signature row of 05 5.4, and of 06 6.4 and J1 step 5, rests
   on `ssh-add -c`, whose confirmation needs an askpass program that
@@ -259,6 +261,7 @@ and in the text it changes.
   (c) replace `-c` by another confirmation. Recommendation: (a): it
   states only what is known, and B2 settles it on both hosts. Approval
   line: `spec`.
+  Decided on 2026-10-09: option (a), applied in the 05 5.4 row, 06 6.4, J1 step 5 and probe B2.
 - **D4, the triggers that the 2026-10-09 ruleset reading fired.** The
   index Deferred row "required status checks without the administrator
   bypass" is reopened by "the jobs of the green run are added as
@@ -274,6 +277,7 @@ and in the text it changes.
   the token narrowing), recorded the same way; (c) leave both, which
   leaves a fired trigger with nothing reopened. Recommendation: (a).
   Approval lines: `spec` (the index row), `decisions` (the record).
+  Decided on 2026-10-09: option (a). ADR 0010, decision 1, records the decision as reopened with its options open, and the index row says so; the choice is the next decision block's item.
 - **D5, the decision-record halves of Advisory findings.** An accepted
   record is not rewritten (12 12.5), so these wait for one amending
   record: a status note on ADR 0006 pointing at the Deferred row of the
@@ -286,6 +290,7 @@ and in the text it changes.
   next decision-record pass carrying the four, with D2 and D4 if they
   are decided by then; (b) one record each. Recommendation: (a).
   Approval line: `decisions`.
+  Decided on 2026-10-09: option (a), as decisions 2 to 5 of ADR 0010, which ADRs 0001, 0006, 0008 and 0009 now name in a `Superseded in part by` line.
 - **D6 (ship9-te-1), the packages S9 measures.** S9 lists `cmd/...`,
   but `coverTrees` in `tools/ci/coverage.go` holds `internal`, `tools`,
   `e2e/probes` and `e2e/fakesbx`, so a package under `cmd/` is not
@@ -293,6 +298,7 @@ and in the text it changes.
   tooling pull request on the `checks` surface; (b) drop `cmd/...` from
   S9, which changes a success criterion. Recommendation: (a). Approval
   line: `checks`.
+  Decided on 2026-10-09: option (a), done in PR #37, "fix(ci): hold cmd packages to the coverage floor (S9)".
 
 ## Exit criteria of stage A
 
@@ -427,6 +433,11 @@ Pending, one line each:
 - ship9-te-5 (test-engineer): a `tools/lenses` check that each report
   under `docs/reviews/round-*/reports/` is well formed: valid JSON with
   the fields of "What a reviewer returns" in lenses.md.
+- `TestLintConfigReportsEachChecker` fails with "parallel golangci-lint
+  is running" when another `tools/ci` runs at the same time (captured
+  2026-10-09). The fix isolates the lock, for example a per-test
+  `GOLANGCI_LINT_CACHE` or `TMPDIR`, never a skip or a retry; it is a
+  `checks` tooling pull request.
 
 ## Session checkpoint (2026-10-09)
 
@@ -444,36 +455,38 @@ measures it with `handoff_state.py`.
 - Round 9 ran: seventeen lenses, then the consolidation.
 - On branch `docs/review-round-9`: the write pass of this page, then
   ship gate rounds 1 to 3, GO in round 3.
+- That branch was pushed as pull request #36 at dc76fec.
+- Decision D6 was done in pull request #37, "fix(ci): hold cmd packages
+  to the coverage floor (S9)".
+- The answers of 2026-10-09 were applied on this branch: D2 and D3 in
+  the spec, D4 and D5 in ADR 0010, AR22 closed.
+
+### Answered on 2026-10-09
+
+Every recommendation of the decision block above was accepted on
+2026-10-09, and each item carries its line. AR22, the fifth ruleset try
+of round-8.md: closed as no longer needed, because pull request #33
+read the ruleset through the API on 2026-10-09; item g of the
+maintainer block (10 10.2) is removed and the 05 5.4 token row says the
+claim stays inferred. G5 of pull request #25 is applied there, as the
+`approvals` surface. This branch was rebased onto pull request #25 at
+3f29a9c.
 
 ### Open for the operator
 
-Each item carries a recommendation; none is a decision.
-
-- **G5 of pull request #25** (item f under "Open for the operator" in
-  round-8.md), an `approvals` surface for `tools/ci/askfirst.go` and
-  `tools/ci/denylist.yaml`. Recommend option (a) there: one surface
-  keeps the check of approvals out of the reach of a checkpoint grant.
-- **AR22, the fifth ruleset try.** The reading of 2026-10-09 (pull
-  request #33) measured the rules, not whether the development token
-  can change them. Recommend keeping the try, as item g of the
-  maintainer block (10 10.2) states it: it is the one measurement of
-  that claim, which 05 5.4 still marks as inferred.
-- **D2 to D6 of this page**, each with its recommendation above.
-- **S1 of pull request #34**: a mise global config whose `[env]` sets
-  `GOFLAGS` reaches the hook's `tools/ci`. Recommend setting
-  `MISE_GLOBAL_CONFIG_FILE` to a fixed path that does not exist in
-  `miseEnv`, with a test.
-- **Pushing `docs/review-round-9` and opening its pull request**,
-  stacked on #25 (the body says so; the base is `main`). Recommend yes:
-  the pass is gated and green locally.
+- **N2 of pull request #34**, a system-wide mise config that reaches
+  the hook's `tools/ci`; it waits for the operator.
+- **The decision ADR 0010 reopened**, required checks without the
+  administrator bypass, as an item of the next decision block.
+- **The token-narrowing review**, whose count reached three on
+  2026-10-09 (D2).
 - **Round 10, the targeted re-audit** of this pass, a fan-out of about
-  seventeen reviewers. Recommend running it once the pull request is
-  open, so the reviewers read its head.
+  seventeen reviewers, once this branch's pull request carries the
+  answers above.
 - **The R8-05-3 tooling pull request** (the `sbxdrv` surface and
-  `skills/**` on `kits`, 05 5.3), after #25 lands. Recommend it before
-  the first task that adds a file under `e2e/fakesbx` (plan T015).
-- **The merges of #34 and #25.** Recommend each once its approval lines
-  are ticked and its CI is green.
+  `skills/**` on `kits`, 05 5.3), after #25 lands, before plan T015.
+- **The merges of #34, #25 and this branch's pull request**, each once
+  its approval lines are ticked and its CI is green.
 
 ### Next steps
 

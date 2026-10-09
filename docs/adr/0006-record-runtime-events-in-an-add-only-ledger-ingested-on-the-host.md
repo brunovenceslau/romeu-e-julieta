@@ -6,6 +6,8 @@ Date: 2026-10-01
 
 Accepted
 
+Superseded in part by [10. Reopen the required checks without the bypass and amend the records of round 9](0010-reopen-the-required-checks-without-the-bypass-and-amend-the-records-of-round-9.md)
+
 ## Context
 
 At the end of the play the Prince has to work out what happened from
