@@ -409,8 +409,9 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 	// so -pgid reaches only this group. The window after the group has
 	// fully emptied (between the last reap and the kill, which a reuse
 	// would need a full pid wrap to hit) is accepted, as it is on the
-	// Cancel path. Errors other than ESRCH are dropped on purpose: EPERM
-	// cannot occur for our own children.
+	// Cancel path. Other errors are dropped on purpose: a failed kill
+	// changes nothing here, since the step's result already stands and
+	// WaitDelay has bounded the wait.
 	if cmd.Process != nil {
 		_ = killGroup(cmd.Process.Pid)
 	}
@@ -638,9 +639,9 @@ func (c *checks) run(ctx context.Context, root string, steps []step) {
 		if err != nil {
 			// out is the step's own output, which is printed as it is, for
 			// readability; the unit step in particular lets the change print
-			// anything. A quiet step is the exception: gofmt -l prints only
-			// paths of the repository, so escaping its output costs no
-			// readability and is defense in depth. err, the error of the
+			// anything. A quiet step is the exception: gofmt -l prints paths
+			// of the repository and its parse errors about them, so escaping
+			// its output costs no readability and is defense in depth. err, the error of the
 			// run, may hold a path and is made safe too.
 			text := string(out)
 			if s.quiet {
