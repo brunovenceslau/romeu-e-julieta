@@ -248,10 +248,13 @@ of the tree with the mise environment besides:
 `MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none`, `MISE_ENV` set and
 empty, `MISE_AUTO_ENV=false`,
 `MISE_GLOBAL_CONFIG_FILE=/dev/null/mise-global.toml` (a path that
-cannot exist), `MISE_ENV_FILE` set and empty, `GOENV=off` and
+cannot exist), `MISE_ENV_FILE`, `MISE_CD` and
+`MISE_TRUSTED_CONFIG_PATHS` set and empty, `GOENV=off` and
 `GOTOOLCHAIN=local`, so mise reads `mise.toml` as its one configuration
-file of the tree, and `mise.lock`, no global configuration and no env
-file (the system configuration of mise still applies), and runs nothing that another mise file of a change holds
+file of the tree, and `mise.lock`, no global configuration, no env file
+and no path the caller trusts or moves to (the system configuration of
+mise still applies), and runs nothing that another mise file of a change
+holds
 (the threat model in `tools/ci/misefiles.go` says what stays trusted).
 That environment is measured with one version of mise, the `version`
 input of the mise action in `ci.yml`, so `fast`, `all` and `setup`

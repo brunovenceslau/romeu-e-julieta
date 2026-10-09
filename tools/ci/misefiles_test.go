@@ -27,6 +27,8 @@ func TestMiseEnvList(t *testing.T) {
 		"MISE_AUTO_ENV=false",
 		"MISE_GLOBAL_CONFIG_FILE=/dev/null/mise-global.toml",
 		"MISE_ENV_FILE=",
+		"MISE_CD=",
+		"MISE_TRUSTED_CONFIG_PATHS=",
 		"GOENV=off",
 		"GOTOOLCHAIN=local",
 	}, miseEnv)
@@ -140,8 +142,8 @@ func TestMiseEnvStopsConfigs(t *testing.T) {
 		if !strings.HasPrefix(key, "MISE_") {
 			continue // a go variable, which mise does not read
 		}
-		if key == "MISE_GLOBAL_CONFIG_FILE" || key == "MISE_ENV_FILE" {
-			continue // TestMiseGlobalConfigIsOff and TestMiseEnvFileIsOff measure them
+		if key == "MISE_GLOBAL_CONFIG_FILE" || key == "MISE_ENV_FILE" || key == "MISE_CD" || key == "MISE_TRUSTED_CONFIG_PATHS" {
+			continue // TestMiseGlobalConfigIsOff, TestMiseEnvFileIsOff and TestMiseCdAndTrustAreOff measure them
 		}
 		without := slices.DeleteFunc(miseEnviron(base), func(v string) bool { return v == kv })
 		assert.NotEmpty(t, written(without), "miseEnv without %s", key)
@@ -264,6 +266,59 @@ func TestMiseEnvFileIsOff(t *testing.T) {
 		assert.False(t, printed(miseEnviron(env)), "the .env in %s, with miseEnv", place)
 		require.NoError(t, os.Remove(path))
 	}
+}
+
+// TestMiseCdAndTrustAreOff measures, with the mise on the search path,
+// what the empty MISE_CD and MISE_TRUSTED_CONFIG_PATHS of miseEnv are
+// for. A caller's MISE_CD makes mise run its command (the go of the
+// shim) in another directory, and a caller's MISE_TRUSTED_CONFIG_PATHS
+// makes mise apply the [env] of an untracked mise.toml in a parent of
+// the tree. Both take effect without the variable and neither with
+// miseEnv, whatever the caller sets. mise runs in isolatedMiseEnv.
+func TestMiseCdAndTrustAreOff(t *testing.T) {
+	parent, elsewhere := t.TempDir(), t.TempDir()
+	dir := filepath.Join(parent, "tree")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "mise.toml"), []byte("[settings]\nlockfile = true\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(parent, "mise.toml"), []byte("[env]\nPLANTED_MARKER = \"planted\"\n"), 0o600))
+	base := isolatedMiseEnv(t)
+	run := func(env []string, args ...string) (string, error) {
+		t.Helper()
+		cmd := exec.CommandContext(t.Context(), "mise", args...)
+		cmd.Dir = dir
+		cmd.Env = env
+		out, err := cmd.Output()
+		return string(out), err
+	}
+	_, err := run(miseEnviron(base), "trust", filepath.Join(dir, "mise.toml"))
+	require.NoError(t, err)
+	without := func(env []string, key string) []string {
+		return slices.DeleteFunc(miseEnviron(env), func(kv string) bool { return kv == key+"=" })
+	}
+
+	cd := append(slices.Clone(base), "MISE_CD="+elsewhere)
+	want, err := filepath.EvalSymlinks(elsewhere)
+	require.NoError(t, err)
+	out, err := run(without(cd, "MISE_CD"), "exec", "--", "pwd", "-P")
+	require.NoError(t, err)
+	assert.Equal(t, want, strings.TrimSpace(out), "MISE_CD, without the variable")
+	here, err := filepath.EvalSymlinks(dir)
+	require.NoError(t, err)
+	out, err = run(miseEnviron(cd), "exec", "--", "pwd", "-P")
+	require.NoError(t, err)
+	assert.Equal(t, here, strings.TrimSpace(out), "MISE_CD, with miseEnv")
+
+	// A new state directory: a run of "mise exec" trusts the parent file
+	// for the runs after it (measured with mise 2026.10.3).
+	fresh := isolatedMiseEnv(t)
+	_, err = run(miseEnviron(fresh), "trust", filepath.Join(dir, "mise.toml"))
+	require.NoError(t, err)
+	trusted := append(slices.Clone(fresh), "MISE_TRUSTED_CONFIG_PATHS="+parent)
+	out, err = run(without(trusted, "MISE_TRUSTED_CONFIG_PATHS"), "env", "-J")
+	require.NoError(t, err)
+	assert.Contains(t, out, "PLANTED_MARKER", "MISE_TRUSTED_CONFIG_PATHS, without the variable")
+	out, _ = run(miseEnviron(trusted), "env", "-J") // mise may refuse the untrusted file
+	assert.NotContains(t, out, "PLANTED_MARKER", "MISE_TRUSTED_CONFIG_PATHS, with miseEnv")
 }
 
 // TestMiseFilesLowercase holds every glob of miseFiles to lower case:

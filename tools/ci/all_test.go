@@ -83,7 +83,7 @@ func TestAll(t *testing.T) {
 			},
 			profile: "tools/ci 1 1",
 			code:    exitFail,
-			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:26: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
+			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:28: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
 		},
 		{
 			name:    "a hygiene finding",
@@ -677,14 +677,14 @@ func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
 		assert.Equal(t, exitFail, code, out)
 		assert.Contains(t, out, "ok    rewrites")
 		assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
-		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:26: workflows: runs-on")
+		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:28: workflows: runs-on")
 	})
 	t.Run("fast by hand", func(t *testing.T) {
 		r, steps := fixture(t)
 		code, out := runCI(t, r, nil, steps, "fast")
 		assert.Equal(t, exitFail, code, out)
 		assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
-		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:26: workflows: runs-on")
+		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:28: workflows: runs-on")
 	})
 	t.Run("the pushed range of a pre-push run", func(t *testing.T) {
 		const zero = "0000000000000000000000000000000000000000"

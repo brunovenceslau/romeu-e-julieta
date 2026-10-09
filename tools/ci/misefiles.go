@@ -158,7 +158,7 @@ import (
 // is ever added.
 
 // miseEnv is the environment of every mise run, as "KEY=value": the
-// six mise variables below, then goPinEnv. The configuration file
+// eight mise variables below, then goPinEnv. The configuration file
 // mise reads is mise.toml alone, it reads no
 // .tool-versions ("none" is the empty list, src/env.rs of mise
 // 2026.10.3), and it selects no environment's files, neither one named
@@ -168,7 +168,11 @@ import (
 // no env file: a caller's MISE_ENV_FILE, such as ".env" (found in the
 // working directory or a parent), would set GOFLAGS for the go that the
 // mise shim starts, so an empty one is set. The system configuration
-// still applies (see the trusted list above). The workflow sets the same
+// still applies (see the trusted list above). An empty MISE_CD keeps mise
+// in the working directory its caller gives it (a MISE_CD would move it,
+// and the go it starts, to another tree), and an empty
+// MISE_TRUSTED_CONFIG_PATHS trusts no path of the caller's (a parent
+// mise.toml with an [env] GOFLAGS would apply). The workflow sets the same
 // table (the workflows check), and the pre-push hook the same variables
 // (TestHook).
 //
@@ -183,6 +187,8 @@ var miseEnv = slices.Concat([]string{
 	"MISE_AUTO_ENV=false",
 	"MISE_GLOBAL_CONFIG_FILE=" + miseNoGlobalConfig,
 	"MISE_ENV_FILE=",
+	"MISE_CD=",
+	"MISE_TRUSTED_CONFIG_PATHS=",
 }, goPinEnv)
 
 // miseNoGlobalConfig is the path miseEnv gives MISE_GLOBAL_CONFIG_FILE,

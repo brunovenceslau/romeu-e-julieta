@@ -1,2 +1,2 @@
 #!/bin/sh
-exec env GOWORK=off GOFLAGS=-mod=readonly MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none MISE_ENV= MISE_AUTO_ENV=false MISE_GLOBAL_CONFIG_FILE=/dev/null/mise-global.toml MISE_ENV_FILE= GOENV=off GOTOOLCHAIN=local go run ./tools/ci fast "$@"
+exec env GOWORK=off GOFLAGS=-mod=readonly MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none MISE_ENV= MISE_AUTO_ENV=false MISE_GLOBAL_CONFIG_FILE=/dev/null/mise-global.toml MISE_ENV_FILE= MISE_CD= MISE_TRUSTED_CONFIG_PATHS= GOENV=off GOTOOLCHAIN=local go run ./tools/ci fast "$@"
