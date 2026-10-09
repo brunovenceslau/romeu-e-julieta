@@ -406,3 +406,12 @@ build reads no network. The test cases of ship9-te-3 (the
 commit. Pending, for the tooling that closes it: ship9-te-5, a
 `tools/lenses` check that each review report is well formed (valid
 JSON with the fields of "What a reviewer returns" in lenses.md).
+
+The ship gate's round 2 on e93387c was NO-GO. Its must-fix findings
+ship9-cr-6 and ship9-cr-7, and its capped findings ship9-cr-8 to
+ship9-cr-10, ship9-sa-7, ship9-sa-8 and ship9-te-6, were applied in
+one write pass, the commit "docs(spec): apply the round-9 ship-gate
+round-2 fixes". `removal-pending` (RJ-336) is raised by preflight step 6
+for any mutating command, `salvage --from-host` included since it is
+marked **P** in 04 4.2, except `rm`, `recreate` and `retire`, and
+exits 2.

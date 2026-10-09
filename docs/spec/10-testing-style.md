@@ -708,9 +708,11 @@ The workflow has two kinds of job:
      Any other answer, an API error included, refuses. Each answer is a
      fixture of the tests of `tools/release`: "fuzz run success
      builds", "fuzz run of another conclusion refuses", "no fuzz run
-     found refuses" and "fuzz run API error refuses". A
-     `--dry-run` build, which the e2e step calls, reads no network and
-     makes no such check. It cross-compiles the
+     found refuses", "fuzz run API error refuses", "fuzz run head not
+     an ancestor refuses" and "guard-tagged file changed since the fuzz
+     run refuses". A `--dry-run` build, which the e2e step calls, reads
+     no network and makes no such check ("dry-run build makes no
+     network read"). It cross-compiles the
      julieta linux binaries, embeds them, the kits and the catalog into
      romeu, builds romeu for darwin, and writes the archives, each with
      `COPYING` and the third-party notices file, and `checksums.txt`.

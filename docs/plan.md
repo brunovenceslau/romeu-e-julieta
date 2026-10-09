@@ -2112,7 +2112,8 @@ early.
 
 - [ ] Merged
 - Module: `skills`. Implements: 02 2.1 (`skills/`), 08 8.1, 08 8.3.
-- Depends on: T059. Operator: no. Ask-first: none expected.
+- Depends on: T059, and the `sbxdrv` surface tooling PR (05 5.3).
+  Operator: no. Ask-first: `kits`.
 - Acceptance:
   - `skills/julieta/SKILL.md` tells the agent to use `julieta memory`
     and to tag a lesson; `skills/handoff/SKILL.md` pipes the required

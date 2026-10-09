@@ -207,7 +207,7 @@ first mutating call.
 | 3 | drift of every live derived file against `render.json` | 4 |
 | 4 | widening digest recomputed from the live files equals the approval (gate 2) | 3 |
 | 5 | host checks shared with `doctor` whose failure widens a sandbox or makes agent output executable on the host: sbx global secrets and broad allow rules (I22), host tools that auto-trust `$ROMEU_ROOT` (I23), and, for a project using `git-ssh-sign`, the signing socket rule of [06 6.4](06-kits.md#64-product-kits). A listing whose shape is not a recorded shape, or that cannot be parsed, fails the step with `upstream-shape` ([03](03-formats.md), opening) | 2 |
-| 6 | sandbox identity (I26): an absent sandbox passes; a present one must have an open generation (1.7) romeu recorded (`RJ-203 unknown-sandbox` otherwise) and the workspace path `$ROMEU_ROOT/<name>-env/<primary>` | 2 |
+| 6 | sandbox identity (I26): an absent sandbox passes; a present one must have an open generation (1.7) romeu recorded (`RJ-203 unknown-sandbox` otherwise) and the workspace path `$ROMEU_ROOT/<name>-env/<primary>`; a present sandbox whose generation is `removing` passes for `rm`, `recreate` and `retire`, and any other mutating command, `salvage --from-host` included, exits with `removal-pending` (`RJ-336`) | 2 |
 
 The preflight never touches the network: descriptors come from the
 content-addressed cache in host state, filled only by `sync`.
@@ -308,7 +308,7 @@ A generation is one sandbox lifetime, identified by a ULID.
 | salvaging | salvage incomplete, no `--accept-loss` | open | salvage record `result: incomplete` with reasons; exit 5 |
 | salvaging | salvage complete or `--accept-loss`; command removes the sandbox | removing | state written before `sbx env rm` |
 | removing | `sbx env rm` succeeds | closed-removed | egress rules removed |
-| removing | `sbx env rm` fails, or the sandbox found present (a command killed before `sbx env rm`) | removing | the existing salvage record kept; exit 1; a rerun of `rm`, `recreate` or `retire` resumes at `sbx env rm` only when the daemon heads equal those in the salvage record; otherwise `removing -> salvaging` with a new salvage id |
+| removing | `sbx env rm` fails, or the sandbox found present (a command killed before `sbx env rm`) | removing | the existing salvage record kept; exit 1; a rerun of `rm`, `recreate` or `retire` resumes at `sbx env rm` only when the daemon heads and each worktree's HEAD and status equal those in the salvage record; otherwise `removing -> salvaging` with a new salvage id |
 | removing | the sandbox found absent (crash recovery) | closed-removed | the existing salvage record kept; egress rules removed |
 | open | `run`, `rm`, `stop`, `pull`, `salvage` without `--from-host`, or `retire` finds the sandbox absent | closed-lost | keeps a lost record `salvage --from-host` wrote for this generation, else writes one: refs and snapshots preserved as a salvage record `result: lost` |
 | salvaging | the sandbox found absent (crash recovery) | closed-lost | as above |
@@ -331,9 +331,11 @@ Destructive commands write in this order: the refs per repo
 (create-only, so a rerun verifies them), the salvage record, the state
 `removing`, `sbx env rm`, `closed-removed`. Recovery: `removing` with
 the sandbox absent becomes `closed-removed`, and with it present the
-next `rm` resumes at `sbx env rm` when the daemon heads equal those in
-the salvage record, and otherwise salvages again under a new salvage
-id; any other command exits 1 with `removal-pending`
+next `rm` resumes at `sbx env rm` when the daemon heads and each
+worktree's HEAD and status equal those in the salvage record, and
+otherwise salvages again under a new salvage id; any other mutating
+command exits 2 with `removal-pending`, and `status` and `doctor`
+report it as `removal-pending`
 ([04 4.4](04-cli.md#44-error-ids)); `salvaging` with no
 salvage record is resumed by the next salvage, which verifies the refs
 already created.
@@ -395,7 +397,7 @@ generated glossary page is a row of
 | preflight | the ordered checks of 1.5 before a mutating sbx call | - |
 | run | preflight, ensure sandbox, egress and tools, then attach to the run layout | - |
 | generation | one sandbox lifetime, identified by a ULID recorded by romeu | - |
-| open generation | a generation in state `open` or `salvaging`; `removing` counts as open only for `rm`, `recreate` and `retire`; any other command that finds a `removing` generation with its sandbox present exits 1 with `removal-pending` ([04 4.4](04-cli.md#44-error-ids)) | - |
+| open generation | a generation in state `open` or `salvaging`; `removing` counts as open only for `rm`, `recreate` and `retire`; any mutating command but `rm`, `recreate` and `retire` that finds a `removing` generation with its sandbox present exits 2 with `removal-pending` ([04 4.4](04-cli.md#44-error-ids)); `status` and `doctor` report it as `removal-pending` | - |
 | adopt | record an existing sandbox of the right name and workspace as a generation | - |
 | snapshot | julieta's bundle of unpushed work into the memory dir's `snapshot/` after each commit | live salvage |
 | salvage | stop agents, capture everything sandbox-only into the memory dir's `salvage/`, verify and import it on the host | - |

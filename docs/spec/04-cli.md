@@ -105,9 +105,7 @@ dir`, see J13).
    `sbx ls --json` and refused the two cases that are not this
    project's sandbox: one romeu has no open generation for
    (`RJ-203 unknown-sandbox`, fix hint "check its workspace, then
-   `romeu adopt <name>`") and one whose workspace path differs. A
-   `removing` generation with its sandbox present exits 1 with
-   `removal-pending` (`RJ-336`) before step 3. Absent,
+   `romeu adopt <name>`") and one whose workspace path differs. Absent,
    `sbx-unknown` and `upstream-shape` are as
    [01 1.6](01-system-model.md#generation) defines them. An absent
    sandbox with an open generation is preserved as the closed-lost row
@@ -319,4 +317,4 @@ table is the source and this section is a link to
 | `RJ-333` | `vscode-trust` | 2 | `doctor` and preflight step 5; the hint names the setting to turn back on or the trusted folder to remove |
 | `RJ-334` | `record-unreadable` | 2 | every reader of a versioned format, for a file of a format it knows that does not decode ([03](03-formats.md), opening); the file is never overwritten, the details name it, and the hint is to restore it from a backup, with `romeu salvage --from-host <name>` to save the work first |
 | `RJ-335` | `generation-lost` | 1 | `run` step 2, after it preserves a lost generation; the hint is `romeu run <name>`, which creates the new sandbox |
-| `RJ-336` | `removal-pending` | 1 | any command but `rm`, `recreate` and `retire` that finds a `removing` generation with its sandbox present ([01 1.7](01-system-model.md#17-vocabulary)); the hint is `romeu rm <name>`, which finishes the removal |
+| `RJ-336` | `removal-pending` | 2 | preflight step 6 ([01 1.5](01-system-model.md#15-preflight-before-every-mutating-sbx-call)), for any mutating command but `rm`, `recreate` and `retire` that finds a `removing` generation with its sandbox present; `status` and `doctor` report it as `removal-pending` ([01 1.7](01-system-model.md#17-vocabulary)); the hint is `romeu rm <name>`, which finishes the removal |

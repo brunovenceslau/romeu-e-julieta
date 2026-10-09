@@ -65,8 +65,8 @@ bound limits its volume, not its content
 
 Both hooks invoke julieta by the absolute path of the read-only
 `.romeu/bin` mount ([06 6.4](06-kits.md#64-product-kits)). The
-SessionStart and SessionEnd hooks always exit 0: on a failure it prints one stdout line naming the
-failure and `julieta status`, and julieta records it as a hook failure.
+SessionStart and SessionEnd hooks always exit 0: on a failure each
+prints one stdout line naming the failure and `julieta status`, and julieta records it as a hook failure.
 When julieta itself cannot run (the mount is absent after an sbx
 change), nothing of julieta is there to print, so the kit renders each
 hook command as a shell wrapper that prints the failure line and exits
