@@ -216,7 +216,7 @@ which print it and go on; so each has an id in 4.4.
 | tree: an interrupted promotion | `interrupted-promotion` | fail |
 | tree: a memory dir violating the layout allowlist | `memory-layout` | fail |
 | tree: a workspace file that differs from the one derived again from host state ([01 1.2](01-system-model.md#12-sources-of-truth-vs-derived)) | `workspace-files` | fail |
-| an open generation with no sandbox in `sbx ls --json`, or a sandbox a project names with no open generation, a generation in `removing` excluded | `generation-sandbox` | fail |
+| an open generation with no sandbox in `sbx ls --json`, or a sandbox a project names with no generation in `open`, `salvaging` or `removing` | `generation-sandbox` | fail |
 | a `removing` generation with its sandbox present ([01 1.6](01-system-model.md#generation)); the hint is `romeu rm <name>` | `removal-pending` | fail |
 | a record of a format romeu knows that does not decode ([03](03-formats.md), opening); the hint is as in `RJ-334` | `record-unreadable` | fail |
 | a project's `egressApplied` differs from the per-sandbox rules `sbx policy ls` reports | `egress-applied` | fail |

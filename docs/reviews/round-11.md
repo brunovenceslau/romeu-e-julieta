@@ -29,8 +29,10 @@ decision is recorded next to it, with its date, when it comes.
 Status, as in rounds 6 to 10: **A** = applied as proposed; **M** =
 applied in a smaller or different form than proposed, as its row
 states; **L** = stated as a limit, no mechanism added; **operator** =
-not applied, and the item is in "Decisions for the operator". In this
-draft the status is the one proposed; the write pass confirms it.
+not applied, and the item is in "Decisions for the operator". The
+write pass, and why its resolution of the three Required clusters
+departs from the one proposed here, are in "Write pass (2026-10-09)"
+below.
 
 The reports are kept in `round-11/reports/<lens>.json`, as the
 reviewers wrote them.
@@ -111,9 +113,9 @@ Two reports cite the command block as 12 12.1 or 12 12.4; it is in
 
 | Cluster | Section | Lenses | Kind | Defect | Verification | Resolution | Status |
 |---|---|---|---|---|---|---|---|
-| **R11-01** | 05 5.3 (the `pr` package paragraph; the `approvals` globs); 12 12.4 (`approvalLine` in `tools/ci/askfirst.go`; "Where this specification writes `tools/ci pr`"); 12 12.2 (Development commands, the two PR checks lines); 02 2.1 (the `tools/ci/` line); 10 10.7 | L13 (L13-R11-1), L3 (L3-R11-1, L3-R11-2), L12 (L12-R11-1), L14 (L14-r11-1), L0 (L0-r11-2), L6 (L6-r11-2) (high-signal) | regression | The delta moved `pr` into the main package `tools/ci/pr` and left the texts that place its code as they were: 12 12.4 defines `approvalLine` in `tools/ci/askfirst.go`, a file of the main package `tools/ci`, which Go cannot import; the `approvals` globs name files, while `go list -deps` lists packages, and no text says how one is matched against the other or which fixture turns the test red; 02 2.1 lays `tools/ci` out as one dispatcher with one package per step and does not name `tools/ci/pr`; and the command block of 12 12.2 still gives `go run ./tools/ci pr <payload file>` and `go run ./tools/ci pr --title <t> --body <file>`. | holds: 12 12.4 reads "`approvalLine` in `tools/ci/askfirst.go`"; `.github/ask-first.yaml` and the copy in 05 5.3 glob `tools/ci/askfirst.go` and `tools/ci/denylist.yaml`; 02 2.1 reads as quoted; 12 12.2 lines 164 and 165 read as quoted, while 10 10.2 (the `run` step and pr job rows, the local-run paragraph) says `go run ./tools/ci/pr`; the alias sentence of 12 12.4 renames the prose name, not a command line | one home: the approval-line, grant and forbidden-name checks live under `tools/ci/pr/` (the main package, and packages below it if needed), and 12 12.4 defines `approvalLine` there; 05 5.3 says the `approvals` glob `tools/ci/askfirst.go` becomes `tools/ci/pr/**` in the tooling pull request of the task that builds `pr`, which R10-01 already names, with the file glob dropped in the same change; 05 5.3 says the test maps each package of `go list -deps` (with `-test`) to its directory, treats a path whose first element has no dot as the standard library, requires every other package's directory to match an `approvals` glob, and names a fixture package that imports a path outside the globs; 02 2.1 names `tools/ci/pr/` as the one main package outside the dispatcher; 12 12.2's two lines become `go run ./tools/ci/pr ...`; 10 10.7 names the closure test beside `tools/ci imports`, so the boundaries have one list (L3-R11-3 below) | A (spec text; the glob with the task that builds `pr`) |
-| **R11-02** | 05 5.3 ("whose import closure is the standard library and paths on `approvals`"); 12 12.1 (Go dependencies: `go.yaml.in/yaml/v3`, `github.com/BurntSushi/toml`); 12 12.4 (`pr` reads `.github/ask-first.yaml` at base and head, `docs/grants.yaml`, the head's `.github/workflows/`); 12 12.3; 10 10.2 (the forbidden-name check, `tools/ci/denylist.yaml`) | L2 (L2-r11-1), L13 (L13-R11-2), L0 (L0-r11-1) (high-signal) | new | `pr` decodes YAML (`.github/ask-first.yaml` at base and head, `docs/grants.yaml`, `tools/ci/denylist.yaml`, and the head's workflows for the name refusal), the standard library has no YAML decoder, and the one 12 12.1 names, `go.yaml.in/yaml/v3`, is a module of `go.mod`, on `dependencies` and outside the `approvals` globs; no text says how `pr` decodes them, and the same files are read with the library by the generator of 12 12.3 and by `tools/ci hygiene`, so two readings of the surface list could differ. The git runner has the same gap in a smaller form: `internal/gitsafe` is on the `gitsafe` surface, not on `approvals`. | holds: 12 12.1 lists the YAML and TOML modules as the complete v1 list; the `dependencies` globs hold `go.mod` and `go.sum`, and `dependencies` is grantable (12 12.4, A checkpoint grant); the `approvals` globs hold no decoder; the git flags `pr` passes are listed in 12 12.4, so `pr` can carry its own git calls without `internal/gitsafe` | 05 5.3 and 12 12.4 state the reader: one strict decoder of the YAML subset these files use (block mappings and sequences, plain and quoted scalars; no anchors, aliases, tags, merge keys or duplicate keys), under `tools/ci/pr/` on `approvals`, with a fuzz target in `fuzz.yml`; the generator of 12 12.3 and `hygiene` read `.github/ask-first.yaml` and `docs/grants.yaml` through it too, so the files have one reading, and a test fails a committed file the subset does not decode; `pr` runs git through its own calls with the flags of 12 12.4 and imports no `internal/` package; see D1 | A, after D1 |
-| **R11-03** | 05 5.3 ("so code a checkpoint grant covers never runs in the job that judges the grants"; "The grantable inputs left under the job"); 12 12.4 (the `pr` job builds with the base's `go.mod`, `go.sum`, `mise.toml` and `mise.lock`); 10 10.2 (the mise-table and `go.mod`-directive rules); index, Deferred decisions (the row on the `pr` job's toolchain) | L2 (L2-r11-2) | new | 05 5.3 says the grantable inputs left under the job are a toolchain version and the `go` line, but `mise.toml` can hold an `[env]` table (for example `GOFLAGS=-toolexec=...`) and `go.mod` a `toolchain` or `godebug` directive; the rules that keep those files to versions are tests of 10 10.2 run by the head's `tools/ci`, on the grantable `checks` surface, and `pr` does not apply them. A pull request granted on `checks` and `dependencies` can loosen the rule and add the table in one diff; after its merge every `pr` job compiles under that table, and the Deferred row's trigger fires only then. | holds as a reading of the text: 10 10.2 lists the two rules among the tests of `tools/ci`; the grant list of 12 12.4 includes `checks` and `dependencies`; 12 12.4 builds `pr` with the base's mise files. That the mise action exports `[env]` to the go it starts is inferred from 10 10.2's own sentence on the mise shim, not measured | `pr`, from the base, applies the mise-table rule and the `go.mod`-directive rule of 10 10.2 to the head's `mise.toml`, `mise.lock` and `go.mod` when the diff touches them, each with a fixture, reading TOML through a strict subset reader under `tools/ci/pr/` (R11-02); 05 5.3 reads "the grantable inputs left under the job are the versions those files pin, held to that shape by `pr`"; the Deferred row keeps option (b) of round 10's D2 deferred, with its trigger unchanged; see D2 | A, after D2 |
+| **R11-01** | 05 5.3 (the `pr` package paragraph; the `approvals` globs); 12 12.4 (`approvalLine` in `tools/ci/askfirst.go`; "Where this specification writes `tools/ci pr`"); 12 12.2 (Development commands, the two PR checks lines); 02 2.1 (the `tools/ci/` line); 10 10.7 | L13 (L13-R11-1), L3 (L3-R11-1, L3-R11-2), L12 (L12-R11-1), L14 (L14-r11-1), L0 (L0-r11-2), L6 (L6-r11-2) (high-signal) | regression | The delta moved `pr` into the main package `tools/ci/pr` and left the texts that place its code as they were: 12 12.4 defines `approvalLine` in `tools/ci/askfirst.go`, a file of the main package `tools/ci`, which Go cannot import; the `approvals` globs name files, while `go list -deps` lists packages, and no text says how one is matched against the other or which fixture turns the test red; 02 2.1 lays `tools/ci` out as one dispatcher with one package per step and does not name `tools/ci/pr`; and the command block of 12 12.2 still gives `go run ./tools/ci pr <payload file>` and `go run ./tools/ci pr --title <t> --body <file>`. | holds: 12 12.4 reads "`approvalLine` in `tools/ci/askfirst.go`"; `.github/ask-first.yaml` and the copy in 05 5.3 glob `tools/ci/askfirst.go` and `tools/ci/denylist.yaml`; 02 2.1 reads as quoted; 12 12.2 lines 164 and 165 read as quoted, while 10 10.2 (the `run` step and pr job rows, the local-run paragraph) says `go run ./tools/ci/pr`; the alias sentence of 12 12.4 renames the prose name, not a command line | one home: the approval-line, grant and forbidden-name checks live under `tools/ci/pr/` (the main package, and packages below it if needed), and 12 12.4 defines `approvalLine` there; 05 5.3 says the `approvals` glob `tools/ci/askfirst.go` becomes `tools/ci/pr/**` in the tooling pull request of the task that builds `pr`, which R10-01 already names, with the file glob dropped in the same change; 05 5.3 says the test maps each package of `go list -deps` (with `-test`) to its directory, treats a path whose first element has no dot as the standard library, requires every other package's directory to match an `approvals` glob, and names a fixture package that imports a path outside the globs; 02 2.1 names `tools/ci/pr/` as the one main package outside the dispatcher; 12 12.2's two lines become `go run ./tools/ci/pr ...`; 10 10.7 names the closure test beside `tools/ci imports`, so the boundaries have one list (L3-R11-3 below) | M: the spec states the invariant and the decided job shape, and the mechanism claims of R10-01 leave it; each becomes an acceptance requirement of plan T005 (see Write pass); requirement (b) |
+| **R11-02** | 05 5.3 ("whose import closure is the standard library and paths on `approvals`"); 12 12.1 (Go dependencies: `go.yaml.in/yaml/v3`, `github.com/BurntSushi/toml`); 12 12.4 (`pr` reads `.github/ask-first.yaml` at base and head, `docs/grants.yaml`, the head's `.github/workflows/`); 12 12.3; 10 10.2 (the forbidden-name check, `tools/ci/denylist.yaml`) | L2 (L2-r11-1), L13 (L13-R11-2), L0 (L0-r11-1) (high-signal) | new | `pr` decodes YAML (`.github/ask-first.yaml` at base and head, `docs/grants.yaml`, `tools/ci/denylist.yaml`, and the head's workflows for the name refusal), the standard library has no YAML decoder, and the one 12 12.1 names, `go.yaml.in/yaml/v3`, is a module of `go.mod`, on `dependencies` and outside the `approvals` globs; no text says how `pr` decodes them, and the same files are read with the library by the generator of 12 12.3 and by `tools/ci hygiene`, so two readings of the surface list could differ. The git runner has the same gap in a smaller form: `internal/gitsafe` is on the `gitsafe` surface, not on `approvals`. | holds: 12 12.1 lists the YAML and TOML modules as the complete v1 list; the `dependencies` globs hold `go.mod` and `go.sum`, and `dependencies` is grantable (12 12.4, A checkpoint grant); the `approvals` globs hold no decoder; the git flags `pr` passes are listed in 12 12.4, so `pr` can carry its own git calls without `internal/gitsafe` | 05 5.3 and 12 12.4 state the reader: one strict decoder of the YAML subset these files use (block mappings and sequences, plain and quoted scalars; no anchors, aliases, tags, merge keys or duplicate keys), under `tools/ci/pr/` on `approvals`, with a fuzz target in `fuzz.yml`; the generator of 12 12.3 and `hygiene` read `.github/ask-first.yaml` and `docs/grants.yaml` through it too, so the files have one reading, and a test fails a committed file the subset does not decode; `pr` runs git through its own calls with the flags of 12 12.4 and imports no `internal/` package; see D1 | M: the spec states the invariant and the decided job shape, and the mechanism claims of R10-01 leave it; each becomes an acceptance requirement of plan T005 (see Write pass); requirement (a); D1 is not needed |
+| **R11-03** | 05 5.3 ("so code a checkpoint grant covers never runs in the job that judges the grants"; "The grantable inputs left under the job"); 12 12.4 (the `pr` job builds with the base's `go.mod`, `go.sum`, `mise.toml` and `mise.lock`); 10 10.2 (the mise-table and `go.mod`-directive rules); index, Deferred decisions (the row on the `pr` job's toolchain) | L2 (L2-r11-2) | new | 05 5.3 says the grantable inputs left under the job are a toolchain version and the `go` line, but `mise.toml` can hold an `[env]` table (for example `GOFLAGS=-toolexec=...`) and `go.mod` a `toolchain` or `godebug` directive; the rules that keep those files to versions are tests of 10 10.2 run by the head's `tools/ci`, on the grantable `checks` surface, and `pr` does not apply them. A pull request granted on `checks` and `dependencies` can loosen the rule and add the table in one diff; after its merge every `pr` job compiles under that table, and the Deferred row's trigger fires only then. | holds as a reading of the text: 10 10.2 lists the two rules among the tests of `tools/ci`; the grant list of 12 12.4 includes `checks` and `dependencies`; 12 12.4 builds `pr` with the base's mise files. That the mise action exports `[env]` to the go it starts is inferred from 10 10.2's own sentence on the mise shim, not measured | `pr`, from the base, applies the mise-table rule and the `go.mod`-directive rule of 10 10.2 to the head's `mise.toml`, `mise.lock` and `go.mod` when the diff touches them, each with a fixture, reading TOML through a strict subset reader under `tools/ci/pr/` (R11-02); 05 5.3 reads "the grantable inputs left under the job are the versions those files pin, held to that shape by `pr`"; the Deferred row keeps option (b) of round 10's D2 deferred, with its trigger unchanged; see D2 | M: the spec states the invariant and the decided job shape, and the mechanism claims of R10-01 leave it; each becomes an acceptance requirement of plan T005 (see Write pass); requirements (c) and (d); D2 is not needed |
 
 ### Downgraded to Advisory
 
@@ -133,9 +135,9 @@ L3-R11-2, L6-r11-2) and are not repeated here.
 |---|---|---|---|---|---|
 | R11-06: L1-r11-1, L4-r11-2 | 03 3.8 (`salvage[].fingerprint`); 01 1.6; J7 step 5; 08 8.5 steps 2 and 4 | new | The fingerprint digests every ignored path with its file's digest: a large ignored tree makes a rerun slow with no output, and a process that keeps writing an ignored file (a log, a cache) changes it on every rerun, so the generation salvages again each time and never resumes at `sbx env rm`. L4-r11-2 says salvage captures no ignored file; step 4 of 08 8.5 does capture them, up to the cap, so the row keeps the cost and churn halves. | 03 3.8 says the fingerprint digests tracked changes and untracked paths with their files, and ignored paths, minus `salvage.excludeIgnored`, by path, size and modification time; a rerun that salvages again prints the first path whose entry changed; the third consecutive salvage of one `rm` exits 1 with `worktree-changing` naming that path | A |
 | L2-r11-3 | 12 12.4 (the name refusal); 10 10.2 (pr job row) | new | The name refusal exempts the pr job's own file and compares only a job's `name`, so a head that adds `pull_request` to that file, or a job with no `name` whose id equals the pr job's name, posts a check of the required name. | the refusal compares each head job's check name (its `name`, else its id) with the pr job's name, and `pr` refuses a head whose version of the pr job's file names an event other than `pull_request_target`; a fixture for each. The accepted row of 05 5.4 on approval lines stays as it is | A |
-| L2-r11-4 | 12 12.4 (neutralizing author text) | new | Neutralizing "a leading `::`" is narrower than what the runner reads (a `::` after leading whitespace, the older `##[` form). Rests on the runner's code as remembered, not measured. | `pr` prints each line of author text behind a fixed prefix (a `>` and a space), so no printed line starts with author bytes, and escapes `##[`; the fixture "pr escapes a workflow command in a PR body" gains a leading space, a leading U+00A0 and a `##[` case | A |
-| L3-R11-3 | 05 5.3 (the `go list -deps` test); 10 10.7; 10 10.2 (imports row) | new | Import boundaries now have two enforcers, `tools/ci imports` (10 10.7) and the closure test of `tools/ci/pr`, and 10 10.7 and the imports row name only the first. | 10 10.7 gains a row for `tools/ci/pr` and the imports row of 10 10.2 cites the closure test, so the boundaries have one list (with R11-01) | A |
-| L4-r11-3 | J7 step 4 | new | "no ref whose work is kept nowhere else" is a judgement, and `git status` does not cover linked worktrees or stashes kept in the attic. | J7 step 4 names `git -C <clone> log --branches --refs=refs/romeu/salvage --not --remotes --oneline`, `git stash list` and `git worktree list` as the check | A |
+| L2-r11-4 | 12 12.4 (neutralizing author text) | new | Neutralizing "a leading `::`" is narrower than what the runner reads (a `::` after leading whitespace, the older `##[` form). Rests on the runner's code as remembered, not measured. | `pr` prints each line of author text behind a fixed prefix (a `>` and a space), so no printed line starts with author bytes, and escapes `##[`; the fixture "pr escapes a workflow command in a PR body" gains a leading space, a leading U+00A0 and a `##[` case | A, with the runner's reading of a `::` after whitespace and of `##[` stated as remembered and not measured |
+| L3-R11-3 | 05 5.3 (the `go list -deps` test); 10 10.7; 10 10.2 (imports row) | new | Import boundaries now have two enforcers, `tools/ci imports` (10 10.7) and the closure test of `tools/ci/pr`, and 10 10.7 and the imports row name only the first. | 10 10.7 gains a row for `tools/ci/pr` and the imports row of 10 10.2 cites the closure test, so the boundaries have one list (with R11-01) | M: the closure test left the spec with R11-01, so 10 10.7 and the imports row keep their one enforcer, and requirement (b) of T005 names the test |
+| L4-r11-3 | J7 step 4 | new | "no ref whose work is kept nowhere else" is a judgement, and `git status` does not cover linked worktrees or stashes kept in the attic. | J7 step 4 names `git -C <clone> log --branches --refs=refs/romeu/salvage --not --remotes --oneline`, `git stash list` and `git worktree list` as the check | M: J7 step 4 names `git log --branches --glob='refs/romeu/salvage/*' --not --remotes --oneline`, since `git log` has no `--refs` option, with `git stash list` and `git worktree list` |
 | L13-R11-3 | 05 5.4 (the "Verified" signature row); 06 6.4; J1 step 5 | new | 06 6.4 and J1 step 5 make the askpass program a requirement, while the 05 5.4 row still says `ssh-add -c` "gives confirm-on-use where an askpass program is installed (macOS ships none)". | the row reads "which gives confirm-on-use through the askpass program J1 step 5 installs (macOS ships none)" | A |
 | L13-R11-4 | 04 4.2 (doctor table, `generation-sandbox`); 01 1.7 | new | "a sandbox a project names with no open generation, a generation in `removing` excluded" can be read as removing the case from the check or as not counting a `removing` generation, which makes the row match what `removal-pending` owns. | the row reads "a sandbox a project names with no generation in `open`, `salvaging` or `removing`" | A |
 | L15-R11-1 | 12 12.8 (the `README.md` row, prerequisites) | regression | The README prerequisite still says "a `gh` with the `attestation` command", while J1 step 1 and 12 12.1 require the floor, 2.68.0. | the prerequisite reads "a `gh` at or above the floor of 12 12.1" | A |
@@ -184,6 +186,9 @@ for their answer and are not repeated.
   code or new grantable input enters the job that judges grants.
   Approval line: `spec`; `approvals` and `ask-first` with the task that
   builds `pr`.
+  Answered on 2026-10-09: none of the options in the spec; how `pr`
+  reads its YAML and TOML is decided by the task that builds `pr`,
+  under requirement (a) of plan T005 (see "Write pass (2026-10-09)").
 - **D2 (R11-03), what holds the shape of the mise files and `go.mod`
   under the `pr` job.** Options: (a) `pr`, from the base, applies the
   mise-table and `go.mod`-directive rules to the head when the diff
@@ -195,6 +200,9 @@ for their answer and are not repeated.
   of two checks and a TOML subset reader, keeps grants for version
   bumps, and leaves (b) deferred with its trigger. Approval line:
   `spec`.
+  Answered on 2026-10-09: option (a), as requirement (c) of plan T005
+  rather than as spec text, with (b) deferred and its trigger unchanged
+  (see "Write pass (2026-10-09)").
 
 ## Exit criteria of stage A
 
@@ -250,13 +258,76 @@ None of the three clusters cites the `sequences` step of 10 10.2, the
 section T004 implements; the criteria are judged for the spec as a
 whole, so the answer stays no until they hold.
 
-What is left before T004:
+What is left before T004, after the write pass below:
 
-- the operator's answers to D1 and D2 of this page, and to D5 and D6
-  of round 10;
-- one write pass for the rows above;
-- a targeted re-audit of that pass, round 12, by the lenses whose
-  findings drove it (L0, L2, L3, L12, L13 and L14 for the Required
-  clusters, with L1, L4, L6 and L15 for their Advisory rows), reading
-  only the sections it changes; the clean verdicts of L5, L7, L8, L10,
-  L11 and L16 are carried forward.
+- the answers to D1 and D2 of this page, given on 2026-10-09 (above),
+  and to D5 and D6 of round 10;
+- a targeted re-audit of the pass, round 12, by the lenses of the three
+  Required clusters, L0, L2, L3, L6, L12, L13 and L14, reading only
+  the sections it changes; the verdicts of the other lenses are carried
+  forward.
+
+## Write pass (2026-10-09)
+
+The pass ran on branch `docs/review-round-9`, the branch of pull
+request #36, at d133542, in one scratch clone, by one build node on
+`opus`. Each row's status above is the one applied.
+
+### Why R11-01 to R11-03 depart from the proposals
+
+The proposals above would each have specified more of the internal
+mechanism of `tools/ci pr`, a step that does not exist yet: a main
+package and its layout (R11-01), a strict YAML-subset decoder shared
+with the generator and `hygiene` (R11-02), and a TOML reader with two
+more rules applied from the base (R11-03). Rounds 9, 10 and 11 each
+specified more of that mechanism, and each found a new gap in what the
+round before had written. Under
+[ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md),
+the structure is decided by the task that builds `pr`, when its code
+and tests can show it, and the spec keeps what is decided now: the
+invariant and the requirements that make it hold. Decided on
+2026-10-09.
+
+- 05 5.3 and 12 12.4 state the invariant: no code that a pull request
+  changes judges that pull request: `pr` runs from a workflow defined
+  in the default branch, builds the default branch's commit, and reads
+  the head only as data. The decided job shape stays in 12 12.4 and
+  10 10.2: `pull_request_target`, `branches: [main]`, a checkout of
+  `github.sha`, `contents: read`, no secret, the git flags, and the
+  event that picks up a fixed `pr`.
+- Removed from the spec, because not yet true or not yet decided: the
+  main package `tools/ci/pr` and the `go list -deps` closure test of
+  R10-01 (05 5.3, 12 12.4, the run-step and pr job rows of 10 10.2 and
+  its local-run paragraph, which go back to `go run ./tools/ci pr`);
+  "code a checkpoint grant covers never runs in the job that judges
+  the grants" (05 5.3); and the reading of 05 5.3 and of the index row
+  on the toolchain that every input of the job but the toolchain and
+  the `go` line is covered, which said nothing of the YAML and TOML
+  readers or of the mise and `go.mod` rules.
+- Each removed claim is an acceptance requirement of plan T005, the
+  task that builds `pr`, one bullet each:
+  - (a) every input `pr` reads from the head is parsed by code under a
+    path no checkpoint grant covers, its YAML and TOML readers included
+    (R11-02);
+  - (b) the code `pr` builds imports only the standard library and
+    packages on `approvals`, held by a test, and `approvals` names
+    those packages' directories (R11-01);
+  - (c) `pr`, built from the default branch, applies the version-pin
+    rules of `mise.toml` and `go.mod` to the head (R11-03);
+  - (d) the mise toolchain and the `go` line are the remaining
+    grantable inputs, each listed in 05 5.4.
+- The index row on the `pr` job's toolchain says the same: those two
+  inputs may change under a grant, the task lists them in 05 5.4, and
+  every other input is held to the invariant by the task's acceptance;
+  its trigger is unchanged.
+
+The Advisory rows were applied as their status says. The parked items
+P1, P3, P5 and P6 were not applied; T005 gained only the four
+requirements above. Nothing under `tools/**`, `.github/**` or
+`.githooks/**` changed.
+
+One command line a row names was checked before it was written:
+`git log` has no `--refs` option, so J7 step 4 uses `--glob`, which
+matched a nested `refs/romeu/salvage/<generation>/<salvage-id>/...`
+ref on a commit no branch holds, with git 2.53.0 in a scratch
+repository on 2026-10-09.

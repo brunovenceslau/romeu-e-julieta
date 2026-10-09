@@ -218,9 +218,10 @@ work as usual.
    `$ROMEU_ROOT/.attic/foo/<ts>/`; drop from workspace files; move state
    and approvals to the state attic.
 4. [O] Once, in each attic clone, `git -C <clone> status` shows a clean
-   tree, `git -C <clone> log --branches --not --remotes --oneline`
-   prints nothing and `git -C <clone> for-each-ref refs/romeu/salvage/`
-   lists no ref whose work is kept nowhere else, the operator may delete
+   tree, `git -C <clone> log --branches --glob='refs/romeu/salvage/*'
+   --not --remotes --oneline` prints nothing, `git -C <clone> stash
+   list` lists no stash and `git -C <clone> worktree list` lists no
+   linked worktree, the operator may delete
    `$ROMEU_ROOT/.attic/foo/<ts>/` and
    `$XDG_STATE_HOME/romeu/attic/foo/<ts>/`; romeu never does, and
    `status` and `doctor` do not read them.

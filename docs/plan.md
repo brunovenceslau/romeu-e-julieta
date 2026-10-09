@@ -499,7 +499,8 @@ task list:
 #### T005 - `tools/ci pr`
 
 - [ ] Merged
-- Module: `ci-bootstrap`. Implements: 12 12.4, 10 10.2 (the `pr` step
+- Module: `ci-bootstrap`. Implements: 12 12.4, 05 5.3 (the invariant
+  of the `pr` job), 10 10.2 (the `pr` step
   and its inputs; it lands whole), 12 12.9 (the base branch), 12 12.10
   (the form of a fix marker), 10 10.4 (goldens under Evidence), ADR 0001
   rules 4, 8 and 11.
@@ -552,6 +553,22 @@ task list:
     name and the four readings of each commit.
   - A payload with neither accepted shape, or without one of the seven
     fields, fails.
+  - The invariant of 05 5.3 holds: no code that a pull request changes
+    judges that pull request. This task decides where the code of `pr`
+    lives and how it reads the head, and shows each of these (round 11,
+    R11-01 to R11-03, decided on 2026-10-09):
+    - every input `pr` reads from the head is parsed by code under a
+      path no checkpoint grant covers, its YAML and TOML readers
+      included (R11-02);
+    - the code `pr` builds imports only the standard library and
+      packages on `approvals`, held by a test, and the `approvals`
+      globs of `.github/ask-first.yaml` name those packages'
+      directories (R11-01);
+    - `pr`, built from the default branch, applies the version-pin
+      rules of `mise.toml` and `go.mod` of 10 10.2 to the head
+      (R11-03);
+    - the mise toolchain and the `go` line of `go.mod` are the grantable
+      inputs left under the job, each listed in 05 5.4.
 - Verify: `go test ./tools/ci/... -run '^TestPR'`, which runs the
   fixture lines; `go run ./tools/ci pr <payload file>` on a saved
   payload.
