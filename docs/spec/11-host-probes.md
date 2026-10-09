@@ -161,7 +161,7 @@ declares its `kind` in the harness.
 | C2 | `mise exec -C <dir> -- <cmd>` vs shims in a fresh non-interactive zsh and bash |
 | C3 | the pinned Claude Code version's setting to disable its own memory, whether a non-writable memory dir is tolerated, and the error text it shows on a refused memory write, so the julieta skill can name it |
 | C4 | `git bundle verify`/`unbundle` under the hardened flags |
-| C5 | for the pinned Claude Code version: the order in which it fires SessionEnd and SessionStart on `/clear`; which SessionStart sources fire (startup, resume, clear, compact); that the hook's output reaches the agent's context, and the size at which it is cut; what a hook's non-zero exit does; and the time a SessionEnd hook is given |
+| C5 | for the pinned Claude Code version: the order in which it fires SessionEnd and SessionStart on `/clear`; which SessionStart sources fire (startup, resume, clear, compact); that the hook's output reaches the agent's context, and the size at which it is cut; what a hook's non-zero exit does, and that the stdout of a failing hook still reaches the context; and the time a SessionEnd hook is given; and that each required agent-profile path of [08 8.5](08-memory-handoff-salvage.md#85-salvage-complete-before-destruction) step 5 exists |
 | C6 | from inside, the A3 plants in a memory dir; `julieta memory check` and the romeu checks report every plant. It settles I24 and julieta delivery (06 6.3) |
 
 C1 is not used: it named a check that left the spec.

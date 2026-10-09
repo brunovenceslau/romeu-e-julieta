@@ -22,7 +22,7 @@ required to be complete, not merely present.
 | Caps | the starting values of 8.6: per entry or handoff file, entries, handoff files; snapshot and salvage payloads are bounded by the salvage cap, which is per salvage (8.5 step 4). julieta keeps `handoff/` under its cap by removing facts files beyond the newest ones it keeps, never the newest facts file and never a narrative file; a `handoff/` over its cap warns in `sync` and `run` and never refuses |
 | Enforcement | `julieta memory check` fails on a violation; romeu `sync` and `run` refuse (exit 2) and name the offending path; romeu reads memory only through `memstore`'s `os.Root` readers and never extracts archives from it (I24) |
 | Interface | two packages, split by what each side needs. `memstore`, linked by both binaries, holds the readers on `os.Root`, `List(filter)`, whose filter carries the text of `list --query`, and `Get(id)`, with the layout allowlist and the caps. `memstore/write`, linked by julieta only, holds `Store`, which adds `Put(entry)` and the store lock. julieta never deletes a memory entry: `edit --status done` closes one, and backups of memory are the owner's |
-| v1 backend | `fs` on `os.Root`; every write follows the atomic write rule of [03 3.8](03-formats.md#38-host-state-schemas-state-v1). A temporary file is named `.tmp-<ULID>` in the target's own directory; a name of that grammar is never read, is not an allowlist violation (`memory check` and `sync` warn, never refuse), and `julieta setup` removes any older than its own start. The store lock is a sandbox-local file, `$HOME/.local/state/julieta/locks/<dir>.lock`, never in the memory dir, because a memory dir is mounted into one sandbox only |
+| v1 backend | `fs` on `os.Root`; every write follows the atomic write rule of [03 3.8](03-formats.md#38-host-state-schemas-state-v1). A temporary file is named `.tmp-<ULID>` in the target's own directory; a name of that grammar is never read, is not an allowlist violation (`memory check` and `sync` warn, never refuse), and `julieta setup` removes any older than its own start. The store lock is a sandbox-local file, `$HOME/.local/state/julieta/locks/<dir>.lock`, never in the memory dir, because a memory dir is mounted into one sandbox only. `Put` takes it, and so does `handoff write` for the whole command, git reads included, on the lock of its target dir |
 | Stamping | julieta assigns the ULID `id` and the `createdAt`/`updatedAt` timestamps on `add` and `edit`; callers cannot supply them (principle: deterministic) |
 | Portability | machine-local in v1 (Q14) |
 | Agent neutrality | markdown + YAML front matter; no agent-specific fields |
@@ -43,7 +43,9 @@ backend possible later.
   memory add`.
 - The skill rule (`skills/julieta/SKILL.md`) tells the agent to use
   `julieta memory` for anything worth keeping, and to tag an entry
-  `lesson` when it records what a session taught.
+  `lesson` when it records what a session taught. Something no event
+  id expresses goes into the handoff, and the agent opens an issue
+  labelled `deferred` that names the row.
 
 ## 8.2 Session hooks (user-side middleware)
 
@@ -53,8 +55,8 @@ run every time, never remembered.
 
 | Hook | Command | Prints or writes |
 |---|---|---|
-| SessionStart, for every source the pinned Claude Code fires (startup, resume, clear, compact) | `julieta handoff show --hook` | in this order: (1) julieta's warnings, one line each: a stale `mise.lock`, snapshots disabled for a repo, the agent's own memory dir writable or not empty, an agent-profile path that does not exist (8.5 step 5), a default branch `julieta setup` moved (`default-branch-moved`, `<repo> <old>..<new>`, shown by the first SessionStart after the move and then cleared), and every recorded hook failure (shown until a later run of the same hook succeeds, below); (2) the fixed built-in memory line (8.1); (3) the latest narrative handoff, or the gap line of 8.3; (4) the facts that changed since it (branch moved, new commits, dirty count); (5) open entries, newest first; (6) entries tagged `lesson` whose status is open, newest first. It reads every manifest repo's memory dir and labels each item with its repo. The whole output is bounded (8.6); when it is cut, the last line is `<n> more entries: julieta memory list`. Warnings come first, so the bound never cuts them |
-| SessionEnd | `julieta handoff write --facts` | a `facts` handoff, so a session that ends without `/handoff` still leaves stamped git facts |
+| SessionStart, for every source the pinned Claude Code fires (startup, resume, clear, compact) | `julieta handoff show --hook` | in this order: (1) julieta's warnings, one line each: a stale `mise.lock`, snapshots disabled for a repo, the agent's own memory dir writable or not empty, a required agent-profile path that does not exist (8.5 step 5), a default branch `julieta setup` moved (`default-branch-moved`, `<repo> <old>..<new>`, shown by the first SessionStart after the move and then cleared), and every recorded hook failure (shown until a later run of the same hook succeeds, below); (2) the fixed built-in memory line (8.1); (3) the latest narrative handoff, or the gap line of 8.3; (4) the facts that changed since it (branch moved, new commits, dirty count); (5) open entries, newest first; (6) entries tagged `lesson` whose status is open, newest first. It reads every manifest repo's memory dir and labels each item with its repo. The whole output is bounded (8.6); when it is cut, the last line is `<n> more entries: julieta memory list`. Warnings come first, so the bound never cuts them |
+| SessionEnd | `julieta handoff write --facts` | a `facts` handoff, so a session that ends without `/handoff` still leaves stamped git facts; whether it raises the gap line is decided by the facts it carries (8.3), not by its time |
 
 Memory, handoff and lesson text is written by agents. SessionStart
 shows it to the next session as data, under a line that says so; the
@@ -65,10 +67,16 @@ Both hooks invoke julieta by the absolute path of the read-only
 `.romeu/bin` mount ([06 6.4](06-kits.md#64-product-kits)). A hook
 always exits 0: on a failure it prints one stdout line naming the
 failure and `julieta status`, and julieta records it as a hook failure.
+When julieta itself cannot run (the mount is absent after an sbx
+change), nothing of julieta is there to print, so the kit renders each
+hook command as a shell wrapper that prints the failure line and exits
+0 in that case.
 Which sources fire, that the output reaches the agent's context, its
 size limit, the behaviour on a non-zero exit and the SessionEnd timeout
 of the pinned version are recorded by one probe row of
-[11 11.2](11-host-probes.md#112-block-b---acceptance-on-real-hosts-last).
+[11 11.2](11-host-probes.md#112-block-b---acceptance-on-real-hosts-last),
+which also checks that the stdout of a failing hook still reaches the
+agent's context.
 
 julieta records every failing git hook run (hook, repo, exit status,
 time) in its state; SessionStart, `julieta status` and `romeu status`
@@ -84,7 +92,7 @@ surface them until a later run of the same hook succeeds.
 | File name | `handoff/<ULID>-<kind>.md` (03 3.10); ULIDs sort by time |
 | Stamping | julieta writes all front matter (3.10) with git facts for every repo in the manifest |
 | Handoff reader | one function in `internal/handoff`, used by julieta and romeu: "latest narrative" = the greatest ULID among `clear` and `final` files; "newest facts" = the greatest ULID among `facts` files; a facts file never hides a narrative |
-| Resume | SessionStart prints the latest narrative plus the difference between its facts and the newest facts. When the newest facts file is newer than the latest narrative, it prints first the gap line `no narrative since <time>; the session ended without /handoff` |
+| Resume | SessionStart prints the latest narrative plus the difference between its facts and the newest facts. The gap line `no narrative since <time>; the session ended without /handoff` prints first only when the newest facts file's git facts differ from the facts stamped in the latest narrative (new commits, a moved branch, a changed dirty count); a newer facts file with the same git facts, such as the one SessionEnd writes at `/clear` after `/handoff`, prints no gap line. Two goldens pin it: `/handoff` then `/clear` (no line), and a facts-only end with new commits (the line) |
 | Before destruction | after the preflight and before the salvage half, `romeu rm` asks the handoff reader whether the open generation has a `final` handoff; on a TTY it asks whether to go on without one, and without a TTY it warns (`no-final-handoff`) and goes on (04 4.2). The narrative handoff is the operator's step: romeu cannot ask a stopped agent for one (J6) |
 | Host | `romeu handoff <name>` prints the latest narrative and newest facts (escaped), labelled as text an agent wrote |
 
@@ -117,8 +125,10 @@ plumbing.
   refs and reads `heads.json` for `status` only, so a kill between the
   two writes leaves nothing romeu acts on wrongly.
 - A snapshot that cannot be written never undoes the commit: it keeps
-  the previous bundle, is recorded as a hook failure with its repo
-  (8.2), and the repo's own hooks still run (04 4.3).
+  the previous bundle, removes its own `.tmp-<ULID>` file before the
+  hook failure is recorded, is recorded as a hook failure with its
+  repo (8.2), and the repo's own hooks still run (04 4.3). A kill
+  leaves the file, and `julieta setup` stays its cleanup (8.1).
 - A repo whose local config sets `core.hooksPath` bypasses the
   dispatcher; `julieta setup` writes `disabled: true` into its
   `heads.json`, `julieta setup` and `julieta status` report "snapshots
@@ -148,8 +158,8 @@ manifest.
    `internal/agent/<agent>`), wait up to 10 s, then SIGKILL; record it,
    with the number of processes matched. Zero matched while the agent
    pane runs is the skipped item `agent-not-matched`. Then salvage waits
-   for the julieta store lock, so a SessionEnd hook already running
-   finishes first; a facts handoff written during salvage is allowed
+   on the store lock of every manifest memory dir (8.1), so a
+   SessionEnd hook already running finishes first; a facts handoff written during salvage is allowed
    and not counted for completeness. `cmd/julieta` passes the agent
    profile (process names, state paths) to `salvage`; the `salvage`
    package, which romeu links too, does not import `agent/*`.
@@ -186,9 +196,12 @@ manifest.
 5. Agent state (from `internal/agent/claude`): project memory files and
    todos to `agent/`; transcripts excluded unless `--include-transcripts`
    (they may contain echoed tokens), listed as `transcript-excluded`;
-   scratch dirs named by the agent profile within the same cap. A
-   profile path that does not exist is the skipped item
-   `agent-path-missing`.
+   scratch dirs named by the agent profile within the same cap. The
+   profile splits its paths into required ones, which exist at the
+   pinned agent (`julieta setup` and probes C3 and C5 check them), and
+   optional ones, such as a todos or scratch dir a session never
+   created. Only a missing required path is the skipped item
+   `agent-path-missing`; a missing optional path is no item.
 6. Write `manifest.json` (3.11). A salvage dir without its
    `manifest.json`, which an interrupted salvage leaves, is ignored by
    verification and kept.
