@@ -1,73 +1,116 @@
 # 9. Developer journeys
 
 Back to [index](../spec.md). Reader: implementers of the scenario
-functions and the guide pages; the operator for the order of steps.
-Type: how-to per journey.
+functions. Each guide page in `docs/guide/` rewrites its journey for the
+operator: the commands typed and what the terminal shows, without the
+step tags or internal states. Type: how-to per journey.
 
 Legend: **[H]** romeu on the host, **[X]** sbx invoked by romeu, **[J]**
-julieta in the sandbox, **[A]** agent, **[O]** operator. Each journey is a scenario function in `e2e/scenarios/`
-run by the host suite (`e2e/host`, real sbx) and, for J2, J3b, J7, J10,
-J11, also by CI with the fake sbx; each has a guide page in
+julieta in the sandbox, **[A]** agent, **[O]** operator
+([01 1.7](01-system-model.md#17-vocabulary)). Each journey is a scenario function in `e2e/scenarios/`
+run by the host suite (`e2e/host`, real sbx) and, for J2, J3b, J6, J7,
+J10, J11, also by CI with the fake sbx; each has a guide page in
 `docs/guide/`. A scenario function runs the [H], [X] and [J] steps,
 replays an [A] step as commits on the fixture origin, and treats an
 [O] step that installs something or opens an editor as a precondition
-it checks. J12 runs J1 steps 3-6 under a fresh root, settings and
-state on the same host, after the first run's sandboxes are removed;
-a second physical machine stays a documented path. In CI a journey
-that reaches a julieta call runs at the hybrid level, on the Linux
-runners ([10 10.1](10-testing-style.md#101-test-levels)).
+it checks. In CI, J6 forwards `julieta salvage` through `sbx env exec`
+to julieta at the hybrid level, and a fixture process stands in for the
+agent. J12 runs J1 steps 3-5 and J12 step 2 under a fresh root,
+settings and state on the same host, after the first run's sandboxes
+are removed (J1 steps 1-2 are installs, preconditions it checks); a
+second physical machine stays a documented path. In CI a journey that
+reaches a julieta call runs at the hybrid level, on the Linux runners
+([10 10.1](10-testing-style.md#101-test-levels)).
+
+What a journey passing means in CI: a scenario asserts, at each [X]
+step, the argv romeu passes to the fake sbx, and at each [H] step the
+state records the step writes; a step the fake cannot perform (attach,
+a live daemon fetch) is asserted by its argv only and listed in the
+scenario's omitted steps, which the host suite covers.
+
+Journeys are told from the operator's side. What the agent is told is
+asserted by the hook and command tests of [08](08-memory-handoff-salvage.md)
+and [04](04-cli.md), and the maintainer's release flow is the ordered
+checklist of
+[12 12.2](12-engineering.md#122-development-commands-and-capability-map),
+which names each step's command and output path.
 
 ## J1 Onboarding (new machine, first time)
 
-1. [O] Install sbx (>= v0.46.0), git at or above the floor of
+0. [O] Create the config repo from the starter in `examples/` (CC0-1.0,
+   [00 0.4](00-scope.md#04-license)): copy it into a new repository,
+   edit `projects/<cfg>.yaml` by hand (its name and the config repo's
+   own entry under `repos`, [03 3.2](03-formats.md#32-project-spec-projectsnameyaml-schema-projectv1)),
+   push.
+1. [O] Read the README's trust paragraph. Install sbx at or above the
+   floor of [10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract)
+   (initial v0.46.0), git at or above the floor of
    [05 5.1](05-security.md#51-hardened-git-internalgitsafe) (initial
    floor 2.45.4), and a `gh` that has the `attestation` command, which
-   step 2 needs (12 12.1).
-2. [O] Download the `romeu` darwin archive for the host arch, verify with
+   step 2 needs (12 12.1). The verification of step 2 needs network
+   access and a `gh` logged in to GitHub.
+2. [O] Download the `romeu` darwin archive for the host arch and
+   `checksums.txt` with `curl`, which sets no quarantine attribute, so
+   Gatekeeper is not asked about an unsigned binary (inferred; B1
+   confirms it on both hosts). Verify with
    `shasum -a 256 -c checksums.txt` and
    `gh attestation verify <archive> --repo <owner>/romeu-e-julieta
    --signer-workflow <owner>/romeu-e-julieta/.github/workflows/release.yml`
-   (both required), put `romeu` on `PATH`.
+   (both required; the verification contract of
+   [10 10.2](10-testing-style.md#release-and-bootstrap), one entry of
+   `e2e/scenarios/commands.yaml` that J9 uses too), put `romeu` on
+   `PATH`.
 3. [O] `romeu init --config-url https://github.com/<owner>/<config-repo>`
    - [H] writes host settings (root default `$HOME/dev`, absolute tool
      paths), clones the config repo to `$ROMEU_ROOT/<cfg>-env/<dir>`.
 4. [O] `romeu doctor`; fix every failure; apply its recommendations
    (`sbx settings set env.rememberHostCommands true`);
    `romeu approve --toolchain` (gate 1).
-5. [O] Add `secrets: <name>@<project>` entries to host settings for the
-   config project (romeu prints the missing names on sync).
+5. [O] Fill the host settings the config project needs
+   ([03 3.4](03-formats.md#34-host-settings-settingsyaml-schema-host-settingsv1)):
+   `gitHosts`, `workloadRepositories`, `signing.agentSocket` when a
+   project uses `git-ssh-sign`, and `secrets` entries named
+   `<name>@<project>` (romeu prints the missing names on sync). For a
+   project that uses `git-ssh-sign`, start the dedicated signing agent
+   with exactly one key ([06 6.4](06-kits.md#64-product-kits)); sync
+   exits 2 with `RJ-204 signing-socket` until it is reachable and holds
+   that key.
 6. [O] `romeu sync <cfg>` -> gate 2 on TTY (repos, secrets, kits and
    their capabilities, workload, gated egress) -> approve.
 7. [O] `romeu run <cfg>` -> sandbox created -> tools installed -> herdr
-   layout with the agent pane focused.
+   layout with the agent pane focused; the operator logs the agent in
+   inside the sandbox, once, on this first run.
 
 ## J2 New project
 
 1. [A] in the config project's sandbox: write `projects/foo.yaml`,
    `julieta spec validate projects/foo.yaml`, commit, push a branch, open
    a PR.
-2. [O] either after merge `romeu sync foo`, or before merge
-   `romeu sync --from <sha> foo`, with the head of the branch pushed
-   in step 1 (the spec is read from a commit of origin, never from a
-   working tree).
-3. [H] clones repos, creates memory dirs and the ledger's spool and
-   view dirs, ingests the spool (empty on a first sync,
-   [13 13.4](13-runtime-ledger.md#134-ingest)), derives egress,
-   renders, gate -> [O] approve.
+2. [O] bind each secret the spec names to a host command, one
+   `<name>@foo` entry per secret in host settings, for example
+   `github@foo: {service: github, argv: [/usr/bin/security, find-generic-password, -s, romeu/foo/github, -w]}`,
+   after storing the value with
+   `security add-generic-password -s romeu/foo/github -a "$USER" -w`
+   (a missing entry makes sync exit 2, and its fix hint prints the
+   entry to paste). Then either after merge `romeu sync foo`, or before
+   merge `romeu sync --from <sha> foo`, with the head of the branch
+   pushed in step 1 (the spec is read from a commit of origin, never
+   from a working tree). On the `--from` path the gate 2 diff is the
+   only review before the spec applies; fields outside the widening set
+   (for example `run`) apply unreviewed inside the sandbox.
+3. [H] clones repos, creates memory dirs, derives egress, renders,
+   gate -> [O] approve.
 4. [O] `romeu run foo`.
 
 ## J3 Run, sandbox exists (J3a) and absent (J3b)
 
-On the host the operator opens one terminal window (for example a cmux
-window) and runs `romeu run <p>` in it; that process becomes the
+On the host the operator opens one terminal window and runs
+`romeu run <p>` in it; that process becomes the
 sandbox's herdr client. Nothing else runs on the host. See `romeu run` in
 [04](04-cli.md). J3a: `sbx env run -d` starts or
 reattaches without re-provisioning; `julieta setup` is a no-op when
 locks are unchanged (S8). J3b: create, record generation, egress,
-`julieta setup` installs everything, then attach. In both, romeu
-ingests the project's spool right after the preflight, and
-`julieta setup` drains the spool files that now have an entry; an
-ingest that fails is reported and `run` goes on (13 13.4). If the tree has an
+`julieta setup` installs everything, then attach. If the tree has an
 open generation with no sandbox, romeu preserves it first (J10). If a
 sandbox of the project's name exists that romeu has no generation for
 (for example after the host state was lost), `run` exits 2 with
@@ -106,19 +149,25 @@ work as usual.
 
 1. [O] optional `/handoff --final` (agent half; the agent may be dead).
 2. [O] `romeu recreate foo` (or `romeu rm foo`).
-3. [H] `romeu salvage foo` (mandatory, deterministic): [H] preflight,
-   generation `open -> salvaging`, new salvage id and host base SHAs for
-   the generation's recorded repo set; [H] ingest the spool (a failed
-   ingest is recorded as `ledger-incomplete` and blocks nothing,
-   13 13.4); [X->J] `julieta salvage
+3. [H] `romeu salvage foo` (mandatory, deterministic): [H] preflight;
+   the handoff reader checks for a `final` handoff of the generation
+   before anything is stopped: on a TTY romeu asks whether to continue
+   without one, and without a TTY it warns and continues; generation
+   `open -> salvaging`, new salvage id and host base SHAs for the
+   generation's recorded repo set; [X->J] `julieta salvage
    --stop-agents`; [H] verify, unbundle, cross-check daemon heads,
-   import; the handoff reader warns if the generation has no `final`
-   handoff.
-4. [H] incomplete -> exit 5 listing what would be lost; the operator
-   fixes it or reruns with `--accept-loss`.
+   import.
+4. [H] incomplete -> exit 5 listing what would be lost, each with its
+   reason; the operator fixes each reason as the guide page says for it
+   (pushes the work, frees the space, starts the sandbox) or reruns with
+   `--accept-loss`.
 5. [X] `sbx env rm <dir>`; [H] remove romeu-applied egress rules;
    generation `salvaging -> closed-removed`. For `recreate`, continue
    with J3b.
+6. [O] restore salvaged work in the new sandbox: push the salvage
+   ref's worktree commit from the host clone into the new sandbox's
+   daemon remote and check it out there; apply `stash-<n>`; extract
+   `ignored.tar.gz` inside the sandbox only, never on the host.
 
 ## J7 Retire a project
 
@@ -128,23 +177,24 @@ work as usual.
    per repo: dirty tree, stashes, branches not on origin, salvage refs
    not reachable from origin; confirm on TTY; move `foo-env/` to
    `$ROMEU_ROOT/.attic/foo/<ts>/`; drop from workspace files; move state
-   and approvals to the state attic. Before the move romeu ingests
-   the spool once more, for the events julieta wrote during the
-   sandbox half. The spool and the view then move with `foo-env/`;
-   the project's ledger entries stay in the ledger (13 13.5).
+   and approvals to the state attic.
 
 ## J8 Tool bump (inside a repo)
 
-1. [A] edit `mise.toml`; `julieta lock`; `julieta install`; commit; PR.
+1. [A] edit `mise.toml`; `julieta lock`; commit; open the PR.
 2. [O] after the PR merges into the branch named by the spec's `ref`,
    `romeu sync foo`: new non-upload catalog domains apply live;
    upload-capable or unknown hosts -> gate.
-3. Running sandboxes already have the tool (installed from inside);
+3. [A] `julieta install`: egress follows `ref`, so a tool whose domains
+   are not already allowed installs once the change has merged and
+   sync has applied it ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress));
    other machines get it on their next `run` (`julieta setup`).
 
 ## J9 Kit or workload bump
 
-- romeu release: install and verify it -> `romeu approve --toolchain`
+- romeu release: install and verify it with the same
+  `e2e/scenarios/commands.yaml` entry as J1 step 2 ->
+  `romeu approve --toolchain`
   (gate 1, once per machine; it prints the julieta version change and the
   catalog diff per affected project) -> `romeu sync --all`; julieta binaries
   update through the read-only mount without recreate; only projects
@@ -155,6 +205,15 @@ work as usual.
   `romeu recreate foo`.
 - Personal kit: [A] edit `kits/<id>/` in the config repo -> PR -> sync ->
   gate -> recreate.
+- sbx update on the host: the next `romeu sync` or `run` exits 3 (gate
+  1, [04 4.2](04-cli.md#42-romeu-host)); [O] `romeu doctor` shows the
+  new sbx version against the floor and the recording set
+  ([10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract));
+  `romeu approve --toolchain`. A version the recording set does not
+  cover is untested: `doctor` says so, and the operator either accepts
+  it or reinstalls the previous sbx; a later command that fails on a
+  changed sbx output is recovered with J6 (salvage, `--accept-loss`) or
+  J10.
 
 ## J10 Recover after sandbox death
 
@@ -164,11 +223,14 @@ work as usual.
    `refs/sandboxes/foo/*` and every `snapshot/heads.bundle` into
    `refs/romeu/salvage/foo/<G>/<salvage-id>/`), moves it to
    `closed-lost` with `result: lost`, creates a new sandbox (new ULID).
-   The dead sandbox's spool is a host directory, so the same `run`
-   ingests the events it left (13 13.4).
-3. [O] recover a branch on the host:
-   `git -C <clone> branch recover/<b> refs/romeu/salvage/foo/<G>/<salvage-id>/<dir>/<b>`
-   and push it (docs show the hardened form).
+3. [O] recover a branch on the host, with the hooks, the fsmonitor and
+   the protocols of [05 5.1](05-security.md#51-hardened-git-internalgitsafe)
+   switched off on the command line:
+   `git -c core.hooksPath=/dev/null -c core.fsmonitor=false -C <clone> branch recover/<b> refs/romeu/salvage/foo/<G>/<salvage-id>/<dir>/<b>`,
+   then
+   `git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c protocol.allow=never -c protocol.https.allow=always -C <clone> push origin recover/<b>`.
+   Both lines are an entry of `e2e/scenarios/commands.yaml`, which
+   J10's CI scenario runs.
 
 ## J11 Egress or secret change approval
 
@@ -190,7 +252,8 @@ work as usual.
 ## J12 Second machine
 
 1. J1 steps 1-5 on the new machine (approvals, secret bindings and
-   memory are machine-local by design).
+   memory are machine-local by design). Agent memory and handoffs stay
+   on the machine that wrote them (Q14).
 2. `romeu sync --all` -> one gate per project -> `romeu run <name>`.
 3. Unpushed work from the other machine is not available (push first).
 
@@ -207,3 +270,19 @@ work as usual.
 4. [O] after `status` shows nothing unpushed, the operator moves or
    deletes the orphaned dirs by hand (romeu never does). A new command
    for this is out of v1 (Q6).
+
+## J14 Stop using romeu and julieta
+
+1. [O] push or recover unpushed work (J10 step 3).
+2. [O] `romeu retire` each project (J7).
+3. What stays, on purpose: the host clones, as plain clones; memory, as
+   plain Markdown ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1));
+   `$ROMEU_ROOT/.attic`.
+4. [O] What the operator removes by hand, as the guide page shows: host
+   settings, host state, romeu-applied egress rules, the refs under
+   `refs/romeu/` and `refs/sandboxes/` (`git for-each-ref`, then
+   `git update-ref -d`), and any remaining sbx sandboxes and volumes.
+
+The scenario runs after J7 and checks `git fsck` on each host clone,
+that no ref is left under `refs/romeu/` or `refs/sandboxes/` after step
+4, and that every memory file parses as 03 3.9 says without julieta.
