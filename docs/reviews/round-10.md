@@ -25,13 +25,13 @@ consolidation. Where a row needs the operator, the item is in
 "Decisions for the operator" below with a recommendation, and the
 decision is recorded next to it, with its date, when it comes.
 
-Status, as in rounds 6 to 9: **A** = apply as proposed; **M** = apply
-in a smaller or different form than proposed, as its row states;
-**L** = state as a limit, no mechanism added. A row whose change
-touches a decision record, an accepted risk, the scope or a path
-outside `docs/` also names its item in "Decisions for the operator";
-its status is the consolidation's proposal for when the item is
-answered. The statuses below are proposals: no write pass has run.
+Status, as in rounds 6 to 9: **A** = applied as proposed; **M** =
+applied in a smaller or different form than proposed, as its row
+states; **L** = stated as a limit, no mechanism added; **operator** =
+not applied, and the item is in "Decisions for the operator". A row
+that also names an item there was applied as that item recommends, and
+the item records the answer when it comes. The write pass is described
+in "Write pass (2026-10-09)" below.
 
 The reports are kept in `round-10/reports/<lens>.json`, as the
 reviewers wrote them.
@@ -104,8 +104,8 @@ member is, else `new`. Sections are cited as the spec cites itself.
 
 | Cluster | Section | Lenses | Kind | Defect | Verification | Resolution | Status |
 |---|---|---|---|---|---|---|---|
-| **R10-01** | 05 5.3 (the `approvals` surface and its entry); 12 12.4 (the `pr` job; A checkpoint grant); 02 2.1 (`tools/ci`) | L2 (L2-r10-1) | new | 05 5.3 says the `approvals` surface holds the check of approval lines and grants, "which no checkpoint grant covers", but its globs name `tools/ci/askfirst.go` alone, while the `pr` job builds the whole `tools/ci` main package, its step packages and the modules of `go.mod`, all on `checks` or `dependencies`, which 12 12.4 lets a checkpoint grant cover. | holds: the `approvals` entry of 05 5.3 and `.github/ask-first.yaml` globs `tools/ci/askfirst.go`, `tools/ci/denylist.yaml` and `.github/workflows/**`; `tools/ci` is one main package of many files; the grant list of 12 12.4 names `checks` and `dependencies` | 05 5.3 and 12 12.4 state the rule: `pr` is built from a main package of its own whose import closure is the standard library and paths on `approvals`; a `tools/ci` test fails when `go list -deps` of that package holds a path outside the `approvals` globs; the globs gain that package in the tooling pull request of the task that builds `pr` (an `ask-first` change); and 05 5.3 names what stays grantable under the job (the toolchain pinned by `mise.toml` and `mise.lock`), see D2 | A (spec text now; the glob with the task that builds `pr`); D2 |
-| **R10-02** | 05 5.4 (the row "Under a `checks` grant ..."); 12 12.4 (the `pr` job) | L2 (L2-r10-2), L11 (L11-r10-1) (high-signal) | new | The mitigation "re-run the `pr` job of each open pull request when `pr` changes" cannot pick up a fix: by GitHub's documentation on re-running workflows, a re-run keeps the `GITHUB_SHA` of the original event, which under `pull_request_target` is the default branch's commit the job checks out; and the step is left to memory, not to a mechanism. | holds as inferred from GitHub's documentation, not measured: 05 5.4 says "re-run", and 12 12.4 has the job check out `github.sha` | 05 5.4 says a new event runs the fixed `pr` (an `edited` event from a change to the body, which the job listens to, or a close and reopen), and that a re-run of an old run judges with the old code; 12 12.4 carries the same sentence; an automatic new run per open pull request when the `pr` build inputs change is a row of Deferred decisions, reopened by the first pull request merged on a stale `pr` result | A; D1 (the accepted-risk row) |
+| **R10-01** | 05 5.3 (the `approvals` surface and its entry); 12 12.4 (the `pr` job; A checkpoint grant); 02 2.1 (`tools/ci`) | L2 (L2-r10-1) | new | 05 5.3 says the `approvals` surface holds the check of approval lines and grants, "which no checkpoint grant covers", but its globs name `tools/ci/askfirst.go` alone, while the `pr` job builds the whole `tools/ci` main package, its step packages and the modules of `go.mod`, all on `checks` or `dependencies`, which 12 12.4 lets a checkpoint grant cover. | holds: the `approvals` entry of 05 5.3 and `.github/ask-first.yaml` globs `tools/ci/askfirst.go`, `tools/ci/denylist.yaml` and `.github/workflows/**`; `tools/ci` is one main package of many files; the grant list of 12 12.4 names `checks` and `dependencies` | 05 5.3 and 12 12.4 state the rule: `pr` is built from a main package of its own whose import closure is the standard library and paths on `approvals`; a `tools/ci` test fails when `go list -deps` of that package holds a path outside the `approvals` globs; the globs gain that package in the tooling pull request of the task that builds `pr` (an `ask-first` change); and 05 5.3 names what stays grantable under the job (the toolchain pinned by `mise.toml` and `mise.lock`), see D2 | A (spec text; the glob with the task that builds `pr`): the package is named `tools/ci/pr`, and the `go` line of `go.mod` is named beside the toolchain as a grantable input; D2 |
+| **R10-02** | 05 5.4 (the row "Under a `checks` grant ..."); 12 12.4 (the `pr` job) | L2 (L2-r10-2), L11 (L11-r10-1) (high-signal) | new | The mitigation "re-run the `pr` job of each open pull request when `pr` changes" cannot pick up a fix: by GitHub's documentation on re-running workflows, a re-run keeps the `GITHUB_SHA` of the original event, which under `pull_request_target` is the default branch's commit the job checks out; and the step is left to memory, not to a mechanism. | holds as inferred from GitHub's documentation, not measured: 05 5.4 says "re-run", and 12 12.4 has the job check out `github.sha` | 05 5.4 says a new event runs the fixed `pr` (an `edited` event from a change to the body, which the job listens to, or a close and reopen), and that a re-run of an old run judges with the old code; 12 12.4 carries the same sentence; an automatic new run per open pull request when the `pr` build inputs change is a row of Deferred decisions, reopened by the first pull request merged on a stale `pr` result | A; D1. GitHub's documentation, read on 2026-10-09, confirms that a re-run keeps the original `GITHUB_SHA`; the row's risk and why it is accepted are unchanged |
 | **R10-03** | 10 10.2 (the `pr` paragraph: "`pr` itself makes no network call"); 12 12.4 (the `pr` job); 10 10.1 (Rules, the one list of network reads) | L13 (L13-R10-1) | new | 10 10.2 says `pr` makes no network call, while 12 12.4 has every git call of `pr` on head objects pass its flags, `fetch` included, and the grammar leaves no other step to fetch `head.sha`; 10 10.1, the one list of the network reads of the steps, does not list that fetch. | holds: the three texts read as stated; the pr job row of 10 10.2 admits one checkout, of `github.sha`, and `run` steps that are `go run ./tools/ci` only | option (a) of the finding: `pr` fetches `head.sha`, unauthenticated, only in the pr job and only when the object is absent; 10 10.2 says `pr` reads the network only for that fetch, and a local run on a saved payload or with `--title` and `--body` reads none; 10 10.1 lists the pr job's head fetch | A |
 | **R10-04** | 01 1.6 (the `removing` row; Recovery); 03 3.8 (`salvage[]`); 03 3.11; 08 8.5; J6 step 5 | L4 (L4-r10-1) | new | The resume rule compares the daemon heads and each worktree's HEAD and status with "the salvage record", but the record of 03 3.8 holds no heads, HEAD or status; the manifest of 03 3.11 holds HEAD and a `dirty` flag only, and 08 8.5 lets the owner delete the salvage dir once the result is recorded. | holds: 03 3.8 lists `id`, `manifestSha256`, `result`, `reasons` and `refsPrefix`; 03 3.11 has `dirty` as a flag; 08 8.5 reads as stated | the state `salvage[]` entry of 03 3.8 gains a fingerprint, written with the state `removing`: the daemon heads, each worktree's HEAD and a digest of its full status (untracked and ignored paths with file digests), under the version rule of 03 (opening); the rerun resumes at `sbx env rm` only when a fresh fingerprint equals it, else `removing -> salvaging`; 08 8.5 says the owner may delete a salvage dir only once its generation has left `removing`; I17 gains the case of an already-dirty worktree edited again after a failed `sbx env rm` | A |
 | **R10-05** | 05 5.4 ("Safe to paste"); 04 4.1 (Error ids) | L14 (L14-r10-1) | unresolved (R9-26) | 04 4.1 now limits the paste claim to the argv, status, step and versions and says a token in a remote URL or an sbx body is not removed, while 05 "Safe to paste" still says the details of an error hold no secret value and can be pasted into an issue. | holds: 05 "Safe to paste" reads as stated; 04 4.1 carries the narrower claim | 05 "Safe to paste" keeps one sentence and links to 04 4.1, which owns the claim: the argv, status, step and versions can be pasted, and the stderr is looked over first; `romeu version --json` stays in the sentence | A |
@@ -116,7 +116,7 @@ member is, else `new`. Sections are cited as the spec cites itself.
 | Cluster | Section | Lenses | Kind | Defect | Why downgraded | Resolution | Status |
 |---|---|---|---|---|---|---|---|
 | **R10-07** | 10 10.2 (maintainer block, item e; pr job row); ADR 0010 decision 1 | L2 (L2-r10-3, Required) | new | Item e says the `pr` job joins the required checks "the same way", but which commit a `pull_request_target` check attaches to is unmeasured, and a head's own `pull_request` workflow can post a check of the same name. | the name collision needs an agent that adds such a job on purpose, which the approval-line row of 05 5.4 already accepts ("a record and a guard against mistakes, not a barrier against an agent"); the attachment question is evidence for an item that is open (ADR 0010 decision 1) and for a maintainer step not yet due | item e says the step records the check run's `head_sha` and whether a ruleset that requires it blocks and then allows a merge, under the Evidence of the task that builds `pr`; `pr`, from the default branch, refuses a head whose workflows give a job outside the pr job's file the pr job's name, with a fixture; if the check cannot be required, that is recorded under the ADR 0010 item | M: the measurement and the name refusal are stated; the attachment question joins the next decision block's ADR 0010 item |
-| **R10-08** | J1 steps 1 and 2; 10 10.2 (Verification contract); 12 12.1 | L15 (L15-R10-1, Required) | new | The operator's `gh attestation verify` now passes `--source-digest` and `--deny-self-hosted-runners`, while J1 and 12 12.1 ask only for a `gh` with the `attestation` command, and no floor or probe records the flags. | `gh` refuses an unknown flag and exits non-zero, so an older `gh` fails visibly and never verifies less; what is missing is a prerequisite line, not a weaker check | 12 12.1 and J1 step 1 state a `gh` floor, the first version with both flags; B1 records the `gh` version; 10 10.2 says the pinned `gh` fixes the development sandbox's flags and the floor fixes the operator's | A |
+| **R10-08** | J1 steps 1 and 2; 10 10.2 (Verification contract); 12 12.1 | L15 (L15-R10-1, Required) | new | The operator's `gh attestation verify` now passes `--source-digest` and `--deny-self-hosted-runners`, while J1 and 12 12.1 ask only for a `gh` with the `attestation` command, and no floor or probe records the flags. | `gh` refuses an unknown flag and exits non-zero, so an older `gh` fails visibly and never verifies less; what is missing is a prerequisite line, not a weaker check | 12 12.1 and J1 step 1 state a `gh` floor, the first version with both flags; B1 records the `gh` version; 10 10.2 says the pinned `gh` fixes the development sandbox's flags and the floor fixes the operator's | A: the floor is `gh` 2.68.0, the first tag of `cli/cli` whose `gh attestation verify` has both flags (read on 2026-10-09 at v2.67.0 and v2.68.0) |
 | **R10-09** | 11 11.2 (opening) | L6 (L6-r10-1, Required, its spec half) | regression (L6-r9-3) | 11 11.2 sizes the sitting as "about 90 minutes per host for B1 to B5", with B6 added in round 9. | the spec half is a time estimate; the gating omission (B6 outside the require-pass lists of O6 and T092) is plan text, parked for B as P4. Round 9's write pass noted the estimate for this round | 11 11.2 gives the estimate for B1 to B6 | A |
 
 ### Advisory
@@ -131,15 +131,15 @@ holds the rest.
 | L2-r10-4 | 12 12.4 (the `pr` job); 10 10.2 (pr job row) | new | `pr` prints author-controlled text (title, body lines, commit subjects) in a job where the runner reads lines starting with `::` as workflow commands. | 12 12.4 says `pr` neutralizes a leading `::` and control characters in author text before printing it; fixture "pr escapes a workflow command in a PR body" | A |
 | L3-R10-3 | 05 5.3 (`approvals`); 12 12.4 | new | The id `approvals` reads as the generic word, and one path sits on up to three surfaces with no vocabulary entry. | the id stays, since renaming a surface is a change on the `ask-first` surface for a reading cost; 05 5.3 says in one sentence that each path on `approvals` is also on `checks` or `dependencies` and needs a line for each | M: the overlap sentence only; no rename |
 | L4-r10-2 | J7 step 4 | new | The attic may be deleted when a report nobody kept shows nothing to keep, or when `git status` and `git for-each-ref` look clean, which shows no unpushed commit. | J7 step 4 names `git -C <clone> log --branches --not --remotes --oneline` and the list of `refs/romeu/salvage/` refs as the check | A |
-| L5-r10-1 | 08 8.3 (Resume); 08 8.2 | new | The gap line says "the session ended without /handoff" also when /handoff ran and a commit followed before /clear. | the line names what is measured ("the newest facts differ from the latest narrative: <n> new commits since <time>"); golden for handoff, commit, /clear. This refines R9-10 | A |
-| L6-r10-3 | 10 10.2 (Release step 1); 10 10.1 (fuzz); S6 | new | The release refusal reads the latest scheduled `fuzz.yml` run, with no stated schedule and no word on whether a manual run counts. | 10 10.1 names the schedule; one sentence beside step 1 says whether a `workflow_dispatch` run counts | A |
-| L6-r10-4 | 10 10.2 (the `pr` step); 12 12.4 | new | Nothing says the pr job fails when the walk from base to head finds no commit, or how its first real run is observed. | the `pr` step fails when the walk finds zero commits (spec half); the Evidence lines of the task that builds `pr` are parked for B (P1) | A |
-| L8-R10-1, L13-R10-2 | ADR 0010 (Context; Decision; Consequences) | new | ADR 0010 says it corrects four texts, and its Decision lists five (items 2 to 6); the Context leaves out round 9's D2 among the items that land in a record. (high-signal) | before pull request #36 merges: "five texts" in the Context and the Consequences, "three of them land in decision records", and round 9's D2 (R9-24) named beside the others; approval line `decisions`, which the pull request already carries | A; D3 |
-| L10-r10-1 | 03 (opening, Versions); 04 4.4 | new | A config repo whose `project.v1` or `host-settings.v1` is older than the window of two versions has no error or hint. | one row in 04 4.4, `format-unsupported`, exit 2, with the hint "apply the edit in the release notes of each skipped release"; 03 cites it | A |
+| L5-r10-1 | 08 8.3 (Resume); 08 8.2 | new | The gap line says "the session ended without /handoff" also when /handoff ran and a commit followed before /clear. | the line names what is measured ("the newest facts differ from the latest narrative: <n> new commits since <time>"); golden for handoff, commit, /clear. This refines R9-10 | A: the line lists what changed (new commits, a moved branch, a changed dirty count) |
+| L6-r10-3 | 10 10.2 (Release step 1); 10 10.1 (fuzz); S6 | new | The release refusal reads the latest scheduled `fuzz.yml` run, with no stated schedule and no word on whether a manual run counts. | 10 10.1 names the schedule; one sentence beside step 1 says whether a `workflow_dispatch` run counts | A: daily on `main`; a `workflow_dispatch` run does not count |
+| L6-r10-4 | 10 10.2 (the `pr` step); 12 12.4 | new | Nothing says the pr job fails when the walk from base to head finds no commit, or how its first real run is observed. | the `pr` step fails when the walk finds zero commits (spec half); the Evidence lines of the task that builds `pr` are parked for B (P1) | A (spec half) |
+| L8-R10-1, L13-R10-2 | ADR 0010 (Context; Decision; Consequences) | new | ADR 0010 says it corrects four texts, and its Decision lists five (items 2 to 6); the Context leaves out round 9's D2 among the items that land in a record. (high-signal) | before pull request #36 merges: "five texts" in the Context and the Consequences, "three of them land in decision records", and round 9's D2 (R9-24) named beside the others; approval line `decisions`, which the pull request already carries | A; D3: ADR 0010 is still only in pull request #36, so it was corrected in place |
+| L10-r10-1 | 03 (opening, Versions); 04 4.4 | new | A config repo whose `project.v1` or `host-settings.v1` is older than the window of two versions has no error or hint. | one row in 04 4.4, `format-unsupported`, exit 2, with the hint "apply the edit in the release notes of each skipped release"; 03 cites it | A: `RJ-337` |
 | L13-R10-3 | index, Deferred decisions (token narrowing; required checks); ADR 0010 decision 1 | new | Two Deferred rows whose triggers fired are handled two ways: one names the record that reopens it and the decision-block item, the other says the review is due and names neither. | both rows say "fired" and name what reopens them and where the decision waits; for the token row, the next decision block's item and the record half in the next decision record | A; D4 |
 | L13-R10-4 | 04 4.2 (doctor table); 04 4.4 (RJ-334, RJ-336); 01 1.7 | new | `doctor` is said to report `removal-pending` and `record-unreadable`, and the doctor table has neither row; its `generation-sandbox` row also matches a `removing` generation. | two doctor rows, `removal-pending` (fail; hint `romeu rm <name>`) and `record-unreadable` (fail; hint as RJ-334); `generation-sandbox` excludes a `removing` generation | A |
 | L13-R10-5 | 04 4.2 (doctor preamble); 01 1.5; 05 5.4 | new | The new sentence "a **pre** check stops a mutating command with exit 2" contradicts 01 1.5, where the protective commands print a failed step 5 and go on. | the sentence excepts the protective commands of 01 1.5, which print it and go on | A |
-| L13-R10-6 | 05 5.4 (approval-line row; token row); 10 10.2 (maintainer block, items a and d) | new | 05 5.4 states the direct-push refusal as measured on 2026-10-08, before the 2026-10-09 ruleset change, and no text names the rule that refuses it now. | 05 5.4 and item d say the try predates the change, and name the pull-request rule as the one expected to refuse it, read and not tried; a direct-push try joins the next sitting | A; D5 |
+| L13-R10-6 | 05 5.4 (approval-line row; token row); 10 10.2 (maintainer block, items a and d) | new | 05 5.4 states the direct-push refusal as measured on 2026-10-08, before the 2026-10-09 ruleset change, and no text names the rule that refuses it now. | 05 5.4 and item d say the try predates the change, and name the pull-request rule as the one expected to refuse it, read and not tried; a direct-push try joins the next sitting | operator: D5; the rows stay as they are until the re-measure of D6 |
 | L15-R10-2 | 12 12.4 (the `pr` job, git flags) | new | The git flag rules rest on one git version and the runner's unpinned git, with no test that fails when a flag changes meaning. | 12 12.4 says the job uses the runner image's git, dates the 2.53.0 reading, and a `pr` test runs each listed git call against a hostile repository (submodule, textconv, external diff, hooks) | A |
 
 ## Parked for stage B
@@ -173,7 +173,9 @@ the G5 fix has no owner yet.
 Everything the consolidation cannot decide, in one block: a change to
 an accepted risk, a decision record, or a path outside `docs/`. Each
 item names the finding, the options and the consolidation's
-recommendation; the recommendation is not a decision.
+recommendation; the recommendation is not a decision. The write pass
+applied D1 to D4 as recommended, and each records the answer, with its
+date, when it comes; D5 and D6 wait for it.
 
 - **D1 (R10-02), the mitigation of the `checks` grant row of 05 5.4.**
   Options: (a) the row says a new event (a body edit, or a close and
@@ -203,7 +205,9 @@ recommendation; the recommendation is not a decision.
   and name round 9's D2 before the merge; (b) merge as is and correct it in the
   next record. Recommendation: (a), since 12 12.5 does not rewrite an
   accepted record once merged. Approval line: `decisions`, already on
-  the pull request.
+  the pull request. The write pass edited ADR 0010 in place, since it
+  is in pull request #36 alone and not yet a record of the default
+  branch.
 - **D4 (L13-R10-3), the two fired Deferred rows.** Options: (a) both
   stay in the table, each saying "fired", the record that reopens it,
   and where the decision waits; the token-narrowing review becomes an
@@ -218,7 +222,17 @@ recommendation; the recommendation is not a decision.
   tried, and a direct-push try joins the next maintainer sitting; (b)
   try it now and record the result. Recommendation: (a), with the try
   at the sitting the ADR 0010 item already needs. Approval line:
-  `spec`.
+  `spec`. Not applied in the write pass: the 05 5.4 row and item d of
+  the maintainer block stay as they are until the measurement of D6.
+- **D6 (D5's measurement), the direct-push refusal under the current
+  ruleset.** The refusal in 05 5.4 and in item d was tried on
+  2026-10-08, before the 2026-10-09 ruleset change, and has not been
+  tried since. Options: (a) re-measure it: a direct push to the
+  default branch with the development sandbox's token, its answer saved
+  under Evidence, and the row and item d worded from that answer;
+  (b) state it as read from the rules and not tried, as D5 (a) says.
+  Recommendation: re-measure, with the operator present. Approval
+  line: `spec`, for the rewording that follows.
 
 ## Exit criteria of stage A
 
@@ -265,14 +279,71 @@ None of the six clusters cites the `sequences` step of 10 10.2, the
 section T004 implements; the criteria are judged for the spec as a
 whole, so the answer stays no until they hold.
 
-What is left before T004:
+What is left before T004, after the write pass below:
 
-- the operator's answers to D1 to D5;
-- one write pass of the 6 Required clusters and the 17 Advisory rows,
-  one pull request, with the approval line of each surface its diff
-  touches (`spec` for 05 and the index; `decisions` for ADR 0010);
-- a targeted re-audit of that pass, round 11, by the lenses whose
+- the operator's answers to D1 to D6;
+- a targeted re-audit of the pass, round 11, by the lenses whose
   findings drove it (L0, L1, L2, L4, L5, L6, L10, L11, L13, L14 and
   L15, with L3, L8 and L9 for their Advisory rows), reading only the
   sections it changed; the clean verdicts of L7 and L16 are carried
   forward.
+
+## Write pass (2026-10-09)
+
+The pass ran on branch `docs/review-round-9`, the branch of pull
+request #36, at d458f83, in one scratch clone, by one build node on
+`opus`. Each Required cluster was checked against the head before it
+was applied, and each held as its Verification cell states. Pull
+request #36 already carries the approval lines this delta needs:
+`spec` (the index, 01 and 05) and `decisions` (ADR 0010).
+
+Resolved: 6 Required clusters, all A; 3 downgraded clusters, 2 A and
+1 M; 14 Advisory rows, 12 A, 1 M and 1 operator (L13-R10-6, D5). D1 to
+D4 were applied as recommended. Nothing under `tools/**`, `.github/**`
+or `.githooks/**` changed; where a resolution describes a check or a
+glob that does not exist yet, the spec states it for the task that
+builds it.
+
+Three choices the rows left open were made in the pass, each stated in
+its row: the main package of `pr` is `tools/ci/pr`, and the pr job's
+`run` line is `go run ./tools/ci/pr` (R10-01); the `go` line of
+`go.mod` is named beside the toolchain as a grantable input under the
+job, because it sets the language version the package is compiled at
+(R10-01); and `fuzz.yml` runs daily, with a `workflow_dispatch` run not
+counted by release step 1 (L6-r10-3). The `gh` floor of R10-08 is
+2.68.0, read on 2026-10-09 in `pkg/cmd/attestation/verify/verify.go`
+of `cli/cli`: v2.67.0 has `--deny-self-hosted-runners` and not
+`--source-digest`, v2.68.0 has both. The fact R10-02 rests on was
+read on 2026-10-09 in GitHub's documentation: a re-run uses the
+`GITHUB_SHA` and `GITHUB_REF` of the original event
+([re-running workflows and jobs](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs)),
+and under `pull_request_target` `GITHUB_SHA` is the last commit on the
+default branch, with `edited` and `reopened` among the event's types
+([events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)).
+
+## Session checkpoint (2026-10-09)
+
+Branch and pull request state is not recorded here; the next session
+measures it with `handoff_state.py`.
+
+### Done
+
+- Round 10 ran: seventeen lenses on d458f83, then the consolidation.
+- Its write pass was applied on branch `docs/review-round-9`, the
+  branch of pull request #36, as described above.
+
+### Open for the operator
+
+- **D5 and D6**, the re-measure of the direct-push refusal under the
+  current ruleset, with the operator present.
+- **D1 to D4**, the answers to the items the write pass applied as
+  recommended.
+- **N2 of pull request #34**, a system-wide mise config that reaches
+  the hook's `tools/ci`.
+- **The stage-B items** P1 to P4 of this page, with those of
+  round-8.md and round-9.md.
+
+### Next steps
+
+- Round 11, the targeted re-audit of this delta, by the lenses listed
+  under "What is left before T004".
