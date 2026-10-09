@@ -31,8 +31,10 @@ const stepTimeout = 15 * time.Minute
 type step struct {
 	name string
 	argv []string
-	// quiet marks a command whose output is its finding: it passes
-	// when it prints nothing, as "gofmt -l" does.
+	// quiet marks a command whose output is its finding, and it means
+	// two things: the step passes when it prints nothing, as "gofmt -l"
+	// does, and what it prints goes through git.SafeLines, because that
+	// output is paths of the repository (checks.run).
 	quiet bool
 	// environ is the whole environment of the command (stepEnv). The
 	// environment of this process never reaches it, so an empty one is
@@ -400,6 +402,19 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 	cmd.Env = append([]string{}, s.environ...)
 	killWithGroup(cmd)
 	out, err := cmd.CombinedOutput()
+	// os/exec calls Cancel only while the leader runs, so a grandchild
+	// that outlives a leader that ended, and holds the output pipe until
+	// WaitDelay, is still ours to kill. A group that is gone is not an
+	// error (ESRCH). While the group has members its pgid is not reused,
+	// so -pgid reaches only this group. The window after the group has
+	// fully emptied (between the last reap and the kill, which a reuse
+	// would need a full pid wrap to hit) is accepted, as it is on the
+	// Cancel path. Other errors are dropped on purpose: a failed kill
+	// changes nothing here, since the step's result already stands and
+	// WaitDelay has bounded the wait.
+	if cmd.Process != nil {
+		_ = killGroup(cmd.Process.Pid)
+	}
 	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		if errors.Is(parent.Err(), context.DeadlineExceeded) {
 			// The deadline of the caller fired, before the limit of the step.
@@ -622,11 +637,18 @@ func (c *checks) run(ctx context.Context, root string, steps []step) {
 		out, err := s.run(ctx, root)
 		detail := ""
 		if err != nil {
-			// out is the step's own output, which is printed as it is: a step
-			// runs the code of the change under test, so quoting its output
-			// would give an attacker nothing and cost readability. err is the
-			// error of the run and may hold a path, so it is made safe.
-			detail = fmt.Sprintf("%s%s\n", out, git.SafeLines(err.Error()))
+			// out is the step's own output, which is printed as it is, for
+			// readability; the unit step in particular lets the change print
+			// anything. A quiet step is the exception: gofmt -l prints paths
+			// of the repository and its parse errors about them, so escaping
+			// its output costs no readability and is defense in depth.
+			// err, the error of the run, may hold a path and is made safe
+			// too.
+			text := string(out)
+			if s.quiet {
+				text = git.SafeLines(text)
+			}
+			detail = fmt.Sprintf("%s%s\n", text, git.SafeLines(err.Error()))
 			if bytes.Contains(out, []byte(moduleLookupOff)) {
 				detail += "the module cache lacks a module of go.sum, and no step fetches one (GOPROXY=off): run \"go run ./tools/ci setup\", which runs \"go mod download\", then run this again\n"
 			}
