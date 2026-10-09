@@ -1,0 +1,390 @@
+{
+  "lens": "L15",
+  "role": "the ground that moves",
+  "model": "opus",
+  "verdict": "No: the spec pins everything it builds and treats everything it runs against as constant. Probes, recordings and conformance fixtures are one-time facts at one upstream version, with no tested window, no staleness and no decoding rule for upstream output, so the largest gap is that a newer sbx is accepted on a blind acknowledgement and parsed by code tested only against the old one.",
+  "findings": [
+    {
+      "id": "L15-1",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "01 1.4",
+      "defect": "No upstream has a tested version window. sbx has a floor (04 4.2, 12 12.1) and no ceiling, and gate 1 compares only for equality: the prompt of `approve --toolchain` shows the julieta and catalog diff and nothing about sbx, so a newer, never-recorded sbx is accepted on a blind acknowledgement.",
+      "scenario": "sbx auto-updates from 0.46.x to 0.48.0 on the host. Every P command exits 3, the operator runs `romeu approve --toolchain`, reads a catalog diff unrelated to sbx, types y, and romeu now drives an sbx version no recording, probe or test has seen, with nothing in status or doctor saying so.",
+      "change": "Define the tested window as the set of sbx versions with a recording set under e2e/testdata/sbx/. `approve --toolchain` prints the live sbx version, the newest recorded version and the block A results it was measured with. A live version outside the window is a named state with a doctor and status row (warn, with an error id that names sbx and the tested range), and the spec says whether P commands proceed, warn or refuse in that state.",
+      "cost": "A decision (warn or refuse), a few rows in 01 1.4, 04 4.2 and 12 12.1, one error id, a unit test on gate 1.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-2",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "03",
+      "defect": "There is no decoding rule for outputs the product does not own (`sbx ls --json`, sbx policy and secret listings, `mise.lock`, herdr replies, registry manifests, GitHub API JSON). The strict-decoding sentence of 03 covers our own formats only, so a renamed or missing field can decode as a zero value, and in 01 1.6 a zero value drives a state transition.",
+      "scenario": "sbx renames the state field or wraps the list of `sbx ls --json` in an object. A lenient parser reads no sandbox, `run` takes the 'finds the sandbox absent' row of 01 1.6, closes a live generation as closed-lost and attempts `sbx env run` over the running sandbox. The I26 path check instead reports 'workspace path differs' and sends the operator to `romeu adopt` for their own sandbox.",
+      "change": "Add to 03 a rule for external outputs: unknown fields are allowed; every field romeu reads is required and typed; a missing or mistyped one is an error that names the upstream and its live version (one error id); no parser returns 'absent', 'none' or an empty list for a shape it did not recognize. Add an invariant to 05 5.2 for the two consumers where a zero value acts (01 1.6 Generation, 01 1.5 step 5), with a fixture per changed shape.",
+      "cost": "One paragraph, one invariant with guard and test, fixtures per parser.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-3",
+      "severity": "Required",
+      "origin": "own",
+      "section": "01 1.5",
+      "defect": "Step 5's I22 check (global secrets, broad allow rules) is a parse of sbx listings, and nothing requires it to fail closed when the listing's shape changes or comes back empty where a recording had rows, so a security check can pass on zero rows.",
+      "scenario": "A new sbx changes the JSON of its policy listing. The parser finds zero rows, the preflight and doctor pass on a machine that has a global `**` allow rule, and every project's egress gating is bypassed behind the operator's back.",
+      "change": "In 01 1.5 step 5 and I22: a listing whose top-level shape is not one of the recorded shapes fails the step (exit 2, an id naming sbx), and so does a listing that cannot be parsed. Add an I22 test row with a changed container shape and one with an unparseable body.",
+      "cost": "Two sentences and two test rows; it builds on L15-2.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-4",
+      "severity": "Required",
+      "origin": "own",
+      "section": "10 10.3",
+      "defect": "Recordings are the contract with sbx, but the only trigger for a new recording set is a floor bump. Recordings carry no date, the spec never says how many versions are kept, and the A5 golden hashes catch our render moving but not sbx changing what it accepts (03 3.3).",
+      "scenario": "Four sbx releases after v1.0.0, CI still replays the 0.46 sessions and stays green. Users run parsers and argv shapes tested only against 0.46, and the first sign of a renamed `sbx policy` flag (04 4.2 run step 4) is a failed `run` on a user's machine.",
+      "change": "In 10 10.3: each recording set records its sbx version and the date it was captured. A new sbx minor release opens a re-recording (block A subset: A4, A5, A9 and the argv table) before romeu widens its tested window (L15-1). The row says what holds until then (the window stays closed) and how many versions are kept and replayed. 11 11.4 flags a golden whose A5 sbx version is outside the window.",
+      "cost": "A rule, a maintainer cadence, a recorded date field, and a tools/ci probes check.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-5",
+      "severity": "Required",
+      "origin": "own",
+      "section": "11 11.4",
+      "defect": "Probe results never go stale, and an open question settled by a probe leaves the index table for good. Each such answer is a fact about one upstream version (Q7 A11, Q16 A13, Q20 A12, Q21 A4, Q22 C5, Q8 C3), yet `host.sbxVersion` is never compared with anything, and the agent version behind C3 and C5 is recorded nowhere (11 11.3).",
+      "scenario": "Q22 is settled by C5 against Claude Code version X and leaves the table. The workload is bumped to version Y, which fires the hooks in the other order or renames SessionEnd, and the guide still describes X with nothing marking the result as measured on an older version.",
+      "change": "Add a 'stale' state to the 11 11.4 lifecycle: a result whose recorded upstream version (sbx for block A, the pin-file entry for A11 to A13, the agent version for C3 and C5) differs from the current one. Record the agent version in `host` for sandbox-side checks. Give the index's Open questions table a rule that a probe-settled question reopens when its result goes stale.",
+      "cost": "A lifecycle row, two result fields, a tools/ci probes check, one sentence in the index.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-6",
+      "severity": "Required",
+      "origin": "own",
+      "section": "06 6.2",
+      "defect": "A workload bump changes the agent's version, and with it the facts of C3, C5 and A12 (skills path, memory dir location, hook order). The spec only makes the bump gated and recreate-class, and gate 2 shows a digest, not which probe facts the bump invalidates. J9 has no re-probe step.",
+      "scenario": "`julieta pin workload` moves the digest. The operator approves the new digest in gate 2, recreates, and runs an agent whose memory dir moved, while the S5 check and the julieta-claude kit target the path A12 measured on the old digest.",
+      "change": "In 06 6.2 and J9: a workload pin change names the probes that read it (A12, C3, C5, and B2's S5 part), and their results become stale (L15-5). Gate 2 for a workload change prints that list. Raise to the spec the plan's rule that a pin change after block O3 needs its probe run again (plan T012), as a check rather than a comment.",
+      "cost": "A rule in 06 and 09, a list derived from probe definitions, a gate diff line.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-7",
+      "severity": "Required",
+      "origin": "own",
+      "section": "08 8.5",
+      "defect": "The agent profile (`internal/agent/claude`: process names, state paths, memory dir) is a set of upstream facts with no drift check. Salvage step 5 has no skip reason for an expected agent path that is absent, so a moved path yields `complete` with no agent state, and a renamed process means `--stop-agents` stops nothing.",
+      "scenario": "A newer Claude Code moves its project memory dir and renames its process. `romeu rm` runs salvage: SIGTERM matches no process, the agent keeps writing, step 5 copies nothing from the old paths, `skipped[]` is empty, and `result: complete` lets the sandbox be removed with the agent's state lost. The memory-dir warning of 08 8.2 checks the old path and stays quiet.",
+      "change": "Add the skip reason `agent-path-missing` to 03 3.11 and count it as incomplete in 08 8.5 step 4. `--stop-agents` records how many processes matched, and zero matches while the agent pane is running is a reason too. `julieta setup` checks that each agent-profile path exists (08 8.1) and warns at SessionStart when one does not.",
+      "cost": "One skip reason, one setup check, test rows in the container e2e.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-8",
+      "severity": "Required",
+      "origin": "own",
+      "section": "04 4.2",
+      "defect": "`romeu recreate` is rm then run, and nothing checks that the new sandbox can be built before the old one is removed. The workload digest, the kit frontend digest and the kit build's download hosts (06 6.3, 06 6.4) are upstream artifacts that can be deleted, moved or rate limited, and the spec does not describe the resulting state or its recovery.",
+      "scenario": "An upstream moves the host that serves mise or herdr downloads, or a registry stops serving the pinned frontend digest. `romeu recreate foo` salvages completely, runs `sbx env rm`, then the create fails at kit build. The operator has no sandbox until a catalog or pin release, and J6 says nothing about this state.",
+      "change": "Before the sandbox half of `recreate`, a reachability step resolves the workload and frontend digests at their registries and checks that the kit download hosts are in the derived egress. It is the one step allowed the network, so 01 1.5's no-network rule names it as an exception. On failure `recreate` exits before salvage, with an id that names the artifact. J6 gains the failure branch.",
+      "cost": "A preflight step, an exception sentence in 01 1.5, one error id, a journey line, an e2e row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-9",
+      "severity": "Required",
+      "origin": "own",
+      "section": "07 7.5",
+      "defect": "romeu parses `mise.lock`, an upstream format, in Go, and the spec names neither the lock format version it reads nor what a new layout does. Nothing records which mise version wrote a lock, though `julieta install` runs the kit's pinned mise with `MISE_LOCKED=1` against locks that newer host or CI mise versions may write.",
+      "scenario": "A developer relocks a repo with a mise release that changed the lock layout. On the host, `romeu sync` either fails every project with a parse error that names no tool and no fix, or reads no artifact hosts and derives a narrower egress. In the sandbox, the pinned mise cannot read the lock and `julieta install` fails for every repo.",
+      "change": "In 07 7.5 step 1: name the supported lock layout(s) by the mise versions they were measured with. An unknown layout is a sync error with its own id and the fix 'relock with julieta lock'. In 07 7.3: `julieta lock --check` fails a lock whose layout the pinned mise does not read.",
+      "cost": "A paragraph, one error id, a fixture per layout, a test in tools/ci mise.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-10",
+      "severity": "Required",
+      "origin": "own",
+      "section": "04 4.3",
+      "defect": "The one freshness mechanism, `julieta pin check`, covers spec workloads and the julieta release in config-repo workflows only, and nothing schedules it. The kit frontend, herdr, mise, the gh pin, the SHA-pinned actions and the reuse image have no staleness signal, and the index's Deferred decisions has no row for one, which ADR 0005 calls an oversight.",
+      "scenario": "herdr publishes a security fix, or a pinned action's runtime is removed by GitHub. Nobody learns of it until a CI run turns red or a user files an issue months later.",
+      "change": "Either widen `pin check` to every entry of the pin file and the `uses` SHAs, run it from a scheduled workflow within the 10 10.2 grammar, and say what 'behind' means per pin, or add a Deferred decisions row with what holds and an observable trigger.",
+      "cost": "A subcommand scope change and a scheduled workflow, or one index row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-11",
+      "severity": "Required",
+      "origin": "own",
+      "section": "09",
+      "defect": "No journey covers the most frequent upstream change: sbx, or the runtime under it, updated on the host. J9 covers a romeu release, a workload bump and a personal kit, and J1 step 1 says only '>= v0.46.0'.",
+      "scenario": "The operator's sbx updates overnight. The next `romeu run` exits 3 and no guide says what to check, whether the new version is tested, how to pin or roll back sbx, or what to do if a command then fails on a changed sbx output.",
+      "change": "Add a journey (an sbx update on the host): the exit 3, the gate 1 output of L15-1, what the operator does when the version is outside the tested window, and the recovery when a command fails on an sbx change (salvage `--from-host`, `--accept-loss`, rolling sbx back). J1 step 1 names the tested range.",
+      "cost": "One journey, a guide page, a scenario function (host suite).",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-12",
+      "severity": "Required",
+      "origin": "own",
+      "section": "05 5.2",
+      "defect": "I28 claims romeu parses kit and workload descriptors the way sbx does, but the conformance fixtures are recorded once against one sbx and one frontend (A11, A12), and no rule re-runs conformance when sbx or the frontend pin moves.",
+      "scenario": "A newer sbx widens what an existing capability key grants (a mount type, a network phase). romeu's gate 2 still shows the old meaning, and the operator approves a wider capability than they were shown.",
+      "change": "In I28 and 06 6.1: the conformance fixtures carry the sbx version and frontend digest they were recorded with. A frontend pin change, or an sbx version entering the tested window, requires the A11 and A12 conformance subset again (L15-4, L15-5).",
+      "cost": "A rule and two recorded fields; the re-run is part of the L15-4 cadence.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-13",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "04 4.3",
+      "defect": "The mise environment julieta sets (`MISE_LOCKED`, `MISE_USE_VERSIONS_HOST_TRACK`, `MISE_DISABLE_UPDATE_WARNING`, `MISE_TRUSTED_CONFIG_PATHS`, `MISE_YES`) is a set of upstream names that no test or probe shows still take effect at the pinned mise.",
+      "scenario": "A mise bump renames the tracking or trust setting. The old variable is ignored without a word, tracking turns back on, and the trust allowlist stops applying while `MISE_YES=1` answers mise's trust prompts.",
+      "change": "A container e2e row (or a C-probe beside C2) that, for each variable, observes its effect at the pinned mise: no request to the versions host for tracking, a refusal of an untrusted config path.",
+      "cost": "One test per variable.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-14",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "07 7.3",
+      "defect": "The spec knows an upstream default will flip ('the default flips in a future mise release' for `monorepo.lockfile`), yet names no probe, check or deferred row with a trigger.",
+      "scenario": "A repo in monorepo mode that omits the setting silently changes lock behavior after a mise bump.",
+      "change": "Make `julieta lock --check` fail a monorepo-mode repo without an explicit `monorepo.lockfile`, or add a deferred row triggered by the mise release that flips it.",
+      "cost": "One check or one index row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-15",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "07 7.6",
+      "defect": "Catalog gaps are found by `spec validate --catalog` in the config repo's CI, but a relock in a worked-on repo (J8), which is where mise backend renames and new tools arrive, triggers no check. The user meets the gap as a `romeu sync` exit 2.",
+      "scenario": "mise moves a tool to another backend. The agent relocks in a worked-on repo and merges, and the next `romeu sync` on the host fails until a catalog release or a gated `egress.tools` entry.",
+      "change": "In J8 and 07 7.3: run the catalog lookup of `spec validate --catalog` from `julieta lock --check` (the pre-commit hook) against the embedded catalog, so the agent sees an unknown `backend:tool` and its two fixes at commit time.",
+      "cost": "A call from one julieta command into another's logic, and a hook row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-16",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "04 4.2",
+      "defect": "`doctor` has no row for an sbx-owned fact changing shape, and no command reports the upstream versions in use (sbx, git, macOS, the pinned frontend, workload, herdr and mise, the running agent, the recording set) for a bug report.",
+      "scenario": "A user hits an sbx incompatibility. Their report says 'romeu is broken', and the maintainer has to ask for five versions one at a time.",
+      "change": "Add a doctor section (also in `--json`) listing each upstream version with its source and whether it is inside the tested window (L15-1), and a doctor row that runs each read-only sbx parser once and fails on an unrecognized shape (L15-2).",
+      "cost": "A doctor section and one row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-17",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "00 0.3",
+      "defect": "The run-layout renderer interface, the only hedge against herdr (a small pre-1.0 project on the path of `romeu run`), is asserted (00 0.3, 12 12.9) and not specified anywhere. 03 3.2 defines the neutral layout, and `layout up` (04 4.3) and A13 define only herdr's behavior.",
+      "scenario": "herdr breaks its protocol or is abandoned. The 'interface' turns out to be `internal/layout` mapping straight to `layout.apply`, and a second renderer means redesigning attach, stale-layout detection and the pane runner.",
+      "change": "State the renderer contract in 03 3.2 or 04 4.3: the operations (apply a layout, detect a stale layout by `runDigest`, attach, run a pane), the inputs, and which parts are herdr-specific, so the golden tests of `--dry-run` cover the neutral half.",
+      "cost": "A short table; no code beyond the interface already planned.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-18",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "02 2.5",
+      "defect": "julieta 'never guesses paths', yet relies on upstream default paths for mise (`$HOME/.local/bin/mise`, data in `$HOME/.local/share/mise`) and herdr (`$HOME/.config/herdr/`). 2.6 rests its secondary-repo decision on undated 'documented sbx behavior'.",
+      "scenario": "A herdr release moves its config dir. The `version_check=false` and prefix settings of 06 6.4 stop applying, and nothing notices.",
+      "change": "In 02 2.5: set these paths explicitly (environment or flags the kit sets) or name them as upstream defaults measured at the pinned version. In 2.6: date the documented behavior and name the probe (A3) that re-confirms it.",
+      "cost": "A few words per row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-19",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "05 5.1",
+      "defect": "The salvage cross-check and `pull` assume the sandbox daemon is `git://127.0.0.1` (05 5.1, I19), and the spec does not name a change of that transport by sbx as an expected break mode, or its recovery.",
+      "scenario": "sbx moves the daemon to another transport. gitsafe refuses it, `pull` fails, and salvage step 3 cannot cross-check, so `rm` exits 5 and only `--accept-loss` moves on, with an error that does not say the cause is upstream.",
+      "change": "In 08 8.5 step 3 and 04 4.2: a daemon URL whose scheme or host gitsafe refuses is a distinct incomplete reason that names sbx, and the guide for J6 gives the recovery.",
+      "cost": "One reason id and a guide line.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-20",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "10 10.2",
+      "defect": "The four runner labels are pinned and the grammar refuses any other, and S2 requires all of them green. The spec checks that each label exists at T002, but says nothing of a label that GitHub retires later.",
+      "scenario": "A pinned macOS image is retired. Every run of ci.yml fails on that leg, S2 cannot be met for the next release, and changing the label is an ask-first workflow change made under pressure.",
+      "change": "In 10 10.2 Runners: name the event (a retirement notice or a failed leg) and the rule (replace the label by a reviewed change, and say which coverage, such as the Intel macOS I27 runs, moves to the host suite), and make S2 refer to the runner list at the release commit.",
+      "cost": "One paragraph.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-21",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "12 12.10",
+      "defect": "`tools/ci dora` runs without a token by design and backfills the whole history on every run, as the last step of `release.yml`. The spec does not say what a 403 or 429 from the GitHub API does to `--attach` or to the release.",
+      "scenario": "The history grows past what anonymous requests allow, and `dora --attach` fails as the last step of a release workflow, so the release run ends red after the release is published.",
+      "change": "In 12 12.10: a rate-limit or auth error is reported with its own exit code, and `--attach` failing does not fail the release (or does, explicitly). State that the tool paginates and sends an API version header.",
+      "cost": "Three sentences, a fixture row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-22",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "06 6.4",
+      "defect": "`kitpin herdr` reads two GitHub release API fields (the asset digest and the release's immutable flag). The spec says a release that is not immutable is refused, but not what a missing digest field does.",
+      "scenario": "GitHub renames the digest field. kitpin writes an empty or missing hash, or the kit's `sha256sum -c` step fails at build with a message that points at herdr rather than at the API change.",
+      "change": "In 06 6.4: a missing or malformed digest is a refusal naming the field, tested against a fixture without it.",
+      "cost": "One sentence, one fixture.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-23",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "05 5.3",
+      "defect": "The `dependencies` surface and the hygiene mise-file rule list 'every path where mise reads its configuration', measured with mise 2026.10.3 (10 10.2, ADR 0007). A test holds the globs to `miseFiles`, but nothing re-measures mise's config discovery when the mise pin moves.",
+      "scenario": "A mise bump starts reading a new config file name. A change can then add that file without touching an ask-first surface or tripping hygiene, which undoes the property the list exists for.",
+      "change": "In 05 5.3: a mise pin change requires re-measuring config discovery at the new version, as part of the reviewed diff, with the measurement named in the PR's Evidence. ADR 0007's Consequences gain the mise counterpart of the golangci-lint sentence.",
+      "cost": "One rule and one sentence.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L15-24",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "The only re-probe rule anywhere ('a pin that changes after block O3 needs the probe that read it run again') is a comment in the pin file (T012), not a check, and T029 runs the parsers over one recorded sbx version with no task that ever records a second.",
+      "scenario": "A later pin change merges without its probe, and nothing fails.",
+      "change": "Make the rule a tools/ci probes check comparing the pin file at each result's commit with the current pin file, once the spec adopts L15-5 and L15-6.",
+      "cost": "A check in T020.",
+      "parked_for_b": true
+    },
+    {
+      "id": "L15-25",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "T088 tests `publish`, `verify` and `--attach` only against a gh helper binary and a recorded API fixture, so the first real GitHub run of the release path is the candidate tag, which the plan itself says cannot be retried under the same name.",
+      "scenario": "A permission or token problem in release.yml shows up only on `v1.0.0-rc.1`, which then has to be abandoned.",
+      "change": "Add a dry run of release.yml against a throwaway tag pattern, or a prerelease tag reserved for rehearsal, before the candidate.",
+      "cost": "One plan task or one step of block O5.",
+      "parked_for_b": true
+    }
+  ],
+  "coverage": {
+    "index": "L15-1, L15-5, L15-10",
+    "00": "L15-17",
+    "01": "L15-1, L15-2, L15-3",
+    "02": "L15-18",
+    "03": "L15-2, L15-9",
+    "04": "L15-8, L15-10, L15-13, L15-16",
+    "05": "L15-3, L15-12, L15-19, L15-23",
+    "06": "L15-6, L15-8, L15-12, L15-22",
+    "07": "L15-9, L15-14, L15-15",
+    "08": "L15-7, L15-19",
+    "09": "L15-6, L15-11, L15-15",
+    "10": "L15-4, L15-20",
+    "11": "L15-5",
+    "12": "L15-1, L15-21",
+    "13": "nothing for this lens (13 13.7 states the cost of dead membership keys after an upstream rename)",
+    "adr": "L15-23 (ADR 0007); ADR 0005's unwatched-trigger consequence underlies L15-10; nothing else for this lens",
+    "plan": "L15-24, L15-25 (parked for B)"
+  },
+  "missing": [
+    {
+      "what": "A tested-version window per upstream (sbx first) and what romeu does outside it",
+      "where": "01 1.4, 04 4.2, 12 12.1, J1"
+    },
+    {
+      "what": "A decoding rule for outputs the product does not own",
+      "where": "03 opening, 05 5.2"
+    },
+    {
+      "what": "A re-recording and re-probe cadence tied to upstream releases and pin changes, not only to floor bumps",
+      "where": "10 10.3, 11 11.4, 12 12.2"
+    },
+    {
+      "what": "A stale state for probe results, and the agent version recorded for C3 and C5",
+      "where": "11 11.3, 11 11.4"
+    },
+    {
+      "what": "A journey for 'an upstream moved under me' (sbx update, agent self-update, a download host moved)",
+      "where": "09"
+    },
+    {
+      "what": "A reachability check before recreate removes a sandbox",
+      "where": "01 1.5, 04 4.2"
+    },
+    {
+      "what": "A freshness signal for every pin",
+      "where": "04 4.3, 10 10.2, or index: Deferred decisions"
+    },
+    {
+      "what": "Whether the workload's agent may update itself inside a sandbox, and the setting that stops it, measured",
+      "where": "06 6.2, 06 6.4, 11 11.2"
+    },
+    {
+      "what": "A drift check for the agent profile's paths and process names",
+      "where": "08 8.1, 08 8.5, 03 3.11"
+    },
+    {
+      "what": "The mise environment and mise lock layout as a measured contract",
+      "where": "04 4.3, 07 7.3, 07 7.5"
+    },
+    {
+      "what": "GitHub API contract notes: version header, pagination, auth, what 403, 404 and 429 do, and the token and permissions release.yml needs, stated against the grammar",
+      "where": "10 10.2, 12 12.10, 04 4.3"
+    },
+    {
+      "what": "Whether sbx depends on Docker Desktop or another host runtime, which version, and whether its updates change sbx behavior",
+      "where": "00 0.2, 12 12.1, 11 11.3"
+    },
+    {
+      "what": "A versions report for bug reports",
+      "where": "04 4.1 or 04 4.2"
+    },
+    {
+      "what": "Blocks A and B as recurring sittings, with what holds between them",
+      "where": "11 opening, 12 12.2"
+    }
+  ],
+  "postmortem": "What happened, as the person who maintains the integrations would tell\nit.\n\n**Week 3.** sbx shipped two minor releases. Each user saw `exit 3`,\nran `romeu approve --toolchain`, read a julieta and catalog diff that had\nnothing to do with sbx, and typed `y`. From then on romeu drove an sbx\nthat no recording, probe or test had seen. The gate did its job by the\nletter: it noticed the change and asked. It gave the human nothing to\ndecide with, so the human did not decide. (01 1.4, 04 4.2 doctor, 10\n10.3 \"Floor bumps\", 11 11.4)\n\n**Week 5.** One of those releases reshaped a field in `sbx ls --json`.\nCI stayed green, because the fake sbx replays the 0.46 recording and only\na floor bump records a new one. On users' machines the parser read no\nsandbox, so `run` closed a live generation as lost and tried to create\nover it. Nobody lost work, because salvage refs are create-only, but\neveryone lost an afternoon, and the error ids sent people to `romeu\nadopt` for sandboxes that were theirs. (01 1.5 step 6, 01 1.6 Generation,\n03 opening, 10 10.3)\n\n**Week 8.** The doctor's I22 check passed on every machine, including\nthe one with a global allow rule, because the policy listing had changed\nshape and the parser found zero rows. We had a security check that\nfailed open, and we found out from a user who read their sbx settings by\nhand. (05 I22, 01 1.5 step 5)\n\n**Week 10.** A routine workload bump moved Claude Code forward several\nversions. Its memory directory and a process name had changed. julieta\ndutifully made the old path non-writable, the warning checked the old\npath and stayed quiet, and salvage reported `complete` with no agent\nstate in it, because \"expected path absent\" was not a skip reason. The\nproduct's promise, \"nothing sandbox-only is lost\", was broken by the very\ncomponent it calls agent-aware. C3, C5 and A12 had measured the old\nversion, once, at block B. (06 6.2, 08 8.1, 08 8.5, 11 11.2, Q8, Q22)\n\n**Week 12.** `romeu recreate` removed a sandbox, then could not build\nthe new one: an upstream download host had moved, and the kit network\ncapability and the catalog `meta` set still named the old one. Salvage\nwas complete, the tree was intact, and the user had no sandbox until a\ncatalog release. (06 6.3, 06 6.4, 07 7.4, 03 3.5, 07 7.6)\n\n**The release that did not happen.** v1.1 never published cleanly. The\nworkflow grammar allows only `read` and `none` permissions and no token,\nand attestation, release creation and the `dora.json` upload all need\nwrite scopes and a token. The candidate tag, which nobody may retry under\nthe same name, was the first real run. (10 10.2, S1, 12 12.10)\n\n**What I would not normally say out loud.**\n\n- We wrote \"settled\" next to facts about software that ships every week.\n  A probe result has no expiry date, and the Open questions table lets a\n  measured fact leave for good. (spec.md Open questions, 11 11.4)\n- We pinned everything we build, and we were proud of that, and we pinned\n  nothing we run against. The host's sbx, the desktop runtime under it,\n  the agent's own updater and GitHub's runner images move on their own\n  schedule, and the spec treats them as constants. (12 12.1, J1, 10 10.2\n  Runners)\n- \"Fail closed\" was only ever applied to our own formats. External\n  outputs had no decoding rule, so some failed closed with the wrong\n  message and some failed open. (03 opening)\n- Our only freshness check was `julieta pin check`, for one pin, run by\n  hand. Everything else reached us as a red run, or as a user's issue.\n  (04 4.3, ADR 0005 Consequences)\n- The maintainer is one person with two Macs, and block A and block B\n  were each one sitting. The spec had no cadence for doing them again, so\n  they were not done again. (12 12.2, 11)",
+  "lens_critique": "This lens equates success with catching every upstream change before a user does, which for a one-maintainer product with host-only sbx and two Macs is not achievable, and chasing it would add machinery the 'decide at the last responsible moment' principle rightly resists. A truer bar is: every upstream change fails closed, with an error that names the upstream and the tested range, and costs no work. The lens also undervalues what the spec already does well (pins by digest, fail-closed protocol checks, salvage before destruction), which turns most upstream breaks into lost time rather than lost data.",
+  "missing_viewpoint": "The upstream itself as a party: someone who reads sbx, mise, herdr and Claude Code release notes and roadmaps (a vendor or ecosystem liaison) and asks what those projects are about to change and what they promise to keep stable. No lens owns the relationship and the forward-looking signal; L15 sees only what has already moved.",
+  "out_of_scope": [
+    {
+      "what": "Whether release.yml can publish under the workflow grammar (permissions only read or none, no github.token or secrets): actions/attest-build-provenance, release creation, the dora.json upload and gh in Actions all need write permissions and a token in the step environment",
+      "why": "the text alone cannot settle it; GitHub's documentation for attest-build-provenance permissions and for GITHUB_TOKEN in run steps would. If confirmed it is Blocking for S1 under 10 10.2"
+    },
+    {
+      "what": "Whether GitHub moved release asset downloads to a host other than objects.githubusercontent.com, which the catalog meta set (03 3.5, 07 7.4) and the julieta kit's network capability (06 6.4) name",
+      "why": "the text alone cannot settle it; a recorded redirect chain of a mise or herdr release download would"
+    },
+    {
+      "what": "Whether the Docker Hub limits quoted in 06 6.6 (200/6h authenticated, 100/6h anonymous) are current",
+      "why": "the text alone cannot settle it; Docker's current published pull-limit policy would. The figures are undated and unsourced, which is itself worth a date"
+    },
+    {
+      "what": "Whether Claude Code updates itself inside the sandbox, so the 'pinned Claude Code version' of C3, C5, Q8 and Q22 is not the running one",
+      "why": "the text alone cannot settle it; Claude Code's documentation on its auto-updater and a C-probe inside a sandbox would"
+    },
+    {
+      "what": "Whether a macos-26-intel runner label exists or is scheduled for retirement",
+      "why": "the text alone cannot settle it; GitHub's runner-images announcements would; L15-20 covers the text-side gap"
+    },
+    {
+      "what": "Q25 still standing in the Open questions table after being decided",
+      "why": "this person would not look at it: it is a shape defect of the index, not a moving upstream"
+    }
+  ],
+  "confidence": "High on the text-settled findings (each cites the absence or the sentence); medium on severity, because it depends on how often sbx changes its output shapes, which the text cannot show."
+}

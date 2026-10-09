@@ -1,0 +1,732 @@
+{
+ "page": "plan",
+ "findings_read": 57,
+ "clusters": [
+  {
+   "id": "R8-plan-1",
+   "section": "plan.md (opening; What v1 leaves out; T096 to T100)",
+   "title": "The plan's hand-kept counts have drifted: 'the seven decision records under adr/' (there are eight), 'The table has 28 rows' (the index has 36), 'the six accepted records', '101 of 102 tasks'.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0",
+    "L1",
+    "L10",
+    "L11",
+    "L13",
+    "L13b",
+    "L14",
+    "L16",
+    "L2b",
+    "L3",
+    "L4",
+    "L5",
+    "L8",
+    "L9"
+   ],
+   "finding_ids": [
+    "L0-P1",
+    "L0-P2",
+    "L1-28",
+    "L10-32",
+    "L11-36",
+    "L13-36",
+    "L13b-42",
+    "L14-24",
+    "L16-25",
+    "L2b-27",
+    "L3-33",
+    "L4-42",
+    "L5-36",
+    "L8-30",
+    "L9-30"
+   ],
+   "listed": 1,
+   "own": 14,
+   "scenario": "A reader counts eight records and 36 rows, finds the plan wrong, and distrusts its other counts; the five deferred rows the plan maps to tasks miss the newer index rows.",
+   "change": "Delete every hand-kept count rather than correcting it: 'the seven decision records under adr/' becomes 'the decision records under adr/'; in What v1 leaves out, replace 'The table has 28 rows at the commit this plan was written from' with 'The index's table is the count'; drop the count in 'the six accepted records' and '101 of 102 tasks'. Re-derive the deferred-row-to-task mapping against the index once, at the stage B rewrite. (The second-table half of L3-33 and L13-36 is cluster R8-plan-2.)",
+   "cost": "a few word deletions and one mapping re-check",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-2",
+   "section": "plan.md (Decisions this plan defers; T002)",
+   "title": "The plan's Decisions this plan defers table holds the apply tag of secrets, which is the index's Q18 under a second name, and T002's acceptance carries a history note that 12 12.5 sends to docs/reviews/.",
+   "severity": "Advisory",
+   "lenses": [
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13b-43"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "One decision has two tables and two owners; a reopening recorded in one is missed in the other.",
+   "change": "Delete the plan's Q18 row and leave a one-line pointer to the index's Q18; move T002's 'Hardening after the merge, operator decision 2026-10-08' note to the round record under docs/reviews/.",
+   "cost": "one row and one paragraph moved",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-3",
+   "section": "ADR 0007 (Threat model); index: Deferred decisions; plan.md",
+   "title": "ADR 0007 defers the untracked go.work and caller GOFLAGS -overlay escapes to 'the plan's deferred-decisions row whether agents push from a second account', reopened by block O1 item d; that row exists in neither the plan nor the index, and its Q25 trigger fired on 2026-10-07 (ADR 0008).",
+   "severity": "Required",
+   "lenses": [
+    "L0",
+    "L11",
+    "L2b"
+   ],
+   "finding_ids": [
+    "L11-2",
+    "L0-P7",
+    "L2b-29"
+   ],
+   "listed": 0,
+   "own": 3,
+   "scenario": "The two go run escapes are deferred to a trigger that has already fired and to a row nobody can find, so they are never reopened.",
+   "change": "Add one row to the index's Deferred decisions: 'the hook starting tools/ci so that an untracked go.work or a caller GOFLAGS cannot act on go run (ADR 0007); until then the review covers them; reopened by the next change to .githooks/pre-push'. Record in ADR 0008's Consequences that the ADR 0007 pointer now resolves to that index row (a superseding note, not a rewrite of ADR 0007). The plan gains no row.",
+   "cost": "one index row and one Consequences sentence in ADR 0008",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Apply as written once the operator agrees: the index row is plain spec text, but the note in ADR 0008's Consequences changes a decision record. Not parked: L11-2 is a stage A finding on the index and ADR 0007, though L0-P7 and L2b-29 were parked.",
+   "operator_reason": "Edits ADR 0008's Consequences and settles a deferral cited by accepted ADR 0007; decision records change only with the operator."
+  },
+  {
+   "id": "R8-plan-4",
+   "section": "plan.md (T088)",
+   "title": "T088 accepts 'release.yml passes tools/ci workflows' under a 10 10.2 grammar that admits permissions of read or none only, while the same task's publish, attest, verify and attach steps need write and a token; its acceptance also has no line for the 05 5.4 operator signature, release immutability, the job's permissions or a build contract.",
+   "severity": "Required",
+   "lenses": [
+    "L0",
+    "L2b",
+    "L7",
+    "L9"
+   ],
+   "finding_ids": [
+    "L0-P3",
+    "L2b-28",
+    "L9-27",
+    "L7-33"
+   ],
+   "listed": 0,
+   "own": 4,
+   "scenario": "T088 cannot be completed as written; the grammar gets widened inside the task without review.",
+   "change": "After the 10 10.2 change (L0-1, L2b-8, L9-1) lands, T088 depends on it and its acceptance names the admitted exception (the two-job shape) plus a fixture that fails a second file using it; add acceptance lines for the release job's permissions, the operator signature and immutability as the spec states them, and the signing step in O7 if L9-2 chooses it.",
+   "cost": "a dependency and three acceptance lines",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-5",
+   "section": "plan.md (T019; T066; T075)",
+   "title": "T066 and T075's J3a acceptance ('starts or reattaches with sbx env run -d') inherits the 04 4.2 contradiction and needs a recording of sbx env run -d on a stopped sandbox that no block A definition makes (A4 records a stop and a listing).",
+   "severity": "Required",
+   "lenses": [
+    "L0",
+    "L1"
+   ],
+   "finding_ids": [
+    "L0-P5",
+    "L1-29"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "The parser for a restart is written against no recording, and J3a is accepted against a step the spec contradicts.",
+   "change": "Once L1-4 settles 04 4.2, rewrite the J3a bullet of T075 to match, and add the restart of a stopped sandbox to A4's definition in T019 (and 11 11.1 per L0-7).",
+   "cost": "two acceptance edits",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-6",
+   "section": "plan.md (O5; O6; T094; T095)",
+   "title": "No task or block runs J1 on a clean account without the maintainer's reference config repo, and none measures cold-create or resume time; T094 and T095 are scored by review only.",
+   "severity": "Required",
+   "lenses": [
+    "L1",
+    "L10"
+   ],
+   "finding_ids": [
+    "L1-30",
+    "L10-29"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "The first stranger to run J1 is the first adopter, after the release.",
+   "change": "Add to O5 a rehearsal on a fresh macOS user account with only the release, the guides and examples/, run to J3b, timed, with the commands counted, recorded in the block's Evidence.",
+   "cost": "one operator-block step",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-7",
+   "section": "plan.md (T022)",
+   "title": "No task produces an adopter starter; T022 builds examples/ for tests and docs only.",
+   "severity": "Required",
+   "lenses": [
+    "L10"
+   ],
+   "finding_ids": [
+    "L10-30"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An adopter has no copyable config repo and writes a first spec from the reference alone.",
+   "change": "Extend T022: examples/ is a copyable config repo with a config-project spec, validate.yml and a README naming the values to replace.",
+   "cost": "one acceptance line",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-8",
+   "section": "plan.md (ci-bootstrap; T084; T095)",
+   "title": "The README lands in T084/T095, after the candidate tag, so the public first page stays two lines for the whole build.",
+   "severity": "Advisory",
+   "lenses": [
+    "L10"
+   ],
+   "finding_ids": [
+    "L10-31"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A visitor during the build finds no status, audience or prerequisites.",
+   "change": "Add to ci-bootstrap a README stub with status (draft, no release), audience and prerequisites under the rule 12 headings.",
+   "cost": "one task line",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-9",
+   "section": "plan.md (Questions for the maintainer 19, 26, 28, 30, 31)",
+   "title": "Questions 19, 26, 28, 30 and 31 record spec defects (formats without a schema, the J12 step mismatch, guard packages on no ask-first surface, the untagged-field list, goldens without hash) that the plan patches in tasks while the spec text stands unpatched.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0",
+    "L2",
+    "L6"
+   ],
+   "finding_ids": [
+    "L0-P6",
+    "L2-24",
+    "L6-41"
+   ],
+   "listed": 0,
+   "own": 3,
+   "scenario": "The gap returns at the next spec reading because only the plan knows it.",
+   "change": "Each answer lands as a spec edit in the same change as its task (L0-29, L0-26, L0-15/L2-10 for a sbxdrv surface in 05 5.3 with T029 marked Ask-first: sbxdrv, a 01 1.4 sentence naming the untagged-field list), and the question is closed by pointing at that edit.",
+   "cost": "a pointer per question",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-10",
+   "section": "plan.md (block O3)",
+   "title": "Block O3's --require-pass list is the only place that demands results for A2, A3, A5, A6, A9 and A14; 10 10.5 does not.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0"
+   ],
+   "finding_ids": [
+    "L0-P4"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Any re-probe after O3 drops the requirement.",
+   "change": "Keep the list, add the spec rule of L0-18 to 10 10.5 and cite it from O3.",
+   "cost": "one citation",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-11",
+   "section": "plan.md (12 12.2 build order; T063 to T066)",
+   "title": "romeu run (T066) depends on the ledger view (T065), so the first run against real sbx waits on three ledger tasks no journey needs.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-35"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The riskiest integration is proven late.",
+   "change": "If L11-1 is accepted, remove T063 to T065, T071, T072 and the ledger clauses of T037, T043, T049, T073, T074; otherwise move T063 to T065 after T075.",
+   "cost": "a reorder or a deletion",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-12",
+   "section": "plan.md (T012; The first slice)",
+   "title": "The first slice lands the whole pin tool (release-API fixtures, the immutable-release check) when it needs only the pin file.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-37"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The first slice carries work 12 12.2's first-input rule defers.",
+   "change": "Land the pin file in T012 and the kitpin subcommands at the first pin change (J9).",
+   "cost": "a task split",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-13",
+   "section": "plan.md (dependency graph; T096 to T101)",
+   "title": "The longest dependency chain is about 36 merges deep with four operator blocks on it, and the T096 to T101 documentation chain depends on nothing but ADR numbering.",
+   "severity": "Required",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-26"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "Wall time is set by a serial chain that need not be serial.",
+   "change": "Once the spec fixes L12-1 and L12-7, merge consecutive single-agent chain tasks where 'or is part of it' allows, run T096 to T100 in parallel with reserved numbers, and state the critical path with its sitting count.",
+   "cost": "a graph rewrite",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-14",
+   "section": "plan.md (task fields; Decisions this plan defers: splitting this page)",
+   "title": "No task carries a file set, so concurrency is decided from module ids about ten times coarser than a task, and the page (2 920 lines) is about to fire its own 3 000-line split trigger.",
+   "severity": "Required",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-27"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "Two overlapping tasks start in parallel, or two independent ones serialize.",
+   "change": "Add a Files field to each task and derive the concurrency check from it; split the page per phase before the trigger fires.",
+   "cost": "a field per task",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-15",
+   "section": "plan.md (Questions for the maintainer; operator blocks)",
+   "title": "Nine of thirteen maintainer questions are due at or before C0 or T019 with two answered, and T019, T052, T083, T084 and T088 each wait on an unanswered one.",
+   "severity": "Advisory",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-28"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "The maintainer is asked piecemeal and tasks stall on single questions.",
+   "change": "Group the open questions into one block with a recommendation each, placed before O3 in the operator table with its own pass condition.",
+   "cost": "one table row",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-16",
+   "section": "plan.md (Verify lines of T002, T009, T026, T092, T094, T095)",
+   "title": "Some Verify lines are not commands another agent can run.",
+   "severity": "Advisory",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-29"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "A task is marked verified on an unrunnable line.",
+   "change": "For each such task name the one runnable command and mark the rest as the operator's pass condition, as the operator blocks do.",
+   "cost": "a line per task",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-17",
+   "section": "plan.md (Ask-first fields)",
+   "title": "About two tasks in three forecast an ask-first surface, and the forecast field has no standing in tools/ci pr.",
+   "severity": "Advisory",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-30"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "The field is noise the maintainer reads per task with no mechanism behind it.",
+   "change": "After L12-2 lands, make the checkpoint approval the mechanism the field feeds, and shrink the field by applying L12-3, L12-16 and L12-23.",
+   "cost": "a field rule",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-18",
+   "section": "plan.md (T008; T029)",
+   "title": "T008 and T029 carry no acceptance for subprocess error details or timeout values and messages.",
+   "severity": "Advisory",
+   "lenses": [
+    "L14"
+   ],
+   "finding_ids": [
+    "L14-23"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An error reaches the user without argv, status or the wait that expired.",
+   "change": "Add to T008 that a subprocess error carries argv, status, bounded stderr and versions, and to T029 the timeout values and a test that the message names the wait.",
+   "cost": "two acceptance lines",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-19",
+   "section": "plan.md (T012; T029)",
+   "title": "The re-probe rule after O3 is a comment in the pin file, not a check, and no task records a second sbx version.",
+   "severity": "Advisory",
+   "lenses": [
+    "L15"
+   ],
+   "finding_ids": [
+    "L15-24"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A pin moves and the parsers keep passing on a stale recording.",
+   "change": "Once the spec adopts L15-5 and L15-6, make the rule a tools/ci probes check comparing the pin file at each result's commit with the current one.",
+   "cost": "one check",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-20",
+   "section": "plan.md (T088; candidate tag)",
+   "title": "T088 tests publish, verify and --attach only against a gh helper and a recorded fixture, so the first real GitHub run of the release path is the candidate tag.",
+   "severity": "Advisory",
+   "lenses": [
+    "L15"
+   ],
+   "finding_ids": [
+    "L15-25"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The candidate fails on a real-API difference and the tag name is spent.",
+   "change": "Add a dry run of release.yml against a reserved rehearsal prerelease tag pattern before the candidate.",
+   "cost": "one task step",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-21",
+   "section": "plan.md (Phase 6; Phase 9; T069)",
+   "title": "No task builds a data inventory, export, owner removal or leaving journey.",
+   "severity": "Advisory",
+   "lenses": [
+    "L16"
+   ],
+   "finding_ids": [
+    "L16-24"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A user who leaves has no supported path for their data.",
+   "change": "When the spec gains L16-1, L16-2, L16-3 and L16-9, add tasks in Phase 6 (romeu memory, J14 scenario) and Phase 9 (the J14 guide page and README heading).",
+   "cost": "two tasks",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-22",
+   "section": "plan.md (O1; O3; O6; T026; T092)",
+   "title": "The maintainer runs the hook (go run ./tools/ci fast at main) in a plain host clone, and the plan asks to read a resolution commit's diff, not main's diff since the host last ran it; T001 to T003 are merged, so the window is open now.",
+   "severity": "Required",
+   "lenses": [
+    "L2"
+   ],
+   "finding_ids": [
+    "L2-23"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Code merged to main since the last host run executes on the maintainer's host unread.",
+   "change": "In each of O1, O3, O6, T026 and T092 add: before running the hook, read git log -p <last host run>..main -- tools/ci .githooks mise.toml mise.lock go.mod and record the commit read in Evidence, or run a released tools/ci; follows the 10 10.2 rule of L2-1.",
+   "cost": "one step per block",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-23",
+   "section": "plan.md (T073; T074)",
+   "title": "No task injects a kill after each step of salvage, rm, recreate or retire, and T074 asserts salvage exits 3 on a gate 1 change, cementing L4-4.",
+   "severity": "Advisory",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-41"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An interrupted destructive command leaves an unrecoverable state no test saw.",
+   "change": "Add destructive-command fault injection to T073 and adjust T074 after L4-4 is decided.",
+   "cost": "one acceptance line",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-24",
+   "section": "plan.md (T034; T061; T068)",
+   "title": "No task covers host-state migration or an undecodable project record, and T061 and T068 carry different completeness case lists.",
+   "severity": "Advisory",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-43"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An upgrade meets old state with no tested path.",
+   "change": "Add a state migration task after T034, and feed T061 and T068 from the one I17 list.",
+   "cost": "one task",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-25",
+   "section": "plan.md (T059; T078; T079)",
+   "title": "T059 has no acceptance for a SessionStart bound or hook failure, T078's test checks command names but not flags or headings, T079 has no test that a personal kit cannot unwire the hooks.",
+   "severity": "Advisory",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-37"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Hook regressions pass review.",
+   "change": "Add those acceptance rows to T059, T078 and T079 once the spec carries them.",
+   "cost": "three acceptance lines",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-26",
+   "section": "plan.md (Verify lines; -run patterns)",
+   "title": "The plan guards against a -run pattern matching no test by having the reviewer read -v output.",
+   "severity": "Advisory",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-38"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A Verify line passes with zero tests run.",
+   "change": "Each task's Verify names its test functions in a committed list that tools/ci compares with go test -json output (the manifest of L6-7).",
+   "cost": "a list per task and one check",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-27",
+   "section": "plan.md (T002; T007)",
+   "title": "T002's coverage fixtures miss a package absent from the profile; T007's mutate acceptance does not say what a stub may be.",
+   "severity": "Advisory",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-39"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A package with no test file escapes the threshold.",
+   "change": "Add a T002 fixture for a package with no test file (expected 0 percent) and a T007 line that the stub is a pass-through and the red comes from a tagged assertion.",
+   "cost": "two lines",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-28",
+   "section": "plan.md (T075; T002)",
+   "title": "T075 compiles the host suite in a Verify line (go vet -tags host) and no task adds it as a step of all.",
+   "severity": "Advisory",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-40"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The host suite breaks unseen between tasks.",
+   "change": "Move the host-tag vet into the cross-build step in T002 or the first task that creates e2e/host.",
+   "cost": "one step",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-29",
+   "section": "plan.md (Toolchain pins: gh)",
+   "title": "The Toolchain pins row for gh ('mise.lock, started through mise exec') contradicts the 10 10.2 lint row and its measured mise exec fallback.",
+   "severity": "Required",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-31"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "gh is started two ways and the pin covers one.",
+   "change": "Follow the fix of L7-7 in the row and in T088.",
+   "cost": "one row",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-30",
+   "section": "plan.md (T088; T090)",
+   "title": "T088 says the candidate tag is one 'the tag ruleset lets nobody retry under the same name', while 10 10.2 item d measured that the token creates and deletes v* tags through the bypass.",
+   "severity": "Required",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-32"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A retagged candidate is accepted as the original.",
+   "change": "Correct T088's sentence to the measured bypass, and add the tag-commit check of L7-6 to T090.",
+   "cost": "one sentence and one check",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-31",
+   "section": "plan.md (block O7; T052)",
+   "title": "Block O7 pins validate.yml in the reference config repo to the release, but no task makes that workflow verify what it downloads, and mise's public key exists only in T052, not in 07 7.4.",
+   "severity": "Required",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-34"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The config repo runs an unverified download.",
+   "change": "Add a task for L7-15 and move the key rule into 07 7.4 (L7-20).",
+   "cost": "one task",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-32",
+   "section": "plan.md (T094)",
+   "title": "T094 accepts the guides' error-id recovery as review only and depends on T092, after block B, so the guides are never run as written.",
+   "severity": "Advisory",
+   "lenses": [
+    "L8"
+   ],
+   "finding_ids": [
+    "L8-31"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "A guide names a stale error id at release.",
+   "change": "Make the guide task depend on the error-id map of L8-4 and move it before the candidate tag.",
+   "cost": "a dependency",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-33",
+   "section": "plan.md (T002; T006; T066)",
+   "title": "T002, T006 and T066 are each more than one logical change.",
+   "severity": "Advisory",
+   "lenses": [
+    "L9"
+   ],
+   "finding_ids": [
+    "L9-28"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "One review covers unrelated changes and a revert takes them all.",
+   "change": "Split each into tasks of one logical change.",
+   "cost": "task splits",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  },
+  {
+   "id": "R8-plan-34",
+   "section": "plan.md (O1; O2; O5 to O7)",
+   "title": "O1 and O2 say 'No task can proceed meanwhile' with no duration, the plan names no agent work during those blocks, and the rehearsal deferral fires only after a candidate fails block B.",
+   "severity": "Advisory",
+   "lenses": [
+    "L9"
+   ],
+   "finding_ids": [
+    "L9-29"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "Agents idle during operator blocks and the rehearsal is learned at the costliest event.",
+   "change": "Name, per block, the work agents do meanwhile (spec-only drafting, fixture tables, probe definitions), and key the rehearsal deferral to the smoke steps of L9-3.",
+   "cost": "one line per block",
+   "parked_for_b": true,
+   "resolution": "parked",
+   "resolution_text": "parked for stage B"
+  }
+ ]
+}

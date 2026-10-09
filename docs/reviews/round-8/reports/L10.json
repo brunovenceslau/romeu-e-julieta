@@ -1,0 +1,463 @@
+{
+  "lens": "L10",
+  "role": "the second adopter",
+  "model": "opus",
+  "verdict": "No: the product is generic in code but proven, documented and exemplified only for its author. The largest gap is that no success criterion, journey or starter lets a stranger without the private reference config repo get from install to a first run (00 0.2, 09 J1, S4).",
+  "findings": [
+    {
+      "id": "L10-1",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "00 0.2",
+      "defect": "The secondary user's needs in 00 0.2 trace to no success criterion, invariant or journey. Every acceptance (S3, S4, S5, S7, S8) runs on the maintainer's two hosts with the private reference config repo, so 'the product is generic' is asserted and never measured.",
+      "scenario": "v1.0.0 passes S1-S11. A stranger with their own config repo and a Rust stack runs J1 and stops at the first sync. Nothing in acceptance could have seen it, because no criterion ever ran without the author's config.",
+      "change": "Add a criterion to the index, for example S12: a fresh account with no access to the reference config repo completes J1 to J3b on the release candidate, using only the public release, docs/guide and examples/. Evidence is a probe result B6-<host>. Add a 00 0.5 row tracing the secondary user to it.",
+      "cost": "One criterion row, one probe definition, one block B step (about one host sitting), and a 00 0.5 row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-2",
+      "severity": "Blocking",
+      "origin": "own",
+      "section": "09 J1",
+      "defect": "Onboarding starts from a config repo that already holds its own config-project spec, but 02 2.2 requires that spec before the first sync, and every spec edit in 09 is an [A] step in a sandbox that cannot exist yet. No command, template or journey step covers the bootstrap.",
+      "scenario": "A newcomer creates an empty repo and runs romeu init --config-url. Then romeu sync <cfg> fails, because projects/<cfg>.yaml is missing. They must write a spec by hand from 03 3.2 with no guide, and no journey says a human may.",
+      "change": "Add a step 0 to J1: copy examples/ (CC0, 00 0.4) into a new repo, edit projects/<cfg>.yaml by hand ([O]), push it, and enable validate.yml. Name examples/ as the adopter's starter in 02 2.1. Either have romeu init accept --scaffold, or say plainly in 04 4.2 that init needs an existing repo and point at the starter.",
+      "cost": "A J1 step, a 02 2.1 sentence and possibly an init flag; a scenario function line in e2e/scenarios/commands.yaml.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-3",
+      "severity": "Required",
+      "origin": "own",
+      "section": "03 3.5",
+      "defect": "The v1 catalog is built only from the reference config repo's locks (03 3.5, S4, 11 B4), and that repo is private. An uncatalogued backend:tool is a sync error (07 7.5 step 2). So a stack other than the author's fails its first sync, and no page tells a stranger to expect it.",
+      "scenario": "An adopter with core:rust and aqua:hashicorp/terraform runs romeu sync and gets exit 2 twice. The fix hint offers a catalog PR to a one-owner ask-first surface that ships only in a release (07 7.6, 05 5.3), or always-gated egress.tools domains whose correct values they must find themselves.",
+      "change": "State the coverage limit in 07 7.6 and in 12 12.8's README prerequisites. Add to 07 7.6 a stranger's path: how to find the domains a tool needs (julieta spec validate --catalog prints the lock hosts), how to propose a catalog entry, and what review it gets. Add a 09 journey 'first sync with an uncatalogued tool'. Consider seeding the catalog from a public, named set of common backends rather than one private repo.",
+      "cost": "A paragraph in 07 7.6, a README line, a short journey; optionally a larger catalog seed task.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-4",
+      "severity": "Required",
+      "origin": "own",
+      "section": "05 5.4",
+      "defect": "The residual-risk table every user reads mixes the risks of running romeu with the maintainer's own GitHub account and ruleset decisions for this repository. Two product rows say 'the token is today the operator's own (ADR 0008)', and ADR 0008 decision 3 binds Q13 to it. The acceptance is scoped to the wrong subject.",
+      "scenario": "An evaluator reads SECURITY.md, which links 05 5.4, and sees that every sandbox's token is the operator's whole account with admin reach. They conclude the product forces this and leave. In fact Q13's name@project bindings let them use a narrow token.",
+      "change": "Split 05 5.4 into 'risks of running romeu' and 'risks of how this repository is developed'. Move the ruleset, token-reach and security-log rows to the second. In the product rows, replace the ADR 0008 pointer with: the sandbox holds whatever credential the operator binds per name@project (Q13), and a broad one widens these risks. Mark ADR 0008's scope as the product repository's development.",
+      "cost": "A table split and three row rewrites; an approval line on the decisions surface for the ADR 0008 scope note.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-5",
+      "severity": "Required",
+      "origin": "own",
+      "section": "05 5.4",
+      "defect": "'Release signing' fixes that an out-of-GitHub credential signs release artifacts, but no page says what is signed, where the public key is published, or what command a user runs. J1 step 2 and S1 verify only checksums and the GitHub attestation.",
+      "scenario": "An adopter follows J1 step 2 and trusts the archive on the strength of the attestation. The extra signing exists, but no user ever checks it, so it protects only the maintainer's own process.",
+      "change": "In 05 5.4 'Release signing', name the signed objects (for example checksums.txt), the signature format, and the public key's published location with its fingerprint in the README. Add the verify command to J1 step 2 and to S1's evidence.",
+      "cost": "A few sentences, one J1 command, and a decision on the signature tool, which ships with release.yml's PR.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-6",
+      "severity": "Required",
+      "origin": "own",
+      "section": "03 3.1",
+      "defect": "The repo url rule accepts only https://<host>/<owner>/<repo>, two path segments. This refuses GitLab subgroups and other forges' paths, while 03 3.4 invites any gitHosts entry with a caFile for private hosts. The forge assumption (GitHub for repos, CI and releases; 01 1.1, 02 2.6, 04 4.3) is never stated.",
+      "scenario": "An adopter on a self-hosted GitLab adds the host to gitHosts. Their spec with https://git.corp/team/backend/api is refused with a name rule error, and nothing tells them the product supports only two-segment paths.",
+      "change": "Either widen the rule to 1..n owner segments (with the same normalization and uniqueness), or state in 01 1.1 and 03 3.1 that v1 supports GitHub-shaped URLs only and why. List 'a forge other than GitHub' under who v1 is not for (00 0.3).",
+      "cost": "A rule change with validator and fuzz updates, or two sentences and a non-goal line.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-7",
+      "severity": "Required",
+      "origin": "listed",
+      "section": "03 3.4",
+      "defect": "A secret argv runs under /usr/bin/env -i with only HOME and PATH=/usr/bin:/bin (03 3.3), and argv[0] must be absolute. So a secret manager that needs a session variable, a socket variable or a non-system PATH fails, and the spec states no such requirement.",
+      "scenario": "An adopter binds github@shop to [/opt/homebrew/bin/bw, get, password, x]. bw needs BW_SESSION, which the scrubbed environment drops. sbx gets an empty value at create, and the failure surfaces inside the sandbox as a git auth error, far from its cause.",
+      "change": "In 03 3.4 Rules, state the execution environment of a secret command exactly, and what it implies (no session variables; a manager must work from HOME alone, e.g. Keychain or a desktop-integrated CLI). Have doctor run each argv once in that environment and fail on a non-zero exit or empty output (never printing the value). Give one non-Keychain example.",
+      "cost": "A rules paragraph, a doctor check with fixtures (it must not print or store the value), and an example.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-8",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "03 3.4",
+      "defect": "The canonical examples of the adopter's own files carry the author's instance and habits: config project verona (01 1.1, 02 2.2, 03 3.4, 03 3.7), Keychain service romeu/verona/github, root $HOME/dev (00 0.1, 02 2.3), cmux (09 J3, 11 A13). No page lists the values an adopter must replace.",
+      "scenario": "An adopter copies 03 3.4 and keeps project: verona. Then romeu init derives <cfg>-env from the URL while the secrets key says github@verona, and sync stops with a missing-binding error that names a project they never created.",
+      "change": "Use neutral names in examples (my-config, romeu/my-config/github). Add to 03 3.4 a short 'values you set' list (root, config url and project, gitHosts, secrets, signing socket). Drop cmux from J3 and A13, or mark it as one example among terminals.",
+      "cost": "Text edits across four pages and one list.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-9",
+      "severity": "Required",
+      "origin": "own",
+      "section": "00 0.2",
+      "defect": "The prerequisites a stranger needs are not in the spec: how the agent authenticates inside the sandbox, mise in every worked-on repo (07 7.2), GitHub for the config repo's CI (02 2.2, 04 4.3), and Keychain items for secrets. There is also no 'not for you if' source for the README's 'when not to use it' heading (12 12.8, ADR 0001 rule 12).",
+      "scenario": "An adopter installs sbx, git and gh per 12 12.8, runs J1 to step 7, and the agent pane asks for a login the spec never mentions. Their repos have no mise.toml, so julieta setup installs nothing and panes fail on missing tools.",
+      "change": "Extend 00 0.2's Primary row 'Needs' with the full prerequisites, and 12 12.8's README prerequisites to match. Add to 00 0.3 an audience list: shared multi-operator Macs, non-GitHub forges, repos without mise, editors other than VS Code, agents other than Claude Code, Linux hosts. Say in 09 J1 where the agent's login happens.",
+      "cost": "Two table cells, a non-goal list and a J1 sentence; the agent-login step may need a probe fact (A12).",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-10",
+      "severity": "Required",
+      "origin": "own",
+      "section": "04 4.2",
+      "defect": "doctor and boundary D check only VS Code trust (01 1.3, I14, I23, 11 A1). An adopter whose editor is another one is unchecked, and the spec does not say so, though the threat model depends on the host tool not auto-trusting $ROMEU_ROOT.",
+      "scenario": "An adopter opens $ROMEU_ROOT in an editor with its own trust model. doctor passes and the preflight step 5 passes, and the editor runs a task file from a host clone that an agent pushed to origin.",
+      "change": "State in 01 1.3 boundary D and in 04 4.2 that only VS Code settings are checked. Add a doctor warn row when no VS Code settings exist ('editor trust not checked'). Say in the guide what to verify by hand for other editors.",
+      "cost": "Two sentences, one warn row with a fixture, a guide paragraph.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-11",
+      "severity": "Required",
+      "origin": "own",
+      "section": "index: Deferred decisions",
+      "defect": "The trigger for 'finer visibility per project in the cross-project view' is 'the first private project on a machine that also runs a public one'. It cannot fire for an adopter whose projects are all private but belong to different clients, and only the maintainer would observe it. Until then 13 13.6 shows every project's name and timing to every sandbox, with no setting.",
+      "scenario": "A consultant runs client A and client B projects on one Mac. A's sandbox runs julieta event list --others and sees project name B and its activity times. The trigger never fires, because neither project is public.",
+      "change": "Rewrite the trigger as 'two projects on one machine whose owners differ, or the first issue asking for it'. Until then, add one host-settings switch that excludes a project from others.jsonl, or state in 00 0.3 that v1 is for one owner's projects per machine.",
+      "cost": "A trigger rewrite, plus either a small allowlist setting (a view policy version bump) or one non-goal line.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-12",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "index: Deferred decisions",
+      "defect": "Several triggers are observable only by the maintainer or are not events: 'The maintainer observes these', 'The maintainer observes it', 'the operator saying so', 'every 2 autonomous work sessions', 'the first team that ... asks for a metric'. No intake channel exists by which an adopter's event fires one (ADR 0005 Consequences).",
+      "scenario": "An adopter restores the ledger from a backup, one of the hash-chain triggers. Nobody upstream learns of it, so the deferral stays closed forever.",
+      "change": "Give each such row an observable form: 'an issue labelled deferred:<row>' is the standard trigger. Add the label convention and an issue template to 12 12.8 (CONTRIBUTING.md). Replace 'the operator saying so' with a dated review event.",
+      "cost": "A label convention, an issue template, several cell rewrites.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-13",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "index: Deferred decisions",
+      "defect": "The table mixes deferrals in the product with deferrals in how this repository is run (token narrowing and its interval, rulesets, release.yml origin, approval recording, merge checkpoint, stacked PRs, metric targets, gate-run records). The token-narrowing interval row is a parameter of the row above it.",
+      "scenario": "An adopter scanning for what v1 leaves out of the product reads twelve rows about one maintainer's GitHub account and misses the three that touch them (docs versioning, ledger rotation, cross-project visibility).",
+      "change": "Split the table into 'Product' and 'This repository', or add a scope column. Merge the interval row into the token-narrowing row.",
+      "cost": "A column or a split, one merged row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-14",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "index: Open questions",
+      "defect": "Q25 is marked decided but stays in Open questions, against the table's own rule. Q4, Q6, Q9, Q12, Q13, Q14 and Q23 are 'Settled by: maintainer' with no event, so they have no exit, and several are adopter-facing (Q9 distribution, Q14 memory across machines, Q23 private registry).",
+      "scenario": "A reader takes Q25 as still open. An adopter waiting on the Homebrew tap of Q9 finds no event that would bring it.",
+      "change": "Remove Q25 now (its record is ADR 0008), or add a 'decided, record pending' state. Give maintainer-settled rows a trigger, or move them to Deferred decisions.",
+      "cost": "Table edits.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-15",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "13 13.9",
+      "defect": "The ledger's stated purpose ('later sessions and the maintainer read them to improve the product', 13 opening; ADR 0006 Context; the 'improving romeu and julieta' consumer) works only on the author's machine. Every other user's ledger stays local, there is no opt-in report and none is deferred, and the ledger cannot be turned off (13 13.1 fixed mounts).",
+      "scenario": "Adopters hit catalog gaps (tool: other) and error ids for months. None reaches upstream, and the 'improve the product' loop sees one user.",
+      "change": "Say in 13 opening that on a user's machine the ledger serves that user only. Add a deferred row: 'an opt-in export of closed-field counts for an issue', triggered by the first adopter issue citing ledger data. State that the ledger is always on, and why.",
+      "cost": "Two sentences and one deferred row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-16",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "06 6.4",
+      "defect": "Product kits carry one person's preferences with no setting and no stated intent: herdr's ctrl+b prefix 'so muscle memory carries over', and julieta-claude making the agent's own memory non-writable and installing skills into ~/.claude/skills.",
+      "scenario": "An adopter who relies on Claude Code's built-in memory finds it read-only after the first run. Nothing on the README told them the product replaces it.",
+      "change": "Mark each opinion as deliberate and name its escape (a personal kit, a herdr config override) in 06 6.4. Put 'replaces the agent's built-in memory' on the README's what-it-is section (12 12.8).",
+      "cost": "Two sentences and a README line.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-17",
+      "severity": "Required",
+      "origin": "own",
+      "section": "10 10.3",
+      "defect": "The behaviour of romeu on an sbx newer than every recorded version is unspecified. doctor fails only below the floor (04 4.2), gate 1 records the version (01 1.4), and the fake sbx is tested only on recorded versions. For a user who updates Docker, compatibility is a guess.",
+      "scenario": "An adopter's sbx auto-updates to a release that renames a sbx ls --json field. romeu approve --toolchain accepts it, then run fails in sbxdrv parsing with an error that names no version problem.",
+      "change": "Specify in 10 10.3 or 04 4.2: a sbx version newer than the newest recording is a doctor warn and a gate 1 notice naming the tested range. State the support range (recorded versions) in 12 12.1, and point SECURITY.md's 'supported versions' at it.",
+      "cost": "A rule, one warn row, one gate 1 line, a README/SECURITY line.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-18",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "03 3.2",
+      "defect": "No compatibility promise exists for the files an adopter owns (project.v1, host-settings.v1). There is apiVersion romeu/v1, and release notes list format changes first (12 12.6), but no page says what a minor release may change or how a breaking change is announced.",
+      "scenario": "A v1.2 adds a required field, and every adopter's config CI goes red on the pinned-julieta bump with no notice.",
+      "change": "State in 03 (opening): within v1 the user-owned formats only gain optional fields, and a breaking change is a new apiVersion with a migration note in the release notes.",
+      "cost": "A paragraph.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-19",
+      "severity": "Required",
+      "origin": "listed",
+      "section": "06 6.1",
+      "defect": "Personal kits are where an adopter's machine differs, yet the text does not settle whether a personal kit's install step may download anything once the network capability is refused (06 6.1, 01 1.4). The descriptor file name is unknown until A11. An adopter cannot write their first kit from the spec.",
+      "scenario": "An adopter writes kits/my-home with an install step that fetches their dotfiles. Sync refuses it for declaring network, or it builds and fails offline, and neither 06 6.1 nor J9 says which or what to do instead.",
+      "change": "In 06 6.1 'Personal kits', state what an install step can reach at build time (the build-phase network that sbx allows, or none) and the supported way to bring files in (committed into kits/<id>/). Once A11 settles it, add a minimal personal-kit example under examples/kits/ to 02 2.1.",
+      "cost": "A paragraph and an example kit; the build-network fact may need A11's result.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-20",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "09 J1",
+      "defect": "J1 shows nothing of the trust model before the host is changed. romeu init clones and writes settings at step 3, gate 2 comes at step 6, and the README's trust paragraph has no stated content (12 12.8). An adopter decides whether to run the binary from a paragraph the spec does not define.",
+      "scenario": "An evaluator wants to know before installing what romeu will execute and write on their Mac. The README gives a paragraph and a link to ARCHITECTURE.md, which (per L10-21) is a skeleton until the end of the build.",
+      "change": "In 12 12.8, define the README trust paragraph's content: what romeu writes (settings, the root tree, state), what it never does (boundaries A-F, I1-I3), and the three residual risks that matter most to a user (05 5.4, product half). Add to J1 a step 0 that reads it.",
+      "cost": "An outline cell and a J1 line.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-21",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "12 12.8",
+      "defect": "ARCHITECTURE.md, the contributor's twenty-minute entry to the trust boundaries, is a skeleton from ci-bootstrap and gets its content in the docs module after block B (12 12.2). For the whole build, the only explanation is 01 1.3, whose reader line is implementers.",
+      "scenario": "An outside contributor arrives mid-build and opens ARCHITECTURE.md. It is headings only, so they leave or read a 277-line spec page.",
+      "change": "Have ci-bootstrap's skeleton carry the boundaries A-F table and the gates summary from 01 1.3 and 01 1.4 (hand-written now; generated diagrams later).",
+      "cost": "One section copied into the skeleton task; a link check.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-22",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "10 10.2",
+      "defect": "Two product CI rules encode one person's working agreement without explaining it: no tracked PROLOGUE.md 'because the user's agreement file lives outside product repositories', and a hashed denylist whose class of names is not stated. A contributor can be refused by an identity match they cannot see.",
+      "scenario": "An outside contributor whose email contains a denylist segment pushes. The hook refuses by location only and never prints the match, so they cannot tell what to change.",
+      "change": "State in 10 10.2 'Forbidden names' the class of names the list holds and the contact for a false positive. Generalize the PROLOGUE.md rule as 'no personal agent-agreement files', or move it out of the product checks.",
+      "cost": "Two sentences; possibly a hygiene rule rename.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-23",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "05 5.3",
+      "defect": "Every ask-first surface, the catalog and the kits included, has one owner, and no contribution path for third parties is stated. The only response promise is SECURITY.md's 30-day acknowledgement (12 12.8). The surfaces an adopter needs most depend on one person with no continuity statement.",
+      "scenario": "An adopter opens a catalog PR for their stack. No page says who reviews it or when, and their only fallback is permanently gated egress.tools.",
+      "change": "Add to 12 12.8's CONTRIBUTING outline a section on outside contributions to the catalog and kits (what evidence a PR needs, expected review). Add a one-line continuity statement to SECURITY.md.",
+      "cost": "Outline cells.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-24",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "04 4.2",
+      "defect": "No command or journey removes the product from a machine (settings, state, the ledger, the attic, romeu-applied sbx rules). An evaluator has no documented exit.",
+      "scenario": "An adopter tries v1 and stops. They delete ~/dev by hand and leave per-sandbox policy rules and state behind, or lose salvage refs they did not know existed.",
+      "change": "Add a journey (J14, leave the product): retire each project, then list exactly which paths and sbx rules remain and how to remove them. romeu never deletes (I16), so the steps are the operator's.",
+      "cost": "A short journey and guide page.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-25",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "06 6.6",
+      "defect": "The publishing path is 'mandatory when the product is promoted for public use (maintainer decision)', which leaves undefined whether v1, a public repository with named public adopters (00 0.2), is 'for public use'.",
+      "scenario": "An adopter cannot tell whether v1 is meant for them or is a pre-public build. The one sentence that hints at it is in a kits page.",
+      "change": "Define 'promoted for public use' as an observable event and give it a deferred-decisions row, or say plainly in 00 0.2 that v1 is public with unsigned local kits.",
+      "cost": "One sentence and possibly a row.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-26",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "00 0.4",
+      "defect": "Product kits are GPL-3.0-only and users are told to put personal kits in their config repo, but the licence of a personal kit derived from a product kit is not addressed. Only examples/ and schemas/ are CC0.",
+      "scenario": "An adopter copies kits/os-base into their private config repo as a starting point. They now hold GPL-licensed files in a private repo and do not know whether it matters.",
+      "change": "Either add a minimal personal-kit example under examples/ (CC0), so nobody needs to copy a product kit, or state the licence of product kits used as templates.",
+      "cost": "An example kit or one sentence.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-27",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "03 3.4",
+      "defect": "'gitCredentialHelper: osxkeychain # optional; the only credential helper hardened git uses' is ambiguous: one helper, or osxkeychain only. GIT_ASKPASS is stripped (05 5.1), so it decides whether a private-repo adopter can sync at all.",
+      "scenario": "An adopter sets gitCredentialHelper to gh's helper or a 1Password helper path. Behaviour is unspecified, so either private clones fail or the helper runs with a scrubbed environment and fails.",
+      "change": "Say in 03 3.4 which values are accepted (a helper name or an absolute path), the environment it runs in, and give one non-Keychain example.",
+      "cost": "A sentence.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-28",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "00 0.5",
+      "defect": "The scope table justifies memory import and verify, and acceptance --file with the repo kind, by the maintainer's own migration of pre-v1 memory. One person's migration is written as general product scope.",
+      "scenario": "An adopter reads 0.5 and wonders what pre-v1 memory is. The feature is harmless, but its stated reason tells them the product was shaped around someone else's history.",
+      "change": "Rephrase the reason as a general need (importing memory from another tool) or mark it as the maintainer's adoption path.",
+      "cost": "One cell.",
+      "parked_for_b": false
+    },
+    {
+      "id": "L10-29",
+      "severity": "Required",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "No task or operator block runs J1 from a clean account without the reference config repo. O5's rehearsal uses the maintainer's host and config, so the plan inherits L10-1's gap.",
+      "scenario": "All 102 tasks merge and block B passes. The first stranger finds the bootstrap gap after v1.0.0.",
+      "change": "Add a stranger rehearsal to O5 or O6: a fresh macOS user account with only the release, the guides and examples/, run to J3b.",
+      "cost": "One block step, about one hour.",
+      "parked_for_b": true
+    },
+    {
+      "id": "L10-30",
+      "severity": "Required",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "No task produces an adopter starter (a config-repo template, a hand-written first spec, an init scaffold). T022 builds examples/ for tests and docs only.",
+      "scenario": "T094's guide for J1 has nothing to point at for step 0 (L10-2).",
+      "change": "Extend T022 or add a task: examples/ is a copyable config repo with a config-project spec, validate.yml and a README of values to replace.",
+      "cost": "One task.",
+      "parked_for_b": true
+    },
+    {
+      "id": "L10-31",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "The README lands in T084/T095, after the candidate tag, so the public first page stays two lines for the whole build.",
+      "scenario": "Visitors during the build see no audience, prerequisites or status.",
+      "change": "Add to ci-bootstrap a README stub with status (draft, no release), audience and prerequisites, under the rule 12 headings.",
+      "cost": "A small task change.",
+      "parked_for_b": true
+    },
+    {
+      "id": "L10-32",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "plan.md",
+      "defect": "The plan header says 'the seven decision records under adr/', and there are eight.",
+      "scenario": "A reader checks the plan against adr/ and doubts the plan's other counts.",
+      "change": "Change 'seven' to 'eight', or drop the count.",
+      "cost": "One word.",
+      "parked_for_b": true
+    }
+  ],
+  "coverage": {
+    "index": "L10-1, L10-11, L10-12, L10-13, L10-14",
+    "00": "L10-1, L10-9, L10-26, L10-28",
+    "01": "L10-6, L10-8, L10-10",
+    "02": "L10-2, L10-8",
+    "03": "L10-6, L10-7, L10-8, L10-18, L10-27",
+    "04": "L10-2, L10-10, L10-17, L10-24",
+    "05": "L10-4, L10-5, L10-23",
+    "06": "L10-16, L10-19, L10-25",
+    "07": "L10-3",
+    "08": "nothing for this lens (machine-local memory is Q14; the memory replacement is reported under 06 as L10-16)",
+    "09": "L10-2, L10-8, L10-20, L10-24",
+    "10": "L10-17, L10-22",
+    "11": "L10-3, L10-8",
+    "12": "L10-9, L10-20, L10-21, L10-23",
+    "13": "L10-11, L10-15",
+    "adr": "L10-4 (ADR 0008), L10-12 (ADR 0005), L10-15 (ADR 0006)",
+    "plan": "L10-29, L10-30, L10-31, L10-32"
+  },
+  "missing": [
+    {
+      "what": "a success criterion for the secondary user: a stranger completes J1 without the reference config repo",
+      "where": "index: Success criteria; 00 0.5"
+    },
+    {
+      "what": "a config-repo bootstrap: starter, first spec written by hand",
+      "where": "02 2.2, 04 4.2, 09 J1"
+    },
+    {
+      "what": "complete prerequisites: agent login in the sandbox, Docker Sandboxes plan, mise per repo, GitHub for config CI, Keychain items",
+      "where": "00 0.2, 12 12.8"
+    },
+    {
+      "what": "who v1 is not for (shared Macs, other forges, repos without mise, other editors, Linux)",
+      "where": "00 0.3"
+    },
+    {
+      "what": "forge assumptions stated",
+      "where": "01 1.1, 03 3.1"
+    },
+    {
+      "what": "a catalog contribution path for strangers and a journey for the first uncatalogued tool",
+      "where": "07 7.6, 09"
+    },
+    {
+      "what": "a support matrix: sbx versions, macOS versions, supported romeu versions",
+      "where": "10 10.3, 12 12.1, 12 12.8"
+    },
+    {
+      "what": "a compatibility promise for user-owned formats",
+      "where": "03 (opening), 12 12.6"
+    },
+    {
+      "what": "a user-verifiable release signature",
+      "where": "05 5.4 Release signing, J1"
+    },
+    {
+      "what": "product risks separated from repository-process risks",
+      "where": "05 5.4, ADR 0008"
+    },
+    {
+      "what": "an intake channel through which adopters fire deferred triggers",
+      "where": "index: Deferred decisions, ADR 0005, 12 12.8"
+    },
+    {
+      "what": "settings or stated intent for opinionated defaults (cross-project view, ledger on, herdr prefix, memory replacement)",
+      "where": "13 13.6, 06 6.4, 08 8.1"
+    },
+    {
+      "what": "editor neutrality in the trust checks",
+      "where": "01 1.3, 04 4.2, 05 5.2 I14 I23"
+    },
+    {
+      "what": "an uninstall journey",
+      "where": "09, 04 4.2"
+    },
+    {
+      "what": "a reader line or page for an evaluator deciding to adopt",
+      "where": "index opening, 00"
+    }
+  ],
+  "postmortem": "It is some months after v1.0.0. The repository has stars, three issues from\nstrangers, and one user: the author. This is how it failed, seen from the\nsecond adopter's chair.\n\n1. The first page turned people away, or failed to. For the whole build\n   the README was two lines (README; 12 12.8 lands it last). Visitors who\n   came early left. The ones who came after v1.0.0 read \"who it is for\" but\n   not the real prerequisites: Claude Code access in the sandbox, GitHub\n   for the config repo's CI, mise in every repo, Docker Sandboxes' own plan\n   (00 0.2, 12 12.8, 07 7.2). They found those out at step four.\n\n2. J1 assumed the author's config repo. `romeu init --config-url` needs\n   a config repo that holds its own spec, but specs are written by agents\n   inside a sandbox that cannot exist yet (02 2.2, 04 4.2, 09 J1). Nothing\n   scaffolds that repo, and no journey has a human write a spec. The first\n   issue a stranger opened was \"how do I make the first spec?\".\n\n3. The catalog was one person's toolbox. Egress coverage was built from\n   the reference config repo's locks, which are private (03 3.5, S4, 11 B4,\n   07 7.5). A Rust or Java user's first `sync` stopped with exit 2 for each\n   tool. The fix routes to an ask-first surface with one owner, then a wait\n   for a release (05 5.3, 07 7.6, 01 1.4). Most people gave up here.\n\n4. \"Generic\" was asserted, never measured. The only sentence about the\n   secondary user is a table row in 00 0.2. No success criterion, invariant\n   or journey traces to it (index S1-S11, 00 0.5). Every acceptance ran on\n   the author's two Macs with the author's config (10 10.1, 11). The product\n   was proven to work for exactly one person.\n\n5. Defaults and examples were the author's instance. `verona`, Keychain\n   service names, `~/dev`, ctrl+b, cmux, VS Code-only trust checks\n   (03 3.4, 02 2.3, 06 6.4, 09 J3, 04 4.2 doctor). Each one is small. Taken\n   together they tell a visitor \"this is someone's dotfiles\".\n\n6. GitHub-shaped rules in a \"generic\" product. The two-segment repo URL\n   rule, a secret named `github`, a GitHub-only base egress set, a `pin\n   check` that reads GitHub releases (03 3.1, 02 2.6, 03 3.5, 04 4.3). GitLab\n   users were refused with no explanation.\n\n7. The security page told adopters about the author's token. 05 5.4 and\n   ADR 0008 put the product repo's own rulesets and one person's account\n   decision into the residual risks every user reads. A careful evaluator\n   read \"the token is today the operator's own\" as a product property and\n   walked away. Release signing had a rule but no way for users to verify\n   it (05 5.4 \"Release signing\", J1 step 2).\n\n8. Feedback had nowhere to go. The ledger \"improves the product\" only on\n   the author's machine (13 opening, 13 13.9, ADR 0006). Deferred triggers\n   are watched by the maintainer during review rounds (index Deferred\n   decisions, ADR 0005). Adopters' failures never fired a trigger, and the\n   catalog gaps they hit were never seen upstream.\n\n9. Cross-project visibility leaked client names for a consultant who ran\n   two clients' projects on one Mac, with no setting to stop it (13 13.6,\n   05 5.4, deferred \"finer visibility\").\n\n10. One gatekeeper. Every catalog entry, kit and contract change waited\n    for one person, with \"no support promise\" (00 0.2, 05 5.3, ADR 0003,\n    12 12.4). When that person took a month off, so did the project.\n\n11. What nobody says out loud: the spec is a very careful record of one\n    person's working agreement (PROLOGUE.md rule, denylist of hidden names,\n    \"sittings\", \"autonomous work sessions\", approval quotes; 10 10.2, index\n    Boundaries and Deferred decisions). A stranger reading it feels they\n    stepped into someone else's house. The product inside is good, but the\n    door is hard to find.",
+  "lens_critique": "The lens defines success as 'nothing in the product is about one person', but v1 is explicitly for one developer (00 0.6), and an opinionated tool should carry its author's choices. The better test is whether a stranger can see, replace or refuse each opinion, not whether opinions are absent. The lens also reads the spec as an adopter's document, when its stated readers are implementers. The adopter's real surface is the README and the guides that do not exist yet, so some findings judge the wrong artifact. And with 'no support promise' in 00 0.2, asking for support matrices and governance can overreach.",
+  "missing_viewpoint": "The economic and legal viewpoint: what it costs in money and obligations to run and contribute (Docker Sandboxes plan, agent usage, Actions minutes, licence of kits and examples, third-party terms of the workload image). No lens title owns cost or legal fitness.",
+  "out_of_scope": [
+    {
+      "what": "whether Docker Sandboxes and the sbx-kit-claude workload are available to any user without a paid plan",
+      "why": "the text alone cannot settle it; Docker's current sbx terms and docs would"
+    },
+    {
+      "what": "correctness of the hardened git flags, the invariants and the ledger regime",
+      "why": "this person would not look at it; they trust or distrust it from the README trust paragraph, and L2 owns it"
+    },
+    {
+      "what": "the DORA, trunk and XP process rules",
+      "why": "this person would not look at it; it governs the product repository, not their use"
+    },
+    {
+      "what": "whether secret managers such as bw or op work under env -i HOME",
+      "why": "the text alone cannot settle it; a run of each CLI under the 03 3.3 environment would"
+    }
+  ],
+  "confidence": "High on the bootstrap, catalog, criteria and 05 5.4 scoping findings (each read directly in the text). Medium on the secret-environment and personal-kit network findings, which rest on behaviour the text does not state."
+}

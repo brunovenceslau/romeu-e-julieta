@@ -1,0 +1,989 @@
+{
+ "page": "04",
+ "findings_read": 66,
+ "clusters": [
+  {
+   "id": "R8-04-1",
+   "section": "04 4.2 (How romeu run reaches the run layout, step 3)",
+   "title": "Run step 3 specifies only the absent sandbox; a present sandbox that is stopped, or whose live env file carries a promoted recreate-class change, has no stated behavior and no block A probe.",
+   "severity": "Blocking",
+   "lenses": [
+    "L0",
+    "L1",
+    "L13"
+   ],
+   "finding_ids": [
+    "L0-7",
+    "L1-4",
+    "L13-4"
+   ],
+   "listed": 0,
+   "own": 3,
+   "scenario": "After a reboot or romeu stop the sandbox is present and stopped: 04 says no sbx env run happens and step 5 execs into it, J3a says sbx env run -d starts it. After a promoted kit bump, sbx env run -d on the existing sandbox may re-plan and rebuild it without salvage, losing unpushed work that 00 0.1 promises is never lost.",
+   "change": "Rewrite run step 3 as three cases. Absent: record a generation, then sbx env run -d --clone <dir> (as now). Present and stopped: if the recreate digest differs, refuse with exit 5 and a new id recreate-needed (fix: romeu recreate <name>); otherwise sbx env run -d to start it, with no provisioning. Running: no sbx env run. Move the step 7 digest comparison before step 3 so it gates the start, and keep the step 7 warning only for a running sandbox. Add one block A probe to 11 11.1 (or extend A4): start a stopped sandbox through romeu's argv, and run sbx env run -d against an existing sandbox after a kit, a workload and a ports change of the env file, recording whether sbx starts, recreates, applies, refuses or prompts. J3a cites run step 3 instead of restating it; the romeu stop row says what the next run does.",
+   "cost": "one rewritten step, one probe, one error id",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed: three cases in run step 3, the digest check moved before the start, refusal with exit 5 on a live recreate-class change, one block A probe covering both the stopped start and the changed env file, and J3a cites the step. This also gives run its exit 5 (R8-04-31)."
+  },
+  {
+   "id": "R8-04-2",
+   "section": "04 4.1 (Output, Error ids); 04 4.2 (doctor)",
+   "title": "Nothing produces evidence a user can paste into an issue: subprocess failure details, the upstream versions in use and the step that failed are unspecified, and no output is declared safe to share.",
+   "severity": "Blocking",
+   "lenses": [
+    "L14",
+    "L15"
+   ],
+   "finding_ids": [
+    "L14-1",
+    "L15-16",
+    "L14-15"
+   ],
+   "listed": 2,
+   "own": 1,
+   "scenario": "A stranger's romeu run fails inside sbxdrv after an sbx update; stderr shows the error id and a hint with no argv, no sbx stderr and no versions; doctor --json would add project names and keychain argv; the maintainer asks for five versions one at a time.",
+   "change": "In the Error ids row of 04 4.1, state that the details of an error raised by a failed subprocess carry the escaped argv, the exit status, the first 4 KiB of its stderr, the numbered step of 04 4.2 it ran in, and the romeu, julieta and sbx versions. Add a versions section to romeu version --json (romeu, sbx, git, macOS, arch, and per project the pinned workload, frontend, herdr and mise from the live manifest) instead of a new command. State in 05 that version --json and an error's details print no secret argv and no ledger field outside the closed sets, so both are safe to paste. No --timings on other commands: the step number in the details says where it failed.",
+   "cost": "three sentences in 04 4.1, one row change, one sentence in 05",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Smaller form: no romeu report command and no generalized --timings (L14-15 conflicts with R8-04-17, which proposes dropping --timings). Subprocess error details gain argv, status, a bounded stderr excerpt, the step and the versions; romeu version --json gains the upstream versions; 05 declares both safe to share."
+  },
+  {
+   "id": "R8-04-3",
+   "section": "00 0.5; 04 4.3 (memory import, memory verify); 08 8.1; 03 3.9; 03 3.12; 10 10.5; 11 11.2; I24",
+   "title": "The generic product carries one maintainer's one-time migration and acceptance: julieta memory import and verify, the import/ directory, the memory-entry digest kind, the repo evidence kind, tools/ci acceptance --file and the C1 hugo check.",
+   "severity": "Blocking",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-4"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A second adopter (00 0.2) installs a product whose reference documents commands and an evidence kind that apply to nobody but the author, and whose acceptance includes a tool they do not use.",
+   "change": "Delete julieta memory import and memory verify from 04 4.3, the import/ allowlist entry, the memory-entry digest kind, the repo evidence kind, --file and C1; do the one-time import with a script in the operator's config repo (02 2.2 already allows an operator acceptance.json there) and record predecessor archiving as an operator step outside the product. If kept, 00 0.5 states why a generic product needs each and the reference marks them operator-only.",
+   "cost": "deletions across six pages",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Needs the operator: 00 0.5 records the maintainer's decision that pre-v1 memory entries are imported at adoption, so moving the import out of the product changes that scope record. Recommendation: move it to the operator's config repo as a script and delete the six items.",
+   "operator_reason": "Changes the scope justification of 00 0.5 (a maintainer decision about import at adoption)."
+  },
+  {
+   "id": "R8-04-4",
+   "section": "04 4.1 (Error ids, fix hints)",
+   "title": "Fix hints are under no check and one id covers situations that need different fixes: rule 13 does not match the commands a hint names, gate 1 and gate 2 share RJ-301, exit 4 covers drift and a non-verifying promotion with one hint, and a hint may suggest a data-discarding flag without saying so.",
+   "severity": "Blocking",
+   "lenses": [
+    "L8",
+    "L1"
+   ],
+   "finding_ids": [
+    "L8-2",
+    "L1-5",
+    "L8-12"
+   ],
+   "listed": 1,
+   "own": 2,
+   "scenario": "A PR renames --overwrite-drift and the drift hint still names the old flag; or after an upgrade a gate 1 refusal prints a gate 2 hint (romeu approve <name>) that exits 2; or an operator recalls the recovery hint at a drift exit and overwrites an edit they meant to keep.",
+   "change": "In the Error ids row of 04 4.1 add: 'a fix hint begins with a command line the user can run, placeholders filled from context, or with decide: and the choice; every command line in a fix hint and in --help examples is matched against the command definitions by the ADR 0001 rule 13 matcher; a hint that names --overwrite-drift, --accept-loss or --force says what it discards'. Split RJ-301 into toolchain-approval-required (gate 1, fix romeu approve --toolchain) and project-approval-required (gate 2); split exit 4 into drift-detected and promotion-unverified (01 1.5, 01 1.6), each with its own hint.",
+   "cost": "two sentences and two id splits",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the hint rule and the two splits; the rule 13 matcher gains the error table and help examples as inputs, which is an input of the existing check, so ADR 0001 needs no change."
+  },
+  {
+   "id": "R8-04-5",
+   "section": "04 4.1 (Exit codes)",
+   "title": "Exit 1 means both 'operation failed' and 'the check found what it looks for' (doctor, spec validate --catalog, lock --check, memory verify, pin check, memory import), so program callers cannot tell an infrastructure failure from a finding.",
+   "severity": "Required",
+   "lenses": [
+    "L13",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13-11",
+    "L13b-9"
+   ],
+   "listed": 2,
+   "own": 0,
+   "scenario": "The config repo's validate.yml runs julieta spec validate --catalog; a transient fetch failure and a genuine unknown catalog key both exit 1; CI either retries the real finding away or files a catalog PR for a network error.",
+   "change": "Add one code to the Exit codes row of 04 4.1: '6 check found findings (the command ran and reports what it checks for)', with error ids of that class, and move the finding exits of romeu doctor (any fail), julieta spec validate --catalog, lock --check, memory verify, pin check and memory import (invalid > 0) from 1 to 6; 1 keeps 'operation failed'. Update those rows and 4.4.",
+   "cost": "one exit code and six cell edits",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed: a distinct exit 6 for check findings, so exit 1 keeps one meaning. Two independent readers (L13, L13b) found it."
+  },
+  {
+   "id": "R8-04-6",
+   "section": "04 4.1 (Output); 04 4.3",
+   "title": "The Output rule promises --json, with a schema in schemas/, on every read command, and several read commands have neither (handoff show, memory check, memory verify, lock --check, pin check, spec validate; no schemas for status, doctor, ledger query, handoff, event list).",
+   "severity": "Required",
+   "lenses": [
+    "L13",
+    "L13b",
+    "L3"
+   ],
+   "finding_ids": [
+    "L13-12",
+    "L13b-10",
+    "L3-21"
+   ],
+   "listed": 2,
+   "own": 1,
+   "scenario": "The config repo's CI parses the text of spec validate --catalog and breaks on a wording change; a contributor parses romeu status --json against a schema that does not exist; the rule is read as untrue and ignored elsewhere.",
+   "change": "Reword the Output row of 04 4.1 to: '--json on every command a program calls, named in its row (one JSON document, or one object per line where the row says so); each such document has a schema in schemas/ listed in 02 2.1'. Add --json to spec validate and pin check (their callers are CI) and to memory verify (an acceptance command item), and add the missing schemas for status, doctor, ledger query, handoff and event list to 02 2.1. The other claims of L3-21 (02 2.5, 02 2.4, 10 10.6) belong to those pages' consolidation.",
+   "cost": "one reworded row, three flags, five schema names",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Narrow the rule to commands a program calls and make the rows and the schema list match it; add --json only where a program is the caller."
+  },
+  {
+   "id": "R8-04-7",
+   "section": "04 4.2 (romeu approve); J11 step 5",
+   "title": "The approve <name> row says it makes no sbx call while its Reads cell names live sbx version for gate 1, and its exit codes omit 3, which 01 1.4 requires of every command that invokes sbx.",
+   "severity": "Required",
+   "lenses": [
+    "L13",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13-8",
+    "L13b-11"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "An implementer honours 'no sbx call' and skips the version read; approve promotes against a stale toolchain gate 1 would have refused, and the next run exits 3 after a promotion the operator believed was gated.",
+   "change": "In the approve row write 'approve <name> makes no mutating sbx call (it reads sbx version for gate 1)' and add 3 to its exit codes; add to the Subprocesses row of 04 4.1 'sbx version and sbx ls --json are reads; a mutating sbx call changes a sandbox, a policy or a secret'; mirror the wording in J11 step 5.",
+   "cost": "three cell edits and one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed. Two independent readers (L13, L13b) found it."
+  },
+  {
+   "id": "R8-04-8",
+   "section": "04 4.1 (Error ids)",
+   "title": "The error-id scheme has no integrity rules: ids go to whichever task writes first, nothing checks uniqueness or that each id is raised by a test, nn has two digits, and nothing says an id is never reused or that a move to another exit keeps it, though ids, command names and probe ids are ledger table members (13 13.7).",
+   "severity": "Required",
+   "lenses": [
+    "L12",
+    "L3",
+    "L8",
+    "L6"
+   ],
+   "finding_ids": [
+    "L12-3",
+    "L3-12",
+    "L8-21",
+    "L6-12"
+   ],
+   "listed": 1,
+   "own": 3,
+   "scenario": "Two concurrent tasks each add RJ-205 for different errors and both merge; or a contributor renames julieta memory rm and ingest then rejects every older spool file naming it, as event-domain; or a misnumbered id is documented but never raised.",
+   "change": "In the Error ids row of 04 4.1: drop the exit prefix and number ids RJ-<nnn> in one sequence (the exit lives in the table's exit field), so moving an error to another exit keeps its id; add 'an id is never reused or renumbered; a retired id stays in the table marked retired with its last text'; add 'an error id, a command name and a probe id are members of the ledger's tables (13 13.7): removing or renaming one is a breaking change of the event format'. Add RJ to the id table of 10 10.2 so tools/ci sequences checks that ids are unique and every referenced id is defined, and add to 10 10.1 a test that every non-retired id is asserted by at least one test (exemptions in a committed list with a reason each).",
+   "cost": "three sentences, one id-table row, one test",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed; the single sequence replaces a per-range allocation table, and the existing sequences check gives uniqueness without a new tool."
+  },
+  {
+   "id": "R8-04-9",
+   "section": "04 4.1 (Error ids); 04 4.2 (doctor)",
+   "title": "The failures field reports will be about, and the doctor checks and warnings a reader sees, have no id or slug: unparsed sbx output, subprocess timeout, registry unreachable, kit build failure, the three compatibility-check causes, disk full, each doctor check and each warning.",
+   "severity": "Required",
+   "lenses": [
+    "L14",
+    "L8"
+   ],
+   "finding_ids": [
+    "L14-2",
+    "L8-11",
+    "L14-17"
+   ],
+   "listed": 1,
+   "own": 2,
+   "scenario": "The disk fills during romeu salvage; the bundle write exits 1 with a Go error string and the closed skipped reasons have none for it; or doctor prints 'fail' for a VS Code setting with no id to search and no page that says why.",
+   "change": "Add rows by slug to the table of 04 4.1: sbx-output-unparsed, subprocess-timeout, registry-unreachable, kit-build-failed, julieta-protocol, julieta-digest, julieta-bin-writable, herdr-protocol, disk-full. Give each row of the doctor table and each warning (recreate needed, layout stale, snapshots disabled, no final handoff, version-only tools) a slug in the same table, so the generated docs/reference/errors.md (12 12.3) covers them with their fix. Add disk-full to the salvage skipped reasons (03 3.11) and listing-truncated to the 13 13.3 table. No separate doctor.md or warnings.md generator.",
+   "cost": "about fifteen table rows and two reason additions",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Smaller form: the one existing table and its generated page take the doctor checks and warnings as rows; no sibling table, no new generator, no free-space doctor row."
+  },
+  {
+   "id": "R8-04-10",
+   "section": "04 4.2 (How romeu run reaches the run layout, step 2; romeu status)",
+   "title": "When run closes a generation as lost it tells the user nothing, and neither run nor status reports the work at risk (snapshot age, the newest facts' dirty and stash counts), so a lost sandbox is discovered from missing work.",
+   "severity": "Required",
+   "lenses": [
+    "L1",
+    "L4"
+   ],
+   "finding_ids": [
+    "L1-10",
+    "L4-17"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "After a host reboot, romeu run foo silently records result: lost and starts a fresh sandbox; the facts said dirty 14 and stashes 2; the user learns an hour later that yesterday's work is not there.",
+   "change": "In run step 2, before the new sandbox is created, print a fixed block: the lost generation, the last snapshot time, the branches and salvage id preserved, and the newest facts' dirty and stash counts as not preserved, with the command that shows them (romeu handoff <name>); copy those counts into the salvage record as reasons dirty-at-last-facts:<n> and stashes-at-last-facts:<n> (08 8.5, 01 1.6). In romeu status add per repo the last snapshot's age and the newest facts' dirty and stash counts.",
+   "cost": "one printed block, two reasons, two status fields",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Print the loss block and record the counts; no TTY prompt (run continues as today) and no snapshot-age doctor warning."
+  },
+  {
+   "id": "R8-04-11",
+   "section": "04 4.2 (doctor, VS Code row); 01 1.3",
+   "title": "The editor-trust check covers less than the threat model leans on: only VS Code is checked and the spec does not say so, and within VS Code a single folder under $ROMEU_ROOT trusted by itself passes.",
+   "severity": "Required",
+   "lenses": [
+    "L10",
+    "L2"
+   ],
+   "finding_ids": [
+    "L10-10",
+    "L2-15"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "The operator presses Trust on one review checkout, or opens $ROMEU_ROOT in another editor; a .vscode/tasks.json an agent pushed runs on the host at the next open, and doctor stays green.",
+   "change": "Change the VS Code doctor row to fail when trust is disabled or when $ROMEU_ROOT, a parent of it, or any folder under it is in the trusted folders list (I14, I23, pre). State in 01 1.3 boundary D and below the doctor table: 'only VS Code's trust settings are checked; another editor's trust model is the operator's to verify', and say in the guide what to check by hand.",
+   "cost": "one row edit and two sentences",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed, without the extra warn row for a machine with no VS Code settings."
+  },
+  {
+   "id": "R8-04-12",
+   "section": "04 4.2 (rm, recreate, retire)",
+   "title": "The data-discarding flags accept too much without naming it: --accept-loss needs no TTY and accepts every reason at once, retire --force both allows an in-spec project and skips the salvage-only confirmation, and retire's incomplete inner salvage is unstated.",
+   "severity": "Required",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-13",
+    "L4-26"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A script runs romeu recreate --accept-loss to get past an over-cap cache and also accepts an unreadable file and a missing repo; or retire --force retires a listed project and skips the confirmation that would have listed two unpushed branches.",
+   "change": "Make the flag --accept-loss=<reason>[,<reason>] on rm, recreate and retire, accepting only the named skipped reasons of 03 3.11, and record the accepted reasons on the salvage record (03 3.8). State that retire with an incomplete inner salvage exits 5 before any move unless --accept-loss names the reasons. Narrow retire --force to 'retire a project the spec still lists'; the salvage-only confirmation stays (TTY, or --accept-loss off a TTY).",
+   "cost": "three row edits and one record field",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed; a named-reason flag replaces both the blanket flag and the --force overload without adding a TTY prompt."
+  },
+  {
+   "id": "R8-04-13",
+   "section": "04 4.2; 03 3.8; 08 8.1",
+   "title": "Retained state grows with no bound, measurement or deferred cleanup: generations[] with a salvage[] per generation in a record rewritten whole on every command, and salvage payloads, salvage refs and .attic on disk.",
+   "severity": "Required",
+   "lenses": [
+    "L3",
+    "L4"
+   ],
+   "finding_ids": [
+    "L3-11",
+    "L4-23"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "Three years of recreate give a record of hundreds of generations parsed by every status; or after a year .attic and the memory dirs hold tens of GiB and the next snapshot and salvage fail for lack of space.",
+   "change": "Add one Deferred decisions row to the index: 'compaction of closed generations and an attic and payload cleanup command; holds: romeu never deletes (I16) and these grow without bound; reopened by the first doctor size warning'. Add one doctor warn row: a project record past 200 generations, or $ROMEU_ROOT/.attic or a memory dir past a size named in the style of 13 13.8. Say in 08 8.1 whether the salvage cap is per salvage or per directory.",
+   "cost": "one deferred row, one doctor row, one sentence",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State it as a limit with a measured trigger: a Deferred row plus one doctor warn row; no attic for generations now."
+  },
+  {
+   "id": "R8-04-14",
+   "section": "04 4.3 (pin workload, pin check); J9; 02 2.2",
+   "title": "julieta pin workload and pin check reach the container registry from the config project's sandbox, and the config project's derived egress names no registry host, so J9's pin step is blocked unless the spec adds the host by hand, which no page says.",
+   "severity": "Required",
+   "lenses": [
+    "L0"
+   ],
+   "finding_ids": [
+    "L0-20"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The agent runs julieta pin workload projects/foo.yaml; the registry request is denied; the agent asks for a native approval or edits egress.extra, neither of which J9 mentions.",
+   "change": "Write in J9's pin step and in 02 2.2: 'the config project's spec lists the registries of host settings workloadRepositories in egress.extra', and add that entry to the example config spec.",
+   "cost": "two sentences",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "State the egress.extra requirement in J9 and 02 2.2; no new derivation rule."
+  },
+  {
+   "id": "R8-04-15",
+   "section": "04 4.2 (romeu run, step 8)",
+   "title": "There is no supported way into the sandbox when the run layout fails (for example a herdr protocol mismatch at the pre-1.0 pin), and the user does not know the sbx env exec argv.",
+   "severity": "Required",
+   "lenses": [
+    "L1"
+   ],
+   "finding_ids": [
+    "L1-14"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "layout up exits non-zero after a herdr mismatch; romeu run offers only --no-attach and the user cannot reach a shell to recover.",
+   "change": "In run step 8, when layout up exits non-zero, print as the fix hint the exact line 'sbx env exec -it <dir> --env JULIETA_MANIFEST=<value> -- /bin/bash -l' with the values filled in, under a new id layout-failed in 4.1. No new command or flag.",
+   "cost": "one sentence and one error id",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Print the shell argv as the fix hint instead of adding romeu shell or run --shell."
+  },
+  {
+   "id": "R8-04-16",
+   "section": "04 4.2 (run step 3); 11 A5; 03 3.3",
+   "title": "The spec never states what sbx reads from the workspace tree on sbx env run --clone, so a repository-local sandbox configuration an agent pushed and the operator pulled could configure the sandbox outside gate 2; no probe plants one.",
+   "severity": "Required",
+   "lenses": [
+    "L2"
+   ],
+   "finding_ids": [
+    "L2-8"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An agent commits a sandbox configuration file into the primary repo; the operator pulls the host clone; the next romeu run creates a sandbox whose mounts or host commands came from the repository, and gate 2 saw nothing.",
+   "change": "Add to probe A5 of 11 11.1: plant a repository-local sandbox configuration in the primary repo and record that sbx env plan and sbx env run read only the env file romeu names. State the result in run step 3 and 03 3.3; if sbx reads such a file, add it to the I3 plant list and refuse it in the drift check.",
+   "cost": "one probe step and one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-04-17",
+   "section": "index S8; 00 0.5; 04 4.2 (run --timings); 02 2.1; 03 3.13",
+   "title": "S8 and run --timings justify each other: the flag, run-timings.v1, a median-of-5 CI test and probe B5 exist to measure a budget whose 2 s and 3 s figures have no stated origin.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "No first user types --timings; a slow CI runner blocks a merge on a number chosen before any code ran, under a test asserted to never flake.",
+   "change": "Keep S8 as a measured property of the host suite (B5 times run in the harness, no product flag); drop --timings, run-timings.v1 and the CI assertion; mark 2 s and 3 s 'first measurement sets the bound'.",
+   "cost": "deletions in four pages and one reworded criterion",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Needs the operator: S8 and 00 0.5 are scope. Recommendation: drop the flag and keep S8 as a harness measurement whose bound the first measurement sets. R8-04-2 assumes this (it does not generalize --timings).",
+   "operator_reason": "Changes a success criterion (S8) and the scope justification of 00 0.5."
+  },
+  {
+   "id": "R8-04-18",
+   "section": "04 4.2 (pull); J4; 01 1.2; 02 2.3; I13; I14; I19; 05 5.4",
+   "title": "romeu pull, the hardened review checkout, both VS Code workspace files, I19 and two residual-risk rows exist for a host-side review path the start does not need, and dev.code-workspace is opened by no journey.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-6"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "ADR 0008 makes the PR the review barrier, so the first user reviews on GitHub; J4 is outside S7's CI set, and dev.code-workspace is rewritten on every promotion and retire for no journey.",
+   "change": "Defer romeu pull, the review checkout and review.code-workspace as one Deferred row ('until then the PR on GitHub is the review; reopened by the first time the maintainer needs a sandbox branch on the host before it is pushed, written as an issue'); delete dev.code-workspace or give it a journey step; I19 and the two residual rows of 05 5.4 leave with pull.",
+   "cost": "a large deletion and one deferred row",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Needs the operator: it removes a v1 command from scope (00 0.5) and two accepted-risk rows of 05 5.4. Recommendation: defer pull with the stated trigger and delete dev.code-workspace.",
+   "operator_reason": "Changes the scope (00 0.5) and the accepted risks (05 5.4)."
+  },
+  {
+   "id": "R8-04-19",
+   "section": "01 1.6 (Candidate); 04 4.2 (approve); J11 step 5",
+   "title": "The awaiting state, the superseded transition and romeu approve <name> exist for a caller that runs romeu sync without a terminal, and the spec names no such caller.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-9"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "01 1.1 puts romeu on the host under the operator and the config repo's CI runs julieta, so a state, a command, a record shape and an exit path are specified for an actor the spec does not have.",
+   "change": "Either name the caller in 01 1.1 and J11, or make a non-TTY sync exit 3 with the digest and no awaiting record, delete the awaiting and superseded rows and approve <name>, and add a Deferred row 'approval of a candidate rendered without a terminal; reopened by the first scripted sync'.",
+   "cost": "deletions in three pages and one deferred row",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Needs the operator: removing approve <name> changes the v1 command set (00 0.5). Recommendation: delete and defer with the stated trigger; R8-04-7, the approve wording fix, then shrinks to approve --toolchain.",
+   "operator_reason": "Changes the scope (00 0.5)."
+  },
+  {
+   "id": "R8-04-20",
+   "section": "00 0.5; 04 4.2; 04 4.3",
+   "title": "The scope table claims every v1 feature traces to a need, yet lists six of sixteen romeu commands and justifies julieta handoff list only by 'kept in v1 by the maintainer'.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-16"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "pull, retire, recreate, ledger ingest and query, event add and list, pin workload and check, lock, layout up and handoff list have no row, so the claim is unmeasured and the table cannot cut anything.",
+   "change": "Give 00 0.5 one row per command of the command definitions with the need it serves on the first day, with a tools/ci sequences check that each command has a row; replace 'kept by the maintainer' with the need, or remove handoff list.",
+   "cost": "about twenty rows and one check",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Needs the operator: the table is the scope record (00 0.5) and some rows are maintainer decisions. Recommendation: one row per command, checked; remove handoff list unless the operator names its need.",
+   "operator_reason": "Changes the scope record (00 0.5)."
+  },
+  {
+   "id": "R8-04-21",
+   "section": "04 4.2 (doctor); 05 5.4; ADR 0008",
+   "title": "doctor measures every credential path except the GitHub token the sandbox holds, whose reach 05 5.4 and ADR 0008 call inferred though its type and scopes are readable.",
+   "severity": "Required",
+   "lenses": [
+    "L2b"
+   ],
+   "finding_ids": [
+    "L2b-5"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "The operator rotates the Keychain entry to a classic token with admin:org and workflow scopes by mistake; nothing on the host notices; every sandbox holds it.",
+   "change": "Add a doctor row, pre for a project that binds a github secret: run the bound argv, read the token type from its prefix and the scopes from the x-oauth-scopes header, fail when the reach includes Administration or exceeds the project's repositories; add the same reading as a block A probe so ADR 0008's 'inferred' becomes measured.",
+   "cost": "one doctor row and one probe",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Needs the operator: it changes an accepted-risk row of 05 5.4 and the measured-or-inferred statement of ADR 0008, and the doctor row sends the secret to the GitHub API from the host. Recommendation: add the probe now and make the doctor row a warn.",
+   "operator_reason": "Changes ADR 0008 and an accepted risk (05 5.4)."
+  },
+  {
+   "id": "R8-04-22",
+   "section": "05 5.1; I3; 04 4.2 (doctor git row); I24; 08 8.1; 04 4.3 (mise env); 07 7.3; 07 7.4; 04 4.4; 13 13.4; 02 2.3; 03 3.1",
+   "title": "Five lists that two or more consumers must agree on are hand-written in two or three places with different memberships and no test: the dangerous git keys, the memory layout allowlist, the mise environment, the commands that ingest, and the reserved names.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-6"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A git CVE names a new config key; a PR adds it to gitsafe's -c list and I3's plant list and forgets the doctor row; doctor passes a host whose global config carries the key.",
+   "change": "For each list name one home and make every other place link to it without repeating members: the git keys in 05 5.1 (I3 and the doctor git row link), the mise environment in 04 4.3 (07 7.3 and 07 7.4 link), the layout allowlist in I24 (08 8.1 links), the ingest callers in 13 13.4 (the ledger ingest row and 4.4 link), the reserved names in 03 3.1 (02 2.3 links). Add one test that I3's plant list and doctor's warn list equal gitsafe's neutralized list, read from one Go slice.",
+   "cost": "five link edits and one test",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Smaller form: one home per list and links elsewhere; one test for the git-key list, whose three consumers are code; no generator rows. The ingest-caller list is also covered by R8-04-23."
+  },
+  {
+   "id": "R8-04-23",
+   "section": "04 4.1; 04 4.2; 04 4.3; 13 13.3; 13 13.4; 08 8.4; 12 12.3",
+   "title": "The cross-cutting side effects of a command (preflight, lock, ingest, drain, snapshot, appending) are hand lists in five sections that a new command must remember to join, and the meta-test reads the same hand list.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A later PR adds romeu prune; its author misses that ingest runs inside four commands and that the idempotency list is closed; events written before a removal are lost and the meta-test passes.",
+   "change": "Make the side effects fields of each entry of the command definitions (the data the reference is generated from), with no default, so a definition without them fails generation; render the P marker, the appending list of the Idempotency row of 04 4.1 and the ingest callers of 13 13.4 from them, and have the idempotency meta-test of 10 10.1 read the fields. Add the row to 12 12.3.",
+   "cost": "one field set in the command data and one generator row",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed: one source in the data replaces three hand lists."
+  },
+  {
+   "id": "R8-04-24",
+   "section": "04 4.3 (hooks run); 08 8.2",
+   "title": "The hook dispatcher stops at the first non-zero stage and prints nothing saying which stage failed, and a normal refusal stays listed as a hook failure at every SessionStart until the same hook next succeeds.",
+   "severity": "Required",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-6"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "A commit fails; the agent cannot tell julieta's lock --check from .githooks/pre-commit from $GIT_DIR/hooks/pre-commit and edits the wrong one.",
+   "change": "In the hooks run row require the dispatcher to print on stderr before exiting 'julieta hooks: <hook> stage <julieta|tracked|local> (<path>) exited <n>', plus the error id and fix when the stage is julieta's own. In 08 8.2 show at SessionStart only failures recorded since the last narrative handoff.",
+   "cost": "two sentences",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-04-25",
+   "section": "04 4.3 (julieta status); 03 3.6; 07 7.5",
+   "title": "No julieta command shows the effective egress allowlist, so a blocked request reaches the agent only as sbx's proxy 403 and the agent cannot tell an unknown host from a gated one.",
+   "severity": "Required",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-10"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The agent runs go get for a module whose host is not in the derived set, gets a 403, and spends turns changing proxy and git settings.",
+   "change": "Carry the derived egress set (auto and approved gated) in the manifest (03 3.6, inside the 32 KiB bound) and print it from julieta status; when a julieta network error names a host absent from that set, its hint says the durable fix is a spec edit plus gate 2 (07 7.5).",
+   "cost": "one manifest field and one hint sentence",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Smaller form: the manifest carries what was applied, not the pending gated set, which lives on the host and would be stale in the sandbox."
+  },
+  {
+   "id": "R8-04-26",
+   "section": "04 4.1 (Idempotency, Output)",
+   "title": "The appending julieta commands (memory add, handoff write, event add) print no defined success output and are not safe to retry, so an agent whose tool call timed out cannot tell whether the write landed.",
+   "severity": "Required",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "memory add waits on the store lock, the agent's call times out, the agent retries and both complete: two identical entries printed at every SessionStart.",
+   "change": "In 04 4.1 require each appending julieta command to print what it wrote (id and path), in text and with --json; make memory add print the existing id and write nothing when an open entry with the same content digest exists (the digest import already uses). No caller key.",
+   "cost": "two sentences",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Print the written id and path and dedupe memory add by content digest; no --key mechanism."
+  },
+  {
+   "id": "R8-04-27",
+   "section": "04 4.2 (recreate); J6",
+   "title": "recreate removes the old sandbox before anything checks the new one can be built, and the spec does not describe the state or recovery when an upstream artifact (workload digest, frontend digest, kit download host) is gone.",
+   "severity": "Required",
+   "lenses": [
+    "L15"
+   ],
+   "finding_ids": [
+    "L15-8"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A registry stops serving the pinned frontend digest; recreate salvages, runs sbx env rm, then the create fails at kit build; the operator has no sandbox and J6 says nothing.",
+   "change": "State in the recreate row and in J6 the failure branch: after a complete salvage and the removal, a failed create leaves the generation closed, the salvage refs and memory intact and no sandbox; the error is kit-build-failed (R8-04-9), and the recovery is a pin or catalog fix, then romeu run. No pre-check step and no network exception to 01 1.5.",
+   "cost": "two sentences",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the limit and the recovery; the salvage before removal already makes the gap lossless."
+  },
+  {
+   "id": "R8-04-28",
+   "section": "04 4.3 (pin check); index Deferred decisions",
+   "title": "The only freshness mechanism, pin check, covers spec workloads and the julieta release and nothing schedules it; the kit frontend, herdr, mise, gh, the action SHAs and the reuse image have no staleness signal and no Deferred row.",
+   "severity": "Required",
+   "lenses": [
+    "L15"
+   ],
+   "finding_ids": [
+    "L15-10"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "herdr publishes a security fix, or a pinned action's runtime is removed; nobody learns until a CI run turns red months later.",
+   "change": "Add a Deferred decisions row: 'a staleness signal for the pins pin check does not cover (frontend, herdr, mise, gh, action SHAs, the reuse image); holds: pins move by hand when a CI run or a release note says so; reopened by the first upstream security fix to a pinned tool found after the fact'.",
+   "cost": "one deferred row",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State it as a limit with an observable trigger, as ADR 0005 asks of an open hedge."
+  },
+  {
+   "id": "R8-04-29",
+   "section": "04 4.3 (julieta salvage); 04 4.2 (romeu salvage)",
+   "title": "julieta salvage takes an optional --stop-agents, J6 passes it for rm and recreate, and no row says whether a standalone romeu salvage passes it.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0"
+   ],
+   "finding_ids": [
+    "L0-22"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "romeu salvage kills the agent mid-session, or salvages a moving tree whose secondaries have no daemon cross-check (05 5.4).",
+   "change": "In the romeu salvage row add: 'passes --stop-agents only when called by rm, recreate and retire; a standalone salvage leaves agents running and says so in its report'.",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-04-30",
+   "section": "04 4.1 (Locking)",
+   "title": "romeu.lock is machine-wide and held through sbx env run, so creating one project makes romeu run of another exit 1 with RJ-101 although they share no state.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0"
+   ],
+   "finding_ids": [
+    "L0-25"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The operator starts two projects in the morning; the second refuses until the first's kits are built.",
+   "change": "Add to the Locking row: 'one lock per machine is a chosen cost: commands on different projects serialize, a create that builds kits included; a per-project lock is deferred until two projects are routinely started together'.",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "Name the serialization as a chosen cost; no per-project lock."
+  },
+  {
+   "id": "R8-04-31",
+   "section": "04 4.2 (romeu run, exit codes)",
+   "title": "romeu run lists exit codes 0-5 and no step of run exits 5.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0"
+   ],
+   "finding_ids": [
+    "L0-40"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An implementer adds an unspecified exit 5 path, or the generated reference lists a code no path uses.",
+   "change": "Name run's exit 5 case: the refusal in run step 3 of a present sandbox with a live recreate-class change (R8-04-1); if that cluster is not applied, write run's exit codes as 0-4.",
+   "cost": "one cell",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply together with R8-04-1."
+  },
+  {
+   "id": "R8-04-32",
+   "section": "04 4.2 (romeu run, step 1)",
+   "title": "romeu run never compares the config repo's last fetched head with the synced spec commit, so a merged spec change is silently not applied until the next sync.",
+   "severity": "Advisory",
+   "lenses": [
+    "L1"
+   ],
+   "finding_ids": [
+    "L1-17"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An agent merges a new pane; romeu run foo does not show it; only status reports spec versus synced commit.",
+   "change": "Add to run step 1: when refs/romeu/origin/<cfg>, as last fetched and with no network call, is ahead of the synced spec commit, print one line 'spec moved: romeu sync <name>'.",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-04-33",
+   "section": "04 4.2; 12 12.8",
+   "title": "No command or journey says how to remove the product from a machine (settings, state, the ledger, the attic, the sbx rules romeu applied).",
+   "severity": "Advisory",
+   "lenses": [
+    "L10"
+   ],
+   "finding_ids": [
+    "L10-24"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An adopter stops after trying v1, deletes ~/dev by hand, and leaves per-sandbox policy rules and state behind, or loses salvage refs they did not know existed.",
+   "change": "Add a short guide section 'Leaving romeu' (12 12.8): retire each project, then list the exact paths (host settings, $XDG_STATE_HOME/romeu, the ledger, $ROMEU_ROOT/.attic, the salvage refs) and the sbx rules romeu applied, which the operator removes, since romeu never deletes (I16). No new journey.",
+   "cost": "one guide section",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "A guide section instead of a new journey J14."
+  },
+  {
+   "id": "R8-04-34",
+   "section": "01 1.4 (Gate 1); 03 3.8; 04 4.2 (approve --toolchain)",
+   "title": "Gate 1, a per-machine toolchain acknowledgement with its own record, diff printer, exit code and flag, guards against an upgrade behind the operator's back on a machine where the operator is the one who upgrades.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-7"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "J1 step 4 and J9 make the operator approve what they just installed.",
+   "change": "Fold gate 1 into a version check: a mismatch of the recorded sbx or romeu version exits 3 with the diff and is cleared by romeu sync, deleting toolchain.json's acknowledgedAt and approve --toolchain; or state in 01 1.4 the threat gate 1 stops that doctor does not.",
+   "cost": "deletions in three pages, or one sentence",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Needs the operator: it removes an approval gate and a command from v1 (00 0.5). Recommendation: keep gate 1 and add one sentence to 01 1.4 naming the threat it stops (an sbx or romeu binary replaced by another process or person on the machine), since folding it into sync weakens a security gate.",
+   "operator_reason": "Changes the approval model and the v1 command set (00 0.5)."
+  },
+  {
+   "id": "R8-04-35",
+   "section": "04 4.3 (pin workload, pin check); 06 6.2",
+   "title": "pin workload and pin check are two sandbox commands reading a registry and GitHub releases for a rare manual act the first user does once.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-21"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "J9 needs one digest move; a documented docker manifest inspect or gh line would do until the second bump.",
+   "change": "Defer pin check to 'the second time a pin is found behind by hand'; keep pin workload and state that the both-arch manifest-list check is its reason.",
+   "cost": "one deletion and one deferred row",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Needs the operator: it removes a v1 command (00 0.5). Recommendation: keep pin workload with its stated reason, and keep pin check, since R8-04-28 leans on it as the existing freshness signal.",
+   "operator_reason": "Changes the v1 command set (00 0.5)."
+  },
+  {
+   "id": "R8-04-36",
+   "section": "04 4.3 (lock); 07 7.3; 03 3.4 (caFile); 05 5.1",
+   "title": "Several hedges carry no trigger: julieta lock locks macOS platforms the product never runs mise on, monorepo.lockfile serves a mode no v1 repo uses, and gitHosts caFile serves private git hosts in a v1 whose only host is github.com.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-22"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Each is small; together they are the shape ADR 0005 was written against.",
+   "change": "In the julieta lock row lock linux-x64 and linux-arm64 only and say a repo adds macOS itself (and drop 'a missing macOS entry is a warning'); drop the monorepo.lockfile sentence of 07 7.3; move caFile and its unit test to a Deferred row 'reopened by the first gitHosts entry other than github.com'.",
+   "cost": "three small edits and one deferred row",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the lock and caFile parts; drop the monorepo sentence only after checking in 07 7.3 that no v1 repo sets it."
+  },
+  {
+   "id": "R8-04-37",
+   "section": "04 4.3 (memory); 08 8.1",
+   "title": "Of the six memory subcommands, search duplicates list with a filter and rm is a delete path in a product that otherwise never deletes, while edit --status done already closes an entry.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-24"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "An agent told 'never delete' has a command that deletes memory; search duplicates list.",
+   "change": "Drop memory rm (edit --status done stays) and fold search into list --query; or state in 00 0.5 the need each serves.",
+   "cost": "one row edit",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Needs the operator: it removes commands from the v1 set (00 0.5). Recommendation: drop rm and fold search into list.",
+   "operator_reason": "Changes the v1 command set (00 0.5)."
+  },
+  {
+   "id": "R8-04-38",
+   "section": "04 4.4",
+   "title": "4.4 is a per-subsystem copy, by slug, of rows of the one error table, although it says the ledger has no catalog of its own, and it invites a 4.5.",
+   "severity": "Advisory",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-14"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The memory store and salvage gain their own error sections by imitation, and the generated errors.md and the hand sections drift.",
+   "change": "Replace 4.4 with one sentence in the Error ids row of 4.1: 'subsystem reasons, the ledger's among them, are rows of this table, and each row says who raises it'; move the Raised by text into those rows, and keep the rejection table of 13 13.4 to reason slugs that link to docs/reference/errors.md.",
+   "cost": "one section replaced by a sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed; keep a one-line 4.4 pointer if any page cites the anchor (check the citers when applying)."
+  },
+  {
+   "id": "R8-04-39",
+   "section": "07 7.5; 13 13.2; 04 4.2; 01 1.6",
+   "title": "The escape hatches (egress.tools, egress.extra, tool: other, --accept-loss, --overwrite-drift, retire --force) are each bounded but none is counted, so nobody sees when one becomes the main road.",
+   "severity": "Advisory",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-22"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "After a year every project carries egress.tools overrides and most events say tool: other, and the catalog-gap signal is noise.",
+   "change": "Add a Deferred decisions row: 'counting escape-hatch use; holds: each hatch is visible per use; reopened when the same egress.tools override appears in two projects' specs'. Say in 13 13.9 that romeu ledger query --tool other already counts the tool: other case.",
+   "cost": "one deferred row and one sentence",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the limit with a trigger; the ledger query already answers one of the counts."
+  },
+  {
+   "id": "R8-04-40",
+   "section": "04 4.2 (doctor)",
+   "title": "doctor compares derived files and the ledger view but not the project record with the facts sbx owns (generations against sbx ls, egressApplied against sbx policy ls).",
+   "severity": "Advisory",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-25"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "An sbx reset drops the per-sandbox allow rules; egressApplied still lists them; doctor passes and the next install fails on a blocked host.",
+   "change": "Add two doctor fail rows: each open generation has a sandbox in sbx ls and each sandbox a project names has an open generation; egressApplied equals the per-sandbox rules sbx policy ls reports.",
+   "cost": "two rows",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed; the salvage-refs check of L4-11 is consolidated with its own page."
+  },
+  {
+   "id": "R8-04-41",
+   "section": "04 4.1 (Subprocesses); 08 8.5",
+   "title": "The timeout of the salvage exec, which moves up to a GiB over virtiofs, and what a timeout leaves behind are unstated.",
+   "severity": "Advisory",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-31"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A large salvage hits a default timeout; julieta is killed mid-write, a partial salvage dir remains, and the generation stays salvaging.",
+   "change": "State in the Subprocesses row that the salvage exec has no timeout and stops only on an interrupt; state in 08 8.5 that a salvage dir without its manifest is ignored by verification and kept.",
+   "cost": "two sentences",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-04-42",
+   "section": "04 4.2 (romeu stop)",
+   "title": "romeu stop runs julieta snapshot --all then sbx stop with no rule for a failed snapshot.",
+   "severity": "Advisory",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-34"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The snapshot fails on a full disk and the operator cannot tell whether the sandbox was stopped.",
+   "change": "In the stop row add: 'a failed snapshot is reported, stop goes on (the sandbox's disk persists), and the command exits 1 after the stop'.",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-04-43",
+   "section": "04 4.3 (julieta setup)",
+   "title": "julieta setup fast-forwards a clean checked-out default branch, and a second romeu run on a running sandbox reruns setup while the agent works, moving its HEAD with the report only on the host terminal.",
+   "severity": "Advisory",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-21"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The agent plans an edit on main; the operator attaches a second terminal; setup fast-forwards main and the edit applies to content the agent never read.",
+   "change": "In the setup row add: a fast-forward of a default branch is recorded as a julieta warning ('default branch moved by setup: <repo> <old>..<new>'), shown by julieta status and at the next SessionStart like the other warnings.",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Record the move as a warning; no detection of running agent processes."
+  },
+  {
+   "id": "R8-04-44",
+   "section": "04 4.2 (doctor); 10 10.1",
+   "title": "doctor warn rows change no exit code and no test asserts them on output, so a warn that stops firing is invisible.",
+   "severity": "Advisory",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-22"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The core.hooksPath warn row is lost in a refactor; doctor exits 0 before and after.",
+   "change": "Add to the Unit row of 10 10.1: doctor fixtures assert each warn and fail row by its slug in the --json output, not only the exit status.",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed; with R8-04-9 each doctor row has a slug to assert."
+  },
+  {
+   "id": "R8-04-45",
+   "section": "04 4.3 (lock --check); 07 7.3",
+   "title": "lock --check checks that lock entries cover the linux platforms, not that a lockable entry carries a checksum, so a checksumless entry in a worked-on repo is never refused or listed.",
+   "severity": "Advisory",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-19"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "An agent adds a ubi: tool; MISE_LOCKED=1 installs it everywhere with no hash and only a one-time warning.",
+   "change": "Have lock --check report by name each lockable entry without a checksum, as a julieta warning shown by julieta status and at SessionStart.",
+   "cost": "one sentence",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-04-46",
+   "section": "04 4.3 (mise environment); 11",
+   "title": "The mise environment julieta sets is a set of upstream variable names that no test or probe shows still take effect at the pinned mise.",
+   "severity": "Advisory",
+   "lenses": [
+    "L15"
+   ],
+   "finding_ids": [
+    "L15-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A mise bump renames the tracking or trust setting; tracking turns back on and the trust allowlist stops applying while MISE_YES=1 answers trust prompts.",
+   "change": "Add one container e2e row (beside C2) that, at the pinned mise, observes two effects: no request to the versions host (tracking off) and refusal of a config path outside MISE_TRUSTED_CONFIG_PATHS.",
+   "cost": "one test row",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Test only the two variables that carry security weight."
+  },
+  {
+   "id": "R8-04-47",
+   "section": "04 4.2 (doctor, root row); 12 12.8",
+   "title": "doctor refuses a root inside a git repo or equal to $HOME, but not one inside a synced folder, where salvage payloads and transcripts would leave the machine.",
+   "severity": "Advisory",
+   "lenses": [
+    "L16"
+   ],
+   "finding_ids": [
+    "L16-15"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The user sets the root under a corporate OneDrive folder; every salvage tarball is uploaded.",
+   "change": "Add a doctor warn row: root under ~/Library/Mobile Documents, ~/Library/CloudStorage/* or ~/Dropbox; add a README prerequisite sentence that ~/Documents and ~/Desktop are synced when iCloud Desktop and Documents is on.",
+   "cost": "one row and one sentence",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Check only paths readable without guessing iCloud state; the ~/Documents case is a README sentence."
+  }
+ ]
+}

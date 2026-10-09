@@ -103,7 +103,7 @@ The spec is validated for the plan tasks that follow when all of these
 hold, and the round page says so in one line with the numbers:
 
 - no Blocking finding open; every Required finding fixed, or declined
-  with the operator's words quoted next to the rationale;
+  with the decision and its date recorded next to the rationale;
 - every report has its coverage table complete, and every page,
   criterion and journey has a finding or an explicit "nothing for this
   lens" from at least two lenses;

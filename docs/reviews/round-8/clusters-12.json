@@ -1,0 +1,839 @@
+{
+ "page": "12",
+ "findings_read": 52,
+ "clusters": [
+  {
+   "id": "R8-12-1",
+   "section": "12 12.4, 12 12.9",
+   "title": "The merge row of 12 12.4 and three Enforced-by cells of 12 12.9 (releasable, merge commit, the reviewer loop) name ruleset checks and a required review that the measured ruleset does not give against the sandbox's token, and ADR 0001 rule 8, ADR 0002 and ADR 0003 still assert them as Accepted text.",
+   "severity": "Blocking",
+   "lenses": [
+    "L3",
+    "L9",
+    "L0"
+   ],
+   "finding_ids": [
+    "L3-5",
+    "L9-9",
+    "L0-10"
+   ],
+   "listed": 0,
+   "own": 3,
+   "scenario": "An agent implementing T005 or a reader of 12 12.9 trusts that main cannot receive a red or unreviewed merge; the sandbox merges a red PR through the API; every Accepted record and the practices table say it cannot.",
+   "change": "12 12.4 merge row: replace the Enforces cell by 'CI green and a merge commit, the one merge method (12.9); what the ruleset requires and what that is worth against the operator's token are stated once, in 05 5.4'. 12 12.9: the 'releasable' row and the reviewer-loop paragraph change their Enforced-by text to '[convention]: by working agreement; the ruleset requirements and their worth are in 05 5.4'; delete the 'As measured on 2026-10-08' sentences (the measurement stays in 10 10.2 and 05 5.4). Decision records: one new ADR that supersedes in part ADR 0001 rule 8, ADR 0002 decision 3 and ADR 0003 on the review requirement and records the ADR 0005 rule 1 exception of 2026-10-07; the three gain a 'Superseded in part by' status line, a form ADR 0001 rule 7 and tools/ci sequences then accept.",
+   "cost": "Four cells and two sentences in 12; one ADR with the maintainer's approval line; one status form in rule 7.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "The spec-text part applies as written; superseding ADR 0001 rule 8, ADR 0002 and ADR 0003 in part, and adding a partial-supersede status form to ADR 0001 rule 7, change decision records. Recommendation: accept both, in one ADR.",
+   "operator_reason": "Changes decision records (ADR 0001, ADR 0002, ADR 0003, and the ADR 0005 exception)."
+  },
+  {
+   "id": "R8-12-2",
+   "section": "12 12.8",
+   "title": "The README outline promises 'first run (J1 in six commands)' while J1 has seven steps, so rule 13 forces the README to match a count that is wrong.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0",
+    "L1"
+   ],
+   "finding_ids": [
+    "L0-32",
+    "L1-25"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "The README is written to the outline; its first-run commands cannot match both the outline's count and J1; a reader expects six commands and meets more.",
+   "change": "12 12.8, README row: replace 'first run (J1 in six commands)' by 'first run (the steps of J1, 09)'.",
+   "cost": "Two words.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-12-3",
+   "section": "12 12.6",
+   "title": "Release notes are commit subjects and Why sections with an undefined 'format-version or exit-code change' detection, and no upgrade section tells the upgrading user what the release costs (gate 1, gate 2, recreate, changed error ids).",
+   "severity": "Required",
+   "lenses": [
+    "L8",
+    "L1"
+   ],
+   "finding_ids": [
+    "L8-18",
+    "L1-24"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A release changes the julieta-claude kit and one exit code; the notes list twenty commits; operators learn of the gate 2 prompt and the recreate one project at a time when romeu sync stops them.",
+   "change": "12 12.6: replace 'a PR that changes a file format version or an exit code is listed first' by 'a PR whose subject carries ! or that touches the contracts surface (05 5.3) is listed first'. Add: 'The notes open with an Upgrading section, generated from the diff since the last non-prerelease tag of the error table, internal/spec/versions.go and the embedded kit digests: the error ids and exit codes added or changed, the format versions changed, and the kits whose projects need a recreate.'",
+   "cost": "Two sentences; one section of tools/release notes from data the binary already embeds, with a fixture.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the detection rule and the Upgrading section from the three diffs only; the toolchain-acknowledgement summary of L1-24 is not added as its own item."
+  },
+  {
+   "id": "R8-12-4",
+   "section": "12 12.6",
+   "title": "The release-notes generator gates the first release while the notes of v1.0.0, 'since the last tag that is not a prerelease', are the whole history of the repository.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-32"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The first release's notes are a long list of every commit since T001; the generator's value starts at the second release.",
+   "change": "12 12.6: add 'The notes of v1.0.0 cover the whole history and are long; that is accepted, and the generator's value starts at the second release.'",
+   "cost": "One sentence.",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State as a limit. Deferring the generator is not proposed: R8-12-3 gives it an Upgrading section the second release needs, and keeping 'nobody writes release notes by hand' keeps one concept."
+  },
+  {
+   "id": "R8-12-5",
+   "section": "12 12.8, 12 12.2",
+   "title": "ARCHITECTURE.md, the newcomer's entry promised by the 'Simple and explicit' principle, is a headings-only skeleton for the whole build, gives no path per critical flow, and no check keeps it in step with new invariants or modules.",
+   "severity": "Advisory",
+   "lenses": [
+    "L3",
+    "L10",
+    "L14"
+   ],
+   "finding_ids": [
+    "L3-32",
+    "L10-21",
+    "L14-16"
+   ],
+   "listed": 2,
+   "own": 1,
+   "scenario": "An outside contributor arrives mid-build and finds headings only; after a hundred PRs the page names the modules of v1.0.0 and misses I34 to I41; a newcomer fixing salvage finds no path from romeu rm to the packages and tests it crosses.",
+   "change": "12 12.2, ci-bootstrap row: the ARCHITECTURE.md skeleton links 01 1.3 (boundaries A-F) and 01 1.4 (gates) under its headings, so the page is useful from the first task. 12 12.8, ARCHITECTURE row: add 'one short section per flow (sync, run, salvage, ingest): its entry function, the packages it crosses, its invariants and tests'. Add: 'tools/ci docs fails ARCHITECTURE.md when an invariant id of 05 5.2 or a module id of 12.2 does not appear in it.' The error-id half of L14-16 is resolved by R8-12-7.",
+   "cost": "Two outline clauses and one docs rule.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Links instead of copied tables in the skeleton; one id-presence rule instead of a headings.yaml entry, since the outline's headings are not fixed by rule 12."
+  },
+  {
+   "id": "R8-12-6",
+   "section": "12 12.3",
+   "title": "01 1.2, 02 2.1 and 12 12.3 hold three different inventories of generated artifacts, and 12 12.3 has go generate write diagrams into ARCHITECTURE.md, a hand-written page, which tools/ci generated and the hand-edit rule cannot classify.",
+   "severity": "Required",
+   "lenses": [
+    "L13"
+   ],
+   "finding_ids": [
+    "L13-18"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The first ARCHITECTURE.md edit after T034 fails generated or is refused as a hand edit of a generated file.",
+   "change": "12 12.3: say 'This table is the one inventory of generated files; 01 1.2 and 02 2.1 cite it'. In the internal/state row replace 'the diagrams in ARCHITECTURE.md' by 'the state diagrams, each in its own file under docs/diagrams/, which ARCHITECTURE.md links'. Add: 'A hand-written page is never a generate target.' 01 1.2 and 02 2.1 replace their lists by a citation of 12 12.3.",
+   "cost": "About thirty words and two citations.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed; it matches the plan's choice of linked files (plan question 27)."
+  },
+  {
+   "id": "R8-12-7",
+   "section": "12 12.8",
+   "title": "The guide outline asks for 'recovery from each expected error id' while every journey in 09 is a success path, so most error ids and every non-journey failure have no recovery page, and nothing checks that each id leads to one.",
+   "severity": "Blocking",
+   "lenses": [
+    "L8"
+   ],
+   "finding_ids": [
+    "L8-4"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "An operator gets exit 4 from romeu run after a hand edit of sbxenv.yaml; errors.md gives a one-line hint; no guide covers it, and the hint's --overwrite-drift discards the edit.",
+   "change": "Add a column 'recovered in' to the internal/cli error table, holding a docs/guide anchor or 'none: <reason>'; docs/reference/errors.md is generated with that link; tools/ci docs fails an id with an empty cell or an anchor that does not resolve. 12 12.8, guide row: replace 'recovery from each expected error id' by 'the recovery of each error id whose table row names this page'; add a row 'docs/guide/recovery.md: the operator; how-to; the recoveries that belong to no journey'. Journey failure variants in 09 are not added.",
+   "cost": "One table column, one docs rule, one guide page in the outline.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "The error-table column and the recovery page; no new journeys, so 09 and its scenario functions stay as they are. Also closes the second half of L14-16."
+  },
+  {
+   "id": "R8-12-8",
+   "section": "13; ADR 0006; 12 12.2; 00 0.5",
+   "title": "The runtime ledger is a v1 feature with no success criterion, no journey and no 'not now' alternative in ADR 0006, yet the build order of 12 12.2 puts it before romeu run.",
+   "severity": "Blocking",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-1"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The first real run waits on three stores, two mounts per sandbox, an ingest in four commands, I31 to I33 and their errors and deferred rows, for records nobody has read yet; 08 8.2 already records hook failures in julieta state.",
+   "change": "Either move the ledger out of v1 as one Deferred row ('the runtime ledger (13; ADR 0006 stays Accepted as the design); until then julieta state (08 8.2) and stderr are the record; reopened by the first lesson that names a sandbox failure julieta state could not reconstruct, or the second machine'), delete the ledger mounts, ingest steps, doctor rows, I31 to I33 and the ledger module of 12 12.2, and keep 13 as a designed-not-built page like 06 6.6; or keep it, and ADR 0006 gains the rejected 'not now' alternative and 00 0.5 its row. Cost of waiting: events before the ledger are not recorded, and adding the two mounts later needs one recreate per project (13 13.1).",
+   "cost": "A maintainer decision; then about a page of deletions, or one ADR paragraph and one scope row.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommendation: defer the ledger (one Deferred row, 13 kept as a design page); it removes the largest unexercised surface from the path to romeu run.",
+   "operator_reason": "Changes the scope (00 0.5) and a decision record (ADR 0006)."
+  },
+  {
+   "id": "R8-12-9",
+   "section": "12 12.10, 12 12.9, 12 12.2; ADR 0004",
+   "title": "tools/ci dora, a five-metric tool with its own schema, trailer and release asset, is a v1 deliverable whose metrics are empty for the whole build (one deployment, at the end), has no reading point, and takes 150 lines of the current-state spec, while ADR 0004 itself says nothing is lost by waiting.",
+   "severity": "Required",
+   "lenses": [
+    "L11",
+    "L9",
+    "L3"
+   ],
+   "finding_ids": [
+    "L11-5",
+    "L9-15",
+    "L3-24"
+   ],
+   "listed": 1,
+   "own": 2,
+   "scenario": "During v1 delivery is never measured; after v1 dora.json is attached to a release and nobody opens it; a DORA rename makes 12 12.10 wrong.",
+   "change": "Recommended: move tools/ci dora to the Deferred table ('until then the review judges the three rows of 12 12.9 that cite it, from gh pr list by hand; reopened by the third deployment or the first lesson that wants a delivery number'); keep ADR 0004 Accepted as the design; keep the Fixes-release trailer form check in pr (its data cannot be backfilled); reduce 12 12.10 to one paragraph that names the tool, what it will measure and that it gates nothing, and move the definitions and the dora.v1 format to the tool's generated reference page when it lands. The three rows of 12 12.9 change their Enforced-by cells to [review]. Alternative: keep the tool and name its reading point (the release notes print the period line of dora --text). The 00 0.6 half of L3-24 belongs to page 00.",
+   "cost": "One Deferred row, a shortened 12 12.10, three cells; the plan loses T089 and one release.yml step.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommendation: defer the tool and keep the trailer check.",
+   "operator_reason": "Changes the v1 scope (00 0.5) and the consequences of ADR 0004."
+  },
+  {
+   "id": "R8-12-10",
+   "section": "12 12.9; index: Deferred decisions",
+   "title": "The no-stack rule plus a maintainer merge for every PR make the calendar critical path equal to the task graph's depth in maintainer sittings, and the deferred row that could change it reopens only on dora output that exists after about 89 of 102 tasks.",
+   "severity": "Blocking",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-1"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Twelve agents finish twelve branches in a day; the trunk advances one chain link per sitting; the chain T001 to T102 is about 36 merges deep, so the build takes about 40 sittings whatever the agent count.",
+   "change": "12 12.9: the 'or is part of it' clause of the one-PR rule says explicitly that consecutive dependent tasks of one chain written by one agent may ship as one pull request. Index, Deferred decisions: the row 'whether the maintainer's merge stays a manual checkpoint' reopens on the first checkpoint with more than N pull requests waiting, counted by hand from GitHub until a tool exists. The maintainer's call: a merge-cadence commitment (a green PR with its approval lines is merged in the next sitting; at least one sitting per working day).",
+   "cost": "One clause, one changed trigger; the cadence is a commitment of the maintainer's time.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommendation: apply the clause and the trigger, and let the maintainer decide on the cadence and on N.",
+   "operator_reason": "A cadence commits the maintainer's time and the trigger changes a deferred decision tied to ADR 0002's no-stack rule; only the maintainer decides either."
+  },
+  {
+   "id": "R8-12-11",
+   "section": "12 12.9; ADR 0002; ADR 0004",
+   "title": "The merge-commit rule has two incompatible reasons: 12 12.9 and ADR 0002 say the fix marker and release notes read a PR's commits on main as written, while 12 12.10 and ADR 0004 decision 3 read commits per PR from GitHub so the merge method does not matter.",
+   "severity": "Advisory",
+   "lenses": [
+    "L13",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13-28",
+    "L13b-26"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "Someone proposes squash merges citing ADR 0004; the setting survives on a reason one record says is not a reason.",
+   "change": "12 12.9, merge-commit row: replace 'A pull request's commits reach main as they were written, which is what the fix marker (12.10) and the release notes (12.6) read' by 'A pull request's commits reach main as they were written and signed, so main's history is the reviewed commits; the tools read commits from GitHub per pull request (12.10) and do not depend on it'. ADR 0002's Consequences sentence is corrected by a status note in the superseding ADR of R8-12-1, if the maintainer accepts that ADR.",
+   "cost": "About twenty words.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Fix the spec sentence now; align ADR 0002 only through the superseding record of R8-12-1, so no extra ADR is written for this."
+  },
+  {
+   "id": "R8-12-12",
+   "section": "12 12.4, 12 12.7",
+   "title": "tools/ci pr requires a non-empty Lessons section on every pull request, which forces a lesson for each change before any change has taught one.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-25"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "From the sixth task on each PR carries a Lessons sentence written to pass the check; docs/lessons.md fills with 'no check possible' entries and real lessons drown.",
+   "change": "12 12.4, pr row: replace 'non-empty Why, What changed, Evidence and Lessons sections' by 'non-empty Why, What changed and Evidence sections, and a Lessons section that holds a lesson or the word none'. 12 12.7, PRs bullet: the same.",
+   "cost": "One clause in two places and in pr.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Accept 'none'; the extra rule tying a required lesson to a Middleware 'none' line is not added, since it is a second concept for the same judgment."
+  },
+  {
+   "id": "R8-12-13",
+   "section": "12 12.7",
+   "title": "docs/lessons.md is one append-heavy file that every learning PR touches, so concurrent pull requests that each record a lesson conflict on it.",
+   "severity": "Required",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-5"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "Ten PRs open in one phase, eight record a lesson; seven need a rebase on a one-file conflict, and an agent resolving one by hand drops another's entry.",
+   "change": "12 12.7: replace docs/lessons.md by 'docs/lessons/NNNN-<slug>.md, one file per lesson, with a generated index docs/lessons/README.md, the layout ADRs already have (ADR 0001 rule 6)'. 12 12.3: the lesson kind of tools/new creates that file with the next free number; the ADR-index row also generates the lessons index. 02 2.1 and the Boundaries follow.",
+   "cost": "A layout change before T006 creates the file; one generator row shared with the ADR index.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Reuse the ADR numbering and index generator (one concept, not a new ULID scheme)."
+  },
+  {
+   "id": "R8-12-14",
+   "section": "12 12.7; 08 8.1",
+   "title": "Two stores are called 'lesson' - docs/lessons.md (this repository, checked by tools/ci lessons) and memory entries tagged lesson (08 8.1, shown at SessionStart) - and the spec never says whether they are one concept.",
+   "severity": "Required",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-18"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A lesson in docs/lessons.md is never shown to a session working on romeu; an agent reintroduces the pattern and review catches it a round later.",
+   "change": "12 12.7: add 'docs/lessons/ (R8-12-13) holds what building romeu taught; it is read through CONTRIBUTING.md and by review, and it is not memory. A memory entry tagged lesson (08 8.1) belongs to a user's project and is shown at SessionStart.' 01 1.7: one vocabulary row naming the two. A lesson that must reach every session becomes a check, which 12 12.7 already requires where it can.",
+   "cost": "Two sentences and one vocabulary row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Name the two concepts apart; no SessionStart change."
+  },
+  {
+   "id": "R8-12-15",
+   "section": "12 12.3",
+   "title": "Generated files with several writers (the error table's consumers, the ADR index, the ledger tables) have no merge rule: a hand edit is forbidden and generated fails a diff, but nothing says how a conflict in one is resolved or that generators emit stable, line-per-record output.",
+   "severity": "Required",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-6"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "Two PRs each add an error id; the second has a textual conflict in errors.md; the agent resolves it by hand, generated fails a round later, and the PR goes back.",
+   "change": "12 12.3, after 'Nobody hand-edits a generated file': 'Every generator emits one record per line in a stable sort order, so additive changes merge. A conflict in a generated file is resolved by taking either side and running go generate on the merged tree.'",
+   "cost": "Two sentences.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "The two sentences; no column and no merge driver."
+  },
+  {
+   "id": "R8-12-16",
+   "section": "12 12.2",
+   "title": "The capability map's module-level 'Depends on' and the chained build order are wrong where the critical path runs (kitpin, needed by block A, sits under kits after julieta-core; the error table sits under romeu-cli after everything; egress, render and gate are serial stages).",
+   "severity": "Required",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-10"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "While one agent builds render, the agents for gate and egress wait, although they depend on render only through types in spec and canon; the plan pulls four pieces forward and asks the maintainer to bless it.",
+   "change": "12 12.2: split kits into kitpin (depends on nothing) and kits; move the error table and the CLI writer out of romeu-cli into a cli module (depends on termsafe) that lands with spec; set each 'Depends on' to the modules whose code the module needs, so egress and gate no longer wait on render beyond what they use; state that order inside a module and disjoint file sets are the plan's duty. The build-order line follows the table.",
+   "cost": "A few table cells and the build-order line; no code.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Correct the edges named; the full package-level graph is not drawn."
+  },
+  {
+   "id": "R8-12-17",
+   "section": "12 12.1; 10 10.2",
+   "title": "gh is 'pinned in mise.lock' and started 'through mise exec', while the lint row of 10 10.2 admits only go, golangci-lint and govulncheck and 10 10.2 measured mise exec running a program of the search path when the tool is missing.",
+   "severity": "Required",
+   "lenses": [
+    "L7",
+    "L13"
+   ],
+   "finding_ids": [
+    "L7-7",
+    "L13-32"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "tools/release verify, the release's own provenance check, runs the runner image's gh at whatever version it carries; the pinned claim is false.",
+   "change": "12 12.1: replace 'through mise exec, except that ...' for gh by 'gh is started by the path mise which resolves, like the other tools of tools/ci'; 10 10.2, lint row: admit gh at an exact locked version. The other three ownerless clauses of L13-32 (revive's exported rule, retire --force, the license step on darwin) belong to pages 10, 04 and the index.",
+   "cost": "One rule change in 12 12.1 and 10 10.2.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-12-18",
+   "section": "12 12.4; 12 12.8",
+   "title": "A stranger has no defined way to obtain the approval line that nearly every likely first PR needs (catalog, error id, dependency bump), since the line quotes the maintainer's words.",
+   "severity": "Required",
+   "lenses": [
+    "L14"
+   ],
+   "finding_ids": [
+    "L14-6"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A stranger opens the catalog PR 07 7.5 points to; pr fails for the missing Approval line; the stranger cannot type words they were not given; the PR sits.",
+   "change": "12 12.4, after the approval-line paragraph: 'An author who does not hold the maintainer's words leaves the line out; pr names each surface that needs one; the maintainer gives the words in a review comment and the author pastes them verbatim.' 12 12.8, CONTRIBUTING row: 'how an outside contributor gets an approval line'. The generated ask-first page carries the same sentence.",
+   "cost": "Two sentences; message text in pr.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "The stranger path only; what a catalog PR's Evidence shows (07 7.6) belongs to page 07."
+  },
+  {
+   "id": "R8-12-19",
+   "section": "12 12.7; 12 12.8; ADR 0001",
+   "title": "Issues have no shape: ADR 0001 and 12 12.7 give them the PR template, no check reads them, 02 2.1 has no issue forms, and only SECURITY.md has a response expectation, while three deferred triggers wait on needs 'written as an issue'.",
+   "severity": "Required",
+   "lenses": [
+    "L14"
+   ],
+   "finding_ids": [
+    "L14-12"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A stranger opens 'it does not work' with no versions, command or output and no word on when anyone looks; the deferred decisions that wait on issues get no facts to decide on.",
+   "change": "12 12.7: replace 'PRs and issues: the PR template ...' by 'PRs: the PR template ...; issues: the forms in .github/ISSUE_TEMPLATE/ (bug: romeu and sbx versions, the command, its output or doctor report; catalog gap: the tool and the domains)'. 02 2.1 lists the two forms. 12 12.8: the README and CONTRIBUTING outlines state a best-effort response expectation for issues and PRs, as SECURITY.md does. ADR 0001's lead-practice table gains an issue row by a follow-up record.",
+   "cost": "Two forms, three outline lines, one ADR follow-up.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommendation: accept; the spec lines apply now and the ADR 0001 row follows in the superseding record of R8-12-1.",
+   "operator_reason": "ADR 0001's lead-practice table assigns issues the PR template; changing it changes a decision record."
+  },
+  {
+   "id": "R8-12-20",
+   "section": "12 12.8; ADR 0001",
+   "title": "Neither the README outline nor ADR 0001 rule 12's heading order has a License heading, so the GPL-3.0-only product with CC0 examples/ and schemas/ is stated only in the spec and REUSE.toml.",
+   "severity": "Required",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-17"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "An adopter asks what they may copy into a config repo and the answer is in a TOML file; once the candidate exists headings.yaml cannot change, so the heading must land before T084.",
+   "change": "ADR 0001 rule 12: add License to the ordered README headings. 12 12.8, README row: 'license: GPL-3.0-only for the product, CC0-1.0 for examples/ and schemas/, and what that means for a config repo'.",
+   "cost": "An ADR 0001 change and two lines.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommendation: accept before T084.",
+   "operator_reason": "Changes ADR 0001 rule 12, a decision record on the decisions surface."
+  },
+  {
+   "id": "R8-12-21",
+   "section": "12 12.6; 12 12.10",
+   "title": "Release notes credit no contributor and link no issue, so a reporter is never told their failure is fixed.",
+   "severity": "Advisory",
+   "lenses": [
+    "L14"
+   ],
+   "finding_ids": [
+    "L14-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A stranger's report is fixed in v1.0.2; the notes list the fix with its Why; neither the reporter nor the fixer is named and the issue stays open.",
+   "change": "12 12.6: add 'Each entry names its PR's author and the issues the PR closes by GitHub's closing keywords.'",
+   "cost": "One sentence; a few lines in tools/release notes.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Use GitHub's closing keywords; no new convention beside Fixes-release."
+  },
+  {
+   "id": "R8-12-22",
+   "section": "12 12.4",
+   "title": "The PR body sections, the Middleware line, the goldens and the approval lines are checked only by tools/ci pr on a saved payload of an existing PR, so the first feedback comes after the PR is public.",
+   "severity": "Advisory",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-30"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The agent opens a PR missing an approval line; pr fails in CI on the public PR; the body is edited twice more in public.",
+   "change": "12 12.2 (PR checks line) and 12 12.4: 'tools/ci pr also takes --title, --body <file> and the local base..HEAD range, so the same check runs before gh pr create.'",
+   "cost": "One input mode of an existing check.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-12-23",
+   "section": "12 12.5",
+   "title": "12 12.5 says the spec describes the current state only, but never defines current state against the plan, so 02 2.1 lists files that do not exist yet and 13 13.1 carries a migration note for a build that never shipped.",
+   "severity": "Advisory",
+   "lenses": [
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13b-40"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A reader of 02 2.1 reads the absence of release.yml as a defect; a reader of 13 13.1 looks for the older build and finds none.",
+   "change": "12 12.5, first bullet: add 'Current state means the v1.0.0 design as it stands, not what is merged; a note about an earlier draft goes to docs/reviews/.' Delete the migration sentence of 13 13.1.",
+   "cost": "One sentence added, one removed.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-12-24",
+   "section": "12 12.5; 12 12.4; 12 12.9; 05 5.4; 10 10.2; index",
+   "title": "History has moved into the current-state spec: dated measurements and 'replaces three rows round 4 recorded' in 05 5.4, a dated Try/Result procedure in 10 10.2, a status paragraph that grows each round, reasoning paragraphs in deferred rows, and the 'as measured on 2026-10-08' clauses of 12 12.4 and 12 12.9.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-16"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "In year three the index lists twelve rounds and a reader cannot find the current merge rule without reading what was measured on which day.",
+   "change": "12 12.5: add 'A dated measurement, a procedure that ran once and the reasoning behind a row live in an ADR, docs/reviews/ or a docs note; the spec states the current rule and links them.' Apply it: 10 10.2 keeps the current ruleset requirements and moves items a to e and the Try/Result table to ADR 0008 or a docs note; the index status becomes one sentence and a link; each 05 5.4 row keeps risk, why accepted and mitigation with one link, its accepted content unchanged. The 12 12.4 and 12 12.9 clauses go with R8-12-1.",
+   "cost": "Words moved; one rule.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "The rule and the moves; no sequences length bound. The 05 5.4 rows are shortened in wording only, so no accepted risk changes."
+  },
+  {
+   "id": "R8-12-25",
+   "section": "12 12.5",
+   "title": "The decisions the spec cites as authority (rounds 2 to 7, and product choices such as herdr, v3 kits, memory as files, stdlib flag, GPL-3.0-only, the two gates) get ADRs only from the docs module after block B, the 12 12.5 list stops at round 6, and a probe overturn has no record to supersede.",
+   "severity": "Required",
+   "lenses": [
+    "L3",
+    "L8",
+    "L9"
+   ],
+   "finding_ids": [
+    "L3-20",
+    "L8-29",
+    "L9-25"
+   ],
+   "listed": 0,
+   "own": 3,
+   "scenario": "A10 overturns the secrets default in T026 and its ADR supersedes nothing; a contributor proposing tmux finds only a dated paragraph of 06 6.4 and a review transcript.",
+   "change": "12 12.5, last bullet: replace 'the docs module writes the initial set from this spec's decisions' by 'a decision the spec cites as authority gets its ADR in or before the first task that implements the citing section; the docs module writes the remainder', and add round 7 to the list of review files (or 'round 7 holds no maintainer decision').",
+   "cost": "One sentence; tasks move in the plan.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "The timing rule and the round-7 line; no table of decisions in the spec, since the review files already list them."
+  },
+  {
+   "id": "R8-12-26",
+   "section": "ADR 0007; ADR 0001; 12 12.5",
+   "title": "ADR 0007 and ADR 0001 hold mechanism (pinned versions, function names such as lintEnv and judgeCommit) in records that are never rewritten, and ADR 0007 cites a deferred row that ADR 0008 removed.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-26"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The first rename of lintEnv or golangci-lint bump makes an Accepted record wrong with no supersede; a reader who trusts ADRs implements the stale mechanism.",
+   "change": "12 12.5: add 'A record holds the decision, the alternatives and the consequences; mechanism, versions and identifiers belong to the spec or the generated reference, which the record links.' ADR 0007 gains a status line: its threat-model cross-reference is superseded by ADR 0008.",
+   "cost": "One rule; one status line; later trims by supersession.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommendation: apply the 12 12.5 rule now and the ADR 0007 status line in the superseding record of R8-12-1.",
+   "operator_reason": "Adds a status line to ADR 0007, a decision record."
+  },
+  {
+   "id": "R8-12-27",
+   "section": "12 12.5; 11 11.3",
+   "title": "Committed probe results pin spec heading anchors in affects, so a heading rename orphans committed data and no rule or check says so.",
+   "severity": "Advisory",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-27"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "03 3.2 is retitled; the A10 result's affects anchor dangles while the resolvedBy check still passes on the file.",
+   "change": "12 12.5: add 'A heading cited by a committed probe result is renamed only with that result's affects in the same commit.' tools/ci probes resolves each affects anchor as tools/ci docs resolves links.",
+   "cost": "A sentence and one check clause.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-12-28",
+   "section": "03 (opening); 01 1.2; 12 12.3",
+   "title": "The format tables of 03 are design input the product later generates, so after v1 the spec holds a second, unmaintained copy of every format.",
+   "severity": "Blocking",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-1"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A field is added to a spec type; generated passes because the reference regenerated; 03 3.2 still lists the old fields; the next contributor writes a spec with the old shape and is refused.",
+   "change": "03 opening: 'After the task that lands a format's generator, this page keeps the intent, the annotated example and the rules that are design decisions, and replaces each field or rule table by a link to its generated reference page (12 12.3).' tools/ci docs fails a spec page holding a table whose header equals a generated table's header.",
+   "cost": "A sentence, one docs rule, a deletion pass on 03 after T021.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply; the deletion pass is plan work after T021."
+  },
+  {
+   "id": "R8-12-29",
+   "section": "04 4.1 to 4.3; 13 13.3, 13 13.4; 08 8.4; 12 12.3",
+   "title": "The cross-cutting side effects of each command (preflight, lock, ingest, drain, snapshot, idempotency) are hand lists in five sections that a new command must remember to join.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A later PR adds romeu prune; its author misses that ingest runs inside four commands; events are lost; the meta-test passes because it reads the same hand list.",
+   "change": "12 12.3, command-definitions row: the definitions carry one required field per side effect; their generated consumers add a per-command side-effect table rendered into 04, read by the idempotency meta-test and the ingest test. The five prose lists become a citation of that table.",
+   "cost": "One field set in the definitions, one generated table replacing five lists.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Reuse the existing command-definitions source; no new generator."
+  },
+  {
+   "id": "R8-12-30",
+   "section": "05 5.3; 01 1.7; 12 12.3",
+   "title": "docs/spec/** is on no ask-first surface while two checks read its Markdown tables as gate input (vocabulary from 01 1.7, sequences from the index), so a PR can edit a gate's input and a residual-risk row with no approval line.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-15"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An agent PR edits the Not column of 01 1.7 to pass vocabulary and rewrites a 05 5.4 row in the same change; no approval line is required and the ruleset requires no review.",
+   "change": "Recommended: add docs/spec.md and docs/spec/** to .github/ask-first.yaml as a 'specification' surface and say so in 05 5.3. Alternative: move the vocabulary and deferred-decisions inputs to data files under tools/ci, rendered into the spec (two generator rows in 12 12.3).",
+   "cost": "One glob, or two data files and two generator rows.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommendation: the glob; it reuses the approval line and adds no concept.",
+   "operator_reason": "Changes the ask-first surface list, a security-model surface the operator owns."
+  },
+  {
+   "id": "R8-12-31",
+   "section": "11 11.4; 10 10.3; 12 12.1",
+   "title": "A floor or pin bump needs probes re-run, but results carry no sbx version, the lifecycle of 11 11.4 has no stale state, and no section says which bump re-runs which probe.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-19"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The first sbx floor bump commits a second recording set; block A results still name the old version; tools/ci probes passes on results that never saw the new sbx.",
+   "change": "Probe results are named docs/probes/<sbx version>/<id>-<host>.json; 11 11.4 gains a 'stale' transition fired by a floor or pin change; the 12 12.1 pin table gains a column 'on bump' naming the probes to re-run and the recordings to re-record.",
+   "cost": "A naming change, one lifecycle row, one column.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "A column in the existing pin table instead of a new 11.5 table."
+  },
+  {
+   "id": "R8-12-32",
+   "section": "01 1.4; 06 6.1; I28; 12 12.2",
+   "title": "The v3 descriptor grammar is parsed by internal/oci and internal/render with no single owner, and nothing says what happens when sbx adds a capability type the strict grammar refuses.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-10"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "sbx adds a capability type; every sync fails closed until a release; the release teaches oci and forgets render; I28 holds for one parser.",
+   "change": "12 12.2, oci row: 'owns the descriptor grammar and the normalized capability set; render imports them'. Index, Deferred decisions: a row 'a capability type sbx adds after v1', holding fail closed, reopened by the first sync that fails on an unmodeled type, cost one release.",
+   "cost": "A cell, a sentence in 01 1.4 and 06 6.1, one deferred row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "oci as the one owner; no new package."
+  },
+  {
+   "id": "R8-12-33",
+   "section": "02 2.1; 12 12.2; S9",
+   "title": "The package tree, the module map and S9's coverage list are three hand lists with different names for the same code.",
+   "severity": "Advisory",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-29"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A package is renamed; the three lists change in different PRs; tools/ci coverage measures a package that no longer exists.",
+   "change": "12 12.2: 'Each module id names its directories in a column of this table; a test of tools/ci holds 02 2.1's tree and S9's list to those directories.'",
+   "cost": "One column and one test.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "A consistency test, not a generator."
+  },
+  {
+   "id": "R8-12-34",
+   "section": "02 2.1; 06 6.1; 12 12.3; 03; 13 13.5; 05 5.3",
+   "title": "The pin file read by four consumers is in no tree and has no writer for the workload entry; three formats have no schema although 03 says each has one; the I4, I25 and I8 guards live in packages outside every ask-first surface, so mutate does not run on a PR that changes only them.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-34"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The pin file is hand-edited for the workload digest; a change to sbxdrv's argv builders merges without mutation testing although I4 lives there.",
+   "change": "02 2.1: add the pin file with its writer (julieta pin workload). 03 opening: name dora.v1, ledger-entry/v1 and the view files as exempt from the schema rule, or 02 2.1 lists their schemas. 10 10.2, mutate row: it also runs on any PR touching a file that holds a guard tagged for an invariant.",
+   "cost": "Three sentences.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Exempt by name rather than add three schemas while R8-12-8 and R8-12-9 may defer two of the formats; mutate keyed on guard tags, not a new surface."
+  },
+  {
+   "id": "R8-12-35",
+   "section": "12 12.2",
+   "title": "The build order brings the product to real sbx only at the release candidate, while 10 10.3 lists what the fake cannot model, so each real-host failure costs a new candidate and a new block B.",
+   "severity": "Required",
+   "lenses": [
+    "L9"
+   ],
+   "finding_ids": [
+    "L9-3"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "91 tasks pass against the fake; the first real run finds a mount or policy argv that differs; each fix outside docs/ needs a new candidate and about 90 minutes of block B per host.",
+   "change": "12 12.2, build order: two real-host smoke steps that are not block B results - after the sync slice (init, sync, approve on one host) and after run (J1 to J3 on one host, from a dry-run build of main) - each one host-suite command whose output is pasted under Evidence and not committed under docs/probes/. Replace the 'Residual rework risk' sentence by what these runs cover.",
+   "cost": "Two short maintainer sittings and a host-suite selector.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommendation: accept; two sittings are cheaper than one extra block B.",
+   "operator_reason": "Adds maintainer sittings to the build order; only the maintainer commits the maintainer's time."
+  },
+  {
+   "id": "R8-12-36",
+   "section": "12 12.2",
+   "title": "The spec mandates a plan and fixes its order but has no re-plan rule, and the plan's counts and dependencies are kept by hand.",
+   "severity": "Required",
+   "lenses": [
+    "L9"
+   ],
+   "finding_ids": [
+    "L9-14"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "With 3 of 102 tasks merged, plan.md already says seven decision records (there are eight) and 28 rows (there are 36).",
+   "change": "12 12.2: 'A PR that changes a spec section updates the plan tasks that implement it in the same PR. tools/ci sequences checks plan.md: task ids are contiguous, each Depends on names an existing lower id or block, each Implements cites an existing section. The plan states no counts.'",
+   "cost": "One rule and one sequences extension.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-12-37",
+   "section": "12 12.2; 12 12.8; 11 11.2",
+   "title": "Guides and the README are written in the docs module after block B, so every guide's expected output is typed after the only real-host run, in text blocks no check compares.",
+   "severity": "Required",
+   "lenses": [
+    "L8"
+   ],
+   "finding_ids": [
+    "L8-8"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The J1 guide shows the gate 2 summary as the writer remembers it; the real first line differs; no host runs again.",
+   "change": "12 12.2, build order: the guides and the README text of the docs module land before the release candidate, so block B runs each guide as written; after block B the docs module only adds ADRs. The recorder-based check is not added.",
+   "cost": "A reorder of the build order (the plan moves T094).",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "The reorder only."
+  },
+  {
+   "id": "R8-12-38",
+   "section": "12 12.10",
+   "title": "dora runs tokenless as the last step of release.yml and backfills the whole history, and the spec does not say what a 403 or 429 does to --attach or the release.",
+   "severity": "Advisory",
+   "lenses": [
+    "L15"
+   ],
+   "finding_ids": [
+    "L15-21"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "History grows past anonymous limits; dora --attach fails; the release run ends red after the release is published.",
+   "change": "12 12.10: 'A rate-limit or auth error exits with its own code; a failed --attach leaves the release published and the run red, and re-running the step attaches the file. The tool paginates and sends the API version header.'",
+   "cost": "Three sentences and a fixture row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Applies only if R8-12-9 keeps the tool in v1; otherwise it moves with the tool."
+  },
+  {
+   "id": "R8-12-39",
+   "section": "12 12.10",
+   "title": "Change fail rate and rework count rely on Fixes-release trailers that authors must remember, which is mechanical memory.",
+   "severity": "Advisory",
+   "lenses": [
+    "L9"
+   ],
+   "finding_ids": [
+    "L9-16"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An agent fixes a release bug without the trailer; nobody adds it; instability reads zero.",
+   "change": "12 12.4, pr row: 'after the first deployment, a pull request with a fix commit carries a Fixes-release trailer or the line Fixes-release: none'.",
+   "cost": "One pr clause and its fixtures.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply; it holds whether or not R8-12-9 defers the tool, since the trailer data cannot be backfilled."
+  },
+  {
+   "id": "R8-12-40",
+   "section": "12 12.10",
+   "title": "maintainerWaitSeconds mixes agent and outside PRs in one median, so the stranger's wait is hidden.",
+   "severity": "Advisory",
+   "lenses": [
+    "L14"
+   ],
+   "finding_ids": [
+    "L14-14"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Agent PRs merge in an hour while outside PRs wait a month; the median looks healthy and the deferred merge-checkpoint decision reads it.",
+   "change": "12 12.10: 'The maintainer wait mixes the operator's own pull requests and outside ones; the split waits for the first outside pull request.'",
+   "cost": "One sentence.",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State as a limit; the split is deferred to its trigger."
+  }
+ ]
+}

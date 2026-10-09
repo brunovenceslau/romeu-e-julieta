@@ -1,0 +1,839 @@
+{
+ "page": "05",
+ "findings_read": 59,
+ "clusters": [
+  {
+   "id": "R8-05-1",
+   "section": "05 5.4",
+   "title": "The Release signing paragraph names an operator-held credential that signs release artifacts, but no page says what is signed, how, where it is published or how a user verifies it; S1, J1 step 2, B1 and 10 10.2 know only checksums.txt and the provenance attestation, and S1 calls the attestation the signature.",
+   "severity": "Blocking",
+   "lenses": [
+    "L0",
+    "L2",
+    "L2b",
+    "L3",
+    "L7",
+    "L9",
+    "L10",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L0-2",
+    "L10-5",
+    "L13b-2",
+    "L2-2",
+    "L2b-7",
+    "L3-17",
+    "L7-2",
+    "L9-2"
+   ],
+   "listed": 0,
+   "own": 8,
+   "scenario": "v1.0.0 ships with checksums.txt and an attestation; the operator never signs anything because no step asks; a user runs J1 step 2, every proof passes, and the control ADR 0008 decision 6 relies on against a token-driven release was never applied.",
+   "change": "Decide one of two texts and write it in 05 5.4, S1, J1 step 2, 11 11.2 B1 and 10 10.2 Release and bootstrap together. (a) Recommended: v1 publishes no signature beyond the provenance attestation. Replace the Release signing paragraph with: \"v1 releases carry checksums.txt and a keyless build provenance attestation and no other signature; the attestation proves that release.yml built the archive, not that the maintainer approved the release.\" Add a Deferred decisions row \"an operator signature over checksums.txt, made outside GitHub; until then the attestation is the only release proof; reopened by the first release whose tag the maintainer did not push, a second contributor, or the token narrowing of ADR 0008\". Remove \"signed\" from S1's evidence wording. Reword ADR 0008 decision 6 to match. (b) Name the signed object (checksums.txt), the tool and key type, the published verifying key and fingerprint (README, SECURITY.md), the operator step in 10 10.2, the verify command in J1 step 2, an S1 evidence item and a B1 predicate.",
+   "cost": "A maintainer decision; (a) about sixty words removed, one deferred row, a superseding sentence for ADR 0008 decision 6; (b) a tool, a key, an operator step per release and one J1 command.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend (a): delete the Release signing paragraph, state that the attestation is the only release proof and what it does not prove, add the deferred row with its trigger, and reword ADR 0008 decision 6 in a short superseding record. (b) adds a key to keep and an operator step per release for a control no second user needs yet.",
+   "operator_reason": "Changes ADR 0008 decision 6 (a decision record) and the release trust 05 5.4 accepts; the choice between a signing step and none is the maintainer's."
+  },
+  {
+   "id": "R8-05-2",
+   "section": "05 5.3; 05 5.4; 10 10.2; 12 12.4; 12 12.9",
+   "title": "The default-branch ruleset is said to require a code-owner review in 05 5.3, 05 5.4, 10 10.2 item a, 12 12.4 and 12 12.9 while the same cells say that, as measured on 2026-10-08, it requires none; the spec describes the removed gate several times and the gate that exists nowhere.",
+   "severity": "Blocking",
+   "lenses": [
+    "L0",
+    "L2",
+    "L3",
+    "L13",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L0-9",
+    "L13-6",
+    "L13b-1",
+    "L3-5",
+    "L2-22"
+   ],
+   "listed": 0,
+   "own": 5,
+   "scenario": "A contributor or the implementer of T005 reads 05 5.3 or the 12 12.4 merge row, believes an independent review guards ask-first paths, and builds or documents a review step that does not exist; a sandbox session merges its own surface change through the API and nothing refuses it.",
+   "change": "In 05 5.4 rewrite the approval-line row to state the merge gate as it is, once: \"The default-branch ruleset requires CI green and refuses a direct push to the default branch; it requires no review (measured 2026-10-08, ADR 0008). The approval line, checked by tools/ci pr, is the only recorded approval, and it is typed by the PR's author.\" In 05 5.3 replace \"the ruleset that requires the code-owner review\" with \"the ruleset's requirements\" and add \"what this approval is worth with one account is in 05 5.4\". In 10 10.2 item a, the 12 12.4 merge row and 12 12.9, delete the sentence stating the review requirement and its \"as measured\" patch and write \"the merge requirements, and what they are worth, are in 05 5.4\". Keep the earlier configuration in docs/reviews and ADR 0008 only.",
+   "cost": "About forty words removed and twenty added in five sections; no mechanism; one optional short ADR for the operator.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the spec-text change as written; leave ADR 0001 rule 8 and ADR 0003 untouched in this pass and list \"mark ADR 0001 rule 8 and ADR 0003 superseded in part by ADR 0008 for the review requirement\" as an operator item, since it changes accepted decision records."
+  },
+  {
+   "id": "R8-05-3",
+   "section": "05 5.3",
+   "title": "internal/sbxdrv (the only code that runs sbx, holding the I4 and I25 guards), e2e/fakesbx and skills/** sit on no ask-first surface, while gitsafe is a surface for the same reason on the git side, and tools/ci mutate never runs on a PR that touches only those guards.",
+   "severity": "Required",
+   "lenses": [
+    "L0",
+    "L2",
+    "L2b",
+    "L13"
+   ],
+   "finding_ids": [
+    "L0-15",
+    "L2-10",
+    "L13-33",
+    "L2b-3"
+   ],
+   "listed": 0,
+   "own": 4,
+   "scenario": "A PR touching only internal/sbxdrv adds a flag to the env run builder, or edits skills/julieta/SKILL.md to skip memory; no approval line is required, mutate does not run, and the change merges with the operator's token into every sandbox.",
+   "change": "In the 05 5.3 YAML add one surface: \"- id: sbxdrv / globs: [internal/sbxdrv/**, e2e/fakesbx/**] / reason: every sbx invocation on the host, and the guards of I4 and I25 with the fake that enforces them in tests\". Add skills/** to the kits surface globs and its reason (\"what enters every sandbox, its pins, and the skills agents follow\"). Change the mutate sentence of 05 5.3 to \"tools/ci mutate reads it to decide which PRs run mutation testing (a .go file on a listed path, or a file holding an invariant guard tag)\", so guards in memstore, handoff, salvage, oci, render, shquote and egress are mutation-tested without putting every reader on a surface. The docs/spec part of L0-15 is handled by the specification-surface cluster (R8-05-38).",
+   "cost": "Four lines of YAML, the regenerated CODEOWNERS and reference table, one clause in the mutate rule.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply in the smaller form: one new sbxdrv surface and skills/** on the kits surface, plus the mutate trigger on guard tags instead of the readers and drivers surfaces of L2b-3, so more guards are tested without more approval lines."
+  },
+  {
+   "id": "R8-05-4",
+   "section": "05 5.3; 12 12.4",
+   "title": "The contracts and checks surfaces put an approval line in the maintainer's words on most PRs and no form approves a class of change or a phase, so the maintainer is the queue on the critical path.",
+   "severity": "Required",
+   "lenses": [
+    "L9",
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-2",
+    "L9-17"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "In phase 4, six romeu-cli tasks each append an error row to internal/cli/errors.go; each PR waits for the maintainer's words while the maintainer is away, and the plan's Ask-first forecast cannot stand in because tools/ci pr reads only the PR body.",
+   "change": "In 12 12.4 add one batched form: at a plan checkpoint the maintainer may grant, in their words recorded in the plan's checkpoint section, a list of task ids per surface; a PR for one of those tasks quotes the grant and names its task, and tools/ci pr accepts a line that matches the grant. Exclude the gates, gitsafe, signing, release, decisions and ask-first surfaces, which keep per-PR words. In 05 5.3 add one sentence pointing at that form.",
+   "cost": "One rule in 12 12.4, one sentence in 05 5.3, one clause in tools/ci pr (T005, not yet merged).",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the checkpoint grant for contracts, checks, dependencies, kits, catalog, ledger, digests and termsafe only; defer narrowing contracts to versions.go until the RJ uniqueness check exists.",
+   "operator_reason": "It changes what an approval on an ask-first surface means, which is the control behind the accepted risk \"The approval line in a PR body is typed by the PR's author\" in 05 5.4."
+  },
+  {
+   "id": "R8-05-5",
+   "section": "05 5.4",
+   "title": "Text from strangers on GitHub (issues, PR bodies, comments, diffs) reaches agents acting with the operator's admin token, ADR 0008 names that class, and 05 has no residual-risk row, no threat-model sentence and no rule bounding what an agent does with it.",
+   "severity": "Blocking",
+   "lenses": [
+    "L5",
+    "L14"
+   ],
+   "finding_ids": [
+    "L14-5",
+    "L5-33"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A stranger opens an issue or a fork PR whose body tells a triaging agent to merge, re-run a workflow with secrets or edit a ruleset; the agent holds the operator's token, so it takes effect; the ADR 0008 trigger \"a second contributor\" fires only after someone contributes.",
+   "change": "Add to the 05 threat paragraph \"or is steered by text it reads from GitHub or the web\". Add a 05 5.4 row: Risk \"issue, PR and comment text from any account can steer an agent that holds the operator's token\"; Why accepted \"the operator decided the token (ADR 0008)\"; Mitigation \"agents read such text as data only and take no merge, close, label, workflow or settings action on it without the maintainer's word (12 12.9); egress and capability widenings still meet the gates\". Change the ADR 0008 narrowing trigger to \"the first issue or PR from an account other than the operator's\".",
+   "cost": "One row, one clause, one working rule in 12 12.9, one trigger change in ADR 0008 (a follow-up record).",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the row, the 12 12.9 working rule and the earlier trigger as written.",
+   "operator_reason": "It adds an accepted risk to 05 5.4 and changes a trigger of ADR 0008."
+  },
+  {
+   "id": "R8-05-6",
+   "section": "05 5.4",
+   "title": "The token row accepts merges, v* tags and ruleset edits as process only, and the spec does not weigh the cheap deterministic guard against mistakes: a julieta-claude PreToolUse refusal of gh pr merge, a v* tag push and ruleset API calls.",
+   "severity": "Advisory",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-32"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An agent told \"ship it\" merges its own PR through gh pr merge; nothing in the session stops it; the working agreement held only in the agent's reading of its instructions.",
+   "change": "Add to the token row's mitigation: \"the julieta-claude kit (06 6.4) refuses gh pr merge, a push of a v* tag and gh api calls to rulesets and repository settings in a PreToolUse hook; this guards against mistakes, not against an agent that edits its own hook\". Add the hook and its test to 06 6.4.",
+   "cost": "One hook entry and its test; a decision.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend it: it moves a rule held in agent goodwill into a deterministic hook, and states its limit.",
+   "operator_reason": "It changes the mitigation of an accepted risk in 05 5.4 and touches the kits surface."
+  },
+  {
+   "id": "R8-05-7",
+   "section": "05 5.4; index: Deferred decisions; ADR 0008",
+   "title": "The token row rests on two duties held in memory (reading the security log at each sitting, a review every 2 autonomous work sessions that nobody counts), and its release-candidate trigger makes the token decision due just before block B.",
+   "severity": "Required",
+   "lenses": [
+    "L9"
+   ],
+   "finding_ids": [
+    "L9-11"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Nobody counts sessions, so the two-session review never fires; or it fires at the rc tag, the token is narrowed, and a capability the build used disappears in the middle of block B.",
+   "change": "Replace \"every 2 autonomous work sessions ... later every 10\" with an event a machine counts, for example \"every 20 merged pull requests, as tools/ci dora counts them\"; move the release-candidate trigger to the checkpoint before the last build phase (C7), so the token is settled before O5; keep the security-log reading worded as a judgment, not as a detector.",
+   "cost": "Two trigger rewrites in the index and ADR 0008 (a superseding note), one sentence in 05 5.4.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the counted-PR trigger and the C7 checkpoint as written.",
+   "operator_reason": "It changes the triggers of an accepted risk and of ADR 0008."
+  },
+  {
+   "id": "R8-05-8",
+   "section": "05 5.4",
+   "title": "The residual-risk table every user reads mixes the risks of running romeu with the maintainer's own development sandbox: rows 2 and 3 say \"the token is today the operator's own (ADR 0008)\" while the product's token is whatever name@project credential the operator binds (03 3.4, Q13) and 06 6.4 forwards one key.",
+   "severity": "Required",
+   "lenses": [
+    "L0",
+    "L10"
+   ],
+   "finding_ids": [
+    "L0-16",
+    "L10-4"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "An evaluator reads SECURITY.md, which links 05 5.4, concludes that romeu forces the operator's whole GitHub account and two SSH keys into every sandbox, and does not install.",
+   "change": "Split 05 5.4 into \"Risks of running romeu\" and \"Risks of how this repository is developed\". Move the approval-line row, the token-reach row and the Round 4 paragraph to the second, with ADR 0008. In rows 2 and 3 replace \"the token is today the operator's own, not per-project (ADR 0008), and narrowing it is deferred\" with \"the sandbox holds whatever credential the operator binds for name@project (03 3.4); a broad one widens this risk\". Add to ADR 0008 a scope line: the product repository's development.",
+   "cost": "A table split, two cell rewrites, one scope line in ADR 0008.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the split as written; it makes no acceptance wider or narrower, it only names whose risk each row is.",
+   "operator_reason": "It moves and rewords accepted risks in 05 5.4 and adds a scope line to ADR 0008."
+  },
+  {
+   "id": "R8-05-9",
+   "section": "05 5.3; 05 5.4; 01 1.7",
+   "title": "One person is \"operator\" in 01 1.1, 05 5.4 and 09, \"maintainer\" in 05 5.3, 10 10.2 and 12 12.9, and \"developer\" or \"user\" in 00 0.2; none of the words is in the vocabulary, and the one sentence that relates them is in ADR 0008 Context.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-8"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "A second adopter reads \"the maintainer's approval\" in 05 5.3 and \"the operator decided\" in 05 5.4, concludes the product has two roles, and asks who the maintainer of their machine is.",
+   "change": "Add to 01 1.7 three rows: operator (the person who runs romeu on a host, owns host settings and answers gates), maintainer (the person who merges and releases the product repository), user (the operator, as 00 0.2 counts them; \"developer\" is not used), and the sentence \"today one person holds both roles\". Then use each word only in its sense across the pages; tools/ci vocabulary holds it.",
+   "cost": "Three rows and a word pass.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as written."
+  },
+  {
+   "id": "R8-05-10",
+   "section": "05 5.4; 10 10.2; index (Status)",
+   "title": "History sits in the current-state spec: 05 5.4 carries dated measurements and the paragraph \"Round 4 recorded the acceptance of three rows\", 10 10.2's maintainer block is a dated procedure, and the index status paragraph grows per round, against 12 12.5.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-16"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "In year three the token row is a page, the index status lists twelve rounds, and a reader cannot find the current merge rule without reading what was measured on which day.",
+   "change": "Reduce each 05 5.4 row to risk, why accepted, mitigation and one link to the ADR or review that holds the measurement: the token row keeps \"the operator decided it and accepted the collision with ADR 0005 rule 1 (ADR 0008)\" and moves the four-tries measurement to ADR 0008 or 10 10.2 item d. Delete the \"Round 4 recorded ...\" paragraph (its facts are in round-4 and ADR 0008). Move 10 10.2 items a to e and the Try/Result table to ADR 0008 or a docs note and keep the current ruleset requirements; make the index status one sentence and a link.",
+   "cost": "Words moved, no mechanism.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the moves; leave the sequences cell-length bound out until a deferred row exceeds a measured length (deferral)."
+  },
+  {
+   "id": "R8-05-11",
+   "section": "05 5.4 (last paragraph); 13 13.8; ADR 0006",
+   "title": "Two ledger residual risks and six starting values are recorded as accepted \"with the design the maintainer accepted as a whole\", so a reader cannot tell a considered acceptance from an inherited one.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-29"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A reviewer weighs the rotation row and the visibility row as decided risks; they were never decided, and the block acceptance is how features the start does not need got in.",
+   "change": "Either the maintainer decides the two rows and the six values by name, one quoted line each, or 05 5.4 marks the two rows \"inherited, undecided\" and 13 13.8 marks the values \"proposed, undecided\"; the last paragraph of 05 5.4 names the two rows instead of \"the other two\".",
+   "cost": "Eight one-line decisions, or two words per row.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend marking them \"inherited, undecided\" now and asking the maintainer for the eight decisions in the next grouped block.",
+   "operator_reason": "Only the maintainer can decide an accepted risk."
+  },
+  {
+   "id": "R8-05-12",
+   "section": "05 5.4",
+   "title": "The salvage row's mitigation says \"a push to origin is the only copy an agent cannot take back\", while ADR 0008 records that the sandbox's token can delete branches, tags and releases.",
+   "severity": "Required",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-8"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An agent pushes, then deletes the remote branch or force-pushes a cleaned history; the next romeu fetch force-moves refs/romeu/origin and the host's last view of the pushed commits is gone; the risk was accepted on a premise ADR 0008 had already removed.",
+   "change": "Rewrite the mitigation cell: \"with the operator's token (ADR 0008) a push is a copy the agent can also take back; I17 holds against loss and against a forged manifest\". Add a Deferred decisions row \"a create-only host ref per fetched origin head per generation (refs/romeu/origin-log/<dir>/<gen>/<sha>); reopened by the first lost pushed commit or the token narrowing of ADR 0008\".",
+   "cost": "One cell, one deferred row.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the rewritten cell and the deferred row; no new ref namespace now.",
+   "operator_reason": "It changes the premise of an accepted risk in 05 5.4."
+  },
+  {
+   "id": "R8-05-13",
+   "section": "05 5.4",
+   "title": "The signature row lists \"confirm-on-use where the agent supports it\" as a mitigation that no probe measures, doctor cannot read and no setting controls, and the forwarding of the signing key has no deferred row with a trigger.",
+   "severity": "Required",
+   "lenses": [
+    "L2"
+   ],
+   "finding_ids": [
+    "L2-7"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An agent commits and signs work nobody asked for; the commits show Verified under the operator's key; the operator believed confirm-on-use was in place because the spec listed it.",
+   "change": "Delete \"confirm-on-use where the agent supports it\" from the mitigation. Add a Deferred decisions row \"a signing key per project, or a signing path that is not forwarded; until then the one-key socket of 06 6.4; reopened by the first commit signed in the operator's name that they did not ask for, or a second contributor\". Optionally let doctor print the forwarded key's comment and fingerprint (04 doctor table).",
+   "cost": "One cell edit, one deferred row, one optional doctor output line.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the deletion and the deferred row; the doctor line is optional.",
+   "operator_reason": "It changes the mitigation of an accepted risk in 05 5.4."
+  },
+  {
+   "id": "R8-05-14",
+   "section": "05 5.4",
+   "title": "The memory-planting row tells the owner to read memory only through romeu handoff, which shows only handoffs, so there is no safe way to read the lessons the agent recorded.",
+   "severity": "Required",
+   "lenses": [
+    "L16"
+   ],
+   "finding_ids": [
+    "L16-9"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A developer wants to keep the lessons the agent recorded; romeu handoff does not show them; they open the directory in an editor, the exposure the row describes.",
+   "change": "Smaller form: change the mitigation to \"read memory through romeu handoff, or with a pager that shows bytes and runs nothing (less, cat -v); never open a memory dir as a workspace folder\"; add a Deferred decisions row \"romeu memory list|show; reopened by the first time the operator needs to read lessons on the host\". The full form adds romeu memory list|show through memstore's os.Root readers (I24, I29) and lists it in 00 0.5.",
+   "cost": "One cell and one deferred row; or one read-only command.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the smaller form and the deferred row; the command waits for its trigger.",
+   "operator_reason": "It changes an accepted risk's mitigation; the full form widens 00 0.5."
+  },
+  {
+   "id": "R8-05-15",
+   "section": "05; 05 5.4",
+   "title": "The threat model lists GitHub and web text as steering but not the product's own memory: a lesson entry and the latest handoff are printed into every later session by SessionStart (08 8.2), and romeu handoff prints agent prose to the operator, a path from agent text to a host action that escaping cannot stop.",
+   "severity": "Advisory",
+   "lenses": [
+    "L2"
+   ],
+   "finding_ids": [
+    "L2-19"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A compromised session writes a lesson with instructions; every later session reads it first; or the handoff tells the operator to run a command on the host and they do.",
+   "change": "Add to the 05 threat paragraph \"or persist instructions to a later session through memory\". Add one 05 5.4 row: Risk \"memory and handoff text are agent text that later sessions and the operator read\"; Why accepted \"memory exists to carry text across sessions\"; Mitigation \"the SessionStart print and romeu handoff label the text as written by an agent; the operator runs nothing a handoff asks without reading it as data\".",
+   "cost": "One clause, one row, one label line in 08 8.2 and 04 handoff.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend one merged row for both channels.",
+   "operator_reason": "It adds an accepted risk to 05 5.4."
+  },
+  {
+   "id": "R8-05-16",
+   "section": "05 5.4; 10 10.2; 00 0.1",
+   "title": "The maintainer runs agent-authored code on the host by design (the pre-push hook runs tools/ci fast; blocks O3 and O6 run tools/ci on a host clone after reading the diff), and 05 5.4 has no row for it.",
+   "severity": "Required",
+   "lenses": [
+    "L2b"
+   ],
+   "finding_ids": [
+    "L2b-9"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "An agent's branch adds a test helper under tools/ci; the token merges it; the maintainer later pushes probe results from a host clone and the hook runs that code on the host with the maintainer's user and Keychain.",
+   "change": "Add a 05 5.4 row: Risk \"the maintainer runs tools/ci and the pre-push hook on the host; that code is agent-authored and merged by the token\"; Why accepted \"the gates must run where the maintainer pushes\"; Mitigation \"the checks surface and its approval line; the maintainer reads the diff of tools/ci since the last host run\". Scope 00 0.1's host sentence to romeu's runtime.",
+   "cost": "One row and one scoping clause.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the row as written; leave a trusted hooksPath checkout as a deferred row reopened by the first tools/ci change the maintainer did not read before a host run.",
+   "operator_reason": "It adds an accepted risk to 05 5.4."
+  },
+  {
+   "id": "R8-05-17",
+   "section": "05 5.3; 10 10.2",
+   "title": "CI and the hook run the tools/ci of the branch under review, so a change to the gate is judged by itself, and no mechanism or deferred row names the gap.",
+   "severity": "Required",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-3"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A PR edits tools/ci so that coverage passes and types its own checks approval line; ci.yml runs the PR's tools/ci all, which exits 0; the merge goes through the API.",
+   "change": "In 05 5.3, after \"the check code is the gate\", add: \"a change to tools/ci is checked by the changed tools/ci; its only check is the checks approval line\". Add a Deferred decisions row \"ci.yml runs the base branch's tools/ci against the merge result; reopened by the first PR that changes tools/ci and a package it checks together\".",
+   "cost": "One sentence and one deferred row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as written: state the limit and defer the base-branch run with its trigger."
+  },
+  {
+   "id": "R8-05-18",
+   "section": "05 5.1; 04 4.3; 08 8.5",
+   "title": "05 5.1 defines the hardened git environment for subprocesses started by romeu only, while the index routes every git call through gitsafe and 10 10.7 links it into julieta; julieta's clone, fetch, fast-forward, bundle and commit-tree calls run under an environment no page states.",
+   "severity": "Blocking",
+   "lenses": [
+    "L13"
+   ],
+   "finding_ids": [
+    "L13-3"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An agent sets a repo-local core.hooksPath and julieta setup's fast-forward runs the hook; or julieta's clone fails because GIT_CONFIG_GLOBAL=/dev/null dropped settings the sandbox needs; two implementers pick opposite answers and both cite the spec.",
+   "change": "Add to 05 5.1 one paragraph \"In the sandbox (julieta)\": julieta's git calls go through gitsafe with the same fresh environment (no ambient GIT_* variables), explicit URLs and refspecs, and -c core.hooksPath=/dev/null, -c core.fsmonitor=false, -c submodule.recurse=false; they keep the sandbox's global config, which the sandbox owns and the agent can write, so nothing in it is trusted beyond the sandbox; this is why 08 8.5 passes -c commit.gpgsign=false. Name the mode in 04 4.3 setup and 08 8.5, make the index boundary cite 05 5.1 for both binaries, and add one gitsafe table test for the mode.",
+   "cost": "About sixty words and one table test.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as written; one runner with two named modes, not a second runner."
+  },
+  {
+   "id": "R8-05-19",
+   "section": "05 5.1; I3",
+   "title": "The insteadOf paragraph omits a local rewrite to git://127.0.0.1, the one git:// target gitsafe allows, core.gitProxy is not neutralized, and the I3 planted list omits both.",
+   "severity": "Advisory",
+   "lenses": [
+    "L2b"
+   ],
+   "finding_ids": [
+    "L2b-15"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A host clone's local config gains an insteadOf that rewrites https://github.com/ to the sandbox daemon by mistake; the next sync reads specs the sandbox served as origin.",
+   "change": "In 05 5.1 add the third case: \"a rewrite whose target is git://127.0.0.1 for a URL that was not is refused\". Add -c core.gitProxy= to the flags block. Add core.gitProxy and a local insteadOf to the I3 planted list.",
+   "cost": "One flag, one sentence, two plant rows.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the flag, the sentence and the plant rows; leave out the doctor row that reads each host clone's local config, since 05 5.1 trusts local config."
+  },
+  {
+   "id": "R8-05-20",
+   "section": "05 5.1; I3; I24; 04 4.2",
+   "title": "Lists that two consumers must agree on are hand-written in several places with different memberships: the dangerous git keys (05 5.1 -c list, I3 plant list, the doctor warn row), the memory layout allowlist, the mise environment, the ingesting commands and the reserved names.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-6"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A git CVE names a new config key; a PR adds it to gitsafe's -c list and I3's plant; the doctor row is forgotten; doctor passes a host whose global config carries it.",
+   "change": "For each list name one home and make the other places link to it without repeating members: the git keys live in 05 5.1, and I3 and the doctor row say \"every key of the 05 5.1 flags list\"; add one test that the I3 plant list equals the neutralized list of 05 5.1 (gitsafe exports the list, doctor reads it). The other four lists get the same one-home edit on their own pages.",
+   "cost": "Words in about ten places, one test.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the one-home edits and the one test; no generator rows until a second divergence is measured."
+  },
+  {
+   "id": "R8-05-21",
+   "section": "05 5.1; 03 3.4; 04 4.3; 07 7.3",
+   "title": "Several hedges carry no trigger: julieta lock locks macOS platforms, monorepo.lockfile serves an unused mode, and gitHosts caFile with its unit test serves private git hosts in a v1 whose only host is github.com.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-22"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "Each is small; together they are the shape ADR 0005 was written against.",
+   "change": "For 05 5.1: keep caFile and its unit test, because 10 10.1's E2E origins use gitHosts[].caFile for the test CA and gitsafe has no test override; add \"(also how the E2E origins of 10 10.1 trust their test CA)\" to the caFile bullet. The lock and monorepo parts belong to 04 and 07.",
+   "cost": "Half a sentence on this page.",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "caFile has a present consumer (10 10.1); state it in 05 5.1 and change nothing else on this page."
+  },
+  {
+   "id": "R8-05-22",
+   "section": "05 5.1; 08 8.5",
+   "title": "The salvage cross-check and pull assume the sandbox daemon is git://127.0.0.1, and no page names a change of that transport by sbx as a break mode with a recovery.",
+   "severity": "Advisory",
+   "lenses": [
+    "L15"
+   ],
+   "finding_ids": [
+    "L15-19"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "sbx moves the daemon; gitsafe refuses it, pull fails, salvage step 3 cannot cross-check, rm exits 5 and only --accept-loss moves on, with an error that does not say the cause is upstream.",
+   "change": "In 08 8.5 step 3 and 04 4.2: a daemon URL whose scheme or host gitsafe refuses is a distinct incomplete reason that names sbx; the J6 guide gives the recovery.",
+   "cost": "One reason id and a guide line.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as written."
+  },
+  {
+   "id": "R8-05-23",
+   "section": "05 5.2",
+   "title": "Several invariant rows claim more or less than their tests measure: I3 and I7 enumerate nine and six of fifteen commands, I24 forbids archive extraction while salvage unbundles, I23 is universal over four tools, I30 says julieta runs only as delivered while 06 6.3 proves compatibility only, I2 cites an unlisted key set, I16's level disagrees with 10 10.1, and I18 mixes julieta's and romeu's halves.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0",
+    "L2",
+    "L13b"
+   ],
+   "finding_ids": [
+    "L0-30",
+    "L0-31",
+    "L2-14",
+    "L13b-39"
+   ],
+   "listed": 0,
+   "own": 4,
+   "scenario": "A hostile global git config is exercised against nine commands and stop or recreate runs git through a path the sweep never saw; a reviewer holds salvage against I24 and finds it in violation; a reader cites I23 as a universal.",
+   "change": "In 05 5.2: write \"every romeu command\" in the I3 and I7 E tests; I24 \"never extracts an archive other than a git bundle, through gitsafe (bundle verify, unbundle, fsck --strict)\"; I23 names its four tools; I30 becomes \"julieta is delivered read-only and checked for compatibility\" and boundary C follows 06 6.3; list the review-checkout key set once in 05 5.1 and let I2 cite it and narrow to existing clones; align 10 10.1's level sentence with I16; split I18 into the julieta half (C, signing) and the romeu half (U: no push argv in gitsafe).",
+   "cost": "About eight cells and one short list.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the cell edits as written."
+  },
+  {
+   "id": "R8-05-24",
+   "section": "05 5.2; S6",
+   "title": "S6's mutation check accepts any stub that makes a tagged test fail, one stub per invariant id, so a stub that panics meets S6 while the guarded decision is observed by no test.",
+   "severity": "Blocking",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-1"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The mutate_I7 stub panics; every tagged I7 test goes red and tools/ci mutate passes; the preflight call missing from retire is observed by no test.",
+   "change": "In 05 5.2 define a stub as a pass-through of the guarded decision (the guard admits what it refuses) and nothing else, and require the red to come from a tagged test's own assertion, not a panic or a build failure. Add a Deferred decisions row \"a stub per guard site (mutate_I<n>_<site>); reopened by the first invariant with a second guard site that a mutate run left unobserved\".",
+   "cost": "A paragraph in 05 5.2 and a rule in tools/ci mutate; one deferred row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the stub definition and the assertion rule; defer per-site stubs with the trigger."
+  },
+  {
+   "id": "R8-05-25",
+   "section": "05 5.2; 10 10.2",
+   "title": "A guard deleted together with its test and both tags turns nothing red: tools/ci invariants pairs what remains and acceptance runs once.",
+   "severity": "Blocking",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-2"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "After v1.0.0 a refactor PR removes a guard site, its test and the two tags; invariants finds no unpaired tag, all is green, and the 05 5.2 row still claims its test.",
+   "change": "In 05 5.2 and the invariants row of 10 10.2: tools/ci invariants reads the ids from the 05 5.2 table itself and fails when a row's id has no guard tag or no test tag in the code; removing an invariant means removing its row in the same PR, which the specification-surface decision (R8-05-38) governs.",
+   "cost": "One clause in tools/ci invariants, two sentences; no new data file.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply with the 05 5.2 table as the list instead of a second committed list."
+  },
+  {
+   "id": "R8-05-26",
+   "section": "05 5.2",
+   "title": "The absence invariants I2, I3, I14 and I16 are tested by absence with no positive control, so an inert plant and a working guard look the same.",
+   "severity": "Required",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-8"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The I3 plant's hook file loses its executable bit in a fixture refresh; the marker never appears, the test stays green, and a later gitsafe change passing GIT_CONFIG_GLOBAL through is not noticed.",
+   "change": "Add to the I2, I3, I14 and I16 rows a control case: the same plant run against unhardened git (or under the guard's pass-through stub) must produce the marker, the .git diff or the trust write, and the test fails if it does not.",
+   "cost": "One case per row, four sentences.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as written."
+  },
+  {
+   "id": "R8-05-27",
+   "section": "05 5.2 (I17); 10 10.1",
+   "title": "I17 and 10 10.1 inject faults into the promotion commit only; no test kills romeu after each step of salvage, rm, recreate or retire, so \"holds under a kill at any line\" is unmeasured for the machine that protects work.",
+   "severity": "Blocking",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-2"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An implementation writes closed-removed before sbx env rm; a kill between the two leaves a live sandbox romeu no longer recognizes, and every CI level stays green.",
+   "change": "Add to I17's Test cell and to 10 10.1's Additional required tests a row \"Destructive-command fault injection\": a test hook kills romeu after each step of salvage, rm, recreate and retire; the next run, salvage or rm converges, no salvage record says lost after a complete one, and sbx env rm is never reached without a complete or accepted record of this generation.",
+   "cost": "A test seam, one e2e table, a mid-session kill in the fake sbx.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as written."
+  },
+  {
+   "id": "R8-05-28",
+   "section": "05 5.2 (I28); 06 6.1",
+   "title": "I28 claims romeu parses descriptors the way sbx does, but the conformance fixtures are recorded once against one sbx and one frontend and nothing re-runs them when a pin moves.",
+   "severity": "Required",
+   "lenses": [
+    "L15"
+   ],
+   "finding_ids": [
+    "L15-12"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A newer sbx widens what a capability key grants; gate 2 still shows the old meaning, and the operator approves a wider capability than shown.",
+   "change": "In I28 and 06 6.1: the conformance fixtures record the sbx version and frontend digest they were made with; a frontend pin change, or an sbx version entering the tested window, requires the A11 and A12 conformance subset again, named in the PR's Evidence.",
+   "cost": "One rule and two recorded fields.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as written."
+  },
+  {
+   "id": "R8-05-29",
+   "section": "05 5.2 (I16, I31, I32)",
+   "title": "The admitted-call-site table of the I16, I31 and I32 scans lives under tools/ci, so each package that legitimately removes a temp file edits the gate's code and needs a checks approval.",
+   "severity": "Advisory",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-16"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "T039 and T064 each add functions to the one table and both PRs need a checks approval for data about their own package.",
+   "change": "No mechanism change: add to 05 5.2 under the scans \"an admitted call site widens I16, I31 or I32, so the table stays on the checks surface and each admission carries the checks approval line\".",
+   "cost": "One sentence.",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the limit; a marker comment in the admitted function would let any PR admit itself without an approval."
+  },
+  {
+   "id": "R8-05-30",
+   "section": "05 5.2 (I22); 04 doctor",
+   "title": "Common pre-existing setups (a global sbx GitHub secret, VS Code workspace trust off, an existing ~/dev) are refused at preflight with no fix hint stated.",
+   "severity": "Advisory",
+   "lenses": [
+    "L1"
+   ],
+   "finding_ids": [
+    "L1-18"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A developer who set the github secret globally, as sbx documents, sees every romeu run exit 2 at preflight step 5 (I22) with a hint the spec does not define.",
+   "change": "In the 04 doctor table give each refusing pre check its hint text: the per-project sbx secret command, the VS Code setting to change, and what init does with a non-empty root.",
+   "cost": "Hint texts for about five checks.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as written in 04."
+  },
+  {
+   "id": "R8-05-31",
+   "section": "05 5.4; 04 4.2; J4; 01 1.2; 02 2.3; I19",
+   "title": "romeu pull, the hardened review checkout, both workspace files, I19 and two residual-risk rows exist for a host-side review path the start does not need, and dev.code-workspace is opened by no journey.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-6"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The first user reviews on GitHub (2.6, ADR 0008); J4 is the one journey for pull and is outside S7's CI set; dev.code-workspace is rewritten on every promotion and retire and carries I13 and I14 with no reader.",
+   "change": "Defer romeu pull, the review checkout and review.code-workspace as one row (\"until then the PR on GitHub is the review; reopened by the first time the maintainer needs a sandbox branch on the host before it is pushed\"); delete dev.code-workspace or give it a journey step; I19 and the two 05 5.4 rows about the review checkout leave with pull.",
+   "cost": "Deletions in 01, 02, 04, 05, 09; the plan loses most of T067.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the deferral with its trigger; it removes a command and two accepted-risk rows.",
+   "operator_reason": "It changes the scope (00 0.5) and removes accepted risks from 05 5.4."
+  },
+  {
+   "id": "R8-05-32",
+   "section": "05 5.4 (herdr row); 03 3.2; Q16",
+   "title": "The run layout is multiplexer-neutral for non-goal renderers while nothing says what happens if herdr, pre-1.0 with no signed releases, stops being maintained.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-17"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "herdr is on the path of every romeu run; Q16 and 05 5.4 cover churn and provenance, not abandonment; the neutrality is paid now and the event that would use it has no row.",
+   "change": "Add a Deferred decisions row \"a second run-layout renderer; until then herdr, pinned by version and sha256, is the one renderer; reopened by a herdr release that breaks the protocol number A13 recorded, six months without a herdr release, or a CVE in it\". Keep 03 3.2's format; the row now gives its neutrality a trigger.",
+   "cost": "One row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the row; leave 03 3.2 as is."
+  },
+  {
+   "id": "R8-05-33",
+   "section": "05 5.3 (signing); 06 6.4; 00 0.5",
+   "title": "Commit signing from a dedicated host agent is a product kit with its own surface, setting, check and open question, and no sentence says why the start needs it.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-19"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A second adopter cannot tell whether to adopt the git-ssh-sign kit or ignore it.",
+   "change": "Add to the 06 6.4 git-ssh-sign intro: \"it exists because the maintainer signs every commit and runs no agent that cannot; it is opt-in\", and mark it opt-in in the README outline.",
+   "cost": "Two sentences.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply in 06 6.4 rather than 00 0.5, so the scope text does not change."
+  },
+  {
+   "id": "R8-05-34",
+   "section": "05 5.3",
+   "title": ".github/workflows/release.yml matches the release and dependencies surfaces, so tools/ci pr asks for two approval lines and the overlap is named nowhere.",
+   "severity": "Advisory",
+   "lenses": [
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13b-38"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A PR editing release.yml carries a release line and fails pr for the missing dependencies line; the author adds a second line with the same words.",
+   "change": "Add under the 05 5.3 list: \"A path may match several surfaces; one approval line may name several surface ids, and it covers each.\"",
+   "cost": "One sentence and a small pr clause.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as written."
+  },
+  {
+   "id": "R8-05-35",
+   "section": "05 5.3 (dependencies); ADR 0007",
+   "title": "The dependencies surface lists every path where mise reads its configuration as measured with mise 2026.10.3, and nothing re-measures mise's config discovery when the mise pin moves.",
+   "severity": "Advisory",
+   "lenses": [
+    "L15"
+   ],
+   "finding_ids": [
+    "L15-23"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A mise bump reads a new config file name; a change adds that file without touching an ask-first surface or tripping hygiene.",
+   "change": "Add to 05 5.3 after the dependencies sentence: \"a change of the mise pin re-measures config discovery at the new version, named in the PR's Evidence\". Add the mise counterpart of the golangci-lint sentence to ADR 0007 Consequences.",
+   "cost": "One sentence, one ADR sentence.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the 05 5.3 sentence now; the ADR 0007 sentence goes to the operator with the next decisions batch."
+  },
+  {
+   "id": "R8-05-36",
+   "section": "05 5.3; 12 12.8",
+   "title": "Every ask-first surface has one owner and no contribution path or continuity statement is given for outside contributors.",
+   "severity": "Advisory",
+   "lenses": [
+    "L10"
+   ],
+   "finding_ids": [
+    "L10-23"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An adopter opens a catalog PR for their stack and no page says who reviews it or when.",
+   "change": "Add to 12 12.8's CONTRIBUTING outline one row: \"outside PRs to the catalog and kits: the evidence a PR needs; reviewed by the one maintainer, best effort\". Add a Deferred decisions row \"a second owner for ask-first surfaces; reopened by the first outside PR on a surface\".",
+   "cost": "One outline row, one deferred row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as written; no continuity promise beyond what one person can keep."
+  },
+  {
+   "id": "R8-05-37",
+   "section": "05 5.4",
+   "title": "The first mention of ADR 0008 in 05 is the bare \"(ADR 0008)\" in the second row of 5.4, before the linked mention, which rule 9 of ADR 0001 fails once its check lands in T086.",
+   "severity": "Required",
+   "lenses": [
+    "L8"
+   ],
+   "finding_ids": [
+    "L8-13"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "T086 lands the rule 9 check and tools/ci all goes red on 05-security.md in an unrelated PR late in the plan.",
+   "change": "Write the first mention in 05 (row 2 of 5.4, or the threat paragraph if R8-05-5 adds one there) as \"[ADR 0008, let the sandbox act as the maintainer on GitHub](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md)\"; move the rule 9 matcher over the spec from T086 to T006 in the plan.",
+   "cost": "One edit and one plan move.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as written."
+  },
+  {
+   "id": "R8-05-38",
+   "section": "05 5.3; 01 1.7; index",
+   "title": "docs/spec/** is on no ask-first surface while the spec is the plan's source of truth and tools/ci vocabulary and sequences read its tables, so gate inputs and the security model sit outside the gate.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-15"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An agent PR edits the Not column of 01 1.7 to make its wording pass tools/ci vocabulary and rewrites a 05 5.4 row in the same change; no approval line is required and it merges.",
+   "change": "Add a surface to 05 5.3: \"- id: specification / globs: [docs/spec.md, docs/spec/01-system-model.md, docs/spec/05-security.md] / reason: the tables the checks read and the security model\". The alternative moves the two tables to data files under tools/ci rendered into the spec.",
+   "cost": "Three globs, or two data files and two generator rows.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the three-file surface: it covers the check inputs and the security model without an approval on every spec edit.",
+   "operator_reason": "The maintainer decided in round 3 which documents are surfaces (decision records, check code); adding the spec changes that decision and the approval load."
+  },
+  {
+   "id": "R8-05-39",
+   "section": "05 (threat model)",
+   "title": "The threat paragraph trusts \"the romeu release (built from reviewed, signed commits, with verified attestations)\" while no review is required, commits are signed by the agent's forwarded key, and the attestation proves only that release.yml built the archive.",
+   "severity": "Required",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-24"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A reader concludes the release is human-reviewed and human-signed; neither holds today, so the host side's trust root is an axiom the text does not support.",
+   "change": "Reword to: \"The host operator and the romeu release are trusted. A release is what release.yml built from main and attested (10 10.2); what review, commit signatures and the attestation are worth today is in 05 5.4.\" Make 02 2.1's \"one signed-commit release\" follow. If R8-05-1 chooses (b), add \"and signed by the maintainer\".",
+   "cost": "Two sentences.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the reword now; it holds under either outcome of the release-signing decision."
+  }
+ ]
+}

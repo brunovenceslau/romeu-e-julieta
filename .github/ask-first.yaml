@@ -44,9 +44,15 @@ surfaces:
   - id: decisions
     globs: [docs/adr/**, .adr-dir]
     reason: decision records; one leaves Proposed, or changes after that, with the maintainer's approval
+  - id: spec
+    globs: [docs/spec.md, docs/spec/01-system-model.md, docs/spec/05-security.md]
+    reason: the gates read tables in these pages (the vocabulary in 01 1.7 and the index), and 05 holds the security model
+  - id: approvals
+    globs: [tools/ci/askfirst.go, tools/ci/denylist.yaml, .github/workflows/**]
+    reason: the approval-line and grant check, the forbidden-name denylist, and the workflows that choose what runs
   - id: checks
     globs: [tools/ci/**, .githooks/**, .golangci.yml, docs/acceptance.json]
     reason: the code of the gates and reports, with the forbidden-name denylist (tools/ci/denylist.yaml), the linter configuration, and the acceptance file, whose command items tools/ci acceptance runs
   - id: ask-first
-    globs: [.github/ask-first.yaml, .github/CODEOWNERS]
-    reason: this list, and the CODEOWNERS file generated from it
+    globs: [.github/ask-first.yaml, .github/CODEOWNERS, docs/grants.yaml]
+    reason: this list, the CODEOWNERS file generated from it, and the checkpoint grants that stand in for approval lines

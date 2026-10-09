@@ -1,0 +1,1641 @@
+{
+ "checked": 503,
+ "regressions": [
+  {
+   "cluster_id": "R8-06-1",
+   "round": "round 6",
+   "finding": "op-personal-kits (maintainer decision): the rule refuses network, mount, volume, credential and ssh-agent capabilities in personal kits; accepted cost 'a personal kit can still run an install step; the gate diff is the control'.",
+   "why": "The proposed change makes sync refuse install steps and lifecycle hooks in personal kits until A14 shows they run inside the microVM. That reverses the accepted cost of a maintainer decision, yet the cluster is marked M (apply), not operator. Route to the operator or reconcile (for example: keep the A14 observations, state the refusal as an option the operator may take once A14 reports)."
+  },
+  {
+   "cluster_id": "R8-10-52",
+   "round": "round 2; round 5",
+   "finding": "dd N8: julieta accepts manifest protocols N and N-1. op-ledger-versioned (maintainer decision): the event schema is versioned and ingest accepts versions N and N-1.",
+   "why": "The cluster replaces both windows with exact match and a Deferred row, marked A. It reverses a round 5 maintainer decision and a round 2 fix, and contradicts R8-13-10 (keeps ADR 0006's N and N-1 window) and R8-06-7 (adds the symmetric julieta-side window). Needs the operator or must be dropped in favour of R8-13-10."
+  },
+  {
+   "cluster_id": "R8-10-4",
+   "round": "round 6; round 2",
+   "finding": "op-acceptance-after-release (maintainer decision): tools/ci acceptance leaves the release workflow; the acceptance file is committed by the final plan task after the release. te N11 (round 2) had put acceptance in release.yml; round 6 took it out. op-probe-completeness and R3-testability-15 put the completeness checks in acceptance so that all is not red until block B.",
+   "why": "R8-10-4 and R8-10-44 put tools/ci acceptance --pre-tag back into release.yml and move the four completeness checks into tools/ci all; R8-11-7 adds the candidate comparison to release.yml. These reopen what round 6 decided and, after v1.0.0, a new probe or journey would again turn all red until measured, the exact cost op-probe-completeness avoided. Marked M and A; they need the operator because they reverse a maintainer decision."
+  },
+  {
+   "cluster_id": "R8-10-44",
+   "round": "round 6; round 2",
+   "finding": "op-acceptance-after-release (maintainer decision): tools/ci acceptance leaves the release workflow; the acceptance file is committed by the final plan task after the release. te N11 (round 2) had put acceptance in release.yml; round 6 took it out. op-probe-completeness and R3-testability-15 put the completeness checks in acceptance so that all is not red until block B.",
+   "why": "R8-10-4 and R8-10-44 put tools/ci acceptance --pre-tag back into release.yml and move the four completeness checks into tools/ci all; R8-11-7 adds the candidate comparison to release.yml. These reopen what round 6 decided and, after v1.0.0, a new probe or journey would again turn all red until measured, the exact cost op-probe-completeness avoided. Marked M and A; they need the operator because they reverse a maintainer decision."
+  },
+  {
+   "cluster_id": "R8-11-7",
+   "round": "round 6; round 2",
+   "finding": "op-acceptance-after-release (maintainer decision): tools/ci acceptance leaves the release workflow; the acceptance file is committed by the final plan task after the release. te N11 (round 2) had put acceptance in release.yml; round 6 took it out. op-probe-completeness and R3-testability-15 put the completeness checks in acceptance so that all is not red until block B.",
+   "why": "R8-10-4 and R8-10-44 put tools/ci acceptance --pre-tag back into release.yml and move the four completeness checks into tools/ci all; R8-11-7 adds the candidate comparison to release.yml. These reopen what round 6 decided and, after v1.0.0, a new probe or journey would again turn all red until measured, the exact cost op-probe-completeness avoided. Marked M and A; they need the operator because they reverse a maintainer decision."
+  },
+  {
+   "cluster_id": "R8-10-3",
+   "round": "round 6",
+   "finding": "R3-critic-09 (O, maintainer decision): tools/release publish creates a published release, never a draft.",
+   "why": "The proposed flow has tools/release publish create a draft, upload every asset, then publish. The end state is published, but the text contradicts the recorded 'never a draft'. Reconcile the wording with the round 6 record (a draft that exists only inside one publish call) or route to the operator with the immutability setting."
+  },
+  {
+   "cluster_id": "R8-10-19",
+   "round": "round 4; round 6",
+   "finding": "op-practices, op-pairing-rule, op-backfill, op-maintainer-wait, op-pr-size (round 4 maintainer decisions) all depend on the metrics tool. op-dora-late (round 6 maintainer decision) kept tools/ci dora in v1, landing with ci-release.",
+   "why": "Deferring tools/ci dora out of v1 reopens op-dora-late and leaves the round 4 decisions (backfill baseline, maintainer wait, PR size reported by the tool) without their mechanism. Correctly marked operator; the recommendation should name these decisions so the operator supersedes them explicitly."
+  },
+  {
+   "cluster_id": "R8-12-9",
+   "round": "round 4; round 6",
+   "finding": "op-practices, op-pairing-rule, op-backfill, op-maintainer-wait, op-pr-size (round 4 maintainer decisions) all depend on the metrics tool. op-dora-late (round 6 maintainer decision) kept tools/ci dora in v1, landing with ci-release.",
+   "why": "Deferring tools/ci dora out of v1 reopens op-dora-late and leaves the round 4 decisions (backfill baseline, maintainer wait, PR size reported by the tool) without their mechanism. Correctly marked operator; the recommendation should name these decisions so the operator supersedes them explicitly."
+  },
+  {
+   "cluster_id": "R8-adr-14",
+   "round": "round 4; round 6",
+   "finding": "op-practices, op-pairing-rule, op-backfill, op-maintainer-wait, op-pr-size (round 4 maintainer decisions) all depend on the metrics tool. op-dora-late (round 6 maintainer decision) kept tools/ci dora in v1, landing with ci-release.",
+   "why": "Deferring tools/ci dora out of v1 reopens op-dora-late and leaves the round 4 decisions (backfill baseline, maintainer wait, PR size reported by the tool) without their mechanism. Correctly marked operator; the recommendation should name these decisions so the operator supersedes them explicitly."
+  },
+  {
+   "cluster_id": "R8-10-40",
+   "round": "round 2; round 6",
+   "finding": "craft C19: tools/release notes generated from Conventional Commits and PR Why sections. op-acceptance-after-release: release notes count from the last tag that is not a prerelease.",
+   "why": "Deferring tools/release notes to the v1.1.0 tag and hand-writing the v1.0.0 notes reverses craft C19 for v1 and touches a clause of a maintainer decision. Marked A; it also conflicts with R8-12-3 and R8-12-4, which keep and extend the generator. Resolve the conflict first; if the deferral stands, it needs the operator."
+  },
+  {
+   "cluster_id": "R8-05-25",
+   "round": "round 6",
+   "finding": "R3-critic-04: tools/ci invariants pairs the tags in the code; tools/ci acceptance checks once that every row of 05 5.2 has both (so all is not red while invariants land incrementally).",
+   "why": "Moving the 'every 05 5.2 row has a guard tag and a test tag' check into tools/ci invariants, a step of all, reintroduces the red-until-done problem round 6 placed the check in acceptance to avoid. Keep the deleted-with-its-tags detection but as a diff-based rule (a row removed from 05 5.2 in the same PR) or in acceptance, as round 6 chose."
+  },
+  {
+   "cluster_id": "R8-03-25",
+   "round": "round 6",
+   "finding": "R3-newcomer-01 (High, O via op-probe-completeness): tools/ci probes kept all red until block B; resolution included 'a golden with no recorded A5 hash is not flagged (11 11.4)'.",
+   "why": "The cluster has tools/ci probes flag a golden with no recorded hash as needing a probe. If that flag fails the step, it reopens the red-until-block-B defect round 6 closed; if it is informational, say so. Reword to a non-failing notice or move the check to tools/ci acceptance."
+  },
+  {
+   "cluster_id": "R8-03-13",
+   "round": "round 1; round 2",
+   "finding": "te C1: e2e origins via git http-backend over httptest TLS, with host settings gitHosts[].caFile pointing at the test CA and gitsafe having no test override. te C1 residual (round 2): unit test that gitsafe refuses file:// and plain paths when caFile is set. 10 10.1's E2E row still states this.",
+   "why": "R8-03-13 and R8-04-36 move caFile to a Deferred row and drop its unit test (R8-07-10 passes the caFile part to page 03). caFile is the seam the E2E level needs for its TLS test CA; removing it either breaks the e2e origins or forces the test override te C1 forbade. R8-05-21 found the same consumer and keeps caFile; take R8-05-21's form and drop the caFile part of the other three."
+  },
+  {
+   "cluster_id": "R8-04-36",
+   "round": "round 1; round 2",
+   "finding": "te C1: e2e origins via git http-backend over httptest TLS, with host settings gitHosts[].caFile pointing at the test CA and gitsafe having no test override. te C1 residual (round 2): unit test that gitsafe refuses file:// and plain paths when caFile is set. 10 10.1's E2E row still states this.",
+   "why": "R8-03-13 and R8-04-36 move caFile to a Deferred row and drop its unit test (R8-07-10 passes the caFile part to page 03). caFile is the seam the E2E level needs for its TLS test CA; removing it either breaks the e2e origins or forces the test override te C1 forbade. R8-05-21 found the same consumer and keeps caFile; take R8-05-21's form and drop the caFile part of the other three."
+  },
+  {
+   "cluster_id": "R8-07-10",
+   "round": "round 1; round 2",
+   "finding": "te C1: e2e origins via git http-backend over httptest TLS, with host settings gitHosts[].caFile pointing at the test CA and gitsafe having no test override. te C1 residual (round 2): unit test that gitsafe refuses file:// and plain paths when caFile is set. 10 10.1's E2E row still states this.",
+   "why": "R8-03-13 and R8-04-36 move caFile to a Deferred row and drop its unit test (R8-07-10 passes the caFile part to page 03). caFile is the seam the E2E level needs for its TLS test CA; removing it either breaks the e2e origins or forces the test override te C1 forbade. R8-05-21 found the same consumer and keeps caFile; take R8-05-21's form and drop the caFile part of the other three."
+  },
+  {
+   "cluster_id": "R8-04-21",
+   "round": "round 1",
+   "finding": "D12: invariant 'romeu never handles secret values' (I25; boundary B: 'romeu never handles a secret value'); secrets reach sbx only through --command.",
+   "why": "The proposed doctor row runs the bound argv on the host, reads the token's prefix and sends it to the GitHub API to read x-oauth-scopes. romeu would then hold and transmit a secret value, against D12. The block A probe can measure the reach from the maintainer's own session instead; the doctor row should not land as written."
+  },
+  {
+   "cluster_id": "R8-03-12",
+   "round": "round 1",
+   "finding": "D12: invariant 'romeu never handles secret values' (I25, boundary B).",
+   "why": "The doctor row that runs each secret argv once and fails on empty output has romeu receive the value in memory. I25's text covers what romeu writes, so this is a tension rather than a breach; state the limit beside I25 (romeu reads the output only to test for emptiness and never retains, prints or writes it) or test the argv through sbx instead."
+  },
+  {
+   "cluster_id": "R8-01-16",
+   "round": "round 1; round 6",
+   "finding": "sa H2: approval and drift preflight on every sbx path; 01 1.5 states 'Destructive commands (salvage, rm, retire) may run when only the spec moved on, but never on drift or a failed identity check'. Round 6 R3-craftsmanship-14 and R3-doubt-04 narrowed when the preflight runs, keeping that sentence.",
+   "why": "The proposed rule lets salvage, salvage --from-host, stop and pull print a failure of steps 1, 3, 4 and 5 and go on; step 3 is drift and step 4 is the gate 2 digest, so salvage would run on drift, which the round 1 rule forbade by name. The identity stop (step 6) is kept. Decide explicitly whether the drift exemption supersedes sa H2's rule, and record it; T074 (plan) cements the old behaviour."
+  },
+  {
+   "cluster_id": "R8-05-13",
+   "round": "round 1",
+   "finding": "sa H5: dedicated signing-only key and socket, confirm-on-use; B measures ssh-add -L; residual risk listed.",
+   "why": "Deleting 'confirm-on-use where the agent supports it' from the 05 5.4 mitigation removes a mitigation round 1 recorded, while R8-06-13 adds 'added to the dedicated agent with ssh-add -c' (which is confirm-on-use) to 06 6.4 and the J1 guide. Reconcile: keep ssh-add -c as the guide step and point the mitigation at it instead of deleting it."
+  },
+  {
+   "cluster_id": "R8-05-14",
+   "round": "round 1; round 2",
+   "finding": "D8: host reads memory only via romeu handoff, no host extraction (I24). dd D8 residual (round 2): read memory only via romeu handoff.",
+   "why": "The smaller form adds 'or with a pager that shows bytes and runs nothing (less, cat -v)' to the mitigation, loosening the round 1 rule that the host reads memory only through romeu. The deferred romeu memory list|show keeps D8's spirit; the pager clause does not. Marked operator, which is right; name D8 in the recommendation."
+  },
+  {
+   "cluster_id": "R8-04-24",
+   "round": "round 6; round 2",
+   "finding": "R3-doubt-20: two rules for when a hook failure stops being shown; 'since the last session' deleted (08 8.2), leaving one rule. dd N8 (round 2): hook failures recorded and surfaced by SessionStart, julieta status and romeu status.",
+   "why": "The proposal 'show at SessionStart only failures recorded since the last narrative handoff' reintroduces a second rule for when a failure stops being shown, the defect round 6 removed. Keep the dispatcher's stage line (the first half) and drop or rework the SessionStart half (for example, show failures until the same hook next succeeds, which is the surviving rule)."
+  },
+  {
+   "cluster_id": "R8-00-2",
+   "round": "round 6; round 1; round 2; round 7",
+   "finding": "op-migration-set (maintainer decision, in the maintainer's own words): julieta memory import, julieta memory verify and tools/ci acceptance --file with the repo evidence kind stay in v1, because memory that exists will be imported when v1 is adopted. Earlier: te C5 and fid R2 (round 1) made the import generic; te N5 (round 2) added --file and the repo kind; A4 (round 7) reworded the 00 0.5 row.",
+   "why": "Option (a) deletes exactly the set a maintainer decision kept. Correctly routed to the operator; the recommendation 'delete' reverses the maintainer's quoted answer and must say so. R8-index-46 (remove import/ from the allowlist) depends on the same decision."
+  },
+  {
+   "cluster_id": "R8-03-4",
+   "round": "round 6; round 1; round 2; round 7",
+   "finding": "op-migration-set (maintainer decision, in the maintainer's own words): julieta memory import, julieta memory verify and tools/ci acceptance --file with the repo evidence kind stay in v1, because memory that exists will be imported when v1 is adopted. Earlier: te C5 and fid R2 (round 1) made the import generic; te N5 (round 2) added --file and the repo kind; A4 (round 7) reworded the 00 0.5 row.",
+   "why": "Option (a) deletes exactly the set a maintainer decision kept. Correctly routed to the operator; the recommendation 'delete' reverses the maintainer's quoted answer and must say so. R8-index-46 (remove import/ from the allowlist) depends on the same decision."
+  },
+  {
+   "cluster_id": "R8-04-3",
+   "round": "round 6; round 1; round 2; round 7",
+   "finding": "op-migration-set (maintainer decision, in the maintainer's own words): julieta memory import, julieta memory verify and tools/ci acceptance --file with the repo evidence kind stay in v1, because memory that exists will be imported when v1 is adopted. Earlier: te C5 and fid R2 (round 1) made the import generic; te N5 (round 2) added --file and the repo kind; A4 (round 7) reworded the 00 0.5 row.",
+   "why": "Option (a) deletes exactly the set a maintainer decision kept. Correctly routed to the operator; the recommendation 'delete' reverses the maintainer's quoted answer and must say so. R8-index-46 (remove import/ from the allowlist) depends on the same decision."
+  },
+  {
+   "cluster_id": "R8-08-21",
+   "round": "round 6; round 1; round 2; round 7",
+   "finding": "op-migration-set (maintainer decision, in the maintainer's own words): julieta memory import, julieta memory verify and tools/ci acceptance --file with the repo evidence kind stay in v1, because memory that exists will be imported when v1 is adopted. Earlier: te C5 and fid R2 (round 1) made the import generic; te N5 (round 2) added --file and the repo kind; A4 (round 7) reworded the 00 0.5 row.",
+   "why": "Option (a) deletes exactly the set a maintainer decision kept. Correctly routed to the operator; the recommendation 'delete' reverses the maintainer's quoted answer and must say so. R8-index-46 (remove import/ from the allowlist) depends on the same decision."
+  },
+  {
+   "cluster_id": "R8-10-9",
+   "round": "round 6; round 1; round 2; round 7",
+   "finding": "op-migration-set (maintainer decision, in the maintainer's own words): julieta memory import, julieta memory verify and tools/ci acceptance --file with the repo evidence kind stay in v1, because memory that exists will be imported when v1 is adopted. Earlier: te C5 and fid R2 (round 1) made the import generic; te N5 (round 2) added --file and the repo kind; A4 (round 7) reworded the 00 0.5 row.",
+   "why": "Option (a) deletes exactly the set a maintainer decision kept. Correctly routed to the operator; the recommendation 'delete' reverses the maintainer's quoted answer and must say so. R8-index-46 (remove import/ from the allowlist) depends on the same decision."
+  },
+  {
+   "cluster_id": "R8-11-1",
+   "round": "round 6; round 1; round 2; round 7",
+   "finding": "op-migration-set (maintainer decision, in the maintainer's own words): julieta memory import, julieta memory verify and tools/ci acceptance --file with the repo evidence kind stay in v1, because memory that exists will be imported when v1 is adopted. Earlier: te C5 and fid R2 (round 1) made the import generic; te N5 (round 2) added --file and the repo kind; A4 (round 7) reworded the 00 0.5 row.",
+   "why": "Option (a) deletes exactly the set a maintainer decision kept. Correctly routed to the operator; the recommendation 'delete' reverses the maintainer's quoted answer and must say so. R8-index-46 (remove import/ from the allowlist) depends on the same decision."
+  },
+  {
+   "cluster_id": "R8-00-6",
+   "round": "round 6",
+   "finding": "op-handoff-list (maintainer decision): julieta handoff list stays in v1.",
+   "why": "Both clusters end with 'delete the command and its row' when no need is named. That reopens a maintainer decision; R8-00-6 is marked M (apply). Keep the need-rewording and route the deletion branch to the operator."
+  },
+  {
+   "cluster_id": "R8-04-20",
+   "round": "round 6",
+   "finding": "op-handoff-list (maintainer decision): julieta handoff list stays in v1.",
+   "why": "Both clusters end with 'delete the command and its row' when no need is named. That reopens a maintainer decision; R8-00-6 is marked M (apply). Keep the need-rewording and route the deletion branch to the operator."
+  },
+  {
+   "cluster_id": "R8-00-1",
+   "round": "round 5",
+   "finding": "op-ledger and the eleven other op-ledger-* maintainer decisions accepted the runtime ledger design as a whole for v1; the pass added the mounts, the ingest steps, I31 to I33 and the plan tasks.",
+   "why": "Option (a) / option 2 moves the ledger out of v1 and deletes those additions. Correctly routed to the operator, but R8-12-8 and R8-adr-2 recommend deferral while R8-00-1 recommends keeping; the consolidator should present one recommendation and name the round 5 decisions it supersedes."
+  },
+  {
+   "cluster_id": "R8-12-8",
+   "round": "round 5",
+   "finding": "op-ledger and the eleven other op-ledger-* maintainer decisions accepted the runtime ledger design as a whole for v1; the pass added the mounts, the ingest steps, I31 to I33 and the plan tasks.",
+   "why": "Option (a) / option 2 moves the ledger out of v1 and deletes those additions. Correctly routed to the operator, but R8-12-8 and R8-adr-2 recommend deferral while R8-00-1 recommends keeping; the consolidator should present one recommendation and name the round 5 decisions it supersedes."
+  },
+  {
+   "cluster_id": "R8-13-1",
+   "round": "round 5",
+   "finding": "op-ledger and the eleven other op-ledger-* maintainer decisions accepted the runtime ledger design as a whole for v1; the pass added the mounts, the ingest steps, I31 to I33 and the plan tasks.",
+   "why": "Option (a) / option 2 moves the ledger out of v1 and deletes those additions. Correctly routed to the operator, but R8-12-8 and R8-adr-2 recommend deferral while R8-00-1 recommends keeping; the consolidator should present one recommendation and name the round 5 decisions it supersedes."
+  },
+  {
+   "cluster_id": "R8-adr-2",
+   "round": "round 5",
+   "finding": "op-ledger and the eleven other op-ledger-* maintainer decisions accepted the runtime ledger design as a whole for v1; the pass added the mounts, the ingest steps, I31 to I33 and the plan tasks.",
+   "why": "Option (a) / option 2 moves the ledger out of v1 and deletes those additions. Correctly routed to the operator, but R8-12-8 and R8-adr-2 recommend deferral while R8-00-1 recommends keeping; the consolidator should present one recommendation and name the round 5 decisions it supersedes."
+  },
+  {
+   "cluster_id": "R8-13-3",
+   "round": "round 5",
+   "finding": "op-ledger-absolute (maintainer decision): nothing in the ledger is ever edited or deleted: no exception, no tombstone, no redaction event. op-ledger-secret: a secret that lands stays; the remedy is rotation.",
+   "why": "Owner removal of a project's entries or the whole ledger by hand is an exception the round 5 decision excluded by name ('no exception'). Correctly routed to the operator; the recommendation 'accept owner removal as a stated limit' should quote op-ledger-absolute so the operator supersedes it knowingly."
+  },
+  {
+   "cluster_id": "R8-adr-21",
+   "round": "round 5",
+   "finding": "op-ledger-absolute (maintainer decision): nothing in the ledger is ever edited or deleted: no exception, no tombstone, no redaction event. op-ledger-secret: a secret that lands stays; the remedy is rotation.",
+   "why": "Owner removal of a project's entries or the whole ledger by hand is an exception the round 5 decision excluded by name ('no exception'). Correctly routed to the operator; the recommendation 'accept owner removal as a stated limit' should quote op-ledger-absolute so the operator supersedes it knowingly."
+  },
+  {
+   "cluster_id": "R8-04-34",
+   "round": "round 1; round 2",
+   "finding": "D3: per-machine toolchain acknowledgement (sbx version, romeu version, catalog digest). sa M5: approval records the rendered hash; toolchain ack holds romeu version. sa N4: gate 1 prints the julieta version change and the catalog diff. te N10: gate 1 e2e exits 3 before any mutating call.",
+   "why": "The first branch folds gate 1 into a version check and deletes approve --toolchain and acknowledgedAt, which removes the mechanism four round 1 and 2 fixes built. The consolidator recommends keeping gate 1 and stating its threat; that branch has no regression. R8-01-11 and R8-03-36 take the same safe form."
+  },
+  {
+   "cluster_id": "R8-04-35",
+   "round": "round 1",
+   "finding": "D27: julieta pin check covers the config repo's CI workflow julieta pin.",
+   "why": "Deferring pin check removes the round 1 mechanism and conflicts with R8-02-4 (which extends pin check to a sha256 comparison) and R8-04-28 (which leans on pin check as the only freshness signal). R8-06-20 is marked M (apply) while R8-04-35 is operator with a keep recommendation; align on keep."
+  },
+  {
+   "cluster_id": "R8-06-20",
+   "round": "round 1",
+   "finding": "D27: julieta pin check covers the config repo's CI workflow julieta pin.",
+   "why": "Deferring pin check removes the round 1 mechanism and conflicts with R8-02-4 (which extends pin check to a sha256 comparison) and R8-04-28 (which leans on pin check as the only freshness signal). R8-06-20 is marked M (apply) while R8-04-35 is operator with a keep recommendation; align on keep."
+  },
+  {
+   "cluster_id": "R8-12-16",
+   "round": "round 6",
+   "finding": "R3-craftsmanship-01: 'Depends on' in 12 12.2 is plan order, 10 10.7 is the import rule. R3-critic-03 (ledger and julieta-core depend on each other) was rejected because 12.2 lists plan order.",
+   "why": "Redefining 'Depends on' as 'the modules whose code the module needs' changes the semantics round 6 used to reject a cycle finding; the ledger and julieta-core edges would then read as a real cycle. Either keep plan-order semantics and fix the edges named, or redefine and handle the cycle in the same edit."
+  },
+  {
+   "cluster_id": "R8-00-7",
+   "round": "round 6; round 1; round 2",
+   "finding": "op-no-live-view (maintainer decision): the live-view step and its probe are deleted; accepted cost 'none; the v1.1 helper stays listed in 00 0.5'. scope-extras (round 1): extras marked v1.1. Conflict 3 (round 2): the registry credential recorded as Q23.",
+   "why": "Deleting the v1.1 row moves the Remote-SSH helper out of 00 0.5, where a round 6 decision says it stays listed. Low risk: the helper remains in the spec as a Deferred row. Say so in the recommendation so the move is a recorded supersession, not a silent one."
+  },
+  {
+   "cluster_id": "R8-07-3",
+   "round": "round 6; round 1; round 2",
+   "finding": "op-no-live-view (maintainer decision): the live-view step and its probe are deleted; accepted cost 'none; the v1.1 helper stays listed in 00 0.5'. scope-extras (round 1): extras marked v1.1. Conflict 3 (round 2): the registry credential recorded as Q23.",
+   "why": "Deleting the v1.1 row moves the Remote-SSH helper out of 00 0.5, where a round 6 decision says it stays listed. Low risk: the helper remains in the spec as a Deferred row. Say so in the recommendation so the move is a recorded supersession, not a silent one."
+  },
+  {
+   "cluster_id": "R8-index-3",
+   "round": "round 6; round 1; round 2",
+   "finding": "op-no-live-view (maintainer decision): the live-view step and its probe are deleted; accepted cost 'none; the v1.1 helper stays listed in 00 0.5'. scope-extras (round 1): extras marked v1.1. Conflict 3 (round 2): the registry credential recorded as Q23.",
+   "why": "Deleting the v1.1 row moves the Remote-SSH helper out of 00 0.5, where a round 6 decision says it stays listed. Low risk: the helper remains in the spec as a Deferred row. Say so in the recommendation so the move is a recorded supersession, not a silent one."
+  },
+  {
+   "cluster_id": "R8-00-8",
+   "round": "round 1; round 2; round 6",
+   "finding": "te H4: S8 measured in CI with fake sbx. te H4 residual: julieta setup no-op <= 3 s timed in the container e2e (median of 5). op-s8-limit (maintainer decision): no timing field is added; the julieta setup budget is measured in the container e2e against local origins. R3-testability-14: --timings --json gets the run-timings.v1 schema.",
+   "why": "Dropping --timings, run-timings.v1 and the CI assertion removes the CI measurement te H4 established for romeu's half and moots R3-testability-14. The julieta half (the container e2e timing under op-s8-limit) must stay whichever way the operator decides. R8-index-23 keeps --timings and conflicts with these four; present one recommendation."
+  },
+  {
+   "cluster_id": "R8-02-14",
+   "round": "round 1; round 2; round 6",
+   "finding": "te H4: S8 measured in CI with fake sbx. te H4 residual: julieta setup no-op <= 3 s timed in the container e2e (median of 5). op-s8-limit (maintainer decision): no timing field is added; the julieta setup budget is measured in the container e2e against local origins. R3-testability-14: --timings --json gets the run-timings.v1 schema.",
+   "why": "Dropping --timings, run-timings.v1 and the CI assertion removes the CI measurement te H4 established for romeu's half and moots R3-testability-14. The julieta half (the container e2e timing under op-s8-limit) must stay whichever way the operator decides. R8-index-23 keeps --timings and conflicts with these four; present one recommendation."
+  },
+  {
+   "cluster_id": "R8-03-16",
+   "round": "round 1; round 2; round 6",
+   "finding": "te H4: S8 measured in CI with fake sbx. te H4 residual: julieta setup no-op <= 3 s timed in the container e2e (median of 5). op-s8-limit (maintainer decision): no timing field is added; the julieta setup budget is measured in the container e2e against local origins. R3-testability-14: --timings --json gets the run-timings.v1 schema.",
+   "why": "Dropping --timings, run-timings.v1 and the CI assertion removes the CI measurement te H4 established for romeu's half and moots R3-testability-14. The julieta half (the container e2e timing under op-s8-limit) must stay whichever way the operator decides. R8-index-23 keeps --timings and conflicts with these four; present one recommendation."
+  },
+  {
+   "cluster_id": "R8-04-17",
+   "round": "round 1; round 2; round 6",
+   "finding": "te H4: S8 measured in CI with fake sbx. te H4 residual: julieta setup no-op <= 3 s timed in the container e2e (median of 5). op-s8-limit (maintainer decision): no timing field is added; the julieta setup budget is measured in the container e2e against local origins. R3-testability-14: --timings --json gets the run-timings.v1 schema.",
+   "why": "Dropping --timings, run-timings.v1 and the CI assertion removes the CI measurement te H4 established for romeu's half and moots R3-testability-14. The julieta half (the container e2e timing under op-s8-limit) must stay whichever way the operator decides. R8-index-23 keeps --timings and conflicts with these four; present one recommendation."
+  },
+  {
+   "cluster_id": "R8-index-23",
+   "round": "round 1; round 6",
+   "finding": "te H4: S8 measured in CI with fake sbx. op-s8-limit: the julieta setup budget of S8 is measured in the container e2e.",
+   "why": "'In CI, record romeuMs ... and assert nothing on it' turns the round 1 CI measurement of romeu's half into a recording; the gate moves to B5 on a host. The julieta half must keep its container e2e assertion. Low risk if stated; conflicts with R8-00-8 and its duplicates."
+  },
+  {
+   "cluster_id": "R8-05-2",
+   "round": "round 3; round 4; round 6",
+   "finding": "N1 (round 3): any ADR diff needs the approval line and a code-owner review. op-residual-risks (round 4): with one account the code-owner review is not independent. op-ruleset-approvals (round 6, maintainer decision): the ruleset dismisses an approval on push and requires approval of the most recent reviewable push.",
+   "why": "Writing the merge gate as measured (no review required, ADR 0008) deletes the text that implemented op-ruleset-approvals and the round 3 code-owner rule. Not a regression of a defect: a later measurement superseded them. The new ADR these clusters propose should name op-ruleset-approvals and N1 as superseded in part, so the trail is explicit."
+  },
+  {
+   "cluster_id": "R8-10-8",
+   "round": "round 3; round 4; round 6",
+   "finding": "N1 (round 3): any ADR diff needs the approval line and a code-owner review. op-residual-risks (round 4): with one account the code-owner review is not independent. op-ruleset-approvals (round 6, maintainer decision): the ruleset dismisses an approval on push and requires approval of the most recent reviewable push.",
+   "why": "Writing the merge gate as measured (no review required, ADR 0008) deletes the text that implemented op-ruleset-approvals and the round 3 code-owner rule. Not a regression of a defect: a later measurement superseded them. The new ADR these clusters propose should name op-ruleset-approvals and N1 as superseded in part, so the trail is explicit."
+  },
+  {
+   "cluster_id": "R8-12-1",
+   "round": "round 3; round 4; round 6",
+   "finding": "N1 (round 3): any ADR diff needs the approval line and a code-owner review. op-residual-risks (round 4): with one account the code-owner review is not independent. op-ruleset-approvals (round 6, maintainer decision): the ruleset dismisses an approval on push and requires approval of the most recent reviewable push.",
+   "why": "Writing the merge gate as measured (no review required, ADR 0008) deletes the text that implemented op-ruleset-approvals and the round 3 code-owner rule. Not a regression of a defect: a later measurement superseded them. The new ADR these clusters propose should name op-ruleset-approvals and N1 as superseded in part, so the trail is explicit."
+  },
+  {
+   "cluster_id": "R8-adr-1",
+   "round": "round 3; round 4; round 6",
+   "finding": "N1 (round 3): any ADR diff needs the approval line and a code-owner review. op-residual-risks (round 4): with one account the code-owner review is not independent. op-ruleset-approvals (round 6, maintainer decision): the ruleset dismisses an approval on push and requires approval of the most recent reviewable push.",
+   "why": "Writing the merge gate as measured (no review required, ADR 0008) deletes the text that implemented op-ruleset-approvals and the round 3 code-owner rule. Not a regression of a defect: a later measurement superseded them. The new ADR these clusters propose should name op-ruleset-approvals and N1 as superseded in part, so the trail is explicit."
+  },
+  {
+   "cluster_id": "R8-05-10",
+   "round": "round 6; round 7",
+   "finding": "G1, M3, M4, B5: the maintainer block of ci-bootstrap, items a to e, the four tries and the host-side checks. Round 7 'What the maintainer has to do' lists item e and the host checks as still to do.",
+   "why": "Moving items a to e and the Try/Result table wholesale out of 10 10.2 can take pending steps (item e after step 2, the host-side refusal checks for a second account) into history. R8-10-18 keeps the to-do items; take its form."
+  },
+  {
+   "cluster_id": "R8-12-24",
+   "round": "round 6; round 7",
+   "finding": "G1, M3, M4, B5: the maintainer block of ci-bootstrap, items a to e, the four tries and the host-side checks. Round 7 'What the maintainer has to do' lists item e and the host checks as still to do.",
+   "why": "Moving items a to e and the Try/Result table wholesale out of 10 10.2 can take pending steps (item e after step 2, the host-side refusal checks for a second account) into history. R8-10-18 keeps the to-do items; take its form."
+  },
+  {
+   "cluster_id": "R8-01-3",
+   "round": "round 6",
+   "finding": "R3-doubt-17: no record held the workspace files' hash; resolved by stating they are regenerated from state and not drift-checked (01 1.2).",
+   "why": "Adding a doctor derive-and-compare row adds a check round 6 chose not to add. Not a defect reopened; a supersession of a round 6 resolution. Record it as such in the 01 1.2 text."
+  },
+  {
+   "cluster_id": "R8-01-21",
+   "round": "round 2",
+   "finding": "craft C2: candidate lifecycle as a state machine (rendered, awaiting, approved, promoted, declined, superseded). sa N7 / sa H2: approve binds to candidate id and digests, promotion only on approval. The simplicity table counted 'adopt' and the state machine.",
+   "why": "Deleting awaiting, superseded and approve <name> removes states round 2 added deliberately. No defect reopens (the TTY path keeps 'promoted only on approval'), but the round 2 counts and craft C2 are superseded; R8-01-31 and R8-04-7 depend on the outcome. R8-04-19 routes it to the operator; R8-01-21 is M. Align on operator."
+  },
+  {
+   "cluster_id": "R8-04-19",
+   "round": "round 2",
+   "finding": "craft C2: candidate lifecycle as a state machine (rendered, awaiting, approved, promoted, declined, superseded). sa N7 / sa H2: approve binds to candidate id and digests, promotion only on approval. The simplicity table counted 'adopt' and the state machine.",
+   "why": "Deleting awaiting, superseded and approve <name> removes states round 2 added deliberately. No defect reopens (the TTY path keeps 'promoted only on approval'), but the round 2 counts and craft C2 are superseded; R8-01-31 and R8-04-7 depend on the outcome. R8-04-19 routes it to the operator; R8-01-21 is M. Align on operator."
+  },
+  {
+   "cluster_id": "R8-04-8",
+   "round": "round 2",
+   "finding": "craft C7: stable error ids RJ-<exit><nn>; dd N3: the identity error RJ-203 names adopt (cited in 01 1.5, I26, 09 J3).",
+   "why": "R8-04-8 renumbers ids to one RJ-<nnn> sequence without the exit prefix and R8-04-4 splits RJ-301 and exit 4. Both supersede craft C7's scheme and move cited ids (RJ-203, RJ-204, RJ-301). No defect reopens; the citations must be updated in the same pass and the scheme change recorded."
+  },
+  {
+   "cluster_id": "R8-04-4",
+   "round": "round 2",
+   "finding": "craft C7: stable error ids RJ-<exit><nn>; dd N3: the identity error RJ-203 names adopt (cited in 01 1.5, I26, 09 J3).",
+   "why": "R8-04-8 renumbers ids to one RJ-<nnn> sequence without the exit prefix and R8-04-4 splits RJ-301 and exit 4. Both supersede craft C7's scheme and move cited ids (RJ-203, RJ-204, RJ-301). No defect reopens; the citations must be updated in the same pass and the scheme change recorded."
+  },
+  {
+   "cluster_id": "R8-05-4",
+   "round": "round 3",
+   "finding": "N2: the approval-quote form was defined nowhere; resolved by one form, in 12 12.4, which rule 8 and 05 5.3 point to.",
+   "why": "A checkpoint grant is a second accepted form of approval line beside the one form round 3 chose. Correctly routed to the operator; name N2 so the second form is a deliberate addition."
+  },
+  {
+   "cluster_id": "R8-10-50",
+   "round": "round 6",
+   "finding": "R3-simplicity-02: day one has tools/new adr, generated, sequences, pr and the ask-first list; each other kind and generator lands with its module (10 10.2, 12 12.2, 12 12.3; index). N10 (round 3): hygiene, fast and the hook land in one commit.",
+   "why": "The proposed day-one marking (fast, hygiene, workflows, unit, invariants) differs from the list round 6 wrote into 12 12.2. Low risk; make the 10 10.2 marking match 12 12.2's day-one list or change both together."
+  },
+  {
+   "cluster_id": "R8-adr-19",
+   "round": "round 6",
+   "finding": "R3-simplicity-02: day one has tools/new adr, generated, sequences, pr and the ask-first list; each other kind and generator lands with its module (10 10.2, 12 12.2, 12 12.3; index). N10 (round 3): hygiene, fast and the hook land in one commit.",
+   "why": "The proposed day-one marking (fast, hygiene, workflows, unit, invariants) differs from the list round 6 wrote into 12 12.2. Low risk; make the 10 10.2 marking match 12 12.2's day-one list or change both together."
+  },
+  {
+   "cluster_id": "R8-04-36",
+   "round": "round 1; round 6",
+   "finding": "D16: lock freshness and 4 platforms. R3-simplicity-06: --check requires the two linux ones; a missing macOS entry is a warning (the smaller fix).",
+   "why": "Dropping the macOS warning and locking only linux goes past round 6's chosen form. No defect reopens; record the supersession of R3-simplicity-06's warning."
+  },
+  {
+   "cluster_id": "R8-07-10",
+   "round": "round 1; round 6",
+   "finding": "D16: lock freshness and 4 platforms. R3-simplicity-06: --check requires the two linux ones; a missing macOS entry is a warning (the smaller fix).",
+   "why": "Dropping the macOS warning and locking only linux goes past round 6's chosen form. No defect reopens; record the supersession of R3-simplicity-06's warning."
+  },
+  {
+   "cluster_id": "R8-adr-10",
+   "round": "round 1; round 2; round 3",
+   "finding": "det-seq: ADR and spec sequence numbers checked by tools/ci. craft C9: tools/new scaffolding with the next free id. #28: one slug function for tools/new adr and tools/ci sequences.",
+   "why": "Dropping contiguity changes the sequence check round 1 introduced. Correctly routed to the operator; low risk."
+  },
+  {
+   "cluster_id": "R8-02-18",
+   "round": "round 2",
+   "finding": "dd N2: binary names use Go arch names chosen by romeu's GOARCH; Q21 recorded as a new open question (sandbox arch equals host arch, probed by A4).",
+   "why": "Embedding only romeu's own GOARCH binary assumes Q21's default before A4 settles it. Low risk; state that it rests on Q21's default and that A4 may reopen it."
+  },
+  {
+   "cluster_id": "R8-06-21",
+   "round": "round 2",
+   "finding": "dd N2: binary names use Go arch names chosen by romeu's GOARCH; Q21 recorded as a new open question (sandbox arch equals host arch, probed by A4).",
+   "why": "Embedding only romeu's own GOARCH binary assumes Q21's default before A4 settles it. Low risk; state that it rests on Q21's default and that A4 may reopen it."
+  },
+  {
+   "cluster_id": "R8-index-17",
+   "round": "round 4; round 5; round 6",
+   "finding": "op-gate-run and op-finding-class (round 4 maintainer decisions) each got their own Deferred row with a trigger. op-ledger-retention (round 5): rotation deferred; round 6 gave rotation a trigger and trimmed the tuning row.",
+   "why": "Merging the finding-class row into the gate-run row and the tuning row into rotation folds rows that maintainer decisions created separately. Keep the union of triggers and name the folded decisions; low risk."
+  },
+  {
+   "cluster_id": "R8-index-18",
+   "round": "round 4; round 6",
+   "finding": "op-maintainer-wait (maintainer decision): the wait from a PR being ready to its merge is measured from GitHub timestamps, by the metrics tool. R3-fidelity-5: a Deferred row for whether the maintainer's merge stays a manual checkpoint.",
+   "why": "Renaming the number and the dora.v1 field changes the name of a maintainer-decided measure; the measure itself is unchanged. Low risk; say the measure is op-maintainer-wait's under a clearer name."
+  },
+  {
+   "cluster_id": "R8-12-37",
+   "round": "round 7; round 6",
+   "finding": "M1: the ci-release row lands the README skeleton; the docs row says 'README text'. Round 6 writer's decision: the candidate-to-v1.0.0 rule allows only docs/ and root Markdown changes, so the docs module runs after block B.",
+   "why": "Moving guides and README text before the release candidate changes the arrangement round 7 M1 and the round 6 build order set. Not a defect reopened (docs-only changes are still allowed after the candidate); record it as a supersession of M1's placement."
+  },
+  {
+   "cluster_id": "R8-07-7",
+   "round": "round 6",
+   "finding": "R3-testability-08: --catalog could report an unknown and exit 0; resolved by exit 1 and a ci-run item naming its repository.",
+   "why": "The cluster keeps exit 1 for an unknown backend:tool and downgrades a missing lock host to a warning. Low risk as long as the unknown-key case stays exit 1, which S4's second clause and R8-index-37 depend on."
+  },
+  {
+   "cluster_id": "R8-index-39",
+   "round": "round 3",
+   "finding": "op-equivalence (maintainer decision): local gates are equivalent when the same subcommands run at the same commit on each OS and architecture of the runner list. N6: no equivalence without a run on each platform.",
+   "why": "'run tools/ci all on your platform before opening a PR; CI runs the other platforms' steps' is a contributor rule, not the equivalence rule, so no conflict if 10 10.2's op-equivalence text stays. Low risk; check the Boundaries rewording does not restate equivalence."
+  },
+  {
+   "cluster_id": "R8-index-35",
+   "round": "round 2; round 3; round 6",
+   "finding": "te M8: scheduled fuzz. A-simplicity-3: fuzz.yml calls tools/ci mutate on a schedule. op-acceptance-after-release: the release workflow was slimmed.",
+   "why": "Running mutate inside release.yml before the build adds a second mechanism beside R8-10-28 (release refuses when the latest scheduled fuzz.yml run is not success) for one need, and lengthens the release workflow round 6 slimmed. Low risk; pick one of the two."
+  },
+  {
+   "cluster_id": "R8-10-6",
+   "round": "round 3; round 6",
+   "finding": "A-determinism-5 (a): nothing tied tools/ci to the locked tool versions; resolved by 'the tools start through mise exec'. R3-critic-11: gh pinned in mise.lock for tools/release verify; no version number written.",
+   "why": "Starting gh by the path mise which resolves rather than mise exec changes the round 3 mechanism for one tool. The spec already measured the mise exec fallback, so this is a correction; record that A-determinism-5 (a)'s form is superseded for gh."
+  },
+  {
+   "cluster_id": "R8-12-17",
+   "round": "round 3; round 6",
+   "finding": "A-determinism-5 (a): nothing tied tools/ci to the locked tool versions; resolved by 'the tools start through mise exec'. R3-critic-11: gh pinned in mise.lock for tools/release verify; no version number written.",
+   "why": "Starting gh by the path mise which resolves rather than mise exec changes the round 3 mechanism for one tool. The spec already measured the mise exec fallback, so this is a correction; record that A-determinism-5 (a)'s form is superseded for gh."
+  }
+ ],
+ "already_resolved": [
+  {
+   "cluster_id": "R8-00-2",
+   "round": "round 6 (also rounds 1, 2, 7)",
+   "how": "The same question (features that trace to nothing: import, verify, --file with the repo kind) was raised as R3-simplicity-03 and decided by op-migration-set: they stay in v1, in the maintainer's own words. Round 1 te C5 and fid R2 made the import generic; round 2 te N5 added --file and the repo evidence kind; round 7 A4 reworded the 00 0.5 row. The fix held; round 8 asks to reverse the decision, not to repair a regression."
+  },
+  {
+   "cluster_id": "R8-03-4",
+   "round": "round 6 (also rounds 1, 2, 7)",
+   "how": "The same question (features that trace to nothing: import, verify, --file with the repo kind) was raised as R3-simplicity-03 and decided by op-migration-set: they stay in v1, in the maintainer's own words. Round 1 te C5 and fid R2 made the import generic; round 2 te N5 added --file and the repo evidence kind; round 7 A4 reworded the 00 0.5 row. The fix held; round 8 asks to reverse the decision, not to repair a regression."
+  },
+  {
+   "cluster_id": "R8-04-3",
+   "round": "round 6 (also rounds 1, 2, 7)",
+   "how": "The same question (features that trace to nothing: import, verify, --file with the repo kind) was raised as R3-simplicity-03 and decided by op-migration-set: they stay in v1, in the maintainer's own words. Round 1 te C5 and fid R2 made the import generic; round 2 te N5 added --file and the repo evidence kind; round 7 A4 reworded the 00 0.5 row. The fix held; round 8 asks to reverse the decision, not to repair a regression."
+  },
+  {
+   "cluster_id": "R8-08-21",
+   "round": "round 6 (also rounds 1, 2, 7)",
+   "how": "The same question (features that trace to nothing: import, verify, --file with the repo kind) was raised as R3-simplicity-03 and decided by op-migration-set: they stay in v1, in the maintainer's own words. Round 1 te C5 and fid R2 made the import generic; round 2 te N5 added --file and the repo evidence kind; round 7 A4 reworded the 00 0.5 row. The fix held; round 8 asks to reverse the decision, not to repair a regression."
+  },
+  {
+   "cluster_id": "R8-10-9",
+   "round": "round 6 (also rounds 1, 2, 7)",
+   "how": "The same question (features that trace to nothing: import, verify, --file with the repo kind) was raised as R3-simplicity-03 and decided by op-migration-set: they stay in v1, in the maintainer's own words. Round 1 te C5 and fid R2 made the import generic; round 2 te N5 added --file and the repo evidence kind; round 7 A4 reworded the 00 0.5 row. The fix held; round 8 asks to reverse the decision, not to repair a regression."
+  },
+  {
+   "cluster_id": "R8-11-1",
+   "round": "round 6 (also rounds 1, 2, 7)",
+   "how": "The same question (features that trace to nothing: import, verify, --file with the repo kind) was raised as R3-simplicity-03 and decided by op-migration-set: they stay in v1, in the maintainer's own words. Round 1 te C5 and fid R2 made the import generic; round 2 te N5 added --file and the repo evidence kind; round 7 A4 reworded the 00 0.5 row. The fix held; round 8 asks to reverse the decision, not to repair a regression."
+  },
+  {
+   "cluster_id": "R8-00-6",
+   "round": "round 6",
+   "how": "op-handoff-list decided julieta handoff list stays in v1 (00 0.5). The 'kept in v1 by the maintainer' cell round 8 objects to is that decision's record; the need was never written down."
+  },
+  {
+   "cluster_id": "R8-04-20",
+   "round": "round 6",
+   "how": "op-handoff-list decided julieta handoff list stays in v1 (00 0.5). The 'kept in v1 by the maintainer' cell round 8 objects to is that decision's record; the need was never written down."
+  },
+  {
+   "cluster_id": "R8-00-1",
+   "round": "round 5",
+   "how": "op-ledger accepted the ledger design as a whole for v1 and the pass added it to 02, 03, 04, 05, 09, 11, 12 and 13. It never added a 00 0.5 row, a criterion or a journey, and ADR 0006 was written without a 'not in v1' alternative; round 6 R3-simplicity-03 questioned other features, not the ledger. So the gap is original, not a regression."
+  },
+  {
+   "cluster_id": "R8-12-8",
+   "round": "round 5",
+   "how": "op-ledger accepted the ledger design as a whole for v1 and the pass added it to 02, 03, 04, 05, 09, 11, 12 and 13. It never added a 00 0.5 row, a criterion or a journey, and ADR 0006 was written without a 'not in v1' alternative; round 6 R3-simplicity-03 questioned other features, not the ledger. So the gap is original, not a regression."
+  },
+  {
+   "cluster_id": "R8-13-1",
+   "round": "round 5",
+   "how": "op-ledger accepted the ledger design as a whole for v1 and the pass added it to 02, 03, 04, 05, 09, 11, 12 and 13. It never added a 00 0.5 row, a criterion or a journey, and ADR 0006 was written without a 'not in v1' alternative; round 6 R3-simplicity-03 questioned other features, not the ledger. So the gap is original, not a regression."
+  },
+  {
+   "cluster_id": "R8-adr-2",
+   "round": "round 5",
+   "how": "op-ledger accepted the ledger design as a whole for v1 and the pass added it to 02, 03, 04, 05, 09, 11, 12 and 13. It never added a 00 0.5 row, a criterion or a journey, and ADR 0006 was written without a 'not in v1' alternative; round 6 R3-simplicity-03 questioned other features, not the ledger. So the gap is original, not a regression."
+  },
+  {
+   "cluster_id": "R8-00-7",
+   "round": "round 1; round 2; round 6",
+   "how": "scope-extras (round 1) created the v1.1 marking; conflict 3 (round 2) recorded the registry credential as Q23; op-no-live-view (round 6) kept the v1.1 helper listed in 00 0.5. None gave the items a trigger or an interim, which is round 8's finding."
+  },
+  {
+   "cluster_id": "R8-07-3",
+   "round": "round 1; round 2; round 6",
+   "how": "scope-extras (round 1) created the v1.1 marking; conflict 3 (round 2) recorded the registry credential as Q23; op-no-live-view (round 6) kept the v1.1 helper listed in 00 0.5. None gave the items a trigger or an interim, which is round 8's finding."
+  },
+  {
+   "cluster_id": "R8-index-3",
+   "round": "round 1; round 2; round 6",
+   "how": "scope-extras (round 1) created the v1.1 marking; conflict 3 (round 2) recorded the registry credential as Q23; op-no-live-view (round 6) kept the v1.1 helper listed in 00 0.5. None gave the items a trigger or an interim, which is round 8's finding."
+  },
+  {
+   "cluster_id": "R8-00-8",
+   "round": "round 1; round 2; round 6",
+   "how": "te H4 made S8 a CI measurement with the fake sbx; te H4 residual timed julieta setup in the container e2e; op-s8-limit refused a timing field and scoped the julieta figure to the container e2e; R3-testability-14 gave --timings --json the run-timings.v1 schema; R3-craftsmanship-04 questioned the budgets and was answered by op-s8-limit. The origin of 2 s and 3 s was never stated."
+  },
+  {
+   "cluster_id": "R8-02-14",
+   "round": "round 1; round 2; round 6",
+   "how": "te H4 made S8 a CI measurement with the fake sbx; te H4 residual timed julieta setup in the container e2e; op-s8-limit refused a timing field and scoped the julieta figure to the container e2e; R3-testability-14 gave --timings --json the run-timings.v1 schema; R3-craftsmanship-04 questioned the budgets and was answered by op-s8-limit. The origin of 2 s and 3 s was never stated."
+  },
+  {
+   "cluster_id": "R8-03-16",
+   "round": "round 1; round 2; round 6",
+   "how": "te H4 made S8 a CI measurement with the fake sbx; te H4 residual timed julieta setup in the container e2e; op-s8-limit refused a timing field and scoped the julieta figure to the container e2e; R3-testability-14 gave --timings --json the run-timings.v1 schema; R3-craftsmanship-04 questioned the budgets and was answered by op-s8-limit. The origin of 2 s and 3 s was never stated."
+  },
+  {
+   "cluster_id": "R8-04-17",
+   "round": "round 1; round 2; round 6",
+   "how": "te H4 made S8 a CI measurement with the fake sbx; te H4 residual timed julieta setup in the container e2e; op-s8-limit refused a timing field and scoped the julieta figure to the container e2e; R3-testability-14 gave --timings --json the run-timings.v1 schema; R3-craftsmanship-04 questioned the budgets and was answered by op-s8-limit. The origin of 2 s and 3 s was never stated."
+  },
+  {
+   "cluster_id": "R8-index-23",
+   "round": "round 1; round 2; round 6",
+   "how": "te H4 made S8 a CI measurement with the fake sbx; te H4 residual timed julieta setup in the container e2e; op-s8-limit refused a timing field and scoped the julieta figure to the container e2e; R3-testability-14 gave --timings --json the run-timings.v1 schema; R3-craftsmanship-04 questioned the budgets and was answered by op-s8-limit. The origin of 2 s and 3 s was never stated."
+  },
+  {
+   "cluster_id": "R8-00-9",
+   "round": "round 4",
+   "how": "Round 4 added 00 0.6 (who else the product is for, with the report's page numbers) and op-no-roi dropped scenario analysis and the ROI percentage. The content round 8 moves to a docs note is that pass's addition; op-no-roi's deletions must stay deleted."
+  },
+  {
+   "cluster_id": "R8-00-13",
+   "round": "round 2",
+   "how": "craft C17 built the vocabulary table and tools/ci vocabulary from its Not column (host settings, personal kit, run layout, candidate/awaiting, sandbox probes). The operator/maintainer/developer rows and the mixin row were never added; round 8 extends the table."
+  },
+  {
+   "cluster_id": "R8-01-33",
+   "round": "round 2",
+   "how": "craft C17 built the vocabulary table and tools/ci vocabulary from its Not column (host settings, personal kit, run layout, candidate/awaiting, sandbox probes). The operator/maintainer/developer rows and the mixin row were never added; round 8 extends the table."
+  },
+  {
+   "cluster_id": "R8-05-9",
+   "round": "round 2",
+   "how": "craft C17 built the vocabulary table and tools/ci vocabulary from its Not column (host settings, personal kit, run layout, candidate/awaiting, sandbox probes). The operator/maintainer/developer rows and the mixin row were never added; round 8 extends the table."
+  },
+  {
+   "cluster_id": "R8-09-6",
+   "round": "round 2",
+   "how": "craft C17 built the vocabulary table and tools/ci vocabulary from its Not column (host settings, personal kit, run layout, candidate/awaiting, sandbox probes). The operator/maintainer/developer rows and the mixin row were never added; round 8 extends the table."
+  },
+  {
+   "cluster_id": "R8-10-29",
+   "round": "round 2",
+   "how": "craft C17 built the vocabulary table and tools/ci vocabulary from its Not column (host settings, personal kit, run layout, candidate/awaiting, sandbox probes). The operator/maintainer/developer rows and the mixin row were never added; round 8 extends the table."
+  },
+  {
+   "cluster_id": "R8-adr-17",
+   "round": "round 2",
+   "how": "craft C17 built the vocabulary table and tools/ci vocabulary from its Not column (host settings, personal kit, run layout, candidate/awaiting, sandbox probes). The operator/maintainer/developer rows and the mixin row were never added; round 8 extends the table."
+  },
+  {
+   "cluster_id": "R8-06-22",
+   "round": "round 2",
+   "how": "craft C17 built the vocabulary table and tools/ci vocabulary from its Not column (host settings, personal kit, run layout, candidate/awaiting, sandbox probes). The operator/maintainer/developer rows and the mixin row were never added; round 8 extends the table."
+  },
+  {
+   "cluster_id": "R8-01-3",
+   "round": "round 6",
+   "how": "R3-doubt-17 (no record held the workspace files' hash) was resolved by stating that the files are regenerated from state and not drift-checked (01 1.2). Round 8 proposes the check round 6 chose not to add."
+  },
+  {
+   "cluster_id": "R8-01-5",
+   "round": "round 1; round 6",
+   "how": "romeu pull was hardened, not questioned: sa L1 (heads compared with julieta status after a daemon fetch), D6 (origin refs), I19 port test (te M), R3-security-08 (git fsck --strict on the unbundled head, 05 5.4 row). Deferring pull removes those mechanisms with it; J10 step 3 and R8-09-3 point at pull, so they change together."
+  },
+  {
+   "cluster_id": "R8-02-13",
+   "round": "round 1; round 6",
+   "how": "romeu pull was hardened, not questioned: sa L1 (heads compared with julieta status after a daemon fetch), D6 (origin refs), I19 port test (te M), R3-security-08 (git fsck --strict on the unbundled head, 05 5.4 row). Deferring pull removes those mechanisms with it; J10 step 3 and R8-09-3 point at pull, so they change together."
+  },
+  {
+   "cluster_id": "R8-04-18",
+   "round": "round 1; round 6",
+   "how": "romeu pull was hardened, not questioned: sa L1 (heads compared with julieta status after a daemon fetch), D6 (origin refs), I19 port test (te M), R3-security-08 (git fsck --strict on the unbundled head, 05 5.4 row). Deferring pull removes those mechanisms with it; J10 step 3 and R8-09-3 point at pull, so they change together."
+  },
+  {
+   "cluster_id": "R8-05-31",
+   "round": "round 1; round 6",
+   "how": "romeu pull was hardened, not questioned: sa L1 (heads compared with julieta status after a daemon fetch), D6 (origin refs), I19 port test (te M), R3-security-08 (git fsck --strict on the unbundled head, 05 5.4 row). Deferring pull removes those mechanisms with it; J10 step 3 and R8-09-3 point at pull, so they change together."
+  },
+  {
+   "cluster_id": "R8-index-30",
+   "round": "round 1; round 6",
+   "how": "romeu pull was hardened, not questioned: sa L1 (heads compared with julieta status after a daemon fetch), D6 (origin refs), I19 port test (te M), R3-security-08 (git fsck --strict on the unbundled head, 05 5.4 row). Deferring pull removes those mechanisms with it; J10 step 3 and R8-09-3 point at pull, so they change together."
+  },
+  {
+   "cluster_id": "R8-01-8",
+   "round": "round 1; round 2",
+   "how": "D3 and sa M5 built gate 1 (sbx version acknowledged per machine); te C3 made recordings per sbx version; te N10 made a different sbx version exit 3 before any mutating call. What an sbx outside the recorded set does was never stated."
+  },
+  {
+   "cluster_id": "R8-10-13",
+   "round": "round 1; round 2",
+   "how": "D3 and sa M5 built gate 1 (sbx version acknowledged per machine); te C3 made recordings per sbx version; te N10 made a different sbx version exit 3 before any mutating call. What an sbx outside the recorded set does was never stated."
+  },
+  {
+   "cluster_id": "R8-09-4",
+   "round": "round 1; round 2",
+   "how": "D3 and sa M5 built gate 1 (sbx version acknowledged per machine); te C3 made recordings per sbx version; te N10 made a different sbx version exit 3 before any mutating call. What an sbx outside the recorded set does was never stated."
+  },
+  {
+   "cluster_id": "R8-01-12",
+   "round": "round 2",
+   "how": "dd N4 / craft C4: renderDigest drops every untagged key (today sandboxOptions) and the I7 table is generated from struct tags. The reason for leaving sandboxOptions ungated was not written; round 8 adds it and a committed list."
+  },
+  {
+   "cluster_id": "R8-03-35",
+   "round": "round 2",
+   "how": "dd N4 / craft C4: renderDigest drops every untagged key (today sandboxOptions) and the I7 table is generated from struct tags. The reason for leaving sandboxOptions ungated was not written; round 8 adds it and a committed list."
+  },
+  {
+   "cluster_id": "R8-01-13",
+   "round": "round 2",
+   "how": "sa N3: the gate diff is never truncated, with a summary at the top repeated above the prompt. Round 8 orders the summary; the mechanism holds."
+  },
+  {
+   "cluster_id": "R8-01-16",
+   "round": "round 1; round 6",
+   "how": "sa H2 put the approval and drift preflight on every sbx path and 01 1.5 says destructive commands never run on drift or a failed identity check; R3-craftsmanship-14 and R3-doubt-04 narrowed it to 'before any mutating sbx call' of a P command. The protective-command exemption round 8 proposes was not considered then."
+  },
+  {
+   "cluster_id": "R8-01-18",
+   "round": "round 6; round 7",
+   "how": "R3-craftsmanship-14 had sync check gate 1 at step 9; B2 (round 7) moved it to step 1 and let step 9 start at sbx ls --json. sync was never marked P; round 8 closes that label gap."
+  },
+  {
+   "cluster_id": "R8-01-21",
+   "round": "round 2",
+   "how": "craft C2 introduced awaiting and superseded; sa N7 bound approve to the candidate id and digests; dd N13 kept status from exiting 3. No caller for the non-TTY path was ever named, which is round 8's finding."
+  },
+  {
+   "cluster_id": "R8-04-19",
+   "round": "round 2",
+   "how": "craft C2 introduced awaiting and superseded; sa N7 bound approve to the candidate id and digests; dd N13 kept status from exiting 3. No caller for the non-TTY path was ever named, which is round 8's finding."
+  },
+  {
+   "cluster_id": "R8-01-31",
+   "round": "round 2",
+   "how": "craft C2 introduced awaiting and superseded; sa N7 bound approve to the candidate id and digests; dd N13 kept status from exiting 3. No caller for the non-TTY path was ever named, which is round 8's finding."
+  },
+  {
+   "cluster_id": "R8-04-7",
+   "round": "round 2",
+   "how": "craft C2 introduced awaiting and superseded; sa N7 bound approve to the candidate id and digests; dd N13 kept status from exiting 3. No caller for the non-TTY path was ever named, which is round 8's finding."
+  },
+  {
+   "cluster_id": "R8-01-22",
+   "round": "round 2",
+   "how": "craft C13: host state is toolchain.json plus one projects/<name>.json hosting the C2 and C6 machines, one atomic write per transition. Which states persist was not written; round 8 adds it (in two different forms, see the conflict between R8-01-22 and R8-03-19)."
+  },
+  {
+   "cluster_id": "R8-03-19",
+   "round": "round 2",
+   "how": "craft C13: host state is toolchain.json plus one projects/<name>.json hosting the C2 and C6 machines, one atomic write per transition. Which states persist was not written; round 8 adds it (in two different forms, see the conflict between R8-01-22 and R8-03-19)."
+  },
+  {
+   "cluster_id": "R8-01-23",
+   "round": "round 2; round 6; round 7",
+   "how": "craft C6 built the generation machine; te N9 added fault injection for the promotion commit only; R3-doubt-01 added salvaging to salvaging; R3-craftsmanship-07 gave salvage --from-host a row that changes no state; A1 (round 7) added the --from-host salvaging row. The destructive-command write order, a failed sandbox half and fault injection for salvage/rm/recreate/retire were never specified."
+  },
+  {
+   "cluster_id": "R8-01-25",
+   "round": "round 2; round 6; round 7",
+   "how": "craft C6 built the generation machine; te N9 added fault injection for the promotion commit only; R3-doubt-01 added salvaging to salvaging; R3-craftsmanship-07 gave salvage --from-host a row that changes no state; A1 (round 7) added the --from-host salvaging row. The destructive-command write order, a failed sandbox half and fault injection for salvage/rm/recreate/retire were never specified."
+  },
+  {
+   "cluster_id": "R8-01-26",
+   "round": "round 2; round 6; round 7",
+   "how": "craft C6 built the generation machine; te N9 added fault injection for the promotion commit only; R3-doubt-01 added salvaging to salvaging; R3-craftsmanship-07 gave salvage --from-host a row that changes no state; A1 (round 7) added the --from-host salvaging row. The destructive-command write order, a failed sandbox half and fault injection for salvage/rm/recreate/retire were never specified."
+  },
+  {
+   "cluster_id": "R8-04-29",
+   "round": "round 2; round 6; round 7",
+   "how": "craft C6 built the generation machine; te N9 added fault injection for the promotion commit only; R3-doubt-01 added salvaging to salvaging; R3-craftsmanship-07 gave salvage --from-host a row that changes no state; A1 (round 7) added the --from-host salvaging row. The destructive-command write order, a failed sandbox half and fault injection for salvage/rm/recreate/retire were never specified."
+  },
+  {
+   "cluster_id": "R8-05-27",
+   "round": "round 2; round 6; round 7",
+   "how": "craft C6 built the generation machine; te N9 added fault injection for the promotion commit only; R3-doubt-01 added salvaging to salvaging; R3-craftsmanship-07 gave salvage --from-host a row that changes no state; A1 (round 7) added the --from-host salvaging row. The destructive-command write order, a failed sandbox half and fault injection for salvage/rm/recreate/retire were never specified."
+  },
+  {
+   "cluster_id": "R8-01-24",
+   "round": "round 7",
+   "how": "B7: after a non-zero create romeu reads sbx ls --json; present keeps the open record, absent removes it, both exit 1. Round 8 defines 'absent' strictly and separates the lost close from the create; it refines B7 rather than reopening it."
+  },
+  {
+   "cluster_id": "R8-01-27",
+   "round": "round 2; round 6",
+   "how": "dd N3 added romeu adopt (TTY, workspace path must match, open generation with adopted: true) and RJ-203; R3-doubt-16 had A4 record the sbx ls fields. That adopt bypasses gate 2 and that identity is name plus path were not addressed."
+  },
+  {
+   "cluster_id": "R8-index-47",
+   "round": "round 2; round 6",
+   "how": "dd N3 added romeu adopt (TTY, workspace path must match, open generation with adopted: true) and RJ-203; R3-doubt-16 had A4 record the sbx ls fields. That adopt bypasses gate 2 and that identity is name plus path were not addressed."
+  },
+  {
+   "cluster_id": "R8-01-28",
+   "round": "round 2",
+   "how": "craft C5: promotion commit with render.json first carrying promoting, sbxenv.yaml as the commit point, recovery at lock time. Which render.json the drift check uses after an abandoned recovery was not stated."
+  },
+  {
+   "cluster_id": "R8-01-29",
+   "round": "round 2",
+   "how": "Round 2 counted four explicit state machines (candidate, promotion commit, generation, probe); craft C11's probe lifecycle merged into te N1. Round 8 finds the promotion commit is a step list and the probe lifecycle a tools/ci table, and reduces the claim."
+  },
+  {
+   "cluster_id": "R8-10-51",
+   "round": "round 2",
+   "how": "Round 2 counted four explicit state machines (candidate, promotion commit, generation, probe); craft C11's probe lifecycle merged into te N1. Round 8 finds the promotion commit is a step list and the probe lifecycle a tools/ci table, and reduces the claim."
+  },
+  {
+   "cluster_id": "R8-11-11",
+   "round": "round 2",
+   "how": "Round 2 counted four explicit state machines (candidate, promotion commit, generation, probe); craft C11's probe lifecycle merged into te N1. Round 8 finds the promotion commit is a step list and the probe lifecycle a tools/ci table, and reduces the claim."
+  },
+  {
+   "cluster_id": "R8-11-12",
+   "round": "round 2",
+   "how": "Round 2 counted four explicit state machines (candidate, promotion commit, generation, probe); craft C11's probe lifecycle merged into te N1. Round 8 finds the promotion commit is a step list and the probe lifecycle a tools/ci table, and reduces the claim."
+  },
+  {
+   "cluster_id": "R8-01-36",
+   "round": "round 1",
+   "how": "fid removed-project: orphaned plus explicit retire; sync never deletes. How the owner deletes what retire moved was never written."
+  },
+  {
+   "cluster_id": "R8-02-3",
+   "round": "round 1; round 2",
+   "how": "D2 (julieta delivered by a romeu-owned read-only mount, verified by sha256), sa N6 (julieta invoked by absolute path, compatibility check), dd N2 (runtime link, Go arch names, Q21). What a source build embeds and that hooks should use the absolute path were not stated."
+  },
+  {
+   "cluster_id": "R8-02-18",
+   "round": "round 1; round 2",
+   "how": "D2 (julieta delivered by a romeu-owned read-only mount, verified by sha256), sa N6 (julieta invoked by absolute path, compatibility check), dd N2 (runtime link, Go arch names, Q21). What a source build embeds and that hooks should use the absolute path were not stated."
+  },
+  {
+   "cluster_id": "R8-06-21",
+   "round": "round 1; round 2",
+   "how": "D2 (julieta delivered by a romeu-owned read-only mount, verified by sha256), sa N6 (julieta invoked by absolute path, compatibility check), dd N2 (runtime link, Go arch names, Q21). What a source build embeds and that hooks should use the absolute path were not stated."
+  },
+  {
+   "cluster_id": "R8-08-5",
+   "round": "round 1; round 2",
+   "how": "D2 (julieta delivered by a romeu-owned read-only mount, verified by sha256), sa N6 (julieta invoked by absolute path, compatibility check), dd N2 (runtime link, Go arch names, Q21). What a source build embeds and that hooks should use the absolute path were not stated."
+  },
+  {
+   "cluster_id": "R8-02-4",
+   "round": "round 1; round 2",
+   "how": "D27 made julieta pin check cover the config repo's CI workflow pin; craft C14 made the config repo's CI use only julieta. A byte-level verification of the downloaded release was not required."
+  },
+  {
+   "cluster_id": "R8-02-6",
+   "round": "round 2",
+   "how": "craft C13 claimed one atomic write per transition. Round 8 finds the claim false for promotion, salvage and retire and narrows it to 'each record write is atomic'."
+  },
+  {
+   "cluster_id": "R8-02-8",
+   "round": "round 6",
+   "how": "R3-craftsmanship-01, -06, -09 built the 10 10.7 boundary table and tools/ci imports. That a package in no row passes was not covered."
+  },
+  {
+   "cluster_id": "R8-10-31",
+   "round": "round 6",
+   "how": "R3-craftsmanship-01, -06, -09 built the 10 10.7 boundary table and tools/ci imports. That a package in no row passes was not covered."
+  },
+  {
+   "cluster_id": "R8-02-16",
+   "round": "round 2; round 4",
+   "how": "craft C16: settled questions leave the spec and become ADRs, one each, written by the docs module. ADR 0005 decision 4 (round 4) says a settled question becomes an ADR when expensive to reverse. Round 8 reconciles the two and asks for a table of product decisions that need a record."
+  },
+  {
+   "cluster_id": "R8-06-24",
+   "round": "round 2; round 4",
+   "how": "craft C16: settled questions leave the spec and become ADRs, one each, written by the docs module. ADR 0005 decision 4 (round 4) says a settled question becomes an ADR when expensive to reverse. Round 8 reconciles the two and asks for a table of product decisions that need a record."
+  },
+  {
+   "cluster_id": "R8-08-28",
+   "round": "round 2; round 4",
+   "how": "craft C16: settled questions leave the spec and become ADRs, one each, written by the docs module. ADR 0005 decision 4 (round 4) says a settled question becomes an ADR when expensive to reverse. Round 8 reconciles the two and asks for a table of product decisions that need a record."
+  },
+  {
+   "cluster_id": "R8-12-25",
+   "round": "round 2; round 4",
+   "how": "craft C16: settled questions leave the spec and become ADRs, one each, written by the docs module. ADR 0005 decision 4 (round 4) says a settled question becomes an ADR when expensive to reverse. Round 8 reconciles the two and asks for a table of product decisions that need a record."
+  },
+  {
+   "cluster_id": "R8-11-13",
+   "round": "round 2; round 4",
+   "how": "craft C16: settled questions leave the spec and become ADRs, one each, written by the docs module. ADR 0005 decision 4 (round 4) says a settled question becomes an ADR when expensive to reverse. Round 8 reconciles the two and asks for a table of product decisions that need a record."
+  },
+  {
+   "cluster_id": "R8-03-1",
+   "round": "round 2; round 5",
+   "how": "dd N8: julieta accepts manifest protocols N and N-1. op-ledger-versioned: ingest accepts event versions N and N-1. No other stored format got a version rule, which is round 8's finding."
+  },
+  {
+   "cluster_id": "R8-13-10",
+   "round": "round 2; round 5",
+   "how": "dd N8: julieta accepts manifest protocols N and N-1. op-ledger-versioned: ingest accepts event versions N and N-1. No other stored format got a version rule, which is round 8's finding."
+  },
+  {
+   "cluster_id": "R8-10-52",
+   "round": "round 2; round 5",
+   "how": "dd N8: julieta accepts manifest protocols N and N-1. op-ledger-versioned: ingest accepts event versions N and N-1. No other stored format got a version rule, which is round 8's finding."
+  },
+  {
+   "cluster_id": "R8-06-7",
+   "round": "round 2; round 5",
+   "how": "dd N8: julieta accepts manifest protocols N and N-1. op-ledger-versioned: ingest accepts event versions N and N-1. No other stored format got a version rule, which is round 8's finding."
+  },
+  {
+   "cluster_id": "R8-03-5",
+   "round": "round 1; round 2",
+   "how": "D17 (hand-written schemas plus a property test) was superseded by op-rules-as-data (schemas derived from rules.go). 'Every format has a schema' was never measured against the list."
+  },
+  {
+   "cluster_id": "R8-13-13",
+   "round": "round 1; round 2",
+   "how": "D17 (hand-written schemas plus a property test) was superseded by op-rules-as-data (schemas derived from rules.go). 'Every format has a schema' was never measured against the list."
+  },
+  {
+   "cluster_id": "R8-12-34",
+   "round": "round 1; round 2",
+   "how": "D17 (hand-written schemas plus a property test) was superseded by op-rules-as-data (schemas derived from rules.go). 'Every format has a schema' was never measured against the list."
+  },
+  {
+   "cluster_id": "R8-03-9",
+   "round": "round 2",
+   "how": "sa N2: strict descriptor subset grammar (no anchors, aliases, merge keys, includes). It was stated for descriptors only."
+  },
+  {
+   "cluster_id": "R8-03-11",
+   "round": "round 1",
+   "how": "D12: invariant I25, romeu never handles secret values; sbx secret set only with --command. An argv element that is itself a token was not refused."
+  },
+  {
+   "cluster_id": "R8-03-13",
+   "round": "round 1; round 2; round 6",
+   "how": "te C1 (round 1) gave gitHosts[].caFile its consumer: the E2E origins over httptest TLS, with no test override in gitsafe; te C1 residual (round 2) added the unit test. D16 required 4 lock platforms; R3-simplicity-06 (round 6) reduced --check to the two linux platforms with a macOS warning."
+  },
+  {
+   "cluster_id": "R8-04-36",
+   "round": "round 1; round 2; round 6",
+   "how": "te C1 (round 1) gave gitHosts[].caFile its consumer: the E2E origins over httptest TLS, with no test override in gitsafe; te C1 residual (round 2) added the unit test. D16 required 4 lock platforms; R3-simplicity-06 (round 6) reduced --check to the two linux platforms with a macOS warning."
+  },
+  {
+   "cluster_id": "R8-05-21",
+   "round": "round 1; round 2; round 6",
+   "how": "te C1 (round 1) gave gitHosts[].caFile its consumer: the E2E origins over httptest TLS, with no test override in gitsafe; te C1 residual (round 2) added the unit test. D16 required 4 lock platforms; R3-simplicity-06 (round 6) reduced --check to the two linux platforms with a macOS warning."
+  },
+  {
+   "cluster_id": "R8-07-10",
+   "round": "round 1; round 2; round 6",
+   "how": "te C1 (round 1) gave gitHosts[].caFile its consumer: the E2E origins over httptest TLS, with no test override in gitsafe; te C1 residual (round 2) added the unit test. D16 required 4 lock platforms; R3-simplicity-06 (round 6) reduced --check to the two linux platforms with a macOS warning."
+  },
+  {
+   "cluster_id": "R8-03-22",
+   "round": "round 1; round 2",
+   "how": "sa H4 (host-provided base SHAs) and dd N10 (repos[].base in every manifest; snapshots exclude the same base). That the base must be pinned by a create-only ref on the host was not stated."
+  },
+  {
+   "cluster_id": "R8-03-24",
+   "round": "round 1; round 6",
+   "how": "D10: goldens probe-confirmed by A5. R3-newcomer-01 / op-probe-completeness: tools/ci probes no longer keeps all red; a golden with no recorded A5 hash is not flagged."
+  },
+  {
+   "cluster_id": "R8-03-25",
+   "round": "round 1; round 6",
+   "how": "D10: goldens probe-confirmed by A5. R3-newcomer-01 / op-probe-completeness: tools/ci probes no longer keeps all red; a golden with no recorded A5 hash is not flagged."
+  },
+  {
+   "cluster_id": "R8-03-27",
+   "round": "round 2",
+   "how": "te C5 residual: memory verify compares status separately from the content digest. Tags were left out; round 8 adds them (moot if import and verify leave)."
+  },
+  {
+   "cluster_id": "R8-03-30",
+   "round": "round 5; round 6",
+   "how": "Round 5 reused the salvage record's reasons for ledger-incomplete (changes no result); R3-critic-12 made ledger-incomplete the one id an ingest ends with. Round 8 moves it to its own field."
+  },
+  {
+   "cluster_id": "R8-03-36",
+   "round": "round 1; round 2",
+   "how": "D3, sa M5, sa N4, te N10 built gate 1 and its tests. Why gate 1 exists beside doctor was never written."
+  },
+  {
+   "cluster_id": "R8-01-11",
+   "round": "round 1; round 2",
+   "how": "D3, sa M5, sa N4, te N10 built gate 1 and its tests. Why gate 1 exists beside doctor was never written."
+  },
+  {
+   "cluster_id": "R8-04-34",
+   "round": "round 1; round 2",
+   "how": "D3, sa M5, sa N4, te N10 built gate 1 and its tests. Why gate 1 exists beside doctor was never written."
+  },
+  {
+   "cluster_id": "R8-04-4",
+   "round": "round 2",
+   "how": "craft C7: stable error ids RJ-<exit><nn> with slug, message and fix hint; generated errors.md; tests assert ids. No uniqueness, retirement or fix-hint rule."
+  },
+  {
+   "cluster_id": "R8-04-8",
+   "round": "round 2",
+   "how": "craft C7: stable error ids RJ-<exit><nn> with slug, message and fix hint; generated errors.md; tests assert ids. No uniqueness, retirement or fix-hint rule."
+  },
+  {
+   "cluster_id": "R8-13-12",
+   "round": "round 2",
+   "how": "craft C7: stable error ids RJ-<exit><nn> with slug, message and fix hint; generated errors.md; tests assert ids. No uniqueness, retirement or fix-hint rule."
+  },
+  {
+   "cluster_id": "R8-04-6",
+   "round": "round 6",
+   "how": "R3-craftsmanship-13: --json is one document or one object per line where the row says so. That every read command has --json and a schema was not measured."
+  },
+  {
+   "cluster_id": "R8-04-11",
+   "round": "round 1",
+   "how": "sa M4: doctor checks mise trust paths, direnv, workspace trust disabled, global lfs filter; both workspaces in Restricted Mode. Only VS Code is checked, and host indexers were not considered."
+  },
+  {
+   "cluster_id": "R8-02-10",
+   "round": "round 1",
+   "how": "sa M4: doctor checks mise trust paths, direnv, workspace trust disabled, global lfs filter; both workspaces in Restricted Mode. Only VS Code is checked, and host indexers were not considered."
+  },
+  {
+   "cluster_id": "R8-04-24",
+   "round": "round 2; round 6",
+   "how": "dd N8 recorded hook failures and surfaced them at SessionStart, julieta status and romeu status; R3-doubt-20 removed the second rule for when they stop being shown."
+  },
+  {
+   "cluster_id": "R8-04-26",
+   "round": "round 1; round 6",
+   "how": "D23 exempted state timestamps from idempotency; R3-craftsmanship-08 made the appending commands a named list. Their success output was not defined."
+  },
+  {
+   "cluster_id": "R8-04-35",
+   "round": "round 1",
+   "how": "D27: julieta pin check covers the config repo's CI workflow pin. It was never scheduled or extended to the other pins."
+  },
+  {
+   "cluster_id": "R8-06-20",
+   "round": "round 1",
+   "how": "D27: julieta pin check covers the config repo's CI workflow pin. It was never scheduled or extended to the other pins."
+  },
+  {
+   "cluster_id": "R8-04-28",
+   "round": "round 1",
+   "how": "D27: julieta pin check covers the config repo's CI workflow pin. It was never scheduled or extended to the other pins."
+  },
+  {
+   "cluster_id": "R8-04-37",
+   "round": "round 2; round 6",
+   "how": "craft C12 turned memory done into edit --status done; R3-craftsmanship-06 split memstore/write so romeu links no Delete. memory rm itself and search stayed."
+  },
+  {
+   "cluster_id": "R8-08-22",
+   "round": "round 2; round 6",
+   "how": "craft C12 turned memory done into edit --status done; R3-craftsmanship-06 split memstore/write so romeu links no Delete. memory rm itself and search stayed."
+  },
+  {
+   "cluster_id": "R8-04-38",
+   "round": "round 5",
+   "how": "op-ledger-simpler: no message catalog of the ledger's own; 04 4.4 lists the ledger reasons by slug. Round 8 finds 4.4 a copy of the one table and folds it."
+  },
+  {
+   "cluster_id": "R8-04-43",
+   "round": "round 1",
+   "how": "D7: julieta setup fetches origin and fast-forwards the default branch when clean. The agent was not told when it happens."
+  },
+  {
+   "cluster_id": "R8-04-46",
+   "round": "round 1",
+   "how": "D15: MISE_TRUSTED_CONFIG_PATHS = manifest repo paths. No test observes the variables at the pinned mise."
+  },
+  {
+   "cluster_id": "R8-05-1",
+   "round": "round 1; round 7",
+   "how": "sa L3 made attestation verify mandatory in release.yml and J1; M2 (round 7) and its confirmation made the ci-run of release.yml S1's evidence. A separate operator signature was never specified, and S1's 'signed' wording comes from that pass."
+  },
+  {
+   "cluster_id": "R8-10-2",
+   "round": "round 1; round 7",
+   "how": "sa L3 made attestation verify mandatory in release.yml and J1; M2 (round 7) and its confirmation made the ci-run of release.yml S1's evidence. A separate operator signature was never specified, and S1's 'signed' wording comes from that pass."
+  },
+  {
+   "cluster_id": "R8-adr-4",
+   "round": "round 1; round 7",
+   "how": "sa L3 made attestation verify mandatory in release.yml and J1; M2 (round 7) and its confirmation made the ci-run of release.yml S1's evidence. A separate operator signature was never specified, and S1's 'signed' wording comes from that pass."
+  },
+  {
+   "cluster_id": "R8-index-24",
+   "round": "round 1; round 7",
+   "how": "sa L3 made attestation verify mandatory in release.yml and J1; M2 (round 7) and its confirmation made the ci-run of release.yml S1's evidence. A separate operator signature was never specified, and S1's 'signed' wording comes from that pass."
+  },
+  {
+   "cluster_id": "R8-index-25",
+   "round": "round 1; round 7",
+   "how": "sa L3 made attestation verify mandatory in release.yml and J1; M2 (round 7) and its confirmation made the ci-run of release.yml S1's evidence. A separate operator signature was never specified, and S1's 'signed' wording comes from that pass."
+  },
+  {
+   "cluster_id": "R8-05-2",
+   "round": "round 3; round 4; round 6",
+   "how": "N1 (code-owner review on ADR diffs), op-residual-risks (the review is not independent with one account), op-ruleset-approvals (dismiss on push, approve the latest push). ADR 0008 (2026-10-07) measured that no review is required; round 8 asks to write the measured state once."
+  },
+  {
+   "cluster_id": "R8-10-8",
+   "round": "round 3; round 4; round 6",
+   "how": "N1 (code-owner review on ADR diffs), op-residual-risks (the review is not independent with one account), op-ruleset-approvals (dismiss on push, approve the latest push). ADR 0008 (2026-10-07) measured that no review is required; round 8 asks to write the measured state once."
+  },
+  {
+   "cluster_id": "R8-12-1",
+   "round": "round 3; round 4; round 6",
+   "how": "N1 (code-owner review on ADR diffs), op-residual-risks (the review is not independent with one account), op-ruleset-approvals (dismiss on push, approve the latest push). ADR 0008 (2026-10-07) measured that no review is required; round 8 asks to write the measured state once."
+  },
+  {
+   "cluster_id": "R8-adr-1",
+   "round": "round 3; round 4; round 6",
+   "how": "N1 (code-owner review on ADR diffs), op-residual-risks (the review is not independent with one account), op-ruleset-approvals (dismiss on push, approve the latest push). ADR 0008 (2026-10-07) measured that no review is required; round 8 asks to write the measured state once."
+  },
+  {
+   "cluster_id": "R8-index-15",
+   "round": "round 3; round 4; round 6",
+   "how": "N1 (code-owner review on ADR diffs), op-residual-risks (the review is not independent with one account), op-ruleset-approvals (dismiss on push, approve the latest push). ADR 0008 (2026-10-07) measured that no review is required; round 8 asks to write the measured state once."
+  },
+  {
+   "cluster_id": "R8-05-4",
+   "round": "round 3; round 6",
+   "how": "N2: one approval-line form, in 12 12.4. G5 (round 6): its edge cases. A batched form was not considered."
+  },
+  {
+   "cluster_id": "R8-05-10",
+   "round": "round 6; round 7",
+   "how": "G1 wrote the maintainer block of ci-bootstrap; M3, M4 and B5 (round 7) reordered it and moved the refusal proofs to the host; round 7 lists what the maintainer still has to do. ADR 0008 records the tries that ran."
+  },
+  {
+   "cluster_id": "R8-10-18",
+   "round": "round 6; round 7",
+   "how": "G1 wrote the maintainer block of ci-bootstrap; M3, M4 and B5 (round 7) reordered it and moved the refusal proofs to the host; round 7 lists what the maintainer still has to do. ADR 0008 records the tries that ran."
+  },
+  {
+   "cluster_id": "R8-12-24",
+   "round": "round 6; round 7",
+   "how": "G1 wrote the maintainer block of ci-bootstrap; M3, M4 and B5 (round 7) reordered it and moved the refusal proofs to the host; round 7 lists what the maintainer still has to do. ADR 0008 records the tries that ran."
+  },
+  {
+   "cluster_id": "R8-index-42",
+   "round": "round 6; round 7",
+   "how": "G1 wrote the maintainer block of ci-bootstrap; M3, M4 and B5 (round 7) reordered it and moved the refusal proofs to the host; round 7 lists what the maintainer still has to do. ADR 0008 records the tries that ran."
+  },
+  {
+   "cluster_id": "R8-05-11",
+   "round": "round 5",
+   "how": "Round 5 states that the maintainer accepted the proposal as a whole, to be transcribed, and that it becomes a decision when ADR 0006 is accepted (Q24); the starting values and residual risks were listed as the writer's. Round 8 asks to mark them undecided or decide them by name."
+  },
+  {
+   "cluster_id": "R8-13-4",
+   "round": "round 5",
+   "how": "Round 5 states that the maintainer accepted the proposal as a whole, to be transcribed, and that it becomes a decision when ADR 0006 is accepted (Q24); the starting values and residual risks were listed as the writer's. Round 8 asks to mark them undecided or decide them by name."
+  },
+  {
+   "cluster_id": "R8-adr-15",
+   "round": "round 5",
+   "how": "Round 5 states that the maintainer accepted the proposal as a whole, to be transcribed, and that it becomes a decision when ADR 0006 is accepted (Q24); the starting values and residual risks were listed as the writer's. Round 8 asks to mark them undecided or decide them by name."
+  },
+  {
+   "cluster_id": "R8-05-13",
+   "round": "round 1; round 2",
+   "how": "sa H5: dedicated signing-only key and socket, confirm-on-use, B measures ssh-add -L, residual risk listed. op-signing (round 2): sync refuses git-ssh-sign unless the socket holds exactly one key equal to signingKey; the full host agent is never forwarded."
+  },
+  {
+   "cluster_id": "R8-06-13",
+   "round": "round 1; round 2",
+   "how": "sa H5: dedicated signing-only key and socket, confirm-on-use, B measures ssh-add -L, residual risk listed. op-signing (round 2): sync refuses git-ssh-sign unless the socket holds exactly one key equal to signingKey; the full host agent is never forwarded."
+  },
+  {
+   "cluster_id": "R8-11-8",
+   "round": "round 1; round 2",
+   "how": "sa H5: dedicated signing-only key and socket, confirm-on-use, B measures ssh-add -L, residual risk listed. op-signing (round 2): sync refuses git-ssh-sign unless the socket holds exactly one key equal to signingKey; the full host agent is never forwarded."
+  },
+  {
+   "cluster_id": "R8-05-14",
+   "round": "round 1; round 2",
+   "how": "D8: host reads memory only via romeu handoff, no host extraction (I24). dd D8 residual: the post-run plant window; read memory only via romeu handoff. That romeu handoff shows only handoffs, not lessons, was not noticed."
+  },
+  {
+   "cluster_id": "R8-05-16",
+   "round": "round 6",
+   "how": "op-host-clone: items a and b run on the host in a plain clone after the maintainer has read the diff of step 1. A standing rule for every later host run was not written."
+  },
+  {
+   "cluster_id": "R8-10-7",
+   "round": "round 6",
+   "how": "op-host-clone: items a and b run on the host in a plain clone after the maintainer has read the diff of step 1. A standing rule for every later host run was not written."
+  },
+  {
+   "cluster_id": "R8-plan-22",
+   "round": "round 6",
+   "how": "op-host-clone: items a and b run on the host in a plain clone after the maintainer has read the diff of step 1. A standing rule for every later host run was not written."
+  },
+  {
+   "cluster_id": "R8-05-19",
+   "round": "round 6",
+   "how": "R3-security-02: a local insteadOf is not neutralized; stated as a limit in 05 5.1 and I3 plants a rewrite to a refused protocol. The git://127.0.0.1 target and core.gitProxy were not covered."
+  },
+  {
+   "cluster_id": "R8-05-23",
+   "round": "round 2; round 6",
+   "how": "sa N6 renamed the handshake 'compatibility check' and scoped it; te N7 added I30; R3-doubt-05 fixed I2's key set. I30's 'only as delivered' wording survived the rename."
+  },
+  {
+   "cluster_id": "R8-10-45",
+   "round": "round 2; round 6",
+   "how": "sa N6 renamed the handshake 'compatibility check' and scoped it; te N7 added I30; R3-doubt-05 fixed I2's key set. I30's 'only as delivered' wording survived the rename."
+  },
+  {
+   "cluster_id": "R8-index-45",
+   "round": "round 2; round 6",
+   "how": "sa N6 renamed the handshake 'compatibility check' and scoped it; te N7 added I30; R3-doubt-05 fixed I2's key set. I30's 'only as delivered' wording survived the rename."
+  },
+  {
+   "cluster_id": "R8-05-24",
+   "round": "round 1; round 6",
+   "how": "te H5 added tools/ci mutate; op-mutate said how mutate treats an absence invariant, a runner without a test level and 'fails', with no invariant exempt. What a stub may be was not defined."
+  },
+  {
+   "cluster_id": "R8-05-25",
+   "round": "round 6",
+   "how": "R3-critic-04: invariants pairs the tags in the code; acceptance checks once that every row has both. A guard deleted with its test and tags was the gap left."
+  },
+  {
+   "cluster_id": "R8-05-28",
+   "round": "round 2",
+   "how": "sa N2: per-capability conformance fixtures from A11/A12. They were not tied to the sbx version and frontend digest they were made with."
+  },
+  {
+   "cluster_id": "R8-05-29",
+   "round": "round 6",
+   "how": "R3-testability-07: an admitted call site is a named function in one table under tools/ci, for I16, I31 and I32. That the table sits on the checks surface is the cost round 8 states."
+  },
+  {
+   "cluster_id": "R8-05-33",
+   "round": "round 1; round 2",
+   "how": "sa H5 and op-signing built the signing kit and its rule. Why the start needs commit signing was never written."
+  },
+  {
+   "cluster_id": "R8-01-20",
+   "round": "round 1; round 2",
+   "how": "sa H5 and op-signing built the signing kit and its rule. Why the start needs commit signing was never written."
+  },
+  {
+   "cluster_id": "R8-06-15",
+   "round": "round 1; round 2",
+   "how": "sa H5 and op-signing built the signing kit and its rule. Why the start needs commit signing was never written."
+  },
+  {
+   "cluster_id": "R8-06-1",
+   "round": "round 6",
+   "how": "op-personal-kits: refused capability types named; a personal kit can still run an install step, the gate diff being the control. Where the install step runs was not measured."
+  },
+  {
+   "cluster_id": "R8-06-9",
+   "round": "round 1",
+   "how": "fid keybindings: the julieta kit configures herdr's tmux-style prefix. The collision with a host tmux and the override were not documented."
+  },
+  {
+   "cluster_id": "R8-06-10",
+   "round": "round 1",
+   "how": "det-agentmem: the agent memory dir is made non-writable and checked by hook and status. The agent was not told at the moment of the refused write."
+  },
+  {
+   "cluster_id": "R8-06-12",
+   "round": "round 2",
+   "how": "op-signing gave the rule and RJ-204. It never got an invariant id or a J1 step."
+  },
+  {
+   "cluster_id": "R8-09-7",
+   "round": "round 2",
+   "how": "op-signing gave the rule and RJ-204. It never got an invariant id or a J1 step."
+  },
+  {
+   "cluster_id": "R8-06-14",
+   "round": "round 2",
+   "how": "op-signing: the full host agent is never forwarded. The rule's scope (sandboxes romeu renders) was implicit; ADR 0008's development sandbox exposed it."
+  },
+  {
+   "cluster_id": "R8-06-18",
+   "round": "round 6; round 7",
+   "how": "op-herdr-pin named herdr's upstream and the pin by version and sha256 from the release API of an immutable release; B-info (round 7) said the build's sha256sum -c is the check. A missing or malformed digest field was not covered."
+  },
+  {
+   "cluster_id": "R8-00-10",
+   "round": "round 1; round 6",
+   "how": "D1/D14 put the herdr probes in block A; op-herdr-pin pinned herdr. What happens if herdr is abandoned, and whether a renderer interface exists, were never written."
+  },
+  {
+   "cluster_id": "R8-03-17",
+   "round": "round 1; round 6",
+   "how": "D1/D14 put the herdr probes in block A; op-herdr-pin pinned herdr. What happens if herdr is abandoned, and whether a renderer interface exists, were never written."
+  },
+  {
+   "cluster_id": "R8-05-32",
+   "round": "round 1; round 6",
+   "how": "D1/D14 put the herdr probes in block A; op-herdr-pin pinned herdr. What happens if herdr is abandoned, and whether a renderer interface exists, were never written."
+  },
+  {
+   "cluster_id": "R8-06-6",
+   "round": "round 1; round 6",
+   "how": "D1/D14 put the herdr probes in block A; op-herdr-pin pinned herdr. What happens if herdr is abandoned, and whether a renderer interface exists, were never written."
+  },
+  {
+   "cluster_id": "R8-07-7",
+   "round": "round 6",
+   "how": "R3-testability-08: --catalog could report an unknown and exit 0; it exits 1 and a ci-run item names its repository. The lock-host case was not distinguished from the unknown-key case."
+  },
+  {
+   "cluster_id": "R8-index-37",
+   "round": "round 6",
+   "how": "R3-testability-08: --catalog could report an unknown and exit 0; it exits 1 and a ci-run item names its repository. The lock-host case was not distinguished from the unknown-key case."
+  },
+  {
+   "cluster_id": "R8-08-3",
+   "round": "round 1; round 2",
+   "how": "det-session: SessionStart prints open memory entries and the handoff; craft user-side middleware: lesson-tagged entries and julieta warnings printed at SessionStart. No bound or order."
+  },
+  {
+   "cluster_id": "R8-08-4",
+   "round": "round 2; round 6",
+   "how": "dd N1 (hook order on /clear, Q22) and R3-testability-17 (both hook orders tested) covered /clear only; compaction and resume were not considered."
+  },
+  {
+   "cluster_id": "R8-08-6",
+   "round": "round 1; round 2",
+   "how": "D21: SessionEnd writes a facts-only handoff; rm warns when a generation has no final handoff. dd N1: the reader selects the latest narrative and newest facts separately; craft C6: the final handoff is computed at rm time; dd N11: rm's check is an os.Root read site. The warning's timing (after the agent is stopped) and the missing-narrative notice were not addressed."
+  },
+  {
+   "cluster_id": "R8-index-29",
+   "round": "round 1; round 2",
+   "how": "D21: SessionEnd writes a facts-only handoff; rm warns when a generation has no final handoff. dd N1: the reader selects the latest narrative and newest facts separately; craft C6: the final handoff is computed at rm time; dd N11: rm's check is an os.Root read site. The warning's timing (after the agent is stopped) and the missing-narrative notice were not addressed."
+  },
+  {
+   "cluster_id": "R8-08-8",
+   "round": "round 1",
+   "how": "D9: chain to tracked and $GIT_DIR hooks; repo-local core.hooksPath reported as snapshots disabled. Where 'disabled' is recorded and a failed snapshot write were not stated."
+  },
+  {
+   "cluster_id": "R8-08-15",
+   "round": "round 6",
+   "how": "R3-craftsmanship-01: salvage takes the agent profile as an argument. Drift of the profile was not checked."
+  },
+  {
+   "cluster_id": "R8-08-18",
+   "round": "round 6",
+   "how": "R3-security-08 added git fsck --strict on pull's unbundled head. The salvage host half was left out."
+  },
+  {
+   "cluster_id": "R8-08-20",
+   "round": "round 1",
+   "how": "D8: memory layout allowlist, refuse on violation. Temp-file names and the store lock were never given a path, so a killed write violates the allowlist; round 8 carves the exception."
+  },
+  {
+   "cluster_id": "R8-09-3",
+   "round": "round 1",
+   "how": "fid cmux: the host window runs only romeu run <p> (09 J3). The '(for example a cmux window)' example survived the non-goal."
+  },
+  {
+   "cluster_id": "R8-index-28",
+   "round": "round 1",
+   "how": "fid cmux: the host window runs only romeu run <p> (09 J3). The '(for example a cmux window)' example survived the non-goal."
+  },
+  {
+   "cluster_id": "R8-09-5",
+   "round": "round 2; round 6",
+   "how": "te N8 (S7 cites J1 to J13), R3-testability-10 (one legend sentence for oracles), R3-newcomer-05 (journeys reaching julieta run at the hybrid level on Linux). What a journey passing means per step was not written."
+  },
+  {
+   "cluster_id": "R8-index-36",
+   "round": "round 2; round 6",
+   "how": "te N8 (S7 cites J1 to J13), R3-testability-10 (one legend sentence for oracles), R3-newcomer-05 (journeys reaching julieta run at the hybrid level on Linux). What a journey passing means per step was not written."
+  },
+  {
+   "cluster_id": "R8-09-11",
+   "round": "round 2; round 6",
+   "how": "sa N1 restricted --from <sha> to commits reachable from refs/romeu/origin/* or refs/sandboxes/*; op-no-sandbox-source deleted sync --from sandbox/<branch>. That the gate 2 diff is the only review on the surviving --from path was not said in J2."
+  },
+  {
+   "cluster_id": "R8-10-1",
+   "round": "round 3; round 6",
+   "how": "N5: a closed key grammar for workflows; release.yml described as tools/release subcommands around one uses step. G7: an expression is one context path. The write permissions and token the publish steps need were never admitted by the grammar."
+  },
+  {
+   "cluster_id": "R8-plan-4",
+   "round": "round 3; round 6",
+   "how": "N5: a closed key grammar for workflows; release.yml described as tools/release subcommands around one uses step. G7: an expression is one context path. The write permissions and token the publish steps need were never admitted by the grammar."
+  },
+  {
+   "cluster_id": "R8-10-3",
+   "round": "round 6",
+   "how": "R3-critic-09 (O): tools/release publish creates a published release, never a draft. Immutability of a published release was not addressed."
+  },
+  {
+   "cluster_id": "R8-10-4",
+   "round": "round 2; round 6; round 7",
+   "how": "te N11 put acceptance out of all and in release.yml; op-acceptance-after-release took it out of release.yml and had the final plan task commit the file after the release; op-probe-completeness and R3-testability-15 moved the completeness checks into acceptance; M5 (round 7) made acceptance compare the candidate's commit with the v1.0.0 tag. What happens after v1.0.0 was never specified."
+  },
+  {
+   "cluster_id": "R8-10-44",
+   "round": "round 2; round 6; round 7",
+   "how": "te N11 put acceptance out of all and in release.yml; op-acceptance-after-release took it out of release.yml and had the final plan task commit the file after the release; op-probe-completeness and R3-testability-15 moved the completeness checks into acceptance; M5 (round 7) made acceptance compare the candidate's commit with the v1.0.0 tag. What happens after v1.0.0 was never specified."
+  },
+  {
+   "cluster_id": "R8-11-7",
+   "round": "round 2; round 6; round 7",
+   "how": "te N11 put acceptance out of all and in release.yml; op-acceptance-after-release took it out of release.yml and had the final plan task commit the file after the release; op-probe-completeness and R3-testability-15 moved the completeness checks into acceptance; M5 (round 7) made acceptance compare the candidate's commit with the v1.0.0 tag. What happens after v1.0.0 was never specified."
+  },
+  {
+   "cluster_id": "R8-index-40",
+   "round": "round 2; round 6; round 7",
+   "how": "te N11 put acceptance out of all and in release.yml; op-acceptance-after-release took it out of release.yml and had the final plan task commit the file after the release; op-probe-completeness and R3-testability-15 moved the completeness checks into acceptance; M5 (round 7) made acceptance compare the candidate's commit with the v1.0.0 tag. What happens after v1.0.0 was never specified."
+  },
+  {
+   "cluster_id": "R8-10-5",
+   "round": "round 6",
+   "how": "R3-critic-11: gh is a prerequisite pinned in mise.lock; 'no version number is written: the pin is the floor'. The same rule was not applied to the other pinned versions in 10 10.2's prose."
+  },
+  {
+   "cluster_id": "R8-adr-3",
+   "round": "round 6",
+   "how": "R3-critic-11: gh is a prerequisite pinned in mise.lock; 'no version number is written: the pin is the floor'. The same rule was not applied to the other pinned versions in 10 10.2's prose."
+  },
+  {
+   "cluster_id": "R8-10-6",
+   "round": "round 3; round 6",
+   "how": "A-determinism-5 (a): the tools start through mise exec. R3-critic-11: gh pinned in mise.lock for tools/release verify. The allowed [tools] set was never written in one place."
+  },
+  {
+   "cluster_id": "R8-12-17",
+   "round": "round 3; round 6",
+   "how": "A-determinism-5 (a): the tools start through mise exec. R3-critic-11: gh pinned in mise.lock for tools/release verify. The allowed [tools] set was never written in one place."
+  },
+  {
+   "cluster_id": "R8-plan-29",
+   "round": "round 3; round 6",
+   "how": "A-determinism-5 (a): the tools start through mise exec. R3-critic-11: gh pinned in mise.lock for tools/release verify. The allowed [tools] set was never written in one place."
+  },
+  {
+   "cluster_id": "R8-10-10",
+   "round": "round 7",
+   "how": "M2 and its confirmation: S1's evidence is the ci-run of release.yml on the tagged commit whose success is the evidence; the asset list is review text. The 'not from the tagged commit' deferral was left standing beside it."
+  },
+  {
+   "cluster_id": "R8-10-12",
+   "round": "round 6",
+   "how": "op-probe-completeness moved 'every probe has a result' into tools/ci acceptance; R3-docs-6 made the index's Settled by column the one source. The check was then scoped to probes named there, which round 8 widens."
+  },
+  {
+   "cluster_id": "R8-plan-10",
+   "round": "round 6",
+   "how": "op-probe-completeness moved 'every probe has a result' into tools/ci acceptance; R3-docs-6 made the index's Settled by column the one source. The check was then scoped to probes named there, which round 8 widens."
+  },
+  {
+   "cluster_id": "R8-10-14",
+   "round": "round 1; round 6",
+   "how": "te C3: fake sbx replays recorded argv only; known argv fixed. R3-testability-04: a scenario names the recorded session it starts from. No list of the argv shapes and sessions block A must record."
+  },
+  {
+   "cluster_id": "R8-10-15",
+   "round": "round 2",
+   "how": "te N3: the recorder redacts (placeholders, stdout allowlist, never secrets), with a planted-token test and hygiene over the recordings. Emails, internal hosts and foreign global rules were not in its scope."
+  },
+  {
+   "cluster_id": "R8-10-19",
+   "round": "round 4; round 6",
+   "how": "op-practices, op-pairing-rule, op-backfill, op-maintainer-wait, op-pr-size adopted the DORA tool; R3-simplicity-01 and R3-newcomer-06 questioned its timing and op-dora-late kept it in v1, landing with ci-release. Deferring it out of v1 was not considered then."
+  },
+  {
+   "cluster_id": "R8-12-9",
+   "round": "round 4; round 6",
+   "how": "op-practices, op-pairing-rule, op-backfill, op-maintainer-wait, op-pr-size adopted the DORA tool; R3-simplicity-01 and R3-newcomer-06 questioned its timing and op-dora-late kept it in v1, landing with ci-release. Deferring it out of v1 was not considered then."
+  },
+  {
+   "cluster_id": "R8-adr-14",
+   "round": "round 4; round 6",
+   "how": "op-practices, op-pairing-rule, op-backfill, op-maintainer-wait, op-pr-size adopted the DORA tool; R3-simplicity-01 and R3-newcomer-06 questioned its timing and op-dora-late kept it in v1, landing with ci-release. Deferring it out of v1 was not considered then."
+  },
+  {
+   "cluster_id": "R8-12-38",
+   "round": "round 4; round 6",
+   "how": "op-practices, op-pairing-rule, op-backfill, op-maintainer-wait, op-pr-size adopted the DORA tool; R3-simplicity-01 and R3-newcomer-06 questioned its timing and op-dora-late kept it in v1, landing with ci-release. Deferring it out of v1 was not considered then."
+  },
+  {
+   "cluster_id": "R8-12-40",
+   "round": "round 4; round 6",
+   "how": "op-practices, op-pairing-rule, op-backfill, op-maintainer-wait, op-pr-size adopted the DORA tool; R3-simplicity-01 and R3-newcomer-06 questioned its timing and op-dora-late kept it in v1, landing with ci-release. Deferring it out of v1 was not considered then."
+  },
+  {
+   "cluster_id": "R8-10-40",
+   "round": "round 2; round 6",
+   "how": "craft C19: tools/release notes generated from Conventional Commits and PR Why sections. op-acceptance-after-release: notes count from the last non-prerelease tag; A5 (round 7) added the prerelease clause. The v1.0.0 notes covering the whole history was not weighed."
+  },
+  {
+   "cluster_id": "R8-12-3",
+   "round": "round 2; round 6",
+   "how": "craft C19: tools/release notes generated from Conventional Commits and PR Why sections. op-acceptance-after-release: notes count from the last non-prerelease tag; A5 (round 7) added the prerelease clause. The v1.0.0 notes covering the whole history was not weighed."
+  },
+  {
+   "cluster_id": "R8-12-4",
+   "round": "round 2; round 6",
+   "how": "craft C19: tools/release notes generated from Conventional Commits and PR Why sections. op-acceptance-after-release: notes count from the last non-prerelease tag; A5 (round 7) added the prerelease clause. The v1.0.0 notes covering the whole history was not weighed."
+  },
+  {
+   "cluster_id": "R8-10-47",
+   "round": "round 6",
+   "how": "R3-doubt-06: emit and drain are ledger/emit, linked by julieta only; R3-craftsmanship-06: memstore split. internal/ledger itself stayed shared, which round 8 splits further."
+  },
+  {
+   "cluster_id": "R8-10-50",
+   "round": "round 6",
+   "how": "R3-simplicity-02: day one has tools/new adr, generated, sequences, pr and the ask-first list; each other kind lands with its module. 10 10.2's step table was not marked to match."
+  },
+  {
+   "cluster_id": "R8-adr-19",
+   "round": "round 6",
+   "how": "R3-simplicity-02: day one has tools/new adr, generated, sequences, pr and the ask-first list; each other kind lands with its module. 10 10.2's step table was not marked to match."
+  },
+  {
+   "cluster_id": "R8-11-2",
+   "round": "round 1; round 2; round 5; round 6",
+   "how": "D24 refocused A3 on memory dirs and the bin mount; sa N6 added the root remount; round 5 extended A3 with the view mount and a hostile spool; R3-security-09 added the read-only host clone; R3-testability-11 moved the device node into A3; R3-newcomer-03 made the sandbox-side checks part of block B. A3 thereby came to need product code, which round 8 splits out."
+  },
+  {
+   "cluster_id": "R8-11-3",
+   "round": "round 2; round 6",
+   "how": "te N1: tools/ci probes checks resolvedBy descends from commit and touches every affects path; op-probe-completeness moved completeness to acceptance; R3-doubt-11 made an overturned probe add an ADR. That an overturned result still fails probes, a step of all, is the leftover."
+  },
+  {
+   "cluster_id": "R8-11-5",
+   "round": "round 6",
+   "how": "op-no-sandbox-source deleted the only probe that measured idle auto-stop; R3-testability-04 had A4 record sbx stop. Exec on a stopped sandbox, a Docker restart and sbx env rm were never probed."
+  },
+  {
+   "cluster_id": "R8-11-6",
+   "round": "round 7",
+   "how": "M5 and its confirmation: the rule compares sources; every block B result carries the candidate's tag and commit; B1 runs once more on v1.0.0. A build contract and a B2 rerun were not required."
+  },
+  {
+   "cluster_id": "R8-12-11",
+   "round": "round 6",
+   "how": "op-merge-commits chose merge commits; R3-doubt-08 made a deployment's commits those of its pull requests, read from GitHub; the writer added a sixth decision item to ADR 0002. 12 12.9's reason for merge commits was left citing the fix marker."
+  },
+  {
+   "cluster_id": "R8-12-12",
+   "round": "round 1; round 2",
+   "how": "op-tools-are-code added the PR template and docs/lessons.md; craft C3 made tools/ci pr check the PR sections. That Lessons may be 'none' was not stated."
+  },
+  {
+   "cluster_id": "R8-12-13",
+   "round": "round 1; round 2",
+   "how": "op-tools-are-code created docs/lessons.md; te N12 made tools/ci lessons resolve the named check. One append-heavy file was the chosen layout; round 8 changes it and tools/ci lessons must follow."
+  },
+  {
+   "cluster_id": "R8-12-16",
+   "round": "round 6",
+   "how": "R3-craftsmanship-01: 'Depends on' is plan order, 10.7 is the import rule; R3-critic-03 was rejected on that reading. The edges themselves were not re-checked."
+  },
+  {
+   "cluster_id": "R8-12-22",
+   "round": "round 3",
+   "how": "A-determinism-4: tools/ci pr reads title, body, ref and SHAs from a payload file and commits and paths from git, with no network call. A local pre-PR mode was not added."
+  },
+  {
+   "cluster_id": "R8-12-37",
+   "round": "round 7; round 6",
+   "how": "M1: the README skeleton lands in ci-release; the docs row says 'README text'. Round 6's writer's decision: only docs/ and root Markdown may change between the candidate and v1.0.0."
+  },
+  {
+   "cluster_id": "R8-13-2",
+   "round": "round 6",
+   "how": "R3-doubt-21: a project recreated under a retired name; stated as a limit in one sentence of 13 13.5. Round 8 adds the retire message, a 05 5.4 row and a deferred row."
+  },
+  {
+   "cluster_id": "R8-13-3",
+   "round": "round 5",
+   "how": "op-ledger-absolute: nothing in the ledger is ever edited or deleted, no exception; op-ledger-secret: rotation is the remedy. Owner removal on the host was excluded by that wording, not considered as an alternative."
+  },
+  {
+   "cluster_id": "R8-adr-21",
+   "round": "round 5",
+   "how": "op-ledger-absolute: nothing in the ledger is ever edited or deleted, no exception; op-ledger-secret: rotation is the remedy. Owner removal on the host was excluded by that wording, not considered as an alternative."
+  },
+  {
+   "cluster_id": "R8-adr-10",
+   "round": "round 1; round 2; round 3",
+   "how": "det-seq (sequence numbers checked by tools/ci), craft C9 (tools/new takes the next free id), #28 (one slug function). Concurrent ADR writing was not considered."
+  },
+  {
+   "cluster_id": "R8-adr-16",
+   "round": "round 2; round 4; round 6; round 7",
+   "how": "Round 2 recorded Q21 to Q23 as new open questions (Q23 from conflict 3); round 4 added Q25 with op-second-account; rounds 6 and 7 carried Q25 through M3; ADR 0008 (2026-10-07) decided it. The rows were not removed afterwards."
+  },
+  {
+   "cluster_id": "R8-index-1",
+   "round": "round 2; round 4; round 6; round 7",
+   "how": "Round 2 recorded Q21 to Q23 as new open questions (Q23 from conflict 3); round 4 added Q25 with op-second-account; rounds 6 and 7 carried Q25 through M3; ADR 0008 (2026-10-07) decided it. The rows were not removed afterwards."
+  },
+  {
+   "cluster_id": "R8-index-2",
+   "round": "round 2; round 4; round 6; round 7",
+   "how": "Round 2 recorded Q21 to Q23 as new open questions (Q23 from conflict 3); round 4 added Q25 with op-second-account; rounds 6 and 7 carried Q25 through M3; ADR 0008 (2026-10-07) decided it. The rows were not removed afterwards."
+  },
+  {
+   "cluster_id": "R8-index-33",
+   "round": "round 2; round 4; round 6; round 7",
+   "how": "Round 2 recorded Q21 to Q23 as new open questions (Q23 from conflict 3); round 4 added Q25 with op-second-account; rounds 6 and 7 carried Q25 through M3; ADR 0008 (2026-10-07) decided it. The rows were not removed afterwards."
+  },
+  {
+   "cluster_id": "R8-adr-5",
+   "round": "round 4; round 6; round 7",
+   "how": "op-second-account (Q25's fallback), G10 (the bypass actor carried by Q25), M3 (refusals proved on the host). ADR 0007 later deferred two escapes to Q25; when ADR 0008 decided Q25, nothing reopened them."
+  },
+  {
+   "cluster_id": "R8-index-13",
+   "round": "round 4; round 6; round 7",
+   "how": "op-second-account (Q25's fallback), G10 (the bypass actor carried by Q25), M3 (refusals proved on the host). ADR 0007 later deferred two escapes to Q25; when ADR 0008 decided Q25, nothing reopened them."
+  },
+  {
+   "cluster_id": "R8-plan-3",
+   "round": "round 4; round 6; round 7",
+   "how": "op-second-account (Q25's fallback), G10 (the bypass actor carried by Q25), M3 (refusals proved on the host). ADR 0007 later deferred two escapes to Q25; when ADR 0008 decided Q25, nothing reopened them."
+  },
+  {
+   "cluster_id": "R8-index-10",
+   "round": "round 3",
+   "how": "A-simplicity-8: docs versioning per release deferred with a trigger. Its until-then cell was not revisited for the first release."
+  },
+  {
+   "cluster_id": "R8-index-17",
+   "round": "round 4; round 5; round 6",
+   "how": "op-gate-run and op-finding-class deferred with triggers; op-ledger-retention deferred rotation; round 6 gave rotation a trigger and trimmed the tuning row. Rows were never merged."
+  },
+  {
+   "cluster_id": "R8-index-18",
+   "round": "round 4; round 6",
+   "how": "op-maintainer-wait defined the measure; R3-fidelity-5 added the merge-checkpoint deferred row with a dora trigger. That the number cannot attribute merges was stated in the row itself."
+  },
+  {
+   "cluster_id": "R8-12-10",
+   "round": "round 4; round 6",
+   "how": "op-maintainer-wait defined the measure; R3-fidelity-5 added the merge-checkpoint deferred row with a dora trigger. That the number cannot attribute merges was stated in the row itself."
+  },
+  {
+   "cluster_id": "R8-index-35",
+   "round": "round 2; round 3; round 6",
+   "how": "te M8 (scheduled fuzz), A-simplicity-3 (fuzz.yml calls mutate), op-mutate. S6's evidence was tool names; no run was tied to the release commit."
+  },
+  {
+   "cluster_id": "R8-index-39",
+   "round": "round 3",
+   "how": "op-equivalence, N6 and N7 defined local-gate equivalence per platform and narrowed 'every gate' to 'every merge gate'. The Boundaries sentences were not re-read against the Linux-only and macOS-only steps."
+  },
+  {
+   "cluster_id": "R8-index-44",
+   "round": "round 2",
+   "how": "te N10 (gate 1 e2e exit 3) and craft C4 (I7 flip table from struct tags). The gate 2 half of I7's E test was never given a concrete change."
+  },
+  {
+   "cluster_id": "R8-01-14",
+   "round": "round 1; round 2",
+   "how": "sa H1 parsed kit and workload capabilities into the widening set; sa N2 made the descriptor grammar strict with conformance fixtures and anonymous reads (Q23). The grammar's owner package and the unmodeled-type case were not fixed, and why the decomposition is needed was not written."
+  },
+  {
+   "cluster_id": "R8-06-23",
+   "round": "round 1; round 2",
+   "how": "sa H1 parsed kit and workload capabilities into the widening set; sa N2 made the descriptor grammar strict with conformance fixtures and anonymous reads (Q23). The grammar's owner package and the unmodeled-type case were not fixed, and why the decomposition is needed was not written."
+  },
+  {
+   "cluster_id": "R8-12-32",
+   "round": "round 1; round 2",
+   "how": "sa H1 parsed kit and workload capabilities into the widening set; sa N2 made the descriptor grammar strict with conformance fixtures and anonymous reads (Q23). The grammar's owner package and the unmodeled-type case were not fixed, and why the decomposition is needed was not written."
+  },
+  {
+   "cluster_id": "R8-01-15",
+   "round": "round 1; round 2",
+   "how": "sa H1 parsed kit and workload capabilities into the widening set; sa N2 made the descriptor grammar strict with conformance fixtures and anonymous reads (Q23). The grammar's owner package and the unmodeled-type case were not fixed, and why the decomposition is needed was not written."
+  },
+  {
+   "cluster_id": "R8-02-19",
+   "round": "round 1; round 2",
+   "how": "sa H1 parsed kit and workload capabilities into the widening set; sa N2 made the descriptor grammar strict with conformance fixtures and anonymous reads (Q23). The grammar's owner package and the unmodeled-type case were not fixed, and why the decomposition is needed was not written."
+  },
+  {
+   "cluster_id": "R8-06-19",
+   "round": "round 1; round 2",
+   "how": "sa H1 parsed kit and workload capabilities into the widening set; sa N2 made the descriptor grammar strict with conformance fixtures and anonymous reads (Q23). The grammar's owner package and the unmodeled-type case were not fixed, and why the decomposition is needed was not written."
+  },
+  {
+   "cluster_id": "R8-04-12",
+   "round": "round 1",
+   "how": "fid removed-project ruled out --prune and kept retire explicit; --accept-loss and retire --force were added later without a named-reason form."
+  },
+  {
+   "cluster_id": "R8-index-31",
+   "round": "round 2",
+   "how": "dd stale 7.6 and dd stale 7.5 corrected 07 7.5 and 7.6 for gate 1 and the sbx command; J8's claim that running sandboxes already have the tool was not re-read against them."
+  }
+ ]
+}

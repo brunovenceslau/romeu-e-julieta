@@ -7,7 +7,7 @@ reader: the implementer picking the next task of romeu e julieta v1
 
 This is the implementation plan of v1. Its source of truth is the
 specification, [spec.md](spec.md) with the fourteen pages under
-`spec/`, and the seven decision records under `adr/`. Where this plan and
+`spec/`, and the decision records under `adr/`. Where this plan and
 the specification disagree, the specification is right and this page
 has a defect.
 
@@ -55,7 +55,8 @@ commit that adds it; a pull request that changes a task keeps them true
 by hand, and a reviewer reads them as part of the diff.
 
 **The shape of a task.** A task is one logical change and one pull
-request. It carries:
+request; consecutive dependent tasks of one chain, written by one
+agent, may ship as one pull request (12 12.9). It carries:
 
 | Field | Meaning |
 |---|---|
@@ -97,7 +98,9 @@ blocks" lists what can proceed while a block is waited for.
   branch, carries one logical change and merges as a merge commit
   (12 12.9;
   [ADR 0002, develop on the trunk with short-lived branches](adr/0002-develop-on-the-trunk-with-short-lived-branches.md)).
-  v1 has no stack: a task that depends on an unmerged one waits for it.
+  v1 has no stack: a task that depends on an unmerged one waits for it,
+  or ships with it in one pull request when both are consecutive tasks
+  of one chain written by one agent.
 - **Dark merges.** Work that is not finished merges on `main` and is
   reached by no command (12 12.9). A task marked **dark** adds code
   that a later task connects.
@@ -110,8 +113,9 @@ blocks" lists what can proceed while a block is waited for.
 - **Review before the pull request opens.** A change is read by a
   reviewer, another agent or a person, before it reaches the
   maintainer (12 12.9, "The agent and the reviewer"). The maintainer's
-  merge is the last step of each task (12 12.4, the default-branch
-  ruleset).
+  merge is the last step of each task, by working agreement; what the
+  default-branch ruleset requires, and what that is worth, is in 05 5.4
+  ([ADR 0009, drop the required review and amend the records that assumed it](adr/0009-drop-the-required-review-and-amend-the-records-that-assumed-it.md)).
 - **Middleware lands with its first input.** A `tools/new` kind and a
   generator row land in the first pull request of the module that owns
   their first input (12 12.2, 12 12.3). We apply the same rule to the
@@ -179,7 +183,7 @@ commands (phase 6), the kits (phase 7).
 
 **Four pieces land before their module's place in the map**, each
 because a module above it needs that piece and the piece needs nothing
-from the modules between (question 3):
+from the modules between (Q26):
 
 | Piece | Task | Module in 12 12.2 | Needed early by |
 |---|---|---|---|
@@ -207,23 +211,23 @@ whose exit status the maintainer reads, wherever one exists. Block A of
 
 | Block | Needs merged first | What the maintainer does | Also needs | Unblocks | Wait on the critical path | Pass | Recommendation |
 |---|---|---|---|---|---|---|---|
-| O1 | T001, written and open: the block finishes it and merges it | the sitting of the maintainer block, items a to d (10 10.2): rulesets and the two repository settings first; one `go run ./tools/ci hygiene add` per forbidden name in a plain host clone; enable the hook, push the branch, open the pull request; then the four tries from inside the sandbox, read on the host (a measurement: 10 10.2, item d, which records the result) | a host clone, the repository's admin rights, the operator's token, which the sandbox holds, created after item a. | T002 directly; 101 of 102 tasks have it in their dependencies | the specification gives no duration; nothing is pushed until it ends, so the whole plan waits. No task can proceed meanwhile | `go run ./tools/ci fast` exits 0 in that clone after item b and non-zero before it; the four tries are read by the host checks of 10 10.2, item d, which no one command joins | do item a before the sandbox that writes the first task receives the operator's token (10 10.2): until then not even a push to the default branch is refused. Save each API answer in a file as you go: the pull request's Evidence needs them, and nothing checks that text until T005, so read each file for a host path or a name before you paste it. Its output is recorded in [ADR 0008, let the sandbox act as the maintainer on GitHub](adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md), which decides Q25. From now on the maintainer also reads the GitHub security log at each sitting, for an action by the operator's token that was not asked for; whether the log covers merges, tag pushes and ruleset updates is unverified (05 5.4) |
-| O2 | T002 | item e (10 10.2): add the jobs of the green run to the default-branch ruleset as required status checks, and save the API's answer | the green run's job names | T003 directly; 100 of 102 tasks have it in their dependencies | one call; do it in the sitting that merges that task, and it adds no wait. No task can proceed meanwhile | the saved answer lists each job name of the green run; no command reads a ruleset back (05 5.4), so this one is **[review]** | one call, in the same sitting as the merge |
-| O3 | T019, T020 | block A on both hosts, Intel and Apple silicon (11 11.1): `go run ./e2e/probes --block A --out docs/probes/`, which lists and plants nothing (question 7), apart from one global setting: A2 sets `env.rememberHostCommands` (11 11.1) and records the prior value in its result; then commit the results and the recordings on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | `sbx` at or above 0.46.0 on both hosts; question 6 answered; the pins of the pin file | T026 directly; 54 of 102 tasks have it in their dependencies | about 75 minutes per host (11 11.1), plus the wait for a sitting with both machines. Meanwhile 28 later tasks can proceed | `go run ./tools/ci probes --require-pass A1,A2,A3,A4,A5,A6,A9,A10,A11,A12,A13,A14` exits 0 on the branch with both hosts' results | run both hosts in one sitting: the arch-sensitive probes (A4, A5, A11, A12, A13) count only with both (11, opening). Read the diff of everything staged before the push: it is data from your host, and the recorder's scrubbing (T018) is a filter, not a reviewer. The second host's files reach the branch by a push from that host's own clone, through its hook, and the harness refuses an `--out` inside a clone whose hook is not enabled. A results-only branch runs `main`'s own `tools/ci` through the hook; if a resolution commit joins it (T026), read that diff in the clone before checking the branch out, as item c of block O1 requires (10 10.2) |
-| O4 | T055 | the catalog handover: build julieta for linux from `main`, run `julieta spec validate --catalog projects/*.yaml` on the reference config repo inside a Linux container, and hand over its output after reading and redacting it: it may name hosts, tool keys or project names that are not for the public repository | a Linux container with read-only access to the config repo's origins and no host credential mounted; julieta has no darwin build (12 12.1) | T091 directly; 6 of 102 tasks have it in their dependencies | minutes; it can happen any time after its one task, so it is off the critical path if done by checkpoint C5. Meanwhile 41 later tasks can proceed | `julieta spec validate --catalog projects/*.yaml` exits 0 or 1, and its output is the handover; an exit of 2 means a spec does not validate, and the block is not done; `go run ./tools/ci hygiene --file <output>` exits 0 on the output before it is handed over | do it at C5, not at the end: it is the only input the catalog task waits for |
-| O5 | every earlier task, T001 to T091 (91 in all) | the candidate: run `julieta spec validate --catalog` again, in the container of O4, and see it exit 0; the rehearsal on one host (below); then push the tag `v1.0.0-rc.1` (11 11.2) | the same container as O4; one host with `sbx` | O6 directly; 5 of 102 tasks have it in their dependencies | the rehearsal is about one block B run on one host, 90 minutes plus the sandbox-side checks (11 11.2). Meanwhile 6 later tasks can proceed | `go test -tags host -json ./e2e/host/...` exits 0, then `go run ./tools/ci probes --require-pass B2,B3,B4,B5,C1,C2,C3,C4,C5 --hosts 1 --dir <the rehearsal directory>` exits 0 | the rehearsal is this plan's addition, not the specification's. After the tag, a change outside `docs/` and the root Markdown files needs a new candidate and block B again (11 11.2) |
-| O6 | O5 | block B on both hosts (11 11.2): B1 to B5 and the sandbox-side checks C1 to C5; then commit the results on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | the candidate's published release; both hosts | T092 directly; 5 of 102 tasks have it in their dependencies | about 90 minutes per host for B1 to B5, plus the sandbox-side checks (11 11.2). Meanwhile 6 later tasks can proceed | `go run ./tools/ci probes --require-pass B1,B2,B3,B4,B5,C1,C2,C3,C4,C5` exits 0 on the branch with both hosts' results | run B1 first on each host: each other result copies the candidate's tag and commit from it (11 11.2). The reading rules of block O3 apply: the staged diff before the push, each host pushing from its own clone through its hook, and a resolution commit's diff before checkout |
-| O7 | T094, T095, T101, T093 | `go run ./tools/ci acceptance --pre-tag` exits 0; push the tag `v1.0.0`; pin `validate.yml` in the reference config repo to that release, run it and note its run id (S4); run B1 once more on v1.0.0, on one host, with `--out` outside the repository: `go run ./e2e/probes --block B --only B1 --out <dir>` (11 11.2) | the documentation tasks merged, each of them; the config repo | T102 directly; 1 of 102 tasks have it in their dependencies | one B1 run and one workflow run. No task can proceed meanwhile | `go run ./tools/ci probes --require-pass B1 --hosts 1 --dir <dir>` exits 0 on that run | the pre-tag check is a command here, and `tools/ci acceptance` runs it again at the end (10 10.5). The release exists only after the tag, so the pin comes after it. Paste under the Evidence of T102 the result file of that B1 run, which the harness wrote through its redaction, and no raw output |
+| O1 | T001, written and open: the block finishes it and merges it | the sitting of the maintainer block, items a to d (10 10.2): rulesets and the two repository settings first; one `go run ./tools/ci hygiene add` per forbidden name in a plain host clone; enable the hook, push the branch, open the pull request; then the four tries from inside the sandbox, read on the host (a measurement: 10 10.2, item d, which records the result) | a host clone, the repository's admin rights, the operator's token, which the sandbox holds, created after item a. | T002 directly; every later task has it in its dependencies | the specification gives no duration; nothing is pushed until it ends, so the whole plan waits. No task can proceed meanwhile | `go run ./tools/ci fast` exits 0 in that clone after item b and non-zero before it; the four tries are read by the host checks of 10 10.2, item d, which no one command joins | do item a before the sandbox that writes the first task receives the operator's token (10 10.2): until then not even a push to the default branch is refused. Save each API answer in a file as you go: the pull request's Evidence needs them, and nothing checks that text until T005, so read each file for a host path or a name before you paste it. Its output is recorded in [ADR 0008, let the sandbox act as the maintainer on GitHub](adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md), which decides Q25. From now on the maintainer also reads the GitHub security log at each sitting, for an action by the operator's token that was not asked for; a judgment, not a detector: the log records ruleset and listed settings changes, and no merge, push, tag, branch deletion or release (05 5.4) |
+| O2 | T002 | item e (10 10.2): add the jobs of the green run to the default-branch ruleset as required status checks, and save the API's answer | the green run's job names | T003 directly; every task after T002 has it in its dependencies | one call; do it in the sitting that merges that task, and it adds no wait. No task can proceed meanwhile | the saved answer lists each job name of the green run; no command reads a ruleset back (05 5.4), so this one is **[review]** | one call, in the same sitting as the merge |
+| O3 | T019, T020 | block A on both hosts, Intel and Apple silicon (11 11.1): `go run ./e2e/probes --block A --out docs/probes/`, which lists and plants nothing (Q29), apart from one global setting: A2 sets `env.rememberHostCommands` (11 11.1) and records the prior value in its result; then commit the results and the recordings on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | `sbx` at or above 0.46.0 on both hosts; the pins of the pin file | T026 directly, and every task that reads a block A fact | about 75 minutes per host (11 11.1), plus the wait for a sitting with both machines. Meanwhile the tasks listed below the table can proceed | `go run ./tools/ci probes --require-pass A1,A2,A3,A4,A5,A6,A9,A10,A11,A12,A13,A14` exits 0 on the branch with both hosts' results | run both hosts in one sitting: the arch-sensitive probes (A4, A5, A11, A12, A13) count only with both (11, opening). Read the diff of everything staged before the push: it is data from your host, and the recorder's scrubbing (T018) is a filter, not a reviewer. The second host's files reach the branch by a push from that host's own clone, through its hook, and the harness refuses an `--out` inside a clone whose hook is not enabled. A results-only branch runs `main`'s own `tools/ci` through the hook; if a resolution commit joins it (T026), read that diff in the clone before checking the branch out, as item c of block O1 requires (10 10.2) |
+| O4 | T055 | the catalog handover: build julieta for linux from `main`, run `julieta spec validate --catalog projects/*.yaml` on the reference config repo inside a Linux container, and hand over its output after reading and redacting it: it may name hosts, tool keys or project names that are not for the public repository | a Linux container with read-only access to the config repo's origins and no host credential mounted; julieta has no darwin build (12 12.1) | T091 directly, and through it block O5 | minutes; it can happen any time after its one task, so it is off the critical path if done by checkpoint C5. Meanwhile every later task up to block O5 but T091 can proceed | `julieta spec validate --catalog projects/*.yaml` exits 0 or 1, and its output is the handover; an exit of 2 means a spec does not validate, and the block is not done; `go run ./tools/ci hygiene --file <output>` exits 0 on the output before it is handed over | do it at C5, not at the end: it is the only input the catalog task waits for |
+| O5 | every earlier task, T001 to T091 and T103 | the candidate: run `julieta spec validate --catalog` again, in the container of O4, and see it exit 0; the rehearsal on one host (below); then step 1 of the release checklist of 12 12.2, the tag `v1.0.0-rc.1` (11 11.2) | the same container as O4; one host with `sbx` | O6 directly, and through it T092 to T095 and T102 | the rehearsal is about one block B run on one host, 90 minutes plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go test -tags host -json ./e2e/host/...` exits 0, then `go run ./tools/ci probes --require-pass B2,B3,B4,B5,C2,C3,C4,C5,C6 --hosts 1 --dir <the rehearsal directory>` exits 0 | the rehearsal is this plan's addition, not the specification's. After the tag, a change outside `docs/` and the root Markdown files needs a new candidate and block B again (11 11.2) |
+| O6 | O5 | step 2 of the release checklist of 12 12.2, block B on both hosts (11 11.2): B1 to B5 and the sandbox-side checks C2 to C6; then commit the results on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | the candidate's published release; both hosts | T092 directly, and through it T093 to T095 and T102 | about 90 minutes per host for B1 to B5, plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go run ./tools/ci probes --require-pass B1,B2,B3,B4,B5,C2,C3,C4,C5,C6` exits 0 on the branch with both hosts' results | run B1 first on each host: each other result copies the candidate's tag and commit from it (11 11.2). The reading rules of block O3 apply: the staged diff before the push, each host pushing from its own clone through its hook, and a resolution commit's diff before checkout |
+| O7 | T094, T095, T101, T093 | steps 3 to 5 of the release checklist of 12 12.2: `go run ./tools/ci acceptance --pre-tag` exits 0; push the tag `v1.0.0`; run B1 and B2 once more on v1.0.0, on one host, with `--out` outside the repository: `go run ./e2e/probes --block B --only B1 --out <dir>`, then the same with `--only B2` (11 11.2). Then pin `validate.yml` in the reference config repo to that release, run it and note its run id (S4) | the documentation tasks merged, each of them; the config repo | T102 directly; no other task | one B1 and one B2 run and one workflow run. No task can proceed meanwhile | `go run ./tools/ci probes --require-pass B1,B2 --hosts 1 --dir <dir>` exits 0 on that run | the pre-tag check is a command here, and `tools/ci acceptance` runs it again at the end (10 10.5); a check that fails after the tag is fixed by a patch release (12 12.2). The release exists only after the tag, so the pin comes after it. Paste under the Evidence of T102 the result files of those runs, which the harness wrote through its redaction, and no raw output |
 
-**What does not wait for block O3.** 48 of the 102 tasks have no block A
-fact in their dependencies. 28 of them come after the tasks block O3
-itself needs, and may proceed while the maintainer finds a sitting with
-both hosts: T021 to T025, T031 to T036, T041, T051 to T055, T057 to
-T063, T070, T078, T084, T091. They include the first build layer,
-`catalog`, `oci`, `state`, `memstore`, `egress` and `romeu init`, and
-julieta's chores up to `ledger`'s event, which run at the container
-level and need no recording, except T056, which reads A13's protocol
-number. T091 is in the list and still waits for block O4.
+**What does not wait for block O3.** These tasks have no block A fact in
+their dependencies, come after the tasks block O3 itself needs, and may
+proceed while the maintainer finds a sitting with both hosts: T021 to
+T025, T031 to T036, T041, T051 to T055, T057, T059 to T062, T070, T078,
+T084, T091. They include the first build layer, `catalog`, `oci`,
+`state`, `memstore`, `egress` and `romeu init`, and julieta's chores up
+to the host half of salvage, which run at the container level and
+need no recording, except T056, which reads A13's protocol number. T091
+is in the list and still waits for block O4.
 
 **The rehearsal in O5.** Build with
 `go run ./tools/release build --version v1.0.0-rc.1 --dry-run`, then,
@@ -235,11 +239,12 @@ first run of the product against real `sbx`, and it includes C3, whose
 result can change a kit (Q8). It is not a block B result and is
 committed nowhere.
 Pass is one command on that directory,
-`go run ./tools/ci probes --require-pass B2,B3,B4,B5,C1,C2,C3,C4,C5 --hosts 1 --dir <it>`
+`go run ./tools/ci probes --require-pass B2,B3,B4,B5,C2,C3,C4,C5,C6 --hosts 1 --dir <it>`
 (T020), after the host suite exited 0; a result that overturns
 a default is handled before the tag, the way T092 says.
-We considered running it at checkpoint C7 instead: it needs the build
-of T088, so it stays here.
+We considered running it at checkpoint C7 instead: it needs the release
+candidate, a published `v1.0.0-rc.<n>` tag that T088's `release.yml`
+builds with the full kit set, so it stays here.
 
 **Results are a pull request.** Blocks O3 and O6 end with a branch, the
 hook, `go run ./tools/ci fast`, the staged diff read by the maintainer,
@@ -253,11 +258,14 @@ this repository has names it must not contain (index, Boundaries): a
 direct push is public before any check reads it, while a branch is
 read by the hook, by `hygiene` and by `pr` first (10 10.2).
 
-**Outside the blocks.** Each merge waits for the maintainer (12 12.4),
-and a pull request that touches an ask-first surface needs the
-maintainer's approval, recorded in an approval line that names what was
-approved (12 12.4). The "Ask-first" field of each task is there so
-those approvals can be given per phase, at the checkpoint, instead of
+**Outside the blocks.** Each merge waits for the maintainer: a green
+pull request with its approval lines is merged at the next sitting, with
+at least one merge each business day, and a checkpoint with more than
+three pull requests waiting reopens the deferred decision on that manual
+checkpoint (12 12.9). A pull request that touches an ask-first surface
+needs the maintainer's approval, recorded in an approval line that names
+what was approved (12 12.4). The "Ask-first" field of each task is there
+so those approvals can be given per phase, at the checkpoint, instead of
 one pull request at a time.
 
 ## Toolchain pins
@@ -270,7 +278,7 @@ task lands it.
 | Go | version in `mise.toml`, locked in `mise.lock` | 12 12.1, 02 2.1 | T001 |
 | `golangci-lint`, `govulncheck` | `mise.lock`; `govulncheck` and `golangci-lint` run from the paths `mise which` resolves, at the version `mise.lock` locks; the `govulncheck` lock entry has no checksum (it rests on the Go checksum database) | 12 12.1, 10 10.2 | T001, T002 |
 | `reuse` | the container image `fsfe/reuse:6.2.0@sha256:<digest>` in `tools/ci`, run on Linux only | 12 12.1, 10 10.2 | T002 |
-| `gh`, for `tools/release verify` | an exact version in `mise.toml`, with a sha256 per platform in `mise.lock`; started through `mise exec` | 12 12.1, 10 10.2 | T088 |
+| `gh`, for `tools/release verify` | an exact version in `mise.toml`, with a sha256 per platform in `mise.lock`; started by the path `mise which` resolves, never through `mise exec` | 12 12.1, 10 10.2 | PR #27 (round 8, DR7), merged |
 | GitHub Actions | `uses` with a 40-hex commit SHA | 10 10.2 | T002, T088 |
 | mise on the CI runners | one `uses` step with a 40-hex commit SHA, the mise version and its sha256 in `with`; Go and the other tools come from `mise.lock` through it | 10 10.2 | T002 |
 | Go dependencies | `go.mod`, `go.sum`; the complete v1 list is in 12 12.1 | 12 12.1 | first use |
@@ -300,14 +308,14 @@ run is a
 
 | Phase | Tasks | Modules | Checkpoint: what must be true before the next phase |
 |---|---|---|---|
-| 0 Bootstrap | T001 to T006 | `ci-bootstrap` | C0: the hook and CI run the same `tools/ci`; the rulesets refuse a direct push to the default branch by the operator's token, a control against an agent that does not edit the ruleset or the repository settings (05 5.4), and the other tries of O1 are recorded ([ADR 0008, let the sandbox act as the maintainer on GitHub](adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md), 05 5.4) (O1, O2); a pull request without its sections fails `pr`. One network step belongs here: the sandbox that builds T012 and T013 must reach the registry that holds the pinned images and the release API (`api.github.com`), which a default-deny sandbox does not, so the maintainer runs one `sbx policy allow network` command scoped to that sandbox (`--sandbox`) with every host in it, exact hosts and no wildcard, after reading the list the agent that writes T012 names. Questions 1 and 2 are answered. The maintainer answers questions 3 to 9 here |
+| 0 Bootstrap | T001 to T006 | `ci-bootstrap` | C0: the hook and CI run the same `tools/ci`; the rulesets refuse a direct push to the default branch by the operator's token, a control against an agent that does not edit the ruleset or the repository settings (05 5.4), and the other tries of O1 are recorded ([ADR 0008, let the sandbox act as the maintainer on GitHub](adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md), 05 5.4) (O1, O2); a pull request without its sections fails `pr`. One network step belongs here: the sandbox that builds T012 and T013 must reach the registry that holds the pinned images and the release API (`api.github.com`), which a default-deny sandbox does not, so the maintainer runs one `sbx policy allow network` command scoped to that sandbox (`--sandbox`) with every host in it, exact hosts and no wildcard, after reading the list the agent that writes T012 names. Questions 1 and 2 are answered. The maintainer answers Q26, Q27, Q29 and Q30 here |
 | 1 The skeleton and the probe harness | T007 to T020 | `termsafe`, `romeu-cli`, `julieta-core`, `ci-release`, `kits`, `probes`, `canon` | C1: both binaries print `version` on the four runners; the handshake passes on the synthetic session; the harness passes `tools/ci all` before any host run (11, opening). Then block O3 |
 | 2 First build layer | T021 to T025 | `spec`, `gitsafe`, `signing` | C2: block A results from both hosts are merged (T026), and `tools/ci probes` passes on them |
 | 3 Block A applied; second layer | T026 to T035 | `probes`, `gitsafe`, `sbxdrv`, `romeu-cli`, `catalog`, `oci`, `state`, `memstore` | C3: the handshake passes on the recorded session on both Linux runners |
-| 4 The `sync` slice | T036 to T050 | `egress`, `render`, `gate`, `romeu-cli` | C4: the J2 and J11 scenario functions run in CI with the fake `sbx`; the I27 hostile trees are refused on the macOS runners |
-| 5 julieta's chores | T051 to T065 | `julieta-core`, `kits`, `layout`, `memstore`, `handoff`, `salvage`, `ledger` | C5: the container e2e passes on amd64 and arm64, with the `julieta setup` no-op inside its S8 bound. Block O4 is done by here. The maintainer takes here the decisions that T101 records, so that task has no one left to wait for |
+| 4 The `sync` slice | T036 to T050, T103 | `egress`, `render`, `gate`, `romeu-cli`, `ci-release` | C4: the J2 and J11 scenario functions run in CI with the fake `sbx`; the I27 hostile trees are refused on the macOS runners. Then smoke step 1 of 12 12.2: on one host, `init`, `sync` and `approve` with the host suite, from a `go run ./tools/release build --version v1.0.0-smoke --dry-run` build of `main` (T103) and a project spec that names no product kit, the output pasted under the Evidence of the next pull request |
+| 5 julieta's chores | T051 to T065 | `julieta-core`, `kits`, `layout`, `memstore`, `handoff`, `salvage` | C5: the container e2e passes on amd64 and arm64, with the `julieta setup` no-op inside its S8 bound. Block O4 is done by here. The maintainer takes here the decisions that T101 records, so that task has no one left to wait for |
 | 6 `run` and the destructive commands | T066 to T075 | `romeu-cli` | C6: the five CI journeys of S7 pass; the meta-tests and the sweeps pass |
-| 7 Kits, skills, the block B definitions and the diagrams | T076 to T083 | `kits`, `skills`, `romeu-cli`, `probes`, `state` | C7: `tools/ci kits` passes; romeu embeds the four product kits; a definition exists for each probe id of 11; the four diagrams of `ARCHITECTURE.md` are generated (T083), or question 11 says otherwise |
+| 7 Kits, skills and the block B definitions | T076 to T083 | `kits`, `skills`, `romeu-cli`, `probes` | C7: `tools/ci kits` passes; romeu embeds the four product kits; a definition exists for each probe id of 11. Then smoke step 2 of 12 12.2: on one host, J1 to J3 with the host suite, from a `go run ./tools/release build --version v1.0.0-smoke --dry-run` build of `main`, the output pasted under the Evidence of the next pull request. The token narrowing row of the index reopens here (ADR 0009) |
 | 8 Release tooling | T084 to T091 | `ci-release`, `catalog` | C8: `go run ./tools/release build --version v1.0.0 --dry-run` succeeds; then block O5 |
 | 9 Acceptance | T092 to T102 | `probes`, `docs`, `ci-release` | `go run ./tools/ci acceptance` exits 0 on the committed `docs/acceptance.json` |
 
@@ -330,6 +338,28 @@ merge of each, since the approval line does not exist yet:
 `go.yaml.in/yaml/v3` (the denylist, the prose list, the workflow files
 and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
 (`hygiene add` and the `/dev/ptmx` helper), each on the list of 12 12.1.
+
+Review round 8 left changes to merged work that go in tooling pull
+requests of their own, each with its own approval line, outside the
+task list:
+
+- the pre-push hook adds `GOWORK=off` and `GOFLAGS=-mod=readonly` to
+  the `GOENV=off` and `GOTOOLCHAIN=local` it has set since PR #30, so
+  that an untracked `go.work` or `vendor/` and a caller's `GOFLAGS`
+  cannot act on `go run` (ADR 0007, Threat model; round 8, DR3, its
+  form decided on 2026-10-09), on the `checks` surface; pending, in
+  draft PR #34;
+- the list of never-tracked files read from `tools/ci/denylist.yaml`
+  instead of a list written in the code (R8-10-34);
+- `tools/ci setup` setting `GOPROXY` and `GOSUMDB` for the steps it runs
+  (R8-10-38);
+- the grammar row of the release workflow in `tools/ci workflows`
+  (R8-10-1);
+- the sentence on outside contributors in the generated
+  `docs/reference/ask-first.md` (R8-12-18);
+- the `sbxdrv` surface and `skills/**` on the `kits` surface of
+  `.github/ask-first.yaml`, and whether the `ledger` surface leaves
+  while the ledger is deferred (R8-05-3; the `ask-first` surface).
 
 #### T001 - Hygiene, the denylist, `fast` and the pre-push hook
 
@@ -450,14 +480,17 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
 
 - [ ] Merged
 - Module: `ci-bootstrap`. Implements: 10 10.2 (the `sequences` step and
-  the id table), ADR 0001 rules 6 and 7.
+  the id table), ADR 0001 rules 6 and 7, rule 7 as ADR 0009 amends it.
 - Depends on: T003. Operator: no. Ask-first: `checks`.
 - Acceptance:
-  - A fixture fails for each rule of the step: a gap in the ADR numbers,
+  - A fixture fails for each rule of the step: a duplicate ADR number,
     a filename that differs from `slug(Title)`, a status outside the
-    set, a one-way supersede link, a cited record that is not Accepted,
+    set, a one-way supersede link, whole or in part (`Supersedes in
+    part` and `Superseded in part by`), a cited record that is not
+    Accepted,
     a Deferred decisions row with an empty cell, a duplicate id, a
     referenced id or id range that is not defined.
+  - A gap in the ADR numbers passes (ADR 0009, decision 4).
   - It passes on this repository's `docs/spec.md`, `docs/spec/` and
     `docs/adr/`.
 - Verify: `go test ./tools/ci/... -run '^TestSequences'`, which runs the
@@ -533,21 +566,27 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
 - Acceptance:
   - `ARCHITECTURE.md` and `CONTRIBUTING.md` exist with front matter (ADR
     0001 rule 1) and the headings of their outlines.
-  - `docs/lessons.md` exists with its first entry, what the bootstrap
-    taught, written by `go run ./tools/new lesson`. The kind and the
-    check land here because this entry is their first input (12 12.2).
-  - `tools/ci lessons` fails an entry that names no existing subcommand
+  - `docs/lessons/0001-<slug>.md` exists, the first lesson, what the
+    bootstrap taught, written by `go run ./tools/new lesson`, with the
+    generated index `docs/lessons/README.md` (12 12.7). The kind, the
+    generator row and the check land here because this lesson is their
+    first input (12 12.2).
+  - `tools/ci lessons` fails a lesson that names no existing subcommand
     or test and gives no "no check possible" reason.
   - `tools/ci docs` lands here with its first inputs, by the rule
     "Middleware lands with its first input": a fixture Markdown file
     fails for a missing or invalid front matter key (rule 1) and for a
     relative link or anchor that does not resolve (rule 5); text in a
-    code span is not a link. `docs/spec.md` and the pages under
-    `docs/spec/` move to front matter in this change (ADR 0001,
-    Consequences). The rest of the step lands in T085 and T086.
+    code span is not a link. The rule 9 matcher lands here too and runs
+    over the spec and the records: a first mention of a record that is
+    not its link form fails, and the spec passes it. `docs/spec.md` and
+    the pages under `docs/spec/` move to front matter in this change
+    (ADR 0001, Consequences). The rest of the step lands in T085 and
+    T086.
 - Verify: `go test ./tools/ci/... -run '^Test(Lessons|Docs)'`, which
   runs the fixture lines; `go run ./tools/ci lessons`; `go run
-  ./tools/ci docs`; `go test ./tools/new/...`.
+  ./tools/ci docs`; `go run ./tools/ci generated`; `go test
+  ./tools/new/...`.
 
 ### Phase 1 - The skeleton and the probe harness
 
@@ -582,9 +621,13 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
 - Depends on: T007. Operator: no. Ask-first: `contracts`.
 - Acceptance:
   - Landed early; see "The first slice".
-  - An error has an id `RJ-<exit><nn>`, a slug, a message and a fix hint
-    in one data table; the text and `--json` forms match 04 4.1; tests
-    assert ids, not message text.
+  - An error has an id `RJ-<nnn>`, one sequence that carries no meaning,
+    a slug, an exit code, a message and a fix hint in one data table,
+    with the ids of 04 4.4; the text and `--json` forms match 04 4.1;
+    tests assert ids, not message text.
+  - A test reads the rows of 04 4.4 and fails when the table in
+    `internal/cli` differs in id, slug or exit code; `check-findings`
+    maps to exit 6 and is the only id that does.
   - `go generate` writes the three consumers of the table (12 12.3): the
     exit-code sections of `--help`, `docs/reference/errors.md` and
     `docs/reference/exit-codes.md`, the pages with the generated-file
@@ -827,29 +870,29 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
 - [ ] Merged
 - Module: `probes`. Implements: 11 11.1, 10 10.3 (Replay only, Stateful
   replay, Known argv), 04 4.2, 07 7.5 (Application), 03 3.3, 10 10.4.
-- Depends on: T018, T012, T017, T016. Operator: question 6 is answered
-  first; feeds block O3. Ask-first: none expected.
+- Depends on: T018, T012, T017, T016. Operator: feeds block O3.
+  Ask-first: none expected.
 - Acceptance:
   - A definition exists for each probe id of 11 11.1: A1, A2, A3, A4,
     A5, A6, A9, A10, A11, A12, A13 and A14, each with its expectation
-    written before any run. A3's expectation follows the maintainer's
-    answer to question 6.
-  - A committed table lists the `sbx` argv shapes romeu needs: the ones
-    04 4.2 names for `sync`, `run`, `adopt`, `stop`, `salvage`, `rm`,
-    `retire`, `status`, `doctor` and `pull`, and the three policy
-    commands of 07 7.5. It also lists the sessions the fake `sbx` starts
-    from, derived from each task of this plan whose end-to-end tests
-    call the fake, T030, T041, T042, T043, T044, T045, T047, T048, T050,
-    T055, T066, T067, T068, T069, T071, T073, T074, T075, T077, T080 and
-    T081, and not from the journeys alone: the five CI journeys J2, J3b,
-    J7, J10 and J11 (10 10.1), each with the state its sandbox starts
-    in: removed, stopped or created outside romeu (10 10.3). That covers
-    `adopt`, `stop` and `pull`, `salvage` alone and `recreate`, whose
-    call orders no journey session holds, and stateful replay fails a
-    call order no session holds. T016 is not among those tasks: its
-    session is synthetic, and T030 replaces it with the A4 recording.
-    T055, T077, T080 and T081 run `sync` or a J2 step through it and
-    reuse its sessions.
+    written before any run. A3 records the mount facts; what romeu and
+    julieta do with the plants is C6 of block B (11 11.2).
+  - The table of 11 11.1 ("Recorded sessions") is committed as data: the
+    `sbx` argv shapes romeu needs, the ones 04 4.2 names for `sync`,
+    `run`, `adopt`, `stop`, `salvage`, `rm`, `retire`, `status`,
+    `doctor` and `pull`, and the three policy commands of 07 7.5. The
+    sessions the fake `sbx` starts from are derived from each task of
+    this plan whose end-to-end tests call the fake, T030, T041, T042,
+    T043, T044, T045, T047, T048, T050, T055, T066, T067, T068, T069,
+    T073, T074, T075, T077, T080 and T081, and not from the journeys
+    alone: the five CI journeys J2, J3b, J7, J10 and J11 (10 10.1), each
+    with the state its sandbox starts in: removed, stopped or created
+    outside romeu (10 10.3). That covers `adopt`, `stop` and `pull`,
+    `salvage` alone and `recreate`, whose call orders no journey session
+    holds, and stateful replay fails a call order no session holds. T016
+    is not among those tasks: its session is synthetic, and T030
+    replaces it with the A4 recording. T055, T077, T080 and T081 run
+    `sync` or a J2 step through it and reuse its sessions.
   - A4's definition records the two non-interactive `sbx env exec <dir>
     -- ...` shapes of 04 4.2 (`run`, steps 5 and 6) beside the `-it`
     forms 11 11.1 lists, so T030 and T066 replay them. That is the
@@ -870,18 +913,17 @@ and the ask-first list), `golang.org/x/term` and `golang.org/x/sys`
   - A11, A12 and A13 read the frontend, the workload and herdr from the
     pin file of T012.
   - A9 lists the global secrets and the global allow rules as `doctor`
-    would read them (11 11.1), and plants nothing; whether a live plant
-    is ever wanted is question 7. It lists once while its own scoped
-    rule still exists, and A10's scoped secret too when A10 ran first in
-    the run and its sandbox is still live, before its `rm --resource` and
-    `env rm` steps; if A10 runs second, only the scoped rule is listed.
-    The spec gives no order between A9 and A10; the listing point and
-    that order are the plan's addition to A9. 11 11.1 lists after the
-    removals, and the recording would then hold no row that tells a
-    global one from a scoped one. It records two observations,
-    `globalRuleRowSeen` and `globalSecretRowSeen`. The recorded shape of
-    that listing is what the synthesized I22 fixtures of T046 and T049
-    must parse as.
+    would read them (11 11.1), and plants nothing (Q29). It lists once
+    while its own scoped rule still exists, and A10's scoped secret too
+    when A10 ran first in the run and its sandbox is still live, before
+    its `rm --resource` and `env rm` steps; if A10 runs second, only the
+    scoped rule is listed. The spec gives no order between A9 and A10;
+    the listing point and that order are the plan's addition to A9. 11
+    11.1 lists after the removals, and the recording would then hold no
+    row that tells a global one from a scoped one. It records two
+    observations, `globalRuleRowSeen` and `globalSecretRowSeen`. The
+    recorded shape of that listing is what the synthesized I22 fixtures
+    of T046 and T049 must parse as.
   - A2 sets the global `env.rememberHostCommands` (11 11.1) and records
     the prior value in its result. A12's agent is one the harness
     starts, with a key it generates.
@@ -1077,14 +1119,14 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
   12.5.
 - Depends on: T026. Operator: no. Ask-first: `decisions`.
 - Acceptance:
-  - Each of the six questions that block A settles alone, by the
-    "Settled by" column of the index, becomes an ADR and leaves the
-    table: Q7 (A11), Q15 (A4), Q16 (A13), Q18 (A10), Q20 (A12) and Q21
-    (A4).
+  - Each question that block A settles alone, by the "Settled by"
+    column of the index, becomes an ADR and leaves the table: Q7 (A11),
+    Q15 (A4), Q16 (A13), Q18 (A10), Q20 (A12), Q21 (A4), Q28 (A12) and
+    Q32 (A14).
   - A question whose probe is arch-sensitive is settled only with a
     result from each host (11, opening).
-  - The review may ask for one pull request per record; the task is the
-    six.
+  - The review may ask for one pull request per record; the task is all
+    of them.
 - Verify: `go run ./tools/ci sequences`.
 
 #### T029 - `sbxdrv`
@@ -1178,9 +1220,11 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
   - Each machine is a transition table; the generated tests exercise
     each row and assert each missing pair illegal, with exit 2 and an
     error id.
-  - The candidate and generation diagrams in `ARCHITECTURE.md` are
-    generated from the tables. The promotion-commit and probe diagrams
-    are the task of T083, by question 11.
+  - The candidate and generation diagrams that `ARCHITECTURE.md` links
+    are generated from the tables, each in its own file under
+    `docs/diagrams/` (12 12.3). They are the only generated diagrams:
+    the promotion commit is the numbered procedure of 01 1.6, and the
+    probe has no lifecycle diagram (12 12.8).
 - Verify: `go test ./internal/state/...`; `go run ./tools/ci generated`.
 
 #### T035 - `memstore`: the shared readers
@@ -1220,15 +1264,15 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
 #### T037 - `render`: `sbxenv.yaml` and `render.json`
 
 - [ ] Merged
-- Module: `render`. Implements: 03 3.3, 03 3.7, 13 13.1 (the fixed
-  mounts), 10 10.4, 10 10.2 (`golden`), 05 5.2 (I8, I11).
+- Module: `render`. Implements: 03 3.3, 03 3.7, 10 10.4, 10 10.2
+  (`golden`), 05 5.2 (I8, I11).
 - Depends on: T026, T032, T036, T019. Operator: no. Ask-first: `checks`.
 - Acceptance:
   - The renderer produces, byte for byte, the goldens T019 wrote and A5
-    probed: the shape of 03 3.3, the three fixed mounts, no `x-*` key,
-    no `lifecycle` hook. A difference is not fixed by `-update`: it
-    moves a hash A5 recorded, `tools/ci probes` flags it, and A5 runs
-    again on both hosts.
+    probed: the shape of 03 3.3, the fixed mount `./.romeu/bin`, no
+    `x-*` key, no `lifecycle` hook. A difference is not fixed by
+    `-update`: it moves a hash A5 recorded, `tools/ci probes` flags it,
+    and A5 runs again on both hosts.
   - The secret command is built by `internal/shquote` (table-tested) in
     the `/usr/bin/env -i` form; no literal value is rendered (I8).
   - `tools/ci imports` rejects `text/template` in `internal/render`
@@ -1369,10 +1413,10 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
   - Step 3 of 04 4.2: two specs with one name or one URL make `sync`
     exit 2 listing every error (J2 step 3).
   - Step 4 of 04 4.2, after a first `sync`: `<name>-env/`,
-    `memory/<dir>/` with its fixed subdirectories, `ledger/spool/` and
-    `ledger/view/` exist, each repo is a hardened clone, each origin is
-    fetched into `refs/romeu/origin/<dir>/*`, and `egressCommit`
-    resolves from `refs/romeu/origin/<dir>/<ref>` (J2 step 3).
+    `memory/<dir>/` with its fixed subdirectories exist, each repo is a
+    hardened clone, each origin is fetched into
+    `refs/romeu/origin/<dir>/*`, and `egressCommit` resolves from
+    `refs/romeu/origin/<dir>/<ref>` (J2 step 3).
   - The idempotency meta-test of 10 10.1 lands here as a table with
     `sync`'s row: a second run on unchanged inputs leaves every file's
     content and mode and every ref as they were, except `lastRun`. Each
@@ -1402,20 +1446,19 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
   - Adding a capability to a kit flips gate 2 (I28).
 - Verify: `go test -tags e2e ./e2e/...` on the four runners.
 
-#### T045 - `romeu approve <name>` and the awaiting candidate
+#### T045 - `romeu sync` without a terminal
 
 - [ ] Merged
-- Module: `romeu-cli`. Implements: 04 4.2 (`approve`), 01 1.6
+- Module: `romeu-cli`. Implements: 04 4.2 (`sync`), 01 1.6
   ("Candidate"), 09 (J11, step 5), 05 5.2 (I7).
 - Depends on: T043. Operator: no. Ask-first: `contracts`, `gates`.
 - Acceptance:
-  - Without a terminal `sync` records an awaiting candidate and exits 3;
-    `approve <name>` on a terminal promotes it and prints that live
-    changes apply on the next `run` or `sync`.
-  - `approve` without a terminal, or with nothing awaiting, exits 2;
-    after the candidate files changed it exits 4 (I7).
-  - A new `sync` supersedes an awaiting candidate, and a candidate dir
-    the record does not name is deleted by the next `sync`.
+  - Without a terminal, a `sync` whose widening digest differs deletes
+    the candidate dir, prints the digest and exits 3; it records no
+    awaiting candidate (01 1.6). Approving a candidate rendered without
+    a terminal is a deferred decision (index).
+  - `romeu approve` takes `--toolchain` only; `approve <name>` is an
+    unknown command (04 4.2).
 - Verify: `go test -tags e2e ./e2e/...`.
 
 #### T046 - The preflight
@@ -1435,7 +1478,7 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
   - The I22 fixtures are synthesized files under the preflight package's
     `testdata/synthetic/`, apart from the recordings and marked
     synthetic in their first line, because no listing of a well-kept
-    host holds what they must show (question 7): one global secret whose
+    host holds what they must show (Q29): one global secret whose
     service name equals a `secrets` entry of the project under test, and
     one per broad-rule shape in a table (`**`, a wildcard over a whole
     top-level domain, a permissive default network policy). Each parses
@@ -1487,7 +1530,7 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
 - Depends on: T047. Operator: no. Ask-first: `contracts`.
 - Acceptance:
   - On fixtures of host state, `status --json` reports drift, an
-    interrupted promotion, an awaiting candidate, a stale toolchain, an
+    interrupted promotion, a stale toolchain, an
     orphaned project and an orphaned repo dir, without taking the lock.
   - The J10 step 1 line is a fixture: `absent; generation <G> open;
     snapshot <T>; refs/sandboxes last fetched <T2>`; for an orphaned
@@ -1510,11 +1553,10 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
     config, `env.rememberHostCommands`, `kit.allowedSources`, the root
     rules (I20), the file modes, the secret bindings and the tree rows.
   - The rows marked **pre** are the functions of T046, called from here
-    (I22, I23). The two I22 rows fail, and `doctor` exits 1, on each
-    synthesized fixture of T046, and pass on the A9 recording, with the
+    (I22, I23). The two I22 rows fail, and `doctor` exits 6 with
+    `check-findings`, on each synthesized fixture of T046, and pass on the A9 recording, with the
     same files.
   - A trusted root or disabled workspace trust fails (I14).
-  - The ledger rows land with T072.
 - Verify: `go test ./internal/... -run '^TestDoctor'`, which lists the
   row tests by name.
 
@@ -1534,11 +1576,30 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
   - That `salvage` and `rm` succeed after `adopt` is tested in T068.
 - Verify: `go test -tags e2e ./e2e/...`.
 
+#### T103 - `tools/release build --dry-run`
+
+- [ ] Merged
+- Module: `ci-release`. Implements: 10 10.2 ("Release and bootstrap"),
+  02 2.1 (Embedding), 12 12.2 (the smoke steps).
+- Depends on: T009, T012. Operator: no. Ask-first: `release`.
+- Acceptance:
+  - `tools/release build --version v1.0.0 --dry-run` builds the two
+    julieta binaries, embeds them with the kits and the catalog present
+    at that task, builds romeu for darwin and writes the archives and
+    `checksums.txt`.
+  - A romeu from that build runs `sync` past the `julieta-not-embedded`
+    refusal of a source build (02 2.1), so smoke step 1 of 12 12.2 can
+    run at checkpoint C4. No product kit exists at C4 (their sources land
+    in phase 7), and a project spec lists its product kits by name (03
+    3.2), so smoke step 1 uses a spec that names no product kit.
+- Verify: `go test ./tools/release/...`; `go run ./tools/release build
+  --version v1.0.0 --dry-run`.
+
 ### Phase 5 - julieta's chores
 
 No task of this phase needs block O3 except T056, which reads the
-protocol number A13 recorded, and `ledger`'s ingest; see "Operator
-blocks" for what may start early.
+protocol number A13 recorded; see "Operator blocks" for what may start
+early.
 
 #### T051 - The manifest, `julieta setup` and `julieta status`
 
@@ -1557,8 +1618,7 @@ blocks" for what may start early.
   - `status --json` reports the per-repo fields of 04 4.3.
   - The other steps of `setup` in 04 4.3 land with their modules, and
     each task says so: the dispatcher in T054, `install` in T053,
-    `memory check` and the agent memory dir check in T057, the view
-    check in T065, the drain in T063.
+    `memory check` and the agent memory dir check in T057.
 - Verify: `go test -tags e2e ./e2e/...`.
 
 #### T052 - `kitpin mise`
@@ -1567,7 +1627,7 @@ blocks" for what may start early.
 - Module: `kits`. Implements: 07 7.4.
 - Depends on: T012. Operator: an agent looks up the signature format
   first; the maintainer confirms mise's public key out of band, and
-  decides question 10 only if the lookup adds a dependency. Ask-first:
+  decides Q31 only if the lookup adds a dependency. Ask-first:
   `kits`, `dependencies` (if the lookup adds one).
 - Acceptance:
   - `kitpin mise <version>` writes the version and both linux sha256
@@ -1581,7 +1641,7 @@ blocks" for what may start early.
   - A test with a recorded fixture covers a good signature, a bad one, a
     checksum file signed with another key, and a checksum file that
     lacks an architecture.
-  - How the signature is verified follows the lookup of question 10.
+  - How the signature is verified follows the lookup of Q31.
 - Verify: `go test ./tools/kitpin/...`.
 
 #### T053 - The mise driver: `install`, `lock` and `tools/ci mise`
@@ -1598,8 +1658,8 @@ blocks" for what may start early.
     `install` (04 4.3).
   - `lock` passes the four platforms and rewrites `mise.lock`; `lock
     --check` writes nothing, fails a tool without a lock entry and a
-    lockable entry without both linux platforms, and warns on a missing
-    macOS entry.
+    lockable entry without both linux platforms with exit 6
+    (`check-findings`), and warns on a missing macOS entry.
   - `tools/ci mise` runs that logic on this repository's lock and the
     examples'.
   - The `julieta setup` no-op is at most 3 s, median of 5, in the
@@ -1628,8 +1688,7 @@ blocks" for what may start early.
     `.githooks/pre-commit` and `$GIT_DIR/hooks/post-commit` through it
     (I21).
   - A failure is recorded in julieta state and shown until a later run
-    of the same hook succeeds. The `hook-failed` event it also emits is
-    tested in T063.
+    of the same hook succeeds.
   - `pre-commit` runs `lock --check` when a mise file is staged.
 - Verify: `go test -tags e2e ./e2e/...`.
 
@@ -1643,13 +1702,15 @@ blocks" for what may start early.
 - Acceptance:
   - `spec validate` exits 2 on a decode or rule error, per file and
     across files; `--catalog` lists each unknown `backend:tool` and lock
-    host and exits 1 when it lists one.
+    host and exits 6 (`check-findings`) when it lists one; a decode error
+    stays exit 2.
   - `pin workload` rewrites the digest after it verifies that the
     manifest list covers linux/amd64 and linux/arm64, through the
     guarded client of `oci`.
   - `pin check` reports a pin that is not a digest or is behind, and
     with `--workflows` the julieta release pinned in the config repo's
-    workflows (04 4.3).
+    workflows (04 4.3); it exits 6 (`check-findings`) when it reports
+    one.
   - The J2 scenario function gains its step 1, `julieta spec validate`
     in the config project's sandbox, at the hybrid level.
 - Verify: `go test ./internal/... -run '^Test(SpecValidate|Pin)'`, which
@@ -1679,30 +1740,25 @@ blocks" for what may start early.
 
 - [ ] Merged
 - Module: `memstore`. Implements: 08 8.1, 03 3.9, 04 4.3 (`memory
-  add|list|show|edit|rm|search`, `memory check`, `setup`).
+  add|list|show|edit`, `memory check`, `setup`).
 - Depends on: T035, T051. Operator: no. Ask-first: none expected.
 - Acceptance:
   - julieta stamps `id`, `created` and `updated`; a supplied id or
     timestamp is an error.
   - Two julieta processes writing one store lose no entry (10 10.1,
     Concurrency).
-  - `memory check` exits 1 on an unmounted, unwritable or non-conforming
-    directory; `setup` gains `memory check` and the agent memory dir
+  - `list --query <text>` filters, and `edit --status done` closes an
+    entry; there is no `memory rm` and no `memory search` (04 4.3).
+  - `memory check` exits 1 on an unmounted or unwritable directory, and
+    6 (`check-findings`) on one that breaks the layout allowlist; `setup` gains `memory check` and the agent memory dir
     check (04 4.3; 08 8.1).
 - Verify: `go test -tags e2e ./e2e/...`.
 
-#### T058 - Memory import and verify
+#### T058 - Memory import and verify (left v1)
 
-- [ ] Merged
-- Module: `memstore`. Implements: 08 8.1 ("Import and verification"), 03
-  3.9, 04 4.3, 00 0.5.
-- Depends on: T057. Operator: no. Ask-first: none expected.
-- Acceptance:
-  - A second import of one file imports nothing and reports `imported +
-    skipped-duplicate == read`; an invalid line makes the exit 1.
-  - `verify --against` fails on a digest set difference and on a
-    `status` difference of a matched entry.
-- Verify: `go test -tags e2e ./e2e/...`.
+- Left v1 in review round 8 (SC2: the one-time import runs as a script
+  in the operator's config repo). The id stays, since the task ids are
+  one sequence (10 10.2); nothing depends on it.
 
 #### T059 - `handoff`
 
@@ -1721,6 +1777,8 @@ blocks" for what may start early.
     uses it.
   - `show --hook` prints the open entries, the `lesson` entries and
     julieta's warnings; the front matter has a golden (10 10.1).
+  - `julieta handoff show --hook` never prints more than 8 KiB, asserted
+    with an oversized store.
   - `list` prints one line per handoff file with its kind, and `--json`
     one document.
 - Verify: `go test -tags e2e ./e2e/...`.
@@ -1772,70 +1830,23 @@ blocks" for what may start early.
   - The package is **dark** until T068.
 - Verify: `go test ./internal/salvage/...`.
 
-#### T063 - `ledger`: the event, julieta's emit and drain
+#### T063 - `ledger`: the event, julieta's emit and drain (left v1)
 
-- [ ] Merged
-- Module: `ledger`. Implements: 13 13.2, 13 13.3 (Draining), 13 13.7, 04
-  4.3 (`event add`; the `command-failed` rule), 04 4.4, 12 12.3 (the
-  event row), 05 5.2 (I33).
-- Depends on: T054, T031. Operator: no. Ask-first: `ledger`,
-  `contracts`.
-- Acceptance:
-  - `go generate` writes the consumers of the event row (12 12.3): the
-    validator, the membership tables of `type`, `tool` and `ref`, the
-    cross-project allowlist, `schemas/runtime-event.v1.json` and
-    `docs/reference/runtime-event.md`. The per-field table of 13 13.10
-    passes (I33).
-  - The hook dispatcher of T054 writes one `hook-failed` event for a
-    hook that exits non-zero, and still records the failure in julieta
-    state; the event names neither the hook nor the repo (13 13.2, 13
-    13.3; 04 4.3).
-  - A julieta command that exits non-zero writes one `command-failed`
-    event when the manifest names a spool; `hooks run`, `pane run` and
-    `event` write none; a failure to emit changes no output and no exit
-    status.
-  - The drain rows of 13 13.10 pass, and `setup` gains the drain (04
-    4.3).
-  - `event add` takes no free text and needs at least one flag.
-- Verify: `go test ./internal/ledger/...`.
+- Left v1 in review round 8 (SC1: the runtime ledger is designed in 13
+  and not built in v1). The id stays, since the task ids are one
+  sequence (10 10.2); nothing depends on it.
 
-#### T064 - `ledger`: the spool reader, ingest and entries
+#### T064 - `ledger`: the spool reader, ingest and entries (left v1)
 
-- [ ] Merged
-- Module: `ledger`. Implements: 13 13.3, 13 13.4, 13 13.5, 13 13.8, 05
-  5.2 (I31, I32).
-- Depends on: T063, T035, T039. Operator: no. Ask-first: `ledger`,
-  `checks`.
-- Acceptance:
-  - The hostile spool table of 13 13.10 passes row by row, with the
-    `afterOpen` and `listNames` hooks and an injected version table
-    (I32).
-  - The entries table of 13 13.10 passes, the racing ingests without the
-    lock included (I31).
-  - The I16 scan fails a fixture of `internal/ledger` with each call 13
-    13.5 does not admit; `tools/ci imports` fails a caller of the spool
-    reader the table does not name.
-  - The starting values are those of 13 13.8.
-  - The ingest function is **dark** until T071.
-- Verify: `go test ./internal/ledger/...`.
+- Left v1 in review round 8 (SC1: the runtime ledger is designed in 13
+  and not built in v1). The id stays, since the task ids are one
+  sequence (10 10.2); nothing depends on it.
 
-#### T065 - `ledger`: the view and `julieta event list`
+#### T065 - `ledger`: the view and `julieta event list` (left v1)
 
-- [ ] Merged
-- Module: `ledger`. Implements: 13 13.6, 04 4.3 (`event list`), 05 5.2
-  (I33), 10 10.1 (Golden).
-- Depends on: T064. Operator: no. Ask-first: `ledger`.
-- Acceptance:
-  - The two views of the two-project fixture match their goldens,
-    ordered by `ingested`, project and key, with no `id` and no key of
-    the other project in `others.jsonl` (I33).
-  - A derivation that changes nothing writes nothing.
-  - `julieta setup` exits 2 with `ledger-view-writable` when it can
-    write the view.
-  - `julieta event list` prints this project's entries from the view,
-    rejected ones included, and `--others` the allowlisted fields of the
-    other projects'.
-- Verify: `go test ./internal/ledger/...`.
+- Left v1 in review round 8 (SC1: the runtime ledger is designed in 13
+  and not built in v1). The id stays, since the task ids are one
+  sequence (10 10.2); nothing depends on it.
 
 ### Phase 6 - `run` and the destructive commands
 
@@ -1844,8 +1855,8 @@ blocks" for what may start early.
 - [ ] Merged
 - Module: `romeu-cli`. Implements: 04 4.2 ("How `romeu run` reaches the
   run layout"), 01 1.5, 01 1.6 ("Generation"), 07 7.5, 09 (J3, J10), S8,
-  05 5.2 (I1, I7, I30, I33).
-- Depends on: T050, T056, T065, T030, T055. Operator: no. Ask-first:
+  05 5.2 (I1, I7, I30).
+- Depends on: T050, T056, T054, T030, T055. Operator: no. Ask-first:
   `contracts`, `gates`.
 - Acceptance:
   - Hybrid, on the Linux runners, the J3b scenario function passes: a
@@ -1865,14 +1876,11 @@ blocks" for what may start early.
     imports is asserted in T068, with `result: lost`.
   - A memory directory that violates the layout allowlist makes `run`
     exit 2 (I24).
-  - A writable view mount stops `run` before `layout up` (I33); a failed
-    compatibility check stops it with exit 2 (I30).
+  - A failed compatibility check stops `run` with exit 2 (I30).
   - A gate 1 or a gate 2 change makes `run` exit 3 before a mutating
     call (I7).
-  - `run --timings --json` prints `run-timings.v1`
-    (`schemas/run-timings.v1.json` is generated); `romeuMs` is at most 2
-    s, median of 5, with the fake `sbx` (S8). The bound is S8's own: a
-    run over it is a defect, not a flake (10 10.1).
+  - romeu's share of S8 is measured by B5 on real hosts (11 11.2), and
+    no CI test asserts a bound on it (S8).
   - The lock is released before the final `exec` (04 4.1).
   - `romeu status` gains julieta's warnings and recorded hook failures
     for a running sandbox, and says so when it skips that exec (04 4.2).
@@ -1967,52 +1975,30 @@ blocks" for what may start early.
   - A body and a branch name with ESC sequences print escaped (I29).
 - Verify: `go test -tags e2e ./e2e/...`.
 
-#### T071 - The ledger in the commands, and `romeu ledger`
+#### T071 - The ledger in the commands, and `romeu ledger` (left v1)
 
-- [ ] Merged
-- Module: `romeu-cli`. Implements: 04 4.2 (`ledger ingest`, `ledger
-  query`), 13 13.4, 13 13.9, 08 8.5 (the ingest before the sandbox
-  half), 05 5.2 (I32).
-- Depends on: T069. Operator: no. Ask-first: `contracts`, `ledger`.
-- Acceptance:
-  - Ingest runs inside `sync`, `run`, `salvage` and `retire` at the step
-    each names, and `retire` ingests a second time before the move (13
-    13.4).
-  - With an ingest that fails, `salvage` and `rm` end with the exit
-    status they would have had, and the salvage record holds
-    `ledger-incomplete` (13 13.10; I32).
-  - `ledger ingest` exits 1 with `ledger-incomplete`; `ledger query`
-    orders by `ingested`, project and key, and prints through the CLI
-    writer.
-- Verify: `go test -tags e2e ./e2e/...`.
+- Left v1 in review round 8 (SC1: the runtime ledger is designed in 13
+  and not built in v1). The id stays, since the task ids are one
+  sequence (10 10.2); nothing depends on it.
 
-#### T072 - The ledger rows of `romeu doctor`
+#### T072 - The ledger rows of `romeu doctor` (left v1)
 
-- [ ] Merged
-- Module: `romeu-cli`. Implements: 04 4.2 (the three ledger rows of the
-  doctor table), 13 13.5, 13 13.6, 13 13.8.
-- Depends on: T071, T049. Operator: no. Ask-first: `contracts`.
-- Acceptance:
-  - On fixtures, `doctor` re-hashes each ingested entry against its name
-    and derives each view again and compares it byte for byte (13
-    13.10).
-  - It fails on a spool root that is missing, a symlink or not a
-    directory, and on wrong modes; it warns on skipped spool files, a
-    leftover temporary name and the ledger's size past 64 MiB.
-- Verify: `go test ./internal/... -run '^TestDoctor'`, which lists the
-  ledger row tests by name.
+- Left v1 in review round 8 (SC1: the runtime ledger is designed in 13
+  and not built in v1). The id stays, since the task ids are one
+  sequence (10 10.2); nothing depends on it.
 
 #### T073 - The meta-tests
 
 - [ ] Merged
 - Module: `romeu-cli`. Implements: 10 10.1 ("Additional required
   tests"), 04 4.1 (Idempotency, Locking), 01 1.6, 05 5.2 (I7).
-- Depends on: T072, T067, T070. Operator: no. Ask-first: none expected.
+- Depends on: T069, T067, T070, T049. Operator: no. Ask-first: none
+  expected.
 - Acceptance:
   - The idempotency table T043 started has a row for each converging and
     each appending command of 04 4.1, romeu's and julieta's (`setup`,
-    `install`, `lock`, `memory add`, `handoff write`, `event add` and
-    `snapshot`, at the container level); a test fails a command of the
+    `install`, `lock`, `memory add`, `handoff write` and `snapshot`, at
+    the container level); a test fails a command of the
     command definitions that has no row.
   - Two romeu processes: the second exits 1 with `RJ-101`.
   - Promotion fault injection: after a kill at each step, each **P**
@@ -2040,9 +2026,11 @@ blocks" for what may start early.
     romeu owns (I16).
   - A hand edit of a live derived file makes `sync` and each **P**
     command exit 4 (I15).
-  - Each gate 2 change and each gate 1 change makes `run`, `stop`,
-    `salvage`, `rm`, `retire` and `pull` exit 3 before a mutating call
-    (I7).
+  - Each gate 2 change and each gate 1 change makes `run` exit 3 before
+    a mutating call, and `rm`, `retire` and `recreate` exit 3 before
+    their removal half, after their salvage half ran; `stop`, `salvage`,
+    `salvage --from-host` and `pull` print the failure and go on, and
+    widen nothing (01 1.5; I7).
   - No e2e run reaches the fake `sbx`'s exit 99 for `--auto-approve`
     (I4) or for a secret value form (I25).
 - Verify: `go test -tags e2e ./e2e/...`.
@@ -2079,7 +2067,7 @@ blocks" for what may start early.
 - Verify: `go test -tags e2e ./e2e/...`; `go vet -tags host
   ./e2e/host/...`.
 
-### Phase 7 - Kits, skills, the block B definitions and the diagrams
+### Phase 7 - Kits, skills and the block B definitions
 
 #### T076 - The `kit` kind and `tools/ci kits`
 
@@ -2113,7 +2101,7 @@ blocks" for what may start early.
     content-addressed directories; the e2e reuses the `sync` sessions of
     T043.
   - The install steps of the `julieta` kit run once in the container e2e
-    as a smoke test, under the network rule of 10 10.1 and question 4; a
+    as a smoke test, under the network rule of 10 10.1 and Q27; a
     kit build itself is what B2 measures (10 10.3, Cannot model).
   - That they build and start is measured by B2 (S3).
 - Verify: `go run ./tools/ci kits`; `go test -tags e2e ./e2e/...`.
@@ -2190,9 +2178,14 @@ blocks" for what may start early.
   Ask-first: none expected.
 - Acceptance:
   - A definition exists for each id of 11 11.2: B1, B2, B3, B4 and B5,
-    each `kind: check` with the predicate its Step cell names, and C1,
-    C2, C3, C4 and C5, each with its declared `kind`, `expect` and
+    each `kind: check` with the predicate its Step cell names, and C2,
+    C3, C4, C5 and C6, each with its declared `kind`, `expect` and
     decision table.
+  - C5 is `kind: observe` with keys `sessionEndBeforeStart` (bool),
+    `sessionStartSources` (string list), `hookOutputReachesContext`
+    (bool), `hookOutputCutBytes` (int or null), `nonZeroExitEffect`
+    (string), `sessionEndTimeoutMs` (int or null); its decision table
+    has one row per key, each naming its own `affects`.
   - B1 installs the candidate from its GitHub release and verifies
     checksums and attestation; each other block B result copies two
     observations from it, the candidate's tag and the commit that tag
@@ -2223,35 +2216,13 @@ blocks" for what may start early.
   binary in a test, and the same with `--version v1.0.0-rc.1`, the
   command line of block O5, which must parse and exit 0.
 
-#### T083 - The promotion-commit and probe diagrams of `ARCHITECTURE.md`
+#### T083 - The promotion-commit and probe diagrams of `ARCHITECTURE.md` (removed)
 
-- [ ] Merged
-- Module: `state`. Implements: 12 12.8 (`ARCHITECTURE.md`), 12 12.3 (the
-  transition-table row), 01 1.6 ("Promotion commit"), 11 11.4.
-- Depends on: T034, T039, T020. Operator: question 11 is answered first.
-  Ask-first: `gates`, `checks`.
-- Acceptance:
-  - **The plan's own reading, which the specification does not state:**
-    12 12.8 says all four state machines of `ARCHITECTURE.md` are
-    generated diagrams, and 12 12.3 names one source for them, the
-    transition tables of `internal/state`, which hold two. The four
-    steps of the promotion commit (01 1.6) and the lifecycle table of 11
-    11.4 each become a transition table beside those two, and the one
-    generator of T034 draws all four.
-  - The lifecycle table keeps one source (12 12.3): `tools/ci probes` of
-    T020 is changed here to read the transition table of
-    `internal/state` instead of its own copy.
-  - `go generate` writes the two diagrams as generated files that
-    `ARCHITECTURE.md` links to, the way T034 writes the first two, and
-    `tools/ci generated` fails a hand edit of either.
-  - The generator's table test covers each row of the two new tables, as
-    for the first two.
-  - If the answer to question 11 is that the two are hand-written, this
-    task is empty, 12 12.3 and 12 12.8 say so, and T095 writes them;
-    that path needs no change outside `docs/`.
-  - This task lands before the candidate tag because the generator is
-    outside `docs/` (11 11.2).
-- Verify: `go test ./internal/state/...`; `go run ./tools/ci generated`.
+- Removed in review round 8 (R8-11-11, R8-11-12): 12 12.8 now draws the
+  candidate and generation machines only, which T034 generates, and
+  describes the promotion commit as the numbered procedure of 01 1.6;
+  the probe has no lifecycle diagram. The id stays, since the task ids
+  are one sequence (10 10.2); nothing depends on it.
 
 ### Phase 8 - Release tooling
 
@@ -2304,9 +2275,9 @@ blocks" for what may start early.
   rules 9, 12, 13, 17 and 20, S10.
 - Depends on: T085. Operator: no. Ask-first: `checks`.
 - Acceptance:
-  - A fixture fails for each case of rule 9: a first mention that is not
-    the link form, one in a heading, one in front matter, one inside
-    another link, a number with no record, a plural form.
+  - A fixture fails for each remaining case of rule 9: one in a heading,
+    one in front matter, one inside another link, a number with no
+    record, a plural form (the first-mention matcher landed in T006).
   - A fixture fails for a heading that is missing, extra or out of order
     against `tools/ci/headings.yaml` (rules 12 and 20).
   - A fixture fails for a fenced block with no language, for a `romeu`
@@ -2341,27 +2312,28 @@ blocks" for what may start early.
 - [ ] Merged
 - Module: `ci-release`. Implements: 10 10.2 ("Release and bootstrap"),
   12 12.6, 12 12.1, 02 2.1 (Embedding), S1, 10 10.2 (`tools/ci pins`).
-- Depends on: T079, T081, T087. Operator: no. Ask-first: `release`,
-  `dependencies`, `checks`.
+- Depends on: T079, T081, T087, T103. Operator: no. Ask-first:
+  `release`, `dependencies`, `checks`.
 - Acceptance:
-  - `tools/release build --version v1.0.0 --dry-run` builds the two
-    julieta binaries, embeds them with the kits and the catalog, builds
-    romeu for darwin and writes the archives and `checksums.txt`.
+  - `tools/release build` is T103's; `release.yml` runs it, and
+    `go run ./tools/release build --version v1.0.0 --dry-run` embeds
+    the four product kits of T079 and the catalog.
   - `tools/release notes` groups Conventional Commit subjects since the
     last tag that is not a prerelease, with each pull request's Why.
   - `tools/release verify` runs `gh attestation verify` with the signer
-    workflow, starting the `gh` of `mise.lock` through `mise exec`;
+    workflow, starting the `gh` of `mise.lock` by the path `mise which`
+    resolves, never through `mise exec` (12 12.1);
     `publish` marks a tag with a suffix as a prerelease and never
     creates a draft.
   - `notes`, `verify` and `publish` are each tested against a `gh`
     helper binary re-executed from the test and a recorded API fixture
-    (10 10.1), and `--attach` of T089 the same way, so the candidate
+    (10 10.1), so the candidate
     tag, which the tag ruleset lets nobody retry under the same name, is
     not their first run.
   - `release.yml` passes `tools/ci workflows`.
-  - `gh` enters `mise.toml` at the version `mise.lock` locks, with a
-    sha256 for each of the four platforms, and the lint row of 10 10.2
-    admits it.
+  - `gh` is in `mise.lock`, with a sha256 for each of the four
+    platforms, from PR #27 (round 8, DR7), merged, and the lint
+    row of 10 10.2 admits it.
   - `tools/ci pins` reports the pin freshness of each tool pin in the
     list of [12 12.1](spec/12-engineering.md#121-tech-stack), by the
     rules of that section: its sources and endpoints, every page read,
@@ -2390,24 +2362,12 @@ blocks" for what may start early.
   the tests by name; `go run ./tools/release build --version v1.0.0
   --dry-run`; `go run ./tools/ci pins`.
 
-#### T089 - `tools/ci dora`
+#### T089 - `tools/ci dora` (left v1)
 
-- [ ] Merged
-- Module: `ci-release`. Implements: 12 12.10, [ADR 0004, measure
-  delivery with the five DORA metrics computed by a
-  tool](adr/0004-measure-delivery-with-the-five-dora-metrics-computed-by-a-tool.md).
-- Depends on: T088. Operator: no. Ask-first: `checks`, `release`.
-- Acceptance:
-  - Against a recorded API fixture and a fixture repository, offline,
-    the same input gives the same bytes.
-  - A period with no deployment has `null` times and `n/a` in the text
-    form.
-  - A rendered output that has a lead time or a deployment count without
-    that period's failed and rework counts fails the unit test.
-  - A marker that names a tag with no deployment is listed under
-    `unmatched`; `--attach` is the last step of `release.yml`.
-- Verify: `go test ./tools/ci/... -run '^TestDora'`, which lists the
-  tests by name.
+- Left v1 in review round 8 (SC12: `tools/ci dora` is a deferred
+  decision, and ADR 0004 stays its design; `release.yml` has no dora
+  step). The id stays, since the task ids are one sequence (10 10.2);
+  nothing depends on it.
 
 #### T090 - `tools/ci acceptance`
 
@@ -2419,17 +2379,17 @@ blocks" for what may start early.
   - Against a recorded API fixture, each evidence kind is verified as 10
     10.5 says.
   - On the product's own file the four end-of-plan checks run: the S6
-    tags per row of 05 5.2; a result per probe of the "Settled by"
-    column, from both hosts when arch-sensitive; a guide page per
-    journey; block B results that count for v1.0.0.
-  - `acceptance --pre-tag` runs the fourth check alone and offline:
-    between the candidate's commit, which the committed block B results
-    record, and `HEAD`, the only paths that differ are under `docs/` or
-    are Markdown files at the root (11 11.2), else it exits non-zero.
-    Block O7 runs it before the v1.0.0 tag, so the manual check of that
-    block is a command; the plan's addition.
-  - With `--file` a `command` item is not run;
-    `schemas/acceptance.v1.json` is generated.
+    tags per row of 05 5.2; a result per probe id of 11, from both hosts
+    when arch-sensitive; a guide page per journey; block B results that
+    count for v1.0.0. They join `all` only in the last task, T102, so
+    `all` stays green while the plan is under way (10 10.5).
+  - It fails while a `default-overturned` result has no `resolvedBy`,
+    and when a block A result's `sbxVersion` or `upstream` version
+    differs from the current floor or pin (11 11.4).
+  - `acceptance --pre-tag` runs the four checks offline against the
+    commit about to be tagged, else it exits non-zero; it is step 3 of
+    the release checklist of 12 12.2, which block O7 runs.
+  - `schemas/acceptance.v1.json` is generated.
 - Verify: `go test ./tools/ci/... -run '^TestAcceptance'`, which lists
   the tests by name.
 
@@ -2476,10 +2436,10 @@ blocks" for what may start early.
     change outside those paths (a kit, a catalog entry) is fixed there,
     and blocks O5 and O6 run again on a new candidate (11 11.2).
   - Pass, for block O6: `go run ./tools/ci probes --require-pass
-    B1,B2,B3,B4,B5,C1,C2,C3,C4,C5` exits 0 on the branch with both
+    B1,B2,B3,B4,B5,C2,C3,C4,C5,C6` exits 0 on the branch with both
     hosts' results; a `fail` or `inconclusive` verdict does not merge.
 - Verify: `go run ./tools/ci fast`; `go run ./tools/ci probes
-  --require-pass B1,B2,B3,B4,B5,C1,C2,C3,C4,C5`.
+  --require-pass B1,B2,B3,B4,B5,C2,C3,C4,C5,C6`.
 
 #### T093 - The records of the questions block B settles
 
@@ -2617,11 +2577,12 @@ blocks" for what may start early.
   Ask-first: `decisions`.
 - Acceptance:
   - Each question whose "Settled by" cell is the maintainer has an ADR
-    and leaves the table: Q4, Q6, Q9, Q12, Q13, Q14, Q23 and Q25. Q25 is
-    decided by the operator and recorded in [ADR 0008, let the sandbox
-    act as the maintainer on
-    GitHub](adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md),
-    from the output of block O1.
+    and leaves the table: Q4, Q6, Q9, Q12, Q13, Q14, Q26, Q27, Q29, Q30
+    and Q31. Q25 left it when it was decided on 2026-10-07, recorded in [ADR
+    0008, let the sandbox act as the maintainer on
+    GitHub](adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md)
+    from the output of block O1, and Q23 became the registry-credential
+    row of Deferred decisions.
   - After this task the Open questions table is empty, or each remaining
     row says what it waits for.
 - Verify: `go run ./tools/ci sequences`.
@@ -2630,7 +2591,8 @@ blocks" for what may start early.
 
 - [ ] Merged
 - Module: `ci-release`. Implements: index ("Success criteria"), 10 10.5,
-  10 10.2 (`links`, `acceptance`), 11 11.2.
+  10 10.2 (`links`, `acceptance`), 11 11.2, 12 12.2 (step 6 of the
+  release checklist).
 - Depends on: T094, T095, T101, T093, O7. Operator: block O7 comes
   first. Ask-first: `checks` (`docs/acceptance.json`).
 - Acceptance:
@@ -2639,11 +2601,13 @@ blocks" for what may start early.
   - `docs/acceptance.json` has one entry per success criterion, and the
     release and CI-run items name the release and the run of the v1.0.0
     commit.
-  - The result file of the B1 run on v1.0.0, written by the harness
-    through its redaction, is under the pull request's Evidence, and no
-    raw run output is; `go run ./tools/ci probes --require-pass B1
-    --hosts 1 --dir <that directory>` exited 0 on it in block O7.
-    **[review]**
+  - The result files of the B1 and B2 runs on v1.0.0, written by the
+    harness through its redaction, are under the pull request's
+    Evidence, and no raw run output is; `go run ./tools/ci probes
+    --require-pass B1,B2 --hosts 1 --dir <that directory>` exited 0 on
+    them in block O7. **[review]**
+  - The four end-of-plan checks of 10 10.5 join `all` in this pull
+    request.
 - Verify: `go run ./tools/ci acceptance` exits 0.
 
 ## Traceability
@@ -2699,7 +2663,7 @@ text names that id.
 | I13 | T038 |
 | I14 | T049, T074 |
 | I15 | T039, T046, T074 |
-| I16 | T039, T064, T074 |
+| I16 | T039, T074 |
 | I17 | T034, T062, T068 |
 | I18 | T061 |
 | I19 | T067 |
@@ -2714,9 +2678,6 @@ text names that id.
 | I28 | T032, T038, T044 |
 | I29 | T007, T040, T070 |
 | I30 | T016, T030, T066 |
-| I31 | T064 |
-| I32 | T064, T071 |
-| I33 | T063, T065, T066 |
 
 ## What v1 leaves out
 
@@ -2732,17 +2693,15 @@ Windows hosts; real support for agents other than Claude Code; a
 process supervisor in the run layout; project rename, and repo rename
 or split, as commands.
 
-**Marked v1.1** (00 0.5): listing `sbx`'s native egress approval
-queue in `status`; `romeu handoff --list` filters; a Remote-SSH
-helper command; an explicit registry credential (Q23).
-
-**Designed and not built** (06 6.6): the publishing path for kits.
+**Designed and not built**: the runtime ledger
+([13](spec/13-runtime-ledger.md)), a row of Deferred decisions like the
+publishing path for kits.
 
 **Deferred decisions** (index, [Deferred decisions](spec.md#deferred-decisions)).
 Each row has what holds until then and the event that reopens it;
 the table is the one place they are written, and this page does not
 copy them.
-Seven rows meet a task of this plan:
+These rows meet a task of this plan:
 
 | Row | Task | What happens there |
 |---|---|---|
@@ -2750,9 +2709,8 @@ Seven rows meet a task of this plan:
 | generating part of the spell-check word list from the vocabulary table | T085 | the list's format and path are fixed there; the generation stays deferred |
 | a scheduled workflow that checks external links | T102 | a dead link in that run reopens it |
 | a scheduled run of the pin-freshness check | T088 | the task builds the check and runs it once by hand |
-| tuning the ledger's starting values | T064 | the plan may tune them (13 13.8) and keeps the proposed defaults |
 | how a local-gate run is recorded | each task | reopened the first time the maintainer chooses the local gates for a merge (10 10.2) |
-| what replaces the code-owner review | T005 | decided at the start of the task, which builds the approval line's check |
+| what replaces the code-owner review | T005 | the task adds the first check that reads the approval line, which is the row's event |
 
 ## Decisions this plan defers
 
@@ -2773,6 +2731,11 @@ for the task that has the context to make it.
 Places where the specification is silent or says two things, found while
 this plan was written. The plan states the reading it took, so work can
 start; none of them is a decision of ours to keep.
+
+A question about the specification is a row of the index's
+[Open questions](spec.md#open-questions); Q26 to Q31 came from this
+list in review round 8. This list keeps the plan's own readings, and
+its numbers stay, so that the tasks can cite them.
 
 **To answer before the work that needs it, in this order.** Each names
 the first task that waits for the answer.
@@ -2800,138 +2763,35 @@ the first task that waits for the answer.
    Answered (maintainer, 2026-10-01): each check lands with its first
    input.
 
-3. **The pieces that land early** (12 12.2, 04 4.1, 10 10.6, 06 6.1, 11
-   11.1, 02 2.1, 10 10.2). Needed before: T008. The map puts the error
-   table under `romeu-cli`, `tools/kitpin` under `kits` and the argv
-   builders under `sbxdrv`, each after modules that need a part of them:
-   `spec`, `state` and `gitsafe` return error ids; A11, A12 and A13 need
-   pins before `kits` exists; the handshake needs two builders. Two
-   further additions are the plan's own: the one pin file of T012, which
-   is not in the tree of 02 2.1 and holds a product-level workload pin
-   that no `tools/kitpin` subcommand writes; and the rule in `tools/ci
-   kits` (T076) that every kit's pin equals the pin file.
-   Recommendation: Accept the four early pieces named in "The first
-   slice", the pin file and its equality rule, and say in 12 12.2 that a
-   module's first task may precede its place when it has no dependency
-   there; add the pin file to the tree of 02 2.1.
+3. **The pieces that land early.** Moved to the index as Q26, with
+   this plan's recommendation as its default.
 
-4. **The image and herdr downloads in CI** (10 10.1). Needed before:
-   T013. The rule that lists where tests may use the network names the
-   container e2e's mise install. It omits pulling the workload's base
-   image for the container and hybrid e2e, and downloading herdr for
-   `layout up`.
-   Recommendation: Add both to the rule, pinned and checksum-verified
-   like mise, with a transport failure reported as an infrastructure
-   error, a red job with its own exit code, and a digest or checksum
-   mismatch always a test failure, since that mismatch is the one sign
-   of a substituted artifact. The sandbox that builds T012 and T013
-   needs the same hosts reachable, which is a step at checkpoint C0.
+4. **The image and herdr downloads in CI.** Moved to the index as Q27.
 
-5. **What the workload's Debian base is** (10 10.1, 06 6.4, 06 6.1).
-   Needed before: T013; an agent's lookup at T012 settles it.
-   **Inferred, not checked:** 10 10.1 runs the container e2e "in the
-   workload's Debian base" and 06 6.4 calls the workload a Debian base.
-   The plan reads that as the pinned workload image, pulled by digest
-   and run as a plain container. If that image cannot be pulled, or does
-   not start without `sbx`, T013 has no image until A12 measures the
-   workload.
-   Recommendation: An agent pulls the pinned digest and runs a shell
-   command in it when it writes T012. If that works, nothing changes. If
-   not, the container e2e uses a Debian image pinned by digest in the
-   pin file until A12 reports the workload's missing set, and 10 10.1
-   says so.
+5. **What the workload's Debian base is.** Moved to the index as Q28,
+   which A12 settles.
 
-6. **What A3 probes in block A** (11 (opening), 11 11.1). Needed before:
-   T019; answer at checkpoint C0. Block A "needs no product code", and
-   A3 expects that "romeu/julieta checks see every plant" and that
-   "ingest skips each spool plant". Those checks do not exist when block
-   A runs, and the task that writes A3's expectation must know which
-   half it writes.
-   Recommendation: Keep the mount facts in A3: each plant as the host
-   sees it, the read-only mounts, the mount paths. Move the product
-   half, what romeu, julieta and ingest do with the plants, to block B,
-   as a case of B3 or an id of its own.
+6. **What A3 probes in block A.** Settled by the specification: A3
+   records the mount facts, and C6 of block B checks what romeu and
+   julieta do with the plants (11 11.2).
 
 7. **Whether block A ever plants a global secret or a broad allow rule
-   on your host** (11 11.1 (A9), 05 5.2 (I22), 04 4.2). Needed before:
-   T019; answer at checkpoint C0. A9 lists the global secrets and the
-   global allow rules as `doctor` would read them, and plants nothing.
-   The doctor fixtures of I22 need a global secret for a service a
-   project uses and a broad allow rule, which no listing of a well-kept
-   host holds. An earlier draft of this plan had A9 plant a throwaway
-   pair on your host: a broad global rule widens every sandbox on the
-   machine while it exists, and an interrupted run could leave it there.
-   Recommendation: No live plant. The fixtures are synthesized files,
-   apart from the recordings and marked as such, each required to parse
-   the way the A9 recording does (T046, T049). If you ever want a live
-   plant, it needs all of: a reserved unroutable name
-   (`*.<prefix>.example.test`), with the broad-rule classifier keyed on
-   wildcard shape and not on reachability; a refusal to plant when a
-   rule or secret of that name already exists; a no-op `--command` such
-   as `false`; removal on every exit path, failure and interrupt
-   included, each with a test; a sweep by prefix at the start of a run;
-   and a line in block O3 on how to list and remove a leftover. With
-   either of A9's two observations false, the shape of a global row
-   stays unmeasured until a host that has one runs A9.
+   on your host.** Moved to the index as Q29.
 
-8. **How probe results reach `main`** (11 (opening), 11 11.3, 10 10.2,
-   12 12.4, 10 10.3). Needed before: block O3. The specification says
-   results are "committed" and does not say by whom or how. A direct
-   push to `main` is refused by the ruleset for the maintainer too (a
-   control against an agent that does not edit the ruleset or the
-   repository settings, 05 5.4), and a branch is public before any check
-   reads it; the recordings hold output of the
-   maintainer's real host. The plan also adds to the recorder (T018) a
-   filter that keeps real values only for its own sandboxes and env dirs
-   in a listing and gives every other row typed placeholders, a positive
-   scrub of the host's own identifiers, wider than the four 10 10.3
-   names, and typed parsers for the git config, the trust settings and
-   the key listing, which change what A1 and A12 record (11 11.1).
-   Recommendation: A pull request from a branch pushed through the hook,
-   as this plan has it, and one line in 11 that says so; and the
-   recorder's filter, scrub and typed parsers named in 10 10.3's
-   Redaction row.
+8. **How probe results reach `main`.** Moved to the index as Q30.
 
-9. **A result that overturns a default** (11 11.4, 10 10.2, 12 12.4).
-   Needed before: T020. `tools/ci probes` fails on an overturned result
-   until it is resolved, and it is a step of `all`, which a merge
-   requires. A pull request with results alone cannot merge when one is
-   overturned.
-   Recommendation: The resolution joins the results' pull request, as
-   this plan has it; or `probes` treats an overturned result as a
-   failure only on `main`, which changes T020. The first needs no code.
+9. **A result that overturns a default.** Settled by the
+   specification: `tools/ci probes` does not fail on an overturned
+   result, and `tools/ci acceptance` fails while one has no
+   `resolvedBy` (11 11.4).
 
-10. **The signature check of `kitpin mise`** (07 7.4, 12 12.1). Needed
-   before: T052. **Inferred, not checked against mise's releases:** 07
-   7.4 has `tools/kitpin` verify a minisign signature. If mise signs in
-   minisign's prehashed mode, the check needs BLAKE2b, which the Go
-   standard library does not have and the complete v1 dependency list of
-   12 12.1 does not name.
-   Recommendation: An agent looks first: the header of the signature
-   file in a mise release says which mode it is, and the finding goes
-   into the pull request of T052. Only if it needs BLAKE2b is there a
-   decision for the maintainer, and it is an ask-first approval
-   (`dependencies`): add `golang.org/x/crypto` to the list of 12 12.1
-   for `tools/kitpin` only; it is not linked into romeu. Whatever the
-   mode, the public key the check trusts is committed with the pin file
-   and confirmed by the maintainer out of band (T052): the key's source
-   is never an agent's lookup.
+10. **The signature check of `kitpin mise`.** Moved to the index as
+   Q31.
 
-11. **The two diagrams with no table source** (12 12.8, 12 12.3, 11
-   11.4, 01 1.6). Needed before: T083, which lands before the candidate
-   tag. 12 12.8 says `ARCHITECTURE.md` shows the candidate,
-   promotion-commit, generation and probe machines "as generated
-   diagrams", and 12 12.3 names one source for them, the transition
-   tables of `internal/state`, which hold two. The promotion commit is a
-   step list (01 1.6) and the probe lifecycle is the table of 11 11.4,
-   which `tools/ci probes` implements. A generator change is outside
-   `docs/`, so after the candidate tag it would need a new candidate (11
-   11.2).
-   Recommendation: **The plan's own reading:** the specification says
-   generated, so T083 gives each of the two a transition table beside
-   the two in `internal/state`, and one generator draws all four. The
-   other reading, hand-written diagrams, changes 12 12.3 and 12 12.8,
-   empties that task and puts the two diagrams in T095.
+11. **The two diagrams with no table source.** Settled by the
+   specification: 12 12.8 draws the candidate and generation machines
+   only, the promotion commit is the numbered procedure of 01 1.6, and
+   the probe has no lifecycle diagram, so T083 is removed.
 
 12. **The text of `SECURITY.md` on what happens next** (12 12.8, ADR
    0001 rule 20). Needed before: T084. 12 12.8 fixes the channel and the
@@ -2968,17 +2828,17 @@ column.
 | 16 | 11 (opening), 10 10.2 | "the first plan task can pass `tools/ci all` before any host run" is said of the probe harness, and the first plan task is `ci-bootstrap`; wording only | the harness is the first task of its module |
 | 17 | 12 12.2, 11 11.2 | the `probes` row comes first in the build order, and the block B and sandbox-side definitions need the kits, the host suite and the release tooling's candidate | T082, after the kits and before the candidate tag |
 | 18 | 12 12.3, S10 | S10 asks for a generated reference page per file format, and the generator table has a row for `project.md` and `runtime-event.md` only | one generator in T021, fed by each schema task |
-| 19 | 12 12.10, 13 13.5, 13 13.6, 02 2.1, 03 (opening) | 03 says each format has a schema in `schemas/`; `dora.v1`, `ledger-entry/v1` and the view files are formats with none in the list of 02 2.1 | no schema is planned for the three |
-| 20 | 12 12.7, 12 12.2 | `docs/lessons.md` and the `lesson` kind have no owning module, and each pull request has a Lessons section from T005 on | the file, the kind and the check land in T006 |
+| 19 | 12 12.10, 13, 02 2.1, 03 (opening) | 03 says each format has a schema in `schemas/`; `dora.v1`, `ledger-entry/v1` and the view files belong to designs that v1 defers (12 12.10, 13) | no schema is planned for them until they are built |
+| 20 | 12 12.7, 12 12.2 | `docs/lessons/` and the `lesson` kind have no owning module, and each pull request has a Lessons section from T005 on | the directory, its generated index, the kind and the check land in T006 |
 | 21 | S4, 03 3.5, 02 2.2, 12 12.1 | 02 2.2 names the reference instance. What a task lacks is access to it and a Linux place to run julieta, which has no darwin build | blocks O4 and O5 |
 | 22 | 06 6.1, 06 6.4, 02 2.1 | `tools/kitpin` has subcommands for the frontend, mise and herdr, and none for the workload digest that A12 and the container e2e read | the workload entry of the pin file is written by hand in T012 |
 | 23 | 11 11.1 (A5), 03 3.3, 12 12.2 | A5 runs `sbx env plan` on the `sbxenv.yaml` goldens and records their hashes, and `render`, which owns the goldens, comes after block A in the build order; 03 3.3 already calls the goldens "probe-confirmed" | the goldens are written with the probe definitions and `render` must reproduce them (T019); 11 11.1 could say so |
-| 24 | 10 10.3, 11 11.1 (A4), 04 4.2 | the fake `sbx` refuses a shape that is in no recording, and no table says which shapes and which starting sessions block A must record; A4 lists `-it` forms of `sbx env exec`, and `run` steps 5 and 6 use the non-interactive form | the table of T019, derived from each task whose end-to-end tests call the fake, with A4 recording both forms; the plan's own engineering, and whether it becomes a table of 10 10.3 is the maintainer's |
+| 24 | 10 10.3, 11 11.1 (A4), 04 4.2 | the fake `sbx` refuses a shape that is in no recording, and no table says which shapes and which starting sessions block A must record; A4 lists `-it` forms of `sbx env exec`, and `run` steps 5 and 6 use the non-interactive form | the table of 11 11.1 (Recorded sessions), committed as data in T019 with the sessions derived from each task whose end-to-end tests call the fake, and A4 recording both forms |
 | 25 | 12 12.3, 10 10.2 | this page has derived parts (counts, block lists, traceability rows) and no generator row or check | kept by hand and read in review; a check would be a change to 10 10.2 |
 | 26 | 09 (opening), 09 (J12) | the opening of 09 says J12 runs J1 steps 3 to 6, and the J12 section says steps 1 to 5 | T075 follows the opening; the two sentences could agree |
-| 27 | 12 12.8, 12 12.3, ADR 0001 rule 17 | the state-machine diagrams of `ARCHITECTURE.md` are generated, and the page is hand-written; ADR 0001 rejected, among its alternatives, a generator that injects text between markers in a page people edit | T034 and T083 write each diagram as a generated file of its own that `ARCHITECTURE.md` links to; nothing is injected into the page |
+| 27 | 12 12.8, 12 12.3, ADR 0001 rule 17 | the state-machine diagrams of `ARCHITECTURE.md` are generated, and the page is hand-written; ADR 0001 rejected, among its alternatives, a generator that injects text between markers in a page people edit | T034 writes each diagram as a generated file of its own that `ARCHITECTURE.md` links to; nothing is injected into the page |
 | 28 | 05 5.3, 10 10.2 (the `mutate` step), 05 5.2 | the I4, I25 and I8 guards live in `sbxdrv`, `fakesbx` and `render`, which are on no ask-first surface, so `mutate` runs on a pull request that changes only them when the scheduled `fuzz.yml` next runs it | no plan change; `fuzz.yml` runs `mutate` over everything (10 10.2), and 05 5.3 could list those packages |
 | 29 | 10 10.2 (the `pr` step; the personal-path rule) | the personal absolute path rule runs in `hygiene` over tracked files, and `pr` does not read a pull request's body for one; text pasted under Evidence meets the forbidden-name check and the prose rules only | the operator blocks paste only files the harness wrote through its redaction, and the maintainer reads the rest first; extending `pr` to that rule is a change to 10 10.2 |
 | 30 | 01 1.4, 05 5.2 (I7), 12 12.3 | the render digest strips every field without a `gate:"widening"` tag, so a new field whose tag is forgotten is left out of the gate, and the flip table passes | T021 keeps a committed list of the untagged fields and the generator fails on a field on neither; 01 1.4 could name that list |
 | 31 | 11 11.4, 10 10.4 | a golden with no recorded hash is not flagged, so after an A5 result exists a golden added later passes `probes` without a probe | A5's definition hashes every file under `internal/render/testdata/` (T019), so none lacks a hash at T026; a golden added later is a re-probe, as the pin file's comment (T012) says of a pin. No check is added |
-| 32 | 10 10.2, 11 11.2 | `tools/ci acceptance --pre-tag` is run by hand before a tag that cannot be redone, and `release.yml` does not run it | block O7 runs it by hand; making it a step of `release.yml` for an unsuffixed tag would remove the dependence on memory, and that is a change to 10 10.2 |
+| 32 | 10 10.5, 11 11.2, 12 12.2 | `tools/ci acceptance --pre-tag` is run by hand before a tag that cannot be redone | settled by the specification: it is step 3 of the release checklist of 12 12.2, outside `release.yml`, and a check that fails after the tag is fixed by a patch release |

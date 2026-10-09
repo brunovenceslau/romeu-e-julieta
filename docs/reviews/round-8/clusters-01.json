@@ -1,0 +1,754 @@
+{
+ "page": "01",
+ "findings_read": 49,
+ "clusters": [
+  {
+   "id": "R8-01-1",
+   "section": "01 1.2",
+   "title": "The 'Agent output that reaches the host' row omits byte streams romeu decodes from the sandbox (julieta --json stdout, snapshot/heads.json), so no grammar, size cap or validation is specified, fuzzed or probed for them, and the Truth row omits the 05 5.4 caveat.",
+   "severity": "Blocking",
+   "lenses": [
+    "L2b",
+    "L2"
+   ],
+   "finding_ids": [
+    "L2b-1",
+    "L2-13"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "The agent, root in the sandbox, makes julieta status --json return 400 MiB or a non-hex SHA or a branch name with a path separator; romeu pull and status decode and use it with no cap or validator stated.",
+   "change": "In 01 1.2, extend the 'Agent output that reaches the host' Items cell with 'julieta's --json stdout read over sbx env exec (version, setup, status, salvage); snapshot/heads.json'. Add to 04 4.1 Output one rule: 'Every document romeu decodes from a subprocess in a sandbox or from a mount is decoded strictly with a size cap, and no string from it becomes a path, a ref or an argv element without the 03 3.1 validators.' Add those decoders to the fuzz list of 10 10.1. In the 'Truth, in git' row, append to the Reviewed cell 'what that review is worth: 05 5.4'. In 02 2.6 replace 'memory is the only agent-written mount' with 'memory and the spool are the only agent-written mounts'. Add I12, I17 and I28 to boundary A's invariant list where they hold today.",
+   "cost": "One cell, one 04 4.1 rule, one fuzz-list line, two small edits.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the row extension and the single strict-decode rule in 04 4.1 instead of the full consumer table both lenses propose; the rule covers every stream, current and future, in one sentence."
+  },
+  {
+   "id": "R8-01-2",
+   "section": "01 1.2",
+   "title": "No single place lists every store the product writes or causes to exist with owner, readers and lifetime; facts are spread over seven sections and some stores (sbx per-name volumes, refs in host clones, the state attic) appear in none.",
+   "severity": "Blocking",
+   "lenses": [
+    "L16"
+   ],
+   "finding_ids": [
+    "L16-1"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "An employer's security review asks where the tool keeps code, secrets and transcripts; the developer reads seven sections and still misses the workload volumes and the ledger under $XDG_STATE_HOME.",
+   "change": "Add to 01, after 1.2, a short table 'Where data lives': one row per store (host tree, memory dir with entries/handoff/snapshot/salvage, .attic, review checkouts, host settings, host state and state attic, runtime ledger, spool, view, refs in romeu namespaces in host clones, sbx sandboxes and their per-name volumes, keychain entries named in settings, the signing agent socket) with columns: path, whose data, who can read it (host user, which sandbox mounts it), lifetime, and what rm and retire do to it. Link it from 02 2.3 and 02 2.4. No generator now; Deferred row: 'generate docs/reference/data.md from this table; reopened by the first time the table and 02 disagree'.",
+   "cost": "One table of about 14 rows and one deferred row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Add the table by hand in 01 and defer the generated reference page with its trigger, rather than adding a generator row now."
+  },
+  {
+   "id": "R8-01-3",
+   "section": "01 1.2",
+   "title": "The two workspace files are rewritten whole with no record of their hash, so a hand edit (for example a memory dir added as a folder, which boundary D forbids) stays live until the next promotion or retire and doctor has no row for it.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0"
+   ],
+   "finding_ids": [
+    "L0-27"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The operator adds memory/shop-api to dev.code-workspace; VS Code opens an agent-writable tree; nothing reports it for days.",
+   "change": "In the 01 1.2 'Derived from state' row, replace 'so they are not drift-checked and a hand edit is overwritten' with 'so they are not drift-checked; doctor derives them again from host state and reports a difference, as it does for the ledger view, and the next promotion or retire overwrites a hand edit'. Add the doctor row in 04 4.2.",
+   "cost": "One sentence and one doctor row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Use the derive-and-compare check the ledger view already has; no hash record."
+  },
+  {
+   "id": "R8-01-4",
+   "section": "01 1.2",
+   "title": "romeu pull creates a review checkout, but review.code-workspace is written only at promotion and retire, so the checkout J4 step 4 opens is listed by no workspace file until the next promotion.",
+   "severity": "Required",
+   "lenses": [
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13b-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The operator runs romeu pull on a secondary repo for the first time and opens review.code-workspace as J4 says; the folder is absent; a hand-added folder is overwritten at the next promotion.",
+   "change": "In the 01 1.2 'Derived from state' Who writes cell write 'romeu (each promotion, retire and pull)', and add review.code-workspace to the Writes cell of the pull row in 04 4.2.",
+   "cost": "Two cells.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply; it depends on the operator's answer to R8-01-5 (if pull is deferred, this goes with it)."
+  },
+  {
+   "id": "R8-01-5",
+   "section": "04 4.2 (pull); 01 1.2; 02 2.3; I13; I14; I19; 05 5.4",
+   "title": "romeu pull, the hardened review checkout, both workspace files, I19 and two residual-risk rows exist for a host-side review path the start does not need, and dev.code-workspace is opened by no journey.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-6"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "ADR 0008 makes the PR on GitHub the review barrier; J4 is the only journey for pull and is outside S7's CI set; dev.code-workspace appears only in 01 1.2 and 02 2.3 yet is rewritten at every promotion and retire and carries I13 and I14.",
+   "change": "Defer romeu pull, the review checkout and review.code-workspace as one Deferred row ('until then the PR on GitHub is the review; reopened by the first time the maintainer needs a sandbox branch on the host before it is pushed'); delete dev.code-workspace or give it a journey step; I19 and the two 05 5.4 residual rows leave with pull.",
+   "cost": "Deletions in 01, 02, 04, 05, 09; the plan loses most of T067.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Operator: it removes a v1 command (scope, 00 0.3) and two accepted-risk rows of 05 5.4. Recommendation: defer pull and the review checkout as proposed, and delete dev.code-workspace, which no journey opens.",
+   "operator_reason": "Operator: it removes a v1 command (scope, 00 0.3) and two accepted-risk rows of 05 5.4."
+  },
+  {
+   "id": "R8-01-6",
+   "section": "01 1.2",
+   "title": "The trust model covers only sandbox-to-host flows; which host facts the agent may read, and through which surface, has no class, so the agent that authored a spec change cannot learn whether it is unsynced, awaiting, declined or live.",
+   "severity": "Required",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-34",
+    "L5-9"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "In the config sandbox the agent pushes egress.extra: [api.stripe.com] (J11); a day later it cannot tell whether the domain is live, so it re-pushes or tells the user the domain is available when it is not.",
+   "change": "Add a row to 01 1.2: 'Host facts the agent reads | the project's live spec commit (manifest, 03 3.6, field specCommit, fresh at each exec) | romeu | the manifest schema'. Add specCommit to the manifest in 03 3.6 and to julieta status --json in 04 4.3. State as a limit in the same row: 'the candidate state is host-only; the agent compares specCommit with the commit it pushed'.",
+   "cost": "One row, one manifest field, one status field.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Give the agent the one fact that answers the question (the live spec commit) and state the candidate state as host-only, instead of a view record of candidate state."
+  },
+  {
+   "id": "R8-01-7",
+   "section": "03 (opening); 01 1.2; 12 12.3",
+   "title": "The format tables of 03 are design input that the product later generates, so after v1 the spec holds a second, unmaintained copy of every format.",
+   "severity": "Blocking",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-1"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A PR adds a spec field; the generated reference regenerates; 03 3.2's table still lists the old set; a contributor writes a spec from 03 and is refused by a validator the spec never described.",
+   "change": "Add to 03's opening: 'Once the task that lands a format's generator merges, that format's field and rule tables here are replaced by a link to the generated reference page; this page keeps the intent, the annotated example and the rules that are design decisions.' In the 01 1.2 'Generated, in git' row, replace 'the field and rule tables of this spec's implementation' with 'docs/reference/* pages that replace the field and rule tables of 03 (03 opening)'. Deferred row: a tools/ci docs rule that fails a spec table whose header equals a generated table's header; reopened by the first stale 03 table found after T021.",
+   "cost": "One policy sentence, one cell, one deferred row, a deletion pass after T021.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the policy and the deletion pass; defer the header-equality check with its trigger."
+  },
+  {
+   "id": "R8-01-8",
+   "section": "01 1.4",
+   "title": "Nothing says what romeu does with an sbx version no recording covers: sbx has a floor and no ceiling, gate 1 compares for equality, and approve --toolchain shows nothing about sbx, so a never-recorded sbx is accepted on a blind acknowledgement and parsers may misread its output.",
+   "severity": "Blocking",
+   "lenses": [
+    "L15",
+    "L14"
+   ],
+   "finding_ids": [
+    "L15-1",
+    "L14-3"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "sbx auto-updates to 0.48.0; every P command exits 3; the operator runs approve --toolchain, reads a catalog diff unrelated to sbx, types y; sbxdrv misreads a renamed field of sbx ls --json and identity or egress acts on a wrong reading.",
+   "change": "In 01 1.4 Gate 1 add: 'The tested window is the set of sbx versions with a recording set under e2e/testdata/sbx/. approve --toolchain prints the live sbx version and the newest recorded one. A live version outside the window is reported by status and doctor as a warning, sbx-untested, naming the version and the recorded range; P commands print it and go on. Every sbx output romeu cannot parse exits 2 with sbx-output-unparsed naming the command and the recorded versions.' Add both ids to the 04 4.1 table and the window to 12 12.1.",
+   "cost": "Three sentences, two ids, a unit test on gate 1.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Recommend warn, not refuse, outside the window, with fail-closed parsing as the safety net; no new state."
+  },
+  {
+   "id": "R8-01-9",
+   "section": "01 1.4",
+   "title": "Gate 1 identifies romeu and julieta only by their version strings, so a source build with the same version passes silently and a downgrade is shown as an ordinary change.",
+   "severity": "Required",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The operator replaces romeu with an older release; gate 1 asks the same question as an upgrade, and the embedded catalog and julieta move backwards.",
+   "change": "In 01 1.4 Gate 1 and 03 3.8 toolchain.json: record romeu's own sha256 and the embedded julieta sha256 values; gate 1 flips on them and the prompt prints 'downgrade' when a version is lower. Add the flip-table row.",
+   "cost": "Two fields, one flip-table row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the sha256 fields and the downgrade label; leave out the 'binary not built by release.yml' doctor check, which needs provenance verification, a separate decision."
+  },
+  {
+   "id": "R8-01-10",
+   "section": "01 1.4",
+   "title": "The spec does not say how a dev build of main is versioned, so dogfooding pre-release builds needs one acknowledgement per build with no stated rule.",
+   "severity": "Advisory",
+   "lenses": [
+    "L9"
+   ],
+   "finding_ids": [
+    "L9-19"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The maintainer runs a romeu built from main each day; every project exits 3 until approve --toolchain, so dogfooding stops.",
+   "change": "In 01 1.4 Gate 1 add: 'A dev build carries the version v0.0.0-dev+<commit> (12 12.2) and is acknowledged like any other version, once per build per machine; when julieta and the catalog are unchanged the prompt is a single line.'",
+   "cost": "One sentence and a version-stamp rule in 12 12.2.",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State the cost as a limit (one y per build) instead of a weaker comparison for dev builds."
+  },
+  {
+   "id": "R8-01-11",
+   "section": "01 1.4 (Gate 1); 03 3.8; 04 4.2 (approve --toolchain)",
+   "title": "Gate 1 is a per-machine acknowledgement with its own record, printer, exit code and flag, and the spec does not state what threat it stops that doctor would not, on a machine where the operator is the one who upgrades.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-7"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "J1 step 4 and J9 make the operator approve what they just installed.",
+   "change": "In 01 1.4 Gate 1 add a 'Why for us' line: 'sbx updates itself and romeu can be replaced by a package manager; gate 1 makes a catalog or julieta change, which can widen egress for every project, visible before any project uses it. doctor reports; it does not stop.'",
+   "cost": "One sentence.",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "Keep gate 1 and state its threat; folding it into doctor would let an unattended upgrade widen egress silently."
+  },
+  {
+   "id": "R8-01-12",
+   "section": "01 1.4",
+   "title": "sandboxOptions is stripped from renderDigest without a stated reason, and a spec field that carries no gate tag is in neither the digest nor the generated I7 flip table, so a forgotten tag passes every test.",
+   "severity": "Required",
+   "lenses": [
+    "L13b",
+    "L6"
+   ],
+   "finding_ids": [
+    "L13b-14",
+    "L6-19"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "A new spec field lands without gate:\"widening\"; the digest ignores it, the flip table has no row, and an agent widens the sandbox through it without gate 2. Separately, cpus 4 to 64 and memory 8g to 128g promote without gate 2.",
+   "change": "In 01 1.4 after the struct-tag paragraph add: 'Fields deliberately left ungated are listed in one committed list beside the tags; go generate fails on a field that is on neither, so a forgotten tag is a generator failure, not a silent strip (I7). Today the list holds sandboxOptions. Why for us: resource limits change how much of the host the sandbox uses, not what it can reach or read.' Mirror the first sentence in 05 5.2 I7.",
+   "cost": "Three sentences; the plan's T021 already builds the list.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply."
+  },
+  {
+   "id": "R8-01-13",
+   "section": "01 1.4 (Gate 2)",
+   "title": "The gate 2 summary shows every change in one form, so a content-only kit edit and a new capability look alike and train the user to approve without reading.",
+   "severity": "Advisory",
+   "lenses": [
+    "L1"
+   ],
+   "finding_ids": [
+    "L1-12"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "After the fifth long diff, the user types y on the summary without seeing that one kit added a lifecycle hook.",
+   "change": "In 01 1.4, change 'It starts with a summary (each changed field, file counts and line counts per kit)' to 'It starts with a summary that lists first, marked, the changed capabilities, gated domains, secret argv and the workload repository, then content-only kit changes with file and line counts'. Add a golden.",
+   "cost": "One sentence and a golden.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply."
+  },
+  {
+   "id": "R8-01-14",
+   "section": "01 1.4; 06 6.1; I28; 12 12.2",
+   "title": "The v3 descriptor grammar is parsed by two packages with no single owner, and nothing says what happens when sbx adds a capability type the strict grammar refuses.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-10"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "sbx adds a capability type; every sync fails closed; the fix teaches internal/oci and forgets internal/render, and a personal kit declaring it still fails.",
+   "change": "In 01 1.4 replace 'parsed by internal/oci for images and by internal/render for local kits' with 'parsed by one grammar in internal/oci, which internal/render calls for local kits'; same in 12 12.2. Add a Deferred row: 'a capability type sbx adds after v1: sync fails closed until a romeu release models it; reopened by the first sync that fails on an unmodeled type'.",
+   "cost": "Two sentence edits and one deferred row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Name internal/oci as the owner instead of a new package; state the fail-closed cost as a deferred row."
+  },
+  {
+   "id": "R8-01-15",
+   "section": "01 1.4 (Gate 2, capabilities); 06 6.1; I28; Q20; Q23; 02 2.4",
+   "title": "A registry client, a strict descriptor grammar, a descriptor cache and per-type conformance fixtures exist in v1 to decompose a workload already pinned by digest and allowlisted by repository, and no sentence says what the gate loses without it.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-8"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The reviewer at gate 2 sees the digest change either way; the decomposition improves the diff for one allowlisted workload.",
+   "change": "In 06 6.1 add a 'Why for us' sentence: 'A digest change alone does not show a reviewer that the new image added a mount, a credential or a network domain; the capability set does, and the gated egress of a workload's declared domains depends on it (egress.Split).'",
+   "cost": "One sentence.",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State what the decomposition buys and keep it in v1; if that sentence cannot be written truthfully, the deferral goes to the operator as a scope change."
+  },
+  {
+   "id": "R8-01-16",
+   "section": "01 1.5",
+   "title": "Preflight checks that cannot widen a sandbox block the commands whose job is to preserve data: gate 1, drift and the signing-socket check make stop, salvage, salvage --from-host, rm and pull exit before they can save work.",
+   "severity": "Blocking",
+   "lenses": [
+    "L4",
+    "L1",
+    "L0"
+   ],
+   "finding_ids": [
+    "L4-4",
+    "L1-3",
+    "L0-8"
+   ],
+   "listed": 1,
+   "own": 2,
+   "scenario": "Docker Desktop updates sbx overnight, or the dedicated signing agent is not running after a reboot; romeu salvage --from-host exits 2 (RJ-204) or salvage exits 3 until approve --toolchain on a TTY, and the sandbox dies meanwhile.",
+   "change": "In 01 1.5 replace 'Destructive commands (salvage, rm, retire) may run when only the spec moved on, but never on drift or a failed identity check.' with: 'salvage, salvage --from-host, stop and pull widen nothing and forward no socket: they print a failure of steps 1, 3, 4 or 5 and go on, and stop only at step 2 or step 6. rm, retire and recreate run their salvage half the same way and pass every step before their removal half.' Amend the E list of I7 and T074 to match.",
+   "cost": "Two sentences, an I7 E-list edit, a T074 change.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as one rule for the protective commands, covering all three findings; keep the full preflight for run, the live changes of sync and any removal."
+  },
+  {
+   "id": "R8-01-17",
+   "section": "01 1.5",
+   "title": "Step 5 is justified as checks that 'can widen a sandbox behind romeu's back', yet it holds the VS Code trust check (I23), which widens no sandbox.",
+   "severity": "Advisory",
+   "lenses": [
+    "L0"
+   ],
+   "finding_ids": [
+    "L0-38"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A user with workspace trust disabled cannot run any P command, for a reason the step's description does not give.",
+   "change": "In 01 1.5 step 5 replace 'host checks shared with doctor that can widen a sandbox behind romeu's back' with 'host checks shared with doctor whose failure widens a sandbox or makes agent output executable on the host'.",
+   "cost": "One phrase.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply."
+  },
+  {
+   "id": "R8-01-18",
+   "section": "01 1.5",
+   "title": "01 1.5 says every command marked P runs the preflight, but sync is not marked P in 04 4.2 although it runs step 1 first and the rest before its first mutating call.",
+   "severity": "Required",
+   "lenses": [
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13b-12"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A reader builds the P list from 04 4.2 for the promotion fault-injection test of 10 10.1 and leaves out sync, the one command that promotes and reconciles live egress.",
+   "change": "Mark sync P in 04 4.2, and add to 01 1.5: 'sync runs step 1 before its first sbx read and steps 2 to 6 before its first mutating call.'",
+   "cost": "One mark and one sentence.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply."
+  },
+  {
+   "id": "R8-01-19",
+   "section": "01 1.5; I22",
+   "title": "Step 5's I22 check parses sbx listings and is not required to fail closed, so a changed or empty listing passes a security check on zero rows.",
+   "severity": "Required",
+   "lenses": [
+    "L15"
+   ],
+   "finding_ids": [
+    "L15-3"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A new sbx changes its policy listing JSON; the parser finds zero rows; preflight and doctor pass on a machine with a global ** allow rule.",
+   "change": "In 01 1.5 step 5 and I22 add: 'A listing whose shape is not a recorded shape, or that cannot be parsed, fails the step (exit 2, sbx-output-unparsed).' Add two I22 test rows: a changed container shape and an unparseable body.",
+   "cost": "One sentence, two test rows.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply; it uses the id introduced by R8-01-8."
+  },
+  {
+   "id": "R8-01-20",
+   "section": "06 6.4 (git-ssh-sign); Q19; 05 5.3; 01 1.5 step 5",
+   "title": "Commit signing from a dedicated host agent is a product kit with an ask-first surface, a settings field, a preflight check and an open question, and no sentence says why the start needs it.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-19"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A second adopter cannot tell whether to adopt the kit or ignore it.",
+   "change": "Add to 00 0.5: 'the maintainer signs every commit and will not run an agent that cannot'; mark git-ssh-sign opt-in in the README outline.",
+   "cost": "Two sentences.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Operator: it adds a reason to the scope (00 0.5) that only the operator can state. Recommendation: accept the proposed sentence if it is the operator's reason.",
+   "operator_reason": "Operator: it adds a reason to the scope (00 0.5) that only the operator can state."
+  },
+  {
+   "id": "R8-01-21",
+   "section": "01 1.6 (Candidate); 04 4.2 (approve); J11 step 5",
+   "title": "The awaiting state, the superseded transition and approve <name> exist for a caller that runs sync without a terminal, and no component, journey or user is that caller.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-9"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "01 1.1 puts romeu on the host under the operator; the config repo's CI runs julieta, not romeu; J11 step 5 says 'when sync ran without a TTY' and never who.",
+   "change": "Make a non-TTY sync whose digest differs delete its candidate dir and exit 3 printing the digest, with no awaiting record. Delete the rendered-to-awaiting row and every awaiting row from 01 1.6, approve <name> from 04 4.2, the awaiting row of 01 1.7, the record from 03 3.8 and J11 step 5; add a Deferred row: 'approval of a candidate rendered without a terminal; reopened by the first scripted sync'.",
+   "cost": "Four state rows, one command, one record, one vocabulary row deleted; one deferred row; the plan loses T045.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Take the deletion branch: no caller exists, so the state is deferred with its trigger."
+  },
+  {
+   "id": "R8-01-22",
+   "section": "01 1.6; 03 3.8",
+   "title": "Which states persist is unstated: the candidate machine has six states and the record persists only awaiting, an approval recorded before promotion step 1 has no recovery, and the generation table has no row for stop, pull, salvage or retire finding the sandbox absent.",
+   "severity": "Required",
+   "lenses": [
+    "L3",
+    "L13"
+   ],
+   "finding_ids": [
+    "L3-9",
+    "L13-35"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "romeu dies after recording the approval and before render.json; the next command deletes the candidate dir as crashed. Separately, romeu stop on an absent sandbox has no row and exits 2 as an illegal transition.",
+   "change": "In 01 1.6 replace 'State is persisted in the project record' with 'The generation states (and awaiting, while it exists) persist in the project record; rendered, approved and declined are transient within one command, and a command killed in them leaves a candidate dir that the next sync deletes and renders again.' Add to the generation table one row: 'open | stop, pull, salvage or retire finds the sandbox absent | closed-lost | as the run row'.",
+   "cost": "Two sentences and one row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Say approved is transient (a kill before step 1 means sync again) instead of adding an approved-window recovery; one row covers the four absent-sandbox commands."
+  },
+  {
+   "id": "R8-01-23",
+   "section": "01 1.6",
+   "title": "The generation machine states no persistence order and no recovery for a kill between the side effects of a destructive command (salvage refs per repo, the salvage record, sbx env rm, closed-removed).",
+   "severity": "Blocking",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-1"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "romeu rm records result complete, runs sbx env rm and is killed before closed-removed; the next run finds salvaging with the sandbox absent and records closed-lost with a new lost record, so history says lost when nothing was.",
+   "change": "In 01 1.6 Generation add: 'Destructive commands write in this order: refs per repo (create-only, so a rerun verifies them), the salvage record, the state removing, sbx env rm, closed-removed. Recovery: removing with the sandbox absent becomes closed-removed and keeps the existing record; salvaging with no salvage record is resumed by the next salvage, which verifies the refs already created.' Add removing to the table and to 03 3.8.",
+   "cost": "One state, about five lines, the T034 rows.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "One new state (removing) and one recovery sentence, instead of pending and complete record states."
+  },
+  {
+   "id": "R8-01-24",
+   "section": "01 1.6",
+   "title": "One sbx ls --json that does not list the sandbox is read as absent, and run then closes the generation as lost and creates a same-name sandbox; there is no unknown answer distinct from absent.",
+   "severity": "Blocking",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-3"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The sbx daemon is restarting and ls returns an empty list while the VM exists; romeu run records closed-lost and calls sbx env run -d on negative evidence.",
+   "change": "In 01 1.6 and 04 4.2 run step 2: 'absent means sbx ls --json exited 0, parsed, and did not list the sandbox; any other answer exits 1 with sbx-unknown and changes nothing. A run that closes an open generation as lost does not create in the same command: it prints the lost record and exits 1, and the next run creates.' Add the id to 04 4.1.",
+   "cost": "Two sentences, one error id.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Drop the double read and the TTY prompt; a second command is the confirmation."
+  },
+  {
+   "id": "R8-01-25",
+   "section": "01 1.6",
+   "title": "The generation table has no row for a sandbox half that failed (julieta exit 1, a timeout, disk full), and 'open generation' in 1.3 F, 1.5 step 6, I26 and adopt is ambiguous beside the state names open and salvaging.",
+   "severity": "Required",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-6"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "julieta salvage times out; the generation stays salvaging; run's identity step reads 'open generation' as state open and exits RJ-203, and adopt refuses, locking the operator out.",
+   "change": "Add the row 'salvaging | the sandbox half fails | open | salvage record result incomplete, reason sandbox-half-failed; exit 1'. Add to 01 1.7: 'open generation | a generation in state open or salvaging | -' and use that phrase in 1.3 F, 1.5 step 6, I26 and 04 4.2 adopt. Add the reason value to 03 3.8.",
+   "cost": "One row, one vocabulary row, one reason value.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply."
+  },
+  {
+   "id": "R8-01-26",
+   "section": "01 1.6",
+   "title": "salvage --from-host can record result lost while the generation stays open and a later absent-sandbox row records a second lost, and nothing says what --from-host does when the sandbox is present or whether a bare salvage stops agents.",
+   "severity": "Required",
+   "lenses": [
+    "L13"
+   ],
+   "finding_ids": [
+    "L13-22"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The operator runs salvage --from-host on an unreachable but present sandbox; rm later finds it absent and writes a second lost record. Or a bare salvage kills the agent and leaves the sandbox running.",
+   "change": "In 01 1.6: '--from-host refuses when sbx ls shows the sandbox present (exit 2, fix hint: romeu salvage)'; in the open-to-closed-lost row effect write 'keeps a lost record written by --from-host for this generation, else writes one'. In 04 4.2 salvage: 'salvage stops agents only when called from rm, recreate or retire (--stop-agents)'.",
+   "cost": "Three sentences.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Keep the rule that only the absent-sandbox row closes; deduplicate the record instead of moving the close into --from-host."
+  },
+  {
+   "id": "R8-01-27",
+   "section": "01 1.6",
+   "title": "adopt records as an open generation a sandbox gate 2 never saw, on a prompt that shows only name and path; its mounts, kits and workload are never compared with the live sbxenv.yaml, so boundary C ('nothing unapproved is ever at a live path') does not hold for it.",
+   "severity": "Required",
+   "lenses": [
+    "L2",
+    "L2b"
+   ],
+   "finding_ids": [
+    "L2-9",
+    "L2b-23"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "After host state is lost (J3), the operator adopts a hand-made sandbox that mounts $HOME read-write; romeu runs julieta in it and salvages from it, and status reports nothing about the mount.",
+   "change": "In 04 4.2 adopt: before the prompt print the mounts, policies, secrets and image sbx reports (sbx ls --json, sbx policy ls), escaped. In the 01 1.6 adopt row and boundary C add: 'an adopted generation is accepted as it stands until recreated'; status shows 'adopted, not gated' until then. Add a 05 5.4 row for that acceptance; record in A4 which fields sbx ls --json gives.",
+   "cost": "One adopt output block, one status field, one 05 5.4 row, one A4 observation.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Operator: it adds an accepted risk to 05 5.4 (an ungated live sandbox after adopt). Recommendation: accept it with the printed inventory and the status label; refusing adopt instead loses the J3 recovery.",
+   "operator_reason": "Operator: it adds an accepted risk to 05 5.4 (an ungated live sandbox after adopt)."
+  },
+  {
+   "id": "R8-01-28",
+   "section": "01 1.6",
+   "title": "When promotion recovery finds a candidate that no longer verifies after step 2 rewrote .romeu/bin and the workspace files, the text does not say which render.json the drift check then uses, so romeu reports its own half-finished promotion as drift.",
+   "severity": "Required",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-21"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "romeu is killed after step 2 and the candidate dir is then damaged; the next command exits 4 and the drift check calls the files hand-edited, so the operator runs --overwrite-drift for an edit nobody made.",
+   "change": "In 01 1.6 step 1 write: 'Write render.json (atomic rename) with promoting: <candidateId> and the previous file digests.' In Recovery replace 'If the candidate no longer verifies, the command exits 4' with 'If the candidate no longer verifies, romeu restores the previous digests in render.json and reports interrupted-promotion-abandoned (exit 4), never drift'. Add the case to the promotion fault injection of 10 10.1.",
+   "cost": "One field, two sentences, one fault-injection case.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply."
+  },
+  {
+   "id": "R8-01-29",
+   "section": "01 1.6; index (principle); 11 11.4; 12 12.8",
+   "title": "The index says every lifecycle is a transition table in internal/state, but the promotion commit is a numbered list, the probe lifecycle is a table in 11 11.4 implemented by tools/ci, and 12 12.8 promises four generated diagrams from tables that hold two.",
+   "severity": "Required",
+   "lenses": [
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13b-15"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A reader expects generated missing-pair tests for promotion recovery; none can exist; plan.md question 11 stays unanswered.",
+   "change": "Amend the index principle and 12 12.8: 'The candidate and generation lifecycles are transition tables in internal/state with generated tests and diagrams; the promotion commit is an ordered step list with a recovery rule per step (01 1.6), tested by fault injection (10 10.1); the probe lifecycle is the table of 11 11.4.' This answers plan.md question 11.",
+   "cost": "Two sentences, two hand-written diagrams.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Name which lifecycles are tables instead of adding two more tables."
+  },
+  {
+   "id": "R8-01-30",
+   "section": "01 1.6",
+   "title": "Tests generated from the transition tables cannot disagree with the tables, and the spec does not say the Effect column is asserted.",
+   "severity": "Advisory",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-24"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "A row's effect 'candidate dir deleted' is wrong in the table and the code alike; the generated test passes.",
+   "change": "In 01 1.6 after 'every missing pair is asserted illegal' add: 'Each row's Effect is asserted by a hand-written case (the file deleted, the record cleared, the exit code).'",
+   "cost": "One sentence, hand-written cases.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply."
+  },
+  {
+   "id": "R8-01-31",
+   "section": "01 1.6; 04 4.2; 07 7.3; 07 7.5; 08 8.4",
+   "title": "The spec quotes user-facing message text in prose with no error id ('candidate changed; run romeu sync' in 01 1.6 and four others), a second hand-written source of the text 04 4.1 keeps in one table.",
+   "severity": "Advisory",
+   "lenses": [
+    "L8"
+   ],
+   "finding_ids": [
+    "L8-20"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "The error table's message is reworded; the spec keeps the old string; a guide writer copies the spec.",
+   "change": "Replace each quoted message by its error or warning id (in 01 1.6, 'exit 4 \"candidate changed; run romeu sync\"' becomes 'exit 4 with its error id'), and add the missing ids to the 04 4.1 table.",
+   "cost": "Five edits and the ids.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply (moot for 01 1.6 if R8-01-21 deletes the awaiting rows)."
+  },
+  {
+   "id": "R8-01-32",
+   "section": "07 7.5; 13 13.2; 04 4.2; 01 1.6",
+   "title": "The escape hatches (egress.tools, egress.extra, tool: other, --accept-loss, --overwrite-drift, retire --force) are each bounded but none is counted, so nothing shows when one has become the main road.",
+   "severity": "Advisory",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-22"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "After a year every project carries egress.tools overrides and most events say tool: other; the catalog-gap signal is noise and no number says so.",
+   "change": "Add a Deferred row: 'counting escape-hatch use (overrides per project, tool: other share, --accept-loss and --overwrite-drift uses); reopened by the first catalog release planned from the ledger'.",
+   "cost": "One deferred row.",
+   "parked_for_b": false,
+   "resolution": "L",
+   "resolution_text": "State as deferred with its trigger; no counters now."
+  },
+  {
+   "id": "R8-01-33",
+   "section": "01 1.7; 01 1.1; 05 5.3; 05 5.4; 09 (legend); 10 10.2; 00 0.2; 06 6.4",
+   "title": "The vocabulary table lacks rows for concepts with several names or one name with several meanings (operator versus maintainer, developer and user; kit versus mixin; stale; session; drift; promotion; interrupted promotion; preflight; orphaned), spec collides with the spec's self-references, and eleven rows have an empty Not column, so the gate enforces about seven phrases.",
+   "severity": "Required",
+   "lenses": [
+    "L13",
+    "L13b",
+    "L3",
+    "L8"
+   ],
+   "finding_ids": [
+    "L13-14",
+    "L13b-16",
+    "L3-8",
+    "L3-7",
+    "L8-23"
+   ],
+   "listed": 3,
+   "own": 2,
+   "scenario": "A second adopter reads 'the maintainer's approval' in 05 5.3 and 'the operator decided' in 05 5.4 and concludes the product has two roles; agent PRs pick kit or mixin by habit; romeu status prints 'interrupted promotion' and the term is found only in the state-machine section; the vocabulary gate passes because no Not column names the loser.",
+   "change": "Add rows to 01 1.7: operator (the person who runs romeu on a host, owns host settings and answers the gates; Not: user, developer); maintainer (the person who merges and releases the product repository; today the same person as the operator); this specification (Not: the spec, for this document); product kit (Not: mixin; 06 6.4 'Kind: mixin' stays as sbx's field value, in code font); drift (a live derived file whose hash differs from render.json); promotion and interrupted promotion (01 1.6); preflight (01 1.5); recreate needed (Not: stale, for the recreate digest); orphaned (a repo dir no spec names, J13); romeu command (Not: session, in 03 3.6 and 06 6.3). Fill the Not column of existing rows where a rival word is in use. Replace the self-references the gate then flags. Deferred row: a generated glossary page from this table, reopened by the first guide page that needs it.",
+   "cost": "About twelve rows and the substitutions the gate then demands.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "One pass adds the rows the five findings name; rows for 'tool', 'host tool' and 'compatibility check' wait until a rival word is found in use; the glossary generator is deferred."
+  },
+  {
+   "id": "R8-01-34",
+   "section": "01 1.7; ADR 0008; 05 5.4; 06 6.4",
+   "title": "The word sandbox names both the development sandbox this repository is built in (ADR 0008, the operator's keys) and a romeu-managed sandbox (06 6.4, one signing key), with one row in 01 1.7 and no page saying which is meant.",
+   "severity": "Blocking",
+   "lenses": [
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13b-3"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "A security reviewer reads 06 6.4 and concludes this product's own agent can only sign; a contributor reads ADR 0008 and concludes every romeu sandbox forwards the GitHub key; the 05 5.4 token rows are read as the product's security model.",
+   "change": "Add a row to 01 1.7: 'development sandbox | the sbx sandbox this repository is developed in, provisioned outside romeu with the operator's account and keys; ADR 0008 and the token rows of 05 5.4 mean this | -'. Make the sandbox row read 'a sandbox romeu created or adopted for a project'. In 05 5.4 (the two token rows and the Verified-signature row) and the deferred token rows, write development sandbox. Leave the text of ADR 0008 as it stands; the vocabulary row tells its reader which sandbox it means.",
+   "cost": "One row, one cell, about eight substitutions.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply in the spec pages and leave the decision record unchanged, so no ADR edit is needed; 05 5.4 changes wording only, no accepted risk."
+  },
+  {
+   "id": "R8-01-35",
+   "section": "05 5.3; 01 1.7; 12 12.3; 10 10.2",
+   "title": "The vocabulary table and the index's tables are check inputs, yet docs/spec/** is on no ask-first surface, while the generated denylist's path is not named and, if under tools/ci, every vocabulary edit crosses the checks surface.",
+   "severity": "Required",
+   "lenses": [
+    "L3",
+    "L12"
+   ],
+   "finding_ids": [
+    "L3-15",
+    "L12-23"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "An agent PR edits the Not column of 01 1.7 to make its own wording pass and rewrites a 05 5.4 row, with no approval line; or a docs PR adding a vocabulary row needs a checks approval for a word.",
+   "change": "Name the generated denylist's path in 01 1.7 and 12 12.3, outside the checks globs (for example docs/reference/vocabulary.yaml), and either add docs/spec.md and docs/spec/** to .github/ask-first.yaml as a 'specification' surface or state in 05 5.3 why the spec stays off the list.",
+   "cost": "One path; one glob or one sentence in 05 5.3.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Operator: which paths are ask-first is the operator's decision on a security-model surface. Recommendation: name the generated path outside tools/ci, and add the specification surface, since 05 5.4 and the gate inputs live there.",
+   "operator_reason": "Operator: which paths are ask-first is the operator's decision on a security-model surface."
+  },
+  {
+   "id": "R8-01-36",
+   "section": "01 1.7; 04 4.2; J7",
+   "title": "retire moves a project to .attic and never deletes, and nothing tells the owner how to delete what they own (.attic, the state attic, salvage payloads).",
+   "severity": "Required",
+   "lenses": [
+    "L16"
+   ],
+   "finding_ids": [
+    "L16-3"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "Years of retired projects pile up under $ROMEU_ROOT/.attic; the owner wants them gone and finds no word on which directories are safe to remove or whether status or doctor will complain.",
+   "change": "In the 01 1.7 retire row append: 'what retire moves is the owner's to delete by hand (J7 step 4)'. Add J7 step 4: 'once status shows nothing unpushed for the project, the operator may delete $ROMEU_ROOT/.attic/<name>/<ts>/ and $XDG_STATE_HOME/romeu/attic/<name>/<ts>/; romeu never does, and status and doctor do not read them.' Add a test that deletes an attic and runs status and doctor.",
+   "cost": "One clause, one journey step, one test.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply."
+  }
+ ]
+}

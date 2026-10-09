@@ -6,6 +6,8 @@ Date: 2026-10-01
 
 Accepted
 
+Superseded in part by [9. Drop the required review and amend the records that assumed it](0009-drop-the-required-review-and-amend-the-records-that-assumed-it.md)
+
 ## Context
 
 Romeo and Juliet came from two houses that kept to themselves for so

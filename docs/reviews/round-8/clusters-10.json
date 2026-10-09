@@ -1,0 +1,1103 @@
+{
+ "page": "10",
+ "findings_read": 76,
+ "clusters": [
+  {
+   "id": "R8-10-1",
+   "section": "10 10.2 (Release and bootstrap; workflow grammar)",
+   "title": "release.yml cannot pass the workflow grammar it is said to pass: the grammar admits only read or none permissions and no token, while attest, publish, verify and dora --attach need write scopes and a token, and no page says which job holds them, on which runner, or that the job holding them runs none of the change's code.",
+   "severity": "Blocking",
+   "lenses": [
+    "L0",
+    "L13",
+    "L9",
+    "L7",
+    "L2",
+    "L2b"
+   ],
+   "finding_ids": [
+    "L0-1",
+    "L13-1",
+    "L9-1",
+    "L7-3",
+    "L2-4",
+    "L2b-8",
+    "L7-10",
+    "L7-11"
+   ],
+   "listed": 0,
+   "own": 8,
+   "scenario": "L0-1: T088 writes release.yml as 10 10.2 describes; tools/ci workflows fails it on permissions and on the token gh needs; the author widens the grammar in the same PR under an approval line they typed; S1 ships from a grammar nobody designed. | L13-1: The PR that adds release.yml (T088) runs tools/ci workflows: either it fails on the first write permission, or the grammar is loosened on an ask-first surface under release pressure, or the release is built by hand on a laptop and S1's evidence names a run that never produced the assets. | L9-1: T088 writes release.yml with permissions contents: write, id-token: write and attestations: write and a GH_TOKEN for tools/release publish; tools/ci workflows fails it. Written within the grammar, the rc tag run fails at the attestation or publish step, and the tag ruleset leaves no clean retry under the same name. S1 cannot be met. | L7-3: The pull request that adds `release.yml` (T088) cannot pass the gate as specified. It either widens the grammar by hand under release pressure, on an ask-first surface with no written rule for the exception, or the release cannot run (permission needs inferred from the action's and the API's documentation, not read here). | L2-4: T088 lands release.yml; tools/ci workflows fails it; the PR widens the grammar under time pressure with an approval line typed by its author, and the scope of the token that publishes releases is decided inside that PR rather than before it. | L2b-8: release.yml is written with write permissions at the top; tools/ci workflows is widened to pass it; a test merged by the sandbox's token runs in the same job and token as tools/release publish and replaces the archive after checksums.txt is written. | L7-10: A test of the tagged commit rewrites a file that `tools/release build` packs, or, if the OIDC token is reachable in that job, requests an attestation for other bytes. The provenance then truthfully names the workflow and attests the wrong thing. | L7-11: Read literally, four runners each build, attest and try to publish. The release gets duplicate assets or a race, or `tools/release` silently picks one runner by a rule no page states.",
+   "change": "Replace the sentence 'The attestation is a uses step and each of the others is one run step, so the file passes tools/ci workflows' with a release-job rule, and add one row to the grammar table: 'release.yml has two kinds of job. The test jobs run tools/ci all, one per pinned runner, with the read permissions of ci.yml. One publish job, on the pinned ubuntu label, needs all of them and runs tools/release build (Go cross-compiles the four targets), the attestation, tools/release verify, notes, publish and tools/ci dora --attach; it runs no test and no tools/ci step but dora. Only that job, only in .github/workflows/release.yml, may set contents: write, id-token: write and attestations: write at job level, and only its run steps of tools/release publish, tools/release verify and tools/ci dora --attach receive a token, through the single env key GH_TOKEN: ${{ github.token }}. tools/ci workflows refuses each of these in any other file or job, with a fixture per refusal.' Add release.yml to the deferred row about a separate test job, now decided.",
+   "cost": "A paragraph and one grammar row with fixtures in tools/ci workflows; the release token scope is decided now, before T088, on the workflows ask-first surface.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as one paragraph: two job kinds, the publish job alone holding the three write scopes and GH_TOKEN for three named steps, refused elsewhere by tools/ci workflows. Building inside the publish job avoids an archive hand-off between jobs, so no artifact action joins the grammar's list (smaller than L7-10's form)."
+  },
+  {
+   "id": "R8-10-2",
+   "section": "10 10.2 (Release and bootstrap); 05 5.4 (Release signing); S1; J1",
+   "title": "Release signing exists only as a prohibition: no page says what is signed, with which tool, where the signature is published or how a user verifies it, while S1 says the attestation step 'signed them'.",
+   "severity": "Blocking",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-17"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L3-17: v1.0.0 ships with checksums.txt and an attestation; the operator never signs anything because no step says to; three years on an incident asks whether any release was signed and the honest answer is that the spec forbade the wrong way and never described the right one.",
+   "change": "Either write in 10 10.2 'v1 publishes no artifact signature beyond GitHub's provenance attestation' and remove 'signed' from S1 and the signing-credential sentence from 10 10.2 and 05 5.4, or name the signed artifact (checksums.txt), the tool, the publication location and the J1 verification command.",
+   "cost": "A decision on the release ask-first surface and a paragraph; possibly one J1 step.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the first option (no signature beyond the attestation in v1, with a deferred row reopened by the first adopter who asks for one).",
+   "operator_reason": "Rewrites the 05 5.4 'Release signing' accepted-risk row."
+  },
+  {
+   "id": "R8-10-3",
+   "section": "10 10.2 (Release and bootstrap); 12 12.10; ADR 0004",
+   "title": "No page makes a published release immutable: dora.json is replaced on every release by design and 'published and never a draft' leaves assets replaceable, while 06 6.4 refuses a herdr release that is not immutable.",
+   "severity": "Blocking",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-5"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L7-5: An archive of v1.0.0 is re-uploaded to fix a packaging bug. Mirrors and taps that recorded the first sha256 fail, two sets of bytes carry one version, and S1's evidence describes assets that no longer exist.",
+   "change": "In 10 10.2: 'A published release never changes; a fix is a new version. GitHub's immutable releases setting is on (an item of the maintainer block), so tools/release publish creates a draft, uploads every asset, dora.json included, and then publishes.' In 12 12.10 and ADR 0004 dora.json is written once before publishing and no later release replaces an earlier one's asset. Add 'replace an asset of a published release' to the index Never list.",
+   "cost": "A decision touching ADR 0004, one maintainer-block item, words in 10 10.2, 12 12.10 and the index.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend apply. If R8-10-19 (L11-5, dora deferral) is accepted, the dora part falls away and the rest is spec text.",
+   "operator_reason": "Changes ADR 0004's replace-on-every-release design for dora.json."
+  },
+  {
+   "id": "R8-10-4",
+   "section": "10 10.5; 10 10.2 (Release and bootstrap); index: Success criteria",
+   "title": "The four end-of-plan completeness checks (S6 tags, probe results, a guide per journey, the block B commit rule) run once, after v1.0.0 is public; a failure then has no path, and after v1.0.0 nothing re-checks them or says what a later release promises.",
+   "severity": "Blocking",
+   "lenses": [
+    "L8",
+    "L9",
+    "L6",
+    "L3"
+   ],
+   "finding_ids": [
+    "L8-1",
+    "L9-4",
+    "L6-31",
+    "L3-30"
+   ],
+   "listed": 0,
+   "own": 4,
+   "scenario": "L8-1: v1.2 adds a journey J14 and changes the output of romeu salvage; tools/ci all and release.yml pass; the J14 guide does not exist and the J6 guide shows output no one has seen since the release candidate, while ADR 0001 rule 13 still passes because it only compares command words with commands.yaml. | L9-4: An invariant row whose test was never tagged, or a probe nobody ran (11 11.4: 'noticed only there'), surfaces in T102 after v1.0.0 is public. The release no longer meets S6 or S10, and the spec defines neither a yank nor a v1.0.1 path. | L6-31: A guide page is removed in v1.1; S10's guide-per-journey check ran once before v1.0.0; nothing is red. | L3-30: v1.1 ships with S8's budget exceeded; the acceptance file still says pass for v1.0.0; nobody can say what v1.1 promised.",
+   "change": "In 10 10.5 replace 'No release workflow reads the file, so a later release does not verify it again' with: 'The four checks run before the v1.0.0 tag (acceptance --pre-tag in release.yml) and, from the commit that adds docs/acceptance.json, in tools/ci all on every pull request: the reason to keep them out of all ends with the plan. docs/acceptance.json is the record of v1.0.0 and is not rewritten; a later release is held to the four checks through all and states any new criterion in its release notes. A check that fails after a tag is fixed by a new patch version.'",
+   "cost": "Three sentences and a release-stage switch in tools/ci acceptance; no pending-ids file.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the smaller form: the checks move into all once the plan ends, run once before the tag, and a post-tag failure is a patch release; L9-4's pending-ids file is not added."
+  },
+  {
+   "id": "R8-10-5",
+   "section": "10 10.2 (lint row, hygiene row, Forbidden names); ADR 0007",
+   "title": "About 330 lines of 10 10.2 restate tool configuration in prose, with pinned versions and commit ids (mise 2026.10.3, revive v1.17.0, golangci-lint 2.14.0, cab976e, fsfe/reuse:6.2.0) in table cells of several hundred words, which nothing holds equal to tools/ci and mise.lock.",
+   "severity": "Blocking",
+   "lenses": [
+    "L3",
+    "L8"
+   ],
+   "finding_ids": [
+    "L3-2",
+    "L8-16"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "L3-2: mise.lock bumps golangci-lint; the lint row of 10 10.2 still describes the previous version's checkers and the revive internals; an agent asked to add a lint rule reads the row, implements against it, and the fixture test of ADR 0001 rule 14 fails for a reason the spec cannot explain; the PR body then quotes the stale row as evidence. | L8-16: A contributor with a red lint step searches 10 10.2 and has to read one table cell of several hundred words; after a golangci-lint bump the cell names a revive version that is no longer pinned.",
+   "change": "In 10 10.2 replace each pinned version or commit id with the file that pins it ('the version mise.lock locks', 'the digest pinned in tools/ci'); split the lint and hygiene cells into prose subsections with one rule per line; keep the step table, the grammar's rationale and the limits. Write a generated docs/reference/ci.md from tools/ci's help as the trigger of the step-table deferred row, built when the first rule changes after v1.",
+   "cost": "An editing pass on 10 10.2; no generator and no new docs rule now.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the deletion of pinned facts and the one-rule-per-line split; the generated reference and the docs rule on version strings wait as the deferred row's trigger."
+  },
+  {
+   "id": "R8-10-6",
+   "section": "10 10.2 (lint row); 12 12.1; ADR 0007 rule 8; ADR 0001 Consequences",
+   "title": "What mise may install is stated four ways that disagree (the lint row's three tools, ADR 0007 rule 8's two, gh in mise.lock per 12 12.1 and the plan, ADR 0001's Markdown tools through mise.lock against 12 12.1's reuse image).",
+   "severity": "Blocking",
+   "lenses": [
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13b-4"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L13b-4: The task that lands tools/release verify (T088) adds gh to mise.toml; the lint test of 10 10.2 fails on a tool outside its three; the author loosens the test, types the approval line for the checks surface (05 5.4 says the author types it) and merges, which is the loosening the test existed to refuse; or gh is started through mise exec, the call form 10 10.2 says runs a search-path program with exit 0 when the tool is missing.",
+   "change": "Write the allowed [tools] set once in 12 12.1, with gh in or out by decision; the 10 10.2 lint row says the test reads that list; ADR 0007 rule 8 and ADR 0001 Consequences point at it; 12 12.1 says whether tools/release follows tools/ci's 'never through mise exec' rule.",
+   "cost": "One decision (gh in mise.lock or not), one list with three pointers, the lint test reading a list.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend gh in mise.lock, listed once in 12 12.1, with tools/release starting it by its resolved path rather than mise exec.",
+   "operator_reason": "Changes ADR 0007 rule 8 and ADR 0001 Consequences."
+  },
+  {
+   "id": "R8-10-7",
+   "section": "10 10.2 (maintainer block, pre-push hook); 12 12.4; 05 5.4; ADR 0008",
+   "title": "The maintainer's host runs agent-written tools/ci at whatever main holds, through the tracked pre-push hook, hygiene add and the result pushes of blocks O3 and O6, while the only written control (read the diff in a plain clone) covers the bootstrap sitting alone.",
+   "severity": "Blocking",
+   "lenses": [
+    "L2"
+   ],
+   "finding_ids": [
+    "L2-1"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L2-1: A hostile test or helper lands in tools/ci in a PR that an agent merges with the operator's token (ADR 0008 decision 4); the maintainer later pushes probe results from a plain host clone with core.hooksPath=.githooks (plan O3), the hook runs go run ./tools/ci fast at main with the maintainer's user, keychain and SSH agent, and the host is the attacker's; romeu executed nothing and every invariant of 05 5.2 still passes.",
+   "change": "In 10 10.2 beside the maintainer block: 'The host runs tools/ci, hygiene add included, only from a commit whose diff since the last host run the maintainer has read, or from the last released tag.' Add the row to 05 5.4 with that control, the Never entry to the index Boundaries, and the host to ADR 0008's Consequences.",
+   "cost": "About forty words in four places, one 05 5.4 row, one ADR 0008 note.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend apply.",
+   "operator_reason": "Adds an accepted risk to 05 5.4 and extends ADR 0008's Consequences."
+  },
+  {
+   "id": "R8-10-8",
+   "section": "10 10.2 (maintainer block item a); 05 5.4; 12 12.4; 12 12.9; ADR 0001 rule 8; ADR 0003; ADR 0008",
+   "title": "The merge-ruleset fact (no review is required) was patched into four places beside the rule it negates, and ADR 0001 rule 8 and ADR 0003 still describe a code-owner review that does not exist.",
+   "severity": "Blocking",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-5"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L3-5: An agent implementing T005 reads 12 12.4's merge row, which says 'one approving review, dismissed by a later push; code-owner review for ask-first paths' and, in the same cell, that the ruleset requires no review; it implements the approval line as if a reviewer will read it, and the PR body cites ADR 0001 rule 8 as the guarantee; three years on nobody can tell which sentence was true when.",
+   "change": "State the merge requirements once, in 05 5.4; 10 10.2 item a, 12 12.4 and 12 12.9 say only 'the merge requirements and what they are worth are in 05 5.4'; ADR 0001 rule 8 and ADR 0003 gain the Status line 'Superseded in part by ADR 0008 for the review requirement', and ADR 0001 rule 7 admits that form.",
+   "cost": "Words in four sections, one status form, one sequences clause.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend apply; the spec side is mechanical.",
+   "operator_reason": "Changes the status of ADR 0001 and ADR 0003 and the ADR 0001 rule 7 form, which ADR 0008 chose not to rewrite."
+  },
+  {
+   "id": "R8-10-9",
+   "section": "10 10.5 (--file, repo evidence); 00 0.5; 04 4.3; 08 8.1; 11 11.2; I24",
+   "title": "The generic product carries one person's migration and acceptance: julieta memory import and verify, the import/ directory, the memory-entry digest kind, the repo evidence kind, acceptance --file and the C1 hugo check.",
+   "severity": "Blocking",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-4"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L11-4: 00 0.5 justifies import and verify by 'the maintainer decided that memory entries written before v1 are imported when v1 is adopted, once'; 10 10.5 says --file lets an operator verify 'repositories that must be archived'; C1 checks that aqua:gohugoio/hugo is the extended variant. The second adopter (00 0.2) installs a product whose reference pages document commands and an evidence kind that apply to nobody but the author, and whose acceptance includes a tool they do not use.",
+   "change": "Delete the import and verify commands, the import/ allowlist entry, the memory-entry digest kind, the repo evidence kind, --file and C1, and do the one-time import with a script in the operator's config repo; or, if kept, 00 0.5 states why a generic product needs each and the reference marks them operator-only.",
+   "cost": "Deletions in 00, 03, 04, 08, 10, 11; the plan loses T058 and parts of T090 and T082.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend deletion.",
+   "operator_reason": "Changes the scope decision recorded in 00 0.5."
+  },
+  {
+   "id": "R8-10-10",
+   "section": "10 10.2 (Release and bootstrap); index: Deferred decisions; S1; J1",
+   "title": "'The release workflow file must not come from the tagged commit' is fixed while its mechanism is deferred, and S1's evidence ('a ci-run of release.yml on the tagged commit') and J1's signer-workflow flags assume the opposite, so T088 must break one of them.",
+   "severity": "Required",
+   "lenses": [
+    "L0",
+    "L7"
+   ],
+   "finding_ids": [
+    "L0-41",
+    "L7-8"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "L0-41: T088 chooses between the two sentences; whichever it picks, one of S1's evidence or the fixed rule is wrong. | L7-8: T088 picks a `workflow_dispatch` from `main`. The signer workflow's ref becomes `refs/heads/main` and the J1 flags that pin the tag have to change, but the journey, B1 and the guide were written earlier for the tag form.",
+   "change": "Name the mechanism in 10 10.2 now: 'release.yml runs on workflow_dispatch from main with the tag as its input, and refuses a tag whose commit is not on main.' Reword S1's evidence to 'a ci-run of release.yml for the tag', write J1's verify command with the --signer-workflow and main ref this implies, and close the deferred row with a link to the paragraph.",
+   "cost": "A decision now instead of at T088; three sentences in 10 10.2, S1 and J1; one deferred row closed.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "operator_reason": "Answers an index deferred decision (the release workflow's mechanism), which stage A shapes and never answers, and changes S1, a success criterion; routed to the operator as SC17 by the gate review of the round page.",
+   "resolution_text": "Decide workflow_dispatch from main with the tag as input; S1 and J1 follow; the deferred row closes. If the deferral is kept instead, the smaller form drops 'on the tagged commit' from S1 and the ref-specific flags from J1 until the row is decided."
+  },
+  {
+   "id": "R8-10-11",
+   "section": "10 10.5; 05 5.4 (tag row); 10 10.2 item d",
+   "title": "Nothing records the commit a release tag named at publication, so a v* tag the token deletes and recreates on another commit is rebuilt and attested with no check noticing that the version moved.",
+   "severity": "Required",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-6"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L7-6: The token deletes `v1.0.0` and recreates it on another commit (create and delete measured as accepted, 10 10.2 item d). `release.yml` builds and attests the new commit, and no check, record or acceptance item notices that the version moved.",
+   "change": "Add to 10 10.5 an acceptance check: 'for each release, the tag's commit equals the source digest in its attested provenance'. State in the 05 5.4 token row that a moved tag goes undetected until that check runs.",
+   "cost": "One acceptance check and one sentence in 05 5.4.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend apply; with the acceptance checks moved into all (R8-10-4), the check runs on every pull request after v1.0.0.",
+   "operator_reason": "Changes the 05 5.4 accepted-risk row on v* tags."
+  },
+  {
+   "id": "R8-10-12",
+   "section": "10 10.5; 11 11.4",
+   "title": "The end-of-plan check requires results only for probes named in the index's Settled by column, so A2, A3, A5, A6, A9 and A14, A3 among them, can be skipped unnoticed.",
+   "severity": "Required",
+   "lenses": [
+    "L0"
+   ],
+   "finding_ids": [
+    "L0-18"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L0-18: Block A is run under time pressure and A3 is deferred; every later check passes; v1.0.0 is accepted with the read-only mount enforcement never observed on a real host.",
+   "change": "In 10 10.5 replace 'every probe named in the \"Settled by\" column of the index's Open questions has a committed result' with 'every probe id of 11 has a committed result'; keep 'from both hosts when the probe is arch-sensitive'; make 11 11.4's 'noticed only there' match.",
+   "cost": "One sentence in 10 10.5 and one in 11 11.4.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-13",
+   "section": "10 10.3; 04 4.1; 04 4.2; 11 11.2; 11 11.4; 12 12.1",
+   "title": "Nothing says what romeu does on an sbx newer than every recording or when its output no longer parses, and nothing re-records or re-checks recordings and probe results after block A, so sbx drift stays green in CI and surfaces as a wrong error on a user's run.",
+   "severity": "Required",
+   "lenses": [
+    "L10",
+    "L4",
+    "L15",
+    "L6",
+    "L3"
+   ],
+   "finding_ids": [
+    "L10-17",
+    "L4-24",
+    "L15-4",
+    "L6-17",
+    "L3-19"
+   ],
+   "listed": 1,
+   "own": 4,
+   "scenario": "L10-17: An adopter's sbx auto-updates to a release that renames a sbx ls --json field. romeu approve --toolchain accepts it, then run fails in sbxdrv parsing with an error that names no version problem. | L4-24: sbx renames the workspace path field; romeu parses an empty path and refuses every sandbox with RJ-203, or reads no sandbox at all and enters the absent rows of 01 1.6 (L4-3). | L15-4: Four sbx releases after v1.0.0, CI still replays the 0.46 sessions and stays green. Users run parsers and argv shapes tested only against 0.46, and the first sign of a renamed `sbx policy` flag (04 4.2 run step 4) is a failed `run` on a user's machine. | L6-17: An sbx patch release renames a field of sbx ls --json; the recordings still carry the old name; CI passes; the first user with the new sbx sees RJ-203 on every run. | L3-19: The first sbx floor bump after v1 commits a second recording set; the block A results are overwritten or left naming the old version; tools/ci probes passes on results that never saw the new sbx; the A5 golden hashes stay recorded against a plan output sbx no longer accepts.",
+   "change": "Replace the Floor bumps row of 10 10.3 with a row 'Tested window': 'The recorded versions are the tested window, named in 12 12.1 and SECURITY.md. An sbx newer than the newest recording is a doctor warn and a gate 1 notice naming the window. An sbxdrv parse failure or a missing field is its own error (exit 2, \"sbx output not understood\", a new RJ id in 04 4.1), and no state transition follows it. Each recording set and each probe result names its sbx version and capture date. Block B replays every recorded argv shape against the candidate's sbx and diffs the output shape; a new sbx minor release, or a floor bump, re-records A4, A5 and A9 before the window widens. tools/ci probes flags a result or golden whose sbx version is outside the window.'",
+   "cost": "One table row, one error id, one doctor warn, one block B step, a version field on results.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply as one 'Tested window' row merging the five proposals; no 'stale' lifecycle state is added (the version field and the window check replace it), and the window widens only by re-recording."
+  },
+  {
+   "id": "R8-10-14",
+   "section": "10 10.3 (Known argv); 11 11.1; 01 1.6",
+   "title": "Neither 10 10.3 nor 11 11.1 lists the argv shapes and starting sessions block A must record, failure sessions included, so a command or a generation-machine failure row can find itself without a recording after the one two-host sitting.",
+   "severity": "Required",
+   "lenses": [
+    "L12",
+    "L4"
+   ],
+   "finding_ids": [
+    "L12-11",
+    "L4-28"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "L12-11: After block O3 a command task finds that sbx env exec without -it, or sbx stop, or a policy rm, is in no recording; its e2e cannot run until the maintainer sits again with both hosts, weeks later. | L4-28: The rows \"sbx env run returns non-zero\", \"sandbox found absent\" and a failed sandbox half are never exercised outside the host suite, and B3 has no journey for them.",
+   "change": "Add to 11 11.1 the table T019 drafts: one row per sbx call of 04 4.2 and 07 7.5 (the non-interactive env exec included), the starting sessions of the five CI journeys plus adopt, stop, pull, salvage alone and recreate, and one failure session per failure row of 01 1.6 (an ls error, an exec timeout, a VM that does not start). 10 10.3 Known argv links it and says a builder with no row is a sync error of the fake, found by a unit test before block A runs.",
+   "cost": "One table (already drafted as T019) and one sentence.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-15",
+   "section": "10 10.3 (Redaction)",
+   "title": "Redaction removes only home path, user name, host name and root path, while block A records the real global git config and sbx global rules into a public repository, where emails and internal hosts would be published for good.",
+   "severity": "Required",
+   "lenses": [
+    "L16"
+   ],
+   "finding_ids": [
+    "L16-12"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L16-12: The maintainer's global git config holds a work email and a url.insteadOf for a company git host, and sbx has a global allow rule for an internal registry; T026 commits the recordings, and those values are public for good.",
+   "change": "Replace the first clause of the Redaction row with: 'the recorder keeps real values only for the harness's own sandboxes and env dirs and writes typed placeholders for every other row of a listing; git config, trust settings and key listings go through typed parsers; a unit test plants an email, an internal url.insteadOf host and a foreign global rule and asserts none reaches the file'.",
+   "cost": "One table cell and the recorder work plan.md question 8 already proposes.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed; the harm is irreversible, so it lands before T026 commits recordings."
+  },
+  {
+   "id": "R8-10-16",
+   "section": "10 10.2 (tools/ci output; Forbidden names)",
+   "title": "tools/ci has no failure-output contract: refusals carry no id or fix line, are addressed to 'the operator' when the pusher may be an agent or a stranger, a forbidden-name hit gives no way forward, and the minutes-long pre-push prints no progress.",
+   "severity": "Required",
+   "lenses": [
+    "L14",
+    "L5"
+   ],
+   "finding_ids": [
+    "L14-7",
+    "L5-27",
+    "L5-28"
+   ],
+   "listed": 0,
+   "own": 3,
+   "scenario": "L14-7: A stranger's PR goes red in `pr` with 'commit abc, field author: forbidden name' because their own name holds a hashed segment; nothing says what to do, and 10 10.2 calls it 'a cost of the check'; their local `fast` had already refused to run because their packaged mise is one version off. | L5-27: The agent pushes; the hook runs for four minutes; the agent's tool call times out at two and reports the push as failed; the agent retries, now racing the first run's judging step, and the second run refuses because HEAD 'moved'. | L5-28: A commit message line with twelve words is refused; the agent rewrites it three times, each a multi-minute pre-push, and the third rewrite still holds the two words that happen to form the halves.",
+   "change": "Add to 10 10.2: 'Every tools/ci failure line carries the step, a rule id, the location and a fix line addressed to the pusher, and each step prints one progress line. For a forbidden-name hit the fix line reads \"reword this line; after one refused rewrite, or if it is your own identity, hand the location to the maintainer, who re-authors the commit\"; for mise it prints the exact version and the install command; for a prose hit in an old commit message, the rebase instruction.'",
+   "cost": "A message table in tools/ci and a paragraph; matchers unchanged; no --json.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply without --json and without a public error-id table (tools/ci is not a product interface); the fix lines and progress lines are the whole change."
+  },
+  {
+   "id": "R8-10-17",
+   "section": "10 10.2 (vulnerabilities row); 10 10.8; 12 12.8",
+   "title": "A merge gate whose result depends on the date (govulncheck in all) or on a flake leaves no owner for a red leg the change did not cause, and every open pull request turns red at once.",
+   "severity": "Required",
+   "lenses": [
+    "L14",
+    "L12"
+   ],
+   "finding_ids": [
+    "L14-8",
+    "L12-19"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "L14-8: An advisory for a dependency lands on a Tuesday and every open PR, the stranger's included, goes red in `vulnerabilities`; the stranger cannot fix go.mod (dependencies surface) and nothing says whether to wait, rebase or close. | L12-19: Eight pull requests are green; one merges; the other seven are stale against main and a new vulnerability advisory makes all of them red the same morning; each agent re-runs all and waits for the maintainer again.",
+   "change": "Add to 10 10.2 beside the vulnerabilities row: 'A red leg caused outside the change (an advisory, a flake, an upstream outage) is fixed on main by one pull request, owned by whoever first sees it; open pull requests rebase after it and are not fixed one by one.' CONTRIBUTING (12 12.8) repeats it in one line.",
+   "cost": "Two sentences and a CONTRIBUTING line; no merge queue.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the ownership rule; re-gating on the merge result (a merge queue) is stated as a limit, since it is a repository setting on the ruleset surface."
+  },
+  {
+   "id": "R8-10-18",
+   "section": "10 10.2 (maintainer block); 05 5.4; index (Status)",
+   "title": "History has moved into the current-state spec: the maintainer block mixes dated measurements and done items with steps still to do, and the removal of the required review sits inside item a.",
+   "severity": "Required",
+   "lenses": [
+    "L3",
+    "L9"
+   ],
+   "finding_ids": [
+    "L3-16",
+    "L9-26"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "L3-16: In year three the index's status paragraph lists twelve rounds, 05 5.4's token row is a page, and a reader cannot find the current rule for a merge without reading what was measured on which day. | L9-26: A new session reruns item d's tries, or skips item e, because the text reads as a to-do list.",
+   "change": "Move items a to e's dated results and the Try/Result table out of 10 10.2 into ADR 0008 or a docs/ note it links; keep in 10 10.2 only the ruleset requirements in force and the items still to do, each marked 'to do'. The 05 5.4 and index parts of L3-16 follow on their own pages.",
+   "cost": "Words moved; no sequences clause.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the 10 10.2 part: the maintainer block keeps only current requirements and to-do items; the bound on deferred-row length is left to the index consolidation. Moving results into ADR 0008 itself would change a record, so a linked docs/ note is the default."
+  },
+  {
+   "id": "R8-10-19",
+   "section": "10 10.2 (dora --attach); 12 12.10; ADR 0004; 00 0.2",
+   "title": "tools/ci dora, a five-metric delivery tool, is a v1 deliverable for a repository with one contributor and no release, while its own ADR says nothing is lost by waiting.",
+   "severity": "Required",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-5"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L11-5: ADR 0004: 'every run reads the whole history, so nothing is lost by the wait'; 12 12.10: 'until the first release the five metrics are empty'; the Deferred table waits for three releases before targets mean anything; the only team user is 'Future' (00 0.2). The tool lands at ci-release and gates the release candidate.",
+   "change": "Move tools/ci dora to the Deferred table ('until then the review judges the three rows of 12 12.9 that cite it; reopened by the third release or the first lesson that cites a delivery number'); keep ADR 0004 Accepted as the design and the Fixes-release trailer check in pr; drop dora --attach from the 10 10.2 release paragraph.",
+   "cost": "One row; the plan loses T089 and one release.yml step.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend deferring; it also simplifies R8-10-1 and R8-10-3.",
+   "operator_reason": "Removes from v1 a deliverable ADR 0004 adopted."
+  },
+  {
+   "id": "R8-10-20",
+   "section": "05 5.3; 10 10.2; 12 12.3",
+   "title": "docs/spec/** is on no ask-first surface while two checks read its tables as input (tools/ci vocabulary from 01 1.7, sequences from the index), so gate inputs sit outside the gate.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-15"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L3-15: An agent PR edits the Not column of 01 1.7 to make its own wording pass tools/ci vocabulary and rewrites a residual-risk row of 05 5.4 in the same change; no approval line is required, the ruleset requires no review, and the change merges.",
+   "change": "Either move the two check inputs into data files under tools/ci rendered into the spec, or add docs/spec.md and docs/spec/** to .github/ask-first.yaml as a 'specification' surface; state the choice in 05 5.3.",
+   "cost": "A decision on an ask-first surface, one glob or two data files.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend the data-file option, which puts the inputs on the existing checks surface.",
+   "operator_reason": "Changes the ask-first surface set of 05 5.3."
+  },
+  {
+   "id": "R8-10-21",
+   "section": "02 2.1; 10 10.2",
+   "title": "tools/ci has about 25 subcommands and 30 tasks in one tree with no internal layout, and every generator is wired through one generate.go, so the phase 0 and 1 tasks conflict pairwise.",
+   "severity": "Required",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-17"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "L12-17: T004, T005, T006, T010, T011, T014 and T020 land in phases 0 and 1; each adds a subcommand to the same dispatcher file and a generator to the same generate.go, and every pair conflicts.",
+   "change": "In 02 2.1 give tools/ci one package per step under tools/ci/internal/<step>, registered in a dispatcher table, and let tools/ci/generate.go call one list per package.",
+   "cost": "A tree entry and a sentence.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed; ADR 0007 rule 8's single go:generate site stays."
+  },
+  {
+   "id": "R8-10-22",
+   "section": "10 10.8",
+   "title": "Done requires tools/ci all, but nothing says which steps can run inside an agent's sandbox (license pulls an image, container and hybrid e2e need Docker and network, vulnerabilities reads a database).",
+   "severity": "Required",
+   "lenses": [
+    "L5"
+   ],
+   "finding_ids": [
+    "L5-29"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L5-29: The agent finishes a task, runs `all` in its sandbox, and `license` and the e2e fail on blocked registry hosts; it either reports done with failing steps or stalls; the maintainer learns the hosts one at a time.",
+   "change": "Add to 10 10.8 a short table of the steps that need hosts or Docker, with the one sbx policy allow set they need, and: 'a step that cannot run in the sandbox is reported as \"not run: <step>, <reason>\", and the task is done only when CI runs it'.",
+   "cost": "A short table and one sentence.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-23",
+   "section": "10 10.1 (Rules); 10 10.6 (Tests)",
+   "title": "'Flaky tests are fixed, never skipped' has no mechanism: nothing forbids t.Skip, t.SkipNow, t.Skipf or testing.Short.",
+   "severity": "Required",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-5"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L6-5: A golden test gains if runtime.GOOS == darwin { t.Skip() } to quiet a macOS failure; all is green on four runners and the macOS output is never compared again.",
+   "change": "Add to TestTestStyle in 10 10.6 a failure on any call to t.Skip, t.SkipNow, t.Skipf or testing.Short and on a TestMain not ending in os.Exit(m.Run()); cite it from 10 10.1's rule.",
+   "cost": "A few lines in one unit test.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-24",
+   "section": "10 10.1 (Rules)",
+   "title": "An absent precondition of the hybrid and container levels (Docker daemon, image digest, herdr binary, mise download) has no stated outcome, so a step that cannot start can exit 0.",
+   "severity": "Required",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-6"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L6-6: A runner image update leaves the Docker daemon absent on ubuntu-26.04-arm; tools/ci selects the hybrid step by OS, the step cannot start, and all exits 0 for weeks while I30 regresses on arm64.",
+   "change": "In 10 10.1 Rules: 'a precondition that cannot be met (Docker, the image digest, the herdr pin, the mise download) is a red job with its own exit code, never a skip; a digest or checksum mismatch is always a test failure'.",
+   "cost": "A paragraph.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-25",
+   "section": "10 10.2 (step table)",
+   "title": "Steps that run on some runners only are selected inside tools/ci and nothing asserts what ran, so a selection that runs nothing, or the wrong subset, is green.",
+   "severity": "Required",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-7"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L6-7: The architecture check that selects the container step misreads a new label; the Linux runner runs the macOS subset; S7's five CI journeys never execute and the run is green.",
+   "change": "Add to 10 10.2: 'the steps each runner class runs are a table in tools/ci with a unit test, and a step whose go test -json reports zero tests fails'.",
+   "cost": "One table and one comparison; no per-test manifest.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the smaller form: the selection is data with a test, and a zero-test step fails; a per-test expected manifest waits for a measured miss."
+  },
+  {
+   "id": "R8-10-26",
+   "section": "10 10.2 (step table)",
+   "title": "No step of all compiles the host suite, so a host suite that does not build is found at block B and forces a new candidate.",
+   "severity": "Required",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-13"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L6-13: A scenario signature changes in T068; e2e/host still calls the old one; all is green; block O6 fails to compile on the maintainer's Mac and the candidate is redone.",
+   "change": "Add a row to 10 10.2: 'go vet -tags host ./e2e/host/... and go vet -tags e2e ./e2e/... on every runner'.",
+   "cost": "One row, seconds per run.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-27",
+   "section": "10 10.2 (race and e2e rows)",
+   "title": "The race run omits -tags e2e and the e2e step has neither -race nor -count=1, so subprocess-heavy paths miss the race detector and e2e can be served from the test cache.",
+   "severity": "Required",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-14"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "L6-14: A data race in sbxdrv's output reader appears only when romeu drives the fake sbx end to end; no -race run covers that path and the e2e step passes.",
+   "change": "Write the e2e step as go test -race -count=1 -tags e2e ./e2e/..., with the unit row's reason for -count=1.",
+   "cost": "Two flags; e2e time grows under -race.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-28",
+   "section": "10 10.2 (subcommands outside all)",
+   "title": "Nothing says what a red scheduled fuzz.yml (fuzz, mutate) does: no required check, no issue, no release block.",
+   "severity": "Required",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-18"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L6-18: mutate goes red on a Tuesday night for a guard of sbxdrv (no ask-first surface, so no PR run); nobody reads scheduled runs; the next release ships the weakened guard.",
+   "change": "State in 10 10.2: 'release.yml refuses to build when the latest scheduled fuzz.yml run on main is not success'.",
+   "cost": "One API read in tools/release, one sentence.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-29",
+   "section": "01 1.7; 10 10.2; 05 5.3; 05 5.4; 00 0.2",
+   "title": "The same person is 'operator', 'maintainer', 'developer' and 'user' across pages, none of them in the vocabulary.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-8"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "L3-8: A second adopter reads 'the maintainer's approval' in 05 5.3 and 'the operator decided' in 05 5.4 and concludes the product has two roles, one of which they must find or invent, and files an issue asking who the maintainer of their machine is.",
+   "change": "Add to 01 1.7 the rows operator (runs romeu on a host and answers gates) and maintainer (merges and releases the product repository), and the sentence that today one person holds both; use each word in its sense only, and write 'operator' for 'developer' and 'user' in 00 0.2.",
+   "cost": "Two rows and a word pass.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-30",
+   "section": "02 2.5; 02 2.4; 10 10.6; 04 4.1",
+   "title": "Four universal claims are refuted by the spec's own tables, 10 10.6's 'every lifecycle is a transition table in internal/state' beside the probe lifecycle in tools/ci among them.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-21"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L3-21: A contributor trusts 'never guesses paths' and adds a fifth $HOME path without touching the manifest; another trusts 'schema in schemas/' and parses romeu status --json against a schema that does not exist.",
+   "change": "In 10 10.6 write 'every lifecycle of host state'; in 02 2.5 'derived from $HOME' for the four paths; in 02 2.4 'the only override of the settings path'; for 04 4.1 add the missing schemas to 02 2.1 or drop the clause.",
+   "cost": "Words; possibly five schemas.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-31",
+   "section": "10 10.7; 02 2.1",
+   "title": "The module-boundary table says nothing about a package in no row, so tools/ci imports is fail-open for every new package.",
+   "severity": "Required",
+   "lenses": [
+    "L3"
+   ],
+   "finding_ids": [
+    "L3-25"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L3-25: A PR adds internal/notify, imported by both binaries, which imports sbxdrv to read sandbox state; no row covers notify; imports passes; julieta now links the only code that runs sbx.",
+   "change": "Add to 10 10.7: 'a package under internal/ that no row names fails tools/ci imports'; replace 02 2.1's '(romeu only)' comments with a link to 10 10.7.",
+   "cost": "One sentence and the check behaviour.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-32",
+   "section": "10 10.3 (Cannot model); 12 12.9",
+   "title": "Field bug classes sit under 'Cannot model' with no seam, so test-first cannot apply to their fixes and a stranger cannot contribute the recording that would make the bug testable.",
+   "severity": "Required",
+   "lenses": [
+    "L14"
+   ],
+   "finding_ids": [
+    "L14-9"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L14-9: A stranger reports `run` hanging on sbx 0.48 during create; a fix needs a recording of that version (10 10.3 Floor bumps) and only block A, run by the maintainer, records; the fix waits for a sitting on both Macs and its PR has no failing test.",
+   "change": "Add to 10 10.3: 'a recording anyone makes with the probe harness (--only), through the recorder's redaction, may be attached to an issue and is committed by the maintainer after reading it'; in 12 12.9: 'a fix for a Cannot-model class replays such a recording, or says under Evidence why none exists'.",
+   "cost": "Two sentences.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed, after the redaction fix of L16-12."
+  },
+  {
+   "id": "R8-10-33",
+   "section": "10 10.2 (vulnerabilities row); ADR 0001 rule 5",
+   "title": "govulncheck reads the network inside all while ADR 0001 rule 5 says all stays offline, so a local all without network is not the equivalent run 10 10.2 requires.",
+   "severity": "Advisory",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-27"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L6-27: The maintainer chooses local gates during an Actions outage on a machine without network; vulnerabilities fails or is skipped; the run is called equivalent.",
+   "change": "Say in 10 10.2 and ADR 0001 rule 5: 'all is offline except vulnerabilities; a local run without it is not equivalent and says so'.",
+   "cost": "Two sentences, one in an ADR.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend apply; the 10 10.2 sentence alone can land now.",
+   "operator_reason": "Amends ADR 0001 rule 5."
+  },
+  {
+   "id": "R8-10-34",
+   "section": "10 10.2 (hygiene row, pushed range row, Forbidden names); 12 12.4",
+   "title": "Two product CI rules encode one person's working agreement without explaining it: no tracked PROLOGUE.md because 'the user's agreement file' lives elsewhere, and a hashed denylist whose class of names and false-positive contact are not stated.",
+   "severity": "Advisory",
+   "lenses": [
+    "L13",
+    "L10"
+   ],
+   "finding_ids": [
+    "L13-30",
+    "L10-22"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "L13-30: A second adopter reads a product CI rule it cannot understand, or removes it as noise and the maintainer's private file is committed. | L10-22: An outside contributor whose email contains a denylist segment pushes. The hook refuses by location only and never prints the match, so they cannot tell what to change.",
+   "change": "In 10 10.2 replace the PROLOGUE.md clause and its reason with 'no tracked file whose name is on the never-tracked list in tools/ci/denylist.yaml', and move PROLOGUE.md onto that list; 12 12.4 says the same. In Forbidden names add: 'the list holds names of other projects this repository must not mention; a false positive is reported in an issue and the maintainer adjusts the entry'.",
+   "cost": "About twenty words and one list entry.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply: the name becomes data in the existing denylist mechanism, and the class and contact are one sentence."
+  },
+  {
+   "id": "R8-10-35",
+   "section": "10 10.2 (step table)",
+   "title": "Neither fast nor all has a time budget, so the pre-push loop and the macOS legs can grow unnoticed until contributors push with --no-verify or the Actions quota runs out onto the maintainer's two machines.",
+   "severity": "Advisory",
+   "lenses": [
+    "L14",
+    "L12"
+   ],
+   "finding_ids": [
+    "L14-18",
+    "L12-18"
+   ],
+   "listed": 1,
+   "own": 1,
+   "scenario": "L14-18: The pre-push `fast` grows to fifteen minutes as lint runs per target and tests multiply; no number fails, and contributors push with --no-verify, which 10 10.2 treats as the backstop case. | L12-18: Phase 4 opens ten pull requests; the macOS legs exhaust the quota; the spec's fallback is a local run on each OS and architecture, which means the maintainer's laptops that block O3 also needs.",
+   "change": "Add to 10 10.2 next to the step table: 'fast targets three minutes on a warm cache; tools/ci prints each step's duration and warns above it.' Add a deferred row 'per-pull-request runner budget; reopened by the first month the Actions quota runs out'.",
+   "cost": "One number, a duration line per step, one deferred row.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply one number for fast and a deferred row for the runner budget; no Linux-only split now."
+  },
+  {
+   "id": "R8-10-36",
+   "section": "10 10.2 (Runners); S2",
+   "title": "Runner labels are pinned, but GitHub retires labels and changes images under a fixed label, and the spec neither names the event nor bounds what the release takes from the image.",
+   "severity": "Advisory",
+   "lenses": [
+    "L15",
+    "L7"
+   ],
+   "finding_ids": [
+    "L15-20",
+    "L7-28"
+   ],
+   "listed": 0,
+   "own": 2,
+   "scenario": "L15-20: A pinned macOS image is retired. Every run of ci.yml fails on that leg, S2 cannot be met for the next release, and changing the label is an ask-first workflow change made under pressure. | L7-28: Two runs of `release.yml` on one tag, a week apart, run on different images, and with L7-7 they run a different `gh`.",
+   "change": "Add to 10 10.2 Runners: 'A retirement notice or a failed leg replaces the label by a reviewed change, which names any coverage that moves to the host suite; S2 means the runner list at the release commit. The release takes no tool from the image beyond the shell and git, and the run records the image version.'",
+   "cost": "One paragraph and a few words in S2.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-37",
+   "section": "10 10.1 (container e2e cache); 10 10.2 (grammar)",
+   "title": "The container e2e's mise cache names no action, no pin and no scope, so a cache written by a branch run under the sandbox's token could be restored by a tag run.",
+   "severity": "Advisory",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-29"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L7-29: A branch workflow run by the token (ADR 0008) writes a poisoned cache entry and the release job's e2e restores it (Actions cache-scoping behaviour inferred).",
+   "change": "Name the cache action, pinned by SHA, on the grammar's with list, and state in 10 10.1: 'release.yml restores no cache'.",
+   "cost": "Two sentences and one allowlist entry.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-38",
+   "section": "10 10.2 (setup)",
+   "title": "go run ./tools/ci setup is the one step that fetches modules, and its environment (GOPROXY, GOSUMDB, GONOSUMDB, GOFLAGS, GOENV) is not stated, so a caller's settings can fill the module cache unverified.",
+   "severity": "Advisory",
+   "lenses": [
+    "L7"
+   ],
+   "finding_ids": [
+    "L7-27"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L7-27: A caller's `GONOSUMDB` or `GOFLAGS=-insecure` fills the module cache without checksum-database verification, and every later step trusts it under `GOPROXY=off`.",
+   "change": "Add to the setup row: 'setup runs in the scrubbed environment of the steps, with GOPROXY=https://proxy.golang.org, GOSUMDB=sum.golang.org and GOENV=off', and a test that a caller's GONOSUMDB and GOFLAGS do not reach it.",
+   "cost": "One sentence and a test.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-39",
+   "section": "10 10.2 (maintainer block item d); 05 5.4; ADR 0008",
+   "title": "Item d did not try the ruleset body change, so 'an agent can disable the ruleset' stays inferred in 05 5.4 and ADR 0008 where a reversible try was available.",
+   "severity": "Advisory",
+   "lenses": [
+    "L2b"
+   ],
+   "finding_ids": [
+    "L2b-25"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L2b-25: The inference is wrong in the other direction (GitHub refuses the edit for a token without a specific permission) and the spec carries a risk row and a deferral that a ten-second try would have removed; or it is right and the row says 'inferred' where 'measured' would close debate.",
+   "change": "Add a fifth try to item d for the next sitting: set the default-branch ruleset's enforcement to disabled with the sandbox's token, read the body back, restore it; record the result in a new ADR note and in 05 5.4.",
+   "cost": "One operator try and one record.",
+   "parked_for_b": false,
+   "resolution": "operator",
+   "resolution_text": "Recommend running the try at the next sitting.",
+   "operator_reason": "Needs an operator-only measurement, and its result changes the 05 5.4 row and ADR 0008."
+  },
+  {
+   "id": "R8-10-40",
+   "section": "10 10.2 (Release and bootstrap); 12 12.6",
+   "title": "Release notes are generated from commit subjects for v1.0.0, whose range is the whole history, so the generator gates a first release for a second that does not exist.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-32"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L11-32: The first release's notes are a README paragraph; the generator gates the first release for a second release that does not exist.",
+   "change": "Move tools/release notes to the Deferred table ('reopened by the v1.1.0 tag'); the v1.0.0 notes are hand-written; drop the notes step from the 10 10.2 release paragraph.",
+   "cost": "One row; part of T088.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-41",
+   "section": "10 10.8",
+   "title": "For host-facing behavior a task is done when its scenario function exists, which proves it compiles, not that it ran.",
+   "severity": "Advisory",
+   "lenses": [
+    "L12"
+   ],
+   "finding_ids": [
+    "L12-25"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "L12-25: J9 and J12 land in T075 with functions that CI cannot run; their first run is block O6, after the candidate tag, and a defect there costs a new candidate and block B again (11 11.2).",
+   "change": "In 10 10.8 replace '(it runs on real hosts in block B)' with 'and its recording-runner test passes in CI (ADR 0001 rule 13); its block B run is the acceptance'.",
+   "cost": "One sentence.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-42",
+   "section": "10 10.8",
+   "title": "The definition of done names nothing about the hand-written docs a change makes stale (a guide step, the fix hint of a new error id).",
+   "severity": "Advisory",
+   "lenses": [
+    "L8"
+   ],
+   "finding_ids": [
+    "L8-24"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L8-24: A task adds an error id with an empty fix hint and changes a journey's output; it is done by 10 10.8.",
+   "change": "Add to 10 10.8: 'a new or changed error id has a reviewed fix hint, and a changed journey updates its guide in the same pull request'.",
+   "cost": "One sentence.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-43",
+   "section": "10 10.2 (Forbidden names)",
+   "title": "The real denylist entries are proven to match only at hygiene add time, so a matcher refactor can stop them matching unseen.",
+   "severity": "Advisory",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-26"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L6-26: The segment hashing is refactored; the synthetic self-test passes; the real entries no longer match and a name reaches a PR title.",
+   "change": "In Forbidden names: 'hygiene add also writes one synthetic entry into the real denylist, its plaintext committed under testdata, and hygiene's tests assert it matches'.",
+   "cost": "One entry, one test.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-44",
+   "section": "10 10.2 (Release and bootstrap)",
+   "title": "tools/ci acceptance --pre-tag is a hand step before an unrepeatable tag, and release.yml does not run it.",
+   "severity": "Advisory",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-37"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L6-37: The maintainer tags v1.0.0 with a kit change since the candidate; block B results no longer count; the tag cannot be redone under that name.",
+   "change": "Have release.yml run go run ./tools/ci acceptance --pre-tag for a tag with no suffix, before tools/release build, and fail the run there.",
+   "cost": "One run step.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed; R8-10-4 relies on this run."
+  },
+  {
+   "id": "R8-10-45",
+   "section": "10 10.1; 05 5.2",
+   "title": "10 10.1 lists I16 as unit-level while 05 5.2 gives I16 an E-level fs snapshot diff.",
+   "severity": "Advisory",
+   "lenses": [
+    "L6"
+   ],
+   "finding_ids": [
+    "L6-33"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L6-33: A reader of 10 drops the E case as redundant; the scan passes and a deletion outside romeu's ownership goes unobserved.",
+   "change": "In 10 10.1 write I16 as 'unit (the scan) and E (the snapshot diff of 05 5.2)'.",
+   "cost": "A few words.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply, keeping both levels."
+  },
+  {
+   "id": "R8-10-46",
+   "section": "10 10.1 (container e2e); I17",
+   "title": "The container e2e names 'salvage completeness cases' without a list, while I17 and T061 hold two different lists of one set.",
+   "severity": "Advisory",
+   "lenses": [
+    "L4"
+   ],
+   "finding_ids": [
+    "L4-40"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L4-40: A case added to one list is never added to the other, and a stash regression passes the e2e that I17 cites.",
+   "change": "Make the I17 Test cell the one list of completeness cases, the stash included; 10 10.1 and the plan link to it.",
+   "cost": "Two cell edits.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-47",
+   "section": "10 10.7; 08 8.1; 02 2.1",
+   "title": "One problem (a binary must not link the other's write path) has two mechanisms: memstore is split so romeu links no delete, while internal/ledger stays shared and julieta links the I31 create function.",
+   "severity": "Advisory",
+   "lenses": [
+    "L13b"
+   ],
+   "finding_ids": [
+    "L13b-32"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L13b-32: A contributor who learned the memstore rule asks why the ledger does not follow it and finds no reason; the I16 scan over romeu-linked packages and the module boundaries of 10 10.7 give two answers to one question.",
+   "change": "Split internal/ledger into a shared schema package and a romeu-only ingest package, as memstore is split, and give the ingest package its row in 10 10.7.",
+   "cost": "One package split before code exists.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply the split, so one rule covers both packages."
+  },
+  {
+   "id": "R8-10-48",
+   "section": "10 10.2 (id table); tools/ci sequences",
+   "title": "Sections are cited mostly as plain text ('10 10.2'), which no check resolves, so a renumbering breaks citations silently.",
+   "severity": "Advisory",
+   "lenses": [
+    "L8"
+   ],
+   "finding_ids": [
+    "L8-14"
+   ],
+   "listed": 1,
+   "own": 0,
+   "scenario": "L8-14: A future page splits 10 into 10 and 14; 10 10.5 becomes 14 14.2; a hundred plain citations still say 10 10.5 and pass every gate.",
+   "change": "Extend tools/ci sequences to resolve a plain '<n> <n>.<m>' citation against file <n>'s headings and fail when it is undefined, as it does for I, S, Q, J and probe ids.",
+   "cost": "One id form and fixtures.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-49",
+   "section": "10 10.6 (code example); 03 3.2",
+   "title": "The 10 10.6 code example carries only SPDX-License-Identifier while 00 0.4 requires SPDX-FileCopyrightText too, and 03 3.2's example hard-codes a v1.0.0 $schema URL.",
+   "severity": "Advisory",
+   "lenses": [
+    "L8"
+   ],
+   "finding_ids": [
+    "L8-27"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L8-27: An agent copies the 10 10.6 header into a new file and reuse lint fails; a user copies examples/ on v1.2 and validates against the v1.0.0 schema.",
+   "change": "Add the SPDX-FileCopyrightText line to the 10 10.6 example; tools/ci schema checks that examples/ carry the release's $schema URL.",
+   "cost": "One line, one check.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  },
+  {
+   "id": "R8-10-50",
+   "section": "10 10.2 (step table); ADR 0001",
+   "title": "The gate is specified in final form, about 27 subcommands and a 20-rule docs standard, with no mark of which steps the first day needs.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-26"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L11-26: 10 is the longest page of the spec (798 lines) for a product whose objective has five bullets; each check is defended, the count is not. The grammar and the review guard the same files.",
+   "change": "Mark in the 10 10.2 step table which steps the first day needs (fast, hygiene, workflows, unit, invariants) and write that the rest land with their first input, as the plan already does.",
+   "cost": "Wording.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply the 10 10.2 marking only; the ADR 0001 rule-adoption split is left out, since it would change a decision record for wording."
+  },
+  {
+   "id": "R8-10-51",
+   "section": "11 11.3; 11 11.4; 10 10.2 (probes)",
+   "title": "A four-state probe lifecycle with a computed decision, affects paths and a generated diagram is machinery for about twenty measurements run once per host.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-27"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L11-27: The measurements are a start need; the lifecycle is built for a volume that will not recur after block B.",
+   "change": "Keep the result format; reduce the lifecycle to the 12 12.5 rule 'an overturned result is resolved in the same pull request with its ADR'; drop the state machine and its diagram (T083).",
+   "cost": "A table and a generator fewer.",
+   "parked_for_b": false,
+   "resolution": "M",
+   "resolution_text": "Apply; it agrees with R8-10-13, which adds a version field instead of a 'stale' state."
+  },
+  {
+   "id": "R8-10-52",
+   "section": "03 3.6; 13 13.7; 10 10.1",
+   "title": "The manifest protocol window (N and N-1) and the event version window are specified and tested before a second version of either exists.",
+   "severity": "Advisory",
+   "lenses": [
+    "L11"
+   ],
+   "finding_ids": [
+    "L11-31"
+   ],
+   "listed": 0,
+   "own": 1,
+   "scenario": "L11-31: A compatibility rule decided before the first upgrade has taught what breaks; the test proves the seam, not the upgrade.",
+   "change": "Keep the version field; replace the window with a Deferred row 'the accepted window; until then exact match; reopened by the first romeu release that changes the manifest'.",
+   "cost": "One row; the seam tests go.",
+   "parked_for_b": false,
+   "resolution": "A",
+   "resolution_text": "Apply as proposed."
+  }
+ ]
+}
