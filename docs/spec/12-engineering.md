@@ -410,8 +410,10 @@ next run. The job reads the head only as git objects, fetched by
 `head.sha` without credentials, which relies on the repository being
 public ([10 10.2](10-testing-style.md#102-ci)), and never builds or
 runs them: every git call of `pr` on head objects passes
-`--no-ext-diff`, `--no-textconv` and `--no-recurse-submodules` with
-`-c core.hooksPath=/dev/null`, `pr` never runs `checkout` or `archive`
+`-c core.hooksPath=/dev/null`; `fetch` passes `--no-recurse-submodules`;
+`diff`, `log` and `show` pass `--no-ext-diff --no-textconv
+--ignore-submodules=all` (git 2.53.0 rejects `--no-recurse-submodules`
+for `diff` and `log`); `pr` never runs `checkout` or `archive`
 on the head, and its diffs are tree to tree, with `.gitattributes` read
 from the default branch's work tree. It reads
 `.github/ask-first.yaml` at the base commit and at the head commit and

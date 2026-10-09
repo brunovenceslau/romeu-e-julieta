@@ -159,10 +159,13 @@ are in `ship-gate-2026-10-09.md`.
   checkout, head fetched by sha and never run), the pr job row of the
   10 10.2 grammar with its refusal fixtures, and adds the job to the
   required checks (10 10.2, item e). In `tools/ci/git`, every call on
-  head objects passes `--no-ext-diff`, `--no-textconv`,
-  `--no-recurse-submodules` and `-c core.hooksPath=/dev/null`, with no
+  head objects passes `-c core.hooksPath=/dev/null`; `fetch` passes
+  `--no-recurse-submodules`; `diff`, `log` and `show` pass
+  `--no-ext-diff --no-textconv --ignore-submodules=all`; with no
   `checkout` or `archive` of the head and tree-to-tree diffs that read
-  `.gitattributes` from the default branch's work tree (12 12.4).
+  `.gitattributes` from the default branch's work tree (12 12.4). When
+  `pr` changes, the `pr` job of each open pull request runs again, so no
+  green result from before the change stands (05 5.4).
 
 ### Tooling pull requests (each ask-first, with its own approval line)
 
