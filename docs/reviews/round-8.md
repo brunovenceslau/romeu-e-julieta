@@ -1916,6 +1916,10 @@ check of approvals out of the reach of a grant.
 Answered on 2026-10-09: (a); it amends AR14 (decided on 2026-10-08).
 The re-audit found the class wider; decided on 2026-10-09 that `pr` runs
 the base commit's code, and `.github/workflows/**` joined `approvals`.
+The next re-audit found the workflow route open; decided on 2026-10-09
+that `pr` runs in a base-defined job on `pull_request_target`, read-only
+and without secrets, the head never built or run, and that the job joins
+the required checks when `pr` lands.
 
 ### Next steps
 

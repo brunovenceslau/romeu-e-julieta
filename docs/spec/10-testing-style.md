@@ -107,10 +107,11 @@ does a file in that directory with another name ending:
 
 | Level | Allowed |
 |---|---|
-| file | the keys `name`, `on`, `permissions`, `concurrency`, `env`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters; `env` is required and holds exactly the mise environment of `tools/ci` (`miseEnv` in `tools/ci/misefiles.go`), in its order, each value a YAML string |
+| file | the keys `name`, `on`, `permissions`, `concurrency`, `env`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters, and `pull_request_target` only as the pr job row below allows; `env` is required and holds exactly the mise environment of `tools/ci` (`miseEnv` in `tools/ci/misefiles.go`), in its order, each value a YAML string |
 | job | the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `runs-on` is `${{ matrix.os }}` or one of the four labels of Runners below, and so is each `os` of the matrix (`runs-on` as a list or a mapping fails); `permissions`, at the top and in a job, is a mapping whose values are `read` or `none`, and the file sets it at the top or in every job, so no scope is left to the default; `strategy` holds `matrix`, `fail-fast` and `max-parallel` only; the matrix is a written mapping with the keys `os` and `include` only, each `include` entry holds `os` and `mise_sha256` only (names matched exactly), and a `${{` in the value of an `include` entry fails (the `os` value is held to the four labels); with `runs-on: ${{ matrix.os }}` every runner of the matrix names an `os` |
 | `uses` step | the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, the owner and the repository start with a letter or a digit, and so does each path segment or it starts with `_`, so no `.` or `..` segment, no `./` path of the repository (a local action) and no `docker://` image fits; `with` is a mapping that holds only the inputs listed for that action in `tools/ci` (the action is matched without case), each value a literal or one `${{ matrix.<key> }}` alone whose values are all literals; an `actions/checkout` step sets `persist-credentials: false`, written exactly so (the case of the action name is ignored, the case of the value is not) |
 | `run` step | the keys `name`, `run`; `run` is one line, `go run ./tools/ci <subcommand> [<argument>...]` or `go run ./tools/release <subcommand> [<argument>...]`; each word is made of ASCII letters, digits and `._/=:-`, or is `"$NAME"` |
+| pr job | one workflow file whose `on` names `pull_request_target` and no other event holds the one job that runs `go run ./tools/ci pr`; the file and the job set `permissions` to `contents: read` and nothing else, no step names a secret or `github.token`, its checkout is of the base commit, and the head is read only as git objects fetched by `head.sha`, never checked out to be built or run; `tools/ci workflows` refuses `pull_request_target` in any other file, with a fixture per refusal. Under that event GitHub runs the workflow file of the default branch, with a token that may write and with secrets, and warns against building or running pull request code ([events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows), [secure use](https://docs.github.com/en/actions/reference/security/secure-use), read on 2026-10-09), which is why every one of these limits is in the grammar |
 | release publish job | in `.github/workflows/release.yml` only, one job, the publish job of [Release and bootstrap](#release-and-bootstrap), may set `contents: write`, `id-token: write` and `attestations: write` in its job `permissions`, and only its `run` steps of `tools/release publish` and `tools/release verify` may hold `env` with the one key `GH_TOKEN: ${{ github.token }}`; `tools/ci workflows` refuses each of these in any other file, job or step, with a fixture per refusal |
 
 So a workflow has no `if`, no `continue-on-error`, no `shell`, no
@@ -153,9 +154,9 @@ Three consequences of the grammar:
   table in `tools/ci` with a unit test of its own, and a step whose
   `go test -json` output reports zero tests fails, so a selection that
   runs nothing is red.
-- `ci.yml` lists `edited` among its `pull_request` types, so a change
-  to a PR's title or body runs `pr` again; `tools/ci workflows` fails a
-  `ci.yml` without it.
+- The pr job's workflow lists `edited` among its `pull_request_target`
+  types, so a change to a PR's title or body runs `pr` again;
+  `tools/ci workflows` fails that file without it.
 - The grammar bounds keys, `run` lines, runner labels, the inputs of
   each action and expressions, not each value: the owner of a `uses`
   action, the filters under `on` and the values under `strategy` other
@@ -165,8 +166,9 @@ Three consequences of the grammar:
   `actions/cache` (the container e2e's mise cache, 10.1) and
   `actions/attest-build-provenance`.
 
-`tools/ci all` runs the `pr` step when `GITHUB_EVENT_NAME` is
-`pull_request`, on the file that `GITHUB_EVENT_PATH` names. A local run
+The `pr` step runs in its own job, the pr job of the grammar, from the
+base commit's code, on the file that `GITHUB_EVENT_PATH` names; `tools/ci
+all` does not run it. A local run
 is `go run ./tools/ci pr <file>`, on a payload saved beforehand (with
 `gh api`, for example), or, before the pull request exists,
 `go run ./tools/ci pr --title <title> --body <file>`, which reads the
@@ -798,7 +800,8 @@ Evidence:
   default-branch ruleset as required status checks. As read on
   2026-10-09, the rule lists the four `all on ...` checks (the note on
   the maintainer block); saving the API's answer under Evidence is still
-  to do.
+  to do. When the task that builds `pr` lands, its job joins the
+  required checks, the same way.
 - f. Before the first release candidate: turn on GitHub's immutable
   releases setting. To do.
 

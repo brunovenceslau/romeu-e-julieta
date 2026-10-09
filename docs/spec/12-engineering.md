@@ -155,7 +155,7 @@ E2E (CI):   go test -tags e2e ./e2e/...             # git + docker + fake sbx; n
 E2E (host): go test -tags host -json ./e2e/host/... # maintainer machine only; real sbx
 Setup:      go run ./tools/ci setup                 # trust mise.toml, install the pinned tools, fill the module cache; CI runs it first
 Fast:       go run ./tools/ci fast                  # what the pre-push hook runs; the hook adds the pushed range
-All checks: go run ./tools/ci all                   # what CI runs; CI adds the pr step on a pull request
+All checks: go run ./tools/ci all                   # what CI runs; the pr step runs in its own base-defined job
 PR checks:  go run ./tools/ci pr <payload file>     # the pr step, on a saved pull request payload
             go run ./tools/ci pr --title <t> --body <file>   # the same check on base..HEAD, before the pull request exists
 Pins:       go run ./tools/ci pins                  # pin freshness of the tools of 12.1; needs the network
@@ -396,8 +396,14 @@ Single quotation marks are allowed, because U+2019 is also the
 apostrophe, and other look-alikes, such as U+275D and U+275E, are left
 to review. `tools/ci pr` builds and runs the code of the base commit
 against the head, so no pull request is judged by code it changes: the
-`pr` job of the workflow checks out the base commit's `tools/ci` and
-runs it against the head (decided on 2026-10-09). It reads
+`pr` job checks out the base commit, with its `go.mod`, `go.sum`,
+`mise.toml` and `mise.lock`, and builds `tools/ci` there (decided on
+2026-10-09). That job is defined in the base: it runs on
+`pull_request_target`, under which GitHub runs the workflow file of the
+default branch, which is every pull request's base (12.9), with
+`permissions: contents: read` and no secret, and it reads the head only
+as git objects fetched by `head.sha`, never built or run
+([10 10.2](10-testing-style.md#102-ci)). It reads
 `.github/ask-first.yaml` at the base commit and at the head commit and
 uses the union of the two lists, so a PR that removes a surface or a
 glob still needs that surface's line.

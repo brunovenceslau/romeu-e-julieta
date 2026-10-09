@@ -154,7 +154,11 @@ are in `ship-gate-2026-10-09.md`.
   (G5, decided on 2026-10-09); a test that a pull request that changes
   `tools/ci` is judged by the base commit's `tools/ci`; and the
   security-auditor's Low of the G5 re-audit, that nothing in code holds
-  the grantable set (G10 closes it).
+  the grantable set (G10 closes it). The same task writes the pr job's
+  workflow on `pull_request_target` (`contents: read`, no secret, base
+  checkout, head fetched by sha and never run), the pr job row of the
+  10 10.2 grammar with its refusal fixtures, and adds the job to the
+  required checks (10 10.2, item e).
 
 ### Tooling pull requests (each ask-first, with its own approval line)
 
