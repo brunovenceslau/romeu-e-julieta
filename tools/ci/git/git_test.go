@@ -124,6 +124,40 @@ func TestSafeLines(t *testing.T) {
 	}
 }
 
+// TestSafeLinesIgnorableRunes checks that a rune that prints but that a
+// culture-sensitive comparison may skip (a combining mark, a variation
+// selector, a filler) cannot hide a marker: in the output, the line
+// stripped to printable ASCII neither starts with "::" nor holds "##[".
+func TestSafeLinesIgnorableRunes(t *testing.T) {
+	skeleton := func(line string) string {
+		return strings.Map(func(r rune) rune {
+			if r == '\t' || (r >= 0x20 && r <= 0x7e) {
+				return r
+			}
+			return -1
+		}, line)
+	}
+	for _, r := range []rune{0x034f, 0xfe0f, 0xe0100, 0x180b, 0x2800, 0x3164, 0x115f, 0x1160, 0xffa0, 0x17b4, 0x0300, 0x2d7f} {
+		c := string(r)
+		for _, in := range []string{
+			c + "::error::x",
+			" \t" + c + " ::error::x",
+			":" + c + ":error::x",
+			"#" + c + "#[error]x",
+			"##" + c + "[error]x",
+			"x ##" + c + "[error]x",
+			"x #" + c + "#[error]x",
+		} {
+			out := git.SafeLines(in)
+			sk := skeleton(out)
+			assert.False(t, strings.HasPrefix(strings.TrimLeft(sk, " \t"), "::"), "%U %q -> %q", r, in, out)
+			assert.NotContains(t, sk, "##[", "%U %q -> %q", r, in, out)
+		}
+	}
+	assert.Equal(t, "./\u034f::error::x", git.SafeLines("\u034f::error::x"))
+	assert.Equal(t, `x #\u034f#[error]`, git.SafeLines("x #\u034f#[error]"))
+}
+
 func TestRunStopsWithItsContext(t *testing.T) {
 	r := gittest.New(t)
 	ctx, cancel := context.WithCancel(t.Context())

@@ -200,6 +200,7 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	if machine == nil {
 		machine = unameMachine
 	}
+	// uname comes from the host machine, not from the repository.
 	uname := machine(ctx)
 	say(e.stdout, "platform  %s/%s, uname -m %s\n", runtime.GOOS, runtime.GOARCH, uname)
 
@@ -233,6 +234,7 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 		translated = procTranslated
 	}
 	archDetail := ""
+	// uname comes from the host machine, not from the repository.
 	switch {
 	case !archMatches(uname, runtime.GOARCH):
 		archDetail = fmt.Sprintf("uname -m reports %s and this binary runs as %s: the tools of this run are not the ones of the machine\n", uname, runtime.GOARCH)
