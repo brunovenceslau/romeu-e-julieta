@@ -29,17 +29,20 @@ import (
 //   - miseEnv and goBuildEnv: the fixed settings.
 //
 // Every other variable of the caller is dropped, so none of the lists
-// holds a key of miseEnv or of goBuildEnv. TestHookEnvIsTheAllowlist
+// holds a key of miseEnv or of goBuildEnv. The module variables
+// (goModulePassThrough) are only the hook's: setup's mise install and
+// go mod download keep the checksum database as their guard. TestHookEnvIsTheAllowlist
 // and TestMiseNeverReads measure what that closes.
 func TestMiseEnvList(t *testing.T) {
 	assert.Equal(t, []string{
 		"PATH", "HOME", "TMPDIR",
-		"XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME",
-		"MISE_CACHE_DIR", "MISE_STATE_DIR",
+		"XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
+		"MISE_CACHE_DIR", "MISE_DATA_DIR", "MISE_STATE_DIR",
 		"GOPATH", "GOCACHE", "GOMODCACHE",
 	}, passThrough)
+	assert.Equal(t, []string{"GOPROXY", "GOPRIVATE", "GONOSUMDB", "GOSUMDB", "GOINSECURE"}, goModulePassThrough)
 	assert.Equal(t, []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}, networkPassThrough)
-	assert.Equal(t, slices.Concat(passThrough, networkPassThrough), hookAllow)
+	assert.Equal(t, slices.Concat(passThrough, networkPassThrough, goModulePassThrough), hookAllow)
 	assert.Equal(t, []string{
 		"MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml",
 		"MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none",
@@ -61,8 +64,8 @@ func TestMiseEnvList(t *testing.T) {
 			assert.NotContains(t, list, key)
 		}
 	}
-	for _, key := range slices.Concat(passThrough, networkPassThrough, dockerPassThrough) {
-		assert.NotContains(t, []string{"MISE_CEILING_PATHS", "MISE_CD", "MISE_ENV_FILE", "MISE_TRUSTED_CONFIG_PATHS", "MISE_GLOBAL_CONFIG_FILE", "MISE_SYSTEM_CONFIG_FILE", "MISE_CONFIG_DIR", "GOFLAGS", "GOENV", "GOWORK", "GOTOOLCHAIN"}, key)
+	for _, key := range slices.Concat(passThrough, networkPassThrough, dockerPassThrough, goModulePassThrough) {
+		assert.NotContains(t, []string{"MISE_CEILING_PATHS", "MISE_CD", "MISE_ENV_FILE", "MISE_TRUSTED_CONFIG_PATHS", "MISE_GLOBAL_CONFIG_FILE", "MISE_SYSTEM_CONFIG_FILE", "MISE_CONFIG_DIR", "XDG_CONFIG_HOME", "GOFLAGS", "GOENV", "GOWORK", "GOTOOLCHAIN"}, key)
 	}
 	// A value of the caller's for a variable of miseEnv loses to the list's.
 	cmd := exec.CommandContext(t.Context(), "env")
@@ -162,8 +165,10 @@ func TestMiseEnvStopsConfigs(t *testing.T) {
 
 	assert.Equal(t, []string{"ci", "confd", "link", "local", "tool-versions", "unix"}, written(base), "without miseEnv")
 	assert.Empty(t, written(miseEnviron(base)), "with miseEnv")
-	for _, kv := range miseEnv[:4] { // the four that name a file of the tree
-		key, _, _ := strings.Cut(kv, "=")
+	for _, key := range []string{"MISE_OVERRIDE_CONFIG_FILENAMES", "MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES", "MISE_ENV", "MISE_AUTO_ENV"} {
+		kvIndex := slices.IndexFunc(miseEnv, func(kv string) bool { return strings.HasPrefix(kv, key+"=") })
+		require.GreaterOrEqual(t, kvIndex, 0, key)
+		kv := miseEnv[kvIndex]
 		without := slices.DeleteFunc(miseEnviron(base), func(v string) bool { return v == kv })
 		assert.NotEmpty(t, written(without), "miseEnv without %s", key)
 	}
@@ -239,16 +244,28 @@ func TestMiseNeverReads(t *testing.T) {
 		{"MISE_CD", func(t *testing.T, l layout) map[string]string {
 			return map[string]string{"MISE_CD": l.elsewhere}
 		}},
+		{"GOFLAGS", func(t *testing.T, l layout) map[string]string {
+			return map[string]string{"GOFLAGS": "-overlay=/planted.json"}
+		}},
+		{"GOENV", func(t *testing.T, l layout) map[string]string {
+			return map[string]string{"GOENV": "/planted/env"}
+		}},
 	}
-	printed := func(t *testing.T, env []string, dir string) (marker, pwd string) {
+	// printed runs "mise exec", what the shim of go does, and returns
+	// what the command sees: the planted marker, the working directory,
+	// and the GOFLAGS and GOENV of its environment.
+	type seen struct{ marker, pwd, goflags, goenv string }
+	printed := func(t *testing.T, env []string, dir string) seen {
 		t.Helper()
-		cmd := exec.CommandContext(t.Context(), "mise", "exec", "--", "sh", "-c", `printf '%s|%s' "${PLANTED:-nothing}" "$(pwd -P)"`)
+		cmd := exec.CommandContext(t.Context(), "mise", "exec", "--", "sh", "-c",
+			`printf '%s|%s|%s|%s' "${PLANTED:-nothing}" "$(pwd -P)" "${GOFLAGS-unset}" "${GOENV-unset}"`)
 		cmd.Dir = dir
 		cmd.Env = env
 		out, err := cmd.Output()
 		require.NoError(t, err, "mise exec")
-		marker, pwd, _ = strings.Cut(string(out), "|")
-		return marker, pwd
+		parts := strings.Split(string(out), "|")
+		require.Len(t, parts, 4, string(out))
+		return seen{parts[0], parts[1], parts[2], parts[3]}
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -268,21 +285,25 @@ func TestMiseNeverReads(t *testing.T) {
 
 			// The control: the environment of the caller, as it is.
 			t.Setenv("MISE_STATE_DIR", t.TempDir())
-			marker, pwd := printed(t, os.Environ(), l.dir)
-			if row.name == "MISE_CD" {
+			control := printed(t, os.Environ(), l.dir)
+			switch row.name {
+			case "MISE_CD":
 				wantElsewhere, err := filepath.EvalSymlinks(l.elsewhere)
 				require.NoError(t, err)
-				assert.Equal(t, wantElsewhere, pwd, "without the allowlist")
-			} else {
-				assert.Equal(t, row.name, marker, "without the allowlist")
+				assert.Equal(t, wantElsewhere, control.pwd, "without the allowlist")
+			case "GOFLAGS":
+				assert.Equal(t, "-overlay=/planted.json", control.goflags, "without the allowlist")
+			case "GOENV":
+				assert.Equal(t, "/planted/env", control.goenv, "without the allowlist")
+			default:
+				assert.Equal(t, row.name, control.marker, "without the allowlist")
 			}
 
 			// The environment tools/ci builds, with MISE_OFFLINE added for the test.
 			t.Setenv("MISE_STATE_DIR", t.TempDir())
 			env := append(miseRunEnviron(passThroughEnv(), l.dir), "MISE_OFFLINE=1")
-			marker, pwd = printed(t, env, l.dir)
-			assert.Equal(t, "nothing", marker, "with the allowlist")
-			assert.Equal(t, wantDir, pwd, "with the allowlist")
+			guarded := printed(t, env, l.dir)
+			assert.Equal(t, seen{"nothing", wantDir, "unset", "off"}, guarded, "with the allowlist")
 		})
 	}
 }

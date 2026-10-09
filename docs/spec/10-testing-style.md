@@ -236,8 +236,9 @@ resolved, is not below the directory where mise installs that tool, so
 a mise configuration that names a tool by a path fails the run. Each
 step runs in an environment built from nothing, not from the caller's:
 the variables that say where things are (`PATH`, with that go
-directory first, `HOME`, `TMPDIR`, the XDG directories, the state and
-cache directories of mise, `GOPATH`, `GOCACHE` and `GOMODCACHE`), then
+directory first, `HOME`, `TMPDIR`, the XDG cache, data and state
+directories, the cache, data and state directories of mise, `GOPATH`,
+`GOCACHE` and `GOMODCACHE`; not `XDG_CONFIG_HOME`), then
 `GOENV=off`, `GOTOOLCHAIN=local`, `GOWORK=off`, `GOPROXY=off` and
 `GOFLAGS=-mod=readonly`. So no `GOFLAGS` of the caller (a `-run` that
 selects no test, or build tags), `go env -w` file or other variable of

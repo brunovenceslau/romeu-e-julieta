@@ -153,6 +153,16 @@ import (
 // paths and the parent directories of the tree never reach a mise run
 // (miseNoGlobalConfig, miseNoSystemConfig, miseCeiling, and the
 // allowlist that drops every other variable).
+//
+// Not covered: a caller who controls the environment of the push, or the
+// git configuration it reads, can always bypass the hook (core.hooksPath
+// names another one, "git push --no-verify" skips it, a PATH that
+// starts with another mise or go replaces the tools), and an allowlisted
+// variable can still point at attacker data: HOME, PATH, GOPATH, GOCACHE,
+// GOMODCACHE, MISE_DATA_DIR or XDG_DATA_HOME name a module cache, a build
+// cache or an installs directory of the caller's choosing. The allowlist
+// closes the variables and files that act without the caller choosing to
+// bypass the hook, not those.
 
 // miseEnv is the fixed part of the environment of every mise run, as
 // "KEY=value": the six mise variables below, then goPinEnv. The
@@ -189,13 +199,15 @@ var miseEnv = slices.Concat([]string{
 }, goPinEnv)
 
 // hookAllow are the variables the pre-push hook keeps from its caller:
-// those of passThrough (where things are on this machine) and
-// networkPassThrough (how to reach the module proxy, for the first go
-// run that fills the module cache). Every other variable is dropped by
+// those of passThrough (where things are on this machine),
+// networkPassThrough (how to reach the network) and goModulePassThrough
+// (where a module comes from, for the first go run that fills the
+// module cache), each only when the caller has set it. Every other
+// variable is dropped by
 // "env -i", the GIT_ ones included: tools/ci finds the repository from
 // the working directory of the hook, which git sets to the top of the
 // tree, and never from a GIT_DIR.
-var hookAllow = slices.Concat(passThrough, networkPassThrough)
+var hookAllow = slices.Concat(passThrough, networkPassThrough, goModulePassThrough)
 
 // miseNoGlobalConfig is the path miseEnv gives MISE_GLOBAL_CONFIG_FILE,
 // so that mise reads no global configuration: its [env] table (a

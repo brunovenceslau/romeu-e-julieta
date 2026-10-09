@@ -13,7 +13,7 @@ reference, with the contributor docs as outlines.
 | shared packages (`internal/...`) | Go | see the capability map |
 | CI, release and dev tooling (`tools/ci`, `tools/new`, `tools/schemagen`, `tools/release`, `tools/kitpin`) | Go | one entry point for local and CI |
 | host probe harness (`e2e/probes`) | Go | runs probe steps, writes `probe-result.v1` JSON |
-| git hook in this repo (`.githooks/pre-push`) | POSIX sh, one line | `exec env -i <the allowlist> <the fixed settings> go run ./tools/ci fast "$@"`: the go command and the mise shim that starts it get an environment built from nothing. The allowlist is `hookAllow` in `tools/ci/misefiles.go` (`PATH`, `HOME`, `TMPDIR`, the XDG and mise state and cache directories, `GOPATH`, `GOCACHE`, `GOMODCACHE`, the proxy variables and `SSL_CERT_FILE`, each kept only when the caller has set it); the fixed settings are `GOWORK=off`, `GOFLAGS=-mod=readonly`, `miseEnv` (which also names no global or system configuration of mise) and `MISE_CEILING_PATHS` as the parent of the tree, so mise reads no file above it. So no other `MISE_` or `GO` variable of the caller, a `go env -w` file, a `go.work` file, an untracked `vendor` directory, a mise configuration outside the tree (global, system, `MISE_CONFIG_DIR`, an env file, a parent directory's `mise.toml`) or `MISE_CD` reaches go. Tests hold the line to those lists and run the hook against a hostile environment; git's pre-push arguments and stdin pass through (10 10.2) |
+| git hook in this repo (`.githooks/pre-push`) | POSIX sh, one line | `exec env -i <the allowlist> <the fixed settings> go run ./tools/ci fast "$@"`: the go command and the mise shim that starts it get an environment built from nothing. The allowlist is `hookAllow` in `tools/ci/misefiles.go` (`PATH`, `HOME`, `TMPDIR`, the XDG cache, data and state directories, the mise cache, data and state directories, `GOPATH`, `GOCACHE`, `GOMODCACHE`, the proxy variables and `SSL_CERT_FILE`, and `GOPROXY`, `GOPRIVATE`, `GONOSUMDB`, `GOSUMDB` and `GOINSECURE`, each kept only when the caller has set it; the last five are the hook's alone, safe there because its go run builds with `-mod=readonly` and `go.sum` decides which module content is accepted, and are not kept by `setup`, where the checksum database is the guard); the fixed settings are `GOWORK=off`, `GOFLAGS=-mod=readonly`, `miseEnv` (which also names no global or system configuration of mise) and `MISE_CEILING_PATHS` as the parent of the tree with its symbolic links resolved (`pwd -P`), so mise reads no file above it. So no other `MISE_` or `GO` variable of the caller, a `go env -w` file, a `go.work` file, an untracked `vendor` directory, a mise configuration outside the tree (global, system, `MISE_CONFIG_DIR`, an env file, a parent directory's `mise.toml`) or `MISE_CD` reaches go. Tests hold the line to those lists and run the hook against a hostile environment; git's pre-push arguments and stdin pass through (10 10.2) |
 | kit install steps | POSIX sh, <= 5 lines per step | download + sha256 check + install only |
 | skills (`skills/*/SKILL.md`) | Markdown | Claude Code skills |
 | schemas | JSON Schema 2020-12 | generated into `schemas/*.json` |
@@ -109,9 +109,10 @@ guarantee rests on the runner's environment setting none of those.
 One input still reaches both installs, so the guarantee holds when it
 does not change the build: a module cache seeded beforehand, since
 `GOPATH` and `GOMODCACHE` pass through. No mise configuration other
-than the project's `mise.toml` does (the global and system ones are
-named by a path that cannot exist, and mise stops at the parent of the
-tree). A `mise install` started by hand runs in
+than the project's `mise.toml` does: the global and system ones are
+named by a path that cannot exist in both installs, and `tools/ci setup`
+also starts mise with a ceiling at the parent of the tree, which the
+mise action does not have. A `mise install` started by hand runs in
 the caller's environment and has none of these properties.
 
 **Pin freshness** ([01 1.7](01-system-model.md#17-vocabulary)) is

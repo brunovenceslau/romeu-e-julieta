@@ -216,11 +216,9 @@ func TestAllSteps(t *testing.T) {
 		for _, key := range dockerPassThrough {
 			assert.Equal(t, s.name == "license" && runtime.GOOS == "linux", slices.Contains(keys(s), key), "%s keeps %s", s.name, key)
 		}
-		assert.NotContains(t, keys(s), "MISE_DATA_DIR")
-		assert.NotContains(t, keys(s), "XDG_DATA_HOME")
 	}
-	for _, key := range slices.Concat(networkPassThrough, dockerPassThrough) {
-		assert.NotContains(t, []string{"MISE_DATA_DIR", "XDG_DATA_HOME"}, key)
+	for _, key := range slices.Concat(networkPassThrough, dockerPassThrough, goModulePassThrough) {
+		assert.NotContains(t, passThrough, key)
 	}
 }
 

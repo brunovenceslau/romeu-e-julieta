@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -998,56 +997,9 @@ func pinnedLintTools(t *testing.T) lintTools {
 // environment of mise itself uses isolatedMiseEnv instead.
 func isolateMiseConfig(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"MISE_STATE_DIR", "XDG_CONFIG_HOME"} {
-		t.Setenv(key, t.TempDir())
-	}
+	t.Setenv("MISE_STATE_DIR", t.TempDir())
 	t.Setenv("MISE_DATA_DIR", "")
 	t.Setenv("XDG_DATA_HOME", "")
-}
-
-// TestIsolateMiseConfig poisons the configuration directories of the
-// process with a global mise configuration whose [env] template writes
-// a marker: "mise env" in passThroughEnv runs it, and runs nothing
-// once isolateMiseConfig has run. (miseEnv alone also keeps the global
-// configuration out, TestMiseGlobalConfigIsOff, so the run here is
-// without it.)
-func TestIsolateMiseConfig(t *testing.T) {
-	markers, poisoned := t.TempDir(), t.TempDir()
-	config := filepath.Join(poisoned, "mise", "config.toml")
-	require.NoError(t, os.MkdirAll(filepath.Dir(config), 0o755))
-	template := `{{ exec(command="touch ` + filepath.ToSlash(filepath.Join(markers, "global")) + `") }}`
-	require.NoError(t, os.WriteFile(config, []byte("[env]\nX_GLOBAL = "+strconv.Quote(template)+"\n"), 0o600))
-	t.Setenv("MISE_STATE_DIR", t.TempDir())
-	t.Setenv("XDG_CONFIG_HOME", poisoned)
-	t.Setenv("MISE_DATA_DIR", t.TempDir())
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
-	ran := func() bool {
-		t.Helper()
-		_ = os.Remove(filepath.Join(markers, "global"))
-		dir := t.TempDir()
-		cmd := exec.CommandContext(t.Context(), "mise", "-C", dir, "env")
-		cmd.Dir = dir
-		cmd.Env = append(passThroughEnv(), "MISE_OFFLINE=1")
-		out, err := cmd.CombinedOutput()
-		require.NoError(t, err, "mise env\n%s", out)
-		_, err = os.Stat(filepath.Join(markers, "global"))
-		return err == nil
-	}
-	require.True(t, ran(), "the poisoned configuration runs its template")
-	moved := []string{"MISE_STATE_DIR", "XDG_CONFIG_HOME"}
-	before := make(map[string]string, len(moved))
-	for _, key := range moved {
-		before[key] = os.Getenv(key)
-		require.NotEmpty(t, before[key], key)
-	}
-	isolateMiseConfig(t)
-	assert.False(t, ran(), "isolateMiseConfig keeps it out")
-	for _, key := range []string{"MISE_DATA_DIR", "XDG_DATA_HOME"} {
-		assert.Empty(t, os.Getenv(key), "isolateMiseConfig clears %s", key)
-	}
-	for _, key := range moved {
-		assert.NotEqual(t, before[key], os.Getenv(key), "isolateMiseConfig moves %s to a directory of its own", key)
-	}
 }
 
 // TestResolveLintTools checks that the tools of fast are the ones
@@ -1231,22 +1183,6 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 			want:  "mise which golangci-lint: exit status 1; the tool is not installed or the configuration is not trusted: run \"mise trust\" and \"mise install\" in ",
 		},
 		{
-			name: "MISE_DATA_DIR is set",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				t.Setenv("MISE_DATA_DIR", filepath.Join(f.home, ".local", "share", "mise"))
-				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
-			},
-			want: "MISE_DATA_DIR is set: fast runs only the tools mise installs below HOME",
-		},
-		{
-			name: "XDG_DATA_HOME is set",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				t.Setenv("XDG_DATA_HOME", filepath.Join(f.home, ".local", "share"))
-				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
-			},
-			want: "XDG_DATA_HOME is set: fast runs only the tools mise installs below HOME",
-		},
-		{
 			name: "HOME is not set",
 			setup: func(t *testing.T, _ fakeMise) (string, string) {
 				t.Setenv("HOME", "")
@@ -1373,6 +1309,7 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 			t.Setenv(key, "/from/"+key)
 		}
 	}
+	t.Setenv("MISE_DATA_DIR", filepath.Dir(f.installs())) // where the fake's tools are
 	dump, cwd := filepath.Join(t.TempDir(), "env"), filepath.Join(t.TempDir(), "cwd")
 	f.script(t, "'"+envPath+"' > '"+dump+"'\npwd -P > '"+cwd+"'\n", f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go"))
 	root := lockedRoot(t, lockFixture)
@@ -1407,22 +1344,38 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 }
 
 // TestMiseInstalls holds miseInstalls to the data directory that mise
-// itself reports in the environment it runs mise in, and pins it on
-// the variables it reads.
+// itself reports in the environment it runs mise in, for each way the
+// directory is chosen (HOME, XDG_DATA_HOME, MISE_DATA_DIR), and pins it
+// on the variables it reads.
 func TestMiseInstalls(t *testing.T) {
-	t.Setenv("MISE_DATA_DIR", "")
-	t.Setenv("XDG_DATA_HOME", "")
-	isolateMiseConfig(t)
-	cmd := exec.CommandContext(t.Context(), "mise", "-C", t.TempDir(), "doctor", "--json")
-	cmd.Env = miseEnviron(passThroughEnv())
-	out, err := cmd.Output()
-	require.NoError(t, err, "mise doctor")
-	var doctor struct{ Dirs struct{ Data string } }
-	require.NoError(t, json.Unmarshal(out, &doctor))
-	require.NotEmpty(t, doctor.Dirs.Data, "the data directory mise reports")
-	installs, err := miseInstalls()
-	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(doctor.Dirs.Data, "installs"), installs, "the installs directory of mise")
+	data, xdg := t.TempDir(), t.TempDir()
+	for _, tt := range []struct {
+		name, data, xdg string
+		want            func(home string) string
+	}{
+		{"below HOME", "", "", func(home string) string { return filepath.Join(home, ".local", "share", "mise", "installs") }},
+		{"XDG_DATA_HOME", "", xdg, func(string) string { return filepath.Join(xdg, "mise", "installs") }},
+		{"MISE_DATA_DIR", data, xdg, func(string) string { return filepath.Join(data, "installs") }},
+	} {
+		t.Run("mise reports "+tt.name, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			t.Setenv("MISE_DATA_DIR", tt.data)
+			t.Setenv("XDG_DATA_HOME", tt.xdg)
+			t.Setenv("MISE_STATE_DIR", t.TempDir())
+			cmd := exec.CommandContext(t.Context(), "mise", "-C", t.TempDir(), "doctor", "--json")
+			cmd.Env = append(miseEnviron(passThroughEnv()), "MISE_OFFLINE=1")
+			out, err := cmd.Output()
+			require.NoError(t, err, "mise doctor")
+			var doctor struct{ Dirs struct{ Data string } }
+			require.NoError(t, json.Unmarshal(out, &doctor))
+			require.NotEmpty(t, doctor.Dirs.Data, "the data directory mise reports")
+			installs, err := miseInstalls()
+			require.NoError(t, err)
+			assert.Equal(t, filepath.Join(doctor.Dirs.Data, "installs"), installs, "the installs directory of mise")
+			assert.Equal(t, tt.want(home), installs)
+		})
+	}
 
 	tests := []struct {
 		name            string
@@ -1430,8 +1383,8 @@ func TestMiseInstalls(t *testing.T) {
 		want            string // the directory, or the start of the error
 	}{
 		{"below HOME", "", "", "/h", "/h/.local/share/mise/installs"},
-		{"MISE_DATA_DIR set", "/m", "", "/h", "MISE_DATA_DIR is set"},
-		{"XDG_DATA_HOME set", "", "/x", "/h", "XDG_DATA_HOME is set"},
+		{"MISE_DATA_DIR set", "/m", "/x", "/h", "/m/installs"},
+		{"XDG_DATA_HOME set", "", "/x", "/h", "/x/mise/installs"},
 		{"HOME not set", "", "", "", "HOME is not set"},
 	}
 	for _, tt := range tests {
@@ -1477,7 +1430,7 @@ func TestStepEnv(t *testing.T) {
 	// The fixed variables, and others that change what a step checks,
 	// each set in the process to a value no step may take.
 	for _, key := range []string{"GOENV", "GOOS", "GOARCH", "CGO_ENABLED", "GOTOOLCHAIN", "GOWORK", "GOPROXY",
-		"GOFLAGS", "GOLANGCI_DIFF_PROCESSOR_PATCH", "GOEXPERIMENT", "MISE_INSTALLS_DIR", "MISE_DATA_DIR", "XDG_DATA_HOME",
+		"GOFLAGS", "GOLANGCI_DIFF_PROCESSOR_PATCH", "GOEXPERIMENT", "MISE_INSTALLS_DIR", "XDG_CONFIG_HOME",
 		"CI", "MISE_TRUSTED_CONFIG_PATHS"} {
 		t.Setenv(key, "from-the-process")
 	}
@@ -1492,8 +1445,9 @@ func TestStepEnv(t *testing.T) {
 	located := []string{
 		"HOME=/from/HOME",
 		"XDG_CACHE_HOME=/from/XDG_CACHE_HOME",
-		"XDG_CONFIG_HOME=/from/XDG_CONFIG_HOME",
+		"XDG_DATA_HOME=/from/XDG_DATA_HOME",
 		"XDG_STATE_HOME=/from/XDG_STATE_HOME",
+		"MISE_DATA_DIR=/from/MISE_DATA_DIR",
 		"MISE_STATE_DIR=/from/MISE_STATE_DIR",
 		"GOPATH=/from/GOPATH",
 		"GOCACHE=/from/GOCACHE",
