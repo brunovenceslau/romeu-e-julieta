@@ -16,17 +16,18 @@ generated schemas carry the field as a constant. `sbxenv.yaml`'s
 and is named `<past participle>At` (`createdAt`, `updatedAt`).
 
 Versions: any change to a format's fields bumps its version. A reader
-refuses a version newer than its own with the error id `format-newer`
-and the fix hint "install the release that wrote it". The release that
-bumps a stored format reads the previous version and writes the new one
-on its next whole-file write (forward-only; a read-only consumer, such
-as romeu reading memory entries, never rewrites). A record romeu cannot
-decode is never overwritten: `status` and `doctor` report it by id, and
-`salvage --from-host` still runs from the tree and the clones into a new
-record beside it. The user-authored formats (`project.v1`,
-`host-settings.v1`) change only by a new version of their `schema`
-field, announced first in the release notes. The manifest keeps its own
-N-1 window, with its reason, in 3.6.
+refuses a version newer than its own with the error `format-newer`
+(`RJ-311`, [04 4.4](04-cli.md#44-error-ids)) and the fix hint "install
+the release that wrote it". The release that bumps a stored format reads
+the previous version and writes the new one on its next whole-file write
+(forward-only; a read-only consumer, such as romeu reading memory
+entries, never rewrites). A record romeu cannot decode is never
+overwritten: `status` and `doctor` report it as the error
+`record-unreadable` (`RJ-334`), and `salvage --from-host` still runs
+from the tree and the clones into a new record beside it. The
+user-authored formats (`project.v1`, `host-settings.v1`) change only by
+a new version of their `schema` field, announced first in the release
+notes. The manifest keeps its own N-1 window, with its reason, in 3.6.
 
 Every format decoded from a mount or a repository (the memory entry,
 the handoff, `snapshot/heads.json`, `mise.lock`, and v3 descriptors) is
@@ -38,7 +39,7 @@ and secret listings, `mise.lock`, herdr replies, registry manifests,
 GitHub API JSON) are decoded tolerantly and checked strictly: unknown
 fields are allowed; every field romeu or julieta reads is required and
 typed; a body that does not decode, or a missing or mistyped field, is
-the error id `upstream-shape` (`RJ-310`, exit 2), naming the upstream
+the error `upstream-shape` (`RJ-310`, exit 2), naming the upstream
 and its live version; no parser returns absent, none or an empty list
 for a shape it did not recognize. An sbx call that exits non-zero is
 not a shape error: it is `sbx-unknown` (`RJ-308`, exit 1) where the
@@ -57,10 +58,9 @@ docs and the JSON Schemas (`tools/schemagen`, an in-repo reflect-based
 generator; no dependency), so types, validators, docs and schemas
 cannot drift. The tables below are the v1 design input to `rules.go`
 and the struct tags. The pull request that lands a format's generator
-(T021 for `project.v1`) replaces that format's field and rule tables
-here by a link to its generated page under `docs/reference/`; this page
-then keeps only the intent, the annotated example and the rules that
-are design decisions.
+replaces that format's field and rule tables here by a link to its
+generated page under `docs/reference/`; this page then keeps only the intent,
+the annotated example and the rules that are design decisions.
 
 ## 3.1 Name and path rules (shared)
 
@@ -286,9 +286,9 @@ project uses `git-ssh-sign`, and `secrets`
 Rules: every `argv[0]` is absolute and exists; no shell strings; an argv
 is a command that fetches the value and never carries it, so an argv
 element that starts with `ghp_`, `gho_`, `ghs_` or `github_pat_`, or
-matches `^[0-9a-f]{40}$`, is refused with the error id
-`secret-in-argv` (a best-effort guard against the common token shapes,
-not a detector); a spec secret name without a matching `name@project`
+matches `^[0-9a-f]{40}$`, is refused with the error `secret-in-argv`
+(`RJ-314`; a best-effort guard against the common token shapes, not a
+detector); a spec secret name without a matching `name@project`
 entry is exit 2 naming the key; a `name@other-project` entry never
 satisfies a different project; entries for unknown projects are
 reported by `doctor`. A secret argv and the credential helper run with
@@ -349,9 +349,9 @@ Passed by romeu on every `sbx env exec` as
 `--env JULIETA_MANIFEST=<base64url(canonical JSON)>`, cached by julieta
 at `$HOME/.local/state/julieta/manifest.json`. romeu checks the encoded
 size at `sync`, before the gate, and refuses a manifest over 32 KiB with
-the error id `manifest-size`; `julieta spec validate` reports the same
-rule. The Go type lives in `internal/manifest`, the one package both
-binaries import for it.
+the error `manifest-size` (`RJ-313`); `julieta spec validate` reports
+the same rule. The Go type lives in `internal/manifest`, the one
+package both binaries import for it.
 
 ```json
 {
@@ -553,8 +553,8 @@ recovery of each is the table of
 and `complete`. romeu recomputes completeness itself; the field is advisory.
 Every path (`bundles[].file`, `files[].path`, `worktrees[].path`, an
 embedded-repo path) is relative, cleaned, has no `..` element and no
-symlink component, and resolves below the salvage dir (error id
-`salvage-path`); the total bytes romeu verifies are bounded by
+symlink component, and resolves below the salvage dir (the error
+`salvage-path`, `RJ-307`); the total bytes romeu verifies are bounded by
 `salvage.capBytes`, and a manifest over it makes the salvage incomplete
 with reason `over-cap`.
 

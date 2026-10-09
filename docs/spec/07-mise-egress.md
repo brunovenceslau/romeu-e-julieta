@@ -162,9 +162,9 @@ cannot know.
   (01 1.4). A project sees gate 2 only when its gated egress changes.
 - `julieta spec validate --catalog projects/*.yaml` fetches every
   project's repos' `mise.lock` at their `ref` and lists unknown
-  `backend:tool` keys and lock hosts missing from the catalog. It exits
-  6 on an unknown `backend:tool` only, the case 7.5 step 2 makes a sync
-  error, and reports a missing lock host as a warning, since 7.5 step 3
+  `backend:tool` keys and lock hosts missing from the catalog. Of these
+  it exits 6 on an unknown `backend:tool` only, the case 7.5 step 2
+  makes a sync error, and reports a missing lock host as a warning, since 7.5 step 3
   gates it. It runs in the config repo's CI from a pinned julieta
   release, so that CI is red until an unknown tool is resolved (7.5,
   step 2, names the two fixes).
