@@ -19,14 +19,17 @@ permissions:
 
 # The environment of every mise run, mise-action's and the one of the
 # mise shim that starts go: mise reads mise.toml as its one
-# configuration file, and mise.lock. It is miseEnv in
-# tools/ci/misefiles.go, which says why, and the workflows check holds
-# this table to that list.
+# configuration file, and mise.lock, and every go command of the job
+# reads no "go env -w" file and starts no other go. It is
+# miseEnv in tools/ci/misefiles.go, which says why, and the workflows
+# check holds this table to that list.
 env:
   MISE_OVERRIDE_CONFIG_FILENAMES: mise.toml
   MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES: none
   MISE_ENV: ""
   MISE_AUTO_ENV: "false"
+  GOENV: "off"
+  GOTOOLCHAIN: local
 
 jobs:
   all:

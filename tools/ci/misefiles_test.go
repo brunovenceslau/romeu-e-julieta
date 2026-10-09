@@ -25,13 +25,24 @@ func TestMiseEnvList(t *testing.T) {
 		"MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none",
 		"MISE_ENV=",
 		"MISE_AUTO_ENV=false",
+		"GOENV=off",
+		"GOTOOLCHAIN=local",
 	}, miseEnv)
+	assert.Equal(t, []string{"GOENV=off", "GOTOOLCHAIN=local"}, goPinEnv)
+	assert.Subset(t, stepEnv("/go"), goPinEnv, "stepEnv holds goPinEnv")
 	for _, kv := range miseEnv {
 		key, _, _ := strings.Cut(kv, "=")
 		for _, list := range [][]string{passThrough, networkPassThrough, dockerPassThrough} {
 			assert.NotContains(t, list, key)
 		}
 	}
+	// A value of the caller's for a variable of miseEnv loses to the list's.
+	cmd := exec.CommandContext(t.Context(), "env")
+	cmd.Env = miseEnviron([]string{"GOENV=/hostile", "GOTOOLCHAIN=go1.99.0"})
+	out, err := cmd.Output()
+	require.NoError(t, err)
+	assert.Contains(t, string(out), "GOENV=off\n")
+	assert.Contains(t, string(out), "GOTOOLCHAIN=local\n")
 	base := []string{"PATH=/x"}
 	assert.Equal(t, append([]string{"PATH=/x"}, miseEnv...), miseEnviron(base))
 	assert.Equal(t, []string{"PATH=/x"}, base, "the base is not changed")
@@ -123,6 +134,9 @@ func TestMiseEnvStopsConfigs(t *testing.T) {
 	assert.Empty(t, written(miseEnviron(base)), "with miseEnv")
 	for _, kv := range miseEnv {
 		key, _, _ := strings.Cut(kv, "=")
+		if !strings.HasPrefix(key, "MISE_") {
+			continue // a go variable, which mise does not read
+		}
 		without := slices.DeleteFunc(miseEnviron(base), func(v string) bool { return v == kv })
 		assert.NotEmpty(t, written(without), "miseEnv without %s", key)
 	}

@@ -13,7 +13,7 @@ reference, with the contributor docs as outlines.
 | shared packages (`internal/...`) | Go | see the capability map |
 | CI, release and dev tooling (`tools/ci`, `tools/new`, `tools/schemagen`, `tools/release`, `tools/kitpin`) | Go | one entry point for local and CI |
 | host probe harness (`e2e/probes`) | Go | runs probe steps, writes `probe-result.v1` JSON |
-| git hook in this repo (`.githooks/pre-push`) | POSIX sh, one line | `exec env <the mise environment> go run ./tools/ci fast "$@"`: the four variables of `miseEnv` in `tools/ci/misefiles.go`, held to that list by a test, so the mise shim that starts go reads `mise.toml` alone; git's pre-push arguments and stdin pass through (10 10.2) |
+| git hook in this repo (`.githooks/pre-push`) | POSIX sh, one line | `exec env <the mise environment> go run ./tools/ci fast "$@"`: the variables of `miseEnv` in `tools/ci/misefiles.go`, held to that list by a test, so the mise shim that starts go reads `mise.toml` alone and a go command it starts reads no `go env -w` file and runs no other toolchain; git's pre-push arguments and stdin pass through (10 10.2) |
 | kit install steps | POSIX sh, <= 5 lines per step | download + sha256 check + install only |
 | skills (`skills/*/SKILL.md`) | Markdown | Claude Code skills |
 | schemas | JSON Schema 2020-12 | generated into `schemas/*.json` |
@@ -84,18 +84,20 @@ counts a version with a `-` suffix as a prerelease.
 The checksum database guards `govulncheck` under a condition, on the
 install that builds it. In hosted CI that is the mise action's step of
 `ci.yml`, which runs before `tools/ci setup`, so `setup` finds the
-tools installed; it runs in the runner's environment, and the
-guarantee rests on that environment setting none of the variables
-below. On a developer machine it is `tools/ci setup`, which runs `mise
-install` in an environment built from nothing, so no `GO` variable of
-the caller reaches it: not `GOSUMDB`, `GONOSUMDB` or `GOPRIVATE`, which
-turn the database off for a module, nor `GOINSECURE`, `GOPROXY`,
-`GOFLAGS`, `GOTOOLCHAIN` or `GOVCS`. Three inputs still reach both
-installs, so the guarantee holds when none of them changes the build:
-a `go env -w` file in the user's configuration directory, since
-neither install sets `GOENV=off` (`GOENV=off` and `GOTOOLCHAIN=local`
-are set only for the go steps of `tools/ci`, through `stepEnv`, never
-for an install); a mise configuration other than the
+tools installed. `miseEnv` ends with `goPinEnv`, `GOENV=off` and
+`GOTOOLCHAIN=local`, the two variables `stepEnv` sets for the go steps
+of `tools/ci` too, so both installs run with them: the hosted one
+through the `env` table of `ci.yml`, which the workflows check holds to
+`miseEnv`, and `tools/ci setup` through `miseEnviron`. So no `go env
+-w` file is read and no other go is started, unless a mise
+configuration named below sets them. On a developer machine
+`tools/ci setup` runs `mise install` in an environment built from
+nothing, so no `GO` variable of the caller reaches it: not `GOSUMDB`,
+`GONOSUMDB` or `GOPRIVATE`, which turn the database off for a module,
+nor `GOINSECURE`, `GOPROXY`, `GOFLAGS` or `GOVCS`. In hosted CI the
+guarantee rests on the runner's environment setting none of those.
+Two inputs still reach both installs, so the guarantee holds when
+neither changes the build: a mise configuration other than the
 project's `mise.toml`, such as a global one whose `[env]` table sets
 `GOFLAGS` or `GOPROXY`, since `HOME` and `MISE_CONFIG_DIR` pass
 through; and a module cache seeded beforehand, since `GOPATH` and

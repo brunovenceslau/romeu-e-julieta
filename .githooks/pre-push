@@ -1,2 +1,2 @@
 #!/bin/sh
-exec env MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none MISE_ENV= MISE_AUTO_ENV=false go run ./tools/ci fast "$@"
+exec env MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none MISE_ENV= MISE_AUTO_ENV=false GOENV=off GOTOOLCHAIN=local go run ./tools/ci fast "$@"
