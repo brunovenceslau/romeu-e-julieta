@@ -40,4 +40,4 @@ says why each surface is on the list.
 | `decisions` | `docs/adr/**`, `.adr-dir` | decision records; one leaves Proposed, or changes after that, with the maintainer's approval |
 | `spec` | `docs/spec.md`, `docs/spec/01-system-model.md`, `docs/spec/05-security.md` | the gates read tables in these pages (the vocabulary in 01 1.7 and the index), and 05 holds the security model |
 | `checks` | `tools/ci/**`, `.githooks/**`, `.golangci.yml`, `docs/acceptance.json` | the code of the gates and reports, with the forbidden-name denylist (tools/ci/denylist.yaml), the linter configuration, and the acceptance file, whose command items tools/ci acceptance runs |
-| `ask-first` | `.github/ask-first.yaml`, `.github/CODEOWNERS` | this list, and the CODEOWNERS file generated from it |
+| `ask-first` | `.github/ask-first.yaml`, `.github/CODEOWNERS`, `docs/grants.yaml` | this list, the CODEOWNERS file generated from it, and the checkpoint grants that stand in for approval lines |

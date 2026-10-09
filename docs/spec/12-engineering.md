@@ -425,14 +425,16 @@ surface that needs one, the maintainer gives the words in a review
 comment, and the author pastes them as the phrase. The generated
 ask-first page says the same.
 
-**A checkpoint grant.** At a plan checkpoint the maintainer may grant,
-in their own words recorded in the plan's section for that checkpoint,
+**A checkpoint grant.** At a plan checkpoint the maintainer may grant
 the approval lines of a list of tasks, per surface, on the `contracts`,
 `checks`, `dependencies`, `catalog`, `ledger`, `digests` and `termsafe`
-surfaces. A pull request for one of those tasks carries the approval
-line with the phrase `granted at <checkpoint> for <task id>`, and `pr`
-accepts it when the plan at the base commit holds that grant for that
-surface and task. Every other surface (`gates`, `gitsafe`, `signing`,
+surfaces, recorded in `docs/grants.yaml`, a file on the `ask-first`
+surface, so a grant is itself an ask-first change. A pull request for
+one of those tasks carries the approval line with the phrase
+`granted at <checkpoint> for <task id>`; `pr` reads `docs/grants.yaml`
+at the base commit and accepts the line only when that file holds that
+grant for that surface and task. The plan names the checkpoints, and it
+is not where a grant is read from. Every other surface (`gates`, `gitsafe`, `signing`,
 `release`, `kits`, `decisions`, `spec` and `ask-first`)
 keeps an approval line in the maintainer's words on each pull request. The line is typed by the PR's author, so the check
 proves that the approval was recorded, not who gave it. While one

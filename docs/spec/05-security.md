@@ -206,9 +206,10 @@ approval line, the ruleset's requirements, and which revision of this
 file `pr` reads are defined in one place,
 [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change);
 what an approval is worth with one account is in 5.4. At a plan
-checkpoint the maintainer may grant, in their own words, the approval
-lines of a list of tasks on the `contracts`, `checks`, `dependencies`,
-`catalog`, `ledger`, `digests` and `termsafe` surfaces, in the form 12
+checkpoint the maintainer may grant the approval lines of a list of
+tasks on the `contracts`, `checks`, `dependencies`, `catalog`,
+`ledger`, `digests` and `termsafe` surfaces, recorded in
+`docs/grants.yaml`, which is on the `ask-first` surface, in the form 12
 12.4 defines; every other surface keeps an approval line in the
 maintainer's words on each pull request.
 
@@ -291,8 +292,8 @@ surfaces:
     globs: [tools/ci/**, .githooks/**, .golangci.yml, docs/acceptance.json]
     reason: the code of the gates and reports, with the forbidden-name denylist (tools/ci/denylist.yaml), the linter configuration, and the acceptance file, whose command items tools/ci acceptance runs
   - id: ask-first
-    globs: [.github/ask-first.yaml, .github/CODEOWNERS]
-    reason: this list, and the CODEOWNERS file generated from it
+    globs: [.github/ask-first.yaml, .github/CODEOWNERS, docs/grants.yaml]
+    reason: this list, the CODEOWNERS file generated from it, and the checkpoint grants that stand in for approval lines
 ```
 
 ## 5.4 Known residual risks (accepted in v1)

@@ -289,10 +289,11 @@ func TestGlobMatch(t *testing.T) {
 }
 
 // TestCodeownersAsksFirst holds the ask-first surface of the committed
-// list to the list itself and the CODEOWNERS file generated from it: a
+// list to the list itself, the CODEOWNERS file generated from it and
+// the checkpoint grants that stand in for approval lines (12 12.4): a
 // change to CODEOWNERS asks for the review even where generated does
 // not judge the commit, as when a step that runs before it rewrote the
-// index (05 5.3).
+// index (05 5.3), and a grant is itself an ask-first change.
 func TestCodeownersAsksFirst(t *testing.T) {
 	src, err := os.ReadFile(filepath.Join(moduleRoot(t), askFirstPath))
 	require.NoError(t, err)
@@ -300,5 +301,5 @@ func TestCodeownersAsksFirst(t *testing.T) {
 	require.NoError(t, err)
 	i := slices.IndexFunc(list.Surfaces, func(s surface) bool { return s.ID == "ask-first" })
 	require.GreaterOrEqual(t, i, 0, "the ask-first surface")
-	assert.Equal(t, []string{askFirstPath, codeownersPath}, list.Surfaces[i].Globs)
+	assert.Equal(t, []string{askFirstPath, codeownersPath, "docs/grants.yaml"}, list.Surfaces[i].Globs)
 }

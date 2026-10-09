@@ -76,3 +76,4 @@
 # ask-first
 /.github/ask-first.yaml @brunovenceslau
 /.github/CODEOWNERS @brunovenceslau
+/docs/grants.yaml @brunovenceslau
