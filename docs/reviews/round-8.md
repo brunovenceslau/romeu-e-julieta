@@ -1736,7 +1736,8 @@ como pendente") are already recorded in "Session of 2026-10-08, continued".
   is in `round-8/write-pass.md`, marked not adversarially verified). The
   house payload rule that every pull request in a stack targets `main` is
   to be amended in a payload pull request, which is ask-first. The
-  explanation of `--base` the operator asked for is still owed.
+  explanation of `--base` the operator asked for was given in the session
+  chat on 2026-10-09.
 - Round 9, answering whether to run it after the write pass. Operator:
   "Sim, rodar a rodada 9 (Recommended)".
 - Merges done by the operator: PR #22, "pr 22 landed;" (after "Pode fazer
