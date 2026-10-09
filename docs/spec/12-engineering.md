@@ -431,10 +431,13 @@ file of the default branch, with `permissions: contents: read` and no
 secret. It checks out the default branch's commit (`github.sha`), with
 its `go.mod`, `go.sum`, `mise.toml` and `mise.lock`, and builds `pr`
 there; it never checks out `pull_request.base.sha`. Where the code of
-`pr` lives and the command line of its step are decided by the task
-that builds it; until then this specification writes `tools/ci pr` for
-the step and `go run ./tools/ci pr` for its command line, and that
-task's pull request updates both where they appear. The check that the
+`pr` lives, which file holds `approvalLine`, and the command line of its
+step are decided by the task that builds it; until then this
+specification writes `tools/ci pr` for the step,
+`go run ./tools/ci pr` for its command line and
+`tools/ci/askfirst.go` for that file, and that task's pull request
+updates each where it appears, the `approvals` glob that names the file
+included. The check that the
 base is the default branch (12.9) stays, but it is not what makes the
 code trusted.
 So a run judges a pull request with the current `main`, and a pull
@@ -470,9 +473,12 @@ leading space, a leading U+00A0 and a `##[` case. A required check is
 matched by name, and the head's own `pull_request` workflows run from
 the head, so `pr` compares each head job's check name (its `name`,
 else its id) with the pr job's name and refuses a match outside the
-pr job's file, and refuses a head whose version of the pr job's file
-names an event other than `pull_request_target`, with a fixture for
-each. It reads
+pr job's file; refuses a head job outside the pr job's file whose
+`name` holds `${{`, since the check name it posts is known only once
+the run expands the expression, with a fixture for a literal
+expression and one for a matrix value; and refuses a head whose
+version of the pr job's file names an event other than
+`pull_request_target`, with a fixture for each. It reads
 `.github/ask-first.yaml` at the base commit and at the head commit and
 uses the union of the two lists, so a PR that removes a surface or a
 glob still needs that surface's line.

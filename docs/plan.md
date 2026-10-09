@@ -556,19 +556,48 @@ task list:
   - The invariant of 05 5.3 holds: no code that a pull request changes
     judges that pull request. This task decides where the code of `pr`
     lives and how it reads the head, and shows each of these (round 11,
-    R11-01 to R11-03, decided on 2026-10-09):
-    - every input `pr` reads from the head is parsed by code under a
-      path no checkpoint grant covers, its YAML and TOML readers
-      included (R11-02);
-    - the code `pr` builds imports only the standard library and
-      packages on `approvals`, held by a test, and the `approvals`
-      globs of `.github/ask-first.yaml` name those packages'
-      directories (R11-01);
-    - `pr`, built from the default branch, applies the version-pin
+    R11-01 to R11-03, decided on 2026-10-09; round 12, R12-02, R12-05
+    and R12-06):
+    - (a) every input `pr` reads from the head is parsed by code under
+      paths on `approvals`, its YAML and TOML readers included
+      (R11-02);
+    - (b) the code `pr` builds imports only the standard library and
+      packages under paths on `approvals`, and the `approvals` globs of
+      `.github/ask-first.yaml` name those packages' directories (R11-01).
+      A test holds it: it maps each package of `go list -deps -test`
+      to its directory and matches the directory to an `approvals`
+      glob, reading a path whose first element has no dot as the
+      standard library; a fixture package that imports a path outside
+      the globs turns it red;
+    - (c) `pr`, built from the default branch, applies the version-pin
       rules of `mise.toml` and `go.mod` of 10 10.2 to the head
-      (R11-03);
-    - the mise toolchain and the `go` line of `go.mod` are the grantable
-      inputs left under the job, each listed in 05 5.4.
+      (R11-03), and refuses a head that adds a tracked `go.work`,
+      `go.work.sum` or `vendor/`, the hygiene rule of 10 10.2 applied
+      from the base, since the go command reads those files from the
+      checkout and the rule that refuses them runs from the head's
+      `tools/ci`; one fixture each (R12-02);
+    - (d) the mise toolchain and the `go` line of `go.mod` are the
+      grantable inputs left under the job, each listed in 05 5.4;
+    - (e) every committed `.github/ask-first.yaml` and
+      `docs/grants.yaml` gives `pr` and the generator of 12 12.3 the
+      same surface set, held by a test, or both use one reader
+      (R12-05).
+  - Each fixture 12 12.4 names is an acceptance line here, and the
+    removal written after it turns it red (R12-06):
+    - the hostile fixture repository (a submodule, a textconv driver,
+      an external diff driver and hooks) against each git call `pr`
+      makes on head objects: removing any one flag of 12 12.4 from its
+      call;
+    - "pr escapes a workflow command in a PR body", with a leading
+      space, a leading U+00A0 and a `##[` case: removing the fixed
+      prefix or the `##[` escape;
+    - a head job outside the pr job's file whose check name equals the
+      pr job's: removing the name comparison;
+    - a head job outside the pr job's file whose `name` holds `${{`,
+      one with a literal expression and one with a matrix value:
+      removing the `${{` refusal;
+    - a head version of the pr job's file that names an event other
+      than `pull_request_target`: removing the event check.
 - Verify: `go test ./tools/ci/... -run '^TestPR'`, which runs the
   fixture lines; `go run ./tools/ci pr <payload file>` on a saved
   payload.

@@ -281,6 +281,12 @@ resort for each.
 | `fsck-failed` | the bundle holds a malformed object; inspect the repo in the sandbox, then rerun |
 | `daemon-url-refused`, a missing repo, daemon heads not in the bundle | rerun once the sandbox is reachable at its daemon; a persisting one names an sbx change |
 
+A rerun of `rm`, `recreate` or `retire` on a `removing` generation whose
+worktrees keep changing is not a skipped reason: the third salvage in a
+row that a changed fingerprint starts exits 5 with the error
+`fingerprint-unstable` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids)),
+which `--accept-loss` does not cover, and its hint is the recovery.
+
 ### Not salvaged
 
 Salvage keeps only what the steps above name. It does not keep paths

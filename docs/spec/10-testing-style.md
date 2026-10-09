@@ -775,7 +775,10 @@ hold the first two items of the list, `--source-digest` the commit and
 them; the `gh` floor of [12 12.1](12-engineering.md#121-tech-stack)
 fixes them for the operator. A `tools/ci` test fails when the `gh`
 pinned in `mise.toml` is below that floor, which 12 12.1 states once
-and the test reads from there, with a fixture. `commands.yaml` gives these lines and the
+and the test reads from there, with two fixtures: a pin below the floor
+fails and a pin at the floor passes; the test also fails when 12 12.1
+holds no floor it can parse, so a reworded floor does not leave it
+green on a stale number. `commands.yaml` gives these lines and the
 checksum line as one block, with the tag as its one variable. The releases carry
 `checksums.txt` and the keyless build provenance attestation, and no
 other signature; what the attestation proves, and what it does not, is
@@ -833,8 +836,11 @@ What they set up, and holds now:
   ruleset only, and the operator's token holds that role: the
   default-branch ruleset has no bypass actor once the maintainer step
   of [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md),
-  decision 1, removes it, and until that step the role bypasses it for
-  pull requests. The merge requirements, and what they are worth, are in
+  decision 1, removes it. Until that step the role bypasses the
+  required checks on a pull request merge; the API answer, saved under
+  Evidence, that shows the default-branch ruleset with no bypass actor
+  ends that state, and the index's S2 and local-gates row read it
+  here. The merge requirements, and what they are worth, are in
   [05 5.4](05-security.md#risks-of-how-this-repository-is-developed).
   Two repository settings, which bind a bypass actor too: squash
   merging and rebase merging off, so every merge is a merge commit
@@ -846,7 +852,12 @@ What they set up, and holds now:
 - d. Four tries with the sandbox's token; of the four, only the direct
   push to the default branch was refused (05 5.4; tried on 2026-10-08;
   under the rules of 2026-10-09 it is read, not tried, and the try is
-  repeated with the four tries after the token narrowing).
+  repeated with the four tries after the token narrowing). A fifth try
+  runs after the narrowing, to do: on a throwaway pull request, post a
+  commit status with the token, and a check from a workflow pushed on
+  a side branch, each under a required check's name on that pull
+  request's head, and record which of the two the ruleset counts
+  (05 5.4; round 12, D1, decided on 2026-10-09).
 
 The host runs `tools/ci`, `hygiene add` included, only from a commit
 whose diff since the last host run the maintainer has read, or from the
