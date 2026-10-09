@@ -702,9 +702,13 @@ The workflow has two kinds of job:
      ancestor of the release commit, or when a file that holds a guard
      or test tag of 05 5.2 changed between the two. It reads the run
      through the GitHub API with the step's `GH_TOKEN` (the release
-     publish job row) and the job's `actions: read` permission. The
-     three answers of that read, `success`, another conclusion and no
-     run found, are each a fixture of the tests of `tools/release`. A
+     publish job row) and the job's `actions: read` permission (the
+     permissions are inferred until the first `release.yml` run reads
+     each endpoint; its log goes under that PR's Evidence).
+     Any other answer, an API error included, refuses. Each answer is a
+     fixture of the tests of `tools/release`: "fuzz run success
+     builds", "fuzz run of another conclusion refuses", "no fuzz run
+     found refuses" and "fuzz run API error refuses". A
      `--dry-run` build, which the e2e step calls, reads no network and
      makes no such check. It cross-compiles the
      julieta linux binaries, embeds them, the kits and the catalog into
@@ -724,7 +728,9 @@ The workflow has two kinds of job:
      ([12 12.6](12-engineering.md#126-release-notes)); it reads the
      merged pull requests, their authors and the issues they close
      through the GitHub API with the step's `GH_TOKEN` and the job's
-     `pull-requests: read` and `issues: read` permissions.
+     `pull-requests: read` and `issues: read` permissions (the
+     permissions are inferred until the first `release.yml` run reads
+     each endpoint; its log goes under that PR's Evidence).
   5. `tools/release publish` creates the release as a draft, uploads
      every asset and publishes it, in one call, and marks it a
      prerelease when the tag has a suffix after the patch number
@@ -902,7 +908,8 @@ stdout are compared. For each release it also checks that the tag's
 commit equals the source digest in the release's attested provenance,
 so a `v*` tag moved to another commit is found. Step 7 of the release
 checklist of [12 12.2](12-engineering.md#122-development-commands-and-capability-map)
-runs it at every release after v1.0.0.
+runs it at every release after v1.0.0, with `--tags`, which runs that
+check alone.
 
 It also checks six things that are complete only at the end of the
 plan. They read only the repository, and they join `all` once the

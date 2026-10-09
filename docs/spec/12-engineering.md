@@ -267,9 +267,10 @@ ordered list; each step names its command and its output:
 6. `go run ./tools/ci acceptance`, and the acceptance pull request
    commits `docs/acceptance.json`.
 7. For every release after v1.0.0, once `release.yml` has published
-   it: `go run ./tools/ci acceptance` exits 0, which checks each
-   release's tag commit against its attested provenance
-   ([10 10.5](10-testing-style.md#105-acceptance-evidence)).
+   it: `go run ./tools/ci acceptance --tags` exits 0; it runs only the
+   check of [10 10.5](10-testing-style.md#105-acceptance-evidence)
+   that each release's tag commit equals the source digest in its
+   attested provenance.
 
 A check that fails after the tag is fixed by a patch release. The two
 tags are maintainer steps by working agreement: the tag ruleset does not
@@ -574,7 +575,9 @@ starts at the second release. It reads the merged pull requests, their
 authors and the issues they close through the GitHub API, with the
 `GH_TOKEN` of its step in the publish job
 ([10 10.2](10-testing-style.md#release-and-bootstrap)), and everything
-else from git.
+else from git (the permissions are inferred until the first
+`release.yml` run reads each endpoint; its log goes under that PR's
+Evidence).
 
 ## 12.7 Text standard and lessons
 

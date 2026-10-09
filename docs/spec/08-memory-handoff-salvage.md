@@ -64,13 +64,20 @@ bound limits its volume, not its content
 ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1)).
 
 Both hooks invoke julieta by the absolute path of the read-only
-`.romeu/bin` mount ([06 6.4](06-kits.md#64-product-kits)). A hook
-always exits 0: on a failure it prints one stdout line naming the
+`.romeu/bin` mount ([06 6.4](06-kits.md#64-product-kits)). The
+SessionStart and SessionEnd hooks always exit 0: on a failure it prints one stdout line naming the
 failure and `julieta status`, and julieta records it as a hook failure.
 When julieta itself cannot run (the mount is absent after an sbx
 change), nothing of julieta is there to print, so the kit renders each
 hook command as a shell wrapper that prints the failure line and exits
-0 in that case.
+0 in that case. The PreToolUse guard of 06 6.4 is excluded from this
+rule, because it must fail closed: its wrapper exits 2 when its program
+cannot run, which blocks the tool call. By the Claude Code hooks
+documentation (code.claude.com/docs/en/hooks, read on 2026-10-09), exit
+2 is the one exit code that blocks a PreToolUse call by itself; any
+other code, a hook that cannot start and a hook that times out let the
+call proceed, so a guard that hangs is not a gate. Probe C5 confirms
+this for the pinned version.
 Which sources fire, that the output reaches the agent's context, its
 size limit, the behaviour on a non-zero exit and the SessionEnd timeout
 of the pinned version are recorded by one probe row of
@@ -198,7 +205,7 @@ manifest.
    (they may contain echoed tokens), listed as `transcript-excluded`;
    scratch dirs named by the agent profile within the same cap. The
    profile splits its paths into required ones, which exist at the
-   pinned agent (`julieta setup` and probes C3 and C5 check them), and
+   pinned agent (`julieta setup` and probe C5 check them), and
    optional ones, such as a todos or scratch dir a session never
    created. Only a missing required path is the skipped item
    `agent-path-missing`; a missing optional path is no item.

@@ -186,7 +186,9 @@ work as usual.
 5. [X] `sbx env rm <dir>`; [H] remove romeu-applied egress rules;
    generation `removing -> closed-removed`. If `sbx env rm` fails, the
    generation stays `removing` and romeu exits 1; the same command run
-   again resumes at `sbx env rm`. For `recreate`, continue
+   again resumes at `sbx env rm` when the daemon heads equal those in
+   the salvage record, and otherwise salvages again first. For
+   `recreate`, continue
    with J3b. If that create fails because an upstream artifact is gone
    (a workload digest, the frontend, a kit download host), the
    generation stays closed, the salvage refs and memory are intact and

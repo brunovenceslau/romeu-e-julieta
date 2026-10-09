@@ -187,7 +187,7 @@ rest.
 | L10-r9-1 | 11 11.1 A13 | unresolved | Round 8 applied L10-8 'as proposed', which included dropping cmux from the examples. | apply the change the finding proposes | A |
 | L10-r9-2 | 12 12.8 README row; 03 3.5 | new | The README prerequisite and 3.5 say the catalog 'covers the reference config repo's stack'. | apply the change the finding proposes | A |
 | L10-r9-3 | 03 opening (Versions) | new | The new rule says user-authored formats change only by a new schema version announced in the release notes, and that the bumping release reads the previous version. | apply the change the finding proposes | A |
-| L10-r9-4 | 05 5.4 row 'protective command'; spec.md Q13 | new | Product-facing text carries review-record ids and a maintainer-instance default. | apply the change the finding proposes | A |
+| L10-r9-4 | 05 5.4 row 'protective command'; spec.md Q13 | new | Product-facing text carries review-record ids and a maintainer-instance default. | apply the change the finding proposes; this removes the clause R8-index-33 added; the 05 5.4 split between product and development rows carries what it said | A  |
 | L11-r9-2 | index (the page table, row 06); 06 | unresolved | The page table of the index still describes 06 as 'kits v3 (local builds), workload, julieta delivery, product kits, publishing path', but 06 now has sections 6.1 to 6.5 and no publishing path; the resolution of R8-index-4 and R8-06-5 was to move only the pointer. | apply the change the finding proposes | A |
 | L12-R9-3 | 02 2.1 (tools/ci entry); 10 10.2 | unresolved | The tree now gives tools/ci one package per step, but says the steps are 'registered in one dispatcher table'. | apply the change the finding proposes | A |
 | L12-R9-4 | 12 12.2 (module table and the directory-to-module test) | new | The new sentence says a package module owns internal/<id> and that a tools/ci test holds the tree, this table and the package list to the same set of directories. | apply the change the finding proposes | A |
@@ -286,6 +286,13 @@ and in the text it changes.
   next decision-record pass carrying the four, with D2 and D4 if they
   are decided by then; (b) one record each. Recommendation: (a).
   Approval line: `decisions`.
+- **D6 (ship9-te-1), the packages S9 measures.** S9 lists `cmd/...`,
+  but `coverTrees` in `tools/ci/coverage.go` holds `internal`, `tools`,
+  `e2e/probes` and `e2e/fakesbx`, so a package under `cmd/` is not
+  measured. Options: (a) add `cmd` to `coverTrees` with a test, a
+  tooling pull request on the `checks` surface; (b) drop `cmd/...` from
+  S9, which changes a success criterion. Recommendation: (a). Approval
+  line: `checks`.
 
 ## Exit criteria of stage A
 
@@ -333,7 +340,7 @@ regressed Required.
 
 What is left before T004, after the write pass below:
 
-- the operator's answers to D2 to D5; R9-24 and R9-25 are the two
+- the operator's answers to D2 to D6; R9-24 and R9-25 are the two
   Required clusters still open, and R9-24's row is the one index row of
   criterion 3 the pass did not fix (the other three, L6-r9-7 and the two
   cells of L13-R9-4, are fixed);
@@ -383,3 +390,19 @@ while `doctor` itself reports them through exit 6, which their rows do
 not spell out; the R9-02 job permissions (`actions: read`,
 `pull-requests: read`, `issues: read`) are inferred, not read from
 GitHub's documentation.
+
+The ship gate's round 1 on 42cc664 was NO-GO. Its must-fix findings
+ship9-cr-1 with ship9-sa-5, ship9-sa-1, ship9-sa-2 and ship9-sa-3, and
+its capped findings ship9-sa-4, ship9-sa-6, ship9-cr-2 to ship9-cr-5
+and ship9-te-2, were applied in one write pass, the commit "docs(spec):
+apply the round-9 ship-gate fixes"; ship9-te-1 is D6. Two fix texts
+were adjusted where the spec showed them wrong: the `sbxdrv` surface
+dependency sits on the first plan task that adds a file under
+`e2e/fakesbx` (T015), not T016; and the inferred release permissions
+are confirmed by the first `release.yml` run only, since a `--dry-run`
+build reads no network. The test cases of ship9-te-3 (the
+`root-indexed` row of 04 4.2) and ship9-te-4 (the `removing` and
+`salvaging` transitions, in I17 of 05 5.2) were added in the same
+commit. Pending, for the tooling that closes it: ship9-te-5, a
+`tools/lenses` check that each review report is well formed (valid
+JSON with the fields of "What a reviewer returns" in lenses.md).

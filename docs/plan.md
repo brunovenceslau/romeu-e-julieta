@@ -751,7 +751,9 @@ task list:
 
 - [ ] Merged
 - Module: `probes`. Implements: 10 10.3, 05 5.2 (I4, I25).
-- Depends on: T014. Operator: no. Ask-first: none expected.
+- Depends on: T014, and the `sbxdrv` surface tooling PR (05 5.3), since
+  this is the first task that adds a file under `e2e/fakesbx`.
+  Operator: no. Ask-first: `sbxdrv`.
 - Acceptance:
   - The map names no owner for `e2e/fakesbx`; see [Questions for the
     maintainer](#questions-for-the-maintainer).
@@ -769,7 +771,7 @@ task list:
 - [ ] Merged
 - Module: `romeu-cli`. Implements: 06 6.3, 05 5.2 (I30), 10 10.1 (E2E
   hybrid).
-- Depends on: T013, T015. Operator: no. Ask-first: none expected.
+- Depends on: T013, T015. Operator: no. Ask-first: `sbxdrv`.
 - Acceptance:
   - At the hybrid level on both Linux runners, the compatibility check
     passes for a julieta of an accepted protocol, with the expected
