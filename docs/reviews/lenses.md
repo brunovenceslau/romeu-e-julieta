@@ -1013,3 +1013,4 @@ sits out costs the round that would have needed it.
 | 9 | 8ecfbb2, the head of pull request #25 (the round-8 write pass), for the targeted re-audit of step 6 | L0 to L16, with no noise probe | round-9.md |
 | 10 | d458f83, the head of pull request #36 (the round-9 write pass), for the targeted re-audit of step 6 | L0 to L16, with no noise probe | round-10.md |
 | 11 | d133542, the head of pull request #36 (the round-10 write pass), for the targeted re-audit of step 6 | L0 to L16, with no noise probe | round-11.md |
+| 12 | 6fd6e60, the head of pull request #36 (the round-11 write pass), for the targeted re-audit of step 6 | L0, L2, L3, L6, L12, L13 and L14, the lenses that raised round-11 findings, with no noise probe; the verdicts of the others carry forward | round-12.md |
