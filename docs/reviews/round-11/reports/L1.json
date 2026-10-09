@@ -1,0 +1,12 @@
+{
+"header":"L1 · The developer who uses it every day · sonnet",
+"verdict":"Both round-10 L1 findings read as resolved at the baseline. One advisory from the delta: the salvage fingerprint hashes every untracked and ignored file on a rerun after a failed removal.",
+"prior_checked":2,
+"prior_resolved_as_stated":2,
+"findings":[
+{"id":"L1-r11-1","kind":"new","severity":"Advisory","section":"03 3.8 (salvage[].fingerprint); 01 1.6; 09 J7 step 5","defect":"The fingerprint that gates the resume of a removing generation digests untracked and ignored paths, each with the digest of its file, and no page says what that costs or when the user sees it.","scenario":"sbx env rm fails once on a Mac with several clones holding node_modules or target dirs. The user reruns romeu rm and waits, with no output and no budget, while every ignored file is hashed; the user concludes the tool hung and interrupts it, leaving the generation removing.","change":"State in 3.8 or 04 that the fingerprint step prints a progress line, or that ignored paths are digested by path, size and mtime; or name the expected cost in the resume row."}
+],
+"pages_read":["docs/reviews/lenses.md (L1, return fields, stage A)","docs/reviews/round-10/reports/L1.json","docs/reviews/round-10.md (L1 rows, R10-06)","docs/spec/09 (J1 steps 1, 2, 5; J7 delta)","docs/spec/06 (6.4)","docs/spec/01 (1.6 delta)","docs/spec/04 (doctor rows, RJ-337)","docs/spec/03 and 05 (delta lines)","docs/spec/08 (resume, gap line)"],
+"out_of_scope":"Pages 10, 11, 12, plan and the ADR skimmed by stat only. L1-r10-1 stays as the round-10 resolution states it: J1 step 5 names no askpass program and points at probe B2 for the outcome without one. I did not re-raise that.",
+"confidence":"Medium: prior items checked by reading baseline text; the new finding rests on reading the 3.8 fingerprint definition, not on a measurement."
+}

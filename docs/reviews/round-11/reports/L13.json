@@ -1,0 +1,66 @@
+{
+  "header": "L13 · The reader who holds the spec against itself · opus",
+  "verdict": "Met for round 10: all five L13 findings with status A (R10-1 to R10-5) read at d133542 as their resolutions say. The largest gap is new and comes from the G5 package split. 05 5.3 and 12 12.4 make `pr` a main package of its own, `tools/ci/pr`, whose import closure is the standard library plus paths on `approvals`. But 12 12.4 still puts `approvalLine` in `tools/ci/askfirst.go`, a file of the `tools/ci` main package, which Go cannot import. 12 12.2 still gives `go run ./tools/ci pr` as the command, and 02 2.1 still lays `tools/ci` out as one dispatcher with one package per step. The closure also leaves out the YAML library of 12 12.1, yet `pr` reads three YAML files that other tools read with that library. Two Required findings and two Advisory ones.",
+  "prior_checked": 5,
+  "prior_resolved_as_stated": 5,
+  "findings": [
+    {
+      "id": "L13-R11-1",
+      "kind": "new",
+      "severity": "Required",
+      "section": "05 5.3 (the `pr` package paragraph; the `approvals` globs); 12 12.4 (\"`approvalLine` in `tools/ci/askfirst.go`\"; \"Where this specification writes `tools/ci pr`\"); 12 12.2 (Development commands, the two PR checks lines); 02 2.1 (the `tools/ci/` line); 10 10.2 (steps table, the pr row)",
+      "defect": "The delta moves `pr` into a main package of its own, `tools/ci/pr`, whose import closure may hold only the standard library and paths on `approvals`. The texts that place its code were left as they were. 12 12.4 defines the approval-line regexp `approvalLine` in `tools/ci/askfirst.go`, and the `approvals` glob names that file. It belongs to package `tools/ci`, the main package that `go run ./tools/ci <subcommand>` builds, and Go refuses to import a main package, so the check `pr` exists to run cannot be in `pr`'s closure. 12 12.2 still gives `go run ./tools/ci pr <payload file>` and `go run ./tools/ci pr --title <t> --body <file>`, while 10 10.2's grammar and local-run paragraph say `go run ./tools/ci/pr`. The alias sentence of 12 12.4 renames the name `tools/ci pr`, not a literal command line. 02 2.1 says `tools/ci` is one package per step under `tools/ci/internal/<step>/` behind a generated dispatcher, and it does not mention the second main package. The `go list -deps` test compares package import paths with `approvals` globs that name single files (`tools/ci/askfirst.go`), and the text does not say how a package is matched against a file glob.",
+      "scenario": "The task that builds `pr` reads 12 12.4 and writes `approvalLine` in `tools/ci/askfirst.go`, then has `tools/ci/pr` import it. The build fails (`import \"…/tools/ci\" is a program, not an importable package`). The implementer then copies the check into `tools/ci/pr`, which leaves two approval-line checks: the one on `approvals` is dead, and the one that runs sits on `checks` until the glob change lands. Or the implementer moves it into a `tools/ci/internal/...` package, which is on `checks`, a grantable surface, so the `go list -deps` test fails. Either way, a contributor who pastes the 12 12.2 command runs the dispatcher, which has no `pr` step, or a second `pr` that is not the one the job runs.",
+      "change": "State one home. The approval-line, grant and forbidden-name checks live under `tools/ci/pr/` (a main package plus, if needed, packages below it), and `approvalLine` is defined there. The `approvals` glob `tools/ci/askfirst.go` becomes `tools/ci/pr/**`, either now or in the tooling pull request that already gains that glob, with the file glob dropped. 12 12.2's two lines become `go run ./tools/ci/pr …`. 02 2.1's `tools/ci/` line names `tools/ci/pr/` as the one main package outside the dispatcher. 05 5.3 says the test maps each package of `go list -deps` to its directory and requires every non-standard package's files to match a glob. Cost: about five sentences on four pages; approval lines `spec` and, for the glob, `ask-first`."
+    },
+    {
+      "id": "L13-R11-2",
+      "kind": "new",
+      "severity": "Required",
+      "section": "05 5.3 (\"whose import closure is the standard library and paths on `approvals`\"); 12 12.1 (libraries: `go.yaml.in/yaml/v3`); 12 12.4 (`pr` reads `.github/ask-first.yaml` at base and head; `docs/grants.yaml`); 12 12.3 (the generator that reads `.github/ask-first.yaml`); 10 10.2 (the forbidden-name check of `pr` and `tools/ci/denylist.yaml`)",
+      "defect": "`pr` reads three YAML files: `.github/ask-first.yaml` at base and head, `docs/grants.yaml` and `tools/ci/denylist.yaml`. The Go standard library has no YAML decoder, and the one YAML library 12 12.1 names, `go.yaml.in/yaml/v3`, is a module path outside the `approvals` globs. So the closure rule forces `pr` to read YAML with a reader of its own, which no text says. The same files are read with the library by the generator of 12 12.3 (CODEOWNERS, `docs/reference/ask-first.md`, the `mutate` trigger) and by `tools/ci hygiene`. That is one problem, reading the surface list, solved two ways, and nothing holds the two readings equal.",
+      "scenario": "A pull request writes a glob in `.github/ask-first.yaml` in a form the library accepts and a hand-written subset reader reads differently or rejects: a quoted scalar, a flow list split over two lines, an anchor, or a `#` inside a value. CODEOWNERS and `mutate` then see one surface set, and `pr` sees another, so a line is required for a surface the generator does not list, or not required for one it does. Or the implementer imports the library anyway, the `go list -deps` test fails, and the test is the first place the conflict shows.",
+      "change": "Choose one reader. Recommended: one strict YAML-subset decoder under `tools/ci/pr/` (on `approvals`), which the generator of 12 12.3 and `hygiene` import too, so the files have one reading. A test fails a committed file the subset does not decode, and fixtures cover each refused form. Alternatively, admit `go.yaml.in/yaml/v3` into the closure by name and add `go.sum`, through its module line, to the grantable inputs the toolchain Deferred row lists. Cost: one paragraph in 05 5.3 or 12 12.4 and one test; approval line `spec`."
+    },
+    {
+      "id": "L13-R11-3",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "05 5.4 (the \"Verified\" signature row); 06 6.4 (`signingKey`, `ssh-add -c`); 09 J1 step 5",
+      "defect": "The delta made askpass a requirement: 06 6.4 says confirm-on-use 'needs a program `SSH_ASKPASS` can name … installed first', and J1 step 5 says to install one and set `SSH_ASKPASS`. The 05 5.4 row was edited in the same pass and still says `ssh-add -c` 'gives confirm-on-use where an askpass program is installed (macOS ships none)', which reads as optional.",
+      "scenario": "A reader of the security model takes 05 5.4's conditional form as the rule and skips the askpass install. The outcome without one, still unmeasured until B2, is either a refused signing or a signing with no confirmation. The risk table then claims a mitigation the operator was not told to install.",
+      "change": "In 05 5.4, write 'which gives confirm-on-use through the askpass program J1 step 5 installs (macOS ships none)'. Cost: one clause; approval line `spec`."
+    },
+    {
+      "id": "L13-R11-4",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "04 4.2 (doctor table, the `generation-sandbox` row); 01 1.7 (open generation)",
+      "defect": "The narrowed row reads 'a sandbox a project names with no open generation, a generation in `removing` excluded'. It can be read two ways: as removing the case from the check, which the resolution of L13-R10-4 means, or as leaving a `removing` generation out of the open generations counted, which makes the row match the very case `removal-pending` now owns. 01 1.7 already says `removing` is not open outside `rm`, `recreate` and `retire`.",
+      "scenario": "The doctor task takes the second reading and reports a removing generation with its sandbox present as both `generation-sandbox` and `removal-pending`, each with a different hint.",
+      "change": "Write 'a sandbox a project names with no generation in `open`, `salvaging` or `removing`'. Cost: one clause."
+    }
+  ],
+  "pages_read": [
+    "docs/reviews/lenses.md (L13; What a reviewer returns; How stage A runs)",
+    "docs/reviews/round-10/reports/L13.json",
+    "docs/reviews/round-10.md (L13 rows R10-03, R10-02 merge, L13-R10-3 to L13-R10-6; Parked P1; D3 to D6)",
+    "git diff d458f83 HEAD over docs/spec.md, docs/spec, docs/adr, docs/plan.md (full word diff)",
+    "docs/adr/0010 (Context, Decision, Consequences, in full)",
+    "docs/spec.md (Deferred rows: toolchain, new pr run, token narrowing, required checks)",
+    "docs/spec/01-system-model.md (1.5 step 6, 1.6 removing rows and write order, 1.7 open generation)",
+    "docs/spec/02-layouts.md (2.1 tools/ lines)",
+    "docs/spec/03-formats.md (opening; 3.8 fingerprint)",
+    "docs/spec/04-cli.md (4.1 Output and Error ids rows; 4.2 doctor preamble and rows; 4.4 RJ-334 to RJ-337)",
+    "docs/spec/05-security.md (5.3 text and YAML; 5.4 signing row, safe-to-paste, approval-line, token and checks-grant rows; I17)",
+    "docs/spec/06-kits.md (6.4 signingKey paragraph)",
+    "docs/spec/08-memory-handoff-salvage.md (diff)",
+    "docs/spec/09-journeys.md (J1 steps 1, 2, 5; J6; retire step 4)",
+    "docs/spec/10-testing-style.md (10.1 Rules; 10.2 grammar, consequences, pr paragraph, steps table, release steps, maintainer item e)",
+    "docs/spec/11-host-probes.md (B1, B2)",
+    "docs/spec/12-engineering.md (12.1 gh floor and libraries; 12.2 Development commands; 12.4 approval line and pr job)",
+    "docs/plan.md (grep for tools/ci pr; T005 is parked for stage B)"
+  ],
+  "out_of_scope": "Round-10 findings with status operator (L13-R10-6, D5 and D6) and the parked one (L13-R10-7, P1) were not re-checked, as the brief says. The plan's `go run ./tools/ci pr <payload file>` in T005's Verify line, which L13-R11-1 also touches, belongs to stage B's P1. The text alone cannot settle whether the gh 2.68.0 floor is right; a read of `cli/cli` at those tags would. Not judged, and left to L2 and L5: whether a fingerprint taken when `removing` is written, after the salvage bundle, leaves a window that the old comparison with the salvage record did not, given that `julieta salvage --stop-agents` runs first. ADR 0010 names three items (D2, D4, D5) but describes them as 'the first' and 'the second'. This was read as consistent, since D2's record half is one of the five texts, and is not raised.",
+  "confidence": "High for L13-R11-1: Go's rule that a main package cannot be imported, and the quoted 12 12.2, 12 12.4 and 02 2.1 lines at d133542, settle it. High for L13-R11-2 on the facts. The severity depends on whether the implementer would have chosen the library, which the closure test then fails. High that the five round-10 resolutions hold, each read in place."
+}
