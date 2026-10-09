@@ -32,7 +32,9 @@ type step struct {
 	name string
 	argv []string
 	// quiet marks a command whose output is its finding: it passes
-	// when it prints nothing, as "gofmt -l" does.
+	// when it prints nothing, as "gofmt -l" does. That output lists
+	// files of the repository, so it is printed as safe text; the
+	// output of any other step is printed as it is (checks.run).
 	quiet bool
 	// environ is the whole environment of the command (stepEnv). The
 	// environment of this process never reaches it, so an empty one is
@@ -400,6 +402,14 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 	cmd.Env = append([]string{}, s.environ...)
 	killWithGroup(cmd)
 	out, err := cmd.CombinedOutput()
+	// os/exec calls Cancel only while the leader runs, so a grandchild
+	// that outlives a leader that ended, and holds the output pipe until
+	// WaitDelay, is still ours to kill. A group that is gone is not an
+	// error (ESRCH). While the group has members its pgid is not reused,
+	// so -pgid reaches only this group.
+	if cmd.Process != nil {
+		_ = killGroup(cmd.Process.Pid)
+	}
 	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		if errors.Is(parent.Err(), context.DeadlineExceeded) {
 			// The deadline of the caller fired, before the limit of the step.
@@ -624,9 +634,15 @@ func (c *checks) run(ctx context.Context, root string, steps []step) {
 		if err != nil {
 			// out is the step's own output, which is printed as it is: a step
 			// runs the code of the change under test, so quoting its output
-			// would give an attacker nothing and cost readability. err is the
-			// error of the run and may hold a path, so it is made safe.
-			detail = fmt.Sprintf("%s%s\n", out, git.SafeLines(err.Error()))
+			// would give an attacker nothing and cost readability. A quiet
+			// step runs none of it and prints names of files of the
+			// repository, so its output is made safe, as is err, the error
+			// of the run, which may hold a path.
+			text := string(out)
+			if s.quiet {
+				text = git.SafeLines(text)
+			}
+			detail = fmt.Sprintf("%s%s\n", text, git.SafeLines(err.Error()))
 			if bytes.Contains(out, []byte(moduleLookupOff)) {
 				detail += "the module cache lacks a module of go.sum, and no step fetches one (GOPROXY=off): run \"go run ./tools/ci setup\", which runs \"go mod download\", then run this again\n"
 			}

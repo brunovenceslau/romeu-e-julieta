@@ -1647,3 +1647,34 @@ func TestChecksPrintErrorsAsSafeText(t *testing.T) {
 	}
 	assert.Contains(t, got, `\x1b[2J`)
 }
+
+// TestQuietStepPrintsSafeText checks that the output of a quiet step,
+// which lists files of the repository, reaches the log with no line that
+// starts a workflow command, while the output of another step is
+// printed as it is.
+func TestQuietStepPrintsSafeText(t *testing.T) {
+	hostile := "::error::x.go\n"
+	var out bytes.Buffer
+	c := newChecks(&out)
+	c.run(t.Context(), t.TempDir(), []step{
+		{name: "listing", argv: []string{"sh", "-c", "printf '%s' \"$0\"; exit 1", hostile}, quiet: true},
+		{name: "code", argv: []string{"sh", "-c", "printf '%s' \"$0\"; exit 1", hostile}},
+	})
+	var listing, code []string
+	var in *[]string
+	for _, line := range strings.Split(out.String(), "\n") {
+		switch {
+		case strings.HasPrefix(line, "FAIL  listing"):
+			in = &listing
+		case strings.HasPrefix(line, "FAIL  code"):
+			in = &code
+		case in != nil:
+			*in = append(*in, line)
+		}
+	}
+	for _, line := range listing {
+		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
+	}
+	assert.Contains(t, listing, "./::error::x.go")
+	assert.Contains(t, code, "::error::x.go", "the output of a step that runs code stays raw")
+}

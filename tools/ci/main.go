@@ -101,6 +101,12 @@ func runSignalled(e env, args []string) int {
 	go func() {
 		select {
 		case sig := <-sigs:
+			// The order is caught, cancel, Stop. Caught before cancel, so
+			// that the run which cancel ends finds the signal and the status
+			// is 128 plus its number. Cancel before Stop, because Stop is
+			// what lets a second signal end this process by its default
+			// action: the group kill starts first, which narrows the window
+			// in which that signal ends the parent before the kill.
 			caught <- sig.(syscall.Signal)
 			cancel()
 			signal.Stop(sigs)
