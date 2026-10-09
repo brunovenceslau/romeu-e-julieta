@@ -394,9 +394,13 @@ U+FEFF), and none is one of these double quotation marks: U+0022,
 U+00AB, U+00BB, U+201C to U+201F, U+2033, U+301D to U+301F and U+FF02.
 Single quotation marks are allowed, because U+2019 is also the
 apostrophe, and other look-alikes, such as U+275D and U+275E, are left
-to review. `tools/ci pr` reads `.github/ask-first.yaml` at the base
-commit and at the head commit and uses the union of the two lists, so
-a PR that removes a surface or a glob still needs that surface's line.
+to review. `tools/ci pr` builds and runs the code of the base commit
+against the head, so no pull request is judged by code it changes: the
+`pr` job of the workflow checks out the base commit's `tools/ci` and
+runs it against the head (decided on 2026-10-09). It reads
+`.github/ask-first.yaml` at the base commit and at the head commit and
+uses the union of the two lists, so a PR that removes a surface or a
+glob still needs that surface's line.
 A surface is touched when a changed path matches one of its globs. The
 changed paths are those that differ between the merge base and the
 head (10 10.2), so merging the default branch into the pull request

@@ -1914,6 +1914,8 @@ accept the risk, reopened by the first grant written to
 `docs/grants.yaml`. Recommend (a): it costs one surface and keeps the
 check of approvals out of the reach of a grant.
 Answered on 2026-10-09: (a); it amends AR14 (decided on 2026-10-08).
+The re-audit found the class wider; decided on 2026-10-09 that `pr` runs
+the base commit's code, and `.github/workflows/**` joined `approvals`.
 
 ### Next steps
 

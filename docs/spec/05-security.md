@@ -212,11 +212,13 @@ tasks on the `contracts`, `checks`, `dependencies`, `catalog`,
 `docs/grants.yaml`, which is on the `ask-first` surface, in the form 12
 12.4 defines; every other surface keeps an approval line in the
 maintainer's words on each pull request. The `approvals` surface holds
-`tools/ci/askfirst.go` and `tools/ci/denylist.yaml`, the check of
-approval lines and grants and the forbidden-name denylist, which no
-checkpoint grant covers (they stay on `checks` too), so a grant on
-`checks` never lets a change edit the check that judges it (round 8,
-G5, decided on 2026-10-09).
+`tools/ci/askfirst.go`, `tools/ci/denylist.yaml` and
+`.github/workflows/**`, the check of approval lines and grants, the
+forbidden-name denylist and the files that choose what runs, which no
+checkpoint grant covers (they stay on `checks` and `dependencies` too).
+`tools/ci pr` builds and runs the code of the base commit against the
+head, so no pull request is judged by code it changes (round 8, G5,
+decided on 2026-10-09).
 
 The file lists itself and `.github/CODEOWNERS`, which `go generate`
 derives from it. The `dependencies` surface holds every path where
@@ -233,10 +235,11 @@ the one maintainer, best effort, and a second owner is a row of
 Round 3 decided that the decision records and the code of the
 checks are surfaces
 ([round 3](../reviews/round-3.md#maintainer-decisions)): the workflows
-only call `tools/ci` (10 10.2), so the check code is the gate. A change
-to `tools/ci` is checked by the changed `tools/ci`, so its only check is
-the `checks` approval line; running the base branch's `tools/ci`
-against the merge result is a row of
+only call `tools/ci` (10 10.2), so the check code is the gate. The steps
+of `all` check a change to `tools/ci` with the changed `tools/ci`, so
+there its only check is the `checks` approval line, while `pr` runs
+the base commit's code (above); running the base branch's `tools/ci`
+for the steps of `all` too is a row of
 [Deferred decisions](../spec.md#in-how-this-repository-is-run). The
 `spec` surface was added on 2026-10-08
 ([round 8](../reviews/round-8.md#decisions-for-the-operator), AR13):
@@ -294,8 +297,8 @@ surfaces:
     globs: [docs/spec.md, docs/spec/01-system-model.md, docs/spec/05-security.md]
     reason: the gates read tables in these pages (the vocabulary in 01 1.7 and the index), and 05 holds the security model
   - id: approvals
-    globs: [tools/ci/askfirst.go, tools/ci/denylist.yaml]
-    reason: the approval-line and grant check, and the forbidden-name denylist
+    globs: [tools/ci/askfirst.go, tools/ci/denylist.yaml, .github/workflows/**]
+    reason: the approval-line and grant check, the forbidden-name denylist, and the workflows that choose what runs
   - id: checks
     globs: [tools/ci/**, .githooks/**, .golangci.yml, docs/acceptance.json]
     reason: the code of the gates and reports, with the forbidden-name denylist (tools/ci/denylist.yaml), the linter configuration, and the acceptance file, whose command items tools/ci acceptance runs

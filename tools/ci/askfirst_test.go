@@ -305,9 +305,9 @@ func TestCodeownersAsksFirst(t *testing.T) {
 }
 
 // TestApprovalsSurface holds the approvals surface of the committed list
-// to the check of approval lines and grants and the forbidden-name
-// denylist, which no checkpoint grant covers, and holds both files on
-// the checks surface too (05 5.3).
+// to the check of approval lines and grants, the forbidden-name denylist
+// and the workflows, which no checkpoint grant covers, and holds each on
+// the surface it was on before, checks or dependencies (05 5.3).
 func TestApprovalsSurface(t *testing.T) {
 	src, err := os.ReadFile(filepath.Join(moduleRoot(t), askFirstPath))
 	require.NoError(t, err)
@@ -315,11 +315,14 @@ func TestApprovalsSurface(t *testing.T) {
 	require.NoError(t, err)
 	i := slices.IndexFunc(list.Surfaces, func(s surface) bool { return s.ID == "approvals" })
 	require.GreaterOrEqual(t, i, 0, "the approvals surface")
-	want := []string{"tools/ci/askfirst.go", "tools/ci/denylist.yaml"}
-	assert.Equal(t, want, list.Surfaces[i].Globs)
-	j := slices.IndexFunc(list.Surfaces, func(s surface) bool { return s.ID == "checks" })
-	require.GreaterOrEqual(t, j, 0, "the checks surface")
-	for _, path := range want {
-		assert.True(t, slices.ContainsFunc(list.Surfaces[j].Globs, func(g string) bool { return globMatch(g, path) }), "%s on checks", path)
+	assert.Equal(t, []string{"tools/ci/askfirst.go", "tools/ci/denylist.yaml", ".github/workflows/**"}, list.Surfaces[i].Globs)
+	for path, id := range map[string]string{
+		"tools/ci/askfirst.go":     "checks",
+		"tools/ci/denylist.yaml":   "checks",
+		".github/workflows/ci.yml": "dependencies",
+	} {
+		j := slices.IndexFunc(list.Surfaces, func(s surface) bool { return s.ID == id })
+		require.GreaterOrEqual(t, j, 0, "the %s surface", id)
+		assert.True(t, slices.ContainsFunc(list.Surfaces[j].Globs, func(g string) bool { return globMatch(g, path) }), "%s on %s", path, id)
 	}
 }

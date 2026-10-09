@@ -70,6 +70,7 @@
 # approvals
 /tools/ci/askfirst.go @brunovenceslau
 /tools/ci/denylist.yaml @brunovenceslau
+/.github/workflows/** @brunovenceslau
 
 # checks
 /tools/ci/** @brunovenceslau

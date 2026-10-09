@@ -151,7 +151,10 @@ are in `ship-gate-2026-10-09.md`.
   TestPRApprovalLine, a test that every non-glob path of the ask-first
   list exists, and a `grantsPath` constant beside `askFirstPath`; and a
   test that `pr` refuses a checkpoint grant for the `approvals` surface
-  (G5, decided on 2026-10-09).
+  (G5, decided on 2026-10-09); a test that a pull request that changes
+  `tools/ci` is judged by the base commit's `tools/ci`; and the
+  security-auditor's Low of the G5 re-audit, that nothing in code holds
+  the grantable set (G10 closes it).
 
 ### Tooling pull requests (each ask-first, with its own approval line)
 
