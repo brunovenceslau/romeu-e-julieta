@@ -242,8 +242,9 @@ Pass is one command on that directory,
 `go run ./tools/ci probes --require-pass B2,B3,B4,B5,C2,C3,C4,C5,C6 --hosts 1 --dir <it>`
 (T020), after the host suite exited 0; a result that overturns
 a default is handled before the tag, the way T092 says.
-We considered running it at checkpoint C7 instead: it needs the build
-of T088, so it stays here.
+We considered running it at checkpoint C7 instead: it needs the release
+candidate, a published `v1.0.0-rc.<n>` tag that T088's `release.yml`
+builds with the full kit set, so it stays here.
 
 **Results are a pull request.** Blocks O3 and O6 end with a branch, the
 hook, `go run ./tools/ci fast`, the staged diff read by the maintainer,
@@ -277,7 +278,7 @@ task lands it.
 | Go | version in `mise.toml`, locked in `mise.lock` | 12 12.1, 02 2.1 | T001 |
 | `golangci-lint`, `govulncheck` | `mise.lock`; `govulncheck` and `golangci-lint` run from the paths `mise which` resolves, at the version `mise.lock` locks; the `govulncheck` lock entry has no checksum (it rests on the Go checksum database) | 12 12.1, 10 10.2 | T001, T002 |
 | `reuse` | the container image `fsfe/reuse:6.2.0@sha256:<digest>` in `tools/ci`, run on Linux only | 12 12.1, 10 10.2 | T002 |
-| `gh`, for `tools/release verify` | an exact version in `mise.toml`, with a sha256 per platform in `mise.lock`; started by the path `mise which` resolves, never through `mise exec` | 12 12.1, 10 10.2 | the tooling pull request of round 8's DR7, pending (Phase 0) |
+| `gh`, for `tools/release verify` | an exact version in `mise.toml`, with a sha256 per platform in `mise.lock`; started by the path `mise which` resolves, never through `mise exec` | 12 12.1, 10 10.2 | PR #27 (round 8, DR7), merged |
 | GitHub Actions | `uses` with a 40-hex commit SHA | 10 10.2 | T002, T088 |
 | mise on the CI runners | one `uses` step with a 40-hex commit SHA, the mise version and its sha256 in `with`; Go and the other tools come from `mise.lock` through it | 10 10.2 | T002 |
 | Go dependencies | `go.mod`, `go.sum`; the complete v1 list is in 12 12.1 | 12 12.1 | first use |
@@ -311,7 +312,7 @@ run is a
 | 1 The skeleton and the probe harness | T007 to T020 | `termsafe`, `romeu-cli`, `julieta-core`, `ci-release`, `kits`, `probes`, `canon` | C1: both binaries print `version` on the four runners; the handshake passes on the synthetic session; the harness passes `tools/ci all` before any host run (11, opening). Then block O3 |
 | 2 First build layer | T021 to T025 | `spec`, `gitsafe`, `signing` | C2: block A results from both hosts are merged (T026), and `tools/ci probes` passes on them |
 | 3 Block A applied; second layer | T026 to T035 | `probes`, `gitsafe`, `sbxdrv`, `romeu-cli`, `catalog`, `oci`, `state`, `memstore` | C3: the handshake passes on the recorded session on both Linux runners |
-| 4 The `sync` slice | T036 to T050, T103 | `egress`, `render`, `gate`, `romeu-cli`, `ci-release` | C4: the J2 and J11 scenario functions run in CI with the fake `sbx`; the I27 hostile trees are refused on the macOS runners. Then smoke step 1 of 12 12.2: on one host, `init`, `sync` and `approve` with the host suite, from a `go run ./tools/release build --version v1.0.0-smoke --dry-run` build of `main` (T103), the output pasted under the Evidence of the next pull request |
+| 4 The `sync` slice | T036 to T050, T103 | `egress`, `render`, `gate`, `romeu-cli`, `ci-release` | C4: the J2 and J11 scenario functions run in CI with the fake `sbx`; the I27 hostile trees are refused on the macOS runners. Then smoke step 1 of 12 12.2: on one host, `init`, `sync` and `approve` with the host suite, from a `go run ./tools/release build --version v1.0.0-smoke --dry-run` build of `main` (T103) and a project spec that names no product kit, the output pasted under the Evidence of the next pull request |
 | 5 julieta's chores | T051 to T065 | `julieta-core`, `kits`, `layout`, `memstore`, `handoff`, `salvage` | C5: the container e2e passes on amd64 and arm64, with the `julieta setup` no-op inside its S8 bound. Block O4 is done by here. The maintainer takes here the decisions that T101 records, so that task has no one left to wait for |
 | 6 `run` and the destructive commands | T066 to T075 | `romeu-cli` | C6: the five CI journeys of S7 pass; the meta-tests and the sweeps pass |
 | 7 Kits, skills and the block B definitions | T076 to T083 | `kits`, `skills`, `romeu-cli`, `probes` | C7: `tools/ci kits` passes; romeu embeds the four product kits; a definition exists for each probe id of 11. Then smoke step 2 of 12 12.2: on one host, J1 to J3 with the host suite, from a `go run ./tools/release build --version v1.0.0-smoke --dry-run` build of `main`, the output pasted under the Evidence of the next pull request. The token narrowing row of the index reopens here (ADR 0009) |
@@ -342,15 +343,16 @@ Review round 8 left changes to merged work that go in tooling pull
 requests of their own, each with its own approval line, outside the
 task list:
 
-- the pre-push hook starts `tools/ci` with `GOENV=off`, `GOWORK=off`
-  and `GOFLAGS=-mod=readonly`, so that a `go env -w` file, an untracked
-  `go.work` or `vendor/` and a caller's `GOFLAGS` cannot act on
-  `go run` (ADR 0007, Threat model; round 8, DR3, its form decided on
-  2026-10-09), on the `checks` surface;
+- the pre-push hook adds `GOWORK=off` and `GOFLAGS=-mod=readonly` to
+  the `GOENV=off` and `GOTOOLCHAIN=local` it has set since PR #30, so
+  that an untracked `go.work` or `vendor/` and a caller's `GOFLAGS`
+  cannot act on `go run` (ADR 0007, Threat model; round 8, DR3, its
+  form decided on 2026-10-09), on the `checks` surface; pending, in
+  draft PR #34;
 - the list of never-tracked files read from `tools/ci/denylist.yaml`
   instead of a list written in the code (R8-10-34);
-- `tools/ci setup` setting `GOPROXY`, `GOSUMDB` and `GOENV=off` for the
-  steps it runs (R8-10-38);
+- `tools/ci setup` setting `GOPROXY` and `GOSUMDB` for the steps it runs
+  (R8-10-38);
 - the grammar row of the release workflow in `tools/ci workflows`
   (R8-10-1);
 - the sentence on outside contributors in the generated
@@ -1587,7 +1589,9 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
     `checksums.txt`.
   - A romeu from that build runs `sync` past the `julieta-not-embedded`
     refusal of a source build (02 2.1), so smoke step 1 of 12 12.2 can
-    run at checkpoint C4.
+    run at checkpoint C4. No product kit exists at C4 (their sources land
+    in phase 7), and a project spec lists its product kits by name (03
+    3.2), so smoke step 1 uses a spec that names no product kit.
 - Verify: `go test ./tools/release/...`; `go run ./tools/release build
   --version v1.0.0 --dry-run`.
 
@@ -2328,7 +2332,7 @@ early.
     not their first run.
   - `release.yml` passes `tools/ci workflows`.
   - `gh` is in `mise.lock`, with a sha256 for each of the four
-    platforms, from the DR7 tooling pull request (Phase 0), and the lint
+    platforms, from PR #27 (round 8, DR7), merged, and the lint
     row of 10 10.2 admits it.
   - `tools/ci pins` reports the pin freshness of each tool pin in the
     list of [12 12.1](spec/12-engineering.md#121-tech-stack), by the

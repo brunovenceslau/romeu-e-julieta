@@ -84,7 +84,8 @@ These go beyond the cluster text; the ship gate checked them (answers in
   13 13.11 (group 4).
 - AR13 landed in this PR rather than a tooling PR (orchestrator decision,
   because the two copies of the surface list must be equal in one commit).
-- DR3 is described as pending in ADR 0009 and the plan, never as closed.
+- DR3 is described as pending, in PR #34, in ADR 0009 and the plan,
+  never as closed.
 
 ## Resolved by main, or not applicable
 
@@ -132,8 +133,8 @@ are in `ship-gate-2026-10-09.md`.
   (R8-index-4).
 - ADR 0008 narrowing trigger "the first issue or PR from an account other
   than the operator's" and its scope line, in DR1's record (AR4, AR6).
-- The index Deferred row for DR3 is not added; the hook PR is pending
-  (DR3), in the form decided on 2026-10-09.
+- The index Deferred row for DR3 is not added; the hook change is
+  pending, in PR #34 (DR3), in the form decided on 2026-10-09.
 - `tools/ci pr` reads checkpoint grants from `docs/grants.yaml` at the
   base commit (12 12.4; ship gate F7, decided on 2026-10-09). The file
   lands with that change, on the `ask-first` surface that already lists
@@ -144,19 +145,28 @@ are in `ship-gate-2026-10-09.md`.
 - `tools/ci setup` hardened against a transient DNS failure while it
   downloads modules (seen once on macos-intel, on `proxy.golang.org`),
   by a bounded retry and never by skipping the step (surface `checks`).
+- With the task that builds `pr` (ship gate round 2, G10): a
+  `grant: checkpoint` field per surface in `.github/ask-first.yaml`, so
+  the list of surfaces a checkpoint grant may cover is data, not prose.
+- With the task that builds `pr` (G11): the approval line written as an
+  ABNF, and a grant tied to a diff and given an expiry.
+- With the task that builds `pr` (G12): the tests TestGrantsFile and
+  TestPRApprovalLine, a test that every non-glob path of the ask-first
+  list exists, and a `grantsPath` constant beside `askFirstPath`.
 
 ### Tooling pull requests (each ask-first, with its own approval line)
 
 - `sbxdrv` surface (`internal/sbxdrv/**`, `e2e/fakesbx/**`) and `skills/**`
   on `kits`; the `ledger` surface stays although the ledger is deferred
   and is a candidate to drop (R8-05-3).
-- Pre-push hook environment (`GOENV=off`, `GOWORK=off`,
-  `GOFLAGS=-mod=readonly`) (DR3, the form decided on 2026-10-09).
+- Pre-push hook environment: `GOWORK=off` and `GOFLAGS=-mod=readonly`
+  added to the `GOENV=off` and `GOTOOLCHAIN=local` the hook has set
+  since PR #30 (DR3, the form decided on 2026-10-09); pending, in PR #34.
+- Setup env `GOPROXY` and `GOSUMDB` (R8-10-38).
 - `tools/ci` checks: one 00 0.5 row per command and every Deferred table;
   probes and acceptance rules of 11 11.3 and 11.4 (group 1 report).
 - The never-tracked list in `tools/ci/denylist.yaml` replacing the
   hard-coded PROLOGUE.md (R8-10-34).
-- Setup env `GOPROXY`, `GOSUMDB`, `GOENV=off` (R8-10-38).
 - Release grammar row in `tools/ci workflows` (R8-10-1).
 - The generated ask-first page sentence on outside contributors
   (R8-12-18).

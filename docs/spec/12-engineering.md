@@ -228,7 +228,8 @@ that follows it and is not committed under `docs/probes/`, so neither
 is a block B result:
 
 1. after the sync slice: `init`, `sync` and `approve`, from a
-   `--dry-run` build of `main`;
+   `--dry-run` build of `main` and a project spec that names no product
+   kit, since the kits land later;
 2. after `run`, once the kits and skills are embedded: J1 to J3, from a
    `--dry-run` build of `main`.
 

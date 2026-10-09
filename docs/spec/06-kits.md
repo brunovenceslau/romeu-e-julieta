@@ -96,7 +96,7 @@ path, and that root inside the sandbox cannot make it writable with
 `julieta memory` on purpose
 ([08 8.1](08-memory-handoff-salvage.md#how-julieta-replaces-the-agents-built-in-memory)).
 
-**Signing rule (decided by the maintainer, I34).** `romeu sync` refuses
+**Signing rule (decided in round 2, op-signing; I34).** `romeu sync` refuses
 to render `git-ssh-sign` (exit 2, `RJ-204 signing-socket`) unless
 `signing.agentSocket` is set, reachable, and holds exactly one key, and
 that key equals the kit's `signingKey` arg. The full host agent is never

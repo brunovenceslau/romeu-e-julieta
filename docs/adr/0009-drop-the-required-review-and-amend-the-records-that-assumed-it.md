@@ -164,7 +164,7 @@ of DR3, F20, F6 and R8-05-35), under the same approval line, extended.
     anything a step of the first-day path (J1 to J3, J5, J6) depends
     on are needs of the start; a dependency that exists only because a
     later section was written does not count. A part of one is
-    deferred only as a risk the operator accepted by name in 05 5.4,
+    deferred only as a risk accepted by name in 05 5.4,
     and its Deferred row says so. "Anything a later step depends on"
     grew with every section written (DR4); the spec's
     [principle](../spec.md#decide-at-the-last-responsible-moment)
@@ -177,11 +177,11 @@ of DR3, F20, F6 and R8-05-35), under the same approval line, extended.
     caller's `GOFLAGS`, were deferred to Q25 and to a plan row that
     exists nowhere. Q25 was decided by ADR 0008 on 2026-10-07, so the
     trigger fired. Closing them was decided on 2026-10-08 (DR3), and
-    the form on 2026-10-09: the pre-push hook starts `tools/ci` with
-    `GOENV=off`, `GOWORK=off` and `GOFLAGS=-mod=readonly`, which also
-    closes a `go env -w` file and an untracked `vendor/`. The change is
-    pending, a tooling pull request on the `checks` surface with its
-    own approval line.
+    the form on 2026-10-09: the pre-push hook adds `GOWORK=off` and
+    `GOFLAGS=-mod=readonly` to the `GOENV=off` and `GOTOOLCHAIN=local`
+    it has set since PR #30, which also closes an untracked `vendor/`.
+    The change is pending, in PR #34, a tooling pull request on the
+    `checks` surface with its own approval line.
 13. **Rule 8's tool list.** "`go` and `golangci-lint` the only tools"
     is replaced by a pointer to the one list in 12 12.1 (DR7).
 14. **Where mechanism lives.** ADR 0007 carries pinned versions,
@@ -274,8 +274,9 @@ of DR3, F20, F6 and R8-05-35), under the same approval line, extended.
 - Review stops being a claimed barrier and stays a practice. What
   holds against an agent that holds the token is in 05 5.4; this
   record adds no control.
-- The pre-push hook change of decision 12 is pending. Until it lands,
-  the escapes it closes stay open, and the pull request's diff review
+- The pre-push hook change of decision 12 is pending, in PR #34. Until
+  it lands, an untracked `go.work` or `vendor/` and a caller's `GOFLAGS`
+  stay open, and the pull request's diff review
   is the only guard against them.
 - [ADR 0004, measure delivery with the five DORA metrics computed by a tool](0004-measure-delivery-with-the-five-dora-metrics-computed-by-a-tool.md)
   stays Accepted as the design of a deferred tool, and
