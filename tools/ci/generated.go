@@ -358,9 +358,6 @@ func scanLines(file, data string, root bool, listed map[string]bool, problems *[
 		}
 		for _, attr := range checkoutAttrs {
 			fix := fmt.Sprintf("write the state as %s, -%s or !%s", attr, attr, attr)
-			if attr == "text" {
-				fix = "use -text"
-			}
 			for _, state := range []string{"set", "unset", "unspecified"} {
 				if slices.Contains(fields, attr+"="+state) {
 					*problems = append(*problems, finding{file, "generated", fmt.Sprintf("gives %q the value %s=%s; git prints that string as it prints a state, so %s", pattern, attr, state, fix)})

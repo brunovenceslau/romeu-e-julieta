@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/adrdir"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 )
 
 // The files that generate writes (12 12.3). A generated file is never
@@ -59,7 +60,7 @@ func runGenerate(ctx context.Context, e env, args []string) (bool, error) {
 			return false, err
 		}
 		if wrote {
-			say(e.stdout, "wrote %s\n", out.path)
+			say(e.stdout, "wrote %s\n", git.SafeLines(out.path))
 		}
 	}
 	return true, nil

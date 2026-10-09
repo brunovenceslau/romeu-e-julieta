@@ -243,7 +243,7 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	c.run(ctx, root, steps)
 	tree := ""
 	if err := changedSince(ctx, repo, before); err != nil {
-		tree = "the steps changed HEAD, the index or the working tree, so a check may not have judged the commit; what changed:\n" + err.Error() + "\n"
+		tree = "the steps changed HEAD, the index or the working tree, so a check may not have judged the commit; what changed:\n" + git.SafeLines(err.Error()) + "\n"
 	}
 	c.report("working tree", tree == "", tree)
 

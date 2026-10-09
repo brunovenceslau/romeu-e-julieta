@@ -34,11 +34,8 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 )
@@ -163,7 +160,7 @@ func run(ctx context.Context, e env, args []string) int {
 	}
 	switch {
 	case err != nil:
-		say(e.stderr, "ci: %s\n", safeText(strings.TrimSpace(err.Error())))
+		say(e.stderr, "ci: %s\n", git.SafeLines(strings.TrimSpace(err.Error())))
 		return exitError
 	case !ok:
 		return exitFail
@@ -206,42 +203,6 @@ func runHygiene(ctx context.Context, e env, args []string) (bool, error) {
 // say writes one piece of output. A write to the terminal or to a pipe
 // that fails has nowhere left to be reported, so the error is dropped
 // here, in one place.
-// neutral returns line so that a CI runner does not read it as a workflow
-// command: one that starts, after any blanks, with "::" or "##[" gets "./"
-// in front. The runner trims the blanks before it looks, so a blank is not
-// a guard. It is the one guard of every line that names repository
-// content: finding.String and safeText both call it.
-func neutral(line string) string {
-	if t := strings.TrimLeft(line, " \t"); strings.HasPrefix(t, "::") || strings.HasPrefix(t, "##[") {
-		return "./" + line
-	}
-	return line
-}
-
-// safeText returns text that may hold repository content, such as the
-// output of a generator or a path in an error, so that it is safe to
-// print: each control character but the tab is written as an escape, a
-// line that is not UTF-8 is quoted, and neutral guards each line.
-func safeText(text string) string {
-	lines := strings.Split(text, "\n")
-	for i, line := range lines {
-		if !utf8.ValidString(line) {
-			line = strconv.QuoteToASCII(line)
-		}
-		var b strings.Builder
-		for _, r := range line {
-			if unicode.IsControl(r) && r != '\t' {
-				q := strconv.QuoteToASCII(string(r))
-				b.WriteString(q[1 : len(q)-1])
-				continue
-			}
-			b.WriteRune(r)
-		}
-		lines[i] = neutral(b.String())
-	}
-	return strings.Join(lines, "\n")
-}
-
 func say(w io.Writer, format string, args ...any) {
 	_, _ = fmt.Fprintf(w, format, args...)
 }

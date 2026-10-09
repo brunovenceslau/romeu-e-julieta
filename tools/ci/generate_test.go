@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -287,4 +288,21 @@ func TestGenerateReportsAnUnlistableRecordDirectory(t *testing.T) {
 	assert.Empty(t, out)
 	assert.Contains(t, errOut, "docs/adr")
 	assert.NoFileExists(t, filepath.Join(r.Dir, ".github", "CODEOWNERS"))
+}
+
+// TestGenerateWroteLineIsSafe checks that a path read from .adr-dir
+// cannot forge a line of the log through the "wrote" line.
+func TestGenerateWroteLineIsSafe(t *testing.T) {
+	r := generateFixture(t)
+	dir := "d\n\u00a0::error::forged\x1b[2J"
+	r.Write(".adr-dir", dir+"\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(r.Dir, dir), 0o755))
+	code, out, errOut := runGen(t, r)
+	require.Equal(t, exitOK, code, errOut)
+	assert.Contains(t, out, `d`+"\n"+`\u00a0::error::forged\x1b[2J/README.md`)
+	assert.NotContains(t, out, "\x1b")
+	for _, line := range strings.Split(out, "\n") {
+		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
+		assert.NotContains(t, line, "\u00a0")
+	}
 }

@@ -71,3 +71,42 @@ func Printable(s string) string {
 	}
 	return s
 }
+
+// SafeLines returns text that may hold repository content, such as a path
+// in a message, so that it is safe to print line by line. Printable
+// serves one value that is quoted whole; SafeLines serves text that
+// keeps its lines. In each line every character that does not print
+// (a control character, a space other than " ", a line separator, a
+// zero-width or direction character) is written as a Go escape, except
+// the tab, and each byte that is not UTF-8 as \xNN. Then two things that
+// the Actions runner reads as a workflow command are broken: a line that
+// starts, after blanks, with "::" (the runner trims leading whitespace
+// before it looks, and compares in a culture-sensitive way) gets "./" in
+// front, and "##[" (the legacy form, which the runner finds anywhere in a
+// line) is written "##\[". Every invisible character is escaped first,
+// so nothing invisible can lead a marker, whatever the runner trims.
+func SafeLines(text string) string {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		var b strings.Builder
+		for j := 0; j < len(line); {
+			r, size := utf8.DecodeRuneInString(line[j:])
+			switch {
+			case r == utf8.RuneError && size == 1:
+				fmt.Fprintf(&b, `\x%02x`, line[j])
+			case r != '\t' && !unicode.IsPrint(r):
+				q := strconv.QuoteToASCII(string(r))
+				b.WriteString(q[1 : len(q)-1])
+			default:
+				b.WriteRune(r)
+			}
+			j += size
+		}
+		l := strings.ReplaceAll(b.String(), "##[", `##\[`)
+		if strings.HasPrefix(strings.TrimLeftFunc(l, unicode.IsSpace), "::") {
+			l = "./" + l
+		}
+		lines[i] = l
+	}
+	return strings.Join(lines, "\n")
+}

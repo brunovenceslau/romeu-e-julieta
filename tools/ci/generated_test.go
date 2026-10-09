@@ -505,7 +505,7 @@ func TestGeneratedInfoAttributesOfALinkedWorktree(t *testing.T) {
 	findings, err := generated(t.Context(), git.Repo{Dir: wt, Env: r.Env}, fsOps(), generateOutputs)
 	require.NoError(t, err)
 	require.Len(t, findings, 1, "%v", findings)
-	assert.Equal(t, `info/attributes: generated: gives ".github/CODEOWNERS" the value text=unset; git prints that string as it prints a state, so use -text`, findings[0].String())
+	assert.Equal(t, `info/attributes: generated: gives ".github/CODEOWNERS" the value text=unset; git prints that string as it prints a state, so write the state as text, -text or !text`, findings[0].String())
 }
 
 // TestGeneratedFindingsPrintHostilePaths checks that a tracked path with
@@ -606,11 +606,11 @@ func TestParseCheckAttr(t *testing.T) {
 // and starts like a workflow command does not begin a line of the log
 // as one.
 func TestFindingPathCannotStartACommand(t *testing.T) {
-	for _, where := range []string{"::error::x/.gitattributes", "  ::stop-commands::tok/f", "##[error]x/f"} {
+	for _, where := range []string{"::error::x/.gitattributes", "  ::stop-commands::tok/f", "##[error]x/f", "\t::error::x/f", "\u00a0::error::x/f", "\u200b::error::x/f", "a/##[error]x"} {
 		line := finding{where, "generated", "m"}.String()
 		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
-		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "##["), "%q", line)
-		assert.Contains(t, line, strings.TrimSpace(where))
+		assert.NotContains(t, line, "##[")
+		assert.Equal(t, line, git.SafeLines(line), "already safe: %q", line)
 	}
 	assert.Equal(t, "a/b: generated: m", finding{"a/b", "generated", "m"}.String())
 }

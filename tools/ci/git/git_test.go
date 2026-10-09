@@ -97,6 +97,33 @@ func TestPrintable(t *testing.T) {
 	}
 }
 
+func TestSafeLines(t *testing.T) {
+	tests := []struct{ name, in, want string }{
+		{"plain text and a tab stay", "a\tb\nplain", "a\tb\nplain"},
+		{"an escape and a CR", "x\x1b[2Jy\r", `x\x1b[2Jy\r`},
+		{"not UTF-8", "a\xffb", `a\xffb`},
+		{"a line separator inside a line", "a\u2028b", `a\u2028b`},
+		{"a right-to-left override inside a line", "a\u202eb", `a\u202eb`},
+		{"a command marker", "::error::x", "./::error::x"},
+		{"a command marker after spaces", "  ::error::x", "./  ::error::x"},
+		{"a command marker after a tab", "\t::error::x/f", "./\t::error::x/f"},
+		{"a no-break space before a marker is escaped", "d\n\u00a0::error::x", `d` + "\n" + `\u00a0::error::x`},
+		{"an em space before a marker is escaped", "\u2003::error::x", `\u2003::error::x`},
+		{"a zero-width space before a marker is escaped", "\u200b::error::x", `\u200b::error::x`},
+		{"a BOM before a marker is escaped", "\ufeff::error::x", `\ufeff::error::x`},
+		{"an Azure marker", "##[error]x", `##\[error]x`},
+		{"an Azure marker in the middle of a line", "x ##[error]y", `x ##\[error]y`},
+		{"a repeated hash before the bracket", "###[error]", `###\[error]`},
+		{"a marker in the middle is text", "a ::error::x", "a ::error::x"},
+		{"a second line after a separator", "d\n\u00a0::error::forged\u2028::error::two", "d\n" + `\u00a0::error::forged\u2028::error::two`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, git.SafeLines(tt.in))
+		})
+	}
+}
+
 func TestRunStopsWithItsContext(t *testing.T) {
 	r := gittest.New(t)
 	ctx, cancel := context.WithCancel(t.Context())
