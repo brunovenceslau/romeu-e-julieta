@@ -13,7 +13,7 @@ reference, with the contributor docs as outlines.
 | shared packages (`internal/...`) | Go | see the capability map |
 | CI, release and dev tooling (`tools/ci`, `tools/new`, `tools/schemagen`, `tools/release`, `tools/kitpin`) | Go | one entry point for local and CI |
 | host probe harness (`e2e/probes`) | Go | runs probe steps, writes `probe-result.v1` JSON |
-| git hook in this repo (`.githooks/pre-push`) | POSIX sh, one line | `exec env <the mise environment> go run ./tools/ci fast "$@"`: the variables of `miseEnv` in `tools/ci/misefiles.go`, held to that list by a test, so the mise shim that starts go reads `mise.toml` alone and a go command it starts reads no `go env -w` file and runs no other toolchain; git's pre-push arguments and stdin pass through (10 10.2) |
+| git hook in this repo (`.githooks/pre-push`) | POSIX sh, one line | `exec env GOWORK=off GOFLAGS=-mod=readonly <the mise environment> go run ./tools/ci fast "$@"`: the variables of `miseEnv` in `tools/ci/misefiles.go`, held to that list by a test, so the mise shim that starts go reads `mise.toml` alone and a go command it starts reads no `go env -w` file, runs no other toolchain, uses no `go.work` file and, whatever the caller's `GOFLAGS` or an untracked `vendor` directory, builds from the module cache; git's pre-push arguments and stdin pass through (10 10.2) |
 | kit install steps | POSIX sh, <= 5 lines per step | download + sha256 check + install only |
 | skills (`skills/*/SKILL.md`) | Markdown | Claude Code skills |
 | schemas | JSON Schema 2020-12 | generated into `schemas/*.json` |
