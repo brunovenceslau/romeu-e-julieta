@@ -265,3 +265,38 @@ ADR 0011 is not edited: it is accepted, and every change its text
 would need is in the spec. The parked items P1 and P6 were not applied.
 Nothing under `tools/**`, `.github/**` or `.githooks/**` changed.
 
+## Session checkpoint (2026-10-09, after round 12)
+
+### Done
+
+- Round 12 ran, and its write pass is applied on pull request #36
+  (branch `docs/review-round-9`), with D1 decided on 2026-10-09,
+  option (a).
+- Pull request #34's full ship gate on edda3e3 was NO-GO, on a ceiling
+  bypass through a symbolic link to a directory; the fix is applied on
+  that pull request's branch, and its body has the details.
+
+### Open for the maintainer
+
+The block is the one in round 11's
+[end-of-session checkpoint](round-11.md#session-checkpoint-2026-10-09-end-of-session),
+"Open for the maintainer": the merges, then the host and GitHub steps
+of ADR 0011 in one sitting. That sitting now runs five tries after the
+narrowing, not four: the fifth is item d of the maintainer block
+(10 10.2), which posts a status and a side-branch check under a
+required check's name.
+
+### Next steps
+
+1. Round 13, the targeted re-audit of this write pass by the lenses
+   that raised round-12 findings in their reports: L0, L2, L3, L6, L12
+   and L13. The verdicts of L1, L4, L5, L7 to L11 and L14 to L16 carry
+   forward.
+2. When a re-audit raises no new Required finding, declare the spec
+   validated for T004 onward in that round's page, with the numbers of
+   the five exit criteria. Otherwise, one more write pass and round.
+3. The other next steps of round 11's checkpoint stand: a ship gate on
+   pull request #36's commits after dc76fec, then pull requests #34 and
+   #39, the R8-05-3 tooling pull request and the stage-B items.
+
+Branch and PR state is measured by ~/.sbx-kit/claude-home/bin/handoff_state.py.
