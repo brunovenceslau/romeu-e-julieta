@@ -53,15 +53,16 @@ At most about 75 minutes per host.
 | A2 | `sbx settings set env.rememberHostCommands true`; env with a `secrets.<svc>.command`, the command a `security find-generic-password` call, started from a non-interactive script; `sbx env run -d` twice; change the command; run again | second run silent; changed command re-prompts; whether a keychain dialog appears recorded | never `--auto-approve` is workable; whether J1 or `doctor` must cover the keychain prompt |
 | A3 | memory dirs and the read-only mounts: from inside, plant a symlink, a FIFO, a dotfile, a `.git` dir and a `.vscode/tasks.json` in a memory dir; write to the `readOnly` `.romeu/bin` mount, also as root after `mount -o remount,rw`; write to the primary clone's source mount, as the agent and as root; check each mount path equals the host path; record the modes of `<name>-env/` and of the memory files as the sandbox sees them through the direct mounts; with a scoped `github` secret, clone a private secondary, push a branch and call the GitHub API | each plant is seen on the host as planted; no write reaches the host through a `readOnly` mount, also as root after the remount; no write reaches the primary host clone; each mount path equals the host path; the modes are recorded; the clone, the push and the API call succeed with no credential file in the sandbox | the read-only host clone (02 2.3), I30, the mount half of I24, the modes of 02 2.3, the secondary-repo credential of 02 2.6 |
 | A4 | clone-mode env started with `sbx env run -d`; `sbx ls --json`; `sbx env exec -it <dir> --env K=<32 KiB value> -- sh -c ...`; two concurrent `exec -it`; `exec -- claude`; `uname -m` inside vs the host arch; `echo $HOME` as the workload user; `sbx stop`, then `sbx ls --json` again | exec works on a detached clone sandbox; `--env` delivers 32 KiB; concurrent execs coexist; the sandbox arch equals the host arch; the workload user's home recorded; `sbx ls --json` reports each sandbox's state and workspace path, field names recorded, including the mount, secret and image fields `adopt` prints; the `sbx stop` argv recorded | `run` attach model; the fields I26 and boundary F read; the recording `romeu stop` replays |
-| A5 | the tree shape of 02 2.3 and the `sbxenv.yaml` goldens: relative paths, file outside mounts, `agent: sbx-kit-claude` + workload kit by digest, `readOnly` additional workspace; a top-level `x-probe` key; `sbx env plan` on each golden | goldens accepted; `x-*` rejected; the sha256 of each golden's normalized form recorded (03 3.3) | render goldens |
+| A5 | the tree shape of 02 2.3 and the `sbxenv.yaml` goldens: relative paths, file outside mounts, `agent: sbx-kit-claude` + workload kit by digest, `readOnly` additional workspace; a top-level `x-probe` key; `sbx env plan` on each golden; a repository-local sandbox configuration planted in the primary repo | goldens accepted; `x-*` rejected; the sha256 of each golden's normalized form recorded (03 3.3); whether `sbx env plan` and `sbx env run` read only the env file romeu names, or also the planted file, recorded | render goldens; run step 3 of 04 4.2 |
 | A6 | branches `feat` and `salvage/1` in the sandbox; host fetch; `sbx env rm`; list `refs/sandboxes`; same-name recreate; fetch and `fetch --prune` via the sbx remote; `mv` a clone dir with the sandbox removed, then `git fetch --all` | refs survive rm; the sbx refspec is forced; moved clone healthy | I6, `retire` move |
 | A9 | `sbx policy allow network --sandbox <p> example.test`; `check`; `curl` inside; `rm --resource`; `sbx env rm`; `sbx policy ls`; trigger a block; `sbx policy approval ls`; list global secrets and global allow rules as doctor would read them | immediate effect; exact argv; how globals are reported | egress application (07), I22 |
 | A10 | on a live env sandbox `sbx secret set <svc> --sandbox <p> --command '<new>'`; check inside; `sbx env run -d` again | recorded: live and kept, live and reverted, or re-plan prompt | the `apply` tag of `secrets` |
 | A11 | build a minimal local v3 kit (`kind: mixin`) with the pinned frontend: files, a binary from the build context, `args`, one fixture per capability type, an unknown key (expect strict error), a YAML anchor (expect rejection or record acceptance); an install step that records where it runs | local v3 builds on this sbx; descriptor file name and capability names recorded; each capability fixture's sbx interpretation recorded as a conformance fixture for I28; where a kit install step executes (host engine or microVM) recorded, as far as the harness can observe it | go/no-go for the kits, kit format, I28 |
-| A12 | inspect the workload by digest: descriptor annotation (and any `sbx kit inspect`-style command), declared capabilities and agent handle, missing apt packages vs `os-base`, skills path, agent memory dir location; with an ssh-agent capability and `SSH_AUTH_SOCK` set to a one-key agent for the `sbx` process, `ssh-add -L` inside, and again with `SSH_AUTH_SOCK` unset for the `sbx` process | capability set readable and recorded as conformance fixtures; handle is `sbx-kit-claude`; inside, only the one key is listed; with the variable unset, `ssh-add -L` lists no key | `os-base` list, I28, what holds for Q19 until it is settled |
+| A12 | inspect the workload by digest: descriptor annotation (and any `sbx kit inspect`-style command), declared capabilities and agent handle, missing apt packages vs `os-base`, skills path, agent memory dir location; the volumes the workload declares, their mount paths, and what of them survives `sbx env rm` and a recreate; with an ssh-agent capability and `SSH_AUTH_SOCK` set to a one-key agent for the `sbx` process, `ssh-add -L` inside, and again with `SSH_AUTH_SOCK` unset for the `sbx` process | capability set readable and recorded as conformance fixtures; handle is `sbx-kit-claude`; inside, only the one key is listed; with the variable unset, `ssh-add -L` lists no key | `os-base` list, I28, what holds for Q19 until it is settled, the volume list of 06 6.2 |
 | A13 | hand-written herdr `layout.apply` through `sbx env exec -it <dir> -- herdr`; agent detection through the exec pty; OSC 9 reaching the host terminal/cmux; kill the host terminal, re-exec, check the agent process survived; host herdr cannot see sandbox processes; socket `protocol` number | layout applies; agent survives terminal loss; host herdr sees nothing | run-layout renderer, "no host panes" model |
-| A14 | a kit install step printing `$PWD` and listing the workspace, timestamped against the clone | install step does not see the clone | confirms the romeu-driven `julieta setup` ordering |
-| A15 | on a detached env sandbox: `sbx stop`, then `sbx env exec`; restart Docker with the sandbox running and run `sbx ls --json` during and after; `ssh-add -L` inside after the restart; `sbx env rm` and list the workload's volumes | what exec does on a stopped sandbox recorded (it starts it or fails); state and fields reported across the restart recorded; the signing socket returns; the volumes left after `rm` recorded | 01 1.6, 08 8.5 |
+| A14 | a kit install step printing `$PWD` and listing the workspace, timestamped against the clone; from inside an install step and a lifecycle hook of a local kit, the hostname, the uid, whether a host path is visible and whether the network namespace is the host's | install step does not see the clone; where install steps and lifecycle hooks run and what they reach recorded | confirms the romeu-driven `julieta setup` ordering; Q32 |
+| A15 | on a detached env sandbox: `sbx stop`, then `sbx env exec`; `sbx stop` again, then `sbx env run -d` through romeu's argv, and once more after a kit, a workload and a ports change of the env file; restart Docker with the sandbox running and run `sbx ls --json` during and after; `ssh-add -L` inside after the restart; `sbx env rm` and list the workload's volumes | what exec does on a stopped sandbox recorded (it starts it or fails); whether `sbx env run -d` starts, recreates, applies, refuses or prompts on a stopped sandbox, with and without each change, recorded; state and fields reported across the restart recorded; the signing socket returns; the volumes left after `rm` recorded | 01 1.6, 08 8.5, run step 3 of 04 4.2 |
+| A16 | from the maintainer's own development session, not through romeu: the type of the token the sandbox's `github` secret holds, read from its prefix, and its scopes, read from the `x-oauth-scopes` header of one authenticated API call; the value is never printed or recorded | type and scopes recorded | the token rows of 05 5.4 and ADR 0008 say measured, not inferred |
 
 Two ids between A6 and A9 are not used: they named probes that left
 the spec, and an id is not given a second meaning. An sbx upgrade under
@@ -141,7 +142,7 @@ declares its `kind` in the harness.
 | ID | Check |
 |---|---|
 | C2 | `mise exec -C <dir> -- <cmd>` vs shims in a fresh non-interactive zsh and bash |
-| C3 | the pinned Claude Code version's setting to disable its own memory, and whether a non-writable memory dir is tolerated |
+| C3 | the pinned Claude Code version's setting to disable its own memory, whether a non-writable memory dir is tolerated, and the error text it shows on a refused memory write, so the julieta skill can name it |
 | C4 | `git bundle verify`/`unbundle` under the hardened flags |
 | C5 | the order in which the pinned Claude Code version fires SessionEnd and SessionStart on `/clear` |
 | C6 | from inside, the A3 plants in a memory dir; `julieta memory check` and the romeu checks report every plant. It settles I24 and julieta delivery (06 6.3) |
@@ -199,7 +200,23 @@ own pull request, like an S6 row before its code (10 10.5).
 each host it needs has one; an ADR follows the rule of the index's
 [Open questions](../spec.md#open-questions).
 
-A result is a fact about the versions its host records.
+A result is a fact about the versions its host records. A pin change
+runs again the probes that read that pin: those of block A before the
+change merges, and those of block B, sandbox-side checks included, at
+the next candidate:
+
+| Pin | Probes run again |
+|---|---|
+| the workload digest | A12, A15, C3, C5, and B2's S5 part |
+| the kit frontend | A11 and its conformance fixtures |
+| herdr | A13 |
+| mise | C2, B4 |
+| the sbx floor | block A |
+
+`tools/ci probes` fails when a committed block A result of a probe this
+table lists records an upstream version or digest other than its
+current pin.
+
 `tools/ci acceptance` fails when a block A result's `sbxVersion`
 differs from the floor of
 [10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract), or a

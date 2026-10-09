@@ -50,7 +50,7 @@ romeu-e-julieta/
 ├─ skills/
 │  ├─ julieta/SKILL.md         general rule: how to use julieta, memory instead of built-in memory
 │  └─ handoff/SKILL.md         /handoff and /handoff --final
-├─ schemas/                    generated JSON Schema 2020-12 (CC0-1.0): project.v1, host-settings.v1, catalog.v1, render.v1, state-*.v1, handoff.v1, memory-entry.v1, manifest.v1, salvage.v1, probe-result.v1, acceptance.v1
+├─ schemas/                    generated JSON Schema 2020-12 (CC0-1.0): project.v1, host-settings.v1, catalog.v1, render.v1, state-*.v1, handoff.v1, memory-entry.v1, manifest.v1, salvage.v1, probe-result.v1, acceptance.v1, and one per `--json` output, `<binary>-<command>.v1` (04 4.1)
 ├─ examples/                   example config repo (projects/*.yaml, kits/, .github/workflows/validate.yml): the adopter's starter (J1 step 0), also used by tests and docs (CC0-1.0)
 ├─ e2e/
 │  ├─ *_test.go                //go:build e2e - git + docker, fake sbx
@@ -122,7 +122,11 @@ my-config/
 Rules: `projects/` holds only `*.yaml`; one of them is the config project
 itself (its primary repo URL equals the host settings' `config.url`).
 romeu reads this repo only through git objects at a named commit
-(`git cat-file`), never from a working tree. The config repo names
+(`git cat-file`), never from a working tree. The config project's own spec
+lists in `egress.extra` the registry hosts of the host settings'
+`workloadRepositories` and `api.github.com`, which `julieta pin
+workload` and `julieta pin check --workflows` read
+([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)). The config repo names
 private repositories, secret names and internal domains: keep it private
 unless every project in it is public. The maintainer's own config repo
 is the reference config repo the catalog is built from (03 3.5).

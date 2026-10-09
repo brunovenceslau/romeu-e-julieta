@@ -77,8 +77,11 @@ which names each step's command and output path.
    `gitHosts`, `workloadRepositories`, `signing.agentSocket` when a
    project uses `git-ssh-sign`, and `secrets` entries named
    `<name>@<project>` (romeu prints the missing names on sync). For a
-   project that uses `git-ssh-sign`, start the dedicated signing agent
-   with exactly one key ([06 6.4](06-kits.md#64-product-kits)); sync
+   project that uses `git-ssh-sign`, register the key on GitHub as a
+   signing key and never as an authentication key, and start the
+   dedicated signing agent with exactly that one key, added with
+   `ssh-add -c` so each use asks for confirmation
+   ([06 6.4](06-kits.md#64-product-kits)); sync
    exits 2 with `RJ-204 signing-socket` until it is reachable and holds
    that key.
 6. [O] `romeu sync <cfg>` -> gate 2 on TTY (repos, secrets, kits and
@@ -113,9 +116,11 @@ which names each step's command and output path.
 On the host the operator opens one terminal window and runs
 `romeu run <p>` in it; that process becomes the
 sandbox's herdr client. Nothing else runs on the host. See `romeu run` in
-[04](04-cli.md). J3a: `sbx env run -d` starts or
-reattaches without re-provisioning; `julieta setup` is a no-op when
-locks are unchanged (S8). J3b: create, record generation, egress,
+[04](04-cli.md#how-romeu-run-reaches-the-run-layout). J3a: run step 3
+starts a stopped sandbox or reattaches to a running one without
+re-provisioning, and refuses with `recreate-needed` a stopped one whose
+env file changed; `julieta setup` is a no-op when locks are unchanged
+(S8). J3b: create, record generation, egress,
 `julieta setup` installs everything, then attach. If the tree has an
 open generation with no sandbox, romeu preserves it first (J10). If a
 sandbox of the project's name exists that romeu has no generation for
@@ -166,10 +171,14 @@ work as usual.
 4. [H] incomplete -> exit 5 listing what would be lost, each with its
    reason; the operator fixes each reason as the guide page says for it
    (pushes the work, frees the space, starts the sandbox) or reruns with
-   `--accept-loss`.
+   `--accept-loss=<reason>[,<reason>]`, naming each reason it accepts.
 5. [X] `sbx env rm <dir>`; [H] remove romeu-applied egress rules;
    generation `salvaging -> closed-removed`. For `recreate`, continue
-   with J3b.
+   with J3b. If that create fails because an upstream artifact is gone
+   (a workload digest, the frontend, a kit download host), the
+   generation stays closed, the salvage refs and memory are intact and
+   no sandbox exists: the error is `kit-build-failed`, and the operator
+   fixes the pin or the catalog, then runs `romeu run`.
 6. [O] restore salvaged work in the new sandbox: push the salvage
    ref's worktree commit from the host clone into the new sandbox's
    daemon remote and check it out there; apply `stash-<n>`; extract
@@ -191,14 +200,21 @@ work as usual.
 
 ## J8 Tool bump (inside a repo)
 
-1. [A] edit `mise.toml`; `julieta lock`; commit; open the PR.
+1. [A] edit `mise.toml`; `julieta lock`; commit (the `pre-commit`
+   `lock --check` warns when the catalog does not know a new
+   `backend:tool`, naming the two fixes of
+   [07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)
+   step 2); open the PR.
 2. [O] after the PR merges into the branch named by the spec's `ref`,
    `romeu sync foo`: new non-upload catalog domains apply live;
    upload-capable or unknown hosts -> gate.
 3. [A] `julieta install`: egress follows `ref`, so a tool whose domains
    are not already allowed installs once the change has merged and
    sync has applied it ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress));
-   other machines get it on their next `run` (`julieta setup`).
+   other machines get it on their next `run` (`julieta setup`). Before
+   the lock merges, egress follows the `ref` branch, so a new host is
+   approved once through sbx for this sandbox (the install error prints
+   the command, and the approval is lost at recreate).
 
 ## J9 Kit or workload bump
 
@@ -211,7 +227,8 @@ work as usual.
   whose kit content or capabilities changed see gate 2 and need
   `romeu recreate <name>`.
 - Workload: [A] `julieta pin workload projects/foo.yaml` in the config
-  sandbox -> PR -> merge -> [O] `romeu sync foo` (gate: new digest) ->
+  sandbox, whose `egress.extra` holds the registry hosts
+  ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)) -> PR -> merge -> [O] `romeu sync foo` (gate: new digest) ->
   `romeu recreate foo`.
 - Personal kit: [A] edit `kits/<id>/` in the config repo -> PR -> sync ->
   gate -> recreate.

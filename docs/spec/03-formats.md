@@ -235,7 +235,11 @@ the secret command is built with `internal/shquote` from host-settings
 argv with a scrubbed environment; romeu only ever renders `command`,
 never a literal value; clone mode comes from romeu's `sbx env run
 --clone`. `./.romeu/bin` is a fixed mount, rendered for each project
-from no spec field.
+from no spec field. romeu names this file by path; probe A5 records
+whether sbx also reads a sandbox configuration from the workspace tree,
+and if it does, that file joins the plant list of I3 and the drift
+check refuses it ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout),
+run step 3).
 
 ## 3.4 Host settings (`settings.yaml`, schema `host-settings.v1`)
 
@@ -361,6 +365,7 @@ binaries import for it.
   "salvageRun": {"id": "01j9zd0a1b2c3d4e5f6g7h8j9k"},
   "run": {"...": "the validated run layout"},
   "runDigest": "<hex>",
+  "egress": ["dl.google.com", "github.com"],
   "agent": "sbx-kit-claude"
 }
 ```
@@ -372,9 +377,12 @@ binaries import for it.
 | `repos[].path` | the primary's host path (clone mode keeps it); a secondary's `<home>/src/<project>/<dir>`, where `<home>` is the workload user's home, measured by probe A4 and stored with the workload pin in `kits/pins.yaml` |
 | `repos[].base` | origin SHAs the host clone already has, each held by the create-only ref `refs/romeu/base/<name>/<generation>/<dir>` ([02 2.3](02-layouts.md#23-host-tree)); snapshot and salvage bundles exclude objects reachable from them (08) |
 | `salvageRun` | present only on salvage calls: the salvage id romeu expects back |
+| `egress` | the domains romeu applied to this sandbox, `auto` plus approved `gated` ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)); the pending gated set lives on the host and is not carried. `julieta status` prints it |
 
-The compatibility check that precedes the first call of a romeu command
-is described in [06 6.3](06-kits.md#63-julieta-delivery).
+The compatibility check that precedes every romeu command that execs
+julieta, and in which romeu accepts julieta protocols N and N-1 the way
+julieta accepts manifests, is described in
+[06 6.3](06-kits.md#63-julieta-delivery).
 
 ## 3.7 `render.json` (in `<name>-env/.romeu/`, schema `render.v1`)
 
@@ -454,7 +462,7 @@ says which states persist; the candidate states do not):
 | `generations[].state` | `open`, `salvaging`, `removing`, `closed-removed`, `closed-lost` |
 | `generations[].createdWith` | the recreate digest at create; `null` for an adopted generation (status reports "recreate digest unknown") |
 | `salvage[].manifestSha256` | plain sha256 of the salvage `manifest.json` bytes (3.12, raw) |
-| `salvage[].result` | `complete`, `incomplete`, `lost`; `reasons[]` lists each skipped item, `sandbox-half-failed`, or `sandbox-lost` |
+| `salvage[].result` | `complete`, `incomplete`, `lost`; `reasons[]` lists each skipped item, `sandbox-half-failed`, or `sandbox-lost`, and for a generation `run` closed as lost, `dirty-at-last-facts:<n>` and `stashes-at-last-facts:<n>` from the newest facts ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), run step 2); `acceptedLoss[]` lists the reasons `--accept-loss` named |
 
 Every file the product writes in place is written as a temp file in the
 same dir, fsync of the file, rename, fsync of the dir; host state files
@@ -529,7 +537,8 @@ Kinds `clear` and `final` require the headings (six for `final`);
 ref in the bundles with SHA: branches, `salvage/*`, tags, notes, each
 worktree HEAD), `bundles[]` (file, sha256, size, embedded-repo path if
 any), `files[]` (path, size, sha256), `skipped[]` (item, reason:
-`excluded-by-spec`, `over-cap`, `transcript-excluded`, `unreadable`) and
+`excluded-by-spec`, `over-cap`, `transcript-excluded`, `unreadable`,
+`disk-full`) and
 `complete`. romeu recomputes completeness itself; the field is advisory.
 Every path (`bundles[].file`, `files[].path`, `worktrees[].path`, an
 embedded-repo path) is relative, cleaned, has no `..` element and no
