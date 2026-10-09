@@ -130,8 +130,9 @@ itself (its primary repo URL equals the host settings' `config.url`).
 romeu reads this repo only through git objects at a named commit
 (`git cat-file`), never from a working tree. The config project's own spec
 lists in `egress.extra` the registry hosts of the host settings'
-`workloadRepositories` and `api.github.com`, which `julieta pin
-workload` and `julieta pin check --workflows` read
+`workloadRepositories`, which `julieta pin workload` and `julieta pin
+check --workflows` read; `api.github.com` comes from the catalog's base
+set and is not listed there
 ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)). The config repo names
 private repositories, secret names and internal domains: keep it private
 unless every project in it is public. The maintainer's own config repo
@@ -156,6 +157,9 @@ $ROMEU_ROOT/                            default $HOME/dev; never a VS Code trust
    ├─ review/<dir>/                     hardened review checkout (created by `romeu pull`)
    └─ memory/<dir>/                     per-repo memory, mounted rw into this project's sandbox only; sync creates it 0700, julieta writes its files 0600
 ```
+
+The supported daily setup: edit and debug inside the sandbox; the host
+clones are for reading, in Restricted Mode.
 
 The tree is an illustration: the names romeu reserves inside
 `<name>-env/` are listed once, in the repo `dir` rule of
@@ -270,8 +274,9 @@ an operator clone used for navigation and egress derivation, holding
 romeu's refs (2.3).
 
 The decision rests on documented sbx behavior (additional workspaces are
-direct mounts), read for the sbx version that probe A1 records, and
-does not wait for a probe; probe A3 confirms it again at that version.
+direct mounts) as documented when this was written, re-confirmed by
+probe A3 at the sbx version that probe A1 records; it does not wait for
+a probe.
 A3 measures what still is mounted: that memory dirs refuse or survive
 planted content as 08 expects, that the `readOnly` mount `.romeu/bin`
 is enforced, and that a write from the sandbox to the primary host

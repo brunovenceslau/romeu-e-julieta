@@ -112,7 +112,7 @@ plumbing.
   the manifest's `repos[].base` (the origin SHAs the host already has,
   the same base salvage uses). One bundle is kept, not the last N.
 - Write: `snapshot/heads.bundle` is renamed into place first and
-  `snapshot/heads.json` (ref -> SHA, `createdAt`, `disabled`) after it,
+  `snapshot/heads.json` (`schema: snapshot/v1`, ref -> SHA, `createdAt`, `disabled`) after it,
   each by the atomic write rule of 03 3.8. romeu trusts the bundle's own
   refs and reads `heads.json` for `status` only, so a kill between the
   two writes leaves nothing romeu acts on wrongly.

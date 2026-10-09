@@ -27,15 +27,22 @@ overwritten: `status` and `doctor` report it as the error
 from the tree and the clones into a new record beside it. The
 user-authored formats (`project.v1`, `host-settings.v1`) change only by
 a new version of their `schema` field, announced first in the release
-notes. The manifest keeps its own N-1 window, with its reason, in 3.6.
+notes, which carry the edit to make. The window for these formats is
+the current and the previous version. The manifest keeps its own N-1
+window, with its reason, in 3.6.
 
 Every format decoded from a mount or a repository (the memory entry,
 the handoff, `snapshot/heads.json`, `mise.lock`, and v3 descriptors) is
 parsed with a strict subset grammar: no YAML anchors, aliases, merge
-keys or includes, and a decoded size bounded by the file cap.
+keys or includes, and a decoded size bounded by the file cap (07 7.5,
+step 1). `mise.lock` is TOML, and its limits are these: no duplicate
+keys or tables, and the same file cap. Its top level is strict (an unknown key is an error), because the file is
+agent-writable and drives egress, so a partial read could widen what a
+sandbox may reach; a lock that does not parse is `lock-unparsed`
+(`RJ-325`, exit 2), not `upstream-shape`.
 
 Outputs of tools the product does not own (`sbx ls --json`, sbx policy
-and secret listings, `mise.lock`, herdr replies, registry manifests,
+and secret listings, herdr replies, registry manifests,
 GitHub API JSON) are decoded tolerantly and checked strictly: unknown
 fields are allowed; every field romeu or julieta reads is required and
 typed; a body that does not decode, or a missing or mistyped field, is
@@ -285,7 +292,8 @@ project uses `git-ssh-sign`, and `secrets`
 
 Rules: every `argv[0]` is absolute and exists; no shell strings; an argv
 is a command that fetches the value and never carries it, so an argv
-element that starts with `ghp_`, `gho_`, `ghs_` or `github_pat_`, or
+element that starts with `ghp_`, `gho_`, `ghs_`, `ghu_`, `ghr_` or
+`github_pat_`, or
 matches `^[0-9a-f]{40}$`, is refused with the error `secret-in-argv`
 (`RJ-314`; a best-effort guard against the common token shapes, not a
 detector); a spec secret name without a matching `name@project`
@@ -338,10 +346,10 @@ running sandbox, install and use domains are both needed at runtime, so
 the distinction has no consumer. The catalog is embedded in both romeu
 and julieta. CI requires every domain used anywhere
 to have an explicit `domains` entry. The entries above are examples; the
-v1 table is built from the reference config repo's locks (S4) and
-measured in probe B4, so it covers that stack only; a tool outside it is
-declared with `egress.tools` in the project spec (always gated) until a
-catalog entry ships in a release.
+v1 table covers the tools listed in `catalog/egress.yaml`; it was built
+from the reference config repo's locks (S4) and measured in probe B4. A
+tool outside it is declared with `egress.tools` in the project spec
+(always gated) until a catalog entry ships in a release.
 
 ## 3.6 julieta manifest (schema `manifest.v1`)
 
