@@ -1497,7 +1497,7 @@ func TestStepEnv(t *testing.T) {
 		"GOCACHE=/from/GOCACHE",
 		"GOMODCACHE=/from/GOMODCACHE",
 	}
-	fixed := []string{"GOENV=off", "GOTOOLCHAIN=local", "GOWORK=off", "GOPROXY=off", "GOFLAGS=-mod=readonly"}
+	fixed := []string{"GOENV=off", "GOTOOLCHAIN=local", "GOWORK=off", "GOFLAGS=-mod=readonly", "GOPROXY=off"}
 	target := []string{"GOOS=darwin", "GOARCH=amd64", "CGO_ENABLED=0"}
 
 	assert.Equal(t, slices.Concat([]string{"PATH=/pinned/go/bin" + sep + "/from/PATH"}, located, fixed),

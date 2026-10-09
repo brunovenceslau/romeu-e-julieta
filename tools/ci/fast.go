@@ -365,6 +365,20 @@ var goPinEnv = []string{
 	"GOTOOLCHAIN=local",
 }
 
+// goBuildEnv holds the two variables that keep the go command on the
+// modules of the tree: GOWORK=off (no go.work file, in the tree or
+// above it, changes them) and GOFLAGS=-mod=readonly (it builds from
+// go.mod and the module cache, never from a vendor directory, and the
+// caller's GOFLAGS is replaced; an empty one would not do, since go
+// then reads the "go env -w" file unless GOENV=off). It is the one
+// list that stepEnv and the pre-push hook (hookLine in the tests, held
+// to the tracked hook by TestHook) both hold. GOPROXY=off is not in it:
+// the hook's first go run fills the module cache.
+var goBuildEnv = []string{
+	"GOWORK=off",
+	"GOFLAGS=-mod=readonly",
+}
+
 // stepEnv is the environment of every step of fast, built from nothing
 // rather than from this process's: PATH with goDir first, so that a go
 // command the linter or a test starts is the pinned one, the rest of
@@ -395,10 +409,8 @@ func stepEnv(goDir string) []string {
 		path += string(os.PathListSeparator) + value
 	}
 	rest := slices.DeleteFunc(passThroughEnv(), func(kv string) bool { return strings.HasPrefix(kv, "PATH=") })
-	return slices.Concat([]string{"PATH=" + path}, rest, goPinEnv, []string{
-		"GOWORK=off",
+	return slices.Concat([]string{"PATH=" + path}, rest, goPinEnv, goBuildEnv, []string{
 		"GOPROXY=off",
-		"GOFLAGS=-mod=readonly",
 	})
 }
 

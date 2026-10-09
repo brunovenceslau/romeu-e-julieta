@@ -34,20 +34,10 @@ const fixtureProse = `rules:
     passes: [a plain tool]
 `
 
-// hookGoEnv is what the hook sets for go run beside miseEnv, and so
-// beside goPinEnv (GOENV=off, GOTOOLCHAIN=local): no go.work file (an
-// untracked one in the tree or above it would change which code
-// `go run ./tools/ci` builds) and GOFLAGS=-mod=readonly, as stepEnv
-// has it. The caller's GOFLAGS, such as -overlay, is replaced, and an
-// empty GOFLAGS would not do: go then reads the "go env -w" file, and
-// an untracked vendor directory would make go run default to
-// -mod=vendor.
-var hookGoEnv = []string{"GOWORK=off", "GOFLAGS=-mod=readonly"}
-
 // hookLine is the hook of 12 12.1, with the line that makes it a
-// script: it starts go, and so the mise shim, with hookGoEnv and miseEnv
+// script: it starts go, and so the mise shim, with goBuildEnv and miseEnv
 // (tools/ci/misefiles.go), each variable a word of env.
-var hookLine = "#!/bin/sh\nexec env " + strings.Join(append(slices.Clone(hookGoEnv), miseEnv...), " ") + " go run ./tools/ci fast \"$@\"\n"
+var hookLine = "#!/bin/sh\nexec env " + strings.Join(append(slices.Clone(goBuildEnv), miseEnv...), " ") + " go run ./tools/ci fast \"$@\"\n"
 
 // newTree returns a fixture repository that passes hygiene: the hook,
 // the two data files, a denylist with the made-up name, and one page.
@@ -151,35 +141,25 @@ func TestRunPrintsAnErrorAsSafeText(t *testing.T) {
 	assert.Contains(t, errOut.String(), `\x1b[2J`)
 }
 
-// TestHookGoEnvIsLiteral holds the words that env gets in the tracked
-// hook to literal values, and to the values stepEnv gives the same
-// variables, so the hook and the steps of tools/ci cannot drift apart.
-func TestHookGoEnvIsLiteral(t *testing.T) {
-	got, err := os.ReadFile(filepath.Join("..", "..", ".githooks", "pre-push"))
-	require.NoError(t, err)
-	words := map[string]bool{}
-	for _, w := range strings.Fields(string(got)) {
-		words[w] = true
-	}
-	for _, want := range []string{"GOENV=off", "GOWORK=off", "GOFLAGS=-mod=readonly"} {
-		assert.True(t, words[want], "the hook sets %s", want)
-		assert.Contains(t, stepEnv("/go"), want, "stepEnv sets %s too", want)
-	}
-	assert.False(t, words["GOFLAGS="], "the hook never empties GOFLAGS")
+// TestGoBuildEnv pins goBuildEnv, and that stepEnv holds it. The hook
+// holds it through hookLine, which TestHook matches byte for byte.
+func TestGoBuildEnv(t *testing.T) {
+	assert.Equal(t, []string{"GOWORK=off", "GOFLAGS=-mod=readonly"}, goBuildEnv)
+	assert.Subset(t, stepEnv("/go"), goBuildEnv, "stepEnv holds goBuildEnv")
 }
 
 // TestHookStartsGoWithoutTheCallersGoEnv runs the tracked hook with a
 // go env file, a go work file, a GOFLAGS and a GOTOOLCHAIN in the
 // caller's environment, and a go stub that prints what it was started
-// with: all four are replaced.
+// with: all four are replaced, and the arguments of git pass through.
 func TestHookStartsGoWithoutTheCallersGoEnv(t *testing.T) {
 	bin := t.TempDir()
-	stub := "#!/bin/sh\necho \"GOENV=${GOENV-unset} GOWORK=${GOWORK-unset} GOFLAGS=${GOFLAGS-unset} GOTOOLCHAIN=${GOTOOLCHAIN-unset} args=$*\"\n"
+	stub := "#!/bin/sh\nprintf 'GOENV=%s GOWORK=%s GOFLAGS=%s GOTOOLCHAIN=%s args=' \"${GOENV-unset}\" \"${GOWORK-unset}\" \"${GOFLAGS-unset}\" \"${GOTOOLCHAIN-unset}\"; for a; do printf '[%s]' \"$a\"; done; echo\n"
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "go"), []byte(stub), 0o700))
-	cmd := exec.Command("sh", filepath.Join("..", "..", ".githooks", "pre-push"))
+	cmd := exec.Command("sh", filepath.Join("..", "..", ".githooks", "pre-push"), "origin", "https://example.test/a b.git")
 	cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"GOENV=/elsewhere/env", "GOWORK=/elsewhere/go.work", "GOFLAGS=-overlay=/tmp/x.json", "GOTOOLCHAIN=go9.9")
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
-	assert.Equal(t, "GOENV=off GOWORK=off GOFLAGS=-mod=readonly GOTOOLCHAIN=local args=run ./tools/ci fast\n", string(out))
+	assert.Equal(t, "GOENV=off GOWORK=off GOFLAGS=-mod=readonly GOTOOLCHAIN=local args=[run][./tools/ci][fast][origin][https://example.test/a b.git]\n", string(out))
 }
