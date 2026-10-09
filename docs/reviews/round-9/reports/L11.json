@@ -1,0 +1,51 @@
+{
+ "header": "L11 · The scope skeptic · sonnet",
+ "verdict": "The write pass meets the lens: the ledger, the one-time migration, --timings, the awaiting state with approve <name>, tools/ci dora, the v1.1 bucket, the kit publishing design and the open-ended carve-out are all gone or bounded, each deferral with a trigger. Two gaps remain: 00 0.5 now claims a check that no page defines (Required), and the index page table still describes a section 06 no longer has (Advisory).",
+ "round8_checked": 33,
+ "round8_resolved_as_stated": 31,
+ "findings": [
+  {
+   "id": "L11-r9-1",
+   "kind": "new",
+   "severity": "Required",
+   "section": "00 0.5; 10 10.2 (sequences); plan T004",
+   "defect": "00 0.5 says the scope table has one row per command of 04 and that `tools/ci sequences` checks that every command has a row (decision SC6), but the sequences row of 10 10.2, the id table under it and the acceptance of T004 list no such check, so the claim has no owner and no fixture.",
+   "scenario": "T004 lands with every fixture its acceptance names and passes. A later task adds a command to 04 4.2 with no 00 0.5 row and `tools/ci all` stays green. The scope table's promise, that every command has a stated first-day need, is then held by nothing, which is the circle this lens exists to catch: the table justifies the commands and nothing checks the table.",
+   "change": "Either add to the sequences row of 10 10.2 and to T004 a rule and a fixture (every command row of 04 4.2 and 4.3 has a first cell in the 00 0.5 table, and the reverse), or weaken 00 0.5 to say review checks it. The first is the decided form (SC6, decided on 2026-10-08).",
+   "round8_ref": "R8-04-20 / L11-16 (SC6)"
+  },
+  {
+   "id": "L11-r9-2",
+   "kind": "unresolved",
+   "severity": "Advisory",
+   "section": "index (the page table, row 06); 06",
+   "defect": "The page table of the index still describes 06 as 'kits v3 (local builds), workload, julieta delivery, product kits, publishing path', but 06 now has sections 6.1 to 6.5 and no publishing path; the resolution of R8-index-4 and R8-06-5 was to move only the pointer. The write-pass note lists it as left.",
+   "scenario": "A reader looking for the kit publishing design follows the index to 06, finds nothing, and cannot tell whether the design was lost or deferred. The Deferred row for publishing and signing product kits is the only place that says it waits.",
+   "change": "Replace 'publishing path' in the 06 row of the index page table with a link to the Deferred row (publishing and signing product kits).",
+   "round8_ref": "R8-index-4 / L11-20"
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L11, What a reviewer returns, How stage A runs)",
+  "docs/reviews/round-8/reports/L11.json",
+  "docs/reviews/round-8.md (Status column, decisions SC1 to SC17, session checkpoints)",
+  "docs/reviews/round-8/clusters-*.json (L11 members)",
+  "docs/reviews/round-8/write-pass.md",
+  "docs/spec.md (principles, success criteria S8 and S9, Open questions, Deferred decisions)",
+  "docs/spec/00-scope.md",
+  "docs/spec/01-system-model.md (gate 1 and gate 2 text)",
+  "docs/spec/02-layouts.md (embedding, ledger mounts)",
+  "docs/spec/03-formats.md (skimmed)",
+  "docs/spec/04-cli.md (command tables, ledger paragraph)",
+  "docs/spec/05-security.md (I31 to I33 note, surfaces)",
+  "docs/spec/06-kits.md (6.1)",
+  "docs/spec/09-journeys.md (J14)",
+  "docs/spec/10-testing-style.md (sequences row)",
+  "docs/spec/12-engineering.md (12.4, 12.10)",
+  "docs/spec/13-runtime-ledger.md (opening)",
+  "docs/adr/0005, 0006, 0007, 0009 (diff and relevant sections)",
+  "docs/plan.md (T004, ledger tasks, Questions for the maintainer)"
+ ],
+ "out_of_scope": "Not read line by line: pages 07, 08 and 11 beyond greps for the L11 topics (memory commands, probe lifecycle, S8 probe), the body of 13 (a deferred design, decided on 2026-10-08), and the many Deferred rows beyond those of L11's round-8 findings. Not judged: the growth of the Deferred table (about 39 to 75 rows by my own count, which reformatting may inflate), nor whether the new Open questions Q26 to Q32 are decisions or plan readings; the text alone does not settle either. Parked and L-status findings were not re-reported. The pending hook change of PR #34 (DR3) was taken as decided and recorded in ADR 0009 decision 12.",
+ "confidence": "Medium-high on the two findings (both checked against the baseline text); medium on the carried-forward resolutions, where I checked the presence of the decided text by grep and a read of the cited sections, not every cross-reference."
+}

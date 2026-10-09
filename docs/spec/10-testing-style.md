@@ -15,7 +15,7 @@ test, coverage and review rules as `internal/*`.
 | E2E (git + fake sbx) | `e2e/*_test.go`, tag `e2e` | CI (linux amd64, linux arm64, macOS Intel, macOS arm64) | romeu commands against a temp `$ROMEU_ROOT`; origins served by `git http-backend` behind `httptest` TLS (host settings `gitHosts[].caFile` points at the test CA; gitsafe has no test override); the sandbox daemon served by `git daemon` on `127.0.0.1`; journeys J2, J3b, J6, J7, J10, J11 (scenario functions shared with the host suite), of which a journey that reaches a julieta call runs at the hybrid level below, on the Linux runners, while the macOS runners run the romeu commands that reach none; promotion fault injection; invariants marked E in [05](05-security.md), including the I27 hostile trees on the macOS runners |
 | E2E (hybrid) | `e2e/hybrid_test.go`, tag `e2e` | CI on `ubuntu-26.04` and `ubuntu-26.04-arm` | the romeu-julieta contract: the fake sbx forwards `env exec` into the julieta container with `.romeu/bin` bind-mounted read-only at the host path; the journeys that reach a julieta call (julieta has no darwin build, 12 12.1), J6 among them, with `julieta salvage` forwarded through `env exec` and the agent replaced by a fixture process; protocol mismatch, `SHA256SUMS` mismatch and a writable bin mount each stop `run` before `layout up`; a 32 KiB manifest round-trips (I30) |
 | E2E (container) | `e2e/container_test.go`, tag `e2e` | CI on `ubuntu-26.04` (amd64) and `ubuntu-26.04-arm` (arm64), native, no QEMU | julieta in the workload's Debian base: `setup` (PATH link, dispatcher, secondary clone, ff of default branch) and its no-op timing, `install` skip rule, `lock --check`, hooks dispatcher, chaining and recorded failures, at the pinned mise no request to its versions host and a refused configuration path outside `MISE_TRUSTED_CONFIG_PATHS` ([04 4.3](04-cli.md#43-julieta-sandbox)), memory (stamping, allowlist), handoff (all kinds; SessionEnd and SessionStart in both orders, so the rule of 08 8.3 is tested in the order Q22 has not confirmed too; SessionStart wired for every source the pinned agent fires), snapshot, the salvage completeness cases, which are the one list in the Test cell of I17 ([05 5.2](05-security.md#52-invariants-and-their-tests)), and three more salvage cases: a fixture process with the agent's process name that ignores SIGTERM is killed after the wait and the manifest records the kill; untracked files count against the salvage cap; a nested repository gets the dirty-tree and stash capture of a top-level one; `layout up --dry-run` golden and `layout up` against the pinned herdr |
-| Host | `e2e/host/*_test.go`, tag `host` | maintainer machines (Intel and Apple silicon) | the same scenario functions against real sbx for J1-J13; S3, S5, S8 confirmation; results as `probe-result.v1` per block B step (11) |
+| Host | `e2e/host/*_test.go`, tag `host` | maintainer machines (Intel and Apple silicon) | the same scenario functions against real sbx for J1-J14; S3, S5, S8 confirmation; results as `probe-result.v1` per block B step (11) |
 | Probes | `e2e/probes` | maintainer machines | [11](11-host-probes.md); `probe-result.v1` files in `docs/probes/` |
 
 Level claims per invariant are those in the 05 table: I14, I20, I22
@@ -61,8 +61,15 @@ Additional required tests:
 - **S8 timing**: `julieta setup` no-op in the container e2e, median of
   5, asserted <= 3 s. That figure is wall time against local origins:
   the fetch of each repo is inside it and the network is not, which is
-  the limit S8 states. romeu's share of `romeu run` is measured on real
-  hosts by B5 ([11 11.2](11-host-probes.md#112-block-b---acceptance-on-real-hosts-last)),
+  the limit S8 states. The figure gates: a median above the bound fails
+  the container e2e, and a second run that passes does not clear it
+  (flaky tests are fixed, never skipped, below). A red is a regression,
+  fixed in the code, or a runner class that became slower; then the
+  maintainer resets the starting value by a pull request that changes
+  S8 and this line together, with the timings of the runs it read under
+  its Evidence, reviewed as any change to a success criterion. romeu's
+  share of `romeu run` is measured on real hosts by B5
+  ([11 11.2](11-host-probes.md#112-block-b---acceptance-on-real-hosts-last)),
   not in CI.
 - **No network in the preflight**: every **P** command runs in the e2e
   with the registry and origins unreachable after `sync`, and succeeds.
@@ -71,18 +78,26 @@ Additional required tests:
   a sandbox or a mount (julieta's `--json` output read over
   `sbx env exec`, `snapshot/heads.json`, the memory entry, the handoff
   file and the `mise.lock` parser); short runs in every CI; long runs in
-  the scheduled `fuzz.yml`, which calls `go run ./tools/ci fuzz`.
+  the scheduled `fuzz.yml`, which calls `go run ./tools/ci fuzz` once a
+  day on `main`, from a `schedule` cron.
 
 Rules:
 
 - Tests never touch the real `$HOME` (`HOME`, `XDG_*`,
   `ROMEU_SETTINGS` in `t.TempDir()`).
-- The network is read by the container e2e's mise install (pinned,
-  checksum-verified, cache keyed by the fixture `mise.lock` sha256),
-  the host suite, `tools/ci acceptance`, `tools/ci links` and
-  `tools/ci pins`, which are outside `all`, and, inside `all`, by the
-  `vulnerabilities` step and by the `license` step's pull of its pinned
-  image (10.2). Nothing else in a test or a step reads it.
+- This is the one list of the network reads of the tests and the
+  steps. The network is read by the container e2e's mise install
+  (pinned, checksum-verified, cache keyed by the fixture `mise.lock`
+  sha256) and, by the default of Q27 in the index's
+  [Open questions](../spec.md#open-questions), its pull of the
+  workload's base image and its herdr download, each pinned and
+  checksum-verified the same way; by the host suite,
+  `tools/ci acceptance`, `tools/ci links` and `tools/ci pins`, which
+  are outside `all`; by the pr job's unauthenticated fetch of a pull
+  request's `head.sha`, made by `pr` only when the object is missing
+  (10.2); and, inside `all`, by the `vulnerabilities` step
+  and by the `license` step's pull of its pinned image (10.2). Nothing
+  else in a test or a step reads it.
 - The container e2e restores its mise cache with `actions/cache`, pinned
   by SHA like every action (10.2); `release.yml` restores no cache.
 - A precondition of the hybrid or container level that cannot be met
@@ -111,8 +126,8 @@ does a file in that directory with another name ending:
 | job | the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `runs-on` is `${{ matrix.os }}` or one of the four labels of Runners below, and so is each `os` of the matrix (`runs-on` as a list or a mapping fails); `permissions`, at the top and in a job, is a mapping whose values are `read` or `none`, and the file sets it at the top or in every job, so no scope is left to the default; `strategy` holds `matrix`, `fail-fast` and `max-parallel` only; the matrix is a written mapping with the keys `os` and `include` only, each `include` entry holds `os` and `mise_sha256` only (names matched exactly), and a `${{` in the value of an `include` entry fails (the `os` value is held to the four labels); with `runs-on: ${{ matrix.os }}` every runner of the matrix names an `os` |
 | `uses` step | the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, the owner and the repository start with a letter or a digit, and so does each path segment or it starts with `_`, so no `.` or `..` segment, no `./` path of the repository (a local action) and no `docker://` image fits; `with` is a mapping that holds only the inputs listed for that action in `tools/ci` (the action is matched without case), each value a literal or one `${{ matrix.<key> }}` alone whose values are all literals; an `actions/checkout` step sets `persist-credentials: false`, written exactly so (the case of the action name is ignored, the case of the value is not) |
 | `run` step | the keys `name`, `run`; `run` is one line, `go run ./tools/ci <subcommand> [<argument>...]` or `go run ./tools/release <subcommand> [<argument>...]`; each word is made of ASCII letters, digits and `._/=:-`, or is `"$NAME"` |
-| pr job | one workflow file whose `on` names `pull_request_target`, with `branches: [main]`, and no other event holds the one job that runs `go run ./tools/ci pr`; the file and the job set `permissions` to `contents: read` and nothing else, no step names a secret or `github.token`, its one checkout is of the default branch's commit (`github.sha`), never `pull_request.base.sha`, with `persist-credentials: false`, and the head is read only as git objects fetched by `head.sha`, never checked out to be built or run; `tools/ci workflows` refuses `pull_request_target` in any other file, the event without `branches: [main]`, and a checkout of any other ref, with a fixture per refusal. The head fetch is unauthenticated, so it relies on the repository being public; a private repository reopens it (the [Deferred decisions](../spec.md#in-how-this-repository-is-run)). Under that event GitHub runs the workflow file of the default branch, with a token that may write and with secrets, and warns against building or running pull request code ([events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows), [secure use](https://docs.github.com/en/actions/reference/security/secure-use), read on 2026-10-09), which is why every one of these limits is in the grammar |
-| release publish job | in `.github/workflows/release.yml` only, one job, the publish job of [Release and bootstrap](#release-and-bootstrap), may set `contents: write`, `id-token: write` and `attestations: write` in its job `permissions`, and only its `run` steps of `tools/release publish` and `tools/release verify` may hold `env` with the one key `GH_TOKEN: ${{ github.token }}`; `tools/ci workflows` refuses each of these in any other file, job or step, with a fixture per refusal |
+| pr job | one workflow file whose `on` names `pull_request_target`, with `branches: [main]`, and no other event holds the one job that runs `go run ./tools/ci pr` (the task that builds `pr` may change that command line, and this row with it, 12 12.4); the file and the job set `permissions` to `contents: read` and nothing else, no step names a secret or `github.token`, its one checkout is of the default branch's commit (`github.sha`), never `pull_request.base.sha`, with `persist-credentials: false`, and the head is read only as git objects fetched by `head.sha` by `pr` itself, never checked out to be built or run; `tools/ci workflows` refuses `pull_request_target` in any other file, the event without `branches: [main]`, and a checkout of any other ref, with a fixture per refusal. The head fetch is unauthenticated, so it relies on the repository being public; a private repository reopens it (the [Deferred decisions](../spec.md#in-how-this-repository-is-run)). Under that event GitHub runs the workflow file of the default branch, with a token that may write and with secrets, and warns against building or running pull request code ([events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows), [secure use](https://docs.github.com/en/actions/reference/security/secure-use), read on 2026-10-09), which is why every one of these limits is in the grammar |
+| release publish job | in `.github/workflows/release.yml` only, one job, the publish job of [Release and bootstrap](#release-and-bootstrap), may set `contents: write`, `id-token: write` and `attestations: write` in its job `permissions`, and only its `run` steps of `tools/release build`, `tools/release notes`, `tools/release verify` and `tools/release publish` may hold `env` with the one key `GH_TOKEN: ${{ github.token }}`; `tools/ci workflows` refuses each of these in any other file, job or step (the `tools/ci setup` step of that job included), with a fixture per admitted step and per refused step |
 
 So a workflow has no `if`, no `continue-on-error`, no `shell`, no
 `container`, no job that calls another workflow, and no `${{ }}`
@@ -172,8 +187,10 @@ all` does not run it. A local run
 is `go run ./tools/ci pr <file>`, on a payload saved beforehand (with
 `gh api`, for example), or, before the pull request exists,
 `go run ./tools/ci pr --title <title> --body <file>`, which reads the
-local base..HEAD range in place of a payload; `pr` itself makes no
-network call. The file is
+local base..HEAD range in place of a payload. `pr` reads the network
+only for the fetch of `head.sha` in the pr job, when the object is
+missing (12 12.4); a local run on a saved payload, or with `--title`
+and `--body`, reads none. The file is
 the pull request object, or the event whose `pull_request` member is
 that object, and `pr` reads seven fields of the object: `title`, `body`,
 `head.ref`, `head.sha`, `base.sha`, `base.ref` and
@@ -184,7 +201,8 @@ reachable from `head.sha` and not from `base.sha`, read by the walk of
 the approval lines, are the paths that differ between the merge base
 of `base.sha` and `head.sha`, and `head.sha` itself, both names of a
 rename included. So a merge of the default branch into the pull
-request brings in no surface the pull request did not change.
+request brings in no surface the pull request did not change. The
+step fails when the walk from `base.sha` to `head.sha` finds no commit.
 
 GitHub Actions is the default runner. If the Actions quota runs out,
 the maintainer may choose the local gates instead, provided they are
@@ -205,13 +223,13 @@ local-gate run is recorded is a
 | unit | `go test -count=1 ./internal/... ./tools/...`, the pinned go command, in the environment of the steps of `fast` (below); `-count=1` because tests that scan the repository would otherwise pass from the test cache | yes |
 | hygiene | `tools/ci hygiene`; its rules are in [Hygiene](#hygiene) below | yes |
 | pushed range | `tools/ci fast` with the pre-push hook's arguments: it first refuses a push it would not test as sent, then runs the forbidden-name check over the remote ref names and the commits of a push (below), and refuses a commit that adds or renames to a file whose name is on the never-tracked list (below) even when a later commit removes it | in the hook only |
-| sequences | `tools/ci sequences`: ADR numbers unique; ADR layout and statuses per ADR 0001 (rules 6-7), the `Superseded in part by` form included, the filename compared through the `slug` function `tools/new adr` uses; every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; every ADR that `docs/spec.md` or `docs/spec/` cites has status Accepted; every row of the index's Deferred decisions tables has its three cells filled ([ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md)); the ids below unique, and every referenced id and id range (for example "J1-J13" in a success criterion) defined; in `docs/plan.md`, task ids contiguous, each "Depends on" naming an existing lower task id or block, and each "Implements" citing an existing section ([12 12.2](12-engineering.md#122-development-commands-and-capability-map)) | yes |
+| sequences | `tools/ci sequences`: ADR numbers unique; ADR layout and statuses per ADR 0001 (rules 6-7), the `Superseded in part by` form included, the filename compared through the `slug` function `tools/new adr` uses; every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; every ADR that `docs/spec.md` or `docs/spec/` cites has status Accepted; every row of the index's Deferred decisions tables has its three cells filled ([ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md)); the ids below unique, and every referenced id and id range (for example "J1-J13" in a success criterion) defined; in `docs/plan.md`, task ids contiguous, each "Depends on" naming an existing lower task id or block, and each "Implements" citing an existing section ([12 12.2](12-engineering.md#122-development-commands-and-capability-map)); every command of [04 4.2](04-cli.md#42-romeu-host) and [04 4.3](04-cli.md#43-julieta-sandbox) has a row in the table of [00 0.5](00-scope.md#05-scope-justification), and every row of it written as a command (a code span that starts with `romeu` or `julieta`) names one of them, so a removed command leaves no row behind, with a fixture each way | yes |
 | vocabulary | `tools/ci vocabulary` (01 1.7) | yes |
 | workflows | `tools/ci workflows`: the grammar above | yes |
 | vulnerabilities | `govulncheck ./...`; it reads the Go vulnerability database over the network, so its result depends on the date. It is the one step of `all` that reads the network for its result: a local `all` without the network is not the equivalent run, and its output says so. It runs before `unit` (below) | |
 | build the tagged suites | `go vet -tags e2e ./e2e/...` and `go vet -tags host ./e2e/host/...` on every runner, so a suite that does not build fails here and not at block B | |
 | unit + golden + race | `go test -race -count=1 -coverprofile=cover.out ./...`, with `cover.out` in a temporary directory, so no run leaves it in the working tree; it runs code of the change, which can game its own result (below) | |
-| coverage | `tools/ci coverage` (S9), per package: every package `go list ./...` reports, `cmd/` included, and a package absent from the profile counts as 0 percent; each package below its threshold is a finding, and the thresholds are starting values that are only raised; it reads the profile that the race run's code of the change wrote, so a test can game it (below) | |
+| coverage | `tools/ci coverage` (S9), per package: every package `go list ./...` reports under `cmd/`, `internal/`, `tools/`, `e2e/probes/` and `e2e/fakesbx/`, and a package absent from the profile counts as 0 percent; the other packages under `e2e/`, `e2e/scenarios` and `e2e/host` among them, are out, because their code runs only under the `e2e` and `host` tags, which the race run does not set, and the journeys they run are the evidence of S7; each package below its threshold is a finding, and the thresholds are starting values that are only raised; it reads the profile that the race run's code of the change wrote, so a test can game it (below) | |
 | golden governance | `tools/ci golden`: fails if `-update` appears in CI invocations; lists every changed golden in the job summary for review | |
 | schema | `tools/ci schema` (10.1); it also checks that each YAML file under `examples/` carries the `$schema` hint of the release that ships it ([03 3.2](03-formats.md#32-project-spec-projectsnameyaml-schema-projectv1)) | |
 | e2e | `go test -race -count=1 -tags e2e ./e2e/...`, `-count=1` for the reason the unit row gives; the romeu it runs is built by `tools/release build --dry-run`, the one way julieta is embedded ([02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public)) | |
@@ -224,7 +242,7 @@ local-gate run is recorded is a
 | mise | `tools/ci mise` (`julieta lock --check` logic on this repo's and the examples' locks) | |
 | probes | `tools/ci probes` (11 11.4: the results that are committed, and the A5 golden hashes; that every probe has a result is checked by `acceptance`, 10.5) | |
 | license | `reuse lint` (REUSE 3.3), from the `fsfe/reuse` image pinned by digest in `tools/ci` ([12 12.1](12-engineering.md#121-tech-stack)), with the working tree and the git directory (`git rev-parse --git-common-dir`) mounted read-only, each at its own path, and no network for the container, so that a linked worktree, whose git directory lies outside the tree, ignores the same files as a clone; it runs before `unit` (below); on Linux only, since the check reads file content alone and the image is built for Linux. On macOS the output of `all` shows `--    license: not run on darwin`, neither `ok` nor `FAIL`. The same step reads the licenses of the module graph and fails a module whose license is not on an allowlist compatible with GPL-3.0-only ([00 0.4](00-scope.md#04-license)); `tools/release build` writes the third-party notices file of each archive from that graph | |
-| docs | `tools/ci docs` (S10; the checks ADR 0001 assigns to it: rules 1, 5 without external URLs, 9 for the title at a first mention, 12, 13, 17, 20). It also fails `ARCHITECTURE.md` when an invariant id of 05 5.2 or a module id of 12 12.2 does not appear in it; an error id whose "recovered in" cell is empty or names an anchor that does not resolve (12 12.8); and a spec page holding a table whose header row equals a generated reference table's ([03](03-formats.md), opening). The Markdown lint and the spell check of rule 5 check nothing until their tools are picked, a [deferred decision](../spec.md#deferred-decisions). The reference pages are compared with their source by `generated`, not here | |
+| docs | `tools/ci docs` (S10; the checks ADR 0001 assigns to it: rules 1, 5 without external URLs, 9 for the title at a first mention, 12, 13, 17, 20). It also fails `ARCHITECTURE.md` when an invariant id of 05 5.2 or a module id of 12 12.2 does not appear in it; and an error id whose "recovered in" cell is empty or names an anchor that does not resolve (12 12.8). The Markdown lint and the spell check of rule 5 check nothing until their tools are picked, a [deferred decision](../spec.md#deferred-decisions). The reference pages are compared with their source by `generated`, not here. The command lines of fix hints and `--help` examples are checked by the unit test over the generated command definitions that [04 4.1](04-cli.md#41-conventions-both-binaries) names (Error ids), not by rule 13, which reads `README.md` and `docs/guide/`. The julieta command lines of a `SKILL.md`, flags included, and the headings the handoff skill names are checked by the test of [12 12.3](12-engineering.md#123-generators) against the command definitions and the headings `julieta handoff write` requires | |
 | lessons | `tools/ci lessons`: every lesson under `docs/lessons/` ([12 12.7](12-engineering.md#127-text-standard-and-lessons)), read after its front matter, names an existing `tools/ci` subcommand or test name, or says "no check possible: <reason>" | |
 | pr | `tools/ci pr` (pull requests only; inputs as described above; 12 12.4; ADR 0001 rules 4, 8, 11; the base branch, 12 12.9; the fix marker, 12 12.10; the tags of 05 5.2, above; the forbidden-name check, below) | |
 
@@ -359,11 +377,10 @@ image version.
 
 Four subcommands are outside `all`:
 
-- `tools/ci acceptance` needs the network (GitHub API). Its four
-  completeness checks (10.5) read only the repository, and they join
-  `all` once the plan's last task has landed
-  (10.5); before the v1.0.0 tag the maintainer runs it with `--pre-tag`
-  as a step of the release checklist of
+- `tools/ci acceptance` needs the network (GitHub API). Its six
+  checks that read only the repository join `all` once the plan's last
+  task has landed (10.5); before the v1.0.0 tag the maintainer runs it
+  with `--pre-tag` as a step of the release checklist of
   [12 12.2](12-engineering.md#122-development-commands-and-capability-map),
   and no workflow runs it. Its unit tests use a recorded API fixture.
 - `tools/ci links` needs the network too: it fetches every external URL
@@ -610,7 +627,7 @@ there by a pull request. A finding says which of the two lists holds
 the name. Entries that exist only at a commit inside the range, and
 neither at HEAD nor at the default branch, are not applied. The local
 refs and the git binary are trusted, as the toolchain is
-([ADR 0007, Threat model](../adr/0007-adopt-testify-assert-and-require-in-tests.md#threat-model)).
+([ADR 0007, adopt testify assert and require in tests](../adr/0007-adopt-testify-assert-and-require-in-tests.md#threat-model)).
 The hook knows only the denylist this clone holds: an entry pushed
 from another clone applies once it is fetched here.
 
@@ -688,11 +705,33 @@ The workflow has two kinds of job:
   job per runner of the list above, with the read permissions of
   `ci.yml`.
 - One publish job, on `ubuntu-26.04`, needs all of them and runs no
-  test and no `tools/ci` step. It holds the permissions and the token
-  of the release publish job row of the grammar, and it builds, so no
-  archive passes from one job to another. Its steps, in order:
-  1. `tools/release build` refuses to build when the latest scheduled
-     `fuzz.yml` run on `main` is not `success`. It cross-compiles the
+  test. It holds the permissions and the token of the release publish
+  job row of the grammar, and it builds, so no archive passes from one
+  job to another. Its one `tools/ci` step is the exception, and it runs
+  first: `go run ./tools/ci setup`, in the setup environment above
+  (`GOPROXY` and `GOSUMDB` set), installs the pinned tools and fills
+  the module cache. The release steps then run in the steps'
+  environment, `GOPROXY=off`. Its steps, in order:
+  1. `tools/release build`, unless it is called with `--dry-run`,
+     refuses to build when the latest scheduled `fuzz.yml` run on
+     `main` is not `success`, or when that run's head commit is not an
+     ancestor of the release commit, or when a file that holds a guard
+     or test tag of 05 5.2 changed between the two. Only a run whose
+     event is `schedule` counts: a `workflow_dispatch` run of
+     `fuzz.yml` does not, so a release that needs a newer run waits for
+     the next daily one. It reads the run
+     through the GitHub API with the step's `GH_TOKEN` (the release
+     publish job row) and the job's `actions: read` permission (the
+     permissions are inferred until the first `release.yml` run reads
+     each endpoint; its log goes under that PR's Evidence).
+     Any other answer, an API error included, refuses. Each answer is a
+     fixture of the tests of `tools/release`: "fuzz run success
+     builds", "fuzz run of another conclusion refuses", "no fuzz run
+     found refuses", "fuzz run API error refuses", "fuzz run head not
+     an ancestor refuses" and "guard-tagged file changed since the fuzz
+     run refuses". A `--dry-run` build, which the e2e step calls, reads
+     no network and makes no such check ("dry-run build makes no
+     network read"). It cross-compiles the
      julieta linux binaries, embeds them, the kits and the catalog into
      romeu, builds romeu for darwin, and writes the archives, each with
      `COPYING` and the third-party notices file, and `checksums.txt`.
@@ -707,7 +746,12 @@ The workflow has two kinds of job:
      verification contract below, with the `gh` that `mise which`
      resolves ([12 12.1](12-engineering.md#121-tech-stack)).
   4. `tools/release notes` generates the release notes
-     ([12 12.6](12-engineering.md#126-release-notes)).
+     ([12 12.6](12-engineering.md#126-release-notes)); it reads the
+     merged pull requests, their authors and the issues they close
+     through the GitHub API with the step's `GH_TOKEN` and the job's
+     `pull-requests: read` and `issues: read` permissions (the
+     permissions are inferred until the first `release.yml` run reads
+     each endpoint; its log goes under that PR's Evidence).
   5. `tools/release publish` creates the release as a draft, uploads
      every asset and publishes it, in one call, and marks it a
      prerelease when the tag has a suffix after the patch number
@@ -723,14 +767,36 @@ README and `tools/release verify` derive: the repository; the signer
 workflow `release.yml`; the commit the tag names; hosted runners only.
 The ref that started the workflow joins the list when the deferred
 decision above is made. The commands that check it are written once,
-in `e2e/scenarios/commands.yaml`. The releases carry `checksums.txt`
-and the keyless build provenance attestation, and no other signature;
-what the attestation proves, and what it does not, is in
-[05 5.4](05-security.md#risks-of-running-romeu), "Release proof".
+in `e2e/scenarios/commands.yaml`; the attestation entry is
 
-`tools/ci acceptance` is not a step of the workflow: its pre-tag run
-and the comparison of the candidate's commit with the tag are
-maintainer steps of the release checklist of
+```
+gh api repos/<owner>/romeu-e-julieta/commits/<tag> --jq .sha
+gh attestation verify <archive> --repo <owner>/romeu-e-julieta \
+  --signer-workflow <owner>/romeu-e-julieta/.github/workflows/release.yml \
+  --source-digest <commit> --deny-self-hosted-runners
+```
+
+The first line reads the commit the tag names from the repository on
+GitHub, and `<commit>` is its output. `--repo` and `--signer-workflow`
+hold the first two items of the list, `--source-digest` the commit and
+`--deny-self-hosted-runners` the hosted runners. The `gh` pinned in
+`mise.toml` fixes the flags in the development sandbox and in
+`tools/release verify`, as its `gh attestation verify --help` shows
+them; the `gh` floor of [12 12.1](12-engineering.md#121-tech-stack)
+fixes them for the operator. A `tools/ci` test fails when the `gh`
+pinned in `mise.toml` is below that floor, which 12 12.1 states once
+and the test reads from there, with two fixtures: a pin below the floor
+fails and a pin at the floor passes; the test also fails when 12 12.1
+holds no floor it can parse, so a reworded floor does not leave it
+green on a stale number. `commands.yaml` gives these lines and the
+checksum line as one block, with the tag as its one variable. The releases carry
+`checksums.txt` and the keyless build provenance attestation, and no
+other signature; what the attestation proves, and what it does not, is
+in [05 5.4](05-security.md#risks-of-running-romeu), "Release proof".
+
+`tools/ci acceptance` is not a step of the workflow: its pre-tag run,
+the comparison of the candidate's commit with the tag, and its run at
+each later release are maintainer steps of the release checklist of
 [12 12.2](12-engineering.md#122-development-commands-and-capability-map),
 and its evidence names the release and the run, which exist only when
 this workflow has ended (10.5).
@@ -771,14 +837,20 @@ What they set up, and holds now:
 
 - a. Two rulesets. On the default branch: changes arrive by pull
   request; a merge commit is the only merge method; force pushes and
-  deletion are refused; a required-status-checks rule lists the four
-  `all on ...` checks. Updates are no longer restricted to the bypass
+  deletion are refused. Updates are no longer restricted to the bypass
   actor (removed, as read on 2026-10-09), so, read from the rules and
   not tried, an account with write access can merge a pull request
-  whose required checks are green. On tags matching `v*`: creation, update and deletion
-  are refused for everyone except the bypass actor. The administrator
-  role is the bypass actor of both, and the operator's token holds that
-  role. The merge requirements, and what they are worth, are in
+  whose required checks (item e) are green. On tags matching `v*`:
+  creation, update and deletion are refused for everyone except the
+  bypass actor. The administrator role is the bypass actor of the tag
+  ruleset only, and the operator's token holds that role: the
+  default-branch ruleset has no bypass actor once the maintainer step
+  of [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md),
+  decision 1, removes it. Until that step the role bypasses the
+  required checks on a pull request merge; the API answer, saved under
+  Evidence, that shows the default-branch ruleset with no bypass actor
+  ends that state, and the index's S2 and local-gates row read it
+  here. The merge requirements, and what they are worth, are in
   [05 5.4](05-security.md#risks-of-how-this-repository-is-developed).
   Two repository settings, which bind a bypass actor too: squash
   merging and rebase merging off, so every merge is a merge commit
@@ -788,7 +860,22 @@ What they set up, and holds now:
   in a plain clone on the host ([Forbidden names](#forbidden-names)).
 - c. The pre-push hook, enabled in that clone.
 - d. Four tries with the sandbox's token; of the four, only the direct
-  push to the default branch was refused (05 5.4).
+  push to the default branch was refused (05 5.4; tried on 2026-10-08;
+  under the rules of 2026-10-09 it is read, not tried, and the try is
+  repeated with the four tries after the token narrowing). The four
+  tries repeated with the narrowed token, their API answers saved under
+  Evidence, record that the token is narrowed, the event of the
+  Deferred decisions rows whose trigger is "the token is narrowed"
+  (round 13, R13-03). The required-name try runs after the narrowing,
+  to do, in three steps on a throwaway pull request (05 5.4; round 12,
+  D1, decided on 2026-10-09; round 13, R13-02): (1) a workflow pushed
+  on a side branch, with `statuses: write` and `checks: write`, posts a
+  commit status and a check run, each under a required check's name,
+  on that pull request's head; record which of the two the ruleset
+  counts, and save the API answers under Evidence; (2) post a status
+  directly with the narrowed token, and record whether the token
+  refuses it; (3) close the pull request, and delete the side branch
+  and its workflow.
 
 The host runs `tools/ci`, `hygiene add` included, only from a commit
 whose diff since the last host run the maintainer has read, or from the
@@ -801,17 +888,18 @@ it out.
 To do, each a maintainer step that saves the API's answer under
 Evidence:
 
-- d. A fifth try, at the next sitting, only with the operator present
-  and confirming live and the revert step ready: set the default-branch
-  ruleset's enforcement to disabled with the sandbox's token, read the
-  body back, and restore it. The result is recorded in 05 5.4 and in
-  the next decision record. To do.
-- e. After step 2: add the CI jobs of the green run to the
-  default-branch ruleset as required status checks. As read on
-  2026-10-09, the rule lists the four `all on ...` checks (the note on
-  the maintainer block); saving the API's answer under Evidence is still
-  to do. When the task that builds `pr` lands, its job joins the
-  required checks, the same way.
+- e. After step 2, the CI jobs of the green run joined the
+  default-branch ruleset as required status checks: as read on
+  2026-10-09, a required-status-checks rule lists the four
+  `all on ...` checks (the note on the maintainer block). Saving the
+  API's answer under Evidence is what is left to do. When the task that
+  builds `pr` lands, its job is added to the required checks, and the
+  step records under that task's Evidence the `head_sha` the pr job's
+  check run carries and whether a ruleset that requires it blocks a
+  merge and then allows it. If the check cannot be required, that is
+  recorded under
+  [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md),
+  decision 1.
 - f. Before the first release candidate: turn on GitHub's immutable
   releases setting. To do.
 
@@ -834,7 +922,7 @@ run, marked interim; S2 still requires a real green run for release.
 | Stateful replay | each scenario's sessions replay as a state machine keyed by the prior mutating calls (for example `sbx ls` answers differently after `env run` and after `env rm`), so a call out of the recorded order fails. A scenario names the recorded session it starts from, which is how a sandbox that was removed, stopped or created outside romeu is replayed. On create the fake writes the recorded `remote.sandbox-<name>` stanza into the primary clone's config, as sbx does (01 1.2) |
 | Parsers | `sbxdrv` parsers run over every recorded version |
 | Shared scenarios | CI and host suites call the same scenario functions in `e2e/scenarios`; only the sbx binary differs |
-| Tested window | the sbx versions with a recording set under `e2e/testdata/sbx/` are the tested window, named in [12 12.1](12-engineering.md#121-tech-stack) and `SECURITY.md`. An sbx outside it is the `sbx-untested` warning of `status` and `doctor`, and gate 1 names the window ([01 1.4](01-system-model.md#gate-1-toolchain-acknowledgement-per-machine)); an sbx output romeu cannot parse, or one that lacks a field, is its own error, `sbx-output-unparsed` (exit 2, [04 4.4](04-cli.md#44-error-ids)), and no state transition follows it. Each recording set and each probe result names its sbx version and capture date. Block B replays every recorded argv shape against the candidate's sbx and compares the output shape; a new sbx minor release or a floor bump records A4, A5 and A9 again before the window widens, and raising the floor requires a new recording set |
+| Tested window | the sbx versions with a recording set under `e2e/testdata/sbx/` are the tested window, named in [12 12.1](12-engineering.md#121-tech-stack) and `SECURITY.md`. An sbx outside it is the `sbx-untested` warning of `status` and `doctor`, and gate 1 names the window ([01 1.4](01-system-model.md#gate-1-toolchain-acknowledgement-per-machine)); an sbx output romeu cannot parse, or one that lacks a field, is `upstream-shape` (exit 2) by the upstream rule of [03](03-formats.md) (opening), and no state transition follows it. Each recording set and each probe result names its sbx version and capture date. Probe B6 ([11 11.2](11-host-probes.md#112-block-b---acceptance-on-real-hosts-last)) replays each recorded argv shape that only reads against the candidate's sbx, in the harness's own throwaway sandbox, and fails naming each shape whose output shape differs from its recording; a new sbx minor release or a floor bump records A4, A5 and A9 again before the window widens, the results of a version above the floor at `docs/probes/<id>-<host>-<sbxVersion>.json` (11 11.3), and raising the floor requires a new recording set |
 | Known argv | taken from recordings, for example `sbx policy rm network --sandbox <s> --resource <host>`. The argv shapes and sessions block A must record are the table of [11 11.1](11-host-probes.md#recorded-sessions); an argv builder with no row there is an error of the fake, found by a unit test before block A runs |
 | Cannot model | VM boot timing, virtiofs semantics, real network policy enforcement, credential injection, kit builds, host-command prompts; these are covered only by the host suite and probes. A recording anyone makes with the probe harness (`--only`), through the recorder's redaction, may be attached to an issue; the maintainer commits it after reading it, and a fix for one of these classes replays it ([12 12.9](12-engineering.md#129-delivery-practices)) |
 
@@ -870,9 +958,12 @@ run is in the config repo); a `command` item is run again, its argv
 from the repository root, and its exit status and the sha256 of its
 stdout are compared. For each release it also checks that the tag's
 commit equals the source digest in the release's attested provenance,
-so a `v*` tag moved to another commit is found.
+so a `v*` tag moved to another commit is found. Step 7 of the release
+checklist of [12 12.2](12-engineering.md#122-development-commands-and-capability-map)
+runs it at every release after v1.0.0, with `--tags`, which runs that
+check alone.
 
-It also checks four things that are complete only at the end of the
+It also checks six things that are complete only at the end of the
 plan. They read only the repository, and they join `all` once the
 plan's last task has landed: before then they would keep `all` red
 while the plan is under way, and from then on every pull request keeps
@@ -887,10 +978,14 @@ them true.
   commit, which every block B result records, and the v1.0.0 tag, the
   only paths that differ are under `docs/` or are Markdown files at
   the repository root (11 11.2); results of one host that name
-  different candidates fail.
+  different candidates fail;
+- no `default-overturned` result lacks its `resolvedBy` (11 11.4);
+- each block A result was recorded at an sbx version in the tested
+  window of 10.3 and at the current pins, and A4, A5 and A9 each have
+  a result at the window's newest version (11 11.4).
 
 Before the v1.0.0 tag the maintainer runs
-`go run ./tools/ci acceptance --pre-tag`, which runs the four checks
+`go run ./tools/ci acceptance --pre-tag`, which runs the six checks
 against the commit about to be tagged, as a step of the release
 checklist of
 [12 12.2](12-engineering.md#122-development-commands-and-capability-map).
@@ -999,8 +1094,9 @@ The Always / Ask first / Never list in the
 [index](../spec.md#boundaries-for-everyone-who-changes-this-repo)
 applies. A task is done only when `go run ./tools/ci all` passes, its
 invariant tags are in place, the generated files are current, a new or
-changed error id has a reviewed fix hint, a changed journey has its
-guide page updated in the same pull request, and, for host-facing
+changed error id has a reviewed fix hint, a changed journey or a
+changed output that a guide page shows has that page updated in the
+same pull request, and, for host-facing
 behavior, the matching scenario function exists and its
 recording-runner test passes in CI (ADR 0001 rule 13); its block B run
 is the acceptance.

@@ -1,0 +1,49 @@
+{
+ "header": "L12 · The parallel-execution engineer · sonnet",
+ "verdict": "All four round-9 findings are resolved in the spec text as stated (the plan part of R9-23 stays parked for B). The delta adds two Required defects in the plan and one Advisory: a prerequisite PR that is no task, and a pull_request_target job that no task creates.",
+ "prior_checked": 4,
+ "prior_resolved_as_stated": 4,
+ "findings": [
+  {
+   "id": "L12-R10-1",
+   "kind": "new",
+   "severity": "Required",
+   "section": "plan.md T015 and T078 (Depends on); 05 5.3 (sbxdrv and skills tooling PR)",
+   "defect": "T015 and T078 now depend on 'the sbxdrv surface tooling PR (05 5.3)', which has no task id, no module, no owner and no place in the phase table or the critical path. It edits .github/ask-first.yaml, an ask-first surface, and 12 12.2 treats such a PR as overlapping every in-flight PR.",
+   "scenario": "A scheduler that reads Depends on as task ids finds an edge to nothing. T015 starts, or is held, by guesswork. Nobody owns the PR, so T015 (the first fake sbx task, on the path to T016 and T019) is held until someone invents it. The same PR serves T078 in a later phase. Both PRs also need an unticked approval line for ask-first, a new barrier in the plan's opening phase.",
+   "change": "Make it a numbered task (module ci-bootstrap, Ask-first: ask-first, Depends on T005), with acceptance that .github/ask-first.yaml names the sbxdrv surface and puts skills/** on kits and that tools/ci pr then accepts a diff under internal/sbxdrv with its line. Give T015 and T078 an edge to that id, and add it to the phase table and the critical-path listing.",
+   "prior_ref": "ADR 0010 / R9-write-pass: sbxdrv surface tooling PR"
+  },
+  {
+   "id": "L12-R10-2",
+   "kind": "new",
+   "severity": "Required",
+   "section": "plan.md T002 and T005; 12 12.4 (pr job); 10 10.2 (pr job row and the edited rule)",
+   "defect": "The spec now runs tools/ci pr from one separate pull_request_target workflow file, defined on the default branch and covered by the workflows grammar row. No plan task creates that file. T005 'lands whole' and is the pr step only; T002 still tests that ci.yml has the 'edited' type and does not mention the pr job file or its grammar row. The accepted-risk rows also say 'a step for the task that builds pr' to re-run the pr job of each open pull request, and T005 has no such step.",
+   "scenario": "T005 merges green and the pr step exists, but no workflow calls it. With the file missing, 'tools/ci all' no longer runs pr and the approval-line and grant checks run nowhere on a pull request. An agent adds the file later in an unplanned PR that touches .github/workflows/** and so the approvals, checks and dependencies surfaces, each needing its own unticked line. A pr fix then leaves green results from the old code on open PRs, and the re-run step is nobody's.",
+   "change": "Add to T005 (or a new task right after it) the pr workflow file as an acceptance item: the job, the fixture refusals of the grammar row, and the re-run of open PRs when pr changes. Move the 'edited' case from the ci.yml case of T002 to this file, and list the approvals surface in the Ask-first field of each task that edits askfirst.go, denylist.yaml or a workflow.",
+   "prior_ref": ""
+  },
+  {
+   "id": "L12-R10-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "05 5.3 (approvals surface, no checkpoint grant); plan.md Ask-first forecasts",
+   "defect": "The approvals surface covers tools/ci/denylist.yaml and .github/workflows/**, which many tasks and every 'hygiene add' touch, and no checkpoint grant can cover it. Every such PR needs its own line, and such a PR also counts as overlapping every in-flight PR. The plan's Ask-first fields were not updated to forecast it.",
+   "scenario": "Phases 0 to 2 contain many tasks that add a workflow or a denylist entry. Each stops on a per-PR approval that the maintainer cannot give in a checkpoint sitting, and the forecast field shows 'none expected'. Concurrent tasks serialize on the maintainer.",
+   "change": "Audit the plan once for tasks that touch these paths and name approvals in their Ask-first field. Group the workflow-touching tasks into as few PRs as possible, and say in 12 12.4 or the plan that denylist additions go through one batched PR per sitting.",
+   "prior_ref": ""
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L12 section)",
+  "docs/reviews/round-9/reports/L12.json",
+  "docs/reviews/round-9.md (rows R9-22, R9-23, L12-R9-3, L12-R9-4)",
+  "docs/spec/12-engineering.md (diff, 12.2 to 12.4)",
+  "docs/spec/02-layouts.md (tools/ci and docs tree rows)",
+  "docs/spec/05-security.md (diff, 5.3 approvals, sbxdrv paragraph)",
+  "docs/spec/10-testing-style.md (pr job row, grep)",
+  "docs/plan.md (diff, T005, T015, T016, T078, O2)"
+ ],
+ "out_of_scope": "Only the spec and plan sections named above were read, and the rest of the 643-line delta was skimmed. The plan's missing T005 grant cases (R9-2) remain parked for stage B and are not re-reported. ADR 0010 text was not read in full."
+}

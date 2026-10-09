@@ -212,7 +212,7 @@ whose exit status the maintainer reads, wherever one exists. Block A of
 | Block | Needs merged first | What the maintainer does | Also needs | Unblocks | Wait on the critical path | Pass | Recommendation |
 |---|---|---|---|---|---|---|---|
 | O1 | T001, written and open: the block finishes it and merges it | the sitting of the maintainer block, items a to d (10 10.2): rulesets and the two repository settings first; one `go run ./tools/ci hygiene add` per forbidden name in a plain host clone; enable the hook, push the branch, open the pull request; then the four tries from inside the sandbox, read on the host (a measurement: 10 10.2, item d, which records the result) | a host clone, the repository's admin rights, the operator's token, which the sandbox holds, created after item a. | T002 directly; every later task has it in its dependencies | the specification gives no duration; nothing is pushed until it ends, so the whole plan waits. No task can proceed meanwhile | `go run ./tools/ci fast` exits 0 in that clone after item b and non-zero before it; the four tries are read by the host checks of 10 10.2, item d, which no one command joins | do item a before the sandbox that writes the first task receives the operator's token (10 10.2): until then not even a push to the default branch is refused. Save each API answer in a file as you go: the pull request's Evidence needs them, and nothing checks that text until T005, so read each file for a host path or a name before you paste it. Its output is recorded in [ADR 0008, let the sandbox act as the maintainer on GitHub](adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md), which decides Q25. From now on the maintainer also reads the GitHub security log at each sitting, for an action by the operator's token that was not asked for; a judgment, not a detector: the log records ruleset and listed settings changes, and no merge, push, tag, branch deletion or release (05 5.4) |
-| O2 | T002 | item e (10 10.2): add the jobs of the green run to the default-branch ruleset as required status checks, and save the API's answer | the green run's job names | T003 directly; every task after T002 has it in its dependencies | one call; do it in the sitting that merges that task, and it adds no wait. No task can proceed meanwhile | the saved answer lists each job name of the green run; no command reads a ruleset back (05 5.4), so this one is **[review]** | one call, in the same sitting as the merge |
+| O2 | T002 | item e (10 10.2): save the API's answer that lists the required checks (the rule exists, as read on 2026-10-09) | the green run's job names | T003 directly; every task after T002 has it in its dependencies | one call; do it in the sitting that merges that task, and it adds no wait. No task can proceed meanwhile | the saved answer lists each job name of the green run; no command reads a ruleset back (05 5.4), so this one is **[review]** | one call, in the same sitting as the merge |
 | O3 | T019, T020 | block A on both hosts, Intel and Apple silicon (11 11.1): `go run ./e2e/probes --block A --out docs/probes/`, which lists and plants nothing (Q29), apart from one global setting: A2 sets `env.rememberHostCommands` (11 11.1) and records the prior value in its result; then commit the results and the recordings on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | `sbx` at or above 0.46.0 on both hosts; the pins of the pin file | T026 directly, and every task that reads a block A fact | about 75 minutes per host (11 11.1), plus the wait for a sitting with both machines. Meanwhile the tasks listed below the table can proceed | `go run ./tools/ci probes --require-pass A1,A2,A3,A4,A5,A6,A9,A10,A11,A12,A13,A14` exits 0 on the branch with both hosts' results | run both hosts in one sitting: the arch-sensitive probes (A4, A5, A11, A12, A13) count only with both (11, opening). Read the diff of everything staged before the push: it is data from your host, and the recorder's scrubbing (T018) is a filter, not a reviewer. The second host's files reach the branch by a push from that host's own clone, through its hook, and the harness refuses an `--out` inside a clone whose hook is not enabled. A results-only branch runs `main`'s own `tools/ci` through the hook; if a resolution commit joins it (T026), read that diff in the clone before checking the branch out, as item c of block O1 requires (10 10.2) |
 | O4 | T055 | the catalog handover: build julieta for linux from `main`, run `julieta spec validate --catalog projects/*.yaml` on the reference config repo inside a Linux container, and hand over its output after reading and redacting it: it may name hosts, tool keys or project names that are not for the public repository | a Linux container with read-only access to the config repo's origins and no host credential mounted; julieta has no darwin build (12 12.1) | T091 directly, and through it block O5 | minutes; it can happen any time after its one task, so it is off the critical path if done by checkpoint C5. Meanwhile every later task up to block O5 but T091 can proceed | `julieta spec validate --catalog projects/*.yaml` exits 0 or 1, and its output is the handover; an exit of 2 means a spec does not validate, and the block is not done; `go run ./tools/ci hygiene --file <output>` exits 0 on the output before it is handed over | do it at C5, not at the end: it is the only input the catalog task waits for |
 | O5 | every earlier task, T001 to T091 and T103 | the candidate: run `julieta spec validate --catalog` again, in the container of O4, and see it exit 0; the rehearsal on one host (below); then step 1 of the release checklist of 12 12.2, the tag `v1.0.0-rc.1` (11 11.2) | the same container as O4; one host with `sbx` | O6 directly, and through it T092 to T095 and T102 | the rehearsal is about one block B run on one host, 90 minutes plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go test -tags host -json ./e2e/host/...` exits 0, then `go run ./tools/ci probes --require-pass B2,B3,B4,B5,C2,C3,C4,C5,C6 --hosts 1 --dir <the rehearsal directory>` exits 0 | the rehearsal is this plan's addition, not the specification's. After the tag, a change outside `docs/` and the root Markdown files needs a new candidate and block B again (11 11.2) |
@@ -499,7 +499,8 @@ task list:
 #### T005 - `tools/ci pr`
 
 - [ ] Merged
-- Module: `ci-bootstrap`. Implements: 12 12.4, 10 10.2 (the `pr` step
+- Module: `ci-bootstrap`. Implements: 12 12.4, 05 5.3 (the invariant
+  of the `pr` job), 10 10.2 (the `pr` step
   and its inputs; it lands whole), 12 12.9 (the base branch), 12 12.10
   (the form of a fix marker), 10 10.4 (goldens under Evidence), ADR 0001
   rules 4, 8 and 11.
@@ -552,6 +553,58 @@ task list:
     name and the four readings of each commit.
   - A payload with neither accepted shape, or without one of the seven
     fields, fails.
+  - The invariant of 05 5.3 holds: no code that a pull request changes
+    judges that pull request. This task decides where the code of `pr`
+    lives and how it reads the head, and shows each of these (round 11,
+    R11-01 to R11-03, decided on 2026-10-09; round 12, R12-02, R12-05
+    and R12-06):
+    - (a) every input `pr` reads from the head is parsed by code under
+      paths on `approvals`, its YAML and TOML readers included
+      (R11-02);
+    - (b) the code `pr` builds imports only the standard library and
+      packages under paths on `approvals`, and the `approvals` globs of
+      `.github/ask-first.yaml` name those packages' directories (R11-01).
+      A test holds it: it reads each package of `go list -deps -test`
+      with its `Standard` field and its `Dir`, takes the standard
+      library from `Standard`, and matches the `Dir` of every other
+      package to an `approvals` glob; a fixture package that imports a
+      path outside the globs turns it red, and so does a fixture with a
+      module path without a dot under a local `replace` (round 13,
+      L2-r13-2, which replaces the dot rule of R12-06);
+    - (c) `pr`, built from the default branch, applies the version-pin
+      rules of `mise.toml` and `go.mod` of 10 10.2 to the head
+      (R11-03), and refuses a head that holds a tracked `go.work`,
+      `go.work.sum` or `vendor/`, the hygiene rule of 10 10.2 applied
+      from the base, since the go command reads those files from the
+      checkout and the rule that refuses them runs from the head's
+      `tools/ci`; one fixture each, and one for a head that edits a
+      `go.work` already tracked on the base, and removing the path
+      pattern of its file turns each red (R12-02; round 13, R13-04);
+    - (d) the mise toolchain and the `go` line of `go.mod` are the
+      grantable inputs left under the job, each listed in 05 5.4;
+    - (e) every committed `.github/ask-first.yaml` and
+      `docs/grants.yaml` gives `pr` and the generator of 12 12.3 the
+      same surface set (R12-05). When each has its own reader, a test
+      holds it with a fixture pair: two files with the same ids and
+      different globs fail, identical files pass, and removing the glob
+      comparison turns the first red; when T005 takes one reader, the
+      test asserts that both call it (round 13, L6-r13-2).
+  - Each fixture 12 12.4 names is an acceptance line here, and the
+    removal written after it turns it red (R12-06):
+    - the hostile fixture repository (a submodule, a textconv driver,
+      an external diff driver and hooks) against each git call `pr`
+      makes on head objects: removing any one flag of 12 12.4 from its
+      call;
+    - "pr escapes a workflow command in a PR body", with a leading
+      space, a leading U+00A0 and a `##[` case: removing the fixed
+      prefix or the `##[` escape;
+    - a head job outside the pr job's file whose check name equals the
+      pr job's: removing the name comparison;
+    - a head job outside the pr job's file whose `name` holds `${{`,
+      one with a literal expression and one with a matrix value:
+      removing the `${{` refusal;
+    - a head version of the pr job's file that names an event other
+      than `pull_request_target`: removing the event check.
 - Verify: `go test ./tools/ci/... -run '^TestPR'`, which runs the
   fixture lines; `go run ./tools/ci pr <payload file>` on a saved
   payload.
@@ -751,7 +804,9 @@ task list:
 
 - [ ] Merged
 - Module: `probes`. Implements: 10 10.3, 05 5.2 (I4, I25).
-- Depends on: T014. Operator: no. Ask-first: none expected.
+- Depends on: T014, and the `sbxdrv` surface tooling PR (05 5.3), since
+  this is the first task that adds a file under `e2e/fakesbx`.
+  Operator: no. Ask-first: `sbxdrv`.
 - Acceptance:
   - The map names no owner for `e2e/fakesbx`; see [Questions for the
     maintainer](#questions-for-the-maintainer).
@@ -769,7 +824,7 @@ task list:
 - [ ] Merged
 - Module: `romeu-cli`. Implements: 06 6.3, 05 5.2 (I30), 10 10.1 (E2E
   hybrid).
-- Depends on: T013, T015. Operator: no. Ask-first: none expected.
+- Depends on: T013, T015. Operator: no. Ask-first: `sbxdrv`.
 - Acceptance:
   - At the hybrid level on both Linux runners, the compatibility check
     passes for a julieta of an accepted protocol, with the expected
@@ -2110,7 +2165,8 @@ early.
 
 - [ ] Merged
 - Module: `skills`. Implements: 02 2.1 (`skills/`), 08 8.1, 08 8.3.
-- Depends on: T059. Operator: no. Ask-first: none expected.
+- Depends on: T059, and the `sbxdrv` surface tooling PR (05 5.3).
+  Operator: no. Ask-first: `kits`.
 - Acceptance:
   - `skills/julieta/SKILL.md` tells the agent to use `julieta memory`
     and to tag a lesson; `skills/handoff/SKILL.md` pipes the required

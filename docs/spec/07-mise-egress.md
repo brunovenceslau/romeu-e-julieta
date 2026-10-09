@@ -74,7 +74,7 @@ via shims and `mise exec -C`.
 | Update checks | off (04 4.3): no request to the version host |
 | Tracking | off (04 4.3) |
 | Versions host | kept on (`mise-versions.jdx.dev` serves version lists and attestation bundles); it is in the catalog `meta` set |
-| GitHub rate limit | aqua/github downloads fall back to `api.github.com`; mise reads `GITHUB_TOKEN`. How sbx exposes the project's `github` secret (by name) as that variable is a fact probe B4 records, measuring behavior with and without it. Until the token narrowing row of the index's [Deferred decisions](../spec.md#in-how-this-repository-is-run) fires, that secret is the operator's own token ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), ADR 0008), so this download path carries its reach |
+| GitHub rate limit | aqua/github downloads fall back to `api.github.com`; mise reads `GITHUB_TOKEN`. How sbx exposes the project's `github` secret (by name) as that variable is a fact probe B4 records, measuring behavior with and without it. The sandbox holds whatever `github@<project>` binds ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), [J1](09-journeys.md#j1-onboarding-new-machine-first-time) step 5); in the development sandbox of this repository that is the operator's own token until the token narrowing row of the index's [Deferred decisions](../spec.md#in-how-this-repository-is-run) fires ([ADR 0008, let the sandbox act as the maintainer on GitHub](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md)), so this download path carries its reach |
 
 ## 7.5 Egress derivation (`internal/egress`)
 
@@ -82,8 +82,8 @@ Input per repo: `(url, egressCommit)`. Output: `auto` and `gated` sets.
 
 1. Read `mise.lock` (and `mise.toml` for presence) at `egressCommit`,
    the commit of `refs/romeu/origin/<dir>/<ref>`, via `git cat-file`,
-   under one size cap of 1 MiB that every repository blob romeu decodes
-   shares. No lock with a `mise.toml` present: sync error ("run julieta
+   under one size cap of 1 MiB, the file cap, that every repository blob
+   romeu decodes shares. No lock with a `mise.toml` present: sync error ("run julieta
    lock"). No mise files: the repo contributes nothing. romeu reads the
    lock layout written by the mise version the `julieta` kit pins; a
    lock it cannot parse, or one with an unknown top-level key, is the
@@ -114,8 +114,9 @@ Input per repo: `(url, egressCommit)`. Output: `auto` and `gated` sets.
 
 julieta's own network commands follow the same rule. The config
 project's spec carries in `egress.extra` the registry hosts of its
-`workloadRepositories` and `api.github.com`, which `julieta pin
-workload` and `julieta pin check --workflows` read
+`workloadRepositories`, which `julieta pin workload` and `julieta pin
+check --workflows` read; `api.github.com` comes from the base set
+(step 4) and is not listed
 ([04 4.3](04-cli.md#43-julieta-sandbox)); they are gated like any extra
 and approved once.
 
@@ -162,9 +163,9 @@ cannot know.
   (01 1.4). A project sees gate 2 only when its gated egress changes.
 - `julieta spec validate --catalog projects/*.yaml` fetches every
   project's repos' `mise.lock` at their `ref` and lists unknown
-  `backend:tool` keys and lock hosts missing from the catalog. It exits
-  6 on an unknown `backend:tool` only, the case 7.5 step 2 makes a sync
-  error, and reports a missing lock host as a warning, since 7.5 step 3
+  `backend:tool` keys and lock hosts missing from the catalog. Of these
+  it exits 6 on an unknown `backend:tool` only, the case 7.5 step 2
+  makes a sync error, and reports a missing lock host as a warning, since 7.5 step 3
   gates it. It runs in the config repo's CI from a pinned julieta
   release, so that CI is red until an unknown tool is resolved (7.5,
   step 2, names the two fixes).

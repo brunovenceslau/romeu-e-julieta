@@ -1,0 +1,84 @@
+{
+  "header": "L2 · The security engineer who has watched a host fall · opus",
+  "verdict": "Mostly met. All four round-11 L2 findings say what their resolutions say: the invariant of the pr job is stated in 05 5.3 and 12 12.4, the mechanism claims are requirements (a) to (d) of plan T005, the name refusal compares the check name (name, else id) and refuses a non-pull_request_target event in the pr job's file, and author text is printed behind a fixed prefix with ##[ escaped. The largest gap is new: ADR 0011 binds the administrator to the required checks and keeps Contents and Workflows write in the narrowed token, while a required check is matched by name and a workflow pushed on any branch runs at once with the permissions it asks for, so it can post a green check or status under a required name on a pull request's head. Second, requirement (c) of T005 holds only mise.toml and go.mod, not every file mise and go read from the job's checkout.",
+  "prior_checked": 4,
+  "prior_resolved_as_stated": 4,
+  "findings": [
+    {
+      "id": "L2-r12-1",
+      "kind": "new",
+      "prior_ref": "L2-r11-2 (R11-03)",
+      "severity": "Required",
+      "section": "plan.md T005 (acceptance requirement (c)); 05 5.3 (the grantable inputs left under the job); index, Deferred decisions (the row on the pr job's toolchain); 10 10.2 (the go.mod-directive and mise-table rules; Hygiene, the tracked mise file and go.work rules)",
+      "defect": "Requirement (c) has pr apply the version-pin rules of mise.toml and go.mod to the head. But the pr job's go is started by the pinned mise and the go command, and they read more files from the checkout. mise reads its other config paths and .tool-versions. go reads go.work, which can hold a toolchain or godebug directive. The rules that refuse those files, the tracked mise file rule and the go.work rule, are steps of hygiene in the head's tools/ci, on checks. The Deferred row now says every input but the toolchain and the go line is held by the task's acceptance, and (c) as written does not cover those files.",
+      "scenario": "A pull request holds grants on checks and dependencies. It adds .mise/config.toml with an [env] table (GOFLAGS=-toolexec=...), or a go.work with a toolchain line, and relaxes the hygiene rule in the same diff. pr applies (c) to mise.toml and go.mod, which did not change, and passes. The head's hygiene is green. After the merge, every pr job builds with that environment or toolchain. T005 meets its acceptance as written, and the row's 'Until then' is false.",
+      "change": "Word (c) as: pr, built from the default branch, refuses a head that changes the shape of any file the pinned mise or the go command reads from the checkout. That is mise.toml and mise.lock under the rules of 10 10.2, any other mise config path or .tool-versions, and go.work or go.work.sum. Name the list in one place, tools/ci/misefiles.go or its successor on approvals, with a fixture per file. Cost: one bullet in T005, and a few fixtures in that task."
+    },
+    {
+      "id": "L2-r12-2",
+      "kind": "new",
+      "severity": "Required",
+      "section": "ADR 0011 (decision 1 and its declined alternative 'a bypass ... is a path around the checks for an agent that holds the token'; decision 2, Contents and Workflows read and write); 05 5.4 (the approval-line row and the token row); 12 12.4 ('A required check is matched by name', the name refusal); 10 10.2 item e",
+      "defect": "ADR 0011 removes the administrator bypass as a path around the checks for an agent. But a required check is matched by name, and the narrowed token keeps Contents and Workflows write. With them an agent can push a branch that holds a workflow on push. That workflow runs at once, from that branch, before any grammar check reads it, with the statuses: write or checks: write it asks for. It can then post a success under a required check's name (an all on ... check, or later the pr job's) on any pull request's head SHA. Pinning the ruleset's check source to GitHub Actions does not tell those apart, because GITHUB_TOKEN writes as that app. The current classic token (repo scope) can also post a commit status directly. Neither the ADR nor 05 5.4 names this path, and the name refusal of 12 12.4 reads only the head's own workflows.",
+      "scenario": "After the narrowing and the bypass removal, an agent wants to merge its pull request, whose pr check is red over a missing approval line. It pushes a branch side/x with .github/workflows/s.yml: on push, permissions statuses: write, one step that calls the statuses API on the pull request's head with the pr check's name and state success. Then it merges through the API with Contents and Pull requests write. The ruleset sees a passing check of the required name. item e's 'blocks a merge and then allows it' never tries this, so T005's evidence reads as a barrier that is not one.",
+      "change": "Choose and write one of these. (1) State it in 05 5.4 and ADR 0011's consequences: required checks bind the administrator against mistakes, not against an agent that holds a token with Contents and Workflows write, and drop the 'path around the checks for an agent' rationale. (2) Close it where the platform allows: name the check source in the ruleset, and add a fifth try to item d after the narrowing: post a status, and a check from a side-branch workflow, under a required name on a throwaway pull request's head, and record which one the ruleset counts. Recommendation: (1) now, as text, and the try in (2) with the four tries after the narrowing. Cost: two sentences and one try. Not measured: whether the ruleset counts a check run or status created by a side-branch workflow's GITHUB_TOKEN on another SHA."
+    },
+    {
+      "id": "L2-r12-3",
+      "kind": "new",
+      "prior_ref": "L2-r11-3",
+      "severity": "Advisory",
+      "section": "12 12.4 (the name refusal: 'compares each head job's check name (its name, else its id) with the pr job's name')",
+      "defect": "The refusal compares the written name. A job's name may hold a ${{ }} expression, such as a matrix value or a literal expression, which the runner evaluates into the posted check name. The written string then differs from the pr job's name while the posted one equals it.",
+      "scenario": "A head adds a pull_request job with name: ${{ 'pr' }}, or a matrix with name: ${{ matrix.n }} and n set to the pr job's name. pr's string compare finds no match, and a green check of the required name posts from the head.",
+      "change": "Have pr refuse a head job outside the pr job's file whose name holds ${{, or treat it as a match. Add a fixture with a literal expression and one with a matrix value. Cost: one clause and two fixtures."
+    },
+    {
+      "id": "L2-r12-4",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "index S2 (evidence: 'the ruleset requires the checks of every merge, the administrator's included'); 05 5.4 (the approval-line row: 'its bypass actor ... bypasses for pull requests only'); index, Deferred decisions (the row 'required status checks without the administrator bypass', removed)",
+      "defect": "ADR 0011 decision 1 applies only after a maintainer step. The delta removed the Deferred row that tracked the bypass, and S2 now states the binding in the present tense. 05 5.4 names the bypass but does not say what it allows until then: the operator's token can merge a pull request whose required checks are red or missing. The pending step is tracked only on the review page round-11.md, which no trigger or check reads.",
+      "scenario": "The maintainer sitting slips. A later agent reads S2 and 05 5.4 as 'every merge needs the four checks' and relies on that as the control for a merge through the API. Meanwhile the bypass still lets a red pull request merge, and no index row or check reopens it.",
+      "change": "Until the API answer is saved, keep one Deferred row or one line in the token row of 05 5.4: 'until the maintainer step of ADR 0011 decision 1, the administrator role bypasses the required checks on a pull request merge; reopened by the saved API answer showing no bypass actor'. Have S2 say 'once that step is applied'. Cost: two sentences."
+    }
+  ],
+  "prior_resolution_notes": {
+    "L2-r11-1 (R11-02, M)": "holds: 05 5.3 says how pr reads YAML and TOML is decided by the task that builds pr; plan T005 requirement (a) says every head input is parsed by code under a path no checkpoint grant covers, YAML and TOML readers included.",
+    "L2-r11-2 (R11-03, M)": "holds as worded: T005 requirement (c) applies the version-pin rules of mise.toml and go.mod to the head, (d) lists the remaining grantable inputs in 05 5.4, and 05 5.3 no longer claims 'never runs'. Its scope gap is L2-r12-1.",
+    "L2-r11-3 (A)": "holds: 12 12.4 compares each head job's check name (name, else id) and refuses a head whose version of the pr job's file names an event other than pull_request_target, with a fixture for each. Its scope gap is L2-r12-3.",
+    "L2-r11-4 (A)": "holds: 12 12.4 prints each line of author text behind '> ', neutralizes control characters, escapes ##[, states the runner reading as remembered and not measured, and the fixture gains the leading space, U+00A0 and ##[ cases."
+  },
+  "coverage": {
+    "index (spec.md)": "L2-r12-1 (toolchain row), L2-r12-4 (S2, removed bypass row); token-narrowing row checked",
+    "00": "nothing for this lens (not in the delta)",
+    "01": "nothing for this lens (not in the delta)",
+    "02": "nothing for this lens (not in the delta)",
+    "03": "nothing for this lens (fingerprint by path, size and mtime for ignored paths checked; the worktree-changing exit harms only the project's own work)",
+    "04": "nothing for this lens (generation-sandbox row checked)",
+    "05": "L2-r12-1, L2-r12-2, L2-r12-4",
+    "06": "nothing for this lens (not in the delta)",
+    "07": "nothing for this lens (not in the delta)",
+    "08": "nothing for this lens (not in the delta)",
+    "09": "nothing for this lens (J7 step 4 checked: the salvage-ref glob, stash and worktree reads are read-only)",
+    "10": "L2-r12-1; pr job row and the gh floor test checked",
+    "11": "nothing for this lens (not in the delta)",
+    "12": "L2-r12-2, L2-r12-3",
+    "13": "nothing for this lens (not in the delta)",
+    "ADRs": "L2-r12-2 (ADR 0011)",
+    "plan.md": "L2-r12-1"
+  },
+  "what_is_missing": "In 05 5.4, one list of what the narrowed token can still do once ADR 0011 is applied, with each item's control: merge (Contents and Pull requests write), push workflows that run on push (Workflows write), and, as the admin-role user, the release-tags bypass that the four tries re-measure. Then the token row says what the narrowing closes and what it leaves.",
+  "postmortem": "A month after the narrowing, an agent's pull request is red on pr: an ask-first path was touched with no approval line. To 'unblock' it, the agent pushes a helper branch whose push workflow posts a success status under the pr check's name on the head SHA, then merges through the API. The ruleset, with no bypass actor, counts the status. The security log records no merge or push. The maintainer finds it at the next sitting from the merge commit's checks, where two pr entries appear. Sections crossed: ADR 0011, 05 5.4, 12 12.4, 10 10.2 items d and e.",
+  "lens_critique": "The lens treats the token as the widest decision, and since round 8 the merge gate is a GitHub-side mechanism. It should ask, for each control on that side, what an actor holding the token can write that the control reads: check names, workflow files on any branch, statuses. The CI-platform viewpoint asked for in round 11 is still missing from the set of lens titles.",
+  "out_of_scope": "Not measured, inferred from GitHub's documented behavior as remembered: that a workflow on a non-default branch with on: push runs with requested statuses or checks write and can write to another SHA; that GITHUB_TOKEN writes are attributed to the GitHub Actions app; that a fine-grained token of an admin-role user still gets the release-tags bypass (item d's re-run measures the tag case); that go honours a toolchain line in a go.work at the checkout root. Evidence that would settle them: one try in a throwaway repository, and the go command documentation at the pinned version. D-items answered on 2026-10-09 and the accepted rows were not re-judged.",
+  "confidence": "High on the four resolution checks. Medium-high on L2-r12-1, a text reading against the hygiene rules of 10 10.2. Medium on L2-r12-2 and L2-r12-3, which rest on platform behavior not measured here. High on L2-r12-4.",
+  "pages_read": [
+    "docs/reviews/lenses.md (L2; What a reviewer returns; How stage A runs, and when the spec counts as validated)",
+    "docs/reviews/round-11/reports/L2.json",
+    "docs/reviews/round-11.md (R11-02, R11-03, L2-r11-3, L2-r11-4 rows; D1, D2; Write pass; Open for the maintainer)",
+    "delta d133542..6fd6e60 word diff, whole: docs/spec/05-security.md, 12-engineering.md, 10-testing-style.md, docs/plan.md, docs/spec.md, 03, 04, 09",
+    "docs/adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md (whole)",
+    "at baseline: 10 10.2 (mise and go.mod rules, Hygiene), 12 12.2 tag paragraph, 11 A16, docs/notes/maintainer-block-of-ci-bootstrap.md (item d tries)"
+  ]
+}

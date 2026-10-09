@@ -31,8 +31,9 @@ decision functions, result writing, redaction) and a thin exec layer
 that only starts `sbx` and captures its output. Both are unit-tested in
 CI (the exec layer against a helper binary), so the first plan task can
 pass `tools/ci all` before any host run. The arch-sensitive probes (A4,
-A5, A11, A12, A13) count as settled only with results from both hosts
-(Intel and Apple silicon). The A5 goldens are written by hand with the
+A5, A11, A12, A13), and A17, whose answer can differ by macOS release,
+count as settled only with results from both hosts (Intel and Apple
+silicon). The A5 goldens are written by hand with the
 probe definitions; `render`
 ([12 12.2](12-engineering.md#122-development-commands-and-capability-map))
 must reproduce them byte for byte, and `tools/ci probes` already flags
@@ -58,11 +59,12 @@ At most about 75 minutes per host.
 | A9 | `sbx policy allow network --sandbox <p> example.test`; `check`; `curl` inside; `rm --resource`; `sbx env rm`; `sbx policy ls`; trigger a block; `sbx policy approval ls`; list global secrets and global allow rules as doctor would read them | immediate effect; exact argv; how globals are reported | egress application (07), I22 |
 | A10 | on a live env sandbox `sbx secret set <svc> --sandbox <p> --command '<new>'`; check inside; `sbx env run -d` again | recorded: live and kept, live and reverted, or re-plan prompt | the `apply` tag of `secrets` |
 | A11 | build a minimal local v3 kit (`kind: mixin`) with the pinned frontend: files, a binary from the build context, `args`, one fixture per capability type, an unknown key (expect strict error), a YAML anchor (expect rejection or record acceptance); an install step that records where it runs | local v3 builds on this sbx; descriptor file name and capability names recorded; each capability fixture's sbx interpretation recorded as a conformance fixture for I28; where a kit install step executes (host engine or microVM) recorded, as far as the harness can observe it | go/no-go for the kits, kit format, I28 |
-| A12 | inspect the workload by digest: descriptor annotation (and any `sbx kit inspect`-style command), declared capabilities and agent handle, missing apt packages vs `os-base`, skills path, agent memory dir location; the volumes the workload declares, their mount paths, and what of them survives `sbx env rm` and a recreate; with an ssh-agent capability and `SSH_AUTH_SOCK` set to a one-key agent for the `sbx` process, `ssh-add -L` inside, and again with `SSH_AUTH_SOCK` unset for the `sbx` process | capability set readable and recorded as conformance fixtures; handle is `sbx-kit-claude`; inside, only the one key is listed; with the variable unset, `ssh-add -L` lists no key | `os-base` list, I28, what holds for Q19 until it is settled, the volume list of 06 6.2 |
-| A13 | hand-written herdr `layout.apply` through `sbx env exec -it <dir> -- herdr`; agent detection through the exec pty; OSC 9 reaching the host terminal/cmux; kill the host terminal, re-exec, check the agent process survived; host herdr cannot see sandbox processes; socket `protocol` number | layout applies; agent survives terminal loss; host herdr sees nothing | run-layout renderer, "no host panes" model |
+| A12 | inspect the workload by digest: descriptor annotation (and any `sbx kit inspect`-style command), declared capabilities and agent handle, missing apt packages vs `os-base`, skills path, agent memory dir location; the volumes the workload declares, their mount paths, and what of them survives `sbx env rm` and a recreate; with an ssh-agent capability and `SSH_AUTH_SOCK` set to a one-key agent for the `sbx` process, `ssh-add -L` inside, and again with `SSH_AUTH_SOCK` unset for the `sbx` process | capability set readable and recorded as conformance fixtures; handle is `sbx-kit-claude`; inside, only the one key is listed; with the variable unset, `ssh-add -L` lists no key | `os-base` list, I28, what holds for Q19 until it is settled, the volume list of 06 6.2 and the volume row of 01 1.2 |
+| A13 | hand-written herdr `layout.apply` through `sbx env exec -it <dir> -- herdr`; agent detection through the exec pty; OSC 9 reaching the host terminal (cmux is the one the maintainer runs); kill the host terminal, re-exec, check the agent process survived; host herdr cannot see sandbox processes; socket `protocol` number | layout applies; agent survives terminal loss; host herdr sees nothing | run-layout renderer, "no host panes" model |
 | A14 | a kit install step printing `$PWD` and listing the workspace, timestamped against the clone; from inside an install step and a lifecycle hook of a local kit, the hostname, the uid, whether a host path is visible and whether the network namespace is the host's | install step does not see the clone; where install steps and lifecycle hooks run and what they reach recorded | confirms the romeu-driven `julieta setup` ordering; Q32 |
-| A15 | on a detached env sandbox: `sbx stop`, then `sbx env exec`; `sbx stop` again, then `sbx env run -d` through romeu's argv, and once more after a kit, a workload and a ports change of the env file; restart Docker with the sandbox running and run `sbx ls --json` during and after; `ssh-add -L` inside after the restart; `sbx env rm` and list the workload's volumes | what exec does on a stopped sandbox recorded (it starts it or fails); whether `sbx env run -d` starts, recreates, applies, refuses or prompts on a stopped sandbox, with and without each change, recorded; state and fields reported across the restart recorded; the signing socket returns; the volumes left after `rm` recorded | 01 1.6, 08 8.5, run step 3 of 04 4.2 |
-| A16 | from the maintainer's own development session, not through romeu: the type of the token the sandbox's `github` secret holds, read from its prefix, and its scopes, read from the `x-oauth-scopes` header of one authenticated API call; the value is never printed or recorded | type and scopes recorded | the token rows of 05 5.4 and ADR 0008 say measured, not inferred |
+| A15 | on a detached env sandbox: `sbx stop`, then `sbx env exec`; `sbx stop` again, then `sbx env run -d` through romeu's argv, and once more after a kit, a workload and a ports change of the env file; restart Docker with the sandbox running and run `sbx ls --json` during and after; `ssh-add -L` inside after the restart | what exec does on a stopped sandbox recorded (it starts it or fails); whether `sbx env run -d` starts, recreates, applies, refuses or prompts on a stopped sandbox, with and without each change, recorded; state and fields reported across the restart recorded; the signing socket returns | 01 1.6, 08 8.5, run step 3 of 04 4.2 |
+| A16 | run in the maintainer's host shell, not through romeu: the type of the token the sandbox's `github` secret holds, read from its prefix, and its scopes, read from the `x-oauth-scopes` header of one authenticated API call; for a fine-grained token, which has no scopes header, the result is its repository list and permissions, read from GitHub's token settings page and recorded by hand **[review]**; the value is never printed or recorded | type and scopes (or repository list and permissions) recorded | the token rows of 05 5.4 and [ADR 0008, let the sandbox act as the maintainer on GitHub](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md) say measured, not inferred |
+| A17 | in a `<name>-env/` that holds its `.metadata_never_index` marker, plant a file carrying a unique token under `memory/<dir>/`; wait for the indexer, then `mdfind -onlyin <name>-env <token>`; again with the marker removed | with the marker present, `mdfind` does not find the file; the result counts only when, with the marker removed, `mdfind` finds the file; otherwise it is inconclusive and run again; if the marker does not keep the file out, the form that does is measured the same way and replaces it | the indexer marker of 02 2.3 and boundary D (01 1.3), the `root-indexed` check of 04 4.2, the indexer row of 05 5.4 |
 
 Two ids between A6 and A9 are not used: they named probes that left
 the spec, and an id is not given a second meaning. An sbx upgrade under
@@ -84,21 +86,24 @@ found by a unit test before block A runs.
 
 ## 11.2 Block B - acceptance on real hosts (last)
 
-About 90 minutes per host for B1 to B5; the sandbox-side checks below
+About 90 minutes per host for B1 to B6; the sandbox-side checks below
 add to that.
 
 | ID | Step | Settles |
 |---|---|---|
-| B1 | install the release candidate from its GitHub release with the J1 commands of `e2e/scenarios/commands.yaml`; verify checksums and attestation; record each asset's sha256 and whether the downloaded archive carries a quarantine attribute | the install-and-verify step of J1, on the candidate |
-| B2 | product kits build and a sandbox starts: linux/amd64 on the Intel host, linux/arm64 on the Apple silicon host; skills, SessionStart/SessionEnd hooks and the non-writable agent memory dir present; `ssh-add -L` shows only the signing key when `git-ssh-sign` is used, and lists no key in a project without `git-ssh-sign` | S3, S5 |
+| B1 | install the release candidate from its GitHub release with the J1 commands of `e2e/scenarios/commands.yaml`; verify checksums and attestation; record the `gh` version, each asset's sha256 and whether the downloaded archive carries a quarantine attribute | the install-and-verify step of J1, on the candidate |
+| B2 | product kits build and a sandbox starts: linux/amd64 on the Intel host, linux/arm64 on the Apple silicon host; skills, SessionStart/SessionEnd hooks and the non-writable agent memory dir present; `ssh-add -L` shows only the signing key when `git-ssh-sign` is used, and lists no key in a project without `git-ssh-sign`; with `git-ssh-sign`, the harness starts the dedicated signing agent with `SSH_ASKPASS` pointing at a wrapper that records each call and answers yes, adds the key with `ssh-add -c`, makes a commit in the sandbox, and records the wrapper's calls and whether the commit is signed; it then records the outcome of the same signing use with no askpass installed: refused, or signed with no confirmation, and the error text the agent sees (05 5.4, [06 6.4](06-kits.md#64-product-kits)) | S3, S5 |
 | B3 | `go test -tags host -json ./e2e/host/...` (J1-J14 on throwaway projects, including `/clear` with the real agent); for J1 from a clean host, J2 and the daily resume of a stopped sandbox (J3a), the result records the count of operator commands and prompts and the wall clock, which the acceptance PR's review compares with [00 0.2](00-scope.md#02-users) | S7 |
 | B4 | `julieta setup` under the catalog-derived policy only, for the reference config repo's tools, on both arches, with and without a GitHub token | S4, catalog entries |
 | B5 | the harness times `romeu run` on a warm sandbox, median of 5, and records the wall clock and romeu's own share of it (the harness points the `sbx` path of its own host settings at a wrapper that times each `sbx` subprocess, and takes that time out); as an observation, the wall clock of `romeu run` on a stopped sandbox, `sbx` time included | S8, for the romeu figure |
+| B6 | the harness replays each argv shape of the recorded sessions (11.1) that only reads (`sbx version`, `sbx ls --json`, `sbx env plan`, `sbx policy ls`) against the candidate's sbx, in its own throwaway sandbox and env dir and in nothing else, and compares the shape of each output with its recording | the tested window of [10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract) at the candidate's sbx |
 
-Each of B1 to B5 is `kind: check` (11.3): its predicate is every
-property its Step cell names, B3's is that every journey passes, and
-B5's is the S8 bound. Each writes a `probe-result.v1` file,
-`docs/probes/B<n>-<host>.json`; for B3 the `go test -json` output is an
+Each of B1 to B6 is `kind: check` (11.3): its predicate is every
+property its Step cell names, B3's is that every journey passes,
+B5's is the S8 bound, and B6's is that every replayed shape matches.
+B6 records one observation per shape, the shape and the result of its
+comparison, and a fail names each shape that differs. Each writes a
+`probe-result.v1` file, `docs/probes/B<n>-<host>.json`; for B3 the `go test -json` output is an
 artifact whose sha256 the result records, and the result has one
 observation per journey. That artifact is
 `docs/probes/B3-<host>-test.json`, one JSON object per line, written
@@ -109,11 +114,7 @@ copied by the harness from the release B1 installed in the same run.
 Block B records
 nothing under `e2e/testdata/`; its outputs are the results and
 artifacts under `docs/probes/`, so committing them does not break the
-rule below. Block B also replays every argv shape of the recorded
-sessions (11.1) against the candidate's sbx and compares the shape of
-each output with its recording
-([10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract), the
-tested window).
+rule below.
 
 **The release candidate.** Block B accepts built artifacts, so it needs
 a release before v1.0.0 exists. The candidate is a `v*` tag with a
@@ -160,7 +161,7 @@ declares its `kind` in the harness.
 | C2 | `mise exec -C <dir> -- <cmd>` vs shims in a fresh non-interactive zsh and bash |
 | C3 | the pinned Claude Code version's setting to disable its own memory, whether a non-writable memory dir is tolerated, and the error text it shows on a refused memory write, so the julieta skill can name it |
 | C4 | `git bundle verify`/`unbundle` under the hardened flags |
-| C5 | for the pinned Claude Code version: the order in which it fires SessionEnd and SessionStart on `/clear`; which SessionStart sources fire (startup, resume, clear, compact); that the hook's output reaches the agent's context, and the size at which it is cut; what a hook's non-zero exit does; and the time a SessionEnd hook is given |
+| C5 | for the pinned Claude Code version: the order in which it fires SessionEnd and SessionStart on `/clear`; which SessionStart sources fire (startup, resume, clear, compact); that the hook's output reaches the agent's context, and the size at which it is cut; what a hook's non-zero exit does, and that the stdout of a failing hook still reaches the context; and the time a SessionEnd hook is given; that a PreToolUse wrapper that exits 2 because its program cannot run blocks the tool call; and that each required agent-profile path of [08 8.5](08-memory-handoff-salvage.md#85-salvage-complete-before-destruction) step 5 exists |
 | C6 | from inside, the A3 plants in a memory dir; `julieta memory check` and the romeu checks report every plant. It settles I24 and julieta delivery (06 6.3) |
 
 C1 is not used: it named a check that left the spec.
@@ -169,7 +170,9 @@ C1 is not used: it named a check that left the spec.
 
 `schemas/probe-result.v1.json`, one file per probe per host
 (`docs/probes/<id>-<host>.json`), for both blocks; a sandbox-side check
-has `block: "B"`:
+has `block: "B"`. A block A result at an sbx version above the floor,
+which widening the tested window records (11.4), sits at
+`docs/probes/<id>-<host>-<sbxVersion>.json` beside it:
 
 ```json
 {
@@ -194,7 +197,7 @@ has `block: "B"`:
 
 | Field | Rule |
 |---|---|
-| `host.upstream` | the version of each upstream the probe reads beyond sbx, recorded by the harness: the frontend pin for A11 to A13, the agent version for C3 and C5; empty for the others |
+| `host.upstream` | a map keyed by pin, `frontend`, `workload`, `herdr`, `mise` and `agent`, recorded by the harness: for every probe the table of 11.4 lists under a pin, the key of that pin holds the version or digest the probe read, and `agent` holds the agent version for C3 and C5; empty for the others |
 | `kind` | `check` (a predicate over observations) or `observe` (record what happens) |
 | `verdict` | `pass | fail | inconclusive`; a `check` passes when its predicate holds; an `observe` probe passes when every declared observation was recorded. A `check` records as observations the values its predicate evaluated (file names, versions, counts), through the recorder's redaction, so the verdict can be recomputed from the file |
 | `decision` | `default-kept | default-overturned`, computed, never typed: each probe declares in the harness, before the run, `onPass` and `onFail` decisions (`check`) or a table from observed values to decisions (`observe`) |
@@ -230,16 +233,21 @@ the next candidate:
 | the sbx floor | block A |
 
 `tools/ci probes` fails when a committed block A result of a probe this
-table lists records an upstream version or digest other than its
-current pin.
+table lists records, under any key of `host.upstream` (11.3), a version
+or digest other than that pin's current one; it compares each key on
+its own.
 
-`tools/ci acceptance` fails when a block A result's `sbxVersion`
-differs from the floor of
-[10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract), or a
-recorded `upstream` version differs from its current pin; a floor or
-pin bump therefore runs the probes that read it again before the next
-release, and the new result settles their open questions again. Git
-history keeps the results it replaces.
+`tools/ci acceptance` fails when a block A result's `sbxVersion` is
+outside the tested window of
+[10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract), when
+A4, A5 or A9 has no result at the window's newest version, or when a
+recorded `upstream` key differs from its current pin; a floor or pin
+bump therefore runs the probes that read it again before the next
+release, and the new result settles their open questions again.
+`acceptance --pre-tag` runs the `resolvedBy` check above and these
+checks as two of its six
+([10 10.5](10-testing-style.md#105-acceptance-evidence)). Git history
+keeps the results it replaces.
 
 `tools/ci probes` checks the results that are committed and says
 nothing about the ones that are not: block B cannot run before a

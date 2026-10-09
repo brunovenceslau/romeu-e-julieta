@@ -55,8 +55,13 @@ a recording set are the tested window,
 [10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract)), `git` (host and
 sandbox, floor in [05](05-security.md#51-hardened-git-internalgitsafe)),
 `mise` and `herdr` (sandbox, pinned by version and sha256). The
-operator's install-and-verify step (J1) also needs a `gh` that has the
-`attestation` command; a packaged `gh` may be older and lack it.
+operator's install-and-verify step (J1) also needs `gh` at or above a
+floor, initially 2.68.0: the first release whose `gh attestation
+verify` has both `--source-digest` and `--deny-self-hosted-runners`
+(read on 2026-10-09 in `pkg/cmd/attestation/verify/verify.go` of
+`cli/cli` at the tags v2.67.0 and v2.68.0); a packaged `gh` may be
+older, and an older one refuses the unknown flag and exits non-zero.
+Probe B1 records the `gh` version it ran.
 romeu itself never starts `gh`.
 
 **Tool pins.** The product pins the tools of this table, and this is
@@ -168,7 +173,9 @@ Module ids are stable; the plan selects work by them. Each module id
 names the directories it owns, and a package module owns
 `internal/<id>`; a `tools/ci` test holds the tree of
 [02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public), this
-table and the package list of S9 to the same set of directories.
+table and the package list of S9 to the same set of directories. The
+test checks only the package modules that an id names; a module whose
+id is no directory name owns the paths its row gives.
 
 | Module id | Responsibility | Depends on |
 |---|---|---|
@@ -245,19 +252,30 @@ which review reads, so they are not covered by a check.
 ordered list; each step names its command and its output:
 
 1. Push the release candidate tag `v1.0.0-rc.<n>`; `release.yml`
-   publishes it as a prerelease (10 10.2).
+   publishes it as a prerelease (10 10.2). Read the Deferred decisions
+   tables of the [index](../spec.md#deferred-decisions) and the
+   listing of packages no command reaches (the dark-code row there) at
+   that tag; the output is the rows whose event happened, pasted under
+   the Evidence of the pull request of step 2.
 2. Block B on both hosts:
    `go run ./e2e/probes --block B --version v1.0.0-rc.<n> --out docs/probes/`;
    the results are committed by a pull request
    ([11 11.2](11-host-probes.md#112-block-b---acceptance-on-real-hosts-last)).
 3. `go run ./tools/ci acceptance --pre-tag` exits 0 on the commit to be
-   tagged ([10 10.5](10-testing-style.md#105-acceptance-evidence)).
+   tagged: it runs the six checks of
+   [10 10.5](10-testing-style.md#105-acceptance-evidence) that read
+   only the repository, the two of 11 11.4 among them.
 4. Push the tag `v1.0.0`.
 5. B1 and B2 once more, on v1.0.0 and on one host, with `--out` a
    directory outside the repository, so the candidate's results stay;
    the output goes under the Evidence of the acceptance pull request.
 6. `go run ./tools/ci acceptance`, and the acceptance pull request
    commits `docs/acceptance.json`.
+7. For every release after v1.0.0, once `release.yml` has published
+   it: `go run ./tools/ci acceptance --tags` exits 0; it runs only the
+   check of [10 10.5](10-testing-style.md#105-acceptance-evidence)
+   that each release's tag commit equals the source digest in its
+   attested provenance.
 
 A check that fails after the tag is fixed by a patch release. The two
 tags are maintainer steps by working agreement: the tag ruleset does not
@@ -288,14 +306,17 @@ merged tree. This table is the one inventory of generated files;
 | spec struct tags (`gate`, `apply`) | widening set and recreate digest field lists, the I7 flip-table test, the field table in `docs/reference/project.md` |
 | `internal/spec/rules.go` + Go types | validators, the rule table in the reference docs, `schemas/*.json` (`tools/schemagen`) |
 | `internal/cli` error table, whose "recovered in" column holds a `docs/guide/` anchor or `none: <reason>` for each id (12.8) | `--help` exit-code sections, `docs/reference/errors.md` with that link, `docs/reference/exit-codes.md` |
-| command definitions, one package per command under `internal/cmd/` (02 2.1), each with a field per side effect (preflight, lock, appending, snapshot, idempotency) and no default, so a definition without them fails generation | the dispatcher table in `internal/cli`, `docs/reference/<command>.md`, the **P** marker and the appending list of [04 4.1](04-cli.md#41-conventions-both-binaries), which the idempotency meta-test of [10 10.1](10-testing-style.md#101-test-levels) reads |
+| command definitions, one package per command under `internal/cmd/` (02 2.1), each with a field per side effect (preflight, lock, appending, snapshot, idempotency) and no default, so a definition without them fails generation | the dispatcher table in `internal/cli`, `docs/reference/<command>.md` with the **P** marker and the appending list, which replace the design input of [04 4.1](04-cli.md#41-conventions-both-binaries) and which the idempotency meta-test of [10 10.1](10-testing-style.md#101-test-levels) reads from the definitions |
 | `internal/state` transition tables | state-machine tests; the state diagrams, each in its own file under `docs/diagrams/`, which `ARCHITECTURE.md` links |
 | `.github/ask-first.yaml` | `.github/CODEOWNERS`, `docs/reference/ask-first.md`, the `mutate` trigger |
 | the vocabulary table (01 1.7) | `docs/reference/vocabulary.yaml`, the denylist `tools/ci vocabulary` reads |
+| the step packages of `tools/ci`, one per step under `tools/ci/internal/<step>/` (02 2.1) | the step dispatcher table of `tools/ci`, so adding a step adds its package and edits no shared table |
 | ADR titles and statuses (`docs/adr/NNNN-*.md`); lesson titles (`docs/lessons/NNNN-*.md`) | the ADR index `docs/adr/README.md`; the lessons index `docs/lessons/README.md` |
 
 Every julieta command and flag a `SKILL.md` names exists in the command
-definitions, checked by a test.
+definitions, and the headings the handoff skill names are the headings
+`julieta handoff write` requires for each kind, both checked by one
+test (the docs row of [10 10.2](10-testing-style.md#102-ci)).
 
 The generator that reads `.github/ask-first.yaml` is a `tools/ci`
 subcommand, so the code that writes `.github/CODEOWNERS` is on the
@@ -313,6 +334,10 @@ the front matter of rule 1 in
 (`type: reference`, `reader:`), both written by its generator.
 
 `go run ./tools/new <kind> <name>` scaffolds with the next free id.
+Two branches from one base take the same number, so a pull request
+that adds a numbered record (an ADR, a lesson, an `RJ-nnn` id) is
+rebased on the current base, and its checks run again, before the
+merge.
 `adr` exists from day one; each other kind lands with the module that
 owns what it scaffolds (12.2):
 
@@ -394,28 +419,66 @@ U+FEFF), and none is one of these double quotation marks: U+0022,
 U+00AB, U+00BB, U+201C to U+201F, U+2033, U+301D to U+301F and U+FF02.
 Single quotation marks are allowed, because U+2019 is also the
 apostrophe, and other look-alikes, such as U+275D and U+275E, are left
-to review. `tools/ci pr` builds and runs the code of the default
-branch against the head, so no pull request is judged by code it
-changes (decided on 2026-10-09). The `pr` job is defined in the default
-branch: it runs on `pull_request_target` for pull requests into `main`,
-under which GitHub runs the workflow file of the default branch, with
-`permissions: contents: read` and no secret. It checks out the default
-branch's commit (`github.sha`), with its `go.mod`, `go.sum`,
-`mise.toml` and `mise.lock`, and builds `tools/ci` there; it never
-checks out `pull_request.base.sha`. The check that the base is the
-default branch (12.9) stays, but it is not what makes the code trusted.
+to review. No code that a pull request changes judges that pull
+request: `pr` runs from a workflow defined in the default branch,
+builds the default branch's commit, and reads the head only as data
+(decided on 2026-10-09; the invariant and what the task that builds
+`pr` must show for it are in
+[05 5.3](05-security.md#53-ask-first-surfaces)). The shape of the `pr`
+job is decided: it runs on `pull_request_target` for pull requests
+into `main` (`branches: [main]`), under which GitHub runs the workflow
+file of the default branch, with `permissions: contents: read` and no
+secret. It checks out the default branch's commit (`github.sha`), with
+its `go.mod`, `go.sum`, `mise.toml` and `mise.lock`, and builds `pr`
+there; it never checks out `pull_request.base.sha`. Where the code of
+`pr` lives, which file holds `approvalLine`, and the command line of its
+step are decided by the task that builds it; until then this
+specification writes `tools/ci pr` for the step,
+`go run ./tools/ci pr` for its command line and
+`tools/ci/askfirst.go` for that file, and that task's pull request
+updates each where it appears, the `approvals` glob that names the file
+included. The check that the
+base is the default branch (12.9) stays, but it is not what makes the
+code trusted.
 So a run judges a pull request with the current `main`, and a pull
 request opened before a fix to `pr` is judged by the fixed `pr` on its
-next run. The job reads the head only as git objects, fetched by
-`head.sha` without credentials, which relies on the repository being
+next run, which a new event starts: a push to the head, an `edited`
+event from a change to the title or body, or a close and reopen. A
+re-run of an old run keeps the `GITHUB_SHA` of the original event, so
+it judges with the old code
+([re-running workflows and jobs](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs),
+read on 2026-10-09). The job reads the head only as git objects:
+`pr` fetches `head.sha` without credentials, only in the pr job and
+only when the object is missing, which relies on the repository being
 public ([10 10.2](10-testing-style.md#102-ci)), and never builds or
 runs them: every git call of `pr` on head objects passes
 `-c core.hooksPath=/dev/null`; `fetch` passes `--no-recurse-submodules`;
 `diff`, `log` and `show` pass `--no-ext-diff --no-textconv
---ignore-submodules=all` (git 2.53.0 rejects `--no-recurse-submodules`
-for `diff` and `log`); `pr` never runs `checkout` or `archive`
-on the head, and its diffs are tree to tree, with `.gitattributes` read
-from the default branch's work tree. It reads
+--ignore-submodules=all` (git 2.53.0, read on 2026-10-09, rejects
+`--no-recurse-submodules` for `diff` and `log`); `pr` never runs
+`checkout` or `archive` on the head, and its diffs are tree to tree,
+with `.gitattributes` read from the default branch's work tree. The job
+runs the runner image's git, which no pin holds, so a `pr` test runs
+each of these git calls against a hostile fixture repository (a
+submodule, a textconv driver, an external diff driver and hooks) and
+fails when a flag no longer holds. `pr` prints each line of text the
+pull request's author controls (the title, body lines, commit
+subjects) behind a fixed prefix, a `>` and a space, so no printed line
+starts with the author's bytes, with control characters neutralized
+and `##[` escaped: the runner reads a line that starts with `::` as a
+workflow command, and, as remembered of the runner's code and not
+measured, one with whitespace before the `::` or in the older `##[`
+form too; fixture "pr escapes a workflow command in a PR body", with a
+leading space, a leading U+00A0 and a `##[` case. A required check is
+matched by name, and the head's own `pull_request` workflows run from
+the head, so `pr` compares each head job's check name (its `name`,
+else its id) with the pr job's name and refuses a match outside the
+pr job's file; refuses a head job outside the pr job's file whose
+`name` holds `${{`, since the check name it posts is known only once
+the run expands the expression, with a fixture for a literal
+expression and one for a matrix value; and refuses a head whose
+version of the pr job's file names an event other than
+`pull_request_target`, with a fixture for each. It reads
 `.github/ask-first.yaml` at the base commit and at the head commit and
 uses the union of the two lists, so a PR that removes a surface or a
 glob still needs that surface's line.
@@ -539,7 +602,9 @@ must have that form; a merge commit's subject is not checked.
 `tools/release notes` generates the notes from the Conventional Commit
 subjects since the last tag that is not a prerelease (10 10.2), so
 the notes of v1.0.0 do not start at its release candidate. They open
-with an **Upgrading** section, generated from the differences, since
+with the link to `docs/` at the release tag, as the Deferred decisions
+row on docs versioning in the [index](../spec.md) says, then an
+**Upgrading** section, generated from the differences, since
 that tag, of the error table, `internal/spec/versions.go` and the
 embedded kit digests: the error ids and exit codes added or changed,
 the format versions changed, and the kits whose projects need a
@@ -549,7 +614,13 @@ GitHub's closing keywords; a PR whose subject carries `!` or that
 touches the `contracts` surface (05 5.3) is listed first. Nobody
 writes release notes by hand. The notes of v1.0.0 cover the whole
 history and are long; that is accepted, and the generator's value
-starts at the second release.
+starts at the second release. It reads the merged pull requests, their
+authors and the issues they close through the GitHub API, with the
+`GH_TOKEN` of its step in the publish job
+([10 10.2](10-testing-style.md#release-and-bootstrap)), and everything
+else from git (the permissions are inferred until the first
+`release.yml` run reads each endpoint; its log goes under that PR's
+Evidence).
 
 ## 12.7 Text standard and lessons
 
@@ -562,7 +633,9 @@ starts at the second release.
   lesson or the word `none`.
 - Issues: the forms in `.github/ISSUE_TEMPLATE/`: a bug (the romeu and
   sbx versions, the command, its output or the `doctor` report) and a
-  catalog gap (the tool and its domains).
+  catalog gap (the tool and its domains). The task that lands the forms
+  also creates the label `deferred`, which reports the event of a
+  deferred decision (index, Deferred decisions).
 - `docs/lessons/NNNN-<slug>.md`: one file per lesson, numbered as ADRs
   are, with the generated index `docs/lessons/README.md` (12.3). A
   lesson holds the date, what happened, the rule, and the enforcing
@@ -586,7 +659,7 @@ product-specific content.
 
 | File | Reader and type | Outline |
 |---|---|---|
-| `README.md` | a developer deciding whether to use the product; explanation + quick start | the heading order of ADR 0001 rule 12, filled with: what it is and who it is for, including that the `julieta-claude` kit replaces the agent's built-in memory with julieta memory; when not to use it; prerequisites, listed here once (a macOS host; sbx; the git floor; a `gh` with the `attestation` command; a Claude Code login, done inside the sandbox at the first run; a `mise.toml` in each repo whose tools `julieta setup` installs; a GitHub account for the config repo's CI; Keychain items for the secret names; a root outside iCloud Drive, Dropbox and other synced folders, knowing that `~/Documents` and `~/Desktop` are synced when iCloud's Desktop and Documents option is on; and the egress catalog's reach: it covers the reference config repo's stack, and another tool is declared with `egress.tools` in the project spec, always gated, until a release ships its catalog entry); install and verify (checksums and the attestation, by the verification contract of 10 10.2); first run (the steps of J1, 09); the trust model in one paragraph: what romeu writes (host settings, the root tree, host state), what it never does (with links to the boundaries A-F of 01 1.3 and to I1-I3), a link to the product half of 05 5.4, and a link to `ARCHITECTURE.md`; the product kits, `git-ssh-sign` marked opt-in; data and uninstall: what romeu keeps on the machine, linking the table of 01 1.2 ("Where data lives"), and how to stop using it, linking the guide of J14; the license: GPL-3.0-only for the product, CC0-1.0 for `examples/` and `schemas/`, and what that means for a config repo; a best-effort response expectation for issues and pull requests; links to guides, reference and ADRs |
+| `README.md` | a developer deciding whether to use the product; explanation + quick start | the heading order of ADR 0001 rule 12, filled with: what it is and who it is for, including the supported daily setup (edit and debug inside the sandbox; host clones are for reading in Restricted Mode) and that the `julieta-claude` kit replaces the agent's built-in memory with julieta memory, and the license, whose sentence sits under this first heading, near the start of the page: GPL-3.0-only for the product, CC0-1.0 for `examples/` and `schemas/`, and what that means for a config repo; when not to use it; prerequisites, listed here once (a macOS host; sbx; the git floor; a `gh` at or above the floor of 12 12.1; a Claude Code login, done inside the sandbox at the first run; a `mise.toml` in each repo whose tools `julieta setup` installs; a GitHub account for the config repo's CI; Keychain items for the secret names; a root outside iCloud Drive, Dropbox and other synced folders, knowing that `~/Documents` and `~/Desktop` are synced when iCloud's Desktop and Documents option is on; and the egress catalog's reach: it covers the tools listed in `catalog/egress.yaml` (built from the reference config repo's locks), and another tool is declared with `egress.tools` in the project spec, always gated, until a release ships its catalog entry); install and verify (checksums and the attestation, by the verification contract of 10 10.2); first run (the steps of J1, 09); the trust model in one paragraph: what romeu writes (host settings, the root tree, host state), what it never does (with links to the boundaries A-F of 01 1.3 and to I1-I3), a link to the product half of 05 5.4, and a link to `ARCHITECTURE.md`; the product kits, `git-ssh-sign` marked opt-in; data and uninstall: what romeu keeps on the machine, linking the table of 01 1.2 ("Where data lives"), that a root excluded from Time Machine (doctor's `root-indexed` check) needs another copy of its memory dirs, handoffs and unpushed work, and how to stop using it, linking the guide of J14; a best-effort response expectation for issues and pull requests; links to guides, reference and ADRs |
 | `ARCHITECTURE.md` | a contributor or reviewer; explanation, one page | components and their single jobs; the trust boundaries A-F and the gates, linked from 01 1.3 and 01 1.4 rather than copied; the candidate and generation state machines, as the generated diagrams under `docs/diagrams/` (12.3), which it links; the promotion commit as the numbered procedure of 01 1.6; one short section per flow (sync, run, salvage): its entry function, the packages it crosses, its invariants and their tests; where each invariant is enforced; module dependency direction. Every invariant id of 05 5.2 and every module id of 12.2 appears in it, which `tools/ci docs` checks |
 | `CONTRIBUTING.md` | a contributor; how-to | the dev loop (`tools/new`, `go generate`, `tools/ci fast`, `tools/ci all`); enabling the pre-push hook; running the gates locally, and which test levels each platform runs (macOS: unit, golden, the git and fake-sbx e2e and the I27 trees; Linux: those and the hybrid and container e2e and `license`; the host suite on a maintainer's Mac only); a red leg the change did not cause is fixed on `main` by one pull request (10 10.2); how to add a command, invariant, probe or kit; the delivery practices (12.9); what counts as ask-first, how approval is recorded, and how an outside contributor gets an approval line (12.4); outside pull requests to the catalog and the kits: the evidence such a pull request needs, reviewed by the one maintainer, best effort; the issue forms and the label `deferred`, which reports the event of a deferred decision (index); a best-effort response expectation for issues and pull requests; the PR template and the Middleware line; a link to the documentation standard (ADR 0001), which holds the text standard for commits and PRs (12.7) and the request to write with a voice; ADRs and superseding |
 | `SECURITY.md` | a person who found a vulnerability; how-to | the three headings of ADR 0001 rule 20. The channel is GitHub's private vulnerability reporting, which the maintainer block switches on (10 10.2). The response expectation the maintainer set: an acknowledgement within 30 days, best effort, and no promised time for a fix. The supported versions name the tested sbx window (10 10.3). What happens next is written with the page |

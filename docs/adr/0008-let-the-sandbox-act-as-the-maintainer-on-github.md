@@ -8,6 +8,10 @@ Accepted
 
 Superseded in part by [9. Drop the required review and amend the records that assumed it](0009-drop-the-required-review-and-amend-the-records-that-assumed-it.md)
 
+Superseded in part by [10. Reopen the required checks without the bypass and amend the records of round 9](0010-reopen-the-required-checks-without-the-bypass-and-amend-the-records-of-round-9.md)
+
+Superseded in part by [11. Bind the administrator to the required checks and narrow the sandbox's GitHub token](0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md)
+
 ## Context
 
 Inside the sandbox, GitHub sees the operator's own GitHub account, and

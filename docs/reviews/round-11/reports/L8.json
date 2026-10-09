@@ -1,0 +1,19 @@
+{
+  "header": "L8 · The technical writer who maintains generated docs · sonnet",
+  "verdict": "Met for this lens: the one round-10 finding (L8-R10-1, status A) reads as resolved at d133542; the delta adds no Blocking, Required or Advisory finding.",
+  "prior_checked": 1,
+  "prior_resolved_as_stated": 1,
+  "findings": [],
+  "pages_read": [
+    "docs/reviews/lenses.md (L8)",
+    "docs/reviews/round-10/reports/L8.json",
+    "docs/reviews/round-10.md (L8 rows, D3)",
+    "full delta d458f83..HEAD over docs/spec.md, docs/spec, docs/adr",
+    "docs/adr/0010 (Context, Alternatives, Decision, Consequences)",
+    "docs/spec/04-cli.md (4.1 error ids and paste rule, 4.4 RJ-334 to RJ-337)",
+    "docs/spec/03-formats.md (fingerprint row)",
+    "internal heading-anchor check (script) over docs: 0 broken anchors"
+  ],
+  "out_of_scope": "Security content of the pr job and the fingerprint, the gh 2.68.0 flag claim (needs network to the cli/cli tags), and the T006 rule 9 matcher were not judged. Pages 00, 02, 07 and 13 were not in the delta.",
+  "confidence": "medium-high: resolution checked against baseline text; ADR 0010 now says five in Context, Alternatives and Consequences, matching Decision items 2 to 6."
+}

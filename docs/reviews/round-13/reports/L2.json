@@ -1,0 +1,76 @@
+{
+ "header": "L2 · The security engineer who has watched a host fall · opus",
+ "verdict": "Met for the delta. All four round-12 L2 findings now read as their resolutions say: plan T005 (c) refuses a tracked go.work, go.work.sum or vendor/ from the base, and 05 5.3 names those files (R12-02, M); the approval-line row of 05 5.4 says the required checks guard against mistakes, not a token holder, and item d of the maintainer block has a fifth try (R12-03, A by D1); 12 12.4 and T005 refuse a head job whose name holds ${{, with both fixtures (L2-r12-3); and item a states the bypass until the maintainer step, which S2, the local-gates row and 05 5.4 point to (R12-04). No Blocking or Required finding is new. The largest gap is Advisory: the fifth try posts its commit status 'with the token', but after the narrowing that token has no Commit statuses permission. The try would then record a refusal by the token, not the ruleset's answer, and it would not try the path that 05 5.4 now accepts: a status posted by a side-branch workflow.",
+ "prior_checked": 4,
+ "prior_resolved_as_stated": 4,
+ "findings": [
+  {
+   "id": "L2-r13-1",
+   "kind": "new",
+   "prior_ref": "L2-r12-2 (R12-03)",
+   "severity": "Advisory",
+   "section": "10 10.2 (maintainer block, item d, the fifth try); 05 5.4 (the approval-line row)",
+   "defect": "The fifth try runs after the narrowing and posts 'a commit status with the token'. But the narrowed token of ADR 0011, decision 2, holds Contents, Pull requests and Workflows write and Actions, Checks and Metadata read. It has no Commit statuses permission, so the API refuses that status before any ruleset reads it. The status path that 05 5.4 accepts (a workflow on a side branch whose GITHUB_TOKEN asks for statuses: write) is never tried. The try also does not say what happens afterwards to the throwaway pull request, the side branch and its workflow, and one of them is left with a green check under a required name.",
+   "scenario": "At the sitting after the narrowing, the maintainer runs the fifth try as written. The status POST returns 403, and the check posted from the side-branch workflow counts. The record reads 'the ruleset counts checks and not statuses'. A later reader concludes that a status cannot satisfy a required check, but a side-branch workflow with statuses: write can still post one. The throwaway pull request stays open with a green required check, and anyone with merge rights can merge it.",
+   "change": "Reword the try as three steps. (1) From a workflow pushed on a side branch, with permissions statuses: write and checks: write, post both a commit status and a check run under a required check's name on the throwaway pull request's head. Record which of the two the ruleset counts, and save the API answers under Evidence. (2) With the narrowed token, post a status directly, and record whether the token refuses it. (3) Close the pull request, and delete the side branch and its workflow. Cost: one sentence in item d."
+  },
+  {
+   "id": "L2-r13-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "plan.md T005, requirement (b) (the test that maps each package of go list -deps -test to an approvals glob); 05 5.3 (the invariant of the pr job)",
+   "defect": "The test treats a package path whose first element has no dot as the standard library, and so skips its directory check. But a module path does not need a dot when a replace directive points it at a local directory. A package under such a path lives in the repository, maybe under a grantable surface, and the test would count it as the standard library. go list already reports this fact in the Standard field of each package.",
+   "scenario": "A pull request granted on checks and dependencies adds 'require cilib v0.0.0' and 'replace cilib => ./internal/cilib' to go.mod, puts code under internal/cilib, and imports it from the code pr builds. The version-pin rules of (c) cover only the go line and the toolchain, and the test in (b) reads cilib as the standard library, so both stay green. After the merge, pr builds code from a directory that no approvals glob names.",
+   "change": "Have the test read the standard library from go list's Standard field ('go list -deps -test -f {{.ImportPath}} {{.Standard}} {{.Dir}}'), and match every package that is not standard to an approvals glob by its Dir. Add a fixture with a dotless module path under a local replace that turns the test red. Cost: one phrase and one fixture in T005."
+  },
+  {
+   "id": "L2-r13-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "plan.md T005, requirement (c); 10 10.2 (Hygiene, 'a tracked go.work, go.work.sum or vendor/')",
+   "defect": "Requirement (c) says that pr refuses a head that 'adds' a tracked go.work, go.work.sum or vendor/, and calls this 'the hygiene rule of 10 10.2 applied from the base'. The hygiene rule refuses one that is tracked at all. A head that edits a go.work already tracked on the base is not refused by the wording of (c). That file could have come in through the administrator bypass, which item a says stands until the maintainer step, or before T005 lands.",
+   "scenario": "A go.work merged earlier, while the bypass stood, holds a 'use' line. A later pull request granted on checks edits it to point at a directory under a grantable surface, and changes no go.mod or mise file. pr applies (c) as written and finds no added file, and the head's own hygiene step has been relaxed under the checks grant. After the merge, the go command that builds pr reads the edited go.work.",
+   "change": "Change 'adds' to 'holds' in (c), so it says what the hygiene rule says, and add a fixture for an edited tracked go.work. Cost: one word and one fixture."
+  },
+  {
+   "id": "L2-r13-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "index, Deferred decisions, In how this repository is run (the reshaped token-narrowing row); 05 5.4 (the token row)",
+   "defect": "The reshaped row's subject is now the review of the sandbox's GitHub access after the narrowing. Its 'what holds until then' cell still describes only the token before the narrowing (the operator's own token, every repository). Once the sitting applies the narrowing, that cell is false. Neither this row nor the token row of 05 5.4 says what the narrowed token can still do: merge through the API, push workflows that run at once, and, through them, post a required check's name. The approval-line row has said that last part since this delta.",
+   "scenario": "After the narrowing, an agent or a later maintainer reads the row to judge the sandbox's reach. They find a description of the old token, and no list for the token that is actually in place. They then rely on the narrowing as the control for merges, while 05 5.4 accepts that the narrowed token can satisfy a required check by name.",
+   "change": "Make the cell hold both states: 'until the narrowing: the operator's own token ...; after it: the narrowed token of ADR 0011, decision 2, which can merge, push branches and workflows, and so post a check under a required name (05 5.4, the approval-line row)'. Cost: one sentence."
+  }
+ ],
+ "prior_resolution_notes": {
+  "L2-r12-1 (R12-02, M)": "holds as resolved: plan T005 (c) refuses a head with a tracked go.work, go.work.sum or vendor/, with the hygiene rule applied from the base and one fixture each, and 05 5.3 names those files among what T005 decides. The mise half is declined in round-12.md with its evidence, and is not re-reported. The wording 'adds' is narrower than the rule, see L2-r13-3.",
+  "L2-r12-2 (R12-03, A by D1)": "holds: the approval-line row of 05 5.4 states that the required checks guard against mistakes, not against an agent holding the token, and item d of the 10 10.2 maintainer block gains the fifth try after the narrowing. The token row and ADR 0011 are not edited, as decided. The design of the try is L2-r13-1.",
+  "L2-r12-3 (A)": "holds: 12 12.4 refuses a head job outside the pr job's file whose name holds ${{, with a fixture for a literal expression and one for a matrix value, and plan T005 lists both as acceptance lines, each with the removal that turns it red.",
+  "L2-r12-4 (R12-04, A)": "holds: item a of the 10 10.2 maintainer block states that the administrator role bypasses the required checks on a pull request merge until the maintainer step, and that the saved API answer ends that state. S2 and the local-gates row say 'once that step is applied' and link item a, and S2 takes the run as its evidence until then. The approval-line row of 05 5.4 says its bypass stands until item a's step."
+ },
+ "coverage": {
+  "index (spec.md)": "L2-r13-4 (token-narrowing row); S2 and the local-gates row checked for R12-04; the two rows whose trigger is 'the token is narrowed' checked, links resolve",
+  "00": "nothing for this lens (not in the delta)",
+  "01": "nothing for this lens (the 1.6 removing row checked: fingerprint-unstable keeps the generation removing and runs no sbx env rm)",
+  "02": "nothing for this lens (not in the delta)",
+  "03": "nothing for this lens (salvage[].cause and the fingerprint field checked: both are host-written state, and no value comes from the sandbox)",
+  "04": "nothing for this lens (RJ-338 checked: its details name a path from the sandbox, which goes through the default termsafe writer of I29; --accept-loss does not cover it)",
+  "05": "L2-r13-1, L2-r13-4; the I17 test row and the 5.3 wording checked",
+  "06": "nothing for this lens (not in the delta)",
+  "07": "nothing for this lens (not in the delta)",
+  "08": "nothing for this lens (the paragraph on fingerprint-unstable checked)",
+  "09": "nothing for this lens (not in the delta)",
+  "10": "L2-r13-1, L2-r13-3; the two-fixture test of the gh floor and item a checked",
+  "11": "nothing for this lens (not in the delta)",
+  "12": "nothing for this lens (the ${{ refusal and the askfirst.go placeholder checked: moving the file changes the approvals glob in the same pull request, which the union of the base and head lists covers)",
+  "13": "nothing for this lens (not in the delta)",
+  "ADRs": "nothing for this lens (not in the delta; ADR 0011 decision 2 read for the permission set in L2-r13-1)",
+  "plan.md": "L2-r13-2, L2-r13-3"
+ },
+ "what_is_missing": "One list, in 05 5.4, of what the narrowed token can still do and what control covers each item. This was asked in round 12 and it is still missing; the delta made it more needed, because the approval-line row now accepts a forged required check, and the token row does not link to that.",
+ "postmortem": "After the narrowing, the fifth try is run as written. The token's status POST returns 403, the side-branch check counts, and the record says that statuses do not satisfy the ruleset. Months later, an agent's pull request is red on pr. A helper branch's push workflow, with statuses: write, posts a success status under the pr check's name. The ruleset counts it, and the agent merges through the API. The review follows the record and finds that it measured the token, not the ruleset. Sections crossed: 10 10.2 item d, 05 5.4, ADR 0011 decision 2, the index token row.",
+ "lens_critique": "The lens should ask of every measurement it relies on whether the actor in the try holds the same permissions as the actor in the accepted risk. The fifth try changes the actor (the token, not a workflow's GITHUB_TOKEN), and a tick on a try is easy to read as a tick on the risk. The CI-platform viewpoint is still missing from the set of lens titles.",
+ "out_of_scope": "Not measured, inferred from GitHub's behavior as remembered: that a fine-grained token without Commit statuses refuses POST /statuses; that a side-branch push workflow's GITHUB_TOKEN can post a status or a check run to another SHA; that go accepts a dotless module path under a local replace without a network lookup. Running go list with such a fixture would settle the last point. Chose not to judge the counting rule of fingerprint-unstable (whether 'the third in a row' also covers a fourth rerun): it concerns salvage completeness, which belongs to another lens, and no host-safety path depends on it, because each rerun's salvage completes before sbx env rm. The baseline HEAD 4c2b11d has the subject 'record the round-12 session checkpoint', not the PR #36 subject the brief gives; the delta was read at 4c2b11d.",
+ "confidence": "High for the four prior checks and for L2-r13-3 and L2-r13-4, which are text against text. Medium for L2-r13-1 and L2-r13-2, which rest on GitHub and go behavior as remembered and not measured.",
+ "pages_read": ["docs/reviews/lenses.md (L2, What a reviewer returns, How stage A runs)", "docs/reviews/round-12/reports/L2.json", "docs/reviews/round-12.md (R12-02, R12-03, R12-04, R12-06, L2-r12-3)", "delta 4f1bd1b..4c2b11d of docs/spec.md, docs/spec, docs/adr, docs/plan.md", "docs/adr/0011 decision 2", "docs/spec/10-testing-style.md Hygiene and maintainer block", "docs/spec/08-memory-handoff-salvage.md sandbox half"]
+}

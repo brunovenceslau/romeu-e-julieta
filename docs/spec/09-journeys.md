@@ -48,20 +48,28 @@ which names each step's command and output path.
    floor of [10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract)
    (initial v0.46.0), git at or above the floor of
    [05 5.1](05-security.md#51-hardened-git-internalgitsafe) (initial
-   floor 2.45.4), and a `gh` that has the `attestation` command, which
-   step 2 needs (12 12.1). The verification of step 2 needs network
+   floor 2.45.4), and `gh` at or above the floor of 12 12.1 (initial
+   floor 2.68.0, the first with both flags of the `gh attestation
+   verify` line of step 2). The verification of step 2 needs network
    access and a `gh` logged in to GitHub.
 2. [O] Download the `romeu` darwin archive for the host arch and
    `checksums.txt` with `curl`, which sets no quarantine attribute, so
    Gatekeeper is not asked about an unsigned binary (inferred; B1
    confirms it on both hosts). Verify with
-   `shasum -a 256 -c checksums.txt` and
+   `shasum -a 256 -c checksums.txt`, then read the commit the release's
+   tag names from GitHub with
+   `gh api repos/<owner>/romeu-e-julieta/commits/<tag> --jq .sha` and
+   verify with
    `gh attestation verify <archive> --repo <owner>/romeu-e-julieta
-   --signer-workflow <owner>/romeu-e-julieta/.github/workflows/release.yml`
-   (both required; the verification contract of
-   [10 10.2](10-testing-style.md#release-and-bootstrap), one entry of
-   `e2e/scenarios/commands.yaml` that J9 uses too), put `romeu` on
-   `PATH`.
+   --signer-workflow <owner>/romeu-e-julieta/.github/workflows/release.yml
+   --source-digest <commit> --deny-self-hosted-runners`, `<commit>`
+   being that output (both checks required; the verification contract
+   of [10 10.2](10-testing-style.md#release-and-bootstrap), one entry of
+   `e2e/scenarios/commands.yaml` that J9 uses too, which gives the three
+   commands as one block to paste, with the tag as its one variable),
+   put `romeu` on `PATH`. Skipping the verification is the user's
+   choice; it costs the one proof that the archive is the one
+   `release.yml` built from the tagged commit.
 3. [O] `romeu init --config-url https://github.com/<owner>/<config-repo>`
    - [H] applies `doctor`'s root check before writing settings and
      refuses a root inside a git repository (a `$HOME` that holds
@@ -83,7 +91,10 @@ which names each step's command and output path.
    project that uses `git-ssh-sign`, register the key on GitHub as a
    signing key and never as an authentication key, and start the
    dedicated signing agent with exactly that one key, added with
-   `ssh-add -c` so each use asks for confirmation
+   `ssh-add -c` so each use asks for confirmation; that needs a program
+   `SSH_ASKPASS` can name, which macOS does not ship, so install one
+   first and set `SSH_ASKPASS` for the agent; what a signing use does
+   without one is the outcome probe B2 records
    ([06 6.4](06-kits.md#64-product-kits)); sync
    exits 2 with `RJ-204 signing-socket` until it is reachable and holds
    that key.
@@ -173,14 +184,19 @@ work as usual.
    `open -> salvaging`, new salvage id and host base SHAs for the
    generation's recorded repo set; [X->J] `julieta salvage
    --stop-agents`; [H] verify, unbundle, cross-check daemon heads,
-   import.
+   import; complete (or accepted, step 4) -> generation
+   `salvaging -> removing`, written before `sbx env rm`.
 4. [H] incomplete -> exit 5 listing what would be lost, each with its
    reason; the operator fixes each reason as the guide page says for it
    (pushes the work, frees the space, starts the sandbox) or reruns with
    `--accept-loss=<reason>[,<reason>]`, naming each reason it accepts.
 5. [X] `sbx env rm <dir>`; [H] remove romeu-applied egress rules;
-   generation `salvaging -> closed-removed`. For `recreate`, continue
-   with J3b. If that create fails because an upstream artifact is gone
+   generation `removing -> closed-removed`. If `sbx env rm` fails, the
+   generation stays `removing` and romeu exits 1; the same command run
+   again resumes at `sbx env rm` when a fresh fingerprint of the daemon
+   heads and each worktree's HEAD and full status equals the one written
+   with `removing` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)),
+   and otherwise salvages again first. For `recreate`, continue with J3b. If that create fails because an upstream artifact is gone
    (a workload digest, the frontend, a kit download host), the
    generation stays closed, the salvage refs and memory are intact and
    no sandbox exists: the error is `kit-build-failed`, and the operator
@@ -201,8 +217,12 @@ work as usual.
    not reachable from origin; confirm on TTY; move `foo-env/` to
    `$ROMEU_ROOT/.attic/foo/<ts>/`; drop from workspace files; move state
    and approvals to the state attic.
-4. [O] Once `status` shows nothing unpushed for the project, the
-   operator may delete `$ROMEU_ROOT/.attic/foo/<ts>/` and
+4. [O] Once, in each attic clone, `git -C <clone> status` shows a clean
+   tree, `git -C <clone> log --branches --glob='refs/romeu/salvage/*'
+   --not --remotes --oneline` prints nothing, `git -C <clone> stash
+   list` lists no stash and `git -C <clone> worktree list` lists no
+   linked worktree, the operator may delete
+   `$ROMEU_ROOT/.attic/foo/<ts>/` and
    `$XDG_STATE_HOME/romeu/attic/foo/<ts>/`; romeu never does, and
    `status` and `doctor` do not read them.
 
@@ -254,7 +274,9 @@ work as usual.
 
 1. [O] `romeu status foo` shows `absent; generation <G> open; snapshot
    <T>; refs/sandboxes last fetched <T2>`.
-2. [O] `romeu run foo`: [H] preserves generation G (imports
+2. [O] `romeu run foo`: [H] preserves generation G as the closed-lost
+   row of [01 1.6](01-system-model.md#generation) says (it keeps a lost
+   record `salvage --from-host` already wrote, else imports
    `refs/sandboxes/foo/*` and every `snapshot/heads.bundle` into
    `refs/romeu/salvage/foo/<G>/<salvage-id>/`), moves it to
    `closed-lost` with `result: lost`, prints the lost record with its
@@ -319,11 +341,17 @@ work as usual.
 2. [O] `romeu retire` each project (J7).
 3. What stays, on purpose: the host clones, as plain clones; memory, as
    plain Markdown ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1));
-   `$ROMEU_ROOT/.attic`.
+   `$ROMEU_ROOT/.attic`, which holds salvage payloads that can carry
+   credentials: delete it as J7 step 4 says once no longer needed. A root excluded from Time Machine, as the
+   `root-indexed` check of [04 4.2](04-cli.md#42-romeu-host) advises, is
+   in no Time Machine backup, so the operator keeps another copy of the
+   memory dirs, the handoffs and any work not pushed.
 4. [O] What the operator removes by hand, as the guide page shows: host
    settings, host state, romeu-applied egress rules, the refs under
    `refs/romeu/` and `refs/sandboxes/` (`git for-each-ref`, then
-   `git update-ref -d`), and any remaining sbx sandboxes and volumes.
+   `git update-ref -d`), the keychain entries named by the secret argv
+   in host settings, the signing agent socket key (01 1.2 marks both
+   kept), and any remaining sbx sandboxes and volumes.
 
 The scenario runs after J7 and checks `git fsck` on each host clone,
 that no ref is left under `refs/romeu/` or `refs/sandboxes/` after step

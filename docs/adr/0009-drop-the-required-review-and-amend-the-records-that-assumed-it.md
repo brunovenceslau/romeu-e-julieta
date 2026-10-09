@@ -18,6 +18,8 @@ Supersedes in part [7. Adopt testify assert and require in tests](0007-adopt-tes
 
 Supersedes in part [8. Let the sandbox act as the maintainer on GitHub](0008-let-the-sandbox-act-as-the-maintainer-on-github.md)
 
+Superseded in part by [10. Reopen the required checks without the bypass and amend the records of round 9](0010-reopen-the-required-checks-without-the-bypass-and-amend-the-records-of-round-9.md)
+
 ## Context
 
 Six texts said that a pull request needs an approving, code-owner

@@ -1,0 +1,65 @@
+{
+ "header": "L16 \u00b7 The owner of the data \u00b7 sonnet",
+ "verdict": "The round-8 write pass closed almost all of the owner's gaps (store table, modes, J14, refs warning, config-repo privacy, redaction, lock path, ledger deferred and said to stay on the machine); the largest remaining gap is that doctor's Time Machine warning and the spec's backup statements pull the owner in opposite directions.",
+ "round8_checked": 17,
+ "round8_resolved_as_stated": 16,
+ "findings": [
+  {
+   "id": "L16-R9-1",
+   "kind": "new",
+   "severity": "Required",
+   "section": "04 4.2 (root-indexed); 08 8.5; 05 5.4; 00 0.1",
+   "defect": "doctor warns when $ROMEU_ROOT is not excluded from Time Machine, while 08 8.5 and the 05 5.4 salvage row say payloads sit in any backup of $ROMEU_ROOT and 08 8.1 says backups of memory are the owner's; the spec never tells the owner that excluding the root drops memory, handoffs and unpushed clones from backup.",
+   "scenario": "An owner follows the doctor warning and excludes the root from Time Machine; the disk fails; memory, handoffs and unpushed clones (the sandbox-only work 00 0.1 promises is not lost) have no copy. An owner who does not exclude it keeps secret-bearing salvage tarballs in backups, as 05 5.4 says, and gets a standing warning.",
+   "change": "Say in 04 4.2 and 08 8.5 which side the product recommends and the cost: either warn only for cloud-synced paths and leave Time Machine to the owner with the 05 5.4 sentence, or keep the warning and add one sentence to the README data section and J14 that an excluded root needs another copy of memory and unpushed work."
+  },
+  {
+   "id": "L16-R9-2",
+   "kind": "unresolved",
+   "round8_ref": "L16-2 / R8-09-2",
+   "severity": "Advisory",
+   "section": "09 J14 step 4",
+   "defect": "J14 lists what the operator removes by hand but omits the keychain entries named in host settings and the signing agent socket key, which the store table of 01 1.2 marks 'kept / kept'; it also lists .attic only under 'stays on purpose' with no pointer to J7 step 4 as the way to delete it with its secret-bearing salvage payloads.",
+   "scenario": "A user who leaves following the guide page keeps the GitHub and secret keychain items the tool read, and believes .attic cannot be removed.",
+   "change": "Add keychain entries to J14 step 4 and a clause in step 3: '.attic holds salvage payloads that can carry credentials; delete it as J7 step 4 says when you no longer need it'."
+  },
+  {
+   "id": "L16-R9-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "09 J7 step 4",
+   "defect": "The condition 'once status shows nothing unpushed for the project' cannot be observed: retire moves the project record to the state attic and the same step says status and doctor do not read the attics.",
+   "scenario": "An owner deletes .attic/foo/<ts>/ waiting for a clear status; status says nothing about foo either way, so the check gives no protection and unpushed work in the moved clones can go with the delete.",
+   "change": "Replace the condition by the one that exists: the unpushed and salvage-only report that retire printed and confirmed, or 'git -C <clone> status / for-each-ref' inside the attic clone."
+  },
+  {
+   "id": "L16-R9-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "10 10.1 (Host row); 08 8.5",
+   "defect": "10 10.1 says the host suite runs 'J1-J13' while 09, S7 and B3 say J1-J14, so the leaving scenario has no stated home in the test levels; and 08 8.5 says payloads 'stay until the owner deletes them' without saying whether doctor, status or salvage verification tolerate a deleted salvage/<gen>/ dir of a live project.",
+   "scenario": "J14 is never run because the level table lists thirteen journeys; an owner deletes an old salvage dir in a live project and a later doctor or verify reports a missing payload.",
+   "change": "Change J1-J13 to J1-J14 in 10 10.1; add to 08 8.5 one sentence on which salvage artifacts an owner may delete and that doctor and status do not read closed payloads."
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L16, What a reviewer returns, How stage A runs)",
+  "docs/reviews/round-8/reports/L16.json",
+  "docs/reviews/round-8.md (L16 rows and decisions SC10, SC16, AR10, AR16, AR17, AR19, AR20)",
+  "docs/reviews/round-8/write-pass.md",
+  "docs/spec.md (S7, Deferred decisions)",
+  "01 1.2, 1.7",
+  "02 2.2, 2.3",
+  "04 4.2",
+  "05 5.4",
+  "06 6.2",
+  "08 8.1, 8.5",
+  "09 J7, J12, J13, J14",
+  "10 10.1, 10.3",
+  "12 12.8",
+  "13 opening",
+  "00 0.2, 0.6"
+ ],
+ "out_of_scope": "Parked or L round-8 findings (L16-13, L16-16, L16-24, L16-25); ledger content, since 13 is designed not built; whether sbx honours 0700/0600 modes across virtiofs when the sandbox user writes memory files (needs probe A3/A15 evidence); full diff of pages 03, 07, 11 and the ADR records only skimmed.",
+ "confidence": "Medium: texts were read at the baseline and quoted checks were by grep; the Required finding rests on reading two sections together, not on a measurement."
+}

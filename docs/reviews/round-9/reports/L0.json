@@ -1,0 +1,71 @@
+{
+ "header": "L0 \u00b7 The control reviewer \u00b7 sonnet",
+ "verdict": "Round 8 is mostly resolved as stated (31 of 33 Status A/M findings checked), but one contradiction survives: three pages and ADR 0009 say the default-branch ruleset requires CI green while 10 10.2 item e and the index say required checks are not yet configured. The delta also leaves a release-grammar gap: tools/release build and notes need a GitHub token the grammar does not admit.",
+ "round8_checked": 33,
+ "round8_resolved_as_stated": 31,
+ "findings": [
+  {
+   "id": "L0-r9-1",
+   "kind": "unresolved",
+   "round8_ref": "L0-10 (and L0-9)",
+   "severity": "Required",
+   "section": "05 5.4 (approval-line row); 12 12.4 (merge row); ADR 0009 Context and decision 1; 10 10.2 maintainer block item a and item e; index Deferred decisions",
+   "defect": "The 12 12.9 row was reworded to a working agreement, but 05 5.4, the 12 12.4 merge row and ADR 0009 still say the default-branch ruleset requires CI green. 10 10.2 item a, which ADR 0009 cites for that claim, lists no status check. Item e (add the CI jobs as required status checks) is 'To do', and the index row 'required status checks without the administrator bypass' says they are not in place. The spec still carries two states of one fact.",
+   "scenario": "A planner or a gate author reads 05 5.4 or 12 12.4, believes a red CI blocks a merge, and builds no check. The ruleset has none, and the token's administrator role bypasses it anyway.",
+   "change": "State the ruleset's current requirements once, in 05 5.4, as measured: no direct push, merge commit only, and required status checks only if the 2026-10-08 measurement shows them. Point 12 12.4 and ADR 0009 at it, and tag 'CI green' in the 12.4 merge row [review] until item e closes. Fix the sentence in ADR 0009 that cites item a."
+  },
+  {
+   "id": "L0-r9-2",
+   "kind": "new",
+   "severity": "Required",
+   "section": "10 10.2 grammar row 'release publish job' and Release and bootstrap step 1 and 4; 12 12.6",
+   "defect": "The grammar admits GH_TOKEN only on the 'tools/release publish' and 'tools/release verify' run steps. The same publish job's 'tools/release build' must read the latest scheduled fuzz.yml run on main (a GitHub API call), and 'tools/release notes' reads every merged PR's Why section, author and closing issues from GitHub (12 12.6), whole history for v1.0.0. Neither step may hold the token, so each runs unauthenticated or fails the grammar.",
+   "scenario": "T088 writes release.yml as 10.2 describes. The build step's fuzz check gets a 403 or a rate limit, or the author widens the grammar by hand, which is the L0-1 failure again for two more steps.",
+   "change": "Either list tools/release build and tools/release notes among the steps that may hold GH_TOKEN, or say they read GitHub unauthenticated and give the bound (public repository, request count for the v1.0.0 notes) and what the step does on a 403 or 429. Make the T088 acceptance fixture cover each admitted step."
+  },
+  {
+   "id": "L0-r9-3",
+   "kind": "unresolved",
+   "round8_ref": "L0-15",
+   "severity": "Advisory",
+   "section": "05 5.3 ask-first surfaces",
+   "defect": "Status M applied a new sbxdrv surface and skills/** on the kits surface. The write pass added only the spec surface, so the code holding the I4 and I25 guards (internal/sbxdrv) and the text every agent follows (skills/**) are still on no surface. The reason is recorded only in plan.md and write-pass.md, and 05 5.3 does not say they are pending.",
+   "scenario": "A PR that changes only internal/sbxdrv/** or skills/** needs no approval line, while kits/** does.",
+   "change": "Add one sentence to 05 5.3 saying the two are pending as their own tooling PR with the trigger, or add the surfaces now with their approval line."
+  },
+  {
+   "id": "L0-r9-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "ADR 0006",
+   "defect": "The spec defers the runtime ledger, but ADR 0006 is still Accepted and speaks of 'a v1 event', 'Rejected for v1' and 'v1 defers'. It carries no note that the ledger is deferred. ADR 0009 says only that 0006 stays as the design of the deferred ledger and is not amended.",
+   "scenario": "A reader who opens ADR 0006 first learns that v1 ships the ledger, the stale-content case ADR 0009 itself cites against ADR 0001 rule 3.",
+   "change": "Add a one-line status note or a 'Superseded in part' line to ADR 0006 pointing at the Deferred decisions row for the ledger, in the same decision-record pass as the other notes."
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L0, What a reviewer returns, How stage A runs)",
+  "docs/reviews/round-8/reports/L0.json",
+  "docs/reviews/round-8.md (Status column)",
+  "docs/reviews/round-8/clusters-*.json",
+  "docs/reviews/round-8/write-pass.md",
+  "docs/spec.md (success criteria, open questions, deferred decisions)",
+  "docs/spec/00-scope.md",
+  "docs/spec/01-system-model.md (1.5, vocabulary row)",
+  "docs/spec/02-layouts.md (spot)",
+  "docs/spec/03-formats.md (3.13 and spot)",
+  "docs/spec/04-cli.md (rows, run step 3, error ids)",
+  "docs/spec/05-security.md (5.3, 5.4)",
+  "docs/spec/07-mise-egress.md (7.6)",
+  "docs/spec/08-memory-handoff-salvage.md (8.4, 8.5)",
+  "docs/spec/09-journeys.md (opening, J12)",
+  "docs/spec/10-testing-style.md (10.2 grammar, Release and bootstrap, maintainer block)",
+  "docs/spec/11-host-probes.md (A2, A3, A4, A11, A14, A15, B3, B5)",
+  "docs/spec/12-engineering.md (12.4, 12.6, 12.9)",
+  "docs/spec/13-runtime-ledger.md (spot)",
+  "docs/adr/0006, 0007, 0008, 0009",
+  "docs/plan.md (lines 350-365, question 28)"
+ ],
+ "out_of_scope": "Parked and L-status findings, the plan clusters parked for stage B (L0-P1 to P6), and the operator-routed items L0-24 and L0-41, which were checked against the recorded decisions SC16 and SC17 only. Not re-read: the full 3300-line diff of pages 02, 03, 06 and the middle of 10 and 12.",
+ "confidence": "Medium. Findings 1 and 2 rest on direct quotes from the baseline. The 31 resolved items were checked by targeted reads, not a full re-read of every page."
+}

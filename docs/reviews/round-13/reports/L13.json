@@ -1,0 +1,58 @@
+{
+ "header": "L13 · The reader who holds the spec against itself · opus",
+ "verdict": "Partly met. All five round-12 L13 findings (L13-R12-1 to L13-R12-5, all status A) now read as their resolutions say at 4c2b11d. The delta raises one new Required finding. The new error `fingerprint-unstable` (RJ-338) is written as 'the third in a row' in 04 4.4, 01 1.6, 08 8.5 and I17, but as a 'limit' in 03 3.8, and no text says what the fourth changed-fingerprint rerun does. One reading makes the hint's 'then rerun' false by one rerun; the other makes the guard a one-time pause. Two Advisory findings follow: 'the fifth try' now names two different tries inside 05 5.4, and the `cause` value `first` labels salvages that are not first.",
+ "prior_checked": 5,
+ "prior_resolved_as_stated": 5,
+ "findings": [
+  {
+   "id": "L13-R13-1",
+   "kind": "new",
+   "severity": "Required",
+   "section": "04 4.4 (RJ-338 `fingerprint-unstable`); 03 3.8 (`salvage[].fingerprint`, `salvage[].cause`); 01 1.6 (the `removing` row); 08 8.5; 05 5.2 (I17)",
+   "defect": "The rule is stated as 'the third in a row' in 04 4.4, 01 1.6, 08 8.5 and I17, and as 'the limit on such salvages in a row' in 03 3.8. No text says what the fourth or a later changed-fingerprint salvage does, even though the count never resets on a `removing` generation (a `first` entry cannot follow). Under the 'cap' reading (three or more), the recovery the hint names, 'stop the writer or add an ignored path to `salvage.excludeIgnored`, then rerun', needs two reruns. That rerun salvages once more, exits 5 again and only then records a stable fingerprint. Editing `excludeIgnored` always changes the fingerprint input (03 3.8: 'ignored paths, minus `salvage.excludeIgnored`'), and a writer stopped after the exit has usually written since the third fingerprint. Under the literal reading (exactly the third), the fourth rerun goes on to `sbx env rm` whether or not the writer stopped, so the guard is a one-time pause and the recoveries are optional.",
+   "scenario": "An agent keeps writing a tracked file and `sbx env rm` keeps failing, so `rm` exits 5 with RJ-338 on the third changed-fingerprint salvage. The operator stops the agent and reruns, as the hint says. The fingerprint taken while the agent was writing differs, so a fourth changed-fingerprint salvage runs. The salvage task (T-salvage) and T008 have to pick a behavior. Under the cap it exits 5 again with the same 'stop the writer' hint for a writer already stopped. Under the literal reading it proceeds. I17's case ends at 'once the writer stops the next rerun resumes', so neither reading is pinned by a test.",
+   "change": "Write the rule once, in 04 4.4, as 'the third or a later' (the cap) and say the count is read from the newest entries (03 3.8 already does). Say in the hint that the first rerun after a recovery salvages once more and exits 5 if a write landed after the recorded fingerprint, and that the next rerun resumes. Or, if a one-time pause is meant, say so and drop 'limit' from 03 3.8. Make 01 1.6, 08 8.5 and I17 cite 04 4.4 rather than restate the number. Add one I17 case for a fourth rerun after an `excludeIgnored` edit. Cost: one clause in 04 4.4, three wording edits, one test line; approval line `spec`."
+  },
+  {
+   "id": "L13-R13-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "05 5.4 (the approval-line row; the token row's Mitigation); 10 10.2 (maintainer block, item d)",
+   "defect": "The delta adds 'the fifth try of 10 10.2, item d, measures which of the two the ruleset counts' to the approval-line row of 05 5.4. Item d defines that fifth try: posting a commit status, and a check from a side-branch workflow, under a required check's name. The token row of the same table keeps its own fifth try: 'the fifth try that would have measured it [an agent disabling the ruleset or changing the settings] is not made'. So one table names two different tries with one name, and says both that a fifth try runs and that it is not made.",
+   "scenario": "At the narrowing sitting, the maintainer reads 05 5.4 to know which tries to run. The token row says the fifth try is not made, while item d and the approval-line row say it runs. The maintainer either skips the status-forgery try, the measurement round 12 D1 decided, or tries to disable the ruleset, which was decided against on 2026-10-09.",
+   "change": "Name the new try by what it does ('the status-and-check try of item d') in both 10 10.2 and 05 5.4. Or reword the token row to 'the try that would have measured it is not made'. Cost: one phrase; approval line `spec`."
+  },
+  {
+   "id": "L13-R13-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "03 3.8 (`salvage[].cause`); 04 4.2 (`romeu salvage`, and `rm`, `recreate`, `retire` through it)",
+   "defect": "The value `first` covers every salvage not started by a changed fingerprint. That includes the second or third standalone `romeu salvage` of a generation, a salvage started again from `salvaging` after an incomplete one, and a lost record. The name says 'first', but the rule says 'not a fingerprint rerun', so one name carries a meaning it does not say.",
+   "scenario": "A reader of `status --json` sees three salvage entries of one generation, each with `cause: first`, and takes the state file as corrupted or the field as a bug. A later format change that wants a third cause, such as `requested` against `removal`, has to rename a v1 value under the version rule.",
+   "change": "Rename the value before the state format lands, for example to `requested` (and keep `fingerprint-changed`), or define `first` as 'any salvage not started by a changed fingerprint'. Cost: one cell and the 03 3.8 example; approval line `spec`."
+  }
+ ],
+ "coverage": {
+  "index": "L13-R12-2, L13-R12-3 and L13-R12-4 resolved (S2, local-gates row, token-narrowing row, two trigger cells); nothing new for this lens",
+  "00": "not in the delta",
+  "01": "L13-R13-1",
+  "02": "not in the delta",
+  "03": "L13-R13-1, L13-R13-3",
+  "04": "L13-R13-1, L13-R13-3",
+  "05": "L13-R13-1 (I17), L13-R13-2",
+  "06": "not in the delta",
+  "07": "not in the delta",
+  "08": "L13-R13-1",
+  "09": "not in the delta",
+  "10": "L13-R13-2; the gh floor test fixtures are nothing for this lens",
+  "11": "not in the delta",
+  "12": "L13-R12-5 resolved (approvalLine file deferral); the `${{` refusal is nothing for this lens",
+  "13": "not in the delta",
+  "ADRs": "not in the delta; ADR 0011 is unchanged, as the round-12 page says",
+  "plan.md": "T005 (a) to (e) and the fixture acceptance lines: L13-R12-5 resolved; nothing new for this lens"
+ },
+ "what_is_missing": "A statement, in 04 4.4 or 01 1.6, of what ends the `fingerprint-unstable` state: whether the count resets and what the next rerun after each recovery does (belongs in 04 4.4, RJ-338).",
+ "out_of_scope": "Read only the round-12 delta (4f1bd1b..4c2b11d) and the lines around it. Not judged: whether three is the right limit; whether a token-posted status satisfies the ruleset, which the fifth try of item d measures and the text cannot settle; and the plan's fixture list, which is parked for stage B.",
+ "confidence": "High for L13-R13-2 (both sentences quoted from 05 5.4 at 4c2b11d). Medium-high for L13-R13-1: the ambiguity is textual, and the effect of an `excludeIgnored` edit on the fingerprint follows from 03 3.8's definition. Medium for L13-R13-3.",
+ "pages_read": ["docs/reviews/lenses.md (L13; What a reviewer returns; How stage A runs)", "docs/reviews/round-12/reports/L13.json", "docs/reviews/round-12.md", "delta 4f1bd1b..HEAD of docs/spec.md, docs/spec/01, 03, 04, 05, 08, 10, 12, docs/plan.md", "docs/spec/10-testing-style.md (hygiene list, maintainer block a-e)", "docs/spec/05-security.md 5.3 deferral and 5.4 rows"]
+}
