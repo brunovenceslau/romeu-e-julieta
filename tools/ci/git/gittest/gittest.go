@@ -28,6 +28,11 @@ type Repo struct {
 // Env returns the environment a fixture runs git with. The identities
 // and dates are fixed, so the same steps give the same commit ids.
 //
+// The global configuration is a file of the fixture's own HOME, which
+// holds GlobalConfig and nothing of the machine. GIT_CONFIG_GLOBAL names
+// it, and git reads it from HOME too when a tool under test drops the
+// variables of git's configuration, as the hook's checks do.
+//
 // GIT_CEILING_DIRECTORIES names the directory that holds the temporary
 // directories of t, so git never looks above them for a repository. A
 // fixture that is not a repository (its .git removed, to test the
@@ -38,6 +43,8 @@ type Repo struct {
 func Env(t testing.TB) []string {
 	t.Helper()
 	home := t.TempDir()
+	global := filepath.Join(home, ".gitconfig")
+	require.NoError(t, os.WriteFile(global, []byte(GlobalConfig), 0o600))
 	ceiling := filepath.Dir(home)
 	if resolved, err := filepath.EvalSymlinks(ceiling); err == nil && resolved != ceiling {
 		ceiling += string(os.PathListSeparator) + resolved
@@ -46,7 +53,7 @@ func Env(t testing.TB) []string {
 		"PATH=" + os.Getenv("PATH"),
 		"HOME=" + home,
 		"GIT_CEILING_DIRECTORIES=" + ceiling,
-		"GIT_CONFIG_GLOBAL=" + os.DevNull,
+		"GIT_CONFIG_GLOBAL=" + global,
 		"GIT_CONFIG_NOSYSTEM=1",
 		"GIT_AUTHOR_NAME=Test Author",
 		"GIT_AUTHOR_EMAIL=author@example.invalid",
@@ -56,6 +63,29 @@ func Env(t testing.TB) []string {
 		"GIT_COMMITTER_DATE=2026-01-02T03:04:05Z",
 	}
 }
+
+// GlobalConfig is the global configuration of a fixture. It turns off
+// what git would otherwise run in the background after a command, so
+// that nothing writes in a fixture once the command returns: a detached
+// "git maintenance run --auto", which a commit starts, and the gc of a
+// push received by a bare fixture. Under the geometric strategy, which
+// git 2.55 documents as the default of manual maintenance, a commit of a
+// few hundred files starts a repack that goes on after the commit
+// returns (measured with git 2.53 and that strategy set), and the
+// cleanup of the test's temporary directory races with it and fails
+// with "directory not empty". The file system monitor, a daemon that
+// would outlive a command too, stays off.
+const GlobalConfig = `[maintenance]
+	auto = false
+	autoDetach = false
+[gc]
+	auto = 0
+	autoDetach = false
+[receive]
+	autoGC = false
+[core]
+	fsmonitor = false
+`
 
 // New creates an empty repository whose first branch is main.
 func New(t testing.TB) *Repo {

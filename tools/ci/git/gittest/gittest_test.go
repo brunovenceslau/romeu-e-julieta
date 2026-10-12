@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -69,8 +70,20 @@ func TestRepo(t *testing.T) {
 // TestEnv checks that a fixture reads no configuration of the machine.
 func TestEnv(t *testing.T) {
 	env := gittest.Env(t)
-	assert.Contains(t, env, "GIT_CONFIG_GLOBAL="+os.DevNull)
 	assert.Contains(t, env, "GIT_CONFIG_NOSYSTEM=1")
+	var home, global string
+	for _, v := range env {
+		if h, ok := strings.CutPrefix(v, "HOME="); ok {
+			home = h
+		}
+		if g, ok := strings.CutPrefix(v, "GIT_CONFIG_GLOBAL="); ok {
+			global = g
+		}
+	}
+	assert.Equal(t, filepath.Join(home, ".gitconfig"), global, "the global file is the fixture's own, the one git reads without the variable too")
+	data, err := os.ReadFile(global)
+	require.NoError(t, err)
+	assert.Equal(t, gittest.GlobalConfig, string(data))
 }
 
 // TestEnvStopsGitAtTheTemporaryDirectories checks that a fixture that is
@@ -91,4 +104,35 @@ func TestEnvStopsGitAtTheTemporaryDirectories(t *testing.T) {
 		_, err = without.Run(context.Background(), nil, "rev-parse", "--show-toplevel")
 		require.NoError(t, err, "without the ceiling git finds it, so the test above proves something")
 	})
+}
+
+// TestFixturesRunNoBackgroundMaintenance checks that git run with Env
+// starts no automatic maintenance. After a commit git may start "git
+// maintenance run --auto --detach", which goes on writing in .git after
+// the commit returns; the cleanup of the test's temporary directory
+// then fails with "directory not empty". The repository here asks for
+// the geometric strategy, which repacks this many loose objects, and
+// the trace of the commit must hold no maintenance run.
+func TestFixturesRunNoBackgroundMaintenance(t *testing.T) {
+	r := gittest.New(t)
+	r.Git("config", "maintenance.strategy", "geometric")
+	for i := range 300 {
+		r.Write("d"+strconv.Itoa(i)+"/f", strconv.Itoa(i)+"\n")
+	}
+	trace := filepath.Join(t.TempDir(), "trace.json")
+	r.WithEnv("GIT_TRACE2_EVENT=" + trace).Commit("many files")
+	events, err := os.ReadFile(trace)
+	require.NoError(t, err)
+	assert.Contains(t, string(events), `"commit"`, "the trace is of the commit")
+	assert.NotContains(t, string(events), `"maintenance","run"`, "the commit started a maintenance run")
+	for key, want := range map[string]string{
+		"maintenance.auto":       "false",
+		"maintenance.autoDetach": "false",
+		"gc.auto":                "0",
+		"gc.autoDetach":          "false",
+		"receive.autoGC":         "false",
+		"core.fsmonitor":         "false",
+	} {
+		assert.Equal(t, want, r.Git("config", "--get", key), key)
+	}
 }
