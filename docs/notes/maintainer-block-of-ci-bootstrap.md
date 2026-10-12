@@ -11,7 +11,9 @@ up and what stays to do are in
 rulesets are worth against an agent that holds the operator's token is
 in [05 5.4](../spec/05-security.md#risks-of-how-this-repository-is-developed).
 The text below is the block as the specification held it before review
-round 8 moved it here, word for word.
+round 8 moved it here, word for word, up to the section
+[The token narrowing](#the-token-narrowing), which is a record kept
+since (item g of 10 10.2).
 
 **The maintainer block.** The parts of `ci-bootstrap` that only the
 maintainer can do are one sitting around step 1 and one call after
@@ -109,3 +111,45 @@ any sandbox and any agent session.
 - e. After step 2: add the CI jobs of the green run to the
   default-branch ruleset as required status checks, and save the API's
   answer.
+
+## The token narrowing
+
+The record of the narrowing of the development sandbox's GitHub token
+([ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md),
+decision 2), as item g of
+[10 10.2](../spec/10-testing-style.md#release-and-bootstrap) asks for
+it. The maintainer adds one dated entry when the narrowing is applied,
+and one for each later read. The entry is the event of the
+[Deferred decisions](../spec.md#in-how-this-repository-is-run) rows
+whose trigger is "the token is narrowed"; no check reads it, so it is
+**[review]**.
+
+Each entry holds three reads, made on the host or checked from the
+maintainer's own session, never only from what the sandbox printed:
+
+1. Probe A16 ([11 11.1](../spec/11-host-probes.md#111-block-a---sbx-and-runtime-facts-first-in-parallel-with-the-first-build-layer)):
+   the token's type, from its prefix, and, for a fine-grained token,
+   its repository list and permissions from GitHub's token settings
+   page. Expected: a fine-grained token, this repository alone,
+   Contents, Pull requests and Workflows read and write, Actions,
+   Checks and Metadata read, and no Administration.
+2. The keys the sandbox's forwarded agent lists (`ssh-add -l` in the
+   sandbox, read by the maintainer). Expected: the signing key, and no
+   GitHub authentication key.
+3. The four tries of item d above, repeated from inside the sandbox
+   with the narrowed token, with throwaway payloads and the same undo
+   and check from the maintainer's session:
+
+   | Try | Answer in item d, with the operator's token | Expected with the narrowed token |
+   |---|---|---|
+   | push an empty commit to the default branch | refused | refused, by the pull-request rule; this answer does not tell the two tokens apart |
+   | merge a throwaway pull request through the API | accepted | accepted once its required checks are green, since the token keeps Contents and Pull requests write; this answer does not tell the two tokens apart |
+   | create and delete the tag `v0.0.0-try` | accepted, through the bypass | not predicted: whether the tag ruleset's bypass for the administrator role applies to a fine-grained token is not measured, and the answer is recorded either way |
+   | update the default-branch ruleset with its own unchanged body | accepted | refused, since the token holds no Administration permission |
+
+The token is narrowed when the A16 read and the agent's keys match
+what is expected and the ruleset update is refused. Any other answer
+on those three means it is not, and the entry says which read
+differed.
+
+No entry yet: the narrowing waits for a maintainer step.

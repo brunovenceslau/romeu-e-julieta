@@ -334,7 +334,9 @@ Destructive commands write in this order: the refs per repo
 `closed-removed`, and with it present the next `rm` resumes at
 `sbx env rm` when a fresh fingerprint of the daemon heads and each
 worktree's HEAD and full status equals that `fingerprint`, and
-otherwise salvages again under a new salvage id; any other mutating
+otherwise salvages again under a new salvage id, up to the limit of
+`fingerprint-unstable` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids));
+any other mutating
 command exits 2 with `removal-pending`, and `status` and `doctor`
 report it as `removal-pending`
 ([04 4.4](04-cli.md#44-error-ids)); `salvaging` with no

@@ -873,20 +873,7 @@ What they set up, and holds now:
 - d. Four tries with the sandbox's token; of the four, only the direct
   push to the default branch was refused (05 5.4; tried on 2026-10-08;
   under the rules of 2026-10-09 it is read, not tried, and the try is
-  repeated with the four tries after the token narrowing). The four
-  tries repeated with the narrowed token, their API answers saved under
-  Evidence, record that the token is narrowed, the event of the
-  Deferred decisions rows whose trigger is "the token is narrowed"
-  (round 13, R13-03). The required-name try runs after the narrowing,
-  to do, in three steps on a throwaway pull request (05 5.4; round 12,
-  D1, decided on 2026-10-09; round 13, R13-02): (1) a workflow pushed
-  on a side branch, with `statuses: write` and `checks: write`, posts a
-  commit status and a check run, each under a required check's name,
-  on that pull request's head; record which of the two the ruleset
-  counts, and save the API answers under Evidence; (2) post a status
-  directly with the narrowed token, and record whether the token
-  refuses it; (3) close the pull request, and delete the side branch
-  and its workflow.
+  repeated with the four tries after the token narrowing, item g).
 
 The host runs `tools/ci`, `hygiene add` included, only from a commit
 whose diff since the last host run the maintainer has read, or from the
@@ -913,6 +900,36 @@ Evidence:
   decision 1.
 - f. Before the first release candidate: turn on GitHub's immutable
   releases setting. To do.
+- g. The record of the token narrowing
+  ([ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md),
+  decision 2). The narrowing is a host step with no pull request, so
+  its answers go in a dated entry of
+  [the note on the maintainer block](../notes/maintainer-block-of-ci-bootstrap.md#the-token-narrowing),
+  not under a pull request's Evidence. The entry holds: probe A16's
+  read on the host ([11 11.1](11-host-probes.md#111-block-a---sbx-and-runtime-facts-first-in-parallel-with-the-first-build-layer)),
+  the token's type, its repository list and its permissions; the keys
+  the sandbox's forwarded agent lists, read by the maintainer, with no
+  GitHub authentication key among them; and the four tries of item d
+  repeated with the narrowed token, each against the expected answer
+  the note lists, with what took effect checked from the maintainer's
+  own session. The entry is the event of the Deferred decisions rows
+  whose trigger is "the token is narrowed". An A16 read that shows
+  more than this repository or the Administration permission, a
+  GitHub key in the agent, or a ruleset update the token is not
+  refused means the token is not narrowed, and the entry says so.
+- h. The required-name try, after the narrowing, in three steps on a
+  throwaway pull request whose head is one empty commit (05 5.4;
+  round 12, D1, decided on 2026-10-09; round 13, R13-02): (1) a
+  workflow pushed on a side branch, with `statuses: write` and
+  `checks: write`, posts a commit status and a check run, each under a
+  required check's name, on that pull request's head; record which of
+  the two the ruleset counts, and save the API answers under the
+  entry of item g; (2) post a status directly with the narrowed token,
+  and record whether the token refuses it; (3) close the pull request,
+  delete its head branch and the side branch with its workflow, and
+  check from the maintainer's own session that the pull request is
+  closed and both branches are gone, so no head that carries a status
+  under a required name can be reopened and merged.
 
 Between steps 1 and 3 the hook is the one check on commit messages,
 identities and ref names, and julieta's dispatcher does not exist yet,

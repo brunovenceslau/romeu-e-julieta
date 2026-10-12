@@ -565,12 +565,17 @@ task list:
       packages under paths on `approvals`, and the `approvals` globs of
       `.github/ask-first.yaml` name those packages' directories (R11-01).
       A test holds it: it reads each package of `go list -deps -test`
-      with its `Standard` field and its `Dir`, takes the standard
+      with its `Standard` field and its `Dir`, once for each lint
+      target of 10 10.2 from the same list, so an import behind a build
+      constraint of another target is read too, takes the standard
       library from `Standard`, and matches the `Dir` of every other
       package to an `approvals` glob; a fixture package that imports a
       path outside the globs turns it red, and so does a fixture with a
       module path without a dot under a local `replace` (round 13,
-      L2-r13-2, which replaces the dot rule of R12-06);
+      L2-r13-2, which replaces the dot rule of R12-06), whose removal
+      is reading the standard library by that dot rule instead of
+      `Standard`, and a fixture whose outside import builds only for
+      darwin, whose removal is listing one target (round 14, R14-11);
     - (c) `pr`, built from the default branch, applies the version-pin
       rules of `mise.toml` and `go.mod` of 10 10.2 to the head
       (R11-03), and refuses a head that holds a tracked `go.work`,
@@ -585,10 +590,13 @@ task list:
     - (e) every committed `.github/ask-first.yaml` and
       `docs/grants.yaml` gives `pr` and the generator of 12 12.3 the
       same surface set (R12-05). When each has its own reader, a test
-      holds it with a fixture pair: two files with the same ids and
-      different globs fail, identical files pass, and removing the glob
-      comparison turns the first red; when T005 takes one reader, the
-      test asserts that both call it (round 13, L6-r13-2).
+      holds it with fixtures: two files with the same ids and different
+      globs fail, two files where one holds an id the other lacks fail,
+      identical files pass, and removing the glob comparison or the id
+      comparison turns the matching fixture red; when T005 takes one
+      reader, the test asserts that both call it, and a second reader
+      inlined in either turns it red (round 13, L6-r13-2; round 14,
+      R14-12).
   - Each fixture 12 12.4 names is an acceptance line here, and the
     removal written after it turns it red (R12-06):
     - the hostile fixture repository (a submodule, a textconv driver,
