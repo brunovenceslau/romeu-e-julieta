@@ -8,23 +8,28 @@ run() {
 # ..." before tools/ci can run, so this probe, which reads go.mod and
 # builds nothing, lets go's own line through and then says what to do.
 # It is shell because it runs before any Go code can.
-if ! (run go list -m) >/dev/null </dev/null; then
-	gopath=$(command -v go) || gopath=
+gopath=$(command -v go) || gopath=
+if [ -z "$gopath" ] || ! (run go list -m) >/dev/null </dev/null; then
 	{
 		case $gopath in
 		'')
-			echo "pre-push: no go is on PATH."
-			echo "pre-push: install mise, then put its shims on PATH, in your shell profile:"
-			echo "pre-push:   eval \"\$(mise activate <shell> --shims)\""
+			printf '%s\n' \
+				"pre-push: no go is on PATH." \
+				"pre-push: install mise, then put its shims on PATH, in your shell profile (bash and zsh):" \
+				'pre-push:   eval "$(mise activate <shell> --shims)"' \
+				"pre-push: for another shell, see mise activate --help."
 			;;
 		*/mise/shims/*)
-			echo "pre-push: the go on PATH ($gopath) is a mise shim that cannot run this module."
-			echo "pre-push: run \"mise trust\" and \"mise install\" in $(pwd -P), then push again."
+			printf '%s\n' \
+				"pre-push: the go on PATH ($gopath) is a mise shim that cannot run this module." \
+				"pre-push: run \"mise trust\" and \"mise install\" in $(pwd -P), then push again."
 			;;
 		*)
-			echo "pre-push: the go on PATH ($gopath) cannot run this module."
-			echo "pre-push: put the mise shims first on PATH, so that go is the pinned toolchain, in your shell profile:"
-			echo "pre-push:   eval \"\$(mise activate <shell> --shims)\""
+			printf '%s\n' \
+				"pre-push: the go on PATH ($gopath) cannot run this module." \
+				"pre-push: put the mise shims first on PATH, so that go is the pinned toolchain, in your shell profile (bash and zsh):" \
+				'pre-push:   eval "$(mise activate <shell> --shims)"' \
+				"pre-push: for another shell, see mise activate --help."
 			;;
 		esac
 	} >&2

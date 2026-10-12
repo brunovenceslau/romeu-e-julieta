@@ -63,23 +63,28 @@ run() {
 # ..." before tools/ci can run, so this probe, which reads go.mod and
 # builds nothing, lets go's own line through and then says what to do.
 # It is shell because it runs before any Go code can.
-if ! (run go list -m) >/dev/null </dev/null; then
-	gopath=$(command -v go) || gopath=
+gopath=$(command -v go) || gopath=
+if [ -z "$gopath" ] || ! (run go list -m) >/dev/null </dev/null; then
 	{
 		case $gopath in
 		'')
-			echo "pre-push: no go is on PATH."
-			echo "pre-push: install mise, then put its shims on PATH, in your shell profile:"
-			echo "pre-push:   eval \"\$(mise activate <shell> --shims)\""
+			printf '%s\n' \
+				"pre-push: no go is on PATH." \
+				"pre-push: install mise, then put its shims on PATH, in your shell profile (bash and zsh):" \
+				'pre-push:   eval "$(mise activate <shell> --shims)"' \
+				"pre-push: for another shell, see mise activate --help."
 			;;
 		*/mise/shims/*)
-			echo "pre-push: the go on PATH ($gopath) is a mise shim that cannot run this module."
-			echo "pre-push: run \"mise trust\" and \"mise install\" in $(pwd -P), then push again."
+			printf '%s\n' \
+				"pre-push: the go on PATH ($gopath) is a mise shim that cannot run this module." \
+				"pre-push: run \"mise trust\" and \"mise install\" in $(pwd -P), then push again."
 			;;
 		*)
-			echo "pre-push: the go on PATH ($gopath) cannot run this module."
-			echo "pre-push: put the mise shims first on PATH, so that go is the pinned toolchain, in your shell profile:"
-			echo "pre-push:   eval \"\$(mise activate <shell> --shims)\""
+			printf '%s\n' \
+				"pre-push: the go on PATH ($gopath) cannot run this module." \
+				"pre-push: put the mise shims first on PATH, so that go is the pinned toolchain, in your shell profile (bash and zsh):" \
+				'pre-push:   eval "$(mise activate <shell> --shims)"' \
+				"pre-push: for another shell, see mise activate --help."
 			;;
 		esac
 	} >&2
@@ -205,8 +210,8 @@ func TestRunPrintsAnErrorAsSafeText(t *testing.T) {
 // MISE_TRUSTED_CONFIG_PATHS, MISE_CONFIG_DIR, XDG_CONFIG_HOME, GIT_DIR,
 // and a MISE_FOO and a GOFOO that no list names) besides every variable
 // of hookAllow, one of them with a space, and a go stub that prints what
-// each call (the probe and the checks) was started with. The hook runs in a symbolic link to the tree,
-// with PWD as the caller typed it. Each call gets exactly what the
+// each call (the probe and the checks) was started with. The hook runs
+// in a symbolic link to the tree, with PWD as the caller typed it. Each call gets exactly what the
 // production lists build for a mise run at the top of the tree
 // (miseRunEnviron over passThroughEnv), the proxy and module variables
 // that were set, and goBuildEnv, with the ceiling the parent of the
@@ -306,7 +311,8 @@ trap 'echo term > "$here/term"; exit 143' TERM
 echo "checks $*"
 if [ -e "$here/hang" ]; then
 	echo ready > "$here/ready"
-	while :; do sleep 0.1; done
+	i=0
+	while [ $i -lt 300 ]; do sleep 0.1; i=$((i+1)); done
 fi
 cat
 exit 7
@@ -317,6 +323,13 @@ exit 7
 // when it is true), and returns the exit code and the two streams.
 func runHook(t *testing.T, bin string, only bool, stdin string) (code int, stdout, stderr string, dir string) {
 	t.Helper()
+	return runHookIn(t, mustEval(t, t.TempDir()), "", bin, only, stdin)
+}
+
+// runHookIn is runHook in the directory dir; with link set, the hook
+// runs in that symbolic link to dir, with PWD as the caller typed it.
+func runHookIn(t *testing.T, dir, link, bin string, only bool, stdin string) (code int, stdout, stderr string, resolved string) {
+	t.Helper()
 	sh, err := exec.LookPath("sh")
 	require.NoError(t, err)
 	hook := mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push"))
@@ -326,8 +339,12 @@ func runHook(t *testing.T, bin string, only bool, stdin string) (code int, stdou
 	}
 	var o, e bytes.Buffer
 	cmd := exec.Command(sh, hook, "origin", "https://example.test/a b.git")
-	cmd.Dir = mustEval(t, t.TempDir())
+	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "PATH="+path)
+	if link != "" {
+		cmd.Dir = link
+		cmd.Env = append(cmd.Env, "PWD="+link)
+	}
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = strings.NewReader(stdin), &o, &e
 	err = cmd.Run()
 	if ee, ok := err.(*exec.ExitError); ok {
@@ -335,12 +352,18 @@ func runHook(t *testing.T, bin string, only bool, stdin string) (code int, stdou
 	} else {
 		require.NoError(t, err)
 	}
-	return code, o.String(), e.String(), cmd.Dir
+	return code, o.String(), e.String(), dir
 }
 
 func stubDir(t *testing.T, marks ...string) string {
 	t.Helper()
-	bin := t.TempDir()
+	return stubDirIn(t, t.TempDir(), marks...)
+}
+
+// stubDirIn is stubDir in the directory bin, which it creates.
+func stubDirIn(t *testing.T, bin string, marks ...string) string {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(bin, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "go"), []byte(hookStub), 0o700))
 	for _, m := range marks {
 		require.NoError(t, os.WriteFile(filepath.Join(bin, m), nil, 0o600))
@@ -372,17 +395,46 @@ func TestHookExplainsAToolchainRefusal(t *testing.T) {
 		assert.NotContains(t, errOut, "mise trust")
 		assert.NotContains(t, errOut, "checks")
 	})
+	// A directory name that echo would expand: \c ends the output and
+	// \033 is ESC.
+	const hostile = `we\ird\c\033[2Jx`
+	t.Run("a go that is not a shim, in a directory with escapes in its name", func(t *testing.T) {
+		bin := stubDirIn(t, filepath.Join(t.TempDir(), hostile), "refuse")
+		code, out, errOut, _ := runHook(t, bin, false, refs)
+		assert.Equal(t, 1, code, "exit status\n%s", errOut)
+		assert.Empty(t, out, "the standard output")
+		assert.Contains(t, errOut, "the go on PATH ("+filepath.Join(bin, "go")+") cannot run this module",
+			"the name is printed as it is")
+		assert.NotContains(t, errOut, "\x1b")
+		assert.Contains(t, errOut, "put the mise shims first on PATH", "the line after the name is still printed")
+	})
 	t.Run("a mise shim", func(t *testing.T) {
-		shims := filepath.Join(t.TempDir(), "mise", "shims")
-		require.NoError(t, os.MkdirAll(shims, 0o700))
-		require.NoError(t, os.WriteFile(filepath.Join(shims, "go"), []byte(hookStub), 0o700))
-		require.NoError(t, os.WriteFile(filepath.Join(shims, "refuse"), nil, 0o600))
+		shims := stubDirIn(t, filepath.Join(t.TempDir(), "mise", "shims"), "refuse")
 		code, out, errOut, dir := runHook(t, shims, false, refs)
 		assert.Equal(t, 1, code, "exit status\n%s", errOut)
 		assert.Empty(t, out, "the standard output")
 		assert.Contains(t, errOut, refusal)
 		assert.Contains(t, errOut, `run "mise trust" and "mise install" in `+dir)
 		assert.NotContains(t, errOut, "put the mise shims first")
+	})
+	t.Run("a mise shim, run in a symbolic link to a tree with escapes in its name", func(t *testing.T) {
+		shims := stubDirIn(t, filepath.Join(t.TempDir(), "mise", "shims"), "refuse")
+		real := filepath.Join(mustEval(t, t.TempDir()), hostile)
+		require.NoError(t, os.Mkdir(real, 0o700))
+		link := filepath.Join(mustEval(t, t.TempDir()), "tree")
+		require.NoError(t, os.Symlink(real, link))
+		code, _, errOut, _ := runHookIn(t, real, link, shims, false, refs)
+		assert.Equal(t, 1, code, "exit status\n%s", errOut)
+		assert.Contains(t, errOut, `run "mise trust" and "mise install" in `+real+",", "the resolved path, as it is")
+		assert.NotContains(t, errOut, link)
+		assert.NotContains(t, errOut, "\x1b")
+	})
+	t.Run("a go under shims that is not mise's", func(t *testing.T) {
+		bin := stubDirIn(t, filepath.Join(t.TempDir(), "other", "shims"), "refuse")
+		code, _, errOut, _ := runHook(t, bin, false, refs)
+		assert.Equal(t, 1, code, "exit status\n%s", errOut)
+		assert.Contains(t, errOut, "put the mise shims first on PATH")
+		assert.NotContains(t, errOut, "mise trust")
 	})
 	t.Run("no go", func(t *testing.T) {
 		bin := t.TempDir()
@@ -394,8 +446,10 @@ func TestHookExplainsAToolchainRefusal(t *testing.T) {
 		code, out, errOut, _ := runHook(t, bin, true, refs)
 		assert.Equal(t, 1, code, "exit status\n%s", errOut)
 		assert.Empty(t, out, "the standard output")
+		assert.NotContains(t, errOut, "env:", "env is not started")
 		assert.Contains(t, errOut, "pre-push: no go is on PATH.")
 		assert.Contains(t, errOut, `eval "$(mise activate <shell> --shims)"`)
+		assert.Contains(t, errOut, "see mise activate --help")
 	})
 	t.Run("a go that accepts the probe", func(t *testing.T) {
 		bin := stubDir(t)
@@ -411,7 +465,8 @@ func TestHookExplainsAToolchainRefusal(t *testing.T) {
 }
 
 // TestHookPassesSIGTERMToGo checks that a SIGTERM sent to the hook
-// reaches the go that runs the checks, because the hook execs it.
+// reaches the go that runs the checks, because the hook execs it, and that
+// the hook's exit status is that go's.
 func TestHookPassesSIGTERMToGo(t *testing.T) {
 	bin := stubDir(t, "hang")
 	sh, err := exec.LookPath("sh")
@@ -419,7 +474,11 @@ func TestHookPassesSIGTERMToGo(t *testing.T) {
 	cmd := exec.Command(sh, mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push")))
 	cmd.Dir = mustEval(t, t.TempDir())
 	cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	// A group of its own, killed at the end, so that a stub that never
+	// sees SIGTERM does not outlive the test.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	require.NoError(t, cmd.Start())
+	t.Cleanup(func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) })
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
 	require.Eventually(t, func() bool {
@@ -428,7 +487,10 @@ func TestHookPassesSIGTERMToGo(t *testing.T) {
 	}, 10*time.Second, 20*time.Millisecond, "the checks started")
 	require.NoError(t, cmd.Process.Signal(syscall.SIGTERM))
 	select {
-	case <-done:
+	case err := <-done:
+		var exit *exec.ExitError
+		require.ErrorAs(t, err, &exit)
+		assert.Equal(t, 143, exit.ExitCode(), "the hook's status is the go stub's")
 	case <-time.After(10 * time.Second):
 		_ = cmd.Process.Kill()
 		t.Fatal("the hook did not end after SIGTERM")
