@@ -470,6 +470,28 @@ finding drove it. Statuses as above.
   the global dynamic secret, and no longer removes the bypass or saves
   a ruleset answer; S2 leaves its Unblocks cell.
 
+### Exchange 3
+
+A fresh reviewer read d349b2c..8730ce9 and returned two blocking
+findings and one advisory one; this exchange applies them. It is the
+last exchange the final pass of stage A allows. Statuses as above.
+
+- F1, `contradiction` (L): ADR 0010, Accepted, cites the Deferred
+  decisions row of the required checks, which the commit that accepted
+  ADR 0011 removed; with ADR 0011 Proposed, that removal rested on a
+  Proposed record. The row is restored under "In how this repository
+  is run": the administrator role bypasses the required checks on a
+  pull request merge, as read on 2026-10-09, and ADR 0011, proposed,
+  takes option (b) of ADR 0010, decision 1; reopened by the acceptance
+  of ADR 0011, whose pull request removes the row again, as its
+  Consequences now say.
+- F2, `contradiction` (A): ADR 0011 drops its two `Supersedes in part`
+  lines, so the links match in both directions (ADR 0001, rule 7); the
+  pull request that accepts it adds them back with the reverse lines.
+- A1 (A): decision 1 of ADR 0011 says that the App token does not hold
+  the administrator role once decision 2 is applied, and that until
+  then the classic token holds it.
+
 ## Session checkpoint (2026-10-12)
 
 Rounds 14 to 18 and the final write pass of stage A were run on this

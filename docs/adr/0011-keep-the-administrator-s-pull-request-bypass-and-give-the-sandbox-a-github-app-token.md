@@ -9,10 +9,6 @@ Proposed
 It becomes Accepted in a later pull request, after the App checks that
 Consequences lists.
 
-Supersedes in part [8. Let the sandbox act as the maintainer on GitHub](0008-let-the-sandbox-act-as-the-maintainer-on-github.md)
-
-Supersedes in part [10. Reopen the required checks without the bypass and amend the records of round 9](0010-reopen-the-required-checks-without-the-bypass-and-amend-the-records-of-round-9.md)
-
 ## Context
 
 Three questions on how this repository is merged were open after
@@ -124,10 +120,12 @@ list.
    24611273, in `pull_request` bypass mode, so the maintainer can merge
    a pull request whose required checks are not green. The reasons:
    GitHub Actions minutes run out on private repositories, and some
-   changes cannot fail CI. The sandbox's App token does not hold the
-   administrator role, so the bypass is the maintainer's and not an
-   agent's, which the App checks measure. Reopened by the first measurement in which a merge with the
-   sandbox's token lands over a red required check. The `release-tags`
+   changes cannot fail CI. Once decision 2 is applied, the sandbox's
+   App token does not hold the administrator role, so the bypass is the
+   maintainer's and not an agent's, which the App checks measure; until
+   then the classic token holds that role. Reopened by the first
+   measurement in which a merge with the sandbox's token lands over a
+   red required check. The `release-tags`
    ruleset keeps the administrator role as its bypass actor too.
 2. **The development sandbox's classic token is replaced with a GitHub
    App installation token.** The review that deferred item 1 of ADR
@@ -171,7 +169,9 @@ list.
   installation token.
 - The pull request that accepts this record adds a
   `Superseded in part by` line to ADR 0008 and to ADR 0010, which stay
-  Accepted with their text unedited. Decision 1 then decides decision 1
+  Accepted with their text unedited, and this record's
+  `Supersedes in part` lines, and it removes the Deferred decisions row
+  of the required checks without the administrator bypass. Decision 1 then decides decision 1
   of ADR 0010; decision 2 decides deferred item 1 of ADR 0008, and
   decision 3 qualifies the direct-push row of its table, which stays
   the record of 2026-10-08.
