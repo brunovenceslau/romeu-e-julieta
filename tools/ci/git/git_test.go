@@ -5,6 +5,8 @@ package git_test
 
 import (
 	"context"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -164,4 +166,26 @@ func TestRunStopsWithItsContext(t *testing.T) {
 	cancel()
 	_, err := r.Run(ctx, nil, "rev-parse", "--git-dir")
 	require.Error(t, err, "Run under a cancelled context")
+}
+
+// TestRunFetchesNoMissingObject shows that Run does not fetch an object
+// that a partial clone lacks: the checks read what the clone holds, and
+// a read must not reach the network. Git run without Run's setting does
+// fetch it, so the test proves something.
+func TestRunFetchesNoMissingObject(t *testing.T) {
+	server := gittest.New(t)
+	server.Write("a.txt", "a\n")
+	server.Commit("a")
+	server.Git("config", "uploadpack.allowFilter", "true")
+	blob := server.Git("rev-parse", "HEAD:a.txt")
+	dir := filepath.Join(t.TempDir(), "clone")
+	server.Git("clone", "--quiet", "--filter=blob:none", "--no-checkout", "file://"+server.Dir, dir)
+	clone := git.Repo{Dir: dir, Env: append(server.Env, "GIT_NO_LAZY_FETCH=0")}
+	_, err := clone.Run(t.Context(), nil, "cat-file", "-p", blob)
+	require.Error(t, err, "Run fetched the blob the partial clone lacks")
+	lazy := exec.Command("git", "cat-file", "-p", blob)
+	lazy.Dir, lazy.Env = dir, server.Env
+	out, err := lazy.CombinedOutput()
+	require.NoError(t, err, "without the setting git fetches it: %s", out)
+	assert.Equal(t, "a\n", string(out))
 }

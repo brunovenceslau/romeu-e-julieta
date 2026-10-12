@@ -714,10 +714,60 @@ func TestScanAttributesSizeCap(t *testing.T) {
 	}
 }
 
+// gitCall is one run of git that recordGit saw: its arguments, and its
+// standard input when it is a cat-file.
+type gitCall struct{ args, stdin string }
+
+// recordGit puts first on PATH a git that records each run of the real
+// one, and returns a function that reads the runs so far. Run looks git
+// up in the PATH of this process, not in the environment of the command.
+func recordGit(t *testing.T) func() []gitCall {
+	t.Helper()
+	real, err := exec.LookPath("git")
+	require.NoError(t, err)
+	bin, calls := t.TempDir(), t.TempDir()
+	wrapper := "#!/bin/sh\n" +
+		"f=$(mktemp " + strconv.Quote(calls+"/call.XXXXXX") + ")\n" +
+		"printf '%s' \"$*\" > \"$f\"\n" +
+		"case \" $* \" in *\" cat-file \"*) cat > \"$f.in\"; exec " + strconv.Quote(real) + " \"$@\" < \"$f.in\";; esac\n" +
+		"exec " + strconv.Quote(real) + " \"$@\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte(wrapper), 0o700))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return func() []gitCall {
+		names, err := filepath.Glob(filepath.Join(calls, "call.*"))
+		require.NoError(t, err)
+		var got []gitCall
+		for _, name := range names {
+			if strings.HasSuffix(name, ".in") {
+				continue
+			}
+			args, err := os.ReadFile(name)
+			require.NoError(t, err)
+			stdin, err := os.ReadFile(name + ".in")
+			if !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
+			got = append(got, gitCall{string(args), string(stdin)})
+		}
+		return got
+	}
+}
+
+// catFileInput returns the standard input of each run of git cat-file
+// with the option that starts with prefix.
+func catFileInput(calls []gitCall, prefix string) []string {
+	var got []string
+	for _, c := range calls {
+		if strings.Contains(" "+c.args, " cat-file "+prefix) {
+			got = append(got, c.stdin)
+		}
+	}
+	return got
+}
+
 // TestScanAttributesReadsManyFilesInOneBatch checks that many nested
-// .gitattributes are each read, and that reading them takes a fixed
-// number of git processes and not one for each file. A git on PATH that
-// logs its arguments counts them.
+// .gitattributes are each read, and that reading them takes one
+// --batch-check and one --batch and not a git process for each file.
 func TestScanAttributesReadsManyFilesInOneBatch(t *testing.T) {
 	const n = 300
 	files := map[string]string{}
@@ -725,19 +775,88 @@ func TestScanAttributesReadsManyFilesInOneBatch(t *testing.T) {
 		files["d"+strconv.Itoa(i)+"/.gitattributes"] = "x" + strconv.Itoa(i) + " text=unset\n"
 	}
 	r := scanFixture(t, files)
-	real, err := exec.LookPath("git")
-	require.NoError(t, err)
-	bin := t.TempDir()
-	log := filepath.Join(t.TempDir(), "log")
-	wrapper := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + strconv.Quote(log) + "\nexec " + strconv.Quote(real) + " \"$@\"\n"
-	require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte(wrapper), 0o700))
-	// Run looks git up in the PATH of this process, not of the command.
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	calls := recordGit(t)
 	got := scanFindings(t, r.Repo)
 	assert.Len(t, got, n)
-	calls, err := os.ReadFile(log)
-	require.NoError(t, err)
-	assert.LessOrEqual(t, strings.Count(string(calls), "cat-file"), 2, "cat-file runs: %d", strings.Count(string(calls), "cat-file"))
+	var catFile int
+	for _, c := range calls() {
+		if strings.Contains(" "+c.args+" ", " cat-file ") {
+			catFile++
+		}
+	}
+	assert.Equal(t, 2, catFile, "cat-file runs")
+	assert.Len(t, catFileInput(calls(), "--batch-check="), 1)
+	assert.Len(t, catFileInput(calls(), "--batch="), 1)
+}
+
+// TestScanAttributesSendsOnlyWhatItReads checks what each cat-file is
+// asked: every distinct blob once to --batch-check, and to --batch only
+// the blobs within the bounds, so an oversized blob never reaches the
+// command that prints content.
+func TestScanAttributesSendsOnlyWhatItReads(t *testing.T) {
+	const same = "x text=unset\n"
+	r := scanFixture(t, map[string]string{
+		"a/.gitattributes": sized(attributesMaxSize+1, "x -text\n"),
+		"b/.gitattributes": same,
+		"c/.gitattributes": same,
+		"d/.gitattributes": same,
+	})
+	big := r.Git("rev-parse", ":a/.gitattributes")
+	small := r.Git("rev-parse", ":b/.gitattributes")
+	calls := recordGit(t)
+	got := scanFindings(t, r.Repo)
+	require.Len(t, got, 4, "%v", got)
+	assert.True(t, strings.HasPrefix(got[0], "a/.gitattributes: generated: is "), got[0])
+	for i, dir := range []string{"b", "c", "d"} {
+		assert.True(t, strings.HasPrefix(got[i+1], dir+`/.gitattributes: generated: gives "x" the value text=unset`), got[i+1])
+	}
+	check := catFileInput(calls(), "--batch-check=")
+	require.Len(t, check, 1)
+	assert.ElementsMatch(t, []string{big, small}, strings.Fields(check[0]), "each distinct blob once")
+	read := catFileInput(calls(), "--batch=")
+	require.Len(t, read, 1)
+	assert.Equal(t, small+"\n", read[0], "only the blob within the bound")
+}
+
+// TestScanAttributesTotalCap checks the bound on all that scanAttributes
+// reads: blobs that fill attributesMaxTotal exactly are read, a file
+// after them is a finding and is not read, and a smaller file after one
+// that does not fit is still read.
+func TestScanAttributesTotalCap(t *testing.T) {
+	const problem = "x text=unset\n"
+	stringFinding := `: generated: gives "x" the value text=unset`
+	notRead := ": generated: is not read: the .gitattributes files before it in path order fill the 8 MiB"
+	fill := func(size int) map[string]string {
+		files := map[string]string{}
+		for i := range attributesMaxTotal / attributesMaxSize {
+			// Distinct content, so each is a blob of its own.
+			files["f"+strconv.Itoa(i)+"/.gitattributes"] = sized(size, "#"+strconv.Itoa(i)+"\n")
+		}
+		return files
+	}
+	t.Run("a file past the total is a finding", func(t *testing.T) {
+		files := fill(attributesMaxSize)
+		files["g/.gitattributes"] = problem
+		got := scanFindings(t, scanFixture(t, files).Repo)
+		require.Len(t, got, 1, "%v", got)
+		assert.True(t, strings.HasPrefix(got[0], "g/.gitattributes"+notRead), got[0])
+	})
+	t.Run("blobs that fill the total exactly are read", func(t *testing.T) {
+		files := fill(attributesMaxSize)
+		files["f0/.gitattributes"] = sized(attributesMaxSize, problem)
+		got := scanFindings(t, scanFixture(t, files).Repo)
+		require.Len(t, got, 1, "%v", got)
+		assert.True(t, strings.HasPrefix(got[0], "f0/.gitattributes"+stringFinding), got[0])
+	})
+	t.Run("a smaller file after one that does not fit is read", func(t *testing.T) {
+		files := fill(attributesMaxSize - 2) // 16 bytes left
+		files["g/.gitattributes"] = sized(attributesMaxSize, problem)
+		files["h/.gitattributes"] = problem
+		got := scanFindings(t, scanFixture(t, files).Repo)
+		require.Len(t, got, 2, "%v", got)
+		assert.True(t, strings.HasPrefix(got[0], "g/.gitattributes"+notRead), got[0])
+		assert.True(t, strings.HasPrefix(got[1], "h/.gitattributes"+stringFinding), got[1])
+	})
 }
 
 // TestScanAttributesMissingObject checks that an index entry whose blob
@@ -748,7 +867,23 @@ func TestScanAttributesMissingObject(t *testing.T) {
 	r.Git("update-index", "--add", "--cacheinfo", "100644,"+absent+",b/.gitattributes")
 	_, _, _, err := scanAttributes(t.Context(), r.Repo)
 	require.ErrorContains(t, err, "missing")
-	assert.Contains(t, err.Error(), "b/.gitattributes")
+	assert.Contains(t, err.Error(), `"b/.gitattributes"`)
+}
+
+// TestScanAttributesMissingAmongOthers checks that a missing blob is an
+// error that names its file when the index also holds a readable file
+// and an oversized one, and when the same blob is missing for two files
+// the first of them is named.
+func TestScanAttributesMissingAmongOthers(t *testing.T) {
+	r := scanFixture(t, map[string]string{
+		"a/.gitattributes": "x -text\n",
+		"z/.gitattributes": sized(attributesMaxSize+1, "x -text\n"),
+	})
+	const absent = "0123456789abcdef0123456789abcdef01234567"
+	r.Git("update-index", "--add", "--cacheinfo", "100644,"+absent+",n/.gitattributes")
+	r.Git("update-index", "--add", "--cacheinfo", "100644,"+absent+",p/.gitattributes")
+	_, _, _, err := scanAttributes(t.Context(), r.Repo)
+	require.ErrorContains(t, err, `reading "n/.gitattributes" of the index: git cat-file: blob `+absent+": the object store is missing it")
 }
 
 // TestScanAttributesFromALinkedWorktree checks that the nested files of
@@ -791,7 +926,7 @@ func TestParseBatch(t *testing.T) {
 		"not a blob":                {a + " tree 3\nabc\n", "tree"},
 		"another object":            {b + " blob 3\nabc\n", b},
 		"a record too many":         {a + " blob 1\nx\n" + a + " blob 1\nx\n", "after"},
-		"no record":                 {"", "no record"},
+		"no record":                 {"", "no header line"},
 		"a header with no LF":       {a + " blob 3", "header"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -807,18 +942,20 @@ func TestParseBatch(t *testing.T) {
 // record an error.
 func TestParseBatchCheck(t *testing.T) {
 	const a, b = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-	sizes, missing, err := parseBatchCheck([]byte(a+" blob 7\n"+b+" missing\n"), []string{a, b})
+	sizes, err := parseBatchCheck([]byte(a+" blob 7\n"+b+" blob 0\n"), []string{a, b})
 	require.NoError(t, err)
-	assert.Equal(t, map[string]int64{a: 7}, sizes)
-	assert.Equal(t, []string{b}, missing)
+	assert.Equal(t, map[string]int64{a: 7, b: 0}, sizes)
 	for name, tc := range map[string]struct{ out, want string }{
-		"short":             {a + " blob 7\n", "no header line for " + b},
-		"another object":    {a + " blob 7\n" + a + " blob 7\n", "where " + b},
-		"a record too many": {a + " blob 7\n" + b + " blob 1\n" + b + " blob 1\n", "after"},
-		"a bad size":        {a + " blob -1\n" + b + " blob 1\n", "size"},
+		"missing":             {a + " blob 7\n" + b + " missing\n", "blob " + b + ": the object store is missing it"},
+		"short":               {a + " blob 7\n", "blob " + b + ": no header line"},
+		"another object":      {a + " blob 7\n" + a + " blob 7\n", "the answer is for " + a},
+		"a record too many":   {a + " blob 7\n" + b + " blob 1\n" + b + " blob 1\n", "after"},
+		"a negative size":     {a + " blob -1\n" + b + " blob 1\n", `the size "-1"`},
+		"a size not a number": {a + " blob 7x\n" + b + " blob 1\n", `the size "7x"`},
+		"not a blob":          {a + " tree 7\n" + b + " blob 1\n", "a tree, not a blob"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, _, err := parseBatchCheck([]byte(tc.out), []string{a, b})
+			_, err := parseBatchCheck([]byte(tc.out), []string{a, b})
 			require.ErrorContains(t, err, tc.want)
 		})
 	}

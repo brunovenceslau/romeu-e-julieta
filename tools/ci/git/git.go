@@ -10,7 +10,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -37,19 +39,26 @@ type Repo struct {
 // its standard output. A command that exits non-zero is an error that
 // carries what git wrote to standard error.
 //
-// Two settings hold for every command, whatever the configuration.
-// Replace refs are off: a push sends the objects themselves, so a local
-// replace ref must not show the checks a different object from the one
-// that leaves the machine. core.quotePath is on: a path that git quotes
-// then has every byte outside ASCII escaped, so unquoting gives back its
-// bytes exactly.
+// Three settings hold for every command, whatever the configuration
+// and the environment. Replace refs are off: a push sends the objects
+// themselves, so a local replace ref must not show the checks a different
+// object from the one that leaves the machine. core.quotePath is on: a
+// path that git quotes then has every byte outside ASCII escaped, so
+// unquoting gives back its bytes exactly. GIT_NO_LAZY_FETCH is 1: an
+// object that a partial clone lacks is an error, not a fetch, so a check
+// reads only what the clone holds and never reaches the network.
 func (r Repo) Run(ctx context.Context, stdin []byte, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, Timeout)
 	defer cancel()
 	fixed := []string{"--no-replace-objects", "-c", "core.quotePath=true"}
 	cmd := exec.CommandContext(ctx, "git", append(fixed, args...)...)
 	cmd.Dir = r.Dir
-	cmd.Env = r.Env
+	env := r.Env
+	if env == nil {
+		env = os.Environ()
+	}
+	// Last, so that it wins over the same variable earlier in env.
+	cmd.Env = append(slices.Clip(env), "GIT_NO_LAZY_FETCH=1")
 	cmd.Stdin = bytes.NewReader(stdin)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
