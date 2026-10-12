@@ -1,0 +1,77 @@
+{
+ "header": "L2 · The security engineer who has watched a host fall · opus",
+ "verdict": "Met for the delta, with no Blocking or Required finding (O8 is an operator block, not a plan task). The largest gap is Advisory: read 2 moved to the host but still sorts keys by their role in the agent, not by how the account registers them, and it drops the account's SSH keys page that R15-04 promised, so a signing key also registered for authentication passes as narrowed. 06 6.4 already has the rule that closes this, for romeu's sandboxes only.",
+ "prior_checked": 5,
+ "prior_resolved_as_stated": 4,
+ "prior_resolution_notes": [
+  "L2-r15-1 (R15-04, A): partly. Read 2 is now a host read of the forwarded socket, and the sandbox's ssh-add -l is a second read. The Resolution's second host read, the GitHub account's SSH keys page against a known list, was not applied (L2-r16-1).",
+  "L2-r15-2 (R15-03, A): resolved as stated. The note is the one home of the reads, the expected answers and the verdict; item g cites it; the entry format, the first-narrowed-entry event and the reversion rule are in. The reversion rule has its own gap (L2-r16-2).",
+  "L2-r15-3 (R15-08, A): resolved as stated. Item h names the empty head commit as the guard and says the commit stays reachable through the pull request's ref.",
+  "L2-r15-4 (R15-07, L): resolved as stated. The tag try runs only while no release.yml exists, and the note states the limit with the pull request that adds release.yml as its reopener.",
+  "L2-r15-5 (R15-09, L): resolved as stated in the note. The reopener is 'the review of the token narrowing row', but that row's after-state still reads 'limited to this repository' with no word on the limit (L2-r16-4)."
+ ],
+ "findings": [
+  {
+   "id": "L2-r16-1",
+   "kind": "unresolved",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block (The token narrowing, read 2); 10 10.2 (item g); 06 6.4",
+   "defect": "Read 2 judges 'the signing key, and no GitHub authentication key' by the keys' roles in the forwarded agent. GitHub assigns the authentication role per account registration, and the read of the account's SSH keys page that the R15-04 Resolution promised was dropped. So a signing key that is also registered as an authentication key passes, and git over SSH still pushes as the operator to every repository.",
+   "scenario": "The operator once added the signing key on GitHub under both key types. At O8 the maintainer removes the separate authentication key from the forwarded agent. The host ssh-add -l on the socket lists only the signing key, so the entry records narrowed and the four Deferred rows fire. From the sandbox, git push over SSH still authenticates with the signing key, to every repository the account can reach, and all of this happens outside the narrowed token.",
+   "change": "Add to read 2 the second host read the R15-04 Resolution named: the account's SSH keys page, read in the maintainer's browser, where the signing key's fingerprint is listed only under Signing keys and never under Authentication keys. This is the rule 06 6.4 already states for romeu's sandboxes ('registered on GitHub as a signing key and never as an authentication key'); cite it. Cost: one sentence in the note, and one clause in the predicate.",
+   "evidence": "Read from the repository at 591a1aa: docs/notes/maintainer-block-of-ci-bootstrap.md:143-147 'listed by `ssh-add -l` on the host with `SSH_AUTH_SOCK` set to that socket. Expected: the signing key, and no GitHub authentication key'; docs/reviews/round-15.md:121 (R15-04 Resolution) 'the forwarding configuration the host gives the sandbox ... and the GitHub account's SSH keys page, each against a known list'; docs/spec/06-kits.md:107-108 '`signingKey` is registered on GitHub as a signing key and never as an authentication key'. Inferred, not read from GitHub's documentation this round: that one public key can be registered under both types and then authenticates git over SSH."
+  },
+  {
+   "id": "L2-r16-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block (The token narrowing, the entry rule); index (rows 279, 283, 351, 353); 05 5.4 (the token and approval-line rows)",
+   "defect": "The reversion rule does not name which rows it restores: 'the token rows of the index and of 05 5.4' is an undefined set, and 05 5.4 has two rows that describe the narrowed token. It also says 'the rows it fired stay fired', so a later not-narrowed entry reopens nothing that was decided on the narrowed premise. The blast radius can widen back with no trigger.",
+   "scenario": "The first entry says narrowed. Row 351 (re-reading the rulesets) is reviewed and stays deferred because the token holds no Administration. Months later the authentication key is back in the forwarded agent, and an entry records not narrowed. The note puts 'the token rows' back to the before-state, but row 351's call, made because the token holds no Administration, stands, and nothing brings it back.",
+   "change": "Name the rows: the token narrowing row of the index, and the token row and approval-line row of 05 5.4. Make a not-narrowed entry after a narrowed one an event of rows 279, 283, 351 and 353 as well, so each one's decision is reviewed again. Cost: one clause in the note and one clause in each of the four triggers.",
+   "evidence": "Read from the repository at 591a1aa: docs/notes/maintainer-block-of-ci-bootstrap.md:128-131 'A later entry whose verdict is not narrowed returns the token rows of the index and of [05 5.4] to the state before the narrowing; the rows it fired stay fired'; docs/spec.md:351 trigger 'the token is narrowed, as the dated entry of [10 10.2], item g, records it ... or `release.yml` lands'; docs/spec/05-security.md:391 (the approval-line row) 'the narrowed token of ADR 0011, decision 2, keeps Contents and Workflows write'."
+  },
+  {
+   "id": "L2-r16-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block (The token narrowing, 'one for each later read'; read 2); plan (block O8); ADR 0011 (decision 2)",
+   "defect": "The narrowed state is read at one moment, and nothing sets when it is read again. O8 says 'stop forwarding the GitHub authentication key' without naming how, and the development sandbox forwards a socket whose keys the host itself manages. A host habit can put the key back between reads, and the entry still says narrowed.",
+   "scenario": "The maintainer removes the authentication key with ssh-add -d, and the O8 entry says narrowed. At the next login, a keychain reload or AddKeysToAgent on the maintainer's first host push over SSH (blocks O3 and O6 push from host clones) adds the key back to the same agent the sandbox gets. No later read is due, so the four fired rows rest on a state that no longer holds until checkpoint C7 or another event of row 348.",
+   "change": "Have O8 and ADR 0011 decision 2 name the mechanism, a dedicated signing socket that holds only the signing key, as 06 6.4 requires for romeu's sandboxes ('The full host agent is never forwarded'). Then set a trigger for later reads: at each sitting, or at each event of the token narrowing row. Cost: one sentence in O8, one in the note, and one in the row's events.",
+   "evidence": "Read from the repository at 591a1aa: docs/notes/maintainer-block-of-ci-bootstrap.md:121-122 'The maintainer adds one dated entry when the narrowing is applied, and one for each later read' (no cadence); docs/plan.md:221 (O8) 'stop forwarding the GitHub authentication key'; docs/adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md:48-49 'The forwarded SSH agent holds the signing key and a separate GitHub authentication key'; docs/spec/06-kits.md:101-102 'The full host agent is never forwarded; the rule governs the sandboxes romeu renders'. Inferred, not read: that the development sandbox's socket is the host's own agent (the sandbox kit's text says the key is loaded 'into each host's ssh-agent', context outside the clone), and that a keychain reload or AddKeysToAgent re-adds the key on this host; the host's ssh config was not read."
+  },
+  {
+   "id": "L2-r16-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "index (the token narrowing row, after-state); the note on the maintainer block (Two limits of the entry)",
+   "defect": "R15-09's limit is stated only in the note, but its reopener is 'the review of the token narrowing row', and that row's after-state still says 'limited to this repository' with no word about planted deploy keys, webhooks or collaborators. The reviewer the trigger summons does not see the limit from the row.",
+   "scenario": "At checkpoint C7 the reviewer reads row 348, sees 'limited to this repository', and closes the review without opening the note. A write deploy key the old token added stays.",
+   "change": "Add one clause to row 348's after-state: 'persistence the operator's token could have planted before the narrowing (deploy keys, webhooks, collaborators) is not read; the note on the maintainer block states this limit'. Cost: one clause.",
+   "evidence": "Read from the repository at 591a1aa: docs/notes/maintainer-block-of-ci-bootstrap.md:166-172 'no read looks for deploy keys, webhooks or collaborators ... which the review of the token narrowing row of [Deferred decisions] reopens'; docs/spec.md:348 'after it, the narrowed token of ADR 0011, decision 2, limited to this repository'."
+  },
+  {
+   "id": "L2-r16-5",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (item h); the note on the maintainer block (The token narrowing, entry format)",
+   "defect": "Item h saves its API answers 'under the entry of item g', but the note defines an entry as a heading 'followed by the three reads', which leaves no place for item h. Item h also runs 'after the narrowing' without saying whether a not-narrowed verdict stops it.",
+   "scenario": "The first entry says not narrowed because the agent still lists the key. The maintainer runs item h anyway and appends the status answers to that entry. A later reader cannot tell which token posted the required-name status, and 05 5.4's approval-line row reads a measurement of the wrong token.",
+   "change": "In the note, extend the entry format to the three reads plus item h's answers. In item h, say that it runs only after an entry whose verdict is narrowed. Cost: two clauses.",
+   "evidence": "Read from the repository at 591a1aa: docs/spec/10-testing-style.md:918 'h. The required-name try, after the narrowing'; :924-925 'save the API answers under the entry of item g'; docs/notes/maintainer-block-of-ci-bootstrap.md:123-124 'An entry is a heading `### <date>: narrowed` or `### <date>: not narrowed`, followed by the three reads'."
+  }
+ ],
+ "what_is_missing": "A read of the account's SSH key registrations; a named mechanism for no longer forwarding the authentication key (the dedicated socket of 06 6.4); a cadence or trigger for later reads; a defined set for 'token rows'; a not-narrowed entry as an event of the four fired rows; a place in the entry for item h's answers.",
+ "postmortem": "The round-15 pass gave the verdict one home and moved read 2 onto the host. That fixed where the read is made, but the key is still classified by its role in the agent, not by its registration on the account, and the read is a single moment with no rule for reading again. It crosses the note's read 2, item g, plan O8 and ADR 0011 decision 2, and it leaves a seam with 06 6.4, which already has both rules (a dedicated socket, and signing-only registration) for romeu's sandboxes. The reversion rule restores the rows' text but not the decisions made on the narrowed premise; that crosses the note's entry rule and index rows 279, 283, 351 and 353.",
+ "lens_critique": "The lens treats success as one decision, written down with its control and trigger. For this product, a narrowing is also a state that has to stay true over time, and the lens's wording does not ask how long a recorded mitigation stays true. It also looks to the security log as the control, while the narrowing's own reads are now the stronger control and deserve the same scrutiny.",
+ "missing_viewpoint": "A host operations or identity administrator's viewpoint: someone who knows how the maintainer's machine actually manages agents, keychains and GitHub key registrations, which is where this narrowing quietly unravels.",
+ "out_of_scope": "The I17 rewrite and RJ-338 count removal (05 5.2, 03, 04, 08), 01 and 09 changes in the delta; the release.yml row beyond its link to the tag try; boundary B secret paths and side channels in the ledger (not touched by the delta).",
+ "confidence": "High on L2-r16-2, -4 and -5 (read from the text). Medium on L2-r16-1 (the seam with 06 6.4 is read from the text; that a key can be registered under both types on GitHub is inferred). Medium-low on L2-r16-3 (how the development sandbox forwards the agent, and the host re-adding the key, are inferred; the host was not read).",
+ "pages_read": "delta.diff whole; docs/notes/maintainer-block-of-ci-bootstrap.md 100-174; docs/spec/10-testing-style.md 840-935; docs/spec.md 279, 283, 348, 351, 353; docs/spec/05-security.md token and approval-line rows; docs/spec/06-kits.md 93-112; docs/adr/0011 85-110; docs/adr/0008 44-52; docs/plan.md O1-O8 and grep for release.yml and C7; docs/reviews/round-15.md rows R15-03 to R15-09 and write pass; round-15 L2.json; docs/reviews/lenses.md L2."
+}

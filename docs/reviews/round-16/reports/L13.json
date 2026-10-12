@@ -1,0 +1,89 @@
+{
+  "header": "L13 · The reader who holds the spec against itself · opus",
+  "verdict": "The changed text states the decision of 2026-10-12 once, in 04 4.4, and every page that cites it and was rewritten now agrees with it; the largest gap is three unchanged sentences (04 4.1 exit codes, the 04 4.2 rm row, 08 8.5) that still describe RJ-338 as a fingerprint that keeps changing, the semantics of the removed count.",
+  "prior_checked": 4,
+  "prior_resolved_as_stated": 4,
+  "prior_resolution_notes": {
+    "L13-r15-1": "R15-03, outside this round's scope, not re-read",
+    "L13-r15-2": "R15-04 and R15-05, outside this round's scope, not re-read",
+    "L13-r15-3": "R15-11 (M): 01 1.6 (row and recovery paragraph), 03 3.8, 08 8.5 and 09 J3 step 5 each say the salvage exits 5 with fingerprint-unstable; the M form changed with the decision (no count), and the one-name goal holds in the rewritten text, but see L13-r16-1 for three unchanged sentences",
+    "L13-r15-4": "R15-12 (M): the excludeIgnored case keeps the writer running, the edit excludes the path, the next rerun exits 5 once, the one after resumes, and the removal is named; resolved as stated",
+    "L13-r15-5": "R15-01 (M, by the decision): the count and salvage[].cause are gone from 03 3.8, its example, 04 4.4 and I17, so the second definition of the row is gone; the interrupted-salvage path is now outcome-silent rather than count-silent, see L13-r16-4",
+    "L13-r15-6": "R15-02 (M, by the decision): the hint is one fixed text with no condition romeu cannot observe; resolved, see L13-r16-2 for what the fixed text leaves out",
+    "L13-r15-7": "R15-10, outside this round's scope, not re-read"
+  },
+  "findings": [
+    {
+      "id": "L13-r16-1",
+      "kind": "regression",
+      "severity": "Required",
+      "origin": "own",
+      "section": "04 4.1 (Exit codes); 04 4.2 (the rm row); 08 8.5",
+      "defect": "Three sentences the pass did not touch still describe RJ-338 by the semantics of the removed count, a fingerprint that keeps changing, while 04 4.4 now exits 5 on the first changed fingerprint after removing.",
+      "scenario": "The implementer of T068 (Implements 04 4.2 rm, 08 8.5) reads the rm row, 'A rerun on a removing generation whose fingerprint keeps changing exits 5', and runs sbx env rm after a single benign change, or adds a second fingerprint read to tell 'keeps changing' from 'changed once'; the I17 case 'after a failed sbx env rm, a changed fingerprint makes the rerun salvage, record its entry and fingerprint, and exit 5' turns red with two pages giving two rules. T008 writes the exit-code meaning from 04 4.1. The search the write pass ran (cause, in a row, third, limit) does not match 'keeps changing'.",
+      "change": "04 4.1: 'a fingerprint that changed after a removal began'; 04 4.2 rm row: 'A rerun on a removing generation whose fingerprint changed exits 5 with fingerprint-unstable (4.4)'; 08 8.5: 'whose worktrees changed after removing was written'. Cost: three phrases. The slug fingerprint-unstable itself now names more than the rule (one change suffices); keeping it is acceptable if 04 4.4 is the definition, which it says it is. Approval line spec.",
+      "evidence": "docs/spec/04-cli.md:13 \"`5` refused to protect data (incomplete salvage, a fingerprint that keeps changing during a removal, ...)\"; docs/spec/04-cli.md:38 \"A rerun on a `removing` generation whose fingerprint keeps changing exits 5 with `fingerprint-unstable` (4.4)\"; docs/spec/08-memory-handoff-salvage.md:284-286 \"on a `removing` generation whose worktrees keep changing is not a skipped reason: each salvage a changed fingerprint starts exits 5\"; docs/spec/04-cli.md:326 \"when a fresh fingerprint ... differs from the `fingerprint` of the state's newest salvage entry: the command salvages again ... and then exits instead of running `sbx env rm`\". Plan T068 Implements 04 4.2 (rm), 08 8.5 (docs/plan.md:1985-1986)."
+    },
+    {
+      "id": "L13-r16-2",
+      "kind": "regression",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "04 4.4 (RJ-338, the hint)",
+      "defect": "The fixed hint names only the recoveries for a path that is still being written; it no longer says that a plain rerun is the recovery when nothing writes, nor that the first rerun after either recovery may exit 5 once more, both of which the text at 85f6860 said.",
+      "scenario": "After one benign edit, the operator sees exit 5 and a hint that opens 'if something still writes that path'; nothing writes it, so the hint offers no step, though a bare rerun resumes. An operator who follows the hint's excludeIgnored recovery gets the same error and hint again on the next rerun (the I17 excludeIgnored case asserts that exit), and reads it as the recovery having failed. The decision's own cost line, 'one more rerun after a single benign change', is the step the hint does not name.",
+      "change": "Append to the fixed text: 'otherwise rerun; the first rerun after a change, or after either recovery, may salvage and exit 5 once more, and the rerun after it resumes at sbx env rm'. Still one fixed text, so R15-02 stays closed. Cost: one clause. Approval line spec.",
+      "evidence": "docs/spec/04-cli.md:326 \"The hint is one fixed text: if something still writes that path, stop it or add an ignored path to `salvage.excludeIgnored` (gate 2), then rerun; `--accept-loss` does not cover this error\"; at 85f6860 the same row read \"the hint says that a rerun with nothing written since this salvage resumes at `sbx env rm`, ... says that the first rerun after a recovery salvages once more and exits 5 again\"; docs/spec/05-security.md:172 \"after an edit of `salvage.excludeIgnored` that excludes that path, with the writer still running, the next rerun salvages and exits 5 once\"."
+    },
+    {
+      "id": "L13-r16-3",
+      "kind": "new",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "01 1.6 (the salvaging -> removing row); 04 4.4 (RJ-338)",
+      "defect": "One transition, salvaging -> removing, carries two effects on two rows: the salvaging row says the state is written 'before sbx env rm' for every command that removes, while the removing row and RJ-338 end the changed-fingerprint salvage at removing with no sbx env rm; and with salvage[].cause removed nothing persisted tells the two apart. RJ-338's 'records its entry ... with the state removing' is also unconditional, while an incomplete salvage without --accept-loss takes salvaging -> open with RJ-306; which applies is left to row order. The same shape stood at c64c468 and 85f6860 (the salvaging row is unchanged; RJ-338 was equally unconditional), so it is not caused by this pass, but removing cause took away the one field that marked the path.",
+      "scenario": "T034 builds the generation machine from 01 1.6 and I17's U case tests every row: an implementer encodes the salvaging -> removing row as written and the changed-fingerprint path runs sbx env rm, or reads RJ-338 first and writes removing after an incomplete salvage. The I17 E cases catch the first; nothing names the second.",
+      "change": "Split the 01 1.6 row: 'salvage complete or --accept-loss; command removes the sandbox; the salvage was not started by a changed fingerprint on removing' -> removing, before sbx env rm; and '... started by a changed fingerprint' -> removing, exit 5, RJ-338. In RJ-338 say 'when that salvage is complete or accepted; an incomplete one exits 5 with RJ-306 by the salvaging rows of 01 1.6'. Cost: one row, one clause. Approval line spec.",
+      "evidence": "docs/spec/01-system-model.md:309 \"| salvaging | salvage complete or `--accept-loss`; command removes the sandbox | removing | state written, with the salvage entry's `fingerprint` (...), before `sbx env rm` |\"; docs/spec/01-system-model.md:311 \"otherwise `removing -> salvaging` with a new salvage id, and that salvage ends at `removing` with exit 5, `fingerprint-unstable`\"; docs/spec/01-system-model.md:308 \"| salvaging | salvage incomplete, no `--accept-loss` | open | salvage record `result: incomplete` with reasons; exit 5 |\"; git show 85f6860:docs/spec/01-system-model.md line 309 identical."
+    },
+    {
+      "id": "L13-r16-4",
+      "kind": "unresolved",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "04 4.4 (RJ-338); 01 1.6 (the salvaging restart row)",
+      "defect": "A changed-fingerprint salvage killed while salvaging is restarted by the 'salvaging ... starts the sandbox half again' row, and since nothing records what started it, the restart ends at sbx env rm without the exit 5; no text says this is the rule.",
+      "scenario": "An operator Ctrl-Cs a slow salvage that a changed fingerprint started and reruns rm: the sandbox is destroyed in that rerun, where an uninterrupted one would have exited 5 and waited for an equal fingerprint. The outcome is defensible (a full salvage then removal, as rm from open), but it is the gap R15-01 named, 'no text says that is the rule', now about the exit rather than the count; at 85f6860 03 3.8's cause cell at least said the restart writes requested. The round-15 write pass calls the interrupted path moot.",
+      "change": "One sentence in RJ-338: 'a salvage restarted from salvaging is the command's own salvage and goes on to sbx env rm when complete or accepted'. Cost: one sentence; the I17 fault-injection case already covers convergence. Approval line spec.",
+      "evidence": "docs/spec/01-system-model.md:303 \"| salvaging | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command was interrupted or failed) | salvaging | new salvage id |\"; docs/reviews/round-15.md:190-191 \"the count is gone, so neither the row's second definition nor the interrupted salvage has anything to restart\"; at 85f6860 docs/spec/03-formats.md salvage[].cause: \"`requested` for ... `rm`, `recreate` or `retire` from `open` or `salvaging`\"."
+    },
+    {
+      "id": "L13-r16-5",
+      "kind": "new",
+      "severity": "Advisory",
+      "origin": "own",
+      "section": "plan T068 (Acceptance); 05 5.2 (I17)",
+      "defect": "T068's first acceptance bullet is a second, partial copy of I17's exit-5 list, missing 'a reflog-only commit absent from the bundle' and 'a salvage ref of an earlier generation re-bundled', next to the new line that makes each E case of I17 a titled test; one set, two lists that disagree, and no check ties the E cases to test titles.",
+      "scenario": "A builder of T068 ticks the first bullet's ten cases and believes I17's first E case is covered while two of its twelve are missing; the new line would catch it only by a reviewer counting.",
+      "change": "Replace the first bullet with 'rm exits 5 for each case of the first E case of I17' and let the new line carry the rest; record as a pending item a check that counts I17's E cases against test titles. Cost: one bullet.",
+      "evidence": "docs/plan.md:1989-1993 \"`rm` exits 5 for each case of I17: a missing repo in the manifest, a forged `complete: true`, a hidden branch, a detached HEAD commit, dirt in a linked worktree, an unbundled tag, a corrupted payload file, a salvage id mismatch, daemon heads not in the bundle, and a repo removed from the spec\"; docs/plan.md:1994 \"Each `E:` case of I17 is one test with a title of its own\"; docs/spec/05-security.md:172 lists also \"a reflog-only commit absent from the bundle\" and \"a salvage ref of an earlier generation re-bundled under `refs/salvage/<generation>/`\"."
+    },
+    {
+      "id": "L13-r16-6",
+      "kind": "new",
+      "severity": "Advisory",
+      "origin": "listed",
+      "section": "04 4.4 (RJ-338); 01 1.6; 03 3.8 (salvage[].fingerprint); 05 5.2 (I17)",
+      "defect": "The stored value the rerun compares against has several names: 'the state's newest salvage entry' (04 4.4), 'the state's salvage entry' (01 1.6), 'the one written with removing' (I17, 03 3.8); and four I17 cases still say 'the resumed rm salvage again', where the command salvages rather than resumes.",
+      "scenario": "A reader asks whether 'the salvage entry' of 01 1.6 means the first or the newest of several; after one RJ-338 exit the generation holds two entries with a fingerprint. 04 4.4 answers it, 01 1.6 does not.",
+      "change": "Use 'the newest salvage entry's fingerprint' in 01 1.6 (row and paragraph) and 'the rerun of rm' in the four I17 cases. Cost: a few words. Approval line spec.",
+      "evidence": "docs/spec/04-cli.md:326 \"the `fingerprint` of the state's newest salvage entry\"; docs/spec/01-system-model.md:311 \"equals the `fingerprint` of the state's salvage entry\"; docs/spec/05-security.md:172 \"an uncommitted edit made after a failed `sbx env rm` makes the resumed `rm` salvage again\"."
+    }
+  ],
+  "what_is_missing": "A statement of what the interrupted changed-fingerprint salvage does (L13-r16-4); the order of RJ-306 and RJ-338 for an incomplete changed-fingerprint salvage (L13-r16-3); the plain-rerun step and the extra exit after a recovery in the hint (L13-r16-2); a leftover search that matches the semantics ('keeps changing') and not only the old words (L13-r16-1).",
+  "postmortem": "Removing the count removed the only persisted bit (salvage[].cause) that marked a salvage as started by a changed fingerprint; the exit-5 rule now lives in the running command only, and the pages that paraphrased the old semantics without naming the count (04 4.1, 04 4.2, 08 8.5) escaped a search by the old words. Sections crossed: 04 4.1, 04 4.2, 04 4.4, 01 1.6, 08 8.5, 05 5.2 I17, plan T068.",
+  "lens_critique": "This lens prizes one name per mechanism; for this product the costlier failure is a sentence that keeps the name but changes the rule, which only a semantic search finds, and the lens has no method for it beyond reading. It also undervalues the operator's path through an error: a consistent hint can still leave out the step most operators need. Missing viewpoint from the set of titles: someone who greps the spec mechanically for every paraphrase of a rule after it changes, a change-impact reader distinct from the whole-system reader.",
+  "out_of_scope": "R15-03, R15-04, R15-05 (the maintainer block and the token narrowing), R15-10 (the token row), the notes on the maintainer block, 10 10.2 and plan block O8 were not re-read.",
+  "confidence": "high for L13-r16-1 (text quoted on three pages at 591a1aa), high for L13-r16-5 (two lists compared), medium for L13-r16-3 and L13-r16-4 (behavior inferred from the table rows, pre-existing shape confirmed at 85f6860), medium for L13-r16-2 (a UX judgment within the decision).",
+  "pages_read": "delta.diff be402ca..591a1aa; docs/spec/04-cli.md (4.1 line 13, 4.2 rm row, 4.4 RJ-338, also at 85f6860 and c64c468); docs/spec/01-system-model.md (1.6 generation table and recovery paragraph, also at 85f6860 and c64c468); docs/spec/03-formats.md (3.8 example and fields); docs/spec/08-memory-handoff-salvage.md (8.5 around line 284); docs/spec/09-journeys.md (J3 step 5); docs/spec/05-security.md (I17); docs/plan.md (T034 header, T068); docs/reviews/round-15.md; docs/reviews/round-15/reports/L13.json; docs/reviews/lenses.md (L13); a grep of docs/spec, docs/spec.md, docs/plan.md, docs/notes, docs/adr for cause, fingerprint-changed, requested, in a row, third, limit, count that, keeps changing."
+}
