@@ -16,6 +16,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 )
 
 // Threat model of the mise configuration channel. mise reads its
@@ -53,7 +54,7 @@ import (
 //     each mise command it starts (miseEnviron), the workflow sets it
 //     in its env table, which the workflows check holds to this list,
 //     and the pre-push hook starts go, and so the mise shim, with it
-//     (TestHook holds the hook's line to this list). With it, mise
+//     (TestHook holds the hook to this list). With it, mise
 //     2026.10.3 reads mise.toml as the one configuration file of the
 //     tree, and mise.lock as its lock (TestMiseEnvStopsConfigs measures
 //     both halves: without miseEnv each file above runs its command;
@@ -166,7 +167,7 @@ import (
 // bypass the hook, not those.
 
 // miseEnv is the fixed part of the environment of every mise run, as
-// "KEY=value": the six mise variables below, then goPinEnv. The
+// "KEY=value": the six mise variables below, then goenv.Pin. The
 // configuration file mise reads is mise.toml alone, it reads no
 // .tool-versions ("none" is the empty list, src/env.rs of mise
 // 2026.10.3), and it selects no environment's files, neither one named
@@ -184,9 +185,9 @@ import (
 // them names (MISE_ENV_FILE, MISE_CD, MISE_TRUSTED_CONFIG_PATHS,
 // MISE_FOO, GOFOO, a GOFLAGS) never reaches it; and the pre-push hook
 // starts go with "env -i", the same allowlist (hookAllow) and the same
-// fixed part (TestHook holds the hook's line to these lists).
+// fixed part (TestHook holds the hook to these lists).
 //
-// goPinEnv ends the list: "mise install" builds govulncheck with the go
+// goenv.Pin ends the list: "mise install" builds govulncheck with the go
 // command ("go install", the go: backend), so that build reads no "go
 // env -w" file and starts no other go than the pinned one, as every go
 // step of tools/ci does (stepEnv).
@@ -197,10 +198,10 @@ var miseEnv = slices.Concat([]string{
 	"MISE_AUTO_ENV=false",
 	"MISE_GLOBAL_CONFIG_FILE=" + miseNoGlobalConfig,
 	"MISE_SYSTEM_CONFIG_FILE=" + miseNoSystemConfig,
-}, goPinEnv)
+}, goenv.Pin)
 
 // hookAllow are the variables the pre-push hook keeps from its caller:
-// those of passThrough (where things are on this machine),
+// those of goenv.PassThrough (where things are on this machine),
 // networkPassThrough (how to reach the network) and goModulePassThrough
 // (where a module comes from, for the first go run that fills the
 // module cache), each only when the caller has set it. Every other
@@ -208,7 +209,7 @@ var miseEnv = slices.Concat([]string{
 // "env -i", the GIT_ ones included: tools/ci finds the repository from
 // the working directory of the hook, which git sets to the top of the
 // tree, and never from a GIT_DIR.
-var hookAllow = slices.Concat(passThrough, networkPassThrough, goModulePassThrough)
+var hookAllow = slices.Concat(goenv.PassThrough, networkPassThrough, goModulePassThrough)
 
 // miseNoGlobalConfig is the path miseEnv gives MISE_GLOBAL_CONFIG_FILE,
 // so that mise reads no global configuration: its [env] table (a

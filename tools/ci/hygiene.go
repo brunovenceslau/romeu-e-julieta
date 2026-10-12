@@ -293,17 +293,38 @@ func fileIn(files []treeFile, path string) ([]byte, bool, error) {
 
 // blobAt returns the content of one file of the tree at rev, and
 // whether it is there. rev is HEAD or an object id, never text a push
-// supplies unchecked. It asks with cat-file's batch mode, which answers
-// "missing" with exit 0, so a file that is absent is told apart from a
-// git command that failed.
+// supplies unchecked. The tree of rev says whether the file is there,
+// and the object store is then asked for its blob: a partial clone
+// holds every tree and may lack the blob, and a blob it lacks is an
+// error that says how to fetch it, never a file that is not there.
 func blobAt(ctx context.Context, repo git.Repo, rev, path string) ([]byte, bool, error) {
-	out, err := repo.Run(ctx, []byte(rev+":"+path+"\n"), "cat-file", "--batch")
+	entries, err := repo.Run(ctx, nil, "ls-tree", "-z", "--full-tree", rev, "--", path)
+	if err != nil {
+		return nil, false, err
+	}
+	var oid string
+	for entry := range strings.SplitSeq(strings.TrimSuffix(string(entries), "\x00"), "\x00") {
+		// "<mode> <type> <id>\t<path>"
+		meta, name, ok := strings.Cut(entry, "\t")
+		if !ok || name != path {
+			continue
+		}
+		f := strings.Fields(meta)
+		if len(f) != 3 || f[1] != "blob" {
+			return nil, false, fmt.Errorf("read %s at %s: not a file", path, rev)
+		}
+		oid = f[2]
+	}
+	if oid == "" {
+		return nil, false, nil
+	}
+	out, err := repo.Run(ctx, []byte(oid+"\n"), "cat-file", "--batch")
 	if err != nil {
 		return nil, false, err
 	}
 	head, rest, _ := bytes.Cut(out, []byte{'\n'})
-	if bytes.HasSuffix(head, []byte(" missing")) {
-		return nil, false, nil
+	if string(head) == oid+" missing" {
+		return nil, false, fmt.Errorf("read %s at %s: the object store lacks its blob %s; %s", path, rev, oid, git.FetchHint(oid))
 	}
 	// "<id> blob <size>"
 	f := strings.Fields(string(head))
@@ -385,6 +406,9 @@ func headTree(ctx context.Context, repo git.Repo, head string) ([]treeFile, erro
 		// "<id> blob <size>\n<content>\n"
 		head, rest, _ := bytes.Cut(blobs, []byte{'\n'})
 		hf := strings.Fields(string(head))
+		if len(hf) == 2 && hf[1] == "missing" {
+			return nil, fmt.Errorf("read %s: the object store lacks its blob %s; %s", git.Printable(files[i].path), hf[0], git.FetchHint(hf[0]))
+		}
 		if len(hf) != 3 {
 			return nil, fmt.Errorf("read blob of tree entry %d: unexpected header", i+1)
 		}

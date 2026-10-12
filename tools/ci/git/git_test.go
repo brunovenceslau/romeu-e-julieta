@@ -5,6 +5,9 @@ package git_test
 
 import (
 	"context"
+	"os/exec"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -164,4 +167,42 @@ func TestRunStopsWithItsContext(t *testing.T) {
 	cancel()
 	_, err := r.Run(ctx, nil, "rev-parse", "--git-dir")
 	require.Error(t, err, "Run under a cancelled context")
+}
+
+// TestRunFetchesNoMissingObject shows that Run does not fetch an object
+// that a partial clone lacks: the checks read what the clone holds, and
+// a read must not reach the network. Git run without Run's setting does
+// fetch it, so the test proves something.
+func TestRunFetchesNoMissingObject(t *testing.T) {
+	server := gittest.New(t)
+	server.Write("a.txt", "a\n")
+	server.Commit("a")
+	server.Git("config", "uploadpack.allowFilter", "true")
+	blob := server.Git("rev-parse", "HEAD:a.txt")
+	dir := filepath.Join(t.TempDir(), "clone")
+	server.Git("clone", "--quiet", "--filter=blob:none", "--no-checkout", "file://"+server.Dir, dir)
+	clone := git.Repo{Dir: dir, Env: slices.Concat(server.Env, []string{"GIT_NO_LAZY_FETCH=0"})}
+	_, err := clone.Run(t.Context(), nil, "cat-file", "-p", blob)
+	require.ErrorContains(t, err, "Not a valid object name "+blob, "Run fetched the blob the partial clone lacks")
+	lazy := exec.Command("git", "cat-file", "-p", blob)
+	lazy.Dir, lazy.Env = dir, server.Env
+	out, err := lazy.CombinedOutput()
+	require.NoError(t, err, "without the setting git fetches it: %s", out)
+	assert.Equal(t, "a\n", string(out))
+}
+
+// TestRunWithTheEnvironmentOfThisProcess shows that a Repo with no Env
+// runs git with the environment of this process, and still with
+// GIT_NO_LAZY_FETCH=1 over the value that environment gives it. A
+// shell alias, set through that environment, prints what git passes on.
+func TestRunWithTheEnvironmentOfThisProcess(t *testing.T) {
+	r := gittest.New(t)
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "alias.probe")
+	t.Setenv("GIT_CONFIG_VALUE_0", `!printf '%s|%s' "$ROMEU_PROBE" "$GIT_NO_LAZY_FETCH"`)
+	t.Setenv("ROMEU_PROBE", "from the parent")
+	t.Setenv("GIT_NO_LAZY_FETCH", "0")
+	out, err := git.Repo{Dir: r.Dir}.Run(t.Context(), nil, "probe")
+	require.NoError(t, err)
+	assert.Equal(t, "from the parent|1", string(out))
 }
