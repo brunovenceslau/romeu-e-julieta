@@ -1,0 +1,100 @@
+{
+ "header": "L0 · The control reviewer · opus",
+ "verdict": "The changed text meets the success criteria and resolves L0-r14-1 and L0-r14-2; the largest gap is Advisory: the event 'the token is narrowed' has two rules of different strictness, item g of 10 10.2 and the note's section, so the four Deferred rows can fire on a token wider than ADR 0011 decision 2 grants.",
+ "prior_checked": 2,
+ "prior_resolved_as_stated": 2,
+ "prior_resolution_notes": {
+  "L0-r14-1": "Resolved as R14-02 states: the note's table gives an expected answer per try, marks the push and merge answers as not telling the tokens apart, and makes a refused ruleset update, with A16 and the agent's keys, decide narrowed or not (notes/maintainer-block-of-ci-bootstrap.md:143-153).",
+  "L0-r14-2": "Resolved in a slightly different form: R14-02 said item d links the note's list; item g links the note's anchor that holds the table (10 10.2:906-907), while item d, the first mention of the four tries, still has no link (10 10.2:873-876). The reader of the spec reaches the list in one hop."
+ },
+ "findings": [
+  {
+   "id": "L0-r15-1",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (maintainer block, item g); the note on the maintainer block (The token narrowing)",
+   "defect": "The event 'the token is narrowed' is defined twice with different strictness: the note requires A16 to match the full expected permission set, while item g rejects only more repositories, Administration, a GitHub key, or an update that is not refused.",
+   "scenario": "The maintainer creates a fine-grained token for this repository that also holds Commit statuses write or Secrets write. By item g it is narrowed, and the four Deferred rows (operator signature, create-only host ref, rulesets re-read check, signed approval record) fire; by the note it is not narrowed. Which one is read decides whether four deferred decisions are reopened.",
+   "change": "Item g cites the note's rule ('narrowed when the A16 read and the agent's keys match what is expected and the ruleset update is refused') as the one home, and drops its own negative list, or lists the full expected set. Cost: one sentence.",
+   "evidence": "docs/spec/10-testing-style.md:916-919 'An A16 read that shows more than this repository or the Administration permission, a GitHub key in the agent, or a ruleset update the token is not refused means the token is not narrowed'; docs/notes/maintainer-block-of-ci-bootstrap.md:133-135 'Expected: a fine-grained token, this repository alone, Contents, Pull requests and Workflows read and write, Actions, Checks and Metadata read, and no Administration'; :150-153 'Any other answer on those three means it is not'."
+  },
+  {
+   "id": "L0-r15-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block (The token narrowing, read 2); 10 10.2 (item g)",
+   "defect": "The check that the GitHub authentication key is no longer forwarded is `ssh-add -l` run inside the sandbox, which contradicts the note's own rule 'never only from what the sandbox printed' and R14-02's promise of a host-side check.",
+   "scenario": "An agent-controlled shell in the sandbox shims `ssh-add` (a PATH entry or an alias) to omit the authentication key. The maintainer reads the expected list, the entry records narrowed, and the key that can push to every repository the account reaches stays forwarded.",
+   "change": "Read 2 is made on the host: the forwarding configuration of the development sandbox (what the host forwards), or `ssh-add -l` against the socket the host forwards, read in a host shell. Cost: one line in the note and the matching words in item g.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:127-128 'made on the host or checked from the maintainer's own session, never only from what the sandbox printed'; :136-138 'The keys the sandbox's forwarded agent lists (`ssh-add -l` in the sandbox, read by the maintainer)'; docs/reviews/round-14.md R14-02 Resolution 'a host-side check that the GitHub authentication key is no longer forwarded into the sandbox'."
+  },
+  {
+   "id": "L0-r15-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block (The token narrowing, read 3); 10 10.2 (Release and bootstrap; item f)",
+   "defect": "The narrowing entry repeats the tag try `v0.0.0-try` 'for each later read', and that name has the prerelease form `release.yml` releases, with nothing limiting the try to before `release.yml` exists.",
+   "scenario": "After `release.yml` lands and item f turns on immutable releases, a later read of the narrowing creates `v0.0.0-try`; the release workflow starts and may publish an attested prerelease named v0.0.0-try that the undo (delete the tag) does not remove (inferred; whether release.yml would run to publish on that tag is not measured).",
+   "change": "The note says the tag try runs only while no `release.yml` exists, or that `release.yml` ignores the `-try` suffix and a test holds it; a later read without the tag try records that answer as skipped. Cost: one sentence, or one sentence and a test in the task that adds release.yml.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:122 'and one for each later read'; :147 'create and delete the tag `v0.0.0-try`'; docs/spec/10-testing-style.md:706-708 '`release.yml` releases a `v*` tag. A tag of the form `v<major>.<minor>.<patch>` is a release; the same with a suffix is a prerelease'."
+  },
+  {
+   "id": "L0-r15-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (maintainer block, To do list, items g and h)",
+   "defect": "The To do lead-in says each item saves the API's answer under Evidence, while item g says its answers go in the note's dated entry, not under a pull request's Evidence, and item h saves under the entry of item g.",
+   "scenario": "A maintainer or agent follows the lead-in and looks for the narrowing record under a pull request's Evidence, finds none, and reads the event as not fired.",
+   "change": "The lead-in says 'under Evidence, or, for items g and h, in the dated entry of the note'. Cost: a few words.",
+   "evidence": "docs/spec/10-testing-style.md:886-887 'To do, each a maintainer step that saves the API's answer under Evidence'; :907-908 'its answers go in a dated entry of the note on the maintainer block, not under a pull request's Evidence'."
+  },
+  {
+   "id": "L0-r15-5",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "plan (maintainer blocks O1 to O7); 10 10.2 (items g and h)",
+   "defect": "No maintainer block of the plan carries items g and h, so the token narrowing, decided on 2026-10-09 and the event four Deferred rows wait on, has no scheduled slot and can reach v1.0.0 undone.",
+   "scenario": "The plan runs O1 (items a to d), O2 (item e) through O7 (the tag); nothing asks for items g and h, the operator's own token stays in the development sandbox through the release, and the 05 5.4 token risk stays open at v1.0.0 by omission rather than by decision.",
+   "change": "Add items g and h to the maintainer block they belong to (O1 or O2, or a new block before the first build phase), or record that they stay unscheduled with the trigger. Cost: one plan row edit.",
+   "evidence": "docs/plan.md:214 'the sitting of the maintainer block, items a to d (10 10.2)'; :215 'item e (10 10.2)'; grep for 'narrow' in docs/plan.md finds nothing; docs/notes/maintainer-block-of-ci-bootstrap.md:155 'No entry yet: the narrowing waits for a maintainer step'."
+  },
+  {
+   "id": "L0-r15-6",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "03 3.8 (`salvage[].cause`); 04 4.4 (`RJ-338`)",
+   "defect": "A rerun from `salvaging` is written as `requested`, so an interrupted changed-fingerprint salvage restarts the row that `fingerprint-unstable` counts, and no text says this is intended.",
+   "scenario": "An operator interrupts each changed-fingerprint salvage of a constantly written worktree; each rerun from `salvaging` writes `requested`, the cap never reaches three, and the reruns loop without the RJ-338 hint. The cap guards liveness, not salvage completeness, so no data is lost.",
+   "change": "One clause in 04 4.4 saying an interrupted salvage resumed from `salvaging` writes `requested` and so ends the row, or the cause cell keeps `fingerprint-changed` for a resume of one. Cost: one clause.",
+   "evidence": "docs/spec/03-formats.md (salvage[].cause) '`requested` for an entry a command writes on its own run, that is ... `rm`, `recreate` or `retire` from `open` or `salvaging`'; docs/spec/01-system-model.md:303 'salvaging | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command was interrupted or failed) | salvaging | new salvage id'."
+  }
+ ],
+ "what_is_missing": "One home for the narrowed or not-narrowed rule; a host-side read of the key forwarding; a guard on the tag try once release.yml exists; a plan block carrying items g and h; a trigger for the note's later reads; a link at item d's first mention of the four tries.",
+ "postmortem": "After v1.0.0 the operator finds the four token-triggered rows fired on a token wider than decision 2 (item g read instead of the note), a GitHub key still forwarded although the record said not (read in the sandbox), possibly a stray v0.0.0-try prerelease from a later read, or no narrowing at all because no plan block scheduled it (10 10.2 g and h, the note, index Deferred rows, 05 5.4, plan O1-O7). The salvage text of RJ-338, 03 3.8, 01 1.6, 09 J3 and I17 holds.",
+ "lens_critique": "A no-lens reviewer judges against S1-S11 and the principles, which say little about how the repository itself is run; the token findings are judged through the Deterministic principle and 0.1's no-unreviewed-host-code clause, a stretch that can over- or under-weight them. It also cannot see implementation traps below the spec's own words. Missing viewpoint from the set, by title only: an operator-of-the-development-process view, the maintainer as a user of the maintainer block (time, order, undo of each step), distinct from the product's operator.",
+ "out_of_scope": "Accepted risks of 05 5.4 and deferred rows as such; ADR 0011 naming only two of the four token-triggered rows (Accepted ADR, text not edited, predates this delta); the operator/maintainer vocabulary left to a later round by R14-05.",
+ "confidence": "Medium-high on the text seams (quoted at 85f6860); the release.yml effect of L0-r15-3 is inferred, not measured.",
+ "pages_read": [
+  "docs/spec.md (Principles, Success criteria, Deferred rows in the delta)",
+  "docs/spec/00-scope.md 0.1",
+  "docs/spec/01-system-model.md 1.6",
+  "docs/spec/03-formats.md 3.8 (delta)",
+  "docs/spec/04-cli.md 4.4 RJ-338",
+  "docs/spec/05-security.md 5.2 I17, 5.4 rows",
+  "docs/spec/09-journeys.md J3 step 5",
+  "docs/spec/10-testing-style.md 10.2 Release and bootstrap, maintainer block",
+  "docs/spec/11-host-probes.md A16",
+  "docs/notes/maintainer-block-of-ci-bootstrap.md",
+  "docs/adr/0011 decision 2",
+  "docs/plan.md T005, O1-O7",
+  "docs/reviews/round-14.md",
+  "docs/reviews/round-14/reports/L0.json",
+  "r15/delta.diff"
+ ]
+}
