@@ -1,0 +1,81 @@
+{
+ "header": "L2 · The security engineer who has watched a host fall · opus",
+ "verdict": "Met for the delta, with no Blocking or Required finding. All four round-13 L2 findings read as their rows' Resolution cells promised. The largest gap is Advisory: the event 'the token is narrowed', which fires four security deferrals and switches the token row to its after-state, is recorded only by the four tries. The token holder runs those tries from inside the sandbox, and their answers sit in [review] PR Evidence. The host-side probe A16, which ADR 0011 decision 2 names, is not cited, and nothing measures that the forwarding of the SSH key stopped. Yet the after-state asserts 'limited to this repository'.",
+ "prior_checked": 4,
+ "prior_resolved_as_stated": 4,
+ "prior_resolution_notes": [
+  "L2-r13-1 (R13-02): resolved as stated. Item d of 10 10.2 now holds the three-step required-name try, and 05 5.4 names it 'the required-name try'. The token row reads 'the try that would have measured it is not made'. The new seam in step 3 is L2-r14-2.",
+  "L2-r13-2: resolved as stated. T005 (b) reads the standard library from 'Standard' and every other package by 'Dir', with a fixture for a module path without a dot under a local replace.",
+  "L2-r13-3 (R13-04): resolved as stated. T005 (c) reads 'holds'. It adds a fixture for an edited go.work already tracked on the base, and each fixture names the path-pattern removal that turns it red.",
+  "L2-r13-4 (R13-03): resolved as stated. The Until-then cell holds both states, the four rows cite the repeated four tries, and the dropped trigger carries its reason. The observable chosen and the after-state's capability list raise L2-r14-1 and L2-r14-3."
+ ],
+ "findings": [
+  {
+   "id": "L2-r14-1",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "listed",
+   "section": "10 10.2 (maintainer block, item d); index, Deferred decisions (the token-narrowing row and the four rows whose trigger is 'the token is narrowed'); 11 11.1 (A16)",
+   "defect": "The event that the token is narrowed is recorded only by 'the four tries repeated with the narrowed token, their API answers saved under Evidence'. The token holder runs those tries from inside the sandbox, and their answers are PR Evidence that 10 10.2 marks [review] with no check reading it. Probe A16, the host-shell read that ADR 0011 decision 2 names next to the four tries, is not cited. A16 is the only measurement of 'limited to this repository', which the new after-state asserts. Neither A16 nor the tries measure that the forwarding of the GitHub authentication SSH key stopped, which is the other half of the narrowing.",
+   "scenario": "At the sitting, the maintainer installs the fine-grained token but the SSH key is still forwarded. The repeated tries show the ruleset update refused (no Administration permission), they are saved under Evidence, and the four Deferred rows and the token row move to the after-state. The record now reads 'limited to this repository', while git over SSH still pushes as the operator to every repository the account reaches. No reader is prompted to check, because the observable the spec chose cannot see it.",
+   "change": "In item d and in the four rows, record the event with three things: A16 run on the host after the narrowing (type, repository list and permissions, recorded by hand); a host-side check that the sandbox's forwarded agent no longer holds the GitHub authentication key (for example, from the sandbox, ssh-add -l lists only the signing key, or ssh -T git@github.com is refused); and the four tries. The maintainer verifies the tries from their own session, as the 2026-10-07 procedure of the maintainer-block note did. Cost: one clause in item d and a shorter cite in each of the four rows ('the narrowing record of 10 10.2, item d').",
+   "evidence": "docs/spec/10-testing-style.md:876-879 'The four tries repeated with the narrowed token, their API answers saved under Evidence, record that the token is narrowed, the event of the Deferred decisions rows whose trigger is \"the token is narrowed\"'. docs/spec/10-testing-style.md:843-845 'The output of each item goes under the Evidence of the PR it belongs to; no check reads that text, so it is **[review]**'. docs/adr/0011-...md:93-100 'The forwarding of the GitHub authentication SSH key to the sandbox stops too ... After it, probe A16 and the four tries of item d of the maintainer block run again'. docs/spec/11-host-probes.md:66 (A16: 'run in the maintainer's host shell ... for a fine-grained token ... its repository list and permissions'). docs/spec.md:348 after-state: 'the narrowed token of ADR 0011, decision 2, limited to this repository'. That the four tries cannot see the SSH key or the repository scope is read from the try list of docs/notes/maintainer-block-of-ci-bootstrap.md:101-106, all of which act on this repository."
+  },
+  {
+   "id": "L2-r14-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (maintainer block, item d, the required-name try, step 3); 05 5.4 (the approval-line row)",
+   "defect": "Step 3 cleans up by closing the throwaway pull request and deleting the side branch and its workflow. The success status and check run that steps 1 and 2 posted belong to the throwaway head's commit, not to the side branch. That head branch is not deleted, so the closed pull request stays reopenable with its required check names green.",
+   "scenario": "Steps 1 and 2 succeed, as 05 5.4 expects a token holder can make them. Step 3 runs as written. Weeks later an agent, or a maintainer tidying old pull requests, reopens the throwaway pull request, or opens a new one from its still-existing head branch. The ruleset sees the required names green on that commit and the merge goes through without any job having run. The 2026-10-07 procedure of the maintainer-block note ended with the maintainer, from their own session, closing the throwaway pull request and deleting its branch, and that step is lost here.",
+   "change": "Step 3 also deletes the throwaway pull request's head branch, and the throwaway head is an empty commit, so a reopen merges nothing. The maintainer checks the cleanup from their own session, as in the note. Cost: one clause.",
+   "evidence": "docs/spec/10-testing-style.md:880-889 '(1) a workflow pushed on a side branch ... posts a commit status and a check run, each under a required check's name, on that pull request's head ... (3) close the pull request, and delete the side branch and its workflow.' docs/notes/maintainer-block-of-ci-bootstrap.md:96-97 'and then closes the throwaway pull request and deletes its branch'. Platform behavior, inferred, not read from a primary source in this round: GitHub attaches commit statuses and check runs to a commit SHA, so deleting a branch does not remove them. The grade rests on the spec text alone: step 3 names no deletion of the head branch."
+  },
+  {
+   "id": "L2-r14-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "listed",
+   "section": "index, Deferred decisions (the token-narrowing row, 'what holds until then'); 05 5.4 (the token row)",
+   "defect": "The after-state lists what the narrowed token can still do as 'merge through the API and push branches and workflows, and so post a check under a required check's name'. The list states as fact what nothing has measured yet, and it omits three things. First, deleting branches and tags (Contents write), the very reason the create-only host-ref row gives. Second, creating or moving a v* tag through the release-tags ruleset's bypass, whose actor is the administrator role the same user holds; whether that bypass applies to a fine-grained token is not measured until the tag try is repeated. Third, editing pull request bodies, approval lines included (Pull requests write).",
+   "scenario": "A reader judges the sandbox's reach after the narrowing from this list, and so treats tags and branch deletion as no longer reachable. If the narrowed token still bypasses the tag ruleset, it can push release.yml on a side branch and tag that commit. The attestation would then pass the verify of 10 10.2, which pins the workflow path and the source digest but no ref (inferred; see out_of_scope). Neither the moved-tag check of 10 10.5 nor any check named in the token row looks at a side-branch release. The create-only host-ref row fires on 'the token is narrowed' while its own reason, that the token can delete branches and tags, still holds, and the list does not say so.",
+   "change": "Phrase the after-state as 'what the four tries repeated with the narrowed token record'. Until they run, list at least: merge through the API; push branches and workflows, and through them post a check under a required name; delete branches and tags; edit pull request bodies; and create a v* tag if the release-tags bypass still applies (the tag try measures it). Use the same list in the 05 5.4 token row. Cost: one sentence in two places.",
+   "evidence": "docs/spec.md:348 'after it, the narrowed token of ADR 0011, decision 2, limited to this repository, which can still merge through the API and push branches and workflows, and so post a check under a required check's name'. docs/spec/05-security.md:392 'The narrowed token can still merge through the API and push branches and workflows, and so post a check under a required check's name'. docs/adr/0011-...md:91-93 'Contents, Pull requests and Workflows read and write'. docs/spec.md:283 '...when the project's token can delete branches and tags'. docs/spec/10-testing-style.md:854-857 tag ruleset: 'creation, update and deletion are refused for everyone except the bypass actor. The administrator role is the bypass actor of the tag ruleset only'. Platform behavior, unmeasured: whether a fine-grained token of an admin user inherits the role's ruleset bypass is not read from a primary source here. The grade rests on the list asserting capabilities with no source and omitting ones the permissions in ADR 0011 grant."
+  }
+ ],
+ "bullet_reconciliation": [
+  "Agent output is data (I24, I29): confirmed for the delta. The path that RJ-338's details print goes through the termsafe writer (04, the Output row), and 03 3.8 adds no new string that crosses to the host unescaped.",
+  "Symlinks and '..' in memory: not touched by the delta; unanswerable here.",
+  "Sandbox holding the operator's account (ADR 0008): the delta reshapes the controls; see L2-r14-1 and L2-r14-3. The compensating control (the security log as a judgment) is kept for both states in docs/spec.md:348.",
+  "Ledger side channels (I33): not touched.",
+  "Boundary B, secrets through error paths: the required-name try's API answers saved under Evidence carry no token value; the A16 row says the value is never recorded. Confirmed for the delta.",
+  "Wrong sandbox (I26): R13-01's rerun loop runs only after the identity step (I17 text 'passes the identity step'). Confirmed; no new path."
+ ],
+ "what_is_missing": [
+  "A16 and a host check that the SSH key forwarding stopped, as the observable of the narrowing (L2-r14-1).",
+  "Deleting the throwaway pull request's head branch in the required-name try, and the maintainer verifying the cleanup from their own session (L2-r14-2).",
+  "A measured, complete after-state capability list (L2-r14-3).",
+  "No bound on the disk that repeated RJ-338 salvages use while a writer keeps running (each one stores a full payload, which I16 never deletes); the existing Deferred row 'reporting and reclaiming the space' covers it, so it is not a finding."
+ ],
+ "postmortem": "After v1.0.0, seen from this lens: (1) the narrowing was recorded from tries run in the sandbox, so a still-forwarded SSH key kept every-repository reach while the record read 'limited to this repository' (index token row, 10 10.2 d, 05 5.4, ADR 0011 d2, 11 A16); (2) the narrowed token kept the tag bypass, and a side-branch release.yml plus a tag yielded an attested archive that the verify without a ref pin accepted (05 5.4 token row, index checksums row, S1, 10 10.2 verification contract, 09 J1); (3) the throwaway pull request of the required-name try was reopened with green required names on its head and merged (10 10.2 d, 05 5.4 approval-line row).",
+ "lens_critique": "What this lens gets wrong about success: it frames success as agent output reaching the host as data, but in this delta the risk is agent-produced evidence deciding a security state (which state a deferral is in, which trigger has fired). Success should add that every transition of a trust state is observed by an actor outside the boundary it constrains. Missing viewpoint, given only the lens titles: still one for the CI platform's own trust model, meaning what GitHub binds to a commit, a ref, an app or a role (statuses on a SHA, bypass by role versus by token, attestation identity by path versus by ref). Rounds 11 to 13 asked for it, and all three platform findings here rest on that model.",
+ "out_of_scope": [
+  "The attestation verify of 10 10.2 (docs/spec/10-testing-style.md:784-787), S1 and 09 J1 pins --signer-workflow by path and --source-digest, but no ref (--source-ref or an @ref on the signer workflow). With Workflows write and a bypassed v* tag, a release.yml on a side branch could produce an attestation that passes. This is outside the delta and inferred from gh's flags, not read from gh's source in this round; it is offered for the round that next touches 10 10.2's verification contract or the pull request that adds release.yml.",
+  "main-merge.diff (PR #34, mise and hook environment) was not read beyond confirming it does not touch item d or the token rows."
+ ],
+ "confidence": "High that the spec text says what the evidence quotes. Medium on the platform behaviors behind L2-r14-2 and L2-r14-3 (status lifetime on a SHA, bypass inheritance for fine-grained tokens), which are inferred and not read from GitHub's documentation in this round. The grades rest on the spec text alone.",
+ "pages_read": [
+  "delta.diff (whole)",
+  "docs/reviews/round-13.md (rows R13-01 to R13-04 and L2-r13-2, write pass, checkpoint)",
+  "docs/reviews/round-13/reports/L2.json",
+  "docs/spec/10-testing-style.md 780-889",
+  "docs/notes/maintainer-block-of-ci-bootstrap.md 80-112",
+  "docs/adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md (grep plus 86-104)",
+  "docs/spec/11-host-probes.md A16 row",
+  "docs/spec/04-cli.md Output and Error ids rows",
+  "docs/spec.md Deferred decisions rows in the delta",
+  "docs/spec/05-security.md 5.2 I17 and 5.4 rows in the delta",
+  "docs/reviews/lenses.md L2 section"
+ ]
+}

@@ -1,0 +1,39 @@
+{
+ "header": "L12 · The parallel-execution engineer · sonnet",
+ "verdict": "My three round-10 findings are plan-only and parked for stage B (P1, P2); none carried Status A or M, so nothing is checked as resolved. The delta adds one Required defect (the pr package's import-closure rule is stated over file globs and conflicts with the layout) and one Advisory (the order of the tooling PR and the pr-building task).",
+ "prior_checked": 0,
+ "prior_resolved_as_stated": 0,
+ "findings": [
+  {
+   "id": "L12-R11-1",
+   "kind": "new",
+   "severity": "Required",
+   "section": "05 5.3 (pr built from tools/ci/pr, go list -deps test); 12 12.4 (the pr job); 02 tools/ci row; 12 12.4 approvalLine in tools/ci/askfirst.go",
+   "defect": "The closure rule compares the packages of go list -deps with the approvals globs, and two of those globs are files (tools/ci/askfirst.go, tools/ci/denylist.yaml), not packages. approvalLine lives in tools/ci/askfirst.go, which sits in the package of tools/ci (a main package, run as go run ./tools/ci). A main package cannot be imported, and a package holds all its files: importing the package of askfirst.go pulls in every other file of that package, which are grantable. The 02 layout says tools/ci holds one package per step under tools/ci/internal/<step>/, lists no tools/ci/pr and no askfirst package, and 12 12.2 still shows go run ./tools/ci pr as the subcommand.",
+   "scenario": "The agent building T005 cannot satisfy both rules. Either pr re-implements approvalLine inside tools/ci/pr (two copies, so the check in tools/ci fast and the job can disagree), or it imports a package that is on no approvals glob and the go list -deps test fails, or the agent widens the globs to a whole package and edits an ask-first file in a PR no task forecasts. Each choice is made late and alone, and the shared file sets of the tooling PRs depend on it.",
+   "change": "Name the package that holds the approval-line, grant and denylist code (for example tools/ci/internal/approvals), put that directory on the approvals globs in place of the two files, list tools/ci/pr and that package in the 02 layout, say in 12 12.2 which commands call pr as a subcommand of the dispatcher and which as the separate main, and state that the test compares package directories with the globs.",
+   "prior_ref": ""
+  },
+  {
+   "id": "L12-R11-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "05 5.3 (the globs gain tools/ci/pr/** in the tooling pull request of the task that builds pr); plan.md T005",
+   "defect": "The glob change is an ask-first edit to .github/ask-first.yaml, which 12 12.2 counts as overlapping every in-flight PR, and it must land with or before the first file under tools/ci/pr/**, yet T005 depends only on T003 and no text orders the two.",
+   "scenario": "T005 is built in parallel with other ci-bootstrap tasks. Its first diff under tools/ci/pr/** merges before the glob exists, or the glob PR waits for a per-PR approval line while T005 waits for the glob. The pr package then runs for a window with its own paths off the approvals surface.",
+   "change": "Fold the glob change into the pr-building task's first PR, or give it a place before T005 in the same tooling PR that stage B creates for the sbxdrv surface (parked P2), so the barrier is one PR with one unticked line.",
+   "prior_ref": ""
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L12 section)",
+  "docs/reviews/round-10/reports/L12.json",
+  "docs/reviews/round-10.md (parked P1, P2)",
+  "docs/spec/05-security.md (delta, 5.3)",
+  "docs/spec/12-engineering.md (delta, 12.1, 12.4)",
+  "docs/spec/02-layouts.md (tools row)",
+  "docs/spec/10-testing-style.md (pr rows, grep)",
+  "docs/plan.md (T005)"
+ ],
+ "out_of_scope": "The rest of the delta (01, 03, 04, 06, 08, 09, 11, ADR 0010) was only skimmed through its stat; the plan part of my round-10 findings stays parked for stage B and is not re-reported."
+}

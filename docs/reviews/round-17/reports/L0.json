@@ -1,0 +1,125 @@
+{
+ "header": "r17.L0 · The control reviewer · opus",
+ "verdict": "The round-16 pass resolves five of the six L0 findings as stated and L0-r16-3 in a narrower form (decision 1 has a step and a pass, but its answer's pull request is still unnamed); it opens new seams, all Advisory: the later-read cadence lives only in the note and not in the O3, O6 and O7 rows, read 2's expected answer requires a signing-only socket that ADR 0011 and R16-11 leave to the maintainer, the not-narrowed event has no trigger cell and may target rows that already left the table, and the plan's opening says the operator's token is held 'until block O8' as if the tag working agreement then lapses.",
+ "prior_checked": 6,
+ "prior_resolved_as_stated": 5,
+ "prior_resolution_notes": {
+  "L0-r16-1": "R16-05 (A) resolved as stated: the first narrowed entry has a fourth part for item h (note:126-130) and item h runs only after such an entry and saves there (10 10.2:920-928). Residue folded into L0-r17-7: the gate is 'holds an entry', not 'the newest entry is narrowed', and the fourth part has no date of its own.",
+  "L0-r16-2": "R16-04 (A) resolved as stated: read 2 has the three parts (note:153-164). It introduces L0-r17-2 (the expected answer is stricter than ADR 0011 decision 2) and checks only the signing key's fingerprint against the account page.",
+  "L0-r16-3": "R16-07 (M) resolved in a narrower form: O8 names decision 1 and its pass (plan.md:221), but the answer goes 'under the Evidence of the pull request that records it' and no pull request is named in O8, item a or ADR 0011; O8's Unblocks column still omits S2. See L0-r17-6.",
+  "L0-r16-4": "R16-06 (A) resolved as stated: the rows returned are named, the referent is 'the rows the first narrowed entry fired', and same-date entries carry a time (note:126-141). The added clause 'is an event of those four rows too' opens L0-r17-3; the heading-with-time format is not spelled out.",
+  "L0-r16-5": "R16-08 (A) resolved as stated: 'a read made once release.yml exists leaves it out and records the tag answer as not measured' (note:169-170) and index row 348 says the tag answer is measured only by an entry made before release.yml lands.",
+  "L0-r16-6": "R16-09 (A) resolved as stated: the four rows link the note's anchor (spec.md:279, 283, 351, 353), item g ties the first narrowed entry to ADR 0011 decision 2, and the plan reads 'until block O8' (plan.md:204). Leftovers in L0-r17-8; the new opening wording opens L0-r17-4."
+ },
+ "findings": [
+  {
+   "id": "L0-r17-1",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block (The token narrowing, cadence and read 3); plan (blocks O3, O6, O7); 11 11.2",
+   "defect": "The note makes a later read due at each sitting of blocks O3, O6 and O7, but no plan row carries it, and its merge try at a release sitting is not ordered against the candidate, the pre-tag check and the v1.0.0 tag.",
+   "scenario": "The maintainer runs O6 and O7 from the plan's rows, which say nothing of the read, so the read is skipped and the narrowing goes unread through the release; or the maintainer remembers it and runs read 3 at O7, merging a throwaway pull request whose revert, after decision 1, is itself a pull request waiting on the four required checks. 11 11.2 counts a result on the candidate when, from the candidate's commit to the v1.0.0 tag, only docs/ and root Markdown paths differ, and tools/ci acceptance checks that before the tag, so a merge reverted before the tag changes no path and an unreverted non-docs payload is caught by the pre-tag check rather than shipped; hence Advisory, not Required: the text does not make O7 tag the wrong commit, it costs a stalled sitting or a new candidate when the payload is not empty.",
+   "change": "Each of O3, O6 and O7 names the later read in 'What the maintainer does' and its time in the wait column; the note says the read runs before the candidate tag at O6 and after the v1.0.0 tag at O7 (or skips the merge try once a candidate exists), and that its payloads are empty commits. Cost: three plan cells and one sentence in the note.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:122-124 'one for each later read, which is due at each sitting of blocks O3, O6 and O7 of the plan'; docs/notes/maintainer-block-of-ci-bootstrap.md:87 'try four things with throwaway payloads'; :97 'the merge reverted'; grep -n 'later read|entry of the note|token narrowing|narrowed' docs/plan.md hits only lines 221 and 319; docs/spec/11-host-probes.md:124-126 'the only paths that differ are under `docs/` or are Markdown files at the repository root'; :130 '`tools/ci acceptance` checks that for each block B result'."
+  },
+  {
+   "id": "L0-r17-2",
+   "kind": "regression",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block (The token narrowing, read 2 and the verdict); plan (block O8, Recommendation); ADR 0011 decision 2",
+   "defect": "Read 2 expects 'the setting names one socket; that socket holds the signing key', and the verdict requires read 2 to match, so a narrowing that stops the forwarding by forwarding nothing reads not narrowed, although ADR 0011 decision 2 decides only that the authentication key's forwarding stops and R16-11 states that how is the maintainer's choice.",
+   "scenario": "The maintainer, following ADR 0011 rather than O8's recommendation, stops forwarding any agent socket; read 2 finds no socket, the entry reads not narrowed, the four rows never fire and item h never runs. Advisory because O8's recommendation leads a maintainer who follows the plan to a signing-only socket, which matches; the defect bites only off the recommended path. Also, part 3 compares only the signing key's fingerprint with the account page, while part 2's 'no GitHub authentication key' needs every forwarded fingerprint checked against the authentication list.",
+   "change": "Read 2's expected answer becomes 'no forwarded socket holds a key the account page lists under authentication keys; when a socket is forwarded, the signing key is listed only under signing keys', with each forwarded fingerprint compared. No ADR change is needed. Cost: two sentences in the note.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:158-161 'Expected: the setting names one socket; that socket holds the signing key and no GitHub authentication key; and the signing key's fingerprint is listed on the page only under signing keys'; :179 'The token is narrowed when the A16 read and the three parts of read 2 match what is expected'; docs/adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md:93-94 'The forwarding of the GitHub authentication SSH key to the sandbox stops too'; docs/reviews/round-16.md R16-11 write pass 'how the forwarding stops is the maintainer's choice'."
+  },
+  {
+   "id": "L0-r17-3",
+   "kind": "regression",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block (The token narrowing, the entry rule); index (Deferred decisions opening; rows 279, 283, 351, 353)",
+   "defect": "The note makes a later not narrowed entry 'an event of those four rows too', but the four trigger cells name only the first narrowed entry, the index says a row leaves the table when its event happens and the decision is made, and a re-narrowing after a not narrowed entry is no event at all.",
+   "scenario": "The first narrowed entry fires the four rows, each is decided and leaves the table; a later read finds an extra permission and writes not narrowed; the note says the decisions are reviewed again, but the rows are gone, their cells never named this event, and nobody files the `deferred` issue the index requires for a review-only event; when the token is narrowed again, nothing reopens what was decided on the not narrowed premise.",
+   "change": "Each of the four trigger cells adds 'or a later entry whose verdict differs from the one before it', the note says a row that left the table is restored with its last decision when such an entry is written, and O8's pass (or the note) says the maintainer files one `deferred` issue per row the entry fires. Cost: four cell edits and two sentences.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:136-141 'is not narrowed returns the token narrowing row ... and is an event of those four rows too, so the decision each took on the narrowed premise is reviewed again'; docs/spec.md:255-257 'A row leaves the table when its event happens and the decision is made. A cell states what holds and the event'; docs/spec.md:279 'or the token is narrowed, as the first narrowed entry of [the note on the maintainer block] records it'."
+  },
+  {
+   "id": "L0-r17-4",
+   "kind": "regression",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "plan (Operator blocks, opening paragraph); index (row 348)",
+   "defect": "The opening ties the maintainer-pushes-tags working agreement to the operator's token being held 'until block O8', which reads as if the reason lapses after O8, although whether the narrowed token passes the tag ruleset's bypass is not measured, and never is when O8 runs after release.yml.",
+   "scenario": "After O8 an agent session reads the opening, concludes the tag ruleset now binds the sandbox's token, and treats the working agreement as moot; nothing measured supports that, and the index row says the tag answer can stay not measured.",
+   "change": "'which the sandbox holds until block O8, and whose narrowed successor's reach on `v*` tags the entry of the note measures, or records as not measured'. Cost: one clause.",
+   "evidence": "docs/plan.md:202-204 'the two `v*` tags, which the maintainer pushes by working agreement, since the tag ruleset does not bind the operator's token, which the sandbox holds until block O8'; docs/spec.md:348 'whether it can create a `v*` tag through the tag ruleset's bypass is measured only by an entry made before `release.yml` lands, and stays not measured otherwise'."
+  },
+  {
+   "id": "L0-r17-5",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block (the entry rule); 05 5.4 (token row); index (row 348)",
+   "defect": "The return rule sends the 05 5.4 token row and index row 348 'to the state before the narrowing', but both are written only in that state and nothing says who rewrites them into a narrowed state at the first narrowed entry.",
+   "scenario": "The first narrowed entry lands; 05 5.4 still reads 'The development sandbox's GitHub token is the operator's own' and 'is applied at the next maintainer sitting'; a later not narrowed entry 'returns' rows that never left that state, so the rule does nothing and the spec misstates the token through v1.0.0.",
+   "change": "The note says the first narrowed entry is followed by a pull request that rewrites the 05 5.4 token row and row 348's 'until the narrowing' clause into the narrowed state, and the return rule reverts that pull request's wording. Cost: one sentence.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:136-139 'returns the token narrowing row of the index and the token row of 05 5.4 to the state before the narrowing'; docs/spec/05-security.md:392 'The development sandbox's GitHub token is the operator's own' and 'is applied at the next maintainer sitting, and the token stands until then'."
+  },
+  {
+   "id": "L0-r17-6",
+   "kind": "unresolved",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "plan (block O8, Pass and Unblocks); 10 10.2 (item a); index (S2)",
+   "defect": "Decision 1's API answer is saved 'under the Evidence of the pull request that records it', and no text names that pull request, while O8 has no pull request of its own and its Unblocks column omits S2.",
+   "scenario": "At O8 the maintainer removes the bypass and holds the API answer with no pull request to paste it into; it stays in a local file, item a keeps 'Until that step', and S2's evidence stays at 'the run, not the ruleset' because the place S2 reads is never updated. Advisory: the step itself is done right, only its record has no named home. Naming the pull request changes no ADR decision, since ADR 0011 leaves it unnamed.",
+   "change": "O8 names the pull request: the next pull request after the sitting, which rewrites item a's 'Until that step' into the past tense with the date and pastes the answer under its Evidence; O8's Unblocks adds S2 and the local-gates row. Cost: two plan cells.",
+   "evidence": "docs/plan.md:221 Pass 'the API answer of the default-branch ruleset showing no bypass actor, saved under the Evidence of the pull request that records it, as ADR 0011, decision 1, says' and Unblocks 'the Deferred decisions rows whose trigger is \"the token is narrowed\"'; docs/spec/10-testing-style.md:863-864 'the API answer, saved under Evidence, that shows the default-branch ruleset with no bypass actor'; docs/adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md:82-83 'save the API answer under the Evidence of the pull request that records it'."
+  },
+  {
+   "id": "L0-r17-7",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (item h); the note on the maintainer block (the fourth part)",
+   "defect": "Item h runs 'once the note holds an entry whose verdict is narrowed', not once the newest entry is narrowed, and its answers are written into the first narrowed entry, under that entry's date, with no date of their own.",
+   "scenario": "O8 writes a narrowed entry; a later read at O3 writes not narrowed; item h runs at a later sitting, measures a token that is no longer narrowed, and files the answers under the first entry's older date, so the record says they describe the narrowed token on that date.",
+   "change": "'run only while the newest entry's verdict is narrowed'; the fourth part opens with the date it was run. Cost: two clauses.",
+   "evidence": "docs/spec/10-testing-style.md:920-928 'run only once the note holds an entry whose verdict is narrowed ... save the API answers in the fourth part of the note's first entry whose verdict is narrowed'."
+  },
+  {
+   "id": "L0-r17-8",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "index (row 348); 05 5.4 (token row); 10 10.2 (item g); plan (block O8)",
+   "defect": "Leftover seams: row 348 and the 05 5.4 token row still point at 'the entry of 10 10.2, item g' and say the narrowing is 'applied at the next maintainer sitting' while O8 says after T002 and before C7; item g says ADR 0011 decision 2 fires the 'trigger' rows while the decision names two of the four; O8 needs 'a throwaway pull request' while item h and read 3's merge try use two.",
+   "scenario": "A reader following row 348 lands on item g, which only cites the note; a reader of ADR 0011 counts two fired rows where the spec counts four; the maintainer prepares one throwaway pull request and closes it in item h before the merge try needs one.",
+   "change": "Row 348 and the 05 5.4 row link the note's anchor and say 'at block O8'; item g says 'the two rows ADR 0011 decision 2 names and the two others whose trigger is the same'; O8 reads 'two throwaway pull requests'. No ADR change. Cost: four small edits.",
+   "evidence": "docs/spec.md:348 'that the entry of [10 10.2](spec/10-testing-style.md#release-and-bootstrap), item g, reads' and 'applied at the next maintainer sitting'; docs/spec/05-security.md:392 'which the entry of [10 10.2](10-testing-style.md#release-and-bootstrap), item g, reads'; docs/adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md:97-99 'fire when it is applied: the check that reads the rulesets again and the signed approval record'; docs/plan.md:221 Also needs 'a throwaway pull request'."
+  }
+ ],
+ "what_is_missing": "The later-read cadence in the O3, O6 and O7 rows, with its order inside a release sitting and an empty-payload rule; a named pull request for decision 1's answer and S2 in O8's Unblocks; a read 2 expected answer that matches ADR 0011 decision 2 and checks every forwarded fingerprint; the not-narrowed and re-narrowed events in the four trigger cells and a rule for rows that already left the table; who files the `deferred` issues for the review-only token events; item h gated on the newest entry and a date on the fourth part; the narrowed-state text of the 05 5.4 token row and row 348 and the step that writes it.",
+ "postmortem": "The maintainer works from the plan's block rows, and the pass put three obligations elsewhere: later reads (note only), the `deferred` issues for the token events (nowhere), and the pull request for decision 1's answer (unnamed). The reads lapse, or run mid-O7 and stall the tag behind a revert pull request. A maintainer who stops the forwarding by forwarding nothing, as ADR 0011 allows, gets not narrowed, so the signed approval record and the ruleset reread never reopen before v1.0.0 and 05 5.4's 'process only against an agent' stays the only control. The tag working agreement is read as moot after O8 on the strength of 'until block O8', which nothing measured. The rows a regression entry 'returns' never had a narrowed state, and the rows it 'reopens' had left the table. Unsaid: every control here is [review] and read by the person who sits, and no success criterion fails while the token stays broad except through S2's fallback. Crosses the note (The token narrowing), 10 10.2 a, g, h, plan opening and O3, O6, O7, O8, the index's Deferred decisions opening and rows 279, 283, 348, 351, 353, 05 5.4, ADR 0011 decisions 1 and 2, 11 11.2, S1 and S2.",
+ "lens_critique": "Reading success only through S1 to S11 under-weights process controls no S row measures: the token narrowing and the bypass removal touch success only through S2's fallback wording, so this lens can call them complete when they are only scheduled, and it tends to grade their seams Advisory because no criterion turns red. It also reads text, not calendars: whether an obligation lands on a sitting the maintainer actually holds is outside the S rows.",
+ "missing_viewpoint": "The operator as the one human in the loop, whose sittings and attention are the budget every maintainer block and [review] control spends; L14 is the maintainer on duty for incidents, not the person whose calendar the blocks consume and whose missed step silently disables a control.",
+ "out_of_scope": "The salvage text of the round-16 pass (RJ-338, 01 1.6, 03 3.8, 08 8.5, I17), reviewed by other lenses; the date discrepancy of the first four tries (2026-10-07 versus 2026-10-08); plan O1 describing items a to d as still to run.",
+ "confidence": "high for L0-r17-3, -4, -5, -6, -7, -8 (read directly in the text); high for the grading of L0-r17-1 (11 11.2's path rule and the pre-tag acceptance check read at 54f674c), medium for its likelihood, which depends on payloads the text leaves open; medium for L0-r17-2, since whether a sandbox can still sign without a forwarded socket depends on the kit, which was not read.",
+ "pages_read": [
+  "git diff 3c32d62..54f674c over docs/spec.md, docs/spec, docs/plan.md, docs/notes (scoped parts)",
+  "docs/notes/maintainer-block-of-ci-bootstrap.md (item d, 86-110; The token narrowing, 115-192)",
+  "docs/spec/10-testing-style.md (10 10.2 maintainer block, 841-944)",
+  "docs/plan.md (Operator blocks, 199-221; phase 7 row, 319)",
+  "docs/spec.md (principles 98-125; S1-S11, 142-152; Deferred decisions opening 250-264; rows 279, 283, 348, 351, 353)",
+  "docs/spec/05-security.md (5.4 approval-line and token rows, 391-392)",
+  "docs/spec/00-scope.md (0.1)",
+  "docs/spec/11-host-probes.md (11 11.2, 120-145)",
+  "docs/spec/12-engineering.md (12 12.2, 225-236)",
+  "docs/adr/0011 (Decision)",
+  "docs/reviews/round-16.md (rows R16-04 to R16-11, Write pass)",
+  "docs/reviews/round-16/reports/L0.json",
+  "docs/reviews/lenses.md (lens titles)"
+ ]
+}

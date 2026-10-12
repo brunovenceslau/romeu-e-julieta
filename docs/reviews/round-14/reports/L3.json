@@ -1,0 +1,73 @@
+{
+"header": "L3 · The maintainer three years from now · sonnet",
+"verdict": "The round-13 write pass keeps the salvage rule in one home and makes the narrowing event nameable, but the event is not provable or findable and the failure count has no reset; the largest gap is the 'token is narrowed' observable (10 10.2 item d).",
+"prior_checked": 2,
+"prior_resolved_as_stated": 2,
+"prior_resolution_notes": {
+ "L3-R13-1": "R13-01 promised one home in RJ-338 ('third or a later'), 03 3.8 linking it, 01/08 citing without the number, I17 fourth rerun and excludeIgnored edit: all present. Reset was never promised; see L3-r14-2.",
+ "L3-R13-2": "R13-03 promised the event as four tries repeated with the narrowed token saved under Evidence, cited by four rows, both token states in the Until-then cell, pre-narrowing triggers kept with a reason: all present. The observable itself is weak; see L3-r14-1."
+},
+"findings": [
+{
+ "id": "L3-r14-1",
+ "kind": "new",
+ "severity": "Advisory",
+ "origin": "own",
+ "section": "10 10.2 (maintainer block, item d); spec.md Deferred decisions (four rows that fire on 'the token is narrowed'); ADR 0011 decision 2",
+ "defect": "The event 'the token is narrowed' is defined as 'the four tries repeated with the narrowed token, saved under Evidence', which neither proves narrowing nor can be found later.",
+ "scenario": "A maintainer applies the narrowing, repeats the tries, and gets the same answers as before, because the narrowed token still merges and pushes workflows and only the direct push was ever refused. Nothing separates old from new. The answers are saved under the Evidence of 'the PR it belongs to', but a host step has no PR, and 'no check reads that text'. In three years nobody can say whether the checksums-signature and create-only-ref rows fired. ADR 0011 decision 2 says the rows fire 'when it is applied' and that probe A16 reruns; the spec says they fire when the tries are saved.",
+ "change": "Define the event as a dated line in docs/notes/maintainer-block-of-ci-bootstrap.md (greppable, already the record of items a to d) that holds the A16 read of type and scopes, an Administration call the token is refused, and the four tries. Make ADR 0011 and the four rows cite that line. Cost: one note line and a few words in five places. No task builds it; it is a maintainer step.",
+ "evidence": "10-testing-style.md:876-878 'The four tries repeated with the narrowed token, their API answers saved under Evidence, record that the token is narrowed'; 10-testing-style.md:843 'goes under the Evidence of the PR it belongs to; no check reads that text'; adr/0011 'The Deferred rows ... fire when it is applied'; the four tries are listed only in docs/notes/maintainer-block-of-ci-bootstrap.md (10 10.2 item d does not link it)."
+},
+{
+ "id": "L3-r14-2",
+ "kind": "unresolved",
+ "severity": "Advisory",
+ "origin": "own",
+ "section": "03 3.8 (salvage[].cause); 04 4.4 RJ-338; 05 5.2 I17",
+ "defect": "'In a row' counts the newest fingerprint-changed entries of the whole generation and nothing resets it, so a single late edit can exit 5.",
+ "scenario": "Inside a removing generation every new entry is fingerprint-changed, and a resumed sbx env rm that fails adds no entry. After three changes spread over days of a failing sbx env rm, the fourth single edit salvages and exits 5 once. The maintainer sees 'third in a row' and finds no reset rule. I17 tests only a constant writer.",
+ "change": "Add one sentence to RJ-338: the count is not reset by a resumed sbx env rm, so the exit is one extra rerun, or state a reset. Add an I17 case with three changes over separated reruns and a single fourth edit. Cost: one sentence and one test.",
+ "evidence": "03-formats.md:483 'the newest entries of the generation with fingerprint-changed, which fingerprint-unstable counts'; 04-cli.md:326 'on the third or a later salvage in a row'; the round-13 report L3-R13-1 asked for 'or reset by a resumed sbx env rm'."
+},
+{
+ "id": "L3-r14-3",
+ "kind": "new",
+ "severity": "Advisory",
+ "origin": "own",
+ "section": "03 3.8 (salvage[].cause); 01 1.6 (closed-lost rows)",
+ "defect": "'requested' is defined as 'any salvage a changed fingerprint did not start', so the lost record that run writes for a lost generation gets a cause no one requested, and a future cause would fall under it silently.",
+ "scenario": "A T-task for run step 2 writes result lost with cause requested. A later automatic salvage is added and also reads as requested. A reader of the state file cannot tell a user's salvage from a crash-recovery record.",
+ "change": "Make cause a closed list (requested, fingerprint-changed, and the value of a lost record, or state that a lost record carries requested) and say a new value needs a format change. Cost: one cell in 03 3.8.",
+ "evidence": "03-formats.md:484 'requested for any salvage a changed fingerprint did not start'; 01-system-model.md closed-lost rows keep or write a lost record without saying a cause."
+},
+{
+ "id": "L3-r14-4",
+ "kind": "new",
+ "severity": "Advisory",
+ "origin": "listed",
+ "section": "10 10.2 (maintainer block, items d and e); spec.md token-narrowing row; 05 5.4 (approval-line and token rows)",
+ "defect": "The to-do steps of item d (the narrowed-token tries and the three-step required-name try) sit under 'Items a to d ran ... holds now', while the 'To do' list holds only e and f; and the vocabulary splits across operator and maintainer for one person.",
+ "scenario": "A maintainer who reads the To-do list does the narrowing and never the tries, so the event never happens. In the same index row, 'the operator's own token' and 'the maintainer step' are the same person, which is the two-names concern of this lens. The token row's 'the try that would have measured it is not made' names no try, next to the named 'required-name try'.",
+ "change": "Move the item d to-do steps under 'To do' as their own letter, keeping the done part in d; name the unmade try ('the ruleset-disable try') in 05 5.4; add operator and maintainer to 01 1.7 as one sentence each. Cost: an edit of three sections; the letters cited as 'item d' must be rechecked.",
+ "evidence": "10-testing-style.md:843-848 'Items a to d ran ... holds now' versus :893 'To do, each a maintainer step ... e. ... f.'; 05-security.md:392 'the try that would have measured it is not made'; spec.md token row 'the operator's own token' and 'the sitting that applies the narrowing'."
+},
+{
+ "id": "L3-r14-5",
+ "kind": "new",
+ "severity": "Advisory",
+ "origin": "own",
+ "section": "05 5.2 (I17); spec.md token-narrowing row; 01 1.6",
+ "defect": "The pass makes normative cells longer and narrates history in them, which works against 'simple and explicit'.",
+ "scenario": "I17 is one cell with about twenty E: clauses and now two more, which cannot be diffed or cited by case title. The index row says 'the sitting that applies the narrowing is no longer one ... (round 13, R13-03)', and 01 1.6 now reads 'the count that fingerprint-unstable sets', a row that cannot be read alone. After a hundred pull requests the cell is the file nobody reviews.",
+ "change": "Split the I17 clauses into a list of case titles (a test-name list under the row) and drop the 'no longer one' sentence from the normative row. Cost: a restructure under the doc rule 'text a test asserts on stays byte-identical', so the move must be word-diffed.",
+ "evidence": "05-security.md:172 (the I17 cell); spec.md token row 'is no longer one, since it only ended the state before it (round 13, R13-03)'; 01-system-model.md:311 'reach the count that fingerprint-unstable sets'."
+}
+],
+"what_is_missing": "A reset rule for the failure count; a closed list of cause values; a provable and findable definition of 'the token is narrowed'; the four tries listed where item d cites them; the named unmade ruleset-disable try; operator and maintainer in 01 1.7.",
+"postmortem": "After v1.0.0: (1) the narrowing is applied, the tries give the old answers, and nobody can say whether the narrowed-token rows fired (10 10.2 d, spec.md rows, ADR 0011). (2) A long sbx outage makes rm exit 5 on one edit, and the maintainer finds no reset rule (03 3.8, 04 4.4, I17). (3) A new lost-record writer picks requested and the cause stops meaning anything (03 3.8, 01 1.6).",
+"lens_critique": "The lens counts nouns and sources, but a reviewer of the text pass should also count events: a deferred row that fires on an event nobody can observe is a concept that exists only in memory. The lens does not ask for that.",
+"out_of_scope": "Whether the narrowed token can post a status (a measurement to do), the facts of GitHub permissions, and the pull request 34 text; plan T005 (b), (c), (e) read as promised, with one odd fixture setup (a go.work already tracked on the base needs a base that already breaks the hygiene rule).",
+"confidence": "Medium-high on the text; the reset behavior is read from 03 3.8 and 01 1.6, not from running code.",
+"pages_read": ["delta.diff", "docs/spec/01 1.6", "03 3.8", "04 4.4", "05 5.2 I17 and 5.4", "08 8.5", "10 10.2 maintainer block", "docs/spec.md Deferred decisions", "docs/plan.md T005", "docs/notes/maintainer-block-of-ci-bootstrap.md", "docs/adr/0011", "round-13.md rows R13-01 and R13-03", "round-13 L3 report", "lenses.md L3"]
+}

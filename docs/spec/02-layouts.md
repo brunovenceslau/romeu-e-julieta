@@ -60,7 +60,7 @@ romeu-e-julieta/
 │  ├─ fakesbx/                 fake sbx that replays recorded sessions only
 │  └─ testdata/sbx/<version>/  redacted sbx help text and argv/stdout/stderr/exit sessions (*.jsonl)
 ├─ tools/
-│  ├─ ci/                      every check CI runs and its committed data: denylist.yaml (forbidden names, hashed, and the never-tracked file names), prose.yaml, headings.yaml, testdata/; one package per step under tools/ci/internal/<step>/, registered in one dispatcher table, and generate.go calls one generator list per package
+│  ├─ ci/                      every check CI runs and its committed data: denylist.yaml (forbidden names, hashed, and the never-tracked file names), prose.yaml, headings.yaml, testdata/; one package per step under tools/ci/internal/<step>/, listed by a dispatcher table generated from those packages (12 12.3), so a new step edits no shared table, and generate.go calls one generator list per package
 │  ├─ new/                     scaffolding: adr, invariant, probe, kit, command, lesson
 │  ├─ schemagen/               reflect-based JSON Schema generator from the Go types and rules.go
 │  ├─ release/                 release subcommands (10 10.2)
@@ -76,6 +76,7 @@ romeu-e-julieta/
 │  ├─ reference/               generated reference pages (12 12.3)
 │  ├─ probes/                  committed probe-result.v1 files (blocks A and B)
 │  ├─ acceptance.json          evidence per success criterion (acceptance.v1)
+│  ├─ grants.yaml              checkpoint grants that stand in for approval lines (12 12.4); read by tools/ci pr alone; an ask-first surface
 │  └─ lessons/                 one file per lesson (NNNN-<slug>.md), with the check that enforces it; README.md is the generated index
 ├─ .githooks/pre-push          mode 100755; runs go run ./tools/ci fast with git's arguments and stdin
 ├─ .golangci.yml               linter configuration (10 10.2, lint)
@@ -83,7 +84,7 @@ romeu-e-julieta/
 ├─ .github/CODEOWNERS          generated from ask-first.yaml
 ├─ .github/workflows/ci.yml, release.yml, fuzz.yml (scheduled; long fuzz runs and tools/ci mutate)
 ├─ .github/pull_request_template.md   Why / What changed / Evidence / Middleware / Lessons
-├─ .github/ISSUE_TEMPLATE/     two issue forms: a bug, a catalog gap (12 12.7)
+├─ .github/ISSUE_TEMPLATE/     two issue forms: a bug, a catalog gap; the label `deferred` lands with them (12 12.7)
 ├─ COPYING (with the first code change), REUSE.toml, LICENSES/, README.md, SECURITY.md
 ```
 
@@ -129,8 +130,9 @@ itself (its primary repo URL equals the host settings' `config.url`).
 romeu reads this repo only through git objects at a named commit
 (`git cat-file`), never from a working tree. The config project's own spec
 lists in `egress.extra` the registry hosts of the host settings'
-`workloadRepositories` and `api.github.com`, which `julieta pin
-workload` and `julieta pin check --workflows` read
+`workloadRepositories`, which `julieta pin workload` and `julieta pin
+check --workflows` read; `api.github.com` comes from the catalog's base
+set and is not listed there
 ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)). The config repo names
 private repositories, secret names and internal domains: keep it private
 unless every project in it is public. The maintainer's own config repo
@@ -144,7 +146,7 @@ $ROMEU_ROOT/                            default $HOME/dev; never a VS Code trust
 ├─ review.code-workspace                derived: folders = every review checkout; open in Restricted Mode
 ├─ .attic/<name>/<UTC-ts>/              retired projects (moved, never deleted by romeu); .attic/ is mode 0700
 └─ <name>-env/                          one per project; <name> = sandbox name; mode 0700
-   ├─ .metadata_never_index             written by sync, outside every mount; keeps Spotlight from parsing agent-written files
+   ├─ .metadata_never_index             written by sync, outside every mount; keeps Spotlight from parsing agent-written files (probe A17)
    ├─ sbxenv.yaml                       derived, never hand-edited; the promotion commit point
    ├─ .romeu/
    │  ├─ render.json                    derived: spec source, SHAs, file digests, egress, digests, promotion marker
@@ -155,6 +157,9 @@ $ROMEU_ROOT/                            default $HOME/dev; never a VS Code trust
    ├─ review/<dir>/                     hardened review checkout (created by `romeu pull`)
    └─ memory/<dir>/                     per-repo memory, mounted rw into this project's sandbox only; sync creates it 0700, julieta writes its files 0600
 ```
+
+The supported daily setup: edit and debug inside the sandbox; the host
+clones are for reading, in Restricted Mode.
 
 The tree is an illustration: the names romeu reserves inside
 `<name>-env/` are listed once, in the repo `dir` rule of
@@ -269,8 +274,9 @@ an operator clone used for navigation and egress derivation, holding
 romeu's refs (2.3).
 
 The decision rests on documented sbx behavior (additional workspaces are
-direct mounts), read for the sbx version that probe A1 records, and
-does not wait for a probe; probe A3 confirms it again at that version.
+direct mounts) as documented when this was written, re-confirmed by
+probe A3 at the sbx version that probe A1 records; it does not wait for
+a probe.
 A3 measures what still is mounted: that memory dirs refuse or survive
 planted content as 08 expects, that the `readOnly` mount `.romeu/bin`
 is enforced, and that a write from the sandbox to the primary host

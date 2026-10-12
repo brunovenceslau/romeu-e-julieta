@@ -1,0 +1,72 @@
+{
+  "header": "L13 · The reader who holds the spec against itself · opus",
+  "verdict": "Met for round 11: the four L13 findings with status A or M (R11-01 and R11-02 as T005 requirements (b) and (a), L13-R11-3, L13-R11-4) read at 6fd6e60 as their resolutions say. The largest gap is new, and it comes from the R11-06 write in 03 3.8. A rerun that keeps salvaging now 'exits 1, naming that path as `worktree-changing`'. That slug is a skipped reason of julieta's manifest. Where it is a skipped reason it leads to exit 5 and can be accepted with `--accept-loss`. In 03 3.8 it is an exit-1 error that has no RJ id in 04 4.4. The rule is written only in a format cell: the rm row, 08 8.5, 01 1.6 and I17 do not have it. Four Advisory findings follow, three of them in the ADR 0011 texts: the decided-but-not-applied ruleset change is spoken of in the present tense; two decided items are handled two ways in the index; and the list of rows the narrowing fires is incomplete. One Required finding and four Advisory ones.",
+  "prior_checked": 4,
+  "prior_resolved_as_stated": 4,
+  "findings": [
+    {
+      "id": "L13-R12-1",
+      "kind": "new",
+      "severity": "Required",
+      "section": "03 3.8 (`salvage[].fingerprint`); 04 4.1 (Exit codes; Error ids); 04 4.4; 04 4.2 (`romeu rm` row); 08 8.5 (skipped reasons and their recovery); 05 5.2 (I17)",
+      "defect": "The delta adds a behavior rule to a format cell: 'the third salvage in a row that a changed fingerprint starts for one generation exits 1, naming that path as `worktree-changing`'. That gives one name two meanings and one condition two exit codes. `worktree-changing` is a julieta skipped reason (03 3.11, 08 8.5). As a skipped reason, it makes the salvage incomplete, so `rm` exits 5 unless `--accept-loss=worktree-changing` accepts it. Here it is a romeu error with exit 1. 04 4.1 says every error has an `RJ-<nnn>` id, a slug and an exit code in one table, and 04 4.4 lists no row for it. The rule is not in the `rm` row of 04 4.2, 08 8.5, 01 1.6 or the I17 tests. And no text says where 'three in a row' is counted across separate `rm` processes: no salvage record field holds why a salvage started.",
+      "scenario": "T008 builds the error table from 04 4.4 and finds no row for this exit. T033 then reads 03 3.8 and has to invent one. It might reuse the slug with exit 1 or map the case to exit 5, and choose whether `--accept-loss=worktree-changing` ends the loop. A script that treats exit 5 as 'salvage incomplete, see the manifest' sees exit 1, 'operation failed', for the same cause. A reader who follows the 08 8.5 recovery table ('let the process finish, then rerun') reruns into the same exit, with no id to look up in `docs/reference/errors.md`.",
+      "change": "Give the case one home and one name. Add an error row to 04 4.4 with its own slug, for example `fingerprint-unstable`, an exit code chosen against 04 4.1 (5, refused to protect data, reads closer than 1) and a hint. Say in the `rm` row (04 4.2) and in 08 8.5 step 4 or 01 1.6 that the rule applies to `rm`, `recreate` and `retire`, and say whether `--accept-loss` covers it. Name the record field the count is read from, for example a `cause` on each salvage record. Add an I17 test for it. Leave 03 3.8 as the definition of the field, linking the rule. Cost: one 04 4.4 row, one field or sentence in 03 3.8, two cross-references and one test line; approval line `spec`."
+    },
+    {
+      "id": "L13-R12-2",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "index (S2 Evidence; Deferred decisions, the local-gates row); 05 5.4 (the approval-line row); 10 10.2 (maintainer block, item a); ADR 0011 (Decision 1; Consequences)",
+      "defect": "ADR 0011 decision 1 applies only after a maintainer step that is still pending (round 11, 'Open for the maintainer', item 1). Its Consequences say 'until the two maintainer steps are applied, the bypass and the current token stand, and the spec says so where it names them'. 10 10.2 item a and the 05 5.4 approval row honour that: until that step the role bypasses the ruleset for pull requests. S2 says in the present tense that 'the ruleset requires the checks of every merge, the administrator's included', and the local-gates row says 'the default-branch ruleset binds the administrator to the required checks'. Neither says the step is pending.",
+      "scenario": "A reader takes S2 or the local-gates row as the current state and merges, or lets an agent merge, believing the administrator cannot skip the checks. Meanwhile 05 5.4 says the bypass actor still bypasses for pull requests. Two pages give opposite answers to 'can the token merge a red pull request today?'.",
+      "change": "In S2 and the local-gates row, add 'once the maintainer step of ADR 0011, decision 1, removes the bypass actor; until then the administrator role bypasses it for pull requests (10 10.2, item a)'. Or write the state in one place, item a, and have both rows link to it. Cost: two clauses; approval line `spec`."
+    },
+    {
+      "id": "L13-R12-3",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "index (Deferred decisions: the token-narrowing row; the removed 'required status checks without the administrator bypass' row); ADR 0011 (Consequences); lenses.md exit criterion 3 ('still open')",
+      "defect": "ADR 0011 decides two items on the same day, each still waiting on a maintainer step, and the index handles them two ways. The required-checks row leaves the index. The token-narrowing row stays, and its first cell still names the decided item: 'narrowing the development sandbox's GitHub token: a fine-grained token … without the Administration permission'. Its record now says 'narrowing decided, applied at the next maintainer sitting'. What is still open is a later review of the sandbox's GitHub access, and no cell names that. So the row fails the 'still open' part of the shape that exit criterion 3 measures.",
+      "scenario": "The round-12 consolidation measures criterion 3 and counts this row as a valid deferred decision, but its first cell is decided. Or a later reader sees the trigger fire at 'the sitting that applies the narrowing' and reopens a decision ADR 0011 already took.",
+      "change": "Choose one rule for a decided row: it leaves the index, with its pending step tracked by ADR 0011 and the maintainer block, or it stays rewritten. Here, rewrite the first cell to what is still open, for example 'reviewing the development sandbox's GitHub access again after the narrowing (a narrower permission set, a GitHub App, ADR 0008)', and keep the events and the count. Cost: one cell; approval line `spec`."
+    },
+    {
+      "id": "L13-R12-4",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "ADR 0011 (Decision 2: 'The Deferred rows whose trigger is \"the token is narrowed\" fire when it is applied'); index (Deferred decisions: the operator signature over `checksums.txt`; the create-only host ref per fetched origin head; the check that reads the rulesets again; the signed approval record)",
+      "defect": "Decision 2 says the narrowing fires two Deferred rows: the check that reads the rulesets again and the signed approval record. Two more rows in the index have the same event under another name, 'or the token narrowing of ADR 0008': the operator signature over `checksums.txt` and the create-only host ref per fetched origin head. They still point the narrowing at ADR 0008, not at ADR 0011, which decided it. One event, two names, and an incomplete list.",
+      "scenario": "The maintainer sitting that applies the narrowing follows ADR 0011's list, reopens two rows and leaves the other two, whose trigger has also fired, with their 'Until then' standing.",
+      "change": "Write the event the same way in all four rows: 'the token is narrowed (the token narrowing row above)'. Make ADR 0011's sentence point at the event, not at a list ('every Deferred row whose event is the token narrowing fires when it is applied'), or list all four. Since ADR text is not edited after acceptance, the index side is the cheap fix. Cost: two trigger cells; approval line `spec`."
+    },
+    {
+      "id": "L13-R12-5",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "plan T005 (the four requirements under 'The invariant of 05 5.3 holds'); 12 12.4 ('`approvalLine` in `tools/ci/askfirst.go`'); 05 5.3 (the `approvals` globs); 02 2.1 (the `tools/ci/` line); 12 12.1, 12 12.3 (the YAML library and the generator)",
+      "defect": "The write pass deferred where `pr`'s code lives, but three texts still pin parts of it, and the four requirements use two names for one set. (1) 12 12.4 still puts `approvalLine` in `tools/ci/askfirst.go`, a file of the main package `tools/ci`. 02 2.1 puts each step under `tools/ci/internal/<step>/`, and such a step package cannot import a main package. Requirement (b) wants the `approvals` globs to name package directories, while the glob in 05 5.3 names that file. (2) Requirement (a) says 'a path no checkpoint grant covers'. Requirement (b) says 'packages on `approvals`'. 05 5.3 says every `approvals` path is also on the grantable `checks` or `dependencies`. The reader cannot tell whether these are one set. (3) Requirement (a) keeps `pr` away from `go.yaml.in/yaml/v3`, which is on `dependencies`. So `pr` reads `.github/ask-first.yaml` with a reader of its own, while the generator of 12 12.3 reads it with the library, and no requirement holds the two readings equal. That was the core of L13-R11-2, and the R11-02 resolution did not carry it.",
+      "scenario": "T005 writes its own subset reader for `.github/ask-first.yaml`, and the generator keeps the library. A glob written in a form the two read differently gives CODEOWNERS one surface set and `pr` another. T005 also finds `approvalLine` pinned in a file its step package cannot import, and has to decide alone whether moving it is allowed.",
+      "change": "Add to 12 12.4's deferral sentence that the file holding `approvalLine` is decided by that task too. In T005, use one name for the set in (a) and (b), for example 'paths on `approvals`'. Add one requirement: 'every committed `.github/ask-first.yaml` and `docs/grants.yaml` gives `pr` and the generator of 12 12.3 the same surface set, held by a test, or both use one reader'. Cost: one clause in 12 12.4 and two lines in T005; approval line `spec`."
+    }
+  ],
+  "pages_read": [
+    "docs/reviews/lenses.md (L13; What a reviewer returns; How stage A runs, and when the spec counts as validated)",
+    "docs/reviews/round-11/reports/L13.json",
+    "docs/reviews/round-11.md (R11-01, R11-02, L13-R11-3, L13-R11-4 rows; Exit criteria; Write pass; Session checkpoint)",
+    "git diff d133542 HEAD over docs/spec.md, docs/spec, docs/adr, docs/plan.md (in full)",
+    "docs/adr/0011 (in full); ADR 0008 and 0010 status lines; docs/adr/README.md",
+    "docs/spec.md (S2; Deferred rows: toolchain, local gates, token narrowing, rulesets check, signed approval record, operator signature, create-only host ref)",
+    "docs/spec/02-layouts.md (2.1 tools/ci line)",
+    "docs/spec/03-formats.md (3.8 fingerprint; 3.11 skipped reasons)",
+    "docs/spec/04-cli.md (4.1 Exit codes and Error ids; 4.2 rm row, doctor generation-sandbox and removal-pending rows; 4.4 RJ-336)",
+    "docs/spec/05-security.md (5.2 I17; 5.3 pr paragraph and globs; 5.4 Verified-signature, approval-line and token rows)",
+    "docs/spec/08-memory-handoff-salvage.md (8.5 step 2; skipped reasons table)",
+    "docs/spec/09-journeys.md (J7 step 4 diff)",
+    "docs/spec/10-testing-style.md (10.2 run step and pr job rows, local-run paragraph, gh floor test, maintainer block items a, d, e)",
+    "docs/spec/12-engineering.md (12.2 command block; 12.4 approvalLine, pr job paragraph, printing and name refusal; 12.8 README row)",
+    "docs/plan.md (T005 diff and Verify; task list headings)"
+  ],
+  "out_of_scope": "Findings marked L, parked (P1, P3, P5, P6) or open for the operator were not re-checked. The baseline commit's subject is 'record the round-11 session checkpoint', not the PR #36 subject the brief gives; the hash 6fd6e60 matches, so this was read as the brief naming the PR, not the commit. The text alone cannot settle three things. Whether `pull_requests_only` (ADR 0011 decision 3) and `pull_request` (its Context) are two API fields or one mode named twice: a saved API answer under Evidence would settle it. The new 12 12.4 claim about whitespace before `::` and the `##[` form, which the text marks 'as remembered of the runner's code and not measured': the runner's source at a pinned version would settle it, and that belongs to L2 and L5. And whether `--glob='refs/romeu/salvage/*'` matches nested refs on every git at or above the floor, which round 11 measured on 2.53.0 only. The handoff count of the token row (four, while the row's grep at this baseline lists five, with round-11.md) was read as a count taken at decision time under the date rule, and is not raised.",
+  "confidence": "High that the four prior resolutions hold, each read in place. High for L13-R12-1 on the facts (04 4.1, 04 4.4 and 08 8.5 quoted at 6fd6e60); its severity rests on T008 and T033 needing the row. High for L13-R12-2 to L13-R12-4, since each one quotes two texts that disagree. Medium for L13-R12-5 part 3, because the T005 task may choose one reader on its own."
+}

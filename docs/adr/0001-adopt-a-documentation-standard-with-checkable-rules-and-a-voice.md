@@ -8,6 +8,8 @@ Accepted
 
 Superseded in part by [9. Drop the required review and amend the records that assumed it](0009-drop-the-required-review-and-amend-the-records-that-assumed-it.md)
 
+Superseded in part by [10. Reopen the required checks without the bypass and amend the records of round 9](0010-reopen-the-required-checks-without-the-bypass-and-amend-the-records-of-round-9.md)
+
 ## Context
 
 In Shakespeare's play, Romeo and Juliet do not die for lack of a plan.

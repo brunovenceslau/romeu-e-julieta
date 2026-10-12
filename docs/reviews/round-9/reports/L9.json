@@ -1,0 +1,74 @@
+{
+ "header": "L9 · The delivery manager who has seen hundred-task plans · sonnet",
+ "verdict": "Mostly resolved: 21 of 23 checked round-8 findings read as resolved; the largest gap is the release publish job, whose token-holding steps do not cover the build and notes steps that call GitHub, so the grammar still forbids part of the release it describes.",
+ "round8_checked": 23,
+ "round8_resolved_as_stated": 21,
+ "findings": [
+  {
+   "id": "L9-R9-1",
+   "kind": "unresolved",
+   "round8_ref": "R8-10-1 (L9-1)",
+   "severity": "Required",
+   "section": "10 10.2 (grammar row 'release publish job'; Release and bootstrap steps 1 and 4); 12 12.6",
+   "defect": "The grammar lets only the 'tools/release publish' and 'tools/release verify' run steps hold GH_TOKEN, but step 1 ('tools/release build') must read the latest scheduled fuzz.yml run on main and step 4 ('tools/release notes') reads each merged PR's Why section, author and closing keywords from GitHub (12 12.6); neither may hold the token.",
+   "scenario": "T088 writes release.yml as described; tools/ci workflows refuses env on the build and notes steps, so either the build and notes steps fail unauthenticated (or hit the anonymous rate limit) on the first rc tag, or the author widens the grammar on the checks surface during release work, which is the situation R8-10-1 closed.",
+   "change": "Name every step that needs GitHub data and let the row admit GH_TOKEN for exactly those steps (build, notes, verify, publish), or state that build and notes read GitHub without a token and how; also say whether 'build --dry-run' (smoke steps) skips the fuzz check, since the host has no such run to read."
+  },
+  {
+   "id": "L9-R9-2",
+   "kind": "unresolved",
+   "round8_ref": "R8-adr-8 (L9-6)",
+   "severity": "Advisory",
+   "section": "index: Deferred decisions (preamble)",
+   "defect": "The resolution applied a reader-after-v1 sentence ('after the review rounds end, the table is read at each release, as a step of the release PR whose Evidence names the rows whose event happened'); the preamble says only 'the tables are read at each release-candidate tag', and rc tags end with v1.0.0.",
+   "scenario": "After v1.0.0 no review round and no rc tag exists, so rows fired by a human-observed event (about 60 rows, nearly all of the product table) are reopened only if someone files the labelled issue; the 'release rule after v1.0.0' row is itself still deferred, so nothing says what the later reader is.",
+   "change": "Add the one sentence to the preamble: from the first release after v1.0.0 the tables are read at each release, and the release PR's Evidence names the rows whose event happened since the last release."
+  },
+  {
+   "id": "L9-R9-3",
+   "kind": "new",
+   "round8_ref": "R8-11-3 (L9-12)",
+   "severity": "Required",
+   "section": "10 10.5; 11 11.4; 12 12.2 (release checklist step 3)",
+   "defect": "Moving the 'default-overturned result has no resolvedBy' failure into tools/ci acceptance leaves it out of the four completeness checks that '--pre-tag' runs and that join 'all', so the pre-tag run in the checklist cannot catch it; the same holds for the 'block A result records another upstream or sbxVersion than the pin or floor' check.",
+   "scenario": "A block B or C probe overturns a default (for example C3 on a kit) in the candidate's results; the maintainer runs 'acceptance --pre-tag' (exit 0, it runs four checks), pushes v1.0.0, and the full acceptance in the last task fails afterwards; the fix is a patch release, so v1.0.0 ships the unresolved default.",
+   "change": "Make 'acceptance --pre-tag' run these two checks too (they read only the repository) and list them in 10 10.5 beside the four, or say that an overturned result blocks the tag by another named step."
+  },
+  {
+   "id": "L9-R9-4",
+   "kind": "new",
+   "round8_ref": "R8-10-18 (L9-26)",
+   "severity": "Advisory",
+   "section": "10 10.2 (the maintainer block)",
+   "defect": "The split into 'ran' and 'to do' reuses the letter d: item d 'Four tries with the sandbox's token' ran, and the to-do 'd. A fifth try...' is a second item d, while the plan (O1) and the maintainer-block note cite 'item d' for the four tries.",
+   "scenario": "A reader of the plan's O1 ('items a to d') or of 05 5.4 following 'item d' lands on two different steps, one done and one still open, and may close the wrong one.",
+   "change": "Letter the fifth try as its own item (for example d2 or g) and update the cites."
+  },
+  {
+   "id": "L9-R9-5",
+   "kind": "regression",
+   "round8_ref": "R8-12-35 (L9-3)",
+   "severity": "Advisory",
+   "section": "plan.md, Operator blocks, 'The rehearsal in O5'",
+   "defect": "The text still calls the O5 rehearsal 'the first run of the product against real sbx', but the smoke steps now put it on real sbx at C4 and C7.",
+   "scenario": "The maintainer reading O5 plans for the first real-sbx failure there, and a failure that C4 or C7 already found is treated as new information about C3 or kit changes.",
+   "change": "Reword to 'the first run of the whole product with the full kit set'."
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L9, What a reviewer returns)",
+  "docs/reviews/round-8/reports/L9.json",
+  "docs/reviews/round-8/clusters-*.json (L9 clusters)",
+  "docs/reviews/round-8.md (decisions SC1, SC2, SC7, SC12-SC15, AR14, DR2, DR5; checkpoints)",
+  "docs/reviews/round-8/write-pass.md",
+  "docs/spec.md (success criteria, Open questions, Deferred decisions)",
+  "docs/spec/10-testing-style.md (10.2 grammar, Release and bootstrap, maintainer block; 10.5)",
+  "docs/spec/11-host-probes.md (11.3, 11.4, A3, C6)",
+  "docs/spec/12-engineering.md (12.2, 12.4, 12.5, 12.6, 12.9, 12.10)",
+  "docs/spec/00-scope.md, 01 (gate 1 dev build), 03 (opening rule), 05 (Release proof), 06 6.1 (Go/no-go row), 09 (release flow, J14)",
+  "docs/adr/0005, 0009 (decisions 18 and 19), diff of 0002/0003/0005",
+  "docs/plan.md (Operator blocks, Phases, T090, how this page is kept)"
+ ],
+ "out_of_scope": "Parked plan findings (L9-27 to L9-30) and L-status findings (L9-19, L9-23, L9-24 read only to confirm they became a limit, a row and a limit); the stale plan text about the old 11 11.4 lifecycle (T020, plan lines on resolvedBy riding with the results PR), already listed in write-pass.md for stage B; the operator-decided token trigger counted by hand, which is the operator's decision (DR5); whether real runner behaviour matches the grammar, which needs the workflow run.",
+ "confidence": "Medium-high: every cited line was read at the baseline; the release-publish token gap rests on reading 10 10.2 and 12 12.6 together, not on running tools/ci workflows."
+}

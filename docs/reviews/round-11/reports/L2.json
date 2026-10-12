@@ -1,0 +1,82 @@
+{
+ "header": "L2 · The security engineer who has watched a host fall · opus",
+ "verdict": "Mostly met. All four round-10 L2 findings with Status A or M now say what their resolutions say (tools/ci/pr with its go list -deps test, the new-event wording and its Deferred row, the item e measurement and the name refusal, the :: neutralization). The largest gap is in the new sentence of 05 5.3 that code a checkpoint grant covers 'never runs in the job that judges the grants'. Two things keep it from holding. First, pr must decode YAML (ask-first.yaml, grants.yaml, denylist.yaml and the head's workflows), the standard library has no YAML decoder, and the project's decoder is a go.mod module on `dependencies`. Second, the pr job starts go through mise and the base's mise.toml, mise.lock and go.mod. Their shape rules (only [settings] and [tools], no [env]; only module, go and require) are enforced by the head's `tools/ci`, which a `checks` grant covers, and not by pr.",
+ "prior_checked": 4,
+ "prior_resolved_as_stated": 4,
+ "findings": [
+  {
+   "id": "L2-r11-1",
+   "kind": "new",
+   "severity": "Required",
+   "section": "05 5.3 (the `tools/ci/pr` paragraph); 12 12.4 (the `pr` job); 12 12.1 (tech stack: `go.yaml.in/yaml/v3`)",
+   "defect": "The import closure of `tools/ci/pr` may be only the standard library and paths on `approvals`. pr must parse YAML: `.github/ask-first.yaml` at base and head, `docs/grants.yaml`, `tools/ci/denylist.yaml`, and, for the new name refusal, the head's `.github/workflows/`. The standard library has no YAML decoder, and the project's one, `go.yaml.in/yaml/v3` (12 12.1), is a module of go.mod on `dependencies`. The spec does not say how pr decodes YAML.",
+   "scenario": "The task that builds pr imports `go.yaml.in/yaml/v3`, and the go list -deps test turns red. Two fixes look natural. One is to admit the module in the test's allow list. That reopens the round-10 scenario: a granted `dependencies` bump swaps the decoder pr runs on attacker-shaped YAML, for example one that resolves duplicate keys or merge keys differently, so a surface glob or a grant reads other than written. The other is a quick hand-written parser of the hostile head's workflows, with no fuzz target and no strictness rules. Either one lands in the PR that makes pr the gate.",
+   "change": "State the choice in 05 5.3 and 12 12.4. Option (a): pr's inputs are decoded by a minimal strict YAML subset parser under `tools/ci/pr/` (on `approvals`), with the same strict rules as 10 10.2's grammar (no anchors, aliases or tags, no duplicate keys) and a fuzz target in `fuzz.yml`. Option (b): the decoder module's directory is vendored under a path on `approvals`, and the go list -deps test admits exactly that path. Cost: one sentence now and one package or vendored directory with the task that builds pr."
+  },
+  {
+   "id": "L2-r11-2",
+   "kind": "new",
+   "severity": "Required",
+   "section": "05 5.3 ('so code a checkpoint grant covers never runs in the job that judges the grants'; 'The grantable inputs left under the job'); 12 12.4 (the `pr` job builds with the base's go.mod, go.sum, mise.toml and mise.lock); 10 10.2 (the mise-table and go.mod-directive rules, and 'That table reaches every mise run of the workflow ... the mise shim that starts go'); index, Deferred decisions (the row on taking the pr job's toolchain off the grantable list)",
+   "defect": "05 5.3 says the grantable inputs left under the job are a toolchain version and the `go` line. But 10 10.2 has go started through the mise shim, and mise.toml and mise.lock decide what code runs, not only which version. An `[env]` table can set `GOFLAGS=-toolexec=...`, and a lock entry carries what is downloaded. go.mod can hold `godebug` or `toolchain` directives. The rules that keep these files to versions (a mise table other than `[settings]` and `[tools]` fails; a go.mod directive other than module, go and require fails) are steps of `all`, which run the head's `tools/ci`, and that code is on `checks`. pr, built from the base, does not check them.",
+   "scenario": "One task holds grants on both `checks` and `dependencies`, which the grant list of 12 12.4 allows. Its pull request bumps a tool in mise.toml, adds an `[env]` key, and loosens the mise-table rule in `tools/ci`. pr (base code) accepts both granted lines, and the head's weakened `all` is green. After the merge, every pr job runs mise with that `[env]`, so code the grant covered runs at compile time of the job that judges grants and approval lines. The Deferred row's trigger, 'the first pull request that changes the toolchain under a checkpoint grant', fires only after this pull request has merged.",
+   "change": "Have pr, from the base, apply the mise-table rule and the go.mod-directive rule to the head's mise.toml, mise.lock and go.mod whenever the diff touches them, each with a fixture. That way the shape that keeps them to versions is judged by code on `approvals`. Reword 05 5.3 to 'the grantable inputs left under the job are the versions those files pin, held to that shape by pr'. Then the Deferred row's 'Until then' is true. Cost: two checks in pr (they need a TOML subset reader, see L2-r11-1), two fixtures and one sentence. Option (b) of round 10's D2 stays deferred."
+  },
+  {
+   "id": "L2-r11-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "12 12.4 (the name refusal: 'a job outside the pr job's file the pr job's name'); 10 10.2 (pr job row)",
+   "defect": "The refusal exempts the pr job's own file and names only a job's name. The head's version of that file is read under `pull_request` too. If the head adds `pull_request` to its `on` and makes its run step exit 0, the head posts a green check under the pr job's name from inside the exempt file. A job with no `name` key posts its job id as the check name.",
+   "scenario": "A head edits the pr job's file, adding `pull_request` to `on` and replacing the run line, or adds a job whose id equals the pr job's name and has no `name` key. pr's refusal does not fire (the job is in the exempt file, or carries no `name`), and two checks with the required name exist, one green. This needs an `approvals` line, which the accepted row of 05 5.4 already covers, so the refusal is a guard against mistakes. As written, it misses the two easiest mistakes.",
+   "change": "Say the refusal compares each head job's check name (its `name`, else its id) with the pr job's name. Say pr also refuses a head whose version of the pr job's file names an event other than `pull_request_target`. Add a fixture for each. Cost: one sentence and two fixtures."
+  },
+  {
+   "id": "L2-r11-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "12 12.4 ('neutralizing a leading `::` and control characters')",
+   "defect": "As far as can be recalled, the Actions runner trims leading whitespace, Unicode whitespace included, before it looks for `::`. It also still parses the older `##[command]` form found anywhere in a line. So 'a leading `::`' and control characters is narrower than what the runner reads. This rests on the runner's code as remembered and was not measured.",
+   "scenario": "A PR body holds a line ` ::stop-commands::x` (a leading space or U+00A0) or `x ##[add-mask]y`. pr prints the malformed line as received, since it does not start with `::` and has no control character. The runner acts on it, and the maintainer's view of why pr failed is hidden or cut off. No secret or write token is in the job.",
+   "change": "Print each line of author text behind a fixed non-whitespace prefix (for example `| `), so no printed line starts with author bytes, and escape `##[`. Extend the fixture 'pr escapes a workflow command in a PR body' to a leading space, a leading U+00A0 and a `##[` form. Cost: one sentence and three fixture cases."
+  }
+ ],
+ "prior_resolution_notes": {
+  "L2-r10-1 (R10-01, A; D2)": "holds: 05 5.3 names `tools/ci/pr`, its closure, the go list -deps test in `tools/ci`, the glob `tools/ci/pr/**` landing with the task that builds pr, and the grantable inputs (mise.toml, mise.lock, the go line); 12 12.4 builds that package; the index has the Deferred row for option (b). New gaps around it are L2-r11-1 and L2-r11-2.",
+  "L2-r10-2 (R10-02, A; D1)": "holds: 05 5.4 and 12 12.4 say a new event runs the fixed pr and a re-run judges with the old code, citing GitHub's documentation; 10 10.2 already requires `edited` among the types; the automatic re-run is a Deferred row reopened by the first merge on a stale result.",
+  "L2-r10-3 (R10-07, M)": "holds: item e of 10 10.2 records head_sha and block-then-allow under the task's Evidence and points to ADR 0010 decision 1 if the check cannot be required; 12 12.4 states the name refusal with a fixture. Its scope gap is L2-r11-3.",
+  "L2-r10-4 (A)": "holds as worded: 12 12.4 neutralizes a leading `::` and control characters, with the fixture named. Its scope gap is L2-r11-4."
+ },
+ "coverage": {
+  "index (spec.md)": "L2-r11-2 (the Deferred row on the pr job's toolchain); the new re-run row and the token row's 'Fired' wording checked, nothing else",
+  "00": "nothing for this lens (not in the delta)",
+  "01": "nothing for this lens (the removing fingerprint in 1.6 and Recovery checked against I17 and I26; it decides re-salvage or removal of the project's own sandbox only)",
+  "02": "nothing for this lens (not in the delta)",
+  "03": "nothing for this lens (salvage[].fingerprint and RJ-337 checked)",
+  "04": "nothing for this lens (doctor rows and RJ-337 checked; the argv paste claim holds since repo URLs carry no userinfo, 03 repo url)",
+  "05": "L2-r11-1, L2-r11-2",
+  "06": "nothing for this lens (the SSH_ASKPASS wording in 6.4 checked)",
+  "07": "nothing for this lens (not in the delta)",
+  "08": "nothing for this lens (the signing-failure skill rule and the salvage-dir rule while removing checked)",
+  "09": "nothing for this lens (J1 steps 1, 2 and 5, J6 step 5, J7 step 4 checked)",
+  "10": "L2-r11-2, L2-r11-3",
+  "11": "nothing for this lens (B1 gh version and B2 askpass wrapper checked)",
+  "12": "L2-r11-1, L2-r11-2, L2-r11-3, L2-r11-4",
+  "13": "nothing for this lens (not in the delta)",
+  "ADRs": "nothing for this lens (ADR 0010's count corrected to five texts and three records, checked)",
+  "plan.md": "nothing for this lens (not in the delta)"
+ },
+ "what_is_missing": "In 05 5.3, one list of the pr job's trusted computing base: the pr package, its decoders, the runner image's git, the go toolchain, mise and the mise action, and the base's mise.toml, mise.lock and go.mod. Each part would name its surface and the code that holds its shape, so a 'never' sentence can be checked against the list.",
+ "postmortem": "Two months after v1.0.0, a dependencies-and-checks task bumps golangci-lint and adds a small mise `[env]` entry to 'fix' a cache path. The head's lint rule that refuses `[env]` was relaxed in the same pull request so the step goes green. pr accepts both granted lines. From then on, the mise shim of every pr job carries that environment. Nobody notices until a later pull request whose workflow change had no approval line merges green. The `GOFLAGS` the entry set had silently made the pr build pick a stale cached binary. Sections crossed: 05 5.3, 12 12.4, 10 10.2 (mise rules, the mise shim), the index Deferred row on the toolchain.",
+ "lens_critique": "The lens still frames the CI gate as host-side `tools/ci`. Since round 8 the gate that guards every ask-first surface is a GitHub-side job, and what it trusts (toolchain, config files, decoders, runner image) is the real boundary. A bullet 'which code, config and tool judges a change, and which surface holds each' would have caught L2-r11-1 and L2-r11-2 in round 10. The set of lens titles still lacks a CI-platform and supply-chain viewpoint.",
+ "pages_read": [
+  "docs/reviews/lenses.md (L2; What a reviewer returns; How stage A runs, and when the spec counts as validated)",
+  "docs/reviews/round-10/reports/L2.json",
+  "docs/reviews/round-10.md (R10-01, R10-02, R10-07, the L2-r10-4 row, D1 to D6, Open for the operator)",
+  "delta d458f83..d133542 of docs/spec/05-security.md, 10-testing-style.md, 12-engineering.md (word diff, whole)",
+  "delta of docs/spec.md, 01, 03, 04, 06, 08, 09, 11 and ADR 0010 (word diff, whole)",
+  "at baseline: 12 12.4 (approval lines and checkpoint grants), 12 12.1 (stack and install environment), 10 10.2 (workflow grammar, the edited rule, the mise and go.mod lint rules, the step environment), 04 4.1 (error details), 03 repo url rule, 05 I25"
+ ],
+ "out_of_scope": "Inferred and not measured: the runner's parsing of workflow commands (leading-whitespace trim, the ##[ form), L2-r11-4. Also inferred: that mise.lock entries carry a download URL and that the mise action exports the mise.toml [env] table (L2-r11-2 rests on 10 10.2's own sentence that the table reaches the mise shim that starts go). Evidence that would settle them: the runner's ActionCommand parser at its current tag, and the pinned mise's lockfile and the mise action's env export. The salvage fingerprint is computed from data the sandbox reports, so an agent can steer re-salvage versus removal. That harms only the project's own work and was left to the data-loss lens. D5, D6, the token-narrowing item and the ADR 0010 required-checks item are open for the operator and were not judged.",
+ "confidence": "High on the four resolution checks. Medium-high on L2-r11-1 (stdlib has no YAML decoder, and 12 12.1 names the module) and on L2-r11-2's text reading (the shape rules sit in `all`, run from the head). Medium on its mise mechanics, and on L2-r11-3 and L2-r11-4, which depend on platform behavior not measured here."
+}

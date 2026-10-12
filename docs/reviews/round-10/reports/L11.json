@@ -1,0 +1,30 @@
+{
+ "header": "L11 · The scope skeptic · sonnet",
+ "verdict": "Both round-9 findings resolve as stated: the sequences row of 10 10.2 now holds the two-way scope-table rule, and the index row for 06 points at the Deferred row. The delta adds no feature without a trigger; every new Deferred row (base-defined steps of all, mutation stub per site, testifylint coverage, gate-run record, authenticated head fetch) carries a trigger, and ADR 0010 reopens a fired trigger instead of hiding it. One Advisory remains.",
+ "prior_checked": 2,
+ "prior_resolved_as_stated": 2,
+ "findings": [
+  {
+   "id": "L11-r10-1",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "05 5.4 (Under a checks grant row); plan task that builds pr",
+   "defect": "The mitigation 're-run the pr job of each open pull request when pr changes, a step for the task that builds pr' is a mechanical duty left to a person or agent, while the scope principle asks for deferrals that are real: either the rerun is code, or the residual is the accepted risk with its reopening trigger.",
+   "scenario": "A fix to tools/ci pr merges, and nobody re-runs the pr job of an open PR. Its old green result still counts, so the fix does not apply to that PR; no check notices.",
+   "change": "State in the row that the rerun is a manual step with the accepted-risk trigger (the first PR merged with a stale pr result), or add one line to the Deferred decisions table for an automatic rerun with its trigger.",
+   "prior_ref": ""
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L11, What a reviewer returns, How stage A runs)",
+  "docs/reviews/round-9/reports/L11.json",
+  "docs/reviews/round-9.md (L11 rows, R9-21)",
+  "docs/adr/0010 (in full)",
+  "docs/spec.md (delta, Deferred rows)",
+  "docs/plan.md (delta)",
+  "docs/spec/10-testing-style.md (sequences row)",
+  "docs/spec/05-security.md (delta, grep-level)"
+ ],
+ "out_of_scope": "Pages 01, 02, 03, 04, 08, 09, 11 and 12 of the delta were skimmed by grep only. The fired token-narrowing trigger is open for the operator and was not re-reported.",
+ "confidence": "Medium: the two prior checks were read against the text; the skim of the large delta may miss a new feature without a trigger."
+}

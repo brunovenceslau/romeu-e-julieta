@@ -1,0 +1,52 @@
+{
+ "header": "L0 \u00b7 The control reviewer \u00b7 sonnet",
+ "verdict": "The changed text meets the success criteria; L0-r13-1 is resolved. The largest gap is Advisory: the 'token is narrowed' event has no stated expected answer.",
+ "prior_checked": 1,
+ "prior_resolved_as_stated": 1,
+ "prior_resolution_notes": {
+  "L0-r13-1": "Resolved as R13-01 promised: 04 4.4 RJ-338 reads 'third or a later salvage in a row' and is the one home; 01 1.6, 03 3.8, 08 8.5 cite it with no ordinal; I17 adds a fourth-rerun E-test (equality comparison turns it red) and the excludeIgnored recovery case; cause value first is renamed requested with no stale use left."
+ },
+ "findings": [
+  {
+   "id": "L0-r14-1",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (maintainer block, item d); spec.md Deferred decisions (four rows triggered by 'the token is narrowed')",
+   "defect": "The event 'the token is narrowed' is recorded by the four tries repeated with the narrowed token, but no text says which API answer shows the narrowing, so the event can be judged on answers identical to the unnarrowed token's.",
+   "scenario": "After the maintainer step, the four tries are repeated and saved under Evidence. Push refused, API merge accepted and tag create accepted through the bypass match the old token's answers; only the ruleset update might differ. The maintainer reads the rows as fired, or not fired, by judgment, so the signature, host-ref, rulesets-check and signed-approval rows move without a checkable record (S2 wording depends on the same state).",
+   "change": "In item d, name the expected answer that records the narrowing (for example the ruleset update refused for lack of Administration) and say that unchanged answers mean not narrowed. Cost: one sentence; the tag try's answer for a fine-grained token should be marked as measured, not assumed.",
+   "evidence": "docs/spec/10-testing-style.md item d: 'The four tries repeated with the narrowed token, their API answers saved under Evidence, record that the token is narrowed'; docs/notes/maintainer-block-of-ci-bootstrap.md lists the four tries (empty push refused; API merge accepted; tag create/delete accepted through the bypass; ruleset update accepted)."
+  },
+  {
+   "id": "L0-r14-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (item d); 05 5.4",
+   "defect": "The four tries that define the narrowing event are listed only in a note outside docs/spec, which the spec cites by 'the four tries'.",
+   "scenario": "A reader of the spec alone cannot say what the four tries are or what to compare; the definition of an event that four rows wait on lives in a note.",
+   "change": "List the four tries in item d (one line each) or link the note's table by anchor at the first mention. Cost: four lines.",
+   "evidence": "docs/spec/10-testing-style.md:873-876 names 'Four tries' without listing them; the list is in docs/notes/maintainer-block-of-ci-bootstrap.md lines 91-108."
+  }
+ ],
+ "what_is_missing": "An expected-outcome statement for the narrowing record. No contradiction found in the main-merge text against round-13 text.",
+ "postmortem": "After v1.0.0 the person sees the four token-triggered rows fire early or never, because the narrowing record cannot tell the two tokens apart (10 10.2 d, spec.md Deferred, 05 5.4). The salvage guard pass closed its class.",
+ "lens_critique": "A no-lens reviewer judges by the success criteria only; it cannot see implementation-level traps (for example how a cap counter is stored) and treats the spec's stated evidence as sufficient when it is merely present.",
+ "out_of_scope": "The required-name try (to do, a recorded step, not a result); the main-merge text of pull request #34 beyond a contradiction check; accepted risks in 05 5.4.",
+ "confidence": "Medium. Read of the text only; whether a fine-grained token without Administration still bypasses the tag ruleset is inferred, not measured.",
+ "pages_read": [
+  "docs/spec.md (S1-S11, Principles, Deferred rows)",
+  "docs/spec/00-scope.md 0.1",
+  "docs/spec/01 1.6",
+  "03 3.8",
+  "04 4.4",
+  "05 5.2 I17, 5.4",
+  "08 8.5",
+  "10 10.2 maintainer block",
+  "docs/plan.md T005",
+  "docs/notes/maintainer-block-of-ci-bootstrap.md",
+  "docs/reviews/round-13.md R13-01 to R13-04",
+  "docs/reviews/round-13/reports/L0.json"
+ ]
+}

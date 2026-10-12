@@ -1,0 +1,31 @@
+{
+ "header": "L0 · The control reviewer · sonnet",
+ "verdict": "All four round-9 findings resolve as stated at the baseline. The delta adds one wording gap: the ssh-add -c confirmation is described as conditional in 06 6.4 and 11 B2 and as required in J1 step 5.",
+ "prior_checked": 4,
+ "prior_resolved_as_stated": 4,
+ "findings": [
+  {
+   "id": "L0-r10-1",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "06 6.4 (signing key paragraph); 09 J1 step 5; 11 B2",
+   "defect": "D3 (2026-10-09) says in J1 step 5 that ssh-add -c 'needs an askpass program, which macOS does not ship, so install one first', while 06 6.4 and probe B2 say it gives confirm-on-use 'where an askpass program is installed'. The spec does not say what happens when none is installed (use refused, or silently unconfirmed), and sync/doctor check only that the socket holds exactly one key (I34), not that confirmation works.",
+   "scenario": "An operator skips the askpass install. Depending on the agent, the sandbox either cannot sign at all or signs without any confirmation. The security row of 05 5.3 'Verified means the key was used' counts on a confirmation the tool cannot see missing.",
+   "change": "State once in 06 6.4 which of the two outcomes B2 must record for a host with no askpass, make J1 step 5 and the 6.4 sentence agree (required, or optional with the unconfirmed outcome named), and say whether doctor reports it or the gap is accepted."
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L0, What a reviewer returns, How stage A runs)",
+  "docs/reviews/round-9/reports/L0.json",
+  "docs/reviews/round-9.md (L0 rows, Status)",
+  "docs/adr/0010 (in full)",
+  "docs/adr/0009 (lines 28, 72, 81)",
+  "docs/spec/05-security.md (5.3 surfaces, 5.4 approval row)",
+  "docs/spec/10-testing-style.md (grammar rows release publish job and pr job, pr types)",
+  "docs/spec/12-engineering.md (12.4 pr job, merge row, releasable row)",
+  "docs/spec/06-kits.md, 09-journeys.md, 11-host-probes.md (delta of askpass, B2)",
+  "docs/spec.md (S2, Deferred rows of required checks)"
+ ],
+ "out_of_scope": "Parked, L and operator-routed findings; ADR 0010 decision 1 (the bypass choice, waiting for the next decision block). Not re-read in full: the deltas of pages 01 to 04, 07, 08 and the middle of 10 and 12.",
+ "confidence": "Medium. Prior resolutions were checked by targeted greps and reads of the cited lines; the delta of the other pages was skimmed through headings and the G5 and ruleset parts only."
+}

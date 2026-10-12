@@ -1,0 +1,40 @@
+{
+ "header": "L4 · The machine operator who has lost work · sonnet",
+ "verdict": "Round-9 resolutions read as stated (4 of 4), but the new removing-resume rule compares against a 'salvage record' that holds no heads, HEAD or status, and the source it can use (the salvage manifest) is a payload the owner is told they may delete.",
+ "prior_checked": 4,
+ "prior_resolved_as_stated": 4,
+ "findings": [
+  {
+   "id": "L4-r10-1",
+   "kind": "new",
+   "severity": "Required",
+   "section": "01 1.6 (removing row, Recovery paragraph); 03 3.8 salvage[]; 03 3.11; 08 8.5 (owner may delete a salvage dir); 09 J6 step 5",
+   "defect": "The resume rule for removing with the sandbox present compares the daemon heads and each worktree's HEAD and status with 'the salvage record'. The state record (3.8 salvage[]) holds only id, manifestSha256, result, reasons and refsPrefix; HEAD and dirty live in the salvage manifest (3.11), a payload that 08 now says the owner may delete once the result is recorded, and 'rm, recreate and retire read the record'. Also 3.11 keeps 'dirty' as a flag, so status cannot tell a further edit to an already-dirty worktree.",
+   "scenario": "A salvage completes, rm writes removing, sbx env rm fails. The operator, told they may delete the salvage dir, frees disk. Or a worktree was already dirty (dirty: true) and the agent edits more files, then rm is rerun. The comparison has nothing to read in the first case; in the second it sees equal HEAD and dirty: true, resumes at sbx env rm, and the new uncommitted edits are destroyed with no salvage of them.",
+   "change": "Say which artifact the comparison reads and what it holds: add to the state salvage[] entry (3.8) a compact fingerprint, written with the removing state, of the daemon heads, each worktree HEAD and a digest of its status output (porcelain with untracked and ignored paths and file digests); resume only when a fresh fingerprint equals it, else removing -> salvaging. Say in 08 8.5 that the owner may not delete the salvage dir of a generation in removing. Add to I17 the case 'an already-dirty worktree gets a further edit after a failed sbx env rm'."
+  },
+  {
+   "id": "L4-r10-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "09 J7 step 4",
+   "defect": "The new condition to delete the attic is 'the unpushed and salvage-only report that retire printed and confirmed shows nothing left to keep', or git status and git for-each-ref inside the attic clone. The report is terminal output that is not recorded, and neither git command shows commits unpushed relative to origin (status only does with an upstream configured; for-each-ref lists refs without comparing them).",
+   "scenario": "Weeks after retire the operator has lost the terminal scrollback. They run the two named git commands, see a clean tree and refs, and delete .attic/foo/<ts>/ with a local-only branch or a salvage ref in it that never reached origin.",
+   "change": "Name a command that decides it, such as git -C <clone> log --branches --not --remotes --oneline plus the refs under refs/romeu/salvage, or have retire write its report next to the attic dir so it can be read again."
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L4, What a reviewer returns, How stage A runs)",
+  "docs/reviews/round-9/reports/L4.json",
+  "docs/reviews/round-9.md (L4 rows, R9-07, R9-09)",
+  "docs/spec/01-system-model.md (1.5 step 6, 1.6 generation table and recovery, 1.7)",
+  "docs/spec/03-formats.md (3.8 salvage fields, 3.11, 3.13)",
+  "docs/spec/04-cli.md (delta lines on RJ-335, RJ-336, root-indexed, error ids)",
+  "docs/spec/05-security.md (I17 delta)",
+  "docs/spec/08-memory-handoff-salvage.md (delta: 8.1, 8.2, 8.3, 8.4, 8.5)",
+  "docs/spec/09-journeys.md (delta: J6, J7, J9, J12 tail)",
+  "docs/spec/02-layouts.md (delta)"
+ ],
+ "out_of_scope": "Not read in full: the delta of 10, 11, 12, 06, 07, the ADRs, spec.md and plan.md (approvals surface, ruleset reading, D2 and D3, ADR 0010), which the L4 lens does not point at. Behaviour of resume when the sandbox is stopped (needs an exec to read daemon heads) is not judged and is left to probe A15.",
+ "confidence": "medium: the 01, 08, J6 and J7 delta read in full and the 03 salvage fields checked directly; the first finding is inferred from the text, not run."
+}

@@ -1,0 +1,105 @@
+{
+ "header": "r18.L0 · The control reviewer · opus",
+ "verdict": "The round-17 pass records each row's status and class consistently, and the new T008, T068 and T069 items are built correctly against 08 8.5 and RJ-338; the largest gap is that the amended exit rule moves Required resolutions into plan acceptance items that stage A, by its own stage table, parks for B and counts only by presence, classified by one reviewer with no route for a disputed class; nothing found blocks validation, every finding Advisory.",
+ "prior_checked": 8,
+ "prior_resolved_as_stated": 8,
+ "prior_resolution_notes": {
+  "L0-r17-1": "R17-13 (L): limit 4 of the note (maintainer-block-of-ci-bootstrap.md:201), reopened by the sitting of block O8 (:214). Resolved as stated; the reopening sitting comes before O6 and O7, where the gap bites, which the limit accepts.",
+  "L0-r17-2": "R17-14 (A): read 2 expects no forwarded socket or each holding the signing key alone, and each forwarded key absent from the authentication keys (note:156-164). Resolved as stated.",
+  "L0-r17-3": "R17-15 (M, L): the note says both rows describe both states and the newest entry's verdict says which holds (note:140); no row is written; limit 5 (note:205). Resolved as stated.",
+  "L0-r17-4": "R17-17 (A): plan.md:204 reads 'until the note on the maintainer block records its first narrowed entry' and that the tag ruleset answer is measured only by an entry made before release.yml lands. Resolved as stated.",
+  "L0-r17-5": "R17-15 (M, L), with L0-r17-3: a later not narrowed entry puts the token back in the earlier state, asking no decision of its own (limit 5). Resolved as stated.",
+  "L0-r17-6": "R17-18 (M, L): O8 does decision 1 first, names the pull request that rewrites 'Until that step' in item a of 10 10.2, and adds S2 to Unblocks (plan.md:221); the merge-try limit is limit 6 (note:210). Resolved as stated.",
+  "L0-r17-7": "R17-19 (A): item h runs only while the newest entry's verdict is narrowed (10 10.2:921; note:131) and the fourth part opens with the try's date (note:131-132). Resolved as stated.",
+  "L0-r17-8": "R17-20 (M, L): index row 348 says 'applied at block O8'; O8's Also needs reads 'two throwaway pull requests'; the 05 5.4 token row is left as limit 5. Resolved as stated."
+ },
+ "findings": [
+  {
+   "id": "L0-r18-1", "kind": "new", "severity": "Advisory", "class": null, "origin": "own",
+   "section": "lenses.md (the stage table; How stage A runs, step 6 and the exit criteria)",
+   "defect": "The exit rule closes a Required test-detail finding by the presence of a plan acceptance item, while the stage table marks every finding on plan.md 'parked for B', so a wrong acceptance item carrying a Required resolution can never block stage A and no step says a re-audit judges it.",
+   "scenario": "A later round moves a Required finding to a T acceptance item that misstates the case (for example a single write in 'write during the salvage'); the re-audit, following the stage table, parks its finding for B, the exit criterion counts the item as present, and the spec is declared validated on a resolution nobody judged as acceptance; this round's brief made the exception, the page does not.",
+   "change": "One sentence in step 6: the targeted re-audit reads the acceptance items a write pass added for test-detail findings and judges them as acceptance, not parked for B. Cost: one sentence.",
+   "evidence": "docs/reviews/lenses.md:61 '`plan.md` is reading context for every reviewer, and a finding on it is marked `parked for B`'; :112-113 'every Required finding of class `test-detail` is an acceptance item of the plan task that implements it, in `plan.md`, citing the finding id, and does not block'"
+  },
+  {
+   "id": "L0-r18-2", "kind": "new", "severity": "Advisory", "class": null, "origin": "own",
+   "section": "lenses.md (How stage A runs, steps 3 and 4)",
+   "defect": "The class that decides whether a Required finding blocks is set by the consolidating reviewer alone, and step 4 sends to the operator only findings that change a decision record, an accepted risk or the scope, so a class set lower than the reporting lens's (behavior-gap to test-detail) unblocks validation with no second reading.",
+   "scenario": "A lens reports a Required behavior-gap; the consolidator, applying the tiebreak, records test-detail; the row goes to a plan item, the exit criterion passes, and neither the reporting lens nor the operator saw the reclassification. In round 17 the operator decided the classes, but the page does not require it.",
+   "change": "One clause in step 4: a Required finding whose class the consolidation sets differently from the reporting lens goes to the decision block. Cost: one clause.",
+   "evidence": "docs/reviews/lenses.md:89-92 'The consolidating reviewer classifies each Required finding as `contradiction`, `behavior-gap` or `test-detail` ... and records the class in its row'; :94-97 'a Blocking or Required finding that changes a decision record, an accepted risk or the scope'"
+  },
+  {
+   "id": "L0-r18-3", "kind": "new", "severity": "Advisory", "class": null, "origin": "own",
+   "section": "lenses.md (What a reviewer returns, the classes); 05 5.2 (I17, 'write during the salvage'); 08 8.5 (step 2)",
+   "defect": "The rule that the spec text is not grown for a test-detail finding leaves no way to correct a spec test case whose own words do not reach its stated result, so I17 still says a writer that 'changes a tracked file' makes the recheck skip the worktree, which a single write does not do under 08 8.5 step 2, while the correct construction lives only in T068.",
+   "scenario": "After T068 merges, a contributor rewrites the test from 05 5.2, the authoritative list, with one write; 08 8.5 absorbs it in the repeat, the rerun returns RJ-338, the case says that turns it red, and the contributor changes the code instead of the test. R17-01's class (decided on 2026-10-12) is not re-litigated; the gap is in the rule.",
+   "change": "One sentence in 'What a reviewer returns': a test-detail finding may carry a wording correction of the spec's own case when the case as written does not reach its stated result; or state it as a limit with a trigger. Cost: one sentence, then one clause in I17.",
+   "evidence": "docs/reviews/lenses.md:276-277 'citing the finding id, and the spec text is not grown for it'; docs/spec/05-security.md:172 'E: write during the salvage: after a failed `sbx env rm`, a writer changes a tracked file while the rerun salvages, so the recheck of 08 8.5 step 2 skips the worktree as `worktree-changing`'; docs/spec/08-memory-handoff-salvage.md 8.5 step 2 'if either moved, the capture repeats once, then the worktree is skipped as `worktree-changing`'"
+  },
+  {
+   "id": "L0-r18-4", "kind": "new", "severity": "Advisory", "class": null, "origin": "own",
+   "section": "round-17.md (R17-02 row; Write pass)",
+   "defect": "R17-02's proposed resolution included a phrase edit in I17 ('naming any reason' to 'naming a reason the salvage skipped') that was neither applied nor recorded as dropped, yet the row's status reads T and not M.",
+   "scenario": "A later round reads R17-02 as fully resolved, finds I17 still says 'naming any reason', and either re-raises it as unresolved or assumes it was applied; the record does not say which part was declined and why.",
+   "change": "The write-pass bullet for R17-01 and R17-02 says the phrase edit was dropped and why (or the status becomes M, T (T068)). Cost: one sentence.",
+   "evidence": "docs/reviews/round-17.md:101 'In the complete-salvage case, \"naming any reason\" becomes \"naming a reason the salvage skipped\". Cost: one case, one phrase.' and status 'T (T068)'; docs/spec/05-security.md:172 '`--accept-loss` naming any reason does not change that'"
+  },
+  {
+   "id": "L0-r18-5", "kind": "new", "severity": "Advisory", "class": null, "origin": "own",
+   "section": "lenses.md (What a reviewer returns, the severity scale and the dated decision)",
+   "defect": "Required still reads 'fix before the next plan task that implements the cited section' while a test-detail Required is closed by that task's acceptance, and the dated decision states neither its reason, what it supersedes, nor whether it applies to rows open before 2026-10-12, though round 17 applied it to its own open rows.",
+   "scenario": "A reader of the scale holds T068 back until R17-01 is fixed in the spec; another reads the rule, adopted between round 17's verdict and its write pass, as a gate loosened after it failed, with no recorded why to answer it.",
+   "change": "Sentence edits: Required 'fix before, or for test-detail by, the plan task'; the dated sentence names its reason and that it applies from round 17's write pass on. Cost: two sentences.",
+   "evidence": "docs/reviews/lenses.md:268-269 '**Required** (fix before the next plan task that implements the cited section)'; :128-129 'The classes of Required, and that only the first two block, were decided on 2026-10-12.'"
+  },
+  {
+   "id": "L0-r18-6", "kind": "new", "severity": "Advisory", "class": null, "origin": "own",
+   "section": "plan (T069, T008, the Implements fields) - parked for B",
+   "defect": "T069 now tests the I17 fingerprint cases and the removing rows of 01 1.6, and T008 tests the RJ-338 hint of 04 4.4, but T069 implements only 04 4.2, 09 J7 and 02 2.3 and T008 only 04 4.1, 10 10.6 and 12 12.3, so the stage A to B delta, which searches Implements fields, misses both when those sections change.",
+   "scenario": "A later round edits the RJ-338 hint or a removing row; the delta lists T068 and T034 but not T008 or T069, whose acceptance now restates the old text.",
+   "change": "Add 04 4.4 to T008 and 05 5.2 (I17) and 01 1.6 to T069's Implements. Cost: two cells.",
+   "evidence": "docs/plan.md:681 'Implements: 04 4.1, 10 10.6, 12 12.3'; :2045 'Implements: 04 4.2 (`retire`), 09 (J7), 02 2.3'; docs/reviews/lenses.md 'From stage A to stage B' item 3 'the tasks whose \"Implements\" field cites it'"
+  },
+  {
+   "id": "L0-r18-7", "kind": "new", "severity": "Advisory", "class": null, "origin": "own",
+   "section": "plan (T069, acceptance), read against 04 4.2 (`retire`) and 04 4.4 (`RJ-338`)",
+   "defect": "T069's new item asserts the exit of retire on a removing generation but not that nothing is moved (tree, workspace files, state attic) when it exits 5 with RJ-338 or RJ-306, nor that the move completes after a resume at `sbx env rm`.",
+   "scenario": "An implementation moves `<name>-env/` to `.attic/` before the inner rm returns RJ-338; the test passes on the exit code, and a live sandbox is left with a removing generation whose state sits in the state attic.",
+   "change": "Extend the T069 item: on RJ-338 and RJ-306 nothing is moved; after the resume, the move of J7 completes. Cost: one clause.",
+   "evidence": "docs/plan.md T069 'an equal fingerprint resumes at `sbx env rm`, and one that differs exits 5 with `RJ-338` after a complete or accepted salvage and with `RJ-306` after an incomplete one (round 17, R17-08)'; docs/spec/04-cli.md:40 '`rm` if needed; an incomplete inner salvage exits 5 before any move'"
+  },
+  {
+   "id": "L0-r18-8", "kind": "new", "severity": "Advisory", "class": null, "origin": "own",
+   "section": "plan (T008, acceptance), read against 04 4.4 (`RJ-338`)",
+   "defect": "The byte-equality test compares the table's hint with the text 04 4.4 quotes, which carries Markdown code spans (`sbx env rm`, `salvage.excludeIgnored`, `--accept-loss`), and does not say whether the CLI table keeps the backticks or the test strips them.",
+   "scenario": "The implementer keeps backticks to pass the test and the terminal prints them, or strips them and the test fails; either way the item is settled by guess.",
+   "change": "One clause in T008: the hint is compared with the quoted text with code-span backticks removed (or kept). Cost: one clause.",
+   "evidence": "docs/plan.md:693-695 'The fix hint of `RJ-338` is the one fixed text that 04 4.4 quotes, and a test fails when the table's hint differs from it by a byte'; docs/spec/04-cli.md:326 'resumes at `sbx env rm`. ... add it to `salvage.excludeIgnored` (gate 2) ... `--accept-loss` does not cover this error.'"
+  },
+  {
+   "id": "L0-r18-9", "kind": "new", "severity": "Advisory", "class": null, "origin": "own",
+   "section": "plan (T068, acceptance, R17-09)",
+   "defect": "The kill point of 'kill the salvage' is a range ('after removing -> salvaging is written and before removing is written again'), not one step of the fault injection, so a test that kills just before writing removing and one that kills mid-capture both satisfy it.",
+   "scenario": "The test kills only after the salvage completes, the mid-capture restart is never exercised, and a bug in restarting a half-written salvage passes.",
+   "change": "Name the step, or say the test kills after each step in that range. Cost: one clause.",
+   "evidence": "docs/plan.md T068 '\"kill the salvage\" kills romeu after `removing -> salvaging` is written and before `removing` is written again (R17-09)'"
+  }
+ ],
+ "what_is_missing": [
+  "lenses.md step 6 or the stage table: that a re-audit judges acceptance items added for test-detail findings as acceptance (L0-r18-1).",
+  "lenses.md step 4: who settles a disputed class (L0-r18-2).",
+  "lenses.md: the reason for the 2026-10-12 rule and from when it applies (L0-r18-5).",
+  "lenses.md: what happens to a spec test cell whose wording does not reach its stated result (L0-r18-3).",
+  "round-17.md: the dropped phrase of R17-02 (L0-r18-4).",
+  "plan T069: 'nothing moved on RJ-338 or RJ-306; the move completes after the resume' (L0-r18-7)."
+ ],
+ "bullets_reconciled": "L0's part two holds no bullets; nothing to reconcile. Part-one notes folded into L0-r18-1 to L0-r18-9.",
+ "postmortem": "After v1.0.0 a user runs `romeu retire` on a project whose earlier rm failed at `sbx env rm`, with a background agent still writing. retire hits RJ-338, but T069 never asserted 'nothing moved', so the implementation moved `<name>-env/` to `.attic/` before the inner rm returned 5; the sandbox lives on, its generation removing, its state in the state attic. The test-detail rows went to acceptance items stage A never judged (parked for B), and T069's Implements does not cite I17 or 01 1.6, so the stage A to B delta never re-read it. Separately, a contributor rewriting 'write during the salvage' from 05 5.2 writes once, gets RJ-338, and changes the code to return RJ-306: the correct construction lived only in a merged plan bullet. Unsaid: the exit rule was loosened at the round that failed it, and two of three Required rows became non-blocking by classification. Sections: 04 4.2 (retire), 04 4.4 (RJ-338), 05 5.2 (I17), 08 8.5 step 2, 01 1.6, plan T068 and T069, lenses.md stage table and exit criteria.",
+ "lens_critique": "A reviewer holding only S1 to S11, the principles and 0.1 judges the spec by its outcomes, but none of those speaks about the review process itself, so this lens judges a process amendment (lenses.md) only through the Tools are code and Simple and explicit principles; it misses whether the reclassification shortens time to a correct v1.0.0 or only to a declared one, and it cannot weigh the classes against S6's 'a tagged test that fails when the guard is disabled', the criterion they most affect.",
+ "missing_viewpoint": "An auditor of the review process itself: someone who checks that changes to the gate (exit rules, classes, stage boundaries) are adopted before the round they decide, by someone other than the round's own consolidator, and that every moved finding is traced to its closing evidence. The lens titles cover users, maintainers, testers and the spec against itself, but none watches the referee.",
+ "out_of_scope": "01 1.6, the new paragraph: a write made after the salvage's read and before `sbx env rm`, on a salvage run from `open` or restarted from `salvaging`, is not salvaged, and no accepted risk is added to 05 5.4; this sits against 00 0.1 'nothing that salvage covers is lost'. Decided as R17-11 option (a), so no finding raised; flagged for the orchestrator.",
+ "confidence": "high for L0-r18-4, L0-r18-6, L0-r18-8 (read text); medium for L0-r18-1, L0-r18-2, L0-r18-3, L0-r18-5 (process judgment); medium for L0-r18-7 (RJ-338 before-move behavior of retire is implied, not written); low impact for L0-r18-9.",
+ "pages_read": ["docs/reviews/lenses.md (stage table, How stage A runs, What a reviewer returns, lens titles)", "docs/reviews/round-17.md (Findings, Exit criteria, Write pass)", "docs/reviews/round-17/reports/L0.json", "docs/plan.md (opening line 204, O8, T008, T068, T069)", "docs/spec.md (Principles, Success criteria, row 348)", "docs/spec/00-scope.md 0.1", "docs/spec/01-system-model.md (diff of 1.6)", "docs/spec/04-cli.md (rm and retire rows, RJ-338)", "docs/spec/05-security.md I17", "docs/spec/08-memory-handoff-salvage.md 8.5", "docs/notes/maintainer-block-of-ci-bootstrap.md (entry reads, limits, spot-check)", "docs/spec/10-testing-style.md 10.2 items a and h (spot-check)"]
+}

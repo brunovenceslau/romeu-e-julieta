@@ -1,0 +1,10 @@
+{
+ "header": "L16 · The owner of the data · sonnet",
+ "verdict": "All four round-9 findings (R9-1 M, R9-2/3/4 A) now read as their resolutions say; the delta adds no gap in what the owner can find, read, export or delete.",
+ "prior_checked": 4,
+ "prior_resolved_as_stated": 4,
+ "findings": [],
+ "pages_read": ["docs/reviews/lenses.md (L16, What a reviewer returns, How stage A runs)", "docs/reviews/round-9/reports/L16.json", "docs/reviews/round-9.md (L16 rows)", "08 8.2, 8.5 (delta)", "09 J7, J14 (delta)", "10 10.1", "04 4.2 root-indexed row", "05 5.4 salvage row, delta grep", "01 1.2 store table, delta grep", "docs/spec.md S7"],
+ "out_of_scope": "ADR 0010, the approvals surface and the D2/D3 decisions were skimmed by grep only; they touch no owner-held data. Whether a deleted salvage payload leaves doctor and verification quiet needs the implementation.",
+ "confidence": "Medium: checked by reading the delta and grep, not by running the spec's checks."
+}

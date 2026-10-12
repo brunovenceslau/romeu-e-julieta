@@ -1,0 +1,48 @@
+{
+ "header": "L14 · The maintainer on duty · sonnet",
+ "verdict": "The round-8 resolutions are in the text; two new gaps remain, both around the evidence a stranger pastes: the 'safe to paste' claim leans on I25, which does not cover child-process stderr, and the rule for an undecodable record names an id that no table row defines.",
+ "round8_checked": 19,
+ "round8_resolved_as_stated": 19,
+ "findings": [
+  {
+   "id": "L14-r9-1",
+   "kind": "new",
+   "severity": "Required",
+   "section": "04 4.1 (Error ids); 05 (Safe to paste)",
+   "defect": "04 4.1 and 05 declare an error's details (escaped argv, status, first 4 KiB of the child's stderr, versions) safe to paste into an issue because 'romeu never handles a secret' (I25), but I25 covers only what romeu writes in argv, env or files, not what git or sbx print on stderr.",
+   "scenario": "A stranger's `sync` fails on git; git's stderr names a remote URL with an embedded token, or sbx's 403 body and paths carry the user name and home directory. The error details carry that text and the spec tells the stranger it is safe, so the token lands in a public issue.",
+   "change": "Say what is safe and what is not: stderr passes the same redaction as the recorder (10 10.3) or is bounded to a closed set, and the pasteable claim is limited to argv, status, step and versions. Name the user's home path and hostnames as not covered, or strip them.",
+   "round8_ref": "R8-04-2"
+  },
+  {
+   "id": "L14-r9-2",
+   "kind": "new",
+   "severity": "Required",
+   "section": "03 (opening, Versions); 04 4.4",
+   "defect": "03 says a record romeu cannot decode is 'reported by id' by status and doctor, but 4.4 has no row for an undecodable own record (format-newer covers only a newer version; upstream-shape covers only other people's tools).",
+   "scenario": "A host state file is truncated by a full disk or a crash. The implementer of T008 has no id to emit, invents one or reuses upstream-shape; the stranger's report says the wrong thing and errors.md has no fix line for it.",
+   "change": "Add one row to 4.4 (for example a slug for an undecodable own record, exit 2, raised by every reader of a versioned format) with its fix hint, and cite it from 03.",
+   "round8_ref": "R8-03-1"
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L14, What a reviewer returns, How stage A runs)",
+  "docs/reviews/round-8/reports/L14.json",
+  "docs/reviews/round-8/clusters-*.json (L14 clusters)",
+  "docs/reviews/round-8.md (rows for the L14 clusters, parked list)",
+  "docs/reviews/round-8/write-pass.md",
+  "docs/spec.md (Open questions, Deferred decisions, S2, Boundaries)",
+  "docs/spec/01-system-model.md 1.4",
+  "docs/spec/03-formats.md (opening)",
+  "docs/spec/04-cli.md (4.1, 4.4)",
+  "docs/spec/05-security.md (I25, 5.4, Safe to paste)",
+  "docs/spec/10-testing-style.md 10.2, 10.3",
+  "docs/spec/11-host-probes.md 11.2",
+  "docs/spec/12-engineering.md 12.4, 12.6 to 12.9",
+  "docs/spec/13-runtime-ledger.md (opening, 13.9)",
+  "docs/adr/0007, docs/adr/0009",
+  "docs/plan.md (T008, T029, opening counts)"
+ ],
+ "out_of_scope": "Round-8 findings parked for stage B or marked L were not re-reported: the plan clusters (R8-plan-1 and R8-plan-18, so the leftover 'six accepted records' in plan.md and the missing T008/T029 acceptance were not raised), R8-11-9 and R8-12-40 (both landed as deferred rows or limits and are present in the index and 12.10). L14-5 (R8-05-5) and L14-12 (R8-12-19) were operator decisions and are present in the text (05 5.4 row, 12.7 issue forms). The pending hook change in PR #34 (DR3) is a tooling PR outside this diff. The rest of the diff was skimmed only.",
+ "confidence": "Medium-high: every resolution was checked against the baseline text by grep and by reading the cited paragraphs; the two new findings are read directly from 04, 05, 03 and 4.4, not run."
+}

@@ -1,0 +1,117 @@
+{
+ "header": "r17.L6 · The test architect who has seen coverage lie · sonnet",
+ "verdict": "The round-16 write pass resolves L6-r16-1 and L6-r16-2 and part of L6-r16-3, but two new Required gaps remain in I17: the write-during-the-salvage case cannot be made to reach its branch as worded, and the --accept-loss branch of RJ-338 has no case with a real skipped reason.",
+ "prior_checked": 3,
+ "prior_resolved_as_stated": 2,
+ "prior_resolution_notes": {
+  "L6-r16-1": "resolved as stated (R16-02, A): precedence is stated once in 04 4.4, 08 8.5 and 01 1.6, and the writer cases assert the id and state; the new cases carry defects L6-r17-1, -2, -4",
+  "L6-r16-2": "resolved as stated (R16-02, A): the RJ-338 case reads the state after the exit and asserts the resumed rerun writes no new entry",
+  "L6-r16-3": "resolved in part (R16-12, M): the details-names-path assertion is added, the hint is quoted and T068's copy replaced by a citation; the titled-test check is a stated limit and not reported; the hint has no golden (see L6-r17-6) and T068 has no RJ-338 bullet (see L6-r17-3)"
+ },
+ "findings": [
+  {
+   "id": "L6-r17-1",
+   "kind": "new",
+   "severity": "Required",
+   "origin": "own",
+   "section": "05 5.2 (I17, case 'write during the salvage'); 08 8.5 step 2",
+   "defect": "The case says only 'a writer changes a tracked file while the rerun salvages', but 08 8.5 step 2 repeats the capture once before skipping, so a one-shot write is absorbed and the rerun ends as RJ-338, turning the case red for the wrong reason or flaky; it also does not say that a change already exists when the rerun starts, without which no salvage starts.",
+   "scenario": "T068 builds the test with a single write. The repeat captures a stable tree, the salvage completes and the rerun exits RJ-338. The suite is red on a correct build, or the author weakens the assertion until it is green. If the fingerprint is unchanged at the start, the rerun resumes at sbx env rm and the case never reaches the skip.",
+   "change": "Word the case as: the fingerprint already differs when the rerun starts, and the writer changes the tracked file between every pair of reads of HEAD and status, through the repeat, so the worktree is skipped as worktree-changing. Cost: one clause in the case.",
+   "evidence": "05-security.md:172 'a writer changes a tracked file while the rerun salvages, so the recheck of 08 8.5 step 2 skips the worktree as `worktree-changing`'; 08-memory-handoff-salvage.md:187-189 'if either moved, the capture repeats once, then the worktree is skipped as `worktree-changing`'."
+  },
+  {
+   "id": "L6-r17-2",
+   "kind": "new",
+   "severity": "Required",
+   "origin": "own",
+   "section": "05 5.2 (I17); 04 4.4 (RJ-338); 08 8.5",
+   "defect": "No I17 case runs the RJ-338 branch 'or --accept-loss names its skipped reasons' with a real skipped reason: the only mention, 'naming any reason does not change that', sits in the changed-fingerprint case whose salvage is complete, so the flag is vacuous there.",
+   "scenario": "A build that honours --accept-loss=worktree-changing on a removing rerun and reaches sbx env rm (destroying work the user believed protected by the fingerprint), or one that returns RJ-306 and open, stays green. A persistent tracked-file writer with the flag is also the one case where the user cannot leave RJ-338 by any flag, and no text or case names the exit (stop the writer, or sbx env rm by hand).",
+   "change": "Add an E case: a writer that keeps a worktree changing, rerun with --accept-loss=worktree-changing; exits 5 with RJ-338, state removing, a new entry that records the accepted reason, sbx env rm not reached (reaching it, or returning RJ-306, turns it red). Replace 'any reason' with 'a reason the salvage skipped'. Cost: one case, one phrase.",
+   "evidence": "04-cli.md:326 'When that salvage completes, or `--accept-loss` names its skipped reasons, the command records its entry and `fingerprint` with the state `removing`, and then exits instead of running `sbx env rm`'; 05-security.md:172 '`--accept-loss` naming any reason does not change that'."
+  },
+  {
+   "id": "L6-r17-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "05 5.2 (I17); plan T068, T069; 04 4.4 (RJ-338)",
+   "defect": "RJ-338 names rm, recreate and retire, but every fingerprint case in I17 is written for 'the rerun of rm', and neither T068 nor T069 has an acceptance bullet for RJ-338.",
+   "scenario": "A retire (or recreate) that resumes at sbx env rm without comparing the fingerprint passes every test; removing the comparison from it turns nothing red.",
+   "change": "Say in I17 that the fingerprint cases run for rm, recreate and retire (a table-driven test over the three commands), and add one T068 bullet naming RJ-338 and RJ-306 on a removing rerun and one T069 bullet for retire. Cost: one clause and two bullets.",
+   "evidence": "04-cli.md:326 '`rm`, `recreate` and `retire`, on a generation `removing`'; 05-security.md:172 'makes the rerun of `rm` salvage again'; plan.md:1988-1992 (T068 first bullets) and 2020-2024 (T069 acceptance) name no fingerprint."
+  },
+  {
+   "id": "L6-r17-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "05 5.2 (I17, case 'kill the salvage'); 01 1.6",
+   "defect": "The case says the salvage is 'killed before it ends' but not at which step, and the rule that a restarted salvage is not one a changed fingerprint started rests on the state 'salvaging' with no stated source (state file or in-process flag).",
+   "scenario": "A kill after the state removing is written leaves a different state and the case passes trivially; a build that persists no marker and keeps an in-process flag is correct, but a build that wrongly keeps the flag across a restart is red only for a kill at the right step.",
+   "change": "Name the kill point (after removing -> salvaging is written, before removing is written), assert that the restarted salvage writes a new entry with a fingerprint and that sbx env rm runs once; state in 01 1.6 that the distinction is the state salvaging and not a stored marker. Cost: one clause in the case, one in 01 1.6.",
+   "evidence": "05-security.md:172 'a salvage that a changed fingerprint started is killed before it ends, and the rerun, which restarts it from `salvaging`, goes on to `sbx env rm`'; 01-system-model.md:309 'for a salvage that a rerun on a `removing` generation started because its fingerprint changed'."
+  },
+  {
+   "id": "L6-r17-5",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "04 4.2 (rm row); 09 J3 step 5",
+   "defect": "The rm row (and 09 J3 step 5) still says a rerun whose fingerprint changed exits 5 with fingerprint-unstable, unqualified, though 04 4.4 now says an incomplete salvage there ends as RJ-306 and open.",
+   "scenario": "An implementer of the rm row returns RJ-338 for an incomplete salvage; the id is wrong though the exit is 5, and the I17 case for RJ-306 is the only thing that notices.",
+   "change": "Qualify the rm row and J3 step 5 as 04 4.4 does ('when that salvage completes or is accepted'), or cite 04 4.4 only. Cost: one clause in each.",
+   "evidence": "04-cli.md (rm row) 'A rerun on a `removing` generation whose fingerprint changed since the last salvage exits 5 with `fingerprint-unstable` (4.4)'; 09-journeys.md:199 'otherwise salvages again and exits 5 with `fingerprint-unstable` (`RJ-338`'."
+  },
+  {
+   "id": "L6-r17-6",
+   "kind": "regression",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "04 4.4 (RJ-338 hint, decided on 2026-10-12, R16-03); 03 3.8",
+   "defect": "The quoted hint says 'If nothing still writes that path, rerun, and the rerun resumes at sbx env rm' and then 'the first rerun after either may exit 5 once more', which contradict each other for the stop case; no test asserts the hint (4.1 says tests assert ids), so the golden-to-be is the only holder.",
+   "scenario": "A user stops the writer, reruns, and gets exit 5 once more after reading that the rerun resumes.",
+   "change": "Proposed amendment to the decided text, for the operator: 'If nothing still writes that path, rerun; the first rerun may exit 5 once more, and the one after it resumes at sbx env rm.' Also hold the text in a T008 golden or say it is not asserted. Cost: one sentence.",
+   "evidence": "04-cli.md:326 'the rerun resumes at `sbx env rm`. If something still writes it ... the first rerun after either may exit 5 once more'."
+  },
+  {
+   "id": "L6-r17-7",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "03 3.8 (salvage[].fingerprint)",
+   "defect": "The sentence 'A rerun that finds it different salvages again and ends as RJ-338, fingerprint-unstable, says, which names the first path whose entry changed' is broken ('says,' dangles) and its 'which' has no clear antecedent.",
+   "scenario": "A reader of the field takes 'which names' as the salvage, not the error's details.",
+   "change": "'... and ends as RJ-338 (fingerprint-unstable), whose details name the first path whose entry changed.' Cost: one sentence.",
+   "evidence": "03-formats.md:482 'ends as [`RJ-338`](04-cli.md#44-error-ids), `fingerprint-unstable`, says, which names the first path whose entry changed'."
+  }
+ ],
+ "what_is_missing": "A case for --accept-loss with a real skipped reason on a removing rerun; the writer's behaviour through the capture repeat and the start precondition; fingerprint cases for recreate and retire; the kill point of 'kill the salvage'; what step 4 does when an ignored file changes while the tar is written (the excludeIgnored case assumes each salvage completes); a T068 bullet for RJ-338 and RJ-306 on a rerun; qualified wording in the rm row and J3 step 5.",
+ "bullets_reconciled": {
+  "fake sbx fidelity": "confirmed as a limit, 10 10.3 'Cannot model': a replay-only fake cannot generate a writer; the writer cases in I17 depend on the julieta half forwarded into the container, which 10 10.3 does not describe for a changing worktree. Unanswerable beyond that without block A recordings",
+  "mutation by disabling the guard": "confirmed in part, 10 10.2 mutation row: mutate runs on files with a guard tag; the I17 cases carry '(x turns this red)' removals, but L6-r17-1, -2, -4 show three where the removal does not reach or is not named",
+  "80% per package": "refuted for this scope: 10 10.2 coverage row sets per-package thresholds only raised, and 05 5.2 names error paths as cases; not re-read further",
+  "probes on maintainer machines": "unanswerable here, outside the round-17 scope (11, S3)",
+  "golden governance": "refuted for this scope: 10 10.4 and the golden row require goldens listed in the PR Evidence; the RJ-338 hint has no golden (L6-r17-6)",
+  "race run that excludes e2e": "refuted: 10 10.2 e2e row runs go test -race with the e2e tag"
+ },
+ "postmortem": "The pass moved the rule to one home (04 4.4) and wrote cases for it, but each new case was checked against the rule it names and not against the step it must pass through: the capture repeat of 08 8.5 step 2, the accepted-reason branch, and the commands other than rm. After v1.0.0 a user with --accept-loss and a persistent writer loops on RJ-338 with no flag that helps, a retire or recreate rerun can resume at sbx env rm unguarded, and the suite stays green. Sections crossed: 04 4.4, 05 5.2 (I17), 08 8.5, 01 1.6, plan T068 and T069.",
+ "lens_critique": "The lens grades a guard by whether its removal turns a named test red. That is right for a guard but blind to a test that is red for the wrong reason or never reaches its branch (a one-shot write absorbed by a retry), and to a branch that is safe-looking and destructive (accepted loss), where the cost of a missing case is not equal to the cost of a missing guard test.",
+ "missing_viewpoint": "A reader who enumerates, for each state-machine row and each command that shares it (rm, recreate, retire), which test covers the pair. No lens in the set is titled for command-by-state coverage.",
+ "out_of_scope": "11 and S3 probes; 10.2 coverage thresholds; the titled-test check for E cases (stated limit in R16-12); R16-03's decision itself, reported only as an amendment (L6-r17-6).",
+ "confidence": "high for L6-r17-1, -5, -7 (text quoted); medium for L6-r17-2 and -3 on severity, since the spec may rely on the table-driven tests of T068 to cover the missing paths; medium for L6-r17-4.",
+ "pages_read": [
+  "docs/reviews/lenses.md (L6)",
+  "docs/reviews/round-16.md (Write pass)",
+  "docs/reviews/round-16/reports/L6.json",
+  "docs/spec/01-system-model.md (1.6)",
+  "docs/spec/03-formats.md (3.8)",
+  "docs/spec/04-cli.md (4.1, 4.2, 4.4)",
+  "docs/spec/05-security.md (I17)",
+  "docs/spec/08-memory-handoff-salvage.md (8.5)",
+  "docs/spec/09-journeys.md (J3 step 5)",
+  "docs/spec/10-testing-style.md (10.2 rows, 10.3, 10.4)",
+  "docs/plan.md (T068, T069)"
+ ]
+}

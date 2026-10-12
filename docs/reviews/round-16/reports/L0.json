@@ -1,0 +1,98 @@
+{
+ "header": "L0 · The control reviewer · opus",
+ "verdict": "The changed text meets the success criteria and resolves all six round-15 findings, one in a narrower form than its row promised; the largest gap is Advisory: item h writes its answers into an entry whose new format has no slot for them, and decision 1 of ADR 0011, the step S2's evidence waits on, sits only in block O8's Recommendation column with no pass.",
+ "prior_checked": 6,
+ "prior_resolved_as_stated": 5,
+ "prior_resolution_notes": {
+  "L0-r15-1": "R15-03 (A) resolved as stated: item g drops its own negative list and cites the note as the one home (10 10.2:911-917); the note fixes the entry heading and makes the first narrowed entry the event (note:122-131).",
+  "L0-r15-2": "R15-04 (A) resolved in a narrower form: read 2 is on the host against the forwarded socket and the sandbox read is a second read (note:143-147), but the Resolution's other two reads, the forwarding configuration that names the socket and the account's SSH keys page, are not in the text; see L0-r16-2.",
+  "L0-r15-3": "R15-07 (L) resolved as stated: the tag try runs only while no release.yml exists (note:150-152), and the limit with its reopening trigger, the pull request that adds release.yml, is stated (note:166-172).",
+  "L0-r15-4": "R15-05 (A) resolved as stated: the opening rule (10 10.2:843-847) and the To do lead-in (10 10.2:888-889) both name items g and h as the exception.",
+  "L0-r15-5": "R15-06 (A) resolved as stated: plan block O8 carries items g and h after T002 and before checkpoint C7, the block count reads eight and the Operator field O1 to O8 (plan.md:67, 207, 221).",
+  "L0-r15-6": "R15-01 (M) resolved as stated: under the decision of 2026-10-12 the count and salvage[].cause are gone, so an interrupted salvage has no row to restart; RJ-338 is the one home and 01 1.6, 03 3.8, 08 8.5, 09 J3 and I17 cite it (04 4.4 RJ-338 row)."
+ },
+ "findings": [
+  {
+   "id": "L0-r16-1",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (maintainer block, item h); the note on the maintainer block (The token narrowing); plan (block O8)",
+   "defect": "Item h saves its answers 'under the entry of item g', but the note, now the one home of the entry, defines an entry as a heading 'followed by the three reads' and never mentions item h, so the required-name try has no slot, and with more than one entry 'the entry of item g' does not say which.",
+   "scenario": "The maintainer writes the narrowed entry at one sitting and runs item h at a later one; the note's format admits no fourth section, so the answers go in a new entry (which then needs a verdict heading and three reads) or are appended to an old one, and block O8's pass, which reads only the verdict, accepts the sitting with no record of which check the ruleset counts.",
+   "change": "The note gives the entry an optional fourth part, 'the required-name try of item h, when it ran', with its expected answers, and says item h's answers go in the first entry whose verdict is narrowed, or in a later entry headed by its own date; O8's pass names that part. Cost: two sentences in the note and a clause in O8.",
+   "evidence": "docs/spec/10-testing-style.md:924-925 'save the API answers under the entry of item g'; docs/notes/maintainer-block-of-ci-bootstrap.md:123-124 'An entry is a heading `### <date>: narrowed` or `### <date>: not narrowed`, followed by the three reads'; docs/plan.md:221 Pass 'the entry's verdict is narrowed, read against the expected answers the note lists'."
+  },
+  {
+   "id": "L0-r16-2",
+   "kind": "unresolved",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block (The token narrowing, read 2); 10 10.2 (item g)",
+   "defect": "Read 2 lists the keys of 'that socket' on the host, but nothing reads which socket the host forwards, and the GitHub account's SSH keys page that R15-04's Resolution named is gone, so a signing key that is also registered as an authentication key passes as 'the signing key'.",
+   "scenario": "The operator's signing key was added to GitHub both as a signing key and as an authentication key (GitHub allows the same key in both lists). The host forwards only that key, read 2 shows the signing key and no other, the entry reads narrowed, and the forwarded key can still push over SSH to every repository the account reaches; or the maintainer lists the host's own agent socket rather than the one the sbx setting forwards.",
+   "change": "Read 2 adds the two host reads R15-04 listed: the sbx setting or kit that names the forwarded socket, and the account's SSH keys page (authentication keys), checked that no forwarded key appears among the authentication keys. Cost: two lines in the note.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:143-147 'the keys of the forwarded socket, listed by `ssh-add -l` on the host with `SSH_AUTH_SOCK` set to that socket. Expected: the signing key, and no GitHub authentication key'; docs/reviews/round-15.md R15-04 Resolution 'the forwarding configuration the host gives the sandbox (the sbx setting or kit that forwards the agent) and the GitHub account's SSH keys page, each against a known list'."
+  },
+  {
+   "id": "L0-r16-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "plan (block O8); 10 10.2 (maintainer block, item a); index (S2)",
+   "defect": "Decision 1 of ADR 0011, removing the administrator role's bypass of the default-branch ruleset, on which S2's evidence waits, is in no block's 'What the maintainer does' and has no pass; it appears only in O8's Recommendation column, and its evidence home ('under Evidence') belongs to no pull request in O8.",
+   "scenario": "The maintainer runs O8 as its columns say, narrows the token and writes the entry, and skips the recommendation; the default-branch ruleset keeps its bypass actor through v1.0.0, so S2 stays at 'the run, not the ruleset, is the evidence' by omission, and no block's pass shows it.",
+   "change": "O8 (or its own block) lists decision 1 under 'What the maintainer does', with the pass 'the saved API answer shows the default-branch ruleset with no bypass actor' and where that answer is saved (the note's entry, as for items g and h, or a named pull request). Cost: one plan row edit, and one clause in 10 10.2 item a if the evidence home moves.",
+   "evidence": "docs/plan.md:221 Recommendation 'run it at the next sitting after T002 merges, together with decision 1 of the same record'; docs/spec.md:143 'once the maintainer step of ADR 0011 ... decision 1, is applied (10 10.2, maintainer block, item a), the ruleset requires the checks of every merge ... until then the run, not the ruleset, is the evidence'; grep of 'decision 1' in docs/plan.md finds only line 221."
+  },
+  {
+   "id": "L0-r16-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block (The token narrowing)",
+   "defect": "The return rule is not testable as written: 'the rows it fired stay fired' has two possible referents for 'it', 'the token rows of the index and of 05 5.4' is not listed anywhere, and two entries with the same date have no order for 'first' and 'later'.",
+   "scenario": "A narrowed entry and a not narrowed entry are written on the same date after a re-read; a reader cannot tell which is later, so whether the token rows stand in the narrowed state is undecided, and 'it' read as the later entry suggests a not narrowed entry fires rows.",
+   "change": "'the rows the event fired stay fired'; name the rows returned (the index token-narrowing row and the 05 5.4 token and approval-line rows); entries are in the order they appear in the note, newest last. Cost: one sentence.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:128-131 'A later entry whose verdict is not narrowed returns the token rows of the index and of 05 5.4 to the state before the narrowing; the rows it fired stay fired'."
+  },
+  {
+   "id": "L0-r16-5",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block (The token narrowing, read 3); index (the token-narrowing row); plan (block O8)",
+   "defect": "'A later read leaves it out' can mean a read made after release.yml exists or any read after the first, and if O8 slips past T088 the first entry also skips the tag try, so the index's 'not measured until that entry' would become never measured with no text saying so.",
+   "scenario": "O8 has no task waiting on it and is due before C7 only by recommendation; the maintainer narrows the token after T088 lands release.yml, the entry omits the tag try under the guard, and whether a fine-grained token passes the tag ruleset's bypass stays unmeasured into the release while the index row still promises the entry measures it.",
+   "change": "'a read made once release.yml exists leaves it out and records the tag answer as not measured'; the index row says the tag answer is measured only by an entry made before release.yml lands. Cost: two clauses.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:150-152 'The tag try runs only while no `release.yml` exists ...; a later read leaves it out'; docs/spec.md:348 'whether it can create a `v*` tag through the tag ruleset's bypass is not measured until that entry'; docs/plan.md:221 'none: no task waits on it ... it is due before checkpoint C7'."
+  },
+  {
+   "id": "L0-r16-6",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "index (the four rows whose trigger is 'the token is narrowed'); plan (Operator blocks, opening)",
+   "defect": "Two seams with unchanged text: the four trigger rows still point at 'the dated entry of 10 10.2, item g', which now only cites the note, rather than at the note's anchor where the event is defined; and ADR 0011 decision 2 fires the rows 'when it is applied', while the spec fires them at the first entry whose verdict is narrowed, with no text saying the spec's verdict is the one that counts; the plan's opening still says the sandbox holds the operator's token, which O8 ends.",
+   "scenario": "A narrowing is applied and its entry reads not narrowed (an extra permission); a reader of ADR 0011 treats the rows as fired, a reader of the note does not.",
+   "change": "The four rows link the note's 'The token narrowing' anchor; the note says its verdict, not the act of applying, is the event that ADR 0011 decision 2 names; the plan's opening says 'the operator's token, or after O8 the narrowed token, which the sandbox holds'. Cost: four link edits and two clauses.",
+   "evidence": "docs/spec.md:279, 283, 351, 353 'the token is narrowed, as the dated entry of 10 10.2, item g, records it'; docs/adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md:97-98 'The Deferred rows whose trigger is \"the token is narrowed\" fire when it is applied'; docs/plan.md:203-204 'the tag ruleset does not bind the operator's token, which the sandbox holds'."
+  }
+ ],
+ "what_is_missing": "A slot and expected answers for item h in the entry; a block, a pass and an evidence home for ADR 0011 decision 1; the forwarding-configuration and account-keys reads R15-04 named; a defined list of the rows the return rule touches; an order for entries that share a date.",
+ "postmortem": "The round-15 pass gave the narrowing record one home and a format (note, 10 10.2 item g) but did not bring item h's record or ADR 0011 decision 1 into it; the seam crosses the note, 10 10.2 items a, g and h, plan block O8 and S2. R15-04 was applied as one of its three reads.",
+ "lens_critique": "Success read only through S1 to S11 under-weights process controls that no S row measures: the token narrowing and the bypass removal sit outside every success criterion except through S2's fallback wording, so a control reviewer can find them complete when they are only scheduled. Missing viewpoint, from the lens titles: the operator as the one human in the loop, whose sittings and attention are the scarce resource every maintainer block spends (L14 is on duty, not the person whose time the blocks budget).",
+ "out_of_scope": "The date discrepancy of the first four tries (2026-10-07 versus 2026-10-08), left as round 14 recorded it; plan O1 still describing items a to d as to be run; the RJ-338 rewrite beyond confirming L0-r15-6.",
+ "confidence": "high for L0-r16-1, -3, -4 (read directly in the text); medium for L0-r16-2 (that GitHub accepts one key as both signing and authentication key is from memory, not re-read from GitHub's docs) and L0-r16-5 (depends on O8's timing).",
+ "pages_read": [
+  "docs/spec.md (S1-S11, Deferred decisions rows at 279, 283, 345-353)",
+  "docs/spec/10-testing-style.md (10 10.2 maintainer block, 838-935)",
+  "docs/notes/maintainer-block-of-ci-bootstrap.md (100-174)",
+  "docs/spec/05-security.md (5.4 token and approval-line rows, via delta)",
+  "docs/plan.md (Operator blocks 199-221, phases 308-321, 1008-1022)",
+  "docs/adr/0011 (decision 2)",
+  "docs/reviews/round-15.md",
+  "docs/reviews/round-15/reports/L0.json",
+  "delta.diff be402ca..591a1aa"
+ ]
+}

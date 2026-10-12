@@ -1,0 +1,116 @@
+{
+  "header": "L2 · The security engineer who has watched a host fall · opus",
+  "verdict": "Mostly met: 46 of the 48 round-8 L2 and L2b findings that were not parked now read as their resolutions say, and the host-side exception for agent-written tools/ci is named, with its control and its trigger. The largest gap is the trigger of the widest decision (narrowing the development sandbox's token). It counts final handoffs 'by hand from the handoff record those sessions keep', but names no file. Read against the session checkpoints this repository does keep, the count may already have fired, and no review of the token decision is recorded.",
+  "round8_checked": 48,
+  "round8_resolved_as_stated": 46,
+  "findings": [
+    {
+      "id": "L2-r9-1",
+      "kind": "unresolved",
+      "round8_ref": "L2b-4, L2-5 (R8-index-5, R8-adr-7, DR5)",
+      "severity": "Required",
+      "section": "index: Deferred decisions (narrowing the development sandbox's GitHub token); ADR 0009 decision 18",
+      "defect": "The trigger 'the second final handoff ... since the last review, on 2026-10-07, counted by hand from the handoff record those sessions keep' names no file and no mark that makes a handoff final. That leaves the count to whoever remembers it, which DR5's recommendation ('replaces memory with a command's output') meant to remove. The plausible record, the session checkpoints in docs/reviews/round-8.md, holds two or more final handoffs since 2026-10-07 (2026-10-08, and 2026-10-09 after the 'continued' session), yet the row still carries 2026-10-07 and no review is recorded.",
+      "scenario": "Sessions holding the operator's administrator token keep running plan tasks. Each orchestrator reads the row, cannot tell which file to count or whether a checkpoint is 'final', and goes on. The decision never returns to the operator before checkpoint C7, which turns the trigger into a calendar backstop the row itself calls a backstop.",
+      "change": "Name the record and the mark in the row and in ADR 0009's next amendment, for example 'the sections headed Session checkpoint in docs/reviews/round-<n>.md, or docs/HANDOFF.md once it exists; a section is final when it says the session ended'. Give the one grep or git log command that counts them since the date in the row. Then count now: if two or more are found, record the review with today's date in the row, or return the decision to the operator. Cost: two sentences and one count."
+    },
+    {
+      "id": "L2-r9-2",
+      "kind": "new",
+      "severity": "Required",
+      "section": "06 6.4 (Signing rule); 09 J1 step 5; 05 5.4 (Verified signature row)",
+      "defect": "The mitigation of the Verified-signature row now rests on 'added with ssh-add -c, so each use asks for confirmation'. An OpenSSH agent confirms a -c key through an askpass program on the host. macOS ships none, so with no askpass installed the agent refuses each signature. No probe (A12, B2) measures what happens when the signing request comes through sbx's forwarded socket. This is inferred from OpenSSH behaviour, not measured.",
+      "scenario": "The operator follows J1 step 5 on a stock Mac. The first signed commit in the sandbox fails with 'agent refused operation'. The operator drops -c to get unblocked, and the 05 5.4 mitigation is gone without anyone recording it. Or an askpass is installed, a GUI prompt appears per commit, and the operator habituates to clicking it.",
+      "change": "Add to B2, on both hosts: with the key added by ssh-add -c, a commit in the sandbox raises the host prompt (or record that it fails). Name the askpass prerequisite in J1 step 5 and the prerequisites of 12 12.8, or reword the mitigation to 'confirm-on-use where an askpass is installed (B2)'. Cost: one probe observation and one guide sentence."
+    },
+    {
+      "id": "L2-r9-3",
+      "kind": "regression",
+      "round8_ref": "L2b-17 (R8-07-11), against AR16",
+      "severity": "Advisory",
+      "section": "07 7.4 (GitHub rate limit row)",
+      "defect": "The pointer added for L2b-17 says that, until the token-narrowing row fires, the project's github secret 'is the operator's own token'. That row is about the development sandbox. AR16, now the head of 05 5.4's second group, says a romeu sandbox's token is the github@<project> binding. So 07 describes every product user's sandbox as holding the maintainer's account token.",
+      "scenario": "A product operator reads 07 7.4 and concludes the risk is the maintainer's development setup, not their own binding. They bind a broad token anyway, because the page tells them the reach is fixed by a row they do not control.",
+      "change": "Reword to: 'the sandbox holds whatever github@<project> binds (05 5.4, J1 step 5); in the development sandbox of this repository that is the operator's own token until the token-narrowing row fires'. Cost: one sentence."
+    },
+    {
+      "id": "L2-r9-4",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "03 (opening); 07 7.5 step 1",
+      "defect": "mise.lock is listed both among the formats 'decoded from a mount or a repository ... parsed with a strict subset grammar' (whose rules are YAML-only: anchors, aliases, merge keys) and among the 'outputs of tools the product does not own ... decoded tolerantly'. 07 7.5 makes an unknown top-level key a sync error. The host-side parser of an agent-writable TOML file therefore has three different statements of its rule.",
+      "scenario": "The implementer of the lock reader picks the tolerant rule from the second paragraph, so an agent-pushed lock with extra tables is accepted on the host. The fuzz target of 10 10.1 then tests the strict parser that is not the one in use.",
+      "change": "Keep mise.lock in one list only (strict at the top level, as 07 7.5 says, tolerant inside entries if needed), state its TOML limits next to the YAML ones, and name the 1 MiB cap of 07 7.5 as 'the file cap'. Cost: one sentence."
+    },
+    {
+      "id": "L2-r9-5",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "ADR 0009 (Consequences, the pre-push hook bullet)",
+      "defect": "The record says that until PR #34 lands, 'the pull request's diff review is the only guard' against an untracked go.work or vendor/ and a caller's GOFLAGS. None of these three appears in any pull request diff, so the named guard cannot see them. What actually holds is that the host runs the hook only in a plain clone (10 10.2) with the maintainer's own environment.",
+      "scenario": "A reader of the record believes the review covers the gap. A vendor/ or go.work left untracked in the host clone, or a GOFLAGS exported in the maintainer's shell, changes what the hook's go run compiles, and no reviewer could have seen it.",
+      "change": "In the record that next amends ADR 0009, or in PR #34's own record note, replace the sentence with the guard that holds: 'the host runs the hook only in a plain clone whose git status --ignored is clean, from a shell with no GOFLAGS or GOWORK set (10 10.2)'. Cost: one sentence on the decisions surface."
+    },
+    {
+      "id": "L2-r9-6",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "02 2.3 (host tree); 01 1.3 boundary D; 04 4.2 (doctor, root-indexed)",
+      "defect": "The indexer control is a .metadata_never_index file inside each <name>-env/, and doctor checks only that the file exists. That a folder-level marker stops Spotlight on current macOS is not measured by any probe. It is reported to be honoured at a volume root, and the .noindex folder suffix is the form usually relied on. Inferred, not measured here.",
+      "scenario": "sync writes the marker and doctor reports no root-indexed finding. Spotlight importers still parse agent-written memory files, and the 05 5.4 row reads as mitigated when it is not.",
+      "change": "Add a block A observation on both hosts: plant a file under <name>-env/memory with the marker present, and record whether mdfind -onlyin finds it. If it does, switch to the measured form. Cost: one probe row."
+    },
+    {
+      "id": "L2-r9-7",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "11 11.1 (A16)",
+      "defect": "A16 reads the token's type 'from its prefix' and its scopes 'from the x-oauth-scopes header'. A fine-grained token, the very token the narrowing row targets, returns no x-oauth-scopes header, so A16 cannot measure the Administration permission or the repository list that the row's narrowing is about. Read 'from the maintainer's own development session', the prefix is not visible either when the sandbox's credential is injected by a proxy rather than exposed as a value.",
+      "scenario": "After the token is narrowed, A16 records 'fine-grained, no scopes' and the 05 5.4 row says measured. The Administration permission the narrowing was meant to remove is unverified.",
+      "change": "State in A16 where it runs (the maintainer's host shell, not through romeu), and that for a fine-grained token the result is its repository list and permissions read from GitHub's token settings page and recorded by hand, **[review]**. Cost: one cell."
+    },
+    {
+      "id": "L2-r9-8",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "03 3.4 (Rules: secret-in-argv)",
+      "defect": "The best-effort token shapes list ghp_, gho_, ghs_ and github_pat_, but leave out ghu_ and ghr_, GitHub's other two token prefixes, which the same refusal would catch at no cost.",
+      "scenario": "An operator pastes a GitHub App user token (ghu_...) as an argv element. It is not refused, and it lands in sbxenv.yaml, the gate diff and sbx's remembered host commands.",
+      "change": "Add ghu_ and ghr_ to the list. Cost: two tokens in one rule and its table test."
+    },
+    {
+      "id": "L2-r9-9",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "01 1.2 ('Agent output that reaches the host' row)",
+      "defect": "The row, edited in this pass, still says agent output is 'stored in romeu namespaces or as ledger entries', while SC1 deferred the ledger in the same pass, so v1 has no such store.",
+      "scenario": "A reviewer of boundary A looks for the ledger's ingest path to check it, and finds a deferred design instead of a v1 path.",
+      "change": "Drop 'or as ledger entries', or add 'when the ledger lands (Deferred decisions)'. Cost: a few words on the spec surface."
+    }
+  ],
+  "pages_read": [
+    "docs/reviews/lenses.md (L2, What a reviewer returns, How stage A runs)",
+    "docs/reviews/round-8/reports/L2.json, L2b.json",
+    "docs/reviews/round-8.md (findings rows for L2/L2b, Decisions for the operator AR1-AR23 and DR1-DR8, session checkpoint 2026-10-09)",
+    "docs/reviews/round-8/clusters-*.json (cluster membership)",
+    "docs/reviews/round-8/ship-gate-2026-10-09.md (F6 to F8)",
+    "docs/spec/05-security.md (whole)",
+    "docs/spec.md (Never list, Open questions, Deferred decisions, S1)",
+    "docs/spec/00-scope.md 0.1",
+    "docs/spec/01-system-model.md 1.2, 1.3, 1.6 (adopt)",
+    "docs/spec/02-layouts.md 2.3",
+    "docs/spec/03-formats.md opening, 3.1, 3.4, 3.11, 3.13",
+    "docs/spec/04-cli.md 4.1, 4.2 (adopt, status, handoff, doctor)",
+    "docs/spec/06-kits.md 6.1, 6.4",
+    "docs/spec/07-mise-egress.md 7.4, 7.5",
+    "docs/spec/08-memory-handoff-salvage.md 8.1, 8.2, 8.5",
+    "docs/spec/09-journeys.md J1 step 5, J2",
+    "docs/spec/10-testing-style.md 10.1 (fuzz), 10.2 (workflow grammar, environment, Forbidden names, Release and bootstrap, maintainer block)",
+    "docs/spec/11-host-probes.md A5, A12, A14, A16, B2",
+    "docs/spec/12-engineering.md 12.1 (hook row), 12.4 (grants)",
+    "docs/adr/0009 (whole); status-line diffs of ADR 0001, 0007, 0008",
+    "docs/plan.md (tooling pull requests list, O1/O3/O6 rows, question 28) as reading context only"
+  ],
+  "out_of_scope": "The plan findings that were parked for stage B (L2-23, L2-24, L2b-27, L2b-28, L2b-29) were not re-reported. I did not read PR #34, so whether the hook change also edits the 12 12.1 hook row is unchecked. The GitHub security-log coverage claim (05 5.4, ADR 0009 decision 17) was not re-read at its source. Three facts are inferred from OpenSSH, macOS and GitHub behaviour and were not measured in this audit: the askpass need of ssh-add -c (L2-r9-2), folder-level .metadata_never_index (L2-r9-6), and the missing x-oauth-scopes header for fine-grained tokens (L2-r9-7). The diff of 13 (ledger, deferred) and of the non-security parts of 10 and 12 was only skimmed.",
+  "confidence": "High on the 48 resolution checks and on L2-r9-1, L2-r9-3, L2-r9-4, L2-r9-5, L2-r9-8 and L2-r9-9, which can be checked against the text. Medium on L2-r9-2, L2-r9-6 and L2-r9-7, which depend on platform behaviour inferred here and not measured."
+}

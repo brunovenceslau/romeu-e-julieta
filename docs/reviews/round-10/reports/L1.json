@@ -1,0 +1,13 @@
+{
+"header":"L1 · The developer who uses it every day · sonnet",
+"verdict":"Round-9 L1 findings all resolved as stated. Two advisories from the delta, both in J1 (install and first run).",
+"prior_checked":3,
+"prior_resolved_as_stated":3,
+"findings":[
+{"id":"L1-r10-1","kind":"new","severity":"Advisory","section":"09 J1 step 5; 06 6.4; 05 5.4","defect":"The D3 decision says the ssh-add -c confirmation needs an askpass program that macOS does not ship, and to install one first, but J1 names no program, no install command, and does not say what ssh-add -c does when none is installed (fails, or silently adds the key with no confirmation).","scenario":"The user follows J1 step 5 for a git-ssh-sign project, runs ssh-add -c, and either gets an error with no next step, or a key that is added without the confirmation they believe they have. Sync then passes RJ-204 and the confirm-on-use property is silently absent.","change":"In J1 step 5 say which askpass the guide uses (or how to pick one), the one-line install, and the observable result when none exists. Add a doctor or sync hint if the missing askpass can be detected."},
+{"id":"L1-r10-2","kind":"new","severity":"Advisory","section":"09 J1 step 2","defect":"First-install verification now takes three pasted commands (shasum, gh api for the tag's commit, gh attestation verify with five flags), and J1 is the 'one brew install and one init' comparison.","scenario":"A tired user skips the attestation step because the copy-paste block needs a tag lookup and substitution of <owner>, <tag> and <commit>; the check that protects the install is the one most likely to be skipped.","change":"Offer the whole verification as one pasteable block with the tag as a single variable, or state in J1 that the README carries the filled-in block; note that skipping it is the user's choice and what it costs."}
+],
+"pages_read":["docs/reviews/lenses.md (L1)","docs/reviews/round-9/reports/L1.json","docs/reviews/round-9.md (L1 rows, R9-06)","docs/spec/01 (1.4)","docs/spec/02 (2.3)","docs/spec/04 (run step 2, 4.4 RJ-335, delta)","docs/spec/09 (J1, J10 delta)","docs/spec/12 (README row)","docs/spec/05 and 06 (askpass greps)"],
+"out_of_scope":"Pages 03, 05, 07, 08, 10, 11, 12 and the ADRs skimmed through the diff stat and greps only. Whether ssh-add -c without askpass fails is a host fact I did not test.",
+"confidence":"Medium: prior items checked by reading baseline text; the new findings rest on the absence of text by grep and reading."
+}

@@ -85,25 +85,36 @@ expected conflict.
    late polish can reopen what an earlier round closed. The output is
    the draft of the round page, in the shape of
    [round-7.md](round-7.md): one row per finding with a proposed
-   resolution and its status (A, M or L).
+   resolution and its status (A, M or L, or T for a finding moved to
+   a plan task's acceptance). The consolidating reviewer classifies
+   each Required finding as `contradiction`, `behavior-gap` or
+   `test-detail`, by the definitions in "What a reviewer returns", and
+   records the class in its row.
 4. **One decision block.** Everything the consolidation cannot decide
    goes to the operator at once, each item with a recommendation: a
    Blocking or Required finding that changes a decision record, an
-   accepted risk or the scope. Advisory findings are applied by
-   default.
+   accepted risk or the scope, and a Required finding whose class the
+   consolidation sets lower than the reporting lens's. Advisory
+   findings are applied by default.
 5. **One write pass, one pull request**: the corrected spec and the
    round page, with the approval line of every ask-first surface the
    diff touches. A large diff is split by page across worktrees with
    disjoint file sets and lands as one pull request.
 6. **A targeted re-audit** (the next round number): only the lenses
    whose findings drove the delta, reading only the sections the write
-   pass changed; clean verdicts are carried forward.
+   pass changed; clean verdicts are carried forward. The acceptance
+   items a write pass added for `test-detail` findings are judged as
+   acceptance in this step, not parked for B.
 
 The spec is validated for the plan tasks that follow when all of these
 hold, and the round page says so in one line with the numbers:
 
-- no Blocking finding open; every Required finding fixed, or declined
-  with the decision and its date recorded next to the rationale;
+- no Blocking finding open; every Required finding of class
+  `contradiction` or `behavior-gap` fixed, or declined with the
+  decision and its date recorded next to the rationale; every Required
+  finding of class `test-detail` is an acceptance item of the plan
+  task that implements it, in `plan.md`, citing the finding id, and
+  does not block;
 - every report has its coverage table complete, and every page,
   criterion and journey has a finding or an explicit "nothing for this
   lens" from at least two lenses;
@@ -114,7 +125,13 @@ hold, and the round page says so in one line with the numbers:
   lens, the count of findings only L0 raised, the overlap of each
   noise-probe pair. They decide which lenses are rewritten before stage
   B;
-- the targeted re-audit raises no new Required finding.
+- the targeted re-audit raises no new Required finding of class
+  `contradiction` or `behavior-gap`.
+
+The classes of Required, and that only the first two block, were
+decided on 2026-10-12, from the round-17 write pass on, its open rows
+included, because test-plan detail is judged where it is implemented,
+in stage B, and a spec held for it grows with test plans.
 
 ### From stage A to stage B
 
@@ -243,7 +260,7 @@ The first line of the report is `<lens id> · <role> · <model>`. Then:
 | Field | Content |
 |---|---|
 | Verdict | one line: does the spec meet this lens's definition of success, and what is the largest gap |
-| Findings | one row each: id (`<lens id>-<n>`), severity on the scale below, origin (`listed` when a bullet of the lens prompted it, `own` otherwise), the spec section cited as the spec cites itself ("04 4.3"), the defect in one sentence, the concrete failure scenario, the proposed change and what it costs |
+| Findings | one row each: id (`<lens id>-<n>`), severity on the scale below, for a Required finding its class (below), origin (`listed` when a bullet of the lens prompted it, `own` otherwise), the spec section cited as the spec cites itself ("04 4.3"), the defect in one sentence, the concrete failure scenario, the proposed change and what it costs |
 | Coverage | one line per page: the index, 00 to 13, the ADRs as one line, `plan.md`; each says `nothing for this lens` or lists finding ids. A page without a line fails the format |
 | What is missing | what this person expected to find and did not, each with where it would belong |
 | Postmortem | the first incident after v1.0.0 as this person sees it, one page at most, with the sections it crosses |
@@ -254,7 +271,22 @@ The first line of the report is `<lens id> · <role> · <model>`. Then:
 Severity scale for every lens, so the merge is mechanical:
 **Blocking** (the spec would ship a defect this lens exists to catch),
 **Required** (fix before the next plan task that implements the cited
-section), **Advisory** (improve when the section is next touched).
+section, or, for `test-detail`, by that task's acceptance), **Advisory** (improve when the section is next touched).
+A Required finding names one class. **`contradiction`**: two texts of
+the spec, or the spec and a decision record, cannot both hold.
+**`behavior-gap`**: the implementation needs a behavior the spec does
+not define. **`test-detail`**: only test-plan detail, that is how a
+listed test case is built, a test case missing for behavior the spec
+already defines, or the naming of a test. Only the first two block
+validation; a `test-detail` finding becomes an acceptance item of the
+plan task that implements it, in `plan.md`, citing the finding id, and
+the spec text is not grown for it; it may carry a wording fix of the
+spec's own test cell when the case as written does not reach its
+stated result, a fix that changes no behavior, a limit the plan review
+of stage B reopens. A reviewer that is unsure between
+`behavior-gap` and `test-detail` asks whether the behavior the test
+would check is written in the spec: if it is, the finding is
+`test-detail`.
 A lens does not report what the spec already lists as a deferred
 decision, a non-goal or an accepted risk, unless the trigger or the
 acceptance is itself the defect.
@@ -1010,3 +1042,13 @@ sits out costs the round that would have needed it.
 | Round | Baseline | Lenses | Page |
 |---|---|---|---|
 | 8 | the default branch at the commit this page was added | L0 to L16, with the noise probe on L2 and L13 | round-8.md, when written |
+| 9 | 8ecfbb2, the head of pull request #25 (the round-8 write pass), for the targeted re-audit of step 6 | L0 to L16, with no noise probe | round-9.md |
+| 10 | d458f83, the head of pull request #36 (the round-9 write pass), for the targeted re-audit of step 6 | L0 to L16, with no noise probe | round-10.md |
+| 11 | d133542, the head of pull request #36 (the round-10 write pass), for the targeted re-audit of step 6 | L0 to L16, with no noise probe | round-11.md |
+| 12 | 6fd6e60, the head of pull request #36 (the round-11 write pass), for the targeted re-audit of step 6 | L0, L2, L3, L6, L12, L13 and L14, the lenses that raised round-11 findings, with no noise probe; the verdicts of the others carry forward | round-12.md |
+| 13 | 4c2b11d, the head of pull request #36 (the round-12 write pass), for the targeted re-audit of step 6 | L0, L2, L3, L6, L12 and L13, the lenses that raised round-12 findings, with no noise probe; the verdicts of the others carry forward | round-13.md |
+| 14 | c64c468, the head of pull request #36 (the round-13 write pass, f611db2, merged with the default branch at 2e775c7), for the targeted re-audit of step 6 | L0, L2, L3, L6 and L13, the lenses that raised round-13 findings, with no noise probe; the verdicts of the others carry forward | round-14.md |
+| 15 | 85f6860, the head of pull request #36 (the round-14 write pass), for the targeted re-audit of step 6 | L0, L2, L3, L6 and L13, the lenses that raised round-14 findings, with no noise probe; the verdicts of the others carry forward | round-15.md |
+| 16 | 591a1aa, the head of pull request #36 (the round-15 write pass), for the targeted re-audit of step 6 | L0 and L2 on the maintainer block, L6 and L13 on the salvage text, with no noise probe; the verdicts of the others carry forward | round-16.md |
+| 17 | 54f674c, the head of pull request #36 (the round-16 write pass), for the targeted re-audit of step 6 | L0 and L2 on the maintainer block, L6 and L13 on the salvage text, with no noise probe; the verdicts of the others carry forward | round-17.md |
+| 18 | 0a32191, the head of pull request #36 (the round-17 write pass), for the targeted re-audit of step 6, the first graded by the exit rule of 2026-10-12 | L0 on the amendment of this page and the plan items, L2 on the maintainer text, L6 and L13 on the salvage text, with no noise probe; the verdicts of the others carry forward | round-18.md |

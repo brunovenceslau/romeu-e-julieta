@@ -1,0 +1,13 @@
+{
+ "header": "L10 · The second adopter · sonnet",
+ "verdict": "All 4 round-9 L10 findings are resolved as stated. The delta adds no Blocking or Required defect for the second adopter; two Advisory gaps remain (older config versions, the askpass step).",
+ "prior_checked": 4,
+ "prior_resolved_as_stated": 4,
+ "findings": [
+  {"id":"L10-r10-1","kind":"new","severity":"Advisory","section":"03 opening (Versions); 04 4.4 RJ-311","defect":"The window for project.v1 and host-settings.v1 is 'current and previous', but no error or hint covers a config repo whose version is older than the window. Only format-newer exists.","scenario":"An adopter skips two releases and runs sync; the installed release no longer reads their project.v1. No page names the error or tells them to read the release notes of the skipped release.","change":"Add one slug, for example format-unsupported, with the hint 'apply the edit in the release notes of each skipped release', or say that the reader reports the old version through the existing error."},
+  {"id":"L10-r10-2","kind":"new","severity":"Advisory","section":"09 J1 step 5; 06 6.4 git-ssh-sign","defect":"J1 step 5 now says ssh-add -c needs an askpass program that macOS does not ship, 'so install one first', but names none and gives no check that one works. 06 6.4 says 'where an askpass program is installed', which reads as optional.","scenario":"An adopter who opts into git-ssh-sign runs ssh-add -c without an askpass, and the first signing use fails or hangs. They do not know which program to install or that 06 makes it optional.","change":"In J1 step 5, name the requirement (a program SSH_ASKPASS can point to) and the check B2 records, and make 06 6.4 agree: required for ssh-add -c."}
+ ],
+ "pages_read": ["docs/reviews/lenses.md (L10, What a reviewer returns, How stage A runs)","docs/reviews/round-9/reports/L10.json","docs/reviews/round-9.md (L10 rows)","docs/spec.md (delta, Q13)","docs/spec/03-formats.md (delta)","docs/spec/04-cli.md (delta)","docs/spec/06-kits.md (delta)","docs/spec/09-journeys.md (delta)","docs/spec/11-host-probes.md (A13)","docs/spec/12-engineering.md (delta, README row)","docs/spec/00-scope.md and 02-layouts.md (delta, skimmed)","docs/spec/05-security.md (5.4 rows, skimmed)"],
+ "out_of_scope": "ADR 0010 and the approvals/pull_request_target job of 12 12.4 are maintainer process, not adopter-facing, so they were skimmed only. Whether an askpass works under sbx needs probe B2 on a host.",
+ "confidence": "Medium-high. Round-9 resolutions were checked against the baseline text by grep and reading; the rest of the delta was skimmed for adopter-facing changes."
+}

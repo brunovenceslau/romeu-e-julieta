@@ -1,0 +1,95 @@
+{
+ "header": "L6 · The test architect who has seen coverage lie · sonnet",
+ "verdict": "The round-14 write pass mostly meets the lens (every new case but two names a removal), with one Required gap: the cause written when an interrupted changed-fingerprint salvage is resumed from salvaging is untested and decided two ways.",
+ "prior_checked": 5,
+ "prior_resolved_as_stated": 2,
+ "prior_resolution_notes": {
+  "L6-r14-1": "resolved as stated: RJ-338 states the row, a resume writes no entry, I17 gains the reset case with its removal; residue in L6-r15-1 and -2",
+  "L6-r14-2": "resolved in part: first-salvage cause and a standalone-salvage case added, but the case does not isolate the standalone salvage (L6-r15-2)",
+  "L6-r14-3": "resolved as stated: item g lists expected answers per try and the not-narrowed rule; trigger wording in L6-r15-3",
+  "L6-r14-4": "resolved in part: per-target listing and dotless removal named; GOARCH not covered (L6-r15-4)",
+  "L6-r14-5": "resolved in part: id-mismatch fixture added; the one-reader removal has no mechanism (L6-r15-5)"
+ },
+ "findings": [
+  {
+   "id": "L6-r15-1",
+   "kind": "new",
+   "severity": "Required",
+   "origin": "own",
+   "section": "03 3.8 salvage[].cause; 01 1.6; 05 5.2 I17",
+   "defect": "The cause of a salvage rerun resumed from salvaging after an interrupted fingerprint-changed salvage is decided two ways, and no I17 case asserts it.",
+   "scenario": "A changed-fingerprint salvage is killed or interrupted; 01 1.6 sends salvaging to salvaging with a new salvage id, and 3.8 enumerates 'rm ... from open or salvaging' as requested, so the row restarts at zero. A writer plus a Ctrl-C then escapes fingerprint-unstable. The definition 'a changed fingerprint started' reads the other way. The fault-injection case asserts convergence, never the cause.",
+   "change": "Say in 3.8 which cause a resume from salvaging writes (recommended: requested ends the row, stated as a rule, or fingerprint-changed if the interrupted entry was started by one), and add to I17 the case 'kill during a fingerprint-changed salvage, rerun' with the cause and the exit it must give; the removal that turns it red is the other choice. Cost: one sentence and one E case. Reaches the salvage tasks that build the rerun from 03 3.8 and I17 and T008 (error table).",
+   "evidence": "03-formats.md:483 'requested for an entry a command writes on its own run, that is salvage ..., rm, recreate or retire from open or salvaging'; 01-system-model.md:304 'salvaging | ... starts the sandbox half again (the earlier command was interrupted or failed) | salvaging | new salvage id'; 05-security.md:172 (I17) fault injection asserts only 'converges'."
+  },
+  {
+   "id": "L6-r15-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "05 5.2 I17",
+   "defect": "The case that a requested entry ends the row cannot tell a standalone salvage from the rm that follows it.",
+   "scenario": "The case 'a generation back at open ... a standalone salvage records requested, and the changed-fingerprint salvages of a later rm count from it' stays green if a standalone salvage does not end the row, because the later rm from open writes its own requested entry.",
+   "change": "Make the case end with a standalone salvage that succeeds and leaves the generation open with no later rm entry in between, or add a variant where the standalone salvage is the only requested entry after the changed ones; name the removal 'standalone salvage not ending the row'. Cost: one E case.",
+   "evidence": "05-security.md:172 'a standalone salvage records requested, and the changed-fingerprint salvages of a later rm count from it'; 03-formats.md:483 rm from open writes requested."
+  },
+  {
+   "id": "L6-r15-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 item g; spec.md Deferred decisions",
+   "defect": "The four Deferred rows' trigger is 'the dated entry ... records it', but item g allows an entry that says the token is not narrowed, so the trigger as written fires on any entry.",
+   "scenario": "The maintainer records an entry whose reads show Administration or a GitHub key; the rows read 'narrowed, as the dated entry records it' and reopen though the verdict is not narrowed.",
+   "change": "Word the trigger as 'an entry of item g whose verdict is narrowed (the note's closing rule)'. Cost: one clause in four rows and the token-narrowing row.",
+   "evidence": "10-testing-style.md:916-921 'The entry is the event ... An A16 read that shows more than this repository ... means the token is not narrowed, and the entry says so'; spec.md Deferred rows 'the token is narrowed, as the dated entry of 10 10.2, item g, records it'."
+  },
+  {
+   "id": "L6-r15-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "plan T005 (b)",
+   "defect": "The build-constraint fixture covers a GOOS difference only, while the lint targets also differ by GOARCH.",
+   "scenario": "An import behind an arm64-only tag is outside the approvals globs; listing linux and darwin on amd64 only still passes the fixture and the imports test.",
+   "change": "Add a fixture whose outside import builds only for arm64 and name its removal (listing one GOARCH per GOOS). Cost: one fixture.",
+   "evidence": "plan.md:565-578 'a fixture whose outside import builds only for darwin, whose removal is listing one target'; 10-testing-style.md:426 'linux and darwin, each on amd64 and arm64'."
+  },
+  {
+   "id": "L6-r15-5",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "plan T005 (e)",
+   "defect": "The one-reader branch says 'a second reader inlined in either turns it red' but names no mechanism that can see an inlined reader.",
+   "scenario": "A test asserting 'both call the one reader' sees only calls; a second reader written as a direct yaml.Unmarshal in the generator is not a call to anything named, so the test stays green.",
+   "change": "Name the mechanism: an AST or import scan that fails when either consumer imports the YAML package or opens the file outside the reader's package, with a fixture for it. Cost: one small scan test.",
+   "evidence": "plan.md:590-599 'when T005 takes one reader, the test asserts that both call it, and a second reader inlined in either turns it red'."
+  },
+  {
+   "id": "L6-r15-6",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "04 4.4 RJ-338",
+   "defect": "The hint is conditional on whether a process is still writing, which romeu cannot know, so no test can assert the condition.",
+   "scenario": "The hint is a static string; a golden check sees both clauses and passes whichever branch the product 'meant'.",
+   "change": "Say in 04 4.4 that the hint is one fixed text naming both cases, so the golden test is on the whole string. Cost: one clause.",
+   "evidence": "04-cli.md:326 'the hint says that a rerun with nothing written since this salvage resumes at sbx env rm, and, when a process is still writing that path, names the two recoveries'."
+  }
+ ],
+ "what_is_missing": "A rule and case for the cause of a rerun resumed from salvaging; the verdict wording in the Deferred rows' trigger; a mechanism for the inlined-reader removal; a removal named for the excludeIgnored case.",
+ "postmortem": "After v1.0.0 a user who interrupts a rerun is never paused by RJ-338 (01 1.6, 03 3.8, 04 4.4, I17); the four Deferred rows reopen on an entry that records 'not narrowed' (10 10.2 g, spec.md); an import behind an arm64-only tag escapes the approvals test (T005 b).",
+ "lens_critique": "The lens asks whether a removal turns a test red but not whether the case reaches the branch it names: two cases here (the standalone salvage, the inlined reader) name a removal that cannot flip them. Success should also include states a crash can leave behind.",
+ "out_of_scope": "Bullets on fake sbx fidelity, 80% per package, goldens, probes and the race run touch no changed text; 10 whole, 11 and S2 to S9 were not re-read. The S6 bullet (guard removal) was applied to the new I17 and T005 cases.",
+ "confidence": "medium: text read at 85f6860, nothing run.",
+ "pages_read": [
+  "docs/reviews/lenses.md (L6)",
+  "docs/reviews/round-14.md rows R14-01, R14-02, R14-07, R14-11, R14-12",
+  "docs/reviews/round-14/reports/L6.json",
+  "delta.diff",
+  "docs/spec/01 1.6, 03 3.8, 04 4.4, 05 5.2 and 5.4, 08 8.5, 10 10.2",
+  "docs/plan.md T005",
+  "docs/notes/maintainer-block-of-ci-bootstrap.md"
+ ]
+}

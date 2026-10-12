@@ -1,0 +1,114 @@
+{
+ "header": "L13 · The reader who holds the spec against itself · opus",
+ "verdict": "Partly met: R14-06 and R14-08 read as their rows promise, and the RJ-338 home now states its row rule. Two new seams have a number on each side: the token-narrowing verdict has two rules (10 10.2 item g against the note's section 'The token narrowing'), and 03 3.8 keeps a second, looser definition of the row next to the one 04 4.4 now gives. The one Required gap is the RJ-338 hint: it depends on a fact romeu cannot observe, and it reaches T008.",
+ "prior_checked": 4,
+ "prior_resolved_as_stated": 3,
+ "prior_resolution_notes": [
+  "L13-r14-1 (R14-06): resolved as stated. 04 4.4 reads 'an edit of `salvage.excludeIgnored` that excludes an ignored path that is present, since the fingerprint holds the ignored paths minus that list'; 'always' is gone.",
+  "L13-r14-2 (R14-07): resolved in part. The case names its writer and follows the third salvage's exit, and the `requested` and row-restart cases are present. But the write pass added 'the writer stops', so the case no longer separates the edit from the stop (see L13-r15-4).",
+  "L13-r14-3 (R14-08): resolved as stated in form. 01 1.6 and 09 J3 each cite `RJ-338` in one clause, and 04 4.4 now lists 09 J3 among its citers. The wording 'up to the limit' misstates the mechanism (see L13-r15-3).",
+  "L13-r14-4 (joined R14-02): resolved as stated. The four index rows share one phrase that cites the dated entry of item g, and that entry joins the A16 read with the tries. New seams in the entry itself are L13-r15-1 and L13-r15-2."
+ ],
+ "findings": [
+  {
+   "id": "L13-r15-1",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "listed",
+   "section": "10 10.2 (maintainer block, item g); docs/notes/maintainer-block-of-ci-bootstrap.md (The token narrowing); index (the four rows whose trigger is 'the token is narrowed'); ADR 0011, decision 2",
+   "defect": "The verdict 'the token is narrowed' has two rules. The note requires the A16 read to match an exact permission list, and 'any other answer' means not narrowed. Item g fails the token only on more than this repository, the Administration permission, a GitHub key, or an accepted ruleset update. And both pages make 'the entry', whatever it records, the event of the four deferred rows.",
+   "scenario": "The maintainer creates the fine-grained token with one extra permission, for example Issues write or Commit statuses write. By item g the token is narrowed and the four rows fire. By the note it is not narrowed, yet the note's own text still says 'the entry is the event', so the rows fire anyway. ADR 0011 says the rows fire 'when it is applied', which is a third reading. Commit statuses write also changes the answer item h measures.",
+   "change": "Give the verdict one home, the note's table and its rule, and have item g cite it in place of its own list of disqualifiers. Write the event as 'an entry that finds the token narrowed' in item g, in the note and in the shared phrase of the four rows. Cost: one sentence in item g, one clause in the note, and the four rows already say 'as the entry records it'. Approval line `spec`.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:150-151 'The token is narrowed when the A16 read and the agent's keys match what is expected and the ruleset update is refused. Any other answer on those three means it is not'; docs/spec/10-testing-style.md:915-919 'The entry is the event of the Deferred decisions rows ... An A16 read that shows more than this repository or the Administration permission, a GitHub key in the agent, or a ruleset update the token is not refused means the token is not narrowed'; docs/notes/maintainer-block-of-ci-bootstrap.md:122 'The entry is the event of the'; docs/adr/0011-...md:97-98 'fire when it is applied'"
+  },
+  {
+   "id": "L13-r15-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (maintainer block, the 'To do' lead-in, items g and h); docs/notes/maintainer-block-of-ci-bootstrap.md (The token narrowing, read 2)",
+   "defect": "The write pass broke two promises. (a) The 'To do' lead-in still says each item saves the API's answer under Evidence, while item g says 'not under a pull request's Evidence' and item h saves 'under the entry of item g'. (b) R14-02 promised 'a host-side check' that the GitHub authentication key is no longer forwarded, but read 2 is `ssh-add -l` run in the sandbox, which contradicts the note's own 'never only from what the sandbox printed'.",
+   "scenario": "A maintainer who reads the lead-in looks for the narrowing's answers under a pull request's Evidence and finds none. At the narrowing, an agent in the sandbox can print an `ssh-add -l` listing without the GitHub key while the host still forwards it. The entry records 'no GitHub key', and nothing on the host checked it.",
+   "change": "(a) Make the lead-in 'each a maintainer step that saves its answers where the item says (a PR's Evidence, or the entry of item g)'. (b) Make read 2 a host-side read of what the sandbox is configured to forward (the host agent or the sbx forwarding setting), with the sandbox listing kept as a cross-check, or else drop 'never only from what the sandbox printed' for that read and record why. Cost: two clauses. Approval line `spec`.",
+   "evidence": "docs/spec/10-testing-style.md:886 'To do, each a maintainer step that saves the API's answer under Evidence:'; docs/spec/10-testing-style.md:910-911 'the keys the sandbox's forwarded agent lists, read by the maintainer'; docs/notes/maintainer-block-of-ci-bootstrap.md:128 'never only from what the sandbox printed'; docs/notes/maintainer-block-of-ci-bootstrap.md:136-137 '(`ssh-add -l` in the sandbox, read by the maintainer)'; docs/reviews/round-14.md R14-02 Resolution 'a host-side check that the GitHub authentication key is no longer forwarded into the sandbox'"
+  },
+  {
+   "id": "L13-r15-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "listed",
+   "section": "01 1.6 (the recovery paragraph); 09 J3 step 5; 03 3.8 (`salvage[].fingerprint`, `salvage[].cause`); 04 4.4 (`RJ-338`)",
+   "defect": "The citers misdescribe the mechanism of their one home. 01 1.6 and 09 J3 say the rerun salvages again 'up to the limit of `fingerprint-unstable`', and 03 3.8 says RJ-338 'ends such salvages'. Under 04 4.4, every later salvage still runs and records its entry, and only the resume in the same command is withheld. The count also carries three names: 'limit', 'the count ... sets' and 'the third or a later'.",
+   "scenario": "A guide page written from J3 tells the operator that salvaging stops after the limit. The operator then sees every further rerun salvage, write a payload and exit 5, and reads it as a bug. The 'they only grow' row of the index makes this worse, since each extra salvage keeps its payload.",
+   "change": "Use one phrase in all three places, for example 'and otherwise salvages again first; from the third such salvage in a row each one exits 5 after it is recorded (`RJ-338`, 04 4.4)'. In 03 3.8 write 'the rule that makes such salvages exit 5'. Cost: three clauses. Approval line `spec`.",
+   "evidence": "docs/spec/01-system-model.md:337-338 'otherwise salvages again under a new salvage id, up to the limit of `fingerprint-unstable`'; docs/spec/09-journeys.md:199 'and otherwise salvages again first, up to the limit of `fingerprint-unstable`'; docs/spec/03-formats.md:482 'the rule that ends such salvages in a row with exit 5 is [`RJ-338`]'; docs/spec/04-cli.md:326 'every later salvage a changed fingerprint starts on that generation exits 5 once: that salvage runs and records its entry'"
+  },
+  {
+   "id": "L13-r15-4",
+   "kind": "unresolved",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "05 5.2 (I17, the `excludeIgnored` case)",
+   "defect": "The rewritten case stops the writer and edits `salvage.excludeIgnored` at the same time, so it cannot tell the edit from the stop. It never tests the exclusion as a recovery from a writer that is still running, which the RJ-338 hint offers as an alternative to stopping, and it names no removal that turns it red.",
+   "scenario": "An implementation of T068 that leaves `excludeIgnored` out of the fingerprint passes the case. With the writer stopped after its last write, the next rerun differs anyway, salvages and exits 5 once, and the rerun after it resumes, which is the outcome the case asserts. The same implementation fails the operator who follows the hint's second recovery with the writer running: every rerun exits 5.",
+   "change": "Keep the writer running: 'a writer that changes only one ignored path on every rerun: after the third salvage's exit 5 an edit of `salvage.excludeIgnored` excludes that path while the writer keeps writing it; the next rerun salvages, records its entry and exits 5 once, and the rerun after it resumes at `sbx env rm` (fingerprinting the excluded path turns this red)'. Cost: one clause. Approval line `spec`.",
+   "evidence": "docs/spec/05-security.md:172 'E: a writer that changes only one ignored path, outside `salvage.excludeIgnored`, on every rerun: after the third salvage's exit 5 the writer stops and an edit of `salvage.excludeIgnored` excludes that path; the next rerun salvages, records its entry and exits 5 once'; docs/spec/04-cli.md:326 'stop the process or add an ignored path to `salvage.excludeIgnored` (gate 2), then rerun'"
+  },
+  {
+   "id": "L13-r15-5",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "listed",
+   "section": "03 3.8 (`salvage[].cause`); 04 4.4 (`RJ-338`); 01 1.6 (generation table, `salvaging` rows)",
+   "defect": "03 3.8 keeps its own definition of the row, 'the newest entries of the generation with `fingerprint-changed`', next to the bound 04 4.4 now sets ('newer than its newest `requested` entry'), and the I17 case calls the looser reading wrong. Its new value list also makes an `rm` from `salvaging` write `requested`, so a changed-fingerprint salvage that is interrupted and resumed ends the row. 04 4.4 neither states nor excludes that path.",
+   "scenario": "The author of T033 or T068 counts from 03 3.8 alone, includes entries older than a `requested` one, and the last I17 case turns red with no text that says why. Separately, an operator who Ctrl-Cs a slow fourth changed-fingerprint salvage reruns `rm` from `salvaging`. The rerun writes `requested`, the count drops to zero, and RJ-338's claim that once the row holds three every later salvage exits 5 no longer holds. No case decides whether that is intended.",
+   "change": "In 03 3.8, replace the definition sentence with a cite: 'the row that `fingerprint-unstable` counts is defined in 04 4.4'. In 04 4.4, add one clause: a salvage resumed from `salvaging` writes `requested` and so ends the row (or, if not intended, have such a resume inherit the interrupted salvage's cause). Add the matching I17 case. Cost: one sentence, one clause and one case. Approval line `spec`.",
+   "evidence": "docs/spec/03-formats.md:483 '`requested` for an entry a command writes on its own run, that is `salvage` ..., `rm`, `recreate` or `retire` from `open` or `salvaging` ... The salvages in a row that a changed fingerprint started are the newest entries of the generation with `fingerprint-changed`, which `fingerprint-unstable` counts'; docs/spec/04-cli.md:326 'The row is the generation's entries with `cause: fingerprint-changed` ... newer than its newest `requested` entry'; docs/spec/05-security.md:172 '(counting every `fingerprint-changed` entry of the generation turns this red)'; docs/spec/01-system-model.md:303 'salvaging | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command was interrupted or failed) | salvaging | new salvage id'"
+  },
+  {
+   "id": "L13-r15-6",
+   "kind": "new",
+   "severity": "Required",
+   "origin": "own",
+   "section": "04 4.4 (`RJ-338`, the hint)",
+   "defect": "The hint's content depends on a fact romeu does not observe: it names the two recoveries only 'when a process is still writing that path', but romeu sees only that one fingerprint differed, not whether a writer is still running. Every other hint in 04 4.4 is fixed text per error id.",
+   "scenario": "T008 builds the error table and its hints from 04 4.4, and a test reads the rows of 04 4.4 against it. The implementer must either invent a heuristic for 'still writing', for example a second fingerprint taken a moment later, which is a new mechanism 03 3.8 does not define, or always print both branches, which the text does not say. Two implementers ship two different hints for one error.",
+   "change": "Make the hint fixed text: 'a rerun with nothing written since this salvage resumes at `sbx env rm`; if a process still writes that path, stop it or add an ignored path to `salvage.excludeIgnored` (gate 2), then rerun; the first rerun after either may salvage and exit 5 once more'. Cost: one clause rewritten in 04 4.4, before T008. Approval line `spec`.",
+   "evidence": "docs/spec/04-cli.md:326 'the hint says that a rerun with nothing written since this salvage resumes at `sbx env rm`, and, when a process is still writing that path, names the two recoveries'; docs/plan.md:687-689 (T008: 'with the ids of 04 4.4 ... A test reads the rows of 04 4.4')"
+  },
+  {
+   "id": "L13-r15-7",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "05 5.4 (the token row); index (the token-narrowing row)",
+   "defect": "Both cells say the item g entry 'measures' the narrowed token's full list of capabilities, but the entry holds the A16 read, the agent's keys and four tries. It measures neither branch or tag deletion, nor pushing workflows, nor editing pull request bodies, so after the entry those items remain what decision 2 grants, still unmeasured.",
+   "scenario": "After the entry exists, a reader of the token row takes 'push and delete branches and tags' and 'edit pull request bodies' as measured, and the next review's accepted-risk judgment rests on a measurement that was never made.",
+   "change": "Say 'until the entry of item g reads its permissions (A16)' in both cells, or list which items the four tries measure. Cost: one phrase in each cell. Approval line `spec`.",
+   "evidence": "docs/spec.md:348 'by the permissions that decision grants, until the entry of [10 10.2], item g, measures them, can still merge through the API, push and delete branches and tags, push workflows ..., and edit pull request bodies'; docs/spec/05-security.md:392 'its full list by the permissions decision 2 grants, until the entry of [10 10.2], item g, measures it'"
+  }
+ ],
+ "what_is_missing": "One home for the 'narrowed' verdict, and 'an entry that finds the token narrowed' as the event. A key check done on the host. A 'To do' lead-in that matches items g and h. 03 3.8 citing the 04 4.4 row rule instead of restating it. One name for the cap that matches 'the salvage runs, then exit 5'. A rule and a case for a changed-fingerprint salvage that is interrupted and resumed from `salvaging`. An I17 `excludeIgnored` case with the writer still running and its red removal. A hint written as fixed text.",
+ "postmortem": "After v1.0.0, an operator follows the J3-derived guide ('up to the limit'), expects salvaging to stop, and watches every rerun salvage and exit 5 (09 and 01 1.6 against 04 4.4). Two T008 builds print different RJ-338 hints, because 'when a process is still writing' has no observable test (04 4.4). An implementation that fingerprints excluded paths passes I17 and traps the operator who chose the exclusion recovery (05 5.2 against 03 3.8). A Ctrl-C during a slow salvage silently resets the cap (03 3.8 against 04 4.4). On the development side, a token with one extra permission is narrowed by item g and not narrowed by the note, the four deferred rows fire either way because 'the entry is the event', and the key check trusted the sandbox's own listing (10 10.2, the note, the index, ADR 0011).",
+ "lens_critique": "The lens counts duplication as failure. For this product, the worst seams this round came from a single fact written twice with different strength: a citer's paraphrase ('up to the limit') or a criterion restated in a second place. The lens should ask of each cite whether it restates or only points, and prefer pointing. It also has no bullet for hints and other operator-facing text that must be producible from what the program can observe. Viewpoint missing from the set, judged from the titles alone: the implementer who must turn each sentence into a deterministic branch, someone who asks 'what input decides this?' of every conditional in a hint, an error or a verdict.",
+ "out_of_scope": "Plan T005 (b) and (e): read, consistent with 10 10.2's single list of lint targets ('once per lint target'), and not judged further. Whether three is the right cap. Platform behavior of fine-grained tokens and the tag bypass, which I did not measure. The 2026-10-07 versus 2026-10-08 date drift the write pass recorded. ADR 0011 names two rows that fire, while the index has four with that trigger; that predates this delta. Bullets: 04 4.1, exit 5 for `fingerprint-unstable`, matches the precondition-of-salvage family (RJ-305 to RJ-307), confirmed; 01 1.7 vocabulary, 'removing counts as open only for rm, recreate and retire', is consistent with the new text, confirmed; 13 does not describe the removal rerun, so 09 against 13 cannot be checked here; operator and maintainer are left by R14-05 to a later round.",
+ "confidence": "High for L13-r15-1, -2 and -3 (quoted text on both sides). Medium-high for -4 (follows from 03 3.8 and the case wording). Medium for -5 (the interrupted path follows from the 01 1.6 salvaging row plus the new value list, and intent is unknown) and for -6 (Required rests on T008 building hints from 04 4.4 verbatim). Medium for -7.",
+ "pages_read": [
+  "docs/reviews/lenses.md (L13)",
+  "docs/reviews/round-14.md (rows R14-01 to R14-12, Write pass)",
+  "docs/reviews/round-14/reports/L13.json",
+  "delta.diff 19863f5..85f6860",
+  "docs/spec.md (Deferred rows 279, 283, 348, 351, 353)",
+  "docs/spec/01-system-model.md 1.6 Generation (table and recovery paragraph), 1.7 row 403",
+  "docs/spec/03-formats.md 3.8 (fingerprint, cause)",
+  "docs/spec/04-cli.md 4.2 rm/recreate/retire rows, 4.4 RJ-305 to RJ-307, RJ-336, RJ-338",
+  "docs/spec/05-security.md I17, 5.4 approval-line and token rows",
+  "docs/spec/08-memory-handoff-salvage.md 8.5 (RJ-338 paragraph)",
+  "docs/spec/09-journeys.md J3 step 5",
+  "docs/spec/10-testing-style.md 10.2 maintainer block items a to h",
+  "docs/spec/11-host-probes.md A16",
+  "docs/notes/maintainer-block-of-ci-bootstrap.md (whole)",
+  "docs/adr/0011 decision 2",
+  "docs/plan.md (T008, T033, T062, T068 headers; T005 delta)"
+ ]
+}

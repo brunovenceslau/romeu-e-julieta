@@ -1,0 +1,56 @@
+{
+ "header": "L6 · The test architect who has seen coverage lie · sonnet",
+ "verdict": "The pass states the RJ-338 decision once and consistently and the new I17 cases name removals, but one Required gap remains: RJ-338 and the older worktree-changing / RJ-306 path overlap with no stated precedence, and no I17 case asserts the error id.",
+ "prior_checked": 5,
+ "prior_resolved_as_stated": 3,
+ "prior_resolution_notes": {
+  "L6-r15-1": "resolved as stated (R15-01, M): cause and the count are gone; a search of docs/spec, plan.md, spec.md, notes and adr finds no `cause`, `fingerprint-changed` or 'in a row' left for this rule",
+  "L6-r15-2": "resolved as stated (R15-13, M): moot with the field and the standalone-salvage case",
+  "L6-r15-3": "not re-read: outside this round's scope (R15-03)",
+  "L6-r15-4": "not re-read: stated limit (L) in plan T005, outside this round's scope",
+  "L6-r15-5": "not re-read: stated limit (L) in plan T005, outside this round's scope",
+  "L6-r15-6": "resolved as stated (R15-02, M): the hint is one fixed text, described by clauses and not given verbatim (see L6-r16-3)"
+ },
+ "findings": [
+  {
+   "id": "L6-r16-1",
+   "kind": "unresolved",
+   "severity": "Required",
+   "origin": "own",
+   "section": "08 8.5; 04 4.4 (RJ-338, RJ-306); 05 5.2 (I17)",
+   "defect": "A rerun of rm, recreate or retire on a removing generation whose worktree is being written can end as RJ-338 (changed fingerprint) or as RJ-306 with worktree-changing (incomplete salvage, accept-loss allowed), and no text says which wins; the I17 writer cases assert only 'exits 5', so a build that returns the wrong id stays green.",
+   "scenario": "A process writes a tracked or ignored file of a worktree while the rerun salvages. The salvage's own recheck (step 3, 'if either moved, the capture repeats once, then the worktree is skipped as worktree-changing') can skip the worktree, so the salvage is incomplete, goes salvaging -> open with RJ-306, and --accept-loss=worktree-changing is accepted, which removes the sandbox. The same writer, between runs only, gives RJ-338, which --accept-loss does not cover. The I17 case 'a writer that keeps changing one ignored path ... each rerun salvages and exits 5' passes for either id, and the case that names fingerprint-unstable uses a change between runs, not a write during the salvage. Pre-existing: this sentence and the table predate the pass (the sentence 'worktrees keep changing is not a skipped reason' is in be402ca at 08:285 and entered with ed64a03, round 12 era), so the overlap is not new from this delta; the decision of 2026-10-12 removed the count that used to make the two paths look separate, and left the sentence standing.",
+   "change": "Add one sentence to 08 8.5 and RJ-338 saying which wins when the rerun's own salvage skips a worktree as worktree-changing (recommended: the skip is RJ-306 as for any salvage, the generation goes to open per 01 1.6, and RJ-338 is only for a salvage that completes and whose recorded fingerprint then differs from the previous one), and say that 'not a skipped reason' means the fingerprint difference itself. Give the writer I17 cases the id they must exit with (assert the error id and the entry, not only exit 5) and add a case for a write during the salvage with the id it gives, whose removal is returning the other id. Cost: one sentence in two places and one E case. Reaches T068 (implements 08 8.5, 01 1.6, I17) and T008 (error table).",
+   "evidence": "08-memory-handoff-salvage.md:188 'if either moved, the capture repeats once, then the worktree is skipped as `worktree-changing`'; 08:279 '| `worktree-changing`, `in-progress-operation` | let the process or the operation finish (or abort it), then rerun |'; 08:285-289 'worktrees keep changing is not a skipped reason: each salvage a changed fingerprint starts exits 5 with the error `fingerprint-unstable` ... which `--accept-loss` does not cover'; 04-cli.md:326 RJ-338 row ('the command salvages again under a new salvage id, records its entry and `fingerprint` with the state `removing`, and then exits'); 01-system-model.md salvaging row 'salvage incomplete, no --accept-loss | open | ... exit 5'; 05-security.md:172 'each rerun salvages and exits 5'."
+  },
+  {
+   "id": "L6-r16-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "01 1.6 (the removing row); 04 4.4 (RJ-338); 05 5.2 (I17)",
+   "defect": "The removing row says the changed-fingerprint salvage 'ends at removing with exit 5' and RJ-338 says it records its entry 'with the state removing', which holds only for a complete salvage; and the new I17 case does not assert the state after the exit or that the next rerun writes no entry.",
+   "scenario": "If an implementation leaves the generation salvaging after the exit 5, the next rerun salvages again and then reaches sbx env rm in the same run, which looks like 'the next rerun resumes at sbx env rm' to a test that checks only that sbx env rm ran; the guard 'state removing written before exit 5' has no test that turns red. An incomplete salvage there goes to open (see L6-r16-1).",
+   "change": "Make the case assert the state read from the file after the exit 5 (removing, with the new entry's fingerprint) and that the resumed rerun adds no salvage entry; qualify the row with 'a complete salvage'. Cost: two clauses, no new case. Reaches T068.",
+   "evidence": "01-system-model.md:311 'otherwise `removing -> salvaging` with a new salvage id, and that salvage ends at `removing` with exit 5, `fingerprint-unstable`'; 05-security.md:172 'a changed fingerprint makes the rerun salvage, record its entry and `fingerprint`, and exit 5 ... and the next rerun with an equal fingerprint resumes at `sbx env rm` (running `sbx env rm` after that salvage turns this red)'."
+  },
+  {
+   "id": "L6-r16-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "04 4.4 (RJ-338); 05 5.2 (I17); plan T068",
+   "defect": "No test is named for the RJ-338 details ('names the first path whose entry changed') or for the fixed hint, and the new T068 line ('each E: case of I17 is one test with a title of its own') names no check that turns red when a case loses its test.",
+   "scenario": "A build prints no path, or the wrong path, in the details, and every I17 case stays green. The T068 line promises titled tests but no gate counts the E: cases against test titles, and T068's acceptance never names RJ-338, so removing the RJ-338 test changes no acceptance line.",
+   "change": "Add to the first RJ-338 case 'the details name the changed path' (removal: printing no path), give the fixed hint text verbatim in 04 4.4 so T008 can hold a golden, and either add a T068 line 'a test titled for RJ-338 exists' or a check of the case-to-title mapping. Cost: one clause, one line, one text. Reaches T068, T008.",
+   "evidence": "04-cli.md:326 'The details name the first path whose entry changed. The hint is one fixed text: ...'; plan.md T068 'Each `E:` case of I17 is one test with a title of its own, so the cases are cited by title and not by their place in the one cell'; plan T068 acceptance has no RJ-338 line."
+  }
+ ],
+ "what_is_missing": "The precedence between a fingerprint difference and a worktree-changing skip; the error id in each writer case; the state after the exit 5; a test of the details and the hint text; a check that ties each E: case of I17 to a titled test.",
+ "postmortem": "The decision removed the count correctly in every page that cited it (01 1.6, 03 3.8, 04 4.4, 08 8.5, 09 J3, I17), but the rule's neighbour, the skipped-reason table and the worktree-changing recheck, was not read against the new unconditional exit 5. The count used to hide that two paths end in exit 5 for a writer. It crosses 08 8.5, 04 4.4, 01 1.6 and 05 I17.",
+ "lens_critique": "The lens counts a case green or red by whether a named removal turns it red, which suits a guard, but it undervalues cases whose subject is an error id or a state: an exit-code-only assertion is a guard that cannot see a swapped id. For a product whose destructive path is the point, the lens also gives little weight to what the product does when two safe refusals compete.",
+ "missing_viewpoint": "A reader who reads the error table as a state-machine consumer: someone who takes each exit 5 and asks which transition and which id produced it, across the pages that list them. No lens in the set is titled for cross-page exit-path enumeration.",
+ "out_of_scope": "R15-03 (10 10.2 item g and Deferred rows), plan T005 build constraint and one-reader scan (R15-16, R15-17); not re-read this round.",
+ "confidence": "high for the quoted overlap and its age (08:285 and the sentence in be402ca, first by git log -S at ed64a03); medium on severity, because the spec may intend the skip path to win and only the text is missing.",
+ "pages_read": ["docs/reviews/lenses.md (L6)", "docs/reviews/round-15.md", "docs/reviews/round-15/reports/L6.json", "docs/spec/01-system-model.md (1.6)", "docs/spec/03-formats.md (3.8)", "docs/spec/04-cli.md (4.4)", "docs/spec/05-security.md (I17)", "docs/spec/08-memory-handoff-salvage.md (8.5)", "docs/spec/09-journeys.md (J3 step 5)", "docs/plan.md (T068)", "r16/delta.diff"]
+}

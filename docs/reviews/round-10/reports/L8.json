@@ -1,0 +1,31 @@
+{
+  "header": "L8 · The technical writer who maintains generated docs · sonnet",
+  "verdict": "Met for this lens: all 8 round-9 findings (status A) read as resolved at d458f83; the delta adds one Advisory (ADR 0010 counts four amended texts, lists five). No Blocking or Required finding.",
+  "prior_checked": 8,
+  "prior_resolved_as_stated": 8,
+  "findings": [
+    {
+      "id": "L8-R10-1",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "ADR 0010 (Context, Alternatives considered, Consequences)",
+      "defect": "ADR 0010 says three times that it corrects four texts, but its Decision lists five amended texts (items 2 to 6: ADR 0006 v1, ADR 0009 pre-push bullet, ADR 0001 Where lessons live row, ADR 0009 decision 5, ADR 0009 decision 18).",
+      "scenario": "A reader auditing the amendments counts four from the Context and the Consequences, finds five in the Decision, and cannot tell whether one is an addition made after the review or the count is wrong. The record is Accepted and not edited, so the mismatch stays.",
+      "change": "Say five in the three places before ADR 0010 is relied on, or drop the number ('the texts below'). Cost: one sentence edit while the record is new."
+    }
+  ],
+  "pages_read": [
+    "docs/reviews/lenses.md (L8, What a reviewer returns)",
+    "docs/reviews/round-9/reports/L8.json",
+    "docs/reviews/round-9.md (L8 rows)",
+    "docs/spec/04-cli.md (4.1 Error ids, Warnings, 4.2, 4.4 rows RJ-329 to RJ-336)",
+    "docs/spec/10-testing-style.md (docs row of 10.2)",
+    "docs/spec/12-engineering.md (full delta, 12.6, 12.3, 12.8 rows)",
+    "docs/spec.md (S10, Deferred decisions rows, rule 9 mentions)",
+    "docs/adr/0010, adr/README.md, Status lines of ADR 0001 and 0006",
+    "docs/plan.md (grep of T008, T021, T088, T094)",
+    "internal anchor check (script) over spec, ADRs and plan: no broken heading anchor"
+  ],
+  "out_of_scope": "Plan acceptance lines of T008, T021, T088, T094 for round-9 items R9-15 to R9-19 are recorded as parked for block B and not re-reported. The rule 9 first-mention sweep is a grep sample, not the T006 matcher. The security content of the pull_request_target pr job, the approvals grammar and the ruleset reading were not judged (not this lens). Pages 00, 02, 03 to 09, 11 and 13 were skimmed through the diff only.",
+  "confidence": "medium-high: each resolution was checked against baseline text; a full rule 9 pass depends on the T006 matcher."
+}

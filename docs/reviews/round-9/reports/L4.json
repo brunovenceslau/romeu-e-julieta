@@ -1,0 +1,67 @@
+{
+ "header": "L4 \u00b7 The machine operator who has lost work \u00b7 sonnet",
+ "verdict": "Mostly yes: the round-8 resolutions for the generation machine, run, salvage, snapshot, formats and index read as stated, but the new removing state has no recovery for a sandbox still present, which can lock the operator out of rm and run on their own sandbox, and one Status A item (heads.json version) is not applied.",
+ "round8_checked": 37,
+ "round8_resolved_as_stated": 36,
+ "findings": [
+  {
+   "id": "L4-r9-1",
+   "kind": "new",
+   "severity": "Required",
+   "section": "01 1.6 (Generation), 01 1.7, 01 1.5 step 6",
+   "defect": "The new state removing has no row for a sandbox that is still present: sbx env rm failing, or a kill between writing removing and the sbx env rm call, leaves removing with a live sandbox. Recovery covers only removing with the sandbox absent, and the 1.7 definition of open generation (open or salvaging) excludes removing, so identity step 6 refuses the live sandbox.",
+   "scenario": "romeu rm completes salvage, writes removing, and sbx env rm exits non-zero (or romeu is killed first). The sandbox is present, the state is removing. Every P command, rm included, fails at step 6 with RJ-203 unknown-sandbox, whose hint says romeu adopt, which is meant for sandboxes romeu never recorded. The operator cannot re-run rm, or run, on their own sandbox.",
+   "change": "Add the row 'removing | sbx env rm fails, or the sandbox is found present | salvaging or open | keep the salvage record; exit 1', or let a rerun of rm resume from removing; and add removing to the 1.7 open generation definition (or define 'live generation' as open, salvaging or removing) so step 6, I26 and doctor generation-sandbox agree. Add the case to the fault-injection list of I17. Also change J6 steps 3 and 5, which still go salvaging to closed-removed without the removing state."
+  },
+  {
+   "id": "L4-r9-2",
+   "kind": "unresolved",
+   "severity": "Advisory",
+   "section": "03 3.13; 08 8.4",
+   "round8_ref": "R8-08-9 (L4-39), Status A",
+   "defect": "The resolution said to add a 03 section and a schema for snapshot/heads.json with a version. The text keeps heads.json in 3.13 as a format without a schema and 8.4 lists its fields (ref -> SHA, createdAt, disabled) with no version field. Write order and bundle authority were applied.",
+   "scenario": "A romeu release that changes heads.json fields cannot be told apart from an older file: the format-newer rule in the 03 opening has no version to refuse on, and strict decoding rejects unknown keys as a generic decode error, so status fails on a snapshot written by another julieta.",
+   "change": "Either add the version field (schema: snapshot/v1) to 8.4 and 3.13's reason, or record the Status as M with the reason that the golden test replaces the schema."
+  },
+  {
+   "id": "L4-r9-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "01 1.6 (salvaging row); 04 4.1 Subprocesses; 01 1.5 step 5 vs 04 4.4",
+   "defect": "Two seams in the write pass: (a) the row 'the sandbox half fails (julieta exits 1, a timeout, a full disk)' names a timeout while 04 4.1 says the salvage exec has no timeout and stops only on an interrupt, so a hung sandbox half has no way to reach the row; (b) an sbx ls --json that does not parse exits 2 sbx-output-unparsed at preflight step 5, but 1.6 and run step 2 say any answer that does not parse exits 1 sbx-unknown, two ids and two exit codes for one condition.",
+   "scenario": "(a) A frozen VM makes sbx env exec hang; the operator interrupts, the generation stays salvaging, and no row says what the interrupt records. (b) After an sbx upgrade renames a field, a script that checks exit 1 versus 2 sees different codes depending on which step read the listing first.",
+   "change": "(a) Say that an interrupt of the salvage exec takes the same row as a failure, and drop 'a timeout' from the row text. (b) State in 1.6 that a parse failure is sbx-output-unparsed (the preflight id) and sbx-unknown is only for a failed or non-zero ls."
+  },
+  {
+   "id": "L4-r9-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "08 8.1; 08 8.4",
+   "defect": "A snapshot write that fails on a full disk is now recorded as a hook failure and keeps the previous bundle, but nothing says that the failed write removes its own .tmp-<ULID> file; only julieta setup removes older leftovers. Each failing commit can leave a partial bundle-sized temp file.",
+   "scenario": "The sandbox disk is nearly full; every commit starts a snapshot that fails after writing most of a bundle, so the leftovers accumulate until the next setup and make the full disk worse.",
+   "change": "Add to 8.4: a write that fails removes its own temp file before the hook failure is recorded; setup stays the cleanup for a kill."
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L4, What a reviewer returns, How stage A runs)",
+  "docs/reviews/round-8/reports/L4.json",
+  "docs/reviews/round-8/clusters-*.json (L4 clusters)",
+  "docs/reviews/round-8.md (Status column)",
+  "docs/reviews/round-8/write-pass.md",
+  "docs/spec/01-system-model.md",
+  "docs/spec/02-layouts.md (2.3, 2.4)",
+  "docs/spec/03-formats.md (opening, 3.6, 3.8, 3.11, 3.13)",
+  "docs/spec/04-cli.md (4.1, 4.2, run steps, doctor, error ids)",
+  "docs/spec/05-security.md (I7, I16, I17, I24, I26, 5.4)",
+  "docs/spec/08-memory-handoff-salvage.md",
+  "docs/spec/09-journeys.md (J6, J10, J12)",
+  "docs/spec/10-testing-style.md (fault injection, Tested window)",
+  "docs/spec/11-host-probes.md (A12, A15, failure sessions)",
+  "docs/spec/13-runtime-ledger.md (13.6)",
+  "docs/spec/00-scope.md",
+  "docs/spec.md (deferred decisions)",
+  "docs/plan.md (T034, T068, T073, T074)"
+ ],
+ "out_of_scope": "Not judged: the plan clusters parked for stage B (L4-41, L4-43, and the stale --accept-loss wording in T068); L4-8 and L4-35 (routed to the operator; S12 is absent from the index and is the operator's decision); drift still stopping salvage (ruled in round 1 and kept on the round-8 page); 06 6.2 volumes wording, 13 13.5 fsync link and the CLI text of 04 4.2 stop/doctor rows were read at a skim only. Real behavior of sbx on a stopped or restarting daemon needs probe A15.",
+ "confidence": "medium: text read in full for 01, 03 3.8, 08 and the cited cells of 04, 05, 10, 11, but not every cell of every page, and the removing gap is inferred from the transition table and the 1.7 definition, not run."
+}

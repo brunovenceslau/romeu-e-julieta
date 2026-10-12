@@ -1,0 +1,48 @@
+{
+ "header": "L4 · The machine operator who has lost work · sonnet",
+ "verdict": "Both round-10 findings (R10-04, L4-r10-2) read as resolved at the baseline; the fingerprint adds two gaps: the spec does not say it is taken from what salvage captured, and it digests ignored files that salvage never captures.",
+ "prior_checked": 2,
+ "prior_resolved_as_stated": 2,
+ "findings": [
+  {
+   "id": "L4-r11-1",
+   "kind": "new",
+   "severity": "Required",
+   "section": "03 3.8 salvage[].fingerprint; 01 1.6 (salvaging -> removing row, Recovery)",
+   "defect": "The fingerprint is 'written in the same whole-file write as the state removing', but the spec never says its values are those of the capture and recheck in 08 8.3 step 2. If it is computed fresh when removing is written, a commit or edit made after the bundle was cut and before that write is in neither the bundle nor any later check; the first sbx env rm has no recheck at all.",
+   "scenario": "rm salvages, then writes removing and computes the fingerprint 20 s later, while the agent (not stopped, no --stop-agents) commits. The salvage bundle misses that commit; the fingerprint includes it. sbx env rm fails once, the rerun computes a fresh fingerprint equal to the stored one and resumes at sbx env rm; the commit is destroyed although the record says complete.",
+   "change": "Say the fingerprint is built from the HEAD, status and daemon-head values that step 2 and 3 of 08 8.3 captured and rechecked (the same read), not read again at the removing write; or state that removing is written only if a fresh fingerprint equals the captured one, else the generation stays salvaging and the capture repeats. Add an I17 case: a commit between the bundle and the removing write."
+  },
+  {
+   "id": "L4-r11-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "03 3.8 salvage[].fingerprint; 08 8.3 step 2",
+   "defect": "The fingerprint digests ignored paths and each file, but salvage captures only non-ignored changes. Any process writing an ignored file (build output, logs, caches) changes the fingerprint, and digesting an ignored tree such as node_modules is unbounded cost.",
+   "scenario": "A dev server keeps writing ignored logs in a running sandbox: every rerun of rm sees a different fingerprint, goes removing -> salvaging with a new salvage id and never resumes at sbx env rm; each pass adds a salvage record and refs. Conversely a large ignored tree makes the fingerprint slow with no salvage benefit.",
+   "change": "Digest only what salvage captures (tracked changes, non-ignored untracked paths, stashes), or name a cap and a skipped-item reason for ignored paths, and say that a rerun that salvages again 3 times in a row exits with a message naming the changing path (worktree-changing) instead of looping."
+  },
+  {
+   "id": "L4-r11-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "section": "09 J7 step 4",
+   "defect": "The condition 'for-each-ref refs/romeu/salvage/ lists no ref whose work is kept nowhere else' is a judgement, not a command output, and git status in each attic clone does not cover the linked worktrees or stashes kept under the foo-env attic dir.",
+   "scenario": "The operator sees a few salvage refs, cannot tell whether the work is on origin, and either keeps the attic forever or deletes it with a stash or linked-worktree edit that only existed there.",
+   "change": "Make the check mechanical: git -C <clone> log --branches --refs=refs/romeu/salvage --not --remotes --oneline (or have retire write its report beside the attic dir), and add git stash list and git worktree list to the named commands."
+  }
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L4, What a reviewer returns, How stage A runs)",
+  "docs/reviews/round-10/reports/L4.json",
+  "docs/reviews/round-10.md (R10-04, L4-r10-2)",
+  "docs/spec/01-system-model.md (1.6 delta)",
+  "docs/spec/03-formats.md (delta, 3.8)",
+  "docs/spec/04-cli.md (delta)",
+  "docs/spec/05-security.md (I17 and delta)",
+  "docs/spec/08-memory-handoff-salvage.md (8.3 step 2, delta of 8.3 and 8.5)",
+  "docs/spec/09-journeys.md (delta: J6 step 5, J7 step 4)"
+ ],
+ "out_of_scope": "The delta of 06, 10, 11, 12, spec.md and the ADRs was not read; the lens does not point at them. Whether a stopped sandbox can yield daemon heads for the fingerprint is left to the probe that covers it.",
+ "confidence": "medium: the 01, 03, 08, 09 and I17 text read in full; the findings are inferred from the text, not run."
+}

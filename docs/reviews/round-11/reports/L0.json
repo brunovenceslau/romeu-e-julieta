@@ -1,0 +1,24 @@
+{
+ "header": "L0 · The control reviewer · sonnet",
+ "verdict": "The round-10 finding resolves as stated: 06 6.4, J1 step 5, 05 5.4 and B2 now agree that ssh-add -c needs a program SSH_ASKPASS can name, installed first, and B2 records the outcome with none. The delta adds one Required gap (the import-closure rule for pr against the YAML dependency pr needs) and one Advisory (stale command lines).",
+ "prior_checked": 1,
+ "prior_resolved_as_stated": 1,
+ "findings": [
+  {"id":"L0-r11-1","kind":"new","severity":"Required","section":"05 5.3 (pr package paragraph); 12 12.1 (Go dependencies); 12 12.4","defect":"The rule says the import closure of tools/ci/pr is the standard library and paths on approvals, and a test fails on any other path in go list -deps. But pr reads .github/ask-first.yaml and docs/grants.yaml, and 12.1 lists go.yaml.in/yaml/v3 as the only YAML reader (there is no stdlib YAML). pr also needs git invocation (internal/gitsafe or its own) and canonical sha256 helpers. The spec does not say how pr parses YAML or which shared packages are placed on approvals.","scenario":"The task that builds pr (T005) imports go.yaml.in/yaml/v3 as 12.1 tells it to: the go list -deps test fails. The implementer either adds the module path to the globs (so a go.mod bump, now on dependencies and grantable, changes code that runs in the grant-judging job, defeating the point) or hand-writes a YAML parser, or reads internal/gitsafe, which is on no approvals glob and is not built until later.","change":"State in 05 5.3 which dependencies pr may import: either pr parses the two files in a format it owns (not YAML), or the third-party YAML module and its version in go.mod/go.sum are named as an accepted grantable input in the same Deferred row as the toolchain; and say whether internal/gitsafe is on approvals or pr carries its own hardened git calls. Make the go list -deps test's allowed set match."},
+  {"id":"L0-r11-2","kind":"new","severity":"Advisory","section":"12 12.4 (command block lines 164-165); plan T005; 10 10.2 pr row","defect":"The command block still shows go run ./tools/ci pr <payload file> and go run ./tools/ci pr --title ... , while the pr job grammar (10.2) allows only go run ./tools/ci/pr and 10.2/12.4 now run it that way. One sentence in 12.4 says the prose 'tools/ci pr' means the package, but a command line copied from the block would invoke a subcommand of tools/ci that no longer exists.","scenario":"A developer runs the documented PR checks line before opening a pull request and gets an unknown subcommand error; the plan task T005 heading and fixture line 556 carry the same stale form.","change":"Write go run ./tools/ci/pr in the 12.4 command block and in plan T005, keeping the explanatory sentence for prose."}
+ ],
+ "pages_read": [
+  "docs/reviews/lenses.md (L0, What a reviewer returns, How stage A runs)",
+  "docs/reviews/round-10/reports/L0.json",
+  "docs/reviews/round-10.md (R10-06 row, L0 row)",
+  "docs/spec/06-kits.md (6.4 signing key)",
+  "docs/spec/09-journeys.md (J1 step 5)",
+  "docs/spec/11-host-probes.md (B2)",
+  "docs/spec/05-security.md (5.3 pr paragraph, 5.4 Verified row)",
+  "docs/spec/12-engineering.md (12.1 dependencies, command block, 12.4)",
+  "docs/plan.md (T005)",
+  "full delta, changed lines of docs/spec and docs/spec.md, skimmed"
+ ],
+ "out_of_scope": "Parked, L and operator-routed findings; ADR 0010 decision 1. The delta of pages 01, 03, 04, 08 (salvage fingerprint, format-unsupported) was skimmed for consistency only, not tested against their fixtures.",
+ "confidence": "Medium. The prior resolution was checked line by line; the new findings rest on reading 05 5.3, 12.1 and 12.4 together, not on a run."
+}

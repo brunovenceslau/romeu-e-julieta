@@ -1,0 +1,98 @@
+{
+ "header": "L2 · The security engineer who has watched a host fall · opus",
+ "verdict": "Met for the delta, with no Blocking or Required finding (no plan task implements the narrowing, a maintainer step). The largest gap is Advisory: the record of the token narrowing reads the forwarded SSH key from inside the sandbox, contradicting its own 'never only from what the sandbox printed', and states its narrowed predicate in two homes that disagree.",
+ "prior_checked": 3,
+ "prior_resolved_as_stated": 2,
+ "prior_resolution_notes": [
+  "L2-r14-1 (R14-02): partly. A16, the four tries with expected answers, the dated entry and the cites from the four rows are in. The Resolution promised 'a host-side check that the GitHub authentication key is no longer forwarded', but the applied read is ssh-add -l in the sandbox (L2-r15-1), and the predicate is split between item g and the note (L2-r15-2).",
+  "L2-r14-2 (R14-04): resolved as stated. The head branch is deleted, the head is one empty commit, and the cleanup is checked from the maintainer's session. The closing clause overclaims (L2-r15-3).",
+  "L2-r14-3 (R14-03, M): resolved in its stated smaller form. Index row 348 holds the full list: deleting branches and tags, editing PR bodies, and the tag bypass marked unmeasured. The 05 5.4 token row points to it."
+ ],
+ "findings": [
+  {
+   "id": "L2-r15-1",
+   "kind": "unresolved",
+   "severity": "Advisory",
+   "origin": "listed",
+   "section": "10 10.2 (item g); the note on the maintainer block, The token narrowing (read 2)",
+   "defect": "The check that the GitHub authentication key is no longer forwarded is ssh-add -l run in the sandbox. That is the one read the note's own opening forbids ('never only from what the sandbox printed'), and it is not the host-side check that R14-02's Resolution promised.",
+   "scenario": "At the sitting the maintainer types ssh-add -l in a sandbox shell. Before the sitting, the agent had appended a PATH entry or a shell function to /etc/sandbox-persistent.sh, which the sandbox sources before every command. The shimmed ssh-add prints only the signing key while the forwarded agent still holds the authentication key. The entry records 'narrowed', the four Deferred rows fire, and git over SSH still pushes as the operator to every repository.",
+   "change": "Make read 2 a host read: on the host, the agent socket or kit config that sbx forwards lists only the signing key, or the authentication key is removed from the account's SSH keys page, read from the maintainer's browser. Keep ssh-add -l only as an extra. Cost: one sentence in the note and one clause in item g.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:128 'checked from the maintainer's own session, never only from what the sandbox printed'; :136-138 'The keys the sandbox's forwarded agent lists (`ssh-add -l` in the sandbox, read by the maintainer)'; docs/spec/10-testing-style.md:910-912 'the keys the sandbox's forwarded agent lists, read by the maintainer'. docs/reviews/round-14.md:123 (Resolution: 'a host-side check that the GitHub authentication key is no longer forwarded into the sandbox'). That the sandbox can shape a command's output through its persistent env file is inferred from the sandbox's own documentation (the persistent environment file is sourced before every command), not tried."
+  },
+  {
+   "id": "L2-r15-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (item g); the note on the maintainer block, The token narrowing",
+   "defect": "The predicate 'the token is narrowed' has two homes that disagree. The note requires the A16 read to match the expected fine-grained token and its exact permission list. Item g fails the token only on more than this repository, on Administration, on a GitHub key, or on an accepted ruleset update.",
+   "scenario": "The maintainer creates the fine-grained token and adds Secrets or Actions read-and-write for convenience. Read against item g, the record says narrowed: one repository, no Administration. Read against the note, it does not. The four rows fire on item g's reading, and the after-state of row 348 lists capabilities that miss secret writes and workflow dispatch. Item g also never says a classic token fails, since 'more than this repository' cannot be read from scopes.",
+   "change": "Keep the predicate in the note alone, and have item g cite it ('narrowed as the note's closing rule defines'). Also state there that a later entry reading not narrowed puts the token row and row 348 back to the before-state. Cost: item g loses one sentence; the note gains one.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:133-135 'Expected: a fine-grained token, this repository alone, Contents, Pull requests and Workflows read and write, Actions, Checks and Metadata read, and no Administration'; :150-151 'The token is narrowed when the A16 read and the agent's keys match what is expected and the ruleset update is refused'; docs/spec/10-testing-style.md:916-919 'An A16 read that shows more than this repository or the Administration permission, a GitHub key in the agent, or a ruleset update the token is not refused means the token is not narrowed'. Read from the text; no platform behavior involved."
+  },
+  {
+   "id": "L2-r15-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (item h, step 3)",
+   "defect": "The cleanup closes with 'so no head that carries a status under a required name can be reopened and merged'. That universal claim is stronger than the steps support. The actual guard is that the head is one empty commit.",
+   "scenario": "After step 3, the empty commit with its green required statuses is still reachable through the closed pull request's refs/pull/N/head. A token with Contents write can create a branch at that SHA and open a pull request, and the statuses attach to the SHA. The merge lands an empty commit, which is harmless. A later editor who trusts the closing clause could swap the empty head for a real one in a rerun of the try.",
+   "change": "Replace the clause with the true reason: 'the head is empty, so a merge of it, even through a branch recreated at its SHA, changes no file'. Cost: one clause.",
+   "evidence": "docs/spec/10-testing-style.md:920-921 'throwaway pull request whose head is one empty commit'; :931-932 'so no head that carries a status under a required name can be reopened and merged'. Inferred, not read from a primary source: that refs/pull/N/head keeps a closed pull request's head reachable, and that commit statuses are keyed by SHA."
+  },
+  {
+   "id": "L2-r15-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block, The token narrowing (the tag try); index (the token narrowing row, after-state)",
+   "defect": "The tag try's answer is 'recorded either way', but nothing uses it. If the tag ruleset's administrator bypass applies to the narrowed token, the token still creates v* tags. The entry still says narrowed, and no row, trigger or step follows from that answer.",
+   "scenario": "The narrowed token creates v0.0.0-try through the bypass, and the entry records it. Because the predicate ignores the tag try, the four rows fire. Later the agent pushes a v* tag on a commit of its choice and release.yml releases it. Only the provenance acceptance check at the next release run notices.",
+   "change": "Name what the answer triggers. Either 'accepted' adds a step that removes the tag ruleset's bypass for the administrator role, or it becomes the trigger of the release.yml row of Deferred decisions. Cost: one sentence in the note.",
+   "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:147 'not predicted: whether the tag ruleset's bypass for the administrator role applies to a fine-grained token is not measured, and the answer is recorded either way'; :150-152 (the predicate names only A16, the keys and the ruleset update); docs/spec.md:348 'whether it can create a `v*` tag through the tag ruleset's bypass is not measured until that entry'. That the bypass applies to the same user's fine-grained token is inferred, not read from GitHub's documentation."
+  },
+  {
+   "id": "L2-r15-5",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "the note on the maintainer block, The token narrowing; index (the token narrowing row, after-state); ADR 0008 (what the token can reach)",
+   "defect": "The narrowing entry turns the after-state to 'limited to this repository' and fires four security deferrals. It does not read the persistence that ADR 0008 says the current token can leave behind (deploy keys, webhooks, collaborators), so a credential planted before the narrowing outlives it unseen.",
+   "scenario": "Before the sitting, the operator's repo-scope token adds a write deploy key to this or another repository, and the sandbox keeps the private half on disk. The narrowing entry reads A16, the agent's keys and the tries, all clean, and records narrowed. ssh-add -l does not list a key file on disk, and A16 reads only the new token. The sandbox keeps pushing with the deploy key.",
+   "change": "Add a fourth read to the entry, made on the host: this repository's deploy keys, webhooks and collaborators, and the account's SSH keys, each against a known list, with any extra one meaning not narrowed. Cost: one list item and one clause in the predicate. The persistence class itself stays the accepted risk of ADR 0008; the defect is that the narrowing's after-state ignores it.",
+   "evidence": "docs/adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md:85-86 'settings, webhooks, deploy keys and collaborators persist after the sandbox is gone'; docs/notes/maintainer-block-of-ci-bootstrap.md:128-152 (three reads, none of deploy keys or webhooks); docs/spec.md:348 'after it, the narrowed token of ADR 0011, decision 2, limited to this repository'. That classic repo scope can manage deploy keys is inferred from GitHub's scope model, not read at a pinned source this round."
+  }
+ ],
+ "what_is_missing": [
+  "A host-side read that the GitHub authentication key is no longer forwarded.",
+  "One home for the narrowed predicate.",
+  "A rule for a later entry that reads not narrowed (reverting the after-state).",
+  "A consumer for the tag try's answer.",
+  "A sweep for persistence planted under the old token.",
+  "Whether the old classic token is revoked or stays live on the host: neither stated nor read."
+ ],
+ "postmortem": "After v1.0.0 a narrowing entry reads narrowed: A16 matches, the sandbox's own ssh-add -l shows only the signing key, and the ruleset update is refused. The four Deferred rows fire and row 348 moves to its after-state. Then four things go wrong. (a) A deploy key planted under the old token keeps write access, because no read looks for it (note, row 348, ADR 0008). (b) The narrowed token creates a v* tag through the administrator bypass, and no rule consumed that answer (note, release.yml row). (c) The key read was shimmed inside the sandbox (note read 2, 10 10.2 g). (d) A token with extra permissions passed item g's weaker test (10 10.2 g against the note).",
+ "lens_critique": "The lens frames success as one widening decision written down with its control and trigger. Here the decision is written down well, but the event that ends it is a hand-made record. The lens should also ask whether the observable that flips a security state is read from outside the boundary it claims to have closed. Missing viewpoint: an incident responder after compromise, who treats every credential rotation as incomplete until persistence is swept and verified from a clean machine.",
+ "out_of_scope": "RJ-338, I17 and salvage[].cause: I17 still holds, since a resume needs a fingerprint equal to the one written with a complete salvage, and the count is conservative and pinned by a case. T005 (b) and (e) strengthen the approvals surface set. Neither raises an L2 finding. The lens bullets on boundary A, I24, I33, boundary B and boundary F (I26) do not touch the changed text: unanswerable this round.",
+ "confidence": "Medium-high on the text findings (L2-r15-1 and L2-r15-2 are read straight from the text). Medium on L2-r15-3 to L2-r15-5, whose scenarios rest on platform behavior inferred rather than read from primary sources this round.",
+ "pages_read": [
+  "r15/delta.diff",
+  "docs/notes/maintainer-block-of-ci-bootstrap.md (The token narrowing)",
+  "docs/spec/10-testing-style.md 10.2 items d, g, h",
+  "docs/spec/05-security.md 5.2 I17, 5.4 approval-line and token rows",
+  "docs/spec.md Deferred decisions rows 279, 283, 348, 351, 353",
+  "docs/spec/04-cli.md RJ-338",
+  "docs/spec/03-formats.md 3.8 salvage rows",
+  "docs/spec/01-system-model.md 1.6 (changed paragraph)",
+  "docs/spec/09-journeys.md J3 step 5",
+  "docs/plan.md T005 (b), (e), O1, phase rows",
+  "docs/adr/0011 decision 2",
+  "docs/adr/0008 (what the token can reach)",
+  "docs/spec/11-host-probes.md A16",
+  "docs/reviews/round-14.md (rows R14-02 to R14-04, write pass)",
+  "docs/reviews/round-14/reports/L2.json",
+  "docs/reviews/lenses.md (L2)"
+ ]
+}

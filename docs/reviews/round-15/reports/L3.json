@@ -1,0 +1,89 @@
+{
+ "header": "L3 \u00b7 The maintainer three years from now \u00b7 sonnet",
+ "verdict": "The round-14 pass closes the reset gap of RJ-338 and moves the narrowing record to a named note, but the event the four Deferred rows cite still has no entry format or deciding entry, and the surrounding text contradicts where its answers go; largest gap L3-r15-1.",
+ "prior_checked": 5,
+ "prior_resolved_as_stated": 5,
+ "prior_resolution_notes": {
+  "L3-r14-1": "R14-02 promised the event defined in the note with A16, key list and four tries, and rows citing it: present; entry format and deciding entry were not promised, see L3-r15-1.",
+  "L3-r14-2": "R14-01: RJ-338 now states the row, that a resume writes no entry, and I17 holds the extra-edit case: present.",
+  "L3-r14-3": "R14-09: cell lists the values and writers, lost record is requested (decided by the pass): present; residual in L3-r15-4.",
+  "L3-r14-4": "R14-05 (M): pending tries are items g and h, d keeps what ran, ruleset-disable try named: present; operator/maintainer names left, as stated.",
+  "L3-r14-5": "R14-10 (M): history moved to the round page; I17 split left to the task, as stated; see L3-r15-5."
+ },
+ "findings": [
+  {
+   "id": "L3-r15-1",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (item g); docs/notes/maintainer-block-of-ci-bootstrap.md (The token narrowing); index Deferred decisions (four rows)",
+   "defect": "The event 'the token is narrowed' is 'a dated entry', but the entry has no format, may say the token is NOT narrowed, and no text says which entry decides.",
+   "scenario": "Three years on, the note holds a first entry that says not narrowed, a later positive one and a still later read that shows a widened token. The rows say 'as the dated entry ... records it'; a reader cannot tell whether the rows fired at the first entry, the positive one, or were un-fired. The closing line 'No entry yet: the narrowing waits for a maintainer step' is never told to be deleted and stays beside the first entry. Item h saves answers 'under the entry of item g' with several entries possible.",
+   "change": "In the note fix an entry heading (date, verdict 'narrowed' or 'not narrowed') and say the rows fire at the first entry with verdict narrowed, a later negative read is a new Deferred-row question not an un-fire, item g replaces the 'No entry yet' line, and item h names the entry by its date. Cost: about four sentences in the note, a few words in item g and h.",
+   "evidence": "10-testing-style.md item g 'a dated entry of the note ... means the token is not narrowed, and the entry says so'; note 'The maintainer adds one dated entry when the narrowing is applied, and one for each later read' and last line 'No entry yet: the narrowing waits for a maintainer step.'; spec.md:279,283,351,353 'as the dated entry of 10 10.2, item g, records it'; 10 10.2 item h 'save the API answers under the entry of item g'."
+  },
+  {
+   "id": "L3-r15-2",
+   "kind": "regression",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 (maintainer block: lead-in of 'To do', rule of 'The output of each item')",
+   "defect": "The maintainer block still says every item's output goes under a pull request's Evidence, and the To do list says each item 'saves the API's answer under Evidence', while item g says its answers go in the note 'not under a pull request's Evidence'.",
+   "scenario": "A maintainer who follows the list header saves the item g reads under a PR that has no relation to them, and the record the Deferred rows cite stays empty; a check-minded agent reads the header as the rule.",
+   "change": "Reword the two general sentences to 'under the Evidence of the PR it belongs to, or, for items g and h, in the entry of the note'. Cost: one clause twice.",
+   "evidence": "10-testing-style.md:843 'The output of each item goes under the Evidence of the PR it belongs to'; 'To do, each a maintainer step that saves the API's answer under Evidence:'; item g 'not under a pull request's Evidence'."
+  },
+  {
+   "id": "L3-r15-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "docs/plan.md (maintainer blocks O1 to O7); 10 10.2 items g, h",
+   "defect": "Items g and h are maintainer steps that appear in no sitting of the plan's O table, so no one schedules them.",
+   "scenario": "O1 covers items a to d and O2 item e; g and h wait on 'a maintainer step' that the plan never lists, so the Deferred rows stay unfired by neglect, not by decision.",
+   "change": "Add an O row (or a clause in O2 or O5) that names items g and h and the order g then h; cost one row.",
+   "evidence": "plan.md O1 'items a to d (10 10.2)', O2 'item e (10 10.2)'; no row names item g or h (grep of the O table)."
+  },
+  {
+   "id": "L3-r15-4",
+   "kind": "unresolved",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "03 3.8 (salvage[].cause)",
+   "defect": "A lost record from crash recovery now carries cause 'requested', and the cell neither says that a new value needs a format change nor separates 'a command's own run' from 'a rerun started'.",
+   "scenario": "A reader of the state file sees cause 'requested' on a record nobody requested, and a later automatic salvage will be filed under the same word because 'requested' is defined by exclusion ('on its own run').",
+   "change": "State that requested also marks the lost record and means 'not started by a changed fingerprint', and that a third value needs a state-format version change. Cost: one sentence.",
+   "evidence": "03-formats.md:483 'requested for an entry a command writes on its own run, that is salvage ..., and the lost record a command writes when it finds the sandbox absent'."
+  },
+  {
+   "id": "L3-r15-5",
+   "kind": "unresolved",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "05 5.2 (I17); plan T062",
+   "defect": "The decision to split the I17 cell into titled cases is recorded only on the round-14 page, not in the task that writes the tests.",
+   "scenario": "The T062 author reads its acceptance list, finds no instruction, and writes one test per cell clause or one test for the cell; case titles cannot then be cited.",
+   "change": "Add a line to the plan task that implements I17 (T062): one titled case per E: clause. Cost: one line.",
+   "evidence": "round-14.md 'Splitting the I17 cell into titled cases is left to the task that writes the I17 tests'; plan.md T062 acceptance 'rm exits 5 for each case of I17' names no splitting."
+  }
+ ],
+ "what_is_missing": "A fixed entry format and a deciding-entry rule for the narrowing record; plan sittings for items g and h; a note in T062 to split I17; a format-change rule for new cause values.",
+ "postmortem": "After v1.0.0 the maintainer cannot tell whether the token is narrowed or whether the four Deferred rows fired: the record is prose with a stale placeholder, answers are told to go to two places, and no sitting schedules the steps (10 10.2, note, index, plan).",
+ "lens_critique": "The lens measures concept count and drift well but rewards fewer words over a stated procedure; for this product a maintainer step with no check needs a fixed record format more than it needs brevity.",
+ "out_of_scope": "The operator versus maintainer names (left to the vocabulary round); the 2026-10-07 versus 2026-10-08 date mismatch in the note (already recorded as found and unchanged).",
+ "confidence": "medium: read the delta and the sections it cites, not every citing page; the grep for O-table rows was narrow.",
+ "pages_read": [
+  "delta.diff",
+  "10 10.2",
+  "03 3.8",
+  "04 4.4 RJ-338",
+  "05 5.2 I17",
+  "05 5.4",
+  "01 1.6",
+  "spec.md Deferred rows",
+  "note on the maintainer block",
+  "ADR 0011 decision 2",
+  "plan O table and T062",
+  "round-14.md"
+ ]
+}

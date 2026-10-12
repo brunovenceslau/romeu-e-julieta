@@ -11,7 +11,9 @@ up and what stays to do are in
 rulesets are worth against an agent that holds the operator's token is
 in [05 5.4](../spec/05-security.md#risks-of-how-this-repository-is-developed).
 The text below is the block as the specification held it before review
-round 8 moved it here, word for word.
+round 8 moved it here, word for word, up to the section
+[The token narrowing](#the-token-narrowing), which is a record kept
+since (item g of 10 10.2).
 
 **The maintainer block.** The parts of `ci-bootstrap` that only the
 maintainer can do are one sitting around step 1 and one call after
@@ -109,3 +111,127 @@ any sandbox and any agent session.
 - e. After step 2: add the CI jobs of the green run to the
   default-branch ruleset as required status checks, and save the API's
   answer.
+
+## The token narrowing
+
+The record of the narrowing of the development sandbox's GitHub token
+to the GitHub App installation token that
+[ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md),
+decision 2, proposes and which is applied once that record is
+Accepted, as item g of
+[10 10.2](../spec/10-testing-style.md#release-and-bootstrap) asks for
+it, and the one home of the rule below. The maintainer adds one dated
+entry when the narrowing is applied, and one for each later read, which
+is due at each sitting of blocks O3, O6 and O7 of the
+[plan](../plan.md#operator-blocks). An entry is a heading
+`### <date>: narrowed` or `### <date>: not narrowed`, followed by the
+three reads; when two entries share a date, each heading carries the
+time after the date, and the entries are in the order of their
+headings, oldest first. The first entry whose verdict is narrowed has a
+fourth part, the answers of the required-name try of item h of
+[10 10.2](../spec/10-testing-style.md#release-and-bootstrap), which runs
+only while the newest entry's verdict is narrowed; the fourth part
+opens with the date the try was run. The first entry replaces the line "No entry yet"
+at the end of this section. The first entry whose verdict is narrowed
+is the event of the four
+[Deferred decisions](../spec.md#in-how-this-repository-is-run) rows
+whose trigger is "the token is narrowed". The token narrowing row of
+the index describes the token before and after the narrowing; the
+token row of
+[05 5.4](../spec/05-security.md#risks-of-how-this-repository-is-developed)
+describes the state before it, in its present words, and points to
+the index row for the state after. No entry edits either: the
+newest entry's verdict says which of the two states holds. A
+later entry whose verdict is not narrowed puts the token back in the
+state before the narrowing, and is an event of those four rows too,
+so the decision each took on the narrowed premise is reviewed
+again; the rows the first narrowed entry fired stay fired. No check
+reads the entries, so they are **[review]**.
+
+Each entry holds three reads, made on the host or checked from the
+maintainer's own session, never only from what the sandbox printed:
+
+1. Probe A16 ([11 11.1](../spec/11-host-probes.md#111-block-a---sbx-and-runtime-facts-first-in-parallel-with-the-first-build-layer)):
+   the token's type, from its prefix, and, for a token with no scopes
+   header, its repository list and permissions from GitHub's settings
+   page of that token or of the App's installation. Expected: an App
+   installation token, an installation on selected repositories, this
+   one among them, Contents, Pull requests and Workflows read and
+   write, Actions, Checks and Metadata read, and no Administration.
+2. The agent the host forwards into the sandbox, read on the host, in
+   three parts: the host's forwarding setting, the sbx setting or kit
+   that names the socket it forwards; the keys of that socket, listed by
+   `ssh-add -l` on the host with `SSH_AUTH_SOCK` set to it; and the
+   GitHub account's SSH keys page, read in the maintainer's session.
+   Whether sbx forwards the agent of the shell that starts it when no
+   setting names a socket is inferred, not measured, so the read does
+   not rely on the setting alone: when no setting names a socket, the
+   socket the second part lists, whose keys the third part checks
+   against the page, is the `SSH_AUTH_SOCK` of the shell that starts
+   the sandbox, on the host. Expected: every socket so listed holds
+   the signing key alone, or no agent is behind it; and the
+   fingerprint of each key it holds is absent from the page's
+   authentication
+   keys, the signing key's being listed only under signing keys, the
+   rule
+   [06 6.4](../spec/06-kits.md#64-product-kits) states for romeu's
+   sandboxes. The sandbox's own `ssh-add -l` may be read too, as a
+   second read, never as the proof.
+3. The four tries of item d above, repeated from inside the sandbox
+   with the narrowed token, with throwaway payloads and the same undo
+   and check from the maintainer's session. The tag try runs only while
+   no `release.yml` exists, since a `v*` tag would start a release once
+   it does; a read made once `release.yml` exists leaves it out and
+   records the tag answer as not measured:
+
+   | Try | Answer in item d, with the operator's token | Expected with the narrowed token |
+   |---|---|---|
+   | push an empty commit to the default branch | refused | refused, by the pull-request rule; this answer does not tell the two tokens apart |
+   | merge a throwaway pull request through the API | accepted | accepted once its required checks are green, since the token keeps Contents and Pull requests write; this answer does not tell the two tokens apart |
+   | create and delete the tag `v0.0.0-try` | accepted, through the bypass | not predicted: whether the tag ruleset's bypass for the administrator role applies to an App installation token is not measured, and the answer is recorded either way |
+   | update the default-branch ruleset with its own unchanged body | accepted | refused, since the token holds no Administration permission |
+
+The token is narrowed when the A16 read and the three parts of read 2
+match what is expected and the ruleset update is refused. Any other answer
+on those three means it is not, and the entry says which read
+differed.
+
+Limits of the entry, stated and not closed:
+
+1. Nothing acts on an accepted tag try; the pull request that adds
+   `release.yml` reopens it (round 15).
+2. No read looks for deploy keys, webhooks or collaborators that the
+   operator's token could have added before the narrowing, a class
+   ADR 0008 lists; the review of the token narrowing row of
+   [Deferred decisions](../spec.md#in-how-this-repository-is-run)
+   reopens it (round 15).
+3. How the forwarding stops is the maintainer's choice: ADR 0011,
+   decision 2, says only that it stops. An entry whose read 2 finds
+   an authentication key, or a second key in a forwarded socket,
+   reopens it (round 16, R16-11).
+4. A later read is due at a sitting, not at the events that change what
+   it reads (a re-created sandbox, `sbx secret set` run again, a
+   replaced token, the maintainer's pushes from the host), and none is
+   due after block O7; the required-name try of item h is not run again
+   for a replaced token either, so its answers describe the token of
+   the first narrowed entry (round 17, R17-13; round 18, R18-A12).
+5. Nothing writes into the token narrowing row of the index or the
+   token row of 05 5.4 that the narrowing holds; an entry whose
+   verdict is not narrowed after a narrowed one asks for no decision of
+   its own, and a narrowed entry that follows a not narrowed one after
+   the first narrowed entry is no event, since the rows the first
+   narrowed entry fired stay fired: the rows
+   are reviewed at their events (round 17, R17-15, R17-20; round 18,
+   R18-A12).
+6. Read 3's merge try, made once the required checks are green, is
+   accepted with either token, so it cannot show whether a token
+   bypasses those checks (round 17, R17-18).
+
+Limits 4 to 6 are reopened, after the sitting of block O8 of the
+[plan](../plan.md#operator-blocks) has written the first entry, by the
+first of: a re-created development sandbox, a replaced token, the
+first release-candidate tag, or the plan's checkpoint C7 (round 18,
+R18-A13).
+
+No entry yet: the narrowing waits for the acceptance of ADR 0011 and
+a maintainer step.

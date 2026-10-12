@@ -1,0 +1,91 @@
+{
+  "header": "L13 · The reader who holds the spec against itself · opus",
+  "verdict": "Met for the round-9 findings: all 12 L13 findings with status A or M read at d458f83 as their resolutions say (one upstream-shape rule, the gate 1 exceptions, GH_TOKEN on build and notes, docs/lessons/ in the index cells, spec validate exit 6, the recreate-needed slug, run step 2's lost record, A12 as the one volume probe, 10 10.1 as the one network list, no plan ids in the spec, api.github.com from the base set, docs/grants.yaml in the tree and 05 5.3 pointing at 12 12.4). The largest gap is new and comes from the G5 fix: 10 10.2 says `pr` itself makes no network call, while 12 12.4 has `pr` run `git fetch` of head.sha, and 10 10.1's one list of network reads leaves out that fetch. That is one Required finding. Six Advisory findings: ADR 0010 counts four amended texts but carries five; two Deferred rows whose triggers fired are handled in two different ways; the doctor table has no row for two slugs that doctor is said to report; the new pre-check sentence contradicts the protective commands; the direct-push refusal rests on a try made before the 2026-10-09 ruleset change; and T005's Ask-first forecast leaves out the new approvals surface.",
+  "prior_checked": 12,
+  "prior_resolved_as_stated": 12,
+  "findings": [
+    {
+      "id": "L13-R10-1",
+      "kind": "new",
+      "severity": "Required",
+      "section": "10 10.2 (the pr paragraph after the grammar: \"`pr` itself makes no network call\"); 12 12.4 (the `pr` job paragraph: \"`fetch` passes `--no-recurse-submodules`\"); 10 10.1 (Rules: \"This is the one list of the network reads of the tests and the steps\"); 10 10.2 grammar (pr job row)",
+      "defect": "Two texts disagree on the same command. 10 10.2 says `pr` itself makes no network call. 12 12.4 says every git call of `pr` on head objects passes `-c core.hooksPath=/dev/null` and that its `fetch` passes `--no-recurse-submodules`, so `pr` fetches head.sha from GitHub. The grammar leaves no other step that could fetch: a `run` step is only `go run ./tools/ci|release`, and the one checkout is of github.sha. The head fetch is also missing from 10 10.1, the list that calls itself the one list of the network reads of the steps and ends 'Nothing else in a test or a step reads it'.",
+      "scenario": "T005 implements 10 10.2's pr step, 'it lands whole', together with 12 12.4. If the implementer follows 10 10.2, `pr` reads only local objects, and in the pull_request_target job, whose checkout is github.sha, the commits base..head are absent, so every run fails or reads an empty range. If the implementer follows 12 12.4, `pr` makes a network call that 10 10.1 says no step makes. Then `tools/ci workflows`, or a later test of the network list, has no row to admit it, and a local `pr --title --body` run without the network fails where 10 10.2 promised it would not.",
+      "change": "Choose one owner of the fetch. Either (a) `pr` fetches head.sha only when the object is missing, and only in the pr job. Then 10 10.2 says 'pr reads the network only for the head fetch of the pr job; a local run on a saved payload reads none', and 10 10.1 adds 'the pr job's unauthenticated fetch of head.sha'. Or (b) a separate `tools/ci` subcommand, for example `fetch-head`, does the fetch as its own `run` step. Then 12 12.4 moves the fetch flags there and 10 10.1 lists that step. Cost: two sentences and one list item, plus one `tools/ci workflows` fixture under (b)."
+    },
+    {
+      "id": "L13-R10-2",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "ADR 0010 (Context; Decision, Amended texts 2 to 6; Consequences)",
+      "defect": "ADR 0010's Context says two of the five round-9 items land in decision records and that the second is 'four texts in accepted records'. Its Consequences say the record 'corrects four texts'. Its Decision lists five amended texts (2 to 6), and decision 6, the mark of a final handoff, is the record half of D2, a third item that lands in a record.",
+      "scenario": "The record is Accepted and by 12 12.5 is never rewritten, so once PR #36 merges the miscount stands for good, or a superseding record is needed to correct a count. A reader who checks the record against round-9.md's D2 ('decision 6 of ADR 0010 carries the record half') finds the record denying it.",
+      "change": "Before the merge, write 'Three of them land in decision records' and 'five texts' in the Context, and 'corrects five texts' in the Consequences, and name D2 (R9-24) beside L0-r9-4, L2-r9-5, L13-R9-4 and L13-R9-9. Cost: three words and one id; approval line `decisions`, which the PR already carries."
+    },
+    {
+      "id": "L13-R10-3",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "index Deferred decisions (the token-narrowing row; the required-checks row); ADR 0010 decision 1; ADR 0008 deferred item 1; lenses.md exit criterion 3",
+      "defect": "One condition, a Deferred row whose trigger has fired, is handled two ways in the same pass. The required-checks row says 'fired', names ADR 0010 decision 1, which reopens it, and waits for an item in the next decision block. The token-narrowing row says 'this trigger has fired and the review is due', but no record reopens ADR 0008's deferred item 1 and no decision-block item is named. ADR 0010 amends only the trigger's wording (decision 6). Both rows stay in the Deferred table although neither is still deferred, against exit criterion 3's 'still open' shape.",
+      "scenario": "The next consolidation counts criterion 3 over the tables. One fired row has a record and a next step, and the other has neither, so the token review that was 'due' on 2026-10-09 waits on no listed item. ADR 0010's own alternative names this risk: a fired trigger left as written 'would hide that the event the record named has happened'.",
+      "change": "Treat both the same way. Either move both to Open questions with 'Settled by: the next decision block', or keep both in the Deferred table with 'fired, reopened by <record>, decision <n>'. For the token row, that means a reopening line in the next decision record (or a seventh item of ADR 0010 before the merge) and a decision-block item. Cost: one cell, plus one record item on the `decisions` surface."
+    },
+    {
+      "id": "L13-R10-4",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "04 4.2 (Checks run by `romeu doctor`); 04 4.4 (RJ-334, RJ-336); 01 1.7 (open generation); 01 1.6 (removing prose); 03 (opening)",
+      "defect": "The pass made doctor report two new slugs. RJ-336 and 01 1.7 say `status` and `doctor` report a removing generation with its sandbox present as `removal-pending`, and 03 says `status` and `doctor` report an undecodable record as `record-unreadable` (RJ-334). The doctor table, which 4.2 says holds each check as a row by its slug, has neither row. Its `generation-sandbox` row ('a sandbox a project names with no open generation') also matches the removing case, because `removing` counts as open only for rm, recreate and retire.",
+      "scenario": "The doctor task generates its checks from the 4.2 table and leaves out both. Or it reports the removing case as `generation-sandbox`, with that row's hint and not 'romeu rm <name>', so `doctor --json` and the preflight name one condition with two slugs.",
+      "change": "Add two doctor rows: `removal-pending` (fail; hint `romeu rm <name>`) and `record-unreadable` (fail; hint as in RJ-334). Narrow `generation-sandbox` to exclude a `removing` generation. Cost: two rows and one clause."
+    },
+    {
+      "id": "L13-R10-5",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "04 4.2 (doctor preamble: \"A **pre** check stops a mutating command with exit 2\"); 01 1.5 (the protective paragraph); 05 5.4 (the protective-command row)",
+      "defect": "The sentence the pass added says a **pre** check stops a mutating command with exit 2. 01 1.5 and the 05 5.4 row say that the protective commands (stop, salvage, salvage --from-host, pull, and the salvage half of rm, recreate and retire), which are mutating **P** commands, print a failed step 5 and go on. This is the gate 1 crossing that round 9 closed in 01 1.4 (R9-06), now reopened for step 5.",
+      "scenario": "The shared implementation of the **pre** checks follows 4.2 and returns exit 2 from step 5 for every mutating command. `romeu salvage` behind a broad sbx allow rule then refuses to save work, against the decision of 2026-10-09 and the I7 E case for `salvage --from-host`.",
+      "change": "Write 'A **pre** check stops a mutating command with exit 2, except the protective commands of 01 1.5, which print it and go on; so each has an id in 4.4.' Cost: one clause."
+    },
+    {
+      "id": "L13-R10-6",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "10 10.2 (maintainer block, items a and d); 05 5.4 (the approval-line row's Mitigation; the token row); 12 12.4 (The rulesets)",
+      "defect": "Item a now says that the default-branch rule restricting updates to the bypass actor was removed (as read on 2026-10-09) and that what follows is 'read from the rules and not tried'. 05 5.4 still states as a present fact that the ruleset 'refuses a direct push to the default branch (measured 2026-10-08)', and item d and the token row cite that try. The try was made against the ruleset before the change, and no text says which remaining rule now does the refusing.",
+      "scenario": "A reader of 05 5.4 takes the direct-push refusal as measured on today's ruleset. If the 2026-10-08 refusal came from the removed update restriction, the token can now push to main directly, and the one control the spec calls measured is no longer in place, with nothing that reads it again.",
+      "change": "In 05 5.4 and item d, say that the try predates the 2026-10-09 change and name the rule now expected to refuse a direct push (the pull-request rule), 'read, not tried'. Or add the direct push to the tries of the next sitting. Cost: one clause in each of two places."
+    },
+    {
+      "id": "L13-R10-7",
+      "kind": "new",
+      "severity": "Advisory",
+      "section": "plan.md T005 (Ask-first: `checks`); 05 5.3 (the `approvals` surface); 12 12.4 (A checkpoint grant)",
+      "defect": "The pass added the `approvals` surface, which holds `tools/ci/askfirst.go`, `tools/ci/denylist.yaml` and `.github/workflows/**` and which no checkpoint grant covers. T005 builds the approval-line check in `tools/ci/askfirst.go` and the pr job's workflow, yet its Ask-first forecast still says only `checks`, although the same pass updated the forecasts of the sbxdrv and skills tasks.",
+      "scenario": "The maintainer grants `checks` at the checkpoint for T005, as the plan's Ask-first field invites. The pull request then needs an `approvals` line (and `dependencies` for the workflow), which no grant can give, and it waits for the maintainer.",
+      "change": "Set T005's Ask-first to `checks`, `approvals`, `dependencies`, and check the other tasks that touch `.github/workflows/**` or `tools/ci/denylist.yaml` (for example T001 to T003) the same way. If plan text is parked for stage B, record it there. Cost: one field per task."
+    }
+  ],
+  "pages_read": [
+    "docs/reviews/lenses.md (L13; What a reviewer returns; How stage A runs)",
+    "docs/reviews/round-9/reports/L13.json",
+    "docs/reviews/round-9.md (L13 rows and clusters R9-02, R9-06, R9-07, R9-14, R9-23; D2 to D6; exit criteria; write pass)",
+    "docs/spec.md (diff in full; Q27; the token-narrowing and required-checks rows)",
+    "docs/spec/01-system-model.md (1.4 gate 1, 1.5 preflight and protective paragraph, 1.6 generation table and Absent, 1.7 rows; diff in full)",
+    "docs/spec/03-formats.md (opening; diff in full)",
+    "docs/spec/04-cli.md (4.1 Exit codes, Error ids, Warnings; run steps 2 and 3; doctor table; spec validate; 4.4 in full; diff in full)",
+    "docs/spec/05-security.md (5.3 in full with the YAML; 5.4 protective, signing and development rows; I7, I22; diff in full)",
+    "docs/spec/06-kits.md (6.2 and 6.4 lines on A12 and askpass)",
+    "docs/spec/07-mise-egress.md and 02-layouts.md (api.github.com lines; the grants.yaml tree line)",
+    "docs/spec/08-memory-handoff-salvage.md and 09-journeys.md (diff skimmed)",
+    "docs/spec/10-testing-style.md (10.1 Rules; 10.2 grammar, pr paragraph, release steps 1 and notes, maintainer block a to e; Tested window; diff in full)",
+    "docs/spec/11-host-probes.md (A12, A15, B2)",
+    "docs/spec/12-engineering.md (12.4 in full, 12.5; diff in full)",
+    "docs/adr/0010 (full); the diffs of ADRs 0001, 0006, 0008, 0009 and README",
+    "docs/plan.md (diff; T005)"
+  ],
+  "out_of_scope": "The round-9 findings with status operator, L or parked were not re-checked, as the brief says. Pages 00, 13 and 11 beyond A12, A15 and B2 were not read, and pages 08 and 09 only as a diff skim. Whether the default-branch ruleset still refuses a direct push after the 2026-10-09 change (L13-R10-6) is not measured: the text alone cannot settle it, and a try or an API reading of the pull-request rule's bypass mode would. Not re-reported because it predates the delta: the doctor slug `toolchain-stale` beside the error `toolchain-approval-required` for one condition, against 4.2's 'shares that error's slug' rule, and the step 6 workspace-path refusal, which still has no error id. The security weight of the pr job's design (pull_request_target, an unauthenticated fetch) belongs to L2 and was not judged.",
+  "confidence": "High for L13-R10-1, L13-R10-2, L13-R10-4 and L13-R10-5: each quotes text present at d458f83 on both sides. Medium for L13-R10-6, which depends on which rule did the 2026-10-08 refusal. High that all 12 round-9 resolutions hold: each was read at its place, not found by a phrase search."
+}

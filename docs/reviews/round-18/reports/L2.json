@@ -1,0 +1,113 @@
+{
+  "header": "r18.L2 · The security engineer who has watched a host fall · opus",
+  "verdict": "Not validated in this scope: two Required contradictions, both able to make the token read narrowed when it is not (row 348 ties the token's end to block O8 again; read 2 accepts 'the setting names no socket' while sbx forwards the inherited host agent), plus three Advisory rows.",
+  "prior_checked": 7,
+  "prior_resolved_as_stated": 5,
+  "prior_resolution_notes": {
+    "L2-r17-1 (R17-13)": "Resolved as stated: limit 4 of the note. But its trigger, the O8 sitting, fires when the limit first applies, so after O8 it has none (L2-r18-3).",
+    "L2-r17-2 (R17-14)": "Not as stated: the write pass says 'expects no forwarded socket', but the text at note line 161 reads 'the setting names no socket', a read of configuration rather than of forwarding; with forwarding by inherited SSH_AUTH_SOCK (Q19, 04 4.1 line 18) the unsafe state passes (L2-r18-2).",
+    "L2-r17-3 (R17-15)": "Resolved as stated: limit 5, decided on 2026-10-12 that the 05 5.4 row is not edited. The new note sentence claiming the 05 5.4 row describes both states is false (L2-r18-4).",
+    "L2-r17-4 (R17-15)": "Not resolved: a narrowed entry after a not narrowed one is still no event, and limit 5 does not name re-narrowing (L2-r18-5).",
+    "L2-r17-5 (R17-16)": "Resolved as stated: limit 3, with 'or a second key in a forwarded socket'.",
+    "L2-r17-6 (R17-17)": "Resolved as stated in the plan's opening (plan line 204), but R17-20 wrote the same tie to the block back into row 348 of the index (L2-r18-1).",
+    "L2-r17-7 (R17-18)": "Resolved as stated: O8 orders decision 1 first, names the pull request, adds S2; the merge try is limit 6, whose trigger has the defect of L2-r18-3."
+  },
+  "findings": [
+    {
+      "id": "L2-r18-1",
+      "kind": "regression",
+      "severity": "Required",
+      "class": "contradiction",
+      "origin": "own",
+      "section": "index (Deferred decisions, row 348); plan (Operator blocks, opening); the note on the maintainer block (the entry rule)",
+      "defect": "Row 348 now says the narrowing is 'applied at block O8 of the plan; the token stands until then', tying the end of the operator's token to the block, which R17-17 removed from the plan's opening because only the note's first narrowed entry ends it.",
+      "scenario": "At O8, read 1 finds the classic token and the entry says not narrowed. Row 348 says the operator's token stood only until O8; the plan's opening and the note say it stands until a narrowed entry. A reviewer of the four 'token is narrowed' rows reads row 348 as narrowed and keeps the merge-gate parts deferred on a false premise.",
+      "change": "Row 348: 'narrowing decided, applied by the first narrowed entry of the note on the maintainer block, planned at block O8; the token stands until that entry'. One sentence; approval line spec.",
+      "evidence": "docs/spec.md:348 'narrowing decided, applied at block O8 of the [plan](plan.md#operator-blocks); the token stands until then (ADR 0011, decision 2)'; docs/plan.md:204 'which the sandbox holds until the note on the maintainer block records its first narrowed entry'; docs/notes/maintainer-block-of-ci-bootstrap.md:139-140 'the newest entry's verdict says which of the two states holds'"
+    },
+    {
+      "id": "L2-r18-2",
+      "kind": "regression",
+      "severity": "Required",
+      "class": "contradiction",
+      "origin": "own",
+      "section": "the note on the maintainer block (read 2, expected answer); ADR 0011 (decision 2); 06 6.4; Q19; 04 4.1",
+      "defect": "Read 2 accepts 'the setting names no socket' as the stopped forwarding, but sbx forwards whatever SSH_AUTH_SOCK the calling shell holds (Q19, 04 4.1; inferred, not measured), so an inherited host agent with the GitHub authentication key passes, part 3 lists no keys, and the verdict reads narrowed while ADR 0011, decision 2's 'the forwarding of the GitHub authentication SSH key ... stops' does not hold.",
+      "scenario": "At O8 the maintainer removes the explicit socket setting and runs sbx from a shell whose SSH_AUTH_SOCK is the host agent. No setting names a socket; read 2 passes; the sandbox's ssh-add -l shows the auth key but is 'never the proof'. The four rows fire on a narrowed premise while the agent can still push over SSH to every repository the account reaches.",
+      "change": "One sentence in read 2: when no setting names a socket, the read also lists, on the host, the keys behind the SSH_AUTH_SOCK of the shell that starts the sandbox, expecting no agent or the signing key alone; the fingerprint part applies to those keys. No new mechanism; approval line spec.",
+      "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:161 'Expected: the setting names no socket, or each socket it names holds the signing key alone'; docs/spec.md:238 (Q19) 'romeu sets SSH_AUTH_SOCK to signing.agentSocket for the sbx calls'; docs/spec/04-cli.md:18 'SSH_AUTH_SOCK=<signing.agentSocket> for sbx call'; ADR 0011 decision 2 'The forwarding of the GitHub authentication SSH key to the sandbox stops too.'"
+    },
+    {
+      "id": "L2-r18-3",
+      "kind": "new",
+      "severity": "Advisory",
+      "class": null,
+      "origin": "own",
+      "section": "the note on the maintainer block (the limits, closing line); plan (O8)",
+      "defect": "Limits 4 to 6 are 'reopened by the sitting of block O8', the very sitting that writes the first entry and so starts them; the trigger fires on day one, O8 names no review of them, and limit 4 (no read after O7 or at the events that change the token) is left with no live trigger for the token's whole life after v1.0.0.",
+      "scenario": "After v1.0.0 the disposable development sandbox is re-created and takes a global github secret holding the operator's classic token. No read is due (limit 4), its trigger fired at O8 months before, and nothing looks again until a reviewer happens to.",
+      "change": "Give limits 4 to 6 a trigger after O8: the first of a re-created development sandbox, a replaced token, the next release-candidate tag, checkpoint C7 (one sentence); O8's Recommendation names the review of the three limits (parked for B).",
+      "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:214-215 'Limits 4 to 6 are reopened by the sitting of block O8 of the [plan](../plan.md#operator-blocks), which applies ADR 0011.'; limit 4: 'none is due after block O7 (round 17, R17-13)'; ADR 0005 rule 4 'When the event happens, the decision is made'"
+    },
+    {
+      "id": "L2-r18-4",
+      "kind": "new",
+      "severity": "Advisory",
+      "class": null,
+      "origin": "own",
+      "section": "the note on the maintainer block (the entry rule); 05 5.4 (the token row)",
+      "defect": "The note says the 05 5.4 token row describes the token before and after the narrowing, but that row states the operator's token in the present tense, says the narrowing 'is applied at the next maintainer sitting, and the token stands until then', and still cites 'the entry of 10 10.2, item g', the seam R17-20 fixed only in row 348.",
+      "scenario": "After a narrowed entry a reader takes 05 5.4's accepted risk as the current state and the note as saying it is current; the risk register and the note disagree on what the accepted risk is.",
+      "change": "Sentence edit in the note: the 05 5.4 row describes the state before the narrowing and points to row 348 for the state after; or add its stale words to limit 5.",
+      "evidence": "docs/notes/maintainer-block-of-ci-bootstrap.md:136-140 'The token narrowing row of the index and the token row of 05 5.4 describe the token before and after the narrowing'; docs/spec/05-security.md:392 'The development sandbox's GitHub token is the operator's own ... is applied at the next maintainer sitting, and the token stands until then ... which the entry of 10 10.2, item g, reads'"
+    },
+    {
+      "id": "L2-r18-5",
+      "kind": "unresolved",
+      "severity": "Advisory",
+      "class": null,
+      "origin": "own",
+      "section": "the note on the maintainer block (the entry rule, limit 5, the fourth part); 10 10.2 (item h)",
+      "defect": "A narrowed entry after a not narrowed one fires nothing, and item h's answers always go in the first narrowed entry and are not re-run when the token is replaced, so they can describe a token that no longer exists.",
+      "scenario": "The fine-grained token expires and is replaced with other permissions; the next read is narrowed but item h is not re-run, and whether a check under a required name counts is believed from the old token's answer filed under an old heading.",
+      "change": "Limit 5 names re-narrowing; limit 4 adds 'and item h' to what is not due at a replaced token; both take the trigger of L2-r18-3. Sentence edits.",
+      "evidence": "docs/spec/10-testing-style.md:921-929 'run only while the newest entry of the note has the verdict narrowed ... save the API answers in the fourth part of the note's first entry whose verdict is narrowed'; docs/notes/maintainer-block-of-ci-bootstrap.md:144 'the rows the first narrowed entry fired stay fired'"
+    }
+  ],
+  "what_is_missing": [
+    "A read 2 that reads the forwarding in effect, not only the setting that names a socket.",
+    "A reopening trigger for limits 4 to 6 that comes after O8, and an actor who reviews them.",
+    "Row 348 tied to the entry, as the plan's opening is.",
+    "A true statement of what the 05 5.4 token row describes.",
+    "Item h tied to a token change, or its answers kept with the token they measured."
+  ],
+  "bullets_reconciled": {
+    "agent output is data on every path (A, I24, I29)": "unanswerable in this scope: the delta touches no boundary A text.",
+    "symlinks and .. in a memory directory (I24, S6)": "unanswerable in this scope: not in the delta.",
+    "the sandbox holding the operator's account (ADR 0008, 05 5.4)": "partly refuted: the narrowing record still lets the verdict read narrowed with the auth key forwarded (L2-r18-2) and lets status text read narrowed when the entry is not (L2-r18-1); the compensating control stays the security log, which by 05 5.4 records no merge or push; after v1.0.0 nothing re-reads the token (L2-r18-3).",
+    "side channels in the ledger (I33)": "unanswerable in this scope.",
+    "boundary B, secret names in spec, values on host": "partly confirmed: read 1 reads the token from the host's settings page and the sandbox only as a second read; O8 still does not say the github secret is sandbox-scoped, accepted as limit 4's event (parked for B).",
+    "romeu acting on the wrong sandbox (F, I26)": "unanswerable in this scope; the parallel risk here is the development sandbox being re-created with a global secret, covered by limit 4."
+  },
+  "postmortem": "After v1.0.0: (1) note read 2, ADR 0011 decision 2: O8 removed the socket setting but sbx inherited the host agent; 'the setting names no socket' passed, the entry said narrowed, the four rows were reviewed on a false premise, and SSH pushes to every repository stayed possible. (2) note limit 4 and its trigger, 05 5.4: the sandbox was re-created with a global secret holding the classic token; no read was due after O7 and the trigger had fired at O8, so nobody looked. (3) index row 348: O8's entry was not narrowed, but the row said the narrowing was applied at block O8, so merge-gate parts stayed deferred. (4) 10 10.2 item h: a replaced token was never tried for the required-name check. Unsaid: the write pass turned each 'add a read' finding into a limit with one shared trigger that fires on the day the limits begin, which in effect is acceptance with no trigger.",
+  "lens_critique": "The lens measures success as written decisions with triggers; for this product the widest risk is a record that reads safe while the state is not, so success should include that every verdict reads the effect (the credential and agent actually in the sandbox), not the configuration, and that status text never runs ahead of the evidence. Its bullets are about romeu's runtime boundaries, while most live exposure today is the development process itself.",
+  "missing_viewpoint": "An incident responder or adversary viewpoint: someone who assumes the agent is already hostile and asks, for each record, what an attacker holding the token can make it say, and how the maintainer would find out within a day. The set has controls (L0), maintainers (L3, L14) and release (L7), but no one who reasons from detection and response time.",
+  "out_of_scope": [
+    "Parked for B: plan O8 sets the github secret with no sandbox scope and says nothing on a global secret (accepted as limit 4's event).",
+    "Parked for B: plan O8 carries no step that reviews limits 4 to 6, though the note makes O8 their trigger.",
+    "Whether ADR 0005 rule 4 makes a trigger that fires at the limit's start a contradiction rather than an Advisory defect is left to the consolidator."
+  ],
+  "confidence": "High on L2-r18-1, L2-r18-3, L2-r18-4 (text against text). Medium on L2-r18-2: the defect in the text is certain, but that sbx forwards the caller's SSH_AUTH_SOCK by default is inferred from Q19 and 04 4.1, not measured. Medium on L2-r18-5.",
+  "pages_read": [
+    "git diff 7155491..0a32191 on docs/notes/maintainer-block-of-ci-bootstrap.md, docs/spec/10-testing-style.md, docs/spec.md, docs/plan.md",
+    "docs/notes/maintainer-block-of-ci-bootstrap.md, The token narrowing (whole)",
+    "docs/spec/10-testing-style.md 10 10.2 items e to h",
+    "docs/spec.md rows 238 (Q19), 279, 283, 348, 351, 353",
+    "docs/spec/05-security.md line 392 (the token row)",
+    "docs/spec/06-kits.md 6.4 signing rule; docs/spec/04-cli.md line 18",
+    "docs/plan.md Operator blocks opening and O8",
+    "docs/adr/0011 decision 2 and Consequences; docs/adr/0008 context; docs/adr/0005 decision and consequences",
+    "docs/reviews/round-17.md rows R17-13 to R17-20 and the Write pass section; docs/reviews/round-17/reports/L2.json",
+    "docs/reviews/lenses.md, L2 section and lens titles"
+  ]
+}
