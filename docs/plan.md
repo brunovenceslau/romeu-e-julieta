@@ -216,9 +216,9 @@ whose exit status the maintainer reads, wherever one exists. Block A of
 | O3 | T019, T020 | block A on both hosts, Intel and Apple silicon (11 11.1): `go run ./e2e/probes --block A --out docs/probes/`, which lists and plants nothing (Q29), apart from one global setting: A2 sets `env.rememberHostCommands` (11 11.1) and records the prior value in its result; then commit the results and the recordings on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | `sbx` at or above 0.46.0 on both hosts; the pins of the pin file | T026 directly, and every task that reads a block A fact | about 75 minutes per host (11 11.1), plus the wait for a sitting with both machines. Meanwhile the tasks listed below the table can proceed | `go run ./tools/ci probes --require-pass A1,A2,A3,A4,A5,A6,A9,A10,A11,A12,A13,A14` exits 0 on the branch with both hosts' results | run both hosts in one sitting: the arch-sensitive probes (A4, A5, A11, A12, A13) count only with both (11, opening). Read the diff of everything staged before the push: it is data from your host, and the recorder's scrubbing (T018) is a filter, not a reviewer. The second host's files reach the branch by a push from that host's own clone, through its hook, and the harness refuses an `--out` inside a clone whose hook is not enabled. A results-only branch runs `main`'s own `tools/ci` through the hook; if a resolution commit joins it (T026), read that diff in the clone before checking the branch out, as item c of block O1 requires (10 10.2) |
 | O4 | T055 | the catalog handover: build julieta for linux from `main`, run `julieta spec validate --catalog projects/*.yaml` on the reference config repo inside a Linux container, and hand over its output after reading and redacting it: it may name hosts, tool keys or project names that are not for the public repository | a Linux container with read-only access to the config repo's origins and no host credential mounted; julieta has no darwin build (12 12.1) | T091 directly, and through it block O5 | minutes; it can happen any time after its one task, so it is off the critical path if done by checkpoint C5. Meanwhile every later task up to block O5 but T091 can proceed | `julieta spec validate --catalog projects/*.yaml` exits 0 or 1, and its output is the handover; an exit of 2 means a spec does not validate, and the block is not done; `go run ./tools/ci hygiene --file <output>` exits 0 on the output before it is handed over | do it at C5, not at the end: it is the only input the catalog task waits for |
 | O5 | every earlier task, T001 to T091 and T103 | the candidate: run `julieta spec validate --catalog` again, in the container of O4, and see it exit 0; the rehearsal on one host (below); then step 1 of the release checklist of 12 12.2, the tag `v1.0.0-rc.1` (11 11.2) | the same container as O4; one host with `sbx` | O6 directly, and through it T092 to T095 and T102 | the rehearsal is about one block B run on one host, 90 minutes plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go test -tags host -json ./e2e/host/...` exits 0, then `go run ./tools/ci probes --require-pass B2,B3,B4,B5,C2,C3,C4,C5,C6 --hosts 1 --dir <the rehearsal directory>` exits 0 | the rehearsal is this plan's addition, not the specification's. After the tag, a change outside `docs/` and the root Markdown files needs a new candidate and block B again (11 11.2) |
-| O6 | O5 | step 2 of the release checklist of 12 12.2, block B on both hosts (11 11.2): B1 to B5 and the sandbox-side checks C2 to C6; then commit the results on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | the candidate's published release; both hosts | T092 directly, and through it T093 to T095 and T102 | about 90 minutes per host for B1 to B5, plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go run ./tools/ci probes --require-pass B1,B2,B3,B4,B5,C2,C3,C4,C5,C6` exits 0 on the branch with both hosts' results | run B1 first on each host: each other result copies the candidate's tag and commit from it (11 11.2). The reading rules of block O3 apply: the staged diff before the push, each host pushing from its own clone through its hook, and a resolution commit's diff before checkout |
+| O6 | O5 | step 2 of the release checklist of 12 12.2, block B on both hosts (11 11.2): B1 to B6 and the sandbox-side checks C2 to C6; then commit the results on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | the candidate's published release; both hosts | T092 directly, and through it T093 to T095 and T102 | about 90 minutes per host for B1 to B6, plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go run ./tools/ci probes --require-pass B1,B2,B3,B4,B5,B6,C2,C3,C4,C5,C6` exits 0 on the branch with both hosts' results | run B1 first on each host: each other result copies the candidate's tag and commit from it (11 11.2). The reading rules of block O3 apply: the staged diff before the push, each host pushing from its own clone through its hook, and a resolution commit's diff before checkout |
 | O7 | T094, T095, T101, T093 | steps 3 to 5 of the release checklist of 12 12.2: `go run ./tools/ci acceptance --pre-tag` exits 0; push the tag `v1.0.0`; run B1 and B2 once more on v1.0.0, on one host, with `--out` outside the repository: `go run ./e2e/probes --block B --only B1 --out <dir>`, then the same with `--only B2` (11 11.2). Then pin `validate.yml` in the reference config repo to that release, run it and note its run id (S4) | the documentation tasks merged, each of them; the config repo | T102 directly; no other task | one B1 and one B2 run and one workflow run. No task can proceed meanwhile | `go run ./tools/ci probes --require-pass B1,B2 --hosts 1 --dir <dir>` exits 0 on that run | the pre-tag check is a command here, and `tools/ci acceptance` runs it again at the end (10 10.5); a check that fails after the tag is fixed by a patch release (12 12.2). The release exists only after the tag, so the pin comes after it. Paste under the Evidence of T102 the result files of those runs, which the harness wrote through its redaction, and no raw output |
-| O8 | T002 | once [ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md) is Accepted, after the App checks its Consequences lists: the token narrowing and the required-name try, items g and h of the maintainer block (10 10.2): install the GitHub App of decision 2 of that record on selected repositories, this one among them, set the global dynamic secret with `sbx secret set github --command <absolute host helper path> --refresh 55m`, stop forwarding the GitHub authentication key, then write the dated entry of the note on the maintainer block and run the required-name try | the host, the host helper that mints the App's installation token, two throwaway pull requests (read 3 of the entry and item h) | the Deferred decisions rows whose trigger is "the token is narrowed" | none: no task waits on it, and every task proceeds around it; it is due before checkpoint C7 | the first entry whose verdict is narrowed, read against the expected answers the note lists, and that entry's fourth part, the answers of the required-name try **[review]** | run it at the first sitting after T002 merges and ADR 0011 is Accepted. To stop the forwarding, forward a socket that holds only the signing key, as [06 6.4](spec/06-kits.md#64-product-kits) requires of romeu's sandboxes, rather than the host's own agent; read 2 of the entry shows whether it holds |
+| O8 | T002 | once [ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md) is Accepted, after the App checks its Consequences lists: the token narrowing and the required-name try, items g and h of the maintainer block (10 10.2): install the GitHub App of decision 2 of that record on selected repositories, this one among them, set the global dynamic secret with `sbx secret set github --command <absolute host helper path> --refresh 55m`, with the helper and the App's private key outside every path mounted into any sandbox and not writable from any sandbox, stop forwarding the GitHub authentication key, then write the dated entry of the note on the maintainer block and run the required-name try | the host, the host helper that mints the App's installation token, two throwaway pull requests (read 3 of the entry and item h) | the Deferred decisions rows whose trigger is "the token is narrowed" | none: no task waits on it, and every task proceeds around it; it is due before checkpoint C7 | the first entry whose verdict is narrowed, read against the expected answers the note lists, and that entry's fourth part, the answers of the required-name try; no command reads them, so it is **[review]** | run it at the first sitting after T002 merges and ADR 0011 is Accepted. To stop the forwarding, forward a socket that holds only the signing key, as [06 6.4](spec/06-kits.md#64-product-kits) requires of romeu's sandboxes, rather than the host's own agent; read 2 of the entry shows whether it holds |
 
 **What does not wait for block O3.** These tasks have no block A fact in
 their dependencies, come after the tasks block O3 itself needs, and may
@@ -549,6 +549,10 @@ task list:
   - A prose-rule violation (ADR 0001 rule 4) in the title, in the body
     or in a commit message fails, one fixture per place.
   - A base other than the default branch fails.
+  - A walk from `base.sha` to `head.sha` that finds no commit fails
+    (10 10.2).
+  - A local run with `--title` and `--body` makes no network read
+    (10 10.2).
   - A malformed `Fixes-release:` trailer fails.
   - The forbidden-name check runs over the title, the body, the head ref
     name and the four readings of each commit.
@@ -1661,6 +1665,11 @@ These tasks need no `sbx` fact and run while block O3 is under way (12
     run at checkpoint C4. No product kit exists at C4 (their sources land
     in phase 7), and a project spec lists its product kits by name (03
     3.2), so smoke step 1 uses a spec that names no product kit.
+  - The fuzz-run fixtures of step 1 of the release steps of 10 10.2
+    are tests of `tools/release`, by their titles there, and one more,
+    "workflow_dispatch fuzz run refuses": a successful `fuzz.yml` run
+    whose event is `workflow_dispatch` does not count, and the build
+    refuses when no `schedule` run qualifies.
 - Verify: `go test ./tools/release/...`; `go run ./tools/release build
   --version v1.0.0 --dry-run`.
 
@@ -1850,6 +1859,10 @@ early.
     with an oversized store.
   - `list` prints one line per handoff file with its kind, and `--json`
     one document.
+  - The three goldens of the SessionStart gap line that 08 8.2 names
+    (Resume): `/handoff` then `/clear` prints no line, a facts-only end
+    with new commits prints it, and `/handoff`, a commit, then `/clear`
+    prints it.
 - Verify: `go test -tags e2e ./e2e/...`.
 
 #### T060 - `julieta snapshot`
@@ -2000,6 +2013,10 @@ early.
   - Each `E:` case of I17 is one test with a title of its own, so the
     cases are cited by title and not by their place in the one cell
     of 05 5.2 that lists them (round 14, R14-10; round 15, R15-15).
+    05 5.2 gives the cases no titles, so each test's title is the
+    opening words of its case, and the tests this task adds beyond the
+    cases carry the titles quoted below, the `--accept-loss` branch of
+    `RJ-338` as "accept-loss names the skipped reasons".
   - `--accept-loss` removes the sandbox after an incomplete salvage;
     `rm` warns when the generation has no `final` handoff.
   - The fingerprint cases of I17 (round 17, R17-01, R17-02, R17-08,
@@ -2010,8 +2027,9 @@ early.
       repeat of 08 8.5 step 2, so the worktree is skipped as
       `worktree-changing`: the rerun exits 5 with `RJ-306` and the state
       is `open` (R17-01);
-    - one more test runs the branch of `RJ-338` where `--accept-loss`
-      names the rerun's skipped reasons: the fingerprint already
+    - one more test, "accept-loss names the skipped reasons", runs the
+      branch of `RJ-338` where `--accept-loss` names the rerun's
+      skipped reasons: the fingerprint already
       differs when the rerun starts, a writer keeps a tracked file
       changing through the repeat, and the rerun, run with
       `--accept-loss=worktree-changing`, exits 5 with `RJ-338`, the
@@ -2452,6 +2470,10 @@ early.
   - `gh` is in `mise.lock`, with a sha256 for each of the four
     platforms, from PR #27 (round 8, DR7), merged, and the lint
     row of 10 10.2 admits it.
+  - The `tools/ci` test of 10 10.2 holds the `gh` pinned in `mise.toml`
+    at or above the floor of 12 12.1, initially 2.68.0, read from that
+    page, with its three cases: a pin below the floor fails, a pin at
+    the floor passes, and a page with no floor it can parse fails.
   - `tools/ci pins` reports the pin freshness of each tool pin in the
     list of [12 12.1](spec/12-engineering.md#121-tech-stack), by the
     rules of that section: its sources and endpoints, every page read,
@@ -2554,10 +2576,10 @@ early.
     change outside those paths (a kit, a catalog entry) is fixed there,
     and blocks O5 and O6 run again on a new candidate (11 11.2).
   - Pass, for block O6: `go run ./tools/ci probes --require-pass
-    B1,B2,B3,B4,B5,C2,C3,C4,C5,C6` exits 0 on the branch with both
+    B1,B2,B3,B4,B5,B6,C2,C3,C4,C5,C6` exits 0 on the branch with both
     hosts' results; a `fail` or `inconclusive` verdict does not merge.
 - Verify: `go run ./tools/ci fast`; `go run ./tools/ci probes
-  --require-pass B1,B2,B3,B4,B5,C2,C3,C4,C5,C6`.
+  --require-pass B1,B2,B3,B4,B5,B6,C2,C3,C4,C5,C6`.
 
 #### T093 - The records of the questions block B settles
 

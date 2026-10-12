@@ -30,7 +30,7 @@ a new version of their `schema` field, announced first in the release
 notes, which carry the edit to make. The window for these formats is
 the current and the previous version; a reader refuses an older one
 with the error `format-unsupported` (`RJ-337`,
-[04 4.4](04-cli.md#44-error-ids)) and the fix hint "apply the edit in
+[04 4.4](04-cli.md#44-error-ids)) and the fix hint "decide: apply the edit in
 the release notes of each skipped release". The manifest keeps its own N-1
 window, with its reason, in 3.6.
 

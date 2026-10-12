@@ -330,8 +330,8 @@ present (exit 2, fix hint `romeu salvage`) and does not close a
 generation; closing stays with the row that finds the sandbox absent.
 
 Destructive commands write in this order: the state `salvaging` with
-the new salvage id, the refs per repo (create-only, so a rerun verifies
-them), the salvage record, the state `removing` with the salvage
+the new salvage id, the refs per repo (create-only, under the salvage
+id's prefix), the salvage record, the state `removing` with the salvage
 entry's `fingerprint`, `sbx env rm`, `closed-removed`. Recovery:
 `removing` with the sandbox absent becomes `closed-removed`, and with
 it present the next `rm`, `recreate` or `retire` resumes at

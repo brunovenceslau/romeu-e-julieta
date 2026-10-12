@@ -19,11 +19,12 @@ round-9 to round-17 write passes, branch `docs/review-round-9`), read
 from a detached clone that nothing wrote to while the reviewers ran.
 The delta read is 7155491..0a32191.
 
-This page records the round before its write pass: every row below is
-a proposal, with the status **open** until a write pass applies it. The
-round raised blocking Required rows, so the session that ran it stopped
-after recording it, as its brief asked, and added no session
-checkpoint. Three rows would change text that a decision fixed, so they
+The round was recorded before its write pass, with each resolution a
+proposal; each row's status is the one the final write pass applied,
+in "Final write pass (2026-10-12)" below. The round raised blocking
+Required rows, so the session that ran it stopped after recording it,
+as its brief asked; the session checkpoint at the end of this page was
+added later. Three rows would change text that a decision fixed, so they
 are in "Decisions for the operator" below.
 
 The reports are kept in `round-18/reports/<lens>.json`, as the
@@ -88,7 +89,7 @@ rule, round 17 had one blocking row (R17-03) and round 18 has seven.
 
 | Item | Question | Options | Recommendation |
 |---|---|---|---|
-| R18-03 | The details of `RJ-338` name "the first path, in byte order, whose entry changed" (round 15, R16-12), but the state keeps only the sha256 of the entries, so the rerun has nothing to compare a fresh entry with; and no page says which call reads the fresh values or carries the stored ones to romeu | (a) store, next to `fingerprint`, the sorted digest of each entry, and name the julieta output that carries the values (08 8.5 steps 2 and 4, 04 4.3, 03 3.11); (b) keep one digest and make the details name the kind of entry that changed (daemon heads, a worktree, ignored paths), amending the decided wording; both also correct 03 3.8's "step 2" to "steps 2 and 4" | (b): it adds no store and no field, keeps the fingerprint one value as decided, and the hint already tells the operator what to do without the path; (a) is the one to take if a report shows the kind is not enough |
+| R18-03 | The details of `RJ-338` name "the first path, in byte order, whose entry changed" (round 16, R16-12), but the state keeps only the sha256 of the entries, so the rerun has nothing to compare a fresh entry with; and no page says which call reads the fresh values or carries the stored ones to romeu | (a) store, next to `fingerprint`, the sorted digest of each entry, and name the julieta output that carries the values (08 8.5 steps 2 and 4, 04 4.3, 03 3.11); (b) keep one digest and make the details name the kind of entry that changed (daemon heads, a worktree, ignored paths), amending the decided wording; both also correct 03 3.8's "step 2" to "steps 2 and 4" | (b): it adds no store and no field, keeps the fingerprint one value as decided, and the hint already tells the operator what to do without the path; (a) is the one to take if a report shows the kind is not enough |
 | R18-06 | 04 4.1 says a fix hint begins with a command line or with `decide:`, and a test parses each; the fixed hint of `RJ-338`, decided on 2026-10-12 and amended for R17-06, begins with prose, and T008 now asserts it byte for byte. The hint also does not say that the `salvage.excludeIgnored` route ends with `romeu sync` exiting 2 with `removal-pending` (R18-A6) | (a) amend the fixed text to open with the command, as in "romeu rm <name>, once nothing writes in the sandbox any more; ..."; (b) 04 4.1 states that a hint may be one fixed text that a row of 04 4.4 quotes, and names `RJ-338` as such a hint | (b): the hint was chosen word for word twice, and a one-clause exception in the rule keeps both texts true; the `sync` sentence then waits for the first report that the exit 2 confused an operator |
 | R18-07 | The paragraph decided as R17-11 option (a) states that writes made after a salvage's read and before its `sbx env rm` are not salvaged on a removal from `open`, or on a salvage restarted from `salvaging`, which includes a killed salvage that a changed fingerprint started; the index says a part of a security invariant is deferred only as a risk accepted by name in 05 5.4, and the 05 5.4 row says salvage proves that nothing the sandbox still holds is lost | (a) R17-11's option (b): a 05 5.4 row for that window, the kill route named, reopened by the first report of such a loss, and the existing row narrowed to what the sandbox held at the salvage read; (b) keep the paragraph and record the window as a stated limit, which leaves the principle of the index unmet | (a): it is the form the index asks for, and it adds no mechanism; it changes the list of accepted risks, which is why it is asked |
 
@@ -492,11 +493,74 @@ last exchange the final pass of stage A allows. Statuses as above.
   the administrator role once decision 2 is applied, and that until
   then the classic token holds it.
 
+Outcome of stage A: finished on 2026-10-12 with exchange 3, the last
+one the closing decision allows, and not by a re-check that raised
+nothing; no reviewer read 949df51. Validated for T004 onward: yes, by
+that decision. 0 Blocking; the 7 blocking Required rows of round 18
+applied (R18-01 to R18-07), 0 declined; 6 blocking findings of the
+exchanges applied (4 in exchange 1, 2 in exchange 3), 0 declined; the
+`test-detail` rows of rounds 17 and 18 are acceptance items of T008,
+T068 and T069; coverage and the three measurements carried from round
+8; the index rows carried from round 17, with the rows the exchanges
+edited or restored.
+
+### Ship gate round 1
+
+The ship gate read the branch at 556e3f0, after main was merged in,
+and returned NO-GO with 19 findings: code-reviewer on opus,
+security-auditor on opus, test-engineer on sonnet. One write pass
+applies all 19. MF marks a must-fix finding.
+
+- F1 (MF, A): the hint of `RJ-337` opens with `decide: ` in 03 and in
+  the 4.4 row, as the hint rule of 04 4.1 asks; no golden held the old
+  text.
+- F2 (MF, A): the write order of 01 1.6 reads "(create-only, under the
+  salvage id's prefix)", since R18-A1 removed the rerun's verification.
+- F3 (MF, A): the session checkpoint below: Done gains exchanges 2 and
+  3, the merge of main and this gate; Next steps 1 to 4 are marked
+  done; dc76fec reads c2ff9b3; its opening no longer says the sections
+  above are left as written.
+- F4 (MF, A): the outcome line of stage A above, with its numbers.
+- F5 (MF, A): decision 2 of ADR 0011 and block O8 keep the host helper
+  and the App's private key outside every path mounted into any
+  sandbox, and not writable from any sandbox; the App checks gain a
+  read from inside a sandbox that finds neither readable.
+- F6 (A): decision 2 names the four rows whose trigger is "the token is
+  narrowed", two of them among them.
+- F7 (A): the trigger of the token narrowing row, and the 05 5.4 row
+  that cites it, exclude the App's bot.
+- F8 (L): decision 1 states that no standing read looks for a merge
+  over a red required check.
+- F9 (A, T (T059)): the three goldens of the gap line of 08 8.2.
+- F10 (A, T (T103)): the fuzz-run fixtures of 10 10.2 and a
+  `workflow_dispatch` case.
+- F11 (A, T (T088)): the `gh` floor test of 10 10.2, with its three
+  cases.
+- F12 (A, T (T005)): an empty walk fails, and a local run with
+  `--title` and `--body` reads no network.
+- F13 (A, T (T068)): the `--accept-loss` branch of `RJ-338` is plan
+  detail of T068, titled "accept-loss names the skipped reasons".
+- F14 (A): T068 says how the I17 tests are titled; the hook row of
+  12 12.1 says its tests hold the hook's line, and that no test
+  compares the prose list with `hookAllow`; block O8 says no command
+  reads its answers.
+- F15 (A): ADR 0011 counts three final handoffs when D2 was recorded
+  and four at review.
+- F16 (A): one note in the checkpoint below, in place of edits to
+  rounds 9, 11 and 12.
+- F17 (A): the same note covers the old title of ADR 0011 in rounds 9
+  and 10, whose links point at the renamed file.
+- F18 (A): block O6 and T092 run B1 to B6, as 11 11.2 does.
+- F19 (A): the openings of rounds 17 and 18 say where the statuses
+  are, and round 18's says a checkpoint was added later; R18-03 cites
+  round 16, R16-12; the token narrowing row reads "decided on
+  2026-10-09; its route was decided on 2026-10-12".
+
 ## Session checkpoint (2026-10-12)
 
-Rounds 14 to 18 and the final write pass of stage A were run on this
-branch, and the sandbox's GitHub route was read for ADR 0011. The
-sections above are left as written.
+Rounds 14 to 18, the final write pass of stage A with its three
+exchanges, and the first round of the ship gate were run on this
+branch, and the sandbox's GitHub route was read for ADR 0011.
 
 ### Decided
 
@@ -560,6 +624,17 @@ sections above are left as written.
   findings and 5 advisory. Exchange 1, 04d48a7 (`all`, `hygiene` and
   `generated` 0), applied all 4 blocking findings and A1 to A4; A5 is a
   stated limit.
+- Exchange 2, 8730ce9, and exchange 3, 949df51 (`all`, `hygiene`,
+  `generated` and the forbidden-names script 0 for each). Stage A is
+  finished.
+- main merged in as 556e3f0, with `tools/ci all` exiting 0.
+- Ship gate round 1 at 556e3f0: NO-GO, 19 findings, applied by the
+  write pass recorded in "Ship gate round 1" above.
+- A note on older records: dc76fec, cited in rounds 9, 11 and 12, was
+  rewritten as c2ff9b3 by the rebase onto main; rounds 9 and 10 name
+  ADR 0011 by its title at the time, "Bind the administrator to the
+  required checks and narrow the sandbox's GitHub token", and their
+  links point at the renamed file.
 - Before every push of this branch, both names gates (`tools/ci
   hygiene` and the forbidden-names script of the sandbox kit
   repository) exited 0.
@@ -580,16 +655,17 @@ One block, a recommendation per item.
 
 ### Next steps
 
-1. Exchange 2: ADR 0011 to Proposed, as decided above. The
+1. Done (8730ce9). Exchange 2: ADR 0011 to Proposed, as decided above. The
    token-narrowing note, 10 10.2 items g and h, the 05 5.4 token rows,
    the index rows and plan block O8 follow it. No spec text rests on a
    Proposed record for the current state.
-2. The fresh reviewer re-checks d349b2c..head. At most one more
+2. Done (949df51). The fresh reviewer re-checks d349b2c..head. At most one more
    exchange (the third). Then stage A is finished.
-3. Merge main into the branch with a signed merge commit, then run
-   `tools/ci all`.
-4. The ship gate on the commits after dc76fec: code-reviewer opus,
-   security-auditor opus, test-engineer sonnet.
+3. Done (556e3f0). Merge main into the branch with a signed merge
+   commit, then run `tools/ci all`.
+4. Round 1 done, NO-GO, applied above. The ship gate on the commits
+   after c2ff9b3: code-reviewer opus, security-auditor opus,
+   test-engineer sonnet.
 5. The PR body:
    - the sections Why, What changed, Evidence, Middleware and Lessons;
    - the plain 12.4 approval lines for `spec` and `decisions`;
@@ -613,6 +689,8 @@ One block, a recommendation per item.
    - a ruleset update is refused;
    - the operator's bypass merge works;
    - the push starts the workflow;
+   - from inside a sandbox, neither the host helper nor the App's
+     private key is readable;
    - which `gh` commands fail with an installation token.
 9. After #36 lands, the docs pass:
    - exit codes 130/143 and their precedence;

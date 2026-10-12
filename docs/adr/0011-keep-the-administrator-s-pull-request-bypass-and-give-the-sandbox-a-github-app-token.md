@@ -22,8 +22,8 @@ review rounds 9 and 10, each with its item in a decision block:
 - whether the development sandbox's GitHub token is narrowed, the
   review that deferred item 1 of
   [ADR 0008, let the sandbox act as the maintainer on GitHub](0008-let-the-sandbox-act-as-the-maintainer-on-github.md)
-  asks for at its triggers, which fired with three final handoffs
-  counted on 2026-10-09
+  asks for at its triggers, which fired with final handoffs counted
+  on 2026-10-09, three when D2 was recorded and four at review
   ([round 9](../reviews/round-9.md#decisions-for-the-operator), D2;
   [round 10](../reviews/round-10.md#decisions-for-the-operator), D4);
 - how the spec states the refusal of a direct push to the default
@@ -125,8 +125,9 @@ list.
    maintainer's and not an agent's, which the App checks measure; until
    then the classic token holds that role. Reopened by the first
    measurement in which a merge with the sandbox's token lands over a
-   red required check. The `release-tags`
-   ruleset keeps the administrator role as its bypass actor too.
+   red required check. No standing read looks for such a merge, so the
+   trigger is seen only when a measurement or a sitting finds one. The
+   `release-tags` ruleset keeps the administrator role as its bypass actor too.
 2. **The development sandbox's classic token is replaced with a GitHub
    App installation token.** The review that deferred item 1 of ADR
    0008 asks for is done. The token is minted on the host by a helper
@@ -136,13 +137,15 @@ list.
    Administration. It is delivered as an sbx dynamic secret,
    `sbx secret set github --command <absolute host helper path>
    --refresh 55m`, which refreshes it before its hour runs out. The
+   helper and the App's private key live outside every path mounted
+   into any sandbox, and are not writable from any sandbox. The
    secret is global, so every sandbox holds the same token; isolation
    per repository is deferred, and it is reopened by a repository that
    a sandbox must not reach. The forwarding of the GitHub
-   authentication SSH key to the sandbox stops too. The Deferred rows
-   whose trigger is "the token is narrowed" fire when it is applied:
-   the check that reads the rulesets again and the signed approval
-   record. After it, probe A16 and the four tries of item d of the
+   authentication SSH key to the sandbox stops too. The four Deferred
+   rows whose trigger is "the token is narrowed" fire when it is
+   applied, among them the check that reads the rulesets again and the
+   signed approval record. After it, probe A16 and the four tries of item d of the
    maintainer block run again
    ([10 10.2](../spec/10-testing-style.md#release-and-bootstrap)).
 3. **The direct-push refusal is read from the rules, not tried.** The
@@ -165,8 +168,9 @@ list.
   comment made by `gh` with the token show the App's bot as the author;
   the agent's merge with a red required check is refused; a ruleset
   update is refused; the maintainer's bypass merge works; the push
-  starts the workflow; and which `gh` commands fail with an
-  installation token.
+  starts the workflow; from inside a sandbox, neither the host helper
+  nor the App's private key is readable; and which `gh` commands fail
+  with an installation token.
 - The pull request that accepts this record adds a
   `Superseded in part by` line to ADR 0008 and to ADR 0010, which stay
   Accepted with their text unedited, and this record's

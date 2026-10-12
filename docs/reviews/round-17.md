@@ -17,9 +17,9 @@ from a detached clone that nothing wrote to while the reviewers ran.
 The delta read is 3c32d62..54f674c, over the index, the pages under
 `spec/`, `plan.md` and the note on the maintainer block.
 
-This page records the round before its write pass: every row below is
-a proposal, with the status **open** until a write pass applies it and
-records A, M or L as in rounds 6 to 16. The round raised Required rows,
+The round was recorded before its write pass, with each resolution a
+proposal; each row's status is the one the pass applied, A, M or L as
+in rounds 6 to 16, in "Write pass (2026-10-12)" below. The round raised Required rows,
 so the session that ran it stopped after recording it, as its brief
 asked; the write pass is the next session's. Two rows would change text
 that a decision fixed, or the list of accepted risks, so they are in
