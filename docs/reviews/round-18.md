@@ -526,7 +526,7 @@ applies all 19. MF marks a must-fix finding.
   sandbox, and not writable from any sandbox; the App checks gain a
   read from inside a sandbox that finds neither readable.
 - F6 (A): decision 2 names the four rows whose trigger is "the token is
-  narrowed", two of them among them.
+  narrowed", the two it names among them.
 - F7 (A): the trigger of the token narrowing row, and the 05 5.4 row
   that cites it, exclude the App's bot.
 - F8 (L): decision 1 states that no standing read looks for a merge
@@ -540,10 +540,9 @@ applies all 19. MF marks a must-fix finding.
   `--title` and `--body` reads no network.
 - F13 (A, T (T068)): the `--accept-loss` branch of `RJ-338` is plan
   detail of T068, titled "accept-loss names the skipped reasons".
-- F14 (A): T068 says how the I17 tests are titled; the hook row of
-  12 12.1 says its tests hold the hook's line, and that no test
-  compares the prose list with `hookAllow`; block O8 says no command
-  reads its answers.
+- F14 (A): T068 says how the I17 tests are titled; block O8 says no
+  command reads its answers. The hook clause is item 9 of the Next
+  steps below (round 2, G1).
 - F15 (A): ADR 0011 counts three final handoffs when D2 was recorded
   and four at review.
 - F16 (A): one note in the checkpoint below, in place of edits to
@@ -555,6 +554,20 @@ applies all 19. MF marks a must-fix finding.
   are, and round 18's says a checkpoint was added later; R18-03 cites
   round 16, R16-12; the token narrowing row reads "decided on
   2026-10-09; its route was decided on 2026-10-12".
+
+### Ship gate round 2
+
+The ship gate read f31b3f9 with the same personas and models and
+returned NO-GO with three findings, applied in one write pass.
+
+- G1 (MF, A): the F14 edit changed the `.githooks/pre-push` row of
+  12 12.1, which this pull request does not edit (see above). The row
+  is byte-identical to origin/main again, and the clause is item 9 of
+  the Next steps below.
+- G2 (A): the Pass cell of block O8 names the read from inside a
+  sandbox that finds neither the host helper nor the App's private key
+  readable. ADR 0011 is not edited.
+- G3 (A): the F6 line above reads "the two it names among them".
 
 ## Session checkpoint (2026-10-12)
 
@@ -699,7 +712,11 @@ One block, a recommendation per item.
    - the conditional sentence of 12.1;
    - the two stale hook descriptions at `docs/plan.md:93-94` and
      `docs/spec/10-testing-style.md:543-545`, which PR #41 made stale.
-     Leave `docs/plan.md:392` alone.
+     Leave `docs/plan.md:392` alone;
+   - the hook row of 12 12.1: tests hold the hook's line to `hookAllow`
+     and the fixed settings, its hints included, and no test compares
+     the list in parentheses with `hookAllow` (ship gate round 1,
+     F14).
 
    Then ask before T004.
 
