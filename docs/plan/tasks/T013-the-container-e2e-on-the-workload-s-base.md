@@ -47,7 +47,9 @@ so no two tasks append to one test file.
   - `tools/ci all` gains the `e2e` step and the "build the tagged
     suites" step of 10 10.2 here, each registered by file (rule 4 of
     `docs/plan.md`), and the step-list golden of T105 changes in the
-    same pull request; from here on every `-tags e2e` Verify line of a
+    same pull request; until T103 lands `tools/release build
+    --dry-run`, the `e2e` step runs only the julieta cases, which need
+    no romeu build; from here on every `-tags e2e` Verify line of a
     later task runs in CI.
   - `tools/ci all` selects the step from the OS and architecture it runs
     on (10 10.2).

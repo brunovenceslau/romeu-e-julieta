@@ -16,8 +16,8 @@ sitting: M5
 
 Goal: The read that ends M5: one month of daily use after the last slot
 of sitting M3 with no hand-applied step and no open runbook section;
-every open item the maintainer tracks outside julieta becomes a
-`julieta memory` entry of its project or closes, in one recorded list.
+every open item of a project is a `julieta memory` entry or closed, in
+one recorded list.
 
 No file of this repository: the work lands in the maintainer's config
 repository, and this file is its record and its checkbox.

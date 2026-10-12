@@ -27,13 +27,13 @@ own rules, since they enter every sandbox (rule 9 of `docs/plan.md`).
 - Implements: 06 6.5.
 - Operator: builds a daily sandbox with it.
 - Acceptance:
-  - A daily sandbox built with it and `julieta-claude` has every
-    behaviour the maintainer's sandboxes have today: the instructions,
-    the settings, the plugins at their pins, the status line and the
-    context tools.
+  - A daily sandbox built with it and `julieta-claude` delivers the
+    instructions file, the merged settings, the plugins at their pins,
+    the status line and themes, and the context-usage tools.
   - The settings merge keeps the hooks and the plugins of
     `julieta-claude` (06 6.5).
 - Verify: one daily sandbox, read at sitting M2: its SessionStart
   output shows the instructions and the status line, `julieta status
   --json` reports no `agent-hooks-missing`, and the plugin list shows
-  the pinned versions.
+  the pinned versions; a test push on a throwaway branch from that
+  sandbox; the hook output names both hooks.

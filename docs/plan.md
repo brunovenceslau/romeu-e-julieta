@@ -350,7 +350,7 @@ written here (a deferred row covers a command for them).
 | M2 | Kits in daily use | sitting M2: the kit-frontend go/no-go by hand on one host (about 40 minutes); then recreate wave 1, one project per slot, each sandbox built from the `julieta`, `julieta-claude` and `git-ssh-sign` product kits plus one personal kit from the config repository | every daily sandbox built from the product kits plus one personal kit; mise per repository through `julieta install` and `lock`; commits signed with the one key of `git-ssh-sign` |
 | M3 | romeu renders and runs | sitting M3: J1 for real on the config project from a `--dry-run` build of `main` (`init`, `doctor`, `approve --toolchain`, `sync`, `run`), then one project per slot until every project definition is rendered by `romeu sync` | every project definition rendered under gate 2, its egress derived and its secrets bound in host settings, the kit pins in one file, and `romeu run` as the one way into a sandbox |
 | M4 | Nothing lost | sitting M4: one `romeu recreate` rehearsal with a planted dirty worktree, stash and ignored file; J6 and J10 pass in CI with the fake sbx; on the host, the rehearsal's `romeu recreate` transcript and salvage listing, read by the maintainer, are the Evidence | recreate, rm and retire with a complete salvage; `romeu pull` and `romeu handoff` |
-| M5 | Every project on romeu | sitting M5: one month of daily use after the last slot of sitting M3 with no hand-applied step and no open runbook section; every open item the maintainer tracks is a `julieta memory` entry of its project or closed (T119) | the product as the one path, with memory as the one place for open items |
+| M5 | Every project on romeu | sitting M5: one month of daily use after the last slot of sitting M3 with no hand-applied step and no open runbook section; every open item of a project is a `julieta memory` entry or closed (T119) | the product as the one path, with memory as the one place for open items |
 | M6 | Public v1 | the release checklist of 12 12.2 completes: blocks A and B on both hosts, `v1.0.0`, `docs/acceptance.json` | the v1.0.0 release with its evidence |
 
 **The sittings.** A sitting is named by its milestone (sitting M1 ends
@@ -488,7 +488,8 @@ step (12 12.9). A pull request that touches an ask-first surface needs
 the maintainer's approval, recorded in an approval line that names what
 was approved (12 12.4). The `ask_first` field of each task is there so
 those approvals can be given per milestone, at the sitting that opens
-it, instead of one pull request at a time.
+it, for the grantable surfaces of 12 12.4; every other surface keeps its
+per-PR line.
 
 ## Toolchain pins
 
@@ -868,7 +869,7 @@ why it is proposed and what reopens it.
 
 | Risk | Window | Why accepted | Reopened by |
 |---|---|---|---|
-| uncommitted work lost to a recreate before salvage exists | the wave of sitting M2 and the slots of sitting M3, until M4 | it is the window the maintainer lives in today, narrowed by `julieta snapshot` from M1 and by `/handoff --final` plus push per slot | the first uncommitted change lost to a recreate: T068 then moves ahead of any remaining M3 task |
+| uncommitted work lost to a recreate before salvage exists | the wave of sitting M2 and the slots of sitting M3, until M4 | the window has no salvage, narrowed by `julieta snapshot` from M1 and by `/handoff --final` plus push per slot | the first uncommitted change lost to a recreate: T068 then moves ahead of any remaining M3 task |
 | the bridge's hand-written manifest and mounts are the "remember" pattern | M1 to sitting M3 | one committed runbook per project in the config repository with the undo of each step; `julieta status` prints the manifest's repos, so a drift is read at sitting M1 | sitting M3 writes every manifest through `sync` |
 | the signing rule (I34) is enforced by no code while the `git-ssh-sign` kit is in daily use before T080 | M2 to T080 (M3) | the host socket is the dedicated signing-only agent loaded with `ssh-add -c`, so each signature asks for confirmation, and T115 reads `ssh-add -L` in every recreated sandbox: exactly one key, the signing key | T080 lands; or a sandbox whose `ssh-add -L` lists more than one key |
 | a checkpoint grant is read by no check until `tools/ci pr` lands | the first grant (sitting M0) to T005 (M6) | the approval line on each pull request stays the record, and the grant file is a reviewed diff on the `ask-first` surface | T005 lands; or a merged pull request whose grant matched no approval line |

@@ -45,4 +45,8 @@ fourth edit of rule 9 (T115), and `romeu sync` writes it afterwards.
     in `kits/julieta/`.
   - That the hooks and the skills are present in a real sandbox is
     measured by B2 (S5).
-- Verify: `go run ./tools/ci kits`.
+- Verify: `go run ./tools/ci kits`; `go test -tags e2e ./e2e/... -run
+  '^TestKitJulietaClaude' -v`; `go test ./internal/agent/claude/...`;
+  in the daily sandbox where it replaced the interim kit's hook lines,
+  a test push on a throwaway branch from that sandbox; the hook output
+  names both hooks.
