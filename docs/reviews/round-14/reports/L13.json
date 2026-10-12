@@ -1,0 +1,78 @@
+{
+ "header": "L13 · The reader who holds the spec against itself · opus",
+ "verdict": "Met for the round-13 rows: RJ-338 has one home in 04 4.4, and 01 1.6, 03 3.8, 08 8.5 and I17 cite it with the cap reading. The largest gap is Advisory: the new hint says a rerun after an edit of `salvage.excludeIgnored` 'always' salvages once more, and the fingerprint definition of 03 3.8 does not support 'always'.",
+ "prior_checked": 3,
+ "prior_resolved_as_stated": 3,
+ "prior_resolution_notes": [
+  "L13-R13-1 (R13-01): resolved as stated. 04 4.4 says 'the third or a later' and is 'the one home of the rule'; 01 1.6, 03 3.8 and 08 8.5 cite it without the number; 04 4.2 had no number; I17 adds the fourth rerun (equality turns it red) and the excludeIgnored-edit case.",
+  "L13-R13-2 (R13-02): resolved as stated. 'The required-name try' in 10 10.2 item d and the 05 5.4 approval-line row; the token row reads 'the try that would have measured it is not made'; grep finds no 'fifth try' left.",
+  "L13-R13-3: resolved as stated. `requested` defined as any salvage a changed fingerprint did not start, and the 03 3.8 example follows; grep finds no `first` value left."
+ ],
+ "findings": [
+  {
+   "id": "L13-r14-1",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "04 4.4 (RJ-338 hint); 03 3.8 (`salvage[].fingerprint`); 05 5.2 (I17)",
+   "defect": "The RJ-338 hint says a further salvage is 'always so after an edit of `salvage.excludeIgnored`, an input of the fingerprint', but 03 3.8 fingerprints the ignored paths minus the list, not the list itself, so an edit that excludes no present ignored path leaves the fingerprint unchanged.",
+   "scenario": "An operator adds an exclusion for a path that the writer has since deleted, or reorders the list. The next rerun resumes at `sbx env rm` at once, which the hint said cannot happen. An implementer of T008 who reads 'an input of the fingerprint' may hash the list itself to make the hint true, and that changes the 03 3.8 definition.",
+   "change": "Write 'usually so after an edit of `salvage.excludeIgnored` that excludes a present path, since the excluded paths leave the fingerprint', or say 'may' with no 'always'. Cost: one clause in 04 4.4. Approval line `spec`.",
+   "evidence": "docs/spec/04-cli.md:326 '(always so after an edit of `salvage.excludeIgnored`, an input of the fingerprint)'; docs/spec/03-formats.md:482 'and ignored paths, minus `salvage.excludeIgnored`, each by path, size and modification time'"
+  },
+  {
+   "id": "L13-r14-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "05 5.2 (I17, the `excludeIgnored` case)",
+   "defect": "I17's new case 'after that exit 5, an edit of `salvage.excludeIgnored` makes the next rerun salvage, record its entry and exit 5 once, and the rerun after it resumes' does not say where the writer writes or whether it still runs, so the case holds only for a writer that writes only an ignored path the edit excludes.",
+   "scenario": "A test author writes a fixture in which the writer keeps writing a tracked file and the edit excludes an unrelated ignored directory. Every later rerun salvages and exits 5, so the case as written fails against a correct implementation. Or the author stops the writer too, and then the case no longer separates the edit from a stop. 'That exit 5' could mean the third salvage's exit or the fourth's.",
+   "change": "Write the case as: 'with the writer still writing only an ignored path, an edit of `salvage.excludeIgnored` that excludes it makes the next rerun salvage, record its entry and exit 5 once, and the rerun after it resumes at `sbx env rm`'. Cost: one phrase. Approval line `spec`.",
+   "evidence": "docs/spec/05-security.md:172 'E: after that exit 5, an edit of `salvage.excludeIgnored` makes the next rerun salvage, record its entry and exit 5 once, and the rerun after it resumes at `sbx env rm`'"
+  },
+  {
+   "id": "L13-r14-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "listed",
+   "section": "09 J3 step 5; 01 1.6 (the recovery paragraph after the table)",
+   "defect": "Two descriptions of the same rerun state that it 'salvages again' with no cap and do not cite RJ-338: journey J3 step 5 and the 01 1.6 recovery prose. This is the 04 versus 09 crossing that the lens watches.",
+   "scenario": "The guide page written from J3 tells the operator that the rerun salvages again and then resumes. The operator meets an exit 5 `fingerprint-unstable` that the journey never names, and a writer who maintains generated docs from 09 has no link to follow.",
+   "change": "Add a cite of RJ-338 (04 4.4) to J3 step 5 and to the 01 1.6 paragraph, for example 'and otherwise salvages again first, up to the cap of `fingerprint-unstable` (04 4.4)'. Cost: two clauses, and the 04 4.4 list of citers grows to name 09 J3. Approval line `spec`.",
+   "evidence": "docs/spec/09-journeys.md:195-199 'the same command run again resumes at `sbx env rm` when a fresh fingerprint ... and otherwise salvages again first.'; docs/spec/01-system-model.md:334-337 'and otherwise salvages again under a new salvage id'; docs/spec/04-cli.md:326 'This row is the one home of the rule; 01 1.6, 03 3.8, 08 8.5 and I17 cite it'"
+  },
+  {
+   "id": "L13-r14-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "listed",
+   "section": "index (Deferred decisions: the four rows whose trigger is 'the token is narrowed'); 10 10.2 (maintainer block, item d); 11 11.1 (A16)",
+   "defect": "One fact, 'the token is narrowed', has two measures in the text. The index rows and 10 10.2 say the four tries of item d record it. ADR 0011, decision 2, says probe A16 and the four tries run again after the narrowing. A16 is the probe that reads the token's repository list and permissions directly.",
+   "scenario": "At the narrowing sitting the maintainer runs A16, which shows a fine-grained token, and skips the tries. The four deferred rows then have no fired event by their own wording. Or the maintainer runs the tries, and a refusal caused by something else is read as proof of the narrowing.",
+   "change": "Name the record of the event once: A16's post-narrowing read, with the four tries as the behavior check, or both, cited the same way in the four rows and in item d. Cost: one phrase in item d and a shared phrase in four trigger cells. Approval line `spec`.",
+   "evidence": "docs/spec.md:279 'or the token is narrowed, which the four tries of [10 10.2] ..., item d, repeated with the narrowed token and saved under Evidence, record'; docs/spec/10-testing-style.md:876-879 'The four tries repeated with the narrowed token ... record that the token is narrowed'; docs/adr/0011-...md:99-100 'After it, probe A16 and the four tries of item d of the maintainer block run again'; docs/spec/11-host-probes.md:66 (A16 reads type and scopes, or the repository list and permissions)"
+  }
+ ],
+ "what_is_missing": "A cite of RJ-338 from 09 J3 step 5 and from the 01 1.6 recovery paragraph; in I17, the writer's state for the excludeIgnored case; one named record for the event 'the token is narrowed'.",
+ "postmortem": "After v1.0.0, an operator hits RJ-338, follows the J3-derived guide that never mentions the cap (09, 01 1.6), and treats exit 5 as a bug. Following the hint, they edit `salvage.excludeIgnored` for a path that is already gone and expect the one extra salvage that the hint called 'always' (04 4.4 against 03 3.8). The resume comes earlier than promised. That is harmless, but it erodes trust in the hints. At the token narrowing, the four deferred rows wait on tries while A16 already showed the narrowing (index, 10 10.2, ADR 0011).",
+ "lens_critique": "The lens treats 'one problem, one mechanism, one name' as a success in itself. For this product a duplicated mechanism can be deliberate defence in depth (the A16 read and the behavioral tries), so the lens should ask whether a duplication is written down as intended, not only whether it exists. Viewpoint missing from the set, judged from the titles alone: the person who has to recover from a half-finished operation under time pressure. L4 and L14 come close, but neither is the incident responder reading error hints alone at the moment of failure.",
+ "out_of_scope": "I read only the round-13 delta (4c2b11d..f611db2) and the lines around it. Not judged: plan T005 (b) and (c), the main-merge text of pull request #34, whether three is the right cap, and the ruleset outcome of the required-name try. Bullets on 04 4.1 conventions: RJ-338 exit 5 matches 04 4.1 ('a fingerprint that keeps changing during a removal'), confirmed. Names: `requested` and 'the required-name try' are each used with one meaning across pages, confirmed. Exceptions: '--accept-loss does not cover this error' is written down with its reason, confirmed.",
+ "confidence": "High for the prior resolutions (grep and quoted text). Medium-high for L13-r14-1: it follows from the 03 3.8 definition. Medium for L13-r14-2, L13-r14-3 and L13-r14-4.",
+ "pages_read": [
+  "docs/reviews/lenses.md (L13)",
+  "docs/reviews/round-13.md (rows R13-01, R13-02, R13-03, R13-04, L13-R13-3; verification notes)",
+  "docs/reviews/round-13/reports/L13.json",
+  "delta.diff 4c2b11d..f611db2",
+  "docs/spec.md (Deferred decisions rows 279, 283, 348, 351, 353)",
+  "docs/spec/01-system-model.md 1.6 (table and recovery paragraph), 1.7 row 401",
+  "docs/spec/03-formats.md 3.8",
+  "docs/spec/04-cli.md 4.1 exit codes, 4.2 rm and retire rows, 4.4 RJ-338",
+  "docs/spec/05-security.md I17, 5.4 approval-line and token rows",
+  "docs/spec/08-memory-handoff-salvage.md 8.5",
+  "docs/spec/09-journeys.md J3 step 5",
+  "docs/spec/10-testing-style.md 10.2 item d",
+  "docs/spec/11-host-probes.md A16",
+  "docs/adr/0011 decision 2 (grep)"
+ ]
+}

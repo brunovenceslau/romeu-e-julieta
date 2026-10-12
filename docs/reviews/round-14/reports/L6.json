@@ -1,0 +1,84 @@
+{
+ "header": "L6 · The test architect who has seen coverage lie · sonnet",
+ "verdict": "The three round-13 findings read as resolved; the changed text leaves one Required gap (the reset rule of the RJ-338 count, untested) and four Advisory test-naming gaps.",
+ "prior_checked": 3,
+ "prior_resolved_as_stated": 3,
+ "prior_resolution_notes": {
+  "L6-r13-1": "resolved as stated: RJ-338 reads 'third or a later', I17 gains the fourth rerun with 'comparing the count with equality turns this red' and the excludeIgnored case (R13-01 row); the reset question is new, L6-r14-1",
+  "L6-r13-2": "resolved for the two-reader branch (fixture pair and glob-comparison removal named); gaps in L6-r14-5",
+  "L6-r13-3": "resolved as stated: 'holds' for 'adds', a fixture for an edited tracked go.work, path-pattern removal named (R13-04 row)"
+ },
+ "findings": [
+  {
+   "id": "L6-r14-1",
+   "kind": "new",
+   "severity": "Required",
+   "origin": "own",
+   "section": "04 4.4 RJ-338; 03 3.8 salvage[].cause; I17",
+   "defect": "The count of 'salvages in a row that a changed fingerprint started' has no reset rule after a recovered rerun resumes at sbx env rm and that call fails again, and no case in I17 says what the row is then.",
+   "scenario": "A rerun after the recovery resumes at sbx env rm, which fails with exit 1; the generation stays removing and the newest entries still hold three or more fingerprint-changed. The next legitimate edit makes the very first new salvage exit 5 under 'the third or a later', so the pause fires with no instability; a team reading 'in a row' as broken by a resume gets another behavior. Both readings pass the I17 sequence as written, so the test cannot choose.",
+   "change": "State in 04 4.4 whether a resume at sbx env rm (or any later entry of another cause) ends the row, and add to I17 the case 'recovery, resume, sbx env rm fails, an edit, rerun' with the exit it must give; the removal that turns it red is counting every fingerprint-changed entry of the generation. Cost: one sentence and one E case; if the row must survive a resume, a recorded marker would be needed in the state format, which is a larger change.",
+   "evidence": "04-cli.md:326 'on the third or a later salvage in a row that a changed fingerprint started, counted from salvage[].cause'; 03-formats.md:483 'The salvages in a row ... are the newest entries of the generation with fingerprint-changed'; 05-security.md:172 I17 ends at 'the rerun after it resumes at sbx env rm'. Implementing tasks: T008 (error table) and the salvage tasks."
+  },
+  {
+   "id": "L6-r14-2",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "05 5.2 (I17); 03 3.8 salvage[].cause",
+   "defect": "No case shows that a salvage which a changed fingerprint did not start (cause requested) ends the row, and none says the first salvage writes requested.",
+   "scenario": "An implementation counts every entry of the generation or ignores cause; the I17 sequence (requested, two changed, third) stays green, and a user who runs romeu salvage between reruns gets exit 5 early.",
+   "change": "Add to I17: a requested salvage between two reruns restarts the count (removal: ignoring cause when counting), and assert the cause of the first salvage entry. Cost: one E case.",
+   "evidence": "03-formats.md:483 '`requested` for any salvage a changed fingerprint did not start'; 05-security.md:172 'the first two reruns salvage again with cause: fingerprint-changed'."
+  },
+  {
+   "id": "L6-r14-3",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "10 10.2 item d; spec.md Deferred decisions (four rows)",
+   "defect": "The four tries repeated with the narrowed token are said to 'record that the token is narrowed', but no expected answer per try is given, so any saved answers satisfy the trigger of four rows.",
+   "scenario": "The tries are rerun and saved with answers identical to the unnarrowed token (merge, tag and ruleset update accepted); the item reads as done and the four rows reopen on evidence that shows no narrowing, or the maintainer must judge it from memory of the 2026-10-08 table.",
+   "change": "Add one line to item d naming the answer that proves the narrowing (for instance the ruleset update and the tag creation refused, the merge still accepted, per the narrowed permissions of ADR 0011 decision 2) and that an answer equal to the unnarrowed one means the narrowing was not applied. Cost: one sentence; the expected answers are inferred until tried, and should say so.",
+   "evidence": "10-testing-style.md:852-858 'The four tries repeated with the narrowed token, their API answers saved under Evidence, record that the token is narrowed'; docs/notes/maintainer-block-of-ci-bootstrap.md:101-108 (unnarrowed answers)."
+  },
+  {
+   "id": "L6-r14-4",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "plan T005 (b)",
+   "defect": "The test of (b) reads go list -deps -test for one GOOS and GOARCH, and the new dotless-module fixture names no removal that turns it red.",
+   "scenario": "A package imported only under a darwin build tag and outside the approvals globs is invisible to the list that runs on linux, so pr builds code the approvals do not cover; separately, nothing says which removal (restoring the dot rule) turns the new fixture red, against R12-06.",
+   "change": "State that the list runs for each target of the release matrix (as 10 10.2 does for the linter, 'with the target GOOS and GOARCH'), add a fixture with an import behind a tag, and name the removal for the dotless fixture (reading the first path element instead of Standard). Cost: a loop over targets in one test.",
+   "evidence": "docs/plan.md:567-573 'reads each package of go list -deps -test with its Standard field and its Dir ... a fixture with a module path without a dot under a local replace'; 10-testing-style.md:425 'The linter sees only the files that build for the GOOS and GOARCH'."
+  },
+  {
+   "id": "L6-r14-5",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "plan T005 (e)",
+   "defect": "The fixture pair of (e) covers different globs only, and the one-reader branch names no removal that turns its assertion red.",
+   "scenario": "A reader compares globs but not ids, so a surface present in one file only passes; or the generator gets a second reader and the 'both call it' assertion is written against a name that still exists.",
+   "change": "Add a pair with different ids and the same globs, and name the removal for the one-reader branch (a second reader function in the generator). Cost: one fixture.",
+   "evidence": "docs/plan.md:588-594 'two files with the same ids and different globs fail, identical files pass ... when T005 takes one reader, the test asserts that both call it'."
+  }
+ ],
+ "what_is_missing": "A reset rule and test for the RJ-338 count; expected answers per try for the narrowed token; a per-target scope for the imports test; removals for the new T005 (b) and (e) fixtures.",
+ "postmortem": "After v1.0.0 a user whose sbx env rm failed after a recovery is paused by RJ-338 on the first new edit, or not at all, because the row's reset was never defined (01 1.6, 03 3.8, 04 4.4, I17); the token is declared narrowed on answers nobody could mark wrong (10 10.2 d, Deferred decisions, 05 5.4); a build-tag import escapes the approvals test (T005 b).",
+ "lens_critique": "The lens measures whether a removal turns a test red, but a state machine's count rule needs a sequence-completeness question too: which sequences the test never reaches. Success is also an evidence step that can be marked wrong, which the bullets (probes, goldens) touch only for probe files. Missing viewpoint from the lens titles: a reader of the state file after a crash (data-forensics), who sees only what the entries record.",
+ "out_of_scope": "The bullets on fake sbx fidelity, 80% per package, goldens, probes and the race run touch no changed text; 10 whole, 11 and S2 to S9 were not re-read beyond the delta. main-merge.diff showed no contradiction with round-13 text.",
+ "confidence": "medium: text read at c64c468, nothing run.",
+ "pages_read": [
+  "docs/reviews/lenses.md (L6)",
+  "docs/reviews/round-13.md (rows R13-01, R13-04, L6-r13-2)",
+  "docs/reviews/round-13/reports/L6.json",
+  "delta.diff",
+  "main-merge.diff",
+  "docs/plan.md T005",
+  "docs/spec/01 1.6, 03 3.8, 04 4.4, 05 5.2 and 5.4, 08 8.5",
+  "docs/spec/10 10.2 (hygiene, maintainer block)",
+  "docs/notes/maintainer-block-of-ci-bootstrap.md"
+ ]
+}
