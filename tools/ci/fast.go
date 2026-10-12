@@ -390,7 +390,7 @@ var goPinEnv = []string{
 // go.mod and the module cache, never from a vendor directory, and the
 // caller's GOFLAGS is replaced; an empty one would not do, since go
 // then reads the "go env -w" file unless GOENV=off). It is the one
-// list that stepEnv and the pre-push hook (hookLine in the tests, held
+// list that stepEnv and the pre-push hook (hookScript in the tests, held
 // to the tracked hook by TestHook) both hold. GOPROXY=off is not in it:
 // the hook's first go run fills the module cache.
 var goBuildEnv = []string{

@@ -53,7 +53,7 @@ import (
 //     each mise command it starts (miseEnviron), the workflow sets it
 //     in its env table, which the workflows check holds to this list,
 //     and the pre-push hook starts go, and so the mise shim, with it
-//     (TestHook holds the hook's line to this list). With it, mise
+//     (TestHook holds the hook to this list). With it, mise
 //     2026.10.3 reads mise.toml as the one configuration file of the
 //     tree, and mise.lock as its lock (TestMiseEnvStopsConfigs measures
 //     both halves: without miseEnv each file above runs its command;
@@ -184,7 +184,7 @@ import (
 // them names (MISE_ENV_FILE, MISE_CD, MISE_TRUSTED_CONFIG_PATHS,
 // MISE_FOO, GOFOO, a GOFLAGS) never reaches it; and the pre-push hook
 // starts go with "env -i", the same allowlist (hookAllow) and the same
-// fixed part (TestHook holds the hook's line to these lists).
+// fixed part (TestHook holds the hook to these lists).
 //
 // goPinEnv ends the list: "mise install" builds govulncheck with the go
 // command ("go install", the go: backend), so that build reads no "go
