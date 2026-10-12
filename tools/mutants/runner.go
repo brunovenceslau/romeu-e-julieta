@@ -15,8 +15,11 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/procgroup"
 )
 
 // The verdicts of a mutant.
@@ -26,42 +29,44 @@ const (
 	invalid  = "invalid"
 )
 
-// passThrough lists the variables of this process that reach the go
-// command, when they are set: its caches, its module cache and its
-// temporary files. With PATH, which goEnv sets, it is the part of the
-// list of tools/ci (its passThrough) that a go test needs.
-var passThrough = []string{
-	"HOME", "TMPDIR", "XDG_CACHE_HOME",
-	"GOPATH", "GOCACHE", "GOMODCACHE",
-}
+// noHooks is the value of core.hooksPath for every git command that
+// writes a working tree in the clone: no hook runs there, neither the
+// clone's own nor one that a global core.hooksPath names.
+const noHooks = "core.hooksPath=" + os.DevNull
 
-// fixedGoEnv holds the variables that decide what the go command builds
-// and runs, each with a fixed value, as the steps of tools/ci set them:
-// no "go env -w" file, no other toolchain, no go.work file, go.mod and
-// the module cache only, and no module fetched.
-var fixedGoEnv = []string{
-	"GOENV=off",
-	"GOTOOLCHAIN=local",
-	"GOWORK=off",
-	"GOFLAGS=-mod=readonly",
-	"GOPROXY=off",
-}
+// defaultMinTimeout is the least -timeout of a mutant run
+// (mutantTimeout).
+const defaultMinTimeout = time.Minute
+
+// timeoutFactor times the baseline's time is the -timeout of a mutant
+// run, when that is above the least one.
+const timeoutFactor = 10
 
 // runner holds what one run works with.
 type runner struct {
 	e      env
-	tmp    string // the temporary directory: the clone and the test binaries
+	tmp    string // the temporary directory: the clone and the go command's files
 	clone  git.Repo
 	root   *os.Root // the working tree of the clone
-	commit string   // the commit HEAD of the source, which the clone holds
+	commit string   // the commit the clone holds: HEAD of the source, or its snapshot
 	goBin  string
 	goEnv  []string
+	// baselines holds, for each target, what its run with no mutant
+	// showed.
+	baselines map[target]baseline
 }
 
-// mutate runs the mutants of the file at mutantsPath and reports
+// baseline is what the run of a target with no mutant showed: how many
+// tests passed, and the -timeout of its mutant runs.
+type baseline struct {
+	passed  int
+	timeout time.Duration
+}
+
+// runMutants runs the mutants of the file at mutantsPath and reports
 // whether every one was killed. An error means the run could not
 // proceed.
-func mutate(ctx context.Context, e env, mutantsPath string, worktree bool) (ok bool, err error) {
+func runMutants(ctx context.Context, e env, mutantsPath string, worktree bool) (ok bool, err error) {
 	if !filepath.IsAbs(mutantsPath) {
 		mutantsPath = filepath.Join(e.dir, mutantsPath)
 	}
@@ -82,7 +87,7 @@ func mutate(ctx context.Context, e env, mutantsPath string, worktree bool) (ok b
 			err = rmErr
 		}
 	}()
-	if err := r.baseline(ctx, targets(mutants)); err != nil {
+	if err := r.runBaselines(ctx, targets(mutants)); err != nil {
 		return false, err
 	}
 	counts := map[string]int{}
@@ -94,18 +99,20 @@ func mutate(ctx context.Context, e env, mutantsPath string, worktree bool) (ok b
 		counts[verdict]++
 		say(e.stdout, "%s %s %s\n", m.ID, verdict, reason)
 	}
-	say(e.stdout, "mutate: %d killed, %d survived, %d invalid, of %d mutants at %s\n",
+	say(e.stdout, "mutants: %d killed, %d survived, %d invalid, of %d mutants at %s\n",
 		counts[killed], counts[survived], counts[invalid], len(mutants), r.commit)
 	return counts[killed] == len(mutants), nil
 }
 
 // newRunner finds the go command, then clones the commit HEAD of the
-// repository that e.dir lies in into a new temporary directory, and
-// checks that the clone is where it should be and holds that commit.
-// With worktree, the clone then moves to a snapshot of the working tree
-// (snapshot).
+// repository that e.dir lies in into a new temporary directory, checks
+// that the clone is where it should be and holds that commit, and
+// removes its remote. With worktree, the clone then moves to a snapshot
+// of the working tree (snapshot). A commit with a submodule is refused
+// (checkTree).
 func newRunner(ctx context.Context, e env, worktree bool) (r *runner, err error) {
-	source := git.Repo{Dir: e.dir, Env: e.gitEnv}
+	gitEnv := git.CleanEnv(e.gitEnv)
+	source := git.Repo{Dir: e.dir, Env: gitEnv}
 	top, err := gitLine(ctx, source, "rev-parse", "--show-toplevel")
 	if err != nil {
 		return nil, err
@@ -126,28 +133,36 @@ func newRunner(ctx context.Context, e env, worktree bool) (r *runner, err error)
 			return nil, err
 		}
 	}
-	tmp, err := os.MkdirTemp(e.tmpDir, "mutate-")
+	tmp, err := os.MkdirTemp(e.tmpDir, "mutants-")
 	if err != nil {
 		return nil, fmt.Errorf("make the temporary directory: %w", err)
 	}
-	r = &runner{e: e, tmp: tmp, commit: commit, goBin: goBin, goEnv: goEnv(goBin)}
+	r = &runner{e: e, tmp: tmp, commit: commit, goBin: goBin, baselines: map[target]baseline{}}
 	defer func() {
 		if err != nil {
 			err = errors.Join(err, r.close())
 			r = nil
 		}
 	}()
-	dest := filepath.Join(tmp, "clone")
-	if _, err := source.Run(ctx, nil, "clone", "--no-local", "--quiet", "--", top, dest); err != nil {
+	goTmp := filepath.Join(tmp, "go")
+	if err := os.Mkdir(goTmp, 0o700); err != nil {
 		return r, err
 	}
-	r.clone = git.Repo{Dir: dest, Env: e.gitEnv}
+	r.goEnv = goEnv(goBin, goTmp)
+	dest := filepath.Join(tmp, "clone")
+	if _, err := source.Run(ctx, nil, "clone", "--no-local", "--quiet", "--origin", "origin", "--config", noHooks, "--", top, dest); err != nil {
+		return r, err
+	}
+	r.clone = git.Repo{Dir: dest, Env: gitEnv}
 	gitDir, err := gitLine(ctx, r.clone, "rev-parse", "--absolute-git-dir")
 	if err != nil {
 		return r, err
 	}
 	if !inside(tmp, gitDir) {
 		return r, fmt.Errorf("the clone's git directory %s is not inside %s", gitDir, tmp)
+	}
+	if _, err := r.clone.Run(ctx, nil, "remote", "remove", "origin"); err != nil {
+		return r, err
 	}
 	head, err := gitLine(ctx, r.clone, "rev-parse", "--verify", "HEAD^{commit}")
 	if err != nil {
@@ -160,6 +175,9 @@ func newRunner(ctx context.Context, e env, worktree bool) (r *runner, err error)
 		if r.commit, err = snapshot(ctx, source, r.clone, commit, tmp); err != nil {
 			return r, err
 		}
+	}
+	if err := checkTree(ctx, r.clone, r.commit); err != nil {
+		return r, err
 	}
 	r.root, err = os.OpenRoot(dest)
 	return r, err
@@ -176,51 +194,90 @@ func (r *runner) close() error {
 	return nil
 }
 
-// warnDirty says on standard error that the working tree has changes
-// the run does not see, as it runs the commit HEAD only.
-func warnDirty(ctx context.Context, e env, source git.Repo, commit string) error {
-	// --no-optional-locks: status does not refresh the real index.
-	out, err := source.Run(ctx, nil, "--no-optional-locks", "status", "--porcelain")
+// checkTree refuses a commit that holds a submodule: the clone would
+// hold an empty directory in its place, and a test that reads it would
+// not see what the source has.
+func checkTree(ctx context.Context, repo git.Repo, commit string) error {
+	out, err := repo.Run(ctx, nil, "ls-tree", "-r", "-z", commit)
 	if err != nil {
 		return err
 	}
-	if n := bytes.Count(out, []byte("\n")); n > 0 {
-		say(e.stderr, "mutate: the working tree has uncommitted changes (git status: %d); the run uses the commit %s without them; -worktree runs them too\n", n, commit)
+	for entry := range strings.SplitSeq(string(out), "\x00") {
+		meta, name, _ := strings.Cut(entry, "\t")
+		if strings.HasPrefix(meta, "160000 ") {
+			return fmt.Errorf("the commit %s holds a submodule (or an embedded repository) at %s, and a clone does not hold its files; tools/mutants runs a tree without one", commit, git.Printable(name))
+		}
 	}
 	return nil
 }
 
-// baseline runs each target with no mutant. A target that fails, or
-// that runs no test, is an error: no mutant can be killed by a test
-// that already fails or that does not run.
-func (r *runner) baseline(ctx context.Context, ts []target) error {
+// warnDirty says on standard error that the working tree has changes
+// the run does not see, as it runs the commit HEAD only. The git
+// environment holds GIT_OPTIONAL_LOCKS=0, so status does not refresh
+// the real index.
+func warnDirty(ctx context.Context, e env, source git.Repo, commit string) error {
+	out, err := source.Run(ctx, nil, "status", "--porcelain")
+	if err != nil {
+		return err
+	}
+	if n := bytes.Count(out, []byte("\n")); n > 0 {
+		say(e.stderr, "mutants: the working tree has uncommitted changes (git status: %d); the run uses the commit %s without them; -worktree runs them too\n", n, commit)
+	}
+	return nil
+}
+
+// runBaselines runs each target with no mutant. A target that does not
+// build, fails, or runs no test is an error: no mutant can be killed by
+// a test that already fails or that does not run. It records how many
+// tests passed and the -timeout of the target's mutant runs.
+func (r *runner) runBaselines(ctx context.Context, ts []target) error {
 	for _, t := range ts {
-		failed, out, err := r.goTest(ctx, t)
+		built, out, err := r.build(ctx, []string{t.pkg})
+		if err != nil {
+			return err
+		}
+		if !built {
+			return fmt.Errorf("the baseline of %s does not build:\n%s", t.pkg, out)
+		}
+		start := time.Now()
+		failed, out, err := r.goTest(ctx, t, 0)
 		if err != nil {
 			return err
 		}
 		if failed {
 			return fmt.Errorf("the baseline of %s -run %s fails with no mutant, so nothing can be killed:\n%s", t.pkg, t.run, out)
 		}
-		if !ranTests(out) {
+		passed := countPassed(out)
+		if passed == 0 {
 			return fmt.Errorf("%s -run %s runs no test, so nothing can be killed:\n%s", t.pkg, t.run, out)
 		}
+		r.baselines[t] = baseline{passed: passed, timeout: mutantTimeout(time.Since(start), r.e.minTimeout)}
 	}
 	return nil
 }
 
-// ranTests reports whether the output of a "go test" that passed shows
-// a package where a test ran: an "ok" line that does not end in "[no
-// tests to run]" (cmd/go reports a package whose -run matched nothing
-// that way, and one with no test file with "?").
-func ranTests(out string) bool {
+// mutantTimeout is the -timeout of the mutant runs of a target whose
+// baseline ran for took: timeoutFactor times as long, and never less
+// than least (defaultMinTimeout when zero), so that a mutant that loops
+// is killed by the go test timeout and a slow machine does not kill one
+// that does not loop.
+func mutantTimeout(took, least time.Duration) time.Duration {
+	if least == 0 {
+		least = defaultMinTimeout
+	}
+	return max(least, timeoutFactor*took).Round(time.Second)
+}
+
+// countPassed counts the tests a "go test -v" run reports as passed,
+// subtests included.
+func countPassed(out string) int {
+	n := 0
 	for line := range strings.Lines(out) {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "ok ") && !strings.HasSuffix(line, "[no tests to run]") {
-			return true
+		if strings.HasPrefix(strings.TrimSpace(line), "--- PASS: ") {
+			n++
 		}
 	}
-	return false
+	return n
 }
 
 // mutant applies m in the clone, runs its target, writes the file back
@@ -238,7 +295,7 @@ func (r *runner) mutant(ctx context.Context, m mutant) (verdict, reason string, 
 	if err != nil || !bytes.Equal(onDisk, blob) {
 		return invalid, fmt.Sprintf("%s is not checked out as its blob (a link, or a filter of .gitattributes)", git.Printable(m.File)), nil
 	}
-	if n := bytes.Count(blob, []byte(m.Old)); n != 1 {
+	if n := occurrences(blob, []byte(m.Old)); n != 1 {
 		return invalid, fmt.Sprintf("old occurs %d times in %s, not once", n, git.Printable(m.File)), nil
 	}
 	pkgs, err := r.packages(ctx, m)
@@ -262,12 +319,19 @@ func (r *runner) mutant(ctx context.Context, m mutant) (verdict, reason string, 
 		say(r.e.stderr, "%s: the build fails:\n%s\n", m.ID, git.SafeLines(strings.TrimSpace(out)))
 		return invalid, "the mutated code does not build", nil
 	}
-	failed, _, err := r.goTest(ctx, m.target())
+	base := r.baselines[m.target()]
+	failed, out, err := r.goTest(ctx, m.target(), base.timeout)
 	if err != nil {
 		return "", "", err
 	}
-	if failed {
+	switch {
+	case failed && strings.Contains(out, "panic: test timed out after "):
+		return killed, fmt.Sprintf("%s -run %s times out after %s", m.Package, m.Run, base.timeout), nil
+	case failed:
 		return killed, fmt.Sprintf("%s -run %s fails", m.Package, m.Run), nil
+	}
+	if passed := countPassed(out); passed < base.passed {
+		return invalid, fmt.Sprintf("%s -run %s passes %d tests, fewer than the %d of the baseline: the mutant renames or skips a test", m.Package, m.Run, passed, base.passed), nil
 	}
 	return survived, fmt.Sprintf("%s -run %s passes", m.Package, m.Run), nil
 }
@@ -315,32 +379,35 @@ func (r *runner) packages(ctx context.Context, m mutant) ([]string, error) {
 }
 
 // build builds the test binaries of pkgs and reports whether they
-// build.
+// build. "-exec=true" runs each binary through true, so nothing runs,
+// and the go command keeps no binary, so two packages with the same
+// name do not ask for the same output file.
 func (r *runner) build(ctx context.Context, pkgs []string) (bool, string, error) {
-	bin := filepath.Join(r.tmp, "bin") + string(filepath.Separator)
-	if err := os.MkdirAll(bin, 0o755); err != nil {
-		return false, "", err
-	}
-	failed, out, err := r.goCmd(ctx, slices.Concat([]string{"test", "-c", "-vet=off", "-o", bin}, pkgs)...)
+	failed, out, err := r.goCmd(ctx, slices.Concat([]string{"test", "-count=1", "-vet=off", "-exec=true"}, pkgs)...)
 	return !failed, out, err
 }
 
-// goTest runs the target in the clone and reports whether it failed.
-// A package pattern starts with "./" (mutant.check), so the go command
-// never reads one as a flag.
-func (r *runner) goTest(ctx context.Context, t target) (failed bool, out string, err error) {
-	return r.goCmd(ctx, "test", "-count=1", "-vet=off", "-run="+t.run, t.pkg)
+// goTest runs the target in the clone, verbose so that countPassed can
+// read it, and reports whether it failed. A timeout of zero leaves the
+// go test default. A package pattern starts with "./" (mutant.check),
+// so the go command never reads one as a flag.
+func (r *runner) goTest(ctx context.Context, t target, timeout time.Duration) (failed bool, out string, err error) {
+	args := []string{"test", "-count=1", "-vet=off", "-v", "-run=" + t.run}
+	if timeout > 0 {
+		args = append(args, "-timeout="+timeout.String())
+	}
+	return r.goCmd(ctx, append(args, t.pkg)...)
 }
 
-// goCmd runs the go command in the clone. It reports a non-zero exit as
-// failed with the output; an error means the command did not run or
-// the run was interrupted.
+// goCmd runs the go command in the clone, in a process group that is
+// killed when it returns (procgroup.CombinedOutput). It reports a
+// non-zero exit as failed with the output; an error means the command
+// did not run or the run was interrupted.
 func (r *runner) goCmd(ctx context.Context, args ...string) (failed bool, out string, err error) {
 	cmd := exec.CommandContext(ctx, r.goBin, args...)
 	cmd.Dir = r.clone.Dir
 	cmd.Env = r.goEnv
-	killWithGroup(cmd)
-	output, err := cmd.CombinedOutput()
+	output, err := procgroup.CombinedOutput(cmd)
 	if ctx.Err() != nil {
 		return false, "", errInterrupted
 	}
@@ -357,10 +424,12 @@ func (r *runner) goCmd(ctx context.Context, args ...string) (failed bool, out st
 // resolveGo returns the go command of the GOROOT that "go env GOROOT"
 // names at the top of the source tree, where the mise shim finds the
 // pinned go, and checks that it is the version this tool was built
-// with.
+// with. The probe runs with GOTOOLCHAIN=local and GOENV=off, so it
+// neither fetches another go nor reads a "go env -w" file.
 func resolveGo(ctx context.Context, top string) (string, error) {
 	cmd := exec.CommandContext(ctx, "go", "env", "GOROOT")
 	cmd.Dir = top
+	cmd.Env = slices.Concat(os.Environ(), goenv.Pin)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("go env GOROOT in %s: %w", top, err)
@@ -376,7 +445,7 @@ func resolveGo(ctx context.Context, top string) (string, error) {
 // this tool.
 func checkGoVersion(ctx context.Context, goBin string) error {
 	cmd := exec.CommandContext(ctx, goBin, "env", "GOVERSION")
-	cmd.Env = goEnv(goBin)
+	cmd.Env = goEnv(goBin, "")
 	out, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("%s env GOVERSION: %w", goBin, err)
@@ -387,17 +456,24 @@ func checkGoVersion(ctx context.Context, goBin string) error {
 	return nil
 }
 
-// goEnv is the environment of the go command: the variables of
-// passThrough that are set, with the directory of goBin first on PATH,
-// so a go that a test starts is the same one, then fixedGoEnv.
-func goEnv(goBin string) []string {
+// goEnv is the environment of the go command, built from nothing as
+// the steps of tools/ci build theirs: the variables of
+// goenv.PassThrough that are set, with the directory of goBin first on
+// PATH, so a go that a test starts is the same one; then goenv.Pin,
+// goenv.Build and GOPROXY=off; then GOTMPDIR=goTmp, when it is not
+// empty.
+func goEnv(goBin, goTmp string) []string {
 	env := []string{"PATH=" + filepath.Dir(goBin) + string(os.PathListSeparator) + os.Getenv("PATH")}
-	for _, key := range passThrough {
-		if value := os.Getenv(key); value != "" {
+	for _, key := range goenv.PassThrough {
+		if value := os.Getenv(key); value != "" && key != "PATH" {
 			env = append(env, key+"="+value)
 		}
 	}
-	return append(env, fixedGoEnv...)
+	env = slices.Concat(env, goenv.Pin, goenv.Build, []string{"GOPROXY=off"})
+	if goTmp != "" {
+		env = append(env, "GOTMPDIR="+goTmp)
+	}
+	return env
 }
 
 // gitLine runs one git command and returns its output without the final

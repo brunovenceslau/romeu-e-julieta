@@ -124,6 +124,22 @@ func checkRelPath(what, p string) error {
 	return nil
 }
 
+// occurrences counts where sub starts in s, overlapping matches
+// included: "xx" occurs twice in "xxx", so it is not unique there, as
+// a replacement of one of them would be ambiguous.
+func occurrences(s, sub []byte) int {
+	n := 0
+	for i := 0; i <= len(s)-len(sub); {
+		j := bytes.Index(s[i:], sub)
+		if j < 0 {
+			break
+		}
+		n++
+		i += j + 1
+	}
+	return n
+}
+
 // targets returns the distinct targets of the mutants, in the order
 // they first appear.
 func targets(mutants []mutant) []target {

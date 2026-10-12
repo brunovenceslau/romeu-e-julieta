@@ -89,3 +89,13 @@ func TestTargetsAreDistinctInOrder(t *testing.T) {
 	}
 	assert.Equal(t, []target{{"./b", "x"}, {"./a", "x"}, {"./b", "y"}}, targets(ms))
 }
+
+// TestOccurrences checks that overlapping matches count: "xx" is not
+// unique in "xxx", where either of two places could be replaced.
+func TestOccurrences(t *testing.T) {
+	assert.Equal(t, 2, occurrences([]byte("xxx"), []byte("xx")))
+	assert.Equal(t, 1, occurrences([]byte("xx"), []byte("xx")))
+	assert.Equal(t, 3, occurrences([]byte("aaaa"), []byte("aa")))
+	assert.Equal(t, 2, occurrences([]byte("ab ab"), []byte("ab")))
+	assert.Equal(t, 0, occurrences([]byte("a"), []byte("ab")))
+}

@@ -19,7 +19,9 @@ import (
 	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
 )
 
@@ -267,7 +269,7 @@ func lockedVersions(data []byte) (map[string]string, error) {
 // that measurement on every machine that runs the tests):
 // $MISE_DATA_DIR if it is set, else mise below $XDG_DATA_HOME if that
 // is set, else .local/share/mise below HOME, and installs below it.
-// Both variables are on the allowlist (passThrough): a caller who points
+// Both variables are on the allowlist (goenv.PassThrough): a caller who points
 // them at an installs directory of their own chooses the go and the
 // linter the checks run, the same way a caller's PATH chooses mise
 // itself, so a caller who controls the environment can bypass the
@@ -308,27 +310,6 @@ var lintTargets = []lintTarget{
 	{"darwin", "arm64"},
 }
 
-// passThrough are the variables of this process that the steps of fast
-// and "mise which" keep, and the pre-push hook with them (hookAllow).
-// Each one says where a program or a file is, never what to check or
-// how:
-//   - PATH: finds mise and go; HOME: the installs of mise, the caches and
-//     the git configuration; TMPDIR: temporary files;
-//   - XDG_CACHE_HOME, XDG_DATA_HOME, XDG_STATE_HOME: where mise and go
-//     keep their files when the person moved them. XDG_CONFIG_HOME is
-//     not here: it would let a caller's git/config (core.fsmonitor, say)
-//     run inside the git calls of the hook, and mise reads no
-//     configuration there (miseNoGlobalConfig);
-//   - MISE_DATA_DIR, MISE_CACHE_DIR, MISE_STATE_DIR: the same for mise;
-//   - GOPATH, GOCACHE, GOMODCACHE: where the module cache and the build
-//     cache are, so the first go run finds the modules.
-var passThrough = []string{
-	"PATH", "HOME", "TMPDIR",
-	"XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
-	"MISE_CACHE_DIR", "MISE_DATA_DIR", "MISE_STATE_DIR",
-	"GOPATH", "GOCACHE", "GOMODCACHE",
-}
-
 // Three more sets say how to reach something, and only the steps that
 // reach it keep them (withProcessEnv): networkPassThrough, a proxy and
 // a certificate bundle, for the steps that use the network;
@@ -360,42 +341,17 @@ func withProcessEnv(env []string, keys []string) []string {
 	return out
 }
 
-// passThroughEnv returns the variables of passThrough that are set in
+// passThroughEnv returns the variables of goenv.PassThrough that are set in
 // this process, in the order of the list. An empty variable is left
 // out, as the go command reads an empty variable as an unset one.
 func passThroughEnv() []string {
 	var env []string
-	for _, key := range passThrough {
+	for _, key := range goenv.PassThrough {
 		if value := os.Getenv(key); value != "" {
 			env = append(env, key+"="+value)
 		}
 	}
 	return env
-}
-
-// goPinEnv holds the two variables that keep the go command on the
-// pinned go and on the process's own environment: GOENV=off (no "go
-// env -w" file is read) and GOTOOLCHAIN=local (no other go is
-// downloaded or run). It is the one list that stepEnv and miseEnv
-// (every mise run, "mise install" and its build of govulncheck
-// among them) both hold.
-var goPinEnv = []string{
-	"GOENV=off",
-	"GOTOOLCHAIN=local",
-}
-
-// goBuildEnv holds the two variables that keep the go command on the
-// modules of the tree: GOWORK=off (no go.work file, in the tree or
-// above it, changes them) and GOFLAGS=-mod=readonly (it builds from
-// go.mod and the module cache, never from a vendor directory, and the
-// caller's GOFLAGS is replaced; an empty one would not do, since go
-// then reads the "go env -w" file unless GOENV=off). It is the one
-// list that stepEnv and the pre-push hook (hookScript in the tests, held
-// to the tracked hook by TestHook) both hold. GOPROXY=off is not in it:
-// the hook's first go run fills the module cache.
-var goBuildEnv = []string{
-	"GOWORK=off",
-	"GOFLAGS=-mod=readonly",
 }
 
 // stepEnv is the environment of every step of fast, built from nothing
@@ -407,7 +363,7 @@ var goBuildEnv = []string{
 // "-run" or build tags, a GOLANGCI_ or GL_ variable, GOEXPERIMENT or
 // GOAMD64, which change the build tags) has no effect on it.
 //
-//   - goPinEnv: GOENV=off, so the go command reads no "go env -w" file,
+//   - goenv.Pin: GOENV=off, so the go command reads no "go env -w" file,
 //     which could set GOFLAGS or any of the variables below, and
 //     GOTOOLCHAIN=local, so the go of goDir runs and no other is
 //     downloaded.
@@ -428,7 +384,7 @@ func stepEnv(goDir string) []string {
 		path += string(os.PathListSeparator) + value
 	}
 	rest := slices.DeleteFunc(passThroughEnv(), func(kv string) bool { return strings.HasPrefix(kv, "PATH=") })
-	return slices.Concat([]string{"PATH=" + path}, rest, goPinEnv, goBuildEnv, []string{
+	return slices.Concat([]string{"PATH=" + path}, rest, goenv.Pin, goenv.Build, []string{
 		"GOPROXY=off",
 	})
 }
@@ -457,21 +413,9 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, s.argv[0], s.argv[1:]...)
 	cmd.Dir = dir
 	cmd.Env = append([]string{}, s.environ...)
-	killWithGroup(cmd)
-	out, err := cmd.CombinedOutput()
-	// os/exec calls Cancel only while the leader runs, so a grandchild
-	// that outlives a leader that ended, and holds the output pipe until
-	// WaitDelay, is still ours to kill. A group that is gone is not an
-	// error (ESRCH). While the group has members its pgid is not reused,
-	// so -pgid reaches only this group. The window after the group has
-	// fully emptied (between the last reap and the kill, which a reuse
-	// would need a full pid wrap to hit) is accepted, as it is on the
-	// Cancel path. Other errors are dropped on purpose: a failed kill
-	// changes nothing here, since the step's result already stands and
-	// WaitDelay has bounded the wait.
-	if cmd.Process != nil {
-		_ = killGroup(cmd.Process.Pid)
-	}
+	// The group is killed after the step too, so a grandchild that
+	// outlives the leader is gone (procgroup.CombinedOutput).
+	out, err := procgroup.CombinedOutput(cmd)
 	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		if errors.Is(parent.Err(), context.DeadlineExceeded) {
 			// The deadline of the caller fired, before the limit of the step.
@@ -532,14 +476,14 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 		}
 	}
 	// repo is what every git command of the judging and of the checks
-	// reads with. In a pre-push run it has no repoLocalEnv variable,
+	// reads with. In a pre-push run it has no git.LocalEnv variable,
 	// so a GIT_DIR or an object directory that git exported to the
 	// hook, or that the caller set, changes none of what is read
 	// (nestedModules too: with the variables cleared it finds the same
 	// repository from root, which is what it wants).
 	repo := git.Repo{Dir: root, Env: e.gitEnv}
 	if hook {
-		repo.Env = hookGitEnv(e.gitEnv)
+		repo.Env = git.CleanEnv(e.gitEnv)
 	}
 	// judge is what holds before the steps and, in a pre-push run,
 	// after them too. It returns "HEAD" by hand, and the id of the
@@ -712,40 +656,6 @@ func (c *checks) run(ctx context.Context, root string, steps []step) {
 		}
 		c.report(s.name, err == nil, detail)
 	}
-}
-
-// repoLocalEnv are the variables that tell git which repository, index,
-// object store, work tree or configuration to use: the names "git
-// rev-parse --local-env-vars" lists (git 2.53.0; TestRepoLocalEnv
-// compares the list with the git that runs the tests), and every
-// variable whose name starts with GIT_CONFIG, the "git -c" and
-// GIT_CONFIG_COUNT settings among them. Git exports such variables to a
-// hook, and the githooks page clears this same list before a hook runs
-// git on another tree (https://git-scm.com/docs/githooks).
-var repoLocalEnv = []string{
-	"GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT",
-	"GIT_OBJECT_DIRECTORY", "GIT_DIR", "GIT_WORK_TREE", "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE",
-	"GIT_INDEX_FILE", "GIT_NO_REPLACE_OBJECTS", "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_SHALLOW_FILE",
-	"GIT_COMMON_DIR",
-}
-
-// hookGitEnv is the environment of the git commands of judgeCommit:
-// base (this process's when nil) without the variables of repoLocalEnv,
-// so that git finds the repository from the top of the working tree,
-// with its own index and objects, and with GIT_OPTIONAL_LOCKS=0, so
-// that "git status" does not write the index
-// (https://git-scm.com/docs/git#Documentation/git.txt-GITOPTIONALLOCKS).
-// The steps of fast get none of these variables either: stepEnv keeps
-// only those of passThrough.
-func hookGitEnv(base []string) []string {
-	if base == nil {
-		base = os.Environ()
-	}
-	env := slices.DeleteFunc(slices.Clone(base), func(kv string) bool {
-		key, _, _ := strings.Cut(kv, "=")
-		return slices.Contains(repoLocalEnv, key) || strings.HasPrefix(key, "GIT_CONFIG_") || key == "GIT_OPTIONAL_LOCKS"
-	})
-	return append(env, "GIT_OPTIONAL_LOCKS=0")
 }
 
 // judgeCommit refuses a pre-push run whose checks would not test the

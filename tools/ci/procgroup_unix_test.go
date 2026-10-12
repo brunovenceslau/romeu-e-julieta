@@ -19,6 +19,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/procgroup"
 )
 
 // helperEnv names the role of this test binary when a test runs it as a
@@ -181,7 +183,7 @@ func TestKillWithGroup(t *testing.T) {
 		pidfile := filepath.Join(t.TempDir(), "pid")
 		killAtEnd(t, pidfile)
 		const bound = 6 * time.Second // the holder sleeps for 15s
-		require.Less(t, killWaitDelay, bound-time.Second, "the bound of the wait is under the bound of the test")
+		require.Less(t, procgroup.WaitDelay, bound-time.Second, "the bound of the wait is under the bound of the test")
 		s := step{name: "escape", argv: []string{os.Args[0], "-test.run=^TestHelperProcess$"},
 			environ: []string{"PATH=" + os.Getenv("PATH"), helperEnv + "=escape", "CI_TEST_PIDFILE=" + pidfile}}
 		ctx, cancel := context.WithCancel(t.Context())
@@ -230,9 +232,9 @@ func TestStepRunKillsTheGroup(t *testing.T) {
 // that would turn a command that succeeded into a failure.
 func TestKillGroupAfterWait(t *testing.T) {
 	cmd := exec.CommandContext(t.Context(), "true")
-	killWithGroup(cmd)
+	procgroup.KillWithGroup(cmd)
 	require.NoError(t, cmd.Run())
-	assert.ErrorIs(t, killGroup(cmd.Process.Pid), os.ErrProcessDone)
+	assert.ErrorIs(t, procgroup.KillGroup(cmd.Process.Pid), os.ErrProcessDone)
 }
 
 // TestMainSignals runs main's signal handling around a step that
@@ -369,7 +371,7 @@ func TestMainSecondSignal(t *testing.T) {
 			ws, ok := exit.Sys().(syscall.WaitStatus)
 			require.True(t, ok)
 			assert.True(t, ws.Signaled(), "the second signal ended the process by its default action")
-			assert.Less(t, time.Since(start), killWaitDelay-250*time.Millisecond, "main did not wait out the drain")
+			assert.Less(t, time.Since(start), procgroup.WaitDelay-250*time.Millisecond, "main did not wait out the drain")
 			return
 		case <-tick.C:
 			_ = cmd.Process.Signal(syscall.SIGTERM)
