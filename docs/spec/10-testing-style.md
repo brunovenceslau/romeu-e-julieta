@@ -855,16 +855,14 @@ What they set up, and holds now:
   not tried, an account with write access can merge a pull request
   whose required checks (item e) are green. On tags matching `v*`:
   creation, update and deletion are refused for everyone except the
-  bypass actor. The administrator role is the bypass actor of the tag
-  ruleset only, and the operator's token holds that role: the
-  default-branch ruleset has no bypass actor once the maintainer step
-  of [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md),
-  decision 1, removes it. Until that step the role bypasses the
-  required checks on a pull request merge; the API answer, saved under
-  Evidence, that shows the default-branch ruleset with no bypass actor
-  ends that state, and the index's S2 and local-gates row read it
-  here. The merge requirements, and what they are worth, are in
-  [05 5.4](05-security.md#risks-of-how-this-repository-is-developed).
+  bypass actor. The administrator role is the bypass actor of both
+  rulesets, in `pull_request` mode on the default branch, and the
+  operator's token holds that role, so it bypasses the required checks
+  on a pull request merge; the index's S2 and local-gates row read it
+  here, and decision 1 of
+  [ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md),
+  proposed, keeps that bypass. The merge requirements, and what they
+  are worth, are in [05 5.4](05-security.md#risks-of-how-this-repository-is-developed).
   Two repository settings, which bind a bypass actor too: squash
   merging and rebase merging off, so every merge is a merge commit
   (12 12.9); and private vulnerability reporting on, the channel
@@ -896,15 +894,15 @@ Evidence, or, for items g and h, in the note's dated entry:
   builds `pr` lands, its job is added to the required checks, and the
   step records under that task's Evidence the `head_sha` the pr job's
   check run carries and whether a ruleset that requires it blocks a
-  merge and then allows it. If the check cannot be required, that is
-  recorded under
-  [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md),
-  decision 1.
+  merge and then allows it. If the check cannot be required, that
+  task's Evidence says so.
 - f. Before the first release candidate: turn on GitHub's immutable
   releases setting. To do.
-- g. The record of the token narrowing
-  ([ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md),
-  decision 2). The narrowing is a host step with no pull request, so
+- g. The record of the token narrowing, the GitHub App installation
+  token that
+  [ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md),
+  decision 2, proposes, applied once that record is Accepted. The
+  narrowing is a host step with no pull request, so
   its answers go in a dated entry of
   [the note on the maintainer block](../notes/maintainer-block-of-ci-bootstrap.md#the-token-narrowing),
   not under a pull request's Evidence. The note is the one home of

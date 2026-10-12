@@ -115,8 +115,10 @@ any sandbox and any agent session.
 ## The token narrowing
 
 The record of the narrowing of the development sandbox's GitHub token
-([ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md),
-decision 2), as item g of
+to the GitHub App installation token that
+[ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md),
+decision 2, proposes and which is applied once that record is
+Accepted, as item g of
 [10 10.2](../spec/10-testing-style.md#release-and-bootstrap) asks for
 it, and the one home of the rule below. The maintainer adds one dated
 entry when the narrowing is applied, and one for each later read, which
@@ -150,11 +152,12 @@ Each entry holds three reads, made on the host or checked from the
 maintainer's own session, never only from what the sandbox printed:
 
 1. Probe A16 ([11 11.1](../spec/11-host-probes.md#111-block-a---sbx-and-runtime-facts-first-in-parallel-with-the-first-build-layer)):
-   the token's type, from its prefix, and, for a fine-grained token,
-   its repository list and permissions from GitHub's token settings
-   page. Expected: a fine-grained token, this repository alone,
-   Contents, Pull requests and Workflows read and write, Actions,
-   Checks and Metadata read, and no Administration.
+   the token's type, from its prefix, and, for a token with no scopes
+   header, its repository list and permissions from GitHub's settings
+   page of that token or of the App's installation. Expected: an App
+   installation token, an installation on selected repositories, this
+   one among them, Contents, Pull requests and Workflows read and
+   write, Actions, Checks and Metadata read, and no Administration.
 2. The agent the host forwards into the sandbox, read on the host, in
    three parts: the host's forwarding setting, the sbx setting or kit
    that names the socket it forwards; the keys of that socket, listed by
@@ -185,7 +188,7 @@ maintainer's own session, never only from what the sandbox printed:
    |---|---|---|
    | push an empty commit to the default branch | refused | refused, by the pull-request rule; this answer does not tell the two tokens apart |
    | merge a throwaway pull request through the API | accepted | accepted once its required checks are green, since the token keeps Contents and Pull requests write; this answer does not tell the two tokens apart |
-   | create and delete the tag `v0.0.0-try` | accepted, through the bypass | not predicted: whether the tag ruleset's bypass for the administrator role applies to a fine-grained token is not measured, and the answer is recorded either way |
+   | create and delete the tag `v0.0.0-try` | accepted, through the bypass | not predicted: whether the tag ruleset's bypass for the administrator role applies to an App installation token is not measured, and the answer is recorded either way |
    | update the default-branch ruleset with its own unchanged body | accepted | refused, since the token holds no Administration permission |
 
 The token is narrowed when the A16 read and the three parts of read 2
@@ -203,7 +206,7 @@ Limits of the entry, stated and not closed:
    [Deferred decisions](../spec.md#in-how-this-repository-is-run)
    reopens it (round 15).
 3. How the forwarding stops is the maintainer's choice: ADR 0011,
-   decision 2, decides only that it stops. An entry whose read 2 finds
+   decision 2, says only that it stops. An entry whose read 2 finds
    an authentication key, or a second key in a forwarded socket,
    reopens it (round 16, R16-11).
 4. A later read is due at a sitting, not at the events that change what
@@ -230,4 +233,5 @@ first of: a re-created development sandbox, a replaced token, the
 first release-candidate tag, or the plan's checkpoint C7 (round 18,
 R18-A13).
 
-No entry yet: the narrowing waits for a maintainer step.
+No entry yet: the narrowing waits for the acceptance of ADR 0011 and
+a maintainer step.

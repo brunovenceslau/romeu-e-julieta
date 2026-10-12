@@ -252,7 +252,7 @@ and in the text it changes.
   Decided on 2026-10-09: option (a). The index row names the record (a `## Session checkpoint (<date>)` heading in `docs/reviews/round-<n>.md`, then a `--final` handoff file), the command that counts them, and the count taken on 2026-10-09: three, so the trigger has fired and the review is due; decision 6 of ADR 0010 carries the record half.
   Answered on 2026-10-09: the review was held, with four final handoffs
   counted, and narrowing the token was decided
-  ([ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md), decision 2).
+  ([ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md), decision 2).
 - **D3 (R9-25), the `ssh-add -c` mitigation.** The mitigation of the
   Verified-signature row of 05 5.4, and of 06 6.4 and J1 step 5, rests
   on `ssh-add -c`, whose confirmation needs an askpass program that

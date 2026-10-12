@@ -354,7 +354,7 @@ repository on 2026-10-09.
   closed as not needed (PR #33 measured the ruleset).
 - D2, D4 and D6 (token narrowing, required checks without the admin
   bypass, direct-push refusal) were decided by delegation and recorded
-  in [ADR 0011](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md).
+  in [ADR 0011](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md).
 - The golangci-lint flake was fixed in PR #39 with
   `--allow-parallel-runners`, plus `-j 1` on request. The measured cost
   of `-j 1`: it does not fix the lock; a cold run takes about 14s

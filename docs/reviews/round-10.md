@@ -222,7 +222,7 @@ date, when it comes; D5 and D6 wait for it.
   decision is made. Approval lines: `spec`, and `decisions` for the
   record half.
   Answered on 2026-10-09: option (a), and both decisions were taken
-  that day in [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md): the required-checks row leaves the table
+  that day in [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md): the required-checks row leaves the table
   (decision 1), and the token-narrowing row stays, reviewed, until the
   narrowing is applied (decision 2).
 - **D5 (L13-R10-6), the direct-push refusal in 05 5.4.** Options: (a)

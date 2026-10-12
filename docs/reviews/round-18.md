@@ -425,6 +425,50 @@ as above.
   heads are unchanged. Reopened by the first finding that the fetch
   changes a comparison.
 
+### Exchange 2
+
+This exchange applies the decisions of 2026-10-12 on
+[ADR 0011](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md),
+item 1 of the Next steps below. It is not a reviewer's round: no
+finding drove it. Statuses as above.
+
+- ADR 0011 (A): Proposed, with the title "Keep the administrator's
+  pull-request bypass and give the sandbox a GitHub App token" and its
+  file renamed to match. Decision 1 keeps the administrator role in the
+  bypass list of the default-branch ruleset, in `pull_request` mode,
+  for the two reasons decided, and is reopened by the first
+  measurement in which a merge with the sandbox's token lands over a
+  red required check. Decision 2 replaces the classic token with a
+  GitHub App installation token delivered as a global sbx dynamic
+  secret; isolation per repository is deferred, reopened by a
+  repository that a sandbox must not reach. Decision 3 is unchanged.
+  Context cites the docs.github.com pages and the "Not verified" list
+  of the facts read for the GitHub App route below; Consequences lists
+  the App checks that come before Accepted. The `Superseded in part by`
+  lines of ADR 0008 and ADR 0010 are removed, since a Proposed record
+  supersedes nothing yet; the pull request that accepts ADR 0011 adds
+  them back. The index is regenerated, and the links of rounds 9 to 11
+  point at the new file name with their text unchanged.
+- The current state (A): no spec text rests on ADR 0011 for what holds
+  today. S2's evidence and the local-gates row of the index say that
+  the administrator role bypasses the required checks on a pull
+  request merge, and the local-gates row names decision 1 as the
+  proposed record that keeps it; item a of 10 10.2 says the same, and
+  item e no longer records under decision 1. The approval row of
+  05 5.4 drops "until the maintainer step ... removes it".
+- The token (A): the token narrowing row of the index, the token rows
+  of 05 5.4, item g of 10 10.2, the note on the maintainer block and
+  probe A16 name the App installation token as the proposed narrowing,
+  applied at block O8 once ADR 0011 is Accepted; the classic token
+  stands until the first narrowed entry. The index row adds the trigger
+  "a repository that a development sandbox must not reach" and moves
+  the date of its last review to 2026-10-12. Read 1 of the note expects
+  an App installation token on selected repositories with the same
+  permissions as before. Item h of 10 10.2 names no record and is not
+  edited.
+- Block O8 of the plan (A): it runs once ADR 0011 is Accepted, sets
+  the global dynamic secret, and no longer removes the bypass or saves
+  a ruleset answer; S2 leaves its Unblocks cell.
 
 ## Session checkpoint (2026-10-12)
 
