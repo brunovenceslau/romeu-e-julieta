@@ -34,17 +34,35 @@ const fixtureProse = `rules:
     passes: [a plain tool]
 `
 
-// hookLine is the hook of 12 12.1, with the line that makes it a
-// script: it starts go, and so the mise shim, in an environment built
-// from nothing ("env -i"): the variables of hookAllow that the caller
-// has set, each as ${K:+K="$K"} so an unset one stays unset and a value
-// with a space stays one word; then goBuildEnv, miseEnv and the ceiling
-// of the mise files (the parent of the tree, which is the working
-// directory of a hook, with its symbolic links resolved: PWD is the path
-// as the caller typed it), each variable a word of env.
-var hookLine = "#!/bin/sh\nexec env -i " + hookAllowWords() + " " +
+// hookScript is the hook of 12 12.1, as a script. Every go it starts
+// (run) is started in an environment built from nothing ("env -i"):
+// the variables of hookAllow that the caller has set, each as
+// ${K:+K="$K"} so an unset one stays unset and a value with a space
+// stays one word; then goBuildEnv, miseEnv and the ceiling of the mise
+// files (the parent of the tree, which is the working directory of a
+// hook, with its symbolic links resolved: PWD is the path as the caller
+// typed it), each variable a word of env. A probe, "go list -m", comes
+// first: a go older than go.mod refuses it, and the hook says what to
+// do, since the refusal is a bare line from a go that no Go code of the
+// tree can improve.
+var hookScript = "#!/bin/sh\n" +
+	"# The environment of every go this hook starts, built from nothing.\n" +
+	"run() {\n\tenv -i " + hookAllowWords() + " " +
 	strings.Join(slices.Concat(goBuildEnv, miseEnv), " ") +
-	` MISE_CEILING_PATHS="$(dirname -- "$(pwd -P)")" go run ./tools/ci fast "$@"` + "\n"
+	` MISE_CEILING_PATHS="$(dirname -- "$(pwd -P)")" "$@"` + "\n}\n" +
+	`# A go that is older than go.mod refuses with a bare "go: go.mod requires
+# go >= ..." before tools/ci can say more, so this probe, which reads
+# go.mod and builds nothing, lets go's own line through and says what to do.
+# sh because no Go runs yet.
+run go list -m >/dev/null </dev/null || {
+	printf '%s\n' \
+		"pre-push: the go on PATH ($(command -v go || echo none)) cannot run this module." \
+		"pre-push: put the mise shims first on PATH, so that go is the pinned toolchain:" \
+		"pre-push:   mise install, then mise activate in your shell profile (or mise activate --shims)." >&2
+	exit 1
+}
+run go run ./tools/ci fast "$@"
+`
 
 func hookAllowWords() string {
 	words := make([]string, len(hookAllow))
@@ -60,7 +78,7 @@ func hookAllowWords() string {
 func newTree(t *testing.T) *gittest.Repo {
 	t.Helper()
 	r := gittest.New(t)
-	r.Write(".githooks/pre-push", hookLine)
+	r.Write(".githooks/pre-push", hookScript)
 	require.NoError(t, os.Chmod(filepath.Join(r.Dir, ".githooks", "pre-push"), 0o744))
 	r.Write("tools/ci/prose.yaml", fixtureProse)
 	r.Write(names.Path, string(denylist(t, madeUp)))
@@ -132,7 +150,7 @@ func TestHook(t *testing.T) {
 	path := filepath.Join("..", "..", ".githooks", "pre-push")
 	got, err := os.ReadFile(path)
 	require.NoError(t, err)
-	assert.Equal(t, hookLine, string(got), "the hook")
+	assert.Equal(t, hookScript, string(got), "the hook")
 	// The index is read with this process's environment: inside the
 	// hook, git names the repository through it.
 	out, err := exec.Command("git", "ls-files", "--stage", "--", path).Output()
@@ -174,7 +192,7 @@ func TestHookEnvIsTheAllowlist(t *testing.T) {
 	linkDir := t.TempDir()
 	link := filepath.Join(linkDir, "tree")
 	require.NoError(t, os.Symlink(real, link))
-	stub := "#!/bin/sh\nenv\nfor a; do printf 'ARG[%s]\\n' \"$a\"; done\n"
+	stub := "#!/bin/sh\n[ \"$1\" = run ] || exit 0\nenv\nfor a; do printf 'ARG[%s]\\n' \"$a\"; done\n"
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "go"), []byte(stub), 0o700))
 	path := bin + string(os.PathListSeparator) + os.Getenv("PATH")
 	for _, key := range hookAllow {
@@ -224,6 +242,70 @@ func TestHookEnvIsTheAllowlist(t *testing.T) {
 	assert.NotEqual(t, filepath.Dir(link), got["MISE_CEILING_PATHS"])
 	assert.Equal(t, want, got, "the variables go gets")
 	assert.Equal(t, []string{"run", "./tools/ci", "fast", "origin", "https://example.test/a b.git"}, args)
+}
+
+// TestHookExplainsAToolchainRefusal runs the tracked hook with a go
+// stub that refuses the probe the way a go older than go.mod does: the
+// hook lets the refusal through, adds what to do, exits non-zero and
+// never starts the checks. With a go that accepts the probe the hook
+// starts the checks, with the arguments of git, and its exit status is
+// theirs; the probe does not read the refs git sends on the standard
+// input. The stub is a shell script, which the four runners of CI run.
+func TestHookExplainsAToolchainRefusal(t *testing.T) {
+	const refusal = "go: go.mod requires go >= 9.9.9 (running go 1.0.0; GOTOOLCHAIN=local)"
+	hook := mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push"))
+	// The stub refuses "list" when REFUSE is set, which the hook does not
+	// pass on to it (env -i): the file next to the stub says it.
+	stub := "#!/bin/sh\n" +
+		"here=$(dirname -- \"$0\")\n" +
+		"if [ \"$1\" = list ]; then\n" +
+		"\t[ -e \"$here/refuse\" ] || exit 0\n" +
+		"\techo '" + refusal + "' >&2\n\texit 1\nfi\n" +
+		"echo \"checks $*\"\ncat >/dev/null\nexit 7\n"
+	tests := []struct {
+		name       string
+		refuse     bool
+		wantCode   int
+		wantOut    []string
+		wantAbsent []string
+	}{
+		{"a go older than go.mod", true, 1,
+			[]string{refusal, "cannot run this module", "put the mise shims first on PATH", "mise activate"},
+			[]string{"checks"}},
+		{"a go that accepts the probe", false, 7,
+			[]string{"checks run ./tools/ci fast origin https://example.test/a b.git"},
+			[]string{"cannot run this module", refusal}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bin := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(bin, "go"), []byte(stub), 0o700))
+			if tt.refuse {
+				require.NoError(t, os.WriteFile(filepath.Join(bin, "refuse"), nil, 0o600))
+			}
+			cmd := exec.Command("sh", hook, "origin", "https://example.test/a b.git")
+			cmd.Dir = t.TempDir()
+			cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+			cmd.Stdin = strings.NewReader("refs/heads/x 0 refs/heads/x 0\n")
+			out, err := cmd.CombinedOutput()
+			code := 0
+			if ee, ok := err.(*exec.ExitError); ok {
+				code = ee.ExitCode()
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantCode, code, "exit status\n%s", out)
+			for _, w := range tt.wantOut {
+				assert.Contains(t, string(out), w)
+			}
+			for _, w := range tt.wantAbsent {
+				assert.NotContains(t, string(out), w)
+			}
+			if tt.refuse {
+				assert.Contains(t, string(out), filepath.Join(bin, "go"), "the hint names the go it found")
+			}
+		})
+	}
 }
 
 func mustAbs(t *testing.T, p string) string {
