@@ -14,22 +14,24 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 )
 
 // TestMiseEnvList pins the allowlist of environment variables of every
 // mise run and of the pre-push hook, and its fixed part, miseEnv:
 //
-//   - passThrough: where things are on this machine (PATH to find mise
+//   - goenv.PassThrough: where things are on this machine (PATH to find mise
 //     and go, HOME for the installs, the caches and the git config,
 //     TMPDIR, the XDG directories for those of mise and git, the state
 //     and cache directories of mise, and the Go path and caches that
 //     hold the module cache);
 //   - networkPassThrough: the proxy and the certificate bundle for a
 //     download of a module or a tool;
-//   - miseEnv and goBuildEnv: the fixed settings.
+//   - miseEnv and goenv.Build: the fixed settings.
 //
 // Every other variable of the caller is dropped, so none of the lists
-// holds a key of miseEnv or of goBuildEnv. The module variables
+// holds a key of miseEnv or of goenv.Build. The module variables
 // (goModulePassThrough) are only the hook's: setup's mise install and
 // go mod download keep the checksum database as their guard. TestHookEnvIsTheAllowlist
 // and TestMiseNeverReads measure what that closes.
@@ -39,10 +41,10 @@ func TestMiseEnvList(t *testing.T) {
 		"XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
 		"MISE_CACHE_DIR", "MISE_DATA_DIR", "MISE_STATE_DIR",
 		"GOPATH", "GOCACHE", "GOMODCACHE",
-	}, passThrough)
+	}, goenv.PassThrough)
 	assert.Equal(t, []string{"GOPROXY", "GOPRIVATE", "GONOSUMDB", "GOSUMDB", "GOINSECURE"}, goModulePassThrough)
 	assert.Equal(t, []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}, networkPassThrough)
-	assert.Equal(t, slices.Concat(passThrough, networkPassThrough, goModulePassThrough), hookAllow)
+	assert.Equal(t, slices.Concat(goenv.PassThrough, networkPassThrough, goModulePassThrough), hookAllow)
 	assert.Equal(t, []string{
 		"MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml",
 		"MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none",
@@ -53,18 +55,18 @@ func TestMiseEnvList(t *testing.T) {
 		"GOENV=off",
 		"GOTOOLCHAIN=local",
 	}, miseEnv)
-	assert.Equal(t, []string{"GOWORK=off", "GOFLAGS=-mod=readonly"}, goBuildEnv)
-	assert.Equal(t, []string{"GOENV=off", "GOTOOLCHAIN=local"}, goPinEnv)
-	assert.Subset(t, stepEnv("/go"), goPinEnv, "stepEnv holds goPinEnv")
-	assert.Subset(t, stepEnv("/go"), goBuildEnv, "stepEnv holds goBuildEnv")
+	assert.Equal(t, []string{"GOWORK=off", "GOFLAGS=-mod=readonly"}, goenv.Build)
+	assert.Equal(t, []string{"GOENV=off", "GOTOOLCHAIN=local"}, goenv.Pin)
+	assert.Subset(t, stepEnv("/go"), goenv.Pin, "stepEnv holds goenv.Pin")
+	assert.Subset(t, stepEnv("/go"), goenv.Build, "stepEnv holds goenv.Build")
 	assert.Equal(t, "MISE_CEILING_PATHS=/a/b", miseCeiling("/a/b/tree"))
-	for _, kv := range slices.Concat(miseEnv, goBuildEnv) {
+	for _, kv := range slices.Concat(miseEnv, goenv.Build) {
 		key, _, _ := strings.Cut(kv, "=")
-		for _, list := range [][]string{passThrough, networkPassThrough, dockerPassThrough} {
+		for _, list := range [][]string{goenv.PassThrough, networkPassThrough, dockerPassThrough} {
 			assert.NotContains(t, list, key)
 		}
 	}
-	for _, key := range slices.Concat(passThrough, networkPassThrough, dockerPassThrough, goModulePassThrough) {
+	for _, key := range slices.Concat(goenv.PassThrough, networkPassThrough, dockerPassThrough, goModulePassThrough) {
 		assert.NotContains(t, []string{"MISE_CEILING_PATHS", "MISE_CD", "MISE_ENV_FILE", "MISE_TRUSTED_CONFIG_PATHS", "MISE_GLOBAL_CONFIG_FILE", "MISE_SYSTEM_CONFIG_FILE", "MISE_CONFIG_DIR", "XDG_CONFIG_HOME", "GOFLAGS", "GOENV", "GOWORK", "GOTOOLCHAIN"}, key)
 	}
 	// A value of the caller's for a variable of miseEnv loses to the list's.

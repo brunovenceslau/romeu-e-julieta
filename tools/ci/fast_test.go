@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 )
 
@@ -389,27 +390,6 @@ func TestFastJudgesAgainAfterTheSteps(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestHookGitEnv pins the variables that judgeCommit's git commands go
-// without: the list git itself gives for a repository's location,
-// every GIT_CONFIG variable, and a GIT_OPTIONAL_LOCKS of the caller,
-// which it replaces with 0.
-func TestHookGitEnv(t *testing.T) {
-	out, err := exec.CommandContext(t.Context(), "git", "rev-parse", "--local-env-vars").Output()
-	require.NoError(t, err)
-	assert.ElementsMatch(t, strings.Fields(string(out)), repoLocalEnv, "git rev-parse --local-env-vars")
-
-	base := []string{"PATH=/bin", "HOME=/h", "GIT_AUTHOR_NAME=a", "GIT_OPTIONAL_LOCKS=1",
-		"GIT_CONFIG_KEY_0=core.worktree", "GIT_CONFIG_VALUE_0=/elsewhere", "GIT_CONFIG_GLOBAL=/g", "GIT_CONFIG_NOSYSTEM=1"}
-	for _, key := range repoLocalEnv {
-		base = append(base, key+"=/x")
-	}
-	assert.Equal(t, []string{"PATH=/bin", "HOME=/h", "GIT_AUTHOR_NAME=a", "GIT_OPTIONAL_LOCKS=0"}, hookGitEnv(base))
-
-	t.Setenv("GIT_INDEX_FILE", "/from/the/process")
-	assert.NotContains(t, hookGitEnv(nil), "GIT_INDEX_FILE=/from/the/process", "nil is this process's environment")
-	assert.Contains(t, hookGitEnv(nil), "GIT_OPTIONAL_LOCKS=0")
 }
 
 // checkoutTip checks out, detached and for the time of the test, the
@@ -1287,10 +1267,10 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 // TestResolveLintToolsEnvironment checks that "mise which" runs in
 // passThroughEnv with miseEnv, at the top of the tree: a fake mise
 // writes its environment and its working directory to files, and every
-// variable of passThrough and of miseEnv reaches it and nothing else,
+// variable of goenv.PassThrough and of miseEnv reaches it and nothing else,
 // with the ones a shell adds itself, whatever else this process holds;
 // a value of miseEnv is the list's, never the process's. Each variable
-// of passThrough is set here, so the result does not depend on the
+// of goenv.PassThrough is set here, so the result does not depend on the
 // caller's environment (a TMPDIR or a MISE_STATE_DIR of its own).
 func TestResolveLintToolsEnvironment(t *testing.T) {
 	envPath, err := exec.LookPath("env")
@@ -1299,7 +1279,7 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 	for _, key := range []string{"GOFLAGS", "MISE_INSTALLS_DIR", "MISE_TRUSTED_CONFIG_PATHS", "CI", "MISE_ENV"} {
 		t.Setenv(key, "from-the-process")
 	}
-	for _, key := range passThrough {
+	for _, key := range goenv.PassThrough {
 		if key != "HOME" && key != "PATH" {
 			t.Setenv(key, "/from/"+key)
 		}
@@ -1322,7 +1302,7 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 			values[key] = value
 		}
 	}
-	want := slices.Clone(passThrough)
+	want := slices.Clone(goenv.PassThrough)
 	for _, kv := range miseEnv {
 		key, value, _ := strings.Cut(kv, "=")
 		want = append(want, key)
@@ -1418,7 +1398,7 @@ func TestIsGateInput(t *testing.T) {
 
 // TestStepEnv pins the environment of the steps, written out in full:
 // PATH with the directory of the pinned go first, the other variables
-// of passThrough that are set, and the fixed ones, in that order and
+// of goenv.PassThrough that are set, and the fixed ones, in that order and
 // nothing else; the lint step adds its target. Every variable of the
 // process that is outside that list stays out, whatever its name.
 func TestStepEnv(t *testing.T) {
@@ -1429,7 +1409,7 @@ func TestStepEnv(t *testing.T) {
 		"CI", "MISE_TRUSTED_CONFIG_PATHS"} {
 		t.Setenv(key, "from-the-process")
 	}
-	for _, key := range passThrough {
+	for _, key := range goenv.PassThrough {
 		t.Setenv(key, "/from/"+key)
 	}
 	// Two that are empty and must be left out.
@@ -1504,7 +1484,7 @@ func TestStepRun(t *testing.T) {
 // TestFastHookIgnoresCallerGitEnv shows that hygiene and the pushed
 // range read this repository when the caller sets GIT_DIR and
 // GIT_ALTERNATE_OBJECT_DIRECTORIES to another one: a pre-push run
-// clears the variables of repoLocalEnv for every git command it runs.
+// clears the variables of git.LocalEnv for every git command it runs.
 func TestFastHookIgnoresCallerGitEnv(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
 	r := newTree(t)

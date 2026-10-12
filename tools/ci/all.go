@@ -355,7 +355,7 @@ func runWorkflows(ctx context.Context, e env, args []string) (bool, error) {
 // machine runs by hand otherwise ("mise trust", "mise install"). The
 // hosted workflow runs it before all: there the mise action trusts the
 // configuration only through MISE_TRUSTED_CONFIG_PATHS, which no step
-// of tools/ci keeps (passThrough), and installs the tools already, so
+// of tools/ci keeps (goenv.PassThrough), and installs the tools already, so
 // the second step finds nothing to do.
 //
 // Both mise steps run with miseEnv, at the top of the tree. In the

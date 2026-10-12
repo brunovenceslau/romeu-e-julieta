@@ -22,6 +22,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 )
@@ -218,7 +219,7 @@ func TestAllSteps(t *testing.T) {
 		}
 	}
 	for _, key := range slices.Concat(networkPassThrough, dockerPassThrough, goModulePassThrough) {
-		assert.NotContains(t, passThrough, key)
+		assert.NotContains(t, goenv.PassThrough, key)
 	}
 }
 

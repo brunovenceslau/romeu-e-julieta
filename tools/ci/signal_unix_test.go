@@ -7,7 +7,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +18,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/procgroup"
 )
 
 // helperEnv names the role of this test binary when a test runs it as a
@@ -161,47 +162,6 @@ func killAtEnd(t *testing.T, pidfile string) {
 	})
 }
 
-// TestKillWithGroup kills the whole group, with the SIGKILL that a
-// grandchild cannot ignore (the group mutants: no Setpgid, the pid and
-// not the group, SIGTERM, no Cancel), and lets the wait end when a
-// holder of the pipe has left the group (the WaitDelay mutants).
-func TestKillWithGroup(t *testing.T) {
-	t.Run("the grandchild that ignores SIGTERM is killed with the group", func(t *testing.T) {
-		pidfile := filepath.Join(t.TempDir(), "pid")
-		killAtEnd(t, pidfile)
-		s := groupStep(pidfile)
-		s.timeout = 500 * time.Millisecond
-		start := time.Now()
-		_, err := s.run(t.Context(), t.TempDir())
-		require.ErrorIs(t, err, context.DeadlineExceeded)
-		assert.Less(t, time.Since(start), 5*time.Second)
-		requireGone(t, waitForPid(t, pidfile))
-	})
-	t.Run("a holder of the pipe outside the group is waited for no longer than WaitDelay", func(t *testing.T) {
-		pidfile := filepath.Join(t.TempDir(), "pid")
-		killAtEnd(t, pidfile)
-		const bound = 6 * time.Second // the holder sleeps for 15s
-		require.Less(t, killWaitDelay, bound-time.Second, "the bound of the wait is under the bound of the test")
-		s := step{name: "escape", argv: []string{os.Args[0], "-test.run=^TestHelperProcess$"},
-			environ: []string{"PATH=" + os.Getenv("PATH"), helperEnv + "=escape", "CI_TEST_PIDFILE=" + pidfile}}
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-		errc := make(chan error, 1)
-		go func() {
-			_, err := s.run(ctx, t.TempDir())
-			errc <- err
-		}()
-		// The holder exists before the step is cancelled, so the wait that
-		// follows is for a live holder and not for nothing.
-		holder := waitForPid(t, pidfile)
-		start := time.Now()
-		cancel()
-		require.Error(t, <-errc)
-		assert.Less(t, time.Since(start), bound, "the step returns after WaitDelay, not when the holder ends")
-		assert.NoError(t, syscall.Kill(holder, 0), "the holder is still alive, so only WaitDelay ended the wait")
-	})
-}
-
 // TestStepRunKillsTheGroup checks that a step whose leader has ended,
 // by failing or by succeeding, leaves no grandchild behind once run
 // returns: the grandchild holds the output pipe, WaitDelay ends the
@@ -223,16 +183,6 @@ func TestStepRunKillsTheGroup(t *testing.T) {
 			requireGone(t, waitForPid(t, pidfile))
 		})
 	}
-}
-
-// TestKillGroupAfterWait checks that a group that is already gone is
-// os.ErrProcessDone, which Go does not report, and not a kill error
-// that would turn a command that succeeded into a failure.
-func TestKillGroupAfterWait(t *testing.T) {
-	cmd := exec.CommandContext(t.Context(), "true")
-	killWithGroup(cmd)
-	require.NoError(t, cmd.Run())
-	assert.ErrorIs(t, killGroup(cmd.Process.Pid), os.ErrProcessDone)
 }
 
 // TestMainSignals runs main's signal handling around a step that
@@ -369,7 +319,7 @@ func TestMainSecondSignal(t *testing.T) {
 			ws, ok := exit.Sys().(syscall.WaitStatus)
 			require.True(t, ok)
 			assert.True(t, ws.Signaled(), "the second signal ended the process by its default action")
-			assert.Less(t, time.Since(start), killWaitDelay-250*time.Millisecond, "main did not wait out the drain")
+			assert.Less(t, time.Since(start), procgroup.WaitDelay-250*time.Millisecond, "main did not wait out the drain")
 			return
 		case <-tick.C:
 			_ = cmd.Process.Signal(syscall.SIGTERM)

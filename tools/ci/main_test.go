@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 )
 
@@ -41,7 +42,7 @@ const fixtureProse = `rules:
 // with "exec env -i" in an environment built from nothing: the
 // variables of hookAllow that the caller has set, each as
 // ${K:+K="$K"} so an unset one stays unset and a value with a space
-// stays one word; then goBuildEnv, miseEnv and the ceiling of the mise
+// stays one word; then goenv.Build, miseEnv and the ceiling of the mise
 // files (the parent of the tree, which is the working directory of a
 // hook, with its symbolic links resolved: PWD is the path as the caller
 // typed it), each variable a word of env. The exec makes a signal sent
@@ -50,7 +51,7 @@ const fixtureProse = `rules:
 // refusal is a bare line from a go that no Go code of the tree can
 // improve.
 var hookScript = strings.Replace(hookTemplate, "{{ENV}}",
-	hookAllowWords()+" "+strings.Join(slices.Concat(goBuildEnv, miseEnv), " ")+
+	hookAllowWords()+" "+strings.Join(slices.Concat(goenv.Build, miseEnv), " ")+
 		` MISE_CEILING_PATHS="$(dirname -- "$(pwd -P)")"`, 1)
 
 const hookTemplate = `#!/bin/sh
@@ -214,7 +215,7 @@ func TestRunPrintsAnErrorAsSafeText(t *testing.T) {
 // in a symbolic link to the tree, with PWD as the caller typed it. Each call gets exactly what the
 // production lists build for a mise run at the top of the tree
 // (miseRunEnviron over passThroughEnv), the proxy and module variables
-// that were set, and goBuildEnv, with the ceiling the parent of the
+// that were set, and goenv.Build, with the ceiling the parent of the
 // resolved tree; and the arguments of git pass through as they are.
 func TestHookEnvIsTheAllowlist(t *testing.T) {
 	bin, real := t.TempDir(), mustEval(t, t.TempDir())
@@ -245,7 +246,7 @@ func TestHookEnvIsTheAllowlist(t *testing.T) {
 	want := map[string]string{}
 	for _, kv := range slices.Concat(
 		miseRunEnviron(withProcessEnv(passThroughEnv(), slices.Concat(networkPassThrough, goModulePassThrough)), real),
-		goBuildEnv,
+		goenv.Build,
 	) {
 		k, v, _ := strings.Cut(kv, "=")
 		want[k] = v
