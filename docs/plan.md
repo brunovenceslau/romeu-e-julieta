@@ -64,7 +64,7 @@ agent, may ship as one pull request (12 12.9). It carries:
 | Module | the module id of 12 12.2 |
 | Implements | the sections of the specification, by number |
 | Depends on | the tasks and operator blocks that come first |
-| Operator | `no`, or the block (O1 to O7) or the question the task waits for or feeds |
+| Operator | `no`, or the block (O1 to O8) or the question the task waits for or feeds |
 | Ask-first | the surfaces of 05 5.3 we expect the diff to touch. `tools/ci pr` computes the real list from the diff (12 12.4); this field is a forecast, so the maintainer can give the approvals early |
 | Acceptance | what a test or a command checks |
 | Verify | the command that shows it |
@@ -204,7 +204,7 @@ by working agreement, since the tag ruleset does not bind the operator's
 token, which the sandbox holds (05 5.4; 12 12.2), the denylist entries,
 which an agent must not hold (10 10.2, "Forbidden names"), and anything
 that reads the reference config repo. The maintainer works in sittings, so these steps
-are seven blocks, and each says what it needs, what it unblocks, what
+are eight blocks, and each says what it needs, what it unblocks, what
 wait it puts on the critical path, and what pass means: one command
 whose exit status the maintainer reads, wherever one exists. Block A of
 11 is sitting O3 here, and block B is sitting O6.
@@ -218,6 +218,7 @@ whose exit status the maintainer reads, wherever one exists. Block A of
 | O5 | every earlier task, T001 to T091 and T103 | the candidate: run `julieta spec validate --catalog` again, in the container of O4, and see it exit 0; the rehearsal on one host (below); then step 1 of the release checklist of 12 12.2, the tag `v1.0.0-rc.1` (11 11.2) | the same container as O4; one host with `sbx` | O6 directly, and through it T092 to T095 and T102 | the rehearsal is about one block B run on one host, 90 minutes plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go test -tags host -json ./e2e/host/...` exits 0, then `go run ./tools/ci probes --require-pass B2,B3,B4,B5,C2,C3,C4,C5,C6 --hosts 1 --dir <the rehearsal directory>` exits 0 | the rehearsal is this plan's addition, not the specification's. After the tag, a change outside `docs/` and the root Markdown files needs a new candidate and block B again (11 11.2) |
 | O6 | O5 | step 2 of the release checklist of 12 12.2, block B on both hosts (11 11.2): B1 to B5 and the sandbox-side checks C2 to C6; then commit the results on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | the candidate's published release; both hosts | T092 directly, and through it T093 to T095 and T102 | about 90 minutes per host for B1 to B5, plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go run ./tools/ci probes --require-pass B1,B2,B3,B4,B5,C2,C3,C4,C5,C6` exits 0 on the branch with both hosts' results | run B1 first on each host: each other result copies the candidate's tag and commit from it (11 11.2). The reading rules of block O3 apply: the staged diff before the push, each host pushing from its own clone through its hook, and a resolution commit's diff before checkout |
 | O7 | T094, T095, T101, T093 | steps 3 to 5 of the release checklist of 12 12.2: `go run ./tools/ci acceptance --pre-tag` exits 0; push the tag `v1.0.0`; run B1 and B2 once more on v1.0.0, on one host, with `--out` outside the repository: `go run ./e2e/probes --block B --only B1 --out <dir>`, then the same with `--only B2` (11 11.2). Then pin `validate.yml` in the reference config repo to that release, run it and note its run id (S4) | the documentation tasks merged, each of them; the config repo | T102 directly; no other task | one B1 and one B2 run and one workflow run. No task can proceed meanwhile | `go run ./tools/ci probes --require-pass B1,B2 --hosts 1 --dir <dir>` exits 0 on that run | the pre-tag check is a command here, and `tools/ci acceptance` runs it again at the end (10 10.5); a check that fails after the tag is fixed by a patch release (12 12.2). The release exists only after the tag, so the pin comes after it. Paste under the Evidence of T102 the result files of those runs, which the harness wrote through its redaction, and no raw output |
+| O8 | T002 | the token narrowing and the required-name try, items g and h of the maintainer block (10 10.2): create the fine-grained token of [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md), decision 2, set it as the sandbox's `github` secret, stop forwarding the GitHub authentication key, then write the dated entry of the note on the maintainer block and run the required-name try | the host, the repository's admin rights, a throwaway pull request | the Deferred decisions rows whose trigger is "the token is narrowed" | none: no task waits on it, and every task proceeds around it; it is due before checkpoint C7 | the entry's verdict is narrowed, read against the expected answers the note lists, which no one command joins **[review]** | run it at the next sitting after T002 merges, together with decision 1 of the same record |
 
 **What does not wait for block O3.** These tasks have no block A fact in
 their dependencies, come after the tasks block O3 itself needs, and may
@@ -1990,6 +1991,9 @@ early.
     dirt in a linked worktree, an unbundled tag, a corrupted payload
     file, a salvage id mismatch, daemon heads not in the bundle, and a
     repo removed from the spec after the generation was created.
+  - Each `E:` case of I17 is one test with a title of its own, so the
+    cases are cited by title and not by their place in the one cell
+    of 05 5.2 that lists them (round 14, R14-10; round 15, R15-15).
   - `--accept-loss` removes the sandbox after an incomplete salvage;
     `rm` warns when the generation has no `final` handoff.
   - `recreate` is `rm`, then `run`: it salvages, removes, records a new

@@ -118,11 +118,18 @@ The record of the narrowing of the development sandbox's GitHub token
 ([ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](../adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md),
 decision 2), as item g of
 [10 10.2](../spec/10-testing-style.md#release-and-bootstrap) asks for
-it. The maintainer adds one dated entry when the narrowing is applied,
-and one for each later read. The entry is the event of the
+it, and the one home of the rule below. The maintainer adds one dated
+entry when the narrowing is applied, and one for each later read. An
+entry is a heading `### <date>: narrowed` or `### <date>: not
+narrowed`, followed by the three reads; the first entry replaces the
+line "No entry yet" at the end of this section. The first entry whose
+verdict is narrowed is the event of the
 [Deferred decisions](../spec.md#in-how-this-repository-is-run) rows
-whose trigger is "the token is narrowed"; no check reads it, so it is
-**[review]**.
+whose trigger is "the token is narrowed". A later entry whose verdict
+is not narrowed returns the token rows of the index and of
+[05 5.4](../spec/05-security.md#risks-of-how-this-repository-is-developed)
+to the state before the narrowing; the rows it fired stay fired. No
+check reads the entries, so they are **[review]**.
 
 Each entry holds three reads, made on the host or checked from the
 maintainer's own session, never only from what the sandbox printed:
@@ -133,12 +140,16 @@ maintainer's own session, never only from what the sandbox printed:
    page. Expected: a fine-grained token, this repository alone,
    Contents, Pull requests and Workflows read and write, Actions,
    Checks and Metadata read, and no Administration.
-2. The keys the sandbox's forwarded agent lists (`ssh-add -l` in the
-   sandbox, read by the maintainer). Expected: the signing key, and no
-   GitHub authentication key.
+2. The agent the host forwards into the sandbox, read on the host: the
+   keys of the forwarded socket, listed by `ssh-add -l` on the host
+   with `SSH_AUTH_SOCK` set to that socket. Expected: the signing key,
+   and no GitHub authentication key. The sandbox's own `ssh-add -l` may
+   be read too, as a second read, never as the proof.
 3. The four tries of item d above, repeated from inside the sandbox
    with the narrowed token, with throwaway payloads and the same undo
-   and check from the maintainer's session:
+   and check from the maintainer's session. The tag try runs only while
+   no `release.yml` exists, since a `v*` tag would start a release once
+   it does; a later read leaves it out:
 
    | Try | Answer in item d, with the operator's token | Expected with the narrowed token |
    |---|---|---|
@@ -151,5 +162,13 @@ The token is narrowed when the A16 read and the agent's keys match
 what is expected and the ruleset update is refused. Any other answer
 on those three means it is not, and the entry says which read
 differed.
+
+Two limits of the entry, stated and not closed (round 15): nothing
+acts on an accepted tag try, which the pull request that adds
+`release.yml` reopens; and no read looks for deploy keys, webhooks or
+collaborators that the operator's token could have added before the
+narrowing, a class ADR 0008 lists, which the review of the token
+narrowing row of [Deferred decisions](../spec.md#in-how-this-repository-is-run)
+reopens.
 
 No entry yet: the narrowing waits for a maintainer step.

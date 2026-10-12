@@ -841,7 +841,9 @@ a stray tag and not the token, which merges through the API.
 **The maintainer block.** The parts of `ci-bootstrap` that only the
 maintainer can do: one sitting around step 1 and one call after step
 2. The output of each item goes under the Evidence of the PR it belongs
-to; no check reads that text, so it is **[review]**. Items a to d ran,
+to, except items g and h, which have no pull request and go in the
+dated entry of the note on the maintainer block; no check reads that
+text, so it is **[review]**. Items a to d ran,
 and what each did and measured, with its date, is in
 [the note on the maintainer block](../notes/maintainer-block-of-ci-bootstrap.md).
 What they set up, and holds now:
@@ -884,7 +886,7 @@ into a plain clone on the host and reads its diff there before checking
 it out.
 
 To do, each a maintainer step that saves the API's answer under
-Evidence:
+Evidence, or, for items g and h, in the note's dated entry:
 
 - e. After step 2, the CI jobs of the green run joined the
   default-branch ruleset as required status checks: as read on
@@ -905,18 +907,14 @@ Evidence:
   decision 2). The narrowing is a host step with no pull request, so
   its answers go in a dated entry of
   [the note on the maintainer block](../notes/maintainer-block-of-ci-bootstrap.md#the-token-narrowing),
-  not under a pull request's Evidence. The entry holds: probe A16's
-  read on the host ([11 11.1](11-host-probes.md#111-block-a---sbx-and-runtime-facts-first-in-parallel-with-the-first-build-layer)),
-  the token's type, its repository list and its permissions; the keys
-  the sandbox's forwarded agent lists, read by the maintainer, with no
-  GitHub authentication key among them; and the four tries of item d
-  repeated with the narrowed token, each against the expected answer
-  the note lists, with what took effect checked from the maintainer's
-  own session. The entry is the event of the Deferred decisions rows
-  whose trigger is "the token is narrowed". An A16 read that shows
-  more than this repository or the Administration permission, a
-  GitHub key in the agent, or a ruleset update the token is not
-  refused means the token is not narrowed, and the entry says so.
+  not under a pull request's Evidence. The note is the one home of
+  what an entry reads (probe A16's read on the host,
+  [11 11.1](11-host-probes.md#111-block-a---sbx-and-runtime-facts-first-in-parallel-with-the-first-build-layer);
+  the agent the host forwards into the sandbox, read on the host; and
+  the four tries of item d repeated with the narrowed token), of the
+  answer each read must give, and of the verdict. The first entry
+  whose verdict is narrowed is the event of the Deferred decisions
+  rows whose trigger is "the token is narrowed".
 - h. The required-name try, after the narrowing, in three steps on a
   throwaway pull request whose head is one empty commit (05 5.4;
   round 12, D1, decided on 2026-10-09; round 13, R13-02): (1) a
@@ -928,8 +926,9 @@ Evidence:
   and record whether the token refuses it; (3) close the pull request,
   delete its head branch and the side branch with its workflow, and
   check from the maintainer's own session that the pull request is
-  closed and both branches are gone, so no head that carries a status
-  under a required name can be reopened and merged.
+  closed and both branches are gone. The commit stays reachable through
+  the pull request's ref, so the guard is that the head is one empty
+  commit: a merge of it changes nothing.
 
 Between steps 1 and 3 the hook is the one check on commit messages,
 identities and ref names, and julieta's dispatcher does not exist yet,
