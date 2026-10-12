@@ -32,8 +32,8 @@ var PassThrough = []string{
 // go and on the process's own environment: GOENV=off (no "go env -w"
 // file is read) and GOTOOLCHAIN=local (no other go is downloaded or
 // run). It is the one list that stepEnv and miseEnv of tools/ci (every
-// mise run, "mise install" and its build of govulncheck among them) and
-// the go commands of tools/mutants all hold.
+// mise run, "mise install" and its builds of govulncheck and gopls
+// among them) and the go commands of tools/mutants all hold.
 var Pin = []string{
 	"GOENV=off",
 	"GOTOOLCHAIN=local",

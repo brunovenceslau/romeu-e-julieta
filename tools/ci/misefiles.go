@@ -112,23 +112,25 @@ import (
 // its templates have no exec() (render_miserc_template in
 // src/config/miserc.rs). A mise run that does not come from tools/ci,
 // the workflow or the pre-push hook, such as a developer's shell with
-// go on the mise shims, has no miseEnv, so a change that adds a file
-// of the list runs its command there before hygiene fails it; hygiene
-// and the code-owner review keep it off the default branch. That the
-// hosted runner delivers the empty MISE_ENV of the env table as a set
-// variable is read from the runner's source (actions/runner v2.338.0
-// keeps an empty value from the job message to the process), but the
-// service that writes the job message is not public, which is why
-// setup checks it in every hosted run. Windows also takes a name with
-// a trailing space or dot for the name without it (mise.local.toml.);
-// no runner of the CI matrix is Windows and no rule refuses such a
-// name, a decision to reopen if Windows joins the matrix
+// go on the mise shims, or an editor or an agent that starts gopls
+// through its shim (gopls starts go the same way, as soon as the
+// language server opens the tree), has no miseEnv, so a change that
+// adds a file of the list runs its command there before hygiene fails
+// it; hygiene and the code-owner review keep it off the default branch.
+// That the hosted runner delivers the empty MISE_ENV of the env table
+// as a set variable is read from the runner's source (actions/runner
+// v2.338.0 keeps an empty value from the job message to the process),
+// but the service that writes the job message is not public, which is
+// why setup checks it in every hosted run. Windows also takes a name
+// with a trailing space or dot for the name without it
+// (mise.local.toml.); no runner of the CI matrix is Windows and no rule
+// refuses such a name, a decision to reopen if Windows joins the matrix
 // (TestPrintableASCII shows the gap). Nothing the caller or the machine
 // configures outside the tree reaches mise: miseEnv names no global or
 // system configuration and the ceiling keeps it out of the parents of
 // the tree (the idiomatic_version_file_enable_tools setting, which
-// would make mise read .go-version and go.mod, is among what a global or
-// system configuration can no longer set).
+// would make mise read .go-version and go.mod, is among what a global
+// or system configuration can no longer set).
 //
 // Not covered either: an attack of the change's tests on the tools/ci
 // process itself. A test runs in the same process tree and account as
@@ -187,10 +189,10 @@ import (
 // starts go with "env -i", the same allowlist (hookAllow) and the same
 // fixed part (TestHook holds the hook to these lists).
 //
-// goenv.Pin ends the list: "mise install" builds govulncheck with the go
-// command ("go install", the go: backend), so that build reads no "go
-// env -w" file and starts no other go than the pinned one, as every go
-// step of tools/ci does (stepEnv).
+// goenv.Pin ends the list: "mise install" builds govulncheck and gopls
+// with the go command ("go install", the go: backend), so those builds
+// read no "go env -w" file and start no other go than the pinned one, as
+// every go step of tools/ci does (stepEnv).
 var miseEnv = slices.Concat([]string{
 	"MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml",
 	"MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none",

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/build"
 	"go/parser"
@@ -1160,13 +1161,14 @@ func TestOnlyAllowedGoModDirectives(t *testing.T) {
 // pinnedTools are the tools the mise configuration of this repository
 // pins, each at the version mise.lock locks: the go command and
 // golangci-lint, the two that fast runs (resolveLintTools), govulncheck,
-// which all starts through "mise exec" (allSteps), and gh, for the
-// release tool (decision DR7 of review round 8: gh is locked, and the
-// tool starts it by its resolved path). This is the one list of what
-// mise may install, and the one that 12 12.1 of the specification
-// points at: allowedMiseTables, TestLockedVersions and TestMiseConfigs
-// read it.
-var pinnedTools = []string{"go", "gh", "golangci-lint", "go:golang.org/x/vuln/cmd/govulncheck"}
+// which all starts by the path "mise which" resolves (allSteps), gh, for
+// the release tool (decision DR7 of review round 8: gh is locked, and the
+// tool starts it by its resolved path), and gopls, the Go language server
+// that editors and agents use to navigate the code, which no step of
+// tools/ci starts. This is the one list of what mise may install, and the
+// one that 12 12.1 of the specification points at: allowedMiseTables,
+// TestLockedVersions and TestMiseConfigs read it.
+var pinnedTools = []string{"go", "gh", "golangci-lint", "go:golang.org/x/vuln/cmd/govulncheck", "go:golang.org/x/tools/gopls"}
 
 // allowedMiseTables are the tables a mise configuration file of this
 // repository may hold, with the keys each may hold. The [env] table,
@@ -1207,6 +1209,210 @@ func TestLockedVersions(t *testing.T) {
 	assert.ElementsMatch(t, pinnedTools, slices.Collect(maps.Keys(locked)), "the tools of mise.lock")
 	for tool, version := range locked {
 		assert.Regexp(t, lockedVersion, version, "the version of %s in mise.lock", tool)
+	}
+}
+
+// lockPlatforms returns the platforms mise.lock holds a download of
+// each tool for, in mise's names: the lintTargets, the supported
+// targets, with darwin written macos and amd64 written x64. So a target
+// added to lintTargets fails TestLockIntegrity until mise.lock carries
+// it.
+func lockPlatforms() []string {
+	osName := map[string]string{"linux": "linux", "darwin": "macos"}
+	archName := map[string]string{"amd64": "x64", "arm64": "arm64"}
+	var platforms []string
+	for _, t := range lintTargets {
+		platforms = append(platforms, osName[t.goos]+"-"+archName[t.goarch])
+	}
+	slices.Sort(platforms)
+	return platforms
+}
+
+// The line grammar of mise.lock as lockIntegrityFindings reads it: the
+// form "mise lock" writes (measured with mise 2026.10.3), and no other.
+// A key is followed by one string or one array of strings, on one line,
+// so a value that spans lines, such as a multi-line string, is not a
+// key line.
+var (
+	lockVersionLine    = regexp.MustCompile(`^lockfile_version = [0-9]+$`)
+	lockToolHeader     = regexp.MustCompile(`^\[\[tools\.("[^"]+"|[A-Za-z0-9_-]+)\]\]$`)
+	lockPlatformHeader = regexp.MustCompile(`^\[tools\.("[^"]+"|[A-Za-z0-9_-]+)\."platforms\.([a-z0-9-]+)"\]$`)
+	lockKeyLine        = regexp.MustCompile(`^([a-z_]+) = ("[^"\\]*"|\[("[^"\\]*"(, "[^"\\]*")*)?\])$`)
+)
+
+// lockEntryKeys are the keys of a [[tools.<name>]] entry, and
+// lockPlatformKeys those of one of its platform tables.
+var (
+	lockEntryKeys    = []string{"version", "backend", "specifiers"}
+	lockPlatformKeys = []string{"checksum", "url", "url_api", "provenance"}
+)
+
+// lockChecksum matches a checksum as mise.lock holds one.
+var lockChecksum = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+
+// lockIntegrityFindings returns what in a mise.lock does not hold the
+// integrity form of 12 12.1. A tool of the mise go backend, one whose
+// name starts with "go:" and whose backend is that same name, is built
+// from source, so it holds no platform table: its integrity rests on
+// the Go checksum database. Every other tool holds a platform table for
+// each of lockPlatforms, each with a sha256 checksum, and none for
+// another platform. The file is read line by line, and each line must
+// be blank, a comment, the lockfile_version line before the first
+// header, a [[tools.<name>]] header, a [tools.<name>."platforms.<p>"]
+// header that follows its tool's header, or a one-line key of
+// lockEntryKeys or lockPlatformKeys in its table; a tool has one entry
+// and one table per platform. So a lock that lockedVersions reads the
+// same line by line holds no spaced header, multi-line string or
+// second entry that the two readers could see past.
+func lockIntegrityFindings(data []byte) []string {
+	type entry struct {
+		backend   string
+		checksums map[string]string
+	}
+	entries := map[string]*entry{}
+	var order, bad []string
+	tool, platform, headerSeen := "", "", false
+	for line := range strings.SplitSeq(string(data), "\n") {
+		switch {
+		case line == "" || strings.HasPrefix(line, "#"):
+		case lockVersionLine.MatchString(line) && !headerSeen:
+		case lockToolHeader.MatchString(line):
+			headerSeen = true
+			tool, platform = strings.Trim(lockToolHeader.FindStringSubmatch(line)[1], `"`), ""
+			if _, dup := entries[tool]; dup {
+				bad = append(bad, tool+": a second entry")
+				tool = ""
+				continue
+			}
+			entries[tool] = &entry{checksums: map[string]string{}}
+			order = append(order, tool)
+		case lockPlatformHeader.MatchString(line):
+			headerSeen = true
+			m := lockPlatformHeader.FindStringSubmatch(line)
+			name := strings.Trim(m[1], `"`)
+			e, ok := entries[name]
+			switch {
+			case !ok:
+				bad = append(bad, name+": a platform table before its entry")
+				tool, platform = "", ""
+			case func() bool { _, dup := e.checksums[m[2]]; return dup }():
+				bad = append(bad, name+": a second platform table for "+m[2])
+				tool, platform = "", ""
+			default:
+				tool, platform = name, m[2]
+				e.checksums[platform] = ""
+			}
+		case lockKeyLine.MatchString(line) && tool != "":
+			m := lockKeyLine.FindStringSubmatch(line)
+			key, value := m[1], strings.Trim(m[2], `"`)
+			switch {
+			case platform == "" && slices.Contains(lockEntryKeys, key):
+				if key == "backend" {
+					entries[tool].backend = value
+				}
+			case platform != "" && slices.Contains(lockPlatformKeys, key):
+				if key == "checksum" {
+					entries[tool].checksums[platform] = value
+				}
+			default:
+				bad = append(bad, fmt.Sprintf("line %q", line))
+			}
+		default:
+			bad = append(bad, fmt.Sprintf("line %q", line))
+		}
+	}
+	platforms := lockPlatforms()
+	for _, tool := range order {
+		e := entries[tool]
+		if strings.HasPrefix(tool, "go:") && e.backend == tool {
+			if len(e.checksums) > 0 {
+				bad = append(bad, tool+": a platform table, for a tool built from source")
+			}
+			continue
+		}
+		if strings.HasPrefix(e.backend, "go:") {
+			bad = append(bad, tool+": backend "+e.backend+" for a tool of another name")
+		}
+		for _, p := range platforms {
+			if !lockChecksum.MatchString(e.checksums[p]) {
+				bad = append(bad, tool+": no sha256 checksum for "+p)
+			}
+		}
+		for _, p := range slices.Sorted(maps.Keys(e.checksums)) {
+			if !slices.Contains(platforms, p) {
+				bad = append(bad, tool+": a platform table for "+p)
+			}
+		}
+	}
+	return bad
+}
+
+// TestLockIntegrity checks that mise.lock holds the integrity form of
+// 12 12.1 for each tool it locks (lockIntegrityFindings).
+func TestLockIntegrity(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(moduleRoot(t), "mise.lock"))
+	require.NoError(t, err)
+	assert.Empty(t, lockIntegrityFindings(data), "mise.lock")
+}
+
+// TestLockPlatforms checks that the platforms of mise.lock are the four
+// that mise.toml names in its header, read from lintTargets.
+func TestLockPlatforms(t *testing.T) {
+	assert.Equal(t, []string{"linux-arm64", "linux-x64", "macos-arm64", "macos-x64"}, lockPlatforms())
+}
+
+// TestLockIntegrityFindings checks what lockIntegrityFindings refuses
+// in a lock, each case with the findings it returns, in order.
+func TestLockIntegrityFindings(t *testing.T) {
+	sum := "sha256:" + strings.Repeat("ab", 32)
+	platforms := func(tool string, skip string) string {
+		var b strings.Builder
+		for _, p := range lockPlatforms() {
+			if p == skip {
+				continue
+			}
+			b.WriteString("[tools." + tool + `."platforms.` + p + "\"]\nchecksum = \"" + sum + "\"\nurl = \"https://example.invalid\"\n\n")
+		}
+		return b.String()
+	}
+	noSums := []string{"gh: no sha256 checksum for linux-arm64", "gh: no sha256 checksum for linux-x64", "gh: no sha256 checksum for macos-arm64", "gh: no sha256 checksum for macos-x64"}
+	head := "# @generated\n\nlockfile_version = 3\n\n"
+	gh := "[[tools.gh]]\nversion = \"2.0.0\"\nbackend = \"aqua:cli/cli\"\nspecifiers = [\"2.0.0\"]\n\n"
+	gopls := "[[tools.\"go:golang.org/x/tools/gopls\"]]\nversion = \"0.23.0\"\nbackend = \"go:golang.org/x/tools/gopls\"\n\n"
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"a downloaded tool with every checksum", head + gh + platforms("gh", ""), nil},
+		{"a tool built from source with no platform table", head + gopls, nil},
+		{"a downloaded tool missing one platform", gh + platforms("gh", "macos-x64"), []string{"gh: no sha256 checksum for macos-x64"}},
+		{"a downloaded tool with no platform table", gh, noSums},
+		{"a platform table without its checksum", gh + strings.Replace(platforms("gh", ""), "checksum = \""+sum+"\"\n", "", 1), []string{"gh: no sha256 checksum for linux-arm64"}},
+		{"a checksum that is not sha256", gh + strings.Replace(platforms("gh", ""), sum, "blake3:00", 1), []string{"gh: no sha256 checksum for linux-arm64"}},
+		{"a sha256 checksum one digit short", gh + strings.Replace(platforms("gh", ""), sum, sum[:len(sum)-1], 1), []string{"gh: no sha256 checksum for linux-arm64"}},
+		{"a sha256 checksum in upper case", gh + strings.Replace(platforms("gh", ""), sum, strings.ToUpper(sum), 1), []string{"gh: no sha256 checksum for linux-arm64"}},
+		{"a platform outside the list", gh + platforms("gh", "") + "[tools.gh.\"platforms.windows-x64\"]\nchecksum = \"" + sum + "\"\n", []string{"gh: a platform table for windows-x64"}},
+		{"a platform outside the list with no checksum", gh + platforms("gh", "") + "[tools.gh.\"platforms.windows-x64\"]\nurl = \"u\"\n", []string{"gh: a platform table for windows-x64"}},
+		{"a tool built from source with a platform table", gopls + platforms(`"go:golang.org/x/tools/gopls"`, ""), []string{"go:golang.org/x/tools/gopls: a platform table, for a tool built from source"}},
+		{"a downloaded tool whose backend claims go", strings.Replace(gh, "aqua:cli/cli", "go:github.com/cli/cli/v2/cmd/gh", 1), append([]string{"gh: backend go:github.com/cli/cli/v2/cmd/gh for a tool of another name"}, noSums...)},
+		{"a backend that holds go: after its prefix", strings.Replace(gh, "aqua:cli/cli", "aqua:go:x", 1), noSums},
+		{"a go: name with another backend", strings.Replace(gopls, "backend = \"go:golang.org/x/tools/gopls\"", "backend = \"aqua:x/gopls\"", 1), []string{"go:golang.org/x/tools/gopls: no sha256 checksum for linux-arm64", "go:golang.org/x/tools/gopls: no sha256 checksum for linux-x64", "go:golang.org/x/tools/gopls: no sha256 checksum for macos-arm64", "go:golang.org/x/tools/gopls: no sha256 checksum for macos-x64"}},
+		{"checksums inside a multi-line string", "[[tools.gh]]\nversion = \"2.0.0\"\nbackend = \"aqua:cli/cli\"\nnote = \"\"\"\n" + platforms("gh", "") + "\"\"\"\n", []string{`line "note = \"\"\""`, `line "\"\"\""`}},
+		{"a header with spaces", "[[ tools.gh ]]\nversion = \"2.0.0\"\n", []string{`line "[[ tools.gh ]]"`, `line "version = \"2.0.0\""`}},
+		{"a second entry of one tool", gh + gh + platforms("gh", ""), []string{"gh: a second entry", `line "version = \"2.0.0\""`, `line "backend = \"aqua:cli/cli\""`, `line "specifiers = [\"2.0.0\"]"`}},
+		{"a second platform table", gh + platforms("gh", "") + "[tools.gh.\"platforms.linux-x64\"]\nchecksum = \"" + sum + "\"\n", []string{"gh: a second platform table for linux-x64", `line "checksum = \"` + sum + `\""`}},
+		{"a platform table before its entry", "[tools.gh.\"platforms.linux-x64\"]\nchecksum = \"" + sum + "\"\n\n" + gh + platforms("gh", ""), []string{"gh: a platform table before its entry", `line "checksum = \"` + sum + `\""`}},
+		{"a key of a platform table in the entry", "[[tools.gh]]\nchecksum = \"" + sum + "\"\n", append([]string{`line "checksum = \"` + sum + `\""`}, noSums...)},
+		{"an unknown key", strings.Replace(gh, "\n\n", "\nnote = \"x\"\n\n", 1) + platforms("gh", ""), []string{`line "note = \"x\""`}},
+		{"an unknown key of a platform table", gh + strings.Replace(platforms("gh", ""), "url = ", "note = \"x\"\nurl = ", 1), []string{`line "note = \"x\""`}},
+		{"the lockfile_version after a header", gh + platforms("gh", "") + "lockfile_version = 3\n", []string{`line "lockfile_version = 3"`}},
+		{"a key outside any table", "version = \"1.0.0\"\n", []string{`line "version = \"1.0.0\""`}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, lockIntegrityFindings([]byte(tt.src)))
+		})
 	}
 }
 
