@@ -913,16 +913,19 @@ Evidence, or, for items g and h, in the note's dated entry:
   the agent the host forwards into the sandbox, read on the host; and
   the four tries of item d repeated with the narrowed token), of the
   answer each read must give, and of the verdict. The first entry
-  whose verdict is narrowed is the event of the Deferred decisions
-  rows whose trigger is "the token is narrowed".
-- h. The required-name try, after the narrowing, in three steps on a
+  whose verdict is narrowed is the record that the narrowing is
+  applied, the moment at which ADR 0011, decision 2, fires the Deferred
+  decisions rows whose trigger is "the token is narrowed", so it is
+  their event.
+- h. The required-name try, run only once the note holds an entry
+  whose verdict is narrowed, in three steps on a
   throwaway pull request whose head is one empty commit (05 5.4;
   round 12, D1, decided on 2026-10-09; round 13, R13-02): (1) a
   workflow pushed on a side branch, with `statuses: write` and
   `checks: write`, posts a commit status and a check run, each under a
   required check's name, on that pull request's head; record which of
-  the two the ruleset counts, and save the API answers under the
-  entry of item g; (2) post a status directly with the narrowed token,
+  the two the ruleset counts, and save the API answers in the fourth
+  part of the note's first entry whose verdict is narrowed; (2) post a status directly with the narrowed token,
   and record whether the token refuses it; (3) close the pull request,
   delete its head branch and the side branch with its workflow, and
   check from the maintainer's own session that the pull request is

@@ -282,10 +282,14 @@ resort for each.
 | `daemon-url-refused`, a missing repo, daemon heads not in the bundle | rerun once the sandbox is reachable at its daemon; a persisting one names an sbx change |
 
 A rerun of `rm`, `recreate` or `retire` on a `removing` generation whose
-worktrees keep changing is not a skipped reason: each salvage a
-changed fingerprint starts exits 5 with the error
-`fingerprint-unstable` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids)),
-which `--accept-loss` does not cover, and its hint is the recovery.
+worktrees changed since the last salvage salvages again. When that
+salvage completes, or `--accept-loss` names its skipped reasons, it
+exits 5 with the error `fingerprint-unstable` (`RJ-338`,
+[04 4.4](04-cli.md#44-error-ids)), which is not a skipped reason, so
+`--accept-loss` does not cover it, and its hint is the recovery. When
+it is incomplete without them, it follows the incomplete rows of
+[01 1.6](01-system-model.md#generation), `RJ-306`, back to `open`, as
+any salvage does.
 
 ### Not salvaged
 

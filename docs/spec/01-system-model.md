@@ -306,9 +306,9 @@ A generation is one sandbox lifetime, identified by a ULID.
 | salvaging | `salvage --from-host`, the sandbox absent | salvaging | as the open row |
 | salvaging | salvage verified; command was `salvage` | open | salvage record `result: complete` |
 | salvaging | salvage incomplete, no `--accept-loss` | open | salvage record `result: incomplete` with reasons; exit 5 |
-| salvaging | salvage complete or `--accept-loss`; command removes the sandbox | removing | state written, with the salvage entry's `fingerprint` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)), before `sbx env rm` |
+| salvaging | salvage complete or `--accept-loss`; command removes the sandbox | removing | state written, with the salvage entry's `fingerprint` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)), before `sbx env rm`; for a salvage that a rerun on a `removing` generation started because its fingerprint changed, the command exits 5 with `fingerprint-unstable` in place of `sbx env rm` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids)) |
 | removing | `sbx env rm` succeeds | closed-removed | egress rules removed |
-| removing | `sbx env rm` fails, or the sandbox found present (a command killed before `sbx env rm`) | removing | the existing salvage record kept; exit 1; a rerun of `rm`, `recreate` or `retire` resumes at `sbx env rm` only when a fresh fingerprint of the daemon heads and each worktree's HEAD and full status equals the `fingerprint` of the state's salvage entry ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)); otherwise `removing -> salvaging` with a new salvage id, and that salvage ends at `removing` with exit 5, `fingerprint-unstable` ([04 4.4](04-cli.md#44-error-ids)) |
+| removing | `sbx env rm` fails, or the sandbox found present (a command killed before `sbx env rm`) | removing | the existing salvage record kept; exit 1; a rerun of `rm`, `recreate` or `retire` resumes at `sbx env rm` only when a fresh fingerprint of the daemon heads and each worktree's HEAD and full status equals the newest `fingerprint` written with `removing` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)); otherwise `removing -> salvaging` with a new salvage id, and that salvage, when complete or accepted, ends at `removing` with exit 5, `fingerprint-unstable` ([04 4.4](04-cli.md#44-error-ids)), and when incomplete without `--accept-loss` follows the incomplete row above |
 | removing | the sandbox found absent (crash recovery) | closed-removed | the existing salvage record kept; egress rules removed |
 | open | `run`, `rm`, `stop`, `pull`, `salvage` without `--from-host`, or `retire` finds the sandbox absent | closed-lost | keeps a lost record `salvage --from-host` wrote for this generation, else writes one: refs and snapshots preserved as a salvage record `result: lost` |
 | salvaging | the sandbox found absent (crash recovery) | closed-lost | as above |
@@ -333,9 +333,9 @@ Destructive commands write in this order: the refs per repo
 `closed-removed`. Recovery: `removing` with the sandbox absent becomes
 `closed-removed`, and with it present the next `rm` resumes at
 `sbx env rm` when a fresh fingerprint of the daemon heads and each
-worktree's HEAD and full status equals that `fingerprint`, and
-otherwise salvages again under a new salvage id and exits 5 with
-`fingerprint-unstable` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids));
+worktree's HEAD and full status equals the newest `fingerprint`
+written with `removing`, and otherwise salvages again under a new
+salvage id and ends as `RJ-338` says ([04 4.4](04-cli.md#44-error-ids));
 any other mutating
 command exits 2 with `removal-pending`, and `status` and `doctor`
 report it as `removal-pending`

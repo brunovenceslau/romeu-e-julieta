@@ -119,17 +119,27 @@ The record of the narrowing of the development sandbox's GitHub token
 decision 2), as item g of
 [10 10.2](../spec/10-testing-style.md#release-and-bootstrap) asks for
 it, and the one home of the rule below. The maintainer adds one dated
-entry when the narrowing is applied, and one for each later read. An
-entry is a heading `### <date>: narrowed` or `### <date>: not
-narrowed`, followed by the three reads; the first entry replaces the
-line "No entry yet" at the end of this section. The first entry whose
-verdict is narrowed is the event of the
+entry when the narrowing is applied, and one for each later read, which
+is due at each sitting of blocks O3, O6 and O7 of the
+[plan](../plan.md#operator-blocks). An entry is a heading
+`### <date>: narrowed` or `### <date>: not narrowed`, followed by the
+three reads; when two entries share a date, each heading carries the
+time after the date, and the entries are in the order of their
+headings, oldest first. The first entry whose verdict is narrowed has a
+fourth part, the answers of the required-name try of item h of
+[10 10.2](../spec/10-testing-style.md#release-and-bootstrap), which runs
+only after that entry. The first entry replaces the line "No entry yet"
+at the end of this section. The first entry whose verdict is narrowed
+is the event of the four
 [Deferred decisions](../spec.md#in-how-this-repository-is-run) rows
 whose trigger is "the token is narrowed". A later entry whose verdict
-is not narrowed returns the token rows of the index and of
+is not narrowed returns the token narrowing row of the index and the
+token row of
 [05 5.4](../spec/05-security.md#risks-of-how-this-repository-is-developed)
-to the state before the narrowing; the rows it fired stay fired. No
-check reads the entries, so they are **[review]**.
+to the state before the narrowing, and is an event of those four rows
+too, so the decision each took on the narrowed premise is reviewed
+again; the rows the first narrowed entry fired stay fired. No check
+reads the entries, so they are **[review]**.
 
 Each entry holds three reads, made on the host or checked from the
 maintainer's own session, never only from what the sandbox printed:
@@ -140,16 +150,24 @@ maintainer's own session, never only from what the sandbox printed:
    page. Expected: a fine-grained token, this repository alone,
    Contents, Pull requests and Workflows read and write, Actions,
    Checks and Metadata read, and no Administration.
-2. The agent the host forwards into the sandbox, read on the host: the
-   keys of the forwarded socket, listed by `ssh-add -l` on the host
-   with `SSH_AUTH_SOCK` set to that socket. Expected: the signing key,
-   and no GitHub authentication key. The sandbox's own `ssh-add -l` may
-   be read too, as a second read, never as the proof.
+2. The agent the host forwards into the sandbox, read on the host, in
+   three parts: the host's forwarding setting, the sbx setting or kit
+   that names the socket it forwards; the keys of that socket, listed by
+   `ssh-add -l` on the host with `SSH_AUTH_SOCK` set to it; and the
+   GitHub account's SSH keys page, read in the maintainer's session.
+   Expected: the setting names one socket; that socket holds the
+   signing key and no GitHub authentication key; and the signing key's
+   fingerprint is listed on the page only under signing keys, never
+   under authentication keys, the rule
+   [06 6.4](../spec/06-kits.md#64-product-kits) states for romeu's
+   sandboxes. The sandbox's own `ssh-add -l` may be read too, as a
+   second read, never as the proof.
 3. The four tries of item d above, repeated from inside the sandbox
    with the narrowed token, with throwaway payloads and the same undo
    and check from the maintainer's session. The tag try runs only while
    no `release.yml` exists, since a `v*` tag would start a release once
-   it does; a later read leaves it out:
+   it does; a read made once `release.yml` exists leaves it out and
+   records the tag answer as not measured:
 
    | Try | Answer in item d, with the operator's token | Expected with the narrowed token |
    |---|---|---|
@@ -158,8 +176,8 @@ maintainer's own session, never only from what the sandbox printed:
    | create and delete the tag `v0.0.0-try` | accepted, through the bypass | not predicted: whether the tag ruleset's bypass for the administrator role applies to a fine-grained token is not measured, and the answer is recorded either way |
    | update the default-branch ruleset with its own unchanged body | accepted | refused, since the token holds no Administration permission |
 
-The token is narrowed when the A16 read and the agent's keys match
-what is expected and the ruleset update is refused. Any other answer
+The token is narrowed when the A16 read and the three parts of read 2
+match what is expected and the ruleset update is refused. Any other answer
 on those three means it is not, and the entry says which read
 differed.
 
