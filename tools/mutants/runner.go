@@ -19,7 +19,6 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/procgroup"
 )
 
 // The verdicts of a mutant.
@@ -54,6 +53,9 @@ type runner struct {
 	// baselines holds, for each target, what its run with no mutant
 	// showed.
 	baselines map[target]baseline
+	// pkgs holds, for each mutant, the packages its run builds
+	// (packages), found once by runBaselines.
+	pkgs map[mutant][]string
 }
 
 // baseline is what the run of a target with no mutant showed: how many
@@ -87,7 +89,7 @@ func runMutants(ctx context.Context, e env, mutantsPath string, worktree bool) (
 			err = rmErr
 		}
 	}()
-	if err := r.runBaselines(ctx, targets(mutants)); err != nil {
+	if err := r.runBaselines(ctx, mutants); err != nil {
 		return false, err
 	}
 	counts := map[string]int{}
@@ -137,7 +139,7 @@ func newRunner(ctx context.Context, e env, worktree bool) (r *runner, err error)
 	if err != nil {
 		return nil, fmt.Errorf("make the temporary directory: %w", err)
 	}
-	r = &runner{e: e, tmp: tmp, commit: commit, goBin: goBin, baselines: map[target]baseline{}}
+	r = &runner{e: e, tmp: tmp, commit: commit, goBin: goBin, baselines: map[target]baseline{}, pkgs: map[mutant][]string{}}
 	defer func() {
 		if err != nil {
 			err = errors.Join(err, r.close())
@@ -226,19 +228,35 @@ func warnDirty(ctx context.Context, e env, source git.Repo, commit string) error
 	return nil
 }
 
-// runBaselines runs each target with no mutant. A target that does not
-// build, fails, or runs no test is an error: no mutant can be killed by
-// a test that already fails or that does not run. It records how many
-// tests passed and the -timeout of the target's mutant runs.
-func (r *runner) runBaselines(ctx context.Context, ts []target) error {
-	for _, t := range ts {
-		built, out, err := r.build(ctx, []string{t.pkg})
+// runBaselines builds, with no mutant, each distinct list of packages
+// that a mutant builds (packages), then runs each target. A list that
+// does not build, or a target that fails or runs no test, is an error:
+// every mutant of a package that does not build would be invalid, and
+// no mutant can be killed by a test that already fails or that does
+// not run. It records how many tests passed and the -timeout of the
+// target's mutant runs.
+func (r *runner) runBaselines(ctx context.Context, mutants []mutant) error {
+	built := map[string]bool{}
+	for _, m := range mutants {
+		pkgs, err := r.packages(ctx, m)
 		if err != nil {
 			return err
 		}
-		if !built {
-			return fmt.Errorf("the baseline of %s does not build:\n%s", t.pkg, out)
+		r.pkgs[m] = pkgs
+		list := strings.Join(pkgs, " ")
+		if built[list] {
+			continue
 		}
+		built[list] = true
+		ok, out, err := r.build(ctx, pkgs)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("the baseline of %s does not build:\n%s", list, out)
+		}
+	}
+	for _, t := range targets(mutants) {
 		start := time.Now()
 		failed, out, err := r.goTest(ctx, t, 0)
 		if err != nil {
@@ -269,7 +287,8 @@ func mutantTimeout(took, least time.Duration) time.Duration {
 }
 
 // countPassed counts the tests a "go test -v" run reports as passed,
-// subtests included.
+// subtests included. It reads the output only, so a line that a test
+// prints itself and that starts with "--- PASS: " counts too.
 func countPassed(out string) int {
 	n := 0
 	for line := range strings.Lines(out) {
@@ -298,10 +317,7 @@ func (r *runner) mutant(ctx context.Context, m mutant) (verdict, reason string, 
 	if n := occurrences(blob, []byte(m.Old)); n != 1 {
 		return invalid, fmt.Sprintf("old occurs %d times in %s, not once", n, git.Printable(m.File)), nil
 	}
-	pkgs, err := r.packages(ctx, m)
-	if err != nil {
-		return "", "", err
-	}
+	pkgs := r.pkgs[m]
 	mutated := bytes.Replace(blob, []byte(m.Old), []byte(m.New), 1)
 	defer func() {
 		if restoreErr := r.restore(m.File, blob); restoreErr != nil {
@@ -356,9 +372,9 @@ func (r *runner) restore(file string, blob []byte) error {
 
 // packages returns the packages a mutant of m builds: its target and,
 // for a Go file, the package of the file when go lists one there, as it
-// does not in a testdata directory. It runs on the commit, before the
-// mutant is written, so a mutant that breaks the package clause does
-// not hide the package.
+// does not in a testdata directory. It runs on the commit, before any
+// mutant is written (runBaselines), so a mutant that breaks the package
+// clause does not hide the package.
 func (r *runner) packages(ctx context.Context, m mutant) ([]string, error) {
 	pkgs := []string{m.Package}
 	if !strings.HasSuffix(m.File, ".go") {
@@ -400,14 +416,14 @@ func (r *runner) goTest(ctx context.Context, t target, timeout time.Duration) (f
 }
 
 // goCmd runs the go command in the clone, in a process group that is
-// killed when it returns (procgroup.CombinedOutput). It reports a
-// non-zero exit as failed with the output; an error means the command
-// did not run or the run was interrupted.
+// killed when it returns (group.combinedOutput). It reports a non-zero
+// exit as failed with the output; an error means the command did not
+// run or the run was interrupted.
 func (r *runner) goCmd(ctx context.Context, args ...string) (failed bool, out string, err error) {
 	cmd := exec.CommandContext(ctx, r.goBin, args...)
 	cmd.Dir = r.clone.Dir
 	cmd.Env = r.goEnv
-	output, err := procgroup.CombinedOutput(cmd)
+	output, err := r.e.group.combinedOutput(cmd)
 	if ctx.Err() != nil {
 		return false, "", errInterrupted
 	}

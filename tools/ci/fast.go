@@ -269,9 +269,9 @@ func lockedVersions(data []byte) (map[string]string, error) {
 // that measurement on every machine that runs the tests):
 // $MISE_DATA_DIR if it is set, else mise below $XDG_DATA_HOME if that
 // is set, else .local/share/mise below HOME, and installs below it.
-// Both variables are on the allowlist (goenv.PassThrough): a caller who points
-// them at an installs directory of their own chooses the go and the
-// linter the checks run, the same way a caller's PATH chooses mise
+// Both variables are on the allowlist (goenv.PassThrough): a caller who
+// points them at an installs directory of their own chooses the go and
+// the linter the checks run, the same way a caller's PATH chooses mise
 // itself, so a caller who controls the environment can bypass the
 // checks (misefiles.go, the threat model).
 func miseInstalls() (string, error) {
@@ -341,8 +341,8 @@ func withProcessEnv(env []string, keys []string) []string {
 	return out
 }
 
-// passThroughEnv returns the variables of goenv.PassThrough that are set in
-// this process, in the order of the list. An empty variable is left
+// passThroughEnv returns the variables of goenv.PassThrough that are set
+// in this process, in the order of the list. An empty variable is left
 // out, as the go command reads an empty variable as an unset one.
 func passThroughEnv() []string {
 	var env []string

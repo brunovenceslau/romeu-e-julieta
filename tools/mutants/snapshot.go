@@ -33,11 +33,14 @@ var snapshotIdentity = []string{
 // writes the private index: no split index, whose shared part git would
 // write as .git/sharedindex.* in the source repository, no file system
 // monitor and no untracked cache, which a configuration could turn on
-// and which would keep their state next to the index or in a daemon.
+// and which would keep their state next to the index or in a daemon,
+// and no hook, as git would run the post-index-change hook of the
+// source repository each time it writes the index.
 var privateIndex = []string{
 	"-c", "core.splitIndex=false",
 	"-c", "core.fsmonitor=false",
 	"-c", "core.untrackedCache=false",
+	"-c", noHooks,
 }
 
 // snapshot records the working tree of source as a commit whose parent
@@ -140,8 +143,11 @@ func checkIndexFlags(ctx context.Context, source git.Repo) error {
 // sendPack streams the objects of want that have does not reach from
 // source to clone: pack-objects writes a pack to a pipe that
 // unpack-objects reads, so no pack is held in memory or on disk. Both
-// run as git.Repo.Run runs git, without replace refs.
+// run as git.Repo.Run runs git, without replace refs and within
+// git.Timeout.
 func sendPack(ctx context.Context, source, clone git.Repo, want, have string) error {
+	ctx, cancel := context.WithTimeout(ctx, git.Timeout)
+	defer cancel()
 	pack := exec.CommandContext(ctx, "git", "--no-replace-objects", "pack-objects", "--revs", "--stdout", "--quiet")
 	pack.Dir, pack.Env = source.Dir, source.Env
 	pack.Stdin = strings.NewReader(want + "\n^" + have + "\n")

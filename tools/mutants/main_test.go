@@ -266,7 +266,8 @@ func TestMutantsEveryMutantKilled(t *testing.T) {
 
 // TestMutantsInvalid covers each kind of invalid mutant: a build failure
 // is no kill, and the file is restored before the next mutant runs, so
-// the killable one after it is still killed.
+// the killable one after it is still killed. Old that overlaps itself
+// ("xx" in "xxx") occurs twice, not once.
 func TestMutantsInvalid(t *testing.T) {
 	f := newFixture(t, `mutants:
   - {id: no-build, file: calc/calc.go, old: "x * 2", new: "x *", package: ./calc, run: ^TestDouble$}
@@ -274,20 +275,23 @@ func TestMutantsInvalid(t *testing.T) {
   - {id: no-file, file: calc/none.go, old: "a", new: "b", package: ./calc, run: ^TestDouble$}
   - {id: a-directory, file: calc, old: "a", new: "b", package: ./calc, run: ^TestDouble$}
   - {id: other-package, file: other/other.go, old: "1", new: "x", package: ./calc, run: ^TestDouble$}
+  - {id: overlapping, file: calc/testdata/x.txt, old: "xx", new: "y", package: ./calc, run: ^TestDouble$}
   - {id: clamp-low, file: calc/calc.go, old: "x < lo", new: "x > lo", package: ./calc, run: ^TestClamp$}
 `)
 	f.repo.Write("other/other.go", "package other\n\n// One is one.\nconst One = 1\n")
+	f.repo.Write("calc/testdata/x.txt", "xxx\n")
 	f.repo.Commit("other")
 	before := f.state(t)
 	assert.Equal(t, exitFail, run(context.Background(), f.e, []string{f.mutants}))
 	lines := strings.Split(strings.TrimSuffix(f.stdout.String(), "\n"), "\n")
-	require.Len(t, lines, 7, f.stdout.String())
+	require.Len(t, lines, 8, f.stdout.String())
 	assert.Equal(t, "no-build invalid the mutated code does not build", lines[0])
 	assert.Equal(t, "missing-old invalid old occurs 0 times in calc/calc.go, not once", lines[1])
 	assert.Equal(t, "no-file invalid calc/none.go is not a file of the commit", lines[2])
 	assert.Equal(t, "a-directory invalid calc is not a file of the commit", lines[3])
 	assert.Equal(t, "other-package invalid the mutated code does not build", lines[4], "the package of the file is built too")
-	assert.Equal(t, "clamp-low killed ./calc -run ^TestClamp$ fails", lines[5])
+	assert.Equal(t, "overlapping invalid old occurs 2 times in calc/testdata/x.txt, not once", lines[5])
+	assert.Equal(t, "clamp-low killed ./calc -run ^TestClamp$ fails", lines[6])
 	assert.Contains(t, f.stderr.String(), "no-build: the build fails:")
 	assert.Contains(t, f.stderr.String(), "other-package: the build fails:")
 	f.assertUntouched(t, before)
@@ -392,11 +396,16 @@ func TestMutantsRefuses(t *testing.T) {
 		}, "none/go test"},
 		{"a package that matches nothing", func(f fixture) []string { return []string{f.mutants} }, func(t *testing.T, f *fixture) {
 			require.NoError(t, os.WriteFile(f.mutants, []byte(strings.ReplaceAll(threeMutants, "package: ./calc", "package: ./nope")), 0o644))
-		}, "the baseline of ./nope does not build"},
+		}, "the baseline of ./nope ./calc does not build"},
 		{"a baseline that does not build", func(f fixture) []string { return []string{f.mutants} }, func(_ *testing.T, f *fixture) {
 			f.repo.Write("calc/broken.go", "package calc\n\nfunc (\n")
 			f.repo.Commit("broken")
 		}, "the baseline of ./calc does not build"},
+		{"a package of a mutated file that does not build", func(f fixture) []string { return []string{f.mutants} }, func(t *testing.T, f *fixture) {
+			f.repo.Write("other/other.go", "package other\n\nfunc (\n")
+			f.repo.Commit("broken other")
+			require.NoError(t, os.WriteFile(f.mutants, []byte(threeMutants+"  - {id: other, file: other/other.go, old: \"func (\", new: \"func ((\", package: ./calc, run: ^TestDouble$}\n"), 0o644))
+		}, "the baseline of ./calc ./other does not build"},
 		{"a submodule", func(f fixture) []string { return []string{f.mutants} }, func(_ *testing.T, f *fixture) {
 			head := f.repo.Git("rev-parse", "HEAD")
 			f.repo.Git("update-index", "--add", "--cacheinfo", "160000,"+head+",sub")
@@ -493,7 +502,11 @@ func TestMutantsKilledWithoutAPassingTest(t *testing.T) {
 	f.repo.Commit("main")
 	f.e.minTimeout = 2 * time.Second
 	before := f.state(t)
-	assert.Equal(t, exitOK, f.runArgs(), f.stderr.String())
+	// A deadline of its own: should the loop not be ended by -timeout,
+	// the run is cut short here, not at the timeout of the package.
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	assert.Equal(t, exitOK, run(ctx, f.e, []string{f.mutants}), "the run must end before its deadline: %s", f.stderr.String())
 	assert.Contains(t, f.stdout.String(), "loops killed ./calc -run ^TestDouble$ times out after 2s\n")
 	assert.Contains(t, f.stdout.String(), "main-panics killed ./calc -run ^TestDouble$ fails\n")
 	assert.Contains(t, f.stdout.String(), "start-panics killed ./calc -run ^TestDouble$ fails\n")
@@ -577,4 +590,34 @@ func TestGoEnvIsBuiltFromNothing(t *testing.T) {
 	assert.NotContains(t, got, "GOFLAGS=-run=Nothing")
 	assert.NotContains(t, got, "GOTOOLCHAIN=go1.0")
 	assert.NotContains(t, goEnv("/pinned/bin/go", ""), "GOTMPDIR=")
+}
+
+// TestRestoreErrors covers what restore refuses: a file it cannot write,
+// a clone that still has a change after the write, and a clone where
+// git status does not run.
+func TestRestoreErrors(t *testing.T) {
+	f := newFixture(t, threeMutants)
+	root, err := os.OpenRoot(f.repo.Dir)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = root.Close() })
+	r := &runner{clone: f.repo.Repo, root: root}
+	err = r.restore("none/file.go", []byte("x"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "restore none/file.go:")
+	err = r.restore("calc/calc.go", []byte("package calc\n"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "the clone still has changes after calc/calc.go was restored")
+	r.clone.Dir = t.TempDir()
+	require.Error(t, r.restore("calc/calc.go", []byte(fixtureCalc)))
+}
+
+// TestInside checks that a path below dir is inside it, and that one
+// outside it, or a dir or a path that does not exist, is not.
+func TestInside(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "sub"), 0o700))
+	assert.True(t, inside(dir, filepath.Join(dir, "sub")))
+	assert.False(t, inside(filepath.Join(dir, "sub"), dir))
+	assert.False(t, inside(filepath.Join(dir, "none"), dir))
+	assert.False(t, inside(dir, filepath.Join(dir, "none")))
 }

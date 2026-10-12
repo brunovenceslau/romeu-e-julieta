@@ -6,9 +6,10 @@
 // Package procgroup runs a command in a process group of its own and
 // kills the whole group, so that no grandchild outlives the command:
 // the steps of tools/ci and the go commands of tools/mutants both run
-// this way. Non-unix builds are unsupported on purpose: the lint
-// targets of tools/ci name linux and darwin only, so no other platform
-// runs these tools.
+// this way. A grandchild that calls setsid leaves the group, and the
+// group kill does not reach it. Non-unix builds are unsupported on
+// purpose: the lint targets of tools/ci name linux and darwin only, so
+// no other platform runs these tools.
 package procgroup
 
 import (
@@ -25,10 +26,10 @@ const WaitDelay = 2 * time.Second
 
 // KillWithGroup starts cmd, which exec.CommandContext made, in a
 // process group of its own and makes its cancellation kill the whole
-// group, so a grandchild that holds the
-// output pipe cannot keep Wait past the deadline. WaitDelay bounds what
-// remains. The caller's signals do not reach the group any more, so a
-// caller cancels the context on SIGINT and SIGTERM, which kills it.
+// group, so a grandchild that holds the output pipe cannot keep Wait
+// past the deadline. WaitDelay bounds what remains. The caller's
+// signals do not reach the group any more, so a caller cancels the
+// context on SIGINT and SIGTERM, which kills it.
 func KillWithGroup(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return KillGroup(cmd.Process.Pid) }

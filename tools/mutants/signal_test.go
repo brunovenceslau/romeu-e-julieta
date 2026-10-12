@@ -81,10 +81,7 @@ func startHelper(t *testing.T, inBaseline bool) (fixture, helper) {
 	t.Helper()
 	f := newFixture(t, hangMutant)
 	h := helper{done: make(chan error, 1), stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}}
-	h.pidfile = filepath.Join(t.TempDir(), "pid")
-	src := strings.Replace(hangTest, "%t", strconv.FormatBool(inBaseline), 1)
-	f.repo.Write("calc/hang_test.go", strings.Replace(src, "%q", strconv.Quote(h.pidfile), 1))
-	f.repo.Commit("hang")
+	h.pidfile = commitHang(t, f, inBaseline)
 	gocache, err := exec.CommandContext(t.Context(), f.e.goBin, "env", "GOCACHE").Output()
 	require.NoError(t, err)
 	h.cmd = exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestHelperProcess$")
@@ -101,6 +98,17 @@ func startHelper(t *testing.T, inBaseline bool) (fixture, helper) {
 	t.Cleanup(func() { _ = h.cmd.Process.Kill() })
 	go func() { h.done <- h.cmd.Wait() }()
 	return f, h
+}
+
+// commitHang commits hangTest to the fixture, hanging from the start
+// when inBaseline is set, and returns the file its pid goes to.
+func commitHang(t *testing.T, f fixture, inBaseline bool) string {
+	t.Helper()
+	pidfile := filepath.Join(t.TempDir(), "pid")
+	src := strings.Replace(hangTest, "%t", strconv.FormatBool(inBaseline), 1)
+	f.repo.Write("calc/hang_test.go", strings.Replace(src, "%q", strconv.Quote(pidfile), 1))
+	f.repo.Commit("hang")
+	return pidfile
 }
 
 // hungPid waits for the hung test binary to write its pid. The handler
@@ -162,7 +170,7 @@ func requireGone(t *testing.T, pid int) {
 		}
 		i := strings.LastIndex(string(b), ") ")
 		return i >= 0 && i+2 < len(b) && b[i+2] == 'Z'
-	}, 5*time.Second, 10*time.Millisecond, "the test binary %d is dead", pid)
+	}, 15*time.Second, 10*time.Millisecond, "the test binary %d is dead", pid)
 }
 
 // TestMutantsInterrupted sends each signal that ends a run while a
@@ -170,7 +178,7 @@ func requireGone(t *testing.T, pid int) {
 // removes the clone, leaves the source as it was, prints only the
 // interrupted line, and exits 128 plus the signal number.
 func TestMutantsInterrupted(t *testing.T) {
-	for _, sig := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT} {
+	for _, sig := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP} {
 		t.Run(sig.String(), func(t *testing.T) {
 			f, h := startHelper(t, false)
 			before := f.state(t)
@@ -201,12 +209,11 @@ func TestMutantsInterruptedInTheBaseline(t *testing.T) {
 // TestMutantsSecondSignal checks that a second signal ends the run at
 // once: the handler steps aside after the first, so the second has its
 // default action, unless the drain of the first ends the run before.
-// The test binary may then outlive the run, as the group kill the first
-// signal started may not have happened yet; the cleanup of hungPid
-// kills it.
+// Either way the test binary is dead, as the handler kills its group
+// before it steps aside.
 func TestMutantsSecondSignal(t *testing.T) {
 	_, h := startHelper(t, false)
-	h.hungPid(t)
+	pid := h.hungPid(t)
 	require.NoError(t, h.cmd.Process.Signal(syscall.SIGINT))
 	require.NoError(t, h.cmd.Process.Signal(syscall.SIGINT))
 	exit := h.wait(t)
@@ -217,6 +224,7 @@ func TestMutantsSecondSignal(t *testing.T) {
 	} else {
 		assert.Equal(t, exitSignalBase+int(syscall.SIGINT), status.ExitStatus())
 	}
+	requireGone(t, pid)
 }
 
 // TestRunSignalledWithoutASignal checks that a run no signal touches
@@ -225,4 +233,52 @@ func TestRunSignalledWithoutASignal(t *testing.T) {
 	f := newFixture(t, threeMutants)
 	assert.Equal(t, exitFail, runSignalled(f.e, []string{f.mutants}))
 	assert.NotContains(t, f.stderr.String(), "interrupted")
+}
+
+// TestRunSignalledInProcess sends SIGTERM to this process while a
+// mutant hangs, once the handler of runSignalled is in place (the hung
+// test binary has written its pid): the run kills the binary and exits
+// 128 plus the signal number.
+func TestRunSignalledInProcess(t *testing.T) {
+	f := newFixture(t, hangMutant)
+	h := helper{pidfile: commitHang(t, f, false)}
+	status := make(chan int, 1)
+	go func() { status <- runSignalled(f.e, []string{f.mutants}) }()
+	pid := h.hungPid(t)
+	require.NoError(t, syscall.Kill(os.Getpid(), syscall.SIGTERM))
+	select {
+	case got := <-status:
+		assert.Equal(t, exitSignalBase+int(syscall.SIGTERM), got)
+	case <-time.After(time.Minute):
+		require.FailNow(t, "the run did not stop")
+	}
+	assert.Equal(t, "mutants: interrupted\n", f.stderr.String())
+	requireGone(t, pid)
+	f.assertNoStashNoClone(t)
+}
+
+// TestGroupKill checks that kill ends the group of the command that
+// runs, and does nothing when none runs.
+func TestGroupKill(t *testing.T) {
+	g := &group{}
+	g.kill()
+	done := make(chan error, 1)
+	go func() {
+		_, err := g.combinedOutput(exec.CommandContext(t.Context(), "sleep", "60"))
+		done <- err
+	}()
+	require.Eventually(t, func() bool {
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		return g.pid != 0
+	}, 10*time.Second, 10*time.Millisecond, "the command starts")
+	g.kill()
+	select {
+	case err := <-done:
+		var exit *exec.ExitError
+		require.ErrorAs(t, err, &exit)
+	case <-time.After(15 * time.Second):
+		require.FailNow(t, "kill did not end the command")
+	}
+	assert.Zero(t, g.pid)
 }

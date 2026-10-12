@@ -33,7 +33,8 @@
 // tracked files as they are on disk and the untracked files that are
 // not ignored, as a commit on top of HEAD through an index of its own,
 // and runs that commit instead (snapshot). That writes objects to the
-// repository, and nothing else.
+// repository, and nothing else. As any "git add" does, it runs a clean
+// filter that the repository's own configuration sets for a file.
 //
 // A tree that the clone cannot hold as the source has it is refused: a
 // submodule (or an embedded repository that -worktree would record as
@@ -43,9 +44,11 @@
 // changes on checkout is not its blob on disk, and a mutant of it is
 // invalid.
 //
-// It first runs each distinct test target once with no mutant: the
-// baseline. A target that does not build, fails, or runs no test then
-// stops the run, since such a target can kill no mutant. The baseline's
+// It first builds, with no mutant, the packages each mutant builds (the
+// target, and the package of the file, see below), and runs each
+// distinct test target once: the baseline. A package that does not
+// build, or a target that fails or runs no test, then stops the run,
+// since every mutant would be invalid or no mutant could be killed. The baseline's
 // time sets the -timeout of the mutant runs (mutantTimeout). Then, for
 // each mutant, it writes the mutated file, builds the test binaries of
 // the target and of the package of the file (when the file's directory
@@ -78,25 +81,29 @@
 // It exits 0 when every mutant is killed, 1 when one survived or is
 // invalid, and 2 when the run could not proceed: the command line or
 // the mutants file is wrong, the clone failed, or a baseline is red. A
-// run that SIGINT, SIGTERM, SIGHUP or SIGQUIT cut short prints one
-// "interrupted" line and exits 128 plus the signal number. Started
-// through "go run", every status other than 0 reaches the caller as 1,
-// with the real one in the "exit status" line that go prints.
+// run that SIGINT, SIGTERM or SIGHUP cut short prints one "interrupted"
+// line and exits 128 plus the signal number. Started through "go run",
+// every status other than 0 reaches the caller as 1, with the real one
+// in the "exit status" line that go prints.
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/procgroup"
 )
 
 // The exit statuses. A run that a signal cut short exits with 128 plus
@@ -114,8 +121,9 @@ const usage = `usage:
 `
 
 // signals are the signals that end a run: each cancels it, which kills
-// the go command, restores the file and removes the clone.
-var signals = []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT}
+// the go command, restores the file and removes the clone. SIGQUIT
+// keeps its default, the goroutine dump of the Go runtime.
+var signals = []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGHUP}
 
 // errInterrupted ends a run whose context a signal cancelled.
 var errInterrupted = errors.New("interrupted")
@@ -136,8 +144,53 @@ type env struct {
 	// minTimeout is the least -timeout of a mutant run; zero means
 	// defaultMinTimeout.
 	minTimeout time.Duration
-	stdout     io.Writer
-	stderr     io.Writer
+	// group is the process group of the go command that runs; nil means
+	// a new one, which run makes.
+	group  *group
+	stdout io.Writer
+	stderr io.Writer
+}
+
+// group holds the process group of the go command that runs, so that
+// the handler of a signal can kill it before it steps aside.
+type group struct {
+	mu  sync.Mutex
+	pid int // the leader of the group; 0 when no go command runs
+}
+
+// combinedOutput runs cmd as procgroup.CombinedOutput does, its group
+// killed when it returns, and holds the group while it runs. The lock
+// covers the start, so kill finds either no group or the one started.
+func (g *group) combinedOutput(cmd *exec.Cmd) ([]byte, error) {
+	procgroup.KillWithGroup(cmd)
+	var out bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &out
+	g.mu.Lock()
+	err := cmd.Start()
+	if err == nil {
+		g.pid = cmd.Process.Pid
+	}
+	g.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	err = cmd.Wait()
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	_ = procgroup.KillGroup(g.pid)
+	g.pid = 0
+	return out.Bytes(), err
+}
+
+// kill kills the group of the go command that runs, if one does. The
+// pgid is not reused while the group has members, as in
+// procgroup.CombinedOutput.
+func (g *group) kill() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.pid != 0 {
+		_ = procgroup.KillGroup(g.pid)
+	}
 }
 
 func main() {
@@ -146,13 +199,17 @@ func main() {
 }
 
 // runSignalled runs the command with a handler for the signals. The
-// first signal cancels the context of the run, which kills the process
-// group of the go command that runs (procgroup.KillWithGroup); the run
-// then writes the mutated file back and removes the clone. The handler
-// steps aside, so a second signal ends the process at once.
+// first signal cancels the context of the run and kills the process
+// group of the go command that runs (group.kill); the run then writes
+// the mutated file back and removes the clone. The handler steps aside
+// once the group is dead, so a second signal ends the process at once
+// and leaves no test binary behind.
 func runSignalled(e env, args []string) int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	if e.group == nil {
+		e.group = &group{}
+	}
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, signals...)
 	defer signal.Stop(sigs)
@@ -161,10 +218,11 @@ func runSignalled(e env, args []string) int {
 		select {
 		case sig := <-sigs:
 			// Caught before cancel, so the run that cancel ends finds the
-			// signal; cancel before Stop, so the group kill starts before a
-			// second signal can end this process.
+			// signal; the group killed before Stop, so a second signal
+			// that ends this process leaves no go command behind.
 			caught <- sig.(syscall.Signal)
 			cancel()
+			e.group.kill()
 			signal.Stop(sigs)
 		case <-ctx.Done():
 		}
@@ -194,6 +252,9 @@ func finish(w io.Writer, status int, sig syscall.Signal) int {
 // run reads the mutants file, runs the mutants, and returns the exit
 // status.
 func run(ctx context.Context, e env, args []string) int {
+	if e.group == nil {
+		e.group = &group{}
+	}
 	fs := flag.NewFlagSet("mutants", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	worktree := fs.Bool("worktree", false, "run a snapshot of the working tree instead of the commit HEAD")

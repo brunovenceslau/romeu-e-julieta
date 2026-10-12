@@ -210,3 +210,21 @@ func TestMutantsHooksOff(t *testing.T) {
 	assert.Equal(t, exitFail, f.runArgs("-worktree"), f.stderr.String())
 	assert.NoFileExists(t, marker, "a hook ran in the clone")
 }
+
+// TestMutantsWorktreeRunsNoSourceHook checks that the private index runs
+// no hook of the source repository: git would run post-index-change each
+// time the snapshot writes the index. The hook is in a core.hooksPath of
+// the repository's own configuration, which wins over one that the
+// configuration of the machine may set.
+func TestMutantsWorktreeRunsNoSourceHook(t *testing.T) {
+	f := newFixture(t, threeMutants)
+	marker := filepath.Join(t.TempDir(), "ran")
+	hooks := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(hooks, "post-index-change"), []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0o700))
+	f.repo.Write("calc/extra_test.go", "package calc\n")
+	f.repo.Git("config", "core.hooksPath", hooks)
+	before := f.state(t)
+	assert.Equal(t, exitFail, f.runArgs("-worktree"), f.stderr.String())
+	assert.NoFileExists(t, marker, "a hook of the source repository ran")
+	f.assertOnlyObjectsAdded(t, before)
+}
