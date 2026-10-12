@@ -31,8 +31,10 @@ const stepTimeout = 15 * time.Minute
 type step struct {
 	name string
 	argv []string
-	// quiet marks a command whose output is its finding: it passes
-	// when it prints nothing, as "gofmt -l" does.
+	// quiet marks a command whose output is its finding, and it means
+	// two things: the step passes when it prints nothing, as "gofmt -l"
+	// does, and what it prints goes through git.SafeLines, because that
+	// output is paths of the repository (checks.run).
 	quiet bool
 	// environ is the whole environment of the command (stepEnv). The
 	// environment of this process never reaches it, so an empty one is
@@ -96,11 +98,37 @@ func fastPhases(root string, tools lintTools) ([]step, step) {
 	for _, target := range lintTargets {
 		steps = append(steps, step{
 			name:    "lint " + target.String(),
-			argv:    []string{tools.linter, "run", "--config", ".golangci.yml"},
+			argv:    lintArgv(tools.linter),
 			environ: lintEnv(target, tools.goDir),
 		})
 	}
 	return steps, step{name: "unit", argv: unit, environ: stepEnv(tools.goDir)}
+}
+
+// lintArgs are the arguments of every golangci-lint run, the one list
+// that the lint steps and the tests that run the linter hold:
+//
+//   - "--config" names .golangci.yml, so that no other .golangci.* file
+//     takes its place.
+//   - "-j 1" (golangci-lint v2.14.0, pkg/commands/flagsets.go:
+//     --concurrency) limits golangci-lint's own Go threads to one
+//     (GOMAXPROCS, pkg/commands/run.go); child processes such as "go
+//     list" and the compiler are not capped. It does not fix the lock
+//     failure below. A cold run takes about 14s against about 7s by
+//     default, and warm runs are about the same. It stays to limit CPU
+//     use when runs overlap.
+//   - "--allow-parallel-runners" (same file) turns off the file lock
+//     that a run takes on golangci-lint.lock in the temporary directory
+//     (pkg/commands/run.go, acquireFileLock). Without it, a run fails
+//     with "parallel golangci-lint is running" after 5 seconds whenever
+//     any other run on the machine, of any repository, holds the lock.
+//     The lock is no check: it only keeps runs from overlapping.
+var lintArgs = []string{"run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners"}
+
+// lintArgv returns the command line of a golangci-lint run: the path of
+// the linter, then lintArgs.
+func lintArgv(linter string) []string {
+	return append([]string{linter}, lintArgs...)
 }
 
 // lintTools are the pinned tools of fast, as mise resolves them: the
@@ -155,7 +183,7 @@ func whichPinned(ctx context.Context, root, name, key, dir string) (string, erro
 	cmd := exec.CommandContext(ctx, "mise", "-C", root, "which", name)
 	// mise finds .miserc.toml from its working directory (misefiles.go).
 	cmd.Dir = root
-	cmd.Env = miseEnviron(passThroughEnv())
+	cmd.Env = miseRunEnviron(passThroughEnv(), root)
 	out, err := cmd.Output()
 	if errors.Is(err, exec.ErrNotFound) {
 		return "", fmt.Errorf("mise is not on the search path: install mise, then run \"mise trust\" and \"mise install\" in %s", root)
@@ -233,20 +261,23 @@ func lockedVersions(data []byte) (map[string]string, error) {
 	return locked, nil
 }
 
-// miseInstalls returns the directory where mise installs tools:
-// .local/share/mise/installs below HOME, the default of the mise data
-// directory when neither MISE_DATA_DIR nor XDG_DATA_HOME is set
-// (measured on linux with mise 2026.10.3, whose "mise doctor" reports
-// it; TestMiseInstalls repeats that measurement on every machine that
-// runs the tests).
-// Either variable would let the caller point mise at an installs
-// directory of their own, so a run with one of them set fails closed,
-// and passThroughEnv, the environment of "mise which", has neither.
+// miseInstalls returns the directory where mise installs tools, the way
+// mise resolves its data directory (measured on linux with mise
+// 2026.10.3, whose "mise doctor" reports it; TestMiseInstalls repeats
+// that measurement on every machine that runs the tests):
+// $MISE_DATA_DIR if it is set, else mise below $XDG_DATA_HOME if that
+// is set, else .local/share/mise below HOME, and installs below it.
+// Both variables are on the allowlist (passThrough): a caller who points
+// them at an installs directory of their own chooses the go and the
+// linter the checks run, the same way a caller's PATH chooses mise
+// itself, so a caller who controls the environment can bypass the
+// checks (misefiles.go, the threat model).
 func miseInstalls() (string, error) {
-	for _, key := range []string{"MISE_DATA_DIR", "XDG_DATA_HOME"} {
-		if os.Getenv(key) != "" {
-			return "", fmt.Errorf("%s is set: fast runs only the tools mise installs below HOME; unset it", key)
-		}
+	if dir := os.Getenv("MISE_DATA_DIR"); dir != "" {
+		return filepath.Join(dir, "installs"), nil
+	}
+	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
+		return filepath.Join(dir, "mise", "installs"), nil
 	}
 	home := os.Getenv("HOME")
 	if home == "" {
@@ -278,27 +309,43 @@ var lintTargets = []lintTarget{
 }
 
 // passThrough are the variables of this process that the steps of fast
-// and "mise which" keep. Each one says where a program or a file is
-// (the search path, the home and temporary directories, the
-// directories of mise and the caches of Go), never what to check or
-// how. The data directory of mise is not among them: miseInstalls
-// derives it from HOME.
+// and "mise which" keep, and the pre-push hook with them (hookAllow).
+// Each one says where a program or a file is, never what to check or
+// how:
+//   - PATH: finds mise and go; HOME: the installs of mise, the caches and
+//     the git configuration; TMPDIR: temporary files;
+//   - XDG_CACHE_HOME, XDG_DATA_HOME, XDG_STATE_HOME: where mise and go
+//     keep their files when the person moved them. XDG_CONFIG_HOME is
+//     not here: it would let a caller's git/config (core.fsmonitor, say)
+//     run inside the git calls of the hook, and mise reads no
+//     configuration there (miseNoGlobalConfig);
+//   - MISE_DATA_DIR, MISE_CACHE_DIR, MISE_STATE_DIR: the same for mise;
+//   - GOPATH, GOCACHE, GOMODCACHE: where the module cache and the build
+//     cache are, so the first go run finds the modules.
 var passThrough = []string{
 	"PATH", "HOME", "TMPDIR",
-	"XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME",
-	"MISE_CACHE_DIR", "MISE_CONFIG_DIR", "MISE_STATE_DIR",
+	"XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
+	"MISE_CACHE_DIR", "MISE_DATA_DIR", "MISE_STATE_DIR",
 	"GOPATH", "GOCACHE", "GOMODCACHE",
 }
 
-// The variables of passThrough name where things are on this machine.
-// Two more sets say how to reach something, and only the steps that
+// Three more sets say how to reach something, and only the steps that
 // reach it keep them (withProcessEnv): networkPassThrough, a proxy and
-// a certificate bundle, for the steps that use the network, and
-// dockerPassThrough, the Docker daemon, for the license step. Neither
-// holds MISE_DATA_DIR or XDG_DATA_HOME, which miseInstalls refuses.
+// a certificate bundle, for the steps that use the network;
+// dockerPassThrough, the Docker daemon, for the license step; and
+// goModulePassThrough, for the go run that the pre-push hook starts
+// before tools/ci: where a module comes from (GOPROXY) and which paths
+// are private or unchecked (GOPRIVATE, GONOSUMDB, GOSUMDB, GOINSECURE),
+// so a person who reaches only a company proxy can run the hook. They
+// are safe there because that go run builds with GOFLAGS=-mod=readonly:
+// go.sum decides which module content is accepted, and none of the five
+// can add an entry to it. They are NOT kept by the mise installs and by
+// "go mod download" of setup, where the checksum database is the guard
+// (the install that builds govulncheck has no go.sum).
 var (
-	networkPassThrough = []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}
-	dockerPassThrough  = []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"}
+	networkPassThrough  = []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}
+	dockerPassThrough   = []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"}
+	goModulePassThrough = []string{"GOPROXY", "GOPRIVATE", "GONOSUMDB", "GOSUMDB", "GOINSECURE"}
 )
 
 // withProcessEnv returns env with the variables of keys that are set in
@@ -337,6 +384,20 @@ var goPinEnv = []string{
 	"GOTOOLCHAIN=local",
 }
 
+// goBuildEnv holds the two variables that keep the go command on the
+// modules of the tree: GOWORK=off (no go.work file, in the tree or
+// above it, changes them) and GOFLAGS=-mod=readonly (it builds from
+// go.mod and the module cache, never from a vendor directory, and the
+// caller's GOFLAGS is replaced; an empty one would not do, since go
+// then reads the "go env -w" file unless GOENV=off). It is the one
+// list that stepEnv and the pre-push hook (hookLine in the tests, held
+// to the tracked hook by TestHook) both hold. GOPROXY=off is not in it:
+// the hook's first go run fills the module cache.
+var goBuildEnv = []string{
+	"GOWORK=off",
+	"GOFLAGS=-mod=readonly",
+}
+
 // stepEnv is the environment of every step of fast, built from nothing
 // rather than from this process's: PATH with goDir first, so that a go
 // command the linter or a test starts is the pinned one, the rest of
@@ -367,10 +428,8 @@ func stepEnv(goDir string) []string {
 		path += string(os.PathListSeparator) + value
 	}
 	rest := slices.DeleteFunc(passThroughEnv(), func(kv string) bool { return strings.HasPrefix(kv, "PATH=") })
-	return slices.Concat([]string{"PATH=" + path}, rest, goPinEnv, []string{
-		"GOWORK=off",
+	return slices.Concat([]string{"PATH=" + path}, rest, goPinEnv, goBuildEnv, []string{
 		"GOPROXY=off",
-		"GOFLAGS=-mod=readonly",
 	})
 }
 
@@ -400,6 +459,19 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 	cmd.Env = append([]string{}, s.environ...)
 	killWithGroup(cmd)
 	out, err := cmd.CombinedOutput()
+	// os/exec calls Cancel only while the leader runs, so a grandchild
+	// that outlives a leader that ended, and holds the output pipe until
+	// WaitDelay, is still ours to kill. A group that is gone is not an
+	// error (ESRCH). While the group has members its pgid is not reused,
+	// so -pgid reaches only this group. The window after the group has
+	// fully emptied (between the last reap and the kill, which a reuse
+	// would need a full pid wrap to hit) is accepted, as it is on the
+	// Cancel path. Other errors are dropped on purpose: a failed kill
+	// changes nothing here, since the step's result already stands and
+	// WaitDelay has bounded the wait.
+	if cmd.Process != nil {
+		_ = killGroup(cmd.Process.Pid)
+	}
 	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		if errors.Is(parent.Err(), context.DeadlineExceeded) {
 			// The deadline of the caller fired, before the limit of the step.
@@ -599,7 +671,7 @@ func (c *checks) verdict(v verdict) {
 	case v.note != "":
 		say(c.out, "--    %s: %s\n", v.name, v.note)
 	case v.err != nil:
-		c.report(v.name, false, v.err.Error()+"\n")
+		c.report(v.name, false, git.SafeLines(v.err.Error())+"\n")
 	default:
 		c.report(v.name, len(v.findings) == 0, lines(v.findings))
 	}
@@ -622,7 +694,18 @@ func (c *checks) run(ctx context.Context, root string, steps []step) {
 		out, err := s.run(ctx, root)
 		detail := ""
 		if err != nil {
-			detail = fmt.Sprintf("%s%v\n", out, err)
+			// out is the step's own output, which is printed as it is, for
+			// readability; the unit step in particular lets the change print
+			// anything. A quiet step is the exception: gofmt -l prints paths
+			// of the repository and its parse errors about them, so escaping
+			// its output costs no readability and is defense in depth.
+			// err, the error of the run, may hold a path and is made safe
+			// too.
+			text := string(out)
+			if s.quiet {
+				text = git.SafeLines(text)
+			}
+			detail = fmt.Sprintf("%s%s\n", text, git.SafeLines(err.Error()))
 			if bytes.Contains(out, []byte(moduleLookupOff)) {
 				detail += "the module cache lacks a module of go.sum, and no step fetches one (GOPROXY=off): run \"go run ./tools/ci setup\", which runs \"go mod download\", then run this again\n"
 			}

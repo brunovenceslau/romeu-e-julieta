@@ -254,19 +254,30 @@ resolved, is not below the directory where mise installs that tool, so
 a mise configuration that names a tool by a path fails the run. Each
 step runs in an environment built from nothing, not from the caller's:
 the variables that say where things are (`PATH`, with that go
-directory first, `HOME`, `TMPDIR`, the XDG and mise directories,
-`GOPATH`, `GOCACHE` and `GOMODCACHE`), then `GOENV=off`,
-`GOTOOLCHAIN=local`, `GOWORK=off`, `GOPROXY=off` and
+directory first, `HOME`, `TMPDIR`, the XDG cache, data and state
+directories, the cache, data and state directories of mise, `GOPATH`,
+`GOCACHE` and `GOMODCACHE`; not `XDG_CONFIG_HOME`), then
+`GOENV=off`, `GOTOOLCHAIN=local`, `GOWORK=off`, `GOPROXY=off` and
 `GOFLAGS=-mod=readonly`. So no `GOFLAGS` of the caller (a `-run` that
 selects no test, or build tags), `go env -w` file or other variable of
 the caller changes what a step checks. Every mise command `tools/ci`
-starts (`mise --version`, `mise trust`, `mise install` and `mise which`) runs at the top
-of the tree with the mise environment besides:
+starts (`mise --version`, `mise trust`, `mise install` and `mise which`)
+runs at the top of the tree in the same kind of environment, built from
+nothing: those variables that say where things are, the proxy variables
+and `SSL_CERT_FILE` where the command reaches the network, and the mise
+environment:
 `MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml`,
 `MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none`, `MISE_ENV` set and
-empty, `MISE_AUTO_ENV=false`, `GOENV=off` and `GOTOOLCHAIN=local`, so
-mise reads `mise.toml` as its one configuration file of the tree, and
-`mise.lock`, and runs nothing that another mise file of a change holds
+empty, `MISE_AUTO_ENV=false`,
+`MISE_GLOBAL_CONFIG_FILE=/dev/null/mise-global.toml` and
+`MISE_SYSTEM_CONFIG_FILE=/dev/null/mise-system.toml` (paths that cannot
+exist), `GOENV=off` and `GOTOOLCHAIN=local`, and
+`MISE_CEILING_PATHS` as the parent of the tree. So mise reads
+`mise.toml` as its one configuration file of the tree, and `mise.lock`,
+no global or system configuration, no file in a parent directory, and
+no env file, `MISE_CD` or trusted path of the caller (no `MISE_` or
+`GO` variable that is not on the list reaches it), and it runs nothing
+that another mise file of a change holds
 (the threat model in `tools/ci/misefiles.go` says what stays trusted).
 That environment is measured with one version of mise, the `version`
 input of the mise action in `ci.yml`, so `fast`, `all` and `setup`
@@ -414,7 +425,17 @@ Four subcommands are outside `all`:
 - The linter sees only the files that build for the GOOS and GOARCH it
   runs under, so `tools/ci` starts it once for each lint target (linux
   and darwin, each on amd64 and arm64, one list that the tests read
-  too), each as `<path> run --config .golangci.yml`, with the path of
+  too), each as `<path> run --config .golangci.yml -j 1
+  --allow-parallel-runners`. `--allow-parallel-runners` skips the file
+  lock on `golangci-lint.lock` in the temporary directory, which fails a
+  run with "parallel golangci-lint is running" while any other run on
+  the machine holds it. `-j 1` limits golangci-lint's own Go threads to
+  one (`GOMAXPROCS`); child processes such as `go list` and the compiler
+  are not capped. It does not fix the lock failure and costs about 14s
+  for a cold run against about 7s by default, warm runs being about the
+  same; it is kept to limit CPU use when runs overlap. `lintArgs` in
+  `tools/ci/fast.go` is the one list, and the fixture test runs the
+  linter with it. Each run uses the path of
   `golangci-lint` that `mise which` resolves and not through
   `mise exec`, which would add a mise `[env]` table, in the environment
   of the steps of `fast` with the target's `GOOS` and `GOARCH` and

@@ -23,7 +23,7 @@ const (
 
 // coverTrees are the directories whose packages S9 measures, each with
 // every package below it.
-var coverTrees = []string{"internal", "tools", "e2e/probes", "e2e/fakesbx"}
+var coverTrees = []string{"cmd", "internal", "tools", "e2e/probes", "e2e/fakesbx"}
 
 // coverStrictModules are the modules S9 holds to coverStrict: the
 // package internal/<module> and every package below it.

@@ -60,7 +60,7 @@ func TestHelperProcess(t *testing.T) {
 		pidfile := os.Getenv("CI_TEST_PIDFILE")
 		st := groupStep(pidfile)
 		if os.Getenv("CI_TEST_FAILFAST") != "" {
-			st = failFastStep(pidfile)
+			st = leaderExitStep(pidfile, 1)
 		}
 		if os.Getenv("CI_TEST_HOLDER") != "" {
 			st = step{name: "holder", argv: []string{os.Args[0], "-test.run=^TestHelperProcess$"},
@@ -85,12 +85,12 @@ func groupStep(pidfile string) step {
 	return step{name: "group", argv: []string{"sh", "-c", script, pidfile}, environ: []string{"PATH=" + os.Getenv("PATH")}}
 }
 
-// failFastStep is a step that writes the pid of a grandchild, which
-// holds the output pipe, and then fails at once: the step has a failing
-// status while its run goes on until the group is killed.
-func failFastStep(pidfile string) step {
-	script := `echo $$ > "$0.leader"; sleep 60 & echo $! > "$0.tmp" && mv "$0.tmp" "$0"; exit 1`
-	return step{name: "failfast", argv: []string{"sh", "-c", script, pidfile}, environ: []string{"PATH=" + os.Getenv("PATH")}}
+// leaderExitStep is a step that writes the pid of a grandchild, which
+// holds the output pipe, and then ends at once with status code: the
+// step has its status while its run goes on until the group is killed.
+func leaderExitStep(pidfile string, code int) step {
+	script := `echo $$ > "$0.leader"; sleep 60 & echo $! > "$0.tmp" && mv "$0.tmp" "$0"; exit ` + strconv.Itoa(code)
+	return step{name: "leaderexit", argv: []string{"sh", "-c", script, pidfile}, environ: []string{"PATH=" + os.Getenv("PATH")}}
 }
 
 // waitForPid returns the pid that the file holds, once it is there.
@@ -144,8 +144,9 @@ func killAtEnd(t *testing.T, pidfile string) {
 			}
 			// Pids 0 and 1 are never ours to kill: -1 would reach every process.
 			if pid, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && pid > 1 {
-				// The group goes only if pid still leads one: a pid that was
-				// recycled after the process ended does not.
+				// The group goes only if pid exists and leads one: this check
+				// cannot tell a recycled pid that leads a group from the
+				// original, which is the most a cleanup of a failed test asks.
 				if pgid, err := syscall.Getpgid(pid); err == nil && pgid == pid {
 					_ = syscall.Kill(-pid, syscall.SIGKILL)
 				}
@@ -201,6 +202,29 @@ func TestKillWithGroup(t *testing.T) {
 	})
 }
 
+// TestStepRunKillsTheGroup checks that a step whose leader has ended,
+// by failing or by succeeding, leaves no grandchild behind once run
+// returns: the grandchild holds the output pipe, WaitDelay ends the
+// wait, and os/exec does not call Cancel for a leader it reaped.
+func TestStepRunKillsTheGroup(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		code int
+	}{{"a leader that fails at once", 1}, {"a leader that succeeds at once", 0}} {
+		t.Run(c.name, func(t *testing.T) {
+			pidfile := filepath.Join(t.TempDir(), "pid")
+			killAtEnd(t, pidfile)
+			_, err := leaderExitStep(pidfile, c.code).run(t.Context(), t.TempDir())
+			require.Error(t, err)
+			if c.code == 0 {
+				// The leader succeeded; the held pipe is what failed the run.
+				require.ErrorIs(t, err, exec.ErrWaitDelay)
+			}
+			requireGone(t, waitForPid(t, pidfile))
+		})
+	}
+}
+
 // TestKillGroupAfterWait checks that a group that is already gone is
 // os.ErrProcessDone, which Go does not report, and not a kill error
 // that would turn a command that succeeded into a failure.
@@ -253,9 +277,7 @@ func TestMainSignals(t *testing.T) {
 
 // TestMainSignalAfterFailure runs main around a step that has already
 // failed while a grandchild still holds its pipe, signals it with SIGINT,
-// and expects status 130 and one interrupted line. The grandchild is not
-// checked: the leader of the group has ended, and a measured run left it
-// alive after the signal (a pending item), so killAtEnd ends it.
+// and expects status 130, one interrupted line and the grandchild gone.
 func TestMainSignalAfterFailure(t *testing.T) {
 	r := newTree(t)
 	r.Commit("fixture")
@@ -269,7 +291,7 @@ func TestMainSignalAfterFailure(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
 	t.Cleanup(func() { _ = cmd.Process.Kill() })
-	waitForPid(t, pidfile)
+	grandchild := waitForPid(t, pidfile)
 	require.NoError(t, cmd.Process.Signal(syscall.SIGINT))
 	select {
 	case err := <-done:
@@ -280,10 +302,11 @@ func TestMainSignalAfterFailure(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("main did not exit after the signal")
 	}
+	requireGone(t, grandchild)
 }
 
-// TestFinish holds the four cells of the exit status of a run: with and
-// without a signal, with a passing and a failing status.
+// TestFinish holds the cells of the exit status of a run: with and
+// without a signal, for a passing, a failing and a refused status.
 func TestFinish(t *testing.T) {
 	const line = "ci: interrupted\n"
 	for _, c := range []struct {
@@ -330,6 +353,7 @@ func TestMainSecondSignal(t *testing.T) {
 	t.Cleanup(func() { _ = cmd.Process.Kill() })
 	waitForPid(t, pidfile)
 	start := time.Now()
+	deadline := time.After(10 * time.Second)
 	// SIGTERM, not SIGINT: a test run in the background may inherit SIGINT
 	// as ignored, and Stop would restore that, so the repeats would be dropped.
 	require.NoError(t, cmd.Process.Signal(syscall.SIGTERM))
@@ -349,7 +373,7 @@ func TestMainSecondSignal(t *testing.T) {
 			return
 		case <-tick.C:
 			_ = cmd.Process.Signal(syscall.SIGTERM)
-		case <-time.After(10 * time.Second):
+		case <-deadline:
 			t.Fatal("main did not exit after the second signal")
 		}
 	}

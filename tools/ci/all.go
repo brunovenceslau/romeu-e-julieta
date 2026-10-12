@@ -200,6 +200,7 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	if machine == nil {
 		machine = unameMachine
 	}
+	// uname comes from the host machine, not from the repository.
 	uname := machine(ctx)
 	say(e.stdout, "platform  %s/%s, uname -m %s\n", runtime.GOOS, runtime.GOARCH, uname)
 
@@ -233,6 +234,7 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 		translated = procTranslated
 	}
 	archDetail := ""
+	// uname comes from the host machine, not from the repository.
 	switch {
 	case !archMatches(uname, runtime.GOARCH):
 		archDetail = fmt.Sprintf("uname -m reports %s and this binary runs as %s: the tools of this run are not the ones of the machine\n", uname, runtime.GOARCH)
@@ -243,7 +245,7 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	c.run(ctx, root, steps)
 	tree := ""
 	if err := changedSince(ctx, repo, before); err != nil {
-		tree = "the steps changed HEAD, the index or the working tree, so a check may not have judged the commit; what changed:\n" + err.Error() + "\n"
+		tree = "the steps changed HEAD, the index or the working tree, so a check may not have judged the commit; what changed:\n" + git.SafeLines(err.Error()) + "\n"
 	}
 	c.report("working tree", tree == "", tree)
 
@@ -382,8 +384,8 @@ func runSetup(ctx context.Context, e env, args []string) (bool, error) {
 	}
 	c := newChecks(e.stdout)
 	mise := []step{
-		{name: "mise trust", argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, environ: miseEnviron(passThroughEnv())},
-		{name: "mise install", argv: []string{"mise", "install"}, environ: miseEnviron(withProcessEnv(passThroughEnv(), networkPassThrough))},
+		{name: "mise trust", argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, environ: miseRunEnviron(passThroughEnv(), root)},
+		{name: "mise install", argv: []string{"mise", "install"}, environ: miseRunEnviron(withProcessEnv(passThroughEnv(), networkPassThrough), root)},
 	}
 	c.run(ctx, root, mise)
 	if !c.ok {
