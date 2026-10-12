@@ -330,7 +330,7 @@ func scanAttributes(ctx context.Context, repo git.Repo) (string, map[string]bool
 			problems = append(problems, finding{file, "generated", fmt.Sprintf("is %d bytes, over the 1 MiB (%d bytes) that this check reads of one file, so its lines are not checked; make it at most that size", size, attributesMaxSize)})
 			continue
 		case !ok:
-			problems = append(problems, finding{file, "generated", fmt.Sprintf("is not read: the .gitattributes files before it in path order fill the 8 MiB (%d bytes) that this check reads in all, so its lines are not checked; make them smaller or fewer", attributesMaxTotal)})
+			problems = append(problems, finding{file, "generated", fmt.Sprintf("is not read: the .gitattributes files read before it (the root one, then the others in path order) leave too little of the 8 MiB (%d bytes) that this check reads in all, so its lines are not checked; make them smaller or fewer", attributesMaxTotal)})
 			continue
 		}
 		scanLines(file, string(data), root, listed, &problems)
@@ -361,8 +361,9 @@ const attributesMaxSize = 1 << 20
 // attributesMaxTotal is the size in bytes of all the .gitattributes that
 // scanAttributes reads, each distinct blob counted once. Every blob read
 // is held at once, and the process peaks near four times what it reads,
-// so this bound keeps the gate near 32 MiB of memory however many files
-// the index holds. It is eight files at attributesMaxSize, or thousands
+// so this bound keeps the memory that the blob bytes take near 32 MiB;
+// the list of the index and of the object names still grows with the
+// number of files. It is eight files at attributesMaxSize, or thousands
 // of ordinary ones: a repository far larger than this one stays under
 // it.
 const attributesMaxTotal = 8 << 20
@@ -373,14 +374,25 @@ const attributesMaxTotal = 8 << 20
 // --batch-check" for the sizes, then "git cat-file --batch" for the
 // blobs it reads, so a blob it does not read is never sent to git. A
 // blob is read when it is at most attributesMaxSize and fits in what is
-// left of attributesMaxTotal, taking the files in path order; one that
+// left of attributesMaxTotal, taking the root file first, since its
+// list judges every output, and then the others in path order; one that
 // does not fit is left out and a smaller one after it may still be read.
 // A blob that is not read has a size and no content, and the caller
 // reports its files. An object the store does not hold, or an answer
 // that is not the blob asked for, is an error that names the first file
-// holding it, since that file cannot be checked.
+// holding it in that order, since that file cannot be checked.
 func readBlobs(ctx context.Context, repo git.Repo, files map[string]string) (map[string]int64, map[string][]byte, error) {
 	paths := slices.Sorted(maps.Keys(files))
+	slices.SortStableFunc(paths, func(a, b string) int {
+		ra, rb := strings.EqualFold(a, attributesPath), strings.EqualFold(b, attributesPath)
+		switch {
+		case ra && !rb:
+			return -1
+		case rb && !ra:
+			return 1
+		}
+		return 0
+	})
 	holder := map[string]string{}
 	var oids []string
 	for _, file := range paths {
@@ -514,7 +526,7 @@ func parseBatchHeader(line, oid string) (int64, error) {
 	fields := strings.Split(line, " ")
 	switch {
 	case len(fields) == 2 && fields[0] == oid && fields[1] == "missing":
-		return 0, &objectError{oid, "the object store is missing it"}
+		return 0, &objectError{oid, "the object store is missing it; " + git.FetchHint(oid)}
 	case len(fields) != 3:
 		return 0, &objectError{oid, fmt.Sprintf("the header %q", line)}
 	case fields[0] != oid:

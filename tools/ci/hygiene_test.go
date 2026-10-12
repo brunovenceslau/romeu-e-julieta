@@ -5,6 +5,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
@@ -724,4 +726,88 @@ func rangeOf(verdicts []verdict, err error) (findings []finding, checked bool, _
 		findings = append(findings, v.findings...)
 	}
 	return findings, checked, err
+}
+
+// TestBlobAt checks how blobAt tells a file that is there from one
+// that is not: by the tree of rev, so a file the tree lacks is not
+// found, a file it holds is read, and a directory or a submodule at the
+// path is an error.
+func TestBlobAt(t *testing.T) {
+	r := newTree(t)
+	head := r.Commit("fixture")
+	data, found, err := blobAt(t.Context(), r.Repo, head, "README.md")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "# A fixture\n\nPlain text.\n", string(data))
+	_, found, err = blobAt(t.Context(), r.Repo, head, "absent.md")
+	require.NoError(t, err)
+	assert.False(t, found)
+	_, found, err = blobAt(t.Context(), r.Repo, head, "docs/absent.md")
+	require.NoError(t, err)
+	assert.False(t, found, "under a directory the tree lacks")
+	_, _, err = blobAt(t.Context(), r.Repo, head, "tools")
+	require.ErrorContains(t, err, "not a file")
+	// A submodule whose commit this repository does not hold, as is usual.
+	r.Git("update-index", "--add", "--cacheinfo", "160000,0123456789abcdef0123456789abcdef01234567,sub")
+	r.Git("commit", "--quiet", "--message", "a submodule")
+	_, _, err = blobAt(t.Context(), r.Repo, "HEAD", "sub")
+	require.ErrorContains(t, err, "read sub at HEAD: not a file")
+}
+
+// partialClone clones upstream with --filter=blob:none and no checkout,
+// so the clone holds every commit and tree and no blob; a later fetch
+// brings no blob either. It returns the clone. The fixture's git runs
+// with GIT_NO_LAZY_FETCH=1 (git.Repo.Run), so a checkout could not
+// fetch the blobs it needs.
+func partialClone(t *testing.T, upstream *gittest.Repo) git.Repo {
+	t.Helper()
+	upstream.Git("config", "uploadpack.allowFilter", "true")
+	dir := filepath.Join(t.TempDir(), "clone")
+	upstream.Git("clone", "--quiet", "--filter=blob:none", "--no-checkout", "file://"+upstream.Dir, dir)
+	return git.Repo{Dir: dir, Env: upstream.Env}
+}
+
+// TestDefaultBranchDenylistOfAPartialClone is the case of a clone made
+// with --filter=blob:none: after a fetch, the denylist of the default
+// branch is in its tree and its blob is not in the object store. That
+// is an error that says how to fetch the blob, never an empty list
+// that would pass every push; once fetched as it says, the list is
+// read.
+func TestDefaultBranchDenylistOfAPartialClone(t *testing.T) {
+	const other = "blorptang wixelfrum"
+	upstream := newTree(t)
+	upstream.Commit("fixture")
+	clone := partialClone(t, upstream)
+	upstream.Write(names.Path, string(denylist(t, madeUp, other)))
+	upstream.Commit("ci: list a second name")
+	_, err := clone.Run(t.Context(), nil, "fetch", "--quiet", "origin")
+	require.NoError(t, err)
+	list, err := defaultBranchDenylist(t.Context(), clone, "origin")
+	require.Error(t, err, "a list that may be empty: %v", list)
+	oid := upstream.Git("rev-parse", "HEAD:"+names.Path)
+	assert.Contains(t, err.Error(), `"git cat-file -p `+oid+`"`)
+	fetch := exec.Command("git", "cat-file", "-p", oid)
+	fetch.Dir, fetch.Env = clone.Dir, clone.Env
+	out, err := fetch.CombinedOutput()
+	require.NoError(t, err, "%s", out)
+	list, err = defaultBranchDenylist(t.Context(), clone, "origin")
+	require.NoError(t, err)
+	assert.Equal(t, 2, list.Len())
+}
+
+// TestHeadTreeOfAPartialClone checks that a tree whose blob the object
+// store lacks is an error that names the file and says how to fetch the
+// blob.
+func TestHeadTreeOfAPartialClone(t *testing.T) {
+	upstream := newTree(t)
+	upstream.Commit("fixture")
+	clone := partialClone(t, upstream)
+	upstream.Write("docs/new.md", "new\n")
+	upstream.Commit("docs: add a page")
+	_, err := clone.Run(t.Context(), nil, "fetch", "--quiet", "origin")
+	require.NoError(t, err)
+	_, err = headTree(t.Context(), clone, "refs/remotes/origin/HEAD")
+	// The clone has no blob at all: the first entry of the tree is said.
+	first := upstream.Git("rev-parse", "HEAD:.githooks/pre-push")
+	require.ErrorContains(t, err, "read .githooks/pre-push: the object store lacks its blob "+first+`; in a partial clone (one made with --filter), fetch it with "git cat-file -p `+first+`"`)
 }

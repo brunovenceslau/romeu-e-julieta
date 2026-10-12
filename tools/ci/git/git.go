@@ -4,15 +4,19 @@
 // Package git runs the git commands the checks read a repository with.
 // The checks only read: nothing here writes a ref, the index or the
 // working tree.
+//
+// A clone made with --filter (a partial clone) lacks the blobs it has
+// not needed yet, and git here never fetches one (see Run). A check
+// that reads such a blob fails: the checks of the pre-push hook need
+// the objects they read to be fetched first, and an error about a
+// lacking object says how (FetchHint), where the check sees it.
 package git
 
 import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -53,12 +57,11 @@ func (r Repo) Run(ctx context.Context, stdin []byte, args ...string) ([]byte, er
 	fixed := []string{"--no-replace-objects", "-c", "core.quotePath=true"}
 	cmd := exec.CommandContext(ctx, "git", append(fixed, args...)...)
 	cmd.Dir = r.Dir
-	env := r.Env
-	if env == nil {
-		env = os.Environ()
-	}
-	// Last, so that it wins over the same variable earlier in env.
-	cmd.Env = append(slices.Clip(env), "GIT_NO_LAZY_FETCH=1")
+	cmd.Env = r.Env
+	// Last, so that it wins over the same variable earlier in the
+	// environment; Environ gives what the command would run with, the
+	// environment of this process when r.Env is nil.
+	cmd.Env = append(cmd.Environ(), "GIT_NO_LAZY_FETCH=1")
 	cmd.Stdin = bytes.NewReader(stdin)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -67,6 +70,13 @@ func (r Repo) Run(ctx context.Context, stdin []byte, args ...string) ([]byte, er
 		return nil, fmt.Errorf("git %s: %w: %s", args[0], err, Printable(strings.TrimSpace(stderr.String())))
 	}
 	return out, nil
+}
+
+// FetchHint is the advice of an error about the object oid that the
+// object store lacks. Git fetches a blob a partial clone lacks when it
+// reads it without GIT_NO_LAZY_FETCH, so the hint names such a read.
+func FetchHint(oid string) string {
+	return `in a partial clone (one made with --filter), fetch it with "git cat-file -p ` + oid + `" and run again`
 }
 
 // Printable returns s as it is when it is UTF-8 and every character of

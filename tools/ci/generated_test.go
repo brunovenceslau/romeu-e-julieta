@@ -720,7 +720,9 @@ type gitCall struct{ args, stdin string }
 
 // recordGit puts first on PATH a git that records each run of the real
 // one, and returns a function that reads the runs so far. Run looks git
-// up in the PATH of this process, not in the environment of the command.
+// up in the PATH of this process, not in the environment of the command,
+// so it sets PATH with t.Setenv, which also keeps a test that calls it
+// from running in parallel with another.
 func recordGit(t *testing.T) func() []gitCall {
 	t.Helper()
 	real, err := exec.LookPath("git")
@@ -825,7 +827,7 @@ func TestScanAttributesSendsOnlyWhatItReads(t *testing.T) {
 func TestScanAttributesTotalCap(t *testing.T) {
 	const problem = "x text=unset\n"
 	stringFinding := `: generated: gives "x" the value text=unset`
-	notRead := ": generated: is not read: the .gitattributes files before it in path order fill the 8 MiB"
+	notRead := ": generated: is not read: the .gitattributes files read before it (the root one, then the others in path order) leave too little of the 8 MiB"
 	fill := func(size int) map[string]string {
 		files := map[string]string{}
 		for i := range attributesMaxTotal / attributesMaxSize {
@@ -847,6 +849,27 @@ func TestScanAttributesTotalCap(t *testing.T) {
 		got := scanFindings(t, scanFixture(t, files).Repo)
 		require.Len(t, got, 1, "%v", got)
 		assert.True(t, strings.HasPrefix(got[0], "f0/.gitattributes"+stringFinding), got[0])
+	})
+	t.Run("the root file is read first", func(t *testing.T) {
+		// '-' sorts before '.', so in path order these fill the total
+		// before the root file.
+		files := map[string]string{attributesPath: problem}
+		for i := range attributesMaxTotal / attributesMaxSize {
+			files["-"+strconv.Itoa(i)+"/.gitattributes"] = sized(attributesMaxSize, "#"+strconv.Itoa(i)+"\n")
+		}
+		got := scanFindings(t, scanFixture(t, files).Repo)
+		require.Len(t, got, 2, "%v", got)
+		assert.True(t, strings.HasPrefix(got[0], "-7/.gitattributes"+notRead), got[0])
+		assert.True(t, strings.HasPrefix(got[1], attributesPath+stringFinding), got[1])
+	})
+	t.Run("a shared blob counts once and an oversized one not at all", func(t *testing.T) {
+		files := fill(attributesMaxSize) // f0 to f7, the total exactly
+		files["0/.gitattributes"] = sized(attributesMaxSize+1, problem)
+		files["g/.gitattributes"] = files["f0/.gitattributes"]
+		files["h/.gitattributes"] = files["f1/.gitattributes"]
+		got := scanFindings(t, scanFixture(t, files).Repo)
+		require.Len(t, got, 1, "%v", got)
+		assert.True(t, strings.HasPrefix(got[0], "0/.gitattributes: generated: is "), got[0])
 	})
 	t.Run("a smaller file after one that does not fit is read", func(t *testing.T) {
 		files := fill(attributesMaxSize - 2) // 16 bytes left
@@ -959,4 +982,24 @@ func TestParseBatchCheck(t *testing.T) {
 			require.ErrorContains(t, err, tc.want)
 		})
 	}
+}
+
+// TestScanAttributesBlobGoneBeforeTheRead checks an object that
+// --batch-check finds and --batch then does not, as when it is removed
+// between the two: the error names the file that holds it. A git first
+// on PATH answers "missing" to --batch.
+func TestScanAttributesBlobGoneBeforeTheRead(t *testing.T) {
+	r := scanFixture(t, map[string]string{"a/.gitattributes": "x -text\n"})
+	oid := r.Git("rev-parse", ":a/.gitattributes")
+	real, err := exec.LookPath("git")
+	require.NoError(t, err)
+	bin := t.TempDir()
+	wrapper := "#!/bin/sh\n" +
+		"case \" $* \" in *\" cat-file --batch=\"*) while read -r id; do printf '%s missing\\n' \"$id\"; done; exit 0;; esac\n" +
+		"exec " + strconv.Quote(real) + " \"$@\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte(wrapper), 0o700))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH")) // serial, as recordGit
+	_, _, _, err = scanAttributes(t.Context(), r.Repo)
+	require.ErrorContains(t, err, `reading "a/.gitattributes" of the index: git cat-file: blob `+oid+": the object store is missing it; ")
+	assert.Contains(t, err.Error(), `"git cat-file -p `+oid+`"`)
 }
