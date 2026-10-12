@@ -134,10 +134,12 @@ at the end of this section. The first entry whose verdict is narrowed
 is the event of the four
 [Deferred decisions](../spec.md#in-how-this-repository-is-run) rows
 whose trigger is "the token is narrowed". The token narrowing row of
-the index and the token row of
+the index describes the token before and after the narrowing; the
+token row of
 [05 5.4](../spec/05-security.md#risks-of-how-this-repository-is-developed)
-describe the token before and after the narrowing, and no entry edits
-them: the newest entry's verdict says which of the two states holds. A
+describes the state before it, in its present words, and points to
+the index row for the state after. No entry edits either: the
+newest entry's verdict says which of the two states holds. A
 later entry whose verdict is not narrowed puts the token back in the
 state before the narrowing, and is an event of those four rows too,
 so the decision each took on the narrowed premise is reviewed
@@ -158,9 +160,15 @@ maintainer's own session, never only from what the sandbox printed:
    that names the socket it forwards; the keys of that socket, listed by
    `ssh-add -l` on the host with `SSH_AUTH_SOCK` set to it; and the
    GitHub account's SSH keys page, read in the maintainer's session.
-   Expected: the setting names no socket, or each socket it names
-   holds the signing key alone; and the fingerprint of each key a
-   forwarded socket holds is absent from the page's authentication
+   Whether sbx forwards the agent of the shell that starts it when no
+   setting names a socket is inferred, not measured, so the read does
+   not rely on the setting alone: when no setting names a socket, the
+   socket the second part lists, whose keys the third part checks
+   against the page, is the `SSH_AUTH_SOCK` of the shell that starts
+   the sandbox, on the host. Expected: every socket so listed holds
+   the signing key alone, or no agent is behind it; and the
+   fingerprint of each key it holds is absent from the page's
+   authentication
    keys, the signing key's being listed only under signing keys, the
    rule
    [06 6.4](../spec/06-kits.md#64-product-kits) states for romeu's
@@ -201,17 +209,24 @@ Limits of the entry, stated and not closed:
 4. A later read is due at a sitting, not at the events that change what
    it reads (a re-created sandbox, `sbx secret set` run again, a
    replaced token, the maintainer's pushes from the host), and none is
-   due after block O7 (round 17, R17-13).
+   due after block O7; the required-name try of item h is not run again
+   for a replaced token either, so its answers describe the token of
+   the first narrowed entry (round 17, R17-13; round 18, R18-A12).
 5. Nothing writes into the token narrowing row of the index or the
-   token row of 05 5.4 that the narrowing holds, and an entry whose
+   token row of 05 5.4 that the narrowing holds; an entry whose
    verdict is not narrowed after a narrowed one asks for no decision of
-   its own: the rows are reviewed at their events (round 17, R17-15,
-   R17-20).
+   its own, and a narrowed entry after a not narrowed one is no event,
+   since the rows the first narrowed entry fired stay fired: the rows
+   are reviewed at their events (round 17, R17-15, R17-20; round 18,
+   R18-A12).
 6. Read 3's merge try, made once the required checks are green, is
    accepted with either token, so it cannot show whether a token
    bypasses those checks (round 17, R17-18).
 
-Limits 4 to 6 are reopened by the sitting of block O8 of the
-[plan](../plan.md#operator-blocks), which applies ADR 0011.
+Limits 4 to 6 are reopened, after the sitting of block O8 of the
+[plan](../plan.md#operator-blocks) has written the first entry, by the
+first of: a re-created development sandbox, a replaced token, the
+first release-candidate tag, or the plan's checkpoint C7 (round 18,
+R18-A13).
 
 No entry yet: the narrowing waits for a maintainer step.

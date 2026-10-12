@@ -93,15 +93,18 @@ expected conflict.
 4. **One decision block.** Everything the consolidation cannot decide
    goes to the operator at once, each item with a recommendation: a
    Blocking or Required finding that changes a decision record, an
-   accepted risk or the scope. Advisory findings are applied by
-   default.
+   accepted risk or the scope, and a Required finding whose class the
+   consolidation sets lower than the reporting lens's. Advisory
+   findings are applied by default.
 5. **One write pass, one pull request**: the corrected spec and the
    round page, with the approval line of every ask-first surface the
    diff touches. A large diff is split by page across worktrees with
    disjoint file sets and lands as one pull request.
 6. **A targeted re-audit** (the next round number): only the lenses
    whose findings drove the delta, reading only the sections the write
-   pass changed; clean verdicts are carried forward.
+   pass changed; clean verdicts are carried forward. The acceptance
+   items a write pass added for `test-detail` findings are judged as
+   acceptance in this step, not parked for B.
 
 The spec is validated for the plan tasks that follow when all of these
 hold, and the round page says so in one line with the numbers:
@@ -126,7 +129,9 @@ hold, and the round page says so in one line with the numbers:
   `contradiction` or `behavior-gap`.
 
 The classes of Required, and that only the first two block, were
-decided on 2026-10-12.
+decided on 2026-10-12, from the round-17 write pass on, its open rows
+included, because test-plan detail is judged where it is implemented,
+in stage B, and a spec held for it grows with test plans.
 
 ### From stage A to stage B
 
@@ -266,7 +271,7 @@ The first line of the report is `<lens id> · <role> · <model>`. Then:
 Severity scale for every lens, so the merge is mechanical:
 **Blocking** (the spec would ship a defect this lens exists to catch),
 **Required** (fix before the next plan task that implements the cited
-section), **Advisory** (improve when the section is next touched).
+section, or, for `test-detail`, by that task's acceptance), **Advisory** (improve when the section is next touched).
 A Required finding names one class. **`contradiction`**: two texts of
 the spec, or the spec and a decision record, cannot both hold.
 **`behavior-gap`**: the implementation needs a behavior the spec does
@@ -275,7 +280,10 @@ listed test case is built, a test case missing for behavior the spec
 already defines, or the naming of a test. Only the first two block
 validation; a `test-detail` finding becomes an acceptance item of the
 plan task that implements it, in `plan.md`, citing the finding id, and
-the spec text is not grown for it. A reviewer that is unsure between
+the spec text is not grown for it; it may carry a wording fix of the
+spec's own test cell when the case as written does not reach its
+stated result, a fix that changes no behavior, a limit the plan review
+of stage B reopens. A reviewer that is unsure between
 `behavior-gap` and `test-detail` asks whether the behavior the test
 would check is written in the spec: if it is, the finding is
 `test-detail`.

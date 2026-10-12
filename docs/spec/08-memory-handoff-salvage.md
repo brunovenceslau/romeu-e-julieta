@@ -216,6 +216,13 @@ manifest.
    `manifest.json`, which an interrupted salvage leaves, is ignored by
    verification and kept.
 
+`julieta salvage --fingerprint` ([04 4.3](04-cli.md#43-julieta-sandbox))
+runs only the reads of steps 2 and 4 and prints the sandbox-side
+values of the fingerprint of
+[03 3.8](03-formats.md#38-host-state-schemas-state-v1); it writes
+nothing and stops no agent. romeu fetches the daemon heads itself, as
+step 3 of its half does.
+
 **Salvage payloads are secret-bearing.** `ignored.tar.gz`, `agent/` and
 transcripts can hold credentials and code. Their dirs are 0700 and
 their files 0600; they stay until the owner deletes them and are part
@@ -282,15 +289,14 @@ resort for each.
 | `daemon-url-refused`, a missing repo, daemon heads not in the bundle | rerun once the sandbox is reachable at its daemon; a persisting one names an sbx change |
 
 A rerun of `rm`, `recreate` or `retire` on a `removing` generation with
-a fingerprint that differs from the newest one written with `removing`
-([03 3.8](03-formats.md#38-host-state-schemas-state-v1)) salvages again. When that
-salvage completes, or `--accept-loss` names its skipped reasons, it
-exits 5 with the error `fingerprint-unstable` (`RJ-338`,
-[04 4.4](04-cli.md#44-error-ids)), which is not a skipped reason, so
-`--accept-loss` does not cover it, and its hint is the recovery. When
-it is incomplete without them, it follows the incomplete rows of
-[01 1.6](01-system-model.md#generation), `RJ-306`, back to `open`, as
-any salvage does.
+a fresh fingerprint ([03 3.8](03-formats.md#38-host-state-schemas-state-v1))
+that differs from the newest one written with `removing` salvages
+again and ends as the error `fingerprint-unstable` (`RJ-338`,
+[04 4.4](04-cli.md#44-error-ids)) says: when that salvage completes, or
+`--accept-loss` names its skipped reasons, exit 5 with that error,
+which is not a skipped reason, so `--accept-loss` does not cover it,
+and its hint is the recovery; otherwise as the `salvaging` rows of
+[01 1.6](01-system-model.md#generation) end any salvage.
 
 ### Not salvaged
 

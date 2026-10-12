@@ -691,8 +691,10 @@ task list:
     `internal/cli` differs in id, slug or exit code; `check-findings`
     maps to exit 6 and is the only id that does.
   - The fix hint of `RJ-338` is the one fixed text that 04 4.4 quotes,
-    and a test fails when the table's hint differs from it by a byte
-    (round 17, R17-06).
+    and a test fails when the table's hint differs from it by a byte;
+    the reference is that row's quoted text, read from the page by the
+    test with its code-span backticks stripped, so the table's hint
+    holds no backtick (round 17, R17-06; round 18, R18-A7).
   - `go generate` writes the three consumers of the table (12 12.3): the
     exit-code sections of `--help`, `docs/reference/errors.md` and
     `docs/reference/exit-codes.md`, the pages with the generated-file
@@ -2005,18 +2007,30 @@ early.
       `worktree-changing`: the rerun exits 5 with `RJ-306` and the state
       is `open` (R17-01);
     - one more test runs the branch of `RJ-338` where `--accept-loss`
-      names the rerun's skipped reasons: a writer keeps a tracked file
+      names the rerun's skipped reasons: the fingerprint already
+      differs when the rerun starts, a writer keeps a tracked file
       changing through the repeat, and the rerun, run with
       `--accept-loss=worktree-changing`, exits 5 with `RJ-338`, the
       state is `removing`, the new entry records the accepted reason,
       and `sbx env rm` is not reached (reaching it, or returning
       `RJ-306`, turns it red); the case whose salvage is complete does
-      not stand for this branch, since it skips no reason (R17-02);
+      not stand for this branch, since it skips no reason (R17-02;
+      round 18, R18-A8). The entry's `fingerprint` is that of the last
+      read of the skipped worktree (03 3.8): once the writer stops, a
+      rerun that finds the worktree as that read left it resumes at
+      `sbx env rm` (R18-A4);
     - the cases run for `rm` and for `recreate`, each asserting
       `RJ-338` or `RJ-306` on a rerun on a `removing` generation, and
       T069 runs them for `retire` (R17-08);
-    - "kill the salvage" kills romeu after `removing -> salvaging` is
-      written and before `removing` is written again (R17-09);
+    - "kill the salvage" kills romeu after each step of the write
+      order of 01 1.6 from the write of `salvaging` up to, and not
+      including, the write of `removing`, one test per step (R17-09;
+      round 18, R18-A8);
+    - a fresh fingerprint that cannot be read (the sandbox does not
+      start, the daemon is unreachable, `julieta salvage --fingerprint`
+      exits non-zero) makes the rerun exit 1 with the state still
+      `removing`, no new salvage entry and `sbx env rm` not reached
+      (round 18, R18-04);
     - the `excludeIgnored` case edits `salvage.excludeIgnored` through
       `romeu sync`, which promotes the edit (gate 2) and then exits 2
       with `removal-pending` (04 4.2, the `sync` steps), and the test
@@ -2054,9 +2068,11 @@ early.
   - Nothing is deleted.
   - On a `removing` generation with its sandbox present, `retire` runs
     the fingerprint cases of I17 that T068 runs for `rm`: an equal
-    fingerprint resumes at `sbx env rm`, and one that differs exits 5
-    with `RJ-338` after a complete or accepted salvage and with
-    `RJ-306` after an incomplete one (round 17, R17-08).
+    fingerprint resumes at `sbx env rm`, and one that differs salvages
+    again and ends as `RJ-338` (04 4.4) says; on an exit with `RJ-338`
+    or `RJ-306` nothing is moved (the tree, the workspace files, the
+    state), and after the resume the move of J7 completes (round 17,
+    R17-08; round 18, R18-05, R18-A9).
 - Verify: `go test -tags e2e ./e2e/...`.
 
 #### T070 - `romeu handoff`
