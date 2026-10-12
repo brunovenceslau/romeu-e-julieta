@@ -281,8 +281,9 @@ resort for each.
 | `fsck-failed` | the bundle holds a malformed object; inspect the repo in the sandbox, then rerun |
 | `daemon-url-refused`, a missing repo, daemon heads not in the bundle | rerun once the sandbox is reachable at its daemon; a persisting one names an sbx change |
 
-A rerun of `rm`, `recreate` or `retire` on a `removing` generation whose
-worktrees changed since the last salvage salvages again. When that
+A rerun of `rm`, `recreate` or `retire` on a `removing` generation with
+a fingerprint that differs from the newest one written with `removing`
+([03 3.8](03-formats.md#38-host-state-schemas-state-v1)) salvages again. When that
 salvage completes, or `--accept-loss` names its skipped reasons, it
 exits 5 with the error `fingerprint-unstable` (`RJ-338`,
 [04 4.4](04-cli.md#44-error-ids)), which is not a skipped reason, so

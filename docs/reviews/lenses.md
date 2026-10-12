@@ -85,7 +85,11 @@ expected conflict.
    late polish can reopen what an earlier round closed. The output is
    the draft of the round page, in the shape of
    [round-7.md](round-7.md): one row per finding with a proposed
-   resolution and its status (A, M or L).
+   resolution and its status (A, M or L, or T for a finding moved to
+   a plan task's acceptance). The consolidating reviewer classifies
+   each Required finding as `contradiction`, `behavior-gap` or
+   `test-detail`, by the definitions in "What a reviewer returns", and
+   records the class in its row.
 4. **One decision block.** Everything the consolidation cannot decide
    goes to the operator at once, each item with a recommendation: a
    Blocking or Required finding that changes a decision record, an
@@ -102,8 +106,12 @@ expected conflict.
 The spec is validated for the plan tasks that follow when all of these
 hold, and the round page says so in one line with the numbers:
 
-- no Blocking finding open; every Required finding fixed, or declined
-  with the decision and its date recorded next to the rationale;
+- no Blocking finding open; every Required finding of class
+  `contradiction` or `behavior-gap` fixed, or declined with the
+  decision and its date recorded next to the rationale; every Required
+  finding of class `test-detail` is an acceptance item of the plan
+  task that implements it, in `plan.md`, citing the finding id, and
+  does not block;
 - every report has its coverage table complete, and every page,
   criterion and journey has a finding or an explicit "nothing for this
   lens" from at least two lenses;
@@ -114,7 +122,11 @@ hold, and the round page says so in one line with the numbers:
   lens, the count of findings only L0 raised, the overlap of each
   noise-probe pair. They decide which lenses are rewritten before stage
   B;
-- the targeted re-audit raises no new Required finding.
+- the targeted re-audit raises no new Required finding of class
+  `contradiction` or `behavior-gap`.
+
+The classes of Required, and that only the first two block, were
+decided on 2026-10-12.
 
 ### From stage A to stage B
 
@@ -243,7 +255,7 @@ The first line of the report is `<lens id> · <role> · <model>`. Then:
 | Field | Content |
 |---|---|
 | Verdict | one line: does the spec meet this lens's definition of success, and what is the largest gap |
-| Findings | one row each: id (`<lens id>-<n>`), severity on the scale below, origin (`listed` when a bullet of the lens prompted it, `own` otherwise), the spec section cited as the spec cites itself ("04 4.3"), the defect in one sentence, the concrete failure scenario, the proposed change and what it costs |
+| Findings | one row each: id (`<lens id>-<n>`), severity on the scale below, for a Required finding its class (below), origin (`listed` when a bullet of the lens prompted it, `own` otherwise), the spec section cited as the spec cites itself ("04 4.3"), the defect in one sentence, the concrete failure scenario, the proposed change and what it costs |
 | Coverage | one line per page: the index, 00 to 13, the ADRs as one line, `plan.md`; each says `nothing for this lens` or lists finding ids. A page without a line fails the format |
 | What is missing | what this person expected to find and did not, each with where it would belong |
 | Postmortem | the first incident after v1.0.0 as this person sees it, one page at most, with the sections it crosses |
@@ -255,6 +267,18 @@ Severity scale for every lens, so the merge is mechanical:
 **Blocking** (the spec would ship a defect this lens exists to catch),
 **Required** (fix before the next plan task that implements the cited
 section), **Advisory** (improve when the section is next touched).
+A Required finding names one class. **`contradiction`**: two texts of
+the spec, or the spec and a decision record, cannot both hold.
+**`behavior-gap`**: the implementation needs a behavior the spec does
+not define. **`test-detail`**: only test-plan detail, that is how a
+listed test case is built, a test case missing for behavior the spec
+already defines, or the naming of a test. Only the first two block
+validation; a `test-detail` finding becomes an acceptance item of the
+plan task that implements it, in `plan.md`, citing the finding id, and
+the spec text is not grown for it. A reviewer that is unsure between
+`behavior-gap` and `test-detail` asks whether the behavior the test
+would check is written in the spec: if it is, the finding is
+`test-detail`.
 A lens does not report what the spec already lists as a deferred
 decision, a non-goal or an accepted risk, unless the trigger or the
 acceptance is itself the defect.

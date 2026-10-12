@@ -914,11 +914,12 @@ Evidence, or, for items g and h, in the note's dated entry:
   the four tries of item d repeated with the narrowed token), of the
   answer each read must give, and of the verdict. The first entry
   whose verdict is narrowed is the record that the narrowing is
-  applied, the moment at which ADR 0011, decision 2, fires the Deferred
-  decisions rows whose trigger is "the token is narrowed", so it is
-  their event.
-- h. The required-name try, run only once the note holds an entry
-  whose verdict is narrowed, in three steps on a
+  applied, the moment at which the four Deferred decisions rows whose
+  trigger is "the token is narrowed" fire: the two ADR 0011, decision
+  2, names and the two others with the same trigger. It is their
+  event.
+- h. The required-name try, run only while the newest entry of the
+  note has the verdict narrowed, in three steps on a
   throwaway pull request whose head is one empty commit (05 5.4;
   round 12, D1, decided on 2026-10-09; round 13, R13-02): (1) a
   workflow pushed on a side branch, with `statuses: write` and

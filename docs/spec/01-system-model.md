@@ -300,15 +300,17 @@ A generation is one sandbox lifetime, identified by a ULID.
 | open | the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows the sandbox | open | the record is kept; exit 1 |
 | (none) | `adopt` on TTY, workspace path matches | open | record as above with `adopted: true` and an unknown recreate digest; the generation is accepted as it stands until it is recreated, and `status` shows `adopted, not gated` |
 | open | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half | salvaging | new salvage id |
-| salvaging | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command was interrupted or failed) | salvaging | new salvage id |
+| salvaging | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command was killed, or failed) | salvaging | new salvage id |
 | salvaging | the sandbox half fails (julieta exits 1, a full disk) or its exec is interrupted | open | salvage record `result: incomplete`, `reasons: [sandbox-half-failed]`; exit 1 |
 | open | `salvage --from-host`, the sandbox absent | open | refs and snapshot bundles imported under a new salvage id; salvage record `result: lost`, `reasons: [sandbox-lost]` |
 | salvaging | `salvage --from-host`, the sandbox absent | salvaging | as the open row |
 | salvaging | salvage verified; command was `salvage` | open | salvage record `result: complete` |
 | salvaging | salvage incomplete, no `--accept-loss` | open | salvage record `result: incomplete` with reasons; exit 5 |
-| salvaging | salvage complete or `--accept-loss`; command removes the sandbox | removing | state written, with the salvage entry's `fingerprint` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)), before `sbx env rm`; for a salvage that a rerun on a `removing` generation started because its fingerprint changed, the command exits 5 with `fingerprint-unstable` in place of `sbx env rm` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids)) |
+| salvaging | salvage complete or `--accept-loss`; command removes the sandbox | removing | state written, with the salvage entry's `fingerprint` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)), before `sbx env rm`; for a salvage that a rerun on a `removing` generation started because a fingerprint differs from the newest one written with `removing`, the command exits 5 with `fingerprint-unstable` in place of `sbx env rm` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids)) |
 | removing | `sbx env rm` succeeds | closed-removed | egress rules removed |
-| removing | `sbx env rm` fails, or the sandbox found present (a command killed before `sbx env rm`) | removing | the existing salvage record kept; exit 1; a rerun of `rm`, `recreate` or `retire` resumes at `sbx env rm` only when a fresh fingerprint of the daemon heads and each worktree's HEAD and full status equals the newest `fingerprint` written with `removing` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)); otherwise `removing -> salvaging` with a new salvage id, and that salvage, when complete or accepted, ends at `removing` with exit 5, `fingerprint-unstable` ([04 4.4](04-cli.md#44-error-ids)), and when incomplete without `--accept-loss` follows the incomplete row above |
+| removing | `sbx env rm` fails | removing | the existing salvage record kept; exit 1 |
+| removing | `rm`, `recreate` or `retire` finds the sandbox present (a command killed before `sbx env rm`, or one whose `sbx env rm` failed), and a fresh fingerprint of the daemon heads and each worktree's HEAD and full status equals the newest `fingerprint` written with `removing` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)) | removing | the existing salvage record kept; the command resumes at `sbx env rm` |
+| removing | `rm`, `recreate` or `retire` finds the sandbox present, and a fresh fingerprint differs from the newest `fingerprint` written with `removing` | salvaging | new salvage id; the `salvaging` rows decide how that salvage ends: complete or accepted, the row to `removing`, which exits 5 with `fingerprint-unstable` ([04 4.4](04-cli.md#44-error-ids)); incomplete without `--accept-loss`, the incomplete row, back to `open` with `RJ-306` |
 | removing | the sandbox found absent (crash recovery) | closed-removed | the existing salvage record kept; egress rules removed |
 | open | `run`, `rm`, `stop`, `pull`, `salvage` without `--from-host`, or `retire` finds the sandbox absent | closed-lost | keeps a lost record `salvage --from-host` wrote for this generation, else writes one: refs and snapshots preserved as a salvage record `result: lost` |
 | salvaging | the sandbox found absent (crash recovery) | closed-lost | as above |
@@ -342,6 +344,16 @@ report it as `removal-pending`
 ([04 4.4](04-cli.md#44-error-ids)); `salvaging` with no
 salvage record is resumed by the next salvage, which verifies the refs
 already created.
+
+The fingerprint guards only the rerun on `removing`: a removal whose
+salvage ran from `open`, or restarted from `salvaging`, compares with
+no earlier read, so a write made after that salvage's read and before its
+`sbx env rm` is not salvaged. Which salvage a command runs is told by
+the state it finds, with no stored marker: `removing` with a
+fingerprint that differs starts the salvage that ends as `RJ-338`
+says, and `salvaging`, left by a romeu killed while it salvaged,
+restarts the command's own salvage, which goes on to `sbx env rm` when
+it is complete or accepted.
 
 Salvage always uses the generation's recorded repo set, not the current
 spec, so a repo removed from the spec (J13) is still salvaged. Whether

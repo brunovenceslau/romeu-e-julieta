@@ -128,16 +128,19 @@ time after the date, and the entries are in the order of their
 headings, oldest first. The first entry whose verdict is narrowed has a
 fourth part, the answers of the required-name try of item h of
 [10 10.2](../spec/10-testing-style.md#release-and-bootstrap), which runs
-only after that entry. The first entry replaces the line "No entry yet"
+only while the newest entry's verdict is narrowed; the fourth part
+opens with the date the try was run. The first entry replaces the line "No entry yet"
 at the end of this section. The first entry whose verdict is narrowed
 is the event of the four
 [Deferred decisions](../spec.md#in-how-this-repository-is-run) rows
-whose trigger is "the token is narrowed". A later entry whose verdict
-is not narrowed returns the token narrowing row of the index and the
-token row of
+whose trigger is "the token is narrowed". The token narrowing row of
+the index and the token row of
 [05 5.4](../spec/05-security.md#risks-of-how-this-repository-is-developed)
-to the state before the narrowing, and is an event of those four rows
-too, so the decision each took on the narrowed premise is reviewed
+describe the token before and after the narrowing, and no entry edits
+them: the newest entry's verdict says which of the two states holds. A
+later entry whose verdict is not narrowed puts the token back in the
+state before the narrowing, and is an event of those four rows too,
+so the decision each took on the narrowed premise is reviewed
 again; the rows the first narrowed entry fired stay fired. No check
 reads the entries, so they are **[review]**.
 
@@ -155,10 +158,11 @@ maintainer's own session, never only from what the sandbox printed:
    that names the socket it forwards; the keys of that socket, listed by
    `ssh-add -l` on the host with `SSH_AUTH_SOCK` set to it; and the
    GitHub account's SSH keys page, read in the maintainer's session.
-   Expected: the setting names one socket; that socket holds the
-   signing key and no GitHub authentication key; and the signing key's
-   fingerprint is listed on the page only under signing keys, never
-   under authentication keys, the rule
+   Expected: the setting names no socket, or each socket it names
+   holds the signing key alone; and the fingerprint of each key a
+   forwarded socket holds is absent from the page's authentication
+   keys, the signing key's being listed only under signing keys, the
+   rule
    [06 6.4](../spec/06-kits.md#64-product-kits) states for romeu's
    sandboxes. The sandbox's own `ssh-add -l` may be read too, as a
    second read, never as the proof.
@@ -181,12 +185,33 @@ match what is expected and the ruleset update is refused. Any other answer
 on those three means it is not, and the entry says which read
 differed.
 
-Two limits of the entry, stated and not closed (round 15): nothing
-acts on an accepted tag try, which the pull request that adds
-`release.yml` reopens; and no read looks for deploy keys, webhooks or
-collaborators that the operator's token could have added before the
-narrowing, a class ADR 0008 lists, which the review of the token
-narrowing row of [Deferred decisions](../spec.md#in-how-this-repository-is-run)
-reopens.
+Limits of the entry, stated and not closed:
+
+1. Nothing acts on an accepted tag try; the pull request that adds
+   `release.yml` reopens it (round 15).
+2. No read looks for deploy keys, webhooks or collaborators that the
+   operator's token could have added before the narrowing, a class
+   ADR 0008 lists; the review of the token narrowing row of
+   [Deferred decisions](../spec.md#in-how-this-repository-is-run)
+   reopens it (round 15).
+3. How the forwarding stops is the maintainer's choice: ADR 0011,
+   decision 2, decides only that it stops. An entry whose read 2 finds
+   an authentication key, or a second key in a forwarded socket,
+   reopens it (round 16, R16-11).
+4. A later read is due at a sitting, not at the events that change what
+   it reads (a re-created sandbox, `sbx secret set` run again, a
+   replaced token, the maintainer's pushes from the host), and none is
+   due after block O7 (round 17, R17-13).
+5. Nothing writes into the token narrowing row of the index or the
+   token row of 05 5.4 that the narrowing holds, and an entry whose
+   verdict is not narrowed after a narrowed one asks for no decision of
+   its own: the rows are reviewed at their events (round 17, R17-15,
+   R17-20).
+6. Read 3's merge try, made once the required checks are green, is
+   accepted with either token, so it cannot show whether a token
+   bypasses those checks (round 17, R17-18).
+
+Limits 4 to 6 are reopened by the sitting of block O8 of the
+[plan](../plan.md#operator-blocks), which applies ADR 0011.
 
 No entry yet: the narrowing waits for a maintainer step.

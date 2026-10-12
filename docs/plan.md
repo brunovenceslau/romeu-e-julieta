@@ -201,7 +201,7 @@ place in the order.
 `sbx` runs only on the host (11, opening), so a step that needs it is
 the maintainer's. So are the two `v*` tags, which the maintainer pushes
 by working agreement, since the tag ruleset does not bind the operator's
-token, which the sandbox holds until block O8 (05 5.4; 12 12.2), the denylist entries,
+token, which the sandbox holds until the note on the maintainer block records its first narrowed entry (05 5.4; 12 12.2), and whether the tag ruleset binds the narrowed token is measured only by an entry made before `release.yml` lands; so are the denylist entries,
 which an agent must not hold (10 10.2, "Forbidden names"), and anything
 that reads the reference config repo. The maintainer works in sittings, so these steps
 are eight blocks, and each says what it needs, what it unblocks, what
@@ -218,7 +218,7 @@ whose exit status the maintainer reads, wherever one exists. Block A of
 | O5 | every earlier task, T001 to T091 and T103 | the candidate: run `julieta spec validate --catalog` again, in the container of O4, and see it exit 0; the rehearsal on one host (below); then step 1 of the release checklist of 12 12.2, the tag `v1.0.0-rc.1` (11 11.2) | the same container as O4; one host with `sbx` | O6 directly, and through it T092 to T095 and T102 | the rehearsal is about one block B run on one host, 90 minutes plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go test -tags host -json ./e2e/host/...` exits 0, then `go run ./tools/ci probes --require-pass B2,B3,B4,B5,C2,C3,C4,C5,C6 --hosts 1 --dir <the rehearsal directory>` exits 0 | the rehearsal is this plan's addition, not the specification's. After the tag, a change outside `docs/` and the root Markdown files needs a new candidate and block B again (11 11.2) |
 | O6 | O5 | step 2 of the release checklist of 12 12.2, block B on both hosts (11 11.2): B1 to B5 and the sandbox-side checks C2 to C6; then commit the results on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | the candidate's published release; both hosts | T092 directly, and through it T093 to T095 and T102 | about 90 minutes per host for B1 to B5, plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go run ./tools/ci probes --require-pass B1,B2,B3,B4,B5,C2,C3,C4,C5,C6` exits 0 on the branch with both hosts' results | run B1 first on each host: each other result copies the candidate's tag and commit from it (11 11.2). The reading rules of block O3 apply: the staged diff before the push, each host pushing from its own clone through its hook, and a resolution commit's diff before checkout |
 | O7 | T094, T095, T101, T093 | steps 3 to 5 of the release checklist of 12 12.2: `go run ./tools/ci acceptance --pre-tag` exits 0; push the tag `v1.0.0`; run B1 and B2 once more on v1.0.0, on one host, with `--out` outside the repository: `go run ./e2e/probes --block B --only B1 --out <dir>`, then the same with `--only B2` (11 11.2). Then pin `validate.yml` in the reference config repo to that release, run it and note its run id (S4) | the documentation tasks merged, each of them; the config repo | T102 directly; no other task | one B1 and one B2 run and one workflow run. No task can proceed meanwhile | `go run ./tools/ci probes --require-pass B1,B2 --hosts 1 --dir <dir>` exits 0 on that run | the pre-tag check is a command here, and `tools/ci acceptance` runs it again at the end (10 10.5); a check that fails after the tag is fixed by a patch release (12 12.2). The release exists only after the tag, so the pin comes after it. Paste under the Evidence of T102 the result files of those runs, which the harness wrote through its redaction, and no raw output |
-| O8 | T002 | the token narrowing and the required-name try, items g and h of the maintainer block (10 10.2): create the fine-grained token of [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md), decision 2, set it as the sandbox's `github` secret, stop forwarding the GitHub authentication key, then write the dated entry of the note on the maintainer block and run the required-name try; and decision 1 of the same record, item a of the maintainer block: remove the administrator role from the bypass list of the default-branch ruleset | the host, the repository's admin rights, a throwaway pull request | the Deferred decisions rows whose trigger is "the token is narrowed" | none: no task waits on it, and every task proceeds around it; it is due before checkpoint C7 | the first entry whose verdict is narrowed, read against the expected answers the note lists, and that entry's fourth part, the answers of the required-name try; and the API answer of the default-branch ruleset showing no bypass actor, saved under the Evidence of the pull request that records it, as ADR 0011, decision 1, says; no one command joins them **[review]** | run it at the next sitting after T002 merges, together with decision 1 of the same record. To stop the forwarding, forward a socket that holds only the signing key, as [06 6.4](spec/06-kits.md#64-product-kits) requires of romeu's sandboxes, rather than the host's own agent; read 2 of the entry shows whether it holds |
+| O8 | T002 | first decision 1 of [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md), item a of the maintainer block: remove the administrator role from the bypass list of the default-branch ruleset; then the token narrowing and the required-name try, items g and h of the maintainer block (10 10.2): create the fine-grained token of [ADR 0011, bind the administrator to the required checks and narrow the sandbox's GitHub token](adr/0011-bind-the-administrator-to-the-required-checks-and-narrow-the-sandbox-s-github-token.md), decision 2, set it as the sandbox's `github` secret, stop forwarding the GitHub authentication key, then write the dated entry of the note on the maintainer block and run the required-name try | the host, the repository's admin rights, two throwaway pull requests (read 3 of the entry and item h) | the Deferred decisions rows whose trigger is "the token is narrowed"; S2, whose evidence reads item a | none: no task waits on it, and every task proceeds around it; it is due before checkpoint C7 | the first entry whose verdict is narrowed, read against the expected answers the note lists, and that entry's fourth part, the answers of the required-name try; and the API answer of the default-branch ruleset showing no bypass actor, saved under the Evidence of the pull request that records it, the one that rewrites "Until that step" in item a of 10 10.2 with the date, as ADR 0011, decision 1, says; no one command joins them **[review]** | run it at the next sitting after T002 merges, together with decision 1 of the same record. To stop the forwarding, forward a socket that holds only the signing key, as [06 6.4](spec/06-kits.md#64-product-kits) requires of romeu's sandboxes, rather than the host's own agent; read 2 of the entry shows whether it holds |
 
 **What does not wait for block O3.** These tasks have no block A fact in
 their dependencies, come after the tasks block O3 itself needs, and may
@@ -690,6 +690,9 @@ task list:
   - A test reads the rows of 04 4.4 and fails when the table in
     `internal/cli` differs in id, slug or exit code; `check-findings`
     maps to exit 6 and is the only id that does.
+  - The fix hint of `RJ-338` is the one fixed text that 04 4.4 quotes,
+    and a test fails when the table's hint differs from it by a byte
+    (round 17, R17-06).
   - `go generate` writes the three consumers of the table (12 12.3): the
     exit-code sections of `--help`, `docs/reference/errors.md` and
     `docs/reference/exit-codes.md`, the pages with the generated-file
@@ -1986,12 +1989,38 @@ early.
   08 8.5, 01 1.6, 09 (J6, J10, J13), 05 5.2 (I5, I6, I17, I26).
 - Depends on: T062, T066. Operator: no. Ask-first: `contracts`, `gates`.
 - Acceptance:
-  - `rm` exits 5 for each case that the first `E:` case of I17 lists.
+  - `rm` exits 5 for each case that the `E:` case of I17 opening with
+    "`rm` exits 5 for" lists (round 17, R17-07).
   - Each `E:` case of I17 is one test with a title of its own, so the
     cases are cited by title and not by their place in the one cell
     of 05 5.2 that lists them (round 14, R14-10; round 15, R15-15).
   - `--accept-loss` removes the sandbox after an incomplete salvage;
     `rm` warns when the generation has no `final` handoff.
+  - The fingerprint cases of I17 (round 17, R17-01, R17-02, R17-08,
+    R17-09, R17-12):
+    - "write during the salvage" starts from a fingerprint that already
+      differs when the rerun starts, and its writer changes the tracked
+      file between every pair of reads of HEAD and status, through the
+      repeat of 08 8.5 step 2, so the worktree is skipped as
+      `worktree-changing`: the rerun exits 5 with `RJ-306` and the state
+      is `open` (R17-01);
+    - one more test runs the branch of `RJ-338` where `--accept-loss`
+      names the rerun's skipped reasons: a writer keeps a tracked file
+      changing through the repeat, and the rerun, run with
+      `--accept-loss=worktree-changing`, exits 5 with `RJ-338`, the
+      state is `removing`, the new entry records the accepted reason,
+      and `sbx env rm` is not reached (reaching it, or returning
+      `RJ-306`, turns it red); the case whose salvage is complete does
+      not stand for this branch, since it skips no reason (R17-02);
+    - the cases run for `rm` and for `recreate`, each asserting
+      `RJ-338` or `RJ-306` on a rerun on a `removing` generation, and
+      T069 runs them for `retire` (R17-08);
+    - "kill the salvage" kills romeu after `removing -> salvaging` is
+      written and before `removing` is written again (R17-09);
+    - the `excludeIgnored` case edits `salvage.excludeIgnored` through
+      `romeu sync`, which promotes the edit (gate 2) and then exits 2
+      with `removal-pending` (04 4.2, the `sync` steps), and the test
+      asserts both (R17-12).
   - `recreate` is `rm`, then `run`: it salvages, removes, records a new
     generation, and exits 5 where `rm` would.
   - After `salvage`, `refs/heads`, `refs/tags`, `refs/remotes` and
@@ -2023,6 +2052,11 @@ early.
     `.attic/<name>/<ts>/`, drops the project from the workspace files
     and moves its state to the state attic.
   - Nothing is deleted.
+  - On a `removing` generation with its sandbox present, `retire` runs
+    the fingerprint cases of I17 that T068 runs for `rm`: an equal
+    fingerprint resumes at `sbx env rm`, and one that differs exits 5
+    with `RJ-338` after a complete or accepted salvage and with
+    `RJ-306` after an incomplete one (round 17, R17-08).
 - Verify: `go test -tags e2e ./e2e/...`.
 
 #### T070 - `romeu handoff`

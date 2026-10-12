@@ -194,9 +194,9 @@ work as usual.
    generation `removing -> closed-removed`. If `sbx env rm` fails, the
    generation stays `removing` and romeu exits 1; the same command run
    again resumes at `sbx env rm` when a fresh fingerprint of the daemon
-   heads and each worktree's HEAD and full status equals the one written
-   with `removing` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)),
-   and otherwise salvages again and exits 5 with `fingerprint-unstable` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids)), so the rerun after it, with an equal fingerprint, resumes. For `recreate`, continue with J3b. If that create fails because an upstream artifact is gone
+   heads and each worktree's HEAD and full status equals the newest one
+   written with `removing` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)),
+   and otherwise salvages again and ends as `fingerprint-unstable` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids)) says: exit 5 when that salvage is complete or accepted, so the rerun after it, with an equal fingerprint, resumes, and `RJ-306`, back to `open`, when it is incomplete. For `recreate`, continue with J3b. If that create fails because an upstream artifact is gone
    (a workload digest, the frontend, a kit download host), the
    generation stays closed, the salvage refs and memory are intact and
    no sandbox exists: the error is `kit-build-failed`, and the operator
