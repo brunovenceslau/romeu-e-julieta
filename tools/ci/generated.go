@@ -15,6 +15,7 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
@@ -259,7 +260,11 @@ const infoAttributes = "info/attributes"
 // since git on a case-insensitive filesystem may read it, and when the index
 // holds it as a regular file (mode 100644 or 100755); an entry with a
 // stage other than 0 is a problem, "resolve it", and is not read. The
-// file is read from its blob in the index.
+// file is read from its blob in the index, by readBlobs: a blob larger
+// than attributesMaxSize is a problem and is not read, so the gate
+// fails on it and does not pass a file it has not checked. When that is
+// the root file, its list is empty too, and each output is said to be
+// missing from it.
 //
 // A line is a pattern and attributes, or a macro definition
 // ("[attr]name attributes"); comment and blank lines are skipped. The
@@ -309,14 +314,19 @@ func scanAttributes(ctx context.Context, repo git.Repo) (string, map[string]bool
 	for _, file := range slices.Sorted(maps.Keys(unmerged)) {
 		problems = append(problems, finding{file, "generated", "has an unmerged entry in the index; resolve it"})
 	}
+	sizes, contents, err := readBlobs(ctx, repo, blobs)
+	if err != nil {
+		return "", nil, nil, err
+	}
 	for _, file := range slices.Sorted(maps.Keys(blobs)) {
-		data, err := repo.Run(ctx, nil, "cat-file", "blob", blobs[file])
-		if err != nil {
-			return "", nil, nil, err
-		}
 		root := strings.EqualFold(file, attributesPath)
 		if root {
 			rootName = file
+		}
+		data, ok := contents[blobs[file]]
+		if !ok {
+			problems = append(problems, finding{file, "generated", fmt.Sprintf("is %d bytes, over the %d that this check reads, so its lines are not checked; keep it under that size", sizes[blobs[file]], attributesMaxSize)})
+			continue
 		}
 		scanLines(file, string(data), root, listed, &problems)
 	}
@@ -333,6 +343,155 @@ func scanAttributes(ctx context.Context, repo git.Repo) (string, map[string]bool
 		return "", nil, nil, err
 	}
 	return rootName, listed, problems, nil
+}
+
+// attributesMaxSize is the size in bytes of the largest .gitattributes
+// that scanAttributes reads. Git 2.53 ignores one of 100 MiB or more
+// (measured: it warns "ignoring overly large gitattributes file"); one a
+// hundredth of that holds thousands of lines, more than a repository
+// needs, and keeps what one file costs to read small.
+const attributesMaxSize = 1 << 20
+
+// readBlobs returns the size of each blob of files, the values of the
+// map, and the content of those no larger than attributesMaxSize, both
+// by object name. It runs two git commands however many files there
+// are: "git cat-file --batch-check" for the sizes, then "git cat-file
+// --batch" for the blobs within the bound, so a larger blob is never
+// read and what the second command prints is at most attributesMaxSize
+// for each distinct blob. An object the store does not hold is an
+// error, since the file of the index cannot be checked.
+func readBlobs(ctx context.Context, repo git.Repo, files map[string]string) (map[string]int64, map[string][]byte, error) {
+	oids := slices.Compact(slices.Sorted(maps.Values(files)))
+	if len(oids) == 0 {
+		return nil, nil, nil
+	}
+	checked, err := repo.Run(ctx, batchInput(oids), "cat-file", "--batch-check="+batchFormat)
+	if err != nil {
+		return nil, nil, err
+	}
+	sizes, missing, err := parseBatchCheck(checked, oids)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, file := range slices.Sorted(maps.Keys(files)) {
+		if slices.Contains(missing, files[file]) {
+			return nil, nil, fmt.Errorf("the index holds %q as blob %s, and the object store is missing it", file, files[file])
+		}
+	}
+	var small []string
+	for _, oid := range oids {
+		if sizes[oid] <= attributesMaxSize {
+			small = append(small, oid)
+		}
+	}
+	if len(small) == 0 {
+		return sizes, nil, nil
+	}
+	read, err := repo.Run(ctx, batchInput(small), "cat-file", "--batch="+batchFormat)
+	if err != nil {
+		return nil, nil, err
+	}
+	contents, err := parseBatch(read, small)
+	if err != nil {
+		return nil, nil, err
+	}
+	return sizes, contents, nil
+}
+
+// batchFormat is the header that "git cat-file --batch" and
+// "--batch-check" print for each object, written out so that the reading
+// does not rest on the default.
+const batchFormat = "%(objectname) %(objecttype) %(objectsize)"
+
+// batchInput is the standard input of "git cat-file --batch" and
+// "--batch-check" for oids: one object name on each line.
+func batchInput(oids []string) []byte {
+	return []byte(strings.Join(oids, "\n") + "\n")
+}
+
+// parseBatchCheck reads the output of "git cat-file --batch-check" for
+// oids, in order: "<oid> blob <size>\n" for each, or "<oid> missing\n"
+// for one the store does not hold. It returns the size of each blob and
+// the missing names; any other record is an error.
+func parseBatchCheck(out []byte, oids []string) (map[string]int64, []string, error) {
+	sizes := map[string]int64{}
+	var missing []string
+	for _, oid := range oids {
+		line, rest, ok := bytes.Cut(out, []byte{'\n'})
+		if !ok {
+			return nil, nil, fmt.Errorf("git cat-file --batch-check gave no header line for %s", oid)
+		}
+		out = rest
+		if string(line) == oid+" missing" {
+			missing = append(missing, oid)
+			continue
+		}
+		size, err := parseBatchHeader(string(line), oid)
+		if err != nil {
+			return nil, nil, err
+		}
+		sizes[oid] = size
+	}
+	if len(out) != 0 {
+		return nil, nil, fmt.Errorf("git cat-file --batch-check gave output after the last record")
+	}
+	return sizes, missing, nil
+}
+
+// parseBatch reads the output of "git cat-file --batch" for oids, in
+// order: for each, the header "<oid> blob <size>\n", then size bytes of
+// content and a line feed. The header's size frames the content, so a
+// line of the content that reads like a header is content. A short
+// record, a missing object, another type, another object, and output
+// after the last record are each an error.
+func parseBatch(out []byte, oids []string) (map[string][]byte, error) {
+	if len(oids) == 0 || len(out) == 0 {
+		return nil, fmt.Errorf("git cat-file --batch gave no record")
+	}
+	contents := map[string][]byte{}
+	for _, oid := range oids {
+		line, rest, ok := bytes.Cut(out, []byte{'\n'})
+		if !ok {
+			return nil, fmt.Errorf("git cat-file --batch gave no header line for %s", oid)
+		}
+		size, err := parseBatchHeader(string(line), oid)
+		if err != nil {
+			return nil, err
+		}
+		if size >= int64(len(rest)) {
+			return nil, fmt.Errorf("git cat-file --batch gave a short record for %s", oid)
+		}
+		if rest[size] != '\n' {
+			return nil, fmt.Errorf("git cat-file --batch gave no line feed after the content of %s", oid)
+		}
+		contents[oid] = rest[:size]
+		out = rest[size+1:]
+	}
+	if len(out) != 0 {
+		return nil, fmt.Errorf("git cat-file --batch gave output after the last record")
+	}
+	return contents, nil
+}
+
+// parseBatchHeader reads the header line "<oid> blob <size>" that git
+// cat-file prints for oid, and returns the size.
+func parseBatchHeader(line, oid string) (int64, error) {
+	fields := strings.Split(line, " ")
+	switch {
+	case len(fields) == 2 && fields[0] == oid && fields[1] == "missing":
+		return 0, fmt.Errorf("git cat-file: object %s is missing", oid)
+	case len(fields) != 3:
+		return 0, fmt.Errorf("git cat-file gave the header %q for %s", line, oid)
+	case fields[0] != oid:
+		return 0, fmt.Errorf("git cat-file gave %s where %s was asked", fields[0], oid)
+	case fields[1] != "blob":
+		return 0, fmt.Errorf("git cat-file gave a %s for %s, not a blob", fields[1], oid)
+	}
+	size, err := strconv.ParseInt(fields[2], 10, 64)
+	if err != nil || size < 0 {
+		return 0, fmt.Errorf("git cat-file gave the size %q for %s", fields[2], oid)
+	}
+	return size, nil
 }
 
 // scanLines reads the lines of one attributes file, called file in a
