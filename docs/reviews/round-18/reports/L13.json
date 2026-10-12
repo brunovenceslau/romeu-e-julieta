@@ -1,0 +1,164 @@
+{
+ "header": "r18.L13 · The reader who holds the spec against itself · opus",
+ "verdict": "The round-17 pass fixed R17-03 (the removing rows now exist) and carried the one fingerprint name to most pages, but its R17-11 paragraph writes a part of I17 down as unguarded with no 05 5.4 row or trigger, RJ-338 and the rewritten J3 still give the fingerprint-started salvage two endings where 01 1.6 has more, and no page says who computes the fingerprint: three Required rows, two contradiction and one behavior-gap.",
+ "prior_checked": 9,
+ "prior_resolved_as_stated": 8,
+ "prior_resolution_notes": {
+  "L13-r17-1": "R17-03 (A): the removing row is three rows as stated; resolved. A new ending gap is in L13-r18-2.",
+  "L13-r17-2": "R17-07 (T068): T068 cites the case by its opening words rather than a new title; the citation by position is gone; resolved as the write pass states.",
+  "L13-r17-3": "R17-04 (A): J3 says 'newest' and 'ends as RJ-338 says'; resolved, but the new text inherits L13-r18-2 and reads awkwardly (L13-r18-8).",
+  "L13-r17-4": "R17-05 (A): the one phrase is on the four pages; resolved, except it drops 'fresh' (L13-r18-5).",
+  "L13-r17-5": "R17-06 (A, T008): the hint is amended as option (a); T008 holds a byte test; resolved, with the test's source copy unnamed (L13-r18-9).",
+  "L13-r17-6": "R17-11 (A, decided option (a)): the 01 1.6 sentence is there as stated; it contradicts 05 5.4 and the index deferral rule (L13-r18-1).",
+  "L13-r17-7": "R17-12 (T068): the excludeIgnored case goes through sync and asserts the exit 2; resolved.",
+  "L13-r17-8": "R17-10 (A): byte order, newest by greatest salvage id, and the dropped repeated sentence are in; resolved as stated, but the '(a ULID)' my proposal named is not declared (L13-r18-7).",
+  "L13-r17-9": "R17-09 (A, T068): RJ-338 says 'killed', but the restart row still reads 'killed, or failed', while the write pass says the row 'says killed'; not resolved as stated (L13-r18-4)."
+ },
+ "findings": [
+  {
+   "id": "L13-r18-1",
+   "kind": "new",
+   "severity": "Required",
+   "class": "contradiction",
+   "origin": "own",
+   "section": "01 1.6 (the new paragraph after the recovery paragraph); 05 5.4 (the row 'Salvage proves that nothing the sandbox still holds is lost'); index (Principles, 'Decide at the last responsible moment'); 05 5.2 (I17, title)",
+   "defect": "The R17-11 paragraph leaves part of I17 unguarded (a write after the salvage read on a first removal, and on a salvage restarted from `salvaging`, including a killed salvage that a changed fingerprint started) with no 05 5.4 row, no Deferred decisions row and no reopening trigger, while the index says a part of a security invariant is deferred only as a risk accepted by name in 05 5.4 and the 05 5.4 row says nothing the sandbox still holds is lost.",
+   "scenario": "A dev server writes to an ignored path while `rm` runs from `open`: the bytes written after the salvage read are destroyed with no word, against the 05 5.4 row the operator relies on. And after RJ-338, an operator who presses Ctrl-C during the rerun's salvage and reruns gets `sbx env rm` with no comparison, which is the one route past RJ-338 the spec otherwise denies even to `--accept-loss`; nothing counts such losses, because the trigger 'at the first report of such a loss' lives only in docs/reviews/round-17.md.",
+   "change": "Item for the operator, since R17-11 option (a) was decided on 2026-10-12: take R17-11 option (b), one 05 5.4 row naming the window (first removal, restart from `salvaging`, the kill route past RJ-338) with the trigger 'the first report of such a loss', and narrow the existing row to 'nothing the sandbox held at the salvage read is lost'. Cost: one row and a phrase; an accepted-risk change. Approval line spec.",
+   "evidence": "docs/spec/01-system-model.md:348-356 \"The fingerprint guards only the rerun on `removing`: a removal whose salvage ran from `open`, or restarted from `salvaging`, compares with no earlier read, so a write made after that salvage's read and before its `sbx env rm` is not salvaged. ... `salvaging`, left by a romeu killed while it salvaged, restarts the command's own salvage, which goes on to `sbx env rm` when it is complete or accepted.\"; docs/spec/05-security.md:357 \"Salvage proves that nothing the sandbox still holds is lost.\"; docs/spec.md:109-111 \"A part of one is deferred only as a risk accepted by name in [05 5.4] ... and its row says so.\"; docs/reviews/round-17.md (Decisions for the operator, R17-11) \"the row of (b) can follow at the first report of such a loss\"."
+  },
+  {
+   "id": "L13-r18-2",
+   "kind": "regression",
+   "severity": "Required",
+   "class": "contradiction",
+   "origin": "own",
+   "section": "04 4.4 (RJ-338); 08 8.5 (the paragraph after the recovery table); 09 J3 (step 5); 01 1.6 (the removing -> salvaging row and the salvaging rows); plan T069",
+   "defect": "RJ-338, the 'one home of the rule', 08 8.5, the rewritten J3 step 5 and the new T069 item say an incomplete salvage started by a changed fingerprint ends with `RJ-306`, exit 5, back to `open`, while the 01 1.6 row for a failed sandbox half writes `result: incomplete` and exits 1 with no error id, and the sandbox found absent goes to `closed-lost`.",
+   "scenario": "A changed fingerprint starts a salvage and julieta exits 1 (a full disk): the table row gives exit 1, `open`, `sandbox-half-failed`; a builder who follows RJ-338 returns `RJ-306`, exit 5, and T069's test asserts it, so either the machine generated from the table (T034) and the I17 U test disagree with the RJ-338 code, or a wrapper that retries on 1 and asks for data fixes on 5 does the wrong thing.",
+   "change": "RJ-338, 08 8.5, J3 and T069: 'the `salvaging` rows of 01 1.6 decide how that salvage ends: `RJ-338` when complete or accepted, `RJ-306` (exit 5) for a verified incomplete salvage, exit 1 for a failed sandbox half, `closed-lost` for an absent sandbox'; 01 1.6 says 'the incomplete rows'. Cost: a sentence per page. Approval line spec.",
+   "evidence": "docs/spec/04-cli.md:326 \"when it is incomplete without them, it follows the incomplete rows of [01 1.6] and exits 5 with `RJ-306`, back to `open`, as any salvage does\"; docs/spec/01-system-model.md:304 \"| salvaging | the sandbox half fails (julieta exits 1, a full disk) or its exec is interrupted | open | salvage record `result: incomplete`, `reasons: [sandbox-half-failed]`; exit 1 |\"; docs/spec/01-system-model.md:313 \"incomplete without `--accept-loss`, the incomplete row, back to `open` with `RJ-306`\"; docs/spec/09-journeys.md:199 \"and `RJ-306`, back to `open`, when it is incomplete\"; docs/plan.md:2058-2059 \"with `RJ-306` after an incomplete one\"."
+  },
+  {
+   "id": "L13-r18-3",
+   "kind": "new",
+   "severity": "Required",
+   "class": "behavior-gap",
+   "origin": "own",
+   "section": "03 3.8 (`salvage[].fingerprint`); 08 8.5 (sandbox half, steps 2 and 4); 04 4.3 (`julieta salvage`); 03 3.11",
+   "defect": "No page defines who computes the fresh fingerprint on a rerun or how the stored fingerprint's inputs reach romeu, and 03 3.8 credits ignored-path size and modification time to step 2 of 08 8.5, which reads only HEAD and status (I17's own case says step 2 does not see ignored paths; step 4 reads them).",
+   "scenario": "T068 must compare a fresh fingerprint on a rerun with an equal fingerprint, where no salvage and so no 08 8.5 step runs; the builder invents a julieta call or a manifest field outside 04 4.3 and 03 3.11, so it escapes the generated reference and the julieta compatibility check, and two builds that take ignored-path stats from step 4 and from a fresh walk produce fingerprints that never match across an upgrade, so every rerun after it exits 5 with RJ-338.",
+   "change": "03 3.8: 'the values that steps 2 and 4 of 08 8.5 and the host verification read'; 03 3.11 (or the `julieta salvage --json` output) carries those values; 04 4.3 names the julieta read a rerun on `removing` makes for a fresh fingerprint, and 08 8.5 cites it. Cost: a clause, a field and a row cell; it defines an interface the spec already requires, no new behavior. Approval line spec.",
+   "evidence": "docs/spec/03-formats.md:482 \"the plain sha256 (3.12) of the values that step 2 of [08 8.5] and the host verification read, not read again at that write: the daemon heads, each worktree's HEAD and a digest of its status, which holds tracked changes and untracked paths, each with the digest of its file, and ignored paths, minus `salvage.excludeIgnored`, each by path, size and modification time. The rerun ... computes it again\"; docs/spec/08-memory-handoff-salvage.md:186 \"each worktree's HEAD and status are read again\"; docs/spec/05-security.md:172 \"one ignored path outside `salvage.excludeIgnored`, which the recheck of [08 8.5] step 2 does not see\"; docs/spec/04-cli.md:248 \"| `julieta salvage [--stop-agents] [--include-transcripts] [--json]` | full salvage for the `salvageRun` id in the manifest |\" (no fingerprint); 03 3.11 lists no fingerprint field."
+  },
+  {
+   "id": "L13-r18-4",
+   "kind": "regression",
+   "severity": "Advisory",
+   "class": null,
+   "origin": "own",
+   "section": "01 1.6 (the salvaging restart row; the recovery paragraph; the new paragraph); 04 4.4 (RJ-338, the restart sentence)",
+   "defect": "The restart row says the earlier command 'was killed, or failed' while the new paragraph and RJ-338 say `salvaging` is left only by a killed romeu, and the recovery paragraph names the same event 'resumed by the next salvage, which verifies the refs already created' and covers only 'no salvage record', while the row restarts under a new salvage id.",
+   "scenario": "A host-side failure that changes nothing (an `sbx-unknown`, an error writing the record) leaves `salvaging`; a builder reading RJ-338 handles only the kill, and one reading 'resumed' writes a resume path that reuses the old id beside the row's new-id restart: two code paths for one event.",
+   "change": "The paragraph and RJ-338: 'left by a romeu killed or failed while it salvaged'; the recovery paragraph: '`salvaging` is restarted by the next salvage under a new salvage id', without 'with no salvage record'. Cost: a few words. Approval line spec.",
+   "evidence": "docs/spec/01-system-model.md:303 \"(the earlier command was killed, or failed)\"; docs/spec/01-system-model.md:344-346 \"`salvaging` with no salvage record is resumed by the next salvage, which verifies the refs already created\"; docs/spec/01-system-model.md:354 \"`salvaging`, left by a romeu killed while it salvaged\"; docs/spec/04-cli.md:326 \"after a romeu was killed while it salvaged\"."
+  },
+  {
+   "id": "L13-r18-5",
+   "kind": "regression",
+   "severity": "Advisory",
+   "class": null,
+   "origin": "own",
+   "section": "04 4.1 (Exit codes); 04 4.2 (the rm row); 08 8.5 (the paragraph after the recovery table); 01 1.6 (the salvaging -> removing row)",
+   "defect": "The R17-05 phrase 'a fingerprint that differs from the newest one written with `removing`' drops 'fresh', which the present rows of 01 1.6, RJ-338, 03 3.8 and J3 keep, so 'a `removing` generation with a fingerprint that differs' reads as a comparison of stored entries.",
+   "scenario": "A reader of 04 4.2 compares the two newest stored fingerprints; after one RJ-338 exit they differ, so every rerun salvages again and the generation never leaves `removing`; the I17 cases catch it, hence Advisory.",
+   "change": "Each says 'a fresh fingerprint that differs from the newest one written with `removing`'. Cost: one word on four pages. Approval line spec.",
+   "evidence": "docs/spec/04-cli.md:38 \"A rerun on a `removing` generation with a fingerprint that differs from the newest one written with `removing`\"; docs/spec/08-memory-handoff-salvage.md:284-285 \"with a fingerprint that differs from the newest one written with `removing`\"; docs/spec/01-system-model.md:312 \"a fresh fingerprint of the daemon heads\"."
+  },
+  {
+   "id": "L13-r18-6",
+   "kind": "new",
+   "severity": "Advisory",
+   "class": null,
+   "origin": "own",
+   "section": "03 3.8 (`salvage[].fingerprint`)",
+   "defect": "When an accepted salvage skipped a worktree as `worktree-changing`, step 2 read its HEAD and status up to three times with different results, and 03 3.8 does not say which read the fingerprint takes.",
+   "scenario": "T068's R17-02 test (`--accept-loss=worktree-changing`) writes a fingerprint from an unnamed read; whether the next rerun after the writer stops resumes or salvages once more depends on that choice; both are safe, since the loss was accepted.",
+   "change": "03 3.8: 'for a worktree read more than once, the last read'. Cost: a clause. Approval line spec.",
+   "evidence": "docs/spec/03-formats.md:482 \"the values that step 2 of [08 8.5] ... read\"; docs/spec/08-memory-handoff-salvage.md:186-188 \"if either moved, the capture repeats once, then the worktree is skipped as `worktree-changing`\"."
+  },
+  {
+   "id": "L13-r18-7",
+   "kind": "regression",
+   "severity": "Advisory",
+   "class": null,
+   "origin": "own",
+   "section": "03 3.8 (`salvage[].fingerprint`); 04 4.4 (RJ-338)",
+   "defect": "'The newest is the entry with the greatest salvage id' relies on an ordered id, but the salvage id is never declared a ULID (01 1.6 declares only the generation id), which the round-17 proposal for R17-10 included and the pass omitted.",
+   "scenario": "An implementation that draws salvage ids from another source orders them by bytes that do not follow time, and compares a rerun with an older fingerprint.",
+   "change": "03 3.8: 'salvage[].id: a ULID, sorting by time'. Cost: a row cell. Approval line spec.",
+   "evidence": "docs/spec/03-formats.md:482 \"the newest is the entry with the greatest salvage id\"; docs/spec/01-system-model.md:294 \"A generation is one sandbox lifetime, identified by a ULID.\"; docs/spec/03-formats.md:395 \"`salvageRun` | present only on salvage calls: the salvage id romeu expects back\"."
+  },
+  {
+   "id": "L13-r18-8",
+   "kind": "regression",
+   "severity": "Advisory",
+   "class": null,
+   "origin": "own",
+   "section": "09 J3 (step 5)",
+   "defect": "The rewritten sentence splits its two branches with a 'so' clause and says the rerun after an RJ-338 exit resumes, while the hint it cites says the first rerun may exit 5 once more.",
+   "scenario": "A reader of J3 alone expects one rerun to finish the removal; a J3 scenario test asserting that is red whenever something wrote between the salvage read and the exit.",
+   "change": "'... and otherwise salvages again and ends as `RJ-338` says: exit 5 when that salvage is complete or accepted, and the reruns its hint describes then resume; `RJ-306`, back to `open`, when it is incomplete.' Cost: a sentence. Approval line spec.",
+   "evidence": "docs/spec/09-journeys.md:199 \"exit 5 when that salvage is complete or accepted, so the rerun after it, with an equal fingerprint, resumes, and `RJ-306`, back to `open`, when it is incomplete\"; docs/spec/04-cli.md:326 \"the first rerun may exit 5 once more, and the one after it resumes at `sbx env rm`\"."
+  },
+  {
+   "id": "L13-r18-9",
+   "kind": "new",
+   "severity": "Advisory",
+   "class": null,
+   "origin": "own",
+   "section": "plan T008, T068, T069 (Acceptance, the items added in round 17)",
+   "defect": "Judged as acceptance: T008's byte-equal test names no authoritative copy of the hint text; T068's R17-02 item omits the precondition its R17-01 item states (the fingerprint already differs when the rerun starts); T068's kill point targets a `removing -> salvaging` write that the write order of 01 1.6 does not list as a step for the fault-injection hook; T069 inherits L13-r18-2.",
+   "scenario": "The T008 test compares the table with itself and passes on any edit; the R17-02 test starts the writer late, no salvage starts, and `sbx env rm` runs; the I17 hook kills 'after each step' and no step lands in the named window.",
+   "change": "T008: 'compares with a golden file holding the 04 4.4 text'; T068: add 'the fingerprint already differs when the rerun starts' to the R17-02 item, and name the `removing -> salvaging` write as a hook step; T069 follows L13-r18-2. Cost: a clause each.",
+   "evidence": "docs/plan.md:693-695 \"The fix hint of `RJ-338` is the one fixed text that 04 4.4 quotes, and a test fails when the table's hint differs from it by a byte\"; docs/plan.md:2010-2011 \"a writer keeps a tracked file changing through the repeat\"; docs/plan.md:2018-2019 \"\\\"kill the salvage\\\" kills romeu after `removing -> salvaging` is written\"; docs/spec/01-system-model.md:332-335 \"Destructive commands write in this order: the refs per repo ..., the salvage record, the state `removing` ..., `sbx env rm`, `closed-removed`.\""
+  }
+ ],
+ "what_is_missing": [
+  "a carrier for the fingerprint: the julieta read that computes a fresh one on a rerun with no salvage, the field that brings the step-2 and step-4 values to romeu, and the step that reads ignored-path size and modification time",
+  "a 05 5.4 row, or any reopening trigger, for the window the new 01 1.6 paragraph names, including the kill route past RJ-338",
+  "a complete list of how a fingerprint-started salvage ends (RJ-338; RJ-306 exit 5; exit 1 for a failed sandbox half; closed-lost)",
+  "a `fingerprint` entry in the 01 1.7 vocabulary, now that the concept spans six pages",
+  "a declared format for the salvage id, now that 'greatest salvage id' carries meaning"
+ ],
+ "bullets_reconciled": {
+  "One problem solved two ways": "confirmed in scope: the recovery of a killed salvage is called 'resumed' (verifying the earlier refs) and 'restarted' (a new salvage id) in adjacent paragraphs of 01 1.6 (L13-r18-4); the three-store bullet is outside this delta.",
+  "Conventions of 04 4.1 that the command tables do not honour": "confirmed: exit 5 in 04 4.1 is 'refused to protect data', and RJ-338 keeps it, but the RJ-338 row, 08 8.5 and J3 promise exit 5 (RJ-306) for an incomplete salvage that the 01 1.6 row ends with exit 1 (L13-r18-2); the 04 4.1 exit-5 phrase itself matches the rows.",
+  "Names that change between pages": "confirmed, narrowed: the one name of R17-05 holds on every page but drops 'fresh' on four of them (L13-r18-5); 'killed' versus 'killed, or failed' (L13-r18-4); 01 1.7 has no fingerprint entry.",
+  "A feature against a principle": "confirmed: the unguarded window of 01 1.6 fails 'Decide at the last responsible moment' (a part of a security invariant deferred without a 05 5.4 row or trigger) (L13-r18-1); the fingerprint with no defined producer fails 'Simple and explicit' (L13-r18-3).",
+  "Promises that cross": "confirmed between 04 4.4, 09 J3 and 01 1.6 (L13-r18-2, L13-r18-8); 13 is not in this delta: unanswerable here.",
+  "Exceptions with no owner": "confirmed: 'The fingerprint guards only the rerun on removing' is an exception to I17 owned by an operator decision in a review page, not by the spec's own accepted-risk list (L13-r18-1); '--accept-loss does not cover this error' has an owner (03 3.11) but a kill does what the flag may not."
+ },
+ "postmortem": "After v1.0.0: (1) a dev server writing to an ignored path loses its last writes on a first `rm` with no warning, against the 05 5.4 row 'nothing the sandbox still holds is lost' (01 1.6, 05 5.4); (2) after a transient `sbx env rm` failure, RJ-338 repeats while a writer runs, the excludeIgnored route ends in a `sync` exit 2 that reads as failure, and operators learn that Ctrl-C during the salvage followed by a rerun removes the sandbox, the route the spec refuses to `--accept-loss` (04 4.4, 01 1.6); (3) wrappers that retry on 1 and stop on 5 misread a failed sandbox half, because RJ-338 and J3 promised RJ-306 where the table gives exit 1 (04 4.4, 09 J3, 01 1.6, plan T069); (4) the fingerprint read was invented by the builder outside 04 4.3 and 03 3.11, so it escaped the generated reference and version checks, and after an upgrade that changed where ignored-path stats come from, every rerun exits 5 (03 3.8, 08 8.5); (5) the recovery code holds a resume path and a restart path for one event (01 1.6). Unsaid: we wrote a value on five pages that no page says how to produce, and we made the polite flag weaker than the rude interrupt.",
+ "lens_critique": "The lens measures consistency, so it rewards a spec that says the same thing everywhere even when that thing is a decision recorded only in a review page; success for this product is that the operator does not lose work, and a perfectly consistent spec can still route a loss through an unlisted window. The lens should also ask where each named value is produced, not only whether its name is stable: one name for a value nobody computes passes this lens's literal test.",
+ "missing_viewpoint": "Given only the titles: no lens owns the interface between romeu and julieta, the boundary across `sbx env exec` where values (manifests, fingerprints, facts) cross from the sandbox to the host; L2 sees it as a trust boundary and L15 as moving ground, but nobody reads it as a protocol whose every message needs a producer, a schema and a version.",
+ "out_of_scope": [
+  "the maintainer-block text (plan O8, the note, 10 10.2), read by L0 and L2",
+  "docs/spec/10-testing-style.md and docs/reviews/lenses.md changes of this pass",
+  "13 (runtime ledger), named by the lens's 'Where to confirm', not in this delta"
+ ],
+ "confidence": "high for L13-r18-2 and L13-r18-3 (checked by grep over docs/spec and docs/plan.md at 0a32191: no fingerprint in 08 8.5 steps, 04 4.3 or 03 3.11, and the sandbox-half-failed row exits 1); medium-high for L13-r18-1, whose resolution depends on an operator decision; medium for the Advisory rows.",
+ "pages_read": [
+  "docs/spec/01-system-model.md (1.6 Generation, lines 280-372)",
+  "docs/spec/03-formats.md (3.8 state schema, 3.11, the ULID rule)",
+  "docs/spec/04-cli.md (4.1, 4.2 salvage/rm/recreate/retire rows, 4.3 julieta salvage row, 4.4 RJ-306, RJ-336 to RJ-338)",
+  "docs/spec/05-security.md (5.2 I17, 5.4 opening and the salvage row)",
+  "docs/spec/08-memory-handoff-salvage.md (8.5 whole)",
+  "docs/spec/09-journeys.md (J3 step 5)",
+  "docs/spec.md (Principles, Decide at the last responsible moment, Deferred decisions opening)",
+  "docs/plan.md (T008, T068, T069 acceptance deltas; O8 delta)",
+  "docs/reviews/round-17.md (rows R17-01 to R17-12, Decisions for the operator, Write pass)",
+  "docs/reviews/round-17/reports/L13.json",
+  "docs/reviews/lenses.md (### L13, lens titles)"
+ ]
+}
