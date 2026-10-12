@@ -1,0 +1,122 @@
+{
+ "header": "r17.L13 · The reader who holds the spec against itself · opus",
+ "verdict": "The round-16 pass routes an incomplete changed-fingerprint salvage to RJ-306 on every page it rewrote and states the restart rule once, but it did not reach one name: R16-01 coined three phrasings beside the R16-13 name, 09 J3 step 5 keeps both old readings, and T068 now cites I17 by position next to a bullet that forbids it. The one Required row is the 01 1.6 table, which holds removing -> salvaging only inside an effect cell while I17 tests every illegal pair of that table (T034).",
+ "prior_checked": 6,
+ "prior_resolved_as_stated": 2,
+ "prior_resolution_notes": {
+  "L13-r16-1": "R16-01 (A): 'keeps changing' is gone, but three new phrasings differ from the R16-13 name and 08 8.5 narrows the inputs to worktrees; partial, see L13-r17-4",
+  "L13-r16-2": "R16-03 (A as decided): both clauses are there, but the applied 'nothing still writes that path' is narrower than the decided 'nothing is writing'; partial, see L13-r17-5",
+  "L13-r16-3": "R16-02 (A): RJ-338, the salvaging -> removing row, the removing row and 08 8.5 now give the incomplete branch to RJ-306 and open; resolved as stated, except 09 J3 (L13-r17-3)",
+  "L13-r16-4": "R16-02 (A): RJ-338 states the restart once and I17 adds 'kill the salvage'; resolved as stated, a wording nit in L13-r17-9",
+  "L13-r16-5": "R16-12 (M): the partial copy is gone, replaced by a citation by position that contradicts the next bullet; not resolved as stated, see L13-r17-2",
+  "L13-r16-6": "R16-13 (M): the name holds in 04 4.4, 01 1.6, 03 3.8 and I17, not in 09 J3 step 5 nor in the three R16-01 phrasings; partial, see L13-r17-3 and L13-r17-4"
+ },
+ "findings": [
+  {
+   "id": "L13-r17-1",
+   "kind": "regression",
+   "severity": "Required",
+   "origin": "own",
+   "section": "01 1.6 (the removing row); 05 5.2 (I17, the U case and the transition case)",
+   "defect": "I17 names `removing -> salvaging` (and through an incomplete salvage `-> open`) as a transition of 01 1.6, and its U case tests every row and every illegal pair of that table, but the table has no row whose From is removing and To is salvaging: the transition lives only inside the effect cell of the removing row, whose To is removing. The same row says 'exit 1' for both of its events, while the command that finds the sandbox present does not exit 1 (it resumes, or exits 5 with RJ-338 or RJ-306). The shape predates this pass, but the pass rewrote that effect cell (R16-02, R16-13) and added a second hidden transition to it (the incomplete branch).",
+   "scenario": "T034 ('state: the candidate and generation machines') builds the generation machine and the I17 U test from the From/Event/To columns; the pair (removing, salvaging) is not a row, so the generated illegal-pair test asserts it is refused, and T068, which needs it for every changed-fingerprint rerun, finds the machine refusing it, or edits the machine and leaves the U test lying.",
+   "change": "Split the removing row of 01 1.6 into explicit rows: 'removing | sbx env rm fails | removing | exit 1'; 'removing | sandbox found present, fresh fingerprint equals the newest written with removing | removing | resumes at sbx env rm'; 'removing | sandbox found present, fingerprint differs | salvaging | new salvage id; the salvaging rows decide the end (RJ-338 on complete or accepted, RJ-306 and open otherwise)'. Cost: two rows; no ADR decision or accepted risk changes. Approval line spec.",
+   "evidence": "docs/spec/01-system-model.md:311 \"| removing | `sbx env rm` fails, or the sandbox found present (a command killed before `sbx env rm`) | removing | the existing salvage record kept; exit 1; a rerun of `rm`, `recreate` or `retire` resumes ... otherwise `removing -> salvaging` with a new salvage id, and that salvage, when complete or accepted, ends at `removing` ... and when incomplete without `--accept-loss` follows the incomplete row above |\"; docs/spec/05-security.md:172 \"U: generation state-machine table (every row, every illegal pair)\" and \"E: one test per transition of 01 1.6: ... `removing -> salvaging` with a new salvage id when the fingerprint differs\"; docs/plan.md:1277 \"#### T034 - `state`: the candidate and generation machines\"."
+  },
+  {
+   "id": "L13-r17-2",
+   "kind": "regression",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "plan T068 (Acceptance, first and second bullets)",
+   "defect": "The R16-12 fix replaced the partial copy with a citation by position, 'the first E: case of I17', and the very next bullet says the cases of I17 are cited by title and not by their place in the one cell of 05 5.2. One task, two rules for citing the same cases; the house rule is by title.",
+   "scenario": "A later edit of I17 inserts or reorders an E case (the pass itself added two); T068's first bullet then silently points at another case, and no check catches it, since the pass left 'no check ties the E cases of I17 to test titles' as a stated limit. Today the builder of T068 reads the right list, so this is Advisory.",
+   "change": "Give I17's first E case a title, as the two new cases have ('E: rm refuses: ...'), and cite it by that title in T068's first bullet. Cost: a few words in 05 5.2 and in T068. Approval line spec.",
+   "evidence": "docs/plan.md:1989 \"`rm` exits 5 for each case that the first `E:` case of I17 lists.\"; docs/plan.md:1990-1992 \"Each `E:` case of I17 is one test with a title of its own, so the cases are cited by title and not by their place in the one cell of 05 5.2\"; docs/reviews/round-16.md (Write pass, R16-12) \"Stated limit: no check ties the `E:` cases of I17 to test titles\"."
+  },
+  {
+   "id": "L13-r17-3",
+   "kind": "unresolved",
+   "severity": "Advisory",
+   "origin": "listed",
+   "section": "09 J3 step 5 (unchanged, cited by RJ-338)",
+   "defect": "J3 step 5 was not reconciled with R16-13 or R16-02: it compares against 'the one written with removing', without 'newest', which after one RJ-338 exit is ambiguous (two entries carry such a fingerprint); and it says the rerun 'salvages again and exits 5 with fingerprint-unstable' unconditionally, while RJ-338 now sends an incomplete salvage to RJ-306 and open. RJ-338 names 09 J3 among the pages that cite it. The text predates this pass and the pass did not touch it.",
+   "scenario": "T066 lands the J3 scenario function (plan J3 -> T066); a builder who writes the comparison or the assertion from J3 compares against the first entry with a fingerprint, so after one RJ-338 exit every rerun differs and the generation never leaves removing, or asserts RJ-338 where I17's 'write during the salvage' case asserts RJ-306.",
+   "change": "In J3 step 5: 'equals the newest one written with removing' and 'otherwise salvages again and ends as RJ-338 says'. Cost: a few words. Approval line spec.",
+   "evidence": "docs/spec/09-journeys.md:196-199 \"the same command run again resumes at `sbx env rm` when a fresh fingerprint of the daemon heads and each worktree's HEAD and full status equals the one written with `removing` ... and otherwise salvages again and exits 5 with `fingerprint-unstable` (`RJ-338`...)\"; docs/spec/04-cli.md:326 \"when it is incomplete without them, it follows the incomplete rows of 01 1.6 and exits 5 with `RJ-306`, back to `open`\" and \"01 1.6, 03 3.8, 08 8.5, 09 J3 and I17 cite it\"; docs/plan.md:2701 \"| J3 | T066 |\"."
+  },
+  {
+   "id": "L13-r17-4",
+   "kind": "regression",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "04 4.1 (Exit codes); 04 4.2 (the rm row); 08 8.5 (the paragraph after the recovery table)",
+   "defect": "R16-01 removed 'keeps changing' but wrote three new phrasings for the comparison that R16-13, in the same pass, named 'the newest fingerprint written with removing': 'a fingerprint that changed after a removal began' (04 4.1), 'whose fingerprint changed since the last salvage' (04 4.2), 'whose worktrees changed since the last salvage' (08 8.5). The 08 8.5 one narrows the inputs: the fingerprint also covers the daemon heads and ignored paths, for which I17 has cases. The 04 4.1 one is loose: after one RJ-338 exit the fingerprint has changed since the removal began even when it equals the newest.",
+   "scenario": "T068 implements 08 8.5 and reads 'worktrees changed': a builder who triggers the resalvage only on a worktree change fails I17's daemon-head and ignored-file cases; the cases catch it, so Advisory.",
+   "change": "Use the one name: 04 4.1 'a fingerprint that differs from the newest written with removing'; 04 4.2 and 08 8.5 'whose fingerprint differs from the newest one written with removing'. Cost: three phrases. Approval line spec.",
+   "evidence": "docs/spec/04-cli.md:13 \"a fingerprint that changed after a removal began\"; docs/spec/04-cli.md:38 \"A rerun on a `removing` generation whose fingerprint changed since the last salvage exits 5\"; docs/spec/08-memory-handoff-salvage.md:284-285 \"on a `removing` generation whose worktrees changed since the last salvage salvages again\"; docs/spec/05-security.md:172 \"a daemon head moved after a failed `sbx env rm` makes the rerun of `rm` salvage again\"."
+  },
+  {
+   "id": "L13-r17-5",
+   "kind": "regression",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "04 4.4 (RJ-338, the fixed hint); 03 3.8 (salvage[].fingerprint)",
+   "defect": "The applied hint narrows the decision. Decided on 2026-10-12: 'a plain rerun resumes at sbx env rm when nothing is writing'. Applied: 'If nothing still writes that path, rerun, and the rerun resumes at sbx env rm.' 'That path' is only the first changed path the details name; another path still being written, or a write that landed after the step-2 read the fingerprint was taken from (03 3.8: 'not read again at that write'), makes the promised resume exit 5 again. The hint also cannot help when 'that path' is tracked or untracked: adding it to salvage.excludeIgnored does not change the fingerprint, which subtracts excludeIgnored from ignored paths only.",
+   "scenario": "One benign edit, then a long-running build writes a second file; the operator reads 'nothing still writes that path, rerun, and the rerun resumes', reruns, gets exit 5 naming another path, and concludes the tool is unreliable; or a writer on a tracked file is 'fixed' by an excludeIgnored edit that changes nothing, and the loop goes on.",
+   "change": "Item for the operator (the hint wording was decided on 2026-10-12): amend the fixed text to 'If nothing writes in the sandbox any more, rerun, and the rerun resumes at sbx env rm, unless something was written after this salvage read it. If something still writes, stop it, or, for an ignored path, add it to salvage.excludeIgnored (gate 2); then rerun; the first rerun after either may exit 5 once more.' Options: (a) amend; (b) keep the decided text and record the two gaps as a stated limit. Recommendation (a). Cost: one sentence. Approval line spec.",
+   "evidence": "docs/spec/04-cli.md:326 \"The hint is one fixed text: \\\"If nothing still writes that path, rerun, and the rerun resumes at `sbx env rm`. If something still writes it, stop it or add an ignored path to `salvage.excludeIgnored` (gate 2), then rerun; the first rerun after either may exit 5 once more.\"; docs/reviews/round-16.md:83-85 \"a plain rerun resumes at `sbx env rm` when nothing is writing\"; docs/spec/03-formats.md:482 \"the values that step 2 of 08 8.5 and the host verification read, not read again at that write\" and \"ignored paths, minus `salvage.excludeIgnored`\"."
+  },
+  {
+   "id": "L13-r17-6",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "01 1.6 (salvaging -> removing row, recovery paragraph); 04 4.4 (RJ-338); 08 8.5 (step 2)",
+   "defect": "One hazard, two mechanisms, no written exception. A first rm from open with a writer on an ignored path outside salvage.excludeIgnored salvages (step 2's recheck does not see ignored files), writes removing and runs sbx env rm, so writes between the salvage read and the removal are lost without a word; the identical writer after a failed sbx env rm is caught by the fingerprint and RJ-338. No page says why the comparison runs only on the rerun path (a baseline exists only after removing is written) or accepts the first-rm window. The shape predates this pass; the pass made the asymmetry sharper by stating that a restarted salvage also goes straight to sbx env rm.",
+   "scenario": "An operator learns the guard from the rare rerun path and trusts it on the common one; a reviewer of T068 cannot tell whether the missing comparison on the first rm is a decision or an accident.",
+   "change": "One sentence in 01 1.6 (the recovery paragraph): the fingerprint guards only a rerun on removing, since the first removal has no earlier read to compare with; writes after the salvage read of a first removal are not salvaged. Recording it as an accepted risk in 05 5.4 would change the accepted-risk list, which needs the operator; the sentence alone does not. Cost: one sentence. Approval line spec.",
+   "evidence": "docs/spec/01-system-model.md:309 \"| salvaging | salvage complete or `--accept-loss`; command removes the sandbox | removing | state written, with the salvage entry's `fingerprint` ..., before `sbx env rm`\"; docs/spec/05-security.md:172 \"a writer that keeps changing one ignored path outside `salvage.excludeIgnored`, which the recheck of 08 8.5 step 2 does not see, so each salvage completes\"; docs/spec/04-cli.md:326 \"A salvage restarted from `salvaging` ... goes on to `sbx env rm` when it is complete or accepted\"; a grep of docs/spec/*.md, docs/spec.md and docs/adr for a rationale (why, because, baseline, from open, after the salvage) found none."
+  },
+  {
+   "id": "L13-r17-7",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "04 4.4 (RJ-338 hint, RJ-336); 04 4.2 (sync steps 8 and 9); 05 5.2 (I17, the excludeIgnored case)",
+   "defect": "The hint's excludeIgnored recovery runs through sync (gate 2 is answered inside sync), which promotes at step 8 and then, the sandbox running, runs preflight step 6 at step 9 and exits 2 removal-pending (RJ-336), whose hint is romeu rm. The route works, since promotion lands first, but the operator sees an error the hint does not mention, and I17's case says only 'after an edit of salvage.excludeIgnored', not that it goes through sync and gate 2. Predates this pass; the pass's new hint clause builds on it.",
+   "scenario": "The operator follows the hint, runs romeu sync, approves, sees exit 2 removal-pending, and reads it as a refusal; the I17 test edits the settings file directly and passes on a path the operator cannot take.",
+   "change": "I17's case: 'after romeu sync promotes an edit of salvage.excludeIgnored (gate 2), which then exits 2 with removal-pending'. Whether the hint should mention the exit 2 is part of the operator item of L13-r17-5. Cost: one clause. Approval line spec.",
+   "evidence": "docs/spec/04-cli.md:32 \"`romeu sync` ... run gate 2; promote; apply live changes\"; docs/spec/04-cli.md:89-90 \"9. `sbx ls --json`. If the sandbox is running: the rest of the preflight (01 1.5)\"; docs/spec/04-cli.md:324 \"`RJ-336` | `removal-pending` | 2 | preflight step 6 ..., for any mutating command but `rm`, `recreate` and `retire` ...; the hint is `romeu rm <name>`\"; docs/spec/01-system-model.md:395 \"gate 2 is answered inside `sync`\"; docs/spec/05-security.md:172 \"after an edit of `salvage.excludeIgnored` that excludes that path\"."
+  },
+  {
+   "id": "L13-r17-8",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "03 3.8 (salvage[].fingerprint); 04 4.4 (RJ-338)",
+   "defect": "Two orders the text relies on are undefined, and R16-12 and R16-13 made both load-bearing: 'the first path whose entry changed' (now asserted by I17) has no ordering of the fingerprint's inputs, and 'the newest fingerprint written with removing' has no ordering key for salvage[] (08 defines 'latest' for handoffs as the greatest ULID; nothing does so here). Also in the rewritten 03 3.8 sentence, 'ends as RJ-338, fingerprint-unstable, says, which names the first path' has lost its antecedent, and RJ-338 says '--accept-loss does not cover' twice, inside the quoted hint and right after it.",
+   "scenario": "Two implementations name different 'first' paths for the same change, so the details are not deterministic across versions; a state file rewritten in another entry order picks another 'newest'.",
+   "change": "03 3.8: 'the first path in byte order whose entry changed' and 'newest: the entry with the greatest salvage id (a ULID)', or the order the implementation chooses, written once; fix the antecedent ('... says; its details name the first path'); drop the second accept-loss sentence or fold it into the hint's reason. Cost: a few words. Approval line spec.",
+   "evidence": "docs/spec/03-formats.md:482 \"A rerun that finds it different salvages again and ends as `RJ-338`, `fingerprint-unstable`, says, which names the first path whose entry changed\"; docs/spec/04-cli.md:326 \"The details name the first path whose entry changed\" and \"`--accept-loss` does not cover this error.\\\" `--accept-loss` does not cover it, since it is not a skipped reason\"; docs/spec/08-memory-handoff-salvage.md:104 \"\\\"latest narrative\\\" = the greatest ULID among `clear` and `final` files\"."
+  },
+  {
+   "id": "L13-r17-9",
+   "kind": "new",
+   "severity": "Advisory",
+   "origin": "own",
+   "section": "04 4.4 (RJ-338, the restart sentence); 01 1.6 (rows at lines 303 and 304)",
+   "defect": "'Interrupted' carries two outcomes: 01 1.6 sends a salvage whose 'exec is interrupted' to open (incomplete, sandbox-half-failed, exit 1), and keeps 'salvaging' for an earlier command that 'was interrupted or failed'; RJ-338's new sentence says 'a salvage restarted from salvaging, after a command was interrupted while it salvaged', and I17 says 'killed'. Only a killed romeu leaves salvaging. Both outcomes end at sbx env rm on the next rerun, so the behaviour agrees; the word does not.",
+   "scenario": "A builder maps a Ctrl-C to 'interrupted' and expects the salvaging restart, while 01 1.6 puts it at open; tests and code disagree on the state after a Ctrl-C.",
+   "change": "RJ-338: 'after the command was killed while it salvaged'; the 01 1.6 restart row: '(the earlier command was killed)'. Cost: two words. Approval line spec.",
+   "evidence": "docs/spec/04-cli.md:326 \"A salvage restarted from `salvaging`, after a command was interrupted while it salvaged, is the command's own salvage\"; docs/spec/01-system-model.md:303 \"starts the sandbox half again (the earlier command was interrupted or failed) | salvaging\"; docs/spec/01-system-model.md:304 \"the sandbox half fails (julieta exits 1, a full disk) or its exec is interrupted | open\"; docs/spec/05-security.md:172 \"E: kill the salvage: a salvage that a changed fingerprint started is killed before it ends\"."
+  }
+ ],
+ "what_is_missing": "A rationale or accepted window for guarding only a rerun on removing (L13-r17-6); an explicit removing -> salvaging row (L13-r17-1); the R16-13 name and the RJ-306 branch in 09 J3 (L13-r17-3); an order for 'first path' and 'newest' (L13-r17-8); a title for I17's first E case (L13-r17-2); the sync and gate-2 path of the excludeIgnored recovery and its exit 2 (L13-r17-7); a hint scoped to ignored paths (L13-r17-5).",
+ "postmortem": "After v1.0.0 the guard shows on the rare path and not the common one: a first rm loses writes made after the salvage read without a word, while a rerun refuses on the same writer (01 1.6, 08 8.5). The less valuable data gets the stricter guard: a tracked-file writer during the rerun salvage lands on RJ-306, which --accept-loss covers, and an ignored-file writer lands on RJ-338, which it cannot (04 4.4, I17). The hint promises a resume that a second path or a late write breaks, and its excludeIgnored route passes through a sync that ends with exit 2 removal-pending pointing back to rm, which reads as a loop (04 4.2, 04 4.4). Builders diverge: T034 builds the machine from the table and refuses removing -> salvaging, T066 reads J3 and compares against the first entry, T068's first bullet drifts with the next edit of I17. Not said out loud: the rule's provenance ('a salvage a changed fingerprint started') lives only in process memory since cause was removed, and every pass fixes the names it searched for, not the paraphrases it did not. Sections crossed: 01 1.6, 03 3.8, 04 4.1, 04 4.2, 04 4.4, 05 5.2 (I17), 08 8.5, 09 J3, plan T034, T066, T068.",
+ "lens_critique": "Bullets reconciled within scope: one problem two ways, confirmed (L13-r17-6, L13-r17-4); 04 4.1 against the tables, confirmed in part: exit 5 is honoured by the rm and retire rows, but 04 4.1's wording of the cause differs (L13-r17-4); names between pages, confirmed (L13-r17-3, L13-r17-4, L13-r17-9), checked against 01 1.7 'open generation'; a feature against a principle, confirmed for 'simple and explicit' (L13-r17-6, an unwritten exception) and for 'deterministic where it can be' (L13-r17-8), 'decide at the last responsible moment' unanswerable in scope; promises that cross between 04 and 09, confirmed (L13-r17-3), 13 not in scope; exceptions with no owner, confirmed for 'unless' in the restart sentence (owned, by RJ-338) and the first-rm window (no owner, L13-r17-6). What this lens gets wrong about success: it counts names and mechanisms on pages, but here the costlier failure is the operator's path through an error and the order of steps across commands (sync, then preflight, then rm); a spec can be one name everywhere and still send the operator round a loop. It also treats a journey as a page to agree with, while journeys are where the plan's tasks read the rule, so a stale journey is a build defect, not a style one.",
+ "missing_viewpoint": "A change-impact reader: someone who, after each decision, enumerates every paraphrase and every citer of the changed rule (journeys, plan bullets, error hints) and checks them mechanically, as distinct from L13's whole-system read and L8's generated docs. Also missing: the operator in the middle of an incident following hints alone, step by step, across commands.",
+ "out_of_scope": "Round-16 rows R16-04 to R16-11 and R16-14 onward (the maintainer block, the token narrowing, the notes, 10 10.2, plan blocks O3 to O8, the index rows on the token) were not read. 13 and 00 0.5 were not read beyond the index principles. Whether the pre-existing kill window between the salvage record and the removing write is handled was not checked.",
+ "confidence": "high for L13-r17-2, L13-r17-3 and L13-r17-4 (quoted text at 54f674c); medium-high for L13-r17-1 (the table and the I17 cell quoted; the effect on T034 inferred); medium for L13-r17-5 (rests on 03 3.8 'not read again' and on the decision's wording); medium for L13-r17-7 (inferred from the step order of 04 4.2 and 01 1.5); medium for L13-r17-6 (absence confirmed by grep only); high for L13-r17-8 and L13-r17-9 as wording.",
+ "pages_read": "git diff 3c32d62..54f674c -- docs/spec.md docs/spec docs/plan.md docs/notes (salvage hunks in full, others by changed lines); docs/spec/04-cli.md (4.1 line 13, 4.2 sync, rm, recreate, retire rows and sync steps 2 to 10, 4.4 RJ-306, RJ-336, RJ-338); docs/spec/01-system-model.md (1.5 steps and protective commands, 1.6 generation table and recovery paragraph, 1.7 open generation and approve); docs/spec/03-formats.md (3.8 field table, settings gate table); docs/spec/05-security.md (I17); docs/spec/08-memory-handoff-salvage.md (8.5 whole); docs/spec/09-journeys.md (J3 steps 3 to 5); docs/plan.md (T068, plan J3 row, T034 heading); docs/spec.md (headings, Deferred decisions on salvage); docs/reviews/round-16.md (decision, R16-01 to R16-03, R16-12, R16-13, write pass); docs/reviews/round-16/reports/L13.json; docs/reviews/lenses.md (titles); greps for removal-pending, excludeIgnored, newest, rationale words."
+}
