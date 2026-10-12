@@ -425,3 +425,170 @@ as above.
   heads are unchanged. Reopened by the first finding that the fetch
   changes a comparison.
 
+
+## Session checkpoint (2026-10-12)
+
+Rounds 14 to 18 and the final write pass of stage A were run on this
+branch, and the sandbox's GitHub route was read for ADR 0011. The
+sections above are left as written.
+
+### Decided
+
+- Decided on 2026-10-11: after its owning session ended, a new session
+  adopted PR #36.
+- R15-01 and R15-02, decided on 2026-10-12: `RJ-338` has no count.
+  Every salvage that a changed fingerprint starts records its entry and
+  exits 5; a rerun with an equal fingerprint resumes.
+- R16-03, decided on 2026-10-12: the fixed hint is amended with two
+  clauses. A plain rerun resumes when nothing writes; the first rerun
+  after a recovery may exit 5 once more.
+- Decided on 2026-10-12: the exit rule of stage A in `lenses.md`. Only
+  a contradiction or a behavior gap blocks; a test-plan detail becomes
+  an acceptance item of the implementing task.
+- Decided on 2026-10-12: R17-06 takes option (a), R17-11 takes
+  option (a), and R17-15 and R17-20 are stated limits.
+- Decided on 2026-10-12: stage A ends with one final pass, made of a
+  writer and a fresh reviewer, with at most 3 change exchanges and no
+  round 19. R18-03, R18-06 and R18-07 take their recommended options.
+- Deferred on 2026-10-12: three process rules.
+  - A convergence-guard tool.
+  - Fixing by deletion first.
+  - Carrying both, with the three classes, to the house payload.
+
+  Trigger: the first production use of romeu-e-julieta, or a prose
+  review that passes 3 rounds without converging.
+- Decided on 2026-10-12: a pause. Work already in flight finishes;
+  nothing new starts until the spec review and then a plan review end.
+  The plan review runs in the same final-pass format. T004 is asked
+  first after that.
+- Decided on 2026-10-12: ADR 0011 becomes Proposed in this PR.
+  - Decision 1 keeps the administrator in the default-branch ruleset's
+    bypass list, in `pull_request` bypass mode. The reasons: GitHub
+    Actions minutes run out on private repositories, and some changes
+    cannot fail CI.
+  - Decision 2 replaces the sandbox's classic token with a GitHub App
+    installation token, delivered as an sbx dynamic secret (`sbx secret
+    set github --command <absolute host helper path> --refresh 55m`).
+    The secret is global; per-repository isolation is deferred and
+    reopened by a repository that a sandbox must not reach.
+  - ADR 0011 becomes Accepted in a later PR, after the App checks.
+- Decided on 2026-10-12, for the period while the operator is away:
+  - commits and pushes to PR branches need no confirmation, and both
+    forbidden-names gates still run before each push;
+  - a must-fix finding the orchestrator would decline is decided after
+    consulting a fable subagent, and is listed in the PR body as an
+    unticked `- [ ] Review: <decision> - <reason>` line;
+  - CI is fixed until green, never by weakening a check.
+
+### Done
+
+- Round 14: record 19863f5; write pass 85f6860 (`all`, `hygiene` and
+  `generated` all 0).
+- Round 15: record be402ca; write pass 591a1aa (`all`, `hygiene` and
+  `generated` all 0).
+- Round 16: record 3c32d62; write pass 54f674c (all 0).
+- Round 17: record 7155491; write pass 0a32191 (all 0).
+- Round 18: record c14479f.
+- Final write pass: d349b2c (`all`, `hygiene` and `generated` 0). The
+  fresh reviewer's verdict on d349b2c was CHANGES, with 4 blocking
+  findings and 5 advisory. Exchange 1, 04d48a7 (`all`, `hygiene` and
+  `generated` 0), applied all 4 blocking findings and A1 to A4; A5 is a
+  stated limit.
+- Before every push of this branch, both names gates (`tools/ci
+  hygiene` and the forbidden-names script of the sandbox kit
+  repository) exited 0.
+
+### Open for the operator
+
+One block, a recommendation per item.
+
+1. The GitHub App checks, after #36 lands. Create the App once in the
+   web UI, install it on a throwaway repository, then run the checks
+   listed in Next steps item 8. Recommended: yes, in one sitting.
+2. The merge of #36, once its ship gate is GO and CI is green.
+   Recommended: merge.
+3. Review the "Decided while the operator was away" checklist in the PR
+   bodies. Recommended: tick each line or reverse it.
+4. The merge of the plan-review PR after #36. Recommended: merge once
+   it is gated.
+
+### Next steps
+
+1. Exchange 2: ADR 0011 to Proposed, as decided above. The
+   token-narrowing note, 10 10.2 items g and h, the 05 5.4 token rows,
+   the index rows and plan block O8 follow it. No spec text rests on a
+   Proposed record for the current state.
+2. The fresh reviewer re-checks d349b2c..head. At most one more
+   exchange (the third). Then stage A is finished.
+3. Merge main into the branch with a signed merge commit, then run
+   `tools/ci all`.
+4. The ship gate on the commits after dc76fec: code-reviewer opus,
+   security-auditor opus, test-engineer sonnet.
+5. The PR body:
+   - the sections Why, What changed, Evidence, Middleware and Lessons;
+   - the plain 12.4 approval lines for `spec` and `decisions`;
+   - an Accepted risks block;
+   - the away-decisions checklist.
+
+   Both names gates run on the body text.
+6. Push, CI green on all four legs, then leave draft.
+7. The plan review as a PR stacked on #36:
+   - a branch from #36's head, a PR that targets main, and a body that
+     says "stacked on #36, review only the last N commits";
+   - a writer and a fresh reviewer, at most 3 exchanges;
+   - its own ship gate, CI green, then ready.
+8. Write the brief for a session of the sandbox kit repository: a host
+   helper that mints the App installation token, then measurements on
+   a throwaway PR. Measure each of these:
+   - a signed commit pushed with the token keeps Verified;
+   - a PR and a comment made by `gh` with the token show the author as
+     the App bot;
+   - the agent's merge with a red required check is refused;
+   - a ruleset update is refused;
+   - the operator's bypass merge works;
+   - the push starts the workflow;
+   - which `gh` commands fail with an installation token.
+9. After #36 lands, the docs pass:
+   - exit codes 130/143 and their precedence;
+   - the generated, `.adr-dir` and title rules;
+   - the ADR 0008 offline wording;
+   - the conditional sentence of 12.1;
+   - the two stale hook descriptions at `docs/plan.md:93-94` and
+     `docs/spec/10-testing-style.md:543-545`, which PR #41 made stale.
+     Leave `docs/plan.md:392` alone.
+
+   Then ask before T004.
+
+### Facts read for the GitHub App route
+
+Read on 2026-10-12 from docs.github.com.
+
+- A fine-grained personal access token is created only in the web UI;
+  no API creates one:
+  <https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens>
+- A GitHub App of a personal account can be installed on selected
+  repositories:
+  <https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/about-creating-github-apps>
+- `POST /app/installations/{installation_id}/access_tokens` takes
+  `repositories` and `permissions`. Its token expires one hour after
+  creation:
+  <https://docs.github.com/en/rest/apps/apps#create-an-installation-access-token-for-an-app>
+- The installation token serves git over HTTPS when the App has the
+  Contents permission:
+  <https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation>
+- Ruleset bypass modes are `always`, `pull_request` and `exempt`. Actor
+  types include Integration (an App), RepositoryRole and User:
+  <https://docs.github.com/en/rest/repos/rules>
+- GitHub Pro includes 3,000 Actions minutes per month for private
+  repositories; public repositories on standard runners are free; usage
+  is blocked when the quota runs out only if no payment method is on
+  file:
+  <https://docs.github.com/en/billing/managing-billing-for-github-actions/about-billing-for-github-actions>
+- `sbx secret set` stores a dynamic secret with `--command` and
+  `--refresh` (default 55m). Its scopes are global or `--sandbox`, with
+  no per-repository scope (read from the sbx help text).
+- Not verified: the `[bot]` attribution of App-made PRs and comments;
+  `gh` with an installation token in `GH_TOKEN`; how bypass applies to
+  a PAT whose owner is in the bypass list.
+
+Branch and PR state is not recorded here: the next session measures it with ~/.sbx-kit/claude-home/bin/handoff_state.py.
