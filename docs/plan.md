@@ -1883,6 +1883,10 @@ early.
     (I18).
   - `salvage` does not import `agent/*` and takes the profile as an
     argument; `schemas/salvage.v1.json` is generated.
+  - `--fingerprint` writes nothing, stops no agent, and prints the
+    fingerprint object of 04 4.3 and nothing else; the full salvage's
+    `--json` document carries the same object (round 18, exchange 1,
+    finding 1 and A4).
 - Verify: `go test -tags e2e ./e2e/...`.
 
 #### T062 - Salvage verification and ref import, the host half

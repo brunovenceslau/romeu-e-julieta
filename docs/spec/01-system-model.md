@@ -300,7 +300,7 @@ A generation is one sandbox lifetime, identified by a ULID.
 | open | the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows the sandbox | open | the record is kept; exit 1 |
 | (none) | `adopt` on TTY, workspace path matches | open | record as above with `adopted: true` and an unknown recreate digest; the generation is accepted as it stands until it is recreated, and `status` shows `adopted, not gated` |
 | open | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half | salvaging | new salvage id |
-| salvaging | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command ended, killed or failed, while it salvaged) | salvaging | new salvage id; the refs the earlier salvage created stay |
+| salvaging | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command ended, killed or failed, while it salvaged, and wrote no later state) | salvaging | new salvage id; the refs the earlier salvage created stay |
 | salvaging | the sandbox half fails (julieta exits 1, a full disk) or its exec is interrupted | open | salvage record `result: incomplete`, `reasons: [sandbox-half-failed]`; exit 1 |
 | open | `salvage --from-host`, the sandbox absent | open | refs and snapshot bundles imported under a new salvage id; salvage record `result: lost`, `reasons: [sandbox-lost]` |
 | salvaging | `salvage --from-host`, the sandbox absent | salvaging | as the open row |
@@ -318,7 +318,7 @@ A generation is one sandbox lifetime, identified by a ULID.
 Absent means `sbx ls --json` exited 0, parsed, and did not list the
 sandbox. A non-zero exit is `sbx-unknown` (exit 1), and an output that
 does not parse is `upstream-shape` (exit 2) by the upstream rule of
-[03](03-formats.md) (opening); either changes nothing. A fresh fingerprint is read with `julieta salvage --fingerprint` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)); a stopped sandbox is started for the read and stopped again, as for the sandbox half ([04 4.2](04-cli.md#42-romeu-host)); a read that fails, because the start fails, the daemon is unreachable or julieta exits non-zero, exits 1 and changes nothing, as a failed `sbx ls --json` does, and the error's details carry the failed subprocess ([04 4.1](04-cli.md#41-conventions-both-binaries)). A `run` that
+[03](03-formats.md) (opening); either changes nothing. A fresh fingerprint is read with `julieta salvage --fingerprint` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)); a stopped sandbox is started for the read and stopped again, as for the sandbox half ([04 4.2](04-cli.md#42-romeu-host)); a read that fails, because the start fails, the daemon is unreachable or julieta exits non-zero, exits 1 with `sbx-unknown` and changes nothing, as a failed `sbx ls --json` does, and the error's details carry the failed subprocess ([04 4.1](04-cli.md#41-conventions-both-binaries)). A `run` that
 closes an open generation as lost does not create in the same command:
 it prints the lost record and exits 1, and the next `run` creates.
 
@@ -341,8 +341,8 @@ salvages again under a new salvage id and ends as `RJ-338` says
 ([04 4.4](04-cli.md#44-error-ids)); any other mutating command exits 2
 with `removal-pending`, and `status` and `doctor` report it as
 `removal-pending` ([04 4.4](04-cli.md#44-error-ids)); `salvaging`, left
-by a romeu that ended, killed or failed, while it salvaged, is
-restarted by the next salvage under a new salvage id, and the refs the earlier
+by a romeu that ended, killed or failed, while it salvaged and wrote
+no later state, is restarted by the next salvage under a new salvage id, and the refs the earlier
 one created stay.
 
 The fingerprint guards only the rerun on `removing`: a removal whose

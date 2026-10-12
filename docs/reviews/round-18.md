@@ -384,3 +384,44 @@ criterion, the re-audit that raises nothing: its verdict is recorded in
 the pull request, not in a round page. The exit criteria judged on
 0a32191 above are not re-judged here; the pull request's reviewer reads
 this pass against them.
+
+### Exchange 1
+
+The reviewer of the pass read d349b2c and returned four blocking
+findings and five advisory ones; this exchange applies them. Statuses
+as above.
+
+- Finding 1, `behavior-gap` (A): nothing said how the full salvage
+  carried the fingerprint's sandbox-side values to romeu at the
+  `removing` write. The `julieta salvage` row of 04 4.3 says its
+  `--json` document carries the fingerprint object, which romeu digests
+  at that write, and that `--fingerprint` prints that object and
+  nothing else; 03 3.8 says the sandbox-side values are taken from that
+  object. T061 gains the acceptance item (A4).
+- Finding 2, `contradiction` (A): limit 5 of the note reads "a narrowed
+  entry that follows a not narrowed one after the first narrowed entry
+  is no event", so the first narrowed entry stays the event.
+- Finding 3, `contradiction` (A): the index gains a row under "In the
+  product" for the marker or second read the new 05 5.4 row defers, a
+  part of I17 accepted there, with the same trigger; the 05 5.4 row's
+  mitigation cell names the invariant and the row, and its trigger
+  reopens both rows.
+- Finding 4, `contradiction` (A): the carve-out of 04 4.1 says the
+  parsing test and the flag sentence of that cell skip the `RJ-338`
+  hint, which names `--accept-loss` only to deny it. The hint text is
+  unchanged.
+- A1 (A): the `RJ-338` limit reads "when the sandbox is running".
+- A2 (A): the restart row and the recovery sentence of 01 1.6 read
+  "and wrote no later state".
+- A3 (A): the `RJ-308` cell covers the rerun whose fresh fingerprint
+  cannot be read, and 01 1.6 names `sbx-unknown` for it; no new id.
+- A4 (A): T061, above.
+- A5 (L, not applied): the daemon heads stay read by the hardened fetch
+  of step 3 of the host half. gitsafe (05 5.1) runs fetches with
+  explicit refspecs into allowlisted namespaces and names no
+  `ls-remote` mode, so a read without a write would add a gitsafe mode,
+  more than one clause; the fetch writes only romeu's own allowlisted
+  refs on the host, nothing in the sandbox, and brings nothing when the
+  heads are unchanged. Reopened by the first finding that the fetch
+  changes a comparison.
+

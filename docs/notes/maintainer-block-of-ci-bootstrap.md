@@ -215,8 +215,9 @@ Limits of the entry, stated and not closed:
 5. Nothing writes into the token narrowing row of the index or the
    token row of 05 5.4 that the narrowing holds; an entry whose
    verdict is not narrowed after a narrowed one asks for no decision of
-   its own, and a narrowed entry after a not narrowed one is no event,
-   since the rows the first narrowed entry fired stay fired: the rows
+   its own, and a narrowed entry that follows a not narrowed one after
+   the first narrowed entry is no event, since the rows the first
+   narrowed entry fired stay fired: the rows
    are reviewed at their events (round 17, R17-15, R17-20; round 18,
    R18-A12).
 6. Read 3's merge try, made once the required checks are green, is
