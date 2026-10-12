@@ -507,7 +507,9 @@ func TestMutantsKilledWithoutAPassingTest(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	assert.Equal(t, exitOK, run(ctx, f.e, []string{f.mutants}), "the run must end before its deadline: %s", f.stderr.String())
-	assert.Contains(t, f.stdout.String(), "loops killed ./calc -run ^TestDouble$ times out after 2s\n")
+	// The timeout grows with the baseline's duration, so a slow runner
+	// sees more than the 2s floor.
+	assert.Regexp(t, `(?m)^loops killed \./calc -run \^TestDouble\$ times out after [0-9]+s$`, f.stdout.String())
 	assert.Contains(t, f.stdout.String(), "main-panics killed ./calc -run ^TestDouble$ fails\n")
 	assert.Contains(t, f.stdout.String(), "start-panics killed ./calc -run ^TestDouble$ fails\n")
 	f.assertUntouched(t, before)

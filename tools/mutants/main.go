@@ -85,6 +85,34 @@
 // line and exits 128 plus the signal number. Started through "go run",
 // every status other than 0 reaches the caller as 1, with the real one
 // in the "exit status" line that go prints.
+//
+// A test earns trust when a wrong line makes it fail. Proving that by
+// hand means editing a tracked file, running the tests and putting the
+// file back, and the putting back is where work gets lost: a checkout
+// or a stash in a shared working tree reaches further than the one
+// file. The tool does the whole loop in a throwaway clone, so nobody
+// has to edit tracked files to mutate them. -worktree exists so that
+// new tests can be checked before the commit that adds them.
+//
+// It is a separate command from the "tools/ci mutate" gate that task
+// T007 of docs/plan.md plans, and the two answer different questions.
+// That gate is a check that runs on every pull request it applies to,
+// over a fixed set of guards declared in the code: it builds each
+// guard's mutate_I<n> stub, which disables the guard through a build
+// tag, and requires a tagged test to fail. It lives in tools/ci, on the
+// checks ask-first surface. This tool is run by a person or an agent
+// while writing tests, over mutants listed in a file for the change at
+// hand. It gates nothing, so it lives outside tools/ci, and a change to
+// it needs no approval of that surface. Keeping the names apart keeps
+// the two from being taken for one another.
+//
+// If the gate of task T007 needs to build or run code away from the
+// working tree, the clone and snapshot engine of this tool is there to
+// reuse: the clone with hooks off and its remote removed, the snapshot
+// through a private index, the go environment built from the lists of
+// tools/ci/goenv, and the process-group handling of tools/ci/procgroup.
+// Moving that engine into a shared package of tools/ci is the natural
+// step when the gate needs it.
 package main
 
 import (
