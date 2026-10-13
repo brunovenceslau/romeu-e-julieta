@@ -103,13 +103,13 @@ two repository tests over the specification's names are T140, both
     `internal/procgroup` alone, and the scan passes on the tree with no
     exception for test files. The `_test.go` files under `tools/ci` and
     `tools/mutants` that import `os/exec`, 13 at commit `b1700c9`
-    (`grep -rl '"os/exec"' --include='*_test.go' tools/`), switch with
-    the code they test: a command a test runs goes through
-    `internal/procgroup` under a class; a signal case that covers the
-    shared handler rather than the tool, such as a signal sent to a
-    helper binary's pid, is dropped when the tests of
-    `internal/procgroup` already cover it, and moves there otherwise;
-    and `tools/ci/procgroup/procgroup_unix_test.go` leaves with
+    (`grep -rl '"os/exec"' --include='*_test.go' tools/`), stop doing
+    so by a route this task decides when it starts and records in its
+    pull request: an export from `internal/procgroup`, such as a path
+    lookup or a helper that signals a pid, which this task's `owns`
+    then gains, or another route that keeps T137's rule that nothing
+    else imports `os/exec` (a deferred decision; trigger: T105
+    starts). `tools/ci/procgroup/procgroup_unix_test.go` leaves with
     `tools/ci/procgroup/`. The scan stays a test in
     `internal/procgroup` until T039 moves it to `tools/ci callsites`
     (decided on 2026-10-13).
