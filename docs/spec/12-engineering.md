@@ -858,8 +858,10 @@ number below the highest that neither the text nor the table holds (a
 dropped obligation is retired, never deleted), an id or a placeholder
 placed against the first paragraph of this section, and an id in a page
 or a section this rule excludes (13, 09's journeys, the index from its
-Open questions heading to the end, 00 0.5, `docs/adr/`). `REQ-1201`
-Where the task files exist, it also fails an Implements entry that cites
+Open questions heading to the end, 00 0.5, `docs/adr/`). The check
+reads one tree, so it cannot tell a deleted highest id from one never
+allocated; review catches that deletion. `REQ-1201` Where the task
+files exist, it also fails an Implements entry that cites
 a retired or unknown id, or whose reading aid names a section other
 than the one the id sits in; a live id that no task of fate `kept`,
 `new`, `deferred` or `merged` cites, the deferred ones reported apart;
