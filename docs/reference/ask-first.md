@@ -28,10 +28,11 @@ says why each surface is on the list.
 |---|---|---|
 | `gates` | `internal/gate/**`, `internal/state/**`, `internal/spec/project.go` | the gates, the state machines, and the gate/apply struct tags that define the widening set |
 | `gitsafe` | `internal/gitsafe/**` | every git invocation on the host, ref namespaces including salvage |
+| `procgroup` | `internal/procgroup/**` | the one package that starts subprocesses, kills their process groups and keeps a child from inheriting the host environment, with the admitted list of its call-site scan |
 | `termsafe` | `internal/termsafe/**`, `internal/cli/writer.go` | host output escaping |
 | `digests` | `internal/canon/**` | every digest the gates compare |
 | `signing` | `internal/signing/**`, `kits/git-ssh-sign/**` | commit signing key isolation |
-| `catalog` | `internal/catalog/**` | upload flags and the base and meta sets |
+| `catalog` | `internal/catalog/**`, `internal/egress/**` | upload flags, the base and meta sets, and the egress derivation that reads them |
 | `kits` | `kits/**`, `tools/kitpin/**` | what enters every sandbox, and its pins |
 | `release` | `.github/workflows/release.yml`, `tools/release/**` | release and publishing paths |
 | `dependencies` | `go.mod`, `go.sum`, `mise.toml`, `mise.lock`, `.mise.toml`, `mise.*.toml`, `.mise.*.toml`, `mise/**`, `.mise/**`, `.config/mise.toml`, `.config/mise.*.toml`, `.config/mise/**`, `.tool-versions`, `.miserc.toml`, `.miserc.local.toml`, `.config/miserc.toml`, `.github/workflows/**` | Go dependencies, the pinned tools the gates run with every file mise reads as its configuration, and CI actions |

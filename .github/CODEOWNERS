@@ -10,6 +10,9 @@
 # gitsafe
 /internal/gitsafe/** @brunovenceslau
 
+# procgroup
+/internal/procgroup/** @brunovenceslau
+
 # termsafe
 /internal/termsafe/** @brunovenceslau
 /internal/cli/writer.go @brunovenceslau
@@ -23,6 +26,7 @@
 
 # catalog
 /internal/catalog/** @brunovenceslau
+/internal/egress/** @brunovenceslau
 
 # kits
 /kits/** @brunovenceslau

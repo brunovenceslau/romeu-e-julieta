@@ -14,6 +14,7 @@ after:
   - T137
 ask_first:
   - checks
+  - procgroup
   - approvals
   - ask-first
 sitting: none

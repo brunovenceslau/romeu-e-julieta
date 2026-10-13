@@ -14,6 +14,9 @@ surfaces:
   - id: gitsafe
     globs: [internal/gitsafe/**]
     reason: every git invocation on the host, ref namespaces including salvage
+  - id: procgroup
+    globs: [internal/procgroup/**]
+    reason: the one package that starts subprocesses, kills their process groups and keeps a child from inheriting the host environment, with the admitted list of its call-site scan
   - id: termsafe
     globs: [internal/termsafe/**, internal/cli/writer.go]
     reason: host output escaping
@@ -24,8 +27,8 @@ surfaces:
     globs: [internal/signing/**, kits/git-ssh-sign/**]
     reason: commit signing key isolation
   - id: catalog
-    globs: [internal/catalog/**]
-    reason: upload flags and the base and meta sets
+    globs: [internal/catalog/**, internal/egress/**]
+    reason: upload flags, the base and meta sets, and the egress derivation that reads them
   - id: kits
     globs: [kits/**, tools/kitpin/**]
     reason: what enters every sandbox, and its pins
