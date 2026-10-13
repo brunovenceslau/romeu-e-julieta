@@ -3,7 +3,7 @@
 - The index row on the sandbox's GitHub access counts final handoffs
   with `grep -h '^## Session checkpoint (' docs/reviews/round-*.md`,
   which misses stage-b.md; widen it to docs/reviews/*.md (moot once the
-  checkpoints are migrated, see "migrate-docs-reviews-checkpoints").
+  checkpoints are migrated, see "migrate-the-docs-reviews-checkpoints-into-docs-handoff").
 - Mark the answered items of the "Open for the operator" list of
   docs/reviews/stage-b.md (items 1 to 3 and 7) as answered.
 - The L17 lens body in docs/reviews/lenses.md is 416 words by a plain

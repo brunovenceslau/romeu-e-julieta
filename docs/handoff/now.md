@@ -4,10 +4,8 @@
 
 Checkpoint of 2026-10-13, written at a context stop. Done record 1 holds
 what merged this session. Five lanes were mid-build when the context
-ended; their output is uncommitted in worktrees under
-/tmp/claude-1000/romeu-wt/ (sandbox scratch, gone with the sandbox):
-T105 PR-A (committed and signed, not pushed), T105 PR-B, T007, T017
-and T023 (builders that stop before committing).
+ended: T105 PR-A, T105 PR-B, T007, T017 and T023. The next session
+measures their state (see In flight).
 
 ## Next steps
 
@@ -36,17 +34,17 @@ One block, a recommendation each.
 
 1. Merge sitting: when three PRs are green (docs/plan.md, decision 12 of
    the re-plan block). Recommended: hold the sitting then, not before.
-2. T012 waits for its own focus. Recommended: start it after T105 PR-B.
-3. Items 8 to 11 of the re-plan decision block (narrowing the checks
-   and contracts surfaces, the grants, the surfaces). Recommended:
-   decide them at T107 or sitting M0, whichever comes first.
+2. T012 waits for its own focus. Recommended: start it after T105
+   PR-B (it touches pins and a signing key and deserves its own focus).
 
 ## In flight
 
-Branches (a map, not state): docs/t105a-tool-timeouts (pushed),
-feat/t105b-procgroup-switch, feat/t007-termsafe, feat/t017-canon,
-feat/t023-gitsafe; the last four are uncommitted builder output in
-worktrees t105b, t007, t017 and t023.
+Map of lanes (names only), each in a worktree in the sandbox scratch:
+- T105 PR-A: docs/t105a-tool-timeouts
+- T105 PR-B: feat/t105b-procgroup-switch
+- T007: feat/t007-termsafe (PR with a termsafe approval line)
+- T017: feat/t017-canon (PR with a digests approval line)
+- T023: feat/t023-gitsafe (PR with a gitsafe approval line)
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
