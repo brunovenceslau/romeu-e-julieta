@@ -8,11 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -23,8 +23,8 @@ import (
 // or a chapter, docs/spec/NN-<name>.md; the document order is the index
 // first, then the chapters by file name. An id is the code span of
 // reqPrefix and four digits; the placeholder is the code span of
-// reqPrefix and reqPlaceholder. The retired table sits in the chapter
-// that carries reqRetiredHeader, under the heading of 12 12.11.
+// reqPrefix and reqPlaceholder. The retired table is the table whose
+// header is reqRetiredHeader, on whichever page holds it (12 12.11).
 const (
 	reqIndexPath     = "docs/spec.md"
 	reqSpecDir       = "docs/spec"
@@ -34,7 +34,14 @@ const (
 	reqWidth         = 4
 	reqLast          = 9999
 	reqRetiredHeader = "| Id | Retired on | Last text | Replaced by |"
-	reqRetiredRule   = "**Retired requirements.**"
+	// reqCiteCap is the most tasks one id may be cited from (12 12.11):
+	// an obligation has few implementers, and a wider citation is a
+	// copy, not a trace.
+	reqCiteCap = 5
+	// reqIndexAid and reqOpeningAid are the reading aids of the index
+	// and of a chapter's text before its first numbered section.
+	reqIndexAid   = "index"
+	reqOpeningAid = "(opening)"
 )
 
 var (
@@ -43,33 +50,66 @@ var (
 	reqSpan = regexp.MustCompile("`" + reqPrefix + "([^`]*)`")
 	// reqDigits is the body of an id.
 	reqDigits = regexp.MustCompile(`^[0-9]{4}$`)
-	// reqIDToken finds an id in a task's Implements line, where the
-	// code span is optional.
-	reqIDToken = regexp.MustCompile(reqPrefix + `[0-9]{4}`)
+	// reqCite is an entry of a task's Implements line: the id, with or
+	// without its code span, bounded on the left so that a longer token
+	// is no id, then any digits that follow the four (a malformed id),
+	// then the reading aid in parentheses, when written.
+	reqCite = regexp.MustCompile("(?:^|[^0-9A-Za-z-])" + reqPrefix + "([0-9]{4})([0-9]*)`?(?:\\s*\\(([^()]*(?:\\([^()]*\\))?[^()]*)\\))?")
 	// reqChapter is the name of a chapter file.
 	reqChapter = regexp.MustCompile(`^[0-9]{2}-[^/]+\.md$`)
+	// reqSection is a numbered section heading of a chapter.
+	reqSection = regexp.MustCompile(`^## ([0-9]+\.[0-9]+)\b`)
+	// reqListMarker is the marker of a list item, which an id must
+	// follow and never precede.
+	reqListMarker = regexp.MustCompile(`^\s*([0-9]+\.|[-*+])\s`)
+	// reqDelimiterRow is the row under a table's header.
+	reqDelimiterRow = regexp.MustCompile(`^\|(\s*:?-+:?\s*\|)+\s*$`)
 	// reqISODate is the form of the "Retired on" cell.
 	reqISODate = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
 	// reqFate is the fate field of a task file's front matter.
 	reqFate = regexp.MustCompile(`^fate:\s*(\S+)`)
+	// reqSpaces is a run of whitespace, which a reading aid that wraps
+	// a line holds in place of one space.
+	reqSpaces = regexp.MustCompile(`\s+`)
 )
 
 // reqReadFates are the fates whose task files the coverage half reads
 // (12 12.11): a folded, removed or left-v1 file cites nothing that
-// counts, and its stale citations are no finding.
-var reqReadFates = []string{"kept", "new", "deferred", "merged"}
+// counts, and its stale citations are no finding. reqOtherFates are
+// the rest of the fates the plan writes; any other fate is a finding.
+var (
+	reqReadFates  = []string{"kept", "new", "deferred", "merged"}
+	reqOtherFates = []string{"folded", "removed", "left-v1"}
+)
 
-// reqPage is one specification page: its path and its lines.
+// reqShared are the ids that more tasks than reqCiteCap may cite: an
+// obligation on every record of a kind is cited from each record
+// task, and the plan's own shape is cited from each task that lays it
+// out (12 12.11).
+var reqShared = []string{"1101", "1169", "1170", "1171"}
+
+// reqPage is one specification page: its path, its lines and its line
+// ending, kept so that allocate writes a page back as it found it.
 type reqPage struct {
 	path  string
 	lines []string
+	eol   string
 }
 
-// reqMark is one id or placeholder found on a page.
+// reqMark is one id or placeholder found on a page, or one citation
+// of an id in a task file.
 type reqMark struct {
 	page string
-	line int // 1-based
-	body string
+	line int    // 1-based
+	col  int    // the byte offset of the code span in its line
+	body string // the digits, the placeholder or a malformed token
+	// section is the reading aid of the section the mark sits in
+	// ("index", "NN n.m" or "NN (opening)"), and, for a citation, the
+	// aid the task wrote, or "" when it wrote none.
+	section string
+	// misplaced says why the mark's place is a finding (12 12.11), or
+	// is "" where the mark is well placed.
+	misplaced string
 }
 
 func (m reqMark) where() string { return m.page + ":" + strconv.Itoa(m.line) }
@@ -97,15 +137,24 @@ func runReqs(ctx context.Context, e env, args []string) (bool, error) {
 	}
 	say(e.stdout, "%s%s\n", lines(findings), summary("reqs", len(findings)))
 	if len(deferred) > 0 {
-		say(e.stdout, "%s\n", reqDeferredLine(deferred))
+		say(e.stdout, "%s", reqDeferredLines(deferred))
 	}
 	return len(findings) == 0, nil
 }
 
-// reqDeferredLine is the second summary line: the ids that only
-// deferred tasks cite, which pass.
-func reqDeferredLine(ids []string) string {
-	return fmt.Sprintf("reqs: %d id(s) cited only by deferred tasks: %s", len(ids), strings.Join(ids, ", "))
+// reqDeferredLines is the second summary of the check: the ids that
+// only deferred tasks cite, which pass, eight to a line.
+func reqDeferredLines(ids []string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "reqs: %d id(s) cited only by deferred tasks:", len(ids))
+	for i, id := range ids {
+		if i%8 == 0 {
+			b.WriteString("\n ")
+		}
+		b.WriteString(" " + id)
+	}
+	b.WriteString("\n")
+	return b.String()
 }
 
 // reqsOf judges files, the tree of one commit as headTree reads it, by
@@ -117,7 +166,10 @@ func reqsOf(files []treeFile) ([]finding, []string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	live, findings := reqIDs(pages)
+	live, placeholders, findings := reqIDs(pages)
+	for _, m := range placeholders {
+		findings = append(findings, finding{m.where(), "reqs", "a placeholder is left; run \"go run ./tools/ci reqs allocate\""})
+	}
 	retired, retiredFindings := reqRetired(pages)
 	findings = append(findings, retiredFindings...)
 	findings = append(findings, reqConsistency(live, retired)...)
@@ -141,7 +193,7 @@ func reqPagesIn(files []treeFile) ([]reqPage, error) {
 		if f.mode == "160000" {
 			return nil, fmt.Errorf("read %s: not a file", f.path)
 		}
-		pages = append(pages, reqPage{path: f.path, lines: reqLines(f.content)})
+		pages = append(pages, reqPageOf(f.path, f.content))
 	}
 	reqSortPages(pages)
 	return pages, nil
@@ -154,70 +206,139 @@ func reqIsPage(p string) bool {
 
 // reqSortPages puts the pages in document order.
 func reqSortPages(pages []reqPage) {
-	sort.SliceStable(pages, func(i, j int) bool {
-		a, b := pages[i].path, pages[j].path
-		if (a == reqIndexPath) != (b == reqIndexPath) {
-			return a == reqIndexPath
+	slices.SortStableFunc(pages, func(a, b reqPage) int {
+		if (a.path == reqIndexPath) != (b.path == reqIndexPath) {
+			if a.path == reqIndexPath {
+				return -1
+			}
+			return 1
 		}
-		return a < b
+		return strings.Compare(a.path, b.path)
 	})
 }
 
-// reqLines splits content into lines, with CR LF read as LF.
-func reqLines(content []byte) []string {
-	return strings.Split(strings.ReplaceAll(string(content), "\r\n", "\n"), "\n")
+// reqPageOf splits content into lines and remembers whether the page
+// ends its lines with CR LF, so that allocate writes it back the same
+// way.
+func reqPageOf(p string, content []byte) reqPage {
+	text := string(content)
+	eol := "\n"
+	if strings.Contains(text, "\r\n") {
+		eol = "\r\n"
+	}
+	return reqPage{path: p, lines: strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n"), eol: eol}
 }
 
 // reqMarks returns every id, placeholder or malformed token of a page,
-// in order, with the lines the ids are not allowed on (reqExcluded)
-// reported as findings by the caller.
+// in order, each with the section it sits in and, where its place
+// breaks the placement rule of 12 12.11, why.
 func reqMarks(p reqPage) []reqMark {
 	var marks []reqMark
+	fenced := false
+	ticks := 0 // the parity of the backticks since the last blank line: a code span may wrap a line, never a paragraph
+	section := reqOpeningAid
 	for i, line := range p.lines {
-		for _, m := range reqSpan.FindAllStringSubmatch(line, -1) {
-			marks = append(marks, reqMark{page: p.path, line: i + 1, body: m[1]})
+		if strings.HasPrefix(line, "```") {
+			fenced = !fenced
+			continue
 		}
+		if line == "" {
+			ticks = 0
+		}
+		if m := reqSection.FindStringSubmatch(line); m != nil && !fenced {
+			section = m[1]
+		}
+		for _, loc := range reqSpan.FindAllStringSubmatchIndex(line, -1) {
+			marks = append(marks, reqMark{
+				page:      p.path,
+				line:      i + 1,
+				col:       loc[0],
+				body:      line[loc[2]:loc[3]],
+				section:   reqAid(p.path, section),
+				misplaced: reqMisplaced(p.lines, i, loc[0], loc[1], fenced, (ticks+strings.Count(line[:loc[0]], "`"))%2 == 1),
+			})
+		}
+		ticks = (ticks + strings.Count(line, "`")) % 2
 	}
 	return marks
 }
 
+// reqAid is the reading aid of a section of a page, as the plan writes
+// it after an id: "index" for the index, else the chapter's number
+// and the section's, or "(opening)" before the first numbered one.
+func reqAid(p, section string) string {
+	if p == reqIndexPath {
+		return reqIndexAid
+	}
+	return path.Base(p)[:2] + " " + section
+}
+
+// reqMisplaced applies the placement rule of 12 12.11 to the code span
+// at [start, end) of line i: an id is the first token of the text it
+// governs, so it follows the marker of a list item, never precedes it,
+// and sits in no fenced block, no other code span (inSpan, which the
+// caller counts across the lines of a paragraph) and no table header.
+func reqMisplaced(lines []string, i, start, end int, fenced, inSpan bool) string {
+	line := lines[i]
+	switch {
+	case fenced:
+		return "sits inside a fenced block"
+	case inSpan:
+		return "sits inside another code span"
+	case strings.TrimSpace(line[:start]) == "" && reqListMarker.MatchString(line[end:]):
+		return "precedes the marker of a list item"
+	case strings.HasPrefix(line, "|") && i+1 < len(lines) && reqDelimiterRow.MatchString(lines[i+1]):
+		return "sits in a table header row"
+	}
+	return ""
+}
+
 // reqIDs reads the ids of the pages. It returns the live ids, each with
-// the place of its first occurrence, and the findings of rules 1 to 3
-// and 6 of 12 12.11: a placeholder, a malformed token, a duplicate and
-// an id inside an excluded page or section. A token whose body is
-// empty is a mention of the prefix and nothing else.
-func reqIDs(pages []reqPage) (map[string]reqMark, []finding) {
+// the place of its first occurrence, the placeholders in document
+// order, and the findings of rules 1 to 3, 6 and 10 of 12 12.11: a
+// malformed token, a duplicate, an id or a placeholder inside an
+// excluded page or section, and one that is misplaced. A placeholder
+// elsewhere is for the caller: the check reports it, allocate numbers
+// it. A token whose body is empty is a mention of the prefix and
+// nothing else.
+func reqIDs(pages []reqPage) (map[string]reqMark, []reqMark, []finding) {
 	live := map[string]reqMark{}
+	var placeholders []reqMark
 	var findings []finding
 	for _, p := range pages {
 		excluded := reqExcluded(p)
-		first, last := reqRetiredRows(p)
+		rowFirst, rowLast := reqRetiredRows(p)
 		for _, m := range reqMarks(p) {
+			token := reqPrefix + m.body
 			switch {
 			case m.body == "":
-			case m.line-1 >= first && m.line-1 < last: // a retired row names its id
+			case m.misplaced != "":
+				findings = append(findings, finding{m.where(), "reqs", token + " " + m.misplaced + " (12 12.11)"})
+			case m.body == reqPlaceholder && excluded[m.line-1]:
+				findings = append(findings, finding{m.where(), "reqs", "a placeholder sits in a page or section that carries no id (12 12.11)"})
 			case m.body == reqPlaceholder:
-				findings = append(findings, finding{m.where(), "reqs", "a placeholder is left; run \"go run ./tools/ci reqs allocate\""})
+				placeholders = append(placeholders, m)
+			case m.line-1 >= rowFirst && m.line-1 < rowLast: // a retired row names its id
 			case !reqDigits.MatchString(m.body):
 				findings = append(findings, finding{m.where(), "reqs", "the token after " + reqPrefix + " is neither four digits nor " + reqPlaceholder})
 			case excluded[m.line-1]:
-				findings = append(findings, finding{m.where(), "reqs", reqPrefix + m.body + " sits in a page or section that carries no id (12 12.11)"})
+				findings = append(findings, finding{m.where(), "reqs", token + " sits in a page or section that carries no id (12 12.11)"})
 			default:
-				if first, dup := live[m.body]; dup {
-					findings = append(findings, finding{m.where(), "reqs", reqPrefix + m.body + " appears twice; its first place is " + first.where()})
+				if prior, dup := live[m.body]; dup {
+					findings = append(findings, finding{m.where(), "reqs", token + " appears twice; its first place is " + prior.where()})
 					continue
 				}
 				live[m.body] = m
 			}
 		}
 	}
-	return live, findings
+	return live, placeholders, findings
 }
 
 // reqExcluded marks the lines of a page where an id is a finding: the
 // whole of chapter 13; chapter 09 from its first journey heading; the
-// index from its Open questions heading; and chapter 00 from its
-// section 0.5 to the next section.
+// index from its Open questions heading to the end; and chapter 00
+// from its section 0.5 to the next section.
 func reqExcluded(p reqPage) []bool {
 	out := make([]bool, len(p.lines))
 	base := path.Base(p.path)
@@ -250,9 +371,9 @@ func reqExcluded(p reqPage) []bool {
 }
 
 // reqRetired reads the retired table: the table whose header is
-// reqRetiredHeader, under the paragraph reqRetiredRule, on whichever
-// page holds it. A row that does not parse is a finding (rule 7); a
-// page without the table has no retired id.
+// reqRetiredHeader, on whichever page holds it. A row that does not
+// parse is a finding (rule 7); a page without the table has no retired
+// id.
 func reqRetired(pages []reqPage) (map[string]reqMark, []finding) {
 	retired := map[string]reqMark{}
 	var findings []finding
@@ -305,13 +426,7 @@ func reqRetiredRows(p reqPage) (int, int) {
 // and a number from 1 to the highest that is neither.
 func reqConsistency(live, retired map[string]reqMark) []finding {
 	var findings []finding
-	for _, body := range slices.Sorted(func(yield func(string) bool) {
-		for b := range retired {
-			if !yield(b) {
-				return
-			}
-		}
-	}) {
+	for _, body := range slices.Sorted(maps.Keys(retired)) {
 		if m, ok := live[body]; ok {
 			findings = append(findings, finding{m.where(), "reqs", reqPrefix + body + " is live and in the retired table at " + retired[body].where()})
 		}
@@ -356,7 +471,7 @@ func reqOutsidePages(files []treeFile) []finding {
 		if !strings.HasPrefix(f.path, "docs/adr/") || f.mode == "160000" {
 			continue
 		}
-		for _, m := range reqMarks(reqPage{path: f.path, lines: reqLines(f.content)}) {
+		for _, m := range reqMarks(reqPageOf(f.path, f.content)) {
 			if reqDigits.MatchString(m.body) {
 				findings = append(findings, finding{m.where(), "reqs", reqPrefix + m.body + " sits in a decision record, which carries no id (12 12.11)"})
 			}
@@ -365,19 +480,24 @@ func reqOutsidePages(files []treeFile) []finding {
 	return findings
 }
 
-// reqTask is what the coverage half reads of one task file: its fate
-// and the ids its Implements line cites.
+// reqTask is what the coverage half reads of one task file: its fate,
+// the line that states it, and the ids its Implements line cites, each
+// with the reading aid written after it.
 type reqTask struct {
-	path  string
-	fate  string
-	cites []reqMark
+	path     string
+	fate     string
+	fateLine int // 1-based
+	cites    []reqMark
 }
 
 // reqTasksIn reads the task files among files. A file without a front
 // matter or a fate is left out: that is a finding of the plan check,
-// not of reqs.
+// not of reqs. A fate outside the ones the plan writes is a finding
+// here, since a misspelt fate would hide a file from the coverage
+// half.
 func reqTasksIn(files []treeFile) ([]reqTask, []finding, error) {
 	var tasks []reqTask
+	var findings []finding
 	for _, f := range files {
 		if path.Dir(f.path) != reqTaskDir || !strings.HasSuffix(f.path, ".md") {
 			continue
@@ -385,20 +505,26 @@ func reqTasksIn(files []treeFile) ([]reqTask, []finding, error) {
 		if f.mode == "160000" {
 			return nil, nil, fmt.Errorf("read %s: not a file", f.path)
 		}
-		t, ok := reqParseTask(f.path, reqLines(f.content))
-		if ok {
-			tasks = append(tasks, t)
+		t, ok := reqParseTask(f.path, reqPageOf(f.path, f.content).lines)
+		if !ok {
+			continue
 		}
+		if !slices.Contains(reqReadFates, t.fate) && !slices.Contains(reqOtherFates, t.fate) {
+			where := f.path + ":" + strconv.Itoa(t.fateLine)
+			findings = append(findings, finding{where, "reqs", "the fate " + t.fate + " is none of " + strings.Join(slices.Concat(reqReadFates, reqOtherFates), ", ")})
+			continue
+		}
+		tasks = append(tasks, t)
 	}
-	return tasks, nil, nil
+	return tasks, findings, nil
 }
 
 // reqParseTask reads the fate and the Implements line of one task
 // file. The front matter is the lines between the first "---" and the
 // next; the Implements entry is the bullet "- Implements:" with its
-// indented continuation lines, and its ids are read wherever they
-// stand in it, with or without a code span: the parenthetical after
-// each id is a reading aid.
+// indented continuation lines, read whole, and its ids are read
+// wherever they stand in it, with or without a code span, each with
+// the reading aid in parentheses after it.
 func reqParseTask(p string, lines []string) (reqTask, bool) {
 	t := reqTask{path: p}
 	if len(lines) == 0 || lines[0] != "---" {
@@ -408,76 +534,99 @@ func reqParseTask(p string, lines []string) (reqTask, bool) {
 	if end < 0 {
 		return t, false
 	}
-	for _, l := range lines[1 : end+1] {
+	for i, l := range lines[1 : end+1] {
 		if m := reqFate.FindStringSubmatch(l); m != nil {
-			t.fate = m[1]
+			t.fate, t.fateLine = m[1], i+2
 		}
 	}
 	if t.fate == "" {
 		return t, false
 	}
-	in := false
-	for i, l := range lines[end+2:] {
-		switch {
-		case strings.HasPrefix(l, "- Implements:"):
-			in = true
-		case in && (l == "" || !strings.HasPrefix(l, " ")):
-			in = false
+	start, block := reqImplements(lines, end+2)
+	for _, loc := range reqCite.FindAllStringSubmatchIndex(block, -1) {
+		m := reqMark{page: p, line: start + strings.Count(block[:loc[2]], "\n")}
+		m.body = block[loc[2]:loc[3]] + block[loc[4]:loc[5]]
+		if loc[6] >= 0 {
+			m.section = reqSpaces.ReplaceAllString(block[loc[6]:loc[7]], " ")
 		}
-		if !in {
-			continue
-		}
-		for _, id := range reqIDToken.FindAllString(l, -1) {
-			t.cites = append(t.cites, reqMark{page: p, line: end + 3 + i, body: strings.TrimPrefix(id, reqPrefix)})
-		}
+		t.cites = append(t.cites, m)
 	}
 	return t, true
 }
 
-// reqCoverage applies rules 8 and 9 over the task files of the fates
-// reqReadFates: an Implements entry whose id is not live is a finding,
-// and so is a live id that no such task cites. An id that only deferred
-// tasks cite is returned apart and is no finding. Without task files
-// the half is silent.
+// reqImplements returns the 1-based line of the Implements bullet of a
+// task file, read from the 0-based line from, and the bullet with its
+// continuation lines joined by newlines; a file without the bullet
+// gives an empty block.
+func reqImplements(lines []string, from int) (int, string) {
+	start := -1
+	var block []string
+	for i := from; i < len(lines); i++ {
+		l := lines[i]
+		switch {
+		case strings.HasPrefix(l, "- Implements:"):
+			start = i + 1
+		case start >= 0 && (l == "" || !strings.HasPrefix(l, " ")):
+			return start, strings.Join(block, "\n")
+		case start < 0:
+			continue
+		}
+		block = append(block, l)
+	}
+	return start, strings.Join(block, "\n")
+}
+
+// reqCoverage applies rules 8, 9 and 11 over the task files of the
+// fates reqReadFates: an Implements entry whose id is not live, or
+// whose reading aid names another section than the one the id sits
+// in, is a finding, and so is a live id that no such task cites, and a
+// live id that more tasks than reqCiteCap cite, the deferred tasks
+// and the ids of reqShared aside. An id that only deferred tasks cite
+// is returned apart and is no finding. Without task files the half is
+// silent.
 func reqCoverage(live, retired map[string]reqMark, tasks []reqTask) ([]finding, []string) {
 	if len(tasks) == 0 {
 		return nil, nil
 	}
 	var findings []finding
-	cited := map[string]bool{}        // by a task of a read fate
-	citedByOther := map[string]bool{} // by a read task that is not deferred
+	cited := map[string]bool{} // by a task of a read fate
+	citers := map[string]int{} // read tasks that are not deferred, per id
 	for _, t := range tasks {
 		if !slices.Contains(reqReadFates, t.fate) {
 			continue
 		}
 		for _, c := range t.cites {
-			if _, ok := live[c.body]; !ok {
+			token := reqPrefix + c.body
+			id, ok := live[c.body]
+			switch {
+			case !reqDigits.MatchString(c.body):
+				findings = append(findings, finding{c.where(), "reqs", "Implements cites " + token + ", which is no id"})
+				continue
+			case !ok:
 				state := "unknown"
 				if _, ok := retired[c.body]; ok {
 					state = "retired"
 				}
-				findings = append(findings, finding{c.where(), "reqs", "Implements cites " + reqPrefix + c.body + ", which is " + state})
+				findings = append(findings, finding{c.where(), "reqs", "Implements cites " + token + ", which is " + state})
 				continue
+			case c.section != "" && c.section != id.section:
+				findings = append(findings, finding{c.where(), "reqs", "Implements cites " + token + " as (" + c.section + "); it sits in " + id.section})
 			}
 			cited[c.body] = true
 			if t.fate != "deferred" {
-				citedByOther[c.body] = true
+				citers[c.body]++
 			}
 		}
 	}
 	var deferred []string
-	for _, body := range slices.Sorted(func(yield func(string) bool) {
-		for b := range live {
-			if !yield(b) {
-				return
-			}
-		}
-	}) {
+	for _, body := range slices.Sorted(maps.Keys(live)) {
 		switch {
 		case !cited[body]:
 			findings = append(findings, finding{live[body].where(), "reqs", reqPrefix + body + " is cited by no task of fate " + strings.Join(reqReadFates, ", ")})
-		case !citedByOther[body]:
+		case citers[body] == 0:
 			deferred = append(deferred, reqPrefix+body)
+		case citers[body] > reqCiteCap && !slices.Contains(reqShared, body):
+			findings = append(findings, finding{live[body].where(), "reqs", fmt.Sprintf("%s%s is cited by %d tasks, more than the %d of 12 12.11; one obligation has few implementers", reqPrefix, body, citers[body], reqCiteCap)})
 		}
 	}
 	return findings, deferred
@@ -485,10 +634,12 @@ func reqCoverage(live, retired map[string]reqMark, tasks []reqTask) ([]finding, 
 
 // reqsAllocate numbers the placeholders of the pages of the working
 // tree, in document order, from the highest live or retired id, and
-// writes each changed page back. It refuses, and writes nothing, when a
-// page cannot be read, when a number would pass reqLast, or when a
-// placeholder sits where an id is a finding. A tree without a
-// placeholder changes no byte.
+// writes each changed page back with the line ending it had. It
+// refuses, and writes nothing, when a page cannot be read, when an id
+// or a retired row is a finding (a row that does not parse would hide
+// its number, and the next placeholder would take it), or when a
+// number would pass reqLast. A tree without a placeholder changes no
+// byte.
 func reqsAllocate(ctx context.Context, e env) (bool, error) {
 	dir, err := repoRoot(ctx, e)
 	if err != nil {
@@ -503,44 +654,46 @@ func reqsAllocate(ctx context.Context, e env) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	live, _ := reqIDs(pages)
-	retired, _ := reqRetired(pages)
+	live, placeholders, findings := reqIDs(pages)
+	retired, retiredFindings := reqRetired(pages)
+	if findings = append(findings, retiredFindings...); len(findings) > 0 {
+		return false, fmt.Errorf("%snothing was written", lines(findings))
+	}
+	byPath := map[string]*reqPage{}
+	for i := range pages {
+		byPath[pages[i].path] = &pages[i]
+	}
 	next := reqHighest(live, retired)
 	var written []string
-	for i := range pages {
-		p := &pages[i]
-		excluded := reqExcluded(*p)
-		changed := false
-		for j, line := range p.lines {
-			if !strings.Contains(line, "`"+reqPrefix+reqPlaceholder+"`") {
-				continue
-			}
-			if excluded[j] {
-				return false, fmt.Errorf("%s:%d: a placeholder sits in a page or section that carries no id (12 12.11); nothing was written", p.path, j+1)
-			}
-			var b strings.Builder
-			rest := line
-			for {
-				before, after, found := strings.Cut(rest, "`"+reqPrefix+reqPlaceholder+"`")
-				b.WriteString(before)
-				if !found {
-					break
-				}
-				next++
-				if next > reqLast {
-					return false, fmt.Errorf("%s:%d: the next id would pass %s%d; nothing was written", p.path, j+1, reqPrefix, reqLast)
-				}
-				b.WriteString("`" + reqPrefix + reqBody(next) + "`")
-				written = append(written, fmt.Sprintf("%s:%d: %s%s", p.path, j+1, reqPrefix, reqBody(next)))
-				rest = after
-			}
-			p.lines[j] = b.String()
-			changed = true
+	shift, last := 0, reqMark{} // the bytes earlier numbers added to the line at hand
+	for _, m := range placeholders {
+		next++
+		if next > reqLast {
+			return false, fmt.Errorf("%s: the next id would pass %s%d; nothing was written", m.where(), reqPrefix, reqLast)
 		}
-		if changed {
-			if _, err := writeIfChanged(root, p.path, []byte(strings.Join(p.lines, "\n"))); err != nil {
-				return false, err
-			}
+		if m.page != last.page || m.line != last.line {
+			shift = 0
+		}
+		p := byPath[m.page]
+		line := p.lines[m.line-1]
+		at := m.col + shift
+		old := "`" + reqPrefix + reqPlaceholder + "`"
+		id := "`" + reqPrefix + reqBody(next) + "`"
+		p.lines[m.line-1] = line[:at] + id + line[at+len(old):]
+		shift += len(id) - len(old)
+		last = m
+		written = append(written, fmt.Sprintf("%s: %s%s", m.where(), reqPrefix, reqBody(next)))
+	}
+	changed := map[string]bool{}
+	for _, m := range placeholders {
+		changed[m.page] = true
+	}
+	for _, p := range pages {
+		if !changed[p.path] {
+			continue
+		}
+		if _, err := writeIfChanged(root, p.path, []byte(strings.Join(p.lines, p.eol))); err != nil {
+			return false, err
 		}
 	}
 	for _, w := range written {
@@ -587,7 +740,7 @@ func reqPagesAt(root *os.Root) ([]reqPage, error) {
 		if err != nil {
 			return nil, err
 		}
-		pages = append(pages, reqPage{path: p, lines: reqLines(content)})
+		pages = append(pages, reqPageOf(p, content))
 	}
 	reqSortPages(pages)
 	return pages, nil

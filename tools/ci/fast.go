@@ -575,12 +575,14 @@ func (c *checks) report(name string, passed bool, detail string) {
 
 // verdict is what one check of the commit judged found: its findings,
 // or why it could not judge (err), or, with a note, why it did not
-// check and so neither passed nor failed.
+// check and so neither passed nor failed; info is a line printed under
+// the verdict either way, for what passed and is still worth a read.
 type verdict struct {
 	name     string
 	findings []finding
 	err      error
 	note     string
+	info     string
 }
 
 // commitChecks judges commit with hygiene, workflows and reqs, from one
@@ -601,12 +603,22 @@ func commitChecks(ctx context.Context, repo git.Repo, commit string) ([]verdict,
 		return nil, err
 	}
 	findings, err := hygieneOf(files)
-	reqs, _, reqsErr := reqsOf(files)
+	reqs, deferred, reqsErr := reqsOf(files)
 	return []verdict{
 		{name: "hygiene", findings: findings, err: err},
 		{name: "workflows", findings: workflowsOf(files)},
-		{name: "reqs", findings: reqs, err: reqsErr},
+		{name: "reqs", findings: reqs, err: reqsErr, info: reqDeferredInfo(deferred)},
 	}, nil
+}
+
+// reqDeferredInfo is the line under the reqs verdict of fast and all
+// when ids rest on deferred tasks alone: the count, and where the ids
+// are listed (12 12.11).
+func reqDeferredInfo(deferred []string) string {
+	if len(deferred) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("      %d id(s) cited only by deferred tasks; go run ./tools/ci reqs lists them\n", len(deferred))
 }
 
 // verdict reports one verdict of commitChecks: one that could not
@@ -619,7 +631,7 @@ func (c *checks) verdict(v verdict) {
 	case v.err != nil:
 		c.report(v.name, false, git.SafeLines(v.err.Error())+"\n")
 	default:
-		c.report(v.name, len(v.findings) == 0, lines(v.findings))
+		c.report(v.name, len(v.findings) == 0, lines(v.findings)+v.info)
 	}
 }
 

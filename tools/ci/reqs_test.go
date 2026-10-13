@@ -4,7 +4,6 @@
 package main
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +15,10 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 )
+
+// reqRetiredRule is the paragraph of 12 12.11 that the retired table
+// of a fixture sits under.
+const reqRetiredRule = "**Retired requirements.**"
 
 // reqTable is the retired table of a fixture, with the rows given.
 func reqTable(rows ...string) string {
@@ -33,9 +36,9 @@ func reqFixture(t *testing.T) *gittest.Repo {
 	return r
 }
 
-// reqTaskFile is a task file of the given fate that cites ids.
-func reqTaskFile(fate string, ids ...string) string {
-	return "---\nid: T001\nfate: " + fate + "\n---\n\n# T001\n\n- Implements: " + strings.Join(ids, ", ") + "\n- Verify: go test\n"
+// reqTaskFile is a task file of the given id and fate that cites ids.
+func reqTaskFile(id, fate string, ids ...string) string {
+	return "---\nid: " + id + "\nfate: " + fate + "\n---\n\n# " + id + "\n\n- Implements: " + strings.Join(ids, ", ") + "\n- Verify: go test\n"
 }
 
 func TestReqsPasses(t *testing.T) {
@@ -114,6 +117,42 @@ func TestReqsRules(t *testing.T) {
 			want:   []string{"docs/adr/0001-first.md:3: reqs: REQ-0001 sits in a decision record, which carries no id (12 12.11)"},
 		},
 		{
+			name: "an id before a list marker",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/spec/01-model.md", "# 01\n\n`REQ-0005` 1. Five.\n  `REQ-0006` - Six.\n")
+			},
+			want: []string{
+				"docs/spec/01-model.md:3: reqs: REQ-0005 precedes the marker of a list item (12 12.11)",
+				"docs/spec/01-model.md:4: reqs: REQ-0006 precedes the marker of a list item (12 12.11)",
+			},
+		},
+		{
+			name: "an id inside a fenced block",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/spec/01-model.md", "# 01\n\n```\ntree/   `REQ-0005` a file\n```\n")
+			},
+			want: []string{"docs/spec/01-model.md:4: reqs: REQ-0005 sits inside a fenced block (12 12.11)"},
+		},
+		{
+			name: "an id in a table header",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/spec/01-model.md", "# 01\n\n| A | `REQ-0005` B |\n|---|---|\n| a | b |\n")
+			},
+			want: []string{"docs/spec/01-model.md:3: reqs: REQ-0005 sits in a table header row (12 12.11)"},
+		},
+		{
+			name:   "an id inside a code span",
+			change: func(r *gittest.Repo) { r.Write("docs/spec/01-model.md", "# 01\n\n`{\"a\": `REQ-0005` 1}`\n") },
+			want:   []string{"docs/spec/01-model.md:3: reqs: REQ-0005 sits inside another code span (12 12.11)"},
+		},
+		{
+			name: "a placeholder inside a retired row",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/spec/12-engineering.md", "# 12\n\n## 12.11 Requirement ids\n\n"+reqTable("| `REQ-0004` | 2026-10-12 | Four, `REQ-new`. | none |"))
+			},
+			want: []string{"docs/spec/12-engineering.md:9: reqs: a placeholder is left"},
+		},
+		{
 			name: "a retired row that does not parse",
 			change: func(r *gittest.Repo) {
 				r.Write("docs/spec/12-engineering.md", "# 12\n\n## 12.11 Requirement ids\n\n"+reqTable(
@@ -130,7 +169,7 @@ func TestReqsRules(t *testing.T) {
 		{
 			name: "an Implements entry whose id is retired or unknown",
 			change: func(r *gittest.Repo) {
-				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("kept", "REQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)", "REQ-0004 (12 12.11)", "REQ-0099 (none)"))
+				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)", "REQ-0004 (12 12.11)", "REQ-0099 (none)"))
 			},
 			want: []string{
 				"docs/plan/tasks/T001-a.md:8: reqs: Implements cites REQ-0004, which is retired",
@@ -138,19 +177,60 @@ func TestReqsRules(t *testing.T) {
 			},
 		},
 		{
+			name: "an Implements entry with more digits than an id",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)", "REQ-00031 (00 0.1)"))
+			},
+			want: []string{
+				"docs/plan/tasks/T001-a.md:8: reqs: Implements cites REQ-00031, which is no id",
+				"docs/spec/00-scope.md:5: reqs: REQ-0003 is cited by no task",
+			},
+		},
+		{
+			name: "a reading aid that names another section",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (00 0.1)", "REQ-0003 (00 (opening))"))
+			},
+			want: []string{
+				"docs/plan/tasks/T001-a.md:8: reqs: Implements cites REQ-0002 as (00 0.1); it sits in index",
+				"docs/plan/tasks/T001-a.md:8: reqs: Implements cites REQ-0003 as (00 (opening)); it sits in 00 0.1",
+			},
+		},
+		{
 			name: "a live id that no task cites",
 			change: func(r *gittest.Repo) {
-				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("kept", "REQ-0001 (index)", "REQ-0002 (index)"))
+				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)"))
 			},
 			want: []string{"docs/spec/00-scope.md:5: reqs: REQ-0003 is cited by no task of fate kept, new, deferred, merged"},
 		},
 		{
+			name: "an id cited by more tasks than the cap",
+			change: func(r *gittest.Repo) {
+				for i, fate := range []string{"kept", "new", "merged", "kept", "kept", "new"} {
+					id := "T00" + string(rune('1'+i))
+					r.Write("docs/plan/tasks/"+id+"-a.md", reqTaskFile(id, fate, "REQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)"))
+				}
+			},
+			want: []string{"docs/spec.md:3: reqs: REQ-0001 is cited by 6 tasks, more than the 5 of 12 12.11; one obligation has few implementers"},
+		},
+		{
 			name: "a folded task is not read",
 			change: func(r *gittest.Repo) {
-				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("kept", "REQ-0001 (index)", "REQ-0002 (index)"))
-				r.Write("docs/plan/tasks/T002-b.md", strings.Replace(reqTaskFile("folded", "REQ-0003 (00 0.1)", "REQ-0099 (none)"), "T001", "T002", 2))
+				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)"))
+				r.Write("docs/plan/tasks/T002-b.md", reqTaskFile("T002", "folded", "REQ-0003 (00 0.1)", "REQ-0099 (none)"))
 			},
 			want: []string{"docs/spec/00-scope.md:5: reqs: REQ-0003 is cited by no task"},
+		},
+		{
+			name: "a fate outside the plan's set",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)"))
+				r.Write("docs/plan/tasks/T002-b.md", reqTaskFile("T002", "Kept", "REQ-0003 (00 0.1)"))
+			},
+			want: []string{
+				"docs/plan/tasks/T002-b.md:3: reqs: the fate Kept is none of kept, new, deferred, merged, folded, removed, left-v1",
+				"docs/spec/00-scope.md:5: reqs: REQ-0003 is cited by no task",
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -168,6 +248,41 @@ func TestReqsRules(t *testing.T) {
 	}
 }
 
+// TestReqsReads holds what the check reads without a finding, and
+// what it cannot read at all.
+func TestReqsReads(t *testing.T) {
+	t.Run("a bare mention of the prefix is no finding", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/01-model.md", "# 01\n\nAn id is `REQ-` and four digits.\n")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+	})
+	t.Run("an id after a list marker is well placed", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/01-model.md", "# 01\n\n1. `REQ-0005` Five.\n   - `REQ-0006` Six, `REQ-0007` seven.\n\n| A | B |\n|---|---|\n| `REQ-0008` a | `b` `REQ-0009` c |\n")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+	})
+	t.Run("a code span that wraps a line hides no id after it", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/01-model.md", "# 01\n\nThe hint is `romeu run\n<name>`; `REQ-0005` five.\n\n`REQ-0006` Six.\n")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+	})
+	t.Run("a page that is a submodule entry is an error", func(t *testing.T) {
+		r := reqFixture(t)
+		require.NoError(t, os.Mkdir(filepath.Join(r.Dir, "docs", "spec", "01-model.md"), 0o755))
+		r.Git("update-index", "--add", "--cacheinfo", "160000,0123456789abcdef0123456789abcdef01234567,docs/spec/01-model.md")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitError, code, out)
+		assert.Contains(t, out, "ci: read docs/spec/01-model.md: not a file")
+	})
+}
+
 func TestReqsCoverage(t *testing.T) {
 	t.Run("the coverage half is silent without task files", func(t *testing.T) {
 		r := reqFixture(t)
@@ -179,36 +294,68 @@ func TestReqsCoverage(t *testing.T) {
 	})
 	t.Run("a deferred-only id is reported and passes", func(t *testing.T) {
 		r := reqFixture(t)
-		r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("kept", "REQ-0001 (index)", "REQ-0002 (index)"))
-		r.Write("docs/plan/tasks/T002-b.md", strings.Replace(reqTaskFile("deferred", "REQ-0002 (index)", "REQ-0003 (00 0.1)"), "T001", "T002", 2))
+		r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)"))
+		r.Write("docs/plan/tasks/T002-b.md", reqTaskFile("T002", "deferred", "REQ-0002 (index)", "REQ-0003 (00 0.1)"))
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
 		assert.Equal(t, exitOK, code, out)
-		assert.Equal(t, "reqs: ok\nreqs: 1 id(s) cited only by deferred tasks: REQ-0003\n", out)
+		assert.Equal(t, "reqs: ok\nreqs: 1 id(s) cited only by deferred tasks:\n  REQ-0003\n", out)
+	})
+	t.Run("the deferred-only ids are listed eight to a line", func(t *testing.T) {
+		ids := make([]string, 9)
+		for i := range ids {
+			ids[i] = reqPrefix + reqBody(i+1)
+		}
+		assert.Equal(t, "reqs: 9 id(s) cited only by deferred tasks:\n  REQ-0001 REQ-0002 REQ-0003 REQ-0004 REQ-0005 REQ-0006 REQ-0007 REQ-0008\n  REQ-0009\n", reqDeferredLines(ids))
 	})
 	t.Run("an Implements line that wraps is read whole", func(t *testing.T) {
 		r := reqFixture(t)
-		r.Write("docs/plan/tasks/T001-a.md", "---\nid: T001\nfate: new\n---\n\n- Implements: `REQ-0001` (index), REQ-0002\n  (index),\n  REQ-0003 (00 0.1)\n- Verify: go test\n")
+		r.Write("docs/plan/tasks/T001-a.md", "---\nid: T001\nfate: new\n---\n\n- Implements: `REQ-0001` (index), REQ-0002\n  (index),\n  REQ-0003 (00\n  0.1)\n- Verify: go test\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, exitOK, code, out, "a reading aid that wraps is read whole")
+	})
+	t.Run("a wrapped entry's finding names its line", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/plan/tasks/T001-a.md", "---\nid: T001\nfate: new\n---\n\n- Implements: `REQ-0001` (index), REQ-0002\n  (index),\n  REQ-0003 (00 0.1),\n  REQ-0099 (00 0.1)\n- Verify: go test\n")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitFail, code, out)
+		assert.Contains(t, out, "docs/plan/tasks/T001-a.md:9: reqs: Implements cites REQ-0099, which is unknown")
 	})
 	t.Run("an untracked task file does not satisfy the coverage half", func(t *testing.T) {
 		r := reqFixture(t)
-		r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("kept", "REQ-0001 (index)", "REQ-0002 (index)"))
+		r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)"))
 		r.Commit("fixture")
-		r.Write("docs/plan/tasks/T002-b.md", strings.Replace(reqTaskFile("new", "REQ-0003 (00 0.1)"), "T001", "T002", 2))
+		r.Write("docs/plan/tasks/T002-b.md", reqTaskFile("T002", "new", "REQ-0003 (00 0.1)"))
 		code, out := runCI(t, r, nil, nil, "reqs")
 		assert.Equal(t, exitFail, code, out)
 		assert.Contains(t, out, "REQ-0003 is cited by no task")
 	})
 	t.Run("a task file without a fate is left to the plan check", func(t *testing.T) {
 		r := reqFixture(t)
-		r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("kept", "REQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)"))
+		r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)"))
 		r.Write("docs/plan/tasks/T002-b.md", "# T002\n\n- Implements: REQ-0099 (none)\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
 		assert.Equal(t, exitOK, code, out)
+	})
+	t.Run("a shared id passes the cap", func(t *testing.T) {
+		live := map[string]reqMark{
+			"0001": {page: "docs/spec.md", line: 3, section: "index"},
+			"1169": {page: "docs/spec/12-engineering.md", line: 5, section: "12 12.5"},
+		}
+		var tasks []reqTask
+		for i := range reqCiteCap + 1 {
+			tasks = append(tasks, reqTask{path: "docs/plan/tasks/T00" + string(rune('1'+i)) + "-a.md", fate: "kept", cites: []reqMark{
+				{body: "0001", section: "index"},
+				{body: "1169", section: "12 12.5"},
+			}})
+		}
+		findings, deferred := reqCoverage(live, nil, tasks)
+		require.Len(t, findings, 1)
+		assert.Equal(t, "docs/spec.md:3: reqs: REQ-0001 is cited by 6 tasks, more than the 5 of 12 12.11; one obligation has few implementers", findings[0].String())
+		assert.Empty(t, deferred)
 	})
 }
 
@@ -249,13 +396,38 @@ func TestReqsAllocate(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, info.ModTime(), after.ModTime(), "no byte changed, so no write")
 	})
+	t.Run("a page with CR LF line ends keeps them", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/01-model.md", "# 01\r\n\r\n`REQ-new` Five.\r\n")
+		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
+		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, "# 01\r\n\r\n`REQ-0005` Five.\r\n", read(t, r, "docs/spec/01-model.md"))
+	})
 	t.Run("a placeholder in an excluded section refuses, and nothing is written", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/spec.md", "# Index\n\n- `REQ-new` Five.\n- `REQ-0001` One.\n- `REQ-0002` Two.\n\n## Open questions\n\n`REQ-new` A question.\n")
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
 		assert.Equal(t, exitError, code, out)
-		assert.Contains(t, out, "ci: docs/spec.md:9: a placeholder sits in a page or section that carries no id (12 12.11); nothing was written")
+		assert.Contains(t, out, "ci: docs/spec.md:9: reqs: a placeholder sits in a page or section that carries no id (12 12.11)\nnothing was written")
 		assert.Contains(t, read(t, r, "docs/spec.md"), "- `REQ-new` Five.")
+	})
+	t.Run("a misplaced placeholder refuses, and nothing is written", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec.md", "# Index\n\n- `REQ-new` Five.\n- `REQ-0001` One.\n- `REQ-0002` Two.\n")
+		r.Write("docs/spec/01-model.md", "# 01\n\n`REQ-new` 1. Six.\n")
+		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
+		assert.Equal(t, exitError, code, out)
+		assert.Contains(t, out, "ci: docs/spec/01-model.md:3: reqs: REQ-new precedes the marker of a list item (12 12.11)\nnothing was written")
+		assert.Contains(t, read(t, r, "docs/spec.md"), "- `REQ-new` Five.", "the index, numbered before the refusal, is not written")
+	})
+	t.Run("allocate refuses when the retired table does not parse, and nothing is written", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/12-engineering.md", "# 12\n\n## 12.11 Requirement ids\n\n"+reqTable("| `REQ-0004` | 2026-11-3 | Four. | none |"))
+		r.Write("docs/spec/01-model.md", "# 01\n\n`REQ-new` Five.\n")
+		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
+		assert.Equal(t, exitError, code, out)
+		assert.Contains(t, out, "ci: docs/spec/12-engineering.md:9: reqs: a retired row's second cell is not an ISO date\nnothing was written")
+		assert.Contains(t, read(t, r, "docs/spec/01-model.md"), "`REQ-new`")
 	})
 	t.Run("a number past the last refuses, and nothing is written", func(t *testing.T) {
 		r := reqFixture(t)
@@ -311,12 +483,15 @@ func TestReqsUsage(t *testing.T) {
 }
 
 // TestReqsInTheCommitChecks: fast and all judge reqs with hygiene and
-// workflows, from the one read of the commit's tree.
+// workflows, from the one read of the commit's tree, and carry the
+// count of the ids that rest on deferred tasks alone.
 func TestReqsInTheCommitChecks(t *testing.T) {
 	r := reqFixture(t)
 	r.Write("docs/spec/01-model.md", "# 01\n\n`REQ-new` Five.\n")
+	r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)"))
+	r.Write("docs/plan/tasks/T002-b.md", reqTaskFile("T002", "deferred", "REQ-0003 (00 0.1)"))
 	head := r.Commit("fixture")
-	verdicts, err := commitChecks(context.Background(), git.Repo{Dir: r.Dir, Env: r.Env}, head)
+	verdicts, err := commitChecks(t.Context(), git.Repo{Dir: r.Dir, Env: r.Env}, head)
 	require.NoError(t, err)
 	names := make([]string, len(verdicts))
 	for i, v := range verdicts {
@@ -325,4 +500,5 @@ func TestReqsInTheCommitChecks(t *testing.T) {
 	assert.Equal(t, []string{"hygiene", "workflows", "reqs"}, names)
 	require.Len(t, verdicts[2].findings, 1)
 	assert.Equal(t, "docs/spec/01-model.md:3: reqs: a placeholder is left; run \"go run ./tools/ci reqs allocate\"", verdicts[2].findings[0].String())
+	assert.Equal(t, "      1 id(s) cited only by deferred tasks; go run ./tools/ci reqs lists them\n", verdicts[2].info)
 }
