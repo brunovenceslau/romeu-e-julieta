@@ -33,7 +33,13 @@ silent; the SessionStart one runs `julieta setup` before `handoff show
 --hook`, the order `romeu run` keeps in 04 4.2, so the dispatcher is the
 global `core.hooksPath` before the session's first commit or push) and
 the two skills pinned from this repository at a SHA; a runbook with each
-step and its undo.
+step and its undo. The open-items cut-over, per project: the one-off
+entry of the store's open items into `julieta memory` is a command of
+the config repository that skips an item whose source id is already
+present and prints the counts on both sides, with one recorded list
+that gives each item its destination (a memory entry id, or closed); it
+runs again at the end of the sitting, after the store's last writer has
+left the definitions, and both counts are in the runbook.
 
 No file of this repository: the work lands in the maintainer's config
 repository, and this file is its record and its checkbox. Each step is
@@ -46,13 +52,16 @@ rule 1 allows outside its own file.
 Re-plan (2026-10-12): The bridge is outside the product: nothing of it
 enters a spec section or a product command. T079 and T114 remove the
 interim kit (Decisions this plan defers). From sitting M1 on julieta is
-the one path for new items; the count-verified entry of the store's
-open items is T119's (item 19 of Decisions of the re-plan, decided on
-2026-10-12).
+the one path for new items, and the count-verified entry of the store's
+open items is this task's (item 19 of Decisions of the re-plan, amended
+on 2026-10-13); T119 reads at sitting M5 that no item is left in the
+store.
 
 - Implements: REQ-0659 (08 8.1), REQ-0673 (08 8.2).
 - Operator: applies the three edits and the host build, two projects
-  first, then every project; then one week of daily use. Rebuilds the
+  first, then every project; runs the one-off entry of the open items
+  per project, then again at the end of the sitting; then one week of
+  daily use. Rebuilds the
   shared bin directory at each sitting and whenever a daily sandbox
   needs a merged fix, with a cross-build of `main` on the host (`go
   build` for linux, or T103's `--dry-run` build once it lands), its
@@ -77,9 +86,15 @@ open items is T119's (item 19 of Decisions of the re-plan, decided on
   - With the bin mount absent, each wrapper prints its warning line and
     exits 0.
   - The runbook holds the undo of each step.
+  - One list per project, each open item of the store with its
+    destination: a memory entry id, or closed.
+  - The entry command skips an item whose source id is present and
+    prints the counts on both sides; both counts, from the first run and
+    the end-of-sitting run, are in the runbook.
 - Verify: in each daily sandbox, read at sitting M1: `julieta status
   --json` exits 0 and lists the manifest's repositories; `julieta
   handoff show --hook` prints the built-in memory line of 08 8.1 at
   least; the test push's hook output names both hooks; `julieta version
   --json` in each daily sandbox names the SHA the runbook's last rebuild
-  line names.
+  line names; `julieta memory list` in each project's sandbox shows the
+  entries the open-items list names.

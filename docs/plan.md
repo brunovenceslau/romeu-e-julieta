@@ -376,11 +376,11 @@ covers a command for them).
 | M | Name | Ends when (observable, on `main` and on the host) | Delivers |
 |---|---|---|---|
 | M0 | Shape the work | the kit-frontend go/no-go read (T113); `tools/ci all` green with checks registered by file; the requirement ids in the specification and `tools/ci reqs` green; the plan as task files, checked by `tools/ci plan`; one source for the ask-first list; the re-plan record Accepted; `internal/procgroup` and the hook settings merged (T137, T138) | the shape that lets M1 to M4 run in parallel |
-| M1 | julieta in daily use | sitting M1: every daily sandbox runs `julieta memory`, `handoff show --hook` at SessionStart, `hooks run` on every commit and `snapshot` after it, from a read-only bin mount and a hand-written manifest; the names gate of the config repository runs through the dispatcher on every push (T112) | memory, handoff, hooks and snapshots in every sandbox the maintainer works in; julieta as the one path for new items; the store's items move at T119 |
+| M1 | julieta in daily use | sitting M1: every daily sandbox runs `julieta memory`, `handoff show --hook` at SessionStart, `hooks run` on every commit and `snapshot` after it, from a read-only bin mount and a hand-written manifest; the names gate of the config repository runs through the dispatcher on every push (T112) | memory, handoff, hooks and snapshots in every sandbox the maintainer works in; julieta as the one path for new items; the store's open items entered into `julieta memory`, counted on both sides (T111) |
 | M2 | Kits in daily use | sitting M2: recreate wave 1, one project per slot, each sandbox built from the `julieta`, `julieta-claude` and `git-ssh-sign` product kits plus one personal kit from the config repository | every daily sandbox built from the product kits plus one personal kit; mise per repository through `julieta install` and `lock`; commits signed with the one key of `git-ssh-sign` |
 | M3 | romeu renders and runs | sitting M3: J1 for real on the config project from a `--dry-run` build of `main` (`init`, `doctor`, `approve --toolchain`, `sync`, `run`), then one project per slot until every project definition is rendered by `romeu sync` | every project definition rendered under gate 2, its egress derived and its secrets bound in host settings, the kit pins in one file, and `romeu run` as the one way into a sandbox |
 | M4 | Nothing lost | sitting M4: one `romeu recreate` rehearsal with a planted dirty worktree, stash and ignored file; J6 and J10 pass in CI with the fake sbx; on the host, the rehearsal's `romeu recreate` transcript and salvage listing, read by the maintainer, are the Evidence | recreate, rm and retire with a complete salvage; `romeu pull` and `romeu handoff` |
-| M5 | Every project on romeu | sitting M5: one month of daily use after the last slot of sitting M3 with no hand-applied step and no open runbook section; every open item of a project is a `julieta memory` entry or closed (T119). M5 is a wait, not a gate: the release and docs tasks of M6 whose trigger fired at the last slot of sitting M3 run during it, and blocks O3 to O7 wait for the end of M5 only where they need a sitting | the product as the one path, with memory as the one place for open items |
+| M5 | Every project on romeu | sitting M5: one month of daily use after the last slot of sitting M3 with no hand-applied step and no open runbook section; every open item of a project is still a `julieta memory` entry or closed, with no item left in the store since the cut-over of sitting M1 (T111, read again by T119). M5 is a wait, not a gate: the release and docs tasks of M6 whose trigger fired at the last slot of sitting M3 run during it, and blocks O3 to O7 wait for the end of M5 only where they need a sitting | the product as the one path, with memory as the one place for open items |
 | M6 | Public v1 | the release checklist of 12 12.2 completes: blocks A and B on both hosts, `v1.0.0`, `docs/acceptance.json` | the v1.0.0 release with its evidence |
 
 **The sittings.** A sitting is named by its milestone: sitting Mn ends
@@ -400,11 +400,13 @@ Evidence.
   that row's trigger; and it runs the kit-frontend go/no-go (T113),
   once T012 merged (about 40 minutes on one host; one approval).
 - **Sitting M1** (ends M1): the bridge (T111) on two projects first,
-  then every project; one week of daily use; the names gate verified
-  from a sandbox again (T111). Output: `julieta status` and
-  `handoff show --hook`, read in each sandbox (3 definition edits per
-  project, counted from T111, plus one host build; one approval per
-  wave).
+  then every project; the open-items cut-over, the one-off entry of
+  the store's items run twice per project (T111); one week of daily
+  use; the names gate verified from a sandbox again (T111). Output:
+  `julieta status` and `handoff show --hook`, read in each sandbox,
+  and the entry's counts in the runbook (3 definition edits per
+  project and the entry run twice, counted from T111, plus one host
+  build; one approval per wave).
 - **Sitting M2** (ends M2): recreate wave 1 (T115), after T114; the
   kit-frontend go/no-go (T113) ran at sitting M0, once T012 merged; on
   a no-go, M2 stops with a decision record that names the option taken
@@ -419,8 +421,8 @@ Evidence.
   the three planted cases, `romeu recreate` and the read of its
   listing, counted from T117; one approval).
 - **Sitting M5** (ends M5): T119, the closing read (per project: the
-  open-items entry run twice and the read, counted from T119; one
-  approval).
+  read that no open item is left in the store since sitting M1,
+  counted from T119; one approval).
 - **M6 has two sittings**, the earlier blocks O3 and O5 to O7, under
   [Operator blocks](#operator-blocks).
 
@@ -806,11 +808,11 @@ per phase" fired and is gone.
 
 ## Accepted risks
 
-The plan's single accepted-risk list. The rows that link a row of 05
-5.4 were accepted on 2026-10-12 with the rows they link (item 22 of
-[Decisions of the re-plan](#decisions-of-the-re-plan)); the other rows
-are the plan's own, proposed on 2026-10-12. Each row has the window it
-covers, why it is accepted and what reopens it.
+The plan's single accepted-risk list. Every row is accepted (item 22
+of [Decisions of the re-plan](#decisions-of-the-re-plan)): the rows
+that link a row of 05 5.4 were accepted on 2026-10-12 with the rows
+they link, and the plan's own rows on 2026-10-13. Each row has the
+window it covers, why it is accepted and what reopens it.
 
 | Risk | Window | Why accepted | Reopened by |
 |---|---|---|---|
@@ -829,9 +831,10 @@ The block the re-plan opened on 2026-10-12, with its answers, each
 taken as recommended. Items 1 to 7, 12 to 15 and 17 to 19 were decided
 on 2026-10-12; items 16 and 20 are deferred decisions, each with the
 sitting that decides it and nothing decided now; items 21 to 26 record
-the other decisions of that day. Items 8 to 11 stay open: each is
-needed before the task or sitting it names, and its answer is recorded
-here as "decided on" with the date. T108's decision record records
+the other decisions of that day. Items 19 and 22 were amended on
+2026-10-13, each as the stage-B review recommended. Items 8 to 11 stay
+open: each is needed before the task or sitting it names, and its
+answer is recorded here as "decided on" with the date. T108's decision record records
 these answers again with the rules they decide.
 
 1. **Registration by file** in place of generated dispatcher tables
@@ -931,10 +934,14 @@ these answers again with the rules they decide.
     repository as a secondary clone of every project (02 2.6), its
     plain list cloned into every sandbox.
 19. **The open-items cut-over.** Decided on 2026-10-12: at T119 (M5).
-    The one-off, count-verified entry of the store's items runs at
-    sitting M5, after the store's last writer has left the definitions;
-    from sitting M1 julieta is the one path for new items. The
-    alternative not taken: the cut-over at T111 (M1).
+    Amended on 2026-10-13: at T111 (M1), as the stage-B review
+    recommended, because a second store left open until M5 would hold
+    items the count never sees. The one-off, count-verified entry of
+    the store's items runs at sitting M1, and again at its end, after
+    the store's last writer has left the definitions; from sitting M1
+    julieta is the one path for new items, and T119 reads at sitting M5
+    that no item is left in the store. The alternative not taken: the
+    cut-over at T119 (M5).
 20. **The render types slice.** A deferred decision: it is decided at
     sitting M2, the sitting that opens M3, from the measured lane, and
     nothing is decided now. The options: a slice, with the next free
@@ -950,7 +957,11 @@ these answers again with the rules they decide.
     `tools/ci pr`, on `tools/ci sequences` and on `tools/ci invariants`
     with `mutate`, the row "I34 is enforced by no code", and the
     approval-line row amended for the grants) are accepted, with the rows of
-    [Accepted risks](#accepted-risks) that link them.
+    [Accepted risks](#accepted-risks) that link them. Amended on
+    2026-10-13: every row of [Accepted risks](#accepted-risks) is
+    accepted, the plan's own rows as well as the rows that link 05 5.4.
+    The alternative not taken: only the rows that link 05 5.4, with the
+    plan's own rows left proposed.
 23. **The records that name their approver.** Decided on 2026-10-12:
     the records written before 2026-10-08 that name their approver are
     not edited.
