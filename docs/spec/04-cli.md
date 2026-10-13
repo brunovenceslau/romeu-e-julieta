@@ -159,10 +159,10 @@ Both binaries install one handler, from `internal/procgroup`, in
    group running (decided on 2026-10-13). What the handler does not
    cover, and where every group it would kill keeps running: a SIGKILL
    to the process, which no handler sees; a SIGHUP or a SIGQUIT, which
-   it does not take, so the process ends by the signal's default
-   action, after the Go runtime's goroutine dump for SIGQUIT, while the
-   race step of `tools/ci`, for example, runs on with no parent left
-   to enforce its 40 minutes; and a panic, a fatal error or an
+   it does not take: a SIGHUP ends the process by its default action, a
+   SIGQUIT by the Go runtime's goroutine dump and exit status 2, while
+   the race step of `tools/ci`, for example, runs on with no parent
+   left to enforce its 40 minutes; and a panic, a fatal error or an
    `os.Exit` from another goroutine. A grandchild that calls `setsid`
    leaves its group, and the group kill does not reach it. A
    subprocess whose context does not derive from the one the handler

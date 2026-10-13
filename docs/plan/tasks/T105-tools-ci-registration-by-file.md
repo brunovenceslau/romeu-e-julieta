@@ -49,13 +49,14 @@ two repository tests over the specification's names are T140, both
 `after` this task, so this pull request is one frozen-behaviour move.
 
 - Implements: REQ-0006 (index), REQ-0021 (index), REQ-0037 (00 0.4),
-  REQ-0040 (01 1.1), REQ-0121 (02 2.1), REQ-0473 (05 5.2), REQ-0770 (10
-  10.1), REQ-0821 (10 10.2), REQ-0855 (10 10.2), REQ-0877 (10 10.2),
-  REQ-0880 (10 10.2), REQ-1040 (12 12.1), REQ-1051 (12 12.1), REQ-1052
-  (12 12.1), REQ-1080 (12 12.2), REQ-1081 (12 12.2), REQ-1101 (12 12.2),
-  REQ-1104 (12 12.3), REQ-1105 (12 12.3), REQ-1108 (12 12.3), REQ-1113
-  (12 12.3), REQ-1117 (12 12.3), REQ-1184 (12 12.8), REQ-1187 (12 12.8),
-  REQ-1188 (12 12.8), REQ-1229 (10 10.6).
+  REQ-0040 (01 1.1), REQ-0121 (02 2.1), REQ-0307 (04 4.1), REQ-0473 (05
+  5.2), REQ-0770 (10 10.1), REQ-0821 (10 10.2), REQ-0855 (10 10.2),
+  REQ-0877 (10 10.2), REQ-0880 (10 10.2), REQ-1040 (12 12.1), REQ-1051
+  (12 12.1), REQ-1052 (12 12.1), REQ-1080 (12 12.2), REQ-1081 (12 12.2),
+  REQ-1101 (12 12.2), REQ-1104 (12 12.3), REQ-1105 (12 12.3), REQ-1108
+  (12 12.3), REQ-1113 (12 12.3), REQ-1117 (12 12.3), REQ-1184 (12 12.8),
+  REQ-1187 (12 12.8), REQ-1188 (12 12.8), REQ-1229 (10 10.6), REQ-1234
+  (04 4.1).
 - Operator: no
 - Acceptance:
   - The step lists of `fast` and `all` taken before the move equal the

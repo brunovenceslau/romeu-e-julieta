@@ -63,9 +63,9 @@ Re-plan (2026-10-12): Kept as written before the re-plan.
     moves into `tools/ci callsites` beside the I16 scan (REQ-0481),
     with its positive control and its seam rule, and the test file is
     removed; its admitted list is `internal/procgroup` alone, as T105
-    leaves it. The file that holds the admitted list in its new home
-    (for example `tools/ci/internal/callsites/admitted.go`) joins the
-    globs of the `procgroup` surface, in `.github/ask-first.yaml` and
+    leaves it. The whole of `tools/ci/internal/callsites/**`, which
+    then holds the admitted list and the guarded lists of the scan,
+    joins the globs of the `procgroup` surface, in `.github/ask-first.yaml` and
     in the list of 05 5.3 alike, with `.github/CODEOWNERS` and
     `docs/reference/ask-first.md` regenerated, the way T107 puts
     `tools/ci/internal/askfirst/**` on `approvals` (decided on
