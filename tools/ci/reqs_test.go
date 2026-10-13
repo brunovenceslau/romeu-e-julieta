@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,7 +56,8 @@ func TestReqsRules(t *testing.T) {
 	tests := []struct {
 		name   string
 		change func(r *gittest.Repo)
-		want   []string
+		want   []string // every finding, one entry per line of the output
+		absent []string
 	}{
 		{
 			name:   "a placeholder left in a page",
@@ -63,9 +65,15 @@ func TestReqsRules(t *testing.T) {
 			want:   []string{"docs/spec/01-model.md:3: reqs: a placeholder is left; run \"go run ./tools/ci reqs allocate\""},
 		},
 		{
-			name:   "a token after the prefix that is neither four digits nor new",
-			change: func(r *gittest.Repo) { r.Write("docs/spec/01-model.md", "# 01\n\n`REQ-12` Five; `REQ-abcd` six.\n") },
-			want:   []string{"docs/spec/01-model.md:3: reqs: the token after REQ- is neither four digits nor new"},
+			name: "a token after the prefix that is neither four digits nor new",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/spec/01-model.md", "# 01\n\n`REQ-12` Five; `REQ-abcd` six.\n`REQ-10000` Seven.\n")
+			},
+			want: []string{
+				"docs/spec/01-model.md:3: reqs: the token after REQ- is neither four digits nor new",
+				"docs/spec/01-model.md:3: reqs: the token after REQ- is neither four digits nor new",
+				"docs/spec/01-model.md:4: reqs: the token after REQ- is neither four digits nor new",
+			},
 		},
 		{
 			name:   "an id that appears twice",
@@ -109,7 +117,11 @@ func TestReqsRules(t *testing.T) {
 			change: func(r *gittest.Repo) {
 				r.Write("docs/spec/00-scope.md", "# 00\n\n## 0.1 Objective\n\n`REQ-0003` Three.\n\n## 0.5 Scope\n\n| Feature | Needed by |\n|---|---|\n| `REQ-0005` a | S1 |\n\n## 0.6 Next\n\n`REQ-0006` Text.\n")
 			},
-			want: []string{"docs/spec/00-scope.md:11: reqs: REQ-0005 sits in a page or section that carries no id (12 12.11)"},
+			want: []string{
+				"docs/spec/00-scope.md:11: reqs: REQ-0005 sits in a page or section that carries no id (12 12.11)",
+				"docs/spec.md: reqs: REQ-0005 is neither live nor retired",
+			},
+			absent: []string{"docs/spec/00-scope.md:15:"},
 		},
 		{
 			name:   "an id in a decision record",
@@ -132,6 +144,26 @@ func TestReqsRules(t *testing.T) {
 				r.Write("docs/spec/01-model.md", "# 01\n\n```\ntree/   `REQ-0005` a file\n```\n")
 			},
 			want: []string{"docs/spec/01-model.md:4: reqs: REQ-0005 sits inside a fenced block (12 12.11)"},
+		},
+		{
+			name: "an id inside a tilde fence or a fence indented by three spaces",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/spec/01-model.md", "# 01\n\n~~~\n`REQ-0005` a\n~~~\n\n   ```\n`REQ-0006` b\n   ```\n")
+			},
+			want: []string{
+				"docs/spec/01-model.md:4: reqs: REQ-0005 sits inside a fenced block (12 12.11)",
+				"docs/spec/01-model.md:8: reqs: REQ-0006 sits inside a fenced block (12 12.11)",
+			},
+		},
+		{
+			name: "only a run of the opener's character as long as the opener closes a fence",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/spec/01-model.md", "# 01\n\n````\n```\n`REQ-0005` a\n```\n````\n\n~~~\n```\n`REQ-0006` b\n~~~\n")
+			},
+			want: []string{
+				"docs/spec/01-model.md:5: reqs: REQ-0005 sits inside a fenced block (12 12.11)",
+				"docs/spec/01-model.md:11: reqs: REQ-0006 sits inside a fenced block (12 12.11)",
+			},
 		},
 		{
 			name: "an id in a table header",
@@ -167,6 +199,22 @@ func TestReqsRules(t *testing.T) {
 			},
 		},
 		{
+			name: "a retired id listed twice",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/spec/12-engineering.md", "# 12\n\n## 12.11 Requirement ids\n\n"+reqTable(
+					"| `REQ-0004` | 2026-10-12 | Four. | none |",
+					"| `REQ-0004` | 2026-10-13 | Four again. | none |"))
+			},
+			want: []string{"docs/spec/12-engineering.md:10: reqs: REQ-0004 is retired twice"},
+		},
+		{
+			name: "a retired row whose first cell lacks the prefix",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/spec/12-engineering.md", "# 12\n\n## 12.11 Requirement ids\n\n"+reqTable("| 0004 | 2026-10-12 | Four. | none |"))
+			},
+			want: []string{"docs/spec/12-engineering.md:9: reqs: a retired row's first cell is not an id"},
+		},
+		{
 			name: "an Implements entry whose id is retired or unknown",
 			change: func(r *gittest.Repo) {
 				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)", "REQ-0004 (12 12.11)", "REQ-0099 (none)"))
@@ -185,6 +233,13 @@ func TestReqsRules(t *testing.T) {
 				"docs/plan/tasks/T001-a.md:8: reqs: Implements cites REQ-00031, which is no id",
 				"docs/spec/00-scope.md:5: reqs: REQ-0003 is cited by no task",
 			},
+		},
+		{
+			name: "an id inside a longer token is no citation",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "XREQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)"))
+			},
+			want: []string{"docs/spec.md:3: reqs: REQ-0001 is cited by no task of fate kept, new, deferred, merged"},
 		},
 		{
 			name: "a reading aid that names another section",
@@ -206,10 +261,11 @@ func TestReqsRules(t *testing.T) {
 		{
 			name: "an id cited by more tasks than the cap",
 			change: func(r *gittest.Repo) {
-				for i, fate := range []string{"kept", "new", "merged", "kept", "kept", "new"} {
+				for i, fate := range []string{"kept", "new", "merged", "kept", "kept"} {
 					id := "T00" + string(rune('1'+i))
 					r.Write("docs/plan/tasks/"+id+"-a.md", reqTaskFile(id, fate, "REQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)"))
 				}
+				r.Write("docs/plan/tasks/T006-a.md", reqTaskFile("T006", "new", "REQ-0001 (index)"))
 			},
 			want: []string{"docs/spec.md:3: reqs: REQ-0001 is cited by 6 tasks, more than the 5 of 12 12.11; one obligation has few implementers"},
 		},
@@ -243,7 +299,10 @@ func TestReqsRules(t *testing.T) {
 			for _, w := range tt.want {
 				assert.Contains(t, out, w)
 			}
-			assert.NotContains(t, out, "reqs: ok")
+			for _, a := range tt.absent {
+				assert.NotContains(t, out, a)
+			}
+			assert.Contains(t, out, summary("reqs", len(tt.want)), "the findings are exactly the ones named")
 		})
 	}
 }
@@ -272,6 +331,52 @@ func TestReqsReads(t *testing.T) {
 		code, out := runCI(t, r, nil, nil, "reqs")
 		assert.Equal(t, exitOK, code, out)
 	})
+	t.Run("an unbalanced backtick does not leak past a blank line", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/01-model.md", "# 01\n\nAn odd ` tick.\n\n`REQ-0005` Five.\n")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+	})
+	t.Run("a heading inside a fence does not change the section", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/01-model.md", "# 01\n\n## 1.1 First\n\n```\n## 1.2 Fake\n```\n\n`REQ-0005` Five.\n")
+		r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)", "REQ-0005 (01 1.1)"))
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+	})
+	t.Run("a run of backticks with a backtick after it opens no fence", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/01-model.md", "# 01\n\n``` a ` b\n\n`REQ-0005` Five.\n")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+	})
+	t.Run("a long line of ids is read in time linear in its length", func(t *testing.T) {
+		// Ten MiB of text, then the ids: a count of the backticks from
+		// the line's start for each span scans the text once per id,
+		// about 1e12 bytes and over ten seconds; one pass scans it once
+		// and takes well under one, even under the race detector.
+		const n = 100_000
+		line := strings.Repeat("a", 10<<20) + strings.Repeat(" `REQ-0001` a", n)
+		start := time.Now()
+		marks := reqMarks(reqPage{path: "docs/spec/01-model.md", lines: []string{line}})
+		elapsed := time.Since(start)
+		require.Len(t, marks, n)
+		assert.Empty(t, marks[n-1].misplaced)
+		assert.Less(t, elapsed, 5*time.Second)
+	})
+	t.Run("a front matter outside the task directory, and a page that is not .md, are not read", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/plan/T009-a.md", reqTaskFile("T009", "kept", "REQ-0099 (none)"))
+		r.Write("docs/plan/tasks/sub/T010-a.md", reqTaskFile("T010", "kept", "REQ-0099 (none)"))
+		r.Write("docs/spec/05-x.mdx", "# 05\n\n`REQ-0001` Again; `REQ-new`.\n")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, "reqs: ok\n", out)
+	})
 	t.Run("a page that is a submodule entry is an error", func(t *testing.T) {
 		r := reqFixture(t)
 		require.NoError(t, os.Mkdir(filepath.Join(r.Dir, "docs", "spec", "01-model.md"), 0o755))
@@ -280,6 +385,25 @@ func TestReqsReads(t *testing.T) {
 		code, out := runCI(t, r, nil, nil, "reqs")
 		assert.Equal(t, exitError, code, out)
 		assert.Contains(t, out, "ci: read docs/spec/01-model.md: not a file")
+	})
+	t.Run("a task file that is a submodule entry is an error, its path quoted", func(t *testing.T) {
+		r := reqFixture(t)
+		require.NoError(t, os.MkdirAll(filepath.Join(r.Dir, "docs", "plan", "tasks", "T001\ta.md"), 0o755))
+		r.Git("update-index", "--add", "--cacheinfo", "160000,0123456789abcdef0123456789abcdef01234567,docs/plan/tasks/T001\ta.md")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitError, code, out)
+		assert.Contains(t, out, `ci: read "docs/plan/tasks/T001\ta.md": not a file`)
+	})
+	t.Run("a decision record that is a submodule entry is skipped", func(t *testing.T) {
+		r := reqFixture(t)
+		require.NoError(t, os.MkdirAll(filepath.Join(r.Dir, "docs", "adr", "0002-sub.md"), 0o755))
+		r.Git("update-index", "--add", "--cacheinfo", "160000,0123456789abcdef0123456789abcdef01234567,docs/adr/0002-sub.md")
+		r.Commit("fixture")
+		require.Contains(t, r.Git("ls-tree", "-r", "HEAD", "docs/adr"), "160000 commit", "the record is a submodule entry")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, "reqs: ok\n", out)
 	})
 }
 
@@ -340,6 +464,34 @@ func TestReqsCoverage(t *testing.T) {
 		code, out := runCI(t, r, nil, nil, "reqs")
 		assert.Equal(t, exitOK, code, out)
 	})
+	t.Run("an Implements entry without a reading aid is accepted", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001", "`REQ-0002`", "REQ-0003"))
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, "reqs: ok\n", out)
+	})
+	t.Run("an id cited by exactly the cap passes, and a deferred citer does not count", func(t *testing.T) {
+		r := reqFixture(t)
+		for i, fate := range []string{"kept", "new", "merged", "kept", "kept", "deferred"} {
+			id := "T00" + string(rune('1'+i))
+			r.Write("docs/plan/tasks/"+id+"-a.md", reqTaskFile(id, fate, "REQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)"))
+		}
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, "reqs: ok\n", out)
+	})
+	t.Run("a task file with CR LF line ends is read", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)"))
+		r.Write("docs/plan/tasks/T002-b.md", strings.ReplaceAll(reqTaskFile("T002", "new", "REQ-0003 (00 0.1)"), "\n", "\r\n"))
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, "reqs: ok\n", out)
+	})
 	t.Run("a shared id passes the cap", func(t *testing.T) {
 		live := map[string]reqMark{
 			"0001": {page: "docs/spec.md", line: 3, section: "index"},
@@ -394,7 +546,18 @@ func TestReqsAllocate(t *testing.T) {
 		assert.Equal(t, before, read(t, r, "docs/spec.md"))
 		after, err := os.Stat(filepath.Join(r.Dir, "docs", "spec.md"))
 		require.NoError(t, err)
-		assert.Equal(t, info.ModTime(), after.ModTime(), "no byte changed, so no write")
+		// A write renames a new file over the page, so a page that was
+		// written is another file; a time stamp could tie.
+		assert.True(t, os.SameFile(info, after), "no byte changed, so no write")
+	})
+	t.Run("allocate may take REQ-9999 itself", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/12-engineering.md", "# 12\n\n## 12.11 Requirement ids\n\n"+reqTable("| `REQ-9998` | 2026-10-12 | Next to last. | none |"))
+		r.Write("docs/spec/01-model.md", "# 01\n\n`REQ-new` The last.\n")
+		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
+		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, "docs/spec/01-model.md:3: REQ-9999\nreqs: 1 placeholder(s) numbered\n", out)
+		assert.Equal(t, "# 01\n\n`REQ-9999` The last.\n", read(t, r, "docs/spec/01-model.md"))
 	})
 	t.Run("a page with CR LF line ends keeps them", func(t *testing.T) {
 		r := reqFixture(t)

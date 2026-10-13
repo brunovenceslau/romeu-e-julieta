@@ -57,6 +57,9 @@ var (
 	reqCite = regexp.MustCompile("(?:^|[^0-9A-Za-z-])" + reqPrefix + "([0-9]{4})([0-9]*)`?(?:\\s*\\(([^()]*(?:\\([^()]*\\))?[^()]*)\\))?")
 	// reqChapter is the name of a chapter file.
 	reqChapter = regexp.MustCompile(`^[0-9]{2}-[^/]+\.md$`)
+	// reqFence is a line that may open or close a fenced block: up to
+	// three spaces, the run of backticks or tildes, and the rest.
+	reqFence = regexp.MustCompile("^ {0,3}(`{3,}|~{3,})(.*)$")
 	// reqSection is a numbered section heading of a chapter.
 	reqSection = regexp.MustCompile(`^## ([0-9]+\.[0-9]+)\b`)
 	// reqListMarker is the marker of a list item, which an id must
@@ -191,7 +194,7 @@ func reqPagesIn(files []treeFile) ([]reqPage, error) {
 			continue
 		}
 		if f.mode == "160000" {
-			return nil, fmt.Errorf("read %s: not a file", f.path)
+			return nil, fmt.Errorf("read %s: not a file", git.Printable(f.path))
 		}
 		pages = append(pages, reqPageOf(f.path, f.content))
 	}
@@ -231,36 +234,70 @@ func reqPageOf(p string, content []byte) reqPage {
 
 // reqMarks returns every id, placeholder or malformed token of a page,
 // in order, each with the section it sits in and, where its place
-// breaks the placement rule of 12 12.11, why.
+// breaks the placement rule of 12 12.11, why. It reads a page in one
+// pass whose work grows with the page's length: the backticks before a
+// code span are counted from the span before it, never from the line's
+// start.
 func reqMarks(p reqPage) []reqMark {
 	var marks []reqMark
-	fenced := false
-	ticks := 0 // the parity of the backticks since the last blank line: a code span may wrap a line, never a paragraph
+	fence := "" // the run that opened the fenced block the line is in, or "" outside one
+	ticks := 0  // the parity of the backticks since the last blank line: a code span may wrap a line, never a paragraph
 	section := reqOpeningAid
 	for i, line := range p.lines {
-		if strings.HasPrefix(line, "```") {
-			fenced = !fenced
+		if next, ok := reqFenceStep(fence, line); ok {
+			fence, ticks = next, 0
 			continue
 		}
+		fenced := fence != ""
 		if line == "" {
 			ticks = 0
 		}
 		if m := reqSection.FindStringSubmatch(line); m != nil && !fenced {
 			section = m[1]
 		}
+		header := strings.HasPrefix(line, "|") && i+1 < len(p.lines) && reqDelimiterRow.MatchString(p.lines[i+1])
+		before, from := ticks, 0 // the backticks of the paragraph before the span at hand
 		for _, loc := range reqSpan.FindAllStringSubmatchIndex(line, -1) {
+			before += strings.Count(line[from:loc[0]], "`")
+			from = loc[0]
 			marks = append(marks, reqMark{
 				page:      p.path,
 				line:      i + 1,
 				col:       loc[0],
 				body:      line[loc[2]:loc[3]],
 				section:   reqAid(p.path, section),
-				misplaced: reqMisplaced(p.lines, i, loc[0], loc[1], fenced, (ticks+strings.Count(line[:loc[0]], "`"))%2 == 1),
+				misplaced: reqMisplaced(line, loc[0], loc[1], reqPlace{fenced: fenced, inSpan: before%2 == 1, header: header}),
 			})
 		}
 		ticks = (ticks + strings.Count(line, "`")) % 2
 	}
 	return marks
+}
+
+// reqFenceStep reads line as a fence of CommonMark: up to three spaces,
+// then a run of three or more backticks or of three or more tildes.
+// Outside a fenced block (fence is ""), such a run opens one, unless it
+// is of backticks and a backtick follows it on the line; inside one, a
+// run of the opener's character at least as long as the opener, with
+// nothing but blanks after it, closes it. It returns the fence after
+// the line and true when the line opens or closes a block, and false
+// for any other line, a line inside a block included.
+func reqFenceStep(fence, line string) (string, bool) {
+	m := reqFence.FindStringSubmatch(line)
+	if m == nil {
+		return fence, false
+	}
+	run, rest := m[1], m[2]
+	if fence == "" {
+		if run[0] == '`' && strings.Contains(rest, "`") {
+			return fence, false
+		}
+		return run, true
+	}
+	if run[0] == fence[0] && len(run) >= len(fence) && strings.TrimSpace(rest) == "" {
+		return "", true
+	}
+	return fence, false
 }
 
 // reqAid is the reading aid of a section of a page, as the plan writes
@@ -273,21 +310,27 @@ func reqAid(p, section string) string {
 	return path.Base(p)[:2] + " " + section
 }
 
+// reqPlace is what the caller of reqMisplaced knows of a line: whether
+// it sits in a fenced block, whether the code span at hand opens inside
+// another one (counted across the lines of a paragraph), and whether
+// the line is a table's header row.
+type reqPlace struct {
+	fenced, inSpan, header bool
+}
+
 // reqMisplaced applies the placement rule of 12 12.11 to the code span
-// at [start, end) of line i: an id is the first token of the text it
+// at [start, end) of line: an id is the first token of the text it
 // governs, so it follows the marker of a list item, never precedes it,
-// and sits in no fenced block, no other code span (inSpan, which the
-// caller counts across the lines of a paragraph) and no table header.
-func reqMisplaced(lines []string, i, start, end int, fenced, inSpan bool) string {
-	line := lines[i]
+// and sits in no fenced block, no other code span and no table header.
+func reqMisplaced(line string, start, end int, at reqPlace) string {
 	switch {
-	case fenced:
+	case at.fenced:
 		return "sits inside a fenced block"
-	case inSpan:
+	case at.inSpan:
 		return "sits inside another code span"
 	case strings.TrimSpace(line[:start]) == "" && reqListMarker.MatchString(line[end:]):
 		return "precedes the marker of a list item"
-	case strings.HasPrefix(line, "|") && i+1 < len(lines) && reqDelimiterRow.MatchString(lines[i+1]):
+	case at.header:
 		return "sits in a table header row"
 	}
 	return ""
@@ -503,7 +546,7 @@ func reqTasksIn(files []treeFile) ([]reqTask, []finding, error) {
 			continue
 		}
 		if f.mode == "160000" {
-			return nil, nil, fmt.Errorf("read %s: not a file", f.path)
+			return nil, nil, fmt.Errorf("read %s: not a file", git.Printable(f.path))
 		}
 		t, ok := reqParseTask(f.path, reqPageOf(f.path, f.content).lines)
 		if !ok {
@@ -669,7 +712,7 @@ func reqsAllocate(ctx context.Context, e env) (bool, error) {
 	for _, m := range placeholders {
 		next++
 		if next > reqLast {
-			return false, fmt.Errorf("%s: the next id would pass %s%d; nothing was written", m.where(), reqPrefix, reqLast)
+			return false, fmt.Errorf("%s: the next id would pass %s%d; nothing was written", git.Printable(m.where()), reqPrefix, reqLast)
 		}
 		if m.page != last.page || m.line != last.line {
 			shift = 0
@@ -734,7 +777,7 @@ func reqPagesAt(root *os.Root) ([]reqPage, error) {
 			return nil, err
 		}
 		if !info.Mode().IsRegular() {
-			return nil, fmt.Errorf("read %s: not a regular file", p)
+			return nil, fmt.Errorf("read %s: not a regular file", git.Printable(p))
 		}
 		content, err := root.ReadFile(p)
 		if err != nil {
