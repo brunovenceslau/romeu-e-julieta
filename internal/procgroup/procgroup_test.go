@@ -9,10 +9,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -99,6 +101,21 @@ func TestRun(t *testing.T) {
 		err := Run(t.Context(), Command{Class: JulietaGit, Argv: []string{"/bin/sh", "-c", "echo out"}, Env: shellEnv, Stdout: failingWriter{}})
 		require.ErrorIs(t, err, errWriter)
 	})
+	t.Run("a writer that fails stops the command well inside its limit", func(t *testing.T) {
+		// More than a pipe holds: with the copy stopped and its end open,
+		// the command would block until its timeout.
+		const limit = 10 * time.Second
+		ctx := WithTestTimeout(t.Context(), SbxRead, limit)
+		start := time.Now()
+		err := Run(ctx, Command{Class: SbxRead, Argv: []string{"/bin/sh", "-c", "head -c 1000000 /dev/zero"}, Env: shellEnv, Stdout: failingWriter{}})
+		require.Error(t, err)
+		assert.Less(t, time.Since(start), limit/2)
+		var timeout *TimeoutError
+		assert.NotErrorAs(t, err, &timeout)
+		var exit *ExitError
+		isExit := errors.As(err, &exit)
+		assert.True(t, errors.Is(err, errWriter) || isExit && (exit.Signal == syscall.SIGPIPE || exit.Code != 0), "the writer's error or the command's broken pipe: %v", err)
+	})
 	t.Run("a failed command is an ExitError with its status", func(t *testing.T) {
 		err := Run(t.Context(), Command{Class: JulietaGit, Argv: []string{"/bin/sh", "-c", "exit 3"}, Env: shellEnv})
 		var exit *ExitError
@@ -128,6 +145,12 @@ func TestRun(t *testing.T) {
 	})
 	t.Run("a relative path that is not there in Dir is ErrNotFound", func(t *testing.T) {
 		err := Run(t.Context(), Command{Class: JulietaGit, Argv: []string{"./missing"}, Dir: t.TempDir()})
+		require.ErrorIs(t, err, ErrNotFound)
+	})
+	t.Run("a relative path is looked up in Dir, not in this process's directory", func(t *testing.T) {
+		// procgroup.go is in this process's directory, not in Dir.
+		require.FileExists(t, "procgroup.go")
+		err := Run(t.Context(), Command{Class: JulietaGit, Argv: []string{"./procgroup.go"}, Dir: t.TempDir()})
 		require.ErrorIs(t, err, ErrNotFound)
 	})
 	t.Run("a working directory that is not there is not ErrNotFound", func(t *testing.T) {
@@ -173,6 +196,28 @@ func TestRunKillsTheGroup(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 		assert.Less(t, time.Since(start), WaitDelay, "the group died with the pipe, so no drain was waited out")
 		assertGone(t, pid)
+	})
+	t.Run("a cancellation with a stdin that never ends kills the grandchild within 1s", func(t *testing.T) {
+		pidfile := filepath.Join(t.TempDir(), "pid")
+		killAtEnd(t, pidfile)
+		stdin, release := io.Pipe()
+		t.Cleanup(func() { require.NoError(t, release.Close()) })
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		errc := make(chan error, 1)
+		go func() {
+			errc <- Run(ctx, Command{Class: Unbounded, Argv: []string{"/bin/sh", "-c", grandchildScript, pidfile}, Env: shellEnv, Stdin: stdin})
+		}()
+		pid := waitForPid(t, pidfile)
+		start := time.Now()
+		cancel()
+		select {
+		case err := <-errc:
+			require.ErrorIs(t, err, context.Canceled)
+		case <-time.After(time.Second):
+			require.FailNow(t, "Run waited on the stdin that never ends")
+		}
+		assert.Eventually(t, func() bool { return gone(pid) }, time.Second-time.Since(start), 5*time.Millisecond, "the grandchild %d is dead within 1s", pid)
 	})
 	t.Run("a grandchild holding the pipe is dead after the step returns", func(t *testing.T) {
 		// os/exec kills the group only while the leader runs, so a leader
@@ -350,4 +395,45 @@ func TestInterrupt(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 		assert.NoFileExists(t, marker)
 	})
+}
+
+// openFiles returns how many files this process has open.
+func openFiles(t *testing.T) int {
+	t.Helper()
+	entries, err := os.ReadDir("/dev/fd")
+	require.NoError(t, err)
+	return len(entries)
+}
+
+// settles reports whether cond holds within 2s. It polls from the
+// calling goroutine, since assert.Eventually runs cond on a goroutine of
+// its own, which a count of goroutines would see.
+func settles(cond func() bool) bool {
+	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
+		if cond() {
+			return true
+		}
+	}
+	return cond()
+}
+
+// TestRunLeavesNothingBehind checks that Run, whether the command
+// succeeds, fails or does not start, leaves no copy goroutine and no
+// open file behind once its streams are done.
+func TestRunLeavesNothingBehind(t *testing.T) {
+	commands := map[string]Command{
+		"a command that succeeds":   {Class: JulietaGit, Argv: []string{"/bin/sh", "-c", "cat; echo err >&2"}, Env: shellEnv},
+		"a command that fails":      {Class: JulietaGit, Argv: []string{"/bin/sh", "-c", "exit 3"}, Env: shellEnv},
+		"a command that never runs": {Class: JulietaGit, Argv: []string{"procgroup-test-no-such-command"}},
+	}
+	for name, c := range commands {
+		t.Run(name, func(t *testing.T) {
+			goroutines, files := runtime.NumGoroutine(), openFiles(t)
+			var stdout, stderr bytes.Buffer
+			c.Stdin, c.Stdout, c.Stderr = strings.NewReader("in\n"), &stdout, &stderr
+			_ = Run(t.Context(), c)
+			assert.True(t, settles(func() bool { return runtime.NumGoroutine() <= goroutines }), "no goroutine left")
+			assert.True(t, settles(func() bool { return openFiles(t) <= files }), "no file left open")
+		})
+	}
 }

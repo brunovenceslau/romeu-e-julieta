@@ -32,23 +32,40 @@ import (
 const thisPackage = "internal/procgroup"
 
 // admittedTools are the directories, below the module root, whose files
-// may still import os/exec and os/signal: tools/ci and tools/mutants,
+// may still import os/exec and os/signal (toolImports): tools/ci and
+// tools/mutants,
 // whose own copy of the group rule and signal handler lives in
 // tools/ci/procgroup and their mains until T105 switches them to this
 // package and removes these two entries.
 var admittedTools = []string{"tools/ci", "tools/mutants"}
 
 // guardedImports are the packages whose import outside this package
-// starts a subprocess or maps a signal around it.
-var guardedImports = []string{"os/exec", "os/signal"}
+// starts a subprocess or maps a signal around it: os/exec and its
+// wrapper execabs, net/http/cgi, which runs a CGI program, plugin,
+// which loads code the scan cannot read, and os/signal.
+var guardedImports = []string{"os/exec", "golang.org/x/sys/execabs", "net/http/cgi", "plugin", "os/signal"}
+
+// toolImports are the guarded imports the admitted tools may still use.
+var toolImports = []string{"os/exec", "os/signal"}
 
 // startCalls are the functions, by package path, that start or replace
 // a process without os/exec; no file outside this package calls them.
 var startCalls = map[string][]string{
 	"os":                    {"StartProcess"},
 	"syscall":               {"Exec", "ForkExec", "StartProcess"},
-	"golang.org/x/sys/unix": {"Exec"},
+	"golang.org/x/sys/unix": {"Exec", "ForkExec"},
 }
+
+// rawCalls are the raw system calls, by package path, whose trap the
+// scan reads: one named by a constant of startTraps starts a process,
+// and one the scan cannot name, a number or a variable, may.
+var rawCalls = map[string][]string{
+	"syscall":               {"Syscall", "Syscall6", "RawSyscall", "RawSyscall6"},
+	"golang.org/x/sys/unix": {"Syscall", "Syscall6", "RawSyscall", "RawSyscall6", "RawSyscallNoError", "SyscallNoError"},
+}
+
+// startTraps are the system calls that start or replace a process.
+var startTraps = []string{"SYS_EXECVE", "SYS_EXECVEAT", "SYS_FORK", "SYS_VFORK", "SYS_CLONE", "SYS_CLONE3", "SYS_POSIX_SPAWN", "SYS_POSIX_SPAWNP"}
 
 // TestCallSites is the call-site scan of 04 4.1, Subprocesses, item 4,
 // over this module: every subprocess starts here and nothing else maps
@@ -165,6 +182,43 @@ import "os/exec"
 
 func Start() error { return exec.Command("gh").Start() }
 `,
+	"internal/fixture/imports.go": `package fixture
+
+import (
+	_ "golang.org/x/sys/execabs"
+	_ "net/http/cgi"
+	_ "plugin"
+)
+`,
+	"internal/fixture/raw.go": `package fixture
+
+import (
+	"syscall"
+
+	"golang.org/x/sys/unix"
+)
+
+func Raw(trap uintptr) {
+	_, _, _ = syscall.Syscall(syscall.SYS_EXECVE, 0, 0, 0)
+	_, _, _ = syscall.RawSyscall6(59, 0, 0, 0, 0, 0, 0)
+	_, _, _ = unix.Syscall(unix.SYS_CLONE3, 0, 0, 0)
+	_, _, _ = unix.RawSyscall(trap, 0, 0, 0)
+	_, _, _ = syscall.Syscall(syscall.SYS_IOCTL, 0, 0, 0)
+	_ = unix.ForkExec
+	f := syscall.Syscall6
+	_ = f
+}
+`,
+	"tools/cix/x.go": `package cix
+
+import "os/exec"
+
+func Start() error { return exec.Command("gh").Start() }
+`,
+	"tools/ci/http.go": `package ci
+
+import _ "net/http/cgi"
+`,
 	"internal/procgroupx/x.go": `package procgroupx
 
 import "os/exec"
@@ -209,7 +263,16 @@ func TestCallSiteFindings(t *testing.T) {
 		"internal/fixture/cgo.go: imports C, whose calls start programs past this package",
 		"internal/fixture/dot.go: dot-imports example.com/fixture/internal/procgroup, which hides its calls from this scan",
 		"internal/fixture/exec.go: imports os/exec outside internal/procgroup",
+		"internal/fixture/imports.go: imports golang.org/x/sys/execabs outside internal/procgroup",
+		"internal/fixture/imports.go: imports net/http/cgi outside internal/procgroup",
+		"internal/fixture/imports.go: imports plugin outside internal/procgroup",
 		"internal/fixture/linkname.go: has a go:linkname directive, which reaches past this package",
+		"internal/fixture/raw.go: calls golang.org/x/sys/unix.ForkExec outside internal/procgroup",
+		"internal/fixture/raw.go: calls golang.org/x/sys/unix.RawSyscall with a trap the scan cannot name",
+		"internal/fixture/raw.go: calls golang.org/x/sys/unix.Syscall with SYS_CLONE3",
+		"internal/fixture/raw.go: calls syscall.RawSyscall6 with a trap the scan cannot name",
+		"internal/fixture/raw.go: calls syscall.Syscall with SYS_EXECVE",
+		"internal/fixture/raw.go: takes syscall.Syscall6 as a value, which hides its trap",
 		"internal/fixture/seam.go: sets procgroup.WithTestTimeout outside a test file",
 		"internal/fixture/seam_test.go: imports os/exec outside internal/procgroup",
 		"internal/fixture/signal.go: imports os/signal outside internal/procgroup",
@@ -220,6 +283,8 @@ func TestCallSiteFindings(t *testing.T) {
 		"internal/fixture/start.go: calls syscall.ForkExec outside internal/procgroup",
 		"internal/procgroup/sub/sub.go: imports os/exec outside internal/procgroup",
 		"internal/procgroupx/x.go: imports os/exec outside internal/procgroup",
+		"tools/ci/http.go: imports net/http/cgi outside internal/procgroup",
+		"tools/cix/x.go: imports os/exec outside internal/procgroup",
 	}, findings)
 }
 
@@ -310,7 +375,7 @@ func fileFindings(rel string, file *ast.File, self string, tools []string) []str
 			findings = append(findings, rel+": imports C, whose calls start programs past this package")
 		case name == "." && (imported == self || starts || slices.Contains(guardedImports, imported)):
 			findings = append(findings, rel+": dot-imports "+imported+", which hides its calls from this scan")
-		case slices.Contains(guardedImports, imported) && !inside(rel, tools):
+		case slices.Contains(guardedImports, imported) && !admittedTool(rel, imported, tools):
 			findings = append(findings, rel+": imports "+imported+" outside "+thisPackage)
 		}
 	}
@@ -322,25 +387,68 @@ func fileFindings(rel string, file *ast.File, self string, tools []string) []str
 		}
 	}
 	isTest := strings.HasSuffix(rel, "_test.go")
+	judged := map[*ast.SelectorExpr]bool{} // the raw calls whose trap was read
 	ast.Inspect(file, func(n ast.Node) bool {
-		sel, ok := n.(*ast.SelectorExpr)
+		if call, ok := n.(*ast.CallExpr); ok {
+			if fun, imported, ok := selectorOf(call.Fun, names); ok && slices.Contains(rawCalls[imported], fun.Sel.Name) {
+				judged[fun] = true
+				if finding := trapFinding(call, names); finding != "" {
+					findings = append(findings, rel+": calls "+imported+"."+fun.Sel.Name+" with "+finding)
+				}
+			}
+			return true
+		}
+		sel, imported, ok := selectorOf(n, names)
 		if !ok {
 			return true
 		}
-		x, ok := sel.X.(*ast.Ident)
-		if !ok {
-			return true
-		}
-		imported := names[x.Name]
 		switch {
 		case imported == self && sel.Sel.Name == "WithTestTimeout" && !isTest:
 			findings = append(findings, rel+": sets procgroup.WithTestTimeout outside a test file")
 		case slices.Contains(startCalls[imported], sel.Sel.Name):
 			findings = append(findings, rel+": calls "+imported+"."+sel.Sel.Name+" outside "+thisPackage)
+		case slices.Contains(rawCalls[imported], sel.Sel.Name) && !judged[sel]:
+			findings = append(findings, rel+": takes "+imported+"."+sel.Sel.Name+" as a value, which hides its trap")
 		}
 		return true
 	})
 	return findings
+}
+
+// selectorOf returns n as a selector on an imported package, with the
+// path of that package.
+func selectorOf(n ast.Node, names map[string]string) (*ast.SelectorExpr, string, bool) {
+	sel, ok := n.(*ast.SelectorExpr)
+	if !ok {
+		return nil, "", false
+	}
+	x, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return nil, "", false
+	}
+	imported, ok := names[x.Name]
+	return sel, imported, ok
+}
+
+// trapFinding judges the trap of a raw system call: "" for a constant
+// of syscall or unix that starts no process, the constant's name for
+// one that does, and a note for a trap the scan cannot name.
+func trapFinding(call *ast.CallExpr, names map[string]string) string {
+	if len(call.Args) > 0 {
+		if sel, imported, ok := selectorOf(call.Args[0], names); ok && rawCalls[imported] != nil && strings.HasPrefix(sel.Sel.Name, "SYS_") {
+			if slices.Contains(startTraps, sel.Sel.Name) {
+				return sel.Sel.Name
+			}
+			return ""
+		}
+	}
+	return "a trap the scan cannot name"
+}
+
+// admittedTool reports whether rel, a file of an admitted tool, may
+// still import the package.
+func admittedTool(rel, imported string, tools []string) bool {
+	return slices.Contains(toolImports, imported) && inside(rel, tools)
 }
 
 // inside reports whether the slash path rel is in one of the dirs.

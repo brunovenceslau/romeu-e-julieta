@@ -18,6 +18,11 @@ import (
 // for its exit status: 130 for SIGINT, 143 for SIGTERM.
 const signalBase = 128
 
+// beforeStepAside runs in the handler right before it steps aside. It
+// is nil but in the helper processes of this package's tests, which
+// set it before Main to hold the handler at that point.
+var beforeStepAside func()
+
 // Main runs the command under the signal rule of 04 4.1, Signals, and
 // returns its exit status, for os.Exit. Both binaries, tools/ci and
 // tools/mutants install it in main, and nothing else maps a signal.
@@ -46,7 +51,12 @@ func Main(name string, stderr io.Writer, run func(ctx context.Context) int) int 
 			// Notify delivers only the two signals above, both a
 			// syscall.Signal on unix.
 			s, _ := sig.(syscall.Signal)
-			interrupt(cancel, g, func() { signal.Stop(sigs) })
+			interrupt(cancel, g, func() {
+				if beforeStepAside != nil {
+					beforeStepAside()
+				}
+				signal.Stop(sigs)
+			})
 			// Sent once the groups are dead, so Main returns no status
 			// while a group of its command still runs.
 			handled <- s

@@ -26,7 +26,11 @@ const (
 	helperEnv  = "PROCGROUP_TEST_HELPER"
 	pidfileEnv = "PROCGROUP_TEST_PIDFILE"
 	readyEnv   = "PROCGROUP_TEST_READY"
+	markerEnv  = "PROCGROUP_TEST_MARKER"
 )
+
+// helperLifetime bounds the life of a helper process.
+const helperLifetime = 2 * time.Minute
 
 // helperName is the name a helper gives Main, which the line of an
 // interrupted run starts with.
@@ -45,9 +49,13 @@ var shellEnv = []string{"PATH=/usr/bin:/bin"}
 // binary again with helperEnv set, to get a process with the behavior
 // they need.
 func TestHelperProcess(t *testing.T) {
-	switch os.Getenv(helperEnv) {
-	case "":
+	role := os.Getenv(helperEnv)
+	if role == "" {
 		return
+	}
+	// A helper whose test died does not outlive it by long.
+	time.AfterFunc(helperLifetime, func() { os.Exit(3) })
+	switch role {
 	case "escape", "escape-exit":
 		// Hold the output pipe from a session of its own, which a kill of
 		// the process group does not reach, and write its pid; then the
@@ -60,7 +68,7 @@ func TestHelperProcess(t *testing.T) {
 			os.Exit(2)
 		}
 		writeOrExit(os.Getenv(pidfileEnv), strconv.Itoa(child.Process.Pid))
-		if os.Getenv(helperEnv) == "escape" {
+		if role == "escape" {
 			time.Sleep(time.Minute)
 		}
 	case "sleep":
@@ -82,13 +90,30 @@ func TestHelperProcess(t *testing.T) {
 		// A command that found a failure (2) or finished its work (0)
 		// and returns once the signal has cancelled it.
 		status := 2
-		if os.Getenv(helperEnv) == "finished" {
+		if role == "finished" {
 			status = 0
 		}
 		os.Exit(Main(helperName, os.Stderr, func(ctx context.Context) int {
 			writeOrExit(os.Getenv(readyEnv), "ready")
 			<-ctx.Done()
 			return status
+		}))
+	case "absorb", "stepped":
+		// A command that returns 2 once cancelled, with the handler held
+		// right before it steps aside: absorb sends this process a second
+		// signal there; stepped writes the marker file after a pause, so
+		// the test sees whether Main waited for the handler.
+		beforeStepAside = func() {
+			if role == "absorb" {
+				_ = syscall.Kill(os.Getpid(), syscall.SIGINT)
+			}
+			time.Sleep(200 * time.Millisecond)
+			writeOrExit(os.Getenv(markerEnv), "stepped")
+		}
+		os.Exit(Main(helperName, os.Stderr, func(ctx context.Context) int {
+			writeOrExit(os.Getenv(readyEnv), "ready")
+			<-ctx.Done()
+			return 2
 		}))
 	case "deaf":
 		// A command that does not return after the first signal, so only
@@ -111,7 +136,7 @@ func writeOrExit(path, content string) {
 
 // helper returns the command that runs this test binary as the helper
 // of the role, with the pid file and the ready file in a directory of
-// the test.
+// the test, and the marker file beside them.
 func helper(t *testing.T, role string) (cmd *exec.Cmd, pidfile, ready string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -119,7 +144,7 @@ func helper(t *testing.T, role string) (cmd *exec.Cmd, pidfile, ready string) {
 	ready = filepath.Join(dir, "ready")
 	killAtEnd(t, pidfile)
 	cmd = exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestHelperProcess$")
-	cmd.Env = append(os.Environ(), helperEnv+"="+role, pidfileEnv+"="+pidfile, readyEnv+"="+ready)
+	cmd.Env = append(os.Environ(), helperEnv+"="+role, pidfileEnv+"="+pidfile, readyEnv+"="+ready, markerEnv+"="+filepath.Join(dir, "marker"))
 	return cmd, pidfile, ready
 }
 

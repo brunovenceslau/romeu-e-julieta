@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"os/exec"
+	"path/filepath"
 	"syscall"
 	"testing"
 	"time"
@@ -59,7 +60,30 @@ func TestMainSignalRule(t *testing.T) {
 		assert.Equal(t, 0, exitCode(t, cmd.Wait()))
 		assert.Empty(t, stderr.String())
 	})
-	t.Run("a second signal ends the process by its default action", func(t *testing.T) {
+	t.Run("a second signal before the handler steps aside is absorbed", func(t *testing.T) {
+		// The helper holds its handler before it steps aside and sends
+		// itself SIGINT there; the status stays 128 plus SIGTERM.
+		cmd, _, ready := helper(t, "absorb")
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		require.NoError(t, cmd.Start())
+		waitForFile(t, ready)
+		require.NoError(t, cmd.Process.Signal(syscall.SIGTERM))
+		assert.Equal(t, 143, exitCode(t, cmd.Wait()))
+		assert.Equal(t, helperName+": interrupted\n", stderr.String())
+		assert.FileExists(t, filepath.Join(filepath.Dir(ready), "marker"), "the handler went on after the second signal")
+	})
+	t.Run("the status waits for the handler to kill the groups", func(t *testing.T) {
+		// The command returns at the cancel, while the handler is still
+		// held; Main returns only once the handler is done.
+		cmd, _, ready := helper(t, "stepped")
+		require.NoError(t, cmd.Start())
+		waitForFile(t, ready)
+		require.NoError(t, cmd.Process.Signal(syscall.SIGTERM))
+		assert.Equal(t, 143, exitCode(t, cmd.Wait()))
+		assert.FileExists(t, filepath.Join(filepath.Dir(ready), "marker"))
+	})
+	t.Run("a signal after the handler steps aside takes its default action", func(t *testing.T) {
 		cmd, _, ready := helper(t, "deaf")
 		require.NoError(t, cmd.Start())
 		waitForFile(t, ready)

@@ -20,8 +20,8 @@
 // sbxdrv and gitsafe for romeu, the mise, hooks and layout packages for
 // julieta, and tools/ci and tools/mutants for themselves.
 //
-// A grandchild that calls setsid leaves the group, and the group kill
-// does not reach it. Non-unix builds are unsupported on purpose: the
+// A grandchild that calls setsid, or setpgid into a group of its own,
+// leaves the group, and the group kill does not reach it. Non-unix builds are unsupported on purpose: the
 // binaries and the tools run on linux and darwin only.
 package procgroup
 
@@ -57,7 +57,9 @@ var (
 )
 
 // kill is syscall.Kill. Tests replace it with a recorder, so that no
-// test sends a real signal to a pid KillGroup must refuse.
+// test sends a real signal to a pid KillGroup must refuse; a test that
+// swaps it must not run in parallel with any other test of this
+// package.
 var kill = syscall.Kill
 
 // Command is one subprocess to run.
@@ -72,11 +74,17 @@ type Command struct {
 	// Env is the whole environment of the command, which never inherits
 	// this process's: nil means an empty one.
 	Env []string
-	// Stdin is the standard input; nil means an empty one.
+	// Stdin is the standard input; nil means an empty one. A reader
+	// that is not a file is copied through a pipe Run closes when the
+	// leader ends; a copy blocked in the reader itself ends only when
+	// the reader returns, and Run does not wait for it.
 	Stdin io.Reader
 	// Stdout and Stderr receive the output; nil discards it. When both
 	// are the same writer, the command writes both to one pipe, in the
-	// order it wrote them.
+	// order it wrote them. A writer must not block: while it does, the
+	// command blocks on the full pipe, and only its timeout or a
+	// cancellation ends it. A writer that fails stops the copy and
+	// closes the pipe, so the command gets EPIPE or SIGPIPE.
 	Stdout io.Writer
 	Stderr io.Writer
 }
@@ -139,11 +147,10 @@ func Run(ctx context.Context, c Command) error {
 	cmd.Dir = c.Dir
 	// os/exec gives a nil Env the environment of this process.
 	cmd.Env = append([]string{}, c.Env...)
-	cmd.Stdin = c.Stdin
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return KillGroup(cmd.Process.Pid) }
 	cmd.WaitDelay = WaitDelay
-	out, err := attach(cmd, c.Stdout, c.Stderr)
+	out, err := attach(cmd, c.Stdin, c.Stdout, c.Stderr)
 	if err != nil {
 		return err
 	}
@@ -154,6 +161,7 @@ func Run(ctx context.Context, c Command) error {
 	}
 	out.started()
 	err = cmd.Wait()
+	out.leaderEnded()
 	g.end(cmd.Process.Pid)
 	if drainErr := out.drain(WaitDelay); err == nil {
 		err = drainErr
@@ -204,7 +212,9 @@ func result(ctx, runCtx context.Context, c Command, limit time.Duration, err err
 
 // CombinedOutput runs the command as Run does and returns its standard
 // output and standard error together, in the order it wrote them.
-// Command's Stdout and Stderr are replaced.
+// Command's Stdout and Stderr are replaced. The output is held in
+// memory with no cap, so a command of a class with no timeout, or one
+// whose output can be large, streams to a writer through Run instead.
 func CombinedOutput(ctx context.Context, c Command) ([]byte, error) {
 	var out bytes.Buffer
 	c.Stdout, c.Stderr = &out, &out
