@@ -1,0 +1,243 @@
+{
+  "node": "review-consistency · reviewer · fable",
+  "verdict": "NO-GO as the two branches stand, with no Blocking finding: both trees pass `go run ./tools/ci all` (exit 0 in spec-req at 8cc30a8 and in replan at b2c79fd) and the names gate (CLEAN, 0 hits, both), the diffs hold no U+2014, every requirement id a task cites is live (1202 ids, 0 unknown, 0 duplicates, 0 reading aids pointing at the wrong section), all 138 task files parse with the ten front-matter fields, every needs/after names a live task with no cycle, and every count docs/plan.md keeps is true by the command it names (37 merges from eedda13, 11 on docs/plan.md, 10 on fast.go, 2984 lines, 103 earlier tasks, 16 surfaces, 18 new tasks). What stops the GO is a set of Required items: (1) `reqs allocate` writes earlier pages before it refuses a later one while saying \"nothing was written\" (reproduced); (2) six `owns` overlaps that no needs/after edge orders, which `tools/ci plan` will fail the day it lands, two of them on this very pair of branches (T104 claims the reqs files it never edits; T121 and T122 edit files outside their owns, one on the `ask-first` surface the forecast lacks); (3) one contradiction inside 12 12.11 (the decision tables of 06 6.1 and 02 2.6 carry nine ids the rule says they carry none of); (4) three contradictions inside docs/plan.md (duplicated list numbers; the M2 row versus the sitting M2 bullet; the four foundation packages that \"need nothing of M0\" while two of them do); (5) a lens that quotes the criterion this same diff replaced. Each fix is a few lines; none changes the design.",
+  "measurements": {
+    "ci_all": {"spec-req@8cc30a8": 0, "replan@b2c79fd": 0},
+    "names_gate": {"spec-req": "CLEAN hits=0 commits=2", "replan": "CLEAN hits=0 commits=5"},
+    "em_dash_in_diffs": {"spec-req": 0, "replan": 0},
+    "req_ids": {"count": 1202, "min": "REQ-0001", "max": "REQ-1202", "duplicates": 0, "retired_rows": 0, "cited_by_no_live_task": 0, "cited_only_by_deferred_tasks": 211, "cited_only_by_module_docs_tasks": 7},
+    "tasks": {"files": 138, "front_matter_parse_failures": 0, "unknown_edge_targets": 0, "cycles": 0, "reading_aid_mismatches": 0, "fates": {"merged": 3, "kept": 50, "new": 29, "deferred": 36, "folded": 9, "left-v1": 7, "removed": 4}},
+    "owns_overlaps_without_an_edge": 7,
+    "plan_md_counts_measured_true": ["37 merges reachable from eedda13", "11 of them touch docs/plan.md", "10 first-parent merges on tools/ci/fast.go", "2984 lines of the earlier plan", "103 earlier task ids", "16 surfaces in .github/ask-first.yaml", "14 pages under spec/", "18 tasks T121 to T138"],
+    "mutations_in_a_scratch_clone": {"empty_body_case_disabled": "tests stay green (gap)", "deferred_fate_inverted": "caught", "index_first_sort_inverted": "caught"},
+    "worktrees_after_the_review": {"spec-req": "clean", "replan": "clean"}
+  },
+  "skills_loaded": ["agent-skills:review", "agent-skills:code-review-and-quality", "cc-skills-golang:golang-how-to", "cc-skills-golang:golang-code-style", "cc-skills-golang:golang-naming", "cc-skills-golang:golang-error-handling", "cc-skills-golang:golang-testing", "cc-skills-golang:golang-stretchr-testify", "cc-skills-golang:golang-safety", "cc-skills-golang:golang-security", "cc-skills-golang:golang-lint", "cc-skills-golang:golang-gopls"],
+  "skills_added_beyond_the_recommended": "none: the code has no concurrency, no old-style patterns to modernize, no data-structure design and no failing program, so golang-modernize, golang-data-structures and golang-troubleshooting were not needed",
+  "skill_steps_skipped": "every install a skill names (gopls, gotests, golangci-lint, govulncheck, gosec, `claude mcp add gopls`) was skipped; nothing was installed and no config was edited",
+  "lsp": "the LSP tool was available and used for findReferences on reqRetiredRule and reqsOf; it indexed reqs.go only (the test file and fast.go call sites did not appear), so grep confirmed each reference count used below",
+  "findings": [
+    {
+      "id": "review-consistency-1",
+      "kind": "other",
+      "severity": "Required",
+      "code_severity": "Required",
+      "cite": "T121; tools/ci/reqs.go reqsAllocate",
+      "defect": "`reqs allocate` writes each page back inside the page loop, so a refusal on a later page (an excluded placeholder, or a number past REQ-9999) leaves the earlier pages renumbered while the error says \"nothing was written\" and T121's acceptance promises nothing written.",
+      "scenario": "docs/spec.md holds `REQ-new` and docs/spec/13-ledger.md holds `REQ-new`; `go run ./tools/ci reqs allocate` exits 2 with \"docs/spec/13-ledger.md:3: a placeholder sits in a page or section that carries no id (12 12.11); nothing was written\", and `git status` shows ` M docs/spec.md` with `REQ-0002` in place of the placeholder (reproduced in a scratch fixture with the binary built from b2c79fd). The existing test puts both placeholders on one page, which is why it passes.",
+      "change": "Split reqsAllocate in two passes: first walk every page and build the new lines into a slice of {path, lines} while numbering, returning the refusal before any write; then write the changed pages. Add the case \"a refusal on a later page writes no earlier page\" to TestReqsAllocate: the index with one valid placeholder, chapter 13 with one, exit 2, and the index byte-identical.",
+      "evidence": "tools/ci/reqs.go:541 `if _, err := writeIfChanged(root, p.path, []byte(strings.Join(p.lines, \"\\n\"))); err != nil {` inside `for i := range pages`; reqs.go:519 \"nothing was written\"; T121 line 57 \"each refuse with nothing\""
+    },
+    {
+      "id": "review-consistency-2",
+      "kind": "ownership-conflict",
+      "severity": "Required",
+      "cite": "T104",
+      "defect": "T104 owns tools/ci/reqs.go and tools/ci/reqs_test.go and claims the coverage half, but no commit of the plan branch edits a tools/ file: the coverage half (reqCoverage and its eight cases) landed in 8cc30a8 under T121, and T121 line 33 says the half \"is T104's\".",
+      "scenario": "`tools/ci plan` (T106) fails T104 against T105 (owns tools/ci/**) on an overlap no edge orders; a reader of T104 looks in the plan pull request for code it does not carry; REQ-1201 is cited by a task whose diff does not build it.",
+      "change": "Remove the two tools/ci paths from T104's owns; move REQ-1201 and the eight coverage case titles from T104's Implements and Acceptance to T121's; rewrite T121 line 33 as \"The coverage half, over docs/plan/tasks/*.md, lives in the same two files.\"",
+      "evidence": "`git diff --stat 8cc30a8..b2c79fd -- tools/` prints nothing; docs/plan/tasks/T104-the-plan-as-task-files.md:10-11 \"- tools/ci/reqs.go\" \"- tools/ci/reqs_test.go\""
+    },
+    {
+      "id": "review-consistency-3",
+      "kind": "ownership-conflict",
+      "severity": "Required",
+      "cite": "T121",
+      "defect": "T121's owns names reqs.go and reqs_test.go only, while its commit 8cc30a8 also edits tools/ci/main.go and tools/ci/fast.go.",
+      "scenario": "Rule 1 of docs/plan.md says a task's pull request edits its owns, its own file and generated outputs \"and nothing else\"; the first pull request of the new plan breaks the rule it introduces, and `tools/ci plan` would fail it.",
+      "change": "Add `tools/ci/main.go` and `tools/ci/fast.go` to T121's owns, as the one-line seam edits rule 14 names.",
+      "evidence": "`git diff --stat origin/main..8cc30a8` lists \"tools/ci/fast.go | 6 +-\" and \"tools/ci/main.go | 5 +\"; T121 owns at lines 7-9"
+    },
+    {
+      "id": "review-consistency-4",
+      "kind": "ownership-conflict",
+      "severity": "Required",
+      "cite": "T122",
+      "defect": "T122's commit ac488e2 edits `.github/ask-first.yaml`, `docs/notes/delivery-metrics-design.md` and `docs/notes/dora-roi-report.md`, none in its owns, and `.github/ask-first.yaml` is on the `ask-first` surface that T122's ask_first forecast (spec, decisions) lacks.",
+      "scenario": "The approval checklist written from the forecast carries no `ask-first` line for a diff that changes the catalog glob of the surface list; the next sitting's grants read the forecast and miss it.",
+      "change": "Add the three paths to T122's owns and `ask-first` to its ask_first; or move the one-line catalog glob change to T107, which owns the file, forecasts `ask-first` and is `after: T122`.",
+      "evidence": "ac488e2 diff of .github/ask-first.yaml: \"-    globs: [catalog/egress.yaml]\" \"+    globs: [internal/catalog/**]\"; .github/ask-first.yaml:57 lists itself in a surface's globs"
+    },
+    {
+      "id": "review-consistency-5",
+      "kind": "ownership-conflict",
+      "severity": "Required",
+      "cite": "T127 (with T013)",
+      "defect": "T013 owns tools/ci/internal/workflows/** and T127 owns tools/ci/internal/workflows/release*.go, both in M1, and no needs or after edge joins them (T013: needs T009, T012, after T105; T127: needs T105).",
+      "scenario": "Two worktrees add a job row to the workflows package in the same week; rule 1 says a merged check's package is owned one task at a time ordered by after, and `tools/ci plan` fails the pair.",
+      "change": "T127: `after: [T013]` (the smaller task waits), and one sentence in T127's body naming the order.",
+      "evidence": "docs/plan/tasks/T013-the-container-e2e-on-the-workload-s-base.md:13 \"- tools/ci/internal/workflows/**\"; T127-the-release-publish-job-row-of-tools-ci-workflows.md:8 \"- tools/ci/internal/workflows/release*.go\""
+    },
+    {
+      "id": "review-consistency-6",
+      "kind": "ownership-conflict",
+      "severity": "Required",
+      "cite": "T021 (with T051 and T122)",
+      "defect": "T021 (M3) and T051 (M1) both own docs/spec/03-formats.md with no edge between them, and neither carries `after: T122`, which owns docs/spec/** (T107, T108 and T126 do).",
+      "scenario": "Both tasks edit the one page for the edit 03 assigns them; `tools/ci plan` fails the pair, and a worktree opened before T122 merges rebases over the craft pass.",
+      "change": "T051: add `after: [T122]`; T021: `after: [T051, T122]`.",
+      "evidence": "T021-spec-the-project-spec-host-settings-the-run.md:10 \"- docs/spec/03-formats.md\"; T051-the-manifest-julieta-setup-and-julieta-status.md:14 \"- docs/spec/03-formats.md\""
+    },
+    {
+      "id": "review-consistency-7",
+      "kind": "ownership-conflict",
+      "severity": "Required",
+      "cite": "T054 (with T035)",
+      "defect": "T035 and T054 both own internal/cmd/julieta/setup/steps.go, the ordered step list of rule 14, both `after: T051`, and no edge orders the two one-line edits.",
+      "scenario": "Rule 14 says the extending task edits the slice by one line \"with an after edge\"; two parallel one-line edits to an ordered slice conflict at the rebase, and `tools/ci plan` fails the pair.",
+      "change": "T054: `after: [T051, T035]` (memory's step lands first), and name the order in the seam sentence at T054 line 32.",
+      "evidence": "T035-memstore-memstore-write-and-the-memory-commands.md:11 \"- internal/cmd/julieta/setup/steps.go\"; T054-the-hook-dispatcher.md:13 the same path; T054:32 \"which this task extends by one line\""
+    },
+    {
+      "id": "review-consistency-8",
+      "kind": "ownership-conflict",
+      "severity": "Required",
+      "cite": "T079 (with T054)",
+      "defect": "T054 owns internal/cmd/julieta/hooks/** and T079 owns internal/cmd/julieta/hooks/guard*.go, and T079 (needs T077, T078) has no edge to T054.",
+      "scenario": "Rule 1: where two tasks share a directory, the later one names its own files and comes after the earlier one; T079 names its files and lacks the edge, so `tools/ci plan` fails the pair.",
+      "change": "T079: `after: [T054]`.",
+      "evidence": "T079-the-julieta-claude-kit.md:14 \"- internal/cmd/julieta/hooks/guard*.go\"; T054-the-hook-dispatcher.md:9 \"- internal/cmd/julieta/hooks/**\""
+    },
+    {
+      "id": "review-consistency-9",
+      "kind": "spec-contradiction",
+      "severity": "Required",
+      "cite": "12 12.11",
+      "defect": "REQ-1198's exclusion list says the decision tables of 06 6.1 and 02 2.6 carry no id, yet 06 6.1's table carries REQ-0563 to REQ-0575 (eight ids, cited by T012, T040 and T076) and 02 2.6's carries REQ-0156 (cited by T037 and T051); the check excludes neither page (REQ-1200), while REQ-0829 says it fails an id in \"a page or section 12.11 excludes\".",
+      "scenario": "A writer obeys the text and retires REQ-0563; T076 loses its citation of the v3-only rule; or a reviewer reads the nine ids as a violation the check misses.",
+      "change": "At 12-engineering.md:826-828 delete \"the decision tables of 06 6.1 and 02 2.6, \" so the sentence reads \"What carries no id: explanation and reasons (the \\\"Why for us\\\" text, the principles of the index), the scope table of 00 0.5, ...\": the v1-decision cells of those tables are checkable obligations the plan already builds. The alternative, retiring the nine ids and moving the obligations, costs more and gains nothing.",
+      "evidence": "docs/spec/12-engineering.md:827 \"the principles of the index), the decision tables of 06 6.1 and 02\"; docs/spec/06-kits.md:10 \"| Kit schema | `REQ-0563` **v3** only\""
+    },
+    {
+      "id": "review-consistency-10",
+      "kind": "spec-craft",
+      "severity": "Advisory",
+      "cite": "12 12.9",
+      "defect": "REQ-1192, REQ-1193, REQ-1194 and REQ-1195 mark rows whose \"Enforced by\" cell opens with **[review]**, while 12 12.11 says a rule judged by review alone carries no id; each cell names a partial check after the marker, so what the id covers is unclear, and REQ-1193 is cited only by T004 (deferred).",
+      "scenario": "A reader of REQ-1193 expects a check for \"count concepts; defer the rest with a trigger\" and finds `sequences` checking the shape of a deferral row.",
+      "change": "In each of the four cells put the id in front of the checkable half (for REQ-1193: \"**[review]**, by the principles ...; `REQ-1193` `sequences` checks the shape of each deferral row\"), or drop the id and keep the marker.",
+      "evidence": "docs/spec/12-engineering.md:765 \"| Simple, incremental design | `REQ-1193` Build what the task in hand needs; count concepts; defer the rest with a trigger | **[review]**\""
+    },
+    {
+      "id": "review-consistency-11",
+      "kind": "spec-craft",
+      "severity": "Required",
+      "cite": "docs/plan.md, How the work is done",
+      "defect": "Four rules of the numbered list carry their number twice and render as \"5. 5.\", \"7. 7.\", \"9. 9.\" and \"13. 13.\"; the defect enters with b2c79fd (absent at d932464) and no check reads it.",
+      "scenario": "The narrative the implementer reads first shows a typing slip on the rules that govern ownership, dependencies, the bridge and the grants.",
+      "change": "Delete the repeated number at docs/plan.md:256, 279, 292 and 329 (\"5. **No task appends ...\", \"7. **Dependencies land ...\", \"9. **The bridge ...\", \"13. **Grants per milestone ...\"). Also one double blank line at docs/plan.md:420.",
+      "evidence": "docs/plan.md:256 \"5. 5. **No task appends to a list another task appends to.** Every\"; `git show d932464:docs/plan.md | grep -nE '^\\s*[0-9]+\\. [0-9]+\\. '` prints nothing"
+    },
+    {
+      "id": "review-consistency-12",
+      "kind": "spec-contradiction",
+      "severity": "Required",
+      "cite": "docs/plan.md, Milestones and sittings",
+      "defect": "The M2 row of the milestone table says sitting M2 runs the kit-frontend go/no-go, while the \"Sitting M2\" bullet and T113 (sitting: M0) say it ran at sitting M0.",
+      "scenario": "The owner of the calendar reads the table alone and books 40 minutes at the wrong sitting; lane B of M3, which waits on T113, starts a milestone late.",
+      "change": "Rewrite the M2 row's \"Ends when\" cell: \"sitting M2: recreate wave 1, one project per slot, each sandbox built from the `julieta`, `julieta-claude` and `git-ssh-sign` product kits plus one personal kit from the config repository (the kit-frontend go/no-go, T113, ran at sitting M0)\".",
+      "evidence": "docs/plan.md:377 \"| M2 | Kits in daily use | sitting M2: the kit-frontend go/no-go by hand on one host (about 40 minutes); then recreate wave 1\"; docs/plan.md:402 \"kit-frontend go/no-go (T113) ran at sitting M0\""
+    },
+    {
+      "id": "review-consistency-13",
+      "kind": "dependency",
+      "severity": "Required",
+      "cite": "docs/plan.md, Milestones and sittings",
+      "defect": "The narrative says M1's four foundation packages (T007, T012, T017, T023) \"need nothing of M0\", but T007 is `after: T105` and T023 `needs: T137`, both M0 tasks.",
+      "scenario": "An implementer opens T007 or T023 on day one of M0 as the page invites and `tools/ci plan --ready` (or the edges, read by hand) says it is not ready.",
+      "change": "Rewrite docs/plan.md:360-362: \"M1's foundation packages T012 and T017 start beside them, since they need nothing of M0; T007 waits for T105 and T023 for T137 (`internal/procgroup`).\" Or drop the two edges if they are not real; T023's is (gitsafe starts subprocesses through procgroup).",
+      "evidence": "docs/plan.md:361 \"packages (T007, T012, T017, T023) start beside them, since they need\"; T007 front matter \"after: - T105\"; T023 front matter \"needs: - T137\""
+    },
+    {
+      "id": "review-consistency-14",
+      "kind": "stale-citation",
+      "severity": "Required",
+      "cite": "docs/reviews/lenses.md, L18",
+      "defect": "L18 quotes as its success criterion \"traceability both ways: every section of the spec has a task, every task has a section, and the counts the page keeps by hand are true\", the sentence this same diff replaced by \"traceability both ways, measured by `tools/ci reqs`: ... the plan keeps no hand count\".",
+      "scenario": "The next stage-B run briefs the traceability auditor with a criterion the page no longer states and the auditor hunts for hand counts the plan is forbidden to keep.",
+      "change": "At lenses.md:1001-1003 quote the new criterion of lines 160-162 verbatim.",
+      "evidence": "docs/reviews/lenses.md:1001 \"the stage-B criterion \\\"traceability both ways: every section of the\"; lenses.md:160 \"- traceability both ways, measured by `tools/ci reqs`: every live\""
+    },
+    {
+      "id": "review-consistency-15",
+      "kind": "stale-citation",
+      "severity": "Advisory",
+      "cite": "docs/reviews/lenses.md, L17",
+      "defect": "L17's second bullet cares about \"Read differently until M6\" paragraphs in T037, T046 and T077, and no task file holds such a paragraph after this pass (the amendments were applied to the specification by T122).",
+      "scenario": "The implementer lens looks for a paragraph that no longer exists and reports its absence as a gap.",
+      "change": "Rewrite the bullet around what remains: the re-plan paragraph of each task and 12 12.2 (Re-planning), which says the specification wins.",
+      "evidence": "docs/reviews/lenses.md:969 \"- **\\\"Read differently until M6\\\" paragraphs** (T037, T046, T077; plan.md\"; `grep -l 'Read differently' docs/plan/tasks/*.md` prints nothing"
+    },
+    {
+      "id": "review-consistency-16",
+      "kind": "spec-testability",
+      "severity": "Advisory",
+      "code_severity": "Optional",
+      "cite": "T121; tools/ci/reqs_test.go",
+      "defect": "No test covers a bare mention of the prefix (the code span `REQ-` with an empty body), which 12 12.11 itself contains twice; with `case m.body == \"\":` disabled, `go test ./tools/ci -run '^TestReqs'` stays green (measured in a scratch clone), and only the live tree's run would catch it.",
+      "scenario": "A refactor of the switch drops the empty-body arm; the unit tests pass; `fast` turns red on 12 12.11 with \"the token after REQ- is neither four digits nor new\" and the author learns it from the hook.",
+      "change": "Add to TestReqsRules a passing case \"a bare mention of the prefix is no finding\": a page with \"`REQ-` and four digits\", exit 0.",
+      "evidence": "tools/ci/reqs.go:197 \"case m.body == \\\"\\\":\"; docs/spec/12-engineering.md:810 \"a probe or a task's acceptance can verify carries a stable id, `REQ-`\""
+    },
+    {
+      "id": "review-consistency-17",
+      "kind": "partial-task",
+      "severity": "Advisory",
+      "code_severity": "Optional",
+      "cite": "10 10.2 reqs row; tools/ci/fast.go commitChecks",
+      "defect": "`fast` and `all` discard the deferred-only list (`reqs, _, reqsErr := reqsOf(files)`), though REQ-0829 and REQ-1201 say the check, in fast and all, reports the deferred ones apart; the standalone subcommand prints them as one 2.1 KB line of 211 ids.",
+      "scenario": "A reviewer running `fast` never sees that 211 of 1202 ids rest on deferred tasks; the one who runs `reqs` gets an unreadable line.",
+      "change": "In commitChecks set the verdict's `note` to the count (\"211 ids cited only by deferred tasks; `go run ./tools/ci reqs` lists them\") and have the subcommand print one id per line or the count plus the ids wrapped.",
+      "evidence": "tools/ci/fast.go:604 \"reqs, _, reqsErr := reqsOf(files)\"; `go run ./tools/ci reqs` at b2c79fd prints \"reqs: 211 id(s) cited only by deferred tasks: REQ-0002, ...\" (2164 bytes, 2 lines)"
+    },
+    {
+      "id": "review-consistency-18",
+      "kind": "other",
+      "severity": "Advisory",
+      "code_severity": "Nit",
+      "cite": "tools/ci/reqs.go",
+      "defect": "Three small leftovers: reqTasksIn returns a `[]finding` that is always nil; `reqRetiredRule` is read by no non-test code while the doc comment of reqRetired says the table is read \"under the paragraph reqRetiredRule\"; and `first` at reqs.go:206 shadows the retired-row index `first` of line 194 with a reqMark.",
+      "scenario": "A reader looks for the rule-paragraph check the comment promises and for the findings reqTasksIn could return; neither exists.",
+      "change": "Drop the nil return (callers: reqsOf); either check that the paragraph precedes the header or move the constant into the test and fix the comment; rename the duplicate check's variable to `prior`.",
+      "evidence": "tools/ci/reqs.go:379 \"func reqTasksIn(files []treeFile) ([]reqTask, []finding, error) {\" and :393 \"return tasks, nil, nil\"; reqs.go:37; reqs.go:206 \"if first, dup := live[m.body]; dup {\""
+    },
+    {
+      "id": "review-consistency-19",
+      "kind": "spec-behavior-gap",
+      "severity": "Advisory",
+      "code_severity": "Optional",
+      "cite": "12 12.11 (REQ-1201); tools/ci/reqs.go reqParseTask",
+      "defect": "A task file whose fate is outside the seven values (a typo such as `fate: Kept`) is silently left out of the coverage half until `tools/ci plan` (T106) exists, so its citations of retired or unknown ids go unchecked and its sole citations surface only as \"cited by no task\".",
+      "scenario": "A new task file with `fate: kept ` plus a stray character cites a retired id; `reqs` passes; the stale citation is found a milestone later, the incident L18 names.",
+      "change": "Until T106 lands, have reqTasksIn return a finding for a fate outside kept, new, deferred, merged, folded, left-v1, removed (the slice the code already half-knows), and let T106 take the rule over.",
+      "evidence": "tools/ci/reqs.go:412-417 reads `fate:` and returns ok=false only when it is empty; reqs.go:450 \"if !slices.Contains(reqReadFates, t.fate) { continue }\""
+    },
+    {
+      "id": "review-consistency-20",
+      "kind": "scope-drift",
+      "severity": "Advisory",
+      "cite": "T012 (measured example; the scripted Implements rewrite)",
+      "defect": "The scripted rewrite cites ids whose sentence names nothing the task builds: T012 (`tools/kitpin`) cites REQ-1110 (the state diagrams of `internal/state` under docs/diagrams/) and REQ-1164 (the specification describes the current state only). Both ids have proper citers elsewhere, so coverage is not faked (7 of 1202 ids are cited only by module `docs` tasks, each a documentation obligation), but the reading aid misleads.",
+      "scenario": "The implementer of T012 reads 12 12.3's diagram row as an acceptance of the pin tool.",
+      "change": "One read of each live task's Implements against the sentence of each id (not its section), dropping an id whose obligation the task does not build; start where a keyword match is likely (\"pins\", \"state\", \"spec\").",
+      "evidence": "docs/plan/tasks/T012-tools-kitpin-and-the-one-pin-file-mise-included.md Implements \"REQ-1110 (12 12.3)\"; docs/spec/12-engineering.md:357 \"| `internal/state` transition tables | `REQ-1110` state-machine tests; the state diagrams\""
+    },
+    {
+      "id": "review-consistency-21",
+      "kind": "spec-craft",
+      "severity": "Advisory",
+      "cite": "docs/plan.md, Spec sentences the re-plan amends",
+      "defect": "The page says \"(ADR 0012, decided 2026-10-12)\" while ADR 0012's status is Proposed and the open block records the same amendments as applied \"under decision (c) of that day\" with nothing recorded as decided before the block is answered.",
+      "scenario": "A reader takes the record as accepted and skips the approval line a Proposed record's acceptance needs.",
+      "change": "At docs/plan.md:713 write \"(ADR 0012, proposed; decision (c) of 2026-10-12)\", the form the open block uses.",
+      "evidence": "docs/plan.md:713 \"by T122 (ADR 0012, decided 2026-10-12); the specification and this plan\"; docs/adr/0012-*.md Status \"Proposed\""
+    }
+  ],
+  "not_tested": [
+    "the semantic fit of every one of the ~2300 Implements citations: the sample read was the 18 new tasks (T121 to T138) and five M1 tasks (T012, T054, T059, T060, T078); the measurement of drift is the docs-only count (7) and the T012 example",
+    "the 211 ids cited only by deferred tasks, one by one: the plan's accepted-risk rows cover T005 and T133; the rest were not read",
+    "whether the `owns` globs of the 50 kept tasks match the files their earlier text names; only the seven overlaps the script found were read",
+    "line length, link anchors and spelling of the spec diff: `tools/ci all` passed, and no further docs check exists before T085"
+  ],
+  "confidence": "high on every finding marked with a command or a reproduction (1, 2, 3, 4, 5-8, 9, 11, 12, 13, 14, 15, 16, 17); medium on 10, 19, 20 and 21, which rest on a reading of the text"
+}

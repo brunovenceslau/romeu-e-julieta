@@ -1,0 +1,152 @@
+{
+  "node": "review-completeness · reviewer · fable",
+  "verdict": "Not complete yet, close. The trace exists and the check is green on both branches (1202 ids, 0 uncited, 0 dangling, 0 duplicates; every non-refuted verdict of verify-1..5 is cited by a synth2 output; after triage every one of the 349 spec edits landed). Six Required defects remain, each small: the plan says the coverage half of tools/ci reqs is T104's while the branch holds it in T121's commit (an owns overlap T104/T105 and an empty checks line follow); T122's commit edits .github/ask-first.yaml, CODEOWNERS and the generated ask-first page outside its owns and without an ask-first approval line; four 12 12.9 rows marked [review] carry ids against 12 12.11; five obligations built by M3 and M4 tasks (REQ-0929, 0932, 0933, 0934 of 10 10.3; REQ-0727 of 09) are cited only by deferred M6 tasks; two unordered owns overlaps (T035/T054 on setup/steps.go, T021/T051 on 03-formats.md); and reqs allocate can reuse a retired id when a retired row does not parse. Plus the duplicated list numbers in docs/plan.md.",
+  "baselines": {
+    "spec": "<worktrees>/base-main 1e63d6a",
+    "plan": "<worktrees>/base-plan d932464",
+    "spec-req": "8cc30a8 (ac488e2 spec pass, then 8cc30a8 tools/ci reqs)",
+    "replan": "b2c79fd (contains 8cc30a8; docs/spec, docs/adr, docs/reviews and tools/ are byte-identical to spec-req)"
+  },
+  "skills_loaded": [
+    "agent-skills:review", "agent-skills:code-review-and-quality", "cc-skills-golang:golang-how-to",
+    "cc-skills-golang:golang-code-style", "cc-skills-golang:golang-naming", "cc-skills-golang:golang-error-handling",
+    "cc-skills-golang:golang-testing", "cc-skills-golang:golang-stretchr-testify", "cc-skills-golang:golang-safety",
+    "cc-skills-golang:golang-security", "cc-skills-golang:golang-lint", "cc-skills-golang:golang-gopls"
+  ],
+  "skills_added_beyond_how_to": "none: the code under review is one allocator and check over Markdown files with no concurrency, no network, no database and no new dependency, so golang-modernize, golang-data-structures and golang-troubleshooting would add nothing golang-code-style and golang-safety did not cover; golang-modernize's one applicable point (slices.Sorted(maps.Keys(...))) is noted as a Nit from golang-code-style.",
+  "skill_steps_skipped": "every install step of the skills (go install gopls@latest, golangci-lint@latest, gotests, govulncheck, claude mcp add) and golang-how-to's configure mode; none was run. LSP: the native LSP tool was available (gopls): documentSymbol on tools/ci/reqs.go and findReferences on reqsOf (2 references, reqs.go:94 and :115) were used; the rest of the navigation was grep, since the package is one file.",
+  "measurements": {
+    "reqs_check": "cd <worktrees>/replan && go run ./tools/ci reqs -> 'reqs: ok' then 'reqs: 211 id(s) cited only by deferred tasks: REQ-0002, ... REQ-1197', exit 0. go test ./tools/ci/ -run TestReqs -count=1 -> ok (0.100s); go vet ./tools/ci/ -> exit 0. The writers' own logs: write-spec/ci-all.log and write-plan/ci-all.log both end 'ci-all exit: 0' / 'exit=0' with the reqs step ok.",
+    "inventory": "inv2.py over spec-req and replan: 174 sections, 1202 ids, 0 duplicates, 0 live id uncited by a kept/new/deferred/merged task, 0 dangling citation, 211 deferred-only ids, 138 task files (50 kept, 29 new, 36 deferred, 9 folded, 3 merged, 7 left-v1, 4 removed), 3 live tasks with no requirement id in Implements (T112, T119 with a recorded reason 'Implements: none (...)', T136 by decision 29 of plan-changes.md). 34 sections with normative wording and no id: 32 are 12 12.11's exclusions (index principles, Open questions, the three Deferred decisions tables, 00 0.5, the journeys of 09, 13); 2 are not recorded anywhere (00 0.2, the opening of 08). Paragraph level, outside the excluded sections: 16 normative paragraphs without an id, all explanation, examples, code blocks, the vocabulary table or a why-for-us note; none is an obligation without an id.",
+    "verify_reports": "verify-1..5: 512 verdicts (341 confirmed, 157 modified, 14 refuted). Every one of the 498 non-refuted verdicts has its id or a source id cited in spec-changes.md, plan-changes.md, req-map.md, tool-contract.md or report.json (0 missing).",
+    "spec_edits_landed": "landed_spec.py over synth2/spec-edits.json (349 edits) against spec-req: 292 literal matches, 23 partial (a wrapped or id-split cell), 32 no literal match, 1 dropped (E186), 1 new file (ADR 0012, present under its real slug). The 55 non-literal edits were read one by one by grep of a distinctive phrase: every one landed (E7 at spec.md:184; the y/Y rule at 01:259; RJ-204/310/334 cells; skills-stale at 06:78; the J1 floors at 09:52-56 with links; lintArgs at 10:505; synthetic: true at 10:1026; the README row at 12:708; the Warnings row at 04:16; the salvage exit codes at 04:414; lock-missing at 07:46 and :93; tools/ci mutate at 05:125; the I7 unit cases at 05:273; the two 05 5.4 lists at 05:490; the julieta-claude list at 06:96; J7 step 4 and J14 cite their rows; the Unit level covers list at 10:30; the e2e container row at 10:21; the 10 10.6 bullet deleted; the composition root at 02:14; L17 to L21 at lenses.md:953-1128; 02 2.2/2.3; the fingerprint cell at 03:499; RJ-348 at 04:503; the hook row at 12:16; julieta hooks guard at 04:407). 0 misses.",
+    "plan_edits_landed": "landed_plan.py over the quoted strings of plan-changes.md sections 4, 5 and the appendices (433 quotes, 200 literal matches): the 233 non-matches are old text, templates, or paraphrases; section 4's new sentences were each read against docs/plan.md (all present, three in better words: the Go-port row names item 18 instead of OD-13, the tools/mutants row, T134 named in the Deferred cell). Section 5 sample of 18 acceptance quotes across 17 tasks: 18 landed (T002's go-directive rule is cited as REQ-0881; T055's projects/*.yaml finding is at its line 51). 0 misses found; not every one of the 233 was read.",
+    "task_files": "tasks_check2.py over the 138 files: every file has the ten front-matter fields and an id equal to its file; 0 unknown edges, 0 edges to a folded/removed/left-v1 task, 0 kept/new task needing a deferred one, 0 cycles, 0 task needing a later milestone, every folded task names absorbed_by, every deferred task has empty owns and a reopen trigger. Unordered owns overlaps between open tasks (no needs/after path either way): 5, listed in the findings (T035/T054, T021/T051, T104/T105, and T021 and T051 against T122's docs/spec/**).",
+    "not_tested": "go run ./tools/ci all was not re-run here (the two writer logs show it green on both branches); the 233 plan quotes without a literal match were sampled, not read whole; the 83 section-default rows of req-map.md were not re-derived one by one (the four 10 10.3 rows and REQ-0727 are the ones found by reading the deferred-only list against the M3 and M4 task bodies)."
+  },
+  "findings": [
+    {
+      "id": "completeness-1",
+      "kind": "spec-contradiction",
+      "severity": "Required",
+      "class": "contradiction",
+      "cite": "T104, T121; plan-changes.md section 1 item 3",
+      "defect": "The plan says the coverage half of tools/ci reqs lands in the plan branch as T104's work, but the branch holds it in T121's commit, so T104 owns and asks approval for a diff it does not carry.",
+      "failure_scenario": "T104's pull request opens with `ask_first: [checks]` and `owns: tools/ci/reqs.go, tools/ci/reqs_test.go` while `git diff 8cc30a8 b2c79fd -- tools` is empty; T105 (`owns: tools/ci/**`, `after: [T121]` only) and T104 are two open M0 tasks with no edge and an overlapping path, which rule 3 and T106's check reject; a reader of T121 looks for the coverage half elsewhere and does not find it.",
+      "proposed_change": "T121: replace 'The coverage half, over `docs/plan/tasks/*.md`, is T104's and lives in the same two files.' with 'The coverage half over `docs/plan/tasks/*.md` lands here too: its fixtures are task files written in the same pass.' and add `REQ-1201 (12 12.11)` to its Implements. T104: remove `tools/ci/reqs.go` and `tools/ci/reqs_test.go` from `owns`, remove `ask_first: [checks]` (leave `[]`), remove 'and the coverage half of `tools/ci reqs` over `docs/plan/tasks/*.md`: ... as 12 12.11 and the `reqs` row of 10 10.2 say' from the Goal, and move the Acceptance bullet that lists the coverage cases to T121. plan-changes.md section 1 item 3 and 'Why the coverage half rides in the plan branch' are history and need no edit.",
+      "evidence": "docs/plan/tasks/T121-...md:30 'The coverage half, over `docs/plan/tasks/*.md`, is T104's and lives in the same two files.'; docs/plan/tasks/T104-...md:7-17 owns and ask_first; `git -C replan diff --stat 8cc30a8 HEAD -- tools` prints nothing; tools/ci/reqs.go:442 `func reqCoverage` is in 8cc30a8."
+    },
+    {
+      "id": "completeness-2",
+      "kind": "ownership-conflict",
+      "severity": "Required",
+      "class": "behavior-gap",
+      "cite": "T122; 05 5.3; plan-changes.md section 2 decision 18 and open block item 11",
+      "defect": "T122's commit changes the `catalog` surface glob in `.github/ask-first.yaml`, `.github/CODEOWNERS` and `docs/reference/ask-first.md`, three files outside T122's owns (T105 and T107 own the yaml; the plan assigns this glob change to T107), and the change set's approval list names `spec`, `decisions` and `checks` only.",
+      "failure_scenario": "The pull request opens without an `ask-first` approval line while its diff touches the ask-first surface (the yaml is on its own list), so the checklist is incomplete by 12 12.4's rule; T107 later finds its one-line change already made under another task's name, or reverts it with its own re-glob.",
+      "proposed_change": "Keep the edit (the `askfirst` check holds 05 5.3 and the yaml equal, so the spec row cannot move alone) and record it: T122 `owns` adds `.github/ask-first.yaml`, `.github/CODEOWNERS`, `docs/reference/ask-first.md`; T122 `ask_first` adds `ask-first`; T122's Goal gains one sentence 'The `catalog` surface glob becomes `internal/catalog/**` here, since the check holds 05 5.3 and the yaml equal; T107 keeps the rest of item 11.'; spec-changes.md line 9 and the PR body add `> - [ ] Approval: ask-first - the catalog surface glob internal/catalog/**`. T107's Goal notes the glob is done.",
+      "evidence": "git -C spec-req diff 1e63d6a HEAD -- .github/ask-first.yaml: '-    globs: [catalog/egress.yaml]' '+    globs: [internal/catalog/**]'; spec-changes.md:9 'Approval lines this change set needs ...: `spec` ..., `decisions` ..., `checks`'; T107-...md:8-18 owns `.github/ask-first.yaml`, ask_first `ask-first`."
+    },
+    {
+      "id": "completeness-3",
+      "kind": "spec-contradiction",
+      "severity": "Required",
+      "class": "contradiction",
+      "cite": "12 12.9 (REQ-1192, REQ-1193, REQ-1194, REQ-1195); 12 12.11 (REQ-1198)",
+      "defect": "12 12.11 says a rule marked **[review]** carries no id, yet four rows of the 12 12.9 practices table carry both an id and the **[review]** mark in their Enforced-by cell.",
+      "failure_scenario": "T004 and T005 are the only citers of these four ids, so the plan reads 'Simple, incremental design' and 'Collective ownership' as obligations `sequences` or `pr` implement; a reviewer applying 12 12.11 cannot tell which of a row's clauses the id governs, and the next pass removes the ids by hand, which rule 5 of the check then reports as a gap.",
+      "proposed_change": "Retire REQ-1192, REQ-1193, REQ-1194 and REQ-1195 in the 12 12.11 table with 'Replaced by: none; a [review] rule carries no id (12.11)', remove the four markers from the rows, and drop the four ids from T004's and T005's Implements (the `coverage` and `pr` checks the cells also name already carry REQ-0829-class ids of 10 10.2). Since the branch is unmerged, the alternative of not allocating them is gone only if allocate is re-run from the base; retiring costs four rows and keeps the numbering law.",
+      "evidence": "docs/spec/12-engineering.md:765 '| Simple, incremental design | `REQ-1193` Build what the task in hand needs; count concepts; defer the rest with a trigger | **[review]**'; :766 '`REQ-1194` ... | **[review]**; `tools/ci pr` requires the Middleware line'; :738 '`REQ-1192` **[review]**; `coverage` (S9) counts it'; :769 '`REQ-1195` ... | **[review]**'; :828-832 'A rule that review judges by working agreement, with no test or check, is marked **[review]** and carries no id.'"
+    },
+    {
+      "id": "completeness-4",
+      "kind": "stale-citation",
+      "severity": "Required",
+      "class": "behavior-gap",
+      "cite": "10 10.3 (REQ-0929, REQ-0932, REQ-0933, REQ-0934); 09 opening (REQ-0727); T029, T042, T048, T049, T068",
+      "defect": "Five obligations that M3 and M4 tasks build are cited only by deferred M6 tasks, so the check passes while the task that builds the behaviour does not cite it: the four 10 10.3 rows were assigned to T018 (the recorder) by section default, and REQ-0727 to T075.",
+      "failure_scenario": "A change to 10 10.3's `remote.sandbox-<name>` stanza or to the `sbx-untested` wording updates T018 (deferred) and never T029, T048 or T049, defeating ADR 0012's consequence that a stale citation turns red; the M4 row requires 'J6 ... pass in CI with the fake sbx' at the hybrid level, which T068 builds (its line 186) without citing REQ-0727, and the 211-id deferred-only line hides these five among release-only ids.",
+      "proposed_change": "T029 Implements adds `REQ-0929 (10 10.3)` and `REQ-0934 (10 10.3)` (its Acceptance lines 78 and 95 already state them); T042 adds `REQ-0932 (10 10.3)` and `REQ-0933 (10 10.3)`; T048 and T049 add `REQ-0933 (10 10.3)`; T068 adds `REQ-0727 (09 (opening))`. Then read the remaining deferred-only ids once against the M0 to M5 task bodies (the check prints the list; 122 of the 211 are cited by a non-release deferred task) and record in req-map.md which section-default rows were re-derived.",
+      "evidence": "docs/spec/10-testing-style.md 10.3 rows: '`REQ-0929` On create the fake writes the recorded `remote.sandbox-<name>` stanza' cited by T018 only; '`REQ-0933` An sbx outside it is the `sbx-untested` warning of `status` and `doctor`' cited by T018 only; docs/plan/tasks/T029-...md:95 '- On create the fake writes the recorded `remote.sandbox-<name>`'; T049-...md:82 'as the warning `sbx-untested`'; docs/spec/09-journeys.md:16 '`REQ-0727` In CI, J6 forwards `julieta salvage` through `sbx env exec`'; T068-...md:187 'J6 runs in CI at the hybrid level on the Linux runners'."
+    },
+    {
+      "id": "completeness-5",
+      "kind": "ownership-conflict",
+      "severity": "Required",
+      "class": "behavior-gap",
+      "cite": "T035, T054 (plan rule 14, decision 19); T021, T051 (plan rule 6)",
+      "defect": "Two pairs of open tasks own the same file with no `needs` or `after` path between them: T035 and T054 both own `internal/cmd/julieta/setup/steps.go` (the rule-14 seam, which decision 19 says is edited 'with an `after` edge'), and T021 and T051 both own `docs/spec/03-formats.md` for their generator edits.",
+      "failure_scenario": "T035 and T054 are both M1 tasks that start after T051; two worktrees each add one line to `setup/steps.go` and the second rebase conflicts on the ordered slice, the measured conflict class the re-plan exists to remove; `tools/ci plan` (T106) fails both pairs at its first run.",
+      "proposed_change": "T054 `after` becomes `[T051, T035]` (memory check precedes hooks in the setup order of 04 4.3; if the reverse order is wanted, put T054 in T035's `after` instead). T021 `after` adds `T051` (T021 is M3, T051 M1; both edit 03-formats.md by one link each). Also add `after: [T122]` to T021 and T051 so their spec-page edits wait for this pass, as T107 and T126 already do.",
+      "evidence": "docs/plan/tasks/T035-...md owns '- internal/cmd/julieta/setup/steps.go', after '- T051', '- T123'; T054-...md owns '- internal/cmd/julieta/setup/steps.go', after '- T051'; T021-...md:10 and T051-...md:14 '- docs/spec/03-formats.md'; tasks_check2.py: 'unordered owns overlaps: 5'."
+    },
+    {
+      "id": "completeness-6",
+      "kind": "other",
+      "severity": "Required",
+      "class": "test-detail",
+      "cite": "tools/ci/reqs.go reqsAllocate (code: Required)",
+      "defect": "`reqsAllocate` drops the findings of `reqIDs` and `reqRetired`, so a retired row that does not parse leaves its id out of `retired`, `reqHighest` ignores it, and the next placeholder takes that number: a retired id is reused, which 12 12.11 forbids.",
+      "failure_scenario": "The table holds '| `REQ-0410` | 2026-11-3 | ... |' (a date typo); allocate numbers a new obligation REQ-0410; `reqs` reports the date cell, the author fixes the date, and `reqs` now reports 'REQ-0410 is live and in the retired table'; the only exit is renumbering the new id by hand, which the rule forbids and the duplicate check cannot distinguish from a double allocation.",
+      "proposed_change": "In reqsAllocate, after `pages, err := reqPagesAt(root)`: `live, findings := reqIDs(pages); retired, more := reqRetired(pages); if f := append(findings, more...); len(f) > 0 { return false, fmt.Errorf(\"%s; nothing was written\", lines(f)) }` (a placeholder is a finding of reqIDs, so filter the placeholder finding out, or run the check on the live ids and the retired table only). Add to TestReqsAllocate the case 'allocate refuses when the retired table does not parse, and nothing is written' (a row with three cells and a placeholder in 01-model.md; expect exitError and `REQ-new` still in the page).",
+      "evidence": "tools/ci/reqs.go:503-505 'live, _ := reqIDs(pages)\n\tretired, _ := reqRetired(pages)\n\tnext := reqHighest(live, retired)'; docs/spec/12-engineering.md:818 'An id is never reused or renumbered'."
+    },
+    {
+      "id": "completeness-7",
+      "kind": "spec-craft",
+      "severity": "Required",
+      "class": "contradiction",
+      "cite": "docs/plan.md, How the work is done, rules 5, 7, 9 and 13; T122 Operator line",
+      "defect": "Four numbered rules of docs/plan.md carry their number twice ('5. 5. **No task appends ...'), a wrap artifact that renders as item 5 whose text starts with '5.'; T122's Operator line wraps a lone 'a' onto its own line.",
+      "failure_scenario": "A reader of the rendered plan sees '5. **No task appends' numbered 5 then '5.' again and doubts whether a rule was lost; the plan is the file every implementer reads first.",
+      "proposed_change": "docs/plan.md:256 '5. 5. **No task' -> '5. **No task'; :279 '7. 7.' -> '7.'; :292 '9. 9.' -> '9.'; :329 '13. 13.' -> '13.'. T122-...md:49-51: join 'if\\n  a\\n  sandbox run is possible.' into one wrapped sentence. Fix wrapmd.py (write-plan) so a list marker is not re-emitted on a re-wrap, since T108 and every re-plan will run it again.",
+      "evidence": "docs/plan.md:256 '5. 5. **No task appends to a list another task appends to.** Every'; :279 '7. 7. **Dependencies land with their first importer.**'; :292 '9. 9. **The bridge is outside the product.**'; :329 '13. 13. **Grants per milestone.**'; docs/plan/tasks/T122-...md:50 '  a'."
+    },
+    {
+      "id": "completeness-8",
+      "kind": "dependency",
+      "severity": "Advisory",
+      "cite": "plan-changes.md section 1 (the PR shape); spec-req branch",
+      "defect": "The PR shape orders T121 first in its own pull request (checks line), then T122 (spec, decisions), then the plan branch; the branch holds T122's commit ac488e2 before T121's 8cc30a8, and the plan branch contains both.",
+      "failure_scenario": "Opened as written, T121 cannot be a pull request of its own without a rebase; opened as one pull request, the body needs the three lines (and `ask-first`, finding 2) while section 1 says two pull requests; at ac488e2 alone the ids exist and nothing checks them, which matters only if that commit were merged by itself.",
+      "proposed_change": "Decide one of: (a) one pull request from spec-req with `checks`, `spec`, `decisions` and `ask-first` lines, and plan-changes.md section 1 items 1 and 2 read 'one pull request, T121 and T122'; (b) `git rebase -i` is unavailable, so reorder with `git cherry-pick` onto main (8cc30a8 first, then ac488e2) and open two pull requests. Recommend (a): the spec cannot be green without the tool and the tool's tree test needs the ids.",
+      "evidence": "git -C spec-req log --oneline: '8cc30a8 feat(tools): add tools/ci reqs ...' above 'ac488e2 docs(spec): apply the stage-B write pass and allocate requirement ids'; plan-changes.md:70-72 '1. **T121 first** (from `main`) ... 2. **T122 second** (from `main`, after T121)'."
+    },
+    {
+      "id": "completeness-9",
+      "kind": "spec-craft",
+      "severity": "Advisory",
+      "cite": "12 12.11 (REQ-1200); tools/ci/reqs.go reqExcluded; T121 Goal",
+      "defect": "REQ-1200 names the excluded index parts as 'the two index tables' while the check and T121 exclude the index 'from `## Open questions` to the end'; equal today because those two tables close the index, divergent the day a section is appended after them.",
+      "failure_scenario": "A later pass adds a section after Deferred decisions with an obligation; the author places an id by the rule's text, allocate refuses by the tool's rule, and the two texts disagree on which is right.",
+      "proposed_change": "12 12.11, REQ-1200: '(13, 09's journeys, the index from its Open questions heading to the end, 00 0.5, `docs/adr/`)' in place of 'the two index tables'; and the first paragraph's 'the Open questions and Deferred decisions tables of the index' reads 'the index from its Open questions heading on'.",
+      "evidence": "docs/spec/12-engineering.md:850-851 'section this rule excludes (13, 09's journeys, the two index tables, 00 0.5, `docs/adr/`)'; tools/ci/reqs.go:243 'from(\"## Open questions\", nil)' under the comment 'the index from its Open questions heading'."
+    },
+    {
+      "id": "completeness-10",
+      "kind": "other",
+      "severity": "Advisory",
+      "cite": "00 0.2; 08 (opening); req-map.md Excluded candidates",
+      "defect": "Two sections with normative wording carry no id and appear in no row of req-map.md, placed or excluded, and are not named by 12 12.11's exclusion list: the users table of 00 0.2 ('no unreviewed host code execution', 'v1 acceptance runs only with the maintainer's config repo') and the opening of 08 ('required to be complete, not merely present').",
+      "failure_scenario": "The next trace re-raises them as uncited obligations, and nobody can tell whether the pass judged them twins or missed them.",
+      "proposed_change": "req-map.md, Excluded candidates, two rows: '| A-50x | 00 0.2 | 35 | Primary: a developer ... | users table: twins of 12 12.8 (prerequisites), 05 5.4 and the deferred row on a fresh adopter |' and '| D-0 | 08 | 5 | Salvage preserves everything ... | chapter opening: twin of 08 8.5 (completeness) |'; or 12 12.11's exclusion list adds 'the users table of 00 0.2 and a chapter's opening paragraph'.",
+      "evidence": "inv2.py summary2.json normative_no_req: '00 0.2 0.2 Users [docs/spec/00-scope.md:33-46] norm=2', '08 8. Memory, handoff, snapshot and salvage [docs/spec/08-memory-handoff-salvage.md:1-14] norm=1'; req-map.json has no row with cite '00 0.2' or '08' and placement 'none'."
+    },
+    {
+      "id": "completeness-11",
+      "kind": "other",
+      "severity": "Advisory",
+      "cite": "tools/ci/reqs.go (code: Optional and Nit)",
+      "defect": "Small code points: `reqTasksIn` returns a `[]finding` that is always nil, and `reqsOf` appends it; in `reqIDs` the `first` of `reqRetiredRows` is shadowed by `first, dup := live[m.body]`; `reqConsistency` sorts map keys through a hand-written iterator where `slices.Sorted(maps.Keys(retired))` reads plainer; `reqLines` folds CR LF to LF and allocate writes LF back, so a CR LF page is silently rewritten.",
+      "failure_scenario": "A reader looks for the finding `reqTasksIn` could return and finds none; a CR LF page diffs whole on its first allocate.",
+      "proposed_change": "Drop the second return of `reqTasksIn` and the `taskFindings` line of `reqsOf`; rename the retired range to `rowFirst, rowLast`; use `slices.Sorted(maps.Keys(...))` in `reqConsistency` and `reqCoverage`; say in `reqsAllocate`'s doc comment that a page is written with LF line ends (or keep the original ending).",
+      "evidence": "tools/ci/reqs.go:379 'func reqTasksIn(files []treeFile) ([]reqTask, []finding, error)' returning 'tasks, nil, nil'; :195 'first, last := reqRetiredRows(p)' and :208 'if first, dup := live[m.body]; dup'; :167-169 'reqLines splits content into lines, with CR LF read as LF'."
+    }
+  ],
+  "what_is_still_missing": [
+    "A re-derivation of the 83 section-default rows of req-map.md by obligation (finding 4 found five by reading the deferred-only list; the rest were not read one by one).",
+    "The ask-first approval line for the catalog glob (finding 2) and the choice of one or two pull requests (finding 8) before the PR opens.",
+    "tools/ci plan (T106) is what makes findings 1 and 5 deterministic; until it lands, tasks_check2.py in this scratch dir is the only overlap measurement."
+  ],
+  "confidence": "High on the measurements (each command and its output is in this file and in out/); high on findings 1 to 7 (each is a quoted text against a quoted text or a quoted diff); medium on finding 4's completeness, since the deferred-only list was read by eye."
+}
