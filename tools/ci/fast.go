@@ -583,8 +583,8 @@ type verdict struct {
 	note     string
 }
 
-// commitChecks judges commit with hygiene and workflows, from one read
-// of its tree with every blob in it. fast and all call it before they
+// commitChecks judges commit with hygiene, workflows and reqs, from one
+// read of its tree with every blob in it. fast and all call it before they
 // start mise or any step, and report its verdicts after the steps
 // (checks.verdict). The steps run code of the change under test, and
 // that code could rewrite the working tree, the index, HEAD or an
@@ -601,9 +601,11 @@ func commitChecks(ctx context.Context, repo git.Repo, commit string) ([]verdict,
 		return nil, err
 	}
 	findings, err := hygieneOf(files)
+	reqs, _, reqsErr := reqsOf(files)
 	return []verdict{
 		{name: "hygiene", findings: findings, err: err},
 		{name: "workflows", findings: workflowsOf(files)},
+		{name: "reqs", findings: reqs, err: reqsErr},
 	}, nil
 }
 
