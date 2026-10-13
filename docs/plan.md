@@ -560,6 +560,7 @@ task lands it.
 | `golangci-lint`, `govulncheck` | `mise.lock`; `govulncheck` and `golangci-lint` run from the paths `mise which` resolves, at the version `mise.lock` locks; the `govulncheck` lock entry has no checksum (it rests on the Go checksum database) | 12 12.1, 10 10.2 | T001, T002 |
 | `reuse` | the container image `fsfe/reuse:6.2.0@sha256:<digest>` in `tools/ci`, run on Linux only | 12 12.1, 10 10.2 | T002 |
 | `gh`, for `tools/release verify` | an exact version in `mise.toml`, with a sha256 per platform in `mise.lock`; started by the path `mise which` resolves, never through `mise exec` | 12 12.1, 10 10.2 | PR #27 (round 8, DR7), merged |
+| `gopls`, a dev tool for editors and agents | an exact version in `mise.toml`, locked in `mise.lock` with no checksum, like `govulncheck` (it rests on the Go checksum database); no step of `tools/ci` starts it | 12 12.1 | PR #44 |
 | GitHub Actions | `uses` with a 40-hex commit SHA | 10 10.2 | T002, T088 |
 | mise on the CI runners | one `uses` step with a 40-hex commit SHA, the mise version and its sha256 in `with`; Go and the other tools come from `mise.lock` through it | 10 10.2 | T002 |
 | Go dependencies | `go.mod`, `go.sum`; the complete v1 list is in 12 12.1 | 12 12.1 | the first importer of each (rule 7): T125 and T053 |
@@ -578,8 +579,8 @@ again: by hand until block A, by the probe after it.
 **The rule for `gh` and every pinned tool** (12 12.1). Each tool pin is
 an exact version with a sha256 per architecture, never "latest", and
 a pin-freshness check reports each pin for which a newer version is
-published. The tool rows above already have that form, except the two
-whose form 12 12.1 keeps (`govulncheck` and `reuse`); 12 12.1 holds
+published. The tool rows above already have that form, except the three
+whose form 12 12.1 keeps (`govulncheck`, `gopls` and `reuse`); 12 12.1 holds
 the one list of tool pins. T088 builds the check, `tools/ci pins`: it
 is the last task that adds a tool pin, so every pin exists when it
 lands. The check reads the network and runs by hand; its scheduled

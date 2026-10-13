@@ -556,8 +556,9 @@ func TestSetup(t *testing.T) {
 	t.Setenv("DOCKER_HOST", "unix:///nowhere")
 	t.Setenv("GITHUB_ACTIONS", "")
 	t.Setenv("MISE_ENV", "ci")
-	// The install builds govulncheck with the go command, so it gets
-	// GOENV=off and GOTOOLCHAIN=local even when the process holds others.
+	// The install builds govulncheck and gopls with the go command, so it
+	// gets GOENV=off and GOTOOLCHAIN=local even when the process holds
+	// others.
 	// passThroughEnv already drops these two, so the override itself is
 	// held by TestMiseEnvList.
 	t.Setenv("GOENV", "/from/the/process")

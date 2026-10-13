@@ -322,7 +322,7 @@ var lintTargets = []lintTarget{
 // go.sum decides which module content is accepted, and none of the five
 // can add an entry to it. They are NOT kept by the mise installs and by
 // "go mod download" of setup, where the checksum database is the guard
-// (the install that builds govulncheck has no go.sum).
+// (the installs that build govulncheck and gopls have no go.sum).
 var (
 	networkPassThrough  = []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}
 	dockerPassThrough   = []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"}
