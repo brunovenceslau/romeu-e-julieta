@@ -46,8 +46,10 @@ func Main(name string, stderr io.Writer, run func(ctx context.Context) int) int 
 			// Notify delivers only the two signals above, both a
 			// syscall.Signal on unix.
 			s, _ := sig.(syscall.Signal)
-			handled <- s
 			interrupt(cancel, g, func() { signal.Stop(sigs) })
+			// Sent once the groups are dead, so Main returns no status
+			// while a group of its command still runs.
+			handled <- s
 		case <-done:
 		}
 	}()

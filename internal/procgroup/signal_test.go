@@ -98,7 +98,7 @@ func TestMainWithoutSignal(t *testing.T) {
 	status := Main(helperName, &stderr, func(ctx context.Context) int {
 		g, ok := ctx.Value(groupsKey{}).(*groups)
 		require.True(t, ok, "Main hands its groups to Run through the context")
-		require.NoError(t, Run(ctx, Command{Class: ToolQuery, Argv: []string{"/bin/sh", "-c", "exit 0"}, Env: shellEnv}))
+		require.NoError(t, Run(ctx, Command{Class: JulietaGit, Argv: []string{"/bin/sh", "-c", "exit 0"}, Env: shellEnv}))
 		g.mu.Lock()
 		defer g.mu.Unlock()
 		assert.Empty(t, g.leaders, "a group that ended is forgotten")

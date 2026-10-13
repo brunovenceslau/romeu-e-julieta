@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// TestTimeouts pins the timeout table: the starting values of 04 4.1,
-// Starting values, then the classes of tools/ci and tools/mutants. The
-// salvage exec, the hook stages and the pane steps have no timeout.
+// TestTimeouts pins the timeout table, the starting values of 04 4.1,
+// Starting values. The salvage exec, the hook stages and the pane steps
+// have no timeout.
 func TestTimeouts(t *testing.T) {
 	want := map[Class]time.Duration{
 		SbxRead:      30 * time.Second,
@@ -29,9 +30,6 @@ func TestTimeouts(t *testing.T) {
 		Mise:         30 * time.Minute,
 		Herdr:        30 * time.Second,
 		Unbounded:    0,
-		ToolStep:     15 * time.Minute,
-		ToolRace:     40 * time.Minute,
-		ToolQuery:    2 * time.Minute,
 	}
 	assert.Len(t, timeouts, len(want), "every class has a row, and every row a class")
 	for class, limit := range want {
@@ -66,4 +64,15 @@ func TestWithTestTimeout(t *testing.T) {
 	nested := WithTestTimeout(ctx, SbxChange, time.Second)
 	assert.Equal(t, time.Millisecond, limitOf(nested, SbxRead), "an outer setting stays")
 	assert.Equal(t, time.Second, limitOf(nested, SbxChange))
+}
+
+// TestWithTestTimeoutAtOrBelowZero checks that a limit at or below zero
+// set through the seam means no timeout, as a zero does in the table.
+func TestWithTestTimeoutAtOrBelowZero(t *testing.T) {
+	for _, d := range []time.Duration{0, -time.Second} {
+		ctx := WithTestTimeout(t.Context(), SbxRead, d)
+		assert.Equal(t, d, limitOf(ctx, SbxRead))
+		err := Run(ctx, Command{Class: SbxRead, Argv: []string{"/bin/sh", "-c", "sleep 0.1"}, Env: shellEnv})
+		require.NoError(t, err, "limit %s", d)
+	}
 }

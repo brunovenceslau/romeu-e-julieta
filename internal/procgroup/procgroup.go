@@ -5,12 +5,20 @@
 
 // Package procgroup starts every subprocess of both binaries, of
 // tools/ci and of tools/mutants (04 4.1, Subprocesses): each command
-// runs in a process group of its own, with exactly the environment its
-// caller gives and the timeout of its class (the timeout table of
-// class.go); a timeout, a cancellation and the signal rule kill the
-// whole group, and the drain of the output pipes after the kill is
-// bounded by WaitDelay. Main is the one signal handler both mains
-// install (04 4.1, Signals).
+// runs in a process group of its own, with the timeout of its class
+// (the timeout table of class.go); a timeout, a cancellation and the
+// signal rule kill the whole group, and so does the end of the leader,
+// and the drain of the output pipes after the kill is bounded by
+// WaitDelay. Main is the one signal handler both mains install (04 4.1,
+// Signals).
+//
+// The scrubbed environment of 04 4.1 has its one implementation here
+// in this form: a command gets exactly the Env its caller gives and
+// never inherits this process's. Which variables a call carries, and
+// that the product names sbx and git by absolute path from host
+// settings (04 4.1, Subprocesses, item 1), are the callers' rules:
+// sbxdrv and gitsafe for romeu, the mise, hooks and layout packages for
+// julieta, and tools/ci and tools/mutants for themselves.
 //
 // A grandchild that calls setsid leaves the group, and the group kill
 // does not reach it. Non-unix builds are unsupported on purpose: the
@@ -23,34 +31,41 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 )
 
 // WaitDelay is how long Run lets the output pipes drain after the
-// command is killed or exits (04 4.1, Subprocesses, item 4).
+// group is killed (04 4.1, Subprocesses, item 4).
 const WaitDelay = 2 * time.Second
 
-// ErrNotFound is the error of a command whose program is not there; it
-// is os/exec's, so errors.Is matches either name.
+// ErrNotFound is the error of a command whose program is not there,
+// named on PATH or by a path. It is os/exec's, so errors.Is matches
+// either name.
 var ErrNotFound = exec.ErrNotFound
 
 var (
 	errNoArgv    = errors.New("procgroup: empty argv")
 	errNoClass   = errors.New("procgroup: no timeout class")
-	errNotAGroup = errors.New("procgroup: a pid at or below 1 names no group of ours")
+	errNotAGroup = errors.New("procgroup: not a group of ours to kill")
 )
+
+// kill is syscall.Kill. Tests replace it with a recorder, so that no
+// test sends a real signal to a pid KillGroup must refuse.
+var kill = syscall.Kill
 
 // Command is one subprocess to run.
 type Command struct {
 	// Class is the row of the timeout table the command runs under.
 	Class Class
-	// Argv is the program and its arguments. The product names the
-	// program by absolute path (04 4.1, Subprocesses, item 1); a bare
-	// name is looked up in this process's PATH.
+	// Argv is the program and its arguments. A bare name is looked up
+	// in this process's PATH.
 	Argv []string
 	// Dir is the working directory; empty means this process's.
 	Dir string
@@ -59,7 +74,9 @@ type Command struct {
 	Env []string
 	// Stdin is the standard input; nil means an empty one.
 	Stdin io.Reader
-	// Stdout and Stderr receive the output; nil discards it.
+	// Stdout and Stderr receive the output; nil discards it. When both
+	// are the same writer, the command writes both to one pipe, in the
+	// order it wrote them.
 	Stdout io.Writer
 	Stderr io.Writer
 }
@@ -85,13 +102,25 @@ func (e *ExitError) Error() string {
 func (e *ExitError) Unwrap() error { return e.err }
 
 // Run runs the command in a process group of its own and waits for it.
+//
 // The group is killed when ctx is cancelled, when the limit of the
 // class passes, which is the error subprocess-timeout (*TimeoutError),
-// when the signal handler of Main fires, and in every case once the
-// leader has ended: os/exec kills only while the leader runs, so a
-// grandchild that outlives a leader which ended, and holds the output
-// pipe until WaitDelay, is still Run's to kill.
-// A command that ends with a status other than 0 is an *ExitError.
+// when the signal handler of Main fires, and in every case as soon as
+// the leader has ended: os/exec kills only while the leader runs, so a
+// grandchild that outlives the leader is Run's to kill. Run reads the
+// output through pipes of its own, so it can kill the group between the
+// end of the leader and the drain: a grandchild in the group that holds
+// the output pipe dies at once, and the pipe closes.
+//
+// After the kill the drain waits at most WaitDelay, for a holder of the
+// pipe that left the group with setsid. Past that bound Run stops
+// reading and returns the leader's result, nil for a leader that
+// exited 0: the command's own work succeeded, its group is dead, and
+// what it wrote before it ended has been read; only what the escaped
+// holder writes later is lost, and it was never the command's result.
+//
+// A command that ends with a status other than 0 is an *ExitError, and
+// a program that is not there is ErrNotFound.
 func Run(ctx context.Context, c Command) error {
 	if len(c.Argv) == 0 {
 		return errNoArgv
@@ -110,20 +139,49 @@ func Run(ctx context.Context, c Command) error {
 	cmd.Dir = c.Dir
 	// os/exec gives a nil Env the environment of this process.
 	cmd.Env = append([]string{}, c.Env...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = c.Stdin, c.Stdout, c.Stderr
+	cmd.Stdin = c.Stdin
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return KillGroup(cmd.Process.Pid) }
 	cmd.WaitDelay = WaitDelay
-	g, _ := ctx.Value(groupsKey{}).(*groups)
-	if err := g.start(cmd); err != nil {
+	out, err := attach(cmd, c.Stdout, c.Stderr)
+	if err != nil {
 		return err
 	}
-	err := cmd.Wait()
+	g, _ := ctx.Value(groupsKey{}).(*groups)
+	if err := g.start(cmd); err != nil {
+		out.abort()
+		return startError(c, err)
+	}
+	out.started()
+	err = cmd.Wait()
 	g.end(cmd.Process.Pid)
+	if drainErr := out.drain(WaitDelay); err == nil {
+		err = drainErr
+	}
 	return result(ctx, runCtx, c, limit, err)
 }
 
-// result gives Run's error for what Wait returned.
+// startError gives Run's error for a command that did not start. The
+// kernel says ENOENT both for a missing program and for a missing
+// working directory, so a program named by a path is looked up to tell
+// the two apart.
+func startError(c Command, err error) error {
+	if errors.Is(err, exec.ErrNotFound) || !errors.Is(err, fs.ErrNotExist) || !strings.Contains(c.Argv[0], "/") {
+		return err
+	}
+	program := c.Argv[0]
+	if !filepath.IsAbs(program) && c.Dir != "" {
+		program = filepath.Join(c.Dir, program)
+	}
+	if _, statErr := os.Stat(program); errors.Is(statErr, fs.ErrNotExist) {
+		return fmt.Errorf("%w: %w", ErrNotFound, err)
+	}
+	return err
+}
+
+// result gives Run's error for what Wait returned. A command that
+// failed at the moment its limit passed is reported as the timeout:
+// Wait cannot tell a failure the deadline caused from one it did not.
 func result(ctx, runCtx context.Context, c Command, limit time.Duration, err error) error {
 	switch {
 	case err == nil:
@@ -156,14 +214,15 @@ func CombinedOutput(ctx context.Context, c Command) ([]byte, error) {
 
 // KillGroup sends SIGKILL to the process group that pid leads. A group
 // that is already gone is os.ErrProcessDone, which os/exec does not
-// report from Cancel. A pid at or below 1 is refused: kill(-1)
-// reaches every process this user may signal, and kill(0) the
-// caller's own group.
+// report from Cancel. It refuses a pid that names no group of a child:
+// at or below 1, since kill(-1) reaches every process this user may
+// signal and kill(0) the caller's own group, and the caller's own
+// group, which a child in a group of its own never leads.
 func KillGroup(pid int) error {
-	if pid <= 1 {
+	if pid <= 1 || pid == syscall.Getpgrp() {
 		return fmt.Errorf("%w: %d", errNotAGroup, pid)
 	}
-	err := syscall.Kill(-pid, syscall.SIGKILL)
+	err := kill(-pid, syscall.SIGKILL)
 	if errors.Is(err, syscall.ESRCH) {
 		return os.ErrProcessDone
 	}
@@ -182,8 +241,8 @@ type groupsKey struct{}
 // nothing: a Run outside Main.
 type groups struct {
 	mu       sync.Mutex
-	leaders  map[int]bool // the pids of the leaders of the running groups
-	isClosed bool         // the handler has fired: no group starts any more
+	leaders  map[int]struct{} // the pids of the leaders of the running groups
+	isClosed bool             // the handler has fired: no group starts any more
 }
 
 // start starts cmd and records its group. The lock covers the start,
@@ -203,19 +262,20 @@ func (g *groups) start(cmd *exec.Cmd) error {
 		return err
 	}
 	if g.leaders == nil {
-		g.leaders = map[int]bool{}
+		g.leaders = map[int]struct{}{}
 	}
-	g.leaders[cmd.Process.Pid] = true
+	g.leaders[cmd.Process.Pid] = struct{}{}
 	return nil
 }
 
-// end kills the group of a leader that Wait reaped, and forgets it. A
-// group with members keeps its pgid, so -pgid reaches only this group.
-// The window after the group has fully emptied, between the last reap
-// and this kill, which a reuse would need a full pid wrap to hit, is
-// accepted, as it is on os/exec's Cancel path. The kill's own error is
-// dropped on purpose: the command's result already stands, and
-// WaitDelay has bounded the wait.
+// end kills the group of a leader that Wait reaped, and forgets it.
+// os/exec signals a leader through a pidfd on Linux, but a group has
+// none, so the kill names the group by number. While the group has a
+// member its pgid is not reused, so -pgid reaches only this group; the
+// window after it has fully emptied, between the last reap and this
+// kill, would need a full wrap of the pid space to hit, and is
+// accepted. The kill's own error is dropped on purpose: the command's
+// result already stands, and the drain is bounded.
 func (g *groups) end(pid int) {
 	if g != nil {
 		g.mu.Lock()

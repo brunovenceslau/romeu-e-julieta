@@ -22,41 +22,64 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// thisPackage is the path of this package below the module root.
+// The call-site scan is a test of this package until T039 moves it into
+// the callsites check of tools/ci, beside the I16 scan (decided on
+// 2026-10-13).
+
+// thisPackage is the directory of this package below the module root.
+// Only files directly in it are admitted: a subpackage or a sibling
+// whose name starts the same is not this package.
 const thisPackage = "internal/procgroup"
 
-// admittedExec are the directories, below the module root, whose files
-// may import os/exec: this package, and, until T105 switches them to
-// it, tools/ci and tools/mutants, whose own copy of the group rule
-// lives in tools/ci/procgroup. T105 removes the two tools entries.
-var admittedExec = []string{thisPackage, "tools/ci", "tools/mutants"}
+// admittedTools are the directories, below the module root, whose files
+// may still import os/exec and os/signal: tools/ci and tools/mutants,
+// whose own copy of the group rule and signal handler lives in
+// tools/ci/procgroup and their mains until T105 switches them to this
+// package and removes these two entries.
+var admittedTools = []string{"tools/ci", "tools/mutants"}
+
+// guardedImports are the packages whose import outside this package
+// starts a subprocess or maps a signal around it.
+var guardedImports = []string{"os/exec", "os/signal"}
+
+// startCalls are the functions, by package path, that start or replace
+// a process without os/exec; no file outside this package calls them.
+var startCalls = map[string][]string{
+	"os":                    {"StartProcess"},
+	"syscall":               {"Exec", "ForkExec", "StartProcess"},
+	"golang.org/x/sys/unix": {"Exec"},
+}
 
 // TestCallSites is the call-site scan of 04 4.1, Subprocesses, item 4,
-// beside the I16 scan of 05 5.2, over this module: no file outside the
-// admitted directories imports os/exec, so every subprocess starts
-// here, and only a test file sets the seam of the timeout table.
+// over this module: every subprocess starts here and nothing else maps
+// a signal, and only a test file sets the seam of the timeout table.
 func TestCallSites(t *testing.T) {
 	root := moduleRoot(t)
 	data, err := os.ReadFile(filepath.Join(root, "go.mod"))
 	require.NoError(t, err)
 	module := modulePath(data)
 	require.NotEmpty(t, module, "the module line of go.mod")
-	findings, err := callSiteFindings(root, module, admittedExec)
+	findings, err := callSiteFindings(root, module, admittedTools)
 	require.NoError(t, err)
 	assert.Empty(t, findings)
 }
 
 // callSiteFixture is the tree of the positive control, written to a
 // temporary directory, since a Go file under testdata would escape the
-// linters: a package outside procgroup that calls exec.Command, in a
-// source file and in a test file, and that sets the seam outside a
-// test; and what the scan admits or leaves out.
+// linters. Each file outside procgroup tries one way around the rule;
+// the rest is what the scan admits or leaves out.
 var callSiteFixture = map[string]string{
 	"internal/procgroup/run.go": `package procgroup
 
-import "os/exec"
+import (
+	"os/exec"
+	"os/signal"
+	"syscall"
+)
 
 func Start(name string) error { return exec.Command(name).Start() }
+
+func Notify() { signal.Ignore(); _ = syscall.Exec }
 
 func WithTestTimeout() {}
 `,
@@ -92,19 +115,80 @@ import "example.com/fixture/internal/other"
 
 func Other() { other.WithTestTimeout() }
 `,
-	"tools/ci/ci.go": `package ci
+	"internal/fixture/signal.go": `package fixture
+
+import "os/signal"
+
+func Ignore() { signal.Ignore() }
+`,
+	"internal/fixture/start.go": `package fixture
+
+import (
+	sys "syscall"
+	"os"
+
+	"golang.org/x/sys/unix"
+)
+
+func Start() {
+	_, _ = os.StartProcess("/bin/true", nil, nil)
+	_, _ = sys.ForkExec("/bin/true", nil, nil)
+	_ = sys.Exec("/bin/true", nil, nil)
+	_ = unix.Exec("/bin/true", nil, nil)
+	f := os.StartProcess
+	_ = f
+}
+`,
+	"internal/fixture/dot.go": `package fixture
+
+import . "example.com/fixture/internal/procgroup"
+
+func Shorten() { WithTestTimeout() }
+`,
+	"internal/fixture/cgo.go": `package fixture
+
+// int system(const char*);
+import "C"
+
+func Run() { C.system(nil) }
+`,
+	"internal/fixture/linkname.go": `package fixture
+
+import _ "unsafe"
+
+//go:linkname forkExec syscall.forkExec
+func forkExec()
+`,
+	"internal/procgroup/sub/sub.go": `package sub
 
 import "os/exec"
 
-func Start(name string) error { return exec.Command(name).Start() }
+func Start() error { return exec.Command("gh").Start() }
+`,
+	"internal/procgroupx/x.go": `package procgroupx
+
+import "os/exec"
+
+func Start() error { return exec.Command("gh").Start() }
+`,
+	"tools/ci/ci.go": `package ci
+
+import (
+	"os/exec"
+	"os/signal"
+)
+
+func Start(name string) error { signal.Ignore(); return exec.Command(name).Start() }
 `,
 	"internal/fixture/testdata/ignored.go": `package ignored
 
 import "os/exec"
-
-func Start(name string) error { return exec.Command(name).Start() }
 `,
 	"internal/.hidden/ignored.go": `package ignored
+
+import "os/exec"
+`,
+	"internal/_ignored/ignored.go": `package ignored
 
 import "os/exec"
 `,
@@ -119,12 +203,23 @@ func TestCallSiteFindings(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o700))
 		require.NoError(t, os.WriteFile(p, []byte(content), 0o600))
 	}
-	findings, err := callSiteFindings(root, "example.com/fixture", admittedExec)
+	findings, err := callSiteFindings(root, "example.com/fixture", admittedTools)
 	require.NoError(t, err)
 	assert.Equal(t, []string{
+		"internal/fixture/cgo.go: imports C, whose calls start programs past this package",
+		"internal/fixture/dot.go: dot-imports example.com/fixture/internal/procgroup, which hides its calls from this scan",
 		"internal/fixture/exec.go: imports os/exec outside internal/procgroup",
+		"internal/fixture/linkname.go: has a go:linkname directive, which reaches past this package",
 		"internal/fixture/seam.go: sets procgroup.WithTestTimeout outside a test file",
 		"internal/fixture/seam_test.go: imports os/exec outside internal/procgroup",
+		"internal/fixture/signal.go: imports os/signal outside internal/procgroup",
+		"internal/fixture/start.go: calls golang.org/x/sys/unix.Exec outside internal/procgroup",
+		"internal/fixture/start.go: calls os.StartProcess outside internal/procgroup",
+		"internal/fixture/start.go: calls os.StartProcess outside internal/procgroup",
+		"internal/fixture/start.go: calls syscall.Exec outside internal/procgroup",
+		"internal/fixture/start.go: calls syscall.ForkExec outside internal/procgroup",
+		"internal/procgroup/sub/sub.go: imports os/exec outside internal/procgroup",
+		"internal/procgroupx/x.go: imports os/exec outside internal/procgroup",
 	}, findings)
 }
 
@@ -155,13 +250,10 @@ func modulePath(gomod []byte) string {
 }
 
 // callSiteFindings walks the Go files of the tree at root, a module
-// whose path is module, and returns one line per breach, sorted: a file
-// outside the admitted directories that imports os/exec, and a file
-// other than a test file that refers to WithTestTimeout of this
-// package. It leaves out what the go command leaves out: testdata, and
-// directories whose name starts with "." or "_".
-func callSiteFindings(root, module string, admitted []string) ([]string, error) {
-	self := module + "/" + thisPackage
+// whose path is module, and returns one line per breach, sorted. It
+// leaves out this package's own files and what the go command leaves
+// out: testdata, and directories whose name starts with "." or "_".
+func callSiteFindings(root, module string, tools []string) ([]string, error) {
 	var findings []string
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -182,50 +274,69 @@ func callSiteFindings(root, module string, admitted []string) ([]string, error) 
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		file, err := parser.ParseFile(token.NewFileSet(), p, nil, parser.SkipObjectResolution)
+		if path.Dir(rel) == thisPackage {
+			return nil
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), p, nil, parser.ParseComments|parser.SkipObjectResolution)
 		if err != nil {
 			return err
 		}
-		findings = append(findings, fileFindings(rel, file, self, admitted)...)
+		findings = append(findings, fileFindings(rel, file, module+"/"+thisPackage, tools)...)
 		return nil
 	})
 	slices.Sort(findings)
 	return findings, err
 }
 
-// fileFindings returns the breaches of one file, whose path below the
-// module root is rel.
-func fileFindings(rel string, file *ast.File, self string, admitted []string) []string {
+// fileFindings returns the breaches of one file outside this package,
+// whose path below the module root is rel and which imports this
+// package as self.
+func fileFindings(rel string, file *ast.File, self string, tools []string) []string {
 	var findings []string
-	seam := map[string]bool{} // the names this file gives this package
+	names := map[string]string{} // the name a file gives an import, to its path
 	for _, spec := range file.Imports {
 		imported, err := strconv.Unquote(spec.Path.Value)
 		if err != nil {
 			continue
 		}
-		switch imported {
-		case "os/exec":
-			if !inside(rel, admitted) {
-				findings = append(findings, rel+": imports os/exec outside "+thisPackage)
-			}
-		case self:
-			name := path.Base(self)
-			if spec.Name != nil {
-				name = spec.Name.Name
-			}
-			seam[name] = true
+		name := path.Base(imported)
+		if spec.Name != nil {
+			name = spec.Name.Name
+		}
+		names[name] = imported
+		_, starts := startCalls[imported]
+		switch {
+		case imported == "C":
+			findings = append(findings, rel+": imports C, whose calls start programs past this package")
+		case name == "." && (imported == self || starts || slices.Contains(guardedImports, imported)):
+			findings = append(findings, rel+": dot-imports "+imported+", which hides its calls from this scan")
+		case slices.Contains(guardedImports, imported) && !inside(rel, tools):
+			findings = append(findings, rel+": imports "+imported+" outside "+thisPackage)
 		}
 	}
-	if strings.HasSuffix(rel, "_test.go") || len(seam) == 0 {
-		return findings
+	for _, group := range file.Comments {
+		for _, c := range group.List {
+			if strings.HasPrefix(c.Text, "//go:linkname") {
+				findings = append(findings, rel+": has a go:linkname directive, which reaches past this package")
+			}
+		}
 	}
+	isTest := strings.HasSuffix(rel, "_test.go")
 	ast.Inspect(file, func(n ast.Node) bool {
 		sel, ok := n.(*ast.SelectorExpr)
-		if !ok || sel.Sel.Name != "WithTestTimeout" {
+		if !ok {
 			return true
 		}
-		if x, ok := sel.X.(*ast.Ident); ok && seam[x.Name] {
+		x, ok := sel.X.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		imported := names[x.Name]
+		switch {
+		case imported == self && sel.Sel.Name == "WithTestTimeout" && !isTest:
 			findings = append(findings, rel+": sets procgroup.WithTestTimeout outside a test file")
+		case slices.Contains(startCalls[imported], sel.Sel.Name):
+			findings = append(findings, rel+": calls "+imported+"."+sel.Sel.Name+" outside "+thisPackage)
 		}
 		return true
 	})

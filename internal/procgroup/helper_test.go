@@ -34,8 +34,9 @@ const helperName = "helper"
 
 // grandchildScript starts a sleep in the background, writes its pid to
 // the file $0 names and waits for it: the sleep is a grandchild of
-// whoever runs the script, in the same process group.
-const grandchildScript = `sleep 60 >/dev/null 2>&1 & echo $! > "$0"; wait`
+// whoever runs the script, in the same process group, and holds the
+// script's standard output and standard error.
+const grandchildScript = `sleep 60 & echo $! > "$0"; wait`
 
 // shellEnv is the environment of the shell commands of the tests.
 var shellEnv = []string{"PATH=/usr/bin:/bin"}
@@ -47,9 +48,10 @@ func TestHelperProcess(t *testing.T) {
 	switch os.Getenv(helperEnv) {
 	case "":
 		return
-	case "escape":
+	case "escape", "escape-exit":
 		// Hold the output pipe from a session of its own, which a kill of
-		// the process group does not reach, and write its pid.
+		// the process group does not reach, and write its pid; then the
+		// leader waits, or with escape-exit exits 0 at once.
 		child := exec.Command(os.Args[0], "-test.run=^TestHelperProcess$")
 		child.Env = append(os.Environ(), helperEnv+"=sleep")
 		child.Stdout, child.Stderr = os.Stdout, os.Stderr
@@ -58,7 +60,9 @@ func TestHelperProcess(t *testing.T) {
 			os.Exit(2)
 		}
 		writeOrExit(os.Getenv(pidfileEnv), strconv.Itoa(child.Process.Pid))
-		time.Sleep(time.Minute)
+		if os.Getenv(helperEnv) == "escape" {
+			time.Sleep(time.Minute)
+		}
 	case "sleep":
 		time.Sleep(15 * time.Second)
 	case "group":

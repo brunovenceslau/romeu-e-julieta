@@ -17,8 +17,9 @@ import (
 // zero value names none, and Run refuses it.
 type Class int
 
-// The classes of the timeout table: the rows of 04 4.1, Starting
-// values, then those of tools/ci and tools/mutants.
+// The classes of the timeout table, the rows of 04 4.1, Starting
+// values. The classes of tools/ci and tools/mutants come with the task
+// that switches them to this package (T105).
 const (
 	classNone    Class = iota // no class named: Run refuses it
 	SbxRead                   // an sbx read: version, ls --json, env plan, policy ls, the secret and settings listings
@@ -33,9 +34,6 @@ const (
 	Mise                      // mise install and mise lock
 	Herdr                     // herdr
 	Unbounded                 // the salvage exec, the hook stages and the pane steps: no timeout
-	ToolStep                  // a step of tools/ci and a go command of tools/mutants
-	ToolRace                  // the race step of tools/ci all, which builds every package with the race detector
-	ToolQuery                 // a git command of the tools, and their short probes of the machine and the toolchain
 )
 
 // timeouts is the timeout table, keyed by class. The rows of the
@@ -45,9 +43,8 @@ const (
 // longer value was taken. Zero means no timeout: the salvage exec moves
 // up to the salvage cap and stops only on an interrupt, and the hook
 // stages and the pane steps are the user's own programs (04 4.1,
-// Subprocesses, item 5). The tool rows are the bounds tools/ci uses
-// today (stepTimeout, raceTimeout and git.Timeout), so that the switch
-// of tools/ci and tools/mutants to this package keeps their behaviour.
+// Subprocesses, item 5). Nothing writes the table: Go has no constant
+// map, and a table keyed by class is what 04 4.1 asks for.
 var timeouts = map[Class]time.Duration{
 	SbxRead:      30 * time.Second,
 	SbxChange:    2 * time.Minute,
@@ -61,9 +58,6 @@ var timeouts = map[Class]time.Duration{
 	Mise:         30 * time.Minute,
 	Herdr:        30 * time.Second,
 	Unbounded:    0,
-	ToolStep:     15 * time.Minute,
-	ToolRace:     40 * time.Minute,
-	ToolQuery:    2 * time.Minute,
 }
 
 // classNames are the names the details of subprocess-timeout print.
@@ -80,9 +74,6 @@ var classNames = map[Class]string{
 	Mise:         "mise",
 	Herdr:        "herdr",
 	Unbounded:    "unbounded",
-	ToolStep:     "tool-step",
-	ToolRace:     "tool-race",
-	ToolQuery:    "tool-query",
 }
 
 // Timeout returns the limit of the class in the table; zero means the
@@ -113,7 +104,8 @@ type testTimeoutKey struct{}
 // have the limit d instead of the one of the table. It is the seam of
 // the table, and only tests set it: the call-site scan of this
 // package fails a call outside a _test.go file. A context carries it,
-// so tests that run in parallel each have their own table.
+// so tests that run in parallel each have their own table. A d at or
+// below zero means no timeout, as a zero does in the table.
 func WithTestTimeout(ctx context.Context, c Class, d time.Duration) context.Context {
 	limits := map[Class]time.Duration{}
 	if outer, ok := ctx.Value(testTimeoutKey{}).(map[Class]time.Duration); ok {
