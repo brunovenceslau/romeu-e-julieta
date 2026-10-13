@@ -1111,7 +1111,8 @@ A check that fails after a tag is fixed by a new patch version.
   ([04 4.1](04-cli.md#subprocesses)); `REQ-0958` every subprocess has a timeout,
   except the salvage exec, which stops only on an interrupt, and the
   hook stages and pane steps of julieta, which are the user's own
-  programs.
+  programs, and the `go` build check and test runs of `tools/mutants`
+  (04 4.1, Subprocesses, item 5).
 - `REQ-1229` No global state except the embedded catalog, kits and binaries, and
   the registries that `init` fills at program start (checks, `tools/new`
   kinds, commands), which nothing writes after `main` starts.
