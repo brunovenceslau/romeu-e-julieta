@@ -380,7 +380,7 @@ covers a command for them).
 | M2 | Kits in daily use | sitting M2: recreate wave 1, one project per slot, each sandbox built from the `julieta`, `julieta-claude` and `git-ssh-sign` product kits plus one personal kit from the config repository | every daily sandbox built from the product kits plus one personal kit; mise per repository through `julieta install` and `lock`; commits signed with the one key of `git-ssh-sign` |
 | M3 | romeu renders and runs | sitting M3: J1 for real on the config project from a `--dry-run` build of `main` (`init`, `doctor`, `approve --toolchain`, `sync`, `run`), then one project per slot until every project definition is rendered by `romeu sync` | every project definition rendered under gate 2, its egress derived and its secrets bound in host settings, the kit pins in one file, and `romeu run` as the one way into a sandbox |
 | M4 | Nothing lost | sitting M4: one `romeu recreate` rehearsal with a planted dirty worktree, stash and ignored file; J6 and J10 pass in CI with the fake sbx; on the host, the rehearsal's `romeu recreate` transcript and salvage listing, read by the maintainer, are the Evidence | recreate, rm and retire with a complete salvage; `romeu pull` and `romeu handoff` |
-| M5 | Every project on romeu | sitting M5: one month of daily use after the last slot of sitting M3 with no hand-applied step and no open runbook section; every open item of a project is still a `julieta memory` entry or closed, with no item left in the store since the cut-over of sitting M1 (T111, read again by T119). M5 is a wait, not a gate: the release and docs tasks of M6 whose trigger fired at the last slot of sitting M3 run during it, and blocks O3 to O7 wait for the end of M5 only where they need a sitting | the product as the one path, with memory as the one place for open items |
+| M5 | Every project on romeu | sitting M5: one month of daily use after the last slot of sitting M3 with no hand-applied step and no open runbook section; every open item of a project is still a `julieta memory` entry or closed, and the store holds no item that the open-items list of the cut-over of sitting M1 does not name (T111, read again by T119). M5 is a wait, not a gate: the release and docs tasks of M6 whose trigger fired at the last slot of sitting M3 run during it, and blocks O3 to O7 wait for the end of M5 only where they need a sitting | the product as the one path, with memory as the one place for open items |
 | M6 | Public v1 | the release checklist of 12 12.2 completes: blocks A and B on both hosts, `v1.0.0`, `docs/acceptance.json` | the v1.0.0 release with its evidence |
 
 **The sittings.** A sitting is named by its milestone: sitting Mn ends
@@ -401,8 +401,9 @@ Evidence.
   once T012 merged (about 40 minutes on one host; one approval).
 - **Sitting M1** (ends M1): the bridge (T111) on two projects first,
   then every project; the open-items cut-over, the one-off entry of
-  the store's items run twice per project (T111); one week of daily
-  use; the names gate verified from a sandbox again (T111). Output:
+  the store's items per project (T111); one week of daily use; the
+  entry run again at the end of the sitting and the names gate
+  verified from a sandbox again (T111). Output:
   `julieta status` and `handoff show --hook`, read in each sandbox,
   and the entry's counts in the runbook (3 definition edits per
   project and the entry run twice, counted from T111, plus one host
@@ -421,8 +422,8 @@ Evidence.
   the three planted cases, `romeu recreate` and the read of its
   listing, counted from T117; one approval).
 - **Sitting M5** (ends M5): T119, the closing read (per project: the
-  read that no open item is left in the store since sitting M1,
-  counted from T119; one approval).
+  read that the store holds no item that the open-items list of
+  sitting M1 does not name, counted from T119; one approval).
 - **M6 has two sittings**, the earlier blocks O3 and O5 to O7, under
   [Operator blocks](#operator-blocks).
 
@@ -834,8 +835,8 @@ sitting that decides it and nothing decided now; items 21 to 26 record
 the other decisions of that day. Items 19 and 22 were amended on
 2026-10-13, each as the stage-B review recommended. Items 8 to 11 stay
 open: each is needed before the task or sitting it names, and its
-answer is recorded here as "decided on" with the date. T108's decision record records
-these answers again with the rules they decide.
+answer is recorded here as "decided on" with the date. T108's decision
+record records these answers again with the rules they decide.
 
 1. **Registration by file** in place of generated dispatcher tables
    for `tools/ci` steps and commands. Decided on 2026-10-12: yes, as
@@ -940,8 +941,9 @@ these answers again with the rules they decide.
     the store's items runs at sitting M1, and again at its end, after
     the store's last writer has left the definitions; from sitting M1
     julieta is the one path for new items, and T119 reads at sitting M5
-    that no item is left in the store. The alternative not taken: the
-    cut-over at T119 (M5).
+    that the store holds no item that the open-items list of sitting M1
+    does not name. The alternative not taken: the cut-over at T119
+    (M5).
 20. **The render types slice.** A deferred decision: it is decided at
     sitting M2, the sitting that opens M3, from the measured lane, and
     nothing is decided now. The options: a slice, with the next free
@@ -956,8 +958,8 @@ these answers again with the rules they decide.
     rows of 05 5.4 that the re-plan added or amended (the rows on
     `tools/ci pr`, on `tools/ci sequences` and on `tools/ci invariants`
     with `mutate`, the row "I34 is enforced by no code", and the
-    approval-line row amended for the grants) are accepted, with the rows of
-    [Accepted risks](#accepted-risks) that link them. Amended on
+    approval-line row amended for the grants) are accepted, with the
+    rows of [Accepted risks](#accepted-risks) that link them. Amended on
     2026-10-13: every row of [Accepted risks](#accepted-risks) is
     accepted, the plan's own rows as well as the rows that link 05 5.4.
     The alternative not taken: only the rows that link 05 5.4, with the

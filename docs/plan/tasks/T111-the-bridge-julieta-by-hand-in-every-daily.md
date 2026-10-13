@@ -11,6 +11,7 @@ needs:
   - T059
   - T060
   - T078
+  - T035
 after: []
 ask_first: []
 sitting: M1
@@ -35,8 +36,10 @@ global `core.hooksPath` before the session's first commit or push) and
 the two skills pinned from this repository at a SHA; a runbook with each
 step and its undo. The open-items cut-over, per project: the one-off
 entry of the store's open items into `julieta memory` is a command of
-the config repository that skips an item whose source id is already
-present and prints the counts on both sides, with one recorded list
+the config repository that writes each item's source id as a tag of its
+entry (`source-<id>`; 03 3.9 gives tags no behaviour but `lesson`),
+skips an item whose tag is already present and prints the counts on
+both sides, with one recorded list
 that gives each item its destination (a memory entry id, or closed); it
 runs again at the end of the sitting, after the store's last writer has
 left the definitions, and both counts are in the runbook.
@@ -54,15 +57,15 @@ enters a spec section or a product command. T079 and T114 remove the
 interim kit (Decisions this plan defers). From sitting M1 on julieta is
 the one path for new items, and the count-verified entry of the store's
 open items is this task's (item 19 of Decisions of the re-plan, amended
-on 2026-10-13); T119 reads at sitting M5 that no item is left in the
-store.
+on 2026-10-13); T119 reads at sitting M5 that the store holds no item
+that the open-items list of sitting M1 does not name.
 
 - Implements: REQ-0659 (08 8.1), REQ-0673 (08 8.2).
 - Operator: applies the three edits and the host build, two projects
   first, then every project; runs the one-off entry of the open items
-  per project, then again at the end of the sitting; then one week of
-  daily use. Rebuilds the
-  shared bin directory at each sitting and whenever a daily sandbox
+  per project; one week of daily use; runs the entry again at the end
+  of the sitting. Rebuilds the shared bin directory at each sitting and
+  whenever a daily sandbox
   needs a merged fix, with a cross-build of `main` on the host (`go
   build` for linux, or T103's `--dry-run` build once it lands), its
   sha256 in `SHA256SUMS`; each rebuild is one runbook line with the SHA
@@ -88,7 +91,7 @@ store.
   - The runbook holds the undo of each step.
   - One list per project, each open item of the store with its
     destination: a memory entry id, or closed.
-  - The entry command skips an item whose source id is present and
+  - The entry command skips an item whose `source-<id>` tag is present and
     prints the counts on both sides; both counts, from the first run and
     the end-of-sitting run, are in the runbook.
 - Verify: in each daily sandbox, read at sitting M1: `julieta status
@@ -97,4 +100,5 @@ store.
   least; the test push's hook output names both hooks; `julieta version
   --json` in each daily sandbox names the SHA the runbook's last rebuild
   line names; `julieta memory list` in each project's sandbox shows the
-  entries the open-items list names.
+  entries the open-items list names; the runbook holds the two count
+  pairs of each project, from the first run and the end-of-sitting run.
