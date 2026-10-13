@@ -10,7 +10,7 @@ owns:
 needs: []
 after: []
 ask_first:
-  - checks
+  - procgroup
 sitting: none
 ---
 
