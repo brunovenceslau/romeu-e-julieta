@@ -102,8 +102,10 @@ are derived from the same data this page specifies.
    except the salvage exec, which moves up to the salvage cap over the
    mount and stops only on an interrupt (an interrupted salvage leaves
    its dir without a `manifest.json`, which verification ignores and
-   keeps, 08 8.5), and the hook stages and pane steps of julieta, which
-   are the user's own programs. `REQ-0301` The details of `subprocess-timeout`
+   keeps, 08 8.5), the hook stages and pane steps of julieta, which
+   are the user's own programs, and the `go` build check and test runs
+   of `tools/mutants`, which run with no timeout (the last row of the
+   table below). `REQ-0301` The details of `subprocess-timeout`
    name the class and its limit, and its fix hint says the sandbox or
    the daemon may still be busy and names `sbx ls --json`.
 
@@ -127,11 +129,11 @@ and each caller names its class.
 | `git clone` and `git fetch` on the host | 15 min |
 | each secret argv and the credential helper | 30 s |
 | julieta's own `git` | 5 min |
-| `mise install` and `mise lock`; `go env` in `tools/mutants`, whose mise shim may install go on a cold cache | 30 min |
+| `mise install` (also the one in the setup of `tools/ci all`) and `mise lock`; `go env` in `tools/mutants`, whose mise shim may install go on a cold cache | 30 min |
 | `herdr` | 30 s |
-| a command step of `tools/ci fast` or `tools/ci all`, the race step excepted | 15 min |
+| a command step of `tools/ci fast` or `tools/ci all`, the setup steps `mise trust` and `go mod download` included, `mise install` and the race step excepted | 15 min |
 | the race step of `tools/ci all` | 40 min |
-| a git command of `tools/ci` or `tools/mutants`; the `git pack-objects` and `git unpack-objects` pair of `tools/mutants` shares one limit | 2 min |
+| a git command of `tools/ci` or `tools/mutants`; the `git pack-objects` and `git unpack-objects` pair of `tools/mutants` start together, and each runs under this limit, with no shared deadline | 2 min |
 | a short probe of `tools/ci` or `tools/mutants` (`uname -m`, `sysctl -n sysctl.proc_translated`, `mise which`, `mise --version`, `go list -find`) | 30 s |
 | the salvage exec, the hook stages and the pane steps | none (Subprocesses, item 5) |
 | the `go` build check and test runs of `tools/mutants` (`go test -exec=true`, the baseline `go test`, each mutant's `go test`) | none: the signal handler kills the group (Signals), and `go test -timeout` bounds each test binary that runs |
