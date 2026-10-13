@@ -3,18 +3,19 @@
 Back to [index](../spec.md). Reader: implementers of `internal/ledger`
 and of the commands that call it; security reviewers. Type: reference.
 
-**This page is a design, not a part of v1.** The runtime ledger is a
-row of [Deferred decisions](../spec.md#in-the-product); until its event
+**This page is a design, not a part of v1.** The runtime ledger is a row
+of [Deferred decisions](../spec.md#in-the-product); until its event
 fires, julieta state
 ([08 8.2](08-memory-handoff-salvage.md#82-session-hooks-user-side-middleware))
 and each command's stderr are the record. Nothing here is built in v1:
 not the commands, the two mounts, the ingest steps, the error ids, the
 invariants I31 to I33 (13.10), the residual risks (13.11) or the plan
-tasks. The design stays so that the decision starts from it when the
-row fires, and
+tasks. The design stays so that the decision starts from it when the row
+fires, and
 [ADR 0006, record runtime events in an add-only ledger ingested on the host](../adr/0006-record-runtime-events-in-an-add-only-ledger-ingested-on-the-host.md)
-stays its record. On this page, "v1" means the first release that
-builds the ledger.
+stays its record. On this page, "L1" means the first release that builds
+the ledger; "v1" keeps its meaning, the product's v1, which builds none
+of it.
 
 Problems show up when things execute. julieta records what failed
 inside a sandbox, romeu keeps those records on the host, and later
@@ -24,10 +25,10 @@ never leaves the machine: no command sends, uploads or syncs it. It is
 always on, because a capture that depends on opting in is a capture an
 agent forgets.
 
-The rule the maintainer set for it is absolute: nothing in the ledger
-is edited or deleted. v1 has no tombstone and no redaction event. This
-page says, for each part of that rule, whether a mechanism enforces it
-or whether it is a promise.
+The rule for it is absolute: nothing in the ledger is edited or deleted.
+v1 has no tombstone and no redaction event. This page says, for each
+part of that rule, whether a mechanism enforces it or whether it is a
+promise.
 
 This store is not the memory store of
 [08 8.1](08-memory-handoff-salvage.md#81-memory-store): memory is per
@@ -50,10 +51,10 @@ julieta -> spool  ---ingest--->     ledger  ---derive--->  view
 | ledger, one per machine | `$XDG_STATE_HOME/romeu/ledger/` | romeu | romeu (`ledger query`, `doctor`, view derivation) | add-only from ingest onward (I31) |
 | view, one per project | `<name>-env/ledger/view/` | romeu | that project's sandbox | derived from the ledger and the view policy (I33) |
 
-*Why for us (three stores):* each follows from a rule the spec already
-has. Agent output reaches the host only as data the host validates
-([01 1.2](01-system-model.md#12-sources-of-truth-vs-derived)); host-only
-state is never mounted (I20); no directory is mounted into two
+*Why for us (three stores):* each follows from a rule this specification
+already has. Agent output reaches the host only as data the host
+validates ([01 1.2](01-system-model.md#12-sources-of-truth-vs-derived));
+host-only state is never mounted (I20); no directory is mounted into two
 sandboxes. One shared directory would break the second and the third,
 and a host store written from a sandbox would break the first.
 
@@ -254,8 +255,9 @@ has one implementation.
   romeu validates, hashes and stores those same bytes. A file swapped
   or rewritten after the open therefore cannot make romeu store bytes
   it did not validate, and a FIFO cannot hang `salvage` or `rm`.
-- **Path-level violations** are skipped, never ingested, and have no
-  key because nothing was read:
+- **Skipped files** are never ingested and get no entry; the first three
+  reasons are found before the file is read, and `version-newer` after
+  it is read and its `schema` parsed (13.4):
 
   | Reason | Meaning |
   |---|---|
@@ -267,29 +269,31 @@ has one implementation.
   Each ingest and `doctor` report a count per reason and the first
   paths of each reason, in name order, up to the reporting limit of
   13.8. v1 has no cleaner for them (a deferred decision).
-- **Draining.** romeu deletes nothing it does not own (I16), and
-  julieta owns the spool. The view lists the keys that have an entry
-  (13.6). `julieta setup` hashes each spool file and deletes it when
-  its sha256 is a listed key, and deletes its own leftover temporary
-  names. A file whose digest is not listed stays for the next ingest.
-  The same bytes written again after a drain match an existing entry,
-  so ingest writes and reports nothing and the next `setup` drains
-  them again. A file swapped between julieta's hash and its delete is
-  lost, which is again the power the agent already has.
+- **Draining.** romeu deletes nothing it does not own (I16), and julieta
+  owns the spool. The view lists the keys that have an entry (13.6).
+  `julieta setup` hashes each spool file and deletes it when its sha256
+  is a listed key, and deletes its own leftover temporary names older
+  than its own start, as 8.1 does for a memory dir. A file whose digest
+  is not listed stays for the next ingest. The same bytes written again
+  after a drain match an existing entry, so ingest writes and reports
+  nothing and the next `setup` drains them again. A file swapped between
+  julieta's hash and its delete is lost, which is again the power the
+  agent already has.
 
 ## 13.4 Ingest
 
 Ingest reads one project's spool and creates ledger entries. It runs
-inside four commands, at the step each one names: `romeu sync` (for
-each target project), `romeu run`, `romeu salvage` (before the sandbox
-half, so also in `rm`, `recreate` and `retire`), and `romeu ledger
-ingest`. This list is the design's one home; when the ledger is built,
-it becomes the `ingest` side-effect field of each command definition,
-beside the fields 04 4.1 names, and this sentence links there. `retire` ingests a second time,
-after the sandbox half and before it moves `<name>-env/` away: the
-spool moves with that directory, so the events julieta wrote during
-its last salvage would otherwise have no next ingest. The spool is a
-host directory, so ingest needs no sandbox.
+inside four commands: `romeu sync` after its step 4 (the tree exists)
+and before the gate, for each target project; `romeu run` after step 2
+and before step 3; `romeu salvage` before the sandbox half, so also in
+`rm`, `recreate` and `retire`; and `romeu ledger ingest`. This list is
+the design's one home; when the ledger is built, it becomes the `ingest`
+side-effect field of each command definition, beside the fields 04 4.1
+names, and this sentence links there. `retire` ingests a second time,
+after the sandbox half and before it moves `<name>-env/` away: the spool
+moves with that directory, so the events julieta wrote during its last
+salvage would otherwise have no next ingest. The spool is a host
+directory, so ingest needs no sandbox.
 
 **A failed ingest never blocks.** An ingest that could not finish (a
 bad spool root, an entry that could not be written, an entry whose
@@ -389,8 +393,8 @@ the guard:
    the entry grammar cannot produce (`.tmp-<ULID>`); a hard link
    across filesystems would fail, so it cannot live elsewhere.
 2. Write it, sync it to disk and close it.
-3. Hard-link it to the entry's name. A link fails when the name
-   exists, so an entry is never replaced.
+3. Hard-link it to the entry's name and sync the directory (03 3.8). A
+   link fails when the name exists, so an entry is never replaced.
 4. Unlink the temporary name. A leftover from a crash is unlinked by
    the next command that ingests, under `romeu.lock` and before its
    first ingest (13.4), never by the ingest function.
@@ -423,10 +427,10 @@ What enforces "created once, never written again", stated plainly:
 
 ## 13.6 View
 
-The view is how a sandbox reads the ledger. The read policy is the
-maintainer's: a sandbox reads its own project's events whole, other
-projects' events as closed-schema fields only, and the full ledger is
-read only on the host, with `romeu ledger query`.
+The view is how a sandbox reads the ledger. The read policy: a sandbox
+reads its own project's events whole, other projects' events as
+closed-schema fields only, and the full ledger is read only on the host,
+with `romeu ledger query`.
 
 romeu derives a project's view after each ingest of that project. It
 builds the three files in memory and replaces a file, by temporary
@@ -532,7 +536,8 @@ yet in `keys`, so an empty list is not read as no failures.
 
 ## 13.10 Tests
 
-U = unit, E = e2e with the fake sbx, H = host
+U = unit, E = e2e with the fake sbx, X = hybrid e2e, H = host (the
+levels of 05 5.2 and 10 10.1)
 ([10 10.1](10-testing-style.md#101-test-levels)). The clock and the
 entropy source are fixed (10 10.4). Each row states its outcome:
 **entry**, **rejected** with its reason, **skip** with its path-level
@@ -632,7 +637,7 @@ Other rows:
   against its name and derives each view and compares it byte for
   byte. The real ledger is machine-local and CI does not see it.
 - **Host probe (H)**: A3
-  ([11 11.1](11-host-probes.md#111-block-a---sbx-and-runtime-facts-first-in-parallel-with-the-first-build-layer)),
+  ([11 11.1](11-host-probes.md#111-block-a---sbx-and-runtime-facts)),
   with the view mount and a hostile spool.
 
 The ledger's invariants. Their ids are reserved in
@@ -660,6 +665,6 @@ the secret that stays, and the cross-project reads.
 | Between a write in the sandbox and ingest on the host, an event can be forged, altered or dropped in the spool, and a dropped one leaves no trace | nothing inside a sandbox can make julieta the one writer of a directory the agent can also write | the ledger is add-only from ingest onward (I31); an entry is read as data an agent may have written; romeu stamps `project` and `ingestedAt` itself and orders by those stamps (13.2) |
 | A removed ledger entry is undetected in v1, so "never deleted" is a promise; nothing protects the ledger from the host | the threat model trusts the host, and a chain on the same disk is rewritten by whoever can remove an entry | romeu has no code that removes an entry (I31); the directory is 0700 under host state (I20); a hash chain is a deferred decision with three triggers |
 | `doctor` verifies the event bytes of ingested entries and nothing else: romeu's stamps (`project`, `ingestedAt`) and rejected entries are covered by no digest | the key is the digest of what julieta wrote, so that `shasum` reproduces it | the same as the row above; v1 does not claim to detect a change to a stamp |
-| A secret that reaches the ledger stays there and in machine backups: nothing is ever redacted | the maintainer's rule is absolute, and a redaction path is a way to delete history | an event has no free text, and no field wider than a closed set, a bounded number, a timestamp or the 26 characters of `id`, so the room for a secret is small and not zero; the remedy is to rotate the credential, which leaves a dead value |
+| A secret that reaches the ledger stays there and in machine backups: nothing is ever redacted | the rule is absolute, and a redaction path is a way to delete history | an event has no free text, and no field wider than a closed set, a bounded number, a timestamp or the 26 characters of `id`, so the room for a secret is small and not zero; the remedy is to rotate the credential, which leaves a dead value |
 | Each sandbox on a machine sees the other projects' names, their activity timing and the allowlisted fields of their events. The numbers and the time among those fields are values an agent chose, so they are a low-rate channel between projects | cross-project reads were accepted with the design | closed sets by membership (I33); `id` and the key stay out; finer visibility is a deferred decision |
 | The ledger only grows, and an agent can mint rejected entries, one per distinct invalid spool file | v1 warns and does not refuse, because refusing would drop events | the spool caps bound what one ingest takes (13.8); a rejected entry is one short line; `doctor` warns on size; rotation and a hard limit are a deferred decision |

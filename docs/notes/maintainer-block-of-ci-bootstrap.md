@@ -1,3 +1,8 @@
+---
+type: explanation
+reader: the maintainer running or re-reading the maintainer block of ci-bootstrap
+---
+
 # The maintainer block of ci-bootstrap, as it ran
 
 Reader: anyone who wants to know how this repository's GitHub settings
@@ -151,13 +156,14 @@ reads the entries, so they are **[review]**.
 Each entry holds three reads, made on the host or checked from the
 maintainer's own session, never only from what the sandbox printed:
 
-1. Probe A16 ([11 11.1](../spec/11-host-probes.md#111-block-a---sbx-and-runtime-facts-first-in-parallel-with-the-first-build-layer)):
+1. Probe A16
+   ([11 11.1](../spec/11-host-probes.md#111-block-a---sbx-and-runtime-facts)):
    the token's type, from its prefix, and, for a token with no scopes
    header, its repository list and permissions from GitHub's settings
    page of that token or of the App's installation. Expected: an App
    installation token, an installation on selected repositories, this
-   one among them, Contents, Pull requests and Workflows read and
-   write, Actions, Checks and Metadata read, and no Administration.
+   one among them, Contents, Pull requests and Workflows read and write,
+   Actions, Checks and Metadata read, and no Administration.
 2. The agent the host forwards into the sandbox, read on the host, in
    three parts: the host's forwarding setting, the sbx setting or kit
    that names the socket it forwards; the keys of that socket, listed by
@@ -235,3 +241,26 @@ R18-A13).
 
 No entry yet: the narrowing waits for the acceptance of ADR 0011 and
 a maintainer step.
+
+## Review log
+
+The dated reads and reviews that the index's token narrowing row and
+the token rows of 05 5.4 used to carry, one entry each, newest last;
+the rows cite this section.
+
+- 2026-10-08: of four tries with the operator's token, only a direct
+  push to the default branch was refused (10 10.2, item d).
+- 2026-10-09: the ruleset read through the API answers
+  `pull_requests_only` for the bypass actor, and the ruleset-disable
+  try is not made; the token's scopes, `gist, read:org, repo, workflow`,
+  read from a response header in the sandbox, not on the host (A16's
+  host read is pending); GitHub's documentation of the security log
+  read at commit `9f651797567230e844373870fce8b14427ad47ad` of
+  `github/docs`: ruleset and listed settings changes, no merge, push,
+  tag, branch deletion or release.
+- 2026-10-09: review of the token narrowing row; four final handoffs
+  counted (2026-10-08 and 2026-10-09 in round-8.md, 2026-10-09 in
+  round-9.md and in round-10.md): narrowing decided.
+- 2026-10-12: review of the token narrowing row; the GitHub App route in
+  place of the fine-grained token, ADR 0011, decision 2, which stays
+  proposed until the App checks its Consequences lists.

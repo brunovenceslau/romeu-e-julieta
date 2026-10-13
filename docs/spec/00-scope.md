@@ -10,7 +10,7 @@ organizer for all their environments:
 
 - agents, inside a sandbox, author and maintain **project specs** in a
   config repo (repos, kits, sandbox options, secret names, run layout);
-- `romeu` **materializes** those specs into one host tree
+- `REQ-0033` `romeu` **materializes** those specs into one host tree
   (`$ROMEU_ROOT`, default `$HOME/dev`): plain clones (never submodules),
   generated `sbxenv.yaml`, per-repo memory directories, generated VS Code
   workspace files;
@@ -65,36 +65,35 @@ tool stores about a repository, and where, is listed in
 
 ## 0.4 License
 
-Decided by the maintainer:
+Decided (the record is a row of 12 12.5):
 
-- **GPL-3.0-only** for the product: version 3 of the GPL only, with no
+- `REQ-0034` **GPL-3.0-only** for the product: version 3 of the GPL only, with no
   "or any later version" option. The license text goes in `COPYING` at
   the repository root together with the first code change.
-- **CC0-1.0** for `examples/` and `schemas/`, which users copy into
+- `REQ-0035` **CC0-1.0** for `examples/` and `schemas/`, which users copy into
   their own config repos. `REUSE.toml` records the split; the CC0-1.0
   text joins `LICENSES/` with the first file under either directory,
   since `reuse lint` fails on a license text that no file uses.
-- Every file carries an SPDX header (`SPDX-License-Identifier` plus
+- `REQ-0036` Every file carries an SPDX header (`SPDX-License-Identifier` plus
   `SPDX-FileCopyrightText`) or is covered by `REUSE.toml`; the repo is
   REUSE 3.3 compliant and `reuse lint` runs in `tools/ci`.
-- Each release archive contains `COPYING` and a third-party notices
+- `REQ-0037` Each release archive contains `COPYING` and a third-party notices
   file that `tools/release build` generates from the module graph; the
   `license` step of `tools/ci` fails a module whose license is not on an
   allowlist compatible with GPL-3.0-only
   ([10 10.2](10-testing-style.md#102-ci)).
-- A personal kit copied from a product kit stays GPL-3.0-only; to start
+- `REQ-0038` A personal kit copied from a product kit stays GPL-3.0-only; to start
   a kit without that, copy the example kits under `examples/kits/`
   (CC0-1.0).
 
 ## 0.5 Scope justification
 
-Every v1 feature traces to a success criterion, an invariant, a
-journey or a need the maintainer named for v1; anything that does not
-is a row of [Deferred decisions](../spec.md#deferred-decisions). The
-table has one row per command of [04](04-cli.md), with the need it
-serves on the first day, and `tools/ci sequences` checks that every
-command has a row; the rows after the commands are features that are
-not commands.
+Every v1 feature traces to a success criterion, an invariant, a journey
+or a need this table names for v1; anything that does not is a row of
+[Deferred decisions](../spec.md#deferred-decisions). The table has one
+row per command of [04](04-cli.md), with the need it serves on the first
+day, and `tools/ci sequences` checks that every command has a row; the
+rows after the commands are features that are not commands.
 
 | Feature | Needed by |
 |---|---|
@@ -133,15 +132,23 @@ not commands.
 | coverage, mutation, fuzz gates | S6, S9 |
 | attestations | S1 |
 | generators and `go generate` | the middleware principle; S10 |
+| `tools/ci pins` (12 12.1) | the tool pin rule, a need named for v1 on 2026-10-08: every pin exact and a report of each pin behind a release |
+| `tools/ci links` | ADR 0001 rule 5 |
+| `tools/ci lessons` | 12 12.7 |
+| `tools/ci golden` | 10 10.4 |
+| `tools/ci acceptance` | S1 to S11 |
+| the probe harness and the recorder (11) | S3, S5, S8 |
+| `e2e/fakesbx` | S7 |
+| `tools/release notes` | ADR 0001 rule 11 |
 
 Memory written before v1 is imported once, by a script in the
 operator's config repo, and not by the product.
 
 ## 0.6 Teams adopting AI-assisted development
 
-v1 serves one developer and has no team feature. The maintainer's
-premise is that teams adopting AI-assisted development come next; the
-analysis of the DORA and Google Cloud report behind that premise is in
-[the DORA report note](../notes/dora-roi-report.md). Recording the
+v1 serves one developer and has no team feature. The premise behind this
+specification is that teams adopting AI-assisted development come next;
+the analysis of the DORA and Google Cloud report behind that premise is
+in [the DORA report note](../notes/dora-roi-report.md). Recording the
 inputs of the report's return model is a
 [deferred decision](../spec.md#deferred-decisions) with its trigger.

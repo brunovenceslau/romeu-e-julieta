@@ -1,3 +1,8 @@
+---
+type: explanation
+reader: anyone weighing which team problems the product could take on after v1
+---
+
 # The DORA report on teams adopting AI-assisted development
 
 Reader: anyone weighing which team problems the product could take on

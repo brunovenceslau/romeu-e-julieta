@@ -1,3 +1,8 @@
+---
+type: reference
+reader: whoever builds `tools/ci dora` when its deferred decision reopens
+---
+
 # The design of the delivery metrics tool
 
 Reader: whoever builds `tools/ci dora` when its deferred decision

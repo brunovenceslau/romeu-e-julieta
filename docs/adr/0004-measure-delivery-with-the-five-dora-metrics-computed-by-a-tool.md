@@ -5,6 +5,7 @@ Date: 2026-10-01
 ## Status
 
 Accepted
+Superseded in part by [ADR 0012, adopt requirement ids in the specification and amend the documentation standard for the plan's shape](0012-adopt-requirement-ids-in-the-specification-and-amend-the-documentation-standard-for-the-plan-s-shape.md) (Consequences)
 
 ## Context
 

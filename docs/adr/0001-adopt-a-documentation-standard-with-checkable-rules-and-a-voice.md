@@ -5,6 +5,7 @@ Date: 2026-09-30
 ## Status
 
 Accepted
+Superseded in part by [ADR 0012, adopt requirement ids in the specification and amend the documentation standard for the plan's shape](0012-adopt-requirement-ids-in-the-specification-and-amend-the-documentation-standard-for-the-plan-s-shape.md) (rules 1, 5, 13 and 15)
 
 Superseded in part by [9. Drop the required review and amend the records that assumed it](0009-drop-the-required-review-and-amend-the-records-that-assumed-it.md)
 
