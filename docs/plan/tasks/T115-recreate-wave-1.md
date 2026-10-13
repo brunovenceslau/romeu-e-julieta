@@ -20,7 +20,7 @@ sitting: M2
 
 Goal: One project per slot: `/handoff --final`, push, `julieta snapshot
 --all`, remove, recreate with the product kits and the personal kit in
-the hand-written project definition. The fourth edit of rule 9 lands
+the hand-written project definition. The fifth edit of rule 9 lands
 here: the kit entries with their args, `julietaBin` set to the bridge's
 bin mount path and `signingKey` to the public key, each with its undo in
 the runbook; `romeu sync` writes both at sitting M3 (T116). `julieta

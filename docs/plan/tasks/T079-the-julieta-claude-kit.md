@@ -38,7 +38,7 @@ of the interim kit (T111) in a daily sandbox; each refusal has a
 container e2e case, in `e2e/kit_julieta_claude_test.go` (rule 1 of
 `docs/plan.md`). The hook command takes julieta's path from the
 `julietaBin` arg (06 6.4): until sitting M3 the arg is set in the
-project definition by hand, the fourth edit of rule 9 (T115), and `romeu
+project definition by hand, the fifth edit of rule 9 (T115), and `romeu
 sync` writes it afterwards. The agent profile of `internal/agent/claude`
 declares the process names and the required state paths and no pane; the
 open-session record `agent-not-matched` reads (T061) comes from the

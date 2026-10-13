@@ -24,7 +24,7 @@ allowed-signers file from the `signingKey` arg.
 
 Re-plan (2026-10-12): Kept, pulled forward. The trust-root role moves
 into that arg, which until sitting M3 is set in the project definition
-by hand, the fourth edit of rule 9 (T115), and `romeu sync` writes
+by hand, the fifth edit of rule 9 (T115), and `romeu sync` writes
 afterwards. Its gate 2 appearance is asserted by T080. Acceptance added:
 a commit in a daily sandbox is signed with the one key and GitHub shows
 it verified. Until T080 lands, I34 is enforced by no code: the host

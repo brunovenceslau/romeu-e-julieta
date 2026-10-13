@@ -40,9 +40,11 @@ reach every sandbox the maintainer uses, and sitting M3, when `romeu
 sync` renders every project definition and writes every manifest. In
 that period:
 
-- each project definition gains the three edits above, and a runbook in
-  the maintainer's config repository records each edit with its undo
-  (plan task T111);
+- each project definition gains the three edits above and a fourth
+  that removes the store's writer kit, the mount of the store and the
+  inbox skill, so `julieta memory` is the route for open items, and a
+  runbook in the maintainer's config repository records each edit with
+  its undo (plan task T111);
 - an interim personal kit, in the kit format the daily sandboxes accept
   today,
   installs the SessionStart and SessionEnd hook lines of
@@ -50,7 +52,7 @@ that period:
   that exits 0 when the bin mount is absent, and pins the two skills of
   `skills/` from this repository at a SHA;
 - the `julieta-claude` kit (T079) and the personal kit (T114)
-  replace that interim kit at sitting M2, with a fourth edit per
+  replace that interim kit at sitting M2, with a fifth edit per
   definition: the kit entries with their args, `julietaBin` set to the
   bin mount's path and `signingKey` to the public key, by hand until
   `romeu sync` writes them (plan task T115); a deferred row of the plan

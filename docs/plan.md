@@ -292,11 +292,13 @@ New or changed, each proposed on 2026-10-12:
    traceability table; `docs/adr/README.md` stays generated as today,
    and its removal is deferred with a trigger.
 9. **The bridge is outside the product.** Running julieta in a
-   sandbox that romeu does not render yet (M1 and M2) is three edits per
-   project definition, an interim personal kit in the kit format the
-   daily sandboxes accept today (the pinned frontend of 06 6.1 is first
+   sandbox that romeu does not render yet (M1 and M2) is four edits per
+   project definition (three that supply julieta and one that removes
+   the store's writer kit, the mount of the store and the inbox
+   skill), an interim personal kit in the kit format the daily
+   sandboxes accept today (the pinned frontend of 06 6.1 is first
    exercised at the kit-frontend go/no-go, T113) and a host build in M1
-   (T111) and, in M2, a fourth edit: the kit entries with their args,
+   (T111) and, in M2, a fifth edit: the kit entries with their args,
    `julietaBin` set to the bin mount's path and `signingKey` to the
    public key, by hand until `romeu sync` writes them at sitting M3
    (T115); all recorded in the config repository's runbook with each
@@ -405,7 +407,7 @@ Evidence.
   entry run again at the end of the sitting and the names gate
   verified from a sandbox again (T111). Output:
   `julieta status` and `handoff show --hook`, read in each sandbox,
-  and the entry's counts in the runbook (3 definition edits per
+  and the entry's counts in the runbook (4 definition edits per
   project and the entry run twice, counted from T111, plus one host
   build; one approval per wave).
 - **Sitting M2** (ends M2): recreate wave 1 (T115), after T114; the
@@ -939,8 +941,11 @@ record records these answers again with the rules they decide.
     recommended, because a second store left open until M5 would hold
     items the count never sees. The one-off, count-verified entry of
     the store's items runs at sitting M1, and again at its end, after
-    the store's last writer has left the definitions; from sitting M1
-    julieta is the one path for new items, and T119 reads at sitting M5
+    a fourth edit of T111 has removed the store's writer kit, the mount
+    of the store and the inbox skill from every definition (decided on
+    2026-10-13); from sitting M1 julieta is the one path for new items.
+    The host build of the store's tool stays a writer of the store,
+    outside every definition, so T119 reads at sitting M5
     that the store holds no item that the open-items list of sitting M1
     does not name. The alternative not taken: the cut-over at T119
     (M5).
