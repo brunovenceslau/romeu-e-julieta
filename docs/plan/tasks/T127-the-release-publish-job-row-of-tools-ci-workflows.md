@@ -6,9 +6,11 @@ module: ci-release
 fate: new
 owns:
   - tools/ci/internal/workflows/release*.go
-needs:
+needs: []
+after:
   - T105
-after: []
+  - T013
+
 ask_first:
   - checks
 sitting: none
@@ -22,9 +24,11 @@ Goal: The grammar row of the release workflow (10 10.2, the publish job:
 no task file. T088 needs it.
 
 Re-plan (2026-10-12, stage B): New. A change to merged work is a task,
-so it has an owner and an `after` edge.
+so it has an owner and an `after` edge: `after: T105` for the moved
+file layout, and `after: T013`, which owns the workflows package whole,
+so the smaller task waits.
 
-- Implements: REQ-0808 (10 10.2).
+- Implements: REQ-0768 (10 10.1), REQ-0808 (10 10.2).
 - Operator: no
 - Acceptance:
   - A fixture per admitted and per refused step of the publish job.

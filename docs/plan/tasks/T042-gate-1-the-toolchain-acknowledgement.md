@@ -28,9 +28,8 @@ Re-plan (2026-10-12): Kept whole: a security invariant is never deferred
 - Implements: REQ-0055 (01 1.3), REQ-0059 (01 1.4), REQ-0060 (01 1.4),
   REQ-0061 (01 1.4), REQ-0062 (01 1.4), REQ-0063 (01 1.4), REQ-0065 (01
   1.4), REQ-0228 (03 3.8), REQ-0272 (04 4.1), REQ-0310 (04 4.2),
-  REQ-0369 (04 4.2), REQ-0488 (05 5.2), REQ-0638 (07 7.6), REQ-0753 (10
-  10.1), REQ-0754 (10 10.1), REQ-0756 (10 10.1), REQ-0757 (10 10.1),
-  REQ-0758 (10 10.1), REQ-0759 (10 10.1), REQ-0790 (10 10.1).
+  REQ-0369 (04 4.2), REQ-0638 (07 7.6), REQ-0790 (10 10.1), REQ-0932 (10
+  10.3), REQ-0933 (10 10.3).
 - Operator: no.
 - Acceptance:
   - `approve --toolchain` needs a terminal, prints the julieta version

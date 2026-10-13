@@ -49,19 +49,16 @@ remaining scenario functions; the lock-change commit on the fixture
 origin is asserted here by the container e2e instead. `mise` runs
 through `internal/procgroup` (T137).
 
-- Implements: REQ-0013 (index), REQ-0160 (03 (opening)), REQ-0169 (03
-  (opening)), REQ-0211 (03 3.5), REQ-0297 (04 4.1), REQ-0302 (04 4.1),
-  REQ-0400 (04 4.3), REQ-0403 (04 4.3), REQ-0404 (04 4.3), REQ-0405 (04
-  4.3), REQ-0406 (04 4.3), REQ-0407 (04 4.3), REQ-0426 (04 4.3),
-  REQ-0435 (04 4.4), REQ-0437 (04 4.4), REQ-0438 (04 4.4), REQ-0439 (04
-  4.4), REQ-0440 (04 4.4), REQ-0441 (04 4.4), REQ-0442 (04 4.4),
-  REQ-0443 (04 4.4), REQ-0444 (04 4.4), REQ-0445 (04 4.4), REQ-0446 (04
-  4.4), REQ-0612 (07 7.2), REQ-0613 (07 7.3), REQ-0614 (07 7.3),
-  REQ-0615 (07 7.3), REQ-0616 (07 7.3), REQ-0617 (07 7.3), REQ-0618 (07
-  7.3), REQ-0619 (07 7.3), REQ-0620 (07 7.3), REQ-0621 (07 7.3),
-  REQ-0625 (07 7.4), REQ-0637 (07 7.5), REQ-0740 (10 10.1), REQ-0791 (10
-  10.1), REQ-0845 (10 10.2), REQ-0960 (10 10.6), REQ-1045 (12 12.1),
-  REQ-1049 (12 12.1).
+- Implements: REQ-0013 (index), REQ-0169 (03 (opening)), REQ-0211 (03
+  3.5), REQ-0297 (04 4.1), REQ-0302 (04 4.1), REQ-0400 (04 4.3),
+  REQ-0403 (04 4.3), REQ-0404 (04 4.3), REQ-0405 (04 4.3), REQ-0406 (04
+  4.3), REQ-0407 (04 4.3), REQ-0426 (04 4.3), REQ-0435 (04 4.4),
+  REQ-0438 (04 4.4), REQ-0439 (04 4.4), REQ-0612 (07 7.2), REQ-0613 (07
+  7.3), REQ-0614 (07 7.3), REQ-0615 (07 7.3), REQ-0616 (07 7.3),
+  REQ-0617 (07 7.3), REQ-0618 (07 7.3), REQ-0619 (07 7.3), REQ-0620 (07
+  7.3), REQ-0621 (07 7.3), REQ-0625 (07 7.4), REQ-0637 (07 7.5),
+  REQ-0740 (10 10.1), REQ-0791 (10 10.1), REQ-0845 (10 10.2), REQ-0960
+  (10 10.6), REQ-1045 (12 12.1), REQ-1049 (12 12.1).
 - Operator: no.
 - Acceptance:
   - `install` runs with the environment of 04 4.3 and skips when the

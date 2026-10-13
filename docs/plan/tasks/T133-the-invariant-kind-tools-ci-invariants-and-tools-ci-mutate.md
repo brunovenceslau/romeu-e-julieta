@@ -28,9 +28,8 @@ release-candidate tag. Carries T007's three "deferred with the tooling"
 rows verbatim and the mutate sentence. T087 and T090 need it. Until it
 reopens, `owns` is empty.
 
-- Implements: REQ-0474 (05 5.2), REQ-0478 (05 5.2), REQ-0560 (05 5.4),
-  REQ-0561 (05 5.4), REQ-0562 (05 5.4), REQ-1111 (12 12.3), REQ-1121 (12
-  12.3).
+- Implements: REQ-0474 (05 5.2), REQ-0478 (05 5.2), REQ-0771 (10 10.1),
+  REQ-1111 (12 12.3), REQ-1121 (12 12.3).
 - Operator: no
 - Acceptance:
   - T007's three deferred rows, verbatim: the `invariant` kind writes

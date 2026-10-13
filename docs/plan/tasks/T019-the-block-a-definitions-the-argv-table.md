@@ -27,15 +27,15 @@ replaced by the id that absorbed it, and `owns` is written when the task
 reopens.
 
 - Implements: REQ-0142 (02 2.3), REQ-0158 (02 2.6), REQ-0199 (03 3.3),
-  REQ-0203 (03 3.3), REQ-0566 (06 6.1), REQ-0588 (06 6.3), REQ-0724 (09
-  (opening)), REQ-0928 (10 10.3), REQ-0938 (10 10.3), REQ-0943 (10
-  10.4), REQ-0976 (11 (opening)), REQ-0977 (11 (opening)), REQ-0979 (11
-  (opening)), REQ-0980 (11 (opening)), REQ-0981 (11 11.1), REQ-0982 (11
-  11.1), REQ-0983 (11 11.1), REQ-0984 (11 11.1), REQ-0985 (11 11.1),
-  REQ-0986 (11 11.1), REQ-0987 (11 11.1), REQ-0988 (11 11.1), REQ-0989
-  (11 11.1), REQ-0990 (11 11.1), REQ-0991 (11 11.1), REQ-0992 (11 11.1),
-  REQ-0993 (11 11.1), REQ-0994 (11 11.1), REQ-0995 (11 11.1), REQ-0997
-  (11 11.1), REQ-0998 (11 11.1), REQ-0999 (11 11.1).
+  REQ-0203 (03 3.3), REQ-0566 (06 6.1), REQ-0588 (06 6.3), REQ-0928 (10
+  10.3), REQ-0938 (10 10.3), REQ-0943 (10 10.4), REQ-0976 (11
+  (opening)), REQ-0977 (11 (opening)), REQ-0979 (11 (opening)), REQ-0980
+  (11 (opening)), REQ-0981 (11 11.1), REQ-0982 (11 11.1), REQ-0983 (11
+  11.1), REQ-0984 (11 11.1), REQ-0985 (11 11.1), REQ-0986 (11 11.1),
+  REQ-0987 (11 11.1), REQ-0988 (11 11.1), REQ-0989 (11 11.1), REQ-0990
+  (11 11.1), REQ-0991 (11 11.1), REQ-0992 (11 11.1), REQ-0993 (11 11.1),
+  REQ-0994 (11 11.1), REQ-0995 (11 11.1), REQ-0997 (11 11.1), REQ-0998
+  (11 11.1), REQ-0999 (11 11.1).
 - Operator: feeds block O3.
 - Ask-first, as forecast before the re-plan: none expected.
 - Acceptance:

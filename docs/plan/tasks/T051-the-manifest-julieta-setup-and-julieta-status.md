@@ -17,7 +17,9 @@ needs:
   - T009
   - T023
   - T013
-after: []
+after:
+  - T122
+
 ask_first:
   - spec
 sitting: none
@@ -45,24 +47,19 @@ the manifest table of 03 3.6 that its generated page replaces by a link
 setup steps and `status/sections.go` the report sections, the seams
 T035, T053, T054 and T079 extend by one line (rule 14).
 
-- Implements: REQ-0006 (index), REQ-0015 (index), REQ-0016 (index),
-  REQ-0035 (00 0.4), REQ-0037 (00 0.4), REQ-0049 (01 1.2), REQ-0051 (01
-  1.2), REQ-0055 (01 1.3), REQ-0118 (02 2.1), REQ-0152 (02 2.5),
-  REQ-0153 (02 2.5), REQ-0154 (02 2.5), REQ-0155 (02 2.5), REQ-0156 (02
-  2.6), REQ-0159 (03 (opening)), REQ-0160 (03 (opening)), REQ-0161 (03
-  (opening)), REQ-0162 (03 (opening)), REQ-0163 (03 (opening)), REQ-0164
-  (03 (opening)), REQ-0165 (03 (opening)), REQ-0166 (03 (opening)),
-  REQ-0167 (03 (opening)), REQ-0172 (03 (opening)), REQ-0173 (03
-  (opening)), REQ-0396 (04 4.3), REQ-0397 (04 4.3), REQ-0398 (04 4.3),
-  REQ-0399 (04 4.3), REQ-0401 (04 4.3), REQ-0402 (04 4.3), REQ-0424 (04
-  4.3), REQ-0425 (04 4.3), REQ-0437 (04 4.4), REQ-0438 (04 4.4),
-  REQ-0439 (04 4.4), REQ-0440 (04 4.4), REQ-0441 (04 4.4), REQ-0442 (04
-  4.4), REQ-0443 (04 4.4), REQ-0444 (04 4.4), REQ-0445 (04 4.4),
-  REQ-0446 (04 4.4), REQ-0586 (06 6.3), REQ-0587 (06 6.3), REQ-0636 (07
-  7.5), REQ-0665 (08 8.2), REQ-0707 (08 8.5), REQ-0733 (10 10.1),
-  REQ-0734 (10 10.1), REQ-0740 (10 10.1), REQ-0747 (10 10.1), REQ-0836
-  (10 10.2), REQ-0960 (10 10.6), REQ-1044 (12 12.1), REQ-1049 (12 12.1),
-  REQ-1050 (12 12.1), REQ-1107 (12 12.3).
+- Implements: REQ-0006 (index), REQ-0016 (index), REQ-0035 (00 0.4),
+  REQ-0037 (00 0.4), REQ-0049 (01 1.2), REQ-0051 (01 1.2), REQ-0152 (02
+  2.5), REQ-0153 (02 2.5), REQ-0154 (02 2.5), REQ-0155 (02 2.5),
+  REQ-0156 (02 2.6), REQ-0161 (03 (opening)), REQ-0162 (03 (opening)),
+  REQ-0163 (03 (opening)), REQ-0164 (03 (opening)), REQ-0165 (03
+  (opening)), REQ-0166 (03 (opening)), REQ-0167 (03 (opening)), REQ-0172
+  (03 (opening)), REQ-0173 (03 (opening)), REQ-0396 (04 4.3), REQ-0397
+  (04 4.3), REQ-0398 (04 4.3), REQ-0399 (04 4.3), REQ-0401 (04 4.3),
+  REQ-0402 (04 4.3), REQ-0424 (04 4.3), REQ-0425 (04 4.3), REQ-0586 (06
+  6.3), REQ-0587 (06 6.3), REQ-0636 (07 7.5), REQ-0665 (08 8.2),
+  REQ-0707 (08 8.5), REQ-0733 (10 10.1), REQ-0734 (10 10.1), REQ-0740
+  (10 10.1), REQ-0747 (10 10.1), REQ-0836 (10 10.2), REQ-1044 (12 12.1),
+  REQ-1049 (12 12.1), REQ-1050 (12 12.1), REQ-1107 (12 12.3).
 - Operator: no.
 - Acceptance:
   - In the container e2e, a manifest of protocol N or N-1 is accepted

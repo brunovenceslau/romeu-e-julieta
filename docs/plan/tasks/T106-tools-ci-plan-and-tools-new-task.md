@@ -28,10 +28,9 @@ an `init`, `task` is `tools/new/task*.go`, and the `switch` in
 reads `docs/plan/tasks/*.md` from the tree the commit checks read before
 mise and the steps, as `hygiene`, `workflows` and `reqs` do.
 
-- Implements: REQ-0826 (10 10.2), REQ-1082 (12 12.2), REQ-1089 (12
-  12.2), REQ-1101 (12 12.2), REQ-1105 (12 12.3), REQ-1110 (12 12.3),
-  REQ-1118 (12 12.3), REQ-1120 (12 12.3), REQ-1126 (12 12.3), REQ-1169
-  (12 12.5), REQ-1170 (12 12.5), REQ-1171 (12 12.5).
+- Implements: REQ-0826 (10 10.2), REQ-1089 (12 12.2), REQ-1101 (12
+  12.2), REQ-1105 (12 12.3), REQ-1118 (12 12.3), REQ-1120 (12 12.3),
+  REQ-1126 (12 12.3).
 - Operator: no
 - Acceptance:
   - Fixtures with a duplicate id, an unknown `needs` or `after`, an id
@@ -51,11 +50,16 @@ mise and the steps, as `hygiene`, `workflows` and `reqs` do.
   - A test registers a fixture kind of `tools/new` by adding one file
     and editing none; a duplicate kind name panics at `init`; `go run
     ./tools/new adr` behaves as before.
-  - Every Implements entry is a live requirement id, checked by
-    `tools/ci reqs`; `plan` reads the field's shape only: each entry an
-    id with its reading aid in one of the forms the plan writes (`<page>
-    <n>.<m>`, `<page> (opening)`, or `index` for the index page), or the
-    `none` form of a task with no obligation.
+  - Every Implements entry is a live requirement id with the right
+    reading aid, checked by `tools/ci reqs`; `plan` reads the field's
+    shape only: each entry an id with its reading aid in one of the
+    forms the plan writes (`<page> <n>.<m>`, `<page> (opening)`, or
+    `index` for the index page), or the `none` form of a task with no
+    obligation; an Implements line of more than 40 ids is a finding,
+    the mirror of the citation cap of 12 12.11.
+  - A task's `ask_first` forecast is checked against its `owns`: a
+    forecast that misses a surface of `.github/ask-first.yaml` whose
+    globs match a path in `owns` fails, with a fixture.
   - `go run ./tools/ci plan --critical-path` prints the longest chain
     over `needs` and `after`, by sitting, and `--ready` the open tasks
     whose `needs` and `after` are merged, each one id per line, with a

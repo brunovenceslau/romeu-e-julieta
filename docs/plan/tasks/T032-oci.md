@@ -29,7 +29,7 @@ Re-plan (2026-10-12): Kept as written before the re-plan.
   5.2), REQ-0515 (05 5.2), REQ-0516 (05 5.2), REQ-0517 (05 5.2),
   REQ-0569 (06 6.1), REQ-0570 (06 6.1), REQ-0571 (06 6.1), REQ-0573 (06
   6.1), REQ-0576 (06 6.2), REQ-0760 (10 10.1), REQ-0793 (10 10.1),
-  REQ-0960 (10 10.6), REQ-1050 (12 12.1).
+  REQ-1050 (12 12.1).
 - Operator: no.
 - Acceptance:
   - The `oci` table of I28 is refused row by row: a digest mismatch at

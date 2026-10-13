@@ -33,7 +33,8 @@ runs no e2e against the release build, so T103 leaves `needs`.
   4.2), REQ-0378 (04 4.2), REQ-0379 (04 4.2), REQ-0380 (04 4.2),
   REQ-0395 (04 4.2), REQ-0436 (04 4.4), REQ-0506 (05 5.2), REQ-0507 (05
   5.2), REQ-0511 (05 5.2), REQ-0713 (08 8.5), REQ-0751 (10 10.1),
-  REQ-0968 (10 10.7).
+  REQ-0968 (10 10.7), REQ-1203 (01 1.5), REQ-1204 (01 1.5), REQ-1205 (01
+  1.5), REQ-1206 (01 1.5).
 - Operator: no.
 - Acceptance:
   - The preflight is one function that runs its six steps in the order

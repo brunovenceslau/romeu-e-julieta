@@ -12,10 +12,14 @@ owns:
   - e2e/kit_julieta_claude_test.go
   - internal/cmd/julieta/setup/agent_paths.go
   - internal/cmd/julieta/hooks/guard*.go
+  - internal/cmd/julieta/setup/steps.go
 needs:
   - T077
   - T078
-after: []
+after:
+  - T054
+  - T053
+
 ask_first:
   - kits
 sitting: none
@@ -39,7 +43,9 @@ sync` writes it afterwards. The agent profile of `internal/agent/claude`
 declares the process names and the required state paths and no pane; the
 open-session record `agent-not-matched` reads (T061) comes from the
 SessionStart and SessionEnd hooks this kit wires. `setup/steps.go` is
-the seam it extends by one line (rule 14).
+the seam it extends by one line (rule 14), after T054 and T053, the
+seam's earlier editors, and the `guard*.go` files sit in T054's
+`hooks/` package, so `after: T054`.
 
 - Implements: REQ-0008 (index), REQ-0010 (index), REQ-0114 (02 2.1),
   REQ-0402 (04 4.3), REQ-0410 (04 4.3), REQ-0424 (04 4.3), REQ-0547 (05

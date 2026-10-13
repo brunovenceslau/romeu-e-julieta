@@ -23,17 +23,11 @@ text below is the one written before the re-plan; `needs` lists its
 earlier dependencies with a folded id replaced by the id that absorbed
 it, and `owns` is written when the task reopens.
 
-- Implements: REQ-0752 (10 10.1), REQ-0753 (10 10.1), REQ-0754 (10
-  10.1), REQ-0755 (10 10.1), REQ-0756 (10 10.1), REQ-0757 (10 10.1),
-  REQ-0758 (10 10.1), REQ-0759 (10 10.1), REQ-0760 (10 10.1), REQ-0761
-  (10 10.1), REQ-0762 (10 10.1), REQ-0763 (10 10.1), REQ-0764 (10 10.1),
-  REQ-0765 (10 10.1), REQ-0766 (10 10.1), REQ-0767 (10 10.1), REQ-0768
-  (10 10.1), REQ-0769 (10 10.1), REQ-0770 (10 10.1), REQ-0771 (10 10.1),
-  REQ-0772 (10 10.1), REQ-0773 (10 10.1), REQ-0774 (10 10.1), REQ-0924
-  (10 10.3), REQ-0925 (10 10.3), REQ-0926 (10 10.3), REQ-0929 (10 10.3),
-  REQ-0932 (10 10.3), REQ-0933 (10 10.3), REQ-0934 (10 10.3), REQ-0935
-  (10 10.3), REQ-0936 (10 10.3), REQ-0937 (10 10.3), REQ-0939 (10 10.3),
-  REQ-0977 (11 (opening)), REQ-0978 (11 (opening)), REQ-1041 (12 12.1).
+- Implements: REQ-0765 (10 10.1), REQ-0924 (10 10.3), REQ-0925 (10
+  10.3), REQ-0926 (10 10.3), REQ-0929 (10 10.3), REQ-0932 (10 10.3),
+  REQ-0933 (10 10.3), REQ-0934 (10 10.3), REQ-0935 (10 10.3), REQ-0936
+  (10 10.3), REQ-0937 (10 10.3), REQ-0939 (10 10.3), REQ-0977 (11
+  (opening)), REQ-0978 (11 (opening)), REQ-1041 (12 12.1).
 - Operator: feeds block O3.
 - Ask-first, as forecast before the re-plan: none expected.
 - Acceptance:

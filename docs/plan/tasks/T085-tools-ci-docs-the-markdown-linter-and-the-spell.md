@@ -25,7 +25,7 @@ before the re-plan; `needs` lists its earlier dependencies with a folded
 id replaced by the id that absorbed it, and `owns` is written when the
 task reopens.
 
-- Implements: REQ-0850 (10 10.2).
+- Implements: REQ-0769 (10 10.1), REQ-0850 (10 10.2).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: `checks`, `ask-first`,
   `dependencies` (if a tool enters `mise.lock`).

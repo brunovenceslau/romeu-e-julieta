@@ -42,12 +42,12 @@ each command package is linked in by its own
 M0's tooling no longer. The runner-class table and the zero-tests
 failure are T013's.
 
-- Implements: REQ-0015 (index), REQ-0112 (02 2.1), REQ-0113 (02 2.1),
-  REQ-0115 (02 2.1), REQ-0267 (04 4.1), REQ-0268 (04 4.1), REQ-0274 (04
-  4.1), REQ-0281 (04 4.1), REQ-0285 (04 4.1), REQ-0286 (04 4.1),
-  REQ-0303 (04 4.1), REQ-0304 (04 4.1), REQ-0305 (04 4.1), REQ-0838 (10
-  10.2), REQ-0971 (10 10.7), REQ-1038 (12 12.1), REQ-1039 (12 12.1),
-  REQ-1109 (12 12.3), REQ-1124 (12 12.3).
+- Implements: REQ-0112 (02 2.1), REQ-0113 (02 2.1), REQ-0115 (02 2.1),
+  REQ-0267 (04 4.1), REQ-0268 (04 4.1), REQ-0274 (04 4.1), REQ-0281 (04
+  4.1), REQ-0285 (04 4.1), REQ-0286 (04 4.1), REQ-0303 (04 4.1),
+  REQ-0304 (04 4.1), REQ-0305 (04 4.1), REQ-0838 (10 10.2), REQ-0971 (10
+  10.7), REQ-1038 (12 12.1), REQ-1039 (12 12.1), REQ-1109 (12 12.3),
+  REQ-1124 (12 12.3).
 - Operator: no.
 - Acceptance:
   - `julieta-core` and the `version` command of `romeu-cli` land before

@@ -36,12 +36,12 @@ own tests; T103 stays in `needs`, since the e2e runs the `--dry-run`
 build. A later command task owns its own scenario directory and e2e
 file, so no task appends to another's.
 
-- Implements: REQ-0033 (00 0.1), REQ-0136 (02 2.3), REQ-0150 (02 2.4),
-  REQ-0204 (03 3.4), REQ-0205 (03 3.4), REQ-0262 (03 3.13), REQ-0281 (04
-  4.1), REQ-0309 (04 4.2), REQ-0375 (04 4.2), REQ-0504 (05 5.2),
-  REQ-0545 (05 5.3), REQ-0724 (09 (opening)), REQ-0725 (09 (opening)),
-  REQ-0729 (09 (opening)), REQ-0730 (09 (opening)), REQ-0735 (10 10.1),
-  REQ-0931 (10 10.3), REQ-1088 (12 12.2).
+- Implements: REQ-0136 (02 2.3), REQ-0150 (02 2.4), REQ-0204 (03 3.4),
+  REQ-0205 (03 3.4), REQ-0262 (03 3.13), REQ-0281 (04 4.1), REQ-0309 (04
+  4.2), REQ-0375 (04 4.2), REQ-0504 (05 5.2), REQ-0545 (05 5.3),
+  REQ-0724 (09 (opening)), REQ-0725 (09 (opening)), REQ-0729 (09
+  (opening)), REQ-0730 (09 (opening)), REQ-0735 (10 10.1), REQ-0931 (10
+  10.3), REQ-1088 (12 12.2).
 - Operator: no.
 - Acceptance:
   - In the e2e with origins served over TLS (10 10.1), `init` writes

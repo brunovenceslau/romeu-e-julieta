@@ -29,11 +29,9 @@ record tasks, and `owns` is written when the task reopens.
   - A record, written with `go run ./tools/new adr`, exists for each
     decision under "Maintainer decisions" of `docs/reviews/round-3.md`
     that the records under `docs/adr/` do not already hold (12 12.5).
-  - `tools/ci generated` passes, and `tools/ci sequences` once T004
-    lands. That the records
+  - `tools/ci generated` passes. That the records
     cover the round's decisions is **[review]** (S10): the pull
     request's Evidence lists each heading under that section with the
     record that holds it, so the count of records against headings is
     read there and not inferred.
-- Verify: `go run ./tools/ci generated`; `go run ./tools/ci sequences`
-  once T004 lands.
+- Verify: `go run ./tools/ci generated`.

@@ -26,13 +26,12 @@ id replaced by the id that absorbed it, and `owns` is written when the
 task reopens.
 
 - Implements: REQ-0002 (index), REQ-0003 (index), REQ-0004 (index),
-  REQ-0006 (index), REQ-0007 (index), REQ-0009 (index), REQ-0213 (03
-  3.5), REQ-0475 (05 5.2), REQ-0871 (10 10.2), REQ-0872 (10 10.2),
-  REQ-0873 (10 10.2), REQ-0923 (10 10.2), REQ-0944 (10 10.5), REQ-0945
-  (10 10.5), REQ-0948 (10 10.5), REQ-1014 (11 11.2), REQ-1035 (11 11.4),
-  REQ-1093 (12 12.2), REQ-1095 (12 12.2), REQ-1096 (12 12.2), REQ-1097
-  (12 12.2), REQ-1098 (12 12.2), REQ-1099 (12 12.2), REQ-1100 (12 12.2),
-  REQ-1110 (12 12.3).
+  REQ-0006 (index), REQ-0007 (index), REQ-0009 (index), REQ-0475 (05
+  5.2), REQ-0871 (10 10.2), REQ-0872 (10 10.2), REQ-0873 (10 10.2),
+  REQ-0923 (10 10.2), REQ-0944 (10 10.5), REQ-0945 (10 10.5), REQ-0948
+  (10 10.5), REQ-1014 (11 11.2), REQ-1035 (11 11.4), REQ-1093 (12 12.2),
+  REQ-1095 (12 12.2), REQ-1096 (12 12.2), REQ-1097 (12 12.2), REQ-1098
+  (12 12.2), REQ-1099 (12 12.2), REQ-1100 (12 12.2).
 - Operator: block O7 comes first.
 - Ask-first, as forecast before the re-plan: `checks`
   (`docs/acceptance.json`).

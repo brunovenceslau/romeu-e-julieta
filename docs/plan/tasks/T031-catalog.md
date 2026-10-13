@@ -36,11 +36,10 @@ after T053 (decision of the stage B pass), so M2 does not wait for this
 task.
 
 - Implements: REQ-0009 (index), REQ-0040 (01 1.1), REQ-0128 (02 2.1),
-  REQ-0129 (02 2.1), REQ-0159 (03 (opening)), REQ-0188 (03 3.1),
-  REQ-0211 (03 3.5), REQ-0212 (03 3.5), REQ-0213 (03 3.5), REQ-0617 (07
-  7.3), REQ-0620 (07 7.3), REQ-0626 (07 7.4), REQ-0637 (07 7.5),
-  REQ-0638 (07 7.6), REQ-0640 (07 7.6), REQ-0641 (07 7.6), REQ-0842 (10
-  10.2).
+  REQ-0129 (02 2.1), REQ-0188 (03 3.1), REQ-0211 (03 3.5), REQ-0212 (03
+  3.5), REQ-0617 (07 7.3), REQ-0620 (07 7.3), REQ-0626 (07 7.4),
+  REQ-0637 (07 7.5), REQ-0638 (07 7.6), REQ-0640 (07 7.6), REQ-0641 (07
+  7.6), REQ-0842 (10 10.2).
 - Operator: no.
 - Acceptance:
   - `internal/catalog/egress/*.yaml` is embedded by glob and decoded

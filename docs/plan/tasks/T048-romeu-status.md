@@ -31,7 +31,8 @@ seam T066 and T080 plug into.
 - Implements: REQ-0061 (01 1.4), REQ-0062 (01 1.4), REQ-0063 (01 1.4),
   REQ-0065 (01 1.4), REQ-0087 (01 1.6), REQ-0107 (01 1.6), REQ-0327 (04
   4.2), REQ-0328 (04 4.2), REQ-0329 (04 4.2), REQ-0334 (04 4.2),
-  REQ-0519 (05 5.2), REQ-0585 (06 6.3), REQ-0712 (08 8.5).
+  REQ-0519 (05 5.2), REQ-0585 (06 6.3), REQ-0712 (08 8.5), REQ-0933 (10
+  10.3).
 - Operator: no.
 - Acceptance:
   - On fixtures of host state, `status --json` reports, without taking

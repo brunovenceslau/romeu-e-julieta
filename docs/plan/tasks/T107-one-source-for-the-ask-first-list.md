@@ -29,8 +29,9 @@ Goal: 05 5.3 links `.github/ask-first.yaml` instead of copying it;
 stays (both are generated outputs under rule 1 of `docs/plan.md`, so
 neither is in `owns`); the `sbxdrv` surface and `skills/**` under `kits`
 are added (the pending R8-05-3 change); the `catalog` surface becomes
-`internal/catalog/**` (code and data, one surface); the two narrowings
-of the open decision block land here if accepted. This task edits 05 and
+`internal/catalog/**` (code and data, one surface), a glob T122 already
+holds in the yaml since the check binds it to 05 5.3; the two
+narrowings of the open decision block land here if accepted. This task edits 05 and
 the code only: the row of 12 12.3 that listed the generated page was
 removed on 2026-10-12 (ADR 0012; T122). It also creates
 `docs/grants.yaml`, `version: 1` with `grants: []`, on the `ask-first`
@@ -58,9 +59,10 @@ carries.
   - `.github/ask-first.yaml` lists `sbxdrv`, `skills/**` under `kits`,
     and `internal/catalog/**` under `catalog`; the `ledger` surface
     stays while its row is deferred; the `contracts` glob becomes
-    `internal/*/errors.go`, `internal/cmd/*/*/errors.go` and
-    `internal/spec/versions.go`, with the narrowing of open-block item
-    9.
+    `internal/*/errors.go`, `internal/cmd/*/*/errors.go`,
+    `internal/spec/versions.go` and `internal/manifest/versions.go`
+    (the manifest's protocol window, T135), with the narrowing of
+    open-block item 9.
   - The created `docs/grants.yaml` is `version: 1` with `grants: []`.
   - The PR template's surfaces pointer reads `.github/ask-first.yaml`.
 - Verify: `go run ./tools/ci generated` and `go run ./tools/ci fast`

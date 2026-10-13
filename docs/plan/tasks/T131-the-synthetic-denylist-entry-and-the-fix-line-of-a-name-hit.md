@@ -8,12 +8,13 @@ owns:
   - tools/ci/denylist.yaml
   - tools/ci/internal/hygiene/testdata/**
   - tools/ci/internal/hygiene/fixline*.go
-needs:
-  - T105
+needs: []
 after:
+  - T105
   - T128
 ask_first:
   - checks
+  - approvals
 sitting: none
 ---
 
@@ -32,7 +33,11 @@ Re-plan (2026-10-12, stage B): New. The hygiene fixtures and the real
 denylist are one package, so the fix line of a forbidden-name hit joins
 this task.
 
-- Implements: REQ-0863 (10 10.2), REQ-0898 (10 10.2).
+`tools/ci/denylist.yaml` is on the `approvals` surface as well as on
+`checks` (05 5.3), so both lines are forecast.
+
+- Implements: REQ-0767 (10 10.1), REQ-0863 (10 10.2), REQ-0898 (10
+  10.2).
 - Operator: no
 - Acceptance:
   - The hygiene test reads the real file and asserts the matcher finds

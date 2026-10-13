@@ -23,7 +23,7 @@ on the new tools. The text below is the one written before the re-plan;
 
 - Implements: REQ-0015 (index), REQ-0909 (10 10.2), REQ-1058 (12 12.1),
   REQ-1087 (12 12.2), REQ-1088 (12 12.2), REQ-1182 (12 12.8), REQ-1183
-  (12 12.8), REQ-1184 (12 12.8), REQ-1185 (12 12.8).
+  (12 12.8), REQ-1184 (12 12.8), REQ-1185 (12 12.8), REQ-1223 (10 10.2).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: none expected.
 - Acceptance:

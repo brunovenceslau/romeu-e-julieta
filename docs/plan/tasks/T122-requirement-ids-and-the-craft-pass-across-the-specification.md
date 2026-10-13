@@ -15,12 +15,18 @@ owns:
   - docs/notes/maintainer-block-of-ci-bootstrap.md
   - docs/reviews/lenses.md
   - docs/reviews/round-18.md
+  - .github/ask-first.yaml
+  - .github/CODEOWNERS
+  - docs/reference/ask-first.md
+  - docs/notes/delivery-metrics-design.md
+  - docs/notes/dora-roi-report.md
 needs:
   - T121
 after: []
 ask_first:
   - spec
   - decisions
+  - ask-first
 sitting: none
 ---
 
@@ -35,7 +41,13 @@ and the five plan lenses L17 to L21 of `docs/reviews/lenses.md`. The
 amendments the re-plan carried for T108 are applied here, so T108 keeps
 the record only. `owns` names the one note it edits (the bridge note
 `docs/notes/julieta-by-hand.md` is T104's) and
-`docs/reviews/round-18.md` for one line of its Done list.
+`docs/reviews/round-18.md` for one line of its Done list. The `catalog`
+surface glob becomes `internal/catalog/**` here, in
+`.github/ask-first.yaml` and its two generated outputs, since the
+`askfirst` check holds 05 5.3 and the yaml equal and the spec row
+cannot move alone; T107 keeps the rest of item 11 of the open block.
+The two notes under `docs/notes/` are edited for the heading renames
+the pass made.
 
 Re-plan (2026-10-12, stage B): New. The specification ends this pass
 with a stable id on each obligation a test, a check, a generator, a
@@ -47,12 +59,12 @@ and a check can hold both directions.
   (12 12.4), REQ-1159 (12 12.4), REQ-1198 (12 12.11).
 - Operator: the operator decisions the pass raised, answered before the
   pull request opens; the measurement of the sandbox hosts of 10 10.8 if
-  a
-  sandbox run is possible.
+  a sandbox run is possible.
 - Acceptance:
   - `go run ./tools/ci reqs` exits 0 after `allocate`; no `REQ-new` is
-    left; the id count equals the obligations the pass placed: 1202 at
-    this pass, measured with `grep -oh '\`REQ-[0-9]\{4\}\`' docs/spec.md
+    left; the id count equals the obligations the pass numbered: 1233
+    at this pass, 8 of them retired in the table of 12 12.11 (so 1225
+    live), measured with `grep -oh '\`REQ-[0-9]\{4\}\`' docs/spec.md
     docs/spec/*.md | sort -u | wc -l`.
   - Every anchor the change set cites resolves, and every citer of a
     renamed heading (03 3.5, 11 11.1) resolves (a one-off link check run

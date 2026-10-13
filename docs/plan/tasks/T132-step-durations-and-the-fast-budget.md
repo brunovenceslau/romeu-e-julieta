@@ -6,9 +6,10 @@ module: ci-release
 fate: new
 owns:
   - tools/ci/internal/run/progress*.go
-needs:
+needs: []
+after:
   - T105
-after: []
+
 ask_first:
   - checks
 sitting: none
@@ -26,7 +27,8 @@ no run ends with a bare `exit status 1` (the output defect of pending
 item 2b55a042).
 
 Re-plan (2026-10-12, stage B): New. The progress line of 10 10.2 had no
-task on `main`.
+task on `main`. `after: T105`, for the moved file layout, is an order
+and not a data dependency (rule 2).
 
 - Implements: REQ-0831 (10 10.2), REQ-0864 (10 10.2).
 - Operator: no

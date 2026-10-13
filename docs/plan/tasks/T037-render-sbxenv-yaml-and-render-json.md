@@ -42,23 +42,16 @@ and `render.json` types become a slice of their own, so that T037, T038
 and T039 land in parallel, is decided at the sitting that opens M3
 (`docs/plan.md`, Decisions open at the re-plan).
 
-- Implements: REQ-0018 (index), REQ-0033 (00 0.1), REQ-0041 (01 1.1),
-  REQ-0042 (01 1.1), REQ-0045 (01 1.2), REQ-0048 (01 1.2), REQ-0054 (01
-  1.3), REQ-0118 (02 2.1), REQ-0132 (02 2.1), REQ-0140 (02 2.3),
-  REQ-0142 (02 2.3), REQ-0156 (02 2.6), REQ-0159 (03 (opening)),
+- Implements: REQ-0018 (index), REQ-0041 (01 1.1), REQ-0042 (01 1.1),
+  REQ-0045 (01 1.2), REQ-0048 (01 1.2), REQ-0054 (01 1.3), REQ-0132 (02
+  2.1), REQ-0140 (02 2.3), REQ-0142 (02 2.3), REQ-0156 (02 2.6),
   REQ-0198 (03 3.3), REQ-0199 (03 3.3), REQ-0200 (03 3.3), REQ-0201 (03
   3.3), REQ-0202 (03 3.3), REQ-0208 (03 3.4), REQ-0256 (03 3.12),
   REQ-0489 (05 5.2), REQ-0490 (05 5.2), REQ-0491 (05 5.2), REQ-0494 (05
   5.2), REQ-0567 (06 6.1), REQ-0583 (06 6.3), REQ-0633 (07 7.5),
-  REQ-0644 (08 8.1), REQ-0732 (10 10.1), REQ-0752 (10 10.1), REQ-0753
-  (10 10.1), REQ-0754 (10 10.1), REQ-0755 (10 10.1), REQ-0756 (10 10.1),
-  REQ-0757 (10 10.1), REQ-0758 (10 10.1), REQ-0759 (10 10.1), REQ-0760
-  (10 10.1), REQ-0761 (10 10.1), REQ-0762 (10 10.1), REQ-0763 (10 10.1),
-  REQ-0764 (10 10.1), REQ-0765 (10 10.1), REQ-0766 (10 10.1), REQ-0767
-  (10 10.1), REQ-0768 (10 10.1), REQ-0769 (10 10.1), REQ-0770 (10 10.1),
-  REQ-0771 (10 10.1), REQ-0772 (10 10.1), REQ-0773 (10 10.1), REQ-0774
-  (10 10.1), REQ-0835 (10 10.2), REQ-0839 (10 10.2), REQ-0940 (10 10.4),
-  REQ-0941 (10 10.4), REQ-0959 (10 10.6), REQ-0980 (11 (opening)).
+  REQ-0644 (08 8.1), REQ-0732 (10 10.1), REQ-0758 (10 10.1), REQ-0835
+  (10 10.2), REQ-0839 (10 10.2), REQ-0940 (10 10.4), REQ-0941 (10 10.4),
+  REQ-0959 (10 10.6), REQ-0980 (11 (opening)).
 - Operator: no.
 - Acceptance:
   - The renderer produces, byte for byte, the goldens T019 wrote and A5

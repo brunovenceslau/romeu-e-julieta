@@ -21,10 +21,10 @@ the maintainer's environments all on the new tools. The text below is
 the one written before the re-plan; `owns` is written when the task
 reopens.
 
-- Implements: REQ-0015 (index), REQ-0719 (08 8.5), REQ-0723 (09
-  (opening)), REQ-0730 (09 (opening)), REQ-0909 (10 10.2), REQ-1080 (12
-  12.2), REQ-1088 (12 12.2), REQ-1108 (12 12.3), REQ-1184 (12 12.8),
-  REQ-1187 (12 12.8), REQ-1188 (12 12.8).
+- Implements: REQ-0719 (08 8.5), REQ-0723 (09 (opening)), REQ-0730 (09
+  (opening)), REQ-0909 (10 10.2), REQ-1080 (12 12.2), REQ-1088 (12
+  12.2), REQ-1108 (12 12.3), REQ-1184 (12 12.8), REQ-1187 (12 12.8),
+  REQ-1188 (12 12.8).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: none (`docs/guide/` is on
   no surface).

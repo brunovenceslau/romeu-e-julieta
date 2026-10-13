@@ -26,17 +26,11 @@ names the tasks it reads code from today (the registry of T105, the
 schema generator of T125), and `owns` is written when the task reopens.
 
 - Implements: REQ-0733 (10 10.1), REQ-0734 (10 10.1), REQ-0750 (10
-  10.1), REQ-0752 (10 10.1), REQ-0753 (10 10.1), REQ-0754 (10 10.1),
-  REQ-0755 (10 10.1), REQ-0756 (10 10.1), REQ-0757 (10 10.1), REQ-0758
-  (10 10.1), REQ-0759 (10 10.1), REQ-0760 (10 10.1), REQ-0761 (10 10.1),
-  REQ-0762 (10 10.1), REQ-0763 (10 10.1), REQ-0764 (10 10.1), REQ-0765
-  (10 10.1), REQ-0766 (10 10.1), REQ-0767 (10 10.1), REQ-0768 (10 10.1),
-  REQ-0769 (10 10.1), REQ-0770 (10 10.1), REQ-0771 (10 10.1), REQ-0772
-  (10 10.1), REQ-0773 (10 10.1), REQ-0774 (10 10.1), REQ-0935 (10 10.3),
-  REQ-0976 (11 (opening)), REQ-0978 (11 (opening)), REQ-1021 (11 11.3),
-  REQ-1022 (11 11.3), REQ-1023 (11 11.3), REQ-1024 (11 11.3), REQ-1025
-  (11 11.3), REQ-1041 (12 12.1), REQ-1044 (12 12.1), REQ-1079 (12 12.2),
-  REQ-1085 (12 12.2), REQ-1119 (12 12.3), REQ-1122 (12 12.3).
+  10.1), REQ-0764 (10 10.1), REQ-0935 (10 10.3), REQ-0976 (11
+  (opening)), REQ-0978 (11 (opening)), REQ-1021 (11 11.3), REQ-1022 (11
+  11.3), REQ-1023 (11 11.3), REQ-1024 (11 11.3), REQ-1025 (11 11.3),
+  REQ-1041 (12 12.1), REQ-1044 (12 12.1), REQ-1079 (12 12.2), REQ-1085
+  (12 12.2), REQ-1119 (12 12.3), REQ-1122 (12 12.3).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: `checks`, `dependencies`
   (the JSON Schema validator of 12 12.1).

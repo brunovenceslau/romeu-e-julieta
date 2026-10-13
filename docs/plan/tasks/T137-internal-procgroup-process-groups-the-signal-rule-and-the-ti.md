@@ -8,8 +8,7 @@ owns:
   - internal/procgroup/**
   - tools/ci/procgroup/**
 needs: []
-after:
-  - T105
+after: []
 ask_first:
   - checks
 sitting: none
@@ -23,11 +22,13 @@ package that starts a subprocess for both binaries, `tools/ci` and
 kill of the group on a timeout, a cancellation or a signal, with a
 bounded drain of the pipes; the one signal handler both `main`s install
 (04 4.1, Signals); and the timeout table of 04 4.1 Starting values as
-one Go table keyed by class with a seam only tests set. The imports of
-`tools/ci` and `tools/mutants` move with it (`after: T105`, which owns
-`tools/ci/**`; `tools/ci/procgroup/**` is listed for its removal). 10
-10.7's row and 12 12.2's `procgroup` row are T122's text; T010's
-`imports` check reads them. T009, T023, T029 and T053 need this task.
+one Go table keyed by class with a seam only tests set. `tools/ci` and
+`tools/mutants` keep importing `tools/ci/procgroup` until T105, which
+comes `after` this task, switches them to `internal/procgroup` and
+removes `tools/ci/procgroup/`, listed here for that removal; until
+then the two copies are the dark code of 12 12.9. 10 10.7's row and 12
+12.2's `procgroup` row are T122's text; T010's `imports` check reads
+them. T009, T023, T029 and T053 need this task.
 
 Re-plan (2026-10-12, stage B): New, an M0 task: both binaries take their
 signal rule and their subprocess runner from this package at their first
@@ -38,7 +39,8 @@ use suffers a timeout more than a wait).
 - Implements: REQ-0274 (04 4.1), REQ-0298 (04 4.1), REQ-0299 (04 4.1),
   REQ-0301 (04 4.1), REQ-0302 (04 4.1), REQ-0303 (04 4.1), REQ-0304 (04
   4.1), REQ-0305 (04 4.1), REQ-0307 (04 4.1), REQ-0500 (05 5.2),
-  REQ-0958 (10 10.6), REQ-0969 (10 10.7), REQ-1086 (12 12.2).
+  REQ-0958 (10 10.6), REQ-0969 (10 10.7), REQ-1086 (12 12.2), REQ-1220
+  (04 4.1).
 - Operator: no
 - Acceptance:
   - A command starts in its own process group; a cancellation or a

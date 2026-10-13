@@ -253,7 +253,7 @@ New or changed, each proposed on 2026-10-12:
    `internal/cmd/<binary>/<command>/` with an `init` that registers its
    definition, plus the import file of rule 1 that links it in. Adding
    one adds files and edits none.
-5. 5. **No task appends to a list another task appends to.** Every
+5. **No task appends to a list another task appends to.** Every
    check, command, generator output, error id, scenario, catalog family,
    kit, probe and task lives in a file of its own. Error ids: each
    package declares its ids in its own `errors.go`, taken from the list
@@ -276,7 +276,7 @@ New or changed, each proposed on 2026-10-12:
    (12 12.3's merge rule), which 10 10.2 links beside its step table
    (T105). The volatile environment rows of 10 10.2 and 12 12.1 stay
    where they are, with a trigger.
-7. 7. **Dependencies land with their first importer.** A module of 12
+7. **Dependencies land with their first importer.** A module of 12
    12.1's list enters `go.mod` and `go.sum` in the task whose code first
    imports it, under that task's `dependencies` forecast, since `go mod
    tidy` drops a requirement that no package imports: the JSON Schema
@@ -289,7 +289,7 @@ New or changed, each proposed on 2026-10-12:
    page holds no task count, no "what waits for a sitting" list and no
    traceability table; `docs/adr/README.md` stays generated as today,
    and its removal is deferred with a trigger.
-9. 9. **The bridge is outside the product.** Running julieta in a
+9. **The bridge is outside the product.** Running julieta in a
    sandbox that romeu does not render yet (M1 and M2) is three edits per
    project definition, an interim personal kit in the kit format the
    daily sandboxes accept today (the pinned frontend of 06 6.1 is first
@@ -326,7 +326,7 @@ New or changed, each proposed on 2026-10-12:
 12. **Runtime isolation.** Each worktree runs `tools/ci` with its own
     caches where a lock is shared and never uses `git stash`; mutation
     checks use `tools/mutants`.
-13. 13. **Grants per milestone.** `docs/grants.yaml` (12 12.4) carries
+13. **Grants per milestone.** `docs/grants.yaml` (12 12.4) carries
     one grant per milestone for the grantable surfaces of 12 12.4 that
     its tasks forecast (`contracts`, `checks`, `dependencies`,
     `catalog`, `ledger`, `digests` and `termsafe`); every other surface
@@ -356,10 +356,11 @@ New or changed, each proposed on 2026-10-12:
 
 A milestone is a statement about `main` plus one sitting of the
 maintainer. The pass that placed the requirement ids opens M0 (T121,
-T122); T104 and T105 start beside it, T106 to T108 follow them, T137 and
-T138 come after T105, and T113 runs at sitting M0; M1's four foundation
-packages (T007, T012, T017, T023) start beside them, since they need
-nothing of M0. M3 has two lanes. Lane A, the packages that read no sbx
+T122); T104, T105 and T137 start beside it, T106 to T108 follow them,
+T138 comes after T105, and T113 runs at sitting M0; M1's foundation
+packages T007, T012 and T017 start beside them, since they need nothing
+of M0, and T023 once T137 (`internal/procgroup`) has merged. M3 has two
+lanes. Lane A, the packages that read no sbx
 fact (`spec`, `catalog`, `state`, `egress`, the host-only verbs of
 `gitsafe`, `sbxdrv` with its hand-written sessions, the preflight),
 starts once T125 has landed (the schema generator and check that `spec`,
@@ -372,20 +373,23 @@ covers a command for them).
 
 | M | Name | Ends when (observable, on `main` and on the host) | Delivers |
 |---|---|---|---|
-| M0 | Shape the work | `tools/ci all` green with checks registered by file; the requirement ids in the specification and `tools/ci reqs` green; the plan as task files, checked by `tools/ci plan`; one source for the ask-first list; the re-plan record Accepted; `internal/procgroup` and the hook settings merged (T137, T138) | the shape that lets M1 to M4 run in parallel |
-| M1 | julieta in daily use | sitting M1: every daily sandbox runs `julieta memory`, `handoff show --hook` at SessionStart, `hooks run` on every commit and `snapshot` after it, from a read-only bin mount and a hand-written manifest; the names gate of the config repository runs through the dispatcher on every push (T112) | memory, handoff, hooks and snapshots in every sandbox the maintainer works in; julieta as the one path for new items; the store's items move at T119 |
-| M2 | Kits in daily use | sitting M2: the kit-frontend go/no-go by hand on one host (about 40 minutes); then recreate wave 1, one project per slot, each sandbox built from the `julieta`, `julieta-claude` and `git-ssh-sign` product kits plus one personal kit from the config repository | every daily sandbox built from the product kits plus one personal kit; mise per repository through `julieta install` and `lock`; commits signed with the one key of `git-ssh-sign` |
+| M0 | Shape the work | the kit-frontend go/no-go read (T113); `tools/ci all` green with checks registered by file; the requirement ids in the specification and `tools/ci reqs` green; the plan as task files, checked by `tools/ci plan`; one source for the ask-first list; the re-plan record Accepted; `internal/procgroup` and the hook settings merged (T137, T138) | the shape that lets M1 to M4 run in parallel |
+| M1 | julieta in daily use | sitting M1: every daily sandbox runs `julieta memory`, `handoff show --hook` at SessionStart, `hooks run` on every commit and `snapshot` after it, from a read-only bin mount and a hand-written manifest; the names gate of the config repository runs through the dispatcher on every push (T112) | memory, handoff, hooks and snapshots in every sandbox the maintainer works in; julieta as the one path for new items, the store's items moved at T111 |
+| M2 | Kits in daily use | sitting M2: recreate wave 1, one project per slot, each sandbox built from the `julieta`, `julieta-claude` and `git-ssh-sign` product kits plus one personal kit from the config repository | every daily sandbox built from the product kits plus one personal kit; mise per repository through `julieta install` and `lock`; commits signed with the one key of `git-ssh-sign` |
 | M3 | romeu renders and runs | sitting M3: J1 for real on the config project from a `--dry-run` build of `main` (`init`, `doctor`, `approve --toolchain`, `sync`, `run`), then one project per slot until every project definition is rendered by `romeu sync` | every project definition rendered under gate 2, its egress derived and its secrets bound in host settings, the kit pins in one file, and `romeu run` as the one way into a sandbox |
 | M4 | Nothing lost | sitting M4: one `romeu recreate` rehearsal with a planted dirty worktree, stash and ignored file; J6 and J10 pass in CI with the fake sbx; on the host, the rehearsal's `romeu recreate` transcript and salvage listing, read by the maintainer, are the Evidence | recreate, rm and retire with a complete salvage; `romeu pull` and `romeu handoff` |
 | M5 | Every project on romeu | sitting M5: one month of daily use after the last slot of sitting M3 with no hand-applied step and no open runbook section; every open item of a project is a `julieta memory` entry or closed (T119). M5 is a wait, not a gate: the release and docs tasks of M6 whose trigger fired at the last slot of sitting M3 run during it, and blocks O3 to O7 wait for the end of M5 only where they need a sitting | the product as the one path, with memory as the one place for open items |
 | M6 | Public v1 | the release checklist of 12 12.2 completes: blocks A and B on both hosts, `v1.0.0`, `docs/acceptance.json` | the v1.0.0 release with its evidence |
 
-**The sittings.** A sitting is named by its milestone (sitting M1 ends
-M1); the form `S<n>` is a success criterion id (10 10.2) and names no
-sitting. Each sitting is the maintainer's own use of the product on one
-host, and its output is the Evidence of the next pull request. Each
-sitting builds from a commit whose diff since the last host build the
-maintainer has read, named with its SHA in the sitting's Evidence.
+**The sittings.** A sitting is named by its milestone: sitting Mn ends
+Mn and opens Mn+1, the grants it writes are Mn+1's (rule 13), and the
+answers of the open block come with the re-plan pull request (T108),
+before sitting M0; the form `S<n>` is a success criterion id (10 10.2)
+and names no sitting. Each sitting is the maintainer's own use of the
+product on one host, and its output is the Evidence of the next pull
+request. Each sitting builds from a commit whose diff since the last
+host build the maintainer has read, named with its SHA in the sitting's
+Evidence.
 
 - **Sitting M0** merges M0 and writes the M0 and M1 grants of rule 13;
   it also reads whether the approval-line check (a deferred row) lands
@@ -416,7 +420,6 @@ maintainer has read, named with its SHA in the sitting's Evidence.
   approval).
 - **M6 has two sittings**, the earlier blocks O3 and O5 to O7, under
   [Operator blocks](#operator-blocks).
-
 
 ## Where the task checklist lives
 
@@ -710,7 +713,8 @@ live or merged task, and every entry is a live id; `tools/ci plan`
 ## Spec sentences the re-plan amends
 
 Every amendment the re-plan listed here was applied to the specification
-by T122 (ADR 0012, decided 2026-10-12); the specification and this plan
+by T122 (ADR 0012, proposed; decision (c) of 2026-10-12); the
+specification and this plan
 read the same sentences, and T108 records the decisions. The readings
 that stay true live where they are used: a hand-written manifest
 validates like a rendered one (T111, T135); `run` attaches a single pane
@@ -877,7 +881,8 @@ in T108's decision record and here as "decided on" with the date.
    `internal/spec/versions.go` once error ids are per package (T008).
    Needed before T107 (M0). Recommended: yes (in T107).
 10. **The grants** in `docs/grants.yaml`, one per milestone, written at
-    the sitting that opens it (rule 13). Needed before sitting M0.
+    the sitting that ends the milestone before (rule 13). Needed before
+    sitting M0.
     Recommended: write the M0 and M1 grants at sitting M0.
 11. **The surfaces**: add `sbxdrv`, put `skills/**` under `kits`
     (R8-05-3), replace `catalog/egress.yaml` by `internal/catalog/**`,
@@ -916,14 +921,19 @@ in T108's decision record and here as "decided on" with the date.
     with its approval line); (b) the config repository as a secondary
     clone of every project (02 2.6), its plain list cloned into every
     sandbox. Recommended: (a).
-19. **The open-items cut-over.** Needed before sitting M1. At T119 (M5,
-    the plan's choice: the one-off entry runs after the store's last
-    writer is gone) or at T111 (M1). Recommended: T119.
-20. **The render types slice.** Needed at the sitting that opens M3: a
-    slice T139 `render: the candidate and render.json types` that lets
+19. **The open-items cut-over.** Needed before sitting M1. At T111 (M1:
+    the one-off entry runs after the week of daily use and again at
+    the end of the sitting, after the store's last writer is gone,
+    both counts in the runbook) or at T119 (M5). Recommended: T111,
+    since the M1 row makes julieta the one path for new items at
+    sitting M1 and a second store open until M5 would hold items the
+    count never sees; T119 keeps the closing read.
+20. **The render types slice.** Decided at sitting M2: a slice, with the
+    next free task id, `render: the candidate and render.json types`
+    that lets
     T037, T038 and T039 land in parallel (two links off lane B, measured
     in the stage B pass) against one interface with one implementation;
-    or the three in sequence as planned. Decided at that sitting.
+    or the three in sequence as planned.
 
 ## Questions for the maintainer
 
@@ -1005,7 +1015,8 @@ the first task that waits for the answer.
    no block and no question carried it.
    Recommendation: Write it in the review of that pull request, a few
    sentences after the acknowledgement: what you read, that a fix has no
-   promised time, and where the outcome is published.
+   promised time, and where the outcome is published. Routed to stage
+   C: the answer is written in T084's pull request review.
 
 13. **The rule for `gh`** (12 12.1, 02 2.1, 07 7.3, 04 4.3). Needed
    before: T088. A rule this plan considered has three parts: an exact

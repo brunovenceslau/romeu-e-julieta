@@ -12,10 +12,8 @@ owns:
   - docs/adr/0018-*.md
   - docs/adr/0019-*.md
   - docs/adr/0020-*.md
-needs:
-  - T106
-after:
-  - T108
+needs: []
+after: []
 ask_first:
   - decisions
 sitting: none
@@ -29,9 +27,10 @@ the one renderer; memory as plain per-repo files; stdlib `flag`;
 GPL-3.0-only with CC0-1.0 for `examples/` and `schemas/`) and one per
 decision of round 8 that ADR 0009 does not hold, each numbered by
 `tools/new adr`. The `owns` globs are provisional: the writer replaces
-them by the numbers `tools/new adr` gives, in order. A record is a
-review order: T035, T040 and T077 come `after` this task, and no task
-`needs` it.
+them by the numbers `tools/new adr` gives, in order, and the collision
+rule of 12 12.3 covers a number taken twice, so this task waits for no
+M0 task. A record is a review order: T035, T040 and T077 come `after`
+this task, and no task `needs` it.
 
 Re-plan (2026-10-12, stage B): New. 12 12.5 asks that a decision the
 specification cites as authority has its record in or before the first
@@ -45,5 +44,4 @@ task that implements the citing section.
   - `tools/ci generated` passes after the ADR index regenerates.
   - T035, T040 and T077 cite "the record of <decision> is merged (12
     12.5)".
-- Verify: `go run ./tools/ci generated` exits 0; `go run ./tools/ci
-  sequences` once T004 lands.
+- Verify: `go run ./tools/ci generated` exits 0.

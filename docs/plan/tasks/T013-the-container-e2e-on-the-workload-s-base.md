@@ -39,9 +39,9 @@ owns `.github/workflows/ci.yml` and the `workflows` check's action-input
 list for the steps it adds, after T105, which moves that check.
 
 - Implements: REQ-0120 (02 2.1), REQ-0131 (02 2.1), REQ-0740 (10 10.1),
-  REQ-0744 (10 10.1), REQ-0745 (10 10.1), REQ-0746 (10 10.1), REQ-0798
-  (10 10.1), REQ-0805 (10 10.2), REQ-0812 (10 10.2), REQ-0832 (10 10.2),
-  REQ-0837 (10 10.2).
+  REQ-0743 (10 10.1), REQ-0744 (10 10.1), REQ-0745 (10 10.1), REQ-0746
+  (10 10.1), REQ-0798 (10 10.1), REQ-0805 (10 10.2), REQ-0812 (10 10.2),
+  REQ-0832 (10 10.2), REQ-0837 (10 10.2).
 - Operator: no.
 - Acceptance:
   - The container e2e runs `julieta version --json` in the workload's

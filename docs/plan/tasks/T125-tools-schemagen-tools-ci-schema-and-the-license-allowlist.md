@@ -34,7 +34,7 @@ its own tests; the first schema under `schemas/` is T135's.
 Re-plan (2026-10-12, stage B): New. Lane A's root, `spec` (T021), needs
 the generator and the check, and T051 no longer waits in front of it.
 
-- Implements: REQ-0118 (02 2.1).
+- Implements: REQ-0118 (02 2.1), REQ-0159 (03 (opening)).
 - Operator: no
 - Acceptance:
   - `go generate` writes a schema for the generator's fixture type, and

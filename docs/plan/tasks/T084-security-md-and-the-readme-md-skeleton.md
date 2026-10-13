@@ -24,8 +24,8 @@ first adopter other than the maintainer; or the maintainer's
 environments all on the new tools. The text below is the one written
 before the re-plan; `owns` is written when the task reopens.
 
-- Implements: REQ-0015 (index), REQ-1087 (12 12.2), REQ-1183 (12 12.8),
-  REQ-1186 (12 12.8).
+- Implements: REQ-1087 (12 12.2), REQ-1183 (12 12.8), REQ-1186 (12
+  12.8).
 - Operator: question 12 is answered in this pull request's review.
 - Ask-first, as forecast before the re-plan: `checks`
   (`tools/ci/headings.yaml`).

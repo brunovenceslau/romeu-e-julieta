@@ -35,5 +35,4 @@ reopens.
     (Q22), a post-block-B edit of that page.
   - The resolution of an overturned result is part of T092, not of this
     task.
-- Verify: `go run ./tools/ci generated`; `go run ./tools/ci probes`; `go
-  run ./tools/ci sequences` once T004 lands.
+- Verify: `go run ./tools/ci generated`; `go run ./tools/ci probes`.

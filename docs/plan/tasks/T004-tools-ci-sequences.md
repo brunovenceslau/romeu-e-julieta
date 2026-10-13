@@ -23,11 +23,9 @@ by name in 05 5.4. The text below is the one written before the re-plan;
 `needs` lists its earlier dependencies with a folded id replaced by the
 id that absorbed it, and `owns` is written when the task reopens.
 
-- Implements: REQ-0560 (05 5.4), REQ-0561 (05 5.4), REQ-0562 (05 5.4),
-  REQ-0826 (10 10.2), REQ-0827 (10 10.2), REQ-0867 (10 10.2), REQ-1083
-  (12 12.2), REQ-1164 (12 12.5), REQ-1165 (12 12.5), REQ-1166 (12 12.5),
-  REQ-1169 (12 12.5), REQ-1170 (12 12.5), REQ-1171 (12 12.5), REQ-1193
-  (12 12.9).
+- Implements: REQ-0826 (10 10.2), REQ-0827 (10 10.2), REQ-0867 (10
+  10.2), REQ-1083 (12 12.2), REQ-1164 (12 12.5), REQ-1165 (12 12.5),
+  REQ-1166 (12 12.5), REQ-1193 (12 12.9).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: `checks`.
 - Acceptance:
@@ -48,7 +46,9 @@ id that absorbed it, and `owns` is written when the task reopens.
     `docs/spec/` fails (12 12.5: the specification names no plan id).
   - A gap in the ADR numbers passes (ADR 0009, decision 4).
   - It passes on this repository's `docs/spec.md`, `docs/spec/` and
-    `docs/adr/`.
+    `docs/adr/`, the records merged before it included (T028, T093,
+    T096 to T101 and T123 name no run of this check): the catch-up over
+    them is this task's.
 - Verify: `go test ./tools/ci/... -run '^TestSequences'`, which runs the
   fixture lines; `go run ./tools/ci sequences`; `go run ./tools/ci
   generated`.

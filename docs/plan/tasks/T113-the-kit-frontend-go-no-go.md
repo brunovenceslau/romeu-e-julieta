@@ -32,8 +32,7 @@ Re-plan (2026-10-12): Runs at sitting M0, once T012 merged: it needs the
 pin file only, and a record (T123) is a review order, not a dependency;
 the earlier plan ran it as part 1 of sitting M2.
 
-- Implements: REQ-0566 (06 6.1), REQ-0572 (06 6.1), REQ-1169 (12 12.5),
-  REQ-1170 (12 12.5), REQ-1171 (12 12.5).
+- Implements: REQ-0566 (06 6.1), REQ-0572 (06 6.1).
 - Operator: runs it at sitting M0.
 - Acceptance:
   - Each fact lands as a fixture in the task that reads it (T032's

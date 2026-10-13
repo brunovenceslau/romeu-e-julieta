@@ -6,9 +6,10 @@ module: ci-release
 fate: new
 owns:
   - tools/ci/internal/setup/**
-needs:
+needs: []
+after:
   - T105
-after: []
+
 ask_first:
   - checks
 sitting: none
@@ -22,7 +23,8 @@ Goal: `setup`'s `go mod download` runs with
 database guards both installs of govulncheck (12 12.1).
 
 Re-plan (2026-10-12, stage B): New. A change to merged work is a task,
-so it has an owner and an `after` edge.
+so it has an owner and an `after` edge: `after: T105`, for the moved
+file layout, is an order and not a data dependency (rule 2).
 
 - Implements: REQ-1071 (12 12.1).
 - Operator: no

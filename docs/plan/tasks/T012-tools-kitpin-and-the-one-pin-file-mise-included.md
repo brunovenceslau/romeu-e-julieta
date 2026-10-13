@@ -33,7 +33,7 @@ are copied below.
   REQ-0262 (03 3.13), REQ-0564 (06 6.1), REQ-0565 (06 6.1), REQ-0578 (06
   6.2), REQ-0605 (06 6.4), REQ-0622 (07 7.4), REQ-0623 (07 7.4),
   REQ-0624 (07 7.4), REQ-0844 (10 10.2), REQ-1061 (12 12.1), REQ-1064
-  (12 12.1), REQ-1069 (12 12.1), REQ-1110 (12 12.3), REQ-1164 (12 12.5).
+  (12 12.1), REQ-1069 (12 12.1).
 - Operator: confirms mise's public key out of band; one `sbx policy
   allow network` for the building sandbox with every host named, exact
   hosts and no wildcard.

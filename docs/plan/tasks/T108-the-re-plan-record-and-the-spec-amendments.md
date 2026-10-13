@@ -35,9 +35,8 @@ them by name). Every spec amendment the re-plan carried was applied on
 request of its own (rule 1). The record is on `decisions`, and
 `docs/adr/README.md` is regenerated.
 
-- Implements: REQ-0015 (index), REQ-0040 (01 1.1), REQ-1083 (12 12.2),
-  REQ-1090 (12 12.2), REQ-1101 (12 12.2), REQ-1105 (12 12.3), REQ-1167
-  (12 12.5).
+- Implements: REQ-0040 (01 1.1), REQ-1083 (12 12.2), REQ-1090 (12 12.2),
+  REQ-1101 (12 12.2), REQ-1105 (12 12.3), REQ-1167 (12 12.5).
 - Operator: the answers of the open block, recorded here.
 - Acceptance:
   - Every anchor the plan and the decision records cite still resolves

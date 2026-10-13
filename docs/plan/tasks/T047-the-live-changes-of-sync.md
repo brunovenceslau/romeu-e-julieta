@@ -31,7 +31,7 @@ edge admits.
 
 - Implements: REQ-0192 (03 3.2), REQ-0344 (04 4.2), REQ-0355 (04 4.2),
   REQ-0488 (05 5.2), REQ-0511 (05 5.2), REQ-0634 (07 7.5), REQ-0635 (07
-  7.5), REQ-0724 (09 (opening)).
+  7.5).
 - Operator: no.
 - Acceptance:
   - With a running sandbox, `sync` runs the rest of the preflight, then

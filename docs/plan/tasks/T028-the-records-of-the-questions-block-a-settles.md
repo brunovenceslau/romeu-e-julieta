@@ -36,5 +36,4 @@ task reopens.
     result from each host (11, opening).
   - The review may ask for one pull request per record; the task is all
     of them.
-- Verify: `go run ./tools/ci generated`; `go run ./tools/ci sequences`
-  once T004 lands.
+- Verify: `go run ./tools/ci generated`.

@@ -22,14 +22,8 @@ before the re-plan; `needs` lists its earlier dependencies with a folded
 id replaced by the id that absorbed it, and `owns` is written when the
 task reopens.
 
-- Implements: REQ-0730 (09 (opening)), REQ-0752 (10 10.1), REQ-0753 (10
-  10.1), REQ-0754 (10 10.1), REQ-0755 (10 10.1), REQ-0756 (10 10.1),
-  REQ-0757 (10 10.1), REQ-0758 (10 10.1), REQ-0759 (10 10.1), REQ-0760
-  (10 10.1), REQ-0761 (10 10.1), REQ-0762 (10 10.1), REQ-0763 (10 10.1),
-  REQ-0764 (10 10.1), REQ-0765 (10 10.1), REQ-0766 (10 10.1), REQ-0767
-  (10 10.1), REQ-0768 (10 10.1), REQ-0769 (10 10.1), REQ-0770 (10 10.1),
-  REQ-0771 (10 10.1), REQ-0772 (10 10.1), REQ-0773 (10 10.1), REQ-0774
-  (10 10.1), REQ-0850 (10 10.2), REQ-1080 (12 12.2), REQ-1087 (12 12.2),
+- Implements: REQ-0015 (index), REQ-0730 (09 (opening)), REQ-0769 (10
+  10.1), REQ-0850 (10 10.2), REQ-1080 (12 12.2), REQ-1087 (12 12.2),
   REQ-1108 (12 12.3), REQ-1166 (12 12.5), REQ-1184 (12 12.8), REQ-1187
   (12 12.8), REQ-1188 (12 12.8).
 - Operator: no.

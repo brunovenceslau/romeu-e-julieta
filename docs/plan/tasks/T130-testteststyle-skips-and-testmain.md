@@ -8,9 +8,10 @@ owns:
   - tools/ci/internal/lint/teststyle*.go
   - tools/ci/all_test.go
   - tools/ci/main_test.go
-needs:
+needs: []
+after:
   - T105
-after: []
+
 ask_first:
   - checks
 sitting: none
@@ -26,7 +27,8 @@ names the two test files whose skips it reworks by their names on
 `main`; the writer takes their post-T105 names from T105's split.
 
 Re-plan (2026-10-12, stage B): New. The meta-test on `main` holds fewer
-rules than the pages it cites.
+rules than the pages it cites. `after: T105`, for the moved file
+layout, is an order and not a data dependency (rule 2).
 
 - Implements: REQ-0964 (10 10.6).
 - Operator: no

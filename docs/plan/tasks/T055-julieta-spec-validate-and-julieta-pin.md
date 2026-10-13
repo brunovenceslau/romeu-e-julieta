@@ -33,12 +33,12 @@ Its J2 step lives in its own file, `e2e/scenarios/j2/step1_*.go`, in the
 directory T043 owns, so this task comes `after` T043 (rule 1 of
 `docs/plan.md`).
 
-- Implements: REQ-0009 (index), REQ-0038 (00 0.4), REQ-0055 (01 1.3),
-  REQ-0117 (02 2.1), REQ-0119 (02 2.1), REQ-0134 (02 2.2), REQ-0135 (02
-  2.2), REQ-0174 (03 3.1), REQ-0178 (03 3.1), REQ-0211 (03 3.5),
-  REQ-0420 (04 4.3), REQ-0421 (04 4.3), REQ-0422 (04 4.3), REQ-0423 (04
-  4.3), REQ-0433 (04 4.4), REQ-0435 (04 4.4), REQ-0519 (05 5.2),
-  REQ-0577 (06 6.2), REQ-0639 (07 7.6), REQ-0728 (09 (opening)).
+- Implements: REQ-0009 (index), REQ-0038 (00 0.4), REQ-0117 (02 2.1),
+  REQ-0119 (02 2.1), REQ-0134 (02 2.2), REQ-0135 (02 2.2), REQ-0174 (03
+  3.1), REQ-0178 (03 3.1), REQ-0211 (03 3.5), REQ-0420 (04 4.3),
+  REQ-0421 (04 4.3), REQ-0422 (04 4.3), REQ-0423 (04 4.3), REQ-0433 (04
+  4.4), REQ-0435 (04 4.4), REQ-0519 (05 5.2), REQ-0577 (06 6.2),
+  REQ-0639 (07 7.6), REQ-0728 (09 (opening)).
 - Operator: feeds block O4.
 - Acceptance:
   - `spec validate` exits 6 (`check-findings`) on any decode, schema or

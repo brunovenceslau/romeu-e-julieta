@@ -26,8 +26,7 @@ written before the re-plan.
   (12 12.2), REQ-1083 (12 12.2), REQ-1102 (12 12.3), REQ-1103 (12 12.3),
   REQ-1111 (12 12.3), REQ-1114 (12 12.3), REQ-1116 (12 12.3), REQ-1118
   (12 12.3), REQ-1119 (12 12.3), REQ-1120 (12 12.3), REQ-1131 (12 12.4),
-  REQ-1143 (12 12.4), REQ-1158 (12 12.4), REQ-1179 (12 12.7), REQ-1195
-  (12 12.9).
+  REQ-1143 (12 12.4), REQ-1158 (12 12.4), REQ-1179 (12 12.7).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: none exists before this
   task.

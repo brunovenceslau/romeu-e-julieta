@@ -30,7 +30,7 @@ it, and `owns` is written when the task reopens, with its import file at
 
 - Implements: REQ-0090 (01 1.6), REQ-0196 (03 3.2), REQ-0297 (04 4.1),
   REQ-0306 (04 4.1), REQ-0358 (04 4.2), REQ-0418 (04 4.3), REQ-0419 (04
-  4.3), REQ-0696 (08 8.5), REQ-0732 (10 10.1), REQ-0743 (10 10.1).
+  4.3), REQ-0696 (08 8.5), REQ-0732 (10 10.1).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: none expected.
 - Acceptance:

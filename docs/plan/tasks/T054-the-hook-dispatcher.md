@@ -16,6 +16,7 @@ needs:
   - T023
 after:
   - T051
+  - T035
 ask_first: []
 sitting: none
 ---
@@ -28,8 +29,10 @@ under `internal/hooks/actions/`.
 
 Re-plan (2026-10-12): Kept. The `pre-commit` lock check lands with T053
 and the `post-commit` snapshot with T060, both dark until then. The
-manifest type comes from T135; `after: T051` for the setup seam file
-`setup/steps.go`, which this task extends by one line;
+manifest type comes from T135; `after: T051` and `after: T035` for the
+setup seam file `setup/steps.go`, which this task extends by one line
+after the memory check's line (the setup order of 04 4.3), so the two
+one-line edits never meet in a rebase;
 `internal/hooks/actions/actions.go` is the hook-name-to-action seam the
 action files register into (rule 14 of `docs/plan.md`).
 
