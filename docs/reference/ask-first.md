@@ -31,7 +31,7 @@ says why each surface is on the list.
 | `termsafe` | `internal/termsafe/**`, `internal/cli/writer.go` | host output escaping |
 | `digests` | `internal/canon/**` | every digest the gates compare |
 | `signing` | `internal/signing/**`, `kits/git-ssh-sign/**` | commit signing key isolation |
-| `catalog` | `catalog/egress.yaml` | upload flags and the base and meta sets |
+| `catalog` | `internal/catalog/**` | upload flags and the base and meta sets |
 | `kits` | `kits/**`, `tools/kitpin/**` | what enters every sandbox, and its pins |
 | `release` | `.github/workflows/release.yml`, `tools/release/**` | release and publishing paths |
 | `dependencies` | `go.mod`, `go.sum`, `mise.toml`, `mise.lock`, `.mise.toml`, `mise.*.toml`, `.mise.*.toml`, `mise/**`, `.mise/**`, `.config/mise.toml`, `.config/mise.*.toml`, `.config/mise/**`, `.tool-versions`, `.miserc.toml`, `.miserc.local.toml`, `.config/miserc.toml`, `.github/workflows/**` | Go dependencies, the pinned tools the gates run with every file mise reads as its configuration, and CI actions |

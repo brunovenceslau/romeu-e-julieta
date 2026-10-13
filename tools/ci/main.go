@@ -16,6 +16,8 @@
 //	go run ./tools/ci hygiene add             add a denylist entry, from a terminal
 //	go run ./tools/ci generated               go generate ./... changes no generated file
 //	go run ./tools/ci generate                write the generated files (what go generate runs)
+//	go run ./tools/ci reqs                    the requirement ids of 12 12.11 over the tree at HEAD
+//	go run ./tools/ci reqs allocate           number the REQ-new placeholders of the working tree
 //
 // It exits 0 when every check passes, 1 when a check fails, and 2 when
 // it could not run a check at all. Inside fast and all, hygiene or
@@ -60,6 +62,7 @@ const usage = `usage:
   go run ./tools/ci hygiene add
   go run ./tools/ci generated
   go run ./tools/ci generate
+  go run ./tools/ci reqs [allocate]
 `
 
 // env is what a run reads and writes. Tests fill it with a fixture;
@@ -161,6 +164,8 @@ func run(ctx context.Context, e env, args []string) int {
 		ok, err = runGenerated(ctx, e, args[1:])
 	case "generate":
 		ok, err = runGenerate(ctx, e, args[1:])
+	case "reqs":
+		ok, err = runReqs(ctx, e, args[1:])
 	default:
 		err = fmt.Errorf("unknown subcommand %q\n%s", args[0], usage)
 	}

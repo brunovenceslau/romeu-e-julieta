@@ -1,0 +1,49 @@
+{
+  "node": "fix · fixer · fable",
+  "spec_head": "0e44a9e",
+  "plan_head": "090af25",
+  "applied": [
+    "review-spec-lens-1", "review-spec-lens-2", "review-spec-lens-3", "review-spec-lens-4", "review-spec-lens-5",
+    "review-spec-lens-6", "review-spec-lens-7", "review-spec-lens-8", "review-spec-lens-9", "review-spec-lens-10",
+    "review-spec-lens-11", "review-spec-lens-12", "review-spec-lens-13", "review-spec-lens-14", "review-spec-lens-15",
+    "review-spec-lens-16", "review-spec-lens-17", "review-spec-lens-18", "review-spec-lens-19", "review-spec-lens-20",
+    "review-spec-lens-21", "review-spec-lens-22", "review-spec-lens-23", "review-spec-lens-24",
+    "completeness-1", "completeness-2", "completeness-3", "completeness-4", "completeness-5", "completeness-6",
+    "completeness-7", "completeness-9", "completeness-10", "completeness-11",
+    "RR-1", "RR-2", "RR-3", "RR-4", "RR-5", "RR-6", "RR-7", "RR-8", "RR-9", "RR-10", "RR-11", "RR-12", "RR-13",
+    "RR-14", "RR-15", "RR-16", "RR-17", "RR-18", "RR-19", "RR-20",
+    "review-consistency-1", "review-consistency-2", "review-consistency-3", "review-consistency-4",
+    "review-consistency-5", "review-consistency-6", "review-consistency-7", "review-consistency-8",
+    "review-consistency-9", "review-consistency-10", "review-consistency-11", "review-consistency-12",
+    "review-consistency-13", "review-consistency-14", "review-consistency-15", "review-consistency-16",
+    "review-consistency-17", "review-consistency-18", "review-consistency-19", "review-consistency-20",
+    "review-consistency-21"
+  ],
+  "declined": [
+    {
+      "id": "completeness-8",
+      "reason": "No repository file carries the pull request shape: plan-changes.md is a scratch document of the write pass, and the shape is the orchestrator's call. The measurement stands and the recommendation (a) is sound: the branch docs/replan now stacks spec, tool and plan commits, so one pull request with the checks, spec, decisions and ask-first lines is the shape that keeps the tool and the ids together."
+    },
+    {
+      "id": "RR-21",
+      "reason": "Measured after RR-1: T068 cites 117 ids, and only 14 of them name recreate (one of those, REQ-0090, is the adopt row); the count is the salvage machinery that rm and recreate share, and the fingerprint cases run for both commands. A split would move 14 ids, keep T068 above 100 and duplicate the shared acceptance, so it does not serve the size concern the finding raises. T068 stays whole, as its re-plan paragraph records."
+    }
+  ],
+  "applied_with_a_note": {
+    "review-spec-lens-5 / completeness-3 / review-consistency-10": "one form for the three: REQ-1189 to REQ-1192 moved to the Rule cell, REQ-1195 retired (no check enforces any part of it), REQ-1192 to REQ-1194 kept because a check enforces part of each row, and 12 12.11 now says a rule a check enforces in part carries an id placed before the rule while its [review] half stays unverified; T004 and T005 keep citing REQ-1193 and REQ-1194.",
+    "review-spec-lens-7": "line 667 of chapter 13 (doctor claims nothing about a stamp) was turned to L1 with the listed lines, since it speaks of the ledger's first build.",
+    "review-spec-lens-15": "05 5.3 is on the spec surface: the pull request body needs the spec approval line, and the branch also edits .github/ask-first.yaml (the catalog glob, from the write pass), so an ask-first line too.",
+    "review-spec-lens-24": "the modernize edits and t.Context are applied; the layout migration already has its task (T105 moves reqs, coverage half included), so no further pending item was written.",
+    "review-spec-lens-22 / RR-19": "the code-span rule counts backticks across the lines of a paragraph, since a code span may wrap a line: a line-local count flagged three well-placed ids (04 4.2 and 12 12.4).",
+    "completeness-2": "the owns, the ask-first forecast and the Goal sentence are applied in T122 and T107; the approval line itself belongs to the pull request body the orchestrator writes.",
+    "completeness-7": "the plan text is fixed; wrapmd.py is a scratch tool outside the repository and was not edited.",
+    "completeness-10": "the two twins now point at their owners in the text (00 0.2 cites the invariants of 05 5.2; 08's opening cites the rule of 8.5); req-map.md is a scratch document.",
+    "completeness-11 / review-consistency-18 / RR-19": "reqTasksIn's second return value is kept and now carries the fate finding of review-consistency-19; the retired-row range is rowFirst and rowLast and the duplicate's variable is prior; the retired-rule paragraph is a constant of the tests.",
+    "RR-2": "resolved by completeness-1: T104 owns no tools/ci path, so T105 needs no edge to it.",
+    "RR-6": "(b) the romeu:invariant allowlist entry lands with T121 (this branch, on checks) since T104 left the checks surface; T007 is after nothing.",
+    "RR-7": "T105's lint-set answer moved to T139 with the split of RR-8, and reads 'answered with the re-plan pull request (T108)'.",
+    "RR-20": "the cap is five, in 12 12.11 and in the tool; the shared ids (REQ-1101, REQ-1169 to REQ-1171) are listed in the tool, which the spec names as the place; the mirror rule is in T106's acceptance."
+  },
+  "new_ids": "REQ-1203 to REQ-1233 (31), each cited from the task that builds it; retired: REQ-0033, REQ-0036, REQ-0139, REQ-0213, REQ-0560, REQ-0561, REQ-0562, REQ-1195",
+  "new_tasks": ["T139 the lint split and the lint set", "T140 the spec-to-tools/ci identifier and module-tree tests"]
+}

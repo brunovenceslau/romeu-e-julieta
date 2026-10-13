@@ -52,9 +52,9 @@ The rulesets, as read through the GitHub API on 2026-10-09:
 
 The token's scopes, `gist, read:org, repo, workflow`, were read on
 2026-10-09 from the `x-oauth-scopes` header of an API response inside
-the sandbox. Probe A16 reads them on the host, where the token is
-held, and that read is still to be made
-([11 11.1](../spec/11-host-probes.md#111-block-a---sbx-and-runtime-facts-first-in-parallel-with-the-first-build-layer)).
+the sandbox. Probe A16 reads them on the host, where the token is held,
+and that read is still to be made
+([11 11.1](../spec/11-host-probes.md#111-block-a---sbx-and-runtime-facts)).
 
 The final handoffs counted on 2026-10-09 were four: 2026-10-08 and
 2026-10-09 in round-8.md, 2026-10-09 in round-9.md and in

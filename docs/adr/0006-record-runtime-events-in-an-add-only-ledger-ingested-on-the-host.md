@@ -17,12 +17,11 @@ when something fails inside a sandbox, the failure should be on record
 before anyone is asked to remember it.
 
 The maintainer asked for this. julieta saves runtime information that
-later feeds back into the sessions, because problems show up when
-things execute; the store is one location the sandboxes on a machine
-share; nothing edits it except through julieta; and what goes there is
-never edited. The maintainer's reason, translated: this looks like
-very good data for improving romeu itself and the whole development
-environment.
+later feeds back into the sessions, because problems show up when things
+execute; the store is one location the sandboxes on a machine share;
+nothing edits it except through julieta; and what goes there is never
+edited. The reason recorded: runtime failures are data for improving
+romeu and the development environment.
 
 The maintainer then decided these points, and this record transcribes
 them:
@@ -30,12 +29,12 @@ them:
 - One ledger per machine, shared by the projects on it.
 - A sandbox may read other projects' events; the full view is on the
   host only.
-- The schema is versioned. The maintainer's reason, translated: with a
-  version, the pressure to get it right the first time drops a little.
+- The schema is versioned. The reason recorded: a version lowers the
+  pressure to get the first schema right.
 - Events are kept; `doctor` warns past a size; rotation waits.
-- **Nothing in the ledger is ever edited or deleted.** The maintainer,
-  translated: that no event is edited has to be absolute. No
-  exception, no tombstone, no redaction event.
+- **Nothing in the ledger is ever edited or deleted.** The rule is
+  absolute: no exception, no tombstone, no redaction event (decided on
+  2026-10-01).
 - A v1 event has no free text.
 - A secret that still lands in the ledger stays there; the remedy is
   to rotate the credential.

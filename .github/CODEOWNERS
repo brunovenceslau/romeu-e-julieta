@@ -22,7 +22,7 @@
 /kits/git-ssh-sign/** @brunovenceslau
 
 # catalog
-/catalog/egress.yaml @brunovenceslau
+/internal/catalog/** @brunovenceslau
 
 # kits
 /kits/** @brunovenceslau

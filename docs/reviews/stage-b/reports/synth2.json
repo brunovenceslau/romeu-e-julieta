@@ -1,0 +1,167 @@
+{
+ "node": "synth · consolidator · fable",
+ "baselines": {
+  "spec": "<worktrees>/base-main @ 1e63d6a",
+  "plan": "<worktrees>/base-plan @ d932464"
+ },
+ "skills_loaded": [
+  "agent-skills:planning-and-task-breakdown",
+  "agent-skills:incremental-implementation",
+  "agent-skills:api-and-interface-design",
+  "agent-skills:deprecation-and-migration",
+  "cc-skills-golang:golang-how-to",
+  "cc-skills-golang:golang-project-layout (what golang-how-to recommends for package structure)",
+  "cc-skills-golang:golang-cli (the subcommand shape)"
+ ],
+ "skill_recommendations_not_followed": [
+  "golang-cli: cobra and viper as the default stack; 04 4.1 and 12 12.1 decide stdlib flag, which wins (the tool contract says so).",
+  "golang-project-layout: ask the developer for an architecture and a DI approach through a question tool; a read-only consolidator with no user, so the repository's decisions stand (manual constructor injection at a composition root, 12 12.1 and T009).",
+  "planning-and-task-breakdown: tasks/plan.md and tasks/todo.md; the plan's own rule (one file per task, no todo.md, decision (c) of 2026-10-12) wins; its task shape (acceptance, verification, dependencies, files touched) is what every task edit here keeps.",
+  "incremental-implementation: commit per slice; this node writes no code and commits nothing (read-only).",
+  "deprecation-and-migration: its strangler and rollback-per-step questions were applied to the migration judgement of skill-migration (section 2, decisions 32 to 34); its 'deprecation notice' template is not used, since the plan speaks of capabilities and names no predecessor."
+ ],
+ "inputs": {
+  "reports_read": [
+   "trace-A..F, trace-P, trace-R (through the first synthesis's merged-raw.json)",
+   "craft-coherence, craft-prose, craft-testability (same)",
+   "skill-go-spec",
+   "skill-go-plan",
+   "skill-go-code",
+   "skill-domain-runtime",
+   "skill-domain-supply",
+   "skill-migration",
+   "verify-1..5",
+   "the first synthesis (synth/)",
+   "trace/pending-items.md",
+   "skill-migration/lenses-stage-b.md"
+  ],
+  "verdict_rows_all_passes": 512,
+  "verdict_rows_verify_4_5": 166,
+  "verify_4_5_by_verdict": {
+   "confirmed": 93,
+   "modified": 64,
+   "refuted": 9
+  },
+  "refuted_dropped_verify_4_5": [
+   "skill-go-spec-8",
+   "skill-go-spec-14",
+   "skill-go-plan-17",
+   "skill-go-code-6",
+   "skill-go-code-task-T122-reqs-tooling",
+   "skill-domain-runtime-21",
+   "supply-17",
+   "skill-migration-12",
+   "skill-migration-task-T066"
+  ],
+  "coverage_check": "every confirmed or modified row of verify-4 and verify-5 maps to an edit of spec-changes.md, a line of plan-changes.md, a decision of section 2 or a pending-item decision of section 6 (the mapping is Appendix A and B of the two files); 2 verify-5 task rows name a report with no task record (skill-domain-supply's unnamed task entry and skill-migration's lenses.md entry) and are carried by their finding rows"
+ },
+ "outputs": {
+  "spec_changes": "<scratch>/wf/synth2/spec-changes.md",
+  "plan_changes": "<scratch>/wf/synth2/plan-changes.md",
+  "req_map_md": "<scratch>/wf/synth2/req-map.md",
+  "req_map_json": "<scratch>/wf/synth2/req-map.json",
+  "tool_contract": "<scratch>/wf/synth2/tool-contract.md",
+  "spec_edits_json": "<scratch>/wf/synth2/spec-edits.json",
+  "merged_verdicts": "<scratch>/wf/synth2/merged-raw-2.json",
+  "scripts": [
+   "build_merge2.py (the six skill reports and verify-4/5 in the first pass's merged shape)",
+   "build_spec2.py (the first pass's edits renumbered as it numbered them, edits_fix2.py applied by those numbers, edits_spec_4.py appended; every anchor resolved against base-main)",
+   "build_reqs2.py (the first pass's map plus the second pass's obligations and task remaps)",
+   "build_plan2.py (plan-head.md + section 5 derived from the first pass + plan_deltas.py + plan-tail.md + the appendices)"
+  ]
+ },
+ "counts": {
+  "spec_edits": 349,
+  "spec_edits_second_pass": 99,
+  "spec_edits_dropped": 1,
+  "spec_edits_by_anchor_resolution": {
+   "line": 305,
+   "wrapped": 42,
+   "file-missing": 1,
+   "described": 1
+  },
+  "req_candidates_placed": 1178,
+  "req_ids_after_splits": 1193,
+  "req_candidates_excluded": 118,
+  "req_new_obligations_second_pass": 75,
+  "req_tasks_cited": 110,
+  "tasks_new": 18,
+  "tasks_new_ids": "T121 to T138 (T133, T134, T136 deferred; T135 to T138 are the second pass's)",
+  "tasks_edited_section_5": 90,
+  "plan_md_sections_edited": 17,
+  "pending_items_decided": 45,
+  "operator_decisions": 16
+ },
+ "mechanism_decisions": [
+  "Inline format: the code span `REQ-nnnn` (regex `REQ-[0-9]{4}`) as the first token of the sentence, bullet, numbered item or rule cell it governs; one id per independently checkable obligation; the placeholder is `REQ-new`.",
+  "Tool: `go run ./tools/ci reqs allocate` (writes, idempotent, document order) and `go run ./tools/ci reqs` (checks, in fast and all), one subcommand with a writing verb like `hygiene add`; no `tools/new req` kind and no ledger file (verify-4 refuted that proposal); the check judges the commit's tree.",
+  "Home of the retired-id record: the table at the end of the new section 12 12.11.",
+  "Implements is one list of requirement ids, each with its section in parentheses as a reading aid (the two forms the spec cites itself with); the check reads the ids only.",
+  "Exclusions the check enforces: 13, 09 from its first journey heading, the index from Open questions to the end, 00 0.5, docs/adr/.",
+  "Document order for the first allocation: index, then 00 to 13; the plan writer resolves keys to numbers through the anchors after allocation.",
+  "The coverage half lands in the plan branch (T104), the spec half in T121 before T122."
+ ],
+ "conflicts_resolved_second_pass": [
+  "skill-domain-supply-12 over TC-19: the catalog lookup of `lock --check` lands in T036; T031 stays M3 (its need T021 is M3) and T053 does not need it (decision 24).",
+  "V-77 over skill-domain-runtime-10: T066 lands the minimal `julieta layout up`, so I1's argv holds; the interim fallback-shell argv is recorded as the alternative (decision 26).",
+  "skill-go-plan-7 over trace-F-13 and V-87: both `tools/new` kinds land in T009; T008 needs T007 only (decision 21).",
+  "skill-go-plan-9 over trace-P-6: T053 keeps go.mod; T036 after T053 (decision 23).",
+  "skill-go-plan-8 over trace-F-11: T123 is a review order (`after`), dropped from T113's needs (decision 22).",
+  "skill-go-spec-3 and skill-domain-supply-3 on the 10 10.2 hook sentence: merged into one sentence that names the last line and cites 12 12.1 for the lists (one home).",
+  "skill-domain-runtime-16 and skill-domain-supply-4 on the 12 12.1 signal sentence: one edit, in the hook paragraph (E212 as fixed).",
+  "skill-domain-runtime-3 and craft-testability-8 on the timeout table: one merged table; the longer value where they differ (decision 27).",
+  "skill-domain-runtime-2 (one table in procgroup) over skill-go-spec-11 (a constant per package): one home (decision 27).",
+  "skill-domain-runtime-9 as modified over the first pass's E141 wording: the open-session reading in verify-5's words.",
+  "skill-domain-supply-2 and the first pass's OD-7 rows in 05 5.4: the first pass's three rows stay, the I34-by-hand row joins, the approval-line row is amended for the grants; the plan links them (decision 39).",
+  "skill-go-code-8 and the first pass's T130, T131, T132: the pending items that those tasks already cover go there; the rest is T136 (decision 29).",
+  "skill-go-spec-task-T108, supply-task-T108, runtime-task-T108 against decision 12: every spec sentence is T122's; T108 keeps the record.",
+  "skill-domain-supply-10's `kits/mise-SHASUMS256.txt` path against TC-16's `kits/mise/SHASUMS256.txt`: TC-16's (already verified), now named in 07 7.4.",
+  "skill-go-plan-16 as modified over its own proposal: per-journey directories stay; no scenarios registry.",
+  "skill-go-code-5 as modified over skill-go-code-6 (refuted): identifiers cited by package and held by a test; no path freeze; T105 keeps the ask-first.yaml edit."
+ ],
+ "operator_decisions": [
+  "OD-1 The open block items 1 to 7 of docs/plan.md are taken as decided by decision (c) of 2026-10-12, and the spec amendments they rest on are applied by T122 now. Recommendation: confirm; an answer other than yes reverts that amendment to T108's list.",
+  "OD-2 One mutation mechanism (TC-7, trace-F-26, craft-testability-9): `tools/ci mutate` runs `tools/mutants` over one committed mutants entry per guard; the alternative is an ADR that records `tools/mutants` as interim. Recommendation: the first; applied provisionally in 05 5.2, 02 2.1 and 12 12.1.",
+  "OD-3 The PreToolUse guard of the `julieta-claude` kit (craft-testability-6): keep, with `julieta hooks guard` defined in 04 4.3 and T079 building it; the alternative is the deferral row the finding drafts. Recommendation: keep; applied provisionally.",
+  "OD-4 `tools/ci pins` (craft-testability-17): keep (answered on 2026-10-08) or defer. Recommendation: keep; applied provisionally.",
+  "OD-5 The merge cadence for a parallel plan (trace-P-20), item 12 of the open block: (a) two merge sittings a day; (b) a merge sitting whenever three green pull requests wait, read from `tools/ci plan --ready`; (c) the reopened deferred decision now. Recommendation: (b) until the token is narrowed.",
+  "OD-6 ADR 0012, the amending record of this pass: accept after merge. Recommendation: accept; it is written Proposed and its `decisions` approval line is the ask.",
+  "OD-7 Accepted risks by name (trace-F-24, trace-F-32, trace-P-21, skill-domain-supply-2): five rows in 05 5.4 (the `pr`, `sequences` and `invariants` rows; the I34-by-hand row; the approval-line row amended for the grants) and the plan's own rows, which link them. Recommendation: accept; applied provisionally.",
+  "OD-8 craft-prose-13: the 17 places where records dated before 2026-10-08 name the maintainer or the operator as the actor of a decision. Recommendation: no edit (the house rule keeps an old record's approver names).",
+  "OD-9 E-F21: the list of hosts the sandbox's network policy allows for `license`, `e2e` and `vulnerabilities` (10 10.8) is a host measurement. Recommendation: the pending clause now (applied), the measurement at sitting M0.",
+  "OD-10 The deferral triggers of `romeu adopt` (T050) and `layout` (T056) gain `or the first release candidate` (V-40). Recommendation: confirm; the alternative is an accepted-risk row per command.",
+  "OD-11 The lint set (skill-go-spec-6, -7, skill-domain-supply-21): option A (errorlint, usetesting, thelper, forbidigo with the Boundaries patterns, revive package-comments) or option B (A plus noctx, contextcheck, modernize and gosec, whose G204 flags every variable-argument exec.Command in tools/ci), each linter with its fixture, and the `tidy` rule of `generated` under either. Recommendation: A with `tidy`; decided at the sitting that opens M0, applied in T105's lint split.",
+  "OD-12 The id-less error chain (skill-go-spec-4): an `internal` row (`RJ-348`, exit 1, hint: open an issue with the details) or a panic. Recommendation: the row; applied provisionally in 04 4.4 and 10 10.1 (`contracts` surface).",
+  "OD-13 The names-gate mechanism of the config repository, T112 (skill-migration-2): (a) each guarded repository carries its own hashed denylist and runs the hygiene check from its tracked pre-push hook, with a `checks` change and its approval line if the check must run outside this repository; (b) the config repository as a secondary clone of every project (02 2.6). Recommendation: (a); the deferred row on a Go port of the gate closes with it.",
+  "OD-14 The open-items cut-over (skill-migration-1): the one-off, idempotent, count-verified entry at T119 (M5, the plan's choice) or at T111 (M1). Recommendation: T119; applied provisionally.",
+  "OD-15 The render types slice (skill-go-plan-13, Advisory): a task between T021 and T037, T038, T039 that lets the three land in parallel (two links off lane B) against one interface with one implementation; decided at the sitting that opens M3. Recommendation: decide there from the measured lane; nothing now.",
+  "OD-16 The spec sweep of 2026-10-01 (pending item aa83b900, 98 findings, blocked on materials outside this repository): close as superseded by review rounds 1 to 18 and this pass, or keep with its trigger. Recommendation: close."
+ ],
+ "no_edit_verdicts": [
+  "craft-prose-13: routed to OD-8.",
+  "trace-F-36: no new rule in 12 12.3.",
+  "skill-go-spec-8 (refuted): no t.Parallel rule; the first package that wants it writes the sentence.",
+  "skill-go-spec-14 (refuted): the split of chapter 10 stays a deferred row.",
+  "skill-go-spec-10, skill-go-code-4, skill-go-code-18 (modified, nothing beyond the first pass): E-F29, E198 and amendment 17 already carry them.",
+  "skill-go-plan-17, skill-go-code-6, skill-domain-runtime-21, skill-domain-supply-17, skill-migration-12, skill-migration-task-T066 (refuted): dropped.",
+  "skill-domain-runtime-17 (modified): a Deferred decisions row, no behaviour now."
+ ],
+ "pending_items": "every item of trace/pending-items.md is decided in plan-changes.md section 6 (a table of 45 rows): 11 become spec changes or plan.md edits of this pass, 14 become task or acceptance items (T005, T013, T063, T104, T112, T122, T136, T137, T138), 9 are already done, and the rest stay pending with their trigger at their home (the sandbox kit repository, the claude-home kit, the operator's own acts, the visions after v1); one (aa83b900) is OD-16.",
+ "observed": [
+  "Every anchor of spec-changes.md resolves at 1e63d6a (305 by line, 42 by a wrapped window, 1 new file, 1 described); build_spec2.py prints no NOT FOUND.",
+  "The first pass's E numbers are reproduced (E195, E196, E198, E212, E213, E230 carry the verdicts that cite them); one first-pass edit (E186) is listed as dropped, so no number moves.",
+  "req-map.md: 1178 placed candidates, 1193 ids after the splits, 118 excluded, 75 obligations added by this pass; 110 tasks cited; T136 is cited by none (its items restate rules other tasks cite), as decision 29 intends.",
+  "plan-changes.md holds no em dash (checked by build_plan2.py) and names no predecessor repository; the three framing phrases of the lesson of 2026-10-12 appear in none of the four outputs (grep after the rebuild: 0 lines each), and 'archive' appears only as the release archives of 10 10.2.",
+  "The baseline front matter of T017, T021, T031, T036, T053, T051, T035 was read to settle decision 24 (T021 is M3 and T031 needs it)."
+ ],
+ "inferred": [
+  "The task owners of the 83 REQ map rows marked `*` (section defaults) are confirmed at placement, as in the first pass.",
+  "The timeout starting values where the two proposals differ are a choice (the longer value), not a measurement; B5 resets them."
+ ],
+ "not_tested": [
+  "Whether `tools/ci reqs allocate` on the written placeholders yields exactly 1193 ids: the writer may split further at placement, and the plan's citations are resolved by anchor after allocation, so a different count breaks nothing.",
+  "The exact heading text and anchors of 03 3.5 and 11 11.1 after the rename, and the `#subprocesses` and `#signals` anchors the new 04 4.1 subsections create (the one-off link run of T122's acceptance covers them).",
+  "The chain lengths after decisions 20 to 25 (one link off the chains through T008 and through T051): skill-go-plan-6 and -7 measured them on the first pass's graph; the plan writer re-measures with `tools/ci plan --critical-path` once T106 lands, and by its script before."
+ ],
+ "confidence": "High on the consolidated spec edits (each anchored at the baseline by script, the first pass's numbers kept) and on the plan's front-matter and ordering edits (each tied to a confirmed or modified verdict, the conflicts decided in section 2 with their reasons); medium on the task owners of the REQ map rows that no finding named and on the timeout starting values; the operator decisions are applied provisionally with the recommended option and marked PROVISIONAL in both change sets."
+}

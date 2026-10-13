@@ -19,3 +19,4 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 9 | [Drop the required review and amend the records that assumed it](0009-drop-the-required-review-and-amend-the-records-that-assumed-it.md) | Accepted |
 | 10 | [Reopen the required checks without the bypass and amend the records of round 9](0010-reopen-the-required-checks-without-the-bypass-and-amend-the-records-of-round-9.md) | Accepted |
 | 11 | [Keep the administrator's pull-request bypass and give the sandbox a GitHub App token](0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md) | Proposed |
+| 12 | [Adopt requirement ids in the specification and amend the documentation standard for the plan's shape](0012-adopt-requirement-ids-in-the-specification-and-amend-the-documentation-standard-for-the-plan-s-shape.md) | Proposed |

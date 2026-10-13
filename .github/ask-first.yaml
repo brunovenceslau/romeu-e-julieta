@@ -24,7 +24,7 @@ surfaces:
     globs: [internal/signing/**, kits/git-ssh-sign/**]
     reason: commit signing key isolation
   - id: catalog
-    globs: [catalog/egress.yaml]
+    globs: [internal/catalog/**]
     reason: upload flags and the base and meta sets
   - id: kits
     globs: [kits/**, tools/kitpin/**]

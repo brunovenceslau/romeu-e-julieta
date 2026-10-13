@@ -53,13 +53,13 @@ tier, because a lens that misses a finding costs a review round later.
 The specification, the plan and the open items are reviewed in three
 stages, in this order, because each derives from the one before it: a
 finding on the plan made against a specification that changes the next
-week is wasted, and the plan's 102 tasks would double every reviewer's
+week is wasted, and the plan's task files would double every reviewer's
 reading.
 
 | Stage | Text under review | Lenses | What the others are for |
 |---|---|---|---|
 | A. Specification | the index, the pages under `spec/`, the records under `adr/` | L0 to L16 | `plan.md` is reading context for every reviewer, and a finding on it is marked `parked for B`. The open questions and deferred decisions in the index are reviewed for shape (a trigger, what holds until then, still open, not a duplicate), never answered |
-| B. Plan | `plan.md`, against the specification as corrected by A | L3, L6, L9, L11, L12, plus plan-specific lenses defined before B runs | the implementer picking the next task, the traceability auditor, the pull-request reviewer, the hunter of unknowns, the owner of the operator's calendar are the candidates; each is written in the form of this page before it runs |
+| B. Plan | `docs/plan.md` and `docs/plan/tasks/`, against the specification as corrected by A | L3, L6, L9, L11, L12 and the plan lenses L17 to L21 | L17 to L21 were written in the form of this page before stage B ran (2026-10-12): the implementer picking the next task, the traceability auditor, the pull-request reviewer, the hunter of unknowns and the owner of the operator's calendar |
 | C. Open items | the open questions and deferred decisions of the index and of `plan.md` | none; one preparer, then the operator | the preparer groups the items, marks duplicates and dependencies, and recommends one of three outcomes per item: decide now, defer with the trigger rewritten, delete. The operator decides in one block |
 
 Stage B accepts that another session ticks checkboxes in `plan.md`
@@ -139,11 +139,13 @@ Three artifacts leave stage A and are the input of stage B:
 
 1. the round page: findings, resolutions, measurements;
 2. the list of sections the write pass changed, by number as the spec
-   cites itself ("04 4.3");
-3. the delta to the plan: for each changed section, the tasks whose
-   "Implements" field cites it. It is a search of `plan.md` for the
-   section numbers, and it says which of the tasks must be read again.
-   It joins the pending `tools/lenses coverage` command.
+   cites itself ("04 4.3"), and of the requirement ids it changed or
+   retired (12 12.11);
+3. the delta to the plan: for each requirement id the write pass changed
+   or retired, the task files whose Implements line cites it (`grep -l
+   REQ-nnnn docs/plan/tasks/*.md`), and the list `tools/ci reqs` prints
+   of task files citing a retired or unknown id. It says which of the
+   tasks must be read again.
 
 Stage B's reviewers receive the three artifacts in part two of their
 brief, after their own read of the plan, for the reason the brief
@@ -155,10 +157,11 @@ runs:
 
 - a task is implementable from its own text by someone who did not
   write the plan, and its Verify line runs without the author;
-- traceability both ways: every section of the spec has a task, every
-  task has a section, and the counts the page keeps by hand are true;
-- "Depends on" is minimal and true, and each task has a file set, so
-  the parallel-execution lens can draw the real critical path;
+- traceability both ways, measured by `tools/ci reqs`: every live
+  requirement id has a live or merged task and every task cites live
+  ids; the plan keeps no hand count;
+- `needs` and `after` are minimal and true, and each task has a file
+  set, so the parallel-execution lens can draw the real critical path;
 - one task is one pull request, and its ask-first forecast is right;
 - the operator blocks are as few as the spec allows, and the plan says
   what proceeds around each;
@@ -260,7 +263,7 @@ The first line of the report is `<lens id> · <role> · <model>`. Then:
 | Field | Content |
 |---|---|
 | Verdict | one line: does the spec meet this lens's definition of success, and what is the largest gap |
-| Findings | one row each: id (`<lens id>-<n>`), severity on the scale below, for a Required finding its class (below), origin (`listed` when a bullet of the lens prompted it, `own` otherwise), the spec section cited as the spec cites itself ("04 4.3"), the defect in one sentence, the concrete failure scenario, the proposed change and what it costs |
+| Findings | one row each: id (`<lens id>-<n>`), severity on the scale below, for a Required finding its class (below), origin (`listed` when a bullet of the lens prompted it, `own` otherwise), the spec section cited as the spec cites itself ("04 4.3"), and the requirement id when one marks the obligation, the defect in one sentence, the concrete failure scenario, the proposed change and what it costs |
 | Coverage | one line per page: the index, 00 to 13, the ADRs as one line, `plan.md`; each says `nothing for this lens` or lists finding ids. A page without a line fails the format |
 | What is missing | what this person expected to find and did not, each with where it would belong |
 | Postmortem | the first incident after v1.0.0 as this person sees it, one page at most, with the sections it crosses |
@@ -268,28 +271,27 @@ The first line of the report is `<lens id> · <role> · <model>`. Then:
 | Out of scope, and why | what the lens did not judge: what the text alone cannot settle, with the evidence that would, and what this person chose not to look at, with the reason |
 | Confidence | one line |
 
-Severity scale for every lens, so the merge is mechanical:
-**Blocking** (the spec would ship a defect this lens exists to catch),
-**Required** (fix before the next plan task that implements the cited
-section, or, for `test-detail`, by that task's acceptance), **Advisory** (improve when the section is next touched).
-A Required finding names one class. **`contradiction`**: two texts of
-the spec, or the spec and a decision record, cannot both hold.
-**`behavior-gap`**: the implementation needs a behavior the spec does
-not define. **`test-detail`**: only test-plan detail, that is how a
-listed test case is built, a test case missing for behavior the spec
-already defines, or the naming of a test. Only the first two block
-validation; a `test-detail` finding becomes an acceptance item of the
-plan task that implements it, in `plan.md`, citing the finding id, and
-the spec text is not grown for it; it may carry a wording fix of the
-spec's own test cell when the case as written does not reach its
-stated result, a fix that changes no behavior, a limit the plan review
-of stage B reopens. A reviewer that is unsure between
-`behavior-gap` and `test-detail` asks whether the behavior the test
-would check is written in the spec: if it is, the finding is
-`test-detail`.
-A lens does not report what the spec already lists as a deferred
-decision, a non-goal or an accepted risk, unless the trigger or the
-acceptance is itself the defect.
+Severity scale for every lens, so the merge is mechanical: **Blocking**
+(the spec would ship a defect this lens exists to catch), **Required**
+(fix before the next plan task that implements the cited section, or,
+for `test-detail`, by that task's acceptance), **Advisory** (improve
+when the section is next touched). A Required finding names one class.
+**`contradiction`**: two texts of the spec, or the spec and a decision
+record, cannot both hold. **`behavior-gap`**: the implementation needs a
+behavior the spec does not define. **`test-detail`**: only test-plan
+detail, that is how a listed test case is built, a test case missing for
+behavior the spec already defines, or the naming of a test. Only the
+first two block validation; a `test-detail` finding becomes an
+acceptance item of the plan task that implements it, in that task's file
+under `docs/plan/tasks/`, citing the finding id, and the spec text is
+not grown for it; it may carry a wording fix of the spec's own test cell
+when the case as written does not reach its stated result, a fix that
+changes no behavior, a limit the plan review of stage B reopens. A
+reviewer that is unsure between `behavior-gap` and `test-detail` asks
+whether the behavior the test would check is written in the spec: if it
+is, the finding is `test-detail`. A lens does not report what the spec
+already lists as a deferred decision, a non-goal or an accepted risk,
+unless the trigger or the acceptance is itself the defect.
 
 The round page records, per lens, the count of findings by origin and
 the findings only L0 raised. Those two numbers are how the next round
@@ -948,6 +950,228 @@ Where to confirm, read last: 08, 13, 05 5.4, 01 1.1 and 1.7, 00 0.1,
 09 (J6, J7), ADR 0006. L2 keeps the attacker; L16 keeps the owner.
 Model: opus.
 
+### L17 The implementer picking the next task
+
+Role: the agent that opens `plan/tasks/`, picks a task whose `needs`
+and `after` are merged, and builds it in a worktree with nobody who
+wrote the plan nearby. Success is the stage-B criterion "a task is
+implementable from its own text by someone who did not write the plan,
+and its Verify line runs without the author", with 10 10.8 as the bar
+for done.
+
+As this person you care about:
+
+- **A Verify line that names test functions** (10 10.8, plan.md "Done,
+  for each task") because `go test` exits 0 on a `-run` pattern that
+  matches nothing. Incident: a task reported done on a green log whose
+  pattern matched no function; the reviewer read the exit code and not
+  the `-v` output.
+- **The re-plan paragraph of each task against the specification**
+  (12 12.2, Re-planning) because an implementer meets a spec sentence
+  and a task sentence that disagree and must know which wins, and 12
+  12.2 says the specification does; the amendments the re-plan carried
+  were applied to the specification on 2026-10-12, so a task sentence
+  that still differs is the stale one.
+- **The default file set of rule 1 against `owns`** because a task that
+  must touch `go.mod` (rule 7), a generated output (12 12.3) or a file
+  under another task's directory (T035 and T051 share `setup/`) learns
+  it at the first `tools/ci plan` failure, not from its own text.
+- **Dark code** (12 12.9; ADR 0002) because a task that lands a package
+  no command reaches must name the task that connects it, or the
+  implementer tests the wrong seam and calls it done.
+- **The container e2e as the first julieta level** (10 10.1; T013)
+  because every `-tags e2e` Verify line pulls an image by digest, and
+  no task says what runs where docker is absent.
+- **Error ids per package** (04 4.4; plan rule 5) because the second
+  package to declare ids needs the union test already, and no task
+  says which one lands it.
+
+Two questions: which task of M1 can an implementer start today from
+its file and the spec alone? What does the implementer do when a docs
+pull request changes a section the task cites after the task has
+started (12 12.2, Re-planning)?
+
+Where to confirm, read last: plan.md ("How to read this plan", rules 1,
+5 and 7), 10 10.8, 10 10.1, 12 12.2, 12 12.9, 04 4.4, the M1 task files
+(T007 to T013, T035, T051, T054, T059, T060, T078), ADR 0002.
+Model: opus.
+
+### L18 The traceability auditor
+
+Role: the person who holds the plan against the specification in both
+directions and trusts a count only when a tool printed it. Success is
+the stage-B criterion "traceability both ways, measured by `tools/ci
+reqs`: every live requirement id has a live or merged task and every
+task cites live ids; the plan keeps no hand count", read with 12 12.2
+(Re-planning) and the `reqs` row of 10 10.2.
+
+As this person you care about:
+
+- **Sections changed by the last stage-A write pass that no live task
+  cites** because 12 12.2 says a pull request that changes a section
+  updates the tasks whose Implements cites it, and a section nobody
+  cites is updated by nobody. Incident: a plan whose citations all
+  resolved after a renumbering, and none of them pointed at the text
+  it meant; the audit found it a milestone later.
+- **Implements lines that cite a page** ("09 (J6, J10)") because
+  `tools/ci plan` (T106) checks that the section exists, and a page
+  always exists.
+- **Acceptance moved by stage A** (status `T`, class `test-detail`,
+  lenses.md "What a reviewer returns") into a task since folded (T057
+  into T035, T044 into T038 and T043): did each row survive the fold?
+- **Left-v1 and removed ids** (T058, T063 to T065, T110, T120) whose
+  work a milestone row still needs (M1 "one path"; M5 "every open
+  item").
+- **Invariants no task names** (05 5.2, I1 to I34): the plan's own
+  method is `grep -l 'I24' plan/tasks/*.md` ("Traceability"), and the
+  auditor runs it for every id, criterion and journey.
+- **The requirement ids decided on 2026-10-12**: one id per checkable
+  obligation, allocated by a tool; the auditor asks what the tool
+  refuses (a reused id, a retired id cited by a live task) and whether
+  the `tools/ci` check reads task files, spec pages, or both.
+
+Two questions: which uncited normative sections are deliberate (a
+deferred row, a non-goal of 00 0.3, index prose) and which are a
+missing task? Can a task "implement" a section when its Acceptance
+never states the section's obligation?
+
+Where to confirm, read last: plan.md ("Traceability", "The fate of each
+earlier task", "What v1 leaves out"), 12 12.2 (Re-planning), 10 10.2
+(the `sequences` row), 05 5.2, 09, 00 0.3, the task files with fate
+`folded`, `left-v1` or `removed`.
+Model: fable.
+
+### L19 The pull-request reviewer
+
+Role: the reviewer who receives one task as one pull request (12 12.9;
+plan.md "The shape of a task") and must say go or no-go from the diff,
+the Evidence and the approval lines (12 12.4), before the maintainer's
+merge. Success is the stage-B criterion "one task is one pull request,
+and its ask-first forecast is right".
+
+As this person you care about:
+
+- **An `ask_first` forecast that misses a surface** (05 5.3) because a
+  diff that touches `.github/ask-first.yaml` under a task forecasting
+  `checks` alone carries a line that approves the wrong thing.
+  Incident: a pull request whose approval line named one surface was
+  merged on a tick, and the file that mattered was on another.
+- **Grants per milestone read by no check** (plan rule 13;
+  `docs/grants.yaml`; T005 in M6) because the reviewer must know what a
+  grant covers at this head and what the per-PR line still asks.
+- **Consecutive tasks shipped as one pull request** (12 12.9) because
+  the reviewer asks which task files the PR ticks and whether
+  `tools/ci plan` (T106) accepts two `merged` lines with one `pr`.
+- **Evidence pasted from a sitting** (plan rule 11; amendment 7)
+  because host output under Evidence meets the names check
+  (10 10.2, "Forbidden names") and nothing else: the recorder's
+  redaction (T018) lands in M6, so from M1 to M5 the reviewer is the
+  redaction.
+- **Generated outputs regenerated on the merged tree** (plan rule 1;
+  12 12.3) because a pull request green on its branch can be red after
+  the merge, and the plan says who reruns the generator and nothing
+  about who reads the result.
+- **A dark merge with no connecting task named** (12 12.9; ADR 0002).
+
+Two questions: what does a reviewer run, from the pull request alone,
+to confirm the `owns` globs were respected before `tools/ci plan`
+exists (M0)? Which pull requests of M1 to M5 carry output of the
+maintainer's host, and who reads each before it is pushed?
+
+Where to confirm, read last: plan.md (rules 1, 11 and 13; "Outside the
+blocks"), 12 12.4, 12 12.9, 05 5.3, 10 10.2 (the `pr` step; "Forbidden
+names"), 12 12.3, ADR 0002, ADR 0009.
+Model: opus.
+
+### L20 The hunter of unknowns
+
+Role: the person who reads a plan for the sentence that rests on a fact
+nobody measured, and who has learned that a fact is cheapest to measure
+before the task that depends on it. Success is: every inferred fact the
+plan rests on is named with the sitting or task that measures it, and
+no task on the critical path waits on a fact that only a later
+milestone measures (plan.md "What is inferred", rule 10; 11 11.1;
+10 10.3).
+
+As this person you care about:
+
+- **Facts marked `source: sitting M2`** that drive `oci`, `kits` and
+  `signing` (Accepted risks) because the no-go branch of T113 names a
+  decision record and no fallback, while T032, T076 and T081, and
+  through them lane B of M3, wait on its go. Incident: six kits written
+  against a frontend whose next milestone renamed the descriptor;
+  nobody had built one kit first.
+- **The bridge as the "remember" pattern** (plan rule 9; T111) because
+  the plan admits it and names `julieta status` as the read; the hunter
+  asks which drift that read cannot show (a manifest `base` left empty,
+  03 3.6; a bin mount one release behind).
+- **Cut-over seams**: an existing memory directory met by `sync` step 4
+  (04 4.2, "create only"), a same-name sandbox met by the preflight
+  (01 1.5 step 6; I26; `RJ-203`) while `adopt` (T050) is deferred.
+  Incident: a store that stayed writable for a week after its import;
+  the items of that week surfaced a month later.
+- **A hook chain with three links** (04 4.3, `hooks run`) and a gate
+  that may sit in none of them (10 10.2, "Forbidden names"; T112).
+- **A confirmation per signature** (06 6.4, `ssh-add -c`) on a day the
+  operator is away: what a commit does when nobody answers.
+- **Hand-written sbx sessions** (plan rule 10; 10 10.3): which shape the
+  first daily run exercises that no session holds.
+
+Two questions: which single fact, if wrong, stops lane B of M3, and at
+which sitting is it measured? What does the plan say an agent does at
+the first daily run that a `synthetic: true` session cannot model?
+
+Where to confirm, read last: plan.md ("What is inferred", rules 9 and
+10, "Accepted risks", "Decisions this plan defers"), T111 to T116,
+06 6.1 (Go/no-go), 06 6.4, 11 11.1, 04 4.2, 04 4.3, 01 1.5, 03 3.6,
+I26.
+Model: fable.
+
+### L21 The owner of the operator's calendar
+
+Role: the person who keeps the one calendar that every sitting,
+approval, merge and host step draws on, and who knows that an agent
+waits for free while the operator's hour is the project's scarcest
+resource (12 12.9, "at least one merge each business day"). Success is
+the stage-B criterion "the operator blocks are as few as the spec
+allows, and the plan says what proceeds around each", measured in
+operator minutes per milestone, not in tasks.
+
+As this person you care about:
+
+- **Per-project steps multiplied by the project count** (T111 three
+  edits, T112 two reads, T115 six steps, T116 six steps) because the
+  lens sums them and asks which edit a script of the config repository
+  makes once. Incident: a runbook that said "one step per project",
+  whose eighth project cost the forty minutes of the first; nothing was
+  scripted because each step was "just an edit".
+- **Rebuilds between sittings** because the bin mount's julieta is
+  built on the host (T111) while M1 and M2 merge julieta changes
+  weekly; the lens asks the cadence and who runs it, when T009's
+  cross-build already builds linux julieta in CI.
+- **Approvals in two repositories** because every bridge step is
+  ask-first in the config repository (plan rule 9) and every grant a
+  one-line pull request here (rule 13); the lens counts approvals per
+  sitting and asks for one pull request per wave.
+- **Interrupts that are not sittings**: a signing confirmation per
+  commit (06 6.4), sbx's own prompt at `sbx env run` without
+  `--auto-approve` (04 4.2, `run` step 3), gate 2 on a TTY (01 1.4).
+- **Waits with nothing to do**: M5 is one month of use (T119); the lens
+  asks which M6 lanes run meanwhile.
+- **Merges as the daily step** (12 12.9; plan.md "Outside the blocks")
+  because three lanes of M1 beside M0 produce more than one pull
+  request a day, and the deferred decision's trigger is three waiting.
+
+Two questions: how many operator minutes does each sitting cost, and
+which of its steps could an agent run from inside a sandbox? What is
+the longest span in which no pull request can merge because a sitting
+has not happened?
+
+Where to confirm, read last: plan.md ("Milestones and sittings",
+"Operator blocks", rules 9, 11 and 13, "Accepted risks"), T111 to T119,
+12 12.9, 12 12.4, 06 6.4, 04 4.2, 01 1.4, J1.
+Model: opus.
+
 ## Measuring the set of lenses
 
 A set of viewpoints is always the list of whoever wrote it. The
@@ -1052,3 +1276,4 @@ sits out costs the round that would have needed it.
 | 16 | 591a1aa, the head of pull request #36 (the round-15 write pass), for the targeted re-audit of step 6 | L0 and L2 on the maintainer block, L6 and L13 on the salvage text, with no noise probe; the verdicts of the others carry forward | round-16.md |
 | 17 | 54f674c, the head of pull request #36 (the round-16 write pass), for the targeted re-audit of step 6 | L0 and L2 on the maintainer block, L6 and L13 on the salvage text, with no noise probe; the verdicts of the others carry forward | round-17.md |
 | 18 | 0a32191, the head of pull request #36 (the round-17 write pass), for the targeted re-audit of step 6, the first graded by the exit rule of 2026-10-12 | L0 on the amendment of this page and the plan items, L2 on the maintainer text, L6 and L13 on the salvage text, with no noise probe; the verdicts of the others carry forward | round-18.md |
+| stage B (not numbered) | 1e63d6a, the default branch after pull request #36, for the specification, and d932464, the head of pull request #43, for the plan; the reviewers read 8cc30a8, the head of pull request #45 at the time | per agent: L9, L11 and L12 on the plan's priorities; L13 and L3, L8, and L6 and L11 on the specification's craft; L13, L3, L8 and L6 in the fresh review of the specification; with no noise probe | stage-b.md |

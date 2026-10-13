@@ -324,10 +324,12 @@ func TestLintConfigLowersNothing(t *testing.T) {
 
 // allowedDirectives are the directives a comment of any Go file of this
 // repository may hold, as "tool:name". go:build is the build
-// constraint (add_test.go). Every other directive, of any tool, is a
-// decision to review here first, because the readers of directives
-// include the linters, and theirs turn findings off.
-var allowedDirectives = []string{"go:build"}
+// constraint (add_test.go); romeu:invariant tags a guard or its test
+// with the invariant it holds (05 5.2), read by the invariants check
+// when it lands. Every other directive, of any tool, is a decision to
+// review here first, because the readers of directives include the
+// linters, and theirs turn findings off.
+var allowedDirectives = []string{"go:build", "romeu:invariant"}
 
 // toolDirective matches the start of a directive of the "tool:name"
 // form after directiveText has normalised the line: the shape go/ast
@@ -526,6 +528,8 @@ func TestDisallowed(t *testing.T) {
 		{"a nolint", "package p\n\nvar _ = 1 //" + nl + "\n", []string{"directive " + nl}},
 		{"revive after a form feed", "package p\n\n// Doc.\n// \f" + rv + "\nfunc F() {}\n", []string{"directive " + rv}},
 		{"a stray go:generate", "package p\n\n//go:generate echo hi\nvar _ = 1\n", []string{"directive go:generate"}},
+		{"an invariant tag", "package p\n\n//romeu:invariant I29 guard\nfunc F() {}\n", nil},
+		{"a misspelt invariant tag", "package p\n\n//romeu:invariants I29 guard\nfunc F() {}\n", []string{"directive romeu:invariants"}},
 		{"go:embed", "package p\n\n//go:embed data.txt\nvar data string\n", []string{"directive go:embed"}},
 		{"go:linkname", "package p\n\n//go:linkname f runtime.f\nfunc f()\n", []string{"directive go:linkname"}},
 		{"generated", "// Code gener" + "ated by x. DO NOT ED" + "IT.\n\npackage p\n", []string{"a generated-code header"}},

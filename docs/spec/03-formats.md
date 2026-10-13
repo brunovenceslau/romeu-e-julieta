@@ -3,55 +3,63 @@
 Back to [index](../spec.md). Reader: implementers of `spec`, `render`,
 `state`, `memstore` and `handoff`. Type: reference.
 
-Every format in the schema list of
+`REQ-0159` Every format in the schema list of
 [02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public) has a
 version field, strict decoding (unknown keys are errors), a JSON Schema
 in `schemas/`, and examples in `examples/` validated in CI; the formats
 without a schema are listed, each with its reason, in 3.13.
 
-Each format the product owns names itself and its version in one form,
+`REQ-0160` JSON is decoded with `encoding/json/v2` (in the standard library of the
+pinned Go; the v1 package is implemented over it): an owned format with
+`json.RejectUnknownMembers(true)`, an upstream output without it. v2's
+defaults, a duplicate member name is an error and member names match
+exactly, are the strictness this page means by strict.
+
+`REQ-0161` Each format the product owns names itself and its version in one form,
 `schema: <name>/v<n>`, where `<name>` is its schema name in 02 2.1; the
 generated schemas carry the field as a constant. `sbxenv.yaml`'s
-`schemaVersion` belongs to sbx and stays. A timestamp is RFC 3339 UTC
+`schemaVersion` belongs to sbx and stays. `REQ-0162` A timestamp is RFC 3339 UTC
 and is named `<past participle>At` (`createdAt`, `updatedAt`).
 
-Versions: any change to a format's fields bumps its version. A reader
+`REQ-0163` Versions: any change to a format's fields bumps its version. A reader
 refuses a version newer than its own with the error `format-newer`
 (`RJ-311`, [04 4.4](04-cli.md#44-error-ids)) and the fix hint "install
-the release that wrote it". The release that bumps a stored format reads
+the release that wrote it". `REQ-0164` The release that bumps a stored format reads
 the previous version and writes the new one on its next whole-file write
 (forward-only; a read-only consumer, such as romeu reading memory
-entries, never rewrites). A record romeu cannot decode is never
-overwritten: `status` and `doctor` report it as the error
-`record-unreadable` (`RJ-334`), and `salvage --from-host` still runs
-from the tree and the clones into a new record beside it. The
-user-authored formats (`project.v1`, `host-settings.v1`) change only by
-a new version of their `schema` field, announced first in the release
-notes, which carry the edit to make. The window for these formats is
-the current and the previous version; a reader refuses an older one
-with the error `format-unsupported` (`RJ-337`,
-[04 4.4](04-cli.md#44-error-ids)) and the fix hint "decide: apply the edit in
-the release notes of each skipped release". The manifest keeps its own N-1
-window, with its reason, in 3.6.
+entries, never rewrites). `REQ-0165` A record romeu cannot decode is never
+overwritten: every reader that needs the record exits 2 with
+`record-unreadable` (`RJ-334`); `status` reports the record as
+unreadable and exits 1, and `doctor` reports it as the failed check
+`record-unreadable` (exit 6); `salvage --from-host` still runs from the
+tree and the clones into a new record beside it. `REQ-0166` The user-authored
+formats (`project.v1`, `host-settings.v1`) change only by a new version
+of their `schema` field, announced first in the release notes, which
+carry the edit to make. `REQ-0167` The window for these formats is the current and
+the previous version; a reader refuses an older one with the error
+`format-unsupported` (`RJ-337`, [04 4.4](04-cli.md#44-error-ids)) and
+the fix hint "decide: apply the edit in the release notes of each
+skipped release". The manifest keeps its own N-1 window, with its
+reason, in 3.6.
 
-Every format decoded from a mount or a repository (the memory entry,
+`REQ-0168` Every format decoded from a mount or a repository (the memory entry,
 the handoff, `snapshot/heads.json`, `mise.lock`, and v3 descriptors) is
 parsed with a strict subset grammar: no YAML anchors, aliases, merge
 keys or includes, and a decoded size bounded by the file cap (07 7.5,
-step 1). `mise.lock` is TOML, and its limits are these: no duplicate
+step 1). `REQ-0169` `mise.lock` is TOML, and its limits are these: no duplicate
 keys or tables, and the same file cap. Its top level is strict (an unknown key is an error), because the file is
 agent-writable and drives egress, so a partial read could widen what a
 sandbox may reach; a lock that does not parse is `lock-unparsed`
 (`RJ-325`, exit 2), not `upstream-shape`.
 
-Outputs of tools the product does not own (`sbx ls --json`, sbx policy
+`REQ-0170` Outputs of tools the product does not own (`sbx ls --json`, sbx policy
 and secret listings, herdr replies, registry manifests,
 GitHub API JSON) are decoded tolerantly and checked strictly: unknown
 fields are allowed; every field romeu or julieta reads is required and
 typed; a body that does not decode, or a missing or mistyped field, is
 the error `upstream-shape` (`RJ-310`, exit 2), naming the upstream
 and its live version; no parser returns absent, none or an empty list
-for a shape it did not recognize. An sbx call that exits non-zero is
+for a shape it did not recognize. `REQ-0171` An sbx call that exits non-zero is
 not a shape error: it is `sbx-unknown` (`RJ-308`, exit 1) where the
 command needs to know whether a sandbox is absent. Gate 1, the
 generation machine and preflight step 5 rest on this rule
@@ -59,7 +67,7 @@ generation machine and preflight step 5 rest on this rule
 [01 1.6](01-system-model.md#16-state-machines),
 [01 1.5](01-system-model.md#15-preflight-before-every-mutating-sbx-call)).
 
-Validation rules live as data in `internal/spec/rules.go`: each rule
+`REQ-0172` Validation rules live as data in `internal/spec/rules.go`: each rule
 names a field path, its constraint (pattern, length, enum, reserved
 values, uniqueness scope), a message, an error id and its scope (both
 validators, or romeu only). From the Go types and those rules,
@@ -67,34 +75,40 @@ validators, or romeu only). From the Go types and those rules,
 docs and the JSON Schemas (`tools/schemagen`, an in-repo reflect-based
 generator; no dependency), so types, validators, docs and schemas
 cannot drift. The tables below are the v1 design input to `rules.go`
-and the struct tags. The pull request that lands a format's generator
+and the struct tags. `REQ-0173` The pull request that lands a format's generator
 replaces that format's field and rule tables here by a link to its
 generated page under `docs/reference/`; this page then keeps only the intent,
 the annotated example and the rules that are design decisions.
 
+A table cell holds one obligation and at most three sentences; what does
+not fit becomes a numbered list under the table, one item per
+obligation, and the cell cites the list.
+
 ## 3.1 Name and path rules (shared)
 
 `julieta spec validate` in the config repo's CI cannot see host
-settings, so the rules that read them are checked by romeu only; the
+settings, so the rules that read them are checked by romeu only; `REQ-0174` the
 "Checked by" column says which, and `spec validate` prints one line
 naming the host-only rules it did not check.
 
 | Field | Rule | Checked by |
 |---|---|---|
-| project `name` | `^[a-z][a-z0-9-]{0,38}[a-z0-9]$`; unique across the config repo; equals the file stem (satisfies sbx's <= 63 chars, no trailing `-` or `.`) | both |
-| repo `dir` | `^[a-z0-9][a-z0-9._-]{0,62}$`, not `.` or `..`, no `/`, not a name romeu reserves inside `<name>-env/`: `memory`, `review`, `ledger`, `.romeu`, `sbxenv.yaml`, `.git` (compared case-insensitively); unique within the project, also case-insensitively. This row is the one list of reserved names | both |
-| repo `url` | `https://<host>/<owner>/<repo>[.git]` only: v1 supports GitHub-shaped URLs (one owner segment, so no GitLab subgroups), and repos, CI and releases assume GitHub; a URL may appear in at most one project, compared after one normalization: host and path lowercased, a trailing `.git` removed | both |
-| repo `url` host | `<host>` must be a host-settings `gitHosts` entry | romeu only |
-| repo `ref` | a branch name valid under `git check-ref-format --branch` rules, implemented in Go | both |
-| kit id | `^[a-z0-9][a-z0-9-]{0,62}$` | both |
-| kit `args` | key `^[a-z][a-zA-Z0-9_]{0,31}$`; value printable UTF-8, no newline, <= 1 KiB | both |
-| secret name | `^[a-z0-9][a-z0-9_-]{0,62}$` | both |
-| secret binding | a `name@project` entry in host settings for every spec secret name (3.4) | romeu only |
-| run layout pane id / tab label | `^[a-z0-9][a-z0-9_-]{0,31}$` | both |
-| relative `cwd` in the run layout | cleaned path, no leading `/`, no `..` element | both |
-| egress domain (every source of [07 7.5](07-mise-egress.md#75-egress-derivation-internalegress): `egress.extra`, catalog, lock-derived, kit-declared) | lowercase hostname, IDNA A-labels, no wildcard, no port, no IP literal | both |
-| workload reference | `<registry>/<repository>@sha256:<64 hex>` | both |
-| workload repository | `<registry>/<repository>` must be in host settings `workloadRepositories` | romeu only |
+| project `name` | `REQ-0175` `^[a-z][a-z0-9-]{0,38}[a-z0-9]$`; unique across the config repo; equals the file stem (satisfies sbx's <= 63 chars, no trailing `-` or `.`) | both |
+| repo `dir` | `REQ-0176` `^[a-z0-9][a-z0-9._-]{0,62}$`, not `.` or `..`, no `/`, not a name romeu reserves inside `<name>-env/`: `memory`, `review`, `ledger`, `.romeu`, `sbxenv.yaml`, `.git` (compared case-insensitively); unique within the project, also case-insensitively. This row is the one list of reserved names | both |
+| repo `url` | `REQ-0177` `https://<host>/<owner>/<repo>[.git]` only: v1 supports GitHub-shaped URLs (one owner segment, so no GitLab subgroups), and repos, CI and releases assume GitHub; a URL may appear in at most one project, compared after one normalization: host and path lowercased, a trailing `.git` removed | both |
+| `projects/` | `REQ-0178` holds `*.yaml` files only; a file of another name or extension is an error naming the path (`RJ-345`) | both |
+| the config project | `REQ-0179` exactly one spec's primary repo URL equals `config.url` of host settings; none is an error naming `config.url` (`RJ-346`) | romeu only |
+| repo `url` host | `REQ-0180` `<host>` must be a host-settings `gitHosts` entry | romeu only |
+| repo `ref` | `REQ-0181` a branch name valid under `git check-ref-format --branch` rules, implemented in Go | both |
+| kit id | `REQ-0182` `^[a-z0-9][a-z0-9-]{0,62}$` | both |
+| kit `args` | `REQ-0183` key `^[a-z][a-zA-Z0-9_]{0,31}$`; value printable UTF-8, no newline, <= 1 KiB | both |
+| secret name | `REQ-0184` `^[a-z0-9][a-z0-9_-]{0,62}$` | both |
+| secret binding | `REQ-0185` a `name@project` entry in host settings for every spec secret name (3.4) | romeu only |
+| run layout pane id / tab label | `REQ-0186` `^[a-z0-9][a-z0-9_-]{0,31}$` | both |
+| relative `cwd` in the run layout | `REQ-0187` cleaned path, no leading `/`, no `..` element | both |
+| egress domain (every source of [07 7.5](07-mise-egress.md#75-egress-derivation-internalegress): `egress.extra`, catalog, lock-derived, kit-declared) | `REQ-0188` lowercase hostname, IDNA A-labels, no wildcard, no port, no IP literal | both |
+| workload reference | `REQ-0189` `<registry>/<repository>@sha256:<64 hex>` | both |
+| workload repository | `REQ-0190` `<registry>/<repository>` must be in host settings `workloadRepositories` | romeu only |
 
 ## 3.2 Project spec (`projects/<name>.yaml`, schema `project.v1`)
 
@@ -159,7 +173,7 @@ The `$schema` line is an editor hint only; `julieta spec validate` in
 the config repo's CI, at the pinned julieta, is the validation. It
 points at a readable tag URL, which a moved tag could change.
 
-The classification is the struct tags on the spec types
+`REQ-0191` The classification is the struct tags on the spec types
 (`gate:"widening"`, `apply:"recreate|live"`, 01 1.4);
 `docs/reference/project.md`, generated from them, replaces this table
 (opening).
@@ -173,10 +187,10 @@ The classification is the struct tags on the spec types
 | `secrets` | widening | recreate; `live` if probe A10 confirms (Q18) | |
 | `egress.extra`, `egress.tools` | widening | live | |
 | `salvage.excludeIgnored` | widening | live | it defines acknowledged loss |
-| `sandboxOptions` (`cpus`, `memory` only) | - | recreate | `status` reports recreate needed; stripped from `renderDigest`; on the list of deliberately ungated fields (01 1.4), an accepted risk of [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1) |
+| `sandboxOptions` (`cpus`, `memory` only) | `REQ-0192` - | recreate | `status` reports recreate needed; stripped from `renderDigest`; on the list of deliberately ungated fields (01 1.4), an accepted risk of [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1) |
 | `run` | - | live | pane commands run only inside the sandbox; on the list of deliberately ungated fields (01 1.4) |
 
-There is no field for a host command, an absolute path, a mount, or an
+`REQ-0193` There is no field for a host command, an absolute path, a mount, or an
 env var for the sandbox as a whole or for sbx; a pane's `env` reaches
 that pane's steps only, which is why `PATH`, `HOME`, `LD_*`, `BASH_ENV`
 and `ENV` are refused there. A `command`, `argv` or `env` key under
@@ -190,13 +204,13 @@ the one renderer; a second renderer is a row of
 
 | Key | Meaning |
 |---|---|
-| `tabs[]` | `label` + `root`; a node is `{pane: <id>}` or `{split: row|column, ratio: 0.1..0.9, first, second}` (binary tree) |
-| `panes[]` | `id`, `repo` (a project `dir`), `cwd` (relative to the repo), `env` (keys `^[A-Z_][A-Z0-9_]*$`, not `PATH`, `HOME`, `LD_*`, `BASH_ENV`, `ENV`), `steps` (list of argv lists; no shell), `focus` (at most one per tab) |
+| `tabs[]` | `REQ-0194` `label` + `root`; a node is `{pane: <id>}` or `{split: row\|column, ratio: 0.1..0.9, first, second}` (binary tree) |
+| `panes[]` | `REQ-0195` `id`, `repo` (a project `dir`), `cwd` (relative to the repo), `env` (keys `^[A-Z_][A-Z0-9_]*$`, not `PATH`, `HOME`, `LD_*`, `BASH_ENV`, `ENV`), `steps` (list of argv lists; no shell), `focus` (at most one per tab) |
 
-Execution rule: every step runs as `mise exec -C <pane dir> -- <argv>`;
+`REQ-0196` Execution rule: every step runs as `mise exec -C <pane dir> -- <argv>`;
 steps run in order; each must exit 0 before the next; the last step is
 exec'd; a failing step prints its exit status and drops to a login shell
-in the pane dir. No steps = login shell. Every pane id appears exactly
+in the pane dir. No steps = login shell. `REQ-0197` Every pane id appears exactly
 once across all tabs.
 
 *Why for us:* mise daemons add `ready`/`deps`, which is
@@ -205,9 +219,9 @@ later version could delegate readiness to mise daemons.
 
 ## 3.3 Rendered `sbxenv.yaml` (sbx env file, `schemaVersion: "1"`)
 
-Produced only by `internal/render` through the YAML marshaller. The key
+`REQ-0198` Produced only by `internal/render` through the YAML marshaller. The key
 names below follow the documented env-file schema and the documented v3
-workload pattern; the golden files are **probe-confirmed**: probe A5
+workload pattern; `REQ-0199` the golden files are **probe-confirmed**: probe A5
 runs `sbx env plan` on them and records the hash of each golden's
 normalized form (decoded and re-encoded with sorted keys by one
 function in `internal/canon`), and `tools/ci probes` compares that
@@ -244,13 +258,13 @@ secrets:
 ports: []
 ```
 
-Rules: no `x-*` keys (metadata lives in `render.json`); no `lifecycle`
+`REQ-0200` Rules: no `x-*` keys (metadata lives in `render.json`); no `lifecycle`
 hooks (they re-prompt on every invocation and `preRemove` only warns);
-the secret command is built with `internal/shquote` from host-settings
+`REQ-0201` the secret command is built with `internal/shquote` from host-settings
 argv with a scrubbed environment; romeu only ever renders `command`,
-never a literal value; clone mode comes from romeu's `sbx env run
+never a literal value; `REQ-0202` clone mode comes from romeu's `sbx env run
 --clone`. `./.romeu/bin` is a fixed mount, rendered for each project
-from no spec field. romeu names this file by path; probe A5 records
+from no spec field. `REQ-0203` romeu names this file by path; probe A5 records
 whether sbx also reads a sandbox configuration from the workspace tree,
 and if it does, that file joins the plant list of I3 and the drift
 check refuses it ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout),
@@ -288,33 +302,32 @@ secrets:
     argv: [/opt/homebrew/bin/op, read, "op://dev/npm/token"]
 ```
 
-Values you set: `romeu init` writes `root`, `config` and `tools`; the
+`REQ-0204` Values you set: `romeu init` writes `root`, `config` and `tools`; the
 operator fills `gitHosts`, `workloadRepositories`, `signing` when a
 project uses `git-ssh-sign`, and `secrets`
 ([J1](09-journeys.md#j1-onboarding-new-machine-first-time) step 5).
 
-Rules: every `argv[0]` is absolute and exists; no shell strings; an argv
-is a command that fetches the value and never carries it, so an argv
-element that starts with `ghp_`, `gho_`, `ghs_`, `ghu_`, `ghr_` or
-`github_pat_`, or
-matches `^[0-9a-f]{40}$`, is refused with the error `secret-in-argv`
-(`RJ-314`; a best-effort guard against the common token shapes, not a
-detector); a spec secret name without a matching `name@project`
-entry is exit 2 naming the key; a `name@other-project` entry never
+`REQ-0205` Rules: every `argv[0]` is absolute and exists; no shell strings; an argv
+is a command that fetches the value and never carries it. `REQ-0206` An
+argv element that starts with `ghp_`, `gho_`, `ghs_`, `ghu_`, `ghr_` or
+`github_pat_`, or matches `^[0-9a-f]{40}$`, is refused with the error
+`secret-in-argv` (`RJ-314`; a best-effort guard against the common token
+shapes, not a detector); a spec secret name without a matching `name@project`
+entry is exit 2 naming the key; `REQ-0207` a `name@other-project` entry never
 satisfies a different project; entries for unknown projects are
-reported by `doctor`. A secret argv and the credential helper run with
+reported by `doctor`. `REQ-0208` A secret argv and the credential helper run with
 exactly `HOME` and `PATH=/usr/bin:/bin`, so a manager must work from
 `HOME` alone (Keychain, or a CLI whose session lives in a file under
 `HOME`); a manager that needs a session variable is not supported in
-v1. `doctor` runs each secret argv once in that environment and fails
+v1. `REQ-0209` `doctor` runs each secret argv once in that environment and fails
 on a non-zero exit or empty output; it never prints, keeps or writes
-the value. There is no registry credential: descriptors are read
+the value. `REQ-0210` There is no registry credential: descriptors are read
 anonymously, and a credential for a private workload registry is a row
 of [Deferred decisions](../spec.md#in-the-product). *Why for us:*
 devcontainer `initializeCommand` runs repo-controlled commands on the
 host; names in the spec and commands in host settings remove that class.
 
-## 3.5 Egress catalog (`catalog/egress.yaml`, schema `catalog.v1`)
+## 3.5 Egress catalog (`internal/catalog/egress/*.yaml`, schema `catalog.v1`)
 
 ```yaml
 schema: catalog/v1
@@ -344,24 +357,26 @@ tools:                      # key: mise backend:tool as written in mise.lock; va
   aqua:cli/cli: []
 ```
 
-One list per tool: because tools can be reinstalled from inside a
+`REQ-0211` One list per tool: because tools can be reinstalled from inside a
 running sandbox, install and use domains are both needed at runtime, so
 the distinction has no consumer. The catalog is embedded in both romeu
-and julieta. CI requires every domain used anywhere
-to have an explicit `domains` entry. The entries above are examples; the
-v1 table covers the tools listed in `catalog/egress.yaml`; it was built
-from the reference config repo's locks (S4) and measured in probe B4. A
-tool outside it is declared with `egress.tools` in the project spec
-(always gated) until a catalog entry ships in a release.
+and julieta. `REQ-0212` CI requires every domain used anywhere to have an explicit
+`domains` entry. The entries above are examples; the v1 catalog was
+built from the reference config repo's locks (S4) and measured in probe
+B4. The `meta` and `base` sets live in
+`internal/catalog/egress/base.yaml`; a domain declared by two files with
+different entries is a decode error. `REQ-0214` A tool outside it is declared with
+`egress.tools` in the project spec (always gated) until a catalog entry
+ships in a release.
 
 ## 3.6 julieta manifest (schema `manifest.v1`)
 
-Passed by romeu on every `sbx env exec` as
+`REQ-0215` Passed by romeu on every `sbx env exec` as
 `--env JULIETA_MANIFEST=<base64url(canonical JSON)>`, cached by julieta
-at `$HOME/.local/state/julieta/manifest.json`. romeu checks the encoded
+at `$HOME/.local/state/julieta/manifest.json`. `REQ-0216` romeu checks the encoded
 size at `sync`, before the gate, and refuses a manifest over 32 KiB with
 the error `manifest-size` (`RJ-313`); `julieta spec validate` reports
-the same rule. The Go type lives in `internal/manifest`, the one
+the same rule. `REQ-0217` The Go type lives in `internal/manifest`, the one
 package both binaries import for it.
 
 ```json
@@ -388,14 +403,14 @@ package both binaries import for it.
 
 | Field | Meaning |
 |---|---|
-| `protocol` | the romeu/julieta contract number; julieta accepts a manifest of protocol N (its own) or N-1 (a cached manifest written before a romeu upgrade) and refuses anything else |
-| `specCommit` | the config repo commit of the live spec, fresh at each exec; the agent compares it with the commit it pushed (01 1.2) |
-| `repos[].path` | the primary's host path (clone mode keeps it); a secondary's `<home>/src/<project>/<dir>`, where `<home>` is the workload user's home, measured by probe A4 and stored with the workload pin in `kits/pins.yaml` |
-| `repos[].base` | origin SHAs the host clone already has, each held by the create-only ref `refs/romeu/base/<name>/<generation>/<dir>` ([02 2.3](02-layouts.md#23-host-tree)); snapshot and salvage bundles exclude objects reachable from them (08) |
-| `salvageRun` | present only on salvage calls: the salvage id romeu expects back |
-| `egress` | the domains romeu applied to this sandbox, `auto` plus approved `gated` ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)); the pending gated set lives on the host and is not carried. `julieta status` prints it |
+| `protocol` | `REQ-0218` the romeu/julieta contract number; `REQ-0219` julieta accepts a manifest of protocol N (its own) or N-1 (a cached manifest written before a romeu upgrade) and refuses anything else with the error `manifest-protocol` (`RJ-342`, exit 2) |
+| `specCommit` | `REQ-0220` the config repo commit of the live spec, fresh at each exec; the agent compares it with the commit it pushed (01 1.2) |
+| `repos[].path` | `REQ-0221` the primary's host path (clone mode keeps it); a secondary's `<home>/src/<project>/<dir>`, where `<home>` is the workload user's home, measured by probe A4 and stored with the workload pin in `kits/pins.yaml` |
+| `repos[].base` | `REQ-0222` origin SHAs the host clone already has, each held by the create-only ref `refs/romeu/base/<name>/<generation>/<dir>` ([02 2.3](02-layouts.md#23-host-tree)); snapshot and salvage bundles exclude objects reachable from them (08) |
+| `salvageRun` | `REQ-0223` present only on salvage calls: the salvage id romeu expects back |
+| `egress` | `REQ-0224` the domains romeu applied to this sandbox, `auto` plus approved `gated` ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)); the pending gated set lives on the host and is not carried. `julieta status` prints it |
 
-The compatibility check that precedes every romeu command that execs
+`REQ-0225` The compatibility check that precedes every romeu command that execs
 julieta, and in which romeu accepts julieta protocols N and N-1 the way
 julieta accepts manifests, is described in
 [06 6.3](06-kits.md#63-julieta-delivery).
@@ -422,16 +437,16 @@ julieta accepts manifests, is described in
 }
 ```
 
-`promoting` is `null` except inside a promotion commit
+`REQ-0226` `promoting` is `null` except inside a promotion commit
 ([01 1.6](01-system-model.md#promotion-commit)), when it is
-`{"candidateId": "<ULID>", "filesDigest": "<hex>", "previousFiles": {...}}`,
-`previousFiles` being the `files` map before the promotion, which
+`{"candidateId": "<ULID>", "filesDigest": "<hex>", "previousFiles": {...}}`.
+`REQ-0227` `previousFiles` is the `files` map before the promotion, which
 recovery writes back when the candidate no longer verifies. The julieta
 binary digest here is what the compatibility check compares against.
 
 ## 3.8 Host state (schemas `state-*.v1`)
 
-`toolchain.json` (gate 1):
+`REQ-0228` `toolchain.json` (gate 1):
 
 ```json
 {
@@ -445,7 +460,7 @@ binary digest here is what the compatibility check compares against.
 }
 ```
 
-`projects/<name>.json` (one record per project; hosts the generation
+`REQ-0229` `projects/<name>.json` (one record per project; hosts the generation
 state machine of [01 1.6](01-system-model.md#16-state-machines), which
 says which states persist; the candidate states do not):
 
@@ -474,24 +489,48 @@ says which states persist; the candidate states do not):
 
 | Field | Values |
 |---|---|
-| `retiring` | `null`, or `{"attic": "<UTC-ts>"}` while the retire steps of 01 1.6 run |
-| `generations[]` | every generation of the project; v1 keeps them all, so the record grows by one generation per recreate and has no bound. `doctor` warns past 256 KiB, and compaction is a row of [Deferred decisions](../spec.md#in-the-product) |
-| `generations[].state` | `open`, `salvaging`, `removing`, `closed-removed`, `closed-lost` |
-| `generations[].createdWith` | the recreate digest at create; `null` for an adopted generation (status reports "recreate digest unknown") |
-| `salvage[].manifestSha256` | plain sha256 of the salvage `manifest.json` bytes (3.12, raw) |
-| `salvage[].id` | a ULID, as the generation's id is ([01 1.6](01-system-model.md#generation)); 01 1.6 appends one entry per salvage, so the newest entry is the last of `salvage[]` |
-| `salvage[].fingerprint` | `null`, or, written in the same whole-file write as the state `removing` (01 1.6), the plain sha256 (3.12) of the values that steps 2 and 4 of [08 8.5](08-memory-handoff-salvage.md#85-salvage-complete-before-destruction) and the host verification read, not read again at that write, the sandbox-side ones taken from the fingerprint object in the `--json` document of `julieta salvage` ([04 4.3](04-cli.md#43-julieta-sandbox)), the same object `--fingerprint` prints: the daemon heads, each worktree's HEAD and a digest of its status, which holds tracked changes and untracked paths, each with the digest of its file, and ignored paths, minus `salvage.excludeIgnored`, each by path, size and modification time; for a worktree that step 2 read more than once, the last read. This cell is the one home of what a fingerprint is; the pages that compare one cite it. The rerun of `rm`, `recreate` or `retire` that finds the generation `removing` with its sandbox present reads the same values again: the daemon heads by the hardened fetch of step 3 of the host half of 08 8.5, the rest with `julieta salvage --fingerprint` over `sbx env exec` ([04 4.3](04-cli.md#43-julieta-sandbox)), which writes nothing and stops no agent; it resumes at `sbx env rm` only when their sha256 equals the newest `fingerprint` written with `removing`, the one of the last entry. A rerun that finds it different salvages again and ends as [`RJ-338`](04-cli.md#44-error-ids), `fingerprint-unstable`, says, whose details name the kind of entry that changed, as far as the manifests ([3.11](#311-salvage-manifest-schema-salvagev1), one per repo) of the last entry tell it: a daemon head or a worktree's HEAD whose fresh value differs from the one the manifest holds (the daemon heads are among the primary repo's `refs[]`, each worktree's HEAD in `worktrees[]`), and otherwise a worktree's status or an ignored path, which the one stored sha256 does not tell apart (decided on 2026-10-12: the details name the kind, not a path). A field of the state format, under the version rule of the opening of this page |
-| `salvage[].result` | `complete`, `incomplete`, `lost`; `reasons[]` lists each skipped item, `sandbox-half-failed`, or `sandbox-lost`, and for a generation `run` closed as lost, `dirty-at-last-facts:<n>` and `stashes-at-last-facts:<n>` from the newest facts ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), run step 2); `acceptedLoss[]` lists the reasons `--accept-loss` named |
+| `retiring` | `REQ-0230` `null`, or `{"attic": "<UTC-ts>"}` while the retire steps of 01 1.6 run |
+| `generations[]` | `REQ-0231` every generation of the project; v1 keeps them all, so the record grows by one generation per recreate and has no bound. `doctor` warns past 256 KiB, and compaction is a row of [Deferred decisions](../spec.md#in-the-product) |
+| `generations[].state` | `REQ-0232` `open`, `salvaging`, `removing`, `closed-removed`, `closed-lost` |
+| `generations[].createdWith` | `REQ-0233` the recreate digest at create; `null` for an adopted generation (status reports "recreate digest unknown") |
+| `salvage[].manifestSha256` | `REQ-0234` plain sha256 of the salvage `manifest.json` bytes (3.12, raw) |
+| `salvage[].id` | `REQ-0235` a ULID, as the generation's id is ([01 1.6](01-system-model.md#generation)); 01 1.6 appends one entry per salvage, so the newest entry is the last of `salvage[]` |
+| `salvage[].fingerprint` | `REQ-0236` `null`, or, written in the same whole-file write as the state `removing` (01 1.6), the `fingerprint` digest (3.12) of the values the list **Fingerprint** after this table names, not read again at that write. That list is the one home of what a fingerprint is; the pages that compare one cite it. A field of the state format, under the version rule of the opening of this page |
+| `salvage[].result` | `REQ-0237` `complete`, `incomplete`, `lost`; `reasons[]` lists each skipped item, `sandbox-half-failed`, or `sandbox-lost`, and for a generation `run` closed as lost, `dirty-at-last-facts:<n>` and `stashes-at-last-facts:<n>` from the newest facts ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), run step 2); `acceptedLoss[]` lists the reasons `--accept-loss` named |
 
-Every file the product writes in place is written as a temp file in the
+**Fingerprint.** What `salvage[].fingerprint` digests, and what its
+reader learns:
+
+1. The values that steps 2 and 4 of
+   [08 8.5](08-memory-handoff-salvage.md#85-salvage-complete-before-destruction)
+   and the host verification read, the sandbox-side ones taken from the
+   fingerprint object in the `--json` document of `julieta salvage`
+   ([04 4.3](04-cli.md#43-julieta-sandbox)), the same object
+   `--fingerprint` prints: the daemon heads, each worktree's HEAD and a
+   digest of its status, which holds tracked changes and untracked
+   paths, each with the digest of its file, and ignored paths, minus
+   `salvage.excludeIgnored`, each by path, size and modification time;
+   for a worktree that step 2 read more than once, the last read.
+2. How the rerun reads and compares it, and how it ends, is the `RJ-338`
+   row of [04 4.4](04-cli.md#44-error-ids).
+3. `REQ-0238` The details of `RJ-338` name the kind of entry that changed, as far
+   as the manifests ([3.11](#311-salvage-manifest-schema-salvagev1), one
+   per repo) of the last entry tell it: a daemon head or a worktree's
+   HEAD whose fresh value differs from the one the manifest holds (the
+   daemon heads are among the primary repo's `refs[]`, each worktree's
+   HEAD in `worktrees[]`), and otherwise a worktree's status or an
+   ignored path, which the one stored sha256 does not tell apart
+   (decided on 2026-10-12: the details name the kind, not a path).
+
+`REQ-0239` Every file the product writes in place is written as a temp file in the
 same dir, fsync of the file, rename, fsync of the dir; host state files
-have mode 0600. `descriptors/<digest>.json` holds the parsed, normalized
+have mode 0600. `REQ-0240` `descriptors/<digest>.json` holds the parsed, normalized
 capability set of one workload or kit descriptor, keyed by its OCI
 digest; entries are immutable.
 
 ## 3.9 Memory entry (schema `memory-entry.v1`)
 
-One file per entry: `memory/<dir>/entries/<ULID>.md`. julieta stamps
+`REQ-0241` One file per entry: `memory/<dir>/entries/<ULID>.md`. julieta stamps
 `id`, `createdAt` and `updatedAt` on `add` and `edit`; the agent
 supplies only `title`, `body`, `tags` and `status` (a supplied id or
 timestamp is an error).
@@ -509,13 +548,13 @@ updatedAt: 2026-10-02T09:20:00Z
 Free-form markdown body.
 ```
 
-Tags with behaviour are a closed set: `lesson` (SessionStart prints the
-entry). An entry file is self-contained: copying `memory/<dir>/entries/`
+`REQ-0242` Tags with behaviour are a closed set: `lesson` (SessionStart prints the
+entry). `REQ-0243` An entry file is self-contained: copying `memory/<dir>/entries/`
 whole is a complete move, and the store lock is recreated on first use.
 
 ## 3.10 Handoff file (schema `handoff.v1`)
 
-`memory/<dir>/handoff/<ULID>-<kind>.md`, where `<kind>` is `clear`,
+`REQ-0244` `memory/<dir>/handoff/<ULID>-<kind>.md`, where `<kind>` is `clear`,
 `final` or `facts`. The kind is in the file name so the handoff reader
 selects files without parsing them; there is no pointer file.
 
@@ -545,46 +584,55 @@ repos:
 ## What would be lost   (kind: final only)
 ```
 
-Kinds `clear` and `final` require the headings (six for `final`);
+`REQ-0245` Kinds `clear` and `final` require the headings (six for `final`);
 `facts` has no body. julieta stamps everything in the front matter.
 
 ## 3.11 Salvage manifest (schema `salvage.v1`)
 
-`memory/<dir>/salvage/<generation>/<salvage-id>/manifest.json`:
-`salvageId` (must equal the id romeu passed), `generation`, `repo`,
-`worktrees[]` (path, HEAD, branch or detached, dirty), `refs[]` (every
-ref in the bundles with SHA: branches, the current generation's
+`REQ-0246` `memory/<dir>/salvage/<generation>/<salvage-id>/manifest.json`:
+`REQ-0247` `salvageId` (must equal the id romeu passed; `REQ-0248` another is the error
+`salvage-id-mismatch`, `RJ-339`), `agentStop` (`matched`, the number of
+processes signalled; `killed`, the number that needed SIGKILL; absent
+without `--stop-agents`), `generation`, `repo`, `worktrees[]` (path,
+HEAD, branch or detached, dirty), `refs[]` (every ref in the bundles
+with SHA: branches, the current generation's
 `refs/salvage/<generation>/*`, the reflog-only commits as
 `refs/salvage-reflog/<branch>/<n>`, tags, notes, each worktree HEAD),
 `bundles[]` (file, sha256, size, embedded-repo path if any), `files[]`
 (path, size, sha256), `skipped[]` (item, reason: `excluded-by-spec`,
 `over-cap`, `transcript-excluded`, `unreadable`, `disk-full`,
 `worktree-changing`, `in-progress-operation`, `agent-not-matched`,
-`agent-path-missing`; the host half adds `fsck-failed` and
-`daemon-url-refused` to the salvage record's `reasons[]`, 3.8; the
-recovery of each is the table of
+`agent-path-missing`; `REQ-0249` the host half adds `fsck-failed`,
+`daemon-url-refused`, `repo-missing` (a repo of the generation's
+recorded set without a manifest), `daemon-heads-missing` (a daemon head
+absent from the bundle refs or with another SHA) and `payload-mismatch`
+(a file whose size or sha256 differs from the manifest); `REQ-0250` a `salvageId`
+other than the id romeu passed is not a reason but the error
+`salvage-id-mismatch` (`RJ-339`, exit 5), raised by the host half's step
+1, which `--accept-loss` does not cover to the salvage record's
+`reasons[]`, 3.8; `REQ-0251` the recovery of each is the table of
 [08 8.5](08-memory-handoff-salvage.md#skipped-reasons-and-their-recovery))
-and `complete`. romeu recomputes completeness itself; the field is advisory.
-Every path (`bundles[].file`, `files[].path`, `worktrees[].path`, an
-embedded-repo path) is relative, cleaned, has no `..` element and no
-symlink component, and resolves below the salvage dir (the error
-`salvage-path`, `RJ-307`); the total bytes romeu verifies are bounded by
-`salvage.capBytes`, and a manifest over it makes the salvage incomplete
-with reason `over-cap`.
+and `complete`. romeu recomputes completeness itself; the field is
+advisory. `REQ-0252` Every path (`bundles[].file`, `files[].path`,
+`worktrees[].path`, an embedded-repo path) is relative, cleaned, has no
+`..` element and no symlink component, and resolves below the salvage
+dir (the error `salvage-path`, `RJ-307`); `REQ-0253` the total bytes romeu verifies
+are bounded by `salvage.capBytes`, and a manifest over it makes the
+salvage incomplete with reason `over-cap`.
 
 ## 3.12 Digests (`internal/canon`)
 
-Structured values are digested with one function,
+`REQ-0254` Structured values are digested with one function,
 `canon.Digest[T](kind, v)`: sha256 over `"romeu/<kind>/v1"`, a NUL byte,
 and the canonical JSON of `v` (keys sorted, UTF-8, no insignificant
-whitespace). Each Go type has exactly one kind, so a value of one kind
-can never be compared with a digest of another. Raw file bytes
+whitespace). `REQ-0255` Each Go type has exactly one kind, so a value of one kind
+can never be compared with a digest of another. `REQ-0256` Raw file bytes
 (`sbxenv.yaml`, binaries, bundles, payload files, probe artifacts,
 salvage manifests as `manifestSha256`) use plain sha256, because
 external tools (`sha256sum`, `shasum`) must reproduce them.
 
-The kinds table is closed for v1 and lands whole with `internal/canon`;
-a new kind is a change to this table first. Every ULID the product
+`REQ-0257` The kinds table is closed for v1 and lands whole with `internal/canon`;
+a new kind is a change to this table first. `REQ-0258` Every ULID the product
 writes is lowercase Crockford base32 (the reason of
 [13 13.3](13-runtime-ledger.md#133-spool) holds for every file on the
 host disk: two names that differ only in case collide on APFS), and
@@ -602,6 +650,8 @@ decoders refuse uppercase.
 | `run` | the validated run layout | stale layout detection |
 | `lock-set` | sorted `{dir, mise.lock sha256}` | `julieta install` skip rule |
 | `secret-argv` | one secret's argv | widening set |
+| `memory-content` | `REQ-0259` an entry's `title`, `body`, `tags` and `status` | `julieta memory add` duplicate rule (04 4.1) |
+| `fingerprint` | `REQ-0260` the fingerprint object of 3.8 | the `removing` write and its rerun |
 
 ## 3.13 Other schemas
 
@@ -614,8 +664,12 @@ Formats without a schema, each with its reason:
 
 | Format | Reason |
 |---|---|
-| `snapshot/heads.json` | read by romeu alone, decoded strictly under the opening's rules, and pinned by a golden |
-| `.romeu/bin/SHA256SUMS` | the `sha256sum` line format, which external tools read |
-| `e2e/scenarios/commands.yaml` | read by one program, the scenario runner, and pinned by its test |
+| `snapshot/heads.json` | `REQ-0261` read by romeu alone, decoded strictly under the opening's rules, and pinned by a golden |
+| `.romeu/bin/SHA256SUMS` | `REQ-0262` the `sha256sum` line format, which external tools read |
+| `e2e/scenarios/<journey>/commands.yaml` | read by one program, the scenario runner, and pinned by its test |
 | `kits/pins.yaml` | written by `tools/kitpin` and read by the product's own consumers, pinned by their tests |
 | `docs/grants.yaml` | read by one program, `tools/ci pr`, and pinned by its test; its form is in [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change) |
+| `.github/ask-first.yaml` | `REQ-0263` `version: 1`; read by `tools/ci pr` and by `go generate`, pinned by their tests (05 5.3) |
+| `tools/ci/denylist.yaml`, `prose.yaml`, `headings.yaml` | `REQ-0264` read by `tools/ci` alone, each pinned by its step's test |
+| `docs/reference/vocabulary.yaml` | `REQ-0265` generated from 01 1.7 and read by `tools/ci vocabulary` |
+| `e2e/testdata/sbx/<version>/*.jsonl` | `REQ-0266` written by the recorder and read by the fake sbx, pinned by their tests (10 10.3) |
