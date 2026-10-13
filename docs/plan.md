@@ -294,8 +294,9 @@ New or changed, each proposed on 2026-10-12:
 9. **The bridge is outside the product.** Running julieta in a
    sandbox that romeu does not render yet (M1 and M2) is four edits per
    project definition (three that supply julieta and one that removes
-   the store's writer kit, the mount of the store and the inbox
-   skill), an interim personal kit in the kit format the daily
+   the store's writer kit and the mount of the store), one change of
+   the sandbox agent payload that removes the inbox skill from every
+   sandbox at once, an interim personal kit in the kit format the daily
    sandboxes accept today (the pinned frontend of 06 6.1 is first
    exercised at the kit-frontend go/no-go, T113) and a host build in M1
    (T111) and, in M2, a fifth edit: the kit entries with their args,
@@ -405,11 +406,11 @@ Evidence.
   then every project; the open-items cut-over, the one-off entry of
   the store's items per project (T111); one week of daily use; the
   entry run again at the end of the sitting and the names gate
-  verified from a sandbox again (T111). Output:
-  `julieta status` and `handoff show --hook`, read in each sandbox,
-  and the entry's counts in the runbook (4 definition edits per
-  project and the entry run twice, counted from T111, plus one host
-  build; one approval per wave).
+  verified from a sandbox again (T111). Output: `julieta status` and
+  `handoff show --hook`, read in each sandbox, and the entry's counts
+  in the runbook (4 definition edits per project and the entry run
+  twice, counted from T111, plus one host build and one payload
+  change; one approval per wave and one for the payload change).
 - **Sitting M2** (ends M2): recreate wave 1 (T115), after T114; the
   kit-frontend go/no-go (T113) ran at sitting M0, once T012 merged; on
   a no-go, M2 stops with a decision record that names the option taken
@@ -835,7 +836,9 @@ taken as recommended. Items 1 to 7, 12 to 15 and 17 to 19 were decided
 on 2026-10-12; items 16 and 20 are deferred decisions, each with the
 sitting that decides it and nothing decided now; items 21 to 26 record
 the other decisions of that day. Items 19 and 22 were amended on
-2026-10-13, each as the stage-B review recommended. Items 8 to 11 stay
+2026-10-13, each as the stage-B review recommended, and item 19's
+removal of the store's writer was decided later that day, after the
+review of that amendment. Items 8 to 11 stay
 open: each is needed before the task or sitting it names, and its
 answer is recorded here as "decided on" with the date. T108's decision
 record records these answers again with the rules they decide.
@@ -941,14 +944,18 @@ record records these answers again with the rules they decide.
     recommended, because a second store left open until M5 would hold
     items the count never sees. The one-off, count-verified entry of
     the store's items runs at sitting M1, and again at its end, after
-    a fourth edit of T111 has removed the store's writer kit, the mount
-    of the store and the inbox skill from every definition (decided on
-    2026-10-13); from sitting M1 julieta is the one path for new items.
-    The host build of the store's tool stays a writer of the store,
-    outside every definition, so T119 reads at sitting M5
-    that the store holds no item that the open-items list of sitting M1
-    does not name. The alternative not taken: the cut-over at T119
-    (M5).
+    the store's writer has left every sandbox (decided on 2026-10-13):
+    a fourth edit of T111 removes the store's writer kit and the mount
+    of the store from every definition, and one change of the sandbox
+    agent payload removes the inbox skill. From sitting M1 julieta is
+    the one path for new items. The inbox skill's message-prefix
+    trigger is not carried over to julieta: the julieta skill's rule
+    that anything worth keeping goes to `julieta memory` covers it, and
+    the loss of the one-step prefix capture is accepted (decided on
+    2026-10-13). The host build of the store's tool stays a writer of
+    the store, outside every sandbox, so T119 reads at sitting M5 that
+    the store holds no item that the open-items list of sitting M1 does
+    not name. The alternative not taken: the cut-over at T119 (M5).
 20. **The render types slice.** A deferred decision: it is decided at
     sitting M2, the sitting that opens M3, from the measured lane, and
     nothing is decided now. The options: a slice, with the next free

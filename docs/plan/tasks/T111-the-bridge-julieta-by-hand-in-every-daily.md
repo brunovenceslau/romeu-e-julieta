@@ -33,23 +33,24 @@ line and exits 0 when the mount is absent, so a skipped hook is never
 silent; the SessionStart one runs `julieta setup` before `handoff show
 --hook`, the order `romeu run` keeps in 04 4.2, so the dispatcher is the
 global `core.hooksPath` before the session's first commit or push) and
-the two skills pinned from this repository at a SHA; a fourth edit
-that removes the store's writer from the definition: the store's writer
-kit, the mount of the store and the inbox skill, so that in a daily
-sandbox the julieta skill of T078 (`julieta memory add`) is the route
-for anything worth keeping and the handoff skill the route for
+the two skills pinned from this repository at a SHA; a fourth edit that
+removes the store's writer kit and the mount of the store from the
+definition; once, outside the definitions, the removal of the inbox
+skill from the sandbox agent payload, with its own undo, a global change
+that lands before the first wave and reaches every sandbox at once. In a
+daily sandbox the julieta skill of T078 (`julieta memory add`) is then
+the route for anything worth keeping and the handoff skill the route for
 handoffs; a runbook with each step and its undo. The open-items
-cut-over, per project: the one-off
-entry of the store's open items into `julieta memory` is a command of
-the config repository that writes each item's source id as a tag of its
-entry (`source-<id>`; 03 3.9 gives tags no behaviour but `lesson`),
-skips an item whose tag is already present and prints the counts on
-both sides, with one recorded list that gives each item its destination
-(a memory entry id, or closed); it runs again at the end of the
-sitting, after the fourth edit has removed the store's writer from
-every definition, and both counts are in the runbook. The host build
-of the store's tool stays a writer of the store, outside every
-definition, so T119's closing read still matters.
+cut-over, per project: the one-off entry of the store's open items into
+`julieta memory` is a command of the config repository that writes each
+item's source id as a tag of its entry (`source-<id>`; 03 3.9 gives tags
+no behaviour but `lesson`), skips an item whose tag is already present
+and prints the counts on both sides, with one recorded list that gives
+each item its destination (a memory entry id, or closed); it runs again
+at the end of the sitting, after the store's writer has left every
+sandbox (the fourth edit and the payload change), and both counts are in
+the runbook. The host build of the store's tool stays a writer of the
+store, outside every sandbox, so T119's closing read still matters.
 
 No file of this repository: the work lands in the maintainer's config
 repository, and this file is its record and its checkbox. Each step is
@@ -70,11 +71,11 @@ that the open-items list of sitting M1 does not name.
 - Implements: REQ-0659 (08 8.1), REQ-0673 (08 8.2).
 - Operator: applies the four edits and the host build, two projects
   first, then every project; runs the one-off entry of the open items
-  per project; one week of daily use; runs the entry again at the end
-  of the sitting. The removal of the inbox skill changes the sandbox
-  agent payload, which lives outside this repository and the config
-  repository's definitions: an ask-first change of the repository that
-  holds it, approved by the operator before the first wave. Rebuilds
+  per project; one week of daily use; runs the entry again at the end of
+  the sitting. Before the first wave, removes the inbox skill once from
+  the sandbox agent payload, which lives outside this repository and the
+  config repository's definitions: an ask-first change of the repository
+  that holds it, one approval, with its undo in the runbook. Rebuilds
   the shared bin directory at each sitting and whenever a daily sandbox
   needs a merged fix, with a cross-build of `main` on the host (`go
   build` for linux, or T103's `--dry-run` build once it lands), its
@@ -101,12 +102,13 @@ that the open-items list of sitting M1 does not name.
   - The runbook holds the undo of each step, the fourth edit's
     included.
   - No daily sandbox holds the store's writer kit, the mount of the
-    store or the inbox skill after the fourth edit.
+    store or the inbox skill after the fourth edit and the payload
+    change.
   - One list per project, each open item of the store with its
     destination: a memory entry id, or closed.
-  - The entry command skips an item whose `source-<id>` tag is present and
-    prints the counts on both sides; both counts, from the first run and
-    the end-of-sitting run, are in the runbook.
+  - The entry command skips an item whose `source-<id>` tag is present
+    and prints the counts on both sides; both counts, from the first run
+    and the end-of-sitting run, are in the runbook.
 - Verify: in each daily sandbox, read at sitting M1: `julieta status
   --json` exits 0 and lists the manifest's repositories; `julieta
   handoff show --hook` prints the built-in memory line of 08 8.1 at
