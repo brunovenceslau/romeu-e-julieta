@@ -7,12 +7,16 @@ fate: new
 owns:
   - tools/ci/**
   - .github/ask-first.yaml
+  - internal/procgroup/callsite_test.go
+  - internal/procgroup/class.go
+  - internal/procgroup/class_test.go
 needs: []
 after:
   - T121
   - T137
 ask_first:
   - checks
+  - procgroup
   - approvals
   - ask-first
 sitting: none
@@ -45,13 +49,14 @@ two repository tests over the specification's names are T140, both
 `after` this task, so this pull request is one frozen-behaviour move.
 
 - Implements: REQ-0006 (index), REQ-0021 (index), REQ-0037 (00 0.4),
-  REQ-0040 (01 1.1), REQ-0121 (02 2.1), REQ-0473 (05 5.2), REQ-0770 (10
-  10.1), REQ-0821 (10 10.2), REQ-0855 (10 10.2), REQ-0877 (10 10.2),
-  REQ-0880 (10 10.2), REQ-1040 (12 12.1), REQ-1051 (12 12.1), REQ-1052
-  (12 12.1), REQ-1080 (12 12.2), REQ-1081 (12 12.2), REQ-1101 (12 12.2),
-  REQ-1104 (12 12.3), REQ-1105 (12 12.3), REQ-1108 (12 12.3), REQ-1113
-  (12 12.3), REQ-1117 (12 12.3), REQ-1184 (12 12.8), REQ-1187 (12 12.8),
-  REQ-1188 (12 12.8), REQ-1229 (10 10.6).
+  REQ-0040 (01 1.1), REQ-0121 (02 2.1), REQ-0307 (04 4.1), REQ-0473 (05
+  5.2), REQ-0770 (10 10.1), REQ-0821 (10 10.2), REQ-0855 (10 10.2),
+  REQ-0877 (10 10.2), REQ-0880 (10 10.2), REQ-1040 (12 12.1), REQ-1051
+  (12 12.1), REQ-1052 (12 12.1), REQ-1080 (12 12.2), REQ-1081 (12 12.2),
+  REQ-1101 (12 12.2), REQ-1104 (12 12.3), REQ-1105 (12 12.3), REQ-1108
+  (12 12.3), REQ-1113 (12 12.3), REQ-1117 (12 12.3), REQ-1184 (12 12.8),
+  REQ-1187 (12 12.8), REQ-1188 (12 12.8), REQ-1229 (10 10.6), REQ-1234
+  (04 4.1).
 - Operator: no
 - Acceptance:
   - The step lists of `fast` and `all` taken before the move equal the
@@ -96,6 +101,62 @@ two repository tests over the specification's names are T140, both
     dispatcher needs, and revive `exported` reads every check package.
   - `tools/ci/internal/askfirst/**` is on the `approvals` surface after
     the move (T107 forecasts it).
+  - The switch to `internal/procgroup` removes the `tools/ci` and
+    `tools/mutants` entries from the admitted list of
+    `internal/procgroup/callsite_test.go`, which leaves
+    `internal/procgroup` alone, and the scan passes on the tree with no
+    exception for test files. The `_test.go` files under `tools/ci` and
+    `tools/mutants` that import `os/exec`, 13 at commit `b1700c9`
+    (`grep -rl '"os/exec"' --include='*_test.go' tools/`), stop doing
+    so by a route this task decides when it starts and records in its
+    pull request: an export from `internal/procgroup`, such as a path
+    lookup or a helper that signals a pid, which this task's `owns`
+    then gains, or another route that keeps T137's rule that nothing
+    else imports `os/exec` (a deferred decision; trigger: T105
+    starts). `tools/ci/procgroup/procgroup_unix_test.go` leaves with
+    `tools/ci/procgroup/`. The scan stays a test in
+    `internal/procgroup` until T039 moves it to `tools/ci callsites`
+    (decided on 2026-10-13).
+  - Each subprocess of the tools gets a class of the timeout table of
+    `internal/procgroup` with the switch (REQ-0300). Their bounds on
+    the base, measured at commit `b1700c9`:
+    - `tools/ci`: a command step of `fast` or `all`, 15 minutes
+      (`stepTimeout`, `tools/ci/fast.go:30`, applied at line 411); the
+      race step, 40 minutes (`raceTimeout`, `tools/ci/all.go:40`); a
+      git command through `git.Repo.Run`, 2 minutes each
+      (`git.Timeout`, `tools/ci/git/git.go:30`, applied at line 55);
+      `uname -m` and `sysctl -n sysctl.proc_translated`
+      (`tools/ci/all.go:262` and `278`), `mise which`
+      (`tools/ci/fast.go:185`) and `mise --version`
+      (`tools/ci/misefiles.go:394`), none.
+    - `tools/mutants`: a git command through `git.Repo.Run`, 2 minutes
+      each; `git pack-objects` piped into `git unpack-objects`
+      (`tools/mutants/snapshot.go:151` and `160`), 2 minutes for the
+      pair, under one deadline (`snapshot.go:149`); `go env GOROOT`
+      and `go env GOVERSION` (`tools/mutants/runner.go:446` and `463`)
+      and `go list -find` (`runner.go:387`), none; the build check, `go
+      test -exec=true` (`runner.go:402`), none; the baseline `go test`
+      (`runner.go:261`, which passes a timeout of 0), none from the
+      tool, and go test's default `-timeout` of 10 minutes bounds its
+      test binary only; a mutant's `go test` (`runner.go:339`), none
+      from the tool, and its `-timeout`, the larger of one minute and
+      ten times the baseline's time (`runner.go:282`), bounds the test
+      binary, not the compile.
+    The classes are a step class, a race class and a git class at
+    those values, a probe class for the short probes (`uname`,
+    `sysctl`, `mise which`, `mise --version`, `go env`, `go list
+    -find`), and, for the `go` build and test runs of `tools/mutants`,
+    either an unbounded class or a limit per call taken from the
+    baseline. Their rows come by a pull request that edits the Starting
+    values table of 04 4.1 alone (REQ-1220) and merges before this
+    task's switch; which of the two options the mutant runs take, and
+    the probe class's value, are a deferred decision of the plan
+    (Decisions this plan defers; trigger: T105 starts). This task then
+    edits `internal/procgroup/class.go` and its test to add them.
+  - After the switch, a test proves the second-signal window closed for
+    `tools/ci`: a run of `tools/ci` that receives two SIGTERMs while a
+    step's group runs exits 143, with the group gone and the second
+    signal absorbed (REQ-1234).
   - Green on the four runners.
 - Verify: `go run ./tools/ci all` exits 0; `go run ./tools/ci generated`
   exits 0 with `docs/reference/checks.md` present.

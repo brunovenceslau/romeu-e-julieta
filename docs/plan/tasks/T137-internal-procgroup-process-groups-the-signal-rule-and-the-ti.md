@@ -6,11 +6,10 @@ module: procgroup
 fate: new
 owns:
   - internal/procgroup/**
-  - tools/ci/procgroup/**
 needs: []
 after: []
 ask_first:
-  - checks
+  - procgroup
 sitting: none
 ---
 
@@ -25,7 +24,7 @@ bounded drain of the pipes; the one signal handler both `main`s install
 one Go table keyed by class with a seam only tests set. `tools/ci` and
 `tools/mutants` keep importing `tools/ci/procgroup` until T105, which
 comes `after` this task, switches them to `internal/procgroup` and
-removes `tools/ci/procgroup/`, listed here for that removal; until
+removes `tools/ci/procgroup/`, under its own `tools/ci/**`; until
 then the two copies are the dark code of 12 12.9. 10 10.7's row and 12
 12.2's `procgroup` row are T122's text; T010's `imports` check reads
 them. T009, T023, T029 and T053 need this task.
@@ -40,7 +39,7 @@ use suffers a timeout more than a wait).
   REQ-0301 (04 4.1), REQ-0302 (04 4.1), REQ-0303 (04 4.1), REQ-0304 (04
   4.1), REQ-0305 (04 4.1), REQ-0307 (04 4.1), REQ-0500 (05 5.2),
   REQ-0958 (10 10.6), REQ-0969 (10 10.7), REQ-1086 (12 12.2), REQ-1220
-  (04 4.1).
+  (04 4.1), REQ-1234 (04 4.1), REQ-1235 (04 4.1).
 - Operator: no
 - Acceptance:
   - A command starts in its own process group; a cancellation or a
@@ -57,8 +56,13 @@ use suffers a timeout more than a wait).
     gone and one line names the interruption (the case "a signal ends
     the group and exits 143"); a command that had already failed with 2
     exits 143 when the signal lands before it returns; a command that
-    finished keeps 0; a second signal ends the process by its default
-    action.
+    finished keeps 0. The handler kills every tracked group
+    synchronously before it steps aside and refuses new starts; a
+    second signal before it steps aside is absorbed and the status
+    stays 128 plus the first signal's number (the case "a second signal
+    before the handler steps aside is absorbed"); after it steps aside
+    a signal takes its default action (the case "a signal after the
+    handler steps aside takes its default action").
   - The timeout table is one Go table keyed by class; a test shortens
     one class through the seam and proves `subprocess-timeout`
     (`RJ-323`) fires with details that name the class and its limit; the

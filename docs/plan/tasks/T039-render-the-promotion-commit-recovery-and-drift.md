@@ -10,12 +10,19 @@ owns:
   - internal/render/testdata/promote/**
   - tools/ci/internal/callsites/**
   - tools/ci/check_callsites.go
+  - internal/procgroup/callsite_test.go
+  - .github/ask-first.yaml
+  - docs/spec/05-security.md
 needs:
   - T033
   - T038
-after: []
+after:
+  - T105
 ask_first:
   - checks
+  - procgroup
+  - ask-first
+  - spec
 sitting: none
 ---
 
@@ -51,6 +58,18 @@ Re-plan (2026-10-12): Kept as written before the re-plan.
     `internal/procgroup` only, and its runner in `sbxdrv` and `gitsafe`
     (and the doctor's secret-argv row); a fixture package that starts
     `gh` fails.
+  - The `os/exec` call-site scan of 04 4.1 (Subprocesses, item 4),
+    which T137 lands as a test in `internal/procgroup/callsite_test.go`,
+    moves into `tools/ci callsites` beside the I16 scan (REQ-0481),
+    with its positive control and its seam rule, and the test file is
+    removed; its admitted list is `internal/procgroup` alone, as T105
+    leaves it. The whole of `tools/ci/internal/callsites/**`, which
+    then holds the admitted list and the guarded lists of the scan,
+    joins the globs of the `procgroup` surface, in `.github/ask-first.yaml` and
+    in the list of 05 5.3 alike, with `.github/CODEOWNERS` and
+    `docs/reference/ask-first.md` regenerated, the way T107 puts
+    `tools/ci/internal/askfirst/**` on `approvals` (decided on
+    2026-10-13).
 - Verify: `go test ./internal/render/...`; `go test ./tools/ci/... -run
   '^TestCallsites'`, which runs the fixtures of the call-site check; `go
   run ./tools/ci callsites` exits 0 on the tree.

@@ -358,7 +358,15 @@ and the tables of the index) and the security model on this page. A
 table a check reads for a report, such as the retired requirements of
 12 12.11 or the step table of 10 10.2, puts no page on it. The other
 pages are not on it, so most edits of this specification need no
-approval line.
+approval line. The `procgroup` surface was added on 2026-10-13:
+`internal/procgroup` starts every subprocess, kills its process group
+and gives a child only the environment its caller names (04 4.1,
+Subprocesses), and the call-site scan and its admitted list decide
+which other code may start one. `internal/egress`, which derives the
+egress sets from the catalog (07 7.5), joined `catalog` the same day,
+a grantable surface (12 12.4): its output follows from the catalog's
+sets, and a grantable surface is strictly better than none (decided
+on 2026-10-13).
 `REQ-0544` Two paths wait for a surface: `internal/sbxdrv` (with `e2e/fakesbx`),
 which holds the I4 and I25 guards, joins a new `sbxdrv` surface, and
 `skills/**`, the text agents follow, joins `kits`, both in their own
@@ -381,6 +389,9 @@ surfaces:
   - id: gitsafe
     globs: [internal/gitsafe/**]
     reason: every git invocation on the host, ref namespaces including salvage
+  - id: procgroup
+    globs: [internal/procgroup/**]
+    reason: the one package that starts subprocesses, kills their process groups and keeps a child from inheriting the host environment, with the call-site scan and its admitted list
   - id: termsafe
     globs: [internal/termsafe/**, internal/cli/writer.go]
     reason: host output escaping
@@ -391,8 +402,8 @@ surfaces:
     globs: [internal/signing/**, kits/git-ssh-sign/**]
     reason: commit signing key isolation
   - id: catalog
-    globs: [internal/catalog/**]
-    reason: upload flags and the base and meta sets
+    globs: [internal/catalog/**, internal/egress/**]
+    reason: upload flags, the base and meta sets, and the egress derivation that reads them
   - id: kits
     globs: [kits/**, tools/kitpin/**]
     reason: what enters every sandbox, and its pins
