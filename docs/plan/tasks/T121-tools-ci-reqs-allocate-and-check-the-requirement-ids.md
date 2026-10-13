@@ -3,7 +3,7 @@ id: T121
 title: "`tools/ci reqs`: allocate and check the requirement ids"
 milestone: M0
 module: ci-release
-fate: new
+fate: merged
 owns:
   - tools/ci/reqs.go
   - tools/ci/reqs_test.go
@@ -15,9 +15,14 @@ after: []
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-13
+pr: 45
 ---
 
 # T121 - `tools/ci reqs`: allocate and check the requirement ids
+
+Merged on 2026-10-13 in pull request #45. The text below is the one
+written by the re-plan.
 
 Goal: The check and the allocator of 12 12.11, in the idiom `tools/ci`
 has today (a subcommand in `main.go`'s switch; T105 moves it to
