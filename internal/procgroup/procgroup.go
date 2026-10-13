@@ -21,8 +21,9 @@
 // julieta, and tools/ci and tools/mutants for themselves.
 //
 // A grandchild that calls setsid, or setpgid into a group of its own,
-// leaves the group, and the group kill does not reach it. Non-unix builds are unsupported on purpose: the
-// binaries and the tools run on linux and darwin only.
+// leaves the group, and the group kill does not reach it. Non-unix
+// builds are unsupported on purpose: the binaries and the tools run on
+// linux and darwin only.
 package procgroup
 
 import (

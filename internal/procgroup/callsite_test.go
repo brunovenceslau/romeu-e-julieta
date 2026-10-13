@@ -32,21 +32,39 @@ import (
 const thisPackage = "internal/procgroup"
 
 // admittedTools are the directories, below the module root, whose files
-// may still import os/exec and os/signal (toolImports): tools/ci and
-// tools/mutants,
-// whose own copy of the group rule and signal handler lives in
+// may still import the toolImports: tools/ci and tools/mutants, whose
+// own copy of the group rule and signal handler lives in
 // tools/ci/procgroup and their mains until T105 switches them to this
 // package and removes these two entries.
 var admittedTools = []string{"tools/ci", "tools/mutants"}
 
 // guardedImports are the packages whose import outside this package
 // starts a subprocess or maps a signal around it: os/exec and its
-// wrapper execabs, net/http/cgi, which runs a CGI program, plugin,
-// which loads code the scan cannot read, and os/signal.
-var guardedImports = []string{"os/exec", "golang.org/x/sys/execabs", "net/http/cgi", "plugin", "os/signal"}
+// wrapper execabs, net/http/cgi, which runs a CGI program, go/build and
+// go/importer, which start the go command with this process's
+// environment, plugin, which loads code the scan cannot read, and
+// os/signal.
+var guardedImports = []string{
+	"os/exec",
+	"golang.org/x/sys/execabs",
+	"net/http/cgi",
+	"go/build",
+	"go/importer",
+	"plugin",
+	"os/signal",
+}
 
-// toolImports are the guarded imports the admitted tools may still use.
-var toolImports = []string{"os/exec", "os/signal"}
+// toolsTree is the directory, below the module root, of the tools. Its
+// packages start programs past this package, as tools/ci/git does, and
+// the scan reads a file's own imports only, so a file outside it that
+// imported one would carry os/exec past the scan. A tool inside it may
+// import one: tools/new runs git through tools/ci/git until T105.
+const toolsTree = "tools"
+
+// toolImports are the guarded imports the admitted tools may still use:
+// go/build matches the build constraints of the lint targets in
+// tools/ci, and admits nothing os/exec does not.
+var toolImports = []string{"os/exec", "os/signal", "go/build"}
 
 // startCalls are the functions, by package path, that start or replace
 // a process without os/exec; no file outside this package calls them.
@@ -185,9 +203,29 @@ func Start() error { return exec.Command("gh").Start() }
 	"internal/fixture/imports.go": `package fixture
 
 import (
+	_ "go/build"
+	_ "go/importer"
 	_ "golang.org/x/sys/execabs"
 	_ "net/http/cgi"
 	_ "plugin"
+)
+`,
+	"internal/fixture/tools.go": `package fixture
+
+import (
+	"example.com/fixture/tools/ci/git"
+	_ "example.com/fixture/tools"
+	_ "example.com/fixture/toolsx"
+)
+
+func Run() { _ = git.Repo{} }
+`,
+	"tools/cix/git.go": `package cix
+
+import (
+	_ "go/build"
+
+	_ "example.com/fixture/tools/ci/git"
 )
 `,
 	"internal/fixture/raw.go": `package fixture
@@ -228,6 +266,7 @@ func Start() error { return exec.Command("gh").Start() }
 	"tools/ci/ci.go": `package ci
 
 import (
+	_ "go/build"
 	"os/exec"
 	"os/signal"
 )
@@ -263,6 +302,8 @@ func TestCallSiteFindings(t *testing.T) {
 		"internal/fixture/cgo.go: imports C, whose calls start programs past this package",
 		"internal/fixture/dot.go: dot-imports example.com/fixture/internal/procgroup, which hides its calls from this scan",
 		"internal/fixture/exec.go: imports os/exec outside internal/procgroup",
+		"internal/fixture/imports.go: imports go/build outside internal/procgroup",
+		"internal/fixture/imports.go: imports go/importer outside internal/procgroup",
 		"internal/fixture/imports.go: imports golang.org/x/sys/execabs outside internal/procgroup",
 		"internal/fixture/imports.go: imports net/http/cgi outside internal/procgroup",
 		"internal/fixture/imports.go: imports plugin outside internal/procgroup",
@@ -281,9 +322,12 @@ func TestCallSiteFindings(t *testing.T) {
 		"internal/fixture/start.go: calls os.StartProcess outside internal/procgroup",
 		"internal/fixture/start.go: calls syscall.Exec outside internal/procgroup",
 		"internal/fixture/start.go: calls syscall.ForkExec outside internal/procgroup",
+		"internal/fixture/tools.go: imports example.com/fixture/tools outside tools/, whose packages start programs past this package",
+		"internal/fixture/tools.go: imports example.com/fixture/tools/ci/git outside tools/, whose packages start programs past this package",
 		"internal/procgroup/sub/sub.go: imports os/exec outside internal/procgroup",
 		"internal/procgroupx/x.go: imports os/exec outside internal/procgroup",
 		"tools/ci/http.go: imports net/http/cgi outside internal/procgroup",
+		"tools/cix/git.go: imports go/build outside internal/procgroup",
 		"tools/cix/x.go: imports os/exec outside internal/procgroup",
 	}, findings)
 }
@@ -346,7 +390,7 @@ func callSiteFindings(root, module string, tools []string) ([]string, error) {
 		if err != nil {
 			return err
 		}
-		findings = append(findings, fileFindings(rel, file, module+"/"+thisPackage, tools)...)
+		findings = append(findings, fileFindings(rel, file, module, tools)...)
 		return nil
 	})
 	slices.Sort(findings)
@@ -354,10 +398,13 @@ func callSiteFindings(root, module string, tools []string) ([]string, error) {
 }
 
 // fileFindings returns the breaches of one file outside this package,
-// whose path below the module root is rel and which imports this
-// package as self.
-func fileFindings(rel string, file *ast.File, self string, tools []string) []string {
+// whose path below the module root is rel, in the module whose path is
+// module.
+func fileFindings(rel string, file *ast.File, module string, tools []string) []string {
 	var findings []string
+	self := module + "/" + thisPackage
+	toolsPackage := module + "/" + toolsTree
+	inTools := inside(rel, []string{toolsTree})
 	names := map[string]string{} // the name a file gives an import, to its path
 	for _, spec := range file.Imports {
 		imported, err := strconv.Unquote(spec.Path.Value)
@@ -377,6 +424,9 @@ func fileFindings(rel string, file *ast.File, self string, tools []string) []str
 			findings = append(findings, rel+": dot-imports "+imported+", which hides its calls from this scan")
 		case slices.Contains(guardedImports, imported) && !admittedTool(rel, imported, tools):
 			findings = append(findings, rel+": imports "+imported+" outside "+thisPackage)
+		case !inTools && (imported == toolsPackage || inside(imported, []string{toolsPackage})):
+			findings = append(findings,
+				rel+": imports "+imported+" outside "+toolsTree+"/, whose packages start programs past this package")
 		}
 	}
 	for _, group := range file.Comments {
@@ -451,7 +501,8 @@ func admittedTool(rel, imported string, tools []string) bool {
 	return slices.Contains(toolImports, imported) && inside(rel, tools)
 }
 
-// inside reports whether the slash path rel is in one of the dirs.
+// inside reports whether the slash path rel is in one of the dirs; an
+// import path is a slash path too.
 func inside(rel string, dirs []string) bool {
 	return slices.ContainsFunc(dirs, func(dir string) bool { return strings.HasPrefix(rel, dir+"/") })
 }
