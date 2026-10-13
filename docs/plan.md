@@ -640,7 +640,8 @@ The earlier plan's ids are kept, so a citation in a review record, a
 decision record or the specification still names the same work; this
 table is the one mapping note for them, and the review records stay as
 written. Each id's file under `plan/tasks/` carries the same fate in
-its front matter.
+its front matter until the task merges; the file's fate then reads
+`merged`, with the date and the pull request.
 
 | Id | Fate | Reason |
 |---|---|---|
