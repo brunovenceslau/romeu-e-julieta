@@ -3,7 +3,7 @@ id: T104
 title: "The plan as task files"
 milestone: M0
 module: docs
-fate: new
+fate: merged
 owns:
   - docs/plan.md
   - docs/plan/**
@@ -13,9 +13,14 @@ after:
   - T121
 ask_first: []
 sitting: none
+merged: 2026-10-13
+pr: 43
 ---
 
 # T104 - The plan as task files
+
+Merged on 2026-10-13 in pull request #43. The text below is the one
+written by the re-plan.
 
 Goal: `docs/plan.md` rewritten as the narrative; `docs/plan/tasks/` with
 one file per task, a stub per folded or removed id and a file with

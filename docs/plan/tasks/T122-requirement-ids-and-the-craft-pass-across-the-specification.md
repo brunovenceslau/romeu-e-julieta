@@ -3,7 +3,7 @@ id: T122
 title: "Requirement ids and the craft pass across the specification"
 milestone: M0
 module: docs
-fate: new
+fate: merged
 owns:
   - docs/spec.md
   - docs/spec/**
@@ -28,9 +28,14 @@ ask_first:
   - decisions
   - ask-first
 sitting: none
+merged: 2026-10-13
+pr: 45
 ---
 
 # T122 - Requirement ids and the craft pass across the specification
+
+Merged on 2026-10-13 in pull request #45. The text below is the one
+written by the re-plan.
 
 Goal: The write pass of the stage B review of the specification: every
 edit of its change set, one `REQ-new` placeholder per obligation placed,
