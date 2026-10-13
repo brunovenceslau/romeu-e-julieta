@@ -46,6 +46,6 @@ reopens, `owns` is empty.
     the id as not red.
   - `tools/ci mutate` runs `tools/mutants` over one committed mutants
     entry per guard, whose `new` text is the pass-through of the guarded
-    decision (PROVISIONAL: item 13 of Decisions open at the re-plan in
-    `docs/plan.md`).
+    decision (item 13 of Decisions of the re-plan in `docs/plan.md`,
+    decided on 2026-10-12).
 - Verify: `go test ./tools/ci/... -run '^Test(Invariants|Mutate)'`.

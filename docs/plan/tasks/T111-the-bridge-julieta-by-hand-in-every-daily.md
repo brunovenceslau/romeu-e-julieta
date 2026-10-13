@@ -45,20 +45,14 @@ rule 1 allows outside its own file.
 
 Re-plan (2026-10-12): The bridge is outside the product: nothing of it
 enters a spec section or a product command. T079 and T114 remove the
-interim kit (Decisions this plan defers). The count-verified entry of
-the store's open items is this task's (item 19 of Decisions open at the
-re-plan, recommended here): the one-off entry of each project's open
-items is a command of the config repository that skips an item whose
-source id is already present and prints the counts on both sides; it
-runs after the week of daily use and again at the end of sitting M1,
-after the store's last writer has left the definitions, and both counts
-are in the runbook, so from sitting M1 on julieta is the one path for
-new items. T119's closing read lists what is left.
+interim kit (Decisions this plan defers). From sitting M1 on julieta is
+the one path for new items; the count-verified entry of the store's
+open items is T119's (item 19 of Decisions of the re-plan, decided on
+2026-10-12).
 
 - Implements: REQ-0659 (08 8.1), REQ-0673 (08 8.2).
 - Operator: applies the three edits and the host build, two projects
-  first, then every project; then one week of daily use; runs the
-  one-off entry twice. Rebuilds the
+  first, then every project; then one week of daily use. Rebuilds the
   shared bin directory at each sitting and whenever a daily sandbox
   needs a merged fix, with a cross-build of `main` on the host (`go
   build` for linux, or T103's `--dry-run` build once it lands), its
@@ -83,9 +77,6 @@ new items. T119's closing read lists what is left.
   - With the bin mount absent, each wrapper prints its warning line and
     exits 0.
   - The runbook holds the undo of each step.
-  - The entry command skips an item whose source id is present, prints
-    the counts on both sides, and both counts, from the first run and
-    the end-of-sitting run, are in the runbook.
 - Verify: in each daily sandbox, read at sitting M1: `julieta status
   --json` exits 0 and lists the manifest's repositories; `julieta
   handoff show --hook` prints the built-in memory line of 08 8.1 at

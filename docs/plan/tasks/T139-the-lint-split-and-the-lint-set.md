@@ -19,11 +19,12 @@ sitting: none
 # T139 - The lint split and the lint set
 
 Goal: `lintconfig_test.go` split by linter group under the lint package
-T105 made, and the lint set of the open block's item 16: option A
-provisionally (`errorlint`, `usetesting`, `thelper`, `forbidigo` with
-the Boundaries patterns and revive `package-comments`) with the `tidy`
-rule of `generated` (`go mod tidy` changes neither `go.mod` nor
-`go.sum`), one fixture violation per enabled linter.
+T105 made, and the lint set of item 16 of Decisions of the re-plan in
+`docs/plan.md`, decided at sitting M0; its agreed default, decided on
+2026-10-12, is option A (`errorlint`, `usetesting`, `thelper`,
+`forbidigo` with the Boundaries patterns and revive `package-comments`)
+with the `tidy` rule of `generated` (`go mod tidy` changes neither
+`go.mod` nor `go.sum`), one fixture violation per enabled linter.
 
 Re-plan (2026-10-12, stage B): New, split from T105 so that the move of
 the checks is one frozen-behaviour pull request and the new rules are
@@ -31,8 +32,8 @@ another; a lint fixture that flakes on one runner then holds no M1 task
 behind it.
 
 - Implements: REQ-1224 (10 10.2), REQ-1225 (10 10.2).
-- Operator: item 16 of the open block (the lint set), answered with the
-  re-plan pull request (T108).
+- Operator: item 16 of Decisions of the re-plan (the lint set), decided
+  at sitting M0, before this task starts.
 - Acceptance:
   - `.golangci.yml` enables the doc-comment, error-string and
     commented-out-code checkers, testifylint with `enable-all: true`

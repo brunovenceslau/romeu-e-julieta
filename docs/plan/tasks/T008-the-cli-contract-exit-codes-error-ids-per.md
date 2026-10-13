@@ -100,8 +100,9 @@ off every chain through it.
     `internal/cli`'s test-support package, and the meta-test over the
     module's `_test.go` files is T073's. An error chain with no
     `*cli.Error` exits 1 as the error `internal` (`RJ-348`), and a test
-    holds that path (PROVISIONAL: item 17 of Decisions open at the
-    re-plan in `docs/plan.md`, applied in 04 4.4 and 10 10.1).
+    holds that path (item 17 of Decisions of the re-plan in
+    `docs/plan.md`, decided on 2026-10-12, as 04 4.4 and 10 10.1 state
+    it).
   - The union test reads the rows of 04 4.4 while it holds rows, then
     the source table of `docs/reference/errors.md`, and fails on a
     duplicate id, an id not in 04 4.4, a row marked retired that a

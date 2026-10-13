@@ -40,7 +40,7 @@ then on does a difference move a recorded hash. The I13 row and its
 golden are this task's, with the workspace files. Whether the candidate
 and `render.json` types become a slice of their own, so that T037, T038
 and T039 land in parallel, is decided at the sitting that opens M3
-(`docs/plan.md`, Decisions open at the re-plan).
+(`docs/plan.md`, item 20 of Decisions of the re-plan).
 
 - Implements: REQ-0018 (index), REQ-0041 (01 1.1), REQ-0042 (01 1.1),
   REQ-0045 (01 1.2), REQ-0048 (01 1.2), REQ-0054 (01 1.3), REQ-0132 (02

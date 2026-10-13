@@ -45,7 +45,8 @@ the record only. `owns` names the one note it edits (the bridge note
 surface glob becomes `internal/catalog/**` here, in
 `.github/ask-first.yaml` and its two generated outputs, since the
 `askfirst` check holds 05 5.3 and the yaml equal and the spec row
-cannot move alone; T107 keeps the rest of item 11 of the open block.
+cannot move alone; T107 keeps the rest of item 11 of Decisions of the
+re-plan.
 The two notes under `docs/notes/` are edited for the heading renames
 the pass made.
 

@@ -16,8 +16,8 @@ sitting: M1
 Goal: The deterministic forbidden-names gate that the maintainer's
 sandboxes run on every push, with its tests, and the pre-push wiring of
 every sandbox runs it through the hook dispatcher once `julieta setup`
-has installed it (T054). Two mechanisms are weighed, their costs named
-(item 18 of Decisions open at the re-plan): (a) each guarded repository
+has installed it (T054). The mechanism is (a), decided on 2026-10-12
+(item 18 of Decisions of the re-plan): each guarded repository
 carries its own hashed denylist and runs the hygiene check of 10 10.2
 from its tracked `.githooks/pre-push`, as this repository does, so no
 private file reaches any sandbox and the dispatcher's tracked link
@@ -25,10 +25,11 @@ carries it; the config repository keeps the plain list and a one-off
 command that writes a guarded repository's entries from it (the `hygiene
 add` form, run in a terminal on the host); if the hygiene check cannot
 run outside this repository without a `checks` change, the task names
-that change and its approval line; (b) the config repository as a
-secondary repo of every project (02 2.6), its plain list cloned into
-every sandbox. The recommendation is (a); the deferred row "a Go port of
-the names gate of the config repository" closes only with it. The phrase
+that change and its approval line. The alternative not taken was (b),
+the config repository as a secondary repo of every project (02 2.6),
+its plain list cloned into every sandbox. The deferred row "a Go port
+of the names gate of the config repository" closes when this task
+lands. The phrase
 list of the lesson of 2026-10-12 (pending item aea4a5dd; its phrases
 stay in the private home, never written here) joins the same private
 home and the same gate as a third list.
@@ -47,7 +48,7 @@ dispatcher, is T111's.
 
 - Implements: none (12 12.11: the names gate of the config repository is
   no obligation of this specification).
-- Operator: wires the gate, chooses the mechanism and runs the
+- Operator: wires the gate with mechanism (a) and runs the
   verification.
 - Acceptance:
   - A push from a sandbox runs the gate, before sitting M1 through the

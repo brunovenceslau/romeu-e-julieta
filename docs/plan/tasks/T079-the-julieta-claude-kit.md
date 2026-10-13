@@ -67,8 +67,9 @@ seam's earlier editors, and the `guard*.go` files sit in T054's
   - `julieta hooks guard` reads one PreToolUse document on stdin and
     exits 2 on the three patterns and on an undecodable document; the
     container e2e feeds the recorded fixture, one case per pattern and
-    one for an undecodable document (PROVISIONAL: item 14 of Decisions
-    open at the re-plan in `docs/plan.md`, recommended keep).
+    one for an undecodable document (item 14 of Decisions of the
+    re-plan in `docs/plan.md`: the guard is kept, decided on
+    2026-10-12).
   - The rendered hook config wires SessionStart for `startup`, `resume`,
     `clear` and `compact`, and SessionEnd once.
   - With the `.romeu/bin` mount absent, each session-hook wrapper prints
