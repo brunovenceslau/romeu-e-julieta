@@ -7,6 +7,7 @@ fate: new
 owns:
   - tools/ci/**
   - .github/ask-first.yaml
+  - internal/procgroup/callsite_test.go
 needs: []
 after:
   - T121
@@ -96,6 +97,30 @@ two repository tests over the specification's names are T140, both
     dispatcher needs, and revive `exported` reads every check package.
   - `tools/ci/internal/askfirst/**` is on the `approvals` surface after
     the move (T107 forecasts it).
+  - The switch to `internal/procgroup` removes the `tools/ci` and
+    `tools/mutants` entries from the admitted list of
+    `internal/procgroup/callsite_test.go`, which leaves
+    `internal/procgroup` alone, and the scan passes on the tree with no
+    exception for test files. The `_test.go` files under `tools/ci` and
+    `tools/mutants` that import `os/exec`, 13 at commit `b1700c9`
+    (`grep -rl '"os/exec"' --include='*_test.go' tools/`), switch with
+    the code they test: a command a test runs goes through
+    `internal/procgroup` under a class; a signal case that covers the
+    shared handler rather than the tool, such as a signal sent to a
+    helper binary's pid, is dropped when the tests of
+    `internal/procgroup` already cover it, and moves there otherwise;
+    and `tools/ci/procgroup/procgroup_unix_test.go` leaves with
+    `tools/ci/procgroup/`. The scan stays a test in
+    `internal/procgroup` until T039 moves it to `tools/ci callsites`
+    (decided on 2026-10-13).
+  - The timeout classes of the tools are added to the timeout table of
+    `internal/procgroup` with the switch, each at the bound the tool
+    has on the base: a command step of `tools/ci` (15 minutes), the
+    race run of `all` (40 minutes) and a git query (2 minutes). The
+    `go` commands of `tools/mutants` are bounded on the base only by the
+    `-timeout` they pass to `go test`, the larger of one minute and ten
+    times the baseline's time, which can exceed 15 minutes, so their
+    class is no shorter than that `-timeout`.
   - Green on the four runners.
 - Verify: `go run ./tools/ci all` exits 0; `go run ./tools/ci generated`
   exits 0 with `docs/reference/checks.md` present.

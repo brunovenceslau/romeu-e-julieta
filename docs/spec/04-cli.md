@@ -143,12 +143,20 @@ Both binaries install one handler, from `internal/procgroup`, in
 2. `REQ-0304` The exit status is 128 plus the signal number (130, 143). The
    signal wins over a failure the command had already found (1 to 6);
    a command that had finished its work keeps 0.
-3. `REQ-0305` The handler then steps aside, so a second signal ends the process by
-   its default action. A second signal that lands in the microseconds
-   between the cancel and the group kill ends the process before the
-   kill (measured on `tools/ci` on 2026-10-12, in a band no shell and
-   no `go run` reaches); closing that window is a row of the index's
-   [Deferred decisions](../spec.md#in-how-this-repository-is-run).
+3. `REQ-0305` The handler kills the group of every subprocess still
+   running, itself and before it returns, and from then on no
+   subprocess starts; only then does it step aside, so a later signal
+   ends the process by its default action. A second signal that lands
+   while the handler cancels and kills is absorbed: it neither ends the
+   process nor changes the status of item 2. This order closes the
+   window, measured on `tools/ci` on 2026-10-12, in which a second
+   signal ended the process between the cancel and the group kill and
+   left the group running (decided on 2026-10-13). What the handler
+   cannot reach stays out of this rule: a SIGKILL to the process, which
+   no handler sees, leaves every group running; a grandchild that calls
+   `setsid` leaves its group, and the group kill does not reach it; and
+   a subprocess whose context does not derive from the one the handler
+   gives the command is not among the groups the handler kills.
 4. `REQ-0306` A hook stage or a pane step ended by a signal is reported as
    `exited 128+<signal>` (4.3, `hooks run`); the `exit_code` a ledger
    event would carry stays as [13 13.2](13-runtime-ledger.md) defines

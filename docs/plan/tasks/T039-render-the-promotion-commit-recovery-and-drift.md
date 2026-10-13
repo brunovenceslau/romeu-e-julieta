@@ -10,6 +10,7 @@ owns:
   - internal/render/testdata/promote/**
   - tools/ci/internal/callsites/**
   - tools/ci/check_callsites.go
+  - internal/procgroup/callsite_test.go
 needs:
   - T033
   - T038
@@ -51,6 +52,12 @@ Re-plan (2026-10-12): Kept as written before the re-plan.
     `internal/procgroup` only, and its runner in `sbxdrv` and `gitsafe`
     (and the doctor's secret-argv row); a fixture package that starts
     `gh` fails.
+  - The `os/exec` call-site scan of 04 4.1 (Subprocesses, item 4),
+    which T137 lands as a test in `internal/procgroup/callsite_test.go`,
+    moves into `tools/ci callsites` beside the I16 scan (REQ-0481),
+    with its positive control and its seam rule, and the test file is
+    removed; its admitted list is `internal/procgroup` alone, as T105
+    leaves it (decided on 2026-10-13).
 - Verify: `go test ./internal/render/...`; `go test ./tools/ci/... -run
   '^TestCallsites'`, which runs the fixtures of the call-site check; `go
   run ./tools/ci callsites` exits 0 on the tree.
