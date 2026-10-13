@@ -14,10 +14,10 @@ sitting: none
 
 # T034 - `state`: the candidate and generation machines
 
-Re-plan (2026-10-12): folded into T033, which carries its acceptance
-rows. This file keeps the id so that earlier citations resolve; the text
-below is the one written before the re-plan, and T033 is where it is
-built.
+Re-plan (2026-10-12): folded into T033; its rows are copied into T033's
+Acceptance. This file keeps the id so that earlier citations resolve;
+the text below is the one written before the re-plan, and T033 is where
+it is built.
 
 - Implements: 01 1.6, 12 12.3 (the transition-table row), 05 5.2 (I7 and
   I17, unit level).

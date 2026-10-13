@@ -22,13 +22,18 @@ re-plan; `needs` lists its earlier dependencies with a folded id
 replaced by the id that absorbed it, and `owns` is written when the task
 reopens.
 
-- Implements: index (Open questions), 11 11.4, 12 12.5.
+- Implements: REQ-1030 (11 11.4), REQ-1088 (12 12.2), REQ-1168 (12
+  12.5), REQ-1169 (12 12.5), REQ-1170 (12 12.5), REQ-1171 (12 12.5).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: `decisions`.
 - Acceptance:
-  - Each of the four questions whose last probe is in block B becomes an
-    ADR and leaves the table: Q2 (A12, B2), Q8 (C3, B2), Q19 (A12, B2)
-    and Q22 (C5, B3).
+  - Each of the four questions whose last probe is in block B leaves the
+    table: Q2 (A12, B2), Q8 (C3, B2), Q19 (A12, B2) and Q22 (C5, B3); it
+    becomes an ADR when the decision is expensive to reverse or its
+    probe overturned the default (index, Open questions; 12 12.5).
+  - The J5 guide page gains the sentence on the hook order C5 recorded
+    (Q22), a post-block-B edit of that page.
   - The resolution of an overturned result is part of T092, not of this
     task.
-- Verify: `go run ./tools/ci sequences`; `go run ./tools/ci probes`.
+- Verify: `go run ./tools/ci generated`; `go run ./tools/ci probes`; `go
+  run ./tools/ci sequences` once T004 lands.

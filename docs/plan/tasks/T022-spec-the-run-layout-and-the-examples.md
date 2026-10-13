@@ -14,10 +14,10 @@ sitting: none
 
 # T022 - `spec`: the run layout and the examples
 
-Re-plan (2026-10-12): folded into T021, which carries its acceptance
-rows. This file keeps the id so that earlier citations resolve; the text
-below is the one written before the re-plan, and T021 is where it is
-built.
+Re-plan (2026-10-12): folded into T021; its rows are copied into T021's
+Acceptance. This file keeps the id so that earlier citations resolve;
+the text below is the one written before the re-plan, and T021 is where
+it is built.
 
 - Implements: 03 3.2 ("Run layout"), 02 2.1 (`examples/`), 03 (opening).
 - Operator: no.

@@ -19,3 +19,5 @@ before the re-plan.
 - Left v1 in review round 8 (SC2: the one-time import runs as a script
   in the operator's config repo). The id stays, since the task ids are
   one sequence (10 10.2); nothing depends on it.
+
+- Implements: none: not a product command.

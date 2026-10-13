@@ -25,8 +25,7 @@ before the re-plan; `needs` lists its earlier dependencies with a folded
 id replaced by the id that absorbed it, and `owns` is written when the
 task reopens.
 
-- Implements: 10 10.2 (the `docs` step), ADR 0001 rule 5, index
-  ("Deferred decisions": the linter and spell checker rows), S10.
+- Implements: REQ-0850 (10 10.2).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: `checks`, `ask-first`,
   `dependencies` (if a tool enters `mise.lock`).
@@ -36,7 +35,9 @@ task reopens.
     `.github/ask-first.yaml`, and fixes the format and path of the
     accepted-words list. The Deferred decisions table says this pull
     request is the one that picks them, so the choice is not a task of
-    its own; the two rows leave the table in the same change.
+    its own; the two rows leave the table in the same change. The linter
+    configuration includes a prose line-length rule, which the index's
+    deferred row names.
   - A fixture fails each tool: one lint violation and one misspelled
     word.
   - A tool that enters `mise.lock` through an `npm:` or `pipx:` backend

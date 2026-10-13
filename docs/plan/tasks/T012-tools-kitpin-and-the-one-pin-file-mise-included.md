@@ -8,6 +8,8 @@ owns:
   - tools/kitpin/**
   - kits/pins.yaml
   - kits/mise-minisign.pub
+  - kits/mise/SHASUMS256.txt
+  - kits/mise/SHASUMS256.txt.minisig
 needs: []
 after: []
 ask_first:
@@ -19,16 +21,19 @@ sitting: none
 
 Earlier title: `tools/kitpin` and the one pin file.
 
-Goal: `tools/kitpin` and the one pin file: the frontend, herdr, mise,
-and the workload entry written by hand.
+Goal: `tools/kitpin` and the one pin file: the frontend, the workload,
+herdr and mise.
 
 Re-plan (2026-10-12): Kept; T052 (`kitpin mise`) is folded in: the
 signature read of Q31 and the committed public key land here, in one
 tool and one pull request. The acceptance rows of the earlier T052 text
-apply as written there.
+are copied below.
 
-- Implements: 06 6.1 (Frontend), 06 6.4 (herdr), 03 3.1 (the workload
-  reference), 02 2.1 (`tools/kitpin`).
+- Implements: REQ-0117 (02 2.1), REQ-0189 (03 3.1), REQ-0221 (03 3.6),
+  REQ-0262 (03 3.13), REQ-0564 (06 6.1), REQ-0565 (06 6.1), REQ-0578 (06
+  6.2), REQ-0605 (06 6.4), REQ-0622 (07 7.4), REQ-0623 (07 7.4),
+  REQ-0624 (07 7.4), REQ-0844 (10 10.2), REQ-1061 (12 12.1), REQ-1064
+  (12 12.1), REQ-1069 (12 12.1), REQ-1110 (12 12.3), REQ-1164 (12 12.5).
 - Operator: confirms mise's public key out of band; one `sbx policy
   allow network` for the building sandbox with every host named, exact
   hosts and no wildcard.
@@ -46,9 +51,32 @@ apply as written there.
     <version>` takes each hash from the release API's digest and refuses
     a release that is not marked immutable (06 6.4). Each has a test
     against a recorded fixture.
-  - The workload entry is written in this pull request by hand, since
-    the specification gives `tools/kitpin` no subcommand for it;
-    `julieta pin workload` moves it in a spec later (06 6.2).
+  - `kitpin herdr` refuses an asset whose digest field is missing or is
+    not `sha256:<64 hex>`, naming the field; a recorded fixture without
+    the field tests it (06 6.4).
+  - `kitpin workload <digest>` rewrites the workload entry of the pin
+    file from a digest-shaped argument and reads no registry; a
+    reference that is not `<registry>/<repository>@sha256:<64 hex>` (03
+    3.1) is refused; tested against a fixture; the arch check stays with
+    `julieta pin workload` (06 6.2, T055).
+  - The workload entry carries `home`, the workload user's home, written
+    by hand with `source: sitting M2`; A4 re-measures it (T026).
+  - `kitpin mise` commits the signed `SHASUMS256.txt` and its signature
+    next to the pin, as `kits/mise/SHASUMS256.txt` and
+    `kits/mise/SHASUMS256.txt.minisig` (07 7.4).
   - The file says, in a comment the check of T020 cannot make: a pin
     that changes after block O3 needs the probe that read it run again.
+- Acceptance (from T052, folded):
+  - `kitpin mise <version>` writes the version and both linux sha256
+    values from the release's `SHASUMS256.txt` into the pin file, after
+    it verifies that file's minisign signature (07 7.4).
+  - The trust root is explicit: mise's minisign public key is committed
+    next to the pin file, and the maintainer confirms it out of band,
+    which the pull request records. There is no way to skip the
+    verification, no flag and no environment variable, and a missing key
+    is an error.
+  - A test with a recorded fixture covers a good signature, a bad one, a
+    checksum file signed with another key, and a checksum file that
+    lacks an architecture.
+  - How the signature is verified follows the lookup of Q31.
 - Verify: `go test ./tools/kitpin/...`.

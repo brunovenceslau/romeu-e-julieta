@@ -6,23 +6,24 @@ module: docs
 fate: deferred
 owns: []
 needs:
-  - T092
   - T094
-after: []
+after:
+  - T118
 ask_first: []
 sitting: none
 ---
 
 # T095 - `README.md`, `ARCHITECTURE.md` and `CONTRIBUTING.md`
 
-Re-plan (2026-10-12): deferred to M6; release and docs. Reopened by: the
-first adopter other than the maintainer; or the maintainer's
-environments all on the new tools. The text below is the one written
-before the re-plan; `needs` lists its earlier dependencies with a folded
-id replaced by the id that absorbed it, and `owns` is written when the
-task reopens.
+Re-plan (2026-10-12): deferred to M6; release and docs; after T118,
+which writes the README's install and host setup. Reopened by: the first
+adopter other than the maintainer; or the maintainer's environments all
+on the new tools. The text below is the one written before the re-plan;
+`owns` is written when the task reopens.
 
-- Implements: 12 12.8, S10, ADR 0001 rules 5, 12, 18 and 19.
+- Implements: REQ-0015 (index), REQ-0909 (10 10.2), REQ-1058 (12 12.1),
+  REQ-1087 (12 12.2), REQ-1088 (12 12.2), REQ-1182 (12 12.8), REQ-1183
+  (12 12.8), REQ-1184 (12 12.8), REQ-1185 (12 12.8).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: none expected.
 - Acceptance:

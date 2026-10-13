@@ -34,7 +34,7 @@ itself: the page number, then the section, as in "10 10.2". The pages:
 
 The plan was re-planned on 2026-10-12, at the end of stage A of the
 specification's review, from the validated specification and from the
-earlier plan of 103 tasks in ten phases. Five requirements were set for
+earlier plan of 103 tasks in ten phases. Six requirements were set for
 the re-plan:
 
 1. Daily use first: order the work so that romeu and julieta enter the
@@ -53,18 +53,20 @@ the re-plan:
    checklist file, the convention its build command expects. This
    repository instead keeps one `docs/plan.md` with the tasks beside
    it; the re-plan states where the task checklist lives and why.
+6. Milestones M0 to M6, each a statement about `main` plus one sitting
+   of the maintainer that produces a measured fact.
 
 Three proposals were written against those requirements, one leading
-with each of the first three, and compared on seven criteria: the five
-requirements, the concept count, consistency with the specification,
-and risk. The result is a synthesis: the 80/20 proposal as the base,
-with the parallel-first proposal's milestone M0, its `gitsafe` split by
-verb, its one-file-per-family catalog, its `owns`, `needs` and `after`
-fields with a deterministic check, and its error-id-per-package rule;
-and the daily-use-first proposal's milestone shape (each ends in one
-sitting that produces a measured fact), its "kits in daily use before
-`sync`" order, its rule that the bridge stays outside the product, and
-its thin `doctor` and preflight.
+with each of the first three, and compared on seven criteria: the first
+five requirements, the concept count, consistency with the
+specification, and risk. The result is a synthesis: the 80/20 proposal
+as the base, with the parallel-first proposal's milestone M0, its
+`gitsafe` split by verb, its one-file-per-family catalog, its `owns`,
+`needs` and `after` fields with a deterministic check, and its
+error-id-per-package rule; and the daily-use-first proposal's milestone
+shape (each ends in one sitting that produces a measured fact), its
+"kits in daily use before `sync`" order, its rule that the bridge stays
+outside the product, and its thin `doctor` and preflight.
 
 What was measured for it: the pull requests merged so far and which
 files they conflicted on; the dependency graph of the earlier plan (49
@@ -87,15 +89,11 @@ plan follows each:
 
 - The plan selects work by the module ids of the capability map
   (12 12.2). Each task names one.
-- The build order between modules follows 12 12.2, with the amendments
-  listed under
-  [Spec sentences the re-plan amends](#spec-sentences-the-re-plan-amends),
-  which T108 carries; until they
-  land, the sentences named there are the ones this plan reads
-  differently, and no other.
+- The build order between modules follows 12 12.2 as amended on
+  2026-10-12 (ADR 0012; T122).
 - `ci-bootstrap` is the first task (10 10.2, "Release and bootstrap");
   its first three tasks (T001 to T003) are merged, and T004 to T006 are
-  deferred with triggers (amendment 12).
+  deferred with triggers (12 12.2, as amended on 2026-10-12).
 - The last task commits `docs/acceptance.json` after the v1.0.0
   release, verifies it with `go run ./tools/ci acceptance`, and runs
   `go run ./tools/ci links` once (index, "Success criteria"; 10 10.2;
@@ -122,33 +120,30 @@ carries:
 | `fate` | `kept`, `new`, `deferred`, `folded`, `merged`, `left-v1` or `removed`; `absorbed_by` names the id a folded task went into |
 | `owns` | the globs the task's pull request may edit, besides the task's own file and the generated outputs it regenerates (rule 1); empty for a deferred task until it reopens |
 | `needs` | a data or interface dependency: the task starts when these are merged |
-| `after` | a file overlap or a review order: the task also waits for these, and the critical path does not count them |
-| `ask_first` | the surfaces of 05 5.3 the diff is expected to touch; a forecast, so the approvals can be given at the sitting that opens the milestone for the grantable surfaces of 12 12.4, while every other surface keeps its approval line on each pull request |
+| `after` | a file overlap or a review order: the task also waits for these; the critical path counts both kinds, and `after` is kept apart so an overlap can be removed by moving a file |
+| `ask_first` | the surfaces of 05 5.3 the diff is expected to touch; a forecast, so the approvals can be given at each sitting for the grantable surfaces of 12 12.4, while every other surface keeps its approval line on each pull request |
 | `sitting` | `none`, or the sitting the task waits for or feeds: a milestone id (M0 to M5) names that milestone's sitting, an earlier block id (O1 to O8) names that block |
 | `merged`, `pr` | the checkbox: the date and the pull request number, written by the task's own pull request; absent while the task is open |
 
 The body carries the goal, a dated re-plan paragraph that says what
 changed from the earlier text, and the fields of before: Implements
-(the sections of the specification, by number), Operator, Acceptance
-(what a test or a command checks) and Verify (the command that shows
-it).
+(the requirement ids of 12 12.11, each with its section as a reading
+aid, in the two forms the spec cites itself with), Operator,
+Acceptance (what a test or a command checks) and Verify (the command
+that shows it).
 
-**Done, for each task** (10 10.8): `go run ./tools/ci all` passes, the
-invariant tags are in place, the generated files are current, a new or
-changed error id has a reviewed fix hint, a changed journey or a
-changed output that a guide page shows has that page updated in the
-same pull request, and for host-facing behavior the matching scenario
-function exists and its recording-runner test passes in CI; its block
-B run is the acceptance. The
-"Verify" line of a task names what is specific to it and does not
-repeat this. Two consequences of `all` that the task lines do not
-repeat either: the race run of 10 10.2 carries no `e2e` tag, so a task
-whose Verify line is `-tags e2e` alone also adds the unit tests that
-keep its packages inside S9, and `coverage` is what shows it; and
-`go test` exits 0 on a `-run` pattern that matches no test, so a
-Verify line that names a pattern names test functions the task adds,
-the reviewer reads the `-v` output for them, and a task whose named
-test did not run is not done.
+**Done, for each task** is the definition of done of
+[10 10.8](spec/10-testing-style.md#108-definition-of-done-for-implementing-agents),
+linked and not restated; the "Verify" line of a task names what is
+specific to it and does not repeat it. Two consequences of `all` that
+the task lines do not repeat either: the race run of 10 10.2 carries
+no `e2e` tag, so a task whose Verify line is `-tags e2e` alone also
+adds the unit tests that keep its packages inside S9, and `coverage` is
+what shows it; and `go test` exits 0 on a `-run` pattern that matches
+no test, so a Verify line that names a pattern names test functions
+the task adds, with each space of a case name written as `_`, the
+reviewer reads the `-v` output for them, and a task whose named test
+did not run is not done.
 
 **Order.** The ids are not a queue and say nothing about order: a task
 starts when every id in its `needs` and `after` is merged, whatever
@@ -163,7 +158,7 @@ Carried over unchanged from the earlier plan:
 
 - **Language.** Go for the two binaries, the shared packages and the
   tools (12 12.1). POSIX sh in two places only, both bounded by the
-  specification: the one-line `.githooks/pre-push`, and kit install
+  specification: the `.githooks/pre-push` of 12 12.1, and kit install
   steps of at most five lines (12 12.1). No task adds a script in
   another language.
 - **Trunk.** Each pull request targets `main` from a short-lived
@@ -201,6 +196,9 @@ Carried over unchanged from the earlier plan:
   its trigger.
 - **Documents.** Each page follows
   [ADR 0001, adopt a documentation standard with checkable rules and a voice](adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md).
+- **Determinism seams.** A package that writes a time, an id or a
+  version takes the clock, the ULID entropy source and the version
+  stamp as injected values, and its tests fix all three (10 10.4).
 
 New or changed, each proposed on 2026-10-12:
 
@@ -209,13 +207,18 @@ New or changed, each proposed on 2026-10-12:
    outputs it regenerates, and nothing else. Defaults: a package task
    owns `internal/<pkg>/**` with its `testdata/`; a command task owns
    `internal/cmd/<binary>/<command>/**`, its own `errors.go` ids, the
-   one-line import file `cmd/<binary>/import_<command>.go` that links
-   the package in (Go runs a package's `init` only when the package is
-   imported), its scenario directory `e2e/scenarios/<journey>/**` and
-   its e2e file: `e2e/<command>_test.go` for a romeu command,
-   `e2e/julieta_<command>_test.go` for a julieta command, whose cases
-   run in the container e2e of T013 (amendment 14); a kit task owns
-   `e2e/kit_<name>_test.go` the same way. A generated output (a path a
+   one-line import file `internal/cmd/<binary>/all/import_<command>.go`
+   that links the package in (Go runs a package's `init` only when the
+   package is imported), its scenario directory
+   `e2e/scenarios/<journey>/**` and its e2e file:
+   `e2e/<command>_test.go` for a romeu command (T047, T067, T068 and
+   T069 list theirs), `e2e/julieta_<command>_test.go` for a julieta
+   command, whose cases run in the container e2e of T013 (10 10.1); a
+   kit task owns `e2e/kit_<name>_test.go` the same way. A merged
+   check's package, and `.github/workflows/ci.yml`, are owned by the
+   task that names them in `owns`, one at a time, ordered by `after`.
+   After T108, a change to `docs/plan.md` is a re-plan pull request of
+   its own. A generated output (a path a
    generator registered under rule 4 writes: the pages under
    `docs/reference/`, `schemas/*.json`, `.github/CODEOWNERS`,
    `docs/adr/README.md`, `docs/diagrams/`) is owned by no task: each
@@ -228,10 +231,12 @@ New or changed, each proposed on 2026-10-12:
    file (`e2e/scenarios/j2/step1_*.go` for T055) and comes `after` it.
 2. **Two kinds of edge.** `needs` is a data or interface dependency;
    `after` is a file overlap or a review order. A task starts when both
-   are merged; the critical path counts `needs` only. The 49 "plan
-   order" edges of the earlier plan are dropped. This reads 12 12.2's
-   "Depends on is plan order" and the earlier plan's "a task depends
-   only on ids below its own" differently, which T108 records.
+   are merged; the critical path counts both kinds, since a task starts
+   when both are merged, and `after` is kept apart so that an overlap
+   can be removed by moving a file. A deferred task keeps true edges;
+   `tools/ci plan` checks them like any other. The 49 "plan order"
+   edges of the earlier plan are dropped (12 12.2, as amended on
+   2026-10-12).
 3. **Disjointness is checked.** `tools/ci plan` (T106) fails when two
    open tasks that no `needs` or `after` edge orders, directly or
    through other tasks, own an overlapping
@@ -248,53 +253,61 @@ New or changed, each proposed on 2026-10-12:
    `internal/cmd/<binary>/<command>/` with an `init` that registers its
    definition, plus the import file of rule 1 that links it in. Adding
    one adds files and edits none.
-5. **No task appends to a list another task appends to.** Every check,
-   command, generator output, error id, scenario, catalog family, kit,
-   probe and task lives in a file of its own. Error ids: each package
-   declares its ids in its own `errors.go`, taken from the list of
-   04 4.4; one test collects the union and fails on a duplicate, an id
-   not in 04 4.4, or an id of 04 4.4 that no package declares. Catalog
-   entries: one file per tool family under `catalog/egress/<family>.yaml`,
-   embedded by glob. Scenarios: one directory per journey with its own
-   `commands.yaml`.
+5. 5. **No task appends to a list another task appends to.** Every
+   check, command, generator output, error id, scenario, catalog family,
+   kit, probe and task lives in a file of its own. Error ids: each
+   package declares its ids in its own `errors.go`, taken from the list
+   of 04 4.4; one test collects the union and fails on a duplicate, an
+   id not in 04 4.4, or an id of 04 4.4 that no package declares.
+   Catalog entries: one file per tool family under
+   `internal/catalog/egress/<family>.yaml`, beside the package that
+   embeds them by glob. Scenarios: one directory per journey with its
+   own `commands.yaml`.
 6. **The specification states contracts; the detail lives with the
-   code.** A code task edits no spec page. A spec defect found while
-   coding is a separate docs pull request. The list of checks becomes a
-   generated page, `docs/reference/checks.md`, one record per line
-   (12 12.3's merge rule), which 10 10.2 links instead of holding the
-   table (T105, T108). The volatile environment rows of 10 10.2 and
-   12 12.1 stay where they are, with a trigger.
-7. **Dependencies land with their first importer.** A module of
-   12 12.1's list enters `go.mod` and `go.sum` in the task whose code
-   first imports it, under that task's `dependencies` forecast, since
-   `go mod tidy` drops a requirement that no package imports: the JSON
-   Schema validator with T051, the TOML parser with T053, which T036
-   then needs. Those two tasks own `go.mod` and `go.sum`, and no other
-   task edits them; `mise.toml` and `mise.lock` change only in a task
-   that names them.
+   code.** A code task edits no spec page, except where the
+   specification assigns a task an edit of its own text (12 12.4 and
+   05 5.3 for the task that builds `pr`; the generator rule of 03
+   (opening), 01 1.4, 04 4.1 and 04 4.4 for the task that lands a
+   generator): such a task names those pages in `owns`, and the
+   requirement ids of a table it replaces by a link are retired with
+   `Replaced by: <the generated page>`. A spec defect found while
+   coding is a separate docs pull request. The inventory of the checks
+   is a generated page, `docs/reference/checks.md`, one record per line
+   (12 12.3's merge rule), which 10 10.2 links beside its step table
+   (T105). The volatile environment rows of 10 10.2 and 12 12.1 stay
+   where they are, with a trigger.
+7. 7. **Dependencies land with their first importer.** A module of 12
+   12.1's list enters `go.mod` and `go.sum` in the task whose code first
+   imports it, under that task's `dependencies` forecast, since `go mod
+   tidy` drops a requirement that no package imports: the JSON Schema
+   validator with T125, the TOML parser with T053, which T036 then comes
+   after. Those two tasks own `go.mod` and `go.sum`, and no other task
+   edits them; `mise.toml` and `mise.lock` change only in a task that
+   names them.
 8. **Derived views are computed, not committed**, unless a consumer
    outside the repository reads them from the tree (`CODEOWNERS`). This
    page holds no task count, no "what waits for a sitting" list and no
    traceability table; `docs/adr/README.md` stays generated as today,
    and its removal is deferred with a trigger.
-9. **The bridge is outside the product.** Running julieta in a sandbox
-   that romeu does not render yet (M1 and M2) is three edits per
-   project definition and a host build in M1 (T111) and, in M2, a
-   fourth edit: the kit entries with their args, `julietaBin` set to
-   the bin mount's path and `signingKey` to the public key, by hand
-   until `romeu sync` writes them at sitting M3 (T115); all recorded in
-   the config repository's runbook with each step's undo, never in a
-   spec section or a product command. Each of those steps is an
-   ask-first change of the config repository, under that repository's
-   own rules, since it changes what enters every sandbox (the hooks,
-   the kits and their args, the gate that guards every push); the task
-   files that record them (T111, T112, T114, T115) say so, and their
-   `ask_first` field stays empty because it lists the surfaces of this
-   repository only. The manifest is the product's type
-   (03 3.6 names the
-   format, not the writer), so a hand-written one validates like a
-   rendered one; [julieta by hand](notes/julieta-by-hand.md) records
-   this reading.
+9. 9. **The bridge is outside the product.** Running julieta in a
+   sandbox that romeu does not render yet (M1 and M2) is three edits per
+   project definition, an interim personal kit in the kit format the
+   daily sandboxes accept today (the pinned frontend of 06 6.1 is first
+   exercised at the kit-frontend go/no-go, T113) and a host build in M1
+   (T111) and, in M2, a fourth edit: the kit entries with their args,
+   `julietaBin` set to the bin mount's path and `signingKey` to the
+   public key, by hand until `romeu sync` writes them at sitting M3
+   (T115); all recorded in the config repository's runbook with each
+   step's undo, never in a spec section or a product command. Each of
+   those steps is an ask-first change of the config repository, under
+   that repository's own rules, since it changes what enters every
+   sandbox (the hooks, the kits and their args, the gate that guards
+   every push); the task files that record them (T111, T112, T114, T115)
+   say so, and their `ask_first` field stays empty because it lists the
+   surfaces of this repository only. The manifest is the product's type
+   (03 3.6 names the format, not the writer), so a hand-written one
+   validates like a rendered one; [julieta by
+   hand](notes/julieta-by-hand.md) records this reading.
 10. **Dogfood before recording.** The fake `sbx` replays sessions
     written by hand from the pinned sbx's help text and from what daily
     use showed, each marked `synthetic: true`; the maintainer's daily
@@ -313,66 +326,94 @@ New or changed, each proposed on 2026-10-12:
 12. **Runtime isolation.** Each worktree runs `tools/ci` with its own
     caches where a lock is shared and never uses `git stash`; mutation
     checks use `tools/mutants`.
-13. **Grants per milestone.** `docs/grants.yaml` (12 12.4) carries one
-    grant per milestone for the grantable surfaces of 12 12.4 that its
-    tasks forecast (`contracts`, `checks`, `dependencies`, `catalog`,
-    `ledger`, `digests` and `termsafe`); every other surface keeps its
-    approval line on each pull request. T107 creates the file, and each
-    grant lands in a one-line pull request of its own on the
-    `ask-first` surface, opened at the sitting that opens the
-    milestone, so a task on those surfaces waits for no sitting of its
-    own. `tools/ci pr` reads the file only when that check lands (M6):
-    until then the grant is a recorded intent, the approval line on
-    each pull request stays the record, and that window is a row of
-    [Accepted risks](#accepted-risks).
+13. 13. **Grants per milestone.** `docs/grants.yaml` (12 12.4) carries
+    one grant per milestone for the grantable surfaces of 12 12.4 that
+    its tasks forecast (`contracts`, `checks`, `dependencies`,
+    `catalog`, `ledger`, `digests` and `termsafe`); every other surface
+    keeps its approval line on each pull request. T107 creates the file,
+    and each grant lands in a one-line pull request of its own on the
+    `ask-first` surface: at each sitting, one grant for every task that
+    can become ready before the next sitting, read from `tools/ci plan
+    --ready`, on the grantable surfaces it forecasts, so a task on those
+    surfaces waits for no sitting of its own. `tools/ci pr` reads the
+    file only when that check lands (M6): until then the grant is a
+    recorded intent, the approval line on each pull request stays the
+    record, and that window is a row of [Accepted
+    risks](#accepted-risks).
+14. **Extension seams.** An order-sensitive step list (the setup steps
+    of 04 4.3, the preflight steps of 01 1.5, the sync steps of 04 4.2,
+    the promotion steps of 01 1.6, a journey's steps) is one explicit
+    slice in one file of the owning package, which the extending task
+    names in `owns` and edits by one line, with an `after` edge; an
+    unordered set (doctor rows, hook actions keyed by hook name, status
+    report sections, sbxdrv environment contributions, render-time rules
+    of `sync`) uses the registration by file of rule 4: a package-level
+    `var _ = register(...)` in the row's own file, one registry per
+    package written during initialization and read-only after. The
+    owning task names its seam file in its Acceptance.
 
 ## Milestones and sittings
 
 A milestone is a statement about `main` plus one sitting of the
-maintainer. Two worktrees start M0 at once (T104 and T105; T106 to
-T108 follow them), and M1's four foundation packages (T007, T012, T017,
-T023) start beside them, since they need nothing of M0. M3 has two
-lanes. Lane A, the packages that read no sbx fact (`spec`, `catalog`,
-`state`, `egress`, the host-only verbs of `gitsafe`, `sbxdrv` with its
-hand-written sessions, the preflight), starts once M1 has landed T051
-(the schema generator and check that `spec`, lane A's root, needs;
-T051 comes after the foundations, T009 and T013), in parallel with
-the rest of M1 and with M2. Lane B (`oci`, and through it `render`, `gate`,
-`sync` and `run`) waits for the fixtures of sitting M2 (T113) and for
-the `julieta` kit (T077), so it runs behind M2's sitting. The critical
-path and the width of each milestone are read from the task files, not
-written here (a deferred row covers a command for them).
+maintainer. The pass that placed the requirement ids opens M0 (T121,
+T122); T104 and T105 start beside it, T106 to T108 follow them, T137 and
+T138 come after T105, and T113 runs at sitting M0; M1's four foundation
+packages (T007, T012, T017, T023) start beside them, since they need
+nothing of M0. M3 has two lanes. Lane A, the packages that read no sbx
+fact (`spec`, `catalog`, `state`, `egress`, the host-only verbs of
+`gitsafe`, `sbxdrv` with its hand-written sessions, the preflight),
+starts once T125 has landed (the schema generator and check that `spec`,
+lane A's root, needs), in parallel with the rest of M1 and with M2. Lane
+B (`oci`, and through it `render`, `gate`, `sync` and `run`) waits for
+the fixtures of sitting M2 (T113) and for the `julieta` kit (T077), so
+it runs behind M2's sitting. The critical path and the width of each
+milestone are read from the task files, not written here (a deferred row
+covers a command for them).
 
 | M | Name | Ends when (observable, on `main` and on the host) | Delivers |
 |---|---|---|---|
-| M0 | Shape the work | `tools/ci all` green with checks registered by file; the plan as task files, checked by `tools/ci plan`; one source for the ask-first list; the re-plan record Accepted | the shape that lets M1 to M4 run in parallel |
-| M1 | julieta in daily use | sitting M1: every daily sandbox runs `julieta memory`, `handoff show --hook` at SessionStart, `hooks run` on every commit and `snapshot` after it, from a read-only bin mount and a hand-written manifest; the names gate of the config repository runs through the dispatcher on every push (T112) | memory, handoff, hooks and snapshots in every sandbox the maintainer works in, with julieta as their one path |
+| M0 | Shape the work | `tools/ci all` green with checks registered by file; the requirement ids in the specification and `tools/ci reqs` green; the plan as task files, checked by `tools/ci plan`; one source for the ask-first list; the re-plan record Accepted; `internal/procgroup` and the hook settings merged (T137, T138) | the shape that lets M1 to M4 run in parallel |
+| M1 | julieta in daily use | sitting M1: every daily sandbox runs `julieta memory`, `handoff show --hook` at SessionStart, `hooks run` on every commit and `snapshot` after it, from a read-only bin mount and a hand-written manifest; the names gate of the config repository runs through the dispatcher on every push (T112) | memory, handoff, hooks and snapshots in every sandbox the maintainer works in; julieta as the one path for new items; the store's items move at T119 |
 | M2 | Kits in daily use | sitting M2: the kit-frontend go/no-go by hand on one host (about 40 minutes); then recreate wave 1, one project per slot, each sandbox built from the `julieta`, `julieta-claude` and `git-ssh-sign` product kits plus one personal kit from the config repository | every daily sandbox built from the product kits plus one personal kit; mise per repository through `julieta install` and `lock`; commits signed with the one key of `git-ssh-sign` |
 | M3 | romeu renders and runs | sitting M3: J1 for real on the config project from a `--dry-run` build of `main` (`init`, `doctor`, `approve --toolchain`, `sync`, `run`), then one project per slot until every project definition is rendered by `romeu sync` | every project definition rendered under gate 2, its egress derived and its secrets bound in host settings, the kit pins in one file, and `romeu run` as the one way into a sandbox |
 | M4 | Nothing lost | sitting M4: one `romeu recreate` rehearsal with a planted dirty worktree, stash and ignored file; J6 and J10 pass in CI with the fake sbx; on the host, the rehearsal's `romeu recreate` transcript and salvage listing, read by the maintainer, are the Evidence | recreate, rm and retire with a complete salvage; `romeu pull` and `romeu handoff` |
-| M5 | Every project on romeu | sitting M5: one month of daily use after the last slot of sitting M3 with no hand-applied step and no open runbook section; every open item of a project is a `julieta memory` entry or closed (T119) | the product as the one path, with memory as the one place for open items |
+| M5 | Every project on romeu | sitting M5: one month of daily use after the last slot of sitting M3 with no hand-applied step and no open runbook section; every open item of a project is a `julieta memory` entry or closed (T119). M5 is a wait, not a gate: the release and docs tasks of M6 whose trigger fired at the last slot of sitting M3 run during it, and blocks O3 to O7 wait for the end of M5 only where they need a sitting | the product as the one path, with memory as the one place for open items |
 | M6 | Public v1 | the release checklist of 12 12.2 completes: blocks A and B on both hosts, `v1.0.0`, `docs/acceptance.json` | the v1.0.0 release with its evidence |
 
 **The sittings.** A sitting is named by its milestone (sitting M1 ends
 M1); the form `S<n>` is a success criterion id (10 10.2) and names no
 sitting. Each sitting is the maintainer's own use of the product on one
-host, and its output is the Evidence of the next pull request:
+host, and its output is the Evidence of the next pull request. Each
+sitting builds from a commit whose diff since the last host build the
+maintainer has read, named with its SHA in the sitting's Evidence.
 
 - **Sitting M0** merges M0 and writes the M0 and M1 grants of rule 13;
   it also reads whether the approval-line check (a deferred row) lands
   with the first grant of a milestone with parallel lanes, which is
-  that row's trigger.
+  that row's trigger; and it runs the kit-frontend go/no-go (T113),
+  once T012 merged (about 40 minutes on one host; one approval).
 - **Sitting M1** (ends M1): the bridge (T111) on two projects first,
   then every project; one week of daily use; the names gate verified
-  from a sandbox again (T112). Output: `julieta status` and
-  `handoff show --hook`, read in each sandbox.
-- **Sitting M2** (ends M2): part 1, the kit-frontend go/no-go (T113);
-  part 2, recreate wave 1 (T115), after T114. On a no-go, M2 stops
-  with a decision record while M3's lane A continues.
+  from a sandbox again (T111). Output: `julieta status` and
+  `handoff show --hook`, read in each sandbox (3 definition edits per
+  project, counted from T111, plus one host build; one approval per
+  wave).
+- **Sitting M2** (ends M2): recreate wave 1 (T115), after T114; the
+  kit-frontend go/no-go (T113) ran at sitting M0, once T012 merged; on
+  a no-go, M2 stops with a decision record that names the option taken
+  and the tasks it releases, while M3's lane A continues (5 steps and
+  one definition edit per project, counted from T115; one approval per
+  wave).
 - **Sitting M3** (ends M3): T116, one project per slot, the config
-  project first and this repository second.
-- **Sitting M4** (ends M4): T117, the recreate rehearsal.
-- **Sitting M5** (ends M5): T119, the closing read.
+  project first and this repository second (8 steps per project,
+  counted from T116; one approval per sitting, the runbook pull
+  request).
+- **Sitting M4** (ends M4): T117, the recreate rehearsal (one project:
+  the three planted cases, `romeu recreate` and the read of its
+  listing, counted from T117; one approval).
+- **Sitting M5** (ends M5): T119, the closing read (per project: the
+  open-items entry run twice and the read, counted from T119; one
+  approval).
 - **M6 has two sittings**, the earlier blocks O3 and O5 to O7, under
   [Operator blocks](#operator-blocks).
 
@@ -387,7 +428,11 @@ checklist: `grep -L '^merged:' docs/plan/tasks/*.md` is the open list;
 `tools/ci plan` (T106) validates the fields, the id sequence, the edges
 and the overlap rule, and fails on `merged` without `pr` or the
 reverse. `tools/new task` scaffolds a file with the next free id (the
-rebase-and-rerun rule of 12 12.3 covers a collision).
+rebase-and-rerun rule of 12 12.3 covers a collision). A task with no
+file in this repository is ticked by the pull request whose Evidence
+carries its sitting's output; that pull request names the sitting task
+in its body and writes `merged:` and `pr:` into the sitting task's
+file, the one write rule 1 allows outside its own file.
 
 This page keeps what changes at re-plan time only: how to read, the
 rules above, the milestones and sittings, the deferred decisions, the
@@ -400,9 +445,10 @@ convention of the planning skill in use: a second checklist file is a
 second source of the same list, the reason the answer of 2026-10-01
 (plan question 1) gave against a tick file; and a single append-heavy
 file is the measured conflict class: the earlier `docs/plan.md` was
-edited by 11 of the 37 merge commits reachable from the re-plan's base
-(`git log --merges --oneline <base> | wc -l` gives the 37, and
-`git log --first-parent --merges --oneline <base> -- docs/plan.md | wc -l`
+edited by 11 of the 37 merge commits reachable from eedda13, the
+re-plan's base (`git log --merges --oneline eedda13 | wc -l` gives the
+37, and
+`git log --first-parent --merges --oneline eedda13 -- docs/plan.md | wc -l`
 the 11), and one pull request existed only to tick a task. A directory
 of task files is the checklist with one writer per item. A build brief
 names the task file in place of a checklist file; the skill expects a
@@ -446,13 +492,13 @@ here, and block B is sitting O6.
 | Block | Needs merged first | What the maintainer does | Also needs | Unblocks | Wait on the critical path | Pass | Recommendation |
 |---|---|---|---|---|---|---|---|
 | O1 | T001, written and open: the block finishes it and merges it | the sitting of the maintainer block, items a to d (10 10.2): rulesets and the two repository settings first; one `go run ./tools/ci hygiene add` per forbidden name in a plain host clone; enable the hook, push the branch, open the pull request; then the four tries from inside the sandbox, read on the host (a measurement: 10 10.2, item d, which records the result) | a host clone, the repository's admin rights, the operator's token, which the sandbox holds, created after item a. | T002 directly; every later task has it in its dependencies | done | `go run ./tools/ci fast` exits 0 in that clone after item b and non-zero before it; the four tries are read by the host checks of 10 10.2, item d, which no one command joins | done; its output is recorded in [ADR 0008, let the sandbox act as the maintainer on GitHub](adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md), which decides Q25. From then on the maintainer also reads the GitHub security log at each sitting, for an action by the operator's token that was not asked for; a judgment, not a detector: the log records ruleset and listed settings changes, and no merge, push, tag, branch deletion or release (05 5.4) |
-| O2 | T002 | item e (10 10.2): save the API's answer that lists the required checks (the rule exists, as read on 2026-10-09) | the green run's job names | T003 directly; every task after T002 has it in its dependencies | done | the saved answer lists each job name of the green run; no command reads a ruleset back (05 5.4), so this one is **[review]** | done |
-| O3 | T019, T020 | block A on both hosts, Intel and Apple silicon (11 11.1): `go run ./e2e/probes --block A --out docs/probes/`, which lists and plants nothing (Q29), apart from one global setting: A2 sets `env.rememberHostCommands` (11 11.1) and records the prior value in its result; then commit the results and the recordings on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | `sbx` at or above 0.46.0 on both hosts; the pins of the pin file | T026 directly, and every task that reads a block A fact | about 75 minutes per host (11 11.1), plus the wait for a sitting with both machines; in M6, off the path of M1 to M5 | `go run ./tools/ci probes --require-pass A1,A2,A3,A4,A5,A6,A9,A10,A11,A12,A13,A14` exits 0 on the branch with both hosts' results | run both hosts in one sitting: the arch-sensitive probes (A4, A5, A11, A12, A13) count only with both (11, opening). Read the diff of everything staged before the push: it is data from your host, and the recorder's scrubbing (T018) is a filter, not a reviewer. The second host's files reach the branch by a push from that host's own clone, through its hook, and the harness refuses an `--out` inside a clone whose hook is not enabled. A results-only branch runs `main`'s own `tools/ci` through the hook; if a resolution commit joins it (T026), read that diff in the clone before checking the branch out, as item c of block O1 requires (10 10.2) |
+| O2 | T002 | item e (10 10.2): save the API's answer that lists the required checks (the rule exists, as read on 2026-10-09) | the green run's job names | T003 directly; every task after T002 has it in its dependencies | done | the rule exists (read 2026-10-09); saving the API's answer under Evidence is to do, at sitting M0 (measured on 2026-10-12: no merged pull request body holds it); no command reads a ruleset back (05 5.4), so this one is **[review]** | the wait is done; the saved answer lands at sitting M0 |
+| O3 | T019, T020 | block A on both hosts, Intel and Apple silicon (11 11.1): `go run ./e2e/probes --block A --out docs/probes/`, which lists and plants nothing (Q29), apart from one global setting: A2 sets `env.rememberHostCommands` (11 11.1) and records the prior value in its result; then commit the results and the recordings on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | `sbx` at or above 0.46.0 on both hosts; the pins of the pin file | T026 directly, and every task that reads a block A fact | about 75 minutes per host (11 11.1), plus the wait for a sitting with both machines; in M6, off the path of M1 to M5 | `go run ./tools/ci probes --require-pass A1,A2,A3,A4,A5,A6,A9,A10,A11,A12,A13,A14,A15,A16,A17` exits 0 on the branch with both hosts' results | run both hosts in one sitting: the arch-sensitive probes (A4, A5, A11, A12, A13, A17) count only with both (11, opening). Read the diff of everything staged before the push: it is data from your host, and the recorder's scrubbing (T018) is a filter, not a reviewer. The second host's files reach the branch by a push from that host's own clone, through its hook, and the harness refuses an `--out` inside a clone whose hook is not enabled. A results-only branch runs `main`'s own `tools/ci` through the hook; if a resolution commit joins it (T026), read that diff in the clone before checking the branch out, as item c of block O1 requires (10 10.2) |
 | O4 | T055 | the catalog handover: build julieta for linux from `main`, run `julieta spec validate --catalog projects/*.yaml` on the reference config repo inside a Linux container, and hand over its output after reading and redacting it: it may name hosts, tool keys or project names that are not for the public repository | a Linux container with read-only access to the config repo's origins and no host credential mounted; julieta has no darwin build (12 12.1) | the acceptance of T102, into which T091 folded | minutes; from M3 on, `julieta spec validate` runs in each project's own sandbox at sitting M3, so the handover is the release candidate's confirmation | `julieta spec validate --catalog projects/*.yaml` exits 0 or 1, and its output is the handover; an exit of 2 means a spec does not validate, and the block is not done; `go run ./tools/ci hygiene --file <output>` exits 0 on the output before it is handed over | do it with O5 |
-| O5 | every task of M0 to M5, and T082, T084 to T088, T090 | the candidate: run `julieta spec validate --catalog` again, in the container of O4, and see it exit 0; the rehearsal on one host (below); then step 1 of the release checklist of 12 12.2, the tag `v1.0.0-rc.1` (11 11.2) | the same container as O4; one host with `sbx` | O6 directly, and through it T092 to T095 and T102 | the rehearsal is about one block B run on one host, 90 minutes plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go test -tags host -json ./e2e/host/...` exits 0, then `go run ./tools/ci probes --require-pass B2,B3,B4,B5,C2,C3,C4,C5,C6 --hosts 1 --dir <the rehearsal directory>` exits 0 | the rehearsal is this plan's addition, not the specification's. After the tag, a change outside `docs/` and the root Markdown files needs a new candidate and block B again (11 11.2) |
+| O5 | every task of M0 to M5, and T082, T084 to T088, T090, T094, T095 | the candidate: run `julieta spec validate --catalog` again, in the container of O4, and see it exit 0; the rehearsal on one host (below); then step 1 of the release checklist of 12 12.2, the tag `v1.0.0-rc.1` (11 11.2) | the same container as O4; one host with `sbx` | O6 directly, and through it T092 to T095 and T102 | the rehearsal is about one block B run on one host, 90 minutes plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go test -tags host -json ./e2e/host/...` exits 0, then `go run ./tools/ci probes --require-pass B2,B3,B4,B5,C2,C3,C4,C5,C6 --hosts 1 --dir <the rehearsal directory>` exits 0 | the rehearsal is this plan's addition, not the specification's. After the tag, a change outside `docs/` and the root Markdown files needs a new candidate and block B again (11 11.2) |
 | O6 | O5 | step 2 of the release checklist of 12 12.2, block B on both hosts (11 11.2): B1 to B6 and the sandbox-side checks C2 to C6; then commit the results on a branch in a plain host clone, with the hook enabled, run `go run ./tools/ci fast`, read the diff of everything staged, push and open the pull request | the candidate's published release; both hosts | T092 directly, and through it T093 to T095 and T102 | about 90 minutes per host for B1 to B6, plus the sandbox-side checks (11 11.2). Meanwhile T096 to T101 can proceed | `go run ./tools/ci probes --require-pass B1,B2,B3,B4,B5,B6,C2,C3,C4,C5,C6` exits 0 on the branch with both hosts' results | run B1 first on each host: each other result copies the candidate's tag and commit from it (11 11.2). The reading rules of block O3 apply: the staged diff before the push, each host pushing from its own clone through its hook, and a resolution commit's diff before checkout |
 | O7 | T094, T095, T101, T093 | steps 3 to 5 of the release checklist of 12 12.2: `go run ./tools/ci acceptance --pre-tag` exits 0; push the tag `v1.0.0`; run B1 and B2 once more on v1.0.0, on one host, with `--out` outside the repository: `go run ./e2e/probes --block B --only B1 --out <dir>`, then the same with `--only B2` (11 11.2). Then pin `validate.yml` in the reference config repo to that release, run it and note its run id (S4) | the documentation tasks merged, each of them; the config repo | T102 directly; no other task | one B1 and one B2 run and one workflow run. No task can proceed meanwhile | `go run ./tools/ci probes --require-pass B1,B2 --hosts 1 --dir <dir>` exits 0 on that run | the pre-tag check is a command here, and `tools/ci acceptance` runs it again at the end (10 10.5); a check that fails after the tag is fixed by a patch release (12 12.2). The release exists only after the tag, so the pin comes after it. Paste under the Evidence of T102 the result files of those runs, which the harness wrote through its redaction, and no raw output |
-| O8 | T002 | once [ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md) is Accepted, after the App checks its Consequences lists: the token narrowing and the required-name try, items g and h of the maintainer block (10 10.2): install the GitHub App of decision 2 of that record on selected repositories, this one among them, set the global dynamic secret with `sbx secret set github --command <absolute host helper path> --refresh 55m`, with the helper and the App's private key outside every path mounted into any sandbox and not writable from any sandbox, stop forwarding the GitHub authentication key, then write the dated entry of the note on the maintainer block and run the required-name try | the host, the host helper that mints the App's installation token, two throwaway pull requests (read 3 of the entry and item h) | the Deferred decisions rows whose trigger is "the token is narrowed" | none: no task waits on it, and every task proceeds around it; it is due before M6 | the first entry whose verdict is narrowed, read against the expected answers the note lists, and that entry's fourth part, the answers of the required-name try; and the read, from inside a sandbox, that finds neither the host helper nor the App's private key readable; no command reads them, so it is **[review]** | run it at the first sitting after ADR 0011 is Accepted. To stop the forwarding, forward a socket that holds only the signing key, as [06 6.4](spec/06-kits.md#64-product-kits) requires of romeu's sandboxes, rather than the host's own agent; read 2 of the entry shows whether it holds |
+| O8 | T002, T126 | once T126 has merged, which accepts [ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md) after the App checks its Consequences lists: the token narrowing and the required-name try, items g and h of the maintainer block (10 10.2): install the GitHub App of decision 2 of that record on selected repositories, this one among them, set the global dynamic secret with `sbx secret set github --command <absolute host helper path> --refresh 55m`, with the helper and the App's private key outside every path mounted into any sandbox and not writable from any sandbox, stop forwarding the GitHub authentication key, then write the dated entry of the note on the maintainer block and run the required-name try | the host, the host helper that mints the App's installation token, two throwaway pull requests (read 3 of the entry and item h) | the Deferred decisions rows whose trigger is "the token is narrowed" | none: no task waits on it, and every task proceeds around it; it is due before M6 | the first entry whose verdict is narrowed, read against the expected answers the note lists, and that entry's fourth part, the answers of the required-name try; and the read, from inside a sandbox, that finds neither the host helper nor the App's private key readable: an `ls` of the helper path and of the key path from inside a sandbox, each refused; no command reads them, so it is **[review]** | run it at the first sitting after T126 has merged. To stop the forwarding, forward a socket that holds only the signing key, as [06 6.4](spec/06-kits.md#64-product-kits) requires of romeu's sandboxes, rather than the host's own agent; read 2 of the entry shows whether it holds |
 
 **The rehearsal in O5.** Build with
 `go run ./tools/release build --version v1.0.0-rc.1 --dry-run`, then,
@@ -487,9 +533,9 @@ three pull requests waiting reopens the deferred decision on that manual
 step (12 12.9). A pull request that touches an ask-first surface needs
 the maintainer's approval, recorded in an approval line that names what
 was approved (12 12.4). The `ask_first` field of each task is there so
-those approvals can be given per milestone, at the sitting that opens
-it, for the grantable surfaces of 12 12.4; every other surface keeps its
-per-PR line.
+those approvals can be given at each sitting, for every task that can
+become ready before the next one, on the grantable surfaces of 12 12.4;
+every other surface keeps its per-PR line.
 
 ## Toolchain pins
 
@@ -504,7 +550,7 @@ task lands it.
 | `gh`, for `tools/release verify` | an exact version in `mise.toml`, with a sha256 per platform in `mise.lock`; started by the path `mise which` resolves, never through `mise exec` | 12 12.1, 10 10.2 | PR #27 (round 8, DR7), merged |
 | GitHub Actions | `uses` with a 40-hex commit SHA | 10 10.2 | T002, T088 |
 | mise on the CI runners | one `uses` step with a 40-hex commit SHA, the mise version and its sha256 in `with`; Go and the other tools come from `mise.lock` through it | 10 10.2 | T002 |
-| Go dependencies | `go.mod`, `go.sum`; the complete v1 list is in 12 12.1 | 12 12.1 | the first importer of each (rule 7): T051 and T053 |
+| Go dependencies | `go.mod`, `go.sum`; the complete v1 list is in 12 12.1 | 12 12.1 | the first importer of each (rule 7): T125 and T053 |
 | kit frontend | `docker/sandbox-kit:3.0.0-m.<N>@sha256:<digest>`, in the pin file | 06 6.1 | T012 |
 | workload | `<registry>/<repository>@sha256:<64 hex>`, in the pin file | 03 3.1, 06 6.2 | T012 |
 | herdr | version and a sha256 per architecture, from an immutable release, in the pin file | 06 6.4 | T012 |
@@ -537,19 +583,19 @@ requests of their own, each with its own approval line:
   the `GOENV=off` and `GOTOOLCHAIN=local` it has set since PR #30, so
   that an untracked `go.work` or `vendor/` and a caller's `GOFLAGS`
   cannot act on `go run` (ADR 0007, Threat model; round 8, DR3, its
-  form decided on 2026-10-09), on the `checks` surface; pending, in
-  draft PR #34;
-- the list of never-tracked files read from `tools/ci/denylist.yaml`
-  instead of a list written in the code (R8-10-34);
-- `tools/ci setup` setting `GOPROXY` and `GOSUMDB` for the steps it runs
-  (R8-10-38);
-- the grammar row of the release workflow in `tools/ci workflows`
-  (R8-10-1);
+  form decided on 2026-10-09), on the `checks` surface; merged in PR
+  #34;
 - the sentence on outside contributors in the generated
   `docs/reference/ask-first.md` (R8-12-18), moot once T107 removes the
   page;
 - the `sbxdrv` surface and `skills/**` on the `kits` surface of
   `.github/ask-first.yaml` (R8-05-3): now part of T107.
+
+Three other changes round 8 left became tasks on 2026-10-12: the
+release grammar row (T127), the never-tracked list (T128) and
+`setup`'s module sources (T129). The hook's settings and comment are
+T138, the `romeu:invariant` allowlist line is T105's, and the pending
+items of the kept tooling are T136.
 
 ## What was built, kept and changed
 
@@ -558,9 +604,10 @@ The verdicts:
 
 | Built | Verdict | Reason |
 |---|---|---|
-| `tools/ci` (`fast`, `all`, `setup`, `hygiene`, `workflows`, `generated`, `generate`, `coverage`), the hook, `ci.yml`, the pins, the licensing | kept; reshaped by T105 with its behaviour frozen by a step-list golden; the hardening is frozen, and a further fix is a pending item unless a real escape is shown | the most hardened code in the repository; its four hand-wired registration points are the top code conflict source (10 merge commits on `fast.go`, by the first-parent command of [Where the task checklist lives](#where-the-task-checklist-lives)) |
-| `tools/mutants` | kept as the tool; no gate consumes it; `tools/ci mutate` in M6 | it removed a measured hazard; a gate needs an invariant with code |
-| `tools/new adr` | kept; registered by file from T106 (rule 4); gains `task` (T106), `command` (T008), `kit` (T076); `invariant`, `lesson` and `probe` in M6 | each kind with its first input |
+| `tools/ci` (`fast`, `all`, `setup`, `hygiene`, `workflows`, `generated`, `generate`, `coverage`), the hook, `ci.yml`, the pins, the licensing | kept; reshaped by T105 with its behaviour frozen by a one-off comparison of the step lists before and after the move, under the pull request's Evidence; the hardening is frozen, and its pending items after the round caps are T136, deferred | the most hardened code in the repository; its four hand-wired registration points are the top code conflict source (10 merge commits on `fast.go` at eedda13, the re-plan's base, by `git log --first-parent --merges --oneline eedda13 -- tools/ci/fast.go \| wc -l`) |
+| `tools/mutants` | kept as the tool, named in 12 12.1 and 02 2.1 (T122); no gate consumes it until `tools/ci mutate` runs it in M6 (item 13 of the open block) | it removed a measured hazard; a gate needs an invariant with code |
+| `tools/ci/procgroup` | kept; moves to `internal/procgroup` in T137 (M0) and serves both binaries | one process layer for the tools and the product |
+| `tools/new adr` | kept; registered by file from T106 (rule 4); gains `task` (T106), `command` and `error` (T009), `kit` (T076); `invariant`, `lesson` and `probe` in M6 | each kind with its first input |
 | `.github/ask-first.yaml`, 16 surfaces | the file kept; one source (T107); two narrowings proposed in the open block | one surface change touches four files today |
 | `docs/reference/ask-first.md` (generated) | dropped (T107) | the YAML with its reasons is the reference |
 | `docs/adr/README.md` (generated) | kept; its removal deferred | 12 12.3's merge rule covers the textual conflict |
@@ -571,8 +618,8 @@ The verdicts:
 | ADR 0008 to 0011 | kept; O8 off the path | governance, not product |
 | `docs/reviews/` | kept as history; no further spec review round as a phase | stage A is done |
 | `docs/plan.md` as one page | changed (T104) | its own trigger fired |
-| spec pages 10 and 12 | the check table of 10 10.2 becomes a link (T108); the environment rows stay with a trigger | the rows changed with the hardening, which is frozen |
-| the Deferred decisions tables of `docs/spec.md` | kept as they are; one file per row deferred with a trigger | |
+| spec pages 10 and 12 | the step table of 10 10.2 stays; `docs/reference/checks.md` is the generated inventory (T105); the amendments were applied by T122; the environment rows stay with a trigger | the rows changed with the hardening, which is frozen |
+| the Deferred decisions tables of `docs/spec.md` | kept as they are; one file per row deferred with a trigger, which now also covers the retired-requirements table of 12 12.11 | |
 
 ## The fate of each earlier task
 
@@ -588,7 +635,7 @@ its front matter.
 | T004 `sequences` | deferred to M6 | `tools/new adr` and `tools/ci plan` remove the main errors; trigger: the first duplicate id or one-way supersede link found in review |
 | T005 `pr` | deferred to M6 | the approval-line check alone may land early by its trigger; the sections and trailers are friction before a product exists |
 | T006 lessons, docs rules, contributor skeletons | deferred to M6 | checks before the documents exist; trigger: the first outside contributor or the release candidate |
-| T007 | kept, narrowed | the invariant tooling is deferred; the guard tags are written now |
+| T007 | kept, narrowed | the invariant tooling is T133; the guard tags are written now |
 | T008 | kept, changed | ids per package, registration by file |
 | T009 | kept | both binaries, the cross-build as a package |
 | T010 | kept, pulled to M1 | its first input exists at T009 |
@@ -597,29 +644,30 @@ its front matter.
 | T013 | kept, M1 | the specification's first julieta level (10 10.1); no new level is added |
 | T014, T018, T019, T020 | deferred to M6 | the harness, the recorder, the argv table, `probes`; trigger: a real-sbx behaviour the fake cannot model breaks a daily run, or the release candidate |
 | T015 | folded into T029 | one seam, one owner |
-| T016, T030 | folded into T066 | the handshake is `run`'s compatibility check and hybrid test; no slice of its own |
+| T016 | folded into T066 | the handshake is `run`'s compatibility check and hybrid test; no slice of its own |
+| T030 | folded into T026 | its two rows wait for the A4 recording, which arrives with block A |
 | T017 | kept | |
 | T021 | kept; T022 folded in | one package, one agent |
 | T023 | kept, split by verb | the runner for both modes, fetch, refs and bundle create now; unbundle, verify, fsck and the tree walk (T024) in M3 |
 | T024 | kept, M3 | needed by salvage and materialization |
 | T025 | kept, M2 | dark until T080 |
-| T026, T027, T028 | deferred to M6 | block A results and records; the git floor is read on the host at sitting M2 and written into T023's floor file as a fixture with `source: sitting M2` |
+| T026, T027, T028 | deferred to M6 | block A results and records |
 | T029 | kept, changed | hand-written sessions, no recorder |
 | T031 | kept, changed | one file per family; T091 folded into T102's acceptance |
 | T032, T033 (T034 folded in), T035 (T057 folded in), T036 | kept | |
 | T037, T038, T039, T040 | kept | three file sets of one package |
 | T041, T042, T043 (T045 folded in) | kept | gate 1 kept whole: ADR 0005 rule 1 |
-| T044 | the I-level cases into T038 and T043; the breadth deferred to M6 | the invariant now, the breadth when it has a consumer |
+| T044 | the I-level cases into T043 (I12, I24, I27, I28); the breadth deferred to M6 | the invariant now, the breadth when it has a consumer |
 | T046, T049 | kept, narrowed | the rows J1 needs; the breadth deferred with a trigger |
 | T047 | kept, M4 | |
 | T048 | kept, narrowed | |
-| T050 `adopt` | deferred to M6 | memory leaves the sandbox in M1, so a recreate loses nothing salvage cannot capture; trigger: a sandbox whose recreate would |
+| T050 `adopt` | deferred to M6 | memory leaves the sandbox in M1, so a recreate loses nothing salvage cannot capture; trigger: a sandbox whose recreate would; or the first release candidate |
 | T051 | kept, changed | a hand-written manifest validates like a rendered one |
 | T052 | folded into T012 | |
 | T053 | kept, M2 | |
 | T054, T059, T060 | kept, M1 | the sandbox-side 80/20 |
 | T055 | kept, M3 | |
-| T056 `layout` | deferred to M6 | `run` attaches a single pane; trigger: the first project whose daily work needs two panes at start; the kit still ships herdr (06 6.4 as written) |
+| T056 `layout` | deferred to M6 | `run` attaches a single pane through the minimal `julieta layout up` of T066; trigger: the first project whose daily work needs two panes at start; or the first release candidate; the kit still ships herdr (06 6.4 as written) |
 | T057 | folded into T035 | |
 | T058 | left v1 (unchanged) | the product has no import command in v1 |
 | T061, T062, T067, T068, T069, T070 | kept, M4 | after memory and snapshot exist |
@@ -636,157 +684,42 @@ its front matter.
 | T091 | folded into T102's acceptance | the catalog entries come from the locks in T031; the handover sitting folds into the release candidate |
 | T092 to T102 | deferred to M6 | release only; one pull request per record |
 | T103 | kept, M3 | a source build refuses `run` and `sync` |
-| T104 to T108, T111 to T119 | new | M0's five tasks; the sittings of M1 to M5 and the steps of the config repository they need, with a file here and no code; `README.md` |
-| T109 | removed | a dependency batch with no importer cannot pass `go mod tidy`; each dependency lands with its first importer, T051 or T053 (rule 7) |
+| T104 to T108, T111 to T119, T121 to T138 | new (T133, T134 and T136 deferred) | M0's tasks; the sittings of M1 to M5 and the steps of the config repository they need, with a file here and no code; `README.md`; the tasks the stage B pass added on 2026-10-12 |
+| T109 | removed | a dependency batch with no importer cannot pass `go mod tidy`; each dependency lands with its first importer, T125 or T053 (rule 7) |
 | T110, T120 | removed | their work is outside this repository, and no task of this plan waits on it |
 
 **The earlier checkpoints.** The earlier plan ended each of its phases
 in a checkpoint, C0 to C8, each a statement about `main`. The
-milestones take their place. A citation of "checkpoint C7", the
-checkpoint before the earlier plan's last build phase (the index's
-token-narrowing row, ADR 0009, the note on the maintainer block), reads
-as the end of M5, sitting M5: the last point before the release work of
-M6, which is what C7 marked. A citation of C4 in a kept task's earlier
+milestones take their place. A citation of C4 in a kept task's earlier
 text reads as the first slot of sitting M3.
 
 ## Traceability
 
-Each task file's Implements line cites the sections of the
-specification it builds, and its text names the success criteria,
-journeys and invariants it covers, by id. The traceability from a
-section, a criterion, a journey or an invariant to its tasks is read
-from the task files, not kept as a table here (rule 8):
-`grep -l 'I24' docs/plan/tasks/*.md` lists the tasks that name I24,
-and the same for `S8`, `J6` or `08 8.1`. `tools/ci plan` (T106)
-checks that every Implements entry cites an existing section, as the
-`sequences` row of 10 10.2 asks of the plan.
+Each task file's Implements line cites the requirement ids (12 12.11)
+it builds, each with its section as a reading aid, and its text names
+the success criteria, journeys and invariants it covers, by id. The
+traceability from a requirement, a criterion, a journey or an
+invariant to its tasks is read from the task files, not kept as a
+table here (rule 8): `grep -l REQ-0123 docs/plan/tasks/*.md` lists the
+tasks that implement that requirement, `grep -l 'I24'
+docs/plan/tasks/*.md` the tasks that name I24, and the same for `S8`
+or `J6`. `tools/ci reqs` checks both directions: every live id has a
+live or merged task, and every entry is a live id; `tools/ci plan`
+(T106) reads the field's shape.
 
 ## Spec sentences the re-plan amends
 
-The plan must not contradict the specification. Each item names the
-sentence as it stands, the conflict, and the wording proposed for T108,
-which carries the amendments with the re-plan record. Until T108
-lands, these are the only sentences this plan reads differently.
-
-1. **02 2.1**, "`plan.md` the build plan, as one page", and plan
-   question 1 (answered 2026-10-01). Conflict: one file per task.
-   Proposed, for T108 with the other amendments and once item 2 of the
-   open block is answered: the tree row names `plan.md` as the
-   narrative and `plan/tasks/` as one file per task with its checkbox.
-   Until then 02 2.1 stands as written, and this plan reads "as one
-   page" as the narrative plus the task files beside it.
-2. **12 12.2**, "Depends on is plan order between modules", and the
-   earlier plan's "a task depends only on ids below its own".
-   Conflict: rule 2. Proposed: "Depends on names the modules whose
-   code a module needs; a task records `needs` (data or interface) and
-   `after` (file overlap or review order), and the critical path counts
-   `needs`". Two sentences restate the one it amends and change with
-   it: the plan part of the `sequences` row of 10 10.2 ("in
-   `docs/plan.md`, task ids contiguous, each "Depends on" naming an
-   existing lower task id or block, and each "Implements" citing an
-   existing section") reads over the task files, with ids contiguous
-   across them, `needs` and `after` naming existing ids, and each
-   Implements line citing an existing section; and the Re-planning
-   paragraph of 12 12.2 ("the plan tasks whose "Implements" cites it")
-   names the task files whose Implements line cites the section.
-3. **12 12.2**, the build order (`probes` and block A first; the sync
-   slice before `julieta-core`, `handoff` and `salvage`; "Block A
-   settles every sbx fact the code depends on before `sbxdrv` and
-   `render` are finalized"), and **11 11.1**'s heading "first, in
-   parallel with the first build layer". Conflict: M1 before M3, block
-   A in M6. Proposed: the order of the milestones, and "block A is the
-   last word on every sbx fact: the facts arrive first from the
-   maintainer's daily use and from sitting M2, each marked with its
-   source, and block A re-measures them before the release candidate".
-4. **02 2.1** (the `tools/ci/`, `internal/cmd/` and `cli/` rows) and
-   **12 12.3** (the dispatcher-table generator rows and `tools/new
-   command`): "listed by a dispatcher table generated from those
-   packages", "the dispatcher table, generated from the command
-   packages", "the step dispatcher table of `tools/ci`", "edits no
-   shared file, since the dispatcher table is generated". Conflict:
-   rule 4. Proposed: "registered by file: each package's `init`
-   registers its definition, and one import file per command under
-   `cmd/<binary>/` links it in, so a new step or command adds files and
-   edits none"; the two generator rows are removed. The commands'
-   generated reference pages stay.
-5. **10 10.2**, the step table, one row per check. Conflict: rule 6
-   against "each check lands with its first input". Proposed: 10 10.2
-   keeps the rules (what `fast` and `all` mean, the ordering, the
-   meaning of the "In fast" column) and links `docs/reference/checks.md`,
-   generated from the registry by T105; plan question 25 (the derived
-   parts of the plan) closes with `tools/ci plan`.
-6. **10 10.3**, "Source of truth: block A records real `sbx <cmd>
-   --help` output and every argv/stdout/stderr/exit ...". Conflict:
-   rule 10. Proposed: add "until block A records them, the sessions are
-   written by hand from the pinned sbx's help text and marked
-   `synthetic: true`; `tools/ci probes` fails on a synthetic session
-   left at the release candidate; the tested window is the sbx version
-   the sessions were written for".
-7. **12 12.2**, the two smoke steps (after the sync slice with a spec
-   that names no product kit; after `run` with kits embedded).
-   Conflict: the kits exist before `sync` (M2), so the first smoke step
-   runs with kits, and the steps become the per-project slots of sitting M3.
-   Proposed: "the maintainer's own projects, one per sitting slot, are
-   the smoke steps, from a `--dry-run` build of `main`; the transcript
-   of each slot's commands and its `romeu status --json`, read by the
-   maintainer, are the Evidence of the next pull request; nothing is
-   committed under `docs/probes/`". The host suite (T075) is not what a
-   slot produces: it lands in M6.
-8. **05 5.3**, the copied surface list, and `docs/reference/ask-first.md`
-   in 12 12.3. Proposed: a link to `.github/ask-first.yaml` (T107,
-   which owns 05); the reference page row of 12 12.3 removed by T108,
-   which owns that page and comes after T107. Plus the surface additions
-   (`sbxdrv`; `skills/**` under `kits`; `catalog/egress/**`) and the
-   two narrowings of the open block, each an ask-first change.
-9. **12 12.2**, "`tools/ci sequences` checks its task ids and
-   citations", and the plan part of the `sequences` row of 10 10.2.
-   Reading: `tools/ci plan` checks the task files until `sequences`
-   lands, and the row's plan part then reads over `docs/plan/tasks/`
-   as amendment 2 says; the wording is T108's.
-10. **No change, readings recorded here**: a hand-written manifest
-    validates like a rendered one (03 3.6 names the format, not the
-    writer); `run` attaches a single pane while `layout` is absent
-    (04 4.2 step 7 dark); the `julieta` kit ships herdr as 06 6.4 says
-    even while `layout` is deferred (a pinned download, so no narrowing
-    of the kit row is needed); 08 8.2's hooks are wired by the interim
-    kit in the bridge period, which is outside the product; the
-    catalog's v1 entries come from the reference locks read in a
-    sandbox rather than from a handover sitting; `romeu adopt` stays in
-    04 4.2, marked deferred here; a citation of checkpoint C7 (the
-    index's token-narrowing row, ADR 0009, the note on the maintainer
-    block) reads as the end of M5, as
-    [The fate of each earlier task](#the-fate-of-each-earlier-task)
-    says; the definition of done of 10 10.8 is restated whole under
-    [How to read this plan](#how-to-read-this-plan).
-11. **12 12.3**, the ADR and lessons indexes and the `NNNN-` lesson
-    names: no change now; a deferred row.
-12. **12 12.2**, the `ci-bootstrap` row, and **10 10.2**, step 3 of
-    `ci-bootstrap`: "the day-one middleware: ... `tools/ci sequences`,
-    `tools/ci pr`, ... `ARCHITECTURE.md` and `CONTRIBUTING.md`
-    skeletons (first task)", "`pr` lands whole". Conflict: T004, T005
-    and T006 are deferred with triggers (the fate table). Proposed: the
-    day-one middleware of the first task is `tools/new adr`, the `go
-    generate` wiring with `tools/ci generated` and
-    `.github/ask-first.yaml`; `sequences`, `pr` (whole, when it lands)
-    and the two skeletons land by their triggers, before the release
-    candidate.
-13. **02 2.1**, the `internal/` tree. Conflict: the preflight of 01 1.5
-    is a package of its own, `internal/preflight/` (T046), which the
-    tree does not list, and the `catalog/` row, the top-level
-    `catalog/egress.yaml` row and the Embedding paragraph name
-    `catalog/egress.yaml`, which `catalog/egress/*.yaml` replaces
-    (rule 5). Proposed: a row for `internal/preflight/` (the ordered
-    checks of 01 1.5 before a mutating sbx call), the embed glob in
-    the `catalog/` row and in the Embedding paragraph, and a
-    `catalog/egress/` directory row (one file per tool family) in
-    place of the `catalog/egress.yaml` row.
-14. **10 10.1**, the E2E (container) row, "`e2e/container_test.go`".
-    Conflict: rule 1 gives each julieta command task its own e2e file,
-    so that no two unordered tasks append to one test file. Proposed:
-    "`e2e/container_test.go` is the harness entry; each julieta
-    command's cases live in `e2e/julieta_<command>_test.go` and each
-    kit's smoke cases in `e2e/kit_<name>_test.go`, in the same package
-    under the same tag".
+Every amendment the re-plan listed here was applied to the specification
+by T122 (ADR 0012, decided 2026-10-12); the specification and this plan
+read the same sentences, and T108 records the decisions. The readings
+that stay true live where they are used: a hand-written manifest
+validates like a rendered one (T111, T135); `run` attaches a single pane
+while `layout` is absent, through the minimal `julieta layout up` of
+T066, so I1's argv holds (T066); the `julieta` kit ships herdr (T077);
+the catalog's v1 entries come from the reference locks read in a sandbox
+(T102); `romeu adopt` stays in 04 4.2, deferred (T050); a sitting of 12
+12.4 is M0 to M5 (rule 13); the definition of done is linked (How to
+read this plan).
 
 ## What v1 leaves out
 
@@ -820,6 +753,10 @@ These rows meet a task of this plan:
 | a scheduled run of the pin-freshness check | T088 | the task builds the check and runs it once by hand |
 | how a local-gate run is recorded | each task | reopened the first time the maintainer chooses the local gates for a merge (10 10.2) |
 | what replaces the code-owner review | T005 | the task adds the first check that reads the approval line, which is the row's event |
+| `release.yml` taking its own file from `main` | T088 | the pull request decides it and closes the row |
+| a check that reads the rulesets again | T088 | its trigger |
+| required status checks without the administrator bypass | T126 | the acceptance of ADR 0011 |
+| the views of the plan as a command | T106 | `--critical-path` and `--ready` |
 
 ## Decisions this plan defers
 
@@ -832,24 +769,24 @@ per phase" fired and is gone.
 | Deferred | Until then | Reopened by |
 |---|---|---|
 | the recorder and the probe harness (T014, T018 to T020, T026 to T028, T082, T092, T093) | hand-written sessions marked `synthetic: true`; the maintainer's daily runs | a real-sbx behaviour the fake cannot model breaks a daily run; or the first release candidate |
-| the approval-line check (`tools/ci approvals`, a small task apart from the `pr` job) | the maintainer's eyes at merge; the grant file as a recorded intent | the first grant written for a milestone with parallel lanes (sitting M0 writes M1's, rule 13, and reads this row then); or the first merged pull request missing an approval line it needed |
-| `tools/ci pr` sections, the Middleware and Lessons fields, the `Fixes-release:` trailer (T005) | the sections are read in review | the first merged pull request missing a section the review wanted; or the release candidate |
+| the approval-line and grant part of `tools/ci pr`, run in the base-defined pr job of 12 12.4 (the first slice of T005) | the maintainer's eyes at merge; the grant file as a recorded intent | the first grant written for a milestone with parallel lanes (sitting M0 writes M1's, rule 13, and reads this row then); or the first merged pull request missing an approval line it needed |
+| `tools/ci pr` sections, the Middleware and Lessons fields, the `Fixes-release:` trailer (T005) | the sections are read in review | the first merged pull request missing a section the review wanted; or before the first release-candidate tag |
 | `sequences`, `lessons`, `docs`, `vocabulary` (T004, T006, T011, T085, T086) | `tools/new adr`, `tools/ci plan` and review | a duplicate id or one-way supersede link found in review; the first outside contributor |
-| the `invariant` kind, `tools/ci invariants` and `mutate` | tags written by hand; `tools/mutants` by hand on a security invariant | the first invariant whose guard has code and whose test could be green by omission, found in review; or the release candidate |
-| `layout` and the attach to it (T056) | `run` attaches a single pane; the kit ships herdr | the first project whose daily work needs two panes at start |
-| `romeu adopt` (T050) | the preflight refuses a sandbox romeu has no generation for; the maintainer removes it by hand | the first host-state loss, or the first sandbox created outside romeu that must be kept |
-| `doctor` and preflight breadth | the I-level rows and the rows J1 needs | the first incident a missing row would have caught; or the release candidate |
+| the `invariant` kind, `tools/ci invariants` and `mutate` (T133) | tags written by hand; `tools/mutants` by hand on a security invariant | the first invariant whose guard has code and whose test could be green by omission, found in review; or the release candidate |
+| `layout` and the attach to it (T056) | `run` attaches a single pane; the kit ships herdr | the first project whose daily work needs two panes at start; or the first release candidate |
+| `romeu adopt` (T050) | the preflight refuses a sandbox romeu has no generation for; the maintainer removes it by hand | the first host-state loss, or the first sandbox created outside romeu that must be kept; or the first release candidate |
+| `doctor` and preflight breadth (T134) | the I-level rows and the rows J1 needs | the first incident a missing row would have caught; or the release candidate |
 | the host suite and the remaining scenario functions (T075) | the CI journeys with the fake | the release candidate |
 | release tooling, attestations, notices, `pins`, `acceptance`, `links`, `fuzz.yml`, guides, root docs, `SECURITY.md` (T084 to T088, T090, T094, T095, T102) | `go build` and the `--dry-run` build on the host | the first adopter other than the maintainer; or the maintainer's environments all on the new tools |
 | the decision records of review rounds 2 to 6 and of the settled questions (T096 to T101) | the review files hold the decisions | the release candidate; or one record when its decision is first touched by code |
 | deriving `merged` from merged pull requests | the tick in the task file | the first task file whose `merged` disagrees with the merged pull requests |
-| the views of the plan (ready list, critical path, traceability) as a command | `grep`, `ls` and review; `tools/ci plan` validates | the first time the critical path is asked for in a review |
-| one file per deferred-decision row | the tables of `docs/spec.md` | two open pull requests conflict on the table twice |
+| one file per deferred-decision row | the tables of `docs/spec.md` and the retired-requirements table of 12 12.11 | two open pull requests conflict on one of them twice |
 | removing the generated ADR index; lessons by date-slug | the index as today, with 12 12.3's merge rule | two concurrent ADR pull requests conflict on it twice |
 | moving the volatile rows of 10 10.2 and 12 12.1 into package docs; splitting `10-testing-style.md` by section | the pages thinned by T108 | two open pull requests conflict on either page after T108 |
 | a check that a code pull request to a check touches no spec page | the rule in this page | the first such pull request found in review |
+| a check that fails a diff changing the mise pin unless `miseFiles` of the mise package was re-measured in the same pull request | the sentence of 05 5.3 and review | the first mise pin bump merged without the re-measure named in its Evidence |
 | the four-runner matrix on every pull request | kept | the median pull request wall time passes 20 minutes over one month, or the Actions quota runs out |
-| a Go port of the names gate of the config repository | the script as it is | the first change it needs |
+| a Go port of the names gate of the config repository | the script as it is | closes when T112 takes the first mechanism of item 18 of the open block (each guarded repository runs the hygiene check from its tracked hook); stays with the second |
 | the interim personal kit of the bridge (T111) | it installs the hooks and skills into every daily sandbox | T079 and T114 merged: then it is removed |
 | `os-base` | absent | the first real `julieta` kit build shows a missing package (sitting M2) |
 | the live secret path (`apply:"live"`, T047 timing) | recreate-class | the first secret rotation that costs an unwanted recreate |
@@ -871,11 +808,12 @@ why it is proposed and what reopens it.
 |---|---|---|---|
 | uncommitted work lost to a recreate before salvage exists | the wave of sitting M2 and the slots of sitting M3, until M4 | the window has no salvage, narrowed by `julieta snapshot` from M1 and by `/handoff --final` plus push per slot | the first uncommitted change lost to a recreate: T068 then moves ahead of any remaining M3 task |
 | the bridge's hand-written manifest and mounts are the "remember" pattern | M1 to sitting M3 | one committed runbook per project in the config repository with the undo of each step; `julieta status` prints the manifest's repos, so a drift is read at sitting M1 | sitting M3 writes every manifest through `sync` |
-| the signing rule (I34) is enforced by no code while the `git-ssh-sign` kit is in daily use before T080 | M2 to T080 (M3) | the host socket is the dedicated signing-only agent loaded with `ssh-add -c`, so each signature asks for confirmation, and T115 reads `ssh-add -L` in every recreated sandbox: exactly one key, the signing key | T080 lands; or a sandbox whose `ssh-add -L` lists more than one key |
-| a checkpoint grant is read by no check until `tools/ci pr` lands | the first grant (sitting M0) to T005 (M6) | the approval line on each pull request stays the record, and the grant file is a reviewed diff on the `ask-first` surface | T005 lands; or a merged pull request whose grant matched no approval line |
+| the signing rule (I34) is enforced by no code while the `git-ssh-sign` kit is in daily use before T080: accepted by name in 05 5.4, the row "I34 is enforced by no code" | M2 to T080 (M3) | as 05 5.4 says; the outcome of an unanswered confirmation is read at sitting M2 (T115) and named here with the away window it covers | T080 lands; or a sandbox whose `ssh-add -L` lists more than one key |
+| a grant is read by no check until `tools/ci pr` lands: accepted by name in 05 5.4, the row "no check reads the approval line or a checkpoint grant" | the first grant (sitting M0) to T005 (M6) | as 05 5.4 says | T005 lands; or a merged pull request whose grant matched no approval line |
 | hand-written sbx sessions diverge from the real binary | until the harness (M6) | the maintainer runs the real binary daily from sitting M3; a divergence is a one-line session fix | the harness's trigger above |
 | the facts of sitting M2 drive `oci`, `kits` and the signing kit by hand | M2, M3 | each fact is a fixture marked `source: sitting M2`, re-measured by block A in M6 with the version rule | a changed fact is a re-probe, as the pin file's rule says today |
-| the security invariants' tooling (tag pairing, mutate) is thinner than the earlier plan's until M6 | all | the guards themselves (I3, I5, I6, I7, I8, I12, I24, I27, I29, I30) land with their packages and are never narrowed; the I-level cases sit in the task that lands the code, never in a breadth task | a reviewer finds an untested guard before M6: a tag-pairing check is one small task |
+| the security invariants' tooling (tag pairing, mutate, the `pr` rule that a pull request removes no last guard or test tag) is thinner than the earlier plan's until M6: accepted by name in 05 5.4, the row "the invariant tag pairing and `mutate` land in M6" | all | as 05 5.4 says; the I-level cases sit in the task that lands the code, never in a breadth task | a reviewer finds an untested guard before M6: a tag-pairing check is one small task |
+| the forbidden-name check over PR titles and bodies runs from no check of this repository | M0 to T005's first slice | the hook checks commits and ref names; the agents' own pre-PR gate checks the text before opening | the first title or body found holding a denylisted name |
 
 ## Decisions open at the re-plan
 
@@ -885,33 +823,48 @@ recorded as decided until it is answered, and the answer is recorded
 in T108's decision record and here as "decided on" with the date.
 
 1. **Registration by file** in place of generated dispatcher tables
-   (amendment 4), for `tools/ci` steps and commands. Needed before M0.
+   for `tools/ci` steps and commands. Needed before M0.
    Recommended: yes. Fallback: the specification as written, sorted
    generated tables with regenerate-on-merge; T105 then still splits
-   the packages.
+   the packages. Applied in the specification by T122 on 2026-10-12
+   under decision (c) of that day; an answer other than yes reverts
+   the amendment to T108's list.
 2. **The plan's shape**: `docs/plan.md` plus `docs/plan/tasks/`, the
-   checklist in the task files, `tools/ci plan` in `fast` (amendment
-   1). Needed before M0. Recommended: yes. It reopens plan question 1,
-   answered 2026-10-01.
-3. **Build order amended** (amendments 2, 3 and 7): julieta's daily
-   commands and the kits before `sync`; block A as the last word, in
-   M6; the smoke steps as per-project slots. Needed before M1.
-   Recommended: yes. Fallback: block A as one two-host sitting before
-   M3's lane B (about 2.5 hours on the critical path).
+   checklist in the task files, `tools/ci plan` in `fast`. Needed
+   before M0. Recommended: yes. It reopens plan question 1, answered
+   2026-10-01. Applied in the specification by T122 on 2026-10-12
+   under decision (c) of that day; an answer other than yes reverts
+   the amendment to T108's list.
+3. **Build order amended**: julieta's daily commands and the kits
+   before `sync`; block A as the last word, in M6; the smoke steps as
+   per-project slots. Needed before M1. Recommended: yes. Fallback:
+   block A as one two-host sitting before M3's lane B (about 2.5 hours
+   on the critical path). Applied in the specification by T122 on
+   2026-10-12 under decision (c) of that day; an answer other than yes
+   reverts the amendment to T108's list.
 4. **Hand-written sbx sessions marked `synthetic: true`** until the
-   harness records them (amendment 6); no recorder before the harness.
-   Needed before M3. Recommended: yes. Alternative: a recorder seam in
-   `sbxdrv` with the redaction package landed early; declined here for
-   the irreversible-harm reason of rule 10.
-5. **The check list as a generated page** linked from 10 10.2
-   (amendment 5). Needed before M0's T105 emits it. Recommended: yes.
+   harness records them; no recorder before the harness. Needed before
+   M3. Recommended: yes. Alternative: a recorder seam in `sbxdrv` with
+   the redaction package landed early; declined here for the
+   irreversible-harm reason of rule 10. Applied in the specification
+   by T122 on 2026-10-12 under decision (c) of that day; an answer
+   other than yes reverts the amendment to T108's list.
+5. **The check inventory as a generated page** linked from 10 10.2,
+   beside its step table. Needed before M0's T105 emits it.
+   Recommended: yes. Applied in the specification by T122 on
+   2026-10-12 under decision (c) of that day; an answer other than yes
+   reverts the amendment to T108's list.
 6. **The bridge is outside the product** (rule 9): recorded in the
    config repo's runbook, never in a spec section. Needed before sitting M1.
-   Recommended: yes.
+   Recommended: yes. Applied in the specification by T122 on
+   2026-10-12 under decision (c) of that day; an answer other than yes
+   reverts the amendment to T108's list.
 7. **The order of M3 and M4**: render and run before salvage, with the
    accepted risk above; or M4 before the slots of sitting M3, which delays
    M3's value by M4's tasks. Needed before sitting M3. Recommended: as
-   proposed.
+   proposed. Applied in the specification by T122 on 2026-10-12 under
+   decision (c) of that day; an answer other than yes reverts the
+   amendment to T108's list.
 8. **Narrow `checks`** to the runner and the security-relevant packages
    (`tools/ci/*.go`, `tools/ci/denylist.yaml`, `.githooks/**`,
    `.golangci.yml`,
@@ -927,9 +880,50 @@ in T108's decision record and here as "decided on" with the date.
     the sitting that opens it (rule 13). Needed before sitting M0.
     Recommended: write the M0 and M1 grants at sitting M0.
 11. **The surfaces**: add `sbxdrv`, put `skills/**` under `kits`
-    (R8-05-3), replace `catalog/egress.yaml` by `catalog/egress/**`,
+    (R8-05-3), replace `catalog/egress.yaml` by `internal/catalog/**`,
     leave `ledger` while its row is deferred. Needed before T107 (M0).
     Recommended: yes, in T107.
+12. **The merge cadence for a parallel plan.** Needed before M0's lanes
+    open. Options: (a) two merge sittings a day while lanes run; (b) a
+    merge sitting whenever three green pull requests wait, read from
+    `tools/ci plan --ready`; (c) the reopened deferred decision now.
+    Recommended: (b) until the token is narrowed.
+13. **One mutation mechanism.** `tools/ci mutate` runs `tools/mutants`
+    over one committed entry per guard; the alternative is an ADR that
+    records `tools/mutants` as interim. Recommended: the first.
+14. **The PreToolUse guard.** Keep, with `julieta hooks guard` defined
+    in 04 4.3; the alternative is a deferral row with the trigger of the
+    first refusal a sitting shows missing. Recommended: keep.
+15. **`tools/ci pins`.** Keep (answered 2026-10-08); the alternative is
+    a deferral. Recommended: keep.
+16. **The lint set.** Needed before T105's lint split. Option A:
+    `errorlint`, `usetesting`, `thelper`, `forbidigo` with the
+    Boundaries patterns (`fmt.Print*`, `os.Stdout`, `os.Stderr`, `log.`,
+    `text/template`, `exec.Command(` and `"sh", "-c"` outside the
+    packages 04 4.1 names) and revive `package-comments`; option B: A
+    plus `noctx`, `contextcheck`, `modernize` and `gosec`, whose G204
+    flags every `exec.Command` with variable arguments in `tools/ci`
+    (restructuring frozen code); each linter with its fixture; and,
+    under either, a `tidy` rule of `generated` (`go mod tidy` changes
+    neither `go.mod` nor `go.sum`). Recommended: A with the `tidy` rule.
+17. **The id-less error chain.** Needed before T008. An `internal` row
+    (`RJ-348`, exit 1, hint: open an issue with the details) or a panic.
+    Recommended: the row (applied provisionally in 04 4.4 and 10 10.1).
+18. **The names-gate mechanism of the config repository.** Needed before
+    sitting M1. (a) each guarded repository carries its hashed denylist
+    and runs the hygiene check from its tracked pre-push hook, which
+    needs the check runnable outside this repository (a `checks` change
+    with its approval line); (b) the config repository as a secondary
+    clone of every project (02 2.6), its plain list cloned into every
+    sandbox. Recommended: (a).
+19. **The open-items cut-over.** Needed before sitting M1. At T119 (M5,
+    the plan's choice: the one-off entry runs after the store's last
+    writer is gone) or at T111 (M1). Recommended: T119.
+20. **The render types slice.** Needed at the sitting that opens M3: a
+    slice T139 `render: the candidate and render.json types` that lets
+    T037, T038 and T039 land in parallel (two links off lane B, measured
+    in the stage B pass) against one interface with one implementation;
+    or the three in sequence as planned. Decided at that sitting.
 
 ## Questions for the maintainer
 
@@ -1035,21 +1029,21 @@ column.
 | # | Section | What we found | Reading taken here |
 |---|---|---|---|
 | 14 | 12 12.2, 02 2.1 | the map names no owner for `e2e/fakesbx`, `e2e/scenarios`, `internal/shquote` and `examples/` | `probes`, `romeu-cli`, `render` and `spec` |
-| 15 | 12 12.2, 12 12.3 | `tools/schemagen` is under `spec`, and `probes`, which comes first and depends on nothing, needs `probe-result.v1` | the generator lands with its first input (12 12.2): in the new order that is the manifest, so T051 (M1) lands `tools/schemagen` and `tools/ci schema`, T035 and T059 generate through them, and T021 (M3) adds its two types; the harness (T014, M6) reads it from there |
+| 15 | 12 12.2, 12 12.3 | `tools/schemagen` is under `spec`, and `probes`, which comes first and depends on nothing, needs `probe-result.v1` | T125 lands the generator with a fixture type and the check, T135 the first schema under `schemas/`, before T021 and T051; T035 and T059 generate through them, and T021 (M3) adds its two types; the harness (T014, M6) reads it from there |
 | 16 | 11 (opening), 10 10.2 | "the first plan task can pass `tools/ci all` before any host run" is said of the probe harness, and the first plan task is `ci-bootstrap`; wording only | the harness is the first task of its module |
 | 17 | 12 12.2, 11 11.2 | the `probes` row comes first in the build order, and the block B and sandbox-side definitions need the kits, the host suite and the release tooling's candidate | T082, after the kits and before the candidate tag |
 | 18 | 12 12.3, S10 | S10 asks for a generated reference page per file format, and the generator table has a row for `project.md` and `runtime-event.md` only | one generator, landed in T051 (gap 15), fed by each schema task |
 | 19 | 12 12.10, 13, 02 2.1, 03 (opening) | 03 says each format has a schema in `schemas/`; `dora.v1`, `ledger-entry/v1` and the view files belong to designs that v1 defers (12 12.10, 13) | no schema is planned for them until they are built |
 | 20 | 12 12.7, 12 12.2 | `docs/lessons/` and the `lesson` kind have no owning module, and each pull request has a Lessons section from T005 on | the directory, its generated index, the kind and the check land in T006 |
 | 21 | S4, 03 3.5, 02 2.2, 12 12.1 | 02 2.2 names the reference instance. What a task lacks is access to it and a Linux place to run julieta, which has no darwin build | from M3 on, each project's own sandbox at sitting M3; blocks O4 and O5 for the candidate |
-| 22 | 06 6.1, 06 6.4, 02 2.1 | `tools/kitpin` has subcommands for the frontend, mise and herdr, and none for the workload digest that A12 and the container e2e read | the workload entry of the pin file is written by hand in T012 |
+| 22 | 06 6.1, 06 6.4, 02 2.1 | `tools/kitpin` has subcommands for the frontend, mise and herdr, and none for the workload digest that A12 and the container e2e read | settled by the specification at 1e63d6a: 06 6.2 and 02 2.1 name `tools/kitpin workload <digest>`, which T012 builds |
 | 23 | 11 11.1 (A5), 03 3.3, 12 12.2 | A5 runs `sbx env plan` on the `sbxenv.yaml` goldens and records their hashes, and `render`, which owns the goldens, comes after block A in the build order; 03 3.3 already calls the goldens "probe-confirmed" | the goldens are written with `render` (T037) and hashed by A5 when it runs (T019, M6); until then they are confirmed by the maintainer's daily use (rule 10) |
-| 24 | 10 10.3, 11 11.1 (A4), 04 4.2 | the fake `sbx` refuses a shape that is in no recording, and no table says which shapes and which starting sessions block A must record; A4 lists `-it` forms of `sbx env exec`, and `run` steps 5 and 6 use the non-interactive form | the sessions are written by hand with each task whose end-to-end tests call the fake (T029), and the table of 11 11.1 (Recorded sessions) is derived from them when T019 lands, with A4 recording both forms |
+| 24 | 10 10.3, 11 11.1 (A4), 04 4.2 | the fake `sbx` refuses a shape that is in no recording, and no table says which shapes and which starting sessions block A must record; A4 lists `-it` forms of `sbx env exec`, and `run` steps 5 and 6 use the non-interactive form | settled by the specification at 1e63d6a: A4's definition records the two non-interactive `sbx env exec` shapes of 04 4.2 beside the `-it` forms, and the table of 11 11.1 (Recorded sessions) lists the shapes; the sessions are written by hand with each task whose end-to-end tests call the fake (T029) |
 | 25 | 12 12.3, 10 10.2 | the earlier plan page had derived parts (counts, block lists, traceability rows) and no generator row or check | proposed to close with the re-plan (item 2 of the open block): the derived parts are gone from this page, and `tools/ci plan` (T106) validates the task files |
-| 26 | 09 (opening), 09 (J12) | the opening of 09 says J12 runs J1 steps 3 to 6, and the J12 section says steps 1 to 5 | T075 follows the opening; the two sentences could agree |
+| 26 | 09 (opening), 09 (J12) | the opening of 09 says J12 runs J1 steps 3 to 6, and the J12 section says steps 1 to 5 | settled by the specification at 1e63d6a: the opening and the J12 section agree on J1 steps 3 to 5 and J12 step 2; T075 follows them |
 | 27 | 12 12.8, 12 12.3, ADR 0001 rule 17 | the state-machine diagrams of `ARCHITECTURE.md` are generated, and the page is hand-written; ADR 0001 rejected, among its alternatives, a generator that injects text between markers in a page people edit | T033 writes each diagram as a generated file of its own that `ARCHITECTURE.md` links to; nothing is injected into the page |
 | 28 | 05 5.3, 10 10.2 (the `mutate` step), 05 5.2 | the I4, I25 and I8 guards live in `sbxdrv`, `fakesbx` and `render`, which are on no ask-first surface, so `mutate` runs on a pull request that changes only them when the scheduled `fuzz.yml` next runs it | no plan change; `fuzz.yml` runs `mutate` over everything (10 10.2), and 05 5.3 could list those packages; `sbxdrv` joins the surfaces in T107 |
 | 29 | 10 10.2 (the `pr` step; the personal-path rule) | the personal absolute path rule runs in `hygiene` over tracked files, and `pr` does not read a pull request's body for one; text pasted under Evidence meets the forbidden-name check and the prose rules only | the operator blocks paste only files the harness wrote through its redaction, and the maintainer reads the rest first; extending `pr` to that rule is a change to 10 10.2 |
-| 30 | 01 1.4, 05 5.2 (I7), 12 12.3 | the render digest strips every field without a `gate:"widening"` tag, so a new field whose tag is forgotten is left out of the gate, and the flip table passes | T021 keeps a committed list of the untagged fields and the generator fails on a field on neither; 01 1.4 could name that list |
+| 30 | 01 1.4, 05 5.2 (I7), 12 12.3 | the render digest strips every field without a `gate:"widening"` tag, so a new field whose tag is forgotten is left out of the gate, and the flip table passes | settled by the specification at 1e63d6a: 01 1.4 names the committed list of the untagged fields, which T021 keeps, and the generator fails on a field on neither |
 | 31 | 11 11.4, 10 10.4 | a golden with no recorded hash is not flagged, so after an A5 result exists a golden added later passes `probes` without a probe | A5's definition hashes every file under `internal/render/testdata/` (T019), so none lacks a hash at T026; a golden added later is a re-probe, as the pin file's comment (T012) says of a pin. No check is added |
 | 32 | 10 10.5, 11 11.2, 12 12.2 | `tools/ci acceptance --pre-tag` is run by hand before a tag that cannot be redone | settled by the specification: it is step 3 of the release checklist of 12 12.2, outside `release.yml`, and a check that fails after the tag is fixed by a patch release |

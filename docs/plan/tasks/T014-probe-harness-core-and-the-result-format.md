@@ -6,7 +6,8 @@ module: probes
 fate: deferred
 owns: []
 needs:
-  - T006
+  - T105
+  - T125
 after: []
 ask_first:
   - checks
@@ -21,11 +22,21 @@ recorder, after the redaction package has its unit tests; until then the
 fake replays sessions written by hand (T029). Reopened by: a real-sbx
 behaviour the fake cannot model breaks a daily run; or the first release
 candidate. The text below is the one written before the re-plan; `needs`
-lists its earlier dependencies with a folded id replaced by the id that
-absorbed it, and `owns` is written when the task reopens.
+names the tasks it reads code from today (the registry of T105, the
+schema generator of T125), and `owns` is written when the task reopens.
 
-- Implements: 11 (opening), 11 11.3, 12 12.3 (the `probe` kind), 10 10.1
-  (Schema), 03 (opening).
+- Implements: REQ-0733 (10 10.1), REQ-0734 (10 10.1), REQ-0750 (10
+  10.1), REQ-0752 (10 10.1), REQ-0753 (10 10.1), REQ-0754 (10 10.1),
+  REQ-0755 (10 10.1), REQ-0756 (10 10.1), REQ-0757 (10 10.1), REQ-0758
+  (10 10.1), REQ-0759 (10 10.1), REQ-0760 (10 10.1), REQ-0761 (10 10.1),
+  REQ-0762 (10 10.1), REQ-0763 (10 10.1), REQ-0764 (10 10.1), REQ-0765
+  (10 10.1), REQ-0766 (10 10.1), REQ-0767 (10 10.1), REQ-0768 (10 10.1),
+  REQ-0769 (10 10.1), REQ-0770 (10 10.1), REQ-0771 (10 10.1), REQ-0772
+  (10 10.1), REQ-0773 (10 10.1), REQ-0774 (10 10.1), REQ-0935 (10 10.3),
+  REQ-0976 (11 (opening)), REQ-0978 (11 (opening)), REQ-1021 (11 11.3),
+  REQ-1022 (11 11.3), REQ-1023 (11 11.3), REQ-1024 (11 11.3), REQ-1025
+  (11 11.3), REQ-1041 (12 12.1), REQ-1044 (12 12.1), REQ-1079 (12 12.2),
+  REQ-1085 (12 12.2), REQ-1119 (12 12.3), REQ-1122 (12 12.3).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: `checks`, `dependencies`
   (the JSON Schema validator of 12 12.1).
@@ -41,4 +52,12 @@ absorbed it, and `owns` is written when the task reopens.
   - `<host>` in a result's file name (`docs/probes/<id>-<host>.json`) is
     `<os>-<arch>`, never the host's name; that reading is the plan's
     addition.
+  - `host.upstream` holds, for each probe the 11.4 table lists under a
+    pin, that pin's version or digest, and `agent` for C3 and C5; empty
+    otherwise.
+  - A block A result at an sbx version above the floor is written to
+    `docs/probes/<id>-<host>-<sbxVersion>.json` beside the floor's.
+  - A `check` records each value its predicate evaluated as an
+    observation, through the redaction, and a test recomputes the
+    verdict from the file.
 - Verify: `go test ./e2e/probes/...`; `go run ./tools/ci schema`.

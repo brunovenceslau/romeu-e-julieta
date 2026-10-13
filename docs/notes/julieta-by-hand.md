@@ -43,7 +43,8 @@ that period:
 - each project definition gains the three edits above, and a runbook in
   the maintainer's config repository records each edit with its undo
   (plan task T111);
-- an interim personal kit, in the format the pinned frontend accepts,
+- an interim personal kit, in the kit format the daily sandboxes accept
+  today,
   installs the SessionStart and SessionEnd hook lines of
   [08 8.2](../spec/08-memory-handoff-salvage.md), each as a wrapper
   that exits 0 when the bin mount is absent, and pins the two skills of

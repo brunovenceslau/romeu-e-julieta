@@ -17,12 +17,16 @@ sitting: none
 
 Re-plan (2026-10-12): deferred to M6; checks before the documents exist.
 Reopened by: the first outside contributor; or the first release
-candidate. The text below is the one written before the re-plan; `needs`
-lists its earlier dependencies with a folded id replaced by the id that
-absorbed it, and `owns` is written when the task reopens.
+candidate. The issue forms of 12 12.7 are T124's. The text below is the
+one written before the re-plan; `needs` lists its earlier dependencies
+with a folded id replaced by the id that absorbed it, and `owns` is
+written when the task reopens.
 
-- Implements: 12 12.8 (outlines), 12 12.7, 12 12.3 (the `lesson` kind),
-  10 10.2 (the `lessons` and `docs` steps), ADR 0001 rules 1 and 5.
+- Implements: REQ-0023 (index), REQ-0123 (02 2.1), REQ-0850 (10 10.2),
+  REQ-0853 (10 10.2), REQ-1083 (12 12.2), REQ-1084 (12 12.2), REQ-1085
+  (12 12.2), REQ-1114 (12 12.3), REQ-1119 (12 12.3), REQ-1125 (12 12.3),
+  REQ-1166 (12 12.5), REQ-1181 (12 12.7), REQ-1184 (12 12.8), REQ-1185
+  (12 12.8).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: `checks`.
 - Acceptance:
@@ -45,6 +49,10 @@ absorbed it, and `owns` is written when the task reopens.
     the pages under `docs/spec/` move to front matter in this change
     (ADR 0001, Consequences). The rest of the step lands in T085 and
     T086.
+  - `docs/notes/*.md` pass rule 1, and the first ADR mentions of the
+    task files take the link form or the rule 9 matcher skips
+    `docs/plan/tasks/` (ADR 0012 exempts the task files from rule 1:
+    they have their own schema, checked by `tools/ci plan`).
 - Verify: `go test ./tools/ci/... -run '^Test(Lessons|Docs)'`, which
   runs the fixture lines; `go run ./tools/ci lessons`; `go run
   ./tools/ci docs`; `go run ./tools/ci generated`; `go test

@@ -23,8 +23,11 @@ No file of this repository: the work lands in the maintainer's config
 repository, and this file is its record and its checkbox. The kit and
 its plugin pins are an ask-first change there, under that repository's
 own rules, since they enter every sandbox (rule 9 of `docs/plan.md`).
+The pull request whose Evidence carries sitting M2's output names this
+task in its body and writes `merged:` and `pr:` into this file, the one
+write rule 1 allows outside its own file.
 
-- Implements: 06 6.5.
+- Implements: REQ-0608 (06 6.5).
 - Operator: builds a daily sandbox with it.
 - Acceptance:
   - A daily sandbox built with it and `julieta-claude` delivers the
@@ -32,8 +35,8 @@ own rules, since they enter every sandbox (rule 9 of `docs/plan.md`).
     the status line and themes, and the context-usage tools.
   - The settings merge keeps the hooks and the plugins of
     `julieta-claude` (06 6.5).
-- Verify: one daily sandbox, read at sitting M2: its SessionStart
-  output shows the instructions and the status line, `julieta status
-  --json` reports no `agent-hooks-missing`, and the plugin list shows
-  the pinned versions; a test push on a throwaway branch from that
-  sandbox; the hook output names both hooks.
+- Verify: one daily sandbox, read at sitting M2: its SessionStart output
+  shows the instructions and the status line, `julieta status --json`
+  reports no `agent-hooks-missing`, and the plugin list shows the pinned
+  versions; a test push on a throwaway branch from that sandbox; the
+  hook output names both hooks.

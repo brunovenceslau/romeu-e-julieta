@@ -19,7 +19,15 @@ pr: 19
 Merged on 2026-10-08 in pull request #19. The text below is the one
 written before the re-plan.
 
-- Implements: 05 5.3, 12 12.3, 10 10.2 (step 3; the `generated` step).
+- Implements: REQ-0021 (index), REQ-0025 (index), REQ-0030 (index),
+  REQ-0046 (01 1.2), REQ-0125 (02 2.1), REQ-0126 (02 2.1), REQ-0535 (05
+  5.3), REQ-0539 (05 5.3), REQ-0543 (05 5.3), REQ-0822 (10 10.2),
+  REQ-0865 (10 10.2), REQ-0915 (10 10.2), REQ-1049 (12 12.1), REQ-1079
+  (12 12.2), REQ-1083 (12 12.2), REQ-1102 (12 12.3), REQ-1103 (12 12.3),
+  REQ-1111 (12 12.3), REQ-1114 (12 12.3), REQ-1116 (12 12.3), REQ-1118
+  (12 12.3), REQ-1119 (12 12.3), REQ-1120 (12 12.3), REQ-1131 (12 12.4),
+  REQ-1143 (12 12.4), REQ-1158 (12 12.4), REQ-1179 (12 12.7), REQ-1195
+  (12 12.9).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: none exists before this
   task.

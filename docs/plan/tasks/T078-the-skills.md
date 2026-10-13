@@ -24,13 +24,22 @@ that every command a skill names is registered.
 Re-plan (2026-10-12): Kept, in M1: sitting M1 needs the skills.
 `skills/**` joins the `kits` surface in T107.
 
-- Implements: 02 2.1 (`skills/`), 08 8.1, 08 8.3.
+- Implements: REQ-0544 (05 5.3), REQ-0604 (06 6.4), REQ-0660 (08 8.1),
+  REQ-0662 (08 8.1), REQ-0676 (08 8.3), REQ-0852 (10 10.2), REQ-1115 (12
+  12.3).
 - Operator: no.
 - Acceptance:
   - `skills/julieta/SKILL.md` tells the agent to use `julieta memory`
     and to tag a lesson; `skills/handoff/SKILL.md` pipes the required
     headings to `julieta handoff write [--final]`.
-  - A test checks that each `julieta` command a skill names exists in
-    the command definitions.
+  - `skills/julieta/SKILL.md` tells the agent, when signing a commit
+    fails or waits on a confirmation that does not come, to ask the
+    operator and never to unset `commit.gpgsign` or sign another way
+    **[review]**.
+  - One test fails when a julieta command or flag named in a SKILL.md is
+    not in the command definitions, or when the headings
+    `skills/handoff/SKILL.md` names for a kind differ from those
+    `julieta handoff write` requires for it; fixtures: an unknown flag,
+    a missing heading, an extra heading (12 12.3).
 - Verify: `go test ./... -run '^TestSkills'`, which lists that test by
   name.

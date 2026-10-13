@@ -14,10 +14,10 @@ sitting: none
 
 # T045 - `romeu sync` without a terminal
 
-Re-plan (2026-10-12): folded into T043, which carries its acceptance
-rows. This file keeps the id so that earlier citations resolve; the text
-below is the one written before the re-plan, and T043 is where it is
-built.
+Re-plan (2026-10-12): folded into T043; its rows are copied into T043's
+Acceptance. This file keeps the id so that earlier citations resolve;
+the text below is the one written before the re-plan, and T043 is where
+it is built.
 
 - Implements: 04 4.2 (`sync`), 01 1.6 ("Candidate"), 09 (J11, step 5),
   05 5.2 (I7).

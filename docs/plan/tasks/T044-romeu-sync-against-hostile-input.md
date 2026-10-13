@@ -15,17 +15,17 @@ sitting: none
 
 # T044 - `romeu sync` against hostile input
 
-Re-plan (2026-10-12): deferred to M6; the I-level hostile cases ride in
-T038 (the hostile trees of I27) and T043 (the hostile input of `sync`);
-the breadth waits for a consumer. Reopened by: a hostile-input case
-outside the I-level set that a daily run or a review asks for; or the
-first release candidate. The text below is the one written before the
-re-plan; `needs` lists its earlier dependencies with a folded id
-replaced by the id that absorbed it, and `owns` is written when the task
-reopens.
+Re-plan (2026-10-12): deferred to M6; the four I-level rows below ride
+in T043 (the memory directory, the hostile kit on the macOS runners, the
+hostile bundle, the I28 flip), and the unit table of the hostile trees
+is T024's; the breadth waits for a consumer. Reopened by: a
+hostile-input case outside the I-level set that a daily run or a review
+asks for; or the first release candidate. The text below is the one
+written before the re-plan; `needs` lists its earlier dependencies with
+a folded id replaced by the id that absorbed it, and `owns` is written
+when the task reopens.
 
-- Implements: 04 4.2 (`sync` steps 5 and 6), 05 5.1, 05 5.2 (I12, I24,
-  I27, I28).
+- Implements: REQ-0340 (04 4.2), REQ-0495 (05 5.2), REQ-0512 (05 5.2).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: none expected.
 - Acceptance:

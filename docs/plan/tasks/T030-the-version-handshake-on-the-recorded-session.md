@@ -4,7 +4,7 @@ title: "The version handshake, on the recorded session"
 milestone: none
 module: romeu-cli
 fate: folded
-absorbed_by: T066
+absorbed_by: T026
 owns: []
 needs: []
 after: []
@@ -14,10 +14,10 @@ sitting: none
 
 # T030 - The version handshake, on the recorded session
 
-Re-plan (2026-10-12): folded into T066, which carries its acceptance
-rows. This file keeps the id so that earlier citations resolve; the text
-below is the one written before the re-plan, and T066 is where it is
-built.
+Re-plan (2026-10-12): folded; its rows are copied into T026's
+Acceptance, where the A4 recording arrives. This file keeps the id so
+that earlier citations resolve; the text below is the one written before
+the re-plan, and T026 is where it is built.
 
 - Implements: 06 6.3, 05 5.2 (I30), 10 10.3 (Source of truth).
 - Operator: no.

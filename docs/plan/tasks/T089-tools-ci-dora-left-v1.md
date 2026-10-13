@@ -20,3 +20,6 @@ before the re-plan.
   decision, and ADR 0004 stays its design; `release.yml` has no dora
   step). The id stays, since the task ids are one sequence (10 10.2);
   nothing depends on it.
+
+- Implements: none: 12 12.10, deferred by the index row on `tools/ci
+  dora`.

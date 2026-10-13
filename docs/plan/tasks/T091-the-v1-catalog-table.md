@@ -14,10 +14,10 @@ sitting: none
 
 # T091 - The v1 catalog table
 
-Re-plan (2026-10-12): folded into T102, which carries its v1 table and
-the handover sitting. This file keeps the id so that earlier citations
-resolve; the text below is the one written before the re-plan, and T102
-is where it is built.
+Re-plan (2026-10-12): folded into T102; its rows are copied into T102's
+Acceptance, with the handover sitting. This file keeps the id so that
+earlier citations resolve; the text below is the one written before the
+re-plan, and T102 is where it is built.
 
 - Implements: 03 3.5 (the closing paragraph), 07 7.6, S4.
 - Operator: block O4 feeds it; block O5 confirms it.

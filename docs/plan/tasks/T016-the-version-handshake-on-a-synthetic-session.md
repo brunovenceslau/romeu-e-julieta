@@ -14,10 +14,10 @@ sitting: none
 
 # T016 - The version handshake, on a synthetic session
 
-Re-plan (2026-10-12): folded into T066, which carries its acceptance
-rows. This file keeps the id so that earlier citations resolve; the text
-below is the one written before the re-plan, and T066 is where it is
-built.
+Re-plan (2026-10-12): folded into T066; its rows are copied into T066's
+Acceptance. This file keeps the id so that earlier citations resolve;
+the text below is the one written before the re-plan, and T066 is where
+it is built.
 
 - Implements: 06 6.3, 05 5.2 (I30), 10 10.1 (E2E hybrid).
 - Operator: no.
@@ -31,7 +31,7 @@ built.
   - The session the fake `sbx` replays is hand-written, lives in the
     test's own data and is named `synthetic`; it is not under
     `e2e/testdata/sbx/<version>/`, which holds block A recordings only
-    (10 10.3). T030 replaces it.
+    (10 10.3). T026 replaces it with the A4 recording.
   - `internal/sbxdrv` gains the two argv builders the check needs, `sbx
     version` and `sbx env exec`. They are the first rows of the argv
     table that T019 completes.

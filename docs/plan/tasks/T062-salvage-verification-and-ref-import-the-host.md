@@ -21,13 +21,38 @@ sitting: none
 
 Goal: Salvage verification and ref import, the host half, dark.
 
-Re-plan (2026-10-12): Kept as written before the re-plan.
+Re-plan (2026-10-12): Kept as written before the re-plan; its files are
+the two globs above, in the package T061 owns by glob.
 
-- Implements: 08 8.5 ("Host half"), 05 5.2 (I6, I17).
+- Implements: REQ-0050 (01 1.2), REQ-0053 (01 1.3), REQ-0157 (02 2.6),
+  REQ-0234 (03 3.8), REQ-0247 (03 3.11), REQ-0248 (03 3.11), REQ-0249
+  (03 3.11), REQ-0250 (03 3.11), REQ-0251 (03 3.11), REQ-0252 (03 3.11),
+  REQ-0253 (03 3.11), REQ-0256 (03 3.12), REQ-0271 (04 4.1), REQ-0300
+  (04 4.1), REQ-0437 (04 4.4), REQ-0438 (04 4.4), REQ-0439 (04 4.4),
+  REQ-0440 (04 4.4), REQ-0441 (04 4.4), REQ-0442 (04 4.4), REQ-0443 (04
+  4.4), REQ-0444 (04 4.4), REQ-0445 (04 4.4), REQ-0446 (04 4.4),
+  REQ-0462 (05 5.1), REQ-0487 (05 5.2), REQ-0501 (05 5.2), REQ-0521 (05
+  5.2), REQ-0522 (05 5.2), REQ-0523 (05 5.2), REQ-0524 (05 5.2),
+  REQ-0525 (05 5.2), REQ-0526 (05 5.2), REQ-0527 (05 5.2), REQ-0528 (05
+  5.2), REQ-0529 (05 5.2), REQ-0530 (05 5.2), REQ-0531 (05 5.2),
+  REQ-0532 (05 5.2), REQ-0533 (05 5.2), REQ-0534 (05 5.2), REQ-0708 (08
+  8.5), REQ-0714 (08 8.5), REQ-0715 (08 8.5), REQ-0717 (08 8.5).
 - Operator: no.
 - Acceptance:
   - The manifest is read through `os.Root`; completeness is recomputed
-    and the manifest's own `complete` ignored (I17).
+    and the manifest's own `complete` ignored (I17); `agentStop` is read
+    as 03 3.11 defines it (zero matched with no open session recorded as
+    0).
+  - A manifest whose `salvageId` differs from the id romeu passed fails
+    with `salvage-id-mismatch` (`RJ-339`); a table of hostile paths
+    (absolute, `..`, a symlink component, outside the dir) each fails
+    with `salvage-path` (`RJ-307`); a manifest whose total bytes exceed
+    `salvage.capBytes` makes the salvage incomplete with `over-cap`.
+  - A bundle ref name the validator refuses fails the salvage; a bundle
+    with missing prerequisites verifies after the origin fetch into
+    `refs/romeu/origin/`; a malformed object in an unbundled head is the
+    skipped item `fsck-failed`; a payload whose size or sha256 differs
+    is `payload-mismatch`.
   - Refs are created only under `refs/romeu/salvage/...` with
     `CreateRef` (I6).
   - The package is **dark** until T068.

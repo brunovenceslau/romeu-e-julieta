@@ -6,7 +6,7 @@ module: romeu-cli
 fate: kept
 owns:
   - internal/cmd/romeu/doctor/**
-  - cmd/romeu/import_doctor.go
+  - internal/cmd/romeu/all/import_doctor.go
   - e2e/doctor_test.go
 needs:
   - T046
@@ -22,26 +22,81 @@ sitting: none
 
 Goal: `romeu doctor`, one file per row.
 
-Re-plan (2026-10-12): Kept, narrowed to the rows J1 step 4 needs:
-floors, root rules, `rememberHostCommands`, `kit.allowedSources`, the
-global secret and broad-rule rows, memory layout. The breadth is
-deferred with its trigger.
+Re-plan (2026-10-12): Kept, narrowed to the rows below, by slug:
+`sbx-floor`, `git-floor`, `sbx-untested`, `toolchain-approval-required`,
+`host-git-config`, `sbx-global-secret`, `sbx-broad-allow`,
+`sbx-remember-commands`, `sbx-allowed-sources`, `root-unsafe`,
+`root-indexed`, `home-symlink`, `auto-trust`, `vscode-trust`,
+`settings-mode`, `tree-mode`, `memory-layout`, `removal-pending`,
+`record-unreadable` and `generation-sandbox` (open, salvaging,
+removing), plus the two I22 `upstream-shape` rows and the doctor
+sentinel case. Every other slug of the table of 04 4.2, the fix-hint
+paragraph and `doctor --json` per check are T134's. "The A9 recording"
+reads as T046 does. T103 stays in `needs` for its e2e. `doctor/rows.go`
+holds the registered rows (rule 14 of `docs/plan.md`); T080 and T134 add
+theirs by one file each.
 
-- Implements: 04 4.2 ("Checks run by `romeu doctor`"), 05 5.2 (I14, I20,
-  I22, I23).
+- Implements: REQ-0056 (01 1.3), REQ-0057 (01 1.3), REQ-0059 (01 1.4),
+  REQ-0062 (01 1.4), REQ-0136 (02 2.3), REQ-0141 (02 2.3), REQ-0148 (02
+  2.4), REQ-0207 (03 3.4), REQ-0209 (03 3.4), REQ-0330 (04 4.2),
+  REQ-0331 (04 4.2), REQ-0364 (04 4.2), REQ-0365 (04 4.2), REQ-0366 (04
+  4.2), REQ-0367 (04 4.2), REQ-0368 (04 4.2), REQ-0369 (04 4.2),
+  REQ-0370 (04 4.2), REQ-0371 (04 4.2), REQ-0372 (04 4.2), REQ-0373 (04
+  4.2), REQ-0374 (04 4.2), REQ-0375 (04 4.2), REQ-0376 (04 4.2),
+  REQ-0377 (04 4.2), REQ-0378 (04 4.2), REQ-0379 (04 4.2), REQ-0380 (04
+  4.2), REQ-0381 (04 4.2), REQ-0382 (04 4.2), REQ-0383 (04 4.2),
+  REQ-0385 (04 4.2), REQ-0386 (04 4.2), REQ-0387 (04 4.2), REQ-0388 (04
+  4.2), REQ-0389 (04 4.2), REQ-0390 (04 4.2), REQ-0391 (04 4.2),
+  REQ-0392 (04 4.2), REQ-0393 (04 4.2), REQ-0394 (04 4.2), REQ-0395 (04
+  4.2), REQ-0435 (04 4.4), REQ-0437 (04 4.4), REQ-0438 (04 4.4),
+  REQ-0439 (04 4.4), REQ-0440 (04 4.4), REQ-0441 (04 4.4), REQ-0442 (04
+  4.4), REQ-0443 (04 4.4), REQ-0444 (04 4.4), REQ-0445 (04 4.4),
+  REQ-0446 (04 4.4), REQ-0471 (05 5.1), REQ-0497 (05 5.2), REQ-0504 (05
+  5.2), REQ-0506 (05 5.2), REQ-0507 (05 5.2), REQ-0508 (05 5.2),
+  REQ-0510 (05 5.2), REQ-0546 (05 5.4), REQ-0555 (05 5.4), REQ-0557 (05
+  5.4), REQ-0559 (05 5.4), REQ-0712 (08 8.5), REQ-0713 (08 8.5),
+  REQ-0751 (10 10.1), REQ-0752 (10 10.1), REQ-0753 (10 10.1), REQ-0754
+  (10 10.1), REQ-0755 (10 10.1), REQ-0756 (10 10.1), REQ-0757 (10 10.1),
+  REQ-0758 (10 10.1), REQ-0759 (10 10.1), REQ-0760 (10 10.1), REQ-0761
+  (10 10.1), REQ-0762 (10 10.1), REQ-0763 (10 10.1), REQ-0764 (10 10.1),
+  REQ-0765 (10 10.1), REQ-0766 (10 10.1), REQ-0767 (10 10.1), REQ-0768
+  (10 10.1), REQ-0769 (10 10.1), REQ-0770 (10 10.1), REQ-0771 (10 10.1),
+  REQ-0772 (10 10.1), REQ-0773 (10 10.1), REQ-0774 (10 10.1), REQ-0789
+  (10 10.1).
 - Operator: no.
 - Acceptance:
-  - Each row of the doctor table that is not marked **pre** and that
-    this phase can build has a fixture with `HOME` in a temp dir: the
-    `sbx` and git floors, the toolchain record (the check function of
-    T042, called from here), the host global git
-    config, `env.rememberHostCommands`, `kit.allowedSources`, the root
-    rules (I20), the file modes, the secret bindings and the tree rows.
+  - Each row above has a fixture with `HOME` in a temp dir, and its test
+    asserts the row's slug in `romeu doctor --json`, not only the exit
+    status (10 10.1): the `sbx` and git floors, the toolchain record
+    (the check function of T042, called from here), the host global git
+    config, which reads the one Go slice of `internal/gitsafe` (T023),
+    `env.rememberHostCommands`, `kit.allowedSources`, the root rules
+    (I20), the file modes, the secret bindings and the tree rows.
   - The rows marked **pre** are the functions of T046, called from here
     (I22, I23). The two I22 rows fail, and `doctor` exits 6 with
-    `check-findings`, on each synthesized fixture of T046, and pass on the A9 recording, with the
-    same files.
+    `check-findings`, on each synthesized fixture of T046, and pass on
+    the A9 recording, with the same files. On the two shape fixtures of
+    T046, `doctor` reports `upstream-shape` on both I22 rows and exits
+    1.
+  - `doctor` reports a live sbx version outside the tested window of 10
+    10.3 as the warning `sbx-untested`, naming the version and the
+    recorded range; until block A the window is the version the
+    synthetic sessions were written for.
+  - The test titled "doctor warns root-indexed when the marker is
+    missing" passes (04 4.2).
   - A trusted root or disabled workspace trust fails (I14).
+  - The case "doctor never shows a secret argv's output": a fixture
+    whose secret argv prints a sentinel on stdout and on stderr and
+    exits 0, and one that prints it and exits 1; the sentinel appears in
+    no stdout, stderr or `--json` output of `doctor` and in no file
+    under the temp `HOME` and `XDG_*` directories after the run;
+    positive control: the guard's stub prints it (I25). The secret argv
+    runs through `internal/procgroup` with its class and with exactly
+    `HOME` and `PATH=/usr/bin:/bin` (03 3.4).
+  - Exit 1 when any check could not run, every failed check still
+    printed; 6 when every check ran and any failed; `--json` carries one
+    object per check with `result` in `pass`, `warn`, `fail` or `error`
+    and the error id for `error`.
 - Verify: `go test ./internal/... -run '^TestDoctor'`, which lists the
   row tests by name; `go test -tags e2e ./e2e/... -run '^TestDoctor' -v`
   for the A9 rows. The pattern names the `TestDoctor*` functions this

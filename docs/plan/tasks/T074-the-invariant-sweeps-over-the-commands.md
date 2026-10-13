@@ -18,9 +18,19 @@ sitting: none
 
 Goal: The invariant sweeps over the commands, one file per sweep.
 
-Re-plan (2026-10-12): Kept as written before the re-plan.
+Re-plan (2026-10-12): Kept as written before the re-plan. The I14
+filesystem diff is the E-level case here; the unit-level case is
+`doctor`'s trust row (T049).
 
-- Implements: 05 5.2 (I2, I3, I4, I7, I14, I15, I16, I25).
+- Implements: REQ-0001 (index), REQ-0026 (index), REQ-0027 (index),
+  REQ-0029 (index), REQ-0047 (01 1.2), REQ-0061 (01 1.4), REQ-0062 (01
+  1.4), REQ-0063 (01 1.4), REQ-0065 (01 1.4), REQ-0076 (01 1.5),
+  REQ-0078 (01 1.5), REQ-0147 (02 2.3), REQ-0308 (04 4.2), REQ-0365 (04
+  4.2), REQ-0458 (05 5.1), REQ-0463 (05 5.1), REQ-0471 (05 5.1),
+  REQ-0476 (05 5.2), REQ-0479 (05 5.2), REQ-0483 (05 5.2), REQ-0484 (05
+  5.2), REQ-0485 (05 5.2), REQ-0488 (05 5.2), REQ-0497 (05 5.2),
+  REQ-0498 (05 5.2), REQ-0499 (05 5.2), REQ-0509 (05 5.2), REQ-0554 (05
+  5.4), REQ-0737 (10 10.1), REQ-0751 (10 10.1).
 - Operator: no.
 - Acceptance:
   - After each romeu command, each clone's `.git/` equals what it was,
@@ -29,6 +39,10 @@ Re-plan (2026-10-12): Kept as written before the re-plan.
     global config and in the environment, `init`, `sync`, `run`, `pull`,
     `salvage`, `rm`, `retire`, `status` and `doctor` leave no marker
     file.
+  - Each absence sweep (I2, I3, I14) runs once against unhardened git or
+    under the guard's pass-through and fails when the marker, the `.git`
+    diff or the trust write does not appear (the positive control of 05
+    5.2).
   - A filesystem diff over a temp `HOME` after each command shows no VS
     Code trust or settings write (I14) and no deletion outside what
     romeu owns (I16).
@@ -39,6 +53,11 @@ Re-plan (2026-10-12): Kept as written before the re-plan.
     their removal half, after their salvage half ran; `stop`, `salvage`,
     `salvage --from-host` and `pull` print the failure and go on, and
     widen nothing (01 1.5; I7).
+  - With a step-5 failure planted, `stop`, `salvage`, `salvage
+    --from-host` and `pull` print it and go on; with drift, an abandoned
+    interrupted promotion or an unknown sandbox they stop (01 1.5).
+  - Each **P** command prints `sbx-untested` on an sbx outside the
+    tested window and goes on.
   - No e2e run reaches the fake `sbx`'s exit 99 for `--auto-approve`
     (I4) or for a secret value form (I25).
 - Verify: `go test -tags e2e ./e2e/... -run '^TestSweeps' -v`. The

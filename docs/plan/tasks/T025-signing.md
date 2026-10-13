@@ -20,7 +20,7 @@ Goal: The ssh-agent identity listing, dark until T080.
 
 Re-plan (2026-10-12): Kept as written before the re-plan.
 
-- Implements: 06 6.4 (the signing rule's check), 12 12.1.
+- Implements: REQ-0520 (05 5.2), REQ-0601 (06 6.4), REQ-1050 (12 12.1).
 - Operator: no.
 - Acceptance:
   - Against a test agent socket, the identity listing returns the keys;

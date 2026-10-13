@@ -9,9 +9,9 @@ owns:
 needs:
   - T021
   - T033
-  - T039
   - T007
-after: []
+after:
+  - T123
 ask_first:
   - gates
 sitting: none
@@ -21,10 +21,22 @@ sitting: none
 
 Goal: `gate`.
 
-Re-plan (2026-10-12): Kept as written before the re-plan.
+Re-plan (2026-10-12): Kept as written before the re-plan; `after: T123`,
+since the record of the two gates is a review order (12 12.5).
 
-- Implements: 01 1.4 (gate 2), 12 12.3 (the struct-tag row), 05 5.2 (I7,
-  I29).
+- Implements: REQ-0055 (01 1.3), REQ-0059 (01 1.4), REQ-0066 (01 1.4),
+  REQ-0067 (01 1.4), REQ-0071 (01 1.4), REQ-0191 (03 3.2), REQ-0192 (03
+  3.2), REQ-0272 (04 4.1), REQ-0488 (05 5.2), REQ-0518 (05 5.2),
+  REQ-0575 (06 6.1), REQ-0638 (07 7.6), REQ-0732 (10 10.1), REQ-0752 (10
+  10.1), REQ-0753 (10 10.1), REQ-0754 (10 10.1), REQ-0755 (10 10.1),
+  REQ-0756 (10 10.1), REQ-0757 (10 10.1), REQ-0758 (10 10.1), REQ-0759
+  (10 10.1), REQ-0760 (10 10.1), REQ-0761 (10 10.1), REQ-0762 (10 10.1),
+  REQ-0763 (10 10.1), REQ-0764 (10 10.1), REQ-0765 (10 10.1), REQ-0766
+  (10 10.1), REQ-0767 (10 10.1), REQ-0768 (10 10.1), REQ-0769 (10 10.1),
+  REQ-0770 (10 10.1), REQ-0771 (10 10.1), REQ-0772 (10 10.1), REQ-0773
+  (10 10.1), REQ-0774 (10 10.1), REQ-0790 (10 10.1), REQ-1050 (12 12.1),
+  REQ-1106 (12 12.3), REQ-1169 (12 12.5), REQ-1170 (12 12.5), REQ-1171
+  (12 12.5).
 - Operator: no.
 - Acceptance:
   - The widening set and the recreate digest field lists are generated
@@ -36,6 +48,15 @@ Re-plan (2026-10-12): Kept as written before the re-plan.
     full, the summary is repeated above the prompt, and a binary file is
     shown as size and sha256, flagged (I29). The diff text has a golden
     under `internal/gate/testdata/` (10 10.1).
-  - The prompt needs a terminal; a `/dev/ptmx` test drives `y` and `N`
-    (10 10.1).
+  - The golden's fixture changes one item of each class (a capability, a
+    gated domain, a secret argv, the workload repository, a content-only
+    kit file); the golden shows the summary first, in that order and
+    marked, then content-only kit changes with file and line counts, the
+    kit file list with modes, the workload repository highlighted and
+    the host-settings argv behind each secret name, and the summary
+    repeated above the prompt (01 1.4).
+  - The prompt needs a terminal: it is written to stderr and the TTY
+    condition is stdin; a `/dev/ptmx` test drives `y` and `N` on stdin
+    and reads stderr (10 10.1).
+  - The record of the two gates is merged (12 12.5).
 - Verify: `go test ./internal/gate/...`.

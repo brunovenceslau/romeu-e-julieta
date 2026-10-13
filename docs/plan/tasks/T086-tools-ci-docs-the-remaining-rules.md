@@ -22,8 +22,16 @@ before the re-plan; `needs` lists its earlier dependencies with a folded
 id replaced by the id that absorbed it, and `owns` is written when the
 task reopens.
 
-- Implements: 10 10.2 (the `docs` step), ADR 0001 rules 9, 12, 13, 17
-  and 20, S10.
+- Implements: REQ-0730 (09 (opening)), REQ-0752 (10 10.1), REQ-0753 (10
+  10.1), REQ-0754 (10 10.1), REQ-0755 (10 10.1), REQ-0756 (10 10.1),
+  REQ-0757 (10 10.1), REQ-0758 (10 10.1), REQ-0759 (10 10.1), REQ-0760
+  (10 10.1), REQ-0761 (10 10.1), REQ-0762 (10 10.1), REQ-0763 (10 10.1),
+  REQ-0764 (10 10.1), REQ-0765 (10 10.1), REQ-0766 (10 10.1), REQ-0767
+  (10 10.1), REQ-0768 (10 10.1), REQ-0769 (10 10.1), REQ-0770 (10 10.1),
+  REQ-0771 (10 10.1), REQ-0772 (10 10.1), REQ-0773 (10 10.1), REQ-0774
+  (10 10.1), REQ-0850 (10 10.2), REQ-1080 (12 12.2), REQ-1087 (12 12.2),
+  REQ-1108 (12 12.3), REQ-1166 (12 12.5), REQ-1184 (12 12.8), REQ-1187
+  (12 12.8), REQ-1188 (12 12.8).
 - Operator: no.
 - Ask-first, as forecast before the re-plan: `checks`.
 - Acceptance:
@@ -33,9 +41,13 @@ task reopens.
   - A fixture fails for a heading that is missing, extra or out of order
     against `tools/ci/headings.yaml` (rules 12 and 20).
   - A fixture fails for a fenced block with no language, for a `romeu`
-    or `julieta` command in an `sh` block that equals no entry of
-    `e2e/scenarios/commands.yaml`, and for a guide page whose `journey:`
-    is no heading of 09 (rule 13).
+    or `julieta` command in an `sh` block that equals no entry of the
+    page's journey's `commands.yaml`, or J1 step 2's verification entry,
+    and for a guide page whose `journey:` is no heading of 09 (rule 13).
+  - A fixture fails `ARCHITECTURE.md` missing an invariant id of 05 5.2
+    or a module id of 12 12.2, and an error id whose recovered-in cell
+    (12 12.8) is empty or names an anchor that does not resolve, a
+    fixture each.
   - A fixture fails for an image and for a file under `docs/` with
     another extension (rule 17).
 - Verify: `go test ./tools/ci/... -run '^TestDocs'`, which runs the

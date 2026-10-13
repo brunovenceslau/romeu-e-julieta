@@ -16,8 +16,7 @@ needs:
   - T043
   - T046
   - T049
-after:
-  - T043
+after: []
 ask_first:
   - sbxdrv
 sitting: none
@@ -36,21 +35,27 @@ task because the slots of sitting M3 (T116) wait for this task. The e2e
 uses the real kit, not a fixture of its name. Between M2 and this task
 the rule holds by hand: the dedicated signing-only socket loaded with
 `ssh-add -c`, and the `ssh-add -L` read of T115 in every recreated
-sandbox (the I34 row of Accepted risks in `docs/plan.md`). The
-`sbxdrv` forecast is for `env_signing.go`.
+sandbox (the I34 row accepted by name in 05 5.4, linked from Accepted
+risks in `docs/plan.md`); that row closes when this task lands. Its four
+files plug into the named seams of rule 14: `doctor/rows.go`,
+`preflight/step5.go`, `sync/rules.go` and `sbxdrv/env.go`'s `register`.
+The `sbxdrv` forecast is for `env_signing.go`.
 
-- Implements: 06 6.4 ("Signing rule"), 01 1.5 (step 5), 04 4.2 (the
-  signing row of `doctor`), 04 4.1 (`SSH_AUTH_SOCK` for the `sbx`
-  calls).
+- Implements: REQ-0075 (01 1.5), REQ-0296 (04 4.1), REQ-0384 (04 4.2),
+  REQ-0520 (05 5.2), REQ-0549 (05 5.4), REQ-0600 (06 6.4), REQ-0601 (06
+  6.4).
 - Operator: no.
 - Acceptance:
   - `sync` refuses to render a kit named `git-ssh-sign` with exit 2 and
     `RJ-204` unless the socket is set, reachable and holds one key equal
-    to `signingKey`. The rule is keyed by the kit's name; the kit
-    (T081, M2) lands first and this task needs it, so the e2e uses the
-    real kit, and no `sync` renders that kit before this task lands
-    (sitting M3 waits for it). No merge forwards the host's whole agent
-    in between: the host socket is the dedicated signing-only one.
+    to `signingKey`. The rule is keyed by the kit's name; the kit (T081,
+    M2) lands first and this task needs it, so the e2e uses the real
+    kit, and no `sync` renders that kit before this task lands (sitting
+    M3 waits for it). No merge forwards the host's whole agent in
+    between: the host socket is the dedicated signing-only one.
+  - git-ssh-sign's capability set appears in the gate 2 diff of a
+    project that adds it, and the rule holds on the first `sync` that
+    renders it.
   - `doctor` and the preflight of that project's **P** commands run the
     same check.
   - For a project that uses the kit, the `sbx` calls carry

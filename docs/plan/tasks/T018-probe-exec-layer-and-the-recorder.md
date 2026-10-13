@@ -23,8 +23,17 @@ text below is the one written before the re-plan; `needs` lists its
 earlier dependencies with a folded id replaced by the id that absorbed
 it, and `owns` is written when the task reopens.
 
-- Implements: 11 (opening), 10 10.3 (Source of truth, Redaction), index
-  (Boundaries, Never).
+- Implements: REQ-0752 (10 10.1), REQ-0753 (10 10.1), REQ-0754 (10
+  10.1), REQ-0755 (10 10.1), REQ-0756 (10 10.1), REQ-0757 (10 10.1),
+  REQ-0758 (10 10.1), REQ-0759 (10 10.1), REQ-0760 (10 10.1), REQ-0761
+  (10 10.1), REQ-0762 (10 10.1), REQ-0763 (10 10.1), REQ-0764 (10 10.1),
+  REQ-0765 (10 10.1), REQ-0766 (10 10.1), REQ-0767 (10 10.1), REQ-0768
+  (10 10.1), REQ-0769 (10 10.1), REQ-0770 (10 10.1), REQ-0771 (10 10.1),
+  REQ-0772 (10 10.1), REQ-0773 (10 10.1), REQ-0774 (10 10.1), REQ-0924
+  (10 10.3), REQ-0925 (10 10.3), REQ-0926 (10 10.3), REQ-0929 (10 10.3),
+  REQ-0932 (10 10.3), REQ-0933 (10 10.3), REQ-0934 (10 10.3), REQ-0935
+  (10 10.3), REQ-0936 (10 10.3), REQ-0937 (10 10.3), REQ-0939 (10 10.3),
+  REQ-0977 (11 (opening)), REQ-0978 (11 (opening)), REQ-1041 (12 12.1).
 - Operator: feeds block O3.
 - Ask-first, as forecast before the re-plan: none expected.
 - Acceptance:
@@ -37,6 +46,9 @@ it, and `owns` is written when the task reopens.
     replaced by a placeholder before a file is written, and the recorder
     refuses to write a file that still holds one (10 10.3, Redaction).
     Each U+2014 becomes `-`.
+  - The recorder replaces the same four values as the details of 04 4.1
+    (the home path, the user name, the host name and the root path),
+    asserted by one fixture shared with T029's details table.
   - Of a listing from the maintainer's real host, an `sbx ls --json`, a
     policy listing, the policy log, an approval listing or a settings
     read, the recorder keeps only the entries of the harness's own
@@ -46,9 +58,8 @@ it, and `owns` is written when the task reopens.
     A placeholder parses as the type it replaces, so a recording still
     parses; T029 round-trips each placeholder through its parsers and
     lists the placeholder types, and the test here uses a stand-in
-    parser until then.
-    The reason: a name on that host may be one this repository must not
-    hold (index, Boundaries).
+    parser until then. The reason: a name on that host may be one this
+    repository must not hold (index, Boundaries).
   - The host global git config, the editor's trust settings and an
     `ssh-add -L` listing pass through typed parsers that keep only what
     a doctor row reads (04 4.2): for the git config, one yes or no per

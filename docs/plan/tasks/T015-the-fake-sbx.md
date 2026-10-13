@@ -14,10 +14,10 @@ sitting: none
 
 # T015 - The fake `sbx`
 
-Re-plan (2026-10-12): folded into T029, which carries its acceptance
-rows. This file keeps the id so that earlier citations resolve; the text
-below is the one written before the re-plan, and T029 is where it is
-built.
+Re-plan (2026-10-12): folded into T029; its rows are copied into T029's
+Acceptance. This file keeps the id so that earlier citations resolve;
+the text below is the one written before the re-plan, and T029 is where
+it is built.
 
 - Implements: 10 10.3, 05 5.2 (I4, I25).
 - Operator: no.

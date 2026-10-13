@@ -27,9 +27,11 @@ verify and unbundle, fsck, the validated tree walk.
 Re-plan (2026-10-12): Kept, in M3: salvage and kit materialization need
 it. The runner both modes use and bundle creation belong to T023; this
 task's files are the four globs above, so the two file sets stay
-disjoint.
+disjoint. The unit table of the I27 hostile trees is here; the E-level
+cases of T044 ride in T043.
 
-- Implements: 05 5.1, 05 5.2 (I27, unit level).
+- Implements: REQ-0050 (01 1.2), REQ-0053 (01 1.3), REQ-0465 (05 5.1),
+  REQ-0512 (05 5.2).
 - Operator: no.
 - Acceptance:
   - The table of hostile trees of I27 is refused by `WalkTree` without

@@ -19,5 +19,5 @@ drops a requirement that no package imports, so a batch that adds
 no importer cannot satisfy its own acceptance row, and every task that
 needed it would have waited on it for nothing. Each dependency of
 12 12.1's list lands with its first importer instead (rule 7 of
-`docs/plan.md`): the JSON Schema validator with T051, the TOML parser
+`docs/plan.md`): the JSON Schema validator with T125, the TOML parser
 with T053. The id stays so that a citation of it still resolves.
