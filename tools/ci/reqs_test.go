@@ -166,6 +166,16 @@ func TestReqsRules(t *testing.T) {
 			},
 		},
 		{
+			name: "a closer with text after it does not close a fence",
+			change: func(r *gittest.Repo) {
+				r.Write("docs/spec/01-model.md", "# 01\n\n```\n`REQ-0005` a\n``` x\n`REQ-0006` b\n```\n")
+			},
+			want: []string{
+				"docs/spec/01-model.md:4: reqs: REQ-0005 sits inside a fenced block (12 12.11)",
+				"docs/spec/01-model.md:6: reqs: REQ-0006 sits inside a fenced block (12 12.11)",
+			},
+		},
+		{
 			name: "an id in a table header",
 			change: func(r *gittest.Repo) {
 				r.Write("docs/spec/01-model.md", "# 01\n\n| A | `REQ-0005` B |\n|---|---|\n| a | b |\n")
@@ -237,7 +247,7 @@ func TestReqsRules(t *testing.T) {
 		{
 			name: "an id inside a longer token is no citation",
 			change: func(r *gittest.Repo) {
-				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "XREQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)"))
+				r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "XREQ-0001 (index)", "X-REQ-0001 (index)", "1REQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)"))
 			},
 			want: []string{"docs/spec.md:3: reqs: REQ-0001 is cited by no task of fate kept, new, deferred, merged"},
 		},
@@ -353,6 +363,27 @@ func TestReqsReads(t *testing.T) {
 		code, out := runCI(t, r, nil, nil, "reqs")
 		assert.Equal(t, exitOK, code, out)
 	})
+	t.Run("a run indented by four spaces opens no fence", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/01-model.md", "# 01\n\n    ```\n\n`REQ-0005` Five.\n")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+	})
+	t.Run("a run of two backticks opens no fence", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/01-model.md", "# 01\n\n``\n\n`REQ-0005` Five.\n")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+	})
+	t.Run("a fence ends the backtick count of the paragraph before it", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/01-model.md", "# 01\n\nAn odd ` tick.\n```\ncode\n```\n`REQ-0005` Five.\n")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+	})
 	t.Run("a long line of ids is read in time linear in its length", func(t *testing.T) {
 		// Ten MiB of text, then the ids: a count of the backticks from
 		// the line's start for each span scans the text once per id,
@@ -367,11 +398,21 @@ func TestReqsReads(t *testing.T) {
 		assert.Empty(t, marks[n-1].misplaced)
 		assert.Less(t, elapsed, 5*time.Second)
 	})
-	t.Run("a front matter outside the task directory, and a page that is not .md, are not read", func(t *testing.T) {
+	t.Run("a front matter outside the task directory or not in a .md file, and a page that is not .md, are not read", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/plan/T009-a.md", reqTaskFile("T009", "kept", "REQ-0099 (none)"))
 		r.Write("docs/plan/tasks/sub/T010-a.md", reqTaskFile("T010", "kept", "REQ-0099 (none)"))
+		r.Write("docs/plan/tasks/T011-a.txt", reqTaskFile("T011", "kept", "REQ-0099 (none)"))
 		r.Write("docs/spec/05-x.mdx", "# 05\n\n`REQ-0001` Again; `REQ-new`.\n")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, "reqs: ok\n", out)
+	})
+	t.Run("a chapter-named file outside docs/spec is no page", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/01-model.md", "# 01\n\n`REQ-0001` Again; `REQ-new`.\n")
+		r.Write("docs/spec/sub/01-model.md", "# 01\n\n`REQ-0001` Again; `REQ-new`.\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
 		assert.Equal(t, exitOK, code, out)
@@ -385,6 +426,15 @@ func TestReqsReads(t *testing.T) {
 		code, out := runCI(t, r, nil, nil, "reqs")
 		assert.Equal(t, exitError, code, out)
 		assert.Contains(t, out, "ci: read docs/spec/01-model.md: not a file")
+	})
+	t.Run("a page that is a submodule entry is an error, its path quoted", func(t *testing.T) {
+		r := reqFixture(t)
+		require.NoError(t, os.MkdirAll(filepath.Join(r.Dir, "docs", "spec", "01-a\tb.md"), 0o755))
+		r.Git("update-index", "--add", "--cacheinfo", "160000,0123456789abcdef0123456789abcdef01234567,docs/spec/01-a\tb.md")
+		r.Commit("fixture")
+		code, out := runCI(t, r, nil, nil, "reqs")
+		assert.Equal(t, exitError, code, out)
+		assert.Contains(t, out, `ci: read "docs/spec/01-a\tb.md": not a file`)
 	})
 	t.Run("a task file that is a submodule entry is an error, its path quoted", func(t *testing.T) {
 		r := reqFixture(t)
@@ -632,6 +682,29 @@ func TestReqsAllocate(t *testing.T) {
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
 		assert.Equal(t, exitError, code, out)
 		assert.Contains(t, out, "ci: read docs/spec.md: not a regular file")
+	})
+	t.Run("a page that is not a regular file refuses, its path quoted", func(t *testing.T) {
+		r := reqFixture(t)
+		require.NoError(t, os.Mkdir(filepath.Join(r.Dir, "docs", "spec", "01-a\tb.md"), 0o755))
+		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
+		assert.Equal(t, exitError, code, out)
+		assert.Contains(t, out, `ci: read "docs/spec/01-a\tb.md": not a regular file`)
+	})
+	t.Run("a number past the last refuses, its path quoted", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/12-engineering.md", "# 12\n\n## 12.11 Requirement ids\n\n"+reqTable("| `REQ-9999` | 2026-10-12 | Last. | none |"))
+		r.Write("docs/spec/01-a\tb.md", "# 01\n\n`REQ-new` Too many.\n")
+		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
+		assert.Equal(t, exitError, code, out)
+		assert.Contains(t, out, `ci: "docs/spec/01-a\tb.md:3": the next id would pass REQ-9999; nothing was written`)
+	})
+	t.Run("a numbered page is named with its control characters escaped", func(t *testing.T) {
+		r := reqFixture(t)
+		r.Write("docs/spec/01-a\x1bb.md", "# 01\n\n`REQ-new` Five.\n")
+		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
+		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, `docs/spec/01-a\x1bb.md:3: REQ-0005`+"\nreqs: 1 placeholder(s) numbered\n", out)
+		assert.Equal(t, "# 01\n\n`REQ-0005` Five.\n", read(t, r, "docs/spec/01-a\x1bb.md"))
 	})
 }
 
