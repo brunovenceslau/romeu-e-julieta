@@ -109,7 +109,7 @@ are derived from the same data this page specifies.
 ### Starting values
 
 Every subprocess has a timeout and fails with `subprocess-timeout`
-(Subprocesses, item 5). These are starting values; the first B5
+(Subprocesses, item 5). `REQ-1220` These are starting values; the first B5
 measurement confirms or resets them, and a change is a pull request
 that edits this table alone. `REQ-0302` The table is one Go table in
 `internal/procgroup`, keyed by class, with a seam that only tests set,
@@ -167,7 +167,7 @@ its first julieta call.
 | Command | Purpose | Reads | Writes | Runs | Exit codes |
 |---|---|---|---|---|---|
 | `romeu init --config-url <url> [--config-project <name>] [--root <abs>] [--config-ref <ref>]` | `REQ-0309` create host settings; clone the config repo into `<root>/<cfg>-env/<dir>`. It needs an existing config repo whose ref holds `projects/<cfg>.yaml` (J1 step 0), and applies `doctor`'s root check before it writes | nothing prior | host settings, its `root`, `config` and `tools` keys ([03 3.4](03-formats.md#34-host-settings-settingsyaml-schema-host-settingsv1); refuses to overwrite), one clone | host: git | 0, 1, 2 |
-| `romeu sync [--all] [--from origin\|<sha>] [--overwrite-drift] [<name>...]` **P** | render specs at a named commit into candidates; run gate 2; promote; apply live changes | host settings, config repo objects, repo objects, registries (descriptors not cached), state | clones (missing only), `refs/romeu/origin/*`, candidates, live derived files on promotion, `<name>-env/` and memory dirs (create only), the `.metadata_never_index` marker, workspace files, project records, descriptor cache, live egress | host: git, sbx (preflight step 1 before its first sbx read and steps 2 to 6 before its first mutating call, step 9 below) | 0, 1, 2, 3, 4 |
+| `romeu sync [--all] [--from origin\|<sha>] [--overwrite-drift] [<name>...]` **P** | `REQ-1221` render specs at a named commit into candidates; run gate 2; promote; apply live changes | host settings, config repo objects, repo objects, registries (descriptors not cached), state | clones (missing only), `refs/romeu/origin/*`, candidates, live derived files on promotion, `<name>-env/` and memory dirs (create only), the `.metadata_never_index` marker, workspace files, project records, descriptor cache, live egress | host: git, sbx (preflight step 1 before its first sbx read and steps 2 to 6 before its first mutating call, step 9 below) | 0, 1, 2, 3, 4 |
 | `romeu approve --toolchain` | `REQ-0310` gate 1 (01 1.4); TTY required; makes no mutating sbx call (it reads `sbx version`) | `toolchain.json`, live `sbx version` | `toolchain.json` | host: sbx (read) | 0, 1, 2 (no TTY) |
 | `romeu run [--no-attach] <name>` **P** | `REQ-0311` ensure sandbox, egress, julieta, setup; attach to the run layout | everything above | project record (generation, `lastRunAt`, `egressApplied`), salvage refs and record when preserving a lost generation | host: sbx, git; sandbox: julieta | 0-5 (5: step 3, a stopped sandbox that needs a recreate) |
 | `romeu adopt <name>` | `REQ-0312` record an existing sandbox named `<name>` as an open generation (01 1.7); before the prompt it prints, escaped, the mounts, policies, secrets and image sbx reports for it; TTY required; `status` shows the generation as `adopted, not gated` until it is recreated ([01 1.6](01-system-model.md#generation)) | `sbx ls --json`, `sbx policy ls`, project record | project record | host: sbx | 0, 1, 2 (no TTY, open generation exists, workspace path differs, no such sandbox), 3 (gate 1) |
@@ -190,18 +190,18 @@ dir`, see J13).
 
 ### How `romeu sync` renders, gates and promotes
 
-`REQ-0335` 1. Take the lock (runs promotion recovery). Load and validate host
+1. `REQ-0335` Take the lock (runs promotion recovery). Load and validate host
    settings (exit 2; a missing secret binding is `secret-unbound`,
    whose fix hint prints the `<name>@<project>` entry to paste). Check
    gate 1 (01 1.4; exit 3): `sbx version` is a read, and 01 1.5 holds
    back only a mutating sbx call, so a stale toolchain stops `sync`
    before it promotes.
-`REQ-0336` 2. Hardened fetch of the config repo's origin into
+2. `REQ-0336` Hardened fetch of the config repo's origin into
    `refs/romeu/origin/<cfg-dir>/*`. The spec commit is the head of the
    config ref, or with `--from <sha>` that commit, which must be
    reachable from `refs/romeu/origin/*` (exit 2 otherwise): a spec on
    a branch is read after the branch is pushed.
-`REQ-0337` 3. `git fsck --strict` on the spec commit; read `projects/*.yaml` via
+3. `REQ-0337` `git fsck --strict` on the spec commit; read `projects/*.yaml` via
    `git cat-file`; strict decode and validate all specs (cross-project
    rules: unique names, unique URLs); exit 2 listing every error. `REQ-0338` A file
    under `projects/` that is not `*.yaml` is an error naming the path
@@ -209,42 +209,42 @@ dir`, see J13).
    repo URL equals `config.url` is an error naming `config.url`
    (`config-project-missing`, `RJ-346`, exit 2); 03 3.1 holds the two
    rules.
-`REQ-0339` 4. For each target project: create `<name>-env/` (mode 0700, with its
+4. `REQ-0339` For each target project: create `<name>-env/` (mode 0700, with its
    `.metadata_never_index` marker, [02 2.3](02-layouts.md#23-host-tree))
    and `memory/<dir>/` (create only, with the fixed subdirectories);
    hardened clone of missing repos; hardened fetch of each repo's
    origin into `refs/romeu/origin/<dir>/*`; resolve `egressCommit` from
    `refs/romeu/origin/<dir>/<ref>`.
-`REQ-0340` 5. Refuse (exit 2) if any memory dir violates the layout allowlist (I24).
-`REQ-0341` 6. Read workload and kit descriptors: the cache in host state first;
+5. `REQ-0340` Refuse (exit 2) if any memory dir violates the layout allowlist (I24).
+6. `REQ-0341` Read workload and kit descriptors: the cache in host state first;
    `internal/oci` by digest only on a cache miss (`registry-unreachable`
    when it cannot); local kits from the config commit's tree via
    `git fsck --strict` and the validated walk (I27). Derive egress
    ([07](07-mise-egress.md)). Delete any candidate dir the project
    record does not name. Render the candidate (`sbxenv.yaml`,
    `render.json`, `kits/`) under `.romeu/candidates/`.
-`REQ-0342` 7. Drift check of live files against the current `render.json`
+7. `REQ-0342` Drift check of live files against the current `render.json`
    (exit 4, `drift-detected`, naming the file; `--overwrite-drift`
    replaces the edited live file, and its edit is lost).
-`REQ-0343` 8. Gate 2 and the candidate state machine
+8. `REQ-0343` Gate 2 and the candidate state machine
    ([01 1.6](01-system-model.md#candidate)); promotion commit on
    approval or when unchanged.
-`REQ-0344` 9. `sbx ls --json`. If the sandbox is running:
+9. `REQ-0344` `sbx ls --json`. If the sandbox is running:
    the rest of the preflight (01 1.5), then reconcile egress live; if the `secrets`
    field is tagged `apply:"live"` (A10, Q18), `sbx secret set <svc>
    --sandbox <name> --command <rendered command>` (never a value); report
    "recreate needed" when the recreate digest differs from the running
    generation.
-`REQ-0345` 10. Report orphaned projects and repo dirs; remove nothing. Warn
+10. `REQ-0345` Report orphaned projects and repo dirs; remove nothing. Warn
     `julieta-pin-mismatch` when the julieta release the config repo's
     `validate.yml` pins is not the version romeu embeds.
 
 ### How `romeu run` reaches the run layout
 
-`REQ-0346` 1. Preflight (01 1.5). When `refs/romeu/origin/<cfg-dir>/<ref>`, as last
+1. `REQ-0346` Preflight (01 1.5). When `refs/romeu/origin/<cfg-dir>/<ref>`, as last
    fetched and with no network call, is ahead of the synced spec
    commit, print the warning `spec-moved: romeu sync <name>`.
-`REQ-0347` 2. The identity step of the preflight (01 1.5, step 6) has read `sbx ls
+2. `REQ-0347` The identity step of the preflight (01 1.5, step 6) has read `sbx ls
    --json` and refused the two cases that are not this project's
    sandbox: one romeu has no open generation for (the error
    `unknown-sandbox`, `RJ-203`, fix hint "decide: confirm that `<name>`
@@ -269,7 +269,7 @@ dir`, see J13).
    ([01 1.6](01-system-model.md#generation)).
 3. Compare the recreate digest of the live render with the open
    generation's, then act on the sandbox's state:
-   `REQ-0350` - absent: record a new generation first (01 1.6), then `sbx env run
+   - `REQ-0350` absent: record a new generation first (01 1.6), then `sbx env run
      -d --clone <dir>` (never `--auto-approve`; the call is interactive
      and raw, as 4.1 Output says, so sbx's own prompt appears in this
      terminal when needed). If sbx returns non-zero on that create, read
@@ -282,13 +282,13 @@ dir`, see J13).
      daemon may finish the create after romeu stopped waiting; the next
      `run` finds the sandbox present and goes on, or absent and closes
      the generation as lost (01 1.6).
-   `REQ-0352` - present and stopped: when the digests differ, exit 5 with
+   - `REQ-0352` present and stopped: when the digests differ, exit 5 with
      `recreate-needed` (fix: `romeu recreate <name>`), since starting
      it would run an env file that no longer matches the sandbox;
      otherwise `sbx env run -d <dir>` starts it, with no provisioning
      (what sbx does with an env file that changed under a stopped
      sandbox is recorded by A15).
-   `REQ-0353` - running: no `sbx env run`; when the digests differ, warn
+   - `REQ-0353` running: no `sbx env run`; when the digests differ, warn
      `recreate-needed` ("recreate needed: <fields> changed -> romeu
      recreate <name>").
 
@@ -296,7 +296,7 @@ dir`, see J13).
    configuration from the workspace tree is recorded by probe A5, and
    if it does, the drift check refuses one
    ([03 3.3](03-formats.md#33-rendered-sbxenvyaml-sbx-env-file-schemaversion-1)).
-`REQ-0354` 4. Reconcile egress: `sbx policy allow network --sandbox <name> <d>` for
+4. `REQ-0354` Reconcile egress: `sbx policy allow network --sandbox <name> <d>` for
    missing domains; `sbx policy rm network --sandbox <name> --resource
    <d>` for domains romeu applied that left the set; verify with `sbx
    policy check network --sandbox <name> <d>`. (Exact argv comes from
@@ -307,12 +307,12 @@ dir`, see J13).
    next `run`, which reconciles from the record. The record write is the
    atomic write of 03 3.8, once before the first call and once after the
    last; `sbx policy check` runs after the writes.
-`REQ-0356` 5. Compatibility check (06 6.3): `sbx env exec <dir> --
+5. `REQ-0356` Compatibility check (06 6.3): `sbx env exec <dir> --
    <abs .romeu/bin>/julieta-linux-<GOARCH> version --json`.
-`REQ-0357` 6. `sbx env exec <dir> --env JULIETA_MANIFEST=... --
+6. `REQ-0357` `sbx env exec <dir> --env JULIETA_MANIFEST=... --
    <abs julieta path> setup --json`; on failure print julieta's report
    (escaped) and exit 1 without attaching.
-`REQ-0358` 7. Unless `--no-attach`: `exec` into
+7. `REQ-0358` Unless `--no-attach`: `exec` into
    `sbx env exec -it <dir> --env JULIETA_MANIFEST=... -- <abs julieta path> layout up`.
    When the run layout fails, `layout up` exits with `layout-failed`,
    whose fix hint is the host command that opens a shell in the
@@ -404,7 +404,7 @@ or the trust entry; `signing-socket` points at J1 step 5.
 | `julieta install [--repo <dir>] [--force]` | `REQ-0403` `mise install` (locked) in every repo; skip when the `lock-set` digest equals the last success. `REQ-0404` A download blocked by egress fails with the error `install-blocked` (`RJ-341`), naming the tool, the host, the sbx command that approves it once for this sandbox (lost at recreate), and the durable fix, a spec edit and gate 2; egress follows the spec's `ref`, so a tool added on a branch installs once it merges; the error says whether the host is in the egress set the manifest carries ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)) | manifest, locks | mise data, julieta state | 0, 1, 2 |
 | `julieta lock [--repo <dir>] [--check]` | `REQ-0405` `mise lock --platform` with `linux-x64`, `linux-arm64` and the platforms the repo's `lockfile_platforms` setting lists (07 7.3). `REQ-0406` `--check` verifies freshness without writing: the lock parses with the pinned mise, every tool in `mise.toml` has a lock entry, and every lockable entry covers `linux-x64` and `linux-arm64`; `REQ-0407` a lockable entry without a checksum is the warning `lock-no-checksum`, and a `backend:tool` the embedded catalog does not know is the warning `lock-unknown-tool`, naming the two fixes of 07 7.5 step 2 | `mise.toml`, `mise.lock` | `mise.lock` (not with `--check`) | 0, 1, 6 (`--check` found a missing entry or platform) |
 | `julieta hooks run <hook> [args]` | `REQ-0408` dispatcher: julieta's own action (`pre-commit`: `lock --check` when `mise.toml` or `mise.lock` is staged; `post-commit`, `post-rewrite`, `post-merge`: `snapshot`), then the repo's tracked `.githooks/<hook>` if executable, then `$GIT_DIR/hooks/<hook>` if executable; the hook's arguments go to each, and its stdin to the first of the two that exists; `REQ-0409` a failure of julieta's own `snapshot` is recorded and does not stop the chain (08 8.4); otherwise the first non-zero status stops, and before exiting the dispatcher prints on stderr `julieta hooks: <hook> stage <julieta\|tracked\|local> (<path>) exited <n>` (or `exited 128+<signal>` for a stage a signal ended, 4.1 Signals), plus the error id and fix when the stage is julieta's own; a failure is recorded in julieta state until the same hook next succeeds | repo | as the hooks do; julieta state | hook's status |
-| `julieta hooks guard [--json]` | `REQ-0410` reads one PreToolUse JSON document on stdin (`tool_name` and `tool_input.command`, the shape C5 records as a fixture under `e2e/testdata/agent/<version>/`); exits 2 with the refusal text of 06 6.4 on its three patterns (`gh pr merge`, a `v*` tag push, `gh api` to rulesets or repository settings) and 0 otherwise; exits 2 on a document it cannot decode (fail closed) | stdin | nothing | sandbox: nothing | 0, 2 |
+| `julieta hooks guard [--json]` | `REQ-0410` reads one PreToolUse JSON document on stdin (`tool_name` and `tool_input.command`, the shape C5 records as a fixture under `e2e/testdata/agent/<version>/`); exits 2 with the refusal text of 06 6.4 on its three patterns (`gh pr merge`, a `v*` tag push, `gh api` to rulesets or repository settings) and 0 otherwise; exits 2 on a document it cannot decode (fail closed) | stdin | nothing | 0, 2 |
 | `julieta memory add\|list\|show\|edit [--repo <dir>] [--json]` | `REQ-0411` memory entries of the repo containing cwd (or `--repo`); `list --query <text>` filters; `edit --status done` closes an entry; julieta stamps id and timestamps; `add` prints the id, the path it wrote and the repo it filed the entry under | manifest, memory dir | memory dir | 0, 1, 2 |
 | `julieta memory check` | `REQ-0412` every manifest memory dir is mounted, writable, and satisfies the layout allowlist | manifest | nothing | 0, 1, 2, 6 (a violation of the layout) |
 | `julieta handoff write [--final\|--facts]` | `REQ-0413` read the narrative on stdin (not for `--facts`), validate headings, stamp facts, write `handoff/<ULID>-<kind>.md`, print its id, its path and the repo it filed the handoff under (08 8.3) | stdin, manifest, repos | memory handoff dir | 0, 1, 2 |

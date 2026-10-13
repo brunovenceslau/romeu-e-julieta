@@ -10,7 +10,7 @@ organizer for all their environments:
 
 - agents, inside a sandbox, author and maintain **project specs** in a
   config repo (repos, kits, sandbox options, secret names, run layout);
-- `REQ-0033` `romeu` **materializes** those specs into one host tree
+- `romeu` **materializes** those specs into one host tree
   (`$ROMEU_ROOT`, default `$HOME/dev`): plain clones (never submodules),
   generated `sbxenv.yaml`, per-repo memory directories, generated VS Code
   workspace files;
@@ -34,7 +34,7 @@ organizer for all their environments:
 
 | User | Needs | v1 support |
 |---|---|---|
-| Primary: a developer (the operator, [01 1.7](01-system-model.md#17-vocabulary)) on a macOS host (Intel or Apple silicon) running Claude Code agents in Linux sandboxes (amd64 or arm64) | one command per project, no hand-maintained env files, nothing that salvage covers lost on sandbox recreate (0.1), no unreviewed host code execution from agent output; prerequisites listed once in [12 12.8](12-engineering.md#128-contributor-docs-outlines) | full |
+| Primary: a developer (the operator, [01 1.7](01-system-model.md#17-vocabulary)) on a macOS host (Intel or Apple silicon) running Claude Code agents in Linux sandboxes (amd64 or arm64) | one command per project, no hand-maintained env files, nothing that salvage covers lost on sandbox recreate (0.1), no unreviewed host code execution from agent output (the invariants of [05 5.2](05-security.md#52-invariants-and-their-tests)); prerequisites listed once in [12 12.8](12-engineering.md#128-contributor-docs-outlines) | full |
 | Secondary: other developers adopting the public product | generic product, their own config repo, no personal values in code | generic by design (no personal values in code); v1 acceptance runs only with the maintainer's config repo and `examples/`, so a fresh adopter's first run is not tested (a [deferred decision](../spec.md#deferred-decisions)); onboarding documented; no support promise |
 | Contributors | a codebase they can trust and extend without tribal knowledge | `ARCHITECTURE.md`, `CONTRIBUTING.md`, generators, error ids with fix hints ([12](12-engineering.md)) |
 | Future: other agents | the core must stay agent-unaware | path kept open only (see non-goals) |
@@ -74,9 +74,11 @@ Decided (the record is a row of 12 12.5):
   their own config repos. `REUSE.toml` records the split; the CC0-1.0
   text joins `LICENSES/` with the first file under either directory,
   since `reuse lint` fails on a license text that no file uses.
-- `REQ-0036` Every file carries an SPDX header (`SPDX-License-Identifier` plus
+- Every file carries an SPDX header (`SPDX-License-Identifier` plus
   `SPDX-FileCopyrightText`) or is covered by `REUSE.toml`; the repo is
-  REUSE 3.3 compliant and `reuse lint` runs in `tools/ci`.
+  REUSE 3.3 compliant and `reuse lint` runs in `tools/ci`: S11
+  (REQ-0016) of the [index](../spec.md#success-criteria-measurable) is
+  the criterion.
 - `REQ-0037` Each release archive contains `COPYING` and a third-party notices
   file that `tools/release build` generates from the module graph; the
   `license` step of `tools/ci` fails a module whose license is not on an

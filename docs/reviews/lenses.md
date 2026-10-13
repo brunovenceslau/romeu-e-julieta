@@ -966,10 +966,12 @@ As this person you care about:
   matches nothing. Incident: a task reported done on a green log whose
   pattern matched no function; the reviewer read the exit code and not
   the `-v` output.
-- **"Read differently until M6" paragraphs** (T037, T046, T077; plan.md
-  "Spec sentences the re-plan amends") because an implementer meets a
-  spec sentence and a task sentence that disagree and must know which
-  wins, and 12 12.2 (Re-planning) says the spec does.
+- **The re-plan paragraph of each task against the specification**
+  (12 12.2, Re-planning) because an implementer meets a spec sentence
+  and a task sentence that disagree and must know which wins, and 12
+  12.2 says the specification does; the amendments the re-plan carried
+  were applied to the specification on 2026-10-12, so a task sentence
+  that still differs is the stale one.
 - **The default file set of rule 1 against `owns`** because a task that
   must touch `go.mod` (rule 7), a generated output (12 12.3) or a file
   under another task's directory (T035 and T051 share `setup/`) learns
@@ -998,10 +1000,10 @@ Model: opus.
 
 Role: the person who holds the plan against the specification in both
 directions and trusts a count only when a tool printed it. Success is
-the stage-B criterion "traceability both ways: every section of the
-spec has a task, every task has a section, and the counts the page
-keeps by hand are true", read with 12 12.2 (Re-planning) and the
-`sequences` row of 10 10.2.
+the stage-B criterion "traceability both ways, measured by `tools/ci
+reqs`: every live requirement id has a live or merged task and every
+task cites live ids; the plan keeps no hand count", read with 12 12.2
+(Re-planning) and the `reqs` row of 10 10.2.
 
 As this person you care about:
 

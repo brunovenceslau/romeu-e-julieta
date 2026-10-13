@@ -55,8 +55,8 @@ layouts are in [02 2.3](02-layouts.md#23-host-tree) and
 
 | Store | Path | Whose data | Who reads it | Lifetime | `rm` / `retire` |
 |---|---|---|---|---|---|
-| project tree | `REQ-0052` `$ROMEU_ROOT/<name>-env/` (`sbxenv.yaml`, `.romeu/`) | the operator's | the host user; the sandbox sees `.romeu/bin` read-only | until `retire` | kept / moved to `.attic` |
-| host clones | `<name>-env/<dir>/` | the repository owner's; origin content agents can push | the host user, in Restricted Mode; sbx clones the primary | until `retire`; never moved, re-cloned or deleted by `sync`, `run` or `rm` | kept / moved |
+| project tree | `$ROMEU_ROOT/<name>-env/` (`sbxenv.yaml`, `.romeu/`) | the operator's | the host user; the sandbox sees `.romeu/bin` read-only | until `retire` | kept / moved to `.attic` |
+| host clones | `<name>-env/<dir>/` | the repository owner's; origin content agents can push | the host user, in Restricted Mode; sbx clones the primary | `REQ-0052` until `retire`; never moved, re-cloned or deleted by `sync`, `run` or `rm` | kept / moved |
 | refs in romeu namespaces | `refs/romeu/*` and `refs/sandboxes/<name>/*` in each host clone | the operator's; salvage commits can hold untracked files | the host user | the clone's: deleting or re-cloning it loses them | kept / moved |
 | review checkouts | `<name>-env/review/<dir>/` | sandbox work | the host user, in Restricted Mode | until `retire` | kept / moved |
 | memory dirs | `<name>-env/memory/<dir>/` (entries, handoffs, snapshots, salvage payloads) | agent-written | the host user; the project's sandbox, read-write | until `retire` | kept / moved |
@@ -141,7 +141,7 @@ every project. Gate 1 makes it visible before any project uses it;
 | `repos` | sorted `{dir, url, primary, ref}` |
 | `secrets` | sorted `{name, service, argvDigest}` (argv from host settings) |
 | `workload` | `{repository, digest, capabilities}`; `capabilities` = the normalized capability set read from the workload descriptor (below) |
-| `kits` | ordered `{id, source: product|personal, contentDigest, args, capabilities}` |
+| `kits` | ordered `{id, source: product\|personal, contentDigest, args, capabilities}` |
 | `egressGated` | sorted gated domains, each with its reason (upload, non-catalog lock host, spec extra, spec tool override, kit-declared) |
 | `ports` | sorted port specs |
 | `agent` | the agent handle |
@@ -203,10 +203,10 @@ first mutating call.
 | Step | Check | Exit |
 |---|---|---|
 | 1 | `REQ-0075` toolchain (gate 1) | 3 |
-| 2 | an interrupted promotion is finished (1.6) or reported | 4 |
-| 3 | drift of every live derived file against `render.json` | 4 |
-| 4 | widening digest recomputed from the live files equals the approval (gate 2) | 3 |
-| 5 | host checks shared with `doctor` whose failure widens a sandbox or makes agent output executable on the host: sbx global secrets and broad allow rules (I22), host tools that auto-trust `$ROMEU_ROOT` (I23), and, for a project using `git-ssh-sign`, the signing socket rule of [06 6.4](06-kits.md#64-product-kits). A listing whose shape is not a recorded shape, or that cannot be parsed, fails the step with `upstream-shape` ([03](03-formats.md), opening) | 2 |
+| 2 | `REQ-1203` an interrupted promotion is finished (1.6) or reported | 4 |
+| 3 | `REQ-1204` drift of every live derived file against `render.json` | 4 |
+| 4 | `REQ-1205` widening digest recomputed from the live files equals the approval (gate 2) | 3 |
+| 5 | `REQ-1206` host checks shared with `doctor` whose failure widens a sandbox or makes agent output executable on the host: sbx global secrets and broad allow rules (I22), host tools that auto-trust `$ROMEU_ROOT` (I23), and, for a project using `git-ssh-sign`, the signing socket rule of [06 6.4](06-kits.md#64-product-kits). A listing whose shape is not a recorded shape, or that cannot be parsed, fails the step with `upstream-shape` ([03](03-formats.md), opening) | 2 |
 | 6 | `REQ-0076` sandbox identity (I26): an absent sandbox passes; a present one must have an open generation (1.7) romeu recorded (the error `unknown-sandbox`, `RJ-203`, otherwise) and the workspace path `$ROMEU_ROOT/<name>-env/<primary>`; a present sandbox whose generation is `removing` passes for `rm`, `recreate` and `retire`, and any other mutating command, `salvage --from-host` included, exits with `removal-pending` (`RJ-336`) | 2 |
 
 `REQ-0077` The preflight never touches the network: descriptors come from the
@@ -255,11 +255,11 @@ shape romeu does not recognize is never read as an absent sandbox.
 | From | Event | To | Effect |
 |---|---|---|---|
 | (none) | `REQ-0085` `sync` renders | rendered | candidate dir written under `.romeu/candidates/<candidate-id>/` |
-| rendered | widening digest equals the approval | promoted | promotion commit (below) |
-| rendered | digest differs, TTY, `y` (the answer `y` or `Y` followed by a newline accepts; any other line declines) | approved | approval recorded |
-| rendered | digest differs, TTY, other | declined | candidate dir deleted |
-| rendered | digest differs, no TTY | declined | candidate dir deleted; the widening digest printed; exit 3 |
-| approved | promotion commit completes | promoted | candidate dir deleted |
+| rendered | `REQ-1207` widening digest equals the approval | promoted | promotion commit (below) |
+| rendered | `REQ-1208` digest differs, TTY, `y` (the answer `y` or `Y` followed by a newline accepts; any other line declines) | approved | approval recorded |
+| rendered | `REQ-1209` digest differs, TTY, other | declined | candidate dir deleted |
+| rendered | `REQ-1210` digest differs, no TTY | declined | candidate dir deleted; the widening digest printed; exit 3 |
+| approved | `REQ-1211` promotion commit completes | promoted | candidate dir deleted |
 
 A candidate dir left by a killed command is deleted by the next `sync`.
 Approving a candidate rendered without a terminal is a row of
@@ -300,25 +300,25 @@ A generation is one sandbox lifetime, identified by a ULID.
 | From | Event | To | Effect |
 |---|---|---|---|
 | (none) | `REQ-0088` `run` finds the sandbox absent and is about to create it | open | record id, recreate digest, workspace path, the repo set, written before `sbx env run` |
-| open | the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows no sandbox | (none) | the record just written is removed; exit 1 |
-| open | the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows the sandbox | open | the record is kept; exit 1 |
+| open | `REQ-1212` the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows no sandbox | (none) | the record just written is removed; exit 1 |
+| open | `REQ-1213` the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows the sandbox | open | the record is kept; exit 1 |
 | open | `REQ-0089` the `sbx env run` of that same command times out (`subprocess-timeout`, [04 4.1](04-cli.md#starting-values)), whatever `sbx ls --json` shows | open | the record is kept, because sbx's daemon may finish the create after romeu stopped waiting; exit 1; the next `run` finds the sandbox present and goes on, or absent and closes the generation as lost (the `closed-lost` row), which costs one extra `run` and never a sandbox without a generation |
 | (none) | `REQ-0090` `adopt` on TTY, workspace path matches | open | record as above with `adopted: true` and an unknown recreate digest; the generation is accepted as it stands until it is recreated, and `status` shows `adopted, not gated` |
 | open | `REQ-0091` `salvage`, `rm`, `recreate` or `retire` starts the sandbox half | salvaging | new salvage id |
-| salvaging | `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command ended, killed or failed, while it salvaged, and wrote no later state) | salvaging | new salvage id; the refs the earlier salvage created stay |
+| salvaging | `REQ-1214` `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command ended, killed or failed, while it salvaged, and wrote no later state) | salvaging | new salvage id; the refs the earlier salvage created stay |
 | salvaging | `REQ-0092` the sandbox half fails (julieta exits 1, a full disk) or its exec is interrupted | open | salvage record `result: incomplete`, `reasons: [sandbox-half-failed]`; `REQ-0093` exit 1, or 128 plus the signal number when a signal to romeu interrupted the exec ([04 4.1](04-cli.md#signals)) |
 | open | `REQ-0094` `salvage --from-host`, the sandbox absent | open | refs and snapshot bundles imported under a new salvage id; salvage record `result: lost`, `reasons: [sandbox-lost]` |
-| salvaging | `salvage --from-host`, the sandbox absent | salvaging | as the open row |
+| salvaging | `REQ-1215` `salvage --from-host`, the sandbox absent | salvaging | as the open row |
 | salvaging | `REQ-0095` salvage verified; command was `salvage` | open | salvage record `result: complete` |
-| salvaging | salvage incomplete, no `--accept-loss` | open | salvage record `result: incomplete` with reasons; exit 5 |
+| salvaging | `REQ-1216` salvage incomplete, no `--accept-loss` | open | salvage record `result: incomplete` with reasons; exit 5 |
 | salvaging | `REQ-0096` salvage complete or `--accept-loss`; command removes the sandbox | removing | state written, with the salvage entry's `fingerprint` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)), before `sbx env rm`; for a salvage that a rerun on a `removing` generation started because a fresh fingerprint ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)) differs from the newest one written with `removing`, the command exits 5 with `fingerprint-unstable` in place of `sbx env rm` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids)) |
 | removing | `REQ-0097` `sbx env rm` succeeds | closed-removed | egress rules removed |
 | removing | `REQ-0098` `sbx env rm` fails | removing | the existing salvage record kept; exit 1 |
 | removing | `REQ-0099` `rm`, `recreate` or `retire` finds the sandbox present (a command killed before `sbx env rm`, or one whose `sbx env rm` failed), and a fresh fingerprint ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)) equals the newest `fingerprint` written with `removing` | removing | the existing salvage record kept; the command resumes at `sbx env rm` |
-| removing | `rm`, `recreate` or `retire` finds the sandbox present, and a fresh fingerprint ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)) differs from the newest `fingerprint` written with `removing` | salvaging | new salvage id; the `salvaging` rows decide how that salvage ends, as `fingerprint-unstable` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids)) lists them |
+| removing | `REQ-1217` `rm`, `recreate` or `retire` finds the sandbox present, and a fresh fingerprint ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)) differs from the newest `fingerprint` written with `removing` | salvaging | new salvage id; the `salvaging` rows decide how that salvage ends, as `fingerprint-unstable` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids)) lists them |
 | removing | `REQ-0100` the sandbox found absent (crash recovery) | closed-removed | the existing salvage record kept; egress rules removed |
 | open | `REQ-0101` `run`, `rm`, `stop`, `pull`, `salvage` without `--from-host`, or `retire` finds the sandbox absent | closed-lost | keeps a lost record `salvage --from-host` wrote for this generation, else writes one: refs and snapshots preserved as a salvage record `result: lost` |
-| salvaging | the sandbox found absent (crash recovery) | closed-lost | as above |
+| salvaging | `REQ-1218` the sandbox found absent (crash recovery) | closed-lost | as above |
 
 `REQ-0102` Absent means `sbx ls --json` exited 0, parsed, and did not list the
 sandbox. A non-zero exit is `sbx-unknown` (exit 1), and an output that
@@ -330,8 +330,8 @@ it prints the lost record and exits 1, and the next `run` creates.
 A romeu killed between the first row's record and the end of
 `sbx env run` leaves an open generation: the next `run` finds the
 sandbox absent and closes it as lost, or finds it present and goes on.
-`salvage --from-host` refuses when `sbx ls --json` shows the sandbox
-present (exit 2, fix hint `romeu salvage`) and does not close a
+`REQ-1219` `salvage --from-host` refuses when `sbx ls --json` shows the
+sandbox present (exit 2, fix hint `romeu salvage`) and does not close a
 generation; closing stays with the row that finds the sandbox absent.
 
 `REQ-0105` Destructive commands write in this order: the state `salvaging` with the

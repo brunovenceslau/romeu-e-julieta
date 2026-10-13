@@ -162,23 +162,23 @@ caller's environment and has none of these properties.
 whether each pin of the table is the newest published version of its
 tool. `go run ./tools/ci pins` reports it.
 
-`REQ-1073` - **Versions.** The pinned version and each published one are read
+- `REQ-1073` **Versions.** The pinned version and each published one are read
   the same way: after a leading `v` or `go`, `major.minor.patch`, with
   an optional `-` suffix, compared in numeric order. So `v1.8.0` and
   `1.8.0` are equal. A published tag that does not parse is not a
   version and changes no status.
-`REQ-1074` - **Newest** is the highest version among the releases that are
+- `REQ-1074` **Newest** is the highest version among the releases that are
   neither drafts nor prereleases. For the image the version is the
   tag's, never the digest.
-`REQ-1075` - **Status**, lowercase: `behind` when the pin is lower than the
+- `REQ-1075` **Status**, lowercase: `behind` when the pin is lower than the
   newest, `current` when equal, `ahead` when higher, and `unknown`
   when the pin does not parse or its source cannot be read whole. An
   unread source is never `current`.
-`REQ-1076` - **Output**: plain text, one line per pin in the order of the table,
+- `REQ-1076` **Output**: plain text, one line per pin in the order of the table,
   with the columns pin, source, pinned, newest and status. The command
   exits 0 whatever the statuses, and non-zero only on a usage or
   internal error.
-`REQ-1077` - **Reach**: GET requests only, with no credential, and no file
+- `REQ-1077` **Reach**: GET requests only, with no credential, and no file
   written, so a bump stays a reviewed diff.
 
 `REQ-1078` It is not a step of `all`: its result depends on what upstream
@@ -216,11 +216,11 @@ names the directories it owns, and a package module owns `internal/<id>`
 and the directories its row names in parentheses; a `tools/ci` test
 holds the tree of
 [02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public), this
-table and the package list of S9 to the same set of directories. The
-test checks only the package modules that an id names; a module whose id
-is no directory name owns the paths its row gives.
+table and the package list of S9 to the same set of directories.
+`REQ-1082` The test checks only the package modules that an id names; a
+module whose id is no directory name owns the paths its row gives.
 
-| Module id | `REQ-1082` Responsibility | Depends on |
+| Module id | Responsibility | Depends on |
 |---|---|---|
 | `ci-bootstrap` | `REQ-1083` in this order ([10 10.2](10-testing-style.md#release-and-bootstrap)): one PR with `tools/ci hygiene`, the forbidden-name denylist, `tools/ci fast` and `.githooks/pre-push`, finished by the maintainer block (rulesets first, denylist entries, hook enabled, the tries of the sandbox token, read on the host); then `tools/ci workflows` and a green CI workflow on the public repo; then the day-one middleware: `tools/new adr`, `go generate` wiring and `tools/ci generated` (the ADR index and CODEOWNERS) and `.github/ask-first.yaml` (first task); `tools/ci sequences`, `tools/ci pr` and the `ARCHITECTURE.md` and `CONTRIBUTING.md` skeletons land by their triggers, before the release candidate. `REQ-1084` The `ARCHITECTURE.md` skeleton links the trust boundaries A-F of [01 1.3](01-system-model.md#13-trust-boundaries) and the gates of [01 1.4](01-system-model.md#14-the-gates) under its headings, so it is useful from the first task. `REQ-1085` A `tools/new` kind and a generator row land in the first PR of the module that owns their first input, not here | - |
 | `probes` | probe harness (pure core + exec layer), `probe-result.v1`, redacted sbx recordings, `tools/ci probes` checks | - |
@@ -295,28 +295,28 @@ which review reads, so they are not covered by a check.
 **The release checklist.** The maintainer's release flow is this
 ordered list; each step names its command and its output:
 
-`REQ-1093` 1. Push the release candidate tag `v1.0.0-rc.<n>`; `release.yml`
+1. `REQ-1093` Push the release candidate tag `v1.0.0-rc.<n>`; `release.yml`
    publishes it as a prerelease (10 10.2). Read the Deferred decisions
    tables of the [index](../spec.md#deferred-decisions) and the packages
    `go list ./internal/...` reports that `go list -deps ./cmd/romeu
    ./cmd/julieta` does not (the dark-code row there), read at that tag;
    the output is the rows whose event happened, pasted under the
    Evidence of the pull request of step 2.
-`REQ-1094` 2. Block B on both hosts:
+2. `REQ-1094` Block B on both hosts:
    `go run ./e2e/probes --block B --version v1.0.0-rc.<n> --out docs/probes/`;
    the results are committed by a pull request
    ([11 11.2](11-host-probes.md#112-block-b---acceptance-on-real-hosts-last)).
-`REQ-1095` 3. `go run ./tools/ci acceptance --pre-tag` exits 0 on the commit to be
+3. `REQ-1095` `go run ./tools/ci acceptance --pre-tag` exits 0 on the commit to be
    tagged: it runs the six checks of
    [10 10.5](10-testing-style.md#105-acceptance-evidence) that read
    only the repository, the two of 11 11.4 among them.
-`REQ-1096` 4. Push the tag `v1.0.0`.
-`REQ-1097` 5. B1 and B2 once more, on v1.0.0 and on one host, with `--out` a
+4. `REQ-1096` Push the tag `v1.0.0`.
+5. `REQ-1097` B1 and B2 once more, on v1.0.0 and on one host, with `--out` a
    directory outside the repository, so the candidate's results stay;
    the output goes under the Evidence of the acceptance pull request.
-`REQ-1098` 6. `go run ./tools/ci acceptance`, and the acceptance pull request
+6. `REQ-1098` `go run ./tools/ci acceptance`, and the acceptance pull request
    commits `docs/acceptance.json`.
-`REQ-1099` 7. For every release after v1.0.0, once `release.yml` has published
+7. `REQ-1099` For every release after v1.0.0, once `release.yml` has published
    it: `go run ./tools/ci acceptance --tags` exits 0; it runs only the
    check of [10 10.5](10-testing-style.md#105-acceptance-evidence)
    that each release's tag commit equals the source digest in its
@@ -533,7 +533,7 @@ default branch into the pull request touches nothing. In a glob, `**`
 matches zero or more path segments, `*` matches inside one segment, and
 each other character matches itself. Across the lines of one body, `pr`:
 
-`REQ-1157` - fails on a line that starts with `Approval: ` and is not an approval
+- `REQ-1157` fails on a line that starts with `Approval: ` and is not an approval
   line, with the message "malformed approval line", even when another
   line approves the same surface;
 - fails on an approval line whose id neither list has;
@@ -597,7 +597,7 @@ must have that form; a merge commit's subject is not checked.
   milestone or a sitting); the plan cites this specification by
   requirement id (12.11). Review history lives in
   `docs/reviews/round-<n>.md`.
-`REQ-1166` - Decisions live in ADRs under `docs/adr/`, one decision per record.
+- `REQ-1166` Decisions live in ADRs under `docs/adr/`, one decision per record.
   Layout, sections, statuses, supersede links and sign-off follow
   [ADR 0001](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
   (rules 6-9); `tools/ci sequences` checks layout, statuses and links,
@@ -615,7 +615,7 @@ must have that form; a merge commit's subject is not checked.
   line of the `decisions` surface, and review, by working agreement, is
   where a rewrite is refused (05 5.4 says what that is worth with one
   account).
-`REQ-1168` - A settled open question becomes an ADR when the decision is expensive
+- `REQ-1168` A settled open question becomes an ADR when the decision is expensive
   to reverse
   ([ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md));
   an overturned probe default always does (11 11.4). `REQ-1169` A decision this
@@ -639,7 +639,7 @@ must have that form; a merge commit's subject is not checked.
   | stdlib `flag`, no CLI framework | 12.1 |
   | GPL-3.0-only, with CC0-1.0 for `examples/` and `schemas/` | [00 0.4](00-scope.md#04-license) |
 
-`REQ-1172` - A heading that a committed probe result names in its `affects` is
+- `REQ-1172` A heading that a committed probe result names in its `affects` is
   renamed together with that result, in the same commit;
   `tools/ci probes` resolves each such anchor (11 11.3).
 
@@ -670,19 +670,19 @@ Evidence).
 
 ## 12.7 Text standard and lessons
 
-`REQ-1178` - Commits: Conventional Commits; the body says why and cites evidence
+- `REQ-1178` Commits: Conventional Commits; the body says why and cites evidence
   where a claim can be checked; English. The prose rules of ADR 0001
   (rule 4) apply to commit messages and PR titles, checked by
   `tools/ci pr`.
-`REQ-1179` - PRs: the PR template sections Why / What changed / Evidence /
+- `REQ-1179` PRs: the PR template sections Why / What changed / Evidence /
   Middleware / Lessons, checked by `tools/ci pr`; Lessons holds a
   lesson or the word `none`.
-`REQ-1180` - Issues: the forms in `.github/ISSUE_TEMPLATE/`: a bug (the romeu and
+- `REQ-1180` Issues: the forms in `.github/ISSUE_TEMPLATE/`: a bug (the romeu and
   sbx versions, the command, its output or the `doctor` report) and a
   catalog gap (the tool and its domains). The task that lands the forms
   also creates the label `deferred`, which reports the event of a
   deferred decision (index, Deferred decisions).
-`REQ-1181` - `docs/lessons/NNNN-<slug>.md`: one file per lesson, numbered as ADRs
+- `REQ-1181` `docs/lessons/NNNN-<slug>.md`: one file per lesson, numbered as ADRs
   are, with the generated index `docs/lessons/README.md` (12.3). A
   lesson holds the date, what happened, the rule, and the enforcing
   `tools/ci` subcommand or test name, or "no check possible:
@@ -705,7 +705,7 @@ product-specific content.
 
 | File | Reader and type | Outline |
 |---|---|---|
-| `README.md` | `REQ-1183` a developer deciding whether to use the product; explanation + quick start | the heading order of ADR 0001 rule 12 as decision 6 of ADR 0009 amends it, filled with: what it is and who it is for, including the supported daily setup (edit and debug inside the sandbox; host clones are for reading in Restricted Mode) and that the `julieta-claude` kit replaces the agent's built-in memory with julieta memory; when not to use it; prerequisites, listed here once (a macOS host; sbx; the git floor; a `gh` at or above the floor of 12 12.1; a Claude Code login, done inside the sandbox at the first run; a `mise.toml` in each repo whose tools `julieta setup` installs; a GitHub account for the config repo's CI; Keychain items for the secret names; a root outside iCloud Drive, Dropbox and other synced folders, knowing that `~/Documents` and `~/Desktop` are synced when iCloud's Desktop and Documents option is on; and the egress catalog's reach: it covers the tools listed in `catalog/egress.yaml` (built from the reference config repo's locks), and another tool is declared with `egress.tools` in the project spec, always gated, until a release ships its catalog entry); install and verify (checksums and the attestation, by the verification contract of 10 10.2); first run (the steps of J1, 09); the trust model in one paragraph: what romeu writes (host settings, the root tree, host state), what it never does (with links to the boundaries A-F of 01 1.3 and to I1-I3), a link to the product half of 05 5.4, and a link to `ARCHITECTURE.md`; the product kits, `git-ssh-sign` marked opt-in; data and uninstall: what romeu keeps on the machine, linking the table of 01 1.2 ("Where data lives"), that a root excluded from Time Machine (doctor's `root-indexed` check) needs another copy of its memory dirs, handoffs and unpushed work, and how to stop using it, linking the guide of J14; a best-effort response expectation for issues and pull requests; the license: GPL-3.0-only for the product, CC0-1.0 for `examples/` and `schemas/`, and what that means for a config repo; links to guides, reference and ADRs |
+| `README.md` | `REQ-1183` a developer deciding whether to use the product; explanation + quick start | the heading order of ADR 0001 rule 12 as decision 6 of ADR 0009 amends it, filled with: what it is and who it is for, including the supported daily setup (edit and debug inside the sandbox; host clones are for reading in Restricted Mode) and that the `julieta-claude` kit replaces the agent's built-in memory with julieta memory; when not to use it; prerequisites, listed here once (a macOS host; sbx; the git floor; a `gh` at or above the floor of 12 12.1; a Claude Code login, done inside the sandbox at the first run; a `mise.toml` in each repo whose tools `julieta setup` installs; a GitHub account for the config repo's CI; Keychain items for the secret names; a root outside iCloud Drive, Dropbox and other synced folders, knowing that `~/Documents` and `~/Desktop` are synced when iCloud's Desktop and Documents option is on; and the egress catalog's reach: it covers the tools listed in the embedded catalog (`internal/catalog/egress/*.yaml`, 03 3.5, built from the reference config repo's locks), and another tool is declared with `egress.tools` in the project spec, always gated, until a release ships its catalog entry); install and verify (checksums and the attestation, by the verification contract of 10 10.2); first run (the steps of J1, 09); the trust model in one paragraph: what romeu writes (host settings, the root tree, host state), what it never does (with links to the boundaries A-F of 01 1.3 and to I1-I3), a link to the product half of 05 5.4, and a link to `ARCHITECTURE.md`; the product kits, `git-ssh-sign` marked opt-in; data and uninstall: what romeu keeps on the machine, linking the table of 01 1.2 ("Where data lives"), that a root excluded from Time Machine (doctor's `root-indexed` check) needs another copy of its memory dirs, handoffs and unpushed work, and how to stop using it, linking the guide of J14; a best-effort response expectation for issues and pull requests; the license: GPL-3.0-only for the product, CC0-1.0 for `examples/` and `schemas/`, and what that means for a config repo; links to guides, reference and ADRs |
 | `ARCHITECTURE.md` | `REQ-1184` a contributor or reviewer; explanation, one page | components and their single jobs; the trust boundaries A-F and the gates, linked from 01 1.3 and 01 1.4 rather than copied; the candidate and generation state machines, as the generated diagrams under `docs/diagrams/` (12.3), which it links; the promotion commit as the numbered procedure of 01 1.6; one short section per flow (sync, run, salvage): its entry function, the packages it crosses, its invariants and their tests; where each invariant is enforced; module dependency direction. Every invariant id of 05 5.2 and every module id of 12.2 appears in it, which `tools/ci docs` checks |
 | `CONTRIBUTING.md` | `REQ-1185` a contributor; how-to | the dev loop (`tools/new`, `go generate`, `tools/ci fast`, `tools/ci all`); enabling the pre-push hook; running the gates locally, and which test levels each platform runs (macOS: unit, golden, the git and fake-sbx e2e and the I27 trees; Linux: those and the hybrid and container e2e and `license`; the host suite on a maintainer's Mac only); a red leg the change did not cause is fixed on `main` by one pull request (10 10.2); how to add a command, invariant, probe or kit; the delivery practices (12.9); what counts as ask-first, how approval is recorded, and how an outside contributor gets an approval line (12.4); outside pull requests to the catalog and the kits: the evidence such a pull request needs, reviewed by the one maintainer, best effort; the issue forms and the label `deferred`, which reports the event of a deferred decision (index); a best-effort response expectation for issues and pull requests; the PR template and the Middleware line; a link to the documentation standard (ADR 0001), which holds the text standard for commits and PRs (12.7) and the request to write with a voice; ADRs and superseding |
 | `SECURITY.md` | `REQ-1186` a person who found a vulnerability; how-to | the three headings of ADR 0001 rule 20. The channel is GitHub's private vulnerability reporting, which the maintainer block switches on (10 10.2). The response expectation the maintainer set: an acknowledgement within 30 days, best effort, and no promised time for a fix. The supported versions name the tested sbx window (10 10.3). What happens next is written with the page |
@@ -728,14 +728,14 @@ or is tagged **[review]**: a reviewer, human or agent, judges it.
 
 | Rule | Enforced by |
 |---|---|
-| Every pull request targets `main` | `REQ-1189` `tools/ci pr`: the payload's `base.ref` equals its `base.repo.default_branch` |
+| `REQ-1189` Every pull request targets `main` | `tools/ci pr`: the payload's `base.ref` equals its `base.repo.default_branch` |
 | A branch carries one pull request and ends when it merges. v1 has no stack of pull requests: a change that depends on an unmerged pull request waits for it, or is part of it; consecutive dependent tasks of one chain, written by one agent, may ship as one pull request | **[review]**; the first half is how GitHub works, the second is a judgment. Stacking is a [deferred decision](../spec.md#deferred-decisions) |
 | A green pull request with its approval lines is merged at the maintainer's next sitting, and at least one merge happens each business day | **[review]**; a sitting with more than three pull requests waiting reopens the [deferred decision](../spec.md#in-how-this-repository-is-run) on whether the maintainer's merge stays a manual checkpoint |
 | A branch is short-lived. Our sources give two ceilings, a couple of days and a few hours (ADR 0002); we adopt neither as a gate | **[review]**, from the pull requests' dates on GitHub |
-| `main` is releasable at every merge | `REQ-1190` CI green on the full list of [10 10.2](10-testing-style.md#102-ci) before every merge, by working agreement; `release.yml` runs the same list on the commit the tag names before it builds. The commits a merge brings in were gated together, as that merge, and not one by one. The merge requirements, and what they are worth, are in [05 5.4](05-security.md#risks-of-how-this-repository-is-developed) |
-| Every merge is a merge commit: no squash, no rebase merge | `REQ-1191` the default-branch ruleset, and the repository's merge settings, which bind the maintainer too (10 10.2, the maintainer block). A pull request's commits reach `main` as they were written and signed, so `main`'s history is the reviewed commits; the release notes read each pull request's commits from GitHub (12.6) and do not depend on it |
+| `REQ-1190` `main` is releasable at every merge | CI green on the full list of [10 10.2](10-testing-style.md#102-ci) before every merge, by working agreement; `release.yml` runs the same list on the commit the tag names before it builds. The commits a merge brings in were gated together, as that merge, and not one by one. The merge requirements, and what they are worth, are in [05 5.4](05-security.md#risks-of-how-this-repository-is-developed) |
+| `REQ-1191` Every merge is a merge commit: no squash, no rebase merge | the default-branch ruleset, and the repository's merge settings, which bind the maintainer too (10 10.2, the maintainer block). A pull request's commits reach `main` as they were written and signed, so `main`'s history is the reviewed commits; the release notes read each pull request's commits from GitHub (12.6) and do not depend on it |
 | Batches are small. v1 sets no limit on pull request size | **[review]**, from the size GitHub shows |
-| Unfinished work merges dark, in small pieces, and does not wait on a branch | `REQ-1192` **[review]**; `coverage` (S9) counts it, so a dark path merges with its tests. No check bounds how long a package stays dark: a [deferred decision](../spec.md#deferred-decisions) |
+| `REQ-1192` Unfinished work merges dark, in small pieces, and does not wait on a branch | **[review]**; `coverage` (S9) counts it, so a dark path merges with its tests. No check bounds how long a package stays dark: a [deferred decision](../spec.md#deferred-decisions) |
 
 Three rows, the short branch, the small batch and the small release,
 are judged by review from `gh pr list --json` read by hand; the tool
@@ -766,7 +766,7 @@ ADR 0003 says what we could and could not check about their source.
 | Continuous refactoring | `REQ-1194` Each change leaves the code it touches better, in the same pull request, with the tests green before and after | **[review]**; `tools/ci pr` requires the Middleware line (12.4), which is where an improved check or generator is named |
 | Continuous integration | Integrate into `main` and test often: small pull requests, each run through the full list, each merged. This is a cadence of integrating and testing. It is not the rule "do not release until the tests pass", which is the row "releasable" above | the trunk rules above; the pre-push hook runs `fast` on every push (12.4) |
 | Small releases | A release is one `v*` tag built by `release.yml`; two small releases are better than one large | **[review]**; the release notes list the changes in each release (12.6) |
-| Collective ownership | `REQ-1195` No file belongs to a person or to the agent that wrote it; anyone changes any code through a pull request. `.github/CODEOWNERS` names the owner of the ask-first paths (05 5.3), whose approval line a change needs; it is not a claim of ownership | **[review]**; the generators (12.3) and `ARCHITECTURE.md` are what let a newcomer change code they did not write |
+| Collective ownership | No file belongs to a person or to the agent that wrote it; anyone changes any code through a pull request. `.github/CODEOWNERS` names the owner of the ask-first paths (05 5.3), whose approval line a change needs; it is not a claim of ownership | **[review]**; the generators (12.3) and `ARCHITECTURE.md` are what let a newcomer change code they did not write |
 
 **The agent and the reviewer.** XP has pair programming. We do not,
 and we do not pretend to. What we have is a loop: the agent that
@@ -806,14 +806,22 @@ release, a pull request with a commit of type `fix` and no such line
 
 ## 12.11 Requirement ids
 
-`REQ-1198` Each obligation of this specification that a test, a check, a generator,
-a probe or a task's acceptance can verify carries a stable id, `REQ-`
-and four digits, written as one code span and placed as the first token
-of the sentence, bullet, numbered item or table cell it governs. One id
-marks one independently checkable obligation: a step list carries one
-per step, and a table whose rows are obligations one per row, in the
-cell that states the rule. The plan's task files cite requirements by
-these ids
+Requirement ids were adopted on 2026-10-12
+([ADR 0012, adopt requirement ids in the specification and amend the documentation standard for the plan's shape](../adr/0012-adopt-requirement-ids-in-the-specification-and-amend-the-documentation-standard-for-the-plan-s-shape.md),
+proposed). `REQ-1198` Each obligation of this specification that a test,
+a check, a generator, a probe or a task's acceptance can verify carries
+a stable id, `REQ-` and four digits, written as one code span and placed
+as the first token of the text it governs: after the marker of a bullet
+or numbered item, at the start of a sentence or of a table cell, and
+never inside another code span, a fenced block or a table header row.
+One id marks one independently checkable obligation: a step list
+carries one per step, and a table whose rows are obligations one per
+row, in the cell that states the rule. In the invariant table of 05 5.2
+the Invariant cell carries the row's id; a Test cell carries an id only
+for a test that is an obligation beyond the tagged test of REQ-0472,
+such as a positive control or a conformance fixture. The plan's task
+files cite requirements by these ids, each followed by the section the
+id sits in as a reading aid
 ([02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public);
 [10 10.2](10-testing-style.md#102-ci), `reqs`). An id is never reused or
 renumbered, and the text it marks may change under it; when an
@@ -824,40 +832,58 @@ order (the index, then `spec/00` to `spec/13`, top to bottom); every
 later id takes the next number after the highest, live or retired.
 
 What carries no id: explanation and reasons (the "Why for us" text,
-the principles of the index), the decision tables of 06 6.1 and 02
-2.6, the scope table of 00 0.5, the journeys of 09 (an obligation
-stated only in a journey moves to the chapter that owns it, and the
-journey cites it), the Open questions and Deferred decisions tables of
-the index, 13 (designed, not built) and the decision records. A rule
-that review judges by working agreement, with no test or check, is
-marked **[review]** and carries no id. S<n>, I<n>, J<n>, RJ-<nnn> and
+the principles of the index), the scope table of 00 0.5, the journeys
+of 09 (an obligation stated only in a journey moves to the chapter that
+owns it, and the journey cites it), the index from its Open questions
+heading to the end, 13 (designed, not built) and the decision records.
+In such a place an id is cited in plain text, `REQ-` and the digits
+with no code span, since the code span is the marker. A rule that
+review alone judges is marked **[review]** and carries no id; a rule
+that a check enforces in part carries one, placed before the rule, and
+its **[review]** half stays unverified. S<n>, I<n>, J<n>, RJ-<nnn> and
 the probe ids stay what they are, handles for a criterion, an
 invariant, a journey, an error and a probe; a requirement id marks the
 obligation text, so a criterion row carries both.
 
-`REQ-1199` A new obligation is written with the placeholder, `REQ-` and the word
-`new` as one code span, in the place its id will take; `go run
-./tools/ci reqs allocate` replaces each placeholder, in document order,
-with the next unused number, and is idempotent on a tree without
-placeholders; nobody types a number. `REQ-1200` `tools/ci reqs`, in `fast` and
-`all` (10 10.2), fails a placeholder left in the tree, an id that is not
+`REQ-1199` A new obligation is written with the placeholder, `REQ-` and
+the word `new` as one code span, in the place its id will take; `go run
+./tools/ci reqs allocate` replaces each placeholder of the working tree,
+in document order, with the next unused number, writes nothing while an
+id or a retired row of the tree is a finding, and is idempotent on a
+tree without placeholders; nobody types a number. `REQ-1200` `tools/ci
+reqs`, in `fast` and `all` (10 10.2), judges the committed tree at HEAD,
+as `hygiene` does, and fails a placeholder left in it, an id that is not
 four digits, an id that appears twice, an id both live and retired, a
 number below the highest that neither the text nor the table holds (a
-dropped obligation is retired, never deleted), and an id in a page or a
-section this rule excludes (13, 09's journeys, the two index tables, 00
-0.5, `docs/adr/`). `REQ-1201` Where the task files exist, it also fails an
-Implements entry that cites a retired or unknown id and a live id that
-no task of fate `kept`, `new`, `deferred` or `merged` cites, the
-deferred ones reported apart. Two branches that allocate from one base
-take the same numbers; the rebase-and-rerun rule of 12.3 covers it, and
-the check fails the duplicate. A pull request that changes the text of a
+dropped obligation is retired, never deleted), an id or a placeholder
+placed against the first paragraph of this section, and an id in a page
+or a section this rule excludes (13, 09's journeys, the index from its
+Open questions heading to the end, 00 0.5, `docs/adr/`). `REQ-1201`
+Where the task files exist, it also fails an Implements entry that cites
+a retired or unknown id, or whose reading aid names a section other
+than the one the id sits in; a live id that no task of fate `kept`,
+`new`, `deferred` or `merged` cites, the deferred ones reported apart;
+and a live id that more than five tasks of the other three fates cite,
+since one obligation has few implementers and a wider citation is a
+copy, not a trace: the few ids that every record of a kind cites are
+listed in the check. Two branches that allocate from one base take the
+same numbers; the rebase-and-rerun rule of 12.3 covers it, and the
+check fails the duplicate. A pull request that changes the text of a
 requirement, or retires one, updates in the same pull request the task
 files whose Implements line cites it (12.2, Re-planning).
 
-`REQ-1202` **Retired requirements.** One row per retired id, written by the pull
-request that retires it and never removed; its conflict risk is
-covered by the plan's deferred row on one file per deferred-decision
+`REQ-1202` **Retired requirements.** One row per retired id, written by
+the pull request that retires it and never removed; its conflict risk
+is covered by the plan's deferred row on one file per deferred-decision
 row.
 
 | Id | Retired on | Last text | Replaced by |
 |---|---|---|---|
+| `REQ-0033` | 2026-10-12 | `romeu` materializes those specs into one host tree (`$ROMEU_ROOT`, default `$HOME/dev`): plain clones (never submodules), generated `sbxenv.yaml`, per-repo memory directories, generated VS Code workspace files | none: an objective of 00 0.1, which explains; the obligations are the tree rules of 02 2.3 |
+| `REQ-0036` | 2026-10-12 | Every file carries an SPDX header (`SPDX-License-Identifier` plus `SPDX-FileCopyrightText`) or is covered by `REUSE.toml`; the repo is REUSE 3.3 compliant and `reuse lint` runs in `tools/ci` | REQ-0016, the S11 row of the index, which 00 0.4 cites |
+| `REQ-0139` | 2026-10-12 | at most one unapproved candidate (`sbxenv.yaml`, `render.json`, `kits/`); never referenced by a live file | REQ-0084 (01 1.6), which the tree rules of 02 2.3 cite |
+| `REQ-0213` | 2026-10-12 | The entries above are examples; the v1 catalog was built from the reference config repo's locks (S4) and measured in probe B4 | none: explanation |
+| `REQ-0560` | 2026-10-12 | the row of Deferred decisions on `tools/ci pr`, with its trigger; the forbidden-name check over pull request text runs in the agents' own pre-PR gate and the maintainer's read until then | none: a pointer to a deferred row, which carries no id |
+| `REQ-0561` | 2026-10-12 | the row of Deferred decisions on `tools/ci sequences`, with its trigger | none: a pointer to a deferred row, which carries no id |
+| `REQ-0562` | 2026-10-12 | the row of Deferred decisions on `tools/ci invariants` and `mutate`, with its trigger | none: a pointer to a deferred row, which carries no id |
+| `REQ-1195` | 2026-10-12 | No file belongs to a person or to the agent that wrote it; anyone changes any code through a pull request. | none: review alone judges it (12.9) |

@@ -282,7 +282,7 @@ local-gate run is recorded is a
 | hygiene | `tools/ci hygiene`; its rules are in [Hygiene](#hygiene) below | yes |
 | pushed range | `REQ-0825` `tools/ci fast` with the pre-push hook's arguments: it first refuses a push it would not test as sent, then runs the forbidden-name check over the remote ref names and the commits of a push (below), and refuses a commit that adds or renames to a file whose name is on the never-tracked list (below) even when a later commit removes it | in the hook only |
 | sequences | `REQ-0826` `tools/ci sequences`: ADR numbers unique; ADR layout and statuses per ADR 0001 (rules 6-7), the `Superseded in part by` form included, the filename compared through the `slug` function `tools/new adr` uses; every `Supersedes` link in an ADR's Status section matches a `Superseded by` link in the target ADR and the reverse; every ADR that `docs/spec.md` or `docs/spec/` cites has status Accepted, or Proposed when every sentence that cites it carries the word `proposed`; a Rejected, Deprecated or Superseded record is cited only from `docs/reviews/`, `docs/notes/` or another record; every row of the index's Deferred decisions tables has its three cells filled ([ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md)); the ids below unique, and every referenced id and id range (for example "J1-J14" in a success criterion) defined; over `docs/plan/tasks/*.md`: task ids contiguous across the files, `needs` and `after` naming existing task ids (`tools/ci plan` holds these until `sequences` lands), and each Implements entry a live requirement id (`reqs`, [12 12.11](12-engineering.md#1211-requirement-ids)); `REQ-0827` no token of the form `T<nnn>`, `O<n>` or `checkpoint C<n>` in `docs/spec.md` or `docs/spec/` (12 12.5), a fixture each way; `REQ-0828` every command of [04 4.2](04-cli.md#42-romeu-host) and [04 4.3](04-cli.md#43-julieta-sandbox) has a row in the table of [00 0.5](00-scope.md#05-scope-justification), and every row of it written as a command (a code span that starts with `romeu` or `julieta`) names one of them, so a removed command leaves no row behind, with a fixture each way | yes |
-| reqs | `REQ-0829` `tools/ci reqs`: the requirement ids of [12 12.11](12-engineering.md#1211-requirement-ids): every id four digits and unique across the specification and the retired table; no placeholder left; no id both live and retired; no number below the highest absent from both; none in a page or section 12.11 excludes; and, over `docs/plan/tasks/*.md` where they exist, every Implements entry a live id and every live id cited by a task of fate `kept`, `new`, `deferred` or `merged`, the deferred ones reported apart. `tools/ci reqs allocate` numbers the placeholders, in document order, and is idempotent | yes |
+| reqs | `REQ-0829` `tools/ci reqs`, over the tree at HEAD: the requirement ids of [12 12.11](12-engineering.md#1211-requirement-ids): every id four digits, unique across the specification and the retired table, and placed as 12.11 says (after a list marker, outside a fenced block, a code span and a table header); no placeholder left; no id both live and retired; no number below the highest absent from both; none in a page or section 12.11 excludes; and, over `docs/plan/tasks/*.md` where they exist, every Implements entry a live id whose reading aid names the id's section, every live id cited by a task of fate `kept`, `new`, `deferred` or `merged`, the deferred ones reported apart, and no id cited by more tasks than 12.11 allows. `tools/ci reqs allocate` numbers the placeholders of the working tree, in document order, writes nothing while an id or a retired row is a finding, and is idempotent | yes |
 | vocabulary | `REQ-0830` `tools/ci vocabulary` (01 1.7) | yes |
 | workflows | `tools/ci workflows`: the grammar above | yes |
 | vulnerabilities | `REQ-0831` `govulncheck ./...`; it reads the Go vulnerability database over the network, so its result depends on the date. It is the one step of `all` that reads the network for its result: a local `all` without the network is not the equivalent run, and its output says so. It runs before `unit` (below) | |
@@ -399,8 +399,8 @@ What a run prints:
   longer; a budget for the hosted legs is a
   [deferred decision](../spec.md#in-how-this-repository-is-run).
 
-A red leg that the change did not cause (an advisory, a flake, an
-upstream outage) is fixed on `main` by one pull request, owned by
+`REQ-1223` A red leg that the change did not cause (an advisory, a flake,
+an upstream outage) is fixed on `main` by one pull request, owned by
 whoever sees it first; open pull requests rebase after it and are not
 fixed one by one. Gating each merge on the merged result (a merge
 queue) is a repository setting on the ruleset, and v1 does not use it.
@@ -478,11 +478,11 @@ Four subcommands are outside `all`:
 ### Lint
 
 - `REQ-0876` `golangci-lint run` covers the whole module, `tools/` included.
-- `.golangci.yml` enables the doc-comment, error-string and
+- `REQ-1224` `.golangci.yml` enables the doc-comment, error-string and
   commented-out-code checkers of ADR 0001 (rule 14) and testifylint with
   `enable-all: true` (10.6); it disables no linter and excludes no
   finding.
-- A fixture test proves that each rule 14 checker and each testifylint
+- `REQ-1225` A fixture test proves that each rule 14 checker and each testifylint
   checker that applies outside suites still reports (10.1).
 - revive's `exported` reads only importable packages, so it skips
   package `main` and `_test.go` files (`File.IsImportable` in the pinned
@@ -826,10 +826,10 @@ The workflow has two kinds of job:
      of a second build with the first.
   2. `REQ-0906` `actions/attest-build-provenance` attests the archives and
      `checksums.txt`.
-  3. `tools/release verify` checks each archive against the
+  3. `REQ-1226` `tools/release verify` checks each archive against the
      verification contract below, with the `gh` that `mise which`
      resolves ([12 12.1](12-engineering.md#121-tech-stack)).
-  4. `tools/release notes` generates the release notes
+  4. `REQ-1227` `tools/release notes` generates the release notes
      ([12 12.6](12-engineering.md#126-release-notes)); it reads the
      merged pull requests, their authors and the issues they close
      through the GitHub API with the step's `GH_TOKEN` and the job's
@@ -1102,7 +1102,7 @@ A check that fails after a tag is fixed by a new patch version.
 
 ## 10.6 Code style
 
-- Standard Go layout; small single-purpose packages; no `utils`.
+- `REQ-1228` Standard Go layout; small single-purpose packages; no `utils`.
 - `REQ-0956` Errors carry an id from the error table (`cli.Error{ID: "RJ-301"}`),
   which fixes the exit code; `main` maps them; tests assert ids, by the
   Error ids rule of 10.1.
@@ -1112,7 +1112,7 @@ A check that fails after a tag is fixed by a new patch version.
   except the salvage exec, which stops only on an interrupt, and the
   hook stages and pane steps of julieta, which are the user's own
   programs.
-- No global state except the embedded catalog, kits and binaries, and
+- `REQ-1229` No global state except the embedded catalog, kits and binaries, and
   the registries that `init` fills at program start (checks, `tools/new`
   kinds, commands), which nothing writes after `main` starts.
 - `REQ-0959` No `text/template` for structured output; no `sh -c` anywhere in
@@ -1166,20 +1166,20 @@ deferred function, which is why the cleanup stands between the two).
 - `REQ-0965` `require` for a precondition and for every error assertion (`Error`,
   `NoError`, `ErrorIs`, `ErrorAs`, `ErrorContains`): a setup step, a
   value a later line depends on, a length before an index.
-- `assert` for an independent check, such as an exit code, an output
+- `REQ-1230` `assert` for an independent check, such as an exit code, an output
   line or a final comparison, so that one run lists every problem.
   Inside a goroutine other than the test's a test uses `assert`,
   because `require` stops the test with `FailNow`, which only the
   goroutine that runs the test may call.
 - `REQ-0966` The expected value comes first: `assert.Equal(t, want, got)`.
-- The precise assertion: `Contains` and `NotContains` for text, `Len`
+- `REQ-1231` The precise assertion: `Contains` and `NotContains` for text, `Len`
   and `Empty` for size, `True` and `False` for a boolean, `Equal` for a
   comparison. A test has no `reflect.DeepEqual` and no hand-written
   `if got != want`.
 - A message only when it adds information: a label for a fixture, or
   the output that explains the failure. A test that logs its output
   on failure keeps doing so.
-- A table test gives each case a `t.Run` that does not depend on
+- `REQ-1232` A table test gives each case a `t.Run` that does not depend on
   another: `go test -run 'TestName/<case>'` runs it alone and it passes,
   with each space of the case name written as `_`.
 - `REQ-0967` A lint finding is fixed in the code: no directive outside the
@@ -1195,18 +1195,11 @@ deferred function, which is why the cleanup stands between the two).
 | Package | May be imported by | Must not import |
 |---|---|---|
 | `REQ-0968` `sbxdrv`, `render`, `gate`, `state`, `egress`, `signing`, `preflight` | `cmd/romeu`, `tools/ci` | `mise`, `hooks`, `layout` |
-| `mise`, `hooks`, `layout`, `agent/*`, `memstore/write` | `cmd/julieta` only | `sbxdrv` |
+| `REQ-1233` `mise`, `hooks`, `layout`, `agent/*`, `memstore/write` | `cmd/julieta` only | `sbxdrv` |
 | `REQ-0969` `gitsafe`, `spec`, `canon`, `catalog`, `oci`, `manifest`, `memstore`, `handoff`, `salvage`, `shquote`, `termsafe`, `cli`, `procgroup` | both | `sbxdrv`, `layout` |
 
 `REQ-0970` Names are packages under `internal/`; a command package under
 `internal/cmd/romeu/` or `internal/cmd/julieta/` follows the row of its
-
-`REQ-0971` `tools/**` and the test packages under `e2e/**` may import
-`internal/procgroup` directly and any other package under `internal/`
-through `internal/cmd/<binary>/all`, the one package per binary that
-links every command in (one blank-import file per command, 02 2.1); the
-rows govern the two binaries.
-
 binary. `REQ-0972` A package under `internal/` that no row names fails
 `tools/ci imports`, so a new package is placed in a row before it
 builds. The second column says which binary may link a package, so a
@@ -1215,6 +1208,12 @@ That is why the writer of the memory store is a package of its own, and
 why `salvage` takes the agent profile as an argument (08 8.5). `oci` is
 shared because `julieta pin` resolves and checks digests with the
 same guarded client (I28).
+
+`REQ-0971` `tools/**` and the test packages under `e2e/**` may import
+`internal/procgroup` directly and any other package under `internal/`
+through `internal/cmd/<binary>/all`, the one package per binary that
+links every command in (one blank-import file per command, 02 2.1); the
+rows govern the two binaries.
 
 ## 10.8 Definition of done for implementing agents
 

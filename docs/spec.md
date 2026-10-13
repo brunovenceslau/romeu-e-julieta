@@ -177,14 +177,14 @@ candidate and count for v1.0.0
     ([12 12.7](spec/12-engineering.md#127-text-standard-and-lessons)).
   - `REQ-0023` Record what a change taught in a file under `docs/lessons/` and
     turn it into a `tools/ci` check when it can be one.
-  - Open each PR against the default branch, from a short-lived branch,
-    and merge unfinished work dark instead of keeping it on a branch
-    ([12 12.9](spec/12-engineering.md#129-delivery-practices)).
-- **Ask first**
   - `REQ-0024` Mark each new obligation of this specification with the placeholder
     of [12 12.11](spec/12-engineering.md#1211-requirement-ids) and let
     `go run ./tools/ci reqs allocate` number it; retire an id, never
     delete or renumber one.
+  - Open each PR against the default branch, from a short-lived branch,
+    and merge unfinished work dark instead of keeping it on a branch
+    ([12 12.9](spec/12-engineering.md#129-delivery-practices)).
+- **Ask first**
   - `REQ-0025` Any change to a path listed in `.github/ask-first.yaml`
     ([05 5.3](spec/05-security.md#53-ask-first-surfaces)), which is
     the one list of those surfaces.

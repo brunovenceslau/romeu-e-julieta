@@ -204,7 +204,7 @@ the one renderer; a second renderer is a row of
 
 | Key | Meaning |
 |---|---|
-| `tabs[]` | `REQ-0194` `label` + `root`; a node is `{pane: <id>}` or `{split: row|column, ratio: 0.1..0.9, first, second}` (binary tree) |
+| `tabs[]` | `REQ-0194` `label` + `root`; a node is `{pane: <id>}` or `{split: row\|column, ratio: 0.1..0.9, first, second}` (binary tree) |
 | `panes[]` | `REQ-0195` `id`, `repo` (a project `dir`), `cwd` (relative to the repo), `env` (keys `^[A-Z_][A-Z0-9_]*$`, not `PATH`, `HOME`, `LD_*`, `BASH_ENV`, `ENV`), `steps` (list of argv lists; no shell), `focus` (at most one per tab) |
 
 `REQ-0196` Execution rule: every step runs as `mise exec -C <pane dir> -- <argv>`;
@@ -308,12 +308,11 @@ project uses `git-ssh-sign`, and `secrets`
 ([J1](09-journeys.md#j1-onboarding-new-machine-first-time) step 5).
 
 `REQ-0205` Rules: every `argv[0]` is absolute and exists; no shell strings; an argv
-is a command that fetches the value and never carries it, so an argv
-element that starts with `ghp_`, `gho_`, `ghs_`, `ghu_`, `ghr_` or
-`github_pat_`, or
-matches `^[0-9a-f]{40}$`, is refused with the error `secret-in-argv`
-(`RJ-314`; `REQ-0206` a best-effort guard against the common token shapes, not a
-detector); a spec secret name without a matching `name@project`
+is a command that fetches the value and never carries it. `REQ-0206` An
+argv element that starts with `ghp_`, `gho_`, `ghs_`, `ghu_`, `ghr_` or
+`github_pat_`, or matches `^[0-9a-f]{40}$`, is refused with the error
+`secret-in-argv` (`RJ-314`; a best-effort guard against the common token
+shapes, not a detector); a spec secret name without a matching `name@project`
 entry is exit 2 naming the key; `REQ-0207` a `name@other-project` entry never
 satisfies a different project; entries for unknown projects are
 reported by `doctor`. `REQ-0208` A secret argv and the credential helper run with
@@ -358,11 +357,11 @@ tools:                      # key: mise backend:tool as written in mise.lock; va
   aqua:cli/cli: []
 ```
 
-One list per tool: `REQ-0211` because tools can be reinstalled from inside a
+`REQ-0211` One list per tool: because tools can be reinstalled from inside a
 running sandbox, install and use domains are both needed at runtime, so
 the distinction has no consumer. The catalog is embedded in both romeu
 and julieta. `REQ-0212` CI requires every domain used anywhere to have an explicit
-`domains` entry. `REQ-0213` The entries above are examples; the v1 catalog was
+`domains` entry. The entries above are examples; the v1 catalog was
 built from the reference config repo's locks (S4) and measured in probe
 B4. The `meta` and `base` sets live in
 `internal/catalog/egress/base.yaml`; a domain declared by two files with
@@ -440,8 +439,8 @@ julieta accepts manifests, is described in
 
 `REQ-0226` `promoting` is `null` except inside a promotion commit
 ([01 1.6](01-system-model.md#promotion-commit)), when it is
-`{"candidateId": "<ULID>", "filesDigest": "<hex>", "previousFiles": `REQ-0227` {...}}`,
-`previousFiles` being the `files` map before the promotion, which
+`{"candidateId": "<ULID>", "filesDigest": "<hex>", "previousFiles": {...}}`.
+`REQ-0227` `previousFiles` is the `files` map before the promotion, which
 recovery writes back when the candidate no longer verifies. The julieta
 binary digest here is what the compatibility check compares against.
 

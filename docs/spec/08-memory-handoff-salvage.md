@@ -10,7 +10,8 @@ uncommitted work since the last snapshot is lost; a periodic snapshot
 of uncommitted changes is a row of
 [Deferred decisions](../spec.md#in-the-product). Snapshot and salvage
 are the deterministic half of every destructive journey and are
-required to be complete, not merely present.
+required to be complete, not merely present; what complete means is
+the rule of 8.5.
 
 ## 8.1 Memory store
 
@@ -124,19 +125,19 @@ plumbing.
 
 ## 8.4 Snapshot (after every commit)
 
-`REQ-0686` - Trigger: `REQ-0687` julieta's hook dispatcher after `post-commit`,
+- `REQ-0686` Trigger: julieta's hook dispatcher after `post-commit`,
   `post-rewrite`, `post-merge`, with no debounce (the bundle holds the
   objects not reachable from the last synced base, so it grows with the
-  work since the last sync); the romeu commands that snapshot are
-  named in their rows of [04 4.2](04-cli.md#42-romeu-host).
-`REQ-0688` - Content: `git bundle create` of all local branches, tags, notes, the
+  work since the last sync); `REQ-0687` the romeu commands that snapshot
+  are named in their rows of [04 4.2](04-cli.md#42-romeu-host).
+- `REQ-0688` Content: `git bundle create` of all local branches, tags, notes, the
   current generation's `refs/salvage/<generation>/*` refs (no earlier
   generation's), every worktree HEAD and, per branch, each reflog
   entry's commit not reachable from a bundled ref, as
   `refs/salvage-reflog/<branch>/<n>`, excluding objects reachable from
   the manifest's `repos[].base` (the origin SHAs the host already has,
   the same base salvage uses). One bundle is kept, not the last N.
-`REQ-0689` - Write: `snapshot/heads.bundle` is renamed into place first and
+- `REQ-0689` Write: `snapshot/heads.bundle` is renamed into place first and
   `snapshot/heads.json` (`schema: snapshot/v1`, ref -> SHA, `createdAt`,
   `disabled`) after it, each by the atomic write rule of 03 3.8. romeu
   trusts the bundle's own refs and reads `heads.json` for `status` only,
@@ -145,12 +146,12 @@ plumbing.
   (8.1, `locks/<dir>.lock`) for the two writes, so two snapshots of one
   repo run one after the other and the pair on disk is always one
   snapshot's.
-`REQ-0691` - A snapshot that cannot be written never undoes the commit: it keeps
+- `REQ-0691` A snapshot that cannot be written never undoes the commit: it keeps
   the previous bundle, removes its own `.tmp-<ULID>` file before the
   hook failure is recorded, is recorded as a hook failure with its
   repo (8.2), and the repo's own hooks still run (04 4.3). A kill
   leaves the file, and `julieta setup` stays its cleanup (8.1).
-`REQ-0692` - A repo whose local config sets `core.hooksPath` bypasses the
+- `REQ-0692` A repo whose local config sets `core.hooksPath` bypasses the
   dispatcher; `julieta setup` writes `disabled: true` into its
   `heads.json`, `julieta setup` and `julieta status` report "snapshots
   disabled for <dir>", SessionStart prints it, and `romeu status` shows
@@ -175,7 +176,7 @@ git call of the sandbox half runs in gitsafe's sandbox mode
 romeu passes `salvageRun.id` and, per repo, `repos[].base` in the
 manifest.
 
-`REQ-0695` 1. `--stop-agents`: SIGTERM to the agent's processes (names from
+1. `REQ-0695` `--stop-agents`: SIGTERM to the agent's processes (names from
    `internal/agent/<agent>`), wait up to 10 s, then SIGKILL; record it
    in the manifest's `agentStop` (3.11). `REQ-0696` Zero matched while a session is
    open, read from julieta state (a SessionStart recorded by `handoff
@@ -194,14 +195,14 @@ manifest.
 2. For each repo in the manifest, and for each nested repository found
    inside a worktree (a `.git` below the top level), for each worktree
    from `git worktree list --porcelain`:
-   `REQ-0700` - uncommitted tracked and untracked (non-ignored) changes: tree
+   - `REQ-0700` uncommitted tracked and untracked (non-ignored) changes: tree
      through a temporary `GIT_INDEX_FILE`, `commit-tree` with parent HEAD,
      `-c commit.gpgsign=false`, author `julieta-salvage`, ref
      `refs/salvage/<generation>/<salvage-id>/<worktree-n>`, outside
      `refs/heads`, so `git push --all` or `--mirror` never publishes it;
      worktree and index untouched;
-   `REQ-0701` - each stash becomes `refs/salvage/<generation>/<salvage-id>/stash-<n>`;
-   `REQ-0702` - each worktree's HEAD and status are read again; if either moved,
+   - `REQ-0701` each stash becomes `refs/salvage/<generation>/<salvage-id>/stash-<n>`;
+   - `REQ-0702` each worktree's HEAD and status are read again; if either moved,
      the capture repeats once, then the worktree is skipped as
      `worktree-changing`. A rebase, merge, cherry-pick or bisect in
      progress is skipped as `in-progress-operation`. Other processes
@@ -212,7 +213,7 @@ manifest.
    sandbox's repositories, so a full sandbox disk fails this step;
    freeing space inside the sandbox is the recovery before
    `--from-host`.
-`REQ-0704` 3. One bundle per repo with all local branches, tags, notes, the
+3. `REQ-0704` One bundle per repo with all local branches, tags, notes, the
    current generation's `refs/salvage/<generation>/*` refs, every
    worktree HEAD (detached ones included) and the reflog-only commits of
    8.4, excluding objects reachable from `repos[].base` (host-known
@@ -221,7 +222,7 @@ manifest.
 4. `REQ-0705` Ignored files, minus `salvage.excludeIgnored`, into `ignored.tar.gz`
    up to the salvage cap of 8.6, shared with the untracked files of step
    2; the rest listed as `over-cap`.
-`REQ-0706` 5. Agent state (from `internal/agent/claude`): project memory files and
+5. `REQ-0706` Agent state (from `internal/agent/claude`): project memory files and
    todos to `agent/`; transcripts excluded unless `--include-transcripts`
    (they may contain echoed tokens), listed as `transcript-excluded`;
    `REQ-0707` scratch dirs named by the agent profile within the same cap. The
@@ -230,7 +231,7 @@ manifest.
    optional ones, such as a todos or scratch dir a session never
    created. Only a missing required path is the skipped item
    `agent-path-missing`; a missing optional path is no item.
-`REQ-0708` 6. Write `manifest.json` (3.11). A salvage dir without its
+6. `REQ-0708` Write `manifest.json` (3.11). A salvage dir without its
    `manifest.json`, which an interrupted salvage leaves, is ignored by
    verification and kept.
 
@@ -263,7 +264,7 @@ every case, since `doctor` fails on a missing one.
 
 ### Host half: `romeu salvage`
 
-`REQ-0714` 1. Read the manifest via `os.Root`; `salvageId` must equal the id romeu
+1. `REQ-0714` Read the manifest via `os.Root`; `salvageId` must equal the id romeu
    passed; every repo in the generation's repo set must appear (a
    missing one is the skipped item `repo-missing`; a `salvageId` other
    than the id romeu passed is the error `salvage-id-mismatch`,
@@ -271,26 +272,26 @@ every case, since `doctor` fails on a missing one.
    sha256 (a mismatch is the skipped item `payload-mismatch`), under the
    path and cap rules of
    [03 3.11](03-formats.md#311-salvage-manifest-schema-salvagev1).
-`REQ-0715` 2. For each bundle: validate every ref name, `git bundle verify`
+2. `REQ-0715` For each bundle: validate every ref name, `git bundle verify`
    (hardened; fetch origin into `refs/romeu/origin/` first if
    prerequisites are missing), `git bundle unbundle`, then
    `git fsck --strict` on each unbundled head, as `pull` does (04 4.2),
    since `transfer.fsckObjects` does not cover an unbundle (05 5.1); a
    failure is the skipped item `fsck-failed`. Then create-only refs
    under `refs/romeu/salvage/<name>/<generation>/<salvage-id>/<dir>/...`.
-`REQ-0716` 3. Primary repo: hardened fetch from the live daemon; every daemon head
+3. `REQ-0716` Primary repo: hardened fetch from the live daemon; every daemon head
    must be present in the bundle refs with the same SHA; a head absent
    or different is the skipped item `daemon-heads-missing`. A daemon URL
    whose scheme or host gitsafe refuses is the skipped item
    `daemon-url-refused`, which names sbx, because the salvage
    cross-check assumes the daemon at `git://127.0.0.1`. Secondary repos
    have no daemon, so no cross-check (05 5.4).
-`REQ-0717` 4. Recompute completeness (ignoring the manifest's own `complete`):
+4. `REQ-0717` Recompute completeness (ignoring the manifest's own `complete`):
    `result: complete` only when nothing was skipped except
    `excluded-by-spec` and `transcript-excluded`; otherwise `incomplete`
    with each skipped item as a reason; record it on the generation; exit
    5 when incomplete (01 1.6).
-`REQ-0718` 5. `--from-host` (sandbox dead or unreachable): skip the sandbox half;
+5. `REQ-0718` `--from-host` (sandbox dead or unreachable): skip the sandbox half;
    import `refs/sandboxes/<name>/*` and every `snapshot/heads.bundle`;
    record `result: lost, reasons: [sandbox-lost]`.
 
