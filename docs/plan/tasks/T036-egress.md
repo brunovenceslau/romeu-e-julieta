@@ -12,7 +12,8 @@ needs:
   - T024
 after:
   - T053
-ask_first: []
+ask_first:
+  - catalog
 sitting: none
 ---
 

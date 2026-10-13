@@ -8,6 +8,8 @@ owns:
   - tools/ci/**
   - .github/ask-first.yaml
   - internal/procgroup/callsite_test.go
+  - internal/procgroup/class.go
+  - internal/procgroup/class_test.go
 needs: []
 after:
   - T121
@@ -114,14 +116,46 @@ two repository tests over the specification's names are T140, both
     `tools/ci/procgroup/`. The scan stays a test in
     `internal/procgroup` until T039 moves it to `tools/ci callsites`
     (decided on 2026-10-13).
-  - The timeout classes of the tools are added to the timeout table of
-    `internal/procgroup` with the switch, each at the bound the tool
-    has on the base: a command step of `tools/ci` (15 minutes), the
-    race run of `all` (40 minutes) and a git query (2 minutes). The
-    `go` commands of `tools/mutants` are bounded on the base only by the
-    `-timeout` they pass to `go test`, the larger of one minute and ten
-    times the baseline's time, which can exceed 15 minutes, so their
-    class is no shorter than that `-timeout`.
+  - Each subprocess of the tools gets a class of the timeout table of
+    `internal/procgroup` with the switch (REQ-0300). Their bounds on
+    the base, measured at commit `b1700c9`:
+    - `tools/ci`: a command step of `fast` or `all`, 15 minutes
+      (`stepTimeout`, `tools/ci/fast.go:30`, applied at line 411); the
+      race step, 40 minutes (`raceTimeout`, `tools/ci/all.go:40`); a
+      git command through `git.Repo.Run`, 2 minutes each
+      (`git.Timeout`, `tools/ci/git/git.go:30`, applied at line 55);
+      `uname -m` and `sysctl -n sysctl.proc_translated`
+      (`tools/ci/all.go:262` and `278`), `mise which`
+      (`tools/ci/fast.go:185`) and `mise --version`
+      (`tools/ci/misefiles.go:394`), none.
+    - `tools/mutants`: a git command through `git.Repo.Run`, 2 minutes
+      each; `git pack-objects` piped into `git unpack-objects`
+      (`tools/mutants/snapshot.go:151` and `160`), 2 minutes for the
+      pair, under one deadline (`snapshot.go:149`); `go env GOROOT`
+      and `go env GOVERSION` (`tools/mutants/runner.go:446` and `463`)
+      and `go list -find` (`runner.go:387`), none; the build check, `go
+      test -exec=true` (`runner.go:402`), none; the baseline `go test`
+      (`runner.go:261`, which passes a timeout of 0), none from the
+      tool, and go test's default `-timeout` of 10 minutes bounds its
+      test binary only; a mutant's `go test` (`runner.go:339`), none
+      from the tool, and its `-timeout`, the larger of one minute and
+      ten times the baseline's time (`runner.go:282`), bounds the test
+      binary, not the compile.
+    The classes are a step class, a race class and a git class at
+    those values, a probe class for the short probes (`uname`,
+    `sysctl`, `mise which`, `mise --version`, `go env`, `go list
+    -find`), and, for the `go` build and test runs of `tools/mutants`,
+    either an unbounded class or a limit per call taken from the
+    baseline. Their rows come by a pull request that edits the Starting
+    values table of 04 4.1 alone (REQ-1220) and merges before this
+    task's switch; which of the two options the mutant runs take, and
+    the probe class's value, are a deferred decision of the plan
+    (Decisions this plan defers; trigger: T105 starts). This task then
+    edits `internal/procgroup/class.go` and its test to add them.
+  - After the switch, a test proves the second-signal window closed for
+    `tools/ci`: a run of `tools/ci` that receives two SIGTERMs while a
+    step's group runs exits 143, with the group gone and the second
+    signal absorbed (REQ-1234).
   - Green on the four runners.
 - Verify: `go run ./tools/ci all` exits 0; `go run ./tools/ci generated`
   exits 0 with `docs/reference/checks.md` present.

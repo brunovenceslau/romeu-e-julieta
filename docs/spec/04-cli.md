@@ -95,7 +95,8 @@ are derived from the same data this page specifies.
    most 2 s. `REQ-0299` The same package starts every subprocess of `tools/ci`
    and `tools/mutants`, so the group rule, the timeout and the
    scrubbed environment have one implementation, and a call-site scan
-   beside the I16 scan (05 5.2) fails an `os/exec` call outside it.
+   fails an `os/exec` call outside it: a test in `internal/procgroup`
+   until it moves beside the I16 scan (05 5.2).
 5. `REQ-0300` Every subprocess has a timeout of the class the Starting values
    table below gives, past which it fails with `subprocess-timeout`,
    except the salvage exec, which moves up to the salvage cap over the
@@ -143,20 +144,30 @@ Both binaries install one handler, from `internal/procgroup`, in
 2. `REQ-0304` The exit status is 128 plus the signal number (130, 143). The
    signal wins over a failure the command had already found (1 to 6);
    a command that had finished its work keeps 0.
-3. `REQ-0305` The handler kills the group of every subprocess still
-   running, itself and before it returns, and from then on no
-   subprocess starts; only then does it step aside, so a later signal
-   ends the process by its default action. A second signal that lands
-   while the handler cancels and kills is absorbed: it neither ends the
-   process nor changes the status of item 2. This order closes the
-   window, measured on `tools/ci` on 2026-10-12, in which a second
-   signal ended the process between the cancel and the group kill and
-   left the group running (decided on 2026-10-13). What the handler
-   cannot reach stays out of this rule: a SIGKILL to the process, which
-   no handler sees, leaves every group running; a grandchild that calls
-   `setsid` leaves its group, and the group kill does not reach it; and
-   a subprocess whose context does not derive from the one the handler
-   gives the command is not among the groups the handler kills.
+3. `REQ-0305` On the first SIGINT or SIGTERM, after the cancel of item
+   1, the handler kills the group of every subprocess still running
+   under the command's context, itself and before it returns, and
+   refuses every later start under that context. `REQ-1234` A second
+   SIGINT or SIGTERM that lands before the handler steps aside is
+   absorbed: it does not end the process, and the status stays the one
+   item 2 gives for the first signal. `REQ-1235` The handler then steps
+   aside, and a later SIGINT or SIGTERM takes its default action,
+   except a SIGINT that was ignored when the process started, which
+   stays ignored (Go's `os/signal`). This order closes the window,
+   measured on `tools/ci` on 2026-10-12, in which a second signal ended
+   the process between the cancel and the group kill and left the
+   group running (decided on 2026-10-13). What the handler does not
+   cover, and where every group it would kill keeps running: a SIGKILL
+   to the process, which no handler sees; a SIGHUP or a SIGQUIT, which
+   it does not take, so the process ends by the signal's default
+   action, after the Go runtime's goroutine dump for SIGQUIT, while the
+   race step of `tools/ci`, for example, runs on with no parent left
+   to enforce its 40 minutes; and a panic, a fatal error or an
+   `os.Exit` from another goroutine. A grandchild that calls `setsid`
+   leaves its group, and the group kill does not reach it. A
+   subprocess whose context does not derive from the one the handler
+   gives the command is neither refused nor killed by the handler,
+   only by its own cancellation or timeout.
 4. `REQ-0306` A hook stage or a pane step ended by a signal is reported as
    `exited 128+<signal>` (4.3, `hooks run`); the `exit_code` a ledger
    event would carry stays as [13 13.2](13-runtime-ledger.md) defines

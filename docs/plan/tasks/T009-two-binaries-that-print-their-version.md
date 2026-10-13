@@ -47,7 +47,7 @@ failure are T013's.
   4.1), REQ-0285 (04 4.1), REQ-0286 (04 4.1), REQ-0303 (04 4.1),
   REQ-0304 (04 4.1), REQ-0305 (04 4.1), REQ-0838 (10 10.2), REQ-0971 (10
   10.7), REQ-1038 (12 12.1), REQ-1039 (12 12.1), REQ-1109 (12 12.3),
-  REQ-1124 (12 12.3).
+  REQ-1124 (12 12.3), REQ-1234 (04 4.1), REQ-1235 (04 4.1).
 - Operator: no.
 - Acceptance:
   - `julieta-core` and the `version` command of `romeu-cli` land before

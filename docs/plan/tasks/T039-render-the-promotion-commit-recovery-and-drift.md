@@ -11,13 +11,18 @@ owns:
   - tools/ci/internal/callsites/**
   - tools/ci/check_callsites.go
   - internal/procgroup/callsite_test.go
+  - .github/ask-first.yaml
+  - docs/spec/05-security.md
 needs:
   - T033
   - T038
-after: []
+after:
+  - T105
 ask_first:
   - checks
   - procgroup
+  - ask-first
+  - spec
 sitting: none
 ---
 
@@ -58,7 +63,13 @@ Re-plan (2026-10-12): Kept as written before the re-plan.
     moves into `tools/ci callsites` beside the I16 scan (REQ-0481),
     with its positive control and its seam rule, and the test file is
     removed; its admitted list is `internal/procgroup` alone, as T105
-    leaves it (decided on 2026-10-13).
+    leaves it. The file that holds the admitted list in its new home
+    (for example `tools/ci/internal/callsites/admitted.go`) joins the
+    globs of the `procgroup` surface, in `.github/ask-first.yaml` and
+    in the list of 05 5.3 alike, with `.github/CODEOWNERS` and
+    `docs/reference/ask-first.md` regenerated, the way T107 puts
+    `tools/ci/internal/askfirst/**` on `approvals` (decided on
+    2026-10-13).
 - Verify: `go test ./internal/render/...`; `go test ./tools/ci/... -run
   '^TestCallsites'`, which runs the fixtures of the call-site check; `go
   run ./tools/ci callsites` exits 0 on the tree.
