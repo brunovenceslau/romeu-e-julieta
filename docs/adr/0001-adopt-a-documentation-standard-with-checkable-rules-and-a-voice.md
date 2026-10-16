@@ -11,6 +11,8 @@ Superseded in part by [9. Drop the required review and amend the records that as
 
 Superseded in part by [10. Reopen the required checks without the bypass and amend the records of round 9](0010-reopen-the-required-checks-without-the-bypass-and-amend-the-records-of-round-9.md)
 
+Superseded in part by [ADR 0013, admit Excalidraw scenes as diagrams under docs/notes and amend rule 17 of the documentation standard](0013-admit-excalidraw-scenes-as-diagrams-under-docs-notes-and-amend-rule-17-of-the-documentation-standard.md) (rule 17)
+
 ## Context
 
 In Shakespeare's play, Romeo and Juliet do not die for lack of a plan.
