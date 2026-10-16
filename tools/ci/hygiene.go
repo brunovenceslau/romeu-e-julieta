@@ -18,6 +18,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 )
@@ -126,8 +127,8 @@ func hygieneOf(files []check.TreeFile) ([]check.Finding, error) {
 		if f.Mode != "100644" && f.Mode != "100755" {
 			findings = append(findings, check.Finding{Where: where, Rule: "mode", Msg: "the mode is " + f.Mode + "; the repository tracks regular files only, of mode 100644 or 100755"})
 		}
-		if isMiseFile(f.Path) && !slices.Contains(pinnedMiseFiles, f.Path) {
-			findings = append(findings, check.Finding{Where: where, Rule: "mise", Msg: "mise reads this file as its configuration, and the repository tracks no mise file but mise.toml and mise.lock (tools/ci/misefiles.go)"})
+		if mise.IsMiseFile(f.Path) && !slices.Contains(mise.PinnedMiseFiles, f.Path) {
+			findings = append(findings, check.Finding{Where: where, Rule: "mise", Msg: "mise reads this file as its configuration, and the repository tracks no mise file but mise.toml and mise.lock (tools/ci/internal/mise/misefiles.go)"})
 		}
 		if f.Path == "go.work" || f.Path == "go.work.sum" || strings.HasPrefix(f.Path, "vendor/") {
 			findings = append(findings, check.Finding{Where: where, Rule: "workspace", Msg: "go.work, go.work.sum and vendor/ are not tracked"})

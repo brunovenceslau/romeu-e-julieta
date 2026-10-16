@@ -15,6 +15,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 )
 
 // coverFile is the name of the cover profile the race step writes, in
@@ -64,7 +65,7 @@ func allSteps(ctx context.Context, root string, tools check.Tools, profile strin
 	env := check.StepEnv(tools.GoDir)
 	gitCommon, gitErr := gitCommonDir(ctx, root)
 	vuln := check.Step{Name: "vulnerabilities", Environ: check.WithProcessEnv(env, check.NetworkPassThrough)}
-	if path, err := whichPinned(ctx, root, "govulncheck", govulncheckLock, govulncheckDir); err != nil {
+	if path, err := mise.WhichPinned(ctx, root, "govulncheck", mise.GovulncheckLock, mise.GovulncheckDir); err != nil {
 		vuln.Unavailable = err
 	} else {
 		vuln.Argv = []string{path, "./..."}
@@ -205,10 +206,10 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 		}
 		defer func() { _ = os.RemoveAll(dir) }()
 		profile = filepath.Join(dir, coverFile)
-		if err := checkMiseVersion(ctx, root); err != nil {
+		if err := mise.CheckVersion(ctx, root); err != nil {
 			return false, err
 		}
-		tools, err := resolveLintTools(ctx, root)
+		tools, err := mise.ResolveLintTools(ctx, root)
 		if err != nil {
 			return false, err
 		}
@@ -382,22 +383,22 @@ func runSetup(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if err := hostedMiseEnv(); err != nil {
+	if err := mise.HostedEnv(); err != nil {
 		return false, err
 	}
-	if err := checkMiseVersion(ctx, root); err != nil {
+	if err := mise.CheckVersion(ctx, root); err != nil {
 		return false, err
 	}
 	c := newChecks(e.Stdout)
-	mise := []check.Step{
-		{Name: "mise trust", Argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, Environ: miseRunEnviron(check.PassThroughEnv(), root)},
-		{Name: "mise install", Argv: []string{"mise", "install"}, Environ: miseRunEnviron(check.WithProcessEnv(check.PassThroughEnv(), check.NetworkPassThrough), root), Class: procgroup.Mise},
+	miseSteps := []check.Step{
+		{Name: "mise trust", Argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, Environ: mise.RunEnviron(check.PassThroughEnv(), root)},
+		{Name: "mise install", Argv: []string{"mise", "install"}, Environ: mise.RunEnviron(check.WithProcessEnv(check.PassThroughEnv(), check.NetworkPassThrough), root), Class: procgroup.Mise},
 	}
-	c.run(ctx, root, mise)
+	c.run(ctx, root, miseSteps)
 	if !c.ok {
 		return false, nil
 	}
-	tools, err := resolveLintTools(ctx, root)
+	tools, err := mise.ResolveLintTools(ctx, root)
 	if err != nil {
 		return false, err
 	}

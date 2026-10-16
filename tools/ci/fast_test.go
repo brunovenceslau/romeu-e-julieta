@@ -939,29 +939,6 @@ func TestGeneratedRunsBeforeTheTests(t *testing.T) {
 	}
 }
 
-// pinnedLintTools returns resolveLintTools for this repository, run in
-// a mise state directory of the test's own, where the test first
-// trusts the repository's mise configuration. mise keeps its trust
-// records in the state directory (https://mise.jdx.dev/directories.html),
-// so the tests do not depend on a "mise trust" of the person who runs
-// them, and leave no trust behind. The configuration directories are
-// the test's own too (isolateMiseConfig).
-func pinnedLintTools(t *testing.T) check.Tools {
-	t.Helper()
-	root := citest.ModuleRoot(t)
-	citest.IsolateMiseConfig(t)
-	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
-		Class: procgroup.ToolStep,
-		Argv:  []string{"mise", "-C", root, "trust"},
-		Dir:   root,
-		Env:   miseEnviron(check.PassThroughEnv()),
-	})
-	require.NoError(t, err, "mise trust\n%s", out)
-	tools, err := resolveLintTools(t.Context(), root)
-	require.NoError(t, err)
-	return tools
-}
-
 // TestIsGateInput pins the untracked files a pre-push run refuses, a
 // nested repository among them, which git lists as its directory.
 func TestIsGateInput(t *testing.T) {

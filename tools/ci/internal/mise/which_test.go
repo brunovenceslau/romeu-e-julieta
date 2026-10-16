@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+package mise
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ import (
 // TestResolveLintTools checks that the tools of fast are the ones
 // mise.toml pins: the linter and the go command, installed by mise.
 func TestResolveLintTools(t *testing.T) {
-	tools := pinnedLintTools(t)
+	tools := citest.PinnedLintTools(t, Environ, ResolveLintTools)
 	assert.Equal(t, "golangci-lint", filepath.Base(tools.Linter))
 	assert.True(t, filepath.IsAbs(tools.Linter), "an absolute path: %s", tools.Linter)
 	assert.FileExists(t, filepath.Join(tools.GoDir, "go"))
@@ -35,12 +35,12 @@ func TestResolveLintTools(t *testing.T) {
 // tool locked at two different versions, and accepts the same version
 // written twice.
 func TestLockedVersionsFixture(t *testing.T) {
-	got, err := lockedVersions([]byte(citest.LockFixture))
+	got, err := LockedVersions([]byte(citest.LockFixture))
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"go": "1.27.0", "go:golang.org/x/vuln/cmd/govulncheck": "1.8.0", "golangci-lint": "2.14.0"}, got)
-	_, err = lockedVersions([]byte(citest.LockFixture + "[[tools.go]]\nversion = \"1.26.0\"\n"))
+	_, err = LockedVersions([]byte(citest.LockFixture + "[[tools.go]]\nversion = \"1.26.0\"\n"))
 	require.ErrorContains(t, err, "mise.lock locks go at two different versions")
-	got, err = lockedVersions([]byte(citest.LockFixture + "[[tools.go]]\nversion = \"1.27.0\"\n"))
+	got, err = LockedVersions([]byte(citest.LockFixture + "[[tools.go]]\nversion = \"1.27.0\"\n"))
 	require.NoError(t, err, "the same version twice")
 	assert.Equal(t, "1.27.0", got["go"])
 }
@@ -48,7 +48,7 @@ func TestLockedVersionsFixture(t *testing.T) {
 // TestLockedVersionsOtherTable shows that a "version" key below a table
 // header other than [[tools.<name>]] is no tool's.
 func TestLockedVersionsOtherTable(t *testing.T) {
-	got, err := lockedVersions([]byte("[[tools.go]]\n[tools.go.options]\nversion = \"9.9.9\"\n"))
+	got, err := LockedVersions([]byte("[[tools.go]]\n[tools.go.options]\nversion = \"9.9.9\"\n"))
 	require.NoError(t, err)
 	assert.Empty(t, got)
 }
@@ -68,15 +68,30 @@ func TestWhichPinnedThroughLinks(t *testing.T) {
 	rootLink := filepath.Join(t.TempDir(), "root")
 	require.NoError(t, os.Symlink(realRoot, rootLink))
 
-	got, err := whichPinned(t.Context(), rootLink, "go", "go", "go")
+	got, err := WhichPinned(t.Context(), rootLink, "go", "go", "go")
 	require.NoError(t, err)
 	want, err := filepath.EvalSymlinks(goCmd)
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
 }
 
-// TestResolveLintToolsFailsClosed runs resolveLintTools against a fake
-// mise (newFakeMise). Every case that names an error fails, and none
+// TestWhichPinnedReadsPinnedTools checks that WhichPinned resolves no
+// tool that PinnedTools does not hold: it fails before it starts mise,
+// even with a fake mise that would answer and a lock that locks it.
+func TestWhichPinnedReadsPinnedTools(t *testing.T) {
+	f := citest.NewFakeMise(t)
+	tool := f.Tool(t, "other", "1.0.0", "bin", "other")
+	f.Script(t, "", "", tool)
+	root := citest.LockedRoot(t, citest.LockFixture+"\n[[tools.other]]\nversion = \"1.0.0\"\n")
+	_, err := WhichPinned(t.Context(), root, "other", "other", "other")
+	require.ErrorContains(t, err, "other is not one of the pinned tools")
+	for _, tool := range []string{GoTool, LintTool, GovulncheckLock} {
+		assert.Contains(t, PinnedTools, tool)
+	}
+}
+
+// TestResolveLintToolsFailsClosed runs ResolveLintTools against a fake
+// mise (citest.NewFakeMise). Every case that names an error fails, and none
 // falls back to a tool on the search path.
 func TestResolveLintToolsFailsClosed(t *testing.T) {
 	const fixed = "{installs}" // the resolved installs directory, in want
@@ -221,7 +236,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 			if tt.lock != "none" {
 				root = citest.LockedRoot(t, cmp.Or(tt.lock, citest.LockFixture))
 			}
-			tools, err := resolveLintTools(t.Context(), root)
+			tools, err := ResolveLintTools(t.Context(), root)
 			if tt.want != "" {
 				installs, evalErr := filepath.EvalSymlinks(f.Installs())
 				if evalErr != nil {
@@ -245,11 +260,11 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 }
 
 // TestResolveLintToolsEnvironment checks that "mise which" runs in
-// passThroughEnv with miseEnv, at the top of the tree: a fake mise
+// check.PassThroughEnv with MiseEnv, at the top of the tree: a fake mise
 // writes its environment and its working directory to files, and every
-// variable of goenv.PassThrough and of miseEnv reaches it and nothing else,
+// variable of goenv.PassThrough and of MiseEnv reaches it and nothing else,
 // with the ones a shell adds itself, whatever else this process holds;
-// a value of miseEnv is the list's, never the process's. Each variable
+// a value of MiseEnv is the list's, never the process's. Each variable
 // of goenv.PassThrough is set here, so the result does not depend on the
 // caller's environment (a TMPDIR or a MISE_STATE_DIR of its own).
 func TestResolveLintToolsEnvironment(t *testing.T) {
@@ -268,7 +283,7 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 	dump, cwd := filepath.Join(t.TempDir(), "env"), filepath.Join(t.TempDir(), "cwd")
 	f.Script(t, "'"+envPath+"' > '"+dump+"'\npwd -P > '"+cwd+"'\n", f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.Tool(t, "go", "1.27.0", "bin", "go"))
 	root := citest.LockedRoot(t, citest.LockFixture)
-	_, err = resolveLintTools(t.Context(), root)
+	_, err = ResolveLintTools(t.Context(), root)
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(dump)
@@ -283,7 +298,7 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 		}
 	}
 	want := slices.Clone(goenv.PassThrough)
-	for _, kv := range miseEnv {
+	for _, kv := range MiseEnv {
 		key, value, _ := strings.Cut(kv, "=")
 		want = append(want, key)
 		assert.Equal(t, value, values[key], key)
@@ -322,7 +337,7 @@ func TestMiseInstalls(t *testing.T) {
 			err := procgroup.Run(t.Context(), procgroup.Command{
 				Class:  procgroup.ToolProbe,
 				Argv:   []string{"mise", "-C", t.TempDir(), "doctor", "--json"},
-				Env:    append(miseEnviron(check.PassThroughEnv()), "MISE_OFFLINE=1"),
+				Env:    append(Environ(check.PassThroughEnv()), "MISE_OFFLINE=1"),
 				Stdout: &out,
 			})
 			require.NoError(t, err, "mise doctor")

@@ -28,6 +28,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 )
 
 // lintFixture is one file of the fixture package: the source, and the
@@ -194,7 +195,7 @@ func TestLintConfigReportsEachChecker(t *testing.T) {
 
 	// The tools are the ones the lint step runs (resolveLintTools), and
 	// the run happens in the fixture's directory, where no mise.toml is.
-	tools := pinnedLintTools(t)
+	tools := citest.PinnedLintTools(t, mise.Environ, mise.ResolveLintTools)
 
 	report := filepath.Join(t.TempDir(), "report.json")
 	// The arguments are the ones of the lint step (lintArgs), with the
@@ -937,7 +938,7 @@ type lintContext struct {
 // (syslistOf).
 func lintTargetContexts(t *testing.T) []lintContext {
 	t.Helper()
-	tools := pinnedLintTools(t)
+	tools := citest.PinnedLintTools(t, mise.Environ, mise.ResolveLintTools)
 	format := `{{context.CgoEnabled}} {{context.Compiler}} {{join context.ToolTags ","}} {{join context.ReleaseTags ","}} {{context.GOROOT}}`
 	var contexts []lintContext
 	for _, target := range lintTargets {
@@ -1374,7 +1375,7 @@ func TestOnlyAllowedGoModDirectives(t *testing.T) {
 // or by a version that the lock does not hold.
 var allowedMiseTables = map[string][]string{
 	"settings": {"lockfile"},
-	"tools":    pinnedTools,
+	"tools":    mise.PinnedTools,
 }
 
 // bareKey matches a TOML key that needs no quotes
@@ -1399,9 +1400,9 @@ var lockedVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 func TestLockedVersions(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), "mise.lock"))
 	require.NoError(t, err)
-	locked, err := lockedVersions(data)
+	locked, err := mise.LockedVersions(data)
 	require.NoError(t, err)
-	assert.ElementsMatch(t, pinnedTools, slices.Collect(maps.Keys(locked)), "the tools of mise.lock")
+	assert.ElementsMatch(t, mise.PinnedTools, slices.Collect(maps.Keys(locked)), "the tools of mise.lock")
 	for tool, version := range locked {
 		assert.Regexp(t, lockedVersion, version, "the version of %s in mise.lock", tool)
 	}
@@ -1695,7 +1696,7 @@ func TestMiseConfigs(t *testing.T) {
 	root := citest.ModuleRoot(t)
 	lock, err := os.ReadFile(filepath.Join(root, "mise.lock"))
 	require.NoError(t, err)
-	locked, err := lockedVersions(lock)
+	locked, err := mise.LockedVersions(lock)
 	require.NoError(t, err)
 	var configs []string
 	for _, f := range repoFiles(t, root, "*mise*") {
@@ -1710,7 +1711,7 @@ func TestMiseConfigs(t *testing.T) {
 		assert.Empty(t, miseFindings(data, locked), "%s holds what is not on allowedMiseTables", f)
 		if f == "mise.toml" {
 			lines := strings.Split(string(data), "\n")
-			for _, tool := range pinnedTools {
+			for _, tool := range mise.PinnedTools {
 				assert.Contains(t, lines, tomlKey(tool)+` = "`+locked[tool]+`"`, "mise.toml pins %s", tool)
 			}
 		}

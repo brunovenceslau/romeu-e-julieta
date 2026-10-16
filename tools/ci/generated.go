@@ -21,6 +21,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 )
 
 // runGenerated is the "generated" subcommand (10 10.2): it first checks
@@ -48,7 +49,7 @@ func runGenerated(ctx context.Context, e check.Env, args []string) (bool, error)
 		check.Say(e.Stdout, "%s%s\n", check.Lines(problems), check.Summary("generated", len(problems)))
 		return false, nil
 	}
-	goBin, err := whichPinned(ctx, root, "go", "go", "go")
+	goBin, err := mise.WhichPinned(ctx, root, "go", "go", "go")
 	if err != nil {
 		return false, err
 	}

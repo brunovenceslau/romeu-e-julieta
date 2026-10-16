@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+package mise
 
 import (
 	"context"
@@ -25,20 +25,20 @@ import (
 )
 
 // TestMiseEnvList pins the allowlist of environment variables of every
-// mise run and of the pre-push hook, and its fixed part, miseEnv:
+// mise run and of the pre-push hook, and its fixed part, MiseEnv:
 //
 //   - goenv.PassThrough: where things are on this machine (PATH to find mise
 //     and go, HOME for the installs, the caches and the git config,
 //     TMPDIR, the XDG directories for those of mise and git, the state
 //     and cache directories of mise, and the Go path and caches that
 //     hold the module cache);
-//   - networkPassThrough: the proxy and the certificate bundle for a
+//   - check.NetworkPassThrough: the proxy and the certificate bundle for a
 //     download of a module or a tool;
-//   - miseEnv and goenv.Build: the fixed settings.
+//   - MiseEnv and goenv.Build: the fixed settings.
 //
 // Every other variable of the caller is dropped, so none of the lists
-// holds a key of miseEnv or of goenv.Build. The module variables
-// (goModulePassThrough) are only the hook's: setup's mise install and
+// holds a key of MiseEnv or of goenv.Build. The module variables
+// (check.GoModulePassThrough) are only the hook's: setup's mise install and
 // go mod download keep the checksum database as their guard. TestHookEnvIsTheAllowlist
 // and TestMiseNeverReads measure what that closes.
 func TestMiseEnvList(t *testing.T) {
@@ -50,7 +50,7 @@ func TestMiseEnvList(t *testing.T) {
 	}, goenv.PassThrough)
 	assert.Equal(t, []string{"GOPROXY", "GOPRIVATE", "GONOSUMDB", "GOSUMDB", "GOINSECURE"}, check.GoModulePassThrough)
 	assert.Equal(t, []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}, check.NetworkPassThrough)
-	assert.Equal(t, slices.Concat(goenv.PassThrough, check.NetworkPassThrough, check.GoModulePassThrough), hookAllow)
+	assert.Equal(t, slices.Concat(goenv.PassThrough, check.NetworkPassThrough, check.GoModulePassThrough), HookAllow)
 	assert.Equal(t, []string{
 		"MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml",
 		"MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none",
@@ -60,13 +60,13 @@ func TestMiseEnvList(t *testing.T) {
 		"MISE_SYSTEM_CONFIG_FILE=/dev/null/mise-system.toml",
 		"GOENV=off",
 		"GOTOOLCHAIN=local",
-	}, miseEnv)
+	}, MiseEnv)
 	assert.Equal(t, []string{"GOWORK=off", "GOFLAGS=-mod=readonly"}, goenv.Build)
 	assert.Equal(t, []string{"GOENV=off", "GOTOOLCHAIN=local"}, goenv.Pin)
 	assert.Subset(t, check.StepEnv("/go"), goenv.Pin, "stepEnv holds goenv.Pin")
 	assert.Subset(t, check.StepEnv("/go"), goenv.Build, "stepEnv holds goenv.Build")
 	assert.Equal(t, "MISE_CEILING_PATHS=/a/b", miseCeiling("/a/b/tree"))
-	for _, kv := range slices.Concat(miseEnv, goenv.Build) {
+	for _, kv := range slices.Concat(MiseEnv, goenv.Build) {
 		key, _, _ := strings.Cut(kv, "=")
 		for _, list := range [][]string{goenv.PassThrough, check.NetworkPassThrough, check.DockerPassThrough} {
 			assert.NotContains(t, list, key)
@@ -75,55 +75,32 @@ func TestMiseEnvList(t *testing.T) {
 	for _, key := range slices.Concat(goenv.PassThrough, check.NetworkPassThrough, check.DockerPassThrough, check.GoModulePassThrough) {
 		assert.NotContains(t, []string{"MISE_CEILING_PATHS", "MISE_CD", "MISE_ENV_FILE", "MISE_TRUSTED_CONFIG_PATHS", "MISE_GLOBAL_CONFIG_FILE", "MISE_SYSTEM_CONFIG_FILE", "MISE_CONFIG_DIR", "XDG_CONFIG_HOME", "GOFLAGS", "GOENV", "GOWORK", "GOTOOLCHAIN"}, key)
 	}
-	// A value of the caller's for a variable of miseEnv loses to the list's.
+	// A value of the caller's for a variable of MiseEnv loses to the list's.
 	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
 		Class: procgroup.ToolProbe,
 		Argv:  []string{"env"},
-		Env:   miseEnviron([]string{"GOENV=/hostile", "GOTOOLCHAIN=go1.99.0"}),
+		Env:   Environ([]string{"GOENV=/hostile", "GOTOOLCHAIN=go1.99.0"}),
 	})
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "GOENV=off\n")
 	assert.Contains(t, string(out), "GOTOOLCHAIN=local\n")
 	base := []string{"PATH=/x"}
-	assert.Equal(t, append([]string{"PATH=/x"}, miseEnv...), miseEnviron(base))
-	assert.Equal(t, append(append([]string{"PATH=/x"}, miseEnv...), "MISE_CEILING_PATHS=/a/b"), miseRunEnviron(base, "/a/b/tree"))
+	assert.Equal(t, append([]string{"PATH=/x"}, MiseEnv...), Environ(base))
+	assert.Equal(t, append(append([]string{"PATH=/x"}, MiseEnv...), "MISE_CEILING_PATHS=/a/b"), RunEnviron(base, "/a/b/tree"))
 	assert.Equal(t, []string{"PATH=/x"}, base, "the base is not changed")
 }
 
-// isolatedMiseEnv is an environment for the real mise built from
-// nothing but PATH: its home, configuration, state and cache
-// directories are new and empty, the system and global configuration
-// files do not exist, and it stays off the network. So no
-// configuration of the person who runs the tests (a global
-// "paranoid = true", say) changes what a test measures. A test that
-// needs the pinned tools below HOME uses isolateMiseConfig instead.
-func isolatedMiseEnv(t *testing.T) []string {
-	t.Helper()
-	none := filepath.Join(t.TempDir(), "none.toml")
-	return []string{
-		"PATH=" + os.Getenv("PATH"),
-		"HOME=" + t.TempDir(),
-		"XDG_CONFIG_HOME=" + t.TempDir(),
-		"MISE_CONFIG_DIR=" + t.TempDir(),
-		"MISE_STATE_DIR=" + t.TempDir(),
-		"MISE_CACHE_DIR=" + t.TempDir(),
-		"MISE_SYSTEM_CONFIG_FILE=" + none,
-		"MISE_GLOBAL_CONFIG_FILE=" + none,
-		"MISE_OFFLINE=1",
-	}
-}
-
 // TestMiseEnvStopsConfigs measures, with the mise on the search path,
-// what miseEnv is for: in a directory whose mise.toml is trusted, each
+// what MiseEnv is for: in a directory whose mise.toml is trusted, each
 // file below holds a template that writes a marker when mise loads it,
 // one of them reached through a .config symbolic link. "mise env"
-// loads every one without miseEnv, and none with it; and each variable
-// of miseEnv, left out alone, lets a file through again, so none of
+// loads every one without MiseEnv, and none with it; and each variable
+// of MiseEnv, left out alone, lets a file through again, so none of
 // the four is there for nothing. mise
-// runs in isolatedMiseEnv.
+// runs in citest.IsolatedMiseEnv.
 func TestMiseEnvStopsConfigs(t *testing.T) {
 	dir, markers := t.TempDir(), t.TempDir()
-	base := isolatedMiseEnv(t)
+	base := citest.IsolatedMiseEnv(t)
 	template := func(name string) string {
 		return `{{ exec(command="touch ` + filepath.ToSlash(filepath.Join(markers, name)) + `") }}`
 	}
@@ -173,15 +150,15 @@ func TestMiseEnvStopsConfigs(t *testing.T) {
 		}
 		return names
 	}
-	mise(miseEnviron(base), "trust", filepath.Join(dir, "mise.toml"))
+	mise(Environ(base), "trust", filepath.Join(dir, "mise.toml"))
 
 	assert.Equal(t, []string{"ci", "confd", "link", "local", "tool-versions", "unix"}, written(base), "without miseEnv")
-	assert.Empty(t, written(miseEnviron(base)), "with miseEnv")
+	assert.Empty(t, written(Environ(base)), "with miseEnv")
 	for _, key := range []string{"MISE_OVERRIDE_CONFIG_FILENAMES", "MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES", "MISE_ENV", "MISE_AUTO_ENV"} {
-		kvIndex := slices.IndexFunc(miseEnv, func(kv string) bool { return strings.HasPrefix(kv, key+"=") })
+		kvIndex := slices.IndexFunc(MiseEnv, func(kv string) bool { return strings.HasPrefix(kv, key+"=") })
 		require.GreaterOrEqual(t, kvIndex, 0, key)
-		kv := miseEnv[kvIndex]
-		without := slices.DeleteFunc(miseEnviron(base), func(v string) bool { return v == kv })
+		kv := MiseEnv[kvIndex]
+		without := slices.DeleteFunc(Environ(base), func(v string) bool { return v == kv })
 		assert.NotEmpty(t, written(without), "miseEnv without %s", key)
 	}
 }
@@ -193,7 +170,7 @@ func TestMiseEnvStopsConfigs(t *testing.T) {
 // plants one, and "mise exec" (what the shim does) prints it. Run in the
 // environment of the caller, every plant takes effect (the control, so
 // no row passes by planting nothing); run in the environment tools/ci
-// builds (passThroughEnv, then miseRunEnviron, with the allowlist of
+// builds (check.PassThroughEnv, then RunEnviron, with the allowlist of
 // the hook) none does. The rows are the escapes found by the audits of
 // the hook: a global or system configuration, a conf.d, a
 // MISE_CONFIG_DIR, a named global file, a .env file of MISE_ENV_FILE in
@@ -324,7 +301,7 @@ func TestMiseNeverReads(t *testing.T) {
 
 			// The environment tools/ci builds, with MISE_OFFLINE added for the test.
 			t.Setenv("MISE_STATE_DIR", t.TempDir())
-			env := append(miseRunEnviron(check.PassThroughEnv(), l.dir), "MISE_OFFLINE=1")
+			env := append(RunEnviron(check.PassThroughEnv(), l.dir), "MISE_OFFLINE=1")
 			guarded := printed(t, env, l.dir)
 			assert.Equal(t, seen{"nothing", wantDir, "unset", "off"}, guarded, "with the allowlist")
 		})
@@ -344,7 +321,7 @@ func TestMiseCeiling(t *testing.T) {
 }
 
 // TestMiseFilesLowercase holds every glob of miseFiles to lower case:
-// isMiseFile matches the path in lower case, so a glob with a capital
+// IsMiseFile matches the path in lower case, so a glob with a capital
 // letter would match nothing.
 func TestMiseFilesLowercase(t *testing.T) {
 	for _, g := range miseFiles {
@@ -361,18 +338,18 @@ func TestIsMiseFile(t *testing.T) {
 		".config/mise.toml", ".config/mise.local.toml", ".config/mise/config.toml", ".config/mise/conf.d/x.toml",
 		".tool-versions", ".miserc.toml", ".miserc.local.toml", ".config/miserc.toml",
 		"Mise.local.toml", "MISE.TOML", ".TOOL-VERSIONS", ".Config/Mise/conf.d/X.toml", ".MiseRC.toml"} {
-		assert.True(t, isMiseFile(path), path)
-		assert.True(t, isMiseFileAtAnyDepth(path), path)
-		assert.True(t, isMiseFileAtAnyDepth("tools/ci/"+path), "tools/ci/"+path)
+		assert.True(t, IsMiseFile(path), path)
+		assert.True(t, IsMiseFileAtAnyDepth(path), path)
+		assert.True(t, IsMiseFileAtAnyDepth("tools/ci/"+path), "tools/ci/"+path)
 	}
 	for _, path := range []string{"README.md", "go.mod", "mise.tom", "mise-x.toml", "docs/promise.toml", "REUSE.toml",
 		"tools/ci/misefiles.go", "x.tool-versions", ".config/other.toml", "miserc.toml"} {
-		assert.False(t, isMiseFile(path), path)
-		assert.False(t, isMiseFileAtAnyDepth(path), path)
+		assert.False(t, IsMiseFile(path), path)
+		assert.False(t, IsMiseFileAtAnyDepth(path), path)
 	}
 	for _, path := range []string{"tools/mise.local.toml", "internal/.tool-versions", "a/b/.config/mise/conf.d/x.toml"} {
-		assert.False(t, isMiseFile(path), "%s: mise started at the top does not read it", path)
-		assert.True(t, isMiseFileAtAnyDepth(path), path)
+		assert.False(t, IsMiseFile(path), "%s: mise started at the top does not read it", path)
+		assert.True(t, IsMiseFileAtAnyDepth(path), path)
 	}
 }
 
@@ -395,12 +372,12 @@ func TestMiseFilesAskFirst(t *testing.T) {
 
 // TestHostedMiseEnv checks the tripwire of setup: in the hosted
 // workflow, where the runner sets GITHUB_ACTIONS to "true", each
-// variable of miseEnv must be set to its value, an empty MISE_ENV
+// variable of MiseEnv must be set to its value, an empty MISE_ENV
 // included, and each one wrong or unset fails on its own; elsewhere,
 // another value of GITHUB_ACTIONS among them, nothing is checked.
 func TestHostedMiseEnv(t *testing.T) {
 	setAll := func() {
-		for _, kv := range miseEnv {
+		for _, kv := range MiseEnv {
 			key, value, _ := strings.Cut(kv, "=")
 			t.Setenv(key, value)
 		}
@@ -408,37 +385,22 @@ func TestHostedMiseEnv(t *testing.T) {
 	for _, value := range []string{"", "1", "TRUE"} {
 		t.Setenv("GITHUB_ACTIONS", value)
 		t.Setenv("MISE_ENV", "ci")
-		require.NoError(t, hostedMiseEnv(), "GITHUB_ACTIONS=%q is not the hosted workflow: nothing is checked", value)
+		require.NoError(t, HostedEnv(), "GITHUB_ACTIONS=%q is not the hosted workflow: nothing is checked", value)
 	}
 
 	t.Setenv("GITHUB_ACTIONS", "true")
 	setAll()
-	require.NoError(t, hostedMiseEnv())
-	for _, kv := range miseEnv {
+	require.NoError(t, HostedEnv())
+	for _, kv := range MiseEnv {
 		key, value, _ := strings.Cut(kv, "=")
 		t.Run(key, func(t *testing.T) {
 			setAll()
 			t.Setenv(key, value+"x")
-			require.ErrorContains(t, hostedMiseEnv(), "the workflow sets "+kv+" for every mise run, and this run has "+key+"="+value+"x")
+			require.ErrorContains(t, HostedEnv(), "the workflow sets "+kv+" for every mise run, and this run has "+key+"="+value+"x")
 			require.NoError(t, os.Unsetenv(key))
-			require.ErrorContains(t, hostedMiseEnv(), "the workflow sets "+kv+" for every mise run, and this run has "+key+" unset")
+			require.ErrorContains(t, HostedEnv(), "the workflow sets "+kv+" for every mise run, and this run has "+key+" unset")
 		})
 	}
-}
-
-// fakeMiseVersion is the version the fake mise of a test reports, and
-// answerVersion the lines of its script that report it, as "mise
-// --version" prints it.
-const (
-	fakeMiseVersion = "2026.10.3"
-	answerVersion   = "if [ \"$1\" = --version ]; then echo '" + fakeMiseVersion + " linux-x64 (2026-10-05)'; exit 0; fi\n"
-)
-
-// miseWorkflow returns goodWorkflow with its mise-action step pinning
-// mise at version.
-func miseWorkflow(t *testing.T, version string) string {
-	t.Helper()
-	return citest.Edits(t, "          sha256: ${{ matrix.mise_sha256 }}\n", "          version: "+version+"\n          sha256: ${{ matrix.mise_sha256 }}\n")
 }
 
 // TestPinnedMiseVersion reads the version of mise that ci.yml pins, in
@@ -451,7 +413,7 @@ func TestPinnedMiseVersion(t *testing.T) {
 	assert.Equal(t, "2026.10.3", got, "the version ci.yml pins")
 
 	twice := func(second string) string {
-		src := miseWorkflow(t, "2026.10.3")
+		src := citest.MiseWorkflow(t, "2026.10.3")
 		step := "      - uses: jdx/mise-action/sub/path@"
 		i := strings.Index(src, step)
 		require.GreaterOrEqual(t, i, 0)
@@ -460,7 +422,7 @@ func TestPinnedMiseVersion(t *testing.T) {
 	tests := []struct {
 		name, src, want string
 	}{
-		{"one step", miseWorkflow(t, "2026.10.3"), "2026.10.3"},
+		{"one step", citest.MiseWorkflow(t, "2026.10.3"), "2026.10.3"},
 		{"two steps, one version, the action in any case", twice("2026.10.3"), "2026.10.3"},
 		{"two versions", twice("2026.10.4"), `holds ["2026.10.4" "2026.10.3"]`},
 		{"no version", citest.GoodWorkflow, `holds [""]`},
@@ -471,7 +433,7 @@ func TestPinnedMiseVersion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
 			if tt.src != "" {
-				path := filepath.Join(root, filepath.FromSlash(pinnedMiseWorkflow))
+				path := filepath.Join(root, filepath.FromSlash(PinnedWorkflow))
 				require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 				require.NoError(t, os.WriteFile(path, []byte(tt.src), 0o600))
 			}
@@ -487,21 +449,21 @@ func TestPinnedMiseVersion(t *testing.T) {
 }
 
 // TestCheckMiseVersion refuses a mise whose version is not the one
-// ci.yml pins, and runs "mise --version" with miseEnv at the top of
+// ci.yml pins, and runs "mise --version" with MiseEnv at the top of
 // the tree.
 func TestCheckMiseVersion(t *testing.T) {
 	root := t.TempDir()
-	path := filepath.Join(root, filepath.FromSlash(pinnedMiseWorkflow))
+	path := filepath.Join(root, filepath.FromSlash(PinnedWorkflow))
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-	require.NoError(t, os.WriteFile(path, []byte(miseWorkflow(t, fakeMiseVersion)), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte(citest.MiseWorkflow(t, citest.FakeMiseVersion)), 0o600))
 	f := citest.NewFakeMise(t)
 	dump := filepath.Join(t.TempDir(), "env")
 	write := func(version string) {
 		script := "#!/bin/sh\n[ \"$1\" = --version ] || exit 3\necho \"$MISE_OVERRIDE_CONFIG_FILENAMES $(pwd -P)\" > '" + dump + "'\necho '" + version + " linux-x64 (2026-10-05)'\necho 'mise WARN  mise version 2026.10.4 available' >&2\n"
 		require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte(script), 0o700))
 	}
-	write(fakeMiseVersion)
-	require.NoError(t, checkMiseVersion(t.Context(), root))
+	write(citest.FakeMiseVersion)
+	require.NoError(t, CheckVersion(t.Context(), root))
 	data, err := os.ReadFile(dump)
 	require.NoError(t, err)
 	real, err := filepath.EvalSymlinks(root)
@@ -509,21 +471,21 @@ func TestCheckMiseVersion(t *testing.T) {
 	assert.Equal(t, "mise.toml "+real+"\n", string(data), "with miseEnv, at the top of the tree")
 
 	write("2026.10.4")
-	require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is at version 2026.10.4, and .github/workflows/ci.yml pins 2026.10.3")
+	require.ErrorContains(t, CheckVersion(t.Context(), root), "mise is at version 2026.10.4, and .github/workflows/ci.yml pins 2026.10.3")
 	for _, other := range []string{"2026.10.30", "2026.10"} {
 		write(other)
-		require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is at version "+other+",", "a version that only shares a prefix with the pin")
+		require.ErrorContains(t, CheckVersion(t.Context(), root), "mise is at version "+other+",", "a version that only shares a prefix with the pin")
 	}
 	write("2024.11.37")
-	require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is at version 2024.11.37")
+	require.ErrorContains(t, CheckVersion(t.Context(), root), "mise is at version 2024.11.37")
 
 	require.NoError(t, os.Remove(filepath.Join(f.Bin, "mise")))
-	require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is not on the search path")
+	require.ErrorContains(t, CheckVersion(t.Context(), root), "mise is not on the search path")
 }
 
 // TestMiseProbesRunUnderTheToolProbeClass shows that the two probes of
-// mise, "mise which" (whichPinned) and "mise --version"
-// (checkMiseVersion), run under the class procgroup.ToolProbe: a mise
+// mise, "mise which" (WhichPinned) and "mise --version"
+// (CheckVersion), run under the class procgroup.ToolProbe: a mise
 // that stalls ends at the limit of that class, shortened here. A probe
 // under another class would end at the deadline of the context
 // instead, which is not subprocess-timeout.
@@ -535,10 +497,10 @@ func TestMiseProbesRunUnderTheToolProbeClass(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte("#!/bin/sh\nexec '"+sleep+"' 30\n"), 0o700))
 	probes := map[string]func(ctx context.Context) error{
 		"mise which": func(ctx context.Context) error {
-			_, err := whichPinned(ctx, root, "go", "go", "go")
+			_, err := WhichPinned(ctx, root, "go", "go", "go")
 			return err
 		},
-		"mise --version": func(ctx context.Context) error { return checkMiseVersion(ctx, root) },
+		"mise --version": func(ctx context.Context) error { return CheckVersion(ctx, root) },
 	}
 	for name, probe := range probes {
 		t.Run(name, func(t *testing.T) {

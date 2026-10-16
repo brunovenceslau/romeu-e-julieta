@@ -1,7 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+// Package mise holds what tools/ci knows of mise: the one environment
+// of every mise run (MiseEnv), the allowlist of the pre-push hook
+// (HookAllow), the tools mise may install (PinnedTools) and how a tool
+// is resolved to the path of its pinned install (WhichPinned), the
+// files mise reads as its configuration, and the version of mise that
+// ci.yml pins. It is a helper of the checks and registers no check.
+package mise
 
 import (
 	"bytes"
@@ -53,21 +59,21 @@ import (
 //
 // What this code does:
 //
-//  1. One environment, miseEnv, for every mise run: tools/ci adds it to
-//     each mise command it starts (miseEnviron), the workflow sets it
+//  1. One environment, MiseEnv, for every mise run: tools/ci adds it to
+//     each mise command it starts (Environ), the workflow sets it
 //     in its env table, which the workflows check holds to this list,
 //     and the pre-push hook starts go, and so the mise shim, with it
 //     (TestHook holds the hook to this list). With it, mise
 //     2026.10.3 reads mise.toml as the one configuration file of the
 //     tree, and mise.lock as its lock (TestMiseEnvStopsConfigs measures
-//     both halves: without miseEnv each file above runs its command;
+//     both halves: without MiseEnv each file above runs its command;
 //     with it none does, and each variable left out alone lets one
 //     through). In the hosted workflow, setup fails a run whose
-//     environment does not hold miseEnv (hostedMiseEnv).
+//     environment does not hold MiseEnv (HostedEnv).
 //  2. One list, miseFiles: mise.toml and mise.lock, the two mise files
 //     the repository tracks, and every other path below the top of the
 //     tree that mise 2026.10.3 reads as configuration when it runs
-//     there without miseEnv (LOCAL_CONFIG_FILENAMES and
+//     there without MiseEnv (LOCAL_CONFIG_FILENAMES and
 //     env_config_patterns in src/config/mod.rs, find_miserc_files in
 //     src/config/miserc.rs). The dependencies surface of the ask-first
 //     list holds exactly these globs besides go.mod, go.sum and the
@@ -76,10 +82,10 @@ import (
 //  3. hygiene refuses a file of the list other than mise.toml and
 //     mise.lock, by their exact names, and a pre-push run refuses an
 //     untracked one at any depth (isGateInput), so a mise run without
-//     miseEnv, as a developer's own shell starts, finds none on the
+//     MiseEnv, as a developer's own shell starts, finds none on the
 //     default branch. Three rules close the names that alias a path
 //     of the list on another file system: both match the path in any
-//     case (isMiseFile), since a case-insensitive file system gives
+//     case (IsMiseFile), since a case-insensitive file system gives
 //     mise Mise.local.toml for mise.local.toml; hygiene refuses every
 //     path with a byte outside printable ASCII, so no fold beyond
 //     ASCII (U+017F, the long s, for the s of mise.local.toml) and no
@@ -94,8 +100,8 @@ import (
 //     the configuration from its -C directory, so it reads the files of
 //     this list, from the root it trusts, and none of a subdirectory.
 //  5. fast, all and setup refuse a mise of another version than the
-//     one ci.yml pins for mise-action (checkMiseVersion): the files
-//     mise reads and the variables of miseEnv are measured with that
+//     one ci.yml pins for mise-action (CheckVersion): the files
+//     mise reads and the variables of MiseEnv are measured with that
 //     version only.
 //  6. fast and all read the commit that hygiene, workflows and the
 //     pushed range judge before they start mise or any step
@@ -108,7 +114,7 @@ import (
 //
 // Not covered: mise still reads a .miserc.toml of the tree. Of its
 // seven keys (the "rc" settings of settings.toml, mise 2026.10.3),
-// miseEnv overrides the four that select configuration files (env,
+// MiseEnv overrides the four that select configuration files (env,
 // auto_env and the two override lists; src/env.rs), env_conf_d acts
 // only on the files of an environment, of which none is selected, and
 // ceiling_paths and ignored_config_paths only narrow what mise reads;
@@ -117,7 +123,7 @@ import (
 // the workflow or the pre-push hook, such as a developer's shell with
 // go on the mise shims, or an editor or an agent that starts gopls
 // through its shim (gopls starts go the same way, as soon as the
-// language server opens the tree), has no miseEnv, so a change that
+// language server opens the tree), has no MiseEnv, so a change that
 // adds a file of the list runs its command there before hygiene fails
 // it; hygiene and the code-owner review keep it off the default branch.
 // That the hosted runner delivers the empty MISE_ENV of the env table
@@ -129,7 +135,7 @@ import (
 // (mise.local.toml.); no runner of the CI matrix is Windows and no rule
 // refuses such a name, a decision to reopen if Windows joins the matrix
 // (TestPrintableASCII shows the gap). Nothing the caller or the machine
-// configures outside the tree reaches mise: miseEnv names no global or
+// configures outside the tree reaches mise: MiseEnv names no global or
 // system configuration and the ceiling keeps it out of the parents of
 // the tree (the idiomatic_version_file_enable_tools setting, which
 // would make mise read .go-version and go.mod, is among what a global
@@ -171,7 +177,7 @@ import (
 // closes the variables and files that act without the caller choosing to
 // bypass the hook, not those.
 
-// miseEnv is the fixed part of the environment of every mise run, as
+// MiseEnv is the fixed part of the environment of every mise run, as
 // "KEY=value": the six mise variables below, then goenv.Pin. The
 // configuration file mise reads is mise.toml alone, it reads no
 // .tool-versions ("none" is the empty list, src/env.rs of mise
@@ -182,21 +188,21 @@ import (
 // (miseNoGlobalConfig, miseNoSystemConfig). The workflow sets the same
 // table (the workflows check).
 //
-// miseEnv is only the fixed part. What else a mise run, and the go that
+// MiseEnv is only the fixed part. What else a mise run, and the go that
 // the mise shim starts, can see is decided by an allowlist, not by a
 // list of variables to override: a run of tools/ci starts mise in
-// passThroughEnv (and the proxy set, networkPassThrough) plus miseEnv
+// check.PassThroughEnv (and the proxy set, check.NetworkPassThrough) plus MiseEnv
 // plus miseCeiling, so a MISE_ or GO variable of the caller that none of
 // them names (MISE_ENV_FILE, MISE_CD, MISE_TRUSTED_CONFIG_PATHS,
 // MISE_FOO, GOFOO, a GOFLAGS) never reaches it; and the pre-push hook
-// starts go with "env -i", the same allowlist (hookAllow) and the same
+// starts go with "env -i", the same allowlist (HookAllow) and the same
 // fixed part (TestHook holds the hook to these lists).
 //
 // goenv.Pin ends the list: "mise install" builds govulncheck and gopls
 // with the go command ("go install", the go: backend), so those builds
 // read no "go env -w" file and start no other go than the pinned one, as
-// every go step of tools/ci does (stepEnv).
-var miseEnv = slices.Concat([]string{
+// every go step of tools/ci does (check.StepEnv).
+var MiseEnv = slices.Concat([]string{
 	"MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml",
 	"MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none",
 	"MISE_ENV=",
@@ -205,18 +211,49 @@ var miseEnv = slices.Concat([]string{
 	"MISE_SYSTEM_CONFIG_FILE=" + miseNoSystemConfig,
 }, goenv.Pin)
 
-// hookAllow are the variables the pre-push hook keeps from its caller:
+// HookAllow are the variables the pre-push hook keeps from its caller:
 // those of goenv.PassThrough (where things are on this machine),
-// networkPassThrough (how to reach the network) and goModulePassThrough
+// check.NetworkPassThrough (how to reach the network) and check.GoModulePassThrough
 // (where a module comes from, for the first go run that fills the
 // module cache), each only when the caller has set it. Every other
 // variable is dropped by
 // "env -i", the GIT_ ones included: tools/ci finds the repository from
 // the working directory of the hook, which git sets to the top of the
 // tree, and never from a GIT_DIR.
-var hookAllow = slices.Concat(goenv.PassThrough, check.NetworkPassThrough, check.GoModulePassThrough)
+var HookAllow = slices.Concat(goenv.PassThrough, check.NetworkPassThrough, check.GoModulePassThrough)
 
-// miseNoGlobalConfig is the path miseEnv gives MISE_GLOBAL_CONFIG_FILE,
+// GovulncheckLock and GovulncheckDir name govulncheck in mise.lock and
+// the directory below the mise installs directory where mise puts it:
+// the name of its backend with ":", "/" and "." written as "-" (measured
+// with mise 2026.10.3). It runs by the path "mise which" resolves, and
+// not through "mise exec": with the tool missing, "mise exec" warned and
+// ran a govulncheck of the search path, exit status 0 (measured with mise
+// 2026.10.3), which is not the version mise.lock locks.
+//
+// GoTool and LintTool are the names of the go command and of
+// golangci-lint, in mise.lock and below the installs directory alike.
+const (
+	GoTool          = "go"
+	LintTool        = "golangci-lint"
+	GovulncheckLock = "go:golang.org/x/vuln/cmd/govulncheck"
+	GovulncheckDir  = "go-golang-org-x-vuln-cmd-govulncheck"
+)
+
+// PinnedTools are the tools the mise configuration of this repository
+// pins, each at the version mise.lock locks: the go command and
+// golangci-lint, the two that fast runs (ResolveLintTools), govulncheck,
+// which all starts by the path "mise which" resolves (the
+// vulnerabilities check), gh, for
+// the release tool (decision DR7 of review round 8: gh is locked, and the
+// tool starts it by its resolved path), and gopls, the Go language server
+// that editors and agents use to navigate the code, which no step of
+// tools/ci starts. This is the one list of what mise may install, and the
+// one that 12 12.1 of the specification points at: WhichPinned resolves
+// no tool that is not on it, and the lint tests (allowedMiseTables,
+// TestLockedVersions and TestMiseConfigs) read it.
+var PinnedTools = []string{GoTool, "gh", LintTool, GovulncheckLock, "go:golang.org/x/tools/gopls"}
+
+// miseNoGlobalConfig is the path MiseEnv gives MISE_GLOBAL_CONFIG_FILE,
 // so that mise reads no global configuration: its [env] table (a
 // GOFLAGS=-overlay=... there reaches the go that the mise shim starts,
 // and so go run ./tools/ci), its tools and its settings. A path under
@@ -251,33 +288,33 @@ func miseCeiling(root string) string {
 	return "MISE_CEILING_PATHS=" + filepath.Dir(root)
 }
 
-// miseEnviron returns env with miseEnv after it, for a mise command.
+// Environ returns env with MiseEnv after it, for a mise command.
 // No list of variables a step keeps from this process holds a key of
-// miseEnv (TestMiseEnvList), so env has none, and a value of the
+// MiseEnv (TestMiseEnvList), so env has none, and a value of the
 // caller's never reaches mise.
-func miseEnviron(env []string) []string {
-	return append(slices.Clone(env), miseEnv...)
+func Environ(env []string) []string {
+	return append(slices.Clone(env), MiseEnv...)
 }
 
-// miseRunEnviron is miseEnviron for a mise run at the top of the tree
+// RunEnviron is Environ for a mise run at the top of the tree
 // root: with the ceiling that keeps mise out of the parents of root.
-func miseRunEnviron(env []string, root string) []string {
-	return append(miseEnviron(env), miseCeiling(root))
+func RunEnviron(env []string, root string) []string {
+	return append(Environ(env), miseCeiling(root))
 }
 
-// hostedMiseEnv fails a run in the hosted workflow (GITHUB_ACTIONS is
+// HostedEnv fails a run in the hosted workflow (GITHUB_ACTIONS is
 // "true", as the runner sets it for every step) whose environment does
-// not hold each variable of miseEnv with its value: the env table of
+// not hold each variable of MiseEnv with its value: the env table of
 // the workflow sets them for mise-action and for the mise shim that
 // starts go, and an empty MISE_ENV must arrive set, not dropped. Off
-// the hosted workflow it checks nothing: there tools/ci sets miseEnv
+// the hosted workflow it checks nothing: there tools/ci sets MiseEnv
 // for each mise run it starts, and the shell that starts tools/ci is
 // the developer's own.
-func hostedMiseEnv() error {
+func HostedEnv() error {
 	if os.Getenv("GITHUB_ACTIONS") != "true" {
 		return nil
 	}
-	for _, kv := range miseEnv {
+	for _, kv := range MiseEnv {
 		key, want, _ := strings.Cut(kv, "=")
 		got, set := os.LookupEnv(key)
 		switch {
@@ -290,14 +327,14 @@ func hostedMiseEnv() error {
 	return nil
 }
 
-// pinnedMiseFiles are the mise files the repository tracks.
-var pinnedMiseFiles = []string{"mise.toml", "mise.lock"}
+// PinnedMiseFiles are the mise files the repository tracks.
+var PinnedMiseFiles = []string{"mise.toml", "mise.lock"}
 
 // miseFiles are the paths that mise 2026.10.3, started at the top of
 // the tree, reads as its configuration or as the lock of the pinned
-// tools, as globs of the ask-first grammar (12 12.4): pinnedMiseFiles,
+// tools, as globs of the ask-first grammar (12 12.4): PinnedMiseFiles,
 // then every other one.
-var miseFiles = append(slices.Clone(pinnedMiseFiles),
+var miseFiles = append(slices.Clone(PinnedMiseFiles),
 	".mise.toml", "mise.*.toml", ".mise.*.toml",
 	"mise/**", ".mise/**",
 	".config/mise.toml", ".config/mise.*.toml", ".config/mise/**",
@@ -305,7 +342,7 @@ var miseFiles = append(slices.Clone(pinnedMiseFiles),
 	".miserc.toml", ".miserc.local.toml", ".config/miserc.toml",
 )
 
-// isMiseFile reports whether mise, started at the top of the tree,
+// IsMiseFile reports whether mise, started at the top of the tree,
 // reads the file at path, relative to that top with forward slashes,
 // as one of miseFiles. The path is matched in lower case, as every
 // glob of miseFiles is written (TestMiseFilesLowercase): on a
@@ -313,21 +350,21 @@ var miseFiles = append(slices.Clone(pinnedMiseFiles),
 // .TOOL-VERSIONS when it looks for .tool-versions. The lowering folds
 // ASCII letters only, and relies on hygiene's path rule
 // (printableASCII) for every other byte.
-func isMiseFile(path string) bool {
+func IsMiseFile(path string) bool {
 	lower := strings.ToLower(path)
 	return slices.ContainsFunc(miseFiles, func(g string) bool { return askfirst.GlobMatch(g, lower) })
 }
 
-// isMiseFileAtAnyDepth reports whether mise reads the file at path as
+// IsMiseFileAtAnyDepth reports whether mise reads the file at path as
 // one of miseFiles when it starts in the directory that holds it or in
-// one above it: isMiseFile of the path, or of what follows any "/" in
+// one above it: IsMiseFile of the path, or of what follows any "/" in
 // it. A test, or a developer's shell, can start mise below the top,
 // where such a file is in a root mise does not trust and fails closed
 // (the threat model above); a pre-push run refuses it all the same,
 // since a developer may have trusted that root.
-func isMiseFileAtAnyDepth(path string) bool {
+func IsMiseFileAtAnyDepth(path string) bool {
 	for {
-		if isMiseFile(path) {
+		if IsMiseFile(path) {
 			return true
 		}
 		_, rest, ok := strings.Cut(path, "/")
@@ -339,22 +376,22 @@ func isMiseFileAtAnyDepth(path string) bool {
 }
 
 // miseAction is the action that installs mise in the hosted workflow,
-// and pinnedMiseWorkflow the workflow whose "version" input for it
-// pins the version of mise itself: the one version under which miseEnv
+// and PinnedWorkflow the workflow whose "version" input for it
+// pins the version of mise itself: the one version under which MiseEnv
 // is measured (TestMiseEnvStopsConfigs).
 const (
-	miseAction         = "jdx/mise-action"
-	pinnedMiseWorkflow = workflowsDir + "ci" + workflowExt
+	miseAction     = "jdx/mise-action"
+	PinnedWorkflow = ".github/workflows/ci.yml"
 )
 
-// pinnedMiseVersion reads the version of mise that pinnedMiseWorkflow
+// pinnedMiseVersion reads the version of mise that PinnedWorkflow
 // pins, in the tree at root: the "version" input of each step that uses
 // miseAction (the action matched without case, as the workflows check
 // matches it), which must be one and the same.
 func pinnedMiseVersion(root string) (string, error) {
-	src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(pinnedMiseWorkflow)))
+	src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(PinnedWorkflow)))
 	if err != nil {
-		return "", fmt.Errorf("the version of mise is pinned in %s: %w", pinnedMiseWorkflow, err)
+		return "", fmt.Errorf("the version of mise is pinned in %s: %w", PinnedWorkflow, err)
 	}
 	var wf struct {
 		Jobs map[string]struct {
@@ -365,7 +402,7 @@ func pinnedMiseVersion(root string) (string, error) {
 		} `yaml:"jobs"`
 	}
 	if err := yaml.Unmarshal(src, &wf); err != nil {
-		return "", fmt.Errorf("%s: %w", pinnedMiseWorkflow, err)
+		return "", fmt.Errorf("%s: %w", PinnedWorkflow, err)
 	}
 	var versions []string
 	for _, job := range wf.Jobs {
@@ -381,30 +418,30 @@ func pinnedMiseVersion(root string) (string, error) {
 		}
 	}
 	if len(versions) != 1 || versions[0] == "" {
-		return "", fmt.Errorf("%s pins the version of mise with one \"version\" input of %s, and it holds %q", pinnedMiseWorkflow, miseAction, versions)
+		return "", fmt.Errorf("%s pins the version of mise with one \"version\" input of %s, and it holds %q", PinnedWorkflow, miseAction, versions)
 	}
 	return versions[0], nil
 }
 
-// checkMiseVersion fails unless the mise on the search path is the
-// version pinnedMiseVersion reads: miseEnv is measured under that
+// CheckVersion fails unless the mise on the search path is the
+// version pinnedMiseVersion reads: MiseEnv is measured under that
 // version, and the variables it sets, or the files mise reads without
 // them, may differ in another (the threat model above). "mise
 // --version" prints the version as its first word (measured with mise
 // 2026.10.3: "2026.10.3 linux-arm64 (2026-10-05)"). It runs as every
-// mise run of tools/ci does: at the top of the tree, with miseEnv.
-func checkMiseVersion(ctx context.Context, root string) error {
+// mise run of tools/ci does: at the top of the tree, with MiseEnv.
+func CheckVersion(ctx context.Context, root string) error {
 	var stdout bytes.Buffer
 	err := procgroup.Run(ctx, procgroup.Command{
 		Class:  procgroup.ToolProbe,
 		Argv:   []string{"mise", "--version"},
 		Dir:    root,
-		Env:    miseRunEnviron(check.PassThroughEnv(), root),
+		Env:    RunEnviron(check.PassThroughEnv(), root),
 		Stdout: &stdout,
 	})
 	out := stdout.Bytes()
 	if errors.Is(err, procgroup.ErrNotFound) {
-		return fmt.Errorf("mise is not on the search path: install the mise that %s pins, then run \"go run ./tools/ci setup\" in %s", pinnedMiseWorkflow, root)
+		return fmt.Errorf("mise is not on the search path: install the mise that %s pins, then run \"go run ./tools/ci setup\" in %s", PinnedWorkflow, root)
 	}
 	if err != nil {
 		return fmt.Errorf("mise --version: %w", err)
@@ -414,7 +451,7 @@ func checkMiseVersion(ctx context.Context, root string) error {
 		return err
 	}
 	if got, _, _ := strings.Cut(strings.TrimSpace(string(out)), " "); got != pinned {
-		return fmt.Errorf("mise is at version %s, and %s pins %s, the version miseEnv is measured with (tools/ci/misefiles.go): install mise %s", git.Printable(got), pinnedMiseWorkflow, pinned, pinned)
+		return fmt.Errorf("mise is at version %s, and %s pins %s, the version MiseEnv is measured with (tools/ci/internal/mise/misefiles.go): install mise %s", git.Printable(got), PinnedWorkflow, pinned, pinned)
 	}
 	return nil
 }

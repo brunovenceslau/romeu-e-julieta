@@ -8,11 +8,13 @@
 package citest
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
@@ -165,7 +167,6 @@ const WorkflowEnv = `env:
   GOTOOLCHAIN: local
 `
 
-// Edits returns goodWorkflow with each pair of olds and news replaced.
 // Edits returns GoodWorkflow with each pair of old and new text
 // replaced, once each, and fails when an old text is not there.
 func Edits(t *testing.T, pairs ...string) string {
@@ -273,3 +274,66 @@ surfaces:
     globs: [.github/ask-first.yaml]
     reason: this list
 `
+
+// IsolatedMiseEnv is an environment for the real mise built from
+// nothing but PATH: its home, configuration, state and cache
+// directories are new and empty, the system and global configuration
+// files do not exist, and it stays off the network. So no
+// configuration of the person who runs the tests (a global
+// "paranoid = true", say) changes what a test measures. A test that
+// needs the pinned tools below HOME uses IsolateMiseConfig instead.
+func IsolatedMiseEnv(t *testing.T) []string {
+	t.Helper()
+	none := filepath.Join(t.TempDir(), "none.toml")
+	return []string{
+		"PATH=" + os.Getenv("PATH"),
+		"HOME=" + t.TempDir(),
+		"XDG_CONFIG_HOME=" + t.TempDir(),
+		"MISE_CONFIG_DIR=" + t.TempDir(),
+		"MISE_STATE_DIR=" + t.TempDir(),
+		"MISE_CACHE_DIR=" + t.TempDir(),
+		"MISE_SYSTEM_CONFIG_FILE=" + none,
+		"MISE_GLOBAL_CONFIG_FILE=" + none,
+		"MISE_OFFLINE=1",
+	}
+}
+
+// FakeMiseVersion is the version the fake mise of a test reports, and
+// AnswerVersion the lines of its script that report it, as "mise
+// --version" prints it.
+const (
+	FakeMiseVersion = "2026.10.3"
+	AnswerVersion   = "if [ \"$1\" = --version ]; then echo '" + FakeMiseVersion + " linux-x64 (2026-10-05)'; exit 0; fi\n"
+)
+
+// MiseWorkflow returns GoodWorkflow with its mise-action step pinning
+// mise at version.
+func MiseWorkflow(t *testing.T, version string) string {
+	t.Helper()
+	return Edits(t, "          sha256: ${{ matrix.mise_sha256 }}\n", "          version: "+version+"\n          sha256: ${{ matrix.mise_sha256 }}\n")
+}
+
+// PinnedLintTools returns the pinned tools as resolve finds them for
+// this repository, run in a mise state directory of the test's own
+// (IsolateMiseConfig), where the test first trusts the repository's
+// mise configuration. mise keeps its trust records in the state
+// directory (https://mise.jdx.dev/directories.html), so the tests do
+// not depend on a "mise trust" of the person who runs them, and leave
+// no trust behind. environ is the environment of a mise run; it and
+// resolve come from the mise package, which citest does not import, as
+// the tests of that package import citest.
+func PinnedLintTools(t *testing.T, environ func([]string) []string, resolve func(context.Context, string) (check.Tools, error)) check.Tools {
+	t.Helper()
+	root := ModuleRoot(t)
+	IsolateMiseConfig(t)
+	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolStep,
+		Argv:  []string{"mise", "-C", root, "trust"},
+		Dir:   root,
+		Env:   environ(check.PassThroughEnv()),
+	})
+	require.NoError(t, err, "mise trust\n%s", out)
+	tools, err := resolve(t.Context(), root)
+	require.NoError(t, err)
+	return tools
+}

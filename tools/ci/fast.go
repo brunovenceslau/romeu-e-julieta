@@ -17,6 +17,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
 )
@@ -229,10 +230,10 @@ func runFast(ctx context.Context, e check.Env, args []string) (bool, error) {
 	}
 	steps := e.Steps
 	if steps == nil {
-		if err := checkMiseVersion(ctx, root); err != nil {
+		if err := mise.CheckVersion(ctx, root); err != nil {
 			return false, err
 		}
-		tools, err := resolveLintTools(ctx, root)
+		tools, err := mise.ResolveLintTools(ctx, root)
 		if err != nil {
 			return false, err
 		}
@@ -528,7 +529,7 @@ func isGateInput(path string) bool {
 		strings.HasSuffix(base, ".go") ||
 		base == "go.work" || base == "go.work.sum" ||
 		strings.HasPrefix(path, "vendor/") ||
-		isMiseFileAtAnyDepth(path)
+		mise.IsMiseFileAtAnyDepth(path)
 }
 
 // nestedModules refuses a go.mod below the root of the working tree,

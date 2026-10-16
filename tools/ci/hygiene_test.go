@@ -17,6 +17,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
@@ -710,7 +711,7 @@ func TestPrintableASCII(t *testing.T) {
 	} {
 		assert.Equal(t, tt.want, printableASCII(tt.path), "%q", tt.path)
 	}
-	assert.False(t, isMiseFile("mise.local.toml."), "nor does isMiseFile match it")
+	assert.False(t, mise.IsMiseFile("mise.local.toml."), "nor does isMiseFile match it")
 }
 
 // rangeOf reads the verdicts of pushedRange back as its findings, and

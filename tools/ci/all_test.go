@@ -26,6 +26,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 )
@@ -176,7 +177,7 @@ func TestAllSteps(t *testing.T) {
 	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.Bin, "git")))
 	goCmd := f.Tool(t, "go", "1.27.0", "bin", "go")
 	linter := f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint")
-	vuln := f.Tool(t, govulncheckDir, "1.8.0", "bin", "govulncheck")
+	vuln := f.Tool(t, mise.GovulncheckDir, "1.8.0", "bin", "govulncheck")
 	script := "#!/bin/sh\ncase \"$4\" in\ngovulncheck) echo '" + vuln + "' ;;\nesac\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte(script), 0o700))
 	for _, key := range slices.Concat(check.NetworkPassThrough, check.DockerPassThrough) {
@@ -261,12 +262,12 @@ func TestAllStepsVulnFailsClosed(t *testing.T) {
 			resolve: func(t *testing.T, _ citest.FakeMise) string {
 				return citest.Executable(t, filepath.Join(t.TempDir(), "govulncheck"))
 			},
-			want: "is outside " + filepath.Join("{installs}", govulncheckDir) + ", where mise installs it",
+			want: "is outside " + filepath.Join("{installs}", mise.GovulncheckDir) + ", where mise installs it",
 		},
 		{
 			name: "at a version beside the locked one",
 			resolve: func(t *testing.T, f citest.FakeMise) string {
-				return f.Tool(t, govulncheckDir, "1.7.0", "bin", "govulncheck")
+				return f.Tool(t, mise.GovulncheckDir, "1.7.0", "bin", "govulncheck")
 			},
 			want: "the install is not the version 1.8.0 that mise.lock locks",
 		},
@@ -517,7 +518,7 @@ func TestAllWiring(t *testing.T) {
 	r := citest.NewTree(t)
 	r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 	r.Write("mise.lock", citest.LockFixture)
-	r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
+	r.Write(mise.PinnedWorkflow, citest.MiseWorkflow(t, citest.FakeMiseVersion))
 	r.Commit("fixture")
 	gitPath, err := procgroup.LookPath("git")
 	require.NoError(t, err)
@@ -531,10 +532,10 @@ func TestAllWiring(t *testing.T) {
 	writeProfile := "for a in \"$@\"; do case \"$a\" in -coverprofile=*) printf 'mode: set\\n" + citest.FixtureModule + "/tools/ci/f.go:1.2,3.4 1 0\\n' > \"${a#-coverprofile=}\" ;; esac; done\n"
 	for path, script := range map[string]string{
 		goCmd: logged("go", writeProfile),
-		filepath.Join(filepath.Dir(goCmd), "gofmt"):                                logged("gofmt", ""),
-		filepath.Join(f.Installs(), "golangci-lint", "2.14.0", "golangci-lint"):    logged("lint", ""),
-		filepath.Join(f.Installs(), govulncheckDir, "1.8.0", "bin", "govulncheck"): logged("govulncheck", ""),
-		filepath.Join(f.Bin, "docker"):                                             logged("docker", ""),
+		filepath.Join(filepath.Dir(goCmd), "gofmt"):                                     logged("gofmt", ""),
+		filepath.Join(f.Installs(), "golangci-lint", "2.14.0", "golangci-lint"):         logged("lint", ""),
+		filepath.Join(f.Installs(), mise.GovulncheckDir, "1.8.0", "bin", "govulncheck"): logged("govulncheck", ""),
+		filepath.Join(f.Bin, "docker"):                                                  logged("docker", ""),
 	} {
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 		require.NoError(t, os.WriteFile(path, []byte(script), 0o700))
@@ -542,9 +543,9 @@ func TestAllWiring(t *testing.T) {
 	which := "if [ \"$3\" = which ]; then\ncase \"$4\" in\n" +
 		"go) echo '" + goCmd + "' ;;\n" +
 		"golangci-lint) echo '" + filepath.Join(f.Installs(), "golangci-lint", "2.14.0", "golangci-lint") + "' ;;\n" +
-		"govulncheck) echo '" + filepath.Join(f.Installs(), govulncheckDir, "1.8.0", "bin", "govulncheck") + "' ;;\n" +
+		"govulncheck) echo '" + filepath.Join(f.Installs(), mise.GovulncheckDir, "1.8.0", "bin", "govulncheck") + "' ;;\n" +
 		"esac\nexit 0\nfi\n"
-	require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte("#!/bin/sh\n"+answerVersion+which+"echo \"mise $*\" >> '"+log+"'\n"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte("#!/bin/sh\n"+citest.AnswerVersion+which+"echo \"mise $*\" >> '"+log+"'\n"), 0o700))
 
 	code, out := runCI(t, r, nil, nil, "all")
 	assert.Equal(t, check.ExitFail, code, out)
@@ -589,7 +590,7 @@ func evalOrSelf(path string) string {
 func TestSetup(t *testing.T) {
 	r := citest.NewTree(t)
 	r.Write("mise.lock", citest.LockFixture)
-	r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
+	r.Write(mise.PinnedWorkflow, citest.MiseWorkflow(t, citest.FakeMiseVersion))
 	r.Commit("fixture")
 	gitPath, err := procgroup.LookPath("git")
 	require.NoError(t, err)
@@ -602,7 +603,7 @@ func TestSetup(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(goCmd), 0o755))
 	require.NoError(t, os.WriteFile(goCmd, []byte("#!/bin/sh\necho \"go $* GOPROXY=${GOPROXY-unset} GOFLAGS=$GOFLAGS HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '"+log+"'\n"), 0o700))
 	linter := f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint")
-	script := "#!/bin/sh\n" + answerVersion + "if [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset} MISE=${MISE_OVERRIDE_CONFIG_FILENAMES-unset},${MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES-unset},${MISE_ENV-unset},${MISE_AUTO_ENV-unset} GO=${GOENV-unset},${GOTOOLCHAIN-unset}\" >> '" + log + "'\n"
+	script := "#!/bin/sh\n" + citest.AnswerVersion + "if [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset} MISE=${MISE_OVERRIDE_CONFIG_FILENAMES-unset},${MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES-unset},${MISE_ENV-unset},${MISE_AUTO_ENV-unset} GO=${GOENV-unset},${GOTOOLCHAIN-unset}\" >> '" + log + "'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte(script), 0o700))
 	t.Setenv("HTTPS_PROXY", "http://proxy.invalid")
 	t.Setenv("DOCKER_HOST", "unix:///nowhere")
@@ -633,7 +634,7 @@ func TestSetup(t *testing.T) {
 	t.Run("a hosted run without the mise environment stops before mise", func(t *testing.T) {
 		require.NoError(t, os.Remove(log))
 		t.Setenv("GITHUB_ACTIONS", "true")
-		for _, kv := range miseEnv { // whatever the caller exports
+		for _, kv := range mise.MiseEnv { // whatever the caller exports
 			key, _, _ := strings.Cut(kv, "=")
 			t.Setenv(key, "")
 			require.NoError(t, os.Unsetenv(key))
@@ -653,11 +654,11 @@ func TestSetup(t *testing.T) {
 	// of them may stop it; and none reaches a mise run of tools/ci.
 	t.Run("a hosted run keeps what mise-action exports out of the mise runs", func(t *testing.T) {
 		dump := filepath.Join(t.TempDir(), "dump")
-		hosted := "#!/bin/sh\n" + answerVersion + "if [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\n" +
+		hosted := "#!/bin/sh\n" + citest.AnswerVersion + "if [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\n" +
 			"echo \"TRUSTED=${MISE_TRUSTED_CONFIG_PATHS-unset} YES=${MISE_YES-unset} LOG=${MISE_LOG_LEVEL-unset} CD=${MISE_CD-unset} ENVFILE=${MISE_ENV_FILE-unset} CEILING=${MISE_CEILING_PATHS-unset}\" >> '" + dump + "'\n"
 		require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte(hosted), 0o700))
 		t.Setenv("GITHUB_ACTIONS", "true")
-		for _, kv := range miseEnv {
+		for _, kv := range mise.MiseEnv {
 			key, value, _ := strings.Cut(kv, "=")
 			t.Setenv(key, value)
 		}
@@ -678,22 +679,22 @@ func TestSetup(t *testing.T) {
 
 	t.Run("a mise of another version stops before mise runs anything else", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(log, nil, 0o600))
-		r.Write(pinnedMiseWorkflow, miseWorkflow(t, "2026.10.4"))
+		r.Write(mise.PinnedWorkflow, citest.MiseWorkflow(t, "2026.10.4"))
 		r.Commit("pins another mise")
 		t.Cleanup(func() {
-			r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
+			r.Write(mise.PinnedWorkflow, citest.MiseWorkflow(t, citest.FakeMiseVersion))
 			r.Commit("pins the fake's mise again")
 		})
 		code, out := runCI(t, r, nil, nil, "setup")
 		assert.Equal(t, check.ExitError, code, out)
-		assert.Contains(t, out, "ci: mise is at version "+fakeMiseVersion+", and .github/workflows/ci.yml pins 2026.10.4")
+		assert.Contains(t, out, "ci: mise is at version "+citest.FakeMiseVersion+", and .github/workflows/ci.yml pins 2026.10.4")
 		data, err := os.ReadFile(log)
 		require.NoError(t, err)
 		assert.Empty(t, string(data), "no mise trust, no mise install")
 	})
 
 	t.Run("a failing mise stops before the download", func(t *testing.T) {
-		require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte("#!/bin/sh\n"+answerVersion+"exit 1\n"), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte("#!/bin/sh\n"+citest.AnswerVersion+"exit 1\n"), 0o700))
 		code, out := runCI(t, r, nil, nil, "setup")
 		assert.Equal(t, check.ExitFail, code, out)
 		assert.Contains(t, out, "FAIL  mise trust")
@@ -716,7 +717,7 @@ func TestSetup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stall := "#!/bin/sh\n" + answerVersion + "if [ \"$1\" = " + tt.stalls + " ]; then exec '" + sleepPath + "' 30; fi\nexit 0\n"
+			stall := "#!/bin/sh\n" + citest.AnswerVersion + "if [ \"$1\" = " + tt.stalls + " ]; then exec '" + sleepPath + "' 30; fi\nexit 0\n"
 			require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte(stall), 0o700))
 			ctx := procgroup.WithTestTimeout(t.Context(), tt.class, 100*time.Millisecond)
 			var out bytes.Buffer
@@ -964,7 +965,7 @@ func TestCommitChecksReadBeforeMise(t *testing.T) {
 			r := citest.NewTree(t)
 			r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 			r.Write("mise.lock", citest.LockFixture)
-			r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
+			r.Write(mise.PinnedWorkflow, citest.MiseWorkflow(t, citest.FakeMiseVersion))
 			r.Write("docs/x.md", "a line with "+emDash+"\n")
 			r.Commit("fixture")
 			rewrite := overwriteObject(t, r, "HEAD:docs/x.md", "a plain line\n").Argv
@@ -975,9 +976,9 @@ func TestCommitChecksReadBeforeMise(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "docker"), []byte("#!/bin/sh\n"), 0o700))
 			goCmd := f.Tool(t, "go", "1.27.0", "bin", "go")
 			f.Tool(t, "go", "1.27.0", "bin", "gofmt")
-			f.Tool(t, govulncheckDir, "1.8.0", "bin", "govulncheck")
-			prelude := "'" + chmod + "' u+w '" + object + "' && '" + cat + "' '" + src + "' > '" + object + "'\n" + answerVersion +
-				"if [ \"$4\" = govulncheck ]; then echo '" + filepath.Join(f.Installs(), govulncheckDir, "1.8.0", "bin", "govulncheck") + "'; exit 0; fi\n"
+			f.Tool(t, mise.GovulncheckDir, "1.8.0", "bin", "govulncheck")
+			prelude := "'" + chmod + "' u+w '" + object + "' && '" + cat + "' '" + src + "' > '" + object + "'\n" + citest.AnswerVersion +
+				"if [ \"$4\" = govulncheck ]; then echo '" + filepath.Join(f.Installs(), mise.GovulncheckDir, "1.8.0", "bin", "govulncheck") + "'; exit 0; fi\n"
 			f.Script(t, prelude, f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint"), goCmd)
 
 			code, out := runCI(t, r, nil, nil, mode)

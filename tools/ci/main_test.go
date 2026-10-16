@@ -24,6 +24,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 )
 
 // hookScript is the tracked hook, with the words of its env filled in
@@ -40,7 +41,7 @@ import (
 // refusal is a bare line from a go that no Go code of the tree can
 // improve.
 var hookScript = strings.Replace(hookTemplate, "{{ENV}}",
-	hookAllowWords()+" "+strings.Join(slices.Concat(goenv.Build, miseEnv), " ")+
+	hookAllowWords()+" "+strings.Join(slices.Concat(goenv.Build, mise.MiseEnv), " ")+
 		` MISE_CEILING_PATHS="$(dirname -- "$(pwd -P)")"`, 1)
 
 const hookTemplate = `#!/bin/sh
@@ -84,8 +85,8 @@ run go run ./tools/ci fast "$@"
 `
 
 func hookAllowWords() string {
-	words := make([]string, len(hookAllow))
-	for i, k := range hookAllow {
+	words := make([]string, len(mise.HookAllow))
+	for i, k := range mise.HookAllow {
 		words[i] = "${" + k + `:+` + k + `="$` + k + `"}`
 	}
 	return strings.Join(words, " ")
@@ -197,7 +198,7 @@ func TestHookEnvIsTheAllowlist(t *testing.T) {
 	stub := "#!/bin/sh\n{\necho CALL\nenv\nfor a; do printf 'ARG[%s]\\n' \"$a\"; done\n} >> \"$(dirname -- \"$0\")/calls\"\n"
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "go"), []byte(stub), 0o700))
 	path := bin + string(os.PathListSeparator) + os.Getenv("PATH")
-	for _, key := range hookAllow {
+	for _, key := range mise.HookAllow {
 		t.Setenv(key, "/allowed/"+key)
 	}
 	t.Setenv("PATH", path)
@@ -215,7 +216,7 @@ func TestHookEnvIsTheAllowlist(t *testing.T) {
 	// What the production lists build, from the same process environment.
 	want := map[string]string{}
 	for _, kv := range slices.Concat(
-		miseRunEnviron(check.WithProcessEnv(check.PassThroughEnv(), slices.Concat(check.NetworkPassThrough, check.GoModulePassThrough)), real),
+		mise.RunEnviron(check.WithProcessEnv(check.PassThroughEnv(), slices.Concat(check.NetworkPassThrough, check.GoModulePassThrough)), real),
 		goenv.Build,
 	) {
 		k, v, _ := strings.Cut(kv, "=")

@@ -19,6 +19,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 )
 
 // workflowsDir holds the workflows, and workflowExt is the one name
@@ -302,15 +303,15 @@ func (c *grammar) file(doc *yaml.Node) {
 }
 
 // envRule is the finding of a file whose env table is not miseEnv.
-var envRule = "env holds exactly the mise environment of tools/ci, each value a YAML string, in this order: " + strings.Join(miseEnv, " ")
+var envRule = "env holds exactly the mise environment of tools/ci, each value a YAML string, in this order: " + strings.Join(mise.MiseEnv, " ")
 
 // env checks the env table of the file: the variables of miseEnv, in
 // its order, each a YAML string with the value of the list, and no
 // other. Every workflow sets it, since every step of one reaches go
 // through the mise shims, and mise-action runs mise itself.
 func (c *grammar) env(n *yaml.Node) {
-	ok := n.Kind == yaml.MappingNode && len(n.Content) == 2*len(miseEnv)
-	for i, kv := range miseEnv {
+	ok := n.Kind == yaml.MappingNode && len(n.Content) == 2*len(mise.MiseEnv)
+	for i, kv := range mise.MiseEnv {
 		if !ok {
 			break
 		}
