@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 // Package setup is the setup subcommand of tools/ci, which prepares a
-// machine to run the checks: it trusts mise.toml, installs the tools
-// mise.lock locks, and fills the module cache. It registers no check.
+// machine to run the checks: it installs the mise that ci.yml pins when
+// another one is found, trusts mise.toml, installs the tools mise.lock
+// locks, and fills the module cache. It registers no check.
 package setup
 
 import (
@@ -27,11 +28,17 @@ import (
 // of tools/ci keeps (goenv.PassThrough), and installs the tools already, so
 // the second step finds nothing to do.
 //
+// Before them, when the mise that tools/ci starts (mise.Path) names
+// another version than the one ci.yml pins, or none, setup installs
+// that pin in the user cache directory (install), after it checks the
+// download against the sha256 of the matrix of ci.yml (mise.ReadPin);
+// every mise command then starts that copy. It still refuses a mise of
+// another version (mise.CheckVersion) before any mise step.
+//
 // Both mise steps run with mise.MiseEnv, at the top of the tree. In the
 // hosted workflow, setup first checks that its own environment holds
 // mise.MiseEnv, as the workflow's env table gives every step
-// (mise.HostedEnv), and before any mise step it refuses a mise of
-// another version than the one ci.yml pins (mise.CheckVersion).
+// (mise.HostedEnv).
 //
 // The download runs the pinned go command in check.StepEnv with the proxy
 // the go command uses by default, the one step of tools/ci that
@@ -53,13 +60,28 @@ func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if err := mise.HostedEnv(); err != nil {
 		return false, err
 	}
+	pin, err := mise.ReadPin(root)
+	if err != nil {
+		return false, err
+	}
+	if version, err := mise.Version(ctx, root); err != nil || version != pin.Version {
+		path, err := install(ctx, pin)
+		if err != nil {
+			return false, fmt.Errorf("setup: install mise %s: %w", pin.Version, err)
+		}
+		check.Say(e.Stdout, "installed mise %s at %s\n", pin.Version, path)
+	}
 	if err := mise.CheckVersion(ctx, root); err != nil {
+		return false, err
+	}
+	misePath, err := mise.Path(root)
+	if err != nil {
 		return false, err
 	}
 	c := check.NewPrinter(e.Stdout)
 	miseSteps := []check.Step{
-		{Name: "mise trust", Argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, Environ: mise.RunEnviron(check.PassThroughEnv(), root)},
-		{Name: "mise install", Argv: []string{"mise", "install"}, Environ: mise.RunEnviron(check.WithProcessEnv(check.PassThroughEnv(), check.NetworkPassThrough), root), Class: procgroup.Mise},
+		{Name: "mise trust", Argv: []string{misePath, "trust", filepath.Join(root, "mise.toml")}, Environ: mise.RunEnviron(check.PassThroughEnv(), root)},
+		{Name: "mise install", Argv: []string{misePath, "install"}, Environ: mise.RunEnviron(check.WithProcessEnv(check.PassThroughEnv(), check.NetworkPassThrough), root), Class: procgroup.Mise},
 	}
 	c.Run(ctx, root, miseSteps)
 	if !c.OK {

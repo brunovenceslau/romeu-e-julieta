@@ -114,22 +114,6 @@ func TestSetup(t *testing.T) {
 		assert.Equal(t, want+want, string(got), "mise trust and mise install get the ceiling and none of what the action exported")
 	})
 
-	t.Run("a mise of another version stops before mise runs anything else", func(t *testing.T) {
-		require.NoError(t, os.WriteFile(log, nil, 0o600))
-		r.Write(mise.PinnedWorkflow, citest.MiseWorkflow(t, "2026.10.4"))
-		r.Commit("pins another mise")
-		t.Cleanup(func() {
-			r.Write(mise.PinnedWorkflow, citest.MiseWorkflow(t, citest.FakeMiseVersion))
-			r.Commit("pins the fake's mise again")
-		})
-		code, out := citest.Run(t, r, nil, Run)
-		assert.Equal(t, check.ExitError, code, out)
-		assert.Contains(t, out, "ci: mise is at version "+citest.FakeMiseVersion+", and .github/workflows/ci.yml pins 2026.10.4")
-		data, err := os.ReadFile(log)
-		require.NoError(t, err)
-		assert.Empty(t, string(data), "no mise trust, no mise install")
-	})
-
 	t.Run("a failing mise stops before the download", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte("#!/bin/sh\n"+citest.AnswerVersion+"exit 1\n"), 0o700))
 		code, out := citest.Run(t, r, nil, Run)

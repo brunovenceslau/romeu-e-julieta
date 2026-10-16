@@ -6,7 +6,8 @@
 // (HookAllow), the tools mise may install (PinnedTools) and how a tool
 // is resolved to the path of its pinned install (WhichPinned), the
 // files mise reads as its configuration, and the version of mise that
-// ci.yml pins. It is a helper of the checks and registers no check.
+// ci.yml pins, with the one path every mise command starts (Path). It
+// is a helper of the checks and registers no check.
 package mise
 
 import (
@@ -99,10 +100,10 @@ import (
 //     directory: mise finds .miserc.toml from its working directory and
 //     the configuration from its -C directory, so it reads the files of
 //     this list, from the root it trusts, and none of a subdirectory.
-//  5. fast, all and setup refuse a mise of another version than the
-//     one ci.yml pins for mise-action (CheckVersion): the files
-//     mise reads and the variables of MiseEnv are measured with that
-//     version only.
+//  5. fast and all refuse a mise of another version than the one
+//     ci.yml pins for mise-action (CheckVersion), and setup installs
+//     that one (ReadPin, Path): the files mise reads and the variables
+//     of MiseEnv are measured with that version only.
 //  6. fast and all read the commit that hygiene, workflows and the
 //     pushed range judge before they start mise or any step
 //     (commitChecks); the generated step, and in all the steps that
