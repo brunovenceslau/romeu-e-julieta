@@ -199,6 +199,22 @@ func TestSetupInstallsThePinnedMise(t *testing.T) {
 		})
 	})
 
+	t.Run("a download an interrupted setup left behind is removed", func(t *testing.T) {
+		x := newInstallFixture(t)
+		newFakeRelease(t, map[string][]byte{x.asset: []byte(x.release)})
+		dirs, err := mise.CacheDirs(citest.FakeMiseVersion)
+		require.NoError(t, err)
+		require.NoError(t, os.MkdirAll(dirs[len(dirs)-1], 0o700))
+		stale := filepath.Join(dirs[len(dirs)-1], ".mise-123.download")
+		require.NoError(t, os.WriteFile(stale, []byte("partial"), 0o600))
+		code, out := citest.Run(t, x.r, nil, Run)
+		assert.Equal(t, check.ExitOK, code, out)
+		entries, err := os.ReadDir(dirs[len(dirs)-1])
+		require.NoError(t, err)
+		require.Len(t, entries, 1, "only the installed mise is left")
+		assert.Equal(t, "mise", entries[0].Name())
+	})
+
 	t.Run("a symbolic link at the cache path fails", func(t *testing.T) {
 		x := newInstallFixture(t)
 		release := newFakeRelease(t, map[string][]byte{x.asset: []byte(x.release)})
@@ -288,7 +304,8 @@ func TestDownloadClient(t *testing.T) {
 	require.True(t, ok)
 	assert.NotNil(t, tr.Proxy, "the proxy variables apply")
 	assert.False(t, tr.TLSClientConfig.InsecureSkipVerify)
-	assert.Nil(t, tr.TLSClientConfig.RootCAs, "the system roots, which SSL_CERT_FILE adds to")
+	assert.Nil(t, tr.TLSClientConfig.RootCAs, "the system roots, or those of SSL_CERT_FILE")
+	assert.True(t, tr.DisableCompression, "the hash covers the bytes the server sent")
 }
 
 // TestDownload covers the download of REQ-1237 against a local server:

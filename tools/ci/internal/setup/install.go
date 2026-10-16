@@ -44,12 +44,14 @@ func releaseURL(pin mise.Pin) string {
 }
 
 // downloadClient is the HTTP client of the download: the proxy
-// variables apply, TLS verification stays on (SSL_CERT_FILE only adds
-// roots), a redirect is followed to https only, and the whole request,
-// body included, stops at downloadLimit.
+// variables apply, TLS verification stays on (SSL_CERT_FILE, where set,
+// names the roots), a redirect is followed to https only, the body is
+// not decompressed (so the hash covers the bytes the server sent), and
+// the whole request, body included, stops at downloadLimit.
 func downloadClient() *http.Client {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.Proxy = http.ProxyFromEnvironment
+	tr.DisableCompression = true
 	tr.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: releaseRoots}
 	return &http.Client{
 		Transport: tr,
@@ -105,7 +107,8 @@ func copyCapped(dst io.Writer, src io.Reader, limit int64) (int64, error) {
 // returns that path. The directories are created with mode 0700, and
 // one that is a symbolic link, is not this user's or that others can
 // write fails, as does a symbolic link or anything else that is not a
-// regular file at the cache path. The download goes to a new file
+// regular file at the cache path. A download that an interrupted setup
+// left beside that path is removed first. The download goes to a new file
 // beside that path, created exclusively with mode 0600 and hashed as it
 // is written; unless its sha256 is the pin's, it is removed, never made
 // executable, and the error names both hashes. A match is made
@@ -132,6 +135,15 @@ func install(ctx context.Context, pin mise.Pin) (string, error) {
 	} else if err == nil && !info.Mode().IsRegular() {
 		return "", fmt.Errorf("%s is not a regular file, where setup installs mise: remove it, then run setup again", dest)
 	}
+	stale, err := filepath.Glob(filepath.Join(filepath.Dir(dest), ".mise-*.download"))
+	if err != nil {
+		return "", err
+	}
+	for _, path := range stale {
+		if err := os.Remove(path); err != nil {
+			return "", err
+		}
+	}
 	f, err := os.CreateTemp(filepath.Dir(dest), ".mise-*.download")
 	if err != nil {
 		return "", err
@@ -148,13 +160,13 @@ func install(ctx context.Context, pin mise.Pin) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := f.Close(); err != nil {
-		return "", err
-	}
 	if sum != pin.Sha256 {
 		return "", fmt.Errorf("%s has sha256 %s, and %s pins %s for %s: the file is removed", url, sum, mise.PinnedWorkflow, pin.Sha256, pin.Label)
 	}
-	if err := os.Chmod(f.Name(), 0o700); err != nil {
+	if err := f.Chmod(0o700); err != nil {
+		return "", err
+	}
+	if err := f.Close(); err != nil {
 		return "", err
 	}
 	if err := os.Rename(f.Name(), dest); err != nil {
