@@ -1,7 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+// Package generated is the generated check of 10 10.2: "go generate
+// ./..." changes no generated file of 12 12.3, and each file generate
+// writes is tracked as a regular file with the bytes generate gives. It
+// is the generated subcommand and the generate subcommand, which writes
+// the consumers of the tables of 12 12.3 that exist today: those of
+// .github/ask-first.yaml (package askfirst) and the index of the
+// decision records.
+package generated
 
 import (
 	"bytes"
@@ -24,14 +31,14 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 )
 
-// runGenerated is the "generated" subcommand (10 10.2): it first checks
+// Run is the "generated" subcommand (10 10.2): it first checks
 // that the tree holds no go:generate line but the one of the repository
-// (checkGenerateDirectives), then runs
+// (CheckDirectives), then runs
 // "go generate ./..." with the go command that mise.lock locks and
 // fails when that changed, created or removed a file of the working
 // tree, or when a file that generate writes is not tracked as a regular
 // file with the bytes that generate gives.
-func runGenerated(ctx context.Context, e check.Env, args []string) (bool, error) {
+func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if len(args) != 0 {
 		return false, fmt.Errorf("generated takes no argument\n%s", check.Usage())
 	}
@@ -41,7 +48,7 @@ func runGenerated(ctx context.Context, e check.Env, args []string) (bool, error)
 	}
 	// Before anything runs: go generate runs every directive it finds, so
 	// the tree must hold the one directive of the repository first.
-	problems, err := checkGenerateDirectives(root)
+	problems, err := CheckDirectives(root)
 	if err != nil {
 		return false, err
 	}
@@ -84,14 +91,14 @@ func generated(ctx context.Context, repo git.Repo, gen check.Step, wanted func(*
 		return nil, err
 	}
 	defer func() { _ = root.Close() }()
-	before, err := snapshot(ctx, repo, root)
+	before, err := Snapshot(ctx, repo, root)
 	if err != nil {
 		return nil, err
 	}
 	if out, err := gen.Run(ctx, repo.Dir); err != nil {
 		return nil, fmt.Errorf("%s: %w\n%s", gen.Name, err, out)
 	}
-	after, err := snapshot(ctx, repo, root)
+	after, err := Snapshot(ctx, repo, root)
 	if err != nil {
 		return nil, err
 	}
@@ -649,11 +656,11 @@ func trackedProblem(ctx context.Context, repo git.Repo, o output, entries []stri
 	return "", nil
 }
 
-// snapshot maps each file of the working tree, tracked or untracked and
+// Snapshot maps each file of the working tree, tracked or untracked and
 // not ignored, to a digest of its type, mode and content. A tracked file
 // deleted from disk is not in it. Files are read through root, so a path
 // that reaches outside it is an error and not a read.
-func snapshot(ctx context.Context, repo git.Repo, root *os.Root) (map[string]string, error) {
+func Snapshot(ctx context.Context, repo git.Repo, root *os.Root) (map[string]string, error) {
 	out, err := repo.Run(ctx, nil, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
 	if err != nil {
 		return nil, err

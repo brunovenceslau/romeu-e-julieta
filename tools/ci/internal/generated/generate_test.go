@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+package generated
 
 import (
 	"bytes"
@@ -37,7 +37,7 @@ func runGen(t *testing.T, r *gittest.Repo, args ...string) (int, string, string)
 	t.Helper()
 	var out, errOut bytes.Buffer
 	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdout: &out, Stderr: &errOut}
-	return run(context.Background(), e, append([]string{"generate"}, args...)), out.String(), errOut.String()
+	return citest.Exit(context.Background(), e, Generate, args...), out.String(), errOut.String()
 }
 
 // TestGenerateWritesTheConsumers is the acceptance case: from the

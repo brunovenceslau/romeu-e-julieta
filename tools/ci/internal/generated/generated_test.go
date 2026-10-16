@@ -3,7 +3,7 @@
 
 //go:build unix
 
-package main
+package generated
 
 import (
 	"bytes"
@@ -75,7 +75,7 @@ func fsOps(ops ...string) check.Step {
 // generatedFixture is a repository with a committed generated file and
 // the other kinds of file a tree holds: an untracked one, an ignored one,
 // a symbolic link, and a tracked file that is deleted from the disk, which
-// no snapshot holds.
+// no Snapshot holds.
 func generatedFixture(t *testing.T) *gittest.Repo {
 	t.Helper()
 	r := gittest.New(t)
@@ -152,9 +152,9 @@ func TestGeneratedNotAGitRepository(t *testing.T) {
 func TestRunGeneratedTakesNoArgument(t *testing.T) {
 	var out, errOut bytes.Buffer
 	e := check.Env{Dir: ".", Stdout: &out, Stderr: &errOut}
-	assert.Equal(t, check.ExitError, run(context.Background(), e, []string{"generated", "x"}))
+	assert.Equal(t, check.ExitError, citest.Exit(context.Background(), e, Run, "x"))
 	assert.Contains(t, errOut.String(), "generated takes no argument")
-	assert.Equal(t, check.ExitError, run(context.Background(), e, []string{"generate", "x"}))
+	assert.Equal(t, check.ExitError, citest.Exit(context.Background(), e, Generate, "x"))
 	assert.Contains(t, errOut.String(), "generate takes no argument")
 }
 
@@ -586,11 +586,11 @@ func TestFileDigestStaysInsideTheRoot(t *testing.T) {
 // error (exit 2), not in findings (exit 1).
 func TestRunGeneratedRefusesAStrayDirectiveBeforeRunningAnything(t *testing.T) {
 	r := gittest.New(t)
-	r.Write(generateSite, "package main\n\n"+generateDirective+"\n")
+	r.Write(Site, "package main\n\n"+generateDirective+"\n")
 	r.Write("zz/z.go", "package z\n\nvar s = `\n//go:generate touch marker\n`\n")
 	var out, errOut bytes.Buffer
 	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdout: &out, Stderr: &errOut}
-	assert.Equal(t, check.ExitFail, run(t.Context(), e, []string{"generated"}), errOut.String())
+	assert.Equal(t, check.ExitFail, citest.Exit(t.Context(), e, Run), errOut.String())
 	assert.Contains(t, out.String(), "zz/z.go: generate-directive: ")
 	assert.NoFileExists(t, filepath.Join(r.Dir, "marker"))
 }

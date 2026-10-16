@@ -394,3 +394,10 @@ func RootOf(t *testing.T, dir string) *os.Root {
 	t.Cleanup(func() { _ = root.Close() })
 	return root
 }
+
+// Exit runs one subcommand with e and returns its exit status, as the
+// dispatcher of tools/ci computes it (check.Status).
+func Exit(ctx context.Context, e check.Env, run func(context.Context, check.Env, []string) (bool, error), args ...string) int {
+	ok, err := run(ctx, e, args)
+	return check.Status(e.Stderr, ok, err)
+}

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+package generated
 
 import (
 	"bytes"
@@ -18,12 +18,12 @@ import (
 )
 
 // generateDirective is the one go:generate directive of the repository
-// (12 12.3, 10 10.2), and generateSite the file it stands in. "go
+// (12 12.3, 10 10.2), and Site the file it stands in. "go
 // generate ./..." runs every such line, with no sandbox, so a second one
 // anywhere would run under the "generated" step: only the site may hold
 // one, and only this text, once.
 const (
-	generateSite      = "tools/ci/generate.go"
+	Site              = "tools/ci/generate.go"
 	generateDirective = "//go:generate go run . generate"
 )
 
@@ -54,15 +54,15 @@ func generateLines(src []byte) []string {
 // generateProblems judges the Go files of a tree, by slash-separated
 // path, and returns what is wrong with their go:generate lines: the
 // repository has exactly one, with exactly the text of
-// generateDirective, in generateSite.
+// generateDirective, in Site.
 func generateProblems(files map[string][]byte) []check.Finding {
 	var problems []check.Finding
 	site := 0
 	for _, path := range slices.Sorted(maps.Keys(files)) {
 		for _, line := range generateLines(files[path]) {
 			switch {
-			case path != generateSite:
-				problems = append(problems, check.Finding{Where: path, Rule: "generate-directive", Msg: fmt.Sprintf("holds %q, and only %s may hold a go:generate line", line, generateSite)})
+			case path != Site:
+				problems = append(problems, check.Finding{Where: path, Rule: "generate-directive", Msg: fmt.Sprintf("holds %q, and only %s may hold a go:generate line", line, Site)})
 			case line != generateDirective:
 				problems = append(problems, check.Finding{Where: path, Rule: "generate-directive", Msg: fmt.Sprintf("holds %q, and the one go:generate line of the repository is %q", line, generateDirective)})
 			default:
@@ -71,12 +71,12 @@ func generateProblems(files map[string][]byte) []check.Finding {
 		}
 	}
 	if site != 1 {
-		problems = append(problems, check.Finding{Where: generateSite, Rule: "generate-directive", Msg: fmt.Sprintf("holds the go:generate line %q %d times, and it must hold it once", generateDirective, site)})
+		problems = append(problems, check.Finding{Where: Site, Rule: "generate-directive", Msg: fmt.Sprintf("holds the go:generate line %q %d times, and it must hold it once", generateDirective, site)})
 	}
 	return problems
 }
 
-// checkGenerateDirectives reads every .go file below root and returns
+// CheckDirectives reads every .go file below root and returns
 // generateProblems for them. It is a superset of what "go generate
 // ./..." reads: it takes no account of build constraints, file-name
 // suffixes, testdata, vendor, "_" and "." directories or nested
@@ -86,7 +86,7 @@ func generateProblems(files map[string][]byte) []check.Finding {
 // inside the tree is read once, through its real path) and a dangling
 // link. A link to a directory whose name ends in .go cannot be read as a
 // file, and that is an error, not a pass.
-func checkGenerateDirectives(root string) ([]check.Finding, error) {
+func CheckDirectives(root string) ([]check.Finding, error) {
 	files := map[string][]byte{}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		switch {

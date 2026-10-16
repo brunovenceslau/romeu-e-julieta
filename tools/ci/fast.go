@@ -16,6 +16,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/generated"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/pushedrange"
@@ -441,7 +442,7 @@ func readTreeState(ctx context.Context, repo git.Repo) (treeState, error) {
 		return treeState{}, err
 	}
 	defer func() { _ = root.Close() }()
-	files, err := snapshot(ctx, repo, root)
+	files, err := generated.Snapshot(ctx, repo, root)
 	if err != nil {
 		return treeState{}, err
 	}
