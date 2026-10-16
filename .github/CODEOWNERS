@@ -72,7 +72,7 @@
 /docs/spec/05-security.md @brunovenceslau
 
 # approvals
-/tools/ci/askfirst.go @brunovenceslau
+/tools/ci/internal/askfirst/** @brunovenceslau
 /tools/ci/denylist.yaml @brunovenceslau
 /.github/workflows/** @brunovenceslau
 

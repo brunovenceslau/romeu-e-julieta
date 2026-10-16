@@ -288,11 +288,11 @@ func TestApprovalsSurface(t *testing.T) {
 	require.NoError(t, err)
 	i := slices.IndexFunc(list.Surfaces, func(s Surface) bool { return s.ID == "approvals" })
 	require.GreaterOrEqual(t, i, 0, "the approvals surface")
-	assert.Equal(t, []string{"tools/ci/askfirst.go", "tools/ci/denylist.yaml", ".github/workflows/**"}, list.Surfaces[i].Globs)
+	assert.Equal(t, []string{"tools/ci/internal/askfirst/**", "tools/ci/denylist.yaml", ".github/workflows/**"}, list.Surfaces[i].Globs)
 	for path, id := range map[string]string{
-		"tools/ci/askfirst.go":     "checks",
-		"tools/ci/denylist.yaml":   "checks",
-		".github/workflows/ci.yml": "dependencies",
+		"tools/ci/internal/askfirst/askfirst.go": "checks",
+		"tools/ci/denylist.yaml":                 "checks",
+		".github/workflows/ci.yml":               "dependencies",
 	} {
 		j := slices.IndexFunc(list.Surfaces, func(s Surface) bool { return s.ID == id })
 		require.GreaterOrEqual(t, j, 0, "the %s surface", id)

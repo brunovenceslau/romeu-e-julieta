@@ -327,7 +327,7 @@ checkpoint the maintainer may grant the approval lines of a list of
 tasks on some surfaces, recorded in `docs/grants.yaml`, which is on the
 `ask-first` surface; which surfaces can be granted, and the form of a
 grant, are in 12 12.4. `REQ-0539` The `approvals` surface holds
-`tools/ci/askfirst.go`, `tools/ci/denylist.yaml` and
+`tools/ci/internal/askfirst/**`, `tools/ci/denylist.yaml` and
 `.github/workflows/**`, the check of approval lines and grants, the
 forbidden-name denylist and the files that choose what runs, which no
 checkpoint grant covers. Each path on `approvals` is also on `checks` or
@@ -452,7 +452,7 @@ surfaces:
     globs: [docs/spec.md, docs/spec/01-system-model.md, docs/spec/05-security.md]
     reason: the gates read tables in these pages (the vocabulary in 01 1.7 and the index), and 05 holds the security model
   - id: approvals
-    globs: [tools/ci/askfirst.go, tools/ci/denylist.yaml, .github/workflows/**]
+    globs: [tools/ci/internal/askfirst/**, tools/ci/denylist.yaml, .github/workflows/**]
     reason: the approval-line and grant check, the forbidden-name denylist, and the workflows that choose what runs
   - id: checks
     globs: [tools/ci/**, .githooks/**, .golangci.yml, docs/acceptance.json]
