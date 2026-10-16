@@ -171,6 +171,14 @@ func TestNewULIDRefuses(t *testing.T) {
 		})
 	}
 
+	t.Run("the last millisecond of 48 bits", func(t *testing.T) {
+		t.Parallel()
+		u, err := NewULID(time.UnixMilli(1<<48-1), NewULIDSource(entropy(counting...)))
+		require.NoError(t, err)
+		assert.Equal(t, uint64(1<<48-1), u.millis())
+		assert.Equal(t, byte('7'), u.String()[0])
+	})
+
 	t.Run("short entropy", func(t *testing.T) {
 		t.Parallel()
 		_, err := NewULID(time.UnixMilli(0), NewULIDSource(entropy(1, 2, 3)))

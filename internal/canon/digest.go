@@ -24,11 +24,19 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 )
 
 // ErrKind is the error of a kind value that is not the one constant of
 // its kind type, such as MemoryContentKind("fingerprint").
 var ErrKind = errors.New("canon: not a kind of the table")
+
+// ErrInvalidText is the error of a string of a value, or a key, that
+// holds U+FFFD: encoding/json writes each byte that is not UTF-8, and a
+// MarshalJSON method's lone surrogate decodes, as U+FFFD, so two strings
+// that differ in those bytes would share one digest.
+var ErrInvalidText = errors.New("canon: a string holds U+FFFD, the mark of text that is not UTF-8")
 
 // ErrInvalidDigest is the error of a digest text that is not 64
 // lowercase hexadecimal digits.
@@ -73,11 +81,12 @@ func notLowerHex(r rune) bool {
 // of every object sorted by their UTF-8 bytes, no insignificant
 // whitespace, and no escape of <, > and &. Digest fails on a value
 // encoding/json cannot write, on an object with a duplicate key, which
-// only a MarshalJSON method can write, and on a kind value other than
-// its constant (ErrKind). A string with invalid UTF-8 is written by
-// encoding/json with each invalid byte as U+FFFD, so two strings that
-// differ only in invalid bytes have one digest; a MarshalJSON method
-// that writes a number writes its text, so 1 and 1.0 have two.
+// only a MarshalJSON method can write, on a kind value other than its
+// constant (ErrKind), and on a string or key that holds U+FFFD
+// (ErrInvalidText): text that is not UTF-8 becomes U+FFFD on the way,
+// and a digest that two different strings share would let a gate pass
+// the one it never saw. A MarshalJSON method that writes a number
+// writes its text, so 1 and 1.0 have two digests.
 func Digest[K Kind, T Input[K]](kind K, v T) (Sum[K], error) {
 	if !known(kind) {
 		return Sum[K]{}, fmt.Errorf("%w: %q", ErrKind, clip(string(kind)))
@@ -194,8 +203,12 @@ func copyArray(out *bytes.Buffer, dec *json.Decoder) error {
 }
 
 // writeString writes s as a JSON string, escaping what JSON requires
-// and leaving <, > and & as they are.
+// and leaving <, > and & as they are. It refuses a string that holds
+// U+FFFD (ErrInvalidText).
 func writeString(out *bytes.Buffer, s string) error {
+	if strings.ContainsRune(s, utf8.RuneError) {
+		return fmt.Errorf("%w: %q", ErrInvalidText, clip(s))
+	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)

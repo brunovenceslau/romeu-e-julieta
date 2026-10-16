@@ -109,7 +109,6 @@ func TestCanonicalJSON(t *testing.T) {
 		{"keys sorted by utf-8, not utf-16", map[string]int{"\U0001F600": 2, "\uff5e": 1},
 			"{\"\uff5e\":1,\"\U0001F600\":2}"},
 		{"objects inside arrays sorted", raw(`[{"b":1,"a":2}]`), `[{"a":2,"b":1}]`},
-		{"invalid utf-8 becomes U+FFFD", "a\xff", "\"a\ufffd\""},
 		{"large and small floats as encoding/json writes them", []float64{1e21, 1e-7}, `[1e+21,1e-7]`},
 		{"number text kept from MarshalJSON", raw(`[1,1.0,1e0,-0]`), `[1,1.0,1e0,-0]`},
 		{"empty object", map[string]int{}, `{}`},
@@ -149,6 +148,10 @@ func TestDigestRefuses(t *testing.T) {
 		{"a duplicate key", raw(`{"a":1,"a":2}`), `duplicate key "a"`},
 		{"a MarshalJSON that writes invalid JSON", raw(`{"a":`), "MarshalJSON"},
 		{"a nested duplicate key", raw(`{"x":[{"k":1,"k":1}]}`), `duplicate key "k"`},
+		{"invalid utf-8 in a string", anyValue{"a\xff"}, "U+FFFD"},
+		{"invalid utf-8 in a key", anyValue{map[string]int{"k\xfe": 1}}, "U+FFFD"},
+		{"a lone surrogate from MarshalJSON", raw(`["\ud800"]`), "U+FFFD"},
+		{"a U+FFFD the value holds", anyValue{"a\ufffd"}, "U+FFFD"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -230,11 +233,10 @@ func TestDigestErrorsQuoteAShortInput(t *testing.T) {
 	assert.Less(t, len(err.Error()), 200)
 }
 
-func TestDigestOfInvalidUTF8IsTheDigestOfU_FFFD(t *testing.T) {
+func TestDigestOfTwoInvalidStringsIsNoDigest(t *testing.T) {
 	t.Parallel()
-	a, err := Digest(MemoryContent, anyValue{"a\xff"})
-	require.NoError(t, err)
-	b, err := Digest(MemoryContent, anyValue{"a\ufffd"})
-	require.NoError(t, err)
-	assert.Equal(t, a, b)
+	for _, s := range []string{"a\xff", "a\xfe"} {
+		_, err := Digest(MemoryContent, anyValue{s})
+		require.ErrorIs(t, err, ErrInvalidText, "%q", s)
+	}
 }
