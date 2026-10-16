@@ -50,6 +50,10 @@ func TestRegistryRefusesADuplicate(t *testing.T) {
 		{"a check name", func(r *Registry) { r.Add(Check{Name: "vet"}) }},
 		{"a subcommand of a check", func(r *Registry) { r.Add(Check{Name: "other", Commands: []Command{cmd}}) }},
 		{"a subcommand of no check", func(r *Registry) { r.AddCommand(cmd) }},
+		{"a subcommand twice in one check", func(r *Registry) {
+			dup := Command{Name: "twice", Usage: []string{"twice"}}
+			r.Add(Check{Name: "other", Commands: []Command{dup, dup}})
+		}},
 		{"no name", func(r *Registry) { r.Add(Check{}) }},
 		{"a malformed requirement id", func(r *Registry) { r.Add(Check{Name: "new", Req: "REQ-12"}) }},
 	}

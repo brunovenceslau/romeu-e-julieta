@@ -131,8 +131,11 @@ func (r *Registry) Add(c Check) {
 	if c.Req != "" && !validReq(c.Req) {
 		panic(fmt.Sprintf("check: %q names %q, which is not a requirement id", c.Name, c.Req))
 	}
-	for _, cmd := range c.Commands {
+	for i, cmd := range c.Commands {
 		r.mustBeNew(cmd.Name)
+		if slices.ContainsFunc(c.Commands[:i], func(o Command) bool { return o.Name == cmd.Name }) {
+			panic(fmt.Sprintf("check: subcommand %q is registered twice", cmd.Name))
+		}
 	}
 	r.checks = append(r.checks, c)
 }
