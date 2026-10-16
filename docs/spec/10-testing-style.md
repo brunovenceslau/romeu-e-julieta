@@ -347,8 +347,33 @@ directory, and no env file, `MISE_CD` or trusted path of the caller (no
 runs nothing that another mise file of a change holds (the threat model
 of the mise package of `tools/ci` says what stays trusted). `REQ-0859` That
 environment is measured with one version of mise, the `version` input of
-the mise action in `ci.yml`, so `fast`, `all` and `setup` refuse, before
-any other mise command, a mise whose `mise --version` names another.
+the mise action in `ci.yml`, the pin, so `fast` and `all` refuse, before
+any other mise command, a mise whose `mise --version` names another, and
+the refusal names `go run ./tools/ci setup`. `REQ-1236` `tools/ci` runs
+mise by one absolute path: the copy at the pin that `setup` installed,
+`<user cache directory>/romeu-e-julieta/mise/<version>/mise` (the user
+cache directory as Go's `os.UserCacheDir` gives it), when it is there
+and its sha256 still equals the matrix's, read again on every run, and
+otherwise the mise on the search path; a copy whose sha256 differs is
+refused, never run, and `setup` installs it again. So a sandbox or a
+machine whose image ships another mise needs no change to its search
+path.
+`REQ-1237` `setup` installs the pin when the mise it would run names
+another version or none, before any other mise command: it reads the
+version and, for the runner label of this platform (Runners, below), the
+sha256 from the matrix of `ci.yml`, the one source of both; downloads
+the binary asset of that mise release for this platform from the GitHub
+releases of mise, through the proxy variables and `SSL_CERT_FILE`, in
+the class `tool-step`; refuses the file, and removes it, unless its
+sha256 equals the matrix's, before the file is made executable or run;
+and puts it at that path by rename. Its `mise trust`, `mise install` and
+`go mod download` then run with that mise. `REQ-1238` A test runs `setup`
+against a fake release: a binary whose sha256 is not the matrix's is
+refused, removed and never run; one that matches is installed and is
+the mise every later mise command of `fast`, `all` and `setup` starts;
+a copy in the cache whose bytes changed after the install is refused
+and not run; a mise on the search path at the pin is used as it is, and
+nothing is downloaded.
 
 `REQ-0860` The command steps of `all` are those of `fast` and `race`, in that
 order, with `vulnerabilities` and `license`, which read the tree and
