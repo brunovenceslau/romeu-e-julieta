@@ -640,8 +640,14 @@ func TestGeneratedOutputsAreNotConverted(t *testing.T) {
 	r, err := os.OpenRoot(root)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = r.Close() })
-	outs, err := generateOutputs(r)
+	// The files the generated check of tools/ci registers (Outputs); the
+	// registry of this test holds a fixture of that check.
+	registered, err := Outputs(r)
 	require.NoError(t, err)
+	var outs []output
+	for _, o := range registered {
+		outs = append(outs, output{o.Path, o.Content})
+	}
 	findings, err := attributeProblems(t.Context(), git.Repo{Dir: root}, outs)
 	require.NoError(t, err)
 	assert.Empty(t, findings)
