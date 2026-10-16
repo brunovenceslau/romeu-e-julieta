@@ -21,6 +21,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/lint"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/pushedrange"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
@@ -895,10 +896,10 @@ func TestFastSteps(t *testing.T) {
 		{Name: "format", Argv: []string{filepath.Join(goDir, "gofmt"), "-l", "."}, Quiet: true, Environ: check.StepEnv(goDir)},
 		{Name: "vet", Argv: []string{goCmd, "vet", "./..."}, Environ: check.StepEnv(goDir)},
 		{Name: "generated", Argv: []string{goCmd, "run", "./tools/ci", "generated"}, Environ: check.StepEnv(goDir)},
-		{Name: "lint linux/amd64", Argv: wantLint, Environ: lintEnv(lintTarget{"linux", "amd64"}, goDir)},
-		{Name: "lint linux/arm64", Argv: wantLint, Environ: lintEnv(lintTarget{"linux", "arm64"}, goDir)},
-		{Name: "lint darwin/amd64", Argv: wantLint, Environ: lintEnv(lintTarget{"darwin", "amd64"}, goDir)},
-		{Name: "lint darwin/arm64", Argv: wantLint, Environ: lintEnv(lintTarget{"darwin", "arm64"}, goDir)},
+		{Name: "lint linux/amd64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "linux", GOARCH: "amd64"}, goDir)},
+		{Name: "lint linux/arm64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "linux", GOARCH: "arm64"}, goDir)},
+		{Name: "lint darwin/amd64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "darwin", GOARCH: "amd64"}, goDir)},
+		{Name: "lint darwin/arm64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "darwin", GOARCH: "arm64"}, goDir)},
 		{Name: "unit", Argv: []string{goCmd, "test", "-count=1", "./tools/..."}, Environ: check.StepEnv(goDir)},
 	}
 	assert.Equal(t, want, fastSteps(root, tools))
@@ -996,7 +997,7 @@ func TestStepEnv(t *testing.T) {
 	assert.Equal(t, slices.Concat([]string{"PATH=/pinned/go/bin" + sep + "/from/PATH"}, located, fixed),
 		check.StepEnv("/pinned/go/bin"), "stepEnv")
 	assert.Equal(t, slices.Concat([]string{"PATH=/pinned/go/bin" + sep + "/from/PATH"}, located, fixed, target),
-		lintEnv(lintTarget{"darwin", "amd64"}, "/pinned/go/bin"), "lintEnv")
+		lint.Env(lint.Target{GOOS: "darwin", GOARCH: "amd64"}, "/pinned/go/bin"), "lintEnv")
 	assert.Equal(t, slices.Concat([]string{"PATH=/from/PATH"}, located), check.PassThroughEnv(), "passThroughEnv")
 
 	// Without PATH in the process, PATH is the go directory alone.

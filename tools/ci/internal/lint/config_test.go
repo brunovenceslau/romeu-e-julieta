@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+package lint
 
 import (
 	"encoding/json"
@@ -182,8 +182,8 @@ func TestLintConfigReportsEachChecker(t *testing.T) {
 
 	// The fixture is a module of its own, with the dependencies of
 	// this one, so it needs the module cache this module needs and no
-	// network. It runs in the environment of the lint step (lintEnv),
-	// for the first of lintTargets: the fixture files build for each.
+	// network. It runs in the environment of the lint step (Env),
+	// for the first of Targets: the fixture files build for each.
 	dir := t.TempDir()
 	for _, name := range []string{"go.mod", "go.sum"} {
 		data, err := os.ReadFile(filepath.Join(root, name))
@@ -194,14 +194,14 @@ func TestLintConfigReportsEachChecker(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, f.file), []byte(f.source), 0o644))
 	}
 
-	// The tools are the ones the lint step runs (resolveLintTools), and
+	// The tools are the ones the lint step runs (mise.ResolveLintTools), and
 	// the run happens in the fixture's directory, where no mise.toml is.
 	tools := citest.PinnedLintTools(t, mise.Environ, mise.ResolveLintTools)
 
 	report := filepath.Join(t.TempDir(), "report.json")
-	// The arguments are the ones of the lint step (lintArgs), with the
+	// The arguments are the ones of the lint step (Args), with the
 	// config by its absolute path, as the run happens in dir.
-	args := slices.Clone(lintArgs)
+	args := slices.Clone(Args)
 	at := slices.Index(args, ".golangci.yml")
 	require.NotEqual(t, -1, at, "lintArgs names .golangci.yml")
 	args[at] = config
@@ -210,7 +210,7 @@ func TestLintConfigReportsEachChecker(t *testing.T) {
 		Class: procgroup.ToolStep,
 		Argv:  append([]string{tools.Linter}, args...),
 		Dir:   dir,
-		Env:   lintEnv(lintTargets[0], tools.GoDir),
+		Env:   Env(Targets[0], tools.GoDir),
 	})
 	// Exit status 1 means the run found issues, which is the point.
 	if err != nil {
@@ -786,7 +786,7 @@ func TestDirectives(t *testing.T) {
 }
 
 // lintContext is what decides whether a Go file builds for one of
-// lintTargets: the target, cgo, the compiler and the tags of the
+// Targets: the target, cgo, the compiler and the tags of the
 // toolchain, and the lists of the operating systems and architectures
 // the toolchain knows, which say which file-name suffixes are
 // constraints.
@@ -801,9 +801,9 @@ type lintContext struct {
 	unixOS       map[string]bool
 }
 
-// lintTargetContexts returns the build context of each of lintTargets,
+// lintTargetContexts returns the build context of each of Targets,
 // the list the lint step runs for, as the pinned go command builds it
-// in the environment of the lint step (lintEnv). It asks "go list" for
+// in the environment of the lint step (Env). It asks "go list" for
 // the context (the template function "context" of "go help list"), so
 // the tool tags are the toolchain's own: the instruction set level
 // (amd64.v1, arm64.v8.0) and the goexperiment tags, which differ from
@@ -817,13 +817,13 @@ func lintTargetContexts(t *testing.T) []lintContext {
 	tools := citest.PinnedLintTools(t, mise.Environ, mise.ResolveLintTools)
 	format := `{{context.CgoEnabled}} {{context.Compiler}} {{join context.ToolTags ","}} {{join context.ReleaseTags ","}} {{context.GOROOT}}`
 	var contexts []lintContext
-	for _, target := range lintTargets {
+	for _, target := range Targets {
 		var stdout strings.Builder
 		err := procgroup.Run(t.Context(), procgroup.Command{
 			Class:  procgroup.ToolProbe,
 			Argv:   []string{filepath.Join(tools.GoDir, "go"), "list", "-f", format, "runtime"},
 			Dir:    t.TempDir(),
-			Env:    lintEnv(target, tools.GoDir),
+			Env:    Env(target, tools.GoDir),
 			Stdout: &stdout,
 		})
 		require.NoError(t, err, "go list for %s", target)
@@ -832,8 +832,8 @@ func lintTargetContexts(t *testing.T) []lintContext {
 		require.Len(t, fields, 5, "go list for %s: %q", target, out)
 		known := syslistOf(t, fields[4])
 		contexts = append(contexts, lintContext{
-			goos:        target.goos,
-			goarch:      target.goarch,
+			goos:        target.GOOS,
+			goarch:      target.GOARCH,
 			cgo:         fields[0] == "true",
 			compiler:    fields[1],
 			toolTags:    strings.Split(fields[2], ","),
@@ -1148,7 +1148,7 @@ func TestSkippedLocation(t *testing.T) {
 
 // TestEveryGoFileIsLinted checks that the linter reaches each Go file
 // of the repository, the tracked ones and the ones not yet added: the
-// lint step lints each of lintTargets with cgo off (fastSteps), so a
+// lint step lints each of Targets with cgo off (fastSteps), so a
 // file must build for one of them, and it must sit where "go list ./..."
 // looks (ADR 0007, rule 8). A file that is skipped is a file whose
 // findings nobody sees.
@@ -1170,7 +1170,7 @@ func TestEveryGoFileIsLinted(t *testing.T) {
 		}
 		ok, err := buildsForLintTarget(contexts, filepath.Join(root, filepath.Dir(f)), filepath.Base(f))
 		require.NoError(t, err, "build constraints of %s", f)
-		assert.True(t, ok, "%s builds for none of %v with cgo off, so the lint steps skip it", f, lintTargets)
+		assert.True(t, ok, "%s builds for none of %v with cgo off, so the lint steps skip it", f, Targets)
 	}
 }
 
@@ -1246,7 +1246,7 @@ func TestOnlyAllowedGoModDirectives(t *testing.T) {
 // repository may hold, with the keys each may hold. The [env] table,
 // the "env_file" setting, [tasks] and [hooks] are not on the list: each
 // one adds to the environment of what mise starts, or starts a program
-// of its own. [tools] holds the pinnedTools alone, each with the
+// of its own. [tools] holds the mise.PinnedTools alone, each with the
 // version mise.lock locks (miseFindings), so no tool is named by a path
 // or by a version that the lock does not hold.
 var allowedMiseTables = map[string][]string{
@@ -1271,7 +1271,7 @@ func tomlKey(name string) string {
 // numbers.
 var lockedVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
-// TestLockedVersions checks that mise.lock locks the pinnedTools and no
+// TestLockedVersions checks that mise.lock locks the mise.PinnedTools and no
 // other, each at an exact version.
 func TestLockedVersions(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), "mise.lock"))
@@ -1285,16 +1285,16 @@ func TestLockedVersions(t *testing.T) {
 }
 
 // lockPlatforms returns the platforms mise.lock holds a download of
-// each tool for, in mise's names: the lintTargets, the supported
+// each tool for, in mise's names: the Targets, the supported
 // targets, with darwin written macos and amd64 written x64. So a target
-// added to lintTargets fails TestLockIntegrity until mise.lock carries
+// added to Targets fails TestLockIntegrity until mise.lock carries
 // it.
 func lockPlatforms() []string {
 	osName := map[string]string{"linux": "linux", "darwin": "macos"}
 	archName := map[string]string{"amd64": "x64", "arm64": "arm64"}
 	var platforms []string
-	for _, t := range lintTargets {
-		platforms = append(platforms, osName[t.goos]+"-"+archName[t.goarch])
+	for _, t := range Targets {
+		platforms = append(platforms, osName[t.GOOS]+"-"+archName[t.GOARCH])
 	}
 	slices.Sort(platforms)
 	return platforms
@@ -1333,7 +1333,7 @@ var lockChecksum = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 // header, a [[tools.<name>]] header, a [tools.<name>."platforms.<p>"]
 // header that follows its tool's header, or a one-line key of
 // lockEntryKeys or lockPlatformKeys in its table; a tool has one entry
-// and one table per platform. So a lock that lockedVersions reads the
+// and one table per platform. So a lock that mise.LockedVersions reads the
 // same line by line holds no spaced header, multi-line string or
 // second entry that the two readers could see past.
 func lockIntegrityFindings(data []byte) []string {
@@ -1428,7 +1428,7 @@ func TestLockIntegrity(t *testing.T) {
 }
 
 // TestLockPlatforms checks that the platforms of mise.lock are the four
-// that mise.toml names in its header, read from lintTargets.
+// that mise.toml names in its header, read from Targets.
 func TestLockPlatforms(t *testing.T) {
 	assert.Equal(t, []string{"linux-arm64", "linux-x64", "macos-arm64", "macos-x64"}, lockPlatforms())
 }
@@ -1563,7 +1563,7 @@ func TestMiseFindings(t *testing.T) {
 // repository, tracked or not (mise.toml, mise.local.toml, .mise.toml,
 // .config/mise and the others whose path names mise), against
 // allowedMiseTables and the versions of mise.lock, and that mise.toml
-// pins each of pinnedTools. fast starts no tool through mise, so an
+// pins each of mise.PinnedTools. fast starts no tool through mise, so an
 // [env] table cannot reach a step; this keeps one out of "go vet" and
 // "go test" too, when a developer starts them through mise. No
 // .tool-versions file is allowed, since mise reads one as a
