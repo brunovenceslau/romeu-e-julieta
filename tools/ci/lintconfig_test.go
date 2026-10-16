@@ -27,6 +27,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
 // lintFixture is one file of the fixture package: the source, and the
@@ -163,14 +164,6 @@ func Documented() error {
 // error, as "errorstring.go:5:2".
 var goFileInError = regexp.MustCompile(`[\w.-]+\.go:\d+`)
 
-// moduleRoot returns the root of this repository.
-func moduleRoot(t *testing.T) string {
-	t.Helper()
-	root, err := filepath.Abs(filepath.Join("..", ".."))
-	require.NoError(t, err)
-	return root
-}
-
 // TestLintConfigReportsEachChecker runs the pinned golangci-lint with
 // the committed .golangci.yml over a fixture package that holds one
 // violation of each checker of ADR 0001, rule 14 (doc comments, error
@@ -180,7 +173,7 @@ func moduleRoot(t *testing.T) string {
 // the suite-* checkers of testifylint are covered by
 // TestLintConfigLowersNothing.
 func TestLintConfigReportsEachChecker(t *testing.T) {
-	root := moduleRoot(t)
+	root := citest.ModuleRoot(t)
 	config := filepath.Join(root, ".golangci.yml")
 	require.FileExists(t, config)
 	fixtures := lintFixtures()
@@ -278,7 +271,7 @@ func TestLintConfigReportsEachChecker(t *testing.T) {
 // linter, a plugin, a limit on the issues, a path or the tests left
 // out of the run) is a decision the reader of this test sees.
 func TestLintConfigLowersNothing(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(moduleRoot(t), ".golangci.yml"))
+	data, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), ".golangci.yml"))
 	require.NoError(t, err)
 	var cfg map[string]any
 	require.NoError(t, yaml.Unmarshal(data, &cfg))
@@ -558,7 +551,7 @@ func TestDisallowed(t *testing.T) {
 // header (ADR 0007, rule 8): a finding is fixed in the code, and a
 // directive or a header that makes the linters skip it hides findings.
 func TestOnlyAllowedDirectives(t *testing.T) {
-	root := moduleRoot(t)
+	root := citest.ModuleRoot(t)
 	files := repoFiles(t, root, "*.go")
 	require.NotEmpty(t, files, "the Go files of the repository")
 	for _, f := range files {
@@ -836,7 +829,7 @@ func TestTestStyleFindings(t *testing.T) {
 // mock or http of testify, or names assert.New, require.New or
 // reflect.DeepEqual.
 func TestTestStyle(t *testing.T) {
-	root := moduleRoot(t)
+	root := citest.ModuleRoot(t)
 	files := repoFiles(t, root, "*.go")
 	require.NotEmpty(t, files, "the Go files of the repository")
 	for _, f := range files {
@@ -854,7 +847,7 @@ func TestTestStyle(t *testing.T) {
 // beside it, and the lint step and the fixture test both name
 // .golangci.yml, so a second file would be one that nothing reads.
 func TestOneLintConfig(t *testing.T) {
-	root := moduleRoot(t)
+	root := citest.ModuleRoot(t)
 	var found []string
 	for _, f := range repoFiles(t, root, "*.golangci.*") {
 		if strings.HasPrefix(filepath.Base(f), ".golangci.") {
@@ -1283,7 +1276,7 @@ func TestSkippedLocation(t *testing.T) {
 // looks (ADR 0007, rule 8). A file that is skipped is a file whose
 // findings nobody sees.
 func TestEveryGoFileIsLinted(t *testing.T) {
-	root := moduleRoot(t)
+	root := citest.ModuleRoot(t)
 	var moduleDirs []string
 	for _, f := range repoFiles(t, root, "*go.mod") {
 		if filepath.Base(f) == "go.mod" && filepath.Dir(f) != "." {
@@ -1363,7 +1356,7 @@ func TestGoModDirectives(t *testing.T) {
 // outside allowedGoModDirectives: an "ignore" there takes a directory
 // out of "./...", and the linter never reads it.
 func TestOnlyAllowedGoModDirectives(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(moduleRoot(t), "go.mod"))
+	data, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), "go.mod"))
 	require.NoError(t, err)
 	found := goModDirectives(data)
 	require.NotEmpty(t, found, "the directives of go.mod")
@@ -1371,18 +1364,6 @@ func TestOnlyAllowedGoModDirectives(t *testing.T) {
 		assert.Contains(t, allowedGoModDirectives, name, "go.mod holds a directive that is not allowed")
 	}
 }
-
-// pinnedTools are the tools the mise configuration of this repository
-// pins, each at the version mise.lock locks: the go command and
-// golangci-lint, the two that fast runs (resolveLintTools), govulncheck,
-// which all starts by the path "mise which" resolves (allSteps), gh, for
-// the release tool (decision DR7 of review round 8: gh is locked, and the
-// tool starts it by its resolved path), and gopls, the Go language server
-// that editors and agents use to navigate the code, which no step of
-// tools/ci starts. This is the one list of what mise may install, and the
-// one that 12 12.1 of the specification points at: allowedMiseTables,
-// TestLockedVersions and TestMiseConfigs read it.
-var pinnedTools = []string{"go", "gh", "golangci-lint", "go:golang.org/x/vuln/cmd/govulncheck", "go:golang.org/x/tools/gopls"}
 
 // allowedMiseTables are the tables a mise configuration file of this
 // repository may hold, with the keys each may hold. The [env] table,
@@ -1416,7 +1397,7 @@ var lockedVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 // TestLockedVersions checks that mise.lock locks the pinnedTools and no
 // other, each at an exact version.
 func TestLockedVersions(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(moduleRoot(t), "mise.lock"))
+	data, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), "mise.lock"))
 	require.NoError(t, err)
 	locked, err := lockedVersions(data)
 	require.NoError(t, err)
@@ -1564,7 +1545,7 @@ func lockIntegrityFindings(data []byte) []string {
 // TestLockIntegrity checks that mise.lock holds the integrity form of
 // 12 12.1 for each tool it locks (lockIntegrityFindings).
 func TestLockIntegrity(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(moduleRoot(t), "mise.lock"))
+	data, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), "mise.lock"))
 	require.NoError(t, err)
 	assert.Empty(t, lockIntegrityFindings(data), "mise.lock")
 }
@@ -1711,7 +1692,7 @@ func TestMiseFindings(t *testing.T) {
 // .tool-versions file is allowed, since mise reads one as a
 // configuration of tools too.
 func TestMiseConfigs(t *testing.T) {
-	root := moduleRoot(t)
+	root := citest.ModuleRoot(t)
 	lock, err := os.ReadFile(filepath.Join(root, "mise.lock"))
 	require.NoError(t, err)
 	locked, err := lockedVersions(lock)
@@ -1741,7 +1722,7 @@ func TestMiseConfigs(t *testing.T) {
 // is the go version mise.toml pins, so the toolchain the checks run
 // and the one the module declares cannot drift apart.
 func TestGoDirectiveEqualsMisePin(t *testing.T) {
-	root := moduleRoot(t)
+	root := citest.ModuleRoot(t)
 	mod, err := os.ReadFile(filepath.Join(root, "go.mod"))
 	require.NoError(t, err)
 	toml, err := os.ReadFile(filepath.Join(root, "mise.toml"))

@@ -22,6 +22,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
 // helperEnv names the role of this test binary when a test runs it as a
@@ -122,7 +123,7 @@ func runAsync(ctx context.Context, c procgroup.Command) <-chan error {
 // limit that ends a helper the test lost.
 func startMain(t *testing.T, extra ...string) (done <-chan error, stderr *bytes.Buffer, pid, grandchild int) {
 	t.Helper()
-	r := newTree(t)
+	r := citest.NewTree(t)
 	r.Commit("fixture")
 	pidfile := filepath.Join(t.TempDir(), "pid")
 	killAtEnd(t, pidfile)

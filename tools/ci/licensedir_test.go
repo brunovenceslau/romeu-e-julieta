@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +19,7 @@ import (
 // relatively in the main working tree (".git"); a linked worktree
 // already gets an absolute path.
 func TestGitCommonDir(t *testing.T) {
-	r := newTree(t)
+	r := citest.NewTree(t)
 	r.Commit("base")
 	want, err := filepath.EvalSymlinks(filepath.Join(r.Dir, ".git"))
 	require.NoError(t, err)

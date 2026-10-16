@@ -22,6 +22,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 )
 
@@ -118,7 +119,7 @@ func loadDenylistFile(t *testing.T, r *gittest.Repo) *names.List {
 
 // TestAddAtATerminal drives "hygiene add" through /dev/ptmx (10 10.1).
 func TestAddAtATerminal(t *testing.T) {
-	r := newTree(t)
+	r := citest.NewTree(t)
 	require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
 	r.Commit("fixture")
 
@@ -169,7 +170,7 @@ func TestAddAtATerminal(t *testing.T) {
 // not parse stops the command: it is not taken for a missing file and
 // written over.
 func TestAddKeepsADenylistItCannotRead(t *testing.T) {
-	r := newTree(t)
+	r := citest.NewTree(t)
 	const damaged = "entries: [\n"
 	r.Write(names.Path, damaged)
 	code, printed, _ := typeAtTerminal(t, r, "zorvex quimby", "zorvex quimby")
@@ -258,7 +259,7 @@ func TestAddRefuses(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := newTree(t)
+			r := citest.NewTree(t)
 			before := loadDenylistFile(t, r).Marshal()
 			code, out := runCI(t, r, tt.stdin, nil, append([]string{"hygiene", "add"}, tt.args...)...)
 			assert.Equal(t, check.ExitError, code, "exit status")

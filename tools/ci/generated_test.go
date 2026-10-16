@@ -21,6 +21,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
 // fsOpsEnv holds the operations that TestHelperFsOps runs, one on each
@@ -634,7 +635,7 @@ func TestFindingPathCannotStartACommand(t *testing.T) {
 // gives, and "generated" would fail with no defect to fix. The cases of
 // TestGeneratedRequiresTrackedRegularOutputs hold the failing side.
 func TestGeneratedOutputsAreNotConverted(t *testing.T) {
-	root := moduleRoot(t)
+	root := citest.ModuleRoot(t)
 	r, err := os.OpenRoot(root)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = r.Close() })

@@ -9,67 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
 )
-
-// sha is a made-up commit id, 40 hex digits.
-const sha = "0123456789abcdef0123456789abcdef01234567"
-
-// goodWorkflow passes the grammar: every construct it allows, once.
-const goodWorkflow = `name: ci
-on:
-  pull_request:
-    types: [opened, synchronize, reopened, edited]
-  push:
-    branches: [main]
-  schedule:
-    - cron: "17 3 * * 1"
-  workflow_dispatch:
-permissions:
-  contents: read
-concurrency:
-  group: ci-${{ github.ref }}
-` + workflowEnv + `jobs:
-  all:
-    name: all on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    needs: []
-    permissions:
-      contents: read
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-26.04
-            mise_sha256: aa
-    steps:
-      - name: Check out
-        uses: actions/checkout@` + sha + `
-        with:
-          persist-credentials: false
-      - uses: jdx/mise-action/sub/path@` + sha + `
-        with:
-          sha256: ${{ matrix.mise_sha256 }}
-      - name: All checks
-        run: go run ./tools/ci all
-      - run: go run ./tools/release notes --tag "$GITHUB_REF_NAME" --out=notes.md
-`
-
-// workflowEnv is the env table every workflow holds: miseEnv, each
-// value a YAML string.
-const workflowEnv = `env:
-  MISE_OVERRIDE_CONFIG_FILENAMES: mise.toml
-  MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES: none
-  MISE_ENV: ""
-  MISE_AUTO_ENV: "false"
-  MISE_GLOBAL_CONFIG_FILE: /dev/null/mise-global.toml
-  MISE_SYSTEM_CONFIG_FILE: /dev/null/mise-system.toml
-  GOENV: "off"
-  GOTOOLCHAIN: local
-`
 
 // TestWorkflowsGrammar fails a fixture for each construct outside the
 // grammar of 10 10.2, and passes the one that holds every construct
@@ -86,16 +30,16 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a shell", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        shell: bash\n", `"shell" is outside the grammar of a run step`},
 		{"continue-on-error", "      - name: All checks\n", "      - name: All checks\n        continue-on-error: true\n", `"continue-on-error"`},
 		{"a container", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    container: alpine\n", `"container" is outside the grammar of a job`},
-		{"a job that calls a workflow", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    uses: owner/repo/.github/workflows/x.yml@" + sha + "\n", `"uses" is outside the grammar of a job`},
+		{"a job that calls a workflow", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    uses: owner/repo/.github/workflows/x.yml@" + citest.Sha + "\n", `"uses" is outside the grammar of a job`},
 		{"a key of the file", "permissions:\n  contents: read\nconcurrency", "defaults:\n  run:\n    shell: bash\npermissions:\n  contents: read\nconcurrency", `"defaults" is outside the grammar of a file`},
-		{"no env at the top", workflowEnv, "", "env holds exactly the mise environment"},
+		{"no env at the top", citest.WorkflowEnv, "", "env holds exactly the mise environment"},
 		{"an env with another key: BASH_ENV", "  MISE_AUTO_ENV: \"false\"\n", "  MISE_AUTO_ENV: \"false\"\n  BASH_ENV: /tmp/x\n", "env holds exactly the mise environment"},
 		{"an env with another value", "MISE_OVERRIDE_CONFIG_FILENAMES: mise.toml", "MISE_OVERRIDE_CONFIG_FILENAMES: mise.toml,mise.local.toml", "env holds exactly the mise environment"},
 		{"an env without one variable", "  MISE_ENV: \"\"\n", "", "env holds exactly the mise environment"},
 		{"an env with a null MISE_ENV", `MISE_ENV: ""`, "MISE_ENV:", "env holds exactly the mise environment"},
 		{"an env with a boolean", `MISE_AUTO_ENV: "false"`, "MISE_AUTO_ENV: false", "env holds exactly the mise environment"},
 		{"an env in another order", "  MISE_ENV: \"\"\n  MISE_AUTO_ENV: \"false\"\n", "  MISE_AUTO_ENV: \"false\"\n  MISE_ENV: \"\"\n", "env holds exactly the mise environment"},
-		{"an env that is a list", workflowEnv, "env: [a]\n", "env holds exactly the mise environment"},
+		{"an env that is a list", citest.WorkflowEnv, "env: [a]\n", "env holds exactly the mise environment"},
 		{"an event outside the list", "  workflow_dispatch:\n", "  pull_request_target:\n", `the event "pull_request_target"`},
 		{"an expression with an operator", "group: ci-${{ github.ref }}", "group: ci-${{ github.ref || 'main' }}", "one context path"},
 		{"an expression with a function call", "group: ci-${{ github.ref }}", "group: ci-${{ format('{0}', github.ref) }}", "one context path"},
@@ -104,15 +48,15 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"an expression with an index", "group: ci-${{ github.ref }}", "group: ci-${{ github['ref'] }}", "one context path"},
 		{"an expression not closed", "group: ci-${{ github.ref }}", "group: ci-${{ github.ref", "not closed"},
 		{"an expression in a run line", "run: go run ./tools/ci all\n", "run: go run ./tools/ci all ${{ github.ref }}\n", "run is one line"},
-		{"a uses with a tag", "uses: actions/checkout@" + sha, "uses: actions/checkout@v6", "40-hex commit SHA"},
-		{"a uses with a short SHA", "uses: actions/checkout@" + sha, "uses: actions/checkout@" + sha[:39], "40-hex commit SHA"},
-		{"a uses with an upper-case SHA", "uses: actions/checkout@" + sha, "uses: actions/checkout@" + strings.ToUpper(sha), "40-hex commit SHA"},
-		{"a local action", "uses: actions/checkout@" + sha, "uses: ./.github/actions/x", "40-hex commit SHA"},
-		{"a local action with a SHA", "uses: actions/checkout@" + sha, "uses: ./.github/actions/x@" + sha, "40-hex commit SHA"},
-		{"a parent directory with a SHA", "uses: actions/checkout@" + sha, "uses: ../x@" + sha, "40-hex commit SHA"},
-		{"two parent directories with a SHA", "uses: actions/checkout@" + sha, "uses: ../..@" + sha, "40-hex commit SHA"},
-		{"a dot path segment", "uses: actions/checkout@" + sha, "uses: actions/checkout/../x@" + sha, "40-hex commit SHA"},
-		{"a docker action", "uses: actions/checkout@" + sha, "uses: docker://alpine@sha256:" + sha + sha[:24], "40-hex commit SHA"},
+		{"a uses with a tag", "uses: actions/checkout@" + citest.Sha, "uses: actions/checkout@v6", "40-hex commit SHA"},
+		{"a uses with a short SHA", "uses: actions/checkout@" + citest.Sha, "uses: actions/checkout@" + citest.Sha[:39], "40-hex commit SHA"},
+		{"a uses with an upper-case SHA", "uses: actions/checkout@" + citest.Sha, "uses: actions/checkout@" + strings.ToUpper(citest.Sha), "40-hex commit SHA"},
+		{"a local action", "uses: actions/checkout@" + citest.Sha, "uses: ./.github/actions/x", "40-hex commit SHA"},
+		{"a local action with a SHA", "uses: actions/checkout@" + citest.Sha, "uses: ./.github/actions/x@" + citest.Sha, "40-hex commit SHA"},
+		{"a parent directory with a SHA", "uses: actions/checkout@" + citest.Sha, "uses: ../x@" + citest.Sha, "40-hex commit SHA"},
+		{"two parent directories with a SHA", "uses: actions/checkout@" + citest.Sha, "uses: ../..@" + citest.Sha, "40-hex commit SHA"},
+		{"a dot path segment", "uses: actions/checkout@" + citest.Sha, "uses: actions/checkout/../x@" + citest.Sha, "40-hex commit SHA"},
+		{"a docker action", "uses: actions/checkout@" + citest.Sha, "uses: docker://alpine@sha256:" + citest.Sha + citest.Sha[:24], "40-hex commit SHA"},
 		{"an env on a uses step", "          persist-credentials: false\n", "          persist-credentials: false\n        env:\n          A: b\n", `"env" is outside the grammar of a uses step`},
 		{"an env on a run step: BASH_ENV", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        env:\n          BASH_ENV: /tmp/x\n", `"env" is outside the grammar of a run step`},
 		{"an env on a run step: an exported function", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        env:\n          BASH_FUNC_go%%: \"() { id; }\"\n", `"env" is outside the grammar of a run step`},
@@ -156,14 +100,14 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a matrix without os", "          - os: ubuntu-26.04\n            mise_sha256: aa\n", "          - mise_sha256: aa\n", "the matrix names os"},
 		{"a with that is a scalar", "        with:\n          persist-credentials: false\n", "        with: x\n", "with is a mapping"},
 		{"a with that is a list", "        with:\n          persist-credentials: false\n", "        with: [ref]\n", "with is a mapping"},
-		{"a uses with a path that starts with a dot", "uses: actions/checkout@" + sha, "uses: ./x@sha", "40-hex commit SHA"},
-		{"a local action with a real SHA", "uses: actions/checkout@" + sha, "uses: ./x@" + sha, "40-hex commit SHA"},
-		{"a uses that is a root path", "uses: actions/checkout@" + sha, "uses: /x@" + sha, "40-hex commit SHA"},
-		{"a uses with a parent as repository", "uses: actions/checkout@" + sha, "uses: owner/..@" + sha, "40-hex commit SHA"},
-		{"a uses with an empty path segment", "uses: actions/checkout@" + sha, "uses: actions/checkout/@" + sha, "40-hex commit SHA"},
-		{"a uses with a 41-hex ref", "uses: actions/checkout@" + sha, "uses: actions/checkout@" + sha + "a", "40-hex commit SHA"},
-		{"a comment after the SHA", "uses: actions/checkout@" + sha, "uses: actions/checkout@" + sha + " # v6", ""},
-		{"a uses with a word after the SHA", "uses: actions/checkout@" + sha, "uses: \"actions/checkout@" + sha + " x\"", "40-hex commit SHA"},
+		{"a uses with a path that starts with a dot", "uses: actions/checkout@" + citest.Sha, "uses: ./x@sha", "40-hex commit SHA"},
+		{"a local action with a real SHA", "uses: actions/checkout@" + citest.Sha, "uses: ./x@" + citest.Sha, "40-hex commit SHA"},
+		{"a uses that is a root path", "uses: actions/checkout@" + citest.Sha, "uses: /x@" + citest.Sha, "40-hex commit SHA"},
+		{"a uses with a parent as repository", "uses: actions/checkout@" + citest.Sha, "uses: owner/..@" + citest.Sha, "40-hex commit SHA"},
+		{"a uses with an empty path segment", "uses: actions/checkout@" + citest.Sha, "uses: actions/checkout/@" + citest.Sha, "40-hex commit SHA"},
+		{"a uses with a 41-hex ref", "uses: actions/checkout@" + citest.Sha, "uses: actions/checkout@" + citest.Sha + "a", "40-hex commit SHA"},
+		{"a comment after the SHA", "uses: actions/checkout@" + citest.Sha, "uses: actions/checkout@" + citest.Sha + " # v6", ""},
+		{"a uses with a word after the SHA", "uses: actions/checkout@" + citest.Sha, "uses: \"actions/checkout@" + citest.Sha + " x\"", "40-hex commit SHA"},
 		{"a runs-on with a larger macos image", "runs-on: ${{ matrix.os }}", "runs-on: macos-26-xlarge", "never *-latest"},
 		{"a runs-on with a windows image", "runs-on: ${{ matrix.os }}", "runs-on: windows-2025", "never *-latest"},
 		{"a runs-on with a prefix before the name", "runs-on: ${{ matrix.os }}", "runs-on: x-ubuntu-22.04", "never *-latest"},
@@ -193,16 +137,16 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a checkout without persist-credentials", "        with:\n          persist-credentials: false\n", "", "persist-credentials: false"},
 		{"a checkout that keeps the credentials", "persist-credentials: false", "persist-credentials: true", "persist-credentials: false"},
 		{"a checkout with persist-credentials in capitals", "persist-credentials: false", "persist-credentials: False", "persist-credentials: false"},
-		{"a checkout in capitals without persist-credentials", "        uses: actions/checkout@" + sha + "\n        with:\n          persist-credentials: false\n", "        uses: Actions/CheckOut@" + sha + "\n", "persist-credentials: false"},
-		{"a checkout in capitals with persist-credentials", "uses: actions/checkout@" + sha, "uses: Actions/CheckOut@" + sha, ""},
+		{"a checkout in capitals without persist-credentials", "        uses: actions/checkout@" + citest.Sha + "\n        with:\n          persist-credentials: false\n", "        uses: Actions/CheckOut@" + citest.Sha + "\n", "persist-credentials: false"},
+		{"a checkout in capitals with persist-credentials", "uses: actions/checkout@" + citest.Sha, "uses: Actions/CheckOut@" + citest.Sha, ""},
 		{"a path segment that starts with an underscore", "uses: jdx/mise-action/sub/path@", "uses: jdx/mise-action/_sub/path@", ""},
-		{"an owner that starts with an underscore", "uses: actions/checkout@" + sha, "uses: _x/checkout@" + sha, "40-hex commit SHA"},
-		{"a repository that starts with an underscore", "uses: actions/checkout@" + sha, "uses: actions/_checkout@" + sha, "40-hex commit SHA"},
+		{"an owner that starts with an underscore", "uses: actions/checkout@" + citest.Sha, "uses: _x/checkout@" + citest.Sha, "40-hex commit SHA"},
+		{"a repository that starts with an underscore", "uses: actions/checkout@" + citest.Sha, "uses: actions/_checkout@" + citest.Sha, "40-hex commit SHA"},
 		{"a strategy key outside the grammar", "      fail-fast: false\n", "      fail-fast: false\n      other: 1\n", `the strategy key "other"`},
 		{"a second strategy key outside the grammar", "      fail-fast: false\n", "      fail-fast: false\n      name: x\n", `the strategy key "name"`},
 		{"a strategy with max-parallel", "      fail-fast: false\n", "      fail-fast: false\n      max-parallel: 2\n", ""},
-		{"a uses path segment of a single underscore", "uses: actions/checkout@" + sha, "uses: actions/checkout/_x@" + sha, ""},
-		{"a uses path segment that starts with two dots", "uses: actions/checkout@" + sha, "uses: actions/checkout/..x@" + sha, "40-hex commit SHA"},
+		{"a uses path segment of a single underscore", "uses: actions/checkout@" + citest.Sha, "uses: actions/checkout/_x@" + citest.Sha, ""},
+		{"a uses path segment that starts with two dots", "uses: actions/checkout@" + citest.Sha, "uses: actions/checkout/..x@" + citest.Sha, "40-hex commit SHA"},
 		{"a job key written quoted", "    timeout-minutes: 60\n", "    \"if\": true\n", `"if" is outside the grammar of a job`},
 		{"a quoted key that is allowed", "    timeout-minutes: 60\n", "    \"timeout-minutes\": 60\n", ""},
 		{"a strategy in flow style", "    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n", "    strategy: {fail-fast: false, matrix: {include: [{os: ubuntu-26.04, mise_sha256: aa}]}}\n", ""},
@@ -211,13 +155,13 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a key with a tag that is not a string", "    timeout-minutes: 60\n", "    !!int timeout-minutes: 60\n", "key is written as a plain string"},
 		{"a key with the string tag", "    timeout-minutes: 60\n", "    !!str timeout-minutes: 60\n", ""},
 		{"a strategy with a bad first key", "    strategy:\n      fail-fast: false\n", "    strategy:\n      other: 1\n      fail-fast: false\n", `the strategy key "other"`},
-		{"steps in flow style", "    steps:\n      - name: Check out\n        uses: actions/checkout@" + sha + "\n        with:\n          persist-credentials: false\n      - uses: jdx/mise-action/sub/path@" + sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n      - name: All checks\n        run: go run ./tools/ci all\n      - run: go run ./tools/release notes --tag \"$GITHUB_REF_NAME\" --out=notes.md\n", "    steps: [{uses: actions/checkout@" + sha + ", with: {persist-credentials: false}}, {uses: jdx/mise-action/sub/path@" + sha + ", with: {sha256: \"${{ matrix.mise_sha256 }}\"}}, {run: \"go run ./tools/ci all\"}]\n", ""},
-		{"steps in flow style with a key outside the grammar", "    steps:\n      - name: Check out\n        uses: actions/checkout@" + sha + "\n        with:\n          persist-credentials: false\n      - uses: jdx/mise-action/sub/path@" + sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n      - name: All checks\n        run: go run ./tools/ci all\n      - run: go run ./tools/release notes --tag \"$GITHUB_REF_NAME\" --out=notes.md\n", "    steps: [{uses: actions/checkout@" + sha + ", with: {persist-credentials: false}}, {uses: jdx/mise-action/sub/path@" + sha + ", with: {sha256: \"${{ matrix.mise_sha256 }}\"}}, {run: \"go run ./tools/ci all\", if: true}]\n", `"if" is outside the grammar of a run step`},
+		{"steps in flow style", "    steps:\n      - name: Check out\n        uses: actions/checkout@" + citest.Sha + "\n        with:\n          persist-credentials: false\n      - uses: jdx/mise-action/sub/path@" + citest.Sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n      - name: All checks\n        run: go run ./tools/ci all\n      - run: go run ./tools/release notes --tag \"$GITHUB_REF_NAME\" --out=notes.md\n", "    steps: [{uses: actions/checkout@" + citest.Sha + ", with: {persist-credentials: false}}, {uses: jdx/mise-action/sub/path@" + citest.Sha + ", with: {sha256: \"${{ matrix.mise_sha256 }}\"}}, {run: \"go run ./tools/ci all\"}]\n", ""},
+		{"steps in flow style with a key outside the grammar", "    steps:\n      - name: Check out\n        uses: actions/checkout@" + citest.Sha + "\n        with:\n          persist-credentials: false\n      - uses: jdx/mise-action/sub/path@" + citest.Sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n      - name: All checks\n        run: go run ./tools/ci all\n      - run: go run ./tools/release notes --tag \"$GITHUB_REF_NAME\" --out=notes.md\n", "    steps: [{uses: actions/checkout@" + citest.Sha + ", with: {persist-credentials: false}}, {uses: jdx/mise-action/sub/path@" + citest.Sha + ", with: {sha256: \"${{ matrix.mise_sha256 }}\"}}, {run: \"go run ./tools/ci all\", if: true}]\n", `"if" is outside the grammar of a run step`},
 		{"an include entry key with a tag that is not a string", "          - os: ubuntu-26.04\n", "          - !!int os: ubuntu-26.04\n", "key is written as a plain string"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			src := goodWorkflow
+			src := citest.GoodWorkflow
 			if tt.old != "" {
 				require.Contains(t, src, tt.old, "the fixture's text to replace")
 				src = strings.Replace(src, tt.old, tt.new, 1)
@@ -242,18 +186,18 @@ func TestWorkflowsFile(t *testing.T) {
 	tests := []struct {
 		name, path, src, want string
 	}{
-		{"a yaml ending", ".github/workflows/ci.yaml", goodWorkflow, "ends in .yml"},
+		{"a yaml ending", ".github/workflows/ci.yaml", citest.GoodWorkflow, "ends in .yml"},
 		{"no ending", ".github/workflows/README", "text", "ends in .yml"},
 		{"a file in a subdirectory", ".github/workflows/old/ci.json", "{}", "ends in .yml"},
 		{"not YAML", ".github/workflows/x.yml", "a: [b\n", "not YAML"},
-		{"two documents", ".github/workflows/x.yml", goodWorkflow + "---\nname: two\n", "one YAML document"},
+		{"two documents", ".github/workflows/x.yml", citest.GoodWorkflow + "---\nname: two\n", "one YAML document"},
 		{"a list", ".github/workflows/x.yml", "- a\n", "a mapping"},
 		{"empty", ".github/workflows/x.yml", "", "not YAML"},
-		{"a ci.yml without edited", ".github/workflows/ci.yml", strings.Replace(goodWorkflow, ", edited]", "]", 1), "edited"},
-		{"a ci.yml without pull_request", ".github/workflows/ci.yml", strings.Replace(goodWorkflow, "  pull_request:\n    types: [opened, synchronize, reopened, edited]\n", "", 1), "edited"},
-		{"a ci.yml without on", ".github/workflows/ci.yml", "name: ci\njobs: {}\n" + workflowEnv, "edited"},
-		{"a ci.yml whose on is one name", ".github/workflows/ci.yml", "on: pull_request\njobs: {}\n" + workflowEnv, "edited"},
-		{"a ci.yml whose on is a list", ".github/workflows/ci.yml", "on: [pull_request, push]\njobs: {}\n" + workflowEnv, "edited"},
+		{"a ci.yml without edited", ".github/workflows/ci.yml", strings.Replace(citest.GoodWorkflow, ", edited]", "]", 1), "edited"},
+		{"a ci.yml without pull_request", ".github/workflows/ci.yml", strings.Replace(citest.GoodWorkflow, "  pull_request:\n    types: [opened, synchronize, reopened, edited]\n", "", 1), "edited"},
+		{"a ci.yml without on", ".github/workflows/ci.yml", "name: ci\njobs: {}\n" + citest.WorkflowEnv, "edited"},
+		{"a ci.yml whose on is one name", ".github/workflows/ci.yml", "on: pull_request\njobs: {}\n" + citest.WorkflowEnv, "edited"},
+		{"a ci.yml whose on is a list", ".github/workflows/ci.yml", "on: [pull_request, push]\njobs: {}\n" + citest.WorkflowEnv, "edited"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -263,11 +207,11 @@ func TestWorkflowsFile(t *testing.T) {
 		})
 	}
 	t.Run("another file without edited", func(t *testing.T) {
-		src := strings.Replace(goodWorkflow, ", edited]", "]", 1)
+		src := strings.Replace(citest.GoodWorkflow, ", edited]", "]", 1)
 		assert.Empty(t, workflowFindings(".github/workflows/fuzz.yml", []byte(src)))
 	})
 	t.Run("a ci.yml with edited", func(t *testing.T) {
-		assert.Empty(t, workflowFindings(".github/workflows/ci.yml", []byte(goodWorkflow)))
+		assert.Empty(t, workflowFindings(".github/workflows/ci.yml", []byte(citest.GoodWorkflow)))
 	})
 }
 
@@ -275,10 +219,10 @@ func TestWorkflowsFile(t *testing.T) {
 // list of names, and a mapping.
 func TestWorkflowsEvents(t *testing.T) {
 	for _, on := range []string{"push", "[push, workflow_dispatch]", "{push: {branches: [main]}}"} {
-		assert.Empty(t, workflowFindings(".github/workflows/x.yml", []byte("on: "+on+"\njobs: {}\n"+workflowEnv)), "on: %s", on)
+		assert.Empty(t, workflowFindings(".github/workflows/x.yml", []byte("on: "+on+"\njobs: {}\n"+citest.WorkflowEnv)), "on: %s", on)
 	}
 	for _, on := range []string{"issues", "[push, issues]", "{issues: {}}"} {
-		got := workflowFindings(".github/workflows/x.yml", []byte("on: "+on+"\njobs: {}\n"+workflowEnv))
+		got := workflowFindings(".github/workflows/x.yml", []byte("on: "+on+"\njobs: {}\n"+citest.WorkflowEnv))
 		require.Len(t, got, 1, "on: %s: %v", on, got)
 		assert.Contains(t, got[0].Msg, `the event "issues"`)
 	}
@@ -288,15 +232,15 @@ func TestWorkflowsEvents(t *testing.T) {
 // of a fixture repository: it reads the committed workflows, and only
 // those under .github/workflows.
 func TestWorkflowsCommitted(t *testing.T) {
-	r := newTree(t)
-	r.Write(".github/workflows/ci.yml", goodWorkflow)
+	r := citest.NewTree(t)
+	r.Write(".github/workflows/ci.yml", citest.GoodWorkflow)
 	r.Write("docs/example.yml", "jobs: {x: {if: true}}\n")
 	r.Commit("fixture")
 	got, err := workflows(t.Context(), r.Repo, "HEAD")
 	require.NoError(t, err)
 	assert.Empty(t, got)
 
-	r.Write(".github/workflows/ci.yml", strings.Replace(goodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1))
+	r.Write(".github/workflows/ci.yml", strings.Replace(citest.GoodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1))
 	got, err = workflows(t.Context(), r.Repo, "HEAD")
 	require.NoError(t, err)
 	assert.Empty(t, got, "a change that is not committed is in no push")
@@ -310,7 +254,7 @@ func TestWorkflowsCommitted(t *testing.T) {
 // TestWorkflowsRepository checks the workflows of this repository, as
 // they are in the working tree.
 func TestWorkflowsRepository(t *testing.T) {
-	root := moduleRoot(t)
+	root := citest.ModuleRoot(t)
 	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(workflowsDir)))
 	require.NoError(t, err)
 	require.NotEmpty(t, entries)
@@ -326,7 +270,7 @@ func TestWorkflowsRepository(t *testing.T) {
 // by a pinned version and a sha256 per platform before setup, and
 // setup before all.
 func TestWorkflowsCIFile(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join(moduleRoot(t), filepath.FromSlash(workflowsDir), "ci.yml"))
+	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(workflowsDir), "ci.yml"))
 	require.NoError(t, err)
 	var wf struct {
 		Jobs map[string]struct {
@@ -376,17 +320,6 @@ func TestWorkflowsCIFile(t *testing.T) {
 	assert.Less(t, index["setup"], index["all"])
 }
 
-// edits returns goodWorkflow with each pair of olds and news replaced.
-func edits(t *testing.T, pairs ...string) string {
-	t.Helper()
-	src := goodWorkflow
-	for i := 0; i+1 < len(pairs); i += 2 {
-		require.Contains(t, src, pairs[i], "the fixture's text to replace")
-		src = strings.Replace(src, pairs[i], pairs[i+1], 1)
-	}
-	return src
-}
-
 const (
 	goodStrategy = "    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n"
 	onRunner     = "runs-on: ${{ matrix.os }}"
@@ -414,7 +347,7 @@ func TestWorkflowsWithValues(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := workflowFindings(".github/workflows/x.yml", []byte(edits(t, tt.pairs...)))
+			got := workflowFindings(".github/workflows/x.yml", []byte(citest.Edits(t, tt.pairs...)))
 			if tt.want == "" {
 				assert.Empty(t, got)
 				return
@@ -433,13 +366,13 @@ func TestWorkflowsWrongKinds(t *testing.T) {
 		pairs []string
 		want  string
 	}{
-		{"jobs as a list", []string{goodWorkflow[strings.Index(goodWorkflow, "jobs:"):], "jobs: []\n"}, "jobs is a mapping"},
-		{"steps as a word", []string{goodWorkflow[strings.Index(goodWorkflow, "    steps:"):], "    steps: foo\n"}, "steps is a list"},
+		{"jobs as a list", []string{citest.GoodWorkflow[strings.Index(citest.GoodWorkflow, "jobs:"):], "jobs: []\n"}, "jobs is a mapping"},
+		{"steps as a word", []string{citest.GoodWorkflow[strings.Index(citest.GoodWorkflow, "    steps:"):], "    steps: foo\n"}, "steps is a list"},
 		{"a strategy as a list", []string{goodStrategy, "    strategy: [a]\n", onRunner, "runs-on: ubuntu-26.04", "sha256: ${{ matrix.mise_sha256 }}", "sha256: aa"}, "strategy is a mapping"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := workflowFindings(".github/workflows/x.yml", []byte(edits(t, tt.pairs...)))
+			got := workflowFindings(".github/workflows/x.yml", []byte(citest.Edits(t, tt.pairs...)))
 			require.Len(t, got, 1, "%v", got)
 			assert.Contains(t, got[0].Msg, tt.want)
 		})
@@ -471,7 +404,7 @@ func TestWorkflowsPermissionsRequired(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := workflowFindings(".github/workflows/x.yml", []byte(edits(t, tt.pairs...)+tt.extra))
+			got := workflowFindings(".github/workflows/x.yml", []byte(citest.Edits(t, tt.pairs...)+tt.extra))
 			if tt.want == "" {
 				assert.Empty(t, got)
 				return
@@ -486,10 +419,10 @@ func TestWorkflowsPermissionsRequired(t *testing.T) {
 // be read excuses only a ${{ matrix.<key> }} reference, whose finding is
 // the matrix's own: any other expression in a with value is still found.
 func TestWorkflowInputWithUnreadableMatrix(t *testing.T) {
-	unreadable := strings.Replace(goodWorkflow,
+	unreadable := strings.Replace(citest.GoodWorkflow,
 		"        include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n",
 		"        include: ${{ github.event.inputs.m }}\n", 1)
-	require.NotEqual(t, goodWorkflow, unreadable)
+	require.NotEqual(t, citest.GoodWorkflow, unreadable)
 	findings := func(with string) string {
 		src := strings.Replace(unreadable, "sha256: ${{ matrix.mise_sha256 }}", "sha256: "+with, 1)
 		var msgs []string
@@ -507,7 +440,7 @@ func TestWorkflowInputWithUnreadableMatrix(t *testing.T) {
 // a list value of the matrix (matrixValues) makes a reference to that
 // key a finding, whatever else is found about the list.
 func TestWorkflowInputFromMatrixListValue(t *testing.T) {
-	src := strings.Replace(goodWorkflow, "      matrix:\n", "      matrix:\n        os: [ubuntu-26.04, \"${{ github.event.pull_request.title }}\"]\n", 1)
+	src := strings.Replace(citest.GoodWorkflow, "      matrix:\n", "      matrix:\n        os: [ubuntu-26.04, \"${{ github.event.pull_request.title }}\"]\n", 1)
 	src = strings.Replace(src, "sha256: ${{ matrix.mise_sha256 }}", "sha256: ${{ matrix.os }}", 1)
 	var msgs []string
 	for _, f := range workflowFindings(".github/workflows/x.yml", []byte(src)) {
@@ -539,7 +472,7 @@ func TestWorkflowsMatrixRunnerNeedsOS(t *testing.T) {
 			// A literal for the input keeps the matrix reference out of the findings.
 			pairs := append([]string{"sha256: ${{ matrix.mise_sha256 }}", "sha256: aa"}, tt.pairs...)
 			var msgs []string
-			for _, f := range workflowFindings(".github/workflows/x.yml", []byte(edits(t, pairs...))) {
+			for _, f := range workflowFindings(".github/workflows/x.yml", []byte(citest.Edits(t, pairs...))) {
 				msgs = append(msgs, f.Msg)
 			}
 			require.Len(t, msgs, len(tt.want), "%v", msgs)

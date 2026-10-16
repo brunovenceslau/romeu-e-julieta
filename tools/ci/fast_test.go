@@ -5,8 +5,6 @@ package main
 
 import (
 	"bytes"
-	"cmp"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -22,12 +20,8 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
-)
-
-var (
-	passing = check.Step{Name: "passes", Argv: []string{"go", "version"}}
-	failing = check.Step{Name: "fails", Argv: []string{"go", "no-such-command"}}
 )
 
 // TestFast covers fast without arguments: the steps and hygiene, and no
@@ -52,13 +46,13 @@ func TestFast(t *testing.T) {
 	}{
 		{
 			name:  "a denylist with an entry, every step passing",
-			steps: []check.Step{passing},
+			steps: []check.Step{citest.Passing},
 			code:  check.ExitOK,
 			want:  []string{"ok    passes", "ok    hygiene"},
 		},
 		{
 			name:  "a missing denylist",
-			steps: []check.Step{passing},
+			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
 				require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
 			},
@@ -67,16 +61,16 @@ func TestFast(t *testing.T) {
 		},
 		{
 			name:  "an empty denylist",
-			steps: []check.Step{passing},
+			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
-				r.Write(names.Path, string(denylist(t)))
+				r.Write(names.Path, string(citest.Denylist(t)))
 			},
 			code: check.ExitFail,
 			want: []string{"FAIL  hygiene", "denylist: the denylist has no entry"},
 		},
 		{
 			name:  "a failing step does not hide the ones after it",
-			steps: []check.Step{failing, passing},
+			steps: []check.Step{citest.Failing, citest.Passing},
 			code:  check.ExitFail,
 			want:  []string{"FAIL  fails", "ok    passes", "ok    hygiene"},
 		},
@@ -92,7 +86,7 @@ func TestFast(t *testing.T) {
 		},
 		{
 			name:  "by hand, a working tree that differs from HEAD runs every check",
-			steps: []check.Step{passing},
+			steps: []check.Step{citest.Passing},
 			after: func(t *testing.T, r *gittest.Repo) {
 				r.Write("tools/ci/x_test.go", "package main\n")
 				r.Write("README.md", "# A fixture\n\nChanged.\n")
@@ -106,7 +100,7 @@ func TestFast(t *testing.T) {
 		},
 		{
 			name:  "a tracked go.mod below the module root",
-			steps: []check.Step{passing},
+			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("tools/inner/go.mod", "module example.invalid/inner\n")
 			},
@@ -116,7 +110,7 @@ func TestFast(t *testing.T) {
 		},
 		{
 			name:  "an ignored go.mod below the module root",
-			steps: []check.Step{passing},
+			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write(".gitignore", "inner/\n")
 			},
@@ -143,7 +137,7 @@ func TestFast(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := newTree(t)
+			r := citest.NewTree(t)
 			if tt.change != nil {
 				tt.change(t, r)
 			}
@@ -284,7 +278,7 @@ func TestFastJudgesTheCommit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			origin := gittest.NewBare(t)
-			r := newTree(t)
+			r := citest.NewTree(t)
 			r.Git("remote", "add", "origin", origin.Dir)
 			r.Git("checkout", "--quiet", "-b", "other")
 			r.Write("docs/other.md", "plain\n")
@@ -315,7 +309,7 @@ func TestFastJudgesTheCommit(t *testing.T) {
 			if tt.dirty != nil {
 				fixture = r.WithEnv(tt.dirty(t, r)...)
 			}
-			code, out := runCI(t, fixture, strings.NewReader(stdin), []check.Step{passing}, "fast", "origin", origin.Dir)
+			code, out := runCI(t, fixture, strings.NewReader(stdin), []check.Step{citest.Passing}, "fast", "origin", origin.Dir)
 			assert.Equal(t, tt.code, code, "exit status")
 			for _, w := range tt.want {
 				assert.Contains(t, out, ids.Replace(strings.ReplaceAll(w, "{other}", other)))
@@ -366,7 +360,7 @@ func TestFastJudgesAgainAfterTheSteps(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			origin := gittest.NewBare(t)
-			r := newTree(t)
+			r := citest.NewTree(t)
 			r.Git("remote", "add", "origin", origin.Dir)
 			head := r.Commit("fixture")
 			r.Git("push", "--quiet", "origin", "main")
@@ -420,7 +414,7 @@ func checkoutTip(t *testing.T, r *gittest.Repo, stdin, head string) {
 func TestFastPushedRange(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
 	origin := gittest.NewBare(t)
-	r := newTree(t)
+	r := citest.NewTree(t)
 	r.Git("remote", "add", "origin", origin.Dir)
 	base := r.Commit("fixture")
 	r.Git("push", "--quiet", "origin", "main")
@@ -535,7 +529,7 @@ func TestFastPushedRange(t *testing.T) {
 				remote = "origin"
 			}
 			checkoutTip(t, r, tt.stdin, "")
-			code, out := runCI(t, r, strings.NewReader(tt.stdin), []check.Step{passing}, "fast", remote, origin.Dir)
+			code, out := runCI(t, r, strings.NewReader(tt.stdin), []check.Step{citest.Passing}, "fast", remote, origin.Dir)
 			assert.Equal(t, tt.code, code, "exit status")
 			for _, w := range tt.want {
 				assert.Contains(t, out, w)
@@ -561,8 +555,8 @@ func TestFastPushedRangeDefaultBranch(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
 	const other = "blorptang wixelfrum" // the entry each pushed commit drops
 	origin := gittest.NewBare(t)
-	r := newTree(t)
-	r.Write(names.Path, string(denylist(t, madeUp, other)))
+	r := citest.NewTree(t)
+	r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp, other)))
 	r.Git("remote", "add", "origin", origin.Dir)
 	base := r.Commit("fixture")
 	r.Git("push", "--quiet", "origin", "main")
@@ -576,7 +570,7 @@ func TestFastPushedRangeDefaultBranch(t *testing.T) {
 		r.Git("checkout", "--quiet", "main")
 		return sha
 	}
-	drop := func() { r.Write(names.Path, string(denylist(t, madeUp))) }
+	drop := func() { r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp))) }
 	line := branch("line", func() string {
 		drop()
 		r.Write("docs/b.txt", "x blorptang-wixelfrum y\n")
@@ -664,7 +658,7 @@ func TestFastPushedRangeDefaultBranch(t *testing.T) {
 				sub.Git("update-ref", "-d", "refs/remotes/origin/stand-in")
 			})
 			checkoutTip(t, r, tt.stdin, "")
-			code, out := runCI(t, r, strings.NewReader(tt.stdin), []check.Step{passing}, "fast", "origin", origin.Dir)
+			code, out := runCI(t, r, strings.NewReader(tt.stdin), []check.Step{citest.Passing}, "fast", "origin", origin.Dir)
 			assert.Equal(t, tt.code, code, "exit status")
 			for _, w := range tt.want {
 				assert.Contains(t, out, w)
@@ -692,7 +686,7 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
 	const other = "blorptang wixelfrum" // a second made-up name, listed on a branch only
 	origin := gittest.NewBare(t)
-	r := newTree(t)
+	r := citest.NewTree(t)
 	r.Git("remote", "add", "origin", origin.Dir)
 	base := r.Commit("fixture")
 	r.Git("push", "--quiet", "origin", "main")
@@ -708,7 +702,7 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 	// listing adds an entry to the denylist and, in the same commit, a
 	// line that holds the name the entry lists.
 	listing := branch("listing", func() string {
-		r.Write(names.Path, string(denylist(t, madeUp, other)))
+		r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp, other)))
 		r.Write("docs/b.txt", "x blorptang-wixelfrum y\n")
 		return r.Commit("docs: add a page and an entry")
 	})
@@ -745,10 +739,10 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 	// inrange lists a second name in one commit and drops it in the next;
 	// the line that holds it stays.
 	inRange := branch("inrange", func() string {
-		r.Write(names.Path, string(denylist(t, madeUp, other)))
+		r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp, other)))
 		r.Write("docs/c.txt", "x blorptang-wixelfrum y\n")
 		r.Commit("docs: add a page and an entry")
-		r.Write(names.Path, string(denylist(t, madeUp)))
+		r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp)))
 		return r.Commit("ci: drop the entry again")
 	})
 	// merged embeds a signed tag, which the push does not send as a ref.
@@ -864,7 +858,7 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			checkoutTip(t, r, tt.stdin, tt.head)
-			code, out := runCI(t, r, strings.NewReader(tt.stdin), []check.Step{passing}, "fast", "origin", origin.Dir)
+			code, out := runCI(t, r, strings.NewReader(tt.stdin), []check.Step{citest.Passing}, "fast", "origin", origin.Dir)
 			assert.Equal(t, tt.code, code, "exit status")
 			for _, w := range tt.want {
 				assert.Contains(t, out, w)
@@ -928,8 +922,8 @@ func TestFastSteps(t *testing.T) {
 func TestGeneratedRunsBeforeTheTests(t *testing.T) {
 	tools := check.Tools{Linter: "/pinned/golangci-lint", GoDir: "/pinned/go/bin"}
 	for name, steps := range map[string][]check.Step{
-		"fast": fastSteps(moduleRoot(t), tools),
-		"all":  allSteps(t.Context(), moduleRoot(t), tools, filepath.Join(t.TempDir(), coverFile)),
+		"fast": fastSteps(citest.ModuleRoot(t), tools),
+		"all":  allSteps(t.Context(), citest.ModuleRoot(t), tools, filepath.Join(t.TempDir(), coverFile)),
 	} {
 		names := make([]string, len(steps))
 		for i, s := range steps {
@@ -954,8 +948,8 @@ func TestGeneratedRunsBeforeTheTests(t *testing.T) {
 // the test's own too (isolateMiseConfig).
 func pinnedLintTools(t *testing.T) check.Tools {
 	t.Helper()
-	root := moduleRoot(t)
-	isolateMiseConfig(t)
+	root := citest.ModuleRoot(t)
+	citest.IsolateMiseConfig(t)
 	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
 		Class: procgroup.ToolStep,
 		Argv:  []string{"mise", "-C", root, "trust"},
@@ -966,424 +960,6 @@ func pinnedLintTools(t *testing.T) check.Tools {
 	tools, err := resolveLintTools(t.Context(), root)
 	require.NoError(t, err)
 	return tools
-}
-
-// isolateMiseConfig gives the real mise that a test starts through
-// passThroughEnv a state directory of the test's own, new and empty, so
-// the trust records of the person who runs the tests do not change what
-// the test measures. HOME and the data directory variables stay: the
-// pinned tools are installed where mise puts them. No global or system
-// configuration reaches mise (miseEnv names none). A test that builds
-// the whole environment of mise itself uses isolatedMiseEnv instead.
-func isolateMiseConfig(t *testing.T) {
-	t.Helper()
-	t.Setenv("MISE_STATE_DIR", t.TempDir())
-}
-
-// TestResolveLintTools checks that the tools of fast are the ones
-// mise.toml pins: the linter and the go command, installed by mise.
-func TestResolveLintTools(t *testing.T) {
-	tools := pinnedLintTools(t)
-	assert.Equal(t, "golangci-lint", filepath.Base(tools.Linter))
-	assert.True(t, filepath.IsAbs(tools.Linter), "an absolute path: %s", tools.Linter)
-	assert.FileExists(t, filepath.Join(tools.GoDir, "go"))
-	assert.FileExists(t, filepath.Join(tools.GoDir, "gofmt"))
-}
-
-// fakeMise is a home directory with the mise installs directory of
-// miseInstalls, and a directory on PATH that holds a mise of its own,
-// a script, in place of the real one. HOME and PATH point at them, and
-// MISE_DATA_DIR and XDG_DATA_HOME are cleared.
-type fakeMise struct {
-	home, bin string
-}
-
-func newFakeMise(t *testing.T) fakeMise {
-	t.Helper()
-	f := fakeMise{home: t.TempDir(), bin: t.TempDir()}
-	require.NoError(t, os.MkdirAll(f.installs(), 0o755))
-	t.Setenv("HOME", f.home)
-	t.Setenv("PATH", f.bin)
-	t.Setenv("MISE_DATA_DIR", "")
-	t.Setenv("XDG_DATA_HOME", "")
-	return f
-}
-
-func (f fakeMise) installs() string {
-	return filepath.Join(f.home, ".local", "share", "mise", "installs")
-}
-
-// tool creates an executable file below the installs directory.
-func (f fakeMise) tool(t *testing.T, rel ...string) string {
-	t.Helper()
-	return executable(t, filepath.Join(append([]string{f.installs()}, rel...)...))
-}
-
-func executable(t *testing.T, path string) string {
-	t.Helper()
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\n"), 0o700))
-	return path
-}
-
-// script writes the fake mise: it runs prelude, then prints linter for
-// "mise -C <dir> which golangci-lint" and goCmd for "... which go".
-func (f fakeMise) script(t *testing.T, prelude, linter, goCmd string) {
-	t.Helper()
-	script := "#!/bin/sh\n" + prelude + "case \"$4\" in\ngolangci-lint) echo '" + linter + "' ;;\ngo) echo '" + goCmd + "' ;;\nesac\n"
-	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
-}
-
-// lockFixture is the mise.lock of the fakes: the versions the fake
-// installs below carry.
-const lockFixture = `[[tools.go]]
-version = "1.27.0"
-
-[[tools."go:golang.org/x/vuln/cmd/govulncheck"]]
-version = "1.8.0"
-
-[[tools.golangci-lint]]
-version = "2.14.0"
-`
-
-// lockedRoot returns a directory that holds a mise.lock with lock.
-func lockedRoot(t *testing.T, lock string) string {
-	t.Helper()
-	root := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.lock"), []byte(lock), 0o600))
-	return root
-}
-
-// TestLockedVersionsFixture reads the versions of a lock, refuses a
-// tool locked at two different versions, and accepts the same version
-// written twice.
-func TestLockedVersionsFixture(t *testing.T) {
-	got, err := lockedVersions([]byte(lockFixture))
-	require.NoError(t, err)
-	assert.Equal(t, map[string]string{"go": "1.27.0", "go:golang.org/x/vuln/cmd/govulncheck": "1.8.0", "golangci-lint": "2.14.0"}, got)
-	_, err = lockedVersions([]byte(lockFixture + "[[tools.go]]\nversion = \"1.26.0\"\n"))
-	require.ErrorContains(t, err, "mise.lock locks go at two different versions")
-	got, err = lockedVersions([]byte(lockFixture + "[[tools.go]]\nversion = \"1.27.0\"\n"))
-	require.NoError(t, err, "the same version twice")
-	assert.Equal(t, "1.27.0", got["go"])
-}
-
-// TestLockedVersionsOtherTable shows that a "version" key below a table
-// header other than [[tools.<name>]] is no tool's.
-func TestLockedVersionsOtherTable(t *testing.T) {
-	got, err := lockedVersions([]byte("[[tools.go]]\n[tools.go.options]\nversion = \"9.9.9\"\n"))
-	require.NoError(t, err)
-	assert.Empty(t, got)
-}
-
-// TestWhichPinnedThroughLinks resolves a tool when both the root and
-// HOME are reached through a link, as on macOS, where the temporary
-// directory is below /var, a link to /private/var.
-func TestWhichPinnedThroughLinks(t *testing.T) {
-	f := newFakeMise(t)
-	homeLink := filepath.Join(t.TempDir(), "home")
-	require.NoError(t, os.Symlink(f.home, homeLink))
-	t.Setenv("HOME", homeLink)
-	goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
-	f.script(t, "", "", strings.Replace(goCmd, f.home, homeLink, 1))
-
-	realRoot := lockedRoot(t, lockFixture)
-	rootLink := filepath.Join(t.TempDir(), "root")
-	require.NoError(t, os.Symlink(realRoot, rootLink))
-
-	got, err := whichPinned(t.Context(), rootLink, "go", "go", "go")
-	require.NoError(t, err)
-	want, err := filepath.EvalSymlinks(goCmd)
-	require.NoError(t, err)
-	assert.Equal(t, want, got)
-}
-
-// TestResolveLintToolsFailsClosed runs resolveLintTools against a fake
-// mise (newFakeMise). Every case that names an error fails, and none
-// falls back to a tool on the search path.
-func TestResolveLintToolsFailsClosed(t *testing.T) {
-	const fixed = "{installs}" // the resolved installs directory, in want
-	tests := []struct {
-		name string
-		// setup prepares the case and returns what the fake mise prints
-		// for golangci-lint and for go; no fake mise is written when
-		// noMise is set, and one that exits 1 when fails is set.
-		setup  func(t *testing.T, f fakeMise) (linter, goCmd string)
-		noMise bool
-		fails  bool
-		// lock is the mise.lock of the root; "" means lockFixture, and
-		// "none" no file.
-		lock string
-		want string
-	}{
-		{
-			name: "a linter at a version beside the locked one",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				return f.tool(t, "golangci-lint", "2.13.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
-			},
-			want: "mise which golangci-lint: the install is not the version 2.14.0 that mise.lock locks: run \"mise install\" in ",
-		},
-		{
-			name: "a go at a version beside the locked one",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.26.0", "bin", "go")
-			},
-			want: "mise which go: the install is not the version 1.27.0 that mise.lock locks",
-		},
-		{
-			name: "no mise.lock",
-			lock: "none",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
-			},
-			want: "mise which golangci-lint: mise.lock: ",
-		},
-		{
-			name: "a tool the lock does not hold",
-			lock: "[[tools.go]]\nversion = \"1.27.0\"\n",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
-			},
-			want: "mise.lock locks no version of golangci-lint",
-		},
-		{
-			name: "a tool locked at two versions",
-			lock: lockFixture + "[[tools.golangci-lint]]\nversion = \"2.13.0\"\n",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
-			},
-			want: "mise.lock locks golangci-lint at two different versions",
-		},
-		{name: "no mise on the search path", noMise: true, want: "mise is not on the search path"},
-		{
-			name:  "mise which fails, with what mise wrote to standard error",
-			fails: true,
-			want:  "mise which golangci-lint: mise exited 1; the tool is not installed or the configuration is not trusted: run \"mise trust\" and \"mise install\" in ",
-		},
-		{
-			name: "HOME is not set",
-			setup: func(t *testing.T, _ fakeMise) (string, string) {
-				t.Setenv("HOME", "")
-				return "", ""
-			},
-			want: "HOME is not set",
-		},
-		{
-			name: "no installs directory",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				require.NoError(t, os.Remove(f.installs()))
-				return "", ""
-			},
-			want: "the mise installs directory " + fixed + ": ",
-		},
-		{
-			name: "a linter outside the installs directory",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				return executable(t, filepath.Join(t.TempDir(), "golangci-lint")), f.tool(t, "go", "1.27.0", "bin", "go")
-			},
-			want: "golangci-lint is outside " + filepath.Join(fixed, "golangci-lint") + ", where mise installs it: the mise configuration names a tool mise did not install",
-		},
-		{
-			name: "a linter in the directory of another tool",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				return f.tool(t, "go", "1.27.0", "bin", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
-			},
-			want: "is outside " + filepath.Join(fixed, "golangci-lint") + ",",
-		},
-		{
-			name: "a linter in a sibling directory that shares the tool's prefix",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				return f.tool(t, "golangci-lint-evil", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
-			},
-			want: "is outside " + filepath.Join(fixed, "golangci-lint") + ",",
-		},
-		{
-			name: "a go below the installs directory that links outside it",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				link := filepath.Join(f.installs(), "go", "1.27.0", "bin", "go")
-				require.NoError(t, os.MkdirAll(filepath.Dir(link), 0o755))
-				require.NoError(t, os.Symlink(executable(t, filepath.Join(t.TempDir(), "go")), link))
-				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), link
-			},
-			want: "mise which go: ",
-		},
-		{
-			name: "both below the installs directory",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				return f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go")
-			},
-		},
-		{
-			// As on macOS, where the temporary directory is below /var, a
-			// link to /private/var.
-			name: "both below an installs directory reached through a link",
-			setup: func(t *testing.T, f fakeMise) (string, string) {
-				link := filepath.Join(t.TempDir(), "home")
-				require.NoError(t, os.Symlink(f.home, link))
-				t.Setenv("HOME", link)
-				linter := f.tool(t, "golangci-lint", "2.14.0", "golangci-lint")
-				goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
-				return strings.Replace(linter, f.home, link, 1), strings.Replace(goCmd, f.home, link, 1)
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			f := newFakeMise(t)
-			var linter, goCmd string
-			if tt.setup != nil {
-				linter, goCmd = tt.setup(t, f)
-			}
-			switch {
-			case tt.fails:
-				require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\necho 'mise ERROR not trusted' >&2\nexit 1\n"), 0o700))
-			case !tt.noMise:
-				f.script(t, "", linter, goCmd)
-			}
-			root := t.TempDir()
-			if tt.lock != "none" {
-				root = lockedRoot(t, cmp.Or(tt.lock, lockFixture))
-			}
-			tools, err := resolveLintTools(t.Context(), root)
-			if tt.want != "" {
-				installs, evalErr := filepath.EvalSymlinks(f.installs())
-				if evalErr != nil {
-					installs = f.installs()
-				}
-				require.ErrorContains(t, err, strings.ReplaceAll(tt.want, fixed, installs))
-				if tt.fails {
-					require.ErrorContains(t, err, "\nmise ERROR not trusted", "what mise wrote to standard error")
-				}
-				assert.Equal(t, check.Tools{}, tools)
-				return
-			}
-			require.NoError(t, err)
-			realLinter, err := filepath.EvalSymlinks(linter)
-			require.NoError(t, err)
-			realGo, err := filepath.EvalSymlinks(goCmd)
-			require.NoError(t, err)
-			assert.Equal(t, check.Tools{Linter: realLinter, GoDir: filepath.Dir(realGo)}, tools)
-		})
-	}
-}
-
-// TestResolveLintToolsEnvironment checks that "mise which" runs in
-// passThroughEnv with miseEnv, at the top of the tree: a fake mise
-// writes its environment and its working directory to files, and every
-// variable of goenv.PassThrough and of miseEnv reaches it and nothing else,
-// with the ones a shell adds itself, whatever else this process holds;
-// a value of miseEnv is the list's, never the process's. Each variable
-// of goenv.PassThrough is set here, so the result does not depend on the
-// caller's environment (a TMPDIR or a MISE_STATE_DIR of its own).
-func TestResolveLintToolsEnvironment(t *testing.T) {
-	envPath, err := procgroup.LookPath("env")
-	require.NoError(t, err)
-	f := newFakeMise(t) // sets HOME and PATH
-	for _, key := range []string{"GOFLAGS", "MISE_INSTALLS_DIR", "MISE_TRUSTED_CONFIG_PATHS", "CI", "MISE_ENV"} {
-		t.Setenv(key, "from-the-process")
-	}
-	for _, key := range goenv.PassThrough {
-		if key != "HOME" && key != "PATH" {
-			t.Setenv(key, "/from/"+key)
-		}
-	}
-	t.Setenv("MISE_DATA_DIR", filepath.Dir(f.installs())) // where the fake's tools are
-	dump, cwd := filepath.Join(t.TempDir(), "env"), filepath.Join(t.TempDir(), "cwd")
-	f.script(t, "'"+envPath+"' > '"+dump+"'\npwd -P > '"+cwd+"'\n", f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.tool(t, "go", "1.27.0", "bin", "go"))
-	root := lockedRoot(t, lockFixture)
-	_, err = resolveLintTools(t.Context(), root)
-	require.NoError(t, err)
-
-	data, err := os.ReadFile(dump)
-	require.NoError(t, err)
-	var keys []string
-	values := map[string]string{}
-	for line := range strings.Lines(string(data)) {
-		key, value, _ := strings.Cut(strings.TrimSuffix(line, "\n"), "=")
-		if !slices.Contains([]string{"PWD", "OLDPWD", "SHLVL", "_"}, key) {
-			keys = append(keys, key)
-			values[key] = value
-		}
-	}
-	want := slices.Clone(goenv.PassThrough)
-	for _, kv := range miseEnv {
-		key, value, _ := strings.Cut(kv, "=")
-		want = append(want, key)
-		assert.Equal(t, value, values[key], key)
-	}
-	want = append(want, "MISE_CEILING_PATHS")
-	assert.Equal(t, strings.TrimPrefix(miseCeiling(root), "MISE_CEILING_PATHS="), values["MISE_CEILING_PATHS"], "the ceiling is the parent of the tree")
-	assert.Equal(t, slices.Sorted(slices.Values(want)), slices.Sorted(slices.Values(keys)), "the variables mise gets")
-	dir, err := os.ReadFile(cwd)
-	require.NoError(t, err)
-	real, err := filepath.EvalSymlinks(root)
-	require.NoError(t, err)
-	assert.Equal(t, real+"\n", string(dir), "mise starts at the top of the tree, where it finds .miserc.toml")
-}
-
-// TestMiseInstalls holds miseInstalls to the data directory that mise
-// itself reports in the environment it runs mise in, for each way the
-// directory is chosen (HOME, XDG_DATA_HOME, MISE_DATA_DIR), and pins it
-// on the variables it reads.
-func TestMiseInstalls(t *testing.T) {
-	data, xdg := t.TempDir(), t.TempDir()
-	for _, tt := range []struct {
-		name, data, xdg string
-		want            func(home string) string
-	}{
-		{"below HOME", "", "", func(home string) string { return filepath.Join(home, ".local", "share", "mise", "installs") }},
-		{"XDG_DATA_HOME", "", xdg, func(string) string { return filepath.Join(xdg, "mise", "installs") }},
-		{"MISE_DATA_DIR", data, xdg, func(string) string { return filepath.Join(data, "installs") }},
-	} {
-		t.Run("mise reports "+tt.name, func(t *testing.T) {
-			home := t.TempDir()
-			t.Setenv("HOME", home)
-			t.Setenv("MISE_DATA_DIR", tt.data)
-			t.Setenv("XDG_DATA_HOME", tt.xdg)
-			t.Setenv("MISE_STATE_DIR", t.TempDir())
-			var out bytes.Buffer
-			err := procgroup.Run(t.Context(), procgroup.Command{
-				Class:  procgroup.ToolProbe,
-				Argv:   []string{"mise", "-C", t.TempDir(), "doctor", "--json"},
-				Env:    append(miseEnviron(check.PassThroughEnv()), "MISE_OFFLINE=1"),
-				Stdout: &out,
-			})
-			require.NoError(t, err, "mise doctor")
-			var doctor struct{ Dirs struct{ Data string } }
-			require.NoError(t, json.Unmarshal(out.Bytes(), &doctor))
-			require.NotEmpty(t, doctor.Dirs.Data, "the data directory mise reports")
-			installs, err := miseInstalls()
-			require.NoError(t, err)
-			assert.Equal(t, filepath.Join(doctor.Dirs.Data, "installs"), installs, "the installs directory of mise")
-			assert.Equal(t, tt.want(home), installs)
-		})
-	}
-
-	tests := []struct {
-		name            string
-		data, xdg, home string
-		want            string // the directory, or the start of the error
-	}{
-		{"below HOME", "", "", "/h", "/h/.local/share/mise/installs"},
-		{"MISE_DATA_DIR set", "/m", "/x", "/h", "/m/installs"},
-		{"XDG_DATA_HOME set", "", "/x", "/h", "/x/mise/installs"},
-		{"HOME not set", "", "", "", "HOME is not set"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("MISE_DATA_DIR", tt.data)
-			t.Setenv("XDG_DATA_HOME", tt.xdg)
-			t.Setenv("HOME", tt.home)
-			got, err := miseInstalls()
-			if !strings.HasPrefix(tt.want, "/") {
-				require.ErrorContains(t, err, tt.want)
-				assert.Empty(t, got)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, filepath.FromSlash(tt.want), got)
-		})
-	}
 }
 
 // TestIsGateInput pins the untracked files a pre-push run refuses, a
@@ -1458,8 +1034,8 @@ func TestStepRun(t *testing.T) {
 		step check.Step
 		ok   bool
 	}{
-		{"a command that exits 0", passing, true},
-		{"a command that exits non-zero", failing, false},
+		{"a command that exits 0", citest.Passing, true},
+		{"a command that exits non-zero", citest.Failing, false},
 		{"a command that is not installed", check.Step{Name: "x", Argv: []string{"no-such-program-here"}}, false},
 		{"gofmt lists a file: output is a failure", check.Step{Name: "format", Argv: []string{"gofmt", "-l", "."}, Quiet: true}, false},
 		{"a quiet command that fails", check.Step{Name: "x", Argv: []string{"gofmt", "-l", "nothing.go"}, Quiet: true}, false},
@@ -1494,7 +1070,7 @@ func TestStepRun(t *testing.T) {
 // clears the variables of git.LocalEnv for every git command it runs.
 func TestFastHookIgnoresCallerGitEnv(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
-	r := newTree(t)
+	r := citest.NewTree(t)
 	r.Commit("fixture")
 	r.Git("remote", "add", "origin", gittest.NewBare(t).Dir)
 	r.Git("push", "--quiet", "origin", "main")
@@ -1507,7 +1083,7 @@ func TestFastHookIgnoresCallerGitEnv(t *testing.T) {
 		"GIT_ALTERNATE_OBJECT_DIRECTORIES="+filepath.Join(other.Dir, ".git", "objects"),
 	)
 	stdin := "refs/heads/main " + r.Git("rev-parse", "HEAD") + " refs/heads/main " + zero + "\n"
-	code, out := runCI(t, hooked, strings.NewReader(stdin), []check.Step{passing}, "fast", "origin", "https://example.invalid/x.git")
+	code, out := runCI(t, hooked, strings.NewReader(stdin), []check.Step{citest.Passing}, "fast", "origin", "https://example.invalid/x.git")
 	assert.Equal(t, check.ExitOK, code, "exit status\n%s", out)
 	assert.Contains(t, out, "ok    hygiene")
 	assert.Contains(t, out, "ok    pushed range")
@@ -1525,13 +1101,13 @@ func TestFastHookReadsTheProcessGitEnv(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
 	const other = "blorptang wixelfrum" // the entry the pushed commit drops
 	origin := gittest.NewBare(t)
-	r := newTree(t)
-	r.Write(names.Path, string(denylist(t, madeUp, other)))
+	r := citest.NewTree(t)
+	r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp, other)))
 	r.Git("remote", "add", "origin", origin.Dir)
 	base := r.Commit("fixture")
 	r.Git("push", "--quiet", "origin", "main")
 	r.Git("fetch", "--quiet", "origin")
-	r.Write(names.Path, string(denylist(t, madeUp)))
+	r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp)))
 	r.Write("docs/b.txt", "x blorptang-wixelfrum y\n")
 	tip := r.Commit("ci: drop an entry")
 	r.Git("checkout", "--quiet", "--detach", tip)
@@ -1550,7 +1126,7 @@ func TestFastHookReadsTheProcessGitEnv(t *testing.T) {
 		t.Helper()
 		var out strings.Builder
 		stdin := "refs/heads/x " + tip + " refs/heads/x " + zero + "\n"
-		e := check.Env{Dir: r.Dir, Stdin: strings.NewReader(stdin), Stdout: &out, Stderr: &out, Steps: []check.Step{passing}}
+		e := check.Env{Dir: r.Dir, Stdin: strings.NewReader(stdin), Stdout: &out, Stderr: &out, Steps: []check.Step{citest.Passing}}
 		return run(t.Context(), e, []string{"fast", "origin", origin.Dir}), out.String()
 	}
 

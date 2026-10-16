@@ -20,6 +20,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
 // TestMiseEnvList pins the allowlist of environment variables of every
@@ -288,7 +289,7 @@ func TestMiseNeverReads(t *testing.T) {
 			// a push from a linked directory is anywhere: mise walks the
 			// real path, so a ceiling computed from the path as given
 			// would never match.
-			l := layout{parent: mustEval(t, t.TempDir()), home: t.TempDir(), elsewhere: t.TempDir()}
+			l := layout{parent: citest.MustEval(t, t.TempDir()), home: t.TempDir(), elsewhere: t.TempDir()}
 			link := filepath.Join(t.TempDir(), "link")
 			require.NoError(t, os.Symlink(l.parent, link))
 			l.dir = filepath.Join(link, "tree")
@@ -333,7 +334,7 @@ func TestMiseNeverReads(t *testing.T) {
 // the tree: a root given through a symbolic link, which git can report
 // when the working tree is configured so, gives the same ceiling.
 func TestMiseCeiling(t *testing.T) {
-	real := mustEval(t, t.TempDir())
+	real := citest.MustEval(t, t.TempDir())
 	link := filepath.Join(t.TempDir(), "link")
 	require.NoError(t, os.Symlink(real, link))
 	assert.Equal(t, "MISE_CEILING_PATHS="+filepath.Dir(real), miseCeiling(link))
@@ -378,7 +379,7 @@ func TestIsMiseFile(t *testing.T) {
 // ask-first list to go.mod, go.sum, every glob of miseFiles and the
 // workflows, in that order: a change to any file mise reads asks first.
 func TestMiseFilesAskFirst(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join(moduleRoot(t), askFirstPath))
+	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), askFirstPath))
 	require.NoError(t, err)
 	list, err := parseAskFirst(src)
 	require.NoError(t, err)
@@ -436,7 +437,7 @@ const (
 // mise at version.
 func miseWorkflow(t *testing.T, version string) string {
 	t.Helper()
-	return edits(t, "          sha256: ${{ matrix.mise_sha256 }}\n", "          version: "+version+"\n          sha256: ${{ matrix.mise_sha256 }}\n")
+	return citest.Edits(t, "          sha256: ${{ matrix.mise_sha256 }}\n", "          version: "+version+"\n          sha256: ${{ matrix.mise_sha256 }}\n")
 }
 
 // TestPinnedMiseVersion reads the version of mise that ci.yml pins, in
@@ -444,7 +445,7 @@ func miseWorkflow(t *testing.T, version string) string {
 // the action, and an error for none, for two, for an empty one and for
 // a missing workflow.
 func TestPinnedMiseVersion(t *testing.T) {
-	got, err := pinnedMiseVersion(moduleRoot(t))
+	got, err := pinnedMiseVersion(citest.ModuleRoot(t))
 	require.NoError(t, err)
 	assert.Equal(t, "2026.10.3", got, "the version ci.yml pins")
 
@@ -461,8 +462,8 @@ func TestPinnedMiseVersion(t *testing.T) {
 		{"one step", miseWorkflow(t, "2026.10.3"), "2026.10.3"},
 		{"two steps, one version, the action in any case", twice("2026.10.3"), "2026.10.3"},
 		{"two versions", twice("2026.10.4"), `holds ["2026.10.4" "2026.10.3"]`},
-		{"no version", goodWorkflow, `holds [""]`},
-		{"no mise-action step", strings.ReplaceAll(goodWorkflow, "jdx/mise-action", "jdx/other"), "holds []"},
+		{"no version", citest.GoodWorkflow, `holds [""]`},
+		{"no mise-action step", strings.ReplaceAll(citest.GoodWorkflow, "jdx/mise-action", "jdx/other"), "holds []"},
 		{"no workflow", "", "the version of mise is pinned in .github/workflows/ci.yml: "},
 	}
 	for _, tt := range tests {
@@ -492,11 +493,11 @@ func TestCheckMiseVersion(t *testing.T) {
 	path := filepath.Join(root, filepath.FromSlash(pinnedMiseWorkflow))
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 	require.NoError(t, os.WriteFile(path, []byte(miseWorkflow(t, fakeMiseVersion)), 0o600))
-	f := newFakeMise(t)
+	f := citest.NewFakeMise(t)
 	dump := filepath.Join(t.TempDir(), "env")
 	write := func(version string) {
 		script := "#!/bin/sh\n[ \"$1\" = --version ] || exit 3\necho \"$MISE_OVERRIDE_CONFIG_FILENAMES $(pwd -P)\" > '" + dump + "'\necho '" + version + " linux-x64 (2026-10-05)'\necho 'mise WARN  mise version 2026.10.4 available' >&2\n"
-		require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte(script), 0o700))
 	}
 	write(fakeMiseVersion)
 	require.NoError(t, checkMiseVersion(t.Context(), root))
@@ -515,7 +516,7 @@ func TestCheckMiseVersion(t *testing.T) {
 	write("2024.11.37")
 	require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is at version 2024.11.37")
 
-	require.NoError(t, os.Remove(filepath.Join(f.bin, "mise")))
+	require.NoError(t, os.Remove(filepath.Join(f.Bin, "mise")))
 	require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is not on the search path")
 }
 
@@ -528,9 +529,9 @@ func TestCheckMiseVersion(t *testing.T) {
 func TestMiseProbesRunUnderTheToolProbeClass(t *testing.T) {
 	sleep, err := procgroup.LookPath("sleep")
 	require.NoError(t, err)
-	root := lockedRoot(t, lockFixture)
-	f := newFakeMise(t)
-	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\nexec '"+sleep+"' 30\n"), 0o700))
+	root := citest.LockedRoot(t, citest.LockFixture)
+	f := citest.NewFakeMise(t)
+	require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte("#!/bin/sh\nexec '"+sleep+"' 30\n"), 0o700))
 	probes := map[string]func(ctx context.Context) error{
 		"mise which": func(ctx context.Context) error {
 			_, err := whichPinned(ctx, root, "go", "go", "go")

@@ -25,6 +25,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 )
@@ -52,37 +53,37 @@ func TestAll(t *testing.T) {
 	}{
 		{
 			name:    "every check passing",
-			steps:   []check.Step{passing},
+			steps:   []check.Step{citest.Passing},
 			profile: "tools/ci 1 1",
 			code:    check.ExitOK,
 			want:    []string{"platform  ", "ok    passes", "ok    hygiene", "ok    workflows", "ok    coverage"},
 		},
 		{
 			name:    "a failing step does not hide the checks after it",
-			steps:   []check.Step{failing, passing},
+			steps:   []check.Step{citest.Failing, citest.Passing},
 			profile: "tools/ci 1 1",
 			code:    check.ExitFail,
 			want:    []string{"FAIL  fails", "ok    passes", "ok    hygiene", "ok    workflows", "ok    coverage"},
 		},
 		{
 			name:    "a package below its threshold",
-			steps:   []check.Step{passing},
+			steps:   []check.Step{citest.Passing},
 			profile: "tools/ci 1 0",
 			code:    check.ExitFail,
 			want:    []string{"ok    workflows", "FAIL  coverage\ntools/ci: coverage: 0.0% of 1 statements covered, below 80% (S9)\n"},
 		},
 		{
 			name:    "no cover profile, as when the race step could not start",
-			steps:   []check.Step{passing},
+			steps:   []check.Step{citest.Passing},
 			profile: "missing",
 			code:    check.ExitFail,
 			want:    []string{"FAIL  coverage\nthe cover profile of the race step: "},
 		},
 		{
 			name:  "a workflow outside the grammar",
-			steps: []check.Step{passing},
+			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
-				r.Write(".github/workflows/ci.yml", strings.Replace(goodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1))
+				r.Write(".github/workflows/ci.yml", strings.Replace(citest.GoodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1))
 			},
 			profile: "tools/ci 1 1",
 			code:    check.ExitFail,
@@ -90,7 +91,7 @@ func TestAll(t *testing.T) {
 		},
 		{
 			name:    "a hygiene finding",
-			steps:   []check.Step{passing},
+			steps:   []check.Step{citest.Passing},
 			change:  func(t *testing.T, r *gittest.Repo) { r.Write("docs/x.md", "a line with "+emDash+"\n") },
 			profile: "tools/ci 1 1",
 			code:    check.ExitFail,
@@ -104,7 +105,7 @@ func TestAll(t *testing.T) {
 		},
 		{
 			name:  "a nested module stops all before any check",
-			steps: []check.Step{passing},
+			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("tools/inner/go.mod", "module example.invalid/inner\n")
 			},
@@ -114,15 +115,15 @@ func TestAll(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := newTree(t)
-			r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+			r := citest.NewTree(t)
+			r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 			if tt.change != nil {
 				tt.change(t, r)
 			}
 			r.Commit("fixture")
 			profile := filepath.Join(t.TempDir(), "cover.out")
 			if tt.profile != "missing" && tt.profile != "" {
-				require.NoError(t, os.WriteFile(profile, profileOf(tt.profile), 0o600))
+				require.NoError(t, os.WriteFile(profile, citest.ProfileOf(tt.profile), 0o600))
 			}
 			code, out := runAllIn(t, r, tt.steps, profile)
 			assert.Equal(t, tt.code, code, "exit status\n%s", out)
@@ -135,7 +136,7 @@ func TestAll(t *testing.T) {
 
 // TestAllUsage refuses an argument.
 func TestAllUsage(t *testing.T) {
-	r := newTree(t)
+	r := citest.NewTree(t)
 	r.Commit("fixture")
 	for _, args := range [][]string{{"all", "x"}, {"setup", "x"}, {"workflows", "x"}} {
 		code, out := runCI(t, r, nil, nil, args...)
@@ -146,14 +147,14 @@ func TestAllUsage(t *testing.T) {
 // TestWorkflowsCommand runs "tools/ci workflows" on a fixture
 // repository: exit 0 with a workflow inside the grammar, 1 outside it.
 func TestWorkflowsCommand(t *testing.T) {
-	r := newTree(t)
-	r.Write(".github/workflows/ci.yml", goodWorkflow)
+	r := citest.NewTree(t)
+	r.Write(".github/workflows/ci.yml", citest.GoodWorkflow)
 	r.Commit("fixture")
 	code, out := runCI(t, r, nil, nil, "workflows")
 	assert.Equal(t, check.ExitOK, code, out)
 	assert.Equal(t, "workflows: ok\n", out)
 
-	r.Write(".github/workflows/extra.yaml", goodWorkflow)
+	r.Write(".github/workflows/extra.yaml", citest.GoodWorkflow)
 	r.Commit("a second ending")
 	code, out = runCI(t, r, nil, nil, "workflows")
 	assert.Equal(t, check.ExitFail, code, out)
@@ -167,17 +168,17 @@ func TestWorkflowsCommand(t *testing.T) {
 // proxy too, and the license step those of the Docker daemon, and no
 // other step keeps either.
 func TestAllSteps(t *testing.T) {
-	root := newTree(t).Dir
-	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.lock"), []byte(lockFixture), 0o600))
+	root := citest.NewTree(t).Dir
+	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.lock"), []byte(citest.LockFixture), 0o600))
 	gitPath, err := procgroup.LookPath("git")
 	require.NoError(t, err)
-	f := newFakeMise(t)
-	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.bin, "git")))
-	goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
-	linter := f.tool(t, "golangci-lint", "2.14.0", "golangci-lint")
-	vuln := f.tool(t, govulncheckDir, "1.8.0", "bin", "govulncheck")
+	f := citest.NewFakeMise(t)
+	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.Bin, "git")))
+	goCmd := f.Tool(t, "go", "1.27.0", "bin", "go")
+	linter := f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint")
+	vuln := f.Tool(t, govulncheckDir, "1.8.0", "bin", "govulncheck")
 	script := "#!/bin/sh\ncase \"$4\" in\ngovulncheck) echo '" + vuln + "' ;;\nesac\n"
-	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte(script), 0o700))
 	for _, key := range slices.Concat(check.NetworkPassThrough, check.DockerPassThrough) {
 		t.Setenv(key, "from-the-process")
 	}
@@ -228,7 +229,7 @@ func TestAllSteps(t *testing.T) {
 // ciJobTimeout returns the timeout-minutes of the job of ci.yml.
 func ciJobTimeout(t *testing.T) time.Duration {
 	t.Helper()
-	src, err := os.ReadFile(filepath.Join(moduleRoot(t), filepath.FromSlash(workflowsDir), "ci.yml"))
+	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(workflowsDir), "ci.yml"))
 	require.NoError(t, err)
 	var wf struct {
 		Jobs map[string]struct {
@@ -252,45 +253,49 @@ func TestAllStepsVulnFailsClosed(t *testing.T) {
 		name string
 		// resolve returns what the fake mise prints for govulncheck; ""
 		// makes it fail, as for a tool that is not installed.
-		resolve func(t *testing.T, f fakeMise) string
+		resolve func(t *testing.T, f citest.FakeMise) string
 		want    string
 	}{
 		{
-			name:    "outside the installs directory",
-			resolve: func(t *testing.T, _ fakeMise) string { return executable(t, filepath.Join(t.TempDir(), "govulncheck")) },
-			want:    "is outside " + filepath.Join("{installs}", govulncheckDir) + ", where mise installs it",
+			name: "outside the installs directory",
+			resolve: func(t *testing.T, _ citest.FakeMise) string {
+				return citest.Executable(t, filepath.Join(t.TempDir(), "govulncheck"))
+			},
+			want: "is outside " + filepath.Join("{installs}", govulncheckDir) + ", where mise installs it",
 		},
 		{
-			name:    "at a version beside the locked one",
-			resolve: func(t *testing.T, f fakeMise) string { return f.tool(t, govulncheckDir, "1.7.0", "bin", "govulncheck") },
-			want:    "the install is not the version 1.8.0 that mise.lock locks",
+			name: "at a version beside the locked one",
+			resolve: func(t *testing.T, f citest.FakeMise) string {
+				return f.Tool(t, govulncheckDir, "1.7.0", "bin", "govulncheck")
+			},
+			want: "the install is not the version 1.8.0 that mise.lock locks",
 		},
 		{
 			name:    "not installed, with a fake on the search path",
-			resolve: func(t *testing.T, _ fakeMise) string { return "" },
+			resolve: func(t *testing.T, _ citest.FakeMise) string { return "" },
 			want:    "mise which govulncheck: ",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := newFakeMise(t)
-			goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
-			tools := check.Tools{Linter: f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), GoDir: filepath.Dir(goCmd)}
+			f := citest.NewFakeMise(t)
+			goCmd := f.Tool(t, "go", "1.27.0", "bin", "go")
+			tools := check.Tools{Linter: f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint"), GoDir: filepath.Dir(goCmd)}
 			marker := filepath.Join(t.TempDir(), "ran")
-			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "govulncheck"), []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "govulncheck"), []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0o700))
 			script := "#!/bin/sh\nexit 1\n"
 			if path := tt.resolve(t, f); path != "" {
 				script = "#!/bin/sh\necho '" + path + "'\n"
 			}
-			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
-			root := lockedRoot(t, lockFixture)
+			require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte(script), 0o700))
+			root := citest.LockedRoot(t, citest.LockFixture)
 			var got check.Step
 			for _, s := range allSteps(t.Context(), root, tools, "/tmp/p/cover.out") {
 				if s.Name == "vulnerabilities" {
 					got = s
 				}
 			}
-			require.ErrorContains(t, got.Unavailable, strings.ReplaceAll(tt.want, "{installs}", evalOrSelf(f.installs())))
+			require.ErrorContains(t, got.Unavailable, strings.ReplaceAll(tt.want, "{installs}", evalOrSelf(f.Installs())))
 			_, err := got.Run(t.Context(), root)
 			require.ErrorIs(t, err, got.Unavailable, "an unavailable tool fails its step")
 			assert.NoFileExists(t, marker, "no govulncheck of the search path ran")
@@ -380,13 +385,13 @@ func TestAllArchitecture(t *testing.T) {
 		{"unknown", "FAIL  architecture\nuname -m reports unknown", check.ExitFail},
 	} {
 		t.Run(tt.uname, func(t *testing.T) {
-			r := newTree(t)
-			r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+			r := citest.NewTree(t)
+			r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 			r.Commit("fixture")
 			profile := filepath.Join(t.TempDir(), "cover.out")
-			require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
+			require.NoError(t, os.WriteFile(profile, citest.ProfileOf("tools/ci 1 1"), 0o600))
 			var out bytes.Buffer
-			e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &out, Steps: []check.Step{passing}, Profile: profile,
+			e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &out, Steps: []check.Step{citest.Passing}, Profile: profile,
 				Machine: func(context.Context) string { return tt.uname }}
 			assert.Equal(t, tt.code, run(t.Context(), e, []string{"all"}), "%s", out.String())
 			assert.Contains(t, out.String(), tt.want)
@@ -405,13 +410,13 @@ func TestAllArchitectureTranslated(t *testing.T) {
 		t.Skip("no uname -m to compare with on " + runtime.GOARCH)
 	}
 	for _, translated := range []bool{false, true} {
-		r := newTree(t)
-		r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+		r := citest.NewTree(t)
+		r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 		r.Commit("fixture")
 		profile := filepath.Join(t.TempDir(), "cover.out")
-		require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
+		require.NoError(t, os.WriteFile(profile, citest.ProfileOf("tools/ci 1 1"), 0o600))
 		var out bytes.Buffer
-		e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &out, Steps: []check.Step{passing}, Profile: profile,
+		e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &out, Steps: []check.Step{citest.Passing}, Profile: profile,
 			Machine:    func(context.Context) string { return same },
 			Translated: func(context.Context) bool { return translated }}
 		code := run(t.Context(), e, []string{"all"})
@@ -496,7 +501,7 @@ func TestLicenseStep(t *testing.T) {
 
 	var out bytes.Buffer
 	c := newChecks(&out)
-	c.run(t.Context(), t.TempDir(), []check.Step{passing, darwin})
+	c.run(t.Context(), t.TempDir(), []check.Step{citest.Passing, darwin})
 	assert.True(t, c.ok, "a step not run fails nothing")
 	assert.Contains(t, out.String(), "--    license: "+darwin.Skip+"\n")
 	assert.NotContains(t, out.String(), "ok    license")
@@ -509,37 +514,37 @@ func TestLicenseStep(t *testing.T) {
 // its profile where coverage reads it, and the profile's directory is
 // gone after the run.
 func TestAllWiring(t *testing.T) {
-	r := newTree(t)
-	r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
-	r.Write("mise.lock", lockFixture)
+	r := citest.NewTree(t)
+	r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
+	r.Write("mise.lock", citest.LockFixture)
 	r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
 	r.Commit("fixture")
 	gitPath, err := procgroup.LookPath("git")
 	require.NoError(t, err)
-	f := newFakeMise(t)
-	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.bin, "git")))
+	f := citest.NewFakeMise(t)
+	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.Bin, "git")))
 	log := filepath.Join(t.TempDir(), "log")
 	logged := func(name string, extra string) string {
 		return "#!/bin/sh\necho \"" + name + " $*\" >> '" + log + "'\n" + extra
 	}
-	goCmd := filepath.Join(f.installs(), "go", "1.27.0", "bin", "go")
-	writeProfile := "for a in \"$@\"; do case \"$a\" in -coverprofile=*) printf 'mode: set\\n" + fixtureModule + "/tools/ci/f.go:1.2,3.4 1 0\\n' > \"${a#-coverprofile=}\" ;; esac; done\n"
+	goCmd := filepath.Join(f.Installs(), "go", "1.27.0", "bin", "go")
+	writeProfile := "for a in \"$@\"; do case \"$a\" in -coverprofile=*) printf 'mode: set\\n" + citest.FixtureModule + "/tools/ci/f.go:1.2,3.4 1 0\\n' > \"${a#-coverprofile=}\" ;; esac; done\n"
 	for path, script := range map[string]string{
 		goCmd: logged("go", writeProfile),
 		filepath.Join(filepath.Dir(goCmd), "gofmt"):                                logged("gofmt", ""),
-		filepath.Join(f.installs(), "golangci-lint", "2.14.0", "golangci-lint"):    logged("lint", ""),
-		filepath.Join(f.installs(), govulncheckDir, "1.8.0", "bin", "govulncheck"): logged("govulncheck", ""),
-		filepath.Join(f.bin, "docker"):                                             logged("docker", ""),
+		filepath.Join(f.Installs(), "golangci-lint", "2.14.0", "golangci-lint"):    logged("lint", ""),
+		filepath.Join(f.Installs(), govulncheckDir, "1.8.0", "bin", "govulncheck"): logged("govulncheck", ""),
+		filepath.Join(f.Bin, "docker"):                                             logged("docker", ""),
 	} {
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 		require.NoError(t, os.WriteFile(path, []byte(script), 0o700))
 	}
 	which := "if [ \"$3\" = which ]; then\ncase \"$4\" in\n" +
 		"go) echo '" + goCmd + "' ;;\n" +
-		"golangci-lint) echo '" + filepath.Join(f.installs(), "golangci-lint", "2.14.0", "golangci-lint") + "' ;;\n" +
-		"govulncheck) echo '" + filepath.Join(f.installs(), govulncheckDir, "1.8.0", "bin", "govulncheck") + "' ;;\n" +
+		"golangci-lint) echo '" + filepath.Join(f.Installs(), "golangci-lint", "2.14.0", "golangci-lint") + "' ;;\n" +
+		"govulncheck) echo '" + filepath.Join(f.Installs(), govulncheckDir, "1.8.0", "bin", "govulncheck") + "' ;;\n" +
 		"esac\nexit 0\nfi\n"
-	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\n"+answerVersion+which+"echo \"mise $*\" >> '"+log+"'\n"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte("#!/bin/sh\n"+answerVersion+which+"echo \"mise $*\" >> '"+log+"'\n"), 0o700))
 
 	code, out := runCI(t, r, nil, nil, "all")
 	assert.Equal(t, check.ExitFail, code, out)
@@ -582,23 +587,23 @@ func evalOrSelf(path string) string {
 // pinned go command, the one step whose environment keeps the go
 // command's default proxy.
 func TestSetup(t *testing.T) {
-	r := newTree(t)
-	r.Write("mise.lock", lockFixture)
+	r := citest.NewTree(t)
+	r.Write("mise.lock", citest.LockFixture)
 	r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
 	r.Commit("fixture")
 	gitPath, err := procgroup.LookPath("git")
 	require.NoError(t, err)
 	sleepPath, err := procgroup.LookPath("sleep")
 	require.NoError(t, err)
-	f := newFakeMise(t)
-	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.bin, "git")))
+	f := citest.NewFakeMise(t)
+	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.Bin, "git")))
 	log := filepath.Join(t.TempDir(), "log")
-	goCmd := filepath.Join(f.installs(), "go", "1.27.0", "bin", "go")
+	goCmd := filepath.Join(f.Installs(), "go", "1.27.0", "bin", "go")
 	require.NoError(t, os.MkdirAll(filepath.Dir(goCmd), 0o755))
 	require.NoError(t, os.WriteFile(goCmd, []byte("#!/bin/sh\necho \"go $* GOPROXY=${GOPROXY-unset} GOFLAGS=$GOFLAGS HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '"+log+"'\n"), 0o700))
-	linter := f.tool(t, "golangci-lint", "2.14.0", "golangci-lint")
+	linter := f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint")
 	script := "#!/bin/sh\n" + answerVersion + "if [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset} MISE=${MISE_OVERRIDE_CONFIG_FILENAMES-unset},${MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES-unset},${MISE_ENV-unset},${MISE_AUTO_ENV-unset} GO=${GOENV-unset},${GOTOOLCHAIN-unset}\" >> '" + log + "'\n"
-	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte(script), 0o700))
 	t.Setenv("HTTPS_PROXY", "http://proxy.invalid")
 	t.Setenv("DOCKER_HOST", "unix:///nowhere")
 	t.Setenv("GITHUB_ACTIONS", "")
@@ -650,7 +655,7 @@ func TestSetup(t *testing.T) {
 		dump := filepath.Join(t.TempDir(), "dump")
 		hosted := "#!/bin/sh\n" + answerVersion + "if [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\n" +
 			"echo \"TRUSTED=${MISE_TRUSTED_CONFIG_PATHS-unset} YES=${MISE_YES-unset} LOG=${MISE_LOG_LEVEL-unset} CD=${MISE_CD-unset} ENVFILE=${MISE_ENV_FILE-unset} CEILING=${MISE_CEILING_PATHS-unset}\" >> '" + dump + "'\n"
-		require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(hosted), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte(hosted), 0o700))
 		t.Setenv("GITHUB_ACTIONS", "true")
 		for _, kv := range miseEnv {
 			key, value, _ := strings.Cut(kv, "=")
@@ -688,7 +693,7 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("a failing mise stops before the download", func(t *testing.T) {
-		require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\n"+answerVersion+"exit 1\n"), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte("#!/bin/sh\n"+answerVersion+"exit 1\n"), 0o700))
 		code, out := runCI(t, r, nil, nil, "setup")
 		assert.Equal(t, check.ExitFail, code, out)
 		assert.Contains(t, out, "FAIL  mise trust")
@@ -712,7 +717,7 @@ func TestSetup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stall := "#!/bin/sh\n" + answerVersion + "if [ \"$1\" = " + tt.stalls + " ]; then exec '" + sleepPath + "' 30; fi\nexit 0\n"
-			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(stall), 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte(stall), 0o700))
 			ctx := procgroup.WithTestTimeout(t.Context(), tt.class, 100*time.Millisecond)
 			var out bytes.Buffer
 			e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &out}
@@ -768,21 +773,21 @@ func overwriteObject(t *testing.T, r *gittest.Repo, rev, other string) check.Ste
 // pre-push run.
 func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
 	dash := "a line with " + emDash + "\n"
-	floating := strings.Replace(goodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1)
+	floating := strings.Replace(citest.GoodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1)
 	fixture := func(t *testing.T) (*gittest.Repo, []check.Step) {
 		t.Helper()
-		r := newTree(t)
-		r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+		r := citest.NewTree(t)
+		r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 		r.Write("docs/x.md", dash)
 		r.Write(".github/workflows/ci.yml", floating)
 		r.Commit("fixture")
-		return r, []check.Step{overwriteObject(t, r, "HEAD:docs/x.md", "a plain line\n"), overwriteObject(t, r, "HEAD:.github/workflows/ci.yml", goodWorkflow)}
+		return r, []check.Step{overwriteObject(t, r, "HEAD:docs/x.md", "a plain line\n"), overwriteObject(t, r, "HEAD:.github/workflows/ci.yml", citest.GoodWorkflow)}
 	}
 	t.Run("all", func(t *testing.T) {
 		r, steps := fixture(t)
 		profile := filepath.Join(t.TempDir(), "cover.out")
-		require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
-		code, out := runAllIn(t, r, append(steps, passing), profile)
+		require.NoError(t, os.WriteFile(profile, citest.ProfileOf("tools/ci 1 1"), 0o600))
+		code, out := runAllIn(t, r, append(steps, citest.Passing), profile)
 		assert.Equal(t, check.ExitFail, code, out)
 		assert.Contains(t, out, "ok    rewrites")
 		assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
@@ -797,7 +802,7 @@ func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
 	})
 	t.Run("the pushed range of a pre-push run", func(t *testing.T) {
 		const zero = "0000000000000000000000000000000000000000"
-		r := newTree(t)
+		r := citest.NewTree(t)
 		r.Git("remote", "add", "origin", gittest.NewBare(t).Dir)
 		r.Commit("fixture")
 		r.Git("push", "--quiet", "origin", "main")
@@ -840,25 +845,25 @@ func TestCommitCheckThatCannotJudgeFails(t *testing.T) {
 		run     func(t *testing.T, r *gittest.Repo, origin string) (int, string)
 	}{
 		{"fast by hand", false, func(t *testing.T, r *gittest.Repo, _ string) (int, string) {
-			return runCI(t, r, nil, []check.Step{passing}, "fast")
+			return runCI(t, r, nil, []check.Step{citest.Passing}, "fast")
 		}},
 		{"all", false, func(t *testing.T, r *gittest.Repo, _ string) (int, string) {
 			profile := filepath.Join(t.TempDir(), "cover.out")
-			require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
-			return runAllIn(t, r, []check.Step{passing}, profile)
+			require.NoError(t, os.WriteFile(profile, citest.ProfileOf("tools/ci 1 1"), 0o600))
+			return runAllIn(t, r, []check.Step{citest.Passing}, profile)
 		}},
 		{"fast as the pre-push hook", true, func(t *testing.T, r *gittest.Repo, origin string) (int, string) {
 			tip := strings.TrimSpace(r.Git("rev-parse", "HEAD"))
 			stdin := strings.NewReader("refs/heads/main " + tip + " refs/heads/main " + zero + "\n")
-			return runCI(t, r, stdin, []check.Step{passing}, "fast", "origin", origin)
+			return runCI(t, r, stdin, []check.Step{citest.Passing}, "fast", "origin", origin)
 		}},
 	}
 	for _, b := range broken {
 		for _, m := range modes {
 			t.Run(b.name+", "+m.name, func(t *testing.T) {
 				origin := gittest.NewBare(t)
-				r := newTree(t)
-				r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+				r := citest.NewTree(t)
+				r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 				r.Git("remote", "add", "origin", origin.Dir)
 				r.Commit("a good base")
 				r.Git("push", "--quiet", "origin", "main")
@@ -919,16 +924,16 @@ func TestAllStepsLeaveTheTree(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := newTree(t)
-			r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
+			r := citest.NewTree(t)
+			r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 			r.Commit("fixture")
 			if tt.before != nil {
 				tt.before(t, r)
 			}
 			profile := filepath.Join(t.TempDir(), "cover.out")
-			require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
+			require.NoError(t, os.WriteFile(profile, citest.ProfileOf("tools/ci 1 1"), 0o600))
 			mutate := check.Step{Name: "mutates", Argv: []string{sh, "-c", tt.script}, Environ: r.Env}
-			code, out := runAllIn(t, r, []check.Step{mutate, passing}, profile)
+			code, out := runAllIn(t, r, []check.Step{mutate, citest.Passing}, profile)
 			want := check.ExitFail
 			if strings.HasPrefix(tt.want[0], "ok") {
 				want = check.ExitOK
@@ -956,24 +961,24 @@ func TestCommitChecksReadBeforeMise(t *testing.T) {
 			require.NoError(t, err)
 			gitPath, err := procgroup.LookPath("git")
 			require.NoError(t, err)
-			r := newTree(t)
-			r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
-			r.Write("mise.lock", lockFixture)
+			r := citest.NewTree(t)
+			r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
+			r.Write("mise.lock", citest.LockFixture)
 			r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
 			r.Write("docs/x.md", "a line with "+emDash+"\n")
 			r.Commit("fixture")
 			rewrite := overwriteObject(t, r, "HEAD:docs/x.md", "a plain line\n").Argv
 			object, src := rewrite[4], rewrite[5]
 
-			f := newFakeMise(t)
-			require.NoError(t, os.Symlink(gitPath, filepath.Join(f.bin, "git")))
-			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "docker"), []byte("#!/bin/sh\n"), 0o700))
-			goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
-			f.tool(t, "go", "1.27.0", "bin", "gofmt")
-			f.tool(t, govulncheckDir, "1.8.0", "bin", "govulncheck")
+			f := citest.NewFakeMise(t)
+			require.NoError(t, os.Symlink(gitPath, filepath.Join(f.Bin, "git")))
+			require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "docker"), []byte("#!/bin/sh\n"), 0o700))
+			goCmd := f.Tool(t, "go", "1.27.0", "bin", "go")
+			f.Tool(t, "go", "1.27.0", "bin", "gofmt")
+			f.Tool(t, govulncheckDir, "1.8.0", "bin", "govulncheck")
 			prelude := "'" + chmod + "' u+w '" + object + "' && '" + cat + "' '" + src + "' > '" + object + "'\n" + answerVersion +
-				"if [ \"$4\" = govulncheck ]; then echo '" + filepath.Join(f.installs(), govulncheckDir, "1.8.0", "bin", "govulncheck") + "'; exit 0; fi\n"
-			f.script(t, prelude, f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), goCmd)
+				"if [ \"$4\" = govulncheck ]; then echo '" + filepath.Join(f.Installs(), govulncheckDir, "1.8.0", "bin", "govulncheck") + "'; exit 0; fi\n"
+			f.Script(t, prelude, f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint"), goCmd)
 
 			code, out := runCI(t, r, nil, nil, mode)
 			assert.Equal(t, check.ExitFail, code, out)

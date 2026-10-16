@@ -16,6 +16,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
@@ -30,7 +31,7 @@ const (
 )
 
 func TestHygienePasses(t *testing.T) {
-	r := newTree(t)
+	r := citest.NewTree(t)
 	r.Write("docs/page.md", strings.Join([]string{
 		"The word `glimmerous` is listed, so a page quotes it in a code span.",
 		"A path like " + usersDir + "<name>/ is a placeholder, and " + homeDir + "agent/ is the sandbox user.",
@@ -258,7 +259,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a denylist with no entry",
 			change: func(t *testing.T, r *gittest.Repo) {
-				r.Write(names.Path, string(denylist(t)))
+				r.Write(names.Path, string(citest.Denylist(t)))
 			},
 			want: []string{names.Path + ": denylist: the denylist has no entry"},
 		},
@@ -280,7 +281,7 @@ func TestHygieneRules(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := newTree(t)
+			r := citest.NewTree(t)
 			tt.change(t, r)
 			r.Commit("fixture")
 			code, out := runCI(t, r, nil, nil, "hygiene")
@@ -308,7 +309,7 @@ func TestHygieneRules(t *testing.T) {
 // and that it does so with no denylist entry to match names with.
 func TestPrologueInThePushedRange(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
-	r := newTree(t)
+	r := citest.NewTree(t)
 	require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
 	r.Commit("base, no denylist")
 	origin := gittest.NewBare(t)
@@ -328,7 +329,7 @@ func TestPrologueInThePushedRange(t *testing.T) {
 	assert.Equal(t, "commit "+added+": added path sub/prologue.md: prologue: the user's agreement file lives outside product repositories\n", check.Lines(got))
 
 	// The run reports the finding too, and not only "not checked".
-	code, out := runCI(t, r, strings.NewReader(stdin), []check.Step{passing}, "fast", "origin", origin.Dir)
+	code, out := runCI(t, r, strings.NewReader(stdin), []check.Step{citest.Passing}, "fast", "origin", origin.Dir)
 	assert.Equal(t, check.ExitFail, code, "exit status")
 	assert.Contains(t, out, "FAIL  pushed range\ncommit "+added+": added path sub/prologue.md: prologue:")
 	assert.Contains(t, out, "pushed range: not checked against names")
@@ -361,14 +362,14 @@ func TestPushedRangeVerdicts(t *testing.T) {
 		},
 		{
 			name: "an entry at HEAD, a listed name in an added line", baseList: true,
-			tip: map[string]string{"docs/page.md": "see " + madeUp + "\n"},
+			tip: map[string]string{"docs/page.md": "see " + citest.MadeUp + "\n"},
 			want: func(tip string) []check.Verdict {
 				return []check.Verdict{{Name: name, Findings: []check.Finding{{Where: "commit " + tip + ": docs/page.md:1", Rule: "name", Msg: "the added line holds a name listed at HEAD"}}}}
 			},
 		},
 		{
 			name: "an entry only at the default branch", baseList: true,
-			tip: map[string]string{names.Path: "", "docs/page.md": "see " + madeUp + "\n"},
+			tip: map[string]string{names.Path: "", "docs/page.md": "see " + citest.MadeUp + "\n"},
 			want: func(tip string) []check.Verdict {
 				return []check.Verdict{{Name: name, Findings: []check.Finding{{Where: "commit " + tip + ": docs/page.md:1", Rule: "name", Msg: "the added line holds a name listed at the remote's default branch"}}}}
 			},
@@ -401,7 +402,7 @@ func TestPushedRangeVerdicts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := newTree(t)
+			r := citest.NewTree(t)
 			if !tt.baseList {
 				require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
 			}
@@ -450,7 +451,7 @@ func TestHygienePrintsPathsSafely(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := newTree(t)
+			r := citest.NewTree(t)
 			r.Write(tt.path, "a "+emDash+" b\n")
 			r.Commit("fixture")
 			code, out := runCI(t, r, nil, nil, "hygiene")
@@ -469,7 +470,7 @@ func TestHygienePrintsPathsSafely(t *testing.T) {
 // TestHygieneReadsHEAD shows which tree is checked: the one of HEAD.
 // What is committed is what a push publishes.
 func TestHygieneReadsHEAD(t *testing.T) {
-	r := newTree(t)
+	r := citest.NewTree(t)
 	r.Write("docs/page.md", "see zorvex quimby\n")
 	r.Commit("with the name")
 	r.Write("docs/page.md", "clean again, and not committed\n")
@@ -494,7 +495,7 @@ func TestDataAtHEAD(t *testing.T) {
 	// origin, whose default branch then holds none either.
 	tree := func(t *testing.T) *gittest.Repo {
 		t.Helper()
-		r := newTree(t)
+		r := citest.NewTree(t)
 		require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
 		r.Commit("no denylist")
 		r.Git("remote", "add", "origin", gittest.NewBare(t).Dir)
@@ -523,7 +524,7 @@ func TestDataAtHEAD(t *testing.T) {
 			{"fast as the hook", pushOf(r), []string{"fast", "origin", url}},
 		}
 		for _, c := range checks {
-			code, out := runCI(t, r, strings.NewReader(c.stdin), []check.Step{passing}, c.args...)
+			code, out := runCI(t, r, strings.NewReader(c.stdin), []check.Step{citest.Passing}, c.args...)
 			if c.stdin != "" && hook != 0 {
 				assert.Equal(t, hook, code, "%s: exit status\n%s", c.name, out)
 				assert.Contains(t, out, "ci: fast judges the commit a push sends", c.name)
@@ -538,19 +539,19 @@ func TestDataAtHEAD(t *testing.T) {
 
 	t.Run("a denylist that is not committed fails every check", func(t *testing.T) {
 		r := tree(t)
-		r.Write(names.Path, string(denylist(t, madeUp)))
+		r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp)))
 		r.Git("add", "--all") // staged is not committed either
 		runAll(t, r, check.ExitFail, check.ExitError)
 	})
 	t.Run("once committed, every check passes", func(t *testing.T) {
 		r := tree(t)
-		r.Write(names.Path, string(denylist(t, madeUp)))
+		r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp)))
 		r.Commit("the denylist")
 		runAll(t, r, check.ExitOK, 0)
 	})
 	t.Run("later changes that are not committed are not read", func(t *testing.T) {
 		r := tree(t)
-		r.Write(names.Path, string(denylist(t, madeUp)))
+		r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp)))
 		r.Commit("the denylist")
 		r.Write(names.Path, "entries: [\n")
 		r.Write("tools/ci/prose.yaml", "rules: []\n")
@@ -570,7 +571,7 @@ func TestHygieneBrokenData(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := newTree(t)
+			r := citest.NewTree(t)
 			r.Write(tt.path, tt.content)
 			r.Commit("fixture")
 			code, out := runCI(t, r, nil, nil, "hygiene")
@@ -582,7 +583,7 @@ func TestHygieneBrokenData(t *testing.T) {
 // TestHygieneFile covers the --file flag: the name matcher over one
 // file outside the tree.
 func TestHygieneFile(t *testing.T) {
-	r := newTree(t)
+	r := citest.NewTree(t)
 	r.Commit("fixture")
 	dir := t.TempDir()
 	write := func(name, content string) string {
@@ -613,7 +614,7 @@ func TestHygieneFile(t *testing.T) {
 	}
 
 	t.Run("without a denylist entry the flag fails", func(t *testing.T) {
-		r.Write(names.Path, string(denylist(t)))
+		r.Write(names.Path, string(citest.Denylist(t)))
 		r.Commit("an empty denylist")
 		code, out := runCI(t, r, nil, nil, "hygiene", "--file", without)
 		assert.Equal(t, check.ExitFail, code, "exit status\n%s", out)
@@ -631,12 +632,12 @@ func TestJudgedCommitIsPinned(t *testing.T) {
 	// the test then commits the Y that makes HEAD differ.
 	moved := func(t *testing.T) (*gittest.Repo, string) {
 		t.Helper()
-		r := newTree(t)
+		r := citest.NewTree(t)
 		return r, r.Commit("X")
 	}
 	t.Run("hygiene: a name that Y adds", func(t *testing.T) {
 		r, x := moved(t)
-		r.Write("docs/page.md", "see "+madeUp+"\n")
+		r.Write("docs/page.md", "see "+citest.MadeUp+"\n")
 		r.Commit("Y")
 		got, err := hygiene(t.Context(), r.Repo, x)
 		require.NoError(t, err)
@@ -667,14 +668,14 @@ func TestJudgedCommitIsPinned(t *testing.T) {
 		assert.Error(t, err)
 	})
 	t.Run("pushedRange: a denylist that Y drops", func(t *testing.T) {
-		r := newTree(t)
+		r := citest.NewTree(t)
 		require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
 		r.Commit("base, no denylist")
 		r.Git("remote", "add", "origin", gittest.NewBare(t).Dir)
 		r.Git("push", "--quiet", "origin", "main")
 		r.Git("fetch", "--quiet", "origin")
-		r.Write(names.Path, string(denylist(t, madeUp)))
-		r.Write("docs/page.md", "see "+madeUp+"\n")
+		r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp)))
+		r.Write("docs/page.md", "see "+citest.MadeUp+"\n")
 		x := r.Commit("X")
 		require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
 		r.Commit("Y")
@@ -734,7 +735,7 @@ func rangeOf(verdicts []check.Verdict, err error) (findings []check.Finding, che
 // found, a file it holds is read, and a directory or a submodule at the
 // path is an error.
 func TestBlobAt(t *testing.T) {
-	r := newTree(t)
+	r := citest.NewTree(t)
 	head := r.Commit("fixture")
 	data, found, err := blobAt(t.Context(), r.Repo, head, "README.md")
 	require.NoError(t, err)
@@ -776,10 +777,10 @@ func partialClone(t *testing.T, upstream *gittest.Repo) git.Repo {
 // read.
 func TestDefaultBranchDenylistOfAPartialClone(t *testing.T) {
 	const other = "blorptang wixelfrum"
-	upstream := newTree(t)
+	upstream := citest.NewTree(t)
 	upstream.Commit("fixture")
 	clone := partialClone(t, upstream)
-	upstream.Write(names.Path, string(denylist(t, madeUp, other)))
+	upstream.Write(names.Path, string(citest.Denylist(t, citest.MadeUp, other)))
 	upstream.Commit("ci: list a second name")
 	_, err := clone.Run(t.Context(), nil, "fetch", "--quiet", "origin")
 	require.NoError(t, err)
@@ -803,7 +804,7 @@ func TestDefaultBranchDenylistOfAPartialClone(t *testing.T) {
 // store lacks is an error that names the file and says how to fetch the
 // blob.
 func TestHeadTreeOfAPartialClone(t *testing.T) {
-	upstream := newTree(t)
+	upstream := citest.NewTree(t)
 	upstream.Commit("fixture")
 	clone := partialClone(t, upstream)
 	upstream.Write("docs/new.md", "new\n")

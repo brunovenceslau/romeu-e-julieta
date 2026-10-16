@@ -22,18 +22,6 @@ import (
 // working tree.
 const coverFile = "cover.out"
 
-// govulncheckLock and govulncheckDir name govulncheck in mise.lock and
-// the directory below the mise installs directory where mise puts it:
-// the name of its backend with ":", "/" and "." written as "-" (measured
-// with mise 2026.10.3). It runs by the path "mise which" resolves, and
-// not through "mise exec": with the tool missing, "mise exec" warned and
-// ran a govulncheck of the search path, exit status 0 (measured with mise
-// 2026.10.3), which is not the version mise.lock locks.
-const (
-	govulncheckLock = "go:golang.org/x/vuln/cmd/govulncheck"
-	govulncheckDir  = "go-golang-org-x-vuln-cmd-govulncheck"
-)
-
 // reuseImage is the container image of the license step: reuse 6.2.0,
 // with its Python and every dependency, pinned by the digest of the
 // image (12 12.1). mise cannot pin reuse for every platform: reuse

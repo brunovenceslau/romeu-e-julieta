@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -107,7 +108,7 @@ func TestReferencePage(t *testing.T) {
 // the committed consumers are what it produces, so a hand edit of either
 // fails here before it fails "generated".
 func TestAskFirstOfThisRepository(t *testing.T) {
-	dir := moduleRoot(t)
+	dir := citest.ModuleRoot(t)
 	root, err := os.OpenRoot(dir)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = root.Close() })
@@ -126,7 +127,7 @@ func TestAskFirstOfThisRepository(t *testing.T) {
 // sentence, so a body that keeps the hint has no line that starts with
 // "Approval: ", which pr would read as a malformed approval line.
 func TestPullRequestTemplate(t *testing.T) {
-	b, err := os.ReadFile(filepath.Join(moduleRoot(t), ".github", "pull_request_template.md"))
+	b, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), ".github", "pull_request_template.md"))
 	require.NoError(t, err)
 	var got []string
 	for _, line := range strings.Split(string(b), "\n") {
@@ -143,7 +144,7 @@ func TestPullRequestTemplate(t *testing.T) {
 // regular expression that approvalLine holds, and that the form itself
 // is not an approval line.
 func TestApprovalLineOfTheSpec(t *testing.T) {
-	b, err := os.ReadFile(filepath.Join(moduleRoot(t), "docs", "spec", "12-engineering.md"))
+	b, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), "docs", "spec", "12-engineering.md"))
 	require.NoError(t, err)
 	spec := strings.ReplaceAll(string(b), "\r\n", "\n")
 	assert.Contains(t, spec, "```text\n"+approvalForm+"\n```\n")
@@ -229,7 +230,7 @@ func TestApprovalLineRefusesEachQuote(t *testing.T) {
 // that heading and before the next one.
 func specAskFirstList(t *testing.T) string {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join(moduleRoot(t), "docs", "spec", "05-security.md"))
+	b, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), "docs", "spec", "05-security.md"))
 	require.NoError(t, err)
 	_, section, found := strings.Cut(string(b), "\n## 5.3 Ask-first surfaces\n")
 	require.True(t, found, "the heading of 5.3")
@@ -250,7 +251,7 @@ func specAskFirstList(t *testing.T) string {
 // the committed owner stands in for it. Two copies of a list drift
 // unless a test holds them together.
 func TestSpecListIsTheCommittedList(t *testing.T) {
-	committed, err := os.ReadFile(filepath.Join(moduleRoot(t), filepath.FromSlash(askFirstPath)))
+	committed, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(askFirstPath)))
 	require.NoError(t, err)
 	want, err := parseAskFirst(committed)
 	require.NoError(t, err)
@@ -295,7 +296,7 @@ func TestGlobMatch(t *testing.T) {
 // not judge the commit, as when a step that runs before it rewrote the
 // index (05 5.3), and a grant is itself an ask-first change.
 func TestCodeownersAsksFirst(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join(moduleRoot(t), askFirstPath))
+	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), askFirstPath))
 	require.NoError(t, err)
 	list, err := parseAskFirst(src)
 	require.NoError(t, err)
@@ -309,7 +310,7 @@ func TestCodeownersAsksFirst(t *testing.T) {
 // and the workflows, which no checkpoint grant covers, and holds each on
 // the surface it was on before, checks or dependencies (05 5.3).
 func TestApprovalsSurface(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join(moduleRoot(t), askFirstPath))
+	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), askFirstPath))
 	require.NoError(t, err)
 	list, err := parseAskFirst(src)
 	require.NoError(t, err)

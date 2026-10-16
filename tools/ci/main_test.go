@@ -23,21 +23,8 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
-
-// madeUp is the forbidden name of every fixture here: an invented word
-// pair that names nothing.
-const madeUp = "zorvex quimby"
-
-// fixtureProse is a made-up word list, so that no test file holds a
-// word the repository really bans.
-const fixtureProse = `rules:
-  - id: shiny
-    phrases: [glimmerous]
-    fails: [a glimmerous tool]
-    passes: [a plain tool]
-`
 
 // hookScript is the tracked hook, with the words of its env filled in
 // from the lists of the code. Every go the hook starts (run) is started
@@ -104,31 +91,6 @@ func hookAllowWords() string {
 	return strings.Join(words, " ")
 }
 
-// newTree returns a fixture repository that passes hygiene: the hook,
-// the two data files, a denylist with the made-up name, and one page.
-// Nothing is committed yet.
-func newTree(t *testing.T) *gittest.Repo {
-	t.Helper()
-	r := gittest.New(t)
-	r.Write(".githooks/pre-push", hookScript)
-	require.NoError(t, os.Chmod(filepath.Join(r.Dir, ".githooks", "pre-push"), 0o744))
-	r.Write("tools/ci/prose.yaml", fixtureProse)
-	r.Write(names.Path, string(denylist(t, madeUp)))
-	r.Write("README.md", "# A fixture\n\nPlain text.\n")
-	return r
-}
-
-func denylist(t *testing.T, madeUpNames ...string) []byte {
-	t.Helper()
-	l := &names.List{}
-	for _, n := range madeUpNames {
-		e, err := names.NewEntry(n)
-		require.NoError(t, err)
-		l.Add(e)
-	}
-	return l.Marshal()
-}
-
 // runCI runs the command in the fixture and returns its exit status
 // and what it printed. The steps of fast are replaced by stubs: the
 // real ones run the tests this file is part of.
@@ -143,7 +105,7 @@ func runCI(t *testing.T, r *gittest.Repo, stdin io.Reader, steps []check.Step, a
 }
 
 func TestUsage(t *testing.T) {
-	r := newTree(t)
+	r := citest.NewTree(t)
 	r.Commit("fixture")
 	tests := []struct {
 		name string
@@ -226,7 +188,7 @@ func TestRunPrintsAnErrorAsSafeText(t *testing.T) {
 // that were set, and goenv.Build, with the ceiling the parent of the
 // resolved tree; and the arguments of git pass through as they are.
 func TestHookEnvIsTheAllowlist(t *testing.T) {
-	bin, real := t.TempDir(), mustEval(t, t.TempDir())
+	bin, real := t.TempDir(), citest.MustEval(t, t.TempDir())
 	linkDir := t.TempDir()
 	link := filepath.Join(linkDir, "tree")
 	require.NoError(t, os.Symlink(real, link))
@@ -261,7 +223,7 @@ func TestHookEnvIsTheAllowlist(t *testing.T) {
 	}
 	hookOut, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
 		Class: procgroup.ToolStep,
-		Argv:  []string{"sh", mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push")), "origin", "https://example.test/a b.git"},
+		Argv:  []string{"sh", citest.MustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push")), "origin", "https://example.test/a b.git"},
 		Dir:   link,
 		Env:   append(os.Environ(), "PWD="+link), // the path as the caller typed it
 	})
@@ -334,7 +296,7 @@ exit 7
 // when it is true), and returns the exit code and the two streams.
 func runHook(t *testing.T, bin string, only bool, stdin string) (code int, stdout, stderr string, dir string) {
 	t.Helper()
-	return runHookIn(t, mustEval(t, t.TempDir()), "", bin, only, stdin)
+	return runHookIn(t, citest.MustEval(t, t.TempDir()), "", bin, only, stdin)
 }
 
 // runHookIn is runHook in the directory dir; with link set, the hook
@@ -343,7 +305,7 @@ func runHookIn(t *testing.T, dir, link, bin string, only bool, stdin string) (co
 	t.Helper()
 	sh, err := procgroup.LookPath("sh")
 	require.NoError(t, err)
-	hook := mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push"))
+	hook := citest.MustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push"))
 	path := bin
 	if !only {
 		path += string(os.PathListSeparator) + os.Getenv("PATH")
@@ -435,9 +397,9 @@ func TestHookExplainsAToolchainRefusal(t *testing.T) {
 	})
 	t.Run("a mise shim, run in a symbolic link to a tree with escapes in its name", func(t *testing.T) {
 		shims := stubDirIn(t, filepath.Join(t.TempDir(), "mise", "shims"), "refuse")
-		real := filepath.Join(mustEval(t, t.TempDir()), hostile)
+		real := filepath.Join(citest.MustEval(t, t.TempDir()), hostile)
 		require.NoError(t, os.Mkdir(real, 0o700))
-		link := filepath.Join(mustEval(t, t.TempDir()), "tree")
+		link := filepath.Join(citest.MustEval(t, t.TempDir()), "tree")
 		require.NoError(t, os.Symlink(real, link))
 		code, _, errOut, _ := runHookIn(t, real, link, shims, false, refs)
 		assert.Equal(t, 1, code, "exit status\n%s", errOut)
@@ -495,8 +457,8 @@ func TestHookPassesSIGTERMToGo(t *testing.T) {
 	ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolStep, 30*time.Second)
 	done := runAsync(ctx, procgroup.Command{
 		Class: procgroup.ToolStep,
-		Argv:  []string{sh, "-c", `echo $$ > "$0.tmp" && mv "$0.tmp" "$0" && exec "$1" "$2"`, pidfile, sh, mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push"))},
-		Dir:   mustEval(t, t.TempDir()),
+		Argv:  []string{sh, "-c", `echo $$ > "$0.tmp" && mv "$0.tmp" "$0" && exec "$1" "$2"`, pidfile, sh, citest.MustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push"))},
+		Dir:   citest.MustEval(t, t.TempDir()),
 		Env:   append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH")),
 	})
 	pid := waitForPid(t, pidfile)
@@ -515,18 +477,4 @@ func TestHookPassesSIGTERMToGo(t *testing.T) {
 	}
 	_, err = os.Stat(filepath.Join(bin, "term"))
 	assert.NoError(t, err, "the go stub saw SIGTERM")
-}
-
-func mustAbs(t *testing.T, p string) string {
-	t.Helper()
-	abs, err := filepath.Abs(p)
-	require.NoError(t, err)
-	return abs
-}
-
-func mustEval(t *testing.T, p string) string {
-	t.Helper()
-	real, err := filepath.EvalSymlinks(p)
-	require.NoError(t, err)
-	return real
 }
