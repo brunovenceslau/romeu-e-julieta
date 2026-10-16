@@ -19,6 +19,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
@@ -379,16 +380,16 @@ func TestIsMiseFile(t *testing.T) {
 // ask-first list to go.mod, go.sum, every glob of miseFiles and the
 // workflows, in that order: a change to any file mise reads asks first.
 func TestMiseFilesAskFirst(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), askFirstPath))
+	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), askfirst.Path))
 	require.NoError(t, err)
-	list, err := parseAskFirst(src)
+	list, err := askfirst.Parse(src)
 	require.NoError(t, err)
-	i := slices.IndexFunc(list.Surfaces, func(s surface) bool { return s.ID == "dependencies" })
+	i := slices.IndexFunc(list.Surfaces, func(s askfirst.Surface) bool { return s.ID == "dependencies" })
 	require.GreaterOrEqual(t, i, 0, "the dependencies surface")
 	want := slices.Concat([]string{"go.mod", "go.sum"}, miseFiles, []string{".github/workflows/**"})
 	assert.Equal(t, want, list.Surfaces[i].Globs)
 	for _, g := range miseFiles {
-		assert.NoError(t, checkGlob(g), g)
+		assert.NoError(t, askfirst.CheckGlob(g), g)
 	}
 }
 

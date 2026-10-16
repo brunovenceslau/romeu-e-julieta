@@ -263,3 +263,13 @@ func LockedRoot(t *testing.T, lock string) string {
 	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.lock"), []byte(lock), 0o600))
 	return root
 }
+
+// ValidAskFirst is the smallest list that passes: one surface, which is
+// the list itself.
+const ValidAskFirst = `version: 1
+owner: "@someone"
+surfaces:
+  - id: ask-first
+    globs: [.github/ask-first.yaml]
+    reason: this list
+`

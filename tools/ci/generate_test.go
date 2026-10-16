@@ -16,7 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
 // generateFixture is a repository with the sources of generate: the
@@ -24,7 +26,7 @@ import (
 func generateFixture(t *testing.T) *gittest.Repo {
 	t.Helper()
 	r := gittest.New(t)
-	r.Write(askFirstPath, validAskFirst)
+	r.Write(askfirst.Path, citest.ValidAskFirst)
 	r.Write(".adr-dir", "docs/adr\n")
 	r.Write("docs/adr/0001-first.md", "# 1. First\n\n## Status\n\nAccepted\n")
 	r.Write("docs/adr/0002-second.md", "# 2. Second\n\n## Status\n\nProposed\n")
@@ -96,8 +98,8 @@ func TestGenerateRefuses(t *testing.T) {
 		want  string
 	}{
 		{"an argument", nil, []string{"x"}, "generate takes no argument"},
-		{"no ask-first list", func(r *gittest.Repo) { require.NoError(t, os.Remove(filepath.Join(r.Dir, askFirstPath))) }, nil, "ask-first.yaml"},
-		{"an invalid list", func(r *gittest.Repo) { r.Write(askFirstPath, "version: 3\n") }, nil, "version is 3"},
+		{"no ask-first list", func(r *gittest.Repo) { require.NoError(t, os.Remove(filepath.Join(r.Dir, askfirst.Path))) }, nil, "ask-first.yaml"},
+		{"an invalid list", func(r *gittest.Repo) { r.Write(askfirst.Path, "version: 3\n") }, nil, "version is 3"},
 		{"no .adr-dir", func(r *gittest.Repo) { require.NoError(t, os.Remove(filepath.Join(r.Dir, ".adr-dir"))) }, nil, ".adr-dir"},
 		{"an .adr-dir outside the tree", func(r *gittest.Repo) { r.Write(".adr-dir", "/etc\n") }, nil, "not a directory inside the repository"},
 		{"a missing record directory", func(r *gittest.Repo) { r.Write(".adr-dir", "nowhere\n") }, nil, "nowhere"},
@@ -110,9 +112,9 @@ func TestGenerateRefuses(t *testing.T) {
 		}, nil, "out"},
 		{"an ask-first list that links outside the tree", func(r *gittest.Repo) {
 			outside := filepath.Join(t.TempDir(), "list.yaml")
-			require.NoError(t, os.WriteFile(outside, []byte(validAskFirst), 0o644))
-			require.NoError(t, os.Remove(filepath.Join(r.Dir, askFirstPath)))
-			require.NoError(t, os.Symlink(outside, filepath.Join(r.Dir, askFirstPath)))
+			require.NoError(t, os.WriteFile(outside, []byte(citest.ValidAskFirst), 0o644))
+			require.NoError(t, os.Remove(filepath.Join(r.Dir, askfirst.Path)))
+			require.NoError(t, os.Symlink(outside, filepath.Join(r.Dir, askfirst.Path)))
 		}, nil, "ask-first.yaml"},
 	}
 	for _, tt := range tests {
@@ -250,7 +252,7 @@ func TestGenerateWritesNothingOutsideTheTree(t *testing.T) {
 	r := generateFixture(t)
 	victim := filepath.Join(t.TempDir(), "victim")
 	require.NoError(t, os.WriteFile(victim, []byte("mine\n"), 0o644))
-	page := filepath.Join(r.Dir, filepath.FromSlash(askFirstPagePath))
+	page := filepath.Join(r.Dir, filepath.FromSlash(askfirst.PagePath))
 	require.NoError(t, os.MkdirAll(filepath.Dir(page), 0o755))
 	require.NoError(t, os.Symlink(victim, page))
 	code, _, errOut := runGen(t, r)
@@ -305,5 +307,23 @@ func TestGenerateWroteLineIsSafe(t *testing.T) {
 	for _, line := range strings.Split(out, "\n") {
 		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
 		assert.NotContains(t, line, "\u00a0")
+	}
+}
+
+// TestAskFirstOfThisRepository parses the committed list and checks that
+// the committed consumers are what it produces, so a hand edit of either
+// fails here before it fails "generated".
+func TestAskFirstOfThisRepository(t *testing.T) {
+	dir := citest.ModuleRoot(t)
+	root, err := os.OpenRoot(dir)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = root.Close() })
+	outputs, err := generateOutputs(root)
+	require.NoError(t, err)
+	require.Len(t, outputs, 3)
+	for _, out := range outputs {
+		got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(out.path)))
+		require.NoError(t, err, out.path)
+		assert.Equal(t, string(out.content), string(got), "%s is current", out.path)
 	}
 }

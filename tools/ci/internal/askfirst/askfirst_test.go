@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+package askfirst
 
 import (
 	"os"
@@ -15,16 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// validAskFirst is the smallest list that passes: one surface, which is
-// the list itself.
-const validAskFirst = `version: 1
-owner: "@someone"
-surfaces:
-  - id: ask-first
-    globs: [.github/ask-first.yaml]
-    reason: this list
-`
-
 // TestParseAskFirst checks each rule of the file with one source that
 // breaks it: the keys, the version, the owner, the ids, the globs, the
 // reason, and the line that makes the file list itself.
@@ -34,32 +24,32 @@ func TestParseAskFirst(t *testing.T) {
 		src  string
 		want string // a part of the error; empty means it parses
 	}{
-		{"valid", validAskFirst, ""},
-		{"two surfaces and a team owner", strings.Replace(validAskFirst, "@someone", "@org/team", 1) + "  - id: gates\n    globs: [internal/gate/**, go.mod, a/*/b.go]\n    reason: the gates\n", ""},
+		{"valid", citest.ValidAskFirst, ""},
+		{"two surfaces and a team owner", strings.Replace(citest.ValidAskFirst, "@someone", "@org/team", 1) + "  - id: gates\n    globs: [internal/gate/**, go.mod, a/*/b.go]\n    reason: the gates\n", ""},
 		{"not YAML", "version: [", "ask-first.yaml"},
-		{"an unknown key", validAskFirst + "extra: 1\n", "field extra not found"},
-		{"a second document", validAskFirst + "---\nversion: 1\n", "more than one YAML document"},
-		{"version 2", strings.Replace(validAskFirst, "version: 1", "version: 2", 1), "version is 2"},
-		{"no version", strings.Replace(validAskFirst, "version: 1\n", "", 1), "version is 0"},
-		{"owner without @", strings.Replace(validAskFirst, "@someone", "someone", 1), "not a GitHub handle"},
-		{"owner with a space", strings.Replace(validAskFirst, "@someone", "@some one", 1), "not a GitHub handle"},
+		{"an unknown key", citest.ValidAskFirst + "extra: 1\n", "field extra not found"},
+		{"a second document", citest.ValidAskFirst + "---\nversion: 1\n", "more than one YAML document"},
+		{"version 2", strings.Replace(citest.ValidAskFirst, "version: 1", "version: 2", 1), "version is 2"},
+		{"no version", strings.Replace(citest.ValidAskFirst, "version: 1\n", "", 1), "version is 0"},
+		{"owner without @", strings.Replace(citest.ValidAskFirst, "@someone", "someone", 1), "not a GitHub handle"},
+		{"owner with a space", strings.Replace(citest.ValidAskFirst, "@someone", "@some one", 1), "not a GitHub handle"},
 		{"no surface", "version: 1\nowner: \"@o\"\nsurfaces: []\n", "no surface is listed"},
-		{"a bad id", strings.Replace(validAskFirst, "id: ask-first", "id: Ask_First", 1), "not lowercase words"},
-		{"a duplicate id", validAskFirst + "  - id: ask-first\n    globs: [a]\n    reason: again\n", "listed twice"},
-		{"no glob", validAskFirst + "  - id: other\n    globs: []\n    reason: x\n", `surface "other" has no glob`},
-		{"no reason", validAskFirst + "  - id: other\n    globs: [a]\n    reason: \" \"\n", "needs a reason"},
-		{"a reason on two lines", validAskFirst + "  - id: other\n    globs: [a]\n    reason: |\n      a\n      b\n", "needs a reason written on one line"},
-		{"a leading slash", validAskFirst + "  - id: other\n    globs: [/a]\n    reason: x\n", "starts or ends with"},
-		{"a character class", validAskFirst + "  - id: other\n    globs: [\"a/[bc]\"]\n    reason: x\n", "holds a character other than"},
-		{"a negation", validAskFirst + "  - id: other\n    globs: [\"!a\"]\n    reason: x\n", "holds a character other than"},
-		{"a partial double star", validAskFirst + "  - id: other\n    globs: [a**/b]\n    reason: x\n", `"**" must be a whole segment`},
-		{"a dot dot", validAskFirst + "  - id: other\n    globs: [a/../b]\n    reason: x\n", "empty, \".\" or \"..\""},
-		{"an empty glob", validAskFirst + "  - id: other\n    globs: [\"\"]\n    reason: x\n", "a glob is empty"},
-		{"the file does not list itself", strings.Replace(validAskFirst, ".github/ask-first.yaml", "elsewhere", 1), "the file lists itself"},
+		{"a bad id", strings.Replace(citest.ValidAskFirst, "id: ask-first", "id: Ask_First", 1), "not lowercase words"},
+		{"a duplicate id", citest.ValidAskFirst + "  - id: ask-first\n    globs: [a]\n    reason: again\n", "listed twice"},
+		{"no glob", citest.ValidAskFirst + "  - id: other\n    globs: []\n    reason: x\n", `surface "other" has no glob`},
+		{"no reason", citest.ValidAskFirst + "  - id: other\n    globs: [a]\n    reason: \" \"\n", "needs a reason"},
+		{"a reason on two lines", citest.ValidAskFirst + "  - id: other\n    globs: [a]\n    reason: |\n      a\n      b\n", "needs a reason written on one line"},
+		{"a leading slash", citest.ValidAskFirst + "  - id: other\n    globs: [/a]\n    reason: x\n", "starts or ends with"},
+		{"a character class", citest.ValidAskFirst + "  - id: other\n    globs: [\"a/[bc]\"]\n    reason: x\n", "holds a character other than"},
+		{"a negation", citest.ValidAskFirst + "  - id: other\n    globs: [\"!a\"]\n    reason: x\n", "holds a character other than"},
+		{"a partial double star", citest.ValidAskFirst + "  - id: other\n    globs: [a**/b]\n    reason: x\n", `"**" must be a whole segment`},
+		{"a dot dot", citest.ValidAskFirst + "  - id: other\n    globs: [a/../b]\n    reason: x\n", "empty, \".\" or \"..\""},
+		{"an empty glob", citest.ValidAskFirst + "  - id: other\n    globs: [\"\"]\n    reason: x\n", "a glob is empty"},
+		{"the file does not list itself", strings.Replace(citest.ValidAskFirst, ".github/ask-first.yaml", "elsewhere", 1), "the file lists itself"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			list, err := parseAskFirst([]byte(tt.src))
+			list, err := Parse([]byte(tt.src))
 			if tt.want == "" {
 				require.NoError(t, err)
 				assert.NotNil(t, list)
@@ -73,7 +63,7 @@ func TestParseAskFirst(t *testing.T) {
 // TestCodeowners checks the lines of CODEOWNERS: the notice, every glob
 // anchored at the root and given to the owner, in the order of the file.
 func TestCodeowners(t *testing.T) {
-	list, err := parseAskFirst([]byte(validAskFirst + "  - id: mods\n    globs: [go.mod, internal/x/**]\n    reason: x\n"))
+	list, err := Parse([]byte(citest.ValidAskFirst + "  - id: mods\n    globs: [go.mod, internal/x/**]\n    reason: x\n"))
 	require.NoError(t, err)
 	want := `# Generated by "go generate ./..." from .github/ask-first.yaml. Do not edit by hand.
 # A change to a path below needs the maintainer's review before it merges
@@ -86,40 +76,22 @@ func TestCodeowners(t *testing.T) {
 /go.mod @someone
 /internal/x/** @someone
 `
-	assert.Equal(t, want, string(list.codeowners()))
+	assert.Equal(t, want, string(list.Codeowners()))
 }
 
 // TestReferencePage checks the generated page: the front matter of rule
 // 1 of ADR 0001 comes first, the header follows, and a "|" in a reason
 // does not split a table cell.
 func TestReferencePage(t *testing.T) {
-	list, err := parseAskFirst([]byte(validAskFirst + "  - id: mods\n    globs: [go.mod, internal/x/**]\n    reason: a | b\n"))
+	list, err := Parse([]byte(citest.ValidAskFirst + "  - id: mods\n    globs: [go.mod, internal/x/**]\n    reason: a | b\n"))
 	require.NoError(t, err)
-	page := string(list.referencePage())
+	page := string(list.ReferencePage())
 	assert.True(t, strings.HasPrefix(page, "---\ntype: reference\nreader: "), "front matter first")
 	assert.Contains(t, page, "\n---\n\n<!-- Generated by \"go generate ./...\" from .github/ask-first.yaml. Do not edit by hand. -->\n")
 	assert.Contains(t, page, "| `ask-first` | `.github/ask-first.yaml` | this list |\n")
 	assert.Contains(t, page, "| `mods` | `go.mod`, `internal/x/**` | a \\| b |\n")
 	assert.Contains(t, page, "`@someone`")
 	assert.Contains(t, page, "```text\n"+approvalForm+"\n```\n", "the form of 12 12.4")
-}
-
-// TestAskFirstOfThisRepository parses the committed list and checks that
-// the committed consumers are what it produces, so a hand edit of either
-// fails here before it fails "generated".
-func TestAskFirstOfThisRepository(t *testing.T) {
-	dir := citest.ModuleRoot(t)
-	root, err := os.OpenRoot(dir)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = root.Close() })
-	outputs, err := generateOutputs(root)
-	require.NoError(t, err)
-	require.Len(t, outputs, 3)
-	for _, out := range outputs {
-		got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(out.path)))
-		require.NoError(t, err, out.path)
-		assert.Equal(t, string(out.content), string(got), "%s is current", out.path)
-	}
 }
 
 // TestPullRequestTemplate checks the five sections of 12 12.7, in order,
@@ -251,13 +223,13 @@ func specAskFirstList(t *testing.T) string {
 // the committed owner stands in for it. Two copies of a list drift
 // unless a test holds them together.
 func TestSpecListIsTheCommittedList(t *testing.T) {
-	committed, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(askFirstPath)))
+	committed, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(Path)))
 	require.NoError(t, err)
-	want, err := parseAskFirst(committed)
+	want, err := Parse(committed)
 	require.NoError(t, err)
 	fence := specAskFirstList(t)
 	require.Contains(t, fence, `owner: "@<owner>"`, "the spec names the owner by its placeholder")
-	got, err := parseAskFirst([]byte(strings.Replace(fence, "@<owner>", want.Owner, 1)))
+	got, err := Parse([]byte(strings.Replace(fence, "@<owner>", want.Owner, 1)))
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
 }
@@ -285,7 +257,7 @@ func TestGlobMatch(t *testing.T) {
 		{"*", ".hidden", true},
 	}
 	for _, tt := range tests {
-		assert.Equal(t, tt.want, globMatch(tt.glob, tt.name), "%s ~ %s", tt.glob, tt.name)
+		assert.Equal(t, tt.want, GlobMatch(tt.glob, tt.name), "%s ~ %s", tt.glob, tt.name)
 	}
 }
 
@@ -296,13 +268,13 @@ func TestGlobMatch(t *testing.T) {
 // not judge the commit, as when a step that runs before it rewrote the
 // index (05 5.3), and a grant is itself an ask-first change.
 func TestCodeownersAsksFirst(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), askFirstPath))
+	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), Path))
 	require.NoError(t, err)
-	list, err := parseAskFirst(src)
+	list, err := Parse(src)
 	require.NoError(t, err)
-	i := slices.IndexFunc(list.Surfaces, func(s surface) bool { return s.ID == "ask-first" })
+	i := slices.IndexFunc(list.Surfaces, func(s Surface) bool { return s.ID == "ask-first" })
 	require.GreaterOrEqual(t, i, 0, "the ask-first surface")
-	assert.Equal(t, []string{askFirstPath, codeownersPath, "docs/grants.yaml"}, list.Surfaces[i].Globs)
+	assert.Equal(t, []string{Path, CodeownersPath, "docs/grants.yaml"}, list.Surfaces[i].Globs)
 }
 
 // TestApprovalsSurface holds the approvals surface of the committed list
@@ -310,11 +282,11 @@ func TestCodeownersAsksFirst(t *testing.T) {
 // and the workflows, which no checkpoint grant covers, and holds each on
 // the surface it was on before, checks or dependencies (05 5.3).
 func TestApprovalsSurface(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), askFirstPath))
+	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), Path))
 	require.NoError(t, err)
-	list, err := parseAskFirst(src)
+	list, err := Parse(src)
 	require.NoError(t, err)
-	i := slices.IndexFunc(list.Surfaces, func(s surface) bool { return s.ID == "approvals" })
+	i := slices.IndexFunc(list.Surfaces, func(s Surface) bool { return s.ID == "approvals" })
 	require.GreaterOrEqual(t, i, 0, "the approvals surface")
 	assert.Equal(t, []string{"tools/ci/askfirst.go", "tools/ci/denylist.yaml", ".github/workflows/**"}, list.Surfaces[i].Globs)
 	for path, id := range map[string]string{
@@ -322,8 +294,8 @@ func TestApprovalsSurface(t *testing.T) {
 		"tools/ci/denylist.yaml":   "checks",
 		".github/workflows/ci.yml": "dependencies",
 	} {
-		j := slices.IndexFunc(list.Surfaces, func(s surface) bool { return s.ID == id })
+		j := slices.IndexFunc(list.Surfaces, func(s Surface) bool { return s.ID == id })
 		require.GreaterOrEqual(t, j, 0, "the %s surface", id)
-		assert.True(t, slices.ContainsFunc(list.Surfaces[j].Globs, func(g string) bool { return globMatch(g, path) }), "%s on %s", path, id)
+		assert.True(t, slices.ContainsFunc(list.Surfaces[j].Globs, func(g string) bool { return GlobMatch(g, path) }), "%s on %s", path, id)
 	}
 }

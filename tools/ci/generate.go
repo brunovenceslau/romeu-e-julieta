@@ -17,6 +17,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/adrdir"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
@@ -25,8 +26,6 @@ import (
 // and when one is not tracked as a regular file with the bytes that
 // generate gives.
 const (
-	codeownersPath    = ".github/CODEOWNERS"
-	askFirstPagePath  = "docs/reference/ask-first.md"
 	adrIndexName      = "README.md"
 	generatedFileMode = 0o644
 )
@@ -78,11 +77,11 @@ type output struct {
 // that follow from them. It writes nothing; "generated" calls it too, to
 // learn which files must be tracked and with what bytes.
 func generateOutputs(root *os.Root) ([]output, error) {
-	src, err := root.ReadFile(askFirstPath)
+	src, err := root.ReadFile(askfirst.Path)
 	if err != nil {
 		return nil, err
 	}
-	list, err := parseAskFirst(src)
+	list, err := askfirst.Parse(src)
 	if err != nil {
 		return nil, err
 	}
@@ -91,8 +90,8 @@ func generateOutputs(root *os.Root) ([]output, error) {
 		return nil, err
 	}
 	return []output{
-		{codeownersPath, list.codeowners()},
-		{askFirstPagePath, list.referencePage()},
+		{askfirst.CodeownersPath, list.Codeowners()},
+		{askfirst.PagePath, list.ReferencePage()},
 		{indexPath, index},
 	}, nil
 }

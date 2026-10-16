@@ -1,7 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+// Package askfirst reads .github/ask-first.yaml, the one list of the
+// paths whose changes need the maintainer's approval (05 5.3), and
+// writes what follows from it: .github/CODEOWNERS and the reference
+// page docs/reference/ask-first.md, which the generate subcommand
+// writes and the generated check compares. It is a helper of the
+// generated check and registers no check.
+package askfirst
 
 import (
 	"bytes"
@@ -15,22 +21,29 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// askFirstPath is the single list of paths whose changes need the
+// Path is the single list of paths whose changes need the
 // maintainer's explicit approval (05 5.3), relative to the repository
 // root.
-const askFirstPath = ".github/ask-first.yaml"
+const Path = ".github/ask-first.yaml"
 
-// askFirst is .github/ask-first.yaml: the owner that the code-owner
+// CodeownersPath and PagePath are the two files generate writes
+// from the list (12 12.3).
+const (
+	CodeownersPath = ".github/CODEOWNERS"
+	PagePath       = "docs/reference/ask-first.md"
+)
+
+// List is .github/ask-first.yaml: the owner that the code-owner
 // review names, and the surfaces whose paths need approval.
-type askFirst struct {
+type List struct {
 	Version  int       `yaml:"version"`
 	Owner    string    `yaml:"owner"`
-	Surfaces []surface `yaml:"surfaces"`
+	Surfaces []Surface `yaml:"surfaces"`
 }
 
-// surface is one group of paths that share a reason to ask first. The
+// Surface is one group of paths that share a reason to ask first. The
 // approval line of a pull request names it by id (12 12.4).
-type surface struct {
+type Surface struct {
 	ID     string   `yaml:"id"`
 	Globs  []string `yaml:"globs"`
 	Reason string   `yaml:"reason"`
@@ -63,28 +76,28 @@ var (
 // reference page and the pull request template show it.
 const approvalForm = "Approval: <surface id> - <what was approved>"
 
-// parseAskFirst reads .github/ask-first.yaml and checks it: the keys are
+// Parse reads .github/ask-first.yaml and checks it: the keys are
 // the ones of 05 5.3, the version is 1, every id is unique and has the
 // shape of an approval line, every glob is written in the dialect of
 // 12 12.4, and the file lists itself.
-func parseAskFirst(src []byte) (*askFirst, error) {
+func Parse(src []byte) (*List, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(src))
 	dec.KnownFields(true)
-	var list askFirst
+	var list List
 	if err := dec.Decode(&list); err != nil {
-		return nil, fmt.Errorf("%s: %w", askFirstPath, err)
+		return nil, fmt.Errorf("%s: %w", Path, err)
 	}
 	var more yaml.Node
 	if err := dec.Decode(&more); !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("%s: holds more than one YAML document", askFirstPath)
+		return nil, fmt.Errorf("%s: holds more than one YAML document", Path)
 	}
 	if err := list.check(); err != nil {
-		return nil, fmt.Errorf("%s: %w", askFirstPath, err)
+		return nil, fmt.Errorf("%s: %w", Path, err)
 	}
 	return &list, nil
 }
 
-func (a *askFirst) check() error {
+func (a *List) check() error {
 	if a.Version != 1 {
 		return fmt.Errorf("version is %d, and this tool reads version 1", a.Version)
 	}
@@ -111,23 +124,23 @@ func (a *askFirst) check() error {
 			return fmt.Errorf("surface %q needs a reason written on one line", s.ID)
 		}
 		for _, g := range s.Globs {
-			if err := checkGlob(g); err != nil {
+			if err := CheckGlob(g); err != nil {
 				return fmt.Errorf("surface %q: %w", s.ID, err)
 			}
-			listsItself = listsItself || g == askFirstPath
+			listsItself = listsItself || g == Path
 		}
 	}
 	if !listsItself {
-		return fmt.Errorf("no surface lists %s: the file lists itself (05 5.3)", askFirstPath)
+		return fmt.Errorf("no surface lists %s: the file lists itself (05 5.3)", Path)
 	}
 	return nil
 }
 
-// checkGlob holds a glob to the dialect of 12 12.4: "/"-separated
+// CheckGlob holds a glob to the dialect of 12 12.4: "/"-separated
 // segments of the characters above, where a segment may be "**" alone.
 // It has no leading "/" (a path from the root is the only kind) and no
 // empty, "." or ".." segment.
-func checkGlob(g string) error {
+func CheckGlob(g string) error {
 	if g == "" {
 		return errors.New("a glob is empty")
 	}
@@ -145,12 +158,12 @@ func checkGlob(g string) error {
 	return nil
 }
 
-// globMatch reports whether a glob of the dialect above (checkGlob)
+// GlobMatch reports whether a glob of the dialect above (checkGlob)
 // matches name, both relative to the top of the tree with forward
 // slashes: "**" matches zero or more whole segments, and "*" any run of
 // characters inside one segment (path.Match, which checkGlob leaves
 // nothing else to read).
-func globMatch(glob, name string) bool {
+func GlobMatch(glob, name string) bool {
 	return segmentsMatch(strings.Split(glob, "/"), strings.Split(name, "/"))
 }
 
@@ -173,19 +186,19 @@ func segmentsMatch(glob, name []string) bool {
 	return err == nil && ok && segmentsMatch(glob[1:], name[1:])
 }
 
-// generatedNotice is the line that every generated file carries (12
+// GeneratedNotice is the line that every generated file carries (12
 // 12.3): who writes it and from what, so nobody edits it by hand.
-func generatedNotice(source string) string {
+func GeneratedNotice(source string) string {
 	return `Generated by "go generate ./..." from ` + source + `. Do not edit by hand.`
 }
 
-// codeowners renders .github/CODEOWNERS: one line per glob, anchored at
+// Codeowners renders .github/CODEOWNERS: one line per glob, anchored at
 // the repository root with a leading "/", all for the one owner. Every
 // owner is the same, so the order of the lines (the last match wins in
 // CODEOWNERS) decides nothing.
-func (a *askFirst) codeowners() []byte {
+func (a *List) Codeowners() []byte {
 	var b bytes.Buffer
-	fmt.Fprintf(&b, "# %s\n", generatedNotice(askFirstPath))
+	fmt.Fprintf(&b, "# %s\n", GeneratedNotice(Path))
 	b.WriteString("# A change to a path below needs the maintainer's review before it merges\n")
 	b.WriteString("# (docs/reference/ask-first.md lists the surfaces and their reasons).\n")
 	for _, s := range a.Surfaces {
@@ -197,13 +210,13 @@ func (a *askFirst) codeowners() []byte {
 	return b.Bytes()
 }
 
-// referencePage renders docs/reference/ask-first.md: the front matter of
+// ReferencePage renders docs/reference/ask-first.md: the front matter of
 // rule 1 of ADR 0001, the generated-file header, and one table row for
 // each surface.
-func (a *askFirst) referencePage() []byte {
+func (a *List) ReferencePage() []byte {
 	var b bytes.Buffer
 	b.WriteString("---\ntype: reference\nreader: a contributor or reviewer deciding whether a change needs the maintainer's approval\n---\n\n")
-	fmt.Fprintf(&b, "<!-- %s -->\n\n", generatedNotice(askFirstPath))
+	fmt.Fprintf(&b, "<!-- %s -->\n\n", GeneratedNotice(Path))
 	b.WriteString("# Ask-first surfaces\n\n")
 	b.WriteString("A change to a path below needs the maintainer's explicit approval.\n")
 	b.WriteString("The pull request body carries one approval line for each surface the change touches,\n")

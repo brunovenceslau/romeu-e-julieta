@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/adrdir"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
 )
 
 // adrStatuses are the statuses of rule 7 of ADR 0001.
@@ -89,7 +90,7 @@ func adrStatus(lines []string) (string, error) {
 // given: the generated-file header, then one row for each record.
 func adrIndex(records []adr) []byte {
 	var b bytes.Buffer
-	fmt.Fprintf(&b, "<!-- %s -->\n\n", generatedNotice("the titles and statuses of the records in this directory"))
+	fmt.Fprintf(&b, "<!-- %s -->\n\n", askfirst.GeneratedNotice("the titles and statuses of the records in this directory"))
 	b.WriteString("# Decision records\n\n")
 	b.WriteString("Each record holds one decision with its context and consequences. A record changes only\n")
 	b.WriteString("with the maintainer's approval; a reversal is a new record that supersedes it. The layout and the statuses are the ones of rules 6 and 7 of\n")

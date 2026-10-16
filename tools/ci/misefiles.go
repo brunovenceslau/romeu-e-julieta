@@ -18,6 +18,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
@@ -314,7 +315,7 @@ var miseFiles = append(slices.Clone(pinnedMiseFiles),
 // (printableASCII) for every other byte.
 func isMiseFile(path string) bool {
 	lower := strings.ToLower(path)
-	return slices.ContainsFunc(miseFiles, func(g string) bool { return globMatch(g, lower) })
+	return slices.ContainsFunc(miseFiles, func(g string) bool { return askfirst.GlobMatch(g, lower) })
 }
 
 // isMiseFileAtAnyDepth reports whether mise reads the file at path as
