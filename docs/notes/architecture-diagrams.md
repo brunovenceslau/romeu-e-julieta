@@ -1,14 +1,20 @@
+---
+type: explanation
+reader: anyone who wants a picture of romeu, julieta, the host and the sandbox before reading the system model
+---
+
 # Architecture diagrams
 
-Reader: anyone who wants a picture of romeu, julieta, the host and the
-sandbox before reading the [system model](../spec/01-system-model.md).
-Type: explanation.
-
 These four diagrams draw one reading of the specification, made on
-2026-10-16. They are not part of the specification: where a diagram and
-a spec page disagree, the spec page holds, and the diagram is fixed.
-Each file is an [Excalidraw](https://excalidraw.com) scene; open it
-there, or in an editor extension that reads `.excalidraw` files.
+2026-10-16, as a picture to look at before the
+[system model](../spec/01-system-model.md). They are not part of the
+specification: where a diagram and a spec page disagree, the spec page
+holds, and the diagram is fixed.
+Each file is an [Excalidraw](https://excalidraw.com) scene, kept
+under `docs/notes/` by
+[ADR 0013](../adr/0013-admit-excalidraw-scenes-as-diagrams-under-docs-notes-and-amend-rule-17-of-the-documentation-standard.md);
+GitHub shows its JSON, so open it at excalidraw.com or in an editor
+extension that reads `.excalidraw` files.
 
 They go from the widest view to the narrowest:
 
@@ -36,9 +42,14 @@ They go from the widest view to the narrowest:
    command, and the sandbox half of salvage. Source: the generation
    table of [01 1.6](../spec/01-system-model.md#16-state-machines).
 
-The diagrams leave out detail the tables keep: diagram 4 merges rows of
-the generation table that share an arrow, and diagram 3 names the
-preflight exit codes only by class. REQ-0079 generates the state
-diagrams of `internal/state` from its transition tables; when that
-package lands, its generated diagram replaces diagram 4, and this note
-says so.
+The diagrams leave out detail the tables keep. Diagram 3 names the
+preflight exit codes only by class. Diagram 4 draws the main rows of the
+generation table and omits these: `open` back to none when the create
+fails and no sandbox is left, the rows that stay in `open`, `salvaging`
+or `removing` (a failed create, a timeout, a restarted salvage, a failed
+`sbx env rm`, a resumed removal), and `removing` to `closed-removed`
+when the sandbox is found absent. Its arrow from `salvaging` back to
+`open` covers the verified salvage of `salvage` and an incomplete
+salvage without `--accept-loss`. REQ-0079 generates the state diagrams
+of `internal/state` from its transition tables; when that package
+lands, its generated diagram replaces diagram 4, and this note says so.
