@@ -348,32 +348,55 @@ runs nothing that another mise file of a change holds (the threat model
 of the mise package of `tools/ci` says what stays trusted). `REQ-0859` That
 environment is measured with one version of mise, the `version` input of
 the mise action in `ci.yml`, the pin, so `fast` and `all` refuse, before
-any other mise command, a mise whose `mise --version` names another, and
-the refusal names `go run ./tools/ci setup`. `REQ-1236` `tools/ci` runs
-mise by one absolute path: the copy at the pin that `setup` installed,
-`<user cache directory>/romeu-e-julieta/mise/<version>/mise` (the user
-cache directory as Go's `os.UserCacheDir` gives it), when it is there
-and its sha256 still equals the matrix's, read again on every run, and
-otherwise the mise on the search path; a copy whose sha256 differs is
-refused, never run, and `setup` installs it again. So a sandbox or a
-machine whose image ships another mise needs no change to its search
-path.
-`REQ-1237` `setup` installs the pin when the mise it would run names
-another version or none, before any other mise command: it reads the
+any other mise command, the mise that REQ-1236 selects when its `mise
+--version` names another, and the refusal names `go run ./tools/ci
+setup`. The refusal keeps that environment consistent and is not a
+security check: a mise on the search path is the machine's own trust
+decision, and `tools/ci` runs only its `--version` before it compares.
+`REQ-1236` `tools/ci` runs mise by one absolute path: the copy at the pin
+that `setup` installed, `<user cache directory>/romeu-e-julieta/mise/<version>/mise`
+(the user cache directory as Go's `os.UserCacheDir` gives it), when it
+is a regular file and not a symbolic link, in directories the user owns
+and no one else can write, and its sha256, read again on every run,
+still equals the matrix's; and otherwise the mise on the search path. A
+copy that fails any of these is never run, and `setup` installs the pin
+again by REQ-1237 and REQ-1239, never in place. A writer with the user's
+own account can still swap the file between the read of its hash and
+its start; that account is trusted, as everywhere in `tools/ci`. So a
+sandbox or a machine whose image ships another mise needs no change to
+its search path.
+`REQ-1237` `setup` installs the pin when the mise of REQ-1236 names
+another version or none, before any other mise command. It reads the
 version and, for the runner label of this platform (Runners, below), the
-sha256 from the matrix of `ci.yml`, the one source of both; downloads
-the binary asset of that mise release for this platform from the GitHub
-releases of mise, through the proxy variables and `SSL_CERT_FILE`, in
-the class `tool-step`; refuses the file, and removes it, unless its
-sha256 equals the matrix's, before the file is made executable or run;
-and puts it at that path by rename. Its `mise trust`, `mise install` and
-`go mod download` then run with that mise. `REQ-1238` A test runs `setup`
-against a fake release: a binary whose sha256 is not the matrix's is
-refused, removed and never run; one that matches is installed and is
-the mise every later mise command of `fast`, `all` and `setup` starts;
-a copy in the cache whose bytes changed after the install is refused
-and not run; a mise on the search path at the pin is used as it is, and
-nothing is downloaded.
+sha256 from the matrix of `ci.yml` in the tree it runs in, the one
+source of both, as every check of `tools/ci` runs the code of that tree;
+a version that is not three numbers joined by dots, or a sha256 that is
+not 64 lowercase hex digits, fails `setup`. The URL is the fixed prefix
+`https://github.com/jdx/mise/releases/download/v<version>/` and the name
+of the release asset of this platform whose sha256 the matrix holds;
+redirects are followed to `https` hosts only, TLS verification is never
+turned off (`SSL_CERT_FILE` only adds roots), the proxy variables apply,
+and the download stops at 15 minutes, the limit 04 4.1 gives a command
+step of `tools/ci`, and at 256 MiB. When that asset is an archive, its
+one mise binary is taken out of it only after the archive's sha256
+matched.
+`REQ-1239` The download goes to a new file in the version's directory,
+created exclusively with mode 0600 and hashed as it is written; unless
+its sha256 equals the matrix's, the file is removed, `setup` fails
+naming both hashes, and the file is never made executable or run. A
+match is made executable by its owner only and put at the path of
+REQ-1236 by rename. The directories are created with mode 0700, and one
+among them that is a symbolic link fails `setup`. `mise trust`, `mise
+install` and `go mod download` then run with that mise.
+`REQ-1238` A test runs `setup` against a fake release: a file whose
+sha256 is not the matrix's is refused, removed and never run; one that
+matches is installed and is the mise every later mise command of `fast`,
+`all` and `setup` starts; a copy in the cache whose bytes changed after
+the install is refused and not run, and the next `setup` replaces it
+with the matching file; a symbolic link at the cache path, a malformed
+version or sha256, and a cache directory others can write each fail; a
+mise on the search path at the pin is used as it is, and nothing is
+downloaded.
 
 `REQ-0860` The command steps of `all` are those of `fast` and `race`, in that
 order, with `vulnerabilities` and `license`, which read the tree and
