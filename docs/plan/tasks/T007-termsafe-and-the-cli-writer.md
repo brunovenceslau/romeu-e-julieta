@@ -6,7 +6,7 @@ module: termsafe
 fate: kept
 owns:
   - internal/termsafe/**
-  - internal/cli/writer.go
+  - internal/cli/writer*.go
 needs: []
 after: []
 ask_first:

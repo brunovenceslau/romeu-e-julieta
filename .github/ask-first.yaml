@@ -16,9 +16,9 @@ surfaces:
     reason: every git invocation on the host, ref namespaces including salvage
   - id: procgroup
     globs: [internal/procgroup/**]
-    reason: the one package that starts subprocesses, kills their process groups and keeps a child from inheriting the host environment, with the call-site scan and its admitted list
+    reason: the one package that starts subprocesses, kills their process groups and keeps a child from inheriting the host environment (bar the list of REQ-0470), with the call-site scan and its admitted list
   - id: termsafe
-    globs: [internal/termsafe/**, internal/cli/writer.go]
+    globs: [internal/termsafe/**, internal/cli/writer*.go]
     reason: host output escaping
   - id: digests
     globs: [internal/canon/**]

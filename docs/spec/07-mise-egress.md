@@ -116,7 +116,7 @@ Input per repo: `(url, egressCommit)`. Output: `auto` and `gated` sets.
    sets, [06](06-kits.md#61-decisions)).
 7. Move every domain with `upload: true`, or without a `domains` entry,
    to `gated`.
-8. `REQ-0633` `effectiveDigest` = `canon.Digest("egress", sorted union)`; recorded
+8. `REQ-0633` `effectiveDigest` = `canon.Digest(canon.Egress, sorted union)`; recorded
    in `render.json`.
 
 julieta's own network commands follow the same rule. The config

@@ -19,8 +19,12 @@ sitting: none
 Earlier title: `gitsafe`: the hardened runner, fetch and refs.
 
 Goal: `gitsafe`, the part every caller needs: the hardened runner, its
-environment and flags in both modes of 05 5.1, the allowlisted ref
-namespaces, fetch and fast-forward, create-only refs, bundle creation
+environment and flags in both modes of 05 5.1 (sandbox mode adds the
+closed network pass-through list of REQ-0470, with a test that pins it),
+the allowlisted ref namespaces, a `Clone` verb in both modes (host:
+`romeu init`'s config clone, T041; sandbox: the secondary clones of
+`julieta setup`, REQ-0398), fetch and fast-forward, create-only refs,
+bundle creation
 (`git bundle create` under the hardened flags, for `julieta snapshot`,
 T060) and the floor file.
 
@@ -35,7 +39,8 @@ under this task's directory, so the two file sets stay disjoint. The
 floor file holds the initial floor 2.45.4 of 05 5.1 until T027 fills the
 per-series list from A1. Every git call runs through
 `internal/procgroup` (T137). Acceptance kept: the I3 plant list, the
-neutralized-key list test, nothing ambient passes, `git://` and
+neutralized-key list test, nothing ambient passes (bar the sandbox
+network list), `git://` and
 `file://` refused.
 
 - Implements: REQ-0017 (index), REQ-0053 (01 1.3), REQ-0143 (02 2.3),
@@ -52,7 +57,19 @@ neutralized-key list test, nothing ambient passes, `git://` and
 - Operator: no.
 - Acceptance:
   - A test asserts the environment and the flags of 05 5.1 on each
-    invocation, and that nothing ambient passes through (I3).
+    invocation, and that nothing ambient passes through (I3), except in
+    sandbox mode the closed network pass-through list of REQ-0470
+    (`HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`, `https_proxy`,
+    `http_proxy`, `no_proxy`, `SSL_CERT_FILE`) and never a `GIT_*`
+    variable; one test pins that list exactly and shows host mode
+    passes none of it.
+  - `Clone` runs in both modes under the hardened flags with an
+    explicit URL: a host-mode clone of a config repo (REQ-0309, T041)
+    and a sandbox-mode clone through the proxy environment (REQ-0398)
+    both succeed in a test, and a refused URL is refused in each mode.
+    The sandbox-mode test runs a local HTTPS proxy whose CA is a test
+    CA, and the same clone fails when `SSL_CERT_FILE` is not set, so
+    the test shows the variable is needed, not only passed.
   - One test holds the plant list of I3, the host git keys `doctor`
     warns on and gitsafe's neutralized keys equal, all three read from
     one Go slice in `internal/gitsafe` (10 10.1, Git keys); T049's row

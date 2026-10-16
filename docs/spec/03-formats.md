@@ -623,10 +623,15 @@ salvage incomplete with reason `over-cap`.
 ## 3.12 Digests (`internal/canon`)
 
 `REQ-0254` Structured values are digested with one function,
-`canon.Digest[T](kind, v)`: sha256 over `"romeu/<kind>/v1"`, a NUL byte,
+`canon.Digest(kind, v)`: sha256 over `"romeu/<kind>/v1"`, a NUL byte,
 and the canonical JSON of `v` (keys sorted, UTF-8, no insignificant
-whitespace). `REQ-0255` Each Go type has exactly one kind, so a value of one kind
-can never be compared with a digest of another. `REQ-0256` Raw file bytes
+whitespace); a string or key that is not UTF-8, or that holds U+FFFD,
+the mark encoding/json leaves of such text, is refused, so two strings
+never share a digest. `REQ-0255` Each Go type has exactly one kind, so a value of one kind
+can never be compared with a digest of another: the kind is a typed
+constant named after the kind in Go case (for example `canon.Widening`,
+`canon.KitTree`), the value's type fixes its one
+kind, and the compiler checks it. `REQ-0256` Raw file bytes
 (`sbxenv.yaml`, binaries, bundles, payload files, probe artifacts,
 salvage manifests as `manifestSha256`) use plain sha256, because
 external tools (`sha256sum`, `shasum`) must reproduce them.

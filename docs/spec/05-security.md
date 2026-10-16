@@ -91,17 +91,33 @@ flags: -c core.hooksPath=/dev/null -c core.fsmonitor=false -c submodule.recurse=
   `internal/gitsafe/floor.go` with sources.
 
 `REQ-0470` **Sandbox mode** is every git call julieta makes (clone, fetch,
-fast-forward, bundle, unbundle, `commit-tree`). It uses the same fresh
-environment (no ambient `GIT_*` variable), explicit URLs and refspecs,
-and `-c core.hooksPath=/dev/null -c core.fsmonitor=false
+fast-forward, bundle, unbundle, `commit-tree`). It uses the fresh
+environment plus one closed network pass-through list, exactly
+`HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`, `https_proxy`, `http_proxy`,
+`no_proxy` and `SSL_CERT_FILE`, each passed when set and not empty
+(the set `tools/ci` passes as `networkPassThrough`), and still no
+`GIT_*` variable. The list is the one exception to "nothing
+inherited": every egress of a sandbox goes through a proxy whose CA
+arrives in `SSL_CERT_FILE` (measured in an sbx sandbox on 2026-10-16),
+so a scrubbed environment would break the clone and fetch of `julieta
+setup` ([04 4.3](04-cli.md#43-julieta-sandbox)). The exception gives
+the agent nothing new: it can set these variables, but it can already
+point git elsewhere through the sandbox's global config
+(`url.<base>.insteadOf`, `http.sslCAInfo`), which this mode keeps and
+does not trust, and what julieta fetches from origin is content the
+agent can push anyway. No credential travels in these variables: the
+proxy adds it. Host mode has no such list. Sandbox
+mode also uses explicit URLs and refspecs, and
+`-c core.hooksPath=/dev/null -c core.fsmonitor=false
 -c submodule.recurse=false`. It keeps the sandbox's global config,
 which the sandbox owns and the agent can write, so nothing in that
 config is trusted beyond the sandbox; this is why salvage passes
 `-c commit.gpgsign=false`
 ([08 8.5](08-memory-handoff-salvage.md#85-salvage-complete-before-destruction)).
-`REQ-0471` One gitsafe table test pins the environment and flags of each mode,
-and gitsafe exports the neutralized list above, which `doctor`'s
-`host-git-config` check and the I3 plant list read.
+`REQ-0471` One gitsafe table test pins the environment (the network
+pass-through list included) and flags of each mode, and gitsafe exports
+the neutralized list above, which `doctor`'s `host-git-config` check and
+the I3 plant list read.
 
 ## 5.2 Invariants and their tests
 
@@ -391,9 +407,9 @@ surfaces:
     reason: every git invocation on the host, ref namespaces including salvage
   - id: procgroup
     globs: [internal/procgroup/**]
-    reason: the one package that starts subprocesses, kills their process groups and keeps a child from inheriting the host environment, with the call-site scan and its admitted list
+    reason: the one package that starts subprocesses, kills their process groups and keeps a child from inheriting the host environment (bar the list of REQ-0470), with the call-site scan and its admitted list
   - id: termsafe
-    globs: [internal/termsafe/**, internal/cli/writer.go]
+    globs: [internal/termsafe/**, internal/cli/writer*.go]
     reason: host output escaping
   - id: digests
     globs: [internal/canon/**]

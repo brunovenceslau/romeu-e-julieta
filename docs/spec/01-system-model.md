@@ -132,7 +132,7 @@ every project. Gate 1 makes it visible before any project uses it;
 
 ### Gate 2: project widening (per project)
 
-`REQ-0066` The widening set is canonical JSON digested with `canon.Digest("widening", set)`
+`REQ-0066` The widening set is canonical JSON digested with `canon.Digest(canon.Widening, set)`
 ([03 3.12](03-formats.md#312-digests-internalcanon)).
 
 | Field | Content |
@@ -146,7 +146,7 @@ every project. Gate 1 makes it visible before any project uses it;
 | `ports` | sorted port specs |
 | `agent` | the agent handle |
 | `salvageExcludes` | `salvage.excludeIgnored` (it defines acknowledged loss) |
-| `renderDigest` | `canon.Digest("render", r)` where `r` is the rendered `sbxenv.yaml` decoded and stripped of every key whose spec field carries no `gate:"widening"` tag (today `sandboxOptions`) |
+| `renderDigest` | `canon.Digest(canon.Render, r)` where `r` is the rendered `sbxenv.yaml` decoded and stripped of every key whose spec field carries no `gate:"widening"` tag (today `sandboxOptions`) |
 
 `REQ-0067` Which spec fields are gated and which apply only at create is declared
 once, as Go struct tags on the spec types (`gate:"widening"`,
