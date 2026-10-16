@@ -1,7 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+// Package reqs is the reqs check of 10 10.2: the requirement ids of 12
+// 12.11 over the specification and the task files of the commit judged,
+// read once before any step, and the reqs subcommand, whose allocate
+// form numbers the placeholders of the working tree.
+package reqs
 
 import (
 	"context"
@@ -118,10 +122,10 @@ type reqMark struct {
 
 func (m reqMark) where() string { return m.page + ":" + strconv.Itoa(m.line) }
 
-// runReqs is the "reqs" subcommand: the check over the tree at HEAD,
+// Run is the "reqs" subcommand: the check over the tree at HEAD,
 // or, with "allocate", the numbering of the placeholders in the
 // working tree.
-func runReqs(ctx context.Context, e check.Env, args []string) (bool, error) {
+func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if len(args) > 0 && args[0] == "allocate" {
 		if len(args) > 1 {
 			return false, fmt.Errorf("reqs allocate takes no argument\n%s", check.Usage())
@@ -135,7 +139,7 @@ func runReqs(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	findings, deferred, err := reqsOf(files)
+	findings, deferred, err := Of(files)
 	if err != nil {
 		return false, err
 	}
@@ -161,11 +165,11 @@ func reqDeferredLines(ids []string) string {
 	return b.String()
 }
 
-// reqsOf judges files, the tree of one commit as headTree reads it, by
+// Of judges files, the tree of one commit as check.HeadTree reads it, by
 // the rules of 12 12.11: the ids of the pages and the retired table,
 // then, where task files exist, the citations of the task files. It
 // returns the findings and the ids cited only by deferred tasks.
-func reqsOf(files []check.TreeFile) ([]check.Finding, []string, error) {
+func Of(files []check.TreeFile) ([]check.Finding, []string, error) {
 	pages, err := reqPagesIn(files)
 	if err != nil {
 		return nil, nil, err
@@ -736,7 +740,7 @@ func reqsAllocate(ctx context.Context, e check.Env) (bool, error) {
 		if !changed[p.path] {
 			continue
 		}
-		if _, err := writeIfChanged(root, p.path, []byte(strings.Join(p.lines, p.eol))); err != nil {
+		if _, err := check.WriteIfChanged(root, p.path, []byte(strings.Join(p.lines, p.eol))); err != nil {
 			return false, err
 		}
 	}
@@ -788,4 +792,22 @@ func reqPagesAt(root *os.Root) ([]reqPage, error) {
 	}
 	reqSortPages(pages)
 	return pages, nil
+}
+
+// DeferredInfo is the line under the reqs verdict of fast and all
+// when ids rest on deferred tasks alone: the count, and where the ids
+// are listed (12 12.11).
+func DeferredInfo(deferred []string) string {
+	if len(deferred) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("      %d id(s) cited only by deferred tasks; go run ./tools/ci reqs lists them\n", len(deferred))
+}
+
+// Judge is the reqs check of the commit fast and all read before any
+// step: one verdict, with the line under it that counts the ids that
+// deferred tasks alone cite.
+func Judge(_ context.Context, c check.Commit) ([]check.Verdict, error) {
+	findings, deferred, err := Of(c.Files)
+	return []check.Verdict{{Name: "reqs", Findings: findings, Err: err, Info: DeferredInfo(deferred)}}, nil
 }

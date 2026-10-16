@@ -574,7 +574,7 @@ func TestFileDigestStaysInsideTheRoot(t *testing.T) {
 	dir, outside := t.TempDir(), t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(outside, "secret"), []byte("s"), 0o644))
 	require.NoError(t, os.Symlink(outside, filepath.Join(dir, "sub")))
-	_, _, err := fileDigest(rootOf(t, dir), "sub/secret")
+	_, _, err := fileDigest(citest.RootOf(t, dir), "sub/secret")
 	require.Error(t, err)
 }
 

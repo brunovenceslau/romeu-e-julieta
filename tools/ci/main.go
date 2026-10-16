@@ -40,6 +40,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/coverage"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/reqs"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/workflows"
 )
 
@@ -52,7 +53,7 @@ func init() {
 	check.RegisterCommand(check.Command{Name: "hygiene", Usage: []string{"hygiene [--file <path>]", "hygiene add"}, Run: hygiene.Run})
 	check.RegisterCommand(check.Command{Name: "generated", Usage: []string{"generated"}, Run: runGenerated})
 	check.RegisterCommand(check.Command{Name: "generate", Usage: []string{"generate"}, Run: runGenerate})
-	check.RegisterCommand(check.Command{Name: "reqs", Usage: []string{"reqs [allocate]"}, Run: runReqs})
+	check.RegisterCommand(check.Command{Name: "reqs", Usage: []string{"reqs [allocate]"}, Run: reqs.Run})
 }
 
 func main() {

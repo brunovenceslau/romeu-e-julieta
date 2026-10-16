@@ -385,3 +385,12 @@ func RangeOf(verdicts []check.Verdict, err error) (findings []check.Finding, che
 	}
 	return findings, checked, err
 }
+
+// RootOf opens dir as a root for the length of the test.
+func RootOf(t *testing.T, dir string) *os.Root {
+	t.Helper()
+	root, err := os.OpenRoot(dir)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = root.Close() })
+	return root
+}

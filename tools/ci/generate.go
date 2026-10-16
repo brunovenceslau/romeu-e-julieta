@@ -6,10 +6,7 @@ package main
 //go:generate go run . generate
 
 import (
-	"bytes"
 	"context"
-	"crypto/rand"
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -21,14 +18,11 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
-// The files that generate writes (12 12.3). A generated file is never
-// edited by hand: generated fails when the run of generate changes one,
-// and when one is not tracked as a regular file with the bytes that
-// generate gives.
-const (
-	adrIndexName      = "README.md"
-	generatedFileMode = 0o644
-)
+// adrIndexName is the name of the index of the decision records that
+// generate writes (12 12.3). A generated file is never edited by hand:
+// generated fails when the run of generate changes one, and when one is
+// not tracked as a regular file with the bytes that generate gives.
+const adrIndexName = "README.md"
 
 // runGenerate is the "generate" subcommand, which "go generate ./..."
 // runs through the directive above. It writes the consumers of the
@@ -55,7 +49,7 @@ func runGenerate(ctx context.Context, e check.Env, args []string) (bool, error) 
 		return false, err
 	}
 	for _, out := range outputs {
-		wrote, err := writeIfChanged(root, out.path, out.content)
+		wrote, err := check.WriteIfChanged(root, out.path, out.content)
 		if err != nil {
 			return false, err
 		}
@@ -124,62 +118,4 @@ func readADRIndex(root *os.Root) ([]byte, string, error) {
 		records = append(records, record)
 	}
 	return adrIndex(records), filepath.ToSlash(filepath.Join(dir, adrIndexName)), nil
-}
-
-// writeIfChanged writes content to path below root, with its
-// directories, unless a regular file holds exactly those bytes already
-// and no execute bit, and reports whether it wrote. A file that is
-// current keeps its modification time. The bytes go to a new file in
-// the same directory that then replaces path, so a symbolic link or a
-// hard link at path is replaced by a regular file and never written
-// through: a local hard link to a file outside the repository keeps its
-// own bytes.
-func writeIfChanged(root *os.Root, path string, content []byte) (bool, error) {
-	info, err := root.Lstat(path)
-	switch {
-	case err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 == 0:
-		old, err := root.ReadFile(path)
-		if err != nil {
-			return false, err
-		}
-		if bytes.Equal(old, content) {
-			return false, nil
-		}
-	case err != nil && !errors.Is(err, fs.ErrNotExist):
-		return false, err
-	}
-	dir := filepath.Dir(path)
-	if err := root.MkdirAll(dir, 0o755); err != nil {
-		return false, err
-	}
-	tmp := filepath.Join(dir, "."+filepath.Base(path)+"."+rand.Text()+".tmp")
-	f, err := root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, generatedFileMode)
-	if err != nil {
-		return false, err
-	}
-	_, err = f.Write(content)
-	if closeErr := f.Close(); err == nil {
-		err = closeErr
-	}
-	// The mode is set after the umask took its share, and an execute bit
-	// is the one thing git tracks of a mode.
-	if err == nil {
-		err = root.Chmod(tmp, generatedFileMode)
-	}
-	if err == nil {
-		err = root.Rename(tmp, path)
-	}
-	if err != nil {
-		return false, errors.Join(err, removeIfExists(root, tmp))
-	}
-	return true, nil
-}
-
-// removeIfExists removes the file at path below root, and is not an
-// error when there is none.
-func removeIfExists(root *os.Root, path string) error {
-	if err := root.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	return nil
 }

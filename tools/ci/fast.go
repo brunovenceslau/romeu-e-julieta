@@ -19,6 +19,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/pushedrange"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/reqs"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/workflows"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
 )
@@ -297,22 +298,11 @@ func commitChecks(ctx context.Context, repo git.Repo, commit string) ([]check.Ve
 		return nil, err
 	}
 	findings, err := hygiene.Of(files)
-	reqs, deferred, reqsErr := reqsOf(files)
-	return []check.Verdict{
+	reqVerdicts, _ := reqs.Judge(ctx, check.Commit{Repo: repo, ID: commit, Files: files})
+	return append([]check.Verdict{
 		{Name: "hygiene", Findings: findings, Err: err},
 		{Name: "workflows", Findings: workflows.Of(files)},
-		{Name: "reqs", Findings: reqs, Err: reqsErr, Info: reqDeferredInfo(deferred)},
-	}, nil
-}
-
-// reqDeferredInfo is the line under the reqs verdict of fast and all
-// when ids rest on deferred tasks alone: the count, and where the ids
-// are listed (12 12.11).
-func reqDeferredInfo(deferred []string) string {
-	if len(deferred) == 0 {
-		return ""
-	}
-	return fmt.Sprintf("      %d id(s) cited only by deferred tasks; go run ./tools/ci reqs lists them\n", len(deferred))
+	}, reqVerdicts...), nil
 }
 
 // verdict reports one verdict of commitChecks: one that could not
