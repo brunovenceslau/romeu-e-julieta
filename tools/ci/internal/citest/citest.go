@@ -157,7 +157,7 @@ concurrency:
       - run: go run ./tools/release notes --tag "$GITHUB_REF_NAME" --out=notes.md
 `
 
-// WorkflowEnv is the env table every workflow holds: miseEnv, each
+// WorkflowEnv is the env table every workflow holds: mise.MiseEnv, each
 // value a YAML string.
 const WorkflowEnv = `env:
   MISE_OVERRIDE_CONFIG_FILENAMES: mise.toml
@@ -194,8 +194,8 @@ var (
 // the trust records of the person who runs the tests do not change what
 // the test measures. HOME and the data directory variables stay: the
 // pinned tools are installed where mise puts them. No global or system
-// configuration reaches mise (miseEnv names none). A test that builds
-// the whole environment of mise itself uses isolatedMiseEnv instead.
+// configuration reaches mise (mise.MiseEnv names none). A test that builds
+// the whole environment of mise itself uses IsolatedMiseEnv instead.
 func IsolateMiseConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("MISE_STATE_DIR", t.TempDir())
@@ -369,7 +369,7 @@ func PartialClone(t *testing.T, upstream *gittest.Repo) git.Repo {
 	return git.Repo{Dir: dir, Env: upstream.Env}
 }
 
-// RangeOf reads the verdicts of pushedRange back as its findings, and
+// RangeOf reads the verdicts of pushedrange.Range back as its findings, and
 // whether names were matched: no verdict carries the "not checked"
 // note. A verdict that could not judge is returned as its error.
 func RangeOf(verdicts []check.Verdict, err error) (findings []check.Finding, checked bool, _ error) {

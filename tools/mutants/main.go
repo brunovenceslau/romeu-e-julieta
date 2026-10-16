@@ -10,10 +10,10 @@
 //
 //	mutants:
 //	  - id: keep-the-last-line
-//	    file: tools/ci/hygiene.go
+//	    file: tools/ci/internal/hygiene/hygiene.go
 //	    old: "i < len(lines)"
 //	    new: "i < len(lines)-1"
-//	    package: ./tools/ci
+//	    package: ./tools/ci/internal/hygiene
 //	    run: ^TestHygiene$
 //
 // Each mutant replaces the one occurrence of old in file (a path from

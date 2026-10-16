@@ -38,24 +38,13 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/coverage"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/generated"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/reqs"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/setup"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/workflows"
 )
 
 func init() {
 	check.RegisterCommand(check.Command{Name: "all", Usage: []string{"all"}, Run: runAll})
 	check.RegisterCommand(check.Command{Name: "fast", Usage: []string{"fast [<remote> <url>]"}, Run: runFast})
 	check.RegisterCommand(check.Command{Name: "setup", Usage: []string{"setup"}, Run: setup.Run})
-	check.RegisterCommand(check.Command{Name: "coverage", Usage: []string{"coverage <profile>"}, Run: coverage.Run})
-	check.RegisterCommand(check.Command{Name: "workflows", Usage: []string{"workflows"}, Run: workflows.Run})
-	check.RegisterCommand(check.Command{Name: "hygiene", Usage: []string{"hygiene [--file <path>]", "hygiene add"}, Run: hygiene.Run})
-	check.RegisterCommand(check.Command{Name: "generated", Usage: []string{"generated"}, Run: generated.Run})
-	check.RegisterCommand(check.Command{Name: "generate", Usage: []string{"generate"}, Run: generated.Generate})
-	check.RegisterCommand(check.Command{Name: "reqs", Usage: []string{"reqs [allocate]"}, Run: reqs.Run})
 }
 
 func main() {

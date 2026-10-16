@@ -48,7 +48,7 @@ func TestSetup(t *testing.T) {
 	// The install builds govulncheck and gopls with the go command, so it
 	// gets GOENV=off and GOTOOLCHAIN=local even when the process holds
 	// others.
-	// passThroughEnv already drops these two, so the override itself is
+	// check.PassThroughEnv already drops these two, so the override itself is
 	// held by TestMiseEnvList.
 	t.Setenv("GOENV", "/from/the/process")
 	t.Setenv("GOTOOLCHAIN", "go1.99.0")

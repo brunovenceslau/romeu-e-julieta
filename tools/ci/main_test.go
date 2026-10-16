@@ -31,9 +31,9 @@ import (
 // hookScript is the tracked hook, with the words of its env filled in
 // from the lists of the code. Every go the hook starts (run) is started
 // with "exec env -i" in an environment built from nothing: the
-// variables of hookAllow that the caller has set, each as
+// variables of mise.HookAllow that the caller has set, each as
 // ${K:+K="$K"} so an unset one stays unset and a value with a space
-// stays one word; then goenv.Build, miseEnv and the ceiling of the mise
+// stays one word; then goenv.Build, mise.MiseEnv and the ceiling of the mise
 // files (the parent of the tree, which is the working directory of a
 // hook, with its symbolic links resolved: PWD is the path as the caller
 // typed it), each variable a word of env. The exec makes a signal sent
@@ -182,11 +182,11 @@ func TestRunPrintsAnErrorAsSafeText(t *testing.T) {
 // global and system configuration, MISE_ENV_FILE, MISE_CD,
 // MISE_TRUSTED_CONFIG_PATHS, MISE_CONFIG_DIR, XDG_CONFIG_HOME, GIT_DIR,
 // and a MISE_FOO and a GOFOO that no list names) besides every variable
-// of hookAllow, one of them with a space, and a go stub that prints what
+// of mise.HookAllow, one of them with a space, and a go stub that prints what
 // each call (the probe and the checks) was started with. The hook runs
 // in a symbolic link to the tree, with PWD as the caller typed it. Each call gets exactly what the
 // production lists build for a mise run at the top of the tree
-// (miseRunEnviron over passThroughEnv), the proxy and module variables
+// (mise.RunEnviron over check.PassThroughEnv), the proxy and module variables
 // that were set, and goenv.Build, with the ceiling the parent of the
 // resolved tree; and the arguments of git pass through as they are.
 func TestHookEnvIsTheAllowlist(t *testing.T) {

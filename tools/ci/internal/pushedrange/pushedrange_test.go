@@ -225,3 +225,26 @@ func TestJudgedCommitIsPinned(t *testing.T) {
 		assert.False(t, checked, "Y has none, and neither has the default branch")
 	})
 }
+
+// TestJudge checks that the pushed range judges nothing outside a
+// pre-push run, and the push of the hook in one, as Range does.
+func TestJudge(t *testing.T) {
+	const zero = "0000000000000000000000000000000000000000"
+	r := citest.NewTree(t)
+	head := r.Commit("fixture")
+	r.Git("remote", "add", "origin", gittest.NewBare(t).Dir)
+	r.Git("push", "--quiet", "origin", "main")
+	r.Git("fetch", "--quiet", "origin")
+	got, err := Judge(t.Context(), check.Commit{Repo: r.Repo, ID: head})
+	require.NoError(t, err)
+	assert.Nil(t, got, "no hook, no verdict")
+	push, err := pushed.Parse(strings.NewReader("refs/heads/main " + head + " refs/heads/main " + zero + "\n"))
+	require.NoError(t, err)
+	got, err = Judge(t.Context(), check.Commit{Repo: r.Repo, ID: head, Hook: &check.Hook{Remote: "origin", Push: push}})
+	require.NoError(t, err)
+	want, err := Range(t.Context(), r.Repo, "origin", push, head)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+	require.Len(t, got, 1)
+	assert.Equal(t, "pushed range", got[0].Name)
+}

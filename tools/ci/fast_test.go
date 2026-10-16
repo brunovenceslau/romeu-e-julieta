@@ -878,7 +878,7 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 
 // TestFastSteps pins the steps fast runs to the In fast column of 10
 // 10.2, for the steps that have code to check today. Every step runs a
-// pinned tool by its path, in stepEnv; the lint steps run the resolved
+// pinned tool by its path, in check.StepEnv; the lint steps run the resolved
 // linter itself, never "mise exec", which would add the [env] table of
 // a mise configuration to their environment.
 func TestFastSteps(t *testing.T) {
@@ -887,7 +887,7 @@ func TestFastSteps(t *testing.T) {
 	goDir := filepath.Join("/pinned", "go", "bin")
 	goCmd := filepath.Join(goDir, "go")
 	tools := check.Tools{Linter: "/pinned/golangci-lint", GoDir: goDir}
-	// Spelled out, not read from lintArgs: this test pins the list.
+	// Spelled out, not read from lint.Args: this test pins the list.
 	wantLint := []string{"/pinned/golangci-lint", "run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners"}
 	want := []check.Step{
 		{Name: "format", Argv: []string{filepath.Join(goDir, "gofmt"), "-l", "."}, Quiet: true, Environ: check.StepEnv(goDir)},
@@ -899,14 +899,14 @@ func TestFastSteps(t *testing.T) {
 		{Name: "lint darwin/arm64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "darwin", GOARCH: "arm64"}, goDir)},
 		{Name: "unit", Argv: []string{goCmd, "test", "-count=1", "./tools/..."}, Environ: check.StepEnv(goDir)},
 	}
-	assert.Equal(t, want, fastSteps(root, tools))
-	for _, s := range fastSteps(root, tools) {
+	assert.Equal(t, want, fastSteps(t.Context(), root, tools))
+	for _, s := range fastSteps(t.Context(), root, tools) {
 		assert.Contains(t, s.Environ, "GOPROXY=off", "%s never reaches the network", s.Name)
 	}
 
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "internal"), 0o755))
 	var unit []string
-	for _, s := range fastSteps(root, tools) {
+	for _, s := range fastSteps(t.Context(), root, tools) {
 		if s.Name == "unit" {
 			unit = s.Argv
 		}
@@ -915,14 +915,14 @@ func TestFastSteps(t *testing.T) {
 }
 
 // TestGeneratedRunsBeforeTheTests holds the order the threat model of
-// tools/ci/misefiles.go relies on: in fast and in all, the generated
+// tools/ci/internal/mise/misefiles.go relies on: in fast and in all, the generated
 // step, which judges the index, runs before every step that runs code
 // of the change (its tests), so that code cannot stage a good copy of
 // a generated file before it is judged.
 func TestGeneratedRunsBeforeTheTests(t *testing.T) {
 	tools := check.Tools{Linter: "/pinned/golangci-lint", GoDir: "/pinned/go/bin"}
 	for name, steps := range map[string][]check.Step{
-		"fast": fastSteps(citest.ModuleRoot(t), tools),
+		"fast": fastSteps(t.Context(), citest.ModuleRoot(t), tools),
 		"all":  allSteps(t.Context(), citest.ModuleRoot(t), tools, filepath.Join(t.TempDir(), coverFile)),
 	} {
 		names := make([]string, len(steps))

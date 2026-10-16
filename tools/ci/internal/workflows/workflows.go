@@ -47,7 +47,7 @@ const (
 //     mise.MiseEnv and nothing else, since other keys could make a tools/ci
 //     run start other code (BASH_ENV, LD_PRELOAD, PATH,
 //     GOFLAGS=-toolexec), and without it the mise of the workflow would
-//     read every mise file of the change (tools/ci/misefiles.go). An
+//     read every mise file of the change (tools/ci/internal/mise/misefiles.go). An
 //     action takes only the with keys listed for it (actionInputs),
 //     each a literal or an exact matrix reference whose values are
 //     literals, so no value an event can write reaches an input, and
@@ -154,7 +154,7 @@ func workflows(ctx context.Context, repo git.Repo, head string) ([]check.Finding
 }
 
 // Of applies the grammar to the workflows among files, the
-// tree of one commit as headTree reads it.
+// tree of one commit as check.HeadTree reads it.
 func Of(files []check.TreeFile) []check.Finding {
 	var findings []check.Finding
 	for _, f := range files {
@@ -773,4 +773,10 @@ func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 	}
 	check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("workflows", len(findings)))
 	return len(findings) == 0, nil
+}
+
+// Judge is the workflows check of the commit fast and all read before
+// any step (Of).
+func Judge(_ context.Context, c check.Commit) ([]check.Verdict, error) {
+	return []check.Verdict{{Name: "workflows", Findings: Of(c.Files)}}, nil
 }

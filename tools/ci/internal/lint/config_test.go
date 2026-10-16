@@ -320,7 +320,7 @@ func TestLintConfigLowersNothing(t *testing.T) {
 
 // allowedDirectives are the directives a comment of any Go file of this
 // repository may hold, as "tool:name". go:build is the build
-// constraint (add_test.go); romeu:invariant tags a guard or its test
+// constraint (tools/ci/internal/hygiene/add_test.go); romeu:invariant tags a guard or its test
 // with the invariant it holds (05 5.2), read by the invariants check
 // when it lands. Every other directive, of any tool, is a decision to
 // review here first, because the readers of directives include the
@@ -566,7 +566,7 @@ func TestOnlyAllowedDirectives(t *testing.T) {
 		assert.Empty(t, bad, "%s holds what makes the linters skip a finding", f)
 	}
 	// The raw lines that go generate runs: exactly one in the repository,
-	// at its site (directives.go). The comments are read above for the
+	// at its site (directives.go of the generated package). The comments are read above for the
 	// other directives and here for the lenient forms of this one.
 	problems, err := generated.CheckDirectives(root)
 	require.NoError(t, err)

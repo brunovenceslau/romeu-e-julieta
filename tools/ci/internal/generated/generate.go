@@ -65,10 +65,43 @@ type output struct {
 	content []byte
 }
 
-// generateOutputs reads the sources below root and returns the files
-// that follow from them. It writes nothing; "generated" calls it too, to
-// learn which files must be tracked and with what bytes.
+// generateOutputs returns every file generate writes: the outputs of
+// each check of the registry, in its order (check.Check.Outputs). It
+// writes nothing; "generated" calls it too, to learn which files must be
+// tracked and with what bytes.
 func generateOutputs(root *os.Root) ([]output, error) {
+	var outs []output
+	for _, c := range check.Registered() {
+		if c.Outputs == nil {
+			continue
+		}
+		got, err := c.Outputs(root)
+		if err != nil {
+			return nil, err
+		}
+		for _, o := range got {
+			outs = append(outs, output{o.Path, o.Content})
+		}
+	}
+	return outs, nil
+}
+
+// Outputs returns the files the generated check registers as its
+// outputs: those of its sources below root (sources), then the
+// inventory of the checks of the registry, docs/reference/checks.md
+// (ChecksPage).
+func Outputs(root *os.Root) ([]check.Output, error) {
+	outs, err := sources(root)
+	if err != nil {
+		return nil, err
+	}
+	return append(outs, check.Output{Path: ChecksPath, Content: ChecksPage(check.Registered())}), nil
+}
+
+// sources reads the sources of the generated check below root and
+// returns the files that follow from them: the two consumers of
+// .github/ask-first.yaml and the index of the decision records.
+func sources(root *os.Root) ([]check.Output, error) {
 	src, err := root.ReadFile(askfirst.Path)
 	if err != nil {
 		return nil, err
@@ -81,10 +114,10 @@ func generateOutputs(root *os.Root) ([]output, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []output{
-		{askfirst.CodeownersPath, list.Codeowners()},
-		{askfirst.PagePath, list.ReferencePage()},
-		{indexPath, index},
+	return []check.Output{
+		{Path: askfirst.CodeownersPath, Content: list.Codeowners()},
+		{Path: askfirst.PagePath, Content: list.ReferencePage()},
+		{Path: indexPath, Content: index},
 	}, nil
 }
 

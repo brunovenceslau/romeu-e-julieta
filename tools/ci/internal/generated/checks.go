@@ -1,0 +1,71 @@
+// SPDX-FileCopyrightText: 2026 Bruno Venceslau
+// SPDX-License-Identifier: GPL-3.0-only
+
+package generated
+
+import (
+	"bytes"
+	"fmt"
+	"strings"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+)
+
+// ChecksPath is the inventory of the checks that generate writes from
+// the registry (12 12.3).
+const ChecksPath = "docs/reference/checks.md"
+
+// ChecksPage renders the inventory of checks, one line of its table per
+// check, in the order of the registry: the name, what it guards, its
+// usage line, where it runs, its order key, whether it runs code of the
+// change, the requirement id of its row in the step table of 10 10.2,
+// and a link to its package.
+func ChecksPage(checks []check.Check) []byte {
+	var b bytes.Buffer
+	b.WriteString("---\ntype: reference\nreader: a contributor who adds or changes a check of tools/ci, or who reads which checks a change meets\n---\n\n")
+	fmt.Fprintf(&b, "<!-- %s -->\n\n", askfirst.GeneratedNotice("the registry of tools/ci, tools/ci/check_*.go"))
+	b.WriteString("# Checks\n\n")
+	b.WriteString("Each check of tools/ci registers itself from one file,\n`tools/ci/check_<check>.go`, and lives in one package below\n`tools/ci/internal/`\n([12 12.2](../spec/12-engineering.md#122-development-commands-and-capability-map)).\n")
+	b.WriteString("fast and all run the checks they hold in the order below, except that\nevery check that judges the tree runs before the first one that runs\ncode of the change, and the checks of the commit judge the commit read\nbefore any step.\n")
+	b.WriteString("The requirement id is the one of the row of the check in the step table of\n[10 10.2](../spec/10-testing-style.md#102-ci); `-` marks a row that holds none.\n\n")
+	b.WriteString("| Check | Guards | Usage | Runs in | Order | Runs code of the change | Requirement | Package |\n|---|---|---|---|---|---|---|---|\n")
+	for _, c := range checks {
+		req := c.Req
+		if req == "" {
+			req = "-"
+		}
+		runsCode := "no"
+		if c.RunsCode {
+			runsCode = "yes"
+		}
+		fmt.Fprintf(&b, "| `%s` | %s | `%s` | %s | %d | %s | %s | [%s](../../%s/) |\n",
+			c.Name, cell(c.Guards), cell(c.Usage), runsIn(c), c.Order, runsCode, req, c.Package, c.Package)
+	}
+	return b.Bytes()
+}
+
+// runsIn says where a check runs: fast, all, or the pre-push run of
+// fast alone.
+func runsIn(c check.Check) string {
+	var in []string
+	switch {
+	case c.Fast:
+		in = append(in, "fast")
+	case c.Hook:
+		in = append(in, "fast, in the pre-push hook only")
+	}
+	if c.All {
+		in = append(in, "all")
+	}
+	if len(in) == 0 {
+		return "-"
+	}
+	return strings.Join(in, ", ")
+}
+
+// cell escapes the one character of a table cell that Markdown reads as
+// its end.
+func cell(s string) string {
+	return strings.ReplaceAll(s, "|", `\|`)
+}

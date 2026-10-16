@@ -27,6 +27,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/license"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/workflows"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
@@ -149,7 +150,7 @@ func TestAllUsage(t *testing.T) {
 
 // TestAllSteps pins the command steps of all: the steps of fast, with
 // vulnerabilities and license before unit, since neither runs code of
-// the change, then race. Each runs in stepEnv; the one
+// the change, then race. Each runs in check.StepEnv; the one
 // that reads the Go vulnerability database keeps the variables of a
 // proxy too, and the license step those of the Docker daemon, and no
 // other step keeps either.
@@ -169,19 +170,19 @@ func TestAllSteps(t *testing.T) {
 		t.Setenv(key, "from-the-process")
 	}
 
-	common, err := gitCommonDir(t.Context(), root)
+	common, err := license.GitCommonDir(t.Context(), root)
 	require.NoError(t, err)
 	tools := check.Tools{Linter: linter, GoDir: filepath.Dir(goCmd)}
 	env := check.StepEnv(tools.GoDir)
 	steps := allSteps(t.Context(), root, tools, "/tmp/p/cover.out")
-	fast := fastSteps(root, tools)
+	fast := fastSteps(t.Context(), root, tools)
 	unit := len(fast) - 1
 	require.Equal(t, "unit", fast[unit].Name)
 	require.Len(t, steps, len(fast)+3)
 	assert.Equal(t, fast[:unit], steps[:unit])
 	assert.Equal(t, fast[unit], steps[unit+2])
 
-	vulnStep, license, race := steps[unit], steps[unit+1], steps[unit+3]
+	vulnStep, licenseStep, race := steps[unit], steps[unit+1], steps[unit+3]
 	assert.Equal(t, check.Step{Name: "vulnerabilities", Argv: []string{evalOrSelf(vuln), "./..."}, Environ: check.WithProcessEnv(env, check.NetworkPassThrough)}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")
 	assert.Equal(t, 40*time.Minute, procgroup.ToolRace.Timeout())
 	assert.Less(t, procgroup.ToolRace.Timeout(), ciJobTimeout(t), "the race run ends before the job of ci.yml does")
@@ -189,7 +190,7 @@ func TestAllSteps(t *testing.T) {
 	for _, s := range steps {
 		assert.Equal(t, s.Name == "race", s.Class != 0, "%s has a class of its own only if it is the race run", s.Name)
 	}
-	assert.Equal(t, licenseStep(root, common, runtime.GOOS, check.WithProcessEnv(env, check.DockerPassThrough)), license)
+	assert.Equal(t, license.Step(root, common, runtime.GOOS, check.WithProcessEnv(env, check.DockerPassThrough)), licenseStep)
 
 	keys := func(s check.Step) []string {
 		var out []string
@@ -405,43 +406,6 @@ func TestProbe(t *testing.T) {
 
 	t.Setenv("PATH", t.TempDir())
 	assert.Contains(t, unameMachine(t.Context()), "unknown (", "a probe that fails says why")
-}
-
-// TestLicenseStep pins the license step: reuse from the image pinned
-// by digest, on linux, with the tree mounted read-only, no network and
-// no privilege; on another platform a step that is not run, which all
-// reports with a "--" line, and neither "ok" nor "FAIL".
-func TestLicenseStep(t *testing.T) {
-	env := []string{"PATH=/x"}
-	assert.Equal(t, check.Step{
-		Name: "license",
-		Argv: []string{"docker", "run", "--rm", "--network", "none",
-			"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--user", "65534",
-			"--env", "GIT_CONFIG_COUNT=2",
-			"--env", "GIT_CONFIG_KEY_0=safe.directory", "--env", "GIT_CONFIG_VALUE_0=/src/repo",
-			"--env", "GIT_CONFIG_KEY_1=safe.directory", "--env", "GIT_CONFIG_VALUE_1=/src/main/.git",
-			"--mount", "type=bind,source=/src/repo,target=/src/repo,readonly",
-			"--mount", "type=bind,source=/src/main/.git,target=/src/main/.git,readonly",
-			"--workdir", "/src/repo",
-			"fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e7662577c8427429e11e1b9f25a992e", "lint"},
-		Environ: env,
-	}, licenseStep("/src/repo", "/src/main/.git", "linux", env))
-	assert.Regexp(t, `@sha256:[0-9a-f]{64}$`, reuseImage)
-
-	darwin := licenseStep("/src/repo", "/src/repo/.git", "darwin", env)
-	assert.Equal(t, "not run on darwin: reuse runs from a Linux container image; the hosted Linux runners run it", darwin.Skip)
-	assert.Empty(t, darwin.Argv, "nothing is started")
-
-	require.Error(t, licenseStep("/src/a,b", "/src/a,b/.git", "linux", env).Unavailable, "a path the mount option cannot name")
-	require.Error(t, licenseStep("/src/a", "/src/b=c/.git", "linux", env).Unavailable, "a git directory the mount option cannot name")
-
-	var out bytes.Buffer
-	c := check.NewPrinter(&out)
-	c.Run(t.Context(), t.TempDir(), []check.Step{citest.Passing, darwin})
-	assert.True(t, c.OK, "a step not run fails nothing")
-	assert.Contains(t, out.String(), "--    license: "+darwin.Skip+"\n")
-	assert.NotContains(t, out.String(), "ok    license")
-	assert.NotContains(t, out.String(), "FAIL  license")
 }
 
 // TestAllWiring runs all with its real steps against fake tools: a
@@ -720,7 +684,7 @@ func TestAllStepsLeaveTheTree(t *testing.T) {
 }
 
 // TestCommitChecksReadBeforeMise runs fast and all with their real
-// steps (no stubs, so resolveLintTools starts mise) against a fake
+// steps (no stubs, so mise.ResolveLintTools starts mise) against a fake
 // mise that rewrites the loose object of a judged file whenever it
 // runs: hygiene still reports the finding of the commit as it was, so
 // the commit is read before "mise --version" and "mise which" run.

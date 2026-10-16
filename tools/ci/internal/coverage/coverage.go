@@ -208,3 +208,10 @@ func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 	check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("coverage", len(findings)))
 	return len(findings) == 0, nil
 }
+
+// After is the coverage check of all, on the profile the race step
+// wrote, for the module of the go.mod in root (At).
+func After(root, profile string) check.Verdict {
+	findings, err := At(root, profile)
+	return check.Verdict{Name: "coverage", Findings: findings, Err: err}
+}

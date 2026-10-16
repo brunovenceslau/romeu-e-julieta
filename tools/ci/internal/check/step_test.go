@@ -157,7 +157,7 @@ func TestStepRunDeadline(t *testing.T) {
 }
 
 // TestPassThroughLists pins the two lists of variables a step may keep
-// from the process, and the way withProcessEnv adds them: in the order
+// from the process, and the way WithProcessEnv adds them: in the order
 // of the list, a variable that is empty or unset left out.
 func TestPassThroughLists(t *testing.T) {
 	assert.Equal(t, []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}, check.NetworkPassThrough)

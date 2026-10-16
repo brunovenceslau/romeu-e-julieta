@@ -51,7 +51,7 @@ func (c *Printer) Verdict(v Verdict) {
 
 // moduleLookupOff is what the go command prints when a step needs a
 // module that the module cache does not hold: the steps run with
-// GOPROXY=off (stepEnv).
+// GOPROXY=off (StepEnv).
 const moduleLookupOff = "module lookup disabled by GOPROXY=off"
 
 // Run runs each step in root and reports it. A step that failed for a

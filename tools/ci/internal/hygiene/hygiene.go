@@ -197,7 +197,7 @@ func LoadDenylist(ctx context.Context, repo git.Repo, head string) (*names.List,
 
 // denylistFindings says what is wrong with the denylist of the commit
 // judged: every check that matches names reads it there, and a
-// pre-push run also at the remote's default branch (pushedRange). A
+// pre-push run also at the remote's default branch (pushedrange.Range). A
 // list that is missing or has no entry is a finding and not an error:
 // the check then proves nothing, and the maintainer is the one who can
 // add an entry.
@@ -422,4 +422,11 @@ func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 	}
 	check.Say(e.Stdout, "%s\n", check.Summary("hygiene", len(findings)))
 	return len(findings) == 0, nil
+}
+
+// Judge is the hygiene check of the commit fast and all read before any
+// step (Of).
+func Judge(_ context.Context, c check.Commit) ([]check.Verdict, error) {
+	findings, err := Of(c.Files)
+	return []check.Verdict{{Name: "hygiene", Findings: findings, Err: err}}, nil
 }

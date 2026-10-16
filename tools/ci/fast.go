@@ -15,62 +15,54 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/generated"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/lint"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/pushedrange"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/reqs"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/workflows"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
 )
 
-// fastSteps returns the command steps of fast, from the In fast column
-// of 10 10.2: format, vet, generated, lint (once per lintTargets) and
-// unit. The other rows of that column join with the code they check.
+// inFast and inAll say whether a check runs in fast and in all. A
+// check of the pre-push run alone (check.Check.Hook) runs in fast when
+// fast runs as the hook (commitChecks).
+func inFast(c check.Check) bool { return c.Fast }
+func inAll(c check.Check) bool  { return c.All }
+
+// registered returns the registered checks that in holds, in the order
+// of the registry.
+func registered(in func(check.Check) bool) []check.Check {
+	var out []check.Check
+	for _, c := range check.Registered() {
+		if in(c) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// stepsOf returns the command steps of the checks that in holds, in the
+// order a run starts them (check.RunOrder): every check that judges the
+// tree, by order key, then every check that runs code of the change, so
+// that no test of the change can rewrite a file before a check has read
+// it.
 //
 // Every step runs a pinned tool by its path: gofmt and go from the
 // directory of the go command that mise resolves, and the golangci-lint
-// it resolves, directly and not through "mise exec", which would add
-// the [env] table of a mise configuration to the environment. Each
-// one runs in stepEnv, so the go command that vets and tests is the one
-// the linter runs, whatever go is first on the search path. "--config"
-// names .golangci.yml so that no other .golangci.* file takes its place.
-//
-// Lint runs once for each of lintTargets, because the linter sees only
-// the files that build for the GOOS and GOARCH it runs under: a file for
-// another one (as pty_darwin_test.go, or a file named for amd64 on an
-// arm64 machine) would never be linted otherwise.
-//
-// The unit step names the two directories the column names, and leaves
-// out one that does not exist yet, which "go test" would take as an
-// error. It passes "-count=1": tests that scan the repository would
-// otherwise be served from the test cache, which cannot see a file
-// added since the cached run.
-func fastSteps(root string, tools check.Tools) []check.Step {
-	before, unit := fastPhases(root, tools)
-	return append(before, unit)
+// and govulncheck it resolves, directly and not through "mise exec",
+// which would add the [env] table of a mise configuration to the
+// environment. Each one runs in check.StepEnv, so the go command that
+// vets and tests is the one the linter runs, whatever go is first on
+// the search path.
+func stepsOf(ctx context.Context, in func(check.Check) bool, p check.Plan) []check.Step {
+	var steps []check.Step
+	for _, c := range check.RunOrder(registered(in)) {
+		steps = append(steps, c.Steps(ctx, p)...)
+	}
+	return steps
 }
 
-// fastPhases returns the steps of fastSteps in two parts: the ones
-// that run none of the change's tests (generated runs the tools/ci of
-// the change, which the ask-first review of tools/ci covers), and
-// unit, the first that runs them. all puts its own steps that judge
-// the tree between the two (allSteps).
-func fastPhases(root string, tools check.Tools) ([]check.Step, check.Step) {
-	goCmd := filepath.Join(tools.GoDir, "go")
-	unit := []string{goCmd, "test", "-count=1"}
-	for _, dir := range []string{"internal", "tools"} {
-		if info, err := os.Stat(filepath.Join(root, dir)); err == nil && info.IsDir() {
-			unit = append(unit, "./"+dir+"/...")
-		}
-	}
-	steps := []check.Step{
-		{Name: "format", Argv: []string{filepath.Join(tools.GoDir, "gofmt"), "-l", "."}, Quiet: true, Environ: check.StepEnv(tools.GoDir)},
-		{Name: "vet", Argv: []string{goCmd, "vet", "./..."}, Environ: check.StepEnv(tools.GoDir)},
-		{Name: "generated", Argv: []string{goCmd, "run", "./tools/ci", "generated"}, Environ: check.StepEnv(tools.GoDir)},
-	}
-	steps = append(steps, lint.Steps(context.Background(), check.Plan{Root: root, Tools: tools})...)
-	return steps, check.Step{Name: "unit", Argv: unit, Environ: check.StepEnv(tools.GoDir)}
+// fastSteps returns the command steps of fast, from the In fast column
+// of 10 10.2: format, vet, generated, lint (once per lint target) and
+// unit. The other rows of that column join with the code they check.
+func fastSteps(ctx context.Context, root string, tools check.Tools) []check.Step {
+	return stepsOf(ctx, inFast, check.Plan{Root: root, Tools: tools})
 }
 
 // runFast runs the fast checks: the command steps, then hygiene and
@@ -147,16 +139,13 @@ func runFast(ctx context.Context, e check.Env, args []string) (bool, error) {
 	}
 	// The commit, and in a pre-push run the range, are read and judged
 	// before mise or any step runs code of the change (commitChecks).
-	verdicts, err := commitChecks(ctx, repo, head)
+	var hooked *check.Hook
+	if hook {
+		hooked = &check.Hook{Remote: args[0], Push: push}
+	}
+	verdicts, err := commitChecks(ctx, repo, head, hooked, inFast)
 	if err != nil {
 		return false, err
-	}
-	if hook {
-		ranged, err := pushedrange.Range(ctx, repo, args[0], push, head)
-		if err != nil {
-			return false, err
-		}
-		verdicts = append(verdicts, ranged...)
 	}
 	// In a pre-push run the steps must leave the tree as judgeCommit
 	// judged it (changedSince, after them).
@@ -175,7 +164,7 @@ func runFast(ctx context.Context, e check.Env, args []string) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		steps = fastSteps(root, tools)
+		steps = fastSteps(ctx, root, tools)
 	}
 	c := check.NewPrinter(e.Stdout)
 	c.Run(ctx, root, steps)
@@ -195,29 +184,41 @@ func runFast(ctx context.Context, e check.Env, args []string) (bool, error) {
 	return c.OK, nil
 }
 
-// commitChecks judges commit with hygiene, workflows and reqs, from one
-// read of its tree with every blob in it. fast and all call it before they
-// start mise or any step, and report its verdicts after the steps
-// (checks.verdict). The steps run code of the change under test, and
-// that code could rewrite the working tree, the index, HEAD or an
-// object of the store (git cat-file does not hash what it reads, so a
-// rewritten loose object is read as the commit's: measured with git
-// 2.53.0), so the checks judge what was read before any of it ran. A
-// tree that cannot be read is an error; a check that cannot judge
-// what was read is a verdict with its error. git and the object store
+// commitChecks judges commit with every check of the commit that in
+// holds (check.Check.Judge), in the order of the registry, from one
+// read of its tree with every blob in it; with hook, the push of a
+// pre-push run, the checks of that run alone (check.Check.Hook) judge
+// it too. fast and all call it before they start mise or any step, and
+// report its verdicts after the steps (check.Printer.Verdict). The
+// steps run code of the change under test, and that code could rewrite
+// the working tree, the index, HEAD or an object of the store (git
+// cat-file does not hash what it reads, so a rewritten loose object is
+// read as the commit's: measured with git 2.53.0), so the checks judge
+// what was read before any of it ran. A tree that cannot be read is an
+// error; a check that cannot judge what was read is a verdict with its
+// error, and one that fails otherwise, as the pushed range does for a
+// remote that is not configured, is an error. git and the object store
 // are trusted up to that read; what mise may run before it is the
 // threat model of misefiles.go.
-func commitChecks(ctx context.Context, repo git.Repo, commit string) ([]check.Verdict, error) {
+func commitChecks(ctx context.Context, repo git.Repo, commit string, hook *check.Hook, in func(check.Check) bool) ([]check.Verdict, error) {
 	files, err := check.HeadTree(ctx, repo, commit)
 	if err != nil {
 		return nil, err
 	}
-	findings, err := hygiene.Of(files)
-	reqVerdicts, _ := reqs.Judge(ctx, check.Commit{Repo: repo, ID: commit, Files: files})
-	return append([]check.Verdict{
-		{Name: "hygiene", Findings: findings, Err: err},
-		{Name: "workflows", Findings: workflows.Of(files)},
-	}, reqVerdicts...), nil
+	judged := check.Commit{Repo: repo, ID: commit, Files: files, Hook: hook}
+	var verdicts []check.Verdict
+	for _, c := range check.Registered() {
+		judges := in(c) || (hook != nil && c.Hook)
+		if c.Judge == nil || !judges {
+			continue
+		}
+		got, err := c.Judge(ctx, judged)
+		if err != nil {
+			return nil, err
+		}
+		verdicts = append(verdicts, got...)
+	}
+	return verdicts, nil
 }
 
 // judgeCommit refuses a pre-push run whose checks would not test the
@@ -375,7 +376,7 @@ func untrackedInputs(ctx context.Context, repo git.Repo) ([]string, error) {
 // untracked TestMain could end a test run early), a go.work or
 // go.work.sum file, a vendor directory at the root, a file mise reads
 // when it starts in the directory that holds it or above
-// (isMiseFileAtAnyDepth), or a nested repository, which git lists as a
+// (mise.IsMiseFileAtAnyDepth), or a nested repository, which git lists as a
 // directory ending in "/" while "go list" still reads the packages
 // inside it.
 func isGateInput(path string) bool {

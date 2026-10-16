@@ -408,7 +408,7 @@ func TestHygieneFile(t *testing.T) {
 // TestPrintableASCII pins the bounds of the path rule: 0x20 and 0x7E
 // are in, 0x1F and 0x7F are out. A Windows file system reads a name
 // with a trailing dot as the name without it, and the rule passes such
-// a name: the accepted gap the threat model of tools/ci/misefiles.go
+// a name: the accepted gap the threat model of tools/ci/internal/mise/misefiles.go
 // names, here to be seen.
 func TestPrintableASCII(t *testing.T) {
 	for _, tt := range []struct {

@@ -4,6 +4,7 @@
 package citest
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -106,4 +107,63 @@ func TestRun(t *testing.T) {
 		assert.Equal(t, tt.code, code)
 		assert.Equal(t, tt.out, out)
 	}
+}
+
+// TestMiseHelpers checks the environment of a mise built from nothing,
+// the workflow that pins a mise version, and the tools mise resolves
+// after a trust, with a fake mise and a resolver of the test.
+func TestMiseHelpers(t *testing.T) {
+	env := IsolatedMiseEnv(t)
+	assert.Contains(t, env, "MISE_OFFLINE=1")
+	assert.Contains(t, MiseWorkflow(t, FakeMiseVersion), "version: "+FakeMiseVersion+"\n")
+	assert.Contains(t, AnswerVersion, FakeMiseVersion)
+
+	f := NewFakeMise(t)
+	require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte("#!/bin/sh\nexit 0\n"), 0o700))
+	var trusted []string
+	want := check.Tools{Linter: "/l", GoDir: "/g"}
+	got := PinnedLintTools(t, func(env []string) []string {
+		trusted = env
+		return append(env, "PATH="+f.Bin)
+	}, func(_ context.Context, root string) (check.Tools, error) {
+		assert.Equal(t, ModuleRoot(t), root)
+		return want, nil
+	})
+	assert.Equal(t, want, got)
+	assert.NotNil(t, trusted, "the trust runs in the environment of a mise run")
+}
+
+// TestGitHelpers checks the partial clone, which holds no blob, and the
+// root of a directory.
+func TestGitHelpers(t *testing.T) {
+	upstream := NewTree(t)
+	upstream.Commit("fixture")
+	clone := PartialClone(t, upstream)
+	out, err := clone.Run(t.Context(), nil, "rev-parse", "HEAD")
+	require.NoError(t, err)
+	assert.Equal(t, upstream.Git("rev-parse", "HEAD"), strings.TrimSpace(string(out)))
+	root := RootOf(t, t.TempDir())
+	require.NoError(t, root.WriteFile("f", []byte("x"), 0o600))
+}
+
+// TestRangeOfAndExit checks how verdicts read back, and the exit status
+// of a subcommand run with an environment of the test's own.
+func TestRangeOfAndExit(t *testing.T) {
+	f := check.Finding{Where: "a", Rule: "r", Msg: "m"}
+	findings, checked, err := RangeOf([]check.Verdict{{Findings: []check.Finding{f}}}, nil)
+	require.NoError(t, err)
+	assert.True(t, checked)
+	assert.Equal(t, []check.Finding{f}, findings)
+	_, checked, err = RangeOf([]check.Verdict{{Note: "not checked"}}, nil)
+	require.NoError(t, err)
+	assert.False(t, checked)
+	_, _, err = RangeOf([]check.Verdict{{Err: errors.New("broken")}}, nil)
+	require.EqualError(t, err, "broken")
+
+	var out bytes.Buffer
+	e := check.Env{Stdout: &out, Stderr: &out}
+	assert.Equal(t, check.ExitError, Exit(t.Context(), e, func(context.Context, check.Env, []string) (bool, error) {
+		return false, errors.New("broken")
+	}, "x"))
+	assert.Equal(t, "ci: broken\n", out.String())
 }

@@ -716,3 +716,16 @@ func fileDigest(root *os.Root, path string) (string, bool, error) {
 	}
 	return hex.EncodeToString(h.Sum(nil)), true, nil
 }
+
+// Steps returns the generated step of fast and all: the generated
+// subcommand of the tools/ci of the change, run by the go command that
+// mise resolves, in the environment of the steps. It runs code of the
+// change, tools/ci itself, which the ask-first review of tools/ci
+// covers, and judges the index, so it runs before unit and race.
+func Steps(_ context.Context, p check.Plan) []check.Step {
+	return []check.Step{{
+		Name:    "generated",
+		Argv:    []string{filepath.Join(p.Tools.GoDir, "go"), "run", "./tools/ci", "generated"},
+		Environ: check.StepEnv(p.Tools.GoDir),
+	}}
+}

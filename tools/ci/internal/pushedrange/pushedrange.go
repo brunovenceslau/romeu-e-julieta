@@ -149,3 +149,12 @@ func defaultBranchDenylist(ctx context.Context, repo git.Repo, remote string) (*
 	}
 	return list, nil
 }
+
+// Judge is the pushed range check of a pre-push run (Range), for the
+// push of c.Hook; outside a pre-push run it judges nothing.
+func Judge(ctx context.Context, c check.Commit) ([]check.Verdict, error) {
+	if c.Hook == nil {
+		return nil, nil
+	}
+	return Range(ctx, c.Repo, c.Hook.Remote, c.Hook.Push, c.ID)
+}
