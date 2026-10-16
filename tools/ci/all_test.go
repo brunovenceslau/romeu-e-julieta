@@ -7,9 +7,9 @@ import (
 	"bytes"
 	"compress/zlib"
 	"context"
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
@@ -167,7 +168,7 @@ func TestWorkflowsCommand(t *testing.T) {
 func TestAllSteps(t *testing.T) {
 	root := newTree(t).Dir
 	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.lock"), []byte(lockFixture), 0o600))
-	gitPath, err := exec.LookPath("git")
+	gitPath, err := procgroup.LookPath("git")
 	require.NoError(t, err)
 	f := newFakeMise(t)
 	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.bin, "git")))
@@ -194,11 +195,11 @@ func TestAllSteps(t *testing.T) {
 
 	vulnStep, license, race := steps[unit], steps[unit+1], steps[unit+3]
 	assert.Equal(t, step{name: "vulnerabilities", argv: []string{evalOrSelf(vuln), "./..."}, environ: withProcessEnv(env, networkPassThrough)}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")
-	assert.Equal(t, 40*time.Minute, raceTimeout)
-	assert.Less(t, raceTimeout, ciJobTimeout(t), "the race run ends before the job of ci.yml does")
-	assert.Equal(t, step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=/tmp/p/cover.out", "./..."}, environ: env, timeout: raceTimeout}, race)
+	assert.Equal(t, 40*time.Minute, procgroup.ToolRace.Timeout())
+	assert.Less(t, procgroup.ToolRace.Timeout(), ciJobTimeout(t), "the race run ends before the job of ci.yml does")
+	assert.Equal(t, step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=/tmp/p/cover.out", "./..."}, environ: env, class: procgroup.ToolRace}, race)
 	for _, s := range steps {
-		assert.Equal(t, s.name == "race", s.timeout != 0, "%s has a budget of its own only if it is the race run", s.name)
+		assert.Equal(t, s.name == "race", s.class != 0, "%s has a class of its own only if it is the race run", s.name)
 	}
 	assert.Equal(t, licenseStep(root, common, runtime.GOOS, withProcessEnv(env, dockerPassThrough)), license)
 
@@ -296,35 +297,52 @@ func TestAllStepsVulnFailsClosed(t *testing.T) {
 	}
 }
 
-// TestStepRunDeadline checks that a step that outlives its limit fails
-// with context.DeadlineExceeded and a message that names the limit,
-// where the bare error of the killed command says only "signal: killed".
+// TestStepRunDeadline checks that a step that outlives the limit of its
+// class fails with procgroup's subprocess-timeout, which names the
+// class and the limit and wraps context.DeadlineExceeded, where the
+// bare error of the killed command says only that a signal ended it; a
+// step runs under procgroup.ToolStep unless it names another class.
 func TestStepRunDeadline(t *testing.T) {
 	sleep := []string{"sleep", "30"}
-	t.Run("the limit of the step", func(t *testing.T) {
-		_, err := step{name: "slow", argv: sleep, timeout: 50 * time.Millisecond, environ: []string{"PATH=" + os.Getenv("PATH")}}.run(t.Context(), t.TempDir())
+	environ := []string{"PATH=" + os.Getenv("PATH")}
+	t.Run("the limit of the step's class", func(t *testing.T) {
+		ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolStep, 50*time.Millisecond)
+		_, err := step{name: "slow", argv: sleep, environ: environ}.run(ctx, t.TempDir())
 		require.ErrorIs(t, err, context.DeadlineExceeded)
-		assert.ErrorContains(t, err, "context deadline exceeded after 50ms: ")
+		timeout, ok := errors.AsType[*procgroup.TimeoutError](err)
+		require.True(t, ok, "the error is subprocess-timeout: %v", err)
+		assert.Equal(t, procgroup.ToolStep, timeout.Class)
+		assert.ErrorContains(t, err, "sleep ran past the 50ms limit of class tool-step")
+	})
+	t.Run("the race step runs under its own class", func(t *testing.T) {
+		ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolRace, 50*time.Millisecond)
+		_, err := step{name: "race", argv: sleep, environ: environ, class: procgroup.ToolRace}.run(ctx, t.TempDir())
+		timeout, ok := errors.AsType[*procgroup.TimeoutError](err)
+		require.True(t, ok, "the error is subprocess-timeout: %v", err)
+		assert.Equal(t, procgroup.ToolRace, timeout.Class)
 	})
 	t.Run("the deadline of the run, before the limit", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 		defer cancel()
-		_, err := step{name: "slow", argv: sleep, environ: []string{"PATH=" + os.Getenv("PATH")}}.run(ctx, t.TempDir())
+		_, err := step{name: "slow", argv: sleep, environ: environ}.run(ctx, t.TempDir())
 		require.ErrorIs(t, err, context.DeadlineExceeded)
-		require.ErrorContains(t, err, "at the deadline of the run: ")
-		assert.NotContains(t, err.Error(), "after 15m")
+		_, ok := errors.AsType[*procgroup.TimeoutError](err)
+		assert.False(t, ok, "the caller's deadline is not the step's subprocess-timeout: %v", err)
 	})
 	t.Run("a grandchild that holds the output pipe", func(t *testing.T) {
 		// sh forks sleep, which inherits the pipe and outlives sh: only
 		// killing the process group, or WaitDelay, ends the wait.
+		ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolStep, 200*time.Millisecond)
 		start := time.Now()
-		_, err := step{name: "slow", argv: []string{"sh", "-c", "sleep 30; true"}, timeout: 200 * time.Millisecond, environ: []string{"PATH=" + os.Getenv("PATH")}}.run(t.Context(), t.TempDir())
+		_, err := step{name: "slow", argv: []string{"sh", "-c", "sleep 30; true"}, environ: environ}.run(ctx, t.TempDir())
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		assert.Less(t, time.Since(start), 5*time.Second, "the step returns at its deadline, not when the grandchild ends")
 	})
 	t.Run("a failure that is not a deadline", func(t *testing.T) {
-		_, err := step{name: "fails", argv: []string{"false"}, timeout: time.Minute, environ: []string{"PATH=" + os.Getenv("PATH")}}.run(t.Context(), t.TempDir())
-		require.Error(t, err)
+		_, err := step{name: "fails", argv: []string{"false"}, environ: environ}.run(t.Context(), t.TempDir())
+		exit, ok := errors.AsType[*procgroup.ExitError](err)
+		require.True(t, ok, "the error is the exit of the command: %v", err)
+		assert.Equal(t, 1, exit.Code)
 		assert.NotErrorIs(t, err, context.DeadlineExceeded)
 	})
 }
@@ -416,9 +434,35 @@ func TestProcTranslated(t *testing.T) {
 		assert.False(t, procTranslated(t.Context()))
 		return
 	}
-	out, err := exec.CommandContext(t.Context(), "sysctl", "-n", "sysctl.proc_translated").Output()
-	want := err == nil && strings.TrimSpace(string(out)) == "1"
+	var out strings.Builder
+	err := procgroup.Run(t.Context(), procgroup.Command{
+		Class:  procgroup.ToolProbe,
+		Argv:   []string{"sysctl", "-n", "sysctl.proc_translated"},
+		Env:    os.Environ(),
+		Stdout: &out,
+	})
+	want := err == nil && strings.TrimSpace(out.String()) == "1"
 	assert.Equal(t, want, procTranslated(t.Context()))
+}
+
+// TestProbe checks how a probe of the machine runs: in this process's
+// environment, with what it prints trimmed and its standard error
+// dropped, under the class procgroup.ToolProbe, past whose limit it is
+// subprocess-timeout.
+func TestProbe(t *testing.T) {
+	t.Setenv("CI_TEST_PROBE", "from the process")
+	out, err := probe(t.Context(), "sh", "-c", `printf ' %s \n' "$CI_TEST_PROBE"; echo noise >&2`)
+	require.NoError(t, err)
+	assert.Equal(t, "from the process", out)
+
+	ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolProbe, 50*time.Millisecond)
+	_, err = probe(ctx, "sleep", "30")
+	timeout, ok := errors.AsType[*procgroup.TimeoutError](err)
+	require.True(t, ok, "the error is subprocess-timeout: %v", err)
+	assert.Equal(t, procgroup.ToolProbe, timeout.Class)
+
+	t.Setenv("PATH", t.TempDir())
+	assert.Contains(t, unameMachine(t.Context()), "unknown (", "a probe that fails says why")
 }
 
 // TestLicenseStep pins the license step: reuse from the image pinned
@@ -469,7 +513,7 @@ func TestAllWiring(t *testing.T) {
 	r.Write("mise.lock", lockFixture)
 	r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
 	r.Commit("fixture")
-	gitPath, err := exec.LookPath("git")
+	gitPath, err := procgroup.LookPath("git")
 	require.NoError(t, err)
 	f := newFakeMise(t)
 	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.bin, "git")))
@@ -541,7 +585,9 @@ func TestSetup(t *testing.T) {
 	r.Write("mise.lock", lockFixture)
 	r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
 	r.Commit("fixture")
-	gitPath, err := exec.LookPath("git")
+	gitPath, err := procgroup.LookPath("git")
+	require.NoError(t, err)
+	sleepPath, err := procgroup.LookPath("sleep")
 	require.NoError(t, err)
 	f := newFakeMise(t)
 	require.NoError(t, os.Symlink(gitPath, filepath.Join(f.bin, "git")))
@@ -647,6 +693,36 @@ func TestSetup(t *testing.T) {
 		assert.Contains(t, out, "FAIL  mise trust")
 		assert.NotContains(t, out, "go mod download")
 	})
+
+	// "mise install" downloads and builds the pinned tools, so it runs
+	// under the class of every mise install, procgroup.Mise; "mise
+	// trust" is a command step, under procgroup.ToolStep. Each case
+	// stalls one mise command and shortens the limit of one class only:
+	// the stalled command ends at the limit of its own class.
+	tests := []struct {
+		name    string
+		stalls  string
+		class   procgroup.Class
+		wantErr string
+	}{
+		{"mise install runs under the mise class", "install", procgroup.Mise, "ran past the 100ms limit of class mise"},
+		{"mise trust runs under the tool-step class", "trust", procgroup.ToolStep, "ran past the 100ms limit of class tool-step"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stall := "#!/bin/sh\n" + answerVersion + "if [ \"$1\" = " + tt.stalls + " ]; then exec '" + sleepPath + "' 30; fi\nexit 0\n"
+			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(stall), 0o700))
+			ctx := procgroup.WithTestTimeout(t.Context(), tt.class, 100*time.Millisecond)
+			var out bytes.Buffer
+			e := env{dir: r.Dir, gitEnv: r.Env, stdin: strings.NewReader(""), stdout: &out, stderr: &out}
+			start := time.Now()
+			code := run(ctx, e, []string{"setup"})
+			assert.Equal(t, exitFail, code, out.String())
+			assert.Contains(t, out.String(), "FAIL  mise "+tt.stalls)
+			assert.Contains(t, out.String(), tt.wantErr)
+			assert.Less(t, time.Since(start), 10*time.Second, "the stalled command ends at the limit of its class")
+		})
+	}
 }
 
 // TestPassThroughLists pins the two lists of variables a step may keep
@@ -813,7 +889,7 @@ func TestCommitCheckThatCannotJudgeFails(t *testing.T) {
 // HEAD is compared by its content too, and a change that is there
 // before the steps and stays is no finding.
 func TestAllStepsLeaveTheTree(t *testing.T) {
-	sh, err := exec.LookPath("sh")
+	sh, err := procgroup.LookPath("sh")
 	require.NoError(t, err)
 	// The tag is put together at run time, so that reuse does not read
 	// this file as one that declares a license.
@@ -873,11 +949,11 @@ func TestAllStepsLeaveTheTree(t *testing.T) {
 func TestCommitChecksReadBeforeMise(t *testing.T) {
 	for _, mode := range []string{"fast", "all"} {
 		t.Run(mode, func(t *testing.T) {
-			chmod, err := exec.LookPath("chmod")
+			chmod, err := procgroup.LookPath("chmod")
 			require.NoError(t, err)
-			cat, err := exec.LookPath("cat")
+			cat, err := procgroup.LookPath("cat")
 			require.NoError(t, err)
-			gitPath, err := exec.LookPath("git")
+			gitPath, err := procgroup.LookPath("git")
 			require.NoError(t, err)
 			r := newTree(t)
 			r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")

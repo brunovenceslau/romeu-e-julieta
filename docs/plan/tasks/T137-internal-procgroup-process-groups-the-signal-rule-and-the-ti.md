@@ -3,7 +3,7 @@ id: T137
 title: "`internal/procgroup`: process groups, the signal rule and the timeout table"
 milestone: M0
 module: procgroup
-fate: new
+fate: merged
 owns:
   - internal/procgroup/**
 needs: []
@@ -11,9 +11,14 @@ after: []
 ask_first:
   - procgroup
 sitting: none
+merged: 2026-10-13
+pr: 49
 ---
 
 # T137 - `internal/procgroup`: process groups, the signal rule and the timeout table
+
+Merged on 2026-10-13 in pull request #49. The text below is the one
+written at the re-plan.
 
 Goal: `tools/ci/procgroup` moves to `internal/procgroup`, the one
 package that starts a subprocess for both binaries, `tools/ci` and

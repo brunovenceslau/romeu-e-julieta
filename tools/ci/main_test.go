@@ -6,9 +6,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
@@ -183,11 +184,17 @@ func TestHook(t *testing.T) {
 	assert.Equal(t, hookScript, string(got), "the hook")
 	// The index is read with this process's environment: inside the
 	// hook, git names the repository through it.
-	out, err := exec.Command("git", "ls-files", "--stage", "--", path).Output()
+	var out strings.Builder
+	err = procgroup.Run(t.Context(), procgroup.Command{
+		Class:  procgroup.ToolGit,
+		Argv:   []string{"git", "ls-files", "--stage", "--", path},
+		Env:    os.Environ(),
+		Stdout: &out,
+	})
 	if err != nil {
 		t.Skipf("the mode is not checked: this copy of the source is not a git working tree (%v)", err)
 	}
-	mode, _, _ := strings.Cut(string(out), " ")
+	mode, _, _ := strings.Cut(out.String(), " ")
 	assert.Equal(t, hookMode, mode, "the mode git records for the hook")
 }
 
@@ -251,10 +258,12 @@ func TestHookEnvIsTheAllowlist(t *testing.T) {
 		k, v, _ := strings.Cut(kv, "=")
 		want[k] = v
 	}
-	cmd := exec.Command("sh", mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push")), "origin", "https://example.test/a b.git")
-	cmd.Dir = link
-	cmd.Env = append(os.Environ(), "PWD="+link) // the path as the caller typed it
-	hookOut, err := cmd.CombinedOutput()
+	hookOut, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolStep,
+		Argv:  []string{"sh", mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push")), "origin", "https://example.test/a b.git"},
+		Dir:   link,
+		Env:   append(os.Environ(), "PWD="+link), // the path as the caller typed it
+	})
 	require.NoError(t, err, string(hookOut))
 	out, err := os.ReadFile(filepath.Join(bin, "calls"))
 	require.NoError(t, err)
@@ -331,7 +340,7 @@ func runHook(t *testing.T, bin string, only bool, stdin string) (code int, stdou
 // runs in that symbolic link to dir, with PWD as the caller typed it.
 func runHookIn(t *testing.T, dir, link, bin string, only bool, stdin string) (code int, stdout, stderr string, resolved string) {
 	t.Helper()
-	sh, err := exec.LookPath("sh")
+	sh, err := procgroup.LookPath("sh")
 	require.NoError(t, err)
 	hook := mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push"))
 	path := bin
@@ -339,17 +348,22 @@ func runHookIn(t *testing.T, dir, link, bin string, only bool, stdin string) (co
 		path += string(os.PathListSeparator) + os.Getenv("PATH")
 	}
 	var o, e bytes.Buffer
-	cmd := exec.Command(sh, hook, "origin", "https://example.test/a b.git")
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "PATH="+path)
-	if link != "" {
-		cmd.Dir = link
-		cmd.Env = append(cmd.Env, "PWD="+link)
+	c := procgroup.Command{
+		Class:  procgroup.ToolStep,
+		Argv:   []string{sh, hook, "origin", "https://example.test/a b.git"},
+		Dir:    dir,
+		Env:    append(os.Environ(), "PATH="+path),
+		Stdin:  strings.NewReader(stdin),
+		Stdout: &o,
+		Stderr: &e,
 	}
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = strings.NewReader(stdin), &o, &e
-	err = cmd.Run()
-	if ee, ok := err.(*exec.ExitError); ok {
-		code = ee.ExitCode()
+	if link != "" {
+		c.Dir = link
+		c.Env = append(c.Env, "PWD="+link)
+	}
+	err = procgroup.Run(t.Context(), c)
+	if exit, ok := errors.AsType[*procgroup.ExitError](err); ok {
+		code = exit.Code
 	} else {
 		require.NoError(t, err)
 	}
@@ -440,7 +454,7 @@ func TestHookExplainsAToolchainRefusal(t *testing.T) {
 	t.Run("no go", func(t *testing.T) {
 		bin := t.TempDir()
 		for _, tool := range []string{"env", "dirname"} {
-			p, err := exec.LookPath(tool)
+			p, err := procgroup.LookPath(tool)
 			require.NoError(t, err)
 			require.NoError(t, os.Symlink(p, filepath.Join(bin, tool)))
 		}
@@ -467,33 +481,35 @@ func TestHookExplainsAToolchainRefusal(t *testing.T) {
 
 // TestHookPassesSIGTERMToGo checks that a SIGTERM sent to the hook
 // reaches the go that runs the checks, because the hook execs it, and that
-// the hook's exit status is that go's.
+// the hook's exit status is that go's. A shell writes its pid and execs
+// the hook, so the pid the test signals is the hook's, and then the go
+// stub's.
 func TestHookPassesSIGTERMToGo(t *testing.T) {
 	bin := stubDir(t, "hang")
-	sh, err := exec.LookPath("sh")
+	sh, err := procgroup.LookPath("sh")
 	require.NoError(t, err)
-	cmd := exec.Command(sh, mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push")))
-	cmd.Dir = mustEval(t, t.TempDir())
-	cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	// A group of its own, killed at the end, so that a stub that never
-	// sees SIGTERM does not outlive the test.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	require.NoError(t, cmd.Start())
-	t.Cleanup(func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) })
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
+	pidfile := filepath.Join(t.TempDir(), "pid")
+	// The group is killed when the run ends, and a stub that never sees
+	// SIGTERM is killed at this limit, so it does not outlive the test.
+	ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolStep, 30*time.Second)
+	done := runAsync(ctx, procgroup.Command{
+		Class: procgroup.ToolStep,
+		Argv:  []string{sh, "-c", `echo $$ > "$0.tmp" && mv "$0.tmp" "$0" && exec "$1" "$2"`, pidfile, sh, mustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push"))},
+		Dir:   mustEval(t, t.TempDir()),
+		Env:   append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH")),
+	})
+	pid := waitForPid(t, pidfile)
 	require.Eventually(t, func() bool {
 		_, err := os.Stat(filepath.Join(bin, "ready"))
 		return err == nil
 	}, 10*time.Second, 20*time.Millisecond, "the checks started")
-	require.NoError(t, cmd.Process.Signal(syscall.SIGTERM))
+	require.NoError(t, syscall.Kill(pid, syscall.SIGTERM))
 	select {
 	case err := <-done:
-		var exit *exec.ExitError
-		require.ErrorAs(t, err, &exit)
-		assert.Equal(t, 143, exit.ExitCode(), "the hook's status is the go stub's")
+		exit, ok := errors.AsType[*procgroup.ExitError](err)
+		require.True(t, ok, "the hook ends with a status: %v", err)
+		assert.Equal(t, 143, exit.Code, "the hook's status is the go stub's")
 	case <-time.After(10 * time.Second):
-		_ = cmd.Process.Kill()
 		t.Fatal("the hook did not end after SIGTERM")
 	}
 	_, err = os.Stat(filepath.Join(bin, "term"))

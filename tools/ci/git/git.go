@@ -16,18 +16,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os/exec"
+	"os"
+	"slices"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 	"unicode/utf8"
-)
 
-// Timeout bounds one git command. The commands here read local objects,
-// so a command that runs this long is stuck, and a stuck command must
-// not hold a push open for ever.
-const Timeout = 2 * time.Minute
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+)
 
 // Repo is a repository on disk.
 type Repo struct {
@@ -43,6 +40,11 @@ type Repo struct {
 // its standard output. A command that exits non-zero is an error that
 // carries what git wrote to standard error.
 //
+// Each command runs through internal/procgroup, in a process group of
+// its own, under the class procgroup.ToolGit: the commands here read
+// local objects, so a command that runs past its limit is stuck, and a
+// stuck command must not hold a push open for ever.
+//
 // Three settings hold for every command, whatever the configuration
 // and the environment. Replace refs are off: a push sends the objects
 // themselves, so a local replace ref must not show the checks a different
@@ -52,24 +54,34 @@ type Repo struct {
 // object that a partial clone lacks is an error, not a fetch, so a check
 // reads only what the clone holds and never reaches the network.
 func (r Repo) Run(ctx context.Context, stdin []byte, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, Timeout)
-	defer cancel()
 	fixed := []string{"--no-replace-objects", "-c", "core.quotePath=true"}
-	cmd := exec.CommandContext(ctx, "git", append(fixed, args...)...)
-	cmd.Dir = r.Dir
-	cmd.Env = r.Env
-	// Last, so that it wins over the same variable earlier in the
-	// environment; Environ gives what the command would run with, the
-	// environment of this process when r.Env is nil.
-	cmd.Env = append(cmd.Environ(), "GIT_NO_LAZY_FETCH=1")
-	cmd.Stdin = bytes.NewReader(stdin)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	var stdout, stderr bytes.Buffer
+	err := procgroup.Run(ctx, procgroup.Command{
+		Class: procgroup.ToolGit,
+		Argv:  append([]string{"git"}, append(fixed, args...)...),
+		Dir:   r.Dir,
+		// Last, so that it wins over the same variable earlier in the
+		// environment.
+		Env:    append(r.Environ(), "GIT_NO_LAZY_FETCH=1"),
+		Stdin:  bytes.NewReader(stdin),
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("git %s: %w: %s", args[0], err, Printable(strings.TrimSpace(stderr.String())))
 	}
-	return out, nil
+	return stdout.Bytes(), nil
+}
+
+// Environ returns the environment a git command of the repository runs
+// with: a copy of Env, or of this process's environment when Env is
+// nil. A command started through internal/procgroup takes it whole,
+// since procgroup gives a nil environment an empty one.
+func (r Repo) Environ() []string {
+	if r.Env == nil {
+		return os.Environ()
+	}
+	return slices.Clone(r.Env)
 }
 
 // FetchHint is the advice of an error about the object oid that the

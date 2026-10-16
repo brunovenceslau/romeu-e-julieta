@@ -8,12 +8,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"unicode"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 )
 
@@ -141,34 +142,49 @@ func checkIndexFlags(ctx context.Context, source git.Repo) error {
 }
 
 // sendPack streams the objects of want that have does not reach from
-// source to clone: pack-objects writes a pack to a pipe that
+// source to clone: pack-objects writes a pack to an OS pipe that
 // unpack-objects reads, so no pack is held in memory or on disk. Both
-// run as git.Repo.Run runs git, without replace refs and within
-// git.Timeout.
+// run without replace refs, in the environment of their repository
+// (git.Repo.Environ), through internal/procgroup, each under its own
+// limit of the class procgroup.ToolGit; they start together, so the
+// pair ends within about that limit.
+//
+// Each end of the pipe is a file, which procgroup hands the command as
+// it is, with no copy of its own whose drain could stop short: what
+// pack-objects wrote is in the pipe when it ends. This process closes
+// the write end once pack-objects has ended, so unpack-objects reads
+// EOF only then, and the read end once unpack-objects has ended, so a
+// pack-objects that still writes gets EPIPE or SIGPIPE and ends too.
 func sendPack(ctx context.Context, source, clone git.Repo, want, have string) error {
-	ctx, cancel := context.WithTimeout(ctx, git.Timeout)
-	defer cancel()
-	pack := exec.CommandContext(ctx, "git", "--no-replace-objects", "pack-objects", "--revs", "--stdout", "--quiet")
-	pack.Dir, pack.Env = source.Dir, source.Env
-	pack.Stdin = strings.NewReader(want + "\n^" + have + "\n")
-	var packErr, unpackErr bytes.Buffer
-	pack.Stderr = &packErr
-	pipe, err := pack.StdoutPipe()
+	pipeOut, pipeIn, err := os.Pipe()
 	if err != nil {
-		return err
+		return fmt.Errorf("snapshot: the pipe of the pack: %w", err)
 	}
-	unpack := exec.CommandContext(ctx, "git", "--no-replace-objects", "unpack-objects", "-q")
-	unpack.Dir, unpack.Env = clone.Dir, clone.Env
-	unpack.Stdin = pipe
-	unpack.Stderr = &unpackErr
-	if err := pack.Start(); err != nil {
-		return fmt.Errorf("snapshot: git pack-objects: %w", err)
-	}
-	unpackRun := unpack.Run()
-	if unpackRun != nil {
-		_ = pack.Process.Kill()
-	}
-	packRun := pack.Wait()
+	var packErr, unpackErr bytes.Buffer
+	packed := make(chan error, 1)
+	go func() {
+		err := procgroup.Run(ctx, procgroup.Command{
+			Class:  procgroup.ToolGit,
+			Argv:   []string{"git", "--no-replace-objects", "pack-objects", "--revs", "--stdout", "--quiet"},
+			Dir:    source.Dir,
+			Env:    source.Environ(),
+			Stdin:  strings.NewReader(want + "\n^" + have + "\n"),
+			Stdout: pipeIn,
+			Stderr: &packErr,
+		})
+		_ = pipeIn.Close()
+		packed <- err
+	}()
+	unpackRun := procgroup.Run(ctx, procgroup.Command{
+		Class:  procgroup.ToolGit,
+		Argv:   []string{"git", "--no-replace-objects", "unpack-objects", "-q"},
+		Dir:    clone.Dir,
+		Env:    clone.Environ(),
+		Stdin:  pipeOut,
+		Stderr: &unpackErr,
+	})
+	_ = pipeOut.Close()
+	packRun := <-packed
 	var errs []error
 	if packRun != nil {
 		errs = append(errs, fmt.Errorf("snapshot: git pack-objects: %w: %s", packRun, git.Printable(strings.TrimSpace(packErr.String()))))

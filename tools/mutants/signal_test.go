@@ -5,9 +5,8 @@ package main
 
 import (
 	"bytes"
-	"context"
+	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,6 +16,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
 // helperEnv names the role of this test binary when a test runs it as a
@@ -25,10 +26,14 @@ const helperEnv = "MUTANTS_TEST_HELPER"
 
 // TestHelperProcess is not a test: the signal tests run this binary
 // again with helperEnv set, to get a process with the signal handling
-// of main that they can interrupt.
+// of main that they can interrupt. It writes its own pid first, for the
+// test to signal.
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv(helperEnv) != "main" {
 		return
+	}
+	if err := os.WriteFile(os.Getenv("MUTANTS_TEST_MAINPID"), []byte(strconv.Itoa(os.Getpid())), 0o600); err != nil {
+		os.Exit(2)
 	}
 	e := env{
 		dir:    os.Getenv("MUTANTS_TEST_DIR"),
@@ -37,7 +42,7 @@ func TestHelperProcess(t *testing.T) {
 		stdout: os.Stdout,
 		stderr: os.Stderr,
 	}
-	os.Exit(runSignalled(e, []string{os.Getenv("MUTANTS_TEST_MUTANTS")}))
+	os.Exit(runMain(e, []string{os.Getenv("MUTANTS_TEST_MUTANTS")}))
 }
 
 // hangTest is a test file whose TestHang, when hang is true, writes the
@@ -68,10 +73,10 @@ const hangMutant = `mutants:
 // helper is a run of the command in a helper process, with the signal
 // handling of main.
 type helper struct {
-	cmd            *exec.Cmd
 	done           chan error
 	stdout, stderr *bytes.Buffer
-	pidfile        string
+	pidfile        string // the pid of the hung test binary
+	mainPidfile    string // the pid of the helper
 }
 
 // startHelper commits hangTest, hanging from the start (in the
@@ -82,21 +87,35 @@ func startHelper(t *testing.T, inBaseline bool) (fixture, helper) {
 	f := newFixture(t, hangMutant)
 	h := helper{done: make(chan error, 1), stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}}
 	h.pidfile = commitHang(t, f, inBaseline)
-	gocache, err := exec.CommandContext(t.Context(), f.e.goBin, "env", "GOCACHE").Output()
+	h.mainPidfile = filepath.Join(t.TempDir(), "main")
+	var gocache strings.Builder
+	err := procgroup.Run(t.Context(), procgroup.Command{
+		Class:  procgroup.Mise,
+		Argv:   []string{f.e.goBin, "env", "GOCACHE"},
+		Env:    os.Environ(),
+		Stdout: &gocache,
+	})
 	require.NoError(t, err)
-	h.cmd = exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestHelperProcess$")
-	h.cmd.Env = append(append([]string{}, f.repo.Env...),
-		"GOCACHE="+strings.TrimSpace(string(gocache)),
-		helperEnv+"=main",
-		"MUTANTS_TEST_DIR="+f.e.dir,
-		"MUTANTS_TEST_GO="+f.e.goBin,
-		"MUTANTS_TEST_TMP="+f.e.tmpDir,
-		"MUTANTS_TEST_MUTANTS="+f.mutants,
-	)
-	h.cmd.Stdout, h.cmd.Stderr = h.stdout, h.stderr
-	require.NoError(t, h.cmd.Start())
-	t.Cleanup(func() { _ = h.cmd.Process.Kill() })
-	go func() { h.done <- h.cmd.Wait() }()
+	// A process group of its own, killed when the test ends or at this
+	// limit, so a helper the test lost does not outlive it.
+	ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolStep, 5*time.Minute)
+	go func() {
+		h.done <- procgroup.Run(ctx, procgroup.Command{
+			Class: procgroup.ToolStep,
+			Argv:  []string{os.Args[0], "-test.run=^TestHelperProcess$"},
+			Env: append(append([]string{}, f.repo.Env...),
+				"GOCACHE="+strings.TrimSpace(gocache.String()),
+				helperEnv+"=main",
+				"MUTANTS_TEST_MAINPID="+h.mainPidfile,
+				"MUTANTS_TEST_DIR="+f.e.dir,
+				"MUTANTS_TEST_GO="+f.e.goBin,
+				"MUTANTS_TEST_TMP="+f.e.tmpDir,
+				"MUTANTS_TEST_MUTANTS="+f.mutants,
+			),
+			Stdout: h.stdout,
+			Stderr: h.stderr,
+		})
+	}()
 	return f, h
 }
 
@@ -111,21 +130,37 @@ func commitHang(t *testing.T, f fixture, inBaseline bool) string {
 	return pidfile
 }
 
-// hungPid waits for the hung test binary to write its pid. The handler
-// of main is in place by then: it is set before the run starts.
-func (h helper) hungPid(t *testing.T) int {
+// readPid waits for the file to hold a pid and returns it. A pid at or
+// below 1 is never one a test may signal (kill(-1) reaches every
+// process, kill(0) the test's own group), so it fails the test.
+func readPid(t *testing.T, file string, wait time.Duration, what string) int {
 	t.Helper()
 	var pid int
 	require.Eventually(t, func() bool {
-		b, err := os.ReadFile(h.pidfile)
+		b, err := os.ReadFile(file)
 		if err != nil {
 			return false
 		}
 		pid, err = strconv.Atoi(string(b))
 		return err == nil
-	}, 2*time.Minute, 20*time.Millisecond, "the test binary hangs")
+	}, wait, 20*time.Millisecond, what)
+	require.Greater(t, pid, 1, "the pid in %s", file)
+	return pid
+}
+
+// hungPid waits for the hung test binary to write its pid. The handler
+// of main is in place by then: it is set before the run starts.
+func (h helper) hungPid(t *testing.T) int {
+	t.Helper()
+	pid := readPid(t, h.pidfile, 2*time.Minute, "the test binary hangs")
 	t.Cleanup(func() { _ = syscall.Kill(pid, syscall.SIGKILL) })
 	return pid
+}
+
+// signal sends sig to the helper, by the pid it wrote.
+func (h helper) signal(t *testing.T, sig syscall.Signal) {
+	t.Helper()
+	require.NoError(t, syscall.Kill(readPid(t, h.mainPidfile, 10*time.Second, "the helper writes its pid"), sig))
 }
 
 // ownStderr is what the run wrote to standard error, without the line
@@ -140,14 +175,14 @@ func (h helper) ownStderr() string {
 	return b.String()
 }
 
-// wait returns the exit status of the helper, or fails the test when it
-// does not end in time.
-func (h helper) wait(t *testing.T) *exec.ExitError {
+// wait returns how the helper ended, or fails the test when it does not
+// end in time.
+func (h helper) wait(t *testing.T) *procgroup.ExitError {
 	t.Helper()
 	select {
 	case err := <-h.done:
-		var exit *exec.ExitError
-		require.ErrorAs(t, err, &exit)
+		exit, ok := errors.AsType[*procgroup.ExitError](err)
+		require.True(t, ok, "the helper ends with a status: %v", err)
 		return exit
 	case <-time.After(time.Minute):
 		require.FailNow(t, "the run did not stop")
@@ -178,17 +213,18 @@ func requireGone(t *testing.T, pid int) {
 // removes the clone, leaves the source as it was, prints only the
 // interrupted line, and exits 128 plus the signal number.
 func TestMutantsInterrupted(t *testing.T) {
-	for _, sig := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP} {
+	for _, sig := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM} {
 		t.Run(sig.String(), func(t *testing.T) {
 			f, h := startHelper(t, false)
 			before := f.state(t)
 			pid := h.hungPid(t)
-			require.NoError(t, h.cmd.Process.Signal(sig))
-			assert.Equal(t, exitSignalBase+int(sig), h.wait(t).ExitCode())
+			h.signal(t, sig)
+			assert.Equal(t, 128+int(sig), h.wait(t).Code)
 			assert.Equal(t, "mutants: interrupted\n", h.ownStderr())
 			assert.Empty(t, h.stdout.String())
 			requireGone(t, pid)
 			f.assertUntouched(t, before)
+			f.assertNoStashNoClone(t)
 		})
 	}
 }
@@ -199,86 +235,47 @@ func TestMutantsInterruptedInTheBaseline(t *testing.T) {
 	f, h := startHelper(t, true)
 	before := f.state(t)
 	pid := h.hungPid(t)
-	require.NoError(t, h.cmd.Process.Signal(syscall.SIGINT))
-	assert.Equal(t, exitSignalBase+int(syscall.SIGINT), h.wait(t).ExitCode())
+	h.signal(t, syscall.SIGINT)
+	assert.Equal(t, 128+int(syscall.SIGINT), h.wait(t).Code)
 	assert.Equal(t, "mutants: interrupted\n", h.ownStderr())
 	requireGone(t, pid)
 	f.assertUntouched(t, before)
 }
 
-// TestMutantsSecondSignal checks that a second signal ends the run at
-// once: the handler steps aside after the first, so the second has its
-// default action, unless the drain of the first ends the run before.
-// Either way the test binary is dead, as the handler kills its group
-// before it steps aside.
+// TestMutantsSecondSignal checks that a run that gets two SIGINTs
+// while a mutant runs a test that never ends exits 130, as for the
+// first signal alone, with the test binary dead and the second signal
+// absorbed rather than ending the process by its default action.
+//
+// The two signals leave the test back to back. The handler of
+// procgroup.Main takes SIGINT through a channel of one slot, so a
+// second SIGINT that lands before the handler steps aside is either
+// dropped on the full channel or left unread in it; only one that lands
+// after the cancel, the kill of every group and the step aside would
+// end the process. The only way for that to happen here is for the
+// test to be held between its two kill calls for longer than the
+// handler takes, which fails this test loudly (a status of a signal,
+// not an exit) and never passes it falsely. The order that closes the
+// window is procgroup's, and its own tests hold the handler at the
+// step aside to show it; that seam is not exported, so this test does
+// not hold it.
 func TestMutantsSecondSignal(t *testing.T) {
 	_, h := startHelper(t, false)
 	pid := h.hungPid(t)
-	require.NoError(t, h.cmd.Process.Signal(syscall.SIGINT))
-	require.NoError(t, h.cmd.Process.Signal(syscall.SIGINT))
+	helperPid := readPid(t, h.mainPidfile, 10*time.Second, "the helper writes its pid")
+	require.NoError(t, syscall.Kill(helperPid, syscall.SIGINT))
+	require.NoError(t, syscall.Kill(helperPid, syscall.SIGINT))
 	exit := h.wait(t)
-	status, ok := exit.Sys().(syscall.WaitStatus)
-	require.True(t, ok)
-	if status.Signaled() {
-		assert.Equal(t, syscall.SIGINT, status.Signal())
-	} else {
-		assert.Equal(t, exitSignalBase+int(syscall.SIGINT), status.ExitStatus())
-	}
+	assert.Zero(t, exit.Signal, "the second signal did not end the process")
+	assert.Equal(t, 128+int(syscall.SIGINT), exit.Code)
+	assert.Equal(t, "mutants: interrupted\n", h.ownStderr())
 	requireGone(t, pid)
 }
 
-// TestRunSignalledWithoutASignal checks that a run no signal touches
-// keeps its own status.
-func TestRunSignalledWithoutASignal(t *testing.T) {
+// TestRunMainWithoutASignal checks that a run no signal touches keeps
+// its own status and prints no interrupted line.
+func TestRunMainWithoutASignal(t *testing.T) {
 	f := newFixture(t, threeMutants)
-	assert.Equal(t, exitFail, runSignalled(f.e, []string{f.mutants}))
+	assert.Equal(t, exitFail, runMain(f.e, []string{f.mutants}))
 	assert.NotContains(t, f.stderr.String(), "interrupted")
-}
-
-// TestRunSignalledInProcess sends SIGTERM to this process while a
-// mutant hangs, once the handler of runSignalled is in place (the hung
-// test binary has written its pid): the run kills the binary and exits
-// 128 plus the signal number.
-func TestRunSignalledInProcess(t *testing.T) {
-	f := newFixture(t, hangMutant)
-	h := helper{pidfile: commitHang(t, f, false)}
-	status := make(chan int, 1)
-	go func() { status <- runSignalled(f.e, []string{f.mutants}) }()
-	pid := h.hungPid(t)
-	require.NoError(t, syscall.Kill(os.Getpid(), syscall.SIGTERM))
-	select {
-	case got := <-status:
-		assert.Equal(t, exitSignalBase+int(syscall.SIGTERM), got)
-	case <-time.After(time.Minute):
-		require.FailNow(t, "the run did not stop")
-	}
-	assert.Equal(t, "mutants: interrupted\n", f.stderr.String())
-	requireGone(t, pid)
-	f.assertNoStashNoClone(t)
-}
-
-// TestGroupKill checks that kill ends the group of the command that
-// runs, and does nothing when none runs.
-func TestGroupKill(t *testing.T) {
-	g := &group{}
-	g.kill()
-	done := make(chan error, 1)
-	go func() {
-		_, err := g.combinedOutput(exec.CommandContext(t.Context(), "sleep", "60"))
-		done <- err
-	}()
-	require.Eventually(t, func() bool {
-		g.mu.Lock()
-		defer g.mu.Unlock()
-		return g.pid != 0
-	}, 10*time.Second, 10*time.Millisecond, "the command starts")
-	g.kill()
-	select {
-	case err := <-done:
-		var exit *exec.ExitError
-		require.ErrorAs(t, err, &exit)
-	case <-time.After(15 * time.Second):
-		require.FailNow(t, "kill did not end the command")
-	}
-	assert.Zero(t, g.pid)
 }

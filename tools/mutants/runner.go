@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -17,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 )
@@ -384,7 +384,7 @@ func (r *runner) packages(ctx context.Context, m mutant) ([]string, error) {
 	if dir == m.Package {
 		return pkgs, nil
 	}
-	notListed, _, err := r.goCmd(ctx, "list", "-find", dir)
+	notListed, _, err := r.goCmd(ctx, procgroup.ToolProbe, "list", "-find", dir)
 	if err != nil {
 		return nil, err
 	}
@@ -399,36 +399,45 @@ func (r *runner) packages(ctx context.Context, m mutant) ([]string, error) {
 // and the go command keeps no binary, so two packages with the same
 // name do not ask for the same output file.
 func (r *runner) build(ctx context.Context, pkgs []string) (bool, string, error) {
-	failed, out, err := r.goCmd(ctx, slices.Concat([]string{"test", "-count=1", "-vet=off", "-exec=true"}, pkgs)...)
+	failed, out, err := r.goCmd(ctx, procgroup.Unbounded, slices.Concat([]string{"test", "-count=1", "-vet=off", "-exec=true"}, pkgs)...)
 	return !failed, out, err
 }
 
 // goTest runs the target in the clone, verbose so that countPassed can
 // read it, and reports whether it failed. A timeout of zero leaves the
-// go test default. A package pattern starts with "./" (mutant.check),
-// so the go command never reads one as a flag.
+// go test default. The go command itself has no limit (the class
+// procgroup.Unbounded): -timeout bounds the test binary, and the
+// signal handler of main kills the group. A package pattern starts
+// with "./" (mutant.check), so the go command never reads one as a
+// flag.
 func (r *runner) goTest(ctx context.Context, t target, timeout time.Duration) (failed bool, out string, err error) {
 	args := []string{"test", "-count=1", "-vet=off", "-v", "-run=" + t.run}
 	if timeout > 0 {
 		args = append(args, "-timeout="+timeout.String())
 	}
-	return r.goCmd(ctx, append(args, t.pkg)...)
+	return r.goCmd(ctx, procgroup.Unbounded, append(args, t.pkg)...)
 }
 
-// goCmd runs the go command in the clone, in a process group that is
-// killed when it returns (group.combinedOutput). It reports a non-zero
-// exit as failed with the output; an error means the command did not
-// run or the run was interrupted.
-func (r *runner) goCmd(ctx context.Context, args ...string) (failed bool, out string, err error) {
-	cmd := exec.CommandContext(ctx, r.goBin, args...)
-	cmd.Dir = r.clone.Dir
-	cmd.Env = r.goEnv
-	output, err := r.e.group.combinedOutput(cmd)
+// goCmd runs the go command in the clone, under the timeout class,
+// through procgroup.CombinedOutput: in a process group of its own that
+// is killed when the leader ends, and by the signal handler of main. It
+// reports a non-zero exit as failed with the output; an error means the
+// command did not run, ran past the limit of its class, or the run was
+// interrupted.
+func (r *runner) goCmd(ctx context.Context, class procgroup.Class, args ...string) (failed bool, out string, err error) {
+	// CombinedOutput holds the output in memory, which its doc advises
+	// against for procgroup.Unbounded: countPassed parses the whole of
+	// it, and -timeout bounds the test binary that writes most of it.
+	output, err := procgroup.CombinedOutput(ctx, procgroup.Command{
+		Class: class,
+		Argv:  append([]string{r.goBin}, args...),
+		Dir:   r.clone.Dir,
+		Env:   r.goEnv,
+	})
 	if ctx.Err() != nil {
 		return false, "", errInterrupted
 	}
-	var exit *exec.ExitError
-	if errors.As(err, &exit) {
+	if _, ok := errors.AsType[*procgroup.ExitError](err); ok {
 		return true, string(output), nil
 	}
 	if err != nil {
@@ -441,16 +450,23 @@ func (r *runner) goCmd(ctx context.Context, args ...string) (failed bool, out st
 // names at the top of the source tree, where the mise shim finds the
 // pinned go, and checks that it is the version this tool was built
 // with. The probe runs with GOTOOLCHAIN=local and GOENV=off, so it
-// neither fetches another go nor reads a "go env -w" file.
+// neither fetches another go nor reads a "go env -w" file. It runs in
+// the class procgroup.Mise: the shim may install the pinned go on a
+// cold cache first.
 func resolveGo(ctx context.Context, top string) (string, error) {
-	cmd := exec.CommandContext(ctx, "go", "env", "GOROOT")
-	cmd.Dir = top
-	cmd.Env = slices.Concat(os.Environ(), goenv.Pin)
-	out, err := cmd.Output()
+	var stdout, stderr strings.Builder
+	err := procgroup.Run(ctx, procgroup.Command{
+		Class:  procgroup.Mise,
+		Argv:   []string{"go", "env", "GOROOT"},
+		Dir:    top,
+		Env:    slices.Concat(os.Environ(), goenv.Pin),
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
 	if err != nil {
-		return "", fmt.Errorf("go env GOROOT in %s: %w", top, err)
+		return "", fmt.Errorf("go env GOROOT in %s: %w: %s", top, err, git.Printable(strings.TrimSpace(stderr.String())))
 	}
-	goBin := filepath.Join(strings.TrimSpace(string(out)), "bin", "go")
+	goBin := filepath.Join(strings.TrimSpace(stdout.String()), "bin", "go")
 	if err := checkGoVersion(ctx, goBin); err != nil {
 		return "", err
 	}
@@ -460,13 +476,18 @@ func resolveGo(ctx context.Context, top string) (string, error) {
 // checkGoVersion fails unless goBin is the version of the go that built
 // this tool.
 func checkGoVersion(ctx context.Context, goBin string) error {
-	cmd := exec.CommandContext(ctx, goBin, "env", "GOVERSION")
-	cmd.Env = goEnv(goBin, "")
-	out, err := cmd.Output()
+	var stdout, stderr strings.Builder
+	err := procgroup.Run(ctx, procgroup.Command{
+		Class:  procgroup.Mise,
+		Argv:   []string{goBin, "env", "GOVERSION"},
+		Env:    goEnv(goBin, ""),
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
 	if err != nil {
-		return fmt.Errorf("%s env GOVERSION: %w", goBin, err)
+		return fmt.Errorf("%s env GOVERSION: %w: %s", goBin, err, git.Printable(strings.TrimSpace(stderr.String())))
 	}
-	if got := strings.TrimSpace(string(out)); got != runtime.Version() {
+	if got := strings.TrimSpace(stdout.String()); got != runtime.Version() {
 		return fmt.Errorf("%s is %s, not %s, the go this tool was built with", goBin, got, runtime.Version())
 	}
 	return nil

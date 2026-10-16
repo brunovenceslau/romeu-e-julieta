@@ -5,7 +5,6 @@ package main
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
@@ -786,9 +786,12 @@ func TestDefaultBranchDenylistOfAPartialClone(t *testing.T) {
 	require.Error(t, err, "a list that may be empty: %v", list)
 	oid := upstream.Git("rev-parse", "HEAD:"+names.Path)
 	assert.Contains(t, err.Error(), `"git cat-file -p `+oid+`"`)
-	fetch := exec.Command("git", "cat-file", "-p", oid)
-	fetch.Dir, fetch.Env = clone.Dir, clone.Env
-	out, err := fetch.CombinedOutput()
+	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolGit,
+		Argv:  []string{"git", "cat-file", "-p", oid},
+		Dir:   clone.Dir,
+		Env:   clone.Env,
+	})
 	require.NoError(t, err, "%s", out)
 	list, err = defaultBranchDenylist(t.Context(), clone, "origin")
 	require.NoError(t, err)

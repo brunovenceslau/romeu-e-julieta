@@ -4,17 +4,20 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 )
 
@@ -70,9 +73,11 @@ func TestMiseEnvList(t *testing.T) {
 		assert.NotContains(t, []string{"MISE_CEILING_PATHS", "MISE_CD", "MISE_ENV_FILE", "MISE_TRUSTED_CONFIG_PATHS", "MISE_GLOBAL_CONFIG_FILE", "MISE_SYSTEM_CONFIG_FILE", "MISE_CONFIG_DIR", "XDG_CONFIG_HOME", "GOFLAGS", "GOENV", "GOWORK", "GOTOOLCHAIN"}, key)
 	}
 	// A value of the caller's for a variable of miseEnv loses to the list's.
-	cmd := exec.CommandContext(t.Context(), "env")
-	cmd.Env = miseEnviron([]string{"GOENV=/hostile", "GOTOOLCHAIN=go1.99.0"})
-	out, err := cmd.Output()
+	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolProbe,
+		Argv:  []string{"env"},
+		Env:   miseEnviron([]string{"GOENV=/hostile", "GOTOOLCHAIN=go1.99.0"}),
+	})
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "GOENV=off\n")
 	assert.Contains(t, string(out), "GOTOOLCHAIN=local\n")
@@ -141,10 +146,12 @@ func TestMiseEnvStopsConfigs(t *testing.T) {
 	require.NoError(t, os.Symlink(filepath.Join("elsewhere", ".mise"), filepath.Join(dir, ".mise")))
 	mise := func(env []string, args ...string) {
 		t.Helper()
-		cmd := exec.CommandContext(t.Context(), "mise", append([]string{"-C", dir}, args...)...)
-		cmd.Dir = dir
-		cmd.Env = env
-		out, err := cmd.CombinedOutput()
+		out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+			Class: procgroup.ToolProbe,
+			Argv:  append([]string{"mise", "-C", dir}, args...),
+			Dir:   dir,
+			Env:   env,
+		})
 		require.NoError(t, err, "mise %v\n%s", args, out)
 	}
 	written := func(env []string) []string {
@@ -259,14 +266,18 @@ func TestMiseNeverReads(t *testing.T) {
 	type seen struct{ marker, pwd, goflags, goenv string }
 	printed := func(t *testing.T, env []string, dir string) seen {
 		t.Helper()
-		cmd := exec.CommandContext(t.Context(), "mise", "exec", "--", "sh", "-c",
-			`printf '%s|%s|%s|%s' "${PLANTED:-nothing}" "$(pwd -P)" "${GOFLAGS-unset}" "${GOENV-unset}"`)
-		cmd.Dir = dir
-		cmd.Env = env
-		out, err := cmd.Output()
+		var stdout strings.Builder
+		err := procgroup.Run(t.Context(), procgroup.Command{
+			Class:  procgroup.ToolProbe,
+			Argv:   []string{"mise", "exec", "--", "sh", "-c", `printf '%s|%s|%s|%s' "${PLANTED:-nothing}" "$(pwd -P)" "${GOFLAGS-unset}" "${GOENV-unset}"`},
+			Dir:    dir,
+			Env:    env,
+			Stdout: &stdout,
+		})
 		require.NoError(t, err, "mise exec")
-		parts := strings.Split(string(out), "|")
-		require.Len(t, parts, 4, string(out))
+		out := stdout.String()
+		parts := strings.Split(out, "|")
+		require.Len(t, parts, 4, out)
 		return seen{parts[0], parts[1], parts[2], parts[3]}
 	}
 	for _, row := range rows {
@@ -505,4 +516,35 @@ func TestCheckMiseVersion(t *testing.T) {
 
 	require.NoError(t, os.Remove(filepath.Join(f.bin, "mise")))
 	require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is not on the search path")
+}
+
+// TestMiseProbesRunUnderTheToolProbeClass shows that the two probes of
+// mise, "mise which" (whichPinned) and "mise --version"
+// (checkMiseVersion), run under the class procgroup.ToolProbe: a mise
+// that stalls ends at the limit of that class, shortened here. A probe
+// under another class would end at the deadline of the context
+// instead, which is not subprocess-timeout.
+func TestMiseProbesRunUnderTheToolProbeClass(t *testing.T) {
+	sleep, err := procgroup.LookPath("sleep")
+	require.NoError(t, err)
+	root := lockedRoot(t, lockFixture)
+	f := newFakeMise(t)
+	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\nexec '"+sleep+"' 30\n"), 0o700))
+	probes := map[string]func(ctx context.Context) error{
+		"mise which": func(ctx context.Context) error {
+			_, err := whichPinned(ctx, root, "go", "go", "go")
+			return err
+		},
+		"mise --version": func(ctx context.Context) error { return checkMiseVersion(ctx, root) },
+	}
+	for name, probe := range probes {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			err := probe(procgroup.WithTestTimeout(ctx, procgroup.ToolProbe, 100*time.Millisecond))
+			timeout, ok := errors.AsType[*procgroup.TimeoutError](err)
+			require.True(t, ok, "the error is subprocess-timeout: %v", err)
+			assert.Equal(t, procgroup.ToolProbe, timeout.Class)
+		})
+	}
 }

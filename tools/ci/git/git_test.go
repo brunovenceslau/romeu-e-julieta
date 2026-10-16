@@ -5,15 +5,18 @@ package git_test
 
 import (
 	"context"
-	"os/exec"
+	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 )
@@ -169,6 +172,26 @@ func TestRunStopsWithItsContext(t *testing.T) {
 	require.Error(t, err, "Run under a cancelled context")
 }
 
+// TestRunUnderTheToolGitClass shows that Run runs git under the class
+// procgroup.ToolGit: a git that stalls, first on PATH, ends at the limit
+// of that class, shortened here. A run under another class would end
+// at the deadline of the context instead, which is not
+// subprocess-timeout.
+func TestRunUnderTheToolGitClass(t *testing.T) {
+	sleep, err := procgroup.LookPath("sleep")
+	require.NoError(t, err)
+	bin := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\nexec '"+sleep+"' 30\n"), 0o700))
+	t.Setenv("PATH", bin)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	ctx = procgroup.WithTestTimeout(ctx, procgroup.ToolGit, 100*time.Millisecond)
+	_, err = git.Repo{Dir: t.TempDir(), Env: []string{}}.Run(ctx, nil, "status")
+	timeout, ok := errors.AsType[*procgroup.TimeoutError](err)
+	require.True(t, ok, "the error is subprocess-timeout: %v", err)
+	assert.Equal(t, procgroup.ToolGit, timeout.Class)
+}
+
 // TestRunFetchesNoMissingObject shows that Run does not fetch an object
 // that a partial clone lacks: the checks read what the clone holds, and
 // a read must not reach the network. Git run without Run's setting does
@@ -184,9 +207,12 @@ func TestRunFetchesNoMissingObject(t *testing.T) {
 	clone := git.Repo{Dir: dir, Env: slices.Concat(server.Env, []string{"GIT_NO_LAZY_FETCH=0"})}
 	_, err := clone.Run(t.Context(), nil, "cat-file", "-p", blob)
 	require.ErrorContains(t, err, "Not a valid object name "+blob, "Run fetched the blob the partial clone lacks")
-	lazy := exec.Command("git", "cat-file", "-p", blob)
-	lazy.Dir, lazy.Env = dir, server.Env
-	out, err := lazy.CombinedOutput()
+	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolGit,
+		Argv:  []string{"git", "cat-file", "-p", blob},
+		Dir:   dir,
+		Env:   server.Env,
+	})
 	require.NoError(t, err, "without the setting git fetches it: %s", out)
 	assert.Equal(t, "a\n", string(out))
 }

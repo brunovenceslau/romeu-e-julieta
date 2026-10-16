@@ -4,17 +4,18 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 )
@@ -391,11 +392,16 @@ func pinnedMiseVersion(root string) (string, error) {
 // 2026.10.3: "2026.10.3 linux-arm64 (2026-10-05)"). It runs as every
 // mise run of tools/ci does: at the top of the tree, with miseEnv.
 func checkMiseVersion(ctx context.Context, root string) error {
-	cmd := exec.CommandContext(ctx, "mise", "--version")
-	cmd.Dir = root
-	cmd.Env = miseRunEnviron(passThroughEnv(), root)
-	out, err := cmd.Output()
-	if errors.Is(err, exec.ErrNotFound) {
+	var stdout bytes.Buffer
+	err := procgroup.Run(ctx, procgroup.Command{
+		Class:  procgroup.ToolProbe,
+		Argv:   []string{"mise", "--version"},
+		Dir:    root,
+		Env:    miseRunEnviron(passThroughEnv(), root),
+		Stdout: &stdout,
+	})
+	out := stdout.Bytes()
+	if errors.Is(err, procgroup.ErrNotFound) {
 		return fmt.Errorf("mise is not on the search path: install the mise that %s pins, then run \"go run ./tools/ci setup\" in %s", pinnedMiseWorkflow, root)
 	}
 	if err != nil {

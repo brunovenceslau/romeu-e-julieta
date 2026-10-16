@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 )
@@ -725,7 +725,7 @@ type gitCall struct{ args, stdin string }
 // from running in parallel with another.
 func recordGit(t *testing.T) func() []gitCall {
 	t.Helper()
-	real, err := exec.LookPath("git")
+	real, err := procgroup.LookPath("git")
 	require.NoError(t, err)
 	bin, calls := t.TempDir(), t.TempDir()
 	wrapper := "#!/bin/sh\n" +
@@ -991,7 +991,7 @@ func TestParseBatchCheck(t *testing.T) {
 func TestScanAttributesBlobGoneBeforeTheRead(t *testing.T) {
 	r := scanFixture(t, map[string]string{"a/.gitattributes": "x -text\n"})
 	oid := r.Git("rev-parse", ":a/.gitattributes")
-	real, err := exec.LookPath("git")
+	real, err := procgroup.LookPath("git")
 	require.NoError(t, err)
 	bin := t.TempDir()
 	wrapper := "#!/bin/sh\n" +

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -15,13 +16,14 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 )
 
@@ -538,18 +540,6 @@ func TestMutantTimeout(t *testing.T) {
 	assert.Equal(t, 50*time.Second, mutantTimeout(5*time.Second, 3*time.Second))
 }
 
-// TestFinish checks the status of a run that no signal touched, of one
-// a signal cut short, and of one that passed before a late signal.
-func TestFinish(t *testing.T) {
-	var b bytes.Buffer
-	assert.Equal(t, exitFail, finish(&b, exitFail, 0))
-	assert.Empty(t, b.String())
-	assert.Equal(t, exitOK, finish(&b, exitOK, syscall.SIGTERM))
-	assert.Empty(t, b.String())
-	assert.Equal(t, exitSignalBase+int(syscall.SIGTERM), finish(&b, exitFail, syscall.SIGTERM))
-	assert.Equal(t, "mutants: interrupted\n", b.String())
-}
-
 // TestCheckGoVersion checks that a go of another version is refused,
 // and that the probe of resolveGo runs with GOTOOLCHAIN=local and
 // GOENV=off.
@@ -622,4 +612,101 @@ func TestInside(t *testing.T) {
 	assert.False(t, inside(filepath.Join(dir, "sub"), dir))
 	assert.False(t, inside(filepath.Join(dir, "none"), dir))
 	assert.False(t, inside(dir, filepath.Join(dir, "none")))
+}
+
+// stub writes an executable shell script named name, with body after
+// its first line, to a directory of its own and returns its path. A
+// program the body names is named by its path, so the stub runs
+// whatever PATH holds.
+func stub(t *testing.T, name, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\n"+body), 0o700))
+	return path
+}
+
+// stall returns the body of a stub that sleeps for 30 s.
+func stall(t *testing.T) string {
+	t.Helper()
+	sleep, err := procgroup.LookPath("sleep")
+	require.NoError(t, err)
+	return "exec '" + sleep + "' 30\n"
+}
+
+// requireTimeoutOf fails unless err is subprocess-timeout of the class.
+func requireTimeoutOf(t *testing.T, class procgroup.Class, err error) {
+	t.Helper()
+	timeout, ok := errors.AsType[*procgroup.TimeoutError](err)
+	require.True(t, ok, "the error is subprocess-timeout: %v", err)
+	assert.Equal(t, class, timeout.Class)
+}
+
+// classCtx returns a context under which the class has a limit of
+// 100 ms, below a deadline of 10 s: a command of another class that
+// stalls ends at that deadline, which is not subprocess-timeout.
+func classCtx(t *testing.T, class procgroup.Class) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	t.Cleanup(cancel)
+	return procgroup.WithTestTimeout(ctx, class, 100*time.Millisecond)
+}
+
+// TestGoProbesRunUnderTheMiseClass shows that "go env GOROOT"
+// (resolveGo), which a mise shim may answer with an install, and "go
+// env GOVERSION" (checkGoVersion) run under the class procgroup.Mise:
+// a go that stalls ends at the limit of that class.
+func TestGoProbesRunUnderTheMiseClass(t *testing.T) {
+	goBin := stub(t, "go", stall(t))
+	t.Run("resolveGo", func(t *testing.T) {
+		t.Setenv("PATH", filepath.Dir(goBin))
+		_, err := resolveGo(classCtx(t, procgroup.Mise), t.TempDir())
+		requireTimeoutOf(t, procgroup.Mise, err)
+	})
+	t.Run("checkGoVersion", func(t *testing.T) {
+		requireTimeoutOf(t, procgroup.Mise, checkGoVersion(classCtx(t, procgroup.Mise), goBin))
+	})
+}
+
+// TestGoProbesCarryStandardError shows that a go probe that fails says
+// what the go command wrote to standard error, made printable.
+func TestGoProbesCarryStandardError(t *testing.T) {
+	goBin := stub(t, "go", "echo 'go: broken\x1b[1m' >&2\nexit 1\n")
+	t.Setenv("PATH", filepath.Dir(goBin))
+	_, err := resolveGo(t.Context(), t.TempDir())
+	require.ErrorContains(t, err, `exited 1: "go: broken\x1b[1m"`)
+	require.ErrorContains(t, checkGoVersion(t.Context(), goBin), `exited 1: "go: broken\x1b[1m"`)
+}
+
+// TestGoListRunsUnderTheProbeClass shows that "go list -find"
+// (packages) runs under the class procgroup.ToolProbe, through goCmd as
+// a run calls it: a go that stalls ends at the limit of that class.
+func TestGoListRunsUnderTheProbeClass(t *testing.T) {
+	goBin := stub(t, "go", stall(t))
+	r := &runner{clone: git.Repo{Dir: t.TempDir()}, goBin: goBin, goEnv: goEnv(goBin, "")}
+	m := mutant{File: "calc/calc.go", Package: "./other"}
+	_, err := r.packages(classCtx(t, procgroup.ToolProbe), m)
+	requireTimeoutOf(t, procgroup.ToolProbe, err)
+}
+
+// TestBuildAndTestAreUnbounded shows that the build and the test runs
+// of the go command (build and goTest) have no limit, the class
+// procgroup.Unbounded: with every class of the tools at 50 ms, a go
+// that takes 300 ms still ends on its own, and what it printed is read.
+func TestBuildAndTestAreUnbounded(t *testing.T) {
+	sleep, err := procgroup.LookPath("sleep")
+	require.NoError(t, err)
+	goBin := stub(t, "go", "'"+sleep+"' 0.3\necho '--- PASS: TestSlow'\n")
+	r := &runner{clone: git.Repo{Dir: t.TempDir()}, goBin: goBin, goEnv: goEnv(goBin, "")}
+	ctx := t.Context()
+	for _, class := range []procgroup.Class{procgroup.ToolStep, procgroup.ToolRace, procgroup.ToolGit, procgroup.ToolProbe, procgroup.Mise} {
+		ctx = procgroup.WithTestTimeout(ctx, class, 50*time.Millisecond)
+	}
+	built, out, err := r.build(ctx, []string{"./calc"})
+	require.NoError(t, err)
+	assert.True(t, built)
+	assert.Contains(t, out, "--- PASS: TestSlow", "the stub ran to its end")
+	failed, out, err := r.goTest(ctx, target{pkg: "./calc", run: "^TestSlow$"}, time.Minute)
+	require.NoError(t, err)
+	assert.False(t, failed)
+	assert.Equal(t, 1, countPassed(out), "the stub ran to its end")
 }

@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
@@ -129,7 +129,7 @@ func TestFast(t *testing.T) {
 		{
 			name: "no mise on the search path: fast stops before any check",
 			setup: func(t *testing.T) {
-				gitPath, err := exec.LookPath("git")
+				gitPath, err := procgroup.LookPath("git")
 				require.NoError(t, err)
 				dir := t.TempDir()
 				require.NoError(t, os.Symlink(gitPath, filepath.Join(dir, "git")))
@@ -343,7 +343,7 @@ func TestFastJudgesTheCommit(t *testing.T) {
 // sees that HEAD moved; the last two cases are seen by it alone too.
 func TestFastJudgesAgainAfterTheSteps(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
-	sh, err := exec.LookPath("sh")
+	sh, err := procgroup.LookPath("sh")
 	require.NoError(t, err)
 	tests := []struct {
 		name   string
@@ -955,10 +955,12 @@ func pinnedLintTools(t *testing.T) lintTools {
 	t.Helper()
 	root := moduleRoot(t)
 	isolateMiseConfig(t)
-	cmd := exec.CommandContext(t.Context(), "mise", "-C", root, "trust")
-	cmd.Dir = root
-	cmd.Env = miseEnviron(passThroughEnv())
-	out, err := cmd.CombinedOutput()
+	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolStep,
+		Argv:  []string{"mise", "-C", root, "trust"},
+		Dir:   root,
+		Env:   miseEnviron(passThroughEnv()),
+	})
 	require.NoError(t, err, "mise trust\n%s", out)
 	tools, err := resolveLintTools(t.Context(), root)
 	require.NoError(t, err)
@@ -1155,7 +1157,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		{
 			name:  "mise which fails, with what mise wrote to standard error",
 			fails: true,
-			want:  "mise which golangci-lint: exit status 1; the tool is not installed or the configuration is not trusted: run \"mise trust\" and \"mise install\" in ",
+			want:  "mise which golangci-lint: mise exited 1; the tool is not installed or the configuration is not trusted: run \"mise trust\" and \"mise install\" in ",
 		},
 		{
 			name: "HOME is not set",
@@ -1273,7 +1275,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 // of goenv.PassThrough is set here, so the result does not depend on the
 // caller's environment (a TMPDIR or a MISE_STATE_DIR of its own).
 func TestResolveLintToolsEnvironment(t *testing.T) {
-	envPath, err := exec.LookPath("env")
+	envPath, err := procgroup.LookPath("env")
 	require.NoError(t, err)
 	f := newFakeMise(t) // sets HOME and PATH
 	for _, key := range []string{"GOFLAGS", "MISE_INSTALLS_DIR", "MISE_TRUSTED_CONFIG_PATHS", "CI", "MISE_ENV"} {
@@ -1338,12 +1340,16 @@ func TestMiseInstalls(t *testing.T) {
 			t.Setenv("MISE_DATA_DIR", tt.data)
 			t.Setenv("XDG_DATA_HOME", tt.xdg)
 			t.Setenv("MISE_STATE_DIR", t.TempDir())
-			cmd := exec.CommandContext(t.Context(), "mise", "-C", t.TempDir(), "doctor", "--json")
-			cmd.Env = append(miseEnviron(passThroughEnv()), "MISE_OFFLINE=1")
-			out, err := cmd.Output()
+			var out bytes.Buffer
+			err := procgroup.Run(t.Context(), procgroup.Command{
+				Class:  procgroup.ToolProbe,
+				Argv:   []string{"mise", "-C", t.TempDir(), "doctor", "--json"},
+				Env:    append(miseEnviron(passThroughEnv()), "MISE_OFFLINE=1"),
+				Stdout: &out,
+			})
 			require.NoError(t, err, "mise doctor")
 			var doctor struct{ Dirs struct{ Data string } }
-			require.NoError(t, json.Unmarshal(out, &doctor))
+			require.NoError(t, json.Unmarshal(out.Bytes(), &doctor))
 			require.NotEmpty(t, doctor.Dirs.Data, "the data directory mise reports")
 			installs, err := miseInstalls()
 			require.NoError(t, err)

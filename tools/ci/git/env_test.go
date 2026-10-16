@@ -4,12 +4,14 @@
 package git
 
 import (
-	"os/exec"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
 // TestCleanEnv checks the variables CleanEnv drops and the one it
@@ -17,9 +19,16 @@ import (
 // every GIT_CONFIG variable, and a GIT_OPTIONAL_LOCKS of the caller,
 // which it replaces with 0.
 func TestCleanEnv(t *testing.T) {
-	out, err := exec.CommandContext(t.Context(), "git", "rev-parse", "--local-env-vars").Output()
+	var stdout strings.Builder
+	err := procgroup.Run(t.Context(), procgroup.Command{
+		Class:  procgroup.ToolGit,
+		Argv:   []string{"git", "rev-parse", "--local-env-vars"},
+		Env:    os.Environ(),
+		Stdout: &stdout,
+	})
 	require.NoError(t, err)
-	assert.ElementsMatch(t, strings.Fields(string(out)), LocalEnv, "git rev-parse --local-env-vars")
+	out := stdout.String()
+	assert.ElementsMatch(t, strings.Fields(out), LocalEnv, "git rev-parse --local-env-vars")
 
 	base := []string{"PATH=/bin", "HOME=/h", "GIT_AUTHOR_NAME=a", "GIT_OPTIONAL_LOCKS=1",
 		"GIT_CONFIG_KEY_0=core.worktree", "GIT_CONFIG_VALUE_0=/elsewhere", "GIT_CONFIG_GLOBAL=/g", "GIT_CONFIG_NOSYSTEM=1"}
