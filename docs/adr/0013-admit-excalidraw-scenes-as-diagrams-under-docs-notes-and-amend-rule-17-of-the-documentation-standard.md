@@ -21,10 +21,17 @@ in it. It is not binary media. What it lacks is a rendering on GitHub,
 which shows the JSON and not the drawing, and a layout that a person
 can edit by hand the way they edit Mermaid.
 
+The alternatives were to redraw the four scenes in Mermaid inside a
+Markdown note, which keeps rule 17 as it stands and renders on GitHub,
+at the cost of the hand-drawn layout; or to keep the scenes outside the
+repository, where review cannot see them change.
+
 ## Decision
 
 1. ADR 0001, rule 17: a file under `docs/notes/` may also carry the
-   extension `.excalidraw`, an Excalidraw scene saved as JSON. Every
+   extension `.excalidraw`, an Excalidraw scene saved as JSON, whose
+   `files` object is empty and whose elements carry no `link`, so a
+   scene holds no embedded media and no URL a reader follows. Every
    other directory under `docs/` keeps the extensions `.md`, `.json` and
    `.yaml`, and the rest of the rule stands: no page of rule 1's path
    set, nor `README.md`, holds Markdown image syntax or an `<img` tag,
@@ -40,7 +47,8 @@ can edit by hand the way they edit Mermaid.
 ## Consequences
 
 - `tools/ci docs` (T086) admits `.excalidraw` under `docs/notes/` and
-  fails it anywhere else under `docs/`, with a fixture for each case.
+  fails it anywhere else under `docs/`, and fails a scene with a
+  non-empty `files` or a non-null `link`, with a fixture for each case.
 - Nothing checks a scene against the specification; review does, and
   the date in the note tells a reader how old the reading is. When a
   scene is found out of date by a review, the fix is to update it or to

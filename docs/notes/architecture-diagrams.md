@@ -46,8 +46,9 @@ The diagrams leave out detail the tables keep. Diagram 3 names the
 preflight exit codes only by class. Diagram 4 draws the main rows of the
 generation table and omits these: `open` back to none when the create
 fails and no sandbox is left, the rows that stay in `open`, `salvaging`
-or `removing` (a failed create, a timeout, a restarted salvage, a failed
-`sbx env rm`, a resumed removal), and `removing` to `closed-removed`
+or `removing` (a failed create, a timeout, a restarted salvage, a
+`salvage --from-host` while `salvaging`, a failed `sbx env rm`, a
+resumed removal), and `removing` to `closed-removed`
 when the sandbox is found absent. Its arrow from `salvaging` back to
 `open` covers the verified salvage of `salvage` and an incomplete
 salvage without `--accept-loss`. REQ-0079 generates the state diagrams
