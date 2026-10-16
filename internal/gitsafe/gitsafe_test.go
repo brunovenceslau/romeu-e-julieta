@@ -178,8 +178,7 @@ func TestNetworkEnv(t *testing.T) {
 }
 
 // TestNetworkEnvUnset: sandbox mode passes a variable of the list only
-// when the process has it, and passes one that is set but empty as it
-// is.
+// when the process has it set and not empty (REQ-0470).
 func TestNetworkEnvUnset(t *testing.T) {
 	for _, k := range NetworkEnv() {
 		t.Setenv(k, "x")
@@ -188,7 +187,7 @@ func TestNetworkEnvUnset(t *testing.T) {
 	t.Setenv("no_proxy", "")
 	r, err := New(Config{Mode: Sandbox, Git: "/usr/bin/git", Home: "/h"})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"GIT_TERMINAL_PROMPT=0", "PATH=/usr/bin:/bin", "HOME=/h", "LANG=C", "no_proxy="}, r.env)
+	assert.Equal(t, []string{"GIT_TERMINAL_PROMPT=0", "PATH=/usr/bin:/bin", "HOME=/h", "LANG=C"}, r.env)
 }
 
 // TestSandboxGitUsesTheProxy: a sandbox-mode fetch over HTTPS goes

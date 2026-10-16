@@ -6,6 +6,11 @@
 package gitsafe
 
 import (
+	"bufio"
+	"context"
+	"io"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -239,4 +244,84 @@ func TestCloneRunsNoHook(t *testing.T) {
 	require.NoError(t, err)
 	assert.FileExists(t, marker, "the plant is live: plain git runs it")
 	assert.FileExists(t, filepath.Join(control, "repo", ".git", "hooks", "post-checkout"))
+}
+
+// TestSandboxCloneThroughTheProxy clones in sandbox mode through a
+// local HTTPS proxy, as julieta setup does in a sandbox (REQ-0398,
+// REQ-0470): the URL names a host only the proxy sends to the server,
+// and the server's certificate is one only a test CA trusts. git's TLS
+// library may ignore SSL_CERT_FILE (libcurl-gnutls does), so the test
+// CA reaches git the way a sandbox can always give it one, through the
+// sandbox's global config, which sandbox mode keeps; the same clone
+// fails without it.
+func TestSandboxCloneThroughTheProxy(t *testing.T) {
+	src, head := newRepo(t)
+	addr, caFile := serveHTTPS(t, bareCopy(t, src, "repo.git"))
+	_, port, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+	// The test certificate of httptest names example.com; the proxy
+	// alone sends that name to the server.
+	url := "https://example.com:" + port + "/repo.git"
+	connects := make(chan string, 8)
+	proxy := listen(t, func(ctx context.Context, conn net.Conn) {
+		tunnel(ctx, conn, addr, connects)
+	})
+	proxyURL := "http://" + strings.TrimSuffix(strings.TrimPrefix(proxy, "git://"), "/")
+	for _, tt := range []struct {
+		name      string
+		globalCfg string
+		ok        bool
+	}{
+		{"the sandbox trusts the test ca", "[http]\n\tsslCAInfo = " + caFile + "\n", true},
+		{"the sandbox trusts the system cas alone", "", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, k := range NetworkEnv() {
+				t.Setenv(k, "")
+			}
+			t.Setenv("HTTPS_PROXY", proxyURL)
+			t.Setenv("https_proxy", proxyURL)
+			home := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(home, ".gitconfig"), []byte(tt.globalCfg), 0o600))
+			r, err := New(Config{Mode: Sandbox, Git: gitPath(t), Home: home})
+			require.NoError(t, err)
+			dest := filepath.Join(t.TempDir(), "repo")
+			err = r.Clone(t.Context(), url, dest)
+			require.NotEmpty(t, connects, "git did not go to the proxy: %v", err)
+			assert.Equal(t, "example.com:"+port, <-connects)
+			if !tt.ok {
+				require.Error(t, err)
+				assert.Contains(t, strings.ToLower(err.Error()), "certificate")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, head, plainGit(t, dest, "rev-parse", "HEAD"))
+		})
+	}
+}
+
+// tunnel serves one CONNECT request on conn: it reports the target on
+// connects, opens a connection to addr whatever the target names, and
+// copies bytes both ways until either side closes or ctx ends.
+func tunnel(ctx context.Context, conn net.Conn, addr string, connects chan<- string) {
+	req, err := http.ReadRequest(bufio.NewReader(conn))
+	if err != nil || req.Method != http.MethodConnect {
+		return
+	}
+	connects <- req.Host
+	upstream, err := new(net.Dialer).DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return
+	}
+	defer func() { _ = upstream.Close() }()
+	if _, err := io.WriteString(conn, "HTTP/1.1 200 Connection established\r\n\r\n"); err != nil {
+		return
+	}
+	done := make(chan struct{}, 2)
+	go func() { _, _ = io.Copy(upstream, conn); done <- struct{}{} }()
+	go func() { _, _ = io.Copy(conn, upstream); done <- struct{}{} }()
+	select {
+	case <-done:
+	case <-ctx.Done():
+	}
 }

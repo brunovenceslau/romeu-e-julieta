@@ -97,8 +97,9 @@ var sandboxSettings = []setting{
 
 // networkEnv is the network pass-through list of sandbox mode (05
 // 5.1): the variables julieta copies from its own environment when they
-// are set, so its git reaches origin through the sandbox's proxy and
-// trusts the proxy's CA. It holds no GIT_* variable, and host mode
+// are set and not empty, so its git reaches origin through the
+// sandbox's proxy and, with a TLS library that reads SSL_CERT_FILE,
+// trusts the CA bundle it names. It holds no GIT_* variable, and host mode
 // passes none of it.
 var networkEnv = []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}
 
@@ -209,7 +210,7 @@ func New(c Config) (*Runner, error) {
 			"LANG=C",
 		}
 		for _, k := range networkEnv {
-			if v, ok := os.LookupEnv(k); ok {
+			if v := os.Getenv(k); v != "" {
 				r.env = append(r.env, k+"="+v)
 			}
 		}
