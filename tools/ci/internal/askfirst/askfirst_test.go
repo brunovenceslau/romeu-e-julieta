@@ -126,7 +126,7 @@ func TestApprovalLineOfTheSpec(t *testing.T) {
 
 // TestApprovalLine checks approvalLine on one line at a time. How pr
 // reads the lines of a whole body is T005's: its TestPRApprovalLine uses
-// the case titles of the table under T005 in docs/plan.md.
+// the case titles of the table in docs/plan/tasks/T005-tools-ci-pr.md.
 func TestApprovalLine(t *testing.T) {
 	cases := []struct {
 		name, line string
