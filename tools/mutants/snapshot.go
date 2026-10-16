@@ -8,7 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -142,15 +142,24 @@ func checkIndexFlags(ctx context.Context, source git.Repo) error {
 }
 
 // sendPack streams the objects of want that have does not reach from
-// source to clone: pack-objects writes a pack to a pipe that
+// source to clone: pack-objects writes a pack to an OS pipe that
 // unpack-objects reads, so no pack is held in memory or on disk. Both
 // run without replace refs, in the environment of their repository
-// (git.Repo.Environ), through internal/procgroup under the class
-// procgroup.ToolGit; they start together, so the pair ends within that
-// one limit. When unpack-objects ends first, the pipe fails the writes
-// of pack-objects, which then ends too.
+// (git.Repo.Environ), through internal/procgroup, each under its own
+// limit of the class procgroup.ToolGit; they start together, so the
+// pair ends within about that limit.
+//
+// Each end of the pipe is a file, which procgroup hands the command as
+// it is, with no copy of its own whose drain could stop short: what
+// pack-objects wrote is in the pipe when it ends. This process closes
+// the write end once pack-objects has ended, so unpack-objects reads
+// EOF only then, and the read end once unpack-objects has ended, so a
+// pack-objects that still writes gets EPIPE or SIGPIPE and ends too.
 func sendPack(ctx context.Context, source, clone git.Repo, want, have string) error {
-	pipeOut, pipeIn := io.Pipe()
+	pipeOut, pipeIn, err := os.Pipe()
+	if err != nil {
+		return fmt.Errorf("snapshot: the pipe of the pack: %w", err)
+	}
 	var packErr, unpackErr bytes.Buffer
 	packed := make(chan error, 1)
 	go func() {
@@ -163,8 +172,7 @@ func sendPack(ctx context.Context, source, clone git.Repo, want, have string) er
 			Stdout: pipeIn,
 			Stderr: &packErr,
 		})
-		// unpack-objects reads to the end of the pack, or to the error.
-		pipeIn.CloseWithError(err)
+		_ = pipeIn.Close()
 		packed <- err
 	}()
 	unpackRun := procgroup.Run(ctx, procgroup.Command{
@@ -175,7 +183,7 @@ func sendPack(ctx context.Context, source, clone git.Repo, want, have string) er
 		Stdin:  pipeOut,
 		Stderr: &unpackErr,
 	})
-	pipeOut.CloseWithError(errUnpackEnded)
+	_ = pipeOut.Close()
 	packRun := <-packed
 	var errs []error
 	if packRun != nil {
@@ -186,7 +194,3 @@ func sendPack(ctx context.Context, source, clone git.Repo, want, have string) er
 	}
 	return errors.Join(errs...)
 }
-
-// errUnpackEnded fails a write of pack-objects that no unpack-objects
-// reads any more.
-var errUnpackEnded = errors.New("git unpack-objects ended")
