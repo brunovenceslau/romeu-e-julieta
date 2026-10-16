@@ -2,44 +2,38 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-15, written before a sandbox recreate. T105 PR-A
-merged (Done record 2). The other five lanes were mid-flight when every
-subagent stopped on an authorization error (gotcha
-"subagents-can-fail-with-an-organization-authorization-error"); each
-lane was pushed to its branch, some as one WIP commit, none gated.
+Checkpoint of 2026-10-16, before a /clear. Eight pull requests merged
+(#53, #55 to #61; Done record 3). The five lanes saved on 2026-10-15
+all shipped. T105 PR-C is built and pushed but not yet gated.
+Subagents worked this session.
 
 ## Next steps
 
-1. Probe one small subagent first; fan out only if it works.
-2. T105 PR-B: pending item "finish-t105-pr-b-the-procgroup-switch".
-3. T007 and T017: pending item "ship-t007-termsafe-and-t017-canon".
-4. Spec fixes PR, then T023 stacked on it: pending items
-   "ship-the-spec-fixes-pr" and "finish-t023-gitsafe".
-5. Merge sitting when three PRs are green.
-6. PR-C of T105 (the register-by-file move) after PR-B merges; it marks
-   T105 and T137 merged ("mark-t137-merged-together-with-t105").
-7. T012 waits by decision. T106, T107, T108 and T138 follow T105.
-8. Migrate the docs/reviews checkpoints
+1. Ship T105 PR-C: pending item "ship-t105-pr-c-the-registration-by-file".
+2. T141, stacked on PR-C: pending item
+   "t141-setup-installs-the-pinned-mise".
+3. Spec PR for the step-table rows that have no REQ id
+   ("step-table-rows-without-a-req-id").
+4. T012 waits by decision. T106, T107, T108, T138, T139 and T140
+   follow T105.
+5. Migrate the docs/reviews checkpoints
    ("migrate-the-docs-reviews-checkpoints-into-docs-handoff").
 
 ## Open for the operator
 
 One block, a recommendation each.
 
-1. Merge sitting: when three PRs are green. Recommended: hold the
-   sitting then, not before.
-2. T012 waits for its own focus. Recommended: start it after T105 PR-B.
-3. The subagent authorization error. Recommended: confirm Claude Code
-   access for subagents before the next fan-out.
+1. I29's code point set ("i29-and-the-invisible-code-points-outside-it").
+   Recommended: widen it to Default_Ignorable_Code_Point before M1's
+   gate diff.
+2. The kit prompts ("prompts-for-the-sandbox-kit-and-the-house-kit").
+   Recommended: ask for both final prompts in one message.
+3. The merge sitting for PR-C and T141. Recommended: merge PR-C first.
+   T141 rides on it.
 
 ## In flight
 
-Each lane's branch (measure state with
-~/.sbx-kit/claude-home/bin/handoff_state.py; nothing here is current):
-- T105 PR-B: feat/t105b-procgroup-switch (WIP commit)
-- T007: feat/t007-termsafe
-- T017: feat/t017-canon
-- Spec fixes: docs/spec-fixes-2026-10-13
-- T023: feat/t023-gitsafe, on the spec fixes branch (WIP commit)
+- T105 PR-C: branch feat/t105c-registration, no PR yet.
 
-Branch and pull request state is NOT recorded here: measure it.
+Branch and pull request state is NOT recorded here: measure it with
+~/.sbx-kit/claude-home/bin/handoff_state.py.
