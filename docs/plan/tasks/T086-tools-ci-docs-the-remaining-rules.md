@@ -43,6 +43,8 @@ task reopens.
     (12 12.8) is empty or names an anchor that does not resolve, a
     fixture each.
   - A fixture fails for an image and for a file under `docs/` with
-    another extension (rule 17).
+    another extension (rule 17); a fixture passes a `.excalidraw` file
+    under `docs/notes/` and another fails one elsewhere under `docs/`
+    (ADR 0013, decision 1).
 - Verify: `go test ./tools/ci/... -run '^TestDocs'`, which runs the
   fixture lines; `go run ./tools/ci docs`.
