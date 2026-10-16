@@ -6,10 +6,15 @@ module: ci-bootstrap
 fate: new
 owns:
   - tools/ci/**
+  - tools/mutants/**
   - .github/ask-first.yaml
   - internal/procgroup/callsite_test.go
   - internal/procgroup/class.go
   - internal/procgroup/class_test.go
+  - internal/procgroup/lookpath.go
+  - internal/procgroup/lookpath_test.go
+  - internal/procgroup/pipes.go
+  - internal/procgroup/procgroup_test.go
 needs: []
 after:
   - T121
@@ -47,6 +52,35 @@ reshaped in a structural pull request of their own when their files
 move, never here. The lint split with its new lint set is T139 and the
 two repository tests over the specification's names are T140, both
 `after` this task, so this pull request is one frozen-behaviour move.
+
+Decided on 2026-10-13, when the task started:
+
+- (a) The tests of `tools/ci` and `tools/mutants` stop importing
+  `os/exec` through one export of `internal/procgroup`, `LookPath`, a
+  documented wrapper over `exec.LookPath`. Their fixtures run through
+  `procgroup.Run` and `procgroup.CombinedOutput` with an explicit
+  environment, under a class of the table or a limit the test sets
+  through `WithTestTimeout`; a signal test runs `Run` in a goroutine,
+  the process it signals writes its own pid, the test signals that pid
+  with `syscall.Kill` (never a pid at or below 1), and reads the exit
+  from `procgroup.ExitError`. The lint test that matched build
+  constraints moves from `go/build` to `go/build/constraint` with a
+  file-name suffix matcher of its own, so no file under `tools/`
+  imports `os/exec`, `os/signal` or `go/build`.
+- (b) The classes of the tools are `tool-step` (15 minutes),
+  `tool-race` (40 minutes), `tool-git` (2 minutes) and `tool-probe`
+  (30 seconds: `uname`, `sysctl`, `mise which`, `mise --version`, `go
+  list -find`); `go env` in `tools/mutants` takes the existing `mise`
+  class, and the `go` build and test runs of `tools/mutants` take
+  `unbounded`. The rows of 04 4.1, Starting values, come first, by a
+  pull request that edits that table alone (REQ-1220).
+- (c) `tools/mutants` no longer takes SIGHUP: both `main`s install
+  `procgroup.Main`, which takes SIGINT and SIGTERM only, and a SIGHUP
+  takes its default action, as 04 4.1, Signals, says of every signal
+  the handler does not take.
+- (d) The task ships as three sequential pull requests: the rows of
+  (b) in 04 4.1, the switch to `internal/procgroup` with the removal of
+  `tools/ci/procgroup/`, and then the registration by file.
 
 - Implements: REQ-0006 (index), REQ-0021 (index), REQ-0037 (00 0.4),
   REQ-0040 (01 1.1), REQ-0121 (02 2.1), REQ-0307 (04 4.1), REQ-0473 (05
@@ -109,12 +143,16 @@ two repository tests over the specification's names are T140, both
     `tools/mutants` that import `os/exec`, 13 at commit `b1700c9`
     (`grep -rl '"os/exec"' --include='*_test.go' tools/`), stop doing
     so by a route this task decides when it starts and records in its
-    pull request: an export from `internal/procgroup`, such as a path
-    lookup or a helper that signals a pid, which this task's `owns`
-    then gains, or another route that keeps T137's rule that nothing
-    else imports `os/exec` (a deferred decision; trigger: T105
-    starts). `tools/ci/procgroup/procgroup_unix_test.go` leaves with
-    `tools/ci/procgroup/`. The scan stays a test in
+    pull request: an export from `internal/procgroup`, `LookPath`,
+    which this task's `owns` gains (decided on 2026-10-13, item (a)
+    above). `tools/ci/lintconfig_test.go`, the one file under `tools/`
+    that imports `go/build` at `b1700c9`, moves to
+    `go/build/constraint` (item (a) above).
+    `tools/ci/procgroup/procgroup_unix_test.go` leaves with
+    `tools/ci/procgroup/`. A tool under `tools/` that the admitted list
+    never named, as `tools/new`, reaches git through `tools/ci/git`;
+    the switch moves that package to `internal/procgroup`, so the
+    route closes with it. The scan stays a test in
     `internal/procgroup` until T039 moves it to `tools/ci callsites`
     (decided on 2026-10-13).
   - Each subprocess of the tools gets a class of the timeout table of
@@ -149,10 +187,10 @@ two repository tests over the specification's names are T140, both
     either an unbounded class or a limit per call taken from the
     baseline. Their rows come by a pull request that edits the Starting
     values table of 04 4.1 alone (REQ-1220) and merges before this
-    task's switch; which of the two options the mutant runs take, and
-    the probe class's value, are a deferred decision of the plan
-    (Decisions this plan defers; trigger: T105 starts). This task then
-    edits `internal/procgroup/class.go` and its test to add them.
+    task's switch; the mutant runs take the unbounded class and the
+    probe class 30 seconds (decided on 2026-10-13, item (b) above).
+    This task then edits `internal/procgroup/class.go` and its test to
+    add them.
   - After the switch, a test proves the second-signal window closed for
     `tools/ci`: a run of `tools/ci` that receives two SIGTERMs while a
     step's group runs exits 143, with the group gone and the second
