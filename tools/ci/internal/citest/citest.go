@@ -8,7 +8,9 @@
 package citest
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -336,4 +338,19 @@ func PinnedLintTools(t *testing.T, environ func([]string) []string, resolve func
 	tools, err := resolve(t.Context(), root)
 	require.NoError(t, err)
 	return tools
+}
+
+// Run runs one subcommand in the fixture r, with stdin (an empty input
+// when nil), and returns its exit status, as the dispatcher of tools/ci
+// computes it (check.Status), and what it printed to standard output
+// and standard error, in the order it printed it.
+func Run(t *testing.T, r *gittest.Repo, stdin io.Reader, run func(context.Context, check.Env, []string) (bool, error), args ...string) (int, string) {
+	t.Helper()
+	var out bytes.Buffer
+	if stdin == nil {
+		stdin = strings.NewReader("")
+	}
+	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: stdin, Stdout: &out, Stderr: &out}
+	ok, err := run(t.Context(), e, args)
+	return check.Status(&out, ok, err), out.String()
 }

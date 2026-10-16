@@ -1,7 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+// Package workflows is the workflows check of 10 10.2: the closed
+// grammar every file of .github/workflows/ is held to, so that a
+// workflow holds no check logic of its own. It judges the commit fast
+// and all read before any step, and is the workflows subcommand.
+package workflows
 
 import (
 	"bytes"
@@ -22,11 +26,11 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 )
 
-// workflowsDir holds the workflows, and workflowExt is the one name
+// Dir holds the workflows, and workflowExt is the one name
 // ending a file there may have.
 const (
-	workflowsDir = ".github/workflows/"
-	workflowExt  = ".yml"
+	Dir         = ".github/workflows/"
+	workflowExt = ".yml"
 )
 
 // Threat model of the workflows check. It guards against two things:
@@ -40,7 +44,7 @@ const (
 //     a pinned GitHub-hosted one (*-latest, a self-hosted label, a label
 //     read from a variable), and an env table other than the one at the
 //     top of the file, which every workflow holds and which holds
-//     miseEnv and nothing else, since other keys could make a tools/ci
+//     mise.MiseEnv and nothing else, since other keys could make a tools/ci
 //     run start other code (BASH_ENV, LD_PRELOAD, PATH,
 //     GOFLAGS=-toolexec), and without it the mise of the workflow would
 //     read every mise file of the change (tools/ci/misefiles.go). An
@@ -60,7 +64,7 @@ const (
 // (the owner of an action, the filters of an event, the strategy values
 // outside the matrix), what a pinned
 // action's code does, and a pull
-// request that edits the workflow or this check itself, since the run
+// request that citest.Edits the workflow or this check itself, since the run
 // it starts uses the files of that pull request.
 
 // The grammar of 10 10.2: the keys each level may hold. A key outside
@@ -146,15 +150,15 @@ func workflows(ctx context.Context, repo git.Repo, head string) ([]check.Finding
 	if err != nil {
 		return nil, err
 	}
-	return workflowsOf(files), nil
+	return Of(files), nil
 }
 
-// workflowsOf applies the grammar to the workflows among files, the
+// Of applies the grammar to the workflows among files, the
 // tree of one commit as headTree reads it.
-func workflowsOf(files []check.TreeFile) []check.Finding {
+func Of(files []check.TreeFile) []check.Finding {
 	var findings []check.Finding
 	for _, f := range files {
-		if strings.HasPrefix(f.Path, workflowsDir) {
+		if strings.HasPrefix(f.Path, Dir) {
 			findings = append(findings, workflowFindings(f.Path, f.Content)...)
 		}
 	}
@@ -176,7 +180,7 @@ func workflowFindings(path string, src []byte) []check.Finding {
 	c := &grammar{where: where}
 	c.walk(doc)
 	c.file(doc)
-	if strings.TrimPrefix(path, workflowsDir) == "ci.yml" {
+	if strings.TrimPrefix(path, Dir) == "ci.yml" {
 		c.edited(doc)
 	}
 	return c.findings
@@ -302,10 +306,10 @@ func (c *grammar) file(doc *yaml.Node) {
 	c.permissionsSet(doc)
 }
 
-// envRule is the finding of a file whose env table is not miseEnv.
+// envRule is the finding of a file whose env table is not mise.MiseEnv.
 var envRule = "env holds exactly the mise environment of tools/ci, each value a YAML string, in this order: " + strings.Join(mise.MiseEnv, " ")
 
-// env checks the env table of the file: the variables of miseEnv, in
+// env checks the env table of the file: the variables of mise.MiseEnv, in
 // its order, each a YAML string with the value of the list, and no
 // other. Every workflow sets it, since every step of one reaches go
 // through the mise shims, and mise-action runs mise itself.
@@ -755,4 +759,18 @@ func field(n *yaml.Node, key string) *yaml.Node {
 		}
 	}
 	return nil
+}
+
+// Run applies the grammar of 10 10.2 to the workflows of the
+// tree at HEAD.
+func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
+	if len(args) != 0 {
+		return false, fmt.Errorf("workflows takes no argument\n%s", check.Usage())
+	}
+	findings, err := workflows(ctx, e.Repo(), "HEAD")
+	if err != nil {
+		return false, err
+	}
+	check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("workflows", len(findings)))
+	return len(findings) == 0, nil
 }

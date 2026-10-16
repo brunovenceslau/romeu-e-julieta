@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+package workflows
 
 import (
 	"os"
@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,7 +18,7 @@ import (
 
 // TestWorkflowsGrammar fails a fixture for each construct outside the
 // grammar of 10 10.2, and passes the one that holds every construct
-// inside it. Each fixture changes one line of goodWorkflow.
+// inside it. Each fixture changes one line of citest.GoodWorkflow.
 func TestWorkflowsGrammar(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -255,13 +256,13 @@ func TestWorkflowsCommitted(t *testing.T) {
 // they are in the working tree.
 func TestWorkflowsRepository(t *testing.T) {
 	root := citest.ModuleRoot(t)
-	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(workflowsDir)))
+	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(Dir)))
 	require.NoError(t, err)
 	require.NotEmpty(t, entries)
 	for _, e := range entries {
-		src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(workflowsDir), e.Name()))
+		src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(Dir), e.Name()))
 		require.NoError(t, err)
-		assert.Empty(t, workflowFindings(workflowsDir+e.Name(), src), "%s", e.Name())
+		assert.Empty(t, workflowFindings(Dir+e.Name(), src), "%s", e.Name())
 	}
 }
 
@@ -270,7 +271,7 @@ func TestWorkflowsRepository(t *testing.T) {
 // by a pinned version and a sha256 per platform before setup, and
 // setup before all.
 func TestWorkflowsCIFile(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(workflowsDir), "ci.yml"))
+	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(Dir), "ci.yml"))
 	require.NoError(t, err)
 	var wf struct {
 		Jobs map[string]struct {
@@ -481,4 +482,21 @@ func TestWorkflowsMatrixRunnerNeedsOS(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestWorkflowsCommand runs "tools/ci workflows" on a fixture
+// repository: exit 0 with a workflow inside the grammar, 1 outside it.
+func TestWorkflowsCommand(t *testing.T) {
+	r := citest.NewTree(t)
+	r.Write(".github/workflows/ci.yml", citest.GoodWorkflow)
+	r.Commit("fixture")
+	code, out := citest.Run(t, r, nil, Run)
+	assert.Equal(t, check.ExitOK, code, out)
+	assert.Equal(t, "workflows: ok\n", out)
+
+	r.Write(".github/workflows/extra.yaml", citest.GoodWorkflow)
+	r.Commit("a second ending")
+	code, out = citest.Run(t, r, nil, Run)
+	assert.Equal(t, check.ExitFail, code, out)
+	assert.Equal(t, ".github/workflows/extra.yaml: workflows: a file here ends in .yml\nworkflows: 1 finding(s)\n", out)
 }

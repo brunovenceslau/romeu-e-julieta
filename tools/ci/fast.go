@@ -18,6 +18,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/workflows"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
 )
@@ -299,7 +300,7 @@ func commitChecks(ctx context.Context, repo git.Repo, commit string) ([]check.Ve
 	reqs, deferred, reqsErr := reqsOf(files)
 	return []check.Verdict{
 		{Name: "hygiene", Findings: findings, Err: err},
-		{Name: "workflows", Findings: workflowsOf(files)},
+		{Name: "workflows", Findings: workflows.Of(files)},
 		{Name: "reqs", Findings: reqs, Err: reqsErr, Info: reqDeferredInfo(deferred)},
 	}, nil
 }

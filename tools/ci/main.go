@@ -40,6 +40,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/workflows"
 )
 
 func init() {
@@ -47,7 +48,7 @@ func init() {
 	check.RegisterCommand(check.Command{Name: "fast", Usage: []string{"fast [<remote> <url>]"}, Run: runFast})
 	check.RegisterCommand(check.Command{Name: "setup", Usage: []string{"setup"}, Run: runSetup})
 	check.RegisterCommand(check.Command{Name: "coverage", Usage: []string{"coverage <profile>"}, Run: runCoverage})
-	check.RegisterCommand(check.Command{Name: "workflows", Usage: []string{"workflows"}, Run: runWorkflows})
+	check.RegisterCommand(check.Command{Name: "workflows", Usage: []string{"workflows"}, Run: workflows.Run})
 	check.RegisterCommand(check.Command{Name: "hygiene", Usage: []string{"hygiene [--file <path>]", "hygiene add"}, Run: runHygiene})
 	check.RegisterCommand(check.Command{Name: "generated", Usage: []string{"generated"}, Run: runGenerated})
 	check.RegisterCommand(check.Command{Name: "generate", Usage: []string{"generate"}, Run: runGenerate})

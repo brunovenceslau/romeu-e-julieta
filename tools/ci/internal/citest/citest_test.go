@@ -4,6 +4,8 @@
 package citest
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 )
 
@@ -78,4 +81,29 @@ func TestFakeMise(t *testing.T) {
 	assert.Equal(t, "fails", Failing.Name)
 	assert.NotEmpty(t, Denylist(t))
 	assert.Contains(t, FixtureProse, "glimmerous")
+}
+
+// TestRun checks the three statuses of a subcommand and that the error
+// is printed.
+func TestRun(t *testing.T) {
+	r := NewTree(t)
+	tests := []struct {
+		ok   bool
+		err  error
+		code int
+		out  string
+	}{
+		{true, nil, check.ExitOK, ""},
+		{false, nil, check.ExitFail, ""},
+		{false, errors.New("broken"), check.ExitError, "ci: broken\n"},
+	}
+	for _, tt := range tests {
+		code, out := Run(t, r, nil, func(_ context.Context, e check.Env, args []string) (bool, error) {
+			assert.Equal(t, []string{"x"}, args)
+			assert.Equal(t, r.Dir, e.Dir)
+			return tt.ok, tt.err
+		}, "x")
+		assert.Equal(t, tt.code, code)
+		assert.Equal(t, tt.out, out)
+	}
 }

@@ -336,20 +336,6 @@ func runCoverage(ctx context.Context, e check.Env, args []string) (bool, error) 
 	return len(findings) == 0, nil
 }
 
-// runWorkflows applies the grammar of 10 10.2 to the workflows of the
-// tree at HEAD.
-func runWorkflows(ctx context.Context, e check.Env, args []string) (bool, error) {
-	if len(args) != 0 {
-		return false, fmt.Errorf("workflows takes no argument\n%s", check.Usage())
-	}
-	findings, err := workflows(ctx, e.Repo(), "HEAD")
-	if err != nil {
-		return false, err
-	}
-	check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("workflows", len(findings)))
-	return len(findings) == 0, nil
-}
-
 // runSetup prepares a machine to run the checks, in three steps: it
 // trusts the repository's mise.toml, installs the tools mise.lock
 // locks, and fills the module cache with the modules of go.sum, which

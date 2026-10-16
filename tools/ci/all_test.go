@@ -27,6 +27,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/workflows"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 )
@@ -145,23 +146,6 @@ func TestAllUsage(t *testing.T) {
 	}
 }
 
-// TestWorkflowsCommand runs "tools/ci workflows" on a fixture
-// repository: exit 0 with a workflow inside the grammar, 1 outside it.
-func TestWorkflowsCommand(t *testing.T) {
-	r := citest.NewTree(t)
-	r.Write(".github/workflows/ci.yml", citest.GoodWorkflow)
-	r.Commit("fixture")
-	code, out := runCI(t, r, nil, nil, "workflows")
-	assert.Equal(t, check.ExitOK, code, out)
-	assert.Equal(t, "workflows: ok\n", out)
-
-	r.Write(".github/workflows/extra.yaml", citest.GoodWorkflow)
-	r.Commit("a second ending")
-	code, out = runCI(t, r, nil, nil, "workflows")
-	assert.Equal(t, check.ExitFail, code, out)
-	assert.Equal(t, ".github/workflows/extra.yaml: workflows: a file here ends in .yml\nworkflows: 1 finding(s)\n", out)
-}
-
 // TestAllSteps pins the command steps of all: the steps of fast, with
 // vulnerabilities and license before unit, since neither runs code of
 // the change, then race. Each runs in stepEnv; the one
@@ -230,7 +214,7 @@ func TestAllSteps(t *testing.T) {
 // ciJobTimeout returns the timeout-minutes of the job of ci.yml.
 func ciJobTimeout(t *testing.T) time.Duration {
 	t.Helper()
-	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(workflowsDir), "ci.yml"))
+	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(workflows.Dir), "ci.yml"))
 	require.NoError(t, err)
 	var wf struct {
 		Jobs map[string]struct {
