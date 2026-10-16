@@ -3,7 +3,7 @@ id: T141
 title: "`tools/ci setup` installs the pinned mise"
 milestone: M0
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - tools/ci/internal/mise/**
   - tools/ci/internal/setup/**
@@ -14,9 +14,14 @@ after:
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-16
+pr: 64
 ---
 
 # T141 - `tools/ci setup` installs the pinned mise
+
+Merged on 2026-10-16 in pull request #64. The text below is the one
+written at the re-plan.
 
 Goal: `go run ./tools/ci setup` installs the mise that `ci.yml` pins
 when the mise `tools/ci` would run names another version or none, into
