@@ -67,13 +67,22 @@ network list), `git://` and
     explicit URL: a host-mode clone of a config repo (REQ-0309, T041)
     and a sandbox-mode clone through the proxy environment (REQ-0398)
     both succeed in a test, and a refused URL is refused in each mode.
-    The sandbox-mode test runs a local HTTPS proxy whose CA is a test
-    CA, and the same clone fails when `SSL_CERT_FILE` is not set, so
-    the test shows the variable is needed, not only passed.
+    The sandbox-mode test clones through a local HTTPS proxy, which
+    alone reaches the server's host name, from a server whose
+    certificate only a test CA trusts; the CA reaches git through the
+    sandbox's global config (`http.sslCAInfo`), since git's libcurl
+    may ignore `SSL_CERT_FILE`, and the same clone fails without it.
   - One test holds the plant list of I3, the host git keys `doctor`
     warns on and gitsafe's neutralized keys equal, all three read from
     one Go slice in `internal/gitsafe` (10 10.1, Git keys); T049's row
-    reads that slice.
+    reads that slice. This task ships the slice (`NeutralizedKeys`) and
+    pins it to the list of 05 5.1; the three-way test lands with the
+    first of T049 and the I3 plant list (deferred; trigger: T049
+    starts).
+  - The keys that make git run a program from a host clone's local
+    config, `core.askPass` and `core.alternateRefsCommand` among them,
+    run nothing under host mode, each shown against a positive control
+    with plain git (05 5.1, REQ-0463).
   - A `git://` URL whose host is not `127.0.0.1`, a `file://` URL and a
     plain path are refused, with a `caFile` set too.
   - `-c credential.helper=<value>` is passed only when
