@@ -75,7 +75,14 @@ network list), `git://` and
   - One test holds the plant list of I3, the host git keys `doctor`
     warns on and gitsafe's neutralized keys equal, all three read from
     one Go slice in `internal/gitsafe` (10 10.1, Git keys); T049's row
-    reads that slice.
+    reads that slice. This task ships the slice (`NeutralizedKeys`) and
+    pins it to the list of 05 5.1; the three-way test lands with the
+    first of T049 and the I3 plant list (deferred; trigger: T049
+    starts).
+  - The keys that make git run a program from a host clone's local
+    config, `core.askPass` and `core.alternateRefsCommand` among them,
+    run nothing under host mode, each shown against a positive control
+    with plain git (05 5.1, REQ-0463).
   - A `git://` URL whose host is not `127.0.0.1`, a `file://` URL and a
     plain path are refused, with a `caFile` set too.
   - `-c credential.helper=<value>` is passed only when

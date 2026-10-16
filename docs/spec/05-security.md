@@ -33,7 +33,8 @@ env:   GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0
        GIT_ATTR_NOSYSTEM=1 PATH=/usr/bin:/bin HOME=<home> LANG=C
 flags: -c core.hooksPath=/dev/null -c core.fsmonitor=false -c submodule.recurse=false
        -c protocol.allow=never -c protocol.https.allow=always -c protocol.git.allow=always
-       -c core.sshCommand=false -c core.gitProxy= -c diff.external= -c core.pager=cat -c credential.helper=
+       -c core.sshCommand=false -c core.gitProxy= -c core.askPass= -c core.alternateRefsCommand=
+       -c diff.external= -c core.pager=cat -c credential.helper=
        -c fetch.prune=false -c transfer.fsckObjects=true -c transfer.bundleURI=false
        -c gc.auto=0 -c maintenance.auto=false -c core.symlinks=false
        -c advice.detachedHead=false
@@ -58,7 +59,13 @@ flags: -c core.hooksPath=/dev/null -c core.fsmonitor=false -c submodule.recurse=
   only by the operator and sbx and is trusted, so a local rewrite to
   another HTTPS host redirects a fetch and is not guarded. A rewrite
   to a protocol gitsafe refuses is refused, and so is a rewrite whose
-  target is `git://127.0.0.1` for a URL that was not.
+  target is `git://127.0.0.1` for a URL that was not. The same trust
+  covers the rest of that local config that steers a fetch without
+  running a program: the `http.*` keys (a proxy, TLS verification, a
+  header) and a symbolic ref planted in a fetch destination. The list
+  above still neutralizes every key that makes git run a program
+  (decided 2026-10-16), so trusted config never becomes a way to run
+  code.
 - `REQ-0464` Credentials: only `-c credential.helper=<host settings value>` when
   `tools.gitCredentialHelper` is set; a `gitHosts[].caFile` becomes
   `-c http.sslCAInfo=<path>` for that host only (also how the E2E

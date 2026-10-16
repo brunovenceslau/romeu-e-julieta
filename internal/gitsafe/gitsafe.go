@@ -76,6 +76,8 @@ var hostSettings = []setting{
 	{"protocol.git.allow", "always"},
 	{"core.sshCommand", "false"},
 	{"core.gitProxy", ""},
+	{"core.askPass", ""},
+	{"core.alternateRefsCommand", ""},
 	{"diff.external", ""},
 	{"core.pager", "cat"},
 	{"credential.helper", ""},

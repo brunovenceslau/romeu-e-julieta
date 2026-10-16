@@ -8,8 +8,13 @@ package gitsafe
 import (
 	"bufio"
 	"context"
+	"encoding/pem"
 	"errors"
+	"io"
+	"log"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +31,7 @@ import (
 var hostFlags = []string{
 	"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "submodule.recurse=false",
 	"-c", "protocol.allow=never", "-c", "protocol.https.allow=always", "-c", "protocol.git.allow=always",
-	"-c", "core.sshCommand=false", "-c", "core.gitProxy=", "-c", "diff.external=", "-c", "core.pager=cat", "-c", "credential.helper=",
+	"-c", "core.sshCommand=false", "-c", "core.gitProxy=", "-c", "core.askPass=", "-c", "core.alternateRefsCommand=", "-c", "diff.external=", "-c", "core.pager=cat", "-c", "credential.helper=",
 	"-c", "fetch.prune=false", "-c", "transfer.fsckObjects=true", "-c", "transfer.bundleURI=false",
 	"-c", "gc.auto=0", "-c", "maintenance.auto=false", "-c", "core.symlinks=false",
 	"-c", "advice.detachedHead=false",
@@ -462,4 +467,59 @@ func TestVerbsRefuseADirThatIsNotARepository(t *testing.T) {
 		}
 	}
 	assert.Empty(t, plainGit(t, outer, "for-each-ref", "refs/romeu", "refs/remotes", "refs/salvage"))
+}
+
+// TestConfigProgramsNeverRun plants, in a host clone's local config,
+// the keys that make git run a program on a fetch, core.askPass on a
+// 401 and core.alternateRefsCommand with an alternate: host mode runs
+// neither, and plain git with the same config runs each (the positive
+// control).
+//
+//romeu:invariant I3 test
+func TestConfigProgramsNeverRun(t *testing.T) {
+	marker := func(t *testing.T) (path, script string) {
+		path = filepath.Join(t.TempDir(), "marker")
+		script = filepath.Join(t.TempDir(), "plant.sh")
+		require.NoError(t, os.WriteFile(script, []byte("#!/bin/sh\necho ran >> '"+path+"'\n"), 0o700))
+		return path, script
+	}
+	t.Run("core.askPass", func(t *testing.T) {
+		srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("WWW-Authenticate", `Basic realm="r"`)
+			w.WriteHeader(http.StatusUnauthorized)
+		}))
+		srv.Config.ErrorLog = log.New(io.Discard, "", 0)
+		srv.StartTLS()
+		t.Cleanup(srv.Close)
+		caFile := filepath.Join(t.TempDir(), "ca.pem")
+		require.NoError(t, os.WriteFile(caFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw}), 0o600))
+		host := srv.Listener.Addr().String()
+		url := "https://" + host + "/r.git"
+		dir, _ := newRepo(t)
+		path, script := marker(t)
+		plainGit(t, dir, "config", "core.askPass", script)
+		r, err := New(Config{Mode: Host, Git: gitPath(t), Home: t.TempDir(), GitHosts: []GitHost{{Host: host, CAFile: caFile}}})
+		require.NoError(t, err)
+		require.Error(t, r.Fetch(t.Context(), dir, url, []string{"+refs/heads/*:refs/romeu/origin/r/*"}))
+		assert.NoFileExists(t, path)
+
+		_, err = plainGitErr(t, dir, []string{"GIT_TERMINAL_PROMPT=0"}, "-c", "http.sslCAInfo="+caFile, "fetch", url)
+		require.Error(t, err)
+		assert.FileExists(t, path, "the plant is live: plain git runs it")
+	})
+	t.Run("core.alternateRefsCommand", func(t *testing.T) {
+		src, _ := newRepo(t)
+		url := serveGit(t, bareCopy(t, src, "repo.git")) + "repo.git"
+		other, _ := newRepo(t)
+		dir, _ := newRepo(t)
+		alternates := filepath.Join(dir, ".git", "objects", "info", "alternates")
+		require.NoError(t, os.WriteFile(alternates, []byte(filepath.Join(other, ".git", "objects")+"\n"), 0o600))
+		path, script := marker(t)
+		plainGit(t, dir, "config", "core.alternateRefsCommand", script)
+		require.NoError(t, newRunner(t, Host).Fetch(t.Context(), dir, url, []string{"+refs/heads/*:refs/romeu/origin/r/*"}))
+		assert.NoFileExists(t, path)
+
+		plainGit(t, dir, "fetch", url, "+refs/heads/*:refs/control/*")
+		assert.FileExists(t, path, "the plant is live: plain git runs it")
+	})
 }
