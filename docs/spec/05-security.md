@@ -97,17 +97,20 @@ environment plus one closed network pass-through list, exactly
 `no_proxy` and `SSL_CERT_FILE`, each passed when set and not empty
 (the set `tools/ci` passes as `networkPassThrough`), and still no
 `GIT_*` variable. The list is the one exception to "nothing
-inherited": every egress of a sandbox goes through a proxy whose CA
-arrives in `SSL_CERT_FILE` (measured in an sbx sandbox on 2026-10-16),
-so a scrubbed environment would break the clone and fetch of `julieta
-setup` ([04 4.3](04-cli.md#43-julieta-sandbox)). The exception gives
-the agent nothing new: it can set these variables, but it can already
-point git elsewhere through the sandbox's global config
-(`url.<base>.insteadOf`, `http.sslCAInfo`), which this mode keeps and
-does not trust, and what julieta fetches from origin is content the
-agent can push anyway. No credential travels in these variables: the
-proxy adds it. Host mode has no such list. Sandbox
-mode also uses explicit URLs and refspecs, and
+inherited": every egress of a sandbox goes through a proxy that the
+proxy variables name, so a scrubbed environment would break the clone
+and fetch of `julieta setup` ([04 4.3](04-cli.md#43-julieta-sandbox)).
+The proxy's CA is in the system bundle of the sandbox image, and
+`SSL_CERT_FILE` names that bundle (measured in an sbx sandbox on
+2026-10-16); git's libcurl on that image reads the system bundle and
+ignores `SSL_CERT_FILE`, which the list keeps for a git whose TLS
+library reads it. The exception gives the agent nothing new: it can
+set these variables, but it can already point git elsewhere through
+the sandbox's global config (`url.<base>.insteadOf`,
+`http.sslCAInfo`), which this mode keeps and does not trust, and what
+julieta fetches from origin is content the agent can push anyway. No
+credential travels in these variables: the proxy adds it. Host mode
+has no such list. Sandbox mode also uses explicit URLs and refspecs, and
 `-c core.hooksPath=/dev/null -c core.fsmonitor=false
 -c submodule.recurse=false`. It keeps the sandbox's global config,
 which the sandbox owns and the agent can write, so nothing in that
