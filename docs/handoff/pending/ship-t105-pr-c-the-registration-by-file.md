@@ -1,7 +1,7 @@
 # Ship T105 PR-C, the registration by file
 
-The branch feat/t105c-registration holds 17 signed commits on main at
-b1ab7e9. A builder wrote them on 2026-10-16 and reviewed its own diff.
+The branch feat/t105c-registration holds a builder's work from
+2026-10-16, with the builder's adversarial review of its own diff.
 
 What the builder measured:
 
@@ -13,8 +13,8 @@ What the builder measured:
 
 To do, in order:
 
-1. Rebase onto main with signing on. #61 merged after the branch point
-   and touched docs/spec/10-testing-style.md and the T141 task file.
+1. Rebase onto main with signing on. docs/spec/10-testing-style.md and
+   the T141 task file changed on main on 2026-10-16.
 2. Run the ship gate: code-reviewer and security-auditor. The diff
    touches the checks, approvals and ask-first surfaces.
 3. Open the PR with these approval lines: checks, approvals, ask-first,
@@ -38,4 +38,4 @@ Points the PR states:
 - The PR that merges marks T105 merged, and T137 with it (pending item
   "mark-t137-merged-together-with-t105").
 
-Reopen: now.
+Reopen: the next session starts.

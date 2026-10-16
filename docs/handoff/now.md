@@ -4,7 +4,7 @@
 
 Checkpoint of 2026-10-16, before a /clear. Eight pull requests merged
 (#53, #55 to #61; Done record 3). The five lanes saved on 2026-10-15
-all shipped. T105 PR-C is built and pushed but not yet gated.
+all shipped. T105 PR-C was built; its ship gate is the next step.
 Subagents worked this session.
 
 ## Next steps
@@ -33,7 +33,7 @@ One block, a recommendation each.
 
 ## In flight
 
-- T105 PR-C: branch feat/t105c-registration, no PR yet.
+- T105 PR-C: branch feat/t105c-registration.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
