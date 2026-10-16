@@ -245,6 +245,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 				}
 				require.ErrorContains(t, err, strings.ReplaceAll(tt.want, fixed, installs))
 				if tt.fails {
+					require.ErrorContains(t, err, "mise which golangci-lint: "+filepath.Join(f.Bin, "mise")+" exited 1;", "the probe and the mise it started")
 					require.ErrorContains(t, err, "\nmise ERROR not trusted", "what mise wrote to standard error")
 				}
 				assert.Equal(t, check.Tools{}, tools)
