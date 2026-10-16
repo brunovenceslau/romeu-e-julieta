@@ -242,22 +242,33 @@ func TestMutantsInterruptedInTheBaseline(t *testing.T) {
 	f.assertUntouched(t, before)
 }
 
-// TestMutantsSecondSignal checks that a second signal does not leave
-// the test binary behind: one that lands before the handler steps aside
-// is absorbed and the status is the first's, and one after it ends the
-// process by its default action. Either way the test binary is dead, as
-// the handler kills its group before it steps aside.
+// TestMutantsSecondSignal checks that a run that gets two SIGINTs
+// while a mutant runs a test that never ends exits 130, as for the
+// first signal alone, with the test binary dead and the second signal
+// absorbed rather than ending the process by its default action.
+//
+// The two signals leave the test back to back. The handler of
+// procgroup.Main takes SIGINT through a channel of one slot, so a
+// second SIGINT that lands before the handler steps aside is either
+// dropped on the full channel or left unread in it; only one that lands
+// after the cancel, the kill of every group and the step aside would
+// end the process. The only way for that to happen here is for the
+// test to be held between its two kill calls for longer than the
+// handler takes, which fails this test loudly (a status of a signal,
+// not an exit) and never passes it falsely. The order that closes the
+// window is procgroup's, and its own tests hold the handler at the
+// step aside to show it; that seam is not exported, so this test does
+// not hold it.
 func TestMutantsSecondSignal(t *testing.T) {
 	_, h := startHelper(t, false)
 	pid := h.hungPid(t)
-	h.signal(t, syscall.SIGINT)
-	h.signal(t, syscall.SIGINT)
+	helperPid := readPid(t, h.mainPidfile, 10*time.Second, "the helper writes its pid")
+	require.NoError(t, syscall.Kill(helperPid, syscall.SIGINT))
+	require.NoError(t, syscall.Kill(helperPid, syscall.SIGINT))
 	exit := h.wait(t)
-	if exit.Signal != 0 {
-		assert.Equal(t, syscall.SIGINT, exit.Signal)
-	} else {
-		assert.Equal(t, 128+int(syscall.SIGINT), exit.Code)
-	}
+	assert.Zero(t, exit.Signal, "the second signal did not end the process")
+	assert.Equal(t, 128+int(syscall.SIGINT), exit.Code)
+	assert.Equal(t, "mutants: interrupted\n", h.ownStderr())
 	requireGone(t, pid)
 }
 

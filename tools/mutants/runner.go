@@ -425,6 +425,9 @@ func (r *runner) goTest(ctx context.Context, t target, timeout time.Duration) (f
 // command did not run, ran past the limit of its class, or the run was
 // interrupted.
 func (r *runner) goCmd(ctx context.Context, class procgroup.Class, args ...string) (failed bool, out string, err error) {
+	// CombinedOutput holds the output in memory, which its doc advises
+	// against for procgroup.Unbounded: countPassed parses the whole of
+	// it, and -timeout bounds the test binary that writes most of it.
 	output, err := procgroup.CombinedOutput(ctx, procgroup.Command{
 		Class: class,
 		Argv:  append([]string{r.goBin}, args...),
@@ -451,16 +454,17 @@ func (r *runner) goCmd(ctx context.Context, class procgroup.Class, args ...strin
 // the class procgroup.Mise: the shim may install the pinned go on a
 // cold cache first.
 func resolveGo(ctx context.Context, top string) (string, error) {
-	var stdout strings.Builder
+	var stdout, stderr strings.Builder
 	err := procgroup.Run(ctx, procgroup.Command{
 		Class:  procgroup.Mise,
 		Argv:   []string{"go", "env", "GOROOT"},
 		Dir:    top,
 		Env:    slices.Concat(os.Environ(), goenv.Pin),
 		Stdout: &stdout,
+		Stderr: &stderr,
 	})
 	if err != nil {
-		return "", fmt.Errorf("go env GOROOT in %s: %w", top, err)
+		return "", fmt.Errorf("go env GOROOT in %s: %w: %s", top, err, git.Printable(strings.TrimSpace(stderr.String())))
 	}
 	goBin := filepath.Join(strings.TrimSpace(stdout.String()), "bin", "go")
 	if err := checkGoVersion(ctx, goBin); err != nil {
@@ -472,15 +476,16 @@ func resolveGo(ctx context.Context, top string) (string, error) {
 // checkGoVersion fails unless goBin is the version of the go that built
 // this tool.
 func checkGoVersion(ctx context.Context, goBin string) error {
-	var stdout strings.Builder
+	var stdout, stderr strings.Builder
 	err := procgroup.Run(ctx, procgroup.Command{
 		Class:  procgroup.Mise,
 		Argv:   []string{goBin, "env", "GOVERSION"},
 		Env:    goEnv(goBin, ""),
 		Stdout: &stdout,
+		Stderr: &stderr,
 	})
 	if err != nil {
-		return fmt.Errorf("%s env GOVERSION: %w", goBin, err)
+		return fmt.Errorf("%s env GOVERSION: %w: %s", goBin, err, git.Printable(strings.TrimSpace(stderr.String())))
 	}
 	if got := strings.TrimSpace(stdout.String()); got != runtime.Version() {
 		return fmt.Errorf("%s is %s, not %s, the go this tool was built with", goBin, got, runtime.Version())

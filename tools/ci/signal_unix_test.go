@@ -191,10 +191,11 @@ func killAtEnd(t *testing.T, pidfile string) {
 			}
 			// Pids 0 and 1 are never ours to kill: -1 would reach every process.
 			if pid, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && pid > 1 {
-				// The group goes only if pid exists and leads one: this check
-				// cannot tell a recycled pid that leads a group from the
-				// original, which is the most a cleanup of a failed test asks.
-				if pgid, err := syscall.Getpgid(pid); err == nil && pgid == pid {
+				// The group goes only if pid exists and leads one other than
+				// this test's own: this check cannot tell a recycled pid that
+				// leads a group from the original, which is the most a cleanup
+				// of a failed test asks.
+				if pgid, err := syscall.Getpgid(pid); err == nil && pgid == pid && pid != syscall.Getpgrp() {
 					_ = syscall.Kill(-pid, syscall.SIGKILL)
 				}
 				// The same for the process alone, which may not lead a group.
@@ -212,7 +213,11 @@ func killAtEnd(t *testing.T, pidfile string) {
 // by failing or by succeeding, leaves no grandchild behind once run
 // returns: the grandchild holds the output pipe, and procgroup kills
 // the group as soon as the leader ends, so the pipe closes and the
-// step's result is the leader's.
+// step's result is the leader's. That the kill comes before the drain,
+// so the drain bound is not waited out, is procgroup's to show
+// (TestRunKillsTheGroup there); the bound here only catches a step
+// that waits for the grandchild, which sleeps 60 s, and leaves the
+// slack a loaded machine needs.
 func TestStepRunKillsTheGroup(t *testing.T) {
 	for _, c := range []struct {
 		name string
@@ -223,6 +228,7 @@ func TestStepRunKillsTheGroup(t *testing.T) {
 			killAtEnd(t, pidfile)
 			start := time.Now()
 			_, err := leaderExitStep(pidfile, c.code).run(t.Context(), t.TempDir())
+			took := time.Since(start)
 			if c.code == 0 {
 				require.NoError(t, err, "the leader succeeded, and its group is gone")
 			} else {
@@ -230,8 +236,8 @@ func TestStepRunKillsTheGroup(t *testing.T) {
 				require.True(t, ok, "the leader's status: %v", err)
 				assert.Equal(t, c.code, exit.Code)
 			}
-			assert.Less(t, time.Since(start), procgroup.WaitDelay, "the run did not wait for the drain bound")
 			requireGone(t, waitForPid(t, pidfile))
+			assert.Less(t, took, procgroup.WaitDelay+20*time.Second, "the run did not wait for the grandchild")
 		})
 	}
 }

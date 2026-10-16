@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -58,4 +59,19 @@ func TestSendPack(t *testing.T) {
 			require.FailNow(t, "the pair did not end after unpack-objects failed")
 		}
 	})
+}
+
+// TestSendPackRunsUnderTheToolGitClass shows that pack-objects and
+// unpack-objects run under the class procgroup.ToolGit: with a git
+// that stalls first on PATH, the pair ends at the limit of that class,
+// each with subprocess-timeout.
+func TestSendPackRunsUnderTheToolGitClass(t *testing.T) {
+	gitBin := stub(t, "git", stall(t))
+	t.Setenv("PATH", filepath.Dir(gitBin))
+	repo := git.Repo{Dir: t.TempDir(), Env: []string{}}
+	err := sendPack(classCtx(t, procgroup.ToolGit), repo, repo, "want", "have")
+	requireTimeoutOf(t, procgroup.ToolGit, err)
+	for _, part := range []string{"snapshot: git pack-objects: ", "snapshot: git unpack-objects: "} {
+		assert.Contains(t, err.Error(), part+"git ran past the 100ms limit of class tool-git")
+	}
 }

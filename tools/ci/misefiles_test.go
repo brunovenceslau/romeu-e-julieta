@@ -4,12 +4,15 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -513,4 +516,35 @@ func TestCheckMiseVersion(t *testing.T) {
 
 	require.NoError(t, os.Remove(filepath.Join(f.bin, "mise")))
 	require.ErrorContains(t, checkMiseVersion(t.Context(), root), "mise is not on the search path")
+}
+
+// TestMiseProbesRunUnderTheToolProbeClass shows that the two probes of
+// mise, "mise which" (whichPinned) and "mise --version"
+// (checkMiseVersion), run under the class procgroup.ToolProbe: a mise
+// that stalls ends at the limit of that class, shortened here. A probe
+// under another class would end at the deadline of the context
+// instead, which is not subprocess-timeout.
+func TestMiseProbesRunUnderTheToolProbeClass(t *testing.T) {
+	sleep, err := procgroup.LookPath("sleep")
+	require.NoError(t, err)
+	root := lockedRoot(t, lockFixture)
+	f := newFakeMise(t)
+	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\nexec '"+sleep+"' 30\n"), 0o700))
+	probes := map[string]func(ctx context.Context) error{
+		"mise which": func(ctx context.Context) error {
+			_, err := whichPinned(ctx, root, "go", "go", "go")
+			return err
+		},
+		"mise --version": func(ctx context.Context) error { return checkMiseVersion(ctx, root) },
+	}
+	for name, probe := range probes {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			err := probe(procgroup.WithTestTimeout(ctx, procgroup.ToolProbe, 100*time.Millisecond))
+			timeout, ok := errors.AsType[*procgroup.TimeoutError](err)
+			require.True(t, ok, "the error is subprocess-timeout: %v", err)
+			assert.Equal(t, procgroup.ToolProbe, timeout.Class)
+		})
+	}
 }

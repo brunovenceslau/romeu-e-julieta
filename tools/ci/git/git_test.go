@@ -5,10 +5,13 @@ package git_test
 
 import (
 	"context"
+	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -167,6 +170,26 @@ func TestRunStopsWithItsContext(t *testing.T) {
 	cancel()
 	_, err := r.Run(ctx, nil, "rev-parse", "--git-dir")
 	require.Error(t, err, "Run under a cancelled context")
+}
+
+// TestRunUnderTheToolGitClass shows that Run runs git under the class
+// procgroup.ToolGit: a git that stalls, first on PATH, ends at the limit
+// of that class, shortened here. A run under another class would end
+// at the deadline of the context instead, which is not
+// subprocess-timeout.
+func TestRunUnderTheToolGitClass(t *testing.T) {
+	sleep, err := procgroup.LookPath("sleep")
+	require.NoError(t, err)
+	bin := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\nexec '"+sleep+"' 30\n"), 0o700))
+	t.Setenv("PATH", bin)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	ctx = procgroup.WithTestTimeout(ctx, procgroup.ToolGit, 100*time.Millisecond)
+	_, err = git.Repo{Dir: t.TempDir(), Env: []string{}}.Run(ctx, nil, "status")
+	timeout, ok := errors.AsType[*procgroup.TimeoutError](err)
+	require.True(t, ok, "the error is subprocess-timeout: %v", err)
+	assert.Equal(t, procgroup.ToolGit, timeout.Class)
 }
 
 // TestRunFetchesNoMissingObject shows that Run does not fetch an object
