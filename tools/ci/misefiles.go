@@ -18,6 +18,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // Threat model of the mise configuration channel. mise reads its
@@ -212,7 +213,7 @@ var miseEnv = slices.Concat([]string{
 // "env -i", the GIT_ ones included: tools/ci finds the repository from
 // the working directory of the hook, which git sets to the top of the
 // tree, and never from a GIT_DIR.
-var hookAllow = slices.Concat(goenv.PassThrough, networkPassThrough, goModulePassThrough)
+var hookAllow = slices.Concat(goenv.PassThrough, check.NetworkPassThrough, check.GoModulePassThrough)
 
 // miseNoGlobalConfig is the path miseEnv gives MISE_GLOBAL_CONFIG_FILE,
 // so that mise reads no global configuration: its [env] table (a
@@ -397,7 +398,7 @@ func checkMiseVersion(ctx context.Context, root string) error {
 		Class:  procgroup.ToolProbe,
 		Argv:   []string{"mise", "--version"},
 		Dir:    root,
-		Env:    miseRunEnviron(passThroughEnv(), root),
+		Env:    miseRunEnviron(check.PassThroughEnv(), root),
 		Stdout: &stdout,
 	})
 	out := stdout.Bytes()

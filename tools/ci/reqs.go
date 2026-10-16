@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // The requirement ids of 12 12.11. A page is the index, docs/spec.md,
@@ -120,17 +121,17 @@ func (m reqMark) where() string { return m.page + ":" + strconv.Itoa(m.line) }
 // runReqs is the "reqs" subcommand: the check over the tree at HEAD,
 // or, with "allocate", the numbering of the placeholders in the
 // working tree.
-func runReqs(ctx context.Context, e env, args []string) (bool, error) {
+func runReqs(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if len(args) > 0 && args[0] == "allocate" {
 		if len(args) > 1 {
-			return false, fmt.Errorf("reqs allocate takes no argument\n%s", usage)
+			return false, fmt.Errorf("reqs allocate takes no argument\n%s", check.Usage())
 		}
 		return reqsAllocate(ctx, e)
 	}
 	if len(args) != 0 {
-		return false, fmt.Errorf("reqs takes no argument, or allocate\n%s", usage)
+		return false, fmt.Errorf("reqs takes no argument, or allocate\n%s", check.Usage())
 	}
-	files, err := headTree(ctx, e.repo(), "HEAD")
+	files, err := check.HeadTree(ctx, e.Repo(), "HEAD")
 	if err != nil {
 		return false, err
 	}
@@ -138,9 +139,9 @@ func runReqs(ctx context.Context, e env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	say(e.stdout, "%s%s\n", lines(findings), summary("reqs", len(findings)))
+	check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("reqs", len(findings)))
 	if len(deferred) > 0 {
-		say(e.stdout, "%s", reqDeferredLines(deferred))
+		check.Say(e.Stdout, "%s", reqDeferredLines(deferred))
 	}
 	return len(findings) == 0, nil
 }
@@ -164,14 +165,14 @@ func reqDeferredLines(ids []string) string {
 // the rules of 12 12.11: the ids of the pages and the retired table,
 // then, where task files exist, the citations of the task files. It
 // returns the findings and the ids cited only by deferred tasks.
-func reqsOf(files []treeFile) ([]finding, []string, error) {
+func reqsOf(files []check.TreeFile) ([]check.Finding, []string, error) {
 	pages, err := reqPagesIn(files)
 	if err != nil {
 		return nil, nil, err
 	}
 	live, placeholders, findings := reqIDs(pages)
 	for _, m := range placeholders {
-		findings = append(findings, finding{m.where(), "reqs", "a placeholder is left; run \"go run ./tools/ci reqs allocate\""})
+		findings = append(findings, check.Finding{Where: m.where(), Rule: "reqs", Msg: "a placeholder is left; run \"go run ./tools/ci reqs allocate\""})
 	}
 	retired, retiredFindings := reqRetired(pages)
 	findings = append(findings, retiredFindings...)
@@ -187,16 +188,16 @@ func reqsOf(files []treeFile) ([]finding, []string, error) {
 }
 
 // reqPagesIn returns the pages among files, in document order.
-func reqPagesIn(files []treeFile) ([]reqPage, error) {
+func reqPagesIn(files []check.TreeFile) ([]reqPage, error) {
 	var pages []reqPage
 	for _, f := range files {
-		if !reqIsPage(f.path) {
+		if !reqIsPage(f.Path) {
 			continue
 		}
-		if f.mode == "160000" {
-			return nil, fmt.Errorf("read %s: not a file", git.Printable(f.path))
+		if f.Mode == "160000" {
+			return nil, fmt.Errorf("read %s: not a file", git.Printable(f.Path))
 		}
-		pages = append(pages, reqPageOf(f.path, f.content))
+		pages = append(pages, reqPageOf(f.Path, f.Content))
 	}
 	reqSortPages(pages)
 	return pages, nil
@@ -344,10 +345,10 @@ func reqMisplaced(line string, start, end int, at reqPlace) string {
 // elsewhere is for the caller: the check reports it, allocate numbers
 // it. A token whose body is empty is a mention of the prefix and
 // nothing else.
-func reqIDs(pages []reqPage) (map[string]reqMark, []reqMark, []finding) {
+func reqIDs(pages []reqPage) (map[string]reqMark, []reqMark, []check.Finding) {
 	live := map[string]reqMark{}
 	var placeholders []reqMark
-	var findings []finding
+	var findings []check.Finding
 	for _, p := range pages {
 		excluded := reqExcluded(p)
 		rowFirst, rowLast := reqRetiredRows(p)
@@ -356,19 +357,19 @@ func reqIDs(pages []reqPage) (map[string]reqMark, []reqMark, []finding) {
 			switch {
 			case m.body == "":
 			case m.misplaced != "":
-				findings = append(findings, finding{m.where(), "reqs", token + " " + m.misplaced + " (12 12.11)"})
+				findings = append(findings, check.Finding{Where: m.where(), Rule: "reqs", Msg: token + " " + m.misplaced + " (12 12.11)"})
 			case m.body == reqPlaceholder && excluded[m.line-1]:
-				findings = append(findings, finding{m.where(), "reqs", "a placeholder sits in a page or section that carries no id (12 12.11)"})
+				findings = append(findings, check.Finding{Where: m.where(), Rule: "reqs", Msg: "a placeholder sits in a page or section that carries no id (12 12.11)"})
 			case m.body == reqPlaceholder:
 				placeholders = append(placeholders, m)
 			case m.line-1 >= rowFirst && m.line-1 < rowLast: // a retired row names its id
 			case !reqDigits.MatchString(m.body):
-				findings = append(findings, finding{m.where(), "reqs", "the token after " + reqPrefix + " is neither four digits nor " + reqPlaceholder})
+				findings = append(findings, check.Finding{Where: m.where(), Rule: "reqs", Msg: "the token after " + reqPrefix + " is neither four digits nor " + reqPlaceholder})
 			case excluded[m.line-1]:
-				findings = append(findings, finding{m.where(), "reqs", token + " sits in a page or section that carries no id (12 12.11)"})
+				findings = append(findings, check.Finding{Where: m.where(), Rule: "reqs", Msg: token + " sits in a page or section that carries no id (12 12.11)"})
 			default:
 				if prior, dup := live[m.body]; dup {
-					findings = append(findings, finding{m.where(), "reqs", token + " appears twice; its first place is " + prior.where()})
+					findings = append(findings, check.Finding{Where: m.where(), Rule: "reqs", Msg: token + " appears twice; its first place is " + prior.where()})
 					continue
 				}
 				live[m.body] = m
@@ -417,29 +418,29 @@ func reqExcluded(p reqPage) []bool {
 // reqRetiredHeader, on whichever page holds it. A row that does not
 // parse is a finding (rule 7); a page without the table has no retired
 // id.
-func reqRetired(pages []reqPage) (map[string]reqMark, []finding) {
+func reqRetired(pages []reqPage) (map[string]reqMark, []check.Finding) {
 	retired := map[string]reqMark{}
-	var findings []finding
+	var findings []check.Finding
 	for _, p := range pages {
 		first, last := reqRetiredRows(p)
 		for i := first; i < last; i++ {
 			m := reqMark{page: p.path, line: i + 1}
 			cells := strings.Split(strings.TrimSuffix(strings.TrimPrefix(p.lines[i], "|"), "|"), "|")
 			if len(cells) != 4 {
-				findings = append(findings, finding{m.where(), "reqs", fmt.Sprintf("a retired row has %d cells, not 4", len(cells))})
+				findings = append(findings, check.Finding{Where: m.where(), Rule: "reqs", Msg: fmt.Sprintf("a retired row has %d cells, not 4", len(cells))})
 				continue
 			}
 			id := strings.Trim(strings.TrimSpace(cells[0]), "`")
 			date := strings.TrimSpace(cells[1])
 			switch {
 			case !strings.HasPrefix(id, reqPrefix) || !reqDigits.MatchString(strings.TrimPrefix(id, reqPrefix)):
-				findings = append(findings, finding{m.where(), "reqs", "a retired row's first cell is not an id"})
+				findings = append(findings, check.Finding{Where: m.where(), Rule: "reqs", Msg: "a retired row's first cell is not an id"})
 			case !reqISODate.MatchString(date):
-				findings = append(findings, finding{m.where(), "reqs", "a retired row's second cell is not an ISO date"})
+				findings = append(findings, check.Finding{Where: m.where(), Rule: "reqs", Msg: "a retired row's second cell is not an ISO date"})
 			default:
 				m.body = strings.TrimPrefix(id, reqPrefix)
 				if _, dup := retired[m.body]; dup {
-					findings = append(findings, finding{m.where(), "reqs", id + " is retired twice"})
+					findings = append(findings, check.Finding{Where: m.where(), Rule: "reqs", Msg: id + " is retired twice"})
 					continue
 				}
 				retired[m.body] = m
@@ -467,11 +468,11 @@ func reqRetiredRows(p reqPage) (int, int) {
 
 // reqConsistency applies rules 4 and 5: an id both live and retired,
 // and a number from 1 to the highest that is neither.
-func reqConsistency(live, retired map[string]reqMark) []finding {
-	var findings []finding
+func reqConsistency(live, retired map[string]reqMark) []check.Finding {
+	var findings []check.Finding
 	for _, body := range slices.Sorted(maps.Keys(retired)) {
 		if m, ok := live[body]; ok {
-			findings = append(findings, finding{m.where(), "reqs", reqPrefix + body + " is live and in the retired table at " + retired[body].where()})
+			findings = append(findings, check.Finding{Where: m.where(), Rule: "reqs", Msg: reqPrefix + body + " is live and in the retired table at " + retired[body].where()})
 		}
 	}
 	for n := 1; n <= reqHighest(live, retired); n++ {
@@ -482,7 +483,7 @@ func reqConsistency(live, retired map[string]reqMark) []finding {
 		if _, ok := retired[body]; ok {
 			continue
 		}
-		findings = append(findings, finding{reqIndexPath, "reqs", reqPrefix + body + " is neither live nor retired; a dropped obligation is retired, never deleted"})
+		findings = append(findings, check.Finding{Where: reqIndexPath, Rule: "reqs", Msg: reqPrefix + body + " is neither live nor retired; a dropped obligation is retired, never deleted"})
 	}
 	return findings
 }
@@ -508,15 +509,15 @@ func reqBody(n int) string {
 
 // reqOutsidePages applies rule 6 to the decision records: an id in a
 // file under docs/adr/ is a finding, since a record carries none.
-func reqOutsidePages(files []treeFile) []finding {
-	var findings []finding
+func reqOutsidePages(files []check.TreeFile) []check.Finding {
+	var findings []check.Finding
 	for _, f := range files {
-		if !strings.HasPrefix(f.path, "docs/adr/") || f.mode == "160000" {
+		if !strings.HasPrefix(f.Path, "docs/adr/") || f.Mode == "160000" {
 			continue
 		}
-		for _, m := range reqMarks(reqPageOf(f.path, f.content)) {
+		for _, m := range reqMarks(reqPageOf(f.Path, f.Content)) {
 			if reqDigits.MatchString(m.body) {
-				findings = append(findings, finding{m.where(), "reqs", reqPrefix + m.body + " sits in a decision record, which carries no id (12 12.11)"})
+				findings = append(findings, check.Finding{Where: m.where(), Rule: "reqs", Msg: reqPrefix + m.body + " sits in a decision record, which carries no id (12 12.11)"})
 			}
 		}
 	}
@@ -538,23 +539,23 @@ type reqTask struct {
 // not of reqs. A fate outside the ones the plan writes is a finding
 // here, since a misspelt fate would hide a file from the coverage
 // half.
-func reqTasksIn(files []treeFile) ([]reqTask, []finding, error) {
+func reqTasksIn(files []check.TreeFile) ([]reqTask, []check.Finding, error) {
 	var tasks []reqTask
-	var findings []finding
+	var findings []check.Finding
 	for _, f := range files {
-		if path.Dir(f.path) != reqTaskDir || !strings.HasSuffix(f.path, ".md") {
+		if path.Dir(f.Path) != reqTaskDir || !strings.HasSuffix(f.Path, ".md") {
 			continue
 		}
-		if f.mode == "160000" {
-			return nil, nil, fmt.Errorf("read %s: not a file", git.Printable(f.path))
+		if f.Mode == "160000" {
+			return nil, nil, fmt.Errorf("read %s: not a file", git.Printable(f.Path))
 		}
-		t, ok := reqParseTask(f.path, reqPageOf(f.path, f.content).lines)
+		t, ok := reqParseTask(f.Path, reqPageOf(f.Path, f.Content).lines)
 		if !ok {
 			continue
 		}
 		if !slices.Contains(reqReadFates, t.fate) && !slices.Contains(reqOtherFates, t.fate) {
-			where := f.path + ":" + strconv.Itoa(t.fateLine)
-			findings = append(findings, finding{where, "reqs", "the fate " + t.fate + " is none of " + strings.Join(slices.Concat(reqReadFates, reqOtherFates), ", ")})
+			where := f.Path + ":" + strconv.Itoa(t.fateLine)
+			findings = append(findings, check.Finding{Where: where, Rule: "reqs", Msg: "the fate " + t.fate + " is none of " + strings.Join(slices.Concat(reqReadFates, reqOtherFates), ", ")})
 			continue
 		}
 		tasks = append(tasks, t)
@@ -627,11 +628,11 @@ func reqImplements(lines []string, from int) (int, string) {
 // and the ids of reqShared aside. An id that only deferred tasks cite
 // is returned apart and is no finding. Without task files the half is
 // silent.
-func reqCoverage(live, retired map[string]reqMark, tasks []reqTask) ([]finding, []string) {
+func reqCoverage(live, retired map[string]reqMark, tasks []reqTask) ([]check.Finding, []string) {
 	if len(tasks) == 0 {
 		return nil, nil
 	}
-	var findings []finding
+	var findings []check.Finding
 	cited := map[string]bool{} // by a task of a read fate
 	citers := map[string]int{} // read tasks that are not deferred, per id
 	for _, t := range tasks {
@@ -643,17 +644,17 @@ func reqCoverage(live, retired map[string]reqMark, tasks []reqTask) ([]finding, 
 			id, ok := live[c.body]
 			switch {
 			case !reqDigits.MatchString(c.body):
-				findings = append(findings, finding{c.where(), "reqs", "Implements cites " + token + ", which is no id"})
+				findings = append(findings, check.Finding{Where: c.where(), Rule: "reqs", Msg: "Implements cites " + token + ", which is no id"})
 				continue
 			case !ok:
 				state := "unknown"
 				if _, ok := retired[c.body]; ok {
 					state = "retired"
 				}
-				findings = append(findings, finding{c.where(), "reqs", "Implements cites " + token + ", which is " + state})
+				findings = append(findings, check.Finding{Where: c.where(), Rule: "reqs", Msg: "Implements cites " + token + ", which is " + state})
 				continue
 			case c.section != "" && c.section != id.section:
-				findings = append(findings, finding{c.where(), "reqs", "Implements cites " + token + " as (" + c.section + "); it sits in " + id.section})
+				findings = append(findings, check.Finding{Where: c.where(), Rule: "reqs", Msg: "Implements cites " + token + " as (" + c.section + "); it sits in " + id.section})
 			}
 			cited[c.body] = true
 			if t.fate != "deferred" {
@@ -665,11 +666,11 @@ func reqCoverage(live, retired map[string]reqMark, tasks []reqTask) ([]finding, 
 	for _, body := range slices.Sorted(maps.Keys(live)) {
 		switch {
 		case !cited[body]:
-			findings = append(findings, finding{live[body].where(), "reqs", reqPrefix + body + " is cited by no task of fate " + strings.Join(reqReadFates, ", ")})
+			findings = append(findings, check.Finding{Where: live[body].where(), Rule: "reqs", Msg: reqPrefix + body + " is cited by no task of fate " + strings.Join(reqReadFates, ", ")})
 		case citers[body] == 0:
 			deferred = append(deferred, reqPrefix+body)
 		case citers[body] > reqCiteCap && !slices.Contains(reqShared, body):
-			findings = append(findings, finding{live[body].where(), "reqs", fmt.Sprintf("%s%s is cited by %d tasks, more than the %d of 12 12.11; one obligation has few implementers", reqPrefix, body, citers[body], reqCiteCap)})
+			findings = append(findings, check.Finding{Where: live[body].where(), Rule: "reqs", Msg: fmt.Sprintf("%s%s is cited by %d tasks, more than the %d of 12 12.11; one obligation has few implementers", reqPrefix, body, citers[body], reqCiteCap)})
 		}
 	}
 	return findings, deferred
@@ -683,8 +684,8 @@ func reqCoverage(live, retired map[string]reqMark, tasks []reqTask) ([]finding, 
 // its number, and the next placeholder would take it), or when a
 // number would pass reqLast. A tree without a placeholder changes no
 // byte.
-func reqsAllocate(ctx context.Context, e env) (bool, error) {
-	dir, err := repoRoot(ctx, e)
+func reqsAllocate(ctx context.Context, e check.Env) (bool, error) {
+	dir, err := check.RepoRoot(ctx, e)
 	if err != nil {
 		return false, err
 	}
@@ -700,7 +701,7 @@ func reqsAllocate(ctx context.Context, e env) (bool, error) {
 	live, placeholders, findings := reqIDs(pages)
 	retired, retiredFindings := reqRetired(pages)
 	if findings = append(findings, retiredFindings...); len(findings) > 0 {
-		return false, fmt.Errorf("%snothing was written", lines(findings))
+		return false, fmt.Errorf("%snothing was written", check.Lines(findings))
 	}
 	byPath := map[string]*reqPage{}
 	for i := range pages {
@@ -740,9 +741,9 @@ func reqsAllocate(ctx context.Context, e env) (bool, error) {
 		}
 	}
 	for _, w := range written {
-		say(e.stdout, "%s\n", git.SafeLines(w))
+		check.Say(e.Stdout, "%s\n", git.SafeLines(w))
 	}
-	say(e.stdout, "reqs: %s\n", reqAllocateSummary(len(written)))
+	check.Say(e.Stdout, "reqs: %s\n", reqAllocateSummary(len(written)))
 	return true, nil
 }
 

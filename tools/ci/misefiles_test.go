@@ -19,6 +19,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // TestMiseEnvList pins the allowlist of environment variables of every
@@ -45,9 +46,9 @@ func TestMiseEnvList(t *testing.T) {
 		"MISE_CACHE_DIR", "MISE_DATA_DIR", "MISE_STATE_DIR",
 		"GOPATH", "GOCACHE", "GOMODCACHE",
 	}, goenv.PassThrough)
-	assert.Equal(t, []string{"GOPROXY", "GOPRIVATE", "GONOSUMDB", "GOSUMDB", "GOINSECURE"}, goModulePassThrough)
-	assert.Equal(t, []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}, networkPassThrough)
-	assert.Equal(t, slices.Concat(goenv.PassThrough, networkPassThrough, goModulePassThrough), hookAllow)
+	assert.Equal(t, []string{"GOPROXY", "GOPRIVATE", "GONOSUMDB", "GOSUMDB", "GOINSECURE"}, check.GoModulePassThrough)
+	assert.Equal(t, []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}, check.NetworkPassThrough)
+	assert.Equal(t, slices.Concat(goenv.PassThrough, check.NetworkPassThrough, check.GoModulePassThrough), hookAllow)
 	assert.Equal(t, []string{
 		"MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml",
 		"MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=none",
@@ -60,16 +61,16 @@ func TestMiseEnvList(t *testing.T) {
 	}, miseEnv)
 	assert.Equal(t, []string{"GOWORK=off", "GOFLAGS=-mod=readonly"}, goenv.Build)
 	assert.Equal(t, []string{"GOENV=off", "GOTOOLCHAIN=local"}, goenv.Pin)
-	assert.Subset(t, stepEnv("/go"), goenv.Pin, "stepEnv holds goenv.Pin")
-	assert.Subset(t, stepEnv("/go"), goenv.Build, "stepEnv holds goenv.Build")
+	assert.Subset(t, check.StepEnv("/go"), goenv.Pin, "stepEnv holds goenv.Pin")
+	assert.Subset(t, check.StepEnv("/go"), goenv.Build, "stepEnv holds goenv.Build")
 	assert.Equal(t, "MISE_CEILING_PATHS=/a/b", miseCeiling("/a/b/tree"))
 	for _, kv := range slices.Concat(miseEnv, goenv.Build) {
 		key, _, _ := strings.Cut(kv, "=")
-		for _, list := range [][]string{goenv.PassThrough, networkPassThrough, dockerPassThrough} {
+		for _, list := range [][]string{goenv.PassThrough, check.NetworkPassThrough, check.DockerPassThrough} {
 			assert.NotContains(t, list, key)
 		}
 	}
-	for _, key := range slices.Concat(goenv.PassThrough, networkPassThrough, dockerPassThrough, goModulePassThrough) {
+	for _, key := range slices.Concat(goenv.PassThrough, check.NetworkPassThrough, check.DockerPassThrough, check.GoModulePassThrough) {
 		assert.NotContains(t, []string{"MISE_CEILING_PATHS", "MISE_CD", "MISE_ENV_FILE", "MISE_TRUSTED_CONFIG_PATHS", "MISE_GLOBAL_CONFIG_FILE", "MISE_SYSTEM_CONFIG_FILE", "MISE_CONFIG_DIR", "XDG_CONFIG_HOME", "GOFLAGS", "GOENV", "GOWORK", "GOTOOLCHAIN"}, key)
 	}
 	// A value of the caller's for a variable of miseEnv loses to the list's.
@@ -321,7 +322,7 @@ func TestMiseNeverReads(t *testing.T) {
 
 			// The environment tools/ci builds, with MISE_OFFLINE added for the test.
 			t.Setenv("MISE_STATE_DIR", t.TempDir())
-			env := append(miseRunEnviron(passThroughEnv(), l.dir), "MISE_OFFLINE=1")
+			env := append(miseRunEnviron(check.PassThroughEnv(), l.dir), "MISE_OFFLINE=1")
 			guarded := printed(t, env, l.dir)
 			assert.Equal(t, seen{"nothing", wantDir, "unset", "off"}, guarded, "with the allowlist")
 		})

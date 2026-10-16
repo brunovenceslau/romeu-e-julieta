@@ -17,6 +17,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/adrdir"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // The files that generate writes (12 12.3). A generated file is never
@@ -37,11 +38,11 @@ const (
 // the decision records. It says which files it wrote, and none when the
 // tree was current. It reads and writes through the root of the
 // repository, so a symbolic link cannot send it outside.
-func runGenerate(ctx context.Context, e env, args []string) (bool, error) {
+func runGenerate(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if len(args) != 0 {
-		return false, fmt.Errorf("generate takes no argument\n%s", usage)
+		return false, fmt.Errorf("generate takes no argument\n%s", check.Usage())
 	}
-	dir, err := repoRoot(ctx, e)
+	dir, err := check.RepoRoot(ctx, e)
 	if err != nil {
 		return false, err
 	}
@@ -60,7 +61,7 @@ func runGenerate(ctx context.Context, e env, args []string) (bool, error) {
 			return false, err
 		}
 		if wrote {
-			say(e.stdout, "wrote %s\n", git.SafeLines(out.path))
+			check.Say(e.Stdout, "wrote %s\n", git.SafeLines(out.path))
 		}
 	}
 	return true, nil

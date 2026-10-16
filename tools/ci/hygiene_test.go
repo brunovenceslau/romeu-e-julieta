@@ -15,6 +15,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
@@ -54,7 +55,7 @@ func TestHygienePasses(t *testing.T) {
 	r.Write("docs/PROLOGUE.md/page.txt", "a directory of that name holds files, not the file\n")
 	r.Commit("fixture")
 	code, out := runCI(t, r, nil, nil, "hygiene")
-	assert.Equal(t, exitOK, code, "exit status\n%s", out)
+	assert.Equal(t, check.ExitOK, code, "exit status\n%s", out)
 }
 
 // TestHygieneRules has one fixture for each rule of 10 10.2: each case
@@ -283,7 +284,7 @@ func TestHygieneRules(t *testing.T) {
 			tt.change(t, r)
 			r.Commit("fixture")
 			code, out := runCI(t, r, nil, nil, "hygiene")
-			assert.Equal(t, exitFail, code, "exit status")
+			assert.Equal(t, check.ExitFail, code, "exit status")
 			for _, w := range tt.want {
 				assert.Contains(t, out, w)
 			}
@@ -324,11 +325,11 @@ func TestPrologueInThePushedRange(t *testing.T) {
 	got, checked, err := rangeOf(pushedRange(t.Context(), r.Repo, "origin", push, tip))
 	require.NoError(t, err)
 	assert.False(t, checked, "no denylist entry: names are not checked")
-	assert.Equal(t, "commit "+added+": added path sub/prologue.md: prologue: the user's agreement file lives outside product repositories\n", lines(got))
+	assert.Equal(t, "commit "+added+": added path sub/prologue.md: prologue: the user's agreement file lives outside product repositories\n", check.Lines(got))
 
 	// The run reports the finding too, and not only "not checked".
-	code, out := runCI(t, r, strings.NewReader(stdin), []step{passing}, "fast", "origin", origin.Dir)
-	assert.Equal(t, exitFail, code, "exit status")
+	code, out := runCI(t, r, strings.NewReader(stdin), []check.Step{passing}, "fast", "origin", origin.Dir)
+	assert.Equal(t, check.ExitFail, code, "exit status")
 	assert.Contains(t, out, "FAIL  pushed range\ncommit "+added+": added path sub/prologue.md: prologue:")
 	assert.Contains(t, out, "pushed range: not checked against names")
 }
@@ -349,41 +350,41 @@ func TestPushedRangeVerdicts(t *testing.T) {
 		baseList    bool              // the default branch holds a denylist with an entry
 		tip         map[string]string // files of the pushed commit; "" removes one
 		noRemote    bool
-		want        func(tip string) []verdict // nil for the rows that end in an error
+		want        func(tip string) []check.Verdict // nil for the rows that end in an error
 		wantErr     string
 		wantVerdict string // the error of a verdict
 	}{
 		{
 			name: "an entry at HEAD, nothing found", baseList: true,
 			tip:  map[string]string{"docs/page.md": "plain\n"},
-			want: func(string) []verdict { return []verdict{{name: name}} },
+			want: func(string) []check.Verdict { return []check.Verdict{{Name: name}} },
 		},
 		{
 			name: "an entry at HEAD, a listed name in an added line", baseList: true,
 			tip: map[string]string{"docs/page.md": "see " + madeUp + "\n"},
-			want: func(tip string) []verdict {
-				return []verdict{{name: name, findings: []finding{{"commit " + tip + ": docs/page.md:1", "name", "the added line holds a name listed at HEAD"}}}}
+			want: func(tip string) []check.Verdict {
+				return []check.Verdict{{Name: name, Findings: []check.Finding{{Where: "commit " + tip + ": docs/page.md:1", Rule: "name", Msg: "the added line holds a name listed at HEAD"}}}}
 			},
 		},
 		{
 			name: "an entry only at the default branch", baseList: true,
 			tip: map[string]string{names.Path: "", "docs/page.md": "see " + madeUp + "\n"},
-			want: func(tip string) []verdict {
-				return []verdict{{name: name, findings: []finding{{"commit " + tip + ": docs/page.md:1", "name", "the added line holds a name listed at the remote's default branch"}}}}
+			want: func(tip string) []check.Verdict {
+				return []check.Verdict{{Name: name, Findings: []check.Finding{{Where: "commit " + tip + ": docs/page.md:1", Rule: "name", Msg: "the added line holds a name listed at the remote's default branch"}}}}
 			},
 		},
 		{
 			name: "no entry anywhere, nothing found",
 			tip:  map[string]string{"docs/page.md": "plain\n"},
-			want: func(string) []verdict { return []verdict{{name: name, note: notChecked}} },
+			want: func(string) []check.Verdict { return []check.Verdict{{Name: name, Note: notChecked}} },
 		},
 		{
 			name: "no entry anywhere, an added prologue file",
 			tip:  map[string]string{"sub/prologue.md": "text\n"},
-			want: func(tip string) []verdict {
-				return []verdict{
-					{name: name, findings: []finding{{"commit " + tip + ": added path sub/prologue.md", "prologue", prologueMsg}}},
-					{name: name, note: notChecked},
+			want: func(tip string) []check.Verdict {
+				return []check.Verdict{
+					{Name: name, Findings: []check.Finding{{Where: "commit " + tip + ": added path sub/prologue.md", Rule: "prologue", Msg: prologueMsg}}},
+					{Name: name, Note: notChecked},
 				}
 			},
 		},
@@ -428,8 +429,8 @@ func TestPushedRangeVerdicts(t *testing.T) {
 			require.NoError(t, err)
 			if tt.wantVerdict != "" {
 				require.Len(t, got, 1)
-				assert.Equal(t, name, got[0].name)
-				require.ErrorContains(t, got[0].err, tt.wantVerdict)
+				assert.Equal(t, name, got[0].Name)
+				require.ErrorContains(t, got[0].Err, tt.wantVerdict)
 				return
 			}
 			assert.Equal(t, tt.want(tip), got)
@@ -453,7 +454,7 @@ func TestHygienePrintsPathsSafely(t *testing.T) {
 			r.Write(tt.path, "a "+emDash+" b\n")
 			r.Commit("fixture")
 			code, out := runCI(t, r, nil, nil, "hygiene")
-			assert.Equal(t, exitFail, code, "exit status")
+			assert.Equal(t, check.ExitFail, code, "exit status")
 			assert.Contains(t, out, tt.want)
 			for _, raw := range []string{"\x1b", "\nhygiene: ok", "\u200b"} {
 				assert.NotContains(t, out, raw, "the output holds a control character of the path")
@@ -473,11 +474,11 @@ func TestHygieneReadsHEAD(t *testing.T) {
 	r.Commit("with the name")
 	r.Write("docs/page.md", "clean again, and not committed\n")
 	code, out := runCI(t, r, nil, nil, "hygiene")
-	assert.Equal(t, exitFail, code, "the committed name\n%s", out)
+	assert.Equal(t, check.ExitFail, code, "the committed name\n%s", out)
 	r.Commit("without the name")
 	r.Write("docs/page.md", "see zorvex quimby, not committed\n")
 	code, out = runCI(t, r, nil, nil, "hygiene")
-	assert.Equal(t, exitOK, code, "the name that is not committed\n%s", out)
+	assert.Equal(t, check.ExitOK, code, "the name that is not committed\n%s", out)
 }
 
 // TestDataAtHEAD shows that the denylist and the word lists are read
@@ -522,14 +523,14 @@ func TestDataAtHEAD(t *testing.T) {
 			{"fast as the hook", pushOf(r), []string{"fast", "origin", url}},
 		}
 		for _, c := range checks {
-			code, out := runCI(t, r, strings.NewReader(c.stdin), []step{passing}, c.args...)
+			code, out := runCI(t, r, strings.NewReader(c.stdin), []check.Step{passing}, c.args...)
 			if c.stdin != "" && hook != 0 {
 				assert.Equal(t, hook, code, "%s: exit status\n%s", c.name, out)
 				assert.Contains(t, out, "ci: fast judges the commit a push sends", c.name)
 				continue
 			}
 			assert.Equal(t, want, code, "%s: exit status\n%s", c.name, out)
-			if want == exitFail {
+			if want == check.ExitFail {
 				assert.Contains(t, out, "denylist: the denylist is missing", c.name)
 			}
 		}
@@ -539,13 +540,13 @@ func TestDataAtHEAD(t *testing.T) {
 		r := tree(t)
 		r.Write(names.Path, string(denylist(t, madeUp)))
 		r.Git("add", "--all") // staged is not committed either
-		runAll(t, r, exitFail, exitError)
+		runAll(t, r, check.ExitFail, check.ExitError)
 	})
 	t.Run("once committed, every check passes", func(t *testing.T) {
 		r := tree(t)
 		r.Write(names.Path, string(denylist(t, madeUp)))
 		r.Commit("the denylist")
-		runAll(t, r, exitOK, 0)
+		runAll(t, r, check.ExitOK, 0)
 	})
 	t.Run("later changes that are not committed are not read", func(t *testing.T) {
 		r := tree(t)
@@ -554,7 +555,7 @@ func TestDataAtHEAD(t *testing.T) {
 		r.Write(names.Path, "entries: [\n")
 		r.Write("tools/ci/prose.yaml", "rules: []\n")
 		r.Git("add", "--all")
-		runAll(t, r, exitOK, exitError)
+		runAll(t, r, check.ExitOK, check.ExitError)
 	})
 }
 
@@ -573,7 +574,7 @@ func TestHygieneBrokenData(t *testing.T) {
 			r.Write(tt.path, tt.content)
 			r.Commit("fixture")
 			code, out := runCI(t, r, nil, nil, "hygiene")
-			assert.Equal(t, exitError, code, "exit status\n%s", out)
+			assert.Equal(t, check.ExitError, code, "exit status\n%s", out)
 		})
 	}
 }
@@ -598,9 +599,9 @@ func TestHygieneFile(t *testing.T) {
 		code int
 		want string
 	}{
-		{"a file that holds a listed name", with, exitFail, ":2: name:"},
-		{"a file that holds none: the other rules do not apply", without, exitOK, ""},
-		{"a file that does not exist", filepath.Join(dir, "nonesuch"), exitError, ""},
+		{"a file that holds a listed name", with, check.ExitFail, ":2: name:"},
+		{"a file that holds none: the other rules do not apply", without, check.ExitOK, ""},
+		{"a file that does not exist", filepath.Join(dir, "nonesuch"), check.ExitError, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -615,7 +616,7 @@ func TestHygieneFile(t *testing.T) {
 		r.Write(names.Path, string(denylist(t)))
 		r.Commit("an empty denylist")
 		code, out := runCI(t, r, nil, nil, "hygiene", "--file", without)
-		assert.Equal(t, exitFail, code, "exit status\n%s", out)
+		assert.Equal(t, check.ExitFail, code, "exit status\n%s", out)
 	})
 }
 
@@ -642,7 +643,7 @@ func TestJudgedCommitIsPinned(t *testing.T) {
 		assert.Empty(t, got, "X is clean")
 		got, err = hygiene(t.Context(), r.Repo, "HEAD")
 		require.NoError(t, err)
-		assert.Contains(t, lines(got), "docs/page.md:1: name:")
+		assert.Contains(t, check.Lines(got), "docs/page.md:1: name:")
 	})
 	t.Run("hygiene: a denylist that Y drops", func(t *testing.T) {
 		r, x := moved(t)
@@ -653,7 +654,7 @@ func TestJudgedCommitIsPinned(t *testing.T) {
 		assert.Empty(t, got, "X has its denylist")
 		got, err = hygiene(t.Context(), r.Repo, "HEAD")
 		require.NoError(t, err)
-		assert.Contains(t, lines(got), "denylist: the denylist is missing")
+		assert.Contains(t, check.Lines(got), "denylist: the denylist is missing")
 	})
 	t.Run("hygiene: word lists that Y drops", func(t *testing.T) {
 		r, x := moved(t)
@@ -682,7 +683,7 @@ func TestJudgedCommitIsPinned(t *testing.T) {
 		got, checked, err := rangeOf(pushedRange(t.Context(), r.Repo, "origin", push, x))
 		require.NoError(t, err)
 		assert.True(t, checked, "X holds an entry")
-		assert.Contains(t, lines(got), "the added line holds a name listed at HEAD")
+		assert.Contains(t, check.Lines(got), "the added line holds a name listed at HEAD")
 		_, checked, err = rangeOf(pushedRange(t.Context(), r.Repo, "origin", push, "HEAD"))
 		require.NoError(t, err)
 		assert.False(t, checked, "Y has none, and neither has the default branch")
@@ -714,16 +715,16 @@ func TestPrintableASCII(t *testing.T) {
 // rangeOf reads the verdicts of pushedRange back as its findings, and
 // whether names were matched: no verdict carries the "not checked"
 // note. A verdict that could not judge is returned as its error.
-func rangeOf(verdicts []verdict, err error) (findings []finding, checked bool, _ error) {
+func rangeOf(verdicts []check.Verdict, err error) (findings []check.Finding, checked bool, _ error) {
 	checked = true
 	for _, v := range verdicts {
 		switch {
-		case v.err != nil:
-			return nil, false, v.err
-		case v.note != "":
+		case v.Err != nil:
+			return nil, false, v.Err
+		case v.Note != "":
 			checked = false
 		}
-		findings = append(findings, v.findings...)
+		findings = append(findings, v.Findings...)
 	}
 	return findings, checked, err
 }
@@ -809,7 +810,7 @@ func TestHeadTreeOfAPartialClone(t *testing.T) {
 	upstream.Commit("docs: add a page")
 	_, err := clone.Run(t.Context(), nil, "fetch", "--quiet", "origin")
 	require.NoError(t, err)
-	_, err = headTree(t.Context(), clone, "refs/remotes/origin/HEAD")
+	_, err = check.HeadTree(t.Context(), clone, "refs/remotes/origin/HEAD")
 	// The clone has no blob at all: the first entry of the tree is said.
 	first := upstream.Git("rev-parse", "HEAD:.githooks/pre-push")
 	require.ErrorContains(t, err, "read .githooks/pre-push: the object store lacks its blob "+first+`; in a partial clone (one made with --filter), fetch it with "git cat-file -p `+first+`"`)

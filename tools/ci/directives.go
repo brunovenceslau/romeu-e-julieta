@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // generateDirective is the one go:generate directive of the repository
@@ -53,23 +55,23 @@ func generateLines(src []byte) []string {
 // path, and returns what is wrong with their go:generate lines: the
 // repository has exactly one, with exactly the text of
 // generateDirective, in generateSite.
-func generateProblems(files map[string][]byte) []finding {
-	var problems []finding
+func generateProblems(files map[string][]byte) []check.Finding {
+	var problems []check.Finding
 	site := 0
 	for _, path := range slices.Sorted(maps.Keys(files)) {
 		for _, line := range generateLines(files[path]) {
 			switch {
 			case path != generateSite:
-				problems = append(problems, finding{path, "generate-directive", fmt.Sprintf("holds %q, and only %s may hold a go:generate line", line, generateSite)})
+				problems = append(problems, check.Finding{Where: path, Rule: "generate-directive", Msg: fmt.Sprintf("holds %q, and only %s may hold a go:generate line", line, generateSite)})
 			case line != generateDirective:
-				problems = append(problems, finding{path, "generate-directive", fmt.Sprintf("holds %q, and the one go:generate line of the repository is %q", line, generateDirective)})
+				problems = append(problems, check.Finding{Where: path, Rule: "generate-directive", Msg: fmt.Sprintf("holds %q, and the one go:generate line of the repository is %q", line, generateDirective)})
 			default:
 				site++
 			}
 		}
 	}
 	if site != 1 {
-		problems = append(problems, finding{generateSite, "generate-directive", fmt.Sprintf("holds the go:generate line %q %d times, and it must hold it once", generateDirective, site)})
+		problems = append(problems, check.Finding{Where: generateSite, Rule: "generate-directive", Msg: fmt.Sprintf("holds the go:generate line %q %d times, and it must hold it once", generateDirective, site)})
 	}
 	return problems
 }
@@ -84,7 +86,7 @@ func generateProblems(files map[string][]byte) []finding {
 // inside the tree is read once, through its real path) and a dangling
 // link. A link to a directory whose name ends in .go cannot be read as a
 // file, and that is an error, not a pass.
-func checkGenerateDirectives(root string) ([]finding, error) {
+func checkGenerateDirectives(root string) ([]check.Finding, error) {
 	files := map[string][]byte{}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		switch {

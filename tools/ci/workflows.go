@@ -18,6 +18,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // workflowsDir holds the workflows, and workflowExt is the one name
@@ -139,8 +140,8 @@ var runPrograms = [][]string{
 // workflows applies the grammar to every file below .github/workflows
 // in the tree at head, as hygiene does: the tree that is committed is
 // the one a runner checks out.
-func workflows(ctx context.Context, repo git.Repo, head string) ([]finding, error) {
-	files, err := headTree(ctx, repo, head)
+func workflows(ctx context.Context, repo git.Repo, head string) ([]check.Finding, error) {
+	files, err := check.HeadTree(ctx, repo, head)
 	if err != nil {
 		return nil, err
 	}
@@ -149,11 +150,11 @@ func workflows(ctx context.Context, repo git.Repo, head string) ([]finding, erro
 
 // workflowsOf applies the grammar to the workflows among files, the
 // tree of one commit as headTree reads it.
-func workflowsOf(files []treeFile) []finding {
-	var findings []finding
+func workflowsOf(files []check.TreeFile) []check.Finding {
+	var findings []check.Finding
 	for _, f := range files {
-		if strings.HasPrefix(f.path, workflowsDir) {
-			findings = append(findings, workflowFindings(f.path, f.content)...)
+		if strings.HasPrefix(f.Path, workflowsDir) {
+			findings = append(findings, workflowFindings(f.Path, f.Content)...)
 		}
 	}
 	return findings
@@ -162,14 +163,14 @@ func workflowsOf(files []treeFile) []finding {
 // workflowFindings returns what one file breaks of the grammar. It
 // reads the YAML as a tree of nodes, so a key is seen as it is
 // written, with its line, and no value is converted.
-func workflowFindings(path string, src []byte) []finding {
+func workflowFindings(path string, src []byte) []check.Finding {
 	where := git.Printable(path)
 	if !strings.HasSuffix(path, workflowExt) {
-		return []finding{{where, "workflows", "a file here ends in " + workflowExt}}
+		return []check.Finding{{Where: where, Rule: "workflows", Msg: "a file here ends in " + workflowExt}}
 	}
 	doc, err := parseWorkflow(src)
 	if err != nil {
-		return []finding{{where, "workflows", err.Error()}}
+		return []check.Finding{{Where: where, Rule: "workflows", Msg: err.Error()}}
 	}
 	c := &grammar{where: where}
 	c.walk(doc)
@@ -201,11 +202,11 @@ func parseWorkflow(src []byte) (*yaml.Node, error) {
 // grammar collects the findings of one file.
 type grammar struct {
 	where    string
-	findings []finding
+	findings []check.Finding
 }
 
 func (c *grammar) add(n *yaml.Node, msg string) {
-	c.findings = append(c.findings, finding{c.where + ":" + strconv.Itoa(n.Line), "workflows", msg})
+	c.findings = append(c.findings, check.Finding{Where: c.where + ":" + strconv.Itoa(n.Line), Rule: "workflows", Msg: msg})
 }
 
 // plainTags are the tags YAML resolves on its own. Any other tag, as

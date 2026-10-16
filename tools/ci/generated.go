@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // runGenerated is the "generated" subcommand (10 10.2): it first checks
@@ -29,11 +30,11 @@ import (
 // fails when that changed, created or removed a file of the working
 // tree, or when a file that generate writes is not tracked as a regular
 // file with the bytes that generate gives.
-func runGenerated(ctx context.Context, e env, args []string) (bool, error) {
+func runGenerated(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if len(args) != 0 {
-		return false, fmt.Errorf("generated takes no argument\n%s", usage)
+		return false, fmt.Errorf("generated takes no argument\n%s", check.Usage())
 	}
-	root, err := repoRoot(ctx, e)
+	root, err := check.RepoRoot(ctx, e)
 	if err != nil {
 		return false, err
 	}
@@ -44,7 +45,7 @@ func runGenerated(ctx context.Context, e env, args []string) (bool, error) {
 		return false, err
 	}
 	if len(problems) != 0 {
-		say(e.stdout, "%s%s\n", lines(problems), summary("generated", len(problems)))
+		check.Say(e.Stdout, "%s%s\n", check.Lines(problems), check.Summary("generated", len(problems)))
 		return false, nil
 	}
 	goBin, err := whichPinned(ctx, root, "go", "go", "go")
@@ -52,14 +53,14 @@ func runGenerated(ctx context.Context, e env, args []string) (bool, error) {
 		return false, err
 	}
 	goDir := filepath.Dir(goBin)
-	gen := step{name: "go generate", argv: []string{goBin, "generate", "./..."}, environ: stepEnv(goDir)}
-	repo := e.repo()
+	gen := check.Step{Name: "go generate", Argv: []string{goBin, "generate", "./..."}, Environ: check.StepEnv(goDir)}
+	repo := e.Repo()
 	repo.Dir = root
 	findings, err := generated(ctx, repo, gen, generateOutputs)
 	if err != nil {
 		return false, err
 	}
-	say(e.stdout, "%s%s\n", lines(findings), summary("generated", len(findings)))
+	check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("generated", len(findings)))
 	return len(findings) == 0, nil
 }
 
@@ -76,7 +77,7 @@ func runGenerated(ctx context.Context, e env, args []string) (bool, error) {
 // regular file (mode 100644) with exactly those bytes and match no ignore
 // rule. The index is what a commit takes, so a file is judged as the
 // merged tree holds it.
-func generated(ctx context.Context, repo git.Repo, gen step, wanted func(*os.Root) ([]output, error)) ([]finding, error) {
+func generated(ctx context.Context, repo git.Repo, gen check.Step, wanted func(*os.Root) ([]output, error)) ([]check.Finding, error) {
 	root, err := os.OpenRoot(repo.Dir)
 	if err != nil {
 		return nil, err
@@ -86,25 +87,25 @@ func generated(ctx context.Context, repo git.Repo, gen step, wanted func(*os.Roo
 	if err != nil {
 		return nil, err
 	}
-	if out, err := gen.run(ctx, repo.Dir); err != nil {
-		return nil, fmt.Errorf("%s: %w\n%s", gen.name, err, out)
+	if out, err := gen.Run(ctx, repo.Dir); err != nil {
+		return nil, fmt.Errorf("%s: %w\n%s", gen.Name, err, out)
 	}
 	after, err := snapshot(ctx, repo, root)
 	if err != nil {
 		return nil, err
 	}
-	var findings []finding
+	var findings []check.Finding
 	for _, path := range slices.Sorted(maps.Keys(before)) {
 		switch had, has := before[path], after[path]; {
 		case has == "":
-			findings = append(findings, finding{path, "generated", "go generate removed this file; commit the removal"})
+			findings = append(findings, check.Finding{Where: path, Rule: "generated", Msg: "go generate removed this file; commit the removal"})
 		case has != had:
-			findings = append(findings, finding{path, "generated", "go generate changed this file; run it and commit the result"})
+			findings = append(findings, check.Finding{Where: path, Rule: "generated", Msg: "go generate changed this file; run it and commit the result"})
 		}
 	}
 	for _, path := range slices.Sorted(maps.Keys(after)) {
 		if _, had := before[path]; !had {
-			findings = append(findings, finding{path, "generated", "go generate created this file; run it and commit the result"})
+			findings = append(findings, check.Finding{Where: path, Rule: "generated", Msg: "go generate created this file; run it and commit the result"})
 		}
 	}
 	if wanted != nil {
@@ -123,7 +124,7 @@ func generated(ctx context.Context, repo git.Repo, gen step, wanted func(*os.Roo
 		}
 		findings = append(findings, converted...)
 	}
-	slices.SortStableFunc(findings, func(a, b finding) int { return strings.Compare(a.where, b.where) })
+	slices.SortStableFunc(findings, func(a, b check.Finding) int { return strings.Compare(a.Where, b.Where) })
 	return findings, nil
 }
 
@@ -167,8 +168,8 @@ var checkoutAttrs = []string{"text", "eol", "ident", "filter", "working-tree-enc
 // check cannot see, a string such as text=unset that reads like -text,
 // is found by scanAttributes in every tracked .gitattributes and in
 // info/attributes of the clone.
-func attributeProblems(ctx context.Context, repo git.Repo, outs []output) ([]finding, error) {
-	var findings []finding
+func attributeProblems(ctx context.Context, repo git.Repo, outs []output) ([]check.Finding, error) {
+	var findings []check.Finding
 	root, listed, valued, err := scanAttributes(ctx, repo)
 	if err != nil {
 		return nil, err
@@ -182,12 +183,12 @@ func attributeProblems(ctx context.Context, repo git.Repo, outs []output) ([]fin
 				// Git on a case-sensitive filesystem ignores a root file in other case.
 				advice = "rename it to " + attributesPath + " and " + advice
 			}
-			findings = append(findings, finding{o.path, "generated", root + " does not list this file with -text; " + advice})
+			findings = append(findings, check.Finding{Where: o.path, Rule: "generated", Msg: root + " does not list this file with -text; " + advice})
 		}
 	}
 	for _, path := range slices.Sorted(maps.Keys(listed)) {
 		if !want[path] {
-			findings = append(findings, finding{attributesPath, "generated", fmt.Sprintf("lists %q with -text, and go generate does not write it; remove the line", path)})
+			findings = append(findings, check.Finding{Where: attributesPath, Rule: "generated", Msg: fmt.Sprintf("lists %q with -text, and go generate does not write it; remove the line", path)})
 		}
 	}
 	findings = append(findings, valued...)
@@ -219,7 +220,7 @@ func attributeProblems(ctx context.Context, repo git.Repo, outs []output) ([]fin
 			if value == want || (attr == "text" && value == "unspecified" && !listed[o.path]) {
 				continue
 			}
-			findings = append(findings, finding{o.path, "generated", fmt.Sprintf("has the %s attribute %q, and a generated file has text unset and the others unspecified; a later line or another .gitattributes sets it", attr, value)})
+			findings = append(findings, check.Finding{Where: o.path, Rule: "generated", Msg: fmt.Sprintf("has the %s attribute %q, and a generated file has text unset and the others unspecified; a later line or another .gitattributes sets it", attr, value)})
 		}
 	}
 	return findings, nil
@@ -282,7 +283,7 @@ const infoAttributes = "info/attributes"
 // with core.autocrlf may convert the file. Another value, such as
 // text=auto, is not a problem here: on a line that matches an output
 // the effective check reports it.
-func scanAttributes(ctx context.Context, repo git.Repo) (string, map[string]bool, []finding, error) {
+func scanAttributes(ctx context.Context, repo git.Repo) (string, map[string]bool, []check.Finding, error) {
 	staged, err := repo.Run(ctx, nil, "ls-files", "--stage", "-z")
 	if err != nil {
 		return "", nil, nil, err
@@ -311,9 +312,9 @@ func scanAttributes(ctx context.Context, repo git.Repo) (string, map[string]bool
 	// is read from; the plain name when the index holds none.
 	rootName := attributesPath
 	listed := map[string]bool{}
-	var problems []finding
+	var problems []check.Finding
 	for _, file := range slices.Sorted(maps.Keys(unmerged)) {
-		problems = append(problems, finding{file, "generated", "has an unmerged entry in the index; resolve it"})
+		problems = append(problems, check.Finding{Where: file, Rule: "generated", Msg: "has an unmerged entry in the index; resolve it"})
 	}
 	sizes, contents, err := readBlobs(ctx, repo, blobs)
 	if err != nil {
@@ -327,10 +328,10 @@ func scanAttributes(ctx context.Context, repo git.Repo) (string, map[string]bool
 		data, ok := contents[blobs[file]]
 		switch size := sizes[blobs[file]]; {
 		case !ok && size > attributesMaxSize:
-			problems = append(problems, finding{file, "generated", fmt.Sprintf("is %d bytes, over the 1 MiB (%d bytes) that this check reads of one file, so its lines are not checked; make it at most that size", size, attributesMaxSize)})
+			problems = append(problems, check.Finding{Where: file, Rule: "generated", Msg: fmt.Sprintf("is %d bytes, over the 1 MiB (%d bytes) that this check reads of one file, so its lines are not checked; make it at most that size", size, attributesMaxSize)})
 			continue
 		case !ok:
-			problems = append(problems, finding{file, "generated", fmt.Sprintf("is not read: the .gitattributes files read before it (the root one, then the others in path order) leave too little of the 8 MiB (%d bytes) that this check reads in all, so its lines are not checked; make them smaller or fewer", attributesMaxTotal)})
+			problems = append(problems, check.Finding{Where: file, Rule: "generated", Msg: fmt.Sprintf("is not read: the .gitattributes files read before it (the root one, then the others in path order) leave too little of the 8 MiB (%d bytes) that this check reads in all, so its lines are not checked; make them smaller or fewer", attributesMaxTotal)})
 			continue
 		}
 		scanLines(file, string(data), root, listed, &problems)
@@ -544,14 +545,14 @@ func parseBatchHeader(line, oid string) (int64, error) {
 // scanLines reads the lines of one attributes file, called file in a
 // finding. When root is true, the pattern of each line with -text is
 // added to listed.
-func scanLines(file, data string, root bool, listed map[string]bool, problems *[]finding) {
+func scanLines(file, data string, root bool, listed map[string]bool, problems *[]check.Finding) {
 	for line := range strings.SplitSeq(data, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 		if strings.HasPrefix(line, `"`) {
-			*problems = append(*problems, finding{file, "generated", fmt.Sprintf("quotes a pattern in %q; write the path unquoted", line)})
+			*problems = append(*problems, check.Finding{Where: file, Rule: "generated", Msg: fmt.Sprintf("quotes a pattern in %q; write the path unquoted", line)})
 			continue
 		}
 		pattern, attrs, _ := strings.Cut(line, " ")
@@ -566,7 +567,7 @@ func scanLines(file, data string, root bool, listed map[string]bool, problems *[
 			fix := fmt.Sprintf("write the state as %s, -%s or !%s", attr, attr, attr)
 			for _, state := range []string{"set", "unset", "unspecified"} {
 				if slices.Contains(fields, attr+"="+state) {
-					*problems = append(*problems, finding{file, "generated", fmt.Sprintf("gives %q the value %s=%s; git prints that string as it prints a state, so %s", pattern, attr, state, fix)})
+					*problems = append(*problems, check.Finding{Where: file, Rule: "generated", Msg: fmt.Sprintf("gives %q the value %s=%s; git prints that string as it prints a state, so %s", pattern, attr, state, fix)})
 				}
 			}
 		}
@@ -580,7 +581,7 @@ const regularMode = "100644"
 // trackedOutputs returns a finding for each of outs that the index does
 // not hold as a regular file with the bytes of the output, or that
 // matches an ignore rule.
-func trackedOutputs(ctx context.Context, repo git.Repo, outs []output) ([]finding, error) {
+func trackedOutputs(ctx context.Context, repo git.Repo, outs []output) ([]check.Finding, error) {
 	// ":(literal)" keeps a glob character of a path from being one.
 	pathspec := []string{"--"}
 	for _, o := range outs {
@@ -606,7 +607,7 @@ func trackedOutputs(ctx context.Context, repo git.Repo, outs []output) ([]findin
 	for _, path := range strings.Split(string(ignored), "\x00") {
 		isIgnored[path] = true
 	}
-	var findings []finding
+	var findings []check.Finding
 	for _, o := range outs {
 		msg, err := trackedProblem(ctx, repo, o, entries[o.path])
 		if err != nil {
@@ -616,7 +617,7 @@ func trackedOutputs(ctx context.Context, repo git.Repo, outs []output) ([]findin
 			msg = "is tracked and matches an ignore rule; a generated file is not ignored"
 		}
 		if msg != "" {
-			findings = append(findings, finding{o.path, "generated", msg})
+			findings = append(findings, check.Finding{Where: o.path, Rule: "generated", Msg: msg})
 		}
 	}
 	return findings, nil

@@ -20,6 +20,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // fsOpsEnv holds the operations that TestHelperFsOps runs, one on each
@@ -61,11 +62,11 @@ func TestHelperFsOps(t *testing.T) {
 }
 
 // fsOps returns a generator step that runs the operations.
-func fsOps(ops ...string) step {
-	return step{
-		name:    "go generate",
-		argv:    []string{os.Args[0], "-test.run=^TestHelperFsOps$"},
-		environ: []string{"PATH=" + os.Getenv("PATH"), fsOpsEnv + "=" + strings.Join(ops, "\n")},
+func fsOps(ops ...string) check.Step {
+	return check.Step{
+		Name:    "go generate",
+		Argv:    []string{os.Args[0], "-test.run=^TestHelperFsOps$"},
+		Environ: []string{"PATH=" + os.Getenv("PATH"), fsOpsEnv + "=" + strings.Join(ops, "\n")},
 	}
 }
 
@@ -94,7 +95,7 @@ func generatedFixture(t *testing.T) *gittest.Repo {
 func TestGenerated(t *testing.T) {
 	tests := []struct {
 		name string
-		gen  step
+		gen  check.Step
 		want []string // "<path>: generated: <message start>"
 	}{
 		{"nothing changes", fsOps(), nil},
@@ -148,10 +149,10 @@ func TestGeneratedNotAGitRepository(t *testing.T) {
 // subcommand.
 func TestRunGeneratedTakesNoArgument(t *testing.T) {
 	var out, errOut bytes.Buffer
-	e := env{dir: ".", stdout: &out, stderr: &errOut}
-	assert.Equal(t, exitError, run(context.Background(), e, []string{"generated", "x"}))
+	e := check.Env{Dir: ".", Stdout: &out, Stderr: &errOut}
+	assert.Equal(t, check.ExitError, run(context.Background(), e, []string{"generated", "x"}))
 	assert.Contains(t, errOut.String(), "generated takes no argument")
-	assert.Equal(t, exitError, run(context.Background(), e, []string{"generate", "x"}))
+	assert.Equal(t, check.ExitError, run(context.Background(), e, []string{"generate", "x"}))
 	assert.Contains(t, errOut.String(), "generate takes no argument")
 }
 
@@ -166,7 +167,7 @@ func committedGenerateFixture(t *testing.T) *gittest.Repo {
 	r := generateFixture(t)
 	r.Write(attributesPath, goodAttributes)
 	code, _, errOut := runGen(t, r)
-	require.Equal(t, exitOK, code, errOut)
+	require.Equal(t, check.ExitOK, code, errOut)
 	r.Commit("fixture")
 	return r
 }
@@ -542,10 +543,10 @@ func TestAttributeProblemsQuoteHostilePaths(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, findings)
 	for _, f := range findings {
-		assert.NotContains(t, f.msg, "\n")
-		assert.NotContains(t, f.msg, "\x1b")
+		assert.NotContains(t, f.Msg, "\n")
+		assert.NotContains(t, f.Msg, "\x1b")
 	}
-	assert.Contains(t, findings[0].msg, `add the line "d\n::error::forged\x1b[2J/README.md -text"`)
+	assert.Contains(t, findings[0].Msg, `add the line "d\n::error::forged\x1b[2J/README.md -text"`)
 	var other string
 	for _, attr := range checkoutAttrs {
 		other += "b\x00" + attr + "\x00unspecified\x00"
@@ -586,8 +587,8 @@ func TestRunGeneratedRefusesAStrayDirectiveBeforeRunningAnything(t *testing.T) {
 	r.Write(generateSite, "package main\n\n"+generateDirective+"\n")
 	r.Write("zz/z.go", "package z\n\nvar s = `\n//go:generate touch marker\n`\n")
 	var out, errOut bytes.Buffer
-	e := env{dir: r.Dir, gitEnv: r.Env, stdout: &out, stderr: &errOut}
-	assert.Equal(t, exitFail, run(t.Context(), e, []string{"generated"}), errOut.String())
+	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdout: &out, Stderr: &errOut}
+	assert.Equal(t, check.ExitFail, run(t.Context(), e, []string{"generated"}), errOut.String())
 	assert.Contains(t, out.String(), "zz/z.go: generate-directive: ")
 	assert.NoFileExists(t, filepath.Join(r.Dir, "marker"))
 }
@@ -617,12 +618,12 @@ func TestParseCheckAttr(t *testing.T) {
 // as one.
 func TestFindingPathCannotStartACommand(t *testing.T) {
 	for _, where := range []string{"::error::x/.gitattributes", "  ::stop-commands::tok/f", "##[error]x/f", "\t::error::x/f", "\u00a0::error::x/f", "\u200b::error::x/f", "a/##[error]x"} {
-		line := finding{where, "generated", "m"}.String()
+		line := check.Finding{Where: where, Rule: "generated", Msg: "m"}.String()
 		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
 		assert.NotContains(t, line, "##[")
 		assert.Equal(t, line, git.SafeLines(line), "already safe: %q", line)
 	}
-	assert.Equal(t, "a/b: generated: m", finding{"a/b", "generated", "m"}.String())
+	assert.Equal(t, "a/b: generated: m", check.Finding{Where: "a/b", Rule: "generated", Msg: "m"}.String())
 }
 
 // TestGeneratedOutputsAreNotConverted runs attributeProblems on this

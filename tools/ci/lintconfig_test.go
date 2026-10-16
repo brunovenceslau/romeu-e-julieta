@@ -213,9 +213,9 @@ func TestLintConfigReportsEachChecker(t *testing.T) {
 	args = append(args, "--output.json.path", report, "--output.text.path", os.DevNull)
 	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
 		Class: procgroup.ToolStep,
-		Argv:  append([]string{tools.linter}, args...),
+		Argv:  append([]string{tools.Linter}, args...),
 		Dir:   dir,
-		Env:   lintEnv(lintTargets[0], tools.goDir),
+		Env:   lintEnv(lintTargets[0], tools.GoDir),
 	})
 	// Exit status 1 means the run found issues, which is the point.
 	if err != nil {
@@ -684,7 +684,7 @@ func TestCheckGenerateDirectivesReadsEveryGoFile(t *testing.T) {
 			problems, err := checkGenerateDirectives(dir)
 			require.NoError(t, err)
 			require.Len(t, problems, 1)
-			assert.Equal(t, rel, problems[0].where)
+			assert.Equal(t, rel, problems[0].Where)
 		})
 	}
 	// What the scan leaves out: a .git directory at any depth (a nested
@@ -719,7 +719,7 @@ func TestCheckGenerateDirectivesReadsEveryGoFile(t *testing.T) {
 		problems, err := checkGenerateDirectives(dir)
 		require.NoError(t, err)
 		require.Len(t, problems, 1, "the target is read once, by its real path")
-		assert.Equal(t, "real/z.go", problems[0].where)
+		assert.Equal(t, "real/z.go", problems[0].Where)
 	})
 	t.Run("a link to a directory with a .go name is an error, not a pass", func(t *testing.T) {
 		dir := t.TempDir()
@@ -951,9 +951,9 @@ func lintTargetContexts(t *testing.T) []lintContext {
 		var stdout strings.Builder
 		err := procgroup.Run(t.Context(), procgroup.Command{
 			Class:  procgroup.ToolProbe,
-			Argv:   []string{filepath.Join(tools.goDir, "go"), "list", "-f", format, "runtime"},
+			Argv:   []string{filepath.Join(tools.GoDir, "go"), "list", "-f", format, "runtime"},
 			Dir:    t.TempDir(),
-			Env:    lintEnv(target, tools.goDir),
+			Env:    lintEnv(target, tools.GoDir),
 			Stdout: &stdout,
 		})
 		require.NoError(t, err, "go list for %s", target)

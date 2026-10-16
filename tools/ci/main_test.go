@@ -22,6 +22,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 )
 
@@ -131,13 +132,13 @@ func denylist(t *testing.T, madeUpNames ...string) []byte {
 // runCI runs the command in the fixture and returns its exit status
 // and what it printed. The steps of fast are replaced by stubs: the
 // real ones run the tests this file is part of.
-func runCI(t *testing.T, r *gittest.Repo, stdin io.Reader, steps []step, args ...string) (int, string) {
+func runCI(t *testing.T, r *gittest.Repo, stdin io.Reader, steps []check.Step, args ...string) (int, string) {
 	t.Helper()
 	var out bytes.Buffer
 	if stdin == nil {
 		stdin = strings.NewReader("")
 	}
-	e := env{dir: r.Dir, gitEnv: r.Env, stdin: stdin, stdout: &out, stderr: &out, steps: steps}
+	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: stdin, Stdout: &out, Stderr: &out, Steps: steps}
 	return run(t.Context(), e, args), out.String()
 }
 
@@ -158,7 +159,7 @@ func TestUsage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			code, out := runCI(t, r, nil, nil, tt.args...)
-			assert.Equal(t, exitError, code, "exit status\n%s", out)
+			assert.Equal(t, check.ExitError, code, "exit status\n%s", out)
 		})
 	}
 }
@@ -171,7 +172,7 @@ func TestOutsideARepository(t *testing.T) {
 	r.Env = gittest.Env(t)
 	for _, args := range [][]string{{"hygiene"}, {"fast"}} {
 		code, out := runCI(t, r, nil, nil, args...)
-		assert.Equal(t, exitError, code, "%v: exit status\n%s", args, out)
+		assert.Equal(t, check.ExitError, code, "%v: exit status\n%s", args, out)
 	}
 }
 
@@ -202,8 +203,8 @@ func TestHook(t *testing.T) {
 // not carry the control characters or the command line of an argument.
 func TestRunPrintsAnErrorAsSafeText(t *testing.T) {
 	var out, errOut bytes.Buffer
-	e := env{dir: t.TempDir(), stdout: &out, stderr: &errOut}
-	assert.Equal(t, exitError, run(context.Background(), e, []string{"hygiene", "--bad\x1b[2J\n::error::forged"}))
+	e := check.Env{Dir: t.TempDir(), Stdout: &out, Stderr: &errOut}
+	assert.Equal(t, check.ExitError, run(context.Background(), e, []string{"hygiene", "--bad\x1b[2J\n::error::forged"}))
 	assert.NotContains(t, errOut.String(), "\x1b")
 	for _, line := range strings.Split(errOut.String(), "\n") {
 		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
@@ -252,7 +253,7 @@ func TestHookEnvIsTheAllowlist(t *testing.T) {
 	// What the production lists build, from the same process environment.
 	want := map[string]string{}
 	for _, kv := range slices.Concat(
-		miseRunEnviron(withProcessEnv(passThroughEnv(), slices.Concat(networkPassThrough, goModulePassThrough)), real),
+		miseRunEnviron(check.WithProcessEnv(check.PassThroughEnv(), slices.Concat(check.NetworkPassThrough, check.GoModulePassThrough)), real),
 		goenv.Build,
 	) {
 		k, v, _ := strings.Cut(kv, "=")

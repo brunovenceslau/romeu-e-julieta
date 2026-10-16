@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 )
 
@@ -25,15 +26,15 @@ import (
 // start without one; it takes no name as an argument and prints none.
 // So the name is in no argument list, no shell history and no pipe
 // that another process filled.
-func add(ctx context.Context, e env, args []string) error {
+func add(ctx context.Context, e check.Env, args []string) error {
 	if len(args) > 0 {
 		return errors.New("hygiene add takes no argument: it reads the name from the terminal")
 	}
-	tty, ok := e.stdin.(*os.File)
+	tty, ok := e.Stdin.(*os.File)
 	if !ok || !term.IsTerminal(int(tty.Fd())) {
 		return errors.New("hygiene add needs a terminal on standard input, on the host")
 	}
-	root, err := repoRoot(ctx, e)
+	root, err := check.RepoRoot(ctx, e)
 	if err != nil {
 		return err
 	}
@@ -49,7 +50,7 @@ func add(ctx context.Context, e env, args []string) error {
 	// The name is typed blind, so it is typed twice: a slip of the
 	// keyboard would write an entry that matches nothing, and no check
 	// could see it, because the name is not in the tree.
-	say(e.stderr, "The name is not shown. If you interrupt, \"stty echo\" brings the echo back.\n")
+	check.Say(e.Stderr, "The name is not shown. If you interrupt, \"stty echo\" brings the echo back.\n")
 	typed, err := readBlind(e, tty, "name, one line, a space between segments: ")
 	if err != nil {
 		return err
@@ -66,21 +67,21 @@ func add(ctx context.Context, e env, args []string) error {
 		return err
 	}
 	if !list.Add(entry) {
-		say(e.stdout, "the denylist already has this entry; it holds %d\n", list.Len())
+		check.Say(e.Stdout, "the denylist already has this entry; it holds %d\n", list.Len())
 		return nil
 	}
 	if err := writeFile(path, list.Marshal()); err != nil {
 		return err
 	}
-	say(e.stdout, "added an entry of %d segment(s); %s now holds %d\n", entry.Segments(), names.Path, list.Len())
+	check.Say(e.Stdout, "added an entry of %d segment(s); %s now holds %d\n", entry.Segments(), names.Path, list.Len())
 	return nil
 }
 
 // readBlind prompts and reads one line from the terminal with echo off.
-func readBlind(e env, tty *os.File, prompt string) ([]byte, error) {
-	say(e.stderr, "%s", prompt)
+func readBlind(e check.Env, tty *os.File, prompt string) ([]byte, error) {
+	check.Say(e.Stderr, "%s", prompt)
 	line, err := term.ReadPassword(int(tty.Fd()))
-	say(e.stderr, "\n")
+	check.Say(e.Stderr, "\n")
 	if err != nil {
 		return nil, fmt.Errorf("read the name: %w", err)
 	}

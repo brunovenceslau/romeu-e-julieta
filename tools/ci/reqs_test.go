@@ -15,6 +15,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // reqRetiredRule is the paragraph of 12 12.11 that the retired table
@@ -46,7 +47,7 @@ func TestReqsPasses(t *testing.T) {
 	r := reqFixture(t)
 	r.Commit("fixture")
 	code, out := runCI(t, r, nil, nil, "reqs")
-	assert.Equal(t, exitOK, code, out)
+	assert.Equal(t, check.ExitOK, code, out)
 	assert.Equal(t, "reqs: ok\n", out)
 }
 
@@ -305,14 +306,14 @@ func TestReqsRules(t *testing.T) {
 			tt.change(r)
 			r.Commit("fixture")
 			code, out := runCI(t, r, nil, nil, "reqs")
-			assert.Equal(t, exitFail, code, out)
+			assert.Equal(t, check.ExitFail, code, out)
 			for _, w := range tt.want {
 				assert.Contains(t, out, w)
 			}
 			for _, a := range tt.absent {
 				assert.NotContains(t, out, a)
 			}
-			assert.Contains(t, out, summary("reqs", len(tt.want)), "the findings are exactly the ones named")
+			assert.Contains(t, out, check.Summary("reqs", len(tt.want)), "the findings are exactly the ones named")
 		})
 	}
 }
@@ -325,28 +326,28 @@ func TestReqsReads(t *testing.T) {
 		r.Write("docs/spec/01-model.md", "# 01\n\nAn id is `REQ-` and four digits.\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 	})
 	t.Run("an id after a list marker is well placed", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/spec/01-model.md", "# 01\n\n1. `REQ-0005` Five.\n   - `REQ-0006` Six, `REQ-0007` seven.\n\n| A | B |\n|---|---|\n| `REQ-0008` a | `b` `REQ-0009` c |\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 	})
 	t.Run("a code span that wraps a line hides no id after it", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/spec/01-model.md", "# 01\n\nThe hint is `romeu run\n<name>`; `REQ-0005` five.\n\n`REQ-0006` Six.\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 	})
 	t.Run("an unbalanced backtick does not leak past a blank line", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/spec/01-model.md", "# 01\n\nAn odd ` tick.\n\n`REQ-0005` Five.\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 	})
 	t.Run("a heading inside a fence does not change the section", func(t *testing.T) {
 		r := reqFixture(t)
@@ -354,35 +355,35 @@ func TestReqsReads(t *testing.T) {
 		r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001 (index)", "REQ-0002 (index)", "REQ-0003 (00 0.1)", "REQ-0005 (01 1.1)"))
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 	})
 	t.Run("a run of backticks with a backtick after it opens no fence", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/spec/01-model.md", "# 01\n\n``` a ` b\n\n`REQ-0005` Five.\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 	})
 	t.Run("a run indented by four spaces opens no fence", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/spec/01-model.md", "# 01\n\n    ```\n\n`REQ-0005` Five.\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 	})
 	t.Run("a run of two backticks opens no fence", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/spec/01-model.md", "# 01\n\n``\n\n`REQ-0005` Five.\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 	})
 	t.Run("a fence ends the backtick count of the paragraph before it", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/spec/01-model.md", "# 01\n\nAn odd ` tick.\n```\ncode\n```\n`REQ-0005` Five.\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 	})
 	t.Run("a long line of ids is read in time linear in its length", func(t *testing.T) {
 		// Ten MiB of text, then the ids: a count of the backticks from
@@ -406,7 +407,7 @@ func TestReqsReads(t *testing.T) {
 		r.Write("docs/spec/05-x.mdx", "# 05\n\n`REQ-0001` Again; `REQ-new`.\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, "reqs: ok\n", out)
 	})
 	t.Run("a chapter-named file outside docs/spec is no page", func(t *testing.T) {
@@ -415,7 +416,7 @@ func TestReqsReads(t *testing.T) {
 		r.Write("docs/spec/sub/01-model.md", "# 01\n\n`REQ-0001` Again; `REQ-new`.\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, "reqs: ok\n", out)
 	})
 	t.Run("a page that is a submodule entry is an error", func(t *testing.T) {
@@ -424,7 +425,7 @@ func TestReqsReads(t *testing.T) {
 		r.Git("update-index", "--add", "--cacheinfo", "160000,0123456789abcdef0123456789abcdef01234567,docs/spec/01-model.md")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, "ci: read docs/spec/01-model.md: not a file")
 	})
 	t.Run("a page that is a submodule entry is an error, its path quoted", func(t *testing.T) {
@@ -433,7 +434,7 @@ func TestReqsReads(t *testing.T) {
 		r.Git("update-index", "--add", "--cacheinfo", "160000,0123456789abcdef0123456789abcdef01234567,docs/spec/01-a\tb.md")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, `ci: read "docs/spec/01-a\tb.md": not a file`)
 	})
 	t.Run("a task file that is a submodule entry is an error, its path quoted", func(t *testing.T) {
@@ -442,7 +443,7 @@ func TestReqsReads(t *testing.T) {
 		r.Git("update-index", "--add", "--cacheinfo", "160000,0123456789abcdef0123456789abcdef01234567,docs/plan/tasks/T001\ta.md")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, `ci: read "docs/plan/tasks/T001\ta.md": not a file`)
 	})
 	t.Run("a decision record that is a submodule entry is skipped", func(t *testing.T) {
@@ -452,7 +453,7 @@ func TestReqsReads(t *testing.T) {
 		r.Commit("fixture")
 		require.Contains(t, r.Git("ls-tree", "-r", "HEAD", "docs/adr"), "160000 commit", "the record is a submodule entry")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, "reqs: ok\n", out)
 	})
 }
@@ -463,7 +464,7 @@ func TestReqsCoverage(t *testing.T) {
 		r.Write("docs/plan.md", "# Plan\n\nNo task file yet.\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, "reqs: ok\n", out)
 	})
 	t.Run("a deferred-only id is reported and passes", func(t *testing.T) {
@@ -472,7 +473,7 @@ func TestReqsCoverage(t *testing.T) {
 		r.Write("docs/plan/tasks/T002-b.md", reqTaskFile("T002", "deferred", "REQ-0002 (index)", "REQ-0003 (00 0.1)"))
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, "reqs: ok\nreqs: 1 id(s) cited only by deferred tasks:\n  REQ-0003\n", out)
 	})
 	t.Run("the deferred-only ids are listed eight to a line", func(t *testing.T) {
@@ -487,14 +488,14 @@ func TestReqsCoverage(t *testing.T) {
 		r.Write("docs/plan/tasks/T001-a.md", "---\nid: T001\nfate: new\n---\n\n- Implements: `REQ-0001` (index), REQ-0002\n  (index),\n  REQ-0003 (00\n  0.1)\n- Verify: go test\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out, "a reading aid that wraps is read whole")
+		assert.Equal(t, check.ExitOK, code, out, "a reading aid that wraps is read whole")
 	})
 	t.Run("a wrapped entry's finding names its line", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/plan/tasks/T001-a.md", "---\nid: T001\nfate: new\n---\n\n- Implements: `REQ-0001` (index), REQ-0002\n  (index),\n  REQ-0003 (00 0.1),\n  REQ-0099 (00 0.1)\n- Verify: go test\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitFail, code, out)
+		assert.Equal(t, check.ExitFail, code, out)
 		assert.Contains(t, out, "docs/plan/tasks/T001-a.md:9: reqs: Implements cites REQ-0099, which is unknown")
 	})
 	t.Run("an untracked task file does not satisfy the coverage half", func(t *testing.T) {
@@ -503,7 +504,7 @@ func TestReqsCoverage(t *testing.T) {
 		r.Commit("fixture")
 		r.Write("docs/plan/tasks/T002-b.md", reqTaskFile("T002", "new", "REQ-0003 (00 0.1)"))
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitFail, code, out)
+		assert.Equal(t, check.ExitFail, code, out)
 		assert.Contains(t, out, "REQ-0003 is cited by no task")
 	})
 	t.Run("a task file without a fate is left to the plan check", func(t *testing.T) {
@@ -512,14 +513,14 @@ func TestReqsCoverage(t *testing.T) {
 		r.Write("docs/plan/tasks/T002-b.md", "# T002\n\n- Implements: REQ-0099 (none)\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 	})
 	t.Run("an Implements entry without a reading aid is accepted", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/plan/tasks/T001-a.md", reqTaskFile("T001", "kept", "REQ-0001", "`REQ-0002`", "REQ-0003"))
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, "reqs: ok\n", out)
 	})
 	t.Run("an id cited by exactly the cap passes, and a deferred citer does not count", func(t *testing.T) {
@@ -530,7 +531,7 @@ func TestReqsCoverage(t *testing.T) {
 		}
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, "reqs: ok\n", out)
 	})
 	t.Run("a task file with CR LF line ends is read", func(t *testing.T) {
@@ -539,7 +540,7 @@ func TestReqsCoverage(t *testing.T) {
 		r.Write("docs/plan/tasks/T002-b.md", strings.ReplaceAll(reqTaskFile("T002", "new", "REQ-0003 (00 0.1)"), "\n", "\r\n"))
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, "reqs: ok\n", out)
 	})
 	t.Run("a shared id passes the cap", func(t *testing.T) {
@@ -575,7 +576,7 @@ func TestReqsAllocate(t *testing.T) {
 		r.Write("docs/spec/01-model.md", "# 01\n\n`REQ-new` Eight.\n")
 		r.Commit("fixture")
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, "docs/spec.md:3: REQ-0005\ndocs/spec.md:3: REQ-0006\ndocs/spec/00-scope.md:3: REQ-0007\ndocs/spec/01-model.md:3: REQ-0008\nreqs: 4 placeholder(s) numbered\n", out)
 		assert.Equal(t, "# Index\n\n- `REQ-0005` Five, then `REQ-0006` six.\n- `REQ-0001` One.\n- `REQ-0002` Two.\n", read(t, r, "docs/spec.md"))
 		assert.Equal(t, "# 00\n\n`REQ-0003` Three; `REQ-0007` seven.\n", read(t, r, "docs/spec/00-scope.md"))
@@ -583,7 +584,7 @@ func TestReqsAllocate(t *testing.T) {
 		assert.Equal(t, "# 12\n\n## 12.11 Requirement ids\n\n"+reqTable("| `REQ-0004` | 2026-10-12 | Four. | none |"), read(t, r, "docs/spec/12-engineering.md"), "a page without a placeholder is not rewritten")
 		r.Commit("allocated")
 		code, out = runCI(t, r, nil, nil, "reqs")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 	})
 	t.Run("allocate is idempotent", func(t *testing.T) {
 		r := reqFixture(t)
@@ -591,7 +592,7 @@ func TestReqsAllocate(t *testing.T) {
 		info, err := os.Stat(filepath.Join(r.Dir, "docs", "spec.md"))
 		require.NoError(t, err)
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, "reqs: ok\n", out)
 		assert.Equal(t, before, read(t, r, "docs/spec.md"))
 		after, err := os.Stat(filepath.Join(r.Dir, "docs", "spec.md"))
@@ -605,7 +606,7 @@ func TestReqsAllocate(t *testing.T) {
 		r.Write("docs/spec/12-engineering.md", "# 12\n\n## 12.11 Requirement ids\n\n"+reqTable("| `REQ-9998` | 2026-10-12 | Next to last. | none |"))
 		r.Write("docs/spec/01-model.md", "# 01\n\n`REQ-new` The last.\n")
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, "docs/spec/01-model.md:3: REQ-9999\nreqs: 1 placeholder(s) numbered\n", out)
 		assert.Equal(t, "# 01\n\n`REQ-9999` The last.\n", read(t, r, "docs/spec/01-model.md"))
 	})
@@ -613,14 +614,14 @@ func TestReqsAllocate(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/spec/01-model.md", "# 01\r\n\r\n`REQ-new` Five.\r\n")
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, "# 01\r\n\r\n`REQ-0005` Five.\r\n", read(t, r, "docs/spec/01-model.md"))
 	})
 	t.Run("a placeholder in an excluded section refuses, and nothing is written", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/spec.md", "# Index\n\n- `REQ-new` Five.\n- `REQ-0001` One.\n- `REQ-0002` Two.\n\n## Open questions\n\n`REQ-new` A question.\n")
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, "ci: docs/spec.md:9: reqs: a placeholder sits in a page or section that carries no id (12 12.11)\nnothing was written")
 		assert.Contains(t, read(t, r, "docs/spec.md"), "- `REQ-new` Five.")
 	})
@@ -629,7 +630,7 @@ func TestReqsAllocate(t *testing.T) {
 		r.Write("docs/spec.md", "# Index\n\n- `REQ-new` Five.\n- `REQ-0001` One.\n- `REQ-0002` Two.\n")
 		r.Write("docs/spec/01-model.md", "# 01\n\n`REQ-new` 1. Six.\n")
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, "ci: docs/spec/01-model.md:3: reqs: REQ-new precedes the marker of a list item (12 12.11)\nnothing was written")
 		assert.Contains(t, read(t, r, "docs/spec.md"), "- `REQ-new` Five.", "the index, numbered before the refusal, is not written")
 	})
@@ -638,7 +639,7 @@ func TestReqsAllocate(t *testing.T) {
 		r.Write("docs/spec/12-engineering.md", "# 12\n\n## 12.11 Requirement ids\n\n"+reqTable("| `REQ-0004` | 2026-11-3 | Four. | none |"))
 		r.Write("docs/spec/01-model.md", "# 01\n\n`REQ-new` Five.\n")
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, "ci: docs/spec/12-engineering.md:9: reqs: a retired row's second cell is not an ISO date\nnothing was written")
 		assert.Contains(t, read(t, r, "docs/spec/01-model.md"), "`REQ-new`")
 	})
@@ -647,7 +648,7 @@ func TestReqsAllocate(t *testing.T) {
 		r.Write("docs/spec/12-engineering.md", "# 12\n\n## 12.11 Requirement ids\n\n"+reqTable("| `REQ-9999` | 2026-10-12 | Last. | none |"))
 		r.Write("docs/spec/01-model.md", "# 01\n\n`REQ-new` Too many.\n")
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, "ci: docs/spec/01-model.md:3: the next id would pass REQ-9999; nothing was written")
 		assert.Contains(t, read(t, r, "docs/spec/01-model.md"), "`REQ-new`")
 	})
@@ -663,7 +664,7 @@ func TestReqsAllocate(t *testing.T) {
 			r.Write("docs/spec/12-engineering.md", read(t, base, "docs/spec/12-engineering.md"))
 			r.Write(page, text)
 			code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-			require.Equal(t, exitOK, code, out)
+			require.Equal(t, check.ExitOK, code, out)
 			return read(t, r, page)
 		}
 		a := branch("docs/spec/01-model.md", "# 01\n\n`REQ-new` From branch a.\n")
@@ -672,7 +673,7 @@ func TestReqsAllocate(t *testing.T) {
 		base.Write("docs/spec/02-layouts.md", b)
 		base.Commit("merged")
 		code, out := runCI(t, base, nil, nil, "reqs")
-		assert.Equal(t, exitFail, code, out)
+		assert.Equal(t, check.ExitFail, code, out)
 		assert.Contains(t, out, "docs/spec/02-layouts.md:3: reqs: REQ-0005 appears twice; its first place is docs/spec/01-model.md:3")
 	})
 	t.Run("a page that is not a regular file refuses", func(t *testing.T) {
@@ -680,14 +681,14 @@ func TestReqsAllocate(t *testing.T) {
 		require.NoError(t, os.Remove(filepath.Join(r.Dir, "docs", "spec.md")))
 		require.NoError(t, os.Symlink("spec", filepath.Join(r.Dir, "docs", "spec.md")))
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, "ci: read docs/spec.md: not a regular file")
 	})
 	t.Run("a page that is not a regular file refuses, its path quoted", func(t *testing.T) {
 		r := reqFixture(t)
 		require.NoError(t, os.Mkdir(filepath.Join(r.Dir, "docs", "spec", "01-a\tb.md"), 0o755))
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, `ci: read "docs/spec/01-a\tb.md": not a regular file`)
 	})
 	t.Run("a number past the last refuses, its path quoted", func(t *testing.T) {
@@ -695,14 +696,14 @@ func TestReqsAllocate(t *testing.T) {
 		r.Write("docs/spec/12-engineering.md", "# 12\n\n## 12.11 Requirement ids\n\n"+reqTable("| `REQ-9999` | 2026-10-12 | Last. | none |"))
 		r.Write("docs/spec/01-a\tb.md", "# 01\n\n`REQ-new` Too many.\n")
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, `ci: "docs/spec/01-a\tb.md:3": the next id would pass REQ-9999; nothing was written`)
 	})
 	t.Run("a numbered page is named with its control characters escaped", func(t *testing.T) {
 		r := reqFixture(t)
 		r.Write("docs/spec/01-a\x1bb.md", "# 01\n\n`REQ-new` Five.\n")
 		code, out := runCI(t, r, nil, nil, "reqs", "allocate")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		assert.Equal(t, `docs/spec/01-a\x1bb.md:3: REQ-0005`+"\nreqs: 1 placeholder(s) numbered\n", out)
 		assert.Equal(t, "# 01\n\n`REQ-0005` Five.\n", read(t, r, "docs/spec/01-a\x1bb.md"))
 	})
@@ -713,7 +714,7 @@ func TestReqsUsage(t *testing.T) {
 	r.Commit("fixture")
 	for _, args := range [][]string{{"reqs", "x"}, {"reqs", "allocate", "x"}} {
 		code, out := runCI(t, r, nil, nil, args...)
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, "usage:")
 	}
 }
@@ -731,10 +732,10 @@ func TestReqsInTheCommitChecks(t *testing.T) {
 	require.NoError(t, err)
 	names := make([]string, len(verdicts))
 	for i, v := range verdicts {
-		names[i] = v.name
+		names[i] = v.Name
 	}
 	assert.Equal(t, []string{"hygiene", "workflows", "reqs"}, names)
-	require.Len(t, verdicts[2].findings, 1)
-	assert.Equal(t, "docs/spec/01-model.md:3: reqs: a placeholder is left; run \"go run ./tools/ci reqs allocate\"", verdicts[2].findings[0].String())
-	assert.Equal(t, "      1 id(s) cited only by deferred tasks; go run ./tools/ci reqs lists them\n", verdicts[2].info)
+	require.Len(t, verdicts[2].Findings, 1)
+	assert.Equal(t, "docs/spec/01-model.md:3: reqs: a placeholder is left; run \"go run ./tools/ci reqs allocate\"", verdicts[2].Findings[0].String())
+	assert.Equal(t, "      1 id(s) cited only by deferred tasks; go run ./tools/ci reqs lists them\n", verdicts[2].Info)
 }

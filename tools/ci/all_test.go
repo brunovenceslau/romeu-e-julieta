@@ -24,16 +24,17 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 )
 
 // runAllIn runs "all" in the fixture with stub steps and the cover
 // profile at profile.
-func runAllIn(t *testing.T, r *gittest.Repo, steps []step, profile string, args ...string) (int, string) {
+func runAllIn(t *testing.T, r *gittest.Repo, steps []check.Step, profile string, args ...string) (int, string) {
 	t.Helper()
 	var out bytes.Buffer
-	e := env{dir: r.Dir, gitEnv: r.Env, stdin: strings.NewReader(""), stdout: &out, stderr: &out, steps: steps, profile: profile}
+	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &out, Steps: steps, Profile: profile}
 	return run(t.Context(), e, append([]string{"all"}, args...)), out.String()
 }
 
@@ -43,7 +44,7 @@ func runAllIn(t *testing.T, r *gittest.Repo, steps []step, profile string, args 
 func TestAll(t *testing.T) {
 	tests := []struct {
 		name    string
-		steps   []step
+		steps   []check.Step
 		change  func(t *testing.T, r *gittest.Repo)
 		profile string // the profile's blocks for profileOf; "missing" for none
 		code    int
@@ -51,63 +52,63 @@ func TestAll(t *testing.T) {
 	}{
 		{
 			name:    "every check passing",
-			steps:   []step{passing},
+			steps:   []check.Step{passing},
 			profile: "tools/ci 1 1",
-			code:    exitOK,
+			code:    check.ExitOK,
 			want:    []string{"platform  ", "ok    passes", "ok    hygiene", "ok    workflows", "ok    coverage"},
 		},
 		{
 			name:    "a failing step does not hide the checks after it",
-			steps:   []step{failing, passing},
+			steps:   []check.Step{failing, passing},
 			profile: "tools/ci 1 1",
-			code:    exitFail,
+			code:    check.ExitFail,
 			want:    []string{"FAIL  fails", "ok    passes", "ok    hygiene", "ok    workflows", "ok    coverage"},
 		},
 		{
 			name:    "a package below its threshold",
-			steps:   []step{passing},
+			steps:   []check.Step{passing},
 			profile: "tools/ci 1 0",
-			code:    exitFail,
+			code:    check.ExitFail,
 			want:    []string{"ok    workflows", "FAIL  coverage\ntools/ci: coverage: 0.0% of 1 statements covered, below 80% (S9)\n"},
 		},
 		{
 			name:    "no cover profile, as when the race step could not start",
-			steps:   []step{passing},
+			steps:   []check.Step{passing},
 			profile: "missing",
-			code:    exitFail,
+			code:    check.ExitFail,
 			want:    []string{"FAIL  coverage\nthe cover profile of the race step: "},
 		},
 		{
 			name:  "a workflow outside the grammar",
-			steps: []step{passing},
+			steps: []check.Step{passing},
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write(".github/workflows/ci.yml", strings.Replace(goodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1))
 			},
 			profile: "tools/ci 1 1",
-			code:    exitFail,
+			code:    check.ExitFail,
 			want:    []string{"FAIL  workflows\n.github/workflows/ci.yml:26: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
 		},
 		{
 			name:    "a hygiene finding",
-			steps:   []step{passing},
+			steps:   []check.Step{passing},
 			change:  func(t *testing.T, r *gittest.Repo) { r.Write("docs/x.md", "a line with "+emDash+"\n") },
 			profile: "tools/ci 1 1",
-			code:    exitFail,
+			code:    check.ExitFail,
 			want:    []string{"FAIL  hygiene", "em-dash", "ok    workflows"},
 		},
 		{
 			name:  "a step that needs a module the cache lacks names the setup",
-			steps: []step{{name: "unit", argv: []string{"sh", "-c", "echo 'x.go:1:2: module lookup disabled by GOPROXY=off'; exit 1"}, environ: []string{"PATH=" + os.Getenv("PATH")}}},
-			code:  exitFail,
+			steps: []check.Step{{Name: "unit", Argv: []string{"sh", "-c", "echo 'x.go:1:2: module lookup disabled by GOPROXY=off'; exit 1"}, Environ: []string{"PATH=" + os.Getenv("PATH")}}},
+			code:  check.ExitFail,
 			want:  []string{"FAIL  unit\nx.go:1:2: module lookup disabled by GOPROXY=off\n", `run "go run ./tools/ci setup", which runs "go mod download"`},
 		},
 		{
 			name:  "a nested module stops all before any check",
-			steps: []step{passing},
+			steps: []check.Step{passing},
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("tools/inner/go.mod", "module example.invalid/inner\n")
 			},
-			code: exitError,
+			code: check.ExitError,
 			want: []string{"ci: the checks read one module"},
 		},
 	}
@@ -138,7 +139,7 @@ func TestAllUsage(t *testing.T) {
 	r.Commit("fixture")
 	for _, args := range [][]string{{"all", "x"}, {"setup", "x"}, {"workflows", "x"}} {
 		code, out := runCI(t, r, nil, nil, args...)
-		assert.Equal(t, exitError, code, "%v\n%s", args, out)
+		assert.Equal(t, check.ExitError, code, "%v\n%s", args, out)
 	}
 }
 
@@ -149,13 +150,13 @@ func TestWorkflowsCommand(t *testing.T) {
 	r.Write(".github/workflows/ci.yml", goodWorkflow)
 	r.Commit("fixture")
 	code, out := runCI(t, r, nil, nil, "workflows")
-	assert.Equal(t, exitOK, code, out)
+	assert.Equal(t, check.ExitOK, code, out)
 	assert.Equal(t, "workflows: ok\n", out)
 
 	r.Write(".github/workflows/extra.yaml", goodWorkflow)
 	r.Commit("a second ending")
 	code, out = runCI(t, r, nil, nil, "workflows")
-	assert.Equal(t, exitFail, code, out)
+	assert.Equal(t, check.ExitFail, code, out)
 	assert.Equal(t, ".github/workflows/extra.yaml: workflows: a file here ends in .yml\nworkflows: 1 finding(s)\n", out)
 }
 
@@ -177,49 +178,49 @@ func TestAllSteps(t *testing.T) {
 	vuln := f.tool(t, govulncheckDir, "1.8.0", "bin", "govulncheck")
 	script := "#!/bin/sh\ncase \"$4\" in\ngovulncheck) echo '" + vuln + "' ;;\nesac\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
-	for _, key := range slices.Concat(networkPassThrough, dockerPassThrough) {
+	for _, key := range slices.Concat(check.NetworkPassThrough, check.DockerPassThrough) {
 		t.Setenv(key, "from-the-process")
 	}
 
 	common, err := gitCommonDir(t.Context(), root)
 	require.NoError(t, err)
-	tools := lintTools{linter: linter, goDir: filepath.Dir(goCmd)}
-	env := stepEnv(tools.goDir)
+	tools := check.Tools{Linter: linter, GoDir: filepath.Dir(goCmd)}
+	env := check.StepEnv(tools.GoDir)
 	steps := allSteps(t.Context(), root, tools, "/tmp/p/cover.out")
 	fast := fastSteps(root, tools)
 	unit := len(fast) - 1
-	require.Equal(t, "unit", fast[unit].name)
+	require.Equal(t, "unit", fast[unit].Name)
 	require.Len(t, steps, len(fast)+3)
 	assert.Equal(t, fast[:unit], steps[:unit])
 	assert.Equal(t, fast[unit], steps[unit+2])
 
 	vulnStep, license, race := steps[unit], steps[unit+1], steps[unit+3]
-	assert.Equal(t, step{name: "vulnerabilities", argv: []string{evalOrSelf(vuln), "./..."}, environ: withProcessEnv(env, networkPassThrough)}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")
+	assert.Equal(t, check.Step{Name: "vulnerabilities", Argv: []string{evalOrSelf(vuln), "./..."}, Environ: check.WithProcessEnv(env, check.NetworkPassThrough)}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")
 	assert.Equal(t, 40*time.Minute, procgroup.ToolRace.Timeout())
 	assert.Less(t, procgroup.ToolRace.Timeout(), ciJobTimeout(t), "the race run ends before the job of ci.yml does")
-	assert.Equal(t, step{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=/tmp/p/cover.out", "./..."}, environ: env, class: procgroup.ToolRace}, race)
+	assert.Equal(t, check.Step{Name: "race", Argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=/tmp/p/cover.out", "./..."}, Environ: env, Class: procgroup.ToolRace}, race)
 	for _, s := range steps {
-		assert.Equal(t, s.name == "race", s.class != 0, "%s has a class of its own only if it is the race run", s.name)
+		assert.Equal(t, s.Name == "race", s.Class != 0, "%s has a class of its own only if it is the race run", s.Name)
 	}
-	assert.Equal(t, licenseStep(root, common, runtime.GOOS, withProcessEnv(env, dockerPassThrough)), license)
+	assert.Equal(t, licenseStep(root, common, runtime.GOOS, check.WithProcessEnv(env, check.DockerPassThrough)), license)
 
-	keys := func(s step) []string {
+	keys := func(s check.Step) []string {
 		var out []string
-		for _, kv := range s.environ {
+		for _, kv := range s.Environ {
 			key, _, _ := strings.Cut(kv, "=")
 			out = append(out, key)
 		}
 		return out
 	}
 	for _, s := range steps {
-		for _, key := range networkPassThrough {
-			assert.Equal(t, s.name == "vulnerabilities", slices.Contains(keys(s), key), "%s keeps %s", s.name, key)
+		for _, key := range check.NetworkPassThrough {
+			assert.Equal(t, s.Name == "vulnerabilities", slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
 		}
-		for _, key := range dockerPassThrough {
-			assert.Equal(t, s.name == "license" && runtime.GOOS == "linux", slices.Contains(keys(s), key), "%s keeps %s", s.name, key)
+		for _, key := range check.DockerPassThrough {
+			assert.Equal(t, s.Name == "license" && runtime.GOOS == "linux", slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
 		}
 	}
-	for _, key := range slices.Concat(networkPassThrough, dockerPassThrough, goModulePassThrough) {
+	for _, key := range slices.Concat(check.NetworkPassThrough, check.DockerPassThrough, check.GoModulePassThrough) {
 		assert.NotContains(t, goenv.PassThrough, key)
 	}
 }
@@ -274,7 +275,7 @@ func TestAllStepsVulnFailsClosed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newFakeMise(t)
 			goCmd := f.tool(t, "go", "1.27.0", "bin", "go")
-			tools := lintTools{linter: f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), goDir: filepath.Dir(goCmd)}
+			tools := check.Tools{Linter: f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), GoDir: filepath.Dir(goCmd)}
 			marker := filepath.Join(t.TempDir(), "ran")
 			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "govulncheck"), []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0o700))
 			script := "#!/bin/sh\nexit 1\n"
@@ -283,15 +284,15 @@ func TestAllStepsVulnFailsClosed(t *testing.T) {
 			}
 			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(script), 0o700))
 			root := lockedRoot(t, lockFixture)
-			var got step
+			var got check.Step
 			for _, s := range allSteps(t.Context(), root, tools, "/tmp/p/cover.out") {
-				if s.name == "vulnerabilities" {
+				if s.Name == "vulnerabilities" {
 					got = s
 				}
 			}
-			require.ErrorContains(t, got.unavailable, strings.ReplaceAll(tt.want, "{installs}", evalOrSelf(f.installs())))
-			_, err := got.run(t.Context(), root)
-			require.ErrorIs(t, err, got.unavailable, "an unavailable tool fails its step")
+			require.ErrorContains(t, got.Unavailable, strings.ReplaceAll(tt.want, "{installs}", evalOrSelf(f.installs())))
+			_, err := got.Run(t.Context(), root)
+			require.ErrorIs(t, err, got.Unavailable, "an unavailable tool fails its step")
 			assert.NoFileExists(t, marker, "no govulncheck of the search path ran")
 		})
 	}
@@ -307,7 +308,7 @@ func TestStepRunDeadline(t *testing.T) {
 	environ := []string{"PATH=" + os.Getenv("PATH")}
 	t.Run("the limit of the step's class", func(t *testing.T) {
 		ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolStep, 50*time.Millisecond)
-		_, err := step{name: "slow", argv: sleep, environ: environ}.run(ctx, t.TempDir())
+		_, err := check.Step{Name: "slow", Argv: sleep, Environ: environ}.Run(ctx, t.TempDir())
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		timeout, ok := errors.AsType[*procgroup.TimeoutError](err)
 		require.True(t, ok, "the error is subprocess-timeout: %v", err)
@@ -316,7 +317,7 @@ func TestStepRunDeadline(t *testing.T) {
 	})
 	t.Run("the race step runs under its own class", func(t *testing.T) {
 		ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolRace, 50*time.Millisecond)
-		_, err := step{name: "race", argv: sleep, environ: environ, class: procgroup.ToolRace}.run(ctx, t.TempDir())
+		_, err := check.Step{Name: "race", Argv: sleep, Environ: environ, Class: procgroup.ToolRace}.Run(ctx, t.TempDir())
 		timeout, ok := errors.AsType[*procgroup.TimeoutError](err)
 		require.True(t, ok, "the error is subprocess-timeout: %v", err)
 		assert.Equal(t, procgroup.ToolRace, timeout.Class)
@@ -324,7 +325,7 @@ func TestStepRunDeadline(t *testing.T) {
 	t.Run("the deadline of the run, before the limit", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 		defer cancel()
-		_, err := step{name: "slow", argv: sleep, environ: environ}.run(ctx, t.TempDir())
+		_, err := check.Step{Name: "slow", Argv: sleep, Environ: environ}.Run(ctx, t.TempDir())
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		_, ok := errors.AsType[*procgroup.TimeoutError](err)
 		assert.False(t, ok, "the caller's deadline is not the step's subprocess-timeout: %v", err)
@@ -334,12 +335,12 @@ func TestStepRunDeadline(t *testing.T) {
 		// killing the process group, or WaitDelay, ends the wait.
 		ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolStep, 200*time.Millisecond)
 		start := time.Now()
-		_, err := step{name: "slow", argv: []string{"sh", "-c", "sleep 30; true"}, environ: environ}.run(ctx, t.TempDir())
+		_, err := check.Step{Name: "slow", Argv: []string{"sh", "-c", "sleep 30; true"}, Environ: environ}.Run(ctx, t.TempDir())
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		assert.Less(t, time.Since(start), 5*time.Second, "the step returns at its deadline, not when the grandchild ends")
 	})
 	t.Run("a failure that is not a deadline", func(t *testing.T) {
-		_, err := step{name: "fails", argv: []string{"false"}, environ: environ}.run(t.Context(), t.TempDir())
+		_, err := check.Step{Name: "fails", Argv: []string{"false"}, Environ: environ}.Run(t.Context(), t.TempDir())
 		exit, ok := errors.AsType[*procgroup.ExitError](err)
 		require.True(t, ok, "the error is the exit of the command: %v", err)
 		assert.Equal(t, 1, exit.Code)
@@ -374,9 +375,9 @@ func TestAllArchitecture(t *testing.T) {
 		uname, want string
 		code        int
 	}{
-		{same, "ok    architecture\n", exitOK},
-		{other, "FAIL  architecture\nuname -m reports " + other + " and this binary runs as " + runtime.GOARCH + ": ", exitFail},
-		{"unknown", "FAIL  architecture\nuname -m reports unknown", exitFail},
+		{same, "ok    architecture\n", check.ExitOK},
+		{other, "FAIL  architecture\nuname -m reports " + other + " and this binary runs as " + runtime.GOARCH + ": ", check.ExitFail},
+		{"unknown", "FAIL  architecture\nuname -m reports unknown", check.ExitFail},
 	} {
 		t.Run(tt.uname, func(t *testing.T) {
 			r := newTree(t)
@@ -385,8 +386,8 @@ func TestAllArchitecture(t *testing.T) {
 			profile := filepath.Join(t.TempDir(), "cover.out")
 			require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
 			var out bytes.Buffer
-			e := env{dir: r.Dir, gitEnv: r.Env, stdin: strings.NewReader(""), stdout: &out, stderr: &out, steps: []step{passing}, profile: profile,
-				machine: func(context.Context) string { return tt.uname }}
+			e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &out, Steps: []check.Step{passing}, Profile: profile,
+				Machine: func(context.Context) string { return tt.uname }}
 			assert.Equal(t, tt.code, run(t.Context(), e, []string{"all"}), "%s", out.String())
 			assert.Contains(t, out.String(), tt.want)
 			assert.Contains(t, out.String(), "ok    passes", "the other checks run")
@@ -410,16 +411,16 @@ func TestAllArchitectureTranslated(t *testing.T) {
 		profile := filepath.Join(t.TempDir(), "cover.out")
 		require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
 		var out bytes.Buffer
-		e := env{dir: r.Dir, gitEnv: r.Env, stdin: strings.NewReader(""), stdout: &out, stderr: &out, steps: []step{passing}, profile: profile,
-			machine:    func(context.Context) string { return same },
-			translated: func(context.Context) bool { return translated }}
+		e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &out, Steps: []check.Step{passing}, Profile: profile,
+			Machine:    func(context.Context) string { return same },
+			Translated: func(context.Context) bool { return translated }}
 		code := run(t.Context(), e, []string{"all"})
 		if translated {
-			assert.Equal(t, exitFail, code, "%s", out.String())
+			assert.Equal(t, check.ExitFail, code, "%s", out.String())
 			assert.Contains(t, out.String(), "FAIL  architecture\nsysctl.proc_translated is 1: ")
 			assert.Contains(t, out.String(), "ok    passes", "the other checks run")
 		} else {
-			assert.Equal(t, exitOK, code, "%s", out.String())
+			assert.Equal(t, check.ExitOK, code, "%s", out.String())
 			assert.Contains(t, out.String(), "ok    architecture\n")
 		}
 	}
@@ -471,9 +472,9 @@ func TestProbe(t *testing.T) {
 // reports with a "--" line, and neither "ok" nor "FAIL".
 func TestLicenseStep(t *testing.T) {
 	env := []string{"PATH=/x"}
-	assert.Equal(t, step{
-		name: "license",
-		argv: []string{"docker", "run", "--rm", "--network", "none",
+	assert.Equal(t, check.Step{
+		Name: "license",
+		Argv: []string{"docker", "run", "--rm", "--network", "none",
 			"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--user", "65534",
 			"--env", "GIT_CONFIG_COUNT=2",
 			"--env", "GIT_CONFIG_KEY_0=safe.directory", "--env", "GIT_CONFIG_VALUE_0=/src/repo",
@@ -482,22 +483,22 @@ func TestLicenseStep(t *testing.T) {
 			"--mount", "type=bind,source=/src/main/.git,target=/src/main/.git,readonly",
 			"--workdir", "/src/repo",
 			"fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e7662577c8427429e11e1b9f25a992e", "lint"},
-		environ: env,
+		Environ: env,
 	}, licenseStep("/src/repo", "/src/main/.git", "linux", env))
 	assert.Regexp(t, `@sha256:[0-9a-f]{64}$`, reuseImage)
 
 	darwin := licenseStep("/src/repo", "/src/repo/.git", "darwin", env)
-	assert.Equal(t, "not run on darwin: reuse runs from a Linux container image; the hosted Linux runners run it", darwin.skip)
-	assert.Empty(t, darwin.argv, "nothing is started")
+	assert.Equal(t, "not run on darwin: reuse runs from a Linux container image; the hosted Linux runners run it", darwin.Skip)
+	assert.Empty(t, darwin.Argv, "nothing is started")
 
-	require.Error(t, licenseStep("/src/a,b", "/src/a,b/.git", "linux", env).unavailable, "a path the mount option cannot name")
-	require.Error(t, licenseStep("/src/a", "/src/b=c/.git", "linux", env).unavailable, "a git directory the mount option cannot name")
+	require.Error(t, licenseStep("/src/a,b", "/src/a,b/.git", "linux", env).Unavailable, "a path the mount option cannot name")
+	require.Error(t, licenseStep("/src/a", "/src/b=c/.git", "linux", env).Unavailable, "a git directory the mount option cannot name")
 
 	var out bytes.Buffer
 	c := newChecks(&out)
-	c.run(t.Context(), t.TempDir(), []step{passing, darwin})
+	c.run(t.Context(), t.TempDir(), []check.Step{passing, darwin})
 	assert.True(t, c.ok, "a step not run fails nothing")
-	assert.Contains(t, out.String(), "--    license: "+darwin.skip+"\n")
+	assert.Contains(t, out.String(), "--    license: "+darwin.Skip+"\n")
 	assert.NotContains(t, out.String(), "ok    license")
 	assert.NotContains(t, out.String(), "FAIL  license")
 }
@@ -541,7 +542,7 @@ func TestAllWiring(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\n"+answerVersion+which+"echo \"mise $*\" >> '"+log+"'\n"), 0o700))
 
 	code, out := runCI(t, r, nil, nil, "all")
-	assert.Equal(t, exitFail, code, out)
+	assert.Equal(t, check.ExitFail, code, out)
 	assert.Contains(t, out, "FAIL  coverage\ntools/ci: coverage: 0.0% of 1 statements covered, below 80% (S9)\n", "coverage read the profile the race step wrote")
 
 	data, err := os.ReadFile(log)
@@ -611,7 +612,7 @@ func TestSetup(t *testing.T) {
 	t.Setenv("GOTOOLCHAIN", "go1.99.0")
 
 	code, out := runCI(t, r, nil, nil, "setup")
-	assert.Equal(t, exitOK, code, out)
+	assert.Equal(t, check.ExitOK, code, out)
 	for _, w := range []string{"ok    mise trust", "ok    mise install", "ok    go mod download"} {
 		assert.Contains(t, out, w)
 	}
@@ -633,7 +634,7 @@ func TestSetup(t *testing.T) {
 			require.NoError(t, os.Unsetenv(key))
 		}
 		code, out := runCI(t, r, nil, nil, "setup")
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, "the workflow sets MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml for every mise run")
 		assert.NoFileExists(t, log, "no mise command ran")
 	})
@@ -661,7 +662,7 @@ func TestSetup(t *testing.T) {
 		t.Setenv("MISE_CD", "/elsewhere")
 		t.Setenv("MISE_ENV_FILE", ".env")
 		code, out := runCI(t, r, nil, nil, "setup")
-		assert.Equal(t, exitOK, code, out)
+		assert.Equal(t, check.ExitOK, code, out)
 		got, err := os.ReadFile(dump)
 		require.NoError(t, err)
 		root, err := filepath.EvalSymlinks(r.Dir)
@@ -679,7 +680,7 @@ func TestSetup(t *testing.T) {
 			r.Commit("pins the fake's mise again")
 		})
 		code, out := runCI(t, r, nil, nil, "setup")
-		assert.Equal(t, exitError, code, out)
+		assert.Equal(t, check.ExitError, code, out)
 		assert.Contains(t, out, "ci: mise is at version "+fakeMiseVersion+", and .github/workflows/ci.yml pins 2026.10.4")
 		data, err := os.ReadFile(log)
 		require.NoError(t, err)
@@ -689,7 +690,7 @@ func TestSetup(t *testing.T) {
 	t.Run("a failing mise stops before the download", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte("#!/bin/sh\n"+answerVersion+"exit 1\n"), 0o700))
 		code, out := runCI(t, r, nil, nil, "setup")
-		assert.Equal(t, exitFail, code, out)
+		assert.Equal(t, check.ExitFail, code, out)
 		assert.Contains(t, out, "FAIL  mise trust")
 		assert.NotContains(t, out, "go mod download")
 	})
@@ -714,10 +715,10 @@ func TestSetup(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(f.bin, "mise"), []byte(stall), 0o700))
 			ctx := procgroup.WithTestTimeout(t.Context(), tt.class, 100*time.Millisecond)
 			var out bytes.Buffer
-			e := env{dir: r.Dir, gitEnv: r.Env, stdin: strings.NewReader(""), stdout: &out, stderr: &out}
+			e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &out}
 			start := time.Now()
 			code := run(ctx, e, []string{"setup"})
-			assert.Equal(t, exitFail, code, out.String())
+			assert.Equal(t, check.ExitFail, code, out.String())
 			assert.Contains(t, out.String(), "FAIL  mise "+tt.stalls)
 			assert.Contains(t, out.String(), tt.wantErr)
 			assert.Less(t, time.Since(start), 10*time.Second, "the stalled command ends at the limit of its class")
@@ -729,14 +730,14 @@ func TestSetup(t *testing.T) {
 // from the process, and the way withProcessEnv adds them: in the order
 // of the list, a variable that is empty or unset left out.
 func TestPassThroughLists(t *testing.T) {
-	assert.Equal(t, []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}, networkPassThrough)
-	assert.Equal(t, []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"}, dockerPassThrough)
+	assert.Equal(t, []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}, check.NetworkPassThrough)
+	assert.Equal(t, []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"}, check.DockerPassThrough)
 
 	t.Setenv("DOCKER_HOST", "unix:///a")
 	t.Setenv("DOCKER_CONTEXT", "")
 	t.Setenv("DOCKER_CONFIG", "/c")
 	base := []string{"PATH=/x"}
-	assert.Equal(t, []string{"PATH=/x", "DOCKER_HOST=unix:///a", "DOCKER_CONFIG=/c"}, withProcessEnv(base, dockerPassThrough), "an empty variable is left out")
+	assert.Equal(t, []string{"PATH=/x", "DOCKER_HOST=unix:///a", "DOCKER_CONFIG=/c"}, check.WithProcessEnv(base, check.DockerPassThrough), "an empty variable is left out")
 	assert.Equal(t, []string{"PATH=/x"}, base, "the base is not changed")
 }
 
@@ -745,7 +746,7 @@ func TestPassThroughLists(t *testing.T) {
 // the same id: git cat-file does not hash what it reads, so a check
 // that reads the blob after the step reads the other bytes. It is what
 // a test of a change could do while a step runs it.
-func overwriteObject(t *testing.T, r *gittest.Repo, rev, other string) step {
+func overwriteObject(t *testing.T, r *gittest.Repo, rev, other string) check.Step {
 	t.Helper()
 	id := strings.TrimSpace(r.Git("rev-parse", "--verify", rev))
 	object := filepath.Join(r.Dir, ".git", "objects", id[:2], id[2:])
@@ -757,7 +758,7 @@ func overwriteObject(t *testing.T, r *gittest.Repo, rev, other string) step {
 	require.NoError(t, z.Close())
 	src := filepath.Join(t.TempDir(), "object")
 	require.NoError(t, os.WriteFile(src, b.Bytes(), 0o600))
-	return step{name: "rewrites", argv: []string{"sh", "-c", `chmod u+w "$1" && cat "$2" > "$1"`, "sh", object, src}, environ: r.Env}
+	return check.Step{Name: "rewrites", Argv: []string{"sh", "-c", `chmod u+w "$1" && cat "$2" > "$1"`, "sh", object, src}, Environ: r.Env}
 }
 
 // TestCommitChecksReadBeforeTheSteps shows that hygiene, workflows and
@@ -768,21 +769,21 @@ func overwriteObject(t *testing.T, r *gittest.Repo, rev, other string) step {
 func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
 	dash := "a line with " + emDash + "\n"
 	floating := strings.Replace(goodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1)
-	fixture := func(t *testing.T) (*gittest.Repo, []step) {
+	fixture := func(t *testing.T) (*gittest.Repo, []check.Step) {
 		t.Helper()
 		r := newTree(t)
 		r.Write("go.mod", "module "+fixtureModule+"\n\ngo 1.27.0\n")
 		r.Write("docs/x.md", dash)
 		r.Write(".github/workflows/ci.yml", floating)
 		r.Commit("fixture")
-		return r, []step{overwriteObject(t, r, "HEAD:docs/x.md", "a plain line\n"), overwriteObject(t, r, "HEAD:.github/workflows/ci.yml", goodWorkflow)}
+		return r, []check.Step{overwriteObject(t, r, "HEAD:docs/x.md", "a plain line\n"), overwriteObject(t, r, "HEAD:.github/workflows/ci.yml", goodWorkflow)}
 	}
 	t.Run("all", func(t *testing.T) {
 		r, steps := fixture(t)
 		profile := filepath.Join(t.TempDir(), "cover.out")
 		require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
 		code, out := runAllIn(t, r, append(steps, passing), profile)
-		assert.Equal(t, exitFail, code, out)
+		assert.Equal(t, check.ExitFail, code, out)
 		assert.Contains(t, out, "ok    rewrites")
 		assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
 		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:26: workflows: runs-on")
@@ -790,7 +791,7 @@ func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
 	t.Run("fast by hand", func(t *testing.T) {
 		r, steps := fixture(t)
 		code, out := runCI(t, r, nil, steps, "fast")
-		assert.Equal(t, exitFail, code, out)
+		assert.Equal(t, check.ExitFail, code, out)
 		assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
 		assert.Contains(t, out, "FAIL  workflows\n.github/workflows/ci.yml:26: workflows: runs-on")
 	})
@@ -807,8 +808,8 @@ func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
 		require.NoError(t, os.Remove(filepath.Join(r.Dir, "docs", "page.md")))
 		tip := strings.TrimSpace(r.Commit("docs: no page"))
 		stdin := strings.NewReader("refs/heads/main " + tip + " refs/heads/main " + zero + "\n")
-		code, out := runCI(t, r, stdin, []step{overwriteObject(t, r, "HEAD~1:docs/page.md", "plain\n")}, "fast", "origin", "url")
-		assert.Equal(t, exitFail, code, out)
+		code, out := runCI(t, r, stdin, []check.Step{overwriteObject(t, r, "HEAD~1:docs/page.md", "plain\n")}, "fast", "origin", "url")
+		assert.Equal(t, check.ExitFail, code, out)
 		assert.Contains(t, out, "ok    hygiene")
 		assert.Contains(t, out, "FAIL  pushed range")
 		assert.Contains(t, out, "docs/page.md:1: name:")
@@ -839,17 +840,17 @@ func TestCommitCheckThatCannotJudgeFails(t *testing.T) {
 		run     func(t *testing.T, r *gittest.Repo, origin string) (int, string)
 	}{
 		{"fast by hand", false, func(t *testing.T, r *gittest.Repo, _ string) (int, string) {
-			return runCI(t, r, nil, []step{passing}, "fast")
+			return runCI(t, r, nil, []check.Step{passing}, "fast")
 		}},
 		{"all", false, func(t *testing.T, r *gittest.Repo, _ string) (int, string) {
 			profile := filepath.Join(t.TempDir(), "cover.out")
 			require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
-			return runAllIn(t, r, []step{passing}, profile)
+			return runAllIn(t, r, []check.Step{passing}, profile)
 		}},
 		{"fast as the pre-push hook", true, func(t *testing.T, r *gittest.Repo, origin string) (int, string) {
 			tip := strings.TrimSpace(r.Git("rev-parse", "HEAD"))
 			stdin := strings.NewReader("refs/heads/main " + tip + " refs/heads/main " + zero + "\n")
-			return runCI(t, r, stdin, []step{passing}, "fast", "origin", origin)
+			return runCI(t, r, stdin, []check.Step{passing}, "fast", "origin", origin)
 		}},
 	}
 	for _, b := range broken {
@@ -865,7 +866,7 @@ func TestCommitCheckThatCannotJudgeFails(t *testing.T) {
 				r.Write(b.path, b.content)
 				r.Commit("breaks " + b.path)
 				code, out := m.run(t, r, origin.Dir)
-				assert.Equal(t, exitFail, code, "exit status\n%s", out)
+				assert.Equal(t, check.ExitFail, code, "exit status\n%s", out)
 				assert.Contains(t, out, "FAIL  hygiene\n"+b.path+": ", "the reason is on the FAIL line")
 				if m.prePush && b.pushedFails {
 					assert.Contains(t, out, "FAIL  pushed range", "the pushed range cannot be judged either")
@@ -926,11 +927,11 @@ func TestAllStepsLeaveTheTree(t *testing.T) {
 			}
 			profile := filepath.Join(t.TempDir(), "cover.out")
 			require.NoError(t, os.WriteFile(profile, profileOf("tools/ci 1 1"), 0o600))
-			mutate := step{name: "mutates", argv: []string{sh, "-c", tt.script}, environ: r.Env}
-			code, out := runAllIn(t, r, []step{mutate, passing}, profile)
-			want := exitFail
+			mutate := check.Step{Name: "mutates", Argv: []string{sh, "-c", tt.script}, Environ: r.Env}
+			code, out := runAllIn(t, r, []check.Step{mutate, passing}, profile)
+			want := check.ExitFail
 			if strings.HasPrefix(tt.want[0], "ok") {
-				want = exitOK
+				want = check.ExitOK
 			}
 			assert.Equal(t, want, code, "exit status\n%s", out)
 			for _, w := range tt.want {
@@ -961,7 +962,7 @@ func TestCommitChecksReadBeforeMise(t *testing.T) {
 			r.Write(pinnedMiseWorkflow, miseWorkflow(t, fakeMiseVersion))
 			r.Write("docs/x.md", "a line with "+emDash+"\n")
 			r.Commit("fixture")
-			rewrite := overwriteObject(t, r, "HEAD:docs/x.md", "a plain line\n").argv
+			rewrite := overwriteObject(t, r, "HEAD:docs/x.md", "a plain line\n").Argv
 			object, src := rewrite[4], rewrite[5]
 
 			f := newFakeMise(t)
@@ -975,7 +976,7 @@ func TestCommitChecksReadBeforeMise(t *testing.T) {
 			f.script(t, prelude, f.tool(t, "golangci-lint", "2.14.0", "golangci-lint"), goCmd)
 
 			code, out := runCI(t, r, nil, nil, mode)
-			assert.Equal(t, exitFail, code, out)
+			assert.Equal(t, check.ExitFail, code, out)
 			assert.Contains(t, out, "ok    unit", "the real steps ran, after mise")
 			assert.Contains(t, out, "FAIL  hygiene\ndocs/x.md:1: em-dash")
 			assert.Equal(t, "a plain line", strings.TrimSpace(r.Git("cat-file", "blob", "HEAD:docs/x.md")), "mise did rewrite the object")

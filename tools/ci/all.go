@@ -14,6 +14,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // coverFile is the name of the cover profile the race step writes, in
@@ -71,23 +72,23 @@ const reuseImage = "fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e76
 // it reads the Go vulnerability database, from the path whichPinned
 // finds below the directory where mise installs it and at the version
 // mise.lock locks. A tool that is not found fails its step and no other.
-func allSteps(ctx context.Context, root string, tools lintTools, profile string) []step {
-	env := stepEnv(tools.goDir)
+func allSteps(ctx context.Context, root string, tools check.Tools, profile string) []check.Step {
+	env := check.StepEnv(tools.GoDir)
 	gitCommon, gitErr := gitCommonDir(ctx, root)
-	vuln := step{name: "vulnerabilities", environ: withProcessEnv(env, networkPassThrough)}
+	vuln := check.Step{Name: "vulnerabilities", Environ: check.WithProcessEnv(env, check.NetworkPassThrough)}
 	if path, err := whichPinned(ctx, root, "govulncheck", govulncheckLock, govulncheckDir); err != nil {
-		vuln.unavailable = err
+		vuln.Unavailable = err
 	} else {
-		vuln.argv = []string{path, "./..."}
+		vuln.Argv = []string{path, "./..."}
 	}
-	goCmd := filepath.Join(tools.goDir, "go")
-	license := licenseStep(root, gitCommon, runtime.GOOS, withProcessEnv(env, dockerPassThrough))
-	if gitErr != nil && license.skip == "" {
-		license.unavailable = gitErr
+	goCmd := filepath.Join(tools.GoDir, "go")
+	license := licenseStep(root, gitCommon, runtime.GOOS, check.WithProcessEnv(env, check.DockerPassThrough))
+	if gitErr != nil && license.Skip == "" {
+		license.Unavailable = gitErr
 	}
 	before, unit := fastPhases(root, tools)
-	return slices.Concat(before, []step{vuln, license, unit,
-		{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env, class: procgroup.ToolRace}})
+	return slices.Concat(before, []check.Step{vuln, license, unit,
+		{Name: "race", Argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, Environ: env, Class: procgroup.ToolRace}})
 }
 
 // gitCommonDir returns the absolute path of the git directory that
@@ -130,13 +131,13 @@ func gitCommonDir(ctx context.Context, root string) (string, error) {
 // fails a run whose steps left the tree changed. The code inside the
 // image is out of scope, as the code of a pinned action is: the review
 // of the pin covers it.
-func licenseStep(root, gitCommon, goos string, env []string) step {
-	s := step{name: "license"}
+func licenseStep(root, gitCommon, goos string, env []string) check.Step {
+	s := check.Step{Name: "license"}
 	if goos != "linux" {
-		s.skip = "not run on " + goos + ": reuse runs from a Linux container image; the hosted Linux runners run it"
+		s.Skip = "not run on " + goos + ": reuse runs from a Linux container image; the hosted Linux runners run it"
 		return s
 	}
-	s.argv = []string{"docker", "run", "--rm", "--network", "none",
+	s.Argv = []string{"docker", "run", "--rm", "--network", "none",
 		"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--user", "65534",
 		"--env", "GIT_CONFIG_COUNT=2",
 		"--env", "GIT_CONFIG_KEY_0=safe.directory", "--env", "GIT_CONFIG_VALUE_0=" + root,
@@ -144,10 +145,10 @@ func licenseStep(root, gitCommon, goos string, env []string) step {
 		"--mount", "type=bind,source=" + root + ",target=" + root + ",readonly",
 		"--mount", "type=bind,source=" + gitCommon + ",target=" + gitCommon + ",readonly",
 		"--workdir", root, reuseImage, "lint"}
-	s.environ = env
+	s.Environ = env
 	for _, path := range []string{root, gitCommon} {
 		if strings.ContainsAny(path, ",=") {
-			s.unavailable = fmt.Errorf("a path holds \",\" or \"=\", which the bind mount of the license step cannot name: %s", path)
+			s.Unavailable = fmt.Errorf("a path holds \",\" or \"=\", which the bind mount of the license step cannot name: %s", path)
 		}
 	}
 	return s
@@ -170,20 +171,20 @@ func licenseStep(root, gitCommon, goos string, env []string) step {
 // It first prints the platform it runs on, as the go command and "uname
 // -m" name it, so that a run's log shows which machine each runner
 // label gave (10 10.2, Runners).
-func runAll(ctx context.Context, e env, args []string) (bool, error) {
+func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if len(args) != 0 {
-		return false, fmt.Errorf("all takes no argument\n%s", usage)
+		return false, fmt.Errorf("all takes no argument\n%s", check.Usage())
 	}
-	root, err := repoRoot(ctx, e)
+	root, err := check.RepoRoot(ctx, e)
 	if err != nil {
 		return false, err
 	}
-	repo := e.repo()
+	repo := e.Repo()
 	repo.Dir = root
 	if err := nestedModules(ctx, repo); err != nil {
 		return false, err
 	}
-	head, err := commitOf(ctx, repo, "HEAD")
+	head, err := check.CommitOf(ctx, repo, "HEAD")
 	if err != nil {
 		return false, err
 	}
@@ -193,13 +194,13 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	machine := e.machine
+	machine := e.Machine
 	if machine == nil {
 		machine = unameMachine
 	}
 	// uname comes from the host machine, not from the repository.
 	uname := machine(ctx)
-	say(e.stdout, "platform  %s/%s, uname -m %s\n", runtime.GOOS, runtime.GOARCH, uname)
+	check.Say(e.Stdout, "platform  %s/%s, uname -m %s\n", runtime.GOOS, runtime.GOARCH, uname)
 
 	// The steps must leave the tree as they found it (changedSince,
 	// after them), mise included.
@@ -207,8 +208,8 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	profile := e.profile
-	steps := e.steps
+	profile := e.Profile
+	steps := e.Steps
 	if steps == nil {
 		dir, err := os.MkdirTemp("", "ci-cover-")
 		if err != nil {
@@ -225,8 +226,8 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 		}
 		steps = allSteps(ctx, root, tools, profile)
 	}
-	c := newChecks(e.stdout)
-	translated := e.translated
+	c := newChecks(e.Stdout)
+	translated := e.Translated
 	if translated == nil {
 		translated = procTranslated
 	}
@@ -247,7 +248,7 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 	c.report("working tree", tree == "", tree)
 
 	findings, err := coverageAt(root, profile)
-	for _, v := range append(verdicts, verdict{name: "coverage", findings: findings, err: err}) {
+	for _, v := range append(verdicts, check.Verdict{Name: "coverage", Findings: findings, Err: err}) {
 		c.verdict(v)
 	}
 	return c.ok, nil
@@ -308,7 +309,7 @@ func archMatches(uname, goarch string) bool {
 
 // coverageAt applies coverage to the profile at path, for the module of
 // the go.mod in root.
-func coverageAt(root, path string) ([]finding, error) {
+func coverageAt(root, path string) ([]check.Finding, error) {
 	goMod, err := os.ReadFile(filepath.Join(root, "go.mod"))
 	if err != nil {
 		return nil, err
@@ -326,37 +327,37 @@ func coverageAt(root, path string) ([]finding, error) {
 
 // runCoverage applies the thresholds of S9 to a cover profile a
 // developer wrote, as "go test -coverprofile=cover.out ./..." does.
-func runCoverage(ctx context.Context, e env, args []string) (bool, error) {
+func runCoverage(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if len(args) != 1 {
-		return false, fmt.Errorf("coverage takes the path of a cover profile\n%s", usage)
+		return false, fmt.Errorf("coverage takes the path of a cover profile\n%s", check.Usage())
 	}
-	root, err := repoRoot(ctx, e)
+	root, err := check.RepoRoot(ctx, e)
 	if err != nil {
 		return false, err
 	}
 	path := args[0]
 	if !filepath.IsAbs(path) {
-		path = filepath.Join(e.dir, path)
+		path = filepath.Join(e.Dir, path)
 	}
 	findings, err := coverageAt(root, path)
 	if err != nil {
 		return false, err
 	}
-	say(e.stdout, "%s%s\n", lines(findings), summary("coverage", len(findings)))
+	check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("coverage", len(findings)))
 	return len(findings) == 0, nil
 }
 
 // runWorkflows applies the grammar of 10 10.2 to the workflows of the
 // tree at HEAD.
-func runWorkflows(ctx context.Context, e env, args []string) (bool, error) {
+func runWorkflows(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if len(args) != 0 {
-		return false, fmt.Errorf("workflows takes no argument\n%s", usage)
+		return false, fmt.Errorf("workflows takes no argument\n%s", check.Usage())
 	}
-	findings, err := workflows(ctx, e.repo(), "HEAD")
+	findings, err := workflows(ctx, e.Repo(), "HEAD")
 	if err != nil {
 		return false, err
 	}
-	say(e.stdout, "%s%s\n", lines(findings), summary("workflows", len(findings)))
+	check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("workflows", len(findings)))
 	return len(findings) == 0, nil
 }
 
@@ -385,11 +386,11 @@ func runWorkflows(ctx context.Context, e env, args []string) (bool, error) {
 // under the class procgroup.Mise, the limit the table gives every mise
 // install; "mise trust" and the download are command steps, under
 // procgroup.ToolStep.
-func runSetup(ctx context.Context, e env, args []string) (bool, error) {
+func runSetup(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if len(args) != 0 {
-		return false, fmt.Errorf("setup takes no argument\n%s", usage)
+		return false, fmt.Errorf("setup takes no argument\n%s", check.Usage())
 	}
-	root, err := repoRoot(ctx, e)
+	root, err := check.RepoRoot(ctx, e)
 	if err != nil {
 		return false, err
 	}
@@ -399,10 +400,10 @@ func runSetup(ctx context.Context, e env, args []string) (bool, error) {
 	if err := checkMiseVersion(ctx, root); err != nil {
 		return false, err
 	}
-	c := newChecks(e.stdout)
-	mise := []step{
-		{name: "mise trust", argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, environ: miseRunEnviron(passThroughEnv(), root)},
-		{name: "mise install", argv: []string{"mise", "install"}, environ: miseRunEnviron(withProcessEnv(passThroughEnv(), networkPassThrough), root), class: procgroup.Mise},
+	c := newChecks(e.Stdout)
+	mise := []check.Step{
+		{Name: "mise trust", Argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, Environ: miseRunEnviron(check.PassThroughEnv(), root)},
+		{Name: "mise install", Argv: []string{"mise", "install"}, Environ: miseRunEnviron(check.WithProcessEnv(check.PassThroughEnv(), check.NetworkPassThrough), root), Class: procgroup.Mise},
 	}
 	c.run(ctx, root, mise)
 	if !c.ok {
@@ -412,11 +413,11 @@ func runSetup(ctx context.Context, e env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	download := step{
-		name:    "go mod download",
-		argv:    []string{filepath.Join(tools.goDir, "go"), "mod", "download"},
-		environ: withProcessEnv(slices.DeleteFunc(stepEnv(tools.goDir), func(kv string) bool { return kv == "GOPROXY=off" }), networkPassThrough),
+	download := check.Step{
+		Name:    "go mod download",
+		Argv:    []string{filepath.Join(tools.GoDir, "go"), "mod", "download"},
+		Environ: check.WithProcessEnv(slices.DeleteFunc(check.StepEnv(tools.GoDir), func(kv string) bool { return kv == "GOPROXY=off" }), check.NetworkPassThrough),
 	}
-	c.run(ctx, root, []step{download})
+	c.run(ctx, root, []check.Step{download})
 	return c.ok, nil
 }

@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,20 +53,20 @@ func TestAllStepsWithoutGitDirectory(t *testing.T) {
 	t.Setenv("LC_ALL", "C") // git's message is then the untranslated one
 	_, err := gitCommonDir(t.Context(), root)
 	require.ErrorContains(t, err, "not a git repository", "the fixture is no repository")
-	var license step
-	for _, s := range allSteps(t.Context(), root, lintTools{}, filepath.Join(root, "cover.out")) {
-		if s.name == "license" {
+	var license check.Step
+	for _, s := range allSteps(t.Context(), root, check.Tools{}, filepath.Join(root, "cover.out")) {
+		if s.Name == "license" {
 			license = s
 		}
 	}
-	require.Equal(t, "license", license.name)
+	require.Equal(t, "license", license.Name)
 	if runtime.GOOS == "linux" {
-		require.Error(t, license.unavailable, "a git directory that is not known fails the step")
-		assert.Empty(t, license.skip)
+		require.Error(t, license.Unavailable, "a git directory that is not known fails the step")
+		assert.Empty(t, license.Skip)
 		return
 	}
-	require.NoError(t, license.unavailable, "a step that is skipped is not unavailable as well")
-	assert.NotEmpty(t, license.skip)
+	require.NoError(t, license.Unavailable, "a step that is skipped is not unavailable as well")
+	assert.NotEmpty(t, license.Skip)
 }
 
 // TestLicenseStepUnnameablePaths shows that the root and the git
@@ -85,10 +86,10 @@ func TestLicenseStepUnnameablePaths(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := licenseStep(tt.root, tt.gitDir, "linux", nil)
 			if tt.refused {
-				require.ErrorContains(t, s.unavailable, "the bind mount")
+				require.ErrorContains(t, s.Unavailable, "the bind mount")
 				return
 			}
-			require.NoError(t, s.unavailable)
+			require.NoError(t, s.Unavailable)
 		})
 	}
 }

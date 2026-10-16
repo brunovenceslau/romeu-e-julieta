@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -169,16 +170,16 @@ func TestCoverageCommand(t *testing.T) {
 	low := filepath.Join(t.TempDir(), "low.out")
 	require.NoError(t, os.WriteFile(low, profileOf("tools/ci 1 0"), 0o600))
 	code, out := runCI(t, r, nil, nil, "coverage", low)
-	assert.Equal(t, exitFail, code, out)
+	assert.Equal(t, check.ExitFail, code, out)
 	assert.Contains(t, out, "tools/ci: coverage: 0.0% of 1 statements covered, below 80% (S9)\ncoverage: 1 finding(s)\n")
 
 	r.Write("full.out", string(profileOf("tools/ci 1 1")))
 	code, out = runCI(t, r, nil, nil, "coverage", "full.out")
-	assert.Equal(t, exitOK, code, out)
+	assert.Equal(t, check.ExitOK, code, out)
 	assert.Equal(t, "coverage: ok\n", out)
 
 	for _, args := range [][]string{{"coverage"}, {"coverage", "a", "b"}, {"coverage", filepath.Join(t.TempDir(), "missing.out")}} {
 		code, out = runCI(t, r, nil, nil, args...)
-		assert.Equal(t, exitError, code, "%v\n%s", args, out)
+		assert.Equal(t, check.ExitError, code, "%v\n%s", args, out)
 	}
 }

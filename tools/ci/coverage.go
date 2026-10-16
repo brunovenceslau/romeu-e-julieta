@@ -13,6 +13,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // The thresholds of S9, in percent of statements, per package.
@@ -52,7 +54,7 @@ type coverPackage struct {
 // when any listing ran it. A package with no test file is in the
 // profile with every block at 0, so it fails instead of being left out.
 // A package with no statement has nothing to measure and passes.
-func coverage(profile []byte, module string) ([]finding, error) {
+func coverage(profile []byte, module string) ([]check.Finding, error) {
 	blocks, err := parseProfile(profile)
 	if err != nil {
 		return nil, err
@@ -74,7 +76,7 @@ func coverage(profile []byte, module string) ([]finding, error) {
 			p.covered += b.stmts
 		}
 	}
-	var findings []finding
+	var findings []check.Finding
 	for _, rel := range slices.Sorted(maps.Keys(packages)) {
 		p := packages[rel]
 		want := threshold(rel)
@@ -82,7 +84,7 @@ func coverage(profile []byte, module string) ([]finding, error) {
 			continue
 		}
 		msg := fmt.Sprintf("%s of %d statements covered, below %d%% (S9)", percent(p.covered, p.stmts), p.stmts, want)
-		findings = append(findings, finding{rel, "coverage", msg})
+		findings = append(findings, check.Finding{Where: rel, Rule: "coverage", Msg: msg})
 	}
 	return findings, nil
 }

@@ -228,9 +228,9 @@ func TestWorkflowsGrammar(t *testing.T) {
 				return
 			}
 			require.Len(t, got, 1, "%v", got)
-			assert.Contains(t, got[0].msg, tt.want)
-			assert.Equal(t, "workflows", got[0].rule)
-			assert.True(t, strings.HasPrefix(got[0].where, ".github/workflows/x.yml:"), "the finding names the file and a line: %s", got[0].where)
+			assert.Contains(t, got[0].Msg, tt.want)
+			assert.Equal(t, "workflows", got[0].Rule)
+			assert.True(t, strings.HasPrefix(got[0].Where, ".github/workflows/x.yml:"), "the finding names the file and a line: %s", got[0].Where)
 		})
 	}
 }
@@ -259,7 +259,7 @@ func TestWorkflowsFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := workflowFindings(tt.path, []byte(tt.src))
 			require.Len(t, got, 1, "%v", got)
-			assert.Contains(t, got[0].msg, tt.want)
+			assert.Contains(t, got[0].Msg, tt.want)
 		})
 	}
 	t.Run("another file without edited", func(t *testing.T) {
@@ -280,7 +280,7 @@ func TestWorkflowsEvents(t *testing.T) {
 	for _, on := range []string{"issues", "[push, issues]", "{issues: {}}"} {
 		got := workflowFindings(".github/workflows/x.yml", []byte("on: "+on+"\njobs: {}\n"+workflowEnv))
 		require.Len(t, got, 1, "on: %s: %v", on, got)
-		assert.Contains(t, got[0].msg, `the event "issues"`)
+		assert.Contains(t, got[0].Msg, `the event "issues"`)
 	}
 }
 
@@ -304,7 +304,7 @@ func TestWorkflowsCommitted(t *testing.T) {
 	got, err = workflows(t.Context(), r.Repo, "HEAD")
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	assert.Equal(t, ".github/workflows/ci.yml:26", got[0].where)
+	assert.Equal(t, ".github/workflows/ci.yml:26", got[0].Where)
 }
 
 // TestWorkflowsRepository checks the workflows of this repository, as
@@ -420,7 +420,7 @@ func TestWorkflowsWithValues(t *testing.T) {
 				return
 			}
 			require.Len(t, got, 1, "%v", got)
-			assert.Contains(t, got[0].msg, tt.want)
+			assert.Contains(t, got[0].Msg, tt.want)
 		})
 	}
 }
@@ -441,7 +441,7 @@ func TestWorkflowsWrongKinds(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := workflowFindings(".github/workflows/x.yml", []byte(edits(t, tt.pairs...)))
 			require.Len(t, got, 1, "%v", got)
-			assert.Contains(t, got[0].msg, tt.want)
+			assert.Contains(t, got[0].Msg, tt.want)
 		})
 	}
 }
@@ -477,7 +477,7 @@ func TestWorkflowsPermissionsRequired(t *testing.T) {
 				return
 			}
 			require.Len(t, got, 1, "%v", got)
-			assert.Contains(t, got[0].msg, tt.want)
+			assert.Contains(t, got[0].Msg, tt.want)
 		})
 	}
 }
@@ -494,7 +494,7 @@ func TestWorkflowInputWithUnreadableMatrix(t *testing.T) {
 		src := strings.Replace(unreadable, "sha256: ${{ matrix.mise_sha256 }}", "sha256: "+with, 1)
 		var msgs []string
 		for _, f := range workflowFindings(".github/workflows/x.yml", []byte(src)) {
-			msgs = append(msgs, f.msg)
+			msgs = append(msgs, f.Msg)
 		}
 		return strings.Join(msgs, "\n")
 	}
@@ -511,7 +511,7 @@ func TestWorkflowInputFromMatrixListValue(t *testing.T) {
 	src = strings.Replace(src, "sha256: ${{ matrix.mise_sha256 }}", "sha256: ${{ matrix.os }}", 1)
 	var msgs []string
 	for _, f := range workflowFindings(".github/workflows/x.yml", []byte(src)) {
-		msgs = append(msgs, f.msg)
+		msgs = append(msgs, f.Msg)
 	}
 	assert.Contains(t, strings.Join(msgs, "\n"), "this with input is a literal")
 }
@@ -540,7 +540,7 @@ func TestWorkflowsMatrixRunnerNeedsOS(t *testing.T) {
 			pairs := append([]string{"sha256: ${{ matrix.mise_sha256 }}", "sha256: aa"}, tt.pairs...)
 			var msgs []string
 			for _, f := range workflowFindings(".github/workflows/x.yml", []byte(edits(t, pairs...))) {
-				msgs = append(msgs, f.msg)
+				msgs = append(msgs, f.Msg)
 			}
 			require.Len(t, msgs, len(tt.want), "%v", msgs)
 			for i, want := range tt.want {

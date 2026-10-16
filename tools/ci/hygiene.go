@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 )
@@ -64,36 +65,13 @@ func isPrologue(p string) bool {
 // inside a sandbox, the same on every machine.
 const sandboxUser = "agent"
 
-// finding is one broken rule. It names a place and a rule and never
-// repeats the text that matched: CI logs are public, and the output is
-// pasted into pull requests.
-type finding struct {
-	where string
-	rule  string
-	msg   string
-}
-
-// String prints a finding with its path quoted by git.Printable when it
-// does not print, and the whole line passed through git.SafeLines, so
-// repository content cannot forge a line of the log or a workflow command.
-func (f finding) String() string {
-	return git.SafeLines(git.Printable(f.where) + ": " + f.rule + ": " + f.msg)
-}
-
-// treeFile is one entry of the tree at HEAD.
-type treeFile struct {
-	path    string
-	mode    string
-	content []byte // nil for a submodule, which has no content here
-}
-
 // hygiene applies the hygiene rules of 10 10.2 to the path and the
 // content of each file of the tree at head (hygieneOf). The tree that
 // is committed is the one a push publishes, so work in progress is not
 // read. head is "HEAD", or the id of the commit fast or all judges
 // (commitChecks).
-func hygiene(ctx context.Context, repo git.Repo, head string) ([]finding, error) {
-	files, err := headTree(ctx, repo, head)
+func hygiene(ctx context.Context, repo git.Repo, head string) ([]check.Finding, error) {
+	files, err := check.HeadTree(ctx, repo, head)
 	if err != nil {
 		return nil, err
 	}
@@ -106,8 +84,8 @@ func hygiene(ctx context.Context, repo git.Repo, head string) ([]finding, error)
 // committed is in no push. It reads nothing else, so a caller that
 // read the tree before running anything judges what it read
 // (commitChecks).
-func hygieneOf(files []treeFile) ([]finding, error) {
-	data, found, err := fileIn(files, prose.Path)
+func hygieneOf(files []check.TreeFile) ([]check.Finding, error) {
+	data, found, err := check.FileIn(files, prose.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -123,57 +101,57 @@ func hygieneOf(files []treeFile) ([]finding, error) {
 	findings = append(findings, hookFindings(files)...)
 	for i, f := range files {
 		// A path that holds a listed name is not printed either.
-		where := git.Printable(f.path)
-		if list.Match([]byte(f.path)) {
+		where := git.Printable(f.Path)
+		if list.Match([]byte(f.Path)) {
 			where = fmt.Sprintf("(path withheld, tree entry %d)", i+1)
-			findings = append(findings, finding{where, "name", "the path holds a listed name"})
+			findings = append(findings, check.Finding{Where: where, Rule: "name", Msg: "the path holds a listed name"})
 		}
-		if !printableASCII(f.path) {
-			findings = append(findings, finding{where, "path", asciiPathMsg})
+		if !printableASCII(f.Path) {
+			findings = append(findings, check.Finding{Where: where, Rule: "path", Msg: asciiPathMsg})
 		}
-		if strings.Contains(f.path, emDash) {
-			findings = append(findings, finding{where, "em-dash", "the path holds U+2014; use a plain dash"})
+		if strings.Contains(f.Path, emDash) {
+			findings = append(findings, check.Finding{Where: where, Rule: "em-dash", Msg: "the path holds U+2014; use a plain dash"})
 		}
 		// A second file there would run in every clone that enabled
 		// the directory, with no rule of 10 10.2 covering it.
-		if strings.HasPrefix(f.path, hookDir) && f.path != hookPath {
-			findings = append(findings, finding{where, "githooks", hookDir + " holds exactly pre-push"})
+		if strings.HasPrefix(f.Path, hookDir) && f.Path != hookPath {
+			findings = append(findings, check.Finding{Where: where, Rule: "githooks", Msg: hookDir + " holds exactly pre-push"})
 		}
-		if isPrologue(f.path) {
-			findings = append(findings, finding{where, "prologue", prologueMsg})
+		if isPrologue(f.Path) {
+			findings = append(findings, check.Finding{Where: where, Rule: "prologue", Msg: prologueMsg})
 		}
 		// A symbolic link or a submodule leads a path to content that
 		// no rule of this list reads by that path: a .config link to a
 		// directory that holds mise/conf.d, say.
-		if f.mode != "100644" && f.mode != "100755" {
-			findings = append(findings, finding{where, "mode", "the mode is " + f.mode + "; the repository tracks regular files only, of mode 100644 or 100755"})
+		if f.Mode != "100644" && f.Mode != "100755" {
+			findings = append(findings, check.Finding{Where: where, Rule: "mode", Msg: "the mode is " + f.Mode + "; the repository tracks regular files only, of mode 100644 or 100755"})
 		}
-		if isMiseFile(f.path) && !slices.Contains(pinnedMiseFiles, f.path) {
-			findings = append(findings, finding{where, "mise", "mise reads this file as its configuration, and the repository tracks no mise file but mise.toml and mise.lock (tools/ci/misefiles.go)"})
+		if isMiseFile(f.Path) && !slices.Contains(pinnedMiseFiles, f.Path) {
+			findings = append(findings, check.Finding{Where: where, Rule: "mise", Msg: "mise reads this file as its configuration, and the repository tracks no mise file but mise.toml and mise.lock (tools/ci/misefiles.go)"})
 		}
-		if f.path == "go.work" || f.path == "go.work.sum" || strings.HasPrefix(f.path, "vendor/") {
-			findings = append(findings, finding{where, "workspace", "go.work, go.work.sum and vendor/ are not tracked"})
+		if f.Path == "go.work" || f.Path == "go.work.sum" || strings.HasPrefix(f.Path, "vendor/") {
+			findings = append(findings, check.Finding{Where: where, Rule: "workspace", Msg: "go.work, go.work.sum and vendor/ are not tracked"})
 		}
 		at := func(line int) string { return where + ":" + strconv.Itoa(line) }
-		for _, n := range list.MatchLines(f.content) {
-			findings = append(findings, finding{at(n), "name", "the line holds a listed name"})
+		for _, n := range list.MatchLines(f.Content) {
+			findings = append(findings, check.Finding{Where: at(n), Rule: "name", Msg: "the line holds a listed name"})
 		}
-		for _, n := range linesWith(f.content, func(line []byte) bool { return bytes.Contains(line, []byte(emDash)) }) {
-			findings = append(findings, finding{at(n), "em-dash", "the line holds U+2014; use a plain dash"})
+		for _, n := range linesWith(f.Content, func(line []byte) bool { return bytes.Contains(line, []byte(emDash)) }) {
+			findings = append(findings, check.Finding{Where: at(n), Rule: "em-dash", Msg: "the line holds U+2014; use a plain dash"})
 		}
-		for _, n := range linesWith(f.content, hasPersonalPath) {
-			findings = append(findings, finding{at(n), "personal-path", "the line holds a personal absolute path; write a <placeholder>"})
+		for _, n := range linesWith(f.Content, hasPersonalPath) {
+			findings = append(findings, check.Finding{Where: at(n), Rule: "personal-path", Msg: "the line holds a personal absolute path; write a <placeholder>"})
 		}
 		// The word lists hold the words they ban, so they are the one
 		// file the lists are not applied to.
-		if f.path != prose.Path {
-			for _, h := range words.Find(f.content) {
-				findings = append(findings, finding{at(h.Line), "prose", h.Rule + ": a listed word or phrase (ADR 0001, rule 4)"})
+		if f.Path != prose.Path {
+			for _, h := range words.Find(f.Content) {
+				findings = append(findings, check.Finding{Where: at(h.Line), Rule: "prose", Msg: h.Rule + ": a listed word or phrase (ADR 0001, rule 4)"})
 			}
 		}
-		if strings.HasSuffix(f.path, ".go") {
-			for _, n := range toDoLines(f.content) {
-				findings = append(findings, finding{at(n), "todo", "a to-do comment names its issue: TODO(#<issue>)"})
+		if strings.HasSuffix(f.Path, ".go") {
+			for _, n := range toDoLines(f.Content) {
+				findings = append(findings, check.Finding{Where: at(n), Rule: "todo", Msg: "a to-do comment names its issue: TODO(#<issue>)"})
 			}
 		}
 	}
@@ -184,7 +162,7 @@ func hygieneOf(files []treeFile) ([]finding, error) {
 // that need not be in the tree: output a person is about to hand over.
 // The denylist rule holds here too, so a clone without entries does
 // not report a file as clean.
-func hygieneFile(ctx context.Context, repo git.Repo, path string) ([]finding, error) {
+func hygieneFile(ctx context.Context, repo git.Repo, path string) ([]check.Finding, error) {
 	list, findings, err := loadDenylist(ctx, repo, "HEAD")
 	if err != nil {
 		return nil, err
@@ -194,14 +172,14 @@ func hygieneFile(ctx context.Context, repo git.Repo, path string) ([]finding, er
 		return nil, err
 	}
 	for _, n := range list.MatchLines(content) {
-		findings = append(findings, finding{"the file:" + strconv.Itoa(n), "name", "the line holds a listed name"})
+		findings = append(findings, check.Finding{Where: "the file:" + strconv.Itoa(n), Rule: "name", Msg: "the line holds a listed name"})
 	}
 	return findings, nil
 }
 
 // loadDenylist reads the denylist committed at head, as hygieneOf
 // reads it from a tree (denylistFindings).
-func loadDenylist(ctx context.Context, repo git.Repo, head string) (*names.List, []finding, error) {
+func loadDenylist(ctx context.Context, repo git.Repo, head string) (*names.List, []check.Finding, error) {
 	list, found, err := denylistAt(ctx, repo, head)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", names.Path, err)
@@ -215,13 +193,13 @@ func loadDenylist(ctx context.Context, repo git.Repo, head string) (*names.List,
 // list that is missing or has no entry is a finding and not an error:
 // the check then proves nothing, and the maintainer is the one who can
 // add an entry.
-func denylistFindings(list *names.List, found bool) []finding {
+func denylistFindings(list *names.List, found bool) []check.Finding {
 	const how = `; the maintainer adds entries with "go run ./tools/ci hygiene add" and commits the file`
 	switch {
 	case !found:
-		return []finding{{names.Path, "denylist", "the denylist is missing at HEAD" + how}}
+		return []check.Finding{{Where: names.Path, Rule: "denylist", Msg: "the denylist is missing at HEAD" + how}}
 	case list.Len() == 0:
-		return []finding{{names.Path, "denylist", "the denylist has no entry at HEAD" + how}}
+		return []check.Finding{{Where: names.Path, Rule: "denylist", Msg: "the denylist has no entry at HEAD" + how}}
 	}
 	return nil
 }
@@ -237,8 +215,8 @@ func denylistAt(ctx context.Context, repo git.Repo, rev string) (*names.List, bo
 
 // denylistIn reads the denylist of files, the tree of one commit
 // (parseDenylist).
-func denylistIn(files []treeFile) (*names.List, bool, error) {
-	data, found, err := fileIn(files, names.Path)
+func denylistIn(files []check.TreeFile) (*names.List, bool, error) {
+	data, found, err := check.FileIn(files, names.Path)
 	if err == nil {
 		var list *names.List
 		if list, found, err = parseDenylist(data, found); err == nil {
@@ -273,22 +251,6 @@ func parseProse(data []byte, found bool) (*prose.Rules, error) {
 		return nil, fmt.Errorf("%s: %w", prose.Path, err)
 	}
 	return rules, nil
-}
-
-// fileIn returns the content of the file at path among files, the
-// tree of one commit, and whether it is there, as blobAt does for a
-// commit in the repository: a submodule at path is not a file.
-func fileIn(files []treeFile, path string) ([]byte, bool, error) {
-	for _, f := range files {
-		if f.path != path {
-			continue
-		}
-		if f.mode == "160000" {
-			return nil, false, fmt.Errorf("read %s: not a file", path)
-		}
-		return f.content, true, nil
-	}
-	return nil, false, nil
 }
 
 // blobAt returns the content of one file of the tree at rev, and
@@ -358,68 +320,17 @@ func printableASCII(path string) bool {
 }
 
 // hookFindings checks that the hook is tracked as an executable file.
-func hookFindings(files []treeFile) []finding {
+func hookFindings(files []check.TreeFile) []check.Finding {
 	for _, f := range files {
-		if f.path != hookPath {
+		if f.Path != hookPath {
 			continue
 		}
-		if f.mode != hookMode {
-			return []finding{{hookPath, "githooks", "the mode is " + f.mode + ", want " + hookMode}}
+		if f.Mode != hookMode {
+			return []check.Finding{{Where: hookPath, Rule: "githooks", Msg: "the mode is " + f.Mode + ", want " + hookMode}}
 		}
 		return nil
 	}
-	return []finding{{hookPath, "githooks", "the hook is not tracked"}}
-}
-
-// headTree returns the files of the tree at head (hygiene) with their
-// content, in the order git lists them.
-func headTree(ctx context.Context, repo git.Repo, head string) ([]treeFile, error) {
-	out, err := repo.Run(ctx, nil, "ls-tree", "-r", "-z", "--full-tree", head)
-	if err != nil {
-		return nil, err
-	}
-	var files []treeFile
-	var ids bytes.Buffer
-	for entry := range strings.SplitSeq(strings.TrimSuffix(string(out), "\x00"), "\x00") {
-		if entry == "" {
-			continue
-		}
-		// "<mode> <type> <id>\t<path>"
-		meta, path, _ := strings.Cut(entry, "\t")
-		f := strings.Fields(meta)
-		if len(f) != 3 {
-			return nil, fmt.Errorf("read tree: unexpected entry of %d fields", len(f))
-		}
-		files = append(files, treeFile{path: path, mode: f[0]})
-		if f[1] == "blob" {
-			ids.WriteString(f[2] + "\n")
-		}
-	}
-	blobs, err := repo.Run(ctx, ids.Bytes(), "cat-file", "--batch")
-	if err != nil {
-		return nil, err
-	}
-	for i := range files {
-		if files[i].mode == "160000" { // a submodule: a commit, not a blob
-			continue
-		}
-		// "<id> blob <size>\n<content>\n"
-		head, rest, _ := bytes.Cut(blobs, []byte{'\n'})
-		hf := strings.Fields(string(head))
-		if len(hf) == 2 && hf[1] == "missing" {
-			return nil, fmt.Errorf("read %s: the object store lacks its blob %s; %s", git.Printable(files[i].path), hf[0], git.FetchHint(hf[0]))
-		}
-		if len(hf) != 3 {
-			return nil, fmt.Errorf("read blob of tree entry %d: unexpected header", i+1)
-		}
-		size, err := strconv.Atoi(hf[2])
-		if err != nil || size+1 > len(rest) {
-			return nil, fmt.Errorf("read blob of tree entry %d: unexpected size", i+1)
-		}
-		files[i].content = rest[:size:size]
-		blobs = rest[size+1:]
-	}
-	return files, nil
+	return []check.Finding{{Where: hookPath, Rule: "githooks", Msg: "the hook is not tracked"}}
 }
 
 // linesWith returns the 1-based numbers of the lines that match.

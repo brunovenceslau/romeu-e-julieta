@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // generateFixture is a repository with the sources of generate: the
@@ -33,7 +34,7 @@ func generateFixture(t *testing.T) *gittest.Repo {
 func runGen(t *testing.T, r *gittest.Repo, args ...string) (int, string, string) {
 	t.Helper()
 	var out, errOut bytes.Buffer
-	e := env{dir: r.Dir, gitEnv: r.Env, stdout: &out, stderr: &errOut}
+	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdout: &out, Stderr: &errOut}
 	return run(context.Background(), e, append([]string{"generate"}, args...)), out.String(), errOut.String()
 }
 
@@ -43,7 +44,7 @@ func runGen(t *testing.T, r *gittest.Repo, args ...string) (int, string, string)
 func TestGenerateWritesTheConsumers(t *testing.T) {
 	r := generateFixture(t)
 	code, out, errOut := runGen(t, r)
-	require.Equal(t, exitOK, code, errOut)
+	require.Equal(t, check.ExitOK, code, errOut)
 	assert.Equal(t, "wrote .github/CODEOWNERS\nwrote docs/reference/ask-first.md\nwrote docs/adr/README.md\n", out)
 	read := func(p string) string {
 		b, err := os.ReadFile(filepath.Join(r.Dir, filepath.FromSlash(p)))
@@ -62,12 +63,12 @@ func TestGenerateWritesTheConsumers(t *testing.T) {
 func TestGenerateIsIdempotent(t *testing.T) {
 	r := generateFixture(t)
 	code, _, errOut := runGen(t, r)
-	require.Equal(t, exitOK, code, errOut)
+	require.Equal(t, check.ExitOK, code, errOut)
 	path := filepath.Join(r.Dir, ".github", "CODEOWNERS")
 	old := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	require.NoError(t, os.Chtimes(path, old, old))
 	code, out, errOut := runGen(t, r)
-	require.Equal(t, exitOK, code, errOut)
+	require.Equal(t, check.ExitOK, code, errOut)
 	assert.Empty(t, out)
 	info, err := os.Stat(path)
 	require.NoError(t, err)
@@ -81,7 +82,7 @@ func TestGenerateRewritesAHandEdit(t *testing.T) {
 	runGen(t, r)
 	r.Write("docs/adr/README.md", "edited\n")
 	code, out, _ := runGen(t, r)
-	require.Equal(t, exitOK, code)
+	require.Equal(t, check.ExitOK, code)
 	assert.Equal(t, "wrote docs/adr/README.md\n", out)
 }
 
@@ -121,7 +122,7 @@ func TestGenerateRefuses(t *testing.T) {
 				tt.setup(r)
 			}
 			code, out, errOut := runGen(t, r, tt.args...)
-			assert.Equal(t, exitError, code)
+			assert.Equal(t, check.ExitError, code)
 			assert.Empty(t, out)
 			assert.Contains(t, errOut, tt.want)
 			assert.NoFileExists(t, filepath.Join(r.Dir, ".github", "CODEOWNERS"))
@@ -137,7 +138,7 @@ func TestGenerateSkipsWhatIsNoRecord(t *testing.T) {
 	r.Write("docs/adr/README.md", "old\n")
 	require.NoError(t, os.Mkdir(filepath.Join(r.Dir, "docs", "adr", "0009-dir.md"), 0o755))
 	code, _, errOut := runGen(t, r)
-	require.Equal(t, exitOK, code, errOut)
+	require.Equal(t, check.ExitOK, code, errOut)
 	b, err := os.ReadFile(filepath.Join(r.Dir, "docs", "adr", "README.md"))
 	require.NoError(t, err)
 	assert.NotContains(t, string(b), "0009")
@@ -253,7 +254,7 @@ func TestGenerateWritesNothingOutsideTheTree(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(page), 0o755))
 	require.NoError(t, os.Symlink(victim, page))
 	code, _, errOut := runGen(t, r)
-	require.Equal(t, exitOK, code, errOut)
+	require.Equal(t, check.ExitOK, code, errOut)
 	b, err := os.ReadFile(victim)
 	require.NoError(t, err)
 	assert.Equal(t, "mine\n", string(b))
@@ -270,7 +271,7 @@ func TestGenerateLeavesARecordLinkOutOfTheIndex(t *testing.T) {
 	require.NoError(t, os.WriteFile(outside, []byte("# 3. Link\n\n## Status\n\nAccepted\n"), 0o644))
 	require.NoError(t, os.Symlink(outside, filepath.Join(r.Dir, "docs", "adr", "0003-link.md")))
 	code, _, errOut := runGen(t, r)
-	require.Equal(t, exitOK, code, errOut)
+	require.Equal(t, check.ExitOK, code, errOut)
 	b, err := os.ReadFile(filepath.Join(r.Dir, "docs", "adr", "README.md"))
 	require.NoError(t, err)
 	assert.NotContains(t, string(b), "0003-link")
@@ -284,7 +285,7 @@ func TestGenerateReportsAnUnlistableRecordDirectory(t *testing.T) {
 	require.NoError(t, os.RemoveAll(filepath.Join(r.Dir, "docs", "adr")))
 	r.Write("docs/adr", "not a directory\n")
 	code, out, errOut := runGen(t, r)
-	assert.Equal(t, exitError, code)
+	assert.Equal(t, check.ExitError, code)
 	assert.Empty(t, out)
 	assert.Contains(t, errOut, "docs/adr")
 	assert.NoFileExists(t, filepath.Join(r.Dir, ".github", "CODEOWNERS"))
@@ -298,7 +299,7 @@ func TestGenerateWroteLineIsSafe(t *testing.T) {
 	r.Write(".adr-dir", dir+"\n")
 	require.NoError(t, os.MkdirAll(filepath.Join(r.Dir, dir), 0o755))
 	code, out, errOut := runGen(t, r)
-	require.Equal(t, exitOK, code, errOut)
+	require.Equal(t, check.ExitOK, code, errOut)
 	assert.Contains(t, out, `d`+"\n"+`\u00a0::error::forged\x1b[2J/README.md`)
 	assert.NotContains(t, out, "\x1b")
 	for _, line := range strings.Split(out, "\n") {

@@ -21,6 +21,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 )
 
@@ -52,7 +53,7 @@ func typeAtTerminal(t *testing.T, r *gittest.Repo, typed ...string) (code int, p
 	}()
 
 	var out bytes.Buffer
-	e := env{dir: r.Dir, gitEnv: r.Env, stdin: terminal, stdout: &out, stderr: &out}
+	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: terminal, Stdout: &out, Stderr: &out}
 	runDone := make(chan int, 1)
 	go func() { runDone <- run(t.Context(), e, []string{"hygiene", "add"}) }()
 
@@ -130,12 +131,12 @@ func TestAddAtATerminal(t *testing.T) {
 		code    int
 		entries int
 	}{
-		{"the first entry creates the file", []string{"Zorvex Quimby", "Zorvex Quimby"}, exitOK, 1},
-		{"a second entry is appended", []string{"plimsor", "plimsor"}, exitOK, 2},
-		{"the same name again changes nothing", []string{"zorvex  quimby", "zorvex  quimby"}, exitOK, 2},
-		{"two lines that differ are refused", []string{"brimlow", "brimlaw"}, exitError, 2},
-		{"a separator inside a segment is refused", []string{"zorvex-quimby", "zorvex-quimby"}, exitError, 2},
-		{"an empty line is refused", []string{"", ""}, exitError, 2},
+		{"the first entry creates the file", []string{"Zorvex Quimby", "Zorvex Quimby"}, check.ExitOK, 1},
+		{"a second entry is appended", []string{"plimsor", "plimsor"}, check.ExitOK, 2},
+		{"the same name again changes nothing", []string{"zorvex  quimby", "zorvex  quimby"}, check.ExitOK, 2},
+		{"two lines that differ are refused", []string{"brimlow", "brimlaw"}, check.ExitError, 2},
+		{"a separator inside a segment is refused", []string{"zorvex-quimby", "zorvex-quimby"}, check.ExitError, 2},
+		{"an empty line is refused", []string{"", ""}, check.ExitError, 2},
 	}
 	for _, s := range steps {
 		code, printed, shown := typeAtTerminal(t, r, s.typed...)
@@ -161,7 +162,7 @@ func TestAddAtATerminal(t *testing.T) {
 	// With the entries written, the tree passes.
 	r.Commit("denylist")
 	code, out := runCI(t, r, nil, nil, "hygiene")
-	assert.Equal(t, exitOK, code, "hygiene after add\n%s", out)
+	assert.Equal(t, check.ExitOK, code, "hygiene after add\n%s", out)
 }
 
 // TestAddKeepsADenylistItCannotRead shows that a denylist that does
@@ -172,7 +173,7 @@ func TestAddKeepsADenylistItCannotRead(t *testing.T) {
 	const damaged = "entries: [\n"
 	r.Write(names.Path, damaged)
 	code, printed, _ := typeAtTerminal(t, r, "zorvex quimby", "zorvex quimby")
-	assert.Equal(t, exitError, code, "exit status\n%s", printed)
+	assert.Equal(t, check.ExitError, code, "exit status\n%s", printed)
 	got, err := os.ReadFile(filepath.Join(r.Dir, filepath.FromSlash(names.Path)))
 	require.NoError(t, err)
 	assert.Equal(t, damaged, string(got), "the denylist was rewritten")
@@ -260,7 +261,7 @@ func TestAddRefuses(t *testing.T) {
 			r := newTree(t)
 			before := loadDenylistFile(t, r).Marshal()
 			code, out := runCI(t, r, tt.stdin, nil, append([]string{"hygiene", "add"}, tt.args...)...)
-			assert.Equal(t, exitError, code, "exit status")
+			assert.Equal(t, check.ExitError, code, "exit status")
 			assert.Contains(t, out, tt.want)
 			assert.NotContains(t, out, "zorvex", "the output repeats the argument")
 			assert.Equal(t, before, loadDenylistFile(t, r).Marshal(), "the denylist changed")

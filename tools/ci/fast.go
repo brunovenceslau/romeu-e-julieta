@@ -5,7 +5,6 @@ package main
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -18,35 +17,10 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
 )
-
-// step is one check of fast that is a command.
-type step struct {
-	name string
-	argv []string
-	// quiet marks a command whose output is its finding, and it means
-	// two things: the step passes when it prints nothing, as "gofmt -l"
-	// does, and what it prints goes through git.SafeLines, because that
-	// output is paths of the repository (checks.run).
-	quiet bool
-	// environ is the whole environment of the command (stepEnv). The
-	// environment of this process never reaches it, so an empty one is
-	// an empty environment.
-	environ []string
-	// unavailable, when set, says why the step's tool could not be
-	// resolved: the step fails with it and starts nothing.
-	unavailable error
-	// class is the timeout class the step runs under; the zero value
-	// means procgroup.ToolStep, whose limit leaves the unit tests, the
-	// longest step, room for a cold build cache.
-	class procgroup.Class
-	// skip, when set, says why the step does not run on this platform:
-	// it is reported with "--", neither passed nor failed.
-	skip string
-}
 
 // fastSteps returns the command steps of fast, from the In fast column
 // of 10 10.2: format, vet, generated, lint (once per lintTargets) and
@@ -70,7 +44,7 @@ type step struct {
 // error. It passes "-count=1": tests that scan the repository would
 // otherwise be served from the test cache, which cannot see a file
 // added since the cached run.
-func fastSteps(root string, tools lintTools) []step {
+func fastSteps(root string, tools check.Tools) []check.Step {
 	before, unit := fastPhases(root, tools)
 	return append(before, unit)
 }
@@ -80,27 +54,27 @@ func fastSteps(root string, tools lintTools) []step {
 // the change, which the ask-first review of tools/ci covers), and
 // unit, the first that runs them. all puts its own steps that judge
 // the tree between the two (allSteps).
-func fastPhases(root string, tools lintTools) ([]step, step) {
-	goCmd := filepath.Join(tools.goDir, "go")
+func fastPhases(root string, tools check.Tools) ([]check.Step, check.Step) {
+	goCmd := filepath.Join(tools.GoDir, "go")
 	unit := []string{goCmd, "test", "-count=1"}
 	for _, dir := range []string{"internal", "tools"} {
 		if info, err := os.Stat(filepath.Join(root, dir)); err == nil && info.IsDir() {
 			unit = append(unit, "./"+dir+"/...")
 		}
 	}
-	steps := []step{
-		{name: "format", argv: []string{filepath.Join(tools.goDir, "gofmt"), "-l", "."}, quiet: true, environ: stepEnv(tools.goDir)},
-		{name: "vet", argv: []string{goCmd, "vet", "./..."}, environ: stepEnv(tools.goDir)},
-		{name: "generated", argv: []string{goCmd, "run", "./tools/ci", "generated"}, environ: stepEnv(tools.goDir)},
+	steps := []check.Step{
+		{Name: "format", Argv: []string{filepath.Join(tools.GoDir, "gofmt"), "-l", "."}, Quiet: true, Environ: check.StepEnv(tools.GoDir)},
+		{Name: "vet", Argv: []string{goCmd, "vet", "./..."}, Environ: check.StepEnv(tools.GoDir)},
+		{Name: "generated", Argv: []string{goCmd, "run", "./tools/ci", "generated"}, Environ: check.StepEnv(tools.GoDir)},
 	}
 	for _, target := range lintTargets {
-		steps = append(steps, step{
-			name:    "lint " + target.String(),
-			argv:    lintArgv(tools.linter),
-			environ: lintEnv(target, tools.goDir),
+		steps = append(steps, check.Step{
+			Name:    "lint " + target.String(),
+			Argv:    lintArgv(tools.Linter),
+			Environ: lintEnv(target, tools.GoDir),
 		})
 	}
-	return steps, step{name: "unit", argv: unit, environ: stepEnv(tools.goDir)}
+	return steps, check.Step{Name: "unit", Argv: unit, Environ: check.StepEnv(tools.GoDir)}
 }
 
 // lintArgs are the arguments of every golangci-lint run, the one list
@@ -129,12 +103,6 @@ func lintArgv(linter string) []string {
 	return append([]string{linter}, lintArgs...)
 }
 
-// lintTools are the pinned tools of fast, as mise resolves them: the
-// path of golangci-lint, and the directory of the go command.
-type lintTools struct {
-	linter, goDir string
-}
-
 // resolveLintTools asks "mise which" for the paths of the versions that
 // mise.toml pins and mise.lock locks, in the environment of
 // passThroughEnv with miseEnv. "mise which" runs no tool and installs
@@ -148,16 +116,16 @@ type lintTools struct {
 // ("path:" in [tools], in the repository or in the global
 // configuration); such a tool is no pinned one, and it is an error here
 // too.
-func resolveLintTools(ctx context.Context, root string) (lintTools, error) {
+func resolveLintTools(ctx context.Context, root string) (check.Tools, error) {
 	linter, err := whichPinned(ctx, root, "golangci-lint", "golangci-lint", "golangci-lint")
 	if err != nil {
-		return lintTools{}, err
+		return check.Tools{}, err
 	}
 	goBin, err := whichPinned(ctx, root, "go", "go", "go")
 	if err != nil {
-		return lintTools{}, err
+		return check.Tools{}, err
 	}
-	return lintTools{linter: linter, goDir: filepath.Dir(goBin)}, nil
+	return check.Tools{Linter: linter, GoDir: filepath.Dir(goBin)}, nil
 }
 
 // whichPinned returns the path "mise which" resolves for the program
@@ -184,7 +152,7 @@ func whichPinned(ctx context.Context, root, name, key, dir string) (string, erro
 		Argv:  []string{"mise", "-C", root, "which", name},
 		// mise finds .miserc.toml from its working directory (misefiles.go).
 		Dir:    root,
-		Env:    miseRunEnviron(passThroughEnv(), root),
+		Env:    miseRunEnviron(check.PassThroughEnv(), root),
 		Stdout: &stdout,
 		Stderr: &stderr,
 	})
@@ -310,114 +278,14 @@ var lintTargets = []lintTarget{
 	{"darwin", "arm64"},
 }
 
-// Three more sets say how to reach something, and only the steps that
-// reach it keep them (withProcessEnv): networkPassThrough, a proxy and
-// a certificate bundle, for the steps that use the network;
-// dockerPassThrough, the Docker daemon, for the license step; and
-// goModulePassThrough, for the go run that the pre-push hook starts
-// before tools/ci: where a module comes from (GOPROXY) and which paths
-// are private or unchecked (GOPRIVATE, GONOSUMDB, GOSUMDB, GOINSECURE),
-// so a person who reaches only a company proxy can run the hook. They
-// are safe there because that go run builds with GOFLAGS=-mod=readonly:
-// go.sum decides which module content is accepted, and none of the five
-// can add an entry to it. They are NOT kept by the mise installs and by
-// "go mod download" of setup, where the checksum database is the guard
-// (the installs that build govulncheck and gopls have no go.sum).
-var (
-	networkPassThrough  = []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}
-	dockerPassThrough   = []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"}
-	goModulePassThrough = []string{"GOPROXY", "GOPRIVATE", "GONOSUMDB", "GOSUMDB", "GOINSECURE"}
-)
-
-// withProcessEnv returns env with the variables of keys that are set in
-// this process, in the order of keys.
-func withProcessEnv(env []string, keys []string) []string {
-	out := slices.Clone(env)
-	for _, key := range keys {
-		if value := os.Getenv(key); value != "" {
-			out = append(out, key+"="+value)
-		}
-	}
-	return out
-}
-
-// passThroughEnv returns the variables of goenv.PassThrough that are set
-// in this process, in the order of the list. An empty variable is left
-// out, as the go command reads an empty variable as an unset one.
-func passThroughEnv() []string {
-	var env []string
-	for _, key := range goenv.PassThrough {
-		if value := os.Getenv(key); value != "" {
-			env = append(env, key+"="+value)
-		}
-	}
-	return env
-}
-
-// stepEnv is the environment of every step of fast, built from nothing
-// rather than from this process's: PATH with goDir first, so that a go
-// command the linter or a test starts is the pinned one, the rest of
-// passThroughEnv, then the variables that decide what the go command
-// builds and runs, each with a fixed value. Nothing else reaches a
-// step, so a variable that changes what a step checks (GOFLAGS with
-// "-run" or build tags, a GOLANGCI_ or GL_ variable, GOEXPERIMENT or
-// GOAMD64, which change the build tags) has no effect on it.
-//
-//   - goenv.Pin: GOENV=off, so the go command reads no "go env -w" file,
-//     which could set GOFLAGS or any of the variables below, and
-//     GOTOOLCHAIN=local, so the go of goDir runs and no other is
-//     downloaded.
-//   - GOWORK=off: a go.work file in a parent directory does not change
-//     the modules.
-//   - GOPROXY=off: no step fetches a module, so the module cache must
-//     hold the modules of go.sum (10 10.1). Two steps of all reach the
-//     network for other reasons: vulnerabilities reads the Go
-//     vulnerability database, so its result depends on the date, and
-//     license may pull its image, by digest.
-//   - GOFLAGS=-mod=readonly: the go command builds from go.mod and the
-//     module cache, never from a vendor directory
-//     (https://go.dev/ref/mod#build-commands); in a pre-push run,
-//     judgeCommit also refuses one that is not tracked.
-func stepEnv(goDir string) []string {
-	path := goDir
-	if value := os.Getenv("PATH"); value != "" {
-		path += string(os.PathListSeparator) + value
-	}
-	rest := slices.DeleteFunc(passThroughEnv(), func(kv string) bool { return strings.HasPrefix(kv, "PATH=") })
-	return slices.Concat([]string{"PATH=" + path}, rest, goenv.Pin, goenv.Build, []string{
-		"GOPROXY=off",
-	})
-}
-
 // lintEnv is the environment of the linter for the target: stepEnv,
 // then the target, the same for every machine, with cgo off.
 func lintEnv(target lintTarget, goDir string) []string {
-	return append(stepEnv(goDir),
+	return append(check.StepEnv(goDir),
 		"GOOS="+target.goos,
 		"GOARCH="+target.goarch,
 		"CGO_ENABLED=0",
 	)
-}
-
-// run runs the step in dir and returns its output, through
-// procgroup.CombinedOutput: the command gets exactly s.environ, an
-// empty environment when it is nil, runs in a process group of its own
-// that is killed when the leader ends, and a run past the limit of its
-// class is a *procgroup.TimeoutError.
-func (s step) run(ctx context.Context, dir string) ([]byte, error) {
-	if s.unavailable != nil {
-		return nil, s.unavailable
-	}
-	out, err := procgroup.CombinedOutput(ctx, procgroup.Command{
-		Class: cmp.Or(s.class, procgroup.ToolStep),
-		Argv:  s.argv,
-		Dir:   dir,
-		Env:   s.environ,
-	})
-	if err == nil && s.quiet && len(bytes.TrimSpace(out)) > 0 {
-		err = errors.New("the command printed what it found")
-	}
-	return out, err
 }
 
 // runFast runs the fast checks: the command steps, then hygiene and
@@ -450,18 +318,18 @@ func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 //
 // In both modes it refuses a go.mod below the module root
 // (nestedModules).
-func runFast(ctx context.Context, e env, args []string) (bool, error) {
+func runFast(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if len(args) != 0 && len(args) != 2 {
-		return false, fmt.Errorf("fast takes no argument, or the two of a pre-push hook\n%s", usage)
+		return false, fmt.Errorf("fast takes no argument, or the two of a pre-push hook\n%s", check.Usage())
 	}
-	root, err := repoRoot(ctx, e)
+	root, err := check.RepoRoot(ctx, e)
 	if err != nil {
 		return false, err
 	}
 	hook := len(args) == 2
 	var push pushed.Push
 	if hook {
-		if push, err = pushed.Parse(e.stdin); err != nil {
+		if push, err = pushed.Parse(e.Stdin); err != nil {
 			return false, err
 		}
 	}
@@ -471,9 +339,9 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 	// hook, or that the caller set, changes none of what is read
 	// (nestedModules too: with the variables cleared it finds the same
 	// repository from root, which is what it wants).
-	repo := git.Repo{Dir: root, Env: e.gitEnv}
+	repo := git.Repo{Dir: root, Env: e.GitEnv}
 	if hook {
-		repo.Env = git.CleanEnv(e.gitEnv)
+		repo.Env = git.CleanEnv(e.GitEnv)
 	}
 	// judge is what holds before the steps and, in a pre-push run,
 	// after them too. It returns "HEAD" by hand, and the id of the
@@ -513,7 +381,7 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 			return false, err
 		}
 	}
-	steps := e.steps
+	steps := e.Steps
 	if steps == nil {
 		if err := checkMiseVersion(ctx, root); err != nil {
 			return false, err
@@ -524,7 +392,7 @@ func runFast(ctx context.Context, e env, args []string) (bool, error) {
 		}
 		steps = fastSteps(root, tools)
 	}
-	c := newChecks(e.stdout)
+	c := newChecks(e.Stdout)
 	c.run(ctx, root, steps)
 	if hook {
 		_, err := judge()
@@ -560,19 +428,7 @@ func (c *checks) report(name string, passed bool, detail string) {
 	if !passed {
 		verdict, c.ok = "FAIL", false
 	}
-	say(c.out, "%s  %s\n%s", verdict, name, detail)
-}
-
-// verdict is what one check of the commit judged found: its findings,
-// or why it could not judge (err), or, with a note, why it did not
-// check and so neither passed nor failed; info is a line printed under
-// the verdict either way, for what passed and is still worth a read.
-type verdict struct {
-	name     string
-	findings []finding
-	err      error
-	note     string
-	info     string
+	check.Say(c.out, "%s  %s\n%s", verdict, name, detail)
 }
 
 // commitChecks judges commit with hygiene, workflows and reqs, from one
@@ -587,17 +443,17 @@ type verdict struct {
 // what was read is a verdict with its error. git and the object store
 // are trusted up to that read; what mise may run before it is the
 // threat model of misefiles.go.
-func commitChecks(ctx context.Context, repo git.Repo, commit string) ([]verdict, error) {
-	files, err := headTree(ctx, repo, commit)
+func commitChecks(ctx context.Context, repo git.Repo, commit string) ([]check.Verdict, error) {
+	files, err := check.HeadTree(ctx, repo, commit)
 	if err != nil {
 		return nil, err
 	}
 	findings, err := hygieneOf(files)
 	reqs, deferred, reqsErr := reqsOf(files)
-	return []verdict{
-		{name: "hygiene", findings: findings, err: err},
-		{name: "workflows", findings: workflowsOf(files)},
-		{name: "reqs", findings: reqs, err: reqsErr, info: reqDeferredInfo(deferred)},
+	return []check.Verdict{
+		{Name: "hygiene", Findings: findings, Err: err},
+		{Name: "workflows", Findings: workflowsOf(files)},
+		{Name: "reqs", Findings: reqs, Err: reqsErr, Info: reqDeferredInfo(deferred)},
 	}, nil
 }
 
@@ -614,14 +470,14 @@ func reqDeferredInfo(deferred []string) string {
 // verdict reports one verdict of commitChecks: one that could not
 // judge fails with its reason, and one with a note prints it with
 // "--".
-func (c *checks) verdict(v verdict) {
+func (c *checks) verdict(v check.Verdict) {
 	switch {
-	case v.note != "":
-		say(c.out, "--    %s: %s\n", v.name, v.note)
-	case v.err != nil:
-		c.report(v.name, false, git.SafeLines(v.err.Error())+"\n")
+	case v.Note != "":
+		check.Say(c.out, "--    %s: %s\n", v.Name, v.Note)
+	case v.Err != nil:
+		c.report(v.Name, false, git.SafeLines(v.Err.Error())+"\n")
 	default:
-		c.report(v.name, len(v.findings) == 0, lines(v.findings)+v.info)
+		c.report(v.Name, len(v.Findings) == 0, check.Lines(v.Findings)+v.Info)
 	}
 }
 
@@ -633,13 +489,13 @@ const moduleLookupOff = "module lookup disabled by GOPROXY=off"
 // run runs each step in root and reports it. A step that failed for a
 // module missing from the module cache names the command that fills
 // the cache.
-func (c *checks) run(ctx context.Context, root string, steps []step) {
+func (c *checks) run(ctx context.Context, root string, steps []check.Step) {
 	for _, s := range steps {
-		if s.skip != "" {
-			say(c.out, "--    %s: %s\n", s.name, s.skip)
+		if s.Skip != "" {
+			check.Say(c.out, "--    %s: %s\n", s.Name, s.Skip)
 			continue
 		}
-		out, err := s.run(ctx, root)
+		out, err := s.Run(ctx, root)
 		detail := ""
 		if err != nil {
 			// out is the step's own output, which is printed as it is, for
@@ -650,7 +506,7 @@ func (c *checks) run(ctx context.Context, root string, steps []step) {
 			// err, the error of the run, may hold a path and is made safe
 			// too.
 			text := string(out)
-			if s.quiet {
+			if s.Quiet {
 				text = git.SafeLines(text)
 			}
 			detail = fmt.Sprintf("%s%s\n", text, git.SafeLines(err.Error()))
@@ -658,7 +514,7 @@ func (c *checks) run(ctx context.Context, root string, steps []step) {
 				detail += "the module cache lacks a module of go.sum, and no step fetches one (GOPROXY=off): run \"go run ./tools/ci setup\", which runs \"go mod download\", then run this again\n"
 			}
 		}
-		c.report(s.name, err == nil, detail)
+		c.report(s.Name, err == nil, detail)
 	}
 }
 
@@ -677,13 +533,13 @@ func (c *checks) run(ctx context.Context, root string, steps []step) {
 // It returns the id of the commit HEAD names. The error names the
 // paths, printable, and never what the files hold.
 func judgeCommit(ctx context.Context, repo git.Repo, push pushed.Push) (string, error) {
-	head, err := commitOf(ctx, repo, "HEAD")
+	head, err := check.CommitOf(ctx, repo, "HEAD")
 	if err != nil {
 		return "", err
 	}
 	var others []string
 	for _, tip := range push.Tips() {
-		commit, err := commitOf(ctx, repo, tip)
+		commit, err := check.CommitOf(ctx, repo, tip)
 		if err != nil {
 			return "", fmt.Errorf("pushed tip %s: %w", tip, err)
 		}
@@ -734,7 +590,7 @@ type treeState struct {
 
 // readTreeState reads the treeState of the repository at repo.Dir.
 func readTreeState(ctx context.Context, repo git.Repo) (treeState, error) {
-	head, err := commitOf(ctx, repo, "HEAD")
+	head, err := check.CommitOf(ctx, repo, "HEAD")
 	if err != nil {
 		return treeState{}, err
 	}
@@ -789,12 +645,6 @@ func changedSince(ctx context.Context, repo git.Repo, before treeState) error {
 		return nil
 	}
 	return errors.New(strings.Join(what, "\n"))
-}
-
-// commitOf returns the commit that rev names.
-func commitOf(ctx context.Context, repo git.Repo, rev string) (string, error) {
-	out, err := repo.Run(ctx, nil, "rev-parse", "--verify", "--end-of-options", rev+"^{commit}")
-	return strings.TrimSpace(string(out)), err
 }
 
 // untrackedInputs returns the untracked files, ignored or not, that the
@@ -858,14 +708,6 @@ func nestedModules(ctx context.Context, repo git.Repo) error {
 		strings.Join(found, "\n"))
 }
 
-func lines(findings []finding) string {
-	var b bytes.Buffer
-	for _, f := range findings {
-		fmt.Fprintln(&b, f)
-	}
-	return b.String()
-}
-
 // pushedRange applies the name matcher to what a push would publish:
 // the remote ref names, the text of each pushed annotated tag and the
 // four readings of each pushed commit. It applies the prologue rule to
@@ -883,17 +725,17 @@ func lines(findings []finding) string {
 // as commitChecks reports a check that cannot judge what it read; a
 // missing or empty one is hygiene's finding. Any other failure, such
 // as a remote that is not configured, is an error.
-func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.Push, head string) ([]verdict, error) {
+func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.Push, head string) ([]check.Verdict, error) {
 	const name = "pushed range"
 	atHead, _, err := loadDenylist(ctx, repo, head)
 	if err != nil {
-		return []verdict{{name: name, err: err}}, nil
+		return []check.Verdict{{Name: name, Err: err}}, nil
 	}
 	atDefault, err := defaultBranchDenylist(ctx, repo, remote)
 	if err != nil {
 		return nil, err
 	}
-	var findings []finding
+	var findings []check.Finding
 	list := &names.List{}
 	list.Merge(atHead)
 	list.Merge(atDefault)
@@ -904,7 +746,7 @@ func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.
 			if list.Match([]byte(r.Path)) {
 				where = "(withheld)"
 			}
-			findings = append(findings, finding{readingAt(r) + "added path " + where, "prologue", prologueMsg})
+			findings = append(findings, check.Finding{Where: readingAt(r) + "added path " + where, Rule: "prologue", Msg: prologueMsg})
 		}
 		if !list.Match(r.Text) {
 			return
@@ -916,33 +758,33 @@ func pushedRange(ctx context.Context, repo git.Repo, remote string, push pushed.
 		of := readingAt(r)
 		switch r.Field {
 		case pushed.FieldRef:
-			findings = append(findings, finding{"pushed ref " + strconv.Itoa(r.Line), "name", "the remote ref name holds " + listed})
+			findings = append(findings, check.Finding{Where: "pushed ref " + strconv.Itoa(r.Line), Rule: "name", Msg: "the remote ref name holds " + listed})
 		case pushed.FieldMessage:
-			findings = append(findings, finding{of + "message line " + strconv.Itoa(r.Line), "name", "the line holds " + listed})
+			findings = append(findings, check.Finding{Where: of + "message line " + strconv.Itoa(r.Line), Rule: "name", Msg: "the line holds " + listed})
 		case pushed.FieldAuthor, pushed.FieldCommitter, pushed.FieldTagger:
-			findings = append(findings, finding{of + r.Field, "name", "the name and email hold " + listed})
+			findings = append(findings, check.Finding{Where: of + r.Field, Rule: "name", Msg: "the name and email hold " + listed})
 		case pushed.FieldTagName:
-			findings = append(findings, finding{of + r.Field, "name", "the tag's name holds " + listed})
+			findings = append(findings, check.Finding{Where: of + r.Field, Rule: "name", Msg: "the tag's name holds " + listed})
 		case pushed.FieldPath:
-			findings = append(findings, finding{of + "added path (withheld)", "name", "the path holds " + listed})
+			findings = append(findings, check.Finding{Where: of + "added path (withheld)", Rule: "name", Msg: "the path holds " + listed})
 		case pushed.FieldLine:
 			path := git.Printable(r.Path)
 			if list.Match([]byte(r.Path)) {
 				path = "(path withheld)"
 			}
-			findings = append(findings, finding{of + path + ":" + strconv.Itoa(r.Line), "name", "the added line holds " + listed})
+			findings = append(findings, check.Finding{Where: of + path + ":" + strconv.Itoa(r.Line), Rule: "name", Msg: "the added line holds " + listed})
 		}
 	})
 	if err != nil {
 		return nil, err
 	}
 	checked := list.Len() > 0
-	var verdicts []verdict
+	var verdicts []check.Verdict
 	if checked || len(findings) > 0 {
-		verdicts = append(verdicts, verdict{name: name, findings: findings})
+		verdicts = append(verdicts, check.Verdict{Name: name, Findings: findings})
 	}
 	if !checked {
-		verdicts = append(verdicts, verdict{name: name, note: "not checked against names, no denylist entry at HEAD or at the remote's default branch"})
+		verdicts = append(verdicts, check.Verdict{Name: name, Note: "not checked against names, no denylist entry at HEAD or at the remote's default branch"})
 	}
 	return verdicts, nil
 }
@@ -983,7 +825,7 @@ func defaultBranchDenylist(ctx context.Context, repo git.Repo, remote string) (*
 	if !slices.Contains(strings.Fields(string(out)), remote) {
 		return nil, errors.New("the push names no configured remote, so the denylist of its default branch is not known here; add the remote, run \"git fetch\" for it, and push to it by name")
 	}
-	commit, err := commitOf(ctx, repo, "refs/remotes/"+remote+"/HEAD")
+	commit, err := check.CommitOf(ctx, repo, "refs/remotes/"+remote+"/HEAD")
 	if err != nil {
 		return nil, fmt.Errorf("the default branch of %s is not known here, and its denylist judges the push; run \"git fetch %s\" (or \"git remote set-head %s --auto\") and push again; if the remote has no commit yet, no fetch can succeed, and the operator makes the first push of a new repository with --no-verify: %w", remote, remote, remote, err)
 	}
