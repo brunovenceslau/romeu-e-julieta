@@ -30,6 +30,10 @@ func TestTimeouts(t *testing.T) {
 		Mise:         30 * time.Minute,
 		Herdr:        30 * time.Second,
 		Unbounded:    0,
+		ToolStep:     15 * time.Minute,
+		ToolRace:     40 * time.Minute,
+		ToolGit:      2 * time.Minute,
+		ToolProbe:    30 * time.Second,
 	}
 	assert.Len(t, timeouts, len(want), "every class has a row, and every row a class")
 	for class, limit := range want {
@@ -49,7 +53,15 @@ func TestClassString(t *testing.T) {
 		assert.NotContains(t, seen, name, "the name of class %d is unique", int(class))
 		seen[name] = class
 	}
+	assert.Len(t, classNames, len(timeouts), "every class of the table has a name, and every name a class")
+	for class := range classNames {
+		assert.True(t, class.valid(), "%s is a row of the table", class)
+	}
 	assert.Equal(t, "sbx-read", SbxRead.String())
+	assert.Equal(t, "tool-step", ToolStep.String())
+	assert.Equal(t, "tool-race", ToolRace.String())
+	assert.Equal(t, "tool-git", ToolGit.String())
+	assert.Equal(t, "tool-probe", ToolProbe.String())
 	assert.Equal(t, "class-99", Class(99).String())
 }
 

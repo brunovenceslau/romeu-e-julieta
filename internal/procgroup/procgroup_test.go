@@ -139,6 +139,17 @@ func TestRun(t *testing.T) {
 		err := Run(t.Context(), Command{Class: JulietaGit, Argv: []string{"procgroup-test-no-such-command"}})
 		require.ErrorIs(t, err, ErrNotFound)
 	})
+	t.Run("a command that did not start is done with its writers when Run returns", func(t *testing.T) {
+		// The copies of the output pipes have ended: the caller may use
+		// the writers at once, which -race checks.
+		var stdout, stderr bytes.Buffer
+		err := Run(t.Context(), Command{Class: JulietaGit, Argv: []string{"procgroup-test-no-such-command"}, Stdout: &stdout, Stderr: &stderr})
+		require.ErrorIs(t, err, ErrNotFound)
+		stdout.WriteString("the caller's")
+		stderr.WriteString("the caller's")
+		assert.Equal(t, "the caller's", stdout.String())
+		assert.Equal(t, "the caller's", stderr.String())
+	})
 	t.Run("an absolute path that is not there is ErrNotFound", func(t *testing.T) {
 		err := Run(t.Context(), Command{Class: JulietaGit, Argv: []string{filepath.Join(t.TempDir(), "missing")}})
 		require.ErrorIs(t, err, ErrNotFound)

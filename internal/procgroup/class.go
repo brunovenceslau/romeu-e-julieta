@@ -18,8 +18,8 @@ import (
 type Class int
 
 // The classes of the timeout table, the rows of 04 4.1, Starting
-// values. The classes of tools/ci and tools/mutants come with the task
-// that switches them to this package (T105).
+// values: the classes of the product, then those of tools/ci and
+// tools/mutants. A class only appends, so the number of each stays.
 const (
 	classNone    Class = iota // no class named: Run refuses it
 	SbxRead                   // an sbx read: version, ls --json, env plan, policy ls, the secret and settings listings
@@ -31,9 +31,13 @@ const (
 	HostGitFetch              // git clone and git fetch on the host
 	Secret                    // each secret argv and the credential helper
 	JulietaGit                // julieta's own git
-	Mise                      // mise install and mise lock
+	Mise                      // mise install (the one of tools/ci setup too) and mise lock; go env in tools/mutants, whose mise shim may install go
 	Herdr                     // herdr
-	Unbounded                 // the salvage exec, the hook stages and the pane steps: no timeout
+	Unbounded                 // the salvage exec, the hook stages and the pane steps, the go build and test runs of tools/mutants: no timeout
+	ToolStep                  // a command step of tools/ci fast or all, the setup steps mise trust and go mod download included, mise install and the race step excepted
+	ToolRace                  // the race step of tools/ci all
+	ToolGit                   // a git command of tools/ci or tools/mutants
+	ToolProbe                 // a short probe of the tools: uname, sysctl, mise which, mise --version, go list -find
 )
 
 // timeouts is the timeout table, keyed by class. The rows of the
@@ -58,6 +62,10 @@ var timeouts = map[Class]time.Duration{
 	Mise:         30 * time.Minute,
 	Herdr:        30 * time.Second,
 	Unbounded:    0,
+	ToolStep:     15 * time.Minute,
+	ToolRace:     40 * time.Minute,
+	ToolGit:      2 * time.Minute,
+	ToolProbe:    30 * time.Second,
 }
 
 // classNames are the names the details of subprocess-timeout print.
@@ -74,6 +82,10 @@ var classNames = map[Class]string{
 	Mise:         "mise",
 	Herdr:        "herdr",
 	Unbounded:    "unbounded",
+	ToolStep:     "tool-step",
+	ToolRace:     "tool-race",
+	ToolGit:      "tool-git",
+	ToolProbe:    "tool-probe",
 }
 
 // Timeout returns the limit of the class in the table; zero means the

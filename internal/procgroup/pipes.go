@@ -120,10 +120,12 @@ func (p *pipes) leaderEnded() {
 
 // abort closes every end of a command that did not start: each output
 // copy reads EOF and closes its own end, and the input copy stops at
-// its next write.
+// its next write. It waits for the output copies, so the caller has its
+// writers back once Run returns.
 func (p *pipes) abort() {
 	p.started()
 	p.leaderEnded()
+	_ = p.drain(WaitDelay)
 }
 
 // drain waits for the output copies to read EOF, for at most bound,
