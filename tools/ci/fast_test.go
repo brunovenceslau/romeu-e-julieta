@@ -21,7 +21,9 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/pushedrange"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
 )
 
 // TestFast covers fast without arguments: the steps and hygiene, and no
@@ -1175,4 +1177,113 @@ func TestQuietStepPrintsSafeText(t *testing.T) {
 	}
 	assert.Contains(t, listing, "./::error::x.go")
 	assert.Contains(t, code, "::error::x.go", "the output of a step that runs code stays raw")
+}
+
+// TestDataAtHEAD shows that the denylist and the word lists are read
+// from the tree at HEAD, by every check: a denylist that is written
+// and not committed protects no push, so it must not turn a check
+// green. Each subtest builds its own tree, so each runs alone.
+func TestDataAtHEAD(t *testing.T) {
+	const (
+		zero = "0000000000000000000000000000000000000000"
+		url  = "https://example.invalid/x.git"
+	)
+	// tree returns a fixture whose HEAD holds no denylist, and pushed to
+	// origin, whose default branch then holds none either.
+	tree := func(t *testing.T) *gittest.Repo {
+		t.Helper()
+		r := citest.NewTree(t)
+		require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
+		r.Commit("no denylist")
+		r.Git("remote", "add", "origin", gittest.NewBare(t).Dir)
+		r.Git("push", "--quiet", "origin", "main")
+		r.Git("fetch", "--quiet", "origin")
+		return r
+	}
+	pushOf := func(r *gittest.Repo) string {
+		return "refs/heads/main " + r.Git("rev-parse", "HEAD") + " refs/heads/main " + zero + "\n"
+	}
+	// runAll runs every check and wants the status want, except fast as
+	// the hook when hook is not 0: a working tree that differs from HEAD
+	// stops it before any check (TestFastJudgesTheCommit).
+	runAll := func(t *testing.T, r *gittest.Repo, want, hook int) {
+		t.Helper()
+		clean := filepath.Join(t.TempDir(), "clean.txt")
+		require.NoError(t, os.WriteFile(clean, []byte("plain\n"), 0o644))
+		checks := []struct {
+			name  string
+			stdin string
+			args  []string
+		}{
+			{"hygiene", "", []string{"hygiene"}},
+			{"hygiene --file", "", []string{"hygiene", "--file", clean}},
+			{"fast", "", []string{"fast"}},
+			{"fast as the hook", pushOf(r), []string{"fast", "origin", url}},
+		}
+		for _, c := range checks {
+			code, out := runCI(t, r, strings.NewReader(c.stdin), []check.Step{citest.Passing}, c.args...)
+			if c.stdin != "" && hook != 0 {
+				assert.Equal(t, hook, code, "%s: exit status\n%s", c.name, out)
+				assert.Contains(t, out, "ci: fast judges the commit a push sends", c.name)
+				continue
+			}
+			assert.Equal(t, want, code, "%s: exit status\n%s", c.name, out)
+			if want == check.ExitFail {
+				assert.Contains(t, out, "denylist: the denylist is missing", c.name)
+			}
+		}
+	}
+
+	t.Run("a denylist that is not committed fails every check", func(t *testing.T) {
+		r := tree(t)
+		r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp)))
+		r.Git("add", "--all") // staged is not committed either
+		runAll(t, r, check.ExitFail, check.ExitError)
+	})
+	t.Run("once committed, every check passes", func(t *testing.T) {
+		r := tree(t)
+		r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp)))
+		r.Commit("the denylist")
+		runAll(t, r, check.ExitOK, 0)
+	})
+	t.Run("later changes that are not committed are not read", func(t *testing.T) {
+		r := tree(t)
+		r.Write(names.Path, string(citest.Denylist(t, citest.MadeUp)))
+		r.Commit("the denylist")
+		r.Write(names.Path, "entries: [\n")
+		r.Write("tools/ci/prose.yaml", "rules: []\n")
+		r.Git("add", "--all")
+		runAll(t, r, check.ExitOK, check.ExitError)
+	})
+}
+
+// TestPrologueInThePushedRange shows that a pushed commit which adds
+// the file fails the pre-push run even when a later commit removes it,
+// and that it does so with no denylist entry to match names with.
+func TestPrologueInThePushedRange(t *testing.T) {
+	const zero = "0000000000000000000000000000000000000000"
+	r := citest.NewTree(t)
+	require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
+	r.Commit("base, no denylist")
+	origin := gittest.NewBare(t)
+	r.Git("remote", "add", "origin", origin.Dir)
+	r.Git("push", "--quiet", "origin", "main")
+	r.Git("fetch", "--quiet", "origin")
+	r.Write("sub/prologue.md", "text\n")
+	added := r.Commit("adds it")
+	require.NoError(t, os.Remove(filepath.Join(r.Dir, "sub", "prologue.md")))
+	tip := r.Commit("removes it again")
+	stdin := "refs/heads/main " + tip + " refs/heads/main " + zero + "\n"
+	push, err := pushed.Parse(strings.NewReader(stdin))
+	require.NoError(t, err)
+	got, checked, err := citest.RangeOf(pushedrange.Range(t.Context(), r.Repo, "origin", push, tip))
+	require.NoError(t, err)
+	assert.False(t, checked, "no denylist entry: names are not checked")
+	assert.Equal(t, "commit "+added+": added path sub/prologue.md: prologue: the user's agreement file lives outside product repositories\n", check.Lines(got))
+
+	// The run reports the finding too, and not only "not checked".
+	code, out := runCI(t, r, strings.NewReader(stdin), []check.Step{citest.Passing}, "fast", "origin", origin.Dir)
+	assert.Equal(t, check.ExitFail, code, "exit status")
+	assert.Contains(t, out, "FAIL  pushed range\ncommit "+added+": added path sub/prologue.md: prologue:")
+	assert.Contains(t, out, "pushed range: not checked against names")
 }

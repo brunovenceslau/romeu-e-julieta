@@ -26,6 +26,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/workflows"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
@@ -94,7 +95,7 @@ func TestAll(t *testing.T) {
 		{
 			name:    "a hygiene finding",
 			steps:   []check.Step{citest.Passing},
-			change:  func(t *testing.T, r *gittest.Repo) { r.Write("docs/x.md", "a line with "+emDash+"\n") },
+			change:  func(t *testing.T, r *gittest.Repo) { r.Write("docs/x.md", "a line with "+hygiene.EmDash+"\n") },
 			profile: "tools/ci 1 1",
 			code:    check.ExitFail,
 			want:    []string{"FAIL  hygiene", "em-dash", "ok    workflows"},
@@ -757,7 +758,7 @@ func overwriteObject(t *testing.T, r *gittest.Repo, rev, other string) check.Ste
 // change could, changes no verdict, in all, in fast by hand and in a
 // pre-push run.
 func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
-	dash := "a line with " + emDash + "\n"
+	dash := "a line with " + hygiene.EmDash + "\n"
 	floating := strings.Replace(citest.GoodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1)
 	fixture := func(t *testing.T) (*gittest.Repo, []check.Step) {
 		t.Helper()
@@ -950,7 +951,7 @@ func TestCommitChecksReadBeforeMise(t *testing.T) {
 			r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 			r.Write("mise.lock", citest.LockFixture)
 			r.Write(mise.PinnedWorkflow, citest.MiseWorkflow(t, citest.FakeMiseVersion))
-			r.Write("docs/x.md", "a line with "+emDash+"\n")
+			r.Write("docs/x.md", "a line with "+hygiene.EmDash+"\n")
 			r.Commit("fixture")
 			rewrite := overwriteObject(t, r, "HEAD:docs/x.md", "a plain line\n").Argv
 			object, src := rewrite[4], rewrite[5]

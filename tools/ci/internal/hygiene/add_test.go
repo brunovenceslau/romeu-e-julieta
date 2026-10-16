@@ -3,7 +3,7 @@
 
 //go:build linux || darwin
 
-package main
+package hygiene
 
 import (
 	"bytes"
@@ -56,7 +56,10 @@ func typeAtTerminal(t *testing.T, r *gittest.Repo, typed ...string) (code int, p
 	var out bytes.Buffer
 	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: terminal, Stdout: &out, Stderr: &out}
 	runDone := make(chan int, 1)
-	go func() { runDone <- run(t.Context(), e, []string{"hygiene", "add"}) }()
+	go func() {
+		ok, err := Run(t.Context(), e, []string{"add"})
+		runDone <- check.Status(e.Stderr, ok, err)
+	}()
 
 	// The name is typed once the command has switched echo off. Typed
 	// earlier it would still be read, but the terminal would show it,
@@ -162,7 +165,7 @@ func TestAddAtATerminal(t *testing.T) {
 	}
 	// With the entries written, the tree passes.
 	r.Commit("denylist")
-	code, out := runCI(t, r, nil, nil, "hygiene")
+	code, out := citest.Run(t, r, nil, Run)
 	assert.Equal(t, check.ExitOK, code, "hygiene after add\n%s", out)
 }
 
@@ -261,7 +264,7 @@ func TestAddRefuses(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := citest.NewTree(t)
 			before := loadDenylistFile(t, r).Marshal()
-			code, out := runCI(t, r, tt.stdin, nil, append([]string{"hygiene", "add"}, tt.args...)...)
+			code, out := citest.Run(t, r, tt.stdin, Run, append([]string{"add"}, tt.args...)...)
 			assert.Equal(t, check.ExitError, code, "exit status")
 			assert.Contains(t, out, tt.want)
 			assert.NotContains(t, out, "zorvex", "the output repeats the argument")

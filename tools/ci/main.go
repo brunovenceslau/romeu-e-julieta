@@ -33,14 +33,13 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/coverage"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/workflows"
 )
 
@@ -50,7 +49,7 @@ func init() {
 	check.RegisterCommand(check.Command{Name: "setup", Usage: []string{"setup"}, Run: runSetup})
 	check.RegisterCommand(check.Command{Name: "coverage", Usage: []string{"coverage <profile>"}, Run: coverage.Run})
 	check.RegisterCommand(check.Command{Name: "workflows", Usage: []string{"workflows"}, Run: workflows.Run})
-	check.RegisterCommand(check.Command{Name: "hygiene", Usage: []string{"hygiene [--file <path>]", "hygiene add"}, Run: runHygiene})
+	check.RegisterCommand(check.Command{Name: "hygiene", Usage: []string{"hygiene [--file <path>]", "hygiene add"}, Run: hygiene.Run})
 	check.RegisterCommand(check.Command{Name: "generated", Usage: []string{"generated"}, Run: runGenerated})
 	check.RegisterCommand(check.Command{Name: "generate", Usage: []string{"generate"}, Run: runGenerate})
 	check.RegisterCommand(check.Command{Name: "reqs", Usage: []string{"reqs [allocate]"}, Run: runReqs})
@@ -85,36 +84,4 @@ func run(ctx context.Context, e check.Env, args []string) int {
 	}
 	ok, err := cmd.Run(ctx, e, args[1:])
 	return check.Status(e.Stderr, ok, err)
-}
-
-// runHygiene parses the arguments of the hygiene subcommand and prints
-// what it finds.
-func runHygiene(ctx context.Context, e check.Env, args []string) (bool, error) {
-	if len(args) > 0 && args[0] == "add" {
-		return true, add(ctx, e, args[1:])
-	}
-	fs := flag.NewFlagSet("hygiene", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	file := fs.String("file", "", "check one file with the name matcher")
-	if err := fs.Parse(args); err != nil {
-		return false, fmt.Errorf("hygiene: %w\n%s", err, check.Usage())
-	}
-	if fs.NArg() > 0 {
-		return false, fmt.Errorf("hygiene: unexpected argument %q\n%s", fs.Arg(0), check.Usage())
-	}
-	var findings []check.Finding
-	var err error
-	if *file != "" {
-		findings, err = hygieneFile(ctx, e.Repo(), *file)
-	} else {
-		findings, err = hygiene(ctx, e.Repo(), "HEAD")
-	}
-	if err != nil {
-		return false, err
-	}
-	for _, f := range findings {
-		check.Say(e.Stdout, "%s\n", f)
-	}
-	check.Say(e.Stdout, "%s\n", check.Summary("hygiene", len(findings)))
-	return len(findings) == 0, nil
 }

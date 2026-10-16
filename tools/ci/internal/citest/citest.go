@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
@@ -353,4 +354,34 @@ func Run(t *testing.T, r *gittest.Repo, stdin io.Reader, run func(context.Contex
 	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: stdin, Stdout: &out, Stderr: &out}
 	ok, err := run(t.Context(), e, args)
 	return check.Status(&out, ok, err), out.String()
+}
+
+// PartialClone clones upstream with --filter=blob:none and no checkout,
+// so the clone holds every commit and tree and no blob; a later fetch
+// brings no blob either. It returns the clone. The fixture's git runs
+// with GIT_NO_LAZY_FETCH=1 (git.Repo.Run), so a checkout could not
+// fetch the blobs it needs.
+func PartialClone(t *testing.T, upstream *gittest.Repo) git.Repo {
+	t.Helper()
+	upstream.Git("config", "uploadpack.allowFilter", "true")
+	dir := filepath.Join(t.TempDir(), "clone")
+	upstream.Git("clone", "--quiet", "--filter=blob:none", "--no-checkout", "file://"+upstream.Dir, dir)
+	return git.Repo{Dir: dir, Env: upstream.Env}
+}
+
+// RangeOf reads the verdicts of pushedRange back as its findings, and
+// whether names were matched: no verdict carries the "not checked"
+// note. A verdict that could not judge is returned as its error.
+func RangeOf(verdicts []check.Verdict, err error) (findings []check.Finding, checked bool, _ error) {
+	checked = true
+	for _, v := range verdicts {
+		switch {
+		case v.Err != nil:
+			return nil, false, v.Err
+		case v.Note != "":
+			checked = false
+		}
+		findings = append(findings, v.Findings...)
+	}
+	return findings, checked, err
 }

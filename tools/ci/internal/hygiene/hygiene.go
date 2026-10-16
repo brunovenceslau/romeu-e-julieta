@@ -1,14 +1,21 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+// Package hygiene is the hygiene check of 10 10.2: the rules of
+// Hygiene and Forbidden names over the path and the content of each
+// file of the commit judged, read once before any step. It is the
+// hygiene subcommand too, with "hygiene --file" and "hygiene add", the
+// maintainer's way to add a denylist entry.
+package hygiene
 
 import (
 	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"go/scanner"
 	"go/token"
+	"io"
 	"os"
 	"path"
 	"regexp"
@@ -23,17 +30,17 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 )
 
-// hookPath is the one file .githooks/ holds, and hookMode the mode git
+// hookPath is the one file .githooks/ holds, and HookMode the mode git
 // must record for it.
 const (
 	hookDir  = ".githooks/"
 	hookPath = ".githooks/pre-push"
-	hookMode = "100755"
+	HookMode = "100755"
 )
 
-// emDash is U+2014, written as an escape so this file passes the rule
+// EmDash is U+2014, written as an escape so this file passes the rule
 // it implements.
-const emDash = "\u2014"
+const EmDash = "\u2014"
 
 var (
 	// personalPath finds a home directory of one person: the name is
@@ -48,17 +55,17 @@ var (
 // prologueName is the one file name no product path may carry. The
 // user's agreement file lives outside product repositories, so the
 // name is refused at any depth. It is compared without regard to case
-// (isPrologue) because a macOS checkout holds prologue.md and
+// (IsPrologue) because a macOS checkout holds prologue.md and
 // PROLOGUE.md as one file, so the case a contributor typed says nothing
 // about the file that other clones see.
 const prologueName = "PROLOGUE.md"
 
-// prologueMsg is the reason the rule gives, and repeats no path.
-const prologueMsg = "the user's agreement file lives outside product repositories"
+// PrologueMsg is the reason the rule gives, and repeats no path.
+const PrologueMsg = "the user's agreement file lives outside product repositories"
 
-// isPrologue reports whether the last element of a git path is
+// IsPrologue reports whether the last element of a git path is
 // prologueName in any case.
-func isPrologue(p string) bool {
+func IsPrologue(p string) bool {
 	return strings.EqualFold(path.Base(p), prologueName)
 }
 
@@ -66,26 +73,26 @@ func isPrologue(p string) bool {
 // inside a sandbox, the same on every machine.
 const sandboxUser = "agent"
 
-// hygiene applies the hygiene rules of 10 10.2 to the path and the
-// content of each file of the tree at head (hygieneOf). The tree that
+// At applies the At rules of 10 10.2 to the path and the
+// content of each file of the tree at head (Of). The tree that
 // is committed is the one a push publishes, so work in progress is not
 // read. head is "HEAD", or the id of the commit fast or all judges
-// (commitChecks).
-func hygiene(ctx context.Context, repo git.Repo, head string) ([]check.Finding, error) {
+// (the runner).
+func At(ctx context.Context, repo git.Repo, head string) ([]check.Finding, error) {
 	files, err := check.HeadTree(ctx, repo, head)
 	if err != nil {
 		return nil, err
 	}
-	return hygieneOf(files)
+	return Of(files)
 }
 
-// hygieneOf applies the hygiene rules to files, the tree of one commit
-// as headTree reads it, with the word lists and the denylist of that
+// Of applies the hygiene rules to files, the tree of one commit
+// as check.HeadTree reads it, with the word lists and the denylist of that
 // same tree: a denylist or a word list that is written and not
 // committed is in no push. It reads nothing else, so a caller that
 // read the tree before running anything judges what it read
-// (commitChecks).
-func hygieneOf(files []check.TreeFile) ([]check.Finding, error) {
+// (the runner).
+func Of(files []check.TreeFile) ([]check.Finding, error) {
 	data, found, err := check.FileIn(files, prose.Path)
 	if err != nil {
 		return nil, err
@@ -110,7 +117,7 @@ func hygieneOf(files []check.TreeFile) ([]check.Finding, error) {
 		if !printableASCII(f.Path) {
 			findings = append(findings, check.Finding{Where: where, Rule: "path", Msg: asciiPathMsg})
 		}
-		if strings.Contains(f.Path, emDash) {
+		if strings.Contains(f.Path, EmDash) {
 			findings = append(findings, check.Finding{Where: where, Rule: "em-dash", Msg: "the path holds U+2014; use a plain dash"})
 		}
 		// A second file there would run in every clone that enabled
@@ -118,8 +125,8 @@ func hygieneOf(files []check.TreeFile) ([]check.Finding, error) {
 		if strings.HasPrefix(f.Path, hookDir) && f.Path != hookPath {
 			findings = append(findings, check.Finding{Where: where, Rule: "githooks", Msg: hookDir + " holds exactly pre-push"})
 		}
-		if isPrologue(f.Path) {
-			findings = append(findings, check.Finding{Where: where, Rule: "prologue", Msg: prologueMsg})
+		if IsPrologue(f.Path) {
+			findings = append(findings, check.Finding{Where: where, Rule: "prologue", Msg: PrologueMsg})
 		}
 		// A symbolic link or a submodule leads a path to content that
 		// no rule of this list reads by that path: a .config link to a
@@ -137,7 +144,7 @@ func hygieneOf(files []check.TreeFile) ([]check.Finding, error) {
 		for _, n := range list.MatchLines(f.Content) {
 			findings = append(findings, check.Finding{Where: at(n), Rule: "name", Msg: "the line holds a listed name"})
 		}
-		for _, n := range linesWith(f.Content, func(line []byte) bool { return bytes.Contains(line, []byte(emDash)) }) {
+		for _, n := range linesWith(f.Content, func(line []byte) bool { return bytes.Contains(line, []byte(EmDash)) }) {
 			findings = append(findings, check.Finding{Where: at(n), Rule: "em-dash", Msg: "the line holds U+2014; use a plain dash"})
 		}
 		for _, n := range linesWith(f.Content, hasPersonalPath) {
@@ -164,7 +171,7 @@ func hygieneOf(files []check.TreeFile) ([]check.Finding, error) {
 // The denylist rule holds here too, so a clone without entries does
 // not report a file as clean.
 func hygieneFile(ctx context.Context, repo git.Repo, path string) ([]check.Finding, error) {
-	list, findings, err := loadDenylist(ctx, repo, "HEAD")
+	list, findings, err := LoadDenylist(ctx, repo, "HEAD")
 	if err != nil {
 		return nil, err
 	}
@@ -178,10 +185,10 @@ func hygieneFile(ctx context.Context, repo git.Repo, path string) ([]check.Findi
 	return findings, nil
 }
 
-// loadDenylist reads the denylist committed at head, as hygieneOf
+// LoadDenylist reads the denylist committed at head, as Of
 // reads it from a tree (denylistFindings).
-func loadDenylist(ctx context.Context, repo git.Repo, head string) (*names.List, []check.Finding, error) {
-	list, found, err := denylistAt(ctx, repo, head)
+func LoadDenylist(ctx context.Context, repo git.Repo, head string) (*names.List, []check.Finding, error) {
+	list, found, err := DenylistAt(ctx, repo, head)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", names.Path, err)
 	}
@@ -205,8 +212,8 @@ func denylistFindings(list *names.List, found bool) []check.Finding {
 	return nil
 }
 
-// denylistAt reads the denylist committed at rev (parseDenylist).
-func denylistAt(ctx context.Context, repo git.Repo, rev string) (*names.List, bool, error) {
+// DenylistAt reads the denylist committed at rev (parseDenylist).
+func DenylistAt(ctx context.Context, repo git.Repo, rev string) (*names.List, bool, error) {
 	data, found, err := blobAt(ctx, repo, rev, names.Path)
 	if err != nil {
 		return nil, false, err
@@ -242,7 +249,7 @@ func parseDenylist(data []byte, found bool) (*names.List, bool, error) {
 	return list, true, nil
 }
 
-// parseProse parses the word lists of a commit (hygieneOf).
+// parseProse parses the word lists of a commit (Of).
 func parseProse(data []byte, found bool) (*prose.Rules, error) {
 	if !found {
 		return nil, fmt.Errorf("%s is not in the tree at HEAD", prose.Path)
@@ -310,7 +317,7 @@ const asciiPathMsg = "the path holds a byte outside printable ASCII (0x20 to 0x7
 // file system, the file a rule refuses by its ASCII name: macOS folds
 // case beyond ASCII (U+017F, the long s, folds to s) and may compose or
 // decompose accents, and a control byte hides in output. With this
-// rule, isMiseFile matches in ASCII lower case alone.
+// rule, mise.IsMiseFile matches in ASCII lower case alone.
 func printableASCII(path string) bool {
 	for i := range len(path) {
 		if path[i] < 0x20 || path[i] > 0x7e {
@@ -326,8 +333,8 @@ func hookFindings(files []check.TreeFile) []check.Finding {
 		if f.Path != hookPath {
 			continue
 		}
-		if f.Mode != hookMode {
-			return []check.Finding{{Where: hookPath, Rule: "githooks", Msg: "the mode is " + f.Mode + ", want " + hookMode}}
+		if f.Mode != HookMode {
+			return []check.Finding{{Where: hookPath, Rule: "githooks", Msg: "the mode is " + f.Mode + ", want " + HookMode}}
 		}
 		return nil
 	}
@@ -383,4 +390,36 @@ func toDoLines(src []byte) []int {
 			}
 		}
 	}
+}
+
+// Run parses the arguments of the hygiene subcommand and prints
+// what it finds.
+func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
+	if len(args) > 0 && args[0] == "add" {
+		return true, add(ctx, e, args[1:])
+	}
+	fs := flag.NewFlagSet("hygiene", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	file := fs.String("file", "", "check one file with the name matcher")
+	if err := fs.Parse(args); err != nil {
+		return false, fmt.Errorf("hygiene: %w\n%s", err, check.Usage())
+	}
+	if fs.NArg() > 0 {
+		return false, fmt.Errorf("hygiene: unexpected argument %q\n%s", fs.Arg(0), check.Usage())
+	}
+	var findings []check.Finding
+	var err error
+	if *file != "" {
+		findings, err = hygieneFile(ctx, e.Repo(), *file)
+	} else {
+		findings, err = At(ctx, e.Repo(), "HEAD")
+	}
+	if err != nil {
+		return false, err
+	}
+	for _, f := range findings {
+		check.Say(e.Stdout, "%s\n", f)
+	}
+	check.Say(e.Stdout, "%s\n", check.Summary("hygiene", len(findings)))
+	return len(findings) == 0, nil
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 )
 
@@ -159,7 +160,7 @@ func TestHook(t *testing.T) {
 		t.Skipf("the mode is not checked: this copy of the source is not a git working tree (%v)", err)
 	}
 	mode, _, _ := strings.Cut(out.String(), " ")
-	assert.Equal(t, hookMode, mode, "the mode git records for the hook")
+	assert.Equal(t, hygiene.HookMode, mode, "the mode git records for the hook")
 }
 
 // TestRunPrintsAnErrorAsSafeText checks that the error line of run does
