@@ -114,7 +114,7 @@ func TestSetup(t *testing.T) {
 		assert.Equal(t, want+want, string(got), "mise trust and mise install get the ceiling and none of what the action exported")
 	})
 
-	t.Run("a failing mise stops before the download", func(t *testing.T) {
+	t.Run("a failing mise trust stops before go mod download", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte("#!/bin/sh\n"+citest.AnswerVersion+"exit 1\n"), 0o700))
 		code, out := citest.Run(t, r, nil, Run)
 		assert.Equal(t, check.ExitFail, code, out)
