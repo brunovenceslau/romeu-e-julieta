@@ -21,9 +21,12 @@
 // A code point is written as its JSON escape: \b, \t, \n, \f and \r
 // for the five controls JSON names, \u and four lowercase hex digits
 // for the others, and a UTF-16 surrogate pair of \u escapes for a tag
-// character. Escaping JSON text this way leaves it valid JSON that
-// decodes to the same value, so the --json output of 04 4.1 can pass
-// through the same writer as human text.
+// character. Inside a JSON string these are JSON's own escapes, so the
+// JSON that encoding/json writes, compact or indented with spaces,
+// stays valid JSON that decodes to the same value, and the --json
+// output of 04 4.1 can pass through the same writer as human text. A
+// tab or a carriage return between JSON tokens is escaped too, which
+// breaks the JSON, so JSON output is never indented with tabs.
 //
 // The backslash itself is kept, so the escape of a string is not
 // unique to it: the text \u202e and the code point U+202E print alike.

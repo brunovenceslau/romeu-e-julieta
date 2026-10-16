@@ -76,7 +76,8 @@ func TestWriterEscapesEachWriteAlone(t *testing.T) {
 	assert.Equal(t, `\xc3\xa9`, out.String())
 }
 
-// TestWriterEmptyWrite checks that an empty write writes nothing.
+// TestWriterEmptyWrite checks that an empty write reports no bytes and
+// puts no text on the writer under it.
 func TestWriterEmptyWrite(t *testing.T) {
 	var out bytes.Buffer
 	n, err := NewWriter(&out).Write(nil)

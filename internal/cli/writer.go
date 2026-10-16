@@ -19,6 +19,8 @@ import (
 // escaped alone and nothing is held between calls, so a code point
 // that two calls split prints as the escapes of its bytes rather than
 // waiting for a flush; fmt and the JSON encoders write once per call.
+// A buffer goes under the Writer, never over it: a bufio.Writer or
+// io.Copy over it would cut its text at the size of its buffer.
 //
 // A line feed inside a value is kept as well, since the writer cannot
 // tell a value from the text around it; a value that must stay on one
@@ -39,8 +41,9 @@ func NewWriter(out io.Writer) *Writer {
 // Write escapes p, line by line, and writes the result to the writer
 // under it in one call. It returns len(p) when that write succeeds and
 // 0 with the error when it does not, since the escaped output does not
-// map back to a count of the bytes of p; a short write with no error
-// is io.ErrShortWrite.
+// map back to a count of the bytes of p; on an error, part of the
+// output may have reached the writer under it. A short write with no
+// error is io.ErrShortWrite.
 //
 //romeu:invariant I29 guard
 func (w *Writer) Write(p []byte) (int, error) {
