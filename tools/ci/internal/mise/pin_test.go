@@ -194,6 +194,16 @@ func TestPath(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "path\n", string(data), "the changed copy never ran")
 	})
+	t.Run("a copy its owner cannot run", func(t *testing.T) {
+		require.NoError(t, os.Chmod(cached, 0o600))
+		t.Cleanup(func() { require.NoError(t, os.Chmod(cached, 0o700)) })
+		fallsBack(t)
+	})
+	t.Run("a copy others can write", func(t *testing.T) {
+		require.NoError(t, os.Chmod(cached, 0o722))
+		t.Cleanup(func() { require.NoError(t, os.Chmod(cached, 0o700)) })
+		fallsBack(t)
+	})
 	t.Run("a symbolic link at the cache path", func(t *testing.T) {
 		other := filepath.Join(t.TempDir(), "mise")
 		require.NoError(t, os.WriteFile(other, []byte(script), 0o700))

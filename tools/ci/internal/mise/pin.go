@@ -185,9 +185,9 @@ func Sha256File(path string) (string, error) {
 
 // cachedCopy returns the path of the copy of mise that setup installed
 // for the pin of the tree at root, when it passes every rule of
-// REQ-1236: a regular file, not a symbolic link, in directories this
-// user owns and no one else can write, whose sha256, read now, is the
-// pin's. Any failure, a tree without a pin included, is no copy.
+// REQ-1236: a regular file, not a symbolic link, that its owner can run
+// and no one else can write, in directories this user owns and no one
+// else can write, whose sha256, read now, is the pin's. Any failure, a tree without a pin included, is no copy.
 func cachedCopy(root string) (string, bool) {
 	pin, err := ReadPin(root)
 	if err != nil {
@@ -203,7 +203,8 @@ func cachedCopy(root string) (string, bool) {
 		}
 	}
 	path := filepath.Join(dirs[len(dirs)-1], "mise")
-	if info, err := os.Lstat(path); err != nil || !info.Mode().IsRegular() {
+	if info, err := os.Lstat(path); err != nil || !info.Mode().IsRegular() ||
+		info.Mode().Perm()&0o100 == 0 || info.Mode().Perm()&0o022 != 0 {
 		return "", false
 	}
 	if sum, err := Sha256File(path); err != nil || sum != pin.Sha256 {
