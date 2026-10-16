@@ -73,11 +73,12 @@ and so comes first.
       `macos-arm64`, `macos-x64`), so `setup` downloads that binary and
       reads no archive (REQ-1237 says so).
     - A mise shim in `~/.local/share/mise/shims` is a symbolic link to
-      the absolute path of the mise that wrote it: in a sandbox whose
-      image ships mise in `/usr/local/bin`, the shims pointed at the
-      pinned mise in `~/.local/bin` that last ran. After `setup`, the
-      `mise install` it runs with the cached mise writes the shims, so
-      they point at the cache path until another mise rewrites them.
+      the absolute path of a mise: mise 2026.10.3 links each shim to the
+      first `mise` on the search path, and to its own path only when the
+      search path holds none (measured again on 2026-10-16 with
+      `mise reshim` and a temporary `MISE_DATA_DIR`). So after `setup`,
+      in a sandbox whose image ships an older mise in `/usr/local/bin`
+      first on the search path, the shims still start that older mise.
       A shim that points at the older mise of the image (2026.9.15)
       still starts the go of `mise.toml`: `go version` and `go list -m`
       exit 0, with a warning on standard error that this mise cannot
