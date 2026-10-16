@@ -15,6 +15,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/coverage"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 )
 
@@ -236,7 +237,7 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 	}
 	c.report("working tree", tree == "", tree)
 
-	findings, err := coverageAt(root, profile)
+	findings, err := coverage.At(root, profile)
 	for _, v := range append(verdicts, check.Verdict{Name: "coverage", Findings: findings, Err: err}) {
 		c.verdict(v)
 	}
@@ -294,46 +295,6 @@ func archMatches(uname, goarch string) bool {
 		return goarch == "arm64"
 	}
 	return false
-}
-
-// coverageAt applies coverage to the profile at path, for the module of
-// the go.mod in root.
-func coverageAt(root, path string) ([]check.Finding, error) {
-	goMod, err := os.ReadFile(filepath.Join(root, "go.mod"))
-	if err != nil {
-		return nil, err
-	}
-	module, err := modulePath(goMod)
-	if err != nil {
-		return nil, err
-	}
-	profile, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("the cover profile of the race step: %w", err)
-	}
-	return coverage(profile, module)
-}
-
-// runCoverage applies the thresholds of S9 to a cover profile a
-// developer wrote, as "go test -coverprofile=cover.out ./..." does.
-func runCoverage(ctx context.Context, e check.Env, args []string) (bool, error) {
-	if len(args) != 1 {
-		return false, fmt.Errorf("coverage takes the path of a cover profile\n%s", check.Usage())
-	}
-	root, err := check.RepoRoot(ctx, e)
-	if err != nil {
-		return false, err
-	}
-	path := args[0]
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(e.Dir, path)
-	}
-	findings, err := coverageAt(root, path)
-	if err != nil {
-		return false, err
-	}
-	check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("coverage", len(findings)))
-	return len(findings) == 0, nil
 }
 
 // runSetup prepares a machine to run the checks, in three steps: it

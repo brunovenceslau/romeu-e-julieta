@@ -1,15 +1,22 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+// Package coverage is the coverage check of 10 10.2: the thresholds of
+// S9, per package, over the cover profile that the race step of all
+// writes, and over a profile a developer names (the coverage
+// subcommand).
+package coverage
 
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -160,4 +167,44 @@ func modulePath(goMod []byte) (string, error) {
 		}
 	}
 	return "", errors.New("go.mod has no module line")
+}
+
+// At applies coverage to the profile at path, for the module of
+// the go.mod in root.
+func At(root, path string) ([]check.Finding, error) {
+	goMod, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return nil, err
+	}
+	module, err := modulePath(goMod)
+	if err != nil {
+		return nil, err
+	}
+	profile, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("the cover profile of the race step: %w", err)
+	}
+	return coverage(profile, module)
+}
+
+// Run applies the thresholds of S9 to a cover profile a
+// developer wrote, as "go test -coverprofile=cover.out ./..." does.
+func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
+	if len(args) != 1 {
+		return false, fmt.Errorf("coverage takes the path of a cover profile\n%s", check.Usage())
+	}
+	root, err := check.RepoRoot(ctx, e)
+	if err != nil {
+		return false, err
+	}
+	path := args[0]
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(e.Dir, path)
+	}
+	findings, err := At(root, path)
+	if err != nil {
+		return false, err
+	}
+	check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("coverage", len(findings)))
+	return len(findings) == 0, nil
 }

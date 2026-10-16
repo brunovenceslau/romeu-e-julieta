@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package main
+package coverage
 
 import (
 	"os"
@@ -154,17 +154,17 @@ func TestCoverageCommand(t *testing.T) {
 	r.Commit("fixture")
 	low := filepath.Join(t.TempDir(), "low.out")
 	require.NoError(t, os.WriteFile(low, citest.ProfileOf("tools/ci 1 0"), 0o600))
-	code, out := runCI(t, r, nil, nil, "coverage", low)
+	code, out := citest.Run(t, r, nil, Run, low)
 	assert.Equal(t, check.ExitFail, code, out)
 	assert.Contains(t, out, "tools/ci: coverage: 0.0% of 1 statements covered, below 80% (S9)\ncoverage: 1 finding(s)\n")
 
 	r.Write("full.out", string(citest.ProfileOf("tools/ci 1 1")))
-	code, out = runCI(t, r, nil, nil, "coverage", "full.out")
+	code, out = citest.Run(t, r, nil, Run, "full.out")
 	assert.Equal(t, check.ExitOK, code, out)
 	assert.Equal(t, "coverage: ok\n", out)
 
 	for _, args := range [][]string{{"coverage"}, {"coverage", "a", "b"}, {"coverage", filepath.Join(t.TempDir(), "missing.out")}} {
-		code, out = runCI(t, r, nil, nil, args...)
+		code, out = citest.Run(t, r, nil, Run, args[1:]...)
 		assert.Equal(t, check.ExitError, code, "%v\n%s", args, out)
 	}
 }
