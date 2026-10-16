@@ -4,17 +4,15 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"go/ast"
-	"go/build"
+	"go/build/constraint"
 	"go/parser"
 	"go/token"
 	"maps"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -27,6 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
 // lintFixture is one file of the fixture package: the source, and the
@@ -201,8 +201,6 @@ func TestLintConfigReportsEachChecker(t *testing.T) {
 
 	// The tools are the ones the lint step runs (resolveLintTools), and
 	// the run happens in the fixture's directory, where no mise.toml is.
-	ctx, cancel := context.WithTimeout(t.Context(), stepTimeout)
-	defer cancel()
 	tools := pinnedLintTools(t)
 
 	report := filepath.Join(t.TempDir(), "report.json")
@@ -213,15 +211,17 @@ func TestLintConfigReportsEachChecker(t *testing.T) {
 	require.NotEqual(t, -1, at, "lintArgs names .golangci.yml")
 	args[at] = config
 	args = append(args, "--output.json.path", report, "--output.text.path", os.DevNull)
-	cmd := exec.CommandContext(ctx, tools.linter, args...)
-	cmd.Dir = dir
-	cmd.Env = lintEnv(lintTargets[0], tools.goDir)
-	out, err := cmd.CombinedOutput()
+	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolStep,
+		Argv:  append([]string{tools.linter}, args...),
+		Dir:   dir,
+		Env:   lintEnv(lintTargets[0], tools.goDir),
+	})
 	// Exit status 1 means the run found issues, which is the point.
-	var exit *exec.ExitError
 	if err != nil {
-		require.ErrorAs(t, err, &exit, "golangci-lint run\n%s", out)
-		require.Equal(t, 1, exit.ExitCode(), "exit status of golangci-lint run\n%s", out)
+		exit, ok := errors.AsType[*procgroup.ExitError](err)
+		require.True(t, ok, "golangci-lint run: %v\n%s", err, out)
+		require.Equal(t, 1, exit.Code, "exit status of golangci-lint run\n%s", out)
 	}
 
 	data, err := os.ReadFile(report)
@@ -472,10 +472,16 @@ func TestIsGenerated(t *testing.T) {
 func repoFiles(t *testing.T, root string, pathspecs ...string) []string {
 	t.Helper()
 	args := append([]string{"-C", root, "ls-files", "-z", "--cached", "--others", "--"}, pathspecs...)
-	out, err := exec.CommandContext(t.Context(), "git", args...).Output()
+	var out strings.Builder
+	err := procgroup.Run(t.Context(), procgroup.Command{
+		Class:  procgroup.ToolGit,
+		Argv:   append([]string{"git"}, args...),
+		Env:    os.Environ(),
+		Stdout: &out,
+	})
 	require.NoError(t, err, "git ls-files")
 	var files []string
-	for _, f := range strings.Split(string(out), "\x00") {
+	for _, f := range strings.Split(out.String(), "\x00") {
 		if f == "" {
 			continue
 		}
@@ -909,6 +915,22 @@ func TestDirectives(t *testing.T) {
 	}
 }
 
+// lintContext is what decides whether a Go file builds for one of
+// lintTargets: the target, cgo, the compiler and the tags of the
+// toolchain, and the lists of the operating systems and architectures
+// the toolchain knows, which say which file-name suffixes are
+// constraints.
+type lintContext struct {
+	goos, goarch string
+	cgo          bool
+	compiler     string
+	toolTags     []string // the instruction set level and the goexperiment tags
+	releaseTags  []string // go1.1 to the version of the toolchain
+	knownOS      map[string]bool
+	knownArch    map[string]bool
+	unixOS       map[string]bool
+}
+
 // lintTargetContexts returns the build context of each of lintTargets,
 // the list the lint step runs for, as the pinned go command builds it
 // in the environment of the lint step (lintEnv). It asks "go list" for
@@ -916,40 +938,228 @@ func TestDirectives(t *testing.T) {
 // the tool tags are the toolchain's own: the instruction set level
 // (amd64.v1, arm64.v8.0) and the goexperiment tags, which differ from
 // one target to another (cfg.go and internal/buildcfg in
-// cmd/go, Go 1.27). Cgo is off, and there are no tags of our own.
-func lintTargetContexts(t *testing.T) []build.Context {
+// cmd/go, Go 1.27). Cgo is off, and there are no tags of our own. The
+// operating systems and architectures that a file-name suffix can name
+// are the lists of internal/syslist in that toolchain's GOROOT
+// (syslistOf).
+func lintTargetContexts(t *testing.T) []lintContext {
 	t.Helper()
 	tools := pinnedLintTools(t)
-	format := `{{context.CgoEnabled}} {{context.Compiler}} {{join context.ToolTags ","}} {{join context.ReleaseTags ","}}`
-	var contexts []build.Context
+	format := `{{context.CgoEnabled}} {{context.Compiler}} {{join context.ToolTags ","}} {{join context.ReleaseTags ","}} {{context.GOROOT}}`
+	var contexts []lintContext
 	for _, target := range lintTargets {
-		cmd := exec.CommandContext(t.Context(), filepath.Join(tools.goDir, "go"), "list", "-f", format, "runtime")
-		cmd.Dir = t.TempDir()
-		cmd.Env = lintEnv(target, tools.goDir)
-		out, err := cmd.Output()
+		var stdout strings.Builder
+		err := procgroup.Run(t.Context(), procgroup.Command{
+			Class:  procgroup.ToolProbe,
+			Argv:   []string{filepath.Join(tools.goDir, "go"), "list", "-f", format, "runtime"},
+			Dir:    t.TempDir(),
+			Env:    lintEnv(target, tools.goDir),
+			Stdout: &stdout,
+		})
 		require.NoError(t, err, "go list for %s", target)
-		fields := strings.Fields(string(out))
-		require.Len(t, fields, 4, "go list for %s: %q", target, out)
-		contexts = append(contexts, build.Context{
-			GOOS:        target.goos,
-			GOARCH:      target.goarch,
-			CgoEnabled:  fields[0] == "true",
-			Compiler:    fields[1],
-			ToolTags:    strings.Split(fields[2], ","),
-			ReleaseTags: strings.Split(fields[3], ","),
+		out := stdout.String()
+		fields := strings.Fields(out)
+		require.Len(t, fields, 5, "go list for %s: %q", target, out)
+		known := syslistOf(t, fields[4])
+		contexts = append(contexts, lintContext{
+			goos:        target.goos,
+			goarch:      target.goarch,
+			cgo:         fields[0] == "true",
+			compiler:    fields[1],
+			toolTags:    strings.Split(fields[2], ","),
+			releaseTags: strings.Split(fields[3], ","),
+			knownOS:     known["KnownOS"],
+			knownArch:   known["KnownArch"],
+			unixOS:      known["UnixOS"],
 		})
 	}
 	return contexts
 }
 
+// syslistOf reads the maps KnownOS, KnownArch and UnixOS of
+// internal/syslist in goroot, the lists go/build matches file names and
+// the "unix" tag against, so this test knows the systems of the
+// toolchain the lint step runs and keeps no copy of them.
+func syslistOf(t *testing.T, goroot string) map[string]map[string]bool {
+	t.Helper()
+	file := filepath.Join(goroot, "src", "internal", "syslist", "syslist.go")
+	f, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.SkipObjectResolution)
+	require.NoError(t, err)
+	lists := map[string]map[string]bool{}
+	for _, decl := range f.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok || gen.Tok != token.VAR {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			value, ok := spec.(*ast.ValueSpec)
+			if !ok || len(value.Names) != 1 || len(value.Values) != 1 {
+				continue
+			}
+			lit, ok := value.Values[0].(*ast.CompositeLit)
+			if !ok {
+				continue
+			}
+			names := map[string]bool{}
+			for _, elt := range lit.Elts {
+				kv, ok := elt.(*ast.KeyValueExpr)
+				require.True(t, ok, "%s: an entry of %s", file, value.Names[0].Name)
+				key, ok := kv.Key.(*ast.BasicLit)
+				require.True(t, ok, "%s: a key of %s", file, value.Names[0].Name)
+				name, err := strconv.Unquote(key.Value)
+				require.NoError(t, err)
+				names[name] = true
+			}
+			lists[value.Names[0].Name] = names
+		}
+	}
+	for _, name := range []string{"KnownOS", "KnownArch", "UnixOS"} {
+		require.NotEmpty(t, lists[name], "%s: %s", file, name)
+	}
+	return lists
+}
+
+// matchTag reports whether the tag holds in the context, as go/build
+// matches one: cgo when cgo is on, the target, the compiler, an
+// operating system that the target's counts as (android as linux,
+// illumos as solaris, ios as darwin), unix on a unix system, and the
+// tool and release tags; boringcrypto is the older name of
+// goexperiment.boringcrypto.
+func (c lintContext) matchTag(name string) bool {
+	switch {
+	case c.cgo && name == "cgo":
+		return true
+	case name == c.goos || name == c.goarch || name == c.compiler:
+		return true
+	case c.goos == "android" && name == "linux", c.goos == "illumos" && name == "solaris", c.goos == "ios" && name == "darwin":
+		return true
+	case name == "unix" && c.unixOS[c.goos]:
+		return true
+	case name == "boringcrypto":
+		name = "goexperiment.boringcrypto"
+	}
+	return slices.Contains(c.toolTags, name) || slices.Contains(c.releaseTags, name)
+}
+
+// matchName reports whether the file name, by its suffixes, builds in
+// the context: the part from the first "_" up to the first ".", without
+// a last "_test", ends in _GOOS_GOARCH, _GOOS or _GOARCH of a known
+// system and architecture, which must then match, or names none.
+func (c lintContext) matchName(name string) bool {
+	name, _, _ = strings.Cut(name, ".")
+	i := strings.Index(name, "_")
+	if i < 0 {
+		return true
+	}
+	l := strings.Split(name[i:], "_")
+	if n := len(l); l[n-1] == "test" {
+		l = l[:n-1]
+	}
+	n := len(l)
+	switch {
+	case n >= 2 && c.knownOS[l[n-2]] && c.knownArch[l[n-1]]:
+		return c.matchTag(l[n-1]) && c.matchTag(l[n-2])
+	case n >= 1 && (c.knownOS[l[n-1]] || c.knownArch[l[n-1]]):
+		return c.matchTag(l[n-1])
+	}
+	return true
+}
+
+// buildConstraint returns the build constraint of a Go source, as
+// go/build reads it: the "//go:build" line among the comments before
+// the first text that is not a comment, and without one, the "// +build"
+// lines of the leading run of blank lines and line comments that a
+// blank line ends, all of which must hold. Nil means no constraint. Two
+// "//go:build" lines are an error.
+func buildConstraint(src []byte) (constraint.Expr, error) {
+	var goBuild string
+	var plusBuild []string
+	var pending []string // the +build lines since the last blank line
+	isLeading := true    // only blank lines and line comments so far
+	isInBlock := false   // inside a /* comment
+	for line := range strings.Lines(string(src)) {
+		line = strings.TrimSpace(line)
+		if line == "" && isLeading {
+			plusBuild, pending = append(plusBuild, pending...), nil
+			continue
+		}
+		if !strings.HasPrefix(line, "//") {
+			isLeading = false
+		}
+		if !isInBlock && constraint.IsGoBuild(line) {
+			if goBuild != "" {
+				return nil, errors.New("two //go:build lines")
+			}
+			goBuild = line
+		}
+		if isLeading && constraint.IsPlusBuild(line) {
+			pending = append(pending, line)
+		}
+		if !skipComments(line, &isInBlock) {
+			break
+		}
+	}
+	if goBuild != "" {
+		return constraint.Parse(goBuild)
+	}
+	var expr constraint.Expr
+	for _, line := range plusBuild {
+		x, err := constraint.Parse(line)
+		if err != nil {
+			continue // go/build ignores a +build line it cannot parse
+		}
+		if expr == nil {
+			expr = x
+		} else {
+			expr = &constraint.AndExpr{X: expr, Y: x}
+		}
+	}
+	return expr, nil
+}
+
+// skipComments reports whether the line holds nothing but comments,
+// a line comment or /* */ comments, and keeps track of a /* comment
+// that the line leaves open.
+func skipComments(line string, isInBlock *bool) bool {
+	for line != "" {
+		if *isInBlock {
+			_, rest, ok := strings.Cut(line, "*/")
+			if !ok {
+				return true
+			}
+			*isInBlock = false
+			line = strings.TrimSpace(rest)
+			continue
+		}
+		switch {
+		case strings.HasPrefix(line, "//"):
+			return true
+		case strings.HasPrefix(line, "/*"):
+			*isInBlock = true
+			line = strings.TrimSpace(line[len("/*"):])
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // buildsForLintTarget reports whether the Go file builds for at least
-// one of the contexts of lintTargetContexts. go/build applies the file-name suffixes (_darwin,
-// _arm64, _test) and the "//go:build" lines through go/build/constraint,
-// and ignores files that begin with "_" or ".". MatchFile leaves the
-// import of "C" to Import, so this reads the imports too: a file that
-// imports "C" builds only with cgo, which every target has off.
-func buildsForLintTarget(contexts []build.Context, dir, name string) (bool, error) {
-	f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(dir, name), nil, parser.ImportsOnly)
+// one of the contexts of lintTargetContexts, as go/build's MatchFile
+// tells it: a file that begins with "_" or "." does not, the file-name
+// suffixes (_darwin, _arm64, _test) must match (matchName), and so must
+// the build constraint (buildConstraint). MatchFile leaves the import of
+// "C" to Import, so this reads the imports too: a file that imports "C"
+// builds only with cgo, which every target has off.
+func buildsForLintTarget(contexts []lintContext, dir, name string) (bool, error) {
+	if strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".") {
+		return false, nil
+	}
+	src, err := os.ReadFile(filepath.Join(dir, name))
+	if err != nil {
+		return false, err
+	}
+	f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(dir, name), src, parser.ImportsOnly)
 	if err != nil {
 		return false, err
 	}
@@ -958,12 +1168,12 @@ func buildsForLintTarget(contexts []build.Context, dir, name string) (bool, erro
 			return false, nil
 		}
 	}
-	for _, ctx := range contexts {
-		ok, err := ctx.MatchFile(dir, name)
-		if err != nil {
-			return false, err
-		}
-		if ok {
+	expr, err := buildConstraint(src)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", name, err)
+	}
+	for _, c := range contexts {
+		if c.matchName(name) && (expr == nil || expr.Eval(c.matchTag)) {
 			return true, nil
 		}
 	}

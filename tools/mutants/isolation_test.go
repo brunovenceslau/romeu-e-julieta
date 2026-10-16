@@ -5,13 +5,14 @@ package main
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
 // hookVars are the variables git exports to a hook, pointed at the
@@ -79,7 +80,7 @@ func TestMutantsIgnoresTheCallersGitVariables(t *testing.T) {
 // command runs the real git.
 func fakeGit(t *testing.T, fail string) (log string, env []string) {
 	t.Helper()
-	real, err := exec.LookPath("git")
+	real, err := procgroup.LookPath("git")
 	require.NoError(t, err)
 	dir := t.TempDir()
 	log = filepath.Join(dir, "log")

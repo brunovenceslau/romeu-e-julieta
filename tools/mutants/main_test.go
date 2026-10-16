@@ -15,7 +15,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -536,18 +535,6 @@ func TestMutantTimeout(t *testing.T) {
 	assert.Equal(t, defaultMinTimeout, mutantTimeout(time.Second, 0))
 	assert.Equal(t, 3*time.Second, mutantTimeout(100*time.Millisecond, 3*time.Second))
 	assert.Equal(t, 50*time.Second, mutantTimeout(5*time.Second, 3*time.Second))
-}
-
-// TestFinish checks the status of a run that no signal touched, of one
-// a signal cut short, and of one that passed before a late signal.
-func TestFinish(t *testing.T) {
-	var b bytes.Buffer
-	assert.Equal(t, exitFail, finish(&b, exitFail, 0))
-	assert.Empty(t, b.String())
-	assert.Equal(t, exitOK, finish(&b, exitOK, syscall.SIGTERM))
-	assert.Empty(t, b.String())
-	assert.Equal(t, exitSignalBase+int(syscall.SIGTERM), finish(&b, exitFail, syscall.SIGTERM))
-	assert.Equal(t, "mutants: interrupted\n", b.String())
 }
 
 // TestCheckGoVersion checks that a go of another version is refused,

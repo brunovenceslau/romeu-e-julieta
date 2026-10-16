@@ -31,13 +31,6 @@ import (
 // whose name starts the same is not this package.
 const thisPackage = "internal/procgroup"
 
-// admittedTools are the directories, below the module root, whose files
-// may still import the toolImports: tools/ci and tools/mutants, whose
-// own copy of the group rule and signal handler lives in
-// tools/ci/procgroup and their mains until T105 switches them to this
-// package and removes these two entries.
-var admittedTools = []string{"tools/ci", "tools/mutants"}
-
 // guardedImports are the packages whose import outside this package
 // starts a subprocess or maps a signal around it: os/exec and its
 // wrapper execabs, net/http/cgi, which runs a CGI program, go/build and
@@ -55,16 +48,12 @@ var guardedImports = []string{
 }
 
 // toolsTree is the directory, below the module root, of the tools. Its
-// packages start programs past this package, as tools/ci/git does, and
-// the scan reads a file's own imports only, so a file outside it that
-// imported one would carry os/exec past the scan. A tool inside it may
-// import one: tools/new runs git through tools/ci/git until T105.
+// packages start programs with the environment and the classes of the
+// tools, as tools/ci/git does, and the scan reads a file's own imports
+// only, so a file outside it that imported one would carry those rules
+// into the product past the scan. A tool inside it may import one:
+// tools/new runs git through tools/ci/git.
 const toolsTree = "tools"
-
-// toolImports are the guarded imports the admitted tools may still use:
-// go/build matches the build constraints of the lint targets in
-// tools/ci, and admits nothing os/exec does not.
-var toolImports = []string{"os/exec", "os/signal", "go/build"}
 
 // startCalls are the functions, by package path, that start or replace
 // a process without os/exec; no file outside this package calls them.
@@ -94,7 +83,7 @@ func TestCallSites(t *testing.T) {
 	require.NoError(t, err)
 	module := modulePath(data)
 	require.NotEmpty(t, module, "the module line of go.mod")
-	findings, err := callSiteFindings(root, module, admittedTools)
+	findings, err := callSiteFindings(root, module)
 	require.NoError(t, err)
 	assert.Empty(t, findings)
 }
@@ -296,7 +285,7 @@ func TestCallSiteFindings(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o700))
 		require.NoError(t, os.WriteFile(p, []byte(content), 0o600))
 	}
-	findings, err := callSiteFindings(root, "example.com/fixture", admittedTools)
+	findings, err := callSiteFindings(root, "example.com/fixture")
 	require.NoError(t, err)
 	assert.Equal(t, []string{
 		"internal/fixture/cgo.go: imports C, whose calls start programs past this package",
@@ -326,6 +315,9 @@ func TestCallSiteFindings(t *testing.T) {
 		"internal/fixture/tools.go: imports example.com/fixture/tools/ci/git outside tools/, whose packages start programs past this package",
 		"internal/procgroup/sub/sub.go: imports os/exec outside internal/procgroup",
 		"internal/procgroupx/x.go: imports os/exec outside internal/procgroup",
+		"tools/ci/ci.go: imports go/build outside internal/procgroup",
+		"tools/ci/ci.go: imports os/exec outside internal/procgroup",
+		"tools/ci/ci.go: imports os/signal outside internal/procgroup",
 		"tools/ci/http.go: imports net/http/cgi outside internal/procgroup",
 		"tools/cix/git.go: imports go/build outside internal/procgroup",
 		"tools/cix/x.go: imports os/exec outside internal/procgroup",
@@ -362,7 +354,7 @@ func modulePath(gomod []byte) string {
 // whose path is module, and returns one line per breach, sorted. It
 // leaves out this package's own files and what the go command leaves
 // out: testdata, and directories whose name starts with "." or "_".
-func callSiteFindings(root, module string, tools []string) ([]string, error) {
+func callSiteFindings(root, module string) ([]string, error) {
 	var findings []string
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -390,7 +382,7 @@ func callSiteFindings(root, module string, tools []string) ([]string, error) {
 		if err != nil {
 			return err
 		}
-		findings = append(findings, fileFindings(rel, file, module, tools)...)
+		findings = append(findings, fileFindings(rel, file, module)...)
 		return nil
 	})
 	slices.Sort(findings)
@@ -400,7 +392,7 @@ func callSiteFindings(root, module string, tools []string) ([]string, error) {
 // fileFindings returns the breaches of one file outside this package,
 // whose path below the module root is rel, in the module whose path is
 // module.
-func fileFindings(rel string, file *ast.File, module string, tools []string) []string {
+func fileFindings(rel string, file *ast.File, module string) []string {
 	var findings []string
 	self := module + "/" + thisPackage
 	toolsPackage := module + "/" + toolsTree
@@ -422,7 +414,7 @@ func fileFindings(rel string, file *ast.File, module string, tools []string) []s
 			findings = append(findings, rel+": imports C, whose calls start programs past this package")
 		case name == "." && (imported == self || starts || slices.Contains(guardedImports, imported)):
 			findings = append(findings, rel+": dot-imports "+imported+", which hides its calls from this scan")
-		case slices.Contains(guardedImports, imported) && !admittedTool(rel, imported, tools):
+		case slices.Contains(guardedImports, imported):
 			findings = append(findings, rel+": imports "+imported+" outside "+thisPackage)
 		case !inTools && (imported == toolsPackage || inside(imported, []string{toolsPackage})):
 			findings = append(findings,
@@ -493,12 +485,6 @@ func trapFinding(call *ast.CallExpr, names map[string]string) string {
 		}
 	}
 	return "a trap the scan cannot name"
-}
-
-// admittedTool reports whether rel, a file of an admitted tool, may
-// still import the package.
-func admittedTool(rel, imported string, tools []string) bool {
-	return slices.Contains(toolImports, imported) && inside(rel, tools)
 }
 
 // inside reports whether the slash path rel is in one of the dirs; an

@@ -5,7 +5,6 @@ package git_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 )
@@ -184,9 +184,12 @@ func TestRunFetchesNoMissingObject(t *testing.T) {
 	clone := git.Repo{Dir: dir, Env: slices.Concat(server.Env, []string{"GIT_NO_LAZY_FETCH=0"})}
 	_, err := clone.Run(t.Context(), nil, "cat-file", "-p", blob)
 	require.ErrorContains(t, err, "Not a valid object name "+blob, "Run fetched the blob the partial clone lacks")
-	lazy := exec.Command("git", "cat-file", "-p", blob)
-	lazy.Dir, lazy.Env = dir, server.Env
-	out, err := lazy.CombinedOutput()
+	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolGit,
+		Argv:  []string{"git", "cat-file", "-p", blob},
+		Dir:   dir,
+		Env:   server.Env,
+	})
 	require.NoError(t, err, "without the setting git fetches it: %s", out)
 	assert.Equal(t, "a\n", string(out))
 }

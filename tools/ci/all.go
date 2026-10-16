@@ -7,13 +7,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
-	"time"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 )
 
@@ -33,11 +32,6 @@ const (
 	govulncheckLock = "go:golang.org/x/vuln/cmd/govulncheck"
 	govulncheckDir  = "go-golang-org-x-vuln-cmd-govulncheck"
 )
-
-// raceTimeout bounds the race run, which builds every package with the
-// race detector and runs every test: a budget of its own, and not the
-// stepTimeout of a fast step. The job of ci.yml has 60 minutes.
-const raceTimeout = 40 * time.Minute
 
 // reuseImage is the container image of the license step: reuse 6.2.0,
 // with its Python and every dependency, pinned by the digest of the
@@ -68,7 +62,10 @@ const reuseImage = "fsfe/reuse:6.2.0@sha256:85462a75c0f8efda09ddd190b92816b70e76
 // profile itself, or exercise less than it claims. The review covers
 // that too; runAll fails a run whose steps left a file changed.
 //
-// The race run passes "-count=1" for the reason the unit step does:
+// The race run, which builds every package with the race detector and
+// runs every test, has a budget of its own, the class
+// procgroup.ToolRace, and not the one of a fast step; the job of ci.yml
+// has 60 minutes. It passes "-count=1" for the reason the unit step does:
 // a test that scans the repository would otherwise be served from the
 // test cache. govulncheck runs in stepEnv with networkPassThrough, since
 // it reads the Go vulnerability database, from the path whichPinned
@@ -90,7 +87,7 @@ func allSteps(ctx context.Context, root string, tools lintTools, profile string)
 	}
 	before, unit := fastPhases(root, tools)
 	return slices.Concat(before, []step{vuln, license, unit,
-		{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env, timeout: raceTimeout}})
+		{name: "race", argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=" + profile, "./..."}, environ: env, class: procgroup.ToolRace}})
 }
 
 // gitCommonDir returns the absolute path of the git directory that
@@ -259,11 +256,26 @@ func runAll(ctx context.Context, e env, args []string) (bool, error) {
 // unameMachine returns what "uname -m" prints, or why it printed
 // nothing.
 func unameMachine(ctx context.Context) string {
-	out, err := exec.CommandContext(ctx, "uname", "-m").Output()
+	out, err := probe(ctx, "uname", "-m")
 	if err != nil {
 		return "unknown (" + err.Error() + ")"
 	}
-	return strings.TrimSpace(string(out))
+	return out
+}
+
+// probe runs a short probe of the machine in the environment of this
+// process, under the class procgroup.ToolProbe, and returns its
+// standard output without the surrounding space; what it writes to
+// standard error is dropped.
+func probe(ctx context.Context, argv ...string) (string, error) {
+	var stdout strings.Builder
+	err := procgroup.Run(ctx, procgroup.Command{
+		Class:  procgroup.ToolProbe,
+		Argv:   argv,
+		Env:    os.Environ(),
+		Stdout: &stdout,
+	})
+	return strings.TrimSpace(stdout.String()), err
 }
 
 // procTranslated reports whether this process runs under Rosetta: on
@@ -275,8 +287,8 @@ func procTranslated(ctx context.Context) bool {
 	if runtime.GOOS != "darwin" {
 		return false
 	}
-	out, err := exec.CommandContext(ctx, "sysctl", "-n", "sysctl.proc_translated").Output()
-	return err == nil && strings.TrimSpace(string(out)) == "1"
+	out, err := probe(ctx, "sysctl", "-n", "sysctl.proc_translated")
+	return err == nil && out == "1"
 }
 
 // archMatches reports whether what "uname -m" prints (x86_64, aarch64 or
@@ -368,6 +380,11 @@ func runWorkflows(ctx context.Context, e env, args []string) (bool, error) {
 // the go command uses by default, the one step of tools/ci that
 // fetches modules; go.sum checks what it fetches. It and "mise
 // install" keep networkPassThrough.
+//
+// "mise install" downloads and builds the pinned tools, so it runs
+// under the class procgroup.Mise, the limit the table gives every mise
+// install; "mise trust" and the download are command steps, under
+// procgroup.ToolStep.
 func runSetup(ctx context.Context, e env, args []string) (bool, error) {
 	if len(args) != 0 {
 		return false, fmt.Errorf("setup takes no argument\n%s", usage)
@@ -385,7 +402,7 @@ func runSetup(ctx context.Context, e env, args []string) (bool, error) {
 	c := newChecks(e.stdout)
 	mise := []step{
 		{name: "mise trust", argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, environ: miseRunEnviron(passThroughEnv(), root)},
-		{name: "mise install", argv: []string{"mise", "install"}, environ: miseRunEnviron(withProcessEnv(passThroughEnv(), networkPassThrough), root)},
+		{name: "mise install", argv: []string{"mise", "install"}, environ: miseRunEnviron(withProcessEnv(passThroughEnv(), networkPassThrough), root), class: procgroup.Mise},
 	}
 	c.run(ctx, root, mise)
 	if !c.ok {

@@ -11,23 +11,17 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
 )
-
-// stepTimeout bounds one command step. The unit tests are the longest,
-// and a cold build cache is the slow case this leaves room for.
-const stepTimeout = 15 * time.Minute
 
 // step is one check of fast that is a command.
 type step struct {
@@ -45,8 +39,10 @@ type step struct {
 	// unavailable, when set, says why the step's tool could not be
 	// resolved: the step fails with it and starts nothing.
 	unavailable error
-	// timeout, when set, replaces stepTimeout for this step.
-	timeout time.Duration
+	// class is the timeout class the step runs under; the zero value
+	// means procgroup.ToolStep, whose limit leaves the unit tests, the
+	// longest step, room for a cold build cache.
+	class procgroup.Class
 	// skip, when set, says why the step does not run on this platform:
 	// it is reported with "--", neither passed nor failed.
 	skip string
@@ -182,23 +178,27 @@ func whichPinned(ctx context.Context, root, name, key, dir string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("the mise installs directory %s: %w; run \"mise trust\" and \"mise install\" in %s", installsDir, err, root)
 	}
-	cmd := exec.CommandContext(ctx, "mise", "-C", root, "which", name)
-	// mise finds .miserc.toml from its working directory (misefiles.go).
-	cmd.Dir = root
-	cmd.Env = miseRunEnviron(passThroughEnv(), root)
-	out, err := cmd.Output()
-	if errors.Is(err, exec.ErrNotFound) {
+	var stdout, stderr bytes.Buffer
+	err = procgroup.Run(ctx, procgroup.Command{
+		Class: procgroup.ToolProbe,
+		Argv:  []string{"mise", "-C", root, "which", name},
+		// mise finds .miserc.toml from its working directory (misefiles.go).
+		Dir:    root,
+		Env:    miseRunEnviron(passThroughEnv(), root),
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+	if errors.Is(err, procgroup.ErrNotFound) {
 		return "", fmt.Errorf("mise is not on the search path: install mise, then run \"mise trust\" and \"mise install\" in %s", root)
 	}
 	if err != nil {
 		detail := ""
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			detail = "\n" + string(bytes.TrimSpace(exit.Stderr))
+		if _, ok := errors.AsType[*procgroup.ExitError](err); ok {
+			detail = "\n" + string(bytes.TrimSpace(stderr.Bytes()))
 		}
 		return "", fmt.Errorf("mise which %s: %w; the tool is not installed or the configuration is not trusted: run \"mise trust\" and \"mise install\" in %s%s", name, err, root, detail)
 	}
-	path, err := filepath.EvalSymlinks(string(bytes.TrimSpace(out)))
+	path, err := filepath.EvalSymlinks(string(bytes.TrimSpace(stdout.Bytes())))
 	if err != nil {
 		return "", fmt.Errorf("mise which %s: %w", name, err)
 	}
@@ -399,31 +399,21 @@ func lintEnv(target lintTarget, goDir string) []string {
 	)
 }
 
-// run runs the step in dir and returns its output. The command gets
-// exactly s.environ: os/exec gives a nil Cmd.Env the environment of
-// this process, so a nil environ becomes an empty, non-nil one.
+// run runs the step in dir and returns its output, through
+// procgroup.CombinedOutput: the command gets exactly s.environ, an
+// empty environment when it is nil, runs in a process group of its own
+// that is killed when the leader ends, and a run past the limit of its
+// class is a *procgroup.TimeoutError.
 func (s step) run(ctx context.Context, dir string) ([]byte, error) {
 	if s.unavailable != nil {
 		return nil, s.unavailable
 	}
-	limit := cmp.Or(s.timeout, stepTimeout)
-	parent := ctx
-	ctx, cancel := context.WithTimeout(parent, limit)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, s.argv[0], s.argv[1:]...)
-	cmd.Dir = dir
-	cmd.Env = append([]string{}, s.environ...)
-	// The group is killed after the step too, so a grandchild that
-	// outlives the leader is gone (procgroup.CombinedOutput).
-	out, err := procgroup.CombinedOutput(cmd)
-	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		if errors.Is(parent.Err(), context.DeadlineExceeded) {
-			// The deadline of the caller fired, before the limit of the step.
-			err = fmt.Errorf("%w at the deadline of the run: %w", context.DeadlineExceeded, err)
-		} else {
-			err = fmt.Errorf("%w after %s: %w", context.DeadlineExceeded, limit, err)
-		}
-	}
+	out, err := procgroup.CombinedOutput(ctx, procgroup.Command{
+		Class: cmp.Or(s.class, procgroup.ToolStep),
+		Argv:  s.argv,
+		Dir:   dir,
+		Env:   s.environ,
+	})
 	if err == nil && s.quiet && len(bytes.TrimSpace(out)) > 0 {
 		err = errors.New("the command printed what it found")
 	}

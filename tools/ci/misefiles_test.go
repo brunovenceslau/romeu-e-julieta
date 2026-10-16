@@ -5,7 +5,6 @@ package main
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -15,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 )
 
@@ -70,9 +70,11 @@ func TestMiseEnvList(t *testing.T) {
 		assert.NotContains(t, []string{"MISE_CEILING_PATHS", "MISE_CD", "MISE_ENV_FILE", "MISE_TRUSTED_CONFIG_PATHS", "MISE_GLOBAL_CONFIG_FILE", "MISE_SYSTEM_CONFIG_FILE", "MISE_CONFIG_DIR", "XDG_CONFIG_HOME", "GOFLAGS", "GOENV", "GOWORK", "GOTOOLCHAIN"}, key)
 	}
 	// A value of the caller's for a variable of miseEnv loses to the list's.
-	cmd := exec.CommandContext(t.Context(), "env")
-	cmd.Env = miseEnviron([]string{"GOENV=/hostile", "GOTOOLCHAIN=go1.99.0"})
-	out, err := cmd.Output()
+	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolProbe,
+		Argv:  []string{"env"},
+		Env:   miseEnviron([]string{"GOENV=/hostile", "GOTOOLCHAIN=go1.99.0"}),
+	})
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "GOENV=off\n")
 	assert.Contains(t, string(out), "GOTOOLCHAIN=local\n")
@@ -141,10 +143,12 @@ func TestMiseEnvStopsConfigs(t *testing.T) {
 	require.NoError(t, os.Symlink(filepath.Join("elsewhere", ".mise"), filepath.Join(dir, ".mise")))
 	mise := func(env []string, args ...string) {
 		t.Helper()
-		cmd := exec.CommandContext(t.Context(), "mise", append([]string{"-C", dir}, args...)...)
-		cmd.Dir = dir
-		cmd.Env = env
-		out, err := cmd.CombinedOutput()
+		out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+			Class: procgroup.ToolProbe,
+			Argv:  append([]string{"mise", "-C", dir}, args...),
+			Dir:   dir,
+			Env:   env,
+		})
 		require.NoError(t, err, "mise %v\n%s", args, out)
 	}
 	written := func(env []string) []string {
@@ -259,14 +263,18 @@ func TestMiseNeverReads(t *testing.T) {
 	type seen struct{ marker, pwd, goflags, goenv string }
 	printed := func(t *testing.T, env []string, dir string) seen {
 		t.Helper()
-		cmd := exec.CommandContext(t.Context(), "mise", "exec", "--", "sh", "-c",
-			`printf '%s|%s|%s|%s' "${PLANTED:-nothing}" "$(pwd -P)" "${GOFLAGS-unset}" "${GOENV-unset}"`)
-		cmd.Dir = dir
-		cmd.Env = env
-		out, err := cmd.Output()
+		var stdout strings.Builder
+		err := procgroup.Run(t.Context(), procgroup.Command{
+			Class:  procgroup.ToolProbe,
+			Argv:   []string{"mise", "exec", "--", "sh", "-c", `printf '%s|%s|%s|%s' "${PLANTED:-nothing}" "$(pwd -P)" "${GOFLAGS-unset}" "${GOENV-unset}"`},
+			Dir:    dir,
+			Env:    env,
+			Stdout: &stdout,
+		})
 		require.NoError(t, err, "mise exec")
-		parts := strings.Split(string(out), "|")
-		require.Len(t, parts, 4, string(out))
+		out := stdout.String()
+		parts := strings.Split(out, "|")
+		require.Len(t, parts, 4, out)
 		return seen{parts[0], parts[1], parts[2], parts[3]}
 	}
 	for _, row := range rows {

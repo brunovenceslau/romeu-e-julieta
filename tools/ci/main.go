@@ -26,7 +26,9 @@
 // status other than 0 reaches the caller as 1, with the real one in the
 // "exit status" line that go prints; a built binary returns it as is.
 // A run that SIGINT or SIGTERM cut short prints one "interrupted" line
-// and exits 128 plus the signal number, even after a failure.
+// and exits 128 plus the signal number, even after a failure: the
+// signal rule of internal/procgroup (04 4.1, Signals), which runs every
+// subprocess of this command too.
 package main
 
 import (
@@ -35,21 +37,18 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 )
 
 // The exit statuses. A run that SIGINT or SIGTERM cut short exits with
-// 128 plus the signal number (130 and 143), see finish.
+// 128 plus the signal number (130 and 143), see procgroup.Main.
 const (
 	exitOK    = 0 // every check passed
 	exitFail  = 1 // a check found something
 	exitError = 2 // a check could not run, or the command line is wrong
-	// exitSignalBase is added to the number of the signal that ended a run.
-	exitSignalBase = 128
 )
 
 const usage = `usage:
@@ -86,57 +85,18 @@ type env struct {
 
 func main() {
 	e := env{dir: ".", stdin: os.Stdin, stdout: os.Stdout, stderr: os.Stderr}
-	os.Exit(runSignalled(e, os.Args[1:]))
+	os.Exit(runMain(e, os.Args[1:]))
 }
 
-// runSignalled runs the command with a handler for SIGINT and SIGTERM.
-// The first signal cancels the context of the run. A step runs in a
-// process group of its own, which a terminal's interrupt does not
-// reach; cancelling the context kills it. The handler then steps
-// aside, so a second signal during the drain ends the process at once.
-func runSignalled(e env, args []string) int {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(sigs)
-	caught := make(chan syscall.Signal, 1)
-	go func() {
-		select {
-		case sig := <-sigs:
-			// The order is caught, cancel, Stop. Caught before cancel, so
-			// that the run which cancel ends finds the signal and the status
-			// is 128 plus its number. Cancel before Stop, because Stop is
-			// what lets a second signal end this process by its default
-			// action: the group kill starts first, which narrows the window
-			// in which that signal ends the parent before the kill.
-			caught <- sig.(syscall.Signal)
-			cancel()
-			signal.Stop(sigs)
-		case <-ctx.Done():
-		}
-	}()
-	status := run(ctx, e, args)
-	select {
-	case sig := <-caught:
-		return finish(e.stderr, status, sig)
-	default:
-		return finish(e.stderr, status, 0)
-	}
-}
-
-// finish gives the exit status of a run that ended with status, after
-// the signal sig cut it short (0 when none did). An interrupted run
-// says so in one line and exits with 128 plus the signal number, even
-// when a check had already failed (1) or a refusal (2) happened: the
-// signal wins. A run that passed (0) stays 0, and a run that no signal
-// touched keeps its status.
-func finish(w io.Writer, status int, sig syscall.Signal) int {
-	if sig == 0 || status == exitOK {
-		return status
-	}
-	say(w, "ci: interrupted\n")
-	return exitSignalBase + int(sig)
+// runMain runs the command under the signal rule of procgroup.Main: the
+// first SIGINT or SIGTERM cancels the context of the run and kills the
+// process group of every step that runs under it, a second one before
+// the handler steps aside is absorbed, and the status is 128 plus the
+// signal number, even after a failure.
+func runMain(e env, args []string) int {
+	return procgroup.Main("ci", e.stderr, func(ctx context.Context) int {
+		return run(ctx, e, args)
+	})
 }
 
 // run dispatches one subcommand and returns the exit status.
