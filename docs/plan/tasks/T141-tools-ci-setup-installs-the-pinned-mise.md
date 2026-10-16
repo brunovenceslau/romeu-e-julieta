@@ -57,6 +57,9 @@ and so comes first.
     is written, removed on any error, never made executable before the
     hash matches, put in place by rename, in directories of mode 0700
     with no symbolic link among them.
+  - The URL is the fixed prefix of REQ-1237 and
+    `mise-v<version>-<os>-<arch>` of the runner label of this platform,
+    and a test pins the name for each of the four labels.
   - Every mise command of `tools/ci` (`mise --version`, `mise trust`,
     `mise install`, `mise which`) starts the one absolute path of
     REQ-1236.
@@ -72,10 +75,15 @@ and so comes first.
     - A mise shim in `~/.local/share/mise/shims` is a symbolic link to
       the absolute path of the mise that wrote it: in a sandbox whose
       image ships mise in `/usr/local/bin`, the shims pointed at the
-      pinned mise in `~/.local/bin` that last ran. `tools/ci` starts
-      mise by the path of REQ-1236 and never through a shim, and the
-      pre-push hook needs only `go`, which a shim of either mise starts,
-      so the hook and its hint (REQ-1046) do not change.
+      pinned mise in `~/.local/bin` that last ran. After `setup`, the
+      `mise install` it runs with the cached mise writes the shims, so
+      they point at the cache path until another mise rewrites them.
+      A shim that points at the older mise of the image (2026.9.15)
+      still starts the go of `mise.toml`: `go version` and `go list -m`
+      exit 0, with a warning on standard error that this mise cannot
+      read `mise.lock` version 3. `tools/ci` starts mise by the path of
+      REQ-1236 and never through a shim, and the pre-push hook needs
+      only `go`, so the hook and its hint (REQ-1046) do not change.
 - Verify: `go test ./tools/ci/... -run '^TestSetupInstallsThePinnedMise'`;
   on a machine whose mise is another version, `go run ./tools/ci setup`
   then `go run ./tools/ci all` exit 0 with nothing installed by hand.

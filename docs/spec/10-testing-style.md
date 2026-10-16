@@ -373,10 +373,10 @@ source of both, as every check of `tools/ci` runs the code of that tree;
 a version that is not three numbers joined by dots, or a sha256 that is
 not 64 lowercase hex digits, fails `setup`. The URL is the fixed prefix
 `https://github.com/jdx/mise/releases/download/v<version>/` and the
-bare binary of this platform, `mise-v<version>-<os>-<arch>` with `<os>`
-`linux` or `macos` and `<arch>` `x64` or `arm64`, the asset whose sha256
-the matrix holds on all four runners (measured on 2026-10-16 against the
-release's `SHASUMS256.txt`);
+bare binary of this platform, `mise-v<version>-<os>-<arch>`, the asset
+whose sha256 the matrix holds: `linux-x64` for `ubuntu-26.04`,
+`linux-arm64` for `ubuntu-26.04-arm`, `macos-arm64` for `macos-26` and
+`macos-x64` for `macos-26-intel`;
 redirects are followed to `https` hosts only, TLS verification is never
 turned off (`SSL_CERT_FILE` only adds roots), the proxy variables apply,
 and the download stops at 15 minutes, the limit 04 4.1 gives a command
