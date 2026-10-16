@@ -343,16 +343,19 @@ func PinnedMiseWorkflow(t *testing.T, version, sha256 string) string {
 // mise configuration. mise keeps its trust records in the state
 // directory (https://mise.jdx.dev/directories.html), so the tests do
 // not depend on a "mise trust" of the person who runs them, and leave
-// no trust behind. environ is the environment of a mise run; it and
+// no trust behind. misePath gives the mise every mise command of
+// tools/ci starts, and environ the environment of a mise run; they and
 // resolve come from the mise package, which citest does not import, as
 // the tests of that package import citest.
-func PinnedLintTools(t *testing.T, environ func([]string) []string, resolve func(context.Context, string) (check.Tools, error)) check.Tools {
+func PinnedLintTools(t *testing.T, misePath func(string) (string, error), environ func([]string) []string, resolve func(context.Context, string) (check.Tools, error)) check.Tools {
 	t.Helper()
 	root := ModuleRoot(t)
 	IsolateMiseConfig(t)
+	path, err := misePath(root)
+	require.NoError(t, err)
 	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
 		Class: procgroup.ToolStep,
-		Argv:  []string{"mise", "-C", root, "trust"},
+		Argv:  []string{path, "-C", root, "trust"},
 		Dir:   root,
 		Env:   environ(check.PassThroughEnv()),
 	})

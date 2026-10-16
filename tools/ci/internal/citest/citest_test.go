@@ -122,7 +122,11 @@ func TestMiseHelpers(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte("#!/bin/sh\nexit 0\n"), 0o700))
 	var trusted []string
 	want := check.Tools{Linter: "/l", GoDir: "/g"}
-	got := PinnedLintTools(t, func(env []string) []string {
+	misePath := filepath.Join(f.Bin, "mise")
+	got := PinnedLintTools(t, func(root string) (string, error) {
+		assert.Equal(t, ModuleRoot(t), root)
+		return misePath, nil
+	}, func(env []string) []string {
 		trusted = env
 		return append(env, "PATH="+f.Bin)
 	}, func(_ context.Context, root string) (check.Tools, error) {

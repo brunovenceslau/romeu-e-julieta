@@ -18,6 +18,20 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
+// pinnedMise returns the mise that the measurements of this package
+// start: the one every mise command of tools/ci starts for this
+// repository (Path), at the version ci.yml pins (CheckVersion), so a
+// measurement is of that version whatever mise comes first on the
+// search path.
+func pinnedMise(t *testing.T) string {
+	t.Helper()
+	root := citest.ModuleRoot(t)
+	require.NoError(t, CheckVersion(t.Context(), root), "the measurements are of the mise ci.yml pins")
+	path, err := Path(root)
+	require.NoError(t, err)
+	return path
+}
+
 // writeWorkflow writes src as the pinned workflow of a new tree, and
 // returns the tree.
 func writeWorkflow(t *testing.T, src string) string {

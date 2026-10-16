@@ -124,11 +124,12 @@ func TestMiseEnvStopsConfigs(t *testing.T) {
 	}
 	// .mise is a link to a directory under another name.
 	require.NoError(t, os.Symlink(filepath.Join("elsewhere", ".mise"), filepath.Join(dir, ".mise")))
+	misePath := pinnedMise(t)
 	mise := func(env []string, args ...string) {
 		t.Helper()
 		out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
 			Class: procgroup.ToolProbe,
-			Argv:  append([]string{"mise", "-C", dir}, args...),
+			Argv:  append([]string{misePath, "-C", dir}, args...),
 			Dir:   dir,
 			Env:   env,
 		})
@@ -244,12 +245,13 @@ func TestMiseNeverReads(t *testing.T) {
 	// what the command sees: the planted marker, the working directory,
 	// and the GOFLAGS and GOENV of its environment.
 	type seen struct{ marker, pwd, goflags, goenv string }
+	misePath := pinnedMise(t)
 	printed := func(t *testing.T, env []string, dir string) seen {
 		t.Helper()
 		var stdout strings.Builder
 		err := procgroup.Run(t.Context(), procgroup.Command{
 			Class:  procgroup.ToolProbe,
-			Argv:   []string{"mise", "exec", "--", "sh", "-c", `printf '%s|%s|%s|%s' "${PLANTED:-nothing}" "$(pwd -P)" "${GOFLAGS-unset}" "${GOENV-unset}"`},
+			Argv:   []string{misePath, "exec", "--", "sh", "-c", `printf '%s|%s|%s|%s' "${PLANTED:-nothing}" "$(pwd -P)" "${GOFLAGS-unset}" "${GOENV-unset}"`},
 			Dir:    dir,
 			Env:    env,
 			Stdout: &stdout,

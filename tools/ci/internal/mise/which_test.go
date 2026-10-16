@@ -25,7 +25,7 @@ import (
 // TestResolveLintTools checks that the tools of fast are the ones
 // mise.toml pins: the linter and the go command, installed by mise.
 func TestResolveLintTools(t *testing.T) {
-	tools := citest.PinnedLintTools(t, Environ, ResolveLintTools)
+	tools := citest.PinnedLintTools(t, Path, Environ, ResolveLintTools)
 	assert.Equal(t, "golangci-lint", filepath.Base(tools.Linter))
 	assert.True(t, filepath.IsAbs(tools.Linter), "an absolute path: %s", tools.Linter)
 	assert.FileExists(t, filepath.Join(tools.GoDir, "go"))
@@ -320,6 +320,7 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 // on the variables it reads.
 func TestMiseInstalls(t *testing.T) {
 	data, xdg := t.TempDir(), t.TempDir()
+	misePath := pinnedMise(t)
 	for _, tt := range []struct {
 		name, data, xdg string
 		want            func(home string) string
@@ -337,7 +338,7 @@ func TestMiseInstalls(t *testing.T) {
 			var out bytes.Buffer
 			err := procgroup.Run(t.Context(), procgroup.Command{
 				Class:  procgroup.ToolProbe,
-				Argv:   []string{"mise", "-C", t.TempDir(), "doctor", "--json"},
+				Argv:   []string{misePath, "-C", t.TempDir(), "doctor", "--json"},
 				Env:    append(Environ(check.PassThroughEnv()), "MISE_OFFLINE=1"),
 				Stdout: &out,
 			})
