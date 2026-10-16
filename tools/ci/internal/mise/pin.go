@@ -128,15 +128,30 @@ const cacheApp = "romeu-e-julieta"
 
 // CacheDirs returns the directories that hold the copy of mise setup
 // installs for version, outermost first: romeu-e-julieta, mise and the
-// version's, below os.UserCacheDir. version must have the shape of a
-// pin's (ReadPin).
+// version's, below the user cache directory of the XDG Base Directory
+// rule (cacheBase). version must have the shape of a pin's (ReadPin).
 func CacheDirs(version string) ([]string, error) {
-	base, err := os.UserCacheDir()
+	base, err := cacheBase()
 	if err != nil {
 		return nil, fmt.Errorf("the user cache directory, where setup installs mise: %w", err)
 	}
 	app := filepath.Join(base, cacheApp)
 	return []string{app, filepath.Join(app, "mise"), filepath.Join(app, "mise", version)}, nil
+}
+
+// cacheBase is the user cache directory of the XDG Base Directory rule,
+// on every platform, macOS included: $XDG_CACHE_HOME when it is an
+// absolute path (a relative one is ignored, as the rule says), and
+// otherwise $HOME/.cache.
+func cacheBase() (string, error) {
+	if dir := os.Getenv("XDG_CACHE_HOME"); filepath.IsAbs(dir) {
+		return dir, nil
+	}
+	home := os.Getenv("HOME")
+	if home == "" {
+		return "", errors.New("HOME is not set, and XDG_CACHE_HOME names no absolute path")
+	}
+	return filepath.Join(home, ".cache"), nil
 }
 
 // CachePath returns the path of the copy of mise setup installs for

@@ -25,7 +25,9 @@ written at the re-plan.
 
 Goal: `go run ./tools/ci setup` installs the mise that `ci.yml` pins
 when the mise `tools/ci` would run names another version or none, into
-`<user cache directory>/romeu-e-julieta/mise/<version>/mise`, after it
+`<user cache directory>/romeu-e-julieta/mise/<version>/mise` (the XDG
+rule on every platform: `$XDG_CACHE_HOME` when absolute, otherwise
+`$HOME/.cache`), after it
 checks the download against the sha256 of the matrix of `ci.yml`; every
 mise command of `tools/ci` then runs that copy by its absolute path,
 checked again on every run. `fast` and `all` keep refusing a mise of
@@ -50,6 +52,12 @@ and so comes first.
   REQ-1239 (10 10.2).
 - Operator: no
 - Acceptance:
+  - The cache directory follows the XDG Base Directory rule on Linux
+    and macOS alike (REQ-1236): an absolute `$XDG_CACHE_HOME`, and
+    otherwise `$HOME/.cache`; a relative `$XDG_CACHE_HOME` is ignored.
+    Go's `os.UserCacheDir` is not used, since on macOS it ignores
+    `$XDG_CACHE_HOME` and names `~/Library/Caches` (decided on
+    2026-10-16, when the macOS runners of #64 found the difference).
   - `setup` reads the version and the sha256 of this platform's runner
     label from the matrix of `ci.yml` and from nowhere else; the
     platform maps to the label by the Runners list of 10 10.2; the

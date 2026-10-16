@@ -355,8 +355,11 @@ security check: a mise on the search path is the machine's own trust
 decision, and `tools/ci` runs only its `--version` before it compares.
 `REQ-1236` `tools/ci` runs mise by one absolute path: the copy at the pin
 that `setup` installed, `<user cache directory>/romeu-e-julieta/mise/<version>/mise`
-(the user cache directory as Go's `os.UserCacheDir` gives it), when it
-is a regular file and not a symbolic link, in directories the user owns
+(the user cache directory of the XDG Base Directory rule on every
+platform, macOS included: `$XDG_CACHE_HOME` when it is an absolute path,
+and otherwise `$HOME/.cache`, as 02 does for the config and state of
+romeu), when it is a regular file its owner can run and no one else can
+write, not a symbolic link, in directories the user owns
 and no one else can write, and its sha256, read again on every run,
 still equals the matrix's; and otherwise the mise on the search path. A
 copy that fails any of these is never run, and `setup` installs the pin
@@ -378,7 +381,8 @@ whose sha256 the matrix holds: `linux-x64` for `ubuntu-26.04`,
 `linux-arm64` for `ubuntu-26.04-arm`, `macos-arm64` for `macos-26` and
 `macos-x64` for `macos-26-intel`;
 redirects are followed to `https` hosts only, TLS verification is never
-turned off (`SSL_CERT_FILE` only adds roots), the proxy variables apply,
+turned off (`SSL_CERT_FILE`, where set, names the roots; the sha256
+still decides), the proxy variables apply, the body is not decompressed,
 and the download stops at 15 minutes, the limit 04 4.1 gives a command
 step of `tools/ci`, and at 256 MiB. No archive is read.
 `REQ-1239` The download goes to a new file in the version's directory,

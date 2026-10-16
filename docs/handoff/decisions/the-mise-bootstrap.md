@@ -11,6 +11,9 @@ and the mise of a sandbox image (2026.9.15) disagreed:
 - The install happens inside `setup`, not in a separate command or
   hook.
 - The installed mise is cached per version under the user cache
-  directory and run by its absolute path.
+  directory and run by its absolute path. That directory follows the
+  XDG Base Directory rule on every platform, macOS included: an
+  absolute `$XDG_CACHE_HOME`, otherwise `$HOME/.cache` (decided on
+  2026-10-16; REQ-1236).
 - The download is the bare binary of each runner, so no archive is read
   (measured; #61).

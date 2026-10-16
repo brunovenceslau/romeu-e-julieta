@@ -143,6 +143,36 @@ func cachedMise(t *testing.T, script string) (string, string) {
 	return root, path
 }
 
+// TestCacheDirs holds the cache to the XDG Base Directory rule on every
+// platform (REQ-1236): $XDG_CACHE_HOME when it is an absolute path, and
+// otherwise $HOME/.cache, macOS included.
+func TestCacheDirs(t *testing.T) {
+	home := t.TempDir()
+	xdg := t.TempDir()
+	tail := filepath.Join("romeu-e-julieta", "mise", "2026.10.3")
+	for _, tt := range []struct {
+		name, home, xdg, want, err string
+	}{
+		{name: "an absolute XDG_CACHE_HOME", home: home, xdg: xdg, want: filepath.Join(xdg, tail)},
+		{name: "no XDG_CACHE_HOME", home: home, want: filepath.Join(home, ".cache", tail)},
+		{name: "a relative XDG_CACHE_HOME is ignored", home: home, xdg: "cache", want: filepath.Join(home, ".cache", tail)},
+		{name: "no HOME and no XDG_CACHE_HOME", err: "HOME is not set"},
+		{name: "no HOME, an absolute XDG_CACHE_HOME", xdg: xdg, want: filepath.Join(xdg, tail)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("HOME", tt.home)
+			t.Setenv("XDG_CACHE_HOME", tt.xdg)
+			dirs, err := CacheDirs("2026.10.3")
+			if tt.err != "" {
+				require.ErrorContains(t, err, tt.err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, dirs[len(dirs)-1])
+		})
+	}
+}
+
 // TestPath selects the mise every mise command of tools/ci starts
 // (REQ-1236): the copy setup installed while it passes every rule, and
 // the mise on the search path otherwise. The copy is checked again on
@@ -155,7 +185,7 @@ func TestPath(t *testing.T) {
 	onPath := filepath.Join(f.Bin, "mise")
 	require.NoError(t, os.WriteFile(onPath, []byte("#!/bin/sh\necho 'path' >> '"+log+"'\necho '2026.9.15 linux-x64'\n"), 0o700))
 
-	assert.Equal(t, filepath.Join(f.Home, ".cache", "romeu-e-julieta", "mise", citest.FakeMiseVersion, "mise"), cached, "below os.UserCacheDir")
+	assert.Equal(t, filepath.Join(f.Home, ".cache", "romeu-e-julieta", "mise", citest.FakeMiseVersion, "mise"), cached, "below $HOME/.cache, on every platform")
 	got, err := Path(root)
 	require.NoError(t, err)
 	assert.Equal(t, cached, got)
