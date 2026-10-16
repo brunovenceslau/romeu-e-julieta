@@ -15,7 +15,7 @@
 
 # termsafe
 /internal/termsafe/** @brunovenceslau
-/internal/cli/writer.go @brunovenceslau
+/internal/cli/writer*.go @brunovenceslau
 
 # digests
 /internal/canon/** @brunovenceslau

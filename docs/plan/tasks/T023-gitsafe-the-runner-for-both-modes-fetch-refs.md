@@ -64,9 +64,12 @@ network list), `git://` and
     variable; one test pins that list exactly and shows host mode
     passes none of it.
   - `Clone` runs in both modes under the hardened flags with an
-    explicit URL: a host-mode clone of a config repo (T041) and a
-    sandbox-mode clone through the proxy environment (REQ-0398) both
-    succeed in a test, and a refused URL is refused in each mode.
+    explicit URL: a host-mode clone of a config repo (REQ-0309, T041)
+    and a sandbox-mode clone through the proxy environment (REQ-0398)
+    both succeed in a test, and a refused URL is refused in each mode.
+    The sandbox-mode test runs a local HTTPS proxy whose CA is a test
+    CA, and the same clone fails when `SSL_CERT_FILE` is not set, so
+    the test shows the variable is needed, not only passed.
   - One test holds the plant list of I3, the host git keys `doctor`
     warns on and gitsafe's neutralized keys equal, all three read from
     one Go slice in `internal/gitsafe` (10 10.1, Git keys); T049's row

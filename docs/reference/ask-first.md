@@ -28,8 +28,8 @@ says why each surface is on the list.
 |---|---|---|
 | `gates` | `internal/gate/**`, `internal/state/**`, `internal/spec/project.go` | the gates, the state machines, and the gate/apply struct tags that define the widening set |
 | `gitsafe` | `internal/gitsafe/**` | every git invocation on the host, ref namespaces including salvage |
-| `procgroup` | `internal/procgroup/**` | the one package that starts subprocesses, kills their process groups and keeps a child from inheriting the host environment, with the call-site scan and its admitted list |
-| `termsafe` | `internal/termsafe/**`, `internal/cli/writer.go` | host output escaping |
+| `procgroup` | `internal/procgroup/**` | the one package that starts subprocesses, kills their process groups and keeps a child from inheriting the host environment (bar the list of REQ-0470), with the call-site scan and its admitted list |
+| `termsafe` | `internal/termsafe/**`, `internal/cli/writer*.go` | host output escaping |
 | `digests` | `internal/canon/**` | every digest the gates compare |
 | `signing` | `internal/signing/**`, `kits/git-ssh-sign/**` | commit signing key isolation |
 | `catalog` | `internal/catalog/**`, `internal/egress/**` | upload flags, the base and meta sets, and the egress derivation that reads them |
