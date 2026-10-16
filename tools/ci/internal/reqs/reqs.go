@@ -237,6 +237,10 @@ func reqPageOf(p string, content []byte) reqPage {
 	return reqPage{path: p, lines: strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n"), eol: eol}
 }
 
+// countTicks counts the backticks of s. reqMarks counts them through it
+// alone, so a test can count the bytes it reads.
+var countTicks = func(s string) int { return strings.Count(s, "`") }
+
 // reqMarks returns every id, placeholder or malformed token of a page,
 // in order, each with the section it sits in and, where its place
 // breaks the placement rule of 12 12.11, why. It reads a page in one
@@ -263,7 +267,7 @@ func reqMarks(p reqPage) []reqMark {
 		header := strings.HasPrefix(line, "|") && i+1 < len(p.lines) && reqDelimiterRow.MatchString(p.lines[i+1])
 		before, from := ticks, 0 // the backticks of the paragraph before the span at hand
 		for _, loc := range reqSpan.FindAllStringSubmatchIndex(line, -1) {
-			before += strings.Count(line[from:loc[0]], "`")
+			before += countTicks(line[from:loc[0]])
 			from = loc[0]
 			marks = append(marks, reqMark{
 				page:      p.path,
@@ -274,7 +278,7 @@ func reqMarks(p reqPage) []reqMark {
 				misplaced: reqMisplaced(line, loc[0], loc[1], reqPlace{fenced: fenced, inSpan: before%2 == 1, header: header}),
 			})
 		}
-		ticks = (ticks + strings.Count(line, "`")) % 2
+		ticks = (ticks + countTicks(line)) % 2
 	}
 	return marks
 }
