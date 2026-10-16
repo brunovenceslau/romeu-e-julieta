@@ -69,7 +69,7 @@ func TestFetchRefusesURLWithCAFile(t *testing.T) {
 	var rec recorder
 	rec.install(r)
 	for _, u := range []string{"git://example.com/o/r", "file:///srv/r.git", "file://localhost/srv/r.git", "/srv/r.git", "r.git"} {
-		err := r.Fetch(t.Context(), "/repo", u, []string{"refs/heads/main:refs/romeu/origin/r/main"})
+		err := r.Fetch(t.Context(), stubRepo, u, []string{"refs/heads/main:refs/romeu/origin/r/main"})
 		require.ErrorIs(t, err, ErrRefused, u)
 	}
 	assert.Empty(t, rec.commands, "a refused URL runs nothing")

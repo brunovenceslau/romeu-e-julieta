@@ -17,8 +17,9 @@ import (
 )
 
 // cloneFlags are the flags of every clone: no tags, as no fetch takes
-// any (05 5.1), and no submodules (02 2.3).
-var cloneFlags = []string{"--no-tags", "--no-recurse-submodules"}
+// any (05 5.1), no submodules (02 2.3), and no template directory, so
+// no hook or file of the machine's templates enters the clone.
+var cloneFlags = []string{"--no-tags", "--no-recurse-submodules", "--template="}
 
 // Clone clones url into dest, a directory that does not exist yet, in
 // a parent directory that does: the caller makes the parent, with the

@@ -21,6 +21,9 @@ var fetchFlags = []string{"--no-tags", "--no-prune", "--no-recurse-submodules", 
 // repository's config rewrites it to must pass CheckURL; each refspec
 // must write into a fetch destination of the mode (I5).
 func (r *Runner) Fetch(ctx context.Context, dir, url string, refspecs []string) error {
+	if err := checkRepo(dir); err != nil {
+		return err
+	}
 	if len(refspecs) == 0 {
 		return fmt.Errorf("%w: a fetch of %q names no refspec", ErrRefused, url)
 	}
@@ -44,6 +47,9 @@ func (r *Runner) Fetch(ctx context.Context, dir, url string, refspecs []string) 
 func (r *Runner) FastForward(ctx context.Context, dir, oid string) error {
 	if r.mode != Sandbox {
 		return fmt.Errorf("%w: fast-forward in %s mode", ErrRefused, r.mode)
+	}
+	if err := checkRepo(dir); err != nil {
+		return err
 	}
 	if err := checkObjectID(oid); err != nil {
 		return err

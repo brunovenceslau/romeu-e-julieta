@@ -32,6 +32,7 @@ import (
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // Mode is how gitsafe hardens a git call: Host for every git
@@ -245,6 +246,25 @@ func (c Config) check() error {
 	return nil
 }
 
+// checkRepo returns ErrRefused for a dir that is not the root of a
+// repository: an absolute path that holds .git, or a bare repository's
+// HEAD and objects. git given any other directory walks up to the
+// repository that encloses it and acts there.
+func checkRepo(dir string) error {
+	if !filepath.IsAbs(dir) {
+		return fmt.Errorf("%w: repository %q is not an absolute path", ErrRefused, dir)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
+		return nil
+	}
+	head, headErr := os.Lstat(filepath.Join(dir, "HEAD"))
+	objects, objErr := os.Lstat(filepath.Join(dir, "objects"))
+	if headErr == nil && objErr == nil && head.Mode().IsRegular() && objects.IsDir() {
+		return nil
+	}
+	return fmt.Errorf("%w: %q is not the root of a repository", ErrRefused, dir)
+}
+
 // isControl reports whether r is an ASCII control character.
 func isControl(r rune) bool {
 	return r < 0x20 || r == 0x7f
@@ -258,7 +278,8 @@ var refusedSubcommands = []string{"push", "send-pack"}
 // run runs git in dir with the flags of the mode, the extra flags
 // before the subcommand, and args, which start with the subcommand.
 // stdout receives the standard output; nil discards it. The error of a
-// git that fails carries the start of its standard error.
+// git that fails carries the start of its standard error, escaped with
+// termsafe.
 //
 //romeu:invariant I3 guard
 //romeu:invariant I18 guard
@@ -290,7 +311,9 @@ func (r *Runner) runWith(ctx context.Context, dir string, extra []setting, stdou
 		Stderr: &stderr,
 	})
 	if err != nil {
-		msg := strings.TrimSpace(stderr.String())
+		// A server writes part of git's standard error (remote: lines),
+		// so it reaches the error only escaped (I29).
+		msg := termsafe.Escape(strings.TrimSpace(stderr.String()))
 		if msg == "" {
 			return fmt.Errorf("gitsafe: git %s: %w", args[0], err)
 		}

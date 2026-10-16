@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // version is a git release: major.minor.patch, and whether it is a
@@ -116,6 +118,20 @@ func parseVersion(out string) (version, error) {
 	return version{nums[0], nums[1], nums[2], rc}, nil
 }
 
+// foundLimit is the most bytes of git's version line a FloorError
+// quotes.
+const foundLimit = 200
+
+// quoteVersion returns the first line of out, cut to foundLimit bytes
+// and escaped with termsafe, for a version CheckFloor cannot read.
+func quoteVersion(out string) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
+	if len(line) > foundLimit {
+		line = line[:foundLimit]
+	}
+	return termsafe.Escape(line)
+}
+
 // CheckFloor runs git version and returns the error git-floor
 // (*FloorError, RJ-344) when git is below the floor of 05 5.1, or when
 // its version cannot be read: a version gitsafe cannot read is not one
@@ -128,7 +144,7 @@ func (r *Runner) CheckFloor(ctx context.Context) error {
 	}
 	v, err := parseVersion(out)
 	if err != nil {
-		return &FloorError{Found: strings.TrimSpace(out), err: err}
+		return &FloorError{Found: quoteVersion(out), err: err}
 	}
 	if !atFloor(v) {
 		return &FloorError{Found: v.String()}

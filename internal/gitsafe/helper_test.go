@@ -112,6 +112,24 @@ func commit(t *testing.T, dir, msg string) string {
 
 // newRunner returns a runner of the mode over the git of the test
 // process, with a temporary home.
+// stubRepo is a directory that looks like the root of a repository,
+// for the tests that record git's argv and start no git.
+var stubRepo string
+
+func TestMain(m *testing.M) {
+	base, err := os.MkdirTemp("", "gitsafe-stub-")
+	if err != nil {
+		panic(err)
+	}
+	stubRepo = filepath.Join(base, "repo")
+	if err := os.MkdirAll(filepath.Join(stubRepo, ".git"), 0o700); err != nil {
+		panic(err)
+	}
+	code := m.Run()
+	_ = os.RemoveAll(base)
+	os.Exit(code)
+}
+
 func newRunner(t *testing.T, mode Mode) *Runner {
 	t.Helper()
 	r, err := New(Config{Mode: mode, Git: gitPath(t), Home: t.TempDir()})

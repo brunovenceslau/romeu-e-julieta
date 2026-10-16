@@ -132,6 +132,9 @@ func inNamespace(ref string, namespaces []string) bool {
 //
 //romeu:invariant I6 guard
 func (r *Runner) CreateRef(ctx context.Context, dir, ref, oid string) error {
+	if err := checkRepo(dir); err != nil {
+		return err
+	}
 	if err := checkRefName(ref, false); err != nil {
 		return err
 	}

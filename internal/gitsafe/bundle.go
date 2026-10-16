@@ -19,6 +19,9 @@ import (
 // the bundle through a lock file it renames into place; git refuses a
 // bundle that would hold no ref.
 func (r *Runner) BundleCreate(ctx context.Context, dir, file string, refs, bases []string) error {
+	if err := checkRepo(dir); err != nil {
+		return err
+	}
 	if !filepath.IsAbs(file) {
 		return fmt.Errorf("%w: bundle file %q is not an absolute path", ErrRefused, file)
 	}

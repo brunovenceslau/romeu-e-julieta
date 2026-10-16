@@ -81,7 +81,8 @@ func TestRunnerEnvironmentAndFlags(t *testing.T) {
 	for k, v := range network {
 		t.Setenv(k, v)
 	}
-	const git, home, dir = "/usr/bin/git", "/home-of-test", "/repo"
+	const git, home = "/usr/bin/git", "/home-of-test"
+	dir := stubRepo
 	oid := strings.Repeat("a", 40)
 	tests := []struct {
 		name  string
@@ -250,9 +251,9 @@ func TestCredentialFlags(t *testing.T) {
 	var rec recorder
 	rec.install(r)
 	ctx := t.Context()
-	require.NoError(t, r.Fetch(ctx, "/repo", "https://GIT.example.com/o/r.git", []string{"refs/heads/main:refs/romeu/origin/r/main"}))
-	require.NoError(t, r.Fetch(ctx, "/repo", "https://github.com/o/r.git", []string{"refs/heads/main:refs/romeu/origin/r/main"}))
-	require.NoError(t, r.CreateRef(ctx, "/repo", "refs/romeu/salvage/shop/g/s/r/main", strings.Repeat("b", 40)))
+	require.NoError(t, r.Fetch(ctx, stubRepo, "https://GIT.example.com/o/r.git", []string{"refs/heads/main:refs/romeu/origin/r/main"}))
+	require.NoError(t, r.Fetch(ctx, stubRepo, "https://github.com/o/r.git", []string{"refs/heads/main:refs/romeu/origin/r/main"}))
+	require.NoError(t, r.CreateRef(ctx, stubRepo, "refs/romeu/salvage/shop/g/s/r/main", strings.Repeat("b", 40)))
 	for _, c := range rec.commands {
 		args := strings.Join(c.Argv, " ")
 		assert.Contains(t, args, "-c credential.helper= -c credential.helper=osxkeychain -c fetch.prune=false",
@@ -324,10 +325,10 @@ func TestRunRefusesPush(t *testing.T) {
 		var rec recorder
 		rec.install(r)
 		for _, sub := range []string{"push", "send-pack"} {
-			err := r.run(t.Context(), "/repo", nil, sub, "https://example.com/o/r.git")
+			err := r.run(t.Context(), stubRepo, nil, sub, "https://example.com/o/r.git")
 			require.ErrorIs(t, err, ErrRefused, sub)
 		}
-		require.ErrorIs(t, r.run(t.Context(), "/repo", nil), ErrRefused, "no subcommand")
+		require.ErrorIs(t, r.run(t.Context(), stubRepo, nil), ErrRefused, "no subcommand")
 		assert.Empty(t, rec.commands, "nothing ran")
 	}
 }
@@ -434,4 +435,31 @@ func TestLimitedBuffer(t *testing.T) {
 	assert.Equal(t, 4, n)
 	assert.Equal(t, "abcd", b.String())
 	assert.True(t, b.truncated)
+}
+
+// TestVerbsRefuseADirThatIsNotARepository: a verb given a directory
+// inside a repository, or one that does not exist, is refused before
+// git starts, so git never walks up and acts on the enclosing
+// repository.
+func TestVerbsRefuseADirThatIsNotARepository(t *testing.T) {
+	outer, head := newRepo(t)
+	inner := filepath.Join(outer, "sub")
+	require.NoError(t, os.Mkdir(inner, 0o700))
+	missing := filepath.Join(t.TempDir(), "missing")
+	url := serveGit(t, bareCopy(t, outer, "repo.git")) + "repo.git"
+	for _, dir := range []string{inner, missing, "relative"} {
+		for _, mode := range []Mode{Host, Sandbox} {
+			r := newRunner(t, mode)
+			ctx := t.Context()
+			dst := map[Mode]string{Host: "refs/romeu/origin/r/*", Sandbox: "refs/remotes/origin/*"}[mode]
+			created := map[Mode]string{Host: "refs/romeu/base/shop/g1/app", Sandbox: "refs/salvage/g1/s1/stash-0"}[mode]
+			require.ErrorIs(t, r.Fetch(ctx, dir, url, []string{"+refs/heads/*:" + dst}), ErrRefused, "%s %s", mode, dir)
+			require.ErrorIs(t, r.CreateRef(ctx, dir, created, head), ErrRefused, "%s %s", mode, dir)
+			require.ErrorIs(t, r.BundleCreate(ctx, dir, filepath.Join(t.TempDir(), "b"), []string{"refs/heads/main"}, nil), ErrRefused, "%s %s", mode, dir)
+			if mode == Sandbox {
+				require.ErrorIs(t, r.FastForward(ctx, dir, head), ErrRefused, "%s %s", dir, mode)
+			}
+		}
+	}
+	assert.Empty(t, plainGit(t, outer, "for-each-ref", "refs/romeu", "refs/remotes", "refs/salvage"))
 }

@@ -9,6 +9,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -118,4 +120,39 @@ func TestCheckFloorRunError(t *testing.T) {
 	require.ErrorIs(t, err, procgroup.ErrNotFound)
 	_, ok := errors.AsType[*FloorError](err)
 	assert.False(t, ok)
+}
+
+// fakeGit writes an executable script that stands in for git and
+// returns its path.
+func fakeGit(t *testing.T, script string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "git")
+	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\n"+script), 0o700))
+	return path
+}
+
+// TestGitOutputInErrorsIsEscaped: what git writes, part of which a
+// server controls, reaches an error only escaped (I29), and the
+// version a FloorError quotes is its first line, cut short.
+func TestGitOutputInErrorsIsEscaped(t *testing.T) {
+	t.Run("standard error", func(t *testing.T) {
+		git := fakeGit(t, `printf 'remote: \033[2J\033]0;title\007\nfatal: \233bad\n' >&2; exit 128`+"\n")
+		r, err := New(Config{Mode: Host, Git: git, Home: t.TempDir()})
+		require.NoError(t, err)
+		err = r.CheckFloor(t.Context())
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), "\x1b")
+		assert.NotContains(t, err.Error(), "\a")
+		assert.NotContains(t, err.Error(), "\x9b")
+		assert.Contains(t, err.Error(), `remote: \u001b[2J`)
+		assert.Contains(t, err.Error(), `fatal: \x9bbad`)
+	})
+	t.Run("an unreadable version", func(t *testing.T) {
+		git := fakeGit(t, `printf 'git version \033[31mbanana\n'; i=0; while [ $i -lt 2000 ]; do echo filler; i=$((i+1)); done`+"\n")
+		r, err := New(Config{Mode: Host, Git: git, Home: t.TempDir()})
+		require.NoError(t, err)
+		floorErr, ok := errors.AsType[*FloorError](r.CheckFloor(t.Context()))
+		require.True(t, ok)
+		assert.Equal(t, `git version \u001b[31mbanana`, floorErr.Found)
+	})
 }

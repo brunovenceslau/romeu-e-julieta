@@ -69,11 +69,11 @@ func TestBundleCreateRefuses(t *testing.T) {
 	var rec recorder
 	rec.install(r)
 	for _, tt := range tests {
-		require.ErrorIs(t, r.BundleCreate(t.Context(), "/repo", tt.file, tt.refs, tt.bases), ErrRefused, tt.name)
+		require.ErrorIs(t, r.BundleCreate(t.Context(), stubRepo, tt.file, tt.refs, tt.bases), ErrRefused, tt.name)
 	}
 	assert.Empty(t, rec.commands)
 
-	require.NoError(t, r.BundleCreate(t.Context(), "/repo", "/b", []string{"refs/heads/main"}, []string{oid}))
+	require.NoError(t, r.BundleCreate(t.Context(), stubRepo, "/b", []string{"refs/heads/main"}, []string{oid}))
 	require.Len(t, rec.commands, 1)
 	assert.Equal(t, []string{"bundle", "create", "/b", "refs/heads/main", "^" + oid}, rec.commands[0].Argv[1+len(sandboxFlags):])
 }

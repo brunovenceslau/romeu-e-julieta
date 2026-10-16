@@ -24,15 +24,15 @@ func TestFetchArgv(t *testing.T) {
 	rec.install(r)
 	const url = "https://github.com/o/r.git"
 	specs := []string{"+refs/heads/*:refs/romeu/origin/r/*", "refs/heads/main:refs/romeu/origin/r/pinned"}
-	require.NoError(t, r.Fetch(t.Context(), "/repo", url, specs))
+	require.NoError(t, r.Fetch(t.Context(), stubRepo, url, specs))
 	require.Len(t, rec.commands, 2)
 
 	resolve := rec.commands[0]
 	assert.Equal(t, []string{"ls-remote", "--get-url", url}, resolve.Argv[1+len(hostFlags):])
-	assert.Equal(t, "/repo", resolve.Dir)
+	assert.Equal(t, stubRepo, resolve.Dir)
 
 	fetch := rec.commands[1]
-	assert.Equal(t, "/repo", fetch.Dir)
+	assert.Equal(t, stubRepo, fetch.Dir)
 	assert.Equal(t,
 		append([]string{"fetch", "--no-tags", "--no-prune", "--no-recurse-submodules", "--no-write-fetch-head", url}, specs...),
 		fetch.Argv[1+len(hostFlags):])

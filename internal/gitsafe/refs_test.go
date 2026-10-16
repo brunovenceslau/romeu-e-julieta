@@ -159,8 +159,8 @@ func TestFetchRefusesRefspec(t *testing.T) {
 	require.NoError(t, err)
 	var rec recorder
 	rec.install(r)
-	require.ErrorIs(t, r.Fetch(t.Context(), "/repo", "https://github.com/o/r.git", nil), ErrRefused)
-	require.ErrorIs(t, r.Fetch(t.Context(), "/repo", "https://github.com/o/r.git",
+	require.ErrorIs(t, r.Fetch(t.Context(), stubRepo, "https://github.com/o/r.git", nil), ErrRefused)
+	require.ErrorIs(t, r.Fetch(t.Context(), stubRepo, "https://github.com/o/r.git",
 		[]string{"refs/heads/main:refs/romeu/origin/r/main", "+refs/heads/*:refs/heads/*"}), ErrRefused)
 	assert.Empty(t, rec.commands)
 }
@@ -227,14 +227,14 @@ func TestCreateRefRefuses(t *testing.T) {
 		require.NoError(t, err)
 		var rec recorder
 		rec.install(r)
-		require.ErrorIs(t, r.CreateRef(t.Context(), "/repo", tt.ref, tt.oid), ErrRefused, "%s %s %s", tt.mode, tt.ref, tt.oid)
+		require.ErrorIs(t, r.CreateRef(t.Context(), stubRepo, tt.ref, tt.oid), ErrRefused, "%s %s %s", tt.mode, tt.ref, tt.oid)
 		assert.Empty(t, rec.commands)
 	}
 	r, err := New(Config{Mode: Host, Git: "/usr/bin/git", Home: "/h"})
 	require.NoError(t, err)
 	var rec recorder
 	rec.install(r)
-	require.NoError(t, r.CreateRef(t.Context(), "/repo", "refs/romeu/base/shop/g/app", strings.Repeat("0a", 32)), "a sha256 id")
+	require.NoError(t, r.CreateRef(t.Context(), stubRepo, "refs/romeu/base/shop/g/app", strings.Repeat("0a", 32)), "a sha256 id")
 }
 
 // TestNamespacesDisjoint: no create-only namespace is a fetch

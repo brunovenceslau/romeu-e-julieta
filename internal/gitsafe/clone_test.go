@@ -44,7 +44,7 @@ func TestCloneArgv(t *testing.T) {
 
 	clone := rec.commands[1]
 	assert.Equal(t, filepath.Dir(dest), clone.Dir)
-	assert.Equal(t, append(ca, "clone", "--no-tags", "--no-recurse-submodules", "--", url, dest), clone.Argv[1+len(hostFlags):])
+	assert.Equal(t, append(ca, "clone", "--no-tags", "--no-recurse-submodules", "--template=", "--", url, dest), clone.Argv[1+len(hostFlags):])
 }
 
 // TestClone clones over the loopback daemon in each mode: the new
@@ -276,6 +276,10 @@ func TestSandboxCloneThroughTheProxy(t *testing.T) {
 		{"the sandbox trusts the system cas alone", "", false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			// A CONNECT the last case left must not count for this one.
+			for len(connects) > 0 {
+				<-connects
+			}
 			for _, k := range NetworkEnv() {
 				t.Setenv(k, "")
 			}
