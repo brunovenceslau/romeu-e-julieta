@@ -372,14 +372,15 @@ sha256 from the matrix of `ci.yml` in the tree it runs in, the one
 source of both, as every check of `tools/ci` runs the code of that tree;
 a version that is not three numbers joined by dots, or a sha256 that is
 not 64 lowercase hex digits, fails `setup`. The URL is the fixed prefix
-`https://github.com/jdx/mise/releases/download/v<version>/` and the name
-of the release asset of this platform whose sha256 the matrix holds;
+`https://github.com/jdx/mise/releases/download/v<version>/` and the
+bare binary of this platform, `mise-v<version>-<os>-<arch>` with `<os>`
+`linux` or `macos` and `<arch>` `x64` or `arm64`, the asset whose sha256
+the matrix holds on all four runners (measured on 2026-10-16 against the
+release's `SHASUMS256.txt`);
 redirects are followed to `https` hosts only, TLS verification is never
 turned off (`SSL_CERT_FILE` only adds roots), the proxy variables apply,
 and the download stops at 15 minutes, the limit 04 4.1 gives a command
-step of `tools/ci`, and at 256 MiB. When that asset is an archive, its
-one mise binary is taken out of it only after the archive's sha256
-matched.
+step of `tools/ci`, and at 256 MiB. No archive is read.
 `REQ-1239` The download goes to a new file in the version's directory,
 created exclusively with mode 0600 and hashed as it is written; unless
 its sha256 equals the matrix's, the file is removed, `setup` fails

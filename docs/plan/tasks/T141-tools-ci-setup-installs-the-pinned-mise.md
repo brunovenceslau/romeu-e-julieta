@@ -63,19 +63,19 @@ and so comes first.
   - The tests of REQ-1238 run against a fake release served locally,
     one case per clause of that requirement.
   - The refusal of `fast` and `all` names `go run ./tools/ci setup`.
-  - Two facts are measured when the task starts, before any code, and
-    written into the spec by a docs pull request that merges first when
-    either changes its text (deferred decisions; trigger: T141 starts):
-    - which release asset of mise for `macos-26` and `macos-26-intel`
-      has the sha256 the matrix holds, the bare binary or an archive;
-      for linux arm64 the bare binary `mise-v2026.10.3-linux-arm64`
-      matched on 2026-10-16, and the comment of the matrix in `ci.yml`
-      calls it "the mise binary". REQ-1237 already covers an archive.
-    - whether the mise shims (`~/.local/share/mise/shims`) that the
-      cached mise writes start that mise and not another one on the
-      search path. If they start another, the pre-push hook and its
-      hint in 12 12.1 (REQ-1046) change with this task: the hint names
-      `setup`, or the hook starts go through the cached mise.
+  - Two facts were measured on 2026-10-16, before any code:
+    - The sha256 of each of the four runners in the matrix of `ci.yml`
+      is that of the bare binary `mise-v2026.10.3-<os>-<arch>` in the
+      release's `SHASUMS256.txt` (`linux-x64`, `linux-arm64`,
+      `macos-arm64`, `macos-x64`), so `setup` downloads that binary and
+      reads no archive (REQ-1237 says so).
+    - A mise shim in `~/.local/share/mise/shims` is a symbolic link to
+      the absolute path of the mise that wrote it: in a sandbox whose
+      image ships mise in `/usr/local/bin`, the shims pointed at the
+      pinned mise in `~/.local/bin` that last ran. `tools/ci` starts
+      mise by the path of REQ-1236 and never through a shim, and the
+      pre-push hook needs only `go`, which a shim of either mise starts,
+      so the hook and its hint (REQ-1046) do not change.
 - Verify: `go test ./tools/ci/... -run '^TestSetupInstallsThePinnedMise'`;
   on a machine whose mise is another version, `go run ./tools/ci setup`
   then `go run ./tools/ci all` exit 0 with nothing installed by hand.
