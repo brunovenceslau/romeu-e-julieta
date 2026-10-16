@@ -9,15 +9,15 @@
 //	go run ./tools/ci fast [<remote> <url>]   the fast checks; with the
 //	                                          hook's arguments, the pushed range too
 //	go run ./tools/ci setup                   trust mise.toml, install the tools, fill the module cache
-//	go run ./tools/ci coverage <profile>      the thresholds of S9 over a cover profile
-//	go run ./tools/ci workflows               the workflow grammar over the tree at HEAD
+//	go run ./tools/ci generated               go generate ./... changes no generated file
+//	go run ./tools/ci generate                write the generated files (what go generate runs)
 //	go run ./tools/ci hygiene                 the hygiene rules over the tree at HEAD
 //	go run ./tools/ci hygiene --file <path>   the name matcher over one file
 //	go run ./tools/ci hygiene add             add a denylist entry, from a terminal
-//	go run ./tools/ci generated               go generate ./... changes no generated file
-//	go run ./tools/ci generate                write the generated files (what go generate runs)
+//	go run ./tools/ci workflows               the workflow grammar over the tree at HEAD
 //	go run ./tools/ci reqs                    the requirement ids of 12 12.11 over the tree at HEAD
 //	go run ./tools/ci reqs allocate           number the REQ-new placeholders of the working tree
+//	go run ./tools/ci coverage <profile>      the thresholds of S9 over a cover profile
 //
 // It exits 0 when every check passes, 1 when a check fails, and 2 when
 // it could not run a check at all. Inside fast and all, hygiene or
