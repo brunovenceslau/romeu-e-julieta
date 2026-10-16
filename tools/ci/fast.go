@@ -4,11 +4,9 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -179,8 +177,8 @@ func runFast(ctx context.Context, e check.Env, args []string) (bool, error) {
 		}
 		steps = fastSteps(root, tools)
 	}
-	c := newChecks(e.Stdout)
-	c.run(ctx, root, steps)
+	c := check.NewPrinter(e.Stdout)
+	c.Run(ctx, root, steps)
 	if hook {
 		_, err := judge()
 		if err == nil {
@@ -192,30 +190,9 @@ func runFast(ctx context.Context, e check.Env, args []string) (bool, error) {
 	}
 
 	for _, v := range verdicts {
-		c.verdict(v)
+		c.Verdict(v)
 	}
-	return c.ok, nil
-}
-
-// checks prints the verdict of each check as it ends, and remembers
-// whether every one passed. Every check runs, so one run shows
-// everything there is to fix.
-type checks struct {
-	out io.Writer
-	ok  bool
-}
-
-func newChecks(out io.Writer) *checks {
-	return &checks{out: out, ok: true}
-}
-
-// report prints one verdict, with what the check found below it.
-func (c *checks) report(name string, passed bool, detail string) {
-	verdict := "ok  "
-	if !passed {
-		verdict, c.ok = "FAIL", false
-	}
-	check.Say(c.out, "%s  %s\n%s", verdict, name, detail)
+	return c.OK, nil
 }
 
 // commitChecks judges commit with hygiene, workflows and reqs, from one
@@ -241,57 +218,6 @@ func commitChecks(ctx context.Context, repo git.Repo, commit string) ([]check.Ve
 		{Name: "hygiene", Findings: findings, Err: err},
 		{Name: "workflows", Findings: workflows.Of(files)},
 	}, reqVerdicts...), nil
-}
-
-// verdict reports one verdict of commitChecks: one that could not
-// judge fails with its reason, and one with a note prints it with
-// "--".
-func (c *checks) verdict(v check.Verdict) {
-	switch {
-	case v.Note != "":
-		check.Say(c.out, "--    %s: %s\n", v.Name, v.Note)
-	case v.Err != nil:
-		c.report(v.Name, false, git.SafeLines(v.Err.Error())+"\n")
-	default:
-		c.report(v.Name, len(v.Findings) == 0, check.Lines(v.Findings)+v.Info)
-	}
-}
-
-// moduleLookupOff is what the go command prints when a step needs a
-// module that the module cache does not hold: the steps run with
-// GOPROXY=off (stepEnv).
-const moduleLookupOff = "module lookup disabled by GOPROXY=off"
-
-// run runs each step in root and reports it. A step that failed for a
-// module missing from the module cache names the command that fills
-// the cache.
-func (c *checks) run(ctx context.Context, root string, steps []check.Step) {
-	for _, s := range steps {
-		if s.Skip != "" {
-			check.Say(c.out, "--    %s: %s\n", s.Name, s.Skip)
-			continue
-		}
-		out, err := s.Run(ctx, root)
-		detail := ""
-		if err != nil {
-			// out is the step's own output, which is printed as it is, for
-			// readability; the unit step in particular lets the change print
-			// anything. A quiet step is the exception: gofmt -l prints paths
-			// of the repository and its parse errors about them, so escaping
-			// its output costs no readability and is defense in depth.
-			// err, the error of the run, may hold a path and is made safe
-			// too.
-			text := string(out)
-			if s.Quiet {
-				text = git.SafeLines(text)
-			}
-			detail = fmt.Sprintf("%s%s\n", text, git.SafeLines(err.Error()))
-			if bytes.Contains(out, []byte(moduleLookupOff)) {
-				detail += "the module cache lacks a module of go.sum, and no step fetches one (GOPROXY=off): run \"go run ./tools/ci setup\", which runs \"go mod download\", then run this again\n"
-			}
-		}
-		c.report(s.Name, err == nil, detail)
-	}
 }
 
 // judgeCommit refuses a pre-push run whose checks would not test the

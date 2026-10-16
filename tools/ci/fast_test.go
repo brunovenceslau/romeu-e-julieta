@@ -4,8 +4,6 @@
 package main
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,7 +16,6 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/lint"
@@ -959,91 +956,6 @@ func TestIsGateInput(t *testing.T) {
 	}
 }
 
-// TestStepEnv pins the environment of the steps, written out in full:
-// PATH with the directory of the pinned go first, the other variables
-// of goenv.PassThrough that are set, and the fixed ones, in that order and
-// nothing else; the lint step adds its target. Every variable of the
-// process that is outside that list stays out, whatever its name.
-func TestStepEnv(t *testing.T) {
-	// The fixed variables, and others that change what a step checks,
-	// each set in the process to a value no step may take.
-	for _, key := range []string{"GOENV", "GOOS", "GOARCH", "CGO_ENABLED", "GOTOOLCHAIN", "GOWORK", "GOPROXY",
-		"GOFLAGS", "GOLANGCI_DIFF_PROCESSOR_PATCH", "GOEXPERIMENT", "MISE_INSTALLS_DIR", "XDG_CONFIG_HOME",
-		"CI", "MISE_TRUSTED_CONFIG_PATHS"} {
-		t.Setenv(key, "from-the-process")
-	}
-	for _, key := range goenv.PassThrough {
-		t.Setenv(key, "/from/"+key)
-	}
-	// Two that are empty and must be left out.
-	t.Setenv("TMPDIR", "")
-	t.Setenv("MISE_CACHE_DIR", "")
-
-	sep := string(os.PathListSeparator)
-	located := []string{
-		"HOME=/from/HOME",
-		"XDG_CACHE_HOME=/from/XDG_CACHE_HOME",
-		"XDG_DATA_HOME=/from/XDG_DATA_HOME",
-		"XDG_STATE_HOME=/from/XDG_STATE_HOME",
-		"MISE_DATA_DIR=/from/MISE_DATA_DIR",
-		"MISE_STATE_DIR=/from/MISE_STATE_DIR",
-		"GOPATH=/from/GOPATH",
-		"GOCACHE=/from/GOCACHE",
-		"GOMODCACHE=/from/GOMODCACHE",
-	}
-	fixed := []string{"GOENV=off", "GOTOOLCHAIN=local", "GOWORK=off", "GOFLAGS=-mod=readonly", "GOPROXY=off"}
-	target := []string{"GOOS=darwin", "GOARCH=amd64", "CGO_ENABLED=0"}
-
-	assert.Equal(t, slices.Concat([]string{"PATH=/pinned/go/bin" + sep + "/from/PATH"}, located, fixed),
-		check.StepEnv("/pinned/go/bin"), "stepEnv")
-	assert.Equal(t, slices.Concat([]string{"PATH=/pinned/go/bin" + sep + "/from/PATH"}, located, fixed, target),
-		lint.Env(lint.Target{GOOS: "darwin", GOARCH: "amd64"}, "/pinned/go/bin"), "lintEnv")
-	assert.Equal(t, slices.Concat([]string{"PATH=/from/PATH"}, located), check.PassThroughEnv(), "passThroughEnv")
-
-	// Without PATH in the process, PATH is the go directory alone.
-	require.NoError(t, os.Unsetenv("PATH"))
-	assert.Equal(t, slices.Concat([]string{"PATH=/pinned/go/bin"}, located, fixed), check.StepEnv("/pinned/go/bin"), "PATH unset")
-	assert.Equal(t, located, check.PassThroughEnv(), "passThroughEnv, PATH unset")
-}
-
-func TestStepRun(t *testing.T) {
-	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "x.go"), []byte("package x\nvar   X = 1\n"), 0o644))
-	tests := []struct {
-		name string
-		step check.Step
-		ok   bool
-	}{
-		{"a command that exits 0", citest.Passing, true},
-		{"a command that exits non-zero", citest.Failing, false},
-		{"a command that is not installed", check.Step{Name: "x", Argv: []string{"no-such-program-here"}}, false},
-		{"gofmt lists a file: output is a failure", check.Step{Name: "format", Argv: []string{"gofmt", "-l", "."}, Quiet: true}, false},
-		{"a quiet command that fails", check.Step{Name: "x", Argv: []string{"gofmt", "-l", "nothing.go"}, Quiet: true}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := tt.step.Run(t.Context(), dir)
-			if tt.ok {
-				require.NoError(t, err)
-			} else {
-				require.Error(t, err)
-			}
-		})
-	}
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "x.go"), []byte("package x\n\nvar X = 1\n"), 0o644))
-	_, err := (check.Step{Name: "format", Argv: []string{"gofmt", "-l", "."}, Quiet: true}).Run(t.Context(), dir)
-	require.NoError(t, err, "gofmt on a formatted tree")
-
-	// The command gets its environ and nothing else; a nil one is empty.
-	t.Setenv("GOFLAGS", "-run=^$")
-	out, err := (check.Step{Name: "env", Argv: []string{"env"}, Environ: []string{"A=1"}}).Run(t.Context(), dir)
-	require.NoError(t, err)
-	assert.Equal(t, "A=1\n", string(out))
-	out, err = (check.Step{Name: "env", Argv: []string{"env"}}).Run(t.Context(), dir)
-	require.NoError(t, err)
-	assert.Empty(t, string(out))
-}
-
 // TestFastHookIgnoresCallerGitEnv shows that hygiene and the pushed
 // range read this repository when the caller sets GIT_DIR and
 // GIT_ALTERNATE_OBJECT_DIRECTORIES to another one: a pre-push run
@@ -1122,62 +1034,6 @@ func TestFastHookReadsTheProcessGitEnv(t *testing.T) {
 	assert.Contains(t, out, "FAIL  pushed range")
 	assert.Contains(t, out, "commit "+tip+": docs/b.txt:1: name: the added line holds a name listed at the remote's default branch")
 	assert.NotContains(t, strings.ToLower(out), "wixelfrum", "the output repeats the matched text")
-}
-
-// TestChecksPrintErrorsAsSafeText checks that the error of a verdict and
-// the error of a step, which may hold a path of the repository, reach
-// the log with no raw control character and no line that starts a
-// workflow command, while the output of a step is printed as it is.
-func TestChecksPrintErrorsAsSafeText(t *testing.T) {
-	hostile := errors.New("x\x1b[2J\n\u00a0::error::forged\n::error::two ##[error]")
-	var out bytes.Buffer
-	c := newChecks(&out)
-	c.verdict(check.Verdict{Name: "v", Err: hostile})
-	c.run(t.Context(), t.TempDir(), []check.Step{{Name: "s", Unavailable: hostile}})
-	got := out.String()
-	assert.NotContains(t, got, "\x1b")
-	assert.NotContains(t, got, "##[")
-	for _, line := range strings.Split(got, "\n") {
-		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
-	}
-	assert.Contains(t, got, `\x1b[2J`)
-}
-
-// TestQuietStepPrintsSafeText checks that the output of a quiet step,
-// which lists files of the repository, reaches the log with no line that
-// starts a workflow command, while the output of another step is
-// printed as it is.
-func TestQuietStepPrintsSafeText(t *testing.T) {
-	hostile := "::error::x.go\n"
-	var out bytes.Buffer
-	c := newChecks(&out)
-	c.run(t.Context(), t.TempDir(), []check.Step{
-		{Name: "escape", Argv: []string{"sh", "-c", `printf '\033[2J\nx.go\n'; exit 1`}, Quiet: true},
-	})
-	assert.NotContains(t, out.String(), "\x1b", "a control character of the output is escaped")
-	assert.Contains(t, out.String(), `\x1b[2J`)
-	out.Reset()
-	c.run(t.Context(), t.TempDir(), []check.Step{
-		{Name: "listing", Argv: []string{"sh", "-c", "printf '%s' \"$0\"; exit 1", hostile}, Quiet: true},
-		{Name: "code", Argv: []string{"sh", "-c", "printf '%s' \"$0\"; exit 1", hostile}},
-	})
-	var listing, code []string
-	var in *[]string
-	for _, line := range strings.Split(out.String(), "\n") {
-		switch {
-		case strings.HasPrefix(line, "FAIL  listing"):
-			in = &listing
-		case strings.HasPrefix(line, "FAIL  code"):
-			in = &code
-		case in != nil:
-			*in = append(*in, line)
-		}
-	}
-	for _, line := range listing {
-		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
-	}
-	assert.Contains(t, listing, "./::error::x.go")
-	assert.Contains(t, code, "::error::x.go", "the output of a step that runs code stays raw")
 }
 
 // TestDataAtHEAD shows that the denylist and the word lists are read

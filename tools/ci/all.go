@@ -216,7 +216,7 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 		}
 		steps = allSteps(ctx, root, tools, profile)
 	}
-	c := newChecks(e.Stdout)
+	c := check.NewPrinter(e.Stdout)
 	translated := e.Translated
 	if translated == nil {
 		translated = procTranslated
@@ -229,19 +229,19 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 	case translated(ctx):
 		archDetail = fmt.Sprintf("sysctl.proc_translated is 1: this %s binary runs under Rosetta, and the tools of this run are not the ones of the machine\n", runtime.GOARCH)
 	}
-	c.report("architecture", archDetail == "", archDetail)
-	c.run(ctx, root, steps)
+	c.Report("architecture", archDetail == "", archDetail)
+	c.Run(ctx, root, steps)
 	tree := ""
 	if err := changedSince(ctx, repo, before); err != nil {
 		tree = "the steps changed HEAD, the index or the working tree, so a check may not have judged the commit; what changed:\n" + git.SafeLines(err.Error()) + "\n"
 	}
-	c.report("working tree", tree == "", tree)
+	c.Report("working tree", tree == "", tree)
 
 	findings, err := coverage.At(root, profile)
 	for _, v := range append(verdicts, check.Verdict{Name: "coverage", Findings: findings, Err: err}) {
-		c.verdict(v)
+		c.Verdict(v)
 	}
-	return c.ok, nil
+	return c.OK, nil
 }
 
 // unameMachine returns what "uname -m" prints, or why it printed
@@ -336,13 +336,13 @@ func runSetup(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if err := mise.CheckVersion(ctx, root); err != nil {
 		return false, err
 	}
-	c := newChecks(e.Stdout)
+	c := check.NewPrinter(e.Stdout)
 	miseSteps := []check.Step{
 		{Name: "mise trust", Argv: []string{"mise", "trust", filepath.Join(root, "mise.toml")}, Environ: mise.RunEnviron(check.PassThroughEnv(), root)},
 		{Name: "mise install", Argv: []string{"mise", "install"}, Environ: mise.RunEnviron(check.WithProcessEnv(check.PassThroughEnv(), check.NetworkPassThrough), root), Class: procgroup.Mise},
 	}
-	c.run(ctx, root, miseSteps)
-	if !c.ok {
+	c.Run(ctx, root, miseSteps)
+	if !c.OK {
 		return false, nil
 	}
 	tools, err := mise.ResolveLintTools(ctx, root)
@@ -354,6 +354,6 @@ func runSetup(ctx context.Context, e check.Env, args []string) (bool, error) {
 		Argv:    []string{filepath.Join(tools.GoDir, "go"), "mod", "download"},
 		Environ: check.WithProcessEnv(slices.DeleteFunc(check.StepEnv(tools.GoDir), func(kv string) bool { return kv == "GOPROXY=off" }), check.NetworkPassThrough),
 	}
-	c.run(ctx, root, []check.Step{download})
-	return c.ok, nil
+	c.Run(ctx, root, []check.Step{download})
+	return c.OK, nil
 }

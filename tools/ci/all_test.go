@@ -289,56 +289,6 @@ func TestAllStepsVulnFailsClosed(t *testing.T) {
 	}
 }
 
-// TestStepRunDeadline checks that a step that outlives the limit of its
-// class fails with procgroup's subprocess-timeout, which names the
-// class and the limit and wraps context.DeadlineExceeded, where the
-// bare error of the killed command says only that a signal ended it; a
-// step runs under procgroup.ToolStep unless it names another class.
-func TestStepRunDeadline(t *testing.T) {
-	sleep := []string{"sleep", "30"}
-	environ := []string{"PATH=" + os.Getenv("PATH")}
-	t.Run("the limit of the step's class", func(t *testing.T) {
-		ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolStep, 50*time.Millisecond)
-		_, err := check.Step{Name: "slow", Argv: sleep, Environ: environ}.Run(ctx, t.TempDir())
-		require.ErrorIs(t, err, context.DeadlineExceeded)
-		timeout, ok := errors.AsType[*procgroup.TimeoutError](err)
-		require.True(t, ok, "the error is subprocess-timeout: %v", err)
-		assert.Equal(t, procgroup.ToolStep, timeout.Class)
-		assert.ErrorContains(t, err, "sleep ran past the 50ms limit of class tool-step")
-	})
-	t.Run("the race step runs under its own class", func(t *testing.T) {
-		ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolRace, 50*time.Millisecond)
-		_, err := check.Step{Name: "race", Argv: sleep, Environ: environ, Class: procgroup.ToolRace}.Run(ctx, t.TempDir())
-		timeout, ok := errors.AsType[*procgroup.TimeoutError](err)
-		require.True(t, ok, "the error is subprocess-timeout: %v", err)
-		assert.Equal(t, procgroup.ToolRace, timeout.Class)
-	})
-	t.Run("the deadline of the run, before the limit", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
-		defer cancel()
-		_, err := check.Step{Name: "slow", Argv: sleep, Environ: environ}.Run(ctx, t.TempDir())
-		require.ErrorIs(t, err, context.DeadlineExceeded)
-		_, ok := errors.AsType[*procgroup.TimeoutError](err)
-		assert.False(t, ok, "the caller's deadline is not the step's subprocess-timeout: %v", err)
-	})
-	t.Run("a grandchild that holds the output pipe", func(t *testing.T) {
-		// sh forks sleep, which inherits the pipe and outlives sh: only
-		// killing the process group, or WaitDelay, ends the wait.
-		ctx := procgroup.WithTestTimeout(t.Context(), procgroup.ToolStep, 200*time.Millisecond)
-		start := time.Now()
-		_, err := check.Step{Name: "slow", Argv: []string{"sh", "-c", "sleep 30; true"}, Environ: environ}.Run(ctx, t.TempDir())
-		require.ErrorIs(t, err, context.DeadlineExceeded)
-		assert.Less(t, time.Since(start), 5*time.Second, "the step returns at its deadline, not when the grandchild ends")
-	})
-	t.Run("a failure that is not a deadline", func(t *testing.T) {
-		_, err := check.Step{Name: "fails", Argv: []string{"false"}, Environ: environ}.Run(t.Context(), t.TempDir())
-		exit, ok := errors.AsType[*procgroup.ExitError](err)
-		require.True(t, ok, "the error is the exit of the command: %v", err)
-		assert.Equal(t, 1, exit.Code)
-		assert.NotErrorIs(t, err, context.DeadlineExceeded)
-	})
-}
-
 // TestArchMatches maps uname -m to the architecture of the Go binary.
 func TestArchMatches(t *testing.T) {
 	for _, tt := range []struct {
@@ -486,9 +436,9 @@ func TestLicenseStep(t *testing.T) {
 	require.Error(t, licenseStep("/src/a", "/src/b=c/.git", "linux", env).Unavailable, "a git directory the mount option cannot name")
 
 	var out bytes.Buffer
-	c := newChecks(&out)
-	c.run(t.Context(), t.TempDir(), []check.Step{citest.Passing, darwin})
-	assert.True(t, c.ok, "a step not run fails nothing")
+	c := check.NewPrinter(&out)
+	c.Run(t.Context(), t.TempDir(), []check.Step{citest.Passing, darwin})
+	assert.True(t, c.OK, "a step not run fails nothing")
 	assert.Contains(t, out.String(), "--    license: "+darwin.Skip+"\n")
 	assert.NotContains(t, out.String(), "ok    license")
 	assert.NotContains(t, out.String(), "FAIL  license")
@@ -715,21 +665,6 @@ func TestSetup(t *testing.T) {
 			assert.Less(t, time.Since(start), 10*time.Second, "the stalled command ends at the limit of its class")
 		})
 	}
-}
-
-// TestPassThroughLists pins the two lists of variables a step may keep
-// from the process, and the way withProcessEnv adds them: in the order
-// of the list, a variable that is empty or unset left out.
-func TestPassThroughLists(t *testing.T) {
-	assert.Equal(t, []string{"HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE"}, check.NetworkPassThrough)
-	assert.Equal(t, []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"}, check.DockerPassThrough)
-
-	t.Setenv("DOCKER_HOST", "unix:///a")
-	t.Setenv("DOCKER_CONTEXT", "")
-	t.Setenv("DOCKER_CONFIG", "/c")
-	base := []string{"PATH=/x"}
-	assert.Equal(t, []string{"PATH=/x", "DOCKER_HOST=unix:///a", "DOCKER_CONFIG=/c"}, check.WithProcessEnv(base, check.DockerPassThrough), "an empty variable is left out")
-	assert.Equal(t, []string{"PATH=/x"}, base, "the base is not changed")
 }
 
 // overwriteObject returns a step that overwrites the loose object of
