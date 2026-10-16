@@ -1,0 +1,241 @@
+// SPDX-FileCopyrightText: 2026 Bruno Venceslau
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Package check is the registry of the checks of tools/ci and what they
+// share. Each check of the step table of 10 10.2 is one package under
+// tools/ci/internal/<check>/ and one file tools/ci/check_<check>.go,
+// whose init calls Register; the runner of fast and all, the dispatcher
+// of the subcommands and the generator of docs/reference/checks.md read
+// the registry, so a new check adds those two paths and edits no other
+// file (12 12.2, 12 12.3).
+package check
+
+import (
+	"cmp"
+	"context"
+	"fmt"
+	"os"
+	"slices"
+	"strings"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
+)
+
+// Check is one check as tools/ci runs it: what it is, where it runs and
+// in what order, and how it runs. A check runs in one of three ways,
+// each a function of its own: as command steps (Steps), as a judge of
+// the commit read before any step (Judge), or after the steps, on what
+// they left (After). It may also add subcommands (Commands) and write
+// generated files (Outputs).
+type Check struct {
+	// Name is the name fast and all print for the check, and its id in
+	// the registry.
+	Name string
+	// Guards says in one line what the check guards.
+	Guards string
+	// Row is the Step cell of the row of the check in the step table
+	// of 10 10.2, and Req the requirement id that row holds, empty when
+	// the row holds none.
+	Row, Req string
+	// Usage is the command line of the check, as checks.md shows it.
+	Usage string
+	// Fast, Hook and All say where the check runs: in every run of
+	// fast, in the pre-push run of fast alone, and in all.
+	Fast, Hook, All bool
+	// Order is the order key. The runner sorts by it, but places every
+	// check that judges the tree before the first one that runs code of
+	// the change (RunOrder).
+	Order int
+	// RunsCode says that the check runs code of the change, as unit and
+	// race do, rather than judging the tree.
+	RunsCode bool
+	// Package is the directory of the check's package, relative to the
+	// root of the repository.
+	Package string
+	// Commands are the subcommands the check adds to tools/ci.
+	Commands []Command
+	// Steps returns the command steps of the check.
+	Steps func(ctx context.Context, p Plan) []Step
+	// Judge judges the commit fast and all read once, before mise and
+	// before any step.
+	Judge func(ctx context.Context, c Commit) ([]Verdict, error)
+	// After judges what the steps left, as coverage reads the profile
+	// of the race step.
+	After func(root, profile string) Verdict
+	// Outputs returns the files the check's generator writes, read
+	// from the tree below root.
+	Outputs func(root *os.Root) ([]Output, error)
+}
+
+// Command is one subcommand of tools/ci: its name, the lines the usage
+// text gives it after "go run ./tools/ci ", and what runs it, which
+// returns whether the check passed or an error when it could not run.
+type Command struct {
+	Name  string
+	Usage []string
+	Run   func(ctx context.Context, e Env, args []string) (bool, error)
+}
+
+// Plan is what the steps of a run are built from: the top of the
+// working tree, the pinned tools mise resolves, and the path the race
+// step writes the cover profile to.
+type Plan struct {
+	Root    string
+	Tools   Tools
+	Profile string
+}
+
+// Commit is the commit fast and all judge, as they read it once before
+// mise and any step: the repository, the id, the files of its tree
+// with their content, and in a pre-push run the push.
+type Commit struct {
+	Repo  git.Repo
+	ID    string
+	Files []TreeFile
+	Hook  *Hook
+}
+
+// Hook is what git gives the pre-push hook: the remote's name and the
+// refs the push sends.
+type Hook struct {
+	Remote string
+	Push   pushed.Push
+}
+
+// Output is one generated file: its slash-separated path from the root
+// and its bytes.
+type Output struct {
+	Path    string
+	Content []byte
+}
+
+// Registry holds the checks and the subcommands of tools/ci. The zero
+// value is empty and ready to use.
+type Registry struct {
+	checks   []Check
+	commands []Command // the subcommands that belong to no check
+}
+
+// Add registers a check. A check with no name, a name or a subcommand
+// that is registered already, or a requirement id that is not of the
+// form REQ-nnnn is a programming error, and Add panics: it runs from
+// an init, so the binary does not start.
+func (r *Registry) Add(c Check) {
+	if c.Name == "" {
+		panic("check: a check without a name")
+	}
+	if slices.ContainsFunc(r.checks, func(o Check) bool { return o.Name == c.Name }) {
+		panic(fmt.Sprintf("check: %q is registered twice", c.Name))
+	}
+	if c.Req != "" && !validReq(c.Req) {
+		panic(fmt.Sprintf("check: %q names %q, which is not a requirement id", c.Name, c.Req))
+	}
+	for i, cmd := range c.Commands {
+		r.mustBeNew(cmd.Name)
+		if slices.ContainsFunc(c.Commands[:i], func(o Command) bool { return o.Name == cmd.Name }) {
+			panic(fmt.Sprintf("check: subcommand %q is registered twice", cmd.Name))
+		}
+	}
+	r.checks = append(r.checks, c)
+}
+
+// AddCommand registers a subcommand that belongs to no check, such as
+// fast. A name that is registered already panics, as in Add.
+func (r *Registry) AddCommand(cmd Command) {
+	r.mustBeNew(cmd.Name)
+	r.commands = append(r.commands, cmd)
+}
+
+func (r *Registry) mustBeNew(name string) {
+	if _, ok := r.Lookup(name); ok || name == "" {
+		panic(fmt.Sprintf("check: the subcommand %q is registered twice or has no name", name))
+	}
+}
+
+// Checks returns the checks by order key, and by name for an equal key.
+func (r *Registry) Checks() []Check {
+	return slices.SortedStableFunc(slices.Values(r.checks), func(a, b Check) int {
+		return cmp.Or(cmp.Compare(a.Order, b.Order), strings.Compare(a.Name, b.Name))
+	})
+}
+
+// Lookup returns the subcommand of that name.
+func (r *Registry) Lookup(name string) (Command, bool) {
+	for _, cmd := range r.allCommands() {
+		if cmd.Name == name {
+			return cmd, true
+		}
+	}
+	return Command{}, false
+}
+
+// allCommands returns the subcommands that belong to no check, in the
+// order they were registered, then those of the checks, by the order of
+// the checks.
+func (r *Registry) allCommands() []Command {
+	cmds := slices.Clone(r.commands)
+	for _, c := range r.Checks() {
+		cmds = append(cmds, c.Commands...)
+	}
+	return cmds
+}
+
+// Usage returns the usage text: one line per usage line of each
+// subcommand, in the order of allCommands.
+func (r *Registry) Usage() string {
+	var b strings.Builder
+	b.WriteString("usage:\n")
+	for _, cmd := range r.allCommands() {
+		for _, line := range cmd.Usage {
+			b.WriteString("  go run ./tools/ci " + line + "\n")
+		}
+	}
+	return b.String()
+}
+
+// validReq reports whether id is a requirement id: REQ- and four
+// digits.
+func validReq(id string) bool {
+	digits, ok := strings.CutPrefix(id, "REQ-")
+	return ok && len(digits) == 4 && strings.Trim(digits, "0123456789") == ""
+}
+
+// RunOrder returns the checks of checks that run as command steps, in
+// the order a run starts them: every check that judges the tree, by its
+// place in checks, then every check that runs code of the change, so
+// that no code of the change runs before a check has judged the tree
+// it would rewrite, whatever the order keys say.
+func RunOrder(checks []Check) []Check {
+	var judges, runners []Check
+	for _, c := range checks {
+		switch {
+		case c.Steps == nil:
+		case c.RunsCode:
+			runners = append(runners, c)
+		default:
+			judges = append(judges, c)
+		}
+	}
+	return append(judges, runners...)
+}
+
+// registry is the registry of this binary, which the init of each
+// check_<check>.go of tools/ci fills.
+var registry Registry
+
+// Register adds a check to the registry of this binary (Registry.Add).
+func Register(c Check) { registry.Add(c) }
+
+// RegisterCommand adds a subcommand that belongs to no check to the
+// registry of this binary (Registry.AddCommand).
+func RegisterCommand(cmd Command) { registry.AddCommand(cmd) }
+
+// Registered returns the checks of this binary (Registry.Checks).
+func Registered() []Check { return registry.Checks() }
+
+// Lookup returns the subcommand of this binary of that name.
+func Lookup(name string) (Command, bool) { return registry.Lookup(name) }
+
+// Usage returns the usage text of this binary (Registry.Usage).
+func Usage() string { return registry.Usage() }

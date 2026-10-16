@@ -3,7 +3,7 @@ id: T105
 title: "`tools/ci` registration by file"
 milestone: M0
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - tools/ci/**
   - tools/mutants/**
@@ -25,9 +25,14 @@ ask_first:
   - approvals
   - ask-first
 sitting: none
+merged: 2026-10-16
+pr: 63
 ---
 
 # T105 - `tools/ci` registration by file
+
+Merged on 2026-10-16 in pull request #63. The text below is the one
+written at the re-plan.
 
 Goal: Each check moves to `tools/ci/internal/<check>/` with its tests
 and testdata; one `check_<check>.go` per check whose `init` registers

@@ -13,3 +13,4 @@
 .github/CODEOWNERS -text
 docs/reference/ask-first.md -text
 docs/adr/README.md -text
+docs/reference/checks.md -text

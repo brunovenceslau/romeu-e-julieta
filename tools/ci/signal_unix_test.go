@@ -21,6 +21,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
 // helperEnv names the role of this test binary when a test runs it as a
@@ -42,12 +44,12 @@ func TestHelperProcess(t *testing.T) {
 		if err := writePid(pidfile+mainSuffix, os.Getpid()); err != nil {
 			os.Exit(2)
 		}
-		steps := []step{groupStep(pidfile)}
+		steps := []check.Step{groupStep(pidfile)}
 		if os.Getenv("CI_TEST_FAILFAST") != "" {
-			failed := step{name: "failed", argv: []string{"sh", "-c", "exit 1"}, environ: []string{"PATH=" + os.Getenv("PATH")}}
-			steps = append([]step{failed}, steps...)
+			failed := check.Step{Name: "failed", Argv: []string{"sh", "-c", "exit 1"}, Environ: []string{"PATH=" + os.Getenv("PATH")}}
+			steps = append([]check.Step{failed}, steps...)
 		}
-		e := env{dir: os.Getenv("CI_TEST_DIR"), stdin: strings.NewReader(""), stdout: os.Stdout, stderr: os.Stderr, steps: steps}
+		e := check.Env{Dir: os.Getenv("CI_TEST_DIR"), Stdin: strings.NewReader(""), Stdout: os.Stdout, Stderr: os.Stderr, Steps: steps}
 		os.Exit(runMain(e, []string{"fast"}))
 	}
 	os.Exit(0)
@@ -74,18 +76,18 @@ func writePid(file string, pid int) error {
 // groupStep is a step whose command forks a grandchild that ignores
 // SIGTERM, writes its pid to pidfile and waits on it: only a SIGKILL
 // to the whole process group ends it.
-func groupStep(pidfile string) step {
+func groupStep(pidfile string) check.Step {
 	script := `echo $$ > "$0.leader"; trap "" TERM; sleep 60 & echo $! > "$0.tmp" && mv "$0.tmp" "$0"; wait`
-	return step{name: "group", argv: []string{"sh", "-c", script, pidfile}, environ: []string{"PATH=" + os.Getenv("PATH")}}
+	return check.Step{Name: "group", Argv: []string{"sh", "-c", script, pidfile}, Environ: []string{"PATH=" + os.Getenv("PATH")}}
 }
 
 // leaderExitStep is a step that writes the pid of a grandchild, which
 // holds the output pipe, and then ends at once with status code: the
 // step has its status while its group still runs, until the group is
 // killed.
-func leaderExitStep(pidfile string, code int) step {
+func leaderExitStep(pidfile string, code int) check.Step {
 	script := `echo $$ > "$0.leader"; sleep 60 & echo $! > "$0.tmp" && mv "$0.tmp" "$0"; exit ` + strconv.Itoa(code)
-	return step{name: "leaderexit", argv: []string{"sh", "-c", script, pidfile}, environ: []string{"PATH=" + os.Getenv("PATH")}}
+	return check.Step{Name: "leaderexit", Argv: []string{"sh", "-c", script, pidfile}, Environ: []string{"PATH=" + os.Getenv("PATH")}}
 }
 
 // waitForPid returns the pid that the file holds, once it is there. A
@@ -121,7 +123,7 @@ func runAsync(ctx context.Context, c procgroup.Command) <-chan error {
 // limit that ends a helper the test lost.
 func startMain(t *testing.T, extra ...string) (done <-chan error, stderr *bytes.Buffer, pid, grandchild int) {
 	t.Helper()
-	r := newTree(t)
+	r := citest.NewTree(t)
 	r.Commit("fixture")
 	pidfile := filepath.Join(t.TempDir(), "pid")
 	killAtEnd(t, pidfile)
@@ -227,7 +229,7 @@ func TestStepRunKillsTheGroup(t *testing.T) {
 			pidfile := filepath.Join(t.TempDir(), "pid")
 			killAtEnd(t, pidfile)
 			start := time.Now()
-			_, err := leaderExitStep(pidfile, c.code).run(t.Context(), t.TempDir())
+			_, err := leaderExitStep(pidfile, c.code).Run(t.Context(), t.TempDir())
 			took := time.Since(start)
 			if c.code == 0 {
 				require.NoError(t, err, "the leader succeeded, and its group is gone")
