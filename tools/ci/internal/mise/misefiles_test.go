@@ -471,7 +471,9 @@ func TestCheckMiseVersion(t *testing.T) {
 	assert.Equal(t, "mise.toml "+real+"\n", string(data), "with miseEnv, at the top of the tree")
 
 	write("2026.10.4")
-	require.ErrorContains(t, CheckVersion(t.Context(), root), "mise is at version 2026.10.4, and .github/workflows/ci.yml pins 2026.10.3")
+	err = CheckVersion(t.Context(), root)
+	require.ErrorContains(t, err, "mise is at version 2026.10.4, and .github/workflows/ci.yml pins 2026.10.3")
+	require.ErrorContains(t, err, `run "go run ./tools/ci setup" in `+root+", which installs mise 2026.10.3", "the refusal names setup")
 	for _, other := range []string{"2026.10.30", "2026.10"} {
 		write(other)
 		require.ErrorContains(t, CheckVersion(t.Context(), root), "mise is at version "+other+",", "a version that only shares a prefix with the pin")
@@ -480,7 +482,9 @@ func TestCheckMiseVersion(t *testing.T) {
 	require.ErrorContains(t, CheckVersion(t.Context(), root), "mise is at version 2024.11.37")
 
 	require.NoError(t, os.Remove(filepath.Join(f.Bin, "mise")))
-	require.ErrorContains(t, CheckVersion(t.Context(), root), "mise is not on the search path")
+	err = CheckVersion(t.Context(), root)
+	require.ErrorContains(t, err, "mise is not on the search path")
+	require.ErrorContains(t, err, `run "go run ./tools/ci setup"`)
 }
 
 // TestMiseProbesRunUnderTheToolProbeClass shows that the two probes of

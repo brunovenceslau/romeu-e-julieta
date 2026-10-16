@@ -151,7 +151,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		{
 			name:  "mise which fails, with what mise wrote to standard error",
 			fails: true,
-			want:  "mise which golangci-lint: mise exited 1; the tool is not installed or the configuration is not trusted: run \"mise trust\" and \"mise install\" in ",
+			want:  "/mise exited 1; the tool is not installed or the configuration is not trusted: run \"mise trust\" and \"mise install\" in ",
 		},
 		{
 			name: "HOME is not set",
