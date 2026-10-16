@@ -562,7 +562,7 @@ task lands it.
 | `gh`, for `tools/release verify` | an exact version in `mise.toml`, with a sha256 per platform in `mise.lock`; started by the path `mise which` resolves, never through `mise exec` | 12 12.1, 10 10.2 | PR #27 (round 8, DR7), merged |
 | `gopls`, a dev tool for editors and agents | an exact version in `mise.toml`, locked in `mise.lock` with no checksum, like `govulncheck` (it rests on the Go checksum database); no step of `tools/ci` starts it | 12 12.1 | PR #44 |
 | GitHub Actions | `uses` with a 40-hex commit SHA | 10 10.2 | T002, T088 |
-| mise on the CI runners | one `uses` step with a 40-hex commit SHA, the mise version and its sha256 in `with`; Go and the other tools come from `mise.lock` through it | 10 10.2 | T002 |
+| mise on the CI runners and on a developer machine | one `uses` step with a 40-hex commit SHA, the mise version and its sha256 in `with`; Go and the other tools come from `mise.lock` through it; `tools/ci setup` reads the same version and sha256 to install that mise where another one is found | 10 10.2, 12 12.1 | T002; T141 |
 | Go dependencies | `go.mod`, `go.sum`; the complete v1 list is in 12 12.1 | 12 12.1 | the first importer of each (rule 7): T125 and T053 |
 | kit frontend | `docker/sandbox-kit:3.0.0-m.<N>@sha256:<digest>`, in the pin file | 06 6.1 | T012 |
 | workload | `<registry>/<repository>@sha256:<64 hex>`, in the pin file | 03 3.1, 06 6.2 | T012 |
