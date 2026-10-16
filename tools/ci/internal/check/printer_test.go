@@ -9,8 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // TestChecksPrintErrorsAsSafeText checks that the error of a verdict and

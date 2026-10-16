@@ -9,10 +9,11 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
 // TestGitCommonDir shows that GitCommonDir names the git directory by an

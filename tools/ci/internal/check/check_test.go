@@ -103,3 +103,22 @@ func TestUsage(t *testing.T) {
 	_, ok = r.Lookup("nonesuch")
 	assert.False(t, ok)
 }
+
+// TestTheRegistryOfTheBinary checks the registry the init of each
+// check_<check>.go fills: what Register and RegisterCommand add is what
+// Registered, Lookup and Usage give.
+func TestTheRegistryOfTheBinary(t *testing.T) {
+	run := func(context.Context, Env, []string) (bool, error) { return true, nil }
+	RegisterCommand(Command{Name: "all", Usage: []string{"all"}, Run: run})
+	Register(Check{Name: "format", Order: 10})
+	Register(Check{Name: "reqs", Order: 120, Commands: []Command{{Name: "reqs", Usage: []string{"reqs [allocate]"}, Run: run}}})
+	var names []string
+	for _, c := range Registered() {
+		names = append(names, c.Name)
+	}
+	assert.Equal(t, []string{"format", "reqs"}, names)
+	cmd, ok := Lookup("reqs")
+	require.True(t, ok)
+	assert.Equal(t, "reqs", cmd.Name)
+	assert.Equal(t, "usage:\n  go run ./tools/ci all\n  go run ./tools/ci reqs [allocate]\n", Usage())
+}

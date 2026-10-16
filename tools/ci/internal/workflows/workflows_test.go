@@ -9,11 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
 // TestWorkflowsGrammar fails a fixture for each construct outside the

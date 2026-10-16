@@ -9,6 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
@@ -17,8 +20,6 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/prose"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestPushedRangeVerdicts pins the verdicts of Range, case by

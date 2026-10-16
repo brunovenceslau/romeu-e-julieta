@@ -16,12 +16,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
-	"github.com/stretchr/testify/require"
 )
 
 // FixtureModule is the module path of the fixture cover profiles.

@@ -10,9 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
 // TestParseAskFirst checks each rule of the file with one source that
