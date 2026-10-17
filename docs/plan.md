@@ -448,8 +448,8 @@ file, the one write rule 1 allows outside its own file.
 
 This page keeps what changes at re-plan time only: how to read, the
 rules above, the milestones and sittings, the deferred decisions, the
-accepted risks, and the decision block of the re-plan. It holds no task body, no count and no traceability
-table.
+accepted risks, and the decision block of the re-plan. It holds no
+task body, no count and no traceability table.
 
 **Why not a plan document plus a separate checklist file**, the
 convention of the planning skill in use: a second checklist file is a
@@ -620,7 +620,7 @@ The verdicts:
 | `tools/mutants` | kept as the tool, named in 12 12.1 and 02 2.1 (T122); no gate consumes it until `tools/ci mutate` runs it in M6 (item 13 of Decisions of the re-plan) | it removed a measured hazard; a gate needs an invariant with code |
 | `tools/ci/procgroup` | kept; moves to `internal/procgroup` in T137 (M0) and serves both binaries | one process layer for the tools and the product |
 | `tools/new adr` | kept; registered by file from T106 (rule 4); gains `task` (T106), `command` and `error` (T009), `kit` (T076); `invariant`, `lesson` and `probe` in M6 | each kind with its first input |
-| `.github/ask-first.yaml`, 16 surfaces | the file kept; one source (T107); two narrowings decided on 2026-10-17 and applied by T107 (items 8 and 9 of Decisions of the re-plan) | one surface change touches four files today |
+| `.github/ask-first.yaml` | the file kept; one source (T107); two narrowings decided on 2026-10-17 and applied by T107 (items 8 and 9 of Decisions of the re-plan) | one surface change touches four files today |
 | `docs/reference/ask-first.md` (generated) | dropped (T107) | the YAML with its reasons is the reference |
 | `docs/adr/README.md` (generated) | kept; its removal deferred | 12 12.3's merge rule covers the textual conflict |
 | the four-runner matrix | kept on `main` and pull requests | a deferred row holds its trigger |
@@ -795,6 +795,7 @@ phase" fired and is gone, and so is the row of the timeout classes of
 | the host suite and the remaining scenario functions (T075) | the CI journeys with the fake | the release candidate |
 | release tooling, attestations, notices, `pins`, `acceptance`, `links`, `fuzz.yml`, guides, root docs, `SECURITY.md` (T084 to T088, T090, T094, T095, T102) | `go build` and the `--dry-run` build on the host | the first adopter other than the maintainer; or the maintainer's environments all on the new tools |
 | the decision records of review rounds 2 to 6 and of the settled questions (T096 to T101) | the review files hold the decisions | the release candidate; or one record when its decision is first touched by code |
+| generated dispatcher tables for the `tools/ci` steps and the commands, in place of registration by file (ADR 0014) | each step and command registers itself from its own file's `init` | the first check or command present in the tree that its registry does not list at run time |
 | deriving `merged` from merged pull requests | the tick in the task file | the first task file whose `merged` disagrees with the merged pull requests |
 | one file per deferred-decision row | the tables of `docs/spec.md` and the retired-requirements table of 12 12.11 | two open pull requests conflict on one of them twice |
 | removing the generated ADR index; lessons by date-slug | the index as today, with 12 12.3's merge rule | two concurrent ADR pull requests conflict on it twice |
@@ -887,7 +888,8 @@ records these answers again with the rules they decide (T108).
    `tools/ci/internal/{hygiene,names,pr,generated,workflows,plan,askfirst,kits,catalog,callsites}/**`,
    `docs/acceptance.json`): the denylist and the kits, catalog and
    call-site packages stay because 05 5.3 names them as what the
-   `checks` line guards; the other check packages are plain. Decided on
+   `checks` line guards; the other check packages are plain. That list
+   is the proposal as written on 2026-10-12. Decided on
    2026-10-17: yes, applied by T107, with the list read after T105
    moved the checks below `tools/ci/internal/`: the runner and the
    moved security code stay on `checks`, with `tools/mutants/**`, and

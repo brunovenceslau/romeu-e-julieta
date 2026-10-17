@@ -23,9 +23,30 @@ it carried into the specification were applied by T122 under
 
 Until now the answers lived only in that block. A few of them replace
 earlier decisions, and one of those is a rule of a decision record: the
-re-plan defers parts of the merge gate, which rule 1 of ADR 0005 says
-are never deferred. This record states the practices the re-plan
-adopts, the decision each one replaces and the event that reopens it.
+re-plan keeps parts of the merge gate deferred, which rule 1 of
+ADR 0005 says are never deferred. 05 5.4 accepted that collision by
+name on 2026-10-07, and no record had amended the rule. This record
+states the practices the re-plan adopts, the decision each one replaces
+and the event that reopens it.
+
+### Alternatives considered
+
+- For the shape of the plan, a plan document plus a separate checklist
+  file, the convention of the planning skill in use: declined because
+  a second checklist is a second source of the same list
+  ([Where the task checklist lives](../plan.md#where-the-task-checklist-lives)).
+- For the registries, the specification as it was written: sorted
+  generated tables with regenerate-on-merge (item 1).
+- For the build order, block A as one two-host sitting before M3's
+  lane B, about 2.5 hours on the critical path (item 3); and M4 before
+  the slots of sitting M3, which delays M3's value by M4's tasks
+  (item 7).
+- For the fake's sessions, a recorder seam in `sbxdrv` with the
+  redaction package landed early, declined for the irreversible-harm
+  reason of rule 10 (item 4).
+- For rule 1 of ADR 0005, leaving it as written and the collision
+  accepted only in 05 5.4: declined because a reader of the record
+  would find a rule the repository does not follow.
 
 ## Decision
 
@@ -37,47 +58,50 @@ adopts, the decision each one replaces and the event that reopens it.
    with its ticks inline. Reopened by: the first task file whose
    `merged` disagrees with the merged pull requests (the row "deriving
    `merged` from merged pull requests" of
-   [Decisions this plan defers](../plan.md#decisions-this-plan-defers));
-   or two open pull requests that conflict on one task file twice.
+   [Decisions this plan defers](../plan.md#decisions-this-plan-defers)).
 2. **Registration by file.** Each `tools/ci` step and each command
-   registers itself from its own file's `init` (12 12.3), and the
-   reference pages are generated from the registries (item 1, decided
-   on 2026-10-12; T105 split the packages). It replaces sorted
-   generated dispatcher tables with regenerate-on-merge, the
+   registers itself from its own file's `init` (item 1, decided on
+   2026-10-12; T105 split the packages), and the reference pages are
+   generated from the registries (item 5 and 12 12.3). It replaces
+   sorted generated dispatcher tables with regenerate-on-merge, the
    specification as written before 2026-10-12. Reopened by: the first
    check or command present in the tree that its registry does not
-   list at run time.
+   list at run time (the row "generated dispatcher tables" of
+   Decisions this plan defers, added with this record).
 3. **Build order for early daily use.** julieta's daily commands and
    the kits come before `sync`; block A is the last word, in M6; the
    smoke steps are per-project slots; render and run come before
    salvage (items 3 and 7, decided on 2026-10-12). It replaces the
-   order of the earlier plan of ten phases, with block A as one
-   two-host sitting before M3's lane B. Reopened by: the first
+   order of the earlier plan of ten phases. Reopened by: the first
    uncommitted change lost to a recreate, which moves T068 ahead of any
    remaining M3 task (the first row of
-   [Accepted risks](../plan.md#accepted-risks)); or a real-sbx
-   behaviour the fake cannot model that breaks a daily run, which
-   reopens block A's place with the recorder below.
+   [Accepted risks](../plan.md#accepted-risks)).
 4. **Dogfood before recording.** The sbx sessions the fake replays are
    written by hand and marked `synthetic: true` until the probe harness
    records them, and no recorder is built before the harness (item 4,
-   decided on 2026-10-12). It replaces block A's recordings as the
-   fake's only source, and declines a recorder seam in `sbxdrv` landed
-   early. Reopened by: a real-sbx behaviour the fake cannot model that
-   breaks a daily run; or the first release candidate (the row of the
-   recorder and the probe harness in Decisions this plan defers).
-5. **Merge-gate parts deferred by name.** Rule 1 of ADR 0005 now reads:
-   a security invariant and anything a later step depends on are never
-   deferred; a part of a merge gate is deferred only when
+   decided on 2026-10-12). It replaces recordings from block A as the
+   fake's source before the harness. Reopened by: a real-sbx behaviour
+   the fake cannot model that breaks a daily run; or the first release
+   candidate (the row of the recorder and the probe harness in
+   Decisions this plan defers).
+5. **Merge-gate parts deferred by name.** Rule 1 of ADR 0005, as this
+   record amends it, reads: a security invariant and anything a later
+   step depends on are never deferred; a part of a merge gate is
+   deferred only when
    [05 5.4](../spec/05-security.md#risks-of-how-this-repository-is-developed)
    accepts the risk by name and a row of
    [Deferred decisions](../spec.md#in-how-this-repository-is-run)
-   holds its trigger. The parts so deferred are the approval-line,
-   grant and section checks of `tools/ci pr`, `tools/ci sequences`, and
-   `tools/ci invariants` with `mutate`; until each lands, the
-   maintainer reads its inputs at merge. Reopened by: the trigger of
-   each part's row in Deferred decisions, each also a row of
-   Decisions this plan defers.
+   holds its trigger. ADR 0005's own text is unchanged; its Status
+   points here. The parts so deferred are the six that 05 5.4 names: a
+   check that reads the rulesets again, a signed approval record,
+   running the change's tests in a separate job, `tools/ci pr`,
+   `tools/ci sequences`, and `tools/ci invariants` with `mutate`. The
+   list is closed: deferring a further part needs a record that amends
+   this decision. For `invariants` and `mutate`, only the automated
+   tag pairing and mutation run are deferred; each invariant's guard
+   and its tests land with the code they guard. Until each part lands,
+   the maintainer reads its inputs at merge. Reopened by: the trigger
+   of each part's row in Deferred decisions.
 6. **The rest of the block.** Every other answer stands as
    [Decisions of the re-plan](../plan.md#decisions-of-the-re-plan)
    records it, and this record does not copy them. Items 8, 9 and 11,
@@ -95,10 +119,10 @@ adopts, the decision each one replaces and the event that reopens it.
   rules stand: a deferral still names what holds until then and an
   observable event.
 - Deferring a merge-gate part is no longer a silent exception: it needs
-  a risk row in 05 5.4 and a trigger row, and the maintainer's reading
-  at merge is the gate until the trigger fires. The cost is that a
-  mistake those checks would catch reaches `main` when the maintainer
-  misses it.
+  a risk row in 05 5.4, a trigger row and a record, and the
+  maintainer's reading at merge is the gate until the trigger fires.
+  The cost is that a mistake those checks would catch reaches `main`
+  when the maintainer misses it.
 - The practices in decisions 1 to 4 are reopened by events, not by a
   later review round; a pull request that meets one of those events
   names this record.
