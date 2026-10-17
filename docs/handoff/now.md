@@ -2,17 +2,20 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-17. #67 merged, green on the four runners (Done
-record 5): every row of the step table in 10 10.2 carries a
-requirement id.
+Checkpoint of 2026-10-17. #67 and #69 merged, green on the four runners
+(Done records 5 and 6): every row of the step table in 10 10.2 carries
+a requirement id, and the pre-push hook and every mise run of
+`tools/ci` install nothing by themselves (T138).
 
 ## Next steps
 
-1. T012 waits by decision. T106, T107, T108, T138, T139 and T140
-   follow T105, which has merged.
+1. T012 waits by decision. T106, T107, T139 and T140 follow T105,
+   which has merged; T108 follows T107.
 2. Tests bound by wall-clock time ("tests-bound-by-wall-clock-time").
 3. Migrate the docs/reviews checkpoints
    ("migrate-the-docs-reviews-checkpoints-into-docs-handoff").
+4. The go that builds tools/ci
+   ("the-go-that-builds-tools-ci-is-not-held-to-the-pin").
 
 ## Open for the operator
 
