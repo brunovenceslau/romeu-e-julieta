@@ -54,7 +54,8 @@ run() {
 # A go older than go.mod refuses with a bare "go: go.mod requires go >=
 # ..." before tools/ci can run, so this probe, which reads go.mod and
 # builds nothing, lets go's own line through and then says what to do.
-# It is shell because it runs before any Go code can.
+# It runs in a subshell, which a signal sent to the hook ends first. It
+# is shell because it runs before any Go code can.
 gopath=$(command -v go) || gopath=
 if [ -z "$gopath" ] || ! (run go list -m) >/dev/null </dev/null; then
 	{
@@ -442,6 +443,108 @@ func TestHookExplainsAToolchainRefusal(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "list -m\n", string(argv), "the probe")
 	})
+}
+
+// TestHookInstallsNothing runs the tracked hook with the real mise
+// behind a go shim, in a tree whose mise.toml names a go that the empty
+// installs directory does not hold, with the module variables of a
+// hostile caller (GONOSUMDB=*) and proxies that refuse every connection,
+// so no run reaches the network. The shim's mise tries no install: the
+// probe refuses, the hook gives the hint for a shim, and mise prints no
+// failed install. The refused proxies fail the probe either way, so that
+// message is the proof, and the empty installs directory a backstop. The
+// control runs the same shim in the same environment with mise's default
+// auto_install, and it tries the install the hook must not; so the
+// difference is the two settings of mise.MiseEnv, not a tree mise cannot
+// read. PATH holds the shim and the
+// two tools the hook starts, so no other go answers in its place.
+func TestHookInstallsNothing(t *testing.T) {
+	root := citest.ModuleRoot(t)
+	require.NoError(t, mise.CheckVersion(t.Context(), root), "the measurement is of the mise ci.yml pins")
+	misePath, err := mise.Path(root)
+	require.NoError(t, err)
+	tree := citest.MustEval(t, t.TempDir())
+	require.NoError(t, os.WriteFile(filepath.Join(tree, "mise.toml"), []byte("[tools]\ngo = \"1.27.2\"\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(tree, "go.mod"), []byte("module example.test/x\n\ngo 1.27\n"), 0o600))
+	bin := t.TempDir()
+	shims := filepath.Join(t.TempDir(), "mise", "shims")
+	require.NoError(t, os.MkdirAll(shims, 0o700))
+	require.NoError(t, os.Symlink(misePath, filepath.Join(shims, "go")))
+	for _, tool := range []string{"env", "dirname"} {
+		p, err := procgroup.LookPath(tool)
+		require.NoError(t, err)
+		require.NoError(t, os.Symlink(p, filepath.Join(bin, tool)))
+	}
+	data := t.TempDir()
+	const refused = "http://127.0.0.1:9"
+	env := []string{
+		"PATH=" + shims + string(os.PathListSeparator) + bin,
+		"HOME=" + t.TempDir(), "TMPDIR=" + t.TempDir(),
+		"XDG_CACHE_HOME=" + t.TempDir(), "XDG_DATA_HOME=" + t.TempDir(), "XDG_STATE_HOME=" + t.TempDir(),
+		"MISE_DATA_DIR=" + data, "MISE_STATE_DIR=" + t.TempDir(), "MISE_CACHE_DIR=" + t.TempDir(),
+		"HTTPS_PROXY=" + refused, "HTTP_PROXY=" + refused, "https_proxy=" + refused, "http_proxy=" + refused,
+		"GONOSUMDB=*", "GOFLAGS=-mod=mod",
+	}
+	// mise reads the tree's mise.toml only once it is trusted, in the
+	// state directory above.
+	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolProbe,
+		Argv:  []string{misePath, "trust", filepath.Join(tree, "mise.toml")},
+		Dir:   tree,
+		Env:   slices.Concat(env, mise.MiseEnv),
+	})
+	require.NoError(t, err, string(out))
+	installs := func() []string {
+		t.Helper()
+		entries, err := os.ReadDir(filepath.Join(data, "installs"))
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		require.NoError(t, err)
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		return names
+	}
+
+	sh, err := procgroup.LookPath("sh")
+	require.NoError(t, err)
+	var o, e bytes.Buffer
+	err = procgroup.Run(t.Context(), procgroup.Command{
+		Class:  procgroup.ToolStep,
+		Argv:   []string{sh, citest.MustAbs(t, filepath.Join("..", "..", ".githooks", "pre-push")), "origin", "https://example.test/a b.git"},
+		Dir:    tree,
+		Env:    env,
+		Stdin:  strings.NewReader(""),
+		Stdout: &o,
+		Stderr: &e,
+	})
+	exit, ok := errors.AsType[*procgroup.ExitError](err)
+	require.True(t, ok, "the hook refuses: %v\n%s", err, e.String())
+	assert.Equal(t, 1, exit.Code)
+	assert.Empty(t, o.String(), "the standard output")
+	assert.Contains(t, e.String(), "is a mise shim that cannot run this module", "the hint for a shim")
+	assert.NotContains(t, e.String(), "install core:go", "the hook's mise tries no install")
+	assert.Empty(t, installs(), "the installs directory")
+
+	// The control: the same shim and environment, with mise's default.
+	var ctl []string
+	for _, kv := range mise.MiseEnv {
+		if !strings.HasPrefix(kv, "MISE_AUTO_INSTALL=") && !strings.HasPrefix(kv, "MISE_NOT_FOUND_AUTO_INSTALL=") {
+			ctl = append(ctl, kv)
+		}
+	}
+	require.Len(t, ctl, len(mise.MiseEnv)-2, "MiseEnv holds the two settings")
+	out, err = procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolProbe,
+		Argv:  []string{filepath.Join(shims, "go"), "list", "-m"},
+		Dir:   tree,
+		Env:   slices.Concat(env, ctl, []string{"MISE_CEILING_PATHS=" + filepath.Dir(tree)}),
+	})
+	require.Error(t, err, string(out))
+	assert.Contains(t, string(out), "Failed to install core:go@1.27.2", "with auto_install, the shim tries the install")
+	assert.Empty(t, installs(), "the refused proxy kept it from the network")
 }
 
 // TestHookPassesSIGTERMToGo checks that a SIGTERM sent to the hook

@@ -3,7 +3,7 @@ id: T138
 title: "The pre-push hook and `miseEnv` install nothing by themselves"
 milestone: M0
 module: ci-release
-fate: new
+fate: merged
 owns:
   - .githooks/pre-push
 needs: []
@@ -12,9 +12,14 @@ after:
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-17
+pr: 69
 ---
 
 # T138 - The pre-push hook and `miseEnv` install nothing by themselves
+
+Merged on 2026-10-17 in pull request #69. The text below is the one
+written at the re-plan.
 
 Goal: `MISE_AUTO_INSTALL=false` and `MISE_NOT_FOUND_AUTO_INSTALL=false`
 join the hook's fixed settings and `miseEnv` of the mise package of

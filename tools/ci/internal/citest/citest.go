@@ -167,6 +167,8 @@ const WorkflowEnv = `env:
   MISE_AUTO_ENV: "false"
   MISE_GLOBAL_CONFIG_FILE: /dev/null/mise-global.toml
   MISE_SYSTEM_CONFIG_FILE: /dev/null/mise-system.toml
+  MISE_AUTO_INSTALL: "false"
+  MISE_NOT_FOUND_AUTO_INSTALL: "false"
   GOENV: "off"
   GOTOOLCHAIN: local
 `
