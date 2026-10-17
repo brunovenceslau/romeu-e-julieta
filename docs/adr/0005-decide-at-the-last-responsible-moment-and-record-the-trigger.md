@@ -8,6 +8,8 @@ Accepted
 
 Superseded in part by [9. Drop the required review and amend the records that assumed it](0009-drop-the-required-review-and-amend-the-records-that-assumed-it.md)
 
+Superseded in part by [ADR 0014, re-plan v1 for early daily use: task files, registration by file, build order, dogfood before recording](0014-re-plan-v1-for-early-daily-use-task-files-registration-by-file-build-order-dogfood-before-recording.md) (rule 1)
+
 ## Context
 
 Friar Laurence decided everything on the first night: the potion, the

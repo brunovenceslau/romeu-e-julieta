@@ -5,7 +5,7 @@ milestone: M0
 module: docs
 fate: new
 owns:
-  - docs/adr/0013-*.md
+  - docs/adr/0014-*.md
   - docs/adr/0001-*.md
   - docs/adr/0005-*.md
   - docs/plan.md
@@ -26,9 +26,9 @@ Earlier title: The re-plan record and the spec amendments.
 
 Goal: One decision record, "re-plan v1 for early daily use: task files,
 registration by file, build order, dogfood before recording", numbered
-by `tools/new adr` (0013, after the stage B pass's 0012). It records the
-answers of Decisions of the re-plan in `docs/plan.md` and supersedes in
-part ADR 0005 rule 1 (the deferrals of merge-gate parts, as 05 5.4 now
+by `tools/new adr` (0014: 0013 went to the Excalidraw record first).
+It records the answers of Decisions of the re-plan in `docs/plan.md`
+and supersedes in part ADR 0005 rule 1 (the deferrals of merge-gate parts, as 05 5.4 now
 accepts them by name). Every spec amendment the re-plan carried was
 applied on 2026-10-12 (ADR 0012; T122), so this task edits no spec
 page; it owns `docs/plan.md`, since after it a change to that page is a
