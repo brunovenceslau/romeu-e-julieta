@@ -26,10 +26,15 @@ import (
 var skipCalls = []string{"Skip", "SkipNow", "Skipf"}
 
 // skipFindings returns what the Go file holds against the skip and
-// TestMain rules of 10 10.6, when it is test code (a *_test.go file, or
-// a package whose name ends in "test"): a call of a method named Skip,
-// SkipNow or Skipf, a reference to testing.Short, and a TestMain whose
-// exit status is not the one m.Run returned. A TestMain passes in
+// TestMain rules of 10 10.6: in any file that imports testing (a test,
+// or a helper package of tests, whatever its name), a reference to a
+// method named Skip, SkipNow or Skipf that is called, or whose receiver
+// is a variable of a testing type or that type itself, so a method
+// value passed to a helper is caught and a field named Skip is not, and
+// a reference to testing.Short; in a *_test.go file, a TestMain whose
+// exit status is not the one m.Run returned. The TestMain rule reads
+// names, not flow: a holder of m.Run's result reassigned before
+// os.Exit, or an exit through syscall or log.Fatal, passes it. A TestMain passes in
 // either spelling: os.Exit(m.Run()), or the result of m.Run stored in a
 // variable that every os.Exit of the function exits with; one that
 // never calls os.Exit returns m.Run's status itself.
@@ -38,9 +43,6 @@ func skipFindings(name string, src []byte) ([]string, error) {
 	f, err := parser.ParseFile(fset, name, src, parser.SkipObjectResolution)
 	if err != nil {
 		return nil, err
-	}
-	if !strings.HasSuffix(name, "_test.go") && !strings.HasSuffix(f.Name.Name, "test") {
-		return nil, nil
 	}
 	testingName, osName := "", ""
 	for _, imp := range f.Imports {
@@ -59,25 +61,92 @@ func skipFindings(name string, src []byte) ([]string, error) {
 			osName = local
 		}
 	}
+	if testingName == "" {
+		return nil, nil
+	}
+	isTestFile := strings.HasSuffix(name, "_test.go")
+	testVars := testingVars(f, testingName)
+	called := map[*ast.SelectorExpr]bool{}
+	ast.Inspect(f, func(n ast.Node) bool {
+		if call, ok := n.(*ast.CallExpr); ok {
+			if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
+				called[sel] = true
+			}
+		}
+		return true
+	})
 	var bad []string
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch n := n.(type) {
-		case *ast.CallExpr:
-			if sel, ok := n.Fun.(*ast.SelectorExpr); ok && slices.Contains(skipCalls, sel.Sel.Name) {
-				bad = append(bad, fset.Position(n.Pos()).String()+": "+sel.Sel.Name)
-			}
 		case *ast.SelectorExpr:
-			if x, ok := n.X.(*ast.Ident); ok && testingName != "" && x.Name == testingName && n.Sel.Name == "Short" {
+			if slices.Contains(skipCalls, n.Sel.Name) && (called[n] || isTestingValue(n.X, testVars, testingName)) {
+				bad = append(bad, fset.Position(n.Pos()).String()+": "+n.Sel.Name)
+			}
+			if x, ok := n.X.(*ast.Ident); ok && x.Name == testingName && n.Sel.Name == "Short" {
 				bad = append(bad, fset.Position(n.Pos()).String()+": testing.Short")
 			}
 		case *ast.FuncDecl:
-			if n.Recv == nil && n.Name.Name == "TestMain" && n.Body != nil {
+			if isTestFile && n.Recv == nil && n.Name.Name == "TestMain" && n.Body != nil {
 				bad = append(bad, testMainFindings(fset, n, osName)...)
 			}
 		}
 		return true
 	})
 	return bad, nil
+}
+
+// testingTypes are the types of testing whose methods skip a test.
+var testingTypes = []string{"T", "B", "F", "TB"}
+
+// isTestingType reports whether e is one of testingTypes, or a pointer
+// to one, named through the file's name for testing.
+func isTestingType(e ast.Expr, testingName string) bool {
+	if star, ok := e.(*ast.StarExpr); ok {
+		e = star.X
+	}
+	sel, ok := e.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	x, ok := sel.X.(*ast.Ident)
+	return ok && x.Name == testingName && slices.Contains(testingTypes, sel.Sel.Name)
+}
+
+// testingVars returns the names the file declares as parameters or
+// variables of a type of testingTypes.
+func testingVars(f *ast.File, testingName string) map[string]bool {
+	vars := map[string]bool{}
+	ast.Inspect(f, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.Field:
+			if isTestingType(n.Type, testingName) {
+				for _, id := range n.Names {
+					vars[id.Name] = true
+				}
+			}
+		case *ast.ValueSpec:
+			if n.Type != nil && isTestingType(n.Type, testingName) {
+				for _, id := range n.Names {
+					vars[id.Name] = true
+				}
+			}
+		}
+		return true
+	})
+	return vars
+}
+
+// isTestingValue reports whether x, the receiver of a selector, is a
+// variable of a testing type, or the type itself as in the method
+// expression (*testing.T).Skip.
+func isTestingValue(x ast.Expr, vars map[string]bool, testingName string) bool {
+	if paren, ok := x.(*ast.ParenExpr); ok {
+		x = paren.X
+	}
+	if id, ok := x.(*ast.Ident); ok {
+		return vars[id.Name]
+	}
+	return isTestingType(x, testingName)
 }
 
 // testMainFindings returns why fn, a TestMain, may exit with another
@@ -108,6 +177,9 @@ func testMainFindings(fset *token.FileSet, fn *ast.FuncDecl, osName string) []st
 			if id, ok := as.Lhs[0].(*ast.Ident); ok {
 				holders[id.Name] = true
 			}
+		}
+		if vs, ok := n.(*ast.ValueSpec); ok && len(vs.Names) == 1 && len(vs.Values) == 1 && isRun(vs.Values[0]) {
+			holders[vs.Names[0].Name] = true
 		}
 		if e, ok := n.(ast.Expr); ok && isRun(e) {
 			runs = true
@@ -162,10 +234,16 @@ func TestTestStyleSkipFindings(t *testing.T) {
 		{"testing.Short", "a_test.go", head + "var _ = testing.Short\nvar _ = os.Exit\n", []string{"a_test.go:8:9: testing.Short"}},
 		{"os.Exit(m.Run())", "a_test.go", head + "func TestMain(m *testing.M) { os.Exit(m.Run()) }\n", nil},
 		{"the result stored, cleaned up and exited", "a_test.go", head + "func TestMain(m *testing.M) {\n\tcode := m.Run()\n\t_ = os.RemoveAll(\"x\")\n\tos.Exit(code)\n}\n", nil},
+		{"the result stored with var", "a_test.go", head + "func TestMain(m *testing.M) {\n\tvar code = m.Run()\n\tos.Exit(code)\n}\n", nil},
+		{"a field named Skip", "a_test.go", head + "type step struct{ Skip string }\nvar _ = step{}.Skip\nvar _ = os.Exit\n", nil},
 		{"a TestMain that returns", "a_test.go", head + "func TestMain(m *testing.M) { m.Run() }\nvar _ = os.Exit\n", nil},
 		{"exit 0 whatever m.Run returned", "a_test.go", head + "func TestMain(m *testing.M) {\n\tm.Run()\n\tos.Exit(0)\n}\n", []string{"a_test.go:10:2: TestMain exits with another status than m.Run's"}},
 		{"no m.Run", "a_test.go", head + "func TestMain(m *testing.M) { os.Exit(0) }\n", []string{"a_test.go:8:1: TestMain calls no m.Run"}},
-		{"code that is not a test", "a.go", head + "func f(t *testing.T) { t.Skip() }\nvar _ = os.Exit\n", nil},
+		{"a method value passed on", "a_test.go", head + "func TestA(t *testing.T) { s := t.Skip; s(\"x\") }\nvar _ = os.Exit\n", []string{"a_test.go:8:33: Skip"}},
+		{"a method expression", "a_test.go", head + "var _ = (*testing.T).SkipNow\nvar _ = os.Exit\n", []string{"a_test.go:8:9: SkipNow"}},
+		{"a helper package of any name", "fixtures/fixtures.go", head + "func Skip(t testing.TB) { t.Skip() }\nvar _ = os.Exit\n", []string{"fixtures/fixtures.go:8:27: Skip"}},
+		{"a TestMain outside a test file", "a.go", head + "func TestMain(m *testing.M) { os.Exit(0) }\n", nil},
+		{"a file that does not import testing", "a.go", "package p\n\ntype s struct{}\n\nfunc (s) Skip() {}\n\nvar _ = s{}.Skip\n", nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
