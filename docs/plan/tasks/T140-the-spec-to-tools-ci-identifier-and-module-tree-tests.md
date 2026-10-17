@@ -3,7 +3,7 @@ id: T140
 title: "The spec-to-tools/ci identifier and module-tree tests"
 milestone: M1
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - tools/ci/internal/moduletree/**
   - tools/ci/internal/identifiers/**
@@ -13,9 +13,14 @@ after:
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-17
+pr: 93
 ---
 
 # T140 - The spec-to-tools/ci identifier and module-tree tests
+
+Merged on 2026-10-17 in pull request #93. The text below is the one
+written at the re-plan.
 
 Goal: Two repository tests: one reads the tree of 02 2.1, the module
 table of 12 12.2 (the rows it names per module) and `coverTrees` of S9,

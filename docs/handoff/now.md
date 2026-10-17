@@ -2,18 +2,19 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-17. #67 to #87 merged (Done records 5 to 22):
+Checkpoint of 2026-10-17. #67 to #90 merged (Done records 5 to 23):
 T138, T106, T107, x64 best effort on a scheduled `x64.yml`, and T108,
 the re-plan record (ADR 0014), which leaves no item of Decisions of the
 re-plan open. The wall-clock stack (Done record 12) fixes procgroup's
 drain, which could cut a successful command's output. The session
 checkpoints of docs/reviews are Done records 13 to 21 (Done record 22).
-tools/new refuses a flag as a title (Done record 23).
+tools/new refuses a flag as a title (Done record 23). T140 holds the
+module tree and the spec identifiers to the code (Done record 24).
 
 ## Next steps
 
 1. T012 waits by decision. T139 waits for item 16 (the lint set) at
-   sitting M0. T140 can start; it touches the `checks` surface.
+   sitting M0.
 2. The tight wall-clock bounds left
    ("tight-wall-clock-bounds-left-in-the-tests"), when one fails.
 3. The go that builds tools/ci

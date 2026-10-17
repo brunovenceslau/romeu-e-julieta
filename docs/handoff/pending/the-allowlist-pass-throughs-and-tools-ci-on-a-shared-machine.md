@@ -10,5 +10,5 @@ mise run (#34), found open on 2026-10-17:
   lint lock was fixed in #39 (`--allow-parallel-runners`, `-j 1`); the
   reproduction of the parallel-run flake is item 12 of T136.
 
-Reopen: the next change to `hookAllow` or to the mise package of
+Reopen: the next change to `HookAllow` or to the mise package of
 `tools/ci`, or T136 reopens.
