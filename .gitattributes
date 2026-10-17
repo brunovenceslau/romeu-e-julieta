@@ -13,3 +13,5 @@
 .github/CODEOWNERS -text
 docs/adr/README.md -text
 docs/reference/checks.md -text
+docs/reference/errors.md -text
+docs/reference/exit-codes.md -text

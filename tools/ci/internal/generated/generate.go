@@ -101,8 +101,8 @@ func Outputs(root *os.Root) ([]check.Output, error) {
 
 // sources reads the sources of the generated check below root and
 // returns the files that follow from them: .github/CODEOWNERS, the one
-// consumer of .github/ask-first.yaml, and the index of the decision
-// records.
+// consumer of .github/ask-first.yaml, the index of the decision
+// records, and the pages of the error table (errorPages).
 func sources(root *os.Root) ([]check.Output, error) {
 	src, err := root.ReadFile(askfirst.Path)
 	if err != nil {
@@ -116,10 +116,14 @@ func sources(root *os.Root) ([]check.Output, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []check.Output{
+	pages, err := errorPages(root)
+	if err != nil {
+		return nil, err
+	}
+	return append([]check.Output{
 		{Path: askfirst.CodeownersPath, Content: list.Codeowners()},
 		{Path: indexPath, Content: index},
-	}, nil
+	}, pages...), nil
 }
 
 // readADRIndex renders the index of the records in the directory that

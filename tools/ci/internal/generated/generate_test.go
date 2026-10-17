@@ -221,7 +221,7 @@ func TestAskFirstOfThisRepository(t *testing.T) {
 	t.Cleanup(func() { _ = root.Close() })
 	outputs, err := generateOutputs(root)
 	require.NoError(t, err)
-	require.Len(t, outputs, 2)
+	require.Len(t, outputs, 4, "CODEOWNERS, the ADR index and the two pages of the error table")
 	for _, out := range outputs {
 		got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(out.path)))
 		require.NoError(t, err, out.path)
