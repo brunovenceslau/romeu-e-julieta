@@ -94,7 +94,10 @@ are derived from the same data this page specifies.
    the wait after the kill is bounded: the output pipes drain until no
    output has moved for 2 s, so what a command wrote before it ended
    is read whole however late the reader is, and a holder of a pipe
-   that left the group ends the drain after 2 s of silence. `REQ-0299` The same package starts every subprocess of `tools/ci`
+   that left the group ends the drain after 2 s of silence. The drain
+   lasts at most 30 s after the command ends, and less when the
+   command's timeout comes first; a drain those end is an error of the
+   command, never a success, since its output may be cut. `REQ-0299` The same package starts every subprocess of `tools/ci`
    and `tools/mutants`, so the group rule, the timeout and the
    scrubbed environment have one implementation, and a call-site scan
    fails an `os/exec` call outside it: a test in `internal/procgroup`
