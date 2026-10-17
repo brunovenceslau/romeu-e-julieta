@@ -10,10 +10,9 @@ import (
 
 func init() {
 	check.Register(check.Check{
-		Name:   "hygiene",
-		Guards: "the tracked paths and their content keep the hygiene rules and hold no forbidden name",
-		Row:    "hygiene",
-		// The hygiene row of 10 10.2 holds no requirement id of its own.
+		Name:    "hygiene",
+		Guards:  "the tracked paths and their content keep the hygiene rules and hold no forbidden name",
+		Row:     "hygiene",
 		Req:     "REQ-1240",
 		Usage:   "go run ./tools/ci hygiene [--file <path>]; go run ./tools/ci hygiene add",
 		Fast:    true,
