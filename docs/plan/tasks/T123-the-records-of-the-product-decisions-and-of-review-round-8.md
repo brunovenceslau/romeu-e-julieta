@@ -5,13 +5,13 @@ milestone: M1
 module: docs
 fate: new
 owns:
-  - docs/adr/0014-*.md
   - docs/adr/0015-*.md
   - docs/adr/0016-*.md
   - docs/adr/0017-*.md
   - docs/adr/0018-*.md
   - docs/adr/0019-*.md
   - docs/adr/0020-*.md
+  - docs/adr/0021-*.md
 needs: []
 after: []
 ask_first:

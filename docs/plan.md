@@ -80,9 +80,9 @@ accepts a local directory source (sitting M2's first act tests it).
 
 Every rule marked "proposed on 2026-10-12" below was taken with the
 answers of that day, recorded under
-[Decisions of the re-plan](#decisions-of-the-re-plan); the items that
-block still holds open are named there, each with the task or sitting
-it is needed before.
+[Decisions of the re-plan](#decisions-of-the-re-plan); no item of that
+block is left open, and the items it defers name the sitting that
+decides each.
 
 ## How to read this plan
 
@@ -448,8 +448,7 @@ file, the one write rule 1 allows outside its own file.
 
 This page keeps what changes at re-plan time only: how to read, the
 rules above, the milestones and sittings, the deferred decisions, the
-accepted risks, and the open decision block
-while it is open. It holds no task body, no count and no traceability
+accepted risks, and the decision block of the re-plan. It holds no task body, no count and no traceability
 table.
 
 **Why not a plan document plus a separate checklist file**, the
@@ -621,12 +620,12 @@ The verdicts:
 | `tools/mutants` | kept as the tool, named in 12 12.1 and 02 2.1 (T122); no gate consumes it until `tools/ci mutate` runs it in M6 (item 13 of Decisions of the re-plan) | it removed a measured hazard; a gate needs an invariant with code |
 | `tools/ci/procgroup` | kept; moves to `internal/procgroup` in T137 (M0) and serves both binaries | one process layer for the tools and the product |
 | `tools/new adr` | kept; registered by file from T106 (rule 4); gains `task` (T106), `command` and `error` (T009), `kit` (T076); `invariant`, `lesson` and `probe` in M6 | each kind with its first input |
-| `.github/ask-first.yaml`, 16 surfaces | the file kept; one source (T107); two narrowings open in Decisions of the re-plan (items 8 and 9) | one surface change touches four files today |
+| `.github/ask-first.yaml`, 16 surfaces | the file kept; one source (T107); two narrowings decided on 2026-10-17 and applied by T107 (items 8 and 9 of Decisions of the re-plan) | one surface change touches four files today |
 | `docs/reference/ask-first.md` (generated) | dropped (T107) | the YAML with its reasons is the reference |
 | `docs/adr/README.md` (generated) | kept; its removal deferred | 12 12.3's merge rule covers the textual conflict |
 | the four-runner matrix | kept on `main` and pull requests | a deferred row holds its trigger |
 | ADR 0001 | kept as review rules; its checks in M6 | |
-| ADR 0002 (no stacks, dark merges), 0003, 0005, 0007 | kept; 0005 used harder | they make an 80/20, parallel plan legal |
+| ADR 0002 (no stacks, dark merges), 0003, 0005, 0007 | kept; 0005 used harder, its rule 1 superseded in part by ADR 0014 (T108) for the merge-gate parts 05 5.4 defers by name | they make an 80/20, parallel plan legal |
 | ADR 0004, 0006 | kept deferred | |
 | ADR 0008 to 0011 | kept; O8 off the path | governance, not product |
 | `docs/reviews/` | kept as history; no further spec review round as a phase | stage A is done |
@@ -836,16 +835,16 @@ window it covers, why it is accepted and what reopens it.
 ## Decisions of the re-plan
 
 The block the re-plan opened on 2026-10-12, with its answers, each
-taken as recommended. Items 1 to 7, 12 to 15 and 17 to 19 were decided
-on 2026-10-12; items 16 and 20 are deferred decisions, each with the
-sitting that decides it and nothing decided now; items 21 to 26 record
-the other decisions of that day. Items 19 and 22 were amended on
-2026-10-13, each as the stage-B review recommended, and item 19's
-removal of the store's writer was decided later that day, after the
-review of that amendment. Items 8 to 11 stay
-open: each is needed before the task or sitting it names, and its
-answer is recorded here as "decided on" with the date. T108's decision
-record records these answers again with the rules they decide.
+taken as recommended unless the item says otherwise. Items 1 to 7, 12
+to 15 and 17 to 19 were decided on 2026-10-12; items 10, 16 and 20 are
+deferred decisions, each with the sitting that decides it and nothing
+decided now; items 21 to 26 record the other decisions of that day.
+Items 19 and 22 were amended on 2026-10-13, each as the stage-B review
+recommended, and item 19's removal of the store's writer was decided
+later that day, after the review of that amendment. Items 8, 9 and 11
+were decided on 2026-10-17, for T107. No item is left open.
+[ADR 0014, re-plan v1 for early daily use: task files, registration by file, build order, dogfood before recording](adr/0014-re-plan-v1-for-early-daily-use-task-files-registration-by-file-build-order-dogfood-before-recording.md)
+records these answers again with the rules they decide (T108).
 
 1. **Registration by file** in place of generated dispatcher tables
    for `tools/ci` steps and commands. Decided on 2026-10-12: yes, as
@@ -888,20 +887,32 @@ record records these answers again with the rules they decide.
    `tools/ci/internal/{hygiene,names,pr,generated,workflows,plan,askfirst,kits,catalog,callsites}/**`,
    `docs/acceptance.json`): the denylist and the kits, catalog and
    call-site packages stay because 05 5.3 names them as what the
-   `checks` line guards; the other check packages are plain. Open,
-   needed before T107 (M0). Recommended: yes (an `ask-first` change, in
-   T107).
+   `checks` line guards; the other check packages are plain. Decided on
+   2026-10-17: yes, applied by T107, with the list read after T105
+   moved the checks below `tools/ci/internal/`: the runner and the
+   moved security code stay on `checks`, with `tools/mutants/**`, and
+   the steps whose result decides whether `all` passes (`coverage`,
+   `license`, `vulnerabilities`, `race`, `unit`, `vet`, `lint`, and
+   their shared fixtures `citest`) stay on it too, since a one-line
+   edit there weakens a gate. Off it: `format`, `prose`, `reqs`,
+   `adrdir` and `slug`. `.github/ask-first.yaml` holds the globs.
 9. **Narrow `contracts`** to `internal/cli/exit.go` and
    `internal/spec/versions.go` once error ids are per package (T008).
-   Open, needed before T107 (M0). Recommended: yes (in T107).
+   Decided on 2026-10-17: yes, in the form of T107's acceptance:
+   `contracts` is `internal/*/errors.go`, `internal/cmd/*/*/errors.go`,
+   `internal/spec/versions.go` and `internal/manifest/versions.go`.
 10. **The grants** in `docs/grants.yaml`, one per milestone, written at
-    the sitting that ends the milestone before (rule 13). Open, needed
-    before sitting M0. Recommended: write the M0 and M1 grants at
-    sitting M0.
+    the sitting that ends the milestone before (rule 13). A deferred
+    decision: it is decided at sitting M0 (decided on 2026-10-13), and
+    nothing is decided now. The agreed default, confirmed on
+    2026-10-17: write the M0 and M1 grants at sitting M0.
 11. **The surfaces**: add `sbxdrv`, put `skills/**` under `kits`
     (R8-05-3), replace `catalog/egress.yaml` by `internal/catalog/**`,
-    leave `ledger` while its row is deferred. Open, needed before T107
-    (M0). Recommended: yes, in T107.
+    leave `ledger` while its row is deferred. Decided on 2026-10-17:
+    yes, applied by T107. `sbxdrv` (`internal/sbxdrv/**`,
+    `e2e/fakesbx/**`) holds the I4 and I25 guards, so it also joins the
+    surfaces of 12 12.4 that keep an approval line on each pull
+    request.
 12. **The merge cadence for a parallel plan.** Decided on 2026-10-12:
     (b), a merge sitting whenever three green pull requests wait, read
     from `tools/ci plan --ready`, until the token is narrowed. The
