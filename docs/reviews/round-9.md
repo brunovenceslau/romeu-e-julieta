@@ -446,57 +446,5 @@ Pending, one line each:
 
 ## Session checkpoint (2026-10-09)
 
-Branch and pull request state is not recorded here; the next session
-measures it with `handoff_state.py`.
-
-### Done
-
-- Pull request #34, "fix(hooks): start tools/ci from pre-push with
-  GOWORK=off and GOFLAGS=-mod=readonly", is a draft. Its ship gate was
-  GO in round 2, and CI is green on four platforms.
-- Pull request #25 was rebased onto cecdd14, at d0bfdcc, and pushed.
-  Its ship gate ran rounds 1 to 3 and was GO in round 3. The rebase
-  delta was reviewed and approved. CI is green.
-- Round 9 ran: seventeen lenses, then the consolidation.
-- On branch `docs/review-round-9`: the write pass of this page, then
-  ship gate rounds 1 to 3, GO in round 3.
-- That branch was pushed as pull request #36 at dc76fec.
-- Decision D6 was done in pull request #37, "fix(ci): hold cmd packages
-  to the coverage floor (S9)".
-- The answers of 2026-10-09 were applied on this branch: D2 and D3 in
-  the spec, D4 and D5 in ADR 0010, AR22 closed.
-
-### Answered on 2026-10-09
-
-Every recommendation of the decision block above was accepted on
-2026-10-09, and each item carries its line. AR22, the fifth ruleset try
-of round-8.md: closed as no longer needed, because pull request #33
-read the ruleset through the API on 2026-10-09; item g of the
-maintainer block (10 10.2) is removed and the 05 5.4 token row says the
-claim stays inferred. G5 of pull request #25 is applied there, as the
-`approvals` surface. This branch was rebased onto pull request #25 at
-3f29a9c.
-
-### Open for the operator
-
-- **N2 of pull request #34**, a system-wide mise config that reaches
-  the hook's `tools/ci`; it waits for the operator.
-- **The decision ADR 0010 reopened**, required checks without the
-  administrator bypass, as an item of the next decision block.
-- **The token-narrowing review**, whose count reached three on
-  2026-10-09 (D2).
-- **Round 10, the targeted re-audit** of this pass, a fan-out of about
-  seventeen reviewers, once this branch's pull request carries the
-  answers above.
-- **The R8-05-3 tooling pull request** (the `sbxdrv` surface and
-  `skills/**` on `kits`, 05 5.3), after #25 lands, before plan T015.
-- **The merges of #34, #25 and this branch's pull request**, each once
-  its approval lines are ticked and its CI is green.
-
-### Next steps
-
-- Push this branch and open its draft pull request, stacked on #25.
-- Round 10.
-- The declared validation of the spec for T004 onward, if round 10
-  raises no new Required finding.
-- The stage-B items of this page and of round-8.md.
+Migrated on 2026-10-17 to docs/handoff:
+[Done record 15](../handoff/done/0015.md).

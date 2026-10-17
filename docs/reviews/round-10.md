@@ -337,27 +337,5 @@ default branch, with `edited` and `reopened` among the event's types
 
 ## Session checkpoint (2026-10-09)
 
-Branch and pull request state is not recorded here; the next session
-measures it with `handoff_state.py`.
-
-### Done
-
-- Round 10 ran: seventeen lenses on d458f83, then the consolidation.
-- Its write pass was applied on branch `docs/review-round-9`, the
-  branch of pull request #36, as described above.
-
-### Open for the operator
-
-- **D5 and D6**, the re-measure of the direct-push refusal under the
-  current ruleset, with the operator present.
-- **D1 to D4**, the answers to the items the write pass applied as
-  recommended.
-- **N2 of pull request #34**, a system-wide mise config that reaches
-  the hook's `tools/ci`.
-- **The stage-B items** P1 to P4 of this page, with those of
-  round-8.md and round-9.md.
-
-### Next steps
-
-- Round 11, the targeted re-audit of this delta, by the lenses listed
-  under "What is left before T004".
+Migrated on 2026-10-17 to docs/handoff:
+[Done record 16](../handoff/done/0016.md).
