@@ -7,6 +7,9 @@ in `.github/ask-first.yaml` matches the two directories, so a change to
 them needs no approval line. Adding both globs is a change to the
 ask-first list, an ask-first surface itself.
 
-Recommended: add both globs to `checks`, in a pull request of its own.
+The packages `tools/ci/internal/reqs` and `tools/ci/internal/format`
+match no glob of `checks` either, so one decision can cover all four.
+
+Recommended: add the globs to `checks`, in a pull request of its own.
 
 Reopen: the operator's answer, or the next change to either package.
