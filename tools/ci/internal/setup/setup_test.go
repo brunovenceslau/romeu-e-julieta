@@ -38,9 +38,9 @@ func TestSetup(t *testing.T) {
 	log := filepath.Join(t.TempDir(), "log")
 	goCmd := filepath.Join(f.Installs(), "go", "1.27.0", "bin", "go")
 	require.NoError(t, os.MkdirAll(filepath.Dir(goCmd), 0o755))
-	require.NoError(t, os.WriteFile(goCmd, []byte("#!/bin/sh\necho \"go $* GOPROXY=${GOPROXY-unset} GOFLAGS=$GOFLAGS HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '"+log+"'\n"), 0o700))
+	require.NoError(t, os.WriteFile(goCmd, []byte("#!/bin/sh\necho \"go $* GOPROXY=${GOPROXY-unset} GOSUMDB=${GOSUMDB-unset} GOFLAGS=$GOFLAGS HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset}\" >> '"+log+"'\n"), 0o700))
 	linter := f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint")
-	script := "#!/bin/sh\n" + citest.AnswerVersion + "if [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset} MISE=${MISE_OVERRIDE_CONFIG_FILENAMES-unset},${MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES-unset},${MISE_ENV-unset},${MISE_AUTO_ENV-unset} GO=${GOENV-unset},${GOTOOLCHAIN-unset}\" >> '" + log + "'\n"
+	script := "#!/bin/sh\n" + citest.AnswerVersion + "if [ \"$3\" = which ]; then\ncase \"$4\" in\ngo) echo '" + goCmd + "' ;;\ngolangci-lint) echo '" + linter + "' ;;\nesac\nexit 0\nfi\necho \"mise $* HTTPS_PROXY=${HTTPS_PROXY-unset} DOCKER_HOST=${DOCKER_HOST-unset} MISE=${MISE_OVERRIDE_CONFIG_FILENAMES-unset},${MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES-unset},${MISE_ENV-unset},${MISE_AUTO_ENV-unset} GO=${GOENV-unset},${GOTOOLCHAIN-unset} SOURCES=${GOPROXY-unset},${GOSUMDB-unset}\" >> '" + log + "'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(f.Bin, "mise"), []byte(script), 0o700))
 	t.Setenv("HTTPS_PROXY", "http://proxy.invalid")
 	t.Setenv("DOCKER_HOST", "unix:///nowhere")
@@ -63,10 +63,11 @@ func TestSetup(t *testing.T) {
 	require.NoError(t, err)
 	root, err := filepath.EvalSymlinks(r.Dir)
 	require.NoError(t, err)
-	// Both mise steps run with mise.MiseEnv, whatever the process holds.
-	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset DOCKER_HOST=unset MISE=mise.toml,none,,false GO=off,local\n"+
-		"mise install HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset MISE=mise.toml,none,,false GO=off,local\n"+
-		"go mod download GOPROXY=https://proxy.golang.org GOFLAGS=-mod=readonly HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n", string(data))
+	// Both mise steps run with mise.MiseEnv, whatever the process holds,
+	// and all three with the module sources of REQ-0862.
+	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset DOCKER_HOST=unset MISE=mise.toml,none,,false GO=off,local SOURCES=https://proxy.golang.org,sum.golang.org\n"+
+		"mise install HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset MISE=mise.toml,none,,false GO=off,local SOURCES=https://proxy.golang.org,sum.golang.org\n"+
+		"go mod download GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org GOFLAGS=-mod=readonly HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n", string(data))
 
 	t.Run("a hosted run without the mise environment stops before mise", func(t *testing.T) {
 		require.NoError(t, os.Remove(log))

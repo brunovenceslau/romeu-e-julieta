@@ -10,23 +10,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestSetupEnv holds the module sources of setup's three steps to
+// TestSetupEnv holds the environment of each of setup's three steps to
 // REQ-0862 (10 10.2): each runs with GOPROXY=https://proxy.golang.org,
 // GOSUMDB=sum.golang.org and GOENV=off, whatever the caller exports, so
 // a caller's settings cannot fill the module cache unverified. The
 // caller below turns the checksum database off in every way the go
-// command reads.
+// command reads. TestSetup shows that Run starts each step with it.
 func TestSetupEnv(t *testing.T) {
 	caller := map[string]string{
-		"GOPROXY":    "http://proxy.invalid,direct",
-		"GOSUMDB":    "off",
-		"GONOSUMDB":  "*",
-		"GONOPROXY":  "*",
-		"GOPRIVATE":  "*",
-		"GOINSECURE": "*",
-		"GOVCS":      "*:all",
-		"GOFLAGS":    "-insecure -mod=mod",
-		"GOENV":      "/from/the/caller",
+		"GOPROXY":     "http://proxy.invalid,direct",
+		"GOSUMDB":     "off",
+		"GONOSUMDB":   "*",
+		"GONOPROXY":   "*",
+		"GOPRIVATE":   "*",
+		"GOINSECURE":  "*",
+		"GOVCS":       "*:all",
+		"GOFLAGS":     "-insecure -mod=mod",
+		"GOENV":       "/from/the/caller",
+		"GOTOOLCHAIN": "go1.99.0",
 	}
 	for key, value := range caller {
 		t.Setenv(key, value)
@@ -51,6 +52,7 @@ func TestSetupEnv(t *testing.T) {
 			assert.Equal(t, []string{"https://proxy.golang.org"}, got["GOPROXY"])
 			assert.Equal(t, []string{"sum.golang.org"}, got["GOSUMDB"])
 			assert.Equal(t, []string{"off"}, got["GOENV"])
+			assert.Equal(t, []string{"local"}, got["GOTOOLCHAIN"])
 			for _, key := range []string{"GONOSUMDB", "GONOPROXY", "GOPRIVATE", "GOINSECURE", "GOVCS"} {
 				assert.NotContains(t, got, key, "the caller's %s does not reach %s", key, s.name)
 			}

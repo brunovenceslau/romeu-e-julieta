@@ -109,20 +109,19 @@ func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 // with goenv.Pin, which both mise.MiseEnv and check.StepEnv hold. Every
 // environment below is built from nothing, so no GO variable of the
 // caller (GONOSUMDB, GOPRIVATE, GOINSECURE, GOFLAGS among them) reaches
-// a step; TestSetupEnv holds both.
+// a step. TestSetupEnv holds each step to both rules.
 var moduleSources = []string{
 	"GOPROXY=https://proxy.golang.org",
 	"GOSUMDB=sum.golang.org",
 }
 
-// trustEnv is the environment of "mise trust" at the top of the tree
-// root.
+// trustEnv is the environment of "mise trust", run in root.
 func trustEnv(root string) []string {
 	return mise.RunEnviron(slices.Concat(check.PassThroughEnv(), moduleSources), root)
 }
 
-// installEnv is the environment of "mise install" at the top of the
-// tree root, which reaches the network to build the pinned go tools.
+// installEnv is the environment of "mise install", run in root, which
+// reaches the network to build the pinned go tools.
 func installEnv(root string) []string {
 	env := check.WithProcessEnv(check.PassThroughEnv(), check.NetworkPassThrough)
 	return mise.RunEnviron(slices.Concat(env, moduleSources), root)
