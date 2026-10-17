@@ -17,9 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/generated"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/plan"
 )
 
 // TestRegisteredChecks pins the registry of tools/ci: the names of the
@@ -64,6 +66,7 @@ func TestRegisteredChecks(t *testing.T) {
 		{"hygiene", true, false, true, false, "judge"},
 		{"workflows", true, false, true, false, "judge"},
 		{"reqs", true, false, true, false, "judge"},
+		{"plan", true, false, true, false, "judge"},
 		{"pushed range", false, true, false, false, "judge"},
 		{"coverage", false, false, true, false, "after"},
 	}, got)
@@ -265,4 +268,29 @@ func TestAFixtureCheckIsAddedByTwoPaths(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, string(out), "  go run ./tools/ci fixture\n", "the usage text names its subcommand")
+}
+
+// TestGeneratedOutputsAreOwnedByNoTask holds plan.Generated, the
+// generated outputs of rule 1 of docs/plan.md that the overlap rule of
+// the plan check leaves out, to the files every registered generator
+// writes: each one matches a glob of the list.
+func TestGeneratedOutputsAreOwnedByNoTask(t *testing.T) {
+	root, err := os.OpenRoot(citest.ModuleRoot(t))
+	require.NoError(t, err)
+	defer func() { _ = root.Close() }()
+	var paths []string
+	for _, c := range check.Registered() {
+		if c.Outputs == nil {
+			continue
+		}
+		outs, err := c.Outputs(root)
+		require.NoError(t, err, c.Name)
+		for _, o := range outs {
+			paths = append(paths, o.Path)
+		}
+	}
+	require.NotEmpty(t, paths)
+	for _, p := range paths {
+		assert.True(t, slices.ContainsFunc(plan.Generated, func(g string) bool { return askfirst.GlobMatch(g, p) }), "%s is in no glob of plan.Generated", p)
+	}
 }

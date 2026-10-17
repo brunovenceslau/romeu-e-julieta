@@ -3,7 +3,7 @@ id: T106
 title: "`tools/ci plan` and `tools/new task`"
 milestone: M0
 module: ci-release
-fate: new
+fate: merged
 owns:
   - tools/ci/internal/plan/**
   - tools/ci/check_plan.go
@@ -15,9 +15,14 @@ after: []
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-17
+pr: 72
 ---
 
 # T106 - `tools/ci plan` and `tools/new task`
+
+Merged on 2026-10-17 in pull requests #71 and #72. The text below is
+the one written at the re-plan, with its amendment.
 
 Goal: The check, in `fast`, that validates the task files; the scaffold
 that writes one with the next free id; `tools/new` kinds registered by
@@ -27,6 +32,16 @@ an `init`, `task` is `tools/new/task*.go`, and the `switch` in
 (T076) add files and edit none. `plan` is a check of the commit: it
 reads `docs/plan/tasks/*.md` from the tree the commit checks read before
 mise and the steps, as `hygiene`, `workflows` and `reqs` do.
+
+Amended on 2026-10-17, when the check was built: the cap of 40 ids on an
+Implements line is a ratchet, not a finding for the 13 tasks that held
+more when the check landed (T001, T002, T005, T008, T021, T033, T043,
+T049, T051, T061, T066, T068, T069), listed in the check, and a test
+fails when one comes down to the cap; splitting the open ones is a
+re-plan. `--critical-path` prints the longest chain over `needs` and
+`after` without the words "by sitting" of the acceptance, whose
+meaning no rule of the plan gives. `tools/new task` takes the title,
+as `adr` and `lesson` do, and derives the slug.
 
 - Implements: REQ-0826 (10 10.2), REQ-1089 (12 12.2), REQ-1101 (12
   12.2), REQ-1105 (12 12.3), REQ-1118 (12 12.3), REQ-1120 (12 12.3),

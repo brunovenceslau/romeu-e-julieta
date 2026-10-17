@@ -162,28 +162,31 @@ func CheckGlob(g string) error {
 // matches name, both relative to the top of the tree with forward
 // slashes: "**" matches zero or more whole segments, and "*" any run of
 // characters inside one segment (path.Match, which checkGlob leaves
-// nothing else to read).
+// nothing else to read). It fills a table over the segments of the glob
+// and of the name, so its work grows with their product: a glob of many
+// "**" segments, which a task file of a change may hold, cannot make it
+// try every split of a deep name.
 func GlobMatch(glob, name string) bool {
-	return segmentsMatch(strings.Split(glob, "/"), strings.Split(name, "/"))
-}
-
-func segmentsMatch(glob, name []string) bool {
-	if len(glob) == 0 {
-		return len(name) == 0
+	g, n := strings.Split(glob, "/"), strings.Split(name, "/")
+	// match[i][j] reports whether g[i:] matches n[j:].
+	match := make([][]bool, len(g)+1)
+	for i := range match {
+		match[i] = make([]bool, len(n)+1)
 	}
-	if glob[0] == "**" {
-		for i := 0; i <= len(name); i++ {
-			if segmentsMatch(glob[1:], name[i:]) {
-				return true
+	match[len(g)][len(n)] = true
+	for i := len(g) - 1; i >= 0; i-- {
+		for j := len(n); j >= 0; j-- {
+			if g[i] == "**" {
+				match[i][j] = match[i+1][j] || (j < len(n) && match[i][j+1])
+				continue
+			}
+			if j < len(n) {
+				ok, err := path.Match(g[i], n[j])
+				match[i][j] = err == nil && ok && match[i+1][j+1]
 			}
 		}
-		return false
 	}
-	if len(name) == 0 {
-		return false
-	}
-	ok, err := path.Match(glob[0], name[0])
-	return err == nil && ok && segmentsMatch(glob[1:], name[1:])
+	return match[0][0]
 }
 
 // GeneratedNotice is the line that every generated file carries (12
