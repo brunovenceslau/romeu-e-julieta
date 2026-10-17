@@ -3,7 +3,7 @@ id: T106
 title: "`tools/ci plan` and `tools/new task`"
 milestone: M0
 module: ci-release
-fate: new
+fate: merged
 owns:
   - tools/ci/internal/plan/**
   - tools/ci/check_plan.go
@@ -15,9 +15,14 @@ after: []
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-17
+pr: 72
 ---
 
 # T106 - `tools/ci plan` and `tools/new task`
+
+Merged on 2026-10-17 in pull requests #71 and #72. The text below is
+the one written at the re-plan, with its amendment.
 
 Goal: The check, in `fast`, that validates the task files; the scaffold
 that writes one with the next free id; `tools/new` kinds registered by
