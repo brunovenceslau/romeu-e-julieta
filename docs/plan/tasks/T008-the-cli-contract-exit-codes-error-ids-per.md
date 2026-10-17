@@ -15,11 +15,14 @@ owns:
   - internal/cli/testsupport/**
   - internal/cmd/romeu/all/doc.go
   - internal/cmd/julieta/all/doc.go
+  - tools/ci/internal/generated/errors*.go
+  - tools/ci/internal/generated/generate.go
 needs:
   - T007
 after: []
 ask_first:
   - contracts
+  - checks
 sitting: none
 ---
 
@@ -35,6 +38,13 @@ the files of `internal/cli` by name, since `internal/cli/writer.go` is
 T007's and `internal/cli/errorids_exempt.yaml` is T073's; a file of the
 package this list does not foresee is added to it in this task's pull
 request.
+
+The generator of the three consumers of the error table (12 12.3) joins
+the generated check of `tools/ci`, whose package no task owns: a file
+`tools/ci/internal/generated/errors*.go` and one more source in
+`generate.go`, on the `checks` surface (decided on 2026-10-17). A check
+of its own would add a row to the step table of 10 10.2 for a generator
+that judges nothing.
 
 Re-plan (2026-10-12): Kept, changed. Each package declares its ids in
 its own `errors.go`, taken from 04 4.4; one test collects the union.
