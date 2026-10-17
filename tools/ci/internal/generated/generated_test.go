@@ -20,7 +20,6 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
@@ -158,9 +157,13 @@ func TestRunGeneratedTakesNoArgument(t *testing.T) {
 	assert.Contains(t, errOut.String(), "generate takes no argument")
 }
 
+// indexPath is the index of the decision records, one of the two
+// outputs of generate in the fixture.
+const indexPath = "docs/adr/README.md"
+
 // goodAttributes is the list of the outputs of generate in the
 // .gitattributes of a clean checkout.
-const goodAttributes = ".github/CODEOWNERS -text\ndocs/reference/ask-first.md -text\ndocs/adr/README.md -text\n"
+const goodAttributes = ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n"
 
 // committedGenerateFixture is a repository whose generated files are
 // written by generate and committed: the state a clean checkout holds.
@@ -221,11 +224,11 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			r.Commit("link it")
 		}, []string{codeowners + ": generated: is tracked with mode 120000"}},
 		{"F: a link to a path outside the tree", func(t *testing.T, r *gittest.Repo) {
-			page := filepath.Join(r.Dir, filepath.FromSlash(askfirst.PagePath))
+			page := filepath.Join(r.Dir, filepath.FromSlash(indexPath))
 			require.NoError(t, os.Remove(page))
 			require.NoError(t, os.Symlink(filepath.Join(t.TempDir(), "outside.md"), page))
 			r.Commit("link it out")
-		}, []string{askfirst.PagePath + ": generated: is tracked with mode 120000"}},
+		}, []string{indexPath + ": generated: is tracked with mode 120000"}},
 		{"executable", func(t *testing.T, r *gittest.Repo) {
 			require.NoError(t, os.Chmod(filepath.Join(r.Dir, codeowners), 0o755))
 			r.Commit("make it executable")
@@ -238,16 +241,15 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			r.Write(codeowners, "# a hand edit\n")
 		}, nil}, // the index still holds the right bytes; the snapshots see no change either
 		{"an output missing from the list", func(t *testing.T, r *gittest.Repo) {
-			r.Write(attributesPath, ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
+			r.Write(attributesPath, ".github/CODEOWNERS -text\n")
 			r.Commit("drop a line")
-		}, []string{askfirst.PagePath + ": generated: .gitattributes does not list this file"}},
+		}, []string{indexPath + ": generated: .gitattributes does not list this file"}},
 		{"no .gitattributes at all", func(t *testing.T, r *gittest.Repo) {
 			r.Git("rm", "--quiet", attributesPath)
 			r.Commit("drop the file")
 		}, []string{
 			codeowners + ": generated: .gitattributes does not list this file",
 			"docs/adr/README.md: generated: .gitattributes does not list this file",
-			askfirst.PagePath + ": generated: .gitattributes does not list this file",
 		}},
 		{"a listed path that generate does not write", func(t *testing.T, r *gittest.Repo) {
 			r.Write(attributesPath, goodAttributes+"stale.md -text\n")
@@ -274,9 +276,9 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			r.Commit("two attributes")
 		}, []string{`.gitattributes: generated: lists "stale.md" with -text`}},
 		{"the index is judged, not HEAD", func(t *testing.T, r *gittest.Repo) {
-			r.Write(attributesPath, ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
+			r.Write(attributesPath, ".github/CODEOWNERS -text\n")
 			r.Git("add", attributesPath)
-		}, []string{askfirst.PagePath + ": generated: .gitattributes does not list this file"}},
+		}, []string{indexPath + ": generated: .gitattributes does not list this file"}},
 		{"a .gitattributes with CRLF line endings", func(t *testing.T, r *gittest.Repo) {
 			r.Write(attributesPath, strings.ReplaceAll(goodAttributes, "\n", "\r\n"))
 			r.Commit("crlf")
@@ -345,7 +347,7 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			r.Commit("encoding")
 		}, []string{codeowners + ": generated: has the working-tree-encoding attribute \"UTF-8\""}},
 		{"an eol", func(t *testing.T, r *gittest.Repo) {
-			r.Write(attributesPath, ".github/CODEOWNERS eol=lf -text\ndocs/reference/ask-first.md -text\ndocs/adr/README.md -text\n")
+			r.Write(attributesPath, ".github/CODEOWNERS eol=lf -text\ndocs/adr/README.md -text\n")
 			r.Commit("eol")
 		}, []string{codeowners + ": generated: has the eol attribute \"lf\""}},
 		{"a later line sets text again", func(t *testing.T, r *gittest.Repo) {
@@ -384,33 +386,31 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 		}, nil},
 		{"the message names a root file in other case", func(t *testing.T, r *gittest.Repo) {
 			r.Git("mv", attributesPath, ".GitAttributes")
-			r.Write(".GitAttributes", ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
+			r.Write(".GitAttributes", ".github/CODEOWNERS -text\n")
 			r.Commit("rename")
 		}, []string{
 			codeowners + `: generated: has the text attribute "unspecified"`,
-			`docs/adr/README.md: generated: has the text attribute "unspecified"`,
-			askfirst.PagePath + ": generated: .GitAttributes does not list this file with -text; rename it to .gitattributes",
+			indexPath + ": generated: .GitAttributes does not list this file with -text; rename it to .gitattributes",
 		}},
 		{"a root file named in other case is the list", func(t *testing.T, r *gittest.Repo) {
 			r.Git("mv", attributesPath, ".GitAttributes")
 			r.Commit("rename")
 		}, []string{
 			codeowners + `: generated: has the text attribute "unspecified"`,
-			`docs/adr/README.md: generated: has the text attribute "unspecified"`,
-			askfirst.PagePath + `: generated: has the text attribute "unspecified"`,
+			indexPath + `: generated: has the text attribute "unspecified"`,
 		}},
 		{"info/attributes does not list an output", func(t *testing.T, r *gittest.Repo) {
-			r.Write(attributesPath, ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
+			r.Write(attributesPath, ".github/CODEOWNERS -text\n")
 			r.Commit("drop a line")
 			info := filepath.Join(r.Dir, ".git", "info")
 			require.NoError(t, os.MkdirAll(info, 0o755))
-			require.NoError(t, os.WriteFile(filepath.Join(info, "attributes"), []byte(askfirst.PagePath+" -text\n"), 0o644))
-		}, []string{askfirst.PagePath + ": generated: .gitattributes does not list this file"}},
+			require.NoError(t, os.WriteFile(filepath.Join(info, "attributes"), []byte(indexPath+" -text\n"), 0o644))
+		}, []string{indexPath + ": generated: .gitattributes does not list this file"}},
 		{"a nested file in other case does not list an output", func(t *testing.T, r *gittest.Repo) {
-			r.Write(attributesPath, ".github/CODEOWNERS -text\ndocs/adr/README.md -text\n")
-			r.Write("sub/.GitAttributes", askfirst.PagePath+" -text\n")
+			r.Write(attributesPath, ".github/CODEOWNERS -text\n")
+			r.Write("sub/.GitAttributes", indexPath+" -text\n")
 			r.Commit("nested")
-		}, []string{askfirst.PagePath + ": generated: .gitattributes does not list this file"}},
+		}, []string{indexPath + ": generated: .gitattributes does not list this file"}},
 		{"a nested .gitattributes that is unmerged", func(t *testing.T, r *gittest.Repo) {
 			r.Write("sub/.gitattributes", "a -text\n")
 			r.Commit("base")
@@ -436,7 +436,6 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			".gitattributes: generated: has an unmerged entry",
 			codeowners + ": generated: .gitattributes does not list this file",
 			"docs/adr/README.md: generated: .gitattributes does not list this file",
-			askfirst.PagePath + ": generated: .gitattributes does not list this file",
 		}},
 		{"a .gitattributes that is a link is not scanned", func(t *testing.T, r *gittest.Repo) {
 			require.NoError(t, os.MkdirAll(filepath.Join(r.Dir, "sub"), 0o755))
@@ -456,7 +455,6 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			".gitattributes: generated: has an unmerged entry",
 			codeowners + ": generated: .gitattributes does not list this file",
 			"docs/adr/README.md: generated: .gitattributes does not list this file",
-			askfirst.PagePath + ": generated: .gitattributes does not list this file",
 		}},
 		{"an oversized root .gitattributes is a finding, and lists nothing", func(t *testing.T, r *gittest.Repo) {
 			r.Write(attributesPath, sized(attributesMaxSize+1, goodAttributes))
@@ -465,7 +463,6 @@ func TestGeneratedRequiresTrackedRegularOutputs(t *testing.T) {
 			".gitattributes: generated: is " + strconv.Itoa(attributesMaxSize+1) + " bytes",
 			codeowners + ": generated: .gitattributes does not list this file",
 			"docs/adr/README.md: generated: .gitattributes does not list this file",
-			askfirst.PagePath + ": generated: .gitattributes does not list this file",
 		}},
 		{"unmerged", func(t *testing.T, r *gittest.Repo) {
 			r.Git("checkout", "--quiet", "-b", "other")

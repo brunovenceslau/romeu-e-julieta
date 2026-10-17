@@ -310,10 +310,11 @@ One case per flip of gate 1 (01 1.4), each titled by its flip:
 
 ## 5.3 Ask-first surfaces
 
-`REQ-0535` `.github/ask-first.yaml` is the single list of paths whose changes need
-the maintainer's explicit approval. `go generate` derives from it the
-table in `docs/reference/ask-first.md` and `.github/CODEOWNERS`, which
-names `owner` for each glob; `REQ-0536` `tools/ci mutate` reads it to decide which
+`REQ-0535` [`.github/ask-first.yaml`](../../.github/ask-first.yaml) is the single
+list of paths whose changes need the maintainer's explicit approval:
+each surface with its id, its globs and its reason. This page links the
+list and does not copy it. `go generate` derives `.github/CODEOWNERS`
+from it, which names `owner` for each glob; `REQ-0536` `tools/ci mutate` reads it to decide which
 PRs run mutation testing (a `.go` file on a listed path, or a file
 holding an invariant guard tag, so a guard outside every surface is
 tested too); `REQ-0537` `tools/ci pr` requires an approval line in the PR body for
@@ -358,7 +359,7 @@ is a row of
 The file lists itself and `.github/CODEOWNERS`, which `go generate`
 derives from it. `REQ-0542` The `dependencies` surface holds every path where
 mise reads its configuration when it starts at the top of the tree
-(`miseFiles` in `tools/ci/misefiles.go`, which a test holds equal to
+(`miseFiles` in `tools/ci/internal/mise/misefiles.go`, which a test holds equal to
 these globs), as measured at the pinned mise; `REQ-0543` a change of the mise pin
 measures config discovery again at the new version, named in the PR's
 Evidence. `owner` is the maintainer's GitHub handle, the `<owner>` of
@@ -375,7 +376,16 @@ there its only check is the `checks` approval line, or a checkpoint
 grant that stands in for that line, while `pr` runs the default branch's
 code (the `pr` invariant of this section); running the base branch's
 `tools/ci` for the steps of `all` too is a row of
-[Deferred decisions](../spec.md#in-how-this-repository-is-run). The
+[Deferred decisions](../spec.md#in-how-this-repository-is-run).
+`checks` holds the runner of the gates (`tools/ci/*.go` and
+`tools/ci/internal/check/**`), the steps whose result decides whether
+`all` passes (coverage, license, vulnerabilities, race, unit, vet and
+lint) with the fixtures their tests share (`tools/ci/internal/citest`),
+the packages a security rule rests on, the mutation runner
+(`tools/mutants/**`), the hooks, the linter configuration and the
+acceptance file. The checks of format, prose and requirement ids, and
+the helpers `tools/ci/adrdir` and `tools/ci/slug`, are not on it
+(decided on 2026-10-17). The
 `spec` surface was added on 2026-10-08
 ([round 8](../reviews/round-8.md#decisions-for-the-operator)): the
 pages whose tables a gate reads for a decision that widens something
@@ -393,74 +403,15 @@ egress sets from the catalog (07 7.5), joined `catalog` the same day,
 a grantable surface (12 12.4): its output follows from the catalog's
 sets, and a grantable surface is strictly better than none (decided
 on 2026-10-13).
-`REQ-0544` Two paths wait for a surface: `internal/sbxdrv` (with `e2e/fakesbx`),
-which holds the I4 and I25 guards, joins a new `sbxdrv` surface, and
-`skills/**`, the text agents follow, joins `kits`, both in their own
-tooling pull request on the `ask-first` surface. That pull request
-merges before the first pull request that adds a file under
-`internal/sbxdrv`, `e2e/fakesbx` or `skills/`; `tools/ci pr` fails such
-a diff while `.github/ask-first.yaml` names no surface for those paths.
+`REQ-0544` `internal/sbxdrv` (with `e2e/fakesbx`), which holds the I4 and I25
+guards, is the `sbxdrv` surface, and `skills/**`, the text agents
+follow, is on `kits`. Both joined on 2026-10-17, before the first file
+under those paths, so the first pull request that adds one carries
+their approval line.
 `REQ-0545` One piece of gate logic sits outside these globs and is reviewed like
 any other code: the test in `e2e/scenarios` that fails a command-table
 entry no scenario reads (rule 13 of
 [ADR 0001, adopt a documentation standard with checkable rules and a voice](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)).
-
-```yaml
-version: 1
-owner: "@<owner>"
-surfaces:
-  - id: gates
-    globs: [internal/gate/**, internal/state/**, internal/spec/project.go]
-    reason: the gates, the state machines, and the gate/apply struct tags that define the widening set
-  - id: gitsafe
-    globs: [internal/gitsafe/**]
-    reason: every git invocation on the host, ref namespaces including salvage
-  - id: procgroup
-    globs: [internal/procgroup/**]
-    reason: the one package that starts subprocesses, kills their process groups and keeps a child from inheriting the host environment (bar the list of REQ-0470), with the call-site scan and its admitted list
-  - id: termsafe
-    globs: [internal/termsafe/**, internal/cli/writer*.go]
-    reason: host output escaping
-  - id: digests
-    globs: [internal/canon/**]
-    reason: every digest the gates compare
-  - id: signing
-    globs: [internal/signing/**, kits/git-ssh-sign/**]
-    reason: commit signing key isolation
-  - id: catalog
-    globs: [internal/catalog/**, internal/egress/**]
-    reason: upload flags, the base and meta sets, and the egress derivation that reads them
-  - id: kits
-    globs: [kits/**, tools/kitpin/**]
-    reason: what enters every sandbox, and its pins
-  - id: release
-    globs: [.github/workflows/release.yml, tools/release/**]
-    reason: release and publishing paths
-  - id: dependencies
-    globs: [go.mod, go.sum, mise.toml, mise.lock, .mise.toml, mise.*.toml, .mise.*.toml, mise/**, .mise/**, .config/mise.toml, .config/mise.*.toml, .config/mise/**, .tool-versions, .miserc.toml, .miserc.local.toml, .config/miserc.toml, .github/workflows/**]
-    reason: Go dependencies, the pinned tools the gates run with every file mise reads as its configuration, and CI actions
-  - id: contracts
-    globs: [internal/cli/errors.go, internal/spec/versions.go]
-    reason: exit codes, error ids and file format versions
-  - id: ledger
-    globs: [internal/ledger/**]
-    reason: the runtime ledger's code, its event schema, and the tags that decide which fields cross projects
-  - id: decisions
-    globs: [docs/adr/**, .adr-dir]
-    reason: decision records; one leaves Proposed, or changes after that, with the maintainer's approval
-  - id: spec
-    globs: [docs/spec.md, docs/spec/01-system-model.md, docs/spec/05-security.md]
-    reason: the gates read tables in these pages (the vocabulary in 01 1.7 and the index), and 05 holds the security model
-  - id: approvals
-    globs: [tools/ci/internal/askfirst/**, tools/ci/denylist.yaml, .github/workflows/**]
-    reason: the approval-line and grant check, the forbidden-name denylist, and the workflows that choose what runs
-  - id: checks
-    globs: [tools/ci/**, .githooks/**, .golangci.yml, docs/acceptance.json]
-    reason: the code of the gates and reports, with the forbidden-name denylist (tools/ci/denylist.yaml), the linter configuration, and the acceptance file, whose command items tools/ci acceptance runs
-  - id: ask-first
-    globs: [.github/ask-first.yaml, .github/CODEOWNERS, docs/grants.yaml]
-    reason: this list, the CODEOWNERS file generated from it, and the checkpoint grants that stand in for approval lines
-```
 
 ## 5.4 Known residual risks (accepted in v1)
 

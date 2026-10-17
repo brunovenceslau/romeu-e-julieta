@@ -3,10 +3,9 @@
 
 // Package askfirst reads .github/ask-first.yaml, the one list of the
 // paths whose changes need the maintainer's approval (05 5.3), and
-// writes what follows from it: .github/CODEOWNERS and the reference
-// page docs/reference/ask-first.md, which the generate subcommand
-// writes and the generated check compares. It is a helper of the
-// generated check and registers no check.
+// writes what follows from it: .github/CODEOWNERS, which the generate
+// subcommand writes and the generated check compares. It is a helper of
+// the generated check and registers no check.
 package askfirst
 
 import (
@@ -26,12 +25,8 @@ import (
 // root.
 const Path = ".github/ask-first.yaml"
 
-// CodeownersPath and PagePath are the two files generate writes
-// from the list (12 12.3).
-const (
-	CodeownersPath = ".github/CODEOWNERS"
-	PagePath       = "docs/reference/ask-first.md"
-)
+// CodeownersPath is the file generate writes from the list (12 12.3).
+const CodeownersPath = ".github/CODEOWNERS"
 
 // List is .github/ask-first.yaml: the owner that the code-owner
 // review names, and the surfaces whose paths need approval.
@@ -72,8 +67,8 @@ var (
 	approvalLine = regexp.MustCompile(`^Approval: ([a-z0-9-]+) - ([^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{C}\p{M}\p{Z}][^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{Cc}\p{Cf}]*)$`)
 )
 
-// approvalForm is the form of an approval line, as 12 12.4, the
-// reference page and the pull request template show it.
+// approvalForm is the form of an approval line, as 12 12.4 and the
+// pull request template show it.
 const approvalForm = "Approval: <surface id> - <what was approved>"
 
 // Parse reads .github/ask-first.yaml and checks it: the keys are
@@ -203,39 +198,12 @@ func (a *List) Codeowners() []byte {
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "# %s\n", GeneratedNotice(Path))
 	b.WriteString("# A change to a path below needs the maintainer's review before it merges\n")
-	b.WriteString("# (docs/reference/ask-first.md lists the surfaces and their reasons).\n")
+	fmt.Fprintf(&b, "# (%s lists the surfaces and their reasons).\n", Path)
 	for _, s := range a.Surfaces {
 		fmt.Fprintf(&b, "\n# %s\n", s.ID)
 		for _, g := range s.Globs {
 			fmt.Fprintf(&b, "/%s %s\n", g, a.Owner)
 		}
-	}
-	return b.Bytes()
-}
-
-// ReferencePage renders docs/reference/ask-first.md: the front matter of
-// rule 1 of ADR 0001, the generated-file header, and one table row for
-// each surface.
-func (a *List) ReferencePage() []byte {
-	var b bytes.Buffer
-	b.WriteString("---\ntype: reference\nreader: a contributor or reviewer deciding whether a change needs the maintainer's approval\n---\n\n")
-	fmt.Fprintf(&b, "<!-- %s -->\n\n", GeneratedNotice(Path))
-	b.WriteString("# Ask-first surfaces\n\n")
-	b.WriteString("A change to a path below needs the maintainer's explicit approval.\n")
-	b.WriteString("The pull request body carries one approval line for each surface the change touches,\n")
-	b.WriteString("in the form that\n[12 12.4](../spec/12-engineering.md#124-middleware-before-and-after-every-change)\ndefines:\n\n")
-	b.WriteString("```text\n" + approvalForm + "\n```\n\n")
-	b.WriteString("The phrase names what was approved, in a few neutral words, and no person.\n")
-	b.WriteString("It holds none of the double quotation marks 12 12.4 lists;\n")
-	b.WriteString("single quotation marks and other look-alikes are left to review.\n\n")
-	fmt.Fprintf(&b, "The code-owner review is requested from `%s`. [05 5.3](../spec/05-security.md#53-ask-first-surfaces)\nsays why each surface is on the list.\n\n", a.Owner)
-	b.WriteString("| Surface | Paths | Why |\n|---|---|---|\n")
-	for _, s := range a.Surfaces {
-		globs := make([]string, len(s.Globs))
-		for i, g := range s.Globs {
-			globs[i] = "`" + g + "`"
-		}
-		fmt.Fprintf(&b, "| `%s` | %s | %s |\n", s.ID, strings.Join(globs, ", "), strings.ReplaceAll(strings.TrimSpace(s.Reason), "|", `\|`))
 	}
 	return b.Bytes()
 }

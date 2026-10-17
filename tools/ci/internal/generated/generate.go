@@ -24,9 +24,10 @@ const adrIndexName = "README.md"
 
 // Generate is the "generate" subcommand, which "go generate ./..."
 // runs through the directive above. It writes the consumers of the
-// tables of 12 12.3 that exist today: the two of .github/ask-first.yaml
-// (the third, the mutate trigger, lands with mutate) and the index of
-// the decision records. It says which files it wrote, and none when the
+// tables of 12 12.3 that exist today: .github/CODEOWNERS, from
+// .github/ask-first.yaml (the mutate trigger, its other consumer, lands
+// with mutate), the index of the decision records and the page of the
+// checks. It says which files it wrote, and none when the
 // tree was current. It reads and writes through the root of the
 // repository, so a symbolic link cannot send it outside.
 func Generate(ctx context.Context, e check.Env, args []string) (bool, error) {
@@ -99,8 +100,9 @@ func Outputs(root *os.Root) ([]check.Output, error) {
 }
 
 // sources reads the sources of the generated check below root and
-// returns the files that follow from them: the two consumers of
-// .github/ask-first.yaml and the index of the decision records.
+// returns the files that follow from them: .github/CODEOWNERS, the one
+// consumer of .github/ask-first.yaml, and the index of the decision
+// records.
 func sources(root *os.Root) ([]check.Output, error) {
 	src, err := root.ReadFile(askfirst.Path)
 	if err != nil {
@@ -116,7 +118,6 @@ func sources(root *os.Root) ([]check.Output, error) {
 	}
 	return []check.Output{
 		{Path: askfirst.CodeownersPath, Content: list.Codeowners()},
-		{Path: askfirst.PagePath, Content: list.ReferencePage()},
 		{Path: indexPath, Content: index},
 	}, nil
 }

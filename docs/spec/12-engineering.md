@@ -568,8 +568,8 @@ approval line with the phrase `granted at <sitting> for <task id>`; `pr`
 reads `docs/grants.yaml` at the base commit and accepts the line only
 when that file holds that grant for that surface and task. The plan
 names the sittings, and it is not where a grant is read from. `REQ-1162` Every
-other surface (`gates`, `gitsafe`, `procgroup`, `signing`, `release`,
-`kits`, `decisions`, `spec`, `approvals` and `ask-first`) keeps an approval line
+other surface (`gates`, `gitsafe`, `procgroup`, `sbxdrv`, `signing`,
+`release`, `kits`, `decisions`, `spec`, `approvals` and `ask-first`) keeps an approval line
 in the maintainer's words on each pull request. The line is typed by the
 PR's author, so the check proves that the approval was recorded, not who
 gave it. While one account and one token act for everyone
@@ -711,7 +711,7 @@ product-specific content.
 | `SECURITY.md` | `REQ-1186` a person who found a vulnerability; how-to | the three headings of ADR 0001 rule 20. The channel is GitHub's private vulnerability reporting, which the maintainer block switches on (10 10.2). The response expectation the maintainer set: an acknowledgement within 30 days, best effort, and no promised time for a fix. The supported versions name the tested sbx window (10 10.3). What happens next is written with the page |
 | `docs/guide/*` | `REQ-1187` the operator; how-to, one page per journey, named in front matter (`journey: J<n>`) | the steps of the journey in [09](09-journeys.md) with expected output, and the recovery of each error id whose "recovered in" cell names this page (12.3). The page of J1 says what to check by hand for an editor other than VS Code, whose trust settings `doctor` does not read; the page of J14 lists the exact paths and rules the operator removes, since romeu never deletes (I16) |
 | `docs/guide/recovery.md` | `REQ-1188` the operator; how-to | the recoveries that belong to no journey, one section per error id whose "recovered in" cell names it |
-| `docs/reference/*` | anyone looking up a fact; reference, generated with its front matter | commands, file formats, errors, exit codes, ask-first surfaces |
+| `docs/reference/*` | anyone looking up a fact; reference, generated with its front matter | commands, file formats, errors, exit codes |
 
 ## 12.9 Delivery practices
 

@@ -17,6 +17,13 @@ paragraph gave the plan's record to T107.
   `kits`, `catalog`, `callsites`, the denylist, `.githooks/**`,
   `.golangci.yml` and `docs/acceptance.json`.
 - `tools/mutants/**` joins `checks`.
+- Amended on 2026-10-17, at T107's security review: the steps whose
+  result decides whether `all` passes stay on `checks` too, since a
+  one-line edit there weakens a gate (the coverage floor, the license
+  container's isolation, the packages `unit` tests): `coverage`,
+  `license`, `vulnerabilities`, `race`, `unit`, `vet`, `lint`, and
+  `citest`, the fixtures their tests share. Off it: `format`, `prose`,
+  `reqs`, `adrdir` and `slug`.
 - Item 9, yes, in the form of T107's acceptance: `contracts` is
   `internal/*/errors.go`, `internal/cmd/*/*/errors.go`,
   `internal/spec/versions.go` and `internal/manifest/versions.go`.

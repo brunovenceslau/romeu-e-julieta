@@ -11,6 +11,5 @@
 # output of generate and each output has a line, and "git check-attr
 # --cached" must report "unset" for every output, nested files included.
 .github/CODEOWNERS -text
-docs/reference/ask-first.md -text
 docs/adr/README.md -text
 docs/reference/checks.md -text

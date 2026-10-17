@@ -65,9 +65,8 @@ Re-plan (2026-10-12): Kept as written before the re-plan.
     removed; its admitted list is `internal/procgroup` alone, as T105
     leaves it. The whole of `tools/ci/internal/callsites/**`, which
     then holds the admitted list and the guarded lists of the scan,
-    joins the globs of the `procgroup` surface, in `.github/ask-first.yaml` and
-    in the list of 05 5.3 alike, with `.github/CODEOWNERS` and
-    `docs/reference/ask-first.md` regenerated, the way T107 puts
+    joins the globs of the `procgroup` surface in `.github/ask-first.yaml`,
+    with `.github/CODEOWNERS` regenerated, the way T107 puts
     `tools/ci/internal/askfirst/**` on `approvals` (decided on
     2026-10-13).
 - Verify: `go test ./internal/render/...`; `go test ./tools/ci/... -run

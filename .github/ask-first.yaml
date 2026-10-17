@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 
 # The single list of paths whose changes need the maintainer's explicit
-# approval (05 5.3). "go generate ./..." derives .github/CODEOWNERS and
-# docs/reference/ask-first.md from it; the approval line a pull request
+# approval (05 5.3). "go generate ./..." derives .github/CODEOWNERS from
+# it; the approval line a pull request
 # carries is defined in 12 12.4. The file lists itself.
 version: 1
 owner: "@brunovenceslau"
@@ -29,9 +29,12 @@ surfaces:
   - id: catalog
     globs: [internal/catalog/**, internal/egress/**]
     reason: upload flags, the base and meta sets, and the egress derivation that reads them
+  - id: sbxdrv
+    globs: [internal/sbxdrv/**, e2e/fakesbx/**]
+    reason: the one package that drives sbx, and its fake, which hold the I4 and I25 guards
   - id: kits
-    globs: [kits/**, tools/kitpin/**]
-    reason: what enters every sandbox, and its pins
+    globs: [kits/**, tools/kitpin/**, skills/**]
+    reason: what enters every sandbox, its pins, and the skills agents follow
   - id: release
     globs: [.github/workflows/release.yml, tools/release/**]
     reason: release and publishing paths
@@ -39,8 +42,8 @@ surfaces:
     globs: [go.mod, go.sum, mise.toml, mise.lock, .mise.toml, mise.*.toml, .mise.*.toml, mise/**, .mise/**, .config/mise.toml, .config/mise.*.toml, .config/mise/**, .tool-versions, .miserc.toml, .miserc.local.toml, .config/miserc.toml, .github/workflows/**]
     reason: Go dependencies, the pinned tools the gates run with every file mise reads as its configuration, and CI actions
   - id: contracts
-    globs: [internal/cli/errors.go, internal/spec/versions.go]
-    reason: exit codes, error ids and file format versions
+    globs: [internal/*/errors.go, internal/cmd/*/*/errors.go, internal/spec/versions.go, internal/manifest/versions.go]
+    reason: exit codes and error ids, declared per package, the file format versions and the manifest's protocol window
   - id: ledger
     globs: [internal/ledger/**]
     reason: the runtime ledger's code, its event schema, and the tags that decide which fields cross projects
@@ -54,8 +57,8 @@ surfaces:
     globs: [tools/ci/internal/askfirst/**, tools/ci/denylist.yaml, .github/workflows/**]
     reason: the approval-line and grant check, the forbidden-name denylist, and the workflows that choose what runs
   - id: checks
-    globs: [tools/ci/**, .githooks/**, .golangci.yml, docs/acceptance.json]
-    reason: the code of the gates and reports, with the forbidden-name denylist (tools/ci/denylist.yaml), the linter configuration, and the acceptance file, whose command items tools/ci acceptance runs
+    globs: [tools/ci/*.go, tools/ci/denylist.yaml, tools/ci/internal/check/**, tools/ci/internal/coverage/**, tools/ci/internal/license/**, tools/ci/internal/vulnerabilities/**, tools/ci/internal/race/**, tools/ci/internal/unit/**, tools/ci/internal/vet/**, tools/ci/internal/lint/**, tools/ci/internal/citest/**, tools/ci/internal/mise/**, tools/ci/internal/setup/**, tools/ci/internal/hygiene/**, tools/ci/internal/pushedrange/**, tools/ci/internal/generated/**, tools/ci/internal/workflows/**, tools/ci/internal/plan/**, tools/ci/internal/askfirst/**, tools/ci/internal/pr/**, tools/ci/internal/kits/**, tools/ci/internal/catalog/**, tools/ci/internal/callsites/**, tools/ci/git/**, tools/ci/goenv/**, tools/ci/names/**, tools/ci/pushed/**, tools/mutants/**, .githooks/**, .golangci.yml, docs/acceptance.json]
+    reason: the runner of the gates, the steps whose result decides whether all passes (coverage, license, vulnerabilities, race, unit, vet, lint) with the fixtures their tests share, the checks a security rule rests on (the pinned tools and the hook's environment, hygiene and the forbidden names, the generated files, the workflow grammar, the plan, the approval lines, the kits, the catalog and the call sites), the mutation runner, the forbidden-name denylist, the linter configuration and the acceptance file, whose command items tools/ci acceptance runs
   - id: ask-first
     globs: [.github/ask-first.yaml, .github/CODEOWNERS, docs/grants.yaml]
     reason: this list, the CODEOWNERS file generated from it, and the checkpoint grants that stand in for approval lines
