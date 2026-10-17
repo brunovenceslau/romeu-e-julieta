@@ -80,7 +80,7 @@ func TestReadPin(t *testing.T) {
 
 	for _, platform := range [][2]string{{"windows", "amd64"}, {"linux", "386"}, {"freebsd", "arm64"}} {
 		_, err := readPin(root, platform[0], platform[1])
-		require.ErrorContains(t, err, "no runner of the CI matrix is "+platform[0]+"/"+platform[1])
+		require.ErrorContains(t, err, "no runner of .github/workflows/ci.yml or .github/workflows/x64.yml is "+platform[0]+"/"+platform[1])
 	}
 
 	malformed := []struct{ name, workflow, want string }{
@@ -90,7 +90,7 @@ func TestReadPin(t *testing.T) {
 		{"a version with a path", citest.MiseWorkflow(t, "2026.10.3/../x"), "which is not three numbers"},
 		{"a sha256 in upper case", citest.PinnedMiseWorkflow(t, "2026.10.3", strings.Repeat("A", 64)), "is not 64 lowercase hex digits"},
 		{"a short sha256", citest.PinnedMiseWorkflow(t, "2026.10.3", strings.Repeat("a", 63)), "is not 64 lowercase hex digits"},
-		{"no sha256 for the runner", strings.Replace(citest.MiseWorkflow(t, "2026.10.3"), "- os: ubuntu-26.04\n", "- os: ubuntu-26.04-x\n", 1), "the matrix of .github/workflows/ci.yml gives no mise_sha256 for ubuntu-26.04"},
+		{"no sha256 for the runner", strings.Replace(citest.MiseWorkflow(t, "2026.10.3"), "- os: ubuntu-26.04\n", "- os: ubuntu-26.04-x\n", 1), "no matrix of .github/workflows/ci.yml gives a mise_sha256 for ubuntu-26.04"},
 	}
 	for _, tt := range malformed {
 		t.Run(tt.name, func(t *testing.T) {
@@ -303,4 +303,74 @@ func TestCheckDir(t *testing.T) {
 	require.NoError(t, os.Chmod(dir, 0o702))
 	require.ErrorContains(t, CheckDir(dir), "others can write")
 	require.ErrorContains(t, CheckDir(filepath.Join(dir, "none")), "no such file")
+}
+
+// TestReadPinOfTheScheduledWorkflow reads the pins of a tree whose
+// ci.yml names the arm64 runners alone and whose x64.yml names the x64
+// ones (10 10.2, Runners): an x64 pin comes from x64.yml, the version
+// is the one of ci.yml, which x64.yml repeats, and each error names the
+// file that holds the culprit.
+func TestReadPinOfTheScheduledWorkflow(t *testing.T) {
+	sha := func(c string) string { return strings.Repeat(c, 64) }
+	entry := func(label, sum string) string {
+		return "          - os: " + label + "\n            mise_sha256: " + sum + "\n"
+	}
+	workflow := func(version string, entries ...string) string {
+		return citest.Edits(t,
+			"          sha256: ${{ matrix.mise_sha256 }}\n", "          version: "+version+"\n          sha256: ${{ matrix.mise_sha256 }}\n",
+			"          - os: ubuntu-26.04\n            mise_sha256: aa\n", strings.Join(entries, ""))
+	}
+	arm := workflow("2026.10.3", entry("ubuntu-26.04-arm", sha("2")), entry("macos-26", sha("3")))
+	x64 := workflow("2026.10.3", entry("ubuntu-26.04", sha("1")), entry("macos-26-intel", sha("a")))
+	tree := func(t *testing.T, ci, scheduled string) string {
+		t.Helper()
+		root := writeWorkflow(t, ci)
+		require.NoError(t, os.WriteFile(filepath.Join(root, filepath.FromSlash(ScheduledWorkflow)), []byte(scheduled), 0o600))
+		return root
+	}
+
+	t.Run("each runner from its file", func(t *testing.T) {
+		root := tree(t, arm, x64)
+		for platform, want := range map[[2]string]Pin{
+			{"linux", "amd64"}:  {"2026.10.3", sha("1"), "ubuntu-26.04"},
+			{"linux", "arm64"}:  {"2026.10.3", sha("2"), "ubuntu-26.04-arm"},
+			{"darwin", "arm64"}: {"2026.10.3", sha("3"), "macos-26"},
+			{"darwin", "amd64"}: {"2026.10.3", sha("a"), "macos-26-intel"},
+		} {
+			pin, err := readPin(root, platform[0], platform[1])
+			require.NoError(t, err, want.Label)
+			assert.Equal(t, want, pin)
+		}
+	})
+	t.Run("no x64.yml pins no x64 runner", func(t *testing.T) {
+		_, err := readPin(writeWorkflow(t, arm), "linux", "amd64")
+		require.ErrorContains(t, err, "no matrix of .github/workflows/ci.yml gives a mise_sha256 for ubuntu-26.04")
+		_, err = readPin(writeWorkflow(t, arm), "linux", "arm64")
+		require.NoError(t, err, "an arm64 runner needs no x64.yml")
+	})
+	t.Run("an x64 runner missing from both files", func(t *testing.T) {
+		_, err := readPin(tree(t, arm, workflow("2026.10.3", entry("macos-26-intel", sha("a")))), "linux", "amd64")
+		require.ErrorContains(t, err, "no matrix of .github/workflows/ci.yml or .github/workflows/x64.yml gives a mise_sha256 for ubuntu-26.04")
+	})
+	t.Run("x64.yml pins another version", func(t *testing.T) {
+		_, err := readPin(tree(t, arm, strings.Replace(x64, "version: 2026.10.3", "version: 2026.10.4", 1)), "linux", "arm64")
+		require.ErrorContains(t, err, `.github/workflows/x64.yml pins mise "2026.10.4" and .github/workflows/ci.yml pins "2026.10.3"`)
+	})
+	t.Run("ci.yml pins no version", func(t *testing.T) {
+		noStep := strings.Replace(arm, "          version: 2026.10.3\n", "", 1)
+		_, err := readPin(tree(t, noStep, x64), "linux", "amd64")
+		require.ErrorContains(t, err, `.github/workflows/ci.yml pins the version of mise with one "version" input`)
+	})
+	t.Run("one runner with two sha256 across the files", func(t *testing.T) {
+		_, err := readPin(tree(t, arm+"", workflow("2026.10.3", entry("macos-26", sha("b")))), "darwin", "arm64")
+		require.ErrorContains(t, err, "two different mise_sha256 for macos-26: "+sha("3")+" in .github/workflows/ci.yml, "+sha("b")+" in .github/workflows/x64.yml")
+	})
+	t.Run("a malformed sha256 in x64.yml", func(t *testing.T) {
+		_, err := readPin(tree(t, arm, workflow("2026.10.3", entry("ubuntu-26.04", sha("A")))), "linux", "amd64")
+		require.ErrorContains(t, err, "of ubuntu-26.04 in .github/workflows/x64.yml is not 64 lowercase hex digits")
+	})
+	t.Run("an x64.yml that is not YAML", func(t *testing.T) {
+		_, err := readPin(tree(t, arm, "jobs: ["), "linux", "arm64")
+		require.ErrorContains(t, err, ".github/workflows/x64.yml: ")
+	})
 }

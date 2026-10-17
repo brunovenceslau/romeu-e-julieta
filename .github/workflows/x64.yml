@@ -1,0 +1,80 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The x64 runners, best effort (10 10.2, Runners): the same job as
+# ci.yml, on a schedule and by hand, so no pull request waits for them.
+# A red run is fixed when it is seen and blocks no merge; GitHub sends
+# no notice of one, and turns the schedule off after 60 days without
+# activity in the repository. Keep the job
+# equal to the one of ci.yml; "go run ./tools/ci workflows" holds this
+# file to the same grammar, and tools/ci setup reads the mise_sha256 of
+# an x64 runner from this matrix.
+name: x64
+
+on:
+  schedule:
+    # Every day at 06:00 UTC.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# The environment of every mise run, mise-action's and the one of the
+# mise shim that starts go: mise reads mise.toml as its one
+# configuration file, and mise.lock, and every go command of the job
+# reads no "go env -w" file and starts no other go. It is
+# miseEnv in tools/ci/misefiles.go, which says why, and the workflows
+# check holds this table to that list.
+env:
+  MISE_OVERRIDE_CONFIG_FILENAMES: mise.toml
+  MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES: none
+  MISE_ENV: ""
+  MISE_AUTO_ENV: "false"
+  MISE_GLOBAL_CONFIG_FILE: /dev/null/mise-global.toml
+  MISE_SYSTEM_CONFIG_FILE: /dev/null/mise-system.toml
+  MISE_AUTO_INSTALL: "false"
+  MISE_NOT_FOUND_AUTO_INSTALL: "false"
+  GOENV: "off"
+  GOTOOLCHAIN: local
+
+jobs:
+  all:
+    name: all on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      # Each runner reports on its own, so one red platform does not
+      # hide the state of the others.
+      fail-fast: false
+      matrix:
+        # mise_sha256 is the sha256 of the mise binary of that platform,
+        # mise 2026.10.3, as its signed SHASUMS256.txt lists it.
+        include:
+          - os: ubuntu-26.04
+            mise_sha256: 8d48bc510b7d844fad0bc7156c0855c2a1e7230c51e498a7f6b63b021f8b57c5
+          - os: macos-26-intel
+            mise_sha256: 38cdd1d904b25e66ec2fff3b5c88930853ab929b63e72c70e77198f82d6ac144
+    steps:
+      - name: Check out
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install mise and the tools of mise.lock
+        # jdx/mise-action v5.1.1
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca
+        with:
+          version: 2026.10.3
+          sha256: ${{ matrix.mise_sha256 }}
+          # No actions cache: an install restored from a cache is not
+          # checked again against the checksums of mise.lock.
+          cache: false
+          # No export of the mise environment: the steps reach go
+          # through the mise shims, and tools/ci builds the environment
+          # of each check itself.
+          env: false
+      - name: Trust mise.toml and fill the module cache
+        run: go run ./tools/ci setup
+      - name: All checks
+        run: go run ./tools/ci all

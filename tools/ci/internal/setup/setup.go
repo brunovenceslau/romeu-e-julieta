@@ -31,7 +31,8 @@ import (
 // Before them, when the mise that tools/ci starts (mise.Path) names
 // another version than the one ci.yml pins, or none, setup installs
 // that pin in the user cache directory (install), after it checks the
-// download against the sha256 of the matrix of ci.yml (mise.ReadPin);
+// download against the sha256 of the matrix of ci.yml, or of x64.yml
+// for an x64 runner (mise.ReadPin);
 // every mise command then starts that copy. It still refuses a mise of
 // another version (mise.CheckVersion) before any mise step.
 //

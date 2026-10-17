@@ -74,4 +74,5 @@ failure are T013's.
     `docs/reference/` gains one generated page per command (12 12.3). A
     duplicate kind name of `tools/new` panics at `init`, and a test
     asserts the kinds' order and names.
-- Verify: `go run ./tools/ci all` on the four runners.
+- Verify: `go run ./tools/ci all` on the runners of `ci.yml`, and of
+  `x64.yml` when it runs (10 10.2, Runners).

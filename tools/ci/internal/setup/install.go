@@ -161,7 +161,7 @@ func install(ctx context.Context, pin mise.Pin) (string, error) {
 		return "", err
 	}
 	if sum != pin.Sha256 {
-		return "", fmt.Errorf("%s has sha256 %s, and %s pins %s for %s: the file is removed", url, sum, mise.PinnedWorkflow, pin.Sha256, pin.Label)
+		return "", fmt.Errorf("%s has sha256 %s, and the matrix of %s or %s pins %s for %s: the file is removed", url, sum, mise.PinnedWorkflow, mise.ScheduledWorkflow, pin.Sha256, pin.Label)
 	}
 	if err := f.Chmod(0o700); err != nil {
 		return "", err

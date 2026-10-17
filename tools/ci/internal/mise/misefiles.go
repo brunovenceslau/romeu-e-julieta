@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -384,24 +385,82 @@ func IsMiseFileAtAnyDepth(path string) bool {
 	}
 }
 
-// miseAction is the action that installs mise in the hosted workflow,
+// miseAction is the action that installs mise in the hosted workflows,
 // and PinnedWorkflow the workflow whose "version" input for it
 // pins the version of mise itself: the one version under which MiseEnv
-// is measured (TestMiseEnvStopsConfigs).
+// is measured (TestMiseEnvStopsConfigs). ScheduledWorkflow runs the
+// best-effort x64 runners on a schedule; it pins the same version, and
+// the matrix of either file gives the sha256 of a runner (ReadPin).
 const (
-	miseAction     = "jdx/mise-action"
-	PinnedWorkflow = ".github/workflows/ci.yml"
+	miseAction        = "jdx/mise-action"
+	PinnedWorkflow    = ".github/workflows/ci.yml"
+	ScheduledWorkflow = ".github/workflows/x64.yml"
 )
 
-// pinnedMiseVersion reads the version of mise that PinnedWorkflow
-// pins, in the tree at root: the "version" input of each step that uses
-// miseAction (the action matched without case, as the workflows check
-// matches it), which must be one and the same.
-func pinnedMiseVersion(root string) (string, error) {
-	src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(PinnedWorkflow)))
-	if err != nil {
-		return "", fmt.Errorf("the version of mise is pinned in %s: %w", PinnedWorkflow, err)
+// workflowSource is the path and the bytes of one workflow file.
+type workflowSource struct {
+	path string
+	src  []byte
+}
+
+// pinWorkflows returns the workflows that pin mise in the tree at root,
+// in order: PinnedWorkflow, which must exist, and ScheduledWorkflow,
+// which may not (a tree without it pins no x64 runner).
+func pinWorkflows(root string) ([]workflowSource, error) {
+	var srcs []workflowSource
+	for _, path := range []string{PinnedWorkflow, ScheduledWorkflow} {
+		src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		switch {
+		case errors.Is(err, fs.ErrNotExist) && path == ScheduledWorkflow:
+			continue
+		case err != nil:
+			return nil, fmt.Errorf("the version of mise is pinned in %s: %w", path, err)
+		}
+		srcs = append(srcs, workflowSource{path, src})
 	}
+	return srcs, nil
+}
+
+// pinnedMiseVersion reads the version of mise that PinnedWorkflow
+// pins, in the tree at root (versionOf).
+func pinnedMiseVersion(root string) (string, error) {
+	srcs, err := pinWorkflows(root)
+	if err != nil {
+		return "", err
+	}
+	return versionOf(srcs)
+}
+
+// versionOf returns the version of mise that the workflows of
+// pinWorkflows pin: the "version" input of each step that uses
+// miseAction (the action matched without case, as the workflows check
+// matches it). PinnedWorkflow, the first, holds one non-empty version,
+// and ScheduledWorkflow, when it exists, holds that same one.
+func versionOf(srcs []workflowSource) (string, error) {
+	var pinned string
+	for i, w := range srcs {
+		var versions []string
+		if err := stepVersions(w.path, w.src, &versions); err != nil {
+			return "", err
+		}
+		if len(versions) != 1 || versions[0] == "" {
+			return "", fmt.Errorf("%s pins the version of mise with one \"version\" input of %s, and it holds %q", w.path, miseAction, versions)
+		}
+		if i == 0 {
+			pinned = versions[0]
+			continue
+		}
+		if versions[0] != pinned {
+			return "", fmt.Errorf("%s pins mise %q and %s pins %q: the two pin one version", w.path, versions[0], srcs[0].path, pinned)
+		}
+	}
+	return pinned, nil
+}
+
+// stepVersions adds to versions each "version" input of a step of the
+// workflow src that uses miseAction (the action matched without case,
+// as the workflows check matches it), once.
+func stepVersions(path string, src []byte, versions *[]string) error {
 	var wf struct {
 		Jobs map[string]struct {
 			Steps []struct {
@@ -411,9 +470,8 @@ func pinnedMiseVersion(root string) (string, error) {
 		} `yaml:"jobs"`
 	}
 	if err := yaml.Unmarshal(src, &wf); err != nil {
-		return "", fmt.Errorf("%s: %w", PinnedWorkflow, err)
+		return fmt.Errorf("%s: %w", path, err)
 	}
-	var versions []string
 	for _, job := range wf.Jobs {
 		for _, s := range job.Steps {
 			action, _, _ := strings.Cut(s.Uses, "@")
@@ -421,15 +479,12 @@ func pinnedMiseVersion(root string) (string, error) {
 				continue
 			}
 			version, _ := s.With["version"].(string)
-			if !slices.Contains(versions, version) {
-				versions = append(versions, version)
+			if !slices.Contains(*versions, version) {
+				*versions = append(*versions, version)
 			}
 		}
 	}
-	if len(versions) != 1 || versions[0] == "" {
-		return "", fmt.Errorf("%s pins the version of mise with one \"version\" input of %s, and it holds %q", PinnedWorkflow, miseAction, versions)
-	}
-	return versions[0], nil
+	return nil
 }
 
 // Version returns the version that the mise of Path names, the first

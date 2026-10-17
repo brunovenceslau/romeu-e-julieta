@@ -44,6 +44,7 @@ behind it.
     of testifylint stay green after the split.
   - The `tidy` rule of `generated` fails a tree whose `go mod tidy`
     changes `go.mod` or `go.sum`, with a fixture.
-  - Green on the four runners.
+  - Green on the runners of `ci.yml`, and of `x64.yml` when it runs
+    (10 10.2, Runners).
 - Verify: `go run ./tools/ci all` exits 0; `go test ./tools/ci/... -run
   '^TestLint'`.
