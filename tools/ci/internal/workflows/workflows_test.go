@@ -250,7 +250,7 @@ func TestWorkflowsCommitted(t *testing.T) {
 	got, err = workflows(t.Context(), r.Repo, "HEAD")
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	assert.Equal(t, ".github/workflows/ci.yml:26", got[0].Where)
+	assert.Equal(t, ".github/workflows/ci.yml:28", got[0].Where)
 }
 
 // TestWorkflowsRepository checks the workflows of this repository, as
