@@ -15,4 +15,5 @@ Gate GO at 50ec159 and c76e04e.
 - Nit: toolImports also lets tools/mutants import go/build; the list goes
   away at T105.
 
-Reopen: T039 or T105 starts, whichever comes first.
+Reopen: T039 starts, or the next spec pass on signals. T105 merged on
+2026-10-16 (#63) without taking these items on.
