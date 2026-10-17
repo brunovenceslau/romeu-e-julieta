@@ -181,7 +181,7 @@ does a file in that directory with another name ending:
 
 | Level | Allowed |
 |---|---|
-| file | `REQ-0802` the keys `name`, `on`, `permissions`, `concurrency`, `env`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters, and `pull_request_target` only as the pr job row below allows; `env` is required and holds exactly the mise environment of `tools/ci` (`miseEnv` of the mise package of `tools/ci`), in its order, each value a YAML string |
+| file | `REQ-0802` the keys `name`, `on`, `permissions`, `concurrency`, `env`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters, and `pull_request_target` only as the pr job row below allows; `env` is required and holds exactly the mise environment of `tools/ci` (`MiseEnv` of the mise package of `tools/ci`), in its order, each value a YAML string |
 | job | `REQ-0803` the keys `name`, `runs-on`, `needs`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `runs-on` is `${{ matrix.os }}` or one of the four labels of Runners below, and so is each `os` of the matrix (`runs-on` as a list or a mapping fails); `permissions`, at the top and in a job, is a mapping whose values are `read` or `none`, and the file sets it at the top or in every job, so no scope is left to the default; `strategy` holds `matrix`, `fail-fast` and `max-parallel` only; the matrix is a written mapping with the keys `os` and `include` only, each `include` entry holds `os` and `mise_sha256` only (names matched exactly), and a `${{` in the value of an `include` entry fails (the `os` value is held to the four labels); with `runs-on: ${{ matrix.os }}` every runner of the matrix names an `os` |
 | `uses` step | `REQ-0804` the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, the owner and the repository start with a letter or a digit, and so does each path segment or it starts with `_`, so no `.` or `..` segment, no `./` path of the repository (a local action) and no `docker://` image fits; `REQ-0805` `with` is a mapping that holds only the inputs listed for that action in `tools/ci` (the action is matched without case), and every `jdx/mise-action` step writes `persist_github_token: false`, an allowed input of that action, each value a literal or one `${{ matrix.<key> }}` alone whose values are all literals; an `actions/checkout` step sets `persist-credentials: false`, written exactly so (the case of the action name is ignored, the case of the value is not) |
 | `run` step | `REQ-0806` the keys `name`, `run`; `run` is one line, `go run ./tools/ci <subcommand> [<argument>...]` or `go run ./tools/release <subcommand> [<argument>...]`; each word is made of ASCII letters, digits and `._/=:-`, or is `"$NAME"` |
@@ -570,7 +570,7 @@ Four subcommands are outside `all`:
   one (`GOMAXPROCS`); child processes such as `go list` and the compiler
   are not capped. It does not fix the lock failure and costs about 14s
   for a cold run against about 7s by default, warm runs being about the
-  same; it is kept to limit CPU use when runs overlap. `lintArgs` in the
+  same; it is kept to limit CPU use when runs overlap. `Args` in the
   lint package of `tools/ci` is the one list, and the fixture test runs
   the linter with it. Each run uses the path of `golangci-lint` that
   `mise which` resolves and not through `mise exec`, which would add a
