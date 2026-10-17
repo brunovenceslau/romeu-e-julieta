@@ -2,21 +2,19 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-16, before a /clear. Eight pull requests merged
-(#53, #55 to #61; Done record 3). The five lanes saved on 2026-10-15
-all shipped. T105 PR-C was built; its ship gate is the next step.
-Subagents worked this session.
+Checkpoint of 2026-10-16, end of session. T105 PR-C (#63) and T141
+(#64) merged, green on the four runners (Done record 4). A sandbox
+whose image ships another mise now runs `go run ./tools/ci setup`
+instead of installing the pinned mise by hand.
 
 ## Next steps
 
-1. Ship T105 PR-C: pending item "ship-t105-pr-c-the-registration-by-file".
-2. T141, stacked on PR-C: pending item
-   "t141-setup-installs-the-pinned-mise".
-3. Spec PR for the step-table rows that have no REQ id
+1. Spec PR for the step-table rows that have no REQ id
    ("step-table-rows-without-a-req-id").
-4. T012 waits by decision. T106, T107, T108, T138, T139 and T140
-   follow T105.
-5. Migrate the docs/reviews checkpoints
+2. T012 waits by decision. T106, T107, T108, T138, T139 and T140
+   follow T105, which has merged.
+3. Tests bound by wall-clock time ("tests-bound-by-wall-clock-time").
+4. Migrate the docs/reviews checkpoints
    ("migrate-the-docs-reviews-checkpoints-into-docs-handoff").
 
 ## Open for the operator
@@ -28,12 +26,10 @@ One block, a recommendation each.
    gate diff.
 2. The kit prompts ("prompts-for-the-sandbox-kit-and-the-house-kit").
    Recommended: ask for both final prompts in one message.
-3. The merge sitting for PR-C and T141. Recommended: merge PR-C first.
-   T141 rides on it.
 
 ## In flight
 
-- T105 PR-C: branch feat/t105c-registration.
+Nothing.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
