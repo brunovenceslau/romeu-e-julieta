@@ -3,7 +3,7 @@ id: T107
 title: "One source for the ask-first list"
 milestone: M0
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - .github/ask-first.yaml
   - tools/ci/internal/askfirst/**
@@ -20,9 +20,14 @@ ask_first:
   - checks
   - approvals
 sitting: none
+merged: 2026-10-17
+pr: 75
 ---
 
 # T107 - One source for the ask-first list
+
+Merged on 2026-10-17 in pull request #75. The text below is the one
+written at the re-plan.
 
 Goal: 05 5.3 links `.github/ask-first.yaml` instead of copying it;
 `docs/reference/ask-first.md` leaves the generated set; `CODEOWNERS`
