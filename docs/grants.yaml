@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The checkpoint grants that stand in for approval lines (12 12.4): each
+# entry names a sitting, a grantable surface and the tasks it covers.
+# tools/ci pr reads this file at the base commit. It is on the ask-first
+# surface, so each grant is its own one-line pull request.
+version: 1
+grants: []

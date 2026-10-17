@@ -42,19 +42,18 @@ func runGen(t *testing.T, r *gittest.Repo, args ...string) (int, string, string)
 
 // TestGenerateWritesTheConsumers is the acceptance case: from the
 // ask-first list and the titles and statuses of the records, generate
-// writes CODEOWNERS, the reference page and the index.
+// writes CODEOWNERS and the index.
 func TestGenerateWritesTheConsumers(t *testing.T) {
 	r := generateFixture(t)
 	code, out, errOut := runGen(t, r)
 	require.Equal(t, check.ExitOK, code, errOut)
-	assert.Equal(t, "wrote .github/CODEOWNERS\nwrote docs/reference/ask-first.md\nwrote docs/adr/README.md\n", out)
+	assert.Equal(t, "wrote .github/CODEOWNERS\nwrote docs/adr/README.md\n", out)
 	read := func(p string) string {
 		b, err := os.ReadFile(filepath.Join(r.Dir, filepath.FromSlash(p)))
 		require.NoError(t, err)
 		return string(b)
 	}
 	assert.Contains(t, read(".github/CODEOWNERS"), "/.github/ask-first.yaml @someone\n")
-	assert.Contains(t, read("docs/reference/ask-first.md"), "| `ask-first` |")
 	index := read("docs/adr/README.md")
 	assert.Contains(t, index, "| 1 | [First](0001-first.md) | Accepted |\n")
 	assert.Contains(t, index, "| 2 | [Second](0002-second.md) | Proposed |\n")
@@ -148,13 +147,13 @@ func TestGenerateSkipsWhatIsNoRecord(t *testing.T) {
 }
 
 // TestGenerateWritesNothingOutsideTheTree is the case of a generated
-// page committed as a link to a path outside the repository: generate
+// file committed as a link to a path outside the repository: generate
 // replaces the link, and the file it pointed to is untouched.
 func TestGenerateWritesNothingOutsideTheTree(t *testing.T) {
 	r := generateFixture(t)
 	victim := filepath.Join(t.TempDir(), "victim")
 	require.NoError(t, os.WriteFile(victim, []byte("mine\n"), 0o644))
-	page := filepath.Join(r.Dir, filepath.FromSlash(askfirst.PagePath))
+	page := filepath.Join(r.Dir, "docs", "adr", "README.md")
 	require.NoError(t, os.MkdirAll(filepath.Dir(page), 0o755))
 	require.NoError(t, os.Symlink(victim, page))
 	code, _, errOut := runGen(t, r)
@@ -222,7 +221,7 @@ func TestAskFirstOfThisRepository(t *testing.T) {
 	t.Cleanup(func() { _ = root.Close() })
 	outputs, err := generateOutputs(root)
 	require.NoError(t, err)
-	require.Len(t, outputs, 3)
+	require.Len(t, outputs, 2)
 	for _, out := range outputs {
 		got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(out.path)))
 		require.NoError(t, err, out.path)

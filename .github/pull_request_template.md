@@ -8,7 +8,7 @@
 of the form Approval: <surface id> - <what was approved>, where the phrase names what was approved,
 in a few neutral words, and no person, and holds none of the double quotation marks
 that docs/spec/12-engineering.md lists in 12.4.
-The surfaces are listed in docs/reference/ask-first.md. -->
+The surfaces are listed in .github/ask-first.yaml. -->
 
 ## Evidence
 
