@@ -3,7 +3,7 @@ id: T023
 title: "`gitsafe`: the runner for both modes, fetch, refs and bundles"
 milestone: M1
 module: gitsafe
-fate: kept
+fate: merged
 owns:
   - internal/gitsafe/**
 needs:
@@ -13,9 +13,14 @@ ask_first:
   - gitsafe
   - contracts
 sitting: none
+merged: 2026-10-16
+pr: 60
 ---
 
 # T023 - `gitsafe`: the runner for both modes, fetch, refs and bundles
+
+Merged on 2026-10-16 in pull request #60. The text below is the one
+written at the re-plan.
 
 Earlier title: `gitsafe`: the hardened runner, fetch and refs.
 

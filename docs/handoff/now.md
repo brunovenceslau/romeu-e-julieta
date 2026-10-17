@@ -8,17 +8,19 @@ T138, T106, T107, x64 best effort on a scheduled `x64.yml`, T108 (ADR
 fix (Done record 12), the docs/reviews checkpoints moved here (Done
 record 22), tools/new refusing a flag as a title (Done record 23), and
 T140, the module tree and the spec identifiers held to the code, with
-its spec fix (Done record 24).
+its spec fix (Done record 24). The record of T007, T017 and T023 as
+merged is in flight (Done record 26).
 
 ## Next steps
 
-1. Take a task from `go run ./tools/ci plan --ready`. M1's foundation
-   packages start beside M0 (docs/plan.md, "Milestones and sittings"):
-   T007 (termsafe), T017 (digests), T023 (gitsafe, contracts). Each
-   ask-first surface its task file forecasts needs the operator's
+1. T129, fixed module sources for `tools/ci setup`, chosen by the
+   operator on 2026-10-17. Its `checks` surface needs the operator's
    approval first; no grant is written before sitting M0.
-2. The other ready tasks: T123, T125, T128, T129, T130, T132; T124
-   needs an operator API call; T112 runs at sitting M1, T126 at O8.
+2. The other ready tasks (`go run ./tools/ci plan --ready`): T008
+   (the CLI contract, M1), T123, T125, T128, T130, T132, and T024
+   (gitsafe's unbundle and verify, M3); T124 needs an operator API
+   call; T112 runs at sitting M1, T126 at O8. T008 and T024 became
+   ready when T007 and T023 were recorded as merged (Done record 26).
 3. T012 waits by decision. T139 waits for item 16 (the lint set) at
    sitting M0.
 4. At their triggers: "tight-wall-clock-bounds-left-in-the-tests",
@@ -40,7 +42,7 @@ One block, a recommendation each.
 
 ## In flight
 
-- This handoff's pull request.
+- The pull request that records T007, T017 and T023.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.

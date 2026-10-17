@@ -3,7 +3,7 @@ id: T017
 title: "`canon`"
 milestone: M1
 module: canon
-fate: kept
+fate: merged
 owns:
   - internal/canon/**
 needs: []
@@ -11,9 +11,14 @@ after: []
 ask_first:
   - digests
 sitting: none
+merged: 2026-10-16
+pr: 59
 ---
 
 # T017 - `canon`
+
+Merged on 2026-10-16 in pull request #59. The text below is the one
+written at the re-plan.
 
 Goal: The `canon` package: every digest the gates compare, and the one
 ULID writer.
