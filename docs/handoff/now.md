@@ -9,21 +9,21 @@ fix (Done record 12), the docs/reviews checkpoints moved here (Done
 record 22), tools/new refusing a flag as a title (Done record 23), and
 T140, the module tree and the spec identifiers held to the code, with
 its spec fix (Done record 24). #97 recorded T007, T017 and T023 as
-merged (Done record 26).
+merged (Done record 26), and the stack #100 fixed the chatty holder
+test of internal/procgroup (Done record 27).
 
 ## Next steps
 
-1. T129, fixed module sources for `tools/ci setup`, chosen by the
-   operator on 2026-10-17. Its `checks` surface needs the operator's
-   approval first; no grant is written before sitting M0.
-2. The other ready tasks (`go run ./tools/ci plan --ready`): T008
-   (the CLI contract, M1), T123, T125, T128, T130, T132, and T024
+1. Take a task from `go run ./tools/ci plan --ready`: T008 (the CLI
+   contract, M1), T123, T125, T128, T130, T132, and T024
    (gitsafe's unbundle and verify, M3); T124 needs an operator API
    call; T112 runs at sitting M1, T126 at O8. T008 and T024 became
    ready when T007 and T023 were recorded as merged (Done record 26).
-3. T012 waits by decision. T139 waits for item 16 (the lint set) at
+   Each ask-first surface its task file forecasts needs the operator's
+   approval first; no grant is written before sitting M0.
+2. T012 waits by decision. T139 waits for item 16 (the lint set) at
    sitting M0.
-4. At their triggers: "tight-wall-clock-bounds-left-in-the-tests",
+3. At their triggers: "tight-wall-clock-bounds-left-in-the-tests",
    "the-go-that-builds-tools-ci-is-not-held-to-the-pin",
    "split-the-open-tasks-over-the-implements-cap".
 
@@ -42,7 +42,7 @@ One block, a recommendation each.
 
 ## In flight
 
-- The stack of the procgroup chatty holder fix (Done record 27).
+- The stack of T129 (Done record 28).
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.

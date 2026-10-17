@@ -41,10 +41,11 @@ import (
 // mise.MiseEnv, as the workflow's env table gives every step
 // (mise.HostedEnv).
 //
-// The download runs the pinned go command in check.StepEnv with the proxy
-// the go command uses by default, the one step of tools/ci that
-// fetches modules; go.sum checks what it fetches. It and "mise
-// install" keep check.NetworkPassThrough.
+// The download runs the pinned go command in check.StepEnv, the one
+// step of tools/ci that fetches the modules of go.sum; go.sum and the
+// checksum database check what it fetches. All three steps run with
+// moduleSources, and the download and "mise install" keep
+// check.NetworkPassThrough.
 //
 // "mise install" downloads and builds the pinned tools, so it runs
 // under the class procgroup.Mise, the limit the table gives every mise
@@ -81,8 +82,8 @@ func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 	}
 	c := check.NewPrinter(e.Stdout)
 	miseSteps := []check.Step{
-		{Name: "mise trust", Argv: []string{misePath, "trust", filepath.Join(root, "mise.toml")}, Environ: mise.RunEnviron(check.PassThroughEnv(), root)},
-		{Name: "mise install", Argv: []string{misePath, "install"}, Environ: mise.RunEnviron(check.WithProcessEnv(check.PassThroughEnv(), check.NetworkPassThrough), root), Class: procgroup.Mise},
+		{Name: "mise trust", Argv: []string{misePath, "trust", filepath.Join(root, "mise.toml")}, Environ: trustEnv(root)},
+		{Name: "mise install", Argv: []string{misePath, "install"}, Environ: installEnv(root), Class: procgroup.Mise},
 	}
 	c.Run(ctx, root, miseSteps)
 	if !c.OK {
@@ -95,8 +96,41 @@ func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 	download := check.Step{
 		Name:    "go mod download",
 		Argv:    []string{filepath.Join(tools.GoDir, "go"), "mod", "download"},
-		Environ: check.WithProcessEnv(slices.DeleteFunc(check.StepEnv(tools.GoDir), func(kv string) bool { return kv == "GOPROXY=off" }), check.NetworkPassThrough),
+		Environ: downloadEnv(tools.GoDir),
 	}
 	c.Run(ctx, root, []check.Step{download})
 	return c.OK, nil
+}
+
+// moduleSources are where the go commands of setup fetch a module from
+// and the checksum database that checks it (REQ-0862): the module
+// proxy alone, with no "direct" fallback to the module's own host, and
+// sum.golang.org. GOENV=off, the third variable REQ-0862 names, comes
+// with goenv.Pin, which both mise.MiseEnv and check.StepEnv hold. Every
+// environment below is built from nothing, so no GO variable of the
+// caller (GONOSUMDB, GOPRIVATE, GOINSECURE, GOFLAGS among them) reaches
+// a step. TestSetupEnv holds each step to both rules.
+var moduleSources = []string{
+	"GOPROXY=https://proxy.golang.org",
+	"GOSUMDB=sum.golang.org",
+}
+
+// trustEnv is the environment of "mise trust", run in root.
+func trustEnv(root string) []string {
+	return mise.RunEnviron(slices.Concat(check.PassThroughEnv(), moduleSources), root)
+}
+
+// installEnv is the environment of "mise install", run in root, which
+// reaches the network to build the pinned go tools.
+func installEnv(root string) []string {
+	env := check.WithProcessEnv(check.PassThroughEnv(), check.NetworkPassThrough)
+	return mise.RunEnviron(slices.Concat(env, moduleSources), root)
+}
+
+// downloadEnv is the environment of "go mod download" with the go
+// command of goDir: the steps' environment with moduleSources in place
+// of their GOPROXY=off.
+func downloadEnv(goDir string) []string {
+	env := slices.DeleteFunc(check.StepEnv(goDir), func(kv string) bool { return kv == "GOPROXY=off" })
+	return check.WithProcessEnv(slices.Concat(env, moduleSources), check.NetworkPassThrough)
 }
