@@ -449,12 +449,14 @@ func TestHookExplainsAToolchainRefusal(t *testing.T) {
 // behind a go shim, in a tree whose mise.toml names a go that the empty
 // installs directory does not hold, with the module variables of a
 // hostile caller (GONOSUMDB=*) and proxies that refuse every connection,
-// so no run reaches the network. The shim's mise installs nothing:
-// the probe refuses, the hook gives the hint for a shim, and the installs
-// directory stays empty. The control runs the same shim in the same
-// environment with mise's default auto_install, and it tries the install
-// the hook must not; so the hook's refusal is the two settings of
-// mise.MiseEnv, not a tree mise cannot read. PATH holds the shim and the
+// so no run reaches the network. The shim's mise tries no install: the
+// probe refuses, the hook gives the hint for a shim, and mise prints no
+// failed install. The refused proxies fail the probe either way, so that
+// message is the proof, and the empty installs directory a backstop. The
+// control runs the same shim in the same environment with mise's default
+// auto_install, and it tries the install the hook must not; so the
+// difference is the two settings of mise.MiseEnv, not a tree mise cannot
+// read. PATH holds the shim and the
 // two tools the hook starts, so no other go answers in its place.
 func TestHookInstallsNothing(t *testing.T) {
 	root := citest.ModuleRoot(t)
