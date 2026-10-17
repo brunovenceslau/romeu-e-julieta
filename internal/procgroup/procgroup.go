@@ -8,8 +8,8 @@
 // runs in a process group of its own, with the timeout of its class
 // (the timeout table of class.go); a timeout, a cancellation and the
 // signal rule kill the whole group, and so does the end of the leader,
-// and the drain of the output pipes after the kill is bounded by
-// WaitDelay. Main is the one signal handler both mains install (04 4.1,
+// and the drain of the output pipes after the kill ends once they have
+// been idle for WaitDelay. Main is the one signal handler both mains install (04 4.1,
 // Signals).
 //
 // The scrubbed environment of 04 4.1 has its one implementation here
@@ -42,8 +42,9 @@ import (
 	"time"
 )
 
-// WaitDelay is how long Run lets the output pipes drain after the
-// group is killed (04 4.1, Subprocesses, item 4).
+// WaitDelay is how long the output pipes may stay idle, with no output
+// moving, before Run stops draining them after the group is killed
+// (04 4.1, Subprocesses, item 4).
 const WaitDelay = 2 * time.Second
 
 // ErrNotFound is the error of a command whose program is not there,
@@ -121,12 +122,15 @@ func (e *ExitError) Unwrap() error { return e.err }
 // end of the leader and the drain: a grandchild in the group that holds
 // the output pipe dies at once, and the pipe closes.
 //
-// After the kill the drain waits at most WaitDelay, for a holder of the
-// pipe that left the group with setsid. Past that bound Run stops
-// reading and returns the leader's result, nil for a leader that
+// After the kill the drain reads on while output moves, and stops once
+// the pipes have been idle for WaitDelay: so a holder of the pipe that
+// left the group with setsid and writes nothing is waited for that
+// long. Run then returns the leader's result, nil for a leader that
 // exited 0: the command's own work succeeded, its group is dead, and
-// what it wrote before it ended has been read; only what the escaped
-// holder writes later is lost, and it was never the command's result.
+// what it wrote before it ended has been read, however late the reader
+// was; only what the escaped holder writes later is lost, and it was
+// never the command's result. A drain that the end of ctx or of the
+// class limit stops is that error, since the output may be cut.
 //
 // A command that ends with a status other than 0 is an *ExitError, and
 // a program that is not there is ErrNotFound.
@@ -164,7 +168,7 @@ func Run(ctx context.Context, c Command) error {
 	err = cmd.Wait()
 	out.leaderEnded()
 	g.end(cmd.Process.Pid)
-	if drainErr := out.drain(WaitDelay); err == nil {
+	if drainErr := out.drain(runCtx, WaitDelay); err == nil {
 		err = drainErr
 	}
 	return result(ctx, runCtx, c, limit, err)

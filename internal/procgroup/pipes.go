@@ -6,10 +6,12 @@
 package procgroup
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
 	"os/exec"
+	"sync/atomic"
 	"time"
 )
 
@@ -21,10 +23,12 @@ import (
 // here, Wait returns when the leader ends, Run kills the group, and
 // drain then reads what is left.
 type pipes struct {
-	childEnds []*os.File // the ends the command holds; closed here once it started
-	readers   []*os.File // the ends the output copies read
-	done      chan error // one result per output copy
-	stdin     *os.File   // the end the input copy writes; nil when there is none
+	childEnds []*os.File   // the ends the command holds; closed here once it started
+	readers   []*os.File   // the ends the output copies read
+	done      chan error   // one result per output copy
+	stdin     *os.File     // the end the input copy writes; nil when there is none
+	moved     atomic.Int64 // counts each read and each write of the output copies
+	writing   atomic.Int32 // the output copies inside a write to the caller's writer
 }
 
 // attach sets cmd's standard streams. A nil reader or writer stays nil,
@@ -94,11 +98,38 @@ func (p *pipes) out(w io.Writer) (io.Writer, error) {
 	p.readers = append(p.readers, r)
 	p.childEnds = append(p.childEnds, wf)
 	go func() {
-		_, err := io.Copy(w, r)
+		err := p.copy(w, r)
 		_ = r.Close()
 		p.done <- err
 	}()
 	return wf, nil
+}
+
+// copy copies r to w as io.Copy does, and records its progress for
+// drain: each read that returns bytes and each write moves the count,
+// and the copy is counted as writing while it waits on w, so a slow
+// writer is not taken for a silent pipe.
+func (p *pipes) copy(w io.Writer, r io.Reader) error {
+	buf := make([]byte, 32*1024)
+	for {
+		n, rerr := r.Read(buf)
+		if n > 0 {
+			p.moved.Add(1)
+			p.writing.Add(1)
+			_, werr := w.Write(buf[:n])
+			p.writing.Add(-1)
+			p.moved.Add(1)
+			if werr != nil {
+				return werr
+			}
+		}
+		if errors.Is(rerr, io.EOF) {
+			return nil
+		}
+		if rerr != nil {
+			return rerr
+		}
+	}
 }
 
 // started closes this process's copy of the ends the command holds, so
@@ -125,26 +156,49 @@ func (p *pipes) leaderEnded() {
 func (p *pipes) abort() {
 	p.started()
 	p.leaderEnded()
-	_ = p.drain(WaitDelay)
+	_ = p.drain(context.Background(), WaitDelay)
 }
 
-// drain waits for the output copies to read EOF, for at most bound,
-// then stops the ones still reading and closes the read ends. It
-// returns the first error of a copy, such as a writer that failed; the
-// stop at the bound is not one (Run's doc says why).
-func (p *pipes) drain(bound time.Duration) error {
-	timer := time.NewTimer(bound)
-	defer timer.Stop()
-	var first error
+// drain waits for the output copies to read EOF. It stops the ones
+// still reading, and closes the read ends, once no copy has moved for
+// idle: no byte read and no write under way. So what the command wrote
+// before it ended is read whole however late the reader is, and a
+// holder of a pipe that left the group and writes nothing ends the
+// drain after idle. It also stops when ctx ends, and then returns
+// ctx's cause: the output may be cut, so the run must not read as a
+// success. Otherwise it returns the first error of a copy, such as a
+// writer that failed; the stop after idle is not one (Run's doc says
+// why).
+func (p *pipes) drain(ctx context.Context, idle time.Duration) error {
+	tick := time.NewTicker(idle / 10)
+	defer tick.Stop()
+	seen, quietSince := p.moved.Load(), time.Now()
+	var first, cut error
+	stop := func(err error) {
+		if cut != nil {
+			return
+		}
+		cut = err
+		for _, r := range p.readers {
+			_ = r.SetReadDeadline(time.Now())
+		}
+	}
 	for range p.readers {
 		var err error
-		select {
-		case err = <-p.done:
-		case <-timer.C:
-			for _, r := range p.readers {
-				_ = r.SetReadDeadline(time.Now())
+	wait:
+		for {
+			select {
+			case err = <-p.done:
+				break wait
+			case <-ctx.Done():
+				stop(context.Cause(ctx))
+			case <-tick.C:
+				if m := p.moved.Load(); m != seen || p.writing.Load() > 0 {
+					seen, quietSince = m, time.Now()
+				} else if time.Since(quietSince) >= idle {
+					stop(errIdle)
+				}
 			}
-			err = <-p.done
 		}
 		if first == nil && !errors.Is(err, os.ErrDeadlineExceeded) {
 			first = err
@@ -153,8 +207,15 @@ func (p *pipes) drain(bound time.Duration) error {
 	for _, r := range p.readers {
 		_ = r.Close()
 	}
+	if first == nil && cut != nil && !errors.Is(cut, errIdle) {
+		first = cut
+	}
 	return first
 }
+
+// errIdle marks a drain that stopped after its idle bound, which is not
+// an error of the run.
+var errIdle = errors.New("procgroup: the output pipes were idle")
 
 // sameWriter reports whether a and b are the one writer. Comparing two
 // interfaces whose dynamic type is not comparable panics, and such

@@ -34,7 +34,22 @@ type failingWriter struct{}
 
 func (failingWriter) Write([]byte) (int, error) { return 0, errWriter }
 
-// TestWaitDelay pins the bound of the drain to the 2 s of 04 4.1,
+// lateWriter is the reader of a loaded machine: its first write returns
+// only after a pause longer than WaitDelay.
+type lateWriter struct {
+	buf   bytes.Buffer
+	slept bool
+}
+
+func (w *lateWriter) Write(b []byte) (int, error) {
+	if !w.slept {
+		w.slept = true
+		time.Sleep(WaitDelay + 500*time.Millisecond)
+	}
+	return w.buf.Write(b)
+}
+
+// TestWaitDelay pins the idle bound of the drain to the 2 s of 04 4.1,
 // Subprocesses, item 4.
 func TestWaitDelay(t *testing.T) {
 	assert.Equal(t, 2*time.Second, WaitDelay)
@@ -100,6 +115,15 @@ func TestRun(t *testing.T) {
 	t.Run("a writer that fails is the error of a command that succeeded", func(t *testing.T) {
 		err := Run(t.Context(), Command{Class: JulietaGit, Argv: []string{"/bin/sh", "-c", "echo out"}, Env: shellEnv, Stdout: failingWriter{}})
 		require.ErrorIs(t, err, errWriter)
+	})
+	t.Run("a late reader gets the whole output of a command that ended", func(t *testing.T) {
+		// 64 KiB fits the pipe, so the command ends with most of it
+		// still unread while the first write waits past WaitDelay.
+		const size = 64 * 1024
+		w := &lateWriter{}
+		err := Run(t.Context(), Command{Class: Unbounded, Argv: []string{"/bin/sh", "-c", "head -c 65536 /dev/zero"}, Env: shellEnv, Stdout: w})
+		require.NoError(t, err)
+		assert.Equal(t, size, w.buf.Len(), "nothing the command wrote is lost")
 	})
 	t.Run("a writer that fails stops the command well inside its limit", func(t *testing.T) {
 		// More than a pipe holds: with the copy stopped and its end open,
@@ -184,7 +208,8 @@ func TestRun(t *testing.T) {
 // TestRunKillsTheGroup covers the group rule of 04 4.1, Subprocesses,
 // item 4: a cancellation kills the whole group with the SIGKILL a
 // grandchild cannot ignore, the group is killed as soon as the leader
-// ends, and the drain after the kill is bounded by WaitDelay.
+// ends, and the drain after the kill ends once the pipes have been
+// idle for WaitDelay, or when the run's context ends.
 func TestRunKillsTheGroup(t *testing.T) {
 	t.Run("a cancellation kills a grandchild that ignores SIGTERM", func(t *testing.T) {
 		pidfile := filepath.Join(t.TempDir(), "pid")
@@ -255,10 +280,8 @@ func TestRunKillsTheGroup(t *testing.T) {
 		assert.Equal(t, "out\n", string(out))
 		assertGone(t, waitForPid(t, pidfile))
 	})
-	t.Run("a holder of the pipe outside the group is waited for no longer than WaitDelay", func(t *testing.T) {
+	t.Run("a holder of the pipe outside the group does not hold a cancelled command", func(t *testing.T) {
 		cmd, pidfile, _ := helper(t, "escape")
-		const bound = 6 * time.Second // the holder sleeps for 15s
-		require.Less(t, WaitDelay, bound-time.Second, "the bound of the wait is under the bound of the test")
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		errc := make(chan error, 1)
@@ -269,21 +292,31 @@ func TestRunKillsTheGroup(t *testing.T) {
 		// The holder exists before the command is cancelled, so the wait
 		// that follows is for a live holder and not for nothing.
 		holder := waitForPid(t, pidfile)
-		start := time.Now()
 		cancel()
 		require.ErrorIs(t, <-errc, context.Canceled)
-		assert.Less(t, time.Since(start), bound, "the command returns after WaitDelay, not when the holder ends")
-		assert.NoError(t, syscall.Kill(holder, 0), "the holder is still alive, so only WaitDelay ended the wait")
+		// The holder sleeps until the test ends it, so a command that
+		// returned while it lives was not waiting for it.
+		assert.NoError(t, syscall.Kill(holder, 0), "the holder is still alive, so it did not hold the command")
 	})
-	t.Run("a leader that exits 0 with a holder outside the group succeeds after WaitDelay", func(t *testing.T) {
+	t.Run("a leader that exits 0 with a holder outside the group succeeds once the pipe is idle", func(t *testing.T) {
 		cmd, pidfile, _ := helper(t, "escape-exit")
 		start := time.Now()
 		_, err := CombinedOutput(t.Context(), Command{Class: Unbounded, Argv: cmd.Args, Env: cmd.Env})
 		require.NoError(t, err)
-		took := time.Since(start)
-		assert.GreaterOrEqual(t, took, WaitDelay, "the drain waited for the holder")
-		assert.Less(t, took, WaitDelay+3*time.Second, "and no longer than its bound")
+		assert.GreaterOrEqual(t, time.Since(start), WaitDelay, "the drain waited for the idle pipe")
+		// The holder sleeps until the test ends it, so a return while it
+		// lives shows the idle bound, not the holder, ended the drain.
 		assert.NoError(t, syscall.Kill(waitForPid(t, pidfile), 0), "the holder is still alive")
+	})
+	t.Run("a holder outside the group that never goes idle makes the run an error at its deadline", func(t *testing.T) {
+		cmd, pidfile, _ := helper(t, "escape-chatty")
+		// The deadline only ends the drain; what is checked is that a
+		// drain cut short is an error and never a success.
+		ctx, cancel := context.WithTimeout(t.Context(), 2*WaitDelay)
+		defer cancel()
+		_, err := CombinedOutput(ctx, Command{Class: Unbounded, Argv: cmd.Args, Env: cmd.Env})
+		require.ErrorIs(t, err, context.DeadlineExceeded, "the output may be cut, so the run is not a success")
+		assert.NoError(t, syscall.Kill(waitForPid(t, pidfile), 0), "the holder is still alive and writing")
 	})
 }
 
