@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
@@ -35,16 +36,24 @@ func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 		check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("plan", len(findings)))
 		return len(findings) == 0, nil
 	}
-	tasks, _, err := Read(files)
+	all, _, err := Read(files)
 	if err != nil {
 		return false, err
+	}
+	// A view prints ids, one per line, so a task whose id is not the
+	// plan's shape is left out of it; the check reports the file.
+	var tasks []Task
+	for _, t := range all {
+		if taskID.MatchString(t.ID) {
+			tasks = append(tasks, t)
+		}
 	}
 	ids := Ready(tasks)
 	if view == "--critical-path" {
 		ids = CriticalPath(tasks)
 	}
 	for _, id := range ids {
-		check.Say(e.Stdout, "%s\n", id)
+		check.Say(e.Stdout, "%s\n", git.SafeLines(id))
 	}
 	return true, nil
 }

@@ -6,6 +6,7 @@ package plan
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -40,7 +41,11 @@ func (s spec) file() (string, string) {
 		if len(xs) == 0 {
 			return " []\n"
 		}
-		return "\n  - " + strings.Join(xs, "\n  - ") + "\n"
+		var b strings.Builder
+		for _, x := range xs {
+			b.WriteString("\n  - " + strconv.Quote(x))
+		}
+		return b.String() + "\n"
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "---\nid: %s\ntitle: \"Task %s\"\nmilestone: M0\nmodule: none\nfate: %s\n", s.id, s.id, fate)
@@ -271,4 +276,122 @@ func TestCriticalPathCountsAfterEdges(t *testing.T) {
 	require.Empty(t, findings)
 	assert.Equal(t, []string{"T002", "T003", "T004"}, CriticalPath(tasks), "the after edge of T003 counts")
 	assert.Equal(t, []string{"T002", "T005"}, Ready(tasks), "a deferred task is not ready, and T007 waits for T005")
+}
+
+// commitTree writes files as one commit of a new repository.
+func commitTree(t *testing.T, files []check.TreeFile) *gittest.Repo {
+	t.Helper()
+	r := gittest.New(t)
+	for _, f := range files {
+		r.Write(f.Path, string(f.Content))
+	}
+	r.Commit("the plan")
+	return r
+}
+
+// TestRun covers the subcommand: the check and its exit status, the two
+// views one id per line with status 0, and a wrong argument.
+func TestRun(t *testing.T) {
+	good := commitTree(t, tree([]spec{merged("T001"), {id: "T002", needs: []string{"T001"}}, {id: "T003", after: []string{"T002"}}}))
+	bad := commitTree(t, tree([]spec{{id: "T001", needs: []string{"T009"}}}))
+	tests := []struct {
+		name string
+		r    *gittest.Repo
+		args []string
+		code int
+		out  string
+	}{
+		{"the check passes", good, nil, check.ExitOK, "plan: ok\n"},
+		{"the check fails", bad, nil, check.ExitFail, "plan: 1 finding(s)"},
+		{"the ready tasks", good, []string{"--ready"}, check.ExitOK, "T002\n"},
+		{"the critical path", good, []string{"--critical-path"}, check.ExitOK, "T002\nT003\n"},
+		{"a wrong argument", good, []string{"--bogus"}, check.ExitError, "plan takes no argument, --critical-path or --ready"},
+		{"two arguments", good, []string{"--ready", "--critical-path"}, check.ExitError, "plan takes no argument"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out := citest.Run(t, tt.r, nil, Run, tt.args...)
+			assert.Equal(t, tt.code, code, out)
+			if tt.code == check.ExitOK && tt.args != nil {
+				assert.Equal(t, tt.out, out)
+			} else {
+				assert.Contains(t, out, tt.out)
+			}
+		})
+	}
+}
+
+// TestViewsLeaveOutAnIDOfAnotherShape checks that a task whose id is
+// not the plan's shape, such as one that would print a second line or
+// an escape, is in neither view.
+func TestViewsLeaveOutAnIDOfAnotherShape(t *testing.T) {
+	files := tree([]spec{{id: "T001"}})
+	p, c := spec{id: "T002"}.file()
+	c = strings.Replace(c, "id: T002\n", "id: \"T002\\n\\e[31mT999\"\n", 1)
+	files = append(files, check.TreeFile{Path: p, Mode: "100644", Content: []byte(c)})
+	r := commitTree(t, files)
+	for _, view := range []string{"--ready", "--critical-path"} {
+		code, out := citest.Run(t, r, nil, Run, view)
+		assert.Equal(t, check.ExitOK, code)
+		assert.Equal(t, "T001\n", out, view)
+	}
+}
+
+// TestCriticalPathTiesAndCycles checks that of two chains of one length
+// the one whose ids come first wins, on every run, and that a cycle,
+// which the check reports, still gives a chain.
+func TestCriticalPathTiesAndCycles(t *testing.T) {
+	tasks, _, err := Read(tree([]spec{
+		{id: "T001"}, {id: "T002", needs: []string{"T001"}},
+		{id: "T003"}, {id: "T004", needs: []string{"T003"}},
+	}))
+	require.NoError(t, err)
+	for range 5 {
+		assert.Equal(t, []string{"T001", "T002"}, CriticalPath(tasks))
+	}
+	tasks, _, err = Read(tree([]spec{{id: "T001", needs: []string{"T002"}}, {id: "T002", needs: []string{"T001"}}}))
+	require.NoError(t, err)
+	assert.Len(t, CriticalPath(tasks), 2, "a cycle ends a chain where it closes")
+}
+
+// TestMoreFindings covers the rules a review added: an owns entry that
+// is no glob, an id named twice, an open task waiting for a closed one,
+// an absorbed_by that names the task itself or a closed task, a date
+// that is no day, and a plan page without task files.
+func TestMoreFindings(t *testing.T) {
+	tests := []struct {
+		name  string
+		files []check.TreeFile
+		want  []string
+	}{
+		{"an owns entry that is no glob", tree([]spec{{id: "T001", owns: []string{"a**b/x"}}}),
+			[]string{`an owns entry is not a glob of .github/ask-first.yaml: glob "a**b/x": "**" must be a whole segment`}},
+		{"an id named twice in needs", tree([]spec{{id: "T001"}, {id: "T002", needs: []string{"T001", "T001"}}}),
+			[]string{"needs names T001 twice"}},
+		{"an open task that waits for a folded one", tree([]spec{{id: "T001", fate: "folded", absorbedBy: "T002"}, {id: "T002"}, {id: "T003", needs: []string{"T001"}}}),
+			[]string{"needs names T001, a task of fate folded, which is never merged"}},
+		{"absorbed_by names the task itself", tree([]spec{{id: "T001", fate: "folded", absorbedBy: "T001"}}),
+			[]string{"absorbed_by names the task itself"}},
+		{"absorbed_by names a removed task", tree([]spec{{id: "T001", fate: "folded", absorbedBy: "T002"}, {id: "T002", fate: "removed"}}),
+			[]string{"absorbed_by names T002, a task of fate removed"}},
+		{"a merged date that is no day", tree([]spec{{id: "T001", fate: "merged", merged: "2026-13-45", pr: "1"}}),
+			[]string{"merged: is a date, YYYY-MM-DD"}},
+		{"a plan page without task files", []check.TreeFile{{Path: "docs/plan.md", Mode: "100644", Content: []byte("# Plan\n")}},
+			[]string{"docs/plan.md is there, and no task file is"}},
+		{"a tree with neither", []check.TreeFile{{Path: "README.md", Mode: "100644", Content: []byte("x\n")}}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, messages(t, tt.files))
+		})
+	}
+}
+
+// TestOverlapOfManyDoubleStars is the case the audit found: an owns
+// glob of many "**" against a deep literal path of another task. The
+// check answers, and reports the overlap.
+func TestOverlapOfManyDoubleStars(t *testing.T) {
+	deep := strings.TrimSuffix(strings.Repeat("d/", 30), "/")
+	got := messages(t, tree([]spec{{id: "T001", owns: []string{strings.Repeat("**/", 16) + "zzz"}}, {id: "T002", owns: []string{deep + "/zzz"}}}))
+	assert.Equal(t, []string{"T001 and T002 both own " + deep + "/zzz, and no needs or after orders them"}, got)
 }

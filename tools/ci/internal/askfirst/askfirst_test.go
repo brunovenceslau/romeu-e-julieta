@@ -300,3 +300,14 @@ func TestApprovalsSurface(t *testing.T) {
 		assert.True(t, slices.ContainsFunc(list.Surfaces[j].Globs, func(g string) bool { return GlobMatch(g, path) }), "%s on %s", path, id)
 	}
 }
+
+// TestGlobMatchOfManyDoubleStars checks a glob of thirty "**" segments
+// against a name of thirty segments, both ways. Before the table it
+// tried every split of the name, and the run did not end; no clock
+// bounds the test, since a hang fails it at go test's own timeout.
+func TestGlobMatchOfManyDoubleStars(t *testing.T) {
+	glob := strings.Repeat("**/", 30) + "zzz"
+	name := strings.TrimSuffix(strings.Repeat("d/", 30), "/")
+	assert.False(t, GlobMatch(glob, name))
+	assert.True(t, GlobMatch(glob, name+"/zzz"))
+}

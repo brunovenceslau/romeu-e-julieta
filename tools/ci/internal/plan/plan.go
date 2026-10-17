@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 
@@ -52,6 +53,9 @@ var (
 	// startable are the open fates whose task waits only for its
 	// edges: a deferred task also waits for its trigger.
 	startable = []string{"kept", "new"}
+	// closed are the fates of a task that is never built here: an edge
+	// of an open task to one never lets it start.
+	closed = []string{"folded", "removed", "left-v1"}
 )
 
 // Generated are the generated outputs of rule 1 of docs/plan.md, which
@@ -190,7 +194,15 @@ func parse(p string, content []byte) (*Task, []check.Finding) {
 			}
 			switch key {
 			case "owns":
-				t.Owns = list
+				// An owns entry is a glob of the dialect of the ask-first
+				// list; one that is not is a finding and matches nothing.
+				for _, g := range list {
+					if err := askfirst.CheckGlob(g); err != nil {
+						findings = append(findings, find(where, "an owns entry is not a glob of "+askFirstPath+": "+err.Error()))
+						continue
+					}
+					t.Owns = append(t.Owns, g)
+				}
 			case "needs":
 				t.Needs = list
 			case "after":
@@ -293,7 +305,7 @@ func fieldFindings(t Task, m []string) []check.Finding {
 			add("merged", "merged: and pr: belong to a task of fate merged")
 		}
 	}
-	if t.Merged != "" && !date.MatchString(t.Merged) {
+	if _, err := time.Parse(time.DateOnly, t.Merged); t.Merged != "" && (!date.MatchString(t.Merged) || err != nil) {
 		add("merged", "merged: is a date, YYYY-MM-DD")
 	}
 	if t.PR != "" {
@@ -363,7 +375,13 @@ func Of(files []check.TreeFile, generated []string) ([]check.Finding, error) {
 		return nil, err
 	}
 	if len(tasks) == 0 && len(findings) == 0 {
-		return nil, nil
+		// A tree without task files has no plan to judge, as the
+		// fixtures of the other checks are; one that keeps
+		// docs/plan.md has lost them.
+		if _, ok, err := check.FileIn(files, "docs/plan.md"); err != nil || !ok {
+			return nil, err
+		}
+		return []check.Finding{{Where: Dir, Rule: "plan", Msg: "docs/plan.md is there, and no task file is"}}, nil
 	}
 	findings = append(findings, ids(tasks)...)
 	byID := index(tasks)
@@ -429,12 +447,17 @@ func edges(tasks []Task, byID map[string]Task) []check.Finding {
 			if key == "after" {
 				list = t.After
 			}
-			for _, id := range list {
-				switch _, ok := byID[id]; {
+			for i, id := range list {
+				other, ok := byID[id]
+				switch {
+				case slices.Contains(list[:i], id):
+					findings = append(findings, check.Finding{Where: t.where(key), Rule: "plan", Msg: key + " names " + id + " twice"})
 				case id == t.ID:
 					findings = append(findings, check.Finding{Where: t.where(key), Rule: "plan", Msg: key + " names the task itself, " + id})
 				case !ok:
 					findings = append(findings, check.Finding{Where: t.where(key), Rule: "plan", Msg: key + " names " + id + ", which no task file holds"})
+				case t.is(open) && slices.Contains(closed, other.Fate):
+					findings = append(findings, check.Finding{Where: t.where(key), Rule: "plan", Msg: key + " names " + id + ", a task of fate " + other.Fate + ", which is never merged"})
 				}
 			}
 		}
@@ -502,8 +525,11 @@ func findCycle(tasks []Task, byID map[string]Task) []string {
 	return nil
 }
 
-// absorbed checks each folded task: absorbed_by names a task of the
-// tree, and that task's Implements cites every id the folded one cites.
+// absorbed checks each folded task: absorbed_by names another task of
+// the tree, of a fate that is built, and that task's Implements cites
+// every id the folded one cites. The folded files of the tree keep the
+// Implements text of before the requirement ids, which cites no id, so
+// on them the last rule holds by itself until a file is folded anew.
 func absorbed(tasks []Task, byID map[string]Task) []check.Finding {
 	var findings []check.Finding
 	for _, t := range tasks {
@@ -511,8 +537,15 @@ func absorbed(tasks []Task, byID map[string]Task) []check.Finding {
 			continue
 		}
 		into, ok := byID[t.AbsorbedBy]
-		if !ok {
+		switch {
+		case t.AbsorbedBy == t.ID:
+			findings = append(findings, check.Finding{Where: t.where("absorbed_by"), Rule: "plan", Msg: "absorbed_by names the task itself"})
+			continue
+		case !ok:
 			findings = append(findings, check.Finding{Where: t.where("absorbed_by"), Rule: "plan", Msg: "absorbed_by names " + t.AbsorbedBy + ", which no task file holds"})
+			continue
+		case slices.Contains(closed, into.Fate):
+			findings = append(findings, check.Finding{Where: t.where("absorbed_by"), Rule: "plan", Msg: "absorbed_by names " + into.ID + ", a task of fate " + into.Fate})
 			continue
 		}
 		var missing []string
@@ -589,7 +622,9 @@ func overlaps(tasks []Task, byID map[string]Task, paths, generated []string) []c
 }
 
 // shared returns a path both tasks own: a tree path, or a literal owns
-// entry of one that a glob of the other matches.
+// entry of one that a glob of the other matches. Two globs that match
+// no tree path and neither matches the other (x_*.go and *_test.go)
+// are not compared: the check reads paths, not the languages of globs.
 func shared(a, b Task, owned map[string][]string, isGenerated func(string) bool) (string, bool) {
 	for _, p := range owned[a.ID] {
 		if slices.Contains(owned[b.ID], p) {
@@ -619,6 +654,9 @@ func shared(a, b Task, owned map[string][]string, isGenerated func(string) bool)
 func forecasts(files []check.TreeFile, tasks []Task, paths []string) ([]check.Finding, error) {
 	src, ok, err := check.FileIn(files, askFirstPath)
 	if err != nil || !ok {
+		// Without the list there is nothing to forecast against; the
+		// generator reads the list to write CODEOWNERS, so the generated
+		// check fails without it.
 		return nil, err
 	}
 	list, err := askfirst.Parse(src)

@@ -28,6 +28,16 @@ an `init`, `task` is `tools/new/task*.go`, and the `switch` in
 reads `docs/plan/tasks/*.md` from the tree the commit checks read before
 mise and the steps, as `hygiene`, `workflows` and `reqs` do.
 
+Amended on 2026-10-17, when the check was built: the cap of 40 ids on an
+Implements line is a ratchet, not a finding for the 13 tasks that held
+more when the check landed (T001, T002, T005, T008, T021, T033, T043,
+T049, T051, T061, T066, T068, T069), listed in the check, and a test
+fails when one comes down to the cap; splitting the open ones is a
+re-plan. `--critical-path` prints the longest chain over `needs` and
+`after` without the words "by sitting" of the acceptance, whose
+meaning no rule of the plan gives. `tools/new task` takes the title,
+as `adr` and `lesson` do, and derives the slug.
+
 - Implements: REQ-0826 (10 10.2), REQ-1089 (12 12.2), REQ-1101 (12
   12.2), REQ-1105 (12 12.3), REQ-1118 (12 12.3), REQ-1120 (12 12.3),
   REQ-1126 (12 12.3).
