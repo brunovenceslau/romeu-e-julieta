@@ -29,7 +29,8 @@ written before the re-plan.
   (10 10.2), REQ-0895 (10 10.2), REQ-0896 (10 10.2), REQ-0897 (10 10.2),
   REQ-0915 (10 10.2), REQ-0926 (10 10.3), REQ-1040 (12 12.1), REQ-1046
   (12 12.1), REQ-1061 (12 12.1), REQ-1062 (12 12.1), REQ-1083 (12 12.2),
-  REQ-1128 (12 12.4), REQ-1142 (12 12.4), REQ-1143 (12 12.4).
+  REQ-1128 (12 12.4), REQ-1142 (12 12.4), REQ-1143 (12 12.4), REQ-1240
+  (10 10.2).
 - Operator: block O1 finishes and pushes it.
 - Ask-first, as forecast before the re-plan: none exists yet; the
   maintainer's review is the guard (10 10.2).
