@@ -157,9 +157,7 @@ func TestHook(t *testing.T) {
 		Env:    os.Environ(),
 		Stdout: &out,
 	})
-	if err != nil {
-		t.Skipf("the mode is not checked: this copy of the source is not a git working tree (%v)", err)
-	}
+	require.NoError(t, err, "the tests run in a clone, with its .git directory (10 10.2)")
 	mode, _, _ := strings.Cut(out.String(), " ")
 	assert.Equal(t, hygiene.HookMode, mode, "the mode git records for the hook")
 }
