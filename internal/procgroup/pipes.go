@@ -156,7 +156,7 @@ func (p *pipes) leaderEnded() {
 func (p *pipes) abort() {
 	p.started()
 	p.leaderEnded()
-	_ = p.drain(context.Background(), WaitDelay)
+	_ = p.drain(context.Background(), WaitDelay, drainCap)
 }
 
 // drain waits for the output copies to read EOF. It stops the ones
@@ -164,14 +164,20 @@ func (p *pipes) abort() {
 // idle: no byte read and no write under way. So what the command wrote
 // before it ended is read whole however late the reader is, and a
 // holder of a pipe that left the group and writes nothing ends the
-// drain after idle. It also stops when ctx ends, and then returns
-// ctx's cause: the output may be cut, so the run must not read as a
-// success. Otherwise it returns the first error of a copy, such as a
-// writer that failed; the stop after idle is not one (Run's doc says
-// why).
-func (p *pipes) drain(ctx context.Context, idle time.Duration) error {
+// drain after idle. It also stops when ctx ends, with ctx's cause, and
+// after limit, with errDrainCap: then the output may be cut, so the
+// run must not read as a success. Otherwise it returns the first error
+// of a copy, such as a writer that failed; the stop after idle is not
+// one (Run's doc says why). A stop frees a copy that waits on the pipe,
+// not one that waits on the caller's writer: a writer that never
+// returns holds the drain, as it holds any copy, and keeping the
+// writer moving is the caller's part.
+func (p *pipes) drain(ctx context.Context, idle, limit time.Duration) error {
 	tick := time.NewTicker(idle / 10)
 	defer tick.Stop()
+	capped := time.NewTimer(limit)
+	defer capped.Stop()
+	ctxDone, capDone := ctx.Done(), capped.C
 	seen, quietSince := p.moved.Load(), time.Now()
 	var first, cut error
 	stop := func(err error) {
@@ -190,8 +196,12 @@ func (p *pipes) drain(ctx context.Context, idle time.Duration) error {
 			select {
 			case err = <-p.done:
 				break wait
-			case <-ctx.Done():
+			case <-ctxDone:
 				stop(context.Cause(ctx))
+				ctxDone = nil // a done channel stays ready; read it once
+			case <-capDone:
+				stop(errDrainCap)
+				capDone = nil
 			case <-tick.C:
 				if m := p.moved.Load(); m != seen || p.writing.Load() > 0 {
 					seen, quietSince = m, time.Now()
@@ -216,6 +226,14 @@ func (p *pipes) drain(ctx context.Context, idle time.Duration) error {
 // errIdle marks a drain that stopped after its idle bound, which is not
 // an error of the run.
 var errIdle = errors.New("procgroup: the output pipes were idle")
+
+// errDrainCap is the error of a drain that output kept busy past
+// drainCap after the command ended.
+var errDrainCap = errors.New("the output pipes were still busy 30 s after the command ended, so its output may be cut")
+
+// drainCap is the longest a drain lasts after the command ends (04 4.1,
+// Subprocesses, item 4). Tests shorten it.
+var drainCap = 30 * time.Second
 
 // sameWriter reports whether a and b are the one writer. Comparing two
 // interfaces whose dynamic type is not comparable panics, and such

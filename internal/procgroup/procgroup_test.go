@@ -53,6 +53,7 @@ func (w *lateWriter) Write(b []byte) (int, error) {
 // Subprocesses, item 4.
 func TestWaitDelay(t *testing.T) {
 	assert.Equal(t, 2*time.Second, WaitDelay)
+	assert.Equal(t, 30*time.Second, drainCap, "the cap of the drain is the 30 s of the same item")
 }
 
 // TestRun covers what a command gets and what Run returns: the
@@ -316,6 +317,15 @@ func TestRunKillsTheGroup(t *testing.T) {
 		defer cancel()
 		_, err := CombinedOutput(ctx, Command{Class: Unbounded, Argv: cmd.Args, Env: cmd.Env})
 		require.ErrorIs(t, err, context.DeadlineExceeded, "the output may be cut, so the run is not a success")
+		assert.NoError(t, syscall.Kill(waitForPid(t, pidfile), 0), "the holder is still alive and writing")
+	})
+	t.Run("a holder outside the group that never goes idle makes a run with no deadline an error at the cap", func(t *testing.T) {
+		real := drainCap
+		drainCap = 2 * WaitDelay
+		t.Cleanup(func() { drainCap = real })
+		cmd, pidfile, _ := helper(t, "escape-chatty")
+		_, err := CombinedOutput(t.Context(), Command{Class: Unbounded, Argv: cmd.Args, Env: cmd.Env})
+		require.ErrorIs(t, err, errDrainCap, "the output may be cut, so the run is not a success")
 		assert.NoError(t, syscall.Kill(waitForPid(t, pidfile), 0), "the holder is still alive and writing")
 	})
 }

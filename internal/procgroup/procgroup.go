@@ -129,8 +129,10 @@ func (e *ExitError) Unwrap() error { return e.err }
 // exited 0: the command's own work succeeded, its group is dead, and
 // what it wrote before it ended has been read, however late the reader
 // was; only what the escaped holder writes later is lost, and it was
-// never the command's result. A drain that the end of ctx or of the
-// class limit stops is that error, since the output may be cut.
+// never the command's result. The drain lasts at most 30 s after the
+// leader ends: a drain that the end of ctx, the class limit or that cap
+// stops is an error, since the output may be cut. A writer of the
+// caller that never returns is not bounded by any of these.
 //
 // A command that ends with a status other than 0 is an *ExitError, and
 // a program that is not there is ErrNotFound.
@@ -168,8 +170,11 @@ func Run(ctx context.Context, c Command) error {
 	err = cmd.Wait()
 	out.leaderEnded()
 	g.end(cmd.Process.Pid)
-	if drainErr := out.drain(runCtx, WaitDelay); err == nil {
+	if drainErr := out.drain(runCtx, WaitDelay, drainCap); err == nil {
 		err = drainErr
+		if errors.Is(err, errDrainCap) {
+			err = fmt.Errorf("%s: %w", c.Argv[0], err)
+		}
 	}
 	return result(ctx, runCtx, c, limit, err)
 }
