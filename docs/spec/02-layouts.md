@@ -83,7 +83,7 @@ romeu-e-julieta/
 ├─ .golangci.yml               linter configuration (10 10.2, lint)
 ├─ .github/ask-first.yaml      the single list of ask-first paths and their owner (05 5.3)
 ├─ .github/CODEOWNERS          generated from ask-first.yaml
-├─ .github/workflows/ci.yml, release.yml, fuzz.yml (scheduled; long fuzz runs and tools/ci mutate)
+├─ .github/workflows/ci.yml, x64.yml (scheduled; the best-effort x64 runners), release.yml, fuzz.yml (scheduled; long fuzz runs and tools/ci mutate)
 ├─ .github/pull_request_template.md   Why / What changed / Evidence / Middleware / Lessons
 ├─ .github/ISSUE_TEMPLATE/     two issue forms: a bug, a catalog gap; the label `deferred` lands with them (12 12.7)
 ├─ COPYING (with the first code change), REUSE.toml, LICENSES/, README.md, SECURITY.md

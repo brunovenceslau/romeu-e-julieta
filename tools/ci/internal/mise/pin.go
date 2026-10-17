@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strings"
 	"syscall"
 
 	"go.yaml.in/yaml/v3"
@@ -22,8 +23,8 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
-// Pin is the mise that PinnedWorkflow pins for one runner of its
-// matrix: the "version" input of mise-action, and the mise_sha256 of
+// Pin is the mise that the workflows pin for one runner of their
+// matrices: the "version" input of mise-action, and the mise_sha256 of
 // the matrix entry whose os is Label, the hash of the bare binary of
 // that platform in mise's release (Asset).
 type Pin struct {
@@ -61,31 +62,63 @@ func (p Pin) Asset() string {
 	return "mise-v" + p.Version + "-" + runnerAssets[p.Label]
 }
 
-// ReadPin reads the pin of this platform from PinnedWorkflow in the
-// tree at root, the one source of the version and the sha256 of mise.
+// ReadPin reads the pin of this platform from the workflows that pin
+// mise in the tree at root (pinWorkflows): the version from
+// PinnedWorkflow, which ScheduledWorkflow repeats, and the sha256 from
+// the matrix that names this platform's runner.
 func ReadPin(root string) (Pin, error) {
 	return readPin(root, runtime.GOOS, runtime.GOARCH)
 }
 
 // readPin is ReadPin for the platform goos/goarch. The version must be
 // three numbers joined by dots and the sha256 64 lowercase hex digits,
-// and the matrix must give the platform's runner one sha256.
+// and the matrices must give the platform's runner one sha256.
 func readPin(root, goos, goarch string) (Pin, error) {
 	label, ok := runnerLabels[goos+"/"+goarch]
 	if !ok {
-		return Pin{}, fmt.Errorf("no runner of the CI matrix is %s/%s, so %s pins no mise for it", goos, goarch, PinnedWorkflow)
+		return Pin{}, fmt.Errorf("no runner of %s or %s is %s/%s, so they pin no mise for it", PinnedWorkflow, ScheduledWorkflow, goos, goarch)
 	}
-	version, err := pinnedMiseVersion(root)
+	srcs, err := pinWorkflows(root)
+	if err != nil {
+		return Pin{}, err
+	}
+	version, err := versionOf(srcs)
 	if err != nil {
 		return Pin{}, err
 	}
 	if !pinVersion.MatchString(version) {
 		return Pin{}, fmt.Errorf("%s pins the version of mise %q, which is not three numbers joined by dots", PinnedWorkflow, version)
 	}
-	src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(PinnedWorkflow)))
-	if err != nil {
-		return Pin{}, fmt.Errorf("%s: %w", PinnedWorkflow, err)
+	var shas []matrixSha
+	paths := make([]string, len(srcs))
+	for i, w := range srcs {
+		paths[i] = w.path
+		if err := matrixShas(w.path, w.src, label, &shas); err != nil {
+			return Pin{}, err
+		}
 	}
+	switch {
+	case len(shas) == 0:
+		return Pin{}, fmt.Errorf("no matrix of %s gives a mise_sha256 for %s, the runner of this platform", strings.Join(paths, " or "), label)
+	case len(shas) > 1:
+		found := make([]string, len(shas))
+		for i, s := range shas {
+			found[i] = s.sha + " in " + s.path
+		}
+		return Pin{}, fmt.Errorf("the matrices give two different mise_sha256 for %s: %s", label, strings.Join(found, ", "))
+	case !pinSha256.MatchString(shas[0].sha):
+		return Pin{}, fmt.Errorf("the mise_sha256 %q of %s in %s is not 64 lowercase hex digits", shas[0].sha, label, shas[0].path)
+	}
+	return Pin{Version: version, Sha256: shas[0].sha, Label: label}, nil
+}
+
+// matrixSha is one mise_sha256 of a runner, with the workflow that
+// holds it.
+type matrixSha struct{ sha, path string }
+
+// matrixShas adds to shas, once for each value, the mise_sha256 of
+// every matrix entry of the workflow src whose os is label.
+func matrixShas(path string, src []byte, label string, shas *[]matrixSha) error {
 	var wf struct {
 		Jobs map[string]struct {
 			Strategy struct {
@@ -101,25 +134,16 @@ func readPin(root, goos, goarch string) (Pin, error) {
 		} `yaml:"jobs"`
 	}
 	if err := yaml.Unmarshal(src, &wf); err != nil {
-		return Pin{}, fmt.Errorf("%s: %w", PinnedWorkflow, err)
+		return fmt.Errorf("%s: %w", path, err)
 	}
-	var shas []string
 	for _, job := range wf.Jobs {
 		for _, entry := range job.Strategy.Matrix.Include {
-			if entry.OS == label && !slices.Contains(shas, entry.Sha256) {
-				shas = append(shas, entry.Sha256)
+			if entry.OS == label && !slices.ContainsFunc(*shas, func(s matrixSha) bool { return s.sha == entry.Sha256 }) {
+				*shas = append(*shas, matrixSha{entry.Sha256, path})
 			}
 		}
 	}
-	switch {
-	case len(shas) == 0:
-		return Pin{}, fmt.Errorf("the matrix of %s gives no mise_sha256 for %s, the runner of this platform", PinnedWorkflow, label)
-	case len(shas) > 1:
-		return Pin{}, fmt.Errorf("the matrix of %s gives two different mise_sha256 for %s", PinnedWorkflow, label)
-	case !pinSha256.MatchString(shas[0]):
-		return Pin{}, fmt.Errorf("the mise_sha256 %q of %s in %s is not 64 lowercase hex digits", shas[0], label, PinnedWorkflow)
-	}
-	return Pin{Version: version, Sha256: shas[0], Label: label}, nil
+	return nil
 }
 
 // cacheApp is the directory of this repository below the user cache

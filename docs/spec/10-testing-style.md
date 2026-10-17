@@ -16,9 +16,9 @@ obligation, and the cell cites the list (03, opening).
 | Unit | `internal/**`, `tools/**`, `e2e/probes/**`, `e2e/fakesbx/**` `_test.go` | CI, dev | the list **Unit level covers** after this table |
 | Golden | `internal/render/testdata/`, `internal/layout/testdata/`, `internal/gate/testdata/`, `internal/handoff/testdata/` | CI, dev | `REQ-0732` `sbxenv.yaml`, workspace files, `render.json`, gate diff text, herdr `layout.apply` requests (`layout up --dry-run`), handoff front matter, the SessionStart print whole and cut at its bound ([08 8.2](08-memory-handoff-salvage.md#82-session-hooks-user-side-middleware)) |
 | Schema | `tools/ci schema` | CI | `REQ-0733` generated schemas equal the committed ones; `REQ-0734` examples and testdata validate |
-| E2E (git + fake sbx) | `e2e/*_test.go`, tag `e2e` | CI (linux amd64, linux arm64, macOS Intel, macOS arm64) | `REQ-0735` romeu commands against a temp `$ROMEU_ROOT`; origins served by `git http-backend` behind `httptest` TLS (host settings `gitHosts[].caFile` points at the test CA; gitsafe has no test override); the sandbox daemon served by `git daemon` on `127.0.0.1`; `REQ-0736` journeys J2, J3b, J6, J7, J10, J11 (scenario functions shared with the host suite), of which a journey that reaches a julieta call runs at the hybrid level below, on the Linux runners, while the macOS runners run the romeu commands that reach none; promotion fault injection; `REQ-0737` invariants marked E in [05](05-security.md), including the I27 hostile trees on the macOS runners |
-| E2E (hybrid) | `e2e/hybrid_test.go`, tag `e2e` | CI on `ubuntu-26.04` and `ubuntu-26.04-arm` | `REQ-0738` the romeu-julieta contract: the fake sbx forwards `env exec` into the julieta container with `.romeu/bin` bind-mounted read-only at the host path; `REQ-0739` the journeys that reach a julieta call (julieta has no darwin build, 12 12.1), J6 among them, with `julieta salvage` forwarded through `env exec` and the agent replaced by a fixture process; protocol mismatch, `SHA256SUMS` mismatch and a writable bin mount each stop `run` before `layout up`; a 32 KiB manifest round-trips (I30) |
-| E2E (container) | `e2e/container_test.go`, `e2e/julieta_<command>_test.go` and `e2e/kit_<name>_test.go`, tag `e2e` | CI on `ubuntu-26.04` (amd64) and `ubuntu-26.04-arm` (arm64), native, no QEMU | `REQ-0740` julieta in the workload's Debian base: `REQ-0741` `setup` (PATH link, dispatcher, secondary clone, ff of default branch) and its no-op timing, `install` skip rule, `lock --check`, hooks dispatcher, chaining and recorded failures, at the pinned mise `julieta install` makes no request to its versions host for a self-update check and a refused configuration path outside `MISE_TRUSTED_CONFIG_PATHS` ([04 4.3](04-cli.md#43-julieta-sandbox)), memory (stamping, allowlist), handoff (all kinds; SessionEnd and SessionStart in both orders, so the rule of 08 8.3 is tested in the order Q22 has not confirmed too; `REQ-0742` SessionStart wired for every source the pinned agent fires), snapshot, the salvage completeness cases, which are the one list in the Test cell of I17 ([05 5.2](05-security.md#52-invariants-and-their-tests)), and three more salvage cases: a fixture process with the agent's process name that ignores SIGTERM is killed after the wait and the manifest records the kill; untracked files count against the salvage cap; a nested repository gets the dirty-tree and stash capture of a top-level one; `REQ-0743` `layout up --dry-run` golden and `layout up` against the pinned herdr; `REQ-0744` `e2e/container_test.go` is the harness entry: each julieta command's cases live in `e2e/julieta_<command>_test.go` and each kit's smoke cases in `e2e/kit_<name>_test.go`, in the same package under the same tag; `REQ-0745` the PreToolUse guard of 06 6.4: one case per refusal, and the case "PreToolUse with the `.romeu/bin` mount absent refuses `gh pr merge`"; `REQ-0746` a salvage with no agent process and a recorded SessionStart without SessionEnd skips `agent-not-matched`, and the same with a later SessionEnd records zero and skips nothing; `REQ-0747` a `setup` whose fetch fails offline warns `fetch-failed`, exits 0, and `run` attaches |
+| E2E (git + fake sbx) | `e2e/*_test.go`, tag `e2e` | CI (linux arm64, macOS arm64; linux amd64 and macOS Intel in the scheduled `x64.yml`) | `REQ-0735` romeu commands against a temp `$ROMEU_ROOT`; origins served by `git http-backend` behind `httptest` TLS (host settings `gitHosts[].caFile` points at the test CA; gitsafe has no test override); the sandbox daemon served by `git daemon` on `127.0.0.1`; `REQ-0736` journeys J2, J3b, J6, J7, J10, J11 (scenario functions shared with the host suite), of which a journey that reaches a julieta call runs at the hybrid level below, on the Linux runners, while the macOS runners run the romeu commands that reach none; promotion fault injection; `REQ-0737` invariants marked E in [05](05-security.md), including the I27 hostile trees on the macOS runners |
+| E2E (hybrid) | `e2e/hybrid_test.go`, tag `e2e` | CI on `ubuntu-26.04-arm`, and on `ubuntu-26.04` in the scheduled `x64.yml` | `REQ-0738` the romeu-julieta contract: the fake sbx forwards `env exec` into the julieta container with `.romeu/bin` bind-mounted read-only at the host path; `REQ-0739` the journeys that reach a julieta call (julieta has no darwin build, 12 12.1), J6 among them, with `julieta salvage` forwarded through `env exec` and the agent replaced by a fixture process; protocol mismatch, `SHA256SUMS` mismatch and a writable bin mount each stop `run` before `layout up`; a 32 KiB manifest round-trips (I30) |
+| E2E (container) | `e2e/container_test.go`, `e2e/julieta_<command>_test.go` and `e2e/kit_<name>_test.go`, tag `e2e` | CI on `ubuntu-26.04-arm` (arm64), and on `ubuntu-26.04` (amd64) in the scheduled `x64.yml`, native, no QEMU | `REQ-0740` julieta in the workload's Debian base: `REQ-0741` `setup` (PATH link, dispatcher, secondary clone, ff of default branch) and its no-op timing, `install` skip rule, `lock --check`, hooks dispatcher, chaining and recorded failures, at the pinned mise `julieta install` makes no request to its versions host for a self-update check and a refused configuration path outside `MISE_TRUSTED_CONFIG_PATHS` ([04 4.3](04-cli.md#43-julieta-sandbox)), memory (stamping, allowlist), handoff (all kinds; SessionEnd and SessionStart in both orders, so the rule of 08 8.3 is tested in the order Q22 has not confirmed too; `REQ-0742` SessionStart wired for every source the pinned agent fires), snapshot, the salvage completeness cases, which are the one list in the Test cell of I17 ([05 5.2](05-security.md#52-invariants-and-their-tests)), and three more salvage cases: a fixture process with the agent's process name that ignores SIGTERM is killed after the wait and the manifest records the kill; untracked files count against the salvage cap; a nested repository gets the dirty-tree and stash capture of a top-level one; `REQ-0743` `layout up --dry-run` golden and `layout up` against the pinned herdr; `REQ-0744` `e2e/container_test.go` is the harness entry: each julieta command's cases live in `e2e/julieta_<command>_test.go` and each kit's smoke cases in `e2e/kit_<name>_test.go`, in the same package under the same tag; `REQ-0745` the PreToolUse guard of 06 6.4: one case per refusal, and the case "PreToolUse with the `.romeu/bin` mount absent refuses `gh pr merge`"; `REQ-0746` a salvage with no agent process and a recorded SessionStart without SessionEnd skips `agent-not-matched`, and the same with a later SessionEnd records zero and skips nothing; `REQ-0747` a `setup` whose fetch fails offline warns `fetch-failed`, exits 0, and `run` attaches |
 | Host | `e2e/host/*_test.go`, tag `host` | maintainer machines (Intel and Apple silicon) | `REQ-0748` the same scenario functions against real sbx for J1-J14; S3, S5, S8 confirmation; results as `probe-result.v1` per block B step (11); `REQ-0749` the J14 scenario asserts, after J7, that `git fsck` passes on each host clone, that `git for-each-ref refs/romeu/ refs/sandboxes/` prints nothing, and that every file under each memory dir parses as 03 3.9 says with a parser that does not import julieta |
 | Probes | `e2e/probes` | maintainer machines | `REQ-0750` [11](11-host-probes.md); `probe-result.v1` files in `docs/probes/` |
 
@@ -170,7 +170,8 @@ Rules:
 
 `REQ-0800` `.github/workflows/ci.yml` calls `go run ./tools/ci all`, which is also
 what developers run locally before a PR; the tracked `.githooks/pre-push`
-runs the `fast` subset.
+runs the `fast` subset. `.github/workflows/x64.yml` runs the same job on
+the x64 runners, on a schedule and by hand (Runners, below).
 
 `REQ-0801` **Every merge gate also runs locally.** A merge gate is a check whose
 failure blocks a merge. Workflows hold no check logic of their own, and
@@ -347,7 +348,8 @@ directory, and no env file, `MISE_CD` or trusted path of the caller (no
 runs nothing that another mise file of a change holds (the threat model
 of the mise package of `tools/ci` says what stays trusted). `REQ-0859` That
 environment is measured with one version of mise, the `version` input of
-the mise action in `ci.yml`, the pin, so `fast` and `all` refuse, before
+the mise action in `ci.yml`, which `x64.yml` repeats, the pin, so `fast`
+and `all` refuse, before
 any other mise command, the mise that REQ-1236 selects when its `mise
 --version` names another, and the refusal names `go run ./tools/ci
 setup`. The refusal keeps that environment consistent and is not a
@@ -371,8 +373,9 @@ its search path.
 `REQ-1237` `setup` installs the pin when the mise of REQ-1236 names
 another version or none, before any other mise command. It reads the
 version and, for the runner label of this platform (Runners, below), the
-sha256 from the matrix of `ci.yml` in the tree it runs in, the one
-source of both, as every check of `tools/ci` runs the code of that tree;
+sha256 from the matrix of `ci.yml`, or of `x64.yml` for an x64 runner
+(a tree without `x64.yml` pins no x64 runner), in the tree it runs in,
+the one source of both (the two files pin one version), as every check of `tools/ci` runs the code of that tree;
 a version that is not three numbers joined by dots, or a sha256 that is
 not 64 lowercase hex digits, fails `setup`. The URL is the fixed prefix
 `https://github.com/jdx/mise/releases/download/v<version>/` and the
@@ -490,10 +493,22 @@ existence are checked; of these, only the task ids of the plan must be
 contiguous.
 
 `REQ-0868` Runners: `ubuntu-26.04` (x64), `ubuntu-26.04-arm` (arm64), `macos-26`
-(arm64) and `macos-26-intel` (x64). The arm64 and Intel labels are
+(arm64) and `macos-26-intel` (x64). `ci.yml` runs the arm64 ones on every
+pull request and push to `main`; `x64.yml` runs the x64 ones every day
+and by hand. x64 (darwin/amd64 and linux/amd64) is best effort: a red
+scheduled run is fixed when it is seen and blocks no merge (decided on
+2026-10-17: the x64 legs were the slowest a pull request waited for, few
+users run an Intel Mac, and linux/amd64 is the sandbox of that host
+alone, 00 0.2). `fast` still lints both amd64 targets on every run.
+Accepted with it: the x64 tests, the x64 entries of `mise.lock` and a
+change to `x64.yml` are first run by the next scheduled run, after the
+merge, and GitHub turns a schedule off after 60 days without activity
+in a public repository, with no notice of a red run, so the x64 state
+is read from the runs of `x64.yml`. The arm64 and Intel labels are
 verified to exist, and every label to report, by `uname -m`, as `aarch64`
 (`ubuntu-26.04-arm`), `arm64` (`macos-26`) and `x86_64` (`ubuntu-26.04`
-and `macos-26-intel`), on the first run of `ci.yml`. Labels are
+and `macos-26-intel`), on the first run of `ci.yml` (arm64) and of
+`x64.yml` (x64). Labels are
 pinned, never `*-latest`: `tools/ci workflows` fails a `runs-on` or a
 matrix `os` that is not one of the four. `REQ-0869` `tools/ci all` reports the
 architecture of the Go binary next to `uname -m`, and fails when they
@@ -1019,7 +1034,8 @@ Evidence, or, for items g and h, in the note's dated entry:
 - `REQ-0918` e. After step 2, the CI jobs of the green run joined the
   default-branch ruleset as required status checks: as read on
   2026-10-09, a required-status-checks rule lists the four `all on ...`
-  checks (the note on the maintainer block). Saving the API's answer
+  checks (the note on the maintainer block); on 2026-10-17 the two x64
+  checks left it, with the x64 runners (Runners). Saving the API's answer
   under Evidence is what is left to do (measured on 2026-10-12: no
   merged pull request body holds it). `REQ-0919` When the task that builds `pr`
   lands, its job is added to the required checks, and the step records

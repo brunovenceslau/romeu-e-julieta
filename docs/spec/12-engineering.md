@@ -108,7 +108,7 @@ except where the form column says otherwise.
 | `go`, `golangci-lint`, `gh` | `REQ-1062` `mise.toml` and `mise.lock` | the version; a sha256 for each of the four platforms of `mise.lock` | the Go release list for `go`; the GitHub releases of the tool for the other two |
 | `govulncheck` | `REQ-1063` `mise.toml` and `mise.lock` | the version, and no sha256: the mise `go` backend builds it from source, and its integrity rests on the Go checksum database (below) | the Go module proxy |
 | `mise` and `herdr` in the sandbox | `REQ-1064` `kits/pins.yaml`, written by `tools/kitpin` ([06 6.4](06-kits.md#64-product-kits), [07 7.4](07-mise-egress.md#74-mise-bootstrap-and-its-own-egress)) | the version; a sha256 for each linux architecture | the GitHub releases of the tool |
-| `mise` on the CI runners and on a developer machine | `REQ-1065` the mise step of `ci.yml` ([10 10.2](10-testing-style.md#102-ci)); `tools/ci setup` reads the same version and sha256 to install that mise where another one is found ([10 10.2](10-testing-style.md#102-ci)) | the version in `with`; a sha256 per runner in the matrix | the GitHub releases of mise |
+| `mise` on the CI runners and on a developer machine | `REQ-1065` the mise step of `ci.yml` and `x64.yml` ([10 10.2](10-testing-style.md#102-ci)); `tools/ci setup` reads the same version and sha256 to install that mise where another one is found ([10 10.2](10-testing-style.md#102-ci)) | the version in `with`; a sha256 per runner in the matrix | the GitHub releases of mise |
 | `reuse` | `REQ-1066` `tools/ci` | `REQ-1067` the tag and the digest of its image index, which names a manifest for linux/amd64 and one for linux/arm64 beside its attestation manifests | the tags of the image on Docker Hub |
 
 `REQ-1068` The two mise pins are one version, since each reads locks the other
@@ -137,12 +137,12 @@ counts a version with a `-` suffix as a prerelease.
 
 `REQ-1071` The checksum database guards `govulncheck` on the install that builds
 it, in both places it runs. In hosted CI that is the mise action's step
-of `ci.yml`, which runs before `tools/ci setup`, so `setup` finds the
+of `ci.yml` and `x64.yml`, which runs before `tools/ci setup`, so `setup` finds the
 tools installed. `miseEnv` ends with `goenv.Pin`, `GOENV=off` and
 `GOTOOLCHAIN=local`, the two variables `stepEnv` sets for the go steps
 of `tools/ci` too, so both installs run with them: the hosted one
-through the `env` table of `ci.yml`, which the workflows check holds to
-`miseEnv`, and `tools/ci setup` through `miseRunEnviron`. So no `go env
+through the `env` tables of `ci.yml` and `x64.yml`, which the workflows
+check holds to `miseEnv`, and `tools/ci setup` through `miseRunEnviron`. So no `go env
 -w` file is read and no other go is started. On a developer machine
 `tools/ci setup` runs `mise install` in an environment built from
 nothing, so no `GO` variable of the caller reaches it: not `GOSUMDB`,

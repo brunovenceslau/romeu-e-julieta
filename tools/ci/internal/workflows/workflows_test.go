@@ -4,8 +4,10 @@
 package workflows
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -267,14 +269,53 @@ func TestWorkflowsRepository(t *testing.T) {
 	}
 }
 
-// TestWorkflowsCIFile reads the repository's ci.yml as data and holds
-// it to what T002 asks of it: the four pinned runners, mise installed
-// by a pinned version and a sha256 per platform before setup, and
-// setup before all.
+// TestWorkflowsCIFile reads the repository's ci.yml and x64.yml as
+// data and holds them to what T002 asks of them: the pinned runners,
+// arm64 on every pull request and x64 on a schedule (10 10.2, Runners),
+// mise installed by a pinned version and a sha256 per platform before
+// setup, and setup before all. Past the header, the trigger and the
+// matrix, the two files are the same, so the scheduled job is the job a
+// pull request runs.
 func TestWorkflowsCIFile(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(Dir), "ci.yml"))
-	require.NoError(t, err)
+	read := func(name string) []byte {
+		src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(Dir), name))
+		require.NoError(t, err)
+		return src
+	}
+	for name, want := range map[string]struct{ events, runners []string }{
+		// x64.yml runs no event a pull request waits for.
+		"ci.yml":  {[]string{"pull_request", "push"}, []string{"ubuntu-26.04-arm", "macos-26"}},
+		"x64.yml": {[]string{"schedule", "workflow_dispatch"}, []string{"ubuntu-26.04", "macos-26-intel"}},
+	} {
+		t.Run(name, func(t *testing.T) { checkCIJob(t, read(name), want.events, want.runners) })
+	}
+	assert.Equal(t, jobBody(t, read("ci.yml")), jobBody(t, read("x64.yml")), "the job of x64.yml is the job of ci.yml")
+}
+
+// jobBody returns the lines of a workflow from "permissions:" on, without the
+// matrix entries and the comments: what ci.yml and x64.yml share.
+func jobBody(t *testing.T, src []byte) []string {
+	t.Helper()
+	_, body, found := strings.Cut(string(src), "\npermissions:\n")
+	require.True(t, found, "a permissions table")
+	var lines []string
+	for line := range strings.SplitSeq(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "- os: ") || strings.HasPrefix(trimmed, "mise_sha256: ") {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+// checkCIJob holds a workflow to the events it runs on, and its one
+// job to the runners want, in order, and to the mise, setup and all
+// steps.
+func checkCIJob(t *testing.T, src []byte, events, want []string) {
+	t.Helper()
 	var wf struct {
+		On   map[string]yaml.Node `yaml:"on"`
 		Jobs map[string]struct {
 			RunsOn   string `yaml:"runs-on"`
 			Strategy struct {
@@ -290,6 +331,8 @@ func TestWorkflowsCIFile(t *testing.T) {
 		} `yaml:"jobs"`
 	}
 	require.NoError(t, yaml.Unmarshal(src, &wf))
+	got := slices.Sorted(maps.Keys(wf.On))
+	assert.Equal(t, slices.Sorted(slices.Values(events)), got, "the events")
 	require.Len(t, wf.Jobs, 1)
 	job, ok := wf.Jobs["all"]
 	require.True(t, ok, "the job is named all")
@@ -300,7 +343,7 @@ func TestWorkflowsCIFile(t *testing.T) {
 		labels = append(labels, entry["os"])
 		assert.Regexp(t, `^[0-9a-f]{64}$`, entry["mise_sha256"], "the mise sha256 of %s", entry["os"])
 	}
-	assert.Equal(t, []string{"ubuntu-26.04", "ubuntu-26.04-arm", "macos-26", "macos-26-intel"}, labels)
+	assert.Equal(t, want, labels)
 
 	index := map[string]int{}
 	for i, s := range job.Steps {

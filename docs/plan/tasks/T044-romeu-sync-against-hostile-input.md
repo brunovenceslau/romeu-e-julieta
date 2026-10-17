@@ -38,6 +38,6 @@ when the task reopens.
     and refused by the walk when it is made reachable (I27).
   - Adding a capability to a kit flips gate 2 (I28).
 - Verify: `go test -tags e2e ./e2e/... -run '^TestSyncHostile' -v` on
-  the four runners. The pattern names the `TestSyncHostile*` functions
+  the runners of `ci.yml`, and of `x64.yml` when it runs. The pattern names the `TestSyncHostile*` functions
   this task adds, and the reviewer reads them in the `-v` output (10
   10.8).

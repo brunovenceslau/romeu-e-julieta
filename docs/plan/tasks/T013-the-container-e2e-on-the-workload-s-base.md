@@ -64,6 +64,8 @@ list for the steps it adds, after T105, which moves that check.
   - Every `jdx/mise-action` step of `ci.yml` writes
     `persist_github_token: false`, which the `workflows` grammar
     requires on every mise action step, with a fixture that lacks it.
+  - `x64.yml` takes each change of `ci.yml` below to its job too, since
+    `TestWorkflowsCIFile` holds the two jobs equal.
   - `ci.yml` sets a `concurrency` group per pull request ref with
     `cancel-in-progress`, so an edit of a pull request's body does not
     queue a second full run; the grammar admits the two keys with a
