@@ -19,4 +19,7 @@ Critical or High finding. Open, in `tools/ci/reqs.go`:
 - Known limit, stated in 12 12.11: a deletion of the highest ids passes
   the check.
 
-Reopen: the next change to tools/ci/reqs.go or its tests.
+The code moved to tools/ci/internal/reqs (T105 PR-C). #64 changed it
+(a byte-count test for reqMarks) without taking these gaps on.
+
+Reopen: the next change to tools/ci/internal/reqs made for its own sake.
