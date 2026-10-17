@@ -22,8 +22,8 @@ import (
 
 // TestSetup runs setup against a fake mise and a fake go: it trusts
 // mise.toml by its path, installs, and downloads the modules with the
-// pinned go command, the one step whose environment keeps the go
-// command's default proxy.
+// pinned go command, the one step whose environment reaches the module
+// proxy.
 func TestSetup(t *testing.T) {
 	r := citest.NewTree(t)
 	r.Write("mise.lock", citest.LockFixture)
@@ -66,7 +66,7 @@ func TestSetup(t *testing.T) {
 	// Both mise steps run with mise.MiseEnv, whatever the process holds.
 	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset DOCKER_HOST=unset MISE=mise.toml,none,,false GO=off,local\n"+
 		"mise install HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset MISE=mise.toml,none,,false GO=off,local\n"+
-		"go mod download GOPROXY=unset GOFLAGS=-mod=readonly HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n", string(data))
+		"go mod download GOPROXY=https://proxy.golang.org GOFLAGS=-mod=readonly HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n", string(data))
 
 	t.Run("a hosted run without the mise environment stops before mise", func(t *testing.T) {
 		require.NoError(t, os.Remove(log))
