@@ -8,8 +8,8 @@ T138, T106, T107, x64 best effort on a scheduled `x64.yml`, T108 (ADR
 fix (Done record 12), the docs/reviews checkpoints moved here (Done
 record 22), tools/new refusing a flag as a title (Done record 23), and
 T140, the module tree and the spec identifiers held to the code, with
-its spec fix (Done record 24). The record of T007, T017 and T023 as
-merged is in flight (Done record 26).
+its spec fix (Done record 24). #97 recorded T007, T017 and T023 as
+merged (Done record 26).
 
 ## Next steps
 
@@ -42,7 +42,7 @@ One block, a recommendation each.
 
 ## In flight
 
-- The pull request that records T007, T017 and T023.
+- The stack of the procgroup chatty holder fix (Done record 27).
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.

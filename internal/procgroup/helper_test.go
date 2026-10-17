@@ -9,6 +9,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -80,10 +81,16 @@ func TestHelperProcess(t *testing.T) {
 		// The holder outlives every wait of the tests; killAtEnd ends it.
 		time.Sleep(helperLifetime)
 	case "chatter":
-		// A holder whose output never goes idle; killAtEnd ends it.
+		// A holder whose output never goes idle; killAtEnd ends it. Once
+		// the run returns and closes the pipe, it stops writing but lives
+		// on until killAtEnd or helperLifetime ends it, so a test that
+		// finds it alive after the run is not racing its exit. A write to
+		// a broken standard output would kill it by SIGPIPE, so that
+		// signal is ignored.
+		signal.Ignore(syscall.SIGPIPE)
 		for {
 			if _, err := os.Stdout.WriteString("x\n"); err != nil {
-				os.Exit(0)
+				select {}
 			}
 			time.Sleep(10 * time.Millisecond)
 		}
