@@ -27,7 +27,8 @@ var beforeStepAside func()
 // it steps aside, and returns the one it replaces. It is for the helper
 // processes of the tests of a main that installs Main, which send a
 // second signal there so that it lands before the handler steps aside
-// whatever the scheduling; nothing else calls it. Call it before Main.
+// whatever the scheduling. Test only: the call-site scan of this
+// package fails a call outside a _test.go file. Call it before Main.
 func SetBeforeStepAside(f func()) (previous func()) {
 	previous, beforeStepAside = beforeStepAside, f
 	return previous
