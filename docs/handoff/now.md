@@ -2,23 +2,25 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-17. #67 and #69 merged, green on the four runners
-(Done records 5 and 6): every row of the step table in 10 10.2 carries
-a requirement id, and the pre-push hook and every mise run of
-`tools/ci` install nothing by themselves (T138).
+Checkpoint of 2026-10-17. #67 to #71 merged (Done records 5 to 7):
+T138, and T106's first half (`tools/new` kinds by file and the `task`
+kind). T106's second half, the `plan` check, is open as #72 and marks
+T106 merged. T107 has started (see In flight).
 
 ## Next steps
 
-1. T012 waits by decision. T106, T107, T139 and T140 follow T105,
-   which has merged; T108 follows T107. T106 is split in two pull
-   requests: `tools/new` kinds by file with the `task` kind, then the
-   `tools/ci plan` check. T107's operator items are decided
-   ("re-plan-items-8-9-and-11-the-ask-first-surfaces").
-2. Tests bound by wall-clock time ("tests-bound-by-wall-clock-time").
-3. Migrate the docs/reviews checkpoints
+1. #72 merged and green; then the handoff PR that records it closes
+   "check-that-merged-and-pr-come-as-a-pair".
+2. T107 ("t107-one-source-for-the-ask-first-list-in-progress"), its
+   decisions in "the-ask-first-surfaces-of-t107"; then T108.
+3. T012 waits by decision. T139 and T140 follow T105, which has merged.
+4. Tests bound by wall-clock time ("tests-bound-by-wall-clock-time").
+5. Migrate the docs/reviews checkpoints
    ("migrate-the-docs-reviews-checkpoints-into-docs-handoff").
-4. The go that builds tools/ci
+6. The go that builds tools/ci
    ("the-go-that-builds-tools-ci-is-not-held-to-the-pin").
+7. Split the tasks over the Implements cap
+   ("split-the-open-tasks-over-the-implements-cap").
 
 ## Open for the operator
 
@@ -29,10 +31,15 @@ One block, a recommendation each.
    gate diff.
 2. The kit prompts ("prompts-for-the-sandbox-kit-and-the-house-kit").
    Recommended: ask for both final prompts in one message.
+3. Merge #72, which carries the `checks` and `approvals` approval
+   lines. Recommended: merge once its four runners are green.
 
 ## In flight
 
-Nothing.
+- #72, branch `feat/t106b-tools-ci-plan`: the `plan` check.
+- Branch `feat/t107-one-source-for-the-ask-first-list`, local only: one
+  draft commit of T107's first step; the pending note says what it
+  holds.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
