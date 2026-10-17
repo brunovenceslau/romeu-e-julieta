@@ -35,7 +35,8 @@ var taskName = regexp.MustCompile(`^T([0-9]{3})-.*\.md$`)
 // milestone and module none, fate new, empty edge and file lists, no
 // sitting, and the Implements line in its none form (REQ-1126). The
 // title is the argument, checked as an ADR title is, and the filename
-// is slug(title), as the tree's task files are named. The file is
+// is slug(title), as an ADR's is; some task files of the tree carry a
+// shorter name, written by hand before this kind existed. The file is
 // created and never overwritten, through the root of the repository,
 // and a run whose re-scan finds its id taken by another file removes
 // its own file and fails, as newADR does.

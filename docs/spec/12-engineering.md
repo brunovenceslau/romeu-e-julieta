@@ -191,7 +191,7 @@ it runs by hand (10 10.2). A scheduled run is a
 `REQ-1079` The development commands, each of which exists with the meaning its comment gives:
 
 ```
-Scaffold:   go run ./tools/new {adr|invariant|probe|kit|command|lesson|task|error} <name>   # for adr and lesson, <name> is the title
+Scaffold:   go run ./tools/new {adr|invariant|probe|kit|command|lesson|task|error} <name>   # for adr, lesson and task, <name> is the title
 Generate:   go generate ./...
 Build:      go build ./...
 Test:       go test -race ./...
@@ -396,7 +396,7 @@ owns what it scaffolds (12.2):
 | `kit` | `REQ-1123` `kits/<name>/` with a descriptor on the pinned frontend |
 | `command` | `REQ-1124` the command's package under `internal/cmd/<binary>/`, its help test, its definition with the side-effect fields to fill, and the one-line blank-import file `internal/cmd/<binary>/all/import_<command>.go` that links it in; it edits no shared file |
 | `lesson` | `REQ-1125` `<name>` is the title. `docs/lessons/NNNN-<slug>.md` with the next free number and the required fields (12.7) |
-| `task` | `REQ-1126` `docs/plan/tasks/Tnnn-<slug>.md` with the next free id and the front matter the plan defines (02 2.1) |
+| `task` | `REQ-1126` `<name>` is the title. `docs/plan/tasks/Tnnn-<slug>.md` with the next free id, the filename from `slug(title)`, and the front matter the plan defines (02 2.1) with its fields to fill |
 | `error` | `REQ-1127` the next `RJ-<nnn>`, declared in the `errors.go` of the package named, with its slug, exit code and the hint to fill (04 4.1) |
 
 ## 12.4 Middleware before and after every change

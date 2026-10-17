@@ -121,6 +121,7 @@ func TestNewTaskRefuses(t *testing.T) {
 		f := fixture{repo: r, stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}}
 		f.e = env{dir: r.Dir, gitEnv: r.Env, now: func() time.Time { return fixedDay }, stdout: f.stdout, stderr: f.stderr}
 		assert.Equal(t, exitError, run(f.e, []string{"task", "t"}))
+		assert.Contains(t, f.stderr.String(), "docs/plan/tasks", "the error names the directory")
 		assert.NoDirExists(t, filepath.Join(r.Dir, "docs", "plan", "tasks"))
 	})
 	t.Run("T999 is the last id", func(t *testing.T) {
