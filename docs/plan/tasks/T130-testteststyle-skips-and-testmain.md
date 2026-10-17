@@ -3,7 +3,7 @@ id: T130
 title: "`TestTestStyle`: skips and `TestMain`"
 milestone: M1
 module: ci-release
-fate: new
+fate: merged
 owns:
   - tools/ci/internal/lint/teststyle*.go
   - tools/ci/all_test.go
@@ -15,9 +15,14 @@ after:
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-17
+pr: 112
 ---
 
 # T130 - `TestTestStyle`: skips and `TestMain`
+
+Merged on 2026-10-17 in pull request #112. The text below is the one
+written at the re-plan.
 
 Goal: The rules of 10 10.1 and 10 10.6 that `TestTestStyle` on `main`
 lacks: `t.Skip`, `t.SkipNow`, `t.Skipf`, `testing.Short`, and a
