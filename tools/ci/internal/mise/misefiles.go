@@ -179,15 +179,21 @@ import (
 // bypass the hook, not those.
 
 // MiseEnv is the fixed part of the environment of every mise run, as
-// "KEY=value": the six mise variables below, then goenv.Pin. The
+// "KEY=value": the eight mise variables below, then goenv.Pin. The
 // configuration file mise reads is mise.toml alone, it reads no
 // .tool-versions ("none" is the empty list, src/env.rs of mise
 // 2026.10.3), and it selects no environment's files, neither one named
 // by MISE_ENV or a .miserc.toml (an empty MISE_ENV is set, so mise
 // does not fall back to the .miserc.toml) nor one of the platform
 // (auto_env). It reads no global or system configuration
-// (miseNoGlobalConfig, miseNoSystemConfig). The workflow sets the same
-// table (the workflows check).
+// (miseNoGlobalConfig, miseNoSystemConfig). It installs nothing by
+// itself: a mise command or a shim that finds a tool of mise.toml missing
+// does not install it (auto_install, not_found_auto_install), so a missing
+// tool is setup's to install and, in the pre-push hook, the probe's hint,
+// never a download under the caller's settings that rewrites mise.lock
+// (measured with mise 2026.10.3: a shim whose go is missing installed it
+// and wrote its version to mise.lock). The workflow sets the same table
+// (the workflows check).
 //
 // MiseEnv is only the fixed part. What else a mise run, and the go that
 // the mise shim starts, can see is decided by an allowlist, not by a
@@ -210,6 +216,8 @@ var MiseEnv = slices.Concat([]string{
 	"MISE_AUTO_ENV=false",
 	"MISE_GLOBAL_CONFIG_FILE=" + miseNoGlobalConfig,
 	"MISE_SYSTEM_CONFIG_FILE=" + miseNoSystemConfig,
+	"MISE_AUTO_INSTALL=false",
+	"MISE_NOT_FOUND_AUTO_INSTALL=false",
 }, goenv.Pin)
 
 // HookAllow are the variables the pre-push hook keeps from its caller:
