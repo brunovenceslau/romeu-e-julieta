@@ -16,6 +16,9 @@ failed yet:
 The two "escape-chatty" subtests of internal/procgroup/procgroup_test.go
 failed once on macos-26 for another reason, a holder that died after the
 run instead of a bound; fixed on 2026-10-17 (Done record 27).
+TestMainSecondSignalAbsorbed of tools/ci failed once on macos-26 by a
+self-sent signal that arrived late, not by a clock; fixed on
+2026-10-17 (Done record 29).
 
 Bounds of 10 s or more only guard against a hang and stay. For each
 bound above, an event (a process still alive, a pipe closed) may

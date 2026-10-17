@@ -40,10 +40,18 @@ func TestHelperProcess(t *testing.T) {
 		// The real signal handling of main, around a step that sleeps, and
 		// with CI_TEST_FAILFAST set, after a step that has already
 		// failed. With CI_TEST_SECOND_SIGNAL set, the handler sends this
-		// process a second SIGTERM right before it steps aside. It writes
-		// its own pid first, for the test to signal.
+		// process a second SIGTERM right before it steps aside and waits
+		// until it reaches the handler's channel. It writes its own pid
+		// first, for the test to signal.
 		if os.Getenv("CI_TEST_SECOND_SIGNAL") != "" {
-			procgroup.SetBeforeStepAside(func() { _ = syscall.Kill(os.Getpid(), syscall.SIGTERM) })
+			procgroup.SetBeforeStepAside(func(sigs <-chan os.Signal) {
+				_ = syscall.Kill(os.Getpid(), syscall.SIGTERM)
+				select {
+				case <-sigs:
+				case <-time.After(10 * time.Second):
+					os.Exit(4) // the signal never reached the handler
+				}
+			})
 		}
 		pidfile := os.Getenv("CI_TEST_PIDFILE")
 		if err := writePid(pidfile+mainSuffix, os.Getpid()); err != nil {
@@ -289,10 +297,11 @@ func TestMainSignalAfterFailure(t *testing.T) {
 //
 // The test sends the first SIGTERM; the helper's handler sends the
 // second to its own process right before it steps aside, after the
-// cancel and the kill of every group. A signal a process sends itself
-// is delivered before kill returns, so the second lands inside the
-// window whatever the scheduling, where it is dropped on the full
-// channel of one slot or left unread in it. Two signals sent back to
+// cancel and the kill of every group, and reads it from the handler's
+// channel before the handler steps aside. A signal a process sends
+// itself may arrive after kill returns, and after the handler's Stop
+// it would end the process, so the read is what puts the second signal
+// inside the window whatever the scheduling. Two signals sent back to
 // back by the test raced the handler instead, and a test held between
 // them failed (the second ended the process).
 func TestMainSecondSignalAbsorbed(t *testing.T) {

@@ -18,18 +18,22 @@ import (
 // for its exit status: 130 for SIGINT, 143 for SIGTERM.
 const signalBase = 128
 
-// beforeStepAside runs in the handler right before it steps aside. It
-// is nil but in the helper processes of tests, which set it before
-// Main to hold the handler at that point.
-var beforeStepAside func()
+// beforeStepAside runs in the handler right before it steps aside, with
+// the channel the handler's signals arrive on. It is nil but in the
+// helper processes of tests, which set it before Main to hold the
+// handler at that point.
+var beforeStepAside func(sigs <-chan os.Signal)
 
 // SetBeforeStepAside sets the function Main's handler runs right before
 // it steps aside, and returns the one it replaces. It is for the helper
 // processes of the tests of a main that installs Main, which send a
-// second signal there so that it lands before the handler steps aside
-// whatever the scheduling. Test only: the call-site scan of this
-// package fails a call outside a _test.go file. Call it before Main.
-func SetBeforeStepAside(f func()) (previous func()) {
+// second signal there and read it from sigs, so that it has landed
+// before the handler steps aside whatever the scheduling: a signal a
+// process sends itself may arrive after kill returns, as on macOS. The
+// handler waits for f, so f must return. Test only: the call-site scan
+// of this package fails a call outside a _test.go file. Call it before
+// Main.
+func SetBeforeStepAside(f func(sigs <-chan os.Signal)) (previous func(sigs <-chan os.Signal)) {
 	previous, beforeStepAside = beforeStepAside, f
 	return previous
 }
@@ -64,7 +68,7 @@ func Main(name string, stderr io.Writer, run func(ctx context.Context) int) int 
 			s, _ := sig.(syscall.Signal)
 			interrupt(cancel, g, func() {
 				if beforeStepAside != nil {
-					beforeStepAside()
+					beforeStepAside(sigs)
 				}
 				signal.Stop(sigs)
 			})

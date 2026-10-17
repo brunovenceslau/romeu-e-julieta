@@ -122,11 +122,17 @@ func TestHelperProcess(t *testing.T) {
 	case "absorb", "stepped":
 		// A command that returns 2 once cancelled, with the handler held
 		// right before it steps aside: absorb sends this process a second
-		// signal there; stepped writes the marker file after a pause, so
-		// the test sees whether Main waited for the handler.
-		beforeStepAside = func() {
+		// signal there and waits until it reaches the handler's channel;
+		// stepped writes the marker file after a pause, so the test sees
+		// whether Main waited for the handler.
+		beforeStepAside = func(sigs <-chan os.Signal) {
 			if role == "absorb" {
 				_ = syscall.Kill(os.Getpid(), syscall.SIGINT)
+				select {
+				case <-sigs:
+				case <-time.After(10 * time.Second):
+					os.Exit(4) // the signal never reached the handler
+				}
 			}
 			time.Sleep(200 * time.Millisecond)
 			writeOrExit(os.Getenv(markerEnv), "stepped")
