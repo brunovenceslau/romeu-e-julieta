@@ -16,7 +16,8 @@ owns:
   - internal/cmd/romeu/all/doc.go
   - internal/cmd/julieta/all/doc.go
   - tools/ci/internal/generated/errors*.go
-  - tools/ci/internal/generated/generate.go
+  - tools/ci/internal/generated/generate*.go
+  - .gitattributes
 needs:
   - T007
 after: []
@@ -41,8 +42,10 @@ request.
 
 The generator of the three consumers of the error table (12 12.3) joins
 the generated check of `tools/ci`, whose package no task owns: a file
-`tools/ci/internal/generated/errors*.go` and one more source in
-`generate.go`, on the `checks` surface (decided on 2026-10-17). A check
+`tools/ci/internal/generated/errors*.go`, one more source in
+`generate.go` with the count its test holds, and the two pages in the
+`-text` list of `.gitattributes`, on the `checks` surface (decided on
+2026-10-17). A check
 of its own would add a row to the step table of 10 10.2 for a generator
 that judges nothing.
 
@@ -72,7 +75,7 @@ off every chain through it.
   (10 10.7), REQ-1080 (12 12.2), REQ-1085 (12 12.2), REQ-1108 (12 12.3),
   REQ-1109 (12 12.3), REQ-1117 (12 12.3), REQ-1119 (12 12.3), REQ-1124
   (12 12.3), REQ-1127 (12 12.3), REQ-1184 (12 12.8), REQ-1187 (12 12.8),
-  REQ-1188 (12 12.8), REQ-1229 (10 10.6).
+  REQ-1188 (12 12.8), REQ-1229 (10 10.6), REQ-1242 (04 4.4).
 - Operator: no.
 - Acceptance:
   - Lands before its module's place in the order of 12 12.2 (Q26):

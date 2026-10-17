@@ -532,6 +532,7 @@ test collects is the source, and this section is a link to
 | `RJ-346` | `config-project-missing` | 2 | `REQ-0444` `sync` step 3 (4.2) when no spec's primary repo URL equals `config.url` of host settings; hint: `decide: add the config repository's own spec under projects/, or fix config.url in settings.yaml` |
 | `RJ-347` | `sandbox-stopped` | 2 | `REQ-0445` `pull` on a primary whose sandbox is stopped; the hint is `romeu run --no-attach <name>` |
 | `RJ-348` | `internal` | 1 | `REQ-0446` `main` of either binary, for an error chain that holds no `*cli.Error` (10 10.1, Error ids): a defect of the code; the hint is `decide: open an issue with the details` |
+| `RJ-349` | `usage` | 2 | `REQ-1242` the dispatcher of either binary, for a command, subcommand, flag or argument its definitions do not have (4.1, Parsing); the hint is the command's `--help` line |
 
 ### `fingerprint-unstable` (`RJ-338`)
 
