@@ -3,7 +3,7 @@ id: T129
 title: "Fixed module sources for `tools/ci setup`"
 milestone: M1
 module: ci-release
-fate: new
+fate: merged
 owns:
   - tools/ci/internal/setup/**
 needs: []
@@ -14,9 +14,14 @@ after:
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-17
+pr: 102
 ---
 
 # T129 - Fixed module sources for `tools/ci setup`
+
+Merged on 2026-10-17 in pull request #102. The text below is the one
+written at the re-plan.
 
 Goal: `setup`'s three steps, `mise trust`, `mise install` and `go mod
 download`, run with `GOPROXY=https://proxy.golang.org`,
