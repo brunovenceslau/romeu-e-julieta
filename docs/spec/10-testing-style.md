@@ -439,7 +439,10 @@ environment of the steps, built from nothing, with
 `GOPROXY=https://proxy.golang.org`, `GOSUMDB=sum.golang.org` and
 `GOENV=off` in place of the steps' `GOPROXY=off`; a test shows that a
 caller's `GONOSUMDB` and `GOFLAGS` do not reach it, so a caller's
-settings cannot fill the module cache unverified.
+settings cannot fill the module cache unverified. One input still
+reaches it, as it reaches both installs of REQ-1071: a module or build
+cache seeded beforehand, since `GOPATH`, `GOMODCACHE` and `GOCACHE`
+pass through.
 
 What a run prints:
 
