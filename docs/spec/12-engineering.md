@@ -139,10 +139,11 @@ counts a version with a `-` suffix as a prerelease.
 it, in both places it runs. In hosted CI that is the mise action's step
 of `ci.yml` and `x64.yml`, which runs before `tools/ci setup`, so `setup` finds the
 tools installed. `MiseEnv` ends with `goenv.Pin`, `GOENV=off` and
-`GOTOOLCHAIN=local`, the two variables `StepEnv` sets for the go steps
-of `tools/ci` too, so both installs run with them: the hosted one
-through the `env` tables of `ci.yml` and `x64.yml`, which the workflows
-check holds to `MiseEnv`, and `tools/ci setup` through `RunEnviron`. So no `go env
+`GOTOOLCHAIN=local`, the two variables `StepEnv` of the check package of
+`tools/ci` sets for its go steps too, so both installs run with them:
+the hosted one through the `env` tables of `ci.yml` and `x64.yml`,
+which the workflows check holds to `MiseEnv`, and `tools/ci setup`
+through `RunEnviron` of the mise package of `tools/ci`. So no `go env
 -w` file is read and no other go is started. On a developer machine
 `tools/ci setup` runs `mise install` in an environment built from
 nothing, so no `GO` variable of the caller reaches it: not `GOSUMDB`,
@@ -213,7 +214,7 @@ Release:    go run ./tools/release build --version v1.0.0 --dry-run
 
 `REQ-1080` Module ids are stable; the plan selects work by them. `REQ-1081` Each module id
 names the directories it owns, and a package module owns `internal/<id>`
-and the directories its row names in parentheses; a `tools/ci` test
+and the `internal/` paths its row gives in code spans; a `tools/ci` test
 holds the tree of
 [02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public), this
 table and the package list of S9 to the same set of directories.
