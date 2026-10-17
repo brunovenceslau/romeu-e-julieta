@@ -72,20 +72,22 @@ func TestRegisteredChecks(t *testing.T) {
 // TestRegisteredChecksAreRowsOfTheStepTable holds each registered check
 // to its row of the step table of 10 10.2: the row names the check, and
 // the requirement id it registers is one that row holds. A row that
-// holds none (hygiene, workflows) is registered with none. The fixtures
-// show that a check with an id of another row, with an id where its row
-// holds none, and with a row the table does not have each fail.
+// holds none is registered with none; every row holds one today, so the
+// fixture adds a row without one. The fixtures show that a check with an
+// id of another row, with an id where its row holds none, and with a row
+// the table does not have each fail.
 func TestRegisteredChecksAreRowsOfTheStepTable(t *testing.T) {
 	rows := stepTableRows(t)
 	require.Contains(t, rows, "format, vet", "the step table of 10 10.2 is read")
 	assert.Empty(t, stepTableProblems(rows, check.Registered()))
+	rows["no id"] = nil
 	assert.Equal(t, []string{
 		`a: REQ-0824 is not an id of the row "lint"`,
-		`b: the row "hygiene" holds no id, and the check names REQ-0882`,
+		`b: the row "no id" holds no id, and the check names REQ-0882`,
 		`c: "nonesuch" is no row of the step table`,
 	}, stepTableProblems(rows, []check.Check{
 		{Name: "a", Row: "lint", Req: "REQ-0824"},
-		{Name: "b", Row: "hygiene", Req: "REQ-0882"},
+		{Name: "b", Row: "no id", Req: "REQ-0882"},
 		{Name: "c", Row: "nonesuch", Req: "REQ-0823"},
 		{Name: "d", Row: "lint", Req: "REQ-0823"},
 	}))
