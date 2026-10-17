@@ -46,7 +46,7 @@ written before the re-plan.
   REQ-1083 (12 12.2), REQ-1129 (12 12.4), REQ-1140 (12 12.4), REQ-1141
   (12 12.4), REQ-1143 (12 12.4), REQ-1190 (12 12.9), REQ-1191 (12 12.9),
   REQ-1192 (12 12.9), REQ-1224 (10 10.2), REQ-1225 (10 10.2), REQ-1230
-  (10 10.6), REQ-1231 (10 10.6).
+  (10 10.6), REQ-1231 (10 10.6), REQ-1241 (10 10.2).
 - Operator: block O2 follows its green run.
 - Ask-first, as forecast before the re-plan: none exists yet.
 - Acceptance:
