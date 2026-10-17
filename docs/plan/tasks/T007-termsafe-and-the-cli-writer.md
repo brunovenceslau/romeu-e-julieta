@@ -3,7 +3,7 @@ id: T007
 title: "`termsafe` and the CLI writer"
 milestone: M1
 module: termsafe
-fate: kept
+fate: merged
 owns:
   - internal/termsafe/**
   - internal/cli/writer*.go
@@ -12,9 +12,14 @@ after: []
 ask_first:
   - termsafe
 sitting: none
+merged: 2026-10-16
+pr: 58
 ---
 
 # T007 - `termsafe` and the CLI writer
+
+Merged on 2026-10-16 in pull request #58. The text below is the one
+written at the re-plan.
 
 Earlier title: `termsafe`, the CLI writer and the invariant tooling.
 
