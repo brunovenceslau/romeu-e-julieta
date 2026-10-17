@@ -55,6 +55,10 @@ var guardedImports = []string{
 // tools/new runs git through tools/ci/git.
 const toolsTree = "tools"
 
+// testSeams are the functions of this package that only tests call:
+// the timeout table's seam and the hook of Main's handler.
+var testSeams = []string{"WithTestTimeout", "SetBeforeStepAside"}
+
 // startCalls are the functions, by package path, that start or replace
 // a process without os/exec; no file outside this package calls them.
 var startCalls = map[string][]string{
@@ -106,6 +110,8 @@ func Start(name string) error { return exec.Command(name).Start() }
 func Notify() { signal.Ignore(); _ = syscall.Exec }
 
 func WithTestTimeout() {}
+
+func SetBeforeStepAside() {}
 `,
 	"internal/fixture/exec.go": `package fixture
 
@@ -117,7 +123,7 @@ func Start() error { return exec.Command("gh").Start() }
 
 import pg "example.com/fixture/internal/procgroup"
 
-func Shorten() { pg.WithTestTimeout() }
+func Shorten() { pg.WithTestTimeout(); pg.SetBeforeStepAside() }
 `,
 	"internal/fixture/seam_test.go": `package fixture
 
@@ -130,6 +136,7 @@ import (
 
 func TestShorten(t *testing.T) {
 	procgroup.WithTestTimeout()
+	procgroup.SetBeforeStepAside()
 	_ = exec.Command("true").Run()
 }
 `,
@@ -303,6 +310,7 @@ func TestCallSiteFindings(t *testing.T) {
 		"internal/fixture/raw.go: calls syscall.RawSyscall6 with a trap the scan cannot name",
 		"internal/fixture/raw.go: calls syscall.Syscall with SYS_EXECVE",
 		"internal/fixture/raw.go: takes syscall.Syscall6 as a value, which hides its trap",
+		"internal/fixture/seam.go: sets procgroup.SetBeforeStepAside outside a test file",
 		"internal/fixture/seam.go: sets procgroup.WithTestTimeout outside a test file",
 		"internal/fixture/seam_test.go: imports os/exec outside internal/procgroup",
 		"internal/fixture/signal.go: imports os/signal outside internal/procgroup",
@@ -445,8 +453,8 @@ func fileFindings(rel string, file *ast.File, module string) []string {
 			return true
 		}
 		switch {
-		case imported == self && sel.Sel.Name == "WithTestTimeout" && !isTest:
-			findings = append(findings, rel+": sets procgroup.WithTestTimeout outside a test file")
+		case imported == self && slices.Contains(testSeams, sel.Sel.Name) && !isTest:
+			findings = append(findings, rel+": sets procgroup."+sel.Sel.Name+" outside a test file")
 		case slices.Contains(startCalls[imported], sel.Sel.Name):
 			findings = append(findings, rel+": calls "+imported+"."+sel.Sel.Name+" outside "+thisPackage)
 		case slices.Contains(rawCalls[imported], sel.Sel.Name) && !judged[sel]:

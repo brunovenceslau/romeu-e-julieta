@@ -2,15 +2,17 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-17. #67 to #79 merged (Done records 5 to 11):
+Checkpoint of 2026-10-17. #67 to #80 merged (Done records 5 to 11):
 T138, T106, T107, x64 best effort on a scheduled `x64.yml`, and T108,
 the re-plan record (ADR 0014), which leaves no item of Decisions of the
-re-plan open.
+re-plan open. The wall-clock stack (Done record 12) fixes procgroup's
+drain, which could cut a successful command's output.
 
 ## Next steps
 
 1. T012 waits by decision. T139 and T140 follow T105, which has merged.
-2. Tests bound by wall-clock time ("tests-bound-by-wall-clock-time").
+2. The tight wall-clock bounds left
+   ("tight-wall-clock-bounds-left-in-the-tests"), when one fails.
 3. Migrate the docs/reviews checkpoints
    ("migrate-the-docs-reviews-checkpoints-into-docs-handoff").
 4. The go that builds tools/ci

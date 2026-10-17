@@ -39,7 +39,12 @@ func TestHelperProcess(t *testing.T) {
 	case "main":
 		// The real signal handling of main, around a step that sleeps, and
 		// with CI_TEST_FAILFAST set, after a step that has already
-		// failed. It writes its own pid first, for the test to signal.
+		// failed. With CI_TEST_SECOND_SIGNAL set, the handler sends this
+		// process a second SIGTERM right before it steps aside. It writes
+		// its own pid first, for the test to signal.
+		if os.Getenv("CI_TEST_SECOND_SIGNAL") != "" {
+			procgroup.SetBeforeStepAside(func() { _ = syscall.Kill(os.Getpid(), syscall.SIGTERM) })
+		}
 		pidfile := os.Getenv("CI_TEST_PIDFILE")
 		if err := writePid(pidfile+mainSuffix, os.Getpid()); err != nil {
 			os.Exit(2)
@@ -282,20 +287,16 @@ func TestMainSignalAfterFailure(t *testing.T) {
 // first signal alone, with the group gone and the second signal
 // absorbed rather than ending the process by its default action.
 //
-// The two signals leave the test back to back. The handler of
-// procgroup.Main takes SIGTERM through a channel of one slot, so a
-// second SIGTERM that lands before the handler steps aside is either
-// dropped on the full channel or left unread in it; only one that lands
-// after the cancel, the kill of every group and the step aside would
-// end the process. The only way for that to happen here is for the
-// test to be held between its two kill calls for longer than the
-// handler takes, which fails this test loudly (a status of a signal,
-// not an exit) and never passes it falsely. The order that closes the
-// window is procgroup's, and its own tests hold the handler at the
-// step aside to show it.
+// The test sends the first SIGTERM; the helper's handler sends the
+// second to its own process right before it steps aside, after the
+// cancel and the kill of every group. A signal a process sends itself
+// is delivered before kill returns, so the second lands inside the
+// window whatever the scheduling, where it is dropped on the full
+// channel of one slot or left unread in it. Two signals sent back to
+// back by the test raced the handler instead, and a test held between
+// them failed (the second ended the process).
 func TestMainSecondSignalAbsorbed(t *testing.T) {
-	done, stderr, pid, grandchild := startMain(t)
-	require.NoError(t, syscall.Kill(pid, syscall.SIGTERM))
+	done, stderr, pid, grandchild := startMain(t, "CI_TEST_SECOND_SIGNAL=1")
 	require.NoError(t, syscall.Kill(pid, syscall.SIGTERM))
 	exit := exitOf(t, done)
 	assert.Zero(t, exit.Signal, "the second signal did not end the process")

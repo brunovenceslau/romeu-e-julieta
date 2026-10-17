@@ -56,12 +56,17 @@ func TestHelperProcess(t *testing.T) {
 	// A helper whose test died does not outlive it by long.
 	time.AfterFunc(helperLifetime, func() { os.Exit(3) })
 	switch role {
-	case "escape", "escape-exit":
+	case "escape", "escape-exit", "escape-chatty":
 		// Hold the output pipe from a session of its own, which a kill of
 		// the process group does not reach, and write its pid; then the
-		// leader waits, or with escape-exit exits 0 at once.
+		// leader waits, or with escape-exit and escape-chatty exits 0 at
+		// once. The holder of escape-chatty writes without a pause.
+		holderRole := "sleep"
+		if role == "escape-chatty" {
+			holderRole = "chatter"
+		}
 		child := exec.Command(os.Args[0], "-test.run=^TestHelperProcess$")
-		child.Env = append(os.Environ(), helperEnv+"=sleep")
+		child.Env = append(os.Environ(), helperEnv+"="+holderRole)
 		child.Stdout, child.Stderr = os.Stdout, os.Stderr
 		child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 		if err := child.Start(); err != nil {
@@ -72,7 +77,16 @@ func TestHelperProcess(t *testing.T) {
 			time.Sleep(time.Minute)
 		}
 	case "sleep":
-		time.Sleep(15 * time.Second)
+		// The holder outlives every wait of the tests; killAtEnd ends it.
+		time.Sleep(helperLifetime)
+	case "chatter":
+		// A holder whose output never goes idle; killAtEnd ends it.
+		for {
+			if _, err := os.Stdout.WriteString("x\n"); err != nil {
+				os.Exit(0)
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
 	case "group":
 		// A command whose group holds a grandchild when the signal lands.
 		os.Exit(Main(helperName, os.Stderr, func(ctx context.Context) int {
