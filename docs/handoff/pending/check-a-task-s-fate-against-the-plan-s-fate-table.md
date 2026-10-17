@@ -7,5 +7,6 @@ docs/plan.md, so a task file and its row there can disagree. The rows
 are prose ("deferred to M6", "kept, narrowed"), so a check first needs
 the table in a form it can read.
 
-Reopen: T108 rewrites the fate table, or a review finds a task whose
-file and row disagree.
+Reopen: a re-plan pull request rewrites the fate table (T108, merged in
+#79, left it as it was), or a review finds a task whose file and row
+disagree.

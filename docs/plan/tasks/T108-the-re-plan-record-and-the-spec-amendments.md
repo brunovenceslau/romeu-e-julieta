@@ -3,7 +3,7 @@ id: T108
 title: "The re-plan record"
 milestone: M0
 module: docs
-fate: new
+fate: merged
 owns:
   - docs/adr/0014-*.md
   - docs/adr/0001-*.md
@@ -18,9 +18,14 @@ after:
 ask_first:
   - decisions
 sitting: none
+merged: 2026-10-17
+pr: 79
 ---
 
 # T108 - The re-plan record
+
+Merged on 2026-10-17 in pull request #79. The text below is the one
+written at the re-plan.
 
 Earlier title: The re-plan record and the spec amendments.
 

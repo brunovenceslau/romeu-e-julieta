@@ -2,22 +2,23 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-17. #67 to #77 merged (Done records 5 to 10):
-T138, T106, T107, and x64 best effort on a scheduled `x64.yml`, whose
-first run is green.
+Checkpoint of 2026-10-17. #67 to #79 merged (Done records 5 to 11):
+T138, T106, T107, x64 best effort on a scheduled `x64.yml`, and T108,
+the re-plan record (ADR 0014), which leaves no item of Decisions of the
+re-plan open.
 
 ## Next steps
 
-1. T108, the re-plan record: it writes the answers of
-   "the-ask-first-surfaces-of-t107" into docs/plan.md.
-2. T012 waits by decision. T139 and T140 follow T105, which has merged.
-3. Tests bound by wall-clock time ("tests-bound-by-wall-clock-time").
-4. Migrate the docs/reviews checkpoints
+1. T012 waits by decision. T139 and T140 follow T105, which has merged.
+2. Tests bound by wall-clock time ("tests-bound-by-wall-clock-time").
+3. Migrate the docs/reviews checkpoints
    ("migrate-the-docs-reviews-checkpoints-into-docs-handoff").
-5. The go that builds tools/ci
+4. The go that builds tools/ci
    ("the-go-that-builds-tools-ci-is-not-held-to-the-pin").
-6. Split the tasks over the Implements cap
+5. Split the tasks over the Implements cap
    ("split-the-open-tasks-over-the-implements-cap").
+6. tools/new takes a flag as a title
+   ("tools-new-takes-a-flag-as-a-title").
 
 ## Open for the operator
 
