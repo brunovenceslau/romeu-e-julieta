@@ -109,9 +109,16 @@ func TestNewTaskRefuses(t *testing.T) {
 		assert.Equal(t, exitError, run(f.e, []string{"task", "a\nb"}))
 		assert.Contains(t, f.stderr.String(), "does not show")
 	})
+	t.Run("a flag as the title", func(t *testing.T) {
+		f := newTaskFixture(t)
+		assert.Equal(t, exitError, run(f.e, []string{"task", "--help"}))
+		assert.Contains(t, f.stderr.String(), `the title "--help" starts with "-"`)
+		assert.Contains(t, f.stderr.String(), "usage:", "the refusal shows the usage")
+		assert.Empty(t, f.stdout.String())
+	})
 	t.Run("no ASCII letter or digit", func(t *testing.T) {
 		f := newTaskFixture(t)
-		assert.Equal(t, exitError, run(f.e, []string{"task", "---"}))
+		assert.Equal(t, exitError, run(f.e, []string{"task", "?!"}))
 		assert.Contains(t, f.stderr.String(), "filename would be empty")
 	})
 	t.Run("no task directory", func(t *testing.T) {

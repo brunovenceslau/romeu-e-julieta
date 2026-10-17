@@ -156,6 +156,8 @@ func TestNewADRRefuses(t *testing.T) {
 		{"a supplementary variation selector in the title", []string{"adr", "Adopt\U000e0100X"}, nil, "character that does not show (U+E0100)"},
 		{"a zero width joiner in the title", []string{"adr", "Adopt\u200dX"}, nil, "character that does not show (U+200D)"},
 		{"a zero width non-joiner in the title", []string{"adr", "Adopt\u200cX"}, nil, "character that does not show (U+200C)"},
+		{"a flag as the title", []string{"adr", "--help"}, nil, `the title "--help" starts with "-"`},
+		{"a flag after a space", []string{"adr", " -h"}, nil, `the title "-h" starts with "-"`},
 		{"a no-break space only", []string{"adr", "\u00a0"}, nil, "the title is empty"},
 		{"spaces and a no-break space only", []string{"adr", " \u00a0\u3000 "}, nil, "the title is empty"},
 		{"a line separator in the title", []string{"adr", "Adopt\u2028X"}, nil, "character that does not show (U+2028)"},
