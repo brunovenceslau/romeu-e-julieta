@@ -126,10 +126,15 @@ func invisible(r rune) bool {
 // (strings.TrimSpace in the caller). The zero width joiners (U+200C,
 // U+200D) and the variation selectors (such as the emoji selector
 // U+FE0F) are refused too: titles are English, the language of the
-// repository, and a joiner hides in a title.
+// repository, and a joiner hides in a title. A title that starts with
+// "-" is refused with the usage, since it is a flag such as --help
+// typed where the title goes.
 func checkTitle(title string) error {
 	if title == "" {
 		return errors.New("the title is empty")
+	}
+	if strings.HasPrefix(title, "-") {
+		return fmt.Errorf("the title %q starts with \"-\", so it reads as a flag; start it with a letter or a digit\n%s", title, usage())
 	}
 	for _, r := range title {
 		if invisible(r) {
