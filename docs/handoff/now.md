@@ -10,7 +10,10 @@ a requirement id, and the pre-push hook and every mise run of
 ## Next steps
 
 1. T012 waits by decision. T106, T107, T139 and T140 follow T105,
-   which has merged; T108 follows T107.
+   which has merged; T108 follows T107. T106 is split in two pull
+   requests: `tools/new` kinds by file with the `task` kind, then the
+   `tools/ci plan` check. T107's operator items are decided
+   ("re-plan-items-8-9-and-11-the-ask-first-surfaces").
 2. Tests bound by wall-clock time ("tests-bound-by-wall-clock-time").
 3. Migrate the docs/reviews checkpoints
    ("migrate-the-docs-reviews-checkpoints-into-docs-handoff").
