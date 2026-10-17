@@ -2,14 +2,13 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-17. #67 to #90 merged (Done records 5 to 23):
-T138, T106, T107, x64 best effort on a scheduled `x64.yml`, and T108,
-the re-plan record (ADR 0014), which leaves no item of Decisions of the
-re-plan open. The wall-clock stack (Done record 12) fixes procgroup's
-drain, which could cut a successful command's output. The session
-checkpoints of docs/reviews are Done records 13 to 21 (Done record 22).
-tools/new refuses a flag as a title (Done record 23). T140 holds the
-module tree and the spec identifiers to the code (Done record 24).
+Checkpoint of 2026-10-17. #67 to #94 merged (Done records 5 to 25):
+T138, T106, T107, x64 best effort on a scheduled `x64.yml`, T108 (ADR
+0014), the procgroup drain fix (Done record 12), the docs/reviews
+checkpoints moved here (Done record 22), tools/new refusing a flag as
+a title (Done record 23), and T140 with its spec fix (Done record 24).
+No task of M0 or M1 can start without the operator: what is left waits
+for a decision, sitting M0 or a trigger.
 
 ## Next steps
 
@@ -18,9 +17,10 @@ module tree and the spec identifiers to the code (Done record 24).
 2. The tight wall-clock bounds left
    ("tight-wall-clock-bounds-left-in-the-tests"), when one fails.
 3. The go that builds tools/ci
-   ("the-go-that-builds-tools-ci-is-not-held-to-the-pin").
+   ("the-go-that-builds-tools-ci-is-not-held-to-the-pin"), at its
+   trigger.
 4. Split the tasks over the Implements cap
-   ("split-the-open-tasks-over-the-implements-cap").
+   ("split-the-open-tasks-over-the-implements-cap"), at its trigger.
 
 ## Open for the operator
 
@@ -31,10 +31,14 @@ One block, a recommendation each.
    gate diff.
 2. The kit prompts ("prompts-for-the-sandbox-kit-and-the-house-kit").
    Recommended: ask for both final prompts in one message.
+3. The T140 tests and the checks surface
+   ("the-t140-tests-and-the-checks-surface"). Recommended: add both
+   globs to `checks`, in a pull request of its own.
 
 ## In flight
 
-- Nothing besides this handoff.
+- This handoff's pull request, branch
+  docs/handoff-session-close-2026-10-17.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
