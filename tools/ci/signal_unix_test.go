@@ -46,7 +46,11 @@ func TestHelperProcess(t *testing.T) {
 		if os.Getenv("CI_TEST_SECOND_SIGNAL") != "" {
 			procgroup.SetBeforeStepAside(func(sigs <-chan os.Signal) {
 				_ = syscall.Kill(os.Getpid(), syscall.SIGTERM)
-				<-sigs
+				select {
+				case <-sigs:
+				case <-time.After(10 * time.Second):
+					os.Exit(4) // the signal never reached the handler
+				}
 			})
 		}
 		pidfile := os.Getenv("CI_TEST_PIDFILE")
@@ -295,8 +299,8 @@ func TestMainSignalAfterFailure(t *testing.T) {
 // second to its own process right before it steps aside, after the
 // cancel and the kill of every group, and reads it from the handler's
 // channel before the handler steps aside. A signal a process sends
-// itself may arrive after kill returns (seen on macos-26, where it
-// then ended the process), so the read is what puts the second signal
+// itself may arrive after kill returns, and after the handler's Stop
+// it would end the process, so the read is what puts the second signal
 // inside the window whatever the scheduling. Two signals sent back to
 // back by the test raced the handler instead, and a test held between
 // them failed (the second ended the process).

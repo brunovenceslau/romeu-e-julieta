@@ -61,8 +61,9 @@ func TestMainSignalRule(t *testing.T) {
 		assert.Empty(t, stderr.String())
 	})
 	t.Run("a second signal before the handler steps aside is absorbed", func(t *testing.T) {
-		// The helper holds its handler before it steps aside and sends
-		// itself SIGINT there; the status stays 128 plus SIGTERM.
+		// The helper holds its handler before it steps aside, sends
+		// itself SIGINT there and waits until the handler's channel has
+		// it; the status stays 128 plus SIGTERM.
 		cmd, _, ready := helper(t, "absorb")
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr

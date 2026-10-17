@@ -29,9 +29,10 @@ var beforeStepAside func(sigs <-chan os.Signal)
 // processes of the tests of a main that installs Main, which send a
 // second signal there and read it from sigs, so that it has landed
 // before the handler steps aside whatever the scheduling: a signal a
-// process sends itself may arrive after kill returns, as on macOS. Test
-// only: the call-site scan of this package fails a call outside a
-// _test.go file. Call it before Main.
+// process sends itself may arrive after kill returns, as on macOS. The
+// handler waits for f, so f must return. Test only: the call-site scan
+// of this package fails a call outside a _test.go file. Call it before
+// Main.
 func SetBeforeStepAside(f func(sigs <-chan os.Signal)) (previous func(sigs <-chan os.Signal)) {
 	previous, beforeStepAside = beforeStepAside, f
 	return previous

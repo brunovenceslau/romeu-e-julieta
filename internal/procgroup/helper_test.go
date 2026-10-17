@@ -128,7 +128,11 @@ func TestHelperProcess(t *testing.T) {
 		beforeStepAside = func(sigs <-chan os.Signal) {
 			if role == "absorb" {
 				_ = syscall.Kill(os.Getpid(), syscall.SIGINT)
-				<-sigs
+				select {
+				case <-sigs:
+				case <-time.After(10 * time.Second):
+					os.Exit(4) // the signal never reached the handler
+				}
 			}
 			time.Sleep(200 * time.Millisecond)
 			writeOrExit(os.Getenv(markerEnv), "stepped")
