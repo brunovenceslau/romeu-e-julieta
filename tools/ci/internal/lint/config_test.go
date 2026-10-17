@@ -196,7 +196,7 @@ func TestLintConfigReportsEachChecker(t *testing.T) {
 
 	// The tools are the ones the lint step runs (mise.ResolveLintTools), and
 	// the run happens in the fixture's directory, where no mise.toml is.
-	tools := citest.PinnedLintTools(t, mise.Environ, mise.ResolveLintTools)
+	tools := citest.PinnedLintTools(t, mise.Path, mise.Environ, mise.ResolveLintTools)
 
 	report := filepath.Join(t.TempDir(), "report.json")
 	// The arguments are the ones of the lint step (Args), with the
@@ -814,7 +814,7 @@ type lintContext struct {
 // (syslistOf).
 func lintTargetContexts(t *testing.T) []lintContext {
 	t.Helper()
-	tools := citest.PinnedLintTools(t, mise.Environ, mise.ResolveLintTools)
+	tools := citest.PinnedLintTools(t, mise.Path, mise.Environ, mise.ResolveLintTools)
 	format := `{{context.CgoEnabled}} {{context.Compiler}} {{join context.ToolTags ","}} {{join context.ReleaseTags ","}} {{context.GOROOT}}`
 	var contexts []lintContext
 	for _, target := range Targets {

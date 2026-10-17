@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -386,18 +385,25 @@ func TestReqsReads(t *testing.T) {
 		assert.Equal(t, check.ExitOK, code, out)
 	})
 	t.Run("a long line of ids is read in time linear in its length", func(t *testing.T) {
-		// Ten MiB of text, then the ids: a count of the backticks from
-		// the line's start for each span scans the text once per id,
-		// about 1e12 bytes and over ten seconds; one pass scans it once
-		// and takes well under one, even under the race detector.
-		const n = 100_000
-		line := strings.Repeat("a", 10<<20) + strings.Repeat(" `REQ-0001` a", n)
-		start := time.Now()
+		// One MiB of text, then the ids. The backticks are counted span
+		// by span, so the bytes counted are the line once for the spans
+		// and once for its parity: two lengths of the line. A count from
+		// the line's start for each span would read the text once per
+		// id, ten thousand lengths. Counting bytes, not seconds, holds
+		// on a runner of any speed.
+		const n = 10_000
+		line := strings.Repeat("a", 1<<20) + strings.Repeat(" `REQ-0001` a", n)
+		read := 0
+		prev := countTicks
+		t.Cleanup(func() { countTicks = prev })
+		countTicks = func(s string) int {
+			read += len(s)
+			return strings.Count(s, "`")
+		}
 		marks := reqMarks(reqPage{path: "docs/spec/01-model.md", lines: []string{line}})
-		elapsed := time.Since(start)
 		require.Len(t, marks, n)
 		assert.Empty(t, marks[n-1].misplaced)
-		assert.Less(t, elapsed, 5*time.Second)
+		assert.LessOrEqual(t, read, 2*len(line), "the backticks are counted in one pass")
 	})
 	t.Run("a front matter outside the task directory or not in a .md file, and a page that is not .md, are not read", func(t *testing.T) {
 		r := reqFixture(t)

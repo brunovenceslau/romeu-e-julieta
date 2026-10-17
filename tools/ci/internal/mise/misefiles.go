@@ -6,7 +6,8 @@
 // (HookAllow), the tools mise may install (PinnedTools) and how a tool
 // is resolved to the path of its pinned install (WhichPinned), the
 // files mise reads as its configuration, and the version of mise that
-// ci.yml pins. It is a helper of the checks and registers no check.
+// ci.yml pins, with the one path every mise command starts (Path). It
+// is a helper of the checks and registers no check.
 package mise
 
 import (
@@ -99,10 +100,10 @@ import (
 //     directory: mise finds .miserc.toml from its working directory and
 //     the configuration from its -C directory, so it reads the files of
 //     this list, from the root it trusts, and none of a subdirectory.
-//  5. fast, all and setup refuse a mise of another version than the
-//     one ci.yml pins for mise-action (CheckVersion): the files
-//     mise reads and the variables of MiseEnv are measured with that
-//     version only.
+//  5. fast and all refuse a mise of another version than the one
+//     ci.yml pins for mise-action (CheckVersion), and setup installs
+//     that one (ReadPin, Path): the files mise reads and the variables
+//     of MiseEnv are measured with that version only.
 //  6. fast and all read the commit that hygiene, workflows and the
 //     pushed range judge before they start mise or any step
 //     (commitChecks); the generated step, and in all the steps that
@@ -423,25 +424,40 @@ func pinnedMiseVersion(root string) (string, error) {
 	return versions[0], nil
 }
 
-// CheckVersion fails unless the mise on the search path is the
-// version pinnedMiseVersion reads: MiseEnv is measured under that
-// version, and the variables it sets, or the files mise reads without
-// them, may differ in another (the threat model above). "mise
-// --version" prints the version as its first word (measured with mise
-// 2026.10.3: "2026.10.3 linux-arm64 (2026-10-05)"). It runs as every
-// mise run of tools/ci does: at the top of the tree, with MiseEnv.
-func CheckVersion(ctx context.Context, root string) error {
+// Version returns the version that the mise of Path names, the first
+// word of "mise --version" (measured with mise 2026.10.3: "2026.10.3
+// linux-arm64 (2026-10-05)"). It runs as every mise run of tools/ci
+// does: at the top of the tree, with MiseEnv. No mise at all is
+// procgroup.ErrNotFound.
+func Version(ctx context.Context, root string) (string, error) {
+	path, err := Path(root)
+	if err != nil {
+		return "", err
+	}
 	var stdout bytes.Buffer
-	err := procgroup.Run(ctx, procgroup.Command{
+	err = procgroup.Run(ctx, procgroup.Command{
 		Class:  procgroup.ToolProbe,
-		Argv:   []string{"mise", "--version"},
+		Argv:   []string{path, "--version"},
 		Dir:    root,
 		Env:    RunEnviron(check.PassThroughEnv(), root),
 		Stdout: &stdout,
 	})
-	out := stdout.Bytes()
+	if err != nil {
+		return "", err
+	}
+	got, _, _ := strings.Cut(strings.TrimSpace(stdout.String()), " ")
+	return got, nil
+}
+
+// CheckVersion fails unless the mise of Path is the version
+// pinnedMiseVersion reads: MiseEnv is measured under that version, and
+// the variables it sets, or the files mise reads without them, may
+// differ in another (the threat model above). The refusal names setup,
+// which installs the pinned mise.
+func CheckVersion(ctx context.Context, root string) error {
+	got, err := Version(ctx, root)
 	if errors.Is(err, procgroup.ErrNotFound) {
-		return fmt.Errorf("mise is not on the search path: install the mise that %s pins, then run \"go run ./tools/ci setup\" in %s", PinnedWorkflow, root)
+		return fmt.Errorf("mise is not on the search path: run \"go run ./tools/ci setup\" in %s, which installs the mise that %s pins", root, PinnedWorkflow)
 	}
 	if err != nil {
 		return fmt.Errorf("mise --version: %w", err)
@@ -450,8 +466,8 @@ func CheckVersion(ctx context.Context, root string) error {
 	if err != nil {
 		return err
 	}
-	if got, _, _ := strings.Cut(strings.TrimSpace(string(out)), " "); got != pinned {
-		return fmt.Errorf("mise is at version %s, and %s pins %s, the version MiseEnv is measured with (tools/ci/internal/mise/misefiles.go): install mise %s", git.Printable(got), PinnedWorkflow, pinned, pinned)
+	if got != pinned {
+		return fmt.Errorf("mise is at version %s, and %s pins %s, the version MiseEnv is measured with (tools/ci/internal/mise/misefiles.go): run \"go run ./tools/ci setup\" in %s, which installs mise %s", git.Printable(got), PinnedWorkflow, pinned, root, pinned)
 	}
 	return nil
 }

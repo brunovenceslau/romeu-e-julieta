@@ -205,7 +205,7 @@ func IsolateMiseConfig(t *testing.T) {
 // FakeMise is a home directory with the mise installs directory of
 // miseInstalls, and a directory on PATH that holds a mise of its own,
 // a script, in place of the real one. HOME and PATH point at them, and
-// MISE_DATA_DIR and XDG_DATA_HOME are cleared.
+// MISE_DATA_DIR, XDG_DATA_HOME and XDG_CACHE_HOME are cleared.
 type FakeMise struct {
 	Home, Bin string
 }
@@ -219,6 +219,8 @@ func NewFakeMise(t *testing.T) FakeMise {
 	t.Setenv("PATH", f.Bin)
 	t.Setenv("MISE_DATA_DIR", "")
 	t.Setenv("XDG_DATA_HOME", "")
+	// The cache below the fake home holds no mise that setup installed.
+	t.Setenv("XDG_CACHE_HOME", "")
 	return f
 }
 
@@ -310,11 +312,29 @@ const (
 	AnswerVersion   = "if [ \"$1\" = --version ]; then echo '" + FakeMiseVersion + " linux-x64 (2026-10-05)'; exit 0; fi\n"
 )
 
+// FakeMiseSha256 is the sha256 MiseWorkflow pins for every runner: the
+// shape of one, and the hash of no file a test writes.
+var FakeMiseSha256 = strings.Repeat("0", 64)
+
 // MiseWorkflow returns GoodWorkflow with its mise-action step pinning
-// mise at version.
+// mise at version, and FakeMiseSha256 for each runner of the matrix.
 func MiseWorkflow(t *testing.T, version string) string {
 	t.Helper()
-	return Edits(t, "          sha256: ${{ matrix.mise_sha256 }}\n", "          version: "+version+"\n          sha256: ${{ matrix.mise_sha256 }}\n")
+	return PinnedMiseWorkflow(t, version, FakeMiseSha256)
+}
+
+// PinnedMiseWorkflow returns GoodWorkflow with its mise-action step
+// pinning mise at version, and a matrix that gives each of the four
+// runners sha256 as the hash of its mise.
+func PinnedMiseWorkflow(t *testing.T, version, sha256 string) string {
+	t.Helper()
+	var matrix strings.Builder
+	for _, label := range []string{"ubuntu-26.04", "ubuntu-26.04-arm", "macos-26", "macos-26-intel"} {
+		matrix.WriteString("          - os: " + label + "\n            mise_sha256: " + sha256 + "\n")
+	}
+	return Edits(t,
+		"          sha256: ${{ matrix.mise_sha256 }}\n", "          version: "+version+"\n          sha256: ${{ matrix.mise_sha256 }}\n",
+		"          - os: ubuntu-26.04\n            mise_sha256: aa\n", matrix.String())
 }
 
 // PinnedLintTools returns the pinned tools as resolve finds them for
@@ -323,16 +343,19 @@ func MiseWorkflow(t *testing.T, version string) string {
 // mise configuration. mise keeps its trust records in the state
 // directory (https://mise.jdx.dev/directories.html), so the tests do
 // not depend on a "mise trust" of the person who runs them, and leave
-// no trust behind. environ is the environment of a mise run; it and
+// no trust behind. misePath gives the mise every mise command of
+// tools/ci starts, and environ the environment of a mise run; they and
 // resolve come from the mise package, which citest does not import, as
 // the tests of that package import citest.
-func PinnedLintTools(t *testing.T, environ func([]string) []string, resolve func(context.Context, string) (check.Tools, error)) check.Tools {
+func PinnedLintTools(t *testing.T, misePath func(string) (string, error), environ func([]string) []string, resolve func(context.Context, string) (check.Tools, error)) check.Tools {
 	t.Helper()
 	root := ModuleRoot(t)
 	IsolateMiseConfig(t)
+	path, err := misePath(root)
+	require.NoError(t, err)
 	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
 		Class: procgroup.ToolStep,
-		Argv:  []string{"mise", "-C", root, "trust"},
+		Argv:  []string{path, "-C", root, "trust"},
 		Dir:   root,
 		Env:   environ(check.PassThroughEnv()),
 	})

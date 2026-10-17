@@ -25,7 +25,7 @@ import (
 // TestResolveLintTools checks that the tools of fast are the ones
 // mise.toml pins: the linter and the go command, installed by mise.
 func TestResolveLintTools(t *testing.T) {
-	tools := citest.PinnedLintTools(t, Environ, ResolveLintTools)
+	tools := citest.PinnedLintTools(t, Path, Environ, ResolveLintTools)
 	assert.Equal(t, "golangci-lint", filepath.Base(tools.Linter))
 	assert.True(t, filepath.IsAbs(tools.Linter), "an absolute path: %s", tools.Linter)
 	assert.FileExists(t, filepath.Join(tools.GoDir, "go"))
@@ -151,7 +151,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		{
 			name:  "mise which fails, with what mise wrote to standard error",
 			fails: true,
-			want:  "mise which golangci-lint: mise exited 1; the tool is not installed or the configuration is not trusted: run \"mise trust\" and \"mise install\" in ",
+			want:  "/mise exited 1; the tool is not installed or the configuration is not trusted: run \"mise trust\" and \"mise install\" in ",
 		},
 		{
 			name: "HOME is not set",
@@ -245,6 +245,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 				}
 				require.ErrorContains(t, err, strings.ReplaceAll(tt.want, fixed, installs))
 				if tt.fails {
+					require.ErrorContains(t, err, "mise which golangci-lint: "+filepath.Join(f.Bin, "mise")+" exited 1;", "the probe and the mise it started")
 					require.ErrorContains(t, err, "\nmise ERROR not trusted", "what mise wrote to standard error")
 				}
 				assert.Equal(t, check.Tools{}, tools)
@@ -320,6 +321,7 @@ func TestResolveLintToolsEnvironment(t *testing.T) {
 // on the variables it reads.
 func TestMiseInstalls(t *testing.T) {
 	data, xdg := t.TempDir(), t.TempDir()
+	misePath := pinnedMise(t)
 	for _, tt := range []struct {
 		name, data, xdg string
 		want            func(home string) string
@@ -337,7 +339,7 @@ func TestMiseInstalls(t *testing.T) {
 			var out bytes.Buffer
 			err := procgroup.Run(t.Context(), procgroup.Command{
 				Class:  procgroup.ToolProbe,
-				Argv:   []string{"mise", "-C", t.TempDir(), "doctor", "--json"},
+				Argv:   []string{misePath, "-C", t.TempDir(), "doctor", "--json"},
 				Env:    append(Environ(check.PassThroughEnv()), "MISE_OFFLINE=1"),
 				Stdout: &out,
 			})

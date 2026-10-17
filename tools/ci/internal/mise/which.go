@@ -50,8 +50,9 @@ func ResolveLintTools(ctx context.Context, root string) (check.Tools, error) {
 // tool's name in the lock), so that a stale install left beside the
 // locked one is refused; a tool locked at two different versions is an
 // error, as the lock then holds no one version to hold an install to.
-// It runs in check.PassThroughEnv with MiseEnv, at the top of the tree,
-// and refuses a key that is not one of PinnedTools before it starts.
+// It starts the mise of Path, in check.PassThroughEnv with MiseEnv, at
+// the top of the tree, and refuses a key that is not one of PinnedTools
+// before it starts.
 func WhichPinned(ctx context.Context, root, name, key, dir string) (string, error) {
 	if !slices.Contains(PinnedTools, key) {
 		return "", fmt.Errorf("mise which %s: %s is not one of the pinned tools (PinnedTools)", name, key)
@@ -64,19 +65,23 @@ func WhichPinned(ctx context.Context, root, name, key, dir string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("the mise installs directory %s: %w; run \"mise trust\" and \"mise install\" in %s", installsDir, err, root)
 	}
+	misePath, err := Path(root)
+	if errors.Is(err, procgroup.ErrNotFound) {
+		return "", fmt.Errorf("mise is not on the search path: run \"go run ./tools/ci setup\" in %s", root)
+	}
+	if err != nil {
+		return "", err
+	}
 	var stdout, stderr bytes.Buffer
 	err = procgroup.Run(ctx, procgroup.Command{
 		Class: procgroup.ToolProbe,
-		Argv:  []string{"mise", "-C", root, "which", name},
+		Argv:  []string{misePath, "-C", root, "which", name},
 		// mise finds .miserc.toml from its working directory (misefiles.go).
 		Dir:    root,
 		Env:    RunEnviron(check.PassThroughEnv(), root),
 		Stdout: &stdout,
 		Stderr: &stderr,
 	})
-	if errors.Is(err, procgroup.ErrNotFound) {
-		return "", fmt.Errorf("mise is not on the search path: install mise, then run \"mise trust\" and \"mise install\" in %s", root)
-	}
 	if err != nil {
 		detail := ""
 		if _, ok := errors.AsType[*procgroup.ExitError](err); ok {

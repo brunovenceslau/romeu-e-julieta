@@ -124,11 +124,12 @@ func TestMiseEnvStopsConfigs(t *testing.T) {
 	}
 	// .mise is a link to a directory under another name.
 	require.NoError(t, os.Symlink(filepath.Join("elsewhere", ".mise"), filepath.Join(dir, ".mise")))
+	misePath := pinnedMise(t)
 	mise := func(env []string, args ...string) {
 		t.Helper()
 		out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
 			Class: procgroup.ToolProbe,
-			Argv:  append([]string{"mise", "-C", dir}, args...),
+			Argv:  append([]string{misePath, "-C", dir}, args...),
 			Dir:   dir,
 			Env:   env,
 		})
@@ -244,12 +245,13 @@ func TestMiseNeverReads(t *testing.T) {
 	// what the command sees: the planted marker, the working directory,
 	// and the GOFLAGS and GOENV of its environment.
 	type seen struct{ marker, pwd, goflags, goenv string }
+	misePath := pinnedMise(t)
 	printed := func(t *testing.T, env []string, dir string) seen {
 		t.Helper()
 		var stdout strings.Builder
 		err := procgroup.Run(t.Context(), procgroup.Command{
 			Class:  procgroup.ToolProbe,
-			Argv:   []string{"mise", "exec", "--", "sh", "-c", `printf '%s|%s|%s|%s' "${PLANTED:-nothing}" "$(pwd -P)" "${GOFLAGS-unset}" "${GOENV-unset}"`},
+			Argv:   []string{misePath, "exec", "--", "sh", "-c", `printf '%s|%s|%s|%s' "${PLANTED:-nothing}" "$(pwd -P)" "${GOFLAGS-unset}" "${GOENV-unset}"`},
 			Dir:    dir,
 			Env:    env,
 			Stdout: &stdout,
@@ -471,7 +473,9 @@ func TestCheckMiseVersion(t *testing.T) {
 	assert.Equal(t, "mise.toml "+real+"\n", string(data), "with miseEnv, at the top of the tree")
 
 	write("2026.10.4")
-	require.ErrorContains(t, CheckVersion(t.Context(), root), "mise is at version 2026.10.4, and .github/workflows/ci.yml pins 2026.10.3")
+	err = CheckVersion(t.Context(), root)
+	require.ErrorContains(t, err, "mise is at version 2026.10.4, and .github/workflows/ci.yml pins 2026.10.3")
+	require.ErrorContains(t, err, `run "go run ./tools/ci setup" in `+root+", which installs mise 2026.10.3", "the refusal names setup")
 	for _, other := range []string{"2026.10.30", "2026.10"} {
 		write(other)
 		require.ErrorContains(t, CheckVersion(t.Context(), root), "mise is at version "+other+",", "a version that only shares a prefix with the pin")
@@ -480,7 +484,9 @@ func TestCheckMiseVersion(t *testing.T) {
 	require.ErrorContains(t, CheckVersion(t.Context(), root), "mise is at version 2024.11.37")
 
 	require.NoError(t, os.Remove(filepath.Join(f.Bin, "mise")))
-	require.ErrorContains(t, CheckVersion(t.Context(), root), "mise is not on the search path")
+	err = CheckVersion(t.Context(), root)
+	require.ErrorContains(t, err, "mise is not on the search path")
+	require.ErrorContains(t, err, `run "go run ./tools/ci setup"`)
 }
 
 // TestMiseProbesRunUnderTheToolProbeClass shows that the two probes of
