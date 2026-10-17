@@ -2,19 +2,16 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-16, end of session. T105 PR-C (#63) and T141
-(#64) merged, green on the four runners (Done record 4). A sandbox
-whose image ships another mise now runs `go run ./tools/ci setup`
-instead of installing the pinned mise by hand.
+Checkpoint of 2026-10-17. #67 merged, green on the four runners (Done
+record 5): every row of the step table in 10 10.2 carries a
+requirement id.
 
 ## Next steps
 
-1. Spec PR for the step-table rows that have no REQ id
-   ("step-table-rows-without-a-req-id").
-2. T012 waits by decision. T106, T107, T108, T138, T139 and T140
+1. T012 waits by decision. T106, T107, T108, T138, T139 and T140
    follow T105, which has merged.
-3. Tests bound by wall-clock time ("tests-bound-by-wall-clock-time").
-4. Migrate the docs/reviews checkpoints
+2. Tests bound by wall-clock time ("tests-bound-by-wall-clock-time").
+3. Migrate the docs/reviews checkpoints
    ("migrate-the-docs-reviews-checkpoints-into-docs-handoff").
 
 ## Open for the operator
