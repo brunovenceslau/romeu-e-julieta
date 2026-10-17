@@ -13,6 +13,10 @@ failed yet:
 - internal/procgroup/errors_test.go:31, 5 s.
 - tools/ci/internal/check/step_test.go:149, 5 s.
 
+The two "escape-chatty" subtests of internal/procgroup/procgroup_test.go
+failed once on macos-26 for another reason, a holder that died after the
+run instead of a bound; fixed on 2026-10-17 (Done record 27).
+
 Bounds of 10 s or more only guard against a hang and stay. For each
 bound above, an event (a process still alive, a pipe closed) may
 replace the clock without weakening what it proves.
