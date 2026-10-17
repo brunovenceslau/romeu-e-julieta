@@ -9,8 +9,9 @@ fix (Done record 12), the docs/reviews checkpoints moved here (Done
 record 22), tools/new refusing a flag as a title (Done record 23), and
 T140, the module tree and the spec identifiers held to the code, with
 its spec fix (Done record 24). #97 recorded T007, T017 and T023 as
-merged (Done record 26), and the stack #100 fixed the chatty holder
-test of internal/procgroup (Done record 27).
+merged (Done record 26), the stack #100 fixed the chatty holder
+test of internal/procgroup (Done record 27), and the stack #103
+merged T129 (Done record 28).
 
 ## Next steps
 
@@ -42,7 +43,7 @@ One block, a recommendation each.
 
 ## In flight
 
-- The stack of T129 (Done record 28).
+- The stack of the second-signal test fix (Done record 29).
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
