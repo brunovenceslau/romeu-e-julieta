@@ -171,7 +171,10 @@ run:                          # versioned with the spec's schema
 
 The `$schema` line is an editor hint only; `julieta spec validate` in
 the config repo's CI, at the pinned julieta, is the validation. It
-points at a readable tag URL, which a moved tag could change.
+points at a readable tag URL, which a moved tag could change. In a file
+under `examples/`, the tag is that of the release that ships it, the
+one `VERSION` names ([02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public)),
+as `v` and the version.
 
 `REQ-0191` The classification is the struct tags on the spec types
 (`gate:"widening"`, `apply:"recreate|live"`, 01 1.4);

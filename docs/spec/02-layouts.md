@@ -8,6 +8,7 @@ and julieta's setup. Type: reference.
 ```
 romeu-e-julieta/
 ├─ go.mod                      module github.com/<owner>/romeu-e-julieta
+├─ VERSION                     the next release, `<major>.<minor>.<patch>` and a newline; the `$schema` hints under examples/ and tools/release read it
 ├─ mise.toml, mise.lock        dev tools for this repo (go, golangci-lint, ...); lock for linux-x64, linux-arm64, macos-x64, macos-arm64
 ├─ ARCHITECTURE.md             one page: components, trust boundaries, the state machines
 ├─ CONTRIBUTING.md             dev loop; how to add a command, invariant, probe or kit via tools/new
@@ -123,6 +124,11 @@ Rules of this tree, one item per obligation:
   `manifest.v1`, `salvage.v1`, `probe-result.v1`, `acceptance.v1`, and
   one per `--json` output, `<binary>-<command>.v1`
   ([04 4.1](04-cli.md#41-conventions-both-binaries)).
+- `REQ-1249` `VERSION` names the next release, `<major>.<minor>.<patch>`
+  and a newline, and is the one file that does: the `$schema` hint of
+  each YAML file under `examples/` names that release as `v` and the
+  version ([03 3.2](03-formats.md#32-project-spec-projectsnameyaml-schema-projectv1)),
+  and `tools/release` reads it.
 - `REQ-0119` `examples/` is the example config repo (`projects/*.yaml`,
   `kits/`, `.github/workflows/validate.yml`): the adopter's starter (J1
   step 0), also used by tests and docs (CC0-1.0).
