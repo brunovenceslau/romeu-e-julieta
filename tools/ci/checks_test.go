@@ -20,7 +20,6 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/generated"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/plan"
 )
 
@@ -48,7 +47,7 @@ func TestRegisteredChecks(t *testing.T) {
 			how = "after"
 		}
 		got = append(got, entry{c.Name, c.Fast, c.Hook, c.All, c.RunsCode, how})
-		assert.Equal(t, "tools/ci/internal/"+strings.ReplaceAll(c.Name, " ", ""), c.Package, "the package of %s", c.Name)
+		assert.Equal(t, "tools/ci/internal/"+checkPackage(c.Name), c.Package, "the package of %s", c.Name)
 		assert.DirExists(t, filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(c.Package)))
 		assert.FileExists(t, "check_"+strings.ReplaceAll(c.Name, " ", "")+".go", "the file that registers %s", c.Name)
 		assert.NotEmpty(t, c.Guards, "what %s guards", c.Name)
@@ -140,9 +139,9 @@ func stepTableRows(t *testing.T) map[string][]string {
 // checks is the one the registry gives; "generated" fails it too, and
 // this names the file.
 func TestChecksPageIsCurrent(t *testing.T) {
-	got, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(generated.ChecksPath)))
+	got, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(check.ChecksPath)))
 	require.NoError(t, err)
-	assert.Equal(t, string(generated.ChecksPage(check.Registered())), string(got), "run go generate ./...")
+	assert.Equal(t, string(check.ChecksPage(check.Registered())), string(got), "run go generate ./...")
 }
 
 // fixtureCheck and fixturePackage are the two files that add the check
@@ -270,6 +269,16 @@ func TestAFixtureCheckIsAddedByTwoPaths(t *testing.T) {
 	assert.Contains(t, string(out), "  go run ./tools/ci fixture\n", "the usage text names its subcommand")
 }
 
+// checkPackage is the directory below tools/ci/internal of the package
+// of the check of that name (REQ-0121): its name without spaces, except
+// for the generated check, whose package is drift.
+func checkPackage(name string) string {
+	if name == "generated" {
+		return "drift"
+	}
+	return strings.ReplaceAll(name, " ", "")
+}
+
 // TestGeneratedOutputsAreOwnedByNoTask holds plan.Generated, the
 // generated outputs of rule 1 of docs/plan.md that the overlap rule of
 // the plan check leaves out, to the files every registered generator
@@ -279,12 +288,9 @@ func TestGeneratedOutputsAreOwnedByNoTask(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = root.Close() }()
 	var paths []string
-	for _, c := range check.Registered() {
-		if c.Outputs == nil {
-			continue
-		}
-		outs, err := c.Outputs(root)
-		require.NoError(t, err, c.Name)
+	for _, g := range check.Generators() {
+		outs, err := g.Outputs(root)
+		require.NoError(t, err, g.Name)
 		for _, o := range outs {
 			paths = append(paths, o.Path)
 		}

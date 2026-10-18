@@ -7,5 +7,5 @@ package main
 // generate ./..." runs the generate subcommand of this command, which
 // the generated check registers (check_generated.go) and writes the
 // generated files. The generated check refuses a go:generate line
-// anywhere else (generated.Site).
+// anywhere else (drift.Site).
 //go:generate go run . generate

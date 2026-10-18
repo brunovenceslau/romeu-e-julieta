@@ -1,19 +1,21 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package generated
+package adrdir
 
 import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/adrdir"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // adrStatuses are the statuses of rule 7 of ADR 0001.
@@ -41,7 +43,7 @@ type adr struct {
 // line to a record a later one replaces; an indented one is part of a
 // quotation or a list and does not count.
 func parseADR(file string, content []byte) (adr, error) {
-	m := adrdir.Name.FindStringSubmatch(file)
+	m := Name.FindStringSubmatch(file)
 	if m == nil {
 		return adr{}, fmt.Errorf("%s: the name is not NNNN-slug.md", file)
 	}
@@ -90,7 +92,7 @@ func adrStatus(lines []string) (string, error) {
 // given: the generated-file header, then one row for each record.
 func adrIndex(records []adr) []byte {
 	var b bytes.Buffer
-	fmt.Fprintf(&b, "<!-- %s -->\n\n", askfirst.GeneratedNotice("the titles and statuses of the records in this directory"))
+	fmt.Fprintf(&b, "<!-- %s -->\n\n", check.GeneratedNotice("the titles and statuses of the records in this directory"))
 	b.WriteString("# Decision records\n\n")
 	b.WriteString("Each record holds one decision with its context and consequences. A record changes only\n")
 	b.WriteString("with the maintainer's approval; a reversal is a new record that supersedes it. The layout and the statuses are the ones of rules 6 and 7 of\n")
@@ -101,4 +103,41 @@ func adrIndex(records []adr) []byte {
 		fmt.Fprintf(&b, "| %d | [%s](%s) | %s |\n", r.number, escape.Replace(r.title), r.file, r.status)
 	}
 	return b.Bytes()
+}
+
+// IndexName is the name of the index of the decision records, in the
+// directory that .adr-dir names (12 12.3). A generated file is never edited
+// by hand: tools/ci generated fails when the run of generate changes
+// it.
+const IndexName = "README.md"
+
+// IndexOutput is the generator of the index of the decision records
+// (12 12.3): it renders the index of the records in the directory that
+// .adr-dir names (Dir). A record is a regular file: a symbolic link with
+// a record's name is skipped.
+func IndexOutput(root *os.Root) ([]check.Output, error) {
+	dir, err := Dir(root)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := fs.ReadDir(root.FS(), filepath.ToSlash(dir))
+	if err != nil {
+		return nil, err
+	}
+	var records []adr
+	for _, entry := range entries {
+		if !Name.MatchString(entry.Name()) || !entry.Type().IsRegular() {
+			continue
+		}
+		content, err := root.ReadFile(filepath.Join(dir, entry.Name()))
+		if err != nil {
+			return nil, err
+		}
+		record, err := parseADR(entry.Name(), content)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, record)
+	}
+	return []check.Output{{Path: filepath.ToSlash(filepath.Join(dir, IndexName)), Content: adrIndex(records)}}, nil
 }

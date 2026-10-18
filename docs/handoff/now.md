@@ -2,21 +2,19 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-18. Done records are merged up to 31. ADR 0015
-is accepted, with the generators next to their data (#119, #120). T130
-is merged (Done record 31). T008's first implementation (#109) is held
-until the rename to `drift` lands.
+Checkpoint of 2026-10-18. Done records are merged up to 32. ADR 0015
+is accepted, the generated check lives in `tools/ci/internal/drift`, and
+each generator lives with its data (Done record 32). T008's first
+implementation (#109) is held for its rework on cobra.
 
 ## Next steps
 
-1. Rename `tools/ci/internal/generated` to `drift` (pending note
-   "rename-the-generated-package-to-drift"), in a pull request of its
-   own on the `checks` surface.
-2. Rework T008 on cobra in #109 (retarget it to main). The error table,
+1. Rework T008 on cobra in #109 (retarget it to main). The error table,
    the union test, Report and `--json`, the `errors.md` generator and
    RequireID carry over; the dispatcher, help and registry become
-   cobra. A new record PR goes on top.
-3. Then T009 and T025. T132 and T123 each need a plan fix first
+   cobra; the generators register through `tools/ci/generator_cli.go`
+   (`check.RegisterGenerator`). A new record PR goes on top.
+2. Then T009 and T025. T132 and T123 each need a plan fix first
    (pending note "t132-and-t123-owns-and-the-build-constraint-gap").
 
 ## Open for the operator
@@ -35,7 +33,7 @@ One block, a recommendation each.
 
 ## In flight
 
-- The stack of T130 (Done record 31).
+- The stack of generators with their data and drift (Done record 32).
 - #109, held.
 
 Branch and pull request state is NOT recorded here: measure it with

@@ -59,11 +59,10 @@ of `cobra/doc`, which no binary imports and which hands `tools/ci` both.
 The generated check of `tools/ci` holds no generator; one file,
 `tools/ci/generator_cli.go`, imports `internal/cli/clidoc` and the two
 `internal/cmd/<binary>/all` packages that link the commands in, and
-hands the generators to it, which needs the rename of
-`tools/ci/internal/generated` to `drift` merged first (pending note
-"rename-the-generated-package-to-drift"). The pages join the `-text`
-list of `.gitattributes`. A check of its own would add a row to the step table
-of 10 10.2 for a generator that judges nothing.
+registers the generators with `check.RegisterGenerator` (02 2.1,
+REQ-0121). The pages join the `-text` list of `.gitattributes`. A check
+of its own would add a row to the step table of 10 10.2 for a generator
+that judges nothing.
 
 Re-plan (2026-10-12): Kept, changed. Each package declares its ids in
 its own `errors.go`, taken from 04 4.4; one test collects the union.
