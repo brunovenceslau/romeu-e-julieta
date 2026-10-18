@@ -4,7 +4,7 @@ Date: 2026-10-17
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -155,15 +155,25 @@ proxy.golang.org):
    matter of REQ-1117, and ends with the P marker, the appending list
    and the exit codes, which the generator writes from the definitions,
    since `cobra/doc` renders neither the side-effect fields nor the help
-   functions of decision 5.
+   functions of decision 5. A generator lives in the package that owns
+   its data: this one in `internal/cli/clidoc`, a subpackage next to
+   `internal/cli` that no binary imports, and the generator of the
+   error table's pages in `internal/cli`. The generated check of
+   `tools/ci` holds no generator of its own; it reaches both through
+   `internal/cli/clidoc`, calls them and checks the drift, and `go
+   generate ./...` keeps its one directive in `tools/ci/generate.go`. A
+   generated Go file is named `*_gen.go` and carries no generated-code
+   header, which the lint step of 10 10.2 refuses, so every lint finding
+   in it stays visible.
 8. **The import boundary is checked.** `github.com/spf13/cobra` is
-   imported only by `internal/cli` and the packages under
-   `internal/cmd/`, and `github.com/spf13/cobra/doc` only by `tools/ci`;
-   `tools/ci imports` (10 10.7) fails another importer, and a test fails
-   when `go list -deps` of `./cmd/romeu` or `./cmd/julieta`, for each of
-   their targets, holds `cobra/doc`, go-md2man, blackfriday or
-   mousetrap. The license step reads the whole module graph of
-   `go.mod`, the modules no binary links included.
+   imported only by `internal/cli`, `internal/cli/clidoc` and the
+   packages under `internal/cmd/`, and `github.com/spf13/cobra/doc` only
+   by `internal/cli/clidoc`, which only `tools/ci` imports (10 10.7);
+   `tools/ci imports` fails another importer, and a test fails when `go
+   list -deps` of `./cmd/romeu` or `./cmd/julieta`, for each of their
+   targets, holds `internal/cli/clidoc`, `cobra/doc`, go-md2man,
+   blackfriday or mousetrap. The license step reads the whole module
+   graph of `go.mod`, the modules no binary links included.
 
 ## Consequences
 
