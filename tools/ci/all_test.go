@@ -304,23 +304,29 @@ func TestArchMatches(t *testing.T) {
 	}
 }
 
+// unames are what uname -m prints, by runtime.GOARCH, on a machine of
+// that architecture (same) and on one of the other (other).
+var unames = map[string]struct{ same, other string }{
+	"amd64": {same: "x86_64", other: "aarch64"},
+	"arm64": {same: "aarch64", other: "x86_64"},
+}
+
 // TestAllArchitecture reports the verdict of the architecture check: ok
 // when uname -m names the architecture of the binary, FAIL, with both
 // named, when it does not, and the other checks still run.
 func TestAllArchitecture(t *testing.T) {
-	other := map[string]string{"amd64": "aarch64", "arm64": "x86_64"}[runtime.GOARCH]
-	if other == "" {
-		t.Skip("no uname -m to compare with on " + runtime.GOARCH)
-	}
-	same := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}[runtime.GOARCH]
-	for _, tt := range []struct {
+	type unameCase struct {
 		uname, want string
 		code        int
-	}{
-		{same, "ok    architecture\n", check.ExitOK},
-		{other, "FAIL  architecture\nuname -m reports " + other + " and this binary runs as " + runtime.GOARCH + ": ", check.ExitFail},
-		{"unknown", "FAIL  architecture\nuname -m reports unknown", check.ExitFail},
-	} {
+	}
+	cases := []unameCase{{"unknown", "FAIL  architecture\nuname -m reports unknown", check.ExitFail}}
+	// On an architecture with no entry, the FAIL case runs alone.
+	if a, ok := unames[runtime.GOARCH]; ok {
+		cases = append(cases,
+			unameCase{a.same, "ok    architecture\n", check.ExitOK},
+			unameCase{a.other, "FAIL  architecture\nuname -m reports " + a.other + " and this binary runs as " + runtime.GOARCH + ": ", check.ExitFail})
+	}
+	for _, tt := range cases {
 		t.Run(tt.uname, func(t *testing.T) {
 			r := citest.NewTree(t)
 			r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
@@ -342,11 +348,15 @@ func TestAllArchitecture(t *testing.T) {
 // under Rosetta, where uname -m prints the architecture it emulates and
 // so matches.
 func TestAllArchitectureTranslated(t *testing.T) {
-	same := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}[runtime.GOARCH]
-	if same == "" {
-		t.Skip("no uname -m to compare with on " + runtime.GOARCH)
+	a, ok := unames[runtime.GOARCH]
+	same := a.same
+	translatedCases := []bool{false, true}
+	if !ok {
+		// With no uname -m of its own, the machine fails on that alone,
+		// so only the FAIL case runs.
+		same, translatedCases = "unknown", []bool{true}
 	}
-	for _, translated := range []bool{false, true} {
+	for _, translated := range translatedCases {
 		r := citest.NewTree(t)
 		r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 		r.Commit("fixture")
@@ -359,7 +369,9 @@ func TestAllArchitectureTranslated(t *testing.T) {
 		code := run(t.Context(), e, []string{"all"})
 		if translated {
 			assert.Equal(t, check.ExitFail, code, "%s", out.String())
-			assert.Contains(t, out.String(), "FAIL  architecture\nsysctl.proc_translated is 1: ")
+			if ok {
+				assert.Contains(t, out.String(), "FAIL  architecture\nsysctl.proc_translated is 1: ")
+			}
 			assert.Contains(t, out.String(), "ok    passes", "the other checks run")
 		} else {
 			assert.Equal(t, check.ExitOK, code, "%s", out.String())
