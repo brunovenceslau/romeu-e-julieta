@@ -7,10 +7,13 @@ fate: kept
 owns:
   - tools/ci/internal/imports/**
   - tools/ci/check_imports.go
+  - tools/ci/checks_test.go
+  - tools/ci/all_test.go
 needs:
   - T009
   - T105
-after: []
+after:
+  - T132
 ask_first:
   - checks
 sitting: none
@@ -20,6 +23,16 @@ sitting: none
 
 Goal: `tools/ci imports`: the table of 10 10.7 over the packages that
 exist, and the I1, I2 and I24 guards.
+
+Re-plan (2026-10-18): Changed. T010 also owns the files that pin the
+registered checks and the steps of `all`, which gain the `imports`
+check: `tools/ci/checks_test.go` and `tools/ci/all_test.go`. It comes
+after T132, which owns `tools/ci/all_test.go` too. REQ-0971 now lets
+`tools/new` import `internal/cli` directly (decided on 2026-10-18), so
+the check reads that sentence as one more allowed edge. The table
+also gained the row of `cli/testsupport` (REQ-1248), a package only
+tests import, and T010 enforces it with the row of `cli/clidoc`
+(REQ-1247).
 
 Re-plan (2026-10-12): Kept, pulled forward: its first input exists at
 T009. The rows it reads name `procgroup` in the third row and the
