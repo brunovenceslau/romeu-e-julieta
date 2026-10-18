@@ -41,7 +41,7 @@ romeu-e-julieta/
 │  ├─ shquote/                 POSIX shell quoter (table-tested)
 │  ├─ cmd/romeu/<command>/     one package per romeu command; cmd/romeu/all/ holds one blank-import file per command (import_<command>.go) and links them in
 │  ├─ cmd/julieta/<command>/   one package per julieta command; cmd/julieta/all/ the same, so tools/** and e2e/** reach every registry through one import (10 10.7)
-│  └─ cli/                     the dispatcher table, generated from the command packages (12 12.3); exit codes and error ids (data), escaping writer, text/--json
+│  └─ cli/                     the registry of command definitions and the cobra tree it assembles (ADR 0015); exit codes and error ids (data), escaping writer, text/--json
 ├─ kits/                       v3 kit sources, local builds (see 06-kits); embed.go, package kits, the one embed.FS of the product kit directories, pins.yaml excluded, which romeu and the render seam read
 │  ├─ julieta/                 product kit: mise, herdr, hook dispatcher dir, env
 │  ├─ julieta-claude/          product kit: skills, SessionStart/SessionEnd hooks, memory rule

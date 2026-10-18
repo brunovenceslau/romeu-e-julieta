@@ -62,7 +62,8 @@ off every chain through it.
   (10 10.7), REQ-1080 (12 12.2), REQ-1085 (12 12.2), REQ-1108 (12 12.3),
   REQ-1109 (12 12.3), REQ-1117 (12 12.3), REQ-1119 (12 12.3), REQ-1124
   (12 12.3), REQ-1127 (12 12.3), REQ-1184 (12 12.8), REQ-1187 (12 12.8),
-  REQ-1188 (12 12.8), REQ-1229 (10 10.6).
+  REQ-1188 (12 12.8), REQ-1229 (10 10.6), REQ-1242 (04 4.2), REQ-1243
+  (04 4.3), REQ-1244 (04 4.4), REQ-1245 (04 4.1), REQ-1246 (12 12.1).
 - Operator: no.
 - Acceptance:
   - Lands before its module's place in the order of 12 12.2 (Q26):
