@@ -1270,6 +1270,7 @@ deferred function, which is why the cleanup stands between the two).
 | `REQ-0968` `sbxdrv`, `render`, `gate`, `state`, `egress`, `signing`, `preflight` | `cmd/romeu`, `tools/ci` | `mise`, `hooks`, `layout` |
 | `REQ-1233` `mise`, `hooks`, `layout`, `agent/*`, `memstore/write` | `cmd/julieta` only | `sbxdrv` |
 | `REQ-0969` `gitsafe`, `spec`, `canon`, `catalog`, `oci`, `manifest`, `memstore`, `handoff`, `salvage`, `shquote`, `termsafe`, `cli`, `procgroup` | both | `sbxdrv`, `layout` |
+| `REQ-1247` `cli/clidoc` (ADR 0015) | `tools/ci` only | `sbxdrv`, `layout` |
 
 `REQ-0970` Names are packages under `internal/`; a command package under
 `internal/cmd/romeu/` or `internal/cmd/julieta/` follows the row of its
@@ -1285,8 +1286,10 @@ same guarded client (I28).
 `REQ-0971` `tools/**` and the test packages under `e2e/**` may import
 `internal/procgroup` directly and any other package under `internal/`
 through `internal/cmd/<binary>/all`, the one package per binary that
-links every command in (one blank-import file per command, 02 2.1); the
-rows govern the two binaries.
+links every command in (one blank-import file per command, 02 2.1);
+`tools/ci` also imports `internal/cli/clidoc` directly, which no binary
+links. The rows govern the two binaries, and a subpackage follows its
+own row, never its parent's.
 
 ## 10.8 Definition of done for implementing agents
 

@@ -22,4 +22,4 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 12 | [Adopt requirement ids in the specification and amend the documentation standard for the plan's shape](0012-adopt-requirement-ids-in-the-specification-and-amend-the-documentation-standard-for-the-plan-s-shape.md) | Proposed |
 | 13 | [Admit Excalidraw scenes as diagrams under docs/notes and amend rule 17 of the documentation standard](0013-admit-excalidraw-scenes-as-diagrams-under-docs-notes-and-amend-rule-17-of-the-documentation-standard.md) | Proposed |
 | 14 | [Re-plan v1 for early daily use: task files, registration by file, build order, dogfood before recording](0014-re-plan-v1-for-early-daily-use-task-files-registration-by-file-build-order-dogfood-before-recording.md) | Proposed |
-| 15 | [Adopt spf13/cobra for the command line of romeu and julieta](0015-adopt-spf13-cobra-for-the-command-line-of-romeu-and-julieta.md) | Proposed |
+| 15 | [Adopt spf13/cobra for the command line of romeu and julieta](0015-adopt-spf13-cobra-for-the-command-line-of-romeu-and-julieta.md) | Accepted |
