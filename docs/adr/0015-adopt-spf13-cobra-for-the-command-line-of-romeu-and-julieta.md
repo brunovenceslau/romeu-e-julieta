@@ -164,9 +164,10 @@ proxy.golang.org):
    `tools/ci` holds no generator of its own; it reaches both through
    `internal/cli/clidoc`, calls them and checks the drift, and `go
    generate ./...` keeps its one directive in `tools/ci/generate.go`. A
-   generated Go file is named `*_gen.go` and carries no generated-code
-   header, which the lint step of 10 10.2 refuses, so every lint finding
-   in it stays visible.
+   generated Go file is named `*_gen.go` and carries the generated
+   header of ADR 0016, and the linters read it, so every lint finding
+   in it stays visible (changed on 2026-10-18 by ADR 0016; the record
+   first left the header out).
 8. **The import boundary is checked.** `github.com/spf13/cobra` is
    imported only by `internal/cli`, `internal/cli/clidoc` and the
    packages under `internal/cmd/`, and `github.com/spf13/cobra/doc` only

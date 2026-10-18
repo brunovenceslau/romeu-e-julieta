@@ -23,3 +23,4 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 13 | [Admit Excalidraw scenes as diagrams under docs/notes and amend rule 17 of the documentation standard](0013-admit-excalidraw-scenes-as-diagrams-under-docs-notes-and-amend-rule-17-of-the-documentation-standard.md) | Proposed |
 | 14 | [Re-plan v1 for early daily use: task files, registration by file, build order, dogfood before recording](0014-re-plan-v1-for-early-daily-use-task-files-registration-by-file-build-order-dogfood-before-recording.md) | Proposed |
 | 15 | [Adopt spf13/cobra for the command line of romeu and julieta](0015-adopt-spf13-cobra-for-the-command-line-of-romeu-and-julieta.md) | Accepted |
+| 16 | [Lint generated files and give each one the full generated header](0016-lint-generated-files-and-give-each-one-the-full-generated-header.md) | Accepted |
