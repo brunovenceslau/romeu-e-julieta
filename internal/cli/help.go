@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 )
 
@@ -27,8 +28,13 @@ func exitCodes() string {
 func writeBinaryHelp(w io.Writer, binary string) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Usage: %s <command> [flags] [args]\n\nCommands:\n", binary)
-	for _, c := range Commands(binary) {
-		fmt.Fprintf(&b, "  %-16s %s\n", c.Line(), c.Summary)
+	cmds := Commands(binary)
+	width := 0
+	for _, c := range cmds {
+		width = max(width, len(c.Line()))
+	}
+	for _, c := range cmds {
+		fmt.Fprintf(&b, "  %-*s  %s\n", width, c.Line(), c.Summary)
 	}
 	fmt.Fprintf(&b, "\nRun %s <command> --help for the help of a command.\n\n%s", binary, exitCodes())
 	_, _ = io.WriteString(w, b.String())
@@ -40,8 +46,12 @@ func writeSubcommandsHelp(w io.Writer, defs []Command) {
 	var b strings.Builder
 	c := defs[0]
 	fmt.Fprintf(&b, "Usage: %s %s <subcommand> [flags] [args]\n\nSubcommands:\n", c.Binary, c.Name)
+	width := 0
 	for _, d := range defs {
-		fmt.Fprintf(&b, "  %-10s %s\n", d.Sub, d.Summary)
+		width = max(width, len(d.Sub))
+	}
+	for _, d := range defs {
+		fmt.Fprintf(&b, "  %-*s  %s\n", width, d.Sub, d.Summary)
 	}
 	fmt.Fprintf(&b, "\nRun %s %s <subcommand> --help for the help of a subcommand.\n\n%s", c.Binary, c.Name, exitCodes())
 	_, _ = io.WriteString(w, b.String())
@@ -58,10 +68,43 @@ func flagLine(f *flag.Flag) string {
 		name += " <" + value + ">"
 	}
 	line := fmt.Sprintf("  %s  %s", name, usage)
-	if f.DefValue != "" && f.DefValue != "false" && f.DefValue != "0" {
-		line += fmt.Sprintf(" (default %q)", f.DefValue)
+	if !isZeroValue(f) {
+		if isStringFlag(f) {
+			line += fmt.Sprintf(" (default %q)", f.DefValue)
+		} else {
+			line += fmt.Sprintf(" (default %s)", f.DefValue)
+		}
 	}
 	return line + "\n"
+}
+
+// isZeroValue reports whether the default of f is the zero value of its
+// type, as flag.PrintDefaults decides it: a new value of the type, which
+// is its zero value, prints the same text.
+func isZeroValue(f *flag.Flag) bool {
+	t := reflect.TypeOf(f.Value)
+	var zero reflect.Value
+	if t.Kind() == reflect.Pointer {
+		zero = reflect.New(t.Elem())
+	} else {
+		zero = reflect.Zero(t)
+	}
+	v, ok := zero.Interface().(flag.Value)
+	if !ok {
+		return false
+	}
+	return f.DefValue == v.String()
+}
+
+// isStringFlag reports whether f holds a string, whose default the help
+// quotes.
+func isStringFlag(f *flag.Flag) bool {
+	getter, ok := f.Value.(flag.Getter)
+	if !ok {
+		return false
+	}
+	_, ok = getter.Get().(string)
+	return ok
 }
 
 // writeCommandHelp writes the help of a command: its usage line, its

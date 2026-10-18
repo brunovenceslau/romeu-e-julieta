@@ -91,7 +91,7 @@ type Command struct {
 	Binary string
 	// Name is the command's name on the command line.
 	Name string
-	// Sub is the subcommand's name, as add in "julieta memory add", or
+	// Sub is the subcommand's name, such as "add" in "julieta memory add", or
 	// empty for a command with no subcommands (04 4.1, Parsing). A
 	// command name either has subcommands, each a definition of its own,
 	// or is one definition with no Sub.

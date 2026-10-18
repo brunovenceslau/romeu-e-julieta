@@ -45,6 +45,9 @@ func Main(ctx context.Context, args []string, env *Env) int {
 		if len(rest) == 0 {
 			return Report(env, usageError(env.Binary, c.Name, fmt.Sprintf("%s %s needs a subcommand", env.Binary, c.Name)))
 		}
+		if strings.HasPrefix(rest[0], "-") {
+			return Report(env, usageError(env.Binary, c.Name, fmt.Sprintf("the flags of %s %s go after its subcommand, not %q", env.Binary, c.Name, rest[0])))
+		}
 		i := slices.IndexFunc(defs, func(d Command) bool { return d.Sub == rest[0] })
 		if i < 0 {
 			return Report(env, usageError(env.Binary, c.Name, fmt.Sprintf("%s %s has no subcommand %q", env.Binary, c.Name, rest[0])))

@@ -207,7 +207,13 @@ var (
 		c := cli.Define(cli.PreflightNone, cli.LockNone, cli.AppendsNothing(), cli.SnapshotNone, cli.ReadsOnly)
 		c.Binary, c.Name, c.Sub, c.Summary, c.Usage = "julieta", "fixturegroup", "one", "the first subcommand", "[--repo <dir>] [args]"
 		c.Examples = []string{"julieta fixturegroup one --repo /x"}
-		c.Flags = func(fs *flag.FlagSet) { fs.StringVar(&repo, "repo", "/work", "the `dir` of the repository") }
+		c.Flags = func(fs *flag.FlagSet) {
+			fs.StringVar(&repo, "repo", "/work", "the `dir` of the repository")
+			fs.Int("count", 3, "how many")
+			fs.String("mode", "0", "the mode")
+			fs.Duration("wait", 0, "how long")
+			fs.Bool("verbose", false, "say more")
+		}
 		c.Run = func(_ context.Context, env *cli.Env, args []string) error {
 			_, err := fmt.Fprintf(env.Stdout, "one repo %s args %s\n", repo, strings.Join(args, ","))
 			return err
@@ -251,6 +257,13 @@ func TestMainSubcommands(t *testing.T) {
 	}
 	_, _, stderr := runJulieta(t, "fixturegroup", "one", "--nosuch")
 	assert.Contains(t, stderr, "fix: julieta fixturegroup one --help\n")
+	// A flag before the subcommand, --json among them, is a usage error
+	// that says where the flags go.
+	for _, args := range [][]string{{"fixturegroup", "--json"}, {"fixturegroup", "--repo", "x", "one"}} {
+		code, _, stderr := runJulieta(t, args...)
+		assert.Equal(t, 2, code, "%v", args)
+		assert.Contains(t, stderr, "go after its subcommand", "%v", args)
+	}
 }
 
 // TestMainHelpOnEveryLevel prints the help of the binary, of a command
@@ -260,13 +273,23 @@ func TestMainHelpOnEveryLevel(t *testing.T) {
 	code, stdout, _ := runJulieta(t, "--help")
 	assert.Equal(t, 0, code)
 	assert.Contains(t, stdout, "  fixturegroup one ")
-	code, stdout, _ = runJulieta(t, "fixturegroup", "--help")
-	assert.Equal(t, 0, code)
-	assert.Contains(t, stdout, "Usage: julieta fixturegroup <subcommand> [flags] [args]\n\nSubcommands:\n  one        the first subcommand\n  two        the second subcommand\n")
+	for _, help := range []string{"--help", "-h", "help"} {
+		code, stdout, _ = runJulieta(t, "fixturegroup", help)
+		assert.Equal(t, 0, code, help)
+		assert.Contains(t, stdout, "Usage: julieta fixturegroup <subcommand> [flags] [args]\n\nSubcommands:\n  one  the first subcommand\n  two  the second subcommand\n", help)
+	}
 	code, stdout, _ = runJulieta(t, "fixturegroup", "one", "-h")
 	assert.Equal(t, 0, code)
 	assert.Contains(t, stdout, "Usage: julieta fixturegroup one [--repo <dir>] [args]\n")
-	assert.Contains(t, stdout, "  --repo <dir>  the dir of the repository (default \"/work\")\n")
+	for _, line := range []string{
+		"  --repo <dir>  the dir of the repository (default \"/work\")\n",
+		"  --count <int>  how many (default 3)\n",
+		"  --mode <string>  the mode (default \"0\")\n",
+		"  --wait <duration>  how long\n",
+		"  --verbose  say more\n",
+	} {
+		assert.Contains(t, stdout, line)
+	}
 	assert.Contains(t, stdout, "  --help  print this help\n")
 	assert.Contains(t, stdout, "143  ended by SIGTERM")
 }

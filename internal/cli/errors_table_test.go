@@ -190,7 +190,7 @@ func TestHintCommandsExist(t *testing.T) {
 		for _, w := range rest {
 			name, _, _ := strings.Cut(strings.TrimLeft(w, "-"), "=")
 			if strings.HasPrefix(w, "-") && !strings.HasPrefix(name, "<") {
-				assert.NotNil(t, fs.Lookup(name), "%q names the flag %s that %s %s does not have", line, w, c.Binary, c.Name)
+				assert.NotNil(t, fs.Lookup(name), "%q names the flag %s that %s %s does not have", line, w, c.Binary, c.Line())
 			}
 		}
 	}
