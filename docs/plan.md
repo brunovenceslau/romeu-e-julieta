@@ -941,11 +941,16 @@ records these answers again with the rules they decide (T108).
     which T139 applies in the lint package T105 made. The set:
     `errorlint`, `usetesting`, `thelper`, `forbidigo` with the
     Boundaries patterns (`fmt.Print*`,
-    `os.Stdout`, `os.Stderr`, `log.`, `text/template`, `exec.Command(`
-    and `"sh", "-c"` outside the packages 04 4.1 names) and revive
+    `os.Stdout`, `os.Stderr`, `log.` and `text/template` outside an
+    allow list that T139 proposes, for the operator to confirm in its
+    pull request; 04 4.1 names no package set for them) and revive
     `package-comments`, each linter with its fixture, and a `tidy` rule
     of `generated` (`go mod tidy` changes neither `go.mod` nor
-    `go.sum`). Option B, not taken: A plus `noctx`, `contextcheck`,
+    `go.sum`). `exec.Command(` is not a forbidigo pattern: the call-site
+    scan of `internal/procgroup` holds `os/exec` to that package (04
+    4.1, Subprocesses), more strictly; `"sh", "-c"` is held by a Go
+    test in the lint package, since forbidigo reads no string argument.
+    Option B, not taken: A plus `noctx`, `contextcheck`,
     `modernize` and `gosec`, whose G204 flags every
     `exec.Command` with variable arguments in `tools/ci` (restructuring
     frozen code).
