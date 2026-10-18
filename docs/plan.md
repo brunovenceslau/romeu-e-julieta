@@ -936,17 +936,17 @@ records these answers again with the rules they decide (T108).
     refusal a sitting shows missing.
 15. **`tools/ci pins`.** Decided on 2026-10-12: keep, as answered on
     2026-10-08. The alternative not taken: a deferral.
-16. **The lint set.** A deferred decision: it is decided at sitting M0,
-    before T139 applies it in the lint package T105 makes, and nothing
-    is decided now. The agreed default, decided on 2026-10-12, is option
-    A with the `tidy` rule: `errorlint`, `usetesting`, `thelper`,
-    `forbidigo` with the Boundaries patterns (`fmt.Print*`,
+16. **The lint set.** Decided on 2026-10-18, ahead of sitting M0:
+    option A with the `tidy` rule, the default agreed on 2026-10-12,
+    which T139 applies in the lint package T105 made. The set:
+    `errorlint`, `usetesting`, `thelper`, `forbidigo` with the
+    Boundaries patterns (`fmt.Print*`,
     `os.Stdout`, `os.Stderr`, `log.`, `text/template`, `exec.Command(`
     and `"sh", "-c"` outside the packages 04 4.1 names) and revive
     `package-comments`, each linter with its fixture, and a `tidy` rule
     of `generated` (`go mod tidy` changes neither `go.mod` nor
-    `go.sum`). Option B, weighed at that sitting: A plus `noctx`,
-    `contextcheck`, `modernize` and `gosec`, whose G204 flags every
+    `go.sum`). Option B, not taken: A plus `noctx`, `contextcheck`,
+    `modernize` and `gosec`, whose G204 flags every
     `exec.Command` with variable arguments in `tools/ci` (restructuring
     frozen code).
 17. **The id-less error chain.** Decided on 2026-10-12: the `internal`

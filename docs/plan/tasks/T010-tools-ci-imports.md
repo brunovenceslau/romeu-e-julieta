@@ -30,7 +30,8 @@ registries through `internal/cmd/<binary>/all` only.
   REQ-0039 (01 1.1), REQ-0114 (02 2.1), REQ-0482 (05 5.2), REQ-0483 (05
   5.2), REQ-0508 (05 5.2), REQ-0839 (10 10.2), REQ-0959 (10 10.6),
   REQ-0968 (10 10.7), REQ-0969 (10 10.7), REQ-0970 (10 10.7), REQ-0971
-  (10 10.7), REQ-0972 (10 10.7), REQ-1233 (10 10.7).
+  (10 10.7), REQ-0972 (10 10.7), REQ-1233 (10 10.7), REQ-1247 (10
+  10.7), REQ-1248 (10 10.7).
 - Operator: no.
 - Acceptance:
   - The check enforces the table of 10 10.7 over the packages that

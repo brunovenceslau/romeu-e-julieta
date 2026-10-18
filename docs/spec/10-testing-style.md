@@ -1278,25 +1278,30 @@ deferred function, which is why the cleanup stands between the two).
 | `REQ-1233` `mise`, `hooks`, `layout`, `agent/*`, `memstore/write` | `cmd/julieta` only | `sbxdrv` |
 | `REQ-0969` `gitsafe`, `spec`, `canon`, `catalog`, `oci`, `manifest`, `memstore`, `handoff`, `salvage`, `shquote`, `termsafe`, `cli`, `procgroup` | both | `sbxdrv`, `layout` |
 | `REQ-1247` `cli/clidoc` (ADR 0015) | `tools/ci` only | `sbxdrv`, `layout` |
+| `REQ-1248` `cli/testsupport` | test packages only | `sbxdrv`, `layout` |
 
 `REQ-0970` Names are packages under `internal/`; a command package under
 `internal/cmd/romeu/` or `internal/cmd/julieta/` follows the row of its
 binary. `REQ-0972` A package under `internal/` that no row names fails
 `tools/ci imports`, so a new package is placed in a row before it
 builds. The second column says which binary may link a package, so a
-package of the last row imports none of the second: romeu links it.
-That is why the writer of the memory store is a package of its own, and
-why `salvage` takes the agent profile as an argument (08 8.5). `oci` is
-shared because `julieta pin` resolves and checks digests with the
-same guarded client (I28).
+package of the row both binaries link (REQ-0969) imports none of the
+row julieta links (REQ-1233): romeu links it. That is why the writer
+of the memory store is a package of its own, and why `salvage` takes
+the agent profile as an argument (08 8.5). `oci` is shared because
+`julieta pin` resolves and checks digests with the same guarded client
+(I28). `cli/testsupport` holds the helpers of the tests of `cli` and of
+the commands, so only a test file imports it and no binary links it.
 
 `REQ-0971` `tools/**` and the test packages under `e2e/**` may import
 `internal/procgroup` directly and any other package under `internal/`
 through `internal/cmd/<binary>/all`, the one package per binary that
 links every command in (one blank-import file per command, 02 2.1);
 `tools/ci` also imports `internal/cli/clidoc` directly, which no binary
-links. The rows govern the two binaries, and a subpackage follows its
-own row, never its parent's.
+links, and `tools/new` imports `internal/cli` directly, for the command
+list and the error table its `command` and `error` kinds read. The
+rows govern the two binaries, and a subpackage follows its own row,
+never its parent's.
 
 ## 10.8 Definition of done for implementing agents
 

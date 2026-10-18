@@ -8,11 +8,8 @@ day run follows the decision note "the-day-run-of-2026-10-18".
 
 ## Next steps
 
-1. T132.
-2. The decisions pull request: REQ-0971 option (a), the lint set of
-   T139, the answers of T125.
-3. T010, T125, T139, T123, T012.
-4. The four items of the decision note (the globs of `checks`, the
+1. T010, T125, T139, T123, T012.
+2. The four items of the decision note (the globs of `checks`, the
    cobra completion fix, I29, `golang.org/x/text`), then the tasks
    T125 unblocks.
 
