@@ -2,20 +2,15 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-18. Done records are merged up to 32. ADR 0015
-is accepted, the generated check lives in `tools/ci/internal/drift`, and
-each generator lives with its data (Done record 32). T008's first
-implementation (#109) is held for its rework on cobra.
+Checkpoint of 2026-10-18. Done records are merged up to 32. T008 on
+cobra is in review: #128 (ADR 0015 minimum versions), #129 (re-plan),
+#109 (T008) and the record PR on top (Done record 33).
 
 ## Next steps
 
-1. Rework T008 on cobra in #109 (retarget it to main). The error table,
-   the union test, Report and `--json`, the `errors.md` generator and
-   RequireID carry over; the dispatcher, help and registry become
-   cobra; the generators register through `tools/ci/generator_cli.go`
-   (`check.RegisterGenerator`). A new record PR goes on top.
-2. Then T009 and T025. T132 and T123 each need a plan fix first
-   (pending note "t132-and-t123-owns-and-the-build-constraint-gap").
+1. After the T008 stack merges: T009 and T025. T132 and T123 each need
+   a plan fix first (pending note
+   "t132-and-t123-owns-and-the-build-constraint-gap").
 
 ## Open for the operator
 
@@ -30,11 +25,13 @@ One block, a recommendation each.
 3. The T140 tests and the checks surface
    ("the-t140-tests-and-the-checks-surface"). Recommended: add both
    globs to `checks`, in a pull request of its own.
+4. cobra's output outside the CLI writer in completion
+   ("cobra-writes-outside-the-cli-writer-in-completion"). Recommended:
+   fix the stderr path in `Main` and unset `BASH_COMP_DEBUG_FILE`.
 
 ## In flight
 
-- The stack of generators with their data and drift (Done record 32).
-- #109, held.
+- The T008 stack: #128, #129, #109 and its record PR.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
