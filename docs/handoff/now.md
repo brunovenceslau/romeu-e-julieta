@@ -2,14 +2,16 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-18. Done records are merged up to 32. T008 on
-cobra is in review: #128 (ADR 0015 minimum versions), #129 (re-plan),
-#109 (T008) and the record PR on top (Done record 33).
+Checkpoint of 2026-10-18. Done records are merged up to 33. ADR 0016
+(the generated header) is in review: #132 (the record and the spec),
+#133 (re-plan), #134 (the code) and the record PR on top (Done record
+34).
 
 ## Next steps
 
-1. After the T008 stack merges: T009 and T025. T132 and T123 each need
-   a plan fix first (pending note
+1. The next tasks of the plan, in order, stacked on the ADR 0016 stack
+   (decision note "the-overnight-run-of-2026-10-18"). T132 and T123
+   each need a plan fix first (pending note
    "t132-and-t123-owns-and-the-build-constraint-gap").
 
 ## Open for the operator
@@ -31,7 +33,7 @@ One block, a recommendation each.
 
 ## In flight
 
-- The T008 stack: #128, #129, #109 and its record PR.
+- The ADR 0016 stack: #132, #133, #134 and its record PR.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.

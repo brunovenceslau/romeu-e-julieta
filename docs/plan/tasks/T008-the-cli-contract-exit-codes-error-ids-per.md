@@ -3,7 +3,7 @@ id: T008
 title: "The CLI contract: exit codes, error ids per package and registration by file"
 milestone: M1
 module: cli
-fate: kept
+fate: merged
 owns:
   - internal/cli/command*.go
   - internal/cli/env*.go
@@ -32,9 +32,14 @@ ask_first:
   - checks
   - dependencies
 sitting: none
+merged: 2026-10-18
+pr: 109
 ---
 
 # T008 - The CLI contract: exit codes, error ids per package and registration by file
+
+Merged on 2026-10-18 in pull request #109. The text below is the one
+written at the re-plan.
 
 Earlier title: The CLI contract: the error table, exit codes and the
 dispatcher.
