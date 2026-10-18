@@ -5,13 +5,13 @@ milestone: M1
 module: docs
 fate: new
 owns:
-  - docs/adr/0015-*.md
   - docs/adr/0016-*.md
   - docs/adr/0017-*.md
   - docs/adr/0018-*.md
   - docs/adr/0019-*.md
   - docs/adr/0020-*.md
   - docs/adr/0021-*.md
+  - docs/adr/0022-*.md
 needs: []
 after: []
 ask_first:
@@ -23,7 +23,7 @@ sitting: none
 
 Goal: One record per row of the product-decision table of 12 12.5 (a
 secondary repo cloned by julieta; the two gates; v3 kits only; herdr as
-the one renderer; memory as plain per-repo files; stdlib `flag`;
+the one renderer; memory as plain per-repo files;
 GPL-3.0-only with CC0-1.0 for `examples/` and `schemas/`) and one per
 decision of round 8 that ADR 0009 does not hold, each numbered by
 `tools/new adr`. The `owns` globs are provisional: the writer replaces
@@ -31,6 +31,12 @@ them by the numbers `tools/new adr` gives, in order, and the collision
 rule of 12 12.3 covers a number taken twice, so this task waits for no
 M0 task. A record is a review order: T035, T040 and T077 come `after`
 this task, and no task `needs` it.
+
+Re-plan (2026-10-17): the row "stdlib `flag`, no CLI framework" left
+the table of 12 12.5 for ADR 0015, which replaces that decision with
+cobra, and took the number 0015; the six records of this task take the
+numbers `tools/new adr` gives from 0016, under the collision rule of 12
+12.3.
 
 Re-plan (2026-10-12, stage B): New. 12 12.5 asks that a decision the
 specification cites as authority has its record in or before the first

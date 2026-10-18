@@ -32,6 +32,13 @@ Goal: `cmd/romeu` and `cmd/julieta` print their version; the cross-build
 check as a `tools/ci` package; the `command` and `error` kinds of
 `tools/new`.
 
+Re-plan (2026-10-17): Changed by ADR 0015. `cli.Main` runs a cobra
+tree, so `main.go` calls `cli.Main(ctx, os.Args[1:], env)` under
+`procgroup.Main`, and the `command` kind of `tools/new` writes a
+definition that returns a `*cobra.Command`. The generator of the
+per-command reference pages is T008's; the `version` pages appear here
+because this task registers the first command.
+
 Re-plan (2026-10-12): Kept. `version --json` reports the fields of 04
 4.1 and whether its directory is writable; julieta builds for linux
 amd64 and arm64 in CI. `cmd/<binary>/main.go` holds no command list:
@@ -67,11 +74,13 @@ failure are T013's.
   - `romeu version` and `julieta version` sent SIGINT exit 130.
   - The cross-build step builds `romeu` for darwin amd64 and arm64 and
     `julieta` for linux amd64 and arm64.
-  - `go run ./tools/new command` writes a stub, its help test and its
-    definition with the side-effect fields to fill, plus its import
-    file; `go run ./tools/new error <package> <slug>` writes the next
+  - `go run ./tools/new command <binary> <command> [<subcommand>]`
+    writes a stub, its help test and its definition with the
+    side-effect fields to fill and a function that returns its
+    `*cobra.Command` with `RunE` (ADR 0015), plus its import file; `go run ./tools/new error <package> <slug>` writes the next
     number into the package's `errors.go` (the `error` kind, 12 12.3);
-    `docs/reference/` gains one generated page per command (12 12.3). A
+    `docs/reference/romeu/version.md` and
+    `docs/reference/julieta/version.md` are generated (12 12.3). A
     duplicate kind name of `tools/new` panics at `init`, and a test
     asserts the kinds' order and names.
 - Verify: `go run ./tools/ci all` on the runners of `ci.yml`, and of
