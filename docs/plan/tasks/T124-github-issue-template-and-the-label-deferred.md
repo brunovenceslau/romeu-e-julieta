@@ -6,9 +6,11 @@ module: docs
 fate: new
 owns:
   - .github/ISSUE_TEMPLATE/**
+  - tools/ci/issueforms_test.go
 needs: []
 after: []
-ask_first: []
+ask_first:
+  - checks
 sitting: none
 ---
 
@@ -18,6 +20,11 @@ Goal: The two issue forms of 12 12.7 (a bug, a catalog gap) and the
 label `deferred` the index's Deferred decisions use to report an event
 no check detects; M1, since events can fire from M0 on. The path is on
 no surface of `.github/ask-first.yaml`.
+
+Re-plan (2026-10-18): Changed. `owns` adds `tools/ci/issueforms_test.go`,
+the fixture test its Verify line runs (`go test ./tools/ci/... -run
+'^TestIssueForms'`), which lives in a package of `tools/ci` and so on the
+`checks` surface, now in `ask_first`.
 
 Re-plan (2026-10-12, stage B): New. The forms had no task file before
 this pass.
