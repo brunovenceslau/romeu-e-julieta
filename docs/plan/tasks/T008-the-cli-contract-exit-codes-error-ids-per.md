@@ -16,9 +16,11 @@ owns:
   - internal/cmd/romeu/all/doc.go
   - internal/cmd/julieta/all/doc.go
   - internal/cli/generate*.go
-  - internal/cli/*_gen.go
+  - internal/cli/completion*.go
   - internal/cli/clidoc/**
-  - tools/ci/generator_cli.go
+  - tools/ci/generator_cli*.go
+  - tools/ci/internal/drift/registry_test.go
+  - tools/ci/internal/drift/generate_test.go
   - .gitattributes
   - go.mod
   - go.sum
@@ -44,6 +46,17 @@ the files of `internal/cli` by name, since `internal/cli/writer.go` is
 T007's and `internal/cli/errorids_exempt.yaml` is T073's; a file of the
 package this list does not foresee is added to it in this task's pull
 request.
+
+Re-plan (2026-10-18): Changed. `internal/cli/exitcodes_gen.go` is a
+generated output of rule 1 of `docs/plan.md`, owned by no task like the
+pages it is generated with, so `owns` drops `internal/cli/*_gen.go` and
+names `internal/cli/completion*.go`, the files of the `completion`
+command, and `tools/ci/generator_cli*.go`, so it takes in the test of
+the import boundary, which runs `go list` for each target, since a test
+under `internal/` imports no `os/exec`. The tests of the generated check
+that read this repository register its generators in a registry of
+their own, so the two files that hold them take in the generators of
+the command line.
 
 Re-plan (2026-10-17): Changed, by
 [ADR 0015, adopt spf13/cobra for the command line of romeu and julieta](../../adr/0015-adopt-spf13-cobra-for-the-command-line-of-romeu-and-julieta.md).
