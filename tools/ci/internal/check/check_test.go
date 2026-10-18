@@ -5,6 +5,7 @@ package check
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,6 +65,31 @@ func TestRegistryRefusesADuplicate(t *testing.T) {
 			r.Add(Check{Name: "hygiene", Commands: []Command{cmd}})
 			assert.Panics(t, func() { tt.add(&r) })
 			assert.Equal(t, []string{"hygiene", "vet"}, names(r.Checks()), "the registry is unchanged")
+		})
+	}
+}
+
+// TestRegistryGenerators checks that the registry returns its
+// generators in the order they were added, and that a generator with no
+// name, no outputs or a name registered already panics.
+func TestRegistryGenerators(t *testing.T) {
+	none := func(*os.Root) ([]Output, error) { return nil, nil }
+	var r Registry
+	r.AddGenerator(Generator{Name: "codeowners", Outputs: none})
+	r.AddGenerator(Generator{Name: "adr index", Outputs: none})
+	var got []string
+	for _, g := range r.Generators() {
+		got = append(got, g.Name)
+	}
+	assert.Equal(t, []string{"codeowners", "adr index"}, got)
+	for name, g := range map[string]Generator{
+		"a name twice": {Name: "codeowners", Outputs: none},
+		"no name":      {Outputs: none},
+		"no outputs":   {Name: "new"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Panics(t, func() { r.AddGenerator(g) })
+			assert.Len(t, r.Generators(), 2, "the registry is unchanged")
 		})
 	}
 }

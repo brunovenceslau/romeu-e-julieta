@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package generated
+package drift
 
 import (
 	"context"
@@ -23,12 +23,10 @@ import (
 const adrIndexName = "README.md"
 
 // Generate is the "generate" subcommand, which "go generate ./..."
-// runs through the directive above. It writes the consumers of the
-// tables of 12 12.3 that exist today: .github/CODEOWNERS, from
-// .github/ask-first.yaml (the mutate trigger, its other consumer, lands
-// with mutate), the index of the decision records and the page of the
-// checks. It says which files it wrote, and none when the
-// tree was current. It reads and writes through the root of the
+// runs through the directive above. It writes what every registered
+// generator returns (check.Generators), the consumers of the tables of
+// 12 12.3. It says which files it wrote, and none when the tree was
+// current. It reads and writes through the root of the
 // repository, so a symbolic link cannot send it outside.
 func Generate(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if len(args) != 0 {
@@ -67,16 +65,13 @@ type output struct {
 }
 
 // generateOutputs returns every file generate writes: the outputs of
-// each check of the registry, in its order (check.Check.Outputs). It
-// writes nothing; "generated" calls it too, to learn which files must be
-// tracked and with what bytes.
+// each generator of the registry, in the order they were registered
+// (check.Generators). It writes nothing; "generated" calls it too, to
+// learn which files must be tracked and with what bytes.
 func generateOutputs(root *os.Root) ([]output, error) {
 	var outs []output
-	for _, c := range check.Registered() {
-		if c.Outputs == nil {
-			continue
-		}
-		got, err := c.Outputs(root)
+	for _, g := range check.Generators() {
+		got, err := g.Outputs(root)
 		if err != nil {
 			return nil, err
 		}
@@ -87,23 +82,15 @@ func generateOutputs(root *os.Root) ([]output, error) {
 	return outs, nil
 }
 
-// Outputs returns the files the generated check registers as its
-// outputs: those of its sources below root (sources), then the
+// The generators this package holds until each moves next to its data:
+// .github/CODEOWNERS, the one consumer of .github/ask-first.yaml
+// (Codeowners), the index of the decision records (ADRIndex), and the
 // inventory of the checks of the registry, docs/reference/checks.md
-// (ChecksPage).
-func Outputs(root *os.Root) ([]check.Output, error) {
-	outs, err := sources(root)
-	if err != nil {
-		return nil, err
-	}
-	return append(outs, check.Output{Path: ChecksPath, Content: ChecksPage(check.Registered())}), nil
-}
+// (ChecksPageOutput). tools/ci/generator_<name>.go registers each.
 
-// sources reads the sources of the generated check below root and
-// returns the files that follow from them: .github/CODEOWNERS, the one
-// consumer of .github/ask-first.yaml, and the index of the decision
-// records.
-func sources(root *os.Root) ([]check.Output, error) {
+// Codeowners reads .github/ask-first.yaml below root and returns
+// .github/CODEOWNERS.
+func Codeowners(root *os.Root) ([]check.Output, error) {
 	src, err := root.ReadFile(askfirst.Path)
 	if err != nil {
 		return nil, err
@@ -112,14 +99,22 @@ func sources(root *os.Root) ([]check.Output, error) {
 	if err != nil {
 		return nil, err
 	}
+	return []check.Output{{Path: askfirst.CodeownersPath, Content: list.Codeowners()}}, nil
+}
+
+// ADRIndex returns the index of the decision records (readADRIndex).
+func ADRIndex(root *os.Root) ([]check.Output, error) {
 	index, indexPath, err := readADRIndex(root)
 	if err != nil {
 		return nil, err
 	}
-	return []check.Output{
-		{Path: askfirst.CodeownersPath, Content: list.Codeowners()},
-		{Path: indexPath, Content: index},
-	}, nil
+	return []check.Output{{Path: indexPath, Content: index}}, nil
+}
+
+// ChecksPageOutput returns docs/reference/checks.md, the inventory of
+// the checks of the registry (ChecksPage).
+func ChecksPageOutput(*os.Root) ([]check.Output, error) {
+	return []check.Output{{Path: ChecksPath, Content: ChecksPage(check.Registered())}}, nil
 }
 
 // readADRIndex renders the index of the records in the directory that

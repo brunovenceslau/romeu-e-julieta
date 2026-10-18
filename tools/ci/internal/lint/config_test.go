@@ -28,7 +28,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/generated"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/drift"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 )
 
@@ -558,7 +558,7 @@ func TestOnlyAllowedDirectives(t *testing.T) {
 	require.NotEmpty(t, files, "the Go files of the repository")
 	for _, f := range files {
 		allowed := allowedDirectives
-		if f == generated.Site {
+		if f == drift.Site {
 			allowed = append(slices.Clone(allowed), "go:generate")
 		}
 		bad, err := disallowed(filepath.Join(root, f), allowed)
@@ -566,16 +566,16 @@ func TestOnlyAllowedDirectives(t *testing.T) {
 		assert.Empty(t, bad, "%s holds what makes the linters skip a finding", f)
 	}
 	// The raw lines that go generate runs: exactly one in the repository,
-	// at its site (directives.go of the generated package). The comments are read above for the
+	// at its site (directives.go of the drift package). The comments are read above for the
 	// other directives and here for the lenient forms of this one.
-	problems, err := generated.CheckDirectives(root)
+	problems, err := drift.CheckDirectives(root)
 	require.NoError(t, err)
 	assert.Empty(t, problems, "the go:generate lines of the repository")
-	src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(generated.Site)))
+	src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(drift.Site)))
 	require.NoError(t, err)
 	found, err := directives(src)
 	require.NoError(t, err)
-	assert.Equal(t, 1, countEntries(found, "go:generate"), "%s", generated.Site)
+	assert.Equal(t, 1, countEntries(found, "go:generate"), "%s", drift.Site)
 }
 
 // countEntries returns how many entries of found are exactly name.

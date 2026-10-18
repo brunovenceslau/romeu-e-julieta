@@ -3,7 +3,7 @@
 
 //go:build unix
 
-package generated
+package drift
 
 import (
 	"bytes"
@@ -637,13 +637,15 @@ func TestGeneratedOutputsAreNotConverted(t *testing.T) {
 	r, err := os.OpenRoot(root)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = r.Close() })
-	// The files the generated check of tools/ci registers (Outputs); the
-	// registry of this test holds a fixture of that check.
-	registered, err := Outputs(r)
-	require.NoError(t, err)
+	// The files the generators of this package write, the inventory of
+	// the checks among them.
 	var outs []output
-	for _, o := range registered {
-		outs = append(outs, output{o.Path, o.Content})
+	for _, gen := range []func(*os.Root) ([]check.Output, error){Codeowners, ADRIndex, ChecksPageOutput} {
+		got, err := gen(r)
+		require.NoError(t, err)
+		for _, o := range got {
+			outs = append(outs, output{o.Path, o.Content})
+		}
 	}
 	findings, err := attributeProblems(t.Context(), git.Repo{Dir: root}, outs)
 	require.NoError(t, err)

@@ -5,7 +5,7 @@ package main
 
 import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/generated"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/drift"
 )
 
 func init() {
@@ -18,12 +18,11 @@ func init() {
 		Fast:    true,
 		All:     true,
 		Order:   30,
-		Package: "tools/ci/internal/generated",
+		Package: "tools/ci/internal/drift",
 		Commands: []check.Command{
-			{Name: "generated", Usage: []string{"generated"}, Run: generated.Run},
-			{Name: "generate", Usage: []string{"generate"}, Run: generated.Generate},
+			{Name: "generated", Usage: []string{"generated"}, Run: drift.Run},
+			{Name: "generate", Usage: []string{"generate"}, Run: drift.Generate},
 		},
-		Steps:   generated.Steps,
-		Outputs: generated.Outputs,
+		Steps: drift.Steps,
 	})
 }

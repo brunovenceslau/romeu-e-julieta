@@ -1,14 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Package generated is the generated check of 10 10.2: "go generate
-// ./..." changes no generated file of 12 12.3, and each file generate
-// writes is tracked as a regular file with the bytes generate gives. It
-// is the generated subcommand and the generate subcommand, which writes
-// the consumers of the tables of 12 12.3 that exist today: those of
-// .github/ask-first.yaml (package askfirst) and the index of the
-// decision records.
-package generated
+// Package drift is the generated check of 10 10.2: "go generate ./..."
+// changes no generated file of 12 12.3, and each file generate writes
+// is tracked as a regular file with the bytes generate gives. It is the
+// generated subcommand and the generate subcommand, which writes what
+// every registered generator returns (check.Generators).
+package drift
 
 import (
 	"bytes"

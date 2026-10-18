@@ -99,7 +99,7 @@
 /tools/ci/internal/setup/** @brunovenceslau
 /tools/ci/internal/hygiene/** @brunovenceslau
 /tools/ci/internal/pushedrange/** @brunovenceslau
-/tools/ci/internal/generated/** @brunovenceslau
+/tools/ci/internal/drift/** @brunovenceslau
 /tools/ci/internal/workflows/** @brunovenceslau
 /tools/ci/internal/plan/** @brunovenceslau
 /tools/ci/internal/askfirst/** @brunovenceslau
