@@ -1,11 +1,5 @@
-# T132 and T123 owns, and the build-constraint gap
+# T123 owns, and the build-constraint gap
 
-- T132 (step durations and the fast budget): `owns` names
-  `tools/ci/internal/run/progress*.go`, but no `run` package exists
-  since T105's split; the verdict lines are printed by the check
-  package (`check.NewPrinter`). Its change of the verdict line, `ok
-  <name> (<d>)`, reaches the asserts of four test files under tools/ci
-  that other tasks own. A plan fix gives T132 its real files first.
 - T123 (the records of the product decisions): its acceptance takes
   each row out of the table of 12 12.5 and edits the task files of
   T035, T040 and T077, but `owns` names only `docs/adr/0015-*.md` to
