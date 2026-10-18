@@ -22,7 +22,11 @@ import (
 // argument count a command refuses) and is the error usage (RJ-349),
 // whose hint names the help of the command that refused it. The binary's
 // main runs it under procgroup.Main, which gives ctx and maps a signal to
-// 130 or 143.
+// 130 or 143. An error that is the cancellation of ctx is printed by
+// no one here: procgroup.Main prints the one line "<binary>:
+// interrupted" (04 4.1, Signals), so Main returns 1 for it, the status
+// of a failed operation, which the signal then overrides. An error that
+// carries a row of the table besides the cancellation is still printed.
 func Main(ctx context.Context, args []string, env *Env) int {
 	env.JSON = false
 	root := Tree(env)
@@ -36,6 +40,9 @@ func Main(ctx context.Context, args []string, env *Env) int {
 	// A nil slice would make cobra read os.Args.
 	root.SetArgs(append([]string{}, args...))
 	cmd, err := root.ExecuteContextC(ctx)
+	if err != nil && ctx.Err() != nil && errors.Is(err, ctx.Err()) && Of(err).ID == Internal.ID {
+		return 1
+	}
 	if err != nil {
 		if _, ok := errors.AsType[*Error](err); !ok {
 			err = usageError(cmd, err.Error())

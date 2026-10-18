@@ -30,6 +30,7 @@ julieta <command> [flags]
 ### SEE ALSO
 
 * [julieta completion](julieta/completion.md) - print the shell completion script
+* [julieta version](julieta/version.md) - print the version of julieta
 
 ### Exit codes
 

@@ -4,8 +4,10 @@
 // Command new scaffolds a file of this repository with the next free
 // id, so nobody types a number, a date or a filename (12 12.3).
 //
-//	go run ./tools/new adr <title>    write the next decision record
-//	go run ./tools/new task <title>   write the next task file of the plan
+//	go run ./tools/new adr <title>                                write the next decision record
+//	go run ./tools/new command <binary> <command> [<subcommand>]  write the scaffold of a command
+//	go run ./tools/new error <package> <slug>                     declare the next error id
+//	go run ./tools/new task <title>                               write the next task file of the plan
 //
 // Each kind registers itself from its own file, <kind>.go (rule 4 of
 // docs/plan.md), so a kind adds a file and edits none; the other kinds

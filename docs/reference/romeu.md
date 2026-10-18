@@ -30,6 +30,7 @@ romeu <command> [flags]
 ### SEE ALSO
 
 * [romeu completion](romeu/completion.md) - print the shell completion script
+* [romeu version](romeu/version.md) - print the version of romeu
 
 ### Exit codes
 
