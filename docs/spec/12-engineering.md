@@ -65,7 +65,9 @@ binaries), and, in `internal/cli/clidoc` only, which no binary
 imports, `github.com/spf13/cobra/doc` with
 `github.com/cpuguy83/go-md2man/v2` and
 `github.com/russross/blackfriday/v2` (the reference pages of the
-commands).
+commands), and, in `tools/kitpin` only, `golang.org/x/crypto` (its
+`blake2b` package: mise signs its checksum file in the prehashed
+minisign mode, which hashes the file with BLAKE2b-512, Q31).
 
 `REQ-1050` The command line of both binaries is cobra
 ([ADR 0015, adopt spf13/cobra for the command line of romeu and julieta](../adr/0015-adopt-spf13-cobra-for-the-command-line-of-romeu-and-julieta.md)),
