@@ -15,6 +15,13 @@ owns:
   - tools/ci/check_crossbuild.go
   - tools/new/command*.go
   - tools/new/error*.go
+  - internal/cli/main.go
+  - internal/cli/main_test.go
+  - tools/ci/checks_test.go
+  - tools/ci/all_test.go
+  - .gitattributes
+  - tools/new/kind_test.go
+  - tools/new/main.go
 needs:
   - T008
   - T105
@@ -31,6 +38,18 @@ sitting: none
 Goal: `cmd/romeu` and `cmd/julieta` print their version; the cross-build
 check as a `tools/ci` package; the `command` and `error` kinds of
 `tools/new`.
+
+Re-plan (2026-10-18): Changed. T009 also owns `internal/cli/main.go`
+and its test: `cli.Main` reports nothing for an error that is the
+cancellation of the command's context, so a command ended by SIGINT or
+SIGTERM prints the one line "<binary>: interrupted" of `procgroup.Main`
+and exits 130 or 143, rather than the error `internal` (`RJ-348`) first
+(04 4.1, Signals). It also owns the files that pin or list what
+T009 adds: `tools/ci/checks_test.go` and `tools/ci/all_test.go` (the
+registered checks and the steps of `all`, which gain the cross-build
+check), `.gitattributes` (the two `version` pages, each with `-text`),
+and `tools/new/kind_test.go` and `tools/new/main.go` (the kinds of
+`tools/new`, which gain `command` and `error`).
 
 Re-plan (2026-10-17): Changed by ADR 0015. `cli.Main` runs a cobra
 tree, so `main.go` calls `cli.Main(ctx, os.Args[1:], env)` under
