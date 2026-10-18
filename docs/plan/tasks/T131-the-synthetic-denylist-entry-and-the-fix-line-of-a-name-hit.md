@@ -3,7 +3,7 @@ id: T131
 title: "The synthetic denylist entry and the fix line of a name hit"
 milestone: M1
 module: ci-release
-fate: new
+fate: merged
 owns:
   - tools/ci/denylist.yaml
   - tools/ci/internal/hygiene/testdata/**
@@ -19,9 +19,14 @@ ask_first:
   - checks
   - approvals
 sitting: none
+merged: 2026-10-18
+pr: 146
 ---
 
 # T131 - The synthetic denylist entry and the fix line of a name hit
+
+Merged on 2026-10-18 in pull request #146. The text below is the one
+written at the re-plan.
 
 Goal: One entry of the real denylist written by `go run ./tools/ci
 hygiene add` for a made-up name whose plaintext is committed under the

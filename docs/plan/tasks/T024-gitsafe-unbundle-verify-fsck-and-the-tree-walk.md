@@ -3,7 +3,7 @@ id: T024
 title: "`gitsafe`: unbundle, verify, fsck and the tree walk"
 milestone: M3
 module: gitsafe
-fate: kept
+fate: merged
 owns:
   - internal/gitsafe/unbundle*.go
   - internal/gitsafe/verify*.go
@@ -15,9 +15,14 @@ after: []
 ask_first:
   - gitsafe
 sitting: none
+merged: 2026-10-18
+pr: 139
 ---
 
 # T024 - `gitsafe`: unbundle, verify, fsck and the tree walk
+
+Merged on 2026-10-18 in pull request #139. The text below is the one
+written at the re-plan.
 
 Earlier title: `gitsafe`: bundles, fsck and the tree walk.
 

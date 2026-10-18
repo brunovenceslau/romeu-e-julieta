@@ -3,7 +3,7 @@ id: T025
 title: "`signing`"
 milestone: M2
 module: signing
-fate: kept
+fate: merged
 owns:
   - internal/signing/**
 needs:
@@ -12,9 +12,14 @@ after: []
 ask_first:
   - signing
 sitting: none
+merged: 2026-10-18
+pr: 140
 ---
 
 # T025 - `signing`
+
+Merged on 2026-10-18 in pull request #140. The text below is the one
+written at the re-plan.
 
 Goal: The ssh-agent identity listing, dark until T080.
 

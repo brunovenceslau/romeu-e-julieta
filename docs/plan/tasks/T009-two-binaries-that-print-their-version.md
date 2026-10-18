@@ -3,7 +3,7 @@ id: T009
 title: "Two binaries that print their version"
 milestone: M1
 module: julieta-core
-fate: kept
+fate: merged
 owns:
   - cmd/romeu/main*.go
   - cmd/julieta/main*.go
@@ -31,9 +31,14 @@ after: []
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-18
+pr: 138
 ---
 
 # T009 - Two binaries that print their version
+
+Merged on 2026-10-18 in pull request #138. The text below is the one
+written at the re-plan.
 
 Goal: `cmd/romeu` and `cmd/julieta` print their version; the cross-build
 check as a `tools/ci` package; the `command` and `error` kinds of

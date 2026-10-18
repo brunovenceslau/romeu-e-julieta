@@ -3,7 +3,7 @@ id: T128
 title: "The never-tracked list in `tools/ci/denylist.yaml`"
 milestone: M1
 module: ci-release
-fate: new
+fate: merged
 owns:
   - tools/ci/denylist.yaml
   - tools/ci/internal/hygiene/nevertracked*.go
@@ -21,9 +21,14 @@ ask_first:
   - checks
   - approvals
 sitting: none
+merged: 2026-10-18
+pr: 144
 ---
 
 # T128 - The never-tracked list in `tools/ci/denylist.yaml`
+
+Merged on 2026-10-18 in pull request #144. The text below is the one
+written at the re-plan.
 
 Goal: The never-tracked file names read from `tools/ci/denylist.yaml`
 instead of the Go constant (`prologueName`, `tools/ci/hygiene.go` on

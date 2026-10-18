@@ -3,7 +3,7 @@ id: T124
 title: "`.github/ISSUE_TEMPLATE/` and the label `deferred`"
 milestone: M1
 module: docs
-fate: new
+fate: merged
 owns:
   - .github/ISSUE_TEMPLATE/**
   - tools/ci/issueforms_test.go
@@ -12,9 +12,14 @@ after: []
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-18
+pr: 142
 ---
 
 # T124 - `.github/ISSUE_TEMPLATE/` and the label `deferred`
+
+Merged on 2026-10-18 in pull request #142. The text below is the one
+written at the re-plan.
 
 Goal: The two issue forms of 12 12.7 (a bug, a catalog gap) and the
 label `deferred` the index's Deferred decisions use to report an event
