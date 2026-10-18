@@ -12,6 +12,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // The modes a materialized tree may hold (I27): a regular file, an
@@ -50,17 +52,17 @@ type TreeEntry struct {
 // I27 in Go, without relying on fsck (05 5.1, REQ-0465): only the modes
 // 100644, 100755 and 040000; no name ".", ".." or ".git", whatever its
 // case and with any character HFS+ ignores, such as U+200C, taken out;
-// and no two paths that are one under case-insensitive comparison. It
+// and no two paths that are one under case-insensitive comparison, or
+// under Unicode normalization (NFC and NFD), which APFS also treats as
+// one, the comparison being the one of foldName. It
 // also refuses a name that holds a control character, a character that
 // does not show or one that turns the direction of text, which no kit
 // needs and a listing could be spoofed with. It returns the files in the
 // order git lists them, or ErrRefused, wrapped with the first rule the
 // tree breaks; a git that fails, as ls-tree does on an empty name,
-// gives its own error. Two names that are one only under Unicode
-// normalization (NFC and NFD), which APFS also treats as one, are not
-// caught here: that needs golang.org/x/text, which the dependency list
-// of 12 12.1 (REQ-1049) does not hold. Neither are the NTFS names fsck
-// refuses (".git.", "git~1"), which are plain names on both hosts. commit is a full object id.
+// gives its own error. The NTFS names fsck refuses (".git.", "git~1")
+// are not caught here: they are plain names on both hosts. commit is a
+// full object id.
 //
 //romeu:invariant I27 guard
 func (r *Runner) WalkTree(ctx context.Context, dir, commit string) ([]TreeEntry, error) {
@@ -151,16 +153,17 @@ func (w *treeWalker) entry(line string) error {
 	default:
 		return fmt.Errorf("%w: %q has the mode %s %s", ErrRefused, path, mode, kind)
 	}
-	if err := checkTreePath(path); err != nil {
+	folded, err := checkTreePath(path)
+	if err != nil {
 		return err
 	}
 	w.bytes += len(path)
 	if w.bytes > maxTreeBytes {
 		return fmt.Errorf("%w: the paths of the tree hold more than %d bytes", ErrRefused, maxTreeBytes)
 	}
-	key := foldPath(path)
+	key := folded
 	if other, dup := w.seen[key]; dup {
-		return fmt.Errorf("%w: %q and %q are one path under case-insensitive comparison", ErrRefused, other, path)
+		return fmt.Errorf("%w: %q and %q are one path under case-insensitive comparison or Unicode normalization", ErrRefused, other, path)
 	}
 	w.seen[key] = path
 	if kind == "blob" {
@@ -171,30 +174,37 @@ func (w *treeWalker) entry(line string) error {
 
 // checkTreePath refuses a path that is too long, is not UTF-8, or holds
 // an empty name or a name that is ".", ".." or ".git" once folded
-// (foldName).
-func checkTreePath(path string) error {
+// (foldName). It returns the path with each name folded, the key the
+// collision map holds.
+func checkTreePath(path string) (string, error) {
 	if len(path) > maxTreePath {
-		return fmt.Errorf("%w: a path longer than %d bytes", ErrRefused, maxTreePath)
+		return "", fmt.Errorf("%w: a path longer than %d bytes", ErrRefused, maxTreePath)
 	}
 	if !utf8.ValidString(path) {
-		return fmt.Errorf("%w: %q is not valid UTF-8", ErrRefused, path)
+		return "", fmt.Errorf("%w: %q is not valid UTF-8", ErrRefused, path)
 	}
+	var folded strings.Builder
 	for name := range strings.SplitSeq(path, "/") {
-		switch foldName(name) {
+		f := foldName(name)
+		switch f {
 		case "":
-			return fmt.Errorf("%w: %q holds an empty name", ErrRefused, path)
+			return "", fmt.Errorf("%w: %q holds an empty name", ErrRefused, path)
 		case ".", "..", foldedDotGit:
-			return fmt.Errorf("%w: %q holds the name %q", ErrRefused, path, name)
+			return "", fmt.Errorf("%w: %q holds the name %q", ErrRefused, path, name)
 		}
 		if len(name) > maxTreeName {
-			return fmt.Errorf("%w: %q holds a name longer than %d bytes", ErrRefused, path, maxTreeName)
+			return "", fmt.Errorf("%w: %q holds a name longer than %d bytes", ErrRefused, path, maxTreeName)
 		}
 		if i := strings.IndexFunc(name, unsafeRune); i >= 0 {
 			r, _ := utf8.DecodeRuneInString(name[i:])
-			return fmt.Errorf("%w: %q holds the character %U", ErrRefused, path, r)
+			return "", fmt.Errorf("%w: %q holds the character %U", ErrRefused, path, r)
 		}
+		if folded.Len() > 0 {
+			folded.WriteByte('/')
+		}
+		folded.WriteString(f)
 	}
-	return nil
+	return folded.String(), nil
 }
 
 // unsafeRune reports whether r may not stand in a name of a tree: a
@@ -219,25 +229,59 @@ func hfsIgnorable(r rune) bool {
 
 // foldName returns name with every character HFS+ ignores taken out and
 // each letter folded to one case, so ".git", ".GIT" and ".g\u200cit"
-// all give one value.
+// all give one value, and in canonical decomposition (NFD), so a
+// precomposed and a decomposed letter give one value too. The order is
+// the one of Unicode's canonical caseless matching (the Unicode
+// Standard, section 3.13, D145): NFD(fold(NFD(x))). The first NFD puts
+// the text where folding sees base letters and marks apart; folding can
+// then produce text that is not decomposed (a letter whose fold has a
+// canonical decomposition, such as U+212A KELVIN SIGN to "k" or a
+// folded capital with an accent), so the second NFD makes the result
+// canonical. The fold is the simple one (one rune to one rune), not the
+// full one, so names equal only under full folding ("stra\u00dfe" and
+// "STRASSE") are not refused; whether APFS joins them is open (the
+// pending note on full case folding). An ASCII name takes a short path:
+// no character of it is ignorable or has a decomposition.
 func foldName(name string) string {
+	if folded, ok := foldASCII(name); ok {
+		return folded
+	}
 	var b strings.Builder
 	for _, r := range name {
 		if hfsIgnorable(r) {
 			continue
 		}
-		b.WriteRune(foldRune(r))
+		b.WriteRune(r)
 	}
-	return b.String()
+	var f strings.Builder
+	for _, r := range norm.NFD.String(b.String()) {
+		f.WriteRune(foldRune(r))
+	}
+	return norm.NFD.String(f.String())
 }
 
-// foldPath folds each name of path (foldName).
-func foldPath(path string) string {
-	names := strings.Split(path, "/")
-	for i, n := range names {
-		names[i] = foldName(n)
+// foldASCII folds a name of ASCII only, as foldName does: it returns
+// name itself when no letter changes, so the common name allocates
+// nothing. ok is false when name holds a byte above 0x7f.
+func foldASCII(name string) (folded string, ok bool) {
+	change := false
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		if c >= utf8.RuneSelf {
+			return "", false
+		}
+		if rune(c) != foldRune(rune(c)) {
+			change = true
+		}
 	}
-	return strings.Join(names, "/")
+	if !change {
+		return name, true
+	}
+	b := []byte(name)
+	for i, c := range b {
+		b[i] = byte(foldRune(rune(c)))
+	}
+	return string(b), true
 }
 
 // foldRune returns the smallest rune of the case-folding orbit of r, one
