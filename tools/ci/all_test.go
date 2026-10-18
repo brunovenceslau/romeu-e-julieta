@@ -26,6 +26,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/crossbuild"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/license"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
@@ -149,8 +150,8 @@ func TestAllUsage(t *testing.T) {
 }
 
 // TestAllSteps pins the command steps of all: the steps of fast, with
-// vulnerabilities and license before unit, since neither runs code of
-// the change, then race. Each runs in check.StepEnv; the one
+// vulnerabilities, license and the four cross builds before unit, since
+// none runs code of the change, then race. Each runs in check.StepEnv; the one
 // that reads the Go vulnerability database keeps the variables of a
 // proxy too, and the license step those of the Docker daemon, and no
 // other step keeps either.
@@ -178,11 +179,12 @@ func TestAllSteps(t *testing.T) {
 	fast := fastSteps(t.Context(), root, tools)
 	unit := len(fast) - 1
 	require.Equal(t, "unit", fast[unit].Name)
-	require.Len(t, steps, len(fast)+3)
+	require.Len(t, steps, len(fast)+7)
 	assert.Equal(t, fast[:unit], steps[:unit])
-	assert.Equal(t, fast[unit], steps[unit+2])
+	assert.Equal(t, fast[unit], steps[unit+6])
+	assert.Equal(t, crossbuild.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[unit+2:unit+6])
 
-	vulnStep, licenseStep, race := steps[unit], steps[unit+1], steps[unit+3]
+	vulnStep, licenseStep, race := steps[unit], steps[unit+1], steps[unit+7]
 	assert.Equal(t, check.Step{Name: "vulnerabilities", Argv: []string{evalOrSelf(vuln), "./..."}, Environ: check.WithProcessEnv(env, check.NetworkPassThrough)}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")
 	assert.Equal(t, 40*time.Minute, procgroup.ToolRace.Timeout())
 	assert.Less(t, procgroup.ToolRace.Timeout(), ciJobTimeout(t), "the race run ends before the job of ci.yml does")
@@ -479,7 +481,7 @@ func TestAllWiring(t *testing.T) {
 	if runtime.GOOS == "linux" {
 		want = append(want, "docker run")
 	}
-	want = append(want, "go test", "go test")
+	want = append(want, "go build", "go build", "go build", "go build", "go test", "go test")
 	assert.Equal(t, want, firstWords, "the order of the steps")
 	require.NotEmpty(t, profile, "the race step names its profile")
 	assert.Equal(t, coverFile, filepath.Base(profile))

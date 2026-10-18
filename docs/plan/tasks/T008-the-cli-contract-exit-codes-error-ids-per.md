@@ -3,7 +3,7 @@ id: T008
 title: "The CLI contract: exit codes, error ids per package and registration by file"
 milestone: M1
 module: cli
-fate: kept
+fate: merged
 owns:
   - internal/cli/command*.go
   - internal/cli/env*.go
@@ -32,9 +32,14 @@ ask_first:
   - checks
   - dependencies
 sitting: none
+merged: 2026-10-18
+pr: 109
 ---
 
 # T008 - The CLI contract: exit codes, error ids per package and registration by file
+
+Merged on 2026-10-18 in pull request #109. The text below is the one
+written at the re-plan.
 
 Earlier title: The CLI contract: the error table, exit codes and the
 dispatcher.
@@ -46,6 +51,11 @@ the files of `internal/cli` by name, since `internal/cli/writer.go` is
 T007's and `internal/cli/errorids_exempt.yaml` is T073's; a file of the
 package this list does not foresee is added to it in this task's pull
 request.
+
+Re-plan (2026-10-18, second): Changed, by
+[ADR 0016, lint generated files and give each one the full generated header](../../adr/0016-lint-generated-files-and-give-each-one-the-full-generated-header.md):
+a generated Go file carries the generated header, and the linters read
+it.
 
 Re-plan (2026-10-18): Changed. `internal/cli/exitcodes_gen.go` is a
 generated output of rule 1 of `docs/plan.md`, owned by no task like the
@@ -218,6 +228,6 @@ off every chain through it.
     `docs/reference/exit-codes.md` list 130 and 143 with the precedence
     sentence of 04 4.1 Signals. The exit-code section of `--help` is
     the Go file `internal/cli/exitcodes_gen.go`; a Go file a generator
-    writes is named `*_gen.go` and carries no generated-code header,
-    which the lint step of 10 10.2 refuses.
+    writes is named `*_gen.go` and carries the generated header of
+    REQ-1117, and the linters read it (ADR 0016).
 - Verify: `go test ./internal/cli/...`; `go run ./tools/ci generated`.

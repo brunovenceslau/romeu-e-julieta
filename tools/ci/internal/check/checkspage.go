@@ -22,7 +22,7 @@ const ChecksPath = "docs/reference/checks.md"
 func ChecksPage(checks []Check) []byte {
 	var b bytes.Buffer
 	b.WriteString("---\ntype: reference\nreader: a contributor who adds or changes a check of tools/ci, or who reads which checks a change meets\n---\n\n")
-	fmt.Fprintf(&b, "<!-- %s -->\n\n", GeneratedNotice("the registry of tools/ci, tools/ci/check_*.go"))
+	b.WriteString(HTMLComment(GeneratedHeader("tools/ci/check_*.go (the registry of tools/ci)")) + "\n")
 	b.WriteString("# Checks\n\n")
 	b.WriteString("Each check of tools/ci registers itself from one file,\n`tools/ci/check_<check>.go`, and lives in one package below\n`tools/ci/internal/`\n([12 12.2](../spec/12-engineering.md#122-development-commands-and-capability-map)).\n")
 	b.WriteString("fast and all run the checks they hold in the order below, except that\nevery check that judges the tree runs before the first one that runs\ncode of the change, and the checks of the commit judge the commit read\nbefore any step.\n")

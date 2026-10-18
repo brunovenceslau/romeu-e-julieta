@@ -70,10 +70,16 @@ func NewTree(t *testing.T) *gittest.Repo {
 	return r
 }
 
-// Denylist returns a denylist that holds the made-up names.
+// NeverTracked is the never-tracked file name of every fixture denylist,
+// the one tools/ci/denylist.yaml lists.
+const NeverTracked = "PROLOGUE.md"
+
+// Denylist returns a denylist that holds the made-up names and the
+// never-tracked name.
 func Denylist(t *testing.T, madeUpNames ...string) []byte {
 	t.Helper()
 	l := &names.List{}
+	require.NoError(t, l.AddNeverTracked(NeverTracked))
 	for _, n := range madeUpNames {
 		e, err := names.NewEntry(n)
 		require.NoError(t, err)

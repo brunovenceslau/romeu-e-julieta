@@ -588,7 +588,15 @@ on:
 
 - a key of `.golangci.yml` outside a short list, so a `default` or
   `enable-all` key under `linters`, an exclusion or a disabled linter
-  fails, while testifylint's `enable-all: true` is required;
+  fails, while testifylint's `enable-all: true` is required, and so is
+  `linters.exclusions.generated: disable`, the one exclusion key, and
+  `generated-is-used: false` for `unused`, which make the linters read
+  generated files but for the checks that skip them on their own ([ADR 0016, lint generated files and give each one the full generated header](../adr/0016-lint-generated-files-and-give-each-one-the-full-generated-header.md));
+- a Go file with the generated header that is no output of `go
+  generate` listed in `.gitattributes`, or that declares an exported
+  identifier or calls `errors.New` or `fmt.Errorf`: revive skips such a
+  file whatever the configuration says, so its two rules of ADR 0001
+  rule 14 are held here (ADR 0016);
 - a second `.golangci.*` file;
 - `REQ-0880` a directive outside the allowlist, which is `go:build`, the
   `romeu:invariant` tag of 05 5.2 in its two forms, and, at one site
@@ -602,7 +610,6 @@ on:
   are trimmed; golangci-lint's `nolint` word at the start of such a
   line; and the `line`, `extern` and `export` directives right after
   `//` or `/*`;
-- a generated-code header;
 - a file that builds with cgo off for none of the lint targets (build
   constraints with the tool tags the pinned go command reports for each
   target, file-name suffixes and an import of `"C"`, as `go/build` and

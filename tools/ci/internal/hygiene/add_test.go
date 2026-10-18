@@ -123,7 +123,8 @@ func loadDenylistFile(t *testing.T, r *gittest.Repo) *names.List {
 // TestAddAtATerminal drives "hygiene add" through /dev/ptmx (10 10.1).
 func TestAddAtATerminal(t *testing.T) {
 	r := citest.NewTree(t)
-	require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
+	// A denylist with the never-tracked list and no entry yet.
+	r.Write(names.Path, string(citest.Denylist(t)))
 	r.Commit("fixture")
 
 	// The name is typed twice, because it is typed blind: a slip of
@@ -135,7 +136,7 @@ func TestAddAtATerminal(t *testing.T) {
 		code    int
 		entries int
 	}{
-		{"the first entry creates the file", []string{"Zorvex Quimby", "Zorvex Quimby"}, check.ExitOK, 1},
+		{"the first entry is written, the list kept", []string{"Zorvex Quimby", "Zorvex Quimby"}, check.ExitOK, 1},
 		{"a second entry is appended", []string{"plimsor", "plimsor"}, check.ExitOK, 2},
 		{"the same name again changes nothing", []string{"zorvex  quimby", "zorvex  quimby"}, check.ExitOK, 2},
 		{"two lines that differ are refused", []string{"brimlow", "brimlaw"}, check.ExitError, 2},

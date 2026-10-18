@@ -35,7 +35,7 @@ func TestPushedRangeVerdicts(t *testing.T) {
 	)
 	tests := []struct {
 		name        string
-		baseList    bool              // the default branch holds a denylist with an entry
+		baseList    bool              // the default branch holds a denylist with an entry; otherwise one with the never-tracked list alone
 		tip         map[string]string // files of the pushed commit; "" removes one
 		noRemote    bool
 		want        func(tip string) []check.Verdict // nil for the rows that end in an error
@@ -51,14 +51,17 @@ func TestPushedRangeVerdicts(t *testing.T) {
 			name: "an entry at HEAD, a listed name in an added line", baseList: true,
 			tip: map[string]string{"docs/page.md": "see " + citest.MadeUp + "\n"},
 			want: func(tip string) []check.Verdict {
-				return []check.Verdict{{Name: name, Findings: []check.Finding{{Where: "commit " + tip + ": docs/page.md:1", Rule: "name", Msg: "the added line holds a name listed at HEAD"}}}}
+				return []check.Verdict{{Name: name, Findings: []check.Finding{{Where: "commit " + tip + ": docs/page.md:1", Rule: "name", Msg: "the added line holds a name listed at HEAD; " + hygiene.NameFix}}}}
 			},
 		},
 		{
 			name: "an entry only at the default branch", baseList: true,
 			tip: map[string]string{names.Path: "", "docs/page.md": "see " + citest.MadeUp + "\n"},
 			want: func(tip string) []check.Verdict {
-				return []check.Verdict{{Name: name, Findings: []check.Finding{{Where: "commit " + tip + ": docs/page.md:1", Rule: "name", Msg: "the added line holds a name listed at the remote's default branch"}}}}
+				return []check.Verdict{{Name: name, Findings: []check.Finding{
+					{Where: names.Path, Rule: hygiene.NeverTrackedRule, Msg: "the denylist at HEAD drops 1 neverTracked name(s) the remote's default branch lists; restore them"},
+					{Where: "commit " + tip + ": docs/page.md:1", Rule: "name", Msg: "the added line holds a name listed at the remote's default branch; " + hygiene.NameFix},
+				}}}
 			},
 		},
 		{
@@ -67,11 +70,11 @@ func TestPushedRangeVerdicts(t *testing.T) {
 			want: func(string) []check.Verdict { return []check.Verdict{{Name: name, Note: notChecked}} },
 		},
 		{
-			name: "no entry anywhere, an added prologue file",
+			name: "no entry anywhere, an added never-tracked file",
 			tip:  map[string]string{"sub/prologue.md": "text\n"},
 			want: func(tip string) []check.Verdict {
 				return []check.Verdict{
-					{Name: name, Findings: []check.Finding{{Where: "commit " + tip + ": added path sub/prologue.md", Rule: "prologue", Msg: hygiene.PrologueMsg}}},
+					{Name: name, Findings: []check.Finding{{Where: "commit " + tip + ": added path sub/prologue.md", Rule: hygiene.NeverTrackedRule, Msg: hygiene.NeverTrackedMsg}}},
 					{Name: name, Note: notChecked},
 				}
 			},
@@ -91,7 +94,7 @@ func TestPushedRangeVerdicts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := citest.NewTree(t)
 			if !tt.baseList {
-				require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
+				r.Write(names.Path, string(citest.Denylist(t)))
 			}
 			r.Commit("base")
 			if !tt.noRemote {
@@ -124,6 +127,60 @@ func TestPushedRangeVerdicts(t *testing.T) {
 			assert.Equal(t, tt.want(tip), got)
 		})
 	}
+}
+
+// TestNeverTrackedInThePushedRange: a pushed commit that adds a name on
+// the neverTracked list of the denylist at HEAD, in another case, is
+// refused even when a later commit of the push removes it.
+func TestNeverTrackedInThePushedRange(t *testing.T) {
+	const zero = "0000000000000000000000000000000000000000"
+	l, err := names.Parse(citest.Denylist(t, citest.MadeUp))
+	require.NoError(t, err)
+	require.NoError(t, l.AddNeverTracked("NOTES.local"))
+	r := citest.NewTree(t)
+	r.Write(names.Path, string(l.Marshal()))
+	r.Commit("base")
+	r.Git("remote", "add", "origin", gittest.NewBare(t).Dir)
+	r.Git("push", "--quiet", "origin", "main")
+	r.Git("fetch", "--quiet", "origin")
+	r.Write("deep/notes.Local", "text\n")
+	added := r.Commit("adds it")
+	require.NoError(t, os.Remove(filepath.Join(r.Dir, "deep", "notes.Local")))
+	tip := r.Commit("removes it again")
+	push, err := pushed.Parse(strings.NewReader("refs/heads/main " + tip + " refs/heads/main " + zero + "\n"))
+	require.NoError(t, err)
+	got, err := Range(t.Context(), r.Repo, "origin", push, tip)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, []check.Finding{{Where: "commit " + added + ": added path deep/notes.Local", Rule: hygiene.NeverTrackedRule, Msg: hygiene.NeverTrackedMsg}}, got[0].Findings)
+}
+
+// TestNeverTrackedNameDroppedByThePush: a push whose denylist at HEAD
+// drops a never-tracked name the remote's default branch lists is
+// refused, and the name stays in force for the paths it adds.
+func TestNeverTrackedNameDroppedByThePush(t *testing.T) {
+	const zero = "0000000000000000000000000000000000000000"
+	r := citest.NewTree(t)
+	r.Commit("base, the default list")
+	r.Git("remote", "add", "origin", gittest.NewBare(t).Dir)
+	r.Git("push", "--quiet", "origin", "main")
+	r.Git("fetch", "--quiet", "origin")
+	l := &names.List{}
+	e, err := names.NewEntry(citest.MadeUp)
+	require.NoError(t, err)
+	l.Add(e)
+	r.Write(names.Path, string(l.Marshal()))
+	r.Write("x/"+citest.NeverTracked, "text\n")
+	tip := r.Commit("drops the list and adds the file")
+	push, err := pushed.Parse(strings.NewReader("refs/heads/main " + tip + " refs/heads/main " + zero + "\n"))
+	require.NoError(t, err)
+	got, err := Range(t.Context(), r.Repo, "origin", push, tip)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, []check.Finding{
+		{Where: names.Path, Rule: hygiene.NeverTrackedRule, Msg: "the denylist at HEAD drops 1 neverTracked name(s) the remote's default branch lists; restore them"},
+		{Where: "commit " + tip + ": added path x/" + citest.NeverTracked, Rule: hygiene.NeverTrackedRule, Msg: hygiene.NeverTrackedMsg},
+	}, got[0].Findings)
 }
 
 // TestDefaultBranchDenylistOfAPartialClone is the case of a clone made

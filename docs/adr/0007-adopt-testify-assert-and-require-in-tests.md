@@ -161,8 +161,13 @@ rules:
    `.golangci.yml` to check that `enable-all: true` is set, which
    covers the `suite-*` checkers.
 8. **No finding is silenced.** The configuration disables no linter,
-   lowers no setting and excludes no path, and no Go file has a
-   generated-code header. A finding is fixed in the code. Directives
+   lowers no setting and excludes no path, and it lints generated files
+   (`linters.exclusions.generated: disable`, and `generated-is-used:
+   false` for `unused`), so the generated-code header hides no finding
+   but those that revive, some staticcheck checks and go vet's stdversion
+   pass drop on their own, which ADR 0016 names and accepts for the
+   outputs of `go generate` alone (changed on 2026-10-18 by ADR 0016;
+   the rule first refused the header). A finding is fixed in the code. Directives
    are held to an allowlist, which today is `go:build`, and
    `go:generate` at one site only: the one directive
    `go:generate go run . generate` in `tools/ci/generate.go`, which
@@ -260,7 +265,7 @@ things:
    `MISE_DATA_DIR` or `XDG_DATA_HOME`.
 2. **The common shortcuts in tracked content.** A suppression
    directive, an excluded path, a lowered or disabled setting of
-   `.golangci.yml`, a generated-code header, a file that no lint target
+   `.golangci.yml`, a generated file the linters skip, a file that no lint target
    builds or that `go list` skips, an `ignore` directive in `go.mod`,
    and an `[env]` table or a tool named by a path in a mise
    configuration. The tests make each of them fail the build, so the
@@ -319,7 +324,7 @@ which decides with HEAD the denylist a push is judged by.
   pass with less checked.
 - A new directive, such as `go:generate` or `go:embed` the day the
   code needs one, is a reviewed line in `allowedDirectives` of
-  `tools/ci/lintconfig_test.go`.
+  `tools/ci/internal/lint/config_test.go`.
 - The fixture test and the lint step of `tools/ci fast` both run the
   golangci-lint and the go command that `mise which` resolves
   (`resolveLintTools`), so a machine without the pinned tools fails

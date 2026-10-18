@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The catalog gap form of 12 12.7 (REQ-1180): the tool and its domains.
+name: Catalog gap
+description: A tool the egress catalog does not know, or knows with the wrong domains.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repository is public. Name only public tools and public hosts.
+  - type: input
+    id: tool
+    attributes:
+      label: Tool
+      description: The tool, as mise or its own docs name it, with the version you use.
+    validations:
+      required: true
+  - type: textarea
+    id: domains
+    attributes:
+      label: Domains
+      description: Each host the tool reaches, one per line, and whether it uploads to it.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Where you saw the tool reach these hosts.
+    validations:
+      required: false

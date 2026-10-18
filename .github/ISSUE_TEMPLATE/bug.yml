@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The bug form of 12 12.7 (REQ-1180): the romeu and sbx versions, the
+# command, and its output or the doctor report.
+name: Bug
+description: romeu or julieta did something it should not, or failed to do what it should.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repository is public. Read what you paste first: remove any
+        secret, token, host name or project name that is not for the public.
+  - type: input
+    id: romeu-version
+    attributes:
+      label: romeu version
+      description: The output of `romeu version`.
+    validations:
+      required: true
+  - type: input
+    id: sbx-version
+    attributes:
+      label: sbx version
+      description: The output of `sbx version`.
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      description: The command you ran, as you typed it.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output or doctor report
+      description: What the command printed, or the output of `romeu doctor`.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: false

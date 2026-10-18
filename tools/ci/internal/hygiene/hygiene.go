@@ -17,7 +17,6 @@ import (
 	"go/token"
 	"io"
 	"os"
-	"path"
 	"regexp"
 	"slices"
 	"strconv"
@@ -51,23 +50,6 @@ var (
 	toDo      = regexp.MustCompile(`\bTODO\b`)
 	issueForm = regexp.MustCompile(`^\(#[0-9]+\)`)
 )
-
-// prologueName is the one file name no product path may carry. The
-// user's agreement file lives outside product repositories, so the
-// name is refused at any depth. It is compared without regard to case
-// (IsPrologue) because a macOS checkout holds prologue.md and
-// PROLOGUE.md as one file, so the case a contributor typed says nothing
-// about the file that other clones see.
-const prologueName = "PROLOGUE.md"
-
-// PrologueMsg is the reason the rule gives, and repeats no path.
-const PrologueMsg = "the user's agreement file lives outside product repositories"
-
-// IsPrologue reports whether the last element of a git path is
-// prologueName in any case.
-func IsPrologue(p string) bool {
-	return strings.EqualFold(path.Base(p), prologueName)
-}
 
 // sandboxUser is the one name a home directory may carry: the user
 // inside a sandbox, the same on every machine.
@@ -112,7 +94,7 @@ func Of(files []check.TreeFile) ([]check.Finding, error) {
 		where := git.Printable(f.Path)
 		if list.Match([]byte(f.Path)) {
 			where = fmt.Sprintf("(path withheld, tree entry %d)", i+1)
-			findings = append(findings, check.Finding{Where: where, Rule: "name", Msg: "the path holds a listed name"})
+			findings = append(findings, NameFinding(where, "the path holds a listed name"))
 		}
 		if !printableASCII(f.Path) {
 			findings = append(findings, check.Finding{Where: where, Rule: "path", Msg: asciiPathMsg})
@@ -125,8 +107,8 @@ func Of(files []check.TreeFile) ([]check.Finding, error) {
 		if strings.HasPrefix(f.Path, hookDir) && f.Path != hookPath {
 			findings = append(findings, check.Finding{Where: where, Rule: "githooks", Msg: hookDir + " holds exactly pre-push"})
 		}
-		if IsPrologue(f.Path) {
-			findings = append(findings, check.Finding{Where: where, Rule: "prologue", Msg: PrologueMsg})
+		if list.NeverTracked(f.Path) {
+			findings = append(findings, check.Finding{Where: where, Rule: NeverTrackedRule, Msg: NeverTrackedMsg})
 		}
 		// A symbolic link or a submodule leads a path to content that
 		// no rule of this list reads by that path: a .config link to a
@@ -142,7 +124,7 @@ func Of(files []check.TreeFile) ([]check.Finding, error) {
 		}
 		at := func(line int) string { return where + ":" + strconv.Itoa(line) }
 		for _, n := range list.MatchLines(f.Content) {
-			findings = append(findings, check.Finding{Where: at(n), Rule: "name", Msg: "the line holds a listed name"})
+			findings = append(findings, NameFinding(at(n), "the line holds a listed name"))
 		}
 		for _, n := range linesWith(f.Content, func(line []byte) bool { return bytes.Contains(line, []byte(EmDash)) }) {
 			findings = append(findings, check.Finding{Where: at(n), Rule: "em-dash", Msg: "the line holds U+2014; use a plain dash"})
@@ -180,7 +162,7 @@ func hygieneFile(ctx context.Context, repo git.Repo, path string) ([]check.Findi
 		return nil, err
 	}
 	for _, n := range list.MatchLines(content) {
-		findings = append(findings, check.Finding{Where: "the file:" + strconv.Itoa(n), Rule: "name", Msg: "the line holds a listed name"})
+		findings = append(findings, NameFinding("the file:"+strconv.Itoa(n), "the line holds a listed name"))
 	}
 	return findings, nil
 }
@@ -208,6 +190,10 @@ func denylistFindings(list *names.List, found bool) []check.Finding {
 		return []check.Finding{{Where: names.Path, Rule: "denylist", Msg: "the denylist is missing at HEAD" + how}}
 	case list.Len() == 0:
 		return []check.Finding{{Where: names.Path, Rule: "denylist", Msg: "the denylist has no entry at HEAD" + how}}
+	case list.NeverTrackedLen() == 0:
+		// A constant held the list before it moved here, so it could not
+		// be dropped; a denylist that lists no name drops the rule.
+		return []check.Finding{{Where: names.Path, Rule: "denylist", Msg: "the denylist lists no neverTracked name at HEAD; restore the list (10 10.2)"}}
 	}
 	return nil
 }

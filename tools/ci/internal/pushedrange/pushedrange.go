@@ -24,8 +24,8 @@ import (
 
 // Range applies the name matcher to what a push would publish:
 // the remote ref names, the text of each pushed annotated tag and the
-// four readings of each pushed commit. It applies the prologue rule to
-// the paths those commits add, which needs no denylist entry.
+// four readings of each pushed commit. It applies the never-tracked
+// list of the same denylists to the paths those commits add.
 //
 // The push is judged by the denylist at head, the commit judgeCommit
 // judged, together with the one at the remote's default branch
@@ -34,7 +34,7 @@ import (
 // review. A finding says which of the two lists holds the name.
 // It returns the verdicts of the "pushed range" check: its findings,
 // and a note when neither list has an entry, as there is nothing to
-// match names with then (the prologue rule ran all the same). A
+// match names with then (the never-tracked list ran all the same). A
 // denylist at head that cannot be read is a verdict with its error,
 // as the runner reports a check that cannot judge what it read; a
 // missing or empty one is the finding of hygiene. Any other failure, such
@@ -50,17 +50,24 @@ func Range(ctx context.Context, repo git.Repo, remote string, push pushed.Push, 
 		return nil, err
 	}
 	var findings []check.Finding
+	// A name the default branch lists and HEAD drops stays in force
+	// through the merge below, and the drop itself is refused, so a
+	// push cannot take a name off the list unseen.
+	if dropped := atHead.NeverTrackedMissing(atDefault); len(dropped) > 0 {
+		findings = append(findings, check.Finding{Where: names.Path, Rule: hygiene.NeverTrackedRule,
+			Msg: fmt.Sprintf("the denylist at HEAD drops %d neverTracked name(s) the remote's default branch lists; restore them", len(dropped))})
+	}
 	list := &names.List{}
 	list.Merge(atHead)
 	list.Merge(atDefault)
 	err = pushed.Walk(ctx, repo, remote, push, func(r pushed.Reading) {
-		if r.Field == pushed.FieldPath && hygiene.IsPrologue(r.Path) {
+		if r.Field == pushed.FieldPath && list.NeverTracked(r.Path) {
 			// A path that holds a listed name is not printed.
 			where := git.Printable(r.Path)
 			if list.Match([]byte(r.Path)) {
 				where = "(withheld)"
 			}
-			findings = append(findings, check.Finding{Where: readingAt(r) + "added path " + where, Rule: "prologue", Msg: hygiene.PrologueMsg})
+			findings = append(findings, check.Finding{Where: readingAt(r) + "added path " + where, Rule: hygiene.NeverTrackedRule, Msg: hygiene.NeverTrackedMsg})
 		}
 		if !list.Match(r.Text) {
 			return
@@ -72,21 +79,21 @@ func Range(ctx context.Context, repo git.Repo, remote string, push pushed.Push, 
 		of := readingAt(r)
 		switch r.Field {
 		case pushed.FieldRef:
-			findings = append(findings, check.Finding{Where: "pushed ref " + strconv.Itoa(r.Line), Rule: "name", Msg: "the remote ref name holds " + listed})
+			findings = append(findings, hygiene.NameFinding("pushed ref "+strconv.Itoa(r.Line), "the remote ref name holds "+listed))
 		case pushed.FieldMessage:
-			findings = append(findings, check.Finding{Where: of + "message line " + strconv.Itoa(r.Line), Rule: "name", Msg: "the line holds " + listed})
+			findings = append(findings, hygiene.NameFinding(of+"message line "+strconv.Itoa(r.Line), "the line holds "+listed))
 		case pushed.FieldAuthor, pushed.FieldCommitter, pushed.FieldTagger:
-			findings = append(findings, check.Finding{Where: of + r.Field, Rule: "name", Msg: "the name and email hold " + listed})
+			findings = append(findings, hygiene.NameFinding(of+r.Field, "the name and email hold "+listed))
 		case pushed.FieldTagName:
-			findings = append(findings, check.Finding{Where: of + r.Field, Rule: "name", Msg: "the tag's name holds " + listed})
+			findings = append(findings, hygiene.NameFinding(of+r.Field, "the tag's name holds "+listed))
 		case pushed.FieldPath:
-			findings = append(findings, check.Finding{Where: of + "added path (withheld)", Rule: "name", Msg: "the path holds " + listed})
+			findings = append(findings, hygiene.NameFinding(of+"added path (withheld)", "the path holds "+listed))
 		case pushed.FieldLine:
 			path := git.Printable(r.Path)
 			if list.Match([]byte(r.Path)) {
 				path = "(path withheld)"
 			}
-			findings = append(findings, check.Finding{Where: of + path + ":" + strconv.Itoa(r.Line), Rule: "name", Msg: "the added line holds " + listed})
+			findings = append(findings, hygiene.NameFinding(of+path+":"+strconv.Itoa(r.Line), "the added line holds "+listed))
 		}
 	})
 	if err != nil {

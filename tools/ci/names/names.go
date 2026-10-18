@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -36,6 +37,9 @@ const header = `# SPDX-FileCopyrightText: 2026 Bruno Venceslau
 
 # Names this repository must not contain, hashed. Add an entry with
 # "go run ./tools/ci hygiene add", on the host, in a terminal.
+# neverTracked lists the file names no tracked path may end with, in
+# any case: files that belong outside product repositories (10 10.2).
+# It is plain text; a name that must not be read goes in entries.
 `
 
 // segment is one piece of a name: its length in bytes and the sha256 of
@@ -50,14 +54,17 @@ type Entry struct {
 	segments []segment
 }
 
-// List is a denylist. The zero value is an empty list.
+// List is a denylist: the forbidden names, hashed, and the never-tracked
+// file names, in plain text. The zero value is an empty list.
 type List struct {
-	entries []Entry
+	entries      []Entry
+	neverTracked []string
 }
 
 // The three types below are the file format.
 type fileList struct {
-	Entries []fileEntry `yaml:"entries"`
+	NeverTracked []string    `yaml:"neverTracked,omitempty"`
+	Entries      []fileEntry `yaml:"entries"`
 }
 
 type fileEntry struct {
@@ -95,6 +102,15 @@ func Parse(data []byte) (*List, error) {
 		return nil, fmt.Errorf("decode denylist: %w", err)
 	}
 	l := &List{}
+	for _, n := range f.NeverTracked {
+		if err := checkFileName(n); err != nil {
+			return nil, fmt.Errorf("denylist neverTracked: %w", err)
+		}
+		if l.isNeverTracked(n) {
+			return nil, fmt.Errorf("denylist neverTracked: %q is listed twice, in some case", n)
+		}
+		l.neverTracked = append(l.neverTracked, n)
+	}
 	for i, fe := range f.Entries {
 		if len(fe.Segments) == 0 {
 			return nil, fmt.Errorf("denylist entry %d has no segment", i+1)
@@ -112,12 +128,18 @@ func Parse(data []byte) (*List, error) {
 		}
 		l.entries = append(l.entries, e)
 	}
+	for i, n := range l.neverTracked {
+		// The error names the position only: the name holds a listed one.
+		if l.Match([]byte(n)) {
+			return nil, fmt.Errorf("denylist neverTracked name %d holds a forbidden name; a name that must not be read goes in entries only", i+1)
+		}
+	}
 	return l, nil
 }
 
 // Marshal encodes the list in the file format, header included.
 func (l *List) Marshal() []byte {
-	f := fileList{Entries: []fileEntry{}}
+	f := fileList{NeverTracked: l.neverTracked, Entries: []fileEntry{}}
 	for _, e := range l.entries {
 		fe := fileEntry{}
 		for _, s := range e.segments {
@@ -137,6 +159,21 @@ func (l *List) Marshal() []byte {
 	return buf.Bytes()
 }
 
+// NeverTrackedMissing returns the never-tracked names of o that l does
+// not hold, in o's order.
+func (l *List) NeverTrackedMissing(o *List) []string {
+	var missing []string
+	for _, n := range o.neverTracked {
+		if !l.isNeverTracked(n) {
+			missing = append(missing, n)
+		}
+	}
+	return missing
+}
+
+// NeverTrackedLen reports the number of never-tracked names.
+func (l *List) NeverTrackedLen() int { return len(l.neverTracked) }
+
 // Len reports the number of entries.
 func (l *List) Len() int { return len(l.entries) }
 
@@ -151,11 +188,65 @@ func (l *List) Add(e Entry) bool {
 	return true
 }
 
-// Merge adds each entry of o that l does not hold yet.
+// Merge adds each entry and never-tracked name of o that l does not
+// hold yet.
 func (l *List) Merge(o *List) {
 	for _, e := range o.entries {
 		l.Add(e)
 	}
+	for _, n := range o.neverTracked {
+		if !l.isNeverTracked(n) {
+			l.neverTracked = append(l.neverTracked, n)
+		}
+	}
+}
+
+// AddNeverTracked adds name to the never-tracked list, and refuses one
+// Parse would refuse or one the list holds in some case.
+func (l *List) AddNeverTracked(name string) error {
+	if err := checkFileName(name); err != nil {
+		return err
+	}
+	if l.isNeverTracked(name) {
+		return fmt.Errorf("%q is listed already, in some case", name)
+	}
+	l.neverTracked = append(l.neverTracked, name)
+	return nil
+}
+
+// NeverTracked reports whether the last element of the git path p is a
+// never-tracked file name, compared without regard to case: a macOS
+// checkout holds prologue.md and PROLOGUE.md as one file, so the case a
+// contributor typed says nothing about the file other clones see.
+func (l *List) NeverTracked(p string) bool {
+	return l.isNeverTracked(p[strings.LastIndexByte(p, '/')+1:])
+}
+
+// isNeverTracked reports whether name is on the never-tracked list, in
+// any case.
+func (l *List) isNeverTracked(name string) bool {
+	return slices.ContainsFunc(l.neverTracked, func(n string) bool { return strings.EqualFold(n, name) })
+}
+
+// checkFileName refuses a never-tracked entry that could never be the
+// last element of a git path, or not as written: an empty name, ".",
+// "..", one that holds a slash or a control character, starts or ends
+// with a space, or holds a backslash, a colon or a pattern character,
+// which the list would take literally.
+func checkFileName(n string) error {
+	switch {
+	case n == "" || n == "." || n == "..":
+		return fmt.Errorf("%q is not a file name", n)
+	case strings.ContainsRune(n, '/'):
+		return fmt.Errorf("%q holds a slash; list the last element of a path", n)
+	case strings.ContainsFunc(n, func(r rune) bool { return r < 0x20 || r == 0x7f }):
+		return fmt.Errorf("%q holds a control character", n)
+	case n != strings.TrimSpace(n):
+		return fmt.Errorf("%q starts or ends with a space", n)
+	case strings.ContainsAny(n, `\:*?[`):
+		return fmt.Errorf("%q holds a backslash, a colon or a pattern character; list a plain file name", n)
+	}
+	return nil
 }
 
 func (e Entry) equal(o Entry) bool {

@@ -3,11 +3,17 @@
 
 # The linter configuration of ADR 0001 (rule 14) and ADR 0007 (testify).
 # No linter is disabled and no finding is excluded: a finding is fixed
-# in the code. tools/ci/lintconfig_test.go proves that each checker
-# below still reports.
+# in the code. tools/ci/internal/lint/config_test.go proves that each
+# checker below still reports, in a generated file too.
 version: "2"
 
 linters:
+  # The linters read generated files too (ADR 0016). revive, the
+  # staticcheck checks that filter generated files and go vet's
+  # stdversion still skip one; ADR 0016 names them and how the
+  # repository holds that.
+  exclusions:
+    generated: disable
   # The default set (errcheck, govet, ineffassign, staticcheck, unused)
   # stays on; these are added to it.
   enable:
@@ -30,3 +36,7 @@ linters:
         - commentedOutCode
     testifylint:
       enable-all: true
+    unused:
+      # An object of a generated file is used only when code uses it,
+      # as in any other file (ADR 0016).
+      generated-is-used: false

@@ -5,6 +5,8 @@ package cli_test
 
 import (
 	"bytes"
+	"cmp"
+	"context"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
@@ -38,21 +40,26 @@ var failing = cli.Row{ID: "RJ-999", Slug: "fixture-failed", Exit: 4, Fix: "decid
 
 // The fixture command of the package's tests, romeu fixture: it prints
 // the clock and its arguments; with --fail it returns an error of the
-// table wrapped twice, whose detail is --detail, and with --plain an
-// error with no id.
+// table wrapped twice, whose detail is --detail, with --plain an error
+// with no id, with --context the error of its context, wrapped, and
+// with both an error of the table joined to it.
 var _ = cli.Register(func() cli.Command {
 	c := cli.Define(cli.PreflightNone, cli.LockNone, cli.AppendsNothing(), cli.SnapshotNone, cli.ReadsOnly)
 	c.Binary, c.Name, c.JSON = "romeu", "fixture", true
 	c.New = func(env *cli.Env) *cobra.Command {
-		var fail, plain bool
+		var fail, plain, withContext bool
 		var detail string
 		cmd := &cobra.Command{
 			Use:     "fixture [args]",
 			Short:   "a command of the tests",
 			Example: "romeu fixture --fail\nromeu fixture --detail=x a",
 			Args:    cobra.ArbitraryArgs,
-			RunE: func(_ *cobra.Command, args []string) error {
+			RunE: func(c *cobra.Command, args []string) error {
 				switch {
+				case withContext && fail:
+					return errors.Join(failing.New("it failed"), c.Context().Err())
+				case withContext:
+					return fmt.Errorf("stopped: %w", cmp.Or(c.Context().Err(), context.Canceled))
 				case fail:
 					e := failing.New("it failed", cli.Detail{Key: "step", Value: detail})
 					e.Fill = map[string]string{"<what>": "retry"}
@@ -66,6 +73,7 @@ var _ = cli.Register(func() cli.Command {
 		}
 		cmd.Flags().BoolVar(&fail, "fail", false, "fail with a fixture error")
 		cmd.Flags().BoolVar(&plain, "plain", false, "fail with an error with no id")
+		cmd.Flags().BoolVar(&withContext, "context", false, "fail with the error of the context")
 		cmd.Flags().StringVarP(&detail, "detail", "d", "2", "the `value` of the detail")
 		return cmd
 	}
@@ -189,6 +197,29 @@ func TestMainInternal(t *testing.T) {
 	code, _, stderr := romeu(t, "fixture", "--plain")
 	assert.Equal(t, 1, code)
 	assert.True(t, strings.HasPrefix(stderr, "error RJ-348 internal: "), stderr)
+}
+
+// TestMainInterrupted prints nothing for an error that is the
+// cancellation of the context, since procgroup.Main prints the one line
+// of an interrupted command and maps the status 1 to 130 or 143 (04
+// 4.1, Signals); context.Canceled from a context that is not canceled
+// is still the error internal.
+func TestMainInterrupted(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	var stdout, stderr bytes.Buffer
+	env := &cli.Env{Binary: "romeu", Stdout: cli.NewWriter(&stdout), Stderr: cli.NewWriter(&stderr), Now: func() time.Time { return fixedNow }}
+	assert.Equal(t, 1, cli.Main(ctx, []string{"fixture", "--context"}, env))
+	assert.Empty(t, stdout.String())
+	assert.Empty(t, stderr.String(), "procgroup.Main prints the interrupted line")
+
+	code, _, got := romeu(t, "fixture", "--context")
+	assert.Equal(t, 1, code)
+	assert.True(t, strings.HasPrefix(got, "error RJ-348 internal: "), got)
+
+	stderr.Reset()
+	assert.Equal(t, 4, cli.Main(ctx, []string{"fixture", "--context", "--fail"}, env))
+	assert.True(t, strings.HasPrefix(stderr.String(), "error RJ-999 fixture-failed: "), "an error of the table joined to the cancellation is printed: %s", stderr.String())
 }
 
 // TestMainUsage exits 2 with the error usage (RJ-349) for every error of

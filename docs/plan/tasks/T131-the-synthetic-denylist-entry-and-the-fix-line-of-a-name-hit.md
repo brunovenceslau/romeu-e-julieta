@@ -8,6 +8,9 @@ owns:
   - tools/ci/denylist.yaml
   - tools/ci/internal/hygiene/testdata/**
   - tools/ci/internal/hygiene/fixline*.go
+  - tools/ci/internal/hygiene/hygiene*.go
+  - tools/ci/internal/pushedrange/pushedrange*.go
+  - tools/ci/fast_test.go
 needs: []
 after:
   - T105
@@ -28,6 +31,11 @@ rewrite, or if it is your own identity, hand the location to the
 maintainer, who re-authors the commit") appended to every name finding
 of `hygiene` and of the pushed range. The name is made up, so an agent
 may hold it. `after: T128` for the shared file.
+
+Re-plan (2026-10-18): Changed. `owns` adds the files the fix line
+reaches: `hygiene*.go` and `pushedrange*.go`, where the name findings
+are made and tested, and `tools/ci/fast_test.go`, whose cases of the
+pushed range read them. T128 names the same files and comes first.
 
 Re-plan (2026-10-12, stage B): New. The hygiene fixtures and the real
 denylist are one package, so the fix line of a forbidden-name hit joins

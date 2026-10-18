@@ -7,6 +7,12 @@ fate: new
 owns:
   - tools/ci/denylist.yaml
   - tools/ci/internal/hygiene/nevertracked*.go
+  - tools/ci/names/names*.go
+  - tools/ci/internal/hygiene/hygiene*.go
+  - tools/ci/internal/pushedrange/pushedrange*.go
+  - tools/ci/internal/citest/citest.go
+  - tools/ci/fast_test.go
+  - tools/ci/internal/hygiene/add_test.go
 needs: []
 after:
   - T105
@@ -22,6 +28,15 @@ sitting: none
 Goal: The never-tracked file names read from `tools/ci/denylist.yaml`
 instead of the Go constant (`prologueName`, `tools/ci/hygiene.go` on
 `main`), the change round 8 left as R8-10-34.
+
+Re-plan (2026-10-18): Changed. `owns` adds the three places the list
+reaches: `tools/ci/names/names*.go`, which decodes `denylist.yaml`
+strictly and rewrites it through `hygiene add`, so the new key is
+declared, kept and checked there; and `hygiene*.go` and
+`pushedrange*.go`, the two rules that call `IsPrologue` today; and
+`tools/ci/internal/citest/citest.go`, whose fixture denylist gains the
+list, and `tools/ci/fast_test.go` and `tools/ci/internal/hygiene/add_test.go`,
+whose cases read it.
 
 Re-plan (2026-10-12, stage B): New. A change to merged work is a task,
 so it has an owner and an `after` edge: `after: T105`, for the moved

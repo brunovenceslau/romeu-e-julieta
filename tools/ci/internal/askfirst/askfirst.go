@@ -193,7 +193,7 @@ func GlobMatch(glob, name string) bool {
 // CODEOWNERS) decides nothing.
 func (a *List) Codeowners() []byte {
 	var b bytes.Buffer
-	fmt.Fprintf(&b, "# %s\n", check.GeneratedNotice(Path))
+	b.WriteString(check.HashComment(check.GeneratedHeader(Path + " (the surfaces and their globs)")))
 	b.WriteString("# A change to a path below needs the maintainer's review before it merges\n")
 	fmt.Fprintf(&b, "# (%s lists the surfaces and their reasons).\n", Path)
 	for _, s := range a.Surfaces {

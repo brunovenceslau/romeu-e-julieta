@@ -137,25 +137,39 @@ func TestHygieneRules(t *testing.T) {
 			want: []string{"vendor/modules.txt: workspace:"},
 		},
 		{
+			name: "a path hit carries the fix line",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("docs/zorvex-quimby.md", "plain\n")
+			},
+			want: []string{"(path withheld, tree entry 3): name: the path holds a listed name; " + NameFix},
+		},
+		{
+			name: "a line hit carries the fix line",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("docs/page.md", "one\nzorvex quimby\n")
+			},
+			want: []string{"docs/page.md:2: name: the line holds a listed name; " + NameFix},
+		},
+		{
 			name: "a tracked PROLOGUE.md at the root",
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("PROLOGUE.md", "text\n")
 			},
-			want: []string{"PROLOGUE.md: prologue: the user's agreement file lives outside product repositories"},
+			want: []string{"PROLOGUE.md: never-tracked: the file belongs outside product repositories (the neverTracked list of tools/ci/denylist.yaml)"},
 		},
 		{
 			name: "a tracked PROLOGUE.md in a subdirectory",
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("docs/notes/PROLOGUE.md", "text\n")
 			},
-			want: []string{"docs/notes/PROLOGUE.md: prologue:"},
+			want: []string{"docs/notes/PROLOGUE.md: never-tracked:"},
 		},
 		{
 			name: "a tracked prologue.md in another case",
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("Docs/Prologue.MD", "text\n")
 			},
-			want: []string{"Docs/Prologue.MD: prologue:"},
+			want: []string{"Docs/Prologue.MD: never-tracked:"},
 		},
 		{
 			name: "a second file in .githooks",
