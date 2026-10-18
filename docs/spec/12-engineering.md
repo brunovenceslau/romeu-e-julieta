@@ -652,17 +652,20 @@ must have that form; a merge commit's subject is not checked.
   decisions`, `Settled questions` or `Decisions for the operator`; `grep
   -l '^## \(Maintainer decisions\|Settled questions\|Decisions for the
   operator\)' docs/reviews/round-*.md` lists the rounds that made one.
-  `REQ-1171` The product decisions below have no record yet; each row names the
-  section that holds its current state:
-
-  | Decision | Current state |
-  |---|---|
-  | a secondary repo is cloned inside the sandbox by julieta | [02 2.6](02-layouts.md#26-multi-repo-projects-the-secondary-repo-decision) |
-  | the two gates | [01 1.4](01-system-model.md#14-the-gates) |
-  | v3 kits only | [06 6.1](06-kits.md#61-decisions) |
-  | herdr as the one run-layout renderer | [06 6.4](06-kits.md#64-product-kits) |
-  | memory as plain per-repo files | [08 8.1](08-memory-handoff-salvage.md#81-memory-store) |
-  | GPL-3.0-only, with CC0-1.0 for `examples/` and `schemas/` | [00 0.4](00-scope.md#04-license) |
+  `REQ-1171` The product decisions the specification cites as authority
+  have a record each, with the section that holds its current state:
+  [ADR 0017, clone a secondary repo inside the sandbox with julieta](../adr/0017-clone-a-secondary-repo-inside-the-sandbox-with-julieta.md)
+  ([02 2.6](02-layouts.md#26-multi-repo-projects-the-secondary-repo-decision));
+  [ADR 0018, gate toolchain changes per machine and project widening per project](../adr/0018-gate-toolchain-changes-per-machine-and-project-widening-per-project.md)
+  ([01 1.4](01-system-model.md#14-the-gates));
+  [ADR 0019, support kit schema v3 only](../adr/0019-support-kit-schema-v3-only.md)
+  ([06 6.1](06-kits.md#61-decisions));
+  [ADR 0020, render run layouts with herdr as the one renderer](../adr/0020-render-run-layouts-with-herdr-as-the-one-renderer.md)
+  ([06 6.4](06-kits.md#64-product-kits));
+  [ADR 0021, keep memory as plain per-repo files](../adr/0021-keep-memory-as-plain-per-repo-files.md)
+  ([08 8.1](08-memory-handoff-salvage.md#81-memory-store)); and
+  [ADR 0022, license the product GPL-3.0-only and the examples and schemas CC0-1.0](../adr/0022-license-the-product-gpl-3-0-only-and-the-examples-and-schemas-cc0-1-0.md)
+  ([00 0.4](00-scope.md#04-license)).
 
 - `REQ-1172` A heading that a committed probe result names in its `affects` is
   renamed together with that result, in the same commit;

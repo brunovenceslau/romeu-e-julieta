@@ -32,3 +32,22 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 14 | [Re-plan v1 for early daily use: task files, registration by file, build order, dogfood before recording](0014-re-plan-v1-for-early-daily-use-task-files-registration-by-file-build-order-dogfood-before-recording.md) | Proposed |
 | 15 | [Adopt spf13/cobra for the command line of romeu and julieta](0015-adopt-spf13-cobra-for-the-command-line-of-romeu-and-julieta.md) | Accepted |
 | 16 | [Lint generated files and give each one the full generated header](0016-lint-generated-files-and-give-each-one-the-full-generated-header.md) | Accepted |
+| 17 | [Clone a secondary repo inside the sandbox with julieta](0017-clone-a-secondary-repo-inside-the-sandbox-with-julieta.md) | Proposed |
+| 18 | [Gate toolchain changes per machine and project widening per project](0018-gate-toolchain-changes-per-machine-and-project-widening-per-project.md) | Proposed |
+| 19 | [Support kit schema v3 only](0019-support-kit-schema-v3-only.md) | Proposed |
+| 20 | [Render run layouts with herdr as the one renderer](0020-render-run-layouts-with-herdr-as-the-one-renderer.md) | Proposed |
+| 21 | [Keep memory as plain per-repo files](0021-keep-memory-as-plain-per-repo-files.md) | Proposed |
+| 22 | [License the product GPL-3.0-only and the examples and schemas CC0-1.0](0022-license-the-product-gpl-3-0-only-and-the-examples-and-schemas-cc0-1-0.md) | Proposed |
+| 23 | [Defer the runtime ledger out of v1](0023-defer-the-runtime-ledger-out-of-v1.md) | Proposed |
+| 24 | [Delete the one-time migration set from the product](0024-delete-the-one-time-migration-set-from-the-product.md) | Proposed |
+| 25 | [Defer the delivery metrics tool and keep its design](0025-defer-the-delivery-metrics-tool-and-keep-its-design.md) | Proposed |
+| 26 | [Put three specification pages on the ask-first list](0026-put-three-specification-pages-on-the-ask-first-list.md) | Proposed |
+| 27 | [Let a checkpoint grant stand for approval lines of seven surfaces](0027-let-a-checkpoint-grant-stand-for-approval-lines-of-seven-surfaces.md) | Proposed |
+| 28 | [Drop romeu run timings and keep S8 as a harness measurement](0028-drop-romeu-run-timings-and-keep-s8-as-a-harness-measurement.md) | Proposed |
+| 29 | [Keep romeu pull, the review checkout and the workspace files in v1](0029-keep-romeu-pull-the-review-checkout-and-the-workspace-files-in-v1.md) | Proposed |
+| 30 | [Exit 3 with the digest for a sync without a terminal and drop the awaiting state](0030-exit-3-with-the-digest-for-a-sync-without-a-terminal-and-drop-the-awaiting-state.md) | Proposed |
+| 31 | [Drop memory rm and fold memory search into list](0031-drop-memory-rm-and-fold-memory-search-into-list.md) | Proposed |
+| 32 | [Merge a green pull request at the next sitting, with one merge per business day](0032-merge-a-green-pull-request-at-the-next-sitting-with-one-merge-per-business-day.md) | Proposed |
+| 33 | [Run the pre-tag checks as maintainer steps of the release checklist](0033-run-the-pre-tag-checks-as-maintainer-steps-of-the-release-checklist.md) | Proposed |
+| 34 | [Add no user-facing success criterion in v1](0034-add-no-user-facing-success-criterion-in-v1.md) | Proposed |
+| 35 | [Show lessons to the owner with a pager that runs nothing](0035-show-lessons-to-the-owner-with-a-pager-that-runs-nothing.md) | Proposed |
