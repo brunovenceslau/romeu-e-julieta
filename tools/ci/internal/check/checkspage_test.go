@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package drift
+package check
 
 import (
 	"strings"
@@ -9,8 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // TestChecksPage checks the inventory of the checks: the front matter
@@ -18,7 +16,7 @@ import (
 // the order given, with "-" for a row that holds no requirement id, the
 // place a check runs, and a cell that holds a "|" escaped.
 func TestChecksPage(t *testing.T) {
-	page := string(ChecksPage([]check.Check{
+	page := string(ChecksPage([]Check{
 		{Name: "format", Guards: "a | b", Usage: "gofmt -l .", Req: "REQ-0820", Fast: true, All: true, Order: 10, Package: "tools/ci/internal/format"},
 		{Name: "unit", Guards: "tests", Usage: "go test", Req: "REQ-0824", Fast: true, All: true, Order: 70, RunsCode: true, Package: "tools/ci/internal/unit"},
 		{Name: "hygiene", Guards: "rules", Usage: "go run ./tools/ci hygiene", Fast: true, All: true, Order: 100, Package: "tools/ci/internal/hygiene"},
@@ -38,4 +36,14 @@ func TestChecksPage(t *testing.T) {
 		"| `race` | race | `go test -race` | all | 80 | yes | REQ-0833 | [tools/ci/internal/race](../../tools/ci/internal/race/) |",
 		"| `nowhere` | none | `none` | - | 1 | no | - | [tools/ci/internal/nowhere](../../tools/ci/internal/nowhere/) |",
 	}, strings.Split(strings.TrimSuffix(table, "\n"), "\n"))
+}
+
+// TestChecksPageOutput checks that the generator writes the inventory of
+// the checks of this binary's registry at ChecksPath.
+func TestChecksPageOutput(t *testing.T) {
+	outs, err := ChecksPageOutput(nil)
+	require.NoError(t, err)
+	require.Len(t, outs, 1)
+	assert.Equal(t, ChecksPath, outs[0].Path)
+	assert.Equal(t, string(ChecksPage(Registered())), string(outs[0].Content))
 }

@@ -637,16 +637,13 @@ func TestGeneratedOutputsAreNotConverted(t *testing.T) {
 	r, err := os.OpenRoot(root)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = r.Close() })
-	// The files the generators of this package write, the inventory of
-	// the checks among them.
-	var outs []output
-	for _, gen := range []func(*os.Root) ([]check.Output, error){Codeowners, ADRIndex, ChecksPageOutput} {
-		got, err := gen(r)
-		require.NoError(t, err)
-		for _, o := range got {
-			outs = append(outs, output{o.Path, o.Content})
-		}
-	}
+	// The files the generators of the registry of this test write, and
+	// the inventory of the checks.
+	outs, err := generateOutputs(r)
+	require.NoError(t, err)
+	checks, err := check.ChecksPageOutput(r)
+	require.NoError(t, err)
+	outs = append(outs, output{checks[0].Path, checks[0].Content})
 	findings, err := attributeProblems(t.Context(), git.Repo{Dir: root}, outs)
 	require.NoError(t, err)
 	assert.Empty(t, findings)

@@ -20,7 +20,6 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/drift"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/plan"
 )
 
@@ -140,9 +139,9 @@ func stepTableRows(t *testing.T) map[string][]string {
 // checks is the one the registry gives; "generated" fails it too, and
 // this names the file.
 func TestChecksPageIsCurrent(t *testing.T) {
-	got, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(drift.ChecksPath)))
+	got, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(check.ChecksPath)))
 	require.NoError(t, err)
-	assert.Equal(t, string(drift.ChecksPage(check.Registered())), string(got), "run go generate ./...")
+	assert.Equal(t, string(check.ChecksPage(check.Registered())), string(got), "run go generate ./...")
 }
 
 // fixtureCheck and fixturePackage are the two files that add the check

@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 // Package adrdir holds what the author of a decision record (tools/new)
-// and the generator of its index (tools/ci generate) both need to find
-// the records: where the directory is, and what a record's filename
-// looks like (rule 6 of ADR 0001). One copy of each, so they cannot
-// disagree about which files are records.
+// and the generator of its index both need to find the records: where
+// the directory is, and what a record's filename looks like (rule 6 of
+// ADR 0001). One copy of each, so they cannot disagree about which
+// files are records. The generator of the index lives here too (Index),
+// next to the records it reads.
 package adrdir
 
 import (

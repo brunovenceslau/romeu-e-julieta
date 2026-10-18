@@ -1,15 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package drift
+package check
 
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strings"
-
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // ChecksPath is the inventory of the checks that generate writes from
@@ -21,10 +19,10 @@ const ChecksPath = "docs/reference/checks.md"
 // usage line, where it runs, its order key, whether it runs code of the
 // change, the requirement id of its row in the step table of 10 10.2,
 // and a link to its package.
-func ChecksPage(checks []check.Check) []byte {
+func ChecksPage(checks []Check) []byte {
 	var b bytes.Buffer
 	b.WriteString("---\ntype: reference\nreader: a contributor who adds or changes a check of tools/ci, or who reads which checks a change meets\n---\n\n")
-	fmt.Fprintf(&b, "<!-- %s -->\n\n", askfirst.GeneratedNotice("the registry of tools/ci, tools/ci/check_*.go"))
+	fmt.Fprintf(&b, "<!-- %s -->\n\n", GeneratedNotice("the registry of tools/ci, tools/ci/check_*.go"))
 	b.WriteString("# Checks\n\n")
 	b.WriteString("Each check of tools/ci registers itself from one file,\n`tools/ci/check_<check>.go`, and lives in one package below\n`tools/ci/internal/`\n([12 12.2](../spec/12-engineering.md#122-development-commands-and-capability-map)).\n")
 	b.WriteString("fast and all run the checks they hold in the order below, except that\nevery check that judges the tree runs before the first one that runs\ncode of the change, and the checks of the commit judge the commit read\nbefore any step.\n")
@@ -47,7 +45,7 @@ func ChecksPage(checks []check.Check) []byte {
 
 // runsIn says where a check runs: fast, all, or the pre-push run of
 // fast alone.
-func runsIn(c check.Check) string {
+func runsIn(c Check) string {
 	var in []string
 	switch {
 	case c.Fast:
@@ -68,4 +66,10 @@ func runsIn(c check.Check) string {
 // its end.
 func cell(s string) string {
 	return strings.ReplaceAll(s, "|", `\|`)
+}
+
+// ChecksPageOutput is the generator of the inventory of the checks of
+// this binary's registry, docs/reference/checks.md (ChecksPage).
+func ChecksPageOutput(*os.Root) ([]Output, error) {
+	return []Output{{Path: ChecksPath, Content: ChecksPage(Registered())}}, nil
 }

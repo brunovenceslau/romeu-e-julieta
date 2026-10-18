@@ -80,6 +80,26 @@ func TestCodeowners(t *testing.T) {
 	assert.Equal(t, want, string(list.Codeowners()))
 }
 
+// TestCodeownersOutput runs the generator on a tree that holds the list
+// at Path, and finds CODEOWNERS at its path with the lines Codeowners
+// renders.
+func TestCodeownersOutput(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".github"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, filepath.FromSlash(Path)), []byte(citest.ValidAskFirst), 0o644))
+	root, err := os.OpenRoot(dir)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = root.Close() })
+	list, err := Parse([]byte(citest.ValidAskFirst))
+	require.NoError(t, err)
+
+	outs, err := CodeownersOutput(root)
+	require.NoError(t, err)
+	require.Len(t, outs, 1)
+	assert.Equal(t, CodeownersPath, outs[0].Path)
+	assert.Equal(t, string(list.Codeowners()), string(outs[0].Content))
+}
+
 // TestPullRequestTemplate checks the five sections of 12 12.7, in order,
 // and the approval hint: the template shows the form of 12 12.4 inside a
 // sentence, so a body that keeps the hint has no line that starts with

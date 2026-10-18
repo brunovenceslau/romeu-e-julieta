@@ -4,11 +4,12 @@
 package main
 
 import (
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/drift"
 )
 
-// The generator of .github/CODEOWNERS, from .github/ask-first.yaml (12 12.3).
+// The generator of .github/CODEOWNERS (12 12.3), which lives with the
+// ask-first list in askfirst.
 func init() {
-	check.RegisterGenerator(check.Generator{Name: "codeowners", Outputs: drift.Codeowners})
+	check.RegisterGenerator(check.Generator{Name: "codeowners", Outputs: askfirst.CodeownersOutput})
 }

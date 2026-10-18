@@ -3,7 +3,11 @@
 
 package drift
 
-import "github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+import (
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/adrdir"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+)
 
 // The tests of this package run generate and generated as tools/ci
 // does, with the generated check in the registry of the test binary, as
@@ -19,6 +23,6 @@ func init() {
 		Order:   30,
 		Package: "tools/ci/internal/drift",
 	})
-	check.RegisterGenerator(check.Generator{Name: "codeowners", Outputs: Codeowners})
-	check.RegisterGenerator(check.Generator{Name: "adr index", Outputs: ADRIndex})
+	check.RegisterGenerator(check.Generator{Name: "codeowners", Outputs: askfirst.CodeownersOutput})
+	check.RegisterGenerator(check.Generator{Name: "adr index", Outputs: adrdir.IndexOutput})
 }
