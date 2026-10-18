@@ -54,7 +54,10 @@ arguments and stdin pass through (10 10.2).
 `REQ-1049` Go dependencies (each an ask-first addition; complete v1 list):
 `go.yaml.in/yaml/v3`, `github.com/BurntSushi/toml`,
 `github.com/santhosh-tekuri/jsonschema/v6` (validates examples against
-the generated schemas) with `golang.org/x/text`, which it compiles in,
+the generated schemas) with `golang.org/x/text`, which it compiles in
+and which `internal/gitsafe` also imports directly, its
+`unicode/norm` package (the tree walk's check of names that are one
+under Unicode normalization, I27 in [05](05-security.md)),
 and `github.com/dlclark/regexp2`, which `go.sum` pins for its tests
 alone and no build compiles, `golang.org/x/term`, `golang.org/x/sys`,
 `github.com/stretchr/testify` (its `assert` and `require` packages, in
