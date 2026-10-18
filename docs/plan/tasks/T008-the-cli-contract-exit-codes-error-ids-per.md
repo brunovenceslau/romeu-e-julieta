@@ -15,9 +15,10 @@ owns:
   - internal/cli/testsupport/**
   - internal/cmd/romeu/all/doc.go
   - internal/cmd/julieta/all/doc.go
-  - tools/ci/internal/generated/errors*.go
-  - tools/ci/internal/generated/commands*.go
-  - tools/ci/internal/generated/generate*.go
+  - internal/cli/generate*.go
+  - internal/cli/*_gen.go
+  - internal/cli/clidoc/**
+  - tools/ci/generator_cli.go
   - .gitattributes
   - go.mod
   - go.sum
@@ -50,13 +51,19 @@ The command line is cobra with pflag, which enter `go.mod` here as their
 first importer (rule 7 of `docs/plan.md`), so this task owns `go.mod`
 and `go.sum` and comes before T125 and T053. The registry by file stays;
 each definition holds a function that returns its `*cobra.Command`, and
-`internal/cli` assembles the binary's tree on each run. The generators
-of the error table and of the per-command reference pages join the
-generated check of `tools/ci`, whose package no task owns: one file each
-under `tools/ci/internal/generated/`, one more source in `generate.go`,
-and the pages in the `-text` list of `.gitattributes`. A check of its own
-would add a row to the step table of 10 10.2 for a generator that judges
-nothing.
+`internal/cli` assembles the binary's tree on each run. A generator
+lives in the package that owns its data (ADR 0015, decision 7): the
+generator of the error table's pages in `internal/cli`, and that of the
+per-command reference pages in `internal/cli/clidoc`, the one importer
+of `cobra/doc`, which no binary imports and which hands `tools/ci` both.
+The generated check of `tools/ci` holds no generator; one file,
+`tools/ci/generator_cli.go`, imports `internal/cli/clidoc` and the two
+`internal/cmd/<binary>/all` packages that link the commands in, and
+hands the generators to it, which needs the rename of
+`tools/ci/internal/generated` to `drift` merged first (pending note
+"rename-the-generated-package-to-drift"). The pages join the `-text`
+list of `.gitattributes`. A check of its own would add a row to the step table
+of 10 10.2 for a generator that judges nothing.
 
 Re-plan (2026-10-12): Kept, changed. Each package declares its ids in
 its own `errors.go`, taken from 04 4.4; one test collects the union.
@@ -138,8 +145,10 @@ off every chain through it.
     bash` and `__complete` on the fixture tree, and another holds a
     completion function to REQ-1245.
   - A test holds the import boundary of REQ-1246: cobra only in
-    `internal/cli` and `internal/cmd/**`, `cobra/doc` only in
-    `tools/ci`, and no target of `cmd/romeu` or `cmd/julieta` linking
+    `internal/cli`, `internal/cli/clidoc` and `internal/cmd/**`,
+    `cobra/doc` only in `internal/cli/clidoc`, which only `tools/ci`
+    imports (REQ-1247), so `tools/ci imports` passes, and no target of
+    `cmd/romeu` or `cmd/julieta` linking `internal/cli/clidoc`,
     `cobra/doc`, go-md2man, blackfriday or mousetrap.
   - The two `internal/cmd/<binary>/all/doc.go` files name the package's
     one purpose: the assembled command set each binary's `main.go`
@@ -187,12 +196,16 @@ off every chain through it.
     <reason>`; a test fails an id without one, and `errors.md` links it.
   - `go generate` writes one `docs/reference/<binary>/<command path>.md`
     page per registered command with `github.com/spf13/cobra/doc`, from
-    the tree `cli` assembles, with the P marker and the appending list
+    the tree `cli` assembles, through the generator in
+    `internal/cli/clidoc`, with the P marker and the appending list
     (12 12.3, REQ-1109); a fixture definition shows the page.
   - `go generate` writes the three consumers of the table (12 12.3): the
     exit-code sections of `--help`, `docs/reference/errors.md` and
     `docs/reference/exit-codes.md`, the pages with the generated-file
     header and front matter; the exit-code section of `--help` and
     `docs/reference/exit-codes.md` list 130 and 143 with the precedence
-    sentence of 04 4.1 Signals.
+    sentence of 04 4.1 Signals. The exit-code section of `--help` is
+    the Go file `internal/cli/exitcodes_gen.go`; a Go file a generator
+    writes is named `*_gen.go` and carries no generated-code header,
+    which the lint step of 10 10.2 refuses.
 - Verify: `go test ./internal/cli/...`; `go run ./tools/ci generated`.

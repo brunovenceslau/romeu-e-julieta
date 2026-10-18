@@ -283,8 +283,9 @@ New or changed, each proposed on 2026-10-12:
    imports it, under that task's `dependencies` forecast, since `go mod
    tidy` drops a requirement that no package imports: the JSON Schema
    validator with T125, the TOML parser with T053, which T036 then comes
-   after, and cobra with pflag and the tools-only `cobra/doc` with T008
-   (ADR 0015, decided on 2026-10-17), which T125 and T053 come after.
+   after, and cobra with pflag and `cobra/doc`, which no binary links,
+   with T008 (ADR 0015, decided on 2026-10-17), which T125 and T053
+   come after.
    Those three tasks own `go.mod` and `go.sum`, ordered by `after`, and
    no other task edits them; `mise.toml` and `mise.lock` change only in a task that
    names them.
