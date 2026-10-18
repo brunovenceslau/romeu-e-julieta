@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
@@ -18,6 +19,24 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pushed"
 )
+
+// fastBudget is the time `fast` targets on a warm cache (10 10.2).
+const fastBudget = 3 * time.Minute
+
+// timed is the verdict of a check of the commit and the time its check
+// took. A check that gives several verdicts gives each the time of the
+// whole call.
+type timed struct {
+	check.Verdict
+	took time.Duration
+}
+
+// printTimed prints each verdict with its duration.
+func printTimed(c *check.Printer, verdicts []timed) {
+	for _, v := range verdicts {
+		c.Verdict(v.Verdict, v.took)
+	}
+}
 
 // inFast and inAll say whether a check runs in fast and in all. A
 // check of the pre-push run alone (check.Check.Hook) runs in fast when
@@ -103,6 +122,15 @@ func runFast(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	now := e.Clock()
+	started := now()
+	// The warning fires on every return, an early error included: the
+	// run may have spent its time in the steps before it failed.
+	defer func() {
+		if took := now().Sub(started); took > fastBudget {
+			check.Say(e.Stderr, "fast: took %s, over the three-minute target of 10 10.2\n", check.FormatDuration(took))
+		}
+	}()
 	hook := len(args) == 2
 	var push pushed.Push
 	if hook {
@@ -143,7 +171,7 @@ func runFast(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if hook {
 		hooked = &check.Hook{Remote: args[0], Push: push}
 	}
-	verdicts, err := commitChecks(ctx, repo, head, hooked, inFast)
+	verdicts, err := commitChecks(ctx, repo, head, hooked, inFast, now)
 	if err != nil {
 		return false, err
 	}
@@ -166,7 +194,7 @@ func runFast(ctx context.Context, e check.Env, args []string) (bool, error) {
 		}
 		steps = fastSteps(ctx, root, tools)
 	}
-	c := check.NewPrinter(e.Stdout)
+	c := check.NewPrinterAt(e.Stdout, now)
 	c.Run(ctx, root, steps)
 	if hook {
 		_, err := judge()
@@ -178,9 +206,8 @@ func runFast(ctx context.Context, e check.Env, args []string) (bool, error) {
 		}
 	}
 
-	for _, v := range verdicts {
-		c.Verdict(v)
-	}
+	printTimed(c, verdicts)
+	c.Last("fast")
 	return c.OK, nil
 }
 
@@ -200,23 +227,27 @@ func runFast(ctx context.Context, e check.Env, args []string) (bool, error) {
 // remote that is not configured, is an error. git and the object store
 // are trusted up to that read; what mise may run before it is the
 // threat model of misefiles.go.
-func commitChecks(ctx context.Context, repo git.Repo, commit string, hook *check.Hook, in func(check.Check) bool) ([]check.Verdict, error) {
+func commitChecks(ctx context.Context, repo git.Repo, commit string, hook *check.Hook, in func(check.Check) bool, now func() time.Time) ([]timed, error) {
 	files, err := check.HeadTree(ctx, repo, commit)
 	if err != nil {
 		return nil, err
 	}
 	judged := check.Commit{Repo: repo, ID: commit, Files: files, Hook: hook}
-	var verdicts []check.Verdict
+	var verdicts []timed
 	for _, c := range check.Registered() {
 		judges := in(c) || (hook != nil && c.Hook)
 		if c.Judge == nil || !judges {
 			continue
 		}
+		start := now()
 		got, err := c.Judge(ctx, judged)
 		if err != nil {
 			return nil, err
 		}
-		verdicts = append(verdicts, got...)
+		took := now().Sub(start)
+		for _, v := range got {
+			verdicts = append(verdicts, timed{v, took})
+		}
 	}
 	return verdicts, nil
 }

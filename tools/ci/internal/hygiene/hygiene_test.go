@@ -67,6 +67,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "U+2014 in a file",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("docs/page.md", "one\ntwo "+EmDash+" three\n")
 			},
 			want: []string{"docs/page.md:2: em-dash:"},
@@ -74,6 +75,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "U+2014 in a code span and in a fenced block: the check skips nothing",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("docs/page.md", "a `"+EmDash+"` span\n\n```\n"+EmDash+"\n```\n")
 			},
 			want: []string{"docs/page.md:1: em-dash:", "docs/page.md:4: em-dash:"},
@@ -81,6 +83,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "U+2014 in a path",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("docs/a"+EmDash+"b.md", "text\n")
 			},
 			// The byte rule of the path reports it too.
@@ -89,6 +92,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a listed prose word",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("docs/page.md", "one\n\nA Glimmerous tool.\n")
 			},
 			want: []string{"docs/page.md:3: prose: shiny"},
@@ -96,6 +100,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a to-do without an issue",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("tools/x/x.go", "package x\n\n// "+todoWord+": later.\nvar X = 1\n")
 			},
 			want: []string{"tools/x/x.go:3: todo:"},
@@ -103,6 +108,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a to-do with a name instead of an issue, in a block comment",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("tools/x/x.go", "package x\n\n/*\n   one\n   "+todoWord+"(someone) later\n*/\nvar X = 1\n")
 			},
 			want: []string{"tools/x/x.go:5: todo:"},
@@ -110,6 +116,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a personal absolute path, macOS form",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("docs/page.md", "run it in "+usersDir+"someone/src\n")
 			},
 			want: []string{"docs/page.md:1: personal-path:"},
@@ -117,6 +124,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a personal absolute path, Linux form",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("tools/x/x.go", "package x\n\nconst p = \""+homeDir+"someone/x\"\n")
 			},
 			want: []string{"tools/x/x.go:3: personal-path:"},
@@ -124,6 +132,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a tracked go.work",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("go.work", "go 1.27\n")
 				r.Write("go.work.sum", "\n")
 			},
@@ -132,6 +141,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a tracked vendor directory",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("vendor/modules.txt", "\n")
 			},
 			want: []string{"vendor/modules.txt: workspace:"},
@@ -139,6 +149,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a path hit carries the fix line",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("docs/zorvex-quimby.md", "plain\n")
 			},
 			want: []string{"(path withheld, tree entry 3): name: the path holds a listed name; " + NameFix},
@@ -146,6 +157,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a line hit carries the fix line",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("docs/page.md", "one\nzorvex quimby\n")
 			},
 			want: []string{"docs/page.md:2: name: the line holds a listed name; " + NameFix},
@@ -153,6 +165,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a tracked PROLOGUE.md at the root",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("PROLOGUE.md", "text\n")
 			},
 			want: []string{"PROLOGUE.md: never-tracked: the file belongs outside product repositories (the neverTracked list of tools/ci/denylist.yaml)"},
@@ -160,6 +173,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a tracked PROLOGUE.md in a subdirectory",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("docs/notes/PROLOGUE.md", "text\n")
 			},
 			want: []string{"docs/notes/PROLOGUE.md: never-tracked:"},
@@ -167,6 +181,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a tracked prologue.md in another case",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("Docs/Prologue.MD", "text\n")
 			},
 			want: []string{"Docs/Prologue.MD: never-tracked:"},
@@ -174,6 +189,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a second file in .githooks",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write(".githooks/pre-commit", "#!/bin/sh\n")
 			},
 			want: []string{".githooks/pre-commit: githooks:"},
@@ -181,6 +197,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a file in .githooks that is no hook",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write(".githooks/other", "text\n")
 			},
 			want: []string{".githooks/other: githooks:"},
@@ -188,6 +205,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a file in .githooks whose path holds a listed name",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write(".githooks/zorvex-quimby", "text\n")
 			},
 			want: []string{
@@ -198,6 +216,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a to-do with an empty issue number",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("tools/x/x.go", "package x\n\n// "+todoWord+"(#): later.\nvar X = 1\n")
 			},
 			want: []string{"tools/x/x.go:3: todo:"},
@@ -205,6 +224,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a hook that is not executable",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				require.NoError(t, os.Chmod(filepath.Join(r.Dir, ".githooks", "pre-push"), 0o644))
 			},
 			want: []string{".githooks/pre-push: githooks: the mode is 100644, want 100755"},
@@ -212,6 +232,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "no hook",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				require.NoError(t, os.Remove(filepath.Join(r.Dir, ".githooks", "pre-push")))
 			},
 			want: []string{".githooks/pre-push: githooks: the hook is not tracked"},
@@ -219,6 +240,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a mise configuration other than mise.toml, in any case",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("mise.local.toml", "[settings]\n")
 				r.Write("Mise.Ci.toml", "[settings]\n")
 				r.Write(".TOOL-VERSIONS", "go 1.27.0\n")
@@ -236,6 +258,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a path with a byte outside printable ASCII",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("mi\u017fe.local.toml", "[settings]\n")
 				r.Write("docs/tab\tname.md", "text\n")
 				r.Write("docs/del\x7fname.md", "text\n")
@@ -245,6 +268,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a symbolic link",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("realconf/mise/conf.d/x.md", "text\n")
 				require.NoError(t, os.Symlink("realconf", filepath.Join(r.Dir, ".config")))
 			},
@@ -253,6 +277,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a submodule",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				// The directory keeps "git add --all" from staging the
 				// removal of the entry.
 				require.NoError(t, os.Mkdir(filepath.Join(r.Dir, "lib"), 0o755))
@@ -263,6 +288,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a missing denylist",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
 			},
 			want: []string{names.Path + ": denylist: the denylist is missing"},
@@ -270,6 +296,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a denylist with no entry",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write(names.Path, string(citest.Denylist(t)))
 			},
 			want: []string{names.Path + ": denylist: the denylist has no entry"},
@@ -277,6 +304,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a listed name in a file",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("docs/page.md", "one\nsee Zorvex-Quimby\n")
 				r.Write("e2e/testdata/sbx/v1/session.jsonl", "{\"out\":\"zorvexquimby\"}\n")
 			},
@@ -285,6 +313,7 @@ func TestHygieneRules(t *testing.T) {
 		{
 			name: "a listed name in a path",
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("docs/zorvex_quimby/page.md", "see zorvex.quimby\n")
 			},
 			want: []string{"(path withheld, tree entry 3): name: the path holds a listed name", "(path withheld, tree entry 3):1: name:"},

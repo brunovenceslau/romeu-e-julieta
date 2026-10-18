@@ -94,6 +94,10 @@ func hookAllowWords() string {
 	return strings.Join(words, " ")
 }
 
+// frozen is the clock of the tests that read a verdict line: it never
+// moves, so every duration prints as 0s (10 10.4).
+func frozen() time.Time { return time.Unix(0, 0) }
+
 // runCI runs the command in the fixture and returns its exit status
 // and what it printed. The steps of fast are replaced by stubs: the
 // real ones run the tests this file is part of.
@@ -103,7 +107,7 @@ func runCI(t *testing.T, r *gittest.Repo, stdin io.Reader, steps []check.Step, a
 	if stdin == nil {
 		stdin = strings.NewReader("")
 	}
-	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: stdin, Stdout: &out, Stderr: &out, Steps: steps}
+	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: stdin, Stdout: &out, Stderr: &out, Steps: steps, Now: frozen}
 	return run(t.Context(), e, args), out.String()
 }
 

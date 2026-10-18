@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -30,7 +31,24 @@ import (
 func Main(ctx context.Context, args []string, env *Env) int {
 	env.JSON = false
 	root := Tree(env)
-	if env.Stdout != nil && len(args) > 0 && (args[0] == cobra.ShellCompRequestCmd || args[0] == cobra.ShellCompNoDescRequestCmd) {
+	completing := len(args) > 0 && (args[0] == cobra.ShellCompRequestCmd || args[0] == cobra.ShellCompNoDescRequestCmd)
+	if completing {
+		// cobra v1.10.2 writes two things of a completion line outside
+		// the writers it was given, and offers no hook for either: a
+		// flag parse error as "[Error] ..." straight to os.Stderr, and
+		// debug lines to the file BASH_COMP_DEBUG_FILE names. The
+		// variable is unset so no file is written, and os.Stderr is a
+		// pipe for the run, whose text goes through the CLI writer of
+		// stderr after it (04 4.1, Output). Only args[0] is looked at:
+		// cobra's completion scripts always call "<binary> __complete"
+		// first, and the root has no persistent flag, so a flag cannot
+		// precede the command (cobra's Find would strip it).
+		_ = os.Unsetenv("BASH_COMP_DEBUG_FILE")
+		if env.Stderr != nil {
+			defer captureStderr(env.Stderr)()
+		}
+	}
+	if completing && env.Stdout != nil {
 		// The output of the hidden __complete commands is a named
 		// exception to the CLI writer (04 4.1, Output, REQ-0270): the
 		// shell reads a real tab between a name and its description, and
@@ -49,6 +67,33 @@ func Main(ctx context.Context, args []string, env *Env) int {
 		}
 	}
 	return Report(env, err)
+}
+
+// captureStderr swaps os.Stderr for a pipe and returns the function that
+// restores it and writes what was written to the pipe to w in one Write,
+// so a multi-byte sequence is not split and w escapes it. A goroutine drains the pipe meanwhile, so a long
+// text cannot fill it. If the pipe cannot be made, os.Stderr stays and
+// the returned function does nothing.
+func captureStderr(w io.Writer) func() {
+	r, pw, err := os.Pipe()
+	if err != nil {
+		return func() {}
+	}
+	old := os.Stderr
+	os.Stderr = pw
+	done := make(chan []byte)
+	go func() {
+		b, _ := io.ReadAll(r)
+		_ = r.Close()
+		done <- b
+	}()
+	return func() {
+		os.Stderr = old
+		_ = pw.Close()
+		if b := <-done; len(b) > 0 {
+			_, _ = w.Write(b)
+		}
+	}
 }
 
 // Tree returns a new cobra tree of env.Binary: the root, a group command

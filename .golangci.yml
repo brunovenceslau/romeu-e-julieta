@@ -1,10 +1,20 @@
 # SPDX-FileCopyrightText: 2026 Bruno Venceslau
 # SPDX-License-Identifier: GPL-3.0-only
 
-# The linter configuration of ADR 0001 (rule 14) and ADR 0007 (testify).
-# No linter is disabled and no finding is excluded: a finding is fixed
-# in the code. tools/ci/internal/lint/config_test.go proves that each
-# checker below still reports, in a generated file too.
+# The linter configuration of ADR 0001 (rule 14), ADR 0007 (testify) and
+# the lint set of item 16 of Decisions of the plan. No linter is
+# disabled and no finding is excluded: a finding is fixed in the code.
+# tools/ci/internal/lint/config_*_test.go prove, linter by linter, that
+# each checker below still reports, in a generated file too.
+#
+# forbidigo is not here: its output patterns hold only outside an allow
+# list of packages, and no setting scopes a linter by package without an
+# exclusion, which ADR 0007 rule 8 bars. The lint step runs it apart,
+# with tools/ci/internal/lint/forbidigo.yml, over the packages outside
+# the list. 04 4.1 names no package set for those patterns, so the list
+# (Allowed in tools/ci/internal/lint/boundaries.go) is a decision of the
+# task that made it, derived from REQ-0269 (all output through the CLI
+# writer) and the composition roots, open for the operator to confirm.
 version: "2"
 
 linters:
@@ -20,15 +30,19 @@ linters:
     - revive
     - gocritic
     - testifylint
+    - errorlint
+    - usetesting
+    - thelper
   settings:
     revive:
-      # Only the two rules of ADR 0001, rule 14, that revive owns:
-      # a doc comment on every exported identifier, and Go style for
-      # error strings.
+      # Only the rules of ADR 0001, rule 14, that revive owns: a doc
+      # comment on every exported identifier, and Go style for error
+      # strings; and the package comment of the lint set.
       enable-all-rules: false
       rules:
         - name: exported
         - name: error-strings
+        - name: package-comments
     gocritic:
       # Commented-out code, the third checker of ADR 0001, rule 14.
       disable-all: true

@@ -834,6 +834,7 @@ window it covers, why it is accepted and what reopens it.
 | the bridge's hand-written manifest and mounts are the "remember" pattern | M1 to sitting M3 | one committed runbook per project in the config repository with the undo of each step; `julieta status` prints the manifest's repos, so a drift is read at sitting M1 | sitting M3 writes every manifest through `sync` |
 | the signing rule (I34) is enforced by no code while the `git-ssh-sign` kit is in daily use before T080: accepted by name in 05 5.4, the row "I34 is enforced by no code" | M2 to T080 (M3) | as 05 5.4 says; the outcome of an unanswered confirmation is read at sitting M2 (T115) and named here with the away window it covers | T080 lands; or a sandbox whose `ssh-add -L` lists more than one key |
 | a grant is read by no check until `tools/ci pr` lands: accepted by name in 05 5.4, the row "no check reads the approval line or a checkpoint grant" | the first grant (sitting M0) to T005 (M6) | as 05 5.4 says | T005 lands; or a merged pull request whose grant matched no approval line |
+| the inbox skill's one-step prefix capture is gone (item 19 of [Decisions of the re-plan](#decisions-of-the-re-plan)) | from sitting M1 | the julieta skill's rule that anything worth keeping goes to `julieta memory` covers it | a capture missed in daily use |
 | hand-written sbx sessions diverge from the real binary | until the harness (M6) | the maintainer runs the real binary daily from sitting M3; a divergence is a one-line session fix | the harness's trigger above |
 | the facts of sitting M2 drive `oci`, `kits` and the signing kit by hand | M2, M3 | each fact is a fixture marked `source: sitting M2`, re-measured by block A in M6 with the version rule | a changed fact is a re-probe, as the pin file's rule says today |
 | the security invariants' tooling (tag pairing, mutate, the `pr` rule that a pull request removes no last guard or test tag) is thinner than the earlier plan's until M6: accepted by name in 05 5.4, the row "the invariant tag pairing and `mutate` land in M6" | all | as 05 5.4 says; the I-level cases sit in the task that lands the code, never in a breadth task | a reviewer finds an untested guard before M6: a tag-pairing check is one small task |
@@ -936,17 +937,22 @@ records these answers again with the rules they decide (T108).
     refusal a sitting shows missing.
 15. **`tools/ci pins`.** Decided on 2026-10-12: keep, as answered on
     2026-10-08. The alternative not taken: a deferral.
-16. **The lint set.** A deferred decision: it is decided at sitting M0,
-    before T139 applies it in the lint package T105 makes, and nothing
-    is decided now. The agreed default, decided on 2026-10-12, is option
-    A with the `tidy` rule: `errorlint`, `usetesting`, `thelper`,
-    `forbidigo` with the Boundaries patterns (`fmt.Print*`,
-    `os.Stdout`, `os.Stderr`, `log.`, `text/template`, `exec.Command(`
-    and `"sh", "-c"` outside the packages 04 4.1 names) and revive
+16. **The lint set.** Decided on 2026-10-18, ahead of sitting M0:
+    option A with the `tidy` rule, the default agreed on 2026-10-12,
+    which T139 applies in the lint package T105 made. The set:
+    `errorlint`, `usetesting`, `thelper`, `forbidigo` with the
+    Boundaries patterns (`fmt.Print*`,
+    `os.Stdout`, `os.Stderr`, `log.` and `text/template` outside an
+    allow list that T139 proposes, for the operator to confirm in its
+    pull request; 04 4.1 names no package set for them) and revive
     `package-comments`, each linter with its fixture, and a `tidy` rule
     of `generated` (`go mod tidy` changes neither `go.mod` nor
-    `go.sum`). Option B, weighed at that sitting: A plus `noctx`,
-    `contextcheck`, `modernize` and `gosec`, whose G204 flags every
+    `go.sum`). `exec.Command(` is not a forbidigo pattern: the call-site
+    scan of `internal/procgroup` holds `os/exec` to that package (04
+    4.1, Subprocesses), more strictly; `"sh", "-c"` is held by a Go
+    test in the lint package, since forbidigo reads no string argument.
+    Option B, not taken: A plus `noctx`, `contextcheck`,
+    `modernize` and `gosec`, whose G204 flags every
     `exec.Command` with variable arguments in `tools/ci` (restructuring
     frozen code).
 17. **The id-less error chain.** Decided on 2026-10-12: the `internal`

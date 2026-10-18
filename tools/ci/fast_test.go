@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,6 +56,7 @@ func TestFast(t *testing.T) {
 			name:  "a missing denylist",
 			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
 			},
 			code: check.ExitFail,
@@ -64,6 +66,7 @@ func TestFast(t *testing.T) {
 			name:  "an empty denylist",
 			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write(names.Path, string(citest.Denylist(t)))
 			},
 			code: check.ExitFail,
@@ -79,6 +82,7 @@ func TestFast(t *testing.T) {
 			name:  "a step runs in its own environment, not in this process's",
 			steps: []check.Step{probe},
 			setup: func(t *testing.T) {
+				t.Helper()
 				t.Setenv("GOFLAGS", "-run=^$")
 			},
 			code:  check.ExitFail,
@@ -89,6 +93,7 @@ func TestFast(t *testing.T) {
 			name:  "by hand, a working tree that differs from HEAD runs every check",
 			steps: []check.Step{citest.Passing},
 			after: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("tools/ci/x_test.go", "package main\n")
 				r.Write("README.md", "# A fixture\n\nChanged.\n")
 				r.Write("docs/staged.md", "plain\n")
@@ -103,6 +108,7 @@ func TestFast(t *testing.T) {
 			name:  "a tracked go.mod below the module root",
 			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("tools/inner/go.mod", "module example.invalid/inner\n")
 			},
 			code:  check.ExitError,
@@ -113,9 +119,11 @@ func TestFast(t *testing.T) {
 			name:  "an ignored go.mod below the module root",
 			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write(".gitignore", "inner/\n")
 			},
 			after: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("inner/go.mod", "module example.invalid/inner\n")
 			},
 			code:  check.ExitError,
@@ -125,6 +133,7 @@ func TestFast(t *testing.T) {
 		{
 			name: "no mise on the search path: fast stops before any check",
 			setup: func(t *testing.T) {
+				t.Helper()
 				gitPath, err := procgroup.LookPath("git")
 				require.NoError(t, err)
 				dir := t.TempDir()
@@ -182,24 +191,28 @@ func TestFastJudgesTheCommit(t *testing.T) {
 		{name: "a clean tree, HEAD pushed", code: check.ExitOK, want: []string{"ok    passes", "ok    hygiene", "ok    pushed range"}},
 		{name: "a staged file", code: check.ExitError, want: []string{refused, "\ndocs/staged.md"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("docs/staged.md", "plain\n")
 				r.Git("add", "docs/staged.md")
 				return nil
 			}},
 		{name: "an intent-to-add entry", code: check.ExitError, want: []string{refused, "\ndocs/intent.md"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("docs/intent.md", "plain\n")
 				r.Git("add", "--intent-to-add", "docs/intent.md")
 				return nil
 			}},
 		{name: "a modified tracked file", code: check.ExitError, want: []string{refused, "\nREADME.md"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("README.md", "# A fixture\n\nChanged.\n")
 				return nil
 			}},
 		{name: "an alternate GIT_INDEX_FILE that matches HEAD does not hide the index", code: check.ExitError,
 			want: []string{refused, "\ndocs/staged.md"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("docs/staged.md", "plain\n")
 				r.Git("add", "docs/staged.md")
 				alt := "GIT_INDEX_FILE=" + filepath.Join(t.TempDir(), "index")
@@ -209,6 +222,7 @@ func TestFastJudgesTheCommit(t *testing.T) {
 		{name: "an untracked test with a TestMain that exits 0", code: check.ExitError,
 			want: []string{refused, "\ntools/ci/x_test.go"}, lacks: []string{"os.Exit"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("tools/ci/x_test.go", "package main\n\nimport (\"os\"; \"testing\")\n\nfunc TestMain(*testing.M) { os.Exit(0) }\n")
 				return nil
 			}},
@@ -216,6 +230,7 @@ func TestFastJudgesTheCommit(t *testing.T) {
 			want:  []string{"\ntools/ci/ignored.go", "\nvendor/modules.txt", "\ngo.work", "\nmise.local.toml", "\n.tool-versions"},
 			lacks: []string{"notes.txt"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write(".git/info/exclude", "*.go\n")
 				r.Write("tools/ci/ignored.go", "package main\n")
 				r.Write("vendor/modules.txt", "# vendored\n")
@@ -227,11 +242,13 @@ func TestFastJudgesTheCommit(t *testing.T) {
 			}},
 		{name: "an untracked file fast does not read", code: check.ExitOK, want: []string{"ok    passes", "ok    hygiene"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("docs/notes.txt", "plain\n")
 				return nil
 			}},
 		{name: "an untracked nested repository", code: check.ExitError, want: []string{refused, "\ntools/ci/evil/"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("tools/ci/evil/evil_test.go", "package evil\n")
 				r.Git("-C", "tools/ci/evil", "init", "--quiet")
 				return nil
@@ -265,11 +282,13 @@ func TestFastJudgesTheCommit(t *testing.T) {
 			stdin: func(head, other string) string { return "refs/tags/v-blob {blobtag} refs/tags/v-blob " + zero + "\n" }},
 		{name: "a staged deletion", code: check.ExitError, want: []string{refused, "\nREADME.md"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Git("rm", "--quiet", "README.md")
 				return nil
 			}},
 		{name: "an untracked go.mod below the module root", code: check.ExitError, want: []string{"ci: the checks read one module", "\ninner/go.mod"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("inner/go.mod", "module example.invalid/inner\n")
 				return nil
 			}},
@@ -831,7 +850,7 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 			want: []string{"ci: fast tests the commit checked out", "\n" + clean}, lacks: []string{"\n" + listing, "pushed range"}},
 		{name: "a denylist that cannot be read at HEAD fails hygiene and the pushed range",
 			stdin: push(broken, "refs/heads/broken"), code: check.ExitFail,
-			want: []string{"FAIL  hygiene\n" + names.Path + ": ", "FAIL  pushed range\n" + names.Path + ": "}},
+			want: []string{"FAIL  hygiene (0s)\n" + names.Path + ": ", "FAIL  pushed range (0s)\n" + names.Path + ": "}},
 		{name: "a deleted ref names no tip",
 			stdin: fmt.Sprintf("(delete) %s refs/heads/listing %s\n", zero, listing), code: check.ExitOK,
 			want: []string{"ok    pushed range"}},
@@ -903,22 +922,31 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 // a mise configuration to their environment.
 func TestFastSteps(t *testing.T) {
 	root := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(root, "tools"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "tools", "other"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "tools", "other", "other.go"), []byte("package other\n"), 0o600))
 	goDir := filepath.Join("/pinned", "go", "bin")
 	goCmd := filepath.Join(goDir, "go")
 	tools := check.Tools{Linter: "/pinned/golangci-lint", GoDir: goDir}
 	// Spelled out, not read from lint.Args: this test pins the list.
 	wantLint := []string{"/pinned/golangci-lint", "run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners"}
+	wantBoundary := []string{"/pinned/golangci-lint", "run", "--config", "tools/ci/internal/lint/forbidigo.yml", "-j", "1", "--allow-parallel-runners", "./tools/other"}
+	lintSteps := func(targets ...lint.Target) []check.Step {
+		var steps []check.Step
+		for _, target := range targets {
+			env := lint.Env(target, goDir)
+			steps = append(steps,
+				check.Step{Name: "lint " + target.String(), Argv: wantLint, Environ: env},
+				check.Step{Name: "lint boundaries " + target.String(), Argv: wantBoundary, Environ: env})
+		}
+		return steps
+	}
 	want := []check.Step{
 		{Name: "format", Argv: []string{filepath.Join(goDir, "gofmt"), "-l", "."}, Quiet: true, Environ: check.StepEnv(goDir)},
 		{Name: "vet", Argv: []string{goCmd, "vet", "./..."}, Environ: check.StepEnv(goDir)},
 		{Name: "generated", Argv: []string{goCmd, "run", "./tools/ci", "generated"}, Environ: check.StepEnv(goDir)},
-		{Name: "lint linux/amd64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "linux", GOARCH: "amd64"}, goDir)},
-		{Name: "lint linux/arm64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "linux", GOARCH: "arm64"}, goDir)},
-		{Name: "lint darwin/amd64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "darwin", GOARCH: "amd64"}, goDir)},
-		{Name: "lint darwin/arm64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "darwin", GOARCH: "arm64"}, goDir)},
-		{Name: "unit", Argv: []string{goCmd, "test", "-count=1", "./tools/..."}, Environ: check.StepEnv(goDir)},
 	}
+	want = append(want, lintSteps(lint.Targets...)...)
+	want = append(want, check.Step{Name: "unit", Argv: []string{goCmd, "test", "-count=1", "./tools/..."}, Environ: check.StepEnv(goDir)})
 	assert.Equal(t, want, fastSteps(t.Context(), root, tools))
 	for _, s := range fastSteps(t.Context(), root, tools) {
 		assert.Contains(t, s.Environ, "GOPROXY=off", "%s never reaches the network", s.Name)
@@ -932,6 +960,7 @@ func TestFastSteps(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{goCmd, "test", "-count=1", "./internal/...", "./tools/..."}, unit, "unit")
+
 }
 
 // TestGeneratedRunsBeforeTheTests holds the order the threat model of
@@ -1038,7 +1067,7 @@ func TestFastHookReadsTheProcessGitEnv(t *testing.T) {
 		t.Helper()
 		var out strings.Builder
 		stdin := "refs/heads/x " + tip + " refs/heads/x " + zero + "\n"
-		e := check.Env{Dir: r.Dir, Stdin: strings.NewReader(stdin), Stdout: &out, Stderr: &out, Steps: []check.Step{citest.Passing}}
+		e := check.Env{Dir: r.Dir, Stdin: strings.NewReader(stdin), Stdout: &out, Stderr: &out, Steps: []check.Step{citest.Passing}, Now: frozen}
 		return run(t.Context(), e, []string{"fast", "origin", origin.Dir}), out.String()
 	}
 
@@ -1161,6 +1190,92 @@ func TestPrologueInThePushedRange(t *testing.T) {
 	// The run reports the finding too, and not only "not checked".
 	code, out := runCI(t, r, strings.NewReader(stdin), []check.Step{citest.Passing}, "fast", "origin", origin.Dir)
 	assert.Equal(t, check.ExitFail, code, "exit status")
-	assert.Contains(t, out, "FAIL  pushed range\ncommit "+added+": added path sub/prologue.md: never-tracked:")
+	assert.Contains(t, out, "FAIL  pushed range (0s)\ncommit "+added+": added path sub/prologue.md: never-tracked:")
 	assert.Contains(t, out, "pushed range: not checked against names")
+}
+
+// ticking returns a clock that moves by step at every reading, so the
+// time between two consecutive readings is step, whatever the machine
+// does (10 10.4).
+func ticking(step time.Duration) func() time.Time {
+	now := time.Unix(0, 0)
+	return func() time.Time {
+		now = now.Add(step)
+		return now
+	}
+}
+
+// runTimed runs args in a fixture with the steps and the clock, and
+// returns the exit status, the standard output and the standard error.
+func runTimed(t *testing.T, now func() time.Time, steps []check.Step, args ...string) (int, string, string) {
+	t.Helper()
+	r := citest.NewTree(t)
+	r.Commit("fixture")
+	var out, errOut strings.Builder
+	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errOut, Steps: steps, Now: now}
+	return run(t.Context(), e, args), out.String(), errOut.String()
+}
+
+// TestProgressDuration holds the verdict line of REQ-0864: each ends
+// with its duration rounded to 100 ms, for a command step that passes,
+// one that fails and a check of the commit, while a "--" line carries
+// none.
+func TestProgressDuration(t *testing.T) {
+	skipped := check.Step{Name: "skipped", Skip: "not on this platform"}
+	code, out, _ := runTimed(t, ticking(1234*time.Millisecond), []check.Step{citest.Passing, citest.Failing, skipped}, "fast")
+	assert.Equal(t, check.ExitFail, code)
+	assert.Contains(t, out, "ok    passes (1.2s)\n")
+	assert.Contains(t, out, "FAIL  fails (1.2s)\n")
+	assert.Contains(t, out, "ok    hygiene (1.2s)\n")
+	assert.Contains(t, out, "--    skipped: not on this platform\n")
+}
+
+// TestProgressFastBudget holds the three-minute target of REQ-0864: a
+// run past it warns on standard error, an early error included, and one
+// within it does not.
+func TestProgressFastBudget(t *testing.T) {
+	// slow reads the start of the run first (time zero) and every later
+	// reading is 3m30s after it, so the run took 3m30s.
+	slow := func() func() time.Time {
+		calls := 0
+		return func() time.Time {
+			calls++
+			if calls == 1 {
+				return time.Unix(0, 0)
+			}
+			return time.Unix(0, 0).Add(3*time.Minute + 30*time.Second)
+		}
+	}
+	const warning = "fast: took 3m30s, over the three-minute target of 10 10.2\n"
+	_, out, stderr := runTimed(t, slow(), []check.Step{citest.Passing}, "fast")
+	assert.Equal(t, warning, stderr)
+	assert.NotContains(t, out, "over the three-minute")
+
+	// A run that ends in an error warns too: the hook refuses a push
+	// whose tip is not HEAD, after the clock has already read the start.
+	r := citest.NewTree(t)
+	r.Commit("fixture")
+	var errOut strings.Builder
+	stdin := "refs/heads/x " + strings.Repeat("1", 40) + " refs/heads/x " + strings.Repeat("0", 40) + "\n"
+	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(stdin), Stdout: &strings.Builder{}, Stderr: &errOut, Steps: []check.Step{citest.Passing}, Now: slow()}
+	assert.Equal(t, check.ExitError, run(t.Context(), e, []string{"fast", "origin", "x"}))
+	assert.Contains(t, errOut.String(), warning)
+
+	_, _, stderr = runTimed(t, ticking(time.Millisecond), []check.Step{citest.Passing}, "fast")
+	assert.Empty(t, stderr, "a run within three minutes is quiet")
+}
+
+// TestProgressFailedNamed holds the last line of a failed run: it names
+// each failed check, in fast and in all, and a run that passes has none.
+func TestProgressFailedNamed(t *testing.T) {
+	code, out, _ := runTimed(t, frozen, []check.Step{citest.Failing, citest.Passing}, "fast")
+	assert.Equal(t, check.ExitFail, code)
+	assert.True(t, strings.HasSuffix(out, "fast: failed: fails\n"), "the last line names the check: %q", out)
+
+	_, out, _ = runTimed(t, frozen, []check.Step{citest.Passing}, "fast")
+	assert.NotContains(t, out, "failed:")
+
+	_, out, _ = runTimed(t, frozen, []check.Step{citest.Failing}, "all")
+	// all also fails coverage, which has no profile here.
+	assert.True(t, strings.HasSuffix(out, "all: failed: fails, coverage\n"), "the last line names the checks: %q", out)
 }

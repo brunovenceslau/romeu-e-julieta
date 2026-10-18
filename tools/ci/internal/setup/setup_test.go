@@ -56,7 +56,7 @@ func TestSetup(t *testing.T) {
 
 	code, out := citest.Run(t, r, nil, Run)
 	assert.Equal(t, check.ExitOK, code, out)
-	for _, w := range []string{"ok    mise trust", "ok    mise install", "ok    go mod download"} {
+	for _, w := range []string{"ok    mise trust", "ok    mise install", "ok    go mod download", "ok    go mod tidy -diff"} {
 		assert.Contains(t, out, w)
 	}
 	data, err := os.ReadFile(log)
@@ -64,10 +64,11 @@ func TestSetup(t *testing.T) {
 	root, err := filepath.EvalSymlinks(r.Dir)
 	require.NoError(t, err)
 	// Both mise steps run with mise.MiseEnv, whatever the process holds,
-	// and all three with the module sources of REQ-0862.
+	// and all four with the module sources of REQ-0862.
 	assert.Equal(t, "mise trust "+filepath.Join(root, "mise.toml")+" HTTPS_PROXY=unset DOCKER_HOST=unset MISE=mise.toml,none,,false GO=off,local SOURCES=https://proxy.golang.org,sum.golang.org\n"+
 		"mise install HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset MISE=mise.toml,none,,false GO=off,local SOURCES=https://proxy.golang.org,sum.golang.org\n"+
-		"go mod download GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org GOFLAGS=-mod=readonly HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n", string(data))
+		"go mod download GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org GOFLAGS=-mod=readonly HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n"+
+		"go mod tidy -diff GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org GOFLAGS=-mod=readonly HTTPS_PROXY=http://proxy.invalid DOCKER_HOST=unset\n", string(data))
 
 	t.Run("a hosted run without the mise environment stops before mise", func(t *testing.T) {
 		require.NoError(t, os.Remove(log))

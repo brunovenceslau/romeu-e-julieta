@@ -114,9 +114,17 @@
 /tools/ci/internal/kits/** @brunovenceslau
 /tools/ci/internal/catalog/** @brunovenceslau
 /tools/ci/internal/callsites/** @brunovenceslau
+/tools/ci/internal/crossbuild/** @brunovenceslau
+/tools/ci/internal/format/** @brunovenceslau
+/tools/ci/internal/identifiers/** @brunovenceslau
+/tools/ci/internal/imports/** @brunovenceslau
+/tools/ci/internal/moduletree/** @brunovenceslau
+/tools/ci/internal/reqs/** @brunovenceslau
 /tools/ci/git/** @brunovenceslau
 /tools/ci/goenv/** @brunovenceslau
 /tools/ci/names/** @brunovenceslau
+/tools/ci/prose/** @brunovenceslau
+/tools/ci/prose.yaml @brunovenceslau
 /tools/ci/pushed/** @brunovenceslau
 /tools/mutants/** @brunovenceslau
 /.githooks/** @brunovenceslau

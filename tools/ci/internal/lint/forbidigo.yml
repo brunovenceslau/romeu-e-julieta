@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The second golangci-lint configuration: forbidigo alone, with the
+# output patterns of the Boundaries of item 16 of Decisions of the plan.
+# The lint step runs it over the packages that Allowed (boundaries.go)
+# does not name. No setting of forbidigo scopes a pattern by the package
+# that holds the call, and ADR 0007 rule 8 bars the exclusions that
+# would, so the scope is the list of packages the run is given. Like
+# .golangci.yml it excludes no finding, and it reads generated files
+# (ADR 0016).
+#
+# Two Boundaries have no pattern here. exec.Command( is held by the
+# call-site test of internal/procgroup (callsite_test.go), which admits
+# os/exec in that package only (04 4.1, Subprocesses) and is stricter
+# than a pattern. "sh", "-c" is held by TestNoShellCommands in this
+# package, since forbidigo reads identifiers and selectors, never a
+# string argument.
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - forbidigo
+  exclusions:
+    generated: disable
+  settings:
+    forbidigo:
+      # Types, so that a renamed import of os or fmt is read as what it
+      # is, and pkg: limits a pattern to the standard package and not to
+      # a variable that happens to be called log.
+      analyze-types: true
+      # exclude-godoc-examples keeps its default, true: an Example
+      # prints to stdout because its "// Output:" comment is compared
+      # with it. That is the one function forbidigo leaves out.
+      forbid:
+        - pattern: '^fmt\.Print(f|ln)?$'
+          pkg: '^fmt$'
+          msg: all output goes through the CLI writer (04 4.1, Output)
+        - pattern: '^os\.(Stdout|Stderr)$'
+          pkg: '^os$'
+          msg: all output goes through the CLI writer (04 4.1, Output)
+        - pattern: '^log\..*$'
+          pkg: '^log$'
+          msg: no log package; errors carry their details (04 4.1, Error ids)
+        - pattern: '^template\..*$'
+          pkg: '^text/template$'
+          msg: no text/template for structured output (REQ-0959)

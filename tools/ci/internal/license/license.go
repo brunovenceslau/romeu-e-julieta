@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
+// Package license is the license check of 10 10.2: reuse lint over the
+// working tree, from the pinned image, on Linux only.
 package license
 
 import (
@@ -83,15 +85,17 @@ func Step(root, gitCommon, goos string, env []string) check.Step {
 	return s
 }
 
-// Steps returns the license step for the tree at p.Root, in the
-// environment of the steps with the Docker daemon's variables
-// (check.DockerPassThrough). A git directory that git cannot name makes
-// the step unavailable, where it runs at all.
+// Steps returns the two steps of the license check for the tree at
+// p.Root: reuse lint, in the environment of the steps with the Docker
+// daemon's variables (check.DockerPassThrough), and the licenses of the
+// module graph (ModulesStep), on every platform. A git directory that
+// git cannot name makes the first step unavailable, where it runs at
+// all.
 func Steps(ctx context.Context, p check.Plan) []check.Step {
 	gitCommon, gitErr := GitCommonDir(ctx, p.Root)
 	s := Step(p.Root, gitCommon, runtime.GOOS, check.WithProcessEnv(check.StepEnv(p.Tools.GoDir), check.DockerPassThrough))
 	if gitErr != nil && s.Skip == "" {
 		s.Unavailable = gitErr
 	}
-	return []check.Step{s}
+	return []check.Step{s, ModulesStep(p)}
 }

@@ -112,6 +112,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		{
 			name: "a linter at a version beside the locked one",
 			setup: func(t *testing.T, f citest.FakeMise) (string, string) {
+				t.Helper()
 				return f.Tool(t, "golangci-lint", "2.13.0", "golangci-lint"), f.Tool(t, "go", "1.27.0", "bin", "go")
 			},
 			want: "mise which golangci-lint: the install is not the version 2.14.0 that mise.lock locks: run \"mise install\" in ",
@@ -119,6 +120,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		{
 			name: "a go at a version beside the locked one",
 			setup: func(t *testing.T, f citest.FakeMise) (string, string) {
+				t.Helper()
 				return f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.Tool(t, "go", "1.26.0", "bin", "go")
 			},
 			want: "mise which go: the install is not the version 1.27.0 that mise.lock locks",
@@ -127,6 +129,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 			name: "no mise.lock",
 			lock: "none",
 			setup: func(t *testing.T, f citest.FakeMise) (string, string) {
+				t.Helper()
 				return f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.Tool(t, "go", "1.27.0", "bin", "go")
 			},
 			want: "mise which golangci-lint: mise.lock: ",
@@ -135,6 +138,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 			name: "a tool the lock does not hold",
 			lock: "[[tools.go]]\nversion = \"1.27.0\"\n",
 			setup: func(t *testing.T, f citest.FakeMise) (string, string) {
+				t.Helper()
 				return f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.Tool(t, "go", "1.27.0", "bin", "go")
 			},
 			want: "mise.lock locks no version of golangci-lint",
@@ -143,6 +147,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 			name: "a tool locked at two versions",
 			lock: citest.LockFixture + "[[tools.golangci-lint]]\nversion = \"2.13.0\"\n",
 			setup: func(t *testing.T, f citest.FakeMise) (string, string) {
+				t.Helper()
 				return f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.Tool(t, "go", "1.27.0", "bin", "go")
 			},
 			want: "mise.lock locks golangci-lint at two different versions",
@@ -156,6 +161,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		{
 			name: "HOME is not set",
 			setup: func(t *testing.T, _ citest.FakeMise) (string, string) {
+				t.Helper()
 				t.Setenv("HOME", "")
 				return "", ""
 			},
@@ -164,6 +170,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		{
 			name: "no installs directory",
 			setup: func(t *testing.T, f citest.FakeMise) (string, string) {
+				t.Helper()
 				require.NoError(t, os.Remove(f.Installs()))
 				return "", ""
 			},
@@ -172,6 +179,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		{
 			name: "a linter outside the installs directory",
 			setup: func(t *testing.T, f citest.FakeMise) (string, string) {
+				t.Helper()
 				return citest.Executable(t, filepath.Join(t.TempDir(), "golangci-lint")), f.Tool(t, "go", "1.27.0", "bin", "go")
 			},
 			want: "golangci-lint is outside " + filepath.Join(fixed, "golangci-lint") + ", where mise installs it: the mise configuration names a tool mise did not install",
@@ -179,6 +187,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		{
 			name: "a linter in the directory of another tool",
 			setup: func(t *testing.T, f citest.FakeMise) (string, string) {
+				t.Helper()
 				return f.Tool(t, "go", "1.27.0", "bin", "golangci-lint"), f.Tool(t, "go", "1.27.0", "bin", "go")
 			},
 			want: "is outside " + filepath.Join(fixed, "golangci-lint") + ",",
@@ -186,6 +195,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		{
 			name: "a linter in a sibling directory that shares the tool's prefix",
 			setup: func(t *testing.T, f citest.FakeMise) (string, string) {
+				t.Helper()
 				return f.Tool(t, "golangci-lint-evil", "2.14.0", "golangci-lint"), f.Tool(t, "go", "1.27.0", "bin", "go")
 			},
 			want: "is outside " + filepath.Join(fixed, "golangci-lint") + ",",
@@ -193,6 +203,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		{
 			name: "a go below the installs directory that links outside it",
 			setup: func(t *testing.T, f citest.FakeMise) (string, string) {
+				t.Helper()
 				link := filepath.Join(f.Installs(), "go", "1.27.0", "bin", "go")
 				require.NoError(t, os.MkdirAll(filepath.Dir(link), 0o755))
 				require.NoError(t, os.Symlink(citest.Executable(t, filepath.Join(t.TempDir(), "go")), link))
@@ -203,6 +214,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 		{
 			name: "both below the installs directory",
 			setup: func(t *testing.T, f citest.FakeMise) (string, string) {
+				t.Helper()
 				return f.Tool(t, "golangci-lint", "2.14.0", "golangci-lint"), f.Tool(t, "go", "1.27.0", "bin", "go")
 			},
 		},
@@ -211,6 +223,7 @@ func TestResolveLintToolsFailsClosed(t *testing.T) {
 			// link to /private/var.
 			name: "both below an installs directory reached through a link",
 			setup: func(t *testing.T, f citest.FakeMise) (string, string) {
+				t.Helper()
 				link := filepath.Join(t.TempDir(), "home")
 				require.NoError(t, os.Symlink(f.Home, link))
 				t.Setenv("HOME", link)

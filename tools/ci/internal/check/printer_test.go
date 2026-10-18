@@ -8,6 +8,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -22,7 +23,7 @@ func TestChecksPrintErrorsAsSafeText(t *testing.T) {
 	hostile := errors.New("x\x1b[2J\n\u00a0::error::forged\n::error::two ##[error]")
 	var out bytes.Buffer
 	c := check.NewPrinter(&out)
-	c.Verdict(check.Verdict{Name: "v", Err: hostile})
+	c.Verdict(check.Verdict{Name: "v", Err: hostile}, 0)
 	c.Run(t.Context(), t.TempDir(), []check.Step{{Name: "s", Unavailable: hostile}})
 	got := out.String()
 	assert.NotContains(t, got, "\x1b")
@@ -68,4 +69,35 @@ func TestQuietStepPrintsSafeText(t *testing.T) {
 	}
 	assert.Contains(t, listing, "./::error::x.go")
 	assert.Contains(t, code, "::error::x.go", "the output of a step that runs code stays raw")
+}
+
+// TestFormatDuration holds the rounding of a duration on a verdict line
+// to 100 ms, on both sides of the boundaries.
+func TestFormatDuration(t *testing.T) {
+	for d, want := range map[time.Duration]string{
+		0:                       "0s",
+		49 * time.Millisecond:   "0s",
+		50 * time.Millisecond:   "100ms",
+		1240 * time.Millisecond: "1.2s",
+		1250 * time.Millisecond: "1.3s",
+		3*time.Minute + 30*time.Second + 40*time.Millisecond: "3m30s",
+	} {
+		assert.Equal(t, want, check.FormatDuration(d), "%s", d)
+	}
+}
+
+// TestLastNamesEachFailedCheckOnce holds the last line of a failed run.
+func TestLastNamesEachFailedCheckOnce(t *testing.T) {
+	var out bytes.Buffer
+	c := check.NewPrinter(&out)
+	c.Last("fast")
+	assert.Empty(t, out.String(), "nothing failed, nothing to name")
+
+	c.Report("a", true, "", 0)
+	c.Report("b", false, "", 0)
+	c.Report("c", false, "", 0)
+	c.Report("b", false, "", 0)
+	out.Reset()
+	c.Last("all")
+	assert.Equal(t, "all: failed: b, c\n", out.String())
 }

@@ -14,9 +14,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/text/unicode/norm"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
@@ -121,6 +123,10 @@ func TestWalkTreeRefusesHostileTrees(t *testing.T) {
 		{"first strong isolate", []rawEntry{file("a\u2068b")}, `holds the character U+2068`},
 		{"line separator", []rawEntry{file("a\u2028b")}, `holds the character U+2028`},
 		{"a name of 256 bytes", []rawEntry{file(strings.Repeat("n", 256))}, `holds a name longer than 255 bytes`},
+		{"precomposed then decomposed e acute", []rawEntry{file("caf\u00e9"), file("cafe\u0301")}, "\"caf\u00e9\" and \"cafe\u0301\" are one path under case-insensitive comparison or Unicode normalization"},
+		{"decomposed then precomposed e acute", []rawEntry{file("cafe\u0301"), file("caf\u00e9")}, "\"cafe\u0301\" and \"caf\u00e9\" are one path"},
+		{"capital E acute against decomposed e acute", []rawEntry{file("CAF\u00c9"), file("cafe\u0301")}, `are one path`},
+		{"directories e acute in both forms", []rawEntry{{"40000", "\u00e9", sub(file("x"))}, {"40000", "e\u0301", sub(file("y"))}}, `are one path`},
 		{"Kelvin sign", []rawEntry{file("k"), file("\u212a")}, `are one path`},
 		{"not UTF-8", []rawEntry{file("a\xff")}, `is not valid UTF-8`},
 	}
@@ -262,4 +268,51 @@ func TestFsck(t *testing.T) {
 		require.ErrorIs(t, r.Fsck(t.Context(), dir, c), ErrRefused, c)
 	}
 	require.ErrorIs(t, r.Fsck(t.Context(), "relative", head), ErrRefused)
+}
+
+// TestFoldName: the folded name is one value for names that are one
+// under case, the characters HFS+ ignores and Unicode normalization, and
+// a different value for names that are not.
+func TestFoldName(t *testing.T) {
+	same := [][2]string{
+		{"caf\u00e9", "cafe\u0301"},
+		{"CAF\u00c9", "cafe\u0301"},
+		{"\u212b", "a\u030a"},              // ANGSTROM SIGN, a singleton decomposition
+		{"\u212a", "k"},                    // KELVIN SIGN folds to k
+		{"s\u0323\u0307", "S\u0307\u0323"}, // two orders of marks on one base
+		{"\u1e9b\u0323", "\u1e69"},         // long s with its marks, folded to s
+		{".GIT", ".g\u200cit"},
+		{"\u1fb3", "\u1fbc"}, // alpha with U+0345 and its capital variant
+	}
+	for _, p := range same {
+		assert.Equal(t, foldName(p[0]), foldName(p[1]), "%q and %q", p[0], p[1])
+	}
+	differ := [][2]string{
+		{"cafe", "caf\u00e9"},
+		{"e\u0301", "e\u0300"},
+		{"a", "b"},
+		{"\u1fb3", "\u03b1"}, // the mark U+0345 is not dropped
+	}
+	for _, p := range differ {
+		assert.NotEqual(t, foldName(p[0]), foldName(p[1]), "%q and %q", p[0], p[1])
+	}
+	// No name other than ".git" itself is known to have the NFD form of
+	// ".git" once folded (no singleton decomposition gives g, i, t or the
+	// dot), so the dot git check holds for them through foldedDotGit.
+	assert.Equal(t, foldedDotGit, foldName(".G\u200cIT"))
+}
+
+// TestFoldASCIIAllocations: an ASCII name that is already folded
+// allocates nothing, and one that changes allocates once.
+func TestFoldASCIIAllocations(t *testing.T) {
+	assert.Zero(t, testing.AllocsPerRun(100, func() { _ = foldName("README.MD") }))
+	assert.LessOrEqual(t, testing.AllocsPerRun(100, func() { _ = foldName("readme.md") }), 2.0)
+	assert.Equal(t, foldName("Readme.Md"), foldName("rEADME.mD"))
+}
+
+// TestUnicodeVersions: the normalization tables and the case folding
+// must come from one Unicode version. A bump of either is a reason to
+// re-check I27 and the fold of foldName.
+func TestUnicodeVersions(t *testing.T) {
+	require.Equal(t, unicode.Version, norm.Version, "golang.org/x/text and the standard library disagree on the Unicode version; re-check I27 and foldName")
 }

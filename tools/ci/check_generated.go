@@ -11,7 +11,7 @@ import (
 func init() {
 	check.Register(check.Check{
 		Name:    "generated",
-		Guards:  "the generated files are what go generate writes, each tracked as a regular file",
+		Guards:  "the generated files are what go generate writes, each tracked as a regular file, and go mod tidy changes neither go.mod nor go.sum",
 		Row:     "generated",
 		Req:     "REQ-0822",
 		Usage:   "go run ./tools/ci generated",

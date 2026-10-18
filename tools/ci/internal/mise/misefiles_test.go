@@ -194,52 +194,65 @@ func TestMiseNeverReads(t *testing.T) {
 		plant func(t *testing.T, l layout) map[string]string
 	}{
 		{"a global configuration below HOME", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			write(t, filepath.Join(l.home, ".config", "mise", "config.toml"), envFile("a global configuration below HOME"))
 			return nil
 		}},
 		{"a conf.d below HOME", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			write(t, filepath.Join(l.home, ".config", "mise", "conf.d", "x.toml"), envFile("a conf.d below HOME"))
 			return nil
 		}},
 		{"MISE_CONFIG_DIR", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			cfg := t.TempDir()
 			write(t, filepath.Join(cfg, "config.toml"), envFile("MISE_CONFIG_DIR"))
 			return map[string]string{"MISE_CONFIG_DIR": cfg}
 		}},
 		{"a conf.d of MISE_CONFIG_DIR", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			cfg := t.TempDir()
 			write(t, filepath.Join(cfg, "conf.d", "y.toml"), envFile("a conf.d of MISE_CONFIG_DIR"))
 			return map[string]string{"MISE_CONFIG_DIR": cfg}
 		}},
 		{"MISE_GLOBAL_CONFIG_FILE", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			return map[string]string{"MISE_GLOBAL_CONFIG_FILE": write(t, filepath.Join(t.TempDir(), "g.toml"), envFile("MISE_GLOBAL_CONFIG_FILE"))}
 		}},
 		{"MISE_SYSTEM_CONFIG_FILE", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			return map[string]string{"MISE_SYSTEM_CONFIG_FILE": write(t, filepath.Join(t.TempDir(), "s.toml"), envFile("MISE_SYSTEM_CONFIG_FILE"))}
 		}},
 		{"MISE_ENV_FILE with a .env in the tree", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			write(t, filepath.Join(l.dir, ".env"), "PLANTED=MISE_ENV_FILE with a .env in the tree\n")
 			return map[string]string{"MISE_ENV_FILE": ".env"}
 		}},
 		{"MISE_ENV_FILE with a .env in a parent", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			write(t, filepath.Join(l.parent, ".env"), "PLANTED=MISE_ENV_FILE with a .env in a parent\n")
 			return map[string]string{"MISE_ENV_FILE": ".env"}
 		}},
 		{"MISE_TRUSTED_CONFIG_PATHS", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			write(t, filepath.Join(l.parent, "mise.toml"), envFile("MISE_TRUSTED_CONFIG_PATHS"))
 			return map[string]string{"MISE_TRUSTED_CONFIG_PATHS": l.parent}
 		}},
 		{"an untrusted mise.toml in a parent", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			write(t, filepath.Join(l.parent, "mise.toml"), envFile("an untrusted mise.toml in a parent"))
 			return nil
 		}},
 		{"MISE_CD", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			return map[string]string{"MISE_CD": l.elsewhere}
 		}},
 		{"GOFLAGS", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			return map[string]string{"GOFLAGS": "-overlay=/planted.json"}
 		}},
 		{"GOENV", func(t *testing.T, l layout) map[string]string {
+			t.Helper()
 			return map[string]string{"GOENV": "/planted/env"}
 		}},
 	}

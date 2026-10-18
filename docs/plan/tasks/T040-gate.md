@@ -22,7 +22,8 @@ sitting: none
 Goal: `gate`.
 
 Re-plan (2026-10-12): Kept as written before the re-plan; `after: T123`,
-since the record of the two gates is a review order (12 12.5).
+since the record of the two gates is a review order (12 12.5):
+[ADR 0018, gate toolchain changes per machine and project widening per project](../../adr/0018-gate-toolchain-changes-per-machine-and-project-widening-per-project.md).
 
 - Implements: REQ-0055 (01 1.3), REQ-0059 (01 1.4), REQ-0066 (01 1.4),
   REQ-0067 (01 1.4), REQ-0071 (01 1.4), REQ-0191 (03 3.2), REQ-0192 (03
@@ -50,5 +51,5 @@ since the record of the two gates is a review order (12 12.5).
   - The prompt needs a terminal: it is written to stderr and the TTY
     condition is stdin; a `/dev/ptmx` test drives `y` and `N` on stdin
     and reads stderr (10 10.1).
-  - The record of the two gates is merged (12 12.5).
+  - The record of the two gates, ADR 0018, is merged (12 12.5).
 - Verify: `go test ./internal/gate/...`.

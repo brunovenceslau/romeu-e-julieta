@@ -40,11 +40,11 @@ type Repo struct {
 // a tool under test would write there. The directory is listed as made
 // and with its symbolic links resolved, since git compares physical
 // paths.
-func Env(t testing.TB) []string {
-	t.Helper()
-	home := t.TempDir()
+func Env(tb testing.TB) []string {
+	tb.Helper()
+	home := tb.TempDir()
 	global := filepath.Join(home, ".gitconfig")
-	require.NoError(t, os.WriteFile(global, []byte(GlobalConfig), 0o600))
+	require.NoError(tb, os.WriteFile(global, []byte(GlobalConfig), 0o600))
 	ceiling := filepath.Dir(home)
 	if resolved, err := filepath.EvalSymlinks(ceiling); err == nil && resolved != ceiling {
 		ceiling += string(os.PathListSeparator) + resolved
@@ -88,17 +88,17 @@ const GlobalConfig = `[maintenance]
 `
 
 // New creates an empty repository whose first branch is main.
-func New(t testing.TB) *Repo {
-	t.Helper()
-	r := &Repo{Dir: t.TempDir(), Env: Env(t), t: t}
+func New(tb testing.TB) *Repo {
+	tb.Helper()
+	r := &Repo{Dir: tb.TempDir(), Env: Env(tb), t: tb}
 	r.Git("init", "--quiet", "--initial-branch=main")
 	return r
 }
 
 // NewBare creates an empty bare repository, to push to.
-func NewBare(t testing.TB) *Repo {
-	t.Helper()
-	r := &Repo{Dir: t.TempDir(), Env: Env(t), t: t}
+func NewBare(tb testing.TB) *Repo {
+	tb.Helper()
+	r := &Repo{Dir: tb.TempDir(), Env: Env(tb), t: tb}
 	r.Git("init", "--quiet", "--bare", "--initial-branch=main")
 	return r
 }
@@ -112,8 +112,9 @@ func (r *Repo) WithEnv(vars ...string) *Repo {
 
 // For returns the same repository bound to t, so that a subtest's
 // failure stops the subtest and not the test that made the repository.
-func (r *Repo) For(t testing.TB) *Repo {
-	return &Repo{Dir: r.Dir, Env: r.Env, t: t}
+func (r *Repo) For(tb testing.TB) *Repo {
+	tb.Helper()
+	return &Repo{Dir: r.Dir, Env: r.Env, t: tb}
 }
 
 // Git runs one git command, fails the test when it fails, and returns

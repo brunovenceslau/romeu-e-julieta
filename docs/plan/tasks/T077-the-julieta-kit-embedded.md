@@ -44,7 +44,8 @@ sessions land; at this task the kit is built and started by hand at
 sitting M2 (T113) and used by the wave 1 sandboxes (T115).
 `kits/embed.go` is the one `embed.FS` of the product kit directories,
 `pins.yaml` excluded, and lands with the first kit; `after: T123`, since
-the v3-kits record is merged before the first kit lands (12 12.5).
+the v3-kits record is merged before the first kit lands (12 12.5):
+[ADR 0019, support kit schema v3 only](../../adr/0019-support-kit-schema-v3-only.md).
 
 - Implements: REQ-0008 (index), REQ-0043 (01 1.1), REQ-0116 (02 2.1),
   REQ-0128 (02 2.1), REQ-0129 (02 2.1), REQ-0155 (02 2.5), REQ-0589 (06

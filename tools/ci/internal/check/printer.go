@@ -8,6 +8,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 )
@@ -17,35 +20,67 @@ import (
 // everything there is to fix.
 type Printer struct {
 	out io.Writer
+	now func() time.Time
 	// OK says whether every check reported so far passed.
 	OK bool
+	// Failed names the checks that failed, in the order they were
+	// reported, each once.
+	Failed []string
 }
 
-// NewPrinter returns a Printer that writes to out.
+// DurationStep is what a duration on a verdict line is rounded to.
+const DurationStep = 100 * time.Millisecond
+
+// FormatDuration returns d rounded to DurationStep, as "1.2s".
+func FormatDuration(d time.Duration) string {
+	return d.Round(DurationStep).String()
+}
+
+// NewPrinter returns a Printer that writes to out and reads the time
+// from time.Now.
 func NewPrinter(out io.Writer) *Printer {
-	return &Printer{out: out, OK: true}
+	return NewPrinterAt(out, time.Now)
 }
 
-// Report prints one verdict, with what the check found below it.
-func (c *Printer) Report(name string, passed bool, detail string) {
+// NewPrinterAt is NewPrinter with the clock now, which tests inject
+// (10 10.4).
+func NewPrinterAt(out io.Writer, now func() time.Time) *Printer {
+	return &Printer{out: out, now: now, OK: true}
+}
+
+// Report prints one verdict of a check that took d, with what the check
+// found below it.
+func (c *Printer) Report(name string, passed bool, detail string, d time.Duration) {
 	verdict := "ok  "
 	if !passed {
 		verdict, c.OK = "FAIL", false
+		if !slices.Contains(c.Failed, name) {
+			c.Failed = append(c.Failed, name)
+		}
 	}
-	Say(c.out, "%s  %s\n%s", verdict, name, detail)
+	Say(c.out, "%s  %s (%s)\n%s", verdict, name, FormatDuration(d), detail)
 }
 
-// Verdict reports one verdict of a check of the commit: one that could not
-// judge fails with its reason, and one with a note prints it with
-// "--".
-func (c *Printer) Verdict(v Verdict) {
+// Last prints the last line of a run that failed, which names each
+// failed check, so that no run ends with a bare "exit status 1". It
+// prints nothing when every check passed. command is "fast" or "all".
+func (c *Printer) Last(command string) {
+	if len(c.Failed) > 0 {
+		Say(c.out, "%s: failed: %s\n", command, strings.Join(c.Failed, ", "))
+	}
+}
+
+// Verdict reports one verdict of a check of the commit that took d: one
+// that could not judge fails with its reason, and one with a note
+// prints it with "--".
+func (c *Printer) Verdict(v Verdict, d time.Duration) {
 	switch {
 	case v.Note != "":
 		Say(c.out, "--    %s: %s\n", v.Name, v.Note)
 	case v.Err != nil:
-		c.Report(v.Name, false, git.SafeLines(v.Err.Error())+"\n")
+		c.Report(v.Name, false, git.SafeLines(v.Err.Error())+"\n", d)
 	default:
-		c.Report(v.Name, len(v.Findings) == 0, Lines(v.Findings)+v.Info)
+		c.Report(v.Name, len(v.Findings) == 0, Lines(v.Findings)+v.Info, d)
 	}
 }
 
@@ -63,6 +98,7 @@ func (c *Printer) Run(ctx context.Context, root string, steps []Step) {
 			Say(c.out, "--    %s: %s\n", s.Name, s.Skip)
 			continue
 		}
+		start := c.now()
 		out, err := s.Run(ctx, root)
 		detail := ""
 		if err != nil {
@@ -78,10 +114,23 @@ func (c *Printer) Run(ctx context.Context, root string, steps []Step) {
 				text = git.SafeLines(text)
 			}
 			detail = fmt.Sprintf("%s%s\n", text, git.SafeLines(err.Error()))
+			if s.NoticeOn != "" && hasLinePrefix(out, s.NoticeOn) {
+				detail += s.Notice + "\n"
+			}
 			if bytes.Contains(out, []byte(moduleLookupOff)) {
 				detail += "the module cache lacks a module of go.sum, and no step fetches one (GOPROXY=off): run \"go run ./tools/ci setup\", which runs \"go mod download\", then run this again\n"
 			}
 		}
-		c.Report(s.Name, err == nil, detail)
+		c.Report(s.Name, err == nil, detail, c.now().Sub(start))
 	}
+}
+
+// hasLinePrefix reports whether a line of out starts with prefix.
+func hasLinePrefix(out []byte, prefix string) bool {
+	for line := range bytes.Lines(out) {
+		if bytes.HasPrefix(line, []byte(prefix)) {
+			return true
+		}
+	}
+	return false
 }

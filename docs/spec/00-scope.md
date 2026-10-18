@@ -65,7 +65,8 @@ tool stores about a repository, and where, is listed in
 
 ## 0.4 License
 
-Decided (the record is a row of 12 12.5):
+Decided, and recorded in
+[ADR 0022, license the product GPL-3.0-only and the examples and schemas CC0-1.0](../adr/0022-license-the-product-gpl-3-0-only-and-the-examples-and-schemas-cc0-1-0.md):
 
 - `REQ-0034` **GPL-3.0-only** for the product: version 3 of the GPL only, with no
   "or any later version" option. The license text goes in `COPYING` at

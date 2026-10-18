@@ -39,6 +39,9 @@ type Step struct {
 	// Skip, when set, says why the step does not run on this platform:
 	// it is reported with "--", neither passed nor failed.
 	Skip string
+	// NoticeOn is a line prefix: when a step that failed printed a line
+	// that starts with it, the verdict adds the line Notice.
+	NoticeOn, Notice string
 }
 
 // Tools are the pinned tools of the steps, as mise resolves them: the

@@ -5,7 +5,15 @@ milestone: M1
 module: ci-release
 fate: new
 owns:
-  - tools/ci/internal/run/progress*.go
+  - tools/ci/internal/check/printer*.go
+  - tools/ci/internal/check/env*.go
+  - tools/ci/internal/check/step*.go
+  - tools/ci/fast*.go
+  - tools/ci/all*.go
+  - tools/ci/main_test.go
+  - tools/ci/internal/vulnerabilities/**
+  - tools/ci/internal/setup/setup_test.go
+  - tools/ci/internal/license/license_test.go
 needs: []
 after:
   - T105
@@ -25,6 +33,20 @@ the `vulnerabilities` step prints, when the network is unreachable, that
 this `all` is not the equivalent run; a step that fails names itself, so
 no run ends with a bare `exit status 1` (the output defect of pending
 item 2b55a042).
+
+Re-plan (2026-10-18): Changed. No `run` package exists since T105's
+split: the check package prints the verdict lines (`check.Printer`), so
+T132 owns `tools/ci/internal/check/printer*.go` in place of
+`tools/ci/internal/run/progress*.go`, with `env*.go`, where the clock
+is injected next to the other seams of `check.Env`, and `step*.go`, in
+case a step carries the network signal. It also owns the files the four
+behaviours reach: `fast` and `all` with their tests (the budget warning,
+and the last line that names each failed step), `main_test.go`, whose
+`runCI` gives those tests a fixed clock, the vulnerabilities
+step (the line that says a run without the network is not the
+equivalent run), and the setup and license tests, which pin a verdict
+line. T125 comes after T132, since T125 owns
+`tools/ci/internal/license/**`, which holds the license test.
 
 Re-plan (2026-10-12, stage B): New. The progress line of 10 10.2 had no
 task on `main`. `after: T105`, for the moved file layout, is an order

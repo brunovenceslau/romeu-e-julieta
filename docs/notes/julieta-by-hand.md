@@ -41,8 +41,8 @@ sync` renders every project definition and writes every manifest. In
 that period:
 
 - each project definition gains the three edits above and a fourth
-  that removes the store's writer kit and the mount of the store, one
-  change of the sandbox agent payload removes the inbox skill from
+  that removes the store's writer kit and the mount of the store, and
+  one change of the sandbox agent payload removes the inbox skill from
   every sandbox at once, so `julieta memory` is the route for open
   items, and a runbook in the maintainer's config repository records
   each edit and that change with its undo (plan task T111);

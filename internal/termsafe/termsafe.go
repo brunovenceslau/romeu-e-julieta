@@ -12,7 +12,17 @@
 //     U+200E, U+200F, U+202A to U+202E and U+2066 to U+2069;
 //   - the zero-width characters U+200B to U+200D, U+2060 and U+FEFF;
 //   - the tag characters, U+E0000 to U+E007F;
-//   - U+2028 and U+2029, the line and paragraph separators.
+//   - U+2028 and U+2029, the line and paragraph separators;
+//   - the Unicode property Default_Ignorable_Code_Point, which adds
+//     among others U+00AD, U+034F, U+2061 to U+2064, U+206A to U+206F,
+//     the variation selectors, the Hangul fillers and the unassigned
+//     code points reserved for the property. The property is derived
+//     as DerivedCoreProperties.txt defines it (see isDefaultIgnorable),
+//     in the Unicode version of the Go release pinned in mise.toml
+//     (unicode.Version). The annotation characters U+FFF9 to U+FFFB and
+//     the Egyptian hieroglyph format characters U+13430 to U+13440 are
+//     excluded from the property, and the text they annotate stays
+//     displayed, so they are kept.
 //
 // A byte that is not part of valid UTF-8 is escaped too, as \x and two
 // hex digits: a terminal that reads 8-bit controls takes the byte 0x9B
@@ -38,6 +48,7 @@ package termsafe
 
 import (
 	"fmt"
+	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -84,8 +95,38 @@ func Escape(s string) string {
 	return string(b)
 }
 
+// isDefaultIgnorable reports whether r has the Unicode property
+// Default_Ignorable_Code_Point. Go has no table for it, so it is
+// derived as DerivedCoreProperties.txt defines it:
+//
+//	Other_Default_Ignorable_Code_Point + Cf + Variation_Selector
+//	  - White_Space
+//	  - U+FFF9..U+FFFB (annotation characters)
+//	  - U+13430..U+13440 (Egyptian hieroglyph format characters)
+//	  - Prepended_Concatenation_Mark (exceptional Cf that stay visible)
+func isDefaultIgnorable(r rune) bool {
+	if r < 0xAD { // fast path: the first member is U+00AD
+		return false
+	}
+	if !unicode.In(r, unicode.Other_Default_Ignorable_Code_Point, unicode.Cf, unicode.Variation_Selector) {
+		return false
+	}
+	switch {
+	case unicode.Is(unicode.White_Space, r):
+		return false
+	case r >= 0xFFF9 && r <= 0xFFFB:
+		return false
+	case r >= 0x13430 && r <= 0x13440:
+		return false
+	}
+	return !unicode.Is(unicode.Prepended_Concatenation_Mark, r)
+}
+
 // isEscaped reports whether r is a code point of I29.
 func isEscaped(r rune) bool {
+	if isDefaultIgnorable(r) {
+		return true
+	}
 	for _, e := range escapedRanges {
 		if r < e.lo {
 			return false

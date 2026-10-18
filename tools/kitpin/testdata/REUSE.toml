@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The license of each fixture of tools/kitpin, none of which can carry
+# an SPDX header of its own (REUSE 3.3), and where each comes from.
+#
+# Recorded on 2026-10-18:
+# - mise/minisign.pub: mise's public key, from
+#   https://raw.githubusercontent.com/jdx/mise/main/minisign.pub;
+# - mise/2026.10.3/: SHASUMS256.txt and SHASUMS256.txt.minisig of the
+#   GitHub release v2026.10.3 of jdx/mise, as downloaded;
+# - herdr/v0.9.5.json: GET /repos/herdrdev/herdr/releases/tags/v0.9.5
+#   on api.github.com, cut to the fields kitpin reads and a few more;
+#   the other herdr files are it with one field changed or removed;
+# - frontend/tags.json and frontend/3.0.0-m.8.json: the tag list of
+#   docker/sandbox-kit and the index of its tag 3.0.0-m.8, from
+#   registry-1.docker.io.
+#
+# Made from those:
+# - mise/changed/SHASUMS256.txt: mise's file with its first hex digit
+#   changed, beside mise's signature;
+# - test/: a test key made for these fixtures from a fixed seed, whose
+#   secret key is not kept, and its signatures over mise's file:
+#   signed (good), forged (mise's key id), legacy (mode "Ed"),
+#   comment (trusted comment changed after signing) and wrongfile (a
+#   trusted comment that names SHASUMS512.txt); test/noarch is
+#   mise's file without the line of mise-v2026.10.3-linux-arm64,
+#   signed by the test key.
+
+version = 1
+
+[[annotations]]
+path = ["herdr/**", "frontend/**", "test/**"]
+SPDX-FileCopyrightText = "2026 Bruno Venceslau"
+SPDX-License-Identifier = "GPL-3.0-only"
+
+# mise's own bytes, or mise's checksum file with one change.
+[[annotations]]
+path = ["mise/**", "test/noarch/SHASUMS256.txt"]
+SPDX-FileCopyrightText = "2025 Jeff Dickey"
+SPDX-License-Identifier = "MIT"

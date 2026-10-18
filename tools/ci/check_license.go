@@ -11,13 +11,16 @@ import (
 func init() {
 	check.Register(check.Check{
 		Name:    "license",
-		Guards:  "every file carries its license and copyright, as REUSE 3.3 asks",
+		Guards:  "every file carries its license and copyright, as REUSE 3.3 asks, and every module of go.sum a license of the allowlist",
 		Row:     "license",
 		Req:     "REQ-0847",
-		Usage:   "reuse lint, from the image pinned by digest",
+		Usage:   "reuse lint, from the image pinned by digest; go run ./tools/ci licenses",
 		All:     true,
 		Order:   60,
 		Package: "tools/ci/internal/license",
-		Steps:   license.Steps,
+		Commands: []check.Command{
+			{Name: "licenses", Usage: []string{"licenses"}, Run: license.RunModules},
+		},
+		Steps: license.Steps,
 	})
 }

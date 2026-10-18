@@ -1,0 +1,124 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The licenses of the module graph (10 10.2, the license row; REQ-0848).
+# The product is GPL-3.0-only (00 0.4), so a module of go.sum may carry
+# only a license that GPL-3.0 can take in.
+#
+# The step judges the modules whose packages some build of this module
+# compiles ("go list -deps -test ./..." for each target and tag set),
+# which the "go mod download" of setup fetches; a module go.sum pins for
+# the tests of a dependency alone, such as github.com/dlclark/regexp2,
+# gives no package to any build and is not judged. It reads every file
+# named LICENSE, LICENCE or COPYING, alone or followed by "-", "." or
+# "_" and more (LICENSE.txt, COPYING-MIT), at any depth of the source of
+# each such module, except Go files and testdata directories, which no
+# build ships as a license. A marker matches as words, with case, spacing and punctuation
+# ignored. A file is under a license when every marker of the license
+# appears in it and no "unless" marker does. Each file fails the step:
+#
+#   - when it names no license of this list (unknown);
+#   - when it holds a rider below, whatever else it names, since a rider
+#     adds terms the markers do not read (a rider);
+#   - when it names a license this list does not allow, even beside an
+#     allowed one, so a dual or a combined license fails closed
+#     (disallowed).
+#
+# A module with no such file fails as unknown. A license or a rider
+# joins this list with the review of the checks surface, which reads its
+# text and the reason. The reasons cite the FSF's list of licenses and
+# their compatibility with the GPL
+# (https://www.gnu.org/licenses/license-list.html, read on 2026-10-18).
+
+licenses:
+  - id: Apache-2.0
+    allowed: true
+    reason: >-
+      The FSF lists it as compatible with GPL version 3; the combined
+      work is distributed under GPL-3.0-only, which keeps its notices.
+    markers:
+      - Apache License
+      - Version 2.0
+  - id: BSD-2-Clause
+    allowed: true
+    reason: >-
+      A permissive license the FSF lists as compatible with the GPL
+      (the FreeBSD license); it asks only that the notice be kept.
+    markers:
+      - Redistribution and use in source and binary forms
+    unless:
+      - used to endorse or promote products derived from this software
+      - All advertising materials mentioning features
+  - id: BSD-3-Clause
+    allowed: true
+    reason: >-
+      A permissive license the FSF lists as compatible with the GPL
+      (the Modified BSD license); it asks that the notice be kept and
+      the authors' names not be used to endorse the work.
+    markers:
+      - Redistribution and use in source and binary forms
+      - used to endorse or promote products derived from this software
+    unless:
+      - All advertising materials mentioning features
+  - id: ISC
+    allowed: true
+    reason: >-
+      A permissive license the FSF lists as compatible with the GPL; it
+      asks only that the notice be kept.
+    markers:
+      - Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted
+      - THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+  - id: MIT
+    allowed: true
+    reason: >-
+      A permissive license the FSF lists as compatible with the GPL (the
+      Expat license); it asks only that the notice be kept.
+    markers:
+      - Permission is hereby granted, free of charge, to any person obtaining a copy
+      - THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND
+  - id: BSD-4-Clause
+    allowed: false
+    reason: >-
+      The FSF lists the original BSD license as incompatible with the
+      GPL: its advertising clause is a further restriction.
+    markers:
+      - Redistribution and use in source and binary forms
+      - All advertising materials mentioning features
+  - id: GPL-2.0
+    allowed: false
+    reason: >-
+      GPL-2.0-only is not compatible with GPL-3.0, and the text alone
+      does not say whether a module grants "or any later version", so
+      a module under it is read as GPL-2.0-only until the list says
+      otherwise for that module.
+    markers:
+      - GNU GENERAL PUBLIC LICENSE
+      - Version 2, June 1991
+  - id: CDDL-1.0
+    allowed: false
+    reason: >-
+      The FSF lists it as incompatible with the GPL: its copyleft is
+      weak and its terms differ from the GPL's.
+    markers:
+      - COMMON DEVELOPMENT AND DISTRIBUTION LICENSE
+  - id: EPL-1.0
+    allowed: false
+    reason: >-
+      The FSF lists it as incompatible with the GPL: its copyleft is
+      weak and it has a choice of law clause.
+    markers:
+      - Eclipse Public License - v 1.0
+
+riders:
+  - marker: Commons Clause
+    reason: It forbids selling the software, a restriction the GPL does not allow.
+  - marker: non-commercial
+    reason: A use restriction the GPL does not allow.
+  - marker: Business Source
+    reason: The Business Source License limits production use until its change date.
+  - marker: GNU Affero
+    reason: The AGPL adds network terms that a reviewer reads before the module joins.
+  - marker: Mozilla Public License
+    reason: The MPL is a file-level copyleft whose combination terms a reviewer reads first.
+  - marker: Lesser General Public
+    reason: The LGPL comes in versions of different compatibility, which a reviewer tells apart.

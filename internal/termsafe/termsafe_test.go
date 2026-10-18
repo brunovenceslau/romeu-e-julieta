@@ -5,8 +5,10 @@ package termsafe_test
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
@@ -32,6 +34,17 @@ var escapedClasses = []struct {
 	{"tag characters", []span{{0xE0000, 0xE007F}}},
 	{"line separator U+2028", []span{{0x2028, 0x2028}}},
 	{"paragraph separator U+2029", []span{{0x2029, 0x2029}}},
+	// Default_Ignorable_Code_Point as DerivedCoreProperties.txt of
+	// Unicode 17.0.0 lists it, written out here by hand and checked
+	// against the derivation in TestDefaultIgnorableDerivation.
+	{"default ignorable", []span{
+		{0x00AD, 0x00AD}, {0x034F, 0x034F}, {0x061C, 0x061C},
+		{0x115F, 0x1160}, {0x17B4, 0x17B5}, {0x180B, 0x180F},
+		{0x200B, 0x200F}, {0x202A, 0x202E}, {0x2060, 0x206F},
+		{0x3164, 0x3164}, {0xFE00, 0xFE0F}, {0xFEFF, 0xFEFF},
+		{0xFFA0, 0xFFA0}, {0xFFF0, 0xFFF8}, {0x1BCA0, 0x1BCA3},
+		{0x1D173, 0x1D17A}, {0xE0000, 0xE0FFF},
+	}},
 }
 
 // inEscapedClass reports whether r is in one of escapedClasses.
@@ -144,12 +157,19 @@ func TestEscapeKeepsOtherText(t *testing.T) {
 		{"hyphen after the marks", "\u2010"},
 		{"before the separators", "\u2027"},
 		{"after the overrides", "\u202f"},
-		{"function application after the word joiner", "\u2061"},
-		{"after the isolates", "\u206a"},
 		{"before the byte order mark", "\ufefe"},
 		{"after the byte order mark", "\uff00"},
 		{"before the tag block", "\U000DFFFF"},
-		{"after the tag block", "\U000E0080"},
+		{"after the default ignorables of the tag plane", "\U000E1000"},
+		{"after the soft hyphen", "\u00ae"},
+		{"before the combining grapheme joiner", "\u034e"},
+		{"combining marks that are not ignorable", "e\u0301 \u0308 \u20dd \u0653"},
+		{"white space that is not ignorable", "a b\u00a0c\u1680d\u2003e\u205f\u3000"},
+		{"prepended concatenation marks", "\u0600\u0605\u06dd\u070f\u0890\u08e2\U000110bd\U000110cd"},
+		{"annotation characters", "\ufff9\ufffa\ufffb"},
+		{"egyptian hieroglyph format controls", "\U00013430\U0001343f\U00013440"},
+		{"hangul syllable and jamo", "\ud55c\u1100\u1161"},
+		{"halfwidth hangul after the filler", "\uffa1"},
 		{"last code point", "\U0010FFFF"},
 	}
 	for _, tt := range tests {
@@ -157,6 +177,83 @@ func TestEscapeKeepsOtherText(t *testing.T) {
 			assert.Equal(t, tt.in, termsafe.Escape(tt.in))
 		})
 	}
+}
+
+// TestEscapeDefaultIgnorable checks the code points the audit of T007
+// named, each between two letters.
+func TestEscapeDefaultIgnorable(t *testing.T) {
+	var named []rune
+	for _, s := range []span{
+		{0x00AD, 0x00AD}, {0x034F, 0x034F}, {0x2061, 0x2064}, {0x206A, 0x206F},
+		{0xFE00, 0xFE0F}, {0xE0100, 0xE01EF}, {0x180B, 0x180F},
+		{0x115F, 0x1160}, {0x3164, 0x3164}, {0xFFA0, 0xFFA0},
+	} {
+		for r := s.lo; r <= s.hi; r++ {
+			named = append(named, r)
+		}
+	}
+	for _, r := range named {
+		got := termsafe.Escape("a" + string(r) + "b")
+		require.True(t, strings.HasPrefix(got, `a\`), "U+%04X: %q", r, got)
+		require.True(t, isPrintableASCII(got), "U+%04X: %q", r, got)
+	}
+	// The annotation characters stay visible: the audit named them,
+	// but DerivedCoreProperties.txt takes them out of the property.
+	assert.Equal(t, "\ufff9\ufffa\ufffb", termsafe.Escape("\ufff9\ufffa\ufffb"))
+}
+
+// derivedDefaultIgnorable is the definition of Default_Ignorable_Code_Point
+// in DerivedCoreProperties.txt, written from the Unicode tables Go carries.
+func derivedDefaultIgnorable(r rune) bool {
+	in := unicode.Is(unicode.Other_Default_Ignorable_Code_Point, r) ||
+		unicode.Is(unicode.Cf, r) || unicode.Is(unicode.Variation_Selector, r)
+	out := unicode.Is(unicode.White_Space, r) ||
+		(r >= 0xFFF9 && r <= 0xFFFB) || (r >= 0x13430 && r <= 0x13440) ||
+		unicode.Is(unicode.Prepended_Concatenation_Mark, r)
+	return in && !out
+}
+
+// TestDefaultIgnorableDerivation walks every code point and checks that
+// the hand-written spans of the default ignorable class are exactly the
+// derivation, and that the package escapes a code point if and only if
+// it is in a class of I29.
+func TestDefaultIgnorableDerivation(t *testing.T) {
+	var di []span
+	for _, c := range escapedClasses {
+		if c.name == "default ignorable" {
+			di = c.spans
+		}
+	}
+	inSpans := func(r rune) bool {
+		for _, s := range di {
+			if s.lo <= r && r <= s.hi {
+				return true
+			}
+		}
+		return false
+	}
+	count := 0
+	for r := rune(0); r <= unicode.MaxRune; r++ {
+		if r >= 0xD800 && r <= 0xDFFF { // surrogates are not UTF-8
+			continue
+		}
+		if derivedDefaultIgnorable(r) {
+			count++
+		}
+		require.Equal(t, derivedDefaultIgnorable(r), inSpans(r), "U+%04X: derivation and spans", r)
+		in := "a" + string(r) + "b"
+		require.Equal(t, inEscapedClass(r), termsafe.Escape(in) != in, "U+%04X: escaped", r)
+	}
+
+	// The checks below come last, so that a Go bump first shows which
+	// code points moved.
+	const update = "update four places: the spans in termsafe_test.go, the escapedClasses row, " +
+		"the I29 row of docs/spec/05-security.md and the package comment of termsafe.go"
+	spec, err := os.ReadFile("../../docs/spec/05-security.md")
+	require.NoError(t, err)
+	assert.Contains(t, string(spec), "Unicode "+unicode.Version, "the spec names another Unicode version; "+update)
+	require.Equal(t, "17.0.0", unicode.Version, update)
+	assert.Equal(t, 4174, count, "Default_Ignorable_Code_Point of Unicode 17.0.0; "+update)
 }
 
 // FuzzEscape checks, for any input, that the output is valid UTF-8,

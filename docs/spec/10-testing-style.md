@@ -277,7 +277,7 @@ local-gate run is recorded is a
 | Step | Command | In `fast` |
 |---|---|---|
 | format, vet | `REQ-0820` `gofmt -l` empty; `go vet ./...`, each the pinned tool, in the environment of the steps of `fast` (below). `REQ-0821` gofmt is the one formatter: it ships with the pinned go, so no second tool or configuration enters; import grouping and the gofumpt rules are review items until a formatter is pinned, a row of the index's [Deferred decisions](../spec.md#in-how-this-repository-is-run) | yes |
-| generated | `REQ-0822` `tools/ci generated`: `go generate ./...` changes no consumer of the table in [12 12.3](12-engineering.md#123-generators). It compares the working tree, tracked and untracked files by content, before and after the run, so a changed, a new and a removed generated file each fail and a tree with uncommitted work can be checked. It then requires each file that `generate` writes to be tracked in the index as a regular file (mode 100644, so not a link and not executable) whose blob is the bytes `generate` gives, and to match no ignore rule, because the comparison above cannot see a generated file that is ignored, untracked or a link to a copy: the merged tree would not hold it. `generate` reads and writes through the root of the repository (`os.Root`), so a link cannot send it outside. It judges the index, so in `fast` and `all` it runs before every step that runs code of the change (`unit`, `race`), a test holds that order, and the mise it starts reads `mise.toml` alone (the mise environment, below) | yes |
+| generated | `REQ-0822` `tools/ci generated`: `go generate ./...` changes no consumer of the table in [12 12.3](12-engineering.md#123-generators). It compares the working tree, tracked and untracked files by content, before and after the run, so a changed, a new and a removed generated file each fail and a tree with uncommitted work can be checked. It then requires each file that `generate` writes to be tracked in the index as a regular file (mode 100644, so not a link and not executable) whose blob is the bytes `generate` gives, and to match no ignore rule, because the comparison above cannot see a generated file that is ignored, untracked or a link to a copy: the merged tree would not hold it. `generate` reads and writes through the root of the repository (`os.Root`), so a link cannot send it outside. It judges the index, so in `fast` and `all` it runs before every step that runs code of the change (`unit`, `race`), a test holds that order, and the mise it starts reads `mise.toml` alone (the mise environment, below). `REQ-1251` The tidy rule: after generate, `go mod tidy`, in the same environment and offline, must change neither `go.mod` nor `go.sum`; a file it changes fails the check, and the fix is to commit tidy's result; `tools/ci setup` runs `go mod tidy -diff`, which writes neither file, with the module proxy, so the module cache holds the modules tidy loads, those of the tests of each dependency among them | yes |
 | lint | `REQ-0823` `golangci-lint run` over the whole module, once per lint target; its rules are in [Lint](#lint) below | yes |
 | unit | `REQ-0824` `go test -count=1 ./internal/... ./tools/...`, the pinned go command, in the environment of the steps of `fast` (below); `-count=1` because tests that scan the repository would otherwise pass from the test cache | yes |
 | hygiene | `REQ-1240` `tools/ci hygiene`; its rules are in [Hygiene](#hygiene) below | yes |
@@ -291,7 +291,7 @@ local-gate run is recorded is a
 | unit + golden + race | `REQ-0833` `go test -race -count=1 -coverprofile=cover.out ./...`, with `cover.out` in a temporary directory, so no run leaves it in the working tree; it runs code of the change, which can game its own result (below) | |
 | coverage | `REQ-0834` `tools/ci coverage` (S9), per package: every package `go list ./...` reports under `cmd/`, `internal/`, `tools/`, `e2e/probes/` and `e2e/fakesbx/`, and a package absent from the profile counts as 0 percent; the other packages under `e2e/`, `e2e/scenarios` and `e2e/host` among them, are out, because their code runs only under the `e2e` and `host` tags, which the race run does not set, and the journeys they run are the evidence of S7; each package below its threshold is a finding, and the thresholds are starting values that are only raised; it reads the profile that the race run's code of the change wrote, so a test can game it (below) | |
 | golden governance | `REQ-0835` `tools/ci golden`: fails if `-update` appears in CI invocations; lists every changed golden in the job summary for review | |
-| schema | `REQ-0836` `tools/ci schema` (10.1); it also checks that each YAML file under `examples/` carries the `$schema` hint of the release that ships it ([03 3.2](03-formats.md#32-project-spec-projectsnameyaml-schema-projectv1)) | |
+| schema | `REQ-0836` `tools/ci schema` (10.1); it also checks that each YAML file under `examples/` carries the `$schema` hint of the release that ships it ([03 3.2](03-formats.md#32-project-spec-projectsnameyaml-schema-projectv1)). `REQ-1250` A YAML or JSON file below a `testdata/` directory whose `schema` field has the form `<name>/v<n>` is judged: a format no generated schema covers is a finding, a file whose base name starts with `invalid` must fail validation, and any other must pass it; a testdata file that does not decode, or has no such field, is the fixture of something else. Validation asserts `format` (`date-time` and the others of JSON Schema 2020-12), not only annotates it | |
 | e2e | `REQ-0837` `go test -race -count=1 -tags e2e ./e2e/...`, `-count=1` for the reason the unit row gives; the romeu it runs is built by `tools/release build --dry-run`, the one way julieta is embedded ([02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public)) | |
 | cross-build | `REQ-0838` darwin amd64/arm64 (`romeu`), linux amd64/arm64 (`julieta`) | |
 | imports | `REQ-0839` `tools/ci imports` (I1, I2, I11, I24, 10.7) | |
@@ -301,7 +301,7 @@ local-gate run is recorded is a
 | kits | `REQ-0843` `tools/ci kits` (one frontend pin; install steps <= 5 lines; every download has a sha256: a download is a step line whose first word is `curl` or `wget`, and the same step has a `sha256sum -c` or `shasum -a 256 -c` line after it; a download line holds no `\|`, `;`, `&&` or `$(`, and the file `-c` reads is a kit file, not one the step downloaded. A download written with another tool is not seen by the check; the review of the `kits` surface covers it). `REQ-0844` On a change to the pin file, it verifies the committed signature of mise's `SHASUMS256.txt` offline and checks the pinned hashes against that file ([07 7.4](07-mise-egress.md#74-mise-bootstrap-and-its-own-egress)) | |
 | mise | `REQ-0845` `tools/ci mise` (`julieta lock --check` logic on this repo's and the examples' locks) | |
 | probes | `REQ-0846` `tools/ci probes` (11 11.4: the results that are committed, and the A5 golden hashes; that every probe has a result is checked by `acceptance`, 10.5) | |
-| license | `REQ-0847` `reuse lint` (REUSE 3.3), from the `fsfe/reuse` image pinned by digest in `tools/ci` ([12 12.1](12-engineering.md#121-tech-stack)), with the working tree and the git directory (`git rev-parse --git-common-dir`) mounted read-only, each at its own path, and no network for the container, so that a linked worktree, whose git directory lies outside the tree, ignores the same files as a clone; it runs before `unit` (below); on Linux only, since the check reads file content alone and the image is built for Linux. On macOS the output of `all` shows `--    license: not run on darwin`, neither `ok` nor `FAIL`. `REQ-0848` The same step reads the licenses of the module graph and fails a module whose license is not on an allowlist compatible with GPL-3.0-only ([00 0.4](00-scope.md#04-license)); `REQ-0849` `tools/release build` writes the third-party notices file of each archive from that graph | |
+| license | `REQ-0847` `reuse lint` (REUSE 3.3), from the `fsfe/reuse` image pinned by digest in `tools/ci` ([12 12.1](12-engineering.md#121-tech-stack)), with the working tree and the git directory (`git rev-parse --git-common-dir`) mounted read-only, each at its own path, and no network for the container, so that a linked worktree, whose git directory lies outside the tree, ignores the same files as a clone; it runs before `unit` (below); on Linux only, since the check reads file content alone and the image is built for Linux. On macOS the output of `all` shows `--    license: not run on darwin`, neither `ok` nor `FAIL`. `REQ-0848` The same step reads the licenses of the module graph and fails a module whose license is not on an allowlist compatible with GPL-3.0-only ([00 0.4](00-scope.md#04-license)); the modules it judges are those whose packages some build of this module compiles (`go list -deps -test ./...` for each target and tag set), so a module `go.sum` pins for the tests of a dependency alone, such as `github.com/dlclark/regexp2`, is not judged; `REQ-0849` `tools/release build` writes the third-party notices file of each archive from that graph | |
 | docs | `REQ-0850` `tools/ci docs` (S10; the checks ADR 0001 assigns to it: rules 1, 5 without external URLs, 9 for the title at a first mention, 12, 13, 17, 20). `REQ-0851` It also fails `ARCHITECTURE.md` when an invariant id of 05 5.2 or a module id of 12 12.2 does not appear in it; and an error id whose "recovered in" cell is empty or names an anchor that does not resolve (12 12.8). The Markdown lint and the spell check of rule 5 check nothing until their tools are picked, a [deferred decision](../spec.md#deferred-decisions). The reference pages are compared with their source by `generated`, not here. `REQ-0852` The command lines of fix hints and `--help` examples are checked by the unit test over the generated command definitions that [04 4.1](04-cli.md#41-conventions-both-binaries) names (Error ids), not by rule 13, which reads `README.md` and `docs/guide/`. The julieta command lines of a `SKILL.md`, flags included, and the headings the handoff skill names are checked by the test of [12 12.3](12-engineering.md#123-generators) against the command definitions and the headings `julieta handoff write` requires | |
 | lessons | `REQ-0853` `tools/ci lessons`: every lesson under `docs/lessons/` ([12 12.7](12-engineering.md#127-text-standard-and-lessons)), read after its front matter, names an existing `tools/ci` subcommand or test name, or says "no check possible: <reason>" | |
 | pr | `REQ-0854` `tools/ci pr` (pull requests only; inputs as described above; 12 12.4; ADR 0001 rules 4, 8, 11; the base branch, 12 12.9; the fix marker, 12 12.10; the tags of 05 5.2, above; the forbidden-name check, below) | |
@@ -549,12 +549,26 @@ Four subcommands are outside `all`:
 ### Lint
 
 - `REQ-0876` `golangci-lint run` covers the whole module, `tools/` included.
-- `REQ-1224` `.golangci.yml` enables the doc-comment, error-string and
-  commented-out-code checkers of ADR 0001 (rule 14) and testifylint with
-  `enable-all: true` (10.6); it disables no linter and excludes no
-  finding.
-- `REQ-1225` A fixture test proves that each rule 14 checker and each testifylint
-  checker that applies outside suites still reports (10.1).
+- `REQ-1224` `.golangci.yml` enables the doc-comment (the package
+  comment included), error-string and commented-out-code checkers of
+  ADR 0001 (rule 14), testifylint with `enable-all: true` (10.6), and
+  errorlint, usetesting and thelper; it disables no linter and excludes
+  no finding.
+- `REQ-1225` A fixture test proves that each rule 14 checker, each
+  testifylint checker that applies outside suites, and each of errorlint,
+  usetesting, thelper and the package-comments rule still reports, in a
+  subtest titled by the linter (10.1).
+- `REQ-1252` forbidigo is not in `.golangci.yml`, because no setting
+  scopes a linter by package without an exclusion, and exclusions are
+  barred. The lint step runs it a second time for each lint target,
+  with a configuration of its own that enables forbidigo alone, over
+  every package outside an allow list kept in the lint package of
+  `tools/ci`, and it forbids `fmt.Print*`, `os.Stdout`, `os.Stderr`,
+  the `log` package and `text/template` there; an empty list of
+  packages fails the step. `os/exec` is held by the call-site test of
+  I16 (05 5.2), and `"sh", "-c"` (10.6) by a test in the lint package
+  over the module. A fixture proves a report outside the list and none
+  inside it.
 - revive's `exported` reads only importable packages, so it skips
   package `main` and `_test.go` files (`File.IsImportable` in the pinned
   revive) and checks no doc comment in `tools/ci` today; no setting of
@@ -1278,25 +1292,30 @@ deferred function, which is why the cleanup stands between the two).
 | `REQ-1233` `mise`, `hooks`, `layout`, `agent/*`, `memstore/write` | `cmd/julieta` only | `sbxdrv` |
 | `REQ-0969` `gitsafe`, `spec`, `canon`, `catalog`, `oci`, `manifest`, `memstore`, `handoff`, `salvage`, `shquote`, `termsafe`, `cli`, `procgroup` | both | `sbxdrv`, `layout` |
 | `REQ-1247` `cli/clidoc` (ADR 0015) | `tools/ci` only | `sbxdrv`, `layout` |
+| `REQ-1248` `cli/testsupport` | test packages only | `sbxdrv`, `layout` |
 
 `REQ-0970` Names are packages under `internal/`; a command package under
 `internal/cmd/romeu/` or `internal/cmd/julieta/` follows the row of its
 binary. `REQ-0972` A package under `internal/` that no row names fails
 `tools/ci imports`, so a new package is placed in a row before it
 builds. The second column says which binary may link a package, so a
-package of the last row imports none of the second: romeu links it.
-That is why the writer of the memory store is a package of its own, and
-why `salvage` takes the agent profile as an argument (08 8.5). `oci` is
-shared because `julieta pin` resolves and checks digests with the
-same guarded client (I28).
+package of the row both binaries link (REQ-0969) imports none of the
+row julieta links (REQ-1233): romeu links it. That is why the writer
+of the memory store is a package of its own, and why `salvage` takes
+the agent profile as an argument (08 8.5). `oci` is shared because
+`julieta pin` resolves and checks digests with the same guarded client
+(I28). `cli/testsupport` holds the helpers of the tests of `cli` and of
+the commands, so only a test file imports it and no binary links it.
 
 `REQ-0971` `tools/**` and the test packages under `e2e/**` may import
 `internal/procgroup` directly and any other package under `internal/`
 through `internal/cmd/<binary>/all`, the one package per binary that
 links every command in (one blank-import file per command, 02 2.1);
 `tools/ci` also imports `internal/cli/clidoc` directly, which no binary
-links. The rows govern the two binaries, and a subpackage follows its
-own row, never its parent's.
+links, and `tools/new` imports `internal/cli` directly, for the command
+list and the error table its `command` and `error` kinds read. The
+rows govern the two binaries, and a subpackage follows its own row,
+never its parent's.
 
 ## 10.8 Definition of done for implementing agents
 

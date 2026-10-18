@@ -99,8 +99,8 @@ that the open-items list of sitting M1 does not name.
     list-heads`, the bundle's size in the runbook.
   - With the bin mount absent, each wrapper prints its warning line and
     exits 0.
-  - The runbook holds the undo of each step, the fourth edit's
-    included.
+  - The runbook holds the undo of each step, the fourth edit's and the
+    payload change's included.
   - No daily sandbox holds the store's writer kit, the mount of the
     store or the inbox skill after the fourth edit and the payload
     change.
