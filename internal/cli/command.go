@@ -91,6 +91,11 @@ type Command struct {
 	Binary string
 	// Name is the command's name on the command line.
 	Name string
+	// Sub is the subcommand's name, as add in "julieta memory add", or
+	// empty for a command with no subcommands (04 4.1, Parsing). A
+	// command name either has subcommands, each a definition of its own,
+	// or is one definition with no Sub.
+	Sub string
 	// Summary is the one line the binary's help prints for it.
 	Summary string
 	// Usage is the line after "<binary> <name>" in its help, its flags
@@ -120,6 +125,15 @@ func Define(preflight Preflight, lock Lock, appending Appending, snapshot Snapsh
 		Snapshot:    snapshot,
 		Idempotency: idempotency,
 	}}
+}
+
+// Line returns the command line that names the definition after the
+// binary: its name, then its subcommand when it has one.
+func (c Command) Line() string {
+	if c.Sub == "" {
+		return c.Name
+	}
+	return c.Name + " " + c.Sub
 }
 
 // Effects returns the side-effect fields of the definition.

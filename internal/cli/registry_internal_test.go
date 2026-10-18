@@ -33,7 +33,32 @@ func TestRegistryOrderAndDuplicates(t *testing.T) {
 	}
 	assert.Equal(t, []string{"julieta zz", "romeu mm", "julieta aa"}, order)
 	assert.Equal(t, []string{"aa", "zz"}, listed)
-	_, ok := r.lookup("romeu", "zz")
-	assert.False(t, ok, "a name is looked up in its own binary")
+	assert.Empty(t, r.named("romeu", "zz"), "a name is looked up in its own binary")
 	assert.PanicsWithValue(t, "cli: julieta zz is registered twice", func() { r.register(def("julieta", "zz")) })
+}
+
+// TestRegistrySubcommands registers a command's subcommands as
+// definitions of their own, lists them by subcommand, and panics on a
+// subcommand registered twice and on a name that is both a definition
+// and the command of subcommands.
+func TestRegistrySubcommands(t *testing.T) {
+	def := func(name, sub string) Command {
+		c := Define(PreflightNone, LockNone, AppendsNothing(), SnapshotNone, ReadsOnly)
+		c.Binary, c.Name, c.Sub = "julieta", name, sub
+		c.Run = func(context.Context, *Env, []string) error { return nil }
+		return c
+	}
+	var r registry
+	r.register(def("memory", "check"))
+	r.register(def("memory", "add"))
+	r.register(def("status", ""))
+	var lines []string
+	for _, c := range r.named("julieta", "memory") {
+		lines = append(lines, c.Line())
+	}
+	assert.Equal(t, []string{"memory add", "memory check"}, lines)
+	assert.PanicsWithValue(t, "cli: julieta memory add is registered twice", func() { r.register(def("memory", "add")) })
+	assert.PanicsWithValue(t, "cli: julieta memory has subcommands, so it is no definition of its own", func() { r.register(def("memory", "")) })
+	assert.PanicsWithValue(t, "cli: julieta status has subcommands, so it is no definition of its own", func() { r.register(def("status", "x")) })
+	assert.Panics(t, func() { r.register(def("pin", "help")) }, "a subcommand is not named help")
 }

@@ -9,17 +9,20 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 )
 
 // Main dispatches args, the arguments after the binary's name, to the
-// registered command of env.Binary that args[0] names, and returns the
-// exit status (04 4.1, Exit codes): 0, or the exit code of the error the
-// command returned, which it prints first (Report). --help on the binary
-// or a command prints the help to stdout and returns 0. A command, flag
-// or argument the definitions do not have is the error usage (RJ-349).
-// The binary's main runs it under procgroup.Main, which gives ctx and
-// maps a signal to 130 or 143.
+// registered definition of env.Binary that args[0] names, and args[1]
+// as well when that command has subcommands, and returns the exit status
+// (04 4.1, Exit codes): 0, or the exit code of the error the definition
+// returned, which it prints first (Report). --help on the binary, on a
+// command with subcommands and on a definition prints its help to stdout
+// and returns 0 (04 4.1, Parsing: --help on every level). A command,
+// subcommand, flag or argument the definitions do not have is the error
+// usage (RJ-349). The binary's main runs it under procgroup.Main, which
+// gives ctx and maps a signal to 130 or 143.
 func Main(ctx context.Context, args []string, env *Env) int {
 	env.JSON = false
 	if len(args) > 0 && isHelp(args[0]) {
@@ -29,14 +32,29 @@ func Main(ctx context.Context, args []string, env *Env) int {
 	if len(args) == 0 {
 		return Report(env, usageError(env.Binary, "", "no command given"))
 	}
-	c, ok := commands.lookup(env.Binary, args[0])
-	if !ok {
+	defs := commands.named(env.Binary, args[0])
+	if len(defs) == 0 {
 		return Report(env, usageError(env.Binary, "", fmt.Sprintf("%s has no command %q", env.Binary, args[0])))
 	}
+	c, rest := defs[0], args[1:]
+	if c.Sub != "" {
+		if len(rest) > 0 && isHelp(rest[0]) {
+			writeSubcommandsHelp(env.Stdout, defs)
+			return 0
+		}
+		if len(rest) == 0 {
+			return Report(env, usageError(env.Binary, c.Name, fmt.Sprintf("%s %s needs a subcommand", env.Binary, c.Name)))
+		}
+		i := slices.IndexFunc(defs, func(d Command) bool { return d.Sub == rest[0] })
+		if i < 0 {
+			return Report(env, usageError(env.Binary, c.Name, fmt.Sprintf("%s %s has no subcommand %q", env.Binary, c.Name, rest[0])))
+		}
+		c, rest = defs[i], rest[1:]
+	}
 	fs, help, json := c.flagSet()
-	if err := fs.Parse(args[1:]); err != nil {
+	if err := fs.Parse(rest); err != nil {
 		if !errors.Is(err, flag.ErrHelp) {
-			return Report(env, usageError(env.Binary, c.Name, err.Error()))
+			return Report(env, usageError(env.Binary, c.Line(), err.Error()))
 		}
 		*help = true
 	}
@@ -54,7 +72,8 @@ func isHelp(arg string) bool {
 }
 
 // usageError returns the error usage for the binary and, when one was
-// named, the command, with its hint filled: the help to read.
+// named, the command line (a command, or a command and its subcommand),
+// with its hint filled: the help to read.
 func usageError(binary, command, message string) *Error {
 	e := Usage.New(message)
 	e.Fill = map[string]string{"<binary>": binary, " <command>": ""}

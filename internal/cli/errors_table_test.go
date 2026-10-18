@@ -149,8 +149,8 @@ func TestFixHints(t *testing.T) {
 }
 
 // TestHintCommandsExist parses each romeu or julieta command line of a
-// fix hint (but RJ-338's) and of a --help example into its command and
-// flags, and fails on one the registered definitions do not have (04
+// fix hint (but RJ-338's) and of a --help example into its command,
+// subcommand and flags, and fails on one the registered definitions do not have (04
 // 4.1, Error ids, item 6).
 func TestHintCommandsExist(t *testing.T) {
 	declared, _ := table(t)
@@ -170,8 +170,13 @@ func TestHintCommandsExist(t *testing.T) {
 		if len(words) < 2 || (words[0] != "romeu" && words[0] != "julieta") || strings.HasPrefix(words[1], "-") {
 			continue
 		}
-		c, ok := find(words[0], words[1])
-		if !assert.True(t, ok, "%q names a command the definitions do not have", line) {
+		c, ok := find(words[0], words[1], "")
+		rest := words[2:]
+		if !ok && len(words) > 2 {
+			c, ok = find(words[0], words[1], words[2])
+			rest = words[3:]
+		}
+		if !assert.True(t, ok, "%q names a command or subcommand the definitions do not have", line) {
 			continue
 		}
 		fs := flag.NewFlagSet(c.Name, flag.ContinueOnError)
@@ -182,7 +187,7 @@ func TestHintCommandsExist(t *testing.T) {
 		if c.Flags != nil {
 			c.Flags(fs)
 		}
-		for _, w := range words[2:] {
+		for _, w := range rest {
 			name, _, _ := strings.Cut(strings.TrimLeft(w, "-"), "=")
 			if strings.HasPrefix(w, "-") && !strings.HasPrefix(name, "<") {
 				assert.NotNil(t, fs.Lookup(name), "%q names the flag %s that %s %s does not have", line, w, c.Binary, c.Name)
@@ -191,10 +196,11 @@ func TestHintCommandsExist(t *testing.T) {
 	}
 }
 
-// find returns the registered definition of binary's command name.
-func find(binary, name string) (cli.Command, bool) {
+// find returns the registered definition of binary's command name and
+// subcommand sub, empty for a command with none.
+func find(binary, name, sub string) (cli.Command, bool) {
 	for _, c := range cli.Commands(binary) {
-		if c.Name == name {
+		if c.Name == name && c.Sub == sub {
 			return c, true
 		}
 	}

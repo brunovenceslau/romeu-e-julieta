@@ -198,3 +198,75 @@ func TestReportJSONSurvivesTheWriter(t *testing.T) {
 	assert.Equal(t, msg, got.Message)
 	assert.NotNil(t, got.Details, "details is an object, not null")
 }
+
+// The fixture command with subcommands: julieta fixturegroup one, which
+// takes --repo with a default, and julieta fixturegroup two.
+var (
+	_ = cli.Register(func() cli.Command {
+		var repo string
+		c := cli.Define(cli.PreflightNone, cli.LockNone, cli.AppendsNothing(), cli.SnapshotNone, cli.ReadsOnly)
+		c.Binary, c.Name, c.Sub, c.Summary, c.Usage = "julieta", "fixturegroup", "one", "the first subcommand", "[--repo <dir>] [args]"
+		c.Examples = []string{"julieta fixturegroup one --repo /x"}
+		c.Flags = func(fs *flag.FlagSet) { fs.StringVar(&repo, "repo", "/work", "the `dir` of the repository") }
+		c.Run = func(_ context.Context, env *cli.Env, args []string) error {
+			_, err := fmt.Fprintf(env.Stdout, "one repo %s args %s\n", repo, strings.Join(args, ","))
+			return err
+		}
+		return c
+	}())
+	_ = cli.Register(func() cli.Command {
+		c := cli.Define(cli.PreflightNone, cli.LockNone, cli.AppendsNothing(), cli.SnapshotNone, cli.ReadsOnly)
+		c.Binary, c.Name, c.Sub, c.Summary = "julieta", "fixturegroup", "two", "the second subcommand"
+		c.Run = func(_ context.Context, env *cli.Env, _ []string) error {
+			_, err := fmt.Fprintln(env.Stdout, "two")
+			return err
+		}
+		return c
+	}())
+)
+
+// runJulieta runs Main for julieta with args.
+func runJulieta(t *testing.T, args ...string) (int, string, string) {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&stdout), Stderr: cli.NewWriter(&stderr), Now: func() time.Time { return fixedNow }}
+	return cli.Main(t.Context(), args, env), stdout.String(), stderr.String()
+}
+
+// TestMainSubcommands dispatches a command's subcommand, with its own
+// flags, and exits 2 with the error usage when the subcommand is missing
+// or unknown, the hint naming the command's help.
+func TestMainSubcommands(t *testing.T) {
+	code, stdout, _ := runJulieta(t, "fixturegroup", "one", "--repo", "/r", "a")
+	assert.Equal(t, 0, code)
+	assert.Equal(t, "one repo /r args a\n", stdout)
+	code, stdout, _ = runJulieta(t, "fixturegroup", "two")
+	assert.Equal(t, 0, code)
+	assert.Equal(t, "two\n", stdout)
+	for _, args := range [][]string{{"fixturegroup"}, {"fixturegroup", "three"}} {
+		code, _, stderr := runJulieta(t, args...)
+		assert.Equal(t, 2, code, "%v", args)
+		assert.True(t, strings.HasPrefix(stderr, "error RJ-349 usage: "), stderr)
+		assert.Contains(t, stderr, "fix: julieta fixturegroup --help\n")
+	}
+	_, _, stderr := runJulieta(t, "fixturegroup", "one", "--nosuch")
+	assert.Contains(t, stderr, "fix: julieta fixturegroup one --help\n")
+}
+
+// TestMainHelpOnEveryLevel prints the help of the binary, of a command
+// with subcommands and of a subcommand, whose flag line names its value
+// and its default.
+func TestMainHelpOnEveryLevel(t *testing.T) {
+	code, stdout, _ := runJulieta(t, "--help")
+	assert.Equal(t, 0, code)
+	assert.Contains(t, stdout, "  fixturegroup one ")
+	code, stdout, _ = runJulieta(t, "fixturegroup", "--help")
+	assert.Equal(t, 0, code)
+	assert.Contains(t, stdout, "Usage: julieta fixturegroup <subcommand> [flags] [args]\n\nSubcommands:\n  one        the first subcommand\n  two        the second subcommand\n")
+	code, stdout, _ = runJulieta(t, "fixturegroup", "one", "-h")
+	assert.Equal(t, 0, code)
+	assert.Contains(t, stdout, "Usage: julieta fixturegroup one [--repo <dir>] [args]\n")
+	assert.Contains(t, stdout, "  --repo <dir>  the dir of the repository (default \"/work\")\n")
+	assert.Contains(t, stdout, "  --help  print this help\n")
+	assert.Contains(t, stdout, "143  ended by SIGTERM")
+}

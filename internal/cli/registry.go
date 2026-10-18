@@ -38,8 +38,14 @@ func (r *registry) register(c Command) {
 		panic(err)
 	}
 	for _, have := range r.cmds {
-		if have.Binary == c.Binary && have.Name == c.Name {
-			panic(fmt.Sprintf("cli: %s %s is registered twice", c.Binary, c.Name))
+		if have.Binary != c.Binary || have.Name != c.Name {
+			continue
+		}
+		if have.Sub == c.Sub {
+			panic(fmt.Sprintf("cli: %s %s is registered twice", c.Binary, c.Line()))
+		}
+		if have.Sub == "" || c.Sub == "" {
+			panic(fmt.Sprintf("cli: %s %s has subcommands, so it is no definition of its own", c.Binary, c.Name))
 		}
 	}
 	r.cmds = append(r.cmds, c)
@@ -51,8 +57,11 @@ func (c Command) check() error {
 	if !slices.Contains(binaries, c.Binary) {
 		missing = append(missing, fmt.Sprintf("a binary of %s, not %q", strings.Join(binaries, " or "), c.Binary))
 	}
-	if c.Name == "" || c.Name == "help" || strings.HasPrefix(c.Name, "-") || strings.ContainsAny(c.Name, " \t\n") {
+	if !isWord(c.Name) {
 		missing = append(missing, fmt.Sprintf("a name of one word other than help, not %q", c.Name))
+	}
+	if c.Sub != "" && !isWord(c.Sub) {
+		missing = append(missing, fmt.Sprintf("a subcommand of one word other than help, not %q", c.Sub))
 	}
 	if c.Run == nil {
 		missing = append(missing, "Run")
@@ -80,6 +89,12 @@ func (c Command) check() error {
 		return fmt.Errorf("cli: the definition of %s %q lacks %s", c.Binary, c.Name, strings.Join(missing, ", "))
 	}
 	return nil
+}
+
+// isWord reports whether s can name a command or a subcommand: one
+// word that is not help and does not start with a dash.
+func isWord(s string) bool {
+	return s != "" && s != "help" && !strings.HasPrefix(s, "-") && !strings.ContainsAny(s, " \t\n")
 }
 
 // flagsBind binds the command's flags to a scratch set beside --help
@@ -112,7 +127,7 @@ func (c Command) flagSet() (*flag.FlagSet, *bool, *bool) {
 }
 
 // Commands returns the registered definitions of the binary, sorted by
-// name.
+// name, then subcommand.
 func Commands(binary string) []Command { return commands.list(binary) }
 
 // list returns the definitions of the binary, sorted by name.
@@ -123,16 +138,19 @@ func (r *registry) list(binary string) []Command {
 			out = append(out, c)
 		}
 	}
-	slices.SortFunc(out, func(a, b Command) int { return strings.Compare(a.Name, b.Name) })
+	slices.SortFunc(out, func(a, b Command) int { return strings.Compare(a.Line(), b.Line()) })
 	return out
 }
 
-// lookup returns the definition of the binary's command name.
-func (r *registry) lookup(binary, name string) (Command, bool) {
-	for _, c := range r.cmds {
-		if c.Binary == binary && c.Name == name {
-			return c, true
+// named returns the definitions of the binary's command name: one with
+// no Sub, or one per subcommand, sorted by subcommand; none for a name
+// the binary does not have.
+func (r *registry) named(binary, name string) []Command {
+	var out []Command
+	for _, c := range r.list(binary) {
+		if c.Name == name {
+			out = append(out, c)
 		}
 	}
-	return Command{}, false
+	return out
 }
