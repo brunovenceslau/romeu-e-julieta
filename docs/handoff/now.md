@@ -15,13 +15,12 @@ merged T129 (Done record 28).
 
 ## Next steps
 
-1. Take a task from `go run ./tools/ci plan --ready`: T008 (the CLI
-   contract, M1), T123, T125, T128, T130, T132, and T024
-   (gitsafe's unbundle and verify, M3); T124 needs an operator API
-   call; T112 runs at sitting M1, T126 at O8. T008 and T024 became
-   ready when T007 and T023 were recorded as merged (Done record 26).
-   Each ask-first surface its task file forecasts needs the operator's
-   approval first; no grant is written before sitting M0.
+1. The stack of ADR 0015 (cobra) merges first; then T008 is reworked on
+   cobra in #109 (Done record 30). T009 and T025 wait for T008.
+   T130's stack #114 is ready; T132 and T123 each need a plan fix first
+   (pending note "t132-and-t123-owns-and-the-build-constraint-gap",
+   once #113 merges). Each ask-first surface a task file forecasts
+   needs the operator's approval first.
 2. T012 waits by decision. T139 waits for item 16 (the lint set) at
    sitting M0.
 3. At their triggers: "tight-wall-clock-bounds-left-in-the-tests",
@@ -43,7 +42,7 @@ One block, a recommendation each.
 
 ## In flight
 
-- The stack of the second-signal test fix (Done record 29).
+- The stack of ADR 0015, cobra for the command line (Done record 30).
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
