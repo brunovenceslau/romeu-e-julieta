@@ -141,21 +141,21 @@ func TestHygieneRules(t *testing.T) {
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("PROLOGUE.md", "text\n")
 			},
-			want: []string{"PROLOGUE.md: prologue: the user's agreement file lives outside product repositories"},
+			want: []string{"PROLOGUE.md: never-tracked: the file belongs outside product repositories (the neverTracked list of tools/ci/denylist.yaml)"},
 		},
 		{
 			name: "a tracked PROLOGUE.md in a subdirectory",
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("docs/notes/PROLOGUE.md", "text\n")
 			},
-			want: []string{"docs/notes/PROLOGUE.md: prologue:"},
+			want: []string{"docs/notes/PROLOGUE.md: never-tracked:"},
 		},
 		{
 			name: "a tracked prologue.md in another case",
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("Docs/Prologue.MD", "text\n")
 			},
-			want: []string{"Docs/Prologue.MD: prologue:"},
+			want: []string{"Docs/Prologue.MD: never-tracked:"},
 		},
 		{
 			name: "a second file in .githooks",

@@ -3,6 +3,11 @@
 
 # Names this repository must not contain, hashed. Add an entry with
 # "go run ./tools/ci hygiene add", on the host, in a terminal.
+# neverTracked lists the file names no tracked path may end with, in
+# any case: files that belong outside product repositories (10 10.2).
+# It is plain text; a name that must not be read goes in entries.
+neverTracked:
+  - PROLOGUE.md
 entries:
   - segments:
       - length: 6

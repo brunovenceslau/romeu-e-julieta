@@ -214,3 +214,64 @@ func TestParse(t *testing.T) {
 		})
 	}
 }
+
+// TestNeverTrackedList: the neverTracked key decodes, matches the last
+// element of a path in any case and at any depth, survives Marshal and
+// Merge, and refuses a name that could never be the last element of a
+// path or that is listed twice in some case.
+func TestNeverTrackedList(t *testing.T) {
+	l, err := Parse([]byte("neverTracked:\n  - NOTES.local\nentries: []\n"))
+	require.NoError(t, err)
+	for _, p := range []string{"NOTES.local", "notes.LOCAL", "a/b/c/Notes.Local"} {
+		assert.True(t, l.NeverTracked(p), p)
+	}
+	for _, p := range []string{"NOTES.local/x", "a/NOTES.local.md", "XNOTES.local"} {
+		assert.False(t, l.NeverTracked(p), p)
+	}
+	back, err := Parse(l.Marshal())
+	require.NoError(t, err)
+	assert.True(t, back.NeverTracked("NOTES.local"), "Marshal keeps the list")
+
+	merged := &List{}
+	merged.Merge(l)
+	merged.Merge(l)
+	assert.Equal(t, 1, strings.Count(string(merged.Marshal()), "NOTES.local"), "Merge adds a name once")
+
+	for _, bad := range []string{
+		"neverTracked:\n  - \"\"\n",
+		"neverTracked:\n  - ..\n",
+		"neverTracked:\n  - a/b\n",
+		"neverTracked:\n  - \"a\\tb\"\n",
+		"neverTracked:\n  - X.md\n  - x.MD\n",
+		"neverTracked:\n  - \"X.md \"\n",
+		"neverTracked:\n  - \" X.md\"\n",
+		"neverTracked:\n  - \"a\\\\b\"\n",
+		"neverTracked:\n  - \"a:b\"\n",
+		"neverTracked:\n  - \"*.md\"\n",
+	} {
+		_, err := Parse([]byte(bad))
+		require.Error(t, err, "%q", bad)
+	}
+	require.NoError(t, merged.AddNeverTracked("OTHER.md"))
+	require.Error(t, merged.AddNeverTracked("other.md"))
+	require.Error(t, merged.AddNeverTracked("a/b"))
+	assert.Equal(t, 2, merged.NeverTrackedLen())
+
+	listed := &List{}
+	e, err := NewEntry("zorvex")
+	require.NoError(t, err)
+	listed.Add(e)
+	require.NoError(t, listed.AddNeverTracked("ZORVEX.md"))
+	_, err = Parse(listed.Marshal())
+	require.ErrorContains(t, err, "name 1 holds a forbidden name")
+	assert.NotContains(t, strings.ToLower(err.Error()), "zorvex", "the error repeats no name")
+}
+
+// TestCommittedDenylistKeepsTheList: the denylist of this repository
+// lists PROLOGUE.md, the name the constant held before the list moved
+// into the file (10 10.2, REQ-0883).
+func TestCommittedDenylistKeepsTheList(t *testing.T) {
+	l, err := Load(filepath.Join("..", "denylist.yaml"))
+	require.NoError(t, err)
+	assert.True(t, l.NeverTracked("PROLOGUE.md"))
+}

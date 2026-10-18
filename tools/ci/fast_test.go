@@ -512,9 +512,9 @@ func TestFastPushedRange(t *testing.T) {
 		{"an added path", push(path, "refs/heads/path", zero), check.ExitFail,
 			[]string{"commit " + path + ": added path (withheld): name:"}, ""},
 		{"an added PROLOGUE.md in another case", push(prologue, "refs/heads/prologue", zero), check.ExitFail,
-			[]string{"FAIL  pushed range", "commit " + prologue + ": added path docs/Prologue.md: prologue:"}, ""},
+			[]string{"FAIL  pushed range", "commit " + prologue + ": added path docs/Prologue.md: never-tracked:"}, ""},
 		{"an added PROLOGUE.md under a listed name keeps the path withheld", push(prologueNamed, "refs/heads/prologuenamed", zero), check.ExitFail,
-			[]string{"commit " + prologueNamed + ": added path (withheld): prologue:"}, ""},
+			[]string{"commit " + prologueNamed + ": added path (withheld): never-tracked:"}, ""},
 		{"an added line", push(line, "refs/heads/line", zero), check.ExitFail,
 			[]string{"commit " + line + ": docs/page.md:2: name:"}, ""},
 		{"a line one commit adds and the next removes", push(removedTip, "refs/heads/removed", zero), check.ExitFail,
@@ -1120,8 +1120,8 @@ func TestDataAtHEAD(t *testing.T) {
 func TestPrologueInThePushedRange(t *testing.T) {
 	const zero = "0000000000000000000000000000000000000000"
 	r := citest.NewTree(t)
-	require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
-	r.Commit("base, no denylist")
+	r.Write(names.Path, string(citest.Denylist(t)))
+	r.Commit("base, a denylist with the never-tracked list and no entry")
 	origin := gittest.NewBare(t)
 	r.Git("remote", "add", "origin", origin.Dir)
 	r.Git("push", "--quiet", "origin", "main")
@@ -1136,11 +1136,11 @@ func TestPrologueInThePushedRange(t *testing.T) {
 	got, checked, err := citest.RangeOf(pushedrange.Range(t.Context(), r.Repo, "origin", push, tip))
 	require.NoError(t, err)
 	assert.False(t, checked, "no denylist entry: names are not checked")
-	assert.Equal(t, "commit "+added+": added path sub/prologue.md: prologue: the user's agreement file lives outside product repositories\n", check.Lines(got))
+	assert.Equal(t, "commit "+added+": added path sub/prologue.md: never-tracked: the file belongs outside product repositories (the neverTracked list of tools/ci/denylist.yaml)\n", check.Lines(got))
 
 	// The run reports the finding too, and not only "not checked".
 	code, out := runCI(t, r, strings.NewReader(stdin), []check.Step{citest.Passing}, "fast", "origin", origin.Dir)
 	assert.Equal(t, check.ExitFail, code, "exit status")
-	assert.Contains(t, out, "FAIL  pushed range\ncommit "+added+": added path sub/prologue.md: prologue:")
+	assert.Contains(t, out, "FAIL  pushed range\ncommit "+added+": added path sub/prologue.md: never-tracked:")
 	assert.Contains(t, out, "pushed range: not checked against names")
 }
