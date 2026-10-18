@@ -23,3 +23,12 @@ either `*_gen.go` files carry no such header, or an ADR amends the rule.
 Recommended: no header, which keeps every lint finding visible.
 
 Reopen: the operator's answer, or the start of the rework of #109.
+
+No package is named `generated` (decided on 2026-10-17). The package
+`tools/ci/internal/generated` on main, which holds the drift check and
+today's generators (CODEOWNERS, the ADR index, `checks.md`), moves its
+generators next to their data and is renamed for what is left, the
+drift check; T008's `owns` in #116 names no file under it. Recommended:
+rename the package to `tools/ci/internal/drift` and keep the step name
+`generated`, which the step table of 10 10.2 names (REQ-0822), in a
+pull request of its own on the `checks` surface before T008's rework.

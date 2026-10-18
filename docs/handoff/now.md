@@ -26,9 +26,10 @@ implementation (#109) is held while the command line moves to cobra (ADR
 
 One block, a recommendation each.
 
-1. The `*_gen.go` header question
+1. The `*_gen.go` header question and the rename of the package
+   `tools/ci/internal/generated`
    ("adjust-the-cobra-stack-for-generators-with-their-data").
-   Recommended: no generated-code header.
+   Recommended: no generated-code header; rename it to `drift`.
 2. I29's code point set ("i29-and-the-invisible-code-points-outside-it").
    Recommended: widen it to Default_Ignorable_Code_Point before M1's
    gate diff.
