@@ -11,7 +11,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -433,4 +435,60 @@ func TestReportJSONSurvivesTheWriter(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(out), &got))
 	assert.Equal(t, msg, got.Message)
 	assert.NotNil(t, got.Details, "details is an object, not null")
+}
+
+// TestCompletionErrorGoesThroughTheWriter completes a line whose flag
+// does not parse, which makes cobra print "[Error] ..." with
+// CompErrorln, and finds the line on the CLI writer, escaped, and
+// nothing on os.Stderr (04 4.1, Output).
+func TestCompletionErrorGoesThroughTheWriter(t *testing.T) {
+	errR, errW, err := os.Pipe()
+	require.NoError(t, err)
+	oldErr := os.Stderr
+	os.Stderr = errW
+	t.Cleanup(func() {
+		os.Stderr = oldErr
+		_ = errW.Close()
+		_ = errR.Close()
+	})
+	code, _, stderr := romeu(t, "__complete", "fixture", "--no\x1b[31msuch", "")
+	assert.Same(t, errW, os.Stderr, "Main restores the os.Stderr it found")
+	require.NoError(t, errW.Close())
+	leaked, err := io.ReadAll(errR)
+	require.NoError(t, err)
+	assert.Equal(t, 0, code)
+	assert.Empty(t, string(leaked), "nothing reaches os.Stderr")
+	assert.Contains(t, stderr, "[Error] ")
+	assert.NotContains(t, stderr, "\x1b")
+}
+
+// TestCompletionWritesNoDebugFile sets BASH_COMP_DEBUG_FILE and finds
+// that cobra appends nothing to it: Main unsets the variable before
+// cobra runs.
+func TestCompletionWritesNoDebugFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "debug")
+	t.Setenv("BASH_COMP_DEBUG_FILE", path)
+	romeu(t, "__complete", "fixture", "--nosuch", "")
+	_, err := os.Stat(path)
+	assert.ErrorIs(t, err, fs.ErrNotExist)
+}
+
+// TestCompletionWithoutAStderrWriter completes with no stderr writer in
+// Env: Main swaps nothing and leaves os.Stderr as it found it.
+func TestCompletionWithoutAStderrWriter(t *testing.T) {
+	errR, errW, err := os.Pipe()
+	require.NoError(t, err)
+	oldErr := os.Stderr
+	os.Stderr = errW
+	t.Cleanup(func() {
+		os.Stderr = oldErr
+		_ = errW.Close()
+		_ = errR.Close()
+	})
+	var stdout bytes.Buffer
+	env := &cli.Env{Binary: "romeu", Stdout: cli.NewWriter(&stdout), Now: func() time.Time { return fixedNow }}
+	code := cli.Main(t.Context(), []string{"__complete", "fix"}, env)
+	assert.Same(t, errW, os.Stderr)
+	assert.Equal(t, 0, code)
+	assert.Equal(t, "fixture\ta command of the tests\n:4\n", stdout.String())
 }
