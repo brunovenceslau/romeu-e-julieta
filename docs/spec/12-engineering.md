@@ -245,7 +245,7 @@ module whose id is no directory name owns the paths its row gives.
 | `kitpin` | `tools/kitpin` and the pin file `kits/pins.yaml`, which block A reads | - |
 | `canon` | canonical JSON, typed domain-separated digests | - |
 | `spec` | project spec, run layout and host settings types with gate/apply tags; `rules.go`; strict decode; generated validators and schemas (`tools/schemagen`) | canon |
-| `termsafe` | escaping of control, bidi, zero-width and tag characters | - |
+| `termsafe` | escaping of control, bidi, zero-width, tag and default-ignorable characters | - |
 | `procgroup` | `REQ-1086` every subprocess start of both binaries, `tools/ci` and `tools/mutants`: a process group per child, the kill of the group on a timeout, a cancellation or a signal, the timeout table and the signal handler of [04 4.1](04-cli.md#subprocesses) | - |
 | `cli` | the union of the per-package `errors.go` declarations, collected by one test (04 4.1), the default-escaping CLI writer, text and `--json` output; lands with `spec`, so every later command has its error ids | termsafe |
 | `gitsafe` | every git invocation: hardened env and flags, allowlisted ref namespaces, create-only refs, bundle verify/unbundle, fsck and tree walk for materialization | - |

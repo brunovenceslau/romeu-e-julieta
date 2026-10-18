@@ -17,7 +17,7 @@ romeu-e-julieta/
 ├─ internal/
 │  ├─ spec/                    types with gate/apply tags, rules.go (validation rules as data), strict decode
 │  ├─ canon/                   canonical JSON and typed, domain-separated digests
-│  ├─ termsafe/                escaping of control, bidi, zero-width and tag characters for host output
+│  ├─ termsafe/                escaping of control, bidi, zero-width, tag and default-ignorable characters for host output
 │  ├─ gitsafe/                 hardened git runner, bundle, create-only refs, validated tree walk
 │  ├─ procgroup/               every subprocess start: a process group per child, its kill on a timeout, a cancellation or a signal, the signal handler (04 4.1)
 │  ├─ oci/                     read and verify v3 descriptors by digest (stdlib net/http); the one descriptor grammar, which render calls for local kits
