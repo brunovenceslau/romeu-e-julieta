@@ -67,6 +67,7 @@ var Generated = []string{
 	".github/CODEOWNERS",
 	"docs/adr/README.md",
 	"docs/diagrams/**",
+	"internal/cli/*_gen.go",
 }
 
 // The fields of a task's front matter, in the order the plan writes

@@ -211,17 +211,22 @@ func TestGenerateWroteLineIsSafe(t *testing.T) {
 	}
 }
 
-// TestAskFirstOfThisRepository parses the committed list and checks that
-// the committed consumers are what it produces, so a hand edit of either
-// fails here before it fails "generated".
-func TestAskFirstOfThisRepository(t *testing.T) {
+// TestGeneratedOfThisRepository runs the generators on this repository
+// and checks that each committed output is what they produce, CODEOWNERS
+// and the index of the decision records among them, so a hand edit of
+// either fails here before it fails "generated".
+func TestGeneratedOfThisRepository(t *testing.T) {
 	dir := citest.ModuleRoot(t)
 	root, err := os.OpenRoot(dir)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = root.Close() })
 	outputs, err := generateOutputs(root)
 	require.NoError(t, err)
-	require.Len(t, outputs, 2)
+	var paths []string
+	for _, out := range outputs {
+		paths = append(paths, out.path)
+	}
+	require.Subset(t, paths, []string{".github/CODEOWNERS", "docs/adr/README.md"})
 	for _, out := range outputs {
 		got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(out.path)))
 		require.NoError(t, err, out.path)

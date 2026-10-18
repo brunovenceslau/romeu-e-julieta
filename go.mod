@@ -3,8 +3,16 @@ module github.com/brunovenceslau/romeu-e-julieta
 go 1.27.2
 
 require (
+	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/sys v0.48.0
 	golang.org/x/term v0.46.0
+)
+
+require (
+	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 )
