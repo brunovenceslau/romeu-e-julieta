@@ -72,10 +72,12 @@ proxy.golang.org):
 ## Decision
 
 1. **cobra for the two binaries.** `romeu` and `julieta` build their
-   command line with `github.com/spf13/cobra` v1.10.2 and its flag
-   package `github.com/spf13/pflag` at v1.0.9, the version cobra
-   requires; a later pflag is an ask-first change of its own, never a
-   side effect of another bump. Both join the dependency list of 12
+   command line with `github.com/spf13/cobra` and its flag package
+   `github.com/spf13/pflag`, at least the versions measured above
+   (cobra v1.10.2, pflag v1.0.9). `go.mod` pins an exact version of
+   each, the newest published when it is added or bumped, and a bump
+   keeps them current (changed on 2026-10-18; the record first fixed
+   the exact versions). Both join the dependency list of 12
    12.1 with T008, the first task that imports them (plan rule 7). The
    tools of the repository (`tools/ci`, `tools/new`, `tools/mutants`,
    `tools/release`) keep the standard library's `flag`. Reopened by: a
