@@ -249,7 +249,9 @@ New or changed, each proposed on 2026-10-12:
 4. **Registration by file, no shared table.** A `tools/ci` check is
    `tools/ci/internal/<check>/` plus `tools/ci/check_<check>.go`, whose
    `init` registers its name, usage line, membership in `fast` and
-   `all`, order key and generator outputs; a `tools/new` kind is
+   `all` and order key (the `generated` check's package is `drift`); a
+   generator lives in the package that owns its data and is registered
+   by `tools/ci/generator_<name>.go` (02 2.1); a `tools/new` kind is
    `tools/new/<kind>*.go` with the same `init` (T106 moves `adr` to
    that form and drops the switch); a command is its package under
    `internal/cmd/<binary>/<command>/` with an `init` that registers its
