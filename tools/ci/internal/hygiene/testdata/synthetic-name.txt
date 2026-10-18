@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# The plaintext of the synthetic entry of tools/ci/denylist.yaml (10
+# 10.2, REQ-0898): a made-up name, written there by "hygiene add", one
+# segment per line, since the matcher reads one line at a time and so
+# does not find the name in this file.
+trezzlewick
+ombravane

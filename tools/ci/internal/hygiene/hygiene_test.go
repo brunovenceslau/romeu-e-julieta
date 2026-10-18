@@ -137,6 +137,20 @@ func TestHygieneRules(t *testing.T) {
 			want: []string{"vendor/modules.txt: workspace:"},
 		},
 		{
+			name: "a path hit carries the fix line",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("docs/zorvex-quimby.md", "plain\n")
+			},
+			want: []string{"(path withheld, tree entry 3): name: the path holds a listed name; " + NameFix},
+		},
+		{
+			name: "a line hit carries the fix line",
+			change: func(t *testing.T, r *gittest.Repo) {
+				r.Write("docs/page.md", "one\nzorvex quimby\n")
+			},
+			want: []string{"docs/page.md:2: name: the line holds a listed name; " + NameFix},
+		},
+		{
 			name: "a tracked PROLOGUE.md at the root",
 			change: func(t *testing.T, r *gittest.Repo) {
 				r.Write("PROLOGUE.md", "text\n")

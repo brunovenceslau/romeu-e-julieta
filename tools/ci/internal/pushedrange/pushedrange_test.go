@@ -51,7 +51,7 @@ func TestPushedRangeVerdicts(t *testing.T) {
 			name: "an entry at HEAD, a listed name in an added line", baseList: true,
 			tip: map[string]string{"docs/page.md": "see " + citest.MadeUp + "\n"},
 			want: func(tip string) []check.Verdict {
-				return []check.Verdict{{Name: name, Findings: []check.Finding{{Where: "commit " + tip + ": docs/page.md:1", Rule: "name", Msg: "the added line holds a name listed at HEAD"}}}}
+				return []check.Verdict{{Name: name, Findings: []check.Finding{{Where: "commit " + tip + ": docs/page.md:1", Rule: "name", Msg: "the added line holds a name listed at HEAD; " + hygiene.NameFix}}}}
 			},
 		},
 		{
@@ -60,7 +60,7 @@ func TestPushedRangeVerdicts(t *testing.T) {
 			want: func(tip string) []check.Verdict {
 				return []check.Verdict{{Name: name, Findings: []check.Finding{
 					{Where: names.Path, Rule: hygiene.NeverTrackedRule, Msg: "the denylist at HEAD drops 1 neverTracked name(s) the remote's default branch lists; restore them"},
-					{Where: "commit " + tip + ": docs/page.md:1", Rule: "name", Msg: "the added line holds a name listed at the remote's default branch"},
+					{Where: "commit " + tip + ": docs/page.md:1", Rule: "name", Msg: "the added line holds a name listed at the remote's default branch; " + hygiene.NameFix},
 				}}}
 			},
 		},

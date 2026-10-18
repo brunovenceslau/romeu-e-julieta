@@ -79,21 +79,21 @@ func Range(ctx context.Context, repo git.Repo, remote string, push pushed.Push, 
 		of := readingAt(r)
 		switch r.Field {
 		case pushed.FieldRef:
-			findings = append(findings, check.Finding{Where: "pushed ref " + strconv.Itoa(r.Line), Rule: "name", Msg: "the remote ref name holds " + listed})
+			findings = append(findings, hygiene.NameFinding("pushed ref "+strconv.Itoa(r.Line), "the remote ref name holds "+listed))
 		case pushed.FieldMessage:
-			findings = append(findings, check.Finding{Where: of + "message line " + strconv.Itoa(r.Line), Rule: "name", Msg: "the line holds " + listed})
+			findings = append(findings, hygiene.NameFinding(of+"message line "+strconv.Itoa(r.Line), "the line holds "+listed))
 		case pushed.FieldAuthor, pushed.FieldCommitter, pushed.FieldTagger:
-			findings = append(findings, check.Finding{Where: of + r.Field, Rule: "name", Msg: "the name and email hold " + listed})
+			findings = append(findings, hygiene.NameFinding(of+r.Field, "the name and email hold "+listed))
 		case pushed.FieldTagName:
-			findings = append(findings, check.Finding{Where: of + r.Field, Rule: "name", Msg: "the tag's name holds " + listed})
+			findings = append(findings, hygiene.NameFinding(of+r.Field, "the tag's name holds "+listed))
 		case pushed.FieldPath:
-			findings = append(findings, check.Finding{Where: of + "added path (withheld)", Rule: "name", Msg: "the path holds " + listed})
+			findings = append(findings, hygiene.NameFinding(of+"added path (withheld)", "the path holds "+listed))
 		case pushed.FieldLine:
 			path := git.Printable(r.Path)
 			if list.Match([]byte(r.Path)) {
 				path = "(path withheld)"
 			}
-			findings = append(findings, check.Finding{Where: of + path + ":" + strconv.Itoa(r.Line), Rule: "name", Msg: "the added line holds " + listed})
+			findings = append(findings, hygiene.NameFinding(of+path+":"+strconv.Itoa(r.Line), "the added line holds "+listed))
 		}
 	})
 	if err != nil {

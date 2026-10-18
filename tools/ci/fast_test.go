@@ -18,6 +18,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/lint"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/pushedrange"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
@@ -541,6 +542,25 @@ func TestFastPushedRange(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestFastPushedRangeFixLine: a forbidden-name hit of the pushed range
+// ends with the fix line of 10 10.2, as the hits of hygiene do.
+func TestFastPushedRangeFixLine(t *testing.T) {
+	t.Run("a pushed-range hit carries the fix line", func(t *testing.T) {
+		const zero = "0000000000000000000000000000000000000000"
+		origin := gittest.NewBare(t)
+		r := citest.NewTree(t)
+		r.Git("remote", "add", "origin", origin.Dir)
+		r.Commit("fixture")
+		r.Git("push", "--quiet", "origin", "main")
+		r.Git("fetch", "--quiet", "origin")
+		tip := r.Commit("docs: a subject\n\nabout Zorvex Quimby")
+		stdin := "refs/heads/main " + tip + " refs/heads/main " + zero + "\n"
+		code, out := runCI(t, r, strings.NewReader(stdin), []check.Step{citest.Passing}, "fast", "origin", origin.Dir)
+		assert.Equal(t, check.ExitFail, code)
+		assert.Contains(t, out, "commit "+tip+": message line 3: name: the line holds a name listed at HEAD; "+hygiene.NameFix+"\n")
+	})
 }
 
 // TestFastPushedRangeDefaultBranch covers the denylist at origin's

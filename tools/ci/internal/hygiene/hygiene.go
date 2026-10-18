@@ -94,7 +94,7 @@ func Of(files []check.TreeFile) ([]check.Finding, error) {
 		where := git.Printable(f.Path)
 		if list.Match([]byte(f.Path)) {
 			where = fmt.Sprintf("(path withheld, tree entry %d)", i+1)
-			findings = append(findings, check.Finding{Where: where, Rule: "name", Msg: "the path holds a listed name"})
+			findings = append(findings, NameFinding(where, "the path holds a listed name"))
 		}
 		if !printableASCII(f.Path) {
 			findings = append(findings, check.Finding{Where: where, Rule: "path", Msg: asciiPathMsg})
@@ -124,7 +124,7 @@ func Of(files []check.TreeFile) ([]check.Finding, error) {
 		}
 		at := func(line int) string { return where + ":" + strconv.Itoa(line) }
 		for _, n := range list.MatchLines(f.Content) {
-			findings = append(findings, check.Finding{Where: at(n), Rule: "name", Msg: "the line holds a listed name"})
+			findings = append(findings, NameFinding(at(n), "the line holds a listed name"))
 		}
 		for _, n := range linesWith(f.Content, func(line []byte) bool { return bytes.Contains(line, []byte(EmDash)) }) {
 			findings = append(findings, check.Finding{Where: at(n), Rule: "em-dash", Msg: "the line holds U+2014; use a plain dash"})
@@ -162,7 +162,7 @@ func hygieneFile(ctx context.Context, repo git.Repo, path string) ([]check.Findi
 		return nil, err
 	}
 	for _, n := range list.MatchLines(content) {
-		findings = append(findings, check.Finding{Where: "the file:" + strconv.Itoa(n), Rule: "name", Msg: "the line holds a listed name"})
+		findings = append(findings, NameFinding("the file:"+strconv.Itoa(n), "the line holds a listed name"))
 	}
 	return findings, nil
 }
