@@ -62,7 +62,7 @@ romeu-e-julieta/
 │  ├─ fakesbx/                 fake sbx that replays recorded sessions only
 │  └─ testdata/sbx/<version>/  redacted sbx help text and argv/stdout/stderr/exit sessions (*.jsonl)
 ├─ tools/
-│  ├─ ci/                      every check CI runs and its committed data: denylist.yaml (forbidden names, hashed, and the never-tracked file names), prose.yaml, headings.yaml, testdata/; one package per check under tools/ci/internal/<check>/ plus tools/ci/check_<check>.go, whose init registers its name, usage, membership in fast and all, order key and generator outputs (12 12.3), so a new check adds files and edits none; the shared helper packages sit beside them, importable from tools/mutants and tools/new, each registering no check
+│  ├─ ci/                      every check CI runs and its committed data: denylist.yaml (forbidden names, hashed, and the never-tracked file names), prose.yaml, headings.yaml, testdata/; one package per check under tools/ci/internal/<check>/ (the generated check's is tools/ci/internal/drift/) plus tools/ci/check_<check>.go, whose init registers its name, usage, membership in fast and all and order key, so a new check adds files and edits none; each generator (12 12.3) lives with its data and is registered by tools/ci/generator_<name>.go; the shared helper packages sit beside them, importable from tools/mutants and tools/new, each registering no check
 │  ├─ new/                     scaffolding: adr, invariant, probe, kit, command, lesson, task, error
 │  ├─ schemagen/               reflect-based JSON Schema generator from the Go types and rules.go
 │  ├─ release/                 release subcommands (10 10.2)
@@ -133,9 +133,15 @@ Rules of this tree, one item per obligation:
   never-tracked file names; `prose.yaml`; `headings.yaml`; `testdata/`):
   one package per check under `tools/ci/internal/<check>/` plus
   `tools/ci/check_<check>.go`, whose `init` registers its name, usage,
-  membership in `fast` and `all`, order key and generator outputs
-  ([12 12.3](12-engineering.md#123-generators-and-single-sources-of-truth)),
-  so a new check adds files and edits none; the shared helper packages
+  membership in `fast` and `all` and order key, so a new check adds
+  files and edits none. The package of the `generated` check is
+  `tools/ci/internal/drift/`, since no package is named `generated`.
+  A generator of
+  [12 12.3](12-engineering.md#123-generators-and-single-sources-of-truth)
+  lives in the package that owns its data and is registered by its own
+  `tools/ci/generator_<name>.go`; the `generated` check holds no
+  generator, and runs every registered one and fails a drift from it.
+  The shared helper packages
   sit beside them, importable from `tools/mutants` and `tools/new`, each
   registering no check.
 - `REQ-0122` `docs/grants.yaml` holds the checkpoint grants that stand in
