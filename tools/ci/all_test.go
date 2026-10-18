@@ -89,6 +89,7 @@ func TestAll(t *testing.T) {
 			name:  "a workflow outside the grammar",
 			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write(".github/workflows/ci.yml", strings.Replace(citest.GoodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1))
 			},
 			profile: "tools/ci 1 1",
@@ -96,9 +97,12 @@ func TestAll(t *testing.T) {
 			want:    []string{"FAIL  workflows (0s)\n.github/workflows/ci.yml:28: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
 		},
 		{
-			name:    "a hygiene finding",
-			steps:   []check.Step{citest.Passing},
-			change:  func(t *testing.T, r *gittest.Repo) { r.Write("docs/x.md", "a line with "+hygiene.EmDash+"\n") },
+			name:  "a hygiene finding",
+			steps: []check.Step{citest.Passing},
+			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
+				r.Write("docs/x.md", "a line with "+hygiene.EmDash+"\n")
+			},
 			profile: "tools/ci 1 1",
 			code:    check.ExitFail,
 			want:    []string{"FAIL  hygiene", "em-dash", "ok    workflows"},
@@ -113,6 +117,7 @@ func TestAll(t *testing.T) {
 			name:  "a nested module stops all before any check",
 			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("tools/inner/go.mod", "module example.invalid/inner\n")
 			},
 			code: check.ExitError,
@@ -252,6 +257,7 @@ func TestAllStepsVulnFailsClosed(t *testing.T) {
 		{
 			name: "outside the installs directory",
 			resolve: func(t *testing.T, _ citest.FakeMise) string {
+				t.Helper()
 				return citest.Executable(t, filepath.Join(t.TempDir(), "govulncheck"))
 			},
 			want: "is outside " + filepath.Join("{installs}", mise.GovulncheckDir) + ", where mise installs it",
@@ -259,14 +265,18 @@ func TestAllStepsVulnFailsClosed(t *testing.T) {
 		{
 			name: "at a version beside the locked one",
 			resolve: func(t *testing.T, f citest.FakeMise) string {
+				t.Helper()
 				return f.Tool(t, mise.GovulncheckDir, "1.7.0", "bin", "govulncheck")
 			},
 			want: "the install is not the version 1.8.0 that mise.lock locks",
 		},
 		{
-			name:    "not installed, with a fake on the search path",
-			resolve: func(t *testing.T, _ citest.FakeMise) string { return "" },
-			want:    "mise which govulncheck: ",
+			name: "not installed, with a fake on the search path",
+			resolve: func(t *testing.T, _ citest.FakeMise) string {
+				t.Helper()
+				return ""
+			},
+			want: "mise which govulncheck: ",
 		},
 	}
 	for _, tt := range tests {
@@ -599,14 +609,17 @@ func TestCommitCheckThatCannotJudgeFails(t *testing.T) {
 		run     func(t *testing.T, r *gittest.Repo, origin string) (int, string)
 	}{
 		{"fast by hand", false, func(t *testing.T, r *gittest.Repo, _ string) (int, string) {
+			t.Helper()
 			return runCI(t, r, nil, []check.Step{citest.Passing}, "fast")
 		}},
 		{"all", false, func(t *testing.T, r *gittest.Repo, _ string) (int, string) {
+			t.Helper()
 			profile := filepath.Join(t.TempDir(), "cover.out")
 			require.NoError(t, os.WriteFile(profile, citest.ProfileOf("tools/ci 1 1"), 0o600))
 			return runAllIn(t, r, []check.Step{citest.Passing}, profile)
 		}},
 		{"fast as the pre-push hook", true, func(t *testing.T, r *gittest.Repo, origin string) (int, string) {
+			t.Helper()
 			tip := strings.TrimSpace(r.Git("rev-parse", "HEAD"))
 			stdin := strings.NewReader("refs/heads/main " + tip + " refs/heads/main " + zero + "\n")
 			return runCI(t, r, stdin, []check.Step{citest.Passing}, "fast", "origin", origin)
@@ -667,10 +680,14 @@ func TestAllStepsLeaveTheTree(t *testing.T) {
 		{name: "a file is staged", script: "echo more >> README.md && git add README.md", want: []string{"FAIL  working tree (0s)\n", "the index changed"}},
 		{name: "HEAD moves", script: "git commit --quiet --allow-empty --message late", want: []string{"FAIL  working tree (0s)\n", "HEAD is now "}},
 		{name: "a file that differed before is changed again",
-			before: func(t *testing.T, r *gittest.Repo) { r.Write("README.md", "# A fixture\n\nWork in progress.\n") },
+			before: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
+				r.Write("README.md", "# A fixture\n\nWork in progress.\n")
+			},
 			script: "echo more >> README.md", want: []string{"FAIL  working tree (0s)\n", "\nREADME.md\n"}},
 		{name: "work in progress that the steps leave as it was",
 			before: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("README.md", "# A fixture\n\nWork in progress.\n")
 				r.Write("notes.txt", "untracked\n")
 			},

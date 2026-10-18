@@ -56,6 +56,7 @@ func TestFast(t *testing.T) {
 			name:  "a missing denylist",
 			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				require.NoError(t, os.Remove(filepath.Join(r.Dir, filepath.FromSlash(names.Path))))
 			},
 			code: check.ExitFail,
@@ -65,6 +66,7 @@ func TestFast(t *testing.T) {
 			name:  "an empty denylist",
 			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write(names.Path, string(citest.Denylist(t)))
 			},
 			code: check.ExitFail,
@@ -80,6 +82,7 @@ func TestFast(t *testing.T) {
 			name:  "a step runs in its own environment, not in this process's",
 			steps: []check.Step{probe},
 			setup: func(t *testing.T) {
+				t.Helper()
 				t.Setenv("GOFLAGS", "-run=^$")
 			},
 			code:  check.ExitFail,
@@ -90,6 +93,7 @@ func TestFast(t *testing.T) {
 			name:  "by hand, a working tree that differs from HEAD runs every check",
 			steps: []check.Step{citest.Passing},
 			after: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("tools/ci/x_test.go", "package main\n")
 				r.Write("README.md", "# A fixture\n\nChanged.\n")
 				r.Write("docs/staged.md", "plain\n")
@@ -104,6 +108,7 @@ func TestFast(t *testing.T) {
 			name:  "a tracked go.mod below the module root",
 			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("tools/inner/go.mod", "module example.invalid/inner\n")
 			},
 			code:  check.ExitError,
@@ -114,9 +119,11 @@ func TestFast(t *testing.T) {
 			name:  "an ignored go.mod below the module root",
 			steps: []check.Step{citest.Passing},
 			change: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write(".gitignore", "inner/\n")
 			},
 			after: func(t *testing.T, r *gittest.Repo) {
+				t.Helper()
 				r.Write("inner/go.mod", "module example.invalid/inner\n")
 			},
 			code:  check.ExitError,
@@ -126,6 +133,7 @@ func TestFast(t *testing.T) {
 		{
 			name: "no mise on the search path: fast stops before any check",
 			setup: func(t *testing.T) {
+				t.Helper()
 				gitPath, err := procgroup.LookPath("git")
 				require.NoError(t, err)
 				dir := t.TempDir()
@@ -183,24 +191,28 @@ func TestFastJudgesTheCommit(t *testing.T) {
 		{name: "a clean tree, HEAD pushed", code: check.ExitOK, want: []string{"ok    passes", "ok    hygiene", "ok    pushed range"}},
 		{name: "a staged file", code: check.ExitError, want: []string{refused, "\ndocs/staged.md"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("docs/staged.md", "plain\n")
 				r.Git("add", "docs/staged.md")
 				return nil
 			}},
 		{name: "an intent-to-add entry", code: check.ExitError, want: []string{refused, "\ndocs/intent.md"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("docs/intent.md", "plain\n")
 				r.Git("add", "--intent-to-add", "docs/intent.md")
 				return nil
 			}},
 		{name: "a modified tracked file", code: check.ExitError, want: []string{refused, "\nREADME.md"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("README.md", "# A fixture\n\nChanged.\n")
 				return nil
 			}},
 		{name: "an alternate GIT_INDEX_FILE that matches HEAD does not hide the index", code: check.ExitError,
 			want: []string{refused, "\ndocs/staged.md"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("docs/staged.md", "plain\n")
 				r.Git("add", "docs/staged.md")
 				alt := "GIT_INDEX_FILE=" + filepath.Join(t.TempDir(), "index")
@@ -210,6 +222,7 @@ func TestFastJudgesTheCommit(t *testing.T) {
 		{name: "an untracked test with a TestMain that exits 0", code: check.ExitError,
 			want: []string{refused, "\ntools/ci/x_test.go"}, lacks: []string{"os.Exit"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("tools/ci/x_test.go", "package main\n\nimport (\"os\"; \"testing\")\n\nfunc TestMain(*testing.M) { os.Exit(0) }\n")
 				return nil
 			}},
@@ -217,6 +230,7 @@ func TestFastJudgesTheCommit(t *testing.T) {
 			want:  []string{"\ntools/ci/ignored.go", "\nvendor/modules.txt", "\ngo.work", "\nmise.local.toml", "\n.tool-versions"},
 			lacks: []string{"notes.txt"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write(".git/info/exclude", "*.go\n")
 				r.Write("tools/ci/ignored.go", "package main\n")
 				r.Write("vendor/modules.txt", "# vendored\n")
@@ -228,11 +242,13 @@ func TestFastJudgesTheCommit(t *testing.T) {
 			}},
 		{name: "an untracked file fast does not read", code: check.ExitOK, want: []string{"ok    passes", "ok    hygiene"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("docs/notes.txt", "plain\n")
 				return nil
 			}},
 		{name: "an untracked nested repository", code: check.ExitError, want: []string{refused, "\ntools/ci/evil/"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("tools/ci/evil/evil_test.go", "package evil\n")
 				r.Git("-C", "tools/ci/evil", "init", "--quiet")
 				return nil
@@ -266,11 +282,13 @@ func TestFastJudgesTheCommit(t *testing.T) {
 			stdin: func(head, other string) string { return "refs/tags/v-blob {blobtag} refs/tags/v-blob " + zero + "\n" }},
 		{name: "a staged deletion", code: check.ExitError, want: []string{refused, "\nREADME.md"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Git("rm", "--quiet", "README.md")
 				return nil
 			}},
 		{name: "an untracked go.mod below the module root", code: check.ExitError, want: []string{"ci: the checks read one module", "\ninner/go.mod"},
 			dirty: func(t *testing.T, r *gittest.Repo) []string {
+				t.Helper()
 				r.Write("inner/go.mod", "module example.invalid/inner\n")
 				return nil
 			}},
@@ -904,22 +922,31 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 // a mise configuration to their environment.
 func TestFastSteps(t *testing.T) {
 	root := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(root, "tools"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "tools", "other"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "tools", "other", "other.go"), []byte("package other\n"), 0o600))
 	goDir := filepath.Join("/pinned", "go", "bin")
 	goCmd := filepath.Join(goDir, "go")
 	tools := check.Tools{Linter: "/pinned/golangci-lint", GoDir: goDir}
 	// Spelled out, not read from lint.Args: this test pins the list.
 	wantLint := []string{"/pinned/golangci-lint", "run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners"}
+	wantBoundary := []string{"/pinned/golangci-lint", "run", "--config", "tools/ci/internal/lint/forbidigo.yml", "-j", "1", "--allow-parallel-runners", "./tools/other"}
+	lintSteps := func(targets ...lint.Target) []check.Step {
+		var steps []check.Step
+		for _, target := range targets {
+			env := lint.Env(target, goDir)
+			steps = append(steps,
+				check.Step{Name: "lint " + target.String(), Argv: wantLint, Environ: env},
+				check.Step{Name: "lint boundaries " + target.String(), Argv: wantBoundary, Environ: env})
+		}
+		return steps
+	}
 	want := []check.Step{
 		{Name: "format", Argv: []string{filepath.Join(goDir, "gofmt"), "-l", "."}, Quiet: true, Environ: check.StepEnv(goDir)},
 		{Name: "vet", Argv: []string{goCmd, "vet", "./..."}, Environ: check.StepEnv(goDir)},
 		{Name: "generated", Argv: []string{goCmd, "run", "./tools/ci", "generated"}, Environ: check.StepEnv(goDir)},
-		{Name: "lint linux/amd64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "linux", GOARCH: "amd64"}, goDir)},
-		{Name: "lint linux/arm64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "linux", GOARCH: "arm64"}, goDir)},
-		{Name: "lint darwin/amd64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "darwin", GOARCH: "amd64"}, goDir)},
-		{Name: "lint darwin/arm64", Argv: wantLint, Environ: lint.Env(lint.Target{GOOS: "darwin", GOARCH: "arm64"}, goDir)},
-		{Name: "unit", Argv: []string{goCmd, "test", "-count=1", "./tools/..."}, Environ: check.StepEnv(goDir)},
 	}
+	want = append(want, lintSteps(lint.Targets...)...)
+	want = append(want, check.Step{Name: "unit", Argv: []string{goCmd, "test", "-count=1", "./tools/..."}, Environ: check.StepEnv(goDir)})
 	assert.Equal(t, want, fastSteps(t.Context(), root, tools))
 	for _, s := range fastSteps(t.Context(), root, tools) {
 		assert.Contains(t, s.Environ, "GOPROXY=off", "%s never reaches the network", s.Name)
@@ -933,6 +960,7 @@ func TestFastSteps(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{goCmd, "test", "-count=1", "./internal/...", "./tools/..."}, unit, "unit")
+
 }
 
 // TestGeneratedRunsBeforeTheTests holds the order the threat model of

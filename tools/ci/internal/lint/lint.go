@@ -2,14 +2,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 // Package lint is the lint check of 10 10.2: golangci-lint over the
-// whole module with the committed .golangci.yml, once per lint target.
-// Its tests (config_test.go) prove that the configuration still reports
-// each checker it enables, and hold the repository to the rules the
-// linter cannot see.
+// whole module with the committed .golangci.yml, and forbidigo with
+// forbidigo.yml over the packages 04 4.1 does not admit its patterns in,
+// each once per lint target. Its tests (config_*_test.go) prove, linter
+// by linter, that the configurations still report each checker they
+// enable, and hold the repository to the rules the linter cannot see.
 package lint
 
 import (
 	"context"
+	"errors"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
@@ -72,15 +74,35 @@ func Env(target Target, goDir string) []string {
 	)
 }
 
-// Steps returns the lint steps, one for each of Targets.
+// Steps returns the lint steps: for each of Targets, the run of
+// .golangci.yml over the whole module and then the run of forbidigo over
+// the packages outside Allowed (BoundaryArgs); a list with no package in
+// it fails that step.
 func Steps(_ context.Context, p check.Plan) []check.Step {
+	boundary, err := BoundaryArgs(p.Root)
 	var steps []check.Step
 	for _, target := range Targets {
+		env := Env(target, p.Tools.GoDir)
 		steps = append(steps, check.Step{
 			Name:    "lint " + target.String(),
 			Argv:    Argv(p.Tools.Linter),
-			Environ: Env(target, p.Tools.GoDir),
+			Environ: env,
 		})
+		switch {
+		case err != nil:
+			steps = append(steps, check.Step{Name: "lint boundaries " + target.String(), Unavailable: err})
+		case boundary == nil:
+			// Every package in the allow list, or none with Go files:
+			// the step would judge nothing, and a run that judges
+			// nothing must not read as a pass.
+			steps = append(steps, check.Step{Name: "lint boundaries " + target.String(), Unavailable: errors.New("no package outside the allow list (Allowed) to judge")})
+		case boundary != nil:
+			steps = append(steps, check.Step{
+				Name:    "lint boundaries " + target.String(),
+				Argv:    append([]string{p.Tools.Linter}, boundary...),
+				Environ: env,
+			})
+		}
 	}
 	return steps
 }

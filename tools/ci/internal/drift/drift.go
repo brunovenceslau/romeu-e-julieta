@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 // Package drift is the generated check of 10 10.2: "go generate ./..."
-// changes no generated file of 12 12.3, and each file generate writes
-// is tracked as a regular file with the bytes generate gives. It is the
+// changes no generated file of 12 12.3, each file generate writes
+// is tracked as a regular file with the bytes generate gives, and
+// "go mod tidy" changes neither go.mod nor go.sum (the tidy rule). It is the
 // generated subcommand and the generate subcommand, which writes what
 // every registered generator returns (check.Generators).
 package drift
@@ -35,7 +36,8 @@ import (
 // "go generate ./..." with the go command that mise.lock locks and
 // fails when that changed, created or removed a file of the working
 // tree, or when a file that generate writes is not tracked as a regular
-// file with the bytes that generate gives.
+// file with the bytes that generate gives. It then runs the tidy rule:
+// "go mod tidy" must change neither go.mod nor go.sum.
 func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if len(args) != 0 {
 		return false, fmt.Errorf("generated takes no argument\n%s", check.Usage())
@@ -66,6 +68,12 @@ func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	// After generate, which may have changed what the module imports.
+	tidied, err := tidy(ctx, repo, check.Step{Name: "go mod tidy", Argv: []string{goBin, "mod", "tidy"}, Environ: check.StepEnv(goDir)})
+	if err != nil {
+		return false, err
+	}
+	findings = append(findings, tidied...)
 	check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("generated", len(findings)))
 	return len(findings) == 0, nil
 }

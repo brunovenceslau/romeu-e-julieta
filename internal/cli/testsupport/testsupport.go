@@ -17,8 +17,8 @@ import (
 // RequireID fails the test unless err carries the error of the table
 // whose id is want: the outermost *cli.Error in its chain, or the error
 // internal (RJ-348) for a chain with none.
-func RequireID(t testing.TB, want string, err error) {
-	t.Helper()
-	require.Error(t, err)
-	require.Equal(t, want, cli.Of(err).ID, "the id of %v", err)
+func RequireID(tb testing.TB, want string, err error) {
+	tb.Helper()
+	require.Error(tb, err)
+	require.Equal(tb, want, cli.Of(err).ID, "the id of %v", err)
 }

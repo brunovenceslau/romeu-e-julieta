@@ -10,8 +10,7 @@ import (
 	"context"
 	"encoding/pem"
 	"errors"
-	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -478,6 +477,7 @@ func TestVerbsRefuseADirThatIsNotARepository(t *testing.T) {
 //romeu:invariant I3 test
 func TestConfigProgramsNeverRun(t *testing.T) {
 	marker := func(t *testing.T) (path, script string) {
+		t.Helper()
 		path = filepath.Join(t.TempDir(), "marker")
 		script = filepath.Join(t.TempDir(), "plant.sh")
 		require.NoError(t, os.WriteFile(script, []byte("#!/bin/sh\necho ran >> '"+path+"'\n"), 0o700))
@@ -488,7 +488,7 @@ func TestConfigProgramsNeverRun(t *testing.T) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="r"`)
 			w.WriteHeader(http.StatusUnauthorized)
 		}))
-		srv.Config.ErrorLog = log.New(io.Discard, "", 0)
+		srv.Config.ErrorLog = slog.NewLogLogger(slog.DiscardHandler, slog.LevelError)
 		srv.StartTLS()
 		t.Cleanup(srv.Close)
 		caFile := filepath.Join(t.TempDir(), "ca.pem")

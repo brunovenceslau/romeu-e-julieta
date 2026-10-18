@@ -7,6 +7,7 @@ package signing
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/binary"
 	"io"
@@ -57,8 +58,11 @@ func framed(msg []byte) []byte {
 // socket path holds at most 104 bytes on macOS.
 func shortDir(t *testing.T) string {
 	t.Helper()
-	dir, err := os.MkdirTemp("", "sig")
-	require.NoError(t, err)
+	// Not os.MkdirTemp, which usetesting flags, and not t.TempDir(),
+	// whose path carries the name of the test and is too long for the
+	// 104-byte socket path this directory is for.
+	dir := filepath.Join(os.TempDir(), "sig"+rand.Text()[:8])
+	require.NoError(t, os.Mkdir(dir, 0o700))
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	return dir
 }

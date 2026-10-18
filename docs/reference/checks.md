@@ -30,7 +30,7 @@ The requirement id is the one of the row of the check in the step table of
 |---|---|---|---|---|---|---|---|
 | `format` | every Go file is formatted as gofmt formats it | `gofmt -l .` | fast, all | 10 | no | REQ-0820 | [tools/ci/internal/format](../../tools/ci/internal/format/) |
 | `vet` | go vet finds nothing in the module | `go vet ./...` | fast, all | 20 | no | REQ-0820 | [tools/ci/internal/vet](../../tools/ci/internal/vet/) |
-| `generated` | the generated files are what go generate writes, each tracked as a regular file | `go run ./tools/ci generated` | fast, all | 30 | no | REQ-0822 | [tools/ci/internal/drift](../../tools/ci/internal/drift/) |
+| `generated` | the generated files are what go generate writes, each tracked as a regular file, and go mod tidy changes neither go.mod nor go.sum | `go run ./tools/ci generated` | fast, all | 30 | no | REQ-0822 | [tools/ci/internal/drift](../../tools/ci/internal/drift/) |
 | `lint` | the linters of .golangci.yml find nothing, for each lint target | `golangci-lint run --config .golangci.yml, once per lint target` | fast, all | 40 | no | REQ-0823 | [tools/ci/internal/lint](../../tools/ci/internal/lint/) |
 | `vulnerabilities` | no known vulnerability of the Go vulnerability database reaches the module | `govulncheck ./...` | all | 50 | no | REQ-0831 | [tools/ci/internal/vulnerabilities](../../tools/ci/internal/vulnerabilities/) |
 | `license` | every file carries its license and copyright, as REUSE 3.3 asks, and every module of go.sum a license of the allowlist | `reuse lint, from the image pinned by digest; go run ./tools/ci licenses` | all | 60 | no | REQ-0847 | [tools/ci/internal/license](../../tools/ci/internal/license/) |

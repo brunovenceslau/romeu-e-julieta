@@ -384,12 +384,15 @@ func TestMutantsRefuses(t *testing.T) {
 		{"-worktree and no file", func(fixture) []string { return []string{"-worktree"} }, nil, "usage:"},
 		{"a missing mutants file", func(f fixture) []string { return []string{f.mutants + ".none"} }, nil, "no such file"},
 		{"a bad mutants file", func(f fixture) []string { return []string{f.mutants} }, func(t *testing.T, f *fixture) {
+			t.Helper()
 			require.NoError(t, os.WriteFile(f.mutants, []byte("mutants: []\n"), 0o644))
 		}, "lists no mutant"},
 		{"not a repository", func(f fixture) []string { return []string{f.mutants} }, func(t *testing.T, f *fixture) {
+			t.Helper()
 			require.NoError(t, os.RemoveAll(filepath.Join(f.repo.Dir, ".git")))
 		}, "git rev-parse"},
 		{"no commit", func(f fixture) []string { return []string{f.mutants} }, func(t *testing.T, f *fixture) {
+			t.Helper()
 			require.NoError(t, os.RemoveAll(filepath.Join(f.repo.Dir, ".git")))
 			f.repo.Git("init", "--quiet", "--initial-branch=main")
 		}, "has no commit HEAD to run"},
@@ -397,6 +400,7 @@ func TestMutantsRefuses(t *testing.T) {
 			f.e.goBin = filepath.Join(f.e.tmpDir, "none", "go")
 		}, "none/go test"},
 		{"a package that matches nothing", func(f fixture) []string { return []string{f.mutants} }, func(t *testing.T, f *fixture) {
+			t.Helper()
 			require.NoError(t, os.WriteFile(f.mutants, []byte(strings.ReplaceAll(threeMutants, "package: ./calc", "package: ./nope")), 0o644))
 		}, "the baseline of ./nope ./calc does not build"},
 		{"a baseline that does not build", func(f fixture) []string { return []string{f.mutants} }, func(_ *testing.T, f *fixture) {
@@ -404,6 +408,7 @@ func TestMutantsRefuses(t *testing.T) {
 			f.repo.Commit("broken")
 		}, "the baseline of ./calc does not build"},
 		{"a package of a mutated file that does not build", func(f fixture) []string { return []string{f.mutants} }, func(t *testing.T, f *fixture) {
+			t.Helper()
 			f.repo.Write("other/other.go", "package other\n\nfunc (\n")
 			f.repo.Commit("broken other")
 			require.NoError(t, os.WriteFile(f.mutants, []byte(threeMutants+"  - {id: other, file: other/other.go, old: \"func (\", new: \"func ((\", package: ./calc, run: ^TestDouble$}\n"), 0o644))
@@ -414,9 +419,11 @@ func TestMutantsRefuses(t *testing.T) {
 			f.repo.Git("commit", "--quiet", "--message", "submodule")
 		}, "holds a submodule (or an embedded repository) at sub"},
 		{"a run that matches no test", func(f fixture) []string { return []string{f.mutants} }, func(t *testing.T, f *fixture) {
+			t.Helper()
 			require.NoError(t, os.WriteFile(f.mutants, []byte(strings.ReplaceAll(threeMutants, "run: ^TestClamp$", "run: ^TestNope$")), 0o644))
 		}, "./calc -run ^TestNope$ runs no test"},
 		{"no temporary directory", func(f fixture) []string { return []string{f.mutants} }, func(t *testing.T, f *fixture) {
+			t.Helper()
 			f.e.tmpDir = filepath.Join(t.TempDir(), "none")
 		}, "make the temporary directory"},
 	}

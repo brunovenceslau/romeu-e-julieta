@@ -136,6 +136,7 @@ func TestModuleTreeFindings(t *testing.T) {
 			`internal/canon/util: "util" names no purpose; a package does one thing (10 10.6)`,
 		}, nil},
 		{"no internal/ directory", nil, nil, func(t *testing.T, root string) {
+			t.Helper()
 			require.NoError(t, os.RemoveAll(filepath.Join(root, "internal")))
 		}},
 		{"a row path that owns a directory", []string{

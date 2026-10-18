@@ -11,7 +11,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -200,7 +200,7 @@ func serveHTTPS(t *testing.T, base string) (host, caFile string) {
 	t.Helper()
 	srv := httptest.NewUnstartedServer(http.FileServer(http.Dir(base)))
 	// A handshake a test makes fail on purpose is not news.
-	srv.Config.ErrorLog = log.New(io.Discard, "", 0)
+	srv.Config.ErrorLog = slog.NewLogLogger(slog.DiscardHandler, slog.LevelError)
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
 	caFile = filepath.Join(t.TempDir(), "ca.pem")

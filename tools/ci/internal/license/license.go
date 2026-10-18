@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
+// Package license is the license check of 10 10.2: reuse lint over the
+// working tree, from the pinned image, on Linux only.
 package license
 
 import (

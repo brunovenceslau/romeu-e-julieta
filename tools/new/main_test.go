@@ -163,6 +163,7 @@ func TestNewADRRefuses(t *testing.T) {
 		{"a line separator in the title", []string{"adr", "Adopt\u2028X"}, nil, "character that does not show (U+2028)"},
 		{"a paragraph separator in the title", []string{"adr", "Adopt\u2029X"}, nil, "character that does not show (U+2029)"},
 		{"an .adr-dir that links outside the repository", []string{"adr", "T"}, func(t *testing.T, f fixture) {
+			t.Helper()
 			require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(f.repo.Dir, "out")))
 			f.repo.Write(".adr-dir", "out\n")
 		}, "a link leads out of the repository"},
@@ -170,15 +171,18 @@ func TestNewADRRefuses(t *testing.T) {
 		{"an unknown kind", []string{"rule", "x"}, nil, `unknown kind "rule"`},
 		{"no kind", nil, nil, "usage:"},
 		{"no .adr-dir", []string{"adr", "T"}, func(t *testing.T, f fixture) {
+			t.Helper()
 			require.NoError(t, os.Remove(filepath.Join(f.repo.Dir, ".adr-dir")))
 		}, ".adr-dir"},
 		{"an .adr-dir outside the repository", []string{"adr", "T"}, func(_ *testing.T, f fixture) {
 			f.repo.Write(".adr-dir", "../out\n")
 		}, "not a directory inside the repository"},
 		{"a missing directory", []string{"adr", "T"}, func(t *testing.T, f fixture) {
+			t.Helper()
 			require.NoError(t, os.RemoveAll(filepath.Join(f.repo.Dir, "docs")))
 		}, "docs"},
 		{"not a repository", []string{"adr", "T"}, func(t *testing.T, f fixture) {
+			t.Helper()
 			require.NoError(t, os.RemoveAll(filepath.Join(f.repo.Dir, ".git")))
 		}, "git rev-parse"},
 	}

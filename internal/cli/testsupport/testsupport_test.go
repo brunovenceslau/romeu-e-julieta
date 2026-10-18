@@ -28,6 +28,7 @@ func (r *recorder) FailNow()              { r.failed = true; panic(r) }
 // requireIDFails reports whether RequireID fails for want and err; the
 // methods the recorder does not replace go to t.
 func requireIDFails(t *testing.T, want string, err error) (failed bool) {
+	t.Helper()
 	r := &recorder{TB: t}
 	defer func() {
 		if p := recover(); p != nil && p != r {

@@ -93,12 +93,17 @@ func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	download := check.Step{
-		Name:    "go mod download",
-		Argv:    []string{filepath.Join(tools.GoDir, "go"), "mod", "download"},
-		Environ: downloadEnv(tools.GoDir),
+	goCmd := filepath.Join(tools.GoDir, "go")
+	download := []check.Step{
+		{Name: "go mod download", Argv: []string{goCmd, "mod", "download"}, Environ: downloadEnv(tools.GoDir)},
+		// "go mod tidy -diff" writes neither go.mod nor go.sum. It runs
+		// here, with the module proxy, to fill the module cache with what
+		// the tidy rule of generated needs offline: tidy also loads the
+		// tests of each dependency, whose modules "go mod download" does
+		// not fetch.
+		{Name: "go mod tidy -diff", Argv: []string{goCmd, "mod", "tidy", "-diff"}, Environ: downloadEnv(tools.GoDir)},
 	}
-	c.Run(ctx, root, []check.Step{download})
+	c.Run(ctx, root, download)
 	return c.OK, nil
 }
 
