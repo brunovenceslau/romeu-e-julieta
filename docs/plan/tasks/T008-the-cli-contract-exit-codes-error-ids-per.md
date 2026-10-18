@@ -15,11 +15,19 @@ owns:
   - internal/cli/testsupport/**
   - internal/cmd/romeu/all/doc.go
   - internal/cmd/julieta/all/doc.go
+  - tools/ci/internal/generated/errors*.go
+  - tools/ci/internal/generated/commands*.go
+  - tools/ci/internal/generated/generate*.go
+  - .gitattributes
+  - go.mod
+  - go.sum
 needs:
   - T007
 after: []
 ask_first:
   - contracts
+  - checks
+  - dependencies
 sitting: none
 ---
 
@@ -35,6 +43,20 @@ the files of `internal/cli` by name, since `internal/cli/writer.go` is
 T007's and `internal/cli/errorids_exempt.yaml` is T073's; a file of the
 package this list does not foresee is added to it in this task's pull
 request.
+
+Re-plan (2026-10-17): Changed, by
+[ADR 0015, adopt spf13/cobra for the command line of romeu and julieta](../../adr/0015-adopt-spf13-cobra-for-the-command-line-of-romeu-and-julieta.md).
+The command line is cobra with pflag, which enter `go.mod` here as their
+first importer (rule 7 of `docs/plan.md`), so this task owns `go.mod`
+and `go.sum` and comes before T125 and T053. The registry by file stays;
+each definition holds a function that returns its `*cobra.Command`, and
+`internal/cli` assembles the binary's tree on each run. The generators
+of the error table and of the per-command reference pages join the
+generated check of `tools/ci`, whose package no task owns: one file each
+under `tools/ci/internal/generated/`, one more source in `generate.go`,
+and the pages in the `-text` list of `.gitattributes`. A check of its own
+would add a row to the step table of 10 10.2 for a generator that judges
+nothing.
 
 Re-plan (2026-10-12): Kept, changed. Each package declares its ids in
 its own `errors.go`, taken from 04 4.4; one test collects the union.
@@ -62,29 +84,63 @@ off every chain through it.
   (10 10.7), REQ-1080 (12 12.2), REQ-1085 (12 12.2), REQ-1108 (12 12.3),
   REQ-1109 (12 12.3), REQ-1117 (12 12.3), REQ-1119 (12 12.3), REQ-1124
   (12 12.3), REQ-1127 (12 12.3), REQ-1184 (12 12.8), REQ-1187 (12 12.8),
-  REQ-1188 (12 12.8), REQ-1229 (10 10.6).
+  REQ-1188 (12 12.8), REQ-1229 (10 10.6), REQ-1242 (04 4.2), REQ-1243
+  (04 4.3), REQ-1244 (04 4.4), REQ-1245 (04 4.1), REQ-1246 (12 12.1),
+  REQ-1049 (12 12.1), REQ-1050 (12 12.1).
 - Operator: no.
 - Acceptance:
   - Lands before its module's place in the order of 12 12.2 (Q26):
     `spec`, `state` and `gitsafe` return its error ids (03, opening; 01
     1.6; 10 10.6), and it needs nothing from the modules between.
-  - `internal/cli` exports `Command` (name, usage, the flag binder, the
-    side-effect fields of 12 12.3 with no default, and `Run(ctx
-    context.Context, env *Env, args []string) error`), `Env` (the
-    escaping writers for stdout and stderr, the clock, the ULID source,
-    the version stamp, the settings path and the subprocess runners the
-    command needs) and `Register(Command)`, called from a package-level
-    `var _ = cli.Register(def)` in each command package; `cli.Main(args,
-    env)` dispatches and maps the error id to the exit code; a fixture
-    command in the package's tests registers and runs through `Main`
-    with a fixed clock. The field list is this task's to settle (rule 6
-    of `docs/plan.md`).
+  - `internal/cli` exports `Env` (the escaping writers for stdout and
+    stderr, the clock, the ULID source, the version stamp, the settings
+    path and the subprocess runner the command needs), `Define` and
+    `Register`, called from a package-level `var _ = cli.Register(def)`
+    in each command package, and `cli.Main(ctx, args, env)`, which
+    assembles the binary's cobra tree from the registered definitions,
+    runs it with `ExecuteContext` and maps the error id to the exit
+    code; a fixture command in the package's tests registers and runs
+    through `Main` with a fixed clock. A definition names its binary,
+    its command path (a command and, for a subcommand, its subcommand)
+    and a function that returns its `*cobra.Command`, whose `RunE` gets
+    the `Env`. The field list is this task's to settle (rule 6 of
+    `docs/plan.md`).
   - A definition is registered through one constructor whose arguments
     are the five side-effect fields; a fixture definition that leaves
     one unset fails `go test ./internal/cli/...`. A duplicate command
-    name panics at `init`, and a test asserts the registry's order and
-    names. The lock field of each definition is checked against the list
-    of 04 4.1 Locking by a table over the definitions.
+    path panics at `init`, and a test asserts the registry's order and
+    names. The lock field of each definition is checked against the
+    list of 04 4.1 Locking by a table over the definitions. A definition
+    with no `Args` validator fails registration, and a group command
+    above subcommands takes none, so `<group> <typo>` is the error
+    `usage`. Each run builds a new tree, so no package holds a root
+    command and a test builds its own (ADR 0015, decision 2).
+  - Flags are GNU-style (04 4.1, Parsing): a test runs a fixture with a
+    flag after an argument, `--name=value`, a one-letter short form and
+    `--`; `--help`, `-h` and `help <command>` print the help of the
+    binary, of a command with subcommands and of a subcommand, each
+    with the exit-code section and each flag's value name and default.
+    A single-dash long flag, an unknown command, subcommand or flag,
+    an argument count a command refuses and `help <unknown>` are the
+    error `usage` (`RJ-349`, exit 2), whose hint names the help to read;
+    an error a command returns with no `*cli.Error` is `internal`
+    (`RJ-348`). A test runs the tree with `os.Stdout` and `os.Stderr`
+    swapped for pipes and finds them empty on every path.
+  - Every byte the tree prints goes through the CLI writer (I29): the
+    tree's output and error streams are the writers of `Env`, its help
+    and usage functions are this package's, and `SilenceErrors` and
+    `SilenceUsage` keep cobra from printing errors of its own; a test
+    feeds a control character and a line feed through an argument, a
+    flag error and a detail and finds them escaped, one value per line.
+  - Both binaries have their own `completion` command for bash, zsh and
+    fish (04 4.2, 04 4.3), whose script and `__complete` output are the
+    raw-output exception of 04 4.1 (REQ-0270); a test runs `completion
+    bash` and `__complete` on the fixture tree, and another holds a
+    completion function to REQ-1245.
+  - A test holds the import boundary of REQ-1246: cobra only in
+    `internal/cli` and `internal/cmd/**`, `cobra/doc` only in
+    `tools/ci`, and no target of `cmd/romeu` or `cmd/julieta` linking
+    `cobra/doc`, go-md2man, blackfriday or mousetrap.
   - The two `internal/cmd/<binary>/all/doc.go` files name the package's
     one purpose: the assembled command set each binary's `main.go`
     imports once.
@@ -129,6 +185,10 @@ off every chain through it.
     pull request, so each command task is checked when it registers.
   - Each id has a recovered-in cell, a `docs/guide/` anchor or `none:
     <reason>`; a test fails an id without one, and `errors.md` links it.
+  - `go generate` writes one `docs/reference/<binary>/<command path>.md`
+    page per registered command with `github.com/spf13/cobra/doc`, from
+    the tree `cli` assembles, with the P marker and the appending list
+    (12 12.3, REQ-1109); a fixture definition shows the page.
   - `go generate` writes the three consumers of the table (12 12.3): the
     exit-code sections of `--help`, `docs/reference/errors.md` and
     `docs/reference/exit-codes.md`, the pages with the generated-file

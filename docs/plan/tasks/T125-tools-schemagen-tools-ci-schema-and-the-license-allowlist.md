@@ -14,7 +14,8 @@ owns:
   - go.sum
 needs:
   - T105
-after: []
+after:
+  - T008
 ask_first:
   - checks
   - dependencies
