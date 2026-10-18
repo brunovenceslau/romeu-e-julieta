@@ -151,11 +151,11 @@ func TestAllUsage(t *testing.T) {
 }
 
 // TestAllSteps pins the command steps of all: the steps of fast, with
-// vulnerabilities, license, the four cross builds and imports before
-// unit, since none runs code of the change, then race. Each runs in
-// check.StepEnv; the one that reads the Go vulnerability database
-// keeps the variables of a proxy too, and the license step those of the
-// Docker daemon, and no other step keeps either.
+// vulnerabilities, the two steps of license, the four cross builds and
+// imports before unit, since none runs code of the change, then race.
+// Each runs in check.StepEnv; the one that reads the Go vulnerability
+// database keeps the variables of a proxy too, and the reuse step of
+// license those of the Docker daemon, and no other step keeps either.
 func TestAllSteps(t *testing.T) {
 	root := citest.NewTree(t).Dir
 	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.lock"), []byte(citest.LockFixture), 0o600))
@@ -180,13 +180,13 @@ func TestAllSteps(t *testing.T) {
 	fast := fastSteps(t.Context(), root, tools)
 	unit := len(fast) - 1
 	require.Equal(t, "unit", fast[unit].Name)
-	require.Len(t, steps, len(fast)+8)
+	require.Len(t, steps, len(fast)+9)
 	assert.Equal(t, fast[:unit], steps[:unit])
-	assert.Equal(t, fast[unit], steps[unit+7])
-	assert.Equal(t, crossbuild.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[unit+2:unit+6])
-	assert.Equal(t, imports.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[unit+6:unit+7])
+	assert.Equal(t, fast[unit], steps[unit+8])
+	assert.Equal(t, crossbuild.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[unit+3:unit+7])
+	assert.Equal(t, imports.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[unit+7:unit+8])
 
-	vulnStep, licenseStep, race := steps[unit], steps[unit+1], steps[unit+8]
+	vulnStep, licenseStep, modulesStep, race := steps[unit], steps[unit+1], steps[unit+2], steps[unit+9]
 	assert.Equal(t, check.Step{Name: "vulnerabilities", Argv: []string{evalOrSelf(vuln), "./..."}, Environ: check.WithProcessEnv(env, check.NetworkPassThrough),
 		NoticeOn: "govulncheck: fetching vulnerabilities:", Notice: "vulnerabilities: could not fetch the vulnerability database, so this all is not the equivalent run (10 10.2)"}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")
 	assert.Equal(t, 40*time.Minute, procgroup.ToolRace.Timeout())
@@ -196,6 +196,7 @@ func TestAllSteps(t *testing.T) {
 		assert.Equal(t, s.Name == "race", s.Class != 0, "%s has a class of its own only if it is the race run", s.Name)
 	}
 	assert.Equal(t, license.Step(root, common, runtime.GOOS, check.WithProcessEnv(env, check.DockerPassThrough)), licenseStep)
+	assert.Equal(t, license.ModulesStep(check.Plan{Root: root, Tools: tools}), modulesStep)
 
 	keys := func(s check.Step) []string {
 		var out []string
@@ -484,7 +485,7 @@ func TestAllWiring(t *testing.T) {
 	if runtime.GOOS == "linux" {
 		want = append(want, "docker run")
 	}
-	want = append(want, "go build", "go build", "go build", "go build", "go run", "go test", "go test")
+	want = append(want, "go run", "go build", "go build", "go build", "go build", "go run", "go test", "go test")
 	assert.Equal(t, want, firstWords, "the order of the steps")
 	require.NotEmpty(t, profile, "the race step names its profile")
 	assert.Equal(t, coverFile, filepath.Base(profile))
