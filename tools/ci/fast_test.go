@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -831,7 +832,7 @@ func TestFastPushedRangeDenylists(t *testing.T) {
 			want: []string{"ci: fast tests the commit checked out", "\n" + clean}, lacks: []string{"\n" + listing, "pushed range"}},
 		{name: "a denylist that cannot be read at HEAD fails hygiene and the pushed range",
 			stdin: push(broken, "refs/heads/broken"), code: check.ExitFail,
-			want: []string{"FAIL  hygiene\n" + names.Path + ": ", "FAIL  pushed range\n" + names.Path + ": "}},
+			want: []string{"FAIL  hygiene (0s)\n" + names.Path + ": ", "FAIL  pushed range (0s)\n" + names.Path + ": "}},
 		{name: "a deleted ref names no tip",
 			stdin: fmt.Sprintf("(delete) %s refs/heads/listing %s\n", zero, listing), code: check.ExitOK,
 			want: []string{"ok    pushed range"}},
@@ -1038,7 +1039,7 @@ func TestFastHookReadsTheProcessGitEnv(t *testing.T) {
 		t.Helper()
 		var out strings.Builder
 		stdin := "refs/heads/x " + tip + " refs/heads/x " + zero + "\n"
-		e := check.Env{Dir: r.Dir, Stdin: strings.NewReader(stdin), Stdout: &out, Stderr: &out, Steps: []check.Step{citest.Passing}}
+		e := check.Env{Dir: r.Dir, Stdin: strings.NewReader(stdin), Stdout: &out, Stderr: &out, Steps: []check.Step{citest.Passing}, Now: frozen}
 		return run(t.Context(), e, []string{"fast", "origin", origin.Dir}), out.String()
 	}
 
@@ -1161,6 +1162,92 @@ func TestPrologueInThePushedRange(t *testing.T) {
 	// The run reports the finding too, and not only "not checked".
 	code, out := runCI(t, r, strings.NewReader(stdin), []check.Step{citest.Passing}, "fast", "origin", origin.Dir)
 	assert.Equal(t, check.ExitFail, code, "exit status")
-	assert.Contains(t, out, "FAIL  pushed range\ncommit "+added+": added path sub/prologue.md: never-tracked:")
+	assert.Contains(t, out, "FAIL  pushed range (0s)\ncommit "+added+": added path sub/prologue.md: never-tracked:")
 	assert.Contains(t, out, "pushed range: not checked against names")
+}
+
+// ticking returns a clock that moves by step at every reading, so the
+// time between two consecutive readings is step, whatever the machine
+// does (10 10.4).
+func ticking(step time.Duration) func() time.Time {
+	now := time.Unix(0, 0)
+	return func() time.Time {
+		now = now.Add(step)
+		return now
+	}
+}
+
+// runTimed runs args in a fixture with the steps and the clock, and
+// returns the exit status, the standard output and the standard error.
+func runTimed(t *testing.T, now func() time.Time, steps []check.Step, args ...string) (int, string, string) {
+	t.Helper()
+	r := citest.NewTree(t)
+	r.Commit("fixture")
+	var out, errOut strings.Builder
+	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errOut, Steps: steps, Now: now}
+	return run(t.Context(), e, args), out.String(), errOut.String()
+}
+
+// TestProgressDuration holds the verdict line of REQ-0864: each ends
+// with its duration rounded to 100 ms, for a command step that passes,
+// one that fails and a check of the commit, while a "--" line carries
+// none.
+func TestProgressDuration(t *testing.T) {
+	skipped := check.Step{Name: "skipped", Skip: "not on this platform"}
+	code, out, _ := runTimed(t, ticking(1234*time.Millisecond), []check.Step{citest.Passing, citest.Failing, skipped}, "fast")
+	assert.Equal(t, check.ExitFail, code)
+	assert.Contains(t, out, "ok    passes (1.2s)\n")
+	assert.Contains(t, out, "FAIL  fails (1.2s)\n")
+	assert.Contains(t, out, "ok    hygiene (1.2s)\n")
+	assert.Contains(t, out, "--    skipped: not on this platform\n")
+}
+
+// TestProgressFastBudget holds the three-minute target of REQ-0864: a
+// run past it warns on standard error, an early error included, and one
+// within it does not.
+func TestProgressFastBudget(t *testing.T) {
+	// slow reads the start of the run first (time zero) and every later
+	// reading is 3m30s after it, so the run took 3m30s.
+	slow := func() func() time.Time {
+		calls := 0
+		return func() time.Time {
+			calls++
+			if calls == 1 {
+				return time.Unix(0, 0)
+			}
+			return time.Unix(0, 0).Add(3*time.Minute + 30*time.Second)
+		}
+	}
+	const warning = "fast: took 3m30s, over the three-minute target of 10 10.2\n"
+	_, out, stderr := runTimed(t, slow(), []check.Step{citest.Passing}, "fast")
+	assert.Equal(t, warning, stderr)
+	assert.NotContains(t, out, "over the three-minute")
+
+	// A run that ends in an error warns too: the hook refuses a push
+	// whose tip is not HEAD, after the clock has already read the start.
+	r := citest.NewTree(t)
+	r.Commit("fixture")
+	var errOut strings.Builder
+	stdin := "refs/heads/x " + strings.Repeat("1", 40) + " refs/heads/x " + strings.Repeat("0", 40) + "\n"
+	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(stdin), Stdout: &strings.Builder{}, Stderr: &errOut, Steps: []check.Step{citest.Passing}, Now: slow()}
+	assert.Equal(t, check.ExitError, run(t.Context(), e, []string{"fast", "origin", "x"}))
+	assert.Contains(t, errOut.String(), warning)
+
+	_, _, stderr = runTimed(t, ticking(time.Millisecond), []check.Step{citest.Passing}, "fast")
+	assert.Empty(t, stderr, "a run within three minutes is quiet")
+}
+
+// TestProgressFailedNamed holds the last line of a failed run: it names
+// each failed check, in fast and in all, and a run that passes has none.
+func TestProgressFailedNamed(t *testing.T) {
+	code, out, _ := runTimed(t, frozen, []check.Step{citest.Failing, citest.Passing}, "fast")
+	assert.Equal(t, check.ExitFail, code)
+	assert.True(t, strings.HasSuffix(out, "fast: failed: fails\n"), "the last line names the check: %q", out)
+
+	_, out, _ = runTimed(t, frozen, []check.Step{citest.Passing}, "fast")
+	assert.NotContains(t, out, "failed:")
+
+	_, out, _ = runTimed(t, frozen, []check.Step{citest.Failing}, "all")
+	// all also fails coverage, which has no profile here.
+	assert.True(t, strings.HasSuffix(out, "all: failed: fails, coverage\n"), "the last line names the checks: %q", out)
 }

@@ -18,9 +18,18 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 )
 
+// fetchFailed starts the line govulncheck prints when it cannot fetch
+// the vulnerability database, whatever the cause: an unreachable
+// network, a proxy that refuses, a server error, a certificate.
+const fetchFailed = "govulncheck: fetching vulnerabilities:"
+
+// notice is the line a failed fetch adds: a run that could not read the
+// database is not the equivalent run (10 10.2).
+const notice = "vulnerabilities: could not fetch the vulnerability database, so this all is not the equivalent run (10 10.2)"
+
 // Steps returns the vulnerabilities step for the tree at p.Root.
 func Steps(ctx context.Context, p check.Plan) []check.Step {
-	s := check.Step{Name: "vulnerabilities", Environ: check.WithProcessEnv(check.StepEnv(p.Tools.GoDir), check.NetworkPassThrough)}
+	s := check.Step{Name: "vulnerabilities", Environ: check.WithProcessEnv(check.StepEnv(p.Tools.GoDir), check.NetworkPassThrough), NoticeOn: fetchFailed, Notice: notice}
 	if path, err := mise.WhichPinned(ctx, p.Root, "govulncheck", mise.GovulncheckLock, mise.GovulncheckDir); err != nil {
 		s.Unavailable = err
 	} else {

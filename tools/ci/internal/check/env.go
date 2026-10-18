@@ -7,6 +7,7 @@ import (
 	"context"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 )
@@ -39,6 +40,9 @@ type Env struct {
 	// Translated reports whether the process runs under Rosetta; nil
 	// means the probe of all.
 	Translated func(context.Context) bool
+	// Now returns the time; nil means time.Now. The durations of the
+	// verdict lines and the budget of fast read it (10 10.4).
+	Now func() time.Time
 }
 
 // Repo returns the repository the command was started in.
@@ -67,4 +71,12 @@ func Status(stderr io.Writer, ok bool, err error) int {
 		return ExitFail
 	}
 	return ExitOK
+}
+
+// Clock returns e.Now, or time.Now when it is nil.
+func (e Env) Clock() func() time.Time {
+	if e.Now == nil {
+		return time.Now
+	}
+	return e.Now
 }

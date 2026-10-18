@@ -72,6 +72,7 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	now := e.Clock()
 	repo := e.Repo()
 	repo.Dir = root
 	if err := nestedModules(ctx, repo); err != nil {
@@ -83,7 +84,7 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 	}
 	// The commit is read and judged before mise or any step runs code
 	// of the change (commitChecks).
-	verdicts, err := commitChecks(ctx, repo, head, nil, inAll)
+	verdicts, err := commitChecks(ctx, repo, head, nil, inAll, now)
 	if err != nil {
 		return false, err
 	}
@@ -119,11 +120,12 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 		}
 		steps = allSteps(ctx, root, tools, profile)
 	}
-	c := check.NewPrinter(e.Stdout)
+	c := check.NewPrinterAt(e.Stdout, now)
 	translated := e.Translated
 	if translated == nil {
 		translated = procTranslated
 	}
+	archStart := now()
 	archDetail := ""
 	// uname comes from the host machine, not from the repository.
 	switch {
@@ -132,24 +134,26 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 	case translated(ctx):
 		archDetail = fmt.Sprintf("sysctl.proc_translated is 1: this %s binary runs under Rosetta, and the tools of this run are not the ones of the machine\n", runtime.GOARCH)
 	}
-	c.Report("architecture", archDetail == "", archDetail)
+	c.Report("architecture", archDetail == "", archDetail, now().Sub(archStart))
 	c.Run(ctx, root, steps)
+	treeStart := now()
 	tree := ""
 	if err := changedSince(ctx, repo, before); err != nil {
 		tree = "the steps changed HEAD, the index or the working tree, so a check may not have judged the commit; what changed:\n" + git.SafeLines(err.Error()) + "\n"
 	}
-	c.Report("working tree", tree == "", tree)
+	c.Report("working tree", tree == "", tree, now().Sub(treeStart))
 
 	// The checks that judge what the steps left, the cover profile of
 	// the race step, come last (check.Check.After).
 	for _, ch := range registered(inAll) {
 		if ch.After != nil {
-			verdicts = append(verdicts, ch.After(root, profile))
+			start := now()
+			v := ch.After(root, profile)
+			verdicts = append(verdicts, timed{v, now().Sub(start)})
 		}
 	}
-	for _, v := range verdicts {
-		c.Verdict(v)
-	}
+	printTimed(c, verdicts)
+	c.Last("all")
 	return c.OK, nil
 }
 
