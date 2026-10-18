@@ -13,7 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli/clidoc"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/lint"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
@@ -93,4 +95,11 @@ func TestCommandLineImportBoundary(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestGeneratedHeaderIsOne holds the generated header of internal/cli to
+// that of tools/ci/internal/check: two writers, since internal/ cannot
+// import tools/ci/internal/, and one text (ADR 0016).
+func TestGeneratedHeaderIsOne(t *testing.T) {
+	assert.Equal(t, check.GeneratedHeader("a/b.go (c)"), clidoc.GeneratedHeader("a/b.go (c)"))
 }
