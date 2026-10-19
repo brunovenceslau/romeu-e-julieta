@@ -24,6 +24,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -52,7 +53,16 @@ type Task struct {
 	Goal      string   `json:"goal" yaml:"-"`
 	Path      string   `json:"path" yaml:"-"`
 	Status    string   `json:"status" yaml:"-"`
+
+	// Body is the Markdown after the front matter, cut to MaxBody bytes;
+	// BodyTruncated says it was cut.
+	Body          string `json:"body" yaml:"-"`
+	BodyTruncated bool   `json:"body_truncated" yaml:"-"`
 }
+
+// MaxBody bounds the body one task carries into the page, so a huge file
+// cannot swell it. The cut falls on a character boundary.
+const MaxBody = 64 << 10
 
 // The statuses of the page. A closed task is folded, removed or left to
 // a later version.
@@ -88,6 +98,7 @@ func parse(path string, content []byte) (Task, error) {
 		return Task{}, fmt.Errorf("%s: the front matter is not YAML: %w", path, err)
 	}
 	t.Path = path
+	t.Body, t.BodyTruncated = boundBody(body)
 	// The page reads a list as an array, never null.
 	for _, l := range []*[]string{&t.Needs, &t.After, &t.AskFirst} {
 		if *l == nil {
@@ -98,6 +109,20 @@ func parse(path string, content []byte) (Task, error) {
 		t.Goal = strings.Join(strings.Fields(m[1]), " ")
 	}
 	return t, nil
+}
+
+// boundBody trims the blank lines around body and cuts it to MaxBody
+// bytes at a character boundary.
+func boundBody(body string) (string, bool) {
+	body = strings.Trim(body, "\n")
+	if len(body) <= MaxBody {
+		return body, false
+	}
+	cut := MaxBody
+	for cut > 0 && !utf8.RuneStart(body[cut]) {
+		cut--
+	}
+	return body[:cut], true
 }
 
 // load reads every T*.md under dir, in path order, with its status set.
