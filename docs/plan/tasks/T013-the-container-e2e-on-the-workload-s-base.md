@@ -10,7 +10,10 @@ owns:
   - tools/ci/internal/container/**
   - tools/ci/check_container.go
   - .github/workflows/ci.yml
+  - .github/workflows/x64.yml
   - tools/ci/internal/workflows/**
+  - tools/ci/check_taggedsuites.go
+  - tools/ci/internal/taggedsuites/**
 needs:
   - T009
   - T012
