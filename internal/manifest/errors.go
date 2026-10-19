@@ -25,7 +25,7 @@ var (
 		ID:          "RJ-342",
 		Slug:        "manifest-protocol",
 		Exit:        2,
-		Fix:         "romeu run <name>",
-		RecoveredIn: "none: the run the hint names passes a manifest of the current protocol",
+		Fix:         "decide: run romeu run <name> on the host, which passes a manifest of the current protocol",
+		RecoveredIn: "none: the run of the hint replaces the manifest",
 	}
 )

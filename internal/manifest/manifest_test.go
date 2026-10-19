@@ -131,7 +131,7 @@ func TestDecodeRefusesAProtocolOutsideTheWindow(t *testing.T) {
 			assert.Equal(t, 2, rowOf(t, err).Exit)
 			var e *cli.Error
 			require.ErrorAs(t, err, &e)
-			assert.Equal(t, "romeu run shop", e.Hint())
+			assert.Contains(t, e.Hint(), "romeu run shop")
 		})
 	}
 }
