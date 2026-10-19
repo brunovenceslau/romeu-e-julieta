@@ -42,6 +42,12 @@ type Step struct {
 	// NoticeOn is a line prefix: when a step that failed printed a line
 	// that starts with it, the verdict adds the line Notice.
 	NoticeOn, Notice string
+	// Read, when set, reads what the command printed and the error of
+	// its run, and returns the text the verdict shows and the step's
+	// error, which decides the verdict in place of the exit status: the
+	// e2e step reads the events of "go test -json" so. An error that
+	// wraps ErrInfrastructure marks the step an infrastructure error.
+	Read func(out []byte, runErr error) ([]byte, error)
 }
 
 // Tools are the pinned tools of the steps, as mise resolves them: the
@@ -129,7 +135,8 @@ func StepEnv(goDir string) []string {
 	})
 }
 
-// Run runs the step in dir and returns its output, through
+// Run runs the step in dir and returns its output, or what s.Read
+// makes of it, through
 // procgroup.CombinedOutput: the command gets exactly s.Environ, an
 // empty environment when it is nil, runs in a process group of its own
 // that is killed when the leader ends, and a run past the limit of its
@@ -146,6 +153,9 @@ func (s Step) Run(ctx context.Context, dir string) ([]byte, error) {
 	})
 	if err == nil && s.Quiet && len(bytes.TrimSpace(out)) > 0 {
 		err = errors.New("the command printed what it found")
+	}
+	if s.Read != nil {
+		return s.Read(out, err)
 	}
 	return out, err
 }

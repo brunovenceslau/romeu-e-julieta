@@ -45,6 +45,13 @@ func runAllIn(t *testing.T, r *gittest.Repo, steps []check.Step, profile string,
 	return run(t.Context(), e, append([]string{"all"}, args...)), out.String()
 }
 
+// infraStep is a step whose Read reports an infrastructure error, as
+// the e2e step does for a pull that failed on transport.
+var infraStep = check.Step{Name: "e2e", Argv: []string{"false"}, Environ: []string{"PATH=" + os.Getenv("PATH")},
+	Read: func([]byte, error) ([]byte, error) {
+		return nil, fmt.Errorf("the image pull: %w", check.ErrInfrastructure)
+	}}
+
 // TestAll covers all with stub steps: every check runs and reports,
 // whatever an earlier one found, and the checks in this process read
 // the tree at HEAD and the cover profile.
@@ -112,6 +119,20 @@ func TestAll(t *testing.T) {
 			steps: []check.Step{{Name: "unit", Argv: []string{"sh", "-c", "echo 'x.go:1:2: module lookup disabled by GOPROXY=off'; exit 1"}, Environ: []string{"PATH=" + os.Getenv("PATH")}}},
 			code:  check.ExitFail,
 			want:  []string{"FAIL  unit (0s)\nx.go:1:2: module lookup disabled by GOPROXY=off\n", `run "go run ./tools/ci setup", which runs "go mod download"`},
+		},
+		{
+			name:    "an infrastructure error alone exits with its own status",
+			steps:   []check.Step{infraStep, citest.Passing},
+			profile: "tools/ci 1 1",
+			code:    check.ExitInfra,
+			want:    []string{"FAIL  e2e", "ok    passes", "all: failed: e2e\n", "ci: all: e2e: an infrastructure error"},
+		},
+		{
+			name:    "an infrastructure error beside a failed check exits as a failure",
+			steps:   []check.Step{infraStep, citest.Failing},
+			profile: "tools/ci 1 1",
+			code:    check.ExitFail,
+			want:    []string{"FAIL  e2e", "FAIL  fails", "all: failed: e2e, fails\n"},
 		},
 		{
 			name:  "a nested module stops all before any check",

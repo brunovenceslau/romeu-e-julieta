@@ -6,6 +6,7 @@ package check_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -69,6 +70,37 @@ func TestQuietStepPrintsSafeText(t *testing.T) {
 	}
 	assert.Contains(t, listing, "./::error::x.go")
 	assert.Contains(t, code, "::error::x.go", "the output of a step that runs code stays raw")
+}
+
+// TestRunReadsTheOutputOfAStep checks the Read hook of a step: what it
+// returns is what the verdict prints, its error decides the verdict
+// whatever the exit status, and an error that wraps ErrInfrastructure
+// marks the step an infrastructure error. InfraOnly holds when every
+// failed check is one.
+func TestRunReadsTheOutputOfAStep(t *testing.T) {
+	infra := func([]byte, error) ([]byte, error) {
+		return []byte("read\n"), fmt.Errorf("the pull: %w", check.ErrInfrastructure)
+	}
+	pass := func([]byte, error) ([]byte, error) { return nil, nil }
+	fail := func([]byte, error) ([]byte, error) { return []byte("no test ran\n"), errors.New("zero tests") }
+	var out bytes.Buffer
+	c := check.NewPrinter(&out)
+	c.Run(t.Context(), t.TempDir(), []check.Step{
+		{Name: "passes", Argv: []string{"sh", "-c", "exit 1"}, Read: pass},
+		{Name: "e2e", Argv: []string{"sh", "-c", "echo raw; exit 1"}, Read: infra},
+	})
+	assert.Contains(t, out.String(), "ok    passes")
+	assert.Contains(t, out.String(), "FAIL  e2e")
+	assert.Contains(t, out.String(), "read\n")
+	assert.NotContains(t, out.String(), "raw")
+	assert.Equal(t, []string{"e2e"}, c.Infra)
+	assert.True(t, c.InfraOnly())
+
+	c.Run(t.Context(), t.TempDir(), []check.Step{{Name: "zero", Argv: []string{"true"}, Read: fail}})
+	assert.Contains(t, out.String(), "FAIL  zero")
+	assert.Contains(t, out.String(), "no test ran")
+	assert.False(t, c.InfraOnly(), "a test failure besides the infrastructure error")
+	assert.False(t, check.NewPrinter(&out).InfraOnly(), "nothing failed")
 }
 
 // TestFormatDuration holds the rounding of a duration on a verdict line
