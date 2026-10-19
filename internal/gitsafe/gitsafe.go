@@ -14,8 +14,9 @@
 // are allowlisted for the mode (I5); a clone takes such a URL and a
 // new directory; CreateRef is create-only (I6);
 // BundleCreate writes a bundle of named refs; nothing builds a push
-// (I18). Unbundle, verify, fsck and the tree walk are the verbs of the
-// files unbundle*.go, verify*.go, fsck*.go and walk*.go.
+// (I18). Unbundle, verify, fsck, the tree walk and the history reads
+// are the verbs of the files unbundle*.go, verify*.go, fsck*.go,
+// walk*.go and history*.go.
 package gitsafe
 
 import (
@@ -291,6 +292,12 @@ func (r *Runner) run(ctx context.Context, dir string, stdout io.Writer, args ...
 
 // runWith is run with extra settings after those of the mode.
 func (r *Runner) runWith(ctx context.Context, dir string, extra []setting, stdout io.Writer, args ...string) error {
+	return r.runInput(ctx, dir, extra, nil, nil, stdout, args...)
+}
+
+// runInput is runWith with env appended to the environment of the mode
+// and stdin as git's standard input; nil means an empty one.
+func (r *Runner) runInput(ctx context.Context, dir string, extra []setting, env []string, stdin io.Reader, stdout io.Writer, args ...string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("%w: no git subcommand", ErrRefused)
 	}
@@ -308,7 +315,8 @@ func (r *Runner) runWith(ctx context.Context, dir string, extra []setting, stdou
 		Class:  r.class,
 		Argv:   argv,
 		Dir:    dir,
-		Env:    slices.Clone(r.env),
+		Env:    slices.Concat(r.env, env),
+		Stdin:  stdin,
 		Stdout: stdout,
 		Stderr: &stderr,
 	})
