@@ -15,6 +15,7 @@
 package view
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -188,6 +189,7 @@ type meta struct {
 	Date       string      `json:"date"`
 	Critical   []string    `json:"critical"`
 	Milestones []Milestone `json:"milestones"`
+	Trends     Trends      `json:"trends"`
 }
 
 // render returns page, the template, with the tasks and the meta data in place.
@@ -199,6 +201,9 @@ func render(page string, tasks []Task, m meta) (string, error) {
 	}
 	if m.Milestones == nil {
 		m.Milestones = []Milestone{}
+	}
+	if m.Trends.Snapshots == nil {
+		m.Trends.Snapshots = []Snapshot{}
 	}
 	data, err := json.Marshal(tasks)
 	if err != nil {
@@ -218,11 +223,17 @@ type Options struct {
 	Template string // the page template
 	Plan     string // docs/plan.md, for the milestone table
 	Out      string // the file to write
+
+	History      bool   // read the git history for the Trends view
+	HistoryLimit int    // the newest commits of the history the page shows
+	Repo         string // the root of the repository the history is read from
+	Source       Source // the history to read; nil reads Repo through internal/gitsafe
 }
 
 // Defaults returns the paths of a run from the root of the repository.
 func Defaults() Options {
-	return Options{Dir: TasksDir, Template: TemplateFile, Plan: PlanFile, Out: "plan-viewer.html"}
+	return Options{Dir: TasksDir, Template: TemplateFile, Plan: PlanFile, Out: "plan-viewer.html",
+		History: true, HistoryLimit: DefaultHistoryLimit, Repo: "."}
 }
 
 // Ready returns the ids of the ready tasks under o.Dir, in id order,
@@ -245,36 +256,40 @@ func CriticalPath(o Options) ([]string, error) {
 	return criticalPath(tasks), nil
 }
 
-// Write renders the page into o.Out and returns its absolute path.
-func Write(o Options, now time.Time) (string, error) {
+// Write renders the page into o.Out and returns its absolute path and
+// the note of the Trends view: why it has no history, or "". A history
+// that cannot be read is a note and never an error, so the other views
+// still render.
+func Write(ctx context.Context, o Options, now time.Time) (path, note string, err error) {
 	tasks, err := read(o.Dir)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	page, err := os.ReadFile(o.Template)
 	if err != nil {
-		return "", fmt.Errorf("%w; run from the root of the repository", err)
+		return "", "", fmt.Errorf("%w; run from the root of the repository", err)
 	}
 	plan, err := os.ReadFile(o.Plan)
 	if err != nil {
-		return "", fmt.Errorf("%w; run from the root of the repository", err)
+		return "", "", fmt.Errorf("%w; run from the root of the repository", err)
 	}
 	ms, err := parseMilestones(string(plan))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	html, err := render(string(page), tasks, meta{Date: now.Format("2006-01-02"), Critical: criticalPath(tasks), Milestones: ms})
+	trends := historyTrends(ctx, o)
+	html, err := render(string(page), tasks, meta{Date: now.Format("2006-01-02"), Critical: criticalPath(tasks), Milestones: ms, Trends: trends})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if err := writeFile(o.Out, []byte(html)); err != nil {
-		return "", err
+		return "", "", err
 	}
 	abs, err := filepath.Abs(o.Out)
 	if err != nil {
-		return o.Out, nil
+		abs = o.Out
 	}
-	return abs, nil
+	return abs, trends.Note, nil
 }
 
 // read loads the tasks and refuses an empty directory.

@@ -162,7 +162,7 @@ func TestRenderPlaceholderInData(t *testing.T) {
 	title := "x /*META*/{} y /*DATA*/[] z"
 	out, err := render(page(t), []Task{{ID: "T001", Title: title}}, meta{Date: "2026-01-01"})
 	require.NoError(t, err)
-	assert.Contains(t, out, `const META = {"date":"2026-01-01","critical":[],"milestones":[]};`)
+	assert.Contains(t, out, `const META = {"date":"2026-01-01","critical":[],"milestones":[],"trends":{"note":"","limit":0,"total":0,"snapshots":[]}};`)
 	assert.Contains(t, out, `"title":"`+title+`"`)
 	assert.Equal(t, 1, strings.Count(out, `"date":"2026-01-01"`))
 }
@@ -197,7 +197,7 @@ func TestRefusesSymlinks(t *testing.T) {
 	out := filepath.Join(dir, "out.html")
 	require.NoError(t, os.Symlink(target, out))
 	o := Options{Dir: dir, Template: "../../template.html", Plan: planFile(t), Out: out}
-	_, err := Write(o, time.Now())
+	_, _, err := Write(t.Context(), o, time.Now())
 	require.ErrorContains(t, err, "symbolic link")
 	b, _ := os.ReadFile(target)
 	assert.Equal(t, "keep", string(b))
@@ -219,9 +219,10 @@ func TestWriteAndReady(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "T001-a.md"), []byte(sample), 0o644))
 	o := Options{Dir: dir, Template: "../../template.html", Plan: planFile(t), Out: filepath.Join(dir, "out.html")}
 
-	got, err := Write(o, time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC))
+	got, note, err := Write(t.Context(), o, time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
 	assert.Equal(t, o.Out, got)
+	assert.Contains(t, note, "history is off")
 	html, err := os.ReadFile(o.Out)
 	require.NoError(t, err)
 	assert.Contains(t, string(html), `"id":"T007"`)
@@ -236,7 +237,7 @@ func TestWriteAndReady(t *testing.T) {
 	o.Dir = t.TempDir()
 	_, err = Ready(o)
 	require.Error(t, err)
-	_, err = Write(o, time.Now())
+	_, _, err = Write(t.Context(), o, time.Now())
 	require.Error(t, err)
 }
 

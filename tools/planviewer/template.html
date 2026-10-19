@@ -12,16 +12,16 @@ SPDX-License-Identifier: GPL-3.0-only
 /* Layout: a full-height graph canvas with a slim progress band on top and a detail drawer on the right (bottom sheet on phones). */
 :root {
   --bg: #f3f4f7; --panel: #ffffff; --fg: #1d2230; --muted: #646b7d; --line: #d9dce5; --edge: #9aa1b3;
-  --merged: #2f8f6b; --ready: #d9822b; --waiting: #4a6fd1; --deferred: #a3a8b8; --closed: #c9ccd6;
+  --merged: #2f8f6b; --ready: #c47016; --waiting: #4a6fd1; --deferred: #7b8196; --closed: #c9ccd6;
   --accent: #7a4fd6; --on-accent: #ffffff; --hi: #1d2230;
   --on-merged: #12141b; --on-ready: #12141b; --on-waiting: #ffffff; --on-deferred: #12141b; --on-closed: #12141b;
   --display: ui-serif, Georgia, "Times New Roman", serif; --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) { :root {
   --bg: #12141b; --panel: #1a1d27; --fg: #e6e8ef; --muted: #9298aa; --line: #2b2f3d; --edge: #4b5166;
-  --merged: #45b88c; --ready: #f0a04b; --waiting: #7d9bf0; --deferred: #5d6275; --closed: #3a3e4d;
+  --merged: #45b88c; --ready: #f0a04b; --waiting: #7d9bf0; --deferred: #7d8397; --closed: #3a3e4d;
   --accent: #a98bf0; --on-accent: #12141b; --hi: #ffffff; color-scheme: dark;
-  --on-merged: #12141b; --on-ready: #12141b; --on-waiting: #12141b; --on-deferred: #ffffff; --on-closed: #ffffff } }
+  --on-merged: #12141b; --on-ready: #12141b; --on-waiting: #12141b; --on-deferred: #12141b; --on-closed: #ffffff } }
 html, body { height: 100%; }
 body { background: var(--bg); color: var(--fg); font-family: var(--body); display: flex; flex-direction: column; overflow: hidden; }
 header { padding-block: 12px 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -133,6 +133,30 @@ body:not([data-view="graph"]) .gonly { display: none; }
 .crit-on .node:not(.crit) { opacity: .5; }
 .crit-on .node.crit circle { stroke: var(--accent); stroke-width: 3.5; stroke-opacity: 1; }
 .crit-on .link.crit { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2.6; }
+/* Trends: hand-written SVG charts that follow the page tokens, and the timeline of decisions. */
+.chart { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.chart h3 { margin-bottom: 6px; }
+.chart svg, .chart svg:active { height: auto; cursor: pointer; touch-action: pan-y; user-select: none; border-radius: 4px; }
+.chart svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ax { font: 11px var(--mono); fill: var(--muted); }
+.grid { stroke: var(--line); stroke-width: 1; }
+.cur { stroke: var(--fg); stroke-width: 1; stroke-dasharray: 3 3; }
+.cline { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linejoin: round; }
+.layer { stroke: var(--panel); stroke-width: 1; }
+.pt { fill: var(--panel); stroke: var(--accent); stroke-width: 2; pointer-events: none; }
+.pt.sel { fill: var(--accent); }
+.gapm { fill: var(--panel); stroke: var(--muted); stroke-width: 1.5; pointer-events: none; }
+.gapm.sel { fill: var(--muted); }
+.key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .78rem; color: var(--muted); margin: 6px 0 0; padding: 0; list-style: none; }
+.key .dot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+.note { margin-bottom: 12px; font-size: .88rem; line-height: 1.5; overflow-wrap: anywhere; }
+.timeline { list-style: none; margin: 0 auto; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tl { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.tl .when { font: 500 .78rem var(--mono); color: var(--muted); }
+.tl a, .detail a { color: var(--accent); font: 500 .78rem var(--mono); }
+.tl .chg { font-size: .85rem; line-height: 1.6; overflow-wrap: anywhere; }
+.detail { margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+.detail .counts { display: flex; flex-wrap: wrap; gap: 4px 14px; font: .8rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 720px) {
   main { flex-direction: column; }
   aside { width: 100%; max-height: 45%; border-left: 0; border-top: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left, 0px)); }
@@ -168,6 +192,7 @@ html, body { margin: 0; }
 <section class="page" id="v-path" role="tabpanel" aria-labelledby="t-path" hidden></section>
 <section class="page" id="v-goals" role="tabpanel" aria-labelledby="t-goals" hidden></section>
 <section class="page" id="v-board" role="tabpanel" aria-labelledby="t-board" hidden></section>
+<section class="page" id="v-trends" role="tabpanel" aria-labelledby="t-trends" hidden></section>
 <main id="v-graph" role="tabpanel" aria-labelledby="t-graph" hidden>
   <div id="graph"><svg id="svg" role="group" aria-label="Task dependency graph"></svg></div>
   <aside id="panel" class="empty"></aside>
@@ -608,8 +633,178 @@ function boardView() {
     }).join("")}</div>`;
 }
 
-// ---- The tab bar and the hash route: #path, #goals, #board, #graph.
-const VIEWS = [["path", "Critical path", pathView], ["goals", "Goals", goalsView], ["board", "Board", boardView], ["graph", "Graph"]];
+// ---- Trends: the plan as it stood at each commit that touched docs/plan/tasks, computed in Go (META.trends).
+const TR = META.trends || { note: "", limit: 0, total: 0, snapshots: [] };
+const SNAPS = (TR.snapshots || []).map((s, i) => ({ ...s, i, ms: Date.parse(s.time) || 0 }));
+const OKS = SNAPS.filter(s => !s.gap);
+const DAY = 86400000;
+const num = v => Number.isFinite(+v) ? +v : 0;
+const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const ymd = ms => new Date(ms).toISOString().slice(0, 10);
+const oidLink = oid => OID.test(oid)
+  ? `<a href="https://github.com/brunovenceslau/romeu-e-julieta/commit/${oid}" target="_blank" rel="noopener" title="${oid}">${oid.slice(0, 7)}</a>`
+  : `<code>${esc(String(oid).slice(0, 12))}</code>`;
+const TRK = [["merged", "Merged"], ["ready", "Ready"], ["waiting", "Waiting"], ["deferred", "Deferred"]];
+let trSel = null, trW = 0, trX = () => 0;
+
+const idList = (ids, max) => {
+  const shown = ids.slice(0, max).map(id => byId.has(id) ? taskLink(id) : `<code>${esc(id)}</code>`).join(" ");
+  return shown + (ids.length > max ? ` and ${ids.length - max} more` : "");
+};
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const deltaEmpty = d => !d || (["added", "removed", "merged", "deferred", "closed", "reopened", "entered", "left"].every(k => !(d[k] || []).length) && d.crit_from === d.crit_to);
+function deltaText(d) {
+  if (!d) return '<span class="hint">the first snapshot of the window, so there is nothing to compare with</span>';
+  const p = [];
+  const n = k => (d[k] || []).length;
+  if (n("added")) p.push(`+${plural(n("added"), "task", "tasks")}`);
+  if (n("removed")) p.push(`-${n("removed")} removed`);
+  if (n("merged")) p.push(`${n("merged")} merged`);
+  if (n("deferred")) p.push(`${n("deferred")} deferred`);
+  if (n("closed")) p.push(`${n("closed")} folded or closed`);
+  if (n("reopened")) p.push(`${n("reopened")} reopened`);
+  if (d.crit_from !== d.crit_to) p.push(`critical path ${num(d.crit_from)} -> ${num(d.crit_to)}`);
+  if (n("left")) p.push(`${idList(d.left, 4)} left the path`);
+  if (n("entered")) p.push(`${idList(d.entered, 4)} joined the path`);
+  return p.length ? p.join(", ") : "no change";
+}
+
+function ticks(max) {
+  const raw = Math.max(max, 1) / 4, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = Math.max(1, [1, 2, 5, 10].map(m => m * mag).find(v => v >= raw));
+  const out = [];
+  for (let v = 0; v < max + step; v += step) out.push(v);
+  return out;
+}
+const TH = 190, PL = 34, PR = 12, PT = 10, PB = 24;
+function chart(kind, w, title, desc) {
+  const ms = SNAPS.map(s => s.ms), x0 = Math.min(...ms), x1 = Math.max(...ms);
+  const rnd = v => Math.round(v * 10) / 10;
+  const X = v => rnd(PL + (x1 === x0 ? (w - PL - PR) / 2 : (v - x0) / (x1 - x0) * (w - PL - PR)));
+  trX = X;
+  const val = s => kind === "scope" ? num(s.scope) : num(s.critical);
+  const tk = ticks(Math.max(1, ...OKS.map(val))), top = tk[tk.length - 1];
+  const Y = v => rnd(PT + (1 - v / top) * (TH - PT - PB));
+  const id = "c-" + kind;
+  let g = tk.map(v => `<line class="grid" x1="${PL}" x2="${w - PR}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${PL - 6}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`).join("");
+  g += [[x0, "start", PL], [(x0 + x1) / 2, "middle", (PL + w - PR) / 2], [x1, "end", w - PR]].map(([v, a, x], i) => (i === 1 && x1 - x0 < 2 * DAY) ? "" : `<text class="ax" x="${x}" y="${TH - 6}" text-anchor="${a}">${ymd(v)}</text>`).join("");
+  if (kind === "scope") {
+    let below = OKS.map(() => 0);
+    TRK.forEach(([k]) => {
+      const upper = OKS.map((s, j) => below[j] + num(s[k]));
+      const fwd = OKS.map((s, j) => `${X(s.ms)},${Y(upper[j])}`);
+      const back = OKS.map((s, j) => `${X(s.ms)},${Y(below[j])}`).reverse();
+      g += `<polygon class="layer" fill="var(--${k})" points="${fwd.concat(back).join(" ")}"/>`;
+      below = upper;
+    });
+  } else {
+    g += `<polyline class="cline" points="${OKS.map(s => `${X(s.ms)},${Y(val(s))}`).join(" ")}"/>`;
+  }
+  const r = OKS.length > 90 ? 2 : 3.5;
+  g += OKS.map(s => `<circle class="pt" data-i="${s.i}" cx="${X(s.ms)}" cy="${Y(val(s))}" r="${r}"/>`).join("");
+  g += SNAPS.filter(s => s.gap).map(s => `<circle class="gapm" data-i="${s.i}" cx="${X(s.ms)}" cy="${TH - PB}" r="4"/>`).join("");
+  g += `<line class="cur" y1="${PT}" y2="${TH - PB}" x1="0" x2="0"/>`;
+  return `<svg id="${id}" viewBox="0 0 ${w} ${TH}" role="group" tabindex="0" aria-labelledby="${id}-t ${id}-d" data-kind="${kind}">
+    <title id="${id}-t">${esc(title)}</title><desc id="${id}-d">${esc(desc)}</desc>${g}</svg>`;
+}
+
+function trDetail(s) {
+  const head = `<div class="row1"><h3>${esc(ymd(s.ms))}</h3>${oidLink(s.oid)}</div><div class="ttl">${esc(s.subject)}</div>`;
+  if (s.gap) return head + `<div class="hint">Gap: ${esc(s.gap)}</div>`;
+  const c = TRK.map(([k, name]) => `${name.toLowerCase()} ${num(s[k])}`).concat([`closed ${num(s.closed)}`]).join(" / ");
+  return head + `<div class="counts"><span>critical path ${num(s.critical)}</span><span>scope ${num(s.scope)}</span><span>${c}</span></div><div class="chg">${deltaText(s.delta)}</div>`;
+}
+function selectTrend(i) {
+  const s = SNAPS[i];
+  if (!s) return;
+  trSel = i;
+  const root = $("v-trends");
+  root.querySelectorAll(".cur").forEach(l => { l.setAttribute("x1", trX(s.ms)); l.setAttribute("x2", trX(s.ms)); });
+  root.querySelectorAll("[data-i]").forEach(e => e.classList.toggle("sel", +e.dataset.i === i));
+  const d = $("tr-detail");
+  if (d) d.innerHTML = trDetail(s);
+}
+
+function trendsView() {
+  const out = ["<h2>Trends</h2>"];
+  if (TR.note) out.push(`<div class="card note" role="status">${esc(TR.note)}</div>`);
+  if (!SNAPS.length) return out.join("");
+  const asOf = (Date.parse(META.date + "T00:00:00Z") || Date.now()) + DAY;
+  // By commit time, not chain order: a rebased history can fold back.
+  const byTime = [...OKS].sort((a, b) => a.ms - b.ms);
+  const at = days => byTime.filter(s => s.ms <= asOf - days * DAY).pop();
+  const now = CRIT.length, scopeNow = TASKS.filter(t => t.status !== "closed").length;
+  const peak = byTime.reduce((b, s) => (!b || num(s.critical) >= num(b.critical)) ? s : b, null);
+  const first = byTime[0];
+  const signed = n => (n > 0 ? "+" : "") + n;
+  const vs = (old, what) => old ? [signed(now - num(old.critical)), `${what}: ${num(old.critical)} on ${ymd(old.ms)}`] : ["-", `${what}: no snapshot that old`];
+  const growth = (old, what) => old ? [signed(scopeNow - num(old.scope)), `scope ${what}: ${num(old.scope)} on ${ymd(old.ms)}`] : ["-", `scope ${what}: no snapshot that old`];
+  const tile = ([big, small]) => `<div class="stat"><b>${esc(big)}</b><span>${esc(small)}</span></div>`;
+  const month = SNAPS.filter(s => s.delta && s.ms > asOf - 30 * DAY);
+  const sum = k => month.reduce((a, s) => a + (s.delta[k] || []).length, 0);
+  out.push(`<p class="hint">The plan at each commit that touched <code>docs/plan/tasks</code> on the first-parent history, read with the same rules as the other views. Dates are commit dates (UTC). The charts follow the first-parent chain, so a commit dated before its parent makes the line step back. Click a chart, or focus it and use the arrow keys, to see one commit.</p>`);
+  if (TR.total > SNAPS.length) out.push(`<p class="hint">Showing the newest ${SNAPS.length} of ${num(TR.total)} commits (<code>-history-limit=${num(TR.limit)}</code>); older ones are not read.</p>`);
+  if (OKS.length) {
+    out.push(`<div class="stats">
+      <div class="stat"><b>${now}</b><span>critical path now (working tree)</span></div>
+      ${tile(vs(at(7), "7 days ago"))}${tile(vs(at(30), "30 days ago"))}
+      ${tile([signed(now - num(peak.critical)), `vs peak: ${num(peak.critical)} on ${ymd(peak.ms)}`])}
+      <div class="stat"><b>${scopeNow}</b><span>active scope now</span></div>
+      ${tile(growth(at(30), "30 days ago"))}${tile(growth(first, "at window start"))}
+    </div>`);
+    out.push(`<p>In the last 30 days: ${plural(sum("added"), "task", "tasks")} added, ${sum("merged")} merged, ${sum("deferred")} deferred, ${sum("closed")} folded or closed, ${sum("reopened")} reopened.</p>`);
+  }
+  if (trSel === null || !SNAPS[trSel]) trSel = (OKS.length ? OKS[OKS.length - 1] : SNAPS[SNAPS.length - 1]).i;
+  trW = Math.max(260, Math.min(920, $("v-trends").clientWidth - 32) - 26);
+  if (OKS.length) {
+    out.push(`<div class="chart"><h3>Open critical path length</h3>${chart("crit", trW, "Open critical path length over time", "Tasks left on the longest chain of open tasks, at each commit.")}
+      <p class="hint" style="margin:6px 0 0">Tasks left on the longest chain of open tasks. A fall is progress; a rise is new scope on the path.</p></div>`);
+    out.push(`<div class="chart"><h3>Tasks by status</h3>${chart("scope", trW, "Tasks by status over time", "Stacked counts of merged, ready, waiting and deferred tasks at each commit; the top edge is the active scope.")}
+      <ul class="key">${TRK.map(([k, name]) => `<li><span class="dot" style="background:var(--${k})"></span>${name}</li>`).join("")}<li>top edge: active scope (open and merged)</li></ul></div>`);
+  }
+  if (SNAPS.some(s => s.gap)) out.push('<p class="hint">A hollow circle on the axis is a gap: a commit whose task files could not be read.</p>');
+  out.push('<div class="card detail" id="tr-detail" aria-live="polite"></div>');
+  const decisions = SNAPS.filter(s => s.gap || (s.delta && !deltaEmpty(s.delta))).reverse();
+  out.push(`<h2>Decisions</h2><p class="hint">The commits where the plan changed, newest first.</p>`);
+  out.push(decisions.length ? `<ul class="timeline">${decisions.map(s => `<li class="card tl"><div class="row1"><span class="when">${esc(ymd(s.ms))}</span>${oidLink(s.oid)}${s.gap ? '<span class="tag">gap</span>' : ""}</div>
+      <div class="ttl">${esc(s.subject)}</div><div class="chg">${s.gap ? "Gap: " + esc(s.gap) : deltaText(s.delta)}</div></li>`).join("")}</ul>` : '<p class="hint">No commit in this window changed the plan.</p>');
+  return out.join("");
+}
+function trendsAfterDraw() {
+  if (SNAPS.length) selectTrend(trSel);
+}
+(() => {
+  const root = $("v-trends");
+  const nearest = (svg, e) => {
+    const r = svg.getBoundingClientRect(), x = (e.clientX - r.left) * (trW / (r.width || trW));
+    return SNAPS.reduce((b, s) => Math.abs(trX(s.ms) - x) < Math.abs(trX(b.ms) - x) ? s : b, SNAPS[0]).i;
+  };
+  root.addEventListener("click", e => {
+    const b = e.target.closest("[data-goto]");
+    if (b) return gotoTask(b.dataset.goto);
+    const svg = e.target.closest("svg[data-kind]");
+    if (svg) selectTrend(nearest(svg, e));
+  });
+  root.addEventListener("keydown", e => {
+    if (!e.target.matches || !e.target.matches("svg[data-kind]")) return;
+    const step = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+    let i = trSel;
+    if (e.key === "Home") i = 0; else if (e.key === "End") i = SNAPS.length - 1; else if (step) i = Math.min(SNAPS.length - 1, Math.max(0, trSel + step)); else return;
+    e.preventDefault();
+    selectTrend(i);
+  });
+})();
+window.addEventListener("resize", () => {
+  const w = Math.max(260, Math.min(920, $("v-trends").clientWidth - 32) - 26);
+  if (current === "trends" && w !== trW) {
+    const f = document.activeElement, keep = f && f.dataset && f.dataset.kind ? f.id : null;
+    $("v-trends").innerHTML = trendsView(); trendsAfterDraw();
+    if (keep && $(keep)) $(keep).focus();
+  }
+});
+
+// ---- The tab bar and the hash route: #path, #goals, #board, #trends, #graph.
+const VIEWS = [["path", "Critical path", pathView], ["goals", "Goals", goalsView], ["board", "Board", boardView], ["trends", "Trends", trendsView], ["graph", "Graph"]];
 let current = null, pendingSel = null;
 const tabsEl = $("tabs");
 VIEWS.forEach(([k, name]) => {
@@ -640,6 +835,7 @@ function route() {
     $("v-" + k).hidden = !on;
     if (on && draw) $("v-" + k).innerHTML = draw();
   });
+  if (current === "trends") trendsAfterDraw();
   if (current === "graph") {
     render();
     if (pendingSel) { select(pendingSel); pendingSel = null; }
