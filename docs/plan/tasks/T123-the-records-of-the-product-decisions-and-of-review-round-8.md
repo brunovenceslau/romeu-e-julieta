@@ -3,7 +3,7 @@ id: T123
 title: "The records of the product decisions and of review round 8"
 milestone: M1
 module: docs
-fate: new
+fate: merged
 owns:
   - docs/adr/0017-*.md
   - docs/adr/0018-*.md
@@ -34,9 +34,14 @@ after: []
 ask_first:
   - decisions
 sitting: none
+merged: 2026-10-18
+pr: 155
 ---
 
 # T123 - The records of the product decisions and of review round 8
+
+Merged on 2026-10-18 in pull request #155. The text below is the one
+written at the re-plan.
 
 Goal: One record per row of the product-decision table of 12 12.5 (a
 secondary repo cloned by julieta; the two gates; v3 kits only; herdr as

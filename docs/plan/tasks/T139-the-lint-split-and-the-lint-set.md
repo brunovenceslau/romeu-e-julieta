@@ -3,7 +3,7 @@ id: T139
 title: "The lint split and the lint set"
 milestone: M1
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - .golangci.yml
   - tools/ci/internal/setup/setup.go
@@ -40,9 +40,14 @@ ask_first:
   - gitsafe
   - signing
 sitting: none
+merged: 2026-10-18
+pr: 162
 ---
 
 # T139 - The lint split and the lint set
+
+Merged on 2026-10-18 in pull request #162. The text below is the one
+written at the re-plan.
 
 Goal: `config_test.go` split by linter group under the lint package
 T105 made, and the lint set of item 16 of Decisions of the re-plan in

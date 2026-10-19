@@ -3,7 +3,7 @@ id: T012
 title: "`tools/kitpin` and the one pin file, mise included"
 milestone: M1
 module: kitpin
-fate: kept
+fate: merged
 owns:
   - tools/ci/internal/lint/boundaries.go
   - tools/kitpin/**
@@ -26,9 +26,14 @@ ask_first:
   - dependencies
   - checks
 sitting: none
+merged: 2026-10-18
+pr: 164
 ---
 
 # T012 - `tools/kitpin` and the one pin file, mise included
+
+Merged on 2026-10-18 in pull request #164. The text below is the one
+written at the re-plan.
 
 Earlier title: `tools/kitpin` and the one pin file.
 

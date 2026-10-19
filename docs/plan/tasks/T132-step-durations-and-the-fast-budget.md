@@ -3,7 +3,7 @@ id: T132
 title: "Step durations and the `fast` budget"
 milestone: M1
 module: ci-release
-fate: new
+fate: merged
 owns:
   - tools/ci/internal/check/printer*.go
   - tools/ci/internal/check/env*.go
@@ -21,9 +21,14 @@ after:
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-18
+pr: 150
 ---
 
 # T132 - Step durations and the `fast` budget
+
+Merged on 2026-10-18 in pull request #150. The text below is the one
+written at the re-plan.
 
 Goal: Each step prints one verdict line that ends with its duration, `ok
 <name> (<d>)` with `<d>` rounded to 100 ms; `fast` warns on stderr when

@@ -3,7 +3,7 @@ id: T010
 title: "`tools/ci imports`"
 milestone: M1
 module: ci-release
-fate: kept
+fate: merged
 owns:
   - tools/ci/internal/imports/**
   - tools/ci/check_imports.go
@@ -17,9 +17,14 @@ after:
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-18
+pr: 153
 ---
 
 # T010 - `tools/ci imports`
+
+Merged on 2026-10-18 in pull request #153. The text below is the one
+written at the re-plan.
 
 Goal: `tools/ci imports`: the table of 10 10.7 over the packages that
 exist, and the I1, I2 and I24 guards.
