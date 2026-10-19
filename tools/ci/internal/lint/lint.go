@@ -34,7 +34,15 @@ import (
 //     with "parallel golangci-lint is running" after 5 seconds whenever
 //     any other run on the machine, of any repository, holds the lock.
 //     The lock is no check: it only keeps runs from overlapping.
-var Args = []string{"run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners"}
+//   - "--build-tags" sets BuildTags, so that the files of the tagged
+//     suites are linted with the rest.
+var Args = []string{"run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners", "--build-tags", BuildTags}
+
+// BuildTags are the tags of the tagged suites of 10 10.1, e2e and host,
+// which every lint run sets: a file of either suite builds only with
+// its tag, and a file no run builds is a file whose findings nobody
+// sees. No file of the module builds only without one of them.
+const BuildTags = "e2e,host"
 
 // Argv returns the command line of a golangci-lint run: the path of
 // the linter, then Args.

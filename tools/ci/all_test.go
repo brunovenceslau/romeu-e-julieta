@@ -26,6 +26,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/container"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/crossbuild"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/imports"
@@ -44,6 +45,15 @@ func runAllIn(t *testing.T, r *gittest.Repo, steps []check.Step, profile string,
 	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &out, Steps: steps, Profile: profile, Now: frozen}
 	return run(t.Context(), e, append([]string{"all"}, args...)), out.String()
 }
+
+// infraStep is a step whose Around reads an infrastructure error, as
+// the e2e step does for a pull that failed on transport.
+var infraStep = check.Step{Name: "e2e", Argv: []string{"false"}, Environ: []string{"PATH=" + os.Getenv("PATH")},
+	Around: func() ([]string, check.Read, error) {
+		return nil, func([]byte, error) ([]byte, error) {
+			return nil, fmt.Errorf("the image pull: %w", check.ErrInfrastructure)
+		}, nil
+	}}
 
 // TestAll covers all with stub steps: every check runs and reports,
 // whatever an earlier one found, and the checks in this process read
@@ -94,7 +104,7 @@ func TestAll(t *testing.T) {
 			},
 			profile: "tools/ci 1 1",
 			code:    check.ExitFail,
-			want:    []string{"FAIL  workflows (0s)\n.github/workflows/ci.yml:28: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
+			want:    []string{"FAIL  workflows (0s)\n.github/workflows/ci.yml:29: workflows: runs-on is ${{ matrix.os }} or one of ubuntu-26.04, ubuntu-26.04-arm, macos-26, macos-26-intel, never *-latest\n", "ok    coverage"},
 		},
 		{
 			name:  "a hygiene finding",
@@ -112,6 +122,20 @@ func TestAll(t *testing.T) {
 			steps: []check.Step{{Name: "unit", Argv: []string{"sh", "-c", "echo 'x.go:1:2: module lookup disabled by GOPROXY=off'; exit 1"}, Environ: []string{"PATH=" + os.Getenv("PATH")}}},
 			code:  check.ExitFail,
 			want:  []string{"FAIL  unit (0s)\nx.go:1:2: module lookup disabled by GOPROXY=off\n", `run "go run ./tools/ci setup", which runs "go mod download"`},
+		},
+		{
+			name:    "an infrastructure error alone exits with its own status",
+			steps:   []check.Step{infraStep, citest.Passing},
+			profile: "tools/ci 1 1",
+			code:    check.ExitInfra,
+			want:    []string{"FAIL  e2e", "ok    passes", "all: failed: e2e\n", "ci: all: e2e: an infrastructure error"},
+		},
+		{
+			name:    "an infrastructure error beside a failed check exits as a failure",
+			steps:   []check.Step{infraStep, citest.Failing},
+			profile: "tools/ci 1 1",
+			code:    check.ExitFail,
+			want:    []string{"FAIL  e2e", "FAIL  fails", "all: failed: e2e, fails\n"},
 		},
 		{
 			name:  "a nested module stops all before any check",
@@ -185,13 +209,17 @@ func TestAllSteps(t *testing.T) {
 	fast := fastSteps(t.Context(), root, tools)
 	unit := len(fast) - 1
 	require.Equal(t, "unit", fast[unit].Name)
-	require.Len(t, steps, len(fast)+9)
+	require.Len(t, steps, len(fast)+10, "no e2e directory, so no tagged suite to vet")
 	assert.Equal(t, fast[:unit], steps[:unit])
 	assert.Equal(t, fast[unit], steps[unit+8])
 	assert.Equal(t, crossbuild.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[unit+3:unit+7])
 	assert.Equal(t, imports.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[unit+7:unit+8])
 
-	vulnStep, licenseStep, modulesStep, race := steps[unit], steps[unit+1], steps[unit+2], steps[unit+9]
+	vulnStep, licenseStep, modulesStep, race, e2e := steps[unit], steps[unit+1], steps[unit+2], steps[unit+9], steps[unit+10]
+	wantE2E := container.Steps(t.Context(), check.Plan{Root: root, Tools: tools})[0]
+	assert.Equal(t, wantE2E.Around == nil, e2e.Around == nil)
+	wantE2E.Around, e2e.Around = nil, nil
+	assert.Equal(t, wantE2E, e2e, "the e2e step comes last, after race")
 	assert.Equal(t, check.Step{Name: "vulnerabilities", Argv: []string{evalOrSelf(vuln), "./..."}, Environ: check.WithProcessEnv(env, check.NetworkPassThrough),
 		NoticeOn: "govulncheck: fetching vulnerabilities:", Notice: "vulnerabilities: could not fetch the vulnerability database, so this all is not the equivalent run (10 10.2)"}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")
 	assert.Equal(t, 40*time.Minute, procgroup.ToolRace.Timeout())
@@ -211,12 +239,13 @@ func TestAllSteps(t *testing.T) {
 		}
 		return out
 	}
+	e2eRuns := e2e.Skip == "" && e2e.Unavailable == nil
 	for _, s := range steps {
 		for _, key := range check.NetworkPassThrough {
-			assert.Equal(t, s.Name == "vulnerabilities", slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
+			assert.Equal(t, s.Name == "vulnerabilities" || (s.Name == "e2e" && e2eRuns), slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
 		}
 		for _, key := range check.DockerPassThrough {
-			assert.Equal(t, s.Name == "license" && runtime.GOOS == "linux", slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
+			assert.Equal(t, (s.Name == "license" && runtime.GOOS == "linux") || (s.Name == "e2e" && e2eRuns), slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
 		}
 	}
 	for _, key := range slices.Concat(check.NetworkPassThrough, check.DockerPassThrough, check.GoModulePassThrough) {
@@ -496,6 +525,9 @@ func TestAllWiring(t *testing.T) {
 		want = append(want, "docker run")
 	}
 	want = append(want, "go run", "go build", "go build", "go build", "go build", "go run", "go test", "go test")
+	if slices.Contains(container.Classes[runtime.GOOS+"/"+runtime.GOARCH], "e2e") {
+		want = append(want, "go test")
+	}
 	assert.Equal(t, want, firstWords, "the order of the steps")
 	require.NotEmpty(t, profile, "the race step names its profile")
 	assert.Equal(t, coverFile, filepath.Base(profile))
@@ -555,14 +587,14 @@ func TestCommitChecksReadBeforeTheSteps(t *testing.T) {
 		assert.Equal(t, check.ExitFail, code, out)
 		assert.Contains(t, out, "ok    rewrites")
 		assert.Contains(t, out, "FAIL  hygiene (0s)\ndocs/x.md:1: em-dash")
-		assert.Contains(t, out, "FAIL  workflows (0s)\n.github/workflows/ci.yml:28: workflows: runs-on")
+		assert.Contains(t, out, "FAIL  workflows (0s)\n.github/workflows/ci.yml:29: workflows: runs-on")
 	})
 	t.Run("fast by hand", func(t *testing.T) {
 		r, steps := fixture(t)
 		code, out := runCI(t, r, nil, steps, "fast")
 		assert.Equal(t, check.ExitFail, code, out)
 		assert.Contains(t, out, "FAIL  hygiene (0s)\ndocs/x.md:1: em-dash")
-		assert.Contains(t, out, "FAIL  workflows (0s)\n.github/workflows/ci.yml:28: workflows: runs-on")
+		assert.Contains(t, out, "FAIL  workflows (0s)\n.github/workflows/ci.yml:29: workflows: runs-on")
 	})
 	t.Run("the pushed range of a pre-push run", func(t *testing.T) {
 		const zero = "0000000000000000000000000000000000000000"

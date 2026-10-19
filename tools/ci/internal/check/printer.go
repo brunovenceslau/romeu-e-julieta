@@ -6,6 +6,7 @@ package check
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -26,6 +27,23 @@ type Printer struct {
 	// Failed names the checks that failed, in the order they were
 	// reported, each once.
 	Failed []string
+	// Infra names the steps of Failed whose error was an
+	// infrastructure error (ErrInfrastructure), each once.
+	Infra []string
+}
+
+// InfraOnly reports whether a check failed and every one that failed
+// is an infrastructure error, so that the run exits ExitInfra.
+func (c *Printer) InfraOnly() bool {
+	if len(c.Failed) == 0 {
+		return false
+	}
+	for _, name := range c.Failed {
+		if !slices.Contains(c.Infra, name) {
+			return false
+		}
+	}
+	return true
 }
 
 // DurationStep is what a duration on a verdict line is rounded to.
@@ -119,6 +137,9 @@ func (c *Printer) Run(ctx context.Context, root string, steps []Step) {
 			}
 			if bytes.Contains(out, []byte(moduleLookupOff)) {
 				detail += "the module cache lacks a module of go.sum, and no step fetches one (GOPROXY=off): run \"go run ./tools/ci setup\", which runs \"go mod download\", then run this again\n"
+			}
+			if errors.Is(err, ErrInfrastructure) && !slices.Contains(c.Infra, s.Name) {
+				c.Infra = append(c.Infra, s.Name)
 			}
 		}
 		c.Report(s.Name, err == nil, detail, c.now().Sub(start))

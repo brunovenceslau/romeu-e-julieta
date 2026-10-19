@@ -61,6 +61,11 @@ func allSteps(ctx context.Context, root string, tools check.Tools, profile strin
 // change and rewrote a file, staged one or moved HEAD may have left a
 // check that judged the tree a copy that is not the commit's.
 //
+// A run whose only failed checks are infrastructure errors (a
+// precondition of the container e2e that could not be met, REQ-0798)
+// returns an error that wraps check.ErrInfrastructure, so it exits
+// check.ExitInfra; beside any other failed check it exits as a failure.
+//
 // It first prints the platform it runs on, as the go command and "uname
 // -m" name it, so that a run's log shows which machine each runner
 // label gave (10 10.2, Runners).
@@ -154,6 +159,9 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 	}
 	printTimed(c, verdicts)
 	c.Last("all")
+	if c.InfraOnly() {
+		return false, fmt.Errorf("all: %s: %w", strings.Join(c.Infra, ", "), check.ErrInfrastructure)
+	}
 	return c.OK, nil
 }
 

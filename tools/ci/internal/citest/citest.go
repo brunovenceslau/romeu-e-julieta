@@ -137,6 +137,7 @@ permissions:
   contents: read
 concurrency:
   group: ci-${{ github.ref }}
+  cancel-in-progress: true
 ` + WorkflowEnv + `jobs:
   all:
     name: all on ${{ matrix.os }}
@@ -159,6 +160,11 @@ concurrency:
       - uses: jdx/mise-action/sub/path@` + Sha + `
         with:
           sha256: ${{ matrix.mise_sha256 }}
+          persist_github_token: false
+      - uses: actions/cache@` + Sha + `
+        with:
+          path: /tmp/cache
+          key: cache-aa
       - name: All checks
         run: go run ./tools/ci all
       - run: go run ./tools/release notes --tag "$GITHUB_REF_NAME" --out=notes.md

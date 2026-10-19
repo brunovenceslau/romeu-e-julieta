@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The lock of fixture.mise.toml, which locks no tool yet. ci.yml keys the
+# cache of the container e2e by the sha256 of this file, and the
+# workflows test holds that key to it.
+
+lockfile_version = 3

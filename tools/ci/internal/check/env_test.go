@@ -28,6 +28,16 @@ func TestStatus(t *testing.T) {
 	assert.Equal(t, "ci: x\\x1b[2J\n", out.String())
 }
 
+// TestStatusOfAnInfrastructureError checks that an error that wraps
+// ErrInfrastructure exits with the status of its own (REQ-0798), and
+// is printed as any other error.
+func TestStatusOfAnInfrastructureError(t *testing.T) {
+	var out bytes.Buffer
+	assert.Equal(t, check.ExitInfra, check.Status(&out, false, fmt.Errorf("all: %w", check.ErrInfrastructure)))
+	assert.Contains(t, out.String(), "ci: all: ")
+	assert.NotContains(t, []int{check.ExitOK, check.ExitFail, check.ExitError}, check.ExitInfra)
+}
+
 // TestRepoRoot checks that the root of the working tree is found from a
 // directory below it, through the repository of the environment.
 func TestRepoRoot(t *testing.T) {

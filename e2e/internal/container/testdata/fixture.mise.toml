@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The mise configuration the container e2e installs in the workload's
+# base, with fixture.mise.lock as its lock (10 10.1). The file names keep
+# mise from reading either as a configuration of this repository, so a
+# case that installs them copies them into its project as mise.toml and
+# mise.lock. A case that needs a tool adds it here and locks it with the
+# pinned mise; ci.yml keys the cache of the container e2e by the sha256
+# of the lock.
+[tools]

@@ -145,6 +145,8 @@ func (c lintContext) matchTag(name string) bool {
 		return true
 	case name == "unix" && c.unixOS[c.goos]:
 		return true
+	case slices.Contains(strings.Split(BuildTags, ","), name):
+		return true
 	case name == "boringcrypto":
 		name = "goexperiment.boringcrypto"
 	}
