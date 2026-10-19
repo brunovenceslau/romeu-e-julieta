@@ -1312,8 +1312,10 @@ the commands, so only a test file imports it and no binary links it.
 through `internal/cmd/<binary>/all`, the one package per binary that
 links every command in (one blank-import file per command, 02 2.1);
 `tools/ci` also imports `internal/cli/clidoc` directly, which no binary
-links, and `tools/new` imports `internal/cli` directly, for the command
-list and the error table its `command` and `error` kinds read. The
+links, `tools/new` imports `internal/cli` directly, for the command
+list and the error table its `command` and `error` kinds read, and
+`tools/planviewer` imports `internal/gitsafe` directly, for the plan
+files of past commits its trends read. The
 rows govern the two binaries, and a subpackage follows its own row,
 never its parent's.
 

@@ -12,16 +12,16 @@ SPDX-License-Identifier: GPL-3.0-only
 /* Layout: a full-height graph canvas with a slim progress band on top and a detail drawer on the right (bottom sheet on phones). */
 :root {
   --bg: #f3f4f7; --panel: #ffffff; --fg: #1d2230; --muted: #646b7d; --line: #d9dce5; --edge: #9aa1b3;
-  --merged: #2f8f6b; --ready: #d9822b; --waiting: #4a6fd1; --deferred: #a3a8b8; --closed: #c9ccd6;
+  --merged: #2f8f6b; --ready: #c47016; --waiting: #4a6fd1; --deferred: #7b8196; --closed: #c9ccd6;
   --accent: #7a4fd6; --on-accent: #ffffff; --hi: #1d2230;
   --on-merged: #12141b; --on-ready: #12141b; --on-waiting: #ffffff; --on-deferred: #12141b; --on-closed: #12141b;
   --display: ui-serif, Georgia, "Times New Roman", serif; --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) { :root {
   --bg: #12141b; --panel: #1a1d27; --fg: #e6e8ef; --muted: #9298aa; --line: #2b2f3d; --edge: #4b5166;
-  --merged: #45b88c; --ready: #f0a04b; --waiting: #7d9bf0; --deferred: #5d6275; --closed: #3a3e4d;
+  --merged: #45b88c; --ready: #f0a04b; --waiting: #7d9bf0; --deferred: #7d8397; --closed: #3a3e4d;
   --accent: #a98bf0; --on-accent: #12141b; --hi: #ffffff; color-scheme: dark;
-  --on-merged: #12141b; --on-ready: #12141b; --on-waiting: #12141b; --on-deferred: #ffffff; --on-closed: #ffffff } }
+  --on-merged: #12141b; --on-ready: #12141b; --on-waiting: #12141b; --on-deferred: #12141b; --on-closed: #ffffff } }
 html, body { height: 100%; }
 body { background: var(--bg); color: var(--fg); font-family: var(--body); display: flex; flex-direction: column; overflow: hidden; }
 header { padding-block: 12px 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -133,6 +133,64 @@ body:not([data-view="graph"]) .gonly { display: none; }
 .crit-on .node:not(.crit) { opacity: .5; }
 .crit-on .node.crit circle { stroke: var(--accent); stroke-width: 3.5; stroke-opacity: 1; }
 .crit-on .link.crit { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2.6; }
+/* Trends: hand-written SVG charts that follow the page tokens, and the timeline of decisions. */
+.chart { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.chart h3 { margin-bottom: 6px; }
+.chart svg, .chart svg:active { height: auto; cursor: pointer; touch-action: pan-y; user-select: none; border-radius: 4px; }
+.chart svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ax { font: 11px var(--mono); fill: var(--muted); }
+.grid { stroke: var(--line); stroke-width: 1; }
+.cur { stroke: var(--fg); stroke-width: 1; stroke-dasharray: 3 3; }
+.cline { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linejoin: round; }
+.layer { stroke: var(--panel); stroke-width: 1; }
+.pt { fill: var(--panel); stroke: var(--accent); stroke-width: 2; pointer-events: none; }
+.pt.sel { fill: var(--accent); }
+.gapm { fill: var(--panel); stroke: var(--muted); stroke-width: 1.5; pointer-events: none; }
+.gapm.sel { fill: var(--muted); }
+.key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .78rem; color: var(--muted); margin: 6px 0 0; padding: 0; list-style: none; }
+.key .dot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+.note { margin-bottom: 12px; font-size: .88rem; line-height: 1.5; overflow-wrap: anywhere; }
+.timeline { list-style: none; margin: 0 auto; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tl { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.tl .when { font: 500 .78rem var(--mono); color: var(--muted); }
+.tl a, .detail a { color: var(--accent); font: 500 .78rem var(--mono); }
+.tl .chg { font-size: .85rem; line-height: 1.6; overflow-wrap: anywhere; }
+.detail { margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+.detail .counts { display: flex; flex-wrap: wrap; gap: 4px 14px; font: .8rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Titles open the task reader: a side sheet on desktop, the whole screen on phones. */
+.ttlb { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; text-align: left; cursor: pointer; overflow-wrap: anywhere; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; text-decoration-thickness: 2px; }
+.ttlb:hover { color: var(--accent); text-decoration-color: var(--accent); }
+.mini { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: .86rem; }
+.mini li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+dialog.reader { margin: 0 0 0 auto; width: min(800px, 100%); max-width: 100%; height: 100%; max-height: 100%; padding: 0; border: 0; border-left: 1px solid var(--line); background: var(--panel); color: var(--fg); overflow: hidden; }
+dialog.reader[open] { display: flex; flex-direction: column; }
+dialog.reader::backdrop { background: rgba(10, 12, 20, .5); }
+.rd-bar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid var(--line); }
+.rd-bar .id { font: 600 .85rem var(--mono); }
+.rd-x, .rd-g { font: 600 .85rem var(--body); color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+.rd-g { margin-left: auto; }
+.rd-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 32px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 12px; }
+.rd-scroll h2 { font-family: var(--display); font-weight: 600; font-size: 1.3rem; line-height: 1.3; margin: 0; text-wrap: balance; overflow-wrap: anywhere; }
+.rd-scroll h2:focus { outline: none; }
+.rd-scroll a, .md a { color: var(--accent); }
+.md { font-size: .92rem; line-height: 1.6; overflow-wrap: anywhere; }
+.md > :first-child { margin-top: 0; }
+.md p, .md ul, .md ol, .md pre, .md blockquote, .md .tbl { margin: 0 0 12px; }
+.md h3, .md h4, .md h5, .md h6 { font-family: var(--display); font-weight: 600; line-height: 1.3; margin: 18px 0 8px; }
+.md h3 { font-size: 1.1rem; } .md h4 { font-size: 1rem; } .md h5, .md h6 { font-size: .92rem; }
+.md ul, .md ol { padding-left: 1.5em; }
+.md ul ul, .md ul ol, .md ol ul, .md ol ol { margin: 2px 0; }
+.md pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; overflow-x: auto; line-height: 1.45; }
+.md pre code { font-size: .82rem; }
+.md :not(pre) > code { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.md blockquote { border-left: 3px solid var(--accent); padding-left: 12px; color: var(--muted); }
+.md blockquote > :last-child { margin-bottom: 0; }
+.md hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+.md .tbl { overflow-x: auto; }
+.md table { border-collapse: collapse; font-size: .85rem; }
+.md th, .md td { border: 1px solid var(--line); padding: 4px 10px; vertical-align: top; text-align: left; }
+.md th { background: var(--bg); }
+.md .al-c { text-align: center; } .md .al-r { text-align: right; }
 @media (max-width: 720px) {
   main { flex-direction: column; }
   aside { width: 100%; max-height: 45%; border-left: 0; border-top: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left, 0px)); }
@@ -168,10 +226,12 @@ html, body { margin: 0; }
 <section class="page" id="v-path" role="tabpanel" aria-labelledby="t-path" hidden></section>
 <section class="page" id="v-goals" role="tabpanel" aria-labelledby="t-goals" hidden></section>
 <section class="page" id="v-board" role="tabpanel" aria-labelledby="t-board" hidden></section>
+<section class="page" id="v-trends" role="tabpanel" aria-labelledby="t-trends" hidden></section>
 <main id="v-graph" role="tabpanel" aria-labelledby="t-graph" hidden>
   <div id="graph"><svg id="svg" role="group" aria-label="Task dependency graph"></svg></div>
   <aside id="panel" class="empty"></aside>
 </main>
+<dialog id="reader" class="reader" aria-labelledby="rd-title"></dialog>
 
 
 <script>
@@ -457,12 +517,14 @@ function highlight(id) {
 }
 
 const code = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+// A task title is a button that opens the task reader.
+const titleBtn = t => `<button class="ttlb" type="button" data-open="${esc(t.id)}">${code(t.title)}</button>`;
 const label = { ready: "Ready", waiting: "Waiting", merged: "Merged", deferred: "Deferred", closed: "Closed" };
 function refList(items) {
   if (!items.length) return '<span class="hint">none</span>';
   return '<div class="refs">' + items.map(({ id, kind }) => {
     const t = byId.get(id);
-    return `<button class="ref" type="button" data-id="${esc(id)}" title="${esc(t ? t.title.replace(/`/g, "") : id)}${kind === "after" ? " (after)" : ""}"><span class="dot" style="background:var(--${t ? t.status : "closed"})"></span>${esc(id)}${kind === "after" ? "~" : ""}</button>`;
+    return `<button class="ref" type="button" data-open="${esc(id)}" title="${esc(t ? t.title.replace(/`/g, "") : id)}${kind === "after" ? " (after)" : ""}"><span class="dot" style="background:var(--${t ? t.status : "closed"})"></span>${esc(id)}${kind === "after" ? "~" : ""}</button>`;
   }).join("") + "</div>";
 }
 
@@ -473,8 +535,7 @@ function emptyPanel() {
   panel.innerHTML = `<h2>Ready to start</h2>
     <p class="hint">Open tasks whose needs and after are all merged, the same rule as <code>go run ./tools/ci plan --ready</code>. Click a node for its details; a tilde (~) marks a soft "after" edge.</p>
     ${refList(ready.map(t => ({ id: t.id })))}
-    <dl>${ready.map(t => `<dt>${esc(t.id)}</dt><dd>${code(t.title)}${t.sitting !== "none" ? ` - sitting ${esc(t.sitting)}` : ""}${t.ask_first.length ? ` - ask-first: ${esc(t.ask_first.join(", "))}` : ""}</dd>`).join("")}</dl>`;
-  bindRefs();
+    <dl>${ready.map(t => `<dt>${esc(t.id)}</dt><dd>${titleBtn(t)}${t.sitting !== "none" ? ` - sitting ${esc(t.sitting)}` : ""}${t.ask_first.length ? ` - ask-first: ${esc(t.ask_first.join(", "))}` : ""}</dd>`).join("")}</dl>`;
 }
 function select(id) {
   selected = id;
@@ -487,28 +548,20 @@ function select(id) {
   panel.className = "";
   panel.innerHTML = `
     <div class="id"><span>${esc(t.id)}</span><span class="pill" style="background:var(--${t.status});color:var(--on-${t.status})">${label[t.status]}</span><span>fate: ${esc(t.fate)}</span><button class="close" type="button" aria-label="Close details">x</button></div>
-    <h2>${code(t.title)}</h2>
+    <h2>${titleBtn(t)}</h2>
     ${t.goal ? `<p>${code(t.goal)}</p>` : ""}
     <dl>
       <dt>Milestone</dt><dd>${esc(t.milestone)}</dd>
       <dt>Module</dt><dd>${esc(t.module)}</dd>
       <dt>Sitting</dt><dd>${esc(t.sitting)}</dd>
       <dt>Ask-first</dt><dd>${t.ask_first.length ? esc(t.ask_first.join(", ")) : "none"}</dd>
-      ${t.pr ? `<dt>Merged</dt><dd>${esc(t.merged)} in <a href="https://github.com/brunovenceslau/romeu-e-julieta/pull/${encodeURIComponent(t.pr)}" target="_blank" rel="noopener">#${esc(t.pr)}</a></dd>` : ""}
+      ${t.pr ? `<dt>Merged</dt><dd>${esc(t.merged)} in <a href="https://github.com/brunovenceslau/romeu-e-julieta/pull/${encodeURIComponent(t.pr)}" target="_blank" rel="noopener noreferrer">#${esc(t.pr)}</a></dd>` : ""}
       ${t.status === "waiting" ? `<dt>Blocked by</dt><dd>${refList(blockers)}</dd>` : ""}
       <dt>Depends on</dt><dd>${refList(deps)}</dd>
       <dt>Unblocks</dt><dd>${refList(dependents.get(t.id))}</dd>
     </dl>
-    <a href="https://github.com/brunovenceslau/romeu-e-julieta/blob/main/${esc(t.path)}" target="_blank" rel="noopener">Open the task file on GitHub</a>`;
+    <a href="https://github.com/brunovenceslau/romeu-e-julieta/blob/main/${esc(t.path)}" target="_blank" rel="noopener noreferrer">Open the task file on GitHub</a>`;
   panel.querySelector(".close").onclick = () => select(null);
-  bindRefs();
-}
-function bindRefs() {
-  panel.querySelectorAll(".ref").forEach(b => b.onclick = () => {
-    const t = byId.get(b.dataset.id);
-    if (t && !show.has(t.status)) { show.add(t.status); legend.querySelector(`[data-k="${t.status}"]`).setAttribute("aria-pressed", "true"); render(); }
-    select(b.dataset.id);
-  });
 }
 
 ["q", "layout", "labels", "afters", "crit"].forEach(id => $(id).addEventListener("input", render));
@@ -518,7 +571,7 @@ emptyPanel();
 // ---- The views: critical path, goals, board, graph. Everything that reaches innerHTML goes through esc or code.
 const pill = s => `<span class="pill" style="background:var(--${esc(s)});color:var(--on-${esc(s)})">${esc(label[s] || s)}</span>`;
 const taskLink = id => byId.has(id)
-  ? `<button class="ref" type="button" data-goto="${esc(id)}" title="${esc(byId.get(id).title.replace(/`/g, ""))}"><span class="dot" style="background:var(--${esc(byId.get(id).status)})"></span>${esc(id)}</button>`
+  ? `<button class="ref" type="button" data-open="${esc(id)}" title="${esc(byId.get(id).title.replace(/`/g, ""))}"><span class="dot" style="background:var(--${esc(byId.get(id).status)})"></span>${esc(id)}</button>`
   : `<span class="ref">${esc(id)}</span>`;
 const tagMs = m => `<span class="tag">${esc(m === "none" ? "no milestone" : m)}</span>`;
 const openDeps = t => [...new Set([...t.needs, ...t.after])].filter(d => byId.get(d)?.status !== "merged");
@@ -544,7 +597,7 @@ function pathView() {
   const ask = chain.filter(t => t.ask_first.length).length;
   const off = TASKS.filter(t => t.status === "ready" && !critSet.has(t.id)).sort(byCrit);
   const frontBox = front ? `<div class="card front"><div class="row1"><span class="badge">Current front</span>${taskLink(front.id)}${pill(front.status)}${tagMs(front.milestone)}</div>
-      <div class="ttl">${code(front.title)}</div>
+      <div class="ttl">${titleBtn(front)}</div>
       ${front.status === "ready" ? '<div class="hint">Ready to start: every need and after is merged.</div>' : '<div class="hint">Waiting on:</div>'}${why(front)}</div>` : "";
   return `<h2>Critical path</h2>
     <p class="hint">The longest chain of open tasks over needs and after, by the rule of <code>go run ./tools/ci plan --critical-path</code>. Finish it in order and the plan ends at ${taskLink(chain[chain.length - 1].id)}. Anything else can run beside it.</p>
@@ -559,7 +612,7 @@ function pathView() {
     ${frontBox}
     <ol class="chain" aria-label="The critical path, in order">${chain.map((t, i) => `<li class="step ${esc(t.status)}${t === front ? " front" : ""}"><span class="n" aria-hidden="true">${i + 1}</span>
       <div class="card"><div class="row1">${taskLink(t.id)}${pill(t.status)}${tagMs(t.milestone)}${t === front ? '<span class="badge">Front</span>' : ""}</div>
-      <div class="ttl">${code(t.title)}</div>${why(t)}</div></li>`).join("")}</ol>
+      <div class="ttl">${titleBtn(t)}</div>${why(t)}</div></li>`).join("")}</ol>
     <details class="more card" style="margin-top:12px"><summary>Ready but off the path (${off.length})</summary>
       <p class="hint">Work that can start now and does not shorten the path. Many of these in a row is drift.</p>
       <div class="refs">${off.map(t => taskLink(t.id)).join("") || '<span class="hint">none</span>'}</div></details>`;
@@ -590,7 +643,7 @@ function goalsView() {
         <div class="prog">${done}/${live.length} merged${def ? `, ${def} deferred` : ""} - ${onPath.length} on the critical path</div>
         <p class="cap">Ends when</p><p class="txt">${code(m.ends_when)}</p>
         <p class="cap">Delivers</p><p class="txt">${code(m.delivers)}</p>
-        ${onPath.length ? `<p class="cap">On the critical path</p><div class="refs">${onPath.map(taskLink).join("")}</div>` : ""}</div>`;
+        ${onPath.length ? `<p class="cap">On the critical path</p><ul class="mini">${onPath.map(id => `<li>${taskLink(id)} ${titleBtn(byId.get(id))}</li>`).join("")}</ul>` : ""}</div>`;
     }).join("")}</div>`;
 }
 
@@ -599,7 +652,7 @@ function boardView() {
   const cols = [["ready", "Ready"], ["waiting", "Waiting"], ["merged", "Merged"], ["deferred", "Deferred"]];
   if (showClosed) cols.push(["closed", "Folded / removed / v1"]);
   const card = t => `<div class="card${critSet.has(t.id) ? " crit" : ""}"><div class="row1">${taskLink(t.id)}${tagMs(t.milestone)}${critSet.has(t.id) ? '<span class="badge">Critical path</span>' : ""}</div>
-    <div class="ttl">${code(t.title)}</div>${t.status === "merged" || t.status === "closed" ? (t.merged ? `<div class="hint">merged ${esc(t.merged)}</div>` : "") : why(t)}</div>`;
+    <div class="ttl">${titleBtn(t)}</div>${t.status === "merged" || t.status === "closed" ? (t.merged ? `<div class="hint">merged ${esc(t.merged)}</div>` : "") : why(t)}</div>`;
   const order = k => k === "merged" ? (a, b) => (a.merged < b.merged ? 1 : a.merged > b.merged ? -1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : byCrit;
   return `<label class="toggle"><input type="checkbox" id="showclosed"${showClosed ? " checked" : ""}> Show folded, removed and left-to-v1 tasks</label>
     <div class="cols">${cols.map(([k, name]) => {
@@ -608,9 +661,178 @@ function boardView() {
     }).join("")}</div>`;
 }
 
-// ---- The tab bar and the hash route: #path, #goals, #board, #graph.
-const VIEWS = [["path", "Critical path", pathView], ["goals", "Goals", goalsView], ["board", "Board", boardView], ["graph", "Graph"]];
-let current = null, pendingSel = null;
+// ---- Trends: the plan as it stood at each commit that touched docs/plan/tasks, computed in Go (META.trends).
+const TR = META.trends || { note: "", limit: 0, total: 0, snapshots: [] };
+const SNAPS = (TR.snapshots || []).map((s, i) => ({ ...s, i, ms: Date.parse(s.time) || 0 }));
+const OKS = SNAPS.filter(s => !s.gap);
+const DAY = 86400000;
+const num = v => Number.isFinite(+v) ? +v : 0;
+const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const ymd = ms => new Date(ms).toISOString().slice(0, 10);
+const oidLink = oid => OID.test(oid)
+  ? `<a href="https://github.com/brunovenceslau/romeu-e-julieta/commit/${oid}" target="_blank" rel="noopener noreferrer" title="${oid}">${oid.slice(0, 7)}</a>`
+  : `<code>${esc(String(oid).slice(0, 12))}</code>`;
+const TRK = [["merged", "Merged"], ["ready", "Ready"], ["waiting", "Waiting"], ["deferred", "Deferred"]];
+let trSel = null, trW = 0, trX = () => 0;
+
+const idList = (ids, max) => {
+  const shown = ids.slice(0, max).map(id => byId.has(id) ? taskLink(id) : `<code>${esc(id)}</code>`).join(" ");
+  return shown + (ids.length > max ? ` and ${ids.length - max} more` : "");
+};
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const deltaEmpty = d => !d || (["added", "removed", "merged", "deferred", "closed", "reopened", "entered", "left"].every(k => !(d[k] || []).length) && d.crit_from === d.crit_to);
+function deltaText(d) {
+  if (!d) return '<span class="hint">the first snapshot of the window, so there is nothing to compare with</span>';
+  const p = [];
+  const n = k => (d[k] || []).length;
+  if (n("added")) p.push(`+${plural(n("added"), "task", "tasks")}`);
+  if (n("removed")) p.push(`-${n("removed")} removed`);
+  if (n("merged")) p.push(`${n("merged")} merged`);
+  if (n("deferred")) p.push(`${n("deferred")} deferred`);
+  if (n("closed")) p.push(`${n("closed")} folded or closed`);
+  if (n("reopened")) p.push(`${n("reopened")} reopened`);
+  if (d.crit_from !== d.crit_to) p.push(`critical path ${num(d.crit_from)} -> ${num(d.crit_to)}`);
+  if (n("left")) p.push(`${idList(d.left, 4)} left the path`);
+  if (n("entered")) p.push(`${idList(d.entered, 4)} joined the path`);
+  return p.length ? p.join(", ") : "no change";
+}
+
+function ticks(max) {
+  const raw = Math.max(max, 1) / 4, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = Math.max(1, [1, 2, 5, 10].map(m => m * mag).find(v => v >= raw));
+  const out = [];
+  for (let v = 0; v < max + step; v += step) out.push(v);
+  return out;
+}
+const TH = 190, PL = 34, PR = 12, PT = 10, PB = 24;
+function chart(kind, w, title, desc) {
+  const ms = SNAPS.map(s => s.ms), x0 = Math.min(...ms), x1 = Math.max(...ms);
+  const rnd = v => Math.round(v * 10) / 10;
+  const X = v => rnd(PL + (x1 === x0 ? (w - PL - PR) / 2 : (v - x0) / (x1 - x0) * (w - PL - PR)));
+  trX = X;
+  const val = s => kind === "scope" ? num(s.scope) : num(s.critical);
+  const tk = ticks(Math.max(1, ...OKS.map(val))), top = tk[tk.length - 1];
+  const Y = v => rnd(PT + (1 - v / top) * (TH - PT - PB));
+  const id = "c-" + kind;
+  let g = tk.map(v => `<line class="grid" x1="${PL}" x2="${w - PR}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${PL - 6}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`).join("");
+  g += [[x0, "start", PL], [(x0 + x1) / 2, "middle", (PL + w - PR) / 2], [x1, "end", w - PR]].map(([v, a, x], i) => (i === 1 && x1 - x0 < 2 * DAY) ? "" : `<text class="ax" x="${x}" y="${TH - 6}" text-anchor="${a}">${ymd(v)}</text>`).join("");
+  if (kind === "scope") {
+    let below = OKS.map(() => 0);
+    TRK.forEach(([k]) => {
+      const upper = OKS.map((s, j) => below[j] + num(s[k]));
+      const fwd = OKS.map((s, j) => `${X(s.ms)},${Y(upper[j])}`);
+      const back = OKS.map((s, j) => `${X(s.ms)},${Y(below[j])}`).reverse();
+      g += `<polygon class="layer" fill="var(--${k})" points="${fwd.concat(back).join(" ")}"/>`;
+      below = upper;
+    });
+  } else {
+    g += `<polyline class="cline" points="${OKS.map(s => `${X(s.ms)},${Y(val(s))}`).join(" ")}"/>`;
+  }
+  const r = OKS.length > 90 ? 2 : 3.5;
+  g += OKS.map(s => `<circle class="pt" data-i="${s.i}" cx="${X(s.ms)}" cy="${Y(val(s))}" r="${r}"/>`).join("");
+  g += SNAPS.filter(s => s.gap).map(s => `<circle class="gapm" data-i="${s.i}" cx="${X(s.ms)}" cy="${TH - PB}" r="4"/>`).join("");
+  g += `<line class="cur" y1="${PT}" y2="${TH - PB}" x1="0" x2="0"/>`;
+  return `<svg id="${id}" viewBox="0 0 ${w} ${TH}" role="group" tabindex="0" aria-labelledby="${id}-t ${id}-d" data-kind="${kind}">
+    <title id="${id}-t">${esc(title)}</title><desc id="${id}-d">${esc(desc)}</desc>${g}</svg>`;
+}
+
+function trDetail(s) {
+  const head = `<div class="row1"><h3>${esc(ymd(s.ms))}</h3>${oidLink(s.oid)}</div><div class="ttl">${esc(s.subject)}</div>`;
+  if (s.gap) return head + `<div class="hint">Gap: ${esc(s.gap)}</div>`;
+  const c = TRK.map(([k, name]) => `${name.toLowerCase()} ${num(s[k])}`).concat([`closed ${num(s.closed)}`]).join(" / ");
+  return head + `<div class="counts"><span>critical path ${num(s.critical)}</span><span>scope ${num(s.scope)}</span><span>${c}</span></div><div class="chg">${deltaText(s.delta)}</div>`;
+}
+function selectTrend(i) {
+  const s = SNAPS[i];
+  if (!s) return;
+  trSel = i;
+  const root = $("v-trends");
+  root.querySelectorAll(".cur").forEach(l => { l.setAttribute("x1", trX(s.ms)); l.setAttribute("x2", trX(s.ms)); });
+  root.querySelectorAll("[data-i]").forEach(e => e.classList.toggle("sel", +e.dataset.i === i));
+  const d = $("tr-detail");
+  if (d) d.innerHTML = trDetail(s);
+}
+
+function trendsView() {
+  const out = ["<h2>Trends</h2>"];
+  if (TR.note) out.push(`<div class="card note" role="status">${esc(TR.note)}</div>`);
+  if (!SNAPS.length) return out.join("");
+  const asOf = (Date.parse(META.date + "T00:00:00Z") || Date.now()) + DAY;
+  // By commit time, not chain order: a rebased history can fold back.
+  const byTime = [...OKS].sort((a, b) => a.ms - b.ms);
+  const at = days => byTime.filter(s => s.ms <= asOf - days * DAY).pop();
+  const now = CRIT.length, scopeNow = TASKS.filter(t => t.status !== "closed").length;
+  const peak = byTime.reduce((b, s) => (!b || num(s.critical) >= num(b.critical)) ? s : b, null);
+  const first = byTime[0];
+  const signed = n => (n > 0 ? "+" : "") + n;
+  const vs = (old, what) => old ? [signed(now - num(old.critical)), `${what}: ${num(old.critical)} on ${ymd(old.ms)}`] : ["-", `${what}: no snapshot that old`];
+  const growth = (old, what) => old ? [signed(scopeNow - num(old.scope)), `scope ${what}: ${num(old.scope)} on ${ymd(old.ms)}`] : ["-", `scope ${what}: no snapshot that old`];
+  const tile = ([big, small]) => `<div class="stat"><b>${esc(big)}</b><span>${esc(small)}</span></div>`;
+  const month = SNAPS.filter(s => s.delta && s.ms > asOf - 30 * DAY);
+  const sum = k => month.reduce((a, s) => a + (s.delta[k] || []).length, 0);
+  out.push(`<p class="hint">The plan at each commit that touched <code>docs/plan/tasks</code> on the first-parent history, read with the same rules as the other views. Dates are commit dates (UTC). The charts follow the first-parent chain, so a commit dated before its parent makes the line step back. Click a chart, or focus it and use the arrow keys, to see one commit.</p>`);
+  if (TR.total > SNAPS.length) out.push(`<p class="hint">Showing the newest ${SNAPS.length} of ${num(TR.total)} commits (<code>-history-limit=${num(TR.limit)}</code>); older ones are not read.</p>`);
+  if (OKS.length) {
+    out.push(`<div class="stats">
+      <div class="stat"><b>${now}</b><span>critical path now (working tree)</span></div>
+      ${tile(vs(at(7), "7 days ago"))}${tile(vs(at(30), "30 days ago"))}
+      ${tile([signed(now - num(peak.critical)), `vs peak: ${num(peak.critical)} on ${ymd(peak.ms)}`])}
+      <div class="stat"><b>${scopeNow}</b><span>active scope now</span></div>
+      ${tile(growth(at(30), "30 days ago"))}${tile(growth(first, "at window start"))}
+    </div>`);
+    out.push(`<p>In the last 30 days: ${plural(sum("added"), "task", "tasks")} added, ${sum("merged")} merged, ${sum("deferred")} deferred, ${sum("closed")} folded or closed, ${sum("reopened")} reopened.</p>`);
+  }
+  if (trSel === null || !SNAPS[trSel]) trSel = (OKS.length ? OKS[OKS.length - 1] : SNAPS[SNAPS.length - 1]).i;
+  trW = Math.max(260, Math.min(920, $("v-trends").clientWidth - 32) - 26);
+  if (OKS.length) {
+    out.push(`<div class="chart"><h3>Open critical path length</h3>${chart("crit", trW, "Open critical path length over time", "Tasks left on the longest chain of open tasks, at each commit.")}
+      <p class="hint" style="margin:6px 0 0">Tasks left on the longest chain of open tasks. A fall is progress; a rise is new scope on the path.</p></div>`);
+    out.push(`<div class="chart"><h3>Tasks by status</h3>${chart("scope", trW, "Tasks by status over time", "Stacked counts of merged, ready, waiting and deferred tasks at each commit; the top edge is the active scope.")}
+      <ul class="key">${TRK.map(([k, name]) => `<li><span class="dot" style="background:var(--${k})"></span>${name}</li>`).join("")}<li>top edge: active scope (open and merged)</li></ul></div>`);
+  }
+  if (SNAPS.some(s => s.gap)) out.push('<p class="hint">A hollow circle on the axis is a gap: a commit whose task files could not be read.</p>');
+  out.push('<div class="card detail" id="tr-detail" aria-live="polite"></div>');
+  const decisions = SNAPS.filter(s => s.gap || (s.delta && !deltaEmpty(s.delta))).reverse();
+  out.push(`<h2>Decisions</h2><p class="hint">The commits where the plan changed, newest first.</p>`);
+  out.push(decisions.length ? `<ul class="timeline">${decisions.map(s => `<li class="card tl"><div class="row1"><span class="when">${esc(ymd(s.ms))}</span>${oidLink(s.oid)}${s.gap ? '<span class="tag">gap</span>' : ""}</div>
+      <div class="ttl">${esc(s.subject)}</div><div class="chg">${s.gap ? "Gap: " + esc(s.gap) : deltaText(s.delta)}</div></li>`).join("")}</ul>` : '<p class="hint">No commit in this window changed the plan.</p>');
+  return out.join("");
+}
+function trendsAfterDraw() {
+  if (SNAPS.length) selectTrend(trSel);
+}
+(() => {
+  const root = $("v-trends");
+  const nearest = (svg, e) => {
+    const r = svg.getBoundingClientRect(), x = (e.clientX - r.left) * (trW / (r.width || trW));
+    return SNAPS.reduce((b, s) => Math.abs(trX(s.ms) - x) < Math.abs(trX(b.ms) - x) ? s : b, SNAPS[0]).i;
+  };
+  root.addEventListener("click", e => {
+    const svg = e.target.closest("svg[data-kind]");
+    if (svg) selectTrend(nearest(svg, e));
+  });
+  root.addEventListener("keydown", e => {
+    if (!e.target.matches || !e.target.matches("svg[data-kind]")) return;
+    const step = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+    let i = trSel;
+    if (e.key === "Home") i = 0; else if (e.key === "End") i = SNAPS.length - 1; else if (step) i = Math.min(SNAPS.length - 1, Math.max(0, trSel + step)); else return;
+    e.preventDefault();
+    selectTrend(i);
+  });
+})();
+window.addEventListener("resize", () => {
+  const w = Math.max(260, Math.min(920, $("v-trends").clientWidth - 32) - 26);
+  if (current === "trends" && w !== trW) {
+    const f = document.activeElement, keep = f && f.dataset && f.dataset.kind ? f.id : null;
+    $("v-trends").innerHTML = trendsView(); trendsAfterDraw();
+    if (keep && $(keep)) $(keep).focus();
+  }
+});
+
+// ---- The tab bar and the hash route: #path, #goals, #board, #trends, #graph.
+const VIEWS = [["path", "Critical path", pathView], ["goals", "Goals", goalsView], ["board", "Board", boardView], ["trends", "Trends", trendsView], ["graph", "Graph"]];
+let current = null, pendingSel = null, justClosed = false, graphAfter = null;
+const TASKHASH = /^task-([A-Za-z0-9._~-]+)$/;
 const tabsEl = $("tabs");
 VIEWS.forEach(([k, name]) => {
   const b = document.createElement("button");
@@ -629,9 +851,8 @@ VIEWS.forEach(([k, name]) => {
   tabsEl.appendChild(b);
 });
 
-function route() {
-  const want = location.hash.replace(/^#/, "");
-  current = VIEWS.some(v => v[0] === want) ? want : "path";
+function showView(want) {
+  current = want;
   document.body.dataset.view = current;
   VIEWS.forEach(([k, , draw]) => {
     const on = k === current;
@@ -640,14 +861,264 @@ function route() {
     $("v-" + k).hidden = !on;
     if (on && draw) $("v-" + k).innerHTML = draw();
   });
+  if (current === "trends") trendsAfterDraw();
   if (current === "graph") {
     render();
     if (pendingSel) { select(pendingSel); pendingSel = null; }
   }
 }
+// #task-T013 opens the reader over the view that is on; any other hash closes it.
+function route() {
+  const raw = location.hash.replace(/^#/, "");
+  const m = TASKHASH.exec(raw);
+  if (m && byId.has(m[1])) {
+    if (!current) showView("path");
+    return readTask(m[1]);
+  }
+  const want = VIEWS.some(v => v[0] === raw) ? raw : "path";
+  if (m) history.replaceState(null, "", "#" + want);
+  if (justClosed && !m && want === current) { justClosed = false; return showInGraph(); }
+  const wasOpen = reader.open;
+  if (wasOpen) reader.close();
+  if (wasOpen && want === current) return;
+  showView(want);
+}
 window.addEventListener("hashchange", route);
 
-// A task id on a page opens that task in the graph.
+// ---- The Markdown reader. It is pure (no DOM) and safe by construction: the whole
+// text is escaped first, so no "<" of the task reaches the page, and the
+// subset below only adds tags it writes itself. A link is made only for an
+// https:// URL or a repository path; any other target stays plain text.
+// md:begin
+const MD_BLOB = "https://github.com/brunovenceslau/romeu-e-julieta/blob/main/";
+const MD_MAX_INLINE = 4000, MD_MAX_DEPTH = 6;
+// mdHref returns the href for the (escaped) link target url, or "" when the target is refused.
+// dir is the directory of the task file, as an array of names.
+function mdHref(url, dir) {
+  if (/^https:\/\/[^\s<>"'`\\\u0000]+$/.test(url)) return url;
+  const m = /^(\/?[A-Za-z0-9._~\/-]*)(#[A-Za-z0-9._~-]*)?$/.exec(url);
+  if (!m || !m[1] || m[1].startsWith("//")) return "";
+  const out = m[1].startsWith("/") ? [] : [...dir];
+  const parts = m[1].replace(/^\//, "").split("/");
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if (p === "" && i === parts.length - 1) continue; // a trailing slash
+    if (p === "" || p === ".") continue;
+    if (p === "..") { if (!out.length) return ""; out.pop(); } else out.push(p);
+  }
+  return MD_BLOB + out.map(encodeURIComponent).join("/") + (m[2] || "");
+}
+// mdInline formats one escaped line of text.
+function mdInline(src, ctx) {
+  const keep = [];
+  const stash = h => "\u0000" + (keep.push(h) - 1) + "\u0000";
+  const restore = s => s.replace(/\u0000(\d+)\u0000/g, (_, i) => restore(keep[+i]));
+  const run = (s, links) => {
+    s = s.replace(/`([^`]+)`/g, (_, c) => stash("<code>" + c + "</code>"));
+    // An image is shown as its alt text.
+    s = s.replace(/!\[([^\[\]]*)\]\([^()\s]*\)/g, "$1");
+    if (links) {
+      s = s.replace(/\[([^\[\]]*)\]\(([^()\s]*)\)/g, (m, text, url) => {
+        const h = mdHref(url, ctx.dir);
+        return h ? stash(`<a href="${h}" target="_blank" rel="noopener noreferrer">${run(text, false)}</a>`) : m;
+      });
+    }
+    s = s.replace(/\*\*(?=\S)([^*]+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|\W)__(?=\S)([^_]+?)__(?!\w)/g, "$1<strong>$2</strong>")
+      .replace(/(^|[^*\w])\*(?=[^\s*])([^*]+?)\*(?!\*)/g, "$1<em>$2</em>")
+      .replace(/(^|\W)_(?=[^\s_])([^_]+?)_(?!\w)/g, "$1<em>$2</em>");
+    if (links) s = s.replace(/\bT\d{3}\b/g, id => ctx.has(id) ? stash(`<a href="#task-${id}">${id}</a>`) : id);
+    return s;
+  };
+  // A very long line is shown as plain text, which keeps the work linear.
+  return src.length > MD_MAX_INLINE ? src : restore(run(src, true));
+}
+// mdCells splits a table row at its unescaped pipes; "\|" is a pipe in the cell.
+function mdCells(line) {
+  const out = [];
+  let cur = "";
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === "\\" && line[i + 1] === "|") { cur += "|"; i++; }
+    else if (line[i] === "|") { out.push(cur); cur = ""; }
+    else cur += line[i];
+  }
+  out.push(cur);
+  if (line.trimStart().startsWith("|")) out.shift();
+  if (out.length && out[out.length - 1].trim() === "" && line.trimEnd().endsWith("|")) out.pop();
+  return out.map(c => c.trim());
+}
+// Every block pattern below is linear: no two parts of one pattern can match the same text.
+const MD_HEAD = /^ {0,3}(#{1,6})[ \t]+(.*)$/;
+const mdRule = l => { const t = l.replace(/ /g, ""); return /^ {0,3}[-*_]/.test(l) && t.length >= 3 && t === t[0].repeat(t.length); };
+// mdHeadText drops the closing #s of a heading ("## a ##").
+function mdHeadText(text) {
+  const t = text.trim();
+  let j = t.length;
+  while (j > 0 && t[j - 1] === "#") j--;
+  return j < t.length && (j === 0 || /[ \t]/.test(t[j - 1])) ? t.slice(0, j).trim() : t;
+}
+const MD_FENCE = /^ {0,3}(`{3,}|~{3,})[^`]*$/, MD_QUOTE = /^ {0,3}&gt; ?(.*)$/;
+const MD_ITEM = /^( *)([-*+]|\d{1,9}[.)])[ \t]+(.*)$/, MD_CELL = /^:?-+:?$/;
+const mdIsTable = (a, b) => a !== undefined && b !== undefined && a.includes("|") && b.includes("|") && mdCells(b).every(c => MD_CELL.test(c)) && mdCells(a).length === mdCells(b).length;
+const mdStarts = (a, b) => MD_FENCE.test(a) || MD_HEAD.test(a) || mdRule(a) || MD_QUOTE.test(a) || MD_ITEM.test(a) || mdIsTable(a, b);
+function mdList(items, ctx) {
+  let html = "";
+  const stack = [];
+  for (const it of items) {
+    const tag = /\d/.test(it.mark[0]) ? "ol" : "ul";
+    while (stack.length && it.indent < stack[stack.length - 1].indent) html += "</li></" + stack.pop().tag + ">";
+    let top = stack[stack.length - 1], fresh = !top || it.indent > top.indent;
+    if (!fresh) {
+      html += "</li>";
+      if (top.tag !== tag) { html += "</" + stack.pop().tag + ">"; fresh = true; }
+    }
+    if (fresh) {
+      const start = tag === "ol" && parseInt(it.mark, 10) !== 1 ? ` start="${parseInt(it.mark, 10)}"` : "";
+      html += `<${tag}${start}>`;
+      stack.push({ indent: it.indent, tag });
+    }
+    html += "<li>" + mdInline(it.text, ctx);
+  }
+  while (stack.length) html += "</li></" + stack.pop().tag + ">";
+  return html;
+}
+// mdBlocks renders escaped lines to HTML.
+function mdBlocks(lines, ctx, depth) {
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.trim() === "") { i++; continue; }
+    let m = MD_FENCE.exec(line);
+    if (m) {
+      const body = [], end = new RegExp("^" + (m[1][0] === "`" ? "`" : "~") + "{" + m[1].length + ",}\\s*$");
+      for (i++; i < lines.length && !end.test(lines[i].trim()); i++) body.push(lines[i]);
+      i++;
+      out.push("<pre><code>" + body.join("\n") + "</code></pre>");
+    } else if ((m = MD_HEAD.exec(line))) {
+      const n = Math.min(6, m[1].length + 2);
+      out.push(`<h${n}>${mdInline(mdHeadText(m[2]), ctx)}</h${n}>`);
+      i++;
+    } else if (mdRule(line)) {
+      out.push("<hr>");
+      i++;
+    } else if (MD_QUOTE.test(line) && depth < MD_MAX_DEPTH) {
+      const inner = [];
+      for (; i < lines.length && (m = MD_QUOTE.exec(lines[i])); i++) inner.push(m[1]);
+      out.push("<blockquote>" + mdBlocks(inner, ctx, depth + 1) + "</blockquote>");
+    } else if (mdIsTable(line, lines[i + 1])) {
+      const al = mdCells(lines[i + 1]).map(c => c.startsWith(":") && c.endsWith(":") ? " class=\"al-c\"" : c.endsWith(":") ? " class=\"al-r\"" : "");
+      const row = (cells, tag) => "<tr>" + al.map((a, j) => `<${tag}${a}>${mdInline(cells[j] || "", ctx)}</${tag}>`).join("") + "</tr>";
+      let html = "<thead>" + row(mdCells(line), "th") + "</thead><tbody>";
+      for (i += 2; i < lines.length && lines[i].trim() !== "" && lines[i].includes("|"); i++) html += row(mdCells(lines[i]), "td");
+      out.push(`<div class="tbl"><table>${html}</tbody></table></div>`);
+    } else if ((m = MD_ITEM.exec(line))) {
+      const items = [];
+      while (i < lines.length) {
+        const l = lines[i];
+        if ((m = MD_ITEM.exec(l))) { items.push({ indent: m[1].length, mark: m[2], text: m[3] }); i++; continue; }
+        if (MD_FENCE.test(l)) break;
+        if (l.trim() === "") {
+          let j = i;
+          while (j < lines.length && lines[j].trim() === "") j++;
+          if (j < lines.length && (MD_ITEM.test(lines[j]) || /^ {2,}\S/.test(lines[j])) && !MD_FENCE.test(lines[j])) { i = j; continue; }
+          break;
+        }
+        if (/^ {2,}/.test(l) || !mdStarts(l, lines[i + 1])) { items[items.length - 1].text += " " + l.trim(); i++; continue; }
+        break;
+      }
+      out.push(mdList(items, ctx));
+    } else {
+      const para = [line.trim()];
+      for (i++; i < lines.length && lines[i].trim() !== "" && !mdStarts(lines[i], lines[i + 1]); i++) para.push(lines[i].trim());
+      out.push("<p>" + mdInline(para.join(" "), ctx) + "</p>");
+    }
+  }
+  return out.join("\n");
+}
+// md renders task text; ctx is { has(id), dir }.
+function md(text, ctx) {
+  const lines = String(text ?? "").replace(/[\u0000\u0001]/g, "").replace(/\t/g, "    ")
+    .replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])).split("\n")
+    // A line over the cap gets a marker no block pattern starts with, so it is a plain paragraph
+    // (or code inside a fence) and no pattern scans it; the marker is dropped below.
+    .map(l => l.length > MD_MAX_INLINE ? "\u0001" + l : l);
+  return mdBlocks(lines, ctx, 0).replace(/\u0001/g, "");
+}
+// md:end
+
+// ---- The task reader: a modal dialog, so the browser traps the focus and Escape closes it.
+const reader = $("reader");
+let opener = null;
+const rdRefs = ids => ids.length
+  ? '<div class="refs">' + ids.map(id => byId.has(id)
+    ? `<button class="ref" type="button" data-open="${esc(id)}" title="${esc(byId.get(id).title.replace(/`/g, ""))}"><span class="dot" style="background:var(--${esc(byId.get(id).status)})"></span>${esc(id)}</button>`
+    : `<span class="ref">${esc(id)}</span>`).join("") + "</div>"
+  : '<span class="hint">none</span>';
+function readerHTML(t) {
+  const dir = String(t.path).split("/").slice(0, -1);
+  const body = t.body
+    ? `<div class="md">${md(t.body, { has: id => byId.has(id), dir })}</div>` + (t.body_truncated ? '<p class="hint">The body is cut at 64 KiB. Open the file on GitHub for the rest.</p>' : "")
+    : '<p class="hint">This task file has no body.</p>';
+  const file = String(t.path).split("/").map(encodeURIComponent).join("/");
+  return `<div class="rd-bar"><span class="id">${esc(t.id)}</span>${pill(t.status)}<span class="hint">fate: ${esc(t.fate)}</span><button class="rd-g" type="button" data-graph="${esc(t.id)}">Show in graph</button><button class="rd-x" type="button">Close</button></div>
+    <div class="rd-scroll"><h2 id="rd-title" tabindex="-1">${code(t.title)}</h2>
+    <dl>
+      <dt>Milestone</dt><dd>${esc(t.milestone)}</dd>
+      <dt>Module</dt><dd>${esc(t.module)}</dd>
+      <dt>Sitting</dt><dd>${esc(t.sitting)}</dd>
+      <dt>Ask-first</dt><dd>${t.ask_first.length ? esc(t.ask_first.join(", ")) : "none"}</dd>
+      ${t.pr ? `<dt>Merged</dt><dd>${esc(t.merged)} in <a href="https://github.com/brunovenceslau/romeu-e-julieta/pull/${encodeURIComponent(t.pr)}" target="_blank" rel="noopener noreferrer">#${esc(t.pr)}</a></dd>` : ""}
+      <dt>Needs</dt><dd>${rdRefs(t.needs)}</dd>
+      <dt>After</dt><dd>${rdRefs(t.after)}</dd>
+      <dt>Unblocks</dt><dd>${rdRefs(dependents.get(t.id).map(d => d.id))}</dd>
+      <dt>File</dt><dd><a href="https://github.com/brunovenceslau/romeu-e-julieta/blob/main/${file}" target="_blank" rel="noopener noreferrer">${esc(t.path)}</a></dd>
+    </dl>
+    <hr>${body}</div>`;
+}
+function readTask(id) {
+  reader.innerHTML = readerHTML(byId.get(id));
+  if (!reader.open) { opener = document.activeElement; reader.showModal(); }
+  reader.querySelector(".rd-scroll").scrollTop = 0;
+  reader.querySelector("#rd-title").focus();
+}
+reader.addEventListener("click", e => {
+  const g = e.target.closest(".rd-g");
+  if (g) graphAfter = g.dataset.graph;
+  if (g || e.target === reader || e.target.closest(".rd-x")) reader.close();
+});
+// Closing by Escape, the button or the backdrop drops the #task- hash without a route.
+reader.addEventListener("close", () => {
+  if (TASKHASH.test(location.hash.slice(1))) {
+    // Undo the entries the reader pushed, so Back does not walk through the tasks seen; a reader
+    // that began at a #task- link has none and rewrites its own entry.
+    const pushed = (history.state && history.state.rd) || 0;
+    if (pushed > 0) { justClosed = true; history.go(-pushed); } else { history.replaceState(null, "", "#" + (current || "path")); showInGraph(); }
+  }
+  if (opener && opener.isConnected) opener.focus();
+  opener = null;
+});
+// A closed reader pushes an entry (state rd: 1); a task opened inside it pushes one more, except
+// when the reader began at a #task- link, where it rewrites that entry.
+function showInGraph() {
+  const id = graphAfter;
+  graphAfter = null;
+  if (id) gotoTask(id);
+}
+function goTask(id) {
+  const d = history.state && history.state.rd;
+  if (reader.open && !d) history.replaceState({ rd: 0 }, "", "#task-" + id);
+  else history.pushState({ rd: reader.open ? d + 1 : 1 }, "", "#task-" + id);
+  route();
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest("[data-open], a[href^='#task-']");
+  if (!b) return;
+  const id = b.dataset.open || b.getAttribute("href").slice(6);
+  if (byId.has(id)) { e.preventDefault(); goTask(id); }
+});
+
+// "Show in graph" from the reader selects the task in the graph.
 function gotoTask(id) {
   const t = byId.get(id);
   if (!t) return;
@@ -658,12 +1129,9 @@ function gotoTask(id) {
   }
   $("q").value = "";
   pendingSel = id;
-  location.hash = "graph";
+  if (current === "graph" && location.hash === "#graph") showView("graph"); // no hashchange to wait for
+  else location.hash = "graph";
 }
-["v-path", "v-goals", "v-board"].forEach(id => $(id).addEventListener("click", e => {
-  const b = e.target.closest("[data-goto]");
-  if (b) gotoTask(b.dataset.goto);
-}));
 $("v-board").addEventListener("change", e => {
   if (e.target.id === "showclosed") { showClosed = e.target.checked; route(); $("showclosed").focus(); }
 });

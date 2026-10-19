@@ -13,18 +13,25 @@
 // file of -o, and prints the path. With -ready it prints the ready task
 // ids, one per line, in the form of "go run ./tools/ci plan --ready",
 // and writes no file; -critical-path does the same for "plan
-// --critical-path". The reading and the page are in
+// --critical-path". The Trends view reads the git history of the task
+// files (internal/gitsafe, read-only): -history=false skips it,
+// -history-limit bounds the commits it shows and -repo names the
+// repository; planviewer is unix-only, as internal/gitsafe is, which it
+// reads the history through. Without a repository the page says so and the other views
+// still render. The reading and the page are in
 // tools/planviewer/internal/view; this package parses the command line,
 // hands the output streams over and sets the exit status: 0 when it
 // succeeds, 1 when it fails, and 2 for a wrong command line.
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/planviewer/internal/view"
@@ -47,6 +54,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&o.Template, "template", o.Template, "the page `template`")
 	fs.StringVar(&o.Dir, "dir", o.Dir, "the `directory` of the task files")
 	fs.StringVar(&o.Plan, "plan", o.Plan, "the `file` with the milestone table")
+	fs.BoolVar(&o.History, "history", o.History, "read the git history for the Trends view")
+	fs.IntVar(&o.HistoryLimit, "history-limit", o.HistoryLimit, "the newest `n` commits of the plan history the Trends view shows")
+	fs.StringVar(&o.Repo, "repo", o.Repo, "the root of the git `repository` the history is read from")
 	list := fs.Bool("ready", false, "print the ready task ids, one per line, and write no file")
 	crit := fs.Bool("critical-path", false, "print the critical path ids, one per line, and write no file")
 	if err := fs.Parse(args); err != nil {
@@ -77,9 +87,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		return exitOK
 	}
-	path, err := view.Write(o, time.Now())
+	if o.HistoryLimit < 1 {
+		return fail(stderr, exitUsage, errors.New("-history-limit must be at least 1"))
+	}
+	path, note, err := view.Write(context.Background(), o, time.Now())
 	if err != nil {
 		return fail(stderr, exitError, err)
+	}
+	if note != "" && o.History {
+		_, _ = fmt.Fprintln(stderr, "planviewer: trends:", strconv.Quote(note))
 	}
 	if _, err := fmt.Fprintln(stdout, path); err != nil {
 		return fail(stderr, exitError, err)

@@ -15,6 +15,7 @@
 package view
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -51,7 +53,16 @@ type Task struct {
 	Goal      string   `json:"goal" yaml:"-"`
 	Path      string   `json:"path" yaml:"-"`
 	Status    string   `json:"status" yaml:"-"`
+
+	// Body is the Markdown after the front matter, cut to MaxBody bytes;
+	// BodyTruncated says it was cut.
+	Body          string `json:"body" yaml:"-"`
+	BodyTruncated bool   `json:"body_truncated" yaml:"-"`
 }
+
+// MaxBody bounds the body one task carries into the page, so a huge file
+// cannot swell it. The cut falls on a character boundary.
+const MaxBody = 64 << 10
 
 // The statuses of the page. A closed task is folded, removed or left to
 // a later version.
@@ -87,6 +98,7 @@ func parse(path string, content []byte) (Task, error) {
 		return Task{}, fmt.Errorf("%s: the front matter is not YAML: %w", path, err)
 	}
 	t.Path = path
+	t.Body, t.BodyTruncated = boundBody(body)
 	// The page reads a list as an array, never null.
 	for _, l := range []*[]string{&t.Needs, &t.After, &t.AskFirst} {
 		if *l == nil {
@@ -97,6 +109,20 @@ func parse(path string, content []byte) (Task, error) {
 		t.Goal = strings.Join(strings.Fields(m[1]), " ")
 	}
 	return t, nil
+}
+
+// boundBody trims the blank lines around body and cuts it to MaxBody
+// bytes at a character boundary.
+func boundBody(body string) (string, bool) {
+	body = strings.Trim(body, "\n")
+	if len(body) <= MaxBody {
+		return body, false
+	}
+	cut := MaxBody
+	for cut > 0 && !utf8.RuneStart(body[cut]) {
+		cut--
+	}
+	return body[:cut], true
 }
 
 // load reads every T*.md under dir, in path order, with its status set.
@@ -188,6 +214,7 @@ type meta struct {
 	Date       string      `json:"date"`
 	Critical   []string    `json:"critical"`
 	Milestones []Milestone `json:"milestones"`
+	Trends     Trends      `json:"trends"`
 }
 
 // render returns page, the template, with the tasks and the meta data in place.
@@ -199,6 +226,9 @@ func render(page string, tasks []Task, m meta) (string, error) {
 	}
 	if m.Milestones == nil {
 		m.Milestones = []Milestone{}
+	}
+	if m.Trends.Snapshots == nil {
+		m.Trends.Snapshots = []Snapshot{}
 	}
 	data, err := json.Marshal(tasks)
 	if err != nil {
@@ -218,11 +248,17 @@ type Options struct {
 	Template string // the page template
 	Plan     string // docs/plan.md, for the milestone table
 	Out      string // the file to write
+
+	History      bool   // read the git history for the Trends view
+	HistoryLimit int    // the newest commits of the history the page shows
+	Repo         string // the root of the repository the history is read from
+	Source       Source // the history to read; nil reads Repo through internal/gitsafe
 }
 
 // Defaults returns the paths of a run from the root of the repository.
 func Defaults() Options {
-	return Options{Dir: TasksDir, Template: TemplateFile, Plan: PlanFile, Out: "plan-viewer.html"}
+	return Options{Dir: TasksDir, Template: TemplateFile, Plan: PlanFile, Out: "plan-viewer.html",
+		History: true, HistoryLimit: DefaultHistoryLimit, Repo: "."}
 }
 
 // Ready returns the ids of the ready tasks under o.Dir, in id order,
@@ -245,36 +281,40 @@ func CriticalPath(o Options) ([]string, error) {
 	return criticalPath(tasks), nil
 }
 
-// Write renders the page into o.Out and returns its absolute path.
-func Write(o Options, now time.Time) (string, error) {
+// Write renders the page into o.Out and returns its absolute path and
+// the note of the Trends view: why it has no history, or "". A history
+// that cannot be read is a note and never an error, so the other views
+// still render.
+func Write(ctx context.Context, o Options, now time.Time) (path, note string, err error) {
 	tasks, err := read(o.Dir)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	page, err := os.ReadFile(o.Template)
 	if err != nil {
-		return "", fmt.Errorf("%w; run from the root of the repository", err)
+		return "", "", fmt.Errorf("%w; run from the root of the repository", err)
 	}
 	plan, err := os.ReadFile(o.Plan)
 	if err != nil {
-		return "", fmt.Errorf("%w; run from the root of the repository", err)
+		return "", "", fmt.Errorf("%w; run from the root of the repository", err)
 	}
 	ms, err := parseMilestones(string(plan))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	html, err := render(string(page), tasks, meta{Date: now.Format("2006-01-02"), Critical: criticalPath(tasks), Milestones: ms})
+	trends := historyTrends(ctx, o)
+	html, err := render(string(page), tasks, meta{Date: now.Format("2006-01-02"), Critical: criticalPath(tasks), Milestones: ms, Trends: trends})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if err := writeFile(o.Out, []byte(html)); err != nil {
-		return "", err
+		return "", "", err
 	}
 	abs, err := filepath.Abs(o.Out)
 	if err != nil {
-		return o.Out, nil
+		abs = o.Out
 	}
-	return abs, nil
+	return abs, trends.Note, nil
 }
 
 // read loads the tasks and refuses an empty directory.

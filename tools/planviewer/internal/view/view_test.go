@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -162,7 +163,7 @@ func TestRenderPlaceholderInData(t *testing.T) {
 	title := "x /*META*/{} y /*DATA*/[] z"
 	out, err := render(page(t), []Task{{ID: "T001", Title: title}}, meta{Date: "2026-01-01"})
 	require.NoError(t, err)
-	assert.Contains(t, out, `const META = {"date":"2026-01-01","critical":[],"milestones":[]};`)
+	assert.Contains(t, out, `const META = {"date":"2026-01-01","critical":[],"milestones":[],"trends":{"note":"","limit":0,"total":0,"snapshots":[]}};`)
 	assert.Contains(t, out, `"title":"`+title+`"`)
 	assert.Equal(t, 1, strings.Count(out, `"date":"2026-01-01"`))
 }
@@ -197,7 +198,7 @@ func TestRefusesSymlinks(t *testing.T) {
 	out := filepath.Join(dir, "out.html")
 	require.NoError(t, os.Symlink(target, out))
 	o := Options{Dir: dir, Template: "../../template.html", Plan: planFile(t), Out: out}
-	_, err := Write(o, time.Now())
+	_, _, err := Write(t.Context(), o, time.Now())
 	require.ErrorContains(t, err, "symbolic link")
 	b, _ := os.ReadFile(target)
 	assert.Equal(t, "keep", string(b))
@@ -219,9 +220,10 @@ func TestWriteAndReady(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "T001-a.md"), []byte(sample), 0o644))
 	o := Options{Dir: dir, Template: "../../template.html", Plan: planFile(t), Out: filepath.Join(dir, "out.html")}
 
-	got, err := Write(o, time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC))
+	got, note, err := Write(t.Context(), o, time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
 	assert.Equal(t, o.Out, got)
+	assert.Contains(t, note, "history is off")
 	html, err := os.ReadFile(o.Out)
 	require.NoError(t, err)
 	assert.Contains(t, string(html), `"id":"T007"`)
@@ -236,7 +238,7 @@ func TestWriteAndReady(t *testing.T) {
 	o.Dir = t.TempDir()
 	_, err = Ready(o)
 	require.Error(t, err)
-	_, err = Write(o, time.Now())
+	_, _, err = Write(t.Context(), o, time.Now())
 	require.Error(t, err)
 }
 
@@ -258,4 +260,76 @@ func TestGoalsKeepsUnknownMilestones(t *testing.T) {
 	assert.Contains(t, p, "Not in docs/plan.md")
 	assert.Contains(t, p, "m.orphan ? lost")
 	assert.Contains(t, p, "code(m.name)")
+}
+
+// The body is the Markdown after the front matter, without the blank
+// lines around it, and the Goal paragraph stays in it.
+func TestParseBody(t *testing.T) {
+	task, err := parse("p.md", []byte(sample))
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(task.Body, "# T007 - A title\n"), task.Body)
+	assert.True(t, strings.HasSuffix(task.Body, "More text."), task.Body)
+	assert.NotContains(t, task.Body, "id: T007")
+	assert.False(t, task.BodyTruncated)
+
+	empty, err := parse("p.md", []byte("---\nid: T001\n---\n"))
+	require.NoError(t, err)
+	assert.Empty(t, empty.Body)
+}
+
+// A huge body is cut to MaxBody bytes on a character boundary and says so.
+func TestBodyIsBounded(t *testing.T) {
+	for _, unit := range []string{"a", "\u00e9", "\u20ac", "\U0001F600"} {
+		body := strings.Repeat(unit, MaxBody/len(unit)+2) // the cut falls inside a character for the wide units
+		task, err := parse("p.md", []byte("---\nid: T001\n---\n"+body+"\n"))
+		require.NoError(t, err)
+		assert.LessOrEqual(t, len(task.Body), MaxBody, unit)
+		assert.Greater(t, len(task.Body), MaxBody-utf8.UTFMax, unit)
+		assert.True(t, utf8.ValidString(task.Body), unit)
+		assert.True(t, task.BodyTruncated, unit)
+	}
+	exact := strings.Repeat("a", MaxBody)
+	task, err := parse("p.md", []byte("---\nid: T001\n---\n"+exact))
+	require.NoError(t, err)
+	assert.Equal(t, exact, task.Body)
+	assert.False(t, task.BodyTruncated)
+}
+
+// Hostile text in a body cannot leave the data script: encoding/json
+// escapes it, and the placeholders in it are not replaced.
+func TestRenderBodyIsEscaped(t *testing.T) {
+	body := "```\n</script><script>alert(1)</script>\n```\n[x](javascript:alert(1)) /*DATA*/[] /*META*/{}"
+	task, err := parse("p.md", []byte("---\nid: T001\nfate: kept\n---\n"+body))
+	require.NoError(t, err)
+	tmpl := page(t)
+	out, err := render(tmpl, []Task{task}, meta{Date: "2026-01-01"})
+	require.NoError(t, err)
+	assert.Equal(t, strings.Count(tmpl, "</script>"), strings.Count(out, "</script>"))
+	assert.Equal(t, strings.Count(tmpl, "<script>"), strings.Count(out, "<script>"))
+	assert.Contains(t, out, `\u003c/script\u003e\u003cscript\u003ealert(1)`)
+	assert.Contains(t, out, `/*DATA*/[] /*META*/{}`)
+	assert.Equal(t, 1, strings.Count(out, `"date":"2026-01-01"`))
+}
+
+// The reader escapes the whole body before it adds any tag, and the page
+// never puts task text into innerHTML except through that renderer. The
+// renderer itself is run with hostile input under node by hand.
+func TestReaderRendersThroughMarkdown(t *testing.T) {
+	p := page(t)
+	assert.Equal(t, 1, strings.Count(p, "md(t.body,"))
+	assert.Equal(t, 0, strings.Count(p, "innerHTML = t.body"))
+	assert.Equal(t, 0, strings.Count(p, "${t.body}"))
+	start, end := strings.Index(p, "// md:begin"), strings.Index(p, "// md:end")
+	require.True(t, start >= 0 && end > start)
+	block := p[start:end]
+	// The escape comes first in md(), before the lines reach a block.
+	esc := strings.Index(block, `.replace(/[&<>"]/g`)
+	blocks := strings.Index(block, "return mdBlocks(")
+	assert.True(t, esc > 0 && esc < blocks)
+	assert.Contains(t, block, `https:\/\/`)
+	assert.NotContains(t, block, "innerHTML")
+	assert.NotContains(t, block, "document.")
+	for _, want := range []string{"<dialog", "showModal()", "data-open", "TASKHASH", "[A-Za-z0-9._~-]"} {
+		assert.Contains(t, p, want)
+	}
 }
