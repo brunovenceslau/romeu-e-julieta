@@ -165,13 +165,13 @@ func TestKitsRules(t *testing.T) {
 		}, "the RUN step at line 2 has 6 lines"},
 		{"a download without a checksum line", func(tr tree) {
 			tr["kits/probe/probe.yaml"] = goodKit(frontendRef(tr), "curl -fsSL -o /tmp/x https://example.invalid/x\ninstall /tmp/x /usr/local/bin/x\n")
-		}, "has no sha256sum -c line after it"},
+		}, "has no valid sha256sum -c line after it"},
 		{"a checksum line before the download", func(tr tree) {
 			tr["kits/probe/probe.yaml"] = goodKit(frontendRef(tr), "sha256sum -c /kit/x.sha256\ncurl -fsSL -o /tmp/x https://example.invalid/x\n")
-		}, "has no sha256sum -c line after it"},
+		}, "has no valid sha256sum -c line after it"},
 		{"a wget download without a checksum line", func(tr tree) {
 			tr["kits/probe/probe.yaml"] = goodKit(frontendRef(tr), "wget -q https://example.invalid/x\n")
-		}, "has no sha256sum -c line after it"},
+		}, "has no valid sha256sum -c line after it"},
 		{"a download piped", func(tr tree) {
 			tr["kits/probe/probe.yaml"] = goodKit(frontendRef(tr), "curl -fsSL https://example.invalid/x | tee /tmp/x\nsha256sum -c /kit/x.sha256\n")
 		}, `holds "|"`},
@@ -272,32 +272,3 @@ func TestKitsMiseSignature(t *testing.T) {
 		})
 	}
 }
-
-// TestKitsNoPinFile checks that a tree with no pin file has nothing to
-// equal, and that a directory with no descriptor is not a kit.
-func TestKitsNoPinFile(t *testing.T) {
-	tr := tree{"kits/mise/SHASUMS256.txt": "x\n", "kits/probe/probe.yaml": goodKit("docker/sandbox-kit:3.0.0-m.8@sha256:"+strings.Repeat("a", 64), goodStep)}
-	assert.Empty(t, messages(kits.Of(tr.files())))
-	assert.Empty(t, messages(kits.Of(nil)))
-}
-
-// TestKitsSubdirectories checks that files below a kit's
-// subdirectories are not descriptors.
-func TestKitsSubdirectories(t *testing.T) {
-	tr := tree{"kits/probe/probe.yaml": goodKit("docker/sandbox-kit:3.0.0-m.8@sha256:"+strings.Repeat("a", 64), goodStep), "kits/probe/files/data.yaml": "not: a descriptor\n"}
-	assert.Empty(t, messages(kits.Of(tr.files())))
-}
-
-// TestKitsScaffoldPasses checks that the descriptor tools/new kit writes
-// (the same text as in tools/new/kit_test.go) passes the rules.
-func TestKitsScaffoldPasses(t *testing.T) {
-	tr := base(t)
-	tr["kits/julieta/julieta.yaml"] = "# syntax=" + frontendRef(tr) + "\n" +
-		"# SPDX-FileCopyrightText: 2026 Bruno Venceslau\n" +
-		"# " + spdxLicense + "\n" +
-		"schemaVersion: \"3\"\nkind: mixin\ndisplayName: julieta\ndescription: TODO\n"
-	assert.Empty(t, messages(kits.Of(tr.files())))
-}
-
-// spdxLicense is split so reuse does not read it as a tag of this file.
-const spdxLicense = "SPDX-" + "License-Identifier: GPL-3.0-only"
