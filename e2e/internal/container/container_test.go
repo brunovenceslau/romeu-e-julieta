@@ -4,6 +4,7 @@
 package container
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -51,6 +52,7 @@ func TestPullFailure(t *testing.T) {
 		{"a timeout", errors.New(`Error response from daemon: Get "https://registry-1.docker.io/v2/": net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)`), true},
 		{"the pull limit", errors.New(`Error response from daemon: toomanyrequests: You have reached your pull rate limit`), true},
 		{"the limit of the class", &procgroup.TimeoutError{Class: procgroup.ToolStep}, true},
+		{"the deadline of the pull", fmt.Errorf("docker pull: %w", context.DeadlineExceeded), true},
 		{"a digest that differs", errors.New(`failed commit on ref "manifest-` + d + `": commit failed: unexpected commit digest sha256:eca47388aeb57cdb4e288371a26475427d7a1920b4bfd0e7fbe6be4cbb97968f, expected ` + d + `: failed precondition`), false},
 		{"a digest that differs, with a 503 in the text", errors.New(`unexpected commit digest sha256:1, expected sha256:2: 503 Service Unavailable`), false},
 		{"a refusal of the proxy", errors.New(`Error response from daemon: unknown: unexpected status from HEAD request to https://x.invalid/v2/x/manifests/` + d + `: 403 Forbidden`), false},

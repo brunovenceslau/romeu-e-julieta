@@ -188,11 +188,17 @@ func pullFailure(err error) error {
 			return fmt.Errorf("the pulled content is not the one the pin names: %w", err)
 		}
 	}
-	if _, ok := errors.AsType[*procgroup.TimeoutError](err); ok || transport.MatchString(msg) {
+	if _, ok := errors.AsType[*procgroup.TimeoutError](err); ok || errors.Is(err, context.DeadlineExceeded) || transport.MatchString(msg) {
 		return &InfraError{Pull, err}
 	}
 	return fmt.Errorf("the pull of the workload's image failed: %w", err)
 }
+
+// PullTimeout bounds the pull of the workload's image, near 3 GB: below
+// the test timeout of the e2e step (14 minutes, tools/ci/internal/
+// container), so that a pull that hangs ends as the infrastructure
+// error of a timeout and not as the panic of a test that ran too long.
+const PullTimeout = 10 * time.Minute
 
 // PullImage pulls ref, which names its digest, and then checks that the
 // image docker holds carries that digest.
@@ -201,7 +207,9 @@ func (c Config) PullImage(ctx context.Context, ref string) error {
 	if !ok || !strings.HasPrefix(digest, "sha256:") {
 		return fmt.Errorf("the reference %q names no digest", ref)
 	}
-	if _, err := c.docker(ctx, procgroup.ToolStep, "pull", "--quiet", ref); err != nil {
+	pullCtx, cancel := context.WithTimeout(ctx, PullTimeout)
+	defer cancel()
+	if _, err := c.docker(pullCtx, procgroup.ToolStep, "pull", "--quiet", ref); err != nil {
 		return pullFailure(err)
 	}
 	out, err := c.docker(ctx, procgroup.ToolProbe, "image", "inspect", "--format", "{{json .RepoDigests}}", ref)
