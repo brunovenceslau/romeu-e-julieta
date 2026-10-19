@@ -167,7 +167,8 @@ dialog.reader[open] { display: flex; flex-direction: column; }
 dialog.reader::backdrop { background: rgba(10, 12, 20, .5); }
 .rd-bar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid var(--line); }
 .rd-bar .id { font: 600 .85rem var(--mono); }
-.rd-x { margin-left: auto; font: 600 .85rem var(--body); color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+.rd-x, .rd-g { font: 600 .85rem var(--body); color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+.rd-g { margin-left: auto; }
 .rd-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 32px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 12px; }
 .rd-scroll h2 { font-family: var(--display); font-weight: 600; font-size: 1.3rem; line-height: 1.3; margin: 0; text-wrap: balance; overflow-wrap: anywhere; }
 .rd-scroll h2:focus { outline: none; }
@@ -523,7 +524,7 @@ function refList(items) {
   if (!items.length) return '<span class="hint">none</span>';
   return '<div class="refs">' + items.map(({ id, kind }) => {
     const t = byId.get(id);
-    return `<button class="ref" type="button" data-id="${esc(id)}" title="${esc(t ? t.title.replace(/`/g, "") : id)}${kind === "after" ? " (after)" : ""}"><span class="dot" style="background:var(--${t ? t.status : "closed"})"></span>${esc(id)}${kind === "after" ? "~" : ""}</button>`;
+    return `<button class="ref" type="button" data-open="${esc(id)}" title="${esc(t ? t.title.replace(/`/g, "") : id)}${kind === "after" ? " (after)" : ""}"><span class="dot" style="background:var(--${t ? t.status : "closed"})"></span>${esc(id)}${kind === "after" ? "~" : ""}</button>`;
   }).join("") + "</div>";
 }
 
@@ -535,7 +536,6 @@ function emptyPanel() {
     <p class="hint">Open tasks whose needs and after are all merged, the same rule as <code>go run ./tools/ci plan --ready</code>. Click a node for its details; a tilde (~) marks a soft "after" edge.</p>
     ${refList(ready.map(t => ({ id: t.id })))}
     <dl>${ready.map(t => `<dt>${esc(t.id)}</dt><dd>${titleBtn(t)}${t.sitting !== "none" ? ` - sitting ${esc(t.sitting)}` : ""}${t.ask_first.length ? ` - ask-first: ${esc(t.ask_first.join(", "))}` : ""}</dd>`).join("")}</dl>`;
-  bindRefs();
 }
 function select(id) {
   selected = id;
@@ -562,14 +562,6 @@ function select(id) {
     </dl>
     <a href="https://github.com/brunovenceslau/romeu-e-julieta/blob/main/${esc(t.path)}" target="_blank" rel="noopener noreferrer">Open the task file on GitHub</a>`;
   panel.querySelector(".close").onclick = () => select(null);
-  bindRefs();
-}
-function bindRefs() {
-  panel.querySelectorAll(".ref").forEach(b => b.onclick = () => {
-    const t = byId.get(b.dataset.id);
-    if (t && !show.has(t.status)) { show.add(t.status); legend.querySelector(`[data-k="${t.status}"]`).setAttribute("aria-pressed", "true"); render(); }
-    select(b.dataset.id);
-  });
 }
 
 ["q", "layout", "labels", "afters", "crit"].forEach(id => $(id).addEventListener("input", render));
@@ -579,7 +571,7 @@ emptyPanel();
 // ---- The views: critical path, goals, board, graph. Everything that reaches innerHTML goes through esc or code.
 const pill = s => `<span class="pill" style="background:var(--${esc(s)});color:var(--on-${esc(s)})">${esc(label[s] || s)}</span>`;
 const taskLink = id => byId.has(id)
-  ? `<button class="ref" type="button" data-goto="${esc(id)}" title="${esc(byId.get(id).title.replace(/`/g, ""))}"><span class="dot" style="background:var(--${esc(byId.get(id).status)})"></span>${esc(id)}</button>`
+  ? `<button class="ref" type="button" data-open="${esc(id)}" title="${esc(byId.get(id).title.replace(/`/g, ""))}"><span class="dot" style="background:var(--${esc(byId.get(id).status)})"></span>${esc(id)}</button>`
   : `<span class="ref">${esc(id)}</span>`;
 const tagMs = m => `<span class="tag">${esc(m === "none" ? "no milestone" : m)}</span>`;
 const openDeps = t => [...new Set([...t.needs, ...t.after])].filter(d => byId.get(d)?.status !== "merged");
@@ -816,8 +808,6 @@ function trendsAfterDraw() {
     return SNAPS.reduce((b, s) => Math.abs(trX(s.ms) - x) < Math.abs(trX(b.ms) - x) ? s : b, SNAPS[0]).i;
   };
   root.addEventListener("click", e => {
-    const b = e.target.closest("[data-goto]");
-    if (b) return gotoTask(b.dataset.goto);
     const svg = e.target.closest("svg[data-kind]");
     if (svg) selectTrend(nearest(svg, e));
   });
@@ -841,7 +831,7 @@ window.addEventListener("resize", () => {
 
 // ---- The tab bar and the hash route: #path, #goals, #board, #trends, #graph.
 const VIEWS = [["path", "Critical path", pathView], ["goals", "Goals", goalsView], ["board", "Board", boardView], ["trends", "Trends", trendsView], ["graph", "Graph"]];
-let current = null, pendingSel = null, justClosed = false;
+let current = null, pendingSel = null, justClosed = false, graphAfter = null;
 const TASKHASH = /^task-([A-Za-z0-9._~-]+)$/;
 const tabsEl = $("tabs");
 VIEWS.forEach(([k, name]) => {
@@ -887,7 +877,7 @@ function route() {
   }
   const want = VIEWS.some(v => v[0] === raw) ? raw : "path";
   if (m) history.replaceState(null, "", "#" + want);
-  if (justClosed && !m && want === current) { justClosed = false; return; }
+  if (justClosed && !m && want === current) { justClosed = false; return showInGraph(); }
   const wasOpen = reader.open;
   if (wasOpen) reader.close();
   if (wasOpen && want === current) return;
@@ -1071,7 +1061,7 @@ function readerHTML(t) {
     ? `<div class="md">${md(t.body, { has: id => byId.has(id), dir })}</div>` + (t.body_truncated ? '<p class="hint">The body is cut at 64 KiB. Open the file on GitHub for the rest.</p>' : "")
     : '<p class="hint">This task file has no body.</p>';
   const file = String(t.path).split("/").map(encodeURIComponent).join("/");
-  return `<div class="rd-bar"><span class="id">${esc(t.id)}</span>${pill(t.status)}<span class="hint">fate: ${esc(t.fate)}</span><button class="rd-x" type="button">Close</button></div>
+  return `<div class="rd-bar"><span class="id">${esc(t.id)}</span>${pill(t.status)}<span class="hint">fate: ${esc(t.fate)}</span><button class="rd-g" type="button" data-graph="${esc(t.id)}">Show in graph</button><button class="rd-x" type="button">Close</button></div>
     <div class="rd-scroll"><h2 id="rd-title" tabindex="-1">${code(t.title)}</h2>
     <dl>
       <dt>Milestone</dt><dd>${esc(t.milestone)}</dd>
@@ -1093,7 +1083,9 @@ function readTask(id) {
   reader.querySelector("#rd-title").focus();
 }
 reader.addEventListener("click", e => {
-  if (e.target === reader || e.target.closest(".rd-x")) reader.close();
+  const g = e.target.closest(".rd-g");
+  if (g) graphAfter = g.dataset.graph;
+  if (g || e.target === reader || e.target.closest(".rd-x")) reader.close();
 });
 // Closing by Escape, the button or the backdrop drops the #task- hash without a route.
 reader.addEventListener("close", () => {
@@ -1101,13 +1093,18 @@ reader.addEventListener("close", () => {
     // Undo the entries the reader pushed, so Back does not walk through the tasks seen; a reader
     // that began at a #task- link has none and rewrites its own entry.
     const pushed = (history.state && history.state.rd) || 0;
-    if (pushed > 0) { justClosed = true; history.go(-pushed); } else history.replaceState(null, "", "#" + (current || "path"));
+    if (pushed > 0) { justClosed = true; history.go(-pushed); } else { history.replaceState(null, "", "#" + (current || "path")); showInGraph(); }
   }
   if (opener && opener.isConnected) opener.focus();
   opener = null;
 });
 // A closed reader pushes an entry (state rd: 1); a task opened inside it pushes one more, except
 // when the reader began at a #task- link, where it rewrites that entry.
+function showInGraph() {
+  const id = graphAfter;
+  graphAfter = null;
+  if (id) gotoTask(id);
+}
 function goTask(id) {
   const d = history.state && history.state.rd;
   if (reader.open && !d) history.replaceState({ rd: 0 }, "", "#task-" + id);
@@ -1121,7 +1118,7 @@ document.addEventListener("click", e => {
   if (byId.has(id)) { e.preventDefault(); goTask(id); }
 });
 
-// A task id on a page opens that task in the graph.
+// "Show in graph" from the reader selects the task in the graph.
 function gotoTask(id) {
   const t = byId.get(id);
   if (!t) return;
@@ -1132,12 +1129,9 @@ function gotoTask(id) {
   }
   $("q").value = "";
   pendingSel = id;
-  location.hash = "graph";
+  if (current === "graph" && location.hash === "#graph") showView("graph"); // no hashchange to wait for
+  else location.hash = "graph";
 }
-["v-path", "v-goals", "v-board"].forEach(id => $(id).addEventListener("click", e => {
-  const b = e.target.closest("[data-goto]");
-  if (b) gotoTask(b.dataset.goto);
-}));
 $("v-board").addEventListener("change", e => {
   if (e.target.id === "showclosed") { showClosed = e.target.checked; route(); $("showclosed").focus(); }
 });
