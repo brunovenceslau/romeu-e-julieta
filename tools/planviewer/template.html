@@ -147,6 +147,7 @@ const dependents = new Map(TASKS.map(t => [t.id, []]));
 allLinks.forEach(l => dependents.get(l.source).push({ id: l.target, kind: l.kind }));
 
 // Legend and status toggles
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const legend = $("legend");
 STATUS.forEach(([k, label]) => {
   const b = document.createElement("button");
@@ -170,7 +171,7 @@ MS.forEach(m => {
     const n = ts.filter(t => t.status === k).length;
     return n ? `<i style="width:${100 * n / ts.length}%;background:var(--${k})"></i>` : "";
   }).join("");
-  b.innerHTML = `<div class="l"><span>${m === "none" ? "no milestone" : m}</span><span>${done}/${live.length}</span></div><div class="bar">${seg}</div>`;
+  b.innerHTML = `<div class="l"><span>${m === "none" ? "no milestone" : esc(m)}</span><span>${done}/${live.length}</span></div><div class="bar">${seg}</div>`;
   b.title = `${m}: ${done} of ${live.length} active tasks merged; ${ts.length - live.length} deferred`;
   b.onclick = () => {
     msFilter = msFilter === m ? null : m;
@@ -388,7 +389,6 @@ function highlight(id) {
   linkEls.forEach(l => l.el.classList.toggle("on", !!id && (l.source === id || l.target === id)));
 }
 
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const code = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
 const label = { ready: "Ready", waiting: "Waiting", merged: "Merged", deferred: "Deferred", closed: "Closed" };
 function refList(items) {
