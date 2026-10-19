@@ -78,6 +78,15 @@ type Result struct {
 // directory first; the archives and checksums.txt reach Out in one
 // rename, so a failure leaves no partial set.
 func Build(ctx context.Context, o Options) (Result, error) {
+	// The go command resolves the directory it runs in to its real path,
+	// so the overlay key, which must equal that path, is built from the
+	// resolved root: a root or a TMPDIR behind a symlink (macOS keeps
+	// /var/folders under /private/var) would otherwise match no file.
+	root, err := filepath.EvalSymlinks(o.Root)
+	if err != nil {
+		return Result{}, err
+	}
+	o.Root = root
 	version, err := os.ReadFile(filepath.Join(o.Root, "VERSION"))
 	if err != nil {
 		return Result{}, err
@@ -120,6 +129,9 @@ func Build(ctx context.Context, o Options) (Result, error) {
 	}
 	stage, err := os.MkdirTemp("", "romeu-stage-")
 	if err != nil {
+		return Result{}, err
+	}
+	if stage, err = filepath.EvalSymlinks(stage); err != nil {
 		return Result{}, err
 	}
 	defer func() { _ = os.RemoveAll(stage) }()

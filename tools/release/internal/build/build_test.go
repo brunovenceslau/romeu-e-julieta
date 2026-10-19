@@ -191,6 +191,28 @@ func readReplace(t *testing.T, root string) string {
 	return strings.TrimSpace(dir)
 }
 
+// TestBuildBehindSymlinks: a repository reached through a symlink and a
+// TMPDIR that is one (macOS keeps /var/folders under /private/var) build
+// the same, since the overlay key must be the real path the go command
+// sees.
+func TestBuildBehindSymlinks(t *testing.T) {
+	target := t.TempDir()
+	link := filepath.Join(t.TempDir(), "tmp-link")
+	require.NoError(t, os.Symlink(target, link))
+	t.Setenv("TMPDIR", link)
+
+	root := fixtureModule(t)
+	rootLink := filepath.Join(t.TempDir(), "root-link")
+	require.NoError(t, os.Symlink(root, rootLink))
+	res, err := Build(t.Context(), Options{Root: rootLink, Version: "v1.0.0", Out: filepath.Join(t.TempDir(), "out"), DryRun: true, GoBin: goBinOf(t)})
+	require.NoError(t, err)
+	assert.True(t, res.Embedded)
+	data, err := os.ReadFile(res.Archives[0])
+	require.NoError(t, err)
+	_, content := members(t, data)
+	assert.Contains(t, string(content["romeu"]), markerJulieta)
+}
+
 func goBinOf(t *testing.T) string {
 	t.Helper()
 	goBin, err := ResolveGo(t.Context())
