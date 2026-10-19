@@ -13,6 +13,8 @@
 # again: the probes that 11 11.4 lists for that pin.
 frontend:
   ref: docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d
+workload:
+  ref: docker.io/docker/sbx-kit-claude@sha256:c0132e89a89d94ddca3984513afdb36be57bd087fcc75823a4d14064b6a39ea5
 herdr:
   version: 0.9.5
   sha256:
