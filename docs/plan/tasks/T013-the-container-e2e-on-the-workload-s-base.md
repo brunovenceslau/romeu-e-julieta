@@ -14,6 +14,22 @@ owns:
   - tools/ci/internal/workflows/**
   - tools/ci/check_taggedsuites.go
   - tools/ci/internal/taggedsuites/**
+  - tools/ci/internal/check/env.go
+  - tools/ci/internal/check/env_test.go
+  - tools/ci/internal/check/printer.go
+  - tools/ci/internal/check/printer_test.go
+  - tools/ci/internal/check/step.go
+  - tools/ci/internal/lint/lint.go
+  - tools/ci/internal/lint/lint_test.go
+  - tools/ci/internal/lint/config_targets_test.go
+  - tools/ci/internal/citest/citest.go
+  - tools/ci/all.go
+  - tools/ci/all_test.go
+  - tools/ci/main.go
+  - tools/ci/checks_test.go
+  - tools/ci/fast_test.go
+  - kits/pins.yaml
+  - docs/reference/checks.md
 needs:
   - T009
   - T012
@@ -23,6 +39,7 @@ ask_first:
   - checks
   - approvals
   - dependencies
+  - kits
 sitting: none
 ---
 
