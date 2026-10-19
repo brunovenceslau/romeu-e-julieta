@@ -3,7 +3,7 @@ id: T076
 title: "The `kit` kind and `tools/ci kits`"
 milestone: M2
 module: kits
-fate: kept
+fate: merged
 owns:
   - tools/new/kit*.go
   - tools/ci/internal/kits/**
@@ -17,9 +17,14 @@ after: []
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-19
+pr: 182
 ---
 
 # T076 - The `kit` kind and `tools/ci kits`
+
+Merged on 2026-10-19 in pull request #182. The text below is the one
+written at the re-plan.
 
 Goal: The `kit` kind of `tools/new` and `tools/ci kits`: the scaffold,
 the five-line and checksum rules, the pin equality rule, the descriptor

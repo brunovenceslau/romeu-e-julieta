@@ -2,13 +2,14 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-19, after sitting M0 (Done record 40) and the
-re-plan of T112. Done records are merged up to 40.
+Checkpoint of 2026-10-19, after T076, T103 and T135 merged (Done record
+41). Done records are merged up to 40.
 
 ## Next steps
 
-1. T013, T076, T135 and T103, under "the-grants-of-2026-10-19".
-2. T112 in the sandbox kit repository and the config repository.
+1. T013, in review fixes; then T051 and T127, which it unblocks.
+2. T112 in the sandbox kit repository and the config repository, from
+   the two prompts of 2026-10-19.
 
 ## Open for the operator
 

@@ -3,7 +3,7 @@ id: T135
 title: "`internal/manifest`: the type, the strict decoder and the canonical encoder"
 milestone: M1
 module: julieta-core
-fate: new
+fate: merged
 owns:
   - internal/manifest/**
   - schemas/manifest.v1.json
@@ -17,9 +17,14 @@ after: []
 ask_first:
   - contracts
 sitting: none
+merged: 2026-10-19
+pr: 184
 ---
 
 # T135 - `internal/manifest`: the type, the strict decoder and the canonical encoder
+
+Merged on 2026-10-19 in pull request #184. The text below is the one
+written at the re-plan.
 
 Goal: The romeu-julieta contract type of 03 3.6 as its own task, so
 every M1 package that reads the manifest (`memory`, `hooks`, `handoff`,

@@ -7,3 +7,6 @@ PROLOGUE.md
 
 # The page "go run ./tools/planviewer" writes.
 /plan-viewer.html
+
+# The worktrees of subagent sessions (Claude Code writes them here).
+/.claude/worktrees/
