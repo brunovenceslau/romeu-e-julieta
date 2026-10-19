@@ -26,6 +26,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/goenv"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/container"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/crossbuild"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/imports"
@@ -206,13 +207,17 @@ func TestAllSteps(t *testing.T) {
 	fast := fastSteps(t.Context(), root, tools)
 	unit := len(fast) - 1
 	require.Equal(t, "unit", fast[unit].Name)
-	require.Len(t, steps, len(fast)+9)
+	require.Len(t, steps, len(fast)+10, "no e2e directory, so no tagged suite to vet")
 	assert.Equal(t, fast[:unit], steps[:unit])
 	assert.Equal(t, fast[unit], steps[unit+8])
 	assert.Equal(t, crossbuild.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[unit+3:unit+7])
 	assert.Equal(t, imports.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[unit+7:unit+8])
 
-	vulnStep, licenseStep, modulesStep, race := steps[unit], steps[unit+1], steps[unit+2], steps[unit+9]
+	vulnStep, licenseStep, modulesStep, race, e2e := steps[unit], steps[unit+1], steps[unit+2], steps[unit+9], steps[unit+10]
+	wantE2E := container.Steps(t.Context(), check.Plan{Root: root, Tools: tools})[0]
+	assert.Equal(t, wantE2E.Read == nil, e2e.Read == nil)
+	wantE2E.Read, e2e.Read = nil, nil
+	assert.Equal(t, wantE2E, e2e, "the e2e step comes last, after race")
 	assert.Equal(t, check.Step{Name: "vulnerabilities", Argv: []string{evalOrSelf(vuln), "./..."}, Environ: check.WithProcessEnv(env, check.NetworkPassThrough),
 		NoticeOn: "govulncheck: fetching vulnerabilities:", Notice: "vulnerabilities: could not fetch the vulnerability database, so this all is not the equivalent run (10 10.2)"}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")
 	assert.Equal(t, 40*time.Minute, procgroup.ToolRace.Timeout())
@@ -232,12 +237,13 @@ func TestAllSteps(t *testing.T) {
 		}
 		return out
 	}
+	e2eRuns := e2e.Skip == "" && e2e.Unavailable == nil
 	for _, s := range steps {
 		for _, key := range check.NetworkPassThrough {
-			assert.Equal(t, s.Name == "vulnerabilities", slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
+			assert.Equal(t, s.Name == "vulnerabilities" || (s.Name == "e2e" && e2eRuns), slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
 		}
 		for _, key := range check.DockerPassThrough {
-			assert.Equal(t, s.Name == "license" && runtime.GOOS == "linux", slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
+			assert.Equal(t, (s.Name == "license" && runtime.GOOS == "linux") || (s.Name == "e2e" && e2eRuns), slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
 		}
 	}
 	for _, key := range slices.Concat(check.NetworkPassThrough, check.DockerPassThrough, check.GoModulePassThrough) {
@@ -517,6 +523,9 @@ func TestAllWiring(t *testing.T) {
 		want = append(want, "docker run")
 	}
 	want = append(want, "go run", "go build", "go build", "go build", "go build", "go run", "go test", "go test")
+	if slices.Contains(container.Classes[runtime.GOOS+"/"+runtime.GOARCH], "e2e") {
+		want = append(want, "go test")
+	}
 	assert.Equal(t, want, firstWords, "the order of the steps")
 	require.NotEmpty(t, profile, "the race step names its profile")
 	assert.Equal(t, coverFile, filepath.Base(profile))
