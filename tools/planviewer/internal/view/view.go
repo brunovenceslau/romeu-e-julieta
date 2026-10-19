@@ -185,13 +185,21 @@ func ready(tasks []Task) []string {
 
 // meta is what the page shows about the checkout it was made from.
 type meta struct {
-	Date string `json:"date"`
+	Date       string      `json:"date"`
+	Critical   []string    `json:"critical"`
+	Milestones []Milestone `json:"milestones"`
 }
 
 // render returns page, the template, with the tasks and the meta data in place.
 // encoding/json escapes <, > and & in strings, so the data cannot close
 // the script element it sits in.
 func render(page string, tasks []Task, m meta) (string, error) {
+	if m.Critical == nil {
+		m.Critical = []string{}
+	}
+	if m.Milestones == nil {
+		m.Milestones = []Milestone{}
+	}
 	data, err := json.Marshal(tasks)
 	if err != nil {
 		return "", err
@@ -208,12 +216,13 @@ func render(page string, tasks []Task, m meta) (string, error) {
 type Options struct {
 	Dir      string // the directory of the task files
 	Template string // the page template
+	Plan     string // docs/plan.md, for the milestone table
 	Out      string // the file to write
 }
 
 // Defaults returns the paths of a run from the root of the repository.
 func Defaults() Options {
-	return Options{Dir: TasksDir, Template: TemplateFile, Out: "plan-viewer.html"}
+	return Options{Dir: TasksDir, Template: TemplateFile, Plan: PlanFile, Out: "plan-viewer.html"}
 }
 
 // Ready returns the ids of the ready tasks under o.Dir, in id order,
@@ -226,6 +235,16 @@ func Ready(o Options) ([]string, error) {
 	return ready(tasks), nil
 }
 
+// CriticalPath returns the ids of the critical path under o.Dir, by the
+// rule of "go run ./tools/ci plan --critical-path".
+func CriticalPath(o Options) ([]string, error) {
+	tasks, err := read(o.Dir)
+	if err != nil {
+		return nil, err
+	}
+	return criticalPath(tasks), nil
+}
+
 // Write renders the page into o.Out and returns its absolute path.
 func Write(o Options, now time.Time) (string, error) {
 	tasks, err := read(o.Dir)
@@ -236,7 +255,15 @@ func Write(o Options, now time.Time) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%w; run from the root of the repository", err)
 	}
-	html, err := render(string(page), tasks, meta{Date: now.Format("2006-01-02")})
+	plan, err := os.ReadFile(o.Plan)
+	if err != nil {
+		return "", fmt.Errorf("%w; run from the root of the repository", err)
+	}
+	ms, err := parseMilestones(string(plan))
+	if err != nil {
+		return "", err
+	}
+	html, err := render(string(page), tasks, meta{Date: now.Format("2006-01-02"), Critical: criticalPath(tasks), Milestones: ms})
 	if err != nil {
 		return "", err
 	}

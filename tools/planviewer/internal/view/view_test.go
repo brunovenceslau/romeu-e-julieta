@@ -162,7 +162,7 @@ func TestRenderPlaceholderInData(t *testing.T) {
 	title := "x /*META*/{} y /*DATA*/[] z"
 	out, err := render(page(t), []Task{{ID: "T001", Title: title}}, meta{Date: "2026-01-01"})
 	require.NoError(t, err)
-	assert.Contains(t, out, `const META = {"date":"2026-01-01"};`)
+	assert.Contains(t, out, `const META = {"date":"2026-01-01","critical":[],"milestones":[]};`)
 	assert.Contains(t, out, `"title":"`+title+`"`)
 	assert.Equal(t, 1, strings.Count(out, `"date":"2026-01-01"`))
 }
@@ -196,7 +196,7 @@ func TestRefusesSymlinks(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "T001-a.md"), []byte("---\nid: T001\nfate: kept\n---\n"), 0o644))
 	out := filepath.Join(dir, "out.html")
 	require.NoError(t, os.Symlink(target, out))
-	o := Options{Dir: dir, Template: "../../template.html", Out: out}
+	o := Options{Dir: dir, Template: "../../template.html", Plan: planFile(t), Out: out}
 	_, err := Write(o, time.Now())
 	require.ErrorContains(t, err, "symbolic link")
 	b, _ := os.ReadFile(target)
@@ -217,7 +217,7 @@ func TestPageIsSelfContained(t *testing.T) {
 func TestWriteAndReady(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "T001-a.md"), []byte(sample), 0o644))
-	o := Options{Dir: dir, Template: "../../template.html", Out: filepath.Join(dir, "out.html")}
+	o := Options{Dir: dir, Template: "../../template.html", Plan: planFile(t), Out: filepath.Join(dir, "out.html")}
 
 	got, err := Write(o, time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
@@ -226,6 +226,8 @@ func TestWriteAndReady(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(html), `"id":"T007"`)
 	assert.Contains(t, string(html), `"date":"2026-01-02"`)
+	assert.Contains(t, string(html), `"critical":["T007"]`)
+	assert.Contains(t, string(html), `"id":"M1"`)
 
 	ids, err := Ready(o)
 	require.NoError(t, err)
@@ -236,4 +238,24 @@ func TestWriteAndReady(t *testing.T) {
 	require.Error(t, err)
 	_, err = Write(o, time.Now())
 	require.Error(t, err)
+}
+
+// A placeholder inside a plan.md milestone cell is data too.
+func TestRenderPlaceholderInMilestone(t *testing.T) {
+	ms := []Milestone{{ID: "M0", Name: "x /*META*/{} y", EndsWhen: "/*DATA*/[] z", Delivers: "</script>"}}
+	out, err := render(page(t), []Task{{ID: "T001", Title: "t"}}, meta{Date: "2026-01-01", Milestones: ms})
+	require.NoError(t, err)
+	assert.Contains(t, out, `"name":"x /*META*/{} y","ends_when":"/*DATA*/[] z"`)
+	assert.Contains(t, out, `\u003c/script\u003e`)
+	assert.Equal(t, 1, strings.Count(out, `"id":"T001"`))
+	assert.Equal(t, 1, strings.Count(out, `"date":"2026-01-01"`))
+}
+
+// The Goals view keeps a task whose milestone is not in the table, in a
+// last card, and escapes what it shows.
+func TestGoalsKeepsUnknownMilestones(t *testing.T) {
+	p := page(t)
+	assert.Contains(t, p, "Not in docs/plan.md")
+	assert.Contains(t, p, "m.orphan ? lost")
+	assert.Contains(t, p, "code(m.name)")
 }

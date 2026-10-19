@@ -7,11 +7,13 @@
 //
 //	go run ./tools/planviewer
 //	go run ./tools/planviewer -ready
+//	go run ./tools/planviewer -critical-path
 //
 // It writes plan-viewer.html there (a path .gitignore holds), or the
 // file of -o, and prints the path. With -ready it prints the ready task
 // ids, one per line, in the form of "go run ./tools/ci plan --ready",
-// and writes no file. The reading and the page are in
+// and writes no file; -critical-path does the same for "plan
+// --critical-path". The reading and the page are in
 // tools/planviewer/internal/view; this package parses the command line,
 // hands the output streams over and sets the exit status: 0 when it
 // succeeds, 1 when it fails, and 2 for a wrong command line.
@@ -44,7 +46,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&o.Out, "o", o.Out, "the `file` to write")
 	fs.StringVar(&o.Template, "template", o.Template, "the page `template`")
 	fs.StringVar(&o.Dir, "dir", o.Dir, "the `directory` of the task files")
+	fs.StringVar(&o.Plan, "plan", o.Plan, "the `file` with the milestone table")
 	list := fs.Bool("ready", false, "print the ready task ids, one per line, and write no file")
+	crit := fs.Bool("critical-path", false, "print the critical path ids, one per line, and write no file")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return exitOK
@@ -54,8 +58,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if fs.NArg() != 0 {
 		return fail(stderr, exitUsage, errors.New("planviewer takes no argument"))
 	}
-	if *list {
-		ids, err := view.Ready(o)
+	if *list && *crit {
+		return fail(stderr, exitUsage, errors.New("-ready and -critical-path exclude each other"))
+	}
+	if *list || *crit {
+		pick := view.Ready
+		if *crit {
+			pick = view.CriticalPath
+		}
+		ids, err := pick(o)
 		if err != nil {
 			return fail(stderr, exitError, err)
 		}

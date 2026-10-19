@@ -32,6 +32,8 @@ func TestRun(t *testing.T) {
 	dir := plan(t)
 	out := filepath.Join(dir, "out.html")
 	tmpl := filepath.Join("template.html")
+	plan := filepath.Join(dir, "plan.md")
+	require.NoError(t, os.WriteFile(plan, []byte("| M | Name | Ends when (x) | Delivers |\n|---|---|---|---|\n| M0 | Shape | done | shape |\n"), 0o644))
 
 	cases := []struct {
 		name       string
@@ -40,8 +42,11 @@ func TestRun(t *testing.T) {
 		stdout     string
 		stderrPart string
 	}{
-		{"writes the page", []string{"-dir", dir, "-template", tmpl, "-o", out}, exitOK, out + "\n", ""},
+		{"writes the page", []string{"-dir", dir, "-template", tmpl, "-plan", plan, "-o", out}, exitOK, out + "\n", ""},
 		{"ready ids", []string{"-dir", dir, "-ready"}, exitOK, "T002\n", ""},
+		{"critical path ids", []string{"-dir", dir, "-critical-path"}, exitOK, "T002\n", ""},
+		{"both lists", []string{"-ready", "-critical-path"}, exitUsage, "", "exclude each other"},
+		{"missing plan", []string{"-dir", dir, "-template", tmpl, "-plan", filepath.Join(dir, "none"), "-o", out}, exitError, "", "no such file"},
 		{"help", []string{"-h"}, exitOK, "", "Usage of planviewer"},
 		{"unknown flag", []string{"-nope"}, exitUsage, "", "flag provided but not defined"},
 		{"extra argument", []string{"extra"}, exitUsage, "", "takes no argument"},

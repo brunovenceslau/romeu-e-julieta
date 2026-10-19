@@ -13,14 +13,14 @@ SPDX-License-Identifier: GPL-3.0-only
 :root {
   --bg: #f3f4f7; --panel: #ffffff; --fg: #1d2230; --muted: #646b7d; --line: #d9dce5; --edge: #9aa1b3;
   --merged: #2f8f6b; --ready: #d9822b; --waiting: #4a6fd1; --deferred: #a3a8b8; --closed: #c9ccd6;
-  --accent: #7a4fd6; --hi: #1d2230;
+  --accent: #7a4fd6; --on-accent: #ffffff; --hi: #1d2230;
   --on-merged: #12141b; --on-ready: #12141b; --on-waiting: #ffffff; --on-deferred: #12141b; --on-closed: #12141b;
   --display: ui-serif, Georgia, "Times New Roman", serif; --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) { :root {
   --bg: #12141b; --panel: #1a1d27; --fg: #e6e8ef; --muted: #9298aa; --line: #2b2f3d; --edge: #4b5166;
   --merged: #45b88c; --ready: #f0a04b; --waiting: #7d9bf0; --deferred: #5d6275; --closed: #3a3e4d;
-  --accent: #a98bf0; --hi: #ffffff; color-scheme: dark;
+  --accent: #a98bf0; --on-accent: #12141b; --hi: #ffffff; color-scheme: dark;
   --on-merged: #12141b; --on-ready: #12141b; --on-waiting: #12141b; --on-deferred: #ffffff; --on-closed: #ffffff } }
 html, body { height: 100%; }
 body { background: var(--bg); color: var(--fg); font-family: var(--body); display: flex; flex-direction: column; overflow: hidden; }
@@ -79,12 +79,67 @@ dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 aside a { color: var(--accent); font-size: .82rem; }
 .hint { color: var(--muted); font-size: .85rem; line-height: 1.55; }
 .close { margin-left: auto; border: 0; background: transparent; color: var(--muted); font-size: 1.2rem; cursor: pointer; display: none; }
+
+[hidden] { display: none !important; }
+/* Views: a tab bar in the header, one page per view. */
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.tab { font: 600 .85rem var(--body); border: 1px solid transparent; background: transparent; color: var(--muted); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+.tab[aria-selected="true"] { color: var(--fg); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.tab:focus-visible, .ref:focus-visible, .toggle input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.page { flex: 1; min-height: 0; overflow: auto; padding: 18px max(16px, env(safe-area-inset-right, 0px)) 32px max(16px, env(safe-area-inset-left, 0px)); }
+.page > * { max-width: 920px; margin-inline: auto; }
+.page h2 { font-family: var(--display); font-weight: 600; font-size: 1.25rem; margin: 0 0 6px; }
+.page h3 { font-family: var(--display); font-weight: 600; font-size: 1rem; margin: 0; }
+.page p { margin: 0 0 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 12px auto; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; display: flex; flex-direction: column; }
+.stat b { font: 650 1.5rem var(--display); font-variant-numeric: tabular-nums; }
+.stat span { font-size: .75rem; color: var(--muted); }
+.tag { font: 500 .72rem var(--mono); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--muted); }
+.badge { font: 650 .68rem var(--body); text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; background: var(--accent); color: var(--on-accent); }
+.front { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; }
+.row1 { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.ttl { font-size: .92rem; line-height: 1.4; overflow-wrap: anywhere; }
+.why { display: grid; grid-template-columns: max-content 1fr; gap: 4px 10px; font-size: .8rem; margin: 0; }
+.why dt { color: var(--muted); }
+.chain { list-style: none; margin: 0 auto; padding: 0; }
+.step { display: grid; grid-template-columns: 34px 1fr; gap: 0 10px; position: relative; padding-bottom: 12px; }
+.step::before { content: ""; position: absolute; left: 16px; top: 28px; bottom: 0; width: 2px; background: var(--line); }
+.step:last-child::before { display: none; }
+.step .n { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 600 .75rem var(--mono); font-variant-numeric: tabular-nums; border: 2px solid var(--line); background: var(--panel); }
+.step.ready .n { border-color: var(--ready); } .step.waiting .n { border-color: var(--waiting); } .step.deferred .n { border-color: var(--deferred); }
+.step.front .n { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.step .card { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 12px; max-width: 1200px !important; }
+.goals .card { display: flex; flex-direction: column; gap: 8px; }
+.goals .card.here { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.goals .cap { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0; }
+.goals .txt { font-size: .86rem; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
+.prog { font: 500 .78rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+#v-board { display: flex; flex-direction: column; overflow: hidden; }
+.cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); grid-template-rows: minmax(0, 1fr); gap: 10px; max-width: none !important; width: 100%; flex: 1; min-height: 0; overflow-x: auto; }
+.col { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.col > h3 { padding: 10px 12px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.col > h3 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.col > h3 .n { font: 500 .78rem var(--mono); color: var(--muted); }
+.cards { overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.cards .card { padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
+.cards .card.crit { border-left: 4px solid var(--accent); }
+.toggle { display: inline-flex; gap: 6px; align-items: center; font-size: .8rem; color: var(--muted); margin-bottom: 10px; }
+.more summary { cursor: pointer; font-size: .88rem; padding: 4px 0; }
+.more summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+body:not([data-view="graph"]) .gonly { display: none; }
+.crit-on .node:not(.crit) { opacity: .5; }
+.crit-on .node.crit circle { stroke: var(--accent); stroke-width: 3.5; stroke-opacity: 1; }
+.crit-on .link.crit { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2.6; }
 @media (max-width: 720px) {
   main { flex-direction: column; }
   aside { width: 100%; max-height: 45%; border-left: 0; border-top: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left, 0px)); }
   aside.empty { display: none; }
   .close { display: inline; }
   .legend { margin-left: 0; }
+  .step { grid-template-columns: 28px 1fr; } .step::before { left: 13px; } .step .n { width: 26px; height: 26px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 html, body { margin: 0; }
@@ -95,10 +150,11 @@ html, body { margin: 0; }
   <div class="top">
     <h1>Romeu e Julieta - plan</h1>
     <span class="asof" id="asof"></span>
-    <div class="legend" id="legend" role="group" aria-label="Show tasks by status"></div>
+    <div class="legend gonly" id="legend" role="group" aria-label="Show tasks by status"></div>
   </div>
-  <div class="ms" id="ms" role="group" aria-label="Milestones"></div>
-  <div class="tools">
+  <div class="tabs" id="tabs" role="tablist" aria-label="Views"></div>
+  <div class="ms gonly" id="ms" role="group" aria-label="Milestones"></div>
+  <div class="tools gonly">
     <input id="q" type="search" placeholder="Search id, title, module" aria-label="Search tasks">
     <select id="layout" aria-label="Layout">
       <option value="milestone">Columns by milestone</option>
@@ -106,9 +162,13 @@ html, body { margin: 0; }
     </select>
     <label><input type="checkbox" id="labels" checked> Ids</label>
     <label><input type="checkbox" id="afters" checked> Soft edges (after)</label>
+    <label><input type="checkbox" id="crit" checked> Critical path</label>
   </div>
 </header>
-<main>
+<section class="page" id="v-path" role="tabpanel" aria-labelledby="t-path" hidden></section>
+<section class="page" id="v-goals" role="tabpanel" aria-labelledby="t-goals" hidden></section>
+<section class="page" id="v-board" role="tabpanel" aria-labelledby="t-board" hidden></section>
+<main id="v-graph" role="tabpanel" aria-labelledby="t-graph" hidden>
   <div id="graph"><svg id="svg" role="group" aria-label="Task dependency graph"></svg></div>
   <aside id="panel" class="empty"></aside>
 </main>
@@ -145,6 +205,12 @@ TASKS.forEach(t => {
 });
 const dependents = new Map(TASKS.map(t => [t.id, []]));
 allLinks.forEach(l => dependents.get(l.source).push({ id: l.target, kind: l.kind }));
+
+// The critical path, computed in Go by the rule of tools/ci plan --critical-path.
+const CRIT = (META.critical || []).filter(id => byId.has(id));
+const critSet = new Set(CRIT);
+const critNext = new Map(CRIT.slice(0, -1).map((id, i) => [id, CRIT[i + 1]]));
+const isCritLink = l => critNext.get(l.source) === l.target;
 
 // Legend and status toggles
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -297,12 +363,13 @@ function render() {
     });
   }
 
+  svg.classList.toggle("crit-on", $("crit").checked);
   vl.forEach(l => {
-    l.el = svgEl("line", { class: "link " + l.kind, "stroke-width": l.kind === "needs" ? 1.2 : 1 });
+    l.el = svgEl("line", { class: "link " + l.kind + (isCritLink(l) ? " crit" : ""), "stroke-width": l.kind === "needs" ? 1.2 : 1 });
     gLinks.appendChild(l.el);
   });
   vn.forEach(n => {
-    const g = svgEl("g", { class: "node " + n.status + (n.id === selected ? " sel" : ""), tabindex: 0, role: "button", "aria-label": n.id });
+    const g = svgEl("g", { class: "node " + n.status + (critSet.has(n.id) ? " crit" : "") + (n.id === selected ? " sel" : ""), tabindex: 0, role: "button", "aria-label": n.id });
     g.appendChild(svgEl("circle", { r: radius(n) }));
     const t = svgEl("text", { dy: "-0.9em", "text-anchor": "middle" });
     t.textContent = n.id;
@@ -444,10 +511,163 @@ function bindRefs() {
   });
 }
 
-["q", "layout", "labels", "afters"].forEach(id => $(id).addEventListener("input", render));
-window.addEventListener("resize", render);
-render();
+["q", "layout", "labels", "afters", "crit"].forEach(id => $(id).addEventListener("input", render));
+window.addEventListener("resize", () => { if (current === "graph") render(); });
 emptyPanel();
+
+// ---- The views: critical path, goals, board, graph. Everything that reaches innerHTML goes through esc or code.
+const pill = s => `<span class="pill" style="background:var(--${esc(s)});color:var(--on-${esc(s)})">${esc(label[s] || s)}</span>`;
+const taskLink = id => byId.has(id)
+  ? `<button class="ref" type="button" data-goto="${esc(id)}" title="${esc(byId.get(id).title.replace(/`/g, ""))}"><span class="dot" style="background:var(--${esc(byId.get(id).status)})"></span>${esc(id)}</button>`
+  : `<span class="ref">${esc(id)}</span>`;
+const tagMs = m => `<span class="tag">${esc(m === "none" ? "no milestone" : m)}</span>`;
+const openDeps = t => [...new Set([...t.needs, ...t.after])].filter(d => byId.get(d)?.status !== "merged");
+// What a task waits on: tasks, an operator sitting, an ask-first surface, a trigger.
+function why(t) {
+  const rows = [];
+  const deps = openDeps(t);
+  if (deps.length) rows.push(["Tasks", `<span class="refs">${deps.map(taskLink).join("")}</span>`]);
+  if (t.sitting && t.sitting !== "none") rows.push(["Sitting", `operator sitting ${esc(t.sitting)}`]);
+  if (t.ask_first.length) rows.push(["Ask-first", esc(t.ask_first.join(", "))]);
+  if (t.status === "deferred") rows.push(["Trigger", "deferred: waits for its trigger"]);
+  return rows.length ? `<dl class="why">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>` : "";
+}
+const byCrit = (a, b) => (critSet.has(b.id) - critSet.has(a.id)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+function pathView() {
+  const chain = CRIT.map(id => byId.get(id));
+  const count = k => chain.filter(t => t.status === k).length;
+  const openN = TASKS.filter(t => ["ready", "waiting", "deferred"].includes(t.status)).length;
+  const front = chain.find(t => t.status === "ready" || t.status === "waiting");
+  if (!chain.length) return `<h2>Critical path</h2><p class="hint">No open task is left, so there is no path.</p>`;
+  const sit = chain.filter(t => t.sitting && t.sitting !== "none").length;
+  const ask = chain.filter(t => t.ask_first.length).length;
+  const off = TASKS.filter(t => t.status === "ready" && !critSet.has(t.id)).sort(byCrit);
+  const frontBox = front ? `<div class="card front"><div class="row1"><span class="badge">Current front</span>${taskLink(front.id)}${pill(front.status)}${tagMs(front.milestone)}</div>
+      <div class="ttl">${code(front.title)}</div>
+      ${front.status === "ready" ? '<div class="hint">Ready to start: every need and after is merged.</div>' : '<div class="hint">Waiting on:</div>'}${why(front)}</div>` : "";
+  return `<h2>Critical path</h2>
+    <p class="hint">The longest chain of open tasks over needs and after, by the rule of <code>go run ./tools/ci plan --critical-path</code>. Finish it in order and the plan ends at ${taskLink(chain[chain.length - 1].id)}. Anything else can run beside it.</p>
+    <div class="stats">
+      <div class="stat"><b>${chain.length}</b><span>left on the path (of ${openN} open)</span></div>
+      <div class="stat"><b>${count("ready")}</b><span>ready</span></div>
+      <div class="stat"><b>${count("waiting")}</b><span>waiting</span></div>
+      <div class="stat"><b>${count("deferred")}</b><span>deferred (trigger)</span></div>
+      <div class="stat"><b>${sit}</b><span>need an operator sitting</span></div>
+      <div class="stat"><b>${ask}</b><span>touch an ask-first surface</span></div>
+    </div>
+    ${frontBox}
+    <ol class="chain" aria-label="The critical path, in order">${chain.map((t, i) => `<li class="step ${esc(t.status)}${t === front ? " front" : ""}"><span class="n" aria-hidden="true">${i + 1}</span>
+      <div class="card"><div class="row1">${taskLink(t.id)}${pill(t.status)}${tagMs(t.milestone)}${t === front ? '<span class="badge">Front</span>' : ""}</div>
+      <div class="ttl">${code(t.title)}</div>${why(t)}</div></li>`).join("")}</ol>
+    <details class="more card" style="margin-top:12px"><summary>Ready but off the path (${off.length})</summary>
+      <p class="hint">Work that can start now and does not shorten the path. Many of these in a row is drift.</p>
+      <div class="refs">${off.map(t => taskLink(t.id)).join("") || '<span class="hint">none</span>'}</div></details>`;
+}
+
+function goalsView() {
+  const ms = META.milestones || [];
+  const front = CRIT.map(id => byId.get(id)).find(t => t.status === "ready" || t.status === "waiting");
+  const known = new Set(ms.map(m => m.id));
+  const lost = TASKS.filter(t => !known.has(t.milestone) && t.status !== "closed");
+  const orphans = lost.length ? [{ id: "", name: "Not in docs/plan.md", ends_when: "These tasks name a milestone the table does not have: " + [...new Set(lost.map(t => t.milestone))].join(", "), delivers: "-", orphan: true }] : [];
+  if (!ms.length) return `<h2>Goals</h2><p class="hint">The page has no milestone table.</p>`;
+  return `<h2>Goals</h2>
+    <p class="hint">Where the plan is heading, from the milestone table of <code>docs/plan.md</code>. Progress counts the tasks of each milestone; the path count is how many of them sit on the critical path.</p>
+    <div class="goals">${[...ms, ...orphans].map(m => {
+      const ts = m.orphan ? lost : TASKS.filter(t => t.milestone === m.id && t.status !== "closed");
+      const live = ts.filter(t => t.status !== "deferred");
+      const done = live.filter(t => t.status === "merged").length;
+      const def = ts.length - live.length;
+      const onPath = CRIT.filter(id => m.orphan ? !known.has(byId.get(id).milestone) : byId.get(id).milestone === m.id);
+      const seg = ["merged", "ready", "waiting", "deferred"].map(k => {
+        const n = ts.filter(t => t.status === k).length;
+        return n ? `<i style="width:${100 * n / ts.length}%;background:var(--${k})"></i>` : "";
+      }).join("");
+      const here = front && front.milestone === m.id;
+      return `<div class="card${here ? " here" : ""}"><div class="row1"><h3>${m.orphan ? "" : esc(m.id) + " - "}${code(m.name)}</h3>${here ? '<span class="badge">Front is here</span>' : ""}</div>
+        <div class="bar" role="img" aria-label="${esc(m.id || m.name)}: ${done} of ${live.length} active tasks merged">${seg}</div>
+        <div class="prog">${done}/${live.length} merged${def ? `, ${def} deferred` : ""} - ${onPath.length} on the critical path</div>
+        <p class="cap">Ends when</p><p class="txt">${code(m.ends_when)}</p>
+        <p class="cap">Delivers</p><p class="txt">${code(m.delivers)}</p>
+        ${onPath.length ? `<p class="cap">On the critical path</p><div class="refs">${onPath.map(taskLink).join("")}</div>` : ""}</div>`;
+    }).join("")}</div>`;
+}
+
+let showClosed = false;
+function boardView() {
+  const cols = [["ready", "Ready"], ["waiting", "Waiting"], ["merged", "Merged"], ["deferred", "Deferred"]];
+  if (showClosed) cols.push(["closed", "Folded / removed / v1"]);
+  const card = t => `<div class="card${critSet.has(t.id) ? " crit" : ""}"><div class="row1">${taskLink(t.id)}${tagMs(t.milestone)}${critSet.has(t.id) ? '<span class="badge">Critical path</span>' : ""}</div>
+    <div class="ttl">${code(t.title)}</div>${t.status === "merged" || t.status === "closed" ? (t.merged ? `<div class="hint">merged ${esc(t.merged)}</div>` : "") : why(t)}</div>`;
+  const order = k => k === "merged" ? (a, b) => (a.merged < b.merged ? 1 : a.merged > b.merged ? -1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : byCrit;
+  return `<label class="toggle"><input type="checkbox" id="showclosed"${showClosed ? " checked" : ""}> Show folded, removed and left-to-v1 tasks</label>
+    <div class="cols">${cols.map(([k, name]) => {
+      const ts = TASKS.filter(t => t.status === k).sort(order(k));
+      return `<section class="col" aria-label="${esc(name)}"><h3><span><span class="dot" style="background:var(--${k})"></span>${esc(name)}</span><span class="n">${ts.length}</span></h3><div class="cards">${ts.map(card).join("") || '<span class="hint">none</span>'}</div></section>`;
+    }).join("")}</div>`;
+}
+
+// ---- The tab bar and the hash route: #path, #goals, #board, #graph.
+const VIEWS = [["path", "Critical path", pathView], ["goals", "Goals", goalsView], ["board", "Board", boardView], ["graph", "Graph"]];
+let current = null, pendingSel = null;
+const tabsEl = $("tabs");
+VIEWS.forEach(([k, name]) => {
+  const b = document.createElement("button");
+  b.className = "tab"; b.type = "button"; b.id = "t-" + k; b.setAttribute("role", "tab"); b.setAttribute("aria-controls", "v-" + k);
+  b.textContent = name;
+  b.onclick = () => { location.hash = k; };
+  b.addEventListener("keydown", e => {
+    const i = VIEWS.findIndex(v => v[0] === k), step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    if (e.key === "Home" || e.key === "End" || step) {
+      e.preventDefault();
+      const j = e.key === "Home" ? 0 : e.key === "End" ? VIEWS.length - 1 : (i + step + VIEWS.length) % VIEWS.length;
+      location.hash = VIEWS[j][0];
+      $("t-" + VIEWS[j][0]).focus();
+    }
+  });
+  tabsEl.appendChild(b);
+});
+
+function route() {
+  const want = location.hash.replace(/^#/, "");
+  current = VIEWS.some(v => v[0] === want) ? want : "path";
+  document.body.dataset.view = current;
+  VIEWS.forEach(([k, , draw]) => {
+    const on = k === current;
+    $("t-" + k).setAttribute("aria-selected", on);
+    $("t-" + k).tabIndex = on ? 0 : -1;
+    $("v-" + k).hidden = !on;
+    if (on && draw) $("v-" + k).innerHTML = draw();
+  });
+  if (current === "graph") {
+    render();
+    if (pendingSel) { select(pendingSel); pendingSel = null; }
+  }
+}
+window.addEventListener("hashchange", route);
+
+// A task id on a page opens that task in the graph.
+function gotoTask(id) {
+  const t = byId.get(id);
+  if (!t) return;
+  if (!show.has(t.status)) { show.add(t.status); legend.querySelector(`[data-k="${t.status}"]`).setAttribute("aria-pressed", "true"); }
+  if (msFilter && msFilter !== t.milestone) {
+    msFilter = null;
+    msEl.querySelectorAll(".msb").forEach(x => x.setAttribute("aria-pressed", "false"));
+  }
+  $("q").value = "";
+  pendingSel = id;
+  location.hash = "graph";
+}
+["v-path", "v-goals", "v-board"].forEach(id => $(id).addEventListener("click", e => {
+  const b = e.target.closest("[data-goto]");
+  if (b) gotoTask(b.dataset.goto);
+}));
+$("v-board").addEventListener("change", e => {
+  if (e.target.id === "showclosed") { showClosed = e.target.checked; route(); $("showclosed").focus(); }
+});
+route();
 </script>
 </body>
 </html>
