@@ -3,7 +3,7 @@ id: T103
 title: "`tools/release build --dry-run`"
 milestone: M3
 module: ci-release
-fate: kept
+fate: merged
 owns:
   - tools/release/**
 needs:
@@ -13,9 +13,14 @@ after: []
 ask_first:
   - release
 sitting: none
+merged: 2026-10-19
+pr: 183
 ---
 
 # T103 - `tools/release build --dry-run`
+
+Merged on 2026-10-19 in pull request #183. The text below is the one
+written at the re-plan.
 
 Goal: `tools/release build --dry-run`: the embedding, so a source build
 refuses `run`, `sync` and promotion.

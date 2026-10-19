@@ -20,3 +20,20 @@ Decided on 2026-10-19, after sitting M0:
 - ADR 0036 and ADR 0037 are Accepted.
 - The behaviour of `romeu init` on a non-empty root is decided in T041's
   re-plan, before T041 starts.
+
+## Standing grants for the next tasks
+
+Decided on 2026-10-19, after the batch above: every task with fate
+kept or new that forecasts one of these surfaces may change it, with
+its review, its approval line and the maintainer's merge. A task
+re-planned later onto one of them needs a new grant.
+
+- `checks`, `contracts`, `dependencies` and `catalog`, the grantable
+  surfaces of 12 12.4: written in `docs/grants.yaml` as grants of
+  sitting M0, each with the open tasks that forecast it.
+- `spec`, `kits`, `sbxdrv` and `gates`: not grantable under 12 12.4, so
+  each pull request still carries its approval line; this note is what
+  the line rests on.
+- Not granted, asked each time, except the grants above for T013 and
+  T103: `procgroup`, `release`, `signing`, `approvals`, `decisions` and
+  `ask-first`.

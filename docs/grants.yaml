@@ -6,4 +6,16 @@
 # tools/ci pr reads this file at the base commit. It is on the ask-first
 # surface, so each grant is its own one-line pull request.
 version: 1
-grants: []
+grants:
+  - sitting: M0
+    surface: catalog
+    tasks: [T031, T036]
+  - sitting: M0
+    surface: checks
+    tasks: [T013, T031, T037, T039, T053, T118, T127]
+  - sitting: M0
+    surface: contracts
+    tasks: [T021]
+  - sitting: M0
+    surface: dependencies
+    tasks: [T013, T053]
