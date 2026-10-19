@@ -4,3 +4,6 @@
 # The user's agreement file lives outside product repositories
 # (hygiene refuses a tracked one, in any case; this pattern is exact).
 PROLOGUE.md
+
+# The page "go run ./tools/planviewer" writes.
+/plan-viewer.html
