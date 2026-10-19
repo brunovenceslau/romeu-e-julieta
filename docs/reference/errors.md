@@ -22,5 +22,7 @@ exit codes are in [exit-codes.md](exit-codes.md).
 
 | Id | Slug | Exit | Fix | Declared in | Recovered in |
 |---|---|---|---|---|---|
+| `RJ-311` | `format-newer` | 2 | `decide: install the release that wrote it` | [internal/manifest](../../internal/manifest/errors.go) | none: the release that wrote the file reads it |
+| `RJ-342` | `manifest-protocol` | 2 | `romeu run <name>` | [internal/manifest](../../internal/manifest/errors.go) | none: the run the hint names passes a manifest of the current protocol |
 | `RJ-348` | `internal` | 1 | `decide: open an issue with the details` | [internal/cli](../../internal/cli/errors.go) | none: a defect of the code, fixed in a release |
 | `RJ-349` | `usage` | 2 | `<binary> <command> --help` | [internal/cli](../../internal/cli/errors.go) | none: the help the hint names lists the commands and flags |
