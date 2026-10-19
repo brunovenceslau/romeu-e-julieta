@@ -88,7 +88,11 @@ func Report(err error) string {
 
 // Fail ends the test on err, with the line of Report, after it names
 // the test in the file of InfraFileEnv when err is an infrastructure
-// error.
+// error. The step of tools/ci attributes an infrastructure error by test
+// name: a test that fails an assertion and then calls Fail with an
+// InfraError reads as one whole. Only the preconditions call Fail with
+// one today (workload, Prepare, CheckDaemon in the cases), and a case
+// keeps it so: it calls Fail with an InfraError before any assertion.
 func Fail(tb testing.TB, err error) {
 	tb.Helper()
 	if _, ok := errors.AsType[*InfraError](err); ok {
@@ -200,12 +204,16 @@ func (c Config) CheckDaemon(ctx context.Context) error {
 }
 
 // substituted are the words of a message about content, checked first:
-// once the pinned digest is taken out of the message, any of them makes
-// the failure a test failure, whatever else the message holds ("unexpected
-// commit digest", "filesystem layer verification failed", "digest
-// mismatch", another sha256), since the one signal that a pinned
-// artifact was substituted must never be retried as infrastructure.
-var substituted = []string{"digest", "verif", "mismatch", "sha256:"}
+// once every sha256 is masked out of the message (the pinned digest, and
+// the blob URL of a layer fetch that failed on transport), any of them
+// makes the failure a test failure, whatever else the message holds
+// ("unexpected commit digest", "filesystem layer verification failed",
+// "digest mismatch"), since the one signal that a pinned artifact was
+// substituted must never be retried as infrastructure.
+var substituted = []string{"digest", "verif", "mismatch"}
+
+// anySHA256 is a sha256 as docker writes one in a reference or a URL.
+var anySHA256 = regexp.MustCompile(`sha256:[0-9a-f]{64}`)
 
 // transport are the messages with which docker reports a pull that
 // failed on its way to the registry, each anchored on the text of the
@@ -232,7 +240,7 @@ var transport = []*regexp.Regexp{
 // timeout; and a test failure for anything else, since a gate fails
 // closed.
 func pullFailure(err error, pinned string) error {
-	msg := strings.ReplaceAll(err.Error(), pinned, "<pinned>")
+	msg := anySHA256.ReplaceAllString(strings.ReplaceAll(err.Error(), pinned, "<pinned>"), "<sha256>")
 	lower := strings.ToLower(msg)
 	for _, s := range substituted {
 		if strings.Contains(lower, s) {
