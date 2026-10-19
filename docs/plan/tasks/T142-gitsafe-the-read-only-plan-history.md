@@ -3,7 +3,7 @@ id: T142
 title: "`gitsafe`: the read-only plan history"
 milestone: M1
 module: gitsafe
-fate: new
+fate: merged
 owns:
   - internal/gitsafe/history*.go
 needs:
@@ -12,9 +12,14 @@ after: []
 ask_first:
   - gitsafe
 sitting: none
+merged: 2026-10-19
+pr: 173
 ---
 
 # T142 - `gitsafe`: the read-only plan history
+
+Merged on 2026-10-19 in pull request #173. The text below is the one
+written at the re-plan.
 
 Goal: the two read-only verbs of `gitsafe` that the trends of
 `tools/planviewer` read the plan's past through: `History`, the commits

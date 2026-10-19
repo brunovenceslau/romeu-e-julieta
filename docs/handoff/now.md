@@ -2,8 +2,8 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-18, after GitHub stack #167 merged (Done record
-38). Done records are merged up to 37.
+Checkpoint of 2026-10-19, after GitHub stack #175 and #177 merged
+(Done record 39). Done records are merged up to 38.
 
 ## Next steps
 
