@@ -43,6 +43,18 @@ import (
 // which a test of this package holds.
 const InfraPrefix = "container e2e: infrastructure error: "
 
+// CacheDir is the directory the harness keeps its downloads in, which
+// ci.yml restores and saves with actions/cache, and CacheKeyPrefix and
+// FixtureLock make the key of that step: the prefix, then the sha256 of
+// the fixture mise.lock (REQ-0796, REQ-0797). CacheDir equals the
+// constant of the same name in e2e/internal/container, and the workflows
+// test holds the step of ci.yml and of x64.yml to all three.
+const (
+	CacheDir       = "/tmp/romeu-e-julieta-container-e2e"
+	CacheKeyPrefix = "container-e2e-"
+	FixtureLock    = "e2e/internal/container/testdata/fixture.mise.lock"
+)
+
 // Classes is the runner-class table of 10 10.2: by "<GOOS>/<GOARCH>",
 // the runner-selected steps each class runs. The four classes are the
 // runners of 10 10.2, Runners; a platform outside it is no runner.

@@ -4,6 +4,8 @@
 package workflows
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"maps"
 	"os"
 	"path/filepath"
@@ -17,6 +19,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/container"
 )
 
 // TestWorkflowsGrammar fails a fixture for each construct outside the
@@ -70,7 +73,19 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"an env on a job", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    env:\n      BASH_ENV: /tmp/x\n", `"env" is outside the grammar of a job`},
 		{"an input checkout does not take here", "          persist-credentials: false\n", "          persist-credentials: false\n          fetch-depth: 0\n", `the input "fetch-depth" is not one this repository uses for actions/checkout`},
 		{"an input mise-action does not take here", "          sha256: ${{ matrix.mise_sha256 }}\n", "          sha256: ${{ matrix.mise_sha256 }}\n          install_args: x\n", `the input "install_args" is not one this repository uses for jdx/mise-action`},
-		{"an input of an action not listed", "uses: jdx/mise-action/sub/path@", "uses: owner/repo/sub/path@", `the input "sha256" is not one this repository uses for owner/repo`},
+		{"a mise step without persist_github_token", "          persist_github_token: false\n", "", "every jdx/mise-action step writes persist_github_token: false"},
+		{"a mise step that persists the token", "persist_github_token: false", "persist_github_token: true", "every jdx/mise-action step writes persist_github_token: false"},
+		{"a mise step that persists the token, quoted", "persist_github_token: false", `persist_github_token: "false"`, "every jdx/mise-action step writes persist_github_token: false"},
+		{"a mise step whose with is not a mapping", "        with:\n          sha256: ${{ matrix.mise_sha256 }}\n          persist_github_token: false\n", "        with: x\n", "with is a mapping"},
+		{"a mise step without with", "        with:\n          sha256: ${{ matrix.mise_sha256 }}\n          persist_github_token: false\n", "", "every jdx/mise-action step writes persist_github_token: false"},
+		{"an input actions/cache does not take here", "          key: cache-aa\n", "          key: cache-aa\n          restore-keys: cache-\n", `the input "restore-keys" is not one this repository uses for actions/cache`},
+		{"an input actions/cache does not take, in another case", "uses: actions/cache@", "uses: Actions/Cache@", ""},
+		{"a concurrency key outside the grammar", "  cancel-in-progress: true\n", "  cancel-in-progress: true\n  queue: max\n", `the concurrency key "queue" is outside the grammar: group and cancel-in-progress`},
+		{"a concurrency that is a name", "concurrency:\n  group: ci-${{ github.ref }}\n  cancel-in-progress: true\n", "concurrency: ci\n", "concurrency is a mapping of group and cancel-in-progress"},
+		{"a concurrency that cancels by an expression", "cancel-in-progress: true", "cancel-in-progress: ${{ github.event.x }}", "cancel-in-progress is true or false"},
+		{"a concurrency that does not cancel", "cancel-in-progress: true", "cancel-in-progress: false", ""},
+		{"a concurrency without a group", "  group: ci-${{ github.ref }}\n", "", "concurrency names its group"},
+		{"an input of an action not listed", "uses: jdx/mise-action/sub/path@" + citest.Sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n          persist_github_token: false\n", "uses: owner/repo/sub/path@" + citest.Sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n", `the input "sha256" is not one this repository uses for owner/repo`},
 		{"a with on a run step", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        with:\n          a: b\n", `"with" is outside the grammar of a run step`},
 		{"a step with uses and run", "          persist-credentials: false\n", "          persist-credentials: false\n        run: go run ./tools/ci all\n", `"run" is outside the grammar of a uses step`},
 		{"a step with neither", "      - name: All checks\n        run: go run ./tools/ci all\n", "      - name: All checks\n", "a step has uses or run"},
@@ -116,7 +131,7 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a runs-on with a windows image", "runs-on: ${{ matrix.os }}", "runs-on: windows-2025", "never *-latest"},
 		{"a runs-on with a prefix before the name", "runs-on: ${{ matrix.os }}", "runs-on: x-ubuntu-22.04", "never *-latest"},
 		{"an anchor", "permissions:\n  contents: read\nconcurrency", "permissions: &p\n  contents: read\nconcurrency", "an anchor or an alias"},
-		{"a merge key where keys are free", "  group: ci-${{ github.ref }}\n", "  group: ci-${{ github.ref }}\n  <<: {a: b}\n", `the tag "!!merge"`},
+		{"a merge key where keys are free", "    branches: [main]\n", "    branches: [main]\n    <<: {a: b}\n", `the tag "!!merge"`},
 		{"a custom tag", "    timeout-minutes: 60\n", "    timeout-minutes: !custom 60\n", `the tag "!custom"`},
 		{"a key written twice", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    timeout-minutes: 5\n", "written twice"},
 		// Allowlists of 10 10.2 (operator decision 2026-10-08).
@@ -159,8 +174,8 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a key with a tag that is not a string", "    timeout-minutes: 60\n", "    !!int timeout-minutes: 60\n", "key is written as a plain string"},
 		{"a key with the string tag", "    timeout-minutes: 60\n", "    !!str timeout-minutes: 60\n", ""},
 		{"a strategy with a bad first key", "    strategy:\n      fail-fast: false\n", "    strategy:\n      other: 1\n      fail-fast: false\n", `the strategy key "other"`},
-		{"steps in flow style", "    steps:\n      - name: Check out\n        uses: actions/checkout@" + citest.Sha + "\n        with:\n          persist-credentials: false\n      - uses: jdx/mise-action/sub/path@" + citest.Sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n      - name: All checks\n        run: go run ./tools/ci all\n      - run: go run ./tools/release notes --tag \"$GITHUB_REF_NAME\" --out=notes.md\n", "    steps: [{uses: actions/checkout@" + citest.Sha + ", with: {persist-credentials: false}}, {uses: jdx/mise-action/sub/path@" + citest.Sha + ", with: {sha256: \"${{ matrix.mise_sha256 }}\"}}, {run: \"go run ./tools/ci all\"}]\n", ""},
-		{"steps in flow style with a key outside the grammar", "    steps:\n      - name: Check out\n        uses: actions/checkout@" + citest.Sha + "\n        with:\n          persist-credentials: false\n      - uses: jdx/mise-action/sub/path@" + citest.Sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n      - name: All checks\n        run: go run ./tools/ci all\n      - run: go run ./tools/release notes --tag \"$GITHUB_REF_NAME\" --out=notes.md\n", "    steps: [{uses: actions/checkout@" + citest.Sha + ", with: {persist-credentials: false}}, {uses: jdx/mise-action/sub/path@" + citest.Sha + ", with: {sha256: \"${{ matrix.mise_sha256 }}\"}}, {run: \"go run ./tools/ci all\", if: true}]\n", `"if" is outside the grammar of a run step`},
+		{"steps in flow style", "    steps:\n      - name: Check out\n        uses: actions/checkout@" + citest.Sha + "\n        with:\n          persist-credentials: false\n      - uses: jdx/mise-action/sub/path@" + citest.Sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n          persist_github_token: false\n      - uses: actions/cache@" + citest.Sha + "\n        with:\n          path: /tmp/cache\n          key: cache-aa\n      - name: All checks\n        run: go run ./tools/ci all\n      - run: go run ./tools/release notes --tag \"$GITHUB_REF_NAME\" --out=notes.md\n", "    steps: [{uses: actions/checkout@" + citest.Sha + ", with: {persist-credentials: false}}, {uses: jdx/mise-action/sub/path@" + citest.Sha + ", with: {sha256: \"${{ matrix.mise_sha256 }}\", persist_github_token: false}}, {run: \"go run ./tools/ci all\"}]\n", ""},
+		{"steps in flow style with a key outside the grammar", "    steps:\n      - name: Check out\n        uses: actions/checkout@" + citest.Sha + "\n        with:\n          persist-credentials: false\n      - uses: jdx/mise-action/sub/path@" + citest.Sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n          persist_github_token: false\n      - uses: actions/cache@" + citest.Sha + "\n        with:\n          path: /tmp/cache\n          key: cache-aa\n      - name: All checks\n        run: go run ./tools/ci all\n      - run: go run ./tools/release notes --tag \"$GITHUB_REF_NAME\" --out=notes.md\n", "    steps: [{uses: actions/checkout@" + citest.Sha + ", with: {persist-credentials: false}}, {uses: jdx/mise-action/sub/path@" + citest.Sha + ", with: {sha256: \"${{ matrix.mise_sha256 }}\", persist_github_token: false}}, {run: \"go run ./tools/ci all\", if: true}]\n", `"if" is outside the grammar of a run step`},
 		{"an include entry key with a tag that is not a string", "          - os: ubuntu-26.04\n", "          - !!int os: ubuntu-26.04\n", "key is written as a plain string"},
 	}
 	for _, tt := range tests {
@@ -252,7 +267,7 @@ func TestWorkflowsCommitted(t *testing.T) {
 	got, err = workflows(t.Context(), r.Repo, "HEAD")
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	assert.Equal(t, ".github/workflows/ci.yml:28", got[0].Where)
+	assert.Equal(t, ".github/workflows/ci.yml:29", got[0].Where)
 }
 
 // TestWorkflowsRepository checks the workflows of this repository, as
@@ -309,14 +324,25 @@ func jobBody(t *testing.T, src []byte) []string {
 	return lines
 }
 
+// cacheKey returns the key of the cache of the container e2e: the
+// prefix, then the sha256 of the fixture mise.lock.
+func cacheKey(t *testing.T) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(container.FixtureLock)))
+	require.NoError(t, err)
+	sum := sha256.Sum256(b)
+	return container.CacheKeyPrefix + hex.EncodeToString(sum[:])
+}
+
 // checkCIJob holds a workflow to the events it runs on, and its one
 // job to the runners want, in order, and to the mise, setup and all
 // steps.
 func checkCIJob(t *testing.T, src []byte, events, want []string) {
 	t.Helper()
 	var wf struct {
-		On   map[string]yaml.Node `yaml:"on"`
-		Jobs map[string]struct {
+		On          map[string]yaml.Node `yaml:"on"`
+		Concurrency map[string]any       `yaml:"concurrency"`
+		Jobs        map[string]struct {
 			RunsOn   string `yaml:"runs-on"`
 			Strategy struct {
 				Matrix struct {
@@ -331,6 +357,7 @@ func checkCIJob(t *testing.T, src []byte, events, want []string) {
 		} `yaml:"jobs"`
 	}
 	require.NoError(t, yaml.Unmarshal(src, &wf))
+	assert.Equal(t, map[string]any{"group": "${{ github.workflow }}-${{ github.ref }}", "cancel-in-progress": true}, wf.Concurrency, "one run per workflow and ref")
 	got := slices.Sorted(maps.Keys(wf.On))
 	assert.Equal(t, slices.Sorted(slices.Values(events)), got, "the events")
 	require.Len(t, wf.Jobs, 1)
@@ -354,13 +381,19 @@ func checkCIJob(t *testing.T, src []byte, events, want []string) {
 			assert.Equal(t, "${{ matrix.mise_sha256 }}", s.With["sha256"])
 			assert.Equal(t, false, s.With["cache"])
 			assert.Equal(t, false, s.With["env"])
+			assert.Equal(t, false, s.With["persist_github_token"])
+		case strings.HasPrefix(s.Uses, "actions/cache@"):
+			index["cache"] = i
+			assert.Equal(t, map[string]any{"path": container.CacheDir, "key": cacheKey(t)}, s.With, "the cache of the container e2e")
 		case s.Run == "go run ./tools/ci setup":
 			index["setup"] = i
 		case s.Run == "go run ./tools/ci all":
 			index["all"] = i
 		}
 	}
-	require.Len(t, index, 3, "the mise, setup and all steps: %v", index)
+	require.Len(t, index, 4, "the mise, cache, setup and all steps: %v", index)
+	assert.Less(t, index["mise"], index["cache"])
+	assert.Less(t, index["cache"], index["setup"])
 	assert.Less(t, index["mise"], index["setup"])
 	assert.Less(t, index["setup"], index["all"])
 }

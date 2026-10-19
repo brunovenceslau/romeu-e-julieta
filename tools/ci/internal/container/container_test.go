@@ -184,30 +184,33 @@ func goDirOf(t *testing.T) string {
 	return ""
 }
 
-// TestTheHarnessNamesTheSamePrefix holds InfraPrefix to the constant of
-// the same name in the container e2e's harness, which prints it: the two
-// packages cannot import each other (e2e/internal and tools/ci/internal),
-// so this test reads the harness's source.
-func TestTheHarnessNamesTheSamePrefix(t *testing.T) {
+// TestTheHarnessNamesTheSameConstants holds InfraPrefix and CacheDir to
+// the constants of the same names in the container e2e's harness, which
+// prints the one and writes to the other: the two packages cannot import
+// each other (e2e/internal and tools/ci/internal), so this test reads
+// the harness's source.
+func TestTheHarnessNamesTheSameConstants(t *testing.T) {
 	path := filepath.Join(citest.ModuleRoot(t), "e2e", "internal", "container", "container.go")
 	f, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 	require.NoError(t, err)
-	var got []string
+	got := map[string]string{}
 	ast.Inspect(f, func(n ast.Node) bool {
 		spec, ok := n.(*ast.ValueSpec)
 		if !ok {
 			return true
 		}
 		for i, name := range spec.Names {
-			if name.Name == "InfraPrefix" && i < len(spec.Values) {
+			if (name.Name == "InfraPrefix" || name.Name == "CacheDir") && i < len(spec.Values) {
 				if lit, ok := spec.Values[i].(*ast.BasicLit); ok {
 					value, err := strconv.Unquote(lit.Value)
 					require.NoError(t, err)
-					got = append(got, value)
+					got[name.Name] = value
 				}
 			}
 		}
 		return true
 	})
-	assert.Equal(t, []string{InfraPrefix}, got)
+	assert.Equal(t, map[string]string{"InfraPrefix": InfraPrefix, "CacheDir": CacheDir}, got)
+	_, err = os.Stat(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(FixtureLock)))
+	require.NoError(t, err, "the fixture mise.lock")
 }

@@ -105,8 +105,19 @@ const checkoutAction = "actions/checkout"
 // out of a workflow this way.
 var actionInputs = map[string][]string{
 	"actions/checkout": {"persist-credentials"},
-	"jdx/mise-action":  {"version", "sha256", "cache", "env"},
+	"jdx/mise-action":  {"version", "sha256", "cache", "env", "persist_github_token"},
+	"actions/cache":    {"path", "key"},
 }
+
+// miseAction is the action whose step must not hand the token on: its
+// github_token input reads the job's token by default, and
+// persist_github_token: false keeps it from every later step (10 10.2,
+// the pr job row).
+const miseAction = "jdx/mise-action"
+
+// concurrencyKeys are the keys a concurrency mapping may hold: the group
+// a run belongs to, and whether a new run cancels the one in progress.
+var concurrencyKeys = []string{"group", "cancel-in-progress"}
 
 // matrixRunner is the one expression runs-on may hold; the labels it
 // takes come from the os key of the job's matrix, each one of
@@ -296,6 +307,8 @@ func (c *grammar) file(doc *yaml.Node) {
 			c.events(value)
 		case key.Value == "permissions":
 			c.permissions(value)
+		case key.Value == "concurrency":
+			c.concurrency(value)
 		case key.Value == "jobs":
 			c.jobs(value)
 		}
@@ -588,6 +601,7 @@ func (c *grammar) step(n, strategy *yaml.Node) {
 	}
 	if uses := field(n, "uses"); uses != nil && uses.Kind == yaml.ScalarNode && usesForm.MatchString(uses.Value) {
 		c.checkout(n, uses)
+		c.miseToken(n, uses)
 	}
 	if kind == "run" && field(n, "run") == nil {
 		c.add(n, "a step has uses or run")
@@ -693,6 +707,45 @@ func (c *grammar) checkout(step, uses *yaml.Node) {
 	}
 	if v := field(field(step, "with"), "persist-credentials"); v == nil || v.Kind != yaml.ScalarNode || v.Value != "false" {
 		c.add(step, "a checkout step sets persist-credentials: false, so that no later step holds the token")
+	}
+}
+
+// miseToken fails a jdx/mise-action step that does not write
+// persist_github_token: false, the YAML boolean, so that no later step
+// reads the job's token from the environment the action exports. The
+// action is matched without case, as GitHub reads it.
+func (c *grammar) miseToken(step, uses *yaml.Node) {
+	if actionName(uses) != miseAction {
+		return
+	}
+	if with := field(step, "with"); with != nil && with.Kind != yaml.MappingNode {
+		return // "with is a mapping" is the finding
+	}
+	if v := field(field(step, "with"), "persist_github_token"); v == nil || v.Kind != yaml.ScalarNode || v.Tag != "!!bool" || v.Value != "false" {
+		c.add(step, "every jdx/mise-action step writes persist_github_token: false, so that no later step holds the token")
+	}
+}
+
+// concurrency checks the concurrency of the file: a mapping of
+// concurrencyKeys that names its group, with cancel-in-progress written
+// true or false. The group may hold expressions, each a context path
+// (walk), so that a run of a pull request's ref cancels the run of the
+// same ref it replaces.
+func (c *grammar) concurrency(n *yaml.Node) {
+	if n.Kind != yaml.MappingNode {
+		c.add(n, "concurrency is a mapping of group and cancel-in-progress")
+		return
+	}
+	for key, value := range pairs(n) {
+		switch {
+		case !slices.Contains(concurrencyKeys, key.Value):
+			c.add(key, "the concurrency key "+strconv.Quote(key.Value)+" is outside the grammar: group and cancel-in-progress")
+		case key.Value == "cancel-in-progress" && (value.Kind != yaml.ScalarNode || value.Tag != "!!bool"):
+			c.add(value, "cancel-in-progress is true or false")
+		}
+	}
+	if field(n, "group") == nil {
+		c.add(n, "concurrency names its group")
 	}
 }
 
