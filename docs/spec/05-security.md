@@ -30,15 +30,19 @@ neutralizes:
 
 ```
 env:   GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0
-       GIT_ATTR_NOSYSTEM=1 PATH=/usr/bin:/bin HOME=<home> LANG=C
+       GIT_ATTR_NOSYSTEM=1 GIT_NO_LAZY_FETCH=1 PATH=/usr/bin:/bin HOME=<home> LANG=C
 flags: -c core.hooksPath=/dev/null -c core.fsmonitor=false -c submodule.recurse=false
        -c protocol.allow=never -c protocol.https.allow=always -c protocol.git.allow=always
        -c core.sshCommand=false -c core.gitProxy= -c core.askPass= -c core.alternateRefsCommand=
        -c diff.external= -c core.pager=cat -c credential.helper=
        -c fetch.prune=false -c transfer.fsckObjects=true -c transfer.bundleURI=false
-       -c gc.auto=0 -c maintenance.auto=false -c core.symlinks=false
+       -c fetch.bundleURI= -c gc.auto=0 -c maintenance.auto=false -c core.symlinks=false
        -c advice.detachedHead=false
 ```
+
+`GIT_NO_LAZY_FETCH=1` and `-c fetch.bundleURI=` stop the repository's own
+config from reaching a promisor remote or a bundle URI that CheckURL and
+the gitHosts allowlist did not see.
 
 - `REQ-0460` `protocol.git.allow` is needed only for the sandbox daemon on
   `127.0.0.1`; gitsafe refuses a `git://` URL whose host is not
@@ -103,7 +107,7 @@ environment plus one closed network pass-through list, exactly
 `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`, `https_proxy`, `http_proxy`,
 `no_proxy` and `SSL_CERT_FILE`, each passed when set and not empty
 (the set `tools/ci` passes as `networkPassThrough`), and still no
-`GIT_*` variable. The list is the one exception to "nothing
+`GIT_*` variable from the caller's environment. The list is the one exception to "nothing
 inherited": every egress of a sandbox goes through a proxy that the
 proxy variables name, so a scrubbed environment would break the clone
 and fetch of `julieta setup` ([04 4.3](04-cli.md#43-julieta-sandbox)).
@@ -119,7 +123,9 @@ julieta fetches from origin is content the agent can push anyway. No
 credential travels in these variables: the proxy adds it. Host mode
 has no such list. Sandbox mode also uses explicit URLs and refspecs, and
 `-c core.hooksPath=/dev/null -c core.fsmonitor=false
--c submodule.recurse=false`. It keeps the sandbox's global config,
+-c submodule.recurse=false -c fetch.bundleURI=`, and `GIT_NO_LAZY_FETCH=1`
+(git 2.45.0 and later, below the floor), so a promisor remote named by
+the repository's own config is never contacted for a missing object. It keeps the sandbox's global config,
 which the sandbox owns and the agent can write, so nothing in that
 config is trusted beyond the sandbox; this is why salvage passes
 `-c commit.gpgsign=false`

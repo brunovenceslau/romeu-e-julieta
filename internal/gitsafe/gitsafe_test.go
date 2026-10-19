@@ -31,13 +31,13 @@ var hostFlags = []string{
 	"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "submodule.recurse=false",
 	"-c", "protocol.allow=never", "-c", "protocol.https.allow=always", "-c", "protocol.git.allow=always",
 	"-c", "core.sshCommand=false", "-c", "core.gitProxy=", "-c", "core.askPass=", "-c", "core.alternateRefsCommand=", "-c", "diff.external=", "-c", "core.pager=cat", "-c", "credential.helper=",
-	"-c", "fetch.prune=false", "-c", "transfer.fsckObjects=true", "-c", "transfer.bundleURI=false",
+	"-c", "fetch.prune=false", "-c", "transfer.fsckObjects=true", "-c", "transfer.bundleURI=false", "-c", "fetch.bundleURI=",
 	"-c", "gc.auto=0", "-c", "maintenance.auto=false", "-c", "core.symlinks=false",
 	"-c", "advice.detachedHead=false",
 }
 
 // sandboxFlags is the flag list of sandbox mode (05 5.1).
-var sandboxFlags = []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "submodule.recurse=false"}
+var sandboxFlags = []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "submodule.recurse=false", "-c", "fetch.bundleURI="}
 
 // ambient are the variables of I3 a hostile environment sets; none may
 // reach git.
@@ -101,7 +101,7 @@ func TestRunnerEnvironmentAndFlags(t *testing.T) {
 			class: procgroup.HostGitFetch,
 			env: []string{
 				"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0",
-				"GIT_ATTR_NOSYSTEM=1", "PATH=/usr/bin:/bin", "HOME=" + home, "LANG=C",
+				"GIT_ATTR_NOSYSTEM=1", "GIT_NO_LAZY_FETCH=1", "PATH=/usr/bin:/bin", "HOME=" + home, "LANG=C",
 			},
 			flags: hostFlags,
 		},
@@ -110,7 +110,7 @@ func TestRunnerEnvironmentAndFlags(t *testing.T) {
 			mode:  Sandbox,
 			class: procgroup.JulietaGit,
 			env: []string{
-				"GIT_TERMINAL_PROMPT=0", "PATH=/usr/bin:/bin", "HOME=" + home, "LANG=C",
+				"GIT_TERMINAL_PROMPT=0", "GIT_NO_LAZY_FETCH=1", "PATH=/usr/bin:/bin", "HOME=" + home, "LANG=C",
 				"HTTPS_PROXY=http://proxy.example:3128", "HTTP_PROXY=http://proxy.example:3129",
 				"NO_PROXY=localhost,127.0.0.1", "https_proxy=http://lower.example:3128",
 				"http_proxy=http://lower.example:3129", "no_proxy=localhost,::1",
@@ -192,7 +192,7 @@ func TestNetworkEnvUnset(t *testing.T) {
 	t.Setenv("no_proxy", "")
 	r, err := New(Config{Mode: Sandbox, Git: "/usr/bin/git", Home: "/h"})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"GIT_TERMINAL_PROMPT=0", "PATH=/usr/bin:/bin", "HOME=/h", "LANG=C"}, r.env)
+	assert.Equal(t, []string{"GIT_TERMINAL_PROMPT=0", "GIT_NO_LAZY_FETCH=1", "PATH=/usr/bin:/bin", "HOME=/h", "LANG=C"}, r.env)
 }
 
 // TestSandboxGitUsesTheProxy: a sandbox-mode fetch over HTTPS goes

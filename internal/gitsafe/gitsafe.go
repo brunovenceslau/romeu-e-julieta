@@ -85,6 +85,7 @@ var hostSettings = []setting{
 	{"fetch.prune", "false"},
 	{"transfer.fsckObjects", "true"},
 	{"transfer.bundleURI", "false"},
+	{"fetch.bundleURI", ""},
 	{"gc.auto", "0"},
 	{"maintenance.auto", "false"},
 	{"core.symlinks", "false"},
@@ -97,6 +98,7 @@ var sandboxSettings = []setting{
 	{"core.hooksPath", "/dev/null"},
 	{"core.fsmonitor", "false"},
 	{"submodule.recurse", "false"},
+	{"fetch.bundleURI", ""},
 }
 
 // networkEnv is the network pass-through list of sandbox mode (05
@@ -179,6 +181,11 @@ var (
 	hostPattern = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$`)
 )
 
+// noLazyFetch stops git from fetching a missing object from a promisor
+// remote the repository's own config names, which would bypass CheckURL
+// and the gitHosts allowlist. Git reads it from 2.45.0, below the floor.
+const noLazyFetch = "GIT_NO_LAZY_FETCH=1"
+
 // New returns a runner for the config, or ErrConfig.
 func New(c Config) (*Runner, error) {
 	if err := c.check(); err != nil {
@@ -193,6 +200,7 @@ func New(c Config) (*Runner, error) {
 			"GIT_CONFIG_NOSYSTEM=1",
 			"GIT_TERMINAL_PROMPT=0",
 			"GIT_ATTR_NOSYSTEM=1",
+			noLazyFetch,
 			"PATH=/usr/bin:/bin",
 			"HOME=" + c.Home,
 			"LANG=C",
@@ -209,6 +217,7 @@ func New(c Config) (*Runner, error) {
 		r.class = procgroup.JulietaGit
 		r.env = []string{
 			"GIT_TERMINAL_PROMPT=0",
+			noLazyFetch,
 			"PATH=/usr/bin:/bin",
 			"HOME=" + c.Home,
 			"LANG=C",
