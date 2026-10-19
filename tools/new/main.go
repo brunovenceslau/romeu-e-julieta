@@ -7,6 +7,7 @@
 //	go run ./tools/new adr <title>                                write the next decision record
 //	go run ./tools/new command <binary> <command> [<subcommand>]  write the scaffold of a command
 //	go run ./tools/new error <package> <slug>                     declare the next error id
+//	go run ./tools/new kit <name>                                 write kits/<name>/ with a descriptor on the pinned frontend
 //	go run ./tools/new task <title>                               write the next task file of the plan
 //
 // Each kind registers itself from its own file, <kind>.go (rule 4 of

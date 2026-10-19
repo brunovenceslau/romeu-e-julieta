@@ -25,8 +25,8 @@ func TestKindsAreRegisteredByFile(t *testing.T) {
 	for _, k := range kinds.sorted() {
 		names = append(names, k.name)
 	}
-	assert.Equal(t, []string{"adr", "command", "error", "task"}, names)
-	assert.Equal(t, "usage:\n  go run ./tools/new adr <title>\n  go run ./tools/new command <binary> <command> [<subcommand>]\n  go run ./tools/new error <package> <slug>\n  go run ./tools/new task <title>\n", usage())
+	assert.Equal(t, []string{"adr", "command", "error", "kit", "task"}, names)
+	assert.Equal(t, "usage:\n  go run ./tools/new adr <title>\n  go run ./tools/new command <binary> <command> [<subcommand>]\n  go run ./tools/new error <package> <slug>\n  go run ./tools/new kit <name>\n  go run ./tools/new task <title>\n", usage())
 	for _, name := range names {
 		assert.FileExists(t, name+".go", "the file that registers %s", name)
 	}
@@ -111,7 +111,7 @@ func TestAFixtureKindIsAddedByOneFile(t *testing.T) {
 		Env:   []string{"PATH=" + os.Getenv("PATH")},
 	})
 	require.Error(t, err)
-	assert.Equal(t, "usage:\n  go run ./tools/new adr <title>\n  go run ./tools/new command <binary> <command> [<subcommand>]\n  go run ./tools/new error <package> <slug>\n  go run ./tools/new fixture <word>\n  go run ./tools/new task <title>\n", string(out))
+	assert.Equal(t, "usage:\n  go run ./tools/new adr <title>\n  go run ./tools/new command <binary> <command> [<subcommand>]\n  go run ./tools/new error <package> <slug>\n  go run ./tools/new fixture <word>\n  go run ./tools/new kit <name>\n  go run ./tools/new task <title>\n", string(out))
 }
 
 // moduleRoot returns the directory of go.mod above the test's directory.
