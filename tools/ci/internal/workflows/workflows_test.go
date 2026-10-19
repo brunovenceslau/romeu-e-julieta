@@ -4,8 +4,6 @@
 package workflows
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"maps"
 	"os"
 	"path/filepath"
@@ -20,6 +18,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/container"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/kitpin/pins"
 )
 
 // TestWorkflowsGrammar fails a fixture for each construct outside the
@@ -82,7 +81,23 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"an input actions/cache does not take, in another case", "uses: actions/cache@", "uses: Actions/Cache@", ""},
 		{"a concurrency key outside the grammar", "  cancel-in-progress: true\n", "  cancel-in-progress: true\n  queue: max\n", `the concurrency key "queue" is outside the grammar: group and cancel-in-progress`},
 		{"a concurrency that is a name", "concurrency:\n  group: ci-${{ github.ref }}\n  cancel-in-progress: true\n", "concurrency: ci\n", "concurrency is a mapping of group and cancel-in-progress"},
-		{"a concurrency that cancels by an expression", "cancel-in-progress: true", "cancel-in-progress: ${{ github.event.x }}", "cancel-in-progress is true or false"},
+		{"a concurrency that cancels by an expression", "cancel-in-progress: true", "cancel-in-progress: ${{ github.event.x }}", "cancel-in-progress is true, false or"},
+		{"a concurrency that cancels for pull requests alone", "cancel-in-progress: true", "cancel-in-progress: ${{ github.event_name == 'pull_request' }}", ""},
+		{"a concurrency that cancels for pushes alone", "cancel-in-progress: true", "cancel-in-progress: ${{ github.event_name == 'push' }}", "one context path"},
+		{"the expression of pull requests in the group", "group: ci-${{ github.ref }}", "group: ci-${{ github.event_name == 'pull_request' }}", "one context path"},
+		{"the expression of pull requests in a name", "      - name: All checks\n", "      - name: ${{ github.event_name == 'pull_request' }}\n", "one context path"},
+		{"a cache keyed by the runner", "key: cache-aa", "key: cache-${{ runner.os }}-${{ runner.arch }}-aa", ""},
+		{"a cache keyed by the ref", "key: cache-aa", "key: cache-${{ github.ref }}-aa", "this with input is a literal"},
+		{"a cache path of the runner", "path: /tmp/cache", "path: /tmp/${{ runner.arch }}", "this with input is a literal"},
+		{"the runner in another action's input", "sha256: ${{ matrix.mise_sha256 }}", "sha256: x-${{ runner.arch }}", "this with input is a literal"},
+		{"the build of tools/ci", "run: go run ./tools/ci all\n", "run: go build -o \"$RUNNER_TEMP/ci\" ./tools/ci\n", ""},
+		{"the built tools/ci", "run: go run ./tools/ci all\n", "run: '\"$RUNNER_TEMP/ci\" all'\n", ""},
+		{"a build of another program", "run: go run ./tools/ci all\n", "run: go build -o \"$RUNNER_TEMP/ci\" ./tools/release\n", "run is one line"},
+		{"a build to another path", "run: go run ./tools/ci all\n", "run: go build -o /tmp/ci ./tools/ci\n", "run is one line"},
+		{"a build with a flag", "run: go run ./tools/ci all\n", "run: go build -toolexec=x -o \"$RUNNER_TEMP/ci\" ./tools/ci\n", "run is one line"},
+		{"another built program", "run: go run ./tools/ci all\n", "run: '\"$RUNNER_TEMP/x\" all'\n", "run is one line"},
+		{"the built tools/ci with no subcommand", "run: go run ./tools/ci all\n", "run: '\"$RUNNER_TEMP/ci\"'\n", "run is one line"},
+		{"the built tools/ci piped", "run: go run ./tools/ci all\n", "run: '\"$RUNNER_TEMP/ci\" all | sh'\n", "run is one line"},
 		{"a concurrency that does not cancel", "cancel-in-progress: true", "cancel-in-progress: false", ""},
 		{"a concurrency without a group", "  group: ci-${{ github.ref }}\n", "", "concurrency names its group"},
 		{"an input of an action not listed", "uses: jdx/mise-action/sub/path@" + citest.Sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n          persist_github_token: false\n", "uses: owner/repo/sub/path@" + citest.Sha + "\n        with:\n          sha256: ${{ matrix.mise_sha256 }}\n", `the input "sha256" is not one this repository uses for owner/repo`},
@@ -297,12 +312,21 @@ func TestWorkflowsCIFile(t *testing.T) {
 		require.NoError(t, err)
 		return src
 	}
-	for name, want := range map[string]struct{ events, runners []string }{
-		// x64.yml runs no event a pull request waits for.
-		"ci.yml":  {[]string{"pull_request", "push"}, []string{"ubuntu-26.04-arm", "macos-26"}},
-		"x64.yml": {[]string{"schedule", "workflow_dispatch"}, []string{"ubuntu-26.04", "macos-26-intel"}},
+	for name, want := range map[string]struct {
+		events, runners []string
+		concurrency     map[string]any
+	}{
+		// x64.yml runs no event a pull request waits for. ci.yml cancels
+		// the run in progress of a pull request alone; a push has a
+		// group of its own commit, so no push replaces another.
+		"ci.yml": {[]string{"pull_request", "push"}, []string{"ubuntu-26.04-arm", "macos-26"},
+			map[string]any{"group": "${{ github.workflow }}-${{ github.ref }}-${{ github.event.head_commit.id }}", "cancel-in-progress": "${{ github.event_name == 'pull_request' }}"}},
+		// x64.yml cancels nothing, and its cron and a dispatch are two
+		// groups.
+		"x64.yml": {[]string{"schedule", "workflow_dispatch"}, []string{"ubuntu-26.04", "macos-26-intel"},
+			map[string]any{"group": "${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}", "cancel-in-progress": false}},
 	} {
-		t.Run(name, func(t *testing.T) { checkCIJob(t, read(name), want.events, want.runners) })
+		t.Run(name, func(t *testing.T) { checkCIJob(t, read(name), want.events, want.runners, want.concurrency) })
 	}
 	assert.Equal(t, jobBody(t, read("ci.yml")), jobBody(t, read("x64.yml")), "the job of x64.yml is the job of ci.yml")
 }
@@ -324,20 +348,24 @@ func jobBody(t *testing.T, src []byte) []string {
 	return lines
 }
 
-// cacheKey returns the key of the cache of the container e2e: the
-// prefix, then the sha256 of the fixture mise.lock.
+// cacheKey returns the key of the cache of the container e2e, from the
+// fixture mise.lock and the pins of this repository (container.CacheKey).
 func cacheKey(t *testing.T) string {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(container.FixtureLock)))
+	root := citest.ModuleRoot(t)
+	lock, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(container.FixtureLock)))
 	require.NoError(t, err)
-	sum := sha256.Sum256(b)
-	return container.CacheKeyPrefix + hex.EncodeToString(sum[:])
+	src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(pins.Path)))
+	require.NoError(t, err)
+	p, err := pins.Parse(src)
+	require.NoError(t, err)
+	return container.CacheKey(lock, p)
 }
 
 // checkCIJob holds a workflow to the events it runs on, and its one
 // job to the runners want, in order, and to the mise, setup and all
 // steps.
-func checkCIJob(t *testing.T, src []byte, events, want []string) {
+func checkCIJob(t *testing.T, src []byte, events, want []string, concurrency map[string]any) {
 	t.Helper()
 	var wf struct {
 		On          map[string]yaml.Node `yaml:"on"`
@@ -357,7 +385,7 @@ func checkCIJob(t *testing.T, src []byte, events, want []string) {
 		} `yaml:"jobs"`
 	}
 	require.NoError(t, yaml.Unmarshal(src, &wf))
-	assert.Equal(t, map[string]any{"group": "${{ github.workflow }}-${{ github.ref }}", "cancel-in-progress": true}, wf.Concurrency, "one run per workflow and ref")
+	assert.Equal(t, concurrency, wf.Concurrency, "the concurrency of the file")
 	got := slices.Sorted(maps.Keys(wf.On))
 	assert.Equal(t, slices.Sorted(slices.Values(events)), got, "the events")
 	require.Len(t, wf.Jobs, 1)
@@ -387,11 +415,15 @@ func checkCIJob(t *testing.T, src []byte, events, want []string) {
 			assert.Equal(t, map[string]any{"path": container.CacheDir, "key": cacheKey(t)}, s.With, "the cache of the container e2e")
 		case s.Run == "go run ./tools/ci setup":
 			index["setup"] = i
-		case s.Run == "go run ./tools/ci all":
+		case s.Run == BuildLine:
+			index["build"] = i
+		case s.Run == BuiltCI+" all":
 			index["all"] = i
 		}
 	}
-	require.Len(t, index, 4, "the mise, cache, setup and all steps: %v", index)
+	require.Len(t, index, 5, "the mise, cache, setup, build and all steps: %v", index)
+	assert.Less(t, index["setup"], index["build"])
+	assert.Less(t, index["build"], index["all"], "all runs the built tools/ci, so its exit status reaches the job")
 	assert.Less(t, index["mise"], index["cache"])
 	assert.Less(t, index["cache"], index["setup"])
 	assert.Less(t, index["mise"], index["setup"])

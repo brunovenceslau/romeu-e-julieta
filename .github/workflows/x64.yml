@@ -17,15 +17,14 @@ on:
     - cron: "0 6 * * *"
   workflow_dispatch:
 
+# A run cancels none in progress, and the schedule and a dispatch by
+# hand are groups of their own, so neither replaces the other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
-
-# One run per workflow and ref: a new run of a pull request, an edit of
-# its title or body among them, cancels the one in progress, so an edit
-# does not queue a second full run.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 # The environment of every mise run, mise-action's and the one of the
 # mise shim that starts go: mise reads mise.toml as its one
@@ -89,14 +88,26 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           # CacheDir of e2e/internal/container: the herdr and the mise
-          # it downloads, each checked against kits/pins.yaml whenever
-          # it is read, so a restored file is not trusted for being
-          # cached. The key is the sha256 of the fixture mise.lock
-          # (e2e/internal/container/testdata/fixture.mise.lock), which
-          # the workflows test holds it to.
+          # it downloads, each checked against kits/pins.yaml when it is
+          # installed for the cases, so a restored file is not trusted
+          # for being cached. The image of the workload is not cached:
+          # every run pulls it by its digest. The key names the runner's
+          # OS and architecture, so each architecture keeps its own
+          # entry and a macOS runner, which runs no container e2e,
+          # finds none to restore and saves none, and then one hash of
+          # the fixture mise.lock and the herdr and mise pins, so a pin
+          # that changes is a new entry (CacheKey of
+          # tools/ci/internal/container, which the workflows test holds
+          # it to).
           path: /tmp/romeu-e-julieta-container-e2e
-          key: container-e2e-3f91d2235d0f01564e532831813a9010e4a800e2507e6637fc44b16ac0c66d7c
+          key: container-e2e-${{ runner.os }}-${{ runner.arch }}-87f76e55cffe50ac5b1dab8f74384c9fa41bd7e6ae61d22f3f6c9bab262b6344
       - name: Trust mise.toml and fill the module cache
         run: go run ./tools/ci setup
+      # tools/ci is built and then run, not started by "go run", which
+      # reaches the job with every exit status other than 0 as 1: so the
+      # job ends with the status tools/ci returns, 3 for an
+      # infrastructure error among them.
+      - name: Build tools/ci
+        run: go build -o "$RUNNER_TEMP/ci" ./tools/ci
       - name: All checks
-        run: go run ./tools/ci all
+        run: '"$RUNNER_TEMP/ci" all'

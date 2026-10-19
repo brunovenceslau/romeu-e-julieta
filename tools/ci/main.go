@@ -26,7 +26,9 @@
 // workflows that cannot judge the commit it read (a denylist that does
 // not parse, say) is a failed check, exit 1. Started through "go run", every
 // status other than 0 reaches the caller as 1, with the real one in the
-// "exit status" line that go prints; a built binary returns it as is.
+// "exit status" line that go prints; a built binary returns it as is,
+// which is why the workflows build tools/ci and then run it
+// (workflows.BuildLine).
 // A run that SIGINT or SIGTERM cut short prints one "interrupted" line
 // and exits 128 plus the signal number, even after a failure: the
 // signal rule of internal/procgroup (04 4.1, Signals), which runs every

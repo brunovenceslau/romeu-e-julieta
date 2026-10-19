@@ -188,7 +188,7 @@ func workflowFindings(path string, src []byte) []check.Finding {
 	if err != nil {
 		return []check.Finding{{Where: where, Rule: "workflows", Msg: err.Error()}}
 	}
-	c := &grammar{where: where}
+	c := &grammar{where: where, exempt: prOnlyCancel(doc)}
 	c.walk(doc)
 	c.file(doc)
 	if strings.TrimPrefix(path, Dir) == "ci.yml" {
@@ -219,6 +219,27 @@ func parseWorkflow(src []byte) (*yaml.Node, error) {
 type grammar struct {
 	where    string
 	findings []check.Finding
+	// exempt is the one node whose expression is not a context path:
+	// the cancel-in-progress of the file's concurrency, when it is
+	// prOnlyExpression (prOnlyCancel).
+	exempt *yaml.Node
+}
+
+// prOnlyExpression is the one expression the grammar admits that is no
+// context path, and only as the cancel-in-progress of the file's
+// concurrency: a new run cancels the one in progress only for a pull
+// request, so that a push to the default branch never cancels the run of
+// the push before it.
+const prOnlyExpression = "${{ github.event_name == 'pull_request' }}"
+
+// prOnlyCancel returns the cancel-in-progress node of the file's
+// concurrency when it is prOnlyExpression, and nil otherwise.
+func prOnlyCancel(doc *yaml.Node) *yaml.Node {
+	v := field(field(doc, "concurrency"), "cancel-in-progress")
+	if v != nil && v.Kind == yaml.ScalarNode && v.Tag == "!!str" && v.Value == prOnlyExpression {
+		return v
+	}
+	return nil
 }
 
 func (c *grammar) add(n *yaml.Node, msg string) {
@@ -242,7 +263,9 @@ func (c *grammar) walk(n *yaml.Node) {
 	case !slices.Contains(plainTags, n.Tag):
 		c.add(n, "the tag "+strconv.Quote(n.Tag)+" is outside the grammar")
 	case n.Kind == yaml.ScalarNode:
-		c.expressions(n)
+		if n != c.exempt {
+			c.expressions(n)
+		}
 	}
 	if n.Kind == yaml.MappingNode {
 		var seen []string
@@ -631,10 +654,46 @@ func (c *grammar) inputs(uses, with, strategy *yaml.Node) {
 		}
 		if value.Kind != yaml.ScalarNode {
 			c.add(value, "a with value is a scalar")
-		} else if withExpressionFails(value.Value, strategy) {
+		} else if withExpressionFails(runnerFree(action, key.Value, value.Value), strategy) {
 			c.add(value, "this with input is a literal, or one ${{ matrix.<key> }} alone whose values are literals")
 		}
 	}
+}
+
+// reportedByWalk reports whether n holds an expression that walk
+// already reports, as it is no context path, so that no second finding
+// names it.
+func reportedByWalk(n *yaml.Node) bool {
+	rest := n.Value
+	for {
+		_, after, found := strings.Cut(rest, "${{")
+		if !found {
+			return false
+		}
+		inner, tail, closed := strings.Cut(after, "}}")
+		if !closed || !contextPath.MatchString(inner) {
+			return true
+		}
+		rest = tail
+	}
+}
+
+// runnerExpressions are the expressions the key of an actions/cache step
+// may hold beside its literal text: the runner's OS and architecture,
+// which the runner sets and no event can write, so that each runner
+// class keeps its own cache entry.
+var runnerExpressions = []string{"${{ runner.os }}", "${{ runner.arch }}"}
+
+// runnerFree returns value with each of runnerExpressions taken out when
+// it is the key input of actions/cache, and value as it is otherwise.
+func runnerFree(action, input, value string) string {
+	if action != "actions/cache" || input != "key" {
+		return value
+	}
+	for _, e := range runnerExpressions {
+		value = strings.ReplaceAll(value, e, "")
+	}
+	return value
 }
 
 // withExpressionFails reports whether a with value holds an expression
@@ -740,8 +799,8 @@ func (c *grammar) concurrency(n *yaml.Node) {
 		switch {
 		case !slices.Contains(concurrencyKeys, key.Value):
 			c.add(key, "the concurrency key "+strconv.Quote(key.Value)+" is outside the grammar: group and cancel-in-progress")
-		case key.Value == "cancel-in-progress" && (value.Kind != yaml.ScalarNode || value.Tag != "!!bool"):
-			c.add(value, "cancel-in-progress is true or false")
+		case key.Value == "cancel-in-progress" && value != c.exempt && !reportedByWalk(value) && (value.Kind != yaml.ScalarNode || value.Tag != "!!bool"):
+			c.add(value, "cancel-in-progress is true, false or "+prOnlyExpression)
 		}
 	}
 	if field(n, "group") == nil {
@@ -749,10 +808,28 @@ func (c *grammar) concurrency(n *yaml.Node) {
 	}
 }
 
+// BuildLine is the one run line that builds a program: tools/ci into
+// the runner's temporary directory, and BuiltCI is that program, which a
+// run line may start in place of "go run ./tools/ci". A program started
+// by "go run" reaches the job with every exit status other than 0 as 1;
+// the built one returns its own, so that the job's log and status show
+// the infrastructure status of tools/ci (3) as it is.
+const (
+	BuildLine = `go build -o "$RUNNER_TEMP/ci" ./tools/ci`
+	BuiltCI   = `"$RUNNER_TEMP/ci"`
+)
+
 // runLine reports whether s is a run line of the grammar: one line of
 // words split by single spaces, starting with one of runPrograms and a
-// subcommand, each word plain or a quoted variable.
+// subcommand, or with BuiltCI and a subcommand, each word plain or a
+// quoted variable; or BuildLine exactly.
 func runLine(s string) bool {
+	if s == BuildLine {
+		return true
+	}
+	if rest, ok := strings.CutPrefix(s, BuiltCI+" "); ok {
+		s = strings.Join(runPrograms[0], " ") + " " + rest
+	}
 	words := strings.Split(s, " ")
 	if len(words) < 4 {
 		return false
