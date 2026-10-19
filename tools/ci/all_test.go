@@ -126,7 +126,7 @@ func TestAll(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := citest.NewTree(t)
+			r := newSchemaTree(t)
 			r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 			if tt.change != nil {
 				tt.change(t, r)
@@ -344,7 +344,7 @@ func TestAllArchitecture(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.uname, func(t *testing.T) {
-			r := citest.NewTree(t)
+			r := newSchemaTree(t)
 			r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 			r.Commit("fixture")
 			profile := filepath.Join(t.TempDir(), "cover.out")
@@ -373,7 +373,7 @@ func TestAllArchitectureTranslated(t *testing.T) {
 		same, translatedCases = "unknown", []bool{true}
 	}
 	for _, translated := range translatedCases {
-		r := citest.NewTree(t)
+		r := newSchemaTree(t)
 		r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 		r.Commit("fixture")
 		profile := filepath.Join(t.TempDir(), "cover.out")
@@ -695,7 +695,7 @@ func TestAllStepsLeaveTheTree(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := citest.NewTree(t)
+			r := newSchemaTree(t)
 			r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
 			r.Commit("fixture")
 			if tt.before != nil {
