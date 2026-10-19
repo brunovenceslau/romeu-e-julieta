@@ -3,7 +3,7 @@ id: T125
 title: "`tools/schemagen`, `tools/ci schema` and the license allowlist"
 milestone: M1
 module: spec
-fate: new
+fate: merged
 owns:
   - tools/schemagen/**
   - tools/ci/internal/schema/**
@@ -27,9 +27,14 @@ ask_first:
   - checks
   - dependencies
 sitting: none
+merged: 2026-10-18
+pr: 160
 ---
 
 # T125 - `tools/schemagen`, `tools/ci schema` and the license allowlist
+
+Merged on 2026-10-18 in pull request #160. The text below is the one
+written at the re-plan.
 
 Goal: The reflect-based JSON Schema generator and the `schema` check of
 10 10.2, in the `spec` module where 12 12.2 puts them, before T135 (the
