@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Romeu e Julieta plan</title>
+<style>
+/* Layout: a full-height graph canvas with a slim progress band on top and a detail drawer on the right (bottom sheet on phones). */
+:root {
+  --bg: #f3f4f7; --panel: #ffffff; --fg: #1d2230; --muted: #646b7d; --line: #d9dce5; --edge: #9aa1b3;
+  --merged: #2f8f6b; --ready: #d9822b; --waiting: #4a6fd1; --deferred: #a3a8b8; --closed: #c9ccd6;
+  --accent: #7a4fd6; --hi: #1d2230;
+  --on-merged: #12141b; --on-ready: #12141b; --on-waiting: #ffffff; --on-deferred: #12141b; --on-closed: #12141b;
+  --display: ui-serif, Georgia, "Times New Roman", serif; --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #12141b; --panel: #1a1d27; --fg: #e6e8ef; --muted: #9298aa; --line: #2b2f3d; --edge: #4b5166;
+  --merged: #45b88c; --ready: #f0a04b; --waiting: #7d9bf0; --deferred: #5d6275; --closed: #3a3e4d;
+  --accent: #a98bf0; --hi: #ffffff; color-scheme: dark;
+  --on-merged: #12141b; --on-ready: #12141b; --on-waiting: #12141b; --on-deferred: #ffffff; --on-closed: #ffffff } }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); display: flex; flex-direction: column; overflow: hidden; }
+header { padding-block: 12px 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; gap: 10px; }
+.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+h1 { font-family: var(--display); font-weight: 650; font-size: 1.3rem; margin: 0; text-wrap: balance; }
+.asof { font-family: var(--mono); font-size: .75rem; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.chip { font: 500 .75rem var(--body); border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 999px; padding: 3px 10px 3px 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.chip .dot { width: 9px; height: 9px; border-radius: 50%; }
+.chip[aria-pressed="false"] { opacity: .4; }
+.chip .n { font-family: var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.chip:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ms { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; }
+.msb { border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; background: transparent; color: var(--fg); text-align: left; cursor: pointer; font: inherit; }
+.msb[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.msb .l { display: flex; justify-content: space-between; font: 500 .72rem var(--mono); letter-spacing: .03em; }
+.msb .l span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 5px; background: var(--line); }
+.bar i { display: block; height: 100%; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tools input, .tools select { font: .82rem var(--body); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+.tools input { flex: 1 1 180px; min-width: 0; }
+.tools label { font-size: .78rem; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+main { flex: 1; position: relative; min-height: 0; display: flex; }
+#graph { flex: 1; min-width: 0; }
+svg { width: 100%; height: 100%; display: block; cursor: grab; }
+svg:active { cursor: grabbing; }
+.link { stroke: var(--edge); stroke-opacity: .55; fill: none; }
+.link.after { stroke-dasharray: 3 3; }
+.node circle { stroke: var(--bg); stroke-width: 1.5; cursor: pointer; }
+.node.merged circle { fill: var(--merged); } .node.ready circle { fill: var(--ready); } .node.waiting circle { fill: var(--waiting); }
+.node.deferred circle { fill: var(--deferred); } .node.closed circle { fill: var(--closed); }
+svg { touch-action: none; user-select: none; }
+code { font-family: var(--mono); font-size: .92em; }
+.node text { font: 500 9px var(--mono); fill: var(--muted); pointer-events: none; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
+.node.ready circle { stroke: var(--ready); stroke-width: 3; stroke-opacity: .35; }
+.dim .node:not(.on) { opacity: .12; }
+.dim .link:not(.on) { stroke-opacity: .06; }
+.link.on { stroke: var(--hi); stroke-opacity: .85; }
+.node.sel circle { stroke: var(--hi); stroke-width: 2.5; stroke-opacity: 1; }
+.node.on text { fill: var(--fg); }
+.mslabel { font: 650 13px var(--display); fill: var(--muted); opacity: .55; text-anchor: middle; }
+aside { width: min(380px, 100%); border-left: 1px solid var(--line); background: var(--panel); overflow-y: auto; padding: 16px; padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 12px; }
+aside h2 { font-family: var(--display); font-weight: 500; font-size: 1.1rem; margin: 0; text-wrap: balance; line-height: 1.3; }
+aside .id { font: 500 .8rem var(--mono); color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pill { font: 600 .68rem var(--body); text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; }
+aside p { margin: 0; line-height: 1.55; font-size: .88rem; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; margin: 0; font-size: .82rem; }
+dt { color: var(--muted); }
+dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.refs { display: flex; flex-wrap: wrap; gap: 4px; }
+.ref { font: 500 .74rem var(--mono); border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 4px; padding: 1px 6px; cursor: pointer; display: inline-flex; gap: 5px; align-items: center; }
+.ref .dot { width: 7px; height: 7px; border-radius: 50%; }
+aside a { color: var(--accent); font-size: .82rem; }
+.hint { color: var(--muted); font-size: .85rem; line-height: 1.55; }
+.close { margin-left: auto; border: 0; background: transparent; color: var(--muted); font-size: 1.2rem; cursor: pointer; display: none; }
+@media (max-width: 720px) {
+  main { flex-direction: column; }
+  aside { width: 100%; max-height: 45%; border-left: 0; border-top: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left, 0px)); }
+  aside.empty { display: none; }
+  .close { display: inline; }
+  .legend { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+html, body { margin: 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>Romeu e Julieta - plan</h1>
+    <span class="asof" id="asof"></span>
+    <div class="legend" id="legend" role="group" aria-label="Show tasks by status"></div>
+  </div>
+  <div class="ms" id="ms" role="group" aria-label="Milestones"></div>
+  <div class="tools">
+    <input id="q" type="search" placeholder="Search id, title, module" aria-label="Search tasks">
+    <select id="layout" aria-label="Layout">
+      <option value="milestone">Columns by milestone</option>
+      <option value="free">Free (force)</option>
+    </select>
+    <label><input type="checkbox" id="labels" checked> Ids</label>
+    <label><input type="checkbox" id="afters" checked> Soft edges (after)</label>
+  </div>
+</header>
+<main>
+  <div id="graph"><svg id="svg" role="group" aria-label="Task dependency graph"></svg></div>
+  <aside id="panel" class="empty"></aside>
+</main>
+
+
+<script>
+"use strict";
+// The first task of an id wins, as in tools/ci plan; an empty milestone is "none".
+const RAW = /*DATA*/[];
+const TASKS = RAW.filter((t, i) => RAW.findIndex(u => u.id === t.id) === i).map(t => ({ ...t, milestone: t.milestone || "none" }));
+const META = /*META*/{};
+const STATUS = [
+  ["ready", "Ready"], ["waiting", "Waiting"], ["merged", "Merged"], ["deferred", "Deferred"], ["closed", "Folded / removed / v1"]
+];
+// The milestones in the data: M0, M1, ... in order, any other name after them, "none" last.
+const msRank = m => m === "none" ? [2, 0, ""] : /^M\d+$/.test(m) ? [0, +m.slice(1), ""] : [1, 0, m];
+const MS = [...new Set(TASKS.map(t => t.milestone))].sort((a, b) => {
+  const x = msRank(a), y = msRank(b);
+  return x[0] - y[0] || x[1] - y[1] || (x[2] < y[2] ? -1 : x[2] > y[2] ? 1 : 0);
+});
+const NS = "http://www.w3.org/2000/svg";
+const $ = id => document.getElementById(id);
+const byId = new Map(TASKS.map(t => [t.id, t]));
+const show = new Set(["ready", "waiting", "merged"]);
+let msFilter = null, selected = null;
+
+$("asof").textContent = `${META.date} - ${TASKS.length} tasks`;
+
+// Edges point from a dependency to the task that waits on it.
+const allLinks = [];
+TASKS.forEach(t => {
+  (t.needs || []).forEach(d => byId.has(d) && allLinks.push({ source: d, target: t.id, kind: "needs" }));
+  (t.after || []).forEach(d => byId.has(d) && allLinks.push({ source: d, target: t.id, kind: "after" }));
+});
+const dependents = new Map(TASKS.map(t => [t.id, []]));
+allLinks.forEach(l => dependents.get(l.source).push({ id: l.target, kind: l.kind }));
+
+// Legend and status toggles
+const legend = $("legend");
+STATUS.forEach(([k, label]) => {
+  const b = document.createElement("button");
+  b.className = "chip"; b.type = "button"; b.dataset.k = k;
+  b.setAttribute("aria-pressed", show.has(k));
+  b.innerHTML = `<span class="dot" style="background:var(--${k})"></span>${label} <span class="n">${TASKS.filter(t => t.status === k).length}</span>`;
+  b.onclick = () => { show.has(k) ? show.delete(k) : show.add(k); b.setAttribute("aria-pressed", show.has(k)); render(); };
+  legend.appendChild(b);
+});
+
+// Milestone progress bars, also a filter
+const msEl = $("ms");
+MS.forEach(m => {
+  const ts = TASKS.filter(t => t.milestone === m && t.status !== "closed");
+  if (!ts.length) return;
+  const live = ts.filter(t => t.status !== "deferred");
+  const done = live.filter(t => t.status === "merged").length;
+  const b = document.createElement("button");
+  b.className = "msb"; b.type = "button"; b.setAttribute("aria-pressed", "false");
+  const seg = ["merged", "ready", "waiting", "deferred"].map(k => {
+    const n = ts.filter(t => t.status === k).length;
+    return n ? `<i style="width:${100 * n / ts.length}%;background:var(--${k})"></i>` : "";
+  }).join("");
+  b.innerHTML = `<div class="l"><span>${m === "none" ? "no milestone" : m}</span><span>${done}/${live.length}</span></div><div class="bar">${seg}</div>`;
+  b.title = `${m}: ${done} of ${live.length} active tasks merged; ${ts.length - live.length} deferred`;
+  b.onclick = () => {
+    msFilter = msFilter === m ? null : m;
+    msEl.querySelectorAll(".msb").forEach(x => x.setAttribute("aria-pressed", "false"));
+    if (msFilter) b.setAttribute("aria-pressed", "true");
+    render();
+  };
+  msEl.appendChild(b);
+});
+
+// ---- The drawing: plain SVG, a pan and zoom transform, a small force layout.
+const svg = $("svg");
+const root = document.createElementNS(NS, "g");
+const gLabels = document.createElementNS(NS, "g"), gLinks = document.createElementNS(NS, "g"), gNodes = document.createElementNS(NS, "g");
+root.append(gLabels, gLinks, gNodes);
+svg.appendChild(root);
+const view = { k: 1, x: 0, y: 0 };
+const applyView = () => root.setAttribute("transform", `translate(${view.x},${view.y}) scale(${view.k})`);
+
+const nodes = TASKS.map((t, i) => ({ ...t, deg: 0, x: 0, y: 0, vx: 0, vy: 0, fx: null, fy: null, i }));
+const nodeById = new Map(nodes.map(n => [n.id, n]));
+allLinks.forEach(l => { nodeById.get(l.source).deg++; nodeById.get(l.target).deg++; });
+const radius = n => 4 + Math.sqrt(n.deg) * 1.6;
+let seeded = false;
+
+function size() { const r = $("graph").getBoundingClientRect(); return [r.width || 800, r.height || 600]; }
+
+function visibleSet() {
+  const q = $("q").value.trim().toLowerCase();
+  return new Set(nodes.filter(n => show.has(n.status) && (!msFilter || n.milestone === msFilter) &&
+    (!q || (n.id + " " + n.title + " " + n.module).toLowerCase().includes(q))).map(n => n.id));
+}
+
+// The simulation state: the visible nodes and links, the pull of each
+// node toward its target, and alpha, which cools to zero.
+const sim = { nodes: [], links: [], tx: () => 0, ty: () => 0, sx: 0, sy: 0, alpha: 0, raf: 0 };
+
+function tick() {
+  const { nodes: ns, links, alpha } = sim;
+  // Repulsion between near pairs, and a hard minimum distance.
+  for (let a = 0; a < ns.length; a++) {
+    for (let b = a + 1; b < ns.length; b++) {
+      const p = ns[a], q = ns[b];
+      let dx = q.x - p.x, dy = q.y - p.y;
+      let d2 = dx * dx + dy * dy;
+      if (d2 > 320 * 320) continue;
+      if (d2 === 0) { dx = (Math.random() - .5) * 1e-3; dy = (Math.random() - .5) * 1e-3; d2 = dx * dx + dy * dy; }
+      const d = Math.sqrt(d2);
+      const k = 70 * alpha / Math.max(d2, 25);
+      p.vx -= dx * k; p.vy -= dy * k; q.vx += dx * k; q.vy += dy * k;
+      const min = radius(p) + radius(q) + 6;
+      if (d < min) { const push = (min - d) / d * 0.5; p.vx -= dx * push; p.vy -= dy * push; q.vx += dx * push; q.vy += dy * push; }
+    }
+  }
+  for (const l of links) {
+    const s = l.s, t = l.t;
+    const dx = t.x + t.vx - s.x - s.vx, dy = t.y + t.vy - s.y - s.vy;
+    const d = Math.hypot(dx, dy) || 1e-6;
+    const needs = l.kind === "needs";
+    const k = (d - (needs ? 40 : 60)) / d * alpha * (needs ? 0.5 : 0.15);
+    s.vx += dx * k * 0.5; s.vy += dy * k * 0.5; t.vx -= dx * k * 0.5; t.vy -= dy * k * 0.5;
+  }
+  for (const n of ns) {
+    n.vx += (sim.tx(n) - n.x) * sim.sx * alpha;
+    n.vy += (sim.ty(n) - n.y) * sim.sy * alpha;
+    if (n.fx !== null) { n.x = n.fx; n.vx = 0; } else { n.vx *= 0.6; n.x += n.vx; }
+    if (n.fy !== null) { n.y = n.fy; n.vy = 0; } else { n.vy *= 0.6; n.y += n.vy; }
+  }
+  sim.alpha += (0 - sim.alpha) * 0.03;
+}
+
+function paint() {
+  for (const l of sim.links) {
+    l.el.setAttribute("x1", l.s.x); l.el.setAttribute("y1", l.s.y); l.el.setAttribute("x2", l.t.x); l.el.setAttribute("y2", l.t.y);
+  }
+  for (const n of sim.nodes) n.el.setAttribute("transform", `translate(${n.x},${n.y})`);
+}
+
+function frame() {
+  sim.raf = 0;
+  for (let i = 0; i < 2 && sim.alpha > 0.002; i++) tick();
+  paint();
+  if (sim.alpha > 0.002) sim.raf = requestAnimationFrame(frame);
+}
+function heat(a) { sim.alpha = Math.max(sim.alpha, a); if (!sim.raf) sim.raf = requestAnimationFrame(frame); }
+
+function svgEl(name, attrs) {
+  const e = document.createElementNS(NS, name);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+let linkEls = [], nodeEls = [];
+
+function render() {
+  const vis = visibleSet();
+  const useAfter = $("afters").checked;
+  const vn = nodes.filter(n => vis.has(n.id));
+  const vl = allLinks.filter(l => (useAfter || l.kind === "needs") && vis.has(l.source) && vis.has(l.target))
+    .map(l => ({ ...l, s: nodeById.get(l.source), t: nodeById.get(l.target) }));
+  const [w, h] = size();
+  const layout = $("layout").value;
+  const cols = MS.filter(m => vn.some(n => n.milestone === m));
+  const colX = m => cols.length < 2 ? w / 2 : 60 + (w - 120) * cols.indexOf(m) / (cols.length - 1);
+
+  if (!seeded) {
+    // A deterministic start: a spiral around the target column.
+    seeded = true;
+    nodes.forEach((n, i) => {
+      const a = i * 2.399963, r = 14 * Math.sqrt(i + 1);
+      n.x = w / 2 + r * Math.cos(a); n.y = h / 2 + r * Math.sin(a);
+    });
+  }
+
+  // A render replaces the elements, so a drag in flight ends here.
+  nodes.forEach(n => { n.fx = null; n.fy = null; });
+  gLabels.replaceChildren(); gLinks.replaceChildren(); gNodes.replaceChildren();
+  if (layout === "milestone") {
+    cols.forEach(m => {
+      const t = svgEl("text", { class: "mslabel", x: colX(m), y: 24 });
+      t.textContent = m === "none" ? "no milestone" : m;
+      gLabels.appendChild(t);
+    });
+  }
+
+  vl.forEach(l => {
+    l.el = svgEl("line", { class: "link " + l.kind, "stroke-width": l.kind === "needs" ? 1.2 : 1 });
+    gLinks.appendChild(l.el);
+  });
+  vn.forEach(n => {
+    const g = svgEl("g", { class: "node " + n.status + (n.id === selected ? " sel" : ""), tabindex: 0, role: "button", "aria-label": n.id });
+    g.appendChild(svgEl("circle", { r: radius(n) }));
+    const t = svgEl("text", { dy: "-0.9em", "text-anchor": "middle" });
+    t.textContent = n.id;
+    if (!$("labels").checked) t.setAttribute("display", "none");
+    g.appendChild(t);
+    const title = document.createElementNS(NS, "title");
+    title.textContent = `${n.id} - ${n.title.replace(/`/g, "")}`;
+    g.appendChild(title);
+    n.el = g;
+    bindNode(g, n);
+    gNodes.appendChild(g);
+  });
+  linkEls = vl; nodeEls = vn;
+
+  sim.nodes = vn; sim.links = vl;
+  if (layout === "milestone") {
+    sim.tx = n => colX(n.milestone); sim.ty = () => h / 2; sim.sx = 0.5; sim.sy = 0.06;
+  } else {
+    sim.tx = () => w / 2; sim.ty = () => h / 2; sim.sx = 0.04; sim.sy = 0.06;
+  }
+  heat(0.8);
+  paint();
+  if (selected) highlight(selected);
+}
+
+// Dragging a node moves it; a click without movement selects it.
+function bindNode(g, n) {
+  let start = null, moved = false;
+  g.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    g.setPointerCapture(e.pointerId);
+    start = [e.clientX, e.clientY]; moved = false;
+    n.fx = n.x; n.fy = n.y;
+  });
+  g.addEventListener("pointermove", e => {
+    if (!start) return;
+    if (Math.hypot(e.clientX - start[0], e.clientY - start[1]) > 3) moved = true;
+    if (moved) { const r = svg.getBoundingClientRect(); n.fx = (e.clientX - r.left - view.x) / view.k; n.fy = (e.clientY - r.top - view.y) / view.k; heat(0.2); }
+  });
+  const end = e => {
+    if (!start) return;
+    start = null; n.fx = null; n.fy = null;
+    if (!moved) select(n.id);
+    heat(0.1);
+  };
+  g.addEventListener("pointerup", end);
+  g.addEventListener("pointercancel", () => { start = null; n.fx = null; n.fy = null; });
+  g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(n.id); } });
+  g.addEventListener("mouseenter", () => { if (!selected) highlight(n.id); });
+  g.addEventListener("mouseleave", () => { if (!selected) highlight(null); });
+}
+
+// Pan with a drag on the background, zoom with the wheel at the cursor.
+(() => {
+  let pan = null;
+  svg.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return; // a node stops its own pointerdown
+    svg.setPointerCapture(e.pointerId);
+    pan = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
+  });
+  svg.addEventListener("pointermove", e => {
+    if (!pan) return;
+    if (Math.hypot(e.clientX - pan.x, e.clientY - pan.y) > 3) pan.moved = true;
+    view.x = pan.vx + e.clientX - pan.x; view.y = pan.vy + e.clientY - pan.y; applyView();
+  });
+  svg.addEventListener("pointerup", () => { if (pan && !pan.moved) select(null); pan = null; });
+  svg.addEventListener("pointercancel", () => { pan = null; });
+  svg.addEventListener("wheel", e => {
+    e.preventDefault();
+    const r = svg.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const k = Math.min(4, Math.max(0.2, view.k * Math.exp(-e.deltaY * 0.0015)));
+    view.x = mx - (mx - view.x) * k / view.k; view.y = my - (my - view.y) * k / view.k; view.k = k;
+    applyView();
+  }, { passive: false });
+})();
+
+function highlight(id) {
+  const on = new Set(id ? [id] : []);
+  if (id) allLinks.forEach(l => { if (l.source === id) on.add(l.target); if (l.target === id) on.add(l.source); });
+  svg.classList.toggle("dim", !!id);
+  nodeEls.forEach(n => n.el.classList.toggle("on", on.has(n.id)));
+  linkEls.forEach(l => l.el.classList.toggle("on", !!id && (l.source === id || l.target === id)));
+}
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const code = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+const label = { ready: "Ready", waiting: "Waiting", merged: "Merged", deferred: "Deferred", closed: "Closed" };
+function refList(items) {
+  if (!items.length) return '<span class="hint">none</span>';
+  return '<div class="refs">' + items.map(({ id, kind }) => {
+    const t = byId.get(id);
+    return `<button class="ref" type="button" data-id="${esc(id)}" title="${esc(t ? t.title.replace(/`/g, "") : id)}${kind === "after" ? " (after)" : ""}"><span class="dot" style="background:var(--${t ? t.status : "closed"})"></span>${esc(id)}${kind === "after" ? "~" : ""}</button>`;
+  }).join("") + "</div>";
+}
+
+const panel = $("panel");
+function emptyPanel() {
+  const ready = TASKS.filter(t => t.status === "ready");
+  panel.className = "empty";
+  panel.innerHTML = `<h2>Ready to start</h2>
+    <p class="hint">Open tasks whose needs and after are all merged, the same rule as <code>go run ./tools/ci plan --ready</code>. Click a node for its details; a tilde (~) marks a soft "after" edge.</p>
+    ${refList(ready.map(t => ({ id: t.id })))}
+    <dl>${ready.map(t => `<dt>${esc(t.id)}</dt><dd>${code(t.title)}${t.sitting !== "none" ? ` - sitting ${esc(t.sitting)}` : ""}${t.ask_first.length ? ` - ask-first: ${esc(t.ask_first.join(", "))}` : ""}</dd>`).join("")}</dl>`;
+  bindRefs();
+}
+function select(id) {
+  selected = id;
+  nodeEls.forEach(n => n.el.classList.toggle("sel", n.id === id));
+  highlight(id);
+  if (!id) return emptyPanel();
+  const t = byId.get(id);
+  const deps = [...t.needs.map(i => ({ id: i, kind: "needs" })), ...t.after.map(i => ({ id: i, kind: "after" }))];
+  const blockers = deps.filter(d => byId.get(d.id)?.status !== "merged");
+  panel.className = "";
+  panel.innerHTML = `
+    <div class="id"><span>${esc(t.id)}</span><span class="pill" style="background:var(--${t.status});color:var(--on-${t.status})">${label[t.status]}</span><span>fate: ${esc(t.fate)}</span><button class="close" type="button" aria-label="Close details">x</button></div>
+    <h2>${code(t.title)}</h2>
+    ${t.goal ? `<p>${code(t.goal)}</p>` : ""}
+    <dl>
+      <dt>Milestone</dt><dd>${esc(t.milestone)}</dd>
+      <dt>Module</dt><dd>${esc(t.module)}</dd>
+      <dt>Sitting</dt><dd>${esc(t.sitting)}</dd>
+      <dt>Ask-first</dt><dd>${t.ask_first.length ? esc(t.ask_first.join(", ")) : "none"}</dd>
+      ${t.pr ? `<dt>Merged</dt><dd>${esc(t.merged)} in <a href="https://github.com/brunovenceslau/romeu-e-julieta/pull/${encodeURIComponent(t.pr)}" target="_blank" rel="noopener">#${esc(t.pr)}</a></dd>` : ""}
+      ${t.status === "waiting" ? `<dt>Blocked by</dt><dd>${refList(blockers)}</dd>` : ""}
+      <dt>Depends on</dt><dd>${refList(deps)}</dd>
+      <dt>Unblocks</dt><dd>${refList(dependents.get(t.id))}</dd>
+    </dl>
+    <a href="https://github.com/brunovenceslau/romeu-e-julieta/blob/main/${esc(t.path)}" target="_blank" rel="noopener">Open the task file on GitHub</a>`;
+  panel.querySelector(".close").onclick = () => select(null);
+  bindRefs();
+}
+function bindRefs() {
+  panel.querySelectorAll(".ref").forEach(b => b.onclick = () => {
+    const t = byId.get(b.dataset.id);
+    if (t && !show.has(t.status)) { show.add(t.status); legend.querySelector(`[data-k="${t.status}"]`).setAttribute("aria-pressed", "true"); render(); }
+    select(b.dataset.id);
+  });
+}
+
+["q", "layout", "labels", "afters"].forEach(id => $(id).addEventListener("input", render));
+window.addEventListener("resize", render);
+render();
+emptyPanel();
+</script>
+</body>
+</html>
