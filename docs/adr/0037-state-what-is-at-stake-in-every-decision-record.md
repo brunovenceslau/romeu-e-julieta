@@ -4,20 +4,18 @@ Date: 2026-10-19
 
 ## Status
 
-Proposed
+Accepted
 
-It becomes Accepted in a later pull request, which adds the
-`Supersedes in part` line for rule 9 of
-[ADR 0001, adopt a documentation standard with checkable rules and a voice](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
-here and the matching
-`Superseded in part by` line there.
+Supersedes in part [1. Adopt a documentation standard with checkable rules and a voice](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md) (rule 9)
 
 ## Context
 
 The forbidden-names rule was recorded without what was at stake, and
 later sessions sized their work by the strongest word they found
 instead ([ADR 0036, keep the forbidden names as a convenience list in the config repository](0036-keep-the-forbidden-names-as-a-convenience-list-in-the-config-repository.md)). A record
-in the layout of rule 6 of ADR 0001 has a Context section, but nothing
+in the layout of rule 6 of
+[ADR 0001, adopt a documentation standard with checkable rules and a voice](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
+has a Context section, but nothing
 asks it to say what happens when the decision turns out wrong, and the
 decision notes of `docs/handoff/decisions/` have no context section at
 all. A reader can then tell what was decided and when, and not how much
@@ -48,9 +46,6 @@ stakes rather than restating its weight.
 
 ## Consequences
 
-- The pull request that accepts this record adds its `Supersedes in
-  part` line for rule 9 of ADR 0001 and the matching `Superseded in
-  part by` line to ADR 0001.
 - `docs/handoff/about.md` names the rule for decision notes.
 - A record written before this one is not rewritten; its stakes are
   added when it is next amended.

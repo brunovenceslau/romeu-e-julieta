@@ -13,6 +13,8 @@ Superseded in part by [10. Reopen the required checks without the bypass and ame
 
 Superseded in part by [ADR 0013, admit Excalidraw scenes as diagrams under docs/notes and amend rule 17 of the documentation standard](0013-admit-excalidraw-scenes-as-diagrams-under-docs-notes-and-amend-rule-17-of-the-documentation-standard.md) (rule 17)
 
+Superseded in part by [37. State what is at stake in every decision record](0037-state-what-is-at-stake-in-every-decision-record.md) (rule 9)
+
 ## Context
 
 In Shakespeare's play, Romeo and Juliet do not die for lack of a plan.
