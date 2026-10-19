@@ -3,7 +3,7 @@ id: T013
 title: "The container e2e, on the workload's base"
 milestone: M1
 module: julieta-core
-fate: kept
+fate: merged
 owns:
   - e2e/container_test.go
   - e2e/internal/container/**
@@ -41,9 +41,14 @@ ask_first:
   - dependencies
   - kits
 sitting: none
+merged: 2026-10-19
+pr: 186
 ---
 
 # T013 - The container e2e, on the workload's base
+
+Merged on 2026-10-19 in pull request #186. The text below is the one
+written at the re-plan.
 
 Goal: The container e2e on the workload's base: the harness, the check
 package, the image pulled by digest (Q27).
