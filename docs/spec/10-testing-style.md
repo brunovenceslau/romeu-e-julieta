@@ -1315,7 +1315,9 @@ links every command in (one blank-import file per command, 02 2.1);
 links, `tools/new` imports `internal/cli` directly, for the command
 list and the error table its `command` and `error` kinds read, and
 `tools/planviewer` imports `internal/gitsafe` directly, for the plan
-files of past commits its trends read. The
+files of past commits its trends read. `tools/ci` imports
+`internal/manifest` directly too, for the type of the manifest schema
+its generator writes. The
 rows govern the two binaries, and a subpackage follows its own row,
 never its parent's.
 

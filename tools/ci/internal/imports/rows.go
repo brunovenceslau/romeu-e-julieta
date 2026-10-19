@@ -144,12 +144,13 @@ var toolImports = []string{"procgroup", "cmd/romeu/all", "cmd/julieta/all"}
 
 // toolExtra are the further packages below internal/ that one tree of
 // tools imports directly (REQ-0971): tools/ci the clidoc package, which
-// no binary links, and tools/new the cli package, for the command list
+// no binary links, and the manifest package, for the type of the
+// manifest schema its generator writes, and tools/new the cli package, for the command list
 // and the error table its command and error kinds read, and tools/planviewer
 // the gitsafe package, for the read-only history its Trends view shows.
 // A tree is the directory and every package below it.
 var toolExtra = map[string][]string{
-	"tools/ci":         {"cli/clidoc"},
+	"tools/ci":         {"cli/clidoc", "manifest"},
 	"tools/new":        {"cli"},
 	"tools/planviewer": {"gitsafe"},
 }
