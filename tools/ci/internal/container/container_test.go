@@ -23,6 +23,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/kitpin/pins"
 )
 
 // TestRunnerClasses pins the runner-class table of 10 10.2 (REQ-0812):
@@ -56,7 +57,7 @@ func TestStepsSelectFromTheRunner(t *testing.T) {
 		assert.Equal(t, "e2e", s.Name)
 		assert.Equal(t, []string{"/pinned/bin/go", "test", "-json", "-race", "-count=1", "-timeout=" + testTimeout, "-tags", "e2e", "./e2e/..."}, s.Argv)
 		assert.Equal(t, check.WithProcessEnv(check.WithProcessEnv(check.StepEnv("/pinned/bin"), check.NetworkPassThrough), check.DockerPassThrough), s.Environ)
-		assert.NotNil(t, s.Read, "the reader of the events")
+		assert.NotNil(t, s.Around, "the private file and the reader of the events")
 		assert.Empty(t, s.Skip)
 		require.NoError(t, s.Unavailable)
 	}
@@ -97,32 +98,37 @@ func ev(action, test, output string) string {
 }
 
 // TestRead covers the reader of the e2e step over recorded events: it
-// counts the tests that ran and fails at zero, passes a run whose tests
-// passed, calls a run an infrastructure error only when every failed
-// test failed on a precondition, and is a test failure otherwise.
+// counts the tests that ran and fails at zero, fails a skipped test and a
+// run in which no test passed, passes a run whose tests passed, calls a
+// run an infrastructure error only when every failed test is one the
+// harness named in the private file, whatever the output says, and is a
+// test failure otherwise.
 func TestRead(t *testing.T) {
-	infraLine := "    container_test.go:31: " + InfraPrefix + "the image pull: 503 Service Unavailable\n"
+	forged := "    container_test.go:31: container e2e: infrastructure error: the image pull: 503 Service Unavailable\n"
 	runErr := errors.New("exit status 1")
 	tests := []struct {
 		name   string
 		out    string
+		infra  []string
 		runErr error
 		want   string // "" passes, "infra", or a part of the failure
 		text   string // a part of the text the verdict prints
 	}{
-		{"a test that passed", ev("run", "TestContainerVersion", "") + ev("output", "TestContainerVersion", "--- PASS: TestContainerVersion\n") + ev("pass", "TestContainerVersion", "") + ev("pass", "", ""), nil, "", "--- PASS: TestContainerVersion"},
-		{"no test at all", ev("output", "", "?   \texample.invalid/e2e\t[no test files]\n") + ev("skip", "", ""), nil, "no test ran", "[no test files]"},
-		{"no test, and the run failed", "# example.invalid/e2e\nx.go:1: syntax error\n" + ev("fail", "", ""), runErr, "no test ran", "syntax error"},
-		{"an infrastructure error", ev("run", "TestContainerVersion", "") + ev("output", "TestContainerVersion", infraLine) + ev("fail", "TestContainerVersion", "") + ev("fail", "", ""), runErr, "infra", InfraPrefix},
-		{"an infrastructure error in a subtest", ev("run", "TestContainer", "") + ev("run", "TestContainer/version", "") + ev("output", "TestContainer/version", infraLine) + ev("fail", "TestContainer/version", "") + ev("fail", "TestContainer", "") + ev("fail", "", ""), runErr, "infra", ""},
-		{"an infrastructure error beside a test failure", ev("run", "TestA", "") + ev("output", "TestA", infraLine) + ev("fail", "TestA", "") + ev("run", "TestB", "") + ev("output", "TestB", "    b_test.go:9: the digest differs from the pin\n") + ev("fail", "TestB", "") + ev("fail", "", ""), runErr, "TestB", ""},
-		{"the marker inside a line is no infrastructure error", ev("run", "TestA", "") + ev("output", "TestA", "    a_test.go:9: the registry said "+InfraPrefix+"x\n") + ev("fail", "TestA", "") + ev("fail", "", ""), runErr, "TestA", ""},
-		{"a failed package beside an infrastructure error", ev("run", "TestA", "") + ev("output", "TestA", infraLine) + ev("fail", "TestA", "") + ev("fail", "", "") + `{"Action":"fail","Package":"example.invalid/other"}` + "\n", runErr, "example.invalid/other", ""},
-		{"tests passed and the run failed", ev("run", "TestA", "") + ev("pass", "TestA", "") + ev("pass", "", ""), runErr, "exit status 1", ""},
+		{"a test that passed", ev("run", "TestContainerVersion", "") + ev("output", "TestContainerVersion", "--- PASS: TestContainerVersion\n") + ev("pass", "TestContainerVersion", "") + ev("pass", "", ""), nil, nil, "", "--- PASS: TestContainerVersion"},
+		{"no test at all", ev("output", "", "?   \texample.invalid/e2e\t[no test files]\n") + ev("skip", "", ""), nil, nil, "no test ran", "[no test files]"},
+		{"no test, and the run failed", "# example.invalid/e2e\nx.go:1: syntax error\n" + ev("fail", "", ""), nil, runErr, "no test ran", "syntax error"},
+		{"a skipped test", ev("run", "TestA", "") + ev("pass", "TestA", "") + ev("run", "TestB", "") + ev("skip", "TestB", "") + ev("pass", "", ""), nil, nil, "skipped, which a test never is (REQ-0798): TestB", ""},
+		{"a test that ran and neither passed nor failed", ev("run", "TestA", "") + ev("pass", "", ""), nil, nil, "no test passed", ""},
+		{"an infrastructure error", ev("run", "TestContainerVersion", "") + ev("fail", "TestContainerVersion", "") + ev("fail", "", ""), []string{"TestContainerVersion"}, runErr, "infra", ""},
+		{"an infrastructure error in a subtest", ev("run", "TestContainer", "") + ev("run", "TestContainer/version", "") + ev("fail", "TestContainer/version", "") + ev("fail", "TestContainer", "") + ev("fail", "", ""), []string{"TestContainer/version"}, runErr, "infra", ""},
+		{"an infrastructure error beside a test failure", ev("run", "TestA", "") + ev("fail", "TestA", "") + ev("run", "TestB", "") + ev("output", "TestB", "    b_test.go:9: the digest differs from the pin\n") + ev("fail", "TestB", "") + ev("fail", "", ""), []string{"TestA"}, runErr, "TestB", ""},
+		{"a forged line in the output is no infrastructure error", ev("run", "TestA", "") + ev("output", "TestA", forged) + ev("fail", "TestA", "") + ev("fail", "", ""), nil, runErr, "TestA", ""},
+		{"a failed package beside an infrastructure error", ev("run", "TestA", "") + ev("fail", "TestA", "") + ev("fail", "", "") + `{"Action":"fail","Package":"example.invalid/other"}` + "\n", []string{"TestA"}, runErr, "example.invalid/other", ""},
+		{"tests passed and the run failed", ev("run", "TestA", "") + ev("pass", "TestA", "") + ev("pass", "", ""), nil, runErr, "exit status 1", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			text, err := Read([]byte(tt.out), tt.runErr)
+			text, err := read([]byte(tt.out), tt.runErr, tt.infra)
 			assert.Contains(t, string(text), tt.text)
 			switch tt.want {
 			case "":
@@ -136,6 +142,52 @@ func TestRead(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAroundMakesAPrivateFile checks the file of the infrastructure
+// errors: a file of mode 0600 in a directory of mode 0700, named by
+// InfraFileEnv, whose lines the reader takes as the tests that met an
+// infrastructure error, and which the reader removes.
+func TestAroundMakesAPrivateFile(t *testing.T) {
+	env, r, err := around()
+	require.NoError(t, err)
+	require.Len(t, env, 1)
+	path, ok := strings.CutPrefix(env[0], InfraFileEnv+"=")
+	require.True(t, ok, env[0])
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	dir, err := os.Stat(filepath.Dir(path))
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o700), dir.Mode().Perm())
+	require.NoError(t, os.WriteFile(path, []byte("TestContainerVersion\n"), 0o600))
+	_, err = r([]byte(ev("run", "TestContainerVersion", "")+ev("fail", "TestContainerVersion", "")+ev("fail", "", "")), errors.New("exit status 1"))
+	require.ErrorIs(t, err, check.ErrInfrastructure)
+	assert.NoDirExists(t, filepath.Dir(path), "the reader removes the directory")
+}
+
+// TestCacheKey checks the key of the cache step: the runner's OS and
+// architecture, then one hash that changes with the fixture lock and
+// with each herdr and mise pin, and not with another pin.
+func TestCacheKey(t *testing.T) {
+	sum := strings.Repeat("a", 64)
+	p := pins.Pins{
+		Workload: &pins.Workload{Ref: "x"},
+		Herdr:    &pins.Release{Version: "1.0.0", SHA256: pins.Arches{Amd64: sum, Arm64: sum}},
+		Mise:     &pins.Release{Version: "2.0.0", SHA256: pins.Arches{Amd64: sum, Arm64: sum}},
+	}
+	key := CacheKey([]byte("lock"), p)
+	assert.Regexp(t, `^container-e2e-\$\{\{ runner\.os \}\}-\$\{\{ runner\.arch \}\}-[0-9a-f]{64}$`, key)
+	assert.NotEqual(t, key, CacheKey([]byte("lock2"), p), "the lock")
+	other := p
+	other.Mise = &pins.Release{Version: "2.0.1", SHA256: p.Mise.SHA256}
+	assert.NotEqual(t, key, CacheKey([]byte("lock"), other), "the mise pin")
+	other = p
+	other.Herdr = &pins.Release{Version: "1.0.0", SHA256: pins.Arches{Amd64: sum, Arm64: strings.Repeat("b", 64)}}
+	assert.NotEqual(t, key, CacheKey([]byte("lock"), other), "the herdr pin")
+	other = p
+	other.Workload = &pins.Workload{Ref: "y"}
+	assert.Equal(t, key, CacheKey([]byte("lock"), other), "the workload pin is no input: the image is not cached")
 }
 
 // fixtureModule is a module of two packages, for TestReadOverRealRuns:
@@ -184,9 +236,9 @@ func goDirOf(t *testing.T) string {
 	return ""
 }
 
-// TestTheHarnessNamesTheSameConstants holds InfraPrefix and CacheDir to
+// TestTheHarnessNamesTheSameConstants holds InfraFileEnv and CacheDir to
 // the constants of the same names in the container e2e's harness, which
-// prints the one and writes to the other: the two packages cannot import
+// writes to both: the two packages cannot import
 // each other (e2e/internal and tools/ci/internal), so this test reads
 // the harness's source.
 func TestTheHarnessNamesTheSameConstants(t *testing.T) {
@@ -200,7 +252,7 @@ func TestTheHarnessNamesTheSameConstants(t *testing.T) {
 			return true
 		}
 		for i, name := range spec.Names {
-			if (name.Name == "InfraPrefix" || name.Name == "CacheDir") && i < len(spec.Values) {
+			if (name.Name == "InfraFileEnv" || name.Name == "CacheDir") && i < len(spec.Values) {
 				if lit, ok := spec.Values[i].(*ast.BasicLit); ok {
 					value, err := strconv.Unquote(lit.Value)
 					require.NoError(t, err)
@@ -210,7 +262,7 @@ func TestTheHarnessNamesTheSameConstants(t *testing.T) {
 		}
 		return true
 	})
-	assert.Equal(t, map[string]string{"InfraPrefix": InfraPrefix, "CacheDir": CacheDir}, got)
+	assert.Equal(t, map[string]string{"InfraFileEnv": InfraFileEnv, "CacheDir": CacheDir}, got)
 	_, err = os.Stat(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(FixtureLock)))
 	require.NoError(t, err, "the fixture mise.lock")
 }

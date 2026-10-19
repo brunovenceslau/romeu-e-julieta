@@ -46,11 +46,13 @@ func runAllIn(t *testing.T, r *gittest.Repo, steps []check.Step, profile string,
 	return run(t.Context(), e, append([]string{"all"}, args...)), out.String()
 }
 
-// infraStep is a step whose Read reports an infrastructure error, as
+// infraStep is a step whose Around reads an infrastructure error, as
 // the e2e step does for a pull that failed on transport.
 var infraStep = check.Step{Name: "e2e", Argv: []string{"false"}, Environ: []string{"PATH=" + os.Getenv("PATH")},
-	Read: func([]byte, error) ([]byte, error) {
-		return nil, fmt.Errorf("the image pull: %w", check.ErrInfrastructure)
+	Around: func() ([]string, check.Read, error) {
+		return nil, func([]byte, error) ([]byte, error) {
+			return nil, fmt.Errorf("the image pull: %w", check.ErrInfrastructure)
+		}, nil
 	}}
 
 // TestAll covers all with stub steps: every check runs and reports,
@@ -215,8 +217,8 @@ func TestAllSteps(t *testing.T) {
 
 	vulnStep, licenseStep, modulesStep, race, e2e := steps[unit], steps[unit+1], steps[unit+2], steps[unit+9], steps[unit+10]
 	wantE2E := container.Steps(t.Context(), check.Plan{Root: root, Tools: tools})[0]
-	assert.Equal(t, wantE2E.Read == nil, e2e.Read == nil)
-	wantE2E.Read, e2e.Read = nil, nil
+	assert.Equal(t, wantE2E.Around == nil, e2e.Around == nil)
+	wantE2E.Around, e2e.Around = nil, nil
 	assert.Equal(t, wantE2E, e2e, "the e2e step comes last, after race")
 	assert.Equal(t, check.Step{Name: "vulnerabilities", Argv: []string{evalOrSelf(vuln), "./..."}, Environ: check.WithProcessEnv(env, check.NetworkPassThrough),
 		NoticeOn: "govulncheck: fetching vulnerabilities:", Notice: "vulnerabilities: could not fetch the vulnerability database, so this all is not the equivalent run (10 10.2)"}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")

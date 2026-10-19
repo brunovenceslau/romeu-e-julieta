@@ -42,13 +42,21 @@ type Step struct {
 	// NoticeOn is a line prefix: when a step that failed printed a line
 	// that starts with it, the verdict adds the line Notice.
 	NoticeOn, Notice string
-	// Read, when set, reads what the command printed and the error of
-	// its run, and returns the text the verdict shows and the step's
-	// error, which decides the verdict in place of the exit status: the
-	// e2e step reads the events of "go test -json" so. An error that
-	// wraps ErrInfrastructure marks the step an infrastructure error.
-	Read func(out []byte, runErr error) ([]byte, error)
+	// Around, when set, runs right before the command: it returns the
+	// variables to add to Environ, and Read, which reads what the
+	// command printed and the error of its run and returns the text the
+	// verdict shows and the step's error, which decides the verdict in
+	// place of the exit status, and releases what Around made. The e2e
+	// step makes a private file there, which its tests name the tests
+	// that met an infrastructure error in, and reads the events of "go
+	// test -json". An error that wraps ErrInfrastructure marks the step
+	// an infrastructure error. An error of Around fails the step, which
+	// then starts nothing.
+	Around func() (env []string, read Read, err error)
 }
+
+// Read reads the output and the error of a step's run (Step.Around).
+type Read func(out []byte, runErr error) ([]byte, error)
 
 // Tools are the pinned tools of the steps, as mise resolves them: the
 // path of golangci-lint, and the directory of the go command.
@@ -135,8 +143,8 @@ func StepEnv(goDir string) []string {
 	})
 }
 
-// Run runs the step in dir and returns its output, or what s.Read
-// makes of it, through
+// Run runs the step in dir and returns its output, or what the Read of
+// s.Around makes of it, through
 // procgroup.CombinedOutput: the command gets exactly s.Environ, an
 // empty environment when it is nil, runs in a process group of its own
 // that is killed when the leader ends, and a run past the limit of its
@@ -145,17 +153,25 @@ func (s Step) Run(ctx context.Context, dir string) ([]byte, error) {
 	if s.Unavailable != nil {
 		return nil, s.Unavailable
 	}
+	env, read := s.Environ, Read(nil)
+	if s.Around != nil {
+		extra, r, err := s.Around()
+		if err != nil {
+			return nil, err
+		}
+		env, read = append(slices.Clone(s.Environ), extra...), r
+	}
 	out, err := procgroup.CombinedOutput(ctx, procgroup.Command{
 		Class: cmp.Or(s.Class, procgroup.ToolStep),
 		Argv:  s.Argv,
 		Dir:   dir,
-		Env:   s.Environ,
+		Env:   env,
 	})
 	if err == nil && s.Quiet && len(bytes.TrimSpace(out)) > 0 {
 		err = errors.New("the command printed what it found")
 	}
-	if s.Read != nil {
-		return s.Read(out, err)
+	if read != nil {
+		return read(out, err)
 	}
 	return out, err
 }
