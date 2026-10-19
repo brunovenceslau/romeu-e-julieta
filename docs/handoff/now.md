@@ -2,8 +2,8 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-19, after sitting M0 (Done record 40). Done
-records are merged up to 39.
+Checkpoint of 2026-10-19, after sitting M0 (Done record 40) and the
+re-plan of T112. Done records are merged up to 40.
 
 ## Next steps
 
@@ -26,7 +26,13 @@ the decision note "the-day-run-of-2026-10-18".
    (`release`), T135 (`contracts`). Recommended: a checkpoint grant for
    the three surfaces at the next sitting.
 4. The sittings of T112 (M1) and T126 (O8). Sitting M0 ran on
-   2026-10-19 (T113, go). Recommended: sitting M1 next.
+   2026-10-19 (T113, go). T112 is re-planned on
+   [ADR 0036, keep the forbidden names as a convenience list in the config repository](../adr/0036-keep-the-forbidden-names-as-a-convenience-list-in-the-config-repository.md) (one plain
+   list in the config repository, one gate in the sandbox kit);
+   recommended: read ADR 0036 and
+   [ADR 0037, state what is at stake in every decision record](../adr/0037-state-what-is-at-stake-in-every-decision-record.md)
+   in their pull request, then
+   build T112 in the kit and config repositories.
 5. The kit prompts ("prompts-for-the-sandbox-kit-and-the-house-kit").
    Recommended: ask for both final prompts in one message.
 6. The behaviour of `romeu init` on a non-empty root

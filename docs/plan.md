@@ -809,7 +809,7 @@ phase" fired and is gone, and so is the row of the timeout classes of
 | a check that a code pull request to a check touches no spec page | the rule in this page | the first such pull request found in review |
 | a check that fails a diff changing the mise pin unless `miseFiles` of the mise package was re-measured in the same pull request | the sentence of 05 5.3 and review | the first mise pin bump merged without the re-measure named in its Evidence |
 | the four-runner matrix on every pull request | kept | the median pull request wall time passes 20 minutes over one month, or the Actions quota runs out |
-| a Go port of the names gate of the config repository | the script as it is | closes when T112 lands mechanism (a) of item 18 of Decisions of the re-plan, decided on 2026-10-12 (each guarded repository runs the hygiene check from its tracked hook) |
+| a Go port of the names gate of the config repository | the script as it is | closes when T112 lands the sandbox gate of [ADR 0036, keep the forbidden names as a convenience list in the config repository](adr/0036-keep-the-forbidden-names-as-a-convenience-list-in-the-config-repository.md) |
 | the interim personal kit of the bridge (T111) | it installs the hooks and skills into every daily sandbox | T079 and T114 merged: then it is removed |
 | `os-base` | absent | the first real `julieta` kit build shows a missing package (sitting M2) |
 | the live secret path (`apply:"live"`, T047 timing) | recreate-class | the first secret rotation that costs an unwanted recreate |
@@ -968,6 +968,9 @@ records these answers again with the rules they decide (T108).
     when T112 lands. The alternative not taken: (b) the config
     repository as a secondary clone of every project (02 2.6), its
     plain list cloned into every sandbox.
+    Amended on 2026-10-19: replaced by ADR 0036, one plain list in the
+    config repository and one gate in the sandbox for every push to a
+    public remote; T112 is re-planned on it.
 19. **The open-items cut-over.** Decided on 2026-10-12: at T119 (M5).
     Amended on 2026-10-13: at T111 (M1), as the stage-B review
     recommended, because a second store left open until M5 would hold
