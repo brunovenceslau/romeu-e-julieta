@@ -4,12 +4,10 @@ Date: 2026-10-19
 
 ## Status
 
-Proposed
+Accepted
 
-It becomes Accepted in a later pull request, which also amends item 18
-of Decisions of the re-plan in `docs/plan.md` for good; the spec text
-it changes (REQ-0885, REQ-0886, REQ-1139) changes when the sandbox gate
-runs.
+The spec text it changes (REQ-0885, REQ-0886, REQ-1139) changes when
+the sandbox gate runs.
 
 ## Context
 

@@ -14,4 +14,4 @@ happens if the decision is wrong or fails, and how hard that is to undo
 [ADR 0001, adopt a documentation standard with checkable rules and a voice](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
 as
 [ADR 0037, state what is at stake in every decision record](../adr/0037-state-what-is-at-stake-in-every-decision-record.md)
-proposes it).
+amends it).

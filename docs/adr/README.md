@@ -51,5 +51,5 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 33 | [Run the pre-tag checks as maintainer steps of the release checklist](0033-run-the-pre-tag-checks-as-maintainer-steps-of-the-release-checklist.md) | Proposed |
 | 34 | [Add no user-facing success criterion in v1](0034-add-no-user-facing-success-criterion-in-v1.md) | Proposed |
 | 35 | [Show lessons to the owner with a pager that runs nothing](0035-show-lessons-to-the-owner-with-a-pager-that-runs-nothing.md) | Proposed |
-| 36 | [Keep the forbidden names as a convenience list in the config repository](0036-keep-the-forbidden-names-as-a-convenience-list-in-the-config-repository.md) | Proposed |
-| 37 | [State what is at stake in every decision record](0037-state-what-is-at-stake-in-every-decision-record.md) | Proposed |
+| 36 | [Keep the forbidden names as a convenience list in the config repository](0036-keep-the-forbidden-names-as-a-convenience-list-in-the-config-repository.md) | Accepted |
+| 37 | [State what is at stake in every decision record](0037-state-what-is-at-stake-in-every-decision-record.md) | Accepted |
