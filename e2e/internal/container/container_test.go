@@ -55,17 +55,57 @@ func TestPullFailure(t *testing.T) {
 		{"the deadline of the pull", fmt.Errorf("docker pull: %w", context.DeadlineExceeded), true},
 		{"a digest that differs", errors.New(`failed commit on ref "manifest-` + d + `": commit failed: unexpected commit digest sha256:eca47388aeb57cdb4e288371a26475427d7a1920b4bfd0e7fbe6be4cbb97968f, expected ` + d + `: failed precondition`), false},
 		{"a digest that differs, with a 503 in the text", errors.New(`unexpected commit digest sha256:1, expected sha256:2: 503 Service Unavailable`), false},
+		{"a layer that fails its check", errors.New(`Error response from daemon: filesystem layer verification failed for digest sha256:` + strings.Repeat("1", 64)), false},
+		{"another sha256 beside a refused connection", errors.New(`pull sha256:` + strings.Repeat("2", 64) + `: dial tcp [::1]:1: connect: connection refused`), false},
+		{"a mismatch beside a timeout", errors.New(`size mismatch: dial tcp 10.0.0.1:443: i/o timeout`), false},
+		{"a timeout in other words", errors.New(`Error response from daemon: some timeout happened`), false},
+		{"a dial that timed out", errors.New(`Error response from daemon: Get "https://registry-1.docker.io/v2/": dial tcp 10.0.0.1:443: i/o timeout`), true},
 		{"a refusal of the proxy", errors.New(`Error response from daemon: unknown: unexpected status from HEAD request to https://x.invalid/v2/x/manifests/` + d + `: 403 Forbidden`), false},
 		{"a manifest the registry does not have", errors.New(`Error response from daemon: manifest unknown`), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := pullFailure(tt.err)
+			got := pullFailure(tt.err, d)
 			_, isInfra := errors.AsType[*InfraError](got)
 			assert.Equal(t, tt.infra, isInfra, "%v", got)
 			assert.ErrorIs(t, got, tt.err)
 		})
 	}
+}
+
+// TestRunArgs holds the docker run of the cases to its hardening: no
+// network, no capability, no new privileges, a bound on processes and
+// memory, the user nobody, and each mount read-only at its own path.
+func TestRunArgs(t *testing.T) {
+	args, err := runArgs("img@sha256:x", []Mount{"/bin dir"}, []string{"/bin dir/julieta", "version", "--json"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"run", "--rm", "--pull=never", "--network=none",
+		"--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=256", "--memory=1g", "--user=65534:65534",
+		"--mount", "type=bind,source=/bin dir,target=/bin dir,readonly",
+		"--entrypoint", "/bin dir/julieta", "img@sha256:x", "version", "--json"}, args)
+	_, err = runArgs("img", []Mount{"/a,b"}, []string{"x"})
+	require.Error(t, err)
+	_, err = runArgs("img", nil, nil)
+	require.Error(t, err)
+}
+
+// TestFailRecordsAnInfrastructureError checks that Fail names a test
+// that met an infrastructure error in the file of InfraFileEnv, and no
+// test that failed otherwise, and that it never makes the file.
+func TestFailRecordsAnInfrastructureError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "infra")
+	require.NoError(t, os.WriteFile(path, nil, 0o600))
+	t.Setenv(InfraFileEnv, path)
+	require.NoError(t, recordInfra("TestA/sub"))
+	require.NoError(t, recordInfra("TestB"))
+	got, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "TestA/sub\nTestB\n", string(got))
+
+	t.Setenv(InfraFileEnv, filepath.Join(t.TempDir(), "missing"))
+	require.Error(t, recordInfra("TestC"), "the file is the step's, never the harness's")
+	t.Setenv(InfraFileEnv, "")
+	require.NoError(t, recordInfra("TestD"), "a run without the step records nothing")
 }
 
 // TestCheckDaemonUnreachable is the fault test of the daemon: a
@@ -122,8 +162,8 @@ func TestDownloadFails(t *testing.T) {
 	for _, base := range []string{down.URL, closed.URL} {
 		c := fixtureConfig(t, base, []byte("binary"))
 		for what, get := range map[string]func() (string, error){
-			Herdr: func() (string, error) { return c.HerdrBinary(t.Context()) },
-			Mise:  func() (string, error) { return c.MiseBinary(t.Context()) },
+			Herdr: func() (string, error) { return c.HerdrBinary(t.Context(), t.TempDir()) },
+			Mise:  func() (string, error) { return c.MiseBinary(t.Context(), t.TempDir()) },
 		} {
 			_, err := get()
 			infra, ok := errors.AsType[*InfraError](err)
@@ -135,9 +175,10 @@ func TestDownloadFails(t *testing.T) {
 }
 
 // TestDownloadChecksTheSHA256 checks that a downloaded file whose sha256
-// is not the pin is a test failure, and so is a cached one, and that a
-// file of the pin is kept under its sha256, read from the cache the next
-// time under the program's own name, and read by the release's own
+// is not the pin is a test failure, and so is a cached one, which leaves
+// no file in the directory the cases mount; and that a file of the pin
+// is kept in the cache under its sha256, read from there the next time,
+// installed under the program's own name, and read by the release's own
 // asset names.
 func TestDownloadChecksTheSHA256(t *testing.T) {
 	var paths []string
@@ -148,28 +189,36 @@ func TestDownloadChecksTheSHA256(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	c := fixtureConfig(t, srv.URL, []byte("binary"))
-	path, err := c.HerdrBinary(t.Context())
+	bin := t.TempDir()
+	path, err := c.HerdrBinary(t.Context(), bin)
 	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(c.CacheDir, "linux-arm64", hexSum([]byte("binary")), "herdr"), path)
+	assert.Equal(t, filepath.Join(bin, "herdr"), path)
+	cached := filepath.Join(c.CacheDir, "linux-arm64", hexSum([]byte("binary")), "herdr")
+	assert.FileExists(t, cached)
+	got, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "binary", string(got))
 	info, err := os.Stat(path)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o755), info.Mode().Perm())
-	_, err = c.HerdrBinary(t.Context())
+	_, err = c.HerdrBinary(t.Context(), t.TempDir())
 	require.NoError(t, err)
 	c.GOARCH = "amd64"
-	_, err = c.MiseBinary(t.Context())
+	_, err = c.MiseBinary(t.Context(), t.TempDir())
 	require.NoError(t, err)
 	assert.Equal(t, []string{"/v1.2.3/herdr-linux-aarch64", "/v1.2.3/mise-v1.2.3-linux-x64"}, paths, "the second herdr is read from the cache")
 
-	require.NoError(t, os.WriteFile(path, []byte("substituted"), 0o755))
+	require.NoError(t, os.WriteFile(cached, []byte("substituted"), 0o755))
 	c.GOARCH = "arm64"
-	_, err = c.HerdrBinary(t.Context())
+	bin = t.TempDir()
+	_, err = c.HerdrBinary(t.Context(), bin)
 	require.Error(t, err)
 	assert.NotErrorAs(t, err, new(*InfraError))
 	assert.Contains(t, err.Error(), "the cached file")
+	assert.NoFileExists(t, filepath.Join(bin, "herdr"), "a file that fails its check is not installed")
 
 	other := fixtureConfig(t, srv.URL, []byte("another binary"))
-	_, err = other.MiseBinary(t.Context())
+	_, err = other.MiseBinary(t.Context(), t.TempDir())
 	require.Error(t, err)
 	assert.NotErrorAs(t, err, new(*InfraError))
 	assert.Contains(t, err.Error(), "not the pinned")
@@ -180,7 +229,7 @@ func TestCacheOfThisUserAlone(t *testing.T) {
 	c := fixtureConfig(t, "http://127.0.0.1:1", []byte("binary"))
 	require.NoError(t, os.MkdirAll(c.CacheDir, 0o700))
 	require.NoError(t, os.Chmod(c.CacheDir, 0o777))
-	_, err := c.HerdrBinary(t.Context())
+	_, err := c.HerdrBinary(t.Context(), t.TempDir())
 	require.Error(t, err)
 	assert.NotErrorAs(t, err, new(*InfraError))
 	assert.Contains(t, err.Error(), "only it may write")

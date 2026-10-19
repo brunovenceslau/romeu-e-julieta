@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"runtime"
 	"slices"
 	"strconv"
@@ -114,14 +113,18 @@ func TestContainerVersion(t *testing.T) {
 	osRelease, err := w.Run(t.Context(), nil, "cat", "/etc/os-release")
 	require.NoError(t, err)
 	lines := strings.Split(string(osRelease), "\n")
-	assert.True(t, slices.Contains(lines, "ID=debian") || slices.Contains(lines, `ID="debian"`), "the workload's base is Debian: %s", osRelease)
+	assert.True(t, slices.Contains(lines, "ID=debian") || slices.Contains(lines, `ID="debian"`), "the workload's base is Debian: %q", osRelease)
+
+	uid, err := w.Run(t.Context(), nil, "id", "-u")
+	require.NoError(t, err)
+	assert.Equal(t, "65534", strings.TrimSpace(string(uid)), "the case runs as nobody, not as the image's user")
 
 	out, err := w.Run(t.Context(), []container.Mount{container.Mount(w.Bin)}, w.Julieta, "version", "--json")
 	require.NoError(t, err)
 	dec := json.NewDecoder(bytes.NewReader(out))
 	dec.DisallowUnknownFields()
 	var v versionJSON
-	require.NoError(t, dec.Decode(&v), "%s", out)
+	require.NoError(t, dec.Decode(&v), "%q", out)
 	b, err := os.ReadFile(w.Julieta)
 	require.NoError(t, err)
 	sum := sha256.Sum256(b)
@@ -141,7 +144,7 @@ func TestContainerPinnedTools(t *testing.T) {
 		"herdr": {w.Herdr, w.Pins.Herdr.Version},
 		"mise":  {w.Mise, w.Pins.Mise.Version},
 	} {
-		dir := container.Mount(filepath.Dir(tool.path))
+		dir := container.Mount(w.Bin)
 		out, err := w.Run(t.Context(), []container.Mount{dir}, tool.path, "--version")
 		require.NoError(t, err, name)
 		assert.Contains(t, string(out), tool.version, name)

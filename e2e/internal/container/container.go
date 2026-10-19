@@ -11,9 +11,11 @@
 // A precondition the harness cannot meet is an infrastructure error
 // (InfraError), never a skip (REQ-0798): the Docker daemon that does
 // not answer, a pull that fails on transport (DNS, a timeout, a 5xx),
-// and a herdr or mise download that fails. Fail prints InfraPrefix for
-// one, and the e2e step of tools/ci reads that line and ends the job
-// with an exit status of its own. A manifest digest, or a download's
+// and a herdr or mise download that fails. Fail names the test that met
+// one in the private file InfraFileEnv names, which the e2e step of
+// tools/ci makes and reads, and ends the job with an exit status of its
+// own; the step reads no marker from the output, which a registry or a
+// container could write. A manifest digest, or a download's
 // sha256, that differs from its pin is a test failure, always: it is
 // the one signal that a pinned artifact was substituted, and a security
 // gate is hardened, not retried.
@@ -32,6 +34,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -40,11 +43,16 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
-// InfraPrefix starts the line Fail prints for an infrastructure error.
-// The e2e step of tools/ci (tools/ci/internal/container) matches it
-// after the file and line go test prints, and a test there holds its
-// constant equal to this one.
+// InfraPrefix starts the line Fail prints for an infrastructure error,
+// for the person who reads the log; no program reads it.
 const InfraPrefix = "container e2e: infrastructure error: "
+
+// InfraFileEnv names the variable that gives the path of the file Fail
+// names a test in, one per line, when the test met an infrastructure
+// error. The e2e step of tools/ci (tools/ci/internal/container) makes
+// the file, of mode 0600, and a test there holds its constant equal to
+// this one. A run of go test with no such variable records nothing.
+const InfraFileEnv = "ROMEU_E2E_INFRA_FILE"
 
 // The preconditions of 10 10.1, as an InfraError names them.
 const (
@@ -78,10 +86,35 @@ func Report(err error) string {
 	return line
 }
 
-// Fail ends the test on err, with the line of Report.
+// Fail ends the test on err, with the line of Report, after it names
+// the test in the file of InfraFileEnv when err is an infrastructure
+// error.
 func Fail(tb testing.TB, err error) {
 	tb.Helper()
+	if _, ok := errors.AsType[*InfraError](err); ok {
+		if rerr := recordInfra(tb.Name()); rerr != nil {
+			tb.Fatalf("%s; and it could not be recorded as one: %v", Report(err), rerr)
+		}
+	}
 	tb.Fatal(Report(err))
+}
+
+// recordInfra appends the name of a test to the file of InfraFileEnv,
+// which must exist: the harness never makes it.
+func recordInfra(name string) error {
+	path := os.Getenv(InfraFileEnv)
+	if path == "" {
+		return nil
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+	if err != nil {
+		return err
+	}
+	if _, err := f.WriteString(name + "\n"); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // CacheDir is the directory the harness keeps its downloads in, one
@@ -148,7 +181,7 @@ func (c Config) docker(ctx context.Context, class procgroup.Class, args ...strin
 		Stderr: &stderr,
 	})
 	if err != nil {
-		return stdout.Bytes(), fmt.Errorf("docker %s: %w: %s", args[0], err, strings.TrimSpace(stderr.String()))
+		return stdout.Bytes(), fmt.Errorf("docker %s: %w: %q", args[0], err, strings.TrimSpace(stderr.String()))
 	}
 	return stdout.Bytes(), nil
 }
@@ -166,29 +199,48 @@ func (c Config) CheckDaemon(ctx context.Context) error {
 	return nil
 }
 
-// substituted are the texts with which docker reports content whose
-// digest is not the one it asked for: a test failure, whatever else the
-// message holds.
-var substituted = []string{"unexpected commit digest", "digest mismatch", "manifest verification failed", "digest did not match"}
+// substituted are the words of a message about content, checked first:
+// once the pinned digest is taken out of the message, any of them makes
+// the failure a test failure, whatever else the message holds ("unexpected
+// commit digest", "filesystem layer verification failed", "digest
+// mismatch", another sha256), since the one signal that a pinned
+// artifact was substituted must never be retried as infrastructure.
+var substituted = []string{"digest", "verif", "mismatch", "sha256:"}
 
-// transport are the texts with which docker reports a pull that failed
-// on its way to the registry: a name that does not resolve, a timeout, a
-// refused or reset connection, and an answer of 5xx or of 429, the
-// registry's limit of pulls, none of which says anything of the content.
-var transport = regexp.MustCompile(`(?i)no such host|server misbehaving|temporary failure in name resolution|i/o timeout|timeout|deadline exceeded|connection refused|connection reset|network is unreachable|: 5[0-9][0-9] [A-Za-z]|: 429 |toomanyrequests`)
+// transport are the messages with which docker reports a pull that
+// failed on its way to the registry, each anchored on the text of the
+// Go network error or of the registry's status around it: a name that
+// does not resolve, a refused, unreachable or reset connection, a dial
+// or handshake that timed out, and an answer of 5xx or of 429, the
+// registry's limit of pulls. A timeout of the pull itself is the context
+// or the procgroup timeout, checked apart.
+var transport = []*regexp.Regexp{
+	regexp.MustCompile(`dial tcp( [^ ]+)?: lookup [^ ]+( on [^ ]+)?: (no such host|server misbehaving|Temporary failure in name resolution)`),
+	regexp.MustCompile(`dial tcp [^ ]+: connect: (connection refused|network is unreachable|no route to host)`),
+	regexp.MustCompile(`dial tcp [^ ]+: i/o timeout`),
+	regexp.MustCompile(`read tcp [^ ]+: read: connection reset by peer`),
+	regexp.MustCompile(`net/http: TLS handshake timeout`),
+	regexp.MustCompile(`net/http: request canceled while waiting for connection \(Client\.Timeout exceeded while awaiting headers\)`),
+	regexp.MustCompile(`unexpected status from (HEAD|GET) request to [^ ]+: (5[0-9]{2}|429) [A-Z]`),
+	regexp.MustCompile(`received unexpected HTTP status: (5[0-9]{2}|429) [A-Z]`),
+	regexp.MustCompile(`toomanyrequests: `),
+}
 
-// pullFailure classifies the error of a failed docker pull: an
-// infrastructure error for a transport failure and a timeout, and a
-// test failure for a digest that differs and for anything else, since a
-// gate fails closed.
-func pullFailure(err error) error {
-	msg := err.Error()
+// pullFailure classifies the error of a failed docker pull of the image
+// whose digest is pinned: a test failure for a message about content,
+// checked first; an infrastructure error for a transport failure and a
+// timeout; and a test failure for anything else, since a gate fails
+// closed.
+func pullFailure(err error, pinned string) error {
+	msg := strings.ReplaceAll(err.Error(), pinned, "<pinned>")
+	lower := strings.ToLower(msg)
 	for _, s := range substituted {
-		if strings.Contains(strings.ToLower(msg), s) {
+		if strings.Contains(lower, s) {
 			return fmt.Errorf("the pulled content is not the one the pin names: %w", err)
 		}
 	}
-	if _, ok := errors.AsType[*procgroup.TimeoutError](err); ok || errors.Is(err, context.DeadlineExceeded) || transport.MatchString(msg) {
+	_, timedOut := errors.AsType[*procgroup.TimeoutError](err)
+	if timedOut || errors.Is(err, context.DeadlineExceeded) || slices.ContainsFunc(transport, func(re *regexp.Regexp) bool { return re.MatchString(msg) }) {
 		return &InfraError{Pull, err}
 	}
 	return fmt.Errorf("the pull of the workload's image failed: %w", err)
@@ -210,7 +262,7 @@ func (c Config) PullImage(ctx context.Context, ref string) error {
 	pullCtx, cancel := context.WithTimeout(ctx, PullTimeout)
 	defer cancel()
 	if _, err := c.docker(pullCtx, procgroup.ToolStep, "pull", "--quiet", ref); err != nil {
-		return pullFailure(err)
+		return pullFailure(err, digest)
 	}
 	out, err := c.docker(ctx, procgroup.ToolProbe, "image", "inspect", "--format", "{{json .RepoDigests}}", ref)
 	if err != nil {
@@ -218,14 +270,14 @@ func (c Config) PullImage(ctx context.Context, ref string) error {
 	}
 	var digests []string
 	if err := json.Unmarshal(out, &digests); err != nil {
-		return fmt.Errorf("the repository digests of the pulled image: %w", err)
+		return fmt.Errorf("the repository digests of the pulled image, %q: %w", out, err)
 	}
 	for _, d := range digests {
 		if strings.HasSuffix(d, "@"+digest) {
 			return nil
 		}
 	}
-	return fmt.Errorf("the pulled image carries the digests %v, not %s", digests, digest)
+	return fmt.Errorf("the pulled image carries the digests %q, not %s", digests, digest)
 }
 
 // maxDownload bounds a release download: mise is the larger, near 135
@@ -255,13 +307,59 @@ func (c Config) platformDir() (string, error) {
 	return dir, nil
 }
 
-// Download returns the path of the program name of what (Herdr or
-// Mise), read from url and kept in the cache as <sha256>/<name>, after
-// it checks the file against want; the name stays the program's, since
-// mise reads its own name to tell itself from a shim. A download that fails is an
-// infrastructure error; a file whose sha256 is not want is a test
-// failure, the downloaded one and the cached one alike.
-func (c Config) Download(ctx context.Context, what, name, url, want string) (string, error) {
+// Download installs the program name of what (Herdr or Mise) into dst,
+// a directory only this user writes, and returns its path. The file is
+// read from url when the cache does not hold it as <sha256>/<name>, and
+// kept there; the copy into dst hashes the bytes it writes, read from
+// the one open handle of the cached file, so the file the cases run is
+// the one that was checked against want, whatever happens to the cache
+// meanwhile. The name stays the program's, since mise reads its own name
+// to tell itself from a shim. A download that fails is an infrastructure
+// error; a file whose sha256 is not want is a test failure, the
+// downloaded one and the cached one alike.
+func (c Config) Download(ctx context.Context, what, name, url, want, dst string) (string, error) {
+	cached, err := c.cache(ctx, what, name, url, want)
+	if err != nil {
+		return "", err
+	}
+	return installVerified(what, cached, filepath.Join(dst, name), want)
+}
+
+// installVerified copies src to dst, of mode 0755, hashing what it
+// copies from the one handle it opened, and removes dst unless the
+// sha256 of those bytes is want.
+func installVerified(what, src, dst, want string) (path string, err error) {
+	in, err := os.Open(src)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = in.Close() }()
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o755)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if cerr := out.Close(); err == nil {
+			err = cerr
+		}
+		if err != nil {
+			_ = os.Remove(dst)
+		}
+	}()
+	h := sha256.New()
+	if _, err := io.Copy(io.MultiWriter(out, h), io.LimitReader(in, maxDownload+1)); err != nil {
+		return "", err
+	}
+	if got := hex.EncodeToString(h.Sum(nil)); got != want {
+		return "", fmt.Errorf("%s: the cached file %s has the sha256 %s, not the pinned %s", what, src, got, want)
+	}
+	return dst, nil
+}
+
+// cache returns the path of the cached file <sha256>/<name>, read from
+// url when it is not there, checked against want and then written
+// whole by a rename.
+func (c Config) cache(ctx context.Context, what, name, url, want string) (string, error) {
 	platform, err := c.platformDir()
 	if err != nil {
 		return "", err
@@ -274,10 +372,7 @@ func (c Config) Download(ctx context.Context, what, name, url, want string) (str
 		return "", err
 	}
 	path := filepath.Join(dir, name)
-	if got, err := fileSHA256(path); err == nil {
-		if got != want {
-			return "", fmt.Errorf("%s: the cached file %s has the sha256 %s, not the pinned %s", what, path, got, want)
-		}
+	if _, err := os.Lstat(path); err == nil {
 		return path, nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", err
@@ -337,15 +432,6 @@ func sha256Hex(b []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// fileSHA256 returns the sha256 of the file at path.
-func fileSHA256(path string) (string, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return sha256Hex(b), nil
-}
-
 // pick returns the sha256 of a for the architecture goarch.
 func pick(a Arches, goarch string) (string, error) {
 	switch goarch {
@@ -363,25 +449,27 @@ var (
 	miseArches  = map[string]string{"amd64": "x64", "arm64": "arm64"}
 )
 
-// HerdrBinary downloads the pinned herdr of the runner's architecture.
-func (c Config) HerdrBinary(ctx context.Context) (string, error) {
+// HerdrBinary installs the pinned herdr of the runner's architecture
+// into dst.
+func (c Config) HerdrBinary(ctx context.Context, dst string) (string, error) {
 	want, err := pick(c.Pins.Herdr.SHA256, c.GOARCH)
 	if err != nil {
 		return "", err
 	}
 	url := c.HerdrBase + "/v" + c.Pins.Herdr.Version + "/" + herdrAssets[c.GOARCH]
-	return c.Download(ctx, Herdr, "herdr", url, want)
+	return c.Download(ctx, Herdr, "herdr", url, want, dst)
 }
 
-// MiseBinary downloads the pinned mise of the runner's architecture.
-func (c Config) MiseBinary(ctx context.Context) (string, error) {
+// MiseBinary installs the pinned mise of the runner's architecture into
+// dst.
+func (c Config) MiseBinary(ctx context.Context, dst string) (string, error) {
 	want, err := pick(c.Pins.Mise.SHA256, c.GOARCH)
 	if err != nil {
 		return "", err
 	}
 	v := c.Pins.Mise.Version
 	url := c.MiseBase + "/v" + v + "/mise-v" + v + "-linux-" + miseArches[c.GOARCH]
-	return c.Download(ctx, Mise, "mise", url, want)
+	return c.Download(ctx, Mise, "mise", url, want, dst)
 }
 
 // BuildJulieta builds julieta for linux on the runner's architecture,
@@ -395,7 +483,7 @@ func (c Config) BuildJulieta(ctx context.Context, dir string) (string, error) {
 		Env:   append(append([]string{}, c.Env...), "GOOS=linux", "GOARCH="+c.GOARCH, "CGO_ENABLED=0"),
 	})
 	if err != nil {
-		return "", fmt.Errorf("build julieta: %w: %s", err, b)
+		return "", fmt.Errorf("build julieta: %w: %q", err, b)
 	}
 	return out, nil
 }
@@ -404,47 +492,72 @@ func (c Config) BuildJulieta(ctx context.Context, dir string) (string, error) {
 // at the same path.
 type Mount string
 
-// Run runs argv in a new container of the workload's image, with no
-// network, the mounts read-only, and the program of argv[0] as the
-// entrypoint, and returns its standard output.
+// RunUser is the user a container of the cases runs as: nobody, not
+// the image's own user, who is in the sudo group of the image.
+const RunUser = "65534:65534"
+
+// Run runs argv in a new container of the workload's image and returns
+// its standard output. The container has no network, no capability, no
+// way to gain privileges, a bound on its processes and its memory, the
+// mounts read-only, the user RunUser, and the program of argv[0] as the
+// entrypoint.
 func (c Config) Run(ctx context.Context, mounts []Mount, argv ...string) ([]byte, error) {
-	args := []string{"run", "--rm", "--pull", "never", "--network", "none"}
+	args, err := runArgs(c.Pins.Workload.Ref, mounts, argv)
+	if err != nil {
+		return nil, err
+	}
+	return c.docker(ctx, procgroup.ToolStep, args...)
+}
+
+// runArgs returns the arguments of the docker run of Run.
+func runArgs(image string, mounts []Mount, argv []string) ([]string, error) {
+	if len(argv) == 0 {
+		return nil, errors.New("no program to run")
+	}
+	args := []string{"run", "--rm", "--pull=never", "--network=none",
+		"--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=256", "--memory=1g",
+		"--user=" + RunUser}
 	for _, m := range mounts {
 		if strings.ContainsAny(string(m), ",=") {
 			return nil, fmt.Errorf("a path holds \",\" or \"=\", which a bind mount cannot name: %s", m)
 		}
 		args = append(args, "--mount", "type=bind,source="+string(m)+",target="+string(m)+",readonly")
 	}
-	args = append(args, "--entrypoint", argv[0], c.Pins.Workload.Ref)
-	return c.docker(ctx, procgroup.ToolStep, append(args, argv[1:]...)...)
+	args = append(args, "--entrypoint", argv[0], image)
+	return append(args, argv[1:]...), nil
 }
 
 // Workload is what the container cases share: the configuration, and
-// the binaries the harness built and downloaded.
+// the binaries the harness built and installed.
 type Workload struct {
 	Config
-	// Julieta is the julieta binary, in Bin.
-	Julieta string
-	// Bin is the directory of Julieta, which the cases mount.
+	// Bin is the directory of the binaries, which the cases mount: a
+	// directory only this user writes.
 	Bin string
-	// Herdr and Mise are the pinned binaries, in the cache.
-	Herdr, Mise string
+	// Julieta is the julieta binary, and Herdr and Mise the pinned ones,
+	// each in Bin.
+	Julieta, Herdr, Mise string
 }
 
 // Prepare meets every precondition of the container e2e, in order: the
-// daemon, the image, herdr, mise, and julieta built into bin.
+// daemon, the image, herdr and mise installed into bin, and julieta
+// built there. bin must be a directory only this user writes; Prepare
+// makes it readable by the container's user.
 func Prepare(ctx context.Context, c Config, bin string) (*Workload, error) {
+	if err := os.Chmod(bin, 0o755); err != nil {
+		return nil, err
+	}
 	if err := c.CheckDaemon(ctx); err != nil {
 		return nil, err
 	}
 	if err := c.PullImage(ctx, c.Pins.Workload.Ref); err != nil {
 		return nil, err
 	}
-	herdr, err := c.HerdrBinary(ctx)
+	herdr, err := c.HerdrBinary(ctx, bin)
 	if err != nil {
 		return nil, err
 	}
-	mise, err := c.MiseBinary(ctx)
+	mise, err := c.MiseBinary(ctx, bin)
 	if err != nil {
 		return nil, err
 	}
