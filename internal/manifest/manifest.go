@@ -9,7 +9,10 @@
 // romeu passes a manifest on every sbx env exec as
 // JULIETA_MANIFEST=<base64url(canonical JSON)> (REQ-0215), written by
 // EncodeEnv and read by DecodeEnv; julieta caches the canonical JSON,
-// which Encode writes and Decode reads.
+// which Encode writes and Decode reads. The manifest is written by a
+// program, never by hand, so Decode reads only the bytes Encode writes:
+// a document in any other spelling is refused, and no difference
+// between the parsers of the writer and the reader can arise.
 package manifest
 
 import (
@@ -60,10 +63,10 @@ type Manifest struct {
 	Protocol int `json:"protocol"`
 	// Repos are the project's repositories, the primary among them.
 	Repos []Repo `json:"repos"`
-	// Run is the validated run layout of 03 3.2, as an object: its Go
-	// type lands with internal/spec, and this field then takes it.
-	Run map[string]any `json:"run"`
-	// RunDigest is the digest of kind run of the run layout (03 3.12).
+	// Run is the validated run layout of 03 3.2.
+	Run Run `json:"run"`
+	// RunDigest is the digest of kind run of Run (03 3.12), which Decode
+	// checks.
 	RunDigest string `json:"runDigest"`
 	// Salvage holds the salvage settings.
 	Salvage Salvage `json:"salvage"`
@@ -76,7 +79,12 @@ type Manifest struct {
 	SpecCommit string `json:"specCommit"`
 }
 
-// Repo is one repository of the project.
+// Repo is one repository of the project. Decode checks the form of
+// Base and the one primary; it does not apply the rules of 03 3.1 to
+// Dir, URL and Ref, nor check Path and Memory, which 03 3.6 leaves to
+// the validators of the project spec. A consumer validates each before
+// it becomes a path, a ref, a URL or an argv element (REQ-0271): URL
+// with gitsafe.CheckURL, the others with the validators of 03 3.1.
 type Repo struct {
 	// Base are the origin SHAs the host clone already has (REQ-0222).
 	Base []string `json:"base"`
@@ -102,6 +110,16 @@ type Salvage struct {
 	ExcludeIgnored []string `json:"excludeIgnored"`
 }
 
+// Run is the validated run layout of 03 3.2, as an object. Its Go type
+// lands with internal/spec, and this field then takes it; until then a
+// number in it is a float64, so a document that spells one in a form
+// Encode does not write, or past what a float64 holds exactly, is not
+// canonical and Decode refuses it.
+type Run map[string]any
+
+// CanonKind declares the kind of Run, run (03 3.12).
+func (Run) CanonKind() canon.RunKind { return canon.Run }
+
 // SalvageRun is the salvage romeu expects back (REQ-0223).
 type SalvageRun struct {
 	// ID is the salvage id.
@@ -117,20 +135,40 @@ var Field = "manifest/v" + strconv.Itoa(Version)
 var schemaField = regexp.MustCompile(`^manifest/v([1-9][0-9]{0,8})$`)
 
 // ErrInvalid is the error of a document that is not a manifest this
-// build reads: it does not decode strictly, names another format or an
-// older version, or passes the size cap.
+// build reads: it does not decode strictly, is not in the canonical
+// form Encode writes, holds a value of the wrong form, names another
+// format or an older version, or passes the size cap.
 var ErrInvalid = errors.New("manifest: not a manifest")
+
+// ErrTooLarge is the error of a manifest whose env value is over
+// MaxEncodedSize bytes (REQ-0216).
+var ErrTooLarge = errors.New("manifest: the env value passes the cap")
+
+// The forms of the values Decode checks.
+var (
+	// commitForm is a commit id: 40 lowercase hexadecimal digits.
+	commitForm = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	// digestForm is the text of a canon.Sum: 64 of them.
+	digestForm = regexp.MustCompile(`^[0-9a-f]{64}$`)
+)
 
 // Decode reads the canonical JSON of a manifest, strictly (03,
 // opening, REQ-0160): an unknown member, a duplicate member name, a
-// member name of another case, text that is not UTF-8 and trailing data
-// are each an error. The schema field is read first, so a newer version
-// is format-newer (RJ-311) even where it holds members this build does
-// not know; then a protocol outside N and N-1 is manifest-protocol
-// (RJ-342). Every other refusal wraps ErrInvalid.
+// member name of another case, text that is not UTF-8 or holds U+FFFD,
+// and trailing data are each an error. The schema field is read first,
+// so a newer version is format-newer (RJ-311) even where it holds
+// members this build does not know. Then the document must be the
+// bytes Encode writes for it, exactly, so a missing member, a null,
+// another key order, whitespace, another escape or number spelling, and
+// a trailing newline are each refused. Then a protocol outside N and
+// N-1 is manifest-protocol (RJ-342), and the values must have their
+// forms (check). Every other refusal wraps ErrInvalid.
 func Decode(data []byte) (Manifest, error) {
 	if len(data) > MaxJSONSize {
 		return Manifest{}, fmt.Errorf("%w: %d bytes of JSON pass the cap of %d", ErrInvalid, len(data), MaxJSONSize)
+	}
+	if err := validText(data); err != nil {
+		return Manifest{}, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	var head struct {
 		Schema *string `json:"schema"`
@@ -155,13 +193,70 @@ func Decode(data []byte) (Manifest, error) {
 	if err := jsonv2.Unmarshal(data, &m, jsonv2.RejectUnknownMembers(true)); err != nil {
 		return Manifest{}, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
+	enc, err := Encode(m)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("%w: %w", ErrInvalid, err)
+	}
+	if !bytes.Equal(enc, data) {
+		return Manifest{}, fmt.Errorf("%w: the document is not the canonical JSON Encode writes for it (a member missing or null, another order, spacing or spelling)", ErrInvalid)
+	}
 	if !acceptsProtocol(m.Protocol, Protocol) {
-		e := ManifestProtocol.New(fmt.Sprintf("the manifest is of protocol %d, and this julieta accepts %d and %d", m.Protocol, Protocol, Protocol-1),
+		e := ManifestProtocol.New(fmt.Sprintf("the manifest is of protocol %d, and this julieta accepts protocol %d and the one before it", m.Protocol, Protocol),
 			cli.Detail{Key: "protocol", Value: strconv.Itoa(m.Protocol)})
 		e.Fill = map[string]string{"<name>": m.Project}
 		return Manifest{}, e
 	}
+	if err := check(m); err != nil {
+		return Manifest{}, fmt.Errorf("%w: %w", ErrInvalid, err)
+	}
 	return m, nil
+}
+
+// check returns why a value of m does not have its form: the
+// generation and the salvage id are lowercase ULIDs (03 3.12), the spec
+// commit and each base are commit ids, the run digest is the digest of
+// kind run of the run, the cap is not negative, and exactly one
+// repository is the primary (03 3.2).
+func check(m Manifest) error {
+	if _, err := canon.ParseULID(m.Generation); err != nil {
+		return fmt.Errorf("generation: %w", err)
+	}
+	if m.SalvageRun != nil {
+		if _, err := canon.ParseULID(m.SalvageRun.ID); err != nil {
+			return fmt.Errorf("salvageRun.id: %w", err)
+		}
+	}
+	if !commitForm.MatchString(m.SpecCommit) {
+		return fmt.Errorf("specCommit %q is not 40 lowercase hexadecimal digits", clip(m.SpecCommit))
+	}
+	if !digestForm.MatchString(m.RunDigest) {
+		return fmt.Errorf("runDigest %q is not 64 lowercase hexadecimal digits", clip(m.RunDigest))
+	}
+	sum, err := canon.Digest(canon.Run, m.Run)
+	if err != nil {
+		return fmt.Errorf("run: %w", err)
+	}
+	if sum.String() != m.RunDigest {
+		return errors.New("runDigest is not the digest of kind run of the run")
+	}
+	if m.Salvage.CapBytes < 0 {
+		return fmt.Errorf("salvage.capBytes %d is negative", m.Salvage.CapBytes)
+	}
+	primaries := 0
+	for i, r := range m.Repos {
+		if r.Primary {
+			primaries++
+		}
+		for _, b := range r.Base {
+			if !commitForm.MatchString(b) {
+				return fmt.Errorf("repos[%d].base %q is not 40 lowercase hexadecimal digits", i, clip(b))
+			}
+		}
+	}
+	if primaries != 1 {
+		return fmt.Errorf("%d repositories are primary, and exactly one is", primaries)
+	}
+	return nil
 }
 
 // DecodeEnv reads the env value of a manifest: base64url without
@@ -206,11 +301,15 @@ func Encode(m Manifest) ([]byte, error) {
 }
 
 // EncodeEnv returns the env value of m: the base64url, without padding,
-// of its canonical JSON (REQ-0215).
+// of its canonical JSON (REQ-0215). A value over MaxEncodedSize is
+// ErrTooLarge; EncodedSize reports its size.
 func EncodeEnv(m Manifest) (string, error) {
 	data, err := Encode(m)
 	if err != nil {
 		return "", err
+	}
+	if n := base64.RawURLEncoding.EncodedLen(len(data)); n > MaxEncodedSize {
+		return "", fmt.Errorf("%w: %d bytes, over %d", ErrTooLarge, n, MaxEncodedSize)
 	}
 	return base64.RawURLEncoding.EncodeToString(data), nil
 }
@@ -236,7 +335,7 @@ func (m Manifest) withEmptyLists() Manifest {
 		m.Repos[i].Base = orEmpty(m.Repos[i].Base)
 	}
 	if m.Run == nil {
-		m.Run = map[string]any{}
+		m.Run = Run{}
 	} else {
 		m.Run = maps.Clone(m.Run)
 	}

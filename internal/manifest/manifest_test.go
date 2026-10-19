@@ -212,8 +212,8 @@ func (asRun) CanonKind() canon.RunKind { return canon.Run }
 
 func TestEncodeWritesTheCanonicalJSONOfCanon(t *testing.T) {
 	hostile := valid(t)
-	hostile.Project = "<a & b>  \t\"\\\x01é😀"
-	hostile.Run = map[string]any{"z": 1.0, "a": map[string]any{"é": []any{"<", nil, true, 0.5}, "A": "b"}, "ÿ": "", "\U0001F600": 1e21}
+	hostile.Project = "<a & b>\u2028\u2029\t\"\\\x01é😀"
+	hostile.Run = map[string]any{"z": 1.0, "a": map[string]any{"é": []any{"<", nil, true, 0.5}, "A": "b"}, "\u00ff": "", "\U0001F600": 1e21}
 	hostile.SalvageRun = nil
 	for name, m := range map[string]Manifest{"the example": valid(t), "hostile text": hostile} {
 		t.Run(strings.ReplaceAll(name, " ", "_"), func(t *testing.T) {
@@ -227,7 +227,7 @@ func TestEncodeWritesTheCanonicalJSONOfCanon(t *testing.T) {
 }
 
 func TestEncodeRefusesTextThatIsNotUTF8(t *testing.T) {
-	for _, s := range []string{"a\xffb", "a�b"} {
+	for _, s := range []string{"a\xffb", "a\uFFFDb"} {
 		m := valid(t)
 		m.Agent = s
 		_, err := Encode(m)
@@ -276,7 +276,8 @@ func TestRoundTrip(t *testing.T) {
 
 // TestTheFixtureOfI30 is the 32 KiB manifest of I30: its env value is
 // the cap exactly, which EncodedSize reports and which DecodeEnv still
-// reads; one byte more of JSON passes the cap.
+// reads; one byte more of JSON passes the cap, which EncodeEnv refuses
+// to write and DecodeEnv to read.
 func TestTheFixtureOfI30(t *testing.T) {
 	m, err := Decode(fixture(t, "size-32k.json"))
 	require.NoError(t, err)
@@ -292,10 +293,12 @@ func TestTheFixtureOfI30(t *testing.T) {
 	size, err = EncodedSize(m)
 	require.NoError(t, err)
 	assert.Greater(t, size, MaxEncodedSize)
-	env, err = EncodeEnv(m)
+	_, err = EncodeEnv(m)
+	require.ErrorIs(t, err, ErrTooLarge)
+	data, err := Encode(m)
 	require.NoError(t, err)
-	_, err = DecodeEnv(env)
-	require.Error(t, err)
+	_, err = DecodeEnv(base64.RawURLEncoding.EncodeToString(data))
+	require.ErrorIs(t, err, ErrInvalid)
 }
 
 func TestDecodeEnvRefuses(t *testing.T) {
