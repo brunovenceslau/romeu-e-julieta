@@ -76,6 +76,14 @@ func initRepo(t *testing.T) string {
 // no file of the tree holds: only the overlay of a build does.
 func fixtureModule(t *testing.T) string {
 	t.Helper()
+	return fixtureModuleWith(t, true)
+}
+
+// fixtureModuleWith is fixtureModule with or without the package that
+// consumes the embedded julieta: without it, nothing reads
+// internal/embedded/julieta, as in the repository today.
+func fixtureModuleWith(t *testing.T, consumer bool) string {
+	t.Helper()
 	dep := t.TempDir()
 	write(t, dep, map[string]string{
 		"go.mod":  "module example.com/dep\n\ngo 1.27\n",
@@ -83,7 +91,7 @@ func fixtureModule(t *testing.T) string {
 		"LICENSE": "The dep license: use it freely.\n",
 	})
 	root := initRepo(t)
-	write(t, root, map[string]string{
+	files := map[string]string{
 		"go.mod":              "module example.com/fixture\n\ngo 1.27\n\nrequire example.com/dep v0.0.0\n\nreplace example.com/dep => " + dep + "\n",
 		"VERSION":             "1.0.0\n",
 		"COPYING":             "The fixture's own license.\n",
@@ -92,7 +100,12 @@ func fixtureModule(t *testing.T) string {
 			"var version, commit, date = \"devel\", \"unknown\", \"unknown\"\n\n" +
 			"func main() { println(dep.Name, version, commit, date, len(embedded.Julieta)) }\n",
 		"internal/embedded/embedded.go": "// Package embedded holds the julieta binary.\npackage embedded\n\nimport _ \"embed\"\n\n// Julieta is the embedded binary.\n//\n//go:embed julieta\nvar Julieta []byte\n",
-	})
+	}
+	if !consumer {
+		delete(files, "internal/embedded/embedded.go")
+		files["cmd/romeu/main.go"] = "package main\n\nimport \"example.com/dep\"\n\nvar version, commit, date = \"devel\", \"unknown\", \"unknown\"\n\nfunc main() { println(dep.Name, version, commit, date) }\n"
+	}
+	write(t, root, files)
 	commit(t, root, "fixture", commitTime)
 	return root
 }
@@ -118,4 +131,11 @@ func members(t *testing.T, data []byte) ([]*tar.Header, map[string][]byte) {
 		content[h.Name] = body
 	}
 	return headers, content
+}
+
+// tag makes the lightweight tag at HEAD.
+func tag(t *testing.T, root, name string) {
+	t.Helper()
+	_, err := git(t.Context(), root, "-c", "tag.gpgsign=false", "tag", name)
+	require.NoError(t, err)
 }

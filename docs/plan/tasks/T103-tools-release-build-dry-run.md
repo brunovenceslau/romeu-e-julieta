@@ -23,6 +23,26 @@ refuses `run`, `sync` and promotion.
 Re-plan (2026-10-12): Kept. The second row below is corrected for the
 new order: the kits land in M2, before the first slot of sitting M3.
 
+Acceptance that cannot hold when this task merges (recorded on
+2026-10-19): the build is written and tested against fixture modules,
+but no package of the repository consumes what it embeds, and
+`tools/release build` says so plainly (a `--dry-run` prints a line that
+names the missing consumer; a build without `--dry-run` refuses). Each
+item below is deferred, with the task whose merge reopens it:
+
+- The julieta binary in romeu: the build maps
+  `internal/embedded/julieta` with a `go build` overlay, and nothing
+  reads that file. Reopened by T043 (the `sync` refusal) and T066 (the
+  `run` refusal), whose embed package consumes the path or moves the
+  `EmbedPath` constant.
+- "A romeu from that build runs `sync` past the `julieta-not-embedded`
+  refusal" (smoke step 1 of 12 12.2, T116): reopened by T043, which
+  adds `sync` and the refusal.
+- The product kits embedded: `kits/embed.go` does not exist. Reopened by
+  T077.
+- The catalog embedded: `internal/catalog` does not exist. Reopened by
+  T031.
+
 - Implements: REQ-0006 (index), REQ-0011 (index), REQ-0037 (00 0.4),
   REQ-0040 (01 1.1), REQ-0128 (02 2.1), REQ-0129 (02 2.1), REQ-0130 (02
   2.1), REQ-0131 (02 2.1), REQ-0432 (04 4.4), REQ-0837 (10 10.2),

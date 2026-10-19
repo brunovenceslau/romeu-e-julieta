@@ -112,7 +112,7 @@ func TestBuildRefusesAnotherVersion(t *testing.T) {
 // sends one.
 func TestDryRunBuildMakesNoNetworkRead(t *testing.T) {
 	var requests atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requests.Add(1)
 		http.Error(w, "no", http.StatusInternalServerError)
 	}))
@@ -120,7 +120,9 @@ func TestDryRunBuildMakesNoNetworkRead(t *testing.T) {
 	root := fixtureModule(t)
 	goBin, err := ResolveGo(t.Context())
 	require.NoError(t, err)
-	gate := &FuzzGate{API: server.URL, Repo: "owner/romeu-e-julieta", Token: "token"}
+	gate := &FuzzGate{API: server.URL, Repo: "owner/romeu-e-julieta", Token: "token",
+		Client: server.Client(), AllowHost: strings.TrimPrefix(server.URL, "https://")}
+	tag(t, root, "v1.0.0")
 
 	_, err = Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: t.TempDir(), DryRun: true, GoBin: goBin, Gate: gate})
 	require.NoError(t, err)
@@ -187,4 +189,133 @@ func readReplace(t *testing.T, root string) string {
 	_, dir, ok := strings.Cut(string(mod), "=> ")
 	require.True(t, ok)
 	return strings.TrimSpace(dir)
+}
+
+func goBinOf(t *testing.T) string {
+	t.Helper()
+	goBin, err := ResolveGo(t.Context())
+	require.NoError(t, err)
+	return goBin
+}
+
+// TestEmbeddingDoesNotPassSilently: with no package that consumes
+// internal/embedded/julieta a dry run builds and says Embedded is false;
+// with one, it says it is embedded.
+func TestEmbeddingDoesNotPassSilently(t *testing.T) {
+	bare := fixtureModuleWith(t, false)
+	res, err := Build(t.Context(), Options{Root: bare, Version: "v1.0.0", Out: filepath.Join(t.TempDir(), "out"), DryRun: true, GoBin: goBinOf(t)})
+	require.NoError(t, err)
+	assert.False(t, res.Embedded)
+
+	root := fixtureModule(t)
+	res, err = Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: filepath.Join(t.TempDir(), "out"), DryRun: true, GoBin: goBinOf(t)})
+	require.NoError(t, err)
+	assert.True(t, res.Embedded)
+}
+
+// fuzzedGate answers success for the head of root, so the gate passes.
+func fuzzedGate(t *testing.T, root string) *FuzzGate {
+	t.Helper()
+	head, err := git(t.Context(), root, "rev-parse", "HEAD")
+	require.NoError(t, err)
+	return gateFor(t, 200, runs("schedule", "main", strings.TrimSpace(string(head)), "success"), nil)
+}
+
+func TestReleaseBuildRefusesWhenNothingEmbedsJulieta(t *testing.T) {
+	bare := fixtureModuleWith(t, false)
+	tag(t, bare, "v1.0.0")
+	out := filepath.Join(t.TempDir(), "out")
+	_, err := Build(t.Context(), Options{Root: bare, Version: "v1.0.0", Out: out, GoBin: goBinOf(t), Gate: fuzzedGate(t, bare)})
+	require.ErrorContains(t, err, "embeds no julieta")
+	assert.NoDirExists(t, out)
+}
+
+func TestReleaseBuildWithTheTagAtHead(t *testing.T) {
+	root := fixtureModule(t)
+	tag(t, root, "v1.0.0")
+	res, err := Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: filepath.Join(t.TempDir(), "out"), GoBin: goBinOf(t), Gate: fuzzedGate(t, root)})
+	require.NoError(t, err)
+	assert.True(t, res.Embedded)
+	assert.Len(t, res.Archives, 2)
+}
+
+func TestReleaseBuildChecksTheTag(t *testing.T) {
+	root := fixtureModule(t)
+	gate := fuzzedGate(t, root)
+	_, err := Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: filepath.Join(t.TempDir(), "out"), GoBin: goBinOf(t), Gate: gate})
+	require.ErrorContains(t, err, "does not exist")
+
+	tag(t, root, "v1.0.0")
+	write(t, root, map[string]string{"later.txt": "x\n"})
+	commit(t, root, "a later commit", commitTime)
+	_, err = Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: filepath.Join(t.TempDir(), "out"), GoBin: goBinOf(t), Gate: gate})
+	require.ErrorContains(t, err, "not HEAD")
+}
+
+// TestDirtyTree: any change, an untracked file included, refuses a
+// release build and a dry run without --allow-dirty; a dry run with it
+// stamps the commit dirty.
+func TestDirtyTree(t *testing.T) {
+	root := fixtureModule(t)
+	tag(t, root, "v1.0.0")
+	write(t, root, map[string]string{"untracked.txt": "x\n"})
+	out := func() string { return filepath.Join(t.TempDir(), "out") }
+
+	_, err := Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: out(), DryRun: true, GoBin: goBinOf(t)})
+	require.ErrorContains(t, err, "the tree has changes")
+	_, err = Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: out(), GoBin: goBinOf(t), AllowDirty: true, Gate: fuzzedGate(t, root)})
+	require.ErrorContains(t, err, "the tree has changes")
+
+	res, err := Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: out(), DryRun: true, AllowDirty: true, GoBin: goBinOf(t)})
+	require.NoError(t, err)
+	assert.True(t, res.Dirty)
+	data, err := os.ReadFile(res.Archives[0])
+	require.NoError(t, err)
+	_, content := members(t, data)
+	head, err := git(t.Context(), root, "rev-parse", "HEAD")
+	require.NoError(t, err)
+	assert.Contains(t, string(content["romeu"]), strings.TrimSpace(string(head))+"-dirty")
+}
+
+// TestOutput: a non-empty --out is refused, an empty one is replaced, and
+// a failed build leaves nothing, not even a staging directory.
+func TestOutput(t *testing.T) {
+	root := fixtureModule(t)
+	parent := t.TempDir()
+
+	full := filepath.Join(parent, "full")
+	write(t, full, map[string]string{"keep.txt": "x\n"})
+	_, err := Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: full, DryRun: true, GoBin: goBinOf(t)})
+	require.ErrorContains(t, err, "is not empty")
+	assert.FileExists(t, filepath.Join(full, "keep.txt"))
+
+	empty := filepath.Join(parent, "empty")
+	require.NoError(t, os.Mkdir(empty, 0o755))
+	res, err := Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: empty, DryRun: true, GoBin: goBinOf(t)})
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(empty, ChecksumsName), res.Checksums)
+	assert.FileExists(t, res.Checksums)
+
+	write(t, root, map[string]string{"cmd/julieta/main.go": "package main\n\nfunc main() { broken }\n"})
+	commit(t, root, "break julieta", commitTime)
+	failed := filepath.Join(parent, "failed")
+	_, err = Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: failed, DryRun: true, GoBin: goBinOf(t)})
+	require.ErrorContains(t, err, "build julieta")
+	assert.NoDirExists(t, failed)
+	entries, err := os.ReadDir(parent)
+	require.NoError(t, err)
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	assert.ElementsMatch(t, []string{"full", "empty"}, names)
+}
+
+// TestNoticesCapALicenseFile: a license file over 1 MiB is refused.
+func TestNoticesCapALicenseFile(t *testing.T) {
+	root := fixtureModule(t)
+	dep := readReplace(t, root)
+	require.NoError(t, os.WriteFile(filepath.Join(dep, "LICENSE"), bytes.Repeat([]byte("x"), maxLicense+1), 0o644))
+	_, err := Notices(t.Context(), root, goBinOf(t), []Target{{"julieta", "linux", "amd64"}})
+	require.ErrorContains(t, err, "is larger than")
 }

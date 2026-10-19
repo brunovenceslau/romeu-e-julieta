@@ -9,8 +9,13 @@
 // It runs from the root of the repository. Without --dry-run the build
 // asks the latest scheduled fuzz.yml run first, through the GitHub API,
 // with GH_TOKEN and GITHUB_REPOSITORY (owner/name) in its environment;
-// --dry-run reads no network and makes no such check. --out defaults to
-// a new temporary directory. The commands are in
+// --dry-run reads no network and makes no such check. The API is https
+// and api.github.com unless --api-host names another host:port. The tree
+// must be clean; a dry run builds a dirty one only with --allow-dirty and
+// stamps it dirty. A release build also needs the tag to name HEAD and
+// at least one package of romeu to consume the embedded julieta, and a
+// dry run says plainly when none does. --out must be absent or empty and
+// is written in one rename; it defaults to a new temporary directory. The commands are in
 // tools/release/internal/build, whose doc comment says what the build
 // does; this package parses the command line and calls it, under
 // procgroup.Main. The exit status is 0 when the archives are written, 1
@@ -45,7 +50,7 @@ func start(args []string, stdout, stderr io.Writer) int {
 	})
 }
 
-const usage = "usage:\n  go run ./tools/release build --version <v> [--dry-run] [--out <dir>]\n"
+const usage = "usage:\n  go run ./tools/release build --version <v> [--dry-run [--allow-dirty]] [--out <dir>] [--api-host <host>]\n"
 
 // run parses args and calls the command they name.
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -57,7 +62,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(io.Discard)
 	version := fs.String("version", "", "the tag to build, v<major>.<minor>.<patch>")
 	dry := fs.Bool("dry-run", false, "build without the fuzz gate and without network")
-	out := fs.String("out", "", "where the archives go")
+	out := fs.String("out", "", "where the archives go; absent or empty")
+	dirty := fs.Bool("allow-dirty", false, "a dry run may build a tree with changes")
+	apiHost := fs.String("api-host", "", "the one API host:port to use besides api.github.com")
 	if err := fs.Parse(args[1:]); err != nil || fs.NArg() != 0 || *version == "" {
 		say(stderr, "release build: --version is required and takes no argument but its flags\n%s", usage)
 		return exitUsage
@@ -72,13 +79,13 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		say(stderr, "release build: no go command: %v\n", err)
 		return exitError
 	}
-	opts := build.Options{Root: root, Version: *version, Out: *out, DryRun: *dry, GoBin: goBin}
+	opts := build.Options{Root: root, Version: *version, Out: *out, DryRun: *dry, AllowDirty: *dirty, GoBin: goBin}
 	if !*dry {
 		api := os.Getenv("GITHUB_API_URL")
 		if api == "" {
 			api = defaultAPI
 		}
-		opts.Gate = &build.FuzzGate{API: api, Repo: os.Getenv("GITHUB_REPOSITORY"), Token: os.Getenv("GH_TOKEN")}
+		opts.Gate = &build.FuzzGate{API: api, Repo: os.Getenv("GITHUB_REPOSITORY"), Token: os.Getenv("GH_TOKEN"), AllowHost: *apiHost}
 	}
 	res, err := build.Build(ctx, opts)
 	if err != nil {
@@ -92,6 +99,12 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		say(stdout, "%s\n", path)
 	}
 	say(stdout, "%s\n", res.Checksums)
+	if res.Dirty {
+		say(stdout, "note: the tree has changes; the commit stamp is <commit>-dirty, not a clean commit\n")
+	}
+	if !res.Embedded {
+		say(stdout, "note: the archives carry no julieta: no package of romeu consumes %s yet (the embed seam of T043, T066 and T077 adds it), so a romeu from this build cannot pass julieta-not-embedded\n", build.EmbedPath)
+	}
 	return exitOK
 }
 

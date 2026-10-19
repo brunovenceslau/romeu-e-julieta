@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -40,7 +42,7 @@ func newHistory(t *testing.T, change map[string]string) history {
 // request it got.
 func gateFor(t *testing.T, status int, body string, got *http.Request) *FuzzGate {
 	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got != nil {
 			*got = *r.Clone(r.Context())
 		}
@@ -48,7 +50,8 @@ func gateFor(t *testing.T, status int, body string, got *http.Request) *FuzzGate
 		_, _ = fmt.Fprint(w, body)
 	}))
 	t.Cleanup(server.Close)
-	return &FuzzGate{API: server.URL, Repo: "owner/romeu-e-julieta", Token: "secret-token"}
+	return &FuzzGate{API: server.URL, Repo: "owner/romeu-e-julieta", Token: "secret-token",
+		Client: server.Client(), AllowHost: strings.TrimPrefix(server.URL, "https://")}
 }
 
 func runs(event, branch, sha, conclusion string) string {
@@ -159,4 +162,46 @@ func TestGitExitCodeOneIsNotAnError(t *testing.T) {
 	exit, ok := errors.AsType[*procgroup.ExitError](err)
 	require.True(t, ok)
 	assert.Equal(t, 1, exit.Code)
+}
+
+// TestFuzzGateAPIHost: the token goes to https and to api.github.com or
+// the one host a flag names, and nowhere else.
+func TestFuzzGateAPIHost(t *testing.T) {
+	h := newHistory(t, map[string]string{"plain.go": "package p\n\nvar changed = 1\n"})
+	good := runs("schedule", "main", h.fuzz, "success")
+	tests := []struct {
+		name    string
+		api     func(g *FuzzGate)
+		wantErr string
+	}{
+		{"http", func(g *FuzzGate) { g.API = "http://api.github.com" }, "is not an https URL"},
+		{"no_scheme", func(g *FuzzGate) { g.API = "api.github.com" }, "is not an https URL"},
+		{"credentials_in_url", func(g *FuzzGate) { g.API = "https://user:pw@api.github.com" }, "is not an https URL"},
+		{"another_host", func(g *FuzzGate) { g.API = "https://evil.example.com" }, "is not api.github.com, and no flag names it"},
+		{"named_host_differs", func(g *FuzzGate) { g.API = "https://evil.example.com"; g.AllowHost = "other.example.com" }, "no flag names it"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gate := gateFor(t, 200, good, nil)
+			tt.api(gate)
+			require.ErrorContains(t, gate.Check(t.Context(), h.root), tt.wantErr)
+		})
+	}
+}
+
+// TestFuzzGateDoesNotFollowARedirectToAnotherHost: the token stays with
+// the host it was sent to.
+func TestFuzzGateDoesNotFollowARedirectToAnotherHost(t *testing.T) {
+	h := newHistory(t, map[string]string{"plain.go": "package p\n\nvar changed = 1\n"})
+	var leaked atomic.Int32
+	other := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { leaked.Add(1) }))
+	t.Cleanup(other.Close)
+	first := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, other.URL, http.StatusFound)
+	}))
+	t.Cleanup(first.Close)
+	gate := &FuzzGate{API: first.URL, Repo: "owner/romeu-e-julieta", Token: "secret-token",
+		Client: first.Client(), AllowHost: strings.TrimPrefix(first.URL, "https://")}
+	require.ErrorContains(t, gate.Check(t.Context(), h.root), "redirected")
+	assert.Zero(t, leaked.Load())
 }

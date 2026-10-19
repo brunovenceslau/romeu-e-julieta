@@ -164,7 +164,7 @@ func section(b *bytes.Buffer, m module) error {
 	}
 	fmt.Fprintf(b, "\n================================================================\n%s\nlinked by: %s\n", title, strings.Join(bins, ", "))
 	for _, name := range names {
-		text, err := os.ReadFile(filepath.Join(m.Dir, name))
+		text, err := readLicense(filepath.Join(m.Dir, name))
 		if err != nil {
 			return fmt.Errorf("module %s: %w", m.Path, err)
 		}
@@ -174,4 +174,25 @@ func section(b *bytes.Buffer, m module) error {
 		}
 	}
 	return nil
+}
+
+// maxLicense is the most a license file may hold; a larger one is not a
+// license and the build refuses it.
+const maxLicense = 1 << 20
+
+// readLicense reads a license file of at most maxLicense bytes.
+func readLicense(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	data, err := io.ReadAll(io.LimitReader(f, maxLicense+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxLicense {
+		return nil, fmt.Errorf("%s is larger than %d bytes", path, maxLicense)
+	}
+	return data, nil
 }
