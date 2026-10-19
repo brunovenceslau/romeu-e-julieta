@@ -26,7 +26,8 @@ const BoundaryConfig = "tools/ci/internal/lint/forbidigo.yml"
 //   - internal/cli: the CLI writer, which owns the output streams, and
 //     the capture of os.Stderr around cobra.
 //   - cmd/romeu, cmd/julieta, tools/ci, tools/kitpin, tools/mutants,
-//     tools/new and tools/planviewer: the main packages, which hand
+//     tools/new, tools/planviewer and tools/release: the main packages,
+//     which hand
 //     os.Stdout and os.Stderr to the writer of their tool and hold the
 //     dispatcher and nothing else.
 //   - internal/procgroup: whose tests run helper processes that write to
@@ -44,6 +45,7 @@ var Allowed = []string{
 	"tools/mutants",
 	"tools/new",
 	"tools/planviewer",
+	"tools/release",
 }
 
 // BoundaryDirs returns the directories under root, as "./dir" and in
