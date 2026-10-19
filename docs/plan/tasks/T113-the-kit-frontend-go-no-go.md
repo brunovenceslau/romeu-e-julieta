@@ -3,16 +3,22 @@ id: T113
 title: "The kit-frontend go/no-go"
 milestone: M2
 module: none
-fate: new
+fate: merged
 owns: []
 needs:
   - T012
 after: []
 ask_first: []
 sitting: M0
+merged: 2026-10-19
+pr: 179
 ---
 
 # T113 - The kit-frontend go/no-go
+
+Merged on 2026-10-19 in pull request #179: sitting M0 ran on that day
+and the verdict is go ("sitting-m0-the-kit-frontend-go"). The text
+below is the one written at the re-plan.
 
 Goal: A minimal local kit built from a directory source, on one host,
 about 40 minutes: the descriptor file name, the capability names, where
