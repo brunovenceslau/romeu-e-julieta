@@ -22,6 +22,8 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/schema"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/schemagen"
 )
 
 // fsOpsEnv holds the operations that TestHelperFsOps runs, one on each
@@ -692,13 +694,19 @@ func TestGeneratedOutputsAreNotConverted(t *testing.T) {
 	r, err := os.OpenRoot(root)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = r.Close() })
-	// The files the generators of the registry of this test write, and
-	// the inventory of the checks.
+	// The files the generators of the registry of this test write, the
+	// inventory of the checks, and the schemas of the formats registered
+	// with tools/schemagen.
 	outs, err := generateOutputs(r)
 	require.NoError(t, err)
 	checks, err := check.ChecksPageOutput(r)
 	require.NoError(t, err)
 	outs = append(outs, output{checks[0].Path, checks[0].Content})
+	schemas, err := schema.Outputs(schemagen.Registered())
+	require.NoError(t, err)
+	for _, o := range schemas {
+		outs = append(outs, output{o.Path, o.Content})
+	}
 	findings, err := attributeProblems(t.Context(), git.Repo{Dir: root}, outs)
 	require.NoError(t, err)
 	assert.Empty(t, findings)

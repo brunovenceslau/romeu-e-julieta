@@ -1209,7 +1209,7 @@ func ticking(step time.Duration) func() time.Time {
 // returns the exit status, the standard output and the standard error.
 func runTimed(t *testing.T, now func() time.Time, steps []check.Step, args ...string) (int, string, string) {
 	t.Helper()
-	r := citest.NewTree(t)
+	r := newSchemaTree(t)
 	r.Commit("fixture")
 	var out, errOut strings.Builder
 	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errOut, Steps: steps, Now: now}
