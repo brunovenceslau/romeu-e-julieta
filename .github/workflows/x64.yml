@@ -17,6 +17,12 @@ on:
     - cron: "0 6 * * *"
   workflow_dispatch:
 
+# A run cancels none in progress, and the schedule and a dispatch by
+# hand are groups of their own, so neither replaces the other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -74,7 +80,34 @@ jobs:
           # through the mise shims, and tools/ci builds the environment
           # of each check itself.
           env: false
+          # The token the action reads stays in the action: no later
+          # step holds it (10 10.2).
+          persist_github_token: false
+      - name: Restore the downloads of the container e2e
+        # actions/cache v6.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          # CacheDir of e2e/internal/container: the herdr and the mise
+          # it downloads, each checked against kits/pins.yaml when it is
+          # installed for the cases, so a restored file is not trusted
+          # for being cached. The image of the workload is not cached:
+          # every run pulls it by its digest. The key names the runner's
+          # OS and architecture, so each architecture keeps its own
+          # entry and a macOS runner, which runs no container e2e,
+          # finds none to restore and saves none, and then one hash of
+          # the fixture mise.lock and the herdr and mise pins, so a pin
+          # that changes is a new entry (CacheKey of
+          # tools/ci/internal/container, which the workflows test holds
+          # it to).
+          path: /tmp/romeu-e-julieta-container-e2e
+          key: container-e2e-${{ runner.os }}-${{ runner.arch }}-87f76e55cffe50ac5b1dab8f74384c9fa41bd7e6ae61d22f3f6c9bab262b6344
       - name: Trust mise.toml and fill the module cache
         run: go run ./tools/ci setup
+      # tools/ci is built and then run, not started by "go run", which
+      # reaches the job with every exit status other than 0 as 1: so the
+      # job ends with the status tools/ci returns, 3 for an
+      # infrastructure error among them.
+      - name: Build tools/ci
+        run: go build -o "$RUNNER_TEMP/ci" ./tools/ci
       - name: All checks
-        run: go run ./tools/ci all
+        run: '"$RUNNER_TEMP/ci" all'

@@ -6,6 +6,7 @@ package check_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -69,6 +70,52 @@ func TestQuietStepPrintsSafeText(t *testing.T) {
 	}
 	assert.Contains(t, listing, "./::error::x.go")
 	assert.Contains(t, code, "::error::x.go", "the output of a step that runs code stays raw")
+}
+
+// around returns an Around hook that adds env and reads with read.
+func around(env []string, read check.Read) func() ([]string, check.Read, error) {
+	return func() ([]string, check.Read, error) { return env, read, nil }
+}
+
+// TestRunReadsTheOutputOfAStep checks the Around hook of a step: the
+// variables it adds reach the command, what its Read returns is what the
+// verdict prints, its error decides the verdict whatever the exit
+// status, an error that wraps ErrInfrastructure marks the step an
+// infrastructure error, and an error of Around fails the step. InfraOnly
+// holds when every failed check is one.
+func TestRunReadsTheOutputOfAStep(t *testing.T) {
+	infra := func([]byte, error) ([]byte, error) {
+		return []byte("read\n"), fmt.Errorf("the pull: %w", check.ErrInfrastructure)
+	}
+	pass := func([]byte, error) ([]byte, error) { return nil, nil }
+	fail := func([]byte, error) ([]byte, error) { return []byte("no test ran\n"), errors.New("zero tests") }
+	echo := func(out []byte, _ error) ([]byte, error) { return out, errors.New("shown") }
+	var out bytes.Buffer
+	c := check.NewPrinter(&out)
+	c.Run(t.Context(), t.TempDir(), []check.Step{
+		{Name: "passes", Argv: []string{"sh", "-c", "exit 1"}, Around: around(nil, pass)},
+		{Name: "e2e", Argv: []string{"sh", "-c", "echo raw; exit 1"}, Around: around(nil, infra)},
+		{Name: "env", Argv: []string{"sh", "-c", `echo "A=$A B=$B"`}, Environ: []string{"A=1"}, Around: around([]string{"B=2"}, echo)},
+		{Name: "around fails", Argv: []string{"sh", "-c", "echo started"}, Around: func() ([]string, check.Read, error) { return nil, nil, errors.New("no file") }},
+	})
+	assert.Contains(t, out.String(), "A=1 B=2", "the variables of Around reach the command")
+	assert.Contains(t, out.String(), "FAIL  around fails")
+	assert.NotContains(t, out.String(), "started")
+	assert.Contains(t, out.String(), "ok    passes")
+	assert.Contains(t, out.String(), "FAIL  e2e")
+	assert.Contains(t, out.String(), "read\n")
+	assert.NotContains(t, out.String(), "raw")
+	assert.Equal(t, []string{"e2e"}, c.Infra)
+	assert.False(t, c.InfraOnly(), "env and around fails failed besides")
+	c = check.NewPrinter(&out)
+	c.Run(t.Context(), t.TempDir(), []check.Step{{Name: "e2e", Argv: []string{"false"}, Around: around(nil, infra)}})
+	assert.True(t, c.InfraOnly())
+
+	c.Run(t.Context(), t.TempDir(), []check.Step{{Name: "zero", Argv: []string{"true"}, Around: around(nil, fail)}})
+	assert.Contains(t, out.String(), "FAIL  zero")
+	assert.Contains(t, out.String(), "no test ran")
+	assert.False(t, c.InfraOnly(), "a test failure besides the infrastructure error")
+	assert.False(t, check.NewPrinter(&out).InfraOnly(), "nothing failed")
 }
 
 // TestFormatDuration holds the rounding of a duration on a verdict line

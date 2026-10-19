@@ -928,8 +928,8 @@ func TestFastSteps(t *testing.T) {
 	goCmd := filepath.Join(goDir, "go")
 	tools := check.Tools{Linter: "/pinned/golangci-lint", GoDir: goDir}
 	// Spelled out, not read from lint.Args: this test pins the list.
-	wantLint := []string{"/pinned/golangci-lint", "run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners"}
-	wantBoundary := []string{"/pinned/golangci-lint", "run", "--config", "tools/ci/internal/lint/forbidigo.yml", "-j", "1", "--allow-parallel-runners", "./tools/other"}
+	wantLint := []string{"/pinned/golangci-lint", "run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners", "--build-tags", "e2e,host"}
+	wantBoundary := []string{"/pinned/golangci-lint", "run", "--config", "tools/ci/internal/lint/forbidigo.yml", "-j", "1", "--allow-parallel-runners", "--build-tags", "e2e,host", "./tools/other"}
 	lintSteps := func(targets ...lint.Target) []check.Step {
 		var steps []check.Step
 		for _, target := range targets {

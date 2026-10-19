@@ -5,6 +5,7 @@ package check
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"time"
@@ -19,7 +20,17 @@ const (
 	ExitOK    = 0 // every check passed
 	ExitFail  = 1 // a check found something
 	ExitError = 2 // a check could not run, or the command line is wrong
+	ExitInfra = 3 // every failed check is an infrastructure error (ErrInfrastructure)
 )
+
+// ErrInfrastructure is the error of a run whose only failures are
+// infrastructure errors: a precondition of the hybrid or container e2e
+// that could not be met (the Docker daemon, a transport failure of the
+// image pull, the herdr or the mise download), which REQ-0798 of 10
+// 10.1 ends with an exit status of its own, never as a skip. A digest
+// or a checksum that differs from its pin is a test failure, never
+// this.
+var ErrInfrastructure = errors.New("an infrastructure error: a precondition of the e2e could not be met, which is not a test failure")
 
 // Env is what a subcommand reads and writes. Tests fill it with a
 // fixture; main fills it with the process's own.
@@ -61,9 +72,13 @@ func RepoRoot(ctx context.Context, e Env) (string, error) {
 }
 
 // Status returns the exit status of a subcommand that returned ok and
-// err, and prints err, made safe, to stderr.
+// err, and prints err, made safe, to stderr. An err that wraps
+// ErrInfrastructure exits ExitInfra.
 func Status(stderr io.Writer, ok bool, err error) int {
 	switch {
+	case errors.Is(err, ErrInfrastructure):
+		Say(stderr, "ci: %s\n", git.SafeLines(strings.TrimSpace(err.Error())))
+		return ExitInfra
 	case err != nil:
 		Say(stderr, "ci: %s\n", git.SafeLines(strings.TrimSpace(err.Error())))
 		return ExitError
