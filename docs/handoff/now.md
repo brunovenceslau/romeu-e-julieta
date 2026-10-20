@@ -12,9 +12,10 @@ Checkpoint of 2026-10-20, after T127 and the re-plan of T051 merged
    `gitsafe` surface is not granted: its pull request carries an
    approval line).
 2. T144, the follow-ups of the container e2e, whose task file lands with
-   its own pull request; its `checks` surface is not in the M0 grant, so its pull request carries an approval line.
+   its own pull request; its `checks` surface is not in the M0 grant, so
+   its pull request carries an approval line.
    Then the docs pull request of
-   "the-spec-catches-up-with-the-hardening-of-t127-and-t144".
+   "the-spec-catches-up-with-the-hardening-of-t127-t143-and-t144".
 3. The rest of the ready list (`go run ./tools/ci plan --ready`).
 4. T112 lands through the sessions of the config and kit repositories
    ("t112-in-the-config-and-kit-repositories"); then this repository
