@@ -9,6 +9,9 @@ owns:
   - internal/gitsafe/clone*.go
   - internal/gitsafe/status*.go
   - internal/gitsafe/gitsafe_test.go
+  - internal/gitsafe/helper_test.go
+  - docs/spec/05-security.md
+  - docs/spec/04-cli.md
   - docs/handoff/pending/gitsafe-s-fast-forward-overwrites-ignored-files-and-runs.md
 needs:
   - T051
@@ -16,6 +19,7 @@ needs:
 after: []
 ask_first:
   - gitsafe
+  - spec
 sitting: none
 ---
 
@@ -46,11 +50,32 @@ records, four gaps:
    ""]`, key `filter..clean`), which git lists and runs for the
    attribute `filter=` with no value.
 4. A sandbox `Clone` checked out HEAD with no filter override. It now
-   lists the drivers of the global config from the root directory, as
-   it resolves the URL, and clones with each emptied.
+   clones with `--no-checkout`, lists the drivers in the new
+   repository, where every conditional include of the global config
+   (`includeIf "gitdir:"`, `"onbranch:"`, `"hasconfig:remote.*.url:"`)
+   resolves as for the checkout, and checks out HEAD with `git reset
+   --hard` and each driver emptied. A HEAD that names no commit is left
+   without a checkout, as `git clone` leaves it.
+
+The security audit of this task added one more, older gap: with
+`merge.verifySignatures=true` in the clone's or the global config,
+`merge` starts `gpg.program` or `gpg.ssh.program` for an incoming
+commit that carries any `gpgsig` header. `FastForward` now passes
+`--no-verify-signatures`. No other verb verifies a signature: the
+history and stash reads run with `log.showSignature=false` and a
+format with no signature field, and `Status`, fetch and clone verify
+none.
 
 One list, `filterNeutral` (`clean`, `smudge` and `process` empty,
-`required` false), serves `Status`, `FastForward` and `Clone`.
+`required` false), serves `Status`, `FastForward` and `Clone`. The
+maintainer approved on 2026-10-20 amending the specification in the
+same pull request: REQ-0463 (05 5.1) says what the verbs empty, that
+`FastForward` refuses to overwrite an ignored file and verifies no
+signature, which program-running keys sandbox mode neutralizes and
+that the transport keys stay the sandbox's own, and the precondition
+that no other process writes the config between the listing of the
+drivers and the command; REQ-0399 (04 4.3) counts an ignored file the
+move would overwrite as a refused fast-forward.
 
 - Implements: none: the hardening serves REQ-0399 and REQ-0463, which
   T051 and T023 implement.
@@ -63,12 +88,25 @@ One list, `filterNeutral` (`clean`, `smudge` and `process` empty,
     name, a long-running process and two in the sandbox's global
     config, one with an empty name, each required, for the
     fast-forward; a required `[filter ""]` clean driver for `Status`;
-    smudge drivers in the sandbox's global config for `Clone`.
+    smudge drivers in the sandbox's global config for `Clone`, plain
+    and behind each of the three conditional includes;
+    `merge.verifySignatures=true` with `gpg.program` and with
+    `gpg.ssh.program` and an incoming commit with a fake PGP or SSH
+    signature.
   - After the fix the fast-forward fails, names `local.env`, and leaves
-    the file and HEAD as they were; no planted filter runs, and the
-    files hold the tree's content. Each test keeps its positive
-    control: plain git overwrites the file or runs the filter.
-  - The argv and environment tests pin the new listing command of
-    `Clone` (run from `/`) and the four keys per driver.
+    the file and HEAD as they were; no planted filter or signature
+    program runs; the files hold the tree's content; the fast-forward
+    over a signed commit succeeds. Each test keeps its positive
+    control: plain git overwrites the file or runs the program.
+  - A clone of an empty repository still succeeds with an unborn HEAD
+    and no checkout, and a clone still has its default branch checked
+    out.
+  - The argv and environment tests pin the clone's five commands (the
+    URL resolution, the clone with `--no-checkout`, the read of HEAD,
+    the listing in the new repository and the checkout with the
+    drivers emptied) and the four keys per driver.
+  - REQ-0463 and REQ-0399 say what the code does; `go run ./tools/ci
+    reqs` passes.
   - The tests of `internal/cmd/julieta/setup` pass unchanged.
-- Verify: `go test ./internal/gitsafe/... ./internal/cmd/julieta/...`.
+- Verify: `go test -race ./internal/gitsafe/... ./internal/cmd/julieta/...`
+  and `go run ./tools/ci reqs`.
