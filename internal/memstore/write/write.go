@@ -94,20 +94,30 @@ func (s *Store) Add(c memstore.Content) (e memstore.Entry, wrote bool, err error
 		return memstore.Entry{}, false, err
 	}
 	err = s.locked(func() error {
-		all, err := s.List(memstore.Filter{})
+		// One entry is in memory at a time: a full store holds up to
+		// MaxEntries files of MaxFileSize each.
+		found := false
+		var derr error
+		err := s.Walk(memstore.Filter{Status: memstore.StatusOpen}, func(have memstore.Entry) bool {
+			d, err := have.Content().Digest()
+			if err != nil {
+				derr = fmt.Errorf("%s: %w", memstore.EntryPath(have.ID), err)
+				return false
+			}
+			if d == sum {
+				e, found = have, true
+				return false
+			}
+			return true
+		})
+		if err = errors.Join(err, derr); err != nil || found {
+			return err
+		}
+		n, err := s.Count()
 		if err != nil {
 			return err
 		}
-		for _, have := range all {
-			if have.Status != memstore.StatusOpen {
-				continue
-			}
-			if d, err := have.Content().Digest(); err == nil && d == sum {
-				e = have
-				return nil
-			}
-		}
-		if len(all) >= memstore.MaxEntries {
+		if n >= memstore.MaxEntries {
 			return fmt.Errorf("%w: %d", ErrFull, memstore.MaxEntries)
 		}
 		now := memstore.Stamp(s.now())
@@ -280,10 +290,11 @@ func (s *Store) atomicWrite(p string, data []byte) error {
 // RemoveTemps removes from the memory dir of root every temporary file
 // of julieta (REQ-0654) whose ULID is older than before, the start of
 // julieta setup, and keeps a newer one, which a julieta that runs now
-// may still be writing. It returns the slash paths it removed and kept.
-// It reads the names Check reports, so it judges every node as Check
-// does.
-func RemoveTemps(root *os.Root, before time.Time) (removed, kept []string, err error) {
+// may still be writing. A ULID of a time after now no julieta wrote
+// yet, so that file is stale too and is removed. It returns the slash
+// paths it removed and kept. It reads the names Check reports, so it
+// judges every node as Check does.
+func RemoveTemps(root *os.Root, before, now time.Time) (removed, kept []string, err error) {
 	rep, err := memstore.Check(root)
 	if err != nil {
 		return nil, nil, err
@@ -293,7 +304,7 @@ func RemoveTemps(root *os.Root, before time.Time) (removed, kept []string, err e
 			continue
 		}
 		at, _ := memstore.TempTime(path.Base(w.Path))
-		if !at.Before(before) {
+		if !at.Before(before) && !at.After(now) {
 			kept = append(kept, w.Path)
 			continue
 		}

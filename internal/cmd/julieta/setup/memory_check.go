@@ -16,6 +16,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
 	memwrite "github.com/brunovenceslau/romeu-e-julieta/internal/memstore/write"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // AgentMemoryWritable is the warning agent-memory-writable (04 4.1,
@@ -26,7 +27,8 @@ const AgentMemoryWritable = "agent-memory-writable"
 // checkMemory is the step memory check and the agent memory dir check
 // of setup (04 4.3, REQ-0400). In the memory dir of every repo of the
 // manifest it first removes julieta's temporary files older than this
-// run's start and keeps newer ones (REQ-0654), then checks that the dir
+// run's start, or of a time after now, which no julieta wrote yet, and
+// keeps the others (REQ-0654), then checks that the dir
 // is mounted, writable and in the layout of 08 8.1 (REQ-0412): a dir
 // that fails leaves the sandbox unusable, so setup exits 1. Then it
 // warns agent-memory-writable when the agent's own memory dir is
@@ -34,12 +36,12 @@ const AgentMemoryWritable = "agent-memory-writable"
 func checkMemory(_ context.Context, r *run) {
 	for _, repo := range r.m.Repos {
 		if err := checkMemoryDir(r, repo.Memory); err != nil {
-			r.fail("memory check of %s: %v", repo.Dir, err)
+			r.fail("memory check of %s: %s", termsafe.Escape(repo.Dir), termsafe.Escape(err.Error()))
 		}
 	}
 	if dir, ok := agentMemoryDir(r.home, r.m.Agent); ok {
 		if why := agentMemoryOpen(dir); why != "" {
-			r.warn(AgentMemoryWritable, fmt.Sprintf("%s %s", dir, why))
+			r.warn(AgentMemoryWritable, fmt.Sprintf("%s %s", termsafe.Escape(dir), termsafe.Escape(why)))
 		}
 	}
 }
@@ -55,7 +57,7 @@ func checkMemoryDir(r *run, dir string) error {
 		return err
 	}
 	defer func() { _ = root.Close() }()
-	if _, _, err := memwrite.RemoveTemps(root, r.start); err != nil {
+	if _, _, err := memwrite.RemoveTemps(root, r.start, r.now()); err != nil {
 		return err
 	}
 	rep, err := memstore.Check(root)
@@ -67,7 +69,7 @@ func checkMemoryDir(r *run, dir string) error {
 		for i, f := range rep.Findings {
 			names[i] = f.String()
 		}
-		return fmt.Errorf("%s breaks the layout of 08 8.1: %s", dir, strings.Join(names, ", "))
+		return fmt.Errorf("%s breaks the layout of 08 8.1: %s", termsafe.Escape(dir), strings.Join(names, ", "))
 	}
 	return nil
 }

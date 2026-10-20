@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
 )
@@ -33,17 +34,32 @@ func tempFile(t *testing.T, mem, sub string, at time.Time) string {
 
 // TestSetupRemovesOldTemps removes a .tmp-<ULID> older than the start of
 // setup and keeps a newer one, which a julieta that runs now may still
-// be writing (REQ-0654).
+// be writing; one of a time after now no julieta wrote yet, and it goes
+// too (REQ-0654). The clock reads the start first, then a minute
+// later.
 func TestSetupRemovesOldTemps(t *testing.T) {
 	s := newSandbox(t)
 	mem := s.m.Repos[0].Memory
 	old := tempFile(t, mem, "entries", clock.Add(-time.Second))
-	newer := tempFile(t, mem, "handoff", clock.Add(time.Second))
-	code, rep, stderr := setupJSON(t)
-	require.Equal(t, 0, code, stderr)
+	newer := tempFile(t, mem, "handoff", clock.Add(30*time.Second))
+	future := tempFile(t, mem, "salvage", clock.Add(2*time.Minute))
+	calls := 0
+	var stdout, stderr bytes.Buffer
+	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&stdout), Stderr: cli.NewWriter(&stderr), Version: stamp,
+		Now: func() time.Time {
+			calls++
+			if calls == 1 {
+				return clock
+			}
+			return clock.Add(time.Minute)
+		}}
+	require.Equal(t, 0, cli.Main(t.Context(), []string{"setup", "--json"}, env), stderr.String())
+	rep, err := setup.Decode(stdout.Bytes())
+	require.NoError(t, err)
 	assert.Empty(t, rep.Unusable)
 	assert.NoFileExists(t, old)
 	assert.FileExists(t, newer)
+	assert.NoFileExists(t, future)
 }
 
 // TestSetupMemoryCheck leaves the sandbox unusable, exit 1, when a

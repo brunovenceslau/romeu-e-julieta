@@ -33,6 +33,7 @@ type run struct {
 	m      manifest.Manifest
 	git    *gitsafe.Runner
 	start  time.Time
+	now    func() time.Time
 	report Report
 }
 
@@ -78,7 +79,7 @@ func setup(ctx context.Context, env *cli.Env) error {
 	if err != nil {
 		return err
 	}
-	r := &run{home: home, m: m, git: git, start: env.Now(),
+	r := &run{home: home, m: m, git: git, start: env.Now(), now: env.Now,
 		report: Report{Schema: Schema, Version: env.Version.Version, Errors: []string{}, Repos: []Repo{}, Unusable: []string{}, Warnings: []Warning{}}}
 	if fromEnv {
 		if err := cacheManifest(home, m); err != nil {

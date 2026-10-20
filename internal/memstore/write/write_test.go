@@ -253,8 +253,50 @@ func TestConcurrentWriters(t *testing.T) {
 	assert.Equal(t, writers*each, n)
 }
 
+// TestConcurrentDuplicates runs writers that add the same content at
+// once, each with a store of its own: the store lock makes the
+// duplicate rule hold across them, so exactly one writes and the
+// others get its entry (04 4.1, Idempotency; REQ-0655).
+func TestConcurrentDuplicates(t *testing.T) {
+	dir, home := t.TempDir(), t.TempDir()
+	src := entropy()
+	const writers = 8
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	wrote := 0
+	ids := map[canon.ULID]bool{}
+	start := make(chan struct{})
+	for range writers {
+		s, err := Open(Config{Dir: dir, Lock: LockPath(home, "api"), Now: func() time.Time { return clock }, ULIDs: src})
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = s.Close() })
+		wg.Go(func() {
+			<-start
+			e, w, err := s.Add(memstore.Content{Title: "same", Body: strings.Repeat("b", 1<<16)})
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			ids[e.ID] = true
+			if w {
+				wrote++
+			}
+		})
+	}
+	close(start)
+	wg.Wait()
+	assert.Equal(t, 1, wrote, "one writer wrote")
+	assert.Len(t, ids, 1, "every writer got the one entry")
+	names, err := os.ReadDir(filepath.Join(dir, "entries"))
+	require.NoError(t, err)
+	assert.Len(t, names, 1, "one file")
+}
+
 // TestRemoveTemps removes a temporary file older than the start and
-// keeps a newer one (REQ-0654); a non-temporary dotfile is not its to
+// keeps a newer one (REQ-0654); one whose ULID is after now no julieta
+// wrote yet, and it goes too; a non-temporary dotfile is not its to
 // remove.
 func TestRemoveTemps(t *testing.T) {
 	dir := t.TempDir()
@@ -263,7 +305,9 @@ func TestRemoveTemps(t *testing.T) {
 	require.NoError(t, err)
 	newer, err := canon.NewULID(clock.Add(time.Minute), src)
 	require.NoError(t, err)
-	for _, p := range []string{"entries/" + memstore.TempName(old), "handoff/" + memstore.TempName(newer), "entries/.hidden"} {
+	future, err := canon.NewULID(clock.Add(time.Hour), src)
+	require.NoError(t, err)
+	for _, p := range []string{"entries/" + memstore.TempName(old), "handoff/" + memstore.TempName(newer), "entries/.hidden", "salvage/" + memstore.TempName(future)} {
 		full := filepath.Join(dir, filepath.FromSlash(p))
 		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o700))
 		require.NoError(t, os.WriteFile(full, nil, 0o600))
@@ -271,9 +315,9 @@ func TestRemoveTemps(t *testing.T) {
 	root, err := os.OpenRoot(dir)
 	require.NoError(t, err)
 	defer func() { _ = root.Close() }()
-	removed, kept, err := RemoveTemps(root, clock)
+	removed, kept, err := RemoveTemps(root, clock, clock.Add(2*time.Minute))
 	require.NoError(t, err)
-	assert.Equal(t, []string{"entries/" + memstore.TempName(old)}, removed)
+	assert.Equal(t, []string{"entries/" + memstore.TempName(old), "salvage/" + memstore.TempName(future)}, removed)
 	assert.Equal(t, []string{"handoff/" + memstore.TempName(newer)}, kept)
 	paths := slices.Sorted(func(yield func(string) bool) {
 		for p := range tree(t, dir) {
@@ -282,7 +326,7 @@ func TestRemoveTemps(t *testing.T) {
 			}
 		}
 	})
-	assert.Equal(t, []string{"entries", "entries/.hidden", "handoff", "handoff/" + memstore.TempName(newer)}, paths)
+	assert.Equal(t, []string{"entries", "entries/.hidden", "handoff", "handoff/" + memstore.TempName(newer), "salvage"}, paths)
 }
 
 // TestOpenRefuses refuses a config without a clock or a ULID source, a
