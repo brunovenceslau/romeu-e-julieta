@@ -3,6 +3,11 @@ name: handoff
 description: Write the handoff before /clear (/handoff) or before the sandbox is recreated or removed (/handoff --final). Use when the operator types /handoff.
 ---
 
+<!--
+SPDX-FileCopyrightText: 2026 Bruno Venceslau
+SPDX-License-Identifier: GPL-3.0-only
+-->
+
 # handoff
 
 The operator types `/handoff` before `/clear`, and `/handoff --final` before

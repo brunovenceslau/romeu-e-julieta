@@ -3,6 +3,11 @@ name: julieta
 description: How to use julieta inside the sandbox. Use it to keep anything worth keeping in the repo's memory, and to handle a commit whose signing fails or waits.
 ---
 
+<!--
+SPDX-FileCopyrightText: 2026 Bruno Venceslau
+SPDX-License-Identifier: GPL-3.0-only
+-->
+
 # julieta
 
 julieta is the tool inside the sandbox. Built-in memory is disabled, so
