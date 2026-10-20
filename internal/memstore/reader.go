@@ -72,6 +72,13 @@ func (r *Reader) Get(id string) (Entry, error) {
 
 // get is Get for a parsed id.
 func (r *Reader) get(u canon.ULID) (Entry, error) {
+	ok, err := r.entriesDir()
+	if err != nil {
+		return Entry{}, err
+	}
+	if !ok {
+		return Entry{}, fmt.Errorf("%w: %s", ErrNotFound, u)
+	}
 	data, err := r.readFile(EntryPath(u))
 	if errors.Is(err, fs.ErrNotExist) {
 		return Entry{}, fmt.Errorf("%w: %s", ErrNotFound, u)
@@ -99,7 +106,7 @@ func (r *Reader) readFile(p string) ([]byte, error) {
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("%w: %s is not a regular file", ErrLayout, p)
 	}
-	f, err := r.root.OpenFile(p, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, err := r.root.OpenFile(p, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK|syscall.O_NOCTTY, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -141,48 +148,84 @@ func (f Filter) match(e Entry) bool {
 	return slices.ContainsFunc(e.Tags, func(t string) bool { return strings.Contains(t, q) })
 }
 
-// List returns the entries f selects, oldest first (by id). A memory
-// dir without entries/ has none. A temporary name of julieta is never
-// read (REQ-0654); any other member of entries/ that is not a file
-// <ULID>.md, and more than MaxEntries entries, are ErrLayout, and an
-// entry that does not decode is its error: no entry is skipped.
+// List returns the entries f selects, oldest first (by id), as Walk
+// reads them.
 func (r *Reader) List(f Filter) ([]Entry, error) {
-	ids, err := r.ids()
+	var out []Entry
+	err := r.Walk(f, func(e Entry) bool {
+		out = append(out, e)
+		return true
+	})
 	if err != nil {
 		return nil, err
-	}
-	var out []Entry
-	for _, u := range ids {
-		e, err := r.get(u)
-		if err != nil {
-			return nil, err
-		}
-		if f.match(e) {
-			out = append(out, e)
-		}
 	}
 	return out, nil
 }
 
-// ids returns the ids of the entries of entries/, sorted.
-func (r *Reader) ids() ([]canon.ULID, error) {
+// Walk calls visit with each entry f selects, oldest first (by id),
+// one entry in memory at a time, until visit returns false. A memory
+// dir without entries/ has none. A temporary name of julieta is never
+// read (REQ-0654); entries/ that is no directory (a symlink among
+// them), any other member of it that is not a file <ULID>.md, and more
+// than MaxEntries entries are ErrLayout, and an entry that does not
+// decode is its error, which names its file: no entry is skipped.
+func (r *Reader) Walk(f Filter, visit func(Entry) bool) error {
+	ids, err := r.ids()
+	if err != nil {
+		return err
+	}
+	for _, u := range ids {
+		e, err := r.get(u)
+		if err != nil {
+			return err
+		}
+		if f.match(e) && !visit(e) {
+			return nil
+		}
+	}
+	return nil
+}
+
+// entriesDir reports whether entries/ exists; one that is not a real
+// directory, a symlink to another directory of the memory dir among
+// them, is ErrLayout.
+func (r *Reader) entriesDir() (bool, error) {
 	info, err := r.root.Lstat(EntriesDir)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
+		return false, nil
 	}
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("%w: %s is not a directory", ErrLayout, EntriesDir)
+		return false, fmt.Errorf("%w: %s is not a directory", ErrLayout, EntriesDir)
 	}
-	names, err := readNames(r.root, EntriesDir, MaxEntries+maxTemps+1)
+	return true, nil
+}
+
+// ids returns the ids of the entries of entries/, sorted. A dir that
+// holds more names than MaxEntries entries and maxTemps temporary
+// files is ErrLayout, so no part of it is read silently, and so is one
+// with more temporary files than maxTemps.
+func (r *Reader) ids() ([]canon.ULID, error) {
+	ok, err := r.entriesDir()
+	if err != nil || !ok {
+		return nil, err
+	}
+	names, more, err := readNames(r.root, EntriesDir, MaxEntries+maxTemps)
 	if err != nil {
 		return nil, err
 	}
+	if more {
+		return nil, fmt.Errorf("%w: %s holds more than %d names", ErrLayout, EntriesDir, MaxEntries+maxTemps)
+	}
 	var ids []canon.ULID
+	temps := 0
 	for _, name := range names {
 		if IsTemp(name) {
+			if temps++; temps > maxTemps {
+				return nil, fmt.Errorf("%w: %s holds more than %d temporary files", ErrLayout, EntriesDir, maxTemps)
+			}
 			continue
 		}
 		u, ok := entryID(name)
@@ -203,7 +246,6 @@ func (r *Reader) Count() (int, error) {
 	return len(ids), err
 }
 
-// maxTemps is how many temporary names past MaxEntries the reader of
-// entries/ reads before it stops, so a dir of leftover temporary files
-// still lists.
+// maxTemps is how many temporary files entries/ may hold beside its
+// entries, so a dir of a few leftover temporary files still lists.
 const maxTemps = 1000

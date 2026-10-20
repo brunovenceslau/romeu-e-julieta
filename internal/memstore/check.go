@@ -14,6 +14,8 @@ import (
 	"strings"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // The rules of the findings of Check, each the slug of one way a memory
@@ -66,8 +68,9 @@ type Finding struct {
 	Rule string
 }
 
-// String returns "<rule> <path>".
-func (f Finding) String() string { return f.Rule + " " + f.Path }
+// String returns "<rule> <path>", the path escaped with termsafe, so a
+// name an agent wrote cannot forge a line of the output.
+func (f Finding) String() string { return f.Rule + " " + termsafe.Escape(f.Path) }
 
 // Report is what Check found in a memory dir: the findings, each a
 // violation of the layout allowlist, and the warnings.
@@ -129,17 +132,17 @@ func Check(root *os.Root) (Report, error) {
 	for len(stack) > 0 {
 		dir := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
-		names, err := readNames(root, dir, maxNodes-nodes+1)
+		names, more, err := readNames(root, dir, maxNodes-nodes)
 		if err != nil {
 			return Report{}, err
+		}
+		if more {
+			rep.Findings = append(rep.Findings, Finding{Path: ".", Rule: RuleNodesCap})
+			return rep, nil
 		}
 		for _, name := range names {
 			nodes++
 			p := path.Join(dir, name)
-			if nodes > maxNodes {
-				rep.Findings = append(rep.Findings, Finding{Path: ".", Rule: RuleNodesCap})
-				return rep, nil
-			}
 			if !validName(name) {
 				rep.Findings = append(rep.Findings, Finding{Path: p, Rule: RuleName})
 				continue
@@ -153,11 +156,14 @@ func Check(root *os.Root) (Report, error) {
 				rep.Findings = append(rep.Findings, Finding{Path: p, Rule: rule})
 				continue
 			}
+			top := strings.SplitN(p, "/", 2)[0]
 			if IsTemp(name) {
 				rep.Warnings = append(rep.Warnings, Finding{Path: p, Rule: RuleTemp})
+				if (top == EntriesDir || top == HandoffDir) && info.Size() > MaxFileSize {
+					rep.Findings = append(rep.Findings, Finding{Path: p, Rule: RuleFileSize})
+				}
 				continue
 			}
-			top := strings.SplitN(p, "/", 2)[0]
 			if top == EntriesDir && dir != "." {
 				if _, ok := entryID(name); !ok || dir != EntriesDir || !mode.IsRegular() {
 					rep.Findings = append(rep.Findings, Finding{Path: p, Rule: RuleEntryName})
@@ -197,27 +203,30 @@ func sortFindings(fs []Finding) {
 	})
 }
 
-// readNames returns the names of the directory dir of root, at most
-// limit of them, sorted.
-func readNames(root *os.Root, dir string, limit int) ([]string, error) {
+// readNames returns the names of the directory dir of root, sorted,
+// and more set when it holds more than limit names, in which case it
+// returns none: a caller never sees a silent part of a directory.
+func readNames(root *os.Root, dir string, limit int) (names []string, more bool, err error) {
 	f, err := root.Open(dir)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer func() { _ = f.Close() }()
-	var names []string
-	for len(names) < limit {
+	for len(names) <= limit {
 		batch, err := f.Readdirnames(256)
 		names = append(names, batch...)
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
+	if len(names) > limit {
+		return nil, true, nil
+	}
 	slices.Sort(names)
-	return names, nil
+	return names, false, nil
 }
 
 // ErrUnmounted is the error of a memory dir that is not there to check:

@@ -4,6 +4,7 @@
 package memstore_test
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -166,4 +167,45 @@ func TestOpenRefuses(t *testing.T) {
 		_, err := memstore.Open(p)
 		require.Error(t, err, p)
 	}
+}
+
+// TestEntriesSymlink refuses an entries/ that is a symlink to another
+// directory of the memory dir, on Get as on List.
+func TestEntriesSymlink(t *testing.T) {
+	dir := t.TempDir()
+	plant(t, filepath.Join(dir, "salvage"), example(t))
+	require.NoError(t, os.Symlink(filepath.Join(dir, "salvage", "entries"), filepath.Join(dir, "entries")))
+	r := open(t, dir)
+	_, err := r.Get(idA)
+	require.ErrorIs(t, err, memstore.ErrLayout)
+	_, err = r.List(memstore.Filter{})
+	require.ErrorIs(t, err, memstore.ErrLayout)
+}
+
+// TestListRefusesTooManyTemps refuses an entries/ with more temporary
+// files than the reader allows, rather than reading part of it.
+func TestListRefusesTooManyTemps(t *testing.T) {
+	dir := t.TempDir()
+	plant(t, dir, example(t))
+	src := canon.NewULIDSource(bytes.NewReader(make([]byte, 10)))
+	for range 1001 {
+		u, err := canon.NewULID(example(t).CreatedAt, src)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "entries", memstore.TempName(u)), nil, 0o600))
+	}
+	_, err := open(t, dir).List(memstore.Filter{})
+	require.ErrorIs(t, err, memstore.ErrLayout)
+	assert.Contains(t, err.Error(), "temporary files")
+}
+
+// TestErrorsEscapeNames escapes a stray name that reaches an error, so
+// it cannot forge a line of the output.
+func TestErrorsEscapeNames(t *testing.T) {
+	dir := t.TempDir()
+	plant(t, dir, example(t))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "entries", "x\nfinding\x1b[0m"), nil, 0o600))
+	_, err := open(t, dir).List(memstore.Filter{})
+	require.ErrorIs(t, err, memstore.ErrLayout)
+	assert.NotContains(t, err.Error(), "\n")
+	assert.NotContains(t, err.Error(), "\x1b")
 }

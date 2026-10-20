@@ -4,14 +4,15 @@
 # The license of each fixture of memstore, none of which can carry an
 # SPDX header of its own (REUSE 3.3). Each is a memory entry file (03
 # 3.9) written for these tests:
-# - valid.md: the example of 03 3.9;
+# - valid.md: the example of 03 3.9, byte for byte;
 # - invalid-anchor.md, invalid-alias.md, invalid-merge-key.md,
 #   invalid-include.md, invalid-duplicate-key.md and
-#   invalid-unknown-key.md: valid.md with one construct the strict
-#   decoder refuses;
+#   invalid-unknown-key.md: an entry like valid.md with one construct
+#   the strict decoder refuses;
 # - newer.md: a memory-entry/v2, refused with format-newer;
 # - fuzz/FuzzDecode/*: the committed seeds of the fuzz target of the
-#   decoder.
+#   decoder: each fixture above, and deep flow nesting, a key of 500
+#   KiB and a v2 file with an anchor.
 
 version = 1
 

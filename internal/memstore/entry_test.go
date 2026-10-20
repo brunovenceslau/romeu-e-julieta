@@ -38,16 +38,33 @@ func example(t *testing.T) memstore.Entry {
 		Tags: []string{"arm64", "ci"}, CreatedAt: at, UpdatedAt: at, Body: "Free-form markdown body.\n"}
 }
 
-// TestDecodeExample reads the example of 03 3.9, and Encode writes the
-// same bytes back.
+// TestDecodeExample reads the example of 03 3.9, byte for byte, whose
+// tags are not sorted and whose lines carry comments: the decoder sorts
+// the tags, and Encode writes the entry in julieta's one spelling,
+// which decodes to the same entry.
 func TestDecodeExample(t *testing.T) {
-	data := fixture(t, "valid.md")
-	e, err := memstore.Decode(data)
+	e, err := memstore.Decode(fixture(t, "valid.md"))
 	require.NoError(t, err)
 	assert.Equal(t, example(t), e)
 	enc, err := memstore.Encode(e)
 	require.NoError(t, err)
-	assert.Equal(t, string(data), string(enc))
+	assert.Equal(t, "---\nschema: memory-entry/v1\nid: 01j9z3k8m6t2q4w5e7r9y1v3k5\ntitle: Flaky integration test on arm64\n"+
+		"status: open\ntags: [arm64, ci]\ncreatedAt: 2026-10-02T09:20:00Z\nupdatedAt: 2026-10-02T09:20:00Z\n---\n"+
+		"Free-form markdown body.\n", string(enc))
+	again, err := memstore.Decode(enc)
+	require.NoError(t, err)
+	assert.Equal(t, e, again)
+}
+
+// TestEncodeSortsTags writes the tags of an entry sorted, whatever
+// their order, and leaves the entry it was given as it was.
+func TestEncodeSortsTags(t *testing.T) {
+	e := example(t)
+	e.Tags = []string{"ci", "arm64"}
+	enc, err := memstore.Encode(e)
+	require.NoError(t, err)
+	assert.Contains(t, string(enc), "\ntags: [arm64, ci]\n")
+	assert.Equal(t, []string{"ci", "arm64"}, e.Tags)
 }
 
 // TestDecodeRefusesTheSubsetGrammar refuses, one fixture each, a front
@@ -73,7 +90,7 @@ func TestDecodeRefusesTheSubsetGrammar(t *testing.T) {
 // TestDecodeRefusesAnAliasAlone refuses an alias whose anchor is
 // elsewhere: the check names the alias when it meets it first.
 func TestDecodeRefusesAnAliasAlone(t *testing.T) {
-	data := strings.Replace(string(fixture(t, "valid.md")), "tags: [arm64, ci]", "tags: *x", 1)
+	data := strings.Replace(string(fixture(t, "valid.md")), "tags: [ci, arm64]", "tags: *x", 1)
 	_, err := memstore.Decode([]byte(data))
 	require.ErrorIs(t, err, memstore.ErrInvalid)
 }
@@ -86,6 +103,24 @@ func TestDecodeRefusesANewerVersion(t *testing.T) {
 	require.True(t, ok, "%v", err)
 	assert.Equal(t, "RJ-311", e.ID)
 	assert.Equal(t, 2, e.Exit)
+}
+
+// TestDecodeNewerFirst reports format-newer (RJ-311) for a v2 file
+// whatever its front matter holds: an anchor, a merge key, an unknown
+// key, or text that is no YAML at all (03, opening).
+func TestDecodeNewerFirst(t *testing.T) {
+	for name, front := range map[string]string{
+		"an anchor":      "schema: memory-entry/v2\ntags: &t [a]\n",
+		"a merge key":    "schema: memory-entry/v2\n<<: {a: 1}\n",
+		"a syntax error": "schema: memory-entry/v2\ntitle: [unclosed\n",
+		"quoted":         "schema: \"memory-entry/v3\"   # a comment\nx: {\n",
+		"a later line":   "id: x\nschema: memory-entry/v2\n: :\n",
+	} {
+		_, err := memstore.Decode([]byte("---\n" + front + "---\nbody\n"))
+		e, ok := errors.AsType[*cli.Error](err)
+		require.True(t, ok, "%s: %v", name, err)
+		assert.Equal(t, "RJ-311", e.ID, name)
+	}
 }
 
 // TestDecodeRefusesOverTheCap refuses a file over the file cap, 1 MiB
@@ -105,27 +140,26 @@ func TestDecodeRefuses(t *testing.T) {
 		"no closing line":      "---\nschema: memory-entry/v1\n",
 		"not UTF-8":            valid + "\xff",
 		"not a mapping":        "---\n- a\n---\n",
-		"a missing key":        strings.Replace(valid, "status: open\n", "", 1),
+		"a missing key":        strings.Replace(valid, "status: open            # open | done\n", "", 1),
 		"another format":       strings.Replace(valid, "memory-entry/v1", "handoff/v1", 1),
 		"no schema":            strings.Replace(valid, "schema: memory-entry/v1\n", "", 1),
 		"an older version":     strings.Replace(valid, "memory-entry/v1", "memory-entry/v0", 1),
-		"a wrong type":         strings.Replace(valid, "tags: [arm64, ci]", "tags: ci", 1),
+		"a wrong type":         strings.Replace(valid, "tags: [ci, arm64]", "tags: ci", 1),
 		"an uppercase id":      strings.Replace(valid, "01j9z3k8m6t2q4w5e7r9y1v3k5", "01J9Z3K8M6T2Q4W5E7R9Y1V3K5", 1),
 		"a zero id":            strings.Replace(valid, "01j9z3k8m6t2q4w5e7r9y1v3k5", "00000000000000000000000000", 1),
 		"another status":       strings.Replace(valid, "status: open", "status: closed", 1),
 		"an empty title":       strings.Replace(valid, "title: Flaky integration test on arm64", "title: ''", 1),
 		"a long title":         strings.Replace(valid, "title: Flaky integration test on arm64", "title: "+strings.Repeat("t", 201), 1),
 		"a control in a title": strings.Replace(valid, "title: Flaky integration test on arm64", `title: "a\tb"`, 1),
-		"a bad tag":            strings.Replace(valid, "[arm64, ci]", "[ARM]", 1),
-		"unsorted tags":        strings.Replace(valid, "[arm64, ci]", "[ci, arm64]", 1),
-		"duplicate tags":       strings.Replace(valid, "[arm64, ci]", "[ci, ci]", 1),
-		"null tags":            strings.Replace(valid, "[arm64, ci]", "null", 1),
-		"too many tags":        strings.Replace(valid, "[arm64, ci]", "["+strings.Repeat("a,", 33)+"a]", 1),
+		"a bad tag":            strings.Replace(valid, "[ci, arm64]", "[ARM]", 1),
+		"duplicate tags":       strings.Replace(valid, "[ci, arm64]", "[ci, ci]", 1),
+		"null tags":            strings.Replace(valid, "[ci, arm64]", "null", 1),
+		"too many tags":        strings.Replace(valid, "[ci, arm64]", "["+strings.Repeat("a,", 33)+"a]", 1),
 		"an offset time":       strings.Replace(valid, "createdAt: 2026-10-02T09:20:00Z", "createdAt: 2026-10-02T09:20:00+02:00", 1),
 		"a fraction":           strings.Replace(valid, "createdAt: 2026-10-02T09:20:00Z", "createdAt: 2026-10-02T09:20:00.5Z", 1),
 		"created after":        strings.Replace(valid, "createdAt: 2026-10-02T09:20:00Z", "createdAt: 2026-10-03T09:20:00Z", 1),
 		"two documents":        strings.Replace(valid, "updatedAt: 2026-10-02T09:20:00Z\n", "updatedAt: 2026-10-02T09:20:00Z\n...\n--- x\n", 1),
-		"too deep":             strings.Replace(valid, "[arm64, ci]", "[[[[[[a]]]]]]", 1),
+		"too deep":             strings.Replace(valid, "[ci, arm64]", "[[[[[[a]]]]]]", 1),
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := memstore.Decode([]byte(data))

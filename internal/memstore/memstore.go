@@ -38,10 +38,12 @@ const (
 	MaxEntries = 10000
 	// MaxHandoffFiles is the number of files in handoff/.
 	MaxHandoffFiles = 1000
-	// maxNodes bounds the walk of Check: a tree with more nodes is a
-	// finding, so the check of a dir an agent filled stays bounded.
-	maxNodes = 200000
 )
+
+// maxNodes bounds the walk of Check: a tree with more nodes is a
+// finding, so the check of a dir an agent filled stays bounded. A
+// variable, so a test can lower it.
+var maxNodes = 200000
 
 // The modes julieta gives what it makes in a memory dir (REQ-0646).
 const (

@@ -20,6 +20,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // Version is the version of the format memory-entry, the n of the
@@ -148,15 +149,16 @@ func (c Content) Check() error {
 }
 
 // check returns why e is no entry of the format: its content fails
-// Content.Check or is not in its normal form, its id is zero, or its
-// times are not UTC seconds with CreatedAt not after UpdatedAt.
+// Content.Check, its tags are null or not distinct, its id is zero, or
+// its times are not UTC seconds with CreatedAt not after UpdatedAt.
+// The tags may be in any order, as in the example of 03 3.9.
 func (e Entry) check() error {
 	c := e.Content()
 	if err := c.Check(); err != nil {
 		return err
 	}
-	if n := c.Normal(); !slices.Equal(n.Tags, c.Tags) || c.Tags == nil {
-		return fmt.Errorf("%w: the tags are not sorted and distinct", ErrInvalid)
+	if c.Tags == nil || len(c.Normal().Tags) != len(c.Tags) {
+		return fmt.Errorf("%w: the tags are null or not distinct", ErrInvalid)
 	}
 	if e.ID == (canon.ULID{}) {
 		return fmt.Errorf("%w: the id is zero", ErrInvalid)
@@ -182,9 +184,12 @@ const (
 )
 
 // Encode returns the file of e: the front matter between two "---"
-// lines, then the body as it is. An entry that breaks a rule of 03 3.9,
-// or whose file passes MaxFileSize, is an error.
+// lines, with the tags sorted, then the body as it is. An entry that
+// breaks a rule of 03 3.9, or whose file passes MaxFileSize, is an
+// error.
 func Encode(e Entry) ([]byte, error) {
+	e.Tags = slices.Clone(e.Tags) // nil stays nil, which check refuses
+	slices.Sort(e.Tags)
 	if e.Schema != Field {
 		return nil, fmt.Errorf("%w: the schema %q is not %s", ErrInvalid, clip(e.Schema), Field)
 	}
@@ -210,10 +215,12 @@ func Encode(e Entry) ([]byte, error) {
 // at most MaxFileSize bytes of UTF-8; a front matter between a first
 // line "---" and the next, of one YAML mapping with no anchor, alias,
 // merge key, tag outside YAML's core schema (an include among them) or
-// duplicate key; a schema field read first, so a newer version is
-// format-newer (RJ-311); then go.yaml.in/yaml/v3 with KnownFields(true)
-// into Entry, every key required; then the rules of 03 3.9. Every other
-// refusal wraps ErrInvalid.
+// duplicate key; then go.yaml.in/yaml/v3 with KnownFields(true) into
+// Entry, every key required; then the rules of 03 3.9, with the tags
+// sorted on the way in. The schema field is read first, from the text
+// of the front matter, so a newer version is format-newer (RJ-311)
+// whatever else it holds, a construct the subset grammar refuses or a
+// syntax error included. Every other refusal wraps ErrInvalid.
 func Decode(data []byte) (Entry, error) {
 	if len(data) > MaxFileSize {
 		return Entry{}, fmt.Errorf("%w: the file has %d bytes, over %d", ErrInvalid, len(data), MaxFileSize)
@@ -234,6 +241,9 @@ func Decode(data []byte) (Entry, error) {
 			return Entry{}, fmt.Errorf("%w: the front matter has no closing line ---", ErrInvalid)
 		}
 		front, body = rest[:i+1], rest[i+len(frontClose):]
+	}
+	if err := checkNewer(front); err != nil {
+		return Entry{}, err
 	}
 	var doc yaml.Node
 	if err := yaml.Unmarshal(front, &doc); err != nil {
@@ -261,7 +271,27 @@ func Decode(data []byte) (Entry, error) {
 	if err := e.check(); err != nil {
 		return Entry{}, err
 	}
+	slices.Sort(e.Tags)
 	return e, nil
+}
+
+// schemaLine reads a top-level schema line of a front matter, before
+// any YAML parse: the key at the start of a line, the value plain or
+// quoted, and an optional comment.
+var schemaLine = regexp.MustCompile(`(?m)^schema:[ \t]+["']?memory-entry/v([1-9][0-9]{0,8})["']?[ \t]*(?:#.*)?$`)
+
+// checkNewer returns format-newer (RJ-311) when the first top-level
+// schema line of the front matter text names a version newer than
+// Version, and nil otherwise; the checks that follow judge the rest.
+func checkNewer(front []byte) error {
+	sub := schemaLine.FindSubmatch(front)
+	if sub == nil {
+		return nil
+	}
+	if n, err := strconv.Atoi(string(sub[1])); err == nil && n > Version {
+		return manifest.FormatNewer.New(fmt.Sprintf("the memory entry is memory-entry/v%d, newer than %s, the version this build reads", n, Field))
+	}
+	return nil
 }
 
 // coreTags are the tags of YAML's core schema that a front matter may
@@ -305,14 +335,14 @@ func checkKeys(m *yaml.Node) error {
 const maxDepth = 4
 
 // checkTree returns why the node n or one below it is outside the
-// subset grammar: an anchor, an alias, a merge key, a tag outside
-// coreTags, or a nesting deeper than maxDepth.
+// subset grammar: an anchor, a merge key, a tag outside coreTags, or a
+// nesting deeper than maxDepth. An alias needs an anchor before it,
+// which is refused first, and the parser refuses an alias to an anchor
+// it has not seen, so no alias reaches past this check.
 func checkTree(n *yaml.Node, depth int) error {
 	switch {
 	case depth > maxDepth:
 		return errors.New("the front matter nests too deep")
-	case n.Kind == yaml.AliasNode:
-		return errors.New("the front matter holds an alias")
 	case n.Anchor != "":
 		return errors.New("the front matter holds an anchor")
 	case n.Tag == "!!merge" || (n.Kind == yaml.ScalarNode && n.Value == "<<" && n.Style == 0):
@@ -352,11 +382,12 @@ func checkVersion(m *yaml.Node) error {
 // clipLen is the most bytes of an input that an error message quotes.
 const clipLen = 64
 
-// clip returns s cut to clipLen bytes, so that an error about a long
-// input stays short.
+// clip returns s cut to clipLen bytes and escaped with termsafe, so
+// that an error about a long input stays short and a name an agent
+// wrote cannot forge a line of the output.
 func clip(s string) string {
-	if len(s) <= clipLen {
-		return s
+	if len(s) > clipLen {
+		s = s[:clipLen] + "..."
 	}
-	return s[:clipLen] + "..."
+	return termsafe.Escape(s)
 }

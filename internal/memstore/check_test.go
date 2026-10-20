@@ -213,3 +213,33 @@ func TestCheckDir(t *testing.T) {
 		require.ErrorIs(t, err, ErrUnwritable)
 	}
 }
+
+// TestCheckNodesCap finds a tree with more nodes than the walk reads,
+// rather than judging part of it.
+func TestCheckNodesCap(t *testing.T) {
+	prev := maxNodes
+	maxNodes = 3
+	t.Cleanup(func() { maxNodes = prev })
+	dir := memDir(t, map[string]string{"entries/": "", "handoff/a": "", "handoff/b": ""})
+	assert.Equal(t, []Finding{{Path: ".", Rule: RuleNodesCap}}, check(t, dir).Findings)
+	dir = memDir(t, map[string]string{"entries/": "", "handoff/a": ""})
+	assert.Empty(t, check(t, dir).Findings)
+}
+
+// TestCheckTempSize applies the file cap to a temporary file too.
+func TestCheckTempSize(t *testing.T) {
+	dir := memDir(t, map[string]string{"entries/" + tempName: strings.Repeat("x", MaxFileSize+1)})
+	rep := check(t, dir)
+	assert.Equal(t, []Finding{{Path: "entries/" + tempName, Rule: RuleFileSize}}, rep.Findings)
+	assert.Equal(t, []Finding{{Path: "entries/" + tempName, Rule: RuleTemp}}, rep.Warnings)
+}
+
+// TestFindingString escapes the path, so a name that holds a line feed
+// or an escape sequence cannot forge a line of the output (I29).
+func TestFindingString(t *testing.T) {
+	f := Finding{Path: "entries/x\nfinding ok \x1b[2Jy", Rule: RuleEntryName}
+	got := f.String()
+	assert.NotContains(t, got, "\n")
+	assert.NotContains(t, got, "\x1b")
+	assert.Equal(t, "entry-name entries/x\\nfinding ok \\u001b[2Jy", got)
+}
