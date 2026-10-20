@@ -14,9 +14,9 @@ A rule decided in this repository can be meant for one session, for
 this repository, for every repository and sandbox the maintainer works
 in, or for every adopter of romeu and julieta. Nothing asks a record to
 say which, so the scope is whatever place the rule happened to be
-written. On 2026-10-20 the rule to search for a maintained library
-before writing one was first written as a record of this repository
-only, although it was meant for every repository; it reached the sandbox
+written. On 2026-10-20 the rule of
+[ADR 0038, search for a maintained library before writing one](0038-search-for-a-maintained-library-before-writing-one.md)
+was first written as a record of this repository only, although it was meant for every repository; it reached the sandbox
 payload only because the question was asked in the session.
 
 Each scope has its own home, and two of them move:

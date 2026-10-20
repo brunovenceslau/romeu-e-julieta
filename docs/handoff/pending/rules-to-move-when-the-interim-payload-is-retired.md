@@ -12,7 +12,7 @@ repository (REQ-0608) unless named otherwise:
 
 - Search for a maintained library before writing one; import, copy a
   small proven piece with its license and origin, or write by hand with
-  a stated reason (the pending note of #198,
+  a stated reason (ADR 0038, and the pending note
   "library-first-in-the-sandbox-payload"). Sent: a prompt was pasted
   into the payload's session on 2026-10-20; its pull request is not yet
   reported. Open: the personal kit, or a product skill under `skills/`
