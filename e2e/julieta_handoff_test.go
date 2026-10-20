@@ -195,7 +195,7 @@ step setup "$J" setup
 cd `+primaryPath+`
 mv /tmp/memory/web /tmp/memory/web.gone
 step startfail "$J" handoff show --hook
-step status "$J" status --json
+step state sh -c 'cat "$HOME/.local/state/julieta/hooks.json"; echo'
 mv /tmp/memory/web.gone /tmp/memory/web
 mv `+secondaryDir+`/.git `+secondaryDir+`/.git.gone
 step endfail "$J" handoff write --facts
@@ -213,9 +213,8 @@ step startok "$J" handoff show --hook
 	assert.True(t, strings.HasPrefix(r.stdout, "julieta handoff show --hook failed: "), r.stdout)
 	assert.True(t, strings.HasSuffix(r.stdout, "; run julieta status\n"), r.stdout)
 
-	r = step(t, steps, "status")
-	assert.Contains(t, r.stdout, `"slug":"hook-failed"`)
-	assert.Contains(t, r.stdout, "SessionStart")
+	r = step(t, steps, "state")
+	assert.Contains(t, r.stdout, `"hook":"SessionStart"`)
 
 	r = step(t, steps, "endfail")
 	assert.Equal(t, 0, r.code, r.stderr)

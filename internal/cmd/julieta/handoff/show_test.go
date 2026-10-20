@@ -181,8 +181,8 @@ func TestShowHookInBothOrders(t *testing.T) {
 
 // TestShowHookFailure: a forced failure exits 0, prints one stdout line
 // that names the failure and julieta status, and records a hook
-// failure; julieta status lists it, and the next SessionStart prints it
-// until the hook next succeeds (REQ-0672, 08 8.2).
+// failure, and the next SessionStart prints it until the hook next
+// succeeds (REQ-0672, 08 8.2).
 func TestShowHookFailure(t *testing.T) {
 	s := newSandbox(t)
 	gone := s.mem(1) + ".gone"
@@ -201,15 +201,6 @@ func TestShowHookFailure(t *testing.T) {
 	assert.Equal(t, s.now, h.Failures[0].At)
 	assert.Equal(t, 1, h.Failures[0].Status)
 
-	_, status, _ := s.julieta(t, "", "status", "--json")
-	var rep struct {
-		Warnings []setup.Warning `json:"warnings"`
-	}
-	require.NoError(t, json.Unmarshal([]byte(status), &rep, json.RejectUnknownMembers(false)))
-	require.Len(t, rep.Warnings, 1, status)
-	assert.Equal(t, handoff.HookFailed, rep.Warnings[0].Slug)
-	assert.Contains(t, rep.Warnings[0].Message, "SessionStart")
-
 	// The next run that succeeds prints the failure, then it is gone.
 	require.NoError(t, os.Rename(gone, s.mem(1)))
 	s.advance(time.Minute)
@@ -220,8 +211,6 @@ func TestShowHookFailure(t *testing.T) {
 	h, err = handoff.ReadHooks(s.home)
 	require.NoError(t, err)
 	assert.Empty(t, h.Failures)
-	_, status, _ = s.julieta(t, "", "status", "--json")
-	assert.NotContains(t, status, handoff.HookFailed)
 }
 
 // TestWriteFactsFailure: the same for handoff write --facts, the
@@ -275,4 +264,24 @@ func TestListPrintsOneLinePerFile(t *testing.T) {
 	assert.Regexp(t, `^[0-9a-hjkmnp-tv-z]{26}  clear  api  `+s.mem(0)+`/handoff/[0-9a-hjkmnp-tv-z]{26}-clear\.md$`, lines[0])
 	assert.Contains(t, lines[1], "  facts  web  ")
 	assert.JSONEq(t, `{"files":[],"schema":"julieta-handoff/v1"}`, newSandbox(t).ok(t, "", "handoff", "list", "--json"))
+}
+
+// TestFailureIsClearedForItsOwnRepoOnly: a SessionEnd that succeeds for
+// one repo forgets the failure of that repo and keeps the other's.
+func TestFailureIsClearedForItsOwnRepoOnly(t *testing.T) {
+	s := newSandbox(t)
+	hidden := filepath.Join(s.repo(1), ".git.hidden")
+	require.NoError(t, os.Rename(filepath.Join(s.repo(1), ".git"), hidden))
+	s.ok(t, "", "handoff", "write", "--facts", "--repo", "api")
+	s.advance(time.Second)
+	s.ok(t, "", "handoff", "write", "--facts", "--repo", "web")
+	h, err := handoff.ReadHooks(s.home)
+	require.NoError(t, err)
+	require.Len(t, h.Failures, 2)
+	require.NoError(t, os.Rename(hidden, filepath.Join(s.repo(1), ".git")))
+	s.ok(t, "", "handoff", "write", "--facts", "--repo", "api")
+	h, err = handoff.ReadHooks(s.home)
+	require.NoError(t, err)
+	require.Len(t, h.Failures, 1)
+	assert.Equal(t, "web", h.Failures[0].Repo)
 }

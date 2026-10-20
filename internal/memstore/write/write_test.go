@@ -399,7 +399,11 @@ func TestLock(t *testing.T) {
 		}
 		got <- u
 	}()
-	<-waiting
+	select {
+	case <-waiting:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the second taker never called onWait")
+	}
 	select {
 	case <-got:
 		t.Fatal("the lock was taken while another holder had it")

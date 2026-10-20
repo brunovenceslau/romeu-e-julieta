@@ -36,9 +36,6 @@ const (
 	// setupFile is the file of setup's State (setup.warningsFile, which
 	// the package does not export).
 	setupFile = "setup.json"
-	// HookFailed is the slug under which a recorded failure is shown
-	// among the warnings of julieta status.
-	HookFailed = "hook-failed"
 )
 
 // Failure is a recorded hook failure (REQ-0672, REQ-0675): the hook, the
@@ -118,12 +115,6 @@ func update(home string, f func(h *Hooks, s *setup.State)) error {
 	s, serr := setup.ReadState(home)
 	oldH, oldS := h, s
 	f(&h, &s)
-	// The failures also stand among the warnings of julieta status,
-	// which has no section of its own for them.
-	s.Warnings = slices.DeleteFunc(s.Warnings, func(w setup.Warning) bool { return w.Slug == HookFailed })
-	for _, x := range h.Failures {
-		s.Warnings = append(s.Warnings, setup.Warning{Slug: HookFailed, Message: failureLine(x)})
-	}
 	var errs []error
 	if herr != nil || !sameHooks(oldH, h) {
 		errs = append(errs, writeState(home, hooksFile, h))

@@ -163,9 +163,6 @@ func warnings(home string, moved *[]setup.Warning) ([]string, error) {
 	}
 	var out []string
 	for _, w := range st.Warnings {
-		if w.Slug == HookFailed {
-			continue // a copy of a failure, for julieta status
-		}
 		if w.Slug == setup.DefaultBranchMoved && moved != nil {
 			*moved = append(*moved, w)
 		}

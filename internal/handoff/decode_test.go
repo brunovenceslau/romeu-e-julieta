@@ -102,3 +102,13 @@ func TestCheckHeadings(t *testing.T) {
 	require.Error(t, handoff.CheckHeadings(handoff.Clear, "text ## Goal\n"+full[len("## Goal\n"):]), "a heading is a line")
 	require.Error(t, handoff.CheckHeadings(handoff.Facts, ""))
 }
+
+// TestDecodeRefusesANewerVersionInFlowStyle: a v2 file in YAML flow
+// style, with an anchor or a syntax error, is format-newer too.
+func TestDecodeRefusesANewerVersionInFlowStyle(t *testing.T) {
+	for _, front := range []string{"{schema: handoff/v2, kind: clear, x: &a 1}", "{schema: \"handoff/v2\", kind: [}"} {
+		_, err := handoff.Decode([]byte("---\n" + front + "\n---\n"))
+		require.Error(t, err, front)
+		assert.Equal(t, "RJ-311", cli.Of(err).ID, front)
+	}
+}

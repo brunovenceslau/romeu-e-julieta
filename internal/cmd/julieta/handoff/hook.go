@@ -20,7 +20,7 @@ type hookRun func() (out, repo string, err error)
 // runHook runs a session hook (08 8.2). Whatever happens it returns nil,
 // so the hook exits 0 (REQ-0672). It records the time of the run
 // (REQ-0669). On success it prints the text of the run and forgets the
-// recorded failures of the hook, and applies after to the state setup
+// recorded failures of the hook for that repo, and applies after to the state setup
 // wrote; on a failure it prints one stdout line naming the failure and
 // julieta status, and records the failure for julieta status and the
 // next SessionStart (REQ-0672, REQ-0675).
@@ -39,7 +39,11 @@ func runHook(env *cli.Env, hook, command string, run hookRun, after func(*setup.
 		if herr == nil {
 			herr = update(home, func(h *Hooks, s *setup.State) {
 				stamp(h)
-				h.Failures = slices.DeleteFunc(h.Failures, func(f Failure) bool { return f.Hook == hook })
+				// Only this hook in this repo is forgotten, and a failure that
+				// happened before the repo was known.
+				h.Failures = slices.DeleteFunc(h.Failures, func(f Failure) bool {
+					return f.Hook == hook && (f.Repo == repo || f.Repo == "")
+				})
 				if after != nil {
 					after(s)
 				}

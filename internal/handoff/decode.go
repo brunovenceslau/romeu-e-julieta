@@ -51,8 +51,9 @@ var (
 	repoKeys  = []string{"dir", "branch", "head", "upstream", "ahead", "behind", "dirty", "stashes"}
 	// schemaField reads a schema field of the form "handoff/v<n>".
 	schemaField = regexp.MustCompile(`^handoff/v([1-9][0-9]{0,8})$`)
-	// schemaLine reads a top-level schema line before any YAML parse.
-	schemaLine = regexp.MustCompile(`(?m)^schema:[ \t]+["']?handoff/v([1-9][0-9]{0,8})["']?[ \t]*(?:#.*)?$`)
+	// schemaLine finds a schema field in the text of a front matter that
+	// does not parse, block or flow style, before any YAML parse.
+	schemaLine = regexp.MustCompile(`schema:[ \t]+["']?handoff/v([1-9][0-9]{0,8})["']?`)
 	// objectID is a git object id in lowercase hex, SHA-1 or SHA-256.
 	objectID = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
 	// dirForm is the form of a repo dir (03 3.1, REQ-0176).

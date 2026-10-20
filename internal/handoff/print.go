@@ -72,7 +72,8 @@ type block struct {
 // and each agent-written text sits under AgentTextLine. When the print
 // of a hook passes Limit it is cut after whole blocks, the narrative
 // after whole lines, and its last line is "<n> more entries: julieta
-// memory list" (REQ-0667); the warnings and the fixed line are never
+// memory list" (REQ-0667), or, when no entry was left out, a line that
+// says the print is cut; the warnings and the fixed line are never
 // cut, so they may pass Limit by themselves.
 func (s Session) Render() string {
 	var fixed strings.Builder
@@ -89,7 +90,9 @@ func (s Session) Render() string {
 	}
 	if n := s.Latest.Narrative; n != nil {
 		narrative = append(narrative, fmt.Sprintf("handoff %s of %s, repo %s", n.File.Kind, n.File.CreatedAt.UTC().Format(time.RFC3339), oneLine(n.Repo)), AgentTextLine)
-		narrative = append(narrative, bodyLines(n.File.Body, 0, "")...)
+		for _, l := range bodyLines(n.File.Body, 0, "") {
+			narrative = append(narrative, "  "+l) // indented, so no line of it passes for ours (I29)
+		}
 	}
 	var rest []block
 	if gap != "" {
@@ -130,6 +133,9 @@ func (s Session) Render() string {
 			cut = true
 			left += b.entries
 		}
+	}
+	if left == 0 {
+		return out + "the print is cut at the bound: julieta handoff show prints it whole\n"
 	}
 	return out + footer(left)
 }

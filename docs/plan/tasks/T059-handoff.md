@@ -8,6 +8,8 @@ owns:
   - internal/handoff/**
   - internal/cmd/julieta/handoff/**
   - internal/cmd/julieta/all/import_handoff.go
+  - internal/memstore/write/write.go
+  - internal/memstore/write/write_test.go
   - e2e/julieta_handoff_test.go
 needs:
   - T035
@@ -95,3 +97,26 @@ of `handoff write`, with the store lock, lives in
 - Verify: `go test -tags e2e ./e2e/... -run '^TestJulietaHandoff' -v`.
   The pattern names the `TestJulietaHandoff*` functions this task adds,
   and the reviewer reads them in the `-v` output (10 10.8).
+
+Decisions taken while building (2026-10-20), each with what reopens it:
+
+- `internal/memstore/write` exports `Lock(path, onWait)` and
+  `AtomicWrite(root, p, data, now, ulids, create)`, which `Store` uses
+  unchanged in behavior and `handoff write` calls, so the lock and the
+  atomic write exist once. The file is added to `owns` above. Reopened
+  by a third writer that needs another option.
+- `dirty` in the handoff front matter is the number of kinds of change
+  the working tree holds (staged, unstaged, untracked, unmerged, hidden;
+  0 to 5), because `gitsafe.Status` has no file count. Reopened by the
+  gitsafe task that adds a file counter (after T151, PR #210): `dirty`
+  then becomes the file count. Salvage's `dirty-at-last-facts`
+  (REQ-0237) reads the same field, so it carries the same meaning until
+  then.
+- The gap line compares head, branch and dirty only (the three things
+  08 8.3 lists, plus a repo added or removed); stashes, upstream and
+  ahead/behind are stamped but never raise it.
+- A recorded hook failure is cleared by a success of the same hook in
+  the same repo (or a failure recorded before the repo was known).
+  Failures are recorded in `hooks.json` and no longer copied into
+  `setup.json`; `julieta status` lists them when the one hook-failure
+  store of T054 is read by a status task.
