@@ -332,7 +332,7 @@ func read(dir string) ([]Task, error) {
 
 // writeFile replaces path with data through a temporary file in the same
 // directory, and refuses a path that is a symbolic link.
-func writeFile(path string, data []byte) (err error) {
+func writeFile(path string, data []byte) error {
 	if info, lerr := os.Lstat(path); lerr == nil && info.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("%s is a symbolic link; refusing to write through it", path)
 	}

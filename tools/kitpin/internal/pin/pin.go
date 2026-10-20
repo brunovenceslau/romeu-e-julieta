@@ -210,10 +210,10 @@ func (w *writer) readPins() (pins.Pins, error) {
 
 // write replaces path with data through renameio (ADR 0038): a new
 // temporary file beside it, under a name no other run takes (O_EXCL),
-// synced to disk, then renamed over path, so a reader never sees half a file; the directory is
-// synced after the rename.
+// synced to disk, then renamed over path, so a reader never sees half
+// a file; the directory is synced after the rename.
 func (w *writer) write(path string, data []byte) error {
-	dir := "."
+	dir, name := ".", path[strings.LastIndex(path, "/")+1:]
 	if i := strings.LastIndex(path, "/"); i > 0 {
 		dir = path[:i]
 		if err := w.root.MkdirAll(dir, 0o755); err != nil {
@@ -227,7 +227,7 @@ func (w *writer) write(path string, data []byte) error {
 		return err
 	}
 	defer func() { _ = sub.Close() }()
-	t, err := renameio.NewPendingFile(path[strings.LastIndex(path, "/")+1:],
+	t, err := renameio.NewPendingFile(name,
 		renameio.WithRoot(sub), renameio.WithStaticPermissions(0o644))
 	if err != nil {
 		return err

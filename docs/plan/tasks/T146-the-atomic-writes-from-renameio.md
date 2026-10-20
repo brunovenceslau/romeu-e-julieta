@@ -46,11 +46,20 @@ directory, which the library does not cover, and
 interrupted run left by their name (`.mise-*.download`), while the
 library's temporary names are its own and not a contract.
 
+Two effects of the swap: `tools/ci/internal/check/write.go`, `view.go`
+and `container.go` now sync the file before the rename, as the other
+sites already did; and the library leaves its empty temporary file
+behind when the `Chmod` right after creating it fails (`NewPendingFile`
+returns before the caller can clean up), which the code it replaces did
+not. The second is accepted, since fixing it is a change upstream.
+
 - Implements: none: a swap under ADR 0038; the requirements stay with
   the tasks that own each site.
 - Operator: no.
 - Acceptance:
-  - The seven code files of `owns` call the library and keep their tests;
+  - The seven code files of `owns` call the library and keep their tests
+    (the two that looked for leftovers by the old names read the
+    library's);
     `link.go` replaces its link with `renameio.Symlink`.
   - A test per package that writes a file holds that the temporary file
     is created in the target's directory, not in `$TMPDIR`, and that the
