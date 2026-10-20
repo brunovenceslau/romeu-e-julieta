@@ -24,11 +24,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore/write"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // Schema is the value of the schema field of the --json document of
@@ -184,7 +186,7 @@ func output(env *cli.Env, rep Report, text func(out *cli.Writer) error) error {
 // did, the id, the path and the repo it filed the entry under (04 4.1,
 // Idempotency, REQ-0280).
 func written(out *cli.Writer, verb string, e Entry, repo string) error {
-	_, err := fmt.Fprintf(out, "%s %s %s repo %s\n", verb, e.ID, e.Path, repo)
+	_, err := fmt.Fprintf(out, "%s %s %s repo %s\n", verb, e.ID, esc(e.Path), esc(repo))
 	return err
 }
 
@@ -197,6 +199,52 @@ func readErr(err error, t target) error {
 	}
 	return fmt.Errorf("the memory dir %s of the repo %s: %w", t.repo.Memory, t.repo.Dir, err)
 }
+
+// usage returns the error usage (RJ-349) for a flag or an argument
+// value that cmd refuses (04 4.1, Parsing; REQ-0273, exit 2), with the
+// hint of the help of the command, as the parser's own errors have it.
+func usage(cmd *cobra.Command, message string) error {
+	e := cli.Usage.New(message)
+	binary, command, _ := strings.Cut(cmd.CommandPath(), " ")
+	e.Fill = map[string]string{"<binary>": binary, " <command>": ""}
+	if command != "" {
+		e.Fill[" <command>"] = " " + command
+	}
+	return e
+}
+
+// checkID returns the error usage when id, the argument of cmd, is no
+// lowercase ULID (03 3.12), ".." among them.
+func checkID(cmd *cobra.Command, id string) error {
+	if _, err := canon.ParseULID(id); err != nil {
+		return usage(cmd, fmt.Sprintf("the id %q is not a lowercase ULID", esc(id)))
+	}
+	return nil
+}
+
+// checkChange returns why the fields ch sets break 03 3.9, each judged
+// as Content.Check judges it.
+func checkChange(ch write.Change) error {
+	c := memstore.Content{Title: "t", Status: memstore.StatusOpen, Tags: []string{}}
+	if ch.Title != nil {
+		c.Title = *ch.Title
+	}
+	if ch.Body != nil {
+		c.Body = *ch.Body
+	}
+	if ch.Tags != nil {
+		c.Tags = *ch.Tags
+	}
+	if ch.Status != nil {
+		c.Status = *ch.Status
+	}
+	return c.Normal().Check()
+}
+
+// esc escapes s with termsafe, so a name or a text an agent wrote
+// cannot forge a line of the output (I29): the CLI writer keeps a line
+// feed, so every value is escaped before it is formatted.
+func esc(s string) string { return termsafe.Escape(s) }
 
 // repoFlag adds --repo to c.
 func repoFlag(c *cobra.Command, repo *string) {

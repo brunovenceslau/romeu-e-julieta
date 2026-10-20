@@ -22,7 +22,10 @@ var _ = cli.Register(func() cli.Command {
 			Example: "julieta memory add --title 'Flaky test on arm64' --tag ci\n" +
 				"julieta memory add --title 'Signing waits' --body 'Ask the operator.' --tag lesson --json",
 			Args: cobra.NoArgs,
-			RunE: func(*cobra.Command, []string) error {
+			RunE: func(cmd *cobra.Command, _ []string) error {
+				if err := in.Normal().Check(); err != nil {
+					return usage(cmd, err.Error())
+				}
 				return add(env, repo, in)
 			},
 		}

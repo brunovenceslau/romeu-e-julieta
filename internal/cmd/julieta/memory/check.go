@@ -58,7 +58,7 @@ func check(env *cli.Env) error {
 		rep, err := memstore.CheckDir(r.Memory)
 		if err != nil {
 			failed = append(failed, r.Dir)
-			if _, err := fmt.Fprintf(env.Stdout, "memory %s %s error: %v\n", r.Dir, r.Memory, err); err != nil {
+			if _, err := fmt.Fprintf(env.Stdout, "memory %s %s error: %s\n", esc(r.Dir), esc(r.Memory), esc(err.Error())); err != nil {
 				return err
 			}
 			continue
@@ -67,23 +67,23 @@ func check(env *cli.Env) error {
 		if len(rep.Findings) > 0 {
 			state = fmt.Sprintf("%d findings", len(rep.Findings))
 		}
-		if _, err := fmt.Fprintf(env.Stdout, "memory %s %s %s\n", r.Dir, r.Memory, state); err != nil {
+		if _, err := fmt.Fprintf(env.Stdout, "memory %s %s %s\n", esc(r.Dir), esc(r.Memory), state); err != nil {
 			return err
 		}
 		for _, f := range rep.Findings {
 			findings = append(findings, f.Rule)
-			if _, err := fmt.Fprintf(env.Stdout, "finding %s %s\n", f.Rule, filepath.Join(r.Memory, f.Path)); err != nil {
+			if _, err := fmt.Fprintf(env.Stdout, "finding %s %s\n", f.Rule, esc(filepath.Join(r.Memory, f.Path))); err != nil {
 				return err
 			}
 		}
 		for _, w := range rep.Warnings {
-			if _, err := fmt.Fprintf(env.Stderr, "note %s %s: %s\n", w.Rule, filepath.Join(r.Memory, w.Path), note(w.Rule)); err != nil {
+			if _, err := fmt.Fprintf(env.Stderr, "note %s %s: %s\n", w.Rule, esc(filepath.Join(r.Memory, w.Path)), note(w.Rule)); err != nil {
 				return err
 			}
 		}
 	}
 	if len(failed) > 0 {
-		return fmt.Errorf("the memory dir of %s is not mounted or not writable", strings.Join(failed, ", "))
+		return fmt.Errorf("the memory dir of %s is not mounted or not writable", esc(strings.Join(failed, ", ")))
 	}
 	if len(findings) > 0 {
 		return fmt.Errorf("the memory dirs break the layout of 08 8.1: %d findings: %s", len(findings), strings.Join(findings, ", "))

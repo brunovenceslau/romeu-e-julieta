@@ -37,6 +37,12 @@ var _ = cli.Register(func() cli.Command {
 				if f.Changed("status") {
 					ch.Status = &status
 				}
+				if err := checkID(cmd, args[0]); err != nil {
+					return err
+				}
+				if err := checkChange(ch); err != nil {
+					return usage(cmd, err.Error())
+				}
 				return edit(env, repo, args[0], ch)
 			},
 		}

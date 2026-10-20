@@ -270,7 +270,8 @@ func TestWithoutManifest(t *testing.T) {
 // TestReadersRefuse fails list and show on a memory dir the readers
 // refuse: an entry of a newer version is format-newer (RJ-311, exit 2);
 // a symlink in entries/ fails without being followed; an id that is no
-// ULID, ".." among them, fails.
+// ULID, ".." among them, and a status other than open and done are the
+// error usage (RJ-349, exit 2).
 func TestReadersRefuse(t *testing.T) {
 	s := newSandbox(t)
 	entries := filepath.Join(s.mem(0), "entries")
@@ -286,13 +287,56 @@ func TestReadersRefuse(t *testing.T) {
 
 	require.NoError(t, os.Remove(filepath.Join(entries, "01j9z3k8m6t2q4w5e7r9y1v3k5.md")))
 	require.NoError(t, os.Symlink("/etc/passwd", filepath.Join(entries, "01j9z3k8m6t2q4w5e7r9y1v3k5.md")))
-	for _, args := range [][]string{{"memory", "list"}, {"memory", "show", "01j9z3k8m6t2q4w5e7r9y1v3k5"}, {"memory", "show", ".."}} {
+	for _, args := range [][]string{{"memory", "list"}, {"memory", "show", "01j9z3k8m6t2q4w5e7r9y1v3k5"}} {
 		code, stdout, _ := s.julieta(t, args...)
 		assert.Equal(t, 1, code, args)
 		assert.NotContains(t, stdout, "root:")
 	}
-	code, _, _ = s.julieta(t, "memory", "list", "--status", "closed")
-	assert.Equal(t, 1, code)
+	for _, args := range [][]string{{"memory", "show", ".."}, {"memory", "list", "--status", "closed"}} {
+		code, _, stderr := s.julieta(t, append(args, "--json")...)
+		assert.Equal(t, 2, code, args)
+		assert.Equal(t, "RJ-349", errorID(t, stderr), args)
+	}
+}
+
+// TestBadValuesAreUsage refuses a flag or argument value the format
+// does not admit as the error usage (RJ-349, exit 2; REQ-0273), with
+// the help of the command as its hint, and writes nothing.
+func TestBadValuesAreUsage(t *testing.T) {
+	s := newSandbox(t)
+	for _, args := range [][]string{
+		{"memory", "add"},
+		{"memory", "add", "--title", ""},
+		{"memory", "add", "--title", "a\nb"},
+		{"memory", "add", "--title", "t", "--status", "closed"},
+		{"memory", "add", "--title", "t", "--tag", "Bad Tag"},
+		{"memory", "add", "--title", "t", "--body", "\xff"},
+		{"memory", "edit", "01j9z3k8m6t2q4w5e7r9y1v3k5", "--status", "closed"},
+		{"memory", "edit", "01j9z3k8m6t2q4w5e7r9y1v3k5", "--tag", ""},
+		{"memory", "edit", "../x", "--status", "done"},
+	} {
+		code, _, stderr := s.julieta(t, append(args, "--json")...)
+		assert.Equal(t, 2, code, "%q: %s", args, stderr)
+		assert.Equal(t, "RJ-349", errorID(t, stderr), args)
+	}
+	code, _, stderr := s.julieta(t, "memory", "add", "--title", "t", "--status", "closed")
+	require.Equal(t, 2, code)
+	assert.Contains(t, stderr, "fix: julieta memory add --help\n")
+	_, err := os.Stat(filepath.Join(s.mem(0), "entries"))
+	require.ErrorIs(t, err, fs.ErrNotExist)
+}
+
+// TestCheckEscapesNames prints a name an agent planted, holding a line
+// feed and an escape sequence, escaped: it cannot forge a line of the
+// output or reach the terminal raw (I29).
+func TestCheckEscapesNames(t *testing.T) {
+	s := newSandbox(t)
+	mem := s.mem(0)
+	require.NoError(t, os.WriteFile(filepath.Join(mem, "x\nmemory web ok\x1b[2J"), nil, 0o600))
+	code, stdout, stderr := s.julieta(t, "memory", "check")
+	assert.Equal(t, 1, code, stderr)
+	assert.Equal(t, "memory api "+mem+" 1 findings\nfinding top-level "+mem+"/x\\nmemory web ok\\u001b[2J\nmemory web "+s.mem(1)+" ok\n", stdout)
+	assert.NotContains(t, stderr, "\x1b")
 }
 
 // TestCheck passes on valid memory dirs and notes a leftover temporary

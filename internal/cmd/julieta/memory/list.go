@@ -11,7 +11,6 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
-	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 var _ = cli.Register(func() cli.Command {
@@ -25,7 +24,10 @@ var _ = cli.Register(func() cli.Command {
 			Short:   "list the memory entries of the repo; --query filters",
 			Example: "julieta memory list\njulieta memory list --query arm64 --status open --json",
 			Args:    cobra.NoArgs,
-			RunE: func(*cobra.Command, []string) error {
+			RunE: func(cmd *cobra.Command, _ []string) error {
+				if f.Status != "" && f.Status != memstore.StatusOpen && f.Status != memstore.StatusDone {
+					return usage(cmd, fmt.Sprintf("--status %q is not %s or %s", f.Status, memstore.StatusOpen, memstore.StatusDone))
+				}
 				return list(env, repo, f)
 			},
 		}
@@ -40,9 +42,6 @@ var _ = cli.Register(func() cli.Command {
 // list prints the entries f selects, one line each in text: the id,
 // the status, the title and the tags.
 func list(env *cli.Env, repo string, f memstore.Filter) error {
-	if f.Status != "" && f.Status != memstore.StatusOpen && f.Status != memstore.StatusDone {
-		return fmt.Errorf("the status %q is not %s or %s", f.Status, memstore.StatusOpen, memstore.StatusDone)
-	}
 	t, err := resolve(repo)
 	if err != nil {
 		return err
@@ -62,9 +61,9 @@ func list(env *cli.Env, repo string, f memstore.Filter) error {
 	}
 	return output(env, rep, func(out *cli.Writer) error {
 		for _, e := range rep.Entries {
-			line := e.ID + "  " + e.Status + "  " + termsafe.Escape(e.Title)
+			line := e.ID + "  " + e.Status + "  " + esc(e.Title)
 			if len(e.Tags) > 0 {
-				line += "  [" + strings.Join(e.Tags, " ") + "]"
+				line += "  [" + esc(strings.Join(e.Tags, " ")) + "]"
 			}
 			if _, err := fmt.Fprintln(out, line); err != nil {
 				return err

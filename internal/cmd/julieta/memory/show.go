@@ -24,7 +24,10 @@ var _ = cli.Register(func() cli.Command {
 			Short:   "print one memory entry",
 			Example: "julieta memory show 01j9z3k8m6t2q4w5e7r9y1v3k5\njulieta memory show 01j9z3k8m6t2q4w5e7r9y1v3k5 --json",
 			Args:    cobra.ExactArgs(1),
-			RunE: func(_ *cobra.Command, args []string) error {
+			RunE: func(cmd *cobra.Command, args []string) error {
+				if err := checkID(cmd, args[0]); err != nil {
+					return err
+				}
 				return show(env, repo, args[0])
 			},
 		}
@@ -53,8 +56,8 @@ func show(env *cli.Env, repo, id string) error {
 	return output(env, rep, func(out *cli.Writer) error {
 		v := rep.Entries[0]
 		_, err := fmt.Fprintf(out, "id       %s\ntitle    %s\nstatus   %s\ntags     %s\ncreated  %s\nupdated  %s\npath     %s\nrepo     %s\n\n%s",
-			v.ID, v.Title, v.Status, strings.Join(v.Tags, " "), v.CreatedAt.Format(time.RFC3339), v.UpdatedAt.Format(time.RFC3339),
-			v.Path, rep.Repo, v.Body)
+			v.ID, esc(v.Title), v.Status, esc(strings.Join(v.Tags, " ")), v.CreatedAt.Format(time.RFC3339), v.UpdatedAt.Format(time.RFC3339),
+			esc(v.Path), esc(rep.Repo), v.Body)
 		return err
 	})
 }
