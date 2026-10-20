@@ -2,13 +2,14 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-20, after T143 merged (Done record 44). Done
-records are merged up to 43.
+Checkpoint of 2026-10-20, after T051 merged (Done record 45). Done
+records are merged up to 44.
 
 ## Next steps
 
-1. T051, `julieta setup` and `julieta status`, on T143's reads, under
-   the standing grants of "the-grants-of-2026-10-19".
+1. T035, next on the critical path (`go run ./tools/ci plan
+   --critical-path`), under the standing grants of
+   "the-grants-of-2026-10-19".
 2. The docs pull request of
    "the-spec-catches-up-with-the-hardening-of-t127-t143-and-t144".
 3. The rest of the ready list (`go run ./tools/ci plan --ready`).
@@ -27,12 +28,15 @@ One block, a recommendation each. Decisions of 2026-10-19 are in
 2. The sitting of T126 (O8) waits for the GitHub App of
    [ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md),
    which does not exist yet. Recommended: create it when M3 starts.
-3. T111 (sitting M1) waits for T051, T054, T059, T060, T078 and T035.
+3. T111 (sitting M1) waits for T054, T059, T060, T078 and T035.
+4. When to harden `gitsafe`'s fast-forward
+   ("gitsafe-fast-forward-overwrites-ignored-files-and-runs-smudge-filters"):
+   a task on the `gitsafe` surface. Recommended: before `julieta setup`
+   runs in daily use, since it can overwrite an ignored file unasked.
 
 ## In flight
 
-- T051 (branch `feat/t051-setup-status`), built by a subagent in a
-  worktree outside the repository.
+- Nothing; the last session ended at this checkpoint.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
