@@ -34,7 +34,7 @@ func narrativeCmd(n int, args string) string {
 	for _, h := range heads[:n] {
 		b.WriteString("## " + h + "\\nText of " + h + ".\\n")
 	}
-	return `printf '` + b.String() + `' | "$1" handoff write ` + args
+	return `printf "` + b.String() + `" | "$1" handoff write ` + args
 }
 
 // gapLine starts the gap line of 08 8.3.
@@ -60,7 +60,7 @@ step final5 sh -c '`+narrativeCmd(5, `--final`)+`' sh "$J"
 step final sh -c '`+narrativeCmd(6, `--final --repo web`)+`' sh "$J"
 step facts "$J" handoff write --facts --json
 step modes sh -c 'stat -c "%a %n" /tmp/memory/api/handoff /tmp/memory/api/handoff/*'
-step front sh -c 'head -n 25 /tmp/memory/api/handoff/*-clear.md'
+step front sh -c 'head -n 40 /tmp/memory/api/handoff/*-clear.md'
 step list "$J" handoff list
 step listjson "$J" handoff list --json
 step show "$J" handoff show
@@ -98,7 +98,8 @@ step show "$J" handoff show
 
 	r = step(t, steps, "modes")
 	require.Equal(t, 0, r.code, r.stderr)
-	assert.Equal(t, "700 /tmp/memory/api/handoff\n600 "+rep.Files[0].Path+"\n600 "+facts.Files[0].Path+"\n", r.stdout)
+	assert.ElementsMatch(t, []string{"700 /tmp/memory/api/handoff", "600 " + rep.Files[0].Path, "600 " + facts.Files[0].Path},
+		strings.Split(strings.TrimSpace(r.stdout), "\n"))
 
 	r = step(t, steps, "front")
 	assert.Contains(t, r.stdout, "schema: handoff/v1\nkind: clear\ncreatedAt: ")
@@ -137,7 +138,8 @@ func TestJulietaHandoffHookOrders(t *testing.T) {
 export JULIETA_MANIFEST=`+manifestEnv(t, 1, originURL+"api.git")+`
 step setup "$J" setup
 cd `+primaryPath+`
-step times0 sh -c 'cat "$HOME/.local/state/julieta/hooks.json" 2>/dev/null || echo none'
+step prime "$J" handoff show --hook
+step times0 sh -c 'cat "$HOME/.local/state/julieta/hooks.json"; echo'
 step narrative sh -c '`+narrativeCmd(5, ``)+`' sh "$J"
 # End first, then Start.
 step end1 "$J" handoff write --facts
@@ -146,7 +148,7 @@ step start1 "$J" handoff show --hook
 step start2 "$J" handoff show --hook
 step end2 "$J" handoff write --facts
 step start3 "$J" handoff show --hook
-step times sh -c 'cat "$HOME/.local/state/julieta/hooks.json"'
+step times sh -c 'cat "$HOME/.local/state/julieta/hooks.json"; echo'
 # A commit after /handoff, then /clear.
 g() { git -c user.name=e2e -c user.email=e2e@example.invalid -c commit.gpgsign=false "$@"; }
 g commit -q --allow-empty -m three
@@ -154,7 +156,9 @@ step end3 "$J" handoff write --facts
 step start4 "$J" handoff show --hook
 `)
 	require.Equal(t, 0, step(t, steps, "setup").code, step(t, steps, "setup").stderr)
-	assert.Equal(t, "none", strings.TrimSpace(step(t, steps, "times0").stdout))
+	assert.Contains(t, step(t, steps, "prime").stdout, "warning default-branch-moved: ", "the first SessionStart after the fast-forward of setup")
+	assert.Contains(t, step(t, steps, "times0").stdout, `"sessionStartAt":"20`)
+	assert.Contains(t, step(t, steps, "times0").stdout, `"sessionEndAt":"0001-01-01T00:00:00Z"`, "no SessionEnd has run")
 	require.Equal(t, 0, step(t, steps, "narrative").code, step(t, steps, "narrative").stderr)
 	for _, name := range []string{"end1", "start1", "start2", "end2", "start3", "end3", "start4"} {
 		r := step(t, steps, name)

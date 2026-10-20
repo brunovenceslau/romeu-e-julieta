@@ -166,8 +166,13 @@ func writeHandoff(ctx context.Context, env *cli.Env, repo string, kind hf.Kind, 
 		}
 		facts = append(facts, rf)
 	}
-	now := memstore.Stamp(env.Now())
-	id, err := canon.NewULID(now, env.ULIDs)
+	// The id takes the clock to the millisecond, not to the second the
+	// front matter shows: two julieta processes of one second, such as
+	// /handoff and the SessionEnd of /clear, are ordered by their ULIDs
+	// (REQ-0680, REQ-0685), and within one millisecond they are not.
+	at := env.Now()
+	now := memstore.Stamp(at)
+	id, err := canon.NewULID(at, env.ULIDs)
 	if err != nil {
 		return File{}, label, err
 	}
@@ -185,7 +190,7 @@ func writeHandoff(ctx context.Context, env *cli.Env, repo string, kind hf.Kind, 
 	if err := mkdir(r.Root(), memstore.HandoffDir); err != nil {
 		return File{}, label, err
 	}
-	if err := atomicWrite(r.Root(), hf.Path(hf.Name{ID: id, Kind: kind}), data, now, env.ULIDs); err != nil {
+	if err := atomicWrite(r.Root(), hf.Path(hf.Name{ID: id, Kind: kind}), data, at, env.ULIDs); err != nil {
 		return File{}, label, err
 	}
 	if kind == hf.Facts {

@@ -22,9 +22,12 @@ type CountFunc func(repo, from, to string) (n int, ok bool)
 // Changes lists, in the order of the repos of old and then of the repos
 // only now has, what differs between the git facts old, stamped in a
 // narrative, and now, stamped in a later facts file (REQ-0681): the
-// count of new commits, a moved branch, a changed dirty count, and the
-// stashes, upstream and ahead and behind counts. It returns none when
-// the git facts are equal. count may be nil.
+// count of new commits, a moved branch and a changed dirty count, which
+// are the three things 08 8.3 says the gap line lists, and a repo added
+// to or removed from the manifest. The stashes, the upstream and the
+// ahead and behind counts are stamped but do not count as a difference:
+// a push changes them and says nothing about the work. It returns none
+// when nothing differs. count may be nil.
 func Changes(old, now []RepoFacts, count CountFunc) []string {
 	var out []string
 	for _, o := range old {
@@ -42,13 +45,6 @@ func Changes(old, now []RepoFacts, count CountFunc) []string {
 		}
 		if n.Dirty != o.Dirty {
 			out = append(out, fmt.Sprintf("%s: dirty %d -> %d", o.Dir, o.Dirty, n.Dirty))
-		}
-		if n.Stashes != o.Stashes {
-			out = append(out, fmt.Sprintf("%s: stashes %d -> %d", o.Dir, o.Stashes, n.Stashes))
-		}
-		if n.Upstream != o.Upstream || n.Ahead != o.Ahead || n.Behind != o.Behind {
-			out = append(out, fmt.Sprintf("%s: upstream %s ahead %d behind %d -> %s ahead %d behind %d", o.Dir,
-				shown(o.Upstream, "none"), o.Ahead, o.Behind, shown(n.Upstream, "none"), n.Ahead, n.Behind))
 		}
 	}
 	for _, n := range now {

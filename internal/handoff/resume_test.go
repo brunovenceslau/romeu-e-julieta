@@ -108,11 +108,12 @@ func TestChanges(t *testing.T) {
 		"api: 3 new commits",
 		"api: branch feat/cart -> main",
 		"api: dirty 1 -> 4",
-		"api: stashes 0 -> 1",
-		"api: upstream origin/feat/cart ahead 2 behind 0 -> origin/feat/cart ahead 0 behind 1",
 		"gone: removed from the manifest",
 		"new: added to the manifest",
 	}, got)
+	pushed := api('a', 1)
+	pushed.Ahead, pushed.Stashes = 0, 3
+	assert.Empty(t, handoff.Changes([]handoff.RepoFacts{api('a', 1)}, []handoff.RepoFacts{pushed}, nil), "a push or a stash is no gap")
 	assert.Equal(t, []string{"api: the head moved"}, handoff.Changes([]handoff.RepoFacts{api('a', 0)}, []handoff.RepoFacts{api('c', 0)}, commitsAB))
 	assert.Empty(t, handoff.Changes(old, old, nil))
 }

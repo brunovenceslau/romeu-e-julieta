@@ -9,6 +9,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
 )
 
 // hookRun is what a hook runs: it returns the text to print on success,
@@ -24,7 +25,7 @@ type hookRun func() (out, repo string, err error)
 // julieta status, and records the failure for julieta status and the
 // next SessionStart (REQ-0672, REQ-0675).
 func runHook(env *cli.Env, hook, command string, run hookRun, after func(*setup.State)) error {
-	start := env.Now().UTC().Truncate(0)
+	start := memstore.Stamp(env.Now())
 	out, repo, err := run()
 	home, herr := setup.Home()
 	stamp := func(h *Hooks) {
