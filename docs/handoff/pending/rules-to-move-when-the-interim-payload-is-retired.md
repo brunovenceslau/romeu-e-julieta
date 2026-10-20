@@ -18,7 +18,8 @@ repository (REQ-0608) unless named otherwise:
   reported. Open: the personal kit, or a product skill under `skills/`
   if adopters get it too.
 - State the scope of every decision record (ADR 0039), as a sentence
-  in the payload's "How to work". Not yet sent.
+  in the payload's "How to work". A prompt was handed over on
+  2026-10-20 to paste into the payload's session; not confirmed pasted.
 
 The payload holds other rules that came from elsewhere; listing them
 belongs to the payload's own repository.
