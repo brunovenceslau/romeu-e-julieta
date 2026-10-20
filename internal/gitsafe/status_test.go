@@ -866,7 +866,11 @@ func TestStatusRunsNoFilterFromAnIncludeIf(t *testing.T) {
 	writeFile(t, extra, "attributes", "a filter=inc\n")
 	writeFile(t, extra, "included", "[core]\n\tattributesFile = "+filepath.Join(extra, "attributes")+
 		"\n[filter \"inc\"]\n\tclean = "+script+"\n\trequired = true\n")
-	plainGit(t, dir, "config", "includeIf.gitdir:"+filepath.Join(dir, ".git")+".path", filepath.Join(extra, "included"))
+	// git matches gitdir: against the resolved path, and TMPDIR sits
+	// behind a symbolic link on macOS (/var to /private/var).
+	resolved, err := filepath.EvalSymlinks(dir)
+	require.NoError(t, err)
+	plainGit(t, dir, "config", "includeIf.gitdir:"+filepath.Join(resolved, ".git")+".path", filepath.Join(extra, "included"))
 	past := time.Now().Add(-time.Hour)
 	require.NoError(t, os.Chtimes(filepath.Join(dir, ".git", "index"), past, past))
 
