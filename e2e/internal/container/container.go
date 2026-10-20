@@ -335,7 +335,7 @@ func (c Config) Download(ctx context.Context, what, name, url, want, dst string)
 	if _, corrupt := errors.AsType[*corruptError](err); !corrupt {
 		return path, err
 	}
-	if rerr := os.Remove(cached); rerr != nil {
+	if rerr := os.Remove(cached); rerr != nil && !errors.Is(rerr, os.ErrNotExist) {
 		return "", fmt.Errorf("%w; and it could not be removed: %w", err, rerr)
 	}
 	if cached, err = c.cache(ctx, what, name, url, want); err != nil {
