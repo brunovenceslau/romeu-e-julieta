@@ -2,15 +2,13 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-20, after T127 and the re-plan of T051 merged
-(Done record 43). Done records are merged up to 42.
+Checkpoint of 2026-10-20, after T143 merged (Done record 44). Done
+records are merged up to 43.
 
 ## Next steps
 
-1. T143, the `gitsafe` read verbs, then T051, which needs it; both
-   under the standing grants of "the-grants-of-2026-10-19" (T143's
-   `gitsafe` surface is not granted: its pull request carries an
-   approval line).
+1. T051, `julieta setup` and `julieta status`, on T143's reads, under
+   the standing grants of "the-grants-of-2026-10-19".
 2. The docs pull request of
    "the-spec-catches-up-with-the-hardening-of-t127-t143-and-t144".
 3. The rest of the ready list (`go run ./tools/ci plan --ready`).
@@ -33,8 +31,8 @@ One block, a recommendation each. Decisions of 2026-10-19 are in
 
 ## In flight
 
-- T143 (branch `feat/t143-gitsafe-status`), reviewed and open for
-  merge.
+- T051 (branch `feat/t051-setup-status`), built by a subagent in a
+  worktree outside the repository.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.

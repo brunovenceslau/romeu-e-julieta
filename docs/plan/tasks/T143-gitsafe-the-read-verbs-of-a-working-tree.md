@@ -3,7 +3,7 @@ id: T143
 title: "`gitsafe`: the read verbs of a working tree"
 milestone: M1
 module: gitsafe
-fate: new
+fate: merged
 owns:
   - internal/gitsafe/status*.go
   - internal/gitsafe/gitsafe.go
@@ -13,9 +13,14 @@ after: []
 ask_first:
   - gitsafe
 sitting: none
+merged: 2026-10-20
+pr: 193
 ---
 
 # T143 - `gitsafe`: the read verbs of a working tree
+
+Merged on 2026-10-20 in pull request #193. The text below is the one
+written at the re-plan.
 
 Goal: the read-only verbs of `gitsafe` that `julieta setup` and `julieta
 status` read a repository's working tree through: the checked-out
