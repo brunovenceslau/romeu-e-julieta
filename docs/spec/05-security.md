@@ -93,12 +93,14 @@ the gitHosts allowlist did not see.
   `gpg.ssh.program`. In sandbox mode the keys that run a program and
   that gitsafe neutralizes are `core.hooksPath`, `core.fsmonitor`, the
   filter drivers, the signature check of the merge and
-  `log.showSignature` of the history reads. The transport keys,
-  `core.gitProxy`, `core.sshCommand`, `core.askPass`,
-  `credential.helper` and `http.*`, stay the sandbox's own: the
-  sandbox may need them to reach origin, the agent can write them, and
-  julieta runs at the agent's trust, so a program they name gains the
-  agent nothing. CheckURL still admits only `https://` and
+  `log.showSignature` of the history reads. Every other key that runs
+  a program (for example `core.pager`, `diff.external`,
+  `merge.<driver>.driver`, `core.alternateRefsCommand`) stays the
+  sandbox's own, among them the transport keys `core.gitProxy`,
+  `core.sshCommand`, `core.askPass`, `credential.helper` and `http.*`,
+  which the sandbox may need to reach origin: the agent can write
+  them, and julieta runs at the agent's trust, so a program they name
+  gains the agent nothing. CheckURL still admits only `https://` and
   `git://127.0.0.1` URLs.
 - `REQ-0464` Credentials: only `-c credential.helper=<host settings value>` when
   `tools.gitCredentialHelper` is set; a `gitHosts[].caFile` becomes

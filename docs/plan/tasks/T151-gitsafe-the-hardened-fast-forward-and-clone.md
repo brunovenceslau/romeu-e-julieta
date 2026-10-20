@@ -71,7 +71,8 @@ maintainer approved on 2026-10-20 amending the specification in the
 same pull request: REQ-0463 (05 5.1) says what the verbs empty, that
 `FastForward` refuses to overwrite an ignored file and verifies no
 signature, which program-running keys sandbox mode neutralizes and
-that the transport keys stay the sandbox's own, and the precondition
+that every other one, the transport keys among them, stays the
+sandbox's own, and the precondition
 that no other process writes the config between the listing of the
 drivers and the command; REQ-0399 (04 4.3) counts an ignored file the
 move would overwrite as a refused fast-forward. `owns` does not list
@@ -101,7 +102,9 @@ amends one requirement there and must not wait for T039.
     control: plain git overwrites the file or runs the program.
   - A clone of an empty repository still succeeds with an unborn HEAD
     and no checkout, and a clone still has its default branch checked
-    out.
+    out. A failure after `git clone --no-checkout` (a test refuses the
+    listing of the drivers) removes the destination, so the next
+    `julieta setup` clones again.
   - The argv and environment tests pin the clone's five commands (the
     URL resolution, the clone with `--no-checkout`, the read of HEAD,
     the listing in the new repository and the checkout with the
