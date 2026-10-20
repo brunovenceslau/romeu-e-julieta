@@ -736,7 +736,7 @@ func TestStatusRefOIDRealGit(t *testing.T) {
 
 	var commands []procgroup.Command
 	r.start = statusAnswers(&commands)
-	for _, bad := range []string{"", "main", "HEAD", "-p", "refs/heads/a..b", "refs/heads/a‮b", "refs/heads/a\u0085b"} {
+	for _, bad := range []string{"", "main", "HEAD", "-p", "refs/heads/a..b", "refs/heads/a\u202eb", "refs/heads/a\u0085b"} {
 		_, _, err := r.RefOID(t.Context(), dir, bad)
 		require.ErrorIs(t, err, ErrRefused, bad)
 	}
@@ -751,7 +751,7 @@ func TestStatusStashMessagesRealGit(t *testing.T) {
 	dir, _ := newRepo(t)
 	commitFile(t, dir, "a", "one\n", "a", "2026-02-01T00:00:00Z")
 	long := strings.Repeat("é", maxSubjectBytes)
-	msgs := []string{"family 👩‍👩‍👧", "a\tb", "bad \xff byte", long}
+	msgs := []string{"family 👩\u200d👩\u200d👧", "a\tb", "bad \xff byte", long}
 	for _, msg := range msgs {
 		writeFile(t, dir, "a", msg+"\n")
 		plainGit(t, dir, "stash", "push", "-q", "-m", msg)
@@ -779,8 +779,8 @@ func TestStatusStashMessagesRealGit(t *testing.T) {
 func TestStatusHiddenRealGit(t *testing.T) {
 	for _, flag := range []string{"--assume-unchanged", "--skip-worktree"} {
 		t.Run(flag, func(t *testing.T) {
-			dir, head := newRepo(t)
-			head = commitFile(t, dir, "a", "one\n", "a", "2026-02-01T00:00:00Z")
+			dir, _ := newRepo(t)
+			head := commitFile(t, dir, "a", "one\n", "a", "2026-02-01T00:00:00Z")
 			plainGit(t, dir, "update-index", flag, "a")
 			writeFile(t, dir, "a", "changed\n")
 			assert.Empty(t, plainGit(t, dir, "status", "--porcelain"), "git status hides the change")
@@ -799,7 +799,7 @@ func TestStatusHiddenRealGit(t *testing.T) {
 // width space fails the read that would return it.
 func TestStatusRefusesUnsafeRefNamesRealGit(t *testing.T) {
 	r := newRunner(t, Sandbox)
-	for _, name := range []string{"a\u0085b", "a‮b", "a b", "a​b"} {
+	for _, name := range []string{"a\u0085b", "a\u202eb", "a\u2028b", "a\u200bb"} {
 		t.Run(strings.ToValidUTF8(name, "?"), func(t *testing.T) {
 			dir, _ := newRepo(t)
 			plainGit(t, dir, "branch", name)
@@ -820,7 +820,7 @@ func TestStatusRefusesUnsafeRefNamesRealGit(t *testing.T) {
 	}
 	dir, _ := newRepo(t)
 	plainGit(t, dir, "config", "branch.main.remote", ".")
-	plainGit(t, dir, "config", "branch.main.merge", "refs/heads/a‮b")
+	plainGit(t, dir, "config", "branch.main.merge", "refs/heads/a\u202eb")
 	_, err := r.Branches(t.Context(), dir)
 	require.ErrorIs(t, err, ErrRefused, "an upstream")
 }
