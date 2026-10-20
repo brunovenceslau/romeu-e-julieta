@@ -17,6 +17,11 @@ owns:
   - .gitattributes
   - e2e/julieta_memory_test.go
   - e2e/julieta_setup_test.go
+  - internal/cli/errors.go
+  - docs/handoff/pending/a-total-bytes-cap-on-entries-of-a-memory-dir.md
+  - docs/handoff/pending/a-bounded-wait-on-the-store-lock.md
+  - docs/handoff/pending/warning-slugs-temp-file-and-handoff-cap-in-04-4-1.md
+  - docs/handoff/pending/a-hard-link-rule-for-memory-dirs.md
 needs:
   - T017
   - T008
@@ -25,7 +30,8 @@ needs:
 after:
   - T051
   - T123
-ask_first: []
+ask_first:
+  - contracts
 sitting: none
 ---
 
@@ -69,7 +75,7 @@ it:
   layout change of 08 8.1.
 - A leftover temporary file and a `handoff/` over its cap print as
   `note` lines on stderr: 04 4.1 lists no warning slug for either.
-  Reopened by a slug for them in 04 4.1.
+  Reopened by a slug for them in 04 4.1 (the pending note below).
 - The agent memory dir check reads the dir through the seam
   `agentMemoryDir` of `setup/memory_check.go`, which no agent profile
   fills yet. Reopened by T079, whose profile names the dir.
@@ -81,6 +87,18 @@ it:
   2026-10-20), and the store lock is a flock of `golang.org/x/sys/unix`
   rather than `gofrs/flock` (decided on 2026-10-20). Reopened by a
   library that names its temporary files, or a lock need beyond flock.
+- `check-findings` (`RJ-328`, exit 6) is declared once, in
+  `internal/cli/errors.go`, since commands of both binaries raise it
+  (approved on 2026-10-20, `contracts`).
+- Deferred on 2026-10-20, each a pending note with its trigger: a
+  total-bytes cap on `entries/`
+  (`docs/handoff/pending/a-total-bytes-cap-on-entries-of-a-memory-dir.md`),
+  a bounded wait on the store lock
+  (`docs/handoff/pending/a-bounded-wait-on-the-store-lock.md`), the
+  warning slugs of the two `note` lines
+  (`docs/handoff/pending/warning-slugs-temp-file-and-handoff-cap-in-04-4-1.md`),
+  and a hard-link rule
+  (`docs/handoff/pending/a-hard-link-rule-for-memory-dirs.md`).
 
 - Implements: REQ-0042 (01 1.1), REQ-0140 (02 2.3), REQ-0168 (03
   (opening)), REQ-0239 (03 3.8), REQ-0241 (03 3.9), REQ-0243 (03 3.9),
