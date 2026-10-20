@@ -18,7 +18,6 @@ package manifest
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"errors"
@@ -279,25 +278,26 @@ func DecodeEnv(value string) (Manifest, error) {
 }
 
 // Encode returns the canonical JSON of m, as 03 3.12 defines it and
-// canon digests it: keys sorted by their UTF-8 bytes, no insignificant
-// whitespace, no escape of <, > and &, and the strings encoding/json
-// writes. The struct fields are declared in key order and encoding/json
-// sorts map keys, so its output is canonical as written. A nil list is
-// written as [] and a nil run as {}, the forms the schema admits. A
-// string or key that holds U+FFFD, or text that is not UTF-8, is
-// canon.ErrInvalidText, as in canon.Digest.
+// canon digests it: what encoding/json/v2 writes for m, in the RFC 8785
+// form, an integer beyond 2^53 with its digits. A nil list is written as
+// [] and a nil run as {}, the forms the schema admits. A string or key
+// that holds U+FFFD, or text that is not UTF-8, is canon.ErrInvalidText,
+// as in canon.Digest.
 func Encode(m Manifest) ([]byte, error) {
-	var b bytes.Buffer
-	enc := json.NewEncoder(&b)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(m.withEmptyLists()); err != nil {
+	data, err := jsonv2.Marshal(m.withEmptyLists(), jsonv2.Deterministic(true),
+		jsonv2.FormatNilSliceAsNull(true), jsonv2.FormatNilMapAsNull(true),
+		jsontext.AllowInvalidUTF8(true), jsontext.AllowDuplicateNames(true))
+	if err != nil {
 		return nil, fmt.Errorf("manifest: encode: %w", err)
 	}
-	data := bytes.TrimSuffix(b.Bytes(), []byte("\n"))
 	if err := validText(data); err != nil {
 		return nil, err
 	}
-	return data, nil
+	out := jsontext.Value(data)
+	if err := out.Canonicalize(jsontext.CanonicalizeRawInts(false)); err != nil {
+		return nil, fmt.Errorf("manifest: encode: %w", err)
+	}
+	return out, nil
 }
 
 // EncodeEnv returns the env value of m: the base64url, without padding,
@@ -351,9 +351,11 @@ func orEmpty[T any](s []T) []T {
 }
 
 // validText checks every string and key of the JSON data for U+FFFD,
-// which encoding/json writes for text that is not UTF-8 (03 3.12).
+// which Encode writes for text that is not UTF-8 (03 3.12). A duplicate
+// key is left to the decoder or to Canonicalize, so that U+FFFD is
+// always canon.ErrInvalidText.
 func validText(data []byte) error {
-	dec := jsontext.NewDecoder(bytes.NewReader(data))
+	dec := jsontext.NewDecoder(bytes.NewReader(data), jsontext.AllowDuplicateNames(true))
 	for {
 		tok, err := dec.ReadToken()
 		if errors.Is(err, io.EOF) {

@@ -627,10 +627,14 @@ salvage incomplete with reason `over-cap`.
 
 `REQ-0254` Structured values are digested with one function,
 `canon.Digest(kind, v)`: sha256 over `"romeu/<kind>/v1"`, a NUL byte,
-and the canonical JSON of `v` (keys sorted, UTF-8, no insignificant
-whitespace); a string or key that is not UTF-8, or that holds U+FFFD,
-the mark encoding/json leaves of such text, is refused, so two strings
-never share a digest. `REQ-0255` Each Go type has exactly one kind, so a value of one kind
+and the canonical JSON of `v`: what `encoding/json/v2` writes for `v`,
+nil lists and maps as null, in the form of RFC 8785, the JSON
+Canonicalization Scheme (keys sorted by their UTF-16 code units,
+numbers in the ECMAScript form, minimal string escapes, UTF-8, no
+insignificant whitespace), except that an integer beyond 2^53 keeps its
+digits; a duplicate key is refused, and a string or key that is not
+UTF-8, or that holds U+FFFD, the mark the writer leaves of such text, is
+refused, so two strings never share a digest. `REQ-0255` Each Go type has exactly one kind, so a value of one kind
 can never be compared with a digest of another: the kind is a typed
 constant named after the kind in Go case (for example `canon.Widening`,
 `canon.KitTree`), the value's type fixes its one

@@ -5,9 +5,9 @@
 // writer (03 3.12).
 //
 // A structured value is digested with Digest: sha256 over
-// "romeu/<kind>/v1", a NUL byte and the canonical JSON of the value. The
-// kind is in the digest's type, Sum, so digests of two kinds never
-// compare. Raw file bytes are not digested here: they use plain sha256,
+// "romeu/<kind>/v1", a NUL byte and the canonical JSON of the value, the
+// RFC 8785 form of encoding/json/jsontext. The kind is in the digest's
+// type, Sum, so digests of two kinds never compare. Raw file bytes are not digested here: they use plain sha256,
 // which sha256sum and shasum reproduce.
 //
 // Every ULID the product writes comes from NewULID, in lowercase
@@ -16,14 +16,13 @@ package canon
 
 import (
 	"bytes"
-	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
-	"slices"
-	"strconv"
+	"io"
 	"strings"
 	"unicode/utf8"
 )
@@ -33,9 +32,9 @@ import (
 var ErrKind = errors.New("canon: not a kind of the table")
 
 // ErrInvalidText is the error of a string of a value, or a key, that
-// holds U+FFFD: encoding/json writes each byte that is not UTF-8, and a
-// MarshalJSON method's lone surrogate decodes, as U+FFFD, so two strings
-// that differ in those bytes would share one digest.
+// holds U+FFFD: Digest writes each byte that is not UTF-8, and a
+// MarshalJSON method's lone surrogate, as U+FFFD, so two strings that
+// differ in those bytes would share one digest.
 var ErrInvalidText = errors.New("canon: a string holds U+FFFD, the mark of text that is not UTF-8")
 
 // ErrInvalidDigest is the error of a digest text that is not 64
@@ -77,16 +76,18 @@ func notLowerHex(r rune) bool {
 // v declares its one kind (Input), so the kind argument names at the
 // call site what the type already fixes.
 //
-// The canonical JSON is what encoding/json writes for v, with the keys
-// of every object sorted by their UTF-8 bytes, no insignificant
-// whitespace, and no escape of <, > and &. Digest fails on a value
-// encoding/json cannot write, on an object with a duplicate key, which
-// only a MarshalJSON method can write, on a kind value other than its
-// constant (ErrKind), and on a string or key that holds U+FFFD
+// The canonical JSON is what encoding/json/v2 writes for v, nil lists
+// and maps as null, canonicalized by RFC 8785 (the JSON Canonicalization
+// Scheme): keys sorted by their UTF-16 code units, numbers in the
+// ECMAScript form, so 1 and 1.0 have one digest, minimal string escapes
+// and no insignificant whitespace; an integer beyond 2^53 keeps its
+// digits, which RFC 8785 would round. Digest fails on a value
+// encoding/json/v2 cannot write, on an object with a duplicate key,
+// which only a MarshalJSON method can write, on a kind value other than
+// its constant (ErrKind), and on a string or key that holds U+FFFD
 // (ErrInvalidText): text that is not UTF-8 becomes U+FFFD on the way,
 // and a digest that two different strings share would let a gate pass
-// the one it never saw. A MarshalJSON method that writes a number
-// writes its text, so 1 and 1.0 have two digests.
+// the one it never saw.
 func Digest[K Kind, T Input[K]](kind K, v T) (Sum[K], error) {
 	if !known(kind) {
 		return Sum[K]{}, fmt.Errorf("%w: %q", ErrKind, clip(string(kind)))
@@ -100,123 +101,45 @@ func Digest[K Kind, T Input[K]](kind K, v T) (Sum[K], error) {
 }
 
 // canonicalJSON returns the canonical JSON of v, as Digest describes
-// it. encoding/json writes v and checks the output of any MarshalJSON
-// method; the copy that follows sorts the keys. Numbers are copied as
-// encoding/json wrote them, so an int64 above 2^53 keeps every digit.
+// it. The writer turns text that is not UTF-8, and a lone surrogate of a
+// MarshalJSON method, into U+FFFD and lets a duplicate key through, so
+// that checkText refuses the first as ErrInvalidText before Canonicalize
+// refuses the second.
 func canonicalJSON(v any) ([]byte, error) {
-	data, err := json.Marshal(v)
+	data, err := json.Marshal(v, json.Deterministic(true),
+		json.FormatNilSliceAsNull(true), json.FormatNilMapAsNull(true),
+		jsontext.AllowInvalidUTF8(true), jsontext.AllowDuplicateNames(true))
 	if err != nil {
 		return nil, err
 	}
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-	var out bytes.Buffer
-	if err := copyValue(&out, dec); err != nil {
+	if err := checkText(data); err != nil {
 		return nil, err
 	}
-	return out.Bytes(), nil
-}
-
-// member is one key of an object and its value, already canonical.
-type member struct {
-	key   string
-	value []byte
-}
-
-// copyValue writes the next value of dec to out in canonical form.
-func copyValue(out *bytes.Buffer, dec *json.Decoder) error {
-	tok, err := dec.Token()
-	if err != nil {
-		return err
+	out := jsontext.Value(data)
+	if err := out.Canonicalize(jsontext.CanonicalizeRawInts(false)); err != nil {
+		return nil, err
 	}
-	switch tok := tok.(type) {
-	case json.Delim:
-		if tok == '{' {
-			return copyObject(out, dec)
+	return out, nil
+}
+
+// checkText refuses a string or key of the JSON data that holds U+FFFD
+// (ErrInvalidText).
+func checkText(data []byte) error {
+	dec := jsontext.NewDecoder(bytes.NewReader(data), jsontext.AllowDuplicateNames(true))
+	for {
+		tok, err := dec.ReadToken()
+		if errors.Is(err, io.EOF) {
+			return nil
 		}
-		return copyArray(out, dec)
-	case string:
-		return writeString(out, tok)
-	case json.Number:
-		out.WriteString(tok.String())
-	case bool:
-		out.WriteString(strconv.FormatBool(tok))
-	default: // nil, the only other token of a value
-		out.WriteString("null")
-	}
-	return nil
-}
-
-// copyObject writes the members of the object whose '{' dec has just
-// read, sorted by key, and reads its '}'.
-func copyObject(out *bytes.Buffer, dec *json.Decoder) error {
-	var members []member
-	for dec.More() {
-		tok, err := dec.Token()
 		if err != nil {
 			return err
 		}
-		key, _ := tok.(string) // the decoder reads an object key as a string, or fails
-		var value bytes.Buffer
-		if err := copyValue(&value, dec); err != nil {
-			return err
-		}
-		members = append(members, member{key: key, value: value.Bytes()})
-	}
-	if _, err := dec.Token(); err != nil {
-		return err
-	}
-	slices.SortStableFunc(members, func(a, b member) int { return cmp.Compare(a.key, b.key) })
-	out.WriteByte('{')
-	for i, m := range members {
-		if i > 0 {
-			if m.key == members[i-1].key {
-				return fmt.Errorf("duplicate key %q", m.key)
+		if tok.Kind() == '"' {
+			if s := tok.String(); strings.ContainsRune(s, utf8.RuneError) {
+				return fmt.Errorf("%w: %q", ErrInvalidText, clip(s))
 			}
-			out.WriteByte(',')
-		}
-		if err := writeString(out, m.key); err != nil {
-			return err
-		}
-		out.WriteByte(':')
-		out.Write(m.value)
-	}
-	out.WriteByte('}')
-	return nil
-}
-
-// copyArray writes the elements of the array whose '[' dec has just
-// read, in their order, and reads its ']'.
-func copyArray(out *bytes.Buffer, dec *json.Decoder) error {
-	out.WriteByte('[')
-	for i := 0; dec.More(); i++ {
-		if i > 0 {
-			out.WriteByte(',')
-		}
-		if err := copyValue(out, dec); err != nil {
-			return err
 		}
 	}
-	out.WriteByte(']')
-	_, err := dec.Token()
-	return err
-}
-
-// writeString writes s as a JSON string, escaping what JSON requires
-// and leaving <, > and & as they are. It refuses a string that holds
-// U+FFFD (ErrInvalidText).
-func writeString(out *bytes.Buffer, s string) error {
-	if strings.ContainsRune(s, utf8.RuneError) {
-		return fmt.Errorf("%w: %q", ErrInvalidText, clip(s))
-	}
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(s); err != nil {
-		return err
-	}
-	out.Write(bytes.TrimSuffix(buf.Bytes(), []byte("\n")))
-	return nil
 }
 
 // clipLen is the most bytes of an input that an error message quotes.

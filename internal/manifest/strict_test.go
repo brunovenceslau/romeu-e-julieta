@@ -6,7 +6,7 @@ package manifest
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/json"
+	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"maps"
 	"os"
@@ -29,15 +29,15 @@ func tree(t *testing.T) map[string]any {
 	return doc
 }
 
-// canonicalOf returns the canonical JSON of doc: the keys of every
-// object sorted, compact, no escape of <, > and &.
+// canonicalOf returns the canonical JSON of doc, its RFC 8785 form with
+// the digits of every integer kept.
 func canonicalOf(t *testing.T, doc any) []byte {
 	t.Helper()
-	var b bytes.Buffer
-	enc := json.NewEncoder(&b)
-	enc.SetEscapeHTML(false)
-	require.NoError(t, enc.Encode(doc))
-	return bytes.TrimSuffix(b.Bytes(), []byte("\n"))
+	b, err := jsonv2.Marshal(doc)
+	require.NoError(t, err)
+	v := jsontext.Value(b)
+	require.NoError(t, v.Canonicalize(jsontext.CanonicalizeRawInts(false)))
+	return v
 }
 
 // memberPaths returns the path of every member of the objects of doc
@@ -196,7 +196,11 @@ func TestRunNumbersKeepTheirText(t *testing.T) {
 		{`{"n":1e2}`, false},
 		{`{"n":100.0}`, false},
 		{`{"n":0.5}`, true},
-		{`{"n":-0}`, true},
+		{`{"n":-0}`, false},
+		{`{"n":0}`, true},
+		{`{"n":1e+21}`, true},
+		{`{"\ufb33":1,"\ud83d\ude00":2}`, false},
+		{"{\"\U0001F600\":2,\"\ufb33\":1}", true},
 	} {
 		t.Run(c.run, func(t *testing.T) {
 			m, err := Decode(withRun(t, c.run))

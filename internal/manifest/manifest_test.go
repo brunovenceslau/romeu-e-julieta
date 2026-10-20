@@ -185,10 +185,10 @@ func TestDecodeRefuses(t *testing.T) {
 	}
 }
 
-// TestFieldsAreDeclaredInKeyOrder holds the property Encode rests on:
-// encoding/json writes struct fields in their declared order, so the
-// fields of every type of the format are declared sorted by JSON name,
-// the order of canonical JSON (03 3.12).
+// TestFieldsAreDeclaredInKeyOrder holds that the fields of every type of
+// the format are declared sorted by JSON name, the order in which
+// canonical JSON (03 3.12) writes them, so the type reads as the
+// document does.
 func TestFieldsAreDeclaredInKeyOrder(t *testing.T) {
 	for _, typ := range []reflect.Type{
 		reflect.TypeFor[Manifest](), reflect.TypeFor[Repo](), reflect.TypeFor[Salvage](), reflect.TypeFor[SalvageRun](),

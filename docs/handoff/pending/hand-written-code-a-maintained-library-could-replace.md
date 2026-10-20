@@ -23,9 +23,9 @@ library was not checked online. In the order of ADR 0038, decision 5:
    (03-formats says "no dependency"; read again under ADR 0038, 3).
 6. The glob matcher of `tools/ci/internal/askfirst`:
    `github.com/bmatcuk/doublestar/v4`, if its dialect fits 12 12.4.
-7. Canonical JSON, `internal/canon/digest.go` and `internal/manifest`:
-   an RFC 8785 library (`github.com/gowebpki/jcs`), if the form of
-   REQ-0254 can become RFC 8785.
+7. Done by T149 on 2026-10-20: the canonical JSON of REQ-0254 is
+   RFC 8785, from `jsontext.Value.Canonicalize` of the standard library,
+   in `internal/canon` and `internal/manifest`; no module was added.
 8. The cover profile reader, `tools/ci/internal/coverage`:
    `golang.org/x/tools/cover`.
 9. License identification, `tools/ci/internal/license`:
