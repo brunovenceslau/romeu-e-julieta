@@ -10,7 +10,8 @@ records are merged up to 44.
 1. The swaps of ADR 0038 decision 5
    ("hand-written-code-a-maintained-library-could-replace"), handled as
    a process failure: the ULIDs and the atomic writes first, since T035
-   uses both; each asks for its dependency. The check of decision 7
+   uses both, then the ssh-agent listing; each asks for its
+   dependency. The check of decision 7
    waits for T005.
 2. T035, next on the critical path (`go run ./tools/ci plan
    --critical-path`), paused on 2026-10-20 and resumed after those two
@@ -41,6 +42,10 @@ One block, a recommendation each. Decisions of 2026-10-19 are in
 5. Paste the prompt of "library-first-in-the-sandbox-payload" into the
    session of the payload's source repository, so ADR 0038 holds in
    every repository. Recommended: today.
+6. Whether the removal of a corrupted cache entry in the container e2e
+   writes a line ("the-spec-catches-up-with-the-hardening-of-t127-t143-and-t144").
+   Recommended: a line on a channel the infrastructure classifier does
+   not read, such as a job annotation, so a poisoned cache shows.
 
 ## In flight
 
