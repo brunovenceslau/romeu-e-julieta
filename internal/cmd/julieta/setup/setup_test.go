@@ -299,19 +299,19 @@ func TestSetupRefusesABadCache(t *testing.T) {
 // TestCheckRepo refuses the values of a repo that cannot become a path
 // or a URL (03 3.1, REQ-0271).
 func TestCheckRepo(t *testing.T) {
-	good := manifest.Repo{Dir: "web", Path: "/home/a/src/shop/web", URL: "https://example.com/web"}
-	require.NoError(t, setup.CheckRepo("/home/a", "shop", good))
+	good := manifest.Repo{Dir: "web", Path: "/sandbox/src/shop/web", URL: "https://example.com/web"}
+	require.NoError(t, setup.CheckRepo("/sandbox", "shop", good))
 	for name, edit := range map[string]func(r *manifest.Repo, project *string){
 		"dir":      func(r *manifest.Repo, _ *string) { r.Dir = "../web" },
 		"reserved": func(r *manifest.Repo, _ *string) { r.Dir = "Memory" },
-		"path":     func(r *manifest.Repo, _ *string) { r.Path = "/home/a/src/shop/../web" },
+		"path":     func(r *manifest.Repo, _ *string) { r.Path = "/sandbox/src/shop/../web" },
 		"place":    func(r *manifest.Repo, _ *string) { r.Path = "/tmp/web" },
 		"project":  func(_ *manifest.Repo, p *string) { *p = "Shop" },
 		"url":      func(r *manifest.Repo, _ *string) { r.URL = "file:///tmp/web" },
 	} {
 		r, project := good, "shop"
 		edit(&r, &project)
-		assert.Error(t, setup.CheckRepo("/home/a", project, r), name)
+		assert.Error(t, setup.CheckRepo("/sandbox", project, r), name)
 	}
 }
 
