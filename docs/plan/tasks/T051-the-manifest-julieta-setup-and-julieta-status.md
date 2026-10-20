@@ -12,6 +12,7 @@ owns:
   - e2e/julieta_setup_test.go
   - e2e/julieta_status_test.go
   - tools/ci/internal/schema/julieta.go
+  - .gitattributes
 needs:
   - T135
   - T009
@@ -59,7 +60,9 @@ T021, whose field-table generator writes that page. The task no longer touches t
 `spec` surface. The
 protocol window is N = 1 with no protocol below it, so the container e2e
 shows N accepted and 0 and N+1 refused, and N-1 stays with T135's unit
-test of `acceptsProtocol` until a second protocol exists.
+test of `acceptsProtocol` until a second protocol exists. The task also
+owns `.gitattributes`, for the `-text` line of each generated output
+it adds (two reference pages and two schemas), as T008 and T009 did.
 
 - Implements: REQ-0006 (index), REQ-0016 (index), REQ-0035 (00 0.4),
   REQ-0037 (00 0.4), REQ-0049 (01 1.2), REQ-0051 (01 1.2), REQ-0152 (02
