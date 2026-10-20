@@ -61,9 +61,17 @@ func syncRepo(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
 
 // cloneMissing clones the secondary repo m when nothing is at its path,
 // and reports whether it did. Its parent, $HOME/src/<project>, is made
-// first.
+// first. Something at the path that is not a repository, an empty
+// directory or a file, is a clone that could not be made.
 func cloneMissing(ctx context.Context, r *run, m manifest.Repo) (bool, error) {
-	if _, err := os.Lstat(m.Path); !errors.Is(err, fs.ErrNotExist) {
+	_, err := os.Lstat(m.Path)
+	if err == nil {
+		if _, err := os.Lstat(filepath.Join(m.Path, ".git")); err != nil {
+			return false, fmt.Errorf("%s exists and is not a repository", m.Path)
+		}
+		return false, nil
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
 		return false, err
 	}
 	if err := os.MkdirAll(filepath.Dir(m.Path), 0o755); err != nil {
@@ -114,13 +122,16 @@ func fastForward(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
 		rep.FastForward = ffCurrent
 		return
 	}
-	ahead, _, err := r.git.AheadBehind(ctx, m.Path, "HEAD", remote)
+	ahead, behind, err := r.git.AheadBehind(ctx, m.Path, "HEAD", remote)
 	switch {
 	case err != nil:
 		failed(err)
 		return
-	case ahead > 0:
+	case ahead > 0 && behind > 0:
 		rep.FastForward = ffDiverged
+		return
+	case ahead > 0:
+		rep.FastForward = ffAhead
 		return
 	}
 	if err := r.git.FastForward(ctx, m.Path, tip); err != nil {

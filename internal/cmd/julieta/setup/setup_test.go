@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
@@ -125,18 +126,22 @@ func TestSetupText(t *testing.T) {
 // where they are, and reports each; none is a warning.
 func TestSetupReportsWhatItDoesNotMove(t *testing.T) {
 	for name, tc := range map[string]struct {
-		dirty bool
-		args  []string
-		want  string
+		dirty  bool
+		noPush bool
+		args   []string
+		want   string
 	}{
 		"dirty":    {dirty: true, want: "not-clean"},
+		"ahead":    {noPush: true, args: []string{"commit", "-q", "--allow-empty", "-m", "mine"}, want: "ahead"},
 		"branch":   {args: []string{"switch", "-q", "-c", "topic"}, want: "not-checked-out"},
 		"detached": {args: []string{"switch", "-q", "--detach"}, want: "not-checked-out"},
 		"diverged": {args: []string{"commit", "-q", "--allow-empty", "-m", "mine"}, want: "diverged"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			s := newSandbox(t)
-			push(t, filepath.Join(s.base, "api.git"), "two")
+			if !tc.noPush {
+				push(t, filepath.Join(s.base, "api.git"), "two")
+			}
 			if tc.dirty {
 				require.NoError(t, os.WriteFile(filepath.Join(s.primary(), "new"), nil, 0o600))
 			} else {
@@ -204,6 +209,15 @@ func TestSetupUnusable(t *testing.T) {
 		assert.Contains(t, rep.Unusable[0], "the secondary repo web")
 		assert.NoDirExists(t, s.m.Repos[1].Path)
 	})
+	t.Run("not a repository", func(t *testing.T) {
+		s := newSandbox(t)
+		require.NoError(t, os.MkdirAll(s.m.Repos[1].Path, 0o700))
+		code, rep, _ := setupJSON(t)
+		assert.Equal(t, 1, code)
+		require.Len(t, rep.Unusable, 1)
+		assert.Contains(t, rep.Unusable[0], "the secondary repo web")
+		assert.False(t, rep.Repos[1].Fetched)
+	})
 	t.Run("secondary path", func(t *testing.T) {
 		s := newSandbox(t)
 		s.m.Repos[1].Path = filepath.Join(t.TempDir(), "web")
@@ -259,11 +273,24 @@ func TestSetupWithoutADefaultBranch(t *testing.T) {
 }
 
 // TestSetupReplacesWhatIsAtTheLink replaces a file at the PATH link, and
-// a link to another binary, with the link to the running binary.
+// a link to another binary, with the link to the running binary, and
+// leaves the running binary itself where it is when it is the file at
+// the path.
 func TestSetupReplacesWhatIsAtTheLink(t *testing.T) {
 	s := newSandbox(t)
 	link := filepath.Join(s.home, ".local", "bin", "julieta")
 	require.NoError(t, os.MkdirAll(filepath.Dir(link), 0o700))
+	exe, err := os.Executable()
+	require.NoError(t, err)
+	require.NoError(t, os.Link(exe, link), "a hard link of the test binary at the PATH link")
+	code, rep, stderr := setupJSON(t)
+	require.Equal(t, 0, code, stderr)
+	assert.False(t, rep.Link.Changed, "the running binary is the file at the path")
+	info, err := os.Lstat(link)
+	require.NoError(t, err)
+	assert.True(t, info.Mode().IsRegular(), "the binary is kept, not replaced by a link to itself")
+	require.NoError(t, os.Remove(link))
+
 	for _, plant := range []func() error{
 		func() error { return os.WriteFile(link, []byte("old"), 0o600) },
 		func() error { return errors.Join(os.Remove(link), os.Symlink("/usr/bin/true", link)) },
@@ -320,4 +347,30 @@ func TestPrintWarning(t *testing.T) {
 	var b strings.Builder
 	setup.PrintWarning(cli.NewWriter(&b), setup.Warning{Slug: "other", Message: "m"})
 	assert.Equal(t, "julieta state holds a warning this julieta does not know, \"other\": m\n", b.String())
+}
+
+// TestSetupReportsAnUnreadableState reports a julieta state file it
+// cannot read, goes on, and replaces it with this run's state.
+func TestSetupReportsAnUnreadableState(t *testing.T) {
+	s := newSandbox(t)
+	require.NoError(t, os.MkdirAll(setup.StateDir(s.home), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(setup.StateDir(s.home), "setup.json"), []byte("{"), 0o600))
+	code, rep, stderr := setupJSON(t)
+	require.Equal(t, 0, code, stderr)
+	require.Len(t, rep.Errors, 1)
+	assert.Contains(t, stderr, "error  julieta state setup.json: ")
+	state, err := setup.ReadState(s.home)
+	require.NoError(t, err)
+	assert.Equal(t, clock, state.At)
+}
+
+// TestEmptyRunDigest holds the digest of kind run of the empty run, {},
+// that e2e/julieta_setup_test.go writes into its manifests as a
+// literal, since e2e may not import internal/canon (REQ-0971). When
+// canon changes the digest, this test fails with the new value, which
+// replaces emptyRunDigest there and here.
+func TestEmptyRunDigest(t *testing.T) {
+	sum, err := canon.Digest(canon.Run, manifest.Run{})
+	require.NoError(t, err)
+	assert.Equal(t, "d33e4b621d0923ab86c327af8e7819ddba70d80740f12b580bf056748a01ff25", sum.String())
 }

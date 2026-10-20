@@ -31,6 +31,13 @@ const (
 	originURL    = "git://127.0.0.1:9418/"
 )
 
+// emptyRunDigest is the digest of kind run of the empty run, {} (03
+// 3.12), a literal since e2e may not import internal/canon (REQ-0971).
+// TestEmptyRunDigest of internal/cmd/julieta/setup holds the same
+// value; when canon changes it, "go test ./internal/cmd/julieta/setup
+// -run '^TestEmptyRunDigest$'" fails and prints the new one.
+const emptyRunDigest = "d33e4b621d0923ab86c327af8e7819ddba70d80740f12b580bf056748a01ff25"
+
 // prologue builds the sandbox and starts the daemon. $1 is julieta.
 const prologue = `set -eu
 J=$1
@@ -129,7 +136,7 @@ func step(t *testing.T, steps map[string]stepResult, name string) stepResult {
 // manifestEnv returns the env value of the manifest of the sandbox, of
 // the protocol given, with the primary's origin at apiURL: canonical
 // JSON (sorted keys, no spacing), base64url without padding (03 3.6).
-// runDigest is the digest of kind run of the empty run, {} (03 3.12).
+// runDigest is emptyRunDigest.
 func manifestEnv(t *testing.T, protocol int, apiURL string) string {
 	t.Helper()
 	repo := func(dir, path, url string, primary bool) map[string]any {
@@ -144,7 +151,7 @@ func manifestEnv(t *testing.T, protocol int, apiURL string) string {
 		"protocol":   protocol,
 		"repos":      []any{repo("api", primaryPath, apiURL, true), repo("web", secondaryDir, originURL+"web.git", false)},
 		"run":        map[string]any{},
-		"runDigest":  "d33e4b621d0923ab86c327af8e7819ddba70d80740f12b580bf056748a01ff25",
+		"runDigest":  emptyRunDigest,
 		"salvage":    map[string]any{"capBytes": 0, "excludeIgnored": []string{}},
 		"schema":     "manifest/v1",
 		"specCommit": strings.Repeat("ab", 20),
@@ -170,7 +177,8 @@ func errorID(t *testing.T, r stepResult) string {
 // setupJSON is the --json document of julieta setup, every field, read
 // strictly.
 type setupJSON struct {
-	Link struct {
+	Errors []string `json:"errors"`
+	Link   struct {
 		Changed bool   `json:"changed"`
 		Path    string `json:"path"`
 		Target  string `json:"target"`

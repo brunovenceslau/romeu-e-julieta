@@ -77,7 +77,7 @@ func setup(ctx context.Context, env *cli.Env) error {
 		return err
 	}
 	r := &run{home: home, m: m, git: git,
-		report: Report{Schema: Schema, Version: env.Version.Version, Repos: []Repo{}, Unusable: []string{}, Warnings: []Warning{}}}
+		report: Report{Schema: Schema, Version: env.Version.Version, Errors: []string{}, Repos: []Repo{}, Unusable: []string{}, Warnings: []Warning{}}}
 	if fromEnv {
 		if err := cacheManifest(home, m); err != nil {
 			r.fail("the manifest cache: %v", err)
@@ -89,8 +89,10 @@ func setup(ctx context.Context, env *cli.Env) error {
 		}
 		s(ctx, r)
 	}
-	// A state file setup cannot read is replaced by this run's.
-	prev, _ := ReadState(home)
+	prev, err := ReadState(home)
+	if err != nil {
+		r.report.Errors = append(r.report.Errors, fmt.Sprintf("%v; this run's state replaces it", err))
+	}
 	if err := recordState(home, prev, env.Now(), env.Version.Version, r.report.Warnings); err != nil {
 		r.fail("julieta state: %v", err)
 	}
@@ -103,11 +105,18 @@ func setup(ctx context.Context, env *cli.Env) error {
 	return nil
 }
 
-// write writes the report: the warnings to stderr, and the --json
+// write writes the report: the warnings and the reads that failed to
+// stderr, as every warning goes (04 4.1, Output and Warnings;
+// cli.Warn), and the --json
 // document or the text lines to stdout.
 func write(env *cli.Env, rep Report) error {
 	for _, w := range rep.Warnings {
 		PrintWarning(env.Stderr, w)
+	}
+	for _, e := range rep.Errors {
+		if _, err := fmt.Fprintf(env.Stderr, "error  %s\n", e); err != nil {
+			return err
+		}
 	}
 	if env.JSON {
 		b, err := json.Marshal(rep, json.Deterministic(true))

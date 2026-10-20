@@ -17,6 +17,10 @@ const Schema = "julieta-setup/v1"
 // that left the sandbox unusable, and the warnings (04 4.3). The fields
 // are in the order of their JSON names.
 type Report struct {
+	// Errors are the reads that failed and did not stop setup, such as
+	// that of a julieta state file it cannot read, which this run's
+	// state replaces.
+	Errors []string `json:"errors"`
 	// Link is the PATH link.
 	Link Link `json:"link"`
 	// Repos are the repos of the manifest, in its order.
@@ -50,7 +54,8 @@ const (
 	ffNoDefault     = "no-default"      // origin/HEAD is missing or dangling
 	ffNotCheckedOut = "not-checked-out" // HEAD is another branch, detached or unborn
 	ffNotClean      = "not-clean"       // the working tree holds a change
-	ffDiverged      = "diverged"        // the branch has commits origin's lacks
+	ffAhead         = "ahead"           // the branch has commits origin's lacks, and lacks none of origin's
+	ffDiverged      = "diverged"        // each has commits the other lacks
 	ffFailed        = "failed"          // a read or the fast-forward failed: Error says why
 )
 
@@ -66,7 +71,7 @@ type Repo struct {
 	Error string `json:"error"`
 	// FastForward is the outcome of the fast-forward of the default
 	// branch: moved, current, not-fetched, no-default,
-	// not-checked-out, not-clean, diverged or failed.
+	// not-checked-out, not-clean, ahead, diverged or failed.
 	FastForward string `json:"fastForward"`
 	// Fetched: the fetch of origin succeeded.
 	Fetched bool `json:"fetched"`

@@ -3,6 +3,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "errors": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "link": {
       "additionalProperties": false,
       "properties": {
@@ -104,6 +110,7 @@
     }
   },
   "required": [
+    "errors",
     "link",
     "repos",
     "schema",
