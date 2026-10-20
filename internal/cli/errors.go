@@ -5,6 +5,20 @@ package cli
 
 // The rows of the error table (04 4.4) that this package raises.
 var (
+	// CheckFindings is the error check-findings (RJ-328): a check ran
+	// and found what it checks for, exit 6 (04 4.1, Exit codes;
+	// REQ-0435): romeu doctor, julieta lock --check, julieta pin check,
+	// julieta spec validate and julieta memory check raise it, and the
+	// details list each finding by its slug. It is declared here, once,
+	// since the commands of both binaries raise it.
+	CheckFindings = Row{
+		ID:          "RJ-328",
+		Slug:        "check-findings",
+		Exit:        6,
+		Fix:         "decide: fix each finding the details name, then run the check again",
+		RecoveredIn: "none: the findings name the paths to fix",
+	}
+
 	// Internal is the error internal (RJ-348): an error chain that holds
 	// no *Error, a defect of the code (10 10.1, Error ids).
 	Internal = Row{

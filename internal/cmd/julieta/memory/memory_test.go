@@ -334,7 +334,7 @@ func TestCheckEscapesNames(t *testing.T) {
 	mem := s.mem(0)
 	require.NoError(t, os.WriteFile(filepath.Join(mem, "x\nmemory web ok\x1b[2J"), nil, 0o600))
 	code, stdout, stderr := s.julieta(t, "memory", "check")
-	assert.Equal(t, 1, code, stderr)
+	assert.Equal(t, 6, code, stderr)
 	assert.Equal(t, "memory api "+mem+" 1 findings\nfinding top-level "+mem+"/x\\nmemory web ok\\u001b[2J\nmemory web "+s.mem(1)+" ok\n", stdout)
 	assert.NotContains(t, stderr, "\x1b")
 }
@@ -361,8 +361,8 @@ func TestCheck(t *testing.T) {
 // TestCheckFindings fails on a memory dir that breaks the layout
 // allowlist and names each finding (REQ-0412, REQ-0651): a symlink, a
 // FIFO, a dotfile, a .git directory and a top-level name outside the
-// four. The exit is 1 until the row check-findings (RJ-328, exit 6) is
-// declared in code (see check.go).
+// four, as the error check-findings (RJ-328), exit 6 (REQ-0435), whose
+// details name each path with its slug.
 func TestCheckFindings(t *testing.T) {
 	s := newSandbox(t)
 	mem := s.mem(0)
@@ -373,7 +373,10 @@ func TestCheckFindings(t *testing.T) {
 	require.NoError(t, os.Symlink("/etc", filepath.Join(mem, "handoff")))
 	require.NoError(t, syscall.Mkfifo(filepath.Join(mem, "entries", "fifo"), 0o600))
 	code, stdout, stderr := s.julieta(t, "memory", "check")
-	assert.Equal(t, 1, code, stderr)
+	assert.Equal(t, 6, code, stderr)
+	assert.True(t, strings.HasPrefix(stderr, "error RJ-328 check-findings: "), stderr)
+	assert.Contains(t, stderr, "\nfix: decide: fix each finding the details name, then run the check again\n")
+	assert.Contains(t, stderr, "\n"+mem+"/handoff: symlink\n")
 	assert.Equal(t, "memory api "+mem+" 5 findings\n"+
 		"finding dotfile "+mem+"/entries/.hidden\n"+
 		"finding fifo "+mem+"/entries/fifo\n"+

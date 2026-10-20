@@ -23,6 +23,7 @@ exit codes are in [exit-codes.md](exit-codes.md).
 | Id | Slug | Exit | Fix | Declared in | Recovered in |
 |---|---|---|---|---|---|
 | `RJ-311` | `format-newer` | 2 | `decide: install the release that wrote it` | [internal/manifest](../../internal/manifest/errors.go) | none: the release that wrote the file reads it |
+| `RJ-328` | `check-findings` | 6 | `decide: fix each finding the details name, then run the check again` | [internal/cli](../../internal/cli/errors.go) | none: the findings name the paths to fix |
 | `RJ-342` | `manifest-protocol` | 2 | `decide: run romeu run <name> on the host, which passes a manifest of the current protocol` | [internal/manifest](../../internal/manifest/errors.go) | none: the run of the hint replaces the manifest |
 | `RJ-348` | `internal` | 1 | `decide: open an issue with the details` | [internal/cli](../../internal/cli/errors.go) | none: a defect of the code, fixed in a release |
 | `RJ-349` | `usage` | 2 | `<binary> <command> --help` | [internal/cli](../../internal/cli/errors.go) | none: the help the hint names lists the commands and flags |

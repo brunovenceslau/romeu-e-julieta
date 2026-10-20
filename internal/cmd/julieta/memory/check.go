@@ -37,13 +37,9 @@ var _ = cli.Register(func() cli.Command {
 // <rule> <dir>/<path>", on stdout, and one line per warning on stderr,
 // a leftover temporary file or a handoff/ over its cap, which refuses
 // nothing (REQ-0650, REQ-0654). A dir that is not mounted or not
-// writable fails the command (exit 1), and so does a finding.
-//
-// A finding is the error check-findings (RJ-328, exit 6, REQ-0435) by
-// 04 4.3. That row is not declared in code yet: it lands in this
-// package's errors.go, on the contracts surface of
-// .github/ask-first.yaml, and until then a finding fails the command
-// with an error that carries no id, exit 1.
+// writable fails the command (exit 1); otherwise a finding is the error
+// check-findings (RJ-328, exit 6, REQ-0435), whose details hold each
+// finding: its path, escaped, and its slug.
 func check(env *cli.Env) error {
 	home, err := setup.Home()
 	if err != nil {
@@ -54,6 +50,7 @@ func check(env *cli.Env) error {
 		return err
 	}
 	var failed, findings []string
+	var details []cli.Detail
 	for _, r := range m.Repos {
 		rep, err := memstore.CheckDir(r.Memory)
 		if err != nil {
@@ -72,6 +69,7 @@ func check(env *cli.Env) error {
 		}
 		for _, f := range rep.Findings {
 			findings = append(findings, f.Rule)
+			details = append(details, cli.Detail{Key: esc(filepath.Join(r.Memory, f.Path)), Value: f.Rule})
 			if _, err := fmt.Fprintf(env.Stdout, "finding %s %s\n", f.Rule, esc(filepath.Join(r.Memory, f.Path))); err != nil {
 				return err
 			}
@@ -86,7 +84,7 @@ func check(env *cli.Env) error {
 		return fmt.Errorf("the memory dir of %s is not mounted or not writable", esc(strings.Join(failed, ", ")))
 	}
 	if len(findings) > 0 {
-		return fmt.Errorf("the memory dirs break the layout of 08 8.1: %d findings: %s", len(findings), strings.Join(findings, ", "))
+		return cli.CheckFindings.New(fmt.Sprintf("the memory dirs break the layout of 08 8.1: %d findings: %s", len(findings), strings.Join(findings, ", ")), details...)
 	}
 	return nil
 }

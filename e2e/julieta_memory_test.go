@@ -135,7 +135,8 @@ step setup-unusable "$J" setup --json
 	assert.Equal(t, "memory api /tmp/memory/api ok\nmemory web /tmp/memory/web ok\n", r.stdout)
 
 	r = step(t, steps, "findings")
-	assert.Equal(t, 1, r.code, "exit 6 once check-findings (RJ-328) is declared in code: %s", r.stderr)
+	assert.Equal(t, 6, r.code, r.stderr)
+	assert.True(t, strings.HasPrefix(r.stderr, "error RJ-328 check-findings: "), r.stderr)
 	assert.Equal(t, "memory api /tmp/memory/api 3 findings\n"+
 		"finding dotfile /tmp/memory/api/entries/.hidden\n"+
 		"finding fifo /tmp/memory/api/entries/fifo\n"+

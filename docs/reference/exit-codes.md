@@ -27,7 +27,7 @@ of [errors.md](errors.md) names its own.
 | 3 | approval required |  |
 | 4 | drift detected, or an interrupted promotion abandoned |  |
 | 5 | refused to protect data |  |
-| 6 | the check ran and found what it checks for |  |
+| 6 | the check ran and found what it checks for | `RJ-328` |
 | 130 | ended by SIGINT |  |
 | 143 | ended by SIGTERM |  |
 
