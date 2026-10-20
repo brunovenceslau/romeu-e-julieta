@@ -14,29 +14,23 @@ ticks T035, T145 and T146).
    waits for T054, T059, T060 and T078.
 3. T112 lands through the sessions of the config and kit repositories
    ("t112-in-the-config-and-kit-repositories").
+4. A task on the `gitsafe` surface hardens the fast-forward before
+   `julieta setup` runs in daily use, and one gives the removal of a
+   corrupted e2e cache entry a job annotation
+   ("the-operator-items-of-2026-10-20").
 
 ## Open for the operator
 
-One block, a recommendation each. Decisions of 2026-10-19 are in
-"the-grants-of-2026-10-19".
+One block. Decisions of 2026-10-19 are in
+"the-grants-of-2026-10-19", and those of 2026-10-20 in
+"the-operator-items-of-2026-10-20".
 
-1. Paste the two T112 prompts, the config repository's first.
-   Recommended: today, so the worktree hook lands before the next
-   fan-out of subagents.
-2. The sitting of T126 (O8) waits for the GitHub App of
-   [ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md),
-   which does not exist yet. Recommended: create it when M3 starts.
-3. When to harden `gitsafe`'s fast-forward
-   ("gitsafe-s-fast-forward-overwrites-ignored-files-and-runs"):
-   a task on the `gitsafe` surface. Recommended: before `julieta setup`
-   runs in daily use, since it can overwrite an ignored file unasked.
-4. Whether the removal of a corrupted cache entry in the container e2e
-   writes a line ("the-spec-catches-up-with-the-hardening-of-t127-t143-and-t144").
-   Recommended: a line on a channel the infrastructure classifier does
-   not read, such as a job annotation, so a poisoned cache shows.
-5. Paste the ADR 0039 prompt into the payload's session
-   ("rules-to-move-when-the-interim-payload-is-retired"). Recommended:
-   today.
+1. Report the pull requests of the three prompts pasted on 2026-10-20
+   (T112 in the config and sandbox kit repositories, ADR 0039 in the
+   payload), so their pending notes close.
+2. Create the GitHub App of
+   [ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md)
+   when M3 starts; the sitting of T126 (O8) waits for it.
 
 ## In flight
 

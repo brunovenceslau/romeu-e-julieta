@@ -13,5 +13,8 @@ One question is left open:
   whether it should write one, without adding output the infrastructure
   classifier of `tools/ci/internal/container` counts as a test's own.
 
-Reopen: when the maintainer decides, or when a cache entry is found
+Decided on 2026-10-20: the removal writes a job annotation, a channel
+the classifier does not read.
+
+Reopen: when that task is planned, or when a cache entry is found
 corrupted.

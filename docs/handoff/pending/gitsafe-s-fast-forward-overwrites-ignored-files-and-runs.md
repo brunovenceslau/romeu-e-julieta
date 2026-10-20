@@ -35,5 +35,8 @@ reading `internal/gitsafe`:
   run `smudge` and `process` from the sandbox's global config; not
   reproduced.
 
-Reopen: before `julieta setup` runs anywhere with more trust than the
-agent, or as a `gitsafe` task (approval line) next in M1.
+Decided on 2026-10-20: a `gitsafe` task (approval line) hardens it
+before `julieta setup` runs in daily use.
+
+Reopen: when that task is planned, or before `julieta setup` runs
+anywhere with more trust than the agent.
