@@ -5,9 +5,9 @@ package handoff_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json/v2"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,6 +21,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	_ "github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/status"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
 // The version stamp the tests give julieta (10 10.4); the clock is the
@@ -81,15 +82,16 @@ func newSandbox(t *testing.T) *sandbox {
 	return s
 }
 
-// git runs git in dir for a test, with an identity and no signing.
+// git runs git in dir for a test, with an identity and no signing, and
+// returns its output.
 func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
-	out, err := cmd.CombinedOutput()
-	require.NoError(t, err, "%s", out)
-	return strings.TrimSpace(string(out))
+	var stdout, stderr bytes.Buffer
+	argv := append([]string{"/usr/bin/git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"}, args...)
+	err := procgroup.Run(t.Context(), procgroup.Command{Class: procgroup.JulietaGit, Argv: argv, Dir: dir,
+		Env: []string{"HOME=" + t.TempDir(), "PATH=/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM=1"}, Stdout: &stdout, Stderr: &stderr})
+	require.NoError(t, err, "git %s: %s", strings.Join(args, " "), stderr.String())
+	return strings.TrimSpace(stdout.String())
 }
 
 // mem returns the memory dir of the repo i, and repo its path.
@@ -103,19 +105,30 @@ func (s *sandbox) advance(d time.Duration) { s.now = s.now.Add(d) }
 // (empty for none), and returns the exit status, stdout and stderr.
 func (s *sandbox) julieta(t *testing.T, stdin string, args ...string) (int, string, string) {
 	t.Helper()
-	in, err := os.CreateTemp(t.TempDir(), "stdin")
-	require.NoError(t, err)
-	_, err = in.WriteString(stdin)
-	require.NoError(t, err)
-	_, err = in.Seek(0, 0)
-	require.NoError(t, err)
+	return s.run(t.Context(), stdin, args...)
+}
+
+// run is julieta for a goroutine other than the test's, which may not
+// fail the test.
+func (s *sandbox) run(ctx context.Context, stdin string, args ...string) (int, string, string) {
+	in, err := os.CreateTemp("", "stdin")
+	if err != nil {
+		return -1, "", err.Error()
+	}
+	defer func() { _ = os.Remove(in.Name()); _ = in.Close() }()
+	if _, err := in.WriteString(stdin); err != nil {
+		return -1, "", err.Error()
+	}
+	if _, err := in.Seek(0, 0); err != nil {
+		return -1, "", err.Error()
+	}
 	old := os.Stdin
 	os.Stdin = in
-	defer func() { os.Stdin = old; _ = in.Close() }()
+	defer func() { os.Stdin = old }()
 	var stdout, stderr bytes.Buffer
 	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&stdout), Stderr: cli.NewWriter(&stderr),
 		Now: func() time.Time { return s.now }, ULIDs: s.ulids, Version: stamp}
-	code := cli.Main(t.Context(), args, env)
+	code := cli.Main(ctx, args, env)
 	return code, stdout.String(), stderr.String()
 }
 

@@ -151,7 +151,7 @@ func TestResumeScenarios(t *testing.T) {
 		s.ok(t, "", "handoff", "write", "--facts") // a session that ended with no /handoff
 		out := s.ok(t, "", "handoff", "show", "--hook")
 		assert.Contains(t, out, gap+"2026-10-20T12:00:00Z: api: 2 new commits\n")
-		assert.True(t, strings.Index(out, gap) < strings.Index(out, "Ship the cart."), "the line prints first")
+		assert.Less(t, strings.Index(out, gap), strings.Index(out, "Ship the cart."), "the line prints first")
 	})
 	t.Run("handoff, a commit, then clear", func(t *testing.T) {
 		s := newSandbox(t)
@@ -274,8 +274,5 @@ func TestListPrintsOneLinePerFile(t *testing.T) {
 	require.Len(t, lines, 3)
 	assert.Regexp(t, `^[0-9a-hjkmnp-tv-z]{26}  clear  api  `+s.mem(0)+`/handoff/[0-9a-hjkmnp-tv-z]{26}-clear\.md$`, lines[0])
 	assert.Contains(t, lines[1], "  facts  web  ")
-	assert.Equal(t, "{\"files\":[],\"schema\":\"julieta-handoff/v1\"}\n", func() string {
-		e := newSandbox(t)
-		return e.ok(t, "", "handoff", "list", "--json")
-	}())
+	assert.JSONEq(t, `{"files":[],"schema":"julieta-handoff/v1"}`, newSandbox(t).ok(t, "", "handoff", "list", "--json"))
 }

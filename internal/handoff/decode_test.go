@@ -94,11 +94,11 @@ func TestDecodeRefusesANewerVersion(t *testing.T) {
 // TestCheckHeadings needs the headings in order, as lines.
 func TestCheckHeadings(t *testing.T) {
 	full := "## Goal\n## State\n## Decisions\n## Next steps\n## Open questions\n"
-	assert.NoError(t, handoff.CheckHeadings(handoff.Clear, full))
-	assert.NoError(t, handoff.CheckHeadings(handoff.Clear, "x\r\n"+strings.ReplaceAll(full, "\n", "  \r\n")))
-	assert.Error(t, handoff.CheckHeadings(handoff.Final, full), "final needs a sixth")
-	assert.NoError(t, handoff.CheckHeadings(handoff.Final, full+"## What would be lost\n"))
-	assert.Error(t, handoff.CheckHeadings(handoff.Clear, "## State\n## Goal\n## Decisions\n## Next steps\n## Open questions\n"), "out of order")
-	assert.Error(t, handoff.CheckHeadings(handoff.Clear, "text ## Goal\n"+full[len("## Goal\n"):]), "a heading is a line")
-	assert.Error(t, handoff.CheckHeadings(handoff.Facts, ""))
+	require.NoError(t, handoff.CheckHeadings(handoff.Clear, full))
+	require.NoError(t, handoff.CheckHeadings(handoff.Clear, "x\r\n"+strings.ReplaceAll(full, "\n", "  \r\n")))
+	require.Error(t, handoff.CheckHeadings(handoff.Final, full), "final needs a sixth")
+	require.NoError(t, handoff.CheckHeadings(handoff.Final, full+"## What would be lost\n"))
+	require.Error(t, handoff.CheckHeadings(handoff.Clear, "## State\n## Goal\n## Decisions\n## Next steps\n## Open questions\n"), "out of order")
+	require.Error(t, handoff.CheckHeadings(handoff.Clear, "text ## Goal\n"+full[len("## Goal\n"):]), "a heading is a line")
+	require.Error(t, handoff.CheckHeadings(handoff.Facts, ""))
 }

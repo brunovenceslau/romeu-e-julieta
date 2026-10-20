@@ -72,7 +72,7 @@ step show "$J" handoff show
 		assert.Equal(t, 2, r.code, "%s: %s", name, r.stderr)
 		assert.Contains(t, r.stderr, "RJ-349", name)
 	}
-	assert.Equal(t, "", strings.TrimSpace(step(t, steps, "nothing").stdout), "nothing was written")
+	assert.Empty(t, strings.TrimSpace(step(t, steps, "nothing").stdout), "nothing was written")
 
 	r := step(t, steps, "clear")
 	require.Equal(t, 0, r.code, r.stderr)

@@ -61,7 +61,7 @@ func runHook(env *cli.Env, hook, command string, run hookRun, after func(*setup.
 		})
 	}
 	if herr != nil {
-		err = fmt.Errorf("%w (and the failure was not recorded: %v)", err, herr)
+		err = fmt.Errorf("%w (and the failure was not recorded: %w)", err, herr)
 	}
 	failed(env, command, err)
 	return nil

@@ -154,7 +154,7 @@ func TestWriteFactsWaitsForTheStoreLock(t *testing.T) {
 
 	done := make(chan string, 1)
 	go func() {
-		code, stdout, stderr := s.julieta(t, "", "handoff", "write", "--facts")
+		code, stdout, stderr := s.run(t.Context(), "", "handoff", "write", "--facts")
 		done <- fmt.Sprintf("%d %s %s", code, stdout, stderr)
 	}()
 	assert.Equal(t, lock, <-waiting, "the command met the held lock of its target dir")

@@ -104,16 +104,6 @@ func load() (sandbox, error) {
 	return sandbox{home: home, m: m}, nil
 }
 
-// dirs returns the memory dirs of the repos of the manifest, labelled
-// with the repo, in the order of the manifest.
-func (s sandbox) dirs() []hf.Dir {
-	out := make([]hf.Dir, 0, len(s.m.Repos))
-	for _, r := range s.m.Repos {
-		out = append(out, hf.Dir{Label: r.Dir, Path: r.Memory})
-	}
-	return out
-}
-
 // target returns the repo a handoff is filed under: the one whose dir
 // is repo, or, when repo is empty, the one whose path holds the working
 // directory, the deepest when repos nest (08 8.3, REQ-0677; never a
