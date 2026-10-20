@@ -302,3 +302,18 @@ func TestShowHookPrintsTheGitHookFailuresToo(t *testing.T) {
 	}
 	assert.Len(t, s.failures(t), 1)
 }
+
+// TestSuccessClearsAFailureRecordedBeforeTheRepoWasKnown: a SessionEnd
+// that failed before it knew its repo is recorded with no repo, and a
+// later success for any repo clears it.
+func TestSuccessClearsAFailureRecordedBeforeTheRepoWasKnown(t *testing.T) {
+	s := newSandbox(t)
+	t.Chdir(t.TempDir())
+	s.ok(t, "", "handoff", "write", "--facts") // no repo holds the working directory
+	fs := s.failures(t)
+	require.Len(t, fs, 1)
+	assert.Empty(t, fs[0].Repo)
+	t.Chdir(s.repo(0))
+	s.ok(t, "", "handoff", "write", "--facts")
+	assert.Empty(t, s.failures(t))
+}
