@@ -16,7 +16,10 @@ Anything kept only in the conversation is gone after `/clear`.
 
 ## Keep something for later
 
-Add one entry per thing, with a one-line title a later session can scan:
+Search first with `julieta memory list --query <text>`: an entry that
+already holds the thing is better changed than repeated (see
+[references/memory.md](references/memory.md)). Then add one entry per
+thing, with a one-line title a later session can scan:
 
 ```sh
 julieta memory add --title 'Signing waits on the host' --body 'Ask the operator.' --tag lesson
@@ -32,8 +35,9 @@ entry, put it in the handoff and open an issue labelled `deferred`, so it
 is tracked where people look.
 
 The command prints the repo it filed the entry under. Read that line: an
-entry under the wrong repo is never shown where it is needed. To find,
-change or close entries, or to file under another repo, read
+entry under the wrong repo is never shown where it is needed. To find
+entries (search before you add something that may be there already),
+change or close them, or to file under another repo, read
 [references/memory.md](references/memory.md).
 
 ## When signing a commit fails or waits
