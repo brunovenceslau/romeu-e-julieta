@@ -30,6 +30,7 @@ The requirement id is the one of the row of the check in the step table of
 |---|---|---|---|---|---|---|---|
 | `format` | every Go file is formatted as gofmt formats it | `gofmt -l .` | fast, all | 10 | no | REQ-0820 | [tools/ci/internal/format](../../tools/ci/internal/format/) |
 | `vet` | go vet finds nothing in the module | `go vet ./...` | fast, all | 20 | no | REQ-0820 | [tools/ci/internal/vet](../../tools/ci/internal/vet/) |
+| `fix` | go fix would change no Go file of the module, for each lint target | `go fix -diff -tags e2e,host ./..., once per lint target` | fast, all | 25 | no | REQ-1254 | [tools/ci/internal/fix](../../tools/ci/internal/fix/) |
 | `generated` | the generated files are what go generate writes, each tracked as a regular file, and go mod tidy changes neither go.mod nor go.sum | `go run ./tools/ci generated` | fast, all | 30 | no | REQ-0822 | [tools/ci/internal/drift](../../tools/ci/internal/drift/) |
 | `lint` | the linters of .golangci.yml find nothing, for each lint target | `golangci-lint run --config .golangci.yml, once per lint target` | fast, all | 40 | no | REQ-0823 | [tools/ci/internal/lint](../../tools/ci/internal/lint/) |
 | `vulnerabilities` | no known vulnerability of the Go vulnerability database reaches the module | `govulncheck ./...` | all | 50 | no | REQ-0831 | [tools/ci/internal/vulnerabilities](../../tools/ci/internal/vulnerabilities/) |

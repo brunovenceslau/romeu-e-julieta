@@ -56,6 +56,7 @@ func TestRegisteredChecks(t *testing.T) {
 	assert.Equal(t, []entry{
 		{"format", true, false, true, false, "steps"},
 		{"vet", true, false, true, false, "steps"},
+		{"fix", true, false, true, false, "steps"},
 		{"generated", true, false, true, false, "steps"},
 		{"lint", true, false, true, false, "steps"},
 		{"vulnerabilities", false, false, true, false, "steps"},
@@ -263,7 +264,7 @@ func TestAFixtureCheckIsAddedByTwoPaths(t *testing.T) {
 	unit := slices.Index(registered, "unit")
 	require.GreaterOrEqual(t, unit, 0)
 	assert.Equal(t, append(append(registered[:unit+1:unit+1], "fixture"), registered[unit+1:]...), checks, "the fixture's key puts it between unit and race")
-	assert.Equal(t, []string{"format", "vet", "generated", "lint linux/amd64", "lint boundaries linux/amd64", "lint linux/arm64", "lint boundaries linux/arm64", "lint darwin/amd64", "lint boundaries darwin/amd64", "lint darwin/arm64", "lint boundaries darwin/arm64", "fixture", "unit"}, steps, "a check that judges the tree runs before unit")
+	assert.Equal(t, []string{"format", "vet", "fix linux/amd64", "fix linux/arm64", "fix darwin/amd64", "fix darwin/arm64", "generated", "lint linux/amd64", "lint boundaries linux/amd64", "lint linux/arm64", "lint boundaries linux/arm64", "lint darwin/amd64", "lint boundaries darwin/amd64", "lint darwin/arm64", "lint boundaries darwin/arm64", "fixture", "unit"}, steps, "a check that judges the tree runs before unit")
 
 	out, err = procgroup.CombinedOutput(t.Context(), procgroup.Command{
 		Class: procgroup.ToolStep,
