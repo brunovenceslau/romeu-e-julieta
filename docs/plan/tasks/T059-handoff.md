@@ -10,6 +10,8 @@ owns:
   - internal/cmd/julieta/all/import_handoff.go
   - internal/memstore/write/write.go
   - internal/memstore/write/write_test.go
+  - internal/hooks/failures.go
+  - internal/hooks/failures_test.go
   - e2e/julieta_handoff_test.go
 needs:
   - T035
@@ -115,8 +117,15 @@ Decisions taken while building (2026-10-20), each with what reopens it:
 - The gap line compares head, branch and dirty only (the three things
   08 8.3 lists, plus a repo added or removed); stashes, upstream and
   ahead/behind are stamped but never raise it.
-- A recorded hook failure is cleared by a success of the same hook in
-  the same repo (or a failure recorded before the repo was known).
-  Failures are recorded in `hooks.json` and no longer copied into
-  `setup.json`; `julieta status` lists them when the one hook-failure
-  store of T054 is read by a status task.
+- SessionStart and SessionEnd failures are recorded, cleared and read
+  through T054's store, `hook-failures/` below julieta state, so the
+  SessionStart print shows every recorded failure, the git hooks' too
+  (08 8.2). A success of a hook clears its failure for the same repo,
+  and one recorded before the repo was known (repo empty). `hooks.json`
+  keeps only `sessionStartAt` and `sessionEndAt`. Failures are no
+  longer copied into `setup.json`, so `julieta status` does not list
+  them yet: the Acceptance line "`julieta status` lists it" is met by a
+  later status task that reads the store. Edit of `internal/hooks`: the
+  constants `SessionStart` and `SessionEnd`, and an optional `message`
+  member of `Failure` (omitted when empty), for the text a session hook
+  has no script to name; its tests pass unchanged and one test is added.

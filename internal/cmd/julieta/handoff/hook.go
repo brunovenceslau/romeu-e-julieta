@@ -4,11 +4,12 @@
 package handoff
 
 import (
+	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/hooks"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
 )
 
@@ -39,30 +40,25 @@ func runHook(env *cli.Env, hook, command string, run hookRun, after func(*setup.
 		if herr == nil {
 			herr = update(home, func(h *Hooks, s *setup.State) {
 				stamp(h)
-				// Only this hook in this repo is forgotten, and a failure that
-				// happened before the repo was known.
-				h.Failures = slices.DeleteFunc(h.Failures, func(f Failure) bool {
-					return f.Hook == hook && (f.Repo == repo || f.Repo == "")
-				})
 				if after != nil {
 					after(s)
 				}
 			})
 		}
-		_, werr := env.Stdout.Write([]byte(out))
+		if herr == nil {
+			// Only this hook in this repo is forgotten, and a failure
+			// recorded before the repo was known.
+			herr = errors.Join(hooks.Clear(failuresDir(home), repo, hook), hooks.Clear(failuresDir(home), "", hook))
+		}
+		_, _ = env.Stdout.Write([]byte(out))
 		if herr != nil {
 			failed(env, command, fmt.Errorf("the state of the hooks was not recorded: %w", herr))
 		}
-		_ = werr
 		return nil
 	}
 	if herr == nil {
-		herr = update(home, func(h *Hooks, _ *setup.State) {
-			stamp(h)
-			f := Failure{At: start, Hook: hook, Message: err.Error(), Repo: repo, Status: cli.ExitCode(err)}
-			h.Failures = slices.DeleteFunc(h.Failures, func(o Failure) bool { return o.Hook == hook && o.Repo == repo })
-			h.Failures = append(h.Failures, f)
-		})
+		herr = errors.Join(update(home, func(h *Hooks, _ *setup.State) { stamp(h) }),
+			hooks.Record(failuresDir(home), hooks.Failure{At: start, ExitCode: cli.ExitCode(err), Hook: hook, Message: err.Error(), Repo: repo, Stage: command}))
 	}
 	if herr != nil {
 		err = fmt.Errorf("%w (and the failure was not recorded: %w)", err, herr)

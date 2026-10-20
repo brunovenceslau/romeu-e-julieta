@@ -16,6 +16,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/handoff"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/hooks"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore/write"
 )
@@ -121,7 +122,7 @@ func TestHooksRecordTheirRuns(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, start, h.SessionStartAt)
 	assert.Equal(t, end, h.SessionEndAt, "handoff show without --hook is no SessionStart")
-	assert.Empty(t, h.Failures)
+	assert.Empty(t, s.failures(t))
 	info, err := os.Stat(filepath.Join(setup.StateDir(s.home), "hooks.json"))
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode())
@@ -194,12 +195,12 @@ func TestShowHookFailure(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(stdout, "\n"), stdout)
 	assert.True(t, strings.HasPrefix(stdout, "julieta handoff show --hook failed: "), stdout)
 	assert.True(t, strings.HasSuffix(stdout, "; run julieta status\n"), stdout)
-	h, err := handoff.ReadHooks(s.home)
-	require.NoError(t, err)
-	require.Len(t, h.Failures, 1)
-	assert.Equal(t, handoff.HookSessionStart, h.Failures[0].Hook)
-	assert.Equal(t, s.now, h.Failures[0].At)
-	assert.Equal(t, 1, h.Failures[0].Status)
+	fs := s.failures(t)
+	require.Len(t, fs, 1)
+	assert.Equal(t, hooks.SessionStart, fs[0].Hook)
+	assert.Equal(t, s.now, fs[0].At)
+	assert.Equal(t, 1, fs[0].ExitCode)
+	assert.Equal(t, "julieta handoff show --hook", fs[0].Stage)
 
 	// The next run that succeeds prints the failure, then it is gone.
 	require.NoError(t, os.Rename(gone, s.mem(1)))
@@ -208,9 +209,7 @@ func TestShowHookFailure(t *testing.T) {
 	assert.Contains(t, next, "hook failure: SessionStart at 2026-10-20T12:00:00Z, exit 1: ")
 	after := s.ok(t, "", "handoff", "show", "--hook")
 	assert.NotContains(t, after, "hook failure")
-	h, err = handoff.ReadHooks(s.home)
-	require.NoError(t, err)
-	assert.Empty(t, h.Failures)
+	assert.Empty(t, s.failures(t))
 }
 
 // TestWriteFactsFailure: the same for handoff write --facts, the
@@ -227,11 +226,10 @@ func TestWriteFactsFailure(t *testing.T) {
 	assert.True(t, strings.HasPrefix(stdout, "julieta handoff write --facts failed: "), stdout)
 	assert.Contains(t, stdout, "julieta status")
 	assert.Empty(t, s.names(t, 0), "nothing is written when the facts cannot be read")
-	h, err := handoff.ReadHooks(s.home)
-	require.NoError(t, err)
-	require.Len(t, h.Failures, 1)
-	assert.Equal(t, handoff.HookSessionEnd, h.Failures[0].Hook)
-	assert.Equal(t, "api", h.Failures[0].Repo)
+	fs := s.failures(t)
+	require.Len(t, fs, 1)
+	assert.Equal(t, hooks.SessionEnd, fs[0].Hook)
+	assert.Equal(t, "api", fs[0].Repo)
 
 	// The SessionStart hooks print it, run after run, and keep it.
 	for range 2 {
@@ -275,13 +273,32 @@ func TestFailureIsClearedForItsOwnRepoOnly(t *testing.T) {
 	s.ok(t, "", "handoff", "write", "--facts", "--repo", "api")
 	s.advance(time.Second)
 	s.ok(t, "", "handoff", "write", "--facts", "--repo", "web")
-	h, err := handoff.ReadHooks(s.home)
-	require.NoError(t, err)
-	require.Len(t, h.Failures, 2)
+	require.Len(t, s.failures(t), 2)
 	require.NoError(t, os.Rename(hidden, filepath.Join(s.repo(1), ".git")))
 	s.ok(t, "", "handoff", "write", "--facts", "--repo", "api")
-	h, err = handoff.ReadHooks(s.home)
+	fs := s.failures(t)
+	require.Len(t, fs, 1)
+	assert.Equal(t, "web", fs[0].Repo)
+}
+
+// failures returns the failures recorded in the store of hook failures.
+func (s *sandbox) failures(t *testing.T) []hooks.Failure {
+	t.Helper()
+	fs, err := hooks.Failures(filepath.Join(setup.StateDir(s.home), "hook-failures"))
 	require.NoError(t, err)
-	require.Len(t, h.Failures, 1)
-	assert.Equal(t, "web", h.Failures[0].Repo)
+	return fs
+}
+
+// TestShowHookPrintsTheGitHookFailuresToo: the SessionStart print shows
+// every failure of the store, a git hook's among them (08 8.2), and a
+// session hook's success does not clear a git hook's.
+func TestShowHookPrintsTheGitHookFailuresToo(t *testing.T) {
+	s := newSandbox(t)
+	dir := filepath.Join(setup.StateDir(s.home), "hook-failures")
+	require.NoError(t, hooks.Record(dir, hooks.Failure{At: s.now, ExitCode: 1, Hook: "pre-commit", Path: "/r/.githooks/pre-commit", Repo: "/r", Stage: "tracked"}))
+	for range 2 {
+		out := s.ok(t, "", "handoff", "show", "--hook")
+		assert.Contains(t, out, "hook failure: pre-commit repo /r at 2026-10-20T12:00:00Z, exit 1: stage tracked /r/.githooks/pre-commit\n")
+	}
+	assert.Len(t, s.failures(t), 1)
 }

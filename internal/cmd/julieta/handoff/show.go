@@ -13,6 +13,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	hf "github.com/brunovenceslau/romeu-e-julieta/internal/handoff"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/hooks"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
 )
@@ -157,10 +158,7 @@ func warnings(home string, moved *[]setup.Warning) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	h, err := ReadHooks(home)
-	if err != nil {
-		return nil, err
-	}
+	failures, ferr := hooks.Failures(failuresDir(home))
 	var out []string
 	for _, w := range st.Warnings {
 		if w.Slug == setup.DefaultBranchMoved && moved != nil {
@@ -168,8 +166,13 @@ func warnings(home string, moved *[]setup.Warning) ([]string, error) {
 		}
 		out = append(out, "warning "+esc(w.Slug)+": "+oneLine(w.Message))
 	}
-	for _, f := range h.Failures {
+	// Every recorded failure, the git hooks' too (08 8.2); a file of the
+	// store that cannot be trusted is one more line, not a failed print.
+	for _, f := range failures {
 		out = append(out, failureLine(f))
+	}
+	if ferr != nil {
+		out = append(out, "hook failure: the store of hook failures is partly unreadable: "+oneLine(ferr.Error()))
 	}
 	return out, nil
 }

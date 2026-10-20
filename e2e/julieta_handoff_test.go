@@ -195,7 +195,7 @@ step setup "$J" setup
 cd `+primaryPath+`
 mv /tmp/memory/web /tmp/memory/web.gone
 step startfail "$J" handoff show --hook
-step state sh -c 'cat "$HOME/.local/state/julieta/hooks.json"; echo'
+step state sh -c 'cat "$HOME"/.local/state/julieta/hook-failures/SessionStart-*.json'
 mv /tmp/memory/web.gone /tmp/memory/web
 mv `+secondaryDir+`/.git `+secondaryDir+`/.git.gone
 step endfail "$J" handoff write --facts

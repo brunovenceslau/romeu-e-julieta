@@ -102,12 +102,13 @@ func (s Session) Render() string {
 	if s.Hook {
 		rest = append(rest, items("open lessons", s.Lessons)...)
 	}
-	all := fixed.String() + joinLines(narrative)
+	var all strings.Builder
+	all.WriteString(fixed.String() + joinLines(narrative))
 	for _, b := range rest {
-		all += b.text
+		all.WriteString(b.text)
 	}
-	if !s.Hook || s.Limit <= 0 || len(all) <= s.Limit {
-		return all
+	if !s.Hook || s.Limit <= 0 || len(all.String()) <= s.Limit {
+		return all.String()
 	}
 	// Cut: the fixed part stays, then whole pieces while they fit with
 	// the room the closing lines need.

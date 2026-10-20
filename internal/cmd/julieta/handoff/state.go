@@ -16,15 +16,16 @@ import (
 	"github.com/google/renameio/v2"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/hooks"
 )
 
 // The two hooks julieta wires (08 8.2), named as the failure line
 // and the state name them.
 const (
 	// HookSessionStart is `julieta handoff show --hook`.
-	HookSessionStart = "SessionStart"
+	HookSessionStart = hooks.SessionStart
 	// HookSessionEnd is `julieta handoff write --facts`.
-	HookSessionEnd = "SessionEnd"
+	HookSessionEnd = hooks.SessionEnd
 )
 
 // hooksFile is the record of the hooks in julieta state
@@ -38,25 +39,12 @@ const (
 	setupFile = "setup.json"
 )
 
-// Failure is a recorded hook failure (REQ-0672, REQ-0675): the hook, the
-// repo it ran for (empty when it failed before it knew), the exit status
-// the failure would have had, when it happened and what it said. The
-// newest failure of each hook and repo is kept until a later run of the
-// same hook succeeds.
-type Failure struct {
-	At      time.Time `json:"at"`
-	Hook    string    `json:"hook"`
-	Message string    `json:"message"`
-	Repo    string    `json:"repo"`
-	Status  int       `json:"status"`
-}
-
 // Hooks is the record of the hooks in julieta state: the time of the
 // last SessionStart run (`handoff show --hook`) and of the last
-// SessionEnd run (`handoff write --facts`), which 08 8.5 step 1 reads,
-// and the recorded failures.
+// SessionEnd run (`handoff write --facts`), which 08 8.5 step 1 reads.
+// The failures of the hooks are not here: they are recorded in
+// internal/hooks's store, hook-failures/, with the git hooks' (08 8.2).
 type Hooks struct {
-	Failures       []Failure `json:"failures"`
 	SessionEndAt   time.Time `json:"sessionEndAt"`
 	SessionStartAt time.Time `json:"sessionStartAt"`
 }
@@ -127,19 +115,25 @@ func update(home string, f func(h *Hooks, s *setup.State)) error {
 
 // sameHooks reports whether a and b are the same record.
 func sameHooks(a, b Hooks) bool {
-	return a.SessionEndAt.Equal(b.SessionEndAt) && a.SessionStartAt.Equal(b.SessionStartAt) &&
-		slices.EqualFunc(a.Failures, b.Failures, func(x, y Failure) bool {
-			return x.At.Equal(y.At) && x.Hook == y.Hook && x.Message == y.Message && x.Repo == y.Repo && x.Status == y.Status
-		})
+	return a.SessionEndAt.Equal(b.SessionEndAt) && a.SessionStartAt.Equal(b.SessionStartAt)
 }
 
-// failureLine words a recorded failure on one line.
-func failureLine(f Failure) string {
+// failuresDir is the store of hook failures below julieta state, the
+// one internal/hooks records the git hooks' in.
+func failuresDir(home string) string { return filepath.Join(setup.StateDir(home), "hook-failures") }
+
+// failureLine words a recorded failure on one line: of a session hook
+// with its message, of a git hook with the stage and the script.
+func failureLine(f hooks.Failure) string {
 	where := f.Hook
 	if f.Repo != "" {
 		where += " repo " + esc(f.Repo)
 	}
-	return fmt.Sprintf("hook failure: %s at %s, exit %d: %s", where, f.At.UTC().Format(time.RFC3339), f.Status, oneLine(f.Message))
+	what := f.Message
+	if what == "" {
+		what = "stage " + f.Stage + " " + f.Path
+	}
+	return fmt.Sprintf("hook failure: %s at %s, exit %d: %s", where, f.At.UTC().Format(time.RFC3339), f.ExitCode, oneLine(what))
 }
 
 // oneLine escapes s and keeps it on one line, cut at 300 bytes.

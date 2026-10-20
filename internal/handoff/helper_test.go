@@ -52,8 +52,8 @@ const narrativeBody = "## Goal\nShip the cart.\n## State\nTests pass.\n## Decisi
 // file returns a handoff file of kind k made at base plus d, with the
 // repos given.
 func file(k handoff.Kind, d time.Duration, repos ...handoff.RepoFacts) handoff.File {
-	f := handoff.File{Front: handoff.Front{Schema: handoff.Field, Kind: k, CreatedAt: base.Add(d), Project: "shop",
-		Generation: "01j9zc2q8x7w4t6y3r5e1v9k0p", Agent: "sbx-kit-claude", Repos: repos}}
+	f := handoff.File{Schema: handoff.Field, Kind: k, CreatedAt: base.Add(d), Project: "shop",
+		Generation: "01j9zc2q8x7w4t6y3r5e1v9k0p", Agent: "sbx-kit-claude", Repos: repos}
 	if k.Narrative() {
 		f.Body = narrativeBody
 	}

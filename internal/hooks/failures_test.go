@@ -59,3 +59,18 @@ func TestFailuresSkipsWhatItCannotTrust(t *testing.T) {
 	assert.Contains(t, err.Error(), "pre-push-0000000000000000.json")
 	assert.Contains(t, err.Error(), "pre-commit-1111111111111111.json")
 }
+
+func TestFailuresOfTheSessionHooks(t *testing.T) {
+	dir := t.TempDir()
+	start := hooks.Failure{At: clock, ExitCode: 1, Hook: hooks.SessionStart, Message: "the memory dir is gone", Repo: "", Stage: "julieta handoff show --hook"}
+	end := hooks.Failure{At: clock.Add(time.Minute), ExitCode: 1, Hook: hooks.SessionEnd, Message: "git failed", Repo: "api", Stage: "julieta handoff write --facts"}
+	require.NoError(t, hooks.Record(dir, start))
+	require.NoError(t, hooks.Record(dir, end))
+	got, err := hooks.Failures(dir)
+	require.NoError(t, err)
+	assert.Equal(t, []hooks.Failure{start, end}, got, "the message survives, and a failure with no repo is a failure")
+	require.NoError(t, hooks.Clear(dir, "", hooks.SessionStart))
+	got, err = hooks.Failures(dir)
+	require.NoError(t, err)
+	assert.Equal(t, []hooks.Failure{end}, got)
+}

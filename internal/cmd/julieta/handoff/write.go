@@ -176,8 +176,8 @@ func writeHandoff(ctx context.Context, env *cli.Env, repo string, kind hf.Kind, 
 	if err != nil {
 		return File{}, label, err
 	}
-	file := hf.File{Front: hf.Front{Schema: hf.Field, Kind: kind, CreatedAt: now, Project: sb.m.Project,
-		Generation: sb.m.Generation, Agent: sb.m.Agent, Repos: facts}, Body: body}
+	file := hf.File{Schema: hf.Field, Kind: kind, CreatedAt: now, Project: sb.m.Project,
+		Generation: sb.m.Generation, Agent: sb.m.Agent, Repos: facts, Body: body}
 	data, err := hf.Encode(file)
 	if err != nil {
 		return File{}, label, err
