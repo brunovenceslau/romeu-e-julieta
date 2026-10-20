@@ -10,11 +10,9 @@ ticks T035, T145 and T146).
 1. The next swap of ADR 0038, the ssh-agent listing of `internal/signing`
    (signing surface, ask first), per
    "hand-written-code-a-maintained-library-could-replace".
-2. Accept ADR 0039, with its supersedes lines for ADR 0001 (operator
-   item 5).
-3. The rest of the ready list (`go run ./tools/ci plan --ready`); T111
+2. The rest of the ready list (`go run ./tools/ci plan --ready`); T111
    waits for T054, T059, T060 and T078.
-4. T112 lands through the sessions of the config and kit repositories
+3. T112 lands through the sessions of the config and kit repositories
    ("t112-in-the-config-and-kit-repositories").
 
 ## Open for the operator
@@ -36,18 +34,13 @@ One block, a recommendation each. Decisions of 2026-10-19 are in
    writes a line ("the-spec-catches-up-with-the-hardening-of-t127-t143-and-t144").
    Recommended: a line on a channel the infrastructure classifier does
    not read, such as a job annotation, so a poisoned cache shows.
-5. Accept ADR 0039. Recommended: with its supersedes lines, in a
-   one-line pull request.
-6. ADR 0021, keep memory as plain per-repo files, is merged but still
-   Proposed, and T035 now builds on it. Recommended: accept it, in a
-   one-line pull request.
-7. Paste the ADR 0039 prompt into the payload's session
+5. Paste the ADR 0039 prompt into the payload's session
    ("rules-to-move-when-the-interim-payload-is-retired"). Recommended:
    today.
 
 ## In flight
 
-- Nothing besides this checkpoint.
+- Nothing.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.

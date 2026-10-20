@@ -4,12 +4,9 @@ Date: 2026-10-20
 
 ## Status
 
-Proposed
+Accepted
 
-It becomes Accepted in a later pull request, which adds the
-`Supersedes in part` line for rule 9 of
-[ADR 0001, adopt a documentation standard with checkable rules and a voice](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
-here and the matching `Superseded in part by` line there.
+Supersedes in part [1. Adopt a documentation standard with checkable rules and a voice](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md) (rule 9)
 
 ## Context
 
@@ -56,7 +53,7 @@ is named in the pending note of Consequences.
 
 ## Decision
 
-Proposed on 2026-10-20: rule 9 of ADR 0001 gains one more sentence.
+Decided on 2026-10-20: rule 9 of ADR 0001 gains one more sentence.
 **[review]** Every decision record states its scope in its Context,
 after what is at stake, and a decision note under
 `docs/handoff/decisions/` in its first paragraph, after the stakes: a
