@@ -14,4 +14,7 @@ happens if the decision is wrong or fails, and how hard that is to undo
 [ADR 0001, adopt a documentation standard with checkable rules and a voice](../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
 as
 [ADR 0037, state what is at stake in every decision record](../adr/0037-state-what-is-at-stake-in-every-decision-record.md)
-amends it).
+amends it). It also states its scope (this session, this repository,
+every repository and sandbox of the maintainer, or every adopter) and,
+for a scope wider than this repository, where else the rule is written
+([ADR 0039, state the scope of every decision record](../adr/0039-state-the-scope-of-every-decision-record.md)).

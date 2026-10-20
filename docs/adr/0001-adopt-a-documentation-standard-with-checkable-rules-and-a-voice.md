@@ -15,6 +15,8 @@ Superseded in part by [ADR 0013, admit Excalidraw scenes as diagrams under docs/
 
 Superseded in part by [37. State what is at stake in every decision record](0037-state-what-is-at-stake-in-every-decision-record.md) (rule 9)
 
+Superseded in part by [39. State the scope of every decision record](0039-state-the-scope-of-every-decision-record.md) (rule 9)
+
 ## Context
 
 In Shakespeare's play, Romeo and Juliet do not die for lack of a plan.
