@@ -23,5 +23,17 @@ Found by the security audit of T051 on 2026-10-20, in
   `Status` with `smudge` added closes it, and REQ-0463's claim that
   every program-running key is neutralized holds again for sandbox mode.
 
+Found by the security audit of the spec catch-up on 2026-10-20, by
+reading `internal/gitsafe`:
+
+- `filterOverrides` (`status.go`) keeps a driver name only when the
+  last dot is past the first byte, so `[filter ""]` (key
+  `filter..clean`) is not emptied, though git lists it and runs it;
+  plain git 2.53.0 ran such a driver. `i >= 0` and a `filter..clean`
+  plant close it.
+- A sandbox `Clone` checks out HEAD with no filter override, so it can
+  run `smudge` and `process` from the sandbox's global config; not
+  reproduced.
+
 Reopen: before `julieta setup` runs anywhere with more trust than the
 agent, or as a `gitsafe` task (approval line) next in M1.

@@ -68,14 +68,19 @@ the gitHosts allowlist did not see.
   running a program: the `http.*` keys (a proxy, TLS verification, a
   header) and a symbolic ref planted in a fetch destination. The list
   above still neutralizes every key that makes git run a program
-  (decided 2026-10-16), so trusted config never becomes a way to run
-  code. The filter drivers are the one case the list cannot name:
-  `filter.<name>.clean`, `.smudge` and `.process` have a dynamic
-  `<name>`, so a verb whose git command can run a filter first lists
+  but the filter drivers below (decided 2026-10-16), so trusted config
+  never becomes a way to run code. The filter drivers are the one case
+  the list cannot name: `filter.<name>.clean`, `.smudge` and
+  `.process` have a dynamic `<name>`, so a verb whose git command can run a filter first lists
   the drivers the config defines (`git config --get-regexp`, which
   reads every config file the mode lets git read and the files they
   include) and runs its command with each driver's commands empty
-  and `required` false, through `GIT_CONFIG_COUNT`.
+  and `required` false, through `GIT_CONFIG_COUNT`; a driver written
+  between the listing and the command is not emptied, which only a
+  process that can already write the config can do. `Status` empties
+  `clean` and `process`; `FastForward` and the sandbox `Clone`, whose
+  checkouts can run `smudge`, do not yet empty any, and `Status` skips
+  a driver with an empty name (`[filter ""]`).
 - `REQ-0464` Credentials: only `-c credential.helper=<host settings value>` when
   `tools.gitCredentialHelper` is set; a `gitHosts[].caFile` becomes
   `-c http.sslCAInfo=<path>` for that host only (also how the E2E
