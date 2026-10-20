@@ -157,7 +157,12 @@ func TestWriteFactsWaitsForTheStoreLock(t *testing.T) {
 		code, stdout, stderr := s.run(t.Context(), "", "handoff", "write", "--facts")
 		done <- fmt.Sprintf("%d %s %s", code, stdout, stderr)
 	}()
-	assert.Equal(t, lock, <-waiting, "the command met the held lock of its target dir")
+	select {
+	case l := <-waiting:
+		assert.Equal(t, lock, l, "the command met the held lock of its target dir")
+	case <-time.After(30 * time.Second):
+		t.Fatal("the command never met the held lock: it does not take the store lock of its target dir")
+	}
 	select {
 	case got := <-done:
 		t.Fatalf("handoff write --facts finished while the store lock was held: %s", got)
@@ -165,7 +170,12 @@ func TestWriteFactsWaitsForTheStoreLock(t *testing.T) {
 	}
 	assert.Empty(t, s.names(t, 0), "nothing written while the lock is held")
 	require.NoError(t, unix.Flock(int(lf.Fd()), unix.LOCK_UN))
-	got := <-done
+	var got string
+	select {
+	case got = <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the command did not finish after the lock was released")
+	}
 	assert.True(t, strings.HasPrefix(got, "0 wrote "), got)
 	assert.Len(t, s.names(t, 0), 1)
 	mu.Lock()
@@ -173,7 +183,17 @@ func TestWriteFactsWaitsForTheStoreLock(t *testing.T) {
 	mu.Unlock()
 
 	// The lock is released at exit: this run does not wait.
-	s.ok(t, "", "handoff", "write", "--facts")
+	again := make(chan string, 1)
+	go func() {
+		code, stdout, stderr := s.run(t.Context(), "", "handoff", "write", "--facts")
+		again <- fmt.Sprintf("%d %s %s", code, stdout, stderr)
+	}()
+	select {
+	case got := <-again:
+		assert.True(t, strings.HasPrefix(got, "0 wrote "), got)
+	case <-time.After(30 * time.Second):
+		t.Fatal("the lock was not released at exit: a second write waits for it")
+	}
 }
 
 // TestWriteKeepsTheNewestFiftyFacts: after each facts write the newest
