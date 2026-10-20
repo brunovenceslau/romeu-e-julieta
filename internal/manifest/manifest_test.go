@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json/jsontext"
 	"errors"
 	"os"
 	"reflect"
@@ -236,6 +237,18 @@ func TestEncodeRefusesTextThatIsNotUTF8(t *testing.T) {
 		m.Run = map[string]any{s: 1}
 		_, err = Encode(m)
 		require.ErrorIs(t, err, canon.ErrInvalidText)
+	}
+}
+
+// TestEncodeRefusesANumberOutOfRange: a run value whose own JSON is a
+// number beyond the float64 range, or one a float64 flushes to zero, is
+// refused as canon refuses it, not written as the largest float64 or 0.
+func TestEncodeRefusesANumberOutOfRange(t *testing.T) {
+	for _, n := range []string{"1e400", "-1e400", "1e-400"} {
+		m := valid(t)
+		m.Run = map[string]any{"n": jsontext.Value(n)}
+		_, err := Encode(m)
+		require.ErrorIs(t, err, canon.ErrNumberRange, n)
 	}
 }
 

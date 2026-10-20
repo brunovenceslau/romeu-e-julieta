@@ -12,6 +12,7 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -120,6 +121,8 @@ func TestCanonicalJSON(t *testing.T) {
 		{"numbers of MarshalJSON in their one form", raw(`[1,1.0,1e0,-0,4.50,2e-3,1E30,0.000001,1e-7]`), `[1,1,1,0,4.5,0.002,1e+30,0.000001,1e-7]`},
 		{"integer of MarshalJSON above 2^53 kept exact", raw(`[9007199254740993,-12345678901234567890]`), `[9007199254740993,-12345678901234567890]`},
 		{"float above 2^53 in its ecmascript form", float64(1 << 60), `1152921504606847000`},
+		{"numbers that round, not clamp, kept in their float64 form", raw(`[9007199254740993.0,5e-324,3e-324,1.7976931348623157e308,0e5,-0.0e-400]`),
+			`[9007199254740992,5e-324,5e-324,1.7976931348623157e+308,0,0]`},
 		{"empty object", map[string]int{}, `{}`},
 		{"null", nil, `null`},
 		{"bytes as base64", []byte{0, 1, 2}, `"AAEC"`},
@@ -129,7 +132,7 @@ func TestCanonicalJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := canonicalJSON(tt.value)
+			got, err := CanonicalJSON(tt.value)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, string(got))
 		})
@@ -161,6 +164,12 @@ func TestDigestRefuses(t *testing.T) {
 		{"invalid utf-8 in a key", anyValue{map[string]int{"k\xfe": 1}}, "U+FFFD"},
 		{"a lone surrogate from MarshalJSON", raw(`["\ud800"]`), "U+FFFD"},
 		{"a U+FFFD the value holds", anyValue{"a\ufffd"}, "U+FFFD"},
+		{"a time.Duration, which v2 has no form for", anyValue{time.Second}, "time.Duration"},
+		{"a number beyond the float64 range", raw(`[1e400]`), "beyond the float64 range"},
+		{"a negative number beyond the float64 range", raw(`{"n":-1e400}`), "beyond the float64 range"},
+		{"a number far beyond the float64 range", raw(`1e500`), "beyond the float64 range"},
+		{"an integer beyond the float64 range", raw(`1` + strings.Repeat("0", 400)), "beyond the float64 range"},
+		{"a number flushed to zero", raw(`[1e-400]`), "flushed to zero"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -247,5 +256,16 @@ func TestDigestOfTwoInvalidStringsIsNoDigest(t *testing.T) {
 	for _, s := range []string{"a\xff", "a\xfe"} {
 		_, err := Digest(MemoryContent, anyValue{s})
 		require.ErrorIs(t, err, ErrInvalidText, "%q", s)
+	}
+}
+
+// TestDigestOfANumberOutOfRangeIsNoDigest: RFC 8785 would write each of
+// these numbers as the largest float64 or as 0, so two of them would
+// share a digest; Digest refuses each as ErrNumberRange.
+func TestDigestOfANumberOutOfRangeIsNoDigest(t *testing.T) {
+	t.Parallel()
+	for _, n := range []string{"1e400", "-1e400", "1e500", "1e-400", "-2.5e-400"} {
+		_, err := Digest(MemoryContent, raw(n))
+		require.ErrorIs(t, err, ErrNumberRange, n)
 	}
 }

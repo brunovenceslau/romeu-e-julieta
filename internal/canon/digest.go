@@ -7,8 +7,9 @@
 // A structured value is digested with Digest: sha256 over
 // "romeu/<kind>/v1", a NUL byte and the canonical JSON of the value, the
 // RFC 8785 form of encoding/json/jsontext. The kind is in the digest's
-// type, Sum, so digests of two kinds never compare. Raw file bytes are not digested here: they use plain sha256,
-// which sha256sum and shasum reproduce.
+// type, Sum, so digests of two kinds never compare. Raw file bytes are
+// not digested here: they use plain sha256, which sha256sum and shasum
+// reproduce.
 //
 // Every ULID the product writes comes from NewULID, in lowercase
 // Crockford base32, and ParseULID refuses any other spelling.
@@ -23,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -36,6 +39,12 @@ var ErrKind = errors.New("canon: not a kind of the table")
 // MarshalJSON method's lone surrogate, as U+FFFD, so two strings that
 // differ in those bytes would share one digest.
 var ErrInvalidText = errors.New("canon: a string holds U+FFFD, the mark of text that is not UTF-8")
+
+// ErrNumberRange is the error of a number that a MarshalJSON method
+// writes beyond the float64 range, or so small that a float64 flushes
+// it to zero: RFC 8785 would write the largest float64 or 0 for it, so
+// two different numbers would share one digest.
+var ErrNumberRange = errors.New("canon: a number out of the float64 range")
 
 // ErrInvalidDigest is the error of a digest text that is not 64
 // lowercase hexadecimal digits.
@@ -76,23 +85,16 @@ func notLowerHex(r rune) bool {
 // v declares its one kind (Input), so the kind argument names at the
 // call site what the type already fixes.
 //
-// The canonical JSON is what encoding/json/v2 writes for v, nil lists
-// and maps as null, canonicalized by RFC 8785 (the JSON Canonicalization
-// Scheme): keys sorted by their UTF-16 code units, numbers in the
-// ECMAScript form, so 1 and 1.0 have one digest, minimal string escapes
-// and no insignificant whitespace; an integer beyond 2^53 keeps its
-// digits, which RFC 8785 would round. Digest fails on a value
-// encoding/json/v2 cannot write, on an object with a duplicate key,
-// which only a MarshalJSON method can write, on a kind value other than
-// its constant (ErrKind), and on a string or key that holds U+FFFD
-// (ErrInvalidText): text that is not UTF-8 becomes U+FFFD on the way,
-// and a digest that two different strings share would let a gate pass
-// the one it never saw.
+// The canonical JSON is CanonicalJSON's. v is marshaled by
+// encoding/json/v2, under its rules: omitempty omits a member whose JSON
+// is null, "", {} or [], and a time.Duration, which v2 has no form for,
+// is refused. Digest fails on a value CanonicalJSON refuses and on a
+// kind value other than its constant (ErrKind).
 func Digest[K Kind, T Input[K]](kind K, v T) (Sum[K], error) {
 	if !known(kind) {
 		return Sum[K]{}, fmt.Errorf("%w: %q", ErrKind, clip(string(kind)))
 	}
-	data, err := canonicalJSON(v)
+	data, err := CanonicalJSON(v)
 	if err != nil {
 		return Sum[K]{}, fmt.Errorf("canon: digest %s: %w", string(kind), err)
 	}
@@ -100,12 +102,24 @@ func Digest[K Kind, T Input[K]](kind K, v T) (Sum[K], error) {
 	return Sum[K](sha256.Sum256(preimage)), nil
 }
 
-// canonicalJSON returns the canonical JSON of v, as Digest describes
-// it. The writer turns text that is not UTF-8, and a lone surrogate of a
-// MarshalJSON method, into U+FFFD and lets a duplicate key through, so
-// that checkText refuses the first as ErrInvalidText before Canonicalize
-// refuses the second.
-func canonicalJSON(v any) ([]byte, error) {
+// CanonicalJSON returns the canonical JSON of v (03 3.12): what
+// encoding/json/v2 writes for v, nil lists and maps as null, in the form
+// of RFC 8785, the JSON Canonicalization Scheme: keys sorted by their
+// UTF-16 code units, minimal string escapes with U+2028 and U+2029 as
+// they are, no insignificant whitespace, and a number with a fraction or
+// an exponent in its float64 ECMAScript form, so 1.0 and 1e0 are 1 and
+// -0 is 0; an integer keeps its digits, which RFC 8785 would round
+// beyond 2^53.
+//
+// It refuses a value encoding/json/v2 cannot write (NaN, an infinity, a
+// channel, a time.Duration), an object with a duplicate key, which only
+// a MarshalJSON method can write, a number a MarshalJSON method writes
+// that is out of the float64 range or that float64 flushes to zero
+// (ErrNumberRange), and a string or key that holds U+FFFD
+// (ErrInvalidText): text that is not UTF-8 becomes U+FFFD on the way.
+// Each of these would let two different values share one digest, and a
+// gate pass the one it never saw.
+func CanonicalJSON(v any) ([]byte, error) {
 	data, err := json.Marshal(v, json.Deterministic(true),
 		json.FormatNilSliceAsNull(true), json.FormatNilMapAsNull(true),
 		jsontext.AllowInvalidUTF8(true), jsontext.AllowDuplicateNames(true))
@@ -123,10 +137,24 @@ func canonicalJSON(v any) ([]byte, error) {
 }
 
 // checkText refuses a string or key of the JSON data that holds U+FFFD
-// (ErrInvalidText).
+// (ErrInvalidText), and a number Canonicalize would clamp to the largest
+// float64 or flush to zero (ErrNumberRange). It reads the writer's
+// output before Canonicalize, so each number is checked in the text the
+// writer gave it, and it lets a duplicate key through, so that the
+// invalid text of two keys that become one is ErrInvalidText.
 func checkText(data []byte) error {
 	dec := jsontext.NewDecoder(bytes.NewReader(data), jsontext.AllowDuplicateNames(true))
 	for {
+		if dec.PeekKind() == '0' {
+			num, err := dec.ReadValue()
+			if err != nil {
+				return err
+			}
+			if err := checkNumber(string(num)); err != nil {
+				return err
+			}
+			continue
+		}
 		tok, err := dec.ReadToken()
 		if errors.Is(err, io.EOF) {
 			return nil
@@ -140,6 +168,27 @@ func checkText(data []byte) error {
 			}
 		}
 	}
+}
+
+// checkNumber refuses the JSON number text that is out of the float64
+// range, which Canonicalize would write as the largest float64, and the
+// one whose mantissa holds a digit other than zero but that float64
+// flushes to zero, which Canonicalize would write as 0 (ErrNumberRange).
+// A number that rounds to a subnormal float64, or to another float64,
+// is kept: that is the one form of RFC 8785.
+func checkNumber(text string) error {
+	f, err := strconv.ParseFloat(text, 64)
+	switch {
+	case errors.Is(err, strconv.ErrRange) && math.IsInf(f, 0):
+		return fmt.Errorf("%w: %s is beyond the float64 range", ErrNumberRange, clip(text))
+	case err != nil:
+		return fmt.Errorf("canon: the number %s: %w", clip(text), err)
+	}
+	mantissa, _, _ := strings.Cut(strings.ToLower(text), "e")
+	if f == 0 && strings.ContainsAny(mantissa, "123456789") {
+		return fmt.Errorf("%w: %s is flushed to zero in a float64", ErrNumberRange, clip(text))
+	}
+	return nil
 }
 
 // clipLen is the most bytes of an input that an error message quotes.
