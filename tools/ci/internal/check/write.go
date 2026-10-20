@@ -65,12 +65,3 @@ func WriteIfChanged(root *os.Root, path string, content []byte) (bool, error) {
 	}
 	return true, nil
 }
-
-// removeIfExists removes the file at path below root, and is not an
-// error when there is none.
-func removeIfExists(root *os.Root, path string) error {
-	if err := root.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	return nil
-}
