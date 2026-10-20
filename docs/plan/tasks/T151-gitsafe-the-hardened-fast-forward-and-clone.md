@@ -10,7 +10,6 @@ owns:
   - internal/gitsafe/status*.go
   - internal/gitsafe/gitsafe_test.go
   - internal/gitsafe/helper_test.go
-  - docs/spec/05-security.md
   - docs/spec/04-cli.md
   - docs/handoff/pending/gitsafe-s-fast-forward-overwrites-ignored-files-and-runs.md
 needs:
@@ -75,7 +74,9 @@ signature, which program-running keys sandbox mode neutralizes and
 that the transport keys stay the sandbox's own, and the precondition
 that no other process writes the config between the listing of the
 drivers and the command; REQ-0399 (04 4.3) counts an ignored file the
-move would overwrite as a refused fast-forward.
+move would overwrite as a refused fast-forward. `owns` does not list
+`docs/spec/05-security.md`, which the open task T039 (M3) owns: T151
+amends one requirement there and must not wait for T039.
 
 - Implements: none: the hardening serves REQ-0399 and REQ-0463, which
   T051 and T023 implement.
