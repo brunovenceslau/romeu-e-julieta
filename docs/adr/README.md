@@ -53,3 +53,4 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 35 | [Show lessons to the owner with a pager that runs nothing](0035-show-lessons-to-the-owner-with-a-pager-that-runs-nothing.md) | Proposed |
 | 36 | [Keep the forbidden names as a convenience list in the config repository](0036-keep-the-forbidden-names-as-a-convenience-list-in-the-config-repository.md) | Accepted |
 | 37 | [State what is at stake in every decision record](0037-state-what-is-at-stake-in-every-decision-record.md) | Accepted |
+| 38 | [Search for a maintained library before writing one](0038-search-for-a-maintained-library-before-writing-one.md) | Proposed |
