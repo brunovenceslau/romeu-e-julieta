@@ -9,8 +9,8 @@ were renamed to `<id>-<slug>.md` in the pull request before this one.
 
 ## Next steps
 
-1. T078 (skills): built and pushed, not reviewed; code review, then its
-   pull request with the `kits` approval line.
+1. T078 (skills): code review, then its pull request ("T078 awaits its
+   review and pull request", 01m5daf06ddqsdsh6m5cn71wx6).
 2. Plan one `gitsafe` task for "gitsafe verbs for the snapshot bundle"
    (01m5d7v42kv79hf42g15ffgk59) and "gitsafe verbs for the global hooks
    path and the dirty count" (01m5d7v43hd4hsw60e4bhek3pw); then re-plan
