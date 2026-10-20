@@ -19,8 +19,8 @@ library was not checked online. In the order of ADR 0038, decision 5:
 3. Done by T146 (#202) on 2026-10-20: the atomic writes come from
    `github.com/google/renameio/v2`; the two sites kept by hand, with
    their reasons, are in T146.
-4. Decided on 2026-10-20: the store lock of T035 stays on
-   `golang.org/x/sys/unix` flock, so it leaves this list.
+4. Decided on 2026-10-20: not a swap. The store lock of T035 stays on
+   `golang.org/x/sys/unix` flock; no task.
 5. The schema generator, `tools/schemagen`: `github.com/invopop/jsonschema`
    (03-formats says "no dependency"; read again under ADR 0038, 3).
 6. The glob matcher of `tools/ci/internal/askfirst`:

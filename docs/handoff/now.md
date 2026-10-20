@@ -11,7 +11,8 @@ open as #203.
 2. The next swap of ADR 0038, the ssh-agent listing of `internal/signing`
    (signing surface, ask first), per
    "hand-written-code-a-maintained-library-could-replace".
-3. ADR 0039 accepted, with its supersedes lines for ADR 0001.
+3. Accept ADR 0039, with its supersedes lines for ADR 0001 (operator
+   item 6).
 4. The rest of the ready list (`go run ./tools/ci plan --ready`); T111
    waits for T054, T059, T060, T078 and T035.
 5. T112 lands through the sessions of the config and kit repositories
