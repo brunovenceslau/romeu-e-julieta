@@ -48,7 +48,9 @@ it:
   set the global `core.hooksPath`: `internal/gitsafe` has no verb that
   writes the sandbox's global git config, and git runs only through
   gitsafe. Acceptance row 3 stays open until that verb lands; the e2e
-  case sets the key itself, in one marked line. Reopened by that verb.
+  case sets the key itself, in one marked line. Decided on 2026-10-20:
+  a task on the `gitsafe` surface adds that verb after T151, and
+  `installDispatcher` calls it. Reopened by that verb.
 - The command ends with the status of the stage that stopped the chain
   through a package seam over `os.Exit`, because `cli.Report` prints an
   error block for every error and the stage has printed its line.
