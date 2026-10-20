@@ -23,7 +23,7 @@ var _ = register(section{
 		rep.Egress = append(rep.Egress, src.m.Egress...)
 		slices.Sort(rep.Egress)
 	},
-	text: func(out *cli.Writer, rep *Report) error {
+	text: func(out, _ *cli.Writer, rep *Report) error {
 		_, err := fmt.Fprintf(out, "project  %s\nspec     %s\negress   %s\n", rep.Project, rep.SpecCommit, strings.Join(rep.Egress, " "))
 		return err
 	},

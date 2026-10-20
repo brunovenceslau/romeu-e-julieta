@@ -113,5 +113,5 @@ step tip git -C /tmp/srv/api.git rev-parse main
 	require.Equal(t, 0, r.code, r.stderr)
 	assert.True(t, strings.HasPrefix(r.stdout, "project  shop\nspec     "+strings.Repeat("ab", 20)+"\negress   dl.google.com github.com\nrepo api  "+primaryPath+"\n"), r.stdout)
 	assert.Contains(t, r.stdout, "  dirty      untracked\n")
-	assert.Contains(t, r.stdout, "\nwarning default-branch-moved: api ")
+	assert.True(t, strings.HasPrefix(r.stderr, "warning default-branch-moved: api "), "warnings go to stderr: %q", r.stderr)
 }

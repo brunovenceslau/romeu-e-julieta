@@ -25,13 +25,15 @@ type source struct {
 }
 
 // section is one section of the report of julieta status: fill sets
-// its fields of the report, and text prints them; order places it in
-// the text, lowest first.
+// its fields of the report, and text prints them, the report to out
+// and the warnings to errOut, the CLI writer of stderr, where every
+// warning goes (04 4.1, Output and Warnings; cli.Warn); order places
+// it in the text, lowest first.
 type section struct {
 	name  string
 	order int
 	fill  func(ctx context.Context, src *source, rep *Report)
-	text  func(out *cli.Writer, rep *Report) error
+	text  func(out, errOut *cli.Writer, rep *Report) error
 }
 
 // sections is the registry of the report sections, an unordered set

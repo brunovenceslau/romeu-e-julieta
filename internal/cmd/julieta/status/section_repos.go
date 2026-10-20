@@ -28,7 +28,7 @@ var _ = register(section{
 			rep.Repos = append(rep.Repos, readRepo(ctx, src, m))
 		}
 	},
-	text: func(out *cli.Writer, rep *Report) error {
+	text: func(out, _ *cli.Writer, rep *Report) error {
 		for _, r := range rep.Repos {
 			if err := repoText(out, r); err != nil {
 				return err

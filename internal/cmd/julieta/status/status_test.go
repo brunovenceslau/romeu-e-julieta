@@ -113,7 +113,7 @@ func TestStatusGoesOnPastAnUnreadableRepo(t *testing.T) {
 }
 
 // TestStatusShowsAFailedFetch shows the warning fetch-failed setup
-// recorded, in the text form as on stderr of setup.
+// recorded, on stderr in the text form, as setup prints it.
 func TestStatusShowsAFailedFetch(t *testing.T) {
 	s := newSandbox(t)
 	s.m.Repos[0].URL = s.url + "gone.git"
@@ -122,7 +122,8 @@ func TestStatusShowsAFailedFetch(t *testing.T) {
 	require.Equal(t, 0, code, stderr)
 	code, stdout, stderr := julieta(t.Context(), "status")
 	require.Equal(t, 0, code, stderr)
-	assert.Contains(t, stdout, "\nwarning fetch-failed: api: ")
+	assert.True(t, strings.HasPrefix(stderr, "warning fetch-failed: api: "), stderr)
+	assert.NotContains(t, stdout, "warning")
 	assert.True(t, strings.HasPrefix(stdout, "project  shop\nspec     "+s.m.SpecCommit+"\negress   dl.google.com github.com\nrepo api  "+s.primary()+"\n"), stdout)
 	assert.Contains(t, stdout, "  branch     main ")
 	assert.Contains(t, stdout, "  dirty      clean\n")

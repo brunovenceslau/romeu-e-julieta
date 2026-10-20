@@ -75,7 +75,7 @@ func status(ctx context.Context, env *cli.Env) error {
 		}
 	}
 	for _, s := range sections {
-		if err := s.text(env.Stdout, &rep); err != nil {
+		if err := s.text(env.Stdout, env.Stderr, &rep); err != nil {
 			return err
 		}
 	}
