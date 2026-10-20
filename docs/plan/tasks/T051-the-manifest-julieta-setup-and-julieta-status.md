@@ -9,6 +9,7 @@ owns:
   - internal/cmd/julieta/status/**
   - internal/cmd/julieta/all/import_setup.go
   - internal/cmd/julieta/all/import_status.go
+  - internal/cmd/julieta/all/doc.go
   - e2e/julieta_setup_test.go
   - e2e/julieta_status_test.go
   - tools/ci/internal/schema/julieta.go
@@ -63,6 +64,9 @@ shows N accepted and 0 and N+1 refused, and N-1 stays with T135's unit
 test of `acceptsProtocol` until a second protocol exists. The task also
 owns `.gitattributes`, for the `-text` line of each generated output
 it adds (two reference pages and two schemas), as T008 and T009 did.
+A command with a schema'd output type adds a type alias of it to its
+import file, so `tools/ci` reaches it through `all` (REQ-0971); the
+task owns `internal/cmd/julieta/all/doc.go`, whose comment says so.
 
 - Implements: REQ-0006 (index), REQ-0016 (index), REQ-0035 (00 0.4),
   REQ-0037 (00 0.4), REQ-0049 (01 1.2), REQ-0051 (01 1.2), REQ-0152 (02
