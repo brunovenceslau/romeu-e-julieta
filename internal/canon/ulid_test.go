@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -243,7 +244,11 @@ func TestNewULIDCarriesPastTheLowerByte(t *testing.T) {
 	assert.Equal(t, oracle(5, append([]byte{1}, make([]byte, 9)...)), id.String())
 }
 
-func TestCanonUsesTheStandardLibraryAlone(t *testing.T) {
+// admittedImports are the imports outside the standard library that
+// canon may hold: the ULID library of ADR 0038 (T145), by name.
+var admittedImports = []string{"github.com/oklog/ulid/v2"}
+
+func TestCanonUsesTheStandardLibraryAndTheAdmittedImports(t *testing.T) {
 	t.Parallel()
 	files, err := filepath.Glob("*.go")
 	require.NoError(t, err)
@@ -257,6 +262,9 @@ func TestCanonUsesTheStandardLibraryAlone(t *testing.T) {
 		require.NoError(t, err)
 		for _, imp := range parsed.Imports {
 			path := strings.Trim(imp.Path.Value, `"`)
+			if slices.Contains(admittedImports, path) {
+				continue
+			}
 			first, _, _ := strings.Cut(path, "/")
 			assert.NotContains(t, first, ".", "%s imports %s", file, path)
 		}
@@ -372,4 +380,28 @@ func FuzzParseULID(f *testing.F) {
 			t.Fatalf("ParseULID(%q).String() = %q", s, id.String())
 		}
 	})
+}
+
+// TestULIDTextMatchesTheLibrary holds the text and the parse of canon
+// equal to the library's for a fixed set of ids, so the wrapper cannot
+// drift from it: String is the library's text lowercased, and ParseULID
+// reads every lowercase text as the library does.
+func TestULIDTextMatchesTheLibrary(t *testing.T) {
+	t.Parallel()
+	src := NewULIDSource(rand.Reader)
+	ids := []ULID{{}, ULID(bytes.Repeat([]byte{0xff}, 16))}
+	for i := range 64 {
+		id, err := NewULID(time.UnixMilli(1_700_000_000_000+int64(i)*7919), src)
+		require.NoError(t, err)
+		ids = append(ids, id)
+	}
+	for _, id := range ids {
+		lib := ulid.ULID(id)
+		require.Equal(t, strings.ToLower(lib.String()), id.String())
+		parsed, err := ParseULID(id.String())
+		require.NoError(t, err)
+		want, err := ulid.ParseStrict(id.String())
+		require.NoError(t, err)
+		require.Equal(t, ULID(want), parsed)
+	}
 }

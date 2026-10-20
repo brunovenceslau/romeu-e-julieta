@@ -3,6 +3,7 @@ module github.com/brunovenceslau/romeu-e-julieta
 go 1.27.2
 
 require (
+	github.com/oklog/ulid/v2 v2.1.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
