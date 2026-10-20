@@ -39,10 +39,7 @@ One block, a recommendation each. Decisions of 2026-10-19 are in
    ("gitsafe-s-fast-forward-overwrites-ignored-files-and-runs"):
    a task on the `gitsafe` surface. Recommended: before `julieta setup`
    runs in daily use, since it can overwrite an ignored file unasked.
-5. Paste the prompt of "library-first-in-the-sandbox-payload" into the
-   session of the payload's source repository, so ADR 0038 holds in
-   every repository. Recommended: today.
-6. Whether the removal of a corrupted cache entry in the container e2e
+5. Whether the removal of a corrupted cache entry in the container e2e
    writes a line ("the-spec-catches-up-with-the-hardening-of-t127-t143-and-t144").
    Recommended: a line on a channel the infrastructure classifier does
    not read, such as a job annotation, so a poisoned cache shows.
