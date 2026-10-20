@@ -85,18 +85,25 @@ func TestStatusWorkingTreeRealGit(t *testing.T) {
 		},
 		"staged": {
 			change: func(t *testing.T, dir string) {
+				t.Helper()
 				writeFile(t, dir, "a", "staged\n")
 				plainGit(t, dir, "add", "a")
 			},
 			want: func(head string) Status { return Status{Branch: "refs/heads/main", OID: head, Staged: true} },
 		},
 		"unstaged": {
-			change: func(t *testing.T, dir string) { writeFile(t, dir, "a", "changed\n") },
-			want:   func(head string) Status { return Status{Branch: "refs/heads/main", OID: head, Unstaged: true} },
+			change: func(t *testing.T, dir string) {
+				t.Helper()
+				writeFile(t, dir, "a", "changed\n")
+			},
+			want: func(head string) Status { return Status{Branch: "refs/heads/main", OID: head, Unstaged: true} },
 		},
 		"untracked": {
-			change: func(t *testing.T, dir string) { writeFile(t, dir, "new", "x\n") },
-			want:   func(head string) Status { return Status{Branch: "refs/heads/main", OID: head, Untracked: true} },
+			change: func(t *testing.T, dir string) {
+				t.Helper()
+				writeFile(t, dir, "new", "x\n")
+			},
+			want: func(head string) Status { return Status{Branch: "refs/heads/main", OID: head, Untracked: true} },
 		},
 	}
 	for name, f := range fixtures {
