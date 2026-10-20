@@ -3,7 +3,7 @@ id: T149
 title: "The digests in the RFC 8785 form"
 milestone: M1
 module: canon
-fate: new
+fate: merged
 owns:
   - internal/canon/digest.go
   - internal/canon/digest_test.go
@@ -17,9 +17,14 @@ after: []
 ask_first:
   - digests
 sitting: none
+merged: 2026-10-20
+pr: 209
 ---
 
 # T149 - The digests in the RFC 8785 form
+
+Merged on 2026-10-20 in pull request #209. The text below is the one
+written when it was built.
 
 Goal: item 7 of the inventory of
 [ADR 0038, search for a maintained library before writing one](../../adr/0038-search-for-a-maintained-library-before-writing-one.md):

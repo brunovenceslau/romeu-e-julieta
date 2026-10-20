@@ -3,7 +3,7 @@ id: T148
 title: "encoding/json/v2 outside the digests"
 milestone: M1
 module: none
-fate: new
+fate: merged
 owns:
   - tools/schemagen/schemagen.go
   - tools/schemagen/schemagen_test.go
@@ -30,9 +30,14 @@ ask_first:
   - kits
   - checks
 sitting: none
+merged: 2026-10-20
+pr: 208
 ---
 
 # T148 - encoding/json/v2 outside the digests
+
+Merged on 2026-10-20 in pull request #208. The text below is the one
+written when it was built.
 
 Goal: every package outside `internal/canon` and `internal/manifest`
 reads and writes JSON with `encoding/json/v2` and `encoding/json/jsontext`,

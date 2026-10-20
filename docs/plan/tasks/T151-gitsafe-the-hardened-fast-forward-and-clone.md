@@ -3,7 +3,7 @@ id: T151
 title: "`gitsafe`: the hardened fast-forward and clone"
 milestone: M1
 module: gitsafe
-fate: new
+fate: merged
 owns:
   - internal/gitsafe/fetch*.go
   - internal/gitsafe/clone*.go
@@ -20,9 +20,14 @@ ask_first:
   - gitsafe
   - spec
 sitting: none
+merged: 2026-10-20
+pr: 210
 ---
 
 # T151 - `gitsafe`: the hardened fast-forward and clone
+
+Merged on 2026-10-20 in pull request #210. The text below is the one
+written when it was built.
 
 Goal: harden the two `gitsafe` verbs that write a checkout,
 `FastForward` and `Clone`, before `julieta setup` runs in daily use, as

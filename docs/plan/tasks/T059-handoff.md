@@ -3,7 +3,7 @@ id: T059
 title: "`handoff`"
 milestone: M1
 module: handoff
-fate: kept
+fate: merged
 owns:
   - internal/handoff/**
   - internal/cmd/julieta/handoff/**
@@ -25,9 +25,14 @@ needs:
 after: []
 ask_first: []
 sitting: none
+merged: 2026-10-20
+pr: 213
 ---
 
 # T059 - `handoff`
+
+Merged on 2026-10-20 in pull request #213. The text below is the one
+written when it was built.
 
 Goal: `handoff write|show|list`, the reader, the SessionStart print and
 its bound, the three gap-line goldens, SessionEnd and SessionStart in
