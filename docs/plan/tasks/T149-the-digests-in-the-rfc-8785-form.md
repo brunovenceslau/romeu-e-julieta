@@ -11,7 +11,7 @@ owns:
   - internal/manifest/manifest.go
   - internal/manifest/manifest_test.go
   - internal/manifest/strict_test.go
-  - docs/handoff/pending/hand-written-code-a-maintained-library-could-replace.md
+  - docs/handoff/pending/00000000008ks9tvtz3bk21p28-hand-written-code-a-maintained-library-could-replace.md
 needs: []
 after: []
 ask_first:
