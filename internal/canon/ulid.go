@@ -67,11 +67,11 @@ func ParseULID(s string) (ULID, error) {
 		return ULID{}, fmt.Errorf("%w: %q has %d bytes, not %d", ErrInvalidULID, clip(s), len(s), ulidLen)
 	}
 	if i := strings.IndexFunc(s, func(r rune) bool { return 'A' <= r && r <= 'Z' }); i >= 0 {
-		return ULID{}, fmt.Errorf("%w: %q has the uppercase %q at %d", ErrInvalidULID, s, s[i], i)
+		return ULID{}, fmt.Errorf("%w: %q has the uppercase %q at %d", ErrInvalidULID, clip(s), s[i], i)
 	}
 	id, err := ulid.ParseStrict(s)
 	if err != nil {
-		return ULID{}, fmt.Errorf("%w: %q: %w", ErrInvalidULID, s, err)
+		return ULID{}, fmt.Errorf("%w: %q: %w", ErrInvalidULID, clip(s), err)
 	}
 	return ULID(id), nil
 }
@@ -119,6 +119,9 @@ func NewULID(now time.Time, src *ULIDSource) (ULID, error) {
 		src.last = next
 		return next, nil
 	}
+	// io.LimitReader hides a ulid.MonotonicReader from ulid.New, so the
+	// library always reads the 80 bits plainly and the order of one
+	// source stays the rule above.
 	id, err := ulid.New(uint64(ms), io.LimitReader(src.entropy, 16-timeLen))
 	if err != nil {
 		return ULID{}, fmt.Errorf("canon: ulid entropy: %w", err)

@@ -67,7 +67,8 @@ tests only; the rules are in [10 10.6](10-testing-style.md#tests)),
 `github.com/spf13/cobra` with `github.com/spf13/pflag` and
 `github.com/inconshreveable/mousetrap` (the command line of both
 binaries), `github.com/oklog/ulid/v2` (the ULIDs of `internal/canon`,
-T145), and, in `internal/cli/clidoc` only, which no binary
+T145; `go.sum` pins `github.com/pborman/getopt` for its command
+alone, which no build compiles), and, in `internal/cli/clidoc` only, which no binary
 imports, `github.com/spf13/cobra/doc` with
 `github.com/cpuguy83/go-md2man/v2` and
 `github.com/russross/blackfriday/v2` (the reference pages of the
