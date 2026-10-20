@@ -80,6 +80,8 @@ type Command struct {
 	// that is not a file is copied through a pipe Run closes when the
 	// leader ends; a copy blocked in the reader itself ends only when
 	// the reader returns, and Run does not wait for it.
+	// The reader is handed over: the copy may still read it after Run
+	// returns, so the caller must not read, reuse or share it.
 	Stdin io.Reader
 	// Stdout and Stderr receive the output; nil discards it. When both
 	// are the same writer, the command writes both to one pipe, in the
