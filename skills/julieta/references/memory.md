@@ -10,10 +10,17 @@ close an entry, or when an entry went under the wrong repo.
 
 ## Find entries
 
+Search before you add: an entry that already holds the thing is better
+changed than repeated.
+
 ```sh
+julieta memory list --query 'signing'
 julieta memory list
 julieta memory show <id>
 ```
+
+`--query` filters by text; `--status open` or `--status done` filters by
+status.
 
 ## Change or close an entry
 

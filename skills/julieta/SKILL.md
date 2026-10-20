@@ -32,8 +32,9 @@ entry, put it in the handoff and open an issue labelled `deferred`, so it
 is tracked where people look.
 
 The command prints the repo it filed the entry under. Read that line: an
-entry under the wrong repo is never shown where it is needed. To find,
-change or close entries, or to file under another repo, read
+entry under the wrong repo is never shown where it is needed. To find
+entries (search before you add something that may be there already),
+change or close them, or to file under another repo, read
 [references/memory.md](references/memory.md).
 
 ## When signing a commit fails or waits
