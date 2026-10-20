@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"errors"
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -243,7 +245,11 @@ func TestNewULIDCarriesPastTheLowerByte(t *testing.T) {
 	assert.Equal(t, oracle(5, append([]byte{1}, make([]byte, 9)...)), id.String())
 }
 
-func TestCanonUsesTheStandardLibraryAlone(t *testing.T) {
+// admittedImports are the imports outside the standard library that
+// canon may hold: the ULID library of ADR 0038 (T145), by name.
+var admittedImports = []string{"github.com/oklog/ulid/v2"}
+
+func TestCanonUsesTheStandardLibraryAndTheAdmittedImports(t *testing.T) {
 	t.Parallel()
 	files, err := filepath.Glob("*.go")
 	require.NoError(t, err)
@@ -257,6 +263,9 @@ func TestCanonUsesTheStandardLibraryAlone(t *testing.T) {
 		require.NoError(t, err)
 		for _, imp := range parsed.Imports {
 			path := strings.Trim(imp.Path.Value, `"`)
+			if slices.Contains(admittedImports, path) {
+				continue
+			}
 			first, _, _ := strings.Cut(path, "/")
 			assert.NotContains(t, first, ".", "%s imports %s", file, path)
 		}
@@ -372,4 +381,90 @@ func FuzzParseULID(f *testing.F) {
 			t.Fatalf("ParseULID(%q).String() = %q", s, id.String())
 		}
 	})
+}
+
+// TestULIDTextMatchesTheLibrary holds the text and the parse of canon
+// equal to the library's for a fixed set of ids, so the wrapper cannot
+// drift from it: String is the library's text lowercased, and ParseULID
+// reads every lowercase text as the library does.
+func TestULIDTextMatchesTheLibrary(t *testing.T) {
+	t.Parallel()
+	src := NewULIDSource(rand.Reader)
+	ids := []ULID{{}, ULID(bytes.Repeat([]byte{0xff}, 16))}
+	for i := range 64 {
+		id, err := NewULID(time.UnixMilli(1_700_000_000_000+int64(i)*7919), src)
+		require.NoError(t, err)
+		ids = append(ids, id)
+	}
+	for _, id := range ids {
+		lib := ulid.ULID(id)
+		require.Equal(t, strings.ToLower(lib.String()), id.String())
+		parsed, err := ParseULID(id.String())
+		require.NoError(t, err)
+		want, err := ulid.ParseStrict(id.String())
+		require.NoError(t, err)
+		require.Equal(t, ULID(want), parsed)
+	}
+}
+
+// monotonicEntropy is an entropy source that is also a
+// ulid.MonotonicReader, whose MonotonicRead fails the test: canon must
+// read its entropy plainly and keep the order of one source itself.
+type monotonicEntropy struct {
+	t *testing.T
+	r io.Reader
+}
+
+func (m monotonicEntropy) Read(p []byte) (int, error) { return m.r.Read(p) }
+
+func (m monotonicEntropy) MonotonicRead(uint64, []byte) error {
+	m.t.Error("canon called MonotonicRead; the order of one source is canon's rule")
+	return errors.New("MonotonicRead called")
+}
+
+func TestNewULIDReadsAMonotonicReaderPlainly(t *testing.T) {
+	t.Parallel()
+	src := NewULIDSource(monotonicEntropy{t: t, r: rand.Reader})
+	first, err := NewULID(time.UnixMilli(1_700_000_000_000), src)
+	require.NoError(t, err)
+	second, err := NewULID(time.UnixMilli(1_700_000_000_000), src)
+	require.NoError(t, err)
+	want, ok := first.next()
+	require.True(t, ok)
+	assert.Equal(t, want, second, "an id in a used millisecond is the last one plus one")
+	third, err := NewULID(time.UnixMilli(1_700_000_000_001), src)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(1_700_000_000_001), third.millis())
+}
+
+// TestCanonCallsOnlyTheStrictPartsOfTheLibrary holds canon to the parts of
+// github.com/oklog/ulid/v2 that keep REQ-0258 and the injected entropy:
+// its non-strict Parse accepts uppercase and returns an undefined id on
+// bad text, and Make, MustNewDefault and DefaultEntropy draw from a
+// math/rand source seeded by the clock.
+func TestCanonCallsOnlyTheStrictPartsOfTheLibrary(t *testing.T) {
+	t.Parallel()
+	admitted := []string{"ULID", "New", "ParseStrict"}
+	files, err := filepath.Glob("*.go")
+	require.NoError(t, err)
+	used := 0
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+		parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, 0)
+		require.NoError(t, err)
+		ast.Inspect(parsed, func(n ast.Node) bool {
+			sel, ok := n.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "ulid" {
+				used++
+				assert.Contains(t, admitted, sel.Sel.Name, "%s uses ulid.%s", file, sel.Sel.Name)
+			}
+			return true
+		})
+	}
+	require.NotZero(t, used, "canon uses the library")
 }

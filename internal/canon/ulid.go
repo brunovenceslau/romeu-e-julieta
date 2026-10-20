@@ -4,17 +4,18 @@
 package canon
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/oklog/ulid/v2"
 )
 
 // ErrInvalidULID is the error of a text that is not a ULID in lowercase
-// Crockford base32: 26 characters of the alphabet crockford, the first
-// at most 7.
+// Crockford base32: 26 characters of that alphabet, the first at most 7.
 var ErrInvalidULID = errors.New("canon: invalid ulid")
 
 // ErrULIDTime is the error of an instant no ULID can hold: before the
@@ -26,52 +27,23 @@ var ErrULIDTime = errors.New("canon: no ulid for this time")
 // source without entropy.
 var ErrULIDSource = errors.New("canon: ulid source without entropy")
 
-// crockford is the lowercase Crockford base32 alphabet. Two names that
-// differ only in case collide on APFS, so every ULID on the host disk is
-// lowercase (03 3.12).
-const crockford = "0123456789abcdefghjkmnpqrstvwxyz"
-
 // The layout of a ULID: 48 bits of Unix milliseconds, then 80 random
-// bits, as 26 characters of 5 bits, the first of which holds 3.
+// bits, as 26 characters of Crockford base32. github.com/oklog/ulid/v2
+// encodes, decodes and stamps them (ADR 0038); canon keeps the text
+// lowercase, because two names that differ only in case collide on
+// APFS, so every ULID on the host disk is lowercase (03 3.12).
 const (
-	ulidLen    = 26
-	timeLen    = 6 // bytes
-	maxMillis  = 1<<48 - 1
-	maxFirstCh = 7 // the value of the first character
+	ulidLen   = 26
+	timeLen   = 6 // bytes
+	maxMillis = 1<<48 - 1
 )
-
-// decoding maps a byte of the alphabet to its value, and every other
-// byte, uppercase letters among them, to invalidCh.
-var decoding = func() [256]byte {
-	var d [256]byte
-	for i := range d {
-		d[i] = invalidCh
-	}
-	for i := range len(crockford) {
-		d[crockford[i]] = byte(i)
-	}
-	return d
-}()
-
-// invalidCh marks a byte outside the alphabet in decoding.
-const invalidCh = 0xff
 
 // ULID is a 128-bit id that sorts by the time it was written. Its text
 // is 26 characters of lowercase Crockford base32.
 type ULID [16]byte
 
 // String returns the id as 26 characters of lowercase Crockford base32.
-func (u ULID) String() string {
-	hi := binary.BigEndian.Uint64(u[:8])
-	lo := binary.BigEndian.Uint64(u[8:])
-	var out [ulidLen]byte
-	for i := ulidLen - 1; i >= 0; i-- {
-		out[i] = crockford[lo&31]
-		lo = lo>>5 | hi<<59
-		hi >>= 5
-	}
-	return string(out[:])
-}
+func (u ULID) String() string { return strings.ToLower(ulid.ULID(u).String()) }
 
 // MarshalText returns the id as String writes it.
 func (u ULID) MarshalText() ([]byte, error) { return []byte(u.String()), nil }
@@ -94,22 +66,14 @@ func ParseULID(s string) (ULID, error) {
 	if len(s) != ulidLen {
 		return ULID{}, fmt.Errorf("%w: %q has %d bytes, not %d", ErrInvalidULID, clip(s), len(s), ulidLen)
 	}
-	var hi, lo uint64
-	for i := range ulidLen {
-		v := decoding[s[i]]
-		if v == invalidCh {
-			return ULID{}, fmt.Errorf("%w: %q has %q at %d", ErrInvalidULID, clip(s), s[i], i)
-		}
-		hi = hi<<5 | lo>>59
-		lo = lo<<5 | uint64(v)
+	if i := strings.IndexFunc(s, func(r rune) bool { return 'A' <= r && r <= 'Z' }); i >= 0 {
+		return ULID{}, fmt.Errorf("%w: %q has the uppercase %q at %d", ErrInvalidULID, clip(s), s[i], i)
 	}
-	if decoding[s[0]] > maxFirstCh {
-		return ULID{}, fmt.Errorf("%w: %q is past 128 bits", ErrInvalidULID, clip(s))
+	id, err := ulid.ParseStrict(s)
+	if err != nil {
+		return ULID{}, fmt.Errorf("%w: %q: %w", ErrInvalidULID, clip(s), err)
 	}
-	var u ULID
-	binary.BigEndian.PutUint64(u[:8], hi)
-	binary.BigEndian.PutUint64(u[8:], lo)
-	return u, nil
+	return ULID(id), nil
 }
 
 // ULIDSource is the injected source of the random bits of ULIDs, and the
@@ -155,23 +119,19 @@ func NewULID(now time.Time, src *ULIDSource) (ULID, error) {
 		src.last = next
 		return next, nil
 	}
-	var u ULID
-	var ts [8]byte
-	binary.BigEndian.PutUint64(ts[:], uint64(ms))
-	copy(u[:timeLen], ts[8-timeLen:])
-	if _, err := io.ReadFull(src.entropy, u[timeLen:]); err != nil {
+	// io.LimitReader hides a ulid.MonotonicReader from ulid.New, so the
+	// library always reads the 80 bits plainly and the order of one
+	// source stays the rule above.
+	id, err := ulid.New(uint64(ms), io.LimitReader(src.entropy, 16-timeLen))
+	if err != nil {
 		return ULID{}, fmt.Errorf("canon: ulid entropy: %w", err)
 	}
-	src.last, src.isIssued = u, true
-	return u, nil
+	src.last, src.isIssued = ULID(id), true
+	return ULID(id), nil
 }
 
 // millis returns the millisecond of the id.
-func (u ULID) millis() uint64 {
-	var ts [8]byte
-	copy(ts[8-timeLen:], u[:timeLen])
-	return binary.BigEndian.Uint64(ts[:])
-}
+func (u ULID) millis() uint64 { return ulid.ULID(u).Time() }
 
 // next returns the id with the same millisecond and the random part
 // plus one, and false when the random part is already the greatest.
