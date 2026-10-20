@@ -6,7 +6,10 @@ Date: 2026-10-20
 
 Proposed
 
-Supersedes in part [1. Adopt a documentation standard with checkable rules and a voice](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md) (rule 9)
+It becomes Accepted in a later pull request, which adds the
+`Supersedes in part` line for rule 9 of
+[ADR 0001, adopt a documentation standard with checkable rules and a voice](0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md)
+here and the matching `Superseded in part by` line there.
 
 ## Context
 
