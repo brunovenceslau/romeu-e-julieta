@@ -54,8 +54,8 @@ where `tools/ci` may import them (`tools/ci/internal/imports/rows.go`).
 The edit of 03 3.6 leaves this task: REQ-0173 replaces a table by a
 link to a generated page under `docs/reference/`, and no generator
 writes one for the manifest yet (`schemas/manifest.v1.json` holds the
-types, not the meaning of each field), so the table stays and REQ-0173
-waits for the task that lands that page. The task no longer touches the
+types, not the meaning of each field), so the edit and REQ-0173 move to
+T021, whose field-table generator writes that page. The task no longer touches the
 `spec` surface. The
 protocol window is N = 1 with no protocol below it, so the container e2e
 shows N accepted and 0 and N+1 refused, and N-1 stays with T135's unit

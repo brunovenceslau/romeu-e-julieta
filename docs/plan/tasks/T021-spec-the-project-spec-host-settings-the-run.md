@@ -43,10 +43,17 @@ specification assigns it: the format tables of 03 3.2 and 03 3.4 that
 its generated pages replace by a link (rule 6), whose requirement ids
 are retired with `Replaced by: <the generated page>`.
 
+Re-plan (2026-10-20): Changed. T051 gave up the edit of the manifest
+table of 03 3.6, because no generator writes a `docs/reference/` page
+for the manifest and `schemas/manifest.v1.json` does not carry the
+meaning of each field. This task's field-table generator also writes
+the manifest's page, from `internal/manifest` and its struct tags, and
+replaces the table of 03 3.6 by a link to it, which is REQ-0173.
+
 - Implements: REQ-0019 (index), REQ-0038 (00 0.4), REQ-0054 (01 1.3),
   REQ-0066 (01 1.4), REQ-0067 (01 1.4), REQ-0118 (02 2.1), REQ-0119 (02
   2.1), REQ-0133 (02 2.2), REQ-0134 (02 2.2), REQ-0159 (03 (opening)),
-  REQ-0160 (03 (opening)), REQ-0172 (03 (opening)), REQ-0174 (03 3.1),
+  REQ-0160 (03 (opening)), REQ-0172 (03 (opening)), REQ-0173 (03 (opening)), REQ-0174 (03 3.1),
   REQ-0175 (03 3.1), REQ-0176 (03 3.1), REQ-0177 (03 3.1), REQ-0178 (03
   3.1), REQ-0179 (03 3.1), REQ-0180 (03 3.1), REQ-0181 (03 3.1),
   REQ-0182 (03 3.1), REQ-0183 (03 3.1), REQ-0184 (03 3.1), REQ-0186 (03
