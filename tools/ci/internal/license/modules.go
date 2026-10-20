@@ -6,7 +6,8 @@ package license
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -204,10 +205,10 @@ func CompiledModules(ctx context.Context, goBin, dir string, env []string) ([]st
 // package that does not load, or a module path or version not of its
 // form, is an error.
 func modulesOf(r io.Reader, seen map[string]bool) error {
-	dec := json.NewDecoder(r)
+	dec := jsontext.NewDecoder(r)
 	for {
 		var p listed
-		if err := dec.Decode(&p); errors.Is(err, io.EOF) {
+		if err := json.UnmarshalDecode(dec, &p); errors.Is(err, io.EOF) {
 			return nil
 		} else if err != nil {
 			return err
@@ -356,12 +357,12 @@ func Download(ctx context.Context, goBin, dir string, env, mods []string) ([]Mod
 // prints; a module it could not download is an error that names it.
 func decodeDownload(r io.Reader) ([]Module, error) {
 	var out []Module
-	dec := json.NewDecoder(r)
+	dec := jsontext.NewDecoder(r)
 	for {
 		var m struct {
 			Path, Version, Dir, Error string
 		}
-		if err := dec.Decode(&m); errors.Is(err, io.EOF) {
+		if err := json.UnmarshalDecode(dec, &m); errors.Is(err, io.EOF) {
 			return out, nil
 		} else if err != nil {
 			return nil, fmt.Errorf("go mod download: %w", err)

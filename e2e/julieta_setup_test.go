@@ -6,9 +6,8 @@
 package e2e
 
 import (
-	"bytes"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/v2"
 	"strconv"
 	"strings"
 	"testing"
@@ -159,11 +158,9 @@ func manifestEnv(t *testing.T, protocol int, apiURL string) string {
 		"schema":     "manifest/v1",
 		"specCommit": strings.Repeat("ab", 20),
 	}
-	var b bytes.Buffer
-	enc := json.NewEncoder(&b)
-	enc.SetEscapeHTML(false)
-	require.NoError(t, enc.Encode(doc))
-	return base64.RawURLEncoding.EncodeToString(bytes.TrimSuffix(b.Bytes(), []byte("\n")))
+	b, err := json.Marshal(doc, json.Deterministic(true))
+	require.NoError(t, err)
+	return base64.RawURLEncoding.EncodeToString(b)
 }
 
 // errorID returns the id of the --json error report a step printed on
@@ -210,13 +207,10 @@ type warningJSON struct {
 }
 
 // decodeStrict decodes data into v, refusing an unknown member and
-// trailing data.
+// trailing data, which json.Unmarshal refuses on its own.
 func decodeStrict(t *testing.T, data string, v any) {
 	t.Helper()
-	dec := json.NewDecoder(strings.NewReader(data))
-	dec.DisallowUnknownFields()
-	require.NoError(t, dec.Decode(v), "%q", data)
-	assert.False(t, dec.More(), "one document: %q", data)
+	require.NoError(t, json.Unmarshal([]byte(data), v, json.RejectUnknownMembers(true)), "%q", data)
 }
 
 // TestJulietaSetup runs julieta setup in the workload (04 4.3): a

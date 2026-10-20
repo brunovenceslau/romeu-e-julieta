@@ -242,6 +242,16 @@ func TestWriteAndReady(t *testing.T) {
 	require.Error(t, err)
 }
 
+// The data escapes U+2028 and U+2029, which end a line in older
+// JavaScript, and writes text that is not UTF-8 as U+FFFD.
+func TestRenderEscapesLineSeparatorsAndInvalidText(t *testing.T) {
+	out, err := render(page(t), []Task{{ID: "T001", Title: "a\u2028b\u2029c\xffd"}}, meta{Date: "2026-01-01"})
+	require.NoError(t, err)
+	assert.Contains(t, out, `"title":"a\u2028b\u2029c`+"\uFFFD"+`d"`)
+	assert.NotContains(t, out, "\u2028")
+	assert.NotContains(t, out, "\u2029")
+}
+
 // A placeholder inside a plan.md milestone cell is data too.
 func TestRenderPlaceholderInMilestone(t *testing.T) {
 	ms := []Milestone{{ID: "M0", Name: "x /*META*/{} y", EndsWhen: "/*DATA*/[] z", Delivers: "</script>"}}
@@ -295,7 +305,7 @@ func TestBodyIsBounded(t *testing.T) {
 	assert.False(t, task.BodyTruncated)
 }
 
-// Hostile text in a body cannot leave the data script: encoding/json
+// Hostile text in a body cannot leave the data script: render
 // escapes it, and the placeholders in it are not replaced.
 func TestRenderBodyIsEscaped(t *testing.T) {
 	body := "```\n</script><script>alert(1)</script>\n```\n[x](javascript:alert(1)) /*DATA*/[] /*META*/{}"

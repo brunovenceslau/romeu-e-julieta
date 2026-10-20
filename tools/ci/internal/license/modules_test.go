@@ -187,7 +187,7 @@ func TestDecodeDownload(t *testing.T) {
 	for src, want := range map[string]string{
 		`{"Path": "a.example/x", "Version": "v1.0.0", "Error": "not in the cache"}`: "a.example/x@v1.0.0: not in the cache",
 		`{"Path": "a.example/x", "Version": "v1.0.0"}`:                              "a.example/x@v1.0.0: no directory in the module cache",
-		`{`: "go mod download: unexpected EOF",
+		`{`: "go mod download: jsontext: unexpected EOF",
 	} {
 		_, err := decodeDownload(strings.NewReader(src))
 		require.Error(t, err, src)

@@ -12,11 +12,10 @@
 package e2e
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -121,10 +120,8 @@ func TestContainerVersion(t *testing.T) {
 
 	out, err := w.Run(t.Context(), []container.Mount{container.Mount(w.Bin)}, w.Julieta, "version", "--json")
 	require.NoError(t, err)
-	dec := json.NewDecoder(bytes.NewReader(out))
-	dec.DisallowUnknownFields()
 	var v versionJSON
-	require.NoError(t, dec.Decode(&v), "%q", out)
+	require.NoError(t, json.Unmarshal(out, &v, json.RejectUnknownMembers(true)), "%q", out)
 	b, err := os.ReadFile(w.Julieta)
 	require.NoError(t, err)
 	sum := sha256.Sum256(b)

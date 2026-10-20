@@ -19,7 +19,8 @@ package imports
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -109,10 +110,10 @@ func Load(ctx context.Context, goBin, dir string) ([]Package, error) {
 // merge decodes the stream of JSON objects "go list -json" prints and
 // adds each package to byPath, the union of what each target lists.
 func merge(byPath map[string]*Package, r io.Reader) error {
-	dec := json.NewDecoder(r)
+	dec := jsontext.NewDecoder(r)
 	for {
 		var l listed
-		if err := dec.Decode(&l); errors.Is(err, io.EOF) {
+		if err := json.UnmarshalDecode(dec, &l); errors.Is(err, io.EOF) {
 			return nil
 		} else if err != nil {
 			return err

@@ -16,7 +16,8 @@ package view
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -218,9 +219,13 @@ type meta struct {
 	Trends     Trends      `json:"trends"`
 }
 
-// render returns page, the template, with the tasks and the meta data in place.
-// encoding/json escapes <, > and & in strings, so the data cannot close
-// the script element it sits in.
+// dataOptions escape <, > and & in strings, so the data cannot close
+// the script element it sits in, and U+2028 and U+2029, which end a
+// line in older JavaScript; text that is not UTF-8 becomes U+FFFD.
+var dataOptions = json.JoinOptions(jsontext.EscapeForHTML(true), jsontext.EscapeForJS(true), jsontext.AllowInvalidUTF8(true))
+
+// render returns page, the template, with the tasks and the meta data in place,
+// written with dataOptions.
 func render(page string, tasks []Task, m meta) (string, error) {
 	if m.Critical == nil {
 		m.Critical = []string{}
@@ -231,11 +236,11 @@ func render(page string, tasks []Task, m meta) (string, error) {
 	if m.Trends.Snapshots == nil {
 		m.Trends.Snapshots = []Snapshot{}
 	}
-	data, err := json.Marshal(tasks)
+	data, err := json.Marshal(tasks, dataOptions)
 	if err != nil {
 		return "", err
 	}
-	md, err := json.Marshal(m)
+	md, err := json.Marshal(m, dataOptions)
 	if err != nil {
 		return "", err
 	}
