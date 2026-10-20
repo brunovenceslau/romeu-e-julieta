@@ -54,13 +54,15 @@ step add "$J" memory add --title "Flaky test on arm64" --body "On the arm64 runn
 step stamp "$J" memory add --title x --id 01j9z3k8m6t2q4w5e7r9y1v3k5 --json
 step dup "$J" memory add --title "Flaky test on arm64" --body "On the arm64 runner." --tag ci --json
 step modes sh -c 'stat -c "%a %n" /tmp/memory/api/entries /tmp/memory/api/entries/*; ls -A /tmp/memory/api; stat -c "%a" "$HOME/.local/state/julieta/locks/api.lock"'
-i=0
+step adds sh -c 'i=0; pids=""
 while [ "$i" -lt 20 ]; do
-	"$J" memory add --title "a$i" >/dev/null &
-	"$J" memory add --title "b$i" >/dev/null &
+	"$1" memory add --title "a$i" >/dev/null & pids="$pids $!"
+	"$1" memory add --title "b$i" >/dev/null & pids="$pids $!"
 	i=$((i+1))
 done
-wait
+failed=0
+for p in $pids; do wait "$p" || failed=$((failed+1)); done
+exit "$failed"' sh "$J"
 step count sh -c '"$1" memory list | wc -l' sh "$J"
 step query "$J" memory list --query ARM64 --json
 id=$("$J" memory list --query arm64 --json | sed 's/.*"id":"\([0-9a-z]*\)".*/\1/')
@@ -109,6 +111,10 @@ step setup-unusable "$J" setup --json
 	require.Equal(t, 0, r.code, r.stderr)
 	assert.Equal(t, "700 /tmp/memory/api/entries\n600 "+e.Path+"\nentries\n600\n", r.stdout,
 		"one entry file, 0600 in a dir 0700, and the store lock outside the memory dir")
+
+	r = step(t, steps, "adds")
+	require.Equal(t, 0, r.code, "the number of the 40 concurrent adds that failed; their stderr:\n%s", r.stderr)
+	assert.Empty(t, r.stderr, "the 40 concurrent adds")
 
 	r = step(t, steps, "count")
 	require.Equal(t, 0, r.code, r.stderr)
