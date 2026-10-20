@@ -115,6 +115,28 @@ func TestAddDuplicate(t *testing.T) {
 	assert.NotEqual(t, first.ID, third.ID)
 }
 
+// TestAddStopsAtTheFirstMatch stops the duplicate walk at the open
+// entry that matches: an entry after it that does not decode is not
+// read, while new content, whose walk reads every entry, fails on it,
+// naming its file.
+func TestAddStopsAtTheFirstMatch(t *testing.T) {
+	s, _ := newStore(t)
+	c := memstore.Content{Title: "t"}
+	first, _, err := s.Add(c)
+	require.NoError(t, err)
+	later, err := canon.NewULID(clock.Add(time.Hour), entropy())
+	require.NoError(t, err)
+	bad := filepath.Join(s.Dir(), filepath.FromSlash(memstore.EntryPath(later)))
+	require.NoError(t, os.WriteFile(bad, []byte("not an entry"), 0o600))
+	again, wrote, err := s.Add(c)
+	require.NoError(t, err)
+	assert.False(t, wrote)
+	assert.Equal(t, first, again)
+	_, _, err = s.Add(memstore.Content{Title: "new"})
+	require.ErrorIs(t, err, memstore.ErrInvalid)
+	assert.Contains(t, err.Error(), memstore.EntryPath(later))
+}
+
 // TestAddRefuses refuses content that breaks 03 3.9, and an add to a
 // full store.
 func TestAddRefuses(t *testing.T) {

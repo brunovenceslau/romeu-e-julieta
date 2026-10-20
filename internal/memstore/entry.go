@@ -134,7 +134,7 @@ func (c Content) Check() error {
 	case !utf8.ValidString(c.Title) || strings.ContainsFunc(c.Title, func(r rune) bool { return !unicode.IsPrint(r) && r != ' ' }):
 		return fmt.Errorf("%w: the title is not one line of printable text", ErrInvalid)
 	case c.Status != StatusOpen && c.Status != StatusDone:
-		return fmt.Errorf("%w: the status %q is not %s or %s", ErrInvalid, clip(c.Status), StatusOpen, StatusDone)
+		return fmt.Errorf("%w: the status \"%s\" is not %s or %s", ErrInvalid, clip(c.Status), StatusOpen, StatusDone)
 	case len(c.Tags) > maxTags:
 		return fmt.Errorf("%w: %d tags, over %d", ErrInvalid, len(c.Tags), maxTags)
 	case !utf8.ValidString(c.Body):
@@ -142,7 +142,7 @@ func (c Content) Check() error {
 	}
 	for _, tag := range c.Tags {
 		if !tagForm.MatchString(tag) {
-			return fmt.Errorf("%w: the tag %q is not of the form [a-z0-9][a-z0-9-]{0,31}", ErrInvalid, clip(tag))
+			return fmt.Errorf("%w: the tag \"%s\" is not of the form [a-z0-9][a-z0-9-]{0,31}", ErrInvalid, clip(tag))
 		}
 	}
 	return nil
@@ -191,7 +191,7 @@ func Encode(e Entry) ([]byte, error) {
 	e.Tags = slices.Clone(e.Tags) // nil stays nil, which check refuses
 	slices.Sort(e.Tags)
 	if e.Schema != Field {
-		return nil, fmt.Errorf("%w: the schema %q is not %s", ErrInvalid, clip(e.Schema), Field)
+		return nil, fmt.Errorf("%w: the schema \"%s\" is not %s", ErrInvalid, clip(e.Schema), Field)
 	}
 	if err := e.check(); err != nil {
 		return nil, err
@@ -217,10 +217,13 @@ func Encode(e Entry) ([]byte, error) {
 // merge key, tag outside YAML's core schema (an include among them) or
 // duplicate key; then go.yaml.in/yaml/v3 with KnownFields(true) into
 // Entry, every key required; then the rules of 03 3.9, with the tags
-// sorted on the way in. The schema field is read first, from the text
-// of the front matter, so a newer version is format-newer (RJ-311)
-// whatever else it holds, a construct the subset grammar refuses or a
-// syntax error included. Every other refusal wraps ErrInvalid.
+// sorted on the way in. The schema field is read from the parsed
+// mapping before the keys are judged, so a newer version is
+// format-newer (RJ-311) though it holds keys v1 does not know; a front
+// matter that does not parse, or that the subset grammar refuses, is
+// format-newer when the text of its schema line names a newer version
+// (checkNewer), so a v2 file with an anchor or a syntax error is too.
+// Every other refusal wraps ErrInvalid.
 func Decode(data []byte) (Entry, error) {
 	if len(data) > MaxFileSize {
 		return Entry{}, fmt.Errorf("%w: the file has %d bytes, over %d", ErrInvalid, len(data), MaxFileSize)
@@ -242,15 +245,12 @@ func Decode(data []byte) (Entry, error) {
 		}
 		front, body = rest[:i+1], rest[i+len(frontClose):]
 	}
-	if err := checkNewer(front); err != nil {
-		return Entry{}, err
-	}
 	var doc yaml.Node
 	if err := yaml.Unmarshal(front, &doc); err != nil {
-		return Entry{}, fmt.Errorf("%w: %w", ErrInvalid, err)
+		return Entry{}, refused(front, err)
 	}
 	if err := checkNode(&doc); err != nil {
-		return Entry{}, fmt.Errorf("%w: %w", ErrInvalid, err)
+		return Entry{}, refused(front, err)
 	}
 	if err := checkVersion(doc.Content[0]); err != nil {
 		return Entry{}, err
@@ -280,9 +280,23 @@ func Decode(data []byte) (Entry, error) {
 // quoted, and an optional comment.
 var schemaLine = regexp.MustCompile(`(?m)^schema:[ \t]+["']?memory-entry/v([1-9][0-9]{0,8})["']?[ \t]*(?:#.*)?$`)
 
-// checkNewer returns format-newer (RJ-311) when the first top-level
-// schema line of the front matter text names a version newer than
-// Version, and nil otherwise; the checks that follow judge the rest.
+// refused returns the error of a front matter that does not parse or
+// that the subset grammar refuses for the reason err: format-newer when
+// its schema line names a newer version (checkNewer), ErrInvalid
+// otherwise.
+func refused(front []byte, err error) error {
+	if newer := checkNewer(front); newer != nil {
+		return newer
+	}
+	return fmt.Errorf("%w: %w", ErrInvalid, err)
+}
+
+// checkNewer returns format-newer (RJ-311) when the first schema line
+// of the front matter text names a version newer than Version, and nil
+// otherwise. It reads text, so a line inside a multi-line scalar can
+// look like a schema line: Decode calls it only for a front matter that
+// does not parse or that the subset grammar refuses, where the parsed
+// mapping cannot be read, and the file is refused either way.
 func checkNewer(front []byte) error {
 	sub := schemaLine.FindSubmatch(front)
 	if sub == nil {
@@ -315,11 +329,11 @@ func checkKeys(m *yaml.Node) error {
 	for i := 0; i < len(m.Content); i += 2 {
 		key := m.Content[i].Value
 		if seen[key] {
-			return fmt.Errorf("the key %q is written twice", clip(key))
+			return fmt.Errorf("the key \"%s\" is written twice", clip(key))
 		}
 		seen[key] = true
 		if !slices.Contains(frontKeys, key) {
-			return fmt.Errorf("the key %q is not a field of %s", clip(key), Field)
+			return fmt.Errorf("the key \"%s\" is not a field of %s", clip(key), Field)
 		}
 	}
 	for _, key := range frontKeys {
@@ -348,7 +362,7 @@ func checkTree(n *yaml.Node, depth int) error {
 	case n.Tag == "!!merge" || (n.Kind == yaml.ScalarNode && n.Value == "<<" && n.Style == 0):
 		return errors.New("the front matter holds a merge key")
 	case !slices.Contains(coreTags, n.Tag):
-		return fmt.Errorf("the front matter holds the tag %q, outside YAML's core schema", clip(n.Tag))
+		return fmt.Errorf("the front matter holds the tag \"%s\", outside YAML's core schema", clip(n.Tag))
 	}
 	for _, c := range n.Content {
 		if err := checkTree(c, depth+1); err != nil {
@@ -369,7 +383,7 @@ func checkVersion(m *yaml.Node) error {
 		v := m.Content[i+1].Value
 		sub := schemaField.FindStringSubmatch(v)
 		if sub == nil || m.Content[i+1].Kind != yaml.ScalarNode {
-			return fmt.Errorf("%w: the schema %q is not memory-entry/v<n>", ErrInvalid, clip(v))
+			return fmt.Errorf("%w: the schema \"%s\" is not memory-entry/v<n>", ErrInvalid, clip(v))
 		}
 		if n, _ := strconv.Atoi(sub[1]); n > Version {
 			return manifest.FormatNewer.New(fmt.Sprintf("the memory entry is %s, newer than %s, the version this build reads", v, Field))
@@ -384,7 +398,8 @@ const clipLen = 64
 
 // clip returns s cut to clipLen bytes and escaped with termsafe, so
 // that an error about a long input stays short and a name an agent
-// wrote cannot forge a line of the output.
+// wrote cannot forge a line of the output. A message quotes it with
+// "%s", never %q, which would escape the escapes again.
 func clip(s string) string {
 	if len(s) > clipLen {
 		s = s[:clipLen] + "..."

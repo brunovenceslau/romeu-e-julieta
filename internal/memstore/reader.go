@@ -65,13 +65,8 @@ func (r *Reader) Path(u canon.ULID) string { return r.dir + "/" + EntryPath(u) }
 func (r *Reader) Get(id string) (Entry, error) {
 	u, err := canon.ParseULID(id)
 	if err != nil {
-		return Entry{}, fmt.Errorf("%w: the id %q: %w", ErrNotFound, clip(id), err)
+		return Entry{}, fmt.Errorf("%w: the id \"%s\": %w", ErrNotFound, clip(id), err)
 	}
-	return r.get(u)
-}
-
-// get is Get for a parsed id.
-func (r *Reader) get(u canon.ULID) (Entry, error) {
 	ok, err := r.entriesDir()
 	if err != nil {
 		return Entry{}, err
@@ -79,6 +74,12 @@ func (r *Reader) get(u canon.ULID) (Entry, error) {
 	if !ok {
 		return Entry{}, fmt.Errorf("%w: %s", ErrNotFound, u)
 	}
+	return r.get(u)
+}
+
+// get is Get for a parsed id, once entriesDir has passed: Get checks
+// it for one entry, and ids for every entry Walk reads.
+func (r *Reader) get(u canon.ULID) (Entry, error) {
 	data, err := r.readFile(EntryPath(u))
 	if errors.Is(err, fs.ErrNotExist) {
 		return Entry{}, fmt.Errorf("%w: %s", ErrNotFound, u)

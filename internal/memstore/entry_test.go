@@ -123,6 +123,26 @@ func TestDecodeNewerFirst(t *testing.T) {
 	}
 }
 
+// TestDecodeNewerInAScalar does not take a line inside a scalar for the
+// schema line: a v1 file whose multi-line title, or a flow sequence of
+// its tags, holds a line "schema: memory-entry/v9" at column 0 is no
+// format-newer. It decodes, or is refused as ErrInvalid.
+func TestDecodeNewerInAScalar(t *testing.T) {
+	valid := string(fixture(t, "valid.md"))
+	for name, data := range map[string]string{
+		"a quoted title":       strings.Replace(valid, "title: Flaky integration test on arm64", "title: \"a\nschema: memory-entry/v9\"", 1),
+		"a flow sequence":      strings.Replace(valid, "tags: [ci, arm64]", "tags: [ci,\nschema: memory-entry/v9,\n arm64]", 1),
+		"before the real line": strings.Replace(valid, "schema: memory-entry/v1\n", "title2: \"x\nschema: memory-entry/v9\"\nschema: memory-entry/v1\n", 1),
+	} {
+		_, err := memstore.Decode([]byte(data))
+		_, isRow := errors.AsType[*cli.Error](err)
+		assert.False(t, isRow, "%s: %v", name, err)
+		if err != nil {
+			require.ErrorIs(t, err, memstore.ErrInvalid, name)
+		}
+	}
+}
+
 // TestDecodeRefusesOverTheCap refuses a file over the file cap, 1 MiB
 // (08 8.6), before it parses it.
 func TestDecodeRefusesOverTheCap(t *testing.T) {
