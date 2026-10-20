@@ -468,4 +468,3 @@ func TestCanonCallsOnlyTheStrictPartsOfTheLibrary(t *testing.T) {
 	}
 	require.NotZero(t, used, "canon uses the library")
 }
-
