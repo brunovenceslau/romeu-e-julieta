@@ -338,4 +338,4 @@ default branch, with `edited` and `reopened` among the event's types
 ## Session checkpoint (2026-10-09)
 
 Migrated on 2026-10-17 to docs/handoff:
-[Done record 16](../handoff/done/0016.md).
+[Done record 16](../handoff/done/00000000000000000000000016-session-of-2026-10-09-after-round-10-migrated-from-docs.md).

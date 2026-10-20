@@ -2,41 +2,56 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-20, after T035 merged (Done record 46, which
-ticks T035, T145 and T146). Later that day ADR 0039 and ADR 0021 were
-accepted and the operator items answered
-("the-operator-items-of-2026-10-20").
+Checkpoint of 2026-10-20, after T059 merged: "Session of 2026-10-20,
+json v2, gitsafe, the hooks and go fix" (01m5d7v40m0axrfnby7097da4e)
+ticks T147, T148, T149, T151, T054, T152 and T059. The handoff notes
+were renamed to `<id>-<slug>.md` in the pull request before this one.
 
 ## Next steps
 
-1. The next swap of ADR 0038, the ssh-agent listing of `internal/signing`
-   (signing surface, ask first), per
-   "hand-written-code-a-maintained-library-could-replace".
-2. The rest of the ready list (`go run ./tools/ci plan --ready`); T111
-   waits for T054, T059, T060 and T078.
-3. T112 lands through the sessions of the config and kit repositories
-   ("t112-in-the-config-and-kit-repositories").
-4. A task on the `gitsafe` surface hardens the fast-forward before
-   `julieta setup` runs in daily use, and one gives the removal of a
-   corrupted e2e cache entry a job annotation
-   ("the-operator-items-of-2026-10-20").
+1. T078 (skills): code review, then its pull request ("T078 awaits its
+   review and pull request", 01m5daf06ddqsdsh6m5cn71wx6).
+2. Plan one `gitsafe` task for "gitsafe verbs for the snapshot bundle"
+   (01m5d7v42kv79hf42g15ffgk59) and "gitsafe verbs for the global hooks
+   path and the dirty count" (01m5d7v43hd4hsw60e4bhek3pw); then re-plan
+   and build T060.
+3. A `julieta status` task for
+   "julieta status reads the hook failure store"
+   (0000000000782g86tsyzte1t16).
+4. T150, the imports check that refuses `encoding/json` v1.
+5. T077, then T081 (the kits of M2).
+6. The removal of a corrupted e2e cache entry writes a job annotation,
+   as decided ("The spec catches up with the hardening of T127, T143 and
+   T144", 0000000000pz8zh0x006xkqa4w).
+7. T111, the cut-over of M1, once T060 and T078 land; T112 through the
+   sessions of the config and kit repositories ("T112 in the config and
+   kit repositories", 00000000008h7a0ey78frxzgfr).
 
 ## Open for the operator
 
-One block. Decisions of 2026-10-19 are in
-"the-grants-of-2026-10-19", and those of 2026-10-20 in
-"the-operator-items-of-2026-10-20".
+One block, a recommendation each. Decisions of 2026-10-20 are in
+"The operator items of 2026-10-20" (0000000000abv84dqf1csebd9c) and in
+the Done record above.
 
-1. Report the pull requests of the three prompts pasted on 2026-10-20
-   (T112 in the config and sandbox kit repositories, ADR 0039 in the
-   payload), so their pending notes close.
-2. Create the GitHub App of
-   [ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md)
-   when M3 starts; the sitting of T126 (O8) waits for it.
+1. Merge the migration pull request, then this checkpoint. Recommended:
+   in that order, today.
+2. Paste the prompt for the payload's handoff tools, in the payload's
+   source repository (the checker reads julieta's ULIDs as item ids;
+   the migrator misses relative links). Recommended: today; until then `handoff_check.py`
+   cannot pass here.
+3. Approve the `gitsafe` task of next step 2 (ask first). Recommended:
+   one task, after T078.
+4. Report the pull requests of the three prompts pasted on 2026-10-20
+   (T112 in the config and kit repositories, ADR 0039 in the payload).
+   Recommended: when those sessions finish, so their notes close.
+5. The GitHub App of ADR 0011, decided for the start of M3 (T126 waits
+   for it), is being set up early in another session. Recommended: say
+   when the sandbox's authentication changes, so no push is in flight.
 
 ## In flight
 
-- Nothing.
+- `feat/t078-skills` (T078), pushed, no pull request yet.
+- The migration pull request and this checkpoint.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.

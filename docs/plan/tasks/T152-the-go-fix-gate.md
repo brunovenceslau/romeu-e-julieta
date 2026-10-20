@@ -3,7 +3,7 @@ id: T152
 title: "The go fix gate"
 milestone: M1
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - tools/ci/check_fix.go
   - tools/ci/internal/fix/**
@@ -43,9 +43,14 @@ ask_first:
   - kits
   - ask-first
 sitting: none
+merged: 2026-10-20
+pr: 212
 ---
 
 # T152 - The go fix gate
+
+Merged on 2026-10-20 in pull request #212. The text below is the one
+written when it was built.
 
 Goal: a step of `fast` and `all`, decided on 2026-10-20, that runs
 `go fix -diff` over the module and fails when the diff is not empty,

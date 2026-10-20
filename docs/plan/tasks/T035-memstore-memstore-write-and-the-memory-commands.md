@@ -18,10 +18,10 @@ owns:
   - e2e/julieta_memory_test.go
   - e2e/julieta_setup_test.go
   - internal/cli/errors.go
-  - docs/handoff/pending/a-total-bytes-cap-on-entries-of-a-memory-dir.md
-  - docs/handoff/pending/a-bounded-wait-on-the-store-lock.md
-  - docs/handoff/pending/warning-slugs-temp-file-and-handoff-cap-in-04-4-1.md
-  - docs/handoff/pending/a-hard-link-rule-for-memory-dirs.md
+  - docs/handoff/pending/00000000009btjygyz3bsrkawt-a-total-bytes-cap-on-entries-of-a-memory-dir.md
+  - docs/handoff/pending/00000000009xvpcgw65jhhjp1e-a-bounded-wait-on-the-store-lock.md
+  - docs/handoff/pending/0000000000b16dz81ste5g13ns-warning-slugs-temp-file-and-handoff-cap-in-04-4-1.md
+  - docs/handoff/pending/0000000000zxewbbr715asmcej-a-hard-link-rule-for-memory-dirs.md
 needs:
   - T017
   - T008
@@ -153,11 +153,11 @@ it:
   check whose findings need a fix text of their own.
 - Deferred on 2026-10-20, each a pending note with its trigger: a
   total-bytes cap on `entries/`
-  (`docs/handoff/pending/a-total-bytes-cap-on-entries-of-a-memory-dir.md`),
+  (`docs/handoff/pending/00000000009btjygyz3bsrkawt-a-total-bytes-cap-on-entries-of-a-memory-dir.md`),
   a bounded wait on the store lock
-  (`docs/handoff/pending/a-bounded-wait-on-the-store-lock.md`), the
+  (`docs/handoff/pending/00000000009xvpcgw65jhhjp1e-a-bounded-wait-on-the-store-lock.md`), the
   warning slugs of the two `note` lines
-  (`docs/handoff/pending/warning-slugs-temp-file-and-handoff-cap-in-04-4-1.md`),
+  (`docs/handoff/pending/0000000000b16dz81ste5g13ns-warning-slugs-temp-file-and-handoff-cap-in-04-4-1.md`),
   and a hard-link rule
-  (`docs/handoff/pending/a-hard-link-rule-for-memory-dirs.md`).
+  (`docs/handoff/pending/0000000000zxewbbr715asmcej-a-hard-link-rule-for-memory-dirs.md`).
   Each is reopened by the trigger its note names.

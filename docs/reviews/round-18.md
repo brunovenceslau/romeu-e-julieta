@@ -572,9 +572,9 @@ returned NO-GO with three findings, applied in one write pass.
 ## Session checkpoint (2026-10-12)
 
 Migrated on 2026-10-17 to docs/handoff:
-[Done record 20](../handoff/done/0020.md),
+[Done record 20](../handoff/done/00000000000000000000000020-session-of-2026-10-12-rounds-14-to-18-and-the-end-of-stage-a.md),
 and the files it names:
-[three-process-rules-deferred-on-2026-10-12](../handoff/pending/three-process-rules-deferred-on-2026-10-12.md).
+[three-process-rules-deferred-on-2026-10-12](../handoff/pending/0000000000k8s86th94r0gfgnp-three-process-rules-deferred-on-2026-10-12.md).
 
 ### Facts read for the GitHub App route
 

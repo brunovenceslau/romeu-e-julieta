@@ -334,7 +334,7 @@ repository on 2026-10-09.
 ## Session checkpoint (2026-10-09, end of session)
 
 Migrated on 2026-10-17 to docs/handoff:
-[Done record 17](../handoff/done/0017.md),
+[Done record 17](../handoff/done/00000000000000000000000017-session-of-2026-10-09-end-of-session-migrated-from-docs.md),
 and the files it names:
-[the-allowlist-pass-throughs-and-tools-ci-on-a-shared-machine](../handoff/pending/the-allowlist-pass-throughs-and-tools-ci-on-a-shared-machine.md);
-[the-lens-page-tooling-and-the-atam-row](../handoff/pending/the-lens-page-tooling-and-the-atam-row.md).
+[the-allowlist-pass-throughs-and-tools-ci-on-a-shared-machine](../handoff/pending/00000000002nrezj1r7whyavqr-the-allowlist-pass-throughs-and-tools-ci-on-a-shared-machine.md);
+[the-lens-page-tooling-and-the-atam-row](../handoff/pending/0000000000svacbdt2csyvztn3-the-lens-page-tooling-and-the-atam-row.md).

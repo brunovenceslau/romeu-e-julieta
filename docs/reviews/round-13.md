@@ -222,4 +222,4 @@ ADR 0011 is not edited. Nothing under `tools/**`, `.github/**` or
 ## Session checkpoint (2026-10-09, after round 13)
 
 Migrated on 2026-10-17 to docs/handoff:
-[Done record 19](../handoff/done/0019.md).
+[Done record 19](../handoff/done/00000000000000000000000019-session-of-2026-10-09-after-round-13-migrated-from-docs.md).
