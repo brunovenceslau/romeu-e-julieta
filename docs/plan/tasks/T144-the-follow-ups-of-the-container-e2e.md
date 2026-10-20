@@ -3,7 +3,7 @@ id: T144
 title: "The follow-ups of the container e2e"
 milestone: M1
 module: julieta-core
-fate: new
+fate: merged
 owns:
   - e2e/internal/container/**
   - tools/ci/internal/container/**
@@ -16,9 +16,14 @@ after:
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-20
+pr: 191
 ---
 
 # T144 - The follow-ups of the container e2e
+
+Merged on 2026-10-20 in pull request #191. The text below is the one
+written at the re-plan.
 
 Goal: the three code gaps the review of T013 (#186) left in the
 container e2e and the workflows grammar.
