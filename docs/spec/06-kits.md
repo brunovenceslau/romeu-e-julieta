@@ -97,7 +97,8 @@ path, and that root inside the sandbox cannot make it writable with
 obligation of the row above:
 
 1. `REQ-0595` The skills `skills/julieta` and `skills/handoff`, into
-   `~/.claude/skills/`.
+   `~/.claude/skills/`, each skill's whole directory, so the files its
+   `SKILL.md` links (REQ-1255) arrive with it.
 2. `REQ-0596` The Claude Code hooks `SessionStart`, for every source the pinned
    version fires (startup, resume, clear, compact), -> `julieta handoff
    show --hook`, and `SessionEnd` -> `julieta handoff write --facts`,
