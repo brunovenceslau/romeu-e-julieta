@@ -14,9 +14,9 @@
 // are allowlisted for the mode (I5); a clone takes such a URL and a
 // new directory; CreateRef is create-only (I6);
 // BundleCreate writes a bundle of named refs; nothing builds a push
-// (I18). Unbundle, verify, fsck, the tree walk and the history reads
-// are the verbs of the files unbundle*.go, verify*.go, fsck*.go,
-// walk*.go and history*.go.
+// (I18). Unbundle, verify, fsck, the tree walk, the history reads and
+// the reads of a working tree are the verbs of the files unbundle*.go,
+// verify*.go, fsck*.go, walk*.go, history*.go and status*.go.
 package gitsafe
 
 import (
