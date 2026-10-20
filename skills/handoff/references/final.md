@@ -6,7 +6,9 @@ SPDX-License-Identifier: GPL-3.0-only
 # /handoff --final, before the sandbox goes
 
 The sandbox is about to be recreated or removed, so anything only it holds
-is lost. Use these six headings, each as a `## ` line, in this order:
+is lost. The handoff itself is not: julieta writes it to the repo's memory
+dir, which lives on the host and is only mounted into the sandbox, so the
+next sandbox of the project reads it. Use these six headings, each as a `## ` line, in this order:
 
 ```markdown kind=final
 ## Goal
