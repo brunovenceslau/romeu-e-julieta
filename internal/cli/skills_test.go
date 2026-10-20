@@ -5,6 +5,8 @@ package cli_test
 
 import (
 	"fmt"
+	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"regexp"
@@ -26,8 +28,10 @@ import (
 // skillsDir is skills/ seen from this package.
 const skillsDir = "../../skills"
 
-// TestSkillsNameRealCommands reads every skills/*/SKILL.md and fails on
-// a julieta command or flag it names that the command definitions lack,
+// TestSkillsNameRealCommands reads every file of every skills/*/ and
+// fails on a julieta command or flag one names that the command
+// definitions lack, on a reference SKILL.md does not link or a link to
+// no file,
 // and on headings of the handoff skill that differ from those
 // `julieta handoff write` requires (12 12.3, REQ-1115). The headings
 // come from handoff.Headings, the list CheckHeadings enforces.
@@ -40,10 +44,19 @@ func TestSkillsNameRealCommands(t *testing.T) {
 		if !f.IsDir() {
 			continue
 		}
-		b, err := os.ReadFile(path.Join(skillsDir, f.Name(), "SKILL.md"))
-		require.NoError(t, err, "skills/%s needs a SKILL.md", f.Name())
+		files := map[string]string{}
+		dir := path.Join(skillsDir, f.Name())
+		require.NoError(t, fs.WalkDir(os.DirFS(dir), ".", func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			b, err := os.ReadFile(path.Join(dir, p))
+			files[p] = string(b)
+			return err
+		}))
+		require.Contains(t, files, "SKILL.md", "skills/%s needs a SKILL.md", f.Name())
 		seen[f.Name()] = true
-		assert.Empty(t, checkSkill(tree, f.Name(), string(b)), "skills/%s/SKILL.md", f.Name())
+		assert.Empty(t, checkSkill(tree, f.Name(), files), "skills/%s", f.Name())
 	}
 	assert.True(t, seen["julieta"], "skills/julieta/SKILL.md is missing")
 	assert.True(t, seen["handoff"], "skills/handoff/SKILL.md is missing")
@@ -65,38 +78,49 @@ func TestSkillsFixtures(t *testing.T) {
 	tests := []struct {
 		name string
 		text string
-		want string // a substring of the problem; empty means none
+		want string            // a substring of the problem; empty means none
+		refs map[string]string // files besides SKILL.md
 	}{
-		{"a whole skill", whole, ""},
-		{"an unknown flag", strings.Replace(whole, "--final <<", "--finale <<", 1), "has no flag --finale"},
-		{"an unknown flag in a span", skill("`julieta memory add --nope`\n"), "has no flag --nope"},
-		{"an unknown flag in a double backtick span", skill("``julieta memory add --nope``\n"), "has no flag --nope"},
-		{"an unknown command", strings.Replace(whole, "julieta memory add", "julieta remember", 1), "has no command remember"},
-		{"an unknown subcommand", skill("`julieta memory zap`\n"), "has no command zap"},
-		{"an unknown subcommand after a flag", skill("`julieta memory -h zap`\n"), "has no command zap"},
-		{"an unknown flag after a quoted pipe", skill("`julieta memory add --body 'a | b' --nope`\n"), "has no flag --nope"},
-		{"a quoted dash is a value", skill("`julieta memory add --title 'a - b' --tag lesson`\n"), ""},
-		{"a flag value is skipped", skill("`julieta memory add --title -x --tag lesson`\n"), ""},
-		{"a placeholder is a value", skill("`julieta memory show <id> --repo=<path>`\n"), ""},
-		{"an unknown flag in brackets", skill("`julieta handoff write [--finale]`\n"), "has no flag --finale"},
-		{"an unknown flag on a continued line", skill("```sh\njulieta memory add \\\n  --nope\n```\n"), "has no flag --nope"},
-		{"an unknown flag in a tilde block", skill("~~~sh\njulieta memory add --nope\n~~~\n"), "has no flag --nope"},
-		{"a longer fence holds a shorter one", skill("````markdown\n```sh\n````\n`julieta memory add --nope`\n"), "has no flag --nope"},
-		{"an unclosed block", front + blocks + "```sh\njulieta memory add\n", "never closed"},
-		{"a missing heading", strings.Replace(whole, "## State\n## Decisions\n## Next steps\n## Open questions\n## What", "## State\n## Next steps\n## Open questions\n## What", 1), "requires"},
-		{"an extra heading", strings.Replace(whole, "## State\n", "## State\n## Risks\n", 1), "Risks\""},
-		{"a missing block", front + block("clear", clearHeadings), "final"},
-		{"a repeated block", whole + block("clear", clearHeadings), "twice"},
-		{"an unknown kind", whole + block("facts", ""), "facts"},
-		{"no front matter", strings.TrimPrefix(whole, front), "front matter"},
-		{"a name in the body only", strings.Replace(whole, "name: handoff\n", "", 1) + "name: handoff\n", "name"},
-		{"another name", strings.Replace(whole, "name: handoff", "name: hand-off", 1), "hand-off"},
-		{"no description", strings.Replace(whole, "description: d\n", "", 1), "description"},
-		{"a description too long", strings.Replace(whole, "description: d", "description: "+strings.Repeat("d", 1025), 1), "description"},
+		{"a whole skill", whole, "", nil},
+		{"an unknown flag", strings.Replace(whole, "--final <<", "--finale <<", 1), "has no flag --finale", nil},
+		{"an unknown flag in a span", skill("`julieta memory add --nope`\n"), "has no flag --nope", nil},
+		{"an unknown flag in a double backtick span", skill("``julieta memory add --nope``\n"), "has no flag --nope", nil},
+		{"an unknown command", strings.Replace(whole, "julieta memory add", "julieta remember", 1), "has no command remember", nil},
+		{"an unknown subcommand", skill("`julieta memory zap`\n"), "has no command zap", nil},
+		{"an unknown subcommand after a flag", skill("`julieta memory -h zap`\n"), "has no command zap", nil},
+		{"an unknown flag after a quoted pipe", skill("`julieta memory add --body 'a | b' --nope`\n"), "has no flag --nope", nil},
+		{"a quoted dash is a value", skill("`julieta memory add --title 'a - b' --tag lesson`\n"), "", nil},
+		{"a flag value is skipped", skill("`julieta memory add --title -x --tag lesson`\n"), "", nil},
+		{"a placeholder is a value", skill("`julieta memory show <id> --repo=<path>`\n"), "", nil},
+		{"an unknown flag in brackets", skill("`julieta handoff write [--finale]`\n"), "has no flag --finale", nil},
+		{"an unknown flag on a continued line", skill("```sh\njulieta memory add \\\n  --nope\n```\n"), "has no flag --nope", nil},
+		{"an unknown flag in a tilde block", skill("~~~sh\njulieta memory add --nope\n~~~\n"), "has no flag --nope", nil},
+		{"a longer fence holds a shorter one", skill("````markdown\n```sh\n````\n`julieta memory add --nope`\n"), "has no flag --nope", nil},
+		{"an unclosed block", front + blocks + "```sh\njulieta memory add\n", "never closed", nil},
+		{"a missing heading", strings.Replace(whole, "## State\n## Decisions\n## Next steps\n## Open questions\n## What", "## State\n## Next steps\n## Open questions\n## What", 1), "requires", nil},
+		{"an extra heading", strings.Replace(whole, "## State\n", "## State\n## Risks\n", 1), "Risks\"", nil},
+		{"a missing block", front + block("clear", clearHeadings), "final", nil},
+		{"a repeated block", whole + block("clear", clearHeadings), "twice", nil},
+		{"an unknown kind", whole + block("facts", ""), "facts", nil},
+		{"no front matter", strings.TrimPrefix(whole, front), "front matter", nil},
+		{"a name in the body only", strings.Replace(whole, "name: handoff\n", "", 1) + "name: handoff\n", "name", nil},
+		{"another name", strings.Replace(whole, "name: handoff", "name: hand-off", 1), "hand-off", nil},
+		{"no description", strings.Replace(whole, "description: d\n", "", 1), "description", nil},
+		{"a block in a reference", front + "See [clear](references/clear.md).\n" + block("final", finalHeadings), "", map[string]string{"references/clear.md": block("clear", clearHeadings)}},
+		{"a command in a reference", front + "See [m](references/m.md).\n" + blocks, "has no flag --nope", map[string]string{"references/m.md": "`julieta memory add --nope`\n"}},
+		{"an unlinked reference", whole, "references/m.md is linked from no line of SKILL.md", map[string]string{"references/m.md": "text\n"}},
+		{"a link to no file", skill("See [m](references/m.md).\n"), "links to references/m.md, which is not in the skill", nil},
+		{"a body too long", skill(strings.Repeat("text\n", 500)), "keep it under 500", nil},
+		{"a description too long", strings.Replace(whole, "description: d", "description: "+strings.Repeat("d", 1025), 1), "description", nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := strings.Join(checkSkill(tree, "handoff", tt.text), "\n")
+			files := tt.refs
+			if files == nil {
+				files = map[string]string{}
+			}
+			files["SKILL.md"] = tt.text
+			got := strings.Join(checkSkill(tree, "handoff", files), "\n")
 			if tt.want == "" {
 				assert.Empty(t, got)
 				return
@@ -109,17 +133,72 @@ func TestSkillsFixtures(t *testing.T) {
 // skillName is the form Claude Code takes for a skill's name.
 var skillName = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
-// checkSkill returns the problems of the SKILL.md text of the skill
-// named name: a front matter without that name or without a
-// description, a julieta command or flag that tree lacks, a code block
-// never closed, and, for the skill "handoff", kind blocks whose headings
-// differ from handoff.Headings. A line scan, not a Markdown parser: a
-// command is a line of a code block, joined with the lines a trailing
-// backslash continues, or a code span, that starts with "julieta".
-func checkSkill(tree *cobra.Command, name, text string) []string {
-	problems, lines := frontMatterProblems(name, strings.Split(text, "\n"))
+// checkSkill returns the problems of the skill named name, whose files
+// maps each path below its directory to its text: a front matter of
+// SKILL.md without that name or without a description, a SKILL.md body
+// of 500 lines or more, a file of the skill SKILL.md does not link, a
+// link of SKILL.md to no file of the skill, and the problems scanFile
+// finds in each file. For the skill "handoff", the kind blocks of all
+// its files together must name the headings handoff.Headings gives.
+// SKILL.md links each reference so the agent reads it only when needed
+// (progressive disclosure), and a file it does not link is never read.
+func checkSkill(tree *cobra.Command, name string, files map[string]string) []string {
+	problems, body := frontMatterProblems(name, strings.Split(files["SKILL.md"], "\n"))
+	if len(body) >= 500 {
+		problems = append(problems, fmt.Sprintf("the body of SKILL.md has %d lines, keep it under 500 and move detail to references/", len(body)))
+	}
+	linked := map[string]bool{}
+	for _, m := range relativeLink.FindAllStringSubmatch(files["SKILL.md"], -1) {
+		target := path.Clean(m[1])
+		linked[target] = true
+		if _, ok := files[target]; !ok {
+			problems = append(problems, fmt.Sprintf("SKILL.md links to %s, which is not in the skill", target))
+		}
+	}
 	blocks := map[string][]string{} // kind -> headings of its block
-	kind, fence := "", ""           // fence: the run that opened the block, "" outside one
+	for _, p := range slices.Sorted(maps.Keys(files)) {
+		if p != "SKILL.md" && !linked[p] {
+			problems = append(problems, p+" is linked from no line of SKILL.md")
+		}
+		lines := strings.Split(files[p], "\n")
+		if p == "SKILL.md" {
+			lines = body
+		}
+		problems = append(problems, scanFile(tree, p, lines, blocks)...)
+	}
+	if name != "handoff" {
+		return problems
+	}
+	for _, k := range []handoff.Kind{handoff.Clear, handoff.Final} {
+		got, ok := blocks[string(k)]
+		switch {
+		case !ok:
+			problems = append(problems, fmt.Sprintf("no block kind=%s names the headings of a %s handoff", k, k))
+		case !slices.Equal(got, handoff.Headings(k)):
+			problems = append(problems, fmt.Sprintf("the headings for %s are %q, julieta handoff write requires %q", k, got, handoff.Headings(k)))
+		}
+	}
+	for k := range blocks {
+		if !handoff.Kind(k).Narrative() {
+			problems = append(problems, fmt.Sprintf("a block kind=%s: only clear and final have headings", k))
+		}
+	}
+	return problems
+}
+
+// relativeLink matches a Markdown link to a path, not to a URL or an
+// anchor of the same file.
+var relativeLink = regexp.MustCompile(`\]\(([^)#\s:]+)(?:#[^)]*)?\)`)
+
+// scanFile returns the problems of the lines of the file p: a julieta
+// command or flag that tree lacks, a code block never closed, and a kind
+// block that comes twice in the skill; it adds the headings of each kind
+// block to blocks. A line scan, not a Markdown parser: a command is a
+// line of a code block, joined with the lines a trailing backslash
+// continues, or a code span, that starts with "julieta".
+func scanFile(tree *cobra.Command, p string, lines []string, blocks map[string][]string) []string {
+	var problems []string
+	kind, fence := "", "" // fence: the run that opened the block, "" outside one
 	for i := 0; i < len(lines); i++ {
 		trimmed := strings.TrimSpace(lines[i])
 		if run := fenceRun(trimmed); run != "" {
@@ -159,24 +238,7 @@ func checkSkill(tree *cobra.Command, name, text string) []string {
 		}
 	}
 	if fence != "" {
-		problems = append(problems, fmt.Sprintf("a code block opened with %s is never closed", fence))
-	}
-	if name != "handoff" {
-		return problems
-	}
-	for _, k := range []handoff.Kind{handoff.Clear, handoff.Final} {
-		got, ok := blocks[string(k)]
-		switch {
-		case !ok:
-			problems = append(problems, fmt.Sprintf("no block kind=%s names the headings of a %s handoff", k, k))
-		case !slices.Equal(got, handoff.Headings(k)):
-			problems = append(problems, fmt.Sprintf("the headings for %s are %q, julieta handoff write requires %q", k, got, handoff.Headings(k)))
-		}
-	}
-	for k := range blocks {
-		if !handoff.Kind(k).Narrative() {
-			problems = append(problems, fmt.Sprintf("a block kind=%s: only clear and final have headings", k))
-		}
+		problems = append(problems, fmt.Sprintf("%s: a code block opened with %s is never closed", p, fence))
 	}
 	return problems
 }

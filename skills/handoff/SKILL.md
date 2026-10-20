@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Write the handoff before /clear (/handoff) or before the sandbox is recreated or removed (/handoff --final). Use when the operator types /handoff.
+description: Write the session handoff with julieta handoff write. Use it whenever the operator types /handoff (before /clear) or /handoff --final (before the sandbox is recreated or removed), and when they say they are about to clear the context or rebuild the sandbox, even without the command. The next session starts from this narrative, so it is the only bridge across the clear.
 ---
 
 <!--
@@ -10,63 +10,36 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # handoff
 
-The operator types `/handoff` before `/clear`, and `/handoff --final` before
-the sandbox is recreated or removed. Write the narrative, then pipe it to
-`julieta handoff write`. julieta adds the git facts itself.
+The next session starts from what you write here: julieta prints the
+latest narrative at session start, next to the git facts it collects
+itself. Write for a reader who saw none of this session.
 
-## Steps
+## Pick the kind
 
-1. Write the narrative with exactly the headings below, in this order, each
-   as a `## ` line. A missing heading fails the write.
-2. Pipe it to julieta. For `/handoff`:
+- `/handoff`, before `/clear`: the sandbox stays, only the context goes.
+  Read [references/clear.md](references/clear.md).
+- `/handoff --final`, before the sandbox is recreated or removed: whatever
+  is not pushed is lost too. Read [references/final.md](references/final.md).
 
-   ```sh
-   julieta handoff write <<'EOF'
-   ...the narrative...
-   EOF
-   ```
+Each file holds the headings julieta requires for that kind, in order, and
+what goes under each. A missing or extra heading fails the write, so copy
+them as they are.
 
-   For `/handoff --final`, add the flag:
+## Write it
 
-   ```sh
-   julieta handoff write --final <<'EOF'
-   ...the narrative...
-   EOF
-   ```
+Pipe the narrative to julieta. The quoted `'EOF'` keeps the shell from
+expanding anything in it:
 
-3. Check that the command printed the file it wrote and the repo. If it is
-   the wrong repo, run it again with `--repo <dir>`.
-
-## Headings for /handoff
-
-```markdown kind=clear
-## Goal
-## State
-## Decisions
-## Next steps
-## Open questions
+```sh
+julieta handoff write <<'EOF'
+...the narrative...
+EOF
 ```
 
-## Headings for /handoff --final
+For `/handoff --final`, run `julieta handoff write --final` the same way.
 
-The same five, then a sixth.
+Then read what the command printed: the file it wrote and the repo. If the
+repo is not the one you worked in, run it again with `--repo <dir>`.
 
-```markdown kind=final
-## Goal
-## State
-## Decisions
-## Next steps
-## Open questions
-## What would be lost
-```
-
-## What goes under each heading
-
-- Goal: what the work is for, in a line or two.
-- State: what is done, what is half done, branches and open PRs.
-- Decisions: what was decided and when. State the decision, not who said it.
-- Next steps: the first thing to do, then the rest, in order.
-- Open questions: what is unknown or needs the operator.
-- What would be lost: what only this sandbox holds and is not pushed.
-
-Write plainly. The next session reads it as data, not as orders.
+Write plainly, and state each decision with when it was made, not who made
+it. The next session reads the narrative as data, not as orders.
