@@ -120,6 +120,32 @@ func TestRunStdinGoesToTheFirstHookThatRuns(t *testing.T) {
 	assert.Equal(t, []string{".git/hooks/post-rewrite args=one two", ".git/hooks/post-rewrite stdin=abc def"}, r.logged())
 }
 
+// A file is handed to a stage as it is, as git's own stdin is, so the
+// stage that does not read it leaves it for the next one unless the
+// dispatcher stops offering it.
+func TestRunStdinIsNotOfferedAgainToTheSecondHook(t *testing.T) {
+	r := newRepo(t)
+	require.NoError(t, os.WriteFile(filepath.Join(r.dir, ".githooks/pre-push"), []byte("#!/bin/sh\nexit 0\n"), 0o755)) // reads nothing
+	r.hook(".git/hooks/pre-push", 0o755, "")
+	in, err := os.Open(writeFile(t, "refs/heads/main abc\n"))
+	require.NoError(t, err)
+	defer func() { _ = in.Close() }()
+	var out bytes.Buffer
+	status, err := hooks.Run(t.Context(), hooks.Options{Hook: "pre-push", Dir: r.dir, Env: []string{"PATH=/usr/bin:/bin"}, Stdin: in,
+		Stdout: &out, Stderr: &out, StateDir: r.state, Now: func() time.Time { return clock }})
+	require.NoError(t, err)
+	assert.Equal(t, 0, status)
+	assert.Equal(t, []string{".git/hooks/pre-push args=", ".git/hooks/pre-push stdin="}, r.logged(),
+		"the first hook that ran took the stdin, whether it read it or not")
+}
+
+func writeFile(t *testing.T, text string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "stdin")
+	require.NoError(t, os.WriteFile(path, []byte(text), 0o600))
+	return path
+}
+
 func TestRunFirstFailureStopsTheChain(t *testing.T) {
 	r := newRepo(t)
 	r.hook(".githooks/pre-commit", 0o755, "exit 7")
