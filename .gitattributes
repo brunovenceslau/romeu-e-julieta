@@ -42,6 +42,8 @@ docs/reference/romeu/completion/fish.md -text
 docs/reference/romeu/completion/zsh.md -text
 docs/reference/romeu/version.md -text
 internal/cli/exitcodes_gen.go -text
+schemas/handoff.v1.json -text
+schemas/julieta-handoff.v1.json -text
 schemas/julieta-memory.v1.json -text
 schemas/julieta-setup.v1.json -text
 schemas/julieta-status.v1.json -text
