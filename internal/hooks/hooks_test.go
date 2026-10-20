@@ -155,7 +155,10 @@ func TestRunFirstFailureStopsTheChain(t *testing.T) {
 	assert.Equal(t, 7, status)
 	assert.Equal(t, "julieta hooks: pre-commit stage tracked ("+r.dir+"/.githooks/pre-commit) exited 7\n", stderr)
 	assert.Len(t, r.logged(), 2, "the local hook did not run")
-	assert.Equal(t, []hooks.Failure{{At: clock, ExitCode: 7, Hook: "pre-commit", Path: r.dir + "/.githooks/pre-commit", Repo: r.dir, Stage: "tracked"}}, r.failures())
+	// The repo is named by its real path (TMPDIR is under a link on macOS).
+	repo, err := filepath.EvalSymlinks(r.dir)
+	require.NoError(t, err)
+	assert.Equal(t, []hooks.Failure{{At: clock, ExitCode: 7, Hook: "pre-commit", Path: r.dir + "/.githooks/pre-commit", Repo: repo, Stage: "tracked"}}, r.failures())
 }
 
 func TestRunLocalHookFailure(t *testing.T) {
