@@ -205,7 +205,7 @@ func TestGenerateWroteLineIsSafe(t *testing.T) {
 	require.Equal(t, check.ExitOK, code, errOut)
 	assert.Contains(t, out, `d`+"\n"+`\u00a0::error::forged\x1b[2J/README.md`)
 	assert.NotContains(t, out, "\x1b")
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
 		assert.NotContains(t, line, "\u00a0")
 	}

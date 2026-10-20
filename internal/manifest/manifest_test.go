@@ -178,8 +178,7 @@ func TestDecodeRefuses(t *testing.T) {
 		t.Run(strings.ReplaceAll(c.name, " ", "_"), func(t *testing.T) {
 			_, err := Decode(c.data)
 			require.Error(t, err)
-			var e *cli.Error
-			if errors.As(err, &e) {
+			if e, ok := errors.AsType[*cli.Error](err); ok {
 				assert.NotEqual(t, ManifestProtocol, e.Row, "a document that does not decode is not a protocol error")
 			}
 		})

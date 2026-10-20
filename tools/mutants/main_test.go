@@ -255,7 +255,7 @@ func TestMutantsEveryMutantKilled(t *testing.T) {
 	sub := filepath.Join(f.repo.Dir, "calc")
 	src, err := os.ReadFile(f.mutants)
 	require.NoError(t, err)
-	killedOnly := strings.SplitN(string(src), "  - id: double-plus", 2)[0]
+	killedOnly, _, _ := strings.Cut(string(src), "  - id: double-plus")
 	rel, err := filepath.Rel(sub, f.mutants)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(f.mutants, []byte(killedOnly), 0o644))

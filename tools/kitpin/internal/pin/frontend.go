@@ -10,6 +10,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"maps"
 	"mime"
 	"net/url"
 	"regexp"
@@ -59,9 +60,7 @@ func pinFrontend(ctx context.Context, e Env, _ *writer, p *pins.Pins) (string, e
 		return "", err
 	}
 	headers := map[string]string{"Accept": strings.Join(indexTypes, ", ")}
-	for k, v := range auth {
-		headers[k] = v
-	}
+	maps.Copy(headers, auth)
 	body, h, err := fetch(ctx, e, e.Registry, "/v2/"+frontendRepo+"/manifests/"+tag, headers)
 	if err != nil {
 		return "", err

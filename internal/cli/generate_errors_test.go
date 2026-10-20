@@ -18,8 +18,8 @@ import (
 
 // rows are two declared rows: one recovered in a guide, one with none.
 var rows = []cli.Declared{
-	{Row: cli.Row{ID: "RJ-301", Slug: "approval", Exit: 3, Fix: "romeu approve <name>", RecoveredIn: "docs/guide/approve.md#gate-2"}, File: "internal/gate/errors.go"},
-	{Row: cli.Row{ID: "RJ-348", Slug: "internal", Exit: 1, Fix: "decide: a | b", RecoveredIn: "none: a defect"}, File: "internal/cli/errors.go"},
+	{ID: "RJ-301", Slug: "approval", Exit: 3, Fix: "romeu approve <name>", RecoveredIn: "docs/guide/approve.md#gate-2", File: "internal/gate/errors.go"},
+	{ID: "RJ-348", Slug: "internal", Exit: 1, Fix: "decide: a | b", RecoveredIn: "none: a defect", File: "internal/cli/errors.go"},
 }
 
 // TestErrorsPage writes the front matter, the header and one line per

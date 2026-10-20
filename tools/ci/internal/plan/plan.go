@@ -356,7 +356,7 @@ func implements(t Task, lines []string, from int, findings []check.Finding) (int
 	if none.MatchString(block) {
 		return start, nil, findings
 	}
-	for _, e := range strings.Split(strings.TrimSuffix(block, "."), ", ") {
+	for e := range strings.SplitSeq(strings.TrimSuffix(block, "."), ", ") {
 		if !entry.MatchString(e) {
 			add(fmt.Sprintf("the Implements entry %q is not an id with its reading aid, \"REQ-nnnn (<page> <n>.<m>)\", \"(<page> (opening))\" or \"(index)\", nor the none form", e))
 		}

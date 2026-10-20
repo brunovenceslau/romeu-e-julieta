@@ -29,7 +29,7 @@ func TestChecksPrintErrorsAsSafeText(t *testing.T) {
 	got := out.String()
 	assert.NotContains(t, got, "\x1b")
 	assert.NotContains(t, got, "##[")
-	for _, line := range strings.Split(got, "\n") {
+	for line := range strings.SplitSeq(got, "\n") {
 		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
 	}
 	assert.Contains(t, got, `\x1b[2J`)
@@ -55,7 +55,7 @@ func TestQuietStepPrintsSafeText(t *testing.T) {
 	})
 	var listing, code []string
 	var in *[]string
-	for _, line := range strings.Split(out.String(), "\n") {
+	for line := range strings.SplitSeq(out.String(), "\n") {
 		switch {
 		case strings.HasPrefix(line, "FAIL  listing"):
 			in = &listing

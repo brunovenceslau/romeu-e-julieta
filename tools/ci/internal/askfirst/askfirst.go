@@ -16,6 +16,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -172,14 +173,14 @@ func GlobMatch(glob, name string) bool {
 		match[i] = make([]bool, len(n)+1)
 	}
 	match[len(g)][len(n)] = true
-	for i := len(g) - 1; i >= 0; i-- {
+	for i, v := range slices.Backward(g) {
 		for j := len(n); j >= 0; j-- {
-			if g[i] == "**" {
+			if v == "**" {
 				match[i][j] = match[i+1][j] || (j < len(n) && match[i][j+1])
 				continue
 			}
 			if j < len(n) {
-				ok, err := path.Match(g[i], n[j])
+				ok, err := path.Match(v, n[j])
 				match[i][j] = err == nil && ok && match[i+1][j+1]
 			}
 		}
