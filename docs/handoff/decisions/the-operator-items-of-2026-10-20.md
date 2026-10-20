@@ -8,8 +8,12 @@ Scope: this repository.
 Decided on 2026-10-20, answering the "Open for the operator" list of
 the checkpoint after the swaps of ADR 0038:
 
-- ADR 0039, with its supersedes lines for ADR 0001, and ADR 0021 are
-  Accepted.
+- [ADR 0039, state the scope of every decision record](../../adr/0039-state-the-scope-of-every-decision-record.md),
+  with its supersedes lines for
+  [ADR 0001, adopt a documentation standard with checkable rules and a voice](../../adr/0001-adopt-a-documentation-standard-with-checkable-rules-and-a-voice.md),
+  and
+  [ADR 0021, keep memory as plain per-repo files](../../adr/0021-keep-memory-as-plain-per-repo-files.md)
+  are Accepted.
 - The T112 prompts (the config repository's first, then the sandbox
   kit repository's) and the ADR 0039 prompt for the payload are pasted
   into their sessions on 2026-10-20; each session reports its pull

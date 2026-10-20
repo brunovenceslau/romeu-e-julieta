@@ -3,7 +3,9 @@
 ## Where we stopped
 
 Checkpoint of 2026-10-20, after T035 merged (Done record 46, which
-ticks T035, T145 and T146).
+ticks T035, T145 and T146). Later that day ADR 0039 and ADR 0021 were
+accepted and the operator items answered
+("the-operator-items-of-2026-10-20").
 
 ## Next steps
 

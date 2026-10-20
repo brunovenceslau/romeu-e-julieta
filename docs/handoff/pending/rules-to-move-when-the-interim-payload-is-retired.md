@@ -17,9 +17,11 @@ repository (REQ-0608) unless named otherwise:
   into the payload's session on 2026-10-20; its pull request is not yet
   reported. Open: the personal kit, or a product skill under `skills/`
   if adopters get it too.
-- State the scope of every decision record (ADR 0039), as a sentence
-  in the payload's "How to work". A prompt was handed over on
-  2026-10-20 to paste into the payload's session; not confirmed pasted.
+- State the scope of every decision record (ADR 0039, accepted on
+  2026-10-20), as a sentence in the payload's "How to work". Sent: the
+  sandbox payload of 2026-10-20 holds the sentence in "How to work",
+  measured in this sandbox's `~/.claude/CLAUDE.md`; its pull request is
+  not yet reported. Open: the personal kit.
 
 The payload holds other rules that came from elsewhere; listing them
 belongs to the payload's own repository.
