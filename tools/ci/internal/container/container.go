@@ -200,8 +200,8 @@ type event struct {
 //     every failed package holds such a test;
 //   - otherwise a failure that names the failed tests.
 //
-// A named test counts only if its own output is nothing or the one
-// line of Fail (reportLine); a parent that is named only through a
+// A named test counts only if its own output is the one line of Fail
+// (reportLine), which it always prints; a parent that is named only through a
 // subtest prints none. Trust still comes from the private file of
 // names; the output is a heuristic that catches an assertion that
 // failed before the error. A bare t.Fail or t.FailNow before Fail
@@ -271,7 +271,7 @@ func read(out []byte, runErr error, infra []string) ([]byte, error) {
 		covered := slices.ContainsFunc(infra, func(i string) bool {
 			switch {
 			case i == name:
-				return len(lines) == 0 || (len(lines) == 1 && reportLine.MatchString(lines[0]))
+				return len(lines) == 1 && reportLine.MatchString(lines[0])
 			case strings.HasPrefix(i, name+"/"):
 				return len(lines) == 0
 			}

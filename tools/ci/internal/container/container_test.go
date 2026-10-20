@@ -119,9 +119,10 @@ func TestRead(t *testing.T) {
 		{"no test, and the run failed", "# example.invalid/e2e\nx.go:1: syntax error\n" + ev("fail", "", ""), nil, runErr, "no test ran", "syntax error"},
 		{"a skipped test", ev("run", "TestA", "") + ev("pass", "TestA", "") + ev("run", "TestB", "") + ev("skip", "TestB", "") + ev("pass", "", ""), nil, nil, "skipped, which a test never is (REQ-0798): TestB", ""},
 		{"a test that ran and neither passed nor failed", ev("run", "TestA", "") + ev("pass", "", ""), nil, nil, "no test passed", ""},
-		{"an infrastructure error", ev("run", "TestContainerVersion", "") + ev("fail", "TestContainerVersion", "") + ev("fail", "", ""), []string{"TestContainerVersion"}, runErr, "infra", ""},
-		{"an infrastructure error in a subtest", ev("run", "TestContainer", "") + ev("run", "TestContainer/version", "") + ev("fail", "TestContainer/version", "") + ev("fail", "TestContainer", "") + ev("fail", "", ""), []string{"TestContainer/version"}, runErr, "infra", ""},
+		{"an infrastructure error", ev("run", "TestContainerVersion", "") + ev("output", "TestContainerVersion", forged) + ev("fail", "TestContainerVersion", "") + ev("fail", "", ""), []string{"TestContainerVersion"}, runErr, "infra", ""},
+		{"an infrastructure error in a subtest", ev("run", "TestContainer", "") + ev("run", "TestContainer/version", "") + ev("output", "TestContainer/version", forged) + ev("fail", "TestContainer/version", "") + ev("fail", "TestContainer", "") + ev("fail", "", ""), []string{"TestContainer/version"}, runErr, "infra", ""},
 		{"an infrastructure error beside a test failure", ev("run", "TestA", "") + ev("fail", "TestA", "") + ev("run", "TestB", "") + ev("output", "TestB", "    b_test.go:9: the digest differs from the pin\n") + ev("fail", "TestB", "") + ev("fail", "", ""), []string{"TestA"}, runErr, "TestB", ""},
+		{"a recorded test that printed nothing failed silently", ev("run", "TestA", "") + ev("fail", "TestA", "") + ev("fail", "", ""), []string{"TestA"}, runErr, "TestA", ""},
 		{"an infrastructure error with its one line", ev("run", "TestA", "") + ev("output", "TestA", "=== RUN   TestA\n") + ev("output", "TestA", forged) + ev("output", "TestA", "--- FAIL: TestA (0.00s)\n") + ev("fail", "TestA", "") + ev("fail", "", ""), []string{"TestA"}, runErr, "infra", ""},
 		{"an assertion that failed before the infrastructure error", ev("run", "TestA", "") + ev("output", "TestA", "    a_test.go:9: the digest differs from the pin\n") + ev("output", "TestA", forged) + ev("fail", "TestA", "") + ev("fail", "", ""), []string{"TestA"}, runErr, "TestA", ""},
 		{"an assertion in a subtest and an infrastructure error in its parent's other subtest", ev("run", "TestA", "") + ev("run", "TestA/x", "") + ev("run", "TestA/y", "") + ev("output", "TestA/x", "    a_test.go:9: wrong\n") + ev("fail", "TestA/x", "") + ev("output", "TestA/y", forged) + ev("fail", "TestA/y", "") + ev("fail", "TestA", "") + ev("fail", "", ""), []string{"TestA/y"}, runErr, "TestA/x", ""},
@@ -168,7 +169,7 @@ func TestAroundMakesAPrivateFile(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o700), dir.Mode().Perm())
 	require.NoError(t, os.WriteFile(path, []byte("TestContainerVersion\n"), 0o600))
-	_, err = r([]byte(ev("run", "TestContainerVersion", "")+ev("fail", "TestContainerVersion", "")+ev("fail", "", "")), errors.New("exit status 1"))
+	_, err = r([]byte(ev("run", "TestContainerVersion", "")+ev("output", "TestContainerVersion", "    c_test.go:3: "+InfraPrefix+"x\n")+ev("fail", "TestContainerVersion", "")+ev("fail", "", "")), errors.New("exit status 1"))
 	require.ErrorIs(t, err, check.ErrInfrastructure)
 	assert.NoDirExists(t, filepath.Dir(path), "the reader removes the directory")
 }
