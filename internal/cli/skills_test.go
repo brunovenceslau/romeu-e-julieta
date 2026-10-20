@@ -7,13 +7,16 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	_ "github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/all"
@@ -50,12 +53,14 @@ func TestSkillsNameRealCommands(t *testing.T) {
 // passes, and each defect is named.
 func TestSkillsFixtures(t *testing.T) {
 	tree := cli.Tree(&cli.Env{Binary: "julieta"})
-	clear := "## Goal\n## State\n## Decisions\n## Next steps\n## Open questions\n"
-	final := clear + "## What would be lost\n"
-	skill := func(body string) string { return "---\nname: handoff\ndescription: d\n---\n" + body }
+	clearHeadings := "## Goal\n## State\n## Decisions\n## Next steps\n## Open questions\n"
+	finalHeadings := clearHeadings + "## What would be lost\n"
+	front := "---\nname: handoff\ndescription: d\n---\n"
 	block := func(kind, headings string) string { return "```markdown kind=" + kind + "\n" + headings + "```\n" }
+	blocks := block("clear", clearHeadings) + block("final", finalHeadings)
+	skill := func(body string) string { return front + body + blocks }
 	whole := skill("`julieta memory add --title t --tag lesson`\n" +
-		"```sh\njulieta handoff write --final <<'EOF'\nEOF\n```\n" + block("clear", clear) + block("final", final))
+		"```sh\njulieta handoff write --final <<'EOF'\nEOF\n```\n")
 
 	tests := []struct {
 		name string
@@ -63,15 +68,31 @@ func TestSkillsFixtures(t *testing.T) {
 		want string // a substring of the problem; empty means none
 	}{
 		{"a whole skill", whole, ""},
-		{"an unknown flag", strings.Replace(whole, "--final <<", "--finale <<", 1), "--finale"},
-		{"an unknown flag in a span", skill("`julieta memory add --nope`\n" + block("clear", clear) + block("final", final)), "--nope"},
-		{"an unknown command", strings.Replace(whole, "julieta memory add", "julieta remember", 1), "remember"},
-		{"an unknown subcommand", skill("`julieta memory zap`\n" + block("clear", clear) + block("final", final)), "zap"},
-		{"a missing heading", strings.Replace(whole, "## State\n## Decisions\n## Next steps\n## Open questions\n## What", "## State\n## Next steps\n## Open questions\n## What", 1), "Decisions"},
-		{"an extra heading", strings.Replace(whole, "## State\n", "## State\n## Risks\n", 1), "Risks"},
-		{"a missing block", skill(block("clear", clear)), "final"},
+		{"an unknown flag", strings.Replace(whole, "--final <<", "--finale <<", 1), "has no flag --finale"},
+		{"an unknown flag in a span", skill("`julieta memory add --nope`\n"), "has no flag --nope"},
+		{"an unknown flag in a double backtick span", skill("``julieta memory add --nope``\n"), "has no flag --nope"},
+		{"an unknown command", strings.Replace(whole, "julieta memory add", "julieta remember", 1), "has no command remember"},
+		{"an unknown subcommand", skill("`julieta memory zap`\n"), "has no command zap"},
+		{"an unknown subcommand after a flag", skill("`julieta memory -h zap`\n"), "has no command zap"},
+		{"an unknown flag after a quoted pipe", skill("`julieta memory add --body 'a | b' --nope`\n"), "has no flag --nope"},
+		{"a quoted dash is a value", skill("`julieta memory add --title 'a - b' --tag lesson`\n"), ""},
+		{"a flag value is skipped", skill("`julieta memory add --title -x --tag lesson`\n"), ""},
+		{"a placeholder is a value", skill("`julieta memory show <id> --repo=<path>`\n"), ""},
+		{"an unknown flag in brackets", skill("`julieta handoff write [--finale]`\n"), "has no flag --finale"},
+		{"an unknown flag on a continued line", skill("```sh\njulieta memory add \\\n  --nope\n```\n"), "has no flag --nope"},
+		{"an unknown flag in a tilde block", skill("~~~sh\njulieta memory add --nope\n~~~\n"), "has no flag --nope"},
+		{"a longer fence holds a shorter one", skill("````markdown\n```sh\n````\n`julieta memory add --nope`\n"), "has no flag --nope"},
+		{"an unclosed block", front + blocks + "```sh\njulieta memory add\n", "never closed"},
+		{"a missing heading", strings.Replace(whole, "## State\n## Decisions\n## Next steps\n## Open questions\n## What", "## State\n## Next steps\n## Open questions\n## What", 1), "requires"},
+		{"an extra heading", strings.Replace(whole, "## State\n", "## State\n## Risks\n", 1), "Risks\""},
+		{"a missing block", front + block("clear", clearHeadings), "final"},
+		{"a repeated block", whole + block("clear", clearHeadings), "twice"},
 		{"an unknown kind", whole + block("facts", ""), "facts"},
-		{"no front matter", strings.TrimPrefix(whole, "---\nname: handoff\ndescription: d\n---\n"), "front matter"},
+		{"no front matter", strings.TrimPrefix(whole, front), "front matter"},
+		{"a name in the body only", strings.Replace(whole, "name: handoff\n", "", 1) + "name: handoff\n", "name"},
+		{"another name", strings.Replace(whole, "name: handoff", "name: hand-off", 1), "hand-off"},
+		{"no description", strings.Replace(whole, "description: d\n", "", 1), "description"},
+		{"a description too long", strings.Replace(whole, "description: d", "description: "+strings.Repeat("d", 1025), 1), "description"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -85,47 +106,60 @@ func TestSkillsFixtures(t *testing.T) {
 	}
 }
 
+// skillName is the form Claude Code takes for a skill's name.
+var skillName = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
 // checkSkill returns the problems of the SKILL.md text of the skill
-// named name: a missing front matter, a julieta command or flag that
-// tree lacks, and, for the skill "handoff", kind blocks whose headings
+// named name: a front matter without that name or without a
+// description, a julieta command or flag that tree lacks, a code block
+// never closed, and, for the skill "handoff", kind blocks whose headings
 // differ from handoff.Headings. A line scan, not a Markdown parser: a
-// command is a line of a code block, or a code span, that starts with
-// "julieta".
+// command is a line of a code block, joined with the lines a trailing
+// backslash continues, or a code span, that starts with "julieta".
 func checkSkill(tree *cobra.Command, name, text string) []string {
-	var problems []string
-	lines := strings.Split(text, "\n")
-	if len(lines) < 4 || lines[0] != "---" || !slices.Contains(lines[1:], "---") || !slices.Contains(lines, "name: "+name) {
-		problems = append(problems, "the front matter lacks name: "+name)
-	}
+	problems, lines := frontMatterProblems(name, strings.Split(text, "\n"))
 	blocks := map[string][]string{} // kind -> headings of its block
-	kind, fenced := "", false
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if info, ok := strings.CutPrefix(trimmed, "```"); ok {
-			fenced = !fenced
-			kind = ""
-			if fenced {
+	kind, fence := "", ""           // fence: the run that opened the block, "" outside one
+	for i := 0; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if run := fenceRun(trimmed); run != "" {
+			info := trimmed[len(run):]
+			switch {
+			case fence == "":
+				fence, kind = run, ""
 				for f := range strings.FieldsSeq(info) {
 					if k, ok := strings.CutPrefix(f, "kind="); ok {
-						kind = k
-						blocks[k] = []string{}
+						if _, dup := blocks[k]; dup {
+							problems = append(problems, fmt.Sprintf("a block kind=%s comes twice", k))
+						}
+						kind, blocks[k] = k, []string{}
 					}
 				}
+				continue
+			case run[0] == fence[0] && len(run) >= len(fence) && strings.TrimSpace(info) == "":
+				fence, kind = "", ""
+				continue
 			}
-			continue
 		}
 		switch {
 		case kind != "":
 			if h, ok := strings.CutPrefix(trimmed, "## "); ok {
 				blocks[kind] = append(blocks[kind], h)
 			}
-		case fenced:
+		case fence != "":
+			for strings.HasSuffix(trimmed, `\`) && i+1 < len(lines) {
+				i++
+				trimmed = strings.TrimSuffix(trimmed, `\`) + " " + strings.TrimSpace(lines[i])
+			}
 			problems = append(problems, commandProblems(tree, trimmed)...)
 		default:
-			for span := range codeSpans(line) {
+			for span := range codeSpans(lines[i]) {
 				problems = append(problems, commandProblems(tree, span)...)
 			}
 		}
+	}
+	if fence != "" {
+		problems = append(problems, fmt.Sprintf("a code block opened with %s is never closed", fence))
 	}
 	if name != "handoff" {
 		return problems
@@ -147,55 +181,124 @@ func checkSkill(tree *cobra.Command, name, text string) []string {
 	return problems
 }
 
-// codeSpans yields the text between backtick pairs of line.
+// frontMatterProblems decodes the front matter, the lines between the
+// first line "---" and the next, and returns its problems and the lines
+// after it. Claude Code needs a name, lowercase words joined by hyphens
+// of at most 64 characters, and a description of at most 1024; the name
+// is the skill's directory.
+func frontMatterProblems(name string, lines []string) ([]string, []string) {
+	end := -1
+	if len(lines) > 0 && lines[0] == "---" {
+		end = slices.Index(lines[1:], "---") + 1
+	}
+	if end < 1 {
+		return []string{"no front matter between two lines ---"}, lines
+	}
+	var fm struct {
+		Name        string `yaml:"name"`
+		Description string `yaml:"description"`
+	}
+	if err := yaml.Unmarshal([]byte(strings.Join(lines[1:end], "\n")), &fm); err != nil {
+		return []string{"the front matter: " + err.Error()}, lines[end+1:]
+	}
+	var problems []string
+	if fm.Name != name || !skillName.MatchString(fm.Name) || len(fm.Name) > 64 {
+		problems = append(problems, fmt.Sprintf("the front matter has name %q, wants %q", fm.Name, name))
+	}
+	if d := strings.TrimSpace(fm.Description); d == "" || len(d) > 1024 {
+		problems = append(problems, fmt.Sprintf("the front matter needs a description of 1 to 1024 characters, has %d", len(d)))
+	}
+	return problems, lines[end+1:]
+}
+
+// fenceRun returns the run of three or more backticks or tildes that
+// starts line, or "".
+func fenceRun(line string) string {
+	if line == "" || (line[0] != '`' && line[0] != '~') {
+		return ""
+	}
+	n := len(line) - len(strings.TrimLeft(line, line[:1]))
+	if n < 3 {
+		return ""
+	}
+	return line[:n]
+}
+
+// codeSpans yields the code spans of line: a run of backticks opens one,
+// and the next run of the same length closes it.
 func codeSpans(line string) func(yield func(string) bool) {
 	return func(yield func(string) bool) {
-		parts := strings.Split(line, "`")
-		for i := 1; i < len(parts); i += 2 {
-			if i < len(parts)-1 && !yield(parts[i]) {
+		for {
+			open := strings.IndexByte(line, '`')
+			if open < 0 {
 				return
 			}
+			n := len(line[open:]) - len(strings.TrimLeft(line[open:], "`"))
+			rest := line[open+n:]
+			closeAt := -1
+			for i := 0; i < len(rest); {
+				if rest[i] != '`' {
+					i++
+					continue
+				}
+				m := len(rest[i:]) - len(strings.TrimLeft(rest[i:], "`"))
+				if m == n {
+					closeAt = i
+					break
+				}
+				i += m
+			}
+			if closeAt < 0 {
+				return
+			}
+			if !yield(strings.TrimSpace(rest[:closeAt])) {
+				return
+			}
+			line = rest[closeAt+n:]
 		}
 	}
 }
 
 // commandProblems returns the problems of one line or span if it is a
 // julieta command line: the first word that is no command of the tree,
-// and each flag the command does not have. Words after the command path
-// are values and are skipped, as are placeholders such as <id>; the line
-// ends at a pipe, a redirect or a list separator.
+// and each flag the command does not have. A flag that takes a value
+// skips the next word; other words after the command path are values, as
+// are quoted words and placeholders such as <id>; a flag in brackets,
+// [--final], is checked as the flag. The line ends at an unquoted pipe,
+// redirect or list separator, and at "--".
 func commandProblems(tree *cobra.Command, line string) []string {
-	words := strings.Fields(strings.TrimPrefix(line, "$ "))
-	if len(words) < 2 || words[0] != "julieta" {
+	words := shellWords(strings.TrimPrefix(line, "$ "))
+	if len(words) < 2 || words[0].quoted || words[0].text != "julieta" {
 		return nil
 	}
-	cmd, descending := tree, true
+	cmd, descending, value := tree, true, false
 	var problems []string
 	for _, w := range words[1:] {
+		text := w.text
+		if !w.quoted && strings.HasPrefix(text, "[") {
+			text = strings.TrimSuffix(strings.TrimPrefix(text, "["), "]")
+		}
 		switch {
-		case w == "|" || w == "&&" || w == ";" || w == "<" || w == ">" || strings.HasPrefix(w, "<<") || strings.HasPrefix(w, ">>"):
+		case value:
+			value = false
+		case w.quoted || strings.HasPrefix(text, "<"):
+			descending = false
+		case text == "--":
 			return problems
-		case strings.HasPrefix(w, "<") && strings.HasSuffix(w, ">"):
-			descending = false
-		case strings.HasPrefix(w, "-"):
-			descending = false
-			name, _, _ := strings.Cut(strings.TrimLeft(w, "-"), "=")
-			var found bool
-			if strings.HasPrefix(w, "--") {
-				found = cmd.Flag(name) != nil
-			} else {
-				found = len(name) == 1 && cmd.Flags().ShorthandLookup(name) != nil
+		case strings.HasPrefix(text, "-"):
+			f := lookupFlag(cmd, text)
+			if f == nil {
+				problems = append(problems, fmt.Sprintf("%q: %s has no flag %s", line, cmd.CommandPath(), text))
+				continue
 			}
-			if !found {
-				problems = append(problems, fmt.Sprintf("%q: %s has no flag %s", line, cmd.CommandPath(), w))
-			}
+			value = f.NoOptDefVal == "" && !strings.Contains(text, "=")
 		case descending:
-			next := find(cmd, w)
+			next := find(cmd, text)
 			switch {
 			case next != nil:
 				cmd = next
 			case cmd.HasSubCommands():
-				return append(problems, fmt.Sprintf("%q: %s has no command %s", line, cmd.CommandPath(), w))
+				return append(problems, fmt.Sprintf("%q: %s has no command %s", line, cmd.CommandPath(), text))
 			default:
 				descending = false // a value of the command
 			}
@@ -204,10 +307,104 @@ func commandProblems(tree *cobra.Command, line string) []string {
 	return problems
 }
 
-// find returns the subcommand of cmd named name, or nil.
+// lookupFlag returns the flag of cmd, its own or inherited, that word
+// names (--name, --name=value or -n), or nil.
+func lookupFlag(cmd *cobra.Command, word string) *pflag.Flag {
+	name, _, _ := strings.Cut(strings.TrimLeft(word, "-"), "=")
+	if strings.HasPrefix(word, "--") {
+		return cmd.Flag(name)
+	}
+	if len(name) != 1 {
+		return nil
+	}
+	if f := cmd.Flags().ShorthandLookup(name); f != nil {
+		return f
+	}
+	return cmd.InheritedFlags().ShorthandLookup(name)
+}
+
+// word is one word of a command line, and whether any of it was quoted.
+type word struct {
+	text   string
+	quoted bool
+}
+
+// shellWords splits line into words the way a POSIX shell treats quotes
+// and backslashes, and stops at the first unquoted |, ;, &, < or >, so a
+// quoted value can neither end the command nor pass for a flag. A
+// placeholder such as <id> or --repo=<path> is part of a word, not a
+// redirect. Written here rather than imported: no shell-words package is
+// a dependency, and the test needs only quotes and operators.
+func shellWords(line string) []word {
+	var words []word
+	var cur strings.Builder
+	in, quoted := false, false // inside a word; the word has a quoted part
+	flush := func() {
+		if in {
+			words = append(words, word{cur.String(), quoted})
+		}
+		cur.Reset()
+		in, quoted = false, false
+	}
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		switch {
+		case c == ' ' || c == '\t':
+			flush()
+		case c == '\'':
+			j := strings.IndexByte(line[i+1:], '\'')
+			if j < 0 {
+				j = len(line) - i - 1
+			}
+			cur.WriteString(line[i+1 : i+1+j])
+			i += j + 1
+			in, quoted = true, true
+		case c == '"':
+			for i++; i < len(line) && line[i] != '"'; i++ {
+				if line[i] == '\\' && i+1 < len(line) {
+					i++
+				}
+				cur.WriteByte(line[i])
+			}
+			in, quoted = true, true
+		case c == '\\' && i+1 < len(line):
+			i++
+			cur.WriteByte(line[i])
+			in = true
+		case c == '<' && isPlaceholder(line[i:]):
+			end := strings.IndexAny(line[i:], " \t")
+			if end < 0 {
+				end = len(line) - i
+			}
+			cur.WriteString(line[i : i+end])
+			i += end - 1
+			in = true
+		case strings.IndexByte("|;&<>", c) >= 0:
+			flush()
+			return words
+		default:
+			cur.WriteByte(c)
+			in = true
+		}
+	}
+	flush()
+	return words
+}
+
+// isPlaceholder reports whether s starts with a placeholder, <name>,
+// that runs to the next blank or the end.
+func isPlaceholder(s string) bool {
+	if end := strings.IndexAny(s, " \t"); end >= 0 {
+		s = s[:end]
+	}
+	return len(s) > 2 && s[1] != '<' && strings.HasSuffix(s, ">")
+}
+
+// find returns the subcommand of cmd named name, or one of its aliases,
+// or nil.
 func find(cmd *cobra.Command, name string) *cobra.Command {
 	for _, c := range cmd.Commands() {
-		if c.Name() == name {
+		if c.Name() == name || c.HasAlias(name) {
 			return c
 		}
 	}
