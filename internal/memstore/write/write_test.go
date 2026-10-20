@@ -374,3 +374,64 @@ func TestPutRefusesAnEntriesFile(t *testing.T) {
 	_, _, err := s.Add(memstore.Content{Title: "t"})
 	require.ErrorIs(t, err, memstore.ErrLayout)
 }
+
+// TestLock takes the exported store lock: it makes the file 0600 in a
+// dir 0700, a second taker calls onWait and waits until the first
+// releases, and the lock can then be taken again.
+func TestLock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "locks", "api.lock")
+	unlock, err := Lock(path, nil)
+	require.NoError(t, err)
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, fs.FileMode(0o600), info.Mode())
+	info, err = os.Stat(filepath.Dir(path))
+	require.NoError(t, err)
+	assert.Equal(t, fs.FileMode(0o700), info.Mode().Perm())
+
+	waiting := make(chan struct{})
+	got := make(chan func(), 1)
+	go func() {
+		u, err := Lock(path, func() { close(waiting) })
+		if err != nil {
+			got <- nil
+			return
+		}
+		got <- u
+	}()
+	<-waiting
+	select {
+	case <-got:
+		t.Fatal("the lock was taken while another holder had it")
+	default:
+	}
+	unlock()
+	u := <-got
+	require.NotNil(t, u)
+	u()
+	again, err := Lock(path, func() { t.Error("the lock was released, nobody waits") })
+	require.NoError(t, err)
+	again()
+}
+
+// TestAtomicWrite writes a file 0600 by a temporary name, replaces an
+// existing file, and with create refuses to and leaves it as it was.
+func TestAtomicWrite(t *testing.T) {
+	root, err := os.OpenRoot(t.TempDir())
+	require.NoError(t, err)
+	defer func() { _ = root.Close() }()
+	src := canon.NewULIDSource(bytes.NewReader(bytes.Repeat([]byte{3}, 1<<10)))
+	now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	require.NoError(t, AtomicWrite(root, "f", []byte("one"), now, src, true))
+	info, err := root.Stat("f")
+	require.NoError(t, err)
+	assert.Equal(t, fs.FileMode(0o600), info.Mode())
+	require.Error(t, AtomicWrite(root, "f", []byte("two"), now, src, true))
+	data, _ := os.ReadFile(filepath.Join(root.Name(), "f"))
+	assert.Equal(t, "one", string(data))
+	require.NoError(t, AtomicWrite(root, "f", []byte("three"), now, src, false))
+	data, _ = os.ReadFile(filepath.Join(root.Name(), "f"))
+	assert.Equal(t, "three", string(data))
+	ents, _ := os.ReadDir(root.Name())
+	assert.Len(t, ents, 1, "no temporary file stays")
+}

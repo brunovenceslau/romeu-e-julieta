@@ -8,15 +8,12 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
-	"path/filepath"
 	"time"
-
-	"golang.org/x/sys/unix"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	hf "github.com/brunovenceslau/romeu-e-julieta/internal/handoff"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore/write"
 )
 
 // onWait is called when a lock is held by another process and the
@@ -30,45 +27,14 @@ var onWait func(lock string)
 // lock came first.
 var beforeGit func()
 
-// lockFile takes the exclusive flock of the lock file lock, which it
-// makes 0600 with its directory 0700 when it is absent, waits as long
-// as another process holds it, and returns the function that releases
-// it. It is the lock of memstore/write, the same file and the same
-// flock, so a handoff write and a memory add or a snapshot of one dir
-// run one after the other (REQ-0655); memstore/write does not export
-// its lock, so the few lines are here. The flock is that of
-// golang.org/x/sys/unix, as write.go decided on 2026-10-20.
+// lockFile takes the store lock at lock with write.Lock (REQ-0655),
+// calling the onWait seam when it has to wait.
 func lockFile(lock string) (unlock func(), err error) {
-	if err := os.MkdirAll(filepath.Dir(lock), memstore.DirMode); err != nil {
-		return nil, err
-	}
-	lf, err := os.OpenFile(lock, os.O_RDWR|os.O_CREATE|unix.O_NOFOLLOW, memstore.FileMode)
-	if err != nil {
-		return nil, err
-	}
-	flock := func(how int) error {
-		for {
-			err := unix.Flock(int(lf.Fd()), how)
-			if !errors.Is(err, unix.EINTR) {
-				return err
-			}
-		}
-	}
-	err = flock(unix.LOCK_EX | unix.LOCK_NB)
-	if errors.Is(err, unix.EWOULDBLOCK) {
+	return write.Lock(lock, func() {
 		if onWait != nil {
 			onWait(lock)
 		}
-		err = flock(unix.LOCK_EX)
-	}
-	if err != nil {
-		_ = lf.Close()
-		return nil, fmt.Errorf("the lock %s: %w", lock, err)
-	}
-	return func() {
-		_ = flock(unix.LOCK_UN)
-		_ = lf.Close()
-	}, nil
+	})
 }
 
 // mkdir makes the directory dir of the root 0700 when it is absent; a
@@ -88,40 +54,10 @@ func mkdir(root *os.Root, dir string) error {
 	return nil
 }
 
-// atomicWrite creates the file p of the root with data by the atomic
-// write rule of 03 3.8 (REQ-0239): a temporary file .tmp-<ULID> in the
-// target's own directory (REQ-0654), written 0600, synced, renamed into
-// place, and the directory synced. The name must be new: an existing
-// file is an error, since a handoff is never rewritten. It is the write
-// of memstore/write, which does not export it, and is written here
-// rather than taken from github.com/google/renameio for the reason
-// given there: renameio cannot name its temporary file .tmp-<ULID>.
+// atomicWrite creates the file p of the root with data and never
+// replaces one (write.AtomicWrite).
 func atomicWrite(root *os.Root, p string, data []byte, now time.Time, ulids *canon.ULIDSource) error {
-	u, err := canon.NewULID(now, ulids)
-	if err != nil {
-		return err
-	}
-	dir := path.Dir(p)
-	tmp := path.Join(dir, memstore.TempName(u))
-	f, err := root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL|unix.O_NOFOLLOW, memstore.FileMode)
-	if err != nil {
-		return err
-	}
-	_, werr := f.Write(data)
-	if err := errors.Join(werr, f.Chmod(memstore.FileMode), f.Sync(), f.Close()); err != nil {
-		return errors.Join(err, root.Remove(tmp))
-	}
-	if _, err := root.Lstat(p); err == nil {
-		return errors.Join(fmt.Errorf("%s exists already", p), root.Remove(tmp))
-	}
-	if err := root.Rename(tmp, p); err != nil {
-		return errors.Join(err, root.Remove(tmp))
-	}
-	d, err := root.Open(dir)
-	if err != nil {
-		return err
-	}
-	return errors.Join(d.Sync(), d.Close())
+	return write.AtomicWrite(root, p, data, now, ulids, true)
 }
 
 // prune removes the facts files of the memory dir beyond the newest

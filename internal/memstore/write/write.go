@@ -191,34 +191,57 @@ func (s *Store) Edit(id string, ch Change) (e memstore.Entry, wrote bool, err er
 	return e, wrote, nil
 }
 
-// locked runs f under the store lock (REQ-0655): an exclusive flock of
-// the lock file, which is made 0600, with its directory 0700, when it
-// is absent, so the lock of a moved store is recreated on first use
-// (REQ-0647). A second process waits for the first. The lock is a
-// flock of golang.org/x/sys/unix rather than github.com/gofrs/flock
-// (decided on 2026-10-20): no new module, one call with O_NOFOLLOW and
-// an EINTR loop, and what gofrs/flock adds (Windows, fcntl locks for
-// NFS, shared locks) julieta does not need.
+// locked runs f under the store lock (REQ-0655).
 func (s *Store) locked(f func() error) error {
-	if err := os.MkdirAll(filepath.Dir(s.lock), memstore.DirMode); err != nil {
-		return err
-	}
-	lf, err := os.OpenFile(s.lock, os.O_RDWR|os.O_CREATE|unix.O_NOFOLLOW, memstore.FileMode)
+	unlock, err := Lock(s.lock, nil)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = lf.Close() }()
-	for {
-		err = unix.Flock(int(lf.Fd()), unix.LOCK_EX)
-		if !errors.Is(err, unix.EINTR) {
-			break
+	defer unlock()
+	return f()
+}
+
+// Lock takes the exclusive flock of the lock file at path, which is
+// made 0600, with its directory 0700, when it is absent, so the lock of
+// a moved store is recreated on first use (REQ-0647). A second process
+// waits for the first; onWait, when not nil, is called once just before
+// the wait, when the lock is held by another (a test seam, 10 10.4).
+// unlock releases it. The lock is a flock of golang.org/x/sys/unix
+// rather than github.com/gofrs/flock (decided on 2026-10-20): no new
+// module, one call with O_NOFOLLOW and an EINTR loop, and what
+// gofrs/flock adds (Windows, fcntl locks for NFS, shared locks) julieta
+// does not need.
+func Lock(path string, onWait func()) (unlock func(), err error) {
+	if err := os.MkdirAll(filepath.Dir(path), memstore.DirMode); err != nil {
+		return nil, err
+	}
+	lf, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|unix.O_NOFOLLOW, memstore.FileMode)
+	if err != nil {
+		return nil, err
+	}
+	flock := func(how int) error {
+		for {
+			err := unix.Flock(int(lf.Fd()), how)
+			if !errors.Is(err, unix.EINTR) {
+				return err
+			}
 		}
 	}
-	if err != nil {
-		return fmt.Errorf("memstore: the store lock %s: %w", s.lock, err)
+	err = flock(unix.LOCK_EX | unix.LOCK_NB)
+	if errors.Is(err, unix.EWOULDBLOCK) {
+		if onWait != nil {
+			onWait()
+		}
+		err = flock(unix.LOCK_EX)
 	}
-	defer func() { _ = unix.Flock(int(lf.Fd()), unix.LOCK_UN) }()
-	return f()
+	if err != nil {
+		_ = lf.Close()
+		return nil, fmt.Errorf("memstore: the store lock %s: %w", path, err)
+	}
+	return func() {
+		_ = flock(unix.LOCK_UN)
+		_ = lf.Close()
+	}, nil
 }
 
 // put writes the file of e by the atomic write rule of 03 3.8: entries/
@@ -255,15 +278,22 @@ func (s *Store) mkdir(dir string) error {
 }
 
 // atomicWrite replaces the file p of the root with data, as put says.
-// It is written here rather than taken from github.com/google/renameio,
-// which the other atomic writes of the product use (decided on
-// 2026-10-20): REQ-0654 names the temporary file .tmp-<ULID> in the
-// target's own directory, a name julieta memory check, romeu sync and
-// julieta setup read, and renameio cannot name its temporary files. It
-// also writes through the os.Root of the memory dir.
 func (s *Store) atomicWrite(p string, data []byte) error {
-	root := s.Root()
-	u, err := canon.NewULID(s.now(), s.ulids)
+	return AtomicWrite(s.Root(), p, data, s.now(), s.ulids, false)
+}
+
+// AtomicWrite writes the file p of root with data by the atomic write
+// rule of 03 3.8 (REQ-0239): a temporary file .tmp-<ULID> in the
+// target's own directory (REQ-0654), 0600, synced, renamed into place,
+// and the directory synced. With create set, a p that exists already is
+// an error and is left as it is. It is written here rather than taken
+// from github.com/google/renameio, which the other atomic writes of the
+// product use (decided on 2026-10-20): REQ-0654 names the temporary
+// file .tmp-<ULID>, a name julieta memory check, romeu sync and julieta
+// setup read, and renameio cannot name its temporary files. It also
+// writes through the os.Root of the memory dir.
+func AtomicWrite(root *os.Root, p string, data []byte, now time.Time, ulids *canon.ULIDSource, create bool) error {
+	u, err := canon.NewULID(now, ulids)
 	if err != nil {
 		return err
 	}
@@ -276,6 +306,11 @@ func (s *Store) atomicWrite(p string, data []byte) error {
 	_, werr := f.Write(data)
 	if err := errors.Join(werr, f.Chmod(memstore.FileMode), f.Sync(), f.Close()); err != nil {
 		return errors.Join(err, root.Remove(tmp))
+	}
+	if create {
+		if _, err := root.Lstat(p); err == nil {
+			return errors.Join(fmt.Errorf("%s exists already", p), root.Remove(tmp))
+		}
 	}
 	if err := root.Rename(tmp, p); err != nil {
 		return errors.Join(err, root.Remove(tmp))
