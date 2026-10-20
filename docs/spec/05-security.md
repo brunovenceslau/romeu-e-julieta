@@ -69,7 +69,13 @@ the gitHosts allowlist did not see.
   header) and a symbolic ref planted in a fetch destination. The list
   above still neutralizes every key that makes git run a program
   (decided 2026-10-16), so trusted config never becomes a way to run
-  code.
+  code. The filter drivers are the one case the list cannot name:
+  `filter.<name>.clean`, `.smudge` and `.process` have a dynamic
+  `<name>`, so a verb whose git command can run a filter first lists
+  the drivers the config defines (`git config --get-regexp`, which
+  reads every config file the mode lets git read and the files they
+  include) and runs its command with each driver's commands empty
+  and `required` false, through `GIT_CONFIG_COUNT`.
 - `REQ-0464` Credentials: only `-c credential.helper=<host settings value>` when
   `tools.gitCredentialHelper` is set; a `gitHosts[].caFile` becomes
   `-c http.sslCAInfo=<path>` for that host only (also how the E2E
@@ -194,7 +200,7 @@ container, CI), C = container (CI), H = host.
 |---|---|---|
 | I1 | `REQ-0482` **No pane or shell ever runs on the host.** `cmd/romeu` has no multiplexer or terminal code; `run` ends by exec'ing exactly `sbx env exec -it <dir> --env JULIETA_MANIFEST=... -- <abs julieta path> layout up`, the path of 06 6.3 step 3 | U: `go list -deps ./cmd/romeu` excludes `internal/layout`, `internal/hooks`, `internal/mise`; E: final argv asserted byte for byte |
 | I2 | `REQ-0483` **The host never configures hooks** and never writes git config except a review checkout's local keys, the one set of 5.1 | U: import graph; E: after every romeu command, each clone's `.git/` that existed before the command (minus `objects/`, `refs/`, `logs/`, `packed-refs`, `index`, `FETCH_HEAD`, `ORIG_HEAD`) is byte-identical to before, including `hooks/`, `config`, `info/attributes`, `objects/info/alternates`; in `config` the `remote.sandbox-<name>.*` keys are left out of the comparison, because sbx writes them (01 1.2); a review repo's local config holds exactly the set of 5.1; positive control (above): the same run with the guard's stub changes `config` |
-| I3 | `REQ-0484` **romeu never executes repository content or ambient git configuration** | E: plant in repos, in a hostile global config and in the process ENV: every key of the 5.1 neutralized list (a test holds the plant list equal to the list gitsafe exports), `core.hooksPath=.githooks` + tracked hooks, `.gitattributes` filters with global `filter.x.*` and a global lfs filter, `include.path`, `alias.*`, a global and a local `url.*.insteadOf` that rewrite to a refused protocol and to `git://127.0.0.1` (a rewrite to another HTTPS host is the stated limit of 5.1), and ENV `GIT_EXTERNAL_DIFF`, `GIT_CONFIG_COUNT`/`KEY_0`/`VALUE_0`, `GIT_SSH_COMMAND`, `GIT_ASKPASS`, `GIT_DIR`, `GIT_EXEC_PATH`; run every romeu command; the marker file never exists, and the positive control (above) makes it exist |
+| I3 | `REQ-0484` **romeu never executes repository content or ambient git configuration** | E: plant in repos, in a hostile global config and in the process ENV: every key of the 5.1 neutralized list (a test holds the plant list equal to the list gitsafe exports), `core.hooksPath=.githooks` + tracked hooks, `.gitattributes` filters with global `filter.x.*`, a global lfs filter and a driver defined only in an `includeIf` file, `include.path`, `alias.*`, a global and a local `url.*.insteadOf` that rewrite to a refused protocol and to `git://127.0.0.1` (a rewrite to another HTTPS host is the stated limit of 5.1), and ENV `GIT_EXTERNAL_DIFF`, `GIT_CONFIG_COUNT`/`KEY_0`/`VALUE_0`, `GIT_SSH_COMMAND`, `GIT_ASKPASS`, `GIT_DIR`, `GIT_EXEC_PATH`; run every romeu command; the marker file never exists, and the positive control (above) makes it exist |
 | I4 | `REQ-0485` **No `--auto-approve`**, ever | U: every sbxdrv builder scanned; E: fake sbx exits 99 on it |
 | I5 | `REQ-0486` **Fetched content lands only in allowlisted namespaces**; never `refs/heads`, `refs/tags`, `refs/remotes` or `HEAD`; never checked out except into `review/` | U: refspec validator table; E: pull + salvage + sync, then `refs/heads`, `refs/tags`, `refs/remotes`, `HEAD` unchanged |
 | I6 | `REQ-0487` **Salvage refs are immutable** (create-only, never a fetch destination, never pruned) | E: fetch with `--prune` and a forced refspec after a same-name recreate; salvage refs survive; a second create on the same ref fails |
