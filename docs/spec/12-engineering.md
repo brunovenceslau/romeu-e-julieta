@@ -226,7 +226,7 @@ E2E (CI):   go test -tags e2e ./e2e/...             # git + docker + fake sbx; n
 E2E (host): go test -tags host -json ./e2e/host/... # maintainer machine only; real sbx
 Setup:      go run ./tools/ci setup                 # trust mise.toml, install the pinned tools, fill the module cache; CI runs it first
 Fast:       go run ./tools/ci fast                  # what the pre-push hook runs; the hook adds the pushed range
-All checks: go run ./tools/ci all                   # what CI runs; the pr step runs in its own base-defined job
+All checks: go run ./tools/ci all                   # the check CI runs, from a built binary; the pr step runs in its own base-defined job
 Plan:       go run ./tools/ci plan                  # the task files: fields, ids, edges, overlap; --ready and --critical-path print the views; in fast
 Reqs:       go run ./tools/ci reqs allocate         # number each REQ-new placeholder (12.11); tools/ci reqs checks the ids, in fast
 PR checks:  go run ./tools/ci pr <payload file>     # the pr step, on a saved pull request payload
@@ -442,7 +442,7 @@ or produced this, and does it exist now?" is answered mechanically:
 | When | Mechanism | Enforces |
 |---|---|---|
 | before push | `REQ-1128` tracked `.githooks/pre-push` runs `go run ./tools/ci fast` with git's pre-push arguments and stdin (contributors enable it with `git config core.hooksPath .githooks`; inside a sandbox, julieta's dispatcher runs it automatically and passes both through) | the steps marked in the `In fast` column of [10 10.2](10-testing-style.md#102-ci), the forbidden-name check over the pushed ref names and commits, and the never-tracked names of the hygiene rules over the paths they add |
-| every PR | `REQ-1129` `go run ./tools/ci all` in CI | the full list in [10 10.2](10-testing-style.md#102-ci) |
+| every PR | `REQ-1129` `tools/ci all`, built and run in CI ([10 10.2](10-testing-style.md#102-ci)) | the full list in [10 10.2](10-testing-style.md#102-ci) |
 | every PR | `REQ-1130` `tools/ci pr` reads the pull request event payload, or, before the pull request exists, a title, a body file and the local base..HEAD range | `REQ-1131` the body has non-empty **Why**, **What changed** and **Evidence** sections, and a **Lessons** section that holds a lesson or the word `none`; `REQ-1132` a **Middleware** line of the form `check: <tools/ci subcommand or test>`, `generator: <tools/new kind or go:generate source>`, or `none: <reason>`; `REQ-1133` every changed golden listed under Evidence; `REQ-1134` an approval line (below) for each ask-first surface the diff touches, ADRs included (ADR 0001 rule 8); `REQ-1135` the title and the commit subjects in Conventional Commit form; `REQ-1136` the prose rules of ADR 0001 (rule 4) in the title, the body and the commit messages; `REQ-1137` the base is the default branch (12.9); `REQ-1138` a `Fixes-release:` trailer has the form of 12.10, and after the first release a pull request with a commit of type `fix` carries one, or the line `Fixes-release: none`; `REQ-1139` the forbidden-name check ([10 10.2](10-testing-style.md#forbidden-names)) over the title, the body, the head ref name, and the four readings of each commit (the message, the author and committer identities, the paths it adds or renames to, and the lines it adds) |
 | merge | `REQ-1140` the default-branch ruleset (below) | CI green and a merge commit, the one merge method (12.9); the merge requirements, and what they are worth, are in [05 5.4](05-security.md#risks-of-how-this-repository-is-developed) |
 
