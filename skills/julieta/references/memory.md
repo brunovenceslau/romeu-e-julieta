@@ -17,10 +17,16 @@ julieta memory show <id>
 
 ## Change or close an entry
 
+Name what changes; an edit that names nothing is refused:
+
 ```sh
-julieta memory edit <id>
+julieta memory edit <id> --title 'Signing waits on the host'
 julieta memory edit <id> --status done
 ```
+
+The tags you give with `--tag` replace the entry's tags, so repeat
+`--tag lesson` when you change the tags of a lesson, or it stops being
+printed at session start.
 
 Close an entry once it no longer holds, so a later session does not act
 on it.
@@ -33,11 +39,3 @@ run it again with `--repo <dir>`:
 ```sh
 julieta memory add --repo <dir> --title 'Signing waits on the host' --body 'Ask the operator.'
 ```
-
-## What does not belong in memory
-
-- Secrets: every later session reads memory, and it may be shared.
-- Orders: a later session weighs memory as data, not as instructions, so
-  write what happened and why.
-- Something no entry fits: put it in the handoff (the handoff skill) and
-  open an issue labelled `deferred`, so it is tracked where people look.

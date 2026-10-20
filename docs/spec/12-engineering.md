@@ -401,9 +401,11 @@ test (the docs row of [10 10.2](10-testing-style.md#102-ci)).
 `REQ-1255` Each skill under `skills/` follows the progressive disclosure
 of skill-creator
 ([ADR 0040](../adr/0040-author-every-skill-with-skill-creator-and-progressive-disclosure.md)):
-its `SKILL.md` front matter names the skill's directory and holds a
-description of what the skill does and when to use it; the body of
-`SKILL.md` stays under 500 lines; every other file of the skill is
+its `SKILL.md` front matter names the skill's directory, in lowercase
+words joined by hyphens of at most 64 characters, and holds a
+description of 1 to 1024 characters, which says what the skill does and
+when to use it **[review]**; the body of `SKILL.md` stays under 500
+lines; every other file of the skill is
 linked from `SKILL.md`, and every relative link of `SKILL.md` names a
 file of the skill. The same test checks it, over every file of the
 skill, and reads julieta commands and handoff headings in the linked

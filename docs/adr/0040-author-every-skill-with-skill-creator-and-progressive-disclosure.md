@@ -68,8 +68,8 @@ Decided on 2026-10-20:
 
 - T078 implements REQ-1255; its skills are rewritten to it, and its
   test reads every file of a skill.
-- The kit that installs the skills copies each skill's directory
-  whole (REQ-0595), so `references/` reaches the sandbox with
-  `SKILL.md`.
+- REQ-0595 now says the kit installs each skill's whole directory, so
+  `references/` reaches the sandbox with `SKILL.md`; T079, which builds
+  that kit, meets it.
 - The pending note "Rules to move when the interim payload is retired"
   lists 1 and 2 for the payload and for T114.

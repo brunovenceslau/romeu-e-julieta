@@ -25,6 +25,12 @@ julieta memory add --title 'Signing waits on the host' --body 'Ask the operator.
 Tag it `lesson` when it records what the work taught: lessons are printed
 at the start of every session, which is how a mistake is not repeated.
 
+Never put a secret in an entry: every later session reads memory, and it
+may be shared. Write what happened and why, not orders, since a later
+session weighs memory as data. When something worth keeping fits no
+entry, put it in the handoff and open an issue labelled `deferred`, so it
+is tracked where people look.
+
 The command prints the repo it filed the entry under. Read that line: an
 entry under the wrong repo is never shown where it is needed. To find,
 change or close entries, or to file under another repo, read
@@ -37,6 +43,7 @@ what leaves the sandbox. If signing fails, or waits on a confirmation that
 does not come, stop and ask the operator: say what failed, and wait.
 
 Do not unset `commit.gpgsign`, sign another way, or pass an option that
-skips signing: an unsigned or differently signed commit looks like work
-that did not come from this sandbox. Do not retry in a loop either; it
-only repeats a request the operator has not answered yet.
+skips signing (`--no-gpg-sign`, `-c commit.gpgsign=false`): an unsigned
+or differently signed commit looks like work that did not come from this
+sandbox. Do not retry either; a retry only repeats a request the operator
+has not answered yet.

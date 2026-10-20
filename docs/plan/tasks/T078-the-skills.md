@@ -30,8 +30,9 @@ Re-plan (2026-10-12): Kept, in M1: sitting M1 needs the skills.
 - Operator: no.
 - Acceptance:
   - `skills/julieta/SKILL.md` tells the agent to use `julieta memory`
-    and to tag a lesson; `skills/handoff/SKILL.md` pipes the required
-    headings to `julieta handoff write [--final]`.
+    and to tag a lesson; the handoff skill names the required headings
+    of each kind in its references, and `skills/handoff/SKILL.md` pipes
+    the narrative to `julieta handoff write [--final]`.
   - `skills/julieta/SKILL.md` tells the agent, when signing a commit
     fails or waits on a confirmation that does not come, to ask the
     operator and never to unset `commit.gpgsign` or sign another way

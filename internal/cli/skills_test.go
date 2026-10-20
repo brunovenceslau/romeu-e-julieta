@@ -31,24 +31,32 @@ const skillsDir = "../../skills"
 // TestSkillsNameRealCommands reads every file of every skills/*/ and
 // fails on a julieta command or flag one names that the command
 // definitions lack, on a reference SKILL.md does not link or a link to
-// no file,
-// and on headings of the handoff skill that differ from those
+// no file, and on headings of the handoff skill that differ from those
 // `julieta handoff write` requires (12 12.3, REQ-1115). The headings
 // come from handoff.Headings, the list CheckHeadings enforces.
 func TestSkillsNameRealCommands(t *testing.T) {
 	tree := cli.Tree(&cli.Env{Binary: "julieta"})
-	files, err := os.ReadDir(skillsDir)
+	dirs, err := os.ReadDir(skillsDir)
 	require.NoError(t, err)
 	seen := map[string]bool{}
-	for _, f := range files {
+	for _, f := range dirs {
 		if !f.IsDir() {
 			continue
 		}
 		files := map[string]string{}
 		dir := path.Join(skillsDir, f.Name())
 		require.NoError(t, fs.WalkDir(os.DirFS(dir), ".", func(p string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
+			switch {
+			case err != nil:
 				return err
+			case p != "." && strings.HasPrefix(d.Name(), "."):
+				// an editor's or the OS's file (.DS_Store, a swap file), not the skill's
+				if d.IsDir() {
+					return fs.SkipDir
+				}
+				return nil
+			case d.IsDir():
+				return nil
 			}
 			b, err := os.ReadFile(path.Join(dir, p))
 			files[p] = string(b)
@@ -110,7 +118,12 @@ func TestSkillsFixtures(t *testing.T) {
 		{"a command in a reference", front + "See [m](references/m.md).\n" + blocks, "has no flag --nope", map[string]string{"references/m.md": "`julieta memory add --nope`\n"}},
 		{"an unlinked reference", whole, "references/m.md is linked from no line of SKILL.md", map[string]string{"references/m.md": "text\n"}},
 		{"a link to no file", skill("See [m](references/m.md).\n"), "links to references/m.md, which is not in the skill", nil},
-		{"a body too long", skill(strings.Repeat("text\n", 500)), "keep it under 500", nil},
+		{"a body of 499 lines", front + blocks + strings.Repeat("text\n", 499-strings.Count(blocks, "\n")), "", nil},
+		{"a body of 500 lines", front + blocks + strings.Repeat("text\n", 500-strings.Count(blocks, "\n")), "keep it under 500", nil},
+		{"a link with ./ and an anchor", skill("See [m](./references/m.md#top).\n"), "", map[string]string{"references/m.md": "text\n"}},
+		{"a link out of the skill", skill("See [j](../julieta/SKILL.md).\n"), "links to ../julieta/SKILL.md, which is not in the skill", nil},
+		{"a link only in a code block", skill("```markdown\nSee [m](references/m.md).\n```\n"), "references/m.md is linked from no line of SKILL.md", map[string]string{"references/m.md": "text\n"}},
+		{"a link only in a code span", skill("`[m](references/m.md)`\n"), "references/m.md is linked from no line of SKILL.md", map[string]string{"references/m.md": "text\n"}},
 		{"a description too long", strings.Replace(whole, "description: d", "description: "+strings.Repeat("d", 1025), 1), "description", nil},
 	}
 	for _, tt := range tests {
@@ -143,28 +156,29 @@ var skillName = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 // SKILL.md links each reference so the agent reads it only when needed
 // (progressive disclosure), and a file it does not link is never read.
 func checkSkill(tree *cobra.Command, name string, files map[string]string) []string {
-	problems, body := frontMatterProblems(name, strings.Split(files["SKILL.md"], "\n"))
+	problems, body := frontMatterProblems(name, splitLines(files["SKILL.md"]))
 	if len(body) >= 500 {
 		problems = append(problems, fmt.Sprintf("the body of SKILL.md has %d lines, keep it under 500 and move detail to references/", len(body)))
 	}
+	blocks := map[string][]string{} // kind -> headings of its block
+	scanned, links := scanFile(tree, "SKILL.md", body, blocks)
+	problems = append(problems, scanned...)
 	linked := map[string]bool{}
-	for _, m := range relativeLink.FindAllStringSubmatch(files["SKILL.md"], -1) {
-		target := path.Clean(m[1])
+	for _, target := range links {
 		linked[target] = true
 		if _, ok := files[target]; !ok {
 			problems = append(problems, fmt.Sprintf("SKILL.md links to %s, which is not in the skill", target))
 		}
 	}
-	blocks := map[string][]string{} // kind -> headings of its block
 	for _, p := range slices.Sorted(maps.Keys(files)) {
-		if p != "SKILL.md" && !linked[p] {
+		if p == "SKILL.md" {
+			continue
+		}
+		if !linked[p] {
 			problems = append(problems, p+" is linked from no line of SKILL.md")
 		}
-		lines := strings.Split(files[p], "\n")
-		if p == "SKILL.md" {
-			lines = body
-		}
-		problems = append(problems, scanFile(tree, p, lines, blocks)...)
+		scanned, _ := scanFile(tree, p, splitLines(files[p]), blocks)
+		problems = append(problems, scanned...)
 	}
 	if name != "handoff" {
 		return problems
@@ -186,18 +200,26 @@ func checkSkill(tree *cobra.Command, name string, files map[string]string) []str
 	return problems
 }
 
+// splitLines returns the lines of text, without the empty element a
+// final newline leaves.
+func splitLines(text string) []string {
+	return strings.Split(strings.TrimSuffix(text, "\n"), "\n")
+}
+
 // relativeLink matches a Markdown link to a path, not to a URL or an
-// anchor of the same file.
+// anchor of the same file; a link with a title does not match, so the
+// file it names counts as not linked.
 var relativeLink = regexp.MustCompile(`\]\(([^)#\s:]+)(?:#[^)]*)?\)`)
 
 // scanFile returns the problems of the lines of the file p: a julieta
 // command or flag that tree lacks, a code block never closed, and a kind
 // block that comes twice in the skill; it adds the headings of each kind
-// block to blocks. A line scan, not a Markdown parser: a command is a
+// block to blocks, and returns the relative links of the prose, outside
+// code blocks and code spans, as cleaned paths. A line scan, not a Markdown parser: a command is a
 // line of a code block, joined with the lines a trailing backslash
 // continues, or a code span, that starts with "julieta".
-func scanFile(tree *cobra.Command, p string, lines []string, blocks map[string][]string) []string {
-	var problems []string
+func scanFile(tree *cobra.Command, p string, lines []string, blocks map[string][]string) ([]string, []string) {
+	var problems, links []string
 	kind, fence := "", "" // fence: the run that opened the block, "" outside one
 	for i := 0; i < len(lines); i++ {
 		trimmed := strings.TrimSpace(lines[i])
@@ -232,15 +254,20 @@ func scanFile(tree *cobra.Command, p string, lines []string, blocks map[string][
 			}
 			problems = append(problems, commandProblems(tree, trimmed)...)
 		default:
+			prose := lines[i]
 			for span := range codeSpans(lines[i]) {
 				problems = append(problems, commandProblems(tree, span)...)
+				prose = strings.Replace(prose, span, "", 1)
+			}
+			for _, m := range relativeLink.FindAllStringSubmatch(prose, -1) {
+				links = append(links, path.Clean(m[1]))
 			}
 		}
 	}
 	if fence != "" {
 		problems = append(problems, fmt.Sprintf("%s: a code block opened with %s is never closed", p, fence))
 	}
-	return problems
+	return problems, links
 }
 
 // frontMatterProblems decodes the front matter, the lines between the
