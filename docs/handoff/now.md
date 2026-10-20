@@ -17,7 +17,7 @@ records are merged up to 44.
    --critical-path`), paused on 2026-10-20 and resumed after those two
    swaps; its work is on the branch `feat/t035-memstore`, and its store
    lock is chosen under ADR 0038.
-3. ADR 0039 (scope) lands and is accepted.
+3. ADR 0039 (scope) is accepted, with its supersedes lines for ADR 0001.
 4. The rest of the ready list (`go run ./tools/ci plan --ready`).
 5. T112 lands through the sessions of the config and kit repositories
    ("t112-in-the-config-and-kit-repositories"); then this repository
