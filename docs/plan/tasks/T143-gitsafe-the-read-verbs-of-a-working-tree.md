@@ -22,7 +22,9 @@ status` read a repository's working tree through: the checked-out
 branch and HEAD, whether the working tree is clean, the local branch
 heads, the default branch of `origin` (`refs/remotes/origin/HEAD`),
 ahead and behind between two refs, the stashes, the worktrees, and the
-repo-local `core.hooksPath`. T051 composes "checked out, clean and
+repo-local `core.hooksPath`, and the object id a ref points at
+(the tip of `refs/remotes/origin/<default>` before and after a
+fast-forward, for `default-branch-moved`). T051 composes "checked out, clean and
 fast-forwardable" from these reads and the existing `FastForward`.
 
 Re-plan (2026-10-20): New. T051 found that `gitsafe` has no verb that
@@ -39,10 +41,18 @@ reviewed apart from the commands; T051 needs it. The task also adds
   which T051 implements.
 - Operator: no.
 - Acceptance:
-  - Each verb runs one git command through the runner, in the mode the
-    caller gives, with the flags and environment of that mode, and
+  - Each verb runs one git command through the runner, except Status,
+    which runs four (the filter drivers of the config, `symbolic-ref`
+    for HEAD, `status`, and `ls-files -v` for the assume-unchanged and
+    skip-worktree flags, which make the tree not clean), in the mode
+    the caller gives, with the flags and environment of that mode, and
     returns typed values, not git's text; a `dir` that is not a
-    repository root is refused as the other verbs refuse it.
+    repository root is refused as the other verbs refuse it. A ref name
+    in a result passes the display check (no character `unsafeRune`
+    refuses), or the read fails; a stash message is escaped and cut,
+    not refused.
+  - `RefOID` returns the object id a full ref name points at, and a
+    missing ref as missing, not as an error.
   - Every verb runs with `GIT_OPTIONAL_LOCKS=0` (10 10.2 does the same for `git status`),
     so no read refreshes the index or takes `index.lock`, and no verb
     runs a repository-configured filter or hook: "clean" is read without
