@@ -38,5 +38,10 @@ reading `internal/gitsafe`:
 Decided on 2026-10-20: a `gitsafe` task (approval line) hardens it
 before `julieta setup` runs in daily use.
 
-Reopen: when that task is planned, or before `julieta setup` runs
-anywhere with more trust than the agent.
+Planned on 2026-10-20 as T151
+(`docs/plan/tasks/T151-gitsafe-the-hardened-fast-forward-and-clone.md`),
+which fixes all four items; this note is removed at the next
+checkpoint.
+
+Reopen: if T151 does not merge before `julieta setup` runs anywhere
+with more trust than the agent.
