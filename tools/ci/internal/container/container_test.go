@@ -126,6 +126,9 @@ func TestRead(t *testing.T) {
 		{"an assertion that failed before the infrastructure error", ev("run", "TestA", "") + ev("output", "TestA", "    a_test.go:9: the digest differs from the pin\n") + ev("output", "TestA", forged) + ev("fail", "TestA", "") + ev("fail", "", ""), []string{"TestA"}, runErr, "TestA", ""},
 		{"an assertion in a subtest and an infrastructure error in its parent's other subtest", ev("run", "TestA", "") + ev("run", "TestA/x", "") + ev("run", "TestA/y", "") + ev("output", "TestA/x", "    a_test.go:9: wrong\n") + ev("fail", "TestA/x", "") + ev("output", "TestA/y", forged) + ev("fail", "TestA/y", "") + ev("fail", "TestA", "") + ev("fail", "", ""), []string{"TestA/y"}, runErr, "TestA/x", ""},
 		{"a parent that printed a failure of its own", ev("run", "TestA", "") + ev("run", "TestA/y", "") + ev("output", "TestA", "    a_test.go:5: cleanup failed\n") + ev("output", "TestA/y", forged) + ev("fail", "TestA/y", "") + ev("fail", "TestA", "") + ev("fail", "", ""), []string{"TestA/y"}, runErr, "TestA", ""},
+		{"an infrastructure line cut into several events", ev("run", "TestA", "") + ev("output", "TestA", "    a_test.go:9: container e2e: infra") + ev("output", "TestA", "structure error: "+strings.Repeat("x", 1000)) + ev("output", "TestA", strings.Repeat("y", 1000)+"\n") + ev("fail", "TestA", "") + ev("fail", "", ""), []string{"TestA"}, runErr, "infra", ""},
+		{"stray output without a newline before the infrastructure line", ev("run", "TestA", "") + ev("output", "TestA", "stray") + ev("output", "TestA", forged) + ev("fail", "TestA", "") + ev("fail", "", ""), []string{"TestA"}, runErr, "TestA", ""},
+		{"a recorded test whose one line is no infrastructure report", ev("run", "TestA", "") + ev("output", "TestA", "    a_test.go:9: the digest differs from the pin\n") + ev("fail", "TestA", "") + ev("fail", "", ""), []string{"TestA"}, runErr, "TestA", ""},
 		{"a forged line in the output is no infrastructure error", ev("run", "TestA", "") + ev("output", "TestA", forged) + ev("fail", "TestA", "") + ev("fail", "", ""), nil, runErr, "TestA", ""},
 		{"a failed package beside an infrastructure error", ev("run", "TestA", "") + ev("fail", "TestA", "") + ev("fail", "", "") + `{"Action":"fail","Package":"example.invalid/other"}` + "\n", []string{"TestA"}, runErr, "example.invalid/other", ""},
 		{"tests passed and the run failed", ev("run", "TestA", "") + ev("pass", "TestA", "") + ev("pass", "", ""), nil, runErr, "exit status 1", ""},
@@ -256,7 +259,7 @@ func TestTheHarnessNamesTheSameConstants(t *testing.T) {
 			return true
 		}
 		for i, name := range spec.Names {
-			if (name.Name == "InfraFileEnv" || name.Name == "CacheDir") && i < len(spec.Values) {
+			if (name.Name == "InfraFileEnv" || name.Name == "CacheDir" || name.Name == "InfraPrefix") && i < len(spec.Values) {
 				if lit, ok := spec.Values[i].(*ast.BasicLit); ok {
 					value, err := strconv.Unquote(lit.Value)
 					require.NoError(t, err)
@@ -266,7 +269,7 @@ func TestTheHarnessNamesTheSameConstants(t *testing.T) {
 		}
 		return true
 	})
-	assert.Equal(t, map[string]string{"InfraFileEnv": InfraFileEnv, "CacheDir": CacheDir}, got)
+	assert.Equal(t, map[string]string{"InfraFileEnv": InfraFileEnv, "CacheDir": CacheDir, "InfraPrefix": InfraPrefix}, got)
 	_, err = os.Stat(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(FixtureLock)))
 	require.NoError(t, err, "the fixture mise.lock")
 }
