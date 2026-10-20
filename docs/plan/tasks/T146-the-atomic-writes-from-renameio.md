@@ -3,7 +3,7 @@ id: T146
 title: "The atomic writes from renameio"
 milestone: M1
 module: none
-fate: new
+fate: merged
 owns:
   - internal/cmd/julieta/setup/state.go
   - internal/cmd/julieta/setup/link.go
@@ -23,9 +23,14 @@ ask_first:
   - checks
   - kits
 sitting: none
+merged: 2026-10-20
+pr: 202
 ---
 
 # T146 - The atomic writes from renameio
+
+Merged on 2026-10-20 in pull request #202. The text below is the one
+written when it was built.
 
 Goal: the second swap of
 [ADR 0038, search for a maintained library before writing one](../../adr/0038-search-for-a-maintained-library-before-writing-one.md),

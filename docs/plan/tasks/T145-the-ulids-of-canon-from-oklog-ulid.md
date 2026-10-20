@@ -3,7 +3,7 @@ id: T145
 title: "The ULIDs of canon from oklog/ulid"
 milestone: M1
 module: canon
-fate: new
+fate: merged
 owns:
   - internal/canon/ulid.go
   - internal/canon/ulid_test.go
@@ -17,9 +17,14 @@ ask_first:
   - digests
   - dependencies
 sitting: none
+merged: 2026-10-20
+pr: 201
 ---
 
 # T145 - The ULIDs of canon from oklog/ulid
+
+Merged on 2026-10-20 in pull request #201. The text below is the one
+written when it was built.
 
 Goal: the first swap of
 [ADR 0038, search for a maintained library before writing one](../../adr/0038-search-for-a-maintained-library-before-writing-one.md),

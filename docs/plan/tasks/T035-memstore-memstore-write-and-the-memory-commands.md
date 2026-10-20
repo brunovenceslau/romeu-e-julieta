@@ -3,7 +3,7 @@ id: T035
 title: "`memstore`, `memstore/write` and the memory commands"
 milestone: M1
 module: memstore
-fate: kept
+fate: merged
 owns:
   - internal/memstore/**
   - internal/cmd/julieta/memory/**
@@ -33,9 +33,14 @@ after:
 ask_first:
   - contracts
 sitting: none
+merged: 2026-10-20
+pr: 203
 ---
 
 # T035 - `memstore`, `memstore/write` and the memory commands
+
+Merged on 2026-10-20 in pull request #203. The text below is the one
+written when it was built.
 
 Earlier title: `memstore`: the shared readers.
 
