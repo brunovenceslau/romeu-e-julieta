@@ -30,7 +30,7 @@ One block, a recommendation each. Decisions of 2026-10-19 are in
    which does not exist yet. Recommended: create it when M3 starts.
 3. T111 (sitting M1) waits for T054, T059, T060, T078 and T035.
 4. When to harden `gitsafe`'s fast-forward
-   ("gitsafe-fast-forward-overwrites-ignored-files-and-runs-smudge-filters"):
+   ("gitsafe-s-fast-forward-overwrites-ignored-files-and-runs"):
    a task on the `gitsafe` surface. Recommended: before `julieta setup`
    runs in daily use, since it can overwrite an ignored file unasked.
 
