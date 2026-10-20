@@ -84,6 +84,10 @@ reopens, with `e2e/scenarios/j1/step2_*.go` among its files.
     keyless attestation is the only signature (ADR 0009, decision 19);
     `release.yml` takes its workflow file from the default branch, never
     the tagged commit, and `tools/ci workflows` has a fixture for each.
+  - `tools/ci workflows` checks that the publish job holds the attest
+    and `tools/release verify` steps and runs its steps in the order
+    of REQ-0901 (build, attest, verify, notes, publish), a fixture for
+    each; the grammar row of T127 checks neither.
   - The pull request decides how releases come from `main` only and
     closes the index row on how `release.yml` is started and the row on
     a check that reads the rulesets again, whose trigger it is, with a
