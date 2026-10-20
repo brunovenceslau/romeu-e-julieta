@@ -167,13 +167,17 @@ func newSandbox(t *testing.T) *sandbox {
 	git(t, filepath.Dir(primary), "clone", "-q", filepath.Join(s.base, "api.git"), primary)
 	run, err := canon.Digest(canon.Run, manifest.Run{})
 	require.NoError(t, err)
+	mem := t.TempDir()
+	for _, dir := range []string{"api", "web"} {
+		require.NoError(t, os.Mkdir(filepath.Join(mem, dir), 0o700))
+	}
 	s.m = manifest.Manifest{
 		Agent: "sbx-kit-claude", Egress: []string{"github.com", "dl.google.com"}, Generation: "01j9zc2q8x7w4t6y3r5e1v9k0p",
 		Project: "shop", Protocol: manifest.Protocol, Run: manifest.Run{}, RunDigest: run.String(), Schema: manifest.Field,
 		SpecCommit: strings.Repeat("ab", 20),
 		Repos: []manifest.Repo{
-			{Dir: "api", URL: s.url + "api.git", Primary: true, Ref: "main", Path: primary, Memory: "/memory/api"},
-			{Dir: "web", URL: s.url + "web.git", Ref: "main", Path: filepath.Join(s.home, "src", "shop", "web"), Memory: "/memory/web"},
+			{Dir: "api", URL: s.url + "api.git", Primary: true, Ref: "main", Path: primary, Memory: filepath.Join(mem, "api")},
+			{Dir: "web", URL: s.url + "web.git", Ref: "main", Path: filepath.Join(s.home, "src", "shop", "web"), Memory: filepath.Join(mem, "web")},
 		},
 	}
 	t.Setenv("HOME", s.home)

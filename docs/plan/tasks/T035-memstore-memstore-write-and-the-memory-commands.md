@@ -7,10 +7,21 @@ fate: kept
 owns:
   - internal/memstore/**
   - internal/cmd/julieta/memory/**
-  - internal/cmd/julieta/setup/memory_check.go
+  - internal/cmd/julieta/setup/memory_check*.go
   - internal/cmd/julieta/setup/steps.go
+  - internal/cmd/julieta/setup/setup.go
+  - internal/cmd/julieta/setup/helper_test.go
+  - internal/cmd/julieta/status/helper_test.go
   - internal/cmd/julieta/all/import_memory.go
+  - tools/ci/internal/schema/memory.go
+  - .gitattributes
   - e2e/julieta_memory_test.go
+  - e2e/julieta_setup_test.go
+  - internal/cli/errors.go
+  - docs/handoff/pending/a-total-bytes-cap-on-entries-of-a-memory-dir.md
+  - docs/handoff/pending/a-bounded-wait-on-the-store-lock.md
+  - docs/handoff/pending/warning-slugs-temp-file-and-handoff-cap-in-04-4-1.md
+  - docs/handoff/pending/a-hard-link-rule-for-memory-dirs.md
 needs:
   - T017
   - T008
@@ -19,7 +30,8 @@ needs:
 after:
   - T051
   - T123
-ask_first: []
+ask_first:
+  - contracts
 sitting: none
 ---
 
@@ -97,3 +109,50 @@ order (12 12.5):
     `setup` gains `memory check` and the agent memory dir check (04 4.3;
     08 8.1).
 - Verify: `go test ./internal/memstore/...`.
+
+Decisions taken while building (2026-10-20), each with what reopens
+it:
+
+- `Put(entry)` of 08 8.1 is `Store.Add` and `Store.Edit`, and the raw
+  write is unexported, so no caller can supply an id or a time. Reopened
+  by a writer that needs to put a whole entry, such as an import.
+- The `--json` documents of `memory add`, `list`, `show` and `edit` are
+  one format, `julieta-memory.v1`, named after the `memory` command.
+  Reopened by a subcommand whose output does not fit it.
+- The body of `add` and `edit` is the flag `--body`: an argv element,
+  which Linux caps at 128 KiB, under the 1 MiB file cap. Reopened by
+  `handoff write`, which reads stdin, if memory should read it too.
+- A title is one line of printable text of at most 200 bytes; a tag
+  matches `[a-z0-9][a-z0-9-]{0,31}`, at most 32 tags, distinct. Reopened
+  by an entry those refuse.
+- A member of `entries/` that is not a file `<ULID>.md` is the finding
+  `entry-name`, since the readers could not read it. Reopened by a
+  layout change of 08 8.1.
+- A leftover temporary file and a `handoff/` over its cap print as
+  `note` lines on stderr: 04 4.1 lists no warning slug for either.
+  Reopened by a slug for them in 04 4.1 (the pending note below).
+- The agent memory dir check reads the dir through the seam
+  `agentMemoryDir` of `setup/memory_check.go`, which no agent profile
+  fills yet. Reopened by T079, whose profile names the dir.
+- The decoder reads tags in any order, as the example of 03 3.9 writes
+  them, and sorts them; `Encode` writes them sorted. Reopened by a tag
+  order with meaning.
+- The atomic write stays in `memstore/write` rather than renameio,
+  because REQ-0654 names the temporary file `.tmp-<ULID>` (decided on
+  2026-10-20), and the store lock is a flock of `golang.org/x/sys/unix`
+  rather than `gofrs/flock` (decided on 2026-10-20). Reopened by a
+  library that names its temporary files, or a lock need beyond flock.
+- `check-findings` (`RJ-328`, exit 6) is declared once, in
+  `internal/cli/errors.go`, since commands of both binaries raise it
+  (decided on 2026-10-20, on the `contracts` surface). Reopened by a
+  check whose findings need a fix text of their own.
+- Deferred on 2026-10-20, each a pending note with its trigger: a
+  total-bytes cap on `entries/`
+  (`docs/handoff/pending/a-total-bytes-cap-on-entries-of-a-memory-dir.md`),
+  a bounded wait on the store lock
+  (`docs/handoff/pending/a-bounded-wait-on-the-store-lock.md`), the
+  warning slugs of the two `note` lines
+  (`docs/handoff/pending/warning-slugs-temp-file-and-handoff-cap-in-04-4-1.md`),
+  and a hard-link rule
+  (`docs/handoff/pending/a-hard-link-rule-for-memory-dirs.md`).
+  Each is reopened by the trigger its note names.

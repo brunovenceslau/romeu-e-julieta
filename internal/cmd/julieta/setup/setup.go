@@ -18,6 +18,7 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -31,6 +32,8 @@ type run struct {
 	home   string
 	m      manifest.Manifest
 	git    *gitsafe.Runner
+	start  time.Time
+	now    func() time.Time
 	report Report
 }
 
@@ -76,7 +79,7 @@ func setup(ctx context.Context, env *cli.Env) error {
 	if err != nil {
 		return err
 	}
-	r := &run{home: home, m: m, git: git,
+	r := &run{home: home, m: m, git: git, start: env.Now(), now: env.Now,
 		report: Report{Schema: Schema, Version: env.Version.Version, Errors: []string{}, Repos: []Repo{}, Unusable: []string{}, Warnings: []Warning{}}}
 	if fromEnv {
 		if err := cacheManifest(home, m); err != nil {
@@ -175,6 +178,8 @@ func PrintWarning(out *cli.Writer, w Warning) {
 		cli.Warn(out, "fetch-failed", w.Message)
 	case DefaultBranchMoved:
 		cli.Warn(out, "default-branch-moved", w.Message)
+	case AgentMemoryWritable:
+		cli.Warn(out, "agent-memory-writable", w.Message)
 	default:
 		_, _ = fmt.Fprintf(out, "julieta state holds a warning this julieta does not know, %q: %s\n", w.Slug, w.Message)
 	}

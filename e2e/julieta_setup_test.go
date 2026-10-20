@@ -23,7 +23,9 @@ import (
 // network but its loopback: two bare origins, api and web, served by
 // git daemon on 127.0.0.1 (the one git:// host gitsafe accepts), the
 // primary api cloned at a path of its own and one commit behind
-// origin's main, and the secondary web missing below $HOME.
+// origin's main, the secondary web missing below $HOME, and the empty
+// memory dir of each, /tmp/memory/<dir>, mode 0700 as romeu sync makes
+// it (08 8.1).
 const (
 	sandboxHome  = "/tmp/home"
 	primaryPath  = "/tmp/work/api"
@@ -44,6 +46,7 @@ J=$1
 shift
 export HOME=` + sandboxHome + `
 mkdir -p "$HOME" /tmp/srv /tmp/work
+mkdir -m 700 -p /tmp/memory/api /tmp/memory/web
 g() { git -c init.defaultBranch=main -c user.name=e2e -c user.email=e2e@example.invalid -c commit.gpgsign=false "$@"; }
 for r in api web; do
 	g init -q --bare /tmp/srv/$r.git

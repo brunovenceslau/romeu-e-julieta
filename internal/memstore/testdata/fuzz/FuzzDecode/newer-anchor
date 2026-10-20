@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("---\nschema: memory-entry/v2\ntags: &t [a]\nx: *t\n---\nbody\n")
