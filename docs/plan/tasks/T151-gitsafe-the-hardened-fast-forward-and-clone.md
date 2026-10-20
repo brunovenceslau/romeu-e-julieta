@@ -11,7 +11,6 @@ owns:
   - internal/gitsafe/gitsafe_test.go
   - internal/gitsafe/helper_test.go
   - docs/spec/04-cli.md
-  - docs/handoff/pending/000000000098hfz7arr3swy84e-gitsafe-s-fast-forward-overwrites-ignored-files-and-runs.md
 needs:
   - T051
   - T143
@@ -33,9 +32,9 @@ Goal: harden the two `gitsafe` verbs that write a checkout,
 `FastForward` and `Clone`, before `julieta setup` runs in daily use, as
 decided on 2026-10-20 (a task on the `gitsafe` surface, with an
 approval line). Two security audits of 2026-10-20 found, and the
-pending note
-[gitsafe's fast-forward overwrites ignored files and runs smudge filters](../../handoff/pending/000000000098hfz7arr3swy84e-gitsafe-s-fast-forward-overwrites-ignored-files-and-runs.md)
-records, four gaps:
+pending note "gitsafe's fast-forward overwrites ignored files and runs
+smudge filters" recorded, four gaps (closed by T151 in the Done record
+[Session of 2026-10-20, json v2, gitsafe, the hooks and go fix](../../handoff/done/01m5d7v40m0axrfnby7097da4e-session-of-2026-10-20-json-v2-gitsafe-the-hooks-and-go-fix.md)):
 
 1. `FastForward` (`merge --ff-only`) overwrites an ignored, untracked
    file when the incoming commit adds a tracked file at its path, and
