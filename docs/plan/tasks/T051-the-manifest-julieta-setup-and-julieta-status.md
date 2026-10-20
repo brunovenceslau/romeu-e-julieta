@@ -3,7 +3,7 @@ id: T051
 title: "`julieta setup` and `julieta status`"
 milestone: M1
 module: julieta-core
-fate: kept
+fate: merged
 owns:
   - internal/cmd/julieta/setup/**
   - internal/cmd/julieta/status/**
@@ -25,9 +25,14 @@ after:
 
 ask_first: []
 sitting: none
+merged: 2026-10-20
+pr: 195
 ---
 
 # T051 - `julieta setup` and `julieta status`
+
+Merged on 2026-10-20 in pull request #195. The text below is the one
+written at the re-plan.
 
 Earlier title: The manifest, `julieta setup` and `julieta status`.
 
