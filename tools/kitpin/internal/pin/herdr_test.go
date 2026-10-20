@@ -4,6 +4,7 @@
 package pin
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -53,4 +54,26 @@ func TestHerdrRefusesAnotherTag(t *testing.T) {
 	h := newHarness(t, map[string]route{"/repos/herdrdev/herdr/releases/tags/v0.9.6": {body: fixture(t, "herdr/v0.9.5.json")}})
 	assert.Equal(t, exitError, h.run(t, "herdr", "0.9.6"))
 	assert.Contains(t, h.stderr.String(), `the release "v0.9.5", not v0.9.6`)
+}
+
+// TestHerdrRefusesAnAmbiguousImmutable: the decoder matches member names
+// exactly and refuses a duplicate one, so neither a second immutable
+// member nor one of another case can mark a release immutable.
+func TestHerdrRefusesAnAmbiguousImmutable(t *testing.T) {
+	good := fixture(t, "herdr/v0.9.5.json")
+	cases := []struct{ name, old, new, want string }{
+		{"duplicate", `"immutable": true`, `"immutable": false, "immutable": true`, `duplicate object member name "immutable"`},
+		{"another_case", `"immutable": true`, `"Immutable": true`, "has no field immutable"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			body := bytes.Replace(good, []byte(c.old), []byte(c.new), 1)
+			require.NotEqual(t, string(good), string(body), "the case changes the fixture")
+			h := newHarness(t, map[string]route{"/repos/herdrdev/herdr/releases/tags/v0.9.5": {body: body}})
+			h.repo.Write("kits/pins.yaml", startPins)
+			assert.Equal(t, exitError, h.run(t, "herdr", "0.9.5"))
+			assert.Contains(t, h.stderr.String(), c.want)
+			assert.Equal(t, startPins, h.read(t, "kits/pins.yaml"))
+		})
+	}
 }

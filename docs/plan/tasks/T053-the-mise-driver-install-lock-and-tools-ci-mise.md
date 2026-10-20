@@ -110,3 +110,7 @@ through `internal/procgroup` (T137).
   The pattern names the `TestJulietaInstall*` and `TestJulietaLock*`
   functions this task adds, and the reviewer reads them in the `-v`
   output (10 10.8).
+
+T148 changed `tools/ci/internal/mise/which_test.go` on 2026-10-20 (its
+import and the `dirs` and `data` tags of the `mise doctor --json`
+test); this task builds on that edit.

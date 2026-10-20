@@ -29,7 +29,7 @@ package schemagen
 import (
 	"bytes"
 	"encoding"
-	"encoding/json"
+	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"fmt"
 	"reflect"
@@ -123,13 +123,14 @@ func Generate(s Schema, comment string) ([]byte, error) {
 	if comment != "" {
 		doc["$comment"] = comment
 	}
+	// Two-space indent, keys sorted, <, > and & as they are, U+2028 and
+	// U+2029 escaped, and a final newline: the committed form.
 	var b bytes.Buffer
-	enc := json.NewEncoder(&b)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(doc); err != nil {
+	if err := jsonv2.MarshalWrite(&b, doc, jsonv2.Deterministic(true),
+		jsontext.Multiline(true), jsontext.WithIndent("  "), jsontext.EscapeForJS(true)); err != nil {
 		return nil, fmt.Errorf("%s: %w", s.Name, err)
 	}
+	b.WriteByte('\n')
 	return b.Bytes(), nil
 }
 
@@ -147,7 +148,7 @@ var (
 	// jsonMethods are the interfaces whose methods give a type a JSON
 	// form of its own.
 	jsonMethods = []reflect.Type{
-		reflect.TypeFor[json.Marshaler](), reflect.TypeFor[json.Unmarshaler](),
+		reflect.TypeFor[jsonv2.Marshaler](), reflect.TypeFor[jsonv2.Unmarshaler](),
 		reflect.TypeFor[jsonv2.MarshalerTo](), reflect.TypeFor[jsonv2.UnmarshalerFrom](),
 	}
 	textMethods = []reflect.Type{reflect.TypeFor[encoding.TextMarshaler](), reflect.TypeFor[encoding.TextUnmarshaler]()}

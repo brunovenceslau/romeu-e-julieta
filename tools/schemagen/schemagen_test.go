@@ -5,7 +5,7 @@ package schemagen
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"net/netip"
 	"reflect"
@@ -241,7 +241,7 @@ type (
 	withChan      struct{ C chan int }
 	withIntMap    struct{ M map[int]string }
 	withMethods   struct{ S interface{ M() } }
-	withMarshaler struct{ J json.RawMessage }
+	withMarshaler struct{ J jsontext.Value }
 	withOption    struct {
 		N int `json:"n,string"`
 	}

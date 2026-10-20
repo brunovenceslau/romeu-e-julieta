@@ -6,7 +6,7 @@ package mise
 import (
 	"bytes"
 	"cmp"
-	"encoding/json"
+	"encoding/json/v2"
 	"os"
 	"path/filepath"
 	"slices"
@@ -357,7 +357,11 @@ func TestMiseInstalls(t *testing.T) {
 				Stdout: &out,
 			})
 			require.NoError(t, err, "mise doctor")
-			var doctor struct{ Dirs struct{ Data string } }
+			var doctor struct {
+				Dirs struct {
+					Data string `json:"data"`
+				} `json:"dirs"`
+			}
 			require.NoError(t, json.Unmarshal(out.Bytes(), &doctor))
 			require.NotEmpty(t, doctor.Dirs.Data, "the data directory mise reports")
 			installs, err := miseInstalls()
