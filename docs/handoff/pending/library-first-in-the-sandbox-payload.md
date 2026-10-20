@@ -13,4 +13,16 @@ library; import it, copy a small proven piece with its license and
 origin, or write it by hand with the reason stated in the pull request;
 and a builder brief names the rule.
 
-Reopen: that session reports its pull request.
+Where the rule lives, by scope:
+
+- this repository: ADR 0038;
+- every sandbox today: the payload of `kits/claude-home`, which is
+  interim;
+- every sandbox once romeu and julieta replace that payload: the
+  personal agent context of 06 (REQ-0608, a personal kit in the config
+  repository), or a product skill under `skills/` if adopters should
+  get it too. Which one is open; the rule moves with the rest of the
+  payload when that migration is planned.
+
+Reopen: that session reports its pull request, or the payload's
+migration to the config repository is planned.
