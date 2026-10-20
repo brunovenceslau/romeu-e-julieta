@@ -20,6 +20,8 @@ docs/reference/julieta/completion.md -text
 docs/reference/julieta/completion/bash.md -text
 docs/reference/julieta/completion/fish.md -text
 docs/reference/julieta/completion/zsh.md -text
+docs/reference/julieta/setup.md -text
+docs/reference/julieta/status.md -text
 docs/reference/julieta/version.md -text
 docs/reference/romeu.md -text
 docs/reference/romeu/completion.md -text
@@ -28,4 +30,6 @@ docs/reference/romeu/completion/fish.md -text
 docs/reference/romeu/completion/zsh.md -text
 docs/reference/romeu/version.md -text
 internal/cli/exitcodes_gen.go -text
+schemas/julieta-setup.v1.json -text
+schemas/julieta-status.v1.json -text
 schemas/manifest.v1.json -text
