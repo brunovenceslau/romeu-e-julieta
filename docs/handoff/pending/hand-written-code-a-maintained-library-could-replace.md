@@ -11,11 +11,9 @@ library was not checked online. In the order of ADR 0038, decision 5:
 
 1. Done by T145 (#201) on 2026-10-20: the ULIDs of `internal/canon`
    now come from `github.com/oklog/ulid/v2` (REQ-0258).
-2. The ssh-agent identity listing, `internal/signing/signing.go`:
-   `golang.org/x/crypto/ssh/agent`; `x/crypto` is in `go.mod` for
-   `tools/kitpin` only (REQ-1049). It is on the `signing` surface (I34);
-   the task reads whether its exact behavior is the requirement
-   (ADR 0038, 3) before it swaps.
+2. Swapped by T147 on 2026-10-20: the ssh-agent identity listing of
+   `internal/signing` comes from `golang.org/x/crypto/ssh/agent`; its
+   exact behavior was read as not the requirement (ADR 0038, 3).
 3. Done by T146 (#202) on 2026-10-20: the atomic writes come from
    `github.com/google/renameio/v2`; the two sites kept by hand, with
    their reasons, are in T146.
@@ -44,5 +42,5 @@ exact behavior is the requirement), and the container e2e harness
 (REQ-0798's split of infrastructure errors from test failures, which no
 candidate meets).
 
-Reopen: each remaining item as a task, in this order. Next is item 2,
-the ssh-agent listing (signing surface, ask first).
+Reopen: each remaining item as a task, in this order. Next is item 5,
+the schema generator.

@@ -5,9 +5,9 @@
 
 // Package signing checks the dedicated host signing socket of
 // git-ssh-sign (06 6.4, I34): signing.agentSocket must be set, reachable
-// and hold exactly one key, the kit's signingKey. It speaks the
-// identity listing of the ssh-agent protocol itself, with no dependency
-// and no subprocess (REQ-0601). The package is dark until T080, whose
+// and hold exactly one key, the kit's signingKey. It reads the identity
+// listing of the ssh-agent protocol through golang.org/x/crypto/ssh/agent,
+// with no subprocess (REQ-0601, T147). The package is dark until T080, whose
 // sync and preflight turn its errors into the error signing-socket
 // (RJ-204).
 //
@@ -32,21 +32,13 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"golang.org/x/crypto/ssh/agent"
 )
 
-// The messages of the identity listing (draft-miller-ssh-agent, 4.4).
-const (
-	requestIdentities = 11 // SSH_AGENTC_REQUEST_IDENTITIES
-	identitiesAnswer  = 12 // SSH_AGENT_IDENTITIES_ANSWER
-	agentFailure      = 5  // SSH_AGENT_FAILURE
-)
-
-// The bounds of an answer, far above an agent that holds one key: the
-// length of the message and the number of keys it lists.
-const (
-	maxMessage = 256 << 10
-	maxKeys    = 1024
-)
+// maxRead bounds the bytes read from the agent, far above an agent that
+// holds one key and below the library's own bound of 16 MiB.
+const maxRead = 256 << 10
 
 // timeout bounds the whole listing when ctx sets no earlier deadline:
 // an agent answers at once, and one that does not is unreachable.
@@ -93,8 +85,8 @@ func (id Identity) Type() string {
 // the absolute path of a socket this process's user owns, not a symbolic
 // link, so a socket another user planted, or one in Linux's abstract
 // namespace, is ErrSocket. Any failure to connect, a refusal and an
-// answer that is not a well formed listing are ErrUnreachable, wrapped
-// with what went wrong and, when ctx ended, with its error.
+// answer the library does not read as a listing are ErrUnreachable,
+// wrapped with what went wrong and, when ctx ended, with its error.
 func Identities(ctx context.Context, socket string) (ids []Identity, err error) {
 	if socket == "" {
 		return nil, ErrNoSocket
@@ -108,9 +100,11 @@ func Identities(ctx context.Context, socket string) (ids []Identity, err error) 
 			return
 		}
 		cause := parent.Err()
-		if d, ok := parent.Deadline(); ok && cause == nil && errors.Is(err, os.ErrDeadlineExceeded) && !time.Now().Before(d) {
+		if d, ok := parent.Deadline(); ok && cause == nil && !time.Now().Before(d) {
 			// The socket's deadline is the caller's and may fire before
-			// the caller's own timer does.
+			// the caller's own timer does. The library keeps only the
+			// text of a read error, so the deadline is read from the
+			// clock, not from the error.
 			cause = context.DeadlineExceeded
 		}
 		if cause != nil && !errors.Is(err, cause) {
@@ -132,18 +126,41 @@ func Identities(ctx context.Context, socket string) (ids []Identity, err error) 
 	}
 	stop := context.AfterFunc(ctx, func() { _ = conn.SetDeadline(time.Unix(1, 0)) })
 	defer stop()
-	if _, err := conn.Write([]byte{0, 0, 0, 1, requestIdentities}); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrUnreachable, err)
-	}
-	msg, err := readMessage(conn)
+	// The client gets the connection without its Close, so it runs the
+	// one call in place and starts no reader goroutine (agent.NewClient).
+	rw := &countingConn{Reader: io.LimitReader(conn, maxRead), Writer: conn}
+	keys, err := agent.NewClient(rw).List()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrUnreachable, err)
 	}
-	ids, err = parseIdentities(msg)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrUnreachable, err)
+	// The library reads the whole answer and parses only the keys its
+	// count names, so an answer that counts fewer keys than it holds
+	// would pass I34 with a second key unseen. The answer must be
+	// exactly its length, its type, its count and the keys listed.
+	want := int64(4 + 1 + 4)
+	ids = make([]Identity, 0, len(keys))
+	for _, k := range keys {
+		want += int64(4 + len(k.Blob) + 4 + len(k.Comment))
+		ids = append(ids, Identity{Blob: k.Blob, Comment: k.Comment})
+	}
+	if rw.read != want {
+		return nil, fmt.Errorf("%w: %d bytes after the last key", ErrUnreachable, rw.read-want)
 	}
 	return ids, nil
+}
+
+// countingConn counts the bytes read through it. It has no Close, which
+// keeps agent.NewClient on its serial path.
+type countingConn struct {
+	io.Reader
+	io.Writer
+	read int64
+}
+
+func (c *countingConn) Read(p []byte) (int, error) {
+	n, err := c.Reader.Read(p)
+	c.read += int64(n)
+	return n, err
 }
 
 // checkSocket returns ErrSocket for a path that is not absolute, names
@@ -169,74 +186,6 @@ func checkSocket(socket string) error {
 		return fmt.Errorf("%w: %q belongs to another user", ErrSocket, socket)
 	}
 	return nil
-}
-
-// readMessage reads one length-prefixed message of the agent protocol.
-func readMessage(r io.Reader) ([]byte, error) {
-	var head [4]byte
-	if _, err := io.ReadFull(r, head[:]); err != nil {
-		return nil, err
-	}
-	n := binary.BigEndian.Uint32(head[:])
-	if n == 0 || n > maxMessage {
-		return nil, fmt.Errorf("an answer of %d bytes", n)
-	}
-	msg := make([]byte, n)
-	if _, err := io.ReadFull(r, msg); err != nil {
-		return nil, err
-	}
-	return msg, nil
-}
-
-// parseIdentities reads an identities answer: its type, the number of
-// keys, then a key blob and a comment for each, with nothing after.
-func parseIdentities(msg []byte) ([]Identity, error) {
-	switch msg[0] {
-	case identitiesAnswer:
-	case agentFailure:
-		return nil, errors.New("the agent refused the listing")
-	default:
-		return nil, fmt.Errorf("an answer of type %d", msg[0])
-	}
-	rest := msg[1:]
-	if len(rest) < 4 {
-		return nil, errors.New("an answer with no key count")
-	}
-	n := binary.BigEndian.Uint32(rest)
-	rest = rest[4:]
-	if n > maxKeys {
-		return nil, fmt.Errorf("an answer of %d keys", n)
-	}
-	ids := make([]Identity, 0, n)
-	for range n {
-		blob, after, err := readString(rest)
-		if err != nil {
-			return nil, err
-		}
-		comment, after, err := readString(after)
-		if err != nil {
-			return nil, err
-		}
-		ids = append(ids, Identity{Blob: blob, Comment: string(comment)})
-		rest = after
-	}
-	if len(rest) != 0 {
-		return nil, fmt.Errorf("%d bytes after the last key", len(rest))
-	}
-	return ids, nil
-}
-
-// readString reads one string of the wire format: a length, then that
-// many bytes.
-func readString(b []byte) (s, rest []byte, err error) {
-	if len(b) < 4 {
-		return nil, nil, errors.New("a string with no length")
-	}
-	n := binary.BigEndian.Uint32(b)
-	if uint64(n) > uint64(len(b)-4) {
-		return nil, nil, fmt.Errorf("a string of %d bytes in %d", n, len(b)-4)
-	}
-	return b[4 : 4+n], b[4+n:], nil
 }
 
 // clip returns at most n bytes of s, which the agent chose.

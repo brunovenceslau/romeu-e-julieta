@@ -22,6 +22,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The messages of the identity listing (draft-miller-ssh-agent, 4.4),
+// which the fake agent speaks, and the library's bound on an answer.
+const (
+	requestIdentities = 11       // SSH_AGENTC_REQUEST_IDENTITIES
+	identitiesAnswer  = 12       // SSH_AGENT_IDENTITIES_ANSWER
+	agentFailure      = 5        // SSH_AGENT_FAILURE
+	maxAnswer         = 16 << 20 // the library's bound
+)
+
 // wireString writes s as a string of the agent wire format.
 func wireString(s []byte) []byte {
 	return append(binary.BigEndian.AppendUint32(nil, uint32(len(s))), s...)
@@ -150,14 +159,20 @@ func TestCheckRefusesTheSigningKey(t *testing.T) {
 }
 
 // TestIdentitiesRefusesBadAnswers: a refusal, another message type, an
-// answer over the bound, a key count over the bound, a truncated key,
-// bytes after the last key, and an agent that closes or never answers
-// are all ErrUnreachable.
+// answer over the package's bound or the library's, a key count over the
+// library's, a truncated key, a key blob too short for its type, bytes
+// after the last key, a count below the keys sent, and an agent that
+// closes are all ErrUnreachable.
 func TestIdentitiesRefusesBadAnswers(t *testing.T) {
-	big := binary.BigEndian.AppendUint32(nil, maxMessage+1)
-	manyKeys := binary.BigEndian.AppendUint32([]byte{identitiesAnswer}, maxKeys+1)
+	big := binary.BigEndian.AppendUint32(nil, maxAnswer+1)
+	// One key whose comment takes the answer past maxRead.
+	overRead := answer(keyBlob("ssh-ed25519", "k"))
+	overRead = append(overRead[:len(overRead)-len(wireString([]byte("a key")))], wireString(make([]byte, maxRead))...)
+	// Two keys under a count of one: the library parses the first only.
+	undercount := answer(keyBlob("ssh-ed25519", "signing"), keyBlob("ssh-ed25519", "other"))
+	binary.BigEndian.PutUint32(undercount[1:], 1)
+	manyKeys := binary.BigEndian.AppendUint32([]byte{identitiesAnswer}, maxAnswer/8+1)
 	truncated := append(binary.BigEndian.AppendUint32([]byte{identitiesAnswer}, 1), 0, 0, 0, 9, 'x')
-	trailing := append(answer(keyBlob("ssh-ed25519", "k")), 0)
 	for name, reply := range map[string][]byte{
 		"failure":       framed([]byte{agentFailure}),
 		"another type":  framed([]byte{99}),
@@ -167,7 +182,10 @@ func TestIdentitiesRefusesBadAnswers(t *testing.T) {
 		"too many keys": framed(manyKeys),
 		"truncated key": framed(truncated),
 		"no comment":    framed(append(binary.BigEndian.AppendUint32([]byte{identitiesAnswer}, 1), wireString([]byte("k"))...)),
-		"trailing":      framed(trailing),
+		"untyped key":   framed(answer([]byte{0, 0, 0, 9})),
+		"trailing":      framed(append(answer(keyBlob("ssh-ed25519", "k")), 0)),
+		"undercount":    framed(undercount),
+		"over read":     framed(overRead),
 		"closed":        nil,
 	} {
 		_, err := Identities(t.Context(), fakeAgent(t, reply))
@@ -175,6 +193,13 @@ func TestIdentitiesRefusesBadAnswers(t *testing.T) {
 	}
 	assert.Empty(t, Identity{Blob: []byte{0, 0, 0, 9}}.Type(), "a blob shorter than its type")
 	assert.Empty(t, Identity{}.Type())
+}
+
+// TestCountingConnHasNoClose: the connection the client gets has no
+// Close, so agent.NewClient takes its serial path and starts no goroutine.
+func TestCountingConnHasNoClose(t *testing.T) {
+	_, ok := any(&countingConn{}).(io.Closer)
+	assert.False(t, ok)
 }
 
 // TestIdentitiesStopsWithTheContext: an agent that accepts and never
