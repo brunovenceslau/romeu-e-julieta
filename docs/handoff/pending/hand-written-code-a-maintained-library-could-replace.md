@@ -9,21 +9,18 @@ does not fit leaves the code as it is
 Inventory of 2026-10-20, by reading the tree; the maturity of each
 library was not checked online. In the order of ADR 0038, decision 5:
 
-1. ULIDs, `internal/canon/ulid.go`: `github.com/oklog/ulid/v2` with a
-   wrapper that lowercases on output and refuses uppercase (REQ-0258).
+1. Done by T145 (#201) on 2026-10-20: the ULIDs of `internal/canon`
+   now come from `github.com/oklog/ulid/v2` (REQ-0258).
 2. The ssh-agent identity listing, `internal/signing/signing.go`:
    `golang.org/x/crypto/ssh/agent`; `x/crypto` is in `go.mod` for
    `tools/kitpin` only (REQ-1049). It is on the `signing` surface (I34);
    the task reads whether its exact behavior is the requirement
    (ADR 0038, 3) before it swaps.
-3. Atomic writes, eight rename sites outside tests:
-   `internal/cmd/julieta/setup/state.go`, `internal/cmd/julieta/setup/link.go`,
-   `tools/kitpin/internal/pin/pin.go`, `tools/ci/internal/hygiene/add.go`,
-   `tools/ci/internal/setup/install.go`, `tools/release/internal/build/build.go`,
-   `tools/planviewer/internal/view/view.go`, `e2e/internal/container/container.go`
-   (not each read to confirm it is a temporary file and a rename):
-   `github.com/google/renameio/v2`, or one shared helper copied from it.
-4. The store lock T035 needs: `github.com/gofrs/flock`.
+3. Done by T146 (#202) on 2026-10-20: the atomic writes come from
+   `github.com/google/renameio/v2`; the two sites kept by hand, with
+   their reasons, are in T146.
+4. Decided on 2026-10-20: the store lock of T035 stays on
+   `golang.org/x/sys/unix` flock, so it leaves this list.
 5. The schema generator, `tools/schemagen`: `github.com/invopop/jsonschema`
    (03-formats says "no dependency"; read again under ADR 0038, 3).
 6. The glob matcher of `tools/ci/internal/askfirst`:
@@ -47,4 +44,5 @@ exact behavior is the requirement), and the container e2e harness
 (REQ-0798's split of infrastructure errors from test failures, which no
 candidate meets).
 
-Reopen: each item as a task, in this order, once ADR 0038 is Accepted.
+Reopen: each remaining item as a task, in this order. Next is item 2,
+the ssh-agent listing (signing surface, ask first).
