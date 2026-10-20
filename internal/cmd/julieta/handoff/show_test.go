@@ -325,7 +325,8 @@ func TestShowHookLeavesAnUnreadableSetupStateAlone(t *testing.T) {
 	s := newSandbox(t)
 	path := filepath.Join(setup.StateDir(s.home), "setup.json")
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
-	require.NoError(t, os.WriteFile(path, []byte(`{"warnings":[`), 0o600))
+	corrupt := "{\"warnings\":["
+	require.NoError(t, os.WriteFile(path, []byte(corrupt), 0o600))
 	s.addEntry(t, 0, memstore.Content{Title: "still printed"})
 	out := s.ok(t, "", "handoff", "show", "--hook")
 	assert.Contains(t, out, "julieta state: setup.json could not be read and is left as it is: ")
@@ -333,7 +334,7 @@ func TestShowHookLeavesAnUnreadableSetupStateAlone(t *testing.T) {
 	assert.Contains(t, out, "built-in memory is disabled")
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
-	assert.Equal(t, `{"warnings":[`, string(data))
+	assert.Equal(t, corrupt, string(data))
 	assert.Empty(t, s.failures(t))
 }
 
