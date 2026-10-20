@@ -280,10 +280,12 @@ func TestSetupReplacesWhatIsAtTheLink(t *testing.T) {
 	s := newSandbox(t)
 	link := filepath.Join(s.home, ".local", "bin", "julieta")
 	require.NoError(t, os.MkdirAll(filepath.Dir(link), 0o700))
-	exe, err := os.Executable()
-	require.NoError(t, err)
-	require.NoError(t, os.Link(exe, link), "a hard link of the test binary at the PATH link")
+	// The running binary is a regular file at the path itself, as when a
+	// copy was installed there.
+	require.NoError(t, os.WriteFile(link, []byte("binary"), 0o700))
+	restore := setup.SetExecutable(func() (string, error) { return link, nil })
 	code, rep, stderr := setupJSON(t)
+	restore()
 	require.Equal(t, 0, code, stderr)
 	assert.False(t, rep.Link.Changed, "the running binary is the file at the path")
 	info, err := os.Lstat(link)

@@ -13,18 +13,20 @@ import (
 // linkPath is the PATH link below $HOME (04 4.3, REQ-0397).
 const linkPath = ".local/bin/julieta"
 
+// executable finds the running binary; a test replaces it.
+var executable = os.Executable
+
 // linkBinary points $HOME/.local/bin/julieta at the running binary. A
 // link that already does is left as it is, and so is the running binary
 // itself when it is the file at the path (a copy installed there, or a
 // hard link to it), which a link to itself would lose; anything else at
-// the path,
-// a file or another link, is replaced by a rename, so the path never
-// goes missing. A link that cannot be made leaves the sandbox
-// unusable.
+// the path, a file or another link, is replaced by a rename, so the
+// path never goes missing. A link that cannot be made leaves the
+// sandbox unusable.
 func linkBinary(_ context.Context, r *run) {
 	path := filepath.Join(r.home, linkPath)
 	r.report.Link.Path = path
-	target, err := os.Executable()
+	target, err := executable()
 	if err != nil {
 		r.fail("the PATH link: the running binary cannot be found: %v", err)
 		return
