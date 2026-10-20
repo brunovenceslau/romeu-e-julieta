@@ -17,7 +17,7 @@ pr: 179
 # T113 - The kit-frontend go/no-go
 
 Merged on 2026-10-19 in pull request #179: sitting M0 ran on that day
-and the verdict is go ("sitting-m0-the-kit-frontend-go"). The text
+and the verdict is go ("sitting-m0-the-kit-frontend-is-a-go"). The text
 below is the one written at the re-plan.
 
 Goal: A minimal local kit built from a directory source, on one host,
