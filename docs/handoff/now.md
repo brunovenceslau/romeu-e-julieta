@@ -2,16 +2,21 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-19, after T013, T076, T103 and T135 merged
-(Done record 42). Done records are merged up to 41.
+Checkpoint of 2026-10-20, after T127 and the re-plan of T051 merged
+(Done record 43). Done records are merged up to 42.
 
 ## Next steps
 
-1. T051 and T127, which T013 unblocked, under the standing grants of
-   "the-grants-of-2026-10-19"; then the rest of the ready list
-   (`go run ./tools/ci plan --ready`).
-2. The follow-ups of "t013-leftovers", as one pull request.
-3. T112 lands through the sessions of the config and kit repositories
+1. T143, the `gitsafe` read verbs, then T051, which needs it; both
+   under the standing grants of "the-grants-of-2026-10-19" (T143's
+   `gitsafe` surface is not granted: its pull request carries an
+   approval line).
+2. T144, the follow-ups of the container e2e; its `checks` surface is
+   not in the M0 grant, so its pull request carries an approval line.
+   Then the docs pull request of
+   "the-spec-catches-up-with-the-hardening-of-t127-and-t144".
+3. The rest of the ready list (`go run ./tools/ci plan --ready`).
+4. T112 lands through the sessions of the config and kit repositories
    ("t112-in-the-config-and-kit-repositories"); then this repository
    drops the hashed denylist and the CI check over pull request text.
 
@@ -30,7 +35,9 @@ One block, a recommendation each. Decisions of 2026-10-19 are in
 
 ## In flight
 
-- The record of the batch (branch `docs/record-batch-1019`).
+- T143 (branch `feat/t143-gitsafe-status`) and T144 (branch
+  `fix/t013-leftovers`), each built by a subagent in a worktree outside
+  the repository.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.

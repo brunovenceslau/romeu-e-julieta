@@ -3,7 +3,7 @@ id: T127
 title: "The release publish job row of `tools/ci workflows`"
 milestone: M1
 module: ci-release
-fate: new
+fate: merged
 owns:
   - tools/ci/internal/workflows/release*.go
   - tools/ci/internal/workflows/workflows.go
@@ -15,9 +15,14 @@ after:
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-20
+pr: 188
 ---
 
 # T127 - The release publish job row of `tools/ci workflows`
+
+Merged on 2026-10-20 in pull request #188. The text below is the one
+written at the re-plan.
 
 Goal: The grammar row of the release workflow (10 10.2, the publish job:
 `ubuntu-26.04`, needs every test job, no test, `tools/ci setup` first,
