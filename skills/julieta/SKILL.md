@@ -16,7 +16,10 @@ Anything kept only in the conversation is gone after `/clear`.
 
 ## Keep something for later
 
-Add one entry per thing, with a one-line title a later session can scan:
+Search first with `julieta memory list --query <text>`: an entry that
+already holds the thing is better changed than repeated (see
+[references/memory.md](references/memory.md)). Then add one entry per
+thing, with a one-line title a later session can scan:
 
 ```sh
 julieta memory add --title 'Signing waits on the host' --body 'Ask the operator.' --tag lesson

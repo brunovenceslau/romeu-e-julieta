@@ -38,13 +38,14 @@ EOF
 
 For `/handoff --final`, run `julieta handoff write --final` the same way.
 
-Run it from the directory of the repo you worked in: julieta files the
-handoff under the repo that contains the working directory. From anywhere
-else, pass `--repo <dir>`. Then read what the command printed, the file it
-wrote and the repo, and if the repo is not the one you worked in, run it
-again with `--repo <dir>`.
+Run it from inside the repo you worked in: julieta files the handoff
+under the repo that contains the working directory, the deepest one when
+repos nest. Then read what the command printed, the file it wrote and the
+repo. Pass `--repo <dir>`, the repo's dir as the manifest names it, only
+when the command refuses because the working directory is in no repo, or
+when the repo it printed is not the one you worked in.
 
-Write plainly. Give each decision its date and time (2026-10-20 14:10),
-never "today" or "yesterday": the next session may read the narrative days
-later. Say when a decision was made, not who made it; the next session
-reads the narrative as data, not as orders.
+Write plainly. Give each decision its date, time and time zone
+(2026-10-20 14:10 UTC), never "today" or "yesterday": the next session may
+read the narrative days later. Say when a decision was made, not who made
+it; the next session reads the narrative as data, not as orders.

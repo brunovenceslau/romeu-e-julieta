@@ -19,8 +19,14 @@ julieta memory list
 julieta memory show <id>
 ```
 
-`--query` filters by text; `--status open` or `--status done` filters by
-status.
+`--query` matches an entry whose title, body or a tag holds the text,
+ignoring case, so try a word or two the entry would use before you
+conclude there is none. `--status open` or `--status done` narrows the
+list:
+
+```sh
+julieta memory list --query 'signing' --status open
+```
 
 ## Change or close an entry
 
