@@ -89,10 +89,9 @@ func Report(err error) string {
 // Fail ends the test on err, with the line of Report, after it names
 // the test in the file of InfraFileEnv when err is an infrastructure
 // error. The step of tools/ci attributes an infrastructure error by test
-// name: a test that fails an assertion and then calls Fail with an
-// InfraError reads as one whole. Only the preconditions call Fail with
-// one today (workload, Prepare, CheckDaemon in the cases), and a case
-// keeps it so: it calls Fail with an InfraError before any assertion.
+// name, and counts the test as one only if it printed no line but the
+// one Fail prints: a test that fails an assertion before it calls Fail
+// with an InfraError reads as a test failure.
 func Fail(tb testing.TB, err error) {
 	tb.Helper()
 	if _, ok := errors.AsType[*InfraError](err); ok {

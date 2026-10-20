@@ -154,6 +154,16 @@ func around() ([]string, check.Read, error) {
 	}, nil
 }
 
+// frameworkLine reports whether a line of a test's output is the
+// framework's ("=== RUN", "--- FAIL", a blank line), not a line the test
+// printed. Fail ends a test with one line (Fatal), after it records the
+// test, so a recorded test that printed more failed before or besides
+// the error it recorded.
+func frameworkLine(out string) bool {
+	t := strings.TrimSpace(out)
+	return t == "" || strings.HasPrefix(t, "=== ") || strings.HasPrefix(t, "--- ")
+}
+
 // event is what read takes from one event of go test -json.
 type event struct {
 	Action  string
@@ -169,13 +179,17 @@ type event struct {
 // when tests ran and passed and none failed or was skipped; a failure
 // when no test ran or passed (REQ-0812) and when a test was skipped
 // (REQ-0798); an error that wraps check.ErrInfrastructure when every
-// failed test is in infra, or a subtest of it is, and every failed
-// package holds such a test; and otherwise a failure that names the
+// failed test is in infra, or a subtest of it is, and printed at most
+// the one line the report of that error is, and a parent of it none (a
+// test that logged more, as an assertion that failed before it, is a
+// test failure), and every
+// failed package holds such a test; and otherwise a failure that names the
 // failed tests.
 func read(out []byte, runErr error, infra []string) ([]byte, error) {
 	var text bytes.Buffer
 	ran, passed := 0, 0
 	var failedTests, skipped, failedPkgs, pkgsWithFailedTests []string
+	logged := map[string]int{} // the lines each test printed of its own
 	sc := bufio.NewScanner(bytes.NewReader(out))
 	sc.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 	for sc.Scan() {
@@ -187,6 +201,9 @@ func read(out []byte, runErr error, infra []string) ([]byte, error) {
 			continue
 		}
 		text.WriteString(e.Output)
+		if e.Test != "" && e.Action == "output" && !frameworkLine(e.Output) {
+			logged[e.Test]++
+		}
 		switch {
 		case e.Test == "" && e.Action == "fail":
 			failedPkgs = append(failedPkgs, e.Package)
@@ -222,7 +239,11 @@ func read(out []byte, runErr error, infra []string) ([]byte, error) {
 	}
 	var notInfra []string
 	for _, name := range failedTests {
-		covered := slices.ContainsFunc(infra, func(i string) bool { return i == name || strings.HasPrefix(i, name+"/") })
+		// A test that recorded the error printed its one line; a parent
+		// that only holds the test that did printed none of its own.
+		covered := slices.ContainsFunc(infra, func(i string) bool {
+			return (i == name && logged[name] <= 1) || (strings.HasPrefix(i, name+"/") && logged[name] == 0)
+		})
 		if !covered {
 			notInfra = append(notInfra, name)
 		}
