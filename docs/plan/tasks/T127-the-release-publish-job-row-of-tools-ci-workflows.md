@@ -6,6 +6,7 @@ module: ci-release
 fate: new
 owns:
   - tools/ci/internal/workflows/release*.go
+  - tools/ci/internal/workflows/workflows.go
 needs: []
 after:
   - T105
@@ -26,7 +27,9 @@ no task file. T088 needs it.
 Re-plan (2026-10-12, stage B): New. A change to merged work is a task,
 so it has an owner and an `after` edge: `after: T105` for the moved
 file layout, and `after: T013`, which owns the workflows package whole,
-so the smaller task waits.
+so the smaller task waits. Re-plan (2026-10-20): `owns` adds
+`workflows.go`, since the package dispatches by file only for `ci.yml`,
+and the permissions, step `env` and `github.token` refusals live there.
 
 - Implements: REQ-0768 (10 10.1), REQ-0808 (10 10.2).
 - Operator: no

@@ -107,6 +107,8 @@ var actionInputs = map[string][]string{
 	"actions/checkout": {"persist-credentials"},
 	"jdx/mise-action":  {"version", "sha256", "cache", "env", "persist_github_token"},
 	"actions/cache":    {"path", "key"},
+	// The publish job of release.yml alone names this action (release.go).
+	"actions/attest-build-provenance": {"subject-path", "subject-checksums"},
 }
 
 // miseAction is the action whose step must not hand the token on: its
@@ -188,9 +190,12 @@ func workflowFindings(path string, src []byte) []check.Finding {
 	if err != nil {
 		return []check.Finding{{Where: where, Rule: "workflows", Msg: err.Error()}}
 	}
-	c := &grammar{where: where, exempt: prOnlyCancel(doc)}
+	c := &grammar{where: where, exempt: prOnlyCancel(doc), rel: readRelease(path, doc)}
 	c.walk(doc)
 	c.file(doc)
+	if strings.TrimPrefix(path, Dir) == releaseFile {
+		c.publish(doc)
+	}
 	if strings.TrimPrefix(path, Dir) == "ci.yml" {
 		c.edited(doc)
 	}
@@ -223,6 +228,9 @@ type grammar struct {
 	// the cancel-in-progress of the file's concurrency, when it is
 	// prOnlyExpression (prOnlyCancel).
 	exempt *yaml.Node
+	// rel is what a release.yml grants its publish job (release.go), and
+	// nil in every other file.
+	rel *release
 }
 
 // prOnlyExpression is the one expression the grammar admits that is no
@@ -263,7 +271,7 @@ func (c *grammar) walk(n *yaml.Node) {
 	case !slices.Contains(plainTags, n.Tag):
 		c.add(n, "the tag "+strconv.Quote(n.Tag)+" is outside the grammar")
 	case n.Kind == yaml.ScalarNode:
-		if n != c.exempt {
+		if n != c.exempt && !c.rel.isToken(n) {
 			c.expressions(n)
 		}
 	}
@@ -440,7 +448,11 @@ func (c *grammar) job(n *yaml.Node) {
 			c.strategy(value)
 			osKnown = c.matrix(field(value, "matrix"))
 		case "permissions":
-			c.permissions(value)
+			if c.rel.isJob(n) {
+				c.publishPermissions(value)
+			} else {
+				c.permissions(value)
+			}
 		case "steps":
 			c.steps(value, field(n, "strategy"))
 		}
@@ -600,6 +612,9 @@ func (c *grammar) step(n, strategy *yaml.Node) {
 	if field(n, "uses") == nil {
 		keys, kind = runStepKeys, "run"
 	}
+	if c.rel.mayHoldEnv(n) {
+		keys = slices.Concat(keys, []string{"env"})
+	}
 	for key, value := range pairs(n) {
 		if !slices.Contains(keys, key.Value) {
 			c.add(key, "the key "+strconv.Quote(key.Value)+" is outside the grammar of a "+kind+" step")
@@ -616,6 +631,8 @@ func (c *grammar) step(n, strategy *yaml.Node) {
 			} else if uses := field(n, "uses"); uses.Kind == yaml.ScalarNode && usesForm.MatchString(uses.Value) {
 				c.inputs(uses, value, strategy)
 			}
+		case "env":
+			c.stepEnv(value)
 		case "run":
 			if value.Kind != yaml.ScalarNode || !runLine(value.Value) {
 				c.add(value, "run is one line: go run ./tools/ci or ./tools/release, a subcommand, and plain words")
@@ -625,6 +642,8 @@ func (c *grammar) step(n, strategy *yaml.Node) {
 	if uses := field(n, "uses"); uses != nil && uses.Kind == yaml.ScalarNode && usesForm.MatchString(uses.Value) {
 		c.checkout(n, uses)
 		c.miseToken(n, uses)
+		c.attest(n, uses)
+		c.publishUses(n, uses)
 	}
 	if kind == "run" && field(n, "run") == nil {
 		c.add(n, "a step has uses or run")
