@@ -32,7 +32,10 @@ owns:
   - tools/kitpin/internal/pin/frontend.go
   - tools/mutants/main_test.go
 needs: []
-after: []
+after:
+  - T148
+  - T149
+  - T150
 ask_first:
   - checks
   - digests
