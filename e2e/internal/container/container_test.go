@@ -261,6 +261,7 @@ func TestCorruptEntryFetchedOnceStillChecked(t *testing.T) {
 // transport, which is the infrastructure error of the download.
 func TestCorruptEntryRetryFails(t *testing.T) {
 	corrupt := func(t *testing.T, c Config) string {
+		t.Helper()
 		dir := filepath.Join(c.CacheDir, "linux-arm64", hexSum([]byte("binary")))
 		require.NoError(t, os.MkdirAll(dir, 0o700))
 		path := filepath.Join(dir, "herdr")
