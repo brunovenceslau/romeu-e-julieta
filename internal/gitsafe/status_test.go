@@ -15,11 +15,13 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // repoState is what a read of a working tree must leave as it found
@@ -540,7 +542,11 @@ func statusAnswers(commands *[]procgroup.Command) func(context.Context, procgrou
 		case slices.Contains(c.Argv, "symbolic-ref"):
 			out = "refs/heads/main\n"
 		case slices.Contains(c.Argv, "status"):
-			out = "# branch.oid " + oid + "\x00"
+			out = "# branch.oid " + oid + "\x00# branch.head main\x00"
+		case slices.Contains(c.Argv, "ls-files"):
+			out = "H a\x00"
+		case slices.Contains(c.Argv, "--count=1"):
+			out = "refs/remotes/origin/main " + oid + "\n"
 		case slices.Contains(c.Argv, "rev-list"):
 			out = "1\t2\n"
 		case slices.Contains(c.Argv, "--get-regexp"):
@@ -554,7 +560,8 @@ func statusAnswers(commands *[]procgroup.Command) func(context.Context, procgrou
 }
 
 // TestStatusArgv pins what each read runs: one git command each, and
-// three for Status (the filter drivers, HEAD and the working tree), all
+// four for Status (the filter drivers, HEAD, the working tree and the
+// index flags), all
 // with GIT_OPTIONAL_LOCKS=0, the settings of History and the flags of
 // the mode; Status's last command empties every filter driver listed.
 func TestStatusArgv(t *testing.T) {
@@ -578,17 +585,22 @@ func TestStatusArgv(t *testing.T) {
 			require.NoError(t, err)
 			_, _, err = r.HooksPath(ctx, stubRepo)
 			require.NoError(t, err)
+			_, ok, err := r.RefOID(ctx, stubRepo, "refs/remotes/origin/main")
+			require.NoError(t, err)
+			assert.True(t, ok)
 
 			want := [][]string{
 				{"config", "-z", "--name-only", "--get-regexp", `^filter\.`},
 				{"symbolic-ref", "-q", "HEAD"},
 				{"status", "--porcelain=v2", "-z", "--branch", "--no-ahead-behind", "--untracked-files=normal", "--ignore-submodules=dirty", "--no-renames"},
+				{"ls-files", "-v", "-z"},
 				{"for-each-ref", "--format=%(HEAD)%(objectname) %(refname) %(upstream)", "refs/heads/"},
 				{"rev-list", "--left-right", "--count", "--end-of-options", "refs/heads/main...refs/remotes/origin/main", "--"},
 				{"for-each-ref", "--format=%(refname) %(symref)", "refs/remotes/origin/HEAD"},
 				{"stash", "list", "-z", "--format=%H %ct %gs"},
 				{"worktree", "list", "--porcelain", "-z"},
 				{"config", "--local", "--no-includes", "-z", "--get", "core.hooksPath"},
+				{"for-each-ref", "--count=1", "--format=%(refname) %(objectname)", "--end-of-options", "refs/remotes/origin/main"},
 			}
 			require.Len(t, commands, len(want))
 			flags := 1 + 2*(len(r.settings)+len(historySettings))
@@ -653,13 +665,19 @@ func TestStatusRefusesABadAnswer(t *testing.T) {
 		out  string
 		read func(r *Runner) error
 	}{
-		{"status without branch.oid", "? x\x00", func(r *Runner) error { _, err := r.Status(t.Context(), stubRepo); return err }},
-		{"status rename record", "# branch.oid " + oid + "\x002 R. x\x00", func(r *Runner) error { _, err := r.Status(t.Context(), stubRepo); return err }},
+		{"status without branch.oid", "# branch.head main\x00? x\x00", func(r *Runner) error { _, err := r.Status(t.Context(), stubRepo); return err }},
+		{"status rename record", "# branch.oid " + oid + "\x00# branch.head main\x002 R. x\x00", func(r *Runner) error { _, err := r.Status(t.Context(), stubRepo); return err }},
 		{"branch outside refs/heads", " " + oid + " refs/tags/v1 \n", func(r *Runner) error { _, err := r.Branches(t.Context(), stubRepo); return err }},
 		{"branch bad upstream", " " + oid + " refs/heads/a origin/a\n", func(r *Runner) error { _, err := r.Branches(t.Context(), stubRepo); return err }},
 		{"branch short id", " abc refs/heads/a \n", func(r *Runner) error { _, err := r.Branches(t.Context(), stubRepo); return err }},
 		{"rev-list", "1 2\n", func(r *Runner) error { _, _, err := r.AheadBehind(t.Context(), stubRepo, "HEAD", "HEAD"); return err }},
-		{"stash control character", oid + " 1 On main: \x1b[2J\x00", func(r *Runner) error { _, err := r.Stashes(t.Context(), stubRepo); return err }},
+		{"HEAD moved", "# branch.oid " + oid + "\x00# branch.head other\x00", func(r *Runner) error { _, err := r.Status(t.Context(), stubRepo); return err }},
+		{"branch bidi override", " " + oid + " refs/heads/a\u202eb \n", func(r *Runner) error { _, err := r.Branches(t.Context(), stubRepo); return err }},
+		{"upstream line separator", " " + oid + " refs/heads/a refs/remotes/origin/a\u2028b\n", func(r *Runner) error { _, err := r.Branches(t.Context(), stubRepo); return err }},
+		{"default branch zero width space", "refs/remotes/origin/HEAD refs/remotes/origin/ma\u200bin\n", func(r *Runner) error { _, err := r.DefaultBranch(t.Context(), stubRepo); return err }},
+		{"worktree branch C1 control", "worktree /a\x00branch refs/heads/a\u0085b\x00\x00", func(r *Runner) error { _, err := r.Worktrees(t.Context(), stubRepo); return err }},
+		{"ref oid short id", "refs/heads/a abc\n", func(r *Runner) error { _, _, err := r.RefOID(t.Context(), stubRepo, "refs/heads/a"); return err }},
+		{"stash bad id", "abc 1 On main: x\x00", func(r *Runner) error { _, err := r.Stashes(t.Context(), stubRepo); return err }},
 		{"worktree relative path", "worktree rel\x00\x00", func(r *Runner) error { _, err := r.Worktrees(t.Context(), stubRepo); return err }},
 		{"worktree control character", "worktree /a\x1bb\x00\x00", func(r *Runner) error { _, err := r.Worktrees(t.Context(), stubRepo); return err }},
 		{"worktree attribute first", "HEAD " + oid + "\x00", func(r *Runner) error { _, err := r.Worktrees(t.Context(), stubRepo); return err }},
@@ -681,4 +699,184 @@ func TestStatusRefusesABadAnswer(t *testing.T) {
 			require.ErrorIs(t, tc.read(r), ErrRefused)
 		})
 	}
+}
+
+// TestStatusRefOIDRealGit reads the tip of a ref, before and after it
+// moves; a missing ref, and one missing while a ref below its name
+// exists, give false and no error; a name gitsafe refuses is refused
+// before git starts.
+func TestStatusRefOIDRealGit(t *testing.T) {
+	src, _ := newRepo(t)
+	dir := filepath.Join(t.TempDir(), "clone")
+	plainGit(t, "", "clone", "-q", src, dir)
+	r := newRunner(t, Sandbox)
+	old := plainGit(t, dir, "rev-parse", "refs/remotes/origin/main")
+
+	check := noWrite(t, dir)
+	got, ok, err := r.RefOID(t.Context(), dir, "refs/remotes/origin/main")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, old, got)
+	check()
+
+	moved := commit(t, src, "upstream")
+	plainGit(t, dir, "fetch", "-q", "origin")
+	got, ok, err = r.RefOID(t.Context(), dir, "refs/remotes/origin/main")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, moved, got)
+
+	plainGit(t, dir, "update-ref", "refs/x/below/y", moved)
+	for _, missing := range []string{"refs/remotes/origin/none", "refs/x/below"} {
+		got, ok, err = r.RefOID(t.Context(), dir, missing)
+		require.NoError(t, err, missing)
+		assert.False(t, ok, missing)
+		assert.Empty(t, got, missing)
+	}
+
+	var commands []procgroup.Command
+	r.start = statusAnswers(&commands)
+	for _, bad := range []string{"", "main", "HEAD", "-p", "refs/heads/a..b", "refs/heads/a‮b", "refs/heads/a\u0085b"} {
+		_, _, err := r.RefOID(t.Context(), dir, bad)
+		require.ErrorIs(t, err, ErrRefused, bad)
+	}
+	assert.Empty(t, commands)
+}
+
+// TestStatusStashMessagesRealGit: a stash message is display text, so
+// one that holds a zero width joiner, a tab or a byte that is not
+// UTF-8 is listed escaped, and one longer than maxSubjectBytes is cut;
+// none fails the list.
+func TestStatusStashMessagesRealGit(t *testing.T) {
+	dir, _ := newRepo(t)
+	commitFile(t, dir, "a", "one\n", "a", "2026-02-01T00:00:00Z")
+	long := strings.Repeat("é", maxSubjectBytes)
+	msgs := []string{"family 👩‍👩‍👧", "a\tb", "bad \xff byte", long}
+	for _, msg := range msgs {
+		writeFile(t, dir, "a", msg+"\n")
+		plainGit(t, dir, "stash", "push", "-q", "-m", msg)
+	}
+	check := noWrite(t, dir)
+	got, err := newRunner(t, Sandbox).Stashes(t.Context(), dir)
+	require.NoError(t, err)
+	check()
+	require.Len(t, got, len(msgs))
+	for i, msg := range msgs[:3] {
+		s := got[len(msgs)-1-i].Subject
+		// git's reflog turns the tab into a space before gitsafe sees it.
+		assert.Equal(t, termsafe.Escape("On main: "+strings.ReplaceAll(msg, "\t", " ")), s)
+		assert.True(t, utf8.ValidString(s))
+		assert.NotContains(t, s, "\t")
+	}
+	assert.LessOrEqual(t, len(got[0].Subject), maxSubjectBytes)
+	assert.True(t, utf8.ValidString(got[0].Subject))
+	assert.True(t, strings.HasPrefix("On main: "+long, got[0].Subject), "cut, not changed")
+}
+
+// TestStatusHiddenRealGit: a file changed under assume-unchanged or
+// skip-worktree does not show in git status, so Status reports the
+// flag as Hidden and the tree as not clean.
+func TestStatusHiddenRealGit(t *testing.T) {
+	for _, flag := range []string{"--assume-unchanged", "--skip-worktree"} {
+		t.Run(flag, func(t *testing.T) {
+			dir, head := newRepo(t)
+			head = commitFile(t, dir, "a", "one\n", "a", "2026-02-01T00:00:00Z")
+			plainGit(t, dir, "update-index", flag, "a")
+			writeFile(t, dir, "a", "changed\n")
+			assert.Empty(t, plainGit(t, dir, "status", "--porcelain"), "git status hides the change")
+			check := noWrite(t, dir)
+			got, err := newRunner(t, Sandbox).Status(t.Context(), dir)
+			require.NoError(t, err)
+			check()
+			assert.Equal(t, Status{Branch: "refs/heads/main", OID: head, Hidden: true}, got)
+			assert.False(t, got.Clean())
+		})
+	}
+}
+
+// TestStatusRefusesUnsafeRefNamesRealGit: a ref name git accepts that
+// holds a C1 control, a direction override, a line separator or a zero
+// width space fails the read that would return it.
+func TestStatusRefusesUnsafeRefNamesRealGit(t *testing.T) {
+	r := newRunner(t, Sandbox)
+	for _, name := range []string{"a\u0085b", "a‮b", "a b", "a​b"} {
+		t.Run(strings.ToValidUTF8(name, "?"), func(t *testing.T) {
+			dir, _ := newRepo(t)
+			plainGit(t, dir, "branch", name)
+			_, err := r.Branches(t.Context(), dir)
+			require.ErrorIs(t, err, ErrRefused)
+
+			plainGit(t, dir, "checkout", "-q", name)
+			_, err = r.Status(t.Context(), dir)
+			require.ErrorIs(t, err, ErrRefused)
+			_, err = r.Worktrees(t.Context(), dir)
+			require.ErrorIs(t, err, ErrRefused)
+
+			plainGit(t, dir, "update-ref", "refs/remotes/origin/"+name, "HEAD")
+			plainGit(t, dir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/"+name)
+			_, err = r.DefaultBranch(t.Context(), dir)
+			require.ErrorIs(t, err, ErrRefused)
+		})
+	}
+	dir, _ := newRepo(t)
+	plainGit(t, dir, "config", "branch.main.remote", ".")
+	plainGit(t, dir, "config", "branch.main.merge", "refs/heads/a‮b")
+	_, err := r.Branches(t.Context(), dir)
+	require.ErrorIs(t, err, ErrRefused, "an upstream")
+}
+
+// TestStatusHooksPathWithoutAValue: a core.hooksPath key with no value,
+// or an empty one, is refused, not reported as a set empty path.
+func TestStatusHooksPathWithoutAValue(t *testing.T) {
+	dir, _ := newRepo(t)
+	config := filepath.Join(dir, ".git", "config")
+	f, err := os.OpenFile(config, os.O_APPEND|os.O_WRONLY, 0)
+	require.NoError(t, err)
+	_, err = f.WriteString("[core]\n\thooksPath\n")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	r := newRunner(t, Sandbox)
+	path, set, err := r.HooksPath(t.Context(), dir)
+	require.ErrorIs(t, err, ErrRefused)
+	assert.False(t, set)
+	assert.Empty(t, path)
+
+	empty, _ := newRepo(t)
+	plainGit(t, empty, "config", "core.hooksPath", "")
+	_, set, err = r.HooksPath(t.Context(), empty)
+	require.ErrorIs(t, err, ErrRefused)
+	assert.False(t, set)
+}
+
+// TestStatusRunsNoFilterFromAnIncludeIf: a filter driver and the
+// attribute that names it, both defined only in a file the local
+// config includes with includeIf, are neutralized too; plain git runs
+// the filter (the positive control).
+//
+//romeu:invariant I3 test
+func TestStatusRunsNoFilterFromAnIncludeIf(t *testing.T) {
+	dir, _ := newRepo(t)
+	writeFile(t, dir, "a", "a\n")
+	plainGit(t, dir, "add", "a")
+	plainGit(t, dir, "commit", "-q", "-m", "a")
+	marker := filepath.Join(t.TempDir(), "marker")
+	extra := t.TempDir()
+	script := filepath.Join(extra, "filter.sh")
+	require.NoError(t, os.WriteFile(script, []byte("#!/bin/sh\necho ran >> '"+marker+"'\ncat\n"), 0o700))
+	writeFile(t, extra, "attributes", "a filter=inc\n")
+	writeFile(t, extra, "included", "[core]\n\tattributesFile = "+filepath.Join(extra, "attributes")+
+		"\n[filter \"inc\"]\n\tclean = "+script+"\n\trequired = true\n")
+	plainGit(t, dir, "config", "includeIf.gitdir:"+filepath.Join(dir, ".git")+".path", filepath.Join(extra, "included"))
+	past := time.Now().Add(-time.Hour)
+	require.NoError(t, os.Chtimes(filepath.Join(dir, ".git", "index"), past, past))
+
+	check := noWrite(t, dir)
+	got, err := newRunner(t, Sandbox).Status(t.Context(), dir)
+	require.NoError(t, err)
+	assert.True(t, got.Clean(), "%+v", got)
+	assert.NoFileExists(t, marker)
+	check()
+
+	_, _ = plainGitErr(t, dir, nil, "status", "--porcelain")
+	assert.FileExists(t, marker, "the plant is live: plain git runs it")
 }

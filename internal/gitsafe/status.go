@@ -15,9 +15,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // statusEnv is what the reads of a working tree add to the environment
@@ -37,6 +39,13 @@ var (
 	maxStatusRecord = 64 << 10
 )
 
+// The bounds of the short answers: a one-line answer of git, such as a
+// ref name or two counts, and the value of core.hooksPath.
+const (
+	maxLineBytes      = 4 << 10
+	maxHooksPathBytes = 8 << 10
+)
+
 // read runs one read of a working tree in dir: the settings of History,
 // statusEnv and env added to the environment, and stdout as git's
 // standard output.
@@ -47,7 +56,7 @@ func (r *Runner) read(ctx context.Context, dir string, env []string, stdout io.W
 // readLine runs a read whose answer is one short line and returns it
 // without its newline.
 func (r *Runner) readLine(ctx context.Context, dir string, args ...string) (string, error) {
-	out := limitedBuffer{limit: 4 << 10}
+	out := limitedBuffer{limit: maxLineBytes}
 	if err := r.read(ctx, dir, nil, &out, args...); err != nil {
 		return "", err
 	}
@@ -81,18 +90,30 @@ type Status struct {
 	Untracked bool
 	// Unmerged: the index holds a conflict.
 	Unmerged bool
+	// Hidden: an index entry is marked assume-unchanged or
+	// skip-worktree, so git status does not compare it with the
+	// working tree and a change to it would not show. A sparse
+	// checkout marks every file outside its cone skip-worktree.
+	Hidden bool
 }
 
 // Clean reports whether the working tree holds no change: nothing
-// staged, unstaged, untracked or unmerged.
+// staged, unstaged, untracked, unmerged or hidden. It does not cover
+// ignored files, a mode change git does not see under
+// core.fileMode=false, or the working tree of a submodule
+// (--ignore-submodules=dirty).
 func (s Status) Clean() bool {
-	return !s.Staged && !s.Unstaged && !s.Untracked && !s.Unmerged
+	return !s.Staged && !s.Unstaged && !s.Untracked && !s.Unmerged && !s.Hidden
 }
 
 // Status reads HEAD and the state of the working tree of the repository
-// in dir, under the flags of the mode, with git symbolic-ref and git
-// status --porcelain=v2. A submodule counts by the commit it records,
-// not by the state of its own working tree, so git never runs in it.
+// in dir, under the flags of the mode, with four git commands: git
+// config lists the filter drivers (below), git symbolic-ref reads HEAD,
+// git status --porcelain=v2 reads the changes, and git ls-files -v
+// reads the assume-unchanged and skip-worktree flags. A submodule
+// counts by the commit it records, not by the state of its own working
+// tree, so git never runs in it. HEAD that moves between symbolic-ref
+// and status, so the two disagree on the branch, is an error.
 //
 // No clean filter runs: git status hashes a file whose stat data does
 // not match the index, and a racy one, through the filter its
@@ -101,11 +122,13 @@ func (s Status) Clean() bool {
 // switched off. Status instead lists the filter drivers the config
 // defines (git config --get-regexp, one more call) and runs git status
 // with each driver's clean and process commands empty and required
-// false, which git reads as no filter. A file a filter would change
-// then reads as modified, so Status can report a change git status
-// would not, never the reverse. A driver defined between the two calls
-// is not neutralized; only a process that can already write the
-// repository's config can do that.
+// false, which git reads as no filter. A file a filter would change,
+// such as one under git-lfs, then reads as Unstaged when its stat data
+// no longer matches the index (a changed modification time is enough),
+// until something refreshes the index; Status may so report a change
+// git status would not. A driver defined between the calls is not
+// neutralized; only a process that can already write the repository's
+// config can do that.
 func (r *Runner) Status(ctx context.Context, dir string) (Status, error) {
 	if err := checkRepo(dir); err != nil {
 		return Status{}, err
@@ -122,7 +145,10 @@ func (r *Runner) Status(ctx context.Context, dir string) (Status, error) {
 	case err != nil:
 		return Status{}, err
 	default:
-		if err := checkRefName(branch, false); err != nil {
+		if !strings.HasPrefix(branch, "refs/heads/") {
+			return Status{}, fmt.Errorf("%w: HEAD points at %q, outside refs/heads/", ErrRefused, branch)
+		}
+		if err := checkDisplayRef(branch); err != nil {
 			return Status{}, err
 		}
 		s.Branch = branch
@@ -139,7 +165,43 @@ func (r *Runner) Status(ctx context.Context, dir string) (Status, error) {
 	if !p.sawOID {
 		return Status{}, fmt.Errorf("%w: git status named no branch.oid", ErrRefused)
 	}
+	head := "(detached)"
+	if s.Branch != "" {
+		head = strings.TrimPrefix(s.Branch, "refs/heads/")
+	}
+	if p.head != head {
+		return Status{}, fmt.Errorf("%w: HEAD moved during the read: symbolic-ref named %q, status %q", ErrRefused, s.Branch, p.head)
+	}
+	flags := &records{limit: maxStatusRecord, each: func(rec string) error {
+		if rec == "" {
+			return fmt.Errorf("%w: an empty ls-files record", ErrRefused)
+		}
+		if tag := rec[0]; tag == 'S' || (tag >= 'a' && tag <= 'z') {
+			s.Hidden = true
+		}
+		return nil
+	}}
+	if err := r.read(ctx, dir, nil, flags, "ls-files", "-v", "-z"); err != nil {
+		return Status{}, err
+	}
+	if err := flags.close(); err != nil {
+		return Status{}, err
+	}
 	return s, nil
+}
+
+// checkDisplayRef returns ErrRefused for a ref name that checkRefName
+// refuses, or that holds a character unsafeRune refuses: a ref name
+// that reaches a typed result is shown to a person.
+func checkDisplayRef(name string) error {
+	if err := checkRefName(name, false); err != nil {
+		return err
+	}
+	if i := strings.IndexFunc(name, unsafeRune); i >= 0 {
+		c, _ := utf8.DecodeRuneInString(name[i:])
+		return fmt.Errorf("%w: ref name %q holds the character %U", ErrRefused, name, c)
+	}
+	return nil
 }
 
 // filterOverrides returns the GIT_CONFIG_COUNT environment that empties
@@ -182,6 +244,7 @@ func (r *Runner) filterOverrides(ctx context.Context, dir string) ([]string, err
 type porcelain struct {
 	status *Status
 	sawOID bool
+	head   string // the branch.head header
 }
 
 // entry reads one record: a header, an ordinary change, a conflict or
@@ -198,8 +261,10 @@ func (p *porcelain) entry(rec string) error {
 			return err
 		}
 		p.status.OID = oid
+	case strings.HasPrefix(rec, "# branch.head "):
+		p.head = strings.TrimPrefix(rec, "# branch.head ")
 	case strings.HasPrefix(rec, "# "):
-		// branch.head, and any header a later git adds.
+		// Any header a later git adds.
 	case strings.HasPrefix(rec, "1 ") && len(rec) > 4:
 		p.status.Staged = p.status.Staged || rec[2] != '.'
 		p.status.Unstaged = p.status.Unstaged || rec[3] != '.'
@@ -228,8 +293,8 @@ type Branch struct {
 
 // Branches lists the local branches of the repository in dir, sorted
 // by name, under the flags of the mode, with git for-each-ref. A name
-// or an upstream checkRefName refuses is refused, and so are more than
-// maxBranches branches.
+// or an upstream checkDisplayRef refuses is refused, and fails the
+// whole list, and so are more than maxBranches branches.
 func (r *Runner) Branches(ctx context.Context, dir string) ([]Branch, error) {
 	if err := checkRepo(dir); err != nil {
 		return nil, err
@@ -272,11 +337,11 @@ func parseBranch(line string) (Branch, error) {
 	if !strings.HasPrefix(b.Name, "refs/heads/") {
 		return Branch{}, fmt.Errorf("%w: branch %q is not under refs/heads/", ErrRefused, b.Name)
 	}
-	if err := checkRefName(b.Name, false); err != nil {
+	if err := checkDisplayRef(b.Name); err != nil {
 		return Branch{}, err
 	}
 	if b.Upstream != "" {
-		if err := checkRefName(b.Upstream, false); err != nil {
+		if err := checkDisplayRef(b.Upstream); err != nil {
 			return Branch{}, err
 		}
 	}
@@ -333,8 +398,10 @@ const originHead = "refs/remotes/origin/HEAD"
 // repository in dir, such as main: the branch refs/remotes/origin/HEAD
 // points at, as git clone and git remote set-head write it, under the
 // flags of the mode, with git for-each-ref. It returns "" when that ref
-// does not exist or is not a symbolic ref. A target outside
-// refs/remotes/origin/ is refused.
+// does not exist, is not a symbolic ref, or points at a ref that does
+// not exist (a dangling origin/HEAD): there is then no default branch
+// to fast-forward, and the caller reports that. A target outside
+// refs/remotes/origin/, or one checkDisplayRef refuses, is refused.
 func (r *Runner) DefaultBranch(ctx context.Context, dir string) (string, error) {
 	if err := checkRepo(dir); err != nil {
 		return "", err
@@ -360,7 +427,7 @@ func (r *Runner) DefaultBranch(ctx context.Context, dir string) (string, error) 
 		return "", nil
 	}
 	name, ok := strings.CutPrefix(target, "refs/remotes/origin/")
-	if err := checkRefName(target, false); err != nil {
+	if err := checkDisplayRef(target); err != nil {
 		return "", err
 	}
 	if !ok || name == "HEAD" {
@@ -372,18 +439,21 @@ func (r *Runner) DefaultBranch(ctx context.Context, dir string) (string, error) 
 // Stashes lists the stashes of the repository in dir, newest first, so
 // the one at index i is stash@{i}, under the flags of the mode, with
 // git stash list. Each is a Commit whose Subject is the stash's
-// message, checked as History checks a subject; more than maxStashes
-// stashes are refused.
+// message. The message is free text, often a copy of a commit subject,
+// so it is not refused: it is escaped with termsafe.Escape, which also
+// replaces bytes that are not UTF-8, and cut to maxSubjectBytes. The
+// id and the time are checked as History checks them; a record over
+// maxStatusRecord bytes, or more than maxStashes stashes, is refused.
 func (r *Runner) Stashes(ctx context.Context, dir string) ([]Commit, error) {
 	if err := checkRepo(dir); err != nil {
 		return nil, err
 	}
 	var stashes []Commit
-	w := &records{limit: maxHistoryRecord(), each: func(rec string) error {
+	w := &records{limit: maxStatusRecord, each: func(rec string) error {
 		if len(stashes) == maxStashes {
 			return fmt.Errorf("%w: more than %d stashes", ErrRefused, maxStashes)
 		}
-		c, err := parseCommit(rec)
+		c, err := parseStash(rec)
 		if err != nil {
 			return err
 		}
@@ -397,6 +467,70 @@ func (r *Runner) Stashes(ctx context.Context, dir string) ([]Commit, error) {
 		return nil, err
 	}
 	return stashes, nil
+}
+
+// parseStash reads one "<oid> <committer time> <message>" record.
+func parseStash(rec string) (Commit, error) {
+	oid, rest, ok1 := strings.Cut(rec, " ")
+	secs, msg, ok2 := strings.Cut(rest, " ")
+	if !ok1 || !ok2 {
+		return Commit{}, fmt.Errorf("%w: stash record %q", ErrRefused, termsafe.Escape(rec))
+	}
+	if err := checkObjectID(oid); err != nil {
+		return Commit{}, err
+	}
+	n, err := strconv.ParseInt(secs, 10, 64)
+	if err != nil {
+		return Commit{}, fmt.Errorf("%w: stash %s has the date %q", ErrRefused, oid, secs)
+	}
+	msg = termsafe.Escape(msg)
+	if len(msg) > maxSubjectBytes {
+		cut := maxSubjectBytes
+		for cut > 0 && !utf8.RuneStart(msg[cut]) {
+			cut--
+		}
+		msg = msg[:cut]
+	}
+	return Commit{OID: oid, Time: time.Unix(n, 0).UTC(), Subject: msg}, nil
+}
+
+// RefOID returns the object id the full ref name ref points at in the
+// repository in dir, and whether it exists, under the flags of the
+// mode, with git for-each-ref: such as the tip of
+// refs/remotes/origin/<default> before and after a fast-forward. A
+// missing ref gives false and no error; a name checkDisplayRef refuses
+// is refused before git starts.
+func (r *Runner) RefOID(ctx context.Context, dir, ref string) (string, bool, error) {
+	if err := checkRepo(dir); err != nil {
+		return "", false, err
+	}
+	if err := checkDisplayRef(ref); err != nil {
+		return "", false, err
+	}
+	var oid string
+	w := &records{limit: maxStatusRecord, each: func(line string) error {
+		name, id, ok := strings.Cut(line, " ")
+		if !ok {
+			return fmt.Errorf("%w: for-each-ref line %q", ErrRefused, line)
+		}
+		if name != ref {
+			return nil // a ref below ref, which then does not exist
+		}
+		if err := checkObjectID(id); err != nil {
+			return err
+		}
+		oid = id
+		return nil
+	}}
+	// A ref and a ref below it cannot both exist, so the first match
+	// is either ref itself or proof that it is missing.
+	if err := r.read(ctx, dir, nil, lines{w}, "for-each-ref", "--count=1", "--format=%(refname) %(objectname)", "--end-of-options", ref); err != nil {
+		return "", false, err
+	}
+	if err := w.close(); err != nil {
+		return "", false, err
+	}
+	return oid, oid != "", nil
 }
 
 // Worktree is one worktree of a repository.
@@ -422,8 +556,9 @@ func zeroOID(oid string) bool {
 
 // Worktrees lists the worktrees of the repository in dir, the main one
 // first, under the flags of the mode, with git worktree list
-// --porcelain -z. A path that is not absolute, not valid UTF-8 or that
-// holds a character unsafeRune refuses is refused, and so are more than
+// --porcelain -z. A branch checkDisplayRef refuses fails the whole
+// list, and so does a path that is not absolute, not valid UTF-8 or
+// that holds a character unsafeRune refuses, and so do more than
 // maxWorktrees worktrees. The reasons git gives for a lock or a prune
 // are dropped.
 func (r *Runner) Worktrees(ctx context.Context, dir string) ([]Worktree, error) {
@@ -477,7 +612,7 @@ func parseWorktreeAttr(wt *Worktree, key, value string) error {
 			wt.OID = value
 		}
 	case "branch":
-		if err := checkRefName(value, false); err != nil {
+		if err := checkDisplayRef(value); err != nil {
 			return err
 		}
 		wt.Branch = value
@@ -518,13 +653,17 @@ func checkWorktreePath(path string) error {
 // nor the -c core.hooksPath=/dev/null that both modes pass, nor an
 // include is read. In a linked worktree --local reads the config the
 // worktrees share; a value in that worktree's own config.worktree
-// (extensions.worktreeConfig) is not reported. A value that is not
-// valid UTF-8 or that holds a character unsafeRune refuses is refused.
+// (extensions.worktreeConfig) is not read, though git honours it in
+// that worktree. The value is returned raw, as the file holds it: a
+// leading ~ is not expanded and a relative path is not resolved. A key
+// with no value, which git config -z answers as an empty value, is
+// refused with the empty value, and so is a value that is not valid
+// UTF-8 or that holds a character unsafeRune refuses.
 func (r *Runner) HooksPath(ctx context.Context, dir string) (string, bool, error) {
 	if err := checkRepo(dir); err != nil {
 		return "", false, err
 	}
-	out := limitedBuffer{limit: 8 << 10}
+	out := limitedBuffer{limit: maxHooksPathBytes}
 	err := r.read(ctx, dir, nil, &out, "config", "--local", "--no-includes", "-z", "--get", "core.hooksPath")
 	switch {
 	case exitedWith(err, 1):
@@ -535,6 +674,9 @@ func (r *Runner) HooksPath(ctx context.Context, dir string) (string, bool, error
 		return "", false, fmt.Errorf("%w: core.hooksPath is longer than %d bytes", ErrRefused, out.limit)
 	}
 	value, ok := strings.CutSuffix(out.String(), "\x00")
+	if value == "" {
+		return "", false, fmt.Errorf("%w: core.hooksPath is set with no value or an empty one", ErrRefused)
+	}
 	if !ok || !utf8.ValidString(value) {
 		return "", false, fmt.Errorf("%w: git config answered %q", ErrRefused, out.String())
 	}
