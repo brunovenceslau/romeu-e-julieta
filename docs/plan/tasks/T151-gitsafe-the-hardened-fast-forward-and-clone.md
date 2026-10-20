@@ -29,7 +29,7 @@ Goal: harden the two `gitsafe` verbs that write a checkout,
 decided on 2026-10-20 (a task on the `gitsafe` surface, with an
 approval line). Two security audits of 2026-10-20 found, and the
 pending note
-[gitsafe's fast-forward overwrites ignored files and runs smudge filters](../../handoff/pending/gitsafe-s-fast-forward-overwrites-ignored-files-and-runs.md)
+[gitsafe's fast-forward overwrites ignored files and runs smudge filters](../../handoff/pending/000000000098hfz7arr3swy84e-gitsafe-s-fast-forward-overwrites-ignored-files-and-runs.md)
 records, four gaps:
 
 1. `FastForward` (`merge --ff-only`) overwrites an ignored, untracked

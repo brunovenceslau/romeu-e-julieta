@@ -447,4 +447,4 @@ Pending, one line each:
 ## Session checkpoint (2026-10-09)
 
 Migrated on 2026-10-17 to docs/handoff:
-[Done record 15](../handoff/done/0015.md).
+[Done record 15](../handoff/done/00000000000000000000000015-session-of-2026-10-09-after-round-9-migrated-from-docs.md).

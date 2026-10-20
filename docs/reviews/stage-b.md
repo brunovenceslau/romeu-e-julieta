@@ -129,6 +129,6 @@ the plan's decisions on the pending items are in docs/plan.md,
 ## Session checkpoint (2026-10-13)
 
 Migrated on 2026-10-17 to docs/handoff:
-[Done record 21](../handoff/done/0021.md),
+[Done record 21](../handoff/done/00000000000000000000000021-session-of-2026-10-13-the-stage-b-trace-pass-migrated-from.md),
 and the files it names:
-[the-gopls-pin-and-the-deferred-split-of-the-pinned-tools](../handoff/decisions/the-gopls-pin-and-the-deferred-split-of-the-pinned-tools.md).
+[the-gopls-pin-and-the-deferred-split-of-the-pinned-tools](../handoff/decisions/0000000000rb4m92mh7vxtrtph-the-gopls-pin-and-the-deferred-split-of-the-pinned-tools.md).
