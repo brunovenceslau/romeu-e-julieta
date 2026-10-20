@@ -22,10 +22,16 @@ repository (REQ-0608) unless named otherwise:
   sandbox payload of 2026-10-20 holds the sentence in "How to work",
   measured in this sandbox's `~/.claude/CLAUDE.md`; its pull request is
   not yet reported. Open: the personal kit.
+- Use the skill `anthropic-skills:skill-creator` and its progressive
+  disclosure to create, edit, review or test a skill, and name it in a
+  builder brief for such work (ADR 0040, decided on 2026-10-20). Sent:
+  a prompt for the payload's repository went to the maintainer on
+  2026-10-20, with a brief guard row as its check; its pull request is
+  not yet reported. Open: the personal kit, T114.
 
 The payload holds other rules that came from elsewhere; listing them
 belongs to the payload's own repository.
 
 Reopen: when the migration of the payload to the config repository is
-planned, when a record means another rule for the payload, or when a
+planned (T114), when a record means another rule for the payload, or when a
 payload session reports its pull request.
