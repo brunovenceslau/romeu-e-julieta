@@ -27,7 +27,8 @@ repository (REQ-0608) unless named otherwise:
   builder brief for such work (ADR 0040, decided on 2026-10-20). Sent:
   a prompt for the payload's repository went to the maintainer on
   2026-10-20, with a brief guard row as its check; its pull request is
-  not yet reported. Open: the personal kit, T114.
+  not yet reported, and the prompt is kept in "The skill-creator rule in
+  the sandbox payload" (01m5drzqycwwtat9czcf4egdsr). Open: the personal kit, T114.
 
 The payload holds other rules that came from elsewhere; listing them
 belongs to the payload's own repository.
