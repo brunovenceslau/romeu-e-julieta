@@ -89,10 +89,9 @@ func Report(err error) string {
 // Fail ends the test on err, with the line of Report, after it names
 // the test in the file of InfraFileEnv when err is an infrastructure
 // error. The step of tools/ci attributes an infrastructure error by test
-// name: a test that fails an assertion and then calls Fail with an
-// InfraError reads as one whole. Only the preconditions call Fail with
-// one today (workload, Prepare, CheckDaemon in the cases), and a case
-// keeps it so: it calls Fail with an InfraError before any assertion.
+// name, and counts the test as one only if it printed no line but the
+// one Fail prints: a test that fails an assertion before it calls Fail
+// with an InfraError reads as a test failure.
 func Fail(tb testing.TB, err error) {
 	tb.Helper()
 	if _, ok := errors.AsType[*InfraError](err); ok {
@@ -324,14 +323,31 @@ func (c Config) platformDir() (string, error) {
 // meanwhile. The name stays the program's, since mise reads its own name
 // to tell itself from a shim. A download that fails is an infrastructure
 // error; a file whose sha256 is not want is a test failure, the
-// downloaded one and the cached one alike.
+// downloaded one and the cached one alike, except that a cached file
+// that fails its check is deleted and fetched once more: a corrupt entry
+// heals, and the fetched file must still match want.
 func (c Config) Download(ctx context.Context, what, name, url, want, dst string) (string, error) {
 	cached, err := c.cache(ctx, what, name, url, want)
 	if err != nil {
 		return "", err
 	}
+	path, err := installVerified(what, cached, filepath.Join(dst, name), want)
+	if _, corrupt := errors.AsType[*corruptError](err); !corrupt {
+		return path, err
+	}
+	if rerr := os.Remove(cached); rerr != nil && !errors.Is(rerr, os.ErrNotExist) {
+		return "", fmt.Errorf("%w; and it could not be removed: %w", err, rerr)
+	}
+	if cached, err = c.cache(ctx, what, name, url, want); err != nil {
+		return "", err
+	}
 	return installVerified(what, cached, filepath.Join(dst, name), want)
 }
+
+// corruptError is a cached file whose sha256 is not the pin.
+type corruptError struct{ msg string }
+
+func (e *corruptError) Error() string { return e.msg }
 
 // installVerified copies src to dst, of mode 0755, hashing what it
 // copies from the one handle it opened, and removes dst unless the
@@ -359,7 +375,7 @@ func installVerified(what, src, dst, want string) (path string, err error) {
 		return "", err
 	}
 	if got := hex.EncodeToString(h.Sum(nil)); got != want {
-		return "", fmt.Errorf("%s: the cached file %s has the sha256 %s, not the pinned %s", what, src, got, want)
+		return "", &corruptError{fmt.Sprintf("%s: the cached file %s has the sha256 %s, not the pinned %s", what, src, got, want)}
 	}
 	return dst, nil
 }

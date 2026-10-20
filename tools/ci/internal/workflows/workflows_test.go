@@ -213,6 +213,26 @@ func TestWorkflowsGrammar(t *testing.T) {
 	}
 }
 
+// TestWorkflowsStepEnvRefusesEventText holds the env of a step, whose
+// values reach tools/ci and tools/release as arguments, to the text of
+// the event: refused in every file, on a plain run step and next to the
+// token of a release step, while the group of the concurrency keeps the
+// event expression it admits today.
+func TestWorkflowsStepEnvRefusesEventText(t *testing.T) {
+	const run = "        run: go run ./tools/ci all\n"
+	for _, path := range []string{".github/workflows/ci.yml", ".github/workflows/x64.yml", ".github/workflows/other.yml"} {
+		for _, value := range []string{"${{ github.event.pull_request.title }}", "${{ github.event.head_commit.message }}", "${{ GitHub.Event.pull_request.head.ref }}"} {
+			src := strings.Replace(citest.GoodWorkflow, run, run+"        env:\n          TITLE: "+value+"\n", 1)
+			wantAny(t, workflowFindings(path, []byte(src)), `"env" is outside the grammar of a run step`)
+		}
+	}
+	env := "        env:\n          GH_TOKEN: ${{ github.token }}\n          TITLE: ${{ github.event.pull_request.title }}\n"
+	src := strings.Replace(goodRelease, "      - name: Notes\n", "      - run: go run ./tools/release notes\n"+env+"      - name: Notes\n", 1)
+	wantAny(t, workflowFindings(releasePath, []byte(src)), "the env of a release step")
+	grouped := strings.Replace(citest.GoodWorkflow, "group: ci-${{ github.ref }}", "group: ci-${{ github.event.head_commit.id }}", 1)
+	assert.Empty(t, workflowFindings(".github/workflows/ci.yml", []byte(grouped)), "the group keeps its event expression")
+}
+
 // TestWorkflowsFile fails what the grammar refuses as a whole file: a
 // name with another ending, text that is not one YAML mapping, and a
 // ci.yml that a change to a pull request's text does not run again.
