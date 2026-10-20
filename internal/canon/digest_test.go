@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +39,7 @@ func (fingerprint) CanonKind() FingerprintKind { return Fingerprint }
 // rawOf is a value of the kind K whose JSON a test writes by hand.
 // Digest reads the kind from its argument, not from CanonKind, so the
 // zero K stands for the kind here.
-type rawOf[K Kind] json.RawMessage
+type rawOf[K Kind] jsontext.Value
 
 func (rawOf[K]) CanonKind() K {
 	var k K
@@ -54,7 +56,9 @@ type anyValue struct{ v any }
 
 func (anyValue) CanonKind() MemoryContentKind { return MemoryContent }
 
-func (a anyValue) MarshalJSON() ([]byte, error) { return json.Marshal(a.v) }
+// MarshalJSONTo writes the value with the encoder Digest passes, under
+// Digest's own options.
+func (a anyValue) MarshalJSONTo(enc *jsontext.Encoder) error { return json.MarshalEncode(enc, a.v) }
 
 // preimage is what Digest hashes, written out by hand from 03 3.12.
 func preimage(kind, canonical string) []byte {
@@ -101,16 +105,24 @@ func TestCanonicalJSON(t *testing.T) {
 		{"control characters escaped", "a\nb\u0001", `"a\nb\u0001"`},
 		{"int64 above 2^53 kept exact", int64(math.MaxInt64), `9223372036854775807`},
 		{"uint64 kept exact", uint64(math.MaxUint64), `18446744073709551615`},
-		{"float as encoding/json writes it", 0.1, `0.1`},
+		{"float in its ecmascript form", 0.1, `0.1`},
 		{"array order kept", []any{3, "a", false, []int{}}, `[3,"a",false,[]]`},
 		{"keys escaped as strings are", map[string]int{"<k&>": 1}, `{"<k&>":1}`},
-		{"control and line separator keys escaped", map[string]int{"\t": 1, "\u2028": 2, "\x7f": 3},
-			"{\"\\t\":1,\"\x7f\":3,\"\\u2028\":2}"},
-		{"keys sorted by utf-8, not utf-16", map[string]int{"\U0001F600": 2, "\uff5e": 1},
-			"{\"\uff5e\":1,\"\U0001F600\":2}"},
+		{"control keys escaped, line separators kept", map[string]int{"\t": 1, "\u2028": 2, "\x7f": 3},
+			"{\"\\t\":1,\"\x7f\":3,\"\u2028\":2}"},
+		{"keys sorted by utf-16, not utf-8", map[string]int{"\U0001F600": 2, "\uff5e": 1},
+			"{\"\U0001F600\":2,\"\uff5e\":1}"},
+		{"keys sorted as in rfc 8785 3.2.3", raw(`{"\u20ac":"Euro Sign","\r":"Carriage Return","\ufb33":"Hebrew Letter Dalet With Dagesh","1":"One","\ud83d\ude00":"Emoji: Grinning Face","\u0080":"Control","\u00f6":"Latin Small Letter O With Diaeresis"}`),
+			"{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\u0080\":\"Control\",\"\u00f6\":\"Latin Small Letter O With Diaeresis\",\"\u20ac\":\"Euro Sign\",\"\U0001F600\":\"Emoji: Grinning Face\",\"\ufb33\":\"Hebrew Letter Dalet With Dagesh\"}"},
+		{"strings escaped as in rfc 8785 3.2.2.2", raw(`"\u20ac$\u000F\u000aA'\u0042\u0022\u005c\\\"\/"`),
+			"\"\u20ac$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\""},
 		{"objects inside arrays sorted", raw(`[{"b":1,"a":2}]`), `[{"a":2,"b":1}]`},
-		{"large and small floats as encoding/json writes them", []float64{1e21, 1e-7}, `[1e+21,1e-7]`},
-		{"number text kept from MarshalJSON", raw(`[1,1.0,1e0,-0]`), `[1,1.0,1e0,-0]`},
+		{"large and small floats in their ecmascript form", []float64{1e21, 1e-7}, `[1e+21,1e-7]`},
+		{"numbers of MarshalJSON in their one form", raw(`[1,1.0,1e0,-0,4.50,2e-3,1E30,0.000001,1e-7]`), `[1,1,1,0,4.5,0.002,1e+30,0.000001,1e-7]`},
+		{"integer of MarshalJSON above 2^53 kept exact", raw(`[9007199254740993,-12345678901234567890]`), `[9007199254740993,-12345678901234567890]`},
+		{"float above 2^53 in its ecmascript form", float64(1 << 60), `1152921504606847000`},
+		{"numbers that round, not clamp, kept in their float64 form", raw(`[9007199254740993.0,5e-324,3e-324,1.7976931348623157e308,0e5,-0.0e-400]`),
+			`[9007199254740992,5e-324,5e-324,1.7976931348623157e+308,0,0]`},
 		{"empty object", map[string]int{}, `{}`},
 		{"null", nil, `null`},
 		{"bytes as base64", []byte{0, 1, 2}, `"AAEC"`},
@@ -120,7 +132,7 @@ func TestCanonicalJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := canonicalJSON(tt.value)
+			got, err := CanonicalJSON(tt.value)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, string(got))
 		})
@@ -143,15 +155,21 @@ func TestDigestRefuses(t *testing.T) {
 		value Input[MemoryContentKind]
 		msg   string
 	}{
-		{"a value encoding/json cannot write", anyValue{math.NaN()}, "unsupported value"},
-		{"a channel", anyValue{make(chan int)}, "unsupported type"},
-		{"a duplicate key", raw(`{"a":1,"a":2}`), `duplicate key "a"`},
-		{"a MarshalJSON that writes invalid JSON", raw(`{"a":`), "MarshalJSON"},
-		{"a nested duplicate key", raw(`{"x":[{"k":1,"k":1}]}`), `duplicate key "k"`},
+		{"a value encoding/json/v2 cannot write", anyValue{math.NaN()}, "unsupported value"},
+		{"a channel", anyValue{make(chan int)}, "chan int"},
+		{"a duplicate key", raw(`{"a":1,"a":2}`), `duplicate object member name "a"`},
+		{"a MarshalJSON that writes invalid JSON", raw(`{"a":`), "unexpected EOF"},
+		{"a nested duplicate key", raw(`{"x":[{"k":1,"k":1}]}`), `duplicate object member name "k"`},
 		{"invalid utf-8 in a string", anyValue{"a\xff"}, "U+FFFD"},
 		{"invalid utf-8 in a key", anyValue{map[string]int{"k\xfe": 1}}, "U+FFFD"},
 		{"a lone surrogate from MarshalJSON", raw(`["\ud800"]`), "U+FFFD"},
 		{"a U+FFFD the value holds", anyValue{"a\ufffd"}, "U+FFFD"},
+		{"a time.Duration, which v2 has no form for", anyValue{time.Second}, "time.Duration"},
+		{"a number beyond the float64 range", raw(`[1e400]`), "beyond the float64 range"},
+		{"a negative number beyond the float64 range", raw(`{"n":-1e400}`), "beyond the float64 range"},
+		{"a number far beyond the float64 range", raw(`1e500`), "beyond the float64 range"},
+		{"an integer beyond the float64 range", raw(`1` + strings.Repeat("0", 400)), "beyond the float64 range"},
+		{"a number flushed to zero", raw(`[1e-400]`), "flushed to zero"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -238,5 +256,16 @@ func TestDigestOfTwoInvalidStringsIsNoDigest(t *testing.T) {
 	for _, s := range []string{"a\xff", "a\xfe"} {
 		_, err := Digest(MemoryContent, anyValue{s})
 		require.ErrorIs(t, err, ErrInvalidText, "%q", s)
+	}
+}
+
+// TestDigestOfANumberOutOfRangeIsNoDigest: RFC 8785 would write each of
+// these numbers as the largest float64 or as 0, so two of them would
+// share a digest; Digest refuses each as ErrNumberRange.
+func TestDigestOfANumberOutOfRangeIsNoDigest(t *testing.T) {
+	t.Parallel()
+	for _, n := range []string{"1e400", "-1e400", "1e500", "1e-400", "-2.5e-400"} {
+		_, err := Digest(MemoryContent, raw(n))
+		require.ErrorIs(t, err, ErrNumberRange, n)
 	}
 }

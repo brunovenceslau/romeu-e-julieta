@@ -5,10 +5,11 @@
 // writer (03 3.12).
 //
 // A structured value is digested with Digest: sha256 over
-// "romeu/<kind>/v1", a NUL byte and the canonical JSON of the value. The
-// kind is in the digest's type, Sum, so digests of two kinds never
-// compare. Raw file bytes are not digested here: they use plain sha256,
-// which sha256sum and shasum reproduce.
+// "romeu/<kind>/v1", a NUL byte and the canonical JSON of the value, the
+// RFC 8785 form of encoding/json/jsontext. The kind is in the digest's
+// type, Sum, so digests of two kinds never compare. Raw file bytes are
+// not digested here: they use plain sha256, which sha256sum and shasum
+// reproduce.
 //
 // Every ULID the product writes comes from NewULID, in lowercase
 // Crockford base32, and ParseULID refuses any other spelling.
@@ -16,13 +17,14 @@ package canon
 
 import (
 	"bytes"
-	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
-	"slices"
+	"io"
+	"math"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -33,10 +35,16 @@ import (
 var ErrKind = errors.New("canon: not a kind of the table")
 
 // ErrInvalidText is the error of a string of a value, or a key, that
-// holds U+FFFD: encoding/json writes each byte that is not UTF-8, and a
-// MarshalJSON method's lone surrogate decodes, as U+FFFD, so two strings
-// that differ in those bytes would share one digest.
+// holds U+FFFD: Digest writes each byte that is not UTF-8, and a
+// MarshalJSON method's lone surrogate, as U+FFFD, so two strings that
+// differ in those bytes would share one digest.
 var ErrInvalidText = errors.New("canon: a string holds U+FFFD, the mark of text that is not UTF-8")
+
+// ErrNumberRange is the error of a number that a MarshalJSON method
+// writes beyond the float64 range, or so small that a float64 flushes
+// it to zero: RFC 8785 would write the largest float64 or 0 for it, so
+// two different numbers would share one digest.
+var ErrNumberRange = errors.New("canon: a number out of the float64 range")
 
 // ErrInvalidDigest is the error of a digest text that is not 64
 // lowercase hexadecimal digits.
@@ -77,21 +85,16 @@ func notLowerHex(r rune) bool {
 // v declares its one kind (Input), so the kind argument names at the
 // call site what the type already fixes.
 //
-// The canonical JSON is what encoding/json writes for v, with the keys
-// of every object sorted by their UTF-8 bytes, no insignificant
-// whitespace, and no escape of <, > and &. Digest fails on a value
-// encoding/json cannot write, on an object with a duplicate key, which
-// only a MarshalJSON method can write, on a kind value other than its
-// constant (ErrKind), and on a string or key that holds U+FFFD
-// (ErrInvalidText): text that is not UTF-8 becomes U+FFFD on the way,
-// and a digest that two different strings share would let a gate pass
-// the one it never saw. A MarshalJSON method that writes a number
-// writes its text, so 1 and 1.0 have two digests.
+// The canonical JSON is CanonicalJSON's. v is marshaled by
+// encoding/json/v2, under its rules: omitempty omits a member whose JSON
+// is null, "", {} or [], and a time.Duration, which v2 has no form for,
+// is refused. Digest fails on a value CanonicalJSON refuses and on a
+// kind value other than its constant (ErrKind).
 func Digest[K Kind, T Input[K]](kind K, v T) (Sum[K], error) {
 	if !known(kind) {
 		return Sum[K]{}, fmt.Errorf("%w: %q", ErrKind, clip(string(kind)))
 	}
-	data, err := canonicalJSON(v)
+	data, err := CanonicalJSON(v)
 	if err != nil {
 		return Sum[K]{}, fmt.Errorf("canon: digest %s: %w", string(kind), err)
 	}
@@ -99,123 +102,92 @@ func Digest[K Kind, T Input[K]](kind K, v T) (Sum[K], error) {
 	return Sum[K](sha256.Sum256(preimage)), nil
 }
 
-// canonicalJSON returns the canonical JSON of v, as Digest describes
-// it. encoding/json writes v and checks the output of any MarshalJSON
-// method; the copy that follows sorts the keys. Numbers are copied as
-// encoding/json wrote them, so an int64 above 2^53 keeps every digit.
-func canonicalJSON(v any) ([]byte, error) {
-	data, err := json.Marshal(v)
+// CanonicalJSON returns the canonical JSON of v (03 3.12): what
+// encoding/json/v2 writes for v, nil lists and maps as null, in the form
+// of RFC 8785, the JSON Canonicalization Scheme: keys sorted by their
+// UTF-16 code units, minimal string escapes with U+2028 and U+2029 as
+// they are, no insignificant whitespace, and a number with a fraction or
+// an exponent in its float64 ECMAScript form, so 1.0 and 1e0 are 1 and
+// -0 is 0; an integer keeps its digits, which RFC 8785 would round
+// beyond 2^53.
+//
+// It refuses a value encoding/json/v2 cannot write (NaN, an infinity, a
+// channel, a time.Duration), an object with a duplicate key, which only
+// a MarshalJSON method can write, a number a MarshalJSON method writes
+// that is out of the float64 range or that float64 flushes to zero
+// (ErrNumberRange), and a string or key that holds U+FFFD
+// (ErrInvalidText): text that is not UTF-8 becomes U+FFFD on the way.
+// Each of these would let two different values share one digest, and a
+// gate pass the one it never saw.
+func CanonicalJSON(v any) ([]byte, error) {
+	data, err := json.Marshal(v, json.Deterministic(true),
+		json.FormatNilSliceAsNull(true), json.FormatNilMapAsNull(true),
+		jsontext.AllowInvalidUTF8(true), jsontext.AllowDuplicateNames(true))
 	if err != nil {
 		return nil, err
 	}
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-	var out bytes.Buffer
-	if err := copyValue(&out, dec); err != nil {
+	if err := checkText(data); err != nil {
 		return nil, err
 	}
-	return out.Bytes(), nil
-}
-
-// member is one key of an object and its value, already canonical.
-type member struct {
-	key   string
-	value []byte
-}
-
-// copyValue writes the next value of dec to out in canonical form.
-func copyValue(out *bytes.Buffer, dec *json.Decoder) error {
-	tok, err := dec.Token()
-	if err != nil {
-		return err
+	out := jsontext.Value(data)
+	if err := out.Canonicalize(jsontext.CanonicalizeRawInts(false)); err != nil {
+		return nil, err
 	}
-	switch tok := tok.(type) {
-	case json.Delim:
-		if tok == '{' {
-			return copyObject(out, dec)
+	return out, nil
+}
+
+// checkText refuses a string or key of the JSON data that holds U+FFFD
+// (ErrInvalidText), and a number Canonicalize would clamp to the largest
+// float64 or flush to zero (ErrNumberRange). It reads the writer's
+// output before Canonicalize, so each number is checked in the text the
+// writer gave it, and it lets a duplicate key through, so that the
+// invalid text of two keys that become one is ErrInvalidText.
+func checkText(data []byte) error {
+	dec := jsontext.NewDecoder(bytes.NewReader(data), jsontext.AllowDuplicateNames(true))
+	for {
+		if dec.PeekKind() == '0' {
+			num, err := dec.ReadValue()
+			if err != nil {
+				return err
+			}
+			if err := checkNumber(string(num)); err != nil {
+				return err
+			}
+			continue
 		}
-		return copyArray(out, dec)
-	case string:
-		return writeString(out, tok)
-	case json.Number:
-		out.WriteString(tok.String())
-	case bool:
-		out.WriteString(strconv.FormatBool(tok))
-	default: // nil, the only other token of a value
-		out.WriteString("null")
-	}
-	return nil
-}
-
-// copyObject writes the members of the object whose '{' dec has just
-// read, sorted by key, and reads its '}'.
-func copyObject(out *bytes.Buffer, dec *json.Decoder) error {
-	var members []member
-	for dec.More() {
-		tok, err := dec.Token()
+		tok, err := dec.ReadToken()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
 		if err != nil {
 			return err
 		}
-		key, _ := tok.(string) // the decoder reads an object key as a string, or fails
-		var value bytes.Buffer
-		if err := copyValue(&value, dec); err != nil {
-			return err
-		}
-		members = append(members, member{key: key, value: value.Bytes()})
-	}
-	if _, err := dec.Token(); err != nil {
-		return err
-	}
-	slices.SortStableFunc(members, func(a, b member) int { return cmp.Compare(a.key, b.key) })
-	out.WriteByte('{')
-	for i, m := range members {
-		if i > 0 {
-			if m.key == members[i-1].key {
-				return fmt.Errorf("duplicate key %q", m.key)
+		if tok.Kind() == '"' {
+			if s := tok.String(); strings.ContainsRune(s, utf8.RuneError) {
+				return fmt.Errorf("%w: %q", ErrInvalidText, clip(s))
 			}
-			out.WriteByte(',')
 		}
-		if err := writeString(out, m.key); err != nil {
-			return err
-		}
-		out.WriteByte(':')
-		out.Write(m.value)
 	}
-	out.WriteByte('}')
-	return nil
 }
 
-// copyArray writes the elements of the array whose '[' dec has just
-// read, in their order, and reads its ']'.
-func copyArray(out *bytes.Buffer, dec *json.Decoder) error {
-	out.WriteByte('[')
-	for i := 0; dec.More(); i++ {
-		if i > 0 {
-			out.WriteByte(',')
-		}
-		if err := copyValue(out, dec); err != nil {
-			return err
-		}
+// checkNumber refuses the JSON number text that is out of the float64
+// range, which Canonicalize would write as the largest float64, and the
+// one whose mantissa holds a digit other than zero but that float64
+// flushes to zero, which Canonicalize would write as 0 (ErrNumberRange).
+// A number that rounds to a subnormal float64, or to another float64,
+// is kept: that is the one form of RFC 8785.
+func checkNumber(text string) error {
+	f, err := strconv.ParseFloat(text, 64)
+	switch {
+	case errors.Is(err, strconv.ErrRange) && math.IsInf(f, 0):
+		return fmt.Errorf("%w: %s is beyond the float64 range", ErrNumberRange, clip(text))
+	case err != nil:
+		return fmt.Errorf("canon: the number %s: %w", clip(text), err)
 	}
-	out.WriteByte(']')
-	_, err := dec.Token()
-	return err
-}
-
-// writeString writes s as a JSON string, escaping what JSON requires
-// and leaving <, > and & as they are. It refuses a string that holds
-// U+FFFD (ErrInvalidText).
-func writeString(out *bytes.Buffer, s string) error {
-	if strings.ContainsRune(s, utf8.RuneError) {
-		return fmt.Errorf("%w: %q", ErrInvalidText, clip(s))
+	mantissa, _, _ := strings.Cut(strings.ToLower(text), "e")
+	if f == 0 && strings.ContainsAny(mantissa, "123456789") {
+		return fmt.Errorf("%w: %s is flushed to zero in a float64", ErrNumberRange, clip(text))
 	}
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(s); err != nil {
-		return err
-	}
-	out.Write(bytes.TrimSuffix(buf.Bytes(), []byte("\n")))
 	return nil
 }
 
