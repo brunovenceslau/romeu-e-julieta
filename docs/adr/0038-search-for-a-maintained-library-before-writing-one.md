@@ -4,7 +4,7 @@ Date: 2026-10-20
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -130,8 +130,8 @@ Decided on 2026-10-20:
   schema generator), "no dependency" for `tools/schemagen` in 03, the
   package comment of `internal/signing`, and T017's "from the standard
   library alone".
-- T035 waits for this record, so its store lock and atomic writes are
-  chosen under 2.
+- T035's store lock is chosen under 2, and T035 resumes after the
+  swaps of 5 for the ULIDs and the atomic writes.
 - REQ-1131, REQ-1179 and the pull request template do not change with
   this record; they gain the **Prior art** section with T005, whose
   task file gains the row of 7.
