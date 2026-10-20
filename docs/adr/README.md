@@ -36,7 +36,7 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 18 | [Gate toolchain changes per machine and project widening per project](0018-gate-toolchain-changes-per-machine-and-project-widening-per-project.md) | Proposed |
 | 19 | [Support kit schema v3 only](0019-support-kit-schema-v3-only.md) | Proposed |
 | 20 | [Render run layouts with herdr as the one renderer](0020-render-run-layouts-with-herdr-as-the-one-renderer.md) | Proposed |
-| 21 | [Keep memory as plain per-repo files](0021-keep-memory-as-plain-per-repo-files.md) | Proposed |
+| 21 | [Keep memory as plain per-repo files](0021-keep-memory-as-plain-per-repo-files.md) | Accepted |
 | 22 | [License the product GPL-3.0-only and the examples and schemas CC0-1.0](0022-license-the-product-gpl-3-0-only-and-the-examples-and-schemas-cc0-1-0.md) | Proposed |
 | 23 | [Defer the runtime ledger out of v1](0023-defer-the-runtime-ledger-out-of-v1.md) | Proposed |
 | 24 | [Delete the one-time migration set from the product](0024-delete-the-one-time-migration-set-from-the-product.md) | Proposed |
@@ -54,4 +54,4 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 36 | [Keep the forbidden names as a convenience list in the config repository](0036-keep-the-forbidden-names-as-a-convenience-list-in-the-config-repository.md) | Accepted |
 | 37 | [State what is at stake in every decision record](0037-state-what-is-at-stake-in-every-decision-record.md) | Accepted |
 | 38 | [Search for a maintained library before writing one](0038-search-for-a-maintained-library-before-writing-one.md) | Accepted |
-| 39 | [State the scope of every decision record](0039-state-the-scope-of-every-decision-record.md) | Proposed |
+| 39 | [State the scope of every decision record](0039-state-the-scope-of-every-decision-record.md) | Accepted |
