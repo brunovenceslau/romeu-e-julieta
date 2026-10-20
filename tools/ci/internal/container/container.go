@@ -36,6 +36,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -49,6 +50,11 @@ import (
 // infrastructure error in. It equals the constant of the same name in
 // e2e/internal/container, which a test of this package holds.
 const InfraFileEnv = "ROMEU_E2E_INFRA_FILE"
+
+// InfraPrefix starts the line the harness prints for an infrastructure
+// error. It equals the constant of the same name in
+// e2e/internal/container, which a test of this package holds.
+const InfraPrefix = "container e2e: infrastructure error: "
 
 // CacheDir is the directory the harness keeps its downloads in, which
 // ci.yml restores and saves with actions/cache, and FixtureLock is the
@@ -154,6 +160,26 @@ func around() ([]string, check.Read, error) {
 	}, nil
 }
 
+// reportLine matches the one line Fail prints through tb.Fatal: the
+// indentation the testing package adds, the file and line of the call,
+// and the report.
+var reportLine = regexp.MustCompile(`^\s*[^\s:]+\.go:[0-9]+: ` + regexp.QuoteMeta(InfraPrefix))
+
+// ownLines returns the lines a test printed itself: the text of all its
+// output events, joined before it is split (go test -json cuts a long
+// line into several events), without the framework's lines ("=== RUN",
+// "--- FAIL", blank).
+func ownLines(out string) []string {
+	var lines []string
+	for l := range strings.SplitSeq(out, "\n") {
+		t := strings.TrimSpace(l)
+		if t != "" && !strings.HasPrefix(t, "=== ") && !strings.HasPrefix(t, "--- ") {
+			lines = append(lines, l)
+		}
+	}
+	return lines
+}
+
 // event is what read takes from one event of go test -json.
 type event struct {
 	Action  string
@@ -165,17 +191,27 @@ type event struct {
 // read reads the output of "go test -json" and the error of its run,
 // with infra the tests the harness named as having met an
 // infrastructure error. It returns the text of the run, the output of
-// each event and every line that is no event, and the step's error: none
-// when tests ran and passed and none failed or was skipped; a failure
-// when no test ran or passed (REQ-0812) and when a test was skipped
-// (REQ-0798); an error that wraps check.ErrInfrastructure when every
-// failed test is in infra, or a subtest of it is, and every failed
-// package holds such a test; and otherwise a failure that names the
-// failed tests.
+// each event and every line that is no event, and the step's error:
+//   - none when tests ran and passed and none failed or was skipped;
+//   - a failure when no test ran or passed (REQ-0812) and when a test
+//     was skipped (REQ-0798);
+//   - an error that wraps check.ErrInfrastructure when every failed
+//     test is one the harness named, or has a subtest it named, and
+//     every failed package holds such a test;
+//   - otherwise a failure that names the failed tests.
+//
+// A named test counts only if its own output is the one line of Fail
+// (reportLine), which it always prints; a parent that is named only through a
+// subtest prints none. Trust still comes from the private file of
+// names; the output is a heuristic that catches an assertion that
+// failed before the error. A bare t.Fail or t.FailNow before Fail
+// prints nothing and cannot be told from the rest, so an e2e test must
+// never fail silently.
 func read(out []byte, runErr error, infra []string) ([]byte, error) {
 	var text bytes.Buffer
 	ran, passed := 0, 0
 	var failedTests, skipped, failedPkgs, pkgsWithFailedTests []string
+	own := map[string]*strings.Builder{} // the output of each test, in order
 	sc := bufio.NewScanner(bytes.NewReader(out))
 	sc.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 	for sc.Scan() {
@@ -187,6 +223,12 @@ func read(out []byte, runErr error, infra []string) ([]byte, error) {
 			continue
 		}
 		text.WriteString(e.Output)
+		if e.Test != "" && e.Action == "output" {
+			if own[e.Test] == nil {
+				own[e.Test] = new(strings.Builder)
+			}
+			own[e.Test].WriteString(e.Output)
+		}
 		switch {
 		case e.Test == "" && e.Action == "fail":
 			failedPkgs = append(failedPkgs, e.Package)
@@ -222,7 +264,19 @@ func read(out []byte, runErr error, infra []string) ([]byte, error) {
 	}
 	var notInfra []string
 	for _, name := range failedTests {
-		covered := slices.ContainsFunc(infra, func(i string) bool { return i == name || strings.HasPrefix(i, name+"/") })
+		var lines []string
+		if b := own[name]; b != nil {
+			lines = ownLines(b.String())
+		}
+		covered := slices.ContainsFunc(infra, func(i string) bool {
+			switch {
+			case i == name:
+				return len(lines) == 1 && reportLine.MatchString(lines[0])
+			case strings.HasPrefix(i, name+"/"):
+				return len(lines) == 0
+			}
+			return false
+		})
 		if !covered {
 			notInfra = append(notInfra, name)
 		}
