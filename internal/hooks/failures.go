@@ -21,6 +21,16 @@ import (
 	"github.com/google/renameio/v2"
 )
 
+// The two session hooks that record failures here beside the git hooks
+// (08 8.2, REQ-0675): SessionStart is julieta handoff show --hook and
+// SessionEnd is julieta handoff write --facts. A session hook has the
+// repo dir it ran for in Repo, or no repo when it failed before it knew
+// one, and the command in Stage.
+const (
+	SessionStart = "SessionStart"
+	SessionEnd   = "SessionEnd"
+)
+
 // Failure is one failing run of a hook, recorded in julieta state until
 // a later run of the same hook in the same repo succeeds (04 4.3,
 // REQ-0409; 08 8.2, REQ-0675): the hook, the repo, the stage that
@@ -29,9 +39,12 @@ type Failure struct {
 	At       time.Time `json:"at"`
 	ExitCode int       `json:"exitCode"`
 	Hook     string    `json:"hook"`
-	Path     string    `json:"path"`
-	Repo     string    `json:"repo"`
-	Stage    string    `json:"stage"`
+	// Message is what the failure said, for a hook that has no script
+	// to name in Path, such as a session hook; empty for a git hook.
+	Message string `json:"message,omitempty"`
+	Path    string `json:"path"`
+	Repo    string `json:"repo"`
+	Stage   string `json:"stage"`
 }
 
 // failureFile returns the file name of the failure of hook in repo: one

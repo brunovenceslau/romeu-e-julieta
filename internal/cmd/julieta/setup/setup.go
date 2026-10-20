@@ -92,11 +92,11 @@ func setup(ctx context.Context, env *cli.Env) error {
 		}
 		s(ctx, r)
 	}
-	prev, err := ReadState(home)
-	if err != nil {
-		r.report.Errors = append(r.report.Errors, fmt.Sprintf("%v; this run's state replaces it", err))
+	readErr, err := recordState(home, env.Now(), env.Version.Version, r.report.Warnings)
+	if readErr != nil {
+		r.report.Errors = append(r.report.Errors, fmt.Sprintf("%v; this run's state replaces it", readErr))
 	}
-	if err := recordState(home, prev, env.Now(), env.Version.Version, r.report.Warnings); err != nil {
+	if err != nil {
 		r.fail("julieta state: %v", err)
 	}
 	if err := write(env, r.report); err != nil {

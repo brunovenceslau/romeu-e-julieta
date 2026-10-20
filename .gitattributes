@@ -20,6 +20,10 @@ docs/reference/julieta/completion.md -text
 docs/reference/julieta/completion/bash.md -text
 docs/reference/julieta/completion/fish.md -text
 docs/reference/julieta/completion/zsh.md -text
+docs/reference/julieta/handoff.md -text
+docs/reference/julieta/handoff/list.md -text
+docs/reference/julieta/handoff/show.md -text
+docs/reference/julieta/handoff/write.md -text
 docs/reference/julieta/hooks.md -text
 docs/reference/julieta/hooks/run.md -text
 docs/reference/julieta/memory.md -text
@@ -38,6 +42,8 @@ docs/reference/romeu/completion/fish.md -text
 docs/reference/romeu/completion/zsh.md -text
 docs/reference/romeu/version.md -text
 internal/cli/exitcodes_gen.go -text
+schemas/handoff.v1.json -text
+schemas/julieta-handoff.v1.json -text
 schemas/julieta-memory.v1.json -text
 schemas/julieta-setup.v1.json -text
 schemas/julieta-status.v1.json -text

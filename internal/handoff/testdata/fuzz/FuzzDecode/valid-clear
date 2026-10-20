@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("---\nschema: handoff/v1\nkind: clear\ncreatedAt: 2026-10-02T18:30:00Z\nproject: shop\ngeneration: 01j9zc2q8x7w4t6y3r5e1v9k0p\nagent: sbx-kit-claude\nrepos:\n  - dir: shop-api\n    branch: feat/cart\n    head: 0123456789abcdef0123456789abcdef01234567\n    upstream: origin/feat/cart\n    ahead: 2\n    behind: 0\n    dirty: 3\n    stashes: 0\n---\n## Goal\nShip the cart.\n## State\nTests pass.\n## Decisions\nUse a map.\n## Next steps\nOpen the PR.\n## Open questions\nNone.\n")

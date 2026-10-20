@@ -8,11 +8,20 @@ owns:
   - internal/handoff/**
   - internal/cmd/julieta/handoff/**
   - internal/cmd/julieta/all/import_handoff.go
+  - internal/memstore/write/write.go
+  - internal/memstore/write/write_test.go
+  - internal/hooks/failures.go
+  - internal/hooks/failures_test.go
+  - internal/cmd/julieta/setup/state.go
+  - internal/cmd/julieta/setup/setup.go
+  - internal/cmd/julieta/setup/export_test.go
+  - internal/cmd/julieta/setup/updatestate_test.go
   - e2e/julieta_handoff_test.go
 needs:
   - T035
   - T023
   - T135
+  - T054
 after: []
 ask_first: []
 sitting: none
@@ -95,3 +104,47 @@ of `handoff write`, with the store lock, lives in
 - Verify: `go test -tags e2e ./e2e/... -run '^TestJulietaHandoff' -v`.
   The pattern names the `TestJulietaHandoff*` functions this task adds,
   and the reviewer reads them in the `-v` output (10 10.8).
+
+Decisions taken while building (2026-10-20), each with what reopens it:
+
+- `internal/memstore/write` exports `Lock(path, onWait)` and
+  `AtomicWrite(root, p, data, now, ulids, create)`, which `Store` uses
+  unchanged in behavior and `handoff write` calls, so the lock and the
+  atomic write exist once. The file is added to `owns` above. Reopened
+  by a third writer that needs another option.
+- `dirty` in the handoff front matter is the number of kinds of change
+  the working tree holds (staged, unstaged, untracked, unmerged, hidden;
+  0 to 5), because `gitsafe.Status` has no file count. Reopened by the
+  gitsafe task that adds a file counter (after T151, PR #210): `dirty`
+  then becomes the file count. Salvage's `dirty-at-last-facts`
+  (REQ-0237) reads the same field, so it carries the same meaning until
+  then.
+- The gap line compares head, branch and dirty only (the three things
+  08 8.3 lists, plus a repo added or removed); stashes, upstream and
+  ahead/behind are stamped but never raise it.
+- SessionStart and SessionEnd failures are recorded, cleared and read
+  through T054's store, `hook-failures/` below julieta state, so the
+  SessionStart print shows every recorded failure, the git hooks' too
+  (08 8.2). A success of a hook clears its failure for the same repo
+  (the manifest repo dir, `./api` and `api` being one), and one
+  recorded before the repo was known (repo empty). The stored message
+  is cut at 300 bytes. `hooks.json` keeps only `sessionStartAt` and
+  `sessionEndAt`. `julieta status` does not list the failures yet: the
+  Acceptance line "`julieta status` lists it" waits for a status
+  section that reads the store, recorded in
+  `docs/handoff/pending/julieta-status-reads-the-hook-failure-store.md`
+  (copying the failures into `setup.json` was removed because two
+  writers of it lost each other's changes). Edit of `internal/hooks`:
+  the constants `SessionStart` and `SessionEnd`, and an optional
+  `message` member of `Failure` (omitted when empty); its tests pass
+  unchanged and one test is added.
+- `setup.json` has one writer protocol: `setup.UpdateState(home, f)`
+  reads, changes and writes it under the lock `state.lock`, and never
+  writes a state it cannot read. `julieta setup` records its state
+  through the same lock, reading the state fresh, so a clear of
+  `default-branch-moved` made while setup ran is not undone (it keeps
+  its old rule of replacing a state it cannot read, and says so). The
+  SessionStart hook clears `default-branch-moved` only through
+  `UpdateState`, and prints an unreadable `setup.json` as one line.
+  Edit of merged `internal/cmd/julieta/setup`: `state.go`, `setup.go`
+  and the two test files; the other setup tests pass unchanged.
