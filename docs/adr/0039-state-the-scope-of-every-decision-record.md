@@ -26,13 +26,14 @@ Each scope has its own home, and two of them move:
 | this session | none; it ends with the session | the same |
 | this repository | its decision records, `docs/handoff/decisions/`, its checks | the same |
 | every repository and sandbox of the maintainer | the sandbox payload (`kits/claude-home` of the payload's source repository), which is interim | the personal agent context of 06 (REQ-0608): a personal kit in the config repository |
-| every adopter of the product | the product kits and `skills/` of this repository | the same |
+| one other repository or machine | that repository's records, or that machine's settings | the same |
+| every adopter of the product | this repository's product parts: the spec, the product kits, `skills/`, the catalog | the same |
 
 What is at stake: a rule written in a narrower home than its scope does
-not hold where it was meant to, and nothing shows it; a builder in
-another repository keeps the old behavior, and the gap is found only
-when the same failure repeats. When the interim payload is retired, a
-rule that lives only there is lost unless it was named for the move.
+not hold where it was meant to, and nothing may show it; a builder in
+another repository keeps the old behavior until the same failure
+repeats. When the interim payload is retired, a rule that lives only
+there can be lost unless it was named for the move.
 Writing the scope down costs one line per record and is undone by
 editing it.
 
@@ -52,13 +53,20 @@ is named in the pending note of Consequences.
 
 ## Decision
 
-Decided on 2026-10-20: rule 9 of ADR 0001 gains one more sentence.
-**[review]** Every decision record and every decision note under
-`docs/handoff/decisions/` states its scope next to what is at stake:
-one of the four scopes of the table above. A scope wider than this
-repository also names the home outside it where the rule is written,
-or a pending note that carries it there; a rule whose home is the
-interim payload names its later home too, so the move finds it.
+Proposed on 2026-10-20: rule 9 of ADR 0001 gains one more sentence.
+**[review]** Every decision record states its scope in its Context,
+after what is at stake, and a decision note under
+`docs/handoff/decisions/` in its first paragraph, after the stakes: a
+line `Scope:` naming one of the scopes of the table above, the widest
+the rule is meant to hold in. A scope other than this repository also
+names the home where the rule is written, or a pending note that
+carries it there; a rule whose home is the interim payload names its
+later home too, so the move finds it. A rule that fits two scopes names
+both homes.
+
+The same rule goes to the "How to work" section of the sandbox payload,
+so it holds in every repository; the pending note of Consequences
+tracks it.
 
 ## Consequences
 
@@ -66,5 +74,6 @@ interim payload names its later home too, so the move finds it.
 - A record written before this one is not rewritten; its scope is
   added when it is next amended.
 - The pending note "rules-to-move-when-the-interim-payload-is-retired"
-  lists the payload's rules that come from this repository's records,
-  with their later home, so the move does not depend on memory.
+  lists the rules this repository's records mean for the payload, with
+  whether each was sent and its later home, so the move does not depend
+  on memory.

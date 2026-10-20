@@ -6,21 +6,23 @@ repository go back to the old behavior.
 
 Scope: every repository and sandbox of the maintainer.
 
-The rules this repository's records sent to the payload, each with its
-later home, the personal kit in the config repository (REQ-0608) unless
-named otherwise:
+The rules this repository's records mean for the payload, each with
+whether it was sent and its later home, the personal kit in the config
+repository (REQ-0608) unless named otherwise:
 
 - Search for a maintained library before writing one; import, copy a
   small proven piece with its license and origin, or write by hand with
-  a stated reason ("library-first-in-the-sandbox-payload"; sent to the
-  payload's session on 2026-10-20). Open: the personal kit, or a product
-  skill under `skills/` if adopters get it too.
-- State the scope of every decision record (ADR 0039): the record
-  itself lives here; the payload's house rule on records gains the same
-  sentence.
+  a stated reason (the pending note of #198,
+  "library-first-in-the-sandbox-payload"). Sent: a prompt was pasted
+  into the payload's session on 2026-10-20; its pull request is not yet
+  reported. Open: the personal kit, or a product skill under `skills/`
+  if adopters get it too.
+- State the scope of every decision record (ADR 0039), as a sentence
+  in the payload's "How to work". Not yet sent.
 
 The payload holds other rules that came from elsewhere; listing them
 belongs to the payload's own repository.
 
 Reopen: when the migration of the payload to the config repository is
-planned, or when a record sends another rule to the payload.
+planned, when a record means another rule for the payload, or when a
+payload session reports its pull request.
