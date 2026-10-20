@@ -208,6 +208,42 @@ func TestStatusRunsNoCleanFilter(t *testing.T) {
 	}
 }
 
+// TestStatusRunsNoEmptyNamedFilter: a filter driver with an empty name
+// ([filter ""], key filter..clean), which git lists and runs for the
+// attribute filter= with no value, planted required in the local
+// config, is neutralized as any other; plain git status runs it (the
+// positive control).
+//
+//romeu:invariant I3 test
+func TestStatusRunsNoEmptyNamedFilter(t *testing.T) {
+	dir, _ := newRepo(t)
+	writeFile(t, dir, ".gitattributes", "d filter=\n")
+	writeFile(t, dir, "d", "d\n")
+	plainGit(t, dir, "add", ".")
+	plainGit(t, dir, "commit", "-q", "-m", "files")
+	marker := filepath.Join(t.TempDir(), "marker")
+	script := filepath.Join(t.TempDir(), "filter.sh")
+	require.NoError(t, os.WriteFile(script, []byte("#!/bin/sh\necho ran >> '"+marker+"'\ncat\n"), 0o700))
+	config, err := os.OpenFile(filepath.Join(dir, ".git", "config"), os.O_APPEND|os.O_WRONLY, 0)
+	require.NoError(t, err)
+	_, err = config.WriteString("[filter \"\"]\n\tclean = " + script + "\n\trequired = true\n")
+	require.NoError(t, errors.Join(err, config.Close()))
+	past := time.Now().Add(-time.Hour)
+	require.NoError(t, os.Chtimes(filepath.Join(dir, ".git", "index"), past, past))
+
+	for _, mode := range []Mode{Host, Sandbox} {
+		check := noWrite(t, dir)
+		got, err := newRunner(t, mode).Status(t.Context(), dir)
+		require.NoError(t, err, mode)
+		assert.True(t, got.Clean(), "%s: %+v", mode, got)
+		assert.NoFileExists(t, marker, mode)
+		check()
+	}
+
+	_, _ = plainGitErr(t, dir, nil, "status", "--porcelain")
+	assert.FileExists(t, marker, "the plant is live: plain git runs it")
+}
+
 // TestStatusLeavesTheIndexAlone: a tracked file whose stat data no
 // longer matches the index makes plain git status refresh the index
 // on disk (the positive control); Status reads it as clean and leaves
@@ -613,11 +649,12 @@ func TestStatusArgv(t *testing.T) {
 				assert.Equal(t, stubRepo, c.Dir)
 			}
 			assert.Subset(t, commands[2].Env, []string{
-				"GIT_CONFIG_COUNT=6",
+				"GIT_CONFIG_COUNT=8",
 				"GIT_CONFIG_KEY_0=filter.lfs.clean", "GIT_CONFIG_VALUE_0=",
-				"GIT_CONFIG_KEY_1=filter.lfs.process", "GIT_CONFIG_VALUE_1=",
-				"GIT_CONFIG_KEY_2=filter.lfs.required", "GIT_CONFIG_VALUE_2=false",
-				"GIT_CONFIG_KEY_3=filter.a.b.clean", "GIT_CONFIG_KEY_5=filter.a.b.required",
+				"GIT_CONFIG_KEY_1=filter.lfs.smudge", "GIT_CONFIG_VALUE_1=",
+				"GIT_CONFIG_KEY_2=filter.lfs.process", "GIT_CONFIG_VALUE_2=",
+				"GIT_CONFIG_KEY_3=filter.lfs.required", "GIT_CONFIG_VALUE_3=false",
+				"GIT_CONFIG_KEY_4=filter.a.b.clean", "GIT_CONFIG_KEY_7=filter.a.b.required",
 			})
 		})
 	}

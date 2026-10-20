@@ -37,6 +37,15 @@ var cloneFlags = []string{"--no-tags", "--no-recurse-submodules", "--template="}
 // default branch, the remote-tracking refs of origin and a checkout;
 // it writes them only into a new directory. Every later fetch into it
 // follows the destinations of its mode (I5).
+//
+// The checkout runs no filter: the filter drivers the global config
+// defines are listed from the root directory, as the rewrite is, and
+// the clone runs with filterNeutral on each (filterOverrides). A driver
+// that only a conditional include of the global config defines, whose
+// condition matches the new repository (includeIf "gitdir:" or
+// "onbranch:"), is not listed from the root directory and not emptied;
+// in sandbox mode that config is the sandbox's own, which the agent
+// can write and gains nothing by.
 func (r *Runner) Clone(ctx context.Context, url, dest string) error {
 	if err := CheckURL(url); err != nil {
 		return err
@@ -47,8 +56,12 @@ func (r *Runner) Clone(ctx context.Context, url, dest string) error {
 	if _, err := r.resolveURL(ctx, "/", url); err != nil {
 		return err
 	}
+	noFilters, err := r.filterOverrides(ctx, "/")
+	if err != nil {
+		return err
+	}
 	args := slices.Concat([]string{"clone"}, cloneFlags, []string{"--", url, dest})
-	return r.runWith(ctx, filepath.Dir(dest), r.hostSettings(url), nil, args...)
+	return r.runInput(ctx, filepath.Dir(dest), r.hostSettings(url), noFilters, nil, nil, args...)
 }
 
 // checkCloneDest returns ErrRefused, wrapped with the reason, for a

@@ -35,14 +35,18 @@ func TestCloneArgv(t *testing.T) {
 	const url = "https://git.example.com/o/r.git"
 	dest := filepath.Join(t.TempDir(), "r")
 	require.NoError(t, r.Clone(t.Context(), url, dest))
-	require.Len(t, rec.commands, 2)
+	require.Len(t, rec.commands, 3)
 	ca := []string{"-c", "http.https://git.example.com/.sslCAInfo=/ca.pem"}
 
 	resolve := rec.commands[0]
 	assert.Equal(t, "/", resolve.Dir, "no repository's local config takes part")
 	assert.Equal(t, append(ca, "ls-remote", "--get-url", url), resolve.Argv[1+len(hostFlags):])
 
-	clone := rec.commands[1]
+	filters := rec.commands[1]
+	assert.Equal(t, "/", filters.Dir, "no repository's local config takes part")
+	assert.Equal(t, []string{"config", "-z", "--name-only", "--get-regexp", `^filter\.`}, filters.Argv[len(filters.Argv)-5:])
+
+	clone := rec.commands[2]
 	assert.Equal(t, filepath.Dir(dest), clone.Dir)
 	assert.Equal(t, append(ca, "clone", "--no-tags", "--no-recurse-submodules", "--template=", "--", url, dest), clone.Argv[1+len(hostFlags):])
 }
@@ -244,6 +248,35 @@ func TestCloneRunsNoHook(t *testing.T) {
 	require.NoError(t, err)
 	assert.FileExists(t, marker, "the plant is live: plain git runs it")
 	assert.FileExists(t, filepath.Join(control, "repo", ".git", "hooks", "post-checkout"))
+}
+
+// TestCloneRunsNoSmudgeFilter plants filter drivers in the sandbox's
+// global config, one with an empty name, each required and named by the
+// .gitattributes of the cloned tree: the clone's checkout runs no
+// filter and writes the files as the tree holds them. Plain git with
+// the same global config runs them (the positive control).
+//
+//romeu:invariant I3 test
+func TestCloneRunsNoSmudgeFilter(t *testing.T) {
+	src, _ := newRepo(t)
+	_, marker, global := filterPlant(t, src)
+	url := serveGit(t, bareCopy(t, src, "repo.git")) + "repo.git"
+	home := t.TempDir()
+	writeFile(t, home, ".gitconfig", global)
+
+	r, err := New(Config{Mode: Sandbox, Git: gitPath(t), Home: home})
+	require.NoError(t, err)
+	dest := filepath.Join(t.TempDir(), "repo")
+	require.NoError(t, r.Clone(t.Context(), url, dest))
+	assert.NoFileExists(t, marker)
+	got, err := os.ReadFile(filepath.Join(dest, "c"))
+	require.NoError(t, err)
+	assert.Equal(t, "c\n", string(got))
+
+	env := []string{"GIT_CONFIG_GLOBAL=" + filepath.Join(home, ".gitconfig")}
+	_, err = plainGitErr(t, t.TempDir(), env, "clone", "-q", url, "repo")
+	require.NoError(t, err)
+	assert.FileExists(t, marker, "the plant is live: plain git runs it")
 }
 
 // TestSandboxCloneThroughTheProxy clones in sandbox mode through a

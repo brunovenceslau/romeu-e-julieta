@@ -121,8 +121,8 @@ func (s Status) Clean() bool {
 // .git/info/attributes and from the config, so they cannot all be
 // switched off. Status instead lists the filter drivers the config
 // defines (git config --get-regexp, one more call) and runs git status
-// with each driver's clean and process commands empty and required
-// false, which git reads as no filter. A file a filter would change,
+// with each driver's clean, smudge and process commands empty and
+// required false, which git reads as no filter. A file a filter would change,
 // such as one under git-lfs, then reads as Unstaged when its stat data
 // no longer matches the index (a changed modification time is enough),
 // until something refreshes the index; Status may so report a change
@@ -204,10 +204,21 @@ func checkDisplayRef(name string) error {
 	return nil
 }
 
-// filterOverrides returns the GIT_CONFIG_COUNT environment that empties
-// the clean and process commands of every filter driver the config of
-// the repository in dir defines, and makes none required; nil when it
-// defines none.
+// filterNeutral is what filterOverrides sets on each filter driver:
+// every key that names a program empty, which git reads as no filter,
+// and required false, so the empty commands are no error. clean runs
+// when git hashes a file (status, the refresh before a checkout),
+// smudge when it writes one (a checkout), and process for either.
+var filterNeutral = []setting{{"clean", ""}, {"smudge", ""}, {"process", ""}, {"required", "false"}}
+
+// filterOverrides returns the GIT_CONFIG_COUNT environment that sets
+// filterNeutral on every filter driver the config read from dir
+// defines; nil when it defines none.
+// dir is a repository's root, whose local config and the files it
+// includes are read too, or "/" for the config of no repository. A
+// driver with an empty name ([filter ""], key filter..clean) is a
+// driver: git lists it and runs it for the attribute filter= with no
+// value.
 func (r *Runner) filterOverrides(ctx context.Context, dir string) ([]string, error) {
 	out := limitedBuffer{limit: outputLimit}
 	err := r.read(ctx, dir, nil, &out, "config", "-z", "--name-only", "--get-regexp", `^filter\.`)
@@ -222,18 +233,18 @@ func (r *Runner) filterOverrides(ctx context.Context, dir string) ([]string, err
 	var names []string
 	for key := range strings.SplitSeq(strings.TrimSuffix(out.String(), "\x00"), "\x00") {
 		rest, _ := strings.CutPrefix(key, "filter.")
-		if i := strings.LastIndexByte(rest, '.'); i > 0 && !slices.Contains(names, rest[:i]) {
+		if i := strings.LastIndexByte(rest, '.'); i >= 0 && !slices.Contains(names, rest[:i]) {
 			names = append(names, rest[:i])
 		}
 	}
 	if len(names) == 0 {
 		return nil, nil
 	}
-	env := []string{"GIT_CONFIG_COUNT=" + strconv.Itoa(3*len(names))}
+	env := []string{"GIT_CONFIG_COUNT=" + strconv.Itoa(len(filterNeutral)*len(names))}
 	for i, name := range names {
-		for j, kv := range [][2]string{{"clean", ""}, {"process", ""}, {"required", "false"}} {
-			n := strconv.Itoa(3*i + j)
-			env = append(env, "GIT_CONFIG_KEY_"+n+"=filter."+name+"."+kv[0], "GIT_CONFIG_VALUE_"+n+"="+kv[1])
+		for j, s := range filterNeutral {
+			n := strconv.Itoa(len(filterNeutral)*i + j)
+			env = append(env, "GIT_CONFIG_KEY_"+n+"=filter."+name+"."+s.key, "GIT_CONFIG_VALUE_"+n+"="+s.value)
 		}
 	}
 	return env, nil
