@@ -36,6 +36,64 @@ one-line edits never meet in a rebase;
 `internal/hooks/actions/actions.go` is the hook-name-to-action seam the
 action files register into (rule 14 of `docs/plan.md`).
 
+Decisions taken while building (2026-10-20), each with what reopens
+it:
+
+- The scripts of the dispatcher are `sh` scripts, one for each client
+  hook of githooks(5) that git runs in a work tree (`hooks.Names`),
+  each `exec <home>/.local/bin/julieta hooks run <hook> "$@"`. Git runs a
+  hook as a program, and a link to the binary would start it under the
+  hook's name. Reopened by a hook name git adds.
+- `setup` writes the scripts (`setup/hooks_path.go`) but does not yet
+  set the global `core.hooksPath`: `internal/gitsafe` has no verb that
+  writes the sandbox's global git config, and git runs only through
+  gitsafe. Acceptance row 3 stays open until that verb lands; the e2e
+  case sets the key itself, in one marked line. Decided on 2026-10-20:
+  a task on the `gitsafe` surface adds that verb after T151, and
+  `installDispatcher` calls it. Reopened by that verb.
+- The command ends with the status of the stage that stopped the chain
+  through a package seam over `os.Exit`, because `cli.Report` prints an
+  error block for every error and the stage has printed its line.
+  Reopened by a silent exit-status error in `internal/cli`.
+- A failure is recorded for the pair of hook and repo, one file each
+  below `$HOME/.local/state/julieta/hook-failures/`, and a success
+  clears the pair's file only: a success of `pre-push` in another repo
+  does not hide a failure. REQ-0409 says "the same hook"; the repo is
+  part of what makes a hook the same. A failure that did not stop the
+  chain (the snapshot) stays recorded after the run. Reopened by a
+  reader that wants one record for each hook.
+- The git dir comes from `GIT_DIR` of the hook's environment, else
+  the `.git` of the working directory, and a `commondir` file moves it
+  to the shared one, so a linked work tree runs the hooks of the main
+  one, as git does. The dispatcher reads that layout and starts no git.
+  Reopened by a gitsafe verb for the hooks directory.
+- The stdin of the hook goes to the first of the tracked and local
+  hooks that runs (exists and is executable), not to one that exists
+  but cannot run. A stage that cannot start has the status 126.
+- The stages get the environment git gave the hook, not a scrubbed
+  one: they are the user's programs in the sandbox (I21), and need
+  `GIT_INDEX_FILE` and `PATH`. Their output goes through the CLI
+  writer, so a terminal control in it is escaped (I29).
+- The stages run with pipes for stdin, stdout and stderr, not the
+  terminal, each in a process group of its own, and procgroup ends a job
+  a hook leaves in the background when the hook ends: a difference from
+  plain git, kept because of I29 and the procgroup rule. The help of
+  `hooks run` says so, and that a flag before the hook name is read by
+  julieta while git always passes the name first.
+- `hooks.Names` holds every hook of githooks(5) for git 2.53 (the
+  client, receiving and git-p4 ones), because a global `core.hooksPath`
+  replaces `$GIT_DIR/hooks` for all of them. A test pins the list.
+  Reopened by a hook name a later git adds.
+- An error of the books (recording or clearing a failure) is said on
+  stderr and never changes the status of the chain. The repo of a
+  record is its real path (symbolic links resolved).
+- The scripts quote the binary path with a quoter of their own, since
+  `internal/shquote` does not exist yet. Reopened by that package.
+- The `hook-failed` ledger event (13 13.2) waits for the emit package
+  of T063; the dispatcher records the failure in julieta state now.
+  The recorded failures are not yet shown by `julieta status` or
+  SessionStart: `hooks.Failures` is what they read.
+
 - Implements: REQ-0154 (02 2.5), REQ-0297 (04 4.1), REQ-0301 (04 4.1),
   REQ-0306 (04 4.1), REQ-0397 (04 4.3), REQ-0408 (04 4.3), REQ-0409 (04
   4.3), REQ-0505 (05 5.2), REQ-0619 (07 7.3), REQ-0675 (08 8.2),

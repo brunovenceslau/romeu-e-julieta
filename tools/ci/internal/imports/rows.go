@@ -71,7 +71,7 @@ var Rows = []Row{
 	},
 	{
 		Req:      "REQ-1233",
-		Names:    []string{"mise", "hooks", "layout", "agent/*", "memstore/write"},
+		Names:    []string{"mise", "hooks", "hooks/actions", "layout", "agent/*", "memstore/write"},
 		LinkedBy: Julieta,
 		MustNot:  []string{"sbxdrv"},
 	},

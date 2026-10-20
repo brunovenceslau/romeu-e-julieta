@@ -20,6 +20,8 @@ docs/reference/julieta/completion.md -text
 docs/reference/julieta/completion/bash.md -text
 docs/reference/julieta/completion/fish.md -text
 docs/reference/julieta/completion/zsh.md -text
+docs/reference/julieta/hooks.md -text
+docs/reference/julieta/hooks/run.md -text
 docs/reference/julieta/memory.md -text
 docs/reference/julieta/memory/add.md -text
 docs/reference/julieta/memory/check.md -text
