@@ -173,7 +173,7 @@ func TestRunPrintsAnErrorAsSafeText(t *testing.T) {
 	e := check.Env{Dir: t.TempDir(), Stdout: &out, Stderr: &errOut}
 	assert.Equal(t, check.ExitError, run(context.Background(), e, []string{"hygiene", "--bad\x1b[2J\n::error::forged"}))
 	assert.NotContains(t, errOut.String(), "\x1b")
-	for _, line := range strings.Split(errOut.String(), "\n") {
+	for line := range strings.SplitSeq(errOut.String(), "\n") {
 		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)
 	}
 	assert.Contains(t, errOut.String(), `\x1b[2J`)
@@ -246,8 +246,8 @@ func TestHookEnvIsTheAllowlist(t *testing.T) {
 			continue
 		}
 		last := len(calls) - 1
-		if strings.HasPrefix(line, "ARG[") {
-			argv[last] = append(argv[last], strings.TrimSuffix(strings.TrimPrefix(line, "ARG["), "]"))
+		if after, ok := strings.CutPrefix(line, "ARG["); ok {
+			argv[last] = append(argv[last], strings.TrimSuffix(after, "]"))
 			continue
 		}
 		k, v, _ := strings.Cut(line, "=")

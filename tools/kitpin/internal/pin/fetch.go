@@ -59,8 +59,7 @@ func fetch(ctx context.Context, e Env, src Source, path string, headers map[stri
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		var uerr *url.Error
-		if errors.As(err, &uerr) {
+		if uerr, ok := errors.AsType[*url.Error](err); ok {
 			err = uerr.Err
 		}
 		return nil, nil, fmt.Errorf("GET %s: %w", where, err)

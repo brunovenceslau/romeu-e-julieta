@@ -40,7 +40,7 @@ func TestHelperFsOps(t *testing.T) {
 	if ops == "" {
 		return
 	}
-	for _, line := range strings.Split(ops, "\n") {
+	for line := range strings.SplitSeq(ops, "\n") {
 		f := strings.SplitN(line, " ", 3)
 		switch f[0] {
 		case "write":

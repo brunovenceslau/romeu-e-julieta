@@ -117,7 +117,7 @@ func repoFiles(t *testing.T, root string, pathspecs ...string) []string {
 	})
 	require.NoError(t, err, "git ls-files")
 	var files []string
-	for _, f := range strings.Split(out.String(), "\x00") {
+	for f := range strings.SplitSeq(out.String(), "\x00") {
 		if f == "" {
 			continue
 		}

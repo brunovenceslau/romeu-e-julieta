@@ -420,8 +420,7 @@ func readBlobs(ctx context.Context, repo git.Repo, files map[string]string) (map
 		return nil, nil, nil
 	}
 	named := func(err error) error {
-		var oe *objectError
-		if errors.As(err, &oe) {
+		if oe, ok := errors.AsType[*objectError](err); ok {
 			return fmt.Errorf("reading %q of the index: %w", holder[oe.oid], err)
 		}
 		return err
@@ -607,7 +606,7 @@ func trackedOutputs(ctx context.Context, repo git.Repo, outs []output) ([]check.
 	}
 	// "<mode> <object> <stage>\t<path>", one entry for each stage.
 	entries := map[string][]string{}
-	for _, rec := range strings.Split(strings.TrimSuffix(string(staged), "\x00"), "\x00") {
+	for rec := range strings.SplitSeq(strings.TrimSuffix(string(staged), "\x00"), "\x00") {
 		meta, path, ok := strings.Cut(rec, "\t")
 		if ok {
 			entries[path] = append(entries[path], meta)
@@ -618,7 +617,7 @@ func trackedOutputs(ctx context.Context, repo git.Repo, outs []output) ([]check.
 		return nil, err
 	}
 	isIgnored := map[string]bool{}
-	for _, path := range strings.Split(string(ignored), "\x00") {
+	for path := range strings.SplitSeq(string(ignored), "\x00") {
 		isIgnored[path] = true
 	}
 	var findings []check.Finding
@@ -672,7 +671,7 @@ func Snapshot(ctx context.Context, repo git.Repo, root *os.Root) (map[string]str
 		return nil, err
 	}
 	files := map[string]string{}
-	for _, name := range bytes.Split(bytes.TrimSuffix(out, []byte{0}), []byte{0}) {
+	for name := range bytes.SplitSeq(bytes.TrimSuffix(out, []byte{0}), []byte{0}) {
 		if len(name) == 0 {
 			continue
 		}

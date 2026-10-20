@@ -68,11 +68,11 @@ func TestUnionProblems(t *testing.T) {
 		rows []cli.Declared
 		want string
 	}{
-		{"a duplicate id", []cli.Declared{{Row: cli.Row{ID: "RJ-301", Slug: "a", Exit: 3}, File: "x"}, {Row: cli.Row{ID: "RJ-301", Slug: "a", Exit: 3}, File: "y"}}, "y: RJ-301 is declared again, first in x"},
-		{"an id not in 4.4", []cli.Declared{{Row: cli.Row{ID: "RJ-777", Slug: "b", Exit: 1}, File: "x"}}, "x: RJ-777 is not a row of 04 4.4"},
-		{"a retired id", []cli.Declared{{Row: cli.Row{ID: "RJ-309", Slug: "old", Exit: 2}, File: "x"}}, "x: RJ-309 is retired in 04 4.4"},
-		{"another slug", []cli.Declared{{Row: cli.Row{ID: "RJ-301", Slug: "c", Exit: 3}, File: "x"}}, "x: RJ-301 is c exit 3, but 04 4.4 says a exit 3"},
-		{"another exit", []cli.Declared{{Row: cli.Row{ID: "RJ-301", Slug: "a", Exit: 1}, File: "x"}}, "x: RJ-301 is a exit 1, but 04 4.4 says a exit 3"},
+		{"a duplicate id", []cli.Declared{{ID: "RJ-301", Slug: "a", Exit: 3, File: "x"}, {ID: "RJ-301", Slug: "a", Exit: 3, File: "y"}}, "y: RJ-301 is declared again, first in x"},
+		{"an id not in 4.4", []cli.Declared{{ID: "RJ-777", Slug: "b", Exit: 1, File: "x"}}, "x: RJ-777 is not a row of 04 4.4"},
+		{"a retired id", []cli.Declared{{ID: "RJ-309", Slug: "old", Exit: 2, File: "x"}}, "x: RJ-309 is retired in 04 4.4"},
+		{"another slug", []cli.Declared{{ID: "RJ-301", Slug: "c", Exit: 3, File: "x"}}, "x: RJ-301 is c exit 3, but 04 4.4 says a exit 3"},
+		{"another exit", []cli.Declared{{ID: "RJ-301", Slug: "a", Exit: 1, File: "x"}}, "x: RJ-301 is a exit 1, but 04 4.4 says a exit 3"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -92,7 +92,7 @@ func TestReadTable(t *testing.T) {
 	}
 	got, err := cli.ReadTable(fsys)
 	require.NoError(t, err)
-	assert.Equal(t, []cli.Declared{{Row: cli.Row{ID: "RJ-301", Slug: "a", Exit: 3, Fix: "decide: x", RecoveredIn: "none: y"}, File: "internal/a/errors.go"}}, got)
+	assert.Equal(t, []cli.Declared{{ID: "RJ-301", Slug: "a", Exit: 3, Fix: "decide: x", RecoveredIn: "none: y", File: "internal/a/errors.go"}}, got)
 	fsys["internal/b/errors.go"] = &fstest.MapFile{Data: []byte("package b\nimport \"x/cli\"\nconst id = \"RJ-303\"\nvar E = cli.Row{ID: id}\n")}
 	_, err = cli.ReadTable(fsys)
 	require.ErrorContains(t, err, "the field ID of a Row is a literal")

@@ -114,7 +114,7 @@ func TestPullRequestTemplate(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), ".github", "pull_request_template.md"))
 	require.NoError(t, err)
 	var got []string
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if h, ok := strings.CutPrefix(line, "## "); ok {
 			got = append(got, h)
 		}

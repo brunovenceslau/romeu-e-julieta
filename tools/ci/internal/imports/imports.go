@@ -481,11 +481,11 @@ func report(ctx context.Context, out io.Writer, goBin, dir string) (bool, error)
 		return false, err
 	}
 	findings := Judge(pkgs)
-	notes := ""
+	var notes strings.Builder
 	for _, n := range Notes(pkgs) {
-		notes += n + "\n"
+		notes.WriteString(n + "\n")
 	}
-	check.Say(out, "%s%s%s\n", check.Lines(findings), notes, check.Summary("imports", len(findings)))
+	check.Say(out, "%s%s%s\n", check.Lines(findings), notes.String(), check.Summary("imports", len(findings)))
 	return len(findings) == 0, nil
 }
 

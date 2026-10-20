@@ -106,6 +106,7 @@
 /tools/ci/internal/hygiene/** @brunovenceslau
 /tools/ci/internal/pushedrange/** @brunovenceslau
 /tools/ci/internal/drift/** @brunovenceslau
+/tools/ci/internal/fix/** @brunovenceslau
 /tools/ci/adrdir/** @brunovenceslau
 /tools/ci/internal/workflows/** @brunovenceslau
 /tools/ci/internal/plan/** @brunovenceslau

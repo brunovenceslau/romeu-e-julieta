@@ -344,8 +344,8 @@ func TestBuildsForLintTarget(t *testing.T) {
 // a directory named testdata or vendor, or a directory under another
 // go.mod. moduleDirs are the directories of the other go.mod files.
 func skippedLocation(rel string, moduleDirs []string) string {
-	parts := strings.Split(rel, "/")
-	for _, p := range parts {
+	parts := strings.SplitSeq(rel, "/")
+	for p := range parts {
 		switch {
 		case strings.HasPrefix(p, "_") || strings.HasPrefix(p, "."):
 			return "a path element that begins with _ or ."

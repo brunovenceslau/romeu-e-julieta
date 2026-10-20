@@ -156,7 +156,7 @@ func Check(root *os.Root) (Report, error) {
 				rep.Findings = append(rep.Findings, Finding{Path: p, Rule: rule})
 				continue
 			}
-			top := strings.SplitN(p, "/", 2)[0]
+			top, _, _ := strings.Cut(p, "/")
 			if IsTemp(name) {
 				rep.Warnings = append(rep.Warnings, Finding{Path: p, Rule: RuleTemp})
 				if (top == EntriesDir || top == HandoffDir) && info.Size() > MaxFileSize {

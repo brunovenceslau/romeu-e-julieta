@@ -943,11 +943,16 @@ func TestFastSteps(t *testing.T) {
 	want := []check.Step{
 		{Name: "format", Argv: []string{filepath.Join(goDir, "gofmt"), "-l", "."}, Quiet: true, Environ: check.StepEnv(goDir)},
 		{Name: "vet", Argv: []string{goCmd, "vet", "./..."}, Environ: check.StepEnv(goDir)},
-		{Name: "generated", Argv: []string{goCmd, "run", "./tools/ci", "generated"}, Environ: check.StepEnv(goDir)},
 	}
+	for _, target := range lint.Targets {
+		want = append(want, check.Step{Name: "fix " + target.String(), Argv: []string{goCmd, "fix", "-diff", "-tags", "e2e,host", "./..."}, Environ: lint.Env(target, goDir)})
+	}
+	want = append(want, []check.Step{
+		{Name: "generated", Argv: []string{goCmd, "run", "./tools/ci", "generated"}, Environ: check.StepEnv(goDir)},
+	}...)
 	want = append(want, lintSteps(lint.Targets...)...)
 	want = append(want, check.Step{Name: "unit", Argv: []string{goCmd, "test", "-count=1", "./tools/..."}, Environ: check.StepEnv(goDir)})
-	assert.Equal(t, want, fastSteps(t.Context(), root, tools))
+	assert.Equal(t, want, withoutAround(t, fastSteps(t.Context(), root, tools)))
 	for _, s := range fastSteps(t.Context(), root, tools) {
 		assert.Contains(t, s.Environ, "GOPROXY=off", "%s never reaches the network", s.Name)
 	}
@@ -961,6 +966,20 @@ func TestFastSteps(t *testing.T) {
 	}
 	assert.Equal(t, []string{goCmd, "test", "-count=1", "./internal/...", "./tools/..."}, unit, "unit")
 
+}
+
+// withoutAround returns steps with the Around hook of each fix step
+// cleared, so that a test can compare them: a func is equal to no
+// other. Each fix step must have one, which reads the diff, and no
+// other step of fast has one.
+func withoutAround(t *testing.T, steps []check.Step) []check.Step {
+	t.Helper()
+	out := slices.Clone(steps)
+	for i := range out {
+		assert.Equal(t, strings.HasPrefix(out[i].Name, "fix "), out[i].Around != nil, "the Around hook of %s", out[i].Name)
+		out[i].Around = nil
+	}
+	return out
 }
 
 // TestGeneratedRunsBeforeTheTests holds the order the threat model of

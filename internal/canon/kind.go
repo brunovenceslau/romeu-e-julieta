@@ -3,6 +3,8 @@
 
 package canon
 
+import "slices"
+
 // The kinds table of 03 3.12, closed for v1: one Go type per kind, and
 // one typed constant of that type, the only value Digest accepts for
 // it. A kind is in the type of a digest (Sum), so a digest of one kind
@@ -90,10 +92,5 @@ var kinds = []any{
 
 // known reports whether k is the one value of its kind type.
 func known[K Kind](k K) bool {
-	for _, kind := range kinds {
-		if kind == any(k) {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(kinds, any(k))
 }

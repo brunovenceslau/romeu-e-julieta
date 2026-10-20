@@ -51,20 +51,20 @@ func TestDir(t *testing.T) {
 		want    string
 		err     string
 	}{
-		{"a directory", ptr("docs/adr\n"), "docs/adr", ""},
-		{"white space around it", ptr("  decisions \r\n"), "decisions", ""},
-		{"a trailing slash", ptr("docs/adr/\n"), "docs/adr", ""},
-		{"a leading dot", ptr("./docs/adr\n"), "docs/adr", ""},
-		{"a doubled slash", ptr("docs//adr\n"), "docs/adr", ""},
+		{"a directory", new("docs/adr\n"), "docs/adr", ""},
+		{"white space around it", new("  decisions \r\n"), "decisions", ""},
+		{"a trailing slash", new("docs/adr/\n"), "docs/adr", ""},
+		{"a leading dot", new("./docs/adr\n"), "docs/adr", ""},
+		{"a doubled slash", new("docs//adr\n"), "docs/adr", ""},
 		{"no file", nil, "", ".adr-dir"},
-		{"an absolute path", ptr("/etc\n"), "", "not a directory inside the repository"},
-		{"a path that climbs out", ptr("../out\n"), "", "not a directory inside the repository"},
-		{"the .git directory", ptr(".git\n"), "", "inside the .git directory"},
-		{"below .git", ptr(".git/adr\n"), "", "inside the .git directory"},
-		{"below .git by a dot", ptr("./.git/adr\n"), "", "inside the .git directory"},
-		{"below .GIT", ptr(".GIT/adr\n"), "", "inside the .git directory"},
-		{"a name that starts like .git", ptr(".github/adr\n"), ".github/adr", ""},
-		{"an empty file", ptr(""), "", "not a directory inside the repository"},
+		{"an absolute path", new("/etc\n"), "", "not a directory inside the repository"},
+		{"a path that climbs out", new("../out\n"), "", "not a directory inside the repository"},
+		{"the .git directory", new(".git\n"), "", "inside the .git directory"},
+		{"below .git", new(".git/adr\n"), "", "inside the .git directory"},
+		{"below .git by a dot", new("./.git/adr\n"), "", "inside the .git directory"},
+		{"below .GIT", new(".GIT/adr\n"), "", "inside the .git directory"},
+		{"a name that starts like .git", new(".github/adr\n"), ".github/adr", ""},
+		{"an empty file", new(""), "", "not a directory inside the repository"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -159,5 +159,3 @@ func TestDirFollowsLinks(t *testing.T) {
 		})
 	}
 }
-
-func ptr(s string) *string { return &s }

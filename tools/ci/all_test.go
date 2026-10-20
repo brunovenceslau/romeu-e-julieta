@@ -210,7 +210,7 @@ func TestAllSteps(t *testing.T) {
 	unit := len(fast) - 1
 	require.Equal(t, "unit", fast[unit].Name)
 	require.Len(t, steps, len(fast)+10, "no e2e directory, so no tagged suite to vet")
-	assert.Equal(t, fast[:unit], steps[:unit])
+	assert.Equal(t, withoutAround(t, fast[:unit]), withoutAround(t, steps[:unit]))
 	assert.Equal(t, fast[unit], steps[unit+8])
 	assert.Equal(t, crossbuild.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[unit+3:unit+7])
 	assert.Equal(t, imports.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[unit+7:unit+8])
@@ -520,7 +520,7 @@ func TestAllWiring(t *testing.T) {
 			}
 		}
 	}
-	want := []string{"gofmt -l", "go vet", "go run", "lint run", "lint run", "lint run", "lint run", "govulncheck ./..."}
+	want := []string{"gofmt -l", "go vet", "go fix", "go fix", "go fix", "go fix", "go run", "lint run", "lint run", "lint run", "lint run", "govulncheck ./..."}
 	if runtime.GOOS == "linux" {
 		want = append(want, "docker run")
 	}
