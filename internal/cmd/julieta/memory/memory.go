@@ -217,7 +217,7 @@ func usage(cmd *cobra.Command, message string) error {
 // lowercase ULID (03 3.12), ".." among them.
 func checkID(cmd *cobra.Command, id string) error {
 	if _, err := canon.ParseULID(id); err != nil {
-		return usage(cmd, fmt.Sprintf("the id %q is not a lowercase ULID", esc(id)))
+		return usage(cmd, fmt.Sprintf("the id \"%s\" is not a lowercase ULID", esc(id)))
 	}
 	return nil
 }
