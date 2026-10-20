@@ -51,7 +51,9 @@ env file, a parent directory's `mise.toml`) or `MISE_CD` reaches go. The
 tests run the hook against a hostile environment; git's pre-push
 arguments and stdin pass through (10 10.2).
 
-`REQ-1049` Go dependencies (each an ask-first addition; complete v1 list):
+`REQ-1049` Go dependencies in use (each an ask-first addition; before code
+that a maintained library could hold is written, the library is searched for
+first, [ADR 0038, search for a maintained library before writing one](../adr/0038-search-for-a-maintained-library-before-writing-one.md)):
 `go.yaml.in/yaml/v3`, `github.com/BurntSushi/toml`,
 `github.com/santhosh-tekuri/jsonschema/v6` (validates examples against
 the generated schemas) with `golang.org/x/text`, which it compiles in
