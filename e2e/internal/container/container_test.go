@@ -177,8 +177,7 @@ func TestDownloadFails(t *testing.T) {
 }
 
 // TestDownloadChecksTheSHA256 checks that a downloaded file whose sha256
-// is not the pin is a test failure, and so is a cached one, which leaves
-// no file in the directory the cases mount; and that a file of the pin
+// is not the pin is a test failure, and a corrupt cached one is fetched once more; and that a file of the pin
 // is kept in the cache under its sha256, read from there the next time,
 // installed under the program's own name, and read by the release's own
 // asset names.
@@ -210,20 +209,50 @@ func TestDownloadChecksTheSHA256(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"/v1.2.3/herdr-linux-aarch64", "/v1.2.3/mise-v1.2.3-linux-x64"}, paths, "the second herdr is read from the cache")
 
+	// A corrupt entry is deleted and fetched once more.
 	require.NoError(t, os.WriteFile(cached, []byte("substituted"), 0o755))
 	c.GOARCH = "arm64"
 	bin = t.TempDir()
-	_, err = c.HerdrBinary(t.Context(), bin)
-	require.Error(t, err)
-	assert.NotErrorAs(t, err, new(*InfraError))
-	assert.Contains(t, err.Error(), "the cached file")
-	assert.NoFileExists(t, filepath.Join(bin, "herdr"), "a file that fails its check is not installed")
+	paths = nil
+	path, err = c.HerdrBinary(t.Context(), bin)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/v1.2.3/herdr-linux-aarch64"}, paths, "the corrupt entry is fetched once")
+	got, err = os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "binary", string(got))
+	got, err = os.ReadFile(cached)
+	require.NoError(t, err)
+	assert.Equal(t, "binary", string(got), "the cache holds the fetched file")
 
 	other := fixtureConfig(t, srv.URL, []byte("another binary"))
 	_, err = other.MiseBinary(t.Context(), t.TempDir())
 	require.Error(t, err)
 	assert.NotErrorAs(t, err, new(*InfraError))
 	assert.Contains(t, err.Error(), "not the pinned")
+}
+
+// TestCorruptEntryFetchedOnceStillChecked checks that a corrupt cached
+// entry whose fetched replacement also fails the pin stays a test
+// failure, after one fetch, and installs nothing.
+func TestCorruptEntryFetchedOnceStillChecked(t *testing.T) {
+	var fetches int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fetches++
+		_, _ = w.Write([]byte("substituted again"))
+	}))
+	t.Cleanup(srv.Close)
+	c := fixtureConfig(t, srv.URL, []byte("binary"))
+	dir := filepath.Join(c.CacheDir, "linux-arm64", hexSum([]byte("binary")))
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "herdr"), []byte("substituted"), 0o755))
+	bin := t.TempDir()
+	_, err := c.HerdrBinary(t.Context(), bin)
+	require.Error(t, err)
+	assert.NotErrorAs(t, err, new(*InfraError))
+	assert.Contains(t, err.Error(), "not the pinned")
+	assert.Equal(t, 1, fetches)
+	assert.NoFileExists(t, filepath.Join(bin, "herdr"))
+	assert.NoFileExists(t, filepath.Join(dir, "herdr"), "nothing unchecked is cached")
 }
 
 // TestCacheOfThisUserAlone refuses a cache that another user may write.
