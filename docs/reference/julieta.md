@@ -30,6 +30,7 @@ julieta <command> [flags]
 ### SEE ALSO
 
 * [julieta completion](julieta/completion.md) - print the shell completion script
+* [julieta hooks](julieta/hooks.md) - the hooks commands
 * [julieta memory](julieta/memory.md) - the memory commands
 * [julieta setup](julieta/setup.md) - prepare the sandbox: the PATH link, the repos and their default branches
 * [julieta status](julieta/status.md) - print the state of the repos, the manifest and julieta's warnings
