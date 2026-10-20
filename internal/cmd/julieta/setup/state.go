@@ -15,6 +15,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
+	"github.com/google/renameio/v2"
 )
 
 // ManifestEnv is the variable romeu passes the manifest in (03 3.6,
@@ -170,16 +171,14 @@ func writeState(home, name string, data []byte) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(dir, ".tmp-"+name+"-")
+	t, err := renameio.NewPendingFile(filepath.Join(dir, name),
+		renameio.WithTempDir(dir), renameio.WithStaticPermissions(0o600))
 	if err != nil {
 		return err
 	}
-	_, werr := tmp.Write(data)
-	if err := errors.Join(werr, tmp.Sync(), tmp.Close()); err != nil {
-		return errors.Join(err, os.Remove(tmp.Name()))
+	defer func() { _ = t.Cleanup() }()
+	if _, err := t.Write(data); err != nil {
+		return err
 	}
-	if err := os.Rename(tmp.Name(), filepath.Join(dir, name)); err != nil {
-		return errors.Join(err, os.Remove(tmp.Name()))
-	}
-	return nil
+	return t.CloseAtomicallyReplace()
 }

@@ -184,7 +184,7 @@ func TestMiseLeavesNoTemporaryFile(t *testing.T) {
 		entries, err := os.ReadDir(filepath.Join(h.repo.Dir, dir))
 		require.NoError(t, err)
 		for _, e := range entries {
-			assert.NotContains(t, e.Name(), ".kitpin-")
+			assert.False(t, strings.HasPrefix(e.Name(), "."), "a temporary file is left: %s", e.Name())
 		}
 	}
 }

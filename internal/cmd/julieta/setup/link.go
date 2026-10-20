@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/google/renameio/v2"
 )
 
 // linkPath is the PATH link below $HOME (04 4.3, REQ-0397).
@@ -63,14 +65,5 @@ func replaceLink(path, target string) error {
 	if info, err := os.Lstat(path); err == nil && info.IsDir() {
 		return fmt.Errorf("%s is a directory", path)
 	}
-	tmp := filepath.Join(dir, fmt.Sprintf(".tmp-julieta-%d", os.Getpid()))
-	_ = os.Remove(tmp)
-	if err := os.Symlink(target, tmp); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	return nil
+	return renameio.Symlink(target, path)
 }
