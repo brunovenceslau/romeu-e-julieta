@@ -45,7 +45,10 @@ One block, a recommendation each.
    CI check with the first Mermaid block.
 6. Approve the `gitsafe` task of next step 2 (ask first). Recommended:
    one task.
-7. Report the pull requests of the prompts pasted on 2026-10-20 (T112 in
+7. ADR 0040 was merged as Accepted in #217 without a `decisions`
+   approval line. Recommended: say whether that merge approves it, or
+   it goes back to Proposed in a pull request of its own.
+8. Report the pull requests of the prompts pasted on 2026-10-20 (T112 in
    the config and kit repositories, ADR 0039 in the payload), and say
    when the GitHub App of ADR 0011 changes the sandbox's authentication.
 

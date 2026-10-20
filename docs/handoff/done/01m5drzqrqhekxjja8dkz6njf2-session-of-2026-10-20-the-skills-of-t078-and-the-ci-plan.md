@@ -11,6 +11,11 @@ Merged on 2026-10-20, with the gate it passed:
   01m5drzqxhskbxg2fx04rm3dzx); `go run ./tools/ci all` after the last
   commit; CI green on both hosts.
 
+#217 added ADR 0040 as Accepted under `docs/adr/`, the ask-first
+`decisions` surface, and its body carried only the `kits` approval line;
+nothing checks the lines until `tools/ci pr` (T005) lands, and the review
+missed it. Open for the operator in now.md.
+
 This record ticks T078.
 
 Closed by this record:
