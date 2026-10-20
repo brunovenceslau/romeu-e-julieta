@@ -103,3 +103,41 @@ func TestWriteIfChangedDropsTheExecuteBit(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o644), info.Mode().Perm())
 }
+
+// TestWriteIfChangedMakesItsTemporaryFileBesideTheTarget checks that a
+// write to a nested path never needs the top of the root: it is made
+// read-only, and the write still succeeds with mode 0644 over a file of
+// mode 0600, with nothing left beside the target.
+func TestWriteIfChangedMakesItsTemporaryFileBesideTheTarget(t *testing.T) {
+	dir := t.TempDir()
+	root := citest.RootOf(t, dir)
+	nested := filepath.Join(dir, "a", "b")
+	require.NoError(t, os.MkdirAll(nested, 0o755))
+	target := filepath.Join(nested, "file")
+	require.NoError(t, os.WriteFile(target, []byte("old"), 0o600))
+	require.NoError(t, os.Chmod(target, 0o600))
+	require.NoError(t, os.Chmod(dir, 0o555))
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	tmpdir := t.TempDir()
+	t.Setenv("TMPDIR", tmpdir)
+
+	changed, err := check.WriteIfChanged(root, "a/b/file", []byte("new"))
+
+	require.NoError(t, err)
+	assert.True(t, changed)
+	got, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, "new", string(got))
+	info, err := os.Stat(target)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+	for d, want := range map[string][]string{tmpdir: {}, nested: {"file"}, dir: {"a"}} {
+		entries, err := os.ReadDir(d)
+		require.NoError(t, err)
+		names := []string{}
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		assert.Equal(t, want, names, "the entries of %s", d)
+	}
+}

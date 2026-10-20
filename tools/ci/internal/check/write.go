@@ -5,11 +5,12 @@ package check
 
 import (
 	"bytes"
-	"crypto/rand"
 	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/google/renameio/v2"
 )
 
 // generatedFileMode is the mode of a file WriteIfChanged writes.
@@ -41,34 +42,26 @@ func WriteIfChanged(root *os.Root, path string, content []byte) (bool, error) {
 	if err := root.MkdirAll(dir, 0o755); err != nil {
 		return false, err
 	}
-	tmp := filepath.Join(dir, "."+filepath.Base(path)+"."+rand.Text()+".tmp")
-	f, err := root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, generatedFileMode)
+	// renameio (ADR 0038) makes its temporary file at the top of the
+	// root it is given, so it gets the root of path's directory. The mode
+	// is set after the umask took its share, and an execute bit is the
+	// one thing git tracks of a mode.
+	sub, err := root.OpenRoot(dir)
 	if err != nil {
 		return false, err
 	}
-	_, err = f.Write(content)
-	if closeErr := f.Close(); err == nil {
-		err = closeErr
-	}
-	// The mode is set after the umask took its share, and an execute bit
-	// is the one thing git tracks of a mode.
-	if err == nil {
-		err = root.Chmod(tmp, generatedFileMode)
-	}
-	if err == nil {
-		err = root.Rename(tmp, path)
-	}
+	defer func() { _ = sub.Close() }()
+	t, err := renameio.NewPendingFile(filepath.Base(path),
+		renameio.WithRoot(sub), renameio.WithStaticPermissions(generatedFileMode))
 	if err != nil {
-		return false, errors.Join(err, removeIfExists(root, tmp))
+		return false, err
+	}
+	defer func() { _ = t.Cleanup() }()
+	if _, err := t.Write(content); err != nil {
+		return false, err
+	}
+	if err := t.CloseAtomicallyReplace(); err != nil {
+		return false, err
 	}
 	return true, nil
-}
-
-// removeIfExists removes the file at path below root, and is not an
-// error when there is none.
-func removeIfExists(root *os.Root, path string) error {
-	if err := root.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	return nil
 }

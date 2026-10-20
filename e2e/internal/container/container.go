@@ -41,6 +41,7 @@ import (
 	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/google/renameio/v2"
 )
 
 // InfraPrefix starts the line Fail prints for an infrastructure error,
@@ -408,23 +409,16 @@ func (c Config) cache(ctx context.Context, what, name, url, want string) (string
 	if got := sha256Hex(body); got != want {
 		return "", fmt.Errorf("%s: %s has the sha256 %s, not the pinned %s", what, url, got, want)
 	}
-	tmp, err := os.CreateTemp(dir, ".download-")
+	t, err := renameio.NewPendingFile(path,
+		renameio.WithTempDir(dir), renameio.WithStaticPermissions(0o755))
 	if err != nil {
 		return "", err
 	}
-	defer func() { _ = os.Remove(tmp.Name()) }()
-	if _, err := tmp.Write(body); err != nil {
-		_ = tmp.Close()
+	defer func() { _ = t.Cleanup() }()
+	if _, err := t.Write(body); err != nil {
 		return "", err
 	}
-	if err := tmp.Chmod(0o755); err != nil {
-		_ = tmp.Close()
-		return "", err
-	}
-	if err := tmp.Close(); err != nil {
-		return "", err
-	}
-	return path, os.Rename(tmp.Name(), path)
+	return path, t.CloseAtomicallyReplace()
 }
 
 // fetch reads url whole, up to maxDownload.

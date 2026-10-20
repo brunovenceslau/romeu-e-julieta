@@ -26,6 +26,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/renameio/v2"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -331,28 +332,18 @@ func read(dir string) ([]Task, error) {
 
 // writeFile replaces path with data through a temporary file in the same
 // directory, and refuses a path that is a symbolic link.
-func writeFile(path string, data []byte) (err error) {
+func writeFile(path string, data []byte) error {
 	if info, lerr := os.Lstat(path); lerr == nil && info.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("%s is a symbolic link; refusing to write through it", path)
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
+	t, err := renameio.NewPendingFile(path,
+		renameio.WithTempDir(filepath.Dir(path)), renameio.WithStaticPermissions(0o644))
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err != nil {
-			_ = os.Remove(tmp.Name())
-		}
-	}()
-	if _, err = tmp.Write(data); err != nil {
-		_ = tmp.Close()
+	defer func() { _ = t.Cleanup() }()
+	if _, err := t.Write(data); err != nil {
 		return err
 	}
-	if err = tmp.Close(); err != nil {
-		return err
-	}
-	if err = os.Chmod(tmp.Name(), 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), path)
+	return t.CloseAtomicallyReplace()
 }

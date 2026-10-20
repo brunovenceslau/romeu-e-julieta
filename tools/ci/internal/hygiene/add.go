@@ -16,6 +16,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
+	"github.com/google/renameio/v2"
 )
 
 // add writes one denylist entry. The maintainer runs it on the host, in
@@ -90,24 +91,15 @@ func readBlind(e check.Env, tty *os.File, prompt string) ([]byte, error) {
 
 // writeFile replaces path through a temporary file in its directory,
 // so a run that is interrupted leaves the earlier denylist whole.
-func writeFile(path string, data []byte) (err error) {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".denylist-*")
+func writeFile(path string, data []byte) error {
+	t, err := renameio.NewPendingFile(path,
+		renameio.WithTempDir(filepath.Dir(path)), renameio.WithStaticPermissions(0o644))
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err != nil { // no file is left behind when a step fails
-			err = errors.Join(err, os.Remove(tmp.Name()))
-		}
-	}()
-	if _, err = tmp.Write(data); err == nil {
-		err = tmp.Chmod(0o644)
-	}
-	if closeErr := tmp.Close(); err == nil {
-		err = closeErr
-	}
-	if err != nil {
+	defer func() { _ = t.Cleanup() }() // no file is left behind when a step fails
+	if _, err := t.Write(data); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), path)
+	return t.CloseAtomicallyReplace()
 }

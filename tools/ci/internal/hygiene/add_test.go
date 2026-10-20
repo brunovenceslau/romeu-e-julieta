@@ -190,7 +190,7 @@ func TestAddKeepsADenylistItCannotRead(t *testing.T) {
 func TestWriteFile(t *testing.T) {
 	leftovers := func(t *testing.T, dir string) []string {
 		t.Helper()
-		found, err := filepath.Glob(filepath.Join(dir, ".denylist-*"))
+		found, err := filepath.Glob(filepath.Join(dir, ".*"))
 		require.NoError(t, err)
 		return found
 	}

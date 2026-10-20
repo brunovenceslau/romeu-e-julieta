@@ -52,8 +52,6 @@ package pin
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"os"
@@ -62,6 +60,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/kitpin/pins"
+	"github.com/google/renameio/v2"
 )
 
 // Source is where one kind of pin is read: the base URL of its
@@ -209,39 +208,36 @@ func (w *writer) readPins() (pins.Pins, error) {
 	return pins.Parse(src)
 }
 
-// write replaces path with data: a new temporary file beside it, under
-// a name no other run takes (O_EXCL), synced to disk, then renamed
-// over path, so a reader never sees half a file; the directory is
-// synced after the rename.
+// write replaces path with data through renameio (ADR 0038): a new
+// temporary file beside it, under a name no other run takes (O_EXCL),
+// synced to disk, then renamed over path, so a reader never sees half
+// a file; the directory is synced after the rename.
 func (w *writer) write(path string, data []byte) error {
-	dir := "."
+	dir, name := ".", path[strings.LastIndex(path, "/")+1:]
 	if i := strings.LastIndex(path, "/"); i > 0 {
 		dir = path[:i]
 		if err := w.root.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
 	}
-	var nonce [8]byte
-	if _, err := rand.Read(nonce[:]); err != nil {
-		return err
-	}
-	tmp := path + ".kitpin-" + hex.EncodeToString(nonce[:])
-	f, err := w.root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	// renameio makes its temporary file at the top of the root it is
+	// given, so it gets the root of path's directory.
+	sub, err := w.root.OpenRoot(dir)
 	if err != nil {
 		return err
 	}
-	_, err = f.Write(data)
-	if err == nil {
-		err = f.Sync()
-	}
-	if closeErr := f.Close(); err == nil {
-		err = closeErr
-	}
-	if err == nil {
-		err = w.root.Rename(tmp, path)
-	}
+	defer func() { _ = sub.Close() }()
+	t, err := renameio.NewPendingFile(name,
+		renameio.WithRoot(sub), renameio.WithStaticPermissions(0o644))
 	if err != nil {
-		return errors.Join(err, w.root.Remove(tmp))
+		return err
+	}
+	defer func() { _ = t.Cleanup() }()
+	if _, err := t.Write(data); err != nil {
+		return err
+	}
+	if err := t.CloseAtomicallyReplace(); err != nil {
+		return err
 	}
 	d, err := w.root.Open(dir)
 	if err != nil {
