@@ -11,12 +11,14 @@ owns:
   - internal/cmd/julieta/all/import_status.go
   - e2e/julieta_setup_test.go
   - e2e/julieta_status_test.go
+  - tools/ci/internal/schema/julieta.go
   - docs/spec/03-formats.md
 needs:
   - T135
   - T009
   - T023
   - T013
+  - T143
 after:
   - T122
 
@@ -47,6 +49,18 @@ the manifest table of 03 3.6 that its generated page replaces by a link
 setup steps and `status/sections.go` the report sections, the seams
 T035, T053, T054 and T079 extend by one line (rule 14).
 
+Re-plan (2026-10-20): Changed, before building. `gitsafe` had no verb
+that reads a working tree (HEAD, clean, branch heads, ahead and behind,
+stashes, worktrees, the repo-local `core.hooksPath`), so those verbs are
+T143's, which this task needs. T125 shipped `schemagen.Register` by type
+and no command kind, so this task registers its two output types in
+`tools/ci/internal/schema/julieta.go`, as `manifest.go` does for the
+manifest; each output type carries a `schema` field. The generated page
+that replaces the table of 03 3.6 is `schemas/manifest.v1.json`. The
+protocol window is N = 1 with no protocol below it, so the container e2e
+shows N accepted and 0 and N+1 refused, and N-1 stays with T135's unit
+test of `acceptsProtocol` until a second protocol exists.
+
 - Implements: REQ-0006 (index), REQ-0016 (index), REQ-0035 (00 0.4),
   REQ-0037 (00 0.4), REQ-0049 (01 1.2), REQ-0051 (01 1.2), REQ-0152 (02
   2.5), REQ-0153 (02 2.5), REQ-0154 (02 2.5), REQ-0155 (02 2.5),
@@ -62,9 +76,10 @@ T035, T053, T054 and T079 extend by one line (rule 14).
   REQ-1049 (12 12.1), REQ-1050 (12 12.1), REQ-1107 (12 12.3).
 - Operator: no.
 - Acceptance:
-  - In the container e2e, a manifest of protocol N or N-1 is accepted
-    and another is refused with `manifest-protocol` (`RJ-342`), through
-    the decoder of T135.
+  - In the container e2e, a manifest of protocol N is accepted and a
+    manifest of protocol 0 and one of N+1 are each refused with
+    `manifest-protocol` (`RJ-342`), through the decoder of T135; N-1 is
+    covered by T135's unit test while N is the first protocol.
   - `setup` links `$HOME/.local/bin/julieta` to the running binary,
     clones a missing secondary repo, and fast-forwards a default branch
     that is checked out and clean, reporting the others; a fast-forward
@@ -81,10 +96,10 @@ T035, T053, T054 and T079 extend by one line (rule 14).
     manifest's applied egress set (07 7.5); the `--json` outputs are
     decoded in tests with the strict decoder, a duplicate and an unknown
     member each refused, one fixture each.
-  - `tools/schemagen`'s command kind (T125) writes
-    `schemas/<binary>-<command>.v1.json` for a definition that declares
-    `--json`; this task adds the first two output types,
-    `julieta-setup.v1` and `julieta-status.v1`.
+  - `tools/ci/internal/schema/julieta.go` registers the first two
+    output types, `julieta-setup.v1` and `julieta-status.v1`, with
+    `schemagen.Register` (T125), and `tools/ci generate` writes
+    `schemas/julieta-setup.v1.json` and `schemas/julieta-status.v1.json`.
   - The other steps of `setup` in 04 4.3 land with their modules, and
     each task says so: the dispatcher in T054, `install` in T053,
     `memory check` and the agent memory dir check in T035, the required
