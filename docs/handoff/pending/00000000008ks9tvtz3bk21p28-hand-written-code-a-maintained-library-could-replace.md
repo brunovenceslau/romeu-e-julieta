@@ -35,6 +35,17 @@ library was not checked online. In the order of ADR 0038, decision 5:
     vendored with its license.
 12. Smaller: the git version compare of `internal/gitsafe/floor.go`, the
     mutation runner `tools/mutants`.
+13. Found on 2026-10-20 while reading the JSON callers, maintenance and
+    license not checked online: the Dockerfile instruction parser and
+    shell word splitting of `tools/ci/internal/kits` (`splitScript`,
+    `unquote`; `mvdan.cc/sh/v3/syntax` or buildkit's parser, on the
+    `checks` surface); the RFC 8288 Link header parser `nextLink` of
+    `tools/kitpin/internal/pin/frontend.go`
+    (`github.com/tomnomnom/linkheader`, on the `kits` surface);
+    `yamlQuote` of `tools/new/task.go`, which `go.yaml.in/yaml/v3`,
+    already a dependency, can do; the git object parsing of
+    `tools/ci/internal/drift` and `tools/ci/pushed` (go-git plumbing, low
+    priority).
 
 Kept with a stated reason (ADR 0038, 3): `internal/gitsafe`,
 `internal/procgroup` and `internal/termsafe` (security surfaces whose

@@ -268,4 +268,4 @@ Nothing under `tools/**`, `.github/**` or `.githooks/**` changed.
 ## Session checkpoint (2026-10-09, after round 12)
 
 Migrated on 2026-10-17 to docs/handoff:
-[Done record 18](../handoff/done/0018.md).
+[Done record 18](../handoff/done/00000000000000000000000018-session-of-2026-10-09-after-round-12-migrated-from-docs.md).

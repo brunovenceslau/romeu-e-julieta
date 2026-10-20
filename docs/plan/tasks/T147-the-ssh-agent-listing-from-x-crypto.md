@@ -3,7 +3,7 @@ id: T147
 title: "The ssh-agent listing from x/crypto"
 milestone: M2
 module: signing
-fate: new
+fate: merged
 owns:
   - internal/signing/signing.go
   - internal/signing/signing_test.go
@@ -15,9 +15,14 @@ after: []
 ask_first:
   - signing
 sitting: none
+merged: 2026-10-20
+pr: 206
 ---
 
 # T147 - The ssh-agent listing from x/crypto
+
+Merged on 2026-10-20 in pull request #206. The text below is the one
+written when it was built.
 
 Goal: the second swap of
 [ADR 0038, search for a maintained library before writing one](../../adr/0038-search-for-a-maintained-library-before-writing-one.md),

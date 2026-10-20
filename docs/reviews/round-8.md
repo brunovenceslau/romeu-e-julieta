@@ -1603,14 +1603,14 @@ those three.
 ## Session checkpoint (2026-10-08)
 
 Migrated on 2026-10-17 to docs/handoff:
-[Done record 13](../handoff/done/0013.md),
+[Done record 13](../handoff/done/00000000000000000000000013-session-of-2026-10-08-migrated-from-docs-reviews-round-8-md.md),
 and the files it names:
-[go-version-and-pin-policy-decided-on-2026-10-08](../handoff/decisions/go-version-and-pin-policy-decided-on-2026-10-08.md);
-[the-lens-page-tooling-and-the-atam-row](../handoff/pending/the-lens-page-tooling-and-the-atam-row.md).
+[go-version-and-pin-policy-decided-on-2026-10-08](../handoff/decisions/0000000000sv5h3c2dte2rq69s-go-version-and-pin-policy-decided-on-2026-10-08.md);
+[the-lens-page-tooling-and-the-atam-row](../handoff/pending/0000000000svacbdt2csyvztn3-the-lens-page-tooling-and-the-atam-row.md).
 
 ## Session checkpoint (2026-10-09)
 
 Migrated on 2026-10-17 to docs/handoff:
-[Done record 14](../handoff/done/0014.md),
+[Done record 14](../handoff/done/00000000000000000000000014-session-of-2026-10-09-after-the-write-pass-migrated-from.md),
 and the files it names:
-[harden-the-setup-download-against-transient-failures](../handoff/pending/harden-the-setup-download-against-transient-failures.md).
+[harden-the-setup-download-against-transient-failures](../handoff/pending/0000000000yf1cw74ez77f52hp-harden-the-setup-download-against-transient-failures.md).

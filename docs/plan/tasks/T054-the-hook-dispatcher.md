@@ -3,7 +3,7 @@ id: T054
 title: "The hook dispatcher"
 milestone: M1
 module: julieta-core
-fate: kept
+fate: merged
 owns:
   - internal/hooks/**
   - internal/cmd/julieta/hooks/**
@@ -19,9 +19,14 @@ after:
   - T035
 ask_first: []
 sitting: none
+merged: 2026-10-20
+pr: 211
 ---
 
 # T054 - The hook dispatcher
+
+Merged on 2026-10-20 in pull request #211. The text below is the one
+written when it was built.
 
 Goal: The hook dispatcher: `hooks run <hook>`, the chain of 04 4.3,
 failures recorded in julieta state, julieta's own actions one file each
