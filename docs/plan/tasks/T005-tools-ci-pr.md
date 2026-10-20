@@ -77,6 +77,11 @@ above.
     without a well-formed Middleware line, fails.
   - A Lessons section that is empty or holds neither a lesson nor the
     word `none` fails.
+  - A pull request whose range adds a directory holding a non-test
+    `.go` file, outside `testdata/` and other than generated code,
+    without a non-empty Prior art section (the search, or `none:
+    <reason>` with a reason of decision 3 of ADR 0038) fails; one fixture
+    each for a new package, a test-only directory and a generated one.
   - A touched ask-first surface without its approval line fails, with
     the list read at the base and at the head and joined; a line that
     names an unknown id fails; a line that starts with `Approval: ` and
