@@ -168,8 +168,10 @@ Rules:
 
 ## 10.2 CI
 
-`REQ-0800` `.github/workflows/ci.yml` calls `go run ./tools/ci all`, which is also
-what developers run locally before a PR; the tracked `.githooks/pre-push`
+`REQ-0800` `.github/workflows/ci.yml` builds `tools/ci` and runs the binary's
+`all`, so its exit code, 3 for an infrastructure error, reaches the job
+(`go run` reports any failure as 1); `go run ./tools/ci all` is the same
+check, what developers run locally before a PR; the tracked `.githooks/pre-push`
 runs the `fast` subset. `.github/workflows/x64.yml` runs the same job on
 the x64 runners, on a schedule and by hand (Runners, below).
 
