@@ -7,10 +7,16 @@ fate: kept
 owns:
   - internal/memstore/**
   - internal/cmd/julieta/memory/**
-  - internal/cmd/julieta/setup/memory_check.go
+  - internal/cmd/julieta/setup/memory_check*.go
   - internal/cmd/julieta/setup/steps.go
+  - internal/cmd/julieta/setup/setup.go
+  - internal/cmd/julieta/setup/helper_test.go
+  - internal/cmd/julieta/status/helper_test.go
   - internal/cmd/julieta/all/import_memory.go
+  - tools/ci/internal/schema/memory.go
+  - .gitattributes
   - e2e/julieta_memory_test.go
+  - e2e/julieta_setup_test.go
 needs:
   - T017
   - T008
