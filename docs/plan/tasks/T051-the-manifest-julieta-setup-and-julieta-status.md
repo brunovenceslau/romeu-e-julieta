@@ -12,7 +12,6 @@ owns:
   - e2e/julieta_setup_test.go
   - e2e/julieta_status_test.go
   - tools/ci/internal/schema/julieta.go
-  - docs/spec/03-formats.md
 needs:
   - T135
   - T009
@@ -22,8 +21,7 @@ needs:
 after:
   - T122
 
-ask_first:
-  - spec
+ask_first: []
 sitting: none
 ---
 
@@ -41,11 +39,7 @@ links the binary on `PATH`, installs the global `core.hooksPath` to the
 dispatcher directory, fast-forwards clean default branches and runs
 `memory check`, whose file lands with T035. `install` and `skills-stale`
 join with T053 and T079. A hand-written manifest validates like a
-rendered one (see `docs/notes/julieta-by-hand.md`). It owns
-`docs/spec/03-formats.md` for the one edit the specification assigns it:
-the manifest table of 03 3.6 that its generated page replaces by a link
-(rule 6 of `docs/plan.md`), whose requirement ids are retired with
-`Replaced by: <the generated page>`. `setup/steps.go` holds the ordered
+rendered one (see `docs/notes/julieta-by-hand.md`). `setup/steps.go` holds the ordered
 setup steps and `status/sections.go` the report sections, the seams
 T035, T053, T054 and T079 extend by one line (rule 14).
 
@@ -55,8 +49,14 @@ stashes, worktrees, the repo-local `core.hooksPath`), so those verbs are
 T143's, which this task needs. T125 shipped `schemagen.Register` by type
 and no command kind, so this task registers its two output types in
 `tools/ci/internal/schema/julieta.go`, as `manifest.go` does for the
-manifest; each output type carries a `schema` field. The generated page
-that replaces the table of 03 3.6 is `schemas/manifest.v1.json`. The
+manifest; each output type carries a `schema` field, and the types sit
+where `tools/ci` may import them (`tools/ci/internal/imports/rows.go`).
+The edit of 03 3.6 leaves this task: REQ-0173 replaces a table by a
+link to a generated page under `docs/reference/`, and no generator
+writes one for the manifest yet (`schemas/manifest.v1.json` holds the
+types, not the meaning of each field), so the table stays and REQ-0173
+waits for the task that lands that page. The task no longer touches the
+`spec` surface. The
 protocol window is N = 1 with no protocol below it, so the container e2e
 shows N accepted and 0 and N+1 refused, and N-1 stays with T135's unit
 test of `acceptsProtocol` until a second protocol exists.
@@ -67,7 +67,7 @@ test of `acceptsProtocol` until a second protocol exists.
   REQ-0156 (02 2.6), REQ-0161 (03 (opening)), REQ-0162 (03 (opening)),
   REQ-0163 (03 (opening)), REQ-0164 (03 (opening)), REQ-0165 (03
   (opening)), REQ-0166 (03 (opening)), REQ-0167 (03 (opening)), REQ-0172
-  (03 (opening)), REQ-0173 (03 (opening)), REQ-0396 (04 4.3), REQ-0397
+  (03 (opening)), REQ-0396 (04 4.3), REQ-0397
   (04 4.3), REQ-0398 (04 4.3), REQ-0399 (04 4.3), REQ-0401 (04 4.3),
   REQ-0402 (04 4.3), REQ-0424 (04 4.3), REQ-0425 (04 4.3), REQ-0586 (06
   6.3), REQ-0587 (06 6.3), REQ-0636 (07 7.5), REQ-0665 (08 8.2),
