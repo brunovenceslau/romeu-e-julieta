@@ -51,8 +51,8 @@ manifest are T149's.
   - `go generate ./...` leaves `schemas/` unchanged: the generator writes
     the committed bytes (two-space indent, sorted keys, `<`, `>` and `&`
     as they are, U+2028 and U+2029 escaped, a final newline).
-  - The plan viewer's data still escapes `<`, `>` and `&`, and also
-    U+2028 and U+2029, and writes text that is not UTF-8 as U+FFFD; a
+  - The plan viewer's data still escapes `<`, `>`, `&`, U+2028 and
+    U+2029, as v1 did, and writes text that is not UTF-8 as U+FFFD; a
     test holds the line separators and the invalid text.
   - `tools/kitpin herdr` refuses a release whose `immutable` member is
     duplicated or spelled in another case; a test holds both.
