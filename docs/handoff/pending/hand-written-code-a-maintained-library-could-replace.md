@@ -13,12 +13,16 @@ library was not checked online. In the order of ADR 0038, decision 5:
    wrapper that lowercases on output and refuses uppercase (REQ-0258).
 2. The ssh-agent identity listing, `internal/signing/signing.go`:
    `golang.org/x/crypto/ssh/agent`; `x/crypto` is in `go.mod` for
-   `tools/kitpin` only (REQ-1049).
-3. Atomic writes, eight copies (`internal/cmd/julieta/setup/state.go`,
-   `link.go`, `tools/kitpin/internal/pin/pin.go`,
-   `tools/ci/internal/hygiene/add.go`, `tools/planviewer/internal/view/view.go`,
-   `e2e/internal/container/container.go`, ...): `github.com/google/renameio/v2`,
-   or one shared helper copied from it.
+   `tools/kitpin` only (REQ-1049). It is on the `signing` surface (I34);
+   the task reads whether its exact behavior is the requirement
+   (ADR 0038, 3) before it swaps.
+3. Atomic writes, eight rename sites outside tests:
+   `internal/cmd/julieta/setup/state.go`, `internal/cmd/julieta/setup/link.go`,
+   `tools/kitpin/internal/pin/pin.go`, `tools/ci/internal/hygiene/add.go`,
+   `tools/ci/internal/setup/install.go`, `tools/release/internal/build/build.go`,
+   `tools/planviewer/internal/view/view.go`, `e2e/internal/container/container.go`
+   (not each read to confirm it is a temporary file and a rename):
+   `github.com/google/renameio/v2`, or one shared helper copied from it.
 4. The store lock T035 needs: `github.com/gofrs/flock`.
 5. The schema generator, `tools/schemagen`: `github.com/invopop/jsonschema`
    (03-formats says "no dependency"; read again under ADR 0038, 3).
@@ -38,6 +42,9 @@ library was not checked online. In the order of ADR 0038, decision 5:
     mutation runner `tools/mutants`.
 
 Kept with a stated reason (ADR 0038, 3): `internal/gitsafe`,
-`internal/procgroup`, `internal/termsafe`, the container e2e harness.
+`internal/procgroup` and `internal/termsafe` (security surfaces whose
+exact behavior is the requirement), and the container e2e harness
+(REQ-0798's split of infrastructure errors from test failures, which no
+candidate meets).
 
 Reopen: each item as a task, in this order, once ADR 0038 is Accepted.
