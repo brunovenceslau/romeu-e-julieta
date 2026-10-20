@@ -133,8 +133,9 @@ sync` refuses to render `git-ssh-sign` (exit 2, the error
 reachable, and holds exactly one key, and that key equals the kit's
 `signingKey` arg. The full host agent is never forwarded; the rule
 governs the sandboxes romeu renders. `REQ-0601` `internal/signing` checks this with
-the ssh-agent protocol's identity listing (no dependency, no
-subprocess); the same check runs in `doctor` and in the preflight of
+the ssh-agent protocol's identity listing, read through
+`golang.org/x/crypto/ssh/agent` (no subprocess, T147); the same check runs
+in `doctor` and in the preflight of
 that project's **P** commands (01 1.5). How sbx is made to forward that
 socket is Q19. `REQ-0602` `signingKey` is registered on GitHub as a signing key and
 never as an authentication key, and it is added to the dedicated agent
