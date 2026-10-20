@@ -88,7 +88,9 @@ The commit that applies go fix lands after the pull requests open on
     changes from run to run), clipped to 200 lines and then the list
     of the files it changes, and the line that names
     `GOOS=<os> GOARCH=<arch> CGO_ENABLED=0 go fix -tags e2e,host ./...`;
-    a run that fails without a diff keeps what go printed.
+    what go printed outside the diff (a build error, a line of the fix
+    tool) comes first, whole, and a run that fails without a diff keeps
+    what go printed.
   - Tests over fixture modules with the pinned go: a clean module
     passes on every target; a fixable file fails on every target; a
     fixable darwin file fails on the darwin targets alone and a linux

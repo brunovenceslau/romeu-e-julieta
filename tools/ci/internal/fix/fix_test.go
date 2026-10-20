@@ -39,31 +39,43 @@ func TestSteps(t *testing.T) {
 		assert.Nil(t, env)
 		_, err = read([]byte("--- /src/a.go (old)\n+++ /src/a.go (new)\n"), nil)
 		require.Error(t, err)
-		assert.Equal(t, fmt.Sprintf("go fix would change the files above for %s; run \"GOOS=%s GOARCH=%s CGO_ENABLED=0 go fix -tags e2e,host ./...\" and commit what it writes",
+		assert.Equal(t, fmt.Sprintf("go fix would change 1 file(s) for %s; run \"GOOS=%s GOARCH=%s CGO_ENABLED=0 go fix -tags e2e,host ./...\" and commit what it writes",
 			target, target.GOOS, target.GOARCH), err.Error())
 	}
 }
 
 // TestRead holds the verdict of one run: a diff fails with the hint
 // whatever the exit status, a long diff is clipped and lists its files,
-// and a run without a diff keeps its output and its error.
+// the lines of the go command that belong to no diff are printed first
+// and whole, and a run without a diff keeps its output and its error.
 func TestRead(t *testing.T) {
+	target := lint.Target{GOOS: "linux", GOARCH: "amd64"}
+	hint := func(n int) string { return Hint(target, n) }
 	diff := "--- /src/a.go (old)\n+++ /src/a.go (new)\n@@ -1 +1 @@\n-x\n+y\n"
+	t.Run("the hint counts the files and names the command", func(t *testing.T) {
+		assert.Equal(t, `go fix would change 2 file(s) for linux/amd64; run "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go fix -tags e2e,host ./..." and commit what it writes`, hint(2))
+	})
 	t.Run("a diff fails with the hint, even on exit status 0", func(t *testing.T) {
-		out, err := Read([]byte(diff), nil, "the hint")
-		require.EqualError(t, err, "the hint")
+		out, err := Read([]byte(diff), nil, target)
+		require.EqualError(t, err, hint(1))
 		assert.Equal(t, diff, string(out))
 	})
 	t.Run("no diff and no error passes", func(t *testing.T) {
-		out, err := Read(nil, nil, "the hint")
+		out, err := Read(nil, nil, target)
 		require.NoError(t, err)
 		assert.Empty(t, out)
 	})
 	t.Run("an error without a diff keeps the output and the error", func(t *testing.T) {
 		runErr := errors.New("exit status 1")
-		out, err := Read([]byte("m.go:1:1: expected 'package'\n"), runErr, "the hint")
+		out, err := Read([]byte("m.go:1:1: expected 'package'\n"), runErr, target)
 		require.ErrorIs(t, err, runErr)
 		assert.Equal(t, "m.go:1:1: expected 'package'\n", string(out))
+	})
+	t.Run("a file with two hunks keeps both", func(t *testing.T) {
+		two := "--- /src/a.go (old)\n+++ /src/a.go (new)\n@@ -1 +1 @@\n-x\n+y\n@@ -9,2 +9,2 @@\n z\n-p\n+q\n\\ No newline at end of file\n"
+		out, err := Read([]byte(two), errors.New("exit status 1"), target)
+		require.EqualError(t, err, hint(1))
+		assert.Equal(t, two, string(out))
 	})
 	t.Run("a long diff is clipped and lists its files", func(t *testing.T) {
 		var b strings.Builder
@@ -73,29 +85,55 @@ func TestRead(t *testing.T) {
 			files = append(files, name)
 			fmt.Fprintf(&b, "--- %s (old)\n+++ %s (new)\n@@ -1 +1 @@\n-x\n+y\n", name, name)
 		}
-		out, err := Read([]byte(b.String()), errors.New("exit status 1"), "the hint")
-		require.EqualError(t, err, "the hint")
+		out, err := Read([]byte(b.String()), errors.New("exit status 1"), target)
+		require.EqualError(t, err, hint(MaxLines))
 		lines := strings.Split(strings.TrimSuffix(string(out), "\n"), "\n")
 		require.Len(t, lines, MaxLines+1+len(files))
 		assert.Equal(t, strings.Split(b.String(), "\n")[:MaxLines], lines[:MaxLines])
 		assert.Equal(t, fmt.Sprintf("(clipped: %d more lines of the diff; it changes these %d files)", 5*MaxLines-MaxLines, MaxLines), lines[MaxLines])
 		assert.Equal(t, files, lines[MaxLines+1:])
 	})
+	t.Run("the output of go after a diff survives the clip and is printed first", func(t *testing.T) {
+		var b strings.Builder
+		for i := range MaxLines {
+			name := fmt.Sprintf("/src/f%03d.go", i)
+			fmt.Fprintf(&b, "--- %s (old)\n+++ %s (new)\n@@ -1 +1 @@\n-x\n+y\n", name, name)
+		}
+		// A build error printed after the diff of the last file, and a
+		// line of the fix tool, with no newline at the end.
+		goSaid := "# example.invalid/m/broken\nbroken/b.go:3:9: cannot use \"x\" (untyped string constant) as int value in return statement\nfix: 1 package could not be loaded"
+		runErr := errors.New("exit status 1")
+		out, err := Read([]byte(b.String()+goSaid), runErr, target)
+		require.ErrorIs(t, err, runErr)
+		assert.Equal(t, hint(MaxLines)+"; go also printed the lines above the diff and failed: exit status 1", err.Error())
+		lines := strings.Split(string(out), "\n")
+		assert.Equal(t, strings.Split(goSaid, "\n"), lines[:3], "what go said comes first, whole")
+		assert.Equal(t, "--- /src/f000.go (old)", lines[3], "then the diff")
+		assert.Contains(t, lines, fmt.Sprintf("(clipped: %d more lines of the diff; it changes these %d files)", 4*MaxLines, MaxLines))
+		assert.NotContains(t, strings.Join(lines[3:], "\n"), "cannot use", "no line of go is part of a file's diff")
+	})
+	t.Run("the output of go between two diffs leaves both files whole", func(t *testing.T) {
+		a := "--- /src/a.go (old)\n+++ /src/a.go (new)\n@@ -1 +1 @@\n-x\n+y\n"
+		b := "--- /src/b.go (old)\n+++ /src/b.go (new)\n@@ -1 +1 @@\n-x\n+y\n"
+		out, err := Read([]byte(b+"# example.invalid/m\nm.go:1:1: an error\n"+a), nil, target)
+		require.EqualError(t, err, hint(2), "an exit status 0 adds nothing to the hint")
+		assert.Equal(t, "# example.invalid/m\nm.go:1:1: an error\n"+a+b, string(out))
+	})
 	t.Run("a diff of MaxLines lines is not clipped", func(t *testing.T) {
 		in := "--- /src/a.go (old)\n+++ /src/a.go (new)\n" + strings.Repeat("+y\n", MaxLines-2)
-		out, err := Read([]byte(in), nil, "the hint")
+		out, err := Read([]byte(in), nil, target)
 		require.Error(t, err)
 		assert.Equal(t, in, string(out))
 	})
 	t.Run("the files are sorted, whatever order go fix printed them in", func(t *testing.T) {
 		a := "--- /src/a.go (old)\n+++ /src/a.go (new)\n@@ -1 +1 @@\n-x\n+y\n"
 		b := "--- /src/b.go (old)\n+++ /src/b.go (new)\n@@ -1,2 +1 @@\n--- not a header\n-x\n+y\n"
-		out, err := Read([]byte(b+a), errors.New("exit status 1"), "the hint")
-		require.EqualError(t, err, "the hint")
+		out, err := Read([]byte(b+a), errors.New("exit status 1"), target)
+		require.EqualError(t, err, hint(2))
 		assert.Equal(t, a+b, string(out))
 	})
 	t.Run("a removed line that starts with -- starts no file", func(t *testing.T) {
-		out, err := Read([]byte("--- x\n-y\n"), nil, "the hint")
+		out, err := Read([]byte("--- x\n-y\n"), nil, target)
 		require.NoError(t, err)
 		assert.Equal(t, "--- x\n-y\n", string(out))
 	})
@@ -146,7 +184,7 @@ func TestStepsRunTheRealCommand(t *testing.T) {
 				switch {
 				case slices.Contains(tt.fails, target):
 					require.Error(t, err, "%s\n%s", s.Name, out)
-					assert.Contains(t, err.Error(), "go fix would change the files above for "+target, s.Name)
+					assert.Contains(t, err.Error(), "go fix would change 1 file(s) for "+target+";", s.Name)
 					assert.Contains(t, string(out), "+\treturn slices.Contains(xs, x)", s.Name)
 				case tt.other != "":
 					require.Error(t, err, "%s\n%s", s.Name, out)
@@ -159,6 +197,27 @@ func TestStepsRunTheRealCommand(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("a diff next to a package that does not build shows both", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.Mkdir(filepath.Join(dir, "broken"), 0o755))
+		for name, content := range map[string]string{
+			"go.mod":      "module example.invalid/m\n\ngo 1.27.2\n",
+			"m.go":        "package m\n\n" + fixable,
+			"broken/b.go": "package broken\n\nfunc b() int { return \"x\" }\n",
+		} {
+			require.NoError(t, os.WriteFile(filepath.Join(dir, filepath.FromSlash(name)), []byte(content), 0o600))
+		}
+		for _, s := range Steps(t.Context(), check.Plan{Root: dir, Tools: tools}) {
+			out, err := s.Run(t.Context(), dir)
+			require.Error(t, err, s.Name)
+			assert.Contains(t, err.Error(), "go fix would change 1 file(s) for "+strings.TrimPrefix(s.Name, "fix ")+";", s.Name)
+			assert.Contains(t, err.Error(), "go also printed the lines above the diff and failed", s.Name)
+			assert.True(t, strings.HasPrefix(string(out), "# example.invalid/m/broken\n"), "%s: what go said comes first\n%s", s.Name, out)
+			assert.Contains(t, string(out), "cannot use", s.Name)
+			assert.Contains(t, string(out), "+\treturn slices.Contains(xs, x)", s.Name)
+		}
+	})
 
 	t.Run("without the tags the e2e file is not read", func(t *testing.T) {
 		dir := t.TempDir()
