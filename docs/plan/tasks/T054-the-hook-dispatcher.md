@@ -74,6 +74,21 @@ it:
   one: they are the user's programs in the sandbox (I21), and need
   `GIT_INDEX_FILE` and `PATH`. Their output goes through the CLI
   writer, so a terminal control in it is escaped (I29).
+- The stages run with pipes for stdin, stdout and stderr, not the
+  terminal, each in a process group of its own, and procgroup ends a job
+  a hook leaves in the background when the hook ends: a difference from
+  plain git, kept because of I29 and the procgroup rule. The help of
+  `hooks run` says so, and that a flag before the hook name is read by
+  julieta while git always passes the name first.
+- `hooks.Names` holds every hook of githooks(5) for git 2.53 (the
+  client, receiving and git-p4 ones), because a global `core.hooksPath`
+  replaces `$GIT_DIR/hooks` for all of them. A test pins the list.
+  Reopened by a hook name a later git adds.
+- An error of the books (recording or clearing a failure) is said on
+  stderr and never changes the status of the chain. The repo of a
+  record is its real path (symbolic links resolved).
+- The scripts quote the binary path with a quoter of their own, since
+  `internal/shquote` does not exist yet. Reopened by that package.
 - The `hook-failed` ledger event (13 13.2) waits for the emit package
   of T063; the dispatcher records the failure in julieta state now.
   The recorded failures are not yet shown by `julieta status` or

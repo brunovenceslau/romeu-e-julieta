@@ -46,6 +46,11 @@ var _ = cli.Register(func() cli.Command {
 			Short: "run the chain of a git hook: julieta's action, .githooks/<hook>, then the local hook",
 			Example: "julieta hooks run pre-commit\n" +
 				"julieta hooks run commit-msg .git/COMMIT_EDITMSG",
+			Long: "Git runs this through the scripts of the dispatcher, which pass the hook name first and then the hook's own arguments.\n" +
+				"A flag before the hook name, such as --help, is read by julieta; whatever follows the name is the hook's.\n\n" +
+				"The stages run with pipes for standard input, output and error, not the terminal, and each in a process group of its own. " +
+				"A job a hook leaves running in the background is ended when the hook ends, which plain git does not do. " +
+				"Their output goes through the CLI writer, so terminal controls in it are escaped.",
 			Args: cobra.MinimumNArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
 				return run(cmd, env, args[0], args[1:])

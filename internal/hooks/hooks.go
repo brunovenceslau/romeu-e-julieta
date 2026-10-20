@@ -40,15 +40,26 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
-// Names are the client-side hooks of githooks(5) that the dispatcher
-// installs a script for and runs: the ones git runs in a work tree. A
-// hook that is not here is refused by Run, so a name never becomes a
-// path outside .githooks/ and hooks/.
+// Names are the hooks of githooks(5) for git 2.53 and the floor of
+// internal/gitsafe: every hook git can run, the client-side ones, the
+// ones a receiving repository runs (bare repositories included, where
+// the hooks run in the git dir) and those of git-p4 and
+// git-send-email. Once the dispatcher is the global core.hooksPath, git
+// no longer looks in $GIT_DIR/hooks, so a hook missing here would stop
+// running in every repo; each one has a script and is forwarded to the
+// repo's own hooks at least. Run refuses any other name, so a name
+// never becomes a path outside .githooks/ and hooks/.
+//
+// fsmonitor-watchman is here for that reason, though its output is a
+// protocol that the CLI writer's escaping can corrupt; git then falls
+// back to a full scan of the tree.
 var Names = []string{
 	"applypatch-msg", "pre-applypatch", "post-applypatch",
 	"pre-commit", "pre-merge-commit", "prepare-commit-msg", "commit-msg", "post-commit",
-	"pre-rebase", "post-checkout", "post-merge", "pre-push", "post-rewrite",
-	"reference-transaction", "pre-auto-gc", "push-to-checkout", "sendemail-validate",
+	"pre-rebase", "post-checkout", "post-merge", "pre-push", "pre-receive", "update",
+	"proc-receive", "post-receive", "post-update", "reference-transaction", "push-to-checkout",
+	"pre-auto-gc", "post-rewrite", "sendemail-validate", "fsmonitor-watchman", "post-index-change",
+	"p4-changelist", "p4-prepare-changelist", "p4-post-changelist", "p4-pre-submit",
 }
 
 // The three stages of the chain, as the failure line names them.
@@ -99,7 +110,8 @@ type Options struct {
 // returns as an error is not a stage's: an unknown hook, a failure to
 // record, or the cancellation of ctx, which kills the stage that runs.
 //
-// A failure is recorded in julieta state before Run returns, and a run
+// A failure is recorded in julieta state before Run returns (an error
+// of the record is said on stderr and changes no status), and a run
 // in which no stage failed clears the record of the same hook in the
 // same repo (REQ-0675); a failure that did not stop the chain stays
 // recorded, since the hook did not succeed.
@@ -107,12 +119,25 @@ func Run(ctx context.Context, o Options) (int, error) {
 	if !slices.Contains(Names, o.Hook) {
 		return 0, fmt.Errorf("%q is not a hook the dispatcher runs", o.Hook)
 	}
+	// The repo is named by its real path, so a link to it is the same repo.
+	repoKey := o.Dir
+	if real, err := filepath.EvalSymlinks(o.Dir); err == nil {
+		repoKey = real
+	}
 	var kept *Failure // the failure that did not stop the chain
 	fail := func(stage, path string, status int) Failure {
-		return Failure{Hook: o.Hook, Repo: o.Dir, Stage: stage, Path: path, ExitCode: status, At: o.Now().UTC()}
+		return Failure{Hook: o.Hook, Repo: repoKey, Stage: stage, Path: path, ExitCode: status, At: o.Now().UTC()}
+	}
+	// A failure to keep the books never changes the chain's status:
+	// it is said on stderr and the stage's status stands.
+	note := func(what string, err error) {
+		if err != nil {
+			_, _ = fmt.Fprintf(o.Stderr, "julieta hooks: %s: %s: %v\n", o.Hook, what, err)
+		}
 	}
 	stop := func(f Failure) (int, error) {
-		return f.ExitCode, Record(o.StateDir, f)
+		note("the failure could not be recorded", Record(o.StateDir, f))
+		return f.ExitCode, nil
 	}
 	for _, a := range o.Actions {
 		err := a.Run(ctx, actions.Input{Hook: o.Hook, Args: o.Args, Dir: o.Dir, Env: o.Env, Stdout: o.Stdout, Stderr: o.Stderr})
@@ -154,7 +179,7 @@ func Run(ctx context.Context, o Options) (int, error) {
 			Class: procgroup.Unbounded, Argv: append([]string{s.path}, o.Args...), Dir: o.Dir, Env: o.Env,
 			Stdin: stdin, Stdout: o.Stdout, Stderr: o.Stderr,
 		})
-		stdin = nil // the first hook that ran took it
+		stdin = nil // the first hook that ran took it; later ones get /dev/null
 		if cerr := ctx.Err(); cerr != nil {
 			return 0, cerr
 		}
@@ -171,9 +196,11 @@ func Run(ctx context.Context, o Options) (int, error) {
 		return stop(fail(s.stage, s.path, status))
 	}
 	if kept != nil {
-		return 0, Record(o.StateDir, *kept)
+		note("the failure could not be recorded", Record(o.StateDir, *kept))
+		return 0, nil
 	}
-	return 0, Clear(o.StateDir, o.Dir, o.Hook)
+	note("the record of an earlier failure could not be cleared", Clear(o.StateDir, repoKey, o.Hook))
+	return 0, nil
 }
 
 // line prints the line that says which stage failed and how it ended

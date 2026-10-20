@@ -33,11 +33,11 @@ func DispatcherDir(home string) string { return filepath.Join(home, dispatcherDi
 //
 // The scripts are shell because git runs a hook as a program, and a
 // link to the binary would start it under the name of the hook. They
-// hold no value but the binary's path, which must be absolute and
-// hold only the characters of a plain path, so that it needs no quoting.
+// hold no value but the binary's path, quoted for sh, which must be
+// absolute and clean.
 func Install(home, binary string) ([]string, error) {
-	if !filepath.IsAbs(binary) || filepath.Clean(binary) != binary || strings.Trim(binary, "/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._+-") != "" {
-		return nil, fmt.Errorf("the binary path %q is not an absolute, clean path of plain characters", binary)
+	if !filepath.IsAbs(binary) || filepath.Clean(binary) != binary || strings.ContainsRune(binary, 0) {
+		return nil, fmt.Errorf("the binary path %q is not an absolute, clean path", binary)
 	}
 	dir := DispatcherDir(home)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -64,5 +64,13 @@ func Install(home, binary string) ([]string, error) {
 // <arguments>". The command stops reading flags at the hook's name, so
 // the arguments of the hook are never taken for its own.
 func script(binary, hook string) []byte {
-	return []byte("#!/bin/sh\n# julieta hook dispatcher: written by julieta setup.\nexec " + binary + " hooks run " + hook + " \"$@\"\n")
+	return []byte("#!/bin/sh\n# julieta hook dispatcher: written by julieta setup.\nexec " + quote(binary) + " hooks run " + hook + " \"$@\"\n")
+}
+
+// quote returns s as one word of sh: in single quotes, with each single
+// quote written as '\”. It is written by hand because internal/shquote
+// (the shell quoter of REQ-0758) does not exist yet; this one is
+// replaced by it when it lands.
+func quote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

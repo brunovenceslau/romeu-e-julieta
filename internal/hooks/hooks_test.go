@@ -11,6 +11,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -65,10 +66,10 @@ func (r *repo) logged() []string {
 // returns the status and the stderr.
 func (r *repo) run(hook string, stdin string, acts ...actions.Action) (int, string) {
 	r.t.Helper()
-	var stderr bytes.Buffer
+	var stdout, stderr bytes.Buffer
 	status, err := hooks.Run(r.t.Context(), hooks.Options{
 		Hook: hook, Args: []string{"one", "two"}, Dir: r.dir, Env: []string{"PATH=/usr/bin:/bin"},
-		Stdin: strings.NewReader(stdin), Stdout: &stderr, Stderr: &stderr,
+		Stdin: strings.NewReader(stdin), Stdout: &stdout, Stderr: &stderr,
 		StateDir: r.state, Now: func() time.Time { return clock }, Actions: acts,
 	})
 	require.NoError(r.t, err)
@@ -261,7 +262,7 @@ func TestRunGitDirOfTheEnvironment(t *testing.T) {
 
 func TestRunRefusesAHookItDoesNotRun(t *testing.T) {
 	r := newRepo(t)
-	for _, name := range []string{"", "../x", "pre-receive", "pre-commit/../../x"} {
+	for _, name := range []string{"", "../x", "pre-foo", "pre-commit/../../x"} {
 		_, err := hooks.Run(t.Context(), hooks.Options{Hook: name, Dir: r.dir, StateDir: r.state})
 		require.Error(t, err, name)
 	}
@@ -305,4 +306,103 @@ func TestRunHasNoTimeout(t *testing.T) {
 		Stdout: &out, Stderr: &out, StateDir: r.state, Now: func() time.Time { return clock }})
 	require.NoError(t, err)
 	assert.Equal(t, 0, status, out.String())
+}
+
+// The list of githooks(5) for git 2.53, written out: a hook missing
+// from hooks.Names stops running in every repo once the dispatcher is
+// the global core.hooksPath.
+func TestNamesAreTheHooksOfGithooks(t *testing.T) {
+	want := []string{
+		"applypatch-msg", "commit-msg", "fsmonitor-watchman", "p4-changelist", "p4-post-changelist",
+		"p4-pre-submit", "p4-prepare-changelist", "post-applypatch", "post-checkout", "post-commit",
+		"post-index-change", "post-merge", "post-receive", "post-rewrite", "post-update", "pre-applypatch",
+		"pre-auto-gc", "pre-commit", "pre-merge-commit", "pre-push", "pre-rebase", "pre-receive",
+		"prepare-commit-msg", "proc-receive", "push-to-checkout", "reference-transaction",
+		"sendemail-validate", "update",
+	}
+	got := slices.Sorted(slices.Values(hooks.Names))
+	assert.Equal(t, want, got)
+}
+
+// A hook that cannot be recorded or cleared keeps the status of the
+// chain: the state dir here sits below a file.
+func TestRunBookkeepingErrorsKeepTheStatus(t *testing.T) {
+	r := newRepo(t)
+	blocker := filepath.Join(t.TempDir(), "file")
+	require.NoError(t, os.WriteFile(blocker, nil, 0o600))
+	r.state = filepath.Join(blocker, "state")
+
+	r.hook(".githooks/pre-commit", 0o755, "exit 7")
+	status, stderr := r.run("pre-commit", "")
+	assert.Equal(t, 7, status, "the stage's status, not the books'")
+	assert.Contains(t, stderr, "pre-commit stage tracked")
+	assert.Contains(t, stderr, "julieta hooks: pre-commit: the failure could not be recorded:")
+
+	r.hook(".githooks/pre-commit", 0o755, "exit 0")
+	status, stderr = r.run("pre-commit", "")
+	assert.Equal(t, 0, status, "a passing chain stays passing")
+	assert.Contains(t, stderr, "the record of an earlier failure could not be cleared:")
+
+	r.hook(".githooks/post-commit", 0o755, "")
+	status, stderr = r.run("post-commit", "", r.logAction("snapshot", errors.New("x"), true))
+	assert.Equal(t, 0, status)
+	assert.Contains(t, stderr, "the failure could not be recorded:")
+}
+
+// The repo is named by its real path: a failure seen through a link is
+// cleared by a success seen through the real path.
+func TestRunNamesTheRepoByItsRealPath(t *testing.T) {
+	r := newRepo(t)
+	link := filepath.Join(t.TempDir(), "link")
+	require.NoError(t, os.Symlink(r.dir, link))
+	real, err := filepath.EvalSymlinks(r.dir)
+	require.NoError(t, err)
+	r.hook(".githooks/pre-commit", 0o755, "exit 1")
+	linked := &repo{t: t, dir: link, state: r.state, log: r.log}
+	linked.run("pre-commit", "")
+	require.Len(t, r.failures(), 1)
+	assert.Equal(t, real, r.failures()[0].Repo)
+
+	r.hook(".githooks/pre-commit", 0o755, "exit 0")
+	status, _ := r.run("pre-commit", "")
+	assert.Equal(t, 0, status)
+	assert.Empty(t, r.failures())
+}
+
+func TestRunFindsTheLocalHookInTheOtherLayouts(t *testing.T) {
+	hookIn := func(t *testing.T, hooksDir string) {
+		t.Helper()
+		require.NoError(t, os.MkdirAll(hooksDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(hooksDir, "update"), []byte("#!/bin/sh\nexit 8\n"), 0o755))
+	}
+	run := func(t *testing.T, dir string, env ...string) int {
+		t.Helper()
+		var out bytes.Buffer
+		status, err := hooks.Run(t.Context(), hooks.Options{Hook: "update", Dir: dir, Env: append([]string{"PATH=/usr/bin:/bin"}, env...),
+			Stdout: &out, Stderr: &out, StateDir: filepath.Join(t.TempDir(), "s"), Now: func() time.Time { return clock }})
+		require.NoError(t, err)
+		return status
+	}
+	t.Run("a_bare_repo", func(t *testing.T) {
+		dir := t.TempDir() // the hook runs in the git dir itself
+		hookIn(t, filepath.Join(dir, "hooks"))
+		assert.Equal(t, 8, run(t, dir))
+	})
+	t.Run("a_relative_GIT_DIR", func(t *testing.T) {
+		dir := t.TempDir()
+		hookIn(t, filepath.Join(dir, "sub", "hooks"))
+		assert.Equal(t, 8, run(t, dir, "GIT_DIR=sub"))
+	})
+	t.Run("a_gitdir_file_with_a_relative_target", func(t *testing.T) {
+		dir := t.TempDir()
+		hookIn(t, filepath.Join(dir, "modules", "m", "hooks"))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "tree"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "tree", ".git"), []byte("gitdir: ../modules/m\n"), 0o644))
+		assert.Equal(t, 8, run(t, filepath.Join(dir, "tree")))
+	})
+	t.Run("a_dot_git_file_that_is_not_a_gitdir_file", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".git"), []byte("nonsense"), 0o644))
+		assert.Equal(t, 0, run(t, dir))
+	})
 }
