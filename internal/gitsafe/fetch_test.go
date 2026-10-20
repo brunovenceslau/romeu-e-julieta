@@ -242,3 +242,60 @@ func TestFastForwardRunsNoSmudgeFilter(t *testing.T) {
 	_, _ = plainGitErr(t, dir, env, "merge", "-q", "--ff-only", next)
 	assert.FileExists(t, marker, "the plant is live: plain git runs it")
 }
+
+// signedCommit writes to the repository in dir a child of its HEAD
+// whose gpgsig header holds a fake signature of the given armor (PGP
+// or SSH), moves the checked-out branch to it and returns it: enough
+// for git to start the signature program of that format.
+func signedCommit(t *testing.T, dir, armor string) string {
+	t.Helper()
+	head := plainGit(t, dir, "rev-parse", "HEAD")
+	tree := plainGit(t, dir, "rev-parse", "HEAD^{tree}")
+	body := "tree " + tree + "\nparent " + head +
+		"\nauthor fixture <fixture@example.invalid> 1767225600 +0000" +
+		"\ncommitter fixture <fixture@example.invalid> 1767225600 +0000" +
+		"\ngpgsig -----BEGIN " + armor + " SIGNATURE-----\n \n AAAA\n -----END " + armor + " SIGNATURE-----\n\nsigned\n"
+	file := filepath.Join(t.TempDir(), "commit")
+	require.NoError(t, os.WriteFile(file, []byte(body), 0o600))
+	oid := plainGit(t, dir, "hash-object", "-t", "commit", "-w", "--", file)
+	plainGit(t, dir, "update-ref", "refs/heads/main", oid)
+	return oid
+}
+
+// TestFastForwardVerifiesNoSignature: merge.verifySignatures=true in
+// the clone's config makes git merge run the signature program of the
+// incoming commit's format, gpg.program for a PGP signature and
+// gpg.ssh.program for an SSH one (with an allowed signers file set),
+// before it fails. FastForward runs
+// neither and moves the branch; plain git runs each (the positive
+// control).
+//
+//romeu:invariant I3 test
+func TestFastForwardVerifiesNoSignature(t *testing.T) {
+	for _, tt := range []struct{ armor, key string }{{"PGP", "gpg.program"}, {"SSH", "gpg.ssh.program"}} {
+		t.Run(tt.armor, func(t *testing.T) {
+			src, _ := newRepo(t)
+			dir := filepath.Join(t.TempDir(), "clone")
+			plainGit(t, "", "clone", "-q", src, dir)
+			head := plainGit(t, dir, "rev-parse", "HEAD")
+			next := signedCommit(t, src, tt.armor)
+			plainGit(t, dir, "fetch", "-q", src, "main")
+			marker := filepath.Join(t.TempDir(), "marker")
+			script := filepath.Join(t.TempDir(), "verify.sh")
+			require.NoError(t, os.WriteFile(script, []byte("#!/bin/sh\necho ran >> '"+marker+"'\nexit 1\n"), 0o700))
+			plainGit(t, dir, "config", "merge.verifySignatures", "true")
+			plainGit(t, dir, "config", tt.key, script)
+			// git starts gpg.ssh.program only once an allowed signers
+			// file is set.
+			plainGit(t, dir, "config", "gpg.ssh.allowedSignersFile", filepath.Join(t.TempDir(), "allowed"))
+
+			require.NoError(t, newRunner(t, Sandbox).FastForward(t.Context(), dir, next))
+			assert.NoFileExists(t, marker)
+			assert.Equal(t, next, plainGit(t, dir, "rev-parse", "HEAD"))
+
+			plainGit(t, dir, "reset", "-q", "--hard", head)
+			_, _ = plainGitErr(t, dir, nil, "merge", "-q", "--ff-only", next)
+			assert.FileExists(t, marker, "the plant is live: plain git runs it")
+		})
+	}
+}

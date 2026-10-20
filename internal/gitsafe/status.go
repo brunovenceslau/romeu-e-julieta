@@ -122,13 +122,12 @@ func (s Status) Clean() bool {
 // switched off. Status instead lists the filter drivers the config
 // defines (git config --get-regexp, one more call) and runs git status
 // with each driver's clean, smudge and process commands empty and
-// required false, which git reads as no filter. A file a filter would change,
-// such as one under git-lfs, then reads as Unstaged when its stat data
-// no longer matches the index (a changed modification time is enough),
-// until something refreshes the index; Status may so report a change
-// git status would not. A driver defined between the calls is not
-// neutralized; only a process that can already write the repository's
-// config can do that.
+// required false, which git reads as no filter. A file a filter would
+// change, such as one under git-lfs, then reads as Unstaged when its
+// stat data no longer matches the index (a changed modification time
+// is enough), until something refreshes the index; Status may so
+// report a change git status would not. The precondition of
+// filterOverrides applies.
 func (r *Runner) Status(ctx context.Context, dir string) (Status, error) {
 	if err := checkRepo(dir); err != nil {
 		return Status{}, err
@@ -214,11 +213,17 @@ var filterNeutral = []setting{{"clean", ""}, {"smudge", ""}, {"process", ""}, {"
 // filterOverrides returns the GIT_CONFIG_COUNT environment that sets
 // filterNeutral on every filter driver the config read from dir
 // defines; nil when it defines none.
-// dir is a repository's root, whose local config and the files it
-// includes are read too, or "/" for the config of no repository. A
-// driver with an empty name ([filter ""], key filter..clean) is a
-// driver: git lists it and runs it for the attribute filter= with no
-// value.
+//
+// dir is a repository's root: its local config, the files it includes
+// and every conditional include of the global config are read as the
+// git command that follows reads them. A driver with an empty name
+// ([filter ""], key filter..clean) is a driver: git lists it and runs
+// it for the attribute filter= with no value.
+//
+// Precondition: no other process writes the config between the listing
+// and the git command it serves, as during julieta setup. A driver
+// written in that window is not emptied; only a process that can
+// already write the config can do that.
 func (r *Runner) filterOverrides(ctx context.Context, dir string) ([]string, error) {
 	out := limitedBuffer{limit: outputLimit}
 	err := r.read(ctx, dir, nil, &out, "config", "-z", "--name-only", "--get-regexp", `^filter\.`)

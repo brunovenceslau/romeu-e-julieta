@@ -141,7 +141,7 @@ func TestRunnerEnvironmentAndFlags(t *testing.T) {
 			for _, c := range rec.commands {
 				assert.Equal(t, tt.class, c.Class, "%v", c.Argv)
 				env := tt.env
-				if slices.Contains(c.Argv, "--get-regexp") {
+				if slices.Equal(c.Argv[len(c.Argv)-5:], []string{"config", "-z", "--name-only", "--get-regexp", `^filter\.`}) {
 					// The listing of the filter drivers is a read.
 					env = slices.Concat(tt.env, statusEnv)
 				}

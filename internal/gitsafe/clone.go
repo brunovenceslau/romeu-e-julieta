@@ -18,8 +18,10 @@ import (
 
 // cloneFlags are the flags of every clone: no tags, as no fetch takes
 // any (05 5.1), no submodules (02 2.3), and no template directory, so
-// no hook or file of the machine's templates enters the clone.
-var cloneFlags = []string{"--no-tags", "--no-recurse-submodules", "--template="}
+// no hook or file of the machine's templates enters the clone;
+// --no-checkout leaves the checkout to a second command, which runs
+// with the filter drivers of the new repository emptied (Clone).
+var cloneFlags = []string{"--no-tags", "--no-recurse-submodules", "--template=", "--no-checkout"}
 
 // Clone clones url into dest, a directory that does not exist yet, in
 // a parent directory that does: the caller makes the parent, with the
@@ -38,14 +40,17 @@ var cloneFlags = []string{"--no-tags", "--no-recurse-submodules", "--template="}
 // it writes them only into a new directory. Every later fetch into it
 // follows the destinations of its mode (I5).
 //
-// The checkout runs no filter: the filter drivers the global config
-// defines are listed from the root directory, as the rewrite is, and
-// the clone runs with filterNeutral on each (filterOverrides). A driver
-// that only a conditional include of the global config defines, whose
-// condition matches the new repository (includeIf "gitdir:" or
-// "onbranch:"), is not listed from the root directory and not emptied;
-// in sandbox mode that config is the sandbox's own, which the agent
-// can write and gains nothing by.
+// The checkout runs no filter. git clone --no-checkout writes the
+// repository without one; the filter drivers are then listed from the
+// new repository, where every conditional include of the global config
+// (includeIf "gitdir:", "onbranch:", "hasconfig:remote.*.url:")
+// resolves as it does for the checkout, and git reset --hard checks
+// out HEAD with filterNeutral on each (filterOverrides), as
+// FastForward does. A HEAD that names no commit, the clone of an empty
+// repository or one whose HEAD dangles, is left without a checkout, as
+// git clone leaves it. The precondition of filterOverrides holds: no
+// other process writes the config between the listing and the
+// checkout.
 func (r *Runner) Clone(ctx context.Context, url, dest string) error {
 	if err := CheckURL(url); err != nil {
 		return err
@@ -56,12 +61,25 @@ func (r *Runner) Clone(ctx context.Context, url, dest string) error {
 	if _, err := r.resolveURL(ctx, "/", url); err != nil {
 		return err
 	}
-	noFilters, err := r.filterOverrides(ctx, "/")
+	args := slices.Concat([]string{"clone"}, cloneFlags, []string{"--", url, dest})
+	if err := r.runWith(ctx, filepath.Dir(dest), r.hostSettings(url), nil, args...); err != nil {
+		return err
+	}
+	head, err := r.output(ctx, dest, nil, "rev-parse", "--verify", "-q", "HEAD^{commit}")
+	switch {
+	case exitedWith(err, 1):
+		return nil // no commit to check out
+	case err != nil:
+		return err
+	}
+	if err := checkObjectID(strings.TrimSuffix(head, "\n")); err != nil {
+		return err
+	}
+	noFilters, err := r.filterOverrides(ctx, dest)
 	if err != nil {
 		return err
 	}
-	args := slices.Concat([]string{"clone"}, cloneFlags, []string{"--", url, dest})
-	return r.runInput(ctx, filepath.Dir(dest), r.hostSettings(url), noFilters, nil, nil, args...)
+	return r.runInput(ctx, dest, nil, noFilters, nil, nil, "reset", "-q", "--hard", "HEAD")
 }
 
 // checkCloneDest returns ErrRefused, wrapped with the reason, for a

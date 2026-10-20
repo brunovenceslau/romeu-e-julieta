@@ -22,33 +22,49 @@ import (
 
 // TestCloneArgv: a clone resolves its URL outside any repository, then
 // clones that explicit URL into the destination, from the
-// destination's parent, with the clone flags and the caFile of its
-// host.
+// destination's parent, with the clone flags, no checkout and the
+// caFile of its host; it then reads HEAD, lists the filter drivers of
+// the new repository and checks out HEAD there with each emptied.
 func TestCloneArgv(t *testing.T) {
 	r, err := New(Config{
 		Mode: Host, Git: "/usr/bin/git", Home: "/h",
 		GitHosts: []GitHost{{Host: "git.example.com", CAFile: "/ca.pem"}},
 	})
 	require.NoError(t, err)
-	var rec recorder
+	rec := recorder{filters: "filter.lfs.smudge\x00"}
 	rec.install(r)
 	const url = "https://git.example.com/o/r.git"
 	dest := filepath.Join(t.TempDir(), "r")
 	require.NoError(t, r.Clone(t.Context(), url, dest))
-	require.Len(t, rec.commands, 3)
+	require.Len(t, rec.commands, 5)
 	ca := []string{"-c", "http.https://git.example.com/.sslCAInfo=/ca.pem"}
 
 	resolve := rec.commands[0]
 	assert.Equal(t, "/", resolve.Dir, "no repository's local config takes part")
 	assert.Equal(t, append(ca, "ls-remote", "--get-url", url), resolve.Argv[1+len(hostFlags):])
 
-	filters := rec.commands[1]
-	assert.Equal(t, "/", filters.Dir, "no repository's local config takes part")
+	clone := rec.commands[1]
+	assert.Equal(t, filepath.Dir(dest), clone.Dir)
+	assert.Equal(t, append(ca, "clone", "--no-tags", "--no-recurse-submodules", "--template=", "--no-checkout", "--", url, dest), clone.Argv[1+len(hostFlags):])
+
+	head := rec.commands[2]
+	assert.Equal(t, dest, head.Dir)
+	assert.Equal(t, []string{"rev-parse", "--verify", "-q", "HEAD^{commit}"}, head.Argv[1+len(hostFlags):])
+
+	filters := rec.commands[3]
+	assert.Equal(t, dest, filters.Dir, "the listing reads the new repository's config")
 	assert.Equal(t, []string{"config", "-z", "--name-only", "--get-regexp", `^filter\.`}, filters.Argv[len(filters.Argv)-5:])
 
-	clone := rec.commands[2]
-	assert.Equal(t, filepath.Dir(dest), clone.Dir)
-	assert.Equal(t, append(ca, "clone", "--no-tags", "--no-recurse-submodules", "--template=", "--", url, dest), clone.Argv[1+len(hostFlags):])
+	checkout := rec.commands[4]
+	assert.Equal(t, dest, checkout.Dir)
+	assert.Equal(t, []string{"reset", "-q", "--hard", "HEAD"}, checkout.Argv[1+len(hostFlags):])
+	assert.Subset(t, checkout.Env, []string{
+		"GIT_CONFIG_COUNT=4",
+		"GIT_CONFIG_KEY_0=filter.lfs.clean", "GIT_CONFIG_VALUE_0=",
+		"GIT_CONFIG_KEY_1=filter.lfs.smudge", "GIT_CONFIG_VALUE_1=",
+		"GIT_CONFIG_KEY_2=filter.lfs.process", "GIT_CONFIG_VALUE_2=",
+		"GIT_CONFIG_KEY_3=filter.lfs.required", "GIT_CONFIG_VALUE_3=false",
+	})
 }
 
 // TestClone clones over the loopback daemon in each mode: the new
@@ -74,6 +90,23 @@ func TestClone(t *testing.T) {
 			got, err := os.ReadFile(filepath.Join(dest, "README"))
 			require.NoError(t, err)
 			assert.Equal(t, "hello\n", string(got))
+		})
+	}
+}
+
+// TestCloneEmpty clones an empty repository in each mode: the clone
+// succeeds with HEAD on an unborn branch and no checkout, as git clone
+// leaves it.
+func TestCloneEmpty(t *testing.T) {
+	src := t.TempDir()
+	plainGit(t, src, "init", "-q")
+	url := serveGit(t, bareCopy(t, src, "repo.git")) + "repo.git"
+	for _, mode := range []Mode{Host, Sandbox} {
+		t.Run(mode.String(), func(t *testing.T) {
+			dest := filepath.Join(t.TempDir(), "repo")
+			require.NoError(t, newRunner(t, mode).Clone(t.Context(), url, dest))
+			assert.Empty(t, refOf(t, dest, "HEAD"))
+			assert.NoFileExists(t, filepath.Join(dest, ".git", "index"))
 		})
 	}
 }
@@ -277,6 +310,55 @@ func TestCloneRunsNoSmudgeFilter(t *testing.T) {
 	_, err = plainGitErr(t, t.TempDir(), env, "clone", "-q", url, "repo")
 	require.NoError(t, err)
 	assert.FileExists(t, marker, "the plant is live: plain git runs it")
+}
+
+// TestCloneRunsNoFilterFromAConditionalInclude: a smudge driver that
+// the sandbox's global config defines only in a file it includes under
+// a condition the new clone meets (includeIf "gitdir:", "onbranch:" and
+// "hasconfig:remote.*.url:") is neutralized too; plain git with the
+// same global config runs it (the positive control).
+//
+//romeu:invariant I3 test
+func TestCloneRunsNoFilterFromAConditionalInclude(t *testing.T) {
+	src, _ := newRepo(t)
+	_, marker, global := filterPlant(t, src)
+	url := serveGit(t, bareCopy(t, src, "repo.git")) + "repo.git"
+	for _, tt := range []struct{ name, condition string }{
+		{"gitdir", "gitdir:"},
+		{"onbranch", "onbranch:main"},
+		{"hasconfig", "hasconfig:remote.*.url:" + url},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.NoError(t, os.RemoveAll(marker))
+			parent := t.TempDir()
+			// git matches gitdir: against the resolved path, and TMPDIR
+			// sits behind a symbolic link on macOS.
+			resolved, err := filepath.EvalSymlinks(parent)
+			require.NoError(t, err)
+			condition := tt.condition
+			if condition == "gitdir:" {
+				condition += resolved + "/**"
+			}
+			home := t.TempDir()
+			writeFile(t, home, "included", global)
+			writeFile(t, home, ".gitconfig", "[includeIf \""+condition+"\"]\n\tpath = "+filepath.Join(home, "included")+"\n")
+
+			r, err := New(Config{Mode: Sandbox, Git: gitPath(t), Home: home})
+			require.NoError(t, err)
+			dest := filepath.Join(parent, "repo")
+			require.NoError(t, r.Clone(t.Context(), url, dest))
+			assert.NoFileExists(t, marker)
+			got, err := os.ReadFile(filepath.Join(dest, "c"))
+			require.NoError(t, err)
+			assert.Equal(t, "c\n", string(got))
+			assert.Equal(t, "refs/heads/main", plainGit(t, dest, "symbolic-ref", "HEAD"))
+
+			env := []string{"GIT_CONFIG_GLOBAL=" + filepath.Join(home, ".gitconfig")}
+			_, err = plainGitErr(t, parent, env, "clone", "-q", url, "control")
+			require.NoError(t, err)
+			assert.FileExists(t, marker, "the plant is live: plain git runs it")
+		})
+	}
 }
 
 // TestSandboxCloneThroughTheProxy clones in sandbox mode through a
