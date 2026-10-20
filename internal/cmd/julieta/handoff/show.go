@@ -6,6 +6,7 @@ package handoff
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -45,14 +46,25 @@ var _ = cli.Register(func() cli.Command {
 				var moved []setup.Warning
 				return runHook(env, HookSessionStart, "julieta handoff show --hook", func() (string, string, error) {
 					out, err := render(cmd.Context(), repo, true, &moved)
+					// api and ./api are one record of a failure.
+					if repo != "" {
+						return out, filepath.Clean(repo), err
+					}
 					return out, repo, err
-				}, func(s *setup.State) {
+				}, func() func(*setup.State) error {
+					if len(moved) == 0 {
+						return nil
+					}
 					// The warning this run showed is cleared with the run
 					// (REQ-0399, REQ-0665): the first SessionStart after a
-					// move shows it, and the second does not.
-					s.Warnings = slices.DeleteFunc(s.Warnings, func(w setup.Warning) bool {
-						return w.Slug == setup.DefaultBranchMoved && slices.Contains(moved, w)
-					})
+					// move shows it, and the second does not. Only
+					// setup.UpdateState writes setup.json.
+					return func(s *setup.State) error {
+						s.Warnings = slices.DeleteFunc(s.Warnings, func(w setup.Warning) bool {
+							return w.Slug == setup.DefaultBranchMoved && slices.Contains(moved, w)
+						})
+						return nil
+					}
 				})
 			},
 		}
@@ -154,12 +166,14 @@ func counter(ctx context.Context, home string, paths map[string]string) hf.Count
 // default-branch-moved ones among them (appended to moved), and every
 // recorded hook failure, the newest of each hook and repo.
 func warnings(home string, moved *[]setup.Warning) ([]string, error) {
-	st, err := setup.ReadState(home)
-	if err != nil {
-		return nil, err
-	}
+	// An unreadable setup.json is one warning line, not a failed print,
+	// and the file is left as it is.
+	st, serr := setup.ReadState(home)
 	failures, ferr := hooks.Failures(failuresDir(home))
 	var out []string
+	if serr != nil {
+		out = append(out, "julieta state: setup.json could not be read and is left as it is: "+oneLine(serr.Error()))
+	}
 	for _, w := range st.Warnings {
 		if w.Slug == setup.DefaultBranchMoved && moved != nil {
 			*moved = append(*moved, w)

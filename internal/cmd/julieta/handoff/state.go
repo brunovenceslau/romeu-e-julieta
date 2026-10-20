@@ -10,7 +10,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
 	"time"
 
 	"github.com/google/renameio/v2"
@@ -34,9 +33,6 @@ const (
 const (
 	hooksFile = "hooks.json"
 	hooksLock = "hooks.lock"
-	// setupFile is the file of setup's State (setup.warningsFile, which
-	// the package does not export).
-	setupFile = "setup.json"
 )
 
 // Hooks is the record of the hooks in julieta state: the time of the
@@ -88,29 +84,24 @@ func writeState(home, name string, v any) error {
 	return t.CloseAtomicallyReplace()
 }
 
-// update runs f under the lock of the state files, with the record of
-// the hooks and the state setup wrote; f changes them, and update writes
-// back what changed. A record that does not read is replaced by the new
-// one, as setup replaces its own (the read error is returned with the
-// write's).
-func update(home string, f func(h *Hooks, s *setup.State)) error {
+// updateHooks runs f on the record of the hooks under its lock and
+// writes it back when it changed. A record that does not read is
+// replaced by the new one (the read error is returned with the write's).
+// setup.json is not touched here: its one writer protocol is
+// setup.UpdateState.
+func updateHooks(home string, f func(h *Hooks)) error {
 	unlock, err := lockFile(filepath.Join(setup.StateDir(home), hooksLock))
 	if err != nil {
 		return err
 	}
 	defer unlock()
 	h, herr := ReadHooks(home)
-	s, serr := setup.ReadState(home)
-	oldH, oldS := h, s
-	f(&h, &s)
-	var errs []error
-	if herr != nil || !sameHooks(oldH, h) {
-		errs = append(errs, writeState(home, hooksFile, h))
+	old := h
+	f(&h)
+	if herr == nil && sameHooks(old, h) {
+		return nil
 	}
-	if serr != nil || !slices.Equal(oldS.Warnings, s.Warnings) {
-		errs = append(errs, writeState(home, setupFile, s))
-	}
-	return errors.Join(append(errs, herr, serr)...)
+	return errors.Join(writeState(home, hooksFile, h), herr)
 }
 
 // sameHooks reports whether a and b are the same record.
@@ -125,7 +116,7 @@ func failuresDir(home string) string { return filepath.Join(setup.StateDir(home)
 // failureLine words a recorded failure on one line: of a session hook
 // with its message, of a git hook with the stage and the script.
 func failureLine(f hooks.Failure) string {
-	where := f.Hook
+	where := esc(f.Hook)
 	if f.Repo != "" {
 		where += " repo " + esc(f.Repo)
 	}

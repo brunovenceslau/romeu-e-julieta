@@ -430,7 +430,7 @@ func TestAtomicWrite(t *testing.T) {
 	info, err := root.Stat("f")
 	require.NoError(t, err)
 	assert.Equal(t, fs.FileMode(0o600), info.Mode())
-	require.Error(t, AtomicWrite(root, "f", []byte("two"), now, src, true))
+	require.ErrorIs(t, AtomicWrite(root, "f", []byte("two"), now, src, true), fs.ErrExist)
 	data, _ := os.ReadFile(filepath.Join(root.Name(), "f"))
 	assert.Equal(t, "one", string(data))
 	require.NoError(t, AtomicWrite(root, "f", []byte("three"), now, src, false))

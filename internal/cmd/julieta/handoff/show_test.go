@@ -317,3 +317,41 @@ func TestSuccessClearsAFailureRecordedBeforeTheRepoWasKnown(t *testing.T) {
 	s.ok(t, "", "handoff", "write", "--facts")
 	assert.Empty(t, s.failures(t))
 }
+
+// TestShowHookLeavesAnUnreadableSetupStateAlone: a setup.json that does
+// not read is one line of the print, the rest prints, the file stays as
+// it was, and the hook exits 0 with no failure recorded.
+func TestShowHookLeavesAnUnreadableSetupStateAlone(t *testing.T) {
+	s := newSandbox(t)
+	path := filepath.Join(setup.StateDir(s.home), "setup.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+	require.NoError(t, os.WriteFile(path, []byte(`{"warnings":[`), 0o600))
+	s.addEntry(t, 0, memstore.Content{Title: "still printed"})
+	out := s.ok(t, "", "handoff", "show", "--hook")
+	assert.Contains(t, out, "julieta state: setup.json could not be read and is left as it is: ")
+	assert.Contains(t, out, "still printed")
+	assert.Contains(t, out, "built-in memory is disabled")
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, `{"warnings":[`, string(data))
+	assert.Empty(t, s.failures(t))
+}
+
+// TestFailureRecordIsKeyedByTheCleanRepoAndCapped: ./api and api are one
+// record, and a long message is cut when it is stored.
+func TestFailureRecordIsKeyedByTheCleanRepoAndCapped(t *testing.T) {
+	s := newSandbox(t)
+	for _, r := range []string{"./api", "api/"} {
+		code, _, stderr := s.julieta(t, "", "handoff", "show", "--hook", "--repo", r)
+		assert.Equal(t, 0, code, stderr)
+	}
+	fs := s.failures(t)
+	require.Len(t, fs, 1, "no repo has the dir api/ or ./api, and both are the one record api")
+	assert.Equal(t, "api", fs[0].Repo)
+
+	code, _, stderr := s.julieta(t, "", "handoff", "show", "--hook", "--repo", strings.Repeat("x", 1000))
+	assert.Equal(t, 0, code, stderr)
+	for _, f := range s.failures(t) {
+		assert.LessOrEqual(t, len(f.Message), 303, f.Repo)
+	}
+}

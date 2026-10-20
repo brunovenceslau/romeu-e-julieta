@@ -285,8 +285,9 @@ func (s *Store) atomicWrite(p string, data []byte) error {
 // AtomicWrite writes the file p of root with data by the atomic write
 // rule of 03 3.8 (REQ-0239): a temporary file .tmp-<ULID> in the
 // target's own directory (REQ-0654), 0600, synced, renamed into place,
-// and the directory synced. With create set, a p that exists already is
-// an error and is left as it is. It is written here rather than taken
+// and the directory synced. With create set, the file is linked into
+// place, so a p that exists already is an error that wraps fs.ErrExist
+// and is left as it is, with no gap between the check and the write. It is written here rather than taken
 // from github.com/google/renameio, which the other atomic writes of the
 // product use (decided on 2026-10-20): REQ-0654 names the temporary
 // file .tmp-<ULID>, a name julieta memory check, romeu sync and julieta
@@ -308,11 +309,17 @@ func AtomicWrite(root *os.Root, p string, data []byte, now time.Time, ulids *can
 		return errors.Join(err, root.Remove(tmp))
 	}
 	if create {
-		if _, err := root.Lstat(p); err == nil {
-			return errors.Join(fmt.Errorf("%s exists already", p), root.Remove(tmp))
+		// A hard link fails with EEXIST when p is there, in one step, so
+		// two creators of one name cannot both win.
+		lerr := root.Link(tmp, p)
+		rerr := root.Remove(tmp)
+		if lerr != nil {
+			return errors.Join(fmt.Errorf("memstore: %s was not created: %w", p, lerr), rerr)
 		}
-	}
-	if err := root.Rename(tmp, p); err != nil {
+		if rerr != nil {
+			return rerr
+		}
+	} else if err := root.Rename(tmp, p); err != nil {
 		return errors.Join(err, root.Remove(tmp))
 	}
 	d, err := root.Open(dir)

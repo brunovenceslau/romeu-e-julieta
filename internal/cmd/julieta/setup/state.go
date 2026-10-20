@@ -15,6 +15,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
+	storewrite "github.com/brunovenceslau/romeu-e-julieta/internal/memstore/write"
 	"github.com/google/renameio/v2"
 )
 
@@ -141,26 +142,73 @@ func ReadState(home string) (State, error) {
 	return s, nil
 }
 
-// recordState writes the state of a setup that ran at at: its warnings
-// and the default-branch-moved warnings of before that no SessionStart
-// has cleared, each once.
-func recordState(home string, prev State, at time.Time, version string, warnings []Warning) error {
-	s := State{At: at.UTC(), Version: version}
-	for _, w := range prev.Warnings {
-		if w.Slug == DefaultBranchMoved {
-			s.Warnings = append(s.Warnings, w)
-		}
+// stateLock is the lock file of setup.json in julieta state: every
+// writer of it, setup's and the SessionStart hook's, reads, changes and
+// writes it under this lock, so none loses the other's change.
+const stateLock = "state.lock"
+
+// stateOnWait is the test seam of the lock: called when the lock is
+// held by another and the caller is about to wait (10 10.4).
+var stateOnWait func()
+
+// UpdateState reads the state setup recorded, calls f to change it and
+// writes it back, all under the lock of the file (03 3.8), so a change
+// another process makes meanwhile is not lost. A state that cannot be
+// read is an error and the file is left as it is; so is an error of f,
+// which writes nothing.
+func UpdateState(home string, f func(*State) error) error {
+	_, err := updateState(home, false, f)
+	return err
+}
+
+// updateState is UpdateState; with replace set, a state that cannot be
+// read is changed from the zero State and replaced, and the read error
+// is returned beside the nil error of the write (setup does so for its
+// own record).
+func updateState(home string, replace bool, f func(*State) error) (readErr, err error) {
+	unlock, err := storewrite.Lock(filepath.Join(StateDir(home), stateLock), stateOnWait)
+	if err != nil {
+		return nil, err
 	}
-	for _, w := range warnings {
-		if !slices.Contains(s.Warnings, w) {
-			s.Warnings = append(s.Warnings, w)
+	defer unlock()
+	s, err := ReadState(home)
+	if err != nil {
+		if !replace {
+			return nil, err
 		}
+		readErr, s = err, State{}
+	}
+	if err := f(&s); err != nil {
+		return readErr, err
 	}
 	data, err := json.Marshal(s, json.Deterministic(true))
 	if err != nil {
-		return err
+		return readErr, err
 	}
-	return writeState(home, warningsFile, data)
+	return readErr, writeState(home, warningsFile, data)
+}
+
+// recordState writes the state of a setup that ran at at: its warnings
+// and the default-branch-moved warnings that no SessionStart has
+// cleared, each once, read under the lock so a clear that happened
+// while setup ran is not undone. It returns the error of a state that
+// could not be read, which this one replaces.
+func recordState(home string, at time.Time, version string, warnings []Warning) (readErr, err error) {
+	return updateState(home, true, func(prev *State) error {
+		s := State{At: at.UTC(), Version: version}
+		for _, w := range prev.Warnings {
+			if w.Slug == DefaultBranchMoved {
+				s.Warnings = append(s.Warnings, w)
+			}
+		}
+		for _, w := range warnings {
+			if !slices.Contains(s.Warnings, w) {
+				s.Warnings = append(s.Warnings, w)
+			}
+		}
+		*prev = s
+		return nil
+	})
 }
 
 // writeState replaces the file name of julieta state with data, by a

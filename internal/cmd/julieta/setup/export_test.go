@@ -14,3 +14,14 @@ func SetExecutable(f func() (string, error)) (restore func()) {
 
 // WriteState exposes writeState to the external tests.
 var WriteState = writeState
+
+// SetStateOnWait sets the seam called when the lock of setup.json is
+// held by another and returns the function that restores it.
+func SetStateOnWait(f func()) (restore func()) {
+	old := stateOnWait
+	stateOnWait = f
+	return func() { stateOnWait = old }
+}
+
+// RecordState exposes recordState to the external tests.
+var RecordState = recordState
