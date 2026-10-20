@@ -59,6 +59,10 @@ landing with tests that can share their blind spots, and replacing
 one later touches every caller; that is harder to undo than a
 dependency.
 
+Scope: every repository and sandbox of the maintainer. Here it is this
+record; in the other repositories it is the sandbox payload, through
+the pending note "library-first-in-the-sandbox-payload".
+
 ### Alternatives considered
 
 - **Keep the closed list.** The state before this record; the inventory
