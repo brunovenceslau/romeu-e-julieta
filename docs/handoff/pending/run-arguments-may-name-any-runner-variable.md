@@ -7,7 +7,7 @@ argv.
 
 The workflows grammar admits any `"$NAME"` word in a run line (`runVar`
 in `tools/ci/internal/workflows/workflows.go`); `go run ./tools/ci all
-"$GITHUB_HEAD_REF"` passes in `ci.yml` (security audit of T144,
+"$GITHUB_HEAD_REF"` in `ci.yml` is admitted by the grammar (security audit of T144,
 2026-10-20). Only the release publish job limits the name, to
 `"$GITHUB_REF_NAME"` (#188). An allowlist of variable names would close
 it.

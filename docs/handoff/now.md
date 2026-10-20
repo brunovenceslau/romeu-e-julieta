@@ -11,8 +11,8 @@ Checkpoint of 2026-10-20, after T127 and the re-plan of T051 merged
    under the standing grants of "the-grants-of-2026-10-19" (T143's
    `gitsafe` surface is not granted: its pull request carries an
    approval line).
-2. T144, the follow-ups of the container e2e; its `checks` surface is
-   not in the M0 grant, so its pull request carries an approval line.
+2. T144, the follow-ups of the container e2e, whose task file lands with
+   its own pull request; its `checks` surface is not in the M0 grant, so its pull request carries an approval line.
    Then the docs pull request of
    "the-spec-catches-up-with-the-hardening-of-t127-and-t144".
 3. The rest of the ready list (`go run ./tools/ci plan --ready`).

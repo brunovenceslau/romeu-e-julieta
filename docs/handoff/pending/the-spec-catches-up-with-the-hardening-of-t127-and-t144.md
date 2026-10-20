@@ -10,7 +10,7 @@ specification sees less than the checks enforce.
   and admits only `"$GITHUB_REF_NAME"` as a quoted variable in its four
   token-carrying steps.
 - REQ-0798 (10 10.1) says a digest or checksum mismatch "is always a test
-  failure". With T144 a cached download that fails its pin is removed
+  failure". Once T144 lands, a cached download that fails its pin is removed
   and fetched once; the fetched file is still held to the pin. The
   sentence needs that exception, and the healing writes no log line, so
   a corrupted or tampered cache entry no longer shows; decide whether it
