@@ -20,6 +20,10 @@ docs/reference/julieta/completion.md -text
 docs/reference/julieta/completion/bash.md -text
 docs/reference/julieta/completion/fish.md -text
 docs/reference/julieta/completion/zsh.md -text
+docs/reference/julieta/handoff.md -text
+docs/reference/julieta/handoff/list.md -text
+docs/reference/julieta/handoff/show.md -text
+docs/reference/julieta/handoff/write.md -text
 docs/reference/julieta/hooks.md -text
 docs/reference/julieta/hooks/run.md -text
 docs/reference/julieta/memory.md -text
