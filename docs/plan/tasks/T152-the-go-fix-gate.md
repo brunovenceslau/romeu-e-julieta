@@ -38,6 +38,7 @@ ask_first:
   - digests
   - approvals
   - kits
+  - ask-first
 sitting: none
 ---
 
