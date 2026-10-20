@@ -38,5 +38,13 @@ reading `internal/gitsafe`:
 Decided on 2026-10-20: a `gitsafe` task (approval line) hardens it
 before `julieta setup` runs in daily use.
 
-Reopen: when that task is planned, or before `julieta setup` runs
-anywhere with more trust than the agent.
+Planned on 2026-10-20 as T151
+(`docs/plan/tasks/T151-gitsafe-the-hardened-fast-forward-and-clone.md`),
+which fixes all four items, closes the conditional includes the
+first fix of `Clone` missed (it now lists the drivers in the new
+repository before its checkout) and the signature programs that
+`merge.verifySignatures` started, and amends REQ-0463 and REQ-0399;
+this note is removed at the next checkpoint.
+
+Reopen: if T151 does not merge before `julieta setup` runs anywhere
+with more trust than the agent.

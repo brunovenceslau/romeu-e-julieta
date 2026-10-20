@@ -233,10 +233,15 @@ func refOf(t *testing.T, dir, ref string) string {
 }
 
 // recorder replaces the runner's start function and records each
-// command, answering ls-remote --get-url with its URL unchanged.
+// command, answering ls-remote --get-url with its URL unchanged,
+// rev-parse of HEAD^{commit} with an object id, and the listing of the
+// filter drivers with filters.
 type recorder struct {
 	mu       sync.Mutex
 	commands []procgroup.Command
+	// filters is the answer to git config --get-regexp, NUL-terminated
+	// keys; empty answers nothing, as a config with no driver.
+	filters string
 }
 
 // install makes r record the commands of the runner.
@@ -247,6 +252,14 @@ func (rec *recorder) install(r *Runner) {
 		rec.mu.Unlock()
 		if i := slices.Index(c.Argv, "--get-url"); i >= 0 && c.Stdout != nil {
 			_, err := io.WriteString(c.Stdout, c.Argv[i+1]+"\n")
+			return err
+		}
+		if slices.Contains(c.Argv, "HEAD^{commit}") && c.Stdout != nil {
+			_, err := io.WriteString(c.Stdout, strings.Repeat("a", 40)+"\n")
+			return err
+		}
+		if rec.filters != "" && slices.Contains(c.Argv, "--get-regexp") && c.Stdout != nil {
+			_, err := io.WriteString(c.Stdout, rec.filters)
 			return err
 		}
 		if slices.Index(c.Argv, "version") >= 0 && c.Stdout != nil {

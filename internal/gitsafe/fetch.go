@@ -44,6 +44,17 @@ func (r *Runner) Fetch(ctx context.Context, dir, url string, refspecs []string) 
 // to move it, a clean worktree among the conditions, is the caller's
 // rule (04 4.3, julieta setup). The host never moves a branch (I5), so
 // host mode refuses it.
+//
+// Three things the caller's checks do not see are guarded here. An
+// ignored, untracked file at a path the move would write a tracked
+// file to, which git merge overwrites by default, makes git fail and
+// name the path (--no-overwrite-ignore), so the move destroys no work.
+// The merge verifies no signature (--no-verify-signatures), so
+// merge.verifySignatures in the config never starts gpg.program or
+// gpg.ssh.program. And the checkout runs no filter: as Status does,
+// FastForward first lists the filter drivers the config defines and
+// runs the merge with filterNeutral on each (filterOverrides, whose
+// precondition applies).
 func (r *Runner) FastForward(ctx context.Context, dir, oid string) error {
 	if r.mode != Sandbox {
 		return fmt.Errorf("%w: fast-forward in %s mode", ErrRefused, r.mode)
@@ -54,5 +65,9 @@ func (r *Runner) FastForward(ctx context.Context, dir, oid string) error {
 	if err := checkObjectID(oid); err != nil {
 		return err
 	}
-	return r.run(ctx, dir, nil, "merge", "--ff-only", "--no-stat", oid)
+	noFilters, err := r.filterOverrides(ctx, dir)
+	if err != nil {
+		return err
+	}
+	return r.runInput(ctx, dir, nil, noFilters, nil, nil, "merge", "--ff-only", "--no-stat", "--no-overwrite-ignore", "--no-verify-signatures", oid)
 }

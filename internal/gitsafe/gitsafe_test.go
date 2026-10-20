@@ -16,6 +16,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -139,7 +140,12 @@ func TestRunnerEnvironmentAndFlags(t *testing.T) {
 			require.NotEmpty(t, rec.commands)
 			for _, c := range rec.commands {
 				assert.Equal(t, tt.class, c.Class, "%v", c.Argv)
-				assert.Equal(t, tt.env, c.Env, "%v", c.Argv)
+				env := tt.env
+				if slices.Equal(c.Argv[len(c.Argv)-5:], []string{"config", "-z", "--name-only", "--get-regexp", `^filter\.`}) {
+					// The listing of the filter drivers is a read.
+					env = slices.Concat(tt.env, statusEnv)
+				}
+				assert.Equal(t, env, c.Env, "%v", c.Argv)
 				require.Greater(t, len(c.Argv), len(tt.flags))
 				assert.Equal(t, git, c.Argv[0])
 				assert.Equal(t, tt.flags, c.Argv[1:1+len(tt.flags)], "%v", c.Argv)

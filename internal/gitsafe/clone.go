@@ -18,8 +18,10 @@ import (
 
 // cloneFlags are the flags of every clone: no tags, as no fetch takes
 // any (05 5.1), no submodules (02 2.3), and no template directory, so
-// no hook or file of the machine's templates enters the clone.
-var cloneFlags = []string{"--no-tags", "--no-recurse-submodules", "--template="}
+// no hook or file of the machine's templates enters the clone;
+// --no-checkout leaves the checkout to a second command, which runs
+// with the filter drivers of the new repository emptied (Clone).
+var cloneFlags = []string{"--no-tags", "--no-recurse-submodules", "--template=", "--no-checkout"}
 
 // Clone clones url into dest, a directory that does not exist yet, in
 // a parent directory that does: the caller makes the parent, with the
@@ -37,6 +39,19 @@ var cloneFlags = []string{"--no-tags", "--no-recurse-submodules", "--template="}
 // default branch, the remote-tracking refs of origin and a checkout;
 // it writes them only into a new directory. Every later fetch into it
 // follows the destinations of its mode (I5).
+//
+// The checkout runs no filter. git clone --no-checkout writes the
+// repository without one; the filter drivers are then listed from the
+// new repository, where every conditional include of the global config
+// (includeIf "gitdir:", "onbranch:", "hasconfig:remote.*.url:")
+// resolves as it does for the checkout, and git reset --hard checks
+// out HEAD with filterNeutral on each (filterOverrides), as
+// FastForward does. A HEAD that names no commit, the clone of an empty
+// repository or one whose HEAD dangles, is left without a checkout, as
+// git clone leaves it. A failure after git clone removes dest, so a
+// later run clones again. The precondition of filterOverrides holds: no
+// other process writes the config between the listing and the
+// checkout.
 func (r *Runner) Clone(ctx context.Context, url, dest string) error {
 	if err := CheckURL(url); err != nil {
 		return err
@@ -48,7 +63,37 @@ func (r *Runner) Clone(ctx context.Context, url, dest string) error {
 		return err
 	}
 	args := slices.Concat([]string{"clone"}, cloneFlags, []string{"--", url, dest})
-	return r.runWith(ctx, filepath.Dir(dest), r.hostSettings(url), nil, args...)
+	if err := r.runWith(ctx, filepath.Dir(dest), r.hostSettings(url), nil, args...); err != nil {
+		return err
+	}
+	if err := r.checkout(ctx, dest); err != nil {
+		// checkCloneDest proved dest absent, so all of it is this
+		// clone's: a clone with no checkout would read as an existing
+		// repository with every file deleted.
+		return errors.Join(err, os.RemoveAll(dest))
+	}
+	return nil
+}
+
+// checkout checks out HEAD in the new clone in dest with the filter
+// drivers of its config emptied, or does nothing when HEAD names no
+// commit.
+func (r *Runner) checkout(ctx context.Context, dest string) error {
+	head, err := r.output(ctx, dest, nil, "rev-parse", "--verify", "-q", "HEAD^{commit}")
+	switch {
+	case exitedWith(err, 1):
+		return nil // no commit to check out
+	case err != nil:
+		return err
+	}
+	if err := checkObjectID(strings.TrimSuffix(head, "\n")); err != nil {
+		return err
+	}
+	noFilters, err := r.filterOverrides(ctx, dest)
+	if err != nil {
+		return err
+	}
+	return r.runInput(ctx, dest, nil, noFilters, nil, nil, "reset", "-q", "--hard", "HEAD")
 }
 
 // checkCloneDest returns ErrRefused, wrapped with the reason, for a
