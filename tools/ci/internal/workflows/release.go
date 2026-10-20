@@ -43,6 +43,10 @@ const (
 // publishWrites are the scopes the publish job may set to write.
 var publishWrites = []string{"contents", "id-token", "attestations"}
 
+// publishActions are the only actions the publish job names, each a key
+// of actionInputs.
+var publishActions = []string{checkoutAction, miseAction, attestAction}
+
 // tokenSubcommands are the tools/release subcommands whose step may hold
 // the env of the row.
 var tokenSubcommands = []string{"build", "notes", "verify", "publish"}
@@ -86,14 +90,12 @@ func readRelease(path string, doc *yaml.Node) *release {
 // well formed go run ./tools/release line.
 func releaseCommand(step *yaml.Node) (sub string, ok bool) {
 	run := field(step, "run")
-	if run == nil || run.Kind != yaml.ScalarNode || !runLine(run.Value) {
+	if run == nil || run.Kind != yaml.ScalarNode || !runLine(run.Value) ||
+		!strings.HasPrefix(run.Value, strings.Join(runPrograms[1], " ")+" ") {
 		return "", false
 	}
-	words := strings.Split(run.Value, " ")
-	if !slices.Equal(words[:3], runPrograms[1]) {
-		return "", false
-	}
-	return words[3], true
+	// runLine holds at least four words, so the subcommand is there.
+	return strings.Split(run.Value, " ")[3], true
 }
 
 // tokenNode returns the value of an env that is exactly
@@ -147,6 +149,38 @@ func (c *grammar) publishPermissions(n *yaml.Node) {
 	}
 }
 
+// publishUses refuses, in the publish job, an action that is not one of
+// publishActions. The whole path before the "@" is compared, so a path
+// inside an allowed action (actions/attest-build-provenance/predicate)
+// is another action and does not borrow the inputs of the main one.
+func (c *grammar) publishUses(step, uses *yaml.Node) {
+	if !c.rel.inJob(step) {
+		return
+	}
+	path, _, _ := strings.Cut(uses.Value, "@")
+	if !slices.Contains(publishActions, strings.ToLower(path)) {
+		c.add(uses, "the publish job names only the actions checkout, mise and attest-build-provenance, by their own path")
+	}
+}
+
+// releaseTrigger holds release.yml to REQ-0899: it releases a v* tag, so
+// on is a mapping of the one event push, which holds tags alone.
+func (c *grammar) releaseTrigger(doc *yaml.Node) {
+	on := field(doc, "on")
+	push := field(on, "push")
+	ok := on != nil && on.Kind == yaml.MappingNode && len(on.Content) == 2 && push != nil && push.Kind == yaml.MappingNode
+	for key := range pairs(push) {
+		ok = ok && key.Value == "tags"
+	}
+	if !ok {
+		n := on
+		if n == nil {
+			n = doc
+		}
+		c.add(n, releaseFile+" runs on push of tags alone (REQ-0899): on holds the one event push, which holds tags only")
+	}
+}
+
 // attest refuses actions/attest-build-provenance outside the publish job
 // of release.yml.
 func (c *grammar) attest(step, uses *yaml.Node) {
@@ -159,6 +193,7 @@ func (c *grammar) attest(step, uses *yaml.Node) {
 // its needs, and the order and kind of its tools commands. A release.yml
 // with no publish job is a finding.
 func (c *grammar) publish(doc *yaml.Node) {
+	c.releaseTrigger(doc)
 	jobs := field(doc, "jobs")
 	if c.rel == nil {
 		if jobs == nil {
@@ -196,6 +231,9 @@ func (c *grammar) publish(doc *yaml.Node) {
 		switch _, isRelease := releaseCommand(s); {
 		case isRelease:
 			released = true
+			if c.rel.mayHoldEnv(s) {
+				c.tokenArgs(run)
+			}
 		case run.Value == setupLine:
 			setups++
 			if released {
@@ -207,5 +245,16 @@ func (c *grammar) publish(doc *yaml.Node) {
 	}
 	if setups != 1 {
 		c.add(job, "the publish job runs "+setupLine+" once")
+	}
+}
+
+// tokenArgs refuses, in a step that holds the token, any variable word
+// but "$GITHUB_REF_NAME": the token must not reach the command line.
+func (c *grammar) tokenArgs(run *yaml.Node) {
+	for _, w := range strings.Split(run.Value, " ")[4:] {
+		if runVar.MatchString(w) && w != `"$GITHUB_REF_NAME"` {
+			c.add(run, "a step that holds the token takes no variable word but \"$GITHUB_REF_NAME\"")
+			return
+		}
 	}
 }

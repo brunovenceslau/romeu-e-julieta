@@ -112,7 +112,7 @@ func TestWorkflowsReleaseStepEnv(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			src := strings.Replace(goodRelease, "      - name: Notes\n", step+"      - name: Notes\n", 1)
-			wantAny(t, workflowFindings(releasePath, []byte(src)), "outside the grammar of a")
+			wantAny(t, workflowFindings(releasePath, []byte(src)), `"env" is outside the grammar`)
 		})
 	}
 }
@@ -136,7 +136,22 @@ func TestWorkflowsReleaseRefused(t *testing.T) {
 		{"the job on a latest runner", "    runs-on: ubuntu-26.04\n    needs: [all]", "    runs-on: ubuntu-latest\n    needs: [all]", "never *-latest"},
 		{"the job with no needs", "    needs: [all]\n    timeout-minutes: 60\n    permissions:\n      contents: write", "    timeout-minutes: 60\n    permissions:\n      contents: write", "needs every other job"},
 		{"the job that needs another job", "needs: [all]\n    timeout-minutes: 60\n    permissions:\n      contents: write", "needs: [all, publish]\n    timeout-minutes: 60\n    permissions:\n      contents: write", "needs every other job"},
-		{"a write-all permission", "    permissions:\n      contents: write\n", "    permissions: write-all\n    xpermissions:\n      contents: write\n", "permissions is a mapping"},
+		{"a write-all permission", "    permissions:\n      contents: write\n      id-token: write\n      attestations: write\n      actions: read\n      pull-requests: read\n      issues: read\n", "    permissions: write-all\n", "permissions is a mapping"},
+		{"a built tools/ci with one word", "      - name: Build\n", "      - run: '\"$RUNNER_TEMP/ci\" all'\n      - name: Build\n", "no test"},
+		{"a built tools/ci setup", "      - name: Build\n", "      - run: '\"$RUNNER_TEMP/ci\" setup'\n      - name: Build\n", "no test"},
+		{"another action by a pinned SHA", "      - name: Setup\n", "      - uses: evil/x@" + citest.Sha + "\n      - name: Setup\n", "names only the actions"},
+		{"a path inside the attest action", "actions/attest-build-provenance@" + citest.Sha, "actions/attest-build-provenance/predicate@" + citest.Sha, "names only the actions"},
+		{"the cache action in the publish job", "      - name: Setup\n", "      - uses: actions/cache@" + citest.Sha + "\n        with:\n          path: /tmp/c\n          key: k\n      - name: Setup\n", "names only the actions"},
+		{"GH_TOKEN as an argument", "run: go run ./tools/release verify\n", "run: go run ./tools/release verify \"$GH_TOKEN\"\n", "takes no variable word"},
+		{"another variable as an argument", "run: go run ./tools/release verify\n", "run: go run ./tools/release verify \"$HOME\"\n", "takes no variable word"},
+		{"a pull_request event", "  push:\n    tags: [\"v*\"]\n", "  pull_request:\n  push:\n    tags: [\"v*\"]\n", "REQ-0899"},
+		{"a workflow_dispatch event", "  push:\n    tags: [\"v*\"]\n", "  push:\n    tags: [\"v*\"]\n  workflow_dispatch:\n", "REQ-0899"},
+		{"a schedule event", "  push:\n    tags: [\"v*\"]\n", "  push:\n    tags: [\"v*\"]\n  schedule:\n    - cron: \"0 6 * * *\"\n", "REQ-0899"},
+		{"a pull_request_target event", "  push:\n    tags: [\"v*\"]\n", "  pull_request_target:\n    branches: [main]\n", "REQ-0899"},
+		{"a push of branches", "    tags: [\"v*\"]\n", "    branches: [main]\n", "REQ-0899"},
+		{"a push with tags and branches", "    tags: [\"v*\"]\n", "    tags: [\"v*\"]\n    branches: [main]\n", "REQ-0899"},
+		{"a push with no filter", "  push:\n    tags: [\"v*\"]\n", "  push:\n", "REQ-0899"},
+		{"the token in a name of the publish job", "      - name: Notes\n", "      - name: ${{ github.token }}\n        run: go run ./tools/release notes\n      - name: Notes\n", "the token"},
 		{"a write of another scope", "      actions: read\n", "      actions: write\n", "a permission of the publish job"},
 		{"a write of packages", "      actions: read\n", "      packages: write\n", "a permission of the publish job"},
 		{"a tools/ci all step", "      - name: Build\n", "      - run: go run ./tools/ci all\n      - name: Build\n", "no test"},
@@ -158,6 +173,13 @@ func TestWorkflowsReleaseRefused(t *testing.T) {
 			wantAny(t, workflowFindings(releasePath, []byte(src)), tt.want)
 		})
 	}
+}
+
+// TestWorkflowsReleasePublishNotAMapping fails a publish job that is
+// not a mapping.
+func TestWorkflowsReleasePublishNotAMapping(t *testing.T) {
+	head, _, _ := strings.Cut(goodRelease, "  publish:\n")
+	wantAny(t, workflowFindings(releasePath, []byte(head+"  publish: []\n")), "holds a job named publish")
 }
 
 // TestWorkflowsReleaseNoPublishJob fails a release.yml with no publish

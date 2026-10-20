@@ -643,6 +643,7 @@ func (c *grammar) step(n, strategy *yaml.Node) {
 		c.checkout(n, uses)
 		c.miseToken(n, uses)
 		c.attest(n, uses)
+		c.publishUses(n, uses)
 	}
 	if kind == "run" && field(n, "run") == nil {
 		c.add(n, "a step has uses or run")
