@@ -48,7 +48,8 @@ var cloneFlags = []string{"--no-tags", "--no-recurse-submodules", "--template=",
 // out HEAD with filterNeutral on each (filterOverrides), as
 // FastForward does. A HEAD that names no commit, the clone of an empty
 // repository or one whose HEAD dangles, is left without a checkout, as
-// git clone leaves it. The precondition of filterOverrides holds: no
+// git clone leaves it. A failure after git clone removes dest, so a
+// later run clones again. The precondition of filterOverrides holds: no
 // other process writes the config between the listing and the
 // checkout.
 func (r *Runner) Clone(ctx context.Context, url, dest string) error {
@@ -65,6 +66,19 @@ func (r *Runner) Clone(ctx context.Context, url, dest string) error {
 	if err := r.runWith(ctx, filepath.Dir(dest), r.hostSettings(url), nil, args...); err != nil {
 		return err
 	}
+	if err := r.checkout(ctx, dest); err != nil {
+		// checkCloneDest proved dest absent, so all of it is this
+		// clone's: a clone with no checkout would read as an existing
+		// repository with every file deleted.
+		return errors.Join(err, os.RemoveAll(dest))
+	}
+	return nil
+}
+
+// checkout checks out HEAD in the new clone in dest with the filter
+// drivers of its config emptied, or does nothing when HEAD names no
+// commit.
+func (r *Runner) checkout(ctx context.Context, dest string) error {
 	head, err := r.output(ctx, dest, nil, "rev-parse", "--verify", "-q", "HEAD^{commit}")
 	switch {
 	case exitedWith(err, 1):

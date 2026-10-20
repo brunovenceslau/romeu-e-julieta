@@ -8,6 +8,7 @@ package gitsafe
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -109,6 +110,40 @@ func TestCloneEmpty(t *testing.T) {
 			assert.NoFileExists(t, filepath.Join(dest, ".git", "index"))
 		})
 	}
+}
+
+// TestCloneLeavesNothingOnALaterFailure: when a step after git clone
+// --no-checkout fails, here the listing of the filter drivers, refused
+// over more than outputLimit bytes of keys in the sandbox's global
+// config, Clone fails and removes the destination, so the next julieta
+// setup clones again instead of finding a repository with no checkout.
+// The control: the same config lets plain git clone --no-checkout
+// write the destination, so the failure comes after it.
+func TestCloneLeavesNothingOnALaterFailure(t *testing.T) {
+	src, _ := newRepo(t)
+	url := serveGit(t, bareCopy(t, src, "repo.git")) + "repo.git"
+	var config strings.Builder
+	for i, keys := 0, 0; keys <= outputLimit; i++ {
+		name := fmt.Sprintf("driver-%06d", i)
+		fmt.Fprintf(&config, "[filter \"%s\"]\n\tsmudge = cat\n", name)
+		keys += len("filter." + name + ".smudge\x00")
+	}
+	home := t.TempDir()
+	writeFile(t, home, ".gitconfig", config.String())
+
+	r, err := New(Config{Mode: Sandbox, Git: gitPath(t), Home: home})
+	require.NoError(t, err)
+	parent := t.TempDir()
+	dest := filepath.Join(parent, "repo")
+	err = r.Clone(t.Context(), url, dest)
+	require.ErrorIs(t, err, ErrRefused)
+	assert.Contains(t, err.Error(), "filter keys")
+	assert.NoDirExists(t, dest)
+
+	env := []string{"GIT_CONFIG_GLOBAL=" + filepath.Join(home, ".gitconfig")}
+	_, err = plainGitErr(t, parent, env, "clone", "-q", "--no-checkout", url, "control")
+	require.NoError(t, err)
+	assert.DirExists(t, filepath.Join(parent, "control", ".git"), "the control: the clone step writes the destination")
 }
 
 // TestCloneCAFile clones over HTTPS from a server whose certificate
