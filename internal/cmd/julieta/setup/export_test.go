@@ -11,3 +11,6 @@ func SetExecutable(f func() (string, error)) (restore func()) {
 	executable = f
 	return func() { executable = os.Executable }
 }
+
+// WriteState exposes writeState to the external tests.
+var WriteState = writeState
