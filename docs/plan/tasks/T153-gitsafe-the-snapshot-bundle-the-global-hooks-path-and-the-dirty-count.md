@@ -3,7 +3,7 @@ id: T153
 title: "`gitsafe`: the snapshot bundle, the global hooks path and the dirty count"
 milestone: M1
 module: gitsafe
-fate: new
+fate: merged
 owns:
   - internal/gitsafe/refs_list*.go
   - internal/gitsafe/reflog*.go
@@ -33,9 +33,14 @@ ask_first:
   - gitsafe
   - spec
 sitting: none
+merged: 2026-10-21
+pr: 224
 ---
 
 # T153 - `gitsafe`: the snapshot bundle, the global hooks path and the dirty count
+
+Merged on 2026-10-21 in pull request #224. The text below is the one
+written when it was built.
 
 Goal: the `gitsafe` verbs that two merged tasks (T054, T059) and one
 open task (T060) wait for, in one task on the `gitsafe` surface, as
