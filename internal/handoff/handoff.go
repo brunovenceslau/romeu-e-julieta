@@ -65,9 +65,12 @@ type RepoFacts struct {
 	// not, and the other way round.
 	Ahead  int `json:"ahead" yaml:"ahead"`
 	Behind int `json:"behind" yaml:"behind"`
-	// Dirty counts the kinds of uncommitted change the working tree
-	// holds (staged, unstaged, untracked, unmerged, hidden); see
-	// internal/cmd/julieta/handoff, which measures it.
+	// Dirty is the number of distinct paths the working tree changes:
+	// staged, unstaged, unmerged, untracked or marked assume-unchanged,
+	// a path counted once, a skip-worktree entry not at all, and at most
+	// 100,000, which a larger change reads as (03 3.10);
+	// internal/cmd/julieta/handoff measures it with gitsafe's
+	// Status.Changed.
 	Dirty int `json:"dirty" yaml:"dirty"`
 	// Stashes is the number of stashes.
 	Stashes int `json:"stashes" yaml:"stashes"`

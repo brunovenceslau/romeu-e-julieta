@@ -12,6 +12,7 @@ owns:
   - internal/gitsafe/status*.go
   - internal/gitsafe/gitsafe_test.go
   - internal/gitsafe/helper_test.go
+  - internal/gitsafe/gitsafe.go
   - internal/hooks/hooks.go
   - internal/hooks/hooks_test.go
   - internal/hooks/system*.go
@@ -22,6 +23,7 @@ owns:
   - internal/handoff/handoff.go
   - e2e/julieta_hooks_test.go
   - docs/spec/04-cli.md
+  - docs/spec/02-layouts.md
 needs:
   - T054
   - T059
@@ -160,3 +162,94 @@ needs a word it is amended the same way (05 is owned by T039).
 T060 is re-planned on this task once it merges: its bundle comes from
 `ListRefs`, `Reflog`, `Worktrees` and `BundleOf`, and its `needs` gains
 T153.
+
+Decisions taken while building (2026-10-21), each with what reopens
+it:
+
+- `BundleOf`'s temporary bare repository borrows the user's objects
+  through its own `objects/info/alternates` file, not
+  `GIT_ALTERNATE_OBJECT_DIRECTORIES`: the file goes with the temporary
+  repository, every git call keeps the environment of its mode (sandbox
+  mode passes no other `GIT_*` variable), and a file line needs no list
+  separator where the variable splits paths at a colon. The temporary
+  repository is made in the directory of the bundle file, and has no
+  shallow file, so a shallow repository's history is git's error.
+  Reopened by a caller that bundles from a shallow repository.
+- `SetGlobalHooksPath` and `SystemHooksPath` read their key with
+  `--includes --type=path`, as git reads it when it runs a hook, so a
+  value in an included file is seen and kept and a leading `~` is
+  expanded. `setup` reports a system value that is still not absolute,
+  rather than record one the dispatcher would ignore, and compares the
+  global value with the dispatcher dir once cleaned, so a trailing
+  slash is not foreign. `SystemHooksPath` is sandbox mode
+  only, since host mode reads no system config. Reopened by a host
+  caller.
+- A global `core.hooksPath` that names another directory leaves the
+  sandbox unusable (`setup` exits 1 and names it), since git then runs
+  no dispatcher, and so does a system value `setup` cannot read, which
+  also leaves the global key unset. Reopened by a warning slug for it
+  in 04 4.4.
+- The record of the system hooks path is
+  `$HOME/.local/state/julieta/system-hooks-path.json`
+  (`internal/hooks/system.go`); a system config that sets no value
+  removes it, and a record the dispatcher cannot read fails the hook.
+  The container e2e runs as `nobody`, who cannot write
+  `/etc/gitconfig`, so its system-stage cases plant that record after
+  `setup`; the read of a planted system config is
+  `TestSystemHooksPathRealGit` of `internal/gitsafe`, through
+  `GIT_CONFIG_SYSTEM`, which only the test adds. Reopened by a harness
+  mount that can plant `/etc/gitconfig`.
+- `Reflog` takes `HEAD` as well as a full ref name, so a worktree's
+  HEAD reflog can be read from that worktree. Reopened by T060.
+- Every hook stage gets its own copy of the hook's stdin (decided on
+  2026-10-21; REQ-0408 says so), so a system hook that reads none cannot
+  hide the ref lines from the tracked `pre-push`. The copy has no size
+  bound, since a non-zero `reference-transaction` in its prepared state
+  aborts the transaction, and a bound would fail a fetch or push of many
+  refs that streamed before. The dispatcher copies the stdin to a 0600
+  file of the temporary directory (`os.TempDir`, never the repository),
+  opens it once for each of the three hook stages, and removes the path
+  before any stage runs: each stage gets its own `*os.File` at offset 0,
+  which procgroup hands to the child as it is, and no file remains once
+  the stages start, whatever ends the process; only a process killed
+  during the copy itself leaves one. Two exceptions go, as they are, to
+  the first hook that runs: `proc-receive`, whose stdin is a protocol
+  that git keeps open, and a stdin that is a character device, such as
+  the terminal git-p4 gives its `p4-*` hooks, which never ends
+  (`/dev/null` is one too, and reads as empty either way). Reopened by a
+  temporary directory too small for a hook's stdin.
+- `Status.Changed` counts assume-unchanged entries (lowercase tags of
+  `git ls-files -v`) and not skip-worktree ones, which still set
+  `Hidden`, so a clean sparse checkout reads 0 (decided on 2026-10-21;
+  03 3.10 says so). It saturates at 100,000 paths: a working tree that
+  changes more reads 100,000 with `ChangedTruncated` set, and no error,
+  so a handoff or snapshot of a huge change still reads, and the set of
+  counted paths stays bounded; the handoff `dirty` reads the cap.
+  Reopened by a reader that needs the exact count past it.
+- The system stage runs with `JULIETA_HOOKS_SYSTEM=1`, and a dispatcher
+  started with it set skips the system stage, so a system hook that
+  leads back to the dispatcher, a copy of its script included, ends
+  after one more chain. Reopened by a system hook that must run nested.
+- The system stage runs before julieta's action, so a failing system
+  hook stops the chain before julieta's snapshot, by REQ-0409's rule
+  that the first non-zero status stops. Reopened by a snapshot that
+  must run whatever the system hook says.
+- `BundleOf`'s temporary repository is made with
+  `--ref-format=reftable` (git 2.45.0, inside the 2.45.4 floor;
+  measured with git 2.53.0 here and 2.47.3 in the container image), so
+  no ref name becomes a file name. `reflog exists` takes no
+  `--end-of-options`: git 2.53.0 and 2.47.3 accept it there, 2.45.4 was
+  not measured, and the ref is `HEAD` or starts with `refs/`. Reopened
+  by a measurement at the floor.
+- T153 owns `internal/gitsafe/gitsafe.go`, whose package doc lists the
+  verb files, and `docs/spec/02-layouts.md`, whose REQ-0154 lists the
+  recorded system hooks path; no open task owns either.
+
+Deferred to T060, each with what reopens it:
+
+- `ListRefs` fails whole on one ref name `checkDisplayRef` refuses.
+  Reopened by T060, which decides whether a snapshot skips that ref
+  and records it.
+- A `.gitsafe-bundle-*` directory a killed process left behind is not
+  cleaned up; callers ignore it. Reopened by T060, when it owns the
+  snapshot directory.

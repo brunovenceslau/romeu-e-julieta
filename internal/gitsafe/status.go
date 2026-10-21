@@ -37,6 +37,9 @@ var (
 	maxStashes      = 10_000
 	maxWorktrees    = 1_000
 	maxStatusRecord = 64 << 10
+	// maxChangedPaths is the cap of Status.Changed, and so the bound of
+	// the set that keeps each path counted once.
+	maxChangedPaths = 100_000
 )
 
 // The bounds of the short answers: a one-line answer of git, such as a
@@ -95,6 +98,22 @@ type Status struct {
 	// working tree and a change to it would not show. A sparse
 	// checkout marks every file outside its cone skip-worktree.
 	Hidden bool
+	// Changed is the number of distinct paths among the ordinary,
+	// unmerged and untracked records of git status and the
+	// assume-unchanged index entries (03 3.10, dirty): a path both
+	// staged and unstaged counts once, and so does an assume-unchanged
+	// entry git status also shows. A skip-worktree entry sets Hidden and
+	// is not counted, since a sparse checkout marks every file outside
+	// its cone, so a clean sparse checkout reads 0. Renames are off, so a
+	// rename counts as two paths, its deletion and its addition. An
+	// untracked directory that holds no tracked file counts once, as git
+	// status --untracked-files=normal shows it. Changed stops at
+	// maxChangedPaths (100,000): a working tree that changes more reads
+	// the cap, with ChangedTruncated set, so the count means "at least".
+	Changed int
+	// ChangedTruncated: the working tree changes more paths than
+	// Changed, which holds the cap.
+	ChangedTruncated bool
 }
 
 // Clean reports whether the working tree holds no change: nothing
@@ -110,7 +129,8 @@ func (s Status) Clean() bool {
 // in dir, under the flags of the mode, with four git commands: git
 // config lists the filter drivers (below), git symbolic-ref reads HEAD,
 // git status --porcelain=v2 reads the changes, and git ls-files -v
-// reads the assume-unchanged and skip-worktree flags. A submodule
+// reads the assume-unchanged and skip-worktree flags; Changed counts
+// the paths of both. A submodule
 // counts by the commit it records, not by the state of its own working
 // tree, so git never runs in it. HEAD that moves between symbolic-ref
 // and status, so the two disagree on the branch, is an error.
@@ -152,7 +172,7 @@ func (r *Runner) Status(ctx context.Context, dir string) (Status, error) {
 		}
 		s.Branch = branch
 	}
-	p := &porcelain{status: &s}
+	p := &porcelain{status: &s, paths: map[string]bool{}}
 	w := &records{limit: maxStatusRecord, each: p.entry}
 	if err := r.read(ctx, dir, noFilters, w, "status", "--porcelain=v2", "-z", "--branch", "--no-ahead-behind",
 		"--untracked-files=normal", "--ignore-submodules=dirty", "--no-renames"); err != nil {
@@ -175,10 +195,19 @@ func (r *Runner) Status(ctx context.Context, dir string) (Status, error) {
 		if rec == "" {
 			return fmt.Errorf("%w: an empty ls-files record", ErrRefused)
 		}
-		if tag := rec[0]; tag == 'S' || (tag >= 'a' && tag <= 'z') {
+		tag := rec[0]
+		assumed := tag >= 'a' && tag <= 'z' // assume-unchanged, with or without skip-worktree
+		if tag == 'S' || assumed {
 			s.Hidden = true
 		}
-		return nil
+		if !assumed {
+			return nil // a skip-worktree entry is not counted: a sparse checkout marks every file outside its cone
+		}
+		path, ok := strings.CutPrefix(rec[1:], " ")
+		if !ok || path == "" {
+			return fmt.Errorf("%w: ls-files record %q", ErrRefused, termsafe.Escape(rec))
+		}
+		return p.add(path)
 	}}
 	if err := r.read(ctx, dir, nil, flags, "ls-files", "-v", "-z"); err != nil {
 		return Status{}, err
@@ -260,7 +289,41 @@ func (r *Runner) filterOverrides(ctx context.Context, dir string) ([]string, err
 type porcelain struct {
 	status *Status
 	sawOID bool
-	head   string // the branch.head header
+	head   string          // the branch.head header
+	paths  map[string]bool // the paths Changed counted, so each counts once
+}
+
+// The number of fields before the path of an ordinary and of an
+// unmerged record of git status --porcelain=v2 (git-status(1)): "1 XY
+// sub mH mI mW hH hI path" and "u XY sub m1 m2 m3 mW h1 h2 h3 path".
+const (
+	ordinaryFields = 8
+	unmergedFields = 10
+)
+
+// count counts the path of a record once, or refuses a record that
+// holds no path after its fields.
+func (p *porcelain) count(rec string, fields int) error {
+	parts := strings.SplitN(rec, " ", fields+1)
+	if len(parts) != fields+1 || parts[fields] == "" {
+		return fmt.Errorf("%w: git status record %q", ErrRefused, termsafe.Escape(rec))
+	}
+	return p.add(parts[fields])
+}
+
+// add counts path once, and stops at maxChangedPaths: a path past the
+// cap sets ChangedTruncated and is not kept, which bounds the set.
+func (p *porcelain) add(path string) error {
+	if p.paths[path] {
+		return nil
+	}
+	if p.status.Changed == maxChangedPaths {
+		p.status.ChangedTruncated = true
+		return nil
+	}
+	p.paths[path] = true
+	p.status.Changed++
+	return nil
 }
 
 // entry reads one record: a header, an ordinary change, a conflict or
@@ -284,10 +347,13 @@ func (p *porcelain) entry(rec string) error {
 	case strings.HasPrefix(rec, "1 ") && len(rec) > 4:
 		p.status.Staged = p.status.Staged || rec[2] != '.'
 		p.status.Unstaged = p.status.Unstaged || rec[3] != '.'
+		return p.count(rec, ordinaryFields)
 	case strings.HasPrefix(rec, "u "):
 		p.status.Unmerged = true
+		return p.count(rec, unmergedFields)
 	case strings.HasPrefix(rec, "? "):
 		p.status.Untracked = true
+		return p.count(rec, 1)
 	default:
 		return fmt.Errorf("%w: git status record %q", ErrRefused, rec)
 	}
@@ -679,8 +745,17 @@ func (r *Runner) HooksPath(ctx context.Context, dir string) (string, bool, error
 	if err := checkRepo(dir); err != nil {
 		return "", false, err
 	}
+	return r.readHooksPath(ctx, dir, "--local", "--no-includes")
+}
+
+// readHooksPath reads core.hooksPath from the config files that scope
+// names, git config's flags such as --local --no-includes, in dir, with
+// the checks HooksPath documents: an unset key is false and no error; a
+// key with no value or an empty one, a value that is not valid UTF-8
+// and one that holds a character unsafeRune refuses are refused.
+func (r *Runner) readHooksPath(ctx context.Context, dir string, scope ...string) (string, bool, error) {
 	out := limitedBuffer{limit: maxHooksPathBytes}
-	err := r.read(ctx, dir, nil, &out, "config", "--local", "--no-includes", "-z", "--get", "core.hooksPath")
+	err := r.read(ctx, dir, nil, &out, slices.Concat([]string{"config"}, scope, []string{"-z", "--get", "core.hooksPath"})...)
 	switch {
 	case exitedWith(err, 1):
 		return "", false, nil // the key is not set
