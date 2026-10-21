@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -26,10 +27,19 @@ type Plan struct {
 
 // Skip is one input a snapshot left out: what it is (a ref name gitsafe
 // refused, a namespace, "worktrees", a worktree, the reflog of a ref,
-// or the reflog commits over the cap) and why.
+// a reflog commit git could not walk, or the reflog commits over the
+// cap) and why. Whole says it is a namespace or a whole source of
+// reflog commits, whose loss a snapshot must not write over an earlier
+// one with (decided while building T060).
 type Skip struct {
-	Item string
-	Err  error
+	Item  string
+	Err   error
+	Whole bool
+}
+
+// Whole reports whether p left out a namespace or a whole source.
+func (p Plan) Whole() bool {
+	return slices.ContainsFunc(p.Skipped, func(s Skip) bool { return s.Whole })
 }
 
 // Refs returns the pairs of p as the refs of snapshot/heads.json.
@@ -48,8 +58,10 @@ func (p Plan) Refs() map[string]string {
 const worktreePrefix = "worktrees/"
 
 // MaxReflogCommits is the most reflog-only commits one snapshot names
-// (decided while building T060): those beyond it, the oldest sources
-// last, are left out and recorded. A variable, so a test can lower it.
+// (decided while building T060): the first of them in source order
+// (the branches by name, then the worktrees, each newest first) are
+// named, and the rest left out and recorded. A variable, so a test can
+// lower it.
 var MaxReflogCommits = 1000
 
 // Pairs returns what a snapshot of the repository in dir bundles (08
@@ -88,7 +100,7 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string, bas
 		if cerr := ctx.Err(); cerr != nil {
 			return cerr
 		}
-		p.Skipped = append(p.Skipped, Skip{Item: item, Err: err})
+		p.Skipped = append(p.Skipped, Skip{Item: item, Err: err, Whole: true})
 		return nil
 	}
 	names := newNameSet()
@@ -108,8 +120,12 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string, bas
 		if err != nil {
 			return Plan{}, err
 		}
-		for _, name := range refused {
+		for _, name := range refused.Names {
 			p.Skipped = append(p.Skipped, Skip{Item: name, Err: fmt.Errorf("%w: a ref name gitsafe does not read", gitsafe.ErrRefused)})
+		}
+		if refused.More > 0 {
+			p.Skipped = append(p.Skipped, Skip{Item: strconv.Itoa(refused.More) + " more ref names of " + ns,
+				Err: fmt.Errorf("%w: ref names gitsafe does not read", gitsafe.ErrRefused)})
 		}
 		for _, r := range refs {
 			add(r.Name, r.OID)
@@ -155,8 +171,8 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string, bas
 			if err := skip("worktree "+strconv.Itoa(k), err); err != nil {
 				return Plan{}, err
 			}
-		case c != common:
-			p.Skipped = append(p.Skipped, Skip{Item: "worktree " + strconv.Itoa(k),
+		case !sameDir(c, common):
+			p.Skipped = append(p.Skipped, Skip{Item: "worktree " + strconv.Itoa(k), Whole: true,
 				Err: fmt.Errorf("%w: its common git dir %s is not the repository's %s", gitsafe.ErrRefused, c, common)})
 		default:
 			sources = append(sources, source{w.Path, "HEAD", prefix})
@@ -165,7 +181,7 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string, bas
 
 	// The reflog commits no bundled ref is, in source order, each once,
 	// with the name of its newest entry.
-	type candidate struct{ prefix, n string }
+	type candidate struct{ prefix, n, item string }
 	seen := map[string]bool{}
 	tips := make([]string, 0, len(p.Pairs))
 	for _, r := range p.Pairs {
@@ -175,9 +191,10 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string, bas
 	var oids []string
 	named := map[string]candidate{}
 	for _, s := range sources {
+		item := "the reflog of " + s.prefix
 		entries, err := git.Reflog(ctx, s.dir, s.ref)
 		if err != nil {
-			if err := skip("the reflog of "+s.prefix, err); err != nil {
+			if err := skip(item, err); err != nil {
 				return Plan{}, err
 			}
 			continue
@@ -188,12 +205,29 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string, bas
 			}
 			seen[oid] = true
 			oids = append(oids, oid)
-			named[oid] = candidate{s.prefix, strconv.Itoa(len(entries) - 1 - i)}
+			named[oid] = candidate{s.prefix, strconv.Itoa(len(entries) - 1 - i), item}
 		}
 	}
-	unreached, err := git.Unreached(ctx, dir, oids, slices.Concat(tips, bases))
+	exclude := slices.Concat(tips, bases)
+	unreached, err := git.Unreached(ctx, dir, oids, exclude)
 	if err != nil {
-		return Plan{}, err
+		// A walk git cannot finish for the whole set is asked again for
+		// each commit alone; a commit that fails alone is left out, and
+		// with it the whole of its source is incomplete.
+		if cerr := ctx.Err(); cerr != nil {
+			return Plan{}, cerr
+		}
+		unreached = nil
+		for _, oid := range oids {
+			one, err := git.Unreached(ctx, dir, []string{oid}, exclude)
+			if err != nil {
+				if err := skip(named[oid].item+": the commit "+oid, err); err != nil {
+					return Plan{}, err
+				}
+				continue
+			}
+			unreached = append(unreached, one...)
+		}
 	}
 	if over := len(unreached) - MaxReflogCommits; over > 0 {
 		p.Skipped = append(p.Skipped, Skip{Item: strconv.Itoa(over) + " reflog commits",
@@ -211,6 +245,17 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string, bas
 	}
 	slices.SortFunc(p.Pairs, func(a, b gitsafe.Ref) int { return strings.Compare(a.Name, b.Name) })
 	return p, nil
+}
+
+// sameDir reports whether a and b name one directory, their symbolic
+// links resolved when they can be.
+func sameDir(a, b string) bool {
+	if a == b {
+		return true
+	}
+	ra, err1 := filepath.EvalSymlinks(a)
+	rb, err2 := filepath.EvalSymlinks(b)
+	return err1 == nil && err2 == nil && ra == rb
 }
 
 // nameSet holds the ref names of a plan and every directory above them,

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -119,6 +120,7 @@ func TestPairsSkipsARefusedRefAlone(t *testing.T) {
 	require.Len(t, plan.Skipped, 1)
 	assert.Equal(t, `refs/tags/bad\u202etag`, plan.Skipped[0].Item)
 	assert.ErrorIs(t, plan.Skipped[0].Err, gitsafe.ErrRefused)
+	assert.False(t, plan.Whole(), "one ref, not a namespace")
 }
 
 // TestPairsSkipsABrokenWorktree: a worktree whose directory is now
@@ -144,6 +146,7 @@ func TestPairsSkipsABrokenWorktree(t *testing.T) {
 		items = append(items, s.Item)
 	}
 	assert.Equal(t, []string{"worktree 2"}, items, "other, the second by its id; gone, whose .git is missing, is prunable and not read")
+	assert.True(t, plan.Whole(), "a whole source of reflog commits")
 }
 
 // TestPairsNamesAtMostTheCap: the reflog commits beyond
@@ -179,4 +182,46 @@ func TestPairsNamesAtMostTheCap(t *testing.T) {
 	assert.Len(t, plan.Pairs, 2, "main and one reflog commit")
 	require.Len(t, plan.Skipped, 1)
 	assert.Equal(t, "1 reflog commits", plan.Skipped[0].Item)
+	assert.False(t, plan.Whole(), "the cap keeps the snapshot moving")
+}
+
+// TestPairsAsksACommitAloneWhenTheWalkFails: a reflog commit whose
+// parent the repository does not hold fails git's walk of the whole
+// set; each commit is then asked alone, the one that fails is left out
+// as a whole source's loss, and the others are named.
+func TestPairsAsksACommitAloneWhenTheWalkFails(t *testing.T) {
+	dir := repo(t)
+	base := commit(t, dir, "base")
+	tree := git(t, dir, "rev-parse", "HEAD^{tree}")
+	good := git(t, dir, "commit-tree", "-m", "good", tree)
+	broken := hashCommit(t, dir, "tree "+tree+"\nparent "+strings.Repeat("e", 40)+
+		"\nauthor f <f@x> 0 +0000\ncommitter f <f@x> 0 +0000\n\nbroken\n")
+	for _, c := range []string{good, broken, base} {
+		git(t, dir, "update-ref", "-m", "move", "refs/heads/main", c)
+	}
+	plan, err := salvage.Pairs(t.Context(), runner(t), dir, generation, []string{base})
+	require.NoError(t, err)
+	oids := map[string]bool{}
+	for _, r := range plan.Pairs {
+		oids[r.OID] = true
+	}
+	assert.True(t, oids[good])
+	assert.False(t, oids[broken])
+	require.Len(t, plan.Skipped, 1)
+	assert.Contains(t, plan.Skipped[0].Item, broken)
+	assert.True(t, plan.Whole())
+}
+
+// TestPairsReadsTheWorktreesOfALinkedPath: a repository reached through
+// a symbolic link has the same common git dir as its worktrees, once
+// the links are resolved, so no worktree is skipped.
+func TestPairsReadsTheWorktreesOfALinkedPath(t *testing.T) {
+	dir := repo(t)
+	commit(t, dir, "one")
+	link := filepath.Join(t.TempDir(), "link")
+	require.NoError(t, os.Symlink(dir, link))
+	git(t, link, "worktree", "add", "-q", "--detach", filepath.Join(filepath.Dir(dir), "wt"))
+	plan, err := salvage.Pairs(t.Context(), runner(t), link, generation, nil)
+	require.NoError(t, err)
+	assert.Empty(t, plan.Skipped)
 }

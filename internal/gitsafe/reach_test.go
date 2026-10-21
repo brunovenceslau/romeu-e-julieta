@@ -7,6 +7,7 @@ package gitsafe
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -124,4 +125,34 @@ func TestCommonDirRealGit(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, main, linked)
 	assert.Equal(t, plainGit(t, dir, "rev-parse", "--path-format=absolute", "--git-common-dir"), main)
+}
+
+// TestBeyondCountsAFailureAsBeyond: a walk git cannot finish, here an
+// exclusion the repository does not hold, answers true, so the caller
+// makes the bundle and its failure is the one recorded.
+func TestBeyondCountsAFailureAsBeyond(t *testing.T) {
+	dir, c := reachFixture(t)
+	r := newRunner(t, Sandbox)
+	ok, err := r.Beyond(t.Context(), dir, []string{c["two"]}, []string{strings.Repeat("e", 40)})
+	require.NoError(t, err)
+	assert.True(t, ok)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err = r.Beyond(ctx, dir, []string{c["two"]}, []string{c["two"]})
+	require.ErrorIs(t, err, context.Canceled, "a context that ended is its error")
+}
+
+// TestUnreachedReadsAWideMerge: a merge of 200 parents is one record of
+// rev-list --parents, under maxParentsRecord.
+func TestUnreachedReadsAWideMerge(t *testing.T) {
+	dir, c := reachFixture(t)
+	tree := plainGit(t, dir, "rev-parse", c["base"]+"^{tree}")
+	args := []string{"commit-tree", "-m", "wide"}
+	for i := range 200 {
+		args = append(args, "-p", plainGit(t, dir, "commit-tree", "-p", c["base"], "-m", "p"+strconv.Itoa(i), tree))
+	}
+	wide := plainGit(t, dir, append(args, tree)...)
+	got, err := newRunner(t, Sandbox).Unreached(t.Context(), dir, []string{wide}, []string{c["base"]})
+	require.NoError(t, err)
+	assert.Equal(t, []string{wide}, got)
 }

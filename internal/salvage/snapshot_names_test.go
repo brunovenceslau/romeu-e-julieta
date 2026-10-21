@@ -6,9 +6,12 @@
 package salvage
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestFreeNameGivesATakenNameASuffix: a reflog commit whose name is
@@ -32,4 +35,14 @@ func TestFreeNameGivesATakenNameASuffix(t *testing.T) {
 	assert.Equal(t, "refs/salvage-reflog/x/2-1", got)
 	_, ok = s.free("refs/salvage-reflog/worktrees/0/1/3")
 	assert.False(t, ok, "below a name of the set")
+}
+
+// TestSameDirResolvesLinks: two paths of one directory, one through a
+// symbolic link, are the same; two directories are not.
+func TestSameDirResolvesLinks(t *testing.T) {
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "link")
+	require.NoError(t, os.Symlink(real, link))
+	assert.True(t, sameDir(real, link))
+	assert.False(t, sameDir(real, t.TempDir()))
 }

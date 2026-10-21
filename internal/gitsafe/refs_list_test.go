@@ -9,6 +9,7 @@ import (
 	"context"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -146,7 +147,7 @@ func TestListRefsReturnsTheNamesItRefuses(t *testing.T) {
 	r := newRunner(t, Sandbox)
 	got, refused, err := r.ListRefs(t.Context(), dir, []string{"refs/heads/", "refs/tags/"})
 	require.NoError(t, err)
-	assert.Equal(t, []string{`refs/tags/bad\u202etag`}, refused, "escaped")
+	assert.Equal(t, Refused{Names: []string{`refs/tags/bad\u202etag`}}, refused, "escaped")
 	assert.Contains(t, got, Ref{Name: "refs/heads/main", OID: two})
 	assert.Contains(t, got, Ref{Name: "refs/tags/light", OID: one})
 	assert.Len(t, got, 4)
@@ -156,4 +157,37 @@ func TestListRefsReturnsTheNamesItRefuses(t *testing.T) {
 	t.Cleanup(func() { maxBranches = old })
 	_, _, err = r.ListRefs(t.Context(), dir, []string{"refs/heads/", "refs/tags/"})
 	require.ErrorIs(t, err, ErrRefused, "the refused name is the fifth")
+}
+
+// TestListRefsBoundsTheNamesItRefuses: a refused name is clipped to
+// maxRefusedName bytes before it is escaped, at most maxRefusedNames are
+// kept and the rest counted, and one record over maxRefRecord bytes
+// fails the list without git's output being read further.
+func TestListRefsBoundsTheNamesItRefuses(t *testing.T) {
+	oid := strings.Repeat("a", 40)
+	answer := func(out string) func(context.Context, procgroup.Command) error {
+		return func(_ context.Context, c procgroup.Command) error {
+			_, err := io.WriteString(c.Stdout, out)
+			return err
+		}
+	}
+	r := newRunner(t, Sandbox)
+	long := "refs/heads/\u202e" + strings.Repeat("x", 1000)
+	var b strings.Builder
+	b.WriteString(oid + " " + long + "\n")
+	for i := range maxRefusedNames + 5 {
+		b.WriteString(oid + " refs/heads/n\u202e" + strconv.Itoa(1000+i) + "\n")
+	}
+	b.WriteString(oid + " refs/heads/good\n")
+	r.start = answer(b.String())
+	got, refused, err := r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/"})
+	require.NoError(t, err)
+	assert.Equal(t, []Ref{{Name: "refs/heads/good", OID: oid}}, got)
+	require.Len(t, refused.Names, maxRefusedNames)
+	assert.Equal(t, 6, refused.More)
+	assert.Equal(t, `refs/heads/\u202e`+strings.Repeat("x", maxRefusedName-len("refs/heads/\u202e"))+"...", refused.Names[0], "clipped, then escaped")
+
+	r.start = answer(oid + " refs/heads/" + strings.Repeat("y", maxRefRecord) + "\n")
+	_, _, err = r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/"})
+	require.ErrorIs(t, err, ErrRefused, "a record over the bound")
 }

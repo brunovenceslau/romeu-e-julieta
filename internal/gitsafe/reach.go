@@ -39,7 +39,7 @@ func (r *Runner) Unreached(ctx context.Context, dir string, oids, exclude []stri
 		want[oid] = true
 	}
 	walked, parent := map[string]bool{}, map[string]bool{}
-	w := &records{limit: maxStatusRecord, each: func(line string) error {
+	w := &records{limit: maxParentsRecord, each: func(line string) error {
 		ids := strings.Fields(line)
 		if len(ids) == 0 {
 			return fmt.Errorf("%w: rev-list line %q", ErrRefused, line)
@@ -75,6 +75,12 @@ func (r *Runner) Unreached(ctx context.Context, dir string, oids, exclude []stri
 	return out, nil
 }
 
+// maxParentsRecord is the longest line of rev-list --parents Unreached
+// reads, 1 MiB: a commit and about 16,000 parents of SHA-1, 15,000 of
+// SHA-256. git sets no bound of its own; a wider merge fails the walk,
+// and its caller then asks for each commit alone.
+const maxParentsRecord = 1 << 20
+
 // errBeyond stops the output of Beyond's rev-list at its first line.
 var errBeyond = errors.New("gitsafe: an object is beyond the exclusion")
 
@@ -98,7 +104,8 @@ func (f *firstLine) Write(p []byte) (int, error) {
 // and stops git there: whether a bundle of oids minus exclude would
 // hold an object, which git bundle create refuses to write when none
 // is (a tag object on a commit exclude reaches is one). No oid is
-// false.
+// false; a walk git cannot finish is true, so the caller's bundle
+// meets the failure; a context that ended is its error.
 func (r *Runner) Beyond(ctx context.Context, dir string, oids, exclude []string) (bool, error) {
 	stdin, err := reachInput(dir, oids, exclude)
 	if err != nil || len(oids) == 0 {
@@ -109,10 +116,12 @@ func (r *Runner) Beyond(ctx context.Context, dir string, oids, exclude []string)
 	if cerr := ctx.Err(); cerr != nil {
 		return false, cerr
 	}
-	if out.seen {
+	if out.seen || err != nil {
+		// A walk git cannot finish answers true: the caller makes the
+		// bundle, and the failure of that is the one it records.
 		return true, nil
 	}
-	return false, err
+	return false, nil
 }
 
 // reachInput checks the repo and every id and returns the standard

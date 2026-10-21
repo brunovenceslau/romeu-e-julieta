@@ -88,3 +88,13 @@ func reflogIndex(t *testing.T, dir, ref, oid string) int {
 	require.FailNow(t, "no entry of the reflog holds the commit", "%s %s", ref, oid)
 	return -1
 }
+
+// hashCommit writes the commit object of text into the repository at
+// dir, as git hash-object --literally does, so its parent need not
+// exist, and returns its id.
+func hashCommit(t *testing.T, dir, text string) string {
+	t.Helper()
+	file := filepath.Join(t.TempDir(), "commit")
+	require.NoError(t, os.WriteFile(file, []byte(text), 0o600))
+	return git(t, dir, "hash-object", "--literally", "-t", "commit", "-w", file)
+}
