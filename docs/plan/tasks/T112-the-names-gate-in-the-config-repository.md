@@ -22,9 +22,9 @@ also installs the gate and the list, read-only, and the dispatcher runs
 the gate before a repository's own pre-push hook when the remote is
 public or its visibility cannot be measured; and `--no-verify` on `git
 push` or `git commit` (and `git commit -n`) asks the maintainer first in
-every sandbox. The phrase list of the lesson of 2026-10-12 (pending item
-aea4a5dd; its phrases stay in the private home, never written here)
-joins the same list as a second section.
+every sandbox. The list has one section, the names: decided on
+2026-10-20, the phrases of the lesson of 2026-10-12 (pending item
+aea4a5dd) do not join it.
 
 No file of this repository: the work lands in the sandbox kit
 repository and in the config repository, as ask-first changes under
