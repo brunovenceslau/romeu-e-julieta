@@ -363,7 +363,7 @@ store is the table of [01 1.2](01-system-model.md#where-data-lives).
 | `julieta` on `PATH` | `REQ-0152` `$HOME/.local/bin/julieta`, a symlink to the running binary, created by `julieta setup` at runtime | julieta |
 | secondary repos | `REQ-0153` `$HOME/src/<name>/<dir>` | julieta (`julieta setup`) |
 | memory dirs | same absolute path as on the host (direct mount) | host tree |
-| julieta state | `REQ-0154` `$HOME/.local/state/julieta/` (manifest cache, install digests, snapshot timestamps, recorded hook failures, the recorded system hooks path) | julieta |
+| julieta state | `REQ-0154` `$HOME/.local/state/julieta/` (manifest cache, install digests, snapshot timestamps, recorded hook failures, the recorded system hooks path, and `snapshot/<dir>/`, where the snapshot of the repo `<dir>` builds its bundle) | julieta |
 | julieta hook dispatcher | `$HOME/.local/share/julieta/hooks/` (global `core.hooksPath`) | julieta |
 | mise | `$HOME/.local/bin/mise`, data in `$HOME/.local/share/mise` | julieta product kit |
 | herdr | `$HOME/.local/bin/herdr`, config `$HOME/.config/herdr/` | julieta product kit |

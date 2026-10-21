@@ -9,6 +9,7 @@ import (
 	"context"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -46,7 +47,7 @@ func TestListRefsRealGit(t *testing.T) {
 	check := noWrite(t, dir)
 	r := newRunner(t, Sandbox)
 
-	got, err := r.ListRefs(t.Context(), dir, []string{"refs/tags/", "refs/heads/", "refs/notes/"})
+	got, _, err := r.ListRefs(t.Context(), dir, []string{"refs/tags/", "refs/heads/", "refs/notes/"})
 	require.NoError(t, err)
 	assert.Equal(t, []Ref{
 		{Name: "refs/heads/main", OID: two},
@@ -56,14 +57,14 @@ func TestListRefsRealGit(t *testing.T) {
 		{Name: "refs/tags/light", OID: one},
 	}, got)
 
-	got, err = r.ListRefs(t.Context(), dir, []string{"refs/salvage/gen1/"})
+	got, _, err = r.ListRefs(t.Context(), dir, []string{"refs/salvage/gen1/"})
 	require.NoError(t, err)
 	assert.Equal(t, []Ref{
 		{Name: "refs/salvage/gen1/heads/main", OID: one},
 		{Name: "refs/salvage/gen1/heads/side", OID: two},
 	}, got, "one generation, not the other")
 
-	got, err = r.ListRefs(t.Context(), dir, []string{"refs/salvage/gen3/"})
+	got, _, err = r.ListRefs(t.Context(), dir, []string{"refs/salvage/gen3/"})
 	require.NoError(t, err)
 	assert.Empty(t, got)
 	check()
@@ -91,7 +92,7 @@ func TestListRefsRefuses(t *testing.T) {
 		{"refs/salvage/gen1/", "refs/salvage/gen2/"},
 		{"refs/heads/", "refs/heads/"},
 	} {
-		_, err := r.ListRefs(t.Context(), stubRepo, ns)
+		_, _, err := r.ListRefs(t.Context(), stubRepo, ns)
 		require.ErrorIs(t, err, ErrRefused, "%q", ns)
 	}
 	assert.Empty(t, rec.commands)
@@ -112,7 +113,7 @@ func TestListRefsArgvAndBound(t *testing.T) {
 	var commands []procgroup.Command
 	r := newRunner(t, Sandbox)
 	r.start = answer(oid+" refs/heads/a\n"+oid+" refs/heads/b\n", &commands)
-	got, err := r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/", "refs/salvage/g/"})
+	got, _, err := r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/", "refs/salvage/g/"})
 	require.NoError(t, err)
 	assert.Len(t, got, 2)
 	require.Len(t, commands, 1)
@@ -124,14 +125,71 @@ func TestListRefsArgvAndBound(t *testing.T) {
 	old := maxBranches
 	maxBranches = 1
 	t.Cleanup(func() { maxBranches = old })
-	_, err = r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/"})
+	_, _, err = r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/"})
 	require.ErrorIs(t, err, ErrRefused, "over the bound")
 	maxBranches = old
 
-	for _, out := range []string{oid + " refs/tags/a\n", "abc refs/heads/a\n", oid + " refs/heads/a\u202eb\n", oid + "refs/heads/a\n"} {
+	for _, out := range []string{oid + " refs/tags/a\n", "abc refs/heads/a\n", oid + "refs/heads/a\n"} {
 		r.start = answer(out, &commands)
-		_, err = r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/"})
+		_, _, err = r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/"})
 		require.ErrorIs(t, err, ErrRefused, "%q", out)
 	}
 	assert.True(t, slices.IsSortedFunc(got, func(a, b Ref) int { return strings.Compare(a.Name, b.Name) }))
+}
+
+// TestListRefsReturnsTheNamesItRefuses: a name checkDisplayRef refuses
+// is left out of the refs and returned, escaped, in the second list, so
+// a caller keeps every other ref (decided while building T060); the
+// refused names count against the bound too.
+func TestListRefsReturnsTheNamesItRefuses(t *testing.T) {
+	dir, one, two := refsFixture(t)
+	plainGit(t, dir, "update-ref", "refs/tags/bad\u202etag", one)
+	r := newRunner(t, Sandbox)
+	got, refused, err := r.ListRefs(t.Context(), dir, []string{"refs/heads/", "refs/tags/"})
+	require.NoError(t, err)
+	assert.Equal(t, Refused{Names: []string{`refs/tags/bad\u202etag`}}, refused, "escaped")
+	assert.Contains(t, got, Ref{Name: "refs/heads/main", OID: two})
+	assert.Contains(t, got, Ref{Name: "refs/tags/light", OID: one})
+	assert.Len(t, got, 4)
+
+	old := maxBranches
+	maxBranches = 4
+	t.Cleanup(func() { maxBranches = old })
+	_, _, err = r.ListRefs(t.Context(), dir, []string{"refs/heads/", "refs/tags/"})
+	require.ErrorIs(t, err, ErrRefused, "the refused name is the fifth")
+}
+
+// TestListRefsBoundsTheNamesItRefuses: a refused name is clipped to
+// maxRefusedName bytes before it is escaped, at most maxRefusedNames are
+// kept and the rest counted, and one record over maxRefRecord bytes is
+// counted as a refused name, its bytes not kept, and the list goes on.
+func TestListRefsBoundsTheNamesItRefuses(t *testing.T) {
+	oid := strings.Repeat("a", 40)
+	answer := func(out string) func(context.Context, procgroup.Command) error {
+		return func(_ context.Context, c procgroup.Command) error {
+			_, err := io.WriteString(c.Stdout, out)
+			return err
+		}
+	}
+	r := newRunner(t, Sandbox)
+	long := "refs/heads/\u202e" + strings.Repeat("x", 1000)
+	var b strings.Builder
+	b.WriteString(oid + " " + long + "\n")
+	for i := range maxRefusedNames + 5 {
+		b.WriteString(oid + " refs/heads/n\u202e" + strconv.Itoa(1000+i) + "\n")
+	}
+	b.WriteString(oid + " refs/heads/good\n")
+	r.start = answer(b.String())
+	got, refused, err := r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/"})
+	require.NoError(t, err)
+	assert.Equal(t, []Ref{{Name: "refs/heads/good", OID: oid}}, got)
+	require.Len(t, refused.Names, maxRefusedNames)
+	assert.Equal(t, 6, refused.More)
+	assert.Equal(t, `refs/heads/\u202e`+strings.Repeat("x", maxRefusedName-len("refs/heads/\u202e"))+"...", refused.Names[0], "clipped, then escaped")
+
+	r.start = answer(oid + " refs/heads/" + strings.Repeat("y", 3*maxRefRecord) + "\n" + oid + " refs/heads/after\n")
+	got, refused, err = r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/"})
+	require.NoError(t, err, "a record over the bound is one refused name")
+	assert.Equal(t, []Ref{{Name: "refs/heads/after", OID: oid}}, got)
+	assert.Equal(t, Refused{More: 1}, refused, "counted, not kept")
 }

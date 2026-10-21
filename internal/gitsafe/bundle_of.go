@@ -79,6 +79,7 @@ func (r *Runner) BundleOf(ctx context.Context, dir, file string, pairs []Ref, ba
 		return ErrNoRefs
 	}
 	names := make([]string, 0, len(pairs))
+	named := make(map[string]bool, len(pairs))
 	var stdin strings.Builder
 	for _, p := range pairs {
 		if err := checkRefName(p.Name, false); err != nil {
@@ -87,9 +88,10 @@ func (r *Runner) BundleOf(ctx context.Context, dir, file string, pairs []Ref, ba
 		if !slices.ContainsFunc(bundleNamespaces, func(ns string) bool { return strings.HasPrefix(p.Name, ns) && len(p.Name) > len(ns) }) {
 			return fmt.Errorf("%w: ref %q is outside %s", ErrRefused, p.Name, strings.Join(bundleNamespaces, ", "))
 		}
-		if slices.Contains(names, p.Name) {
+		if named[p.Name] {
 			return fmt.Errorf("%w: ref %q named twice", ErrRefused, p.Name)
 		}
+		named[p.Name] = true
 		if err := checkObjectID(p.OID); err != nil {
 			return err
 		}

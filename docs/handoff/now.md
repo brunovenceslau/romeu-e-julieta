@@ -13,15 +13,16 @@ under "Work authorized while the operator is away on 2026-10-21"
    maintainer's merge.
 2. Plan "Readers of formats between binaries ignore unknown members"
    (01m5egnpyfywadcsxpy0naz3hj); ask first to build it.
-3. T155, T150, T156, T157, planned from 01m5drzqsp6zg34xzmywckwb7b,
-   once their plan merges; build them in that order.
-4. The e2e cache annotation of 0000000000pz8zh0x006xkqa4w.
-5. The `AGENTS.md` and `CLAUDE.md` of 01m5e1majbx0hq6p710g9dmtr2.
-6. A task for T060's `disabled` item outside its owns.
-7. T077, then T081 (the kits of M2).
-8. The plan of "Dependency bumps run as a script, not by hand"
+3. T155, planned from 01m5drzqsp6zg34xzmywckwb7b; then T150 (step
+   4), then T156 and T157: the build order is T155, T150, T156, T157.
+4. T150, the imports check that refuses `encoding/json` v1.
+5. The e2e cache annotation of 0000000000pz8zh0x006xkqa4w.
+6. The `AGENTS.md` and `CLAUDE.md` of 01m5e1majbx0hq6p710g9dmtr2.
+7. A task for T060's `disabled` item outside its owns.
+8. T077, then T081 (the kits of M2).
+9. The plan of "Dependency bumps run as a script, not by hand"
    (01m5e14094yhqhsxq2g941pwrf), docs only.
-9. A checkpoint; then T111, the cut-over of M1, once T060 lands.
+10. A checkpoint; then T111, the cut-over of M1, once T060 lands.
 
 ## Open for the operator
 
@@ -44,7 +45,7 @@ One block, a recommendation each.
    changes the sandbox's authentication. Recommended: one session each.
 6. Decide the scheduled pin-freshness run, whose deferral fired with
    GO-2026-6809 (01m5e14094yhqhsxq2g941pwrf). Recommended: with the
-   bump plan of next step 8.
+   bump plan of next step 9.
 7. Confirm the partial-snapshot rule written in T060's pull request,
    and answer the two questions of the CI plan's pull request.
    Recommended: as each recommends.

@@ -10,10 +10,14 @@
 //	var _ = register("pre-commit", Action{...})
 //
 // during initialization, so the registry is written then and read-only
-// after. The files that land with later tasks are lock_check.go
-// (pre-commit, T053) and snapshot.go (post-commit, post-rewrite and
-// post-merge, T060); until they land, no hook has an action and the
-// chain starts at the tracked hook.
+// after. The snapshot (08 8.4) is the action of post-commit,
+// post-rewrite and post-merge, one file each (snapshot_post_commit.go,
+// snapshot_post_rewrite.go, snapshot_post_merge.go); each runs the
+// handler the package of julieta snapshot sets with HandleSnapshot
+// (snapshot_action.go), which calls the writer Snapshot (snapshot.go).
+// The file that lands with a later task is lock_check.go (pre-commit,
+// T053); until it lands, pre-commit has no action and its chain starts
+// at the tracked hook.
 package actions
 
 import (

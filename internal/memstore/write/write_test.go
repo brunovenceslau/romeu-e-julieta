@@ -5,6 +5,7 @@ package write
 
 import (
 	"bytes"
+	"context"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -416,6 +417,45 @@ func TestLock(t *testing.T) {
 	again, err := Lock(path, func() { t.Error("the lock was released, nobody waits") })
 	require.NoError(t, err)
 	again()
+}
+
+// TestLockContextHonoursTheContext: a taker that waits for the store
+// lock gives up when its context ends, with the context's error, and
+// takes the lock once it is free (decided while building T060). The
+// interleaving is the onWait seam, never a sleep.
+func TestLockContextHonoursTheContext(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "locks", "api.lock")
+	unlock, err := Lock(path, nil)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	_, err = LockContext(ctx, path, cancel)
+	require.ErrorIs(t, err, context.Canceled)
+
+	waiting := make(chan struct{})
+	got := make(chan error, 1)
+	go func() {
+		u, err := LockContext(t.Context(), path, func() { close(waiting) })
+		if err == nil {
+			u()
+		}
+		got <- err
+	}()
+	select {
+	case <-waiting:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the second taker never called onWait")
+	}
+	unlock()
+	select {
+	case err := <-got:
+		require.NoError(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("the second taker never took the lock")
+	}
+	u, err := LockContext(t.Context(), path, func() { t.Error("the lock is free, nobody waits") })
+	require.NoError(t, err)
+	u()
 }
 
 // TestAtomicWrite writes a file 0600 by a temporary name, replaces an
