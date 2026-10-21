@@ -589,6 +589,9 @@ repos:
 
 `REQ-0245` Kinds `clear` and `final` require the headings (six for `final`);
 `facts` has no body. julieta stamps everything in the front matter.
+`dirty` is the number of distinct paths the working tree changes,
+staged, unstaged, unmerged, untracked or hidden by assume-unchanged or
+skip-worktree, each path counted once and a rename counted as two.
 
 ## 3.11 Salvage manifest (schema `salvage.v1`)
 

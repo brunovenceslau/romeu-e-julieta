@@ -17,11 +17,9 @@ import (
 // (05 5.1): the branch and head, the upstream and the commits ahead and
 // behind it, the dirty count and the stashes (03 3.10).
 //
-// Dirty is the number of kinds of change the working tree holds, of
-// staged, unstaged, untracked, unmerged and hidden: gitsafe.Status
-// reports those and no count of files, and the file count is a
-// follow-up for gitsafe. A change in the number of files within one
-// kind is not seen.
+// Dirty is gitsafe.Status's Changed: the number of distinct paths the
+// working tree changes, staged, unstaged, unmerged, untracked or hidden
+// (03 3.10), which salvage reads as dirty-at-last-facts:<n> (REQ-0237).
 func gather(ctx context.Context, git *gitsafe.Runner, r manifest.Repo) (hf.RepoFacts, error) {
 	fail := func(err error) (hf.RepoFacts, error) {
 		return hf.RepoFacts{}, fmt.Errorf("the git facts of the repo %s: %w", esc(r.Dir), err)
@@ -31,7 +29,7 @@ func gather(ctx context.Context, git *gitsafe.Runner, r manifest.Repo) (hf.RepoF
 	if err != nil {
 		return fail(err)
 	}
-	f.Branch, f.Head, f.Dirty = strings.TrimPrefix(st.Branch, "refs/heads/"), st.OID, dirty(st)
+	f.Branch, f.Head, f.Dirty = strings.TrimPrefix(st.Branch, "refs/heads/"), st.OID, st.Changed
 	var upstream string
 	if st.Branch != "" {
 		branches, err := git.Branches(ctx, r.Path)
@@ -62,15 +60,4 @@ func gather(ctx context.Context, git *gitsafe.Runner, r manifest.Repo) (hf.RepoF
 	}
 	f.Stashes = len(stashes)
 	return f, nil
-}
-
-// dirty counts the kinds of change st reports.
-func dirty(st gitsafe.Status) int {
-	n := 0
-	for _, b := range []bool{st.Staged, st.Unstaged, st.Untracked, st.Unmerged, st.Hidden} {
-		if b {
-			n++
-		}
-	}
-	return n
 }

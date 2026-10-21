@@ -91,21 +91,27 @@ func TestStatusWorkingTreeRealGit(t *testing.T) {
 				writeFile(t, dir, "a", "staged\n")
 				plainGit(t, dir, "add", "a")
 			},
-			want: func(head string) Status { return Status{Branch: "refs/heads/main", OID: head, Staged: true} },
+			want: func(head string) Status {
+				return Status{Branch: "refs/heads/main", OID: head, Staged: true, Changed: 1}
+			},
 		},
 		"unstaged": {
 			change: func(t *testing.T, dir string) {
 				t.Helper()
 				writeFile(t, dir, "a", "changed\n")
 			},
-			want: func(head string) Status { return Status{Branch: "refs/heads/main", OID: head, Unstaged: true} },
+			want: func(head string) Status {
+				return Status{Branch: "refs/heads/main", OID: head, Unstaged: true, Changed: 1}
+			},
 		},
 		"untracked": {
 			change: func(t *testing.T, dir string) {
 				t.Helper()
 				writeFile(t, dir, "new", "x\n")
 			},
-			want: func(head string) Status { return Status{Branch: "refs/heads/main", OID: head, Untracked: true} },
+			want: func(head string) Status {
+				return Status{Branch: "refs/heads/main", OID: head, Untracked: true, Changed: 1}
+			},
 		},
 	}
 	for name, f := range fixtures {
@@ -159,6 +165,7 @@ func TestStatusDetachedAndUnbornRealGit(t *testing.T) {
 	got, err = r.Status(t.Context(), conflict)
 	require.NoError(t, err)
 	assert.True(t, got.Unmerged)
+	assert.Equal(t, 1, got.Changed, "the conflicted path")
 	assert.False(t, got.Clean())
 }
 
@@ -703,6 +710,8 @@ func TestStatusRefusesABadAnswer(t *testing.T) {
 		read func(r *Runner) error
 	}{
 		{"status without branch.oid", "# branch.head main\x00? x\x00", func(r *Runner) error { _, err := r.Status(t.Context(), stubRepo); return err }},
+		{"status ordinary record without a path", "# branch.oid " + oid + "\x00# branch.head main\x001 .M N... 100644 100644 100644 " + oid + " " + oid + "\x00", func(r *Runner) error { _, err := r.Status(t.Context(), stubRepo); return err }},
+		{"status unmerged record without a path", "# branch.oid " + oid + "\x00# branch.head main\x00u UU N... 100644 100644 100644 100644 " + oid + " " + oid + " " + oid + "\x00", func(r *Runner) error { _, err := r.Status(t.Context(), stubRepo); return err }},
 		{"status rename record", "# branch.oid " + oid + "\x00# branch.head main\x002 R. x\x00", func(r *Runner) error { _, err := r.Status(t.Context(), stubRepo); return err }},
 		{"branch outside refs/heads", " " + oid + " refs/tags/v1 \n", func(r *Runner) error { _, err := r.Branches(t.Context(), stubRepo); return err }},
 		{"branch bad upstream", " " + oid + " refs/heads/a origin/a\n", func(r *Runner) error { _, err := r.Branches(t.Context(), stubRepo); return err }},
@@ -825,7 +834,7 @@ func TestStatusHiddenRealGit(t *testing.T) {
 			got, err := newRunner(t, Sandbox).Status(t.Context(), dir)
 			require.NoError(t, err)
 			check()
-			assert.Equal(t, Status{Branch: "refs/heads/main", OID: head, Hidden: true}, got)
+			assert.Equal(t, Status{Branch: "refs/heads/main", OID: head, Hidden: true, Changed: 1}, got)
 			assert.False(t, got.Clean())
 		})
 	}
@@ -920,4 +929,65 @@ func TestStatusRunsNoFilterFromAnIncludeIf(t *testing.T) {
 
 	_, _ = plainGitErr(t, dir, nil, "status", "--porcelain")
 	assert.FileExists(t, marker, "the plant is live: plain git runs it")
+}
+
+// TestStatusChangedCountsPathsRealGit: Changed counts distinct paths.
+// Two unstaged files, one of them also staged, one untracked file and
+// one assume-unchanged entry read as 4: the path that is staged and
+// unstaged counts once, and the hidden entry, which git status does not
+// show, is read from git ls-files -v. A rename, with renames off, is a
+// deletion and an addition, so it counts as two; a hidden entry that is
+// also staged counts once.
+func TestStatusChangedCountsPathsRealGit(t *testing.T) {
+	r := newRunner(t, Sandbox)
+
+	dir, _ := newRepo(t)
+	for _, name := range []string{"a", "b", "c"} {
+		commitFile(t, dir, name, "one\n", name, "2026-02-01T00:00:00Z")
+	}
+	writeFile(t, dir, "a", "staged\n")
+	plainGit(t, dir, "add", "a")
+	writeFile(t, dir, "a", "staged, then changed again\n")
+	writeFile(t, dir, "b", "unstaged\n")
+	writeFile(t, dir, "new", "untracked\n")
+	plainGit(t, dir, "update-index", "--assume-unchanged", "c")
+	writeFile(t, dir, "c", "hidden\n")
+	assert.Equal(t, "h c", plainGit(t, dir, "ls-files", "-v", "c"), "the hidden entry, as git ls-files -v shows it")
+	check := noWrite(t, dir)
+	got, err := r.Status(t.Context(), dir)
+	require.NoError(t, err)
+	check()
+	assert.True(t, got.Staged && got.Unstaged && got.Untracked && got.Hidden)
+	assert.Equal(t, 4, got.Changed)
+
+	renamed, _ := newRepo(t)
+	commitFile(t, renamed, "old", "content\n", "old", "2026-02-01T00:00:00Z")
+	plainGit(t, renamed, "mv", "old", "new")
+	got, err = r.Status(t.Context(), renamed)
+	require.NoError(t, err)
+	assert.Equal(t, 2, got.Changed, "a rename is a deletion and an addition")
+
+	both, _ := newRepo(t)
+	commitFile(t, both, "a", "one\n", "a", "2026-02-01T00:00:00Z")
+	writeFile(t, both, "a", "staged\n")
+	plainGit(t, both, "add", "a")
+	plainGit(t, both, "update-index", "--assume-unchanged", "a")
+	got, err = r.Status(t.Context(), both)
+	require.NoError(t, err)
+	assert.True(t, got.Staged && got.Hidden)
+	assert.Equal(t, 1, got.Changed, "a staged path that is also hidden counts once")
+}
+
+// TestStatusChangedReadsPathsWithSpaces: a path with spaces, and one
+// with a newline, which -z keeps whole, each count as one path.
+func TestStatusChangedReadsPathsWithSpaces(t *testing.T) {
+	dir, _ := newRepo(t)
+	commitFile(t, dir, "a b c", "one\n", "a", "2026-02-01T00:00:00Z")
+	writeFile(t, dir, "a b c", "two\n")
+	writeFile(t, dir, "x\ny", "new\n")
+	plainGit(t, dir, "add", "x\ny")
+	plainGit(t, dir, "update-index", "--assume-unchanged", "a b c")
+	got, err := newRunner(t, Sandbox).Status(t.Context(), dir)
+	require.NoError(t, err)
+	assert.Equal(t, 2, got.Changed)
 }
