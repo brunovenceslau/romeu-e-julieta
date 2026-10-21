@@ -24,9 +24,10 @@ and records ADR 0040 and the CI plan.
    of the config and kit repositories ("T112 in the config and kit
    repositories", 00000000008h7a0ey78frxzgfr).
 8. Plan the bump tool of "Dependency bumps run as a script, not by hand"
-   (01m5e14094yhqhsxq2g941pwrf) at its trigger.
-9. "A short CLAUDE.md of pointers for this repository"
-   (01m5e1majbx0hq6p710g9dmtr2), at its trigger.
+   (01m5e14094yhqhsxq2g941pwrf); the trigger of its deferred scheduled
+   run fired with GO-2026-6809.
+9. Build the file of "A short CLAUDE.md of pointers for this
+   repository" (01m5e1majbx0hq6p710g9dmtr2) at its trigger.
 
 ## Open for the operator
 
@@ -45,6 +46,11 @@ One block, a recommendation each.
    the config and kit repositories", 00000000008h7a0ey78frxzgfr; the
    config repository's part is done), and say when the GitHub App of
    ADR 0011 changes the sandbox's authentication.
+5. Decide the scheduled run of the pin-freshness check, a deferred
+   decision of `docs/spec.md` whose trigger fired on 2026-10-20 with
+   GO-2026-6809 ("Dependency bumps run as a script, not by hand",
+   01m5e14094yhqhsxq2g941pwrf). Recommended: decide it with the bump
+   tool, one plan.
 
 ## In flight
 
