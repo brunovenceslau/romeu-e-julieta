@@ -124,3 +124,61 @@ not to the code under test. Sharding and GOCACHE stay deferred
     and `go run ./tools/ci all` passes.
 - Verify: the timings above, then `go test -race -count=1 ./...` and
   `go run ./tools/ci all`.
+
+Decisions taken while building (2026-10-21), each with what reopens
+it:
+
+- No `internal/racechild`. The imports check refuses it twice, measured
+  with a probe package imported from `tools/mutants`: no row of the
+  table of 10 10.7 names it (`imports unnamed`, REQ-0972), and `tools/**`
+  imports below `internal/` only `procgroup` and the `all` packages
+  (`imports tools`, REQ-0971). The acceptance's fallback holds: each of
+  the four packages that starts the test binary as a child
+  (`internal/procgroup`, `tools/ci`, `tools/ci/internal/drift`,
+  `tools/mutants`) has a `raceEnv` constant in its helper test file,
+  its doc naming `GORACE`, `atexit_sleep_ms` and the 1000 ms default.
+  The child's environment is otherwise as it was: the entry is added,
+  nothing is removed. Reopened by a row in the table for a test-support
+  package that `tools/**` may import.
+- The `setup` and the two `version` tests start no child: they call
+  `os.Executable` to read the path and the hash of the running test
+  binary. The 1 s of each of those packages is the test binary's own
+  `atexit_sleep_ms` sleep at its exit, which no test can set.
+- The archive tests: both approaches, as far as each keeps what a test
+  checks. A smaller payload is out for the tests that read the
+  archive: the 3.8 MB of a romeu with the julieta in it is the Go
+  runtime twice, and the build contract takes no `-s -w`. So
+  `fixture_test.go` builds the fixture twice at once, once per package
+  run (`shared`): a dry run whose gate counts its requests, and a
+  release behind a passing gate, both of one commit. `TestDryRunBuild`,
+  `TestBuildIsReproducible` (the two builds of one commit, a dry run
+  and a release, byte for byte), the dry run of
+  `TestDryRunBuildMakesNoNetworkRead`, the embedded half of
+  `TestEmbeddingDoesNotPassSilently` and `TestReleaseBuildWithTheTagAtHead`
+  read them. `TestDirtyTree` and `TestOutput` build the fixture without
+  the consumer of the julieta (half the payload), which neither reads.
+  The tests that cannot share a build keep their own: the symlink test,
+  which sets `TMPDIR`, and the two builds of the fixture without the
+  consumer. Every test that does not set the environment is parallel,
+  so a package run holds seven builds, not twelve, and they overlap.
+  Reopened by a build option that picks the gzip level, or a smaller
+  fixture binary.
+- Two `context.Background()` stay in `tools/mutants/main_test.go`,
+  each with its reason in a comment: `pinnedGo`, shared by every test
+  and made by the first to ask, and `fixture.runArgs`, which has no
+  `*testing.T` and a caller in `isolation_test.go`, which the task does
+  not own. The three helpers that serve git (`setup`, `status`,
+  `gitsafe`) take `context.WithCancel(t.Context())`: the cleanup still
+  cancels, and the test's end does it first.
+- `internal/gitsafe/reach_test.go` holds four more
+  `context.Background()`, which the audit's 28 do not list and this task
+  does not own.
+- `TestDirtyTree` and `TestOutput` now run on the fixture without the
+  embedded julieta. The refusals they assert come before the embed check
+  (`build.go:111-117` against `build.go:158`), so no assertion changed,
+  but those paths no longer run with the consumer present.
+- With `-count` above 1 the shared builds are memoised in the test
+  binary, so later iterations compare the same bytes again.
+- `raceEnv` replaces any outer `GORACE` options in a child that inherits
+  `os.Environ()`. No `GORACE` is set anywhere in the repo or CI today;
+  reopen if one is.

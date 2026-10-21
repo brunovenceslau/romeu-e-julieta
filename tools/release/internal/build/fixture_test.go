@@ -9,8 +9,13 @@ import (
 	"compress/gzip"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -138,4 +143,110 @@ func tag(t *testing.T, root, name string) {
 	t.Helper()
 	_, err := git(t.Context(), root, "-c", "tag.gpgsign=false", "tag", name)
 	require.NoError(t, err)
+}
+
+// built is a build read into memory: what a test of the archives reads,
+// kept after the directory the build wrote them to is gone.
+type built struct {
+	res      Result
+	sums     []byte
+	archives map[string][]byte // by file name
+}
+
+// readBuilt reads the files of res.
+func readBuilt(res Result) (built, error) {
+	b := built{res: res, archives: map[string][]byte{}}
+	var err error
+	if b.sums, err = os.ReadFile(res.Checksums); err != nil {
+		return built{}, err
+	}
+	for _, path := range res.Archives {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return built{}, err
+		}
+		b.archives[filepath.Base(path)] = data
+	}
+	return b, nil
+}
+
+// sharedBuilds are the two builds of one fixture commit that the tests
+// of the archives read. The gzip of an archive is the slow part of a
+// build under the race detector (some 4 s for each of the two archives of
+// a build), so the package pays it for these two builds, not for each
+// test that reads an archive.
+//
+// The paths in res.Archives and res.Checksums of each result point into
+// the temporary directory of the first test, removed when it ends, so
+// readers use only the in-memory bytes and the base names.
+type sharedBuilds struct {
+	head    string // the commit both builds are of
+	dry     built  // a dry run, with a gate that must stay unasked
+	release built  // a release build behind a gate that passes
+	asked   int32  // the requests the gate of the dry run got
+}
+
+var (
+	sharedOnce  sync.Once
+	sharedValue sharedBuilds
+	// errShared says that the first test to ask did not finish the
+	// builds: a failed require ends that test inside the Once, and the
+	// others must fail too, not read an empty value.
+	errShared = errors.New("the shared builds did not finish in an earlier test")
+)
+
+// shared returns the two shared builds, made by the first test to ask.
+// The builds run in that test: its context and its temporary files.
+func shared(t *testing.T) sharedBuilds {
+	t.Helper()
+	sharedOnce.Do(func() { sharedValue, errShared = buildShared(t) })
+	require.NoError(t, errShared)
+	return sharedValue
+}
+
+// buildShared builds the fixture at v1.0.0 twice at once: as a dry run,
+// and as a release behind a gate that passes. The dry run's gate counts
+// the requests it gets, and answers none of them with success.
+func buildShared(t *testing.T) (sharedBuilds, error) {
+	t.Helper()
+	root := fixtureModule(t)
+	tag(t, root, "v1.0.0")
+	head, err := git(t.Context(), root, "rev-parse", "HEAD")
+	require.NoError(t, err)
+	goBin := goBinOf(t)
+
+	var asked atomic.Int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		asked.Add(1)
+		http.Error(w, "no", http.StatusInternalServerError)
+	}))
+	t.Cleanup(server.Close)
+	unasked := &FuzzGate{API: server.URL, Repo: "owner/romeu-e-julieta", Token: "token",
+		Client: server.Client(), AllowHost: strings.TrimPrefix(server.URL, "https://")}
+
+	opts := [2]Options{
+		{Root: root, Version: "v1.0.0", Out: t.TempDir(), DryRun: true, GoBin: goBin, Gate: unasked},
+		{Root: root, Version: "v1.0.0", Out: filepath.Join(t.TempDir(), "out"), GoBin: goBin, Gate: fuzzedGate(t, root)},
+	}
+	// The two builds run at once from one Root, which is safe because
+	// Build never writes into Root: its staging directory comes from
+	// os.MkdirTemp (build.go, Build) and its output from publish, both
+	// outside Root.
+	var results [2]built
+	var errs [2]error
+	var wg sync.WaitGroup
+	for i := range opts {
+		wg.Go(func() {
+			res, err := Build(t.Context(), opts[i])
+			if err == nil {
+				results[i], err = readBuilt(res)
+			}
+			errs[i] = err
+		})
+	}
+	wg.Wait()
+	if err := errors.Join(errs[:]...); err != nil {
+		return sharedBuilds{}, err
+	}
+	return sharedBuilds{head: strings.TrimSpace(string(head)), dry: results[0], release: results[1], asked: asked.Load()}, nil
 }
