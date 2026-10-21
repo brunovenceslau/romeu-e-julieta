@@ -20,7 +20,8 @@ import (
 // Dirty is gitsafe.Status's Changed: the number of distinct paths the
 // working tree changes, staged, unstaged, unmerged, untracked or marked
 // assume-unchanged (03 3.10), which salvage reads as
-// dirty-at-last-facts:<n> (REQ-0237).
+// dirty-at-last-facts:<n> (REQ-0237). A change past Status's cap reads
+// as the cap, an "at least" the format does not mark.
 func gather(ctx context.Context, git *gitsafe.Runner, r manifest.Repo) (hf.RepoFacts, error) {
 	fail := func(err error) (hf.RepoFacts, error) {
 		return hf.RepoFacts{}, fmt.Errorf("the git facts of the repo %s: %w", esc(r.Dir), err)

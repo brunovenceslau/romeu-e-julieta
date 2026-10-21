@@ -212,16 +212,20 @@ it:
   before any stage runs: each stage gets its own `*os.File` at offset 0,
   which procgroup hands to the child as it is, and no file remains once
   the stages start, whatever ends the process; only a process killed
-  during the copy itself leaves one. `proc-receive` is the exception:
-  its stdin is a protocol that git keeps open, so it still goes, as it
-  is, to the first hook that runs. Reopened by a temporary directory
-  too small for a hook's stdin.
+  during the copy itself leaves one. Two exceptions go, as they are, to
+  the first hook that runs: `proc-receive`, whose stdin is a protocol
+  that git keeps open, and a stdin that is a character device, such as
+  the terminal git-p4 gives its `p4-*` hooks, which never ends
+  (`/dev/null` is one too, and reads as empty either way). Reopened by a
+  temporary directory too small for a hook's stdin.
 - `Status.Changed` counts assume-unchanged entries (lowercase tags of
   `git ls-files -v`) and not skip-worktree ones, which still set
   `Hidden`, so a clean sparse checkout reads 0 (decided on 2026-10-21;
-  03 3.10 says so). It counts at most 100,000 paths, beyond which
-  `Status` fails with `ErrRefused`, as the other bounds do. Reopened by
-  a working tree that changes more.
+  03 3.10 says so). It saturates at 100,000 paths: a working tree that
+  changes more reads 100,000 with `ChangedTruncated` set, and no error,
+  so a handoff or snapshot of a huge change still reads, and the set of
+  counted paths stays bounded; the handoff `dirty` reads the cap.
+  Reopened by a reader that needs the exact count past it.
 - The system stage runs with `JULIETA_HOOKS_SYSTEM=1`, and a dispatcher
   started with it set skips the system stage, so a system hook that
   leads back to the dispatcher, a copy of its script included, ends

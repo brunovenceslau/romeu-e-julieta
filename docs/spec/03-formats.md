@@ -594,7 +594,8 @@ repos:
 staged, unstaged, unmerged, untracked, or marked assume-unchanged. Each
 path counts once, a rename counts as two, an untracked directory that
 holds no tracked file counts once, and a skip-worktree entry does not
-count, so a clean sparse checkout reads 0.
+count, so a clean sparse checkout reads 0. The count stops at 100,000:
+a working tree that changes more paths reads 100,000.
 
 ## 3.11 Salvage manifest (schema `salvage.v1`)
 

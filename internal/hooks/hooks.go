@@ -15,7 +15,8 @@
 // $GIT_DIR/hooks/<hook>; each hook only if it exists and is executable.
 // The arguments of the hook go to each, and so does a copy of its
 // stdin, kept in a temporary file with no bound (readStdin), except for
-// proc-receive, whose stdin goes to the first hook that runs. The system hook runs
+// proc-receive and a terminal, whose stdin goes to the first hook that
+// runs. The system hook runs
 // with SystemMarker in its environment, and a run that starts with it
 // set skips the system stage, so a system hook that leads back to the
 // dispatcher cannot loop. The first non-zero status stops the chain
@@ -281,14 +282,17 @@ const hookStages = 3
 // none leaves all of it to the next (REQ-0408), and the copy leaves no
 // file behind once the stages start, whatever ends the process. A
 // large reference-transaction, whose failure aborts the transaction,
-// so fails no git command for its size. A streamed hook's stdin is in
-// itself, once.
+// so fails no git command for its size. A streamed hook's stdin, and a
+// stdin that is a character device, is in itself, once, to the first
+// hook that runs: a terminal never ends, and git-p4 gives its p4-*
+// hooks the user's; /dev/null, which git gives a hook with no input,
+// is one too, and reads as empty either way.
 func readStdin(hook string, in io.Reader) (next func() io.Reader, closeAll func(), err error) {
 	none := func() io.Reader { return nil }
 	if in == nil {
 		return none, func() {}, nil
 	}
-	if slices.Contains(streamedStdin, hook) {
+	if slices.Contains(streamedStdin, hook) || charDevice(in) {
 		return func() io.Reader {
 			r := in
 			in = nil
@@ -330,4 +334,15 @@ func readStdin(hook string, in io.Reader) (next func() io.Reader, closeAll func(
 		i++
 		return files[i-1]
 	}, closeAll, nil
+}
+
+// charDevice reports whether in is a file that is a character device,
+// such as a terminal or /dev/null.
+func charDevice(in io.Reader) bool {
+	f, ok := in.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := f.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }

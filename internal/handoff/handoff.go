@@ -67,7 +67,8 @@ type RepoFacts struct {
 	Behind int `json:"behind" yaml:"behind"`
 	// Dirty is the number of distinct paths the working tree changes:
 	// staged, unstaged, unmerged, untracked or marked assume-unchanged,
-	// a path counted once and a skip-worktree entry not at all (03 3.10);
+	// a path counted once, a skip-worktree entry not at all, and at most
+	// 100,000, which a larger change reads as (03 3.10);
 	// internal/cmd/julieta/handoff measures it with gitsafe's
 	// Status.Changed.
 	Dirty int `json:"dirty" yaml:"dirty"`

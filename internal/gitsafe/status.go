@@ -37,8 +37,8 @@ var (
 	maxStashes      = 10_000
 	maxWorktrees    = 1_000
 	maxStatusRecord = 64 << 10
-	// maxChangedPaths bounds the paths Status.Changed counts, and so
-	// the set that keeps each counted once.
+	// maxChangedPaths is the cap of Status.Changed, and so the bound of
+	// the set that keeps each path counted once.
 	maxChangedPaths = 100_000
 )
 
@@ -107,9 +107,13 @@ type Status struct {
 	// its cone, so a clean sparse checkout reads 0. Renames are off, so a
 	// rename counts as two paths, its deletion and its addition. An
 	// untracked directory that holds no tracked file counts once, as git
-	// status --untracked-files=normal shows it. More than maxChangedPaths
-	// paths fail the read.
+	// status --untracked-files=normal shows it. Changed stops at
+	// maxChangedPaths (100,000): a working tree that changes more reads
+	// the cap, with ChangedTruncated set, so the count means "at least".
 	Changed int
+	// ChangedTruncated: the working tree changes more paths than
+	// Changed, which holds the cap.
+	ChangedTruncated bool
 }
 
 // Clean reports whether the working tree holds no change: nothing
@@ -307,13 +311,15 @@ func (p *porcelain) count(rec string, fields int) error {
 	return p.add(parts[fields])
 }
 
-// add counts path once, and refuses more than maxChangedPaths paths.
+// add counts path once, and stops at maxChangedPaths: a path past the
+// cap sets ChangedTruncated and is not kept, which bounds the set.
 func (p *porcelain) add(path string) error {
 	if p.paths[path] {
 		return nil
 	}
 	if p.status.Changed == maxChangedPaths {
-		return fmt.Errorf("%w: the working tree changes more than %d paths", ErrRefused, maxChangedPaths)
+		p.status.ChangedTruncated = true
+		return nil
 	}
 	p.paths[path] = true
 	p.status.Changed++

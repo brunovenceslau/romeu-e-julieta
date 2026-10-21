@@ -1016,9 +1016,11 @@ func TestStatusChangedOfASparseCheckoutRealGit(t *testing.T) {
 	assert.Equal(t, 1, got.Changed)
 }
 
-// TestStatusChangedIsBounded: more changed paths than maxChangedPaths,
-// lowered for the test, are refused, and as many as the bound are
-// counted; the bound covers the assume-unchanged entries too.
+// TestStatusChangedIsBounded: Changed saturates at maxChangedPaths,
+// lowered for the test: a working tree that changes more reads the cap
+// with ChangedTruncated set, and no error, so a handoff of a huge change
+// still reads; at the cap it is not truncated; the cap covers the
+// assume-unchanged entries too.
 func TestStatusChangedIsBounded(t *testing.T) {
 	old := maxChangedPaths
 	maxChangedPaths = 2
@@ -1030,16 +1032,23 @@ func TestStatusChangedIsBounded(t *testing.T) {
 	writeFile(t, dir, "y", "1\n")
 	got, err := r.Status(t.Context(), dir)
 	require.NoError(t, err)
-	assert.Equal(t, 2, got.Changed, "at the bound")
+	assert.Equal(t, 2, got.Changed, "at the cap")
+	assert.False(t, got.ChangedTruncated)
 	writeFile(t, dir, "z", "1\n")
-	_, err = r.Status(t.Context(), dir)
-	require.ErrorIs(t, err, ErrRefused, "over the bound")
+	got, err = r.Status(t.Context(), dir)
+	require.NoError(t, err)
+	assert.Equal(t, 2, got.Changed, "over the cap, the cap")
+	assert.True(t, got.ChangedTruncated)
+	assert.True(t, got.Untracked)
 
 	hidden, _ := newRepo(t)
 	commitFile(t, hidden, "a", "one\n", "a", "2026-02-01T00:00:00Z")
 	plainGit(t, hidden, "update-index", "--assume-unchanged", "a")
 	writeFile(t, hidden, "x", "1\n")
 	writeFile(t, hidden, "y", "1\n")
-	_, err = r.Status(t.Context(), hidden)
-	require.ErrorIs(t, err, ErrRefused, "two untracked and one assume-unchanged path")
+	got, err = r.Status(t.Context(), hidden)
+	require.NoError(t, err)
+	assert.Equal(t, 2, got.Changed)
+	assert.True(t, got.ChangedTruncated, "two untracked and one assume-unchanged path")
+	assert.True(t, got.Hidden, "the flags are read past the cap")
 }
