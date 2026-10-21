@@ -87,3 +87,71 @@ by an `after` edge or a narrower item.
 - Verify: `go test -tags e2e ./e2e/... -run '^TestJulietaSnapshot' -v`.
   The pattern names the `TestJulietaSnapshot*` functions this task adds,
   and the reviewer reads them in the `-v` output (10 10.8).
+
+Decisions taken while building (2026-10-21), each with what reopens
+it:
+
+- An input `gitsafe` refuses whole (decided on 2026-10-21): the
+  snapshot skips that item, snapshots the rest, and records the skipped
+  item as a hook failure of the repo. `salvage.Pairs` lists each
+  namespace with its own `ListRefs` call, so a refused tag name loses
+  `refs/tags/` and keeps the branches; a refused `Worktrees` or
+  `Reflog` loses that input only. `actions.Snapshot` writes the pair
+  and returns `ErrSnapshotPartial` naming each item, which the
+  dispatcher records (REQ-0409) and `julieta snapshot` exits 1 on.
+  Reopened by a `gitsafe` verb that lists the refs it accepts and
+  reports the rest.
+- The `.gitsafe-bundle-*` leftover: the bundle is built in
+  `$HOME/.local/state/julieta/snapshot/<dir>/`, never in the memory
+  dir, whose layout check (08 8.1) reads a dot directory as a finding
+  that `romeu sync` refuses. Each snapshot, under the store lock,
+  removes the `.gitsafe-bundle-*` and `heads-*` names a killed snapshot
+  left there; the bundle is then copied into `snapshot/` through a
+  `.tmp-<ULID>` file, which `julieta setup` stays the cleanup of
+  (REQ-0691). Reopened by a memory dir on the file system of julieta
+  state, where a rename would do.
+- The copy is streamed by `copyAtomic` (`internal/hooks/actions/
+  snapshot.go`), which follows `write.AtomicWrite` step for step:
+  `AtomicWrite` takes a `[]byte`, and a bundle may reach the salvage
+  cap. Reopened by `internal/memstore/write` gaining a reader form,
+  which `copyAtomic` then calls.
+- The store lock is held from before the read of the refs to after
+  the last write, so the work directory has one user and the pair on
+  disk is one snapshot's (REQ-0690). Reopened by a snapshot slow enough
+  to hold `julieta memory add` back.
+- When the bases reach every ref, git refuses an empty bundle; the
+  snapshot then removes the earlier bundle in place of the first write
+  and writes `heads.json`, so the pair stays one snapshot's and
+  `disabled` is written for a repo with no work. A repo with no ref is
+  the same case (`gitsafe.ErrNoRefs`). The refusal is read from git's
+  message under `LANG=C`. Reopened by a `gitsafe` sentinel for it.
+- `heads.json` lists every ref the snapshot read; the bundle holds only
+  the refs with an object beyond the bases, since git leaves out a ref
+  a base reaches. romeu trusts the bundle's refs (REQ-0689).
+- Names: a detached worktree HEAD is
+  `refs/salvage-reflog/worktrees/<k>/HEAD` and a commit of its HEAD
+  reflog `refs/salvage-reflog/worktrees/<k>/<n>`, with `k` the
+  worktree's place in `git worktree list` and `n` the entry's index as
+  git numbers it (`<ref>@{n}`), the branches' too. A name a branch
+  already takes is skipped and recorded. Reopened by romeu's import,
+  should it need the worktree's path.
+- Whether a bundled ref reaches a reflog commit is asked one ref at a
+  time with `AheadBehind`: about 0.6 s for a branch of 300 commits
+  here. Reopened by a snapshot too slow after a commit, with a
+  `gitsafe` verb that answers for every commit in one `rev-list`.
+- `disabled` is what `julieta snapshot` reads itself: the repo's own
+  config sets `core.hooksPath`, as `julieta status` reads it. The
+  `setup`, `status` and SessionStart part of the acceptance row is a
+  task of its own after T060 (decided on 2026-10-21).
+- The snapshot handler of the dispatcher is set by
+  `internal/cmd/julieta/snapshot` with `actions.HandleSnapshot`, since
+  `internal/hooks/actions` cannot import a package that imports
+  `internal/cmd/julieta/setup`; its clock is `time.Now`, a variable the
+  tests replace. A manifest repo is found by its path or by one of its
+  worktrees; a repo of no manifest takes no snapshot and records
+  nothing. Reopened by an `actions.Input` that carries the clock.
+- The snapshot is not bounded by `salvage.capBytes` (REQ-0648 is not
+  implemented here). Reopened by the task that implements REQ-0648.
+- The golden is `testdata/heads.json.golden`: a `.json` file under
+  `testdata/` naming `snapshot/v1` is read by `tools/ci schema` as a
+  registered format, and 03 3.13 gives `heads.json` none.
