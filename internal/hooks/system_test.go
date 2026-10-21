@@ -8,6 +8,7 @@ package hooks_test
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,20 +82,78 @@ func TestRunASystemHookThatIgnoresStdinLeavesItToTheRepoHook(t *testing.T) {
 	assert.Contains(t, stderr, "stage tracked")
 }
 
-// TestRunStdinOverTheBound: a stdin longer than the bound, lowered for
-// the test, fails the run before any stage starts.
-func TestRunStdinOverTheBound(t *testing.T) {
-	t.Cleanup(hooks.SetMaxStdin(4))
+// TestRunLargeStdinReachesEveryHook: a stdin larger than any memory
+// bound, as a reference-transaction of many refs writes, reaches the
+// system, tracked and local hooks whole, each from its own copy, and
+// the copy leaves no file behind.
+func TestRunLargeStdinReachesEveryHook(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
 	r := newRepo(t)
-	r.hook(".githooks/pre-push", 0o755, "")
-	var out bytes.Buffer
-	_, err := hooks.Run(t.Context(), hooks.Options{Hook: "pre-push", Dir: r.dir, Env: []string{"PATH=/usr/bin:/bin"},
-		Stdin: strings.NewReader("12345"), Stdout: &out, Stderr: &out, StateDir: r.state, Now: func() time.Time { return clock }})
-	require.ErrorContains(t, err, "longer than 4 bytes")
-	assert.Empty(t, r.logged(), "no stage ran")
+	out := t.TempDir()
+	cat := func(path, name string) {
+		require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\ncat >"+filepath.Join(out, name)+"\n"), 0o755))
+	}
+	system := filepath.Join(t.TempDir(), "kit")
+	require.NoError(t, os.MkdirAll(system, 0o755))
+	cat(filepath.Join(system, "reference-transaction"), "system")
+	cat(filepath.Join(r.dir, ".githooks", "reference-transaction"), "tracked")
+	cat(filepath.Join(r.dir, ".git", "hooks", "reference-transaction"), "local")
+	line := strings.Repeat("a", 40) + " " + strings.Repeat("b", 40) + " refs/heads/branch-with-a-long-name\n"
+	stdin := strings.Repeat(line, (9<<20)/len(line)+1) // over the 8 MiB the dispatcher once held in memory
+	status, stderr := r.runSystem("reference-transaction", stdin, system, filepath.Join(t.TempDir(), "dispatcher"))
+	require.Equal(t, 0, status, stderr)
+	for _, name := range []string{"system", "tracked", "local"} {
+		got, err := os.ReadFile(filepath.Join(out, name))
+		require.NoError(t, err)
+		assert.Equal(t, sha256.Sum256([]byte(stdin)), sha256.Sum256(got), "%s got the whole stdin", name)
+	}
+	assertEmptyDir(t, tmp)
+}
 
-	status, _ := r.run("pre-push", "1234")
-	assert.Equal(t, 0, status, "at the bound")
+// TestRunStdinCopyLeavesNoFile: the copy of the stdin is gone after a
+// stage fails and after a run whose context is cancelled while a stage
+// runs.
+func TestRunStdinCopyLeavesNoFile(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+	r := newRepo(t)
+	r.hook(".githooks/pre-push", 0o755, "exit 3")
+	status, _ := r.run("pre-push", "refs/heads/main abc\n")
+	assert.Equal(t, 3, status)
+	assertEmptyDir(t, tmp)
+
+	started := filepath.Join(t.TempDir(), "started")
+	require.NoError(t, os.WriteFile(filepath.Join(r.dir, ".githooks", "pre-push"),
+		[]byte("#!/bin/sh\ntouch "+started+"\nexec sleep 30\n"), 0o755))
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go func() {
+		for {
+			if _, err := os.Stat(started); err == nil {
+				cancel()
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
+	}()
+	var out bytes.Buffer
+	_, err := hooks.Run(ctx, hooks.Options{Hook: "pre-push", Dir: r.dir, Env: []string{"PATH=/usr/bin:/bin"},
+		Stdin: strings.NewReader("refs/heads/main abc\n"), Stdout: &out, Stderr: &out, StateDir: r.state, Now: func() time.Time { return clock }})
+	require.ErrorIs(t, err, context.Canceled)
+	assertEmptyDir(t, tmp)
+}
+
+// assertEmptyDir fails the test unless dir holds nothing.
+func assertEmptyDir(t *testing.T, dir string) {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "no copy of the stdin remains in %s", dir)
 }
 
 // TestRunProcReceiveStreamsStdin: proc-receive talks a protocol with

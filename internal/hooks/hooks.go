@@ -14,8 +14,8 @@
 // (internal/hooks/actions); the repo's tracked .githooks/<hook>; and
 // $GIT_DIR/hooks/<hook>; each hook only if it exists and is executable.
 // The arguments of the hook go to each, and so does a copy of its
-// stdin, read once and bounded (readStdin), except for proc-receive,
-// whose stdin goes to the first hook that runs. The system hook runs
+// stdin, kept in a temporary file with no bound (readStdin), except for
+// proc-receive, whose stdin goes to the first hook that runs. The system hook runs
 // with SystemMarker in its environment, and a run that starts with it
 // set skips the system stage, so a system hook that leads back to the
 // dispatcher cannot loop. The first non-zero status stops the chain
@@ -32,7 +32,6 @@
 package hooks
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -93,8 +92,9 @@ type Options struct {
 	Dir string
 	// Env is the environment of the stages, as git gave it.
 	Env []string
-	// Stdin is the stdin of the hook, read once and given to every hook
-	// stage as a copy (readStdin). Nil means an empty one.
+	// Stdin is the stdin of the hook, copied once to a file and given to
+	// every hook stage as a reader of its own (readStdin). Nil means an
+	// empty one.
 	Stdin io.Reader
 	// Stdout and Stderr receive the output of every stage and the line
 	// the dispatcher prints on a failure.
@@ -155,10 +155,11 @@ func Run(ctx context.Context, o Options) (int, error) {
 		note("the failure could not be recorded", Record(o.StateDir, f))
 		return f.ExitCode, nil
 	}
-	stdin, err := readStdin(o.Hook, o.Stdin)
+	stdin, closeStdin, err := readStdin(o.Hook, o.Stdin)
 	if err != nil {
 		return 0, err
 	}
+	defer closeStdin()
 	// runHook runs one hook stage, if its hook is executable, with env,
 	// and reports whether it stopped the chain, with its status.
 	runHook := func(stage, path string, env []string) (bool, int, error) {
@@ -261,41 +262,72 @@ func executable(path string) bool {
 	return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
 }
 
-// maxStdin is the bound of the stdin the dispatcher reads once and
-// gives each hook a copy of: git writes ref lines there, about a hundred
-// bytes each, so 8 MiB holds some eighty thousand. It is a variable so
-// the tests can lower it.
-var maxStdin = 8 << 20
-
 // streamedStdin are the hooks whose stdin is a protocol with git, which
 // keeps it open while the hook answers (githooks(5), proc-receive):
 // reading it to its end first would wait for ever, so it goes as it is
 // to the first hook that runs, and the later ones get none.
 var streamedStdin = []string{"proc-receive"}
 
-// readStdin returns the stdin of each hook stage of hook: a new reader
-// of one copy of in for every call, so a stage that reads none leaves
-// all of it to the next (REQ-0408), and procgroup.Run, which does not
-// wait for the copy of a reader that is not a file, never shares a
-// reader between two stages. A stdin longer than maxStdin is an error
-// before any stage runs. A streamed hook's stdin is in itself, once.
-func readStdin(hook string, in io.Reader) (func() io.Reader, error) {
+// hookStages is the number of stages that run a hook, and so read a
+// copy of the stdin: system, tracked and local.
+const hookStages = 3
+
+// readStdin returns the stdin of each hook stage of hook, and a close
+// that releases it. in is copied, with no bound, to a file of the
+// temporary directory (0600, never in the repository), which is opened
+// once for each stage that runs a hook and then removed, before any
+// stage runs: each stage gets its own *os.File at offset 0, which
+// procgroup.Run passes to the child as it is, so a stage that reads
+// none leaves all of it to the next (REQ-0408), and the copy leaves no
+// file behind once the stages start, whatever ends the process. A
+// large reference-transaction, whose failure aborts the transaction,
+// so fails no git command for its size. A streamed hook's stdin is in
+// itself, once.
+func readStdin(hook string, in io.Reader) (next func() io.Reader, closeAll func(), err error) {
+	none := func() io.Reader { return nil }
 	if in == nil {
-		return func() io.Reader { return nil }, nil
+		return none, func() {}, nil
 	}
 	if slices.Contains(streamedStdin, hook) {
 		return func() io.Reader {
 			r := in
 			in = nil
 			return r
-		}, nil
+		}, func() {}, nil
 	}
-	data, err := io.ReadAll(io.LimitReader(in, int64(maxStdin)+1))
+	f, err := os.CreateTemp("", "julieta-hook-stdin-")
 	if err != nil {
-		return nil, fmt.Errorf("the stdin of the hook %s: %w", hook, err)
+		return nil, nil, fmt.Errorf("the copy of the stdin of the hook %s: %w", hook, err)
 	}
-	if len(data) > maxStdin {
-		return nil, fmt.Errorf("the stdin of the hook %s is longer than %d bytes", hook, maxStdin)
+	path := f.Name()
+	defer func() { _ = os.Remove(path) }()
+	_, err = io.Copy(f, in)
+	if cerr := f.Close(); err == nil {
+		err = cerr
 	}
-	return func() io.Reader { return bytes.NewReader(data) }, nil
+	if err != nil {
+		return nil, nil, fmt.Errorf("the copy of the stdin of the hook %s: %w", hook, err)
+	}
+	files := make([]*os.File, 0, hookStages)
+	closeAll = func() {
+		for _, f := range files {
+			_ = f.Close()
+		}
+	}
+	for range hookStages {
+		f, err := os.Open(path)
+		if err != nil {
+			closeAll()
+			return nil, nil, fmt.Errorf("the copy of the stdin of the hook %s: %w", hook, err)
+		}
+		files = append(files, f)
+	}
+	i := 0
+	return func() io.Reader {
+		if i == len(files) {
+			return nil
+		}
+		i++
+		return files[i-1]
+	}, closeAll, nil
 }

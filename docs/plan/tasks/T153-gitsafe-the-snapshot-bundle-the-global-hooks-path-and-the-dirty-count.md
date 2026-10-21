@@ -202,13 +202,20 @@ it:
 - `Reflog` takes `HEAD` as well as a full ref name, so a worktree's
   HEAD reflog can be read from that worktree. Reopened by T060.
 - Every hook stage gets its own copy of the hook's stdin (decided on
-  2026-10-21; REQ-0408 says so): the dispatcher reads it once, up to
-  8 MiB (about eighty thousand ref lines), refuses a longer one before
-  any stage runs, and gives each stage a new reader, so a system hook
-  that reads none cannot hide the ref lines from the tracked
-  `pre-push`. `proc-receive` is the exception: its stdin is a protocol
-  that git keeps open, so it still goes, as it is, to the first hook
-  that runs. Reopened by a hook whose stdin needs more than the bound.
+  2026-10-21; REQ-0408 says so), so a system hook that reads none cannot
+  hide the ref lines from the tracked `pre-push`. The copy has no size
+  bound, since a non-zero `reference-transaction` in its prepared state
+  aborts the transaction, and a bound would fail a fetch or push of many
+  refs that streamed before. The dispatcher copies the stdin to a 0600
+  file of the temporary directory (`os.TempDir`, never the repository),
+  opens it once for each of the three hook stages, and removes the path
+  before any stage runs: each stage gets its own `*os.File` at offset 0,
+  which procgroup hands to the child as it is, and no file remains once
+  the stages start, whatever ends the process; only a process killed
+  during the copy itself leaves one. `proc-receive` is the exception:
+  its stdin is a protocol that git keeps open, so it still goes, as it
+  is, to the first hook that runs. Reopened by a temporary directory
+  too small for a hook's stdin.
 - `Status.Changed` counts assume-unchanged entries (lowercase tags of
   `git ls-files -v`) and not skip-worktree ones, which still set
   `Hidden`, so a clean sparse checkout reads 0 (decided on 2026-10-21;
