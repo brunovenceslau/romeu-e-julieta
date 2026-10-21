@@ -120,7 +120,7 @@ func TestPairsSkipsARefusedRefAlone(t *testing.T) {
 	require.Len(t, plan.Skipped, 1)
 	assert.Equal(t, `refs/tags/bad\u202etag`, plan.Skipped[0].Item)
 	require.ErrorIs(t, plan.Skipped[0].Err, gitsafe.ErrRefused)
-	assert.False(t, plan.Whole(), "one ref, not a namespace")
+	assert.False(t, plan.LostNamespace(), "one ref, not a namespace")
 }
 
 // TestPairsSkipsABrokenWorktree: a worktree whose directory is now
@@ -146,7 +146,7 @@ func TestPairsSkipsABrokenWorktree(t *testing.T) {
 		items = append(items, s.Item)
 	}
 	assert.Equal(t, []string{"worktree 2"}, items, "other, the second by its id; gone, whose .git is missing, is prunable and not read")
-	assert.True(t, plan.Whole(), "a whole source of reflog commits")
+	assert.False(t, plan.LostNamespace(), "a source of reflog commits, not a namespace")
 }
 
 // TestPairsNamesAtMostTheCap: the reflog commits beyond
@@ -180,15 +180,16 @@ func TestPairsNamesAtMostTheCap(t *testing.T) {
 	plan, err = salvage.Pairs(t.Context(), runner(t), dir, generation, []string{base})
 	require.NoError(t, err)
 	assert.Len(t, plan.Pairs, 2, "main and one reflog commit")
-	require.Len(t, plan.Skipped, 1)
-	assert.Equal(t, "1 reflog commits", plan.Skipped[0].Item)
-	assert.False(t, plan.Whole(), "the cap keeps the snapshot moving")
+	require.Len(t, plan.Skipped, 2)
+	assert.Equal(t, "1 reflog commits over the candidates' cap", plan.Skipped[0].Item, "o1, the oldest of three")
+	assert.Equal(t, "1 reflog commits", plan.Skipped[1].Item)
+	assert.False(t, plan.LostNamespace(), "the cap keeps the snapshot moving")
 }
 
 // TestPairsAsksACommitAloneWhenTheWalkFails: a reflog commit whose
 // parent the repository does not hold fails git's walk of the whole
 // set; each commit is then asked alone, the one that fails is left out
-// as a whole source's loss, and the others are named.
+// and recorded, and the others are named.
 func TestPairsAsksACommitAloneWhenTheWalkFails(t *testing.T) {
 	dir := repo(t)
 	base := commit(t, dir, "base")
@@ -209,7 +210,49 @@ func TestPairsAsksACommitAloneWhenTheWalkFails(t *testing.T) {
 	assert.False(t, oids[broken])
 	require.Len(t, plan.Skipped, 1)
 	assert.Contains(t, plan.Skipped[0].Item, broken)
-	assert.True(t, plan.Whole())
+	assert.False(t, plan.LostNamespace())
+}
+
+// TestPairsBoundsTheWalk: the reflog candidates are capped at twice
+// MaxReflogCommits before the first walk, the rest a recorded skip;
+// and the walk commit by commit stops after MaxWalkFailures failures,
+// the commits not asked a recorded skip.
+func TestPairsBoundsTheWalk(t *testing.T) {
+	dir := repo(t)
+	base := commit(t, dir, "base")
+	tree := git(t, dir, "rev-parse", "HEAD^{tree}")
+	var moves []string
+	for i := range 3 {
+		moves = append(moves, hashCommit(t, dir, "tree "+tree+"\nparent "+strings.Repeat(strconv.Itoa(i+1), 40)+
+			"\nauthor f <f@x> 0 +0000\ncommitter f <f@x> 0 +0000\n\nbroken "+strconv.Itoa(i)+"\n"))
+	}
+	moves = append(moves, git(t, dir, "commit-tree", "-m", "good", tree), base)
+	for _, c := range moves {
+		git(t, dir, "update-ref", "-m", "move", "refs/heads/main", c)
+	}
+	oldWalk, oldCap := salvage.MaxWalkFailures, salvage.MaxReflogCommits
+	t.Cleanup(func() { salvage.MaxWalkFailures, salvage.MaxReflogCommits = oldWalk, oldCap })
+
+	// Newest first: good, then broken 2, 1, 0. One failure stops the
+	// walk: good is named, broken 2 fails, 1 and 0 are not asked.
+	salvage.MaxWalkFailures = 1
+	plan, err := salvage.Pairs(t.Context(), runner(t), dir, generation, []string{base})
+	require.NoError(t, err)
+	assert.Len(t, plan.Pairs, 2, "main and good")
+	require.Len(t, plan.Skipped, 2)
+	assert.Contains(t, plan.Skipped[0].Item, moves[2])
+	assert.Equal(t, "2 reflog commits not walked", plan.Skipped[1].Item)
+
+	// A cap of 1 asks at most 2 candidates: good and broken 2.
+	salvage.MaxWalkFailures, salvage.MaxReflogCommits = oldWalk, 1
+	plan, err = salvage.Pairs(t.Context(), runner(t), dir, generation, []string{base})
+	require.NoError(t, err)
+	var items []string
+	for _, s := range plan.Skipped {
+		items = append(items, s.Item)
+	}
+	assert.Contains(t, items, "2 reflog commits over the candidates' cap")
+	assert.False(t, plan.LostNamespace())
 }
 
 // TestPairsReadsTheWorktreesOfALinkedPath: a repository reached through

@@ -115,9 +115,9 @@ const (
 // made), the earlier bundle is removed in place of the first write;
 // when the plan also left an input out, nothing is written, so a
 // partial plan never takes the earlier bundle away. A plan that lost a
-// namespace or a whole source of reflog commits (salvage.Plan.Whole)
-// does not replace an earlier pair either, and is written only where
-// there is none. Before it builds,
+// namespace of refs (salvage.Plan.LostNamespace) does not replace an
+// earlier pair either, and is written only where there is none; a plan
+// that lost a reflog source is written. Before it builds,
 // Snapshot removes what a killed snapshot left in c.Work. The whole
 // snapshot, the wait for the lock included, ends after
 // SnapshotTimeout.
@@ -169,9 +169,9 @@ func Snapshot(ctx context.Context, c SnapshotConfig) (res SnapshotResult, err er
 	if snapshotAfterRead != nil {
 		snapshotAfterRead()
 	}
-	if plan.Whole() {
-		// A plan that lost a namespace or a whole source does not
-		// replace an earlier pair (decided while building T060).
+	if plan.LostNamespace() {
+		// A plan that lost a namespace of refs does not replace an
+		// earlier pair (decided while building T060).
 		if _, err := root.Lstat(path.Join(memstore.SnapshotDir, salvage.HeadsFile)); err == nil {
 			return SnapshotResult{Skipped: plan.Skipped}, partial(plan.Skipped)
 		} else if !errors.Is(err, fs.ErrNotExist) {

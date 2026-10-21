@@ -373,11 +373,12 @@ func TestCopyAtomicCopiesARegularFileOnly(t *testing.T) {
 	require.NoError(t, copyAtomic(t.Context(), root, "out", file, clock, ulids))
 }
 
-// TestAWholeSkipKeepsTheEarlierPair (decided while building T060): a
-// plan that lost a whole source, here the reflog of a worktree that is
-// now another repository, does not replace an earlier pair, and fails;
-// with no earlier pair, it is written, and fails.
-func TestAWholeSkipKeepsTheEarlierPair(t *testing.T) {
+// TestALostNamespaceKeepsTheEarlierPair (decided while building
+// T060): a plan that lost a namespace, here refs/salvage/<generation>/
+// refused whole for a generation gitsafe does not read, does not
+// replace an earlier pair, and fails; with no earlier pair, it is
+// written, and fails.
+func TestALostNamespaceKeepsTheEarlierPair(t *testing.T) {
 	f := newFixture(t)
 	commit(t, f.repo, "one")
 	_, err := Snapshot(t.Context(), f.config(t, clock))
@@ -385,22 +386,43 @@ func TestAWholeSkipKeepsTheEarlierPair(t *testing.T) {
 	before, err := os.ReadFile(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
 	require.NoError(t, err)
 
-	wt := filepath.Join(filepath.Dir(f.repo), "wt")
-	git(t, f.repo, "worktree", "add", "-q", "-b", "w", wt)
-	require.NoError(t, os.RemoveAll(wt))
-	git(t, filepath.Dir(f.repo), "init", "-q", wt)
 	commit(t, f.repo, "two")
-	_, err = Snapshot(t.Context(), f.config(t, clock.Add(time.Minute)))
+	c := f.config(t, clock.Add(time.Minute))
+	c.Generation = "a*b"
+	_, err = Snapshot(t.Context(), c)
 	require.ErrorIs(t, err, ErrSnapshotPartial)
 	after, err := os.ReadFile(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
 	require.NoError(t, err)
 	assert.Equal(t, string(before), string(after), "the earlier pair stays")
 
 	require.NoError(t, os.RemoveAll(f.snapshotDir()))
-	res, err := Snapshot(t.Context(), f.config(t, clock.Add(2*time.Minute)))
+	c.Now = func() time.Time { return clock.Add(2 * time.Minute) }
+	res, err := Snapshot(t.Context(), c)
 	require.ErrorIs(t, err, ErrSnapshotPartial)
 	assert.True(t, res.Bundle, "with no earlier pair, the partial one is written")
 	assert.Equal(t, clock.Add(2*time.Minute), f.heads(t).CreatedAt)
+}
+
+// TestABrokenWorktreeStillWritesTheSnapshot (decided while building
+// T060): the reflog of a worktree that is now another repository is
+// left out and recorded, and the snapshot replaces the earlier pair,
+// so later work is still salvaged.
+func TestABrokenWorktreeStillWritesTheSnapshot(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+	_, err := Snapshot(t.Context(), f.config(t, clock))
+	require.NoError(t, err)
+
+	wt := filepath.Join(filepath.Dir(f.repo), "wt")
+	git(t, f.repo, "worktree", "add", "-q", "-b", "w", wt)
+	require.NoError(t, os.RemoveAll(wt))
+	git(t, filepath.Dir(f.repo), "init", "-q", wt)
+	two := commit(t, f.repo, "two")
+	_, err = Snapshot(t.Context(), f.config(t, clock.Add(time.Minute)))
+	require.ErrorIs(t, err, ErrSnapshotPartial)
+	h := f.heads(t)
+	assert.Equal(t, clock.Add(time.Minute), h.CreatedAt, "the snapshot was written")
+	assert.Equal(t, two, h.Refs["refs/heads/main"])
 }
 
 // TestSnapshotEndsAtItsDeadline: a context whose deadline has passed

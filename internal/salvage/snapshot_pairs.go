@@ -28,18 +28,20 @@ type Plan struct {
 // Skip is one input a snapshot left out: what it is (a ref name gitsafe
 // refused, a namespace, "worktrees", a worktree, the reflog of a ref,
 // a reflog commit git could not walk, or the reflog commits over the
-// cap) and why. Whole says it is a namespace or a whole source of
-// reflog commits, whose loss a snapshot must not write over an earlier
-// one with (decided while building T060).
+// cap) and why. Namespace says it is a namespace of refs gitsafe
+// refused whole (refs/heads/, refs/tags/, refs/notes/ or
+// refs/salvage/<generation>/), whose loss a snapshot must not write
+// over an earlier pair with; the loss of a reflog source is not
+// (decided while building T060).
 type Skip struct {
-	Item  string
-	Err   error
-	Whole bool
+	Item      string
+	Err       error
+	Namespace bool
 }
 
-// Whole reports whether p left out a namespace or a whole source.
-func (p Plan) Whole() bool {
-	return slices.ContainsFunc(p.Skipped, func(s Skip) bool { return s.Whole })
+// LostNamespace reports whether p left out a whole namespace of refs.
+func (p Plan) LostNamespace() bool {
+	return slices.ContainsFunc(p.Skipped, func(s Skip) bool { return s.Namespace })
 }
 
 // Refs returns the pairs of p as the refs of snapshot/heads.json.
@@ -63,6 +65,12 @@ const worktreePrefix = "worktrees/"
 // named, and the rest left out and recorded. A variable, so a test can
 // lower it.
 var MaxReflogCommits = 1000
+
+// MaxWalkFailures is the most reflog commits Pairs asks git about one
+// by one that may fail, after a walk of the whole set failed: the walk
+// stops there, and the commits not asked are a recorded skip. A
+// variable, so a test can lower it.
+var MaxWalkFailures = 20
 
 // Pairs returns what a snapshot of the repository in dir bundles (08
 // 8.4, REQ-0688), read through gitsafe: the local branches, tags and
@@ -100,7 +108,7 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string, bas
 		if cerr := ctx.Err(); cerr != nil {
 			return cerr
 		}
-		p.Skipped = append(p.Skipped, Skip{Item: item, Err: err, Whole: true})
+		p.Skipped = append(p.Skipped, Skip{Item: item, Err: err})
 		return nil
 	}
 	names := newNameSet()
@@ -115,6 +123,7 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string, bas
 			if err := skip(ns, err); err != nil {
 				return Plan{}, err
 			}
+			p.Skipped[len(p.Skipped)-1].Namespace = true
 			continue
 		}
 		if err != nil {
@@ -172,7 +181,7 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string, bas
 				return Plan{}, err
 			}
 		case !sameDir(c, common):
-			p.Skipped = append(p.Skipped, Skip{Item: "worktree " + strconv.Itoa(k), Whole: true,
+			p.Skipped = append(p.Skipped, Skip{Item: "worktree " + strconv.Itoa(k),
 				Err: fmt.Errorf("%w: its common git dir %s is not the repository's %s", gitsafe.ErrRefused, c, common)})
 		default:
 			sources = append(sources, source{w.Path, "HEAD", prefix})
@@ -208,6 +217,11 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string, bas
 			named[oid] = candidate{s.prefix, strconv.Itoa(len(entries) - 1 - i), item}
 		}
 	}
+	if over := len(oids) - 2*MaxReflogCommits; over > 0 {
+		p.Skipped = append(p.Skipped, Skip{Item: strconv.Itoa(over) + " reflog commits over the candidates' cap",
+			Err: fmt.Errorf("%w: a snapshot asks git about at most %d reflog commits", gitsafe.ErrRefused, 2*MaxReflogCommits)})
+		oids = oids[:2*MaxReflogCommits]
+	}
 	exclude := slices.Concat(tips, bases)
 	unreached, err := git.Unreached(ctx, dir, oids, exclude)
 	if err != nil {
@@ -218,12 +232,19 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string, bas
 			return Plan{}, cerr
 		}
 		unreached = nil
-		for _, oid := range oids {
+		failures := 0
+		for i, oid := range oids {
+			if failures == MaxWalkFailures {
+				p.Skipped = append(p.Skipped, Skip{Item: strconv.Itoa(len(oids)-i) + " reflog commits not walked",
+					Err: fmt.Errorf("%w: git failed on %d reflog commits", gitsafe.ErrRefused, failures)})
+				break
+			}
 			one, err := git.Unreached(ctx, dir, []string{oid}, exclude)
 			if err != nil {
 				if err := skip(named[oid].item+": the commit "+oid, err); err != nil {
 					return Plan{}, err
 				}
+				failures++
 				continue
 			}
 			unreached = append(unreached, one...)
