@@ -16,5 +16,9 @@ salvage's `dirty-at-last-facts`, REQ-0237, then read it). julieta's own
 git calls already empty `core.hooksPath`, so the global key does not
 make them call the dispatcher.
 
-Reopen: when the task is planned; it can share one task with "gitsafe
-verbs for the snapshot bundle" (01m5d7v42kv79hf42g15ffgk59).
+Planned on 2026-10-20 as T153, one task with "gitsafe verbs for the
+snapshot bundle" (01m5d7v42kv79hf42g15ffgk59). Decided on 2026-10-21:
+the dispatcher gains a first `system` stage for the system hooks path
+the sandbox kit sets (option (a) of T153).
+
+Reopen: when T153 merges, and this note closes.
