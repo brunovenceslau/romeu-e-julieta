@@ -4,12 +4,13 @@
 
 Checkpoint of 2026-10-20, after T078 merged: "Session of 2026-10-20, the
 skills of T078 and the CI plan" (01m5drzqrqhekxjja8dkz6njf2) ticks T078
-and records ADR 0040 and the CI plan.
+and records ADR 0040 and the CI plan. Since then, on 2026-10-21, T153 merged
+(#224), ticked by "T153, the gitsafe verbs of the snapshot bundle and
+the system hooks stage" (01m5ed3ahrd8b8e0p20606r97g).
 
 ## Next steps
 
-1. Build T153 (`gitsafe` verbs and the `system` stage of the hooks
-   chain); then re-plan and build T060.
+1. Build T060 (`julieta snapshot`), re-planned on T153 on 2026-10-21.
 2. Plan "One race run, test tags and parallel CI jobs"
    (01m5drzqsp6zg34xzmywckwb7b), measuring the slow race packages first.
 3. A `julieta status` task for "julieta status reads the hook failure
@@ -50,7 +51,7 @@ One block, a recommendation each.
 
 ## In flight
 
-- `docs/plan-gitsafe-snapshot-and-hooks-verbs`, the plan of T153.
+- `docs/tick-t153-replan-t060`, T153's tick and T060's re-plan.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
