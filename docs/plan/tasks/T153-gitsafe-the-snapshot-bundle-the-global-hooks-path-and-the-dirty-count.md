@@ -160,3 +160,38 @@ needs a word it is amended the same way (05 is owned by T039).
 T060 is re-planned on this task once it merges: its bundle comes from
 `ListRefs`, `Reflog`, `Worktrees` and `BundleOf`, and its `needs` gains
 T153.
+
+Decisions taken while building (2026-10-21), each with what reopens
+it:
+
+- `BundleOf`'s temporary bare repository borrows the user's objects
+  through its own `objects/info/alternates` file, not
+  `GIT_ALTERNATE_OBJECT_DIRECTORIES`: the file goes with the temporary
+  repository, every git call keeps the environment of its mode (sandbox
+  mode passes no other `GIT_*` variable), and a file line needs no list
+  separator where the variable splits paths at a colon. The temporary
+  repository is made in the directory of the bundle file, and has no
+  shallow file, so a shallow repository's history is git's error.
+  Reopened by a caller that bundles from a shallow repository.
+- `SetGlobalHooksPath` and `SystemHooksPath` read their key with
+  `--includes`, as git reads it when it runs a hook, so a value in an
+  included file is seen and kept. `SystemHooksPath` is sandbox mode
+  only, since host mode reads no system config. Reopened by a host
+  caller.
+- A global `core.hooksPath` that names another directory leaves the
+  sandbox unusable (`setup` exits 1 and names it), since git then runs
+  no dispatcher, and so does a system value `setup` cannot read, which
+  also leaves the global key unset. Reopened by a warning slug for it
+  in 04 4.4.
+- The record of the system hooks path is
+  `$HOME/.local/state/julieta/system-hooks-path.json`
+  (`internal/hooks/system.go`); a system config that sets no value
+  removes it, and a record the dispatcher cannot read fails the hook.
+  The container e2e runs as `nobody`, who cannot write
+  `/etc/gitconfig`, so its system-stage cases plant that record after
+  `setup`; the read of a planted system config is
+  `TestSystemHooksPathRealGit` of `internal/gitsafe`, through
+  `GIT_CONFIG_SYSTEM`, which only the test adds. Reopened by a harness
+  mount that can plant `/etc/gitconfig`.
+- `Reflog` takes `HEAD` as well as a full ref name, so a worktree's
+  HEAD reflog can be read from that worktree. Reopened by T060.
