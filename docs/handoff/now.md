@@ -23,6 +23,8 @@ and records ADR 0040 and the CI plan.
 7. T111, the cut-over of M1, once T060 lands; T112 through the sessions
    of the config and kit repositories ("T112 in the config and kit
    repositories", 00000000008h7a0ey78frxzgfr).
+8. Plan the bump tool of "Dependency bumps run as a script, not by hand"
+   (01m5e14094yhqhsxq2g941pwrf) at its trigger.
 
 ## Open for the operator
 
