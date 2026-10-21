@@ -36,7 +36,8 @@ func pairsOf(p salvage.Plan) map[string]string {
 // and no earlier generation's, each detached worktree HEAD, and each
 // reflog entry's commit that no bundled ref reaches, as
 // refs/salvage-reflog/<branch>/<n> with n the entry's index in git's
-// <branch>@{n}; a commit some bundled ref reaches gets no name.
+// <branch>@{n}; a commit some bundled ref reaches, a tag among them,
+// gets no name.
 func TestPairsNamesWhatASnapshotBundles(t *testing.T) {
 	dir := repo(t)
 	c1 := commit(t, dir, "one")
@@ -58,6 +59,10 @@ func TestPairsNamesWhatASnapshotBundles(t *testing.T) {
 	git(t, dir, "reset", "-q", "--hard", c1)
 	// A detached commit of the main worktree, left by a checkout: in
 	// the HEAD reflog only.
+	// A detached commit a tag reaches is bundled by its tag: no name.
+	git(t, dir, "checkout", "-q", "--detach", c2a)
+	tagged := commit(t, dir, "tagged")
+	git(t, dir, "tag", "kept", tagged)
 	git(t, dir, "checkout", "-q", "--detach", c2a)
 	h1 := commit(t, dir, "h1")
 	git(t, dir, "checkout", "-q", "main")
@@ -71,12 +76,13 @@ func TestPairsNamesWhatASnapshotBundles(t *testing.T) {
 	assert.Empty(t, plan.Skipped)
 	h1n := reflogIndex(t, dir, "HEAD", h1)
 	want := map[string]string{
-		"refs/heads/main":                           c2a,
-		"refs/heads/feature":                        c1,
-		"refs/tags/v1":                              tagObject,
-		"refs/tags/light":                           c1,
-		"refs/notes/commits":                        notes,
-		"refs/salvage/" + generation + "/api/stash": c1,
+		"refs/heads/main":    c2a,
+		"refs/heads/feature": c1,
+		"refs/tags/v1":       tagObject,
+		"refs/tags/light":    c1,
+		"refs/tags/kept":     tagged,
+		"refs/notes/commits": notes,
+		"refs/salvage/" + generation + "/api/stash":                                                  c1,
 		"refs/salvage-reflog/main/" + strconv.Itoa(reflogIndex(t, dir, "refs/heads/main", c2)):       c2,
 		"refs/salvage-reflog/feature/" + strconv.Itoa(reflogIndex(t, dir, "refs/heads/feature", f1)): f1,
 		"refs/salvage-reflog/worktrees/0/" + strconv.Itoa(h1n):                                       h1,

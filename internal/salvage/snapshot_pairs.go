@@ -64,9 +64,8 @@ const worktreePrefix = "worktrees/"
 // Whether a bundled ref reaches a commit is asked of git one ref at a
 // time (gitsafe.AheadBehind), its own branch or worktree first; a
 // commit found unreached is bundled and reaches the older ones in turn.
-// Tags and notes are not asked: a commit only they reach gets a name of
-// its own, which adds no object to the bundle. An answer git cannot
-// give for one ref counts as not reached, so the commit is bundled.
+// An answer git cannot give for one ref, such as for a tag of a tree,
+// counts as not reached, so the commit is bundled.
 //
 // An input gitsafe refuses whole, with gitsafe.ErrRefused (a ref name
 // it refuses, more refs or worktrees than it lists, a reflog over its
@@ -104,13 +103,11 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string) (Pl
 			branches = refs
 		}
 	}
-	// The tips a reflog commit is asked against: branches, salvage refs
-	// and worktree HEADs, then each reflog commit bundled.
+	// The tips a reflog commit is asked against: every bundled ref, then
+	// each worktree HEAD and each reflog commit bundled.
 	var tips []string
 	for _, r := range p.Pairs {
-		if strings.HasPrefix(r.Name, "refs/heads/") || strings.HasPrefix(r.Name, "refs/salvage/") {
-			tips = append(tips, r.OID)
-		}
+		tips = append(tips, r.OID)
 	}
 	type source struct {
 		dir, ref, prefix, tip string
