@@ -23,5 +23,7 @@ T060 also needs the store lock and atomic write that T059 exports
 (#213), and its `disabled` acceptance item touches `setup`, `status` and
 the SessionStart print, outside its owns.
 
-Reopen: when that `gitsafe` task is planned; then T060 is re-planned on
-it.
+Planned on 2026-10-20 as T153.
+
+Reopen: when T153 merges; then T060 is re-planned on it and this note
+closes.

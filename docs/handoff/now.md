@@ -8,10 +8,8 @@ and records ADR 0040 and the CI plan.
 
 ## Next steps
 
-1. Plan one `gitsafe` task, approved on 2026-10-20, for "gitsafe verbs
-   for the snapshot bundle" (01m5d7v42kv79hf42g15ffgk59) and "gitsafe
-   verbs for the global hooks path and the dirty count"
-   (01m5d7v43hd4hsw60e4bhek3pw); then re-plan and build T060.
+1. Build T153 (`gitsafe` verbs) once its option (a) or (b) is picked;
+   then re-plan and build T060.
 2. Plan "One race run, test tags and parallel CI jobs"
    (01m5drzqsp6zg34xzmywckwb7b), measuring the slow race packages first.
 3. A `julieta status` task for "julieta status reads the hook failure
@@ -46,15 +44,17 @@ One block, a recommendation each.
    the config and kit repositories", 00000000008h7a0ey78frxzgfr; the
    config repository's part is done), and say when the GitHub App of
    ADR 0011 changes the sandbox's authentication.
-5. Decide the scheduled run of the pin-freshness check, a deferred
-   decision of `docs/spec.md` whose trigger fired on 2026-10-20 with
-   GO-2026-6809 ("Dependency bumps run as a script, not by hand",
-   01m5e14094yhqhsxq2g941pwrf). Recommended: decide it with the bump
-   tool, one plan.
+5. Decide the scheduled run of the pin-freshness check, whose deferral
+   fired with GO-2026-6809 (01m5e14094yhqhsxq2g941pwrf). Recommended:
+   with the bump tool, one plan.
+6. Pick option (a) or (b) of T153: julieta's dispatcher gains a
+   `system` stage for the sandbox kit's system `core.hooksPath`, or the
+   kit's dispatcher calls julieta. Recommended: (a), so the names gate of
+   T112 keeps running once the global key points at julieta.
 
 ## In flight
 
-- `docs/t112-config-part-closed`, the config repository's part of T112.
+- `docs/plan-gitsafe-snapshot-and-hooks-verbs`, the plan of T153.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
