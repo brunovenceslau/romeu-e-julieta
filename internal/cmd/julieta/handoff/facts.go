@@ -18,8 +18,9 @@ import (
 // behind it, the dirty count and the stashes (03 3.10).
 //
 // Dirty is gitsafe.Status's Changed: the number of distinct paths the
-// working tree changes, staged, unstaged, unmerged, untracked or hidden
-// (03 3.10), which salvage reads as dirty-at-last-facts:<n> (REQ-0237).
+// working tree changes, staged, unstaged, unmerged, untracked or marked
+// assume-unchanged (03 3.10), which salvage reads as
+// dirty-at-last-facts:<n> (REQ-0237).
 func gather(ctx context.Context, git *gitsafe.Runner, r manifest.Repo) (hf.RepoFacts, error) {
 	fail := func(err error) (hf.RepoFacts, error) {
 		return hf.RepoFacts{}, fmt.Errorf("the git facts of the repo %s: %w", esc(r.Dir), err)

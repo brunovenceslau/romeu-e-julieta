@@ -821,9 +821,11 @@ func TestStatusStashMessagesRealGit(t *testing.T) {
 
 // TestStatusHiddenRealGit: a file changed under assume-unchanged or
 // skip-worktree does not show in git status, so Status reports the
-// flag as Hidden and the tree as not clean.
+// flag as Hidden and the tree as not clean. Changed counts the
+// assume-unchanged entry and not the skip-worktree one, which a sparse
+// checkout sets on every file outside its cone (03 3.10).
 func TestStatusHiddenRealGit(t *testing.T) {
-	for _, flag := range []string{"--assume-unchanged", "--skip-worktree"} {
+	for flag, changed := range map[string]int{"--assume-unchanged": 1, "--skip-worktree": 0} {
 		t.Run(flag, func(t *testing.T) {
 			dir, _ := newRepo(t)
 			head := commitFile(t, dir, "a", "one\n", "a", "2026-02-01T00:00:00Z")
@@ -834,7 +836,7 @@ func TestStatusHiddenRealGit(t *testing.T) {
 			got, err := newRunner(t, Sandbox).Status(t.Context(), dir)
 			require.NoError(t, err)
 			check()
-			assert.Equal(t, Status{Branch: "refs/heads/main", OID: head, Hidden: true, Changed: 1}, got)
+			assert.Equal(t, Status{Branch: "refs/heads/main", OID: head, Hidden: true, Changed: changed}, got)
 			assert.False(t, got.Clean())
 		})
 	}
@@ -990,4 +992,54 @@ func TestStatusChangedReadsPathsWithSpaces(t *testing.T) {
 	got, err := newRunner(t, Sandbox).Status(t.Context(), dir)
 	require.NoError(t, err)
 	assert.Equal(t, 2, got.Changed)
+}
+
+// TestStatusChangedOfASparseCheckoutRealGit: a clean sparse checkout,
+// whose files outside the cone are skip-worktree entries, reads as
+// Hidden with Changed 0; a change inside the cone counts.
+func TestStatusChangedOfASparseCheckoutRealGit(t *testing.T) {
+	dir, _ := newRepo(t)
+	commitFile(t, dir, "in/a", "one\n", "in", "2026-02-01T00:00:00Z")
+	commitFile(t, dir, "out/b", "one\n", "out", "2026-02-02T00:00:00Z")
+	commitFile(t, dir, "out/c", "one\n", "out", "2026-02-03T00:00:00Z")
+	plainGit(t, dir, "sparse-checkout", "set", "in")
+	assert.Contains(t, plainGit(t, dir, "ls-files", "-v"), "S out/b", "the files outside the cone are skip-worktree")
+	r := newRunner(t, Sandbox)
+	got, err := r.Status(t.Context(), dir)
+	require.NoError(t, err)
+	assert.True(t, got.Hidden)
+	assert.Equal(t, 0, got.Changed, "a clean sparse checkout")
+
+	writeFile(t, dir, "in/a", "two\n")
+	got, err = r.Status(t.Context(), dir)
+	require.NoError(t, err)
+	assert.Equal(t, 1, got.Changed)
+}
+
+// TestStatusChangedIsBounded: more changed paths than maxChangedPaths,
+// lowered for the test, are refused, and as many as the bound are
+// counted; the bound covers the assume-unchanged entries too.
+func TestStatusChangedIsBounded(t *testing.T) {
+	old := maxChangedPaths
+	maxChangedPaths = 2
+	t.Cleanup(func() { maxChangedPaths = old })
+	r := newRunner(t, Sandbox)
+
+	dir, _ := newRepo(t)
+	writeFile(t, dir, "x", "1\n")
+	writeFile(t, dir, "y", "1\n")
+	got, err := r.Status(t.Context(), dir)
+	require.NoError(t, err)
+	assert.Equal(t, 2, got.Changed, "at the bound")
+	writeFile(t, dir, "z", "1\n")
+	_, err = r.Status(t.Context(), dir)
+	require.ErrorIs(t, err, ErrRefused, "over the bound")
+
+	hidden, _ := newRepo(t)
+	commitFile(t, hidden, "a", "one\n", "a", "2026-02-01T00:00:00Z")
+	plainGit(t, hidden, "update-index", "--assume-unchanged", "a")
+	writeFile(t, hidden, "x", "1\n")
+	writeFile(t, hidden, "y", "1\n")
+	_, err = r.Status(t.Context(), hidden)
+	require.ErrorIs(t, err, ErrRefused, "two untracked and one assume-unchanged path")
 }

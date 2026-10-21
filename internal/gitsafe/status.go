@@ -37,6 +37,9 @@ var (
 	maxStashes      = 10_000
 	maxWorktrees    = 1_000
 	maxStatusRecord = 64 << 10
+	// maxChangedPaths bounds the paths Status.Changed counts, and so
+	// the set that keeps each counted once.
+	maxChangedPaths = 100_000
 )
 
 // The bounds of the short answers: a one-line answer of git, such as a
@@ -96,12 +99,16 @@ type Status struct {
 	// checkout marks every file outside its cone skip-worktree.
 	Hidden bool
 	// Changed is the number of distinct paths among the ordinary,
-	// unmerged and untracked records of git status and the hidden index
-	// entries (03 3.10, dirty): a path both staged and unstaged counts
-	// once, and so does a hidden entry git status also shows. Renames
-	// are off, so a rename counts as two paths, its deletion and its
-	// addition. An untracked directory that holds no tracked file counts
-	// once, as git status --untracked-files=normal shows it.
+	// unmerged and untracked records of git status and the
+	// assume-unchanged index entries (03 3.10, dirty): a path both
+	// staged and unstaged counts once, and so does an assume-unchanged
+	// entry git status also shows. A skip-worktree entry sets Hidden and
+	// is not counted, since a sparse checkout marks every file outside
+	// its cone, so a clean sparse checkout reads 0. Renames are off, so a
+	// rename counts as two paths, its deletion and its addition. An
+	// untracked directory that holds no tracked file counts once, as git
+	// status --untracked-files=normal shows it. More than maxChangedPaths
+	// paths fail the read.
 	Changed int
 }
 
@@ -184,18 +191,19 @@ func (r *Runner) Status(ctx context.Context, dir string) (Status, error) {
 		if rec == "" {
 			return fmt.Errorf("%w: an empty ls-files record", ErrRefused)
 		}
-		if tag := rec[0]; tag == 'S' || (tag >= 'a' && tag <= 'z') {
-			path, ok := strings.CutPrefix(rec[1:], " ")
-			if !ok || path == "" {
-				return fmt.Errorf("%w: ls-files record %q", ErrRefused, termsafe.Escape(rec))
-			}
+		tag := rec[0]
+		assumed := tag >= 'a' && tag <= 'z' // assume-unchanged, with or without skip-worktree
+		if tag == 'S' || assumed {
 			s.Hidden = true
-			if !p.paths[path] {
-				p.paths[path] = true
-				s.Changed++
-			}
 		}
-		return nil
+		if !assumed {
+			return nil // a skip-worktree entry is not counted: a sparse checkout marks every file outside its cone
+		}
+		path, ok := strings.CutPrefix(rec[1:], " ")
+		if !ok || path == "" {
+			return fmt.Errorf("%w: ls-files record %q", ErrRefused, termsafe.Escape(rec))
+		}
+		return p.add(path)
 	}}
 	if err := r.read(ctx, dir, nil, flags, "ls-files", "-v", "-z"); err != nil {
 		return Status{}, err
@@ -278,7 +286,7 @@ type porcelain struct {
 	status *Status
 	sawOID bool
 	head   string          // the branch.head header
-	paths  map[string]bool // the paths Changed counts, so each counts once
+	paths  map[string]bool // the paths Changed counted, so each counts once
 }
 
 // The number of fields before the path of an ordinary and of an
@@ -296,10 +304,19 @@ func (p *porcelain) count(rec string, fields int) error {
 	if len(parts) != fields+1 || parts[fields] == "" {
 		return fmt.Errorf("%w: git status record %q", ErrRefused, termsafe.Escape(rec))
 	}
-	if !p.paths[parts[fields]] {
-		p.paths[parts[fields]] = true
-		p.status.Changed++
+	return p.add(parts[fields])
+}
+
+// add counts path once, and refuses more than maxChangedPaths paths.
+func (p *porcelain) add(path string) error {
+	if p.paths[path] {
+		return nil
 	}
+	if p.status.Changed == maxChangedPaths {
+		return fmt.Errorf("%w: the working tree changes more than %d paths", ErrRefused, maxChangedPaths)
+	}
+	p.paths[path] = true
+	p.status.Changed++
 	return nil
 }
 
