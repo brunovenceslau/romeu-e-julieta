@@ -64,11 +64,14 @@ Planned on 2026-10-21 as three tasks:
 - T157, after T155 and T156: `unit` leaves `fast` and `all`, the jobs
   `static`, `race` and `e2e` with `all` their union, and one aggregator
   per host that keeps the required check names; a skipped job is a
-  success for GitHub, so each aggregator needs one `if`, which the
-  workflow grammar admits for that form only.
+  success for GitHub, so each aggregator needs one `if` that fails it
+  unless every needed job succeeded, which the workflow grammar admits
+  for that form only.
+
+The build order is T155, T150, T156, T157.
 
 Open questions, each in its task: whether the e2e job keeps
-`./e2e/...` (T156), whether `fast` runs the race once it fits the
-budget, and the aggregator's failing step (T157).
+`./e2e/...` (T156), and whether `fast` runs the race once it fits the
+budget (T157).
 
 Reopen: closed when T157 merges; this note then gets its Done record.
