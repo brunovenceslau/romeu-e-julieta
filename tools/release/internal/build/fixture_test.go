@@ -185,18 +185,18 @@ type sharedBuilds struct {
 var (
 	sharedOnce  sync.Once
 	sharedValue sharedBuilds
-	// sharedErr says that the first test to ask did not finish the
+	// errShared says that the first test to ask did not finish the
 	// builds: a failed require ends that test inside the Once, and the
 	// others must fail too, not read an empty value.
-	sharedErr = errors.New("the shared builds did not finish in an earlier test")
+	errShared = errors.New("the shared builds did not finish in an earlier test")
 )
 
 // shared returns the two shared builds, made by the first test to ask.
 // The builds run in that test: its context and its temporary files.
 func shared(t *testing.T) sharedBuilds {
 	t.Helper()
-	sharedOnce.Do(func() { sharedValue, sharedErr = buildShared(t) })
-	require.NoError(t, sharedErr)
+	sharedOnce.Do(func() { sharedValue, errShared = buildShared(t) })
+	require.NoError(t, errShared)
 	return sharedValue
 }
 
