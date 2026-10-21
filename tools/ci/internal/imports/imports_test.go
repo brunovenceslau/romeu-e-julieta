@@ -24,11 +24,11 @@ import (
 )
 
 // pkg is one package of a fixture module: what its non-test file, its
-// test file and its test file of the e2e suite (//go:build e2e) import,
+// test file, its external test file (package <name>_test) and its test file of the e2e suite (//go:build e2e) import,
 // each path relative to the module, except a standard library path such
 // as text/template.
 type pkg struct {
-	imports, testImports, e2eTestImports []string
+	imports, testImports, xtestImports, e2eTestImports []string
 }
 
 // baseTree is a module that keeps every rule: both binaries, a command
@@ -50,7 +50,7 @@ func baseTree() map[string]pkg {
 		"internal/procgroup":       {},
 		"internal/canon":           {},
 		"internal/signing":         {imports: []string{"internal/canon"}},
-		"internal/render":          {imports: []string{"encoding/json"}},
+		"internal/render":          {imports: []string{"encoding/json/v2"}},
 		"internal/layout":          {},
 		"internal/hooks":           {},
 		"internal/mise":            {},
@@ -101,6 +101,13 @@ func writeTree(t *testing.T, pkgs map[string]pkg) string {
 				test += importLine(imp)
 			}
 			require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "p_test.go"), []byte(test), 0o600))
+		}
+		if len(spec.xtestImports) > 0 {
+			test := "package " + name + "_test\n\n"
+			for _, imp := range spec.xtestImports {
+				test += importLine(imp)
+			}
+			require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "p_x_test.go"), []byte(test), 0o600))
 		}
 		if len(spec.e2eTestImports) > 0 {
 			test := "//go:build e2e\n\npackage " + name + "\n\n"
@@ -302,6 +309,30 @@ func TestImportsTable(t *testing.T) {
 			name:   "an e2e test of the tagged suite imports a package directly",
 			change: map[string]pkg{"e2e/x": {e2eTestImports: []string{"internal/cli"}}},
 			want:   []string{"e2e/x: imports tools: imports internal/cli directly; tools/** and e2e/** reach internal/ through internal/cmd/<binary>/all (REQ-0971)"},
+		},
+		{
+			name:   "a package imports encoding/json v1",
+			change: map[string]pkg{"internal/canon": {imports: []string{"encoding/json"}}},
+			want:   []string{"internal/canon: imports json-v1: imports encoding/json; JSON is encoding/json/v2 (REQ-0960)"},
+		},
+		{
+			name:   "a test file imports encoding/json v1",
+			change: map[string]pkg{"internal/canon": {testImports: []string{"encoding/json"}}},
+			want:   []string{"internal/canon: imports json-v1: imports encoding/json; JSON is encoding/json/v2 (REQ-0960)"},
+		},
+		{
+			name:   "an external test package imports encoding/json v1",
+			change: map[string]pkg{"internal/canon": {xtestImports: []string{"encoding/json"}}},
+			want:   []string{"internal/canon: imports json-v1: imports encoding/json; JSON is encoding/json/v2 (REQ-0960)"},
+		},
+		{
+			name:   "an e2e test of the tagged suite imports encoding/json v1",
+			change: map[string]pkg{"e2e/x": {e2eTestImports: []string{"encoding/json"}}},
+			want:   []string{"e2e/x: imports json-v1: imports encoding/json; JSON is encoding/json/v2 (REQ-0960)"},
+		},
+		{
+			name:   "encoding/json/v2 and encoding/json/jsontext are no finding",
+			change: map[string]pkg{"internal/canon": {imports: []string{"encoding/json/v2", "encoding/json/jsontext"}, testImports: []string{"encoding/json/v2"}}},
 		},
 		{
 			name:   "internal/render links text/template",

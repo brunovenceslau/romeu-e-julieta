@@ -3,8 +3,9 @@
 
 // Package imports is the imports check of 10 10.2 (REQ-0839): the
 // table of module boundaries of 10 10.7 over the packages that exist,
-// the rule of REQ-0971 for tools/** and e2e/**, and the guards of I1,
-// I2, I11 and I24 of 05 5.2. It reads the import graph from
+// the rule of REQ-0971 for tools/** and e2e/**, the rule of REQ-0960
+// that no package, its tests included, imports encoding/json (v1), and
+// the guards of I1, I2, I11 and I24 of 05 5.2. It reads the import graph from
 // "go list -json", once for each target of lint.Targets, without build
 // tags and with the tags of the tagged suites (tagSets), and judges the
 // union, so a file that builds on one platform alone, or only in the
@@ -176,6 +177,7 @@ const (
 	ruleMustNot  = "imports must-not"
 	ruleTools    = "imports tools"
 	ruleTestOnly = "imports test-only"
+	ruleJSONv1   = "imports json-v1"
 	ruleI1       = "imports I1"
 	ruleI2       = "imports I2"
 	ruleI24      = "imports I24"
@@ -190,7 +192,8 @@ var binaryPaths = []struct {
 
 // Judge returns the findings of the check over pkgs, sorted by place:
 // the rows of 10 10.7 (rowFindings, binaryFindings, testOnlyFindings),
-// the tools rule of REQ-0971 (toolFindings), and the guards of I1, I2,
+// the tools rule of REQ-0971 (toolFindings), the JSON rule of REQ-0960
+// (jsonV1Findings), and the guards of I1, I2,
 // I24 and I11.
 func Judge(pkgs []Package) []check.Finding {
 	findings := slices.Concat(
@@ -198,6 +201,7 @@ func Judge(pkgs []Package) []check.Finding {
 		binaryFindings(pkgs),
 		testOnlyFindings(pkgs),
 		toolFindings(pkgs),
+		jsonV1Findings(pkgs),
 		hostTerminalFindings(pkgs),
 		hostHooksFindings(pkgs),
 		hostMemWriteFindings(pkgs),
@@ -364,6 +368,24 @@ func toolFindings(pkgs []Package) []check.Finding {
 			}
 			findings = append(findings, check.Finding{Where: p.Path, Rule: ruleTools,
 				Msg: fmt.Sprintf("imports %s directly; tools/** and e2e/** reach internal/ through internal/cmd/<binary>/all (REQ-0971)", imp)})
+		}
+	}
+	return findings
+}
+
+// jsonV1 is the import path of encoding/json, the v1 package;
+// encoding/json/v2 and encoding/json/jsontext are other paths.
+const jsonV1 = "encoding/json"
+
+// jsonV1Findings holds every package of the module to REQ-0960: JSON is
+// encoding/json/v2, so no package, its test files included, imports
+// encoding/json. The allowlist is empty.
+func jsonV1Findings(pkgs []Package) []check.Finding {
+	var findings []check.Finding
+	for _, p := range pkgs {
+		if slices.Contains(p.Imports, jsonV1) || slices.Contains(p.TestImports, jsonV1) {
+			findings = append(findings, check.Finding{Where: p.Path, Rule: ruleJSONv1,
+				Msg: "imports " + jsonV1 + "; JSON is encoding/json/v2 (REQ-0960)"})
 		}
 	}
 	return findings
