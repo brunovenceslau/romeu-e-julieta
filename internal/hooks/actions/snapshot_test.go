@@ -368,7 +368,68 @@ func TestCopyAtomicCopiesARegularFileOnly(t *testing.T) {
 	require.NoError(t, os.Symlink(file, link))
 	ulids := newFixture(t).config(t, clock).ULIDs
 	for _, src := range []string{link, dir} {
-		require.ErrorContains(t, copyAtomic(root, "out", src, clock, ulids), "not a regular file", src)
+		require.ErrorContains(t, copyAtomic(t.Context(), root, "out", src, clock, ulids), "not a regular file", src)
 	}
-	require.NoError(t, copyAtomic(root, "out", file, clock, ulids))
+	require.NoError(t, copyAtomic(t.Context(), root, "out", file, clock, ulids))
+}
+
+// TestAWholeSkipKeepsTheEarlierPair (decided while building T060): a
+// plan that lost a whole source, here the reflog of a worktree that is
+// now another repository, does not replace an earlier pair, and fails;
+// with no earlier pair, it is written, and fails.
+func TestAWholeSkipKeepsTheEarlierPair(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+	_, err := Snapshot(t.Context(), f.config(t, clock))
+	require.NoError(t, err)
+	before, err := os.ReadFile(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
+	require.NoError(t, err)
+
+	wt := filepath.Join(filepath.Dir(f.repo), "wt")
+	git(t, f.repo, "worktree", "add", "-q", "-b", "w", wt)
+	require.NoError(t, os.RemoveAll(wt))
+	git(t, filepath.Dir(f.repo), "init", "-q", wt)
+	commit(t, f.repo, "two")
+	_, err = Snapshot(t.Context(), f.config(t, clock.Add(time.Minute)))
+	require.ErrorIs(t, err, ErrSnapshotPartial)
+	after, err := os.ReadFile(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
+	require.NoError(t, err)
+	assert.Equal(t, string(before), string(after), "the earlier pair stays")
+
+	require.NoError(t, os.RemoveAll(f.snapshotDir()))
+	res, err := Snapshot(t.Context(), f.config(t, clock.Add(2*time.Minute)))
+	require.ErrorIs(t, err, ErrSnapshotPartial)
+	assert.True(t, res.Bundle, "with no earlier pair, the partial one is written")
+	assert.Equal(t, clock.Add(2*time.Minute), f.heads(t).CreatedAt)
+}
+
+// TestSnapshotEndsAtItsDeadline: a context whose deadline has passed
+// ends the snapshot with its error, and nothing is written.
+func TestSnapshotEndsAtItsDeadline(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+	_, err := Snapshot(ctx, f.config(t, clock))
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	_, err = os.Stat(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
+// TestCopyAtomicStopsWithItsContext: a copy whose context ends stops
+// reading, fails with the context's error and leaves no temporary
+// file. The context is cancelled before the copy, the one point a test
+// reaches without a seam inside io.Copy.
+func TestCopyAtomicStopsWithItsContext(t *testing.T) {
+	dir := t.TempDir()
+	root, err := os.OpenRoot(dir)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = root.Close() })
+	src := filepath.Join(t.TempDir(), "src")
+	require.NoError(t, os.WriteFile(src, make([]byte, 1<<20), 0o600))
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	err = copyAtomic(ctx, root, "out", src, clock, newFixture(t).config(t, clock).ULIDs)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Empty(t, names(t, dir))
 }

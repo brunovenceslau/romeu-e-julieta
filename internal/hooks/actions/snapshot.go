@@ -114,7 +114,10 @@ const (
 // is beyond the bases (gitsafe.Beyond, asked before any bundle is
 // made), the earlier bundle is removed in place of the first write;
 // when the plan also left an input out, nothing is written, so a
-// partial plan never takes the earlier bundle away. Before it builds,
+// partial plan never takes the earlier bundle away. A plan that lost a
+// namespace or a whole source of reflog commits (salvage.Plan.Whole)
+// does not replace an earlier pair either, and is written only where
+// there is none. Before it builds,
 // Snapshot removes what a killed snapshot left in c.Work. The whole
 // snapshot, the wait for the lock included, ends after
 // SnapshotTimeout.
@@ -166,6 +169,15 @@ func Snapshot(ctx context.Context, c SnapshotConfig) (res SnapshotResult, err er
 	if snapshotAfterRead != nil {
 		snapshotAfterRead()
 	}
+	if plan.Whole() {
+		// A plan that lost a namespace or a whole source does not
+		// replace an earlier pair (decided while building T060).
+		if _, err := root.Lstat(path.Join(memstore.SnapshotDir, salvage.HeadsFile)); err == nil {
+			return SnapshotResult{Skipped: plan.Skipped}, partial(plan.Skipped)
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return SnapshotResult{}, err
+		}
+	}
 	heads := salvage.Heads{CreatedAt: now, Disabled: disabled, Refs: plan.Refs()}
 	data, err := salvage.EncodeHeads(heads)
 	if err != nil {
@@ -205,7 +217,7 @@ func Snapshot(ctx context.Context, c SnapshotConfig) (res SnapshotResult, err er
 
 	bundlePath := path.Join(memstore.SnapshotDir, salvage.BundleFile)
 	if bundle {
-		err = copyAtomic(root, bundlePath, built, now, c.ULIDs)
+		err = copyAtomic(ctx, root, bundlePath, built, now, c.ULIDs)
 	} else {
 		err = removeSynced(root, bundlePath)
 	}
@@ -284,8 +296,8 @@ func mkdirIn(root *os.Root, dir string) error {
 // with a []byte: a temporary file .tmp-<ULID> in the target's own
 // directory (REQ-0654), 0600, synced, renamed into place, and the
 // directory synced. A failure removes the temporary file. src must be
-// a regular file, judged with Lstat.
-func copyAtomic(root *os.Root, p, src string, now time.Time, ulids *canon.ULIDSource) error {
+// a regular file, judged with Lstat. The copy stops when ctx ends.
+func copyAtomic(ctx context.Context, root *os.Root, p, src string, now time.Time, ulids *canon.ULIDSource) error {
 	if info, err := os.Lstat(src); err != nil {
 		return err
 	} else if !info.Mode().IsRegular() {
@@ -306,7 +318,7 @@ func copyAtomic(root *os.Root, p, src string, now time.Time, ulids *canon.ULIDSo
 	if err != nil {
 		return err
 	}
-	_, werr := io.Copy(f, in)
+	_, werr := io.Copy(f, ctxReader{ctx, in})
 	if err := errors.Join(werr, f.Chmod(memstore.FileMode), snapshotSync(f), f.Close()); err != nil {
 		return errors.Join(err, root.Remove(tmp))
 	}
@@ -314,6 +326,20 @@ func copyAtomic(root *os.Root, p, src string, now time.Time, ulids *canon.ULIDSo
 		return errors.Join(err, root.Remove(tmp))
 	}
 	return syncDir(root, dir)
+}
+
+// ctxReader reads r until ctx ends, then fails with the error of ctx.
+type ctxReader struct {
+	ctx context.Context
+	r   io.Reader
+}
+
+// Read reads from r, or returns the error of ctx once it ended.
+func (c ctxReader) Read(p []byte) (int, error) {
+	if err := c.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return c.r.Read(p)
 }
 
 // removeSynced removes the file p of the root, if it is there, and
