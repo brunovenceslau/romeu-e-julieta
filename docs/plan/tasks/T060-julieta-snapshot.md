@@ -10,13 +10,25 @@ owns:
   - internal/cmd/julieta/all/import_snapshot.go
   - e2e/julieta_snapshot_test.go
   - internal/hooks/actions/snapshot*.go
+  - internal/hooks/actions/actions.go
+  - internal/gitsafe/reach*.go
+  - internal/gitsafe/commondir*.go
+  - internal/gitsafe/refs_list*.go
+  - internal/gitsafe/refs_parity_test.go
+  - internal/gitsafe/export_test.go
+  - internal/gitsafe/bundle_of.go
+  - internal/gitsafe/gitsafe.go
+  - internal/memstore/write/write.go
+  - internal/memstore/write/write_test.go
+  - docs/spec/02-layouts.md
 needs:
   - T054
   - T023
   - T135
   - T153
 after: []
-ask_first: []
+ask_first:
+  - gitsafe
 sitting: none
 ---
 
@@ -74,9 +86,10 @@ by an `after` edge or a narrower item.
   - On a forced write failure the previous bundle stays, no `.tmp-` file
     of this run remains, the failure is recorded as a hook failure with
     its repo, and the repo's own `post-commit` still runs.
-  - With a repo-local `core.hooksPath`, `julieta setup` writes
-    `disabled: true`, and `setup`, `julieta status` and SessionStart
-    report "snapshots disabled for <dir>".
+  - With a repo-local `core.hooksPath`, `julieta snapshot` writes
+    `disabled: true`. That `julieta setup` writes it, and that `setup`,
+    `julieta status` and SessionStart report "snapshots disabled for
+    <dir>", belongs to a later task (decided on 2026-10-21).
   - A snapshot that races a commit leaves a valid bundle (10 10.1), with
     the interleaving forced through a test seam and never by sleeping;
     two snapshots of one repo at once are serialized by the store lock
@@ -91,16 +104,19 @@ by an `after` edge or a narrower item.
 Decisions taken while building (2026-10-21), each with what reopens
 it:
 
-- An input `gitsafe` refuses whole (decided on 2026-10-21): the
+- An input the snapshot cannot read (decided on 2026-10-21): the
   snapshot skips that item, snapshots the rest, and records the skipped
-  item as a hook failure of the repo. `salvage.Pairs` lists each
-  namespace with its own `ListRefs` call, so a refused tag name loses
-  `refs/tags/` and keeps the branches; a refused `Worktrees` or
-  `Reflog` loses that input only. `actions.Snapshot` writes the pair
-  and returns `ErrSnapshotPartial` naming each item, which the
-  dispatcher records (REQ-0409) and `julieta snapshot` exits 1 on.
-  Reopened by a `gitsafe` verb that lists the refs it accepts and
-  reports the rest.
+  item as a hook failure of the repo. `gitsafe.ListRefs` returns the
+  names it refuses beside the refs it accepts, so a refused ref name
+  loses that ref alone; a namespace over the bound of `ListRefs`, the
+  worktrees git cannot list, a worktree whose common git dir
+  (`gitsafe.CommonDir`) is not the repository's own and a reflog that
+  cannot be read for any reason are each left out alone.
+  `actions.Snapshot` writes the pair and returns `ErrSnapshotPartial`
+  naming each item, which the dispatcher records (REQ-0409) and
+  `julieta snapshot` exits 1 on. A partial plan that holds nothing
+  beyond the bases writes nothing, so it never removes the previous
+  bundle. Reopened by an input git can read only in part.
 - The `.gitsafe-bundle-*` leftover: the bundle is built in
   `$HOME/.local/state/julieta/snapshot/<dir>/`, never in the memory
   dir, whose layout check (08 8.1) reads a dot directory as a finding
@@ -117,14 +133,17 @@ it:
   which `copyAtomic` then calls.
 - The store lock is held from before the read of the refs to after
   the last write, so the work directory has one user and the pair on
-  disk is one snapshot's (REQ-0690). Reopened by a snapshot slow enough
-  to hold `julieta memory add` back.
-- When the bases reach every ref, git refuses an empty bundle; the
-  snapshot then removes the earlier bundle in place of the first write
-  and writes `heads.json`, so the pair stays one snapshot's and
-  `disabled` is written for a repo with no work. A repo with no ref is
-  the same case (`gitsafe.ErrNoRefs`). The refusal is read from git's
-  message under `LANG=C`. Reopened by a `gitsafe` sentinel for it.
+  disk is one snapshot's (REQ-0690). The whole snapshot, the wait for
+  the lock included, ends after 60 s (`actions.SnapshotTimeout`), and
+  the wait honours the context (`write.LockContext`, which tries the
+  lock every 10 ms). Reopened by a repository whose snapshot needs
+  longer.
+- Whether a bundle holds anything is asked before it is made
+  (`gitsafe.Beyond`, `git rev-list --objects` up to its first line);
+  when the bases reach every object, the snapshot removes the earlier
+  bundle in place of the first write and writes `heads.json`, so the
+  pair stays one snapshot's and `disabled` is written for a repo with
+  no work, a repo with no ref included. No git message is read.
 - `heads.json` lists every ref the snapshot read; the bundle holds only
   the refs with an object beyond the bases, since git leaves out a ref
   a base reaches. romeu trusts the bundle's refs (REQ-0689).
@@ -132,13 +151,20 @@ it:
   `refs/salvage-reflog/worktrees/<k>/HEAD` and a commit of its HEAD
   reflog `refs/salvage-reflog/worktrees/<k>/<n>`, with `k` the
   worktree's place in `git worktree list` and `n` the entry's index as
-  git numbers it (`<ref>@{n}`), the branches' too. A name a branch
-  already takes is skipped and recorded. Reopened by romeu's import,
-  should it need the worktree's path.
-- Whether a bundled ref reaches a reflog commit is asked one ref at a
-  time with `AheadBehind`: about 0.6 s for a branch of 300 commits
-  here. Reopened by a snapshot too slow after a commit, with a
-  `gitsafe` verb that answers for every commit in one `rev-list`.
+  git numbers it (`<ref>@{n}`), the branches' too. A name already
+  taken gets the suffix `-<k>`, the first free, so no commit is lost
+  to a name. Reopened by romeu's import, should it need the worktree's
+  path.
+- Which reflog commits need a name is one question to git
+  (`gitsafe.Unreached`, `git rev-list --parents --stdin` with every
+  bundled ref and the bases excluded): a commit the walk lists and that
+  is no parent of a walked commit is reached by no bundled ref and by
+  no other reflog commit. At most 1000 are named per snapshot
+  (`salvage.MaxReflogCommits`); the rest is a recorded skip. Measured
+  on a repository of 300 branches and a 300-entry reflog of orphan
+  commits: 1 min 19.9 s with one `AheadBehind` per commit and tip,
+  0.24 s with `Unreached`. Reopened by a snapshot too slow after a
+  commit.
 - `disabled` is what `julieta snapshot` reads itself: the repo's own
   config sets `core.hooksPath`, as `julieta status` reads it. The
   `setup`, `status` and SessionStart part of the acceptance row is a
@@ -150,8 +176,21 @@ it:
   tests replace. A manifest repo is found by its path or by one of its
   worktrees; a repo of no manifest takes no snapshot and records
   nothing. Reopened by an `actions.Input` that carries the clock.
-- The snapshot is not bounded by `salvage.capBytes` (REQ-0648 is not
-  implemented here). Reopened by the task that implements REQ-0648.
+- Deferred: the snapshot is not bounded by `salvage.capBytes`
+  (REQ-0648 is not implemented here). Reopened when romeu's unbundle of
+  the snapshot is built.
+- Deferred: `salvage.CheckRef` and `gitsafe`'s `unsafeRune` refuse
+  the control and format characters and the line and paragraph
+  separators, not the whole Default_Ignorable set `termsafe` escapes; a
+  test pins that the two ref checks agree. One definition is reopened
+  with the readers task or a display bug.
+- Deferred: the dispatcher's handler finds the repo of a hook by
+  listing the worktrees of each manifest repo, one `git worktree list`
+  per repo on each commit outside a repo's own path. Reopened by a
+  manifest of many repos.
+- The built bundle is judged with `Lstat` and must be a regular file
+  before it is opened, and the work directory is made 0700 on each
+  run.
 - The golden is `testdata/heads.json.golden`: a `.json` file under
   `testdata/` naming `snapshot/v1` is read by `tools/ci schema` as a
   registered format, and 03 3.13 gives `heads.json` none.
