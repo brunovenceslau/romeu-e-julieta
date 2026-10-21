@@ -13,21 +13,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// hooksScript builds the sandbox of the hooks cases: after setup, git
-// points at the dispatcher julieta wrote and the primary repo has a
-// tracked pre-commit and post-rewrite and a local post-commit, each
-// logging to /tmp/hooklog.
-//
-// The line that sets the global core.hooksPath stands in for the half
-// of setup that needs a verb of gitsafe (hooks_path.go of the setup
-// package): until it lands, the case sets it the way that step will.
+// hooksScript builds the sandbox of the hooks cases: setup points the
+// global core.hooksPath at the dispatcher it wrote, with no line of the
+// case setting it, and the primary repo has a tracked pre-commit and
+// post-rewrite and a local post-commit, each logging to /tmp/hooklog.
 const hooksScript = `
 export JULIETA_MANIFEST=%s
 step setup "$J" setup
+step global git config --global core.hooksPath
 git config --global user.name e2e
 git config --global user.email e2e@example.invalid
 git config --global commit.gpgsign false
-git config --global core.hooksPath "$HOME/.local/share/julieta/hooks"
 cd ` + primaryPath + `
 mkdir -p .githooks
 cat >.githooks/pre-commit <<'EOF2'
@@ -78,6 +74,7 @@ step signalled git commit -q --allow-empty -m fourth
 step signalstate sh -c 'cat "$HOME"/.local/state/julieta/hook-failures/*.json'
 `)
 	require.Equal(t, 0, step(t, steps, "setup").code, step(t, steps, "setup").stderr)
+	assert.Equal(t, sandboxHome+"/.local/share/julieta/hooks\n", step(t, steps, "global").stdout, "setup set the global key")
 
 	r := step(t, steps, "ok")
 	assert.Equal(t, 0, r.code, r.stderr)
@@ -107,4 +104,80 @@ step signalstate sh -c 'cat "$HOME"/.local/state/julieta/hook-failures/*.json'
 	assert.NotEqual(t, 0, r.code)
 	assert.Contains(t, r.stderr, ") exited 128+15\n")
 	assert.Contains(t, step(t, steps, "signalstate").stdout, `"exitCode":143`)
+}
+
+// systemScript adds to hooksScript a system hooks directory, as the
+// sandbox kit sets one with the system core.hooksPath, whose pre-commit
+// logs to /tmp/hooklog and fails while /tmp/sysstop exists, and record,
+// which writes the record setup keeps of the system value. The workload
+// runs as nobody, who cannot write /etc/gitconfig, so the case plants
+// the record julieta state holds (the file system-hooks-path.json of
+// internal/hooks) after setup has run; the read of a planted system
+// config is a test of internal/gitsafe.
+const systemScript = `
+step norecord sh -c 'ls -A "$HOME/.local/state/julieta" | grep -c system-hooks-path || true'
+mkdir -p /tmp/syshooks syshooks
+cat >/tmp/syshooks/pre-commit <<'EOF2'
+#!/bin/sh
+echo "system pre-commit $*" >>/tmp/hooklog
+[ ! -e /tmp/sysstop ] || { echo "the system hook says no" >&2; exit 4; }
+EOF2
+printf '#!/bin/sh\necho "relative pre-commit" >>/tmp/hooklog\n' >syshooks/pre-commit
+chmod +x /tmp/syshooks/pre-commit syshooks/pre-commit
+record() { printf '{"path":"%s"}\n' "$1" >"$HOME/.local/state/julieta/system-hooks-path.json"; }
+`
+
+// TestJulietaHooksSystemStage runs the system stage of the dispatcher
+// in the workload (04 4.3, REQ-0408): setup records no system value
+// where the system config sets none; with a system hooks path recorded,
+// its pre-commit runs first, with the hook's arguments, and a failure
+// there stops the chain, is git's failure and names the stage system; a
+// recorded path that is relative, or that is julieta's own dispatcher
+// dir, runs nothing in that stage and the chain goes on.
+func TestJulietaHooksSystemStage(t *testing.T) {
+	script := strings.Replace(hooksScript, "%s", manifestEnv(t, 1, originURL+"api.git"), 1) + systemScript + `
+record /tmp/syshooks
+step ok git commit -q --allow-empty -m first
+step log cat /tmp/hooklog
+: >/tmp/hooklog
+touch /tmp/sysstop
+step stopped git commit -q --allow-empty -m second
+step stoppedlog cat /tmp/hooklog
+step state sh -c 'cat "$HOME"/.local/state/julieta/hook-failures/*.json'
+rm /tmp/sysstop
+: >/tmp/hooklog
+record syshooks
+step relative git commit -q --allow-empty -m third
+step relativelog cat /tmp/hooklog
+: >/tmp/hooklog
+record "$HOME/.local/share/julieta/hooks"
+step own git commit -q --allow-empty -m fourth
+step ownlog cat /tmp/hooklog
+`
+	steps := scenario(t, script)
+	require.Equal(t, 0, step(t, steps, "setup").code, step(t, steps, "setup").stderr)
+	assert.Equal(t, "0\n", step(t, steps, "norecord").stdout, "no system config, no record")
+
+	r := step(t, steps, "ok")
+	assert.Equal(t, 0, r.code, r.stderr)
+	assert.Equal(t, "system pre-commit \ntracked pre-commit \nlocal post-commit\n", step(t, steps, "log").stdout,
+		"the system hook first, then the repo's, through the dispatcher")
+
+	r = step(t, steps, "stopped")
+	assert.NotEqual(t, 0, r.code, "git stops the commit on the system hook's status")
+	assert.Contains(t, r.stderr, "the system hook says no\n")
+	assert.Contains(t, r.stderr, "julieta hooks: pre-commit stage system (/tmp/syshooks/pre-commit) exited 4\n")
+	assert.Equal(t, "system pre-commit \n", step(t, steps, "stoppedlog").stdout, "the chain stopped at the system stage")
+	state := step(t, steps, "state").stdout
+	assert.Contains(t, state, `"stage":"system"`)
+	assert.Contains(t, state, `"exitCode":4`)
+
+	r = step(t, steps, "relative")
+	assert.Equal(t, 0, r.code, r.stderr)
+	assert.Equal(t, "tracked pre-commit \nlocal post-commit\n", step(t, steps, "relativelog").stdout, "a relative record runs nothing")
+
+	r = step(t, steps, "own")
+	assert.Equal(t, 0, r.code, r.stderr)
+	assert.Equal(t, "tracked pre-commit \nlocal post-commit\n", step(t, steps, "ownlog").stdout,
+		"julieta's own dispatcher dir is not a system stage, so the chain does not call itself")
 }

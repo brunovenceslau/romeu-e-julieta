@@ -8,21 +8,23 @@
 // scripts that point git at it (Install) and the failures it records
 // in julieta state (Record, Failures).
 //
-// For a hook, Run executes up to three stages in this order: julieta's
-// own action (internal/hooks/actions), the repo's tracked
-// .githooks/<hook> and $GIT_DIR/hooks/<hook>, each only if it exists
-// and is executable. The arguments of the hook go to each; its stdin
-// goes to the first of the two repo hooks that runs. The first
-// non-zero status stops the chain and is the status of the dispatcher,
-// except for an action that continues (the snapshot), whose failure is
-// recorded and does not stop the chain.
+// For a hook, Run executes up to four stages in this order: the hook of
+// the system core.hooksPath that julieta setup recorded (SystemFile),
+// which the global key hides from git; julieta's own action
+// (internal/hooks/actions); the repo's tracked .githooks/<hook>; and
+// $GIT_DIR/hooks/<hook>; each hook only if it exists and is executable.
+// The arguments of the hook go to each; its stdin goes to the first of
+// the three hooks that runs. The first non-zero status stops the chain
+// and is the status of the dispatcher, except for an action that
+// continues (the snapshot), whose failure is recorded and does not stop
+// the chain.
 //
-// The two repo hooks are repository content that runs on purpose, and
-// only in the sandbox (I21, REQ-0505): they have no timeout (the
-// Unbounded class of internal/procgroup, REQ-0300) and get the
-// environment git gave the hook, which they need (GIT_INDEX_FILE, PATH
-// and the rest). The scrubbed environment of 04 4.1 is for julieta's
-// own subprocesses.
+// The system hook belongs to the sandbox, and the two repo hooks are
+// repository content that runs on purpose, and only in the sandbox
+// (I21, REQ-0505): they have no timeout (the Unbounded class of
+// internal/procgroup, REQ-0300) and get the environment git gave the
+// hook, which they need (GIT_INDEX_FILE, PATH and the rest). The
+// scrubbed environment of 04 4.1 is for julieta's own subprocesses.
 package hooks
 
 import (
@@ -62,8 +64,9 @@ var Names = []string{
 	"p4-changelist", "p4-prepare-changelist", "p4-post-changelist", "p4-pre-submit",
 }
 
-// The three stages of the chain, as the failure line names them.
+// The four stages of the chain, as the failure line names them.
 const (
+	StageSystem  = "system"
 	StageJulieta = "julieta"
 	StageTracked = "tracked"
 	StageLocal   = "local"
@@ -85,8 +88,8 @@ type Options struct {
 	Dir string
 	// Env is the environment of the stages, as git gave it.
 	Env []string
-	// Stdin is the stdin of the hook, given to the first repo hook that
-	// runs. Nil means an empty one.
+	// Stdin is the stdin of the hook, given to the first hook that runs,
+	// system or repo. Nil means an empty one.
 	Stdin io.Reader
 	// Stdout and Stderr receive the output of every stage and the line
 	// the dispatcher prints on a failure.
@@ -102,6 +105,14 @@ type Options struct {
 	// and returns the exit status it maps to. Nil prints the text of
 	// the error and returns 1.
 	ActionError func(err error) int
+	// System is the system hooks path julieta setup recorded
+	// (ReadSystem), empty for none. A path that is not absolute is
+	// ignored.
+	System string
+	// Dispatcher is the directory of julieta's own dispatcher
+	// (DispatcherDir): a System that names it is not run, so the chain
+	// never calls itself.
+	Dispatcher string
 }
 
 // Run runs the chain of the hook and returns the status of the
@@ -139,6 +150,39 @@ func Run(ctx context.Context, o Options) (int, error) {
 		note("the failure could not be recorded", Record(o.StateDir, f))
 		return f.ExitCode, nil
 	}
+	stdin := o.Stdin
+	// runHook runs one hook stage, if its hook is executable, and
+	// reports whether it stopped the chain, with its status.
+	runHook := func(stage, path string) (bool, int, error) {
+		if !executable(path) {
+			return false, 0, nil
+		}
+		err := procgroup.Run(ctx, procgroup.Command{
+			Class: procgroup.Unbounded, Argv: append([]string{path}, o.Args...), Dir: o.Dir, Env: o.Env,
+			Stdin: stdin, Stdout: o.Stdout, Stderr: o.Stderr,
+		})
+		stdin = nil // the first hook that ran took it; later ones get /dev/null
+		if cerr := ctx.Err(); cerr != nil {
+			return false, 0, cerr
+		}
+		if err == nil {
+			return false, 0, nil
+		}
+		status, said := statusOf(err)
+		if status == statusNotStarted {
+			_, _ = fmt.Fprintf(o.Stderr, "julieta hooks: %s stage %s (%s) did not start: %v\n", o.Hook, stage, path, err)
+		}
+		if err := line(o, stage, path, said); err != nil {
+			return false, 0, err
+		}
+		status, err = stop(fail(stage, path, status))
+		return true, status, err
+	}
+	if path := systemHook(o.System, o.Dispatcher, o.Hook); path != "" {
+		if stopped, status, err := runHook(StageSystem, path); stopped || err != nil {
+			return status, err
+		}
+	}
 	for _, a := range o.Actions {
 		err := a.Run(ctx, actions.Input{Hook: o.Hook, Args: o.Args, Dir: o.Dir, Env: o.Env, Stdout: o.Stdout, Stderr: o.Stderr})
 		if cerr := ctx.Err(); cerr != nil {
@@ -165,35 +209,15 @@ func Run(ctx context.Context, o Options) (int, error) {
 		}
 		kept = &f
 	}
-	stdin := o.Stdin
 	type repoHook struct{ stage, path string }
 	repoHooks := []repoHook{{StageTracked, filepath.Join(o.Dir, ".githooks", o.Hook)}}
 	if dir := hooksDir(o.Dir, o.Env); dir != "" {
 		repoHooks = append(repoHooks, repoHook{StageLocal, filepath.Join(dir, o.Hook)})
 	}
 	for _, s := range repoHooks {
-		if !executable(s.path) {
-			continue
+		if stopped, status, err := runHook(s.stage, s.path); stopped || err != nil {
+			return status, err
 		}
-		err := procgroup.Run(ctx, procgroup.Command{
-			Class: procgroup.Unbounded, Argv: append([]string{s.path}, o.Args...), Dir: o.Dir, Env: o.Env,
-			Stdin: stdin, Stdout: o.Stdout, Stderr: o.Stderr,
-		})
-		stdin = nil // the first hook that ran took it; later ones get /dev/null
-		if cerr := ctx.Err(); cerr != nil {
-			return 0, cerr
-		}
-		if err == nil {
-			continue
-		}
-		status, said := statusOf(err)
-		if status == statusNotStarted {
-			_, _ = fmt.Fprintf(o.Stderr, "julieta hooks: %s stage %s (%s) did not start: %v\n", o.Hook, s.stage, s.path, err)
-		}
-		if err := line(o, s.stage, s.path, said); err != nil {
-			return 0, err
-		}
-		return stop(fail(s.stage, s.path, status))
 	}
 	if kept != nil {
 		note("the failure could not be recorded", Record(o.StateDir, *kept))

@@ -722,8 +722,17 @@ func (r *Runner) HooksPath(ctx context.Context, dir string) (string, bool, error
 	if err := checkRepo(dir); err != nil {
 		return "", false, err
 	}
+	return r.readHooksPath(ctx, dir, "--local", "--no-includes")
+}
+
+// readHooksPath reads core.hooksPath from the config files that scope
+// names, git config's flags such as --local --no-includes, in dir, with
+// the checks HooksPath documents: an unset key is false and no error; a
+// key with no value or an empty one, a value that is not valid UTF-8
+// and one that holds a character unsafeRune refuses are refused.
+func (r *Runner) readHooksPath(ctx context.Context, dir string, scope ...string) (string, bool, error) {
 	out := limitedBuffer{limit: maxHooksPathBytes}
-	err := r.read(ctx, dir, nil, &out, "config", "--local", "--no-includes", "-z", "--get", "core.hooksPath")
+	err := r.read(ctx, dir, nil, &out, slices.Concat([]string{"config"}, scope, []string{"-z", "--get", "core.hooksPath"})...)
 	switch {
 	case exitedWith(err, 1):
 		return "", false, nil // the key is not set

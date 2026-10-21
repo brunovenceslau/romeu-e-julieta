@@ -145,3 +145,42 @@ func TestDocumentOfFailureIsStrictJSON(t *testing.T) {
 	require.NoError(t, json.Unmarshal(b, &m))
 	assert.Len(t, m, 6)
 }
+
+// TestRunRunsTheRecordedSystemHookFirst: the system hooks path setup
+// recorded in julieta state is the first stage, named system in the
+// failure line; julieta's own dispatcher directory recorded there runs
+// nothing, so the chain never calls itself.
+func TestRunRunsTheRecordedSystemHookFirst(t *testing.T) {
+	s := newSandbox(t, "")
+	state := filepath.Join(s.home, ".local/state/julieta")
+	out := filepath.Join(s.repo, "out")
+	kit := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(kit, "pre-commit"), []byte("#!/bin/sh\necho system >>"+out+"\n"), 0o755))
+	s.hook(t, ".githooks/pre-commit", "echo tracked >>"+out)
+	require.NoError(t, ihooks.RecordSystem(state, kit))
+	code, _, stderr := julieta(t, "hooks", "run", "pre-commit")
+	assert.Equal(t, 0, code, stderr)
+	assert.Empty(t, s.exits)
+	b, err := os.ReadFile(out)
+	require.NoError(t, err)
+	assert.Equal(t, "system\ntracked\n", string(b))
+
+	require.NoError(t, os.WriteFile(filepath.Join(kit, "pre-commit"), []byte("#!/bin/sh\nexit 6\n"), 0o755))
+	code, _, stderr = julieta(t, "hooks", "run", "pre-commit")
+	assert.Equal(t, 0, code)
+	assert.Equal(t, []int{6}, s.exits)
+	assert.Contains(t, stderr, "julieta hooks: pre-commit stage system ("+kit+"/pre-commit) exited 6\n")
+
+	s.exits = nil
+	dispatcher := ihooks.DispatcherDir(s.home)
+	require.NoError(t, os.MkdirAll(dispatcher, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dispatcher, "pre-commit"), []byte("#!/bin/sh\nexit 9\n"), 0o755))
+	require.NoError(t, ihooks.RecordSystem(state, dispatcher))
+	require.NoError(t, os.Remove(out))
+	code, _, stderr = julieta(t, "hooks", "run", "pre-commit")
+	assert.Equal(t, 0, code, stderr)
+	assert.Empty(t, s.exits, "julieta's own dispatcher is not a system stage")
+	b, err = os.ReadFile(out)
+	require.NoError(t, err)
+	assert.Equal(t, "tracked\n", string(b))
+}
