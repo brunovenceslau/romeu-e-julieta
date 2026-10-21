@@ -175,6 +175,10 @@ func readBuilt(res Result) (built, error) {
 // build under the race detector (some 4 s for each of the two archives of
 // a build), so the package pays it for these two builds, not for each
 // test that reads an archive.
+//
+// The paths in res.Archives and res.Checksums of each result point into
+// the temporary directory of the first test, removed when it ends, so
+// readers use only the in-memory bytes and the base names.
 type sharedBuilds struct {
 	head    string // the commit both builds are of
 	dry     built  // a dry run, with a gate that must stay unasked
@@ -224,6 +228,10 @@ func buildShared(t *testing.T) (sharedBuilds, error) {
 		{Root: root, Version: "v1.0.0", Out: t.TempDir(), DryRun: true, GoBin: goBin, Gate: unasked},
 		{Root: root, Version: "v1.0.0", Out: filepath.Join(t.TempDir(), "out"), GoBin: goBin, Gate: fuzzedGate(t, root)},
 	}
+	// The two builds run at once from one Root, which is safe because
+	// Build never writes into Root: its staging directory comes from
+	// os.MkdirTemp (build.go, Build) and its output from publish, both
+	// outside Root.
 	var results [2]built
 	var errs [2]error
 	var wg sync.WaitGroup

@@ -173,3 +173,12 @@ it:
 - `internal/gitsafe/reach_test.go` holds four more
   `context.Background()`, which the audit's 28 do not list and this task
   does not own.
+- `TestDirtyTree` and `TestOutput` now run on the fixture without the
+  embedded julieta. The refusals they assert come before the embed check
+  (`build.go:111-117` against `build.go:158`), so no assertion changed,
+  but those paths no longer run with the consumer present.
+- With `-count` above 1 the shared builds are memoised in the test
+  binary, so later iterations compare the same bytes again.
+- `raceEnv` replaces any outer `GORACE` options in a child that inherits
+  `os.Environ()`. No `GORACE` is set anywhere in the repo or CI today;
+  reopen if one is.

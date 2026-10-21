@@ -74,6 +74,7 @@ func TestBuildIsReproducible(t *testing.T) {
 	t.Parallel()
 	both := shared(t)
 	require.Len(t, both.dry.archives, 2)
+	require.Len(t, both.release.archives, 2)
 	for name, a := range both.dry.archives {
 		assert.True(t, bytes.Equal(a, both.release.archives[name]), name)
 	}

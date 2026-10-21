@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -156,7 +157,7 @@ func startMain(t *testing.T, extra ...string) (done <-chan error, stderr *bytes.
 	done = runAsync(ctx, procgroup.Command{
 		Class:  procgroup.ToolStep,
 		Argv:   []string{os.Args[0], "-test.run=^TestHelperProcess$"},
-		Env:    append(append(r.Env, raceEnv, "PATH="+os.Getenv("PATH"), helperEnv+"=main", "CI_TEST_DIR="+r.Dir, "CI_TEST_PIDFILE="+pidfile), extra...),
+		Env:    append(append(slices.Clone(r.Env), raceEnv, "PATH="+os.Getenv("PATH"), helperEnv+"=main", "CI_TEST_DIR="+r.Dir, "CI_TEST_PIDFILE="+pidfile), extra...),
 		Stderr: stderr,
 	})
 	pid = waitForPid(t, pidfile+mainSuffix)
