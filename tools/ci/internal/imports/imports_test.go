@@ -50,7 +50,7 @@ func baseTree() map[string]pkg {
 		"internal/procgroup":       {},
 		"internal/canon":           {},
 		"internal/signing":         {imports: []string{"internal/canon"}},
-		"internal/render":          {imports: []string{"encoding/json"}},
+		"internal/render":          {imports: []string{"encoding/json/v2"}},
 		"internal/layout":          {},
 		"internal/hooks":           {},
 		"internal/mise":            {},
@@ -302,6 +302,25 @@ func TestImportsTable(t *testing.T) {
 			name:   "an e2e test of the tagged suite imports a package directly",
 			change: map[string]pkg{"e2e/x": {e2eTestImports: []string{"internal/cli"}}},
 			want:   []string{"e2e/x: imports tools: imports internal/cli directly; tools/** and e2e/** reach internal/ through internal/cmd/<binary>/all (REQ-0971)"},
+		},
+		{
+			name:   "a package imports encoding/json v1",
+			change: map[string]pkg{"internal/canon": {imports: []string{"encoding/json"}}},
+			want:   []string{"internal/canon: imports json-v1: imports encoding/json; JSON is encoding/json/v2 (REQ-0960)"},
+		},
+		{
+			name:   "a test file imports encoding/json v1",
+			change: map[string]pkg{"internal/canon": {testImports: []string{"encoding/json"}}},
+			want:   []string{"internal/canon: imports json-v1: imports encoding/json; JSON is encoding/json/v2 (REQ-0960)"},
+		},
+		{
+			name:   "an e2e test of the tagged suite imports encoding/json v1",
+			change: map[string]pkg{"internal/canon": {e2eTestImports: []string{"encoding/json"}}},
+			want:   []string{"internal/canon: imports json-v1: imports encoding/json; JSON is encoding/json/v2 (REQ-0960)"},
+		},
+		{
+			name:   "encoding/json/v2 and encoding/json/jsontext are no finding",
+			change: map[string]pkg{"internal/canon": {imports: []string{"encoding/json/v2", "encoding/json/jsontext"}, testImports: []string{"encoding/json/v2"}}},
 		},
 		{
 			name:   "internal/render links text/template",
