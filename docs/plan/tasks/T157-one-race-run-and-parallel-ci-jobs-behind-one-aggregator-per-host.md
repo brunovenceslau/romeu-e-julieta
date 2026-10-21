@@ -101,7 +101,7 @@ still the slowest after this task.
 
 - Implements: REQ-0800 (10 10.2), REQ-0803 (10 10.2), REQ-0806 (10
   10.2), REQ-0809 (10 10.2), REQ-0812 (10 10.2), REQ-0833 (10 10.2),
-  REQ-0856 (10 10.2); retires REQ-0824 (10 10.2).
+  REQ-0824 (10 10.2), REQ-0856 (10 10.2).
 - Operator: no action at merge: the aggregators keep the names of the
   required checks, so the ruleset of `main` does not change. The
   approval lines of `checks`, `dependencies` and `approvals` are the
