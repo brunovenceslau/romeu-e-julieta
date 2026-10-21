@@ -33,6 +33,7 @@ docs/reference/julieta/memory/edit.md -text
 docs/reference/julieta/memory/list.md -text
 docs/reference/julieta/memory/show.md -text
 docs/reference/julieta/setup.md -text
+docs/reference/julieta/snapshot.md -text
 docs/reference/julieta/status.md -text
 docs/reference/julieta/version.md -text
 docs/reference/romeu.md -text

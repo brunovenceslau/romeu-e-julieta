@@ -34,6 +34,7 @@ julieta <command> [flags]
 * [julieta hooks](julieta/hooks.md) - the hooks commands
 * [julieta memory](julieta/memory.md) - the memory commands
 * [julieta setup](julieta/setup.md) - prepare the sandbox: the PATH link, the repos and their default branches
+* [julieta snapshot](julieta/snapshot.md) - bundle the unpushed work of a repo into its memory dir's snapshot/
 * [julieta status](julieta/status.md) - print the state of the repos, the manifest, the recorded hook failures and julieta's warnings
 * [julieta version](julieta/version.md) - print the version of julieta
 

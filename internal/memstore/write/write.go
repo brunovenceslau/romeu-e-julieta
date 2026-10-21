@@ -13,6 +13,7 @@
 package write
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -212,6 +213,24 @@ func (s *Store) locked(f func() error) error {
 // gofrs/flock adds (Windows, fcntl locks for NFS, shared locks) julieta
 // does not need.
 func Lock(path string, onWait func()) (unlock func(), err error) {
+	return lock(context.Background(), path, onWait, true)
+}
+
+// lockPoll is how often LockContext tries the lock again while it
+// waits.
+const lockPoll = 10 * time.Millisecond
+
+// LockContext is Lock with a wait that ends with ctx: it tries the lock
+// every lockPoll until it is free, and returns the error of ctx, the
+// lock not taken, when ctx ends first (decided while building T060), so
+// a snapshot that a held lock keeps waiting meets its deadline.
+func LockContext(ctx context.Context, path string, onWait func()) (unlock func(), err error) {
+	return lock(ctx, path, onWait, false)
+}
+
+// lock is Lock, with a wait that blocks with block set and polls until
+// ctx ends otherwise.
+func lock(ctx context.Context, path string, onWait func(), block bool) (unlock func(), err error) {
 	if err := os.MkdirAll(filepath.Dir(path), memstore.DirMode); err != nil {
 		return nil, err
 	}
@@ -232,7 +251,11 @@ func Lock(path string, onWait func()) (unlock func(), err error) {
 		if onWait != nil {
 			onWait()
 		}
-		err = flock(unix.LOCK_EX)
+		if block {
+			err = flock(unix.LOCK_EX)
+		} else {
+			err = pollLock(ctx, func() error { return flock(unix.LOCK_EX | unix.LOCK_NB) })
+		}
 	}
 	if err != nil {
 		_ = lf.Close()
@@ -242,6 +265,23 @@ func Lock(path string, onWait func()) (unlock func(), err error) {
 		_ = flock(unix.LOCK_UN)
 		_ = lf.Close()
 	}, nil
+}
+
+// pollLock calls try every lockPoll until it takes the lock or fails
+// otherwise than EWOULDBLOCK, or ctx ends.
+func pollLock(ctx context.Context, try func() error) error {
+	tick := time.NewTicker(lockPoll)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-tick.C:
+			if err := try(); !errors.Is(err, unix.EWOULDBLOCK) {
+				return err
+			}
+		}
+	}
 }
 
 // put writes the file of e by the atomic write rule of 03 3.8: entries/

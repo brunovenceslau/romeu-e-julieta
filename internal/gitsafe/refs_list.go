@@ -6,10 +6,14 @@
 package gitsafe
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"slices"
 	"strings"
+	"unicode/utf8"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // Ref is a full ref name and the object it points at: one ref ListRefs
@@ -26,6 +30,23 @@ var listNamespaces = []string{"refs/heads/", "refs/tags/", "refs/notes/"}
 // (08 8.5), one directory per generation.
 const salvagePrefix = "refs/salvage/"
 
+// Refused are the ref names a list left out (ListRefs): at most
+// maxRefusedNames of them, each clipped to maxRefusedName bytes and
+// escaped with termsafe, and the number of the others.
+type Refused struct {
+	Names []string
+	More  int
+}
+
+// The bounds of the refused names and of one record of ListRefs.
+const (
+	maxRefusedNames = 100
+	maxRefusedName  = 128
+	// maxRefRecord is the longest "<oid> <name>" record ListRefs reads,
+	// a SHA-256 id and a name of 4 KiB.
+	maxRefRecord = 64 + 1 + 4<<10
+)
+
 // ListRefs lists the refs of the repository in dir under the namespaces
 // given, sorted by name, each with the object it points at (an
 // annotated tag's own object, not its commit), under the flags of the
@@ -33,19 +54,35 @@ const salvagePrefix = "refs/salvage/"
 // refs/heads/, refs/tags/, refs/notes/, and refs/salvage/<generation>/
 // for one generation per call, each named once; git reads each as a
 // plain prefix, since none holds a pattern character. A name
-// checkDisplayRef refuses, or one outside the namespaces asked for,
-// fails the whole list, and so do more than maxBranches refs.
-func (r *Runner) ListRefs(ctx context.Context, dir string, namespaces []string) ([]Ref, error) {
+// checkDisplayRef refuses is left out of the refs and returned in
+// refused, clipped and escaped, so a caller keeps every other ref
+// (decided while building T060). A name outside the namespaces asked
+// for, an id that is not a full object id and more than maxBranches
+// names, the refused ones counted, fail the whole list, and git's
+// output is not read further; a record over maxRefRecord bytes is one
+// refused name, counted in More (decided while building T060).
+func (r *Runner) ListRefs(ctx context.Context, dir string, namespaces []string) (refs []Ref, refused Refused, err error) {
 	if err := checkRepo(dir); err != nil {
-		return nil, err
+		return nil, Refused{}, err
 	}
 	if err := checkListNamespaces(namespaces); err != nil {
-		return nil, err
+		return nil, Refused{}, err
 	}
-	var refs []Ref
-	w := &records{limit: maxStatusRecord, each: func(line string) error {
-		if len(refs) == maxBranches {
+	full := func() error {
+		if len(refs)+len(refused.Names)+refused.More == maxBranches {
 			return fmt.Errorf("%w: more than %d refs", ErrRefused, maxBranches)
+		}
+		return nil
+	}
+	w := &refRecords{limit: maxRefRecord, overlong: func() error {
+		if err := full(); err != nil {
+			return err
+		}
+		refused.More++
+		return nil
+	}, each: func(line string) error {
+		if err := full(); err != nil {
+			return err
 		}
 		oid, name, ok := strings.Cut(line, " ")
 		if !ok {
@@ -54,24 +91,106 @@ func (r *Runner) ListRefs(ctx context.Context, dir string, namespaces []string) 
 		if err := checkObjectID(oid); err != nil {
 			return err
 		}
-		if err := checkDisplayRef(name); err != nil {
-			return err
-		}
 		if !slices.ContainsFunc(namespaces, func(ns string) bool { return strings.HasPrefix(name, ns) }) {
 			return fmt.Errorf("%w: ref %q is outside %s", ErrRefused, name, strings.Join(namespaces, ", "))
+		}
+		if checkDisplayRef(name) != nil {
+			if len(refused.Names) == maxRefusedNames {
+				refused.More++
+			} else {
+				refused.Names = append(refused.Names, termsafe.Escape(clipName(name)))
+			}
+			return nil
 		}
 		refs = append(refs, Ref{Name: name, OID: oid})
 		return nil
 	}}
 	args := slices.Concat([]string{"for-each-ref", "--format=%(objectname) %(refname)", "--end-of-options"}, namespaces)
-	if err := r.read(ctx, dir, nil, lines{w}, args...); err != nil {
-		return nil, err
+	err = r.read(ctx, dir, nil, lines{w}, args...)
+	if w.err != nil {
+		return nil, Refused{}, w.err
+	}
+	if err != nil {
+		return nil, Refused{}, err
 	}
 	if err := w.close(); err != nil {
-		return nil, err
+		return nil, Refused{}, err
 	}
 	slices.SortFunc(refs, func(a, b Ref) int { return strings.Compare(a.Name, b.Name) })
-	return refs, nil
+	return refs, refused, nil
+}
+
+// refRecords splits ListRefs' output into NUL-ended records, as
+// records does, with two differences: a record over limit bytes is
+// not kept and calls overlong, as one name refused, and the next
+// record is read; and an error of each or overlong fails the write, so
+// git's output is not read further.
+type refRecords struct {
+	partial  bytes.Buffer
+	over     bool
+	limit    int
+	each     func(string) error
+	overlong func() error
+	err      error
+}
+
+// Write takes the next part of the output.
+func (w *refRecords) Write(p []byte) (int, error) {
+	if w.err != nil {
+		return 0, w.err
+	}
+	n := len(p)
+	for len(p) > 0 {
+		i := bytes.IndexByte(p, 0)
+		chunk := p
+		if i >= 0 {
+			chunk = p[:i]
+		}
+		if !w.over && w.partial.Len()+len(chunk) > w.limit {
+			w.over = true
+			w.partial.Reset()
+		}
+		if !w.over {
+			w.partial.Write(chunk)
+		}
+		if i < 0 {
+			break
+		}
+		p = p[i+1:]
+		if w.over {
+			w.over = false
+			w.err = w.overlong()
+		} else {
+			w.err = w.each(w.partial.String())
+			w.partial.Reset()
+		}
+		if w.err != nil {
+			return 0, w.err
+		}
+	}
+	return n, nil
+}
+
+// close returns the error of the records, and ErrRefused for output that
+// ends inside one.
+func (w *refRecords) close() error {
+	if w.err == nil && (w.partial.Len() > 0 || w.over) {
+		w.err = fmt.Errorf("%w: git's output ends inside a record", ErrRefused)
+	}
+	return w.err
+}
+
+// clipName returns name cut to maxRefusedName bytes, on a character's
+// start, with "..." when it was cut.
+func clipName(name string) string {
+	if len(name) <= maxRefusedName {
+		return name
+	}
+	cut := maxRefusedName
+	for cut > 0 && !utf8.RuneStart(name[cut]) {
+		cut--
+	}
+	return name[:cut] + "..."
 }
 
 // checkListNamespaces returns ErrRefused for a list ListRefs does not
