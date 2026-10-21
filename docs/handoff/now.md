@@ -11,9 +11,8 @@ under "Work authorized while the operator is away on 2026-10-21"
 
 1. T060 (`julieta snapshot`): its builder's report, then a code review
    and a security audit, then its pull request.
-2. The status task for "julieta status reads the hook failure store"
-   (0000000000782g86tsyzte1t16): its builder's report, a review, its
-   pull request, and the Done record that closes the note.
+2. Plan "Readers of formats between binaries ignore unknown members"
+   (01m5egnpyfywadcsxpy0naz3hj); ask first to build it.
 3. "One race run, test tags and parallel CI jobs"
    (01m5drzqsp6zg34xzmywckwb7b): measure the race packages, plan, build.
 4. T150, the imports check that refuses `encoding/json` v1.
@@ -51,9 +50,7 @@ One block, a recommendation each.
 ## In flight
 
 - `feat/t060-julieta-snapshot`, T060, a builder in its own worktree.
-- `feat/julieta-status-hook-failures`, the status task, a builder in its
-  own worktree.
-- `docs/checkpoint-2026-10-21`, this checkpoint.
+- `feat/julieta-status-hook-failures`, T154.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.

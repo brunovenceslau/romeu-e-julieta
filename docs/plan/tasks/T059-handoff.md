@@ -136,8 +136,8 @@ Decisions taken while building (2026-10-20), each with what reopens it:
   is cut at 300 bytes. `hooks.json` keeps only `sessionStartAt` and
   `sessionEndAt`. `julieta status` does not list the failures yet: the
   Acceptance line "`julieta status` lists it" waits for a status
-  section that reads the store, recorded in
-  `docs/handoff/pending/0000000000782g86tsyzte1t16-julieta-status-reads-the-hook-failure-store.md`
+  section that reads the store, which T154 built
+  (`docs/handoff/done/01m5egnpzdw2107nc5k4bfkbz3-julieta-status-lists-the-recorded-hook-failures-t154.md`)
   (copying the failures into `setup.json` was removed because two
   writers of it lost each other's changes). Edit of `internal/hooks`:
   the constants `SessionStart` and `SessionEnd`, and an optional

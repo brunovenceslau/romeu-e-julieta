@@ -43,14 +43,14 @@ clear a failure when the same hook next succeeds. A file of the store
 that cannot be read is one entry of the report's `errors`, and the
 failures that can be read are still listed.
 
-`julieta-status/v1` gains the member without a new version. REQ-0163
-says any change to a format's fields bumps its version; no release has
-shipped the format yet (the repository has no tag), and REQ-0424 lists
-the hook failures as part of the v1 report from the start, so the
-member completes v1 rather than changing it. The generated schema, the
-valid fixture and the e2e decoder of every field gain it. Reopened by
-the first release: from then on a new member of the report is a new
-version.
+`julieta-status/v1` gains the member without a new version: decided on
+2026-10-21, formats evolve by the rules of protobuf, where adding a
+member is backward compatible ("Formats evolve by the rules of
+protobuf", 01m5egnpxhheh7197j08zdr618). REQ-0163 still says any change
+to a format's fields bumps its version until "Readers of formats
+between binaries ignore unknown members" (01m5egnpyfywadcsxpy0naz3hj)
+amends it. The generated schema, the valid fixture and the e2e decoder of
+every field gain the member.
 
 - Implements: REQ-0424 (04 4.3), REQ-0675 (08 8.2).
 - Operator: no.
