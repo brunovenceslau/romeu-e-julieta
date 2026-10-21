@@ -24,11 +24,11 @@ import (
 )
 
 // pkg is one package of a fixture module: what its non-test file, its
-// test file and its test file of the e2e suite (//go:build e2e) import,
+// test file, its external test file (package <name>_test) and its test file of the e2e suite (//go:build e2e) import,
 // each path relative to the module, except a standard library path such
 // as text/template.
 type pkg struct {
-	imports, testImports, e2eTestImports []string
+	imports, testImports, xtestImports, e2eTestImports []string
 }
 
 // baseTree is a module that keeps every rule: both binaries, a command
@@ -101,6 +101,13 @@ func writeTree(t *testing.T, pkgs map[string]pkg) string {
 				test += importLine(imp)
 			}
 			require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "p_test.go"), []byte(test), 0o600))
+		}
+		if len(spec.xtestImports) > 0 {
+			test := "package " + name + "_test\n\n"
+			for _, imp := range spec.xtestImports {
+				test += importLine(imp)
+			}
+			require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "p_x_test.go"), []byte(test), 0o600))
 		}
 		if len(spec.e2eTestImports) > 0 {
 			test := "//go:build e2e\n\npackage " + name + "\n\n"
@@ -314,9 +321,14 @@ func TestImportsTable(t *testing.T) {
 			want:   []string{"internal/canon: imports json-v1: imports encoding/json; JSON is encoding/json/v2 (REQ-0960)"},
 		},
 		{
-			name:   "an e2e test of the tagged suite imports encoding/json v1",
-			change: map[string]pkg{"internal/canon": {e2eTestImports: []string{"encoding/json"}}},
+			name:   "an external test package imports encoding/json v1",
+			change: map[string]pkg{"internal/canon": {xtestImports: []string{"encoding/json"}}},
 			want:   []string{"internal/canon: imports json-v1: imports encoding/json; JSON is encoding/json/v2 (REQ-0960)"},
+		},
+		{
+			name:   "an e2e test of the tagged suite imports encoding/json v1",
+			change: map[string]pkg{"e2e/x": {e2eTestImports: []string{"encoding/json"}}},
+			want:   []string{"e2e/x: imports json-v1: imports encoding/json; JSON is encoding/json/v2 (REQ-0960)"},
 		},
 		{
 			name:   "encoding/json/v2 and encoding/json/jsontext are no finding",
