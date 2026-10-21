@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -20,10 +19,6 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/hooks"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/hooks/actions"
 )
-
-// failuresDir is the directory of julieta state that holds the
-// recorded failures of the hooks (REQ-0154, REQ-0675).
-const failuresDir = "hook-failures"
 
 // The process the command runs in: the stdin the hook's stages read a
 // copy of, the environment the stages get, and the exit that ends
@@ -98,7 +93,7 @@ func run(cmd *cobra.Command, env *cli.Env, hook string, args []string) error {
 	status, err := hooks.Run(cmd.Context(), hooks.Options{
 		Hook: hook, Args: args, Dir: dir, Env: environ(), Stdin: stdin(),
 		Stdout: env.Stdout, Stderr: env.Stderr,
-		StateDir: filepath.Join(setup.StateDir(home), failuresDir), Now: env.Now,
+		StateDir: hooks.FailuresDir(setup.StateDir(home)), Now: env.Now,
 		Actions:     actions.For(hook),
 		ActionError: func(err error) int { return cli.Report(env, err) },
 		System:      system, Dispatcher: hooks.DispatcherDir(home),

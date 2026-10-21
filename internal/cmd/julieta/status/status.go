@@ -3,7 +3,8 @@
 
 // Package status holds the command julieta status (04 4.3, REQ-0424):
 // the state of each repo of the manifest, the live spec commit, the
-// egress set romeu applied and julieta's warnings. Each part of the
+// egress set romeu applied, the recorded hook failures and julieta's
+// warnings. Each part of the
 // report is a section of its own file, registered in sections.go. It
 // writes nothing, and a read that fails is shown in the report, never
 // the exit status: status exits 0, or 2 without a manifest (REQ-0425).
@@ -25,7 +26,7 @@ var _ = cli.Register(func() cli.Command {
 	c.New = func(env *cli.Env) *cobra.Command {
 		return &cobra.Command{
 			Use:     "status",
-			Short:   "print the state of the repos, the manifest and julieta's warnings",
+			Short:   "print the state of the repos, the manifest, the recorded hook failures and julieta's warnings",
 			Example: "julieta status\njulieta status --json",
 			Args:    cobra.NoArgs,
 			RunE: func(c *cobra.Command, _ []string) error {

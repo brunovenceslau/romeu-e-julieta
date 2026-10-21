@@ -111,7 +111,7 @@ func sameHooks(a, b Hooks) bool {
 
 // failuresDir is the store of hook failures below julieta state, the
 // one internal/hooks records the git hooks' in.
-func failuresDir(home string) string { return filepath.Join(setup.StateDir(home), "hook-failures") }
+func failuresDir(home string) string { return hooks.FailuresDir(setup.StateDir(home)) }
 
 // failureLine words a recorded failure on one line: of a session hook
 // with its message, of a git hook with the stage and the script.

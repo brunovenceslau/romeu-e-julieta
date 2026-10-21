@@ -47,6 +47,11 @@ type Failure struct {
 	Stage   string `json:"stage"`
 }
 
+// FailuresDir returns the store of hook failures below stateDir,
+// julieta state (02 2.5, REQ-0154): the one directory julieta hooks
+// run, the session hooks and julieta status all use.
+func FailuresDir(stateDir string) string { return filepath.Join(stateDir, "hook-failures") }
+
 // failureFile returns the file name of the failure of hook in repo: one
 // file for each pair, so that recording and clearing are a rename and a
 // remove and two hooks that finish together lose no record of each

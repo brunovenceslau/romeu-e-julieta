@@ -15,6 +15,46 @@
       },
       "type": "array"
     },
+    "hookFailures": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "exitCode": {
+            "type": "integer"
+          },
+          "hook": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "exitCode",
+          "hook",
+          "message",
+          "path",
+          "repo",
+          "stage"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
     "project": {
       "type": "string"
     },
@@ -197,6 +237,7 @@
   "required": [
     "egress",
     "errors",
+    "hookFailures",
     "project",
     "repos",
     "schema",

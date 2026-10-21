@@ -6,6 +6,7 @@ package status
 import (
 	"encoding/json/v2"
 	"fmt"
+	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 )
@@ -25,6 +26,10 @@ type Report struct {
 	// Errors are the reads outside a repo that failed, such as that of
 	// julieta state.
 	Errors []string `json:"errors"`
+	// HookFailures are the hook failures recorded in julieta state, the
+	// oldest first, each until a later run of the same hook in the same
+	// repo succeeds (08 8.2, REQ-0675).
+	HookFailures []HookFailure `json:"hookFailures"`
 	// Project is the project of the manifest.
 	Project string `json:"project"`
 	// Repos are the repos of the manifest, in its order.
@@ -35,6 +40,31 @@ type Report struct {
 	SpecCommit string `json:"specCommit"`
 	// Warnings are julieta's warnings, those setup recorded among them.
 	Warnings []setup.Warning `json:"warnings"`
+}
+
+// HookFailure is one recorded failing run of a hook: a git hook's, of
+// the stage system, julieta, tracked or local, or a session hook's,
+// SessionStart or SessionEnd (08 8.2).
+type HookFailure struct {
+	// At is the time of the run.
+	At time.Time `json:"at"`
+	// ExitCode is the exit status of the stage that failed.
+	ExitCode int `json:"exitCode"`
+	// Hook is the git hook's name, or SessionStart or SessionEnd.
+	Hook string `json:"hook"`
+	// Message is what a session hook's failure said; empty for a git
+	// hook.
+	Message string `json:"message"`
+	// Path is the script of the stage that failed; empty for a session
+	// hook.
+	Path string `json:"path"`
+	// Repo is the path of the repo a git hook ran in, or the dir of the
+	// repo a session hook ran for; empty when a session hook failed
+	// before it knew one.
+	Repo string `json:"repo"`
+	// Stage is the stage of a git hook that failed, or the command of a
+	// session hook.
+	Stage string `json:"stage"`
 }
 
 // Repo is the state of one repo (04 4.3, REQ-0424).
