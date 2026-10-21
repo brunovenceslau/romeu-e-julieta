@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/salvage"
 )
 
@@ -243,4 +244,47 @@ func TestSnapshotOfASkippedInputIsWrittenAndFails(t *testing.T) {
 	assert.Contains(t, err.Error(), "refs/tags/")
 	assert.Equal(t, map[string]string{"refs/heads/main": c1}, f.heads(t).Refs)
 	assert.Len(t, res.Skipped, 1)
+}
+
+// TestSnapshotRefusesWhatItCannotWrite: a memory dir that is not an
+// absolute, clean path, a snapshot path that is no directory, a work
+// directory below a file, a directory that is no repository and a
+// bundle path that cannot be removed each fail the snapshot before or
+// in place of its writes.
+func TestSnapshotRefusesWhatItCannotWrite(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+
+	c := f.config(t, clock)
+	c.Memory = "memory"
+	_, err := Snapshot(t.Context(), c)
+	require.ErrorContains(t, err, "not an absolute, clean path")
+
+	file := filepath.Join(t.TempDir(), "file")
+	require.NoError(t, os.WriteFile(file, nil, 0o600))
+	c = f.config(t, clock)
+	c.Work = filepath.Join(file, "work")
+	_, err = Snapshot(t.Context(), c)
+	require.Error(t, err)
+
+	c = f.config(t, clock)
+	c.Dir = t.TempDir()
+	_, err = Snapshot(t.Context(), c)
+	require.Error(t, err, "no repository")
+
+	require.NoError(t, os.RemoveAll(f.snapshotDir()))
+	require.NoError(t, os.WriteFile(f.snapshotDir(), nil, 0o600))
+	_, err = Snapshot(t.Context(), f.config(t, clock))
+	require.ErrorIs(t, err, memstore.ErrLayout)
+	require.NoError(t, os.Remove(f.snapshotDir()))
+
+	// Nothing beyond the base, and a bundle path that is a directory
+	// with a file in it, which no remove takes.
+	git(t, f.repo, "reset", "-q", "--hard", f.base)
+	git(t, f.repo, "reflog", "expire", "--expire=now", "--all")
+	require.NoError(t, os.MkdirAll(filepath.Join(f.snapshotDir(), salvage.BundleFile, "x"), 0o700))
+	_, err = Snapshot(t.Context(), f.config(t, clock))
+	require.Error(t, err)
+	_, err = os.Stat(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
+	require.ErrorIs(t, err, os.ErrNotExist, "no heads.json after a failed first write")
 }
