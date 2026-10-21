@@ -261,7 +261,7 @@ func TestReleaseBuildChecksTheTag(t *testing.T) {
 // stamps the commit dirty.
 func TestDirtyTree(t *testing.T) {
 	t.Parallel()
-	root := fixtureModule(t)
+	root := fixtureModuleWith(t, false) // nothing here reads the embedded julieta, so the archives are half the size
 	tag(t, root, "v1.0.0")
 	write(t, root, map[string]string{"untracked.txt": "x\n"})
 	out := func() string { return filepath.Join(t.TempDir(), "out") }
@@ -286,7 +286,7 @@ func TestDirtyTree(t *testing.T) {
 // a failed build leaves nothing, not even a staging directory.
 func TestOutput(t *testing.T) {
 	t.Parallel()
-	root := fixtureModule(t)
+	root := fixtureModuleWith(t, false) // nothing here reads the embedded julieta, so the archives are half the size
 	parent := t.TempDir()
 
 	full := filepath.Join(parent, "full")
