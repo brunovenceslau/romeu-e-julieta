@@ -5,7 +5,6 @@ package drift
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,7 +36,7 @@ func runGen(t *testing.T, r *gittest.Repo, args ...string) (int, string, string)
 	t.Helper()
 	var out, errOut bytes.Buffer
 	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdout: &out, Stderr: &errOut}
-	return citest.Exit(context.Background(), e, Generate, args...), out.String(), errOut.String()
+	return citest.Exit(t.Context(), e, Generate, args...), out.String(), errOut.String()
 }
 
 // TestGenerateWritesTheConsumers is the acceptance case: from the

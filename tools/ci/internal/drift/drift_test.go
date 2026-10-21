@@ -7,7 +7,6 @@ package drift
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -133,7 +132,7 @@ func TestGenerated(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := generatedFixture(t)
-			findings, err := generated(context.Background(), r.Repo, tt.gen, nil)
+			findings, err := generated(t.Context(), r.Repo, tt.gen, nil)
 			require.NoError(t, err)
 			require.Len(t, findings, len(tt.want))
 			for i, w := range tt.want {
@@ -147,7 +146,7 @@ func TestGenerated(t *testing.T) {
 // is an error that carries its output, not a finding.
 func TestGeneratedGeneratorFails(t *testing.T) {
 	r := generatedFixture(t)
-	_, err := generated(context.Background(), r.Repo, fsOps("fail"), nil)
+	_, err := generated(t.Context(), r.Repo, fsOps("fail"), nil)
 	require.ErrorContains(t, err, "go generate")
 	require.ErrorContains(t, err, "the generator says no")
 }
@@ -157,7 +156,7 @@ func TestGeneratedGeneratorFails(t *testing.T) {
 func TestGeneratedNotAGitRepository(t *testing.T) {
 	r := generatedFixture(t)
 	r.Dir = t.TempDir()
-	_, err := generated(context.Background(), r.Repo, fsOps("write a x"), nil)
+	_, err := generated(t.Context(), r.Repo, fsOps("write a x"), nil)
 	require.Error(t, err)
 }
 
@@ -166,9 +165,9 @@ func TestGeneratedNotAGitRepository(t *testing.T) {
 func TestRunGeneratedTakesNoArgument(t *testing.T) {
 	var out, errOut bytes.Buffer
 	e := check.Env{Dir: ".", Stdout: &out, Stderr: &errOut}
-	assert.Equal(t, check.ExitError, citest.Exit(context.Background(), e, Run, "x"))
+	assert.Equal(t, check.ExitError, citest.Exit(t.Context(), e, Run, "x"))
 	assert.Contains(t, errOut.String(), "generated takes no argument")
-	assert.Equal(t, check.ExitError, citest.Exit(context.Background(), e, Generate, "x"))
+	assert.Equal(t, check.ExitError, citest.Exit(t.Context(), e, Generate, "x"))
 	assert.Contains(t, errOut.String(), "generate takes no argument")
 }
 
@@ -197,7 +196,7 @@ func committedGenerateFixture(t *testing.T) *gittest.Repo {
 // the outputs of generate as the files that must be tracked.
 func gateOf(t *testing.T, r *gittest.Repo) []string {
 	t.Helper()
-	findings, err := generated(context.Background(), r.Repo, fsOps(), generateOutputs)
+	findings, err := generated(t.Context(), r.Repo, fsOps(), generateOutputs)
 	require.NoError(t, err)
 	got := make([]string, len(findings))
 	for i, f := range findings {

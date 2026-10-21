@@ -29,6 +29,10 @@ import (
 
 // pinnedGo is the go command the tests run in their clones, found once
 // as main finds it, from the directory of this package.
+//
+// It is shared by every test of the run and made by the first to ask, so
+// its context is no test's: a test's context ends with that test and
+// would end the lookup for the others, hence the one Background here.
 var pinnedGo = sync.OnceValues(func() (string, error) {
 	return resolveGo(context.Background(), ".")
 })
@@ -191,7 +195,7 @@ func (f fixture) assertOnlyObjectsAdded(t *testing.T, before repoState) {
 
 func (f fixture) assertNoStashNoClone(t *testing.T) {
 	t.Helper()
-	_, err := f.repo.Run(context.Background(), nil, "rev-parse", "--verify", "--quiet", "refs/stash")
+	_, err := f.repo.Run(t.Context(), nil, "rev-parse", "--verify", "--quiet", "refs/stash")
 	require.Error(t, err, "refs/stash must not exist")
 	entries, err := os.ReadDir(f.e.tmpDir)
 	require.NoError(t, err)
@@ -206,6 +210,10 @@ func (f fixture) writeMutants(t *testing.T, text string) {
 
 // runArgs runs the command against the fixture with args before the
 // mutants file.
+//
+// It has no *testing.T, and isolation_test.go calls it as it is, so it
+// stays on the one Background context that the tests of this package
+// keep besides pinnedGo.
 func (f fixture) runArgs(args ...string) int {
 	return run(context.Background(), f.e, append(args, f.mutants))
 }
@@ -237,7 +245,7 @@ const threeMutants = `mutants:
 func TestMutantsEndToEnd(t *testing.T) {
 	f := newFixture(t, threeMutants)
 	before := f.state(t)
-	code := run(context.Background(), f.e, []string{f.mutants})
+	code := run(t.Context(), f.e, []string{f.mutants})
 	assert.Equal(t, exitFail, code, f.stderr.String())
 	want := "clamp-low killed ./calc -run ^TestClamp$ fails\n" +
 		"double-plus survived ./calc -run ^TestDouble$ passes\n" +
@@ -261,7 +269,7 @@ func TestMutantsEveryMutantKilled(t *testing.T) {
 	require.NoError(t, os.WriteFile(f.mutants, []byte(killedOnly), 0o644))
 	f.e.dir = sub
 	before := f.state(t)
-	assert.Equal(t, exitOK, run(context.Background(), f.e, []string{rel}), f.stderr.String())
+	assert.Equal(t, exitOK, run(t.Context(), f.e, []string{rel}), f.stderr.String())
 	assert.Contains(t, f.stdout.String(), "mutants: 1 killed, 0 survived, 0 invalid, of 1 mutants")
 	f.assertUntouched(t, before)
 }
@@ -284,7 +292,7 @@ func TestMutantsInvalid(t *testing.T) {
 	f.repo.Write("calc/testdata/x.txt", "xxx\n")
 	f.repo.Commit("other")
 	before := f.state(t)
-	assert.Equal(t, exitFail, run(context.Background(), f.e, []string{f.mutants}))
+	assert.Equal(t, exitFail, run(t.Context(), f.e, []string{f.mutants}))
 	lines := strings.Split(strings.TrimSuffix(f.stdout.String(), "\n"), "\n")
 	require.Len(t, lines, 8, f.stdout.String())
 	assert.Equal(t, "no-build invalid the mutated code does not build", lines[0])
@@ -323,7 +331,7 @@ func TestData(t *testing.T) {
 `)
 	f.repo.Commit("testdata")
 	before := f.state(t)
-	assert.Equal(t, exitOK, run(context.Background(), f.e, []string{f.mutants}), f.stderr.String())
+	assert.Equal(t, exitOK, run(t.Context(), f.e, []string{f.mutants}), f.stderr.String())
 	assert.Contains(t, f.stdout.String(), "data killed ./... -run ^TestData$ fails")
 	f.assertUntouched(t, before)
 }
@@ -336,7 +344,7 @@ func TestMutantsLinkIsInvalid(t *testing.T) {
 	require.NoError(t, os.Symlink("calc.go", filepath.Join(f.repo.Dir, "calc", "calc.lnk")))
 	f.repo.Commit("link")
 	before := f.state(t)
-	assert.Equal(t, exitFail, run(context.Background(), f.e, []string{f.mutants}))
+	assert.Equal(t, exitFail, run(t.Context(), f.e, []string{f.mutants}))
 	assert.Contains(t, f.stdout.String(), "link invalid calc/calc.lnk is not checked out as its blob")
 	f.assertUntouched(t, before)
 }
@@ -348,7 +356,7 @@ func TestMutantsRedBaseline(t *testing.T) {
 	f.repo.Write("calc/calc_test.go", strings.Replace(fixtureCalcTest, "!= 4", "!= 5", 1))
 	f.repo.Commit("red")
 	before := f.state(t)
-	assert.Equal(t, exitError, run(context.Background(), f.e, []string{f.mutants}))
+	assert.Equal(t, exitError, run(t.Context(), f.e, []string{f.mutants}))
 	assert.Empty(t, f.stdout.String())
 	assert.Contains(t, f.stderr.String(), "the baseline of ./calc -run ^TestDouble$ fails with no mutant")
 	assert.Contains(t, f.stderr.String(), "Double(2) is not 4")
@@ -362,7 +370,7 @@ func TestMutantsUsesTheCommit(t *testing.T) {
 	// Uncommitted, this test would fail the baseline of TestDouble.
 	f.repo.Write("calc/calc_test.go", strings.Replace(fixtureCalcTest, "!= 4", "!= 5", 1))
 	before := f.state(t)
-	assert.Equal(t, exitFail, run(context.Background(), f.e, []string{f.mutants}), f.stderr.String())
+	assert.Equal(t, exitFail, run(t.Context(), f.e, []string{f.mutants}), f.stderr.String())
 	assert.Contains(t, f.stderr.String(), "the working tree has uncommitted changes (git status: 1); the run uses the commit "+before.head+" without them; -worktree runs them too")
 	assert.Contains(t, f.stdout.String(), "double-plus survived")
 	f.assertUntouched(t, before)
@@ -434,7 +442,7 @@ func TestMutantsRefuses(t *testing.T) {
 				tt.setup(t, &f)
 			}
 			tmp := f.e.tmpDir
-			assert.Equal(t, exitError, run(context.Background(), f.e, tt.args(f)))
+			assert.Equal(t, exitError, run(t.Context(), f.e, tt.args(f)))
 			assert.Empty(t, f.stdout.String())
 			assert.Contains(t, f.stderr.String(), tt.want)
 			if entries, err := os.ReadDir(tmp); err == nil {
@@ -553,13 +561,13 @@ func TestMutantTimeout(t *testing.T) {
 func TestCheckGoVersion(t *testing.T) {
 	fake := filepath.Join(t.TempDir(), "go")
 	require.NoError(t, os.WriteFile(fake, []byte("#!/bin/sh\necho go0.0.1\n"), 0o700))
-	err := checkGoVersion(context.Background(), fake)
+	err := checkGoVersion(t.Context(), fake)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "is go0.0.1, not "+runtime.Version())
 	broken := filepath.Join(t.TempDir(), "go")
 	require.NoError(t, os.WriteFile(broken, []byte("#!/bin/sh\nexit 3\n"), 0o700))
-	require.Error(t, checkGoVersion(context.Background(), broken))
-	_, err = resolveGo(context.Background(), filepath.Join(t.TempDir(), "none"))
+	require.Error(t, checkGoVersion(t.Context(), broken))
+	_, err = resolveGo(t.Context(), filepath.Join(t.TempDir(), "none"))
 	require.Error(t, err)
 
 	probe := t.TempDir()
@@ -567,7 +575,7 @@ func TestCheckGoVersion(t *testing.T) {
 	t.Setenv("PATH", probe+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("GOTOOLCHAIN", "go1.0")
 	t.Setenv("GOENV", "/elsewhere")
-	_, err = resolveGo(context.Background(), probe)
+	_, err = resolveGo(t.Context(), probe)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "/local-off/bin/go")
 }

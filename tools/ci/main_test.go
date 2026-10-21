@@ -5,7 +5,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"os"
@@ -171,7 +170,7 @@ func TestHook(t *testing.T) {
 func TestRunPrintsAnErrorAsSafeText(t *testing.T) {
 	var out, errOut bytes.Buffer
 	e := check.Env{Dir: t.TempDir(), Stdout: &out, Stderr: &errOut}
-	assert.Equal(t, check.ExitError, run(context.Background(), e, []string{"hygiene", "--bad\x1b[2J\n::error::forged"}))
+	assert.Equal(t, check.ExitError, run(t.Context(), e, []string{"hygiene", "--bad\x1b[2J\n::error::forged"}))
 	assert.NotContains(t, errOut.String(), "\x1b")
 	for line := range strings.SplitSeq(errOut.String(), "\n") {
 		assert.False(t, strings.HasPrefix(strings.TrimSpace(line), "::"), "%q", line)

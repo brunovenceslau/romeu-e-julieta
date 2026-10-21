@@ -124,7 +124,7 @@ func serveGit(t *testing.T, base string) string {
 	t.Helper()
 	ln, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	var wg sync.WaitGroup
 	argv := []string{gitPath(t), "daemon", "--inetd", "--export-all", "--base-path=" + base}
 	wg.Go(func() {

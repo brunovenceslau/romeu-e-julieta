@@ -4,7 +4,6 @@
 package gittest_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -98,10 +97,10 @@ func TestEnvStopsGitAtTheTemporaryDirectories(t *testing.T) {
 		dir := t.TempDir()
 		require.True(t, strings.HasPrefix(dir, outer.Dir), "the fixture directory lies in the outer work tree")
 		inner := git.Repo{Dir: dir, Env: env}
-		_, err := inner.Run(context.Background(), nil, "rev-parse", "--show-toplevel")
+		_, err := inner.Run(t.Context(), nil, "rev-parse", "--show-toplevel")
 		require.Error(t, err, "the ceiling hides the outer repository")
 		without := git.Repo{Dir: dir, Env: []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_GLOBAL=" + os.DevNull}}
-		_, err = without.Run(context.Background(), nil, "rev-parse", "--show-toplevel")
+		_, err = without.Run(t.Context(), nil, "rev-parse", "--show-toplevel")
 		require.NoError(t, err, "without the ceiling git finds it, so the test above proves something")
 	})
 }
