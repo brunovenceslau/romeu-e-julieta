@@ -6,6 +6,7 @@ package status_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,7 +20,7 @@ import (
 
 // failuresDir is the store of hook failures below julieta state, where
 // julieta hooks run and the session hooks record them.
-func failuresDir(home string) string { return filepath.Join(setup.StateDir(home), "hook-failures") }
+func failuresDir(home string) string { return hooks.FailuresDir(setup.StateDir(home)) }
 
 // TestStatusListsTheRecordedHookFailures lists each failure recorded in
 // the store, a git hook's of the tracked and the system stage and a
@@ -65,26 +66,44 @@ func TestStatusListsTheRecordedHookFailures(t *testing.T) {
 // holds none, or does not exist, and prints no failure line.
 func TestStatusWithNoHookFailures(t *testing.T) {
 	newSandbox(t)
-	rep := statusJSON(t)
-	assert.NotNil(t, rep.HookFailures)
-	assert.Empty(t, rep.HookFailures)
-	_, stdout, _ := julieta(t.Context(), "status")
+	code, stdout, stderr := julieta(t.Context(), "status", "--json")
+	require.Equal(t, 0, code, stderr)
+	assert.Contains(t, stdout, `"hookFailures":[]`, "an empty list, never null")
+	_, stdout, _ = julieta(t.Context(), "status")
 	assert.NotContains(t, stdout, "hook failure")
 }
 
-// TestStatusGoesOnPastAnUnreadableHookFailure lists a file of the store
-// it cannot read under errors and the failures it can read as before.
-func TestStatusGoesOnPastAnUnreadableHookFailure(t *testing.T) {
+// TestStatusPrintsAFailureWithNoDetail ends the line of a failure that
+// has neither a path nor a message at its time, with no separator after
+// it.
+func TestStatusPrintsAFailureWithNoDetail(t *testing.T) {
+	s := newSandbox(t)
+	require.NoError(t, hooks.Record(failuresDir(s.home), hooks.Failure{At: clock, ExitCode: 1, Hook: hooks.SessionEnd, Repo: "api", Stage: "julieta handoff write --facts"}))
+	code, stdout, stderr := julieta(t.Context(), "status")
+	require.Equal(t, 0, code, stderr)
+	assert.Contains(t, stdout, "hook failure  SessionEnd  repo api  stage julieta handoff write --facts  exit 1  at 2026-10-20T12:00:00Z\n")
+}
+
+// TestStatusGoesOnPastAnUntrustedHookFailure lists each file of the
+// store it cannot trust, one with an unknown member and one whose repo
+// and hook name another file, as one entry of errors each, and the
+// failures it can read as before.
+func TestStatusGoesOnPastAnUntrustedHookFailure(t *testing.T) {
 	s := newSandbox(t)
 	dir := failuresDir(s.home)
 	good := hooks.Failure{At: clock, ExitCode: 2, Hook: "pre-push", Path: "p", Repo: s.primary(), Stage: "local"}
 	require.NoError(t, hooks.Record(dir, good))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pre-commit-0000000000000000.json"), []byte(`{"unknown":1}`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pre-commit-1111111111111111.json"),
+		[]byte(`{"at":"2026-10-20T12:00:00Z","exitCode":1,"hook":"pre-commit","path":"p","repo":"/elsewhere","stage":"tracked"}`), 0o600))
 
 	rep := statusJSON(t)
 	require.Len(t, rep.HookFailures, 1)
 	assert.Equal(t, "pre-push", rep.HookFailures[0].Hook)
-	require.Len(t, rep.Errors, 1)
-	assert.Contains(t, rep.Errors[0], "hook failures: ")
-	assert.Contains(t, rep.Errors[0], "pre-commit-0000000000000000.json")
+	require.Len(t, rep.Errors, 2, "one entry for each file: %q", rep.Errors)
+	for i, name := range []string{"pre-commit-0000000000000000.json", "pre-commit-1111111111111111.json"} {
+		assert.True(t, strings.HasPrefix(rep.Errors[i], "hook failures: "), rep.Errors[i])
+		assert.Contains(t, rep.Errors[i], name)
+		assert.NotContains(t, rep.Errors[i], "\n")
+	}
 }

@@ -6,7 +6,6 @@ package status
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -25,12 +24,14 @@ var _ = register(section{
 	name:  "hook-failures",
 	order: 80,
 	fill: func(_ context.Context, src *source, rep *Report) {
-		failures, err := hooks.Failures(filepath.Join(setup.StateDir(src.home), "hook-failures"))
-		if err != nil {
-			rep.Errors = append(rep.Errors, "hook failures: "+err.Error())
+		failures, err := hooks.Failures(hooks.FailuresDir(setup.StateDir(src.home)))
+		for _, e := range splitJoined(err) {
+			rep.Errors = append(rep.Errors, "hook failures: "+e.Error())
 		}
 		rep.HookFailures = make([]HookFailure, 0, len(failures))
 		for _, f := range failures {
+			// The report's type mirrors the store's on purpose: a new
+			// field of hooks.Failure breaks this conversion, and the build.
 			rep.HookFailures = append(rep.HookFailures, HookFailure(f))
 		}
 	},
@@ -46,11 +47,28 @@ var _ = register(section{
 			}
 			// Each value is escaped alone, so a line feed in it stays on
 			// the failure's line (cli.Writer).
-			fmt.Fprintf(&b, "hook failure  %s  repo %s  stage %s  exit %d  at %s  %s\n",
+			fmt.Fprintf(&b, "hook failure  %s  repo %s  stage %s  exit %d  at %s",
 				termsafe.Escape(f.Hook), termsafe.Escape(repo), termsafe.Escape(f.Stage), f.ExitCode,
-				f.At.UTC().Format(time.RFC3339), termsafe.Escape(detail))
+				f.At.UTC().Format(time.RFC3339))
+			if detail != "" {
+				b.WriteString("  " + termsafe.Escape(detail))
+			}
+			b.WriteString("\n")
 		}
 		_, err := out.Write([]byte(b.String()))
 		return err
 	},
 })
+
+// splitJoined returns the errors that err joins, one for each file of
+// the store hooks.Failures could not trust, so that each is one entry of
+// errors; an error that joins none is itself, and nil is none.
+func splitJoined(err error) []error {
+	if err == nil {
+		return nil
+	}
+	if j, ok := err.(interface{ Unwrap() []error }); ok {
+		return j.Unwrap()
+	}
+	return []error{err}
+}

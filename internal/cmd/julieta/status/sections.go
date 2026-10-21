@@ -40,8 +40,9 @@ type section struct {
 // (plan rule 14): each section registers itself from its own file with
 // var _ = register(section{...}), and the tasks of the other sections
 // of 04 4.3 add a file each: tools installed with T053, the last
-// snapshot with T054, the agent memory dir with T035, and the agent's
-// hooks and skills with T079. It is written during initialization and
+// snapshot with T054, the agent memory dir with T035, the agent's hooks
+// and skills with T079, and the recorded hook failures with T154. It is
+// written during initialization and
 // read-only after.
 var sections []section
 
