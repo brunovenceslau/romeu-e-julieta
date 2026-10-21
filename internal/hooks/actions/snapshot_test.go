@@ -1,0 +1,246 @@
+// SPDX-FileCopyrightText: 2026 Bruno Venceslau
+// SPDX-License-Identifier: GPL-3.0-only
+
+//go:build unix
+
+package actions
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/salvage"
+)
+
+// seam sets the test seam *v to value and restores it after the test;
+// a test that sets one does not run in parallel.
+func seam[T any](t *testing.T, v *T, value T) {
+	t.Helper()
+	old := *v
+	*v = value
+	t.Cleanup(func() { *v = old })
+}
+
+// TestSnapshotWritesTheBundleThenHeads (08 8.4, REQ-0688, REQ-0689):
+// the bundle holds the refs beyond the base, needs the base, and is
+// renamed into place before heads.json, which lists every ref the
+// snapshot read with the time of the clock; both files are 0600 in a
+// snapshot dir 0700, no temporary file remains, and a second snapshot
+// replaces the pair, so one bundle is kept.
+func TestSnapshotWritesTheBundleThenHeads(t *testing.T) {
+	f := newFixture(t)
+	c1 := commit(t, f.repo, "one")
+	git(t, f.repo, "tag", "at-base", f.base)
+
+	res, err := Snapshot(t.Context(), f.config(t, clock))
+	require.NoError(t, err)
+	assert.True(t, res.Bundle)
+	assert.Equal(t, filepath.Join(f.snapshotDir(), salvage.HeadsFile), res.Path)
+	h := f.heads(t)
+	assert.Equal(t, clock, h.CreatedAt)
+	assert.False(t, h.Disabled)
+	assert.Equal(t, map[string]string{"refs/heads/main": c1, "refs/tags/at-base": f.base}, h.Refs)
+	assert.Equal(t, res.Heads, h)
+	assert.Equal(t, map[string]string{"refs/heads/main": c1}, f.bundleHeads(t), "a ref the base reaches is not in the bundle")
+	assert.Contains(t, git(t, f.repo, "bundle", "verify", filepath.Join(f.snapshotDir(), salvage.BundleFile)), f.base,
+		"the bundle needs the base")
+	for _, p := range []string{f.snapshotDir(), filepath.Join(f.snapshotDir(), salvage.BundleFile), res.Path} {
+		info, err := os.Stat(p)
+		require.NoError(t, err)
+		want := os.FileMode(0o600)
+		if info.IsDir() {
+			want = 0o700
+		}
+		assert.Equal(t, want, info.Mode().Perm(), p)
+	}
+	assert.Equal(t, []string{salvage.BundleFile, salvage.HeadsFile}, names(t, f.snapshotDir()))
+
+	c2 := commit(t, f.repo, "two")
+	later := clock.Add(time.Minute)
+	_, err = Snapshot(t.Context(), f.config(t, later))
+	require.NoError(t, err)
+	assert.Equal(t, later, f.heads(t).CreatedAt)
+	assert.Equal(t, map[string]string{"refs/heads/main": c2}, f.bundleHeads(t))
+	assert.Equal(t, []string{salvage.BundleFile, salvage.HeadsFile}, names(t, f.snapshotDir()), "one bundle is kept")
+	assert.Empty(t, names(t, f.config(t, later).Work), "the bundle is built in julieta state and removed there")
+}
+
+// TestSnapshotWithNothingBeyondTheBaseHasNoBundle: when the base
+// reaches every ref, git refuses an empty bundle; the snapshot removes
+// the bundle of an earlier one and writes heads.json, so the pair is
+// still this snapshot's.
+func TestSnapshotWithNothingBeyondTheBaseHasNoBundle(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+	_, err := Snapshot(t.Context(), f.config(t, clock))
+	require.NoError(t, err)
+	git(t, f.repo, "reset", "-q", "--hard", f.base)
+	git(t, f.repo, "reflog", "expire", "--expire=now", "--all")
+
+	res, err := Snapshot(t.Context(), f.config(t, clock.Add(time.Minute)))
+	require.NoError(t, err)
+	assert.False(t, res.Bundle)
+	assert.Equal(t, []string{salvage.HeadsFile}, names(t, f.snapshotDir()))
+	assert.Equal(t, map[string]string{"refs/heads/main": f.base}, f.heads(t).Refs)
+}
+
+// TestSnapshotOfARepositoryWithNoRef writes heads.json with no ref and
+// no bundle.
+func TestSnapshotOfARepositoryWithNoRef(t *testing.T) {
+	f := newFixture(t)
+	git(t, filepath.Dir(f.repo), "init", "-q", "empty")
+	c := f.config(t, clock)
+	c.Dir, c.Bases = filepath.Join(filepath.Dir(f.repo), "empty"), nil
+	res, err := Snapshot(t.Context(), c)
+	require.NoError(t, err)
+	assert.False(t, res.Bundle)
+	assert.Empty(t, f.heads(t).Refs)
+}
+
+// TestSnapshotKilledBetweenTheWrites: a kill after the bundle's rename
+// and before heads.json leaves the previous heads.json and a valid
+// bundle (REQ-0689); the kill is the seam returning an error.
+func TestSnapshotKilledBetweenTheWrites(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+	_, err := Snapshot(t.Context(), f.config(t, clock))
+	require.NoError(t, err)
+	before, err := os.ReadFile(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
+	require.NoError(t, err)
+
+	c2 := commit(t, f.repo, "two")
+	killed := errors.New("killed")
+	seam(t, &snapshotBetweenWrites, func() error { return killed })
+	_, err = Snapshot(t.Context(), f.config(t, clock.Add(time.Minute)))
+	require.ErrorIs(t, err, killed)
+	after, err := os.ReadFile(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
+	require.NoError(t, err)
+	assert.Equal(t, string(before), string(after), "the previous heads.json")
+	assert.Equal(t, map[string]string{"refs/heads/main": c2}, f.bundleHeads(t), "a valid bundle, the new one")
+}
+
+// TestSnapshotWriteFailureKeepsThePreviousBundle (REQ-0691): a write of
+// the bundle that fails keeps the previous bundle and heads.json and
+// leaves no temporary file of this run.
+func TestSnapshotWriteFailureKeepsThePreviousBundle(t *testing.T) {
+	f := newFixture(t)
+	c1 := commit(t, f.repo, "one")
+	_, err := Snapshot(t.Context(), f.config(t, clock))
+	require.NoError(t, err)
+	bundle, err := os.ReadFile(filepath.Join(f.snapshotDir(), salvage.BundleFile))
+	require.NoError(t, err)
+
+	commit(t, f.repo, "two")
+	full := errors.New("no space left on device")
+	seam(t, &snapshotSync, func(*os.File) error { return full })
+	_, err = Snapshot(t.Context(), f.config(t, clock.Add(time.Minute)))
+	require.ErrorIs(t, err, full)
+	now, err := os.ReadFile(filepath.Join(f.snapshotDir(), salvage.BundleFile))
+	require.NoError(t, err)
+	assert.Equal(t, bundle, now, "the previous bundle stays")
+	assert.Equal(t, map[string]string{"refs/heads/main": c1}, f.heads(t).Refs, "and the previous heads.json")
+	assert.Equal(t, []string{salvage.BundleFile, salvage.HeadsFile}, names(t, f.snapshotDir()), "no .tmp- file remains")
+}
+
+// TestSnapshotRacingACommitLeavesAValidBundle (10 10.1, REQ-0778): a
+// commit and an amend land between the read of the refs and the bundle,
+// forced by the seam; the bundle is valid and holds the refs read, and
+// heads.json lists the same.
+func TestSnapshotRacingACommitLeavesAValidBundle(t *testing.T) {
+	f := newFixture(t)
+	c1 := commit(t, f.repo, "one")
+	seam(t, &snapshotAfterRead, func() {
+		commit(t, f.repo, "two")
+		git(t, f.repo, "commit", "-q", "--amend", "--allow-empty", "-m", "two amended")
+	})
+	_, err := Snapshot(t.Context(), f.config(t, clock))
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"refs/heads/main": c1}, f.bundleHeads(t))
+	assert.Equal(t, map[string]string{"refs/heads/main": c1}, f.heads(t).Refs)
+}
+
+// TestTwoSnapshotsAreSerializedByTheStoreLock (08 8.4, REQ-0690; 10
+// 10.1, REQ-0779): a second snapshot of the repo waits for the store
+// lock the first holds from before its read to after its last write,
+// so the pair on disk is one snapshot's, the second's. The interleaving
+// is forced by the seams, never by a sleep: the first snapshot holds
+// the lock until the second reports its wait, and a commit lands in
+// between, so the two snapshots differ.
+func TestTwoSnapshotsAreSerializedByTheStoreLock(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+	secondConfig := f.config(t, clock.Add(time.Minute))
+	waiting := make(chan struct{})
+	seam(t, &snapshotOnWait, func() { close(waiting) })
+	second := make(chan error, 1)
+	calls := 0
+	var c2 string
+	seam(t, &snapshotAfterRead, func() {
+		calls++
+		if calls > 1 {
+			return
+		}
+		go func() {
+			_, err := Snapshot(t.Context(), secondConfig)
+			second <- err
+		}()
+		<-waiting
+		c2 = commit(t, f.repo, "two")
+	})
+	_, err := Snapshot(t.Context(), f.config(t, clock))
+	require.NoError(t, err)
+	require.NoError(t, <-second)
+	h := f.heads(t)
+	assert.Equal(t, clock.Add(time.Minute), h.CreatedAt, "the second snapshot wrote last")
+	assert.Equal(t, map[string]string{"refs/heads/main": c2}, h.Refs)
+	assert.Equal(t, h.Refs, f.bundleHeads(t), "the pair on disk is one snapshot's")
+}
+
+// TestSnapshotRemovesWhatAKilledSnapshotLeft (decided while building
+// T060): a killed snapshot can leave gitsafe's temporary repository
+// (.gitsafe-bundle-*) and its bundle in the snapshot's own directory of
+// julieta state; the next snapshot of the repo, under the store lock,
+// removes both.
+func TestSnapshotRemovesWhatAKilledSnapshotLeft(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+	c := f.config(t, clock)
+	require.NoError(t, os.MkdirAll(filepath.Join(c.Work, ".gitsafe-bundle-123", "objects"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(c.Work, "heads-01j9zc2q8x7w4t6y3r5e1v9k0p.bundle"), []byte("x"), 0o600))
+	_, err := Snapshot(t.Context(), c)
+	require.NoError(t, err)
+	assert.Empty(t, names(t, c.Work))
+}
+
+// TestSnapshotRecordsARepoLocalHooksPath (REQ-0692): a repo whose own
+// config sets core.hooksPath bypasses the dispatcher, and heads.json
+// says disabled.
+func TestSnapshotRecordsARepoLocalHooksPath(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+	git(t, f.repo, "config", "core.hooksPath", ".husky")
+	_, err := Snapshot(t.Context(), f.config(t, clock))
+	require.NoError(t, err)
+	assert.True(t, f.heads(t).Disabled)
+}
+
+// TestSnapshotOfASkippedInputIsWrittenAndFails (decided while building
+// T060): an input gitsafe refuses whole is left out, the rest is
+// written, and the error names it, so the dispatcher records a hook
+// failure with the repo.
+func TestSnapshotOfASkippedInputIsWrittenAndFails(t *testing.T) {
+	f := newFixture(t)
+	c1 := commit(t, f.repo, "one")
+	git(t, f.repo, "update-ref", "refs/tags/bad‮tag", c1)
+	res, err := Snapshot(t.Context(), f.config(t, clock))
+	require.ErrorIs(t, err, ErrSnapshotPartial)
+	assert.Contains(t, err.Error(), "refs/tags/")
+	assert.Equal(t, map[string]string{"refs/heads/main": c1}, f.heads(t).Refs)
+	assert.Len(t, res.Skipped, 1)
+}
