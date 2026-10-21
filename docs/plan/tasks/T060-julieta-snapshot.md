@@ -107,16 +107,27 @@ it:
 - An input the snapshot cannot read (decided on 2026-10-21): the
   snapshot skips that item, snapshots the rest, and records the skipped
   item as a hook failure of the repo. `gitsafe.ListRefs` returns the
-  names it refuses beside the refs it accepts, so a refused ref name
-  loses that ref alone; a namespace over the bound of `ListRefs`, the
-  worktrees git cannot list, a worktree whose common git dir
-  (`gitsafe.CommonDir`) is not the repository's own and a reflog that
-  cannot be read for any reason are each left out alone.
-  `actions.Snapshot` writes the pair and returns `ErrSnapshotPartial`
-  naming each item, which the dispatcher records (REQ-0409) and
-  `julieta snapshot` exits 1 on. A partial plan that holds nothing
-  beyond the bases writes nothing, so it never removes the previous
-  bundle. Reopened by an input git can read only in part.
+  names it refuses beside the refs it accepts, at most 100, each clipped
+  to 128 bytes before it is escaped, and the count of the rest; one
+  record over 4 KiB of name fails the list without git's output being
+  read further. `actions.Snapshot` returns `ErrSnapshotPartial` naming
+  each item, which the dispatcher records (REQ-0409) and `julieta
+  snapshot` exits 1 on. The rule, as the reading closest to that
+  decision (skip the item, snapshot the rest, lose nothing):
+  - a single refused ref name is skipped and the snapshot written;
+  - the loss of a namespace (more refs than `ListRefs` lists) or of a
+    whole source of reflog commits (the worktree list, a worktree whose
+    common git dir, read with `gitsafe.CommonDir` and compared with its
+    links resolved, is not the repository's own, a reflog that cannot
+    be read, a reflog commit git cannot walk) does not replace an
+    existing pair: the earlier pair stays, the failure is recorded, and
+    the plan is written only where no earlier pair exists;
+  - a partial plan with nothing beyond the bases writes nothing, so the
+    earlier `heads.json` and bundle stay;
+  - the reflog commits over the cap of 1000 are a recorded skip that
+    still writes, or a repository with more would never be snapshot
+    again.
+  Reopened by an input git can read only in part.
 - The `.gitsafe-bundle-*` leftover: the bundle is built in
   `$HOME/.local/state/julieta/snapshot/<dir>/`, never in the memory
   dir, whose layout check (08 8.1) reads a dot directory as a finding
@@ -163,8 +174,19 @@ it:
   (`salvage.MaxReflogCommits`); the rest is a recorded skip. Measured
   on a repository of 300 branches and a 300-entry reflog of orphan
   commits: 1 min 19.9 s with one `AheadBehind` per commit and tip,
-  0.24 s with `Unreached`. Reopened by a snapshot too slow after a
-  commit.
+  0.24 s with `Unreached`. When git cannot finish the walk of the
+  whole set (a commit whose parent is missing), each commit is asked
+  alone and one that fails is a whole-source skip. `Unreached` reads a
+  line of up to 1 MiB, a merge of about 16,000 parents; a wider one
+  fails the walk and falls to that path. `gitsafe.Beyond` answers true
+  for a walk git cannot finish, so the bundle meets the failure and it
+  is recorded. Reopened by a snapshot too slow after a commit.
+- The copy of the bundle into the memory dir stops when the snapshot's
+  context ends (a reader that checks it), and its error path removes
+  the temporary file.
+- Deferred: the reflog reads cost two git processes per branch and per
+  worktree, and the hook can wait up to the whole 60 s. Reopened by a
+  repository whose snapshot times out.
 - `disabled` is what `julieta snapshot` reads itself: the repo's own
   config sets `core.hooksPath`, as `julieta status` reads it. The
   `setup`, `status` and SessionStart part of the acceptance row is a
