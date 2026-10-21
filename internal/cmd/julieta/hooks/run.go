@@ -28,11 +28,14 @@ const failuresDir = "hook-failures"
 // The process the command runs in: the stdin the hook's first repo
 // stage reads, the environment the stages get, and the exit that ends
 // the process with the status of a stage. Tests replace them, and a
-// test that does must not run in parallel with another.
+// test that does must not run in parallel with another. stdin is read
+// once per run: procgroup.Run does not wait for the copy of a reader
+// that is not a file, so a run must not hand the next one a reader that
+// copy may still be reading.
 var (
-	stdin   io.Reader = os.Stdin
-	environ           = os.Environ
-	exit              = os.Exit
+	stdin   = func() io.Reader { return os.Stdin }
+	environ = os.Environ
+	exit    = os.Exit
 )
 
 var _ = cli.Register(func() cli.Command {
@@ -82,7 +85,7 @@ func run(cmd *cobra.Command, env *cli.Env, hook string, args []string) error {
 		return err
 	}
 	status, err := hooks.Run(cmd.Context(), hooks.Options{
-		Hook: hook, Args: args, Dir: dir, Env: environ(), Stdin: stdin,
+		Hook: hook, Args: args, Dir: dir, Env: environ(), Stdin: stdin(),
 		Stdout: env.Stdout, Stderr: env.Stderr,
 		StateDir: filepath.Join(setup.StateDir(home), failuresDir), Now: env.Now,
 		Actions:     actions.For(hook),

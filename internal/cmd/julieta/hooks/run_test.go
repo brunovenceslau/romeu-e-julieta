@@ -10,7 +10,6 @@ import (
 	"encoding/json/v2"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -37,7 +36,7 @@ func newSandbox(t *testing.T, stdin string) *sandbox {
 	require.NoError(t, os.MkdirAll(filepath.Join(s.repo, ".git", "hooks"), 0o755))
 	require.NoError(t, os.MkdirAll(filepath.Join(s.repo, ".githooks"), 0o755))
 	t.Chdir(s.repo)
-	t.Cleanup(hooks.Process(strings.NewReader(stdin), []string{"PATH=/usr/bin:/bin", "MARK=seen"}, func(code int) { s.exits = append(s.exits, code) }))
+	t.Cleanup(hooks.Process(stdin, []string{"PATH=/usr/bin:/bin", "MARK=seen"}, func(code int) { s.exits = append(s.exits, code) }))
 	return s
 }
 
@@ -67,6 +66,24 @@ func TestRunPassesArgumentsStdinAndEnvironmentToTheHook(t *testing.T) {
 	b, err := os.ReadFile(out)
 	require.NoError(t, err)
 	assert.Equal(t, "seen|-x --file=m --json -h|stdin text\n", string(b), "flags after the hook are its arguments")
+}
+
+// TestRunGivesEachRunItsStdin holds the stdin seam to the process it
+// stands for: each run reads all of its stdin, as each process has its
+// own. A reader shared by two runs leaves the second one empty, and its
+// stdin copy, which procgroup.Run does not wait for, can still be
+// reading it when the second run starts (a data race).
+func TestRunGivesEachRunItsStdin(t *testing.T) {
+	s := newSandbox(t, "stdin text")
+	out := filepath.Join(s.repo, "out")
+	s.hook(t, ".githooks/pre-push", `cat >>`+out+`; echo >>`+out)
+	for range 2 {
+		code, _, stderr := julieta(t, "hooks", "run", "pre-push")
+		require.Equal(t, 0, code, stderr)
+	}
+	b, err := os.ReadFile(out)
+	require.NoError(t, err)
+	assert.Equal(t, "stdin text\nstdin text\n", string(b))
 }
 
 func TestRunEndsWithTheStatusOfTheStageThatFailed(t *testing.T) {
