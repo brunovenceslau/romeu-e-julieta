@@ -6,6 +6,7 @@
 package gitsafe
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"slices"
@@ -56,9 +57,10 @@ const (
 // checkDisplayRef refuses is left out of the refs and returned in
 // refused, clipped and escaped, so a caller keeps every other ref
 // (decided while building T060). A name outside the namespaces asked
-// for, an id that is not a full object id, a record over maxRefRecord
-// bytes and more than maxBranches names, the refused ones counted, fail
-// the whole list.
+// for, an id that is not a full object id and more than maxBranches
+// names, the refused ones counted, fail the whole list, and git's
+// output is not read further; a record over maxRefRecord bytes is one
+// refused name, counted in More (decided while building T060).
 func (r *Runner) ListRefs(ctx context.Context, dir string, namespaces []string) (refs []Ref, refused Refused, err error) {
 	if err := checkRepo(dir); err != nil {
 		return nil, Refused{}, err
@@ -66,9 +68,21 @@ func (r *Runner) ListRefs(ctx context.Context, dir string, namespaces []string) 
 	if err := checkListNamespaces(namespaces); err != nil {
 		return nil, Refused{}, err
 	}
-	w := &records{limit: maxRefRecord, each: func(line string) error {
+	full := func() error {
 		if len(refs)+len(refused.Names)+refused.More == maxBranches {
 			return fmt.Errorf("%w: more than %d refs", ErrRefused, maxBranches)
+		}
+		return nil
+	}
+	w := &refRecords{limit: maxRefRecord, overlong: func() error {
+		if err := full(); err != nil {
+			return err
+		}
+		refused.More++
+		return nil
+	}, each: func(line string) error {
+		if err := full(); err != nil {
+			return err
 		}
 		oid, name, ok := strings.Cut(line, " ")
 		if !ok {
@@ -92,7 +106,7 @@ func (r *Runner) ListRefs(ctx context.Context, dir string, namespaces []string) 
 		return nil
 	}}
 	args := slices.Concat([]string{"for-each-ref", "--format=%(objectname) %(refname)", "--end-of-options"}, namespaces)
-	err = r.read(ctx, dir, nil, lines{stopOnRefusal{w}}, args...)
+	err = r.read(ctx, dir, nil, lines{w}, args...)
 	if w.err != nil {
 		return nil, Refused{}, w.err
 	}
@@ -106,17 +120,64 @@ func (r *Runner) ListRefs(ctx context.Context, dir string, namespaces []string) 
 	return refs, refused, nil
 }
 
-// stopOnRefusal passes git's output to w and fails the write once w
-// has refused a record, so git's output is not read further.
-type stopOnRefusal struct{ w *records }
+// refRecords splits ListRefs' output into NUL-ended records, as
+// records does, with two differences: a record over limit bytes is
+// not kept and calls overlong, as one name refused, and the next
+// record is read; and an error of each or overlong fails the write, so
+// git's output is not read further.
+type refRecords struct {
+	partial  bytes.Buffer
+	over     bool
+	limit    int
+	each     func(string) error
+	overlong func() error
+	err      error
+}
 
-// Write passes p on, and returns the refusal of w once there is one.
-func (s stopOnRefusal) Write(p []byte) (int, error) {
-	n, _ := s.w.Write(p)
-	if s.w.err != nil {
-		return 0, s.w.err
+// Write takes the next part of the output.
+func (w *refRecords) Write(p []byte) (int, error) {
+	if w.err != nil {
+		return 0, w.err
+	}
+	n := len(p)
+	for len(p) > 0 {
+		i := bytes.IndexByte(p, 0)
+		chunk := p
+		if i >= 0 {
+			chunk = p[:i]
+		}
+		if !w.over && w.partial.Len()+len(chunk) > w.limit {
+			w.over = true
+			w.partial.Reset()
+		}
+		if !w.over {
+			w.partial.Write(chunk)
+		}
+		if i < 0 {
+			break
+		}
+		p = p[i+1:]
+		if w.over {
+			w.over = false
+			w.err = w.overlong()
+		} else {
+			w.err = w.each(w.partial.String())
+			w.partial.Reset()
+		}
+		if w.err != nil {
+			return 0, w.err
+		}
 	}
 	return n, nil
+}
+
+// close returns the error of the records, and ErrRefused for output that
+// ends inside one.
+func (w *refRecords) close() error {
+	if w.err == nil && (w.partial.Len() > 0 || w.over) {
+		w.err = fmt.Errorf("%w: git's output ends inside a record", ErrRefused)
+	}
+	return w.err
 }
 
 // clipName returns name cut to maxRefusedName bytes, on a character's

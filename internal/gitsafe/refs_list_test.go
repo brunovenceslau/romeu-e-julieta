@@ -161,8 +161,8 @@ func TestListRefsReturnsTheNamesItRefuses(t *testing.T) {
 
 // TestListRefsBoundsTheNamesItRefuses: a refused name is clipped to
 // maxRefusedName bytes before it is escaped, at most maxRefusedNames are
-// kept and the rest counted, and one record over maxRefRecord bytes
-// fails the list without git's output being read further.
+// kept and the rest counted, and one record over maxRefRecord bytes is
+// counted as a refused name, its bytes not kept, and the list goes on.
 func TestListRefsBoundsTheNamesItRefuses(t *testing.T) {
 	oid := strings.Repeat("a", 40)
 	answer := func(out string) func(context.Context, procgroup.Command) error {
@@ -187,7 +187,9 @@ func TestListRefsBoundsTheNamesItRefuses(t *testing.T) {
 	assert.Equal(t, 6, refused.More)
 	assert.Equal(t, `refs/heads/\u202e`+strings.Repeat("x", maxRefusedName-len("refs/heads/\u202e"))+"...", refused.Names[0], "clipped, then escaped")
 
-	r.start = answer(oid + " refs/heads/" + strings.Repeat("y", maxRefRecord) + "\n")
-	_, _, err = r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/"})
-	require.ErrorIs(t, err, ErrRefused, "a record over the bound")
+	r.start = answer(oid + " refs/heads/" + strings.Repeat("y", 3*maxRefRecord) + "\n" + oid + " refs/heads/after\n")
+	got, refused, err = r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/"})
+	require.NoError(t, err, "a record over the bound is one refused name")
+	assert.Equal(t, []Ref{{Name: "refs/heads/after", OID: oid}}, got)
+	assert.Equal(t, Refused{More: 1}, refused, "counted, not kept")
 }
