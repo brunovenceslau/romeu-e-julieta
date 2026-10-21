@@ -279,3 +279,43 @@ func TestTheDispatcherTakesTheSnapshot(t *testing.T) {
 	_, err = os.Stat(failures)
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
+
+// TestAPartialSnapshotIsWrittenAndRecorded (decided on 2026-10-21): a
+// ref name gitsafe refuses is skipped and the rest snapshot; julieta
+// hooks run post-commit writes heads.json, records one failure of the
+// hook for the repo and still runs the repo's own post-commit, and
+// julieta snapshot prints the paths it wrote and exits 1.
+func TestAPartialSnapshotIsWrittenAndRecorded(t *testing.T) {
+	s := newSandbox(t)
+	out := filepath.Join(t.TempDir(), "out")
+	require.NoError(t, os.MkdirAll(filepath.Join(s.primary(), ".githooks"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(s.primary(), ".githooks", "post-commit"), []byte("#!/bin/sh\necho tracked >>"+out+"\n"), 0o755))
+	c1 := commit(t, s.primary(), "one")
+	git(t, s.primary(), "update-ref", "refs/tags/bad\u202etag", c1)
+
+	code, _, stderr := julieta(t, "hooks", "run", "post-commit")
+	assert.Equal(t, 0, code, "a partial snapshot does not fail the commit")
+	assert.Contains(t, stderr, `refs/tags/bad\u202etag`)
+	assert.Contains(t, stderr, "julieta hooks: post-commit stage julieta (snapshot) exited 1\n")
+	data, err := os.ReadFile(filepath.Join(s.snapshotDir(), salvage.HeadsFile))
+	require.NoError(t, err)
+	h, err := salvage.DecodeHeads(data)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"refs/heads/main": c1}, h.Refs)
+	got, err := ihooks.Failures(filepath.Join(s.home, ".local/state/julieta/hook-failures"))
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	real, err := filepath.EvalSymlinks(s.primary())
+	require.NoError(t, err)
+	assert.Equal(t, real, got[0].Repo)
+	assert.Equal(t, "post-commit", got[0].Hook)
+	log, err := os.ReadFile(out)
+	require.NoError(t, err)
+	assert.Equal(t, "tracked\n", string(log), "the repo's own post-commit ran")
+
+	code, stdout, stderr := julieta(t, "snapshot")
+	assert.Equal(t, 1, code)
+	assert.Equal(t, "wrote "+filepath.Join(s.snapshotDir(), salvage.BundleFile)+" repo api\n"+
+		"wrote "+filepath.Join(s.snapshotDir(), salvage.HeadsFile)+" createdAt 2026-10-21T09:30:00Z repo api\n", stdout)
+	assert.Contains(t, stderr, "the snapshot left out what it could not read")
+}

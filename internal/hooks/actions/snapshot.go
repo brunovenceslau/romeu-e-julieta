@@ -71,10 +71,15 @@ type SnapshotResult struct {
 	Skipped []salvage.Skip
 }
 
-// ErrSnapshotPartial is the error of a snapshot that wrote its pair
-// without an input gitsafe refused whole: the result is returned with
-// it, and a hook records the failure (decided while building T060).
-var ErrSnapshotPartial = errors.New("the snapshot left out what gitsafe refused")
+// ErrSnapshotPartial is the error of a snapshot that left out an input
+// it could not read (salvage.Pairs): the result is returned with it,
+// and a hook records the failure (decided on 2026-10-21).
+var ErrSnapshotPartial = errors.New("the snapshot left out what it could not read")
+
+// SnapshotTimeout bounds one snapshot, the wait for the store lock
+// included (decided while building T060): a commit's hook never waits
+// on it longer.
+const SnapshotTimeout = 60 * time.Second
 
 // The test seams of Snapshot (10 10.4), nil or the real call outside
 // tests: snapshotOnWait is called when the store lock is held by
@@ -97,10 +102,6 @@ const (
 	workBundlePrefix = "heads-"
 )
 
-// gitEmptyBundle is what git bundle create says when the bases reach
-// every ref (bundle.c, under LANG=C, which gitsafe sets).
-const gitEmptyBundle = "Refusing to create empty bundle"
-
 // Snapshot takes a snapshot of the repo of c (08 8.4): under the store
 // lock of its memory dir (REQ-0690), from before the read of the refs to
 // after the last write, it reads what the bundle holds (salvage.Pairs,
@@ -110,9 +111,13 @@ const gitEmptyBundle = "Refusing to create empty bundle"
 // write rule of 03 3.8 through a temporary file .tmp-<ULID> of the
 // snapshot dir (REQ-0689). A failed write removes its own temporary
 // file and leaves the earlier pair as it was (REQ-0691). When no object
-// is beyond the bases, the earlier bundle is removed in place of the
-// first write. Before it builds, Snapshot removes what a killed snapshot
-// left in c.Work.
+// is beyond the bases (gitsafe.Beyond, asked before any bundle is
+// made), the earlier bundle is removed in place of the first write;
+// when the plan also left an input out, nothing is written, so a
+// partial plan never takes the earlier bundle away. Before it builds,
+// Snapshot removes what a killed snapshot left in c.Work. The whole
+// snapshot, the wait for the lock included, ends after
+// SnapshotTimeout.
 //
 // The bundle is copied into the memory dir rather than renamed, since
 // c.Work and the memory dir are on different file systems; it is
@@ -122,7 +127,9 @@ func Snapshot(ctx context.Context, c SnapshotConfig) (res SnapshotResult, err er
 	if !filepath.IsAbs(c.Memory) || filepath.Clean(c.Memory) != c.Memory {
 		return SnapshotResult{}, fmt.Errorf("the memory dir %q is not an absolute, clean path", c.Memory)
 	}
-	unlock, err := write.Lock(c.Lock, func() {
+	ctx, cancel := context.WithTimeout(ctx, SnapshotTimeout)
+	defer cancel()
+	unlock, err := write.LockContext(ctx, c.Lock, func() {
 		if snapshotOnWait != nil {
 			snapshotOnWait()
 		}
@@ -152,7 +159,7 @@ func Snapshot(ctx context.Context, c SnapshotConfig) (res SnapshotResult, err er
 	if err != nil {
 		return SnapshotResult{}, err
 	}
-	plan, err := salvage.Pairs(ctx, c.Git, c.Dir, c.Generation)
+	plan, err := salvage.Pairs(ctx, c.Git, c.Dir, c.Generation, c.Bases)
 	if err != nil {
 		return SnapshotResult{}, err
 	}
@@ -169,6 +176,17 @@ func Snapshot(ctx context.Context, c SnapshotConfig) (res SnapshotResult, err er
 		return SnapshotResult{}, err
 	}
 
+	oids := make([]string, 0, len(plan.Pairs))
+	for _, p := range plan.Pairs {
+		oids = append(oids, p.OID)
+	}
+	bundle, err := c.Git.Beyond(ctx, c.Dir, oids, c.Bases)
+	if err != nil {
+		return SnapshotResult{}, err
+	}
+	if !bundle && len(plan.Skipped) > 0 {
+		return SnapshotResult{Skipped: plan.Skipped}, partial(plan.Skipped)
+	}
 	u, err := canon.NewULID(now, c.ULIDs)
 	if err != nil {
 		return SnapshotResult{}, err
@@ -179,12 +197,10 @@ func Snapshot(ctx context.Context, c SnapshotConfig) (res SnapshotResult, err er
 			err = errors.Join(err, rmErr)
 		}
 	}()
-	bundle := true
-	switch err := c.Git.BundleOf(ctx, c.Dir, built, plan.Pairs, c.Bases); {
-	case errors.Is(err, gitsafe.ErrNoRefs), err != nil && strings.Contains(err.Error(), gitEmptyBundle):
-		bundle = false
-	case err != nil:
-		return SnapshotResult{}, err
+	if bundle {
+		if err := c.Git.BundleOf(ctx, c.Dir, built, plan.Pairs, c.Bases); err != nil {
+			return SnapshotResult{}, err
+		}
 	}
 
 	bundlePath := path.Join(memstore.SnapshotDir, salvage.BundleFile)
@@ -207,21 +223,29 @@ func Snapshot(ctx context.Context, c SnapshotConfig) (res SnapshotResult, err er
 	}
 	res = SnapshotResult{Heads: heads, Path: filepath.Join(c.Memory, filepath.FromSlash(headsPath)), Bundle: bundle, Skipped: plan.Skipped}
 	if len(plan.Skipped) > 0 {
-		errs := []error{ErrSnapshotPartial}
-		for _, s := range plan.Skipped {
-			errs = append(errs, fmt.Errorf("%s: %w", s.Item, s.Err))
-		}
-		return res, errors.Join(errs...)
+		return res, partial(plan.Skipped)
 	}
 	return res, nil
 }
 
-// clearWork makes the snapshot's directory of julieta state 0700 when
-// it is absent and removes what a killed snapshot left in it: gitsafe's
+// partial returns ErrSnapshotPartial joined with each input left out.
+func partial(skipped []salvage.Skip) error {
+	errs := []error{ErrSnapshotPartial}
+	for _, s := range skipped {
+		errs = append(errs, fmt.Errorf("%s: %w", s.Item, s.Err))
+	}
+	return errors.Join(errs...)
+}
+
+// clearWork makes the snapshot's directory of julieta state, 0700 on
+// every run, and removes what a killed snapshot left in it: gitsafe's
 // temporary repository and a bundle, with git's lock file. The caller
 // holds the store lock, so no other snapshot of the repo uses them.
 func clearWork(dir string) error {
 	if err := os.MkdirAll(dir, memstore.DirMode); err != nil {
+		return err
+	}
+	if err := os.Chmod(dir, memstore.DirMode); err != nil {
 		return err
 	}
 	entries, err := os.ReadDir(dir)
@@ -259,8 +283,14 @@ func mkdirIn(root *os.Root, dir string) error {
 // src by the atomic write rule of 03 3.8, as write.AtomicWrite does
 // with a []byte: a temporary file .tmp-<ULID> in the target's own
 // directory (REQ-0654), 0600, synced, renamed into place, and the
-// directory synced. A failure removes the temporary file.
+// directory synced. A failure removes the temporary file. src must be
+// a regular file, judged with Lstat.
 func copyAtomic(root *os.Root, p, src string, now time.Time, ulids *canon.ULIDSource) error {
+	if info, err := os.Lstat(src); err != nil {
+		return err
+	} else if !info.Mode().IsRegular() {
+		return fmt.Errorf("the bundle %s is not a regular file", src)
+	}
 	in, err := os.Open(src)
 	if err != nil {
 		return err

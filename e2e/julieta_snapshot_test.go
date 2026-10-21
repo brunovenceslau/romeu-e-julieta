@@ -128,6 +128,7 @@ step check "$J" memory check
 // that can write clears the record.
 func TestJulietaSnapshotWriteFailure(t *testing.T) {
 	steps := snapshotScenario(t, `
+step uid id -u
 git commit -q --allow-empty -m first
 before=$(sha256sum $snap/heads.bundle)
 chmod 500 $snap
@@ -141,6 +142,7 @@ step log cat /tmp/hooklog
 step again git commit -q --allow-empty -m third
 step cleared sh -c 'ls -A "$HOME/.local/state/julieta/hook-failures" | wc -l'
 `)
+	require.NotEqual(t, "0", strings.TrimSpace(step(t, steps, "uid").stdout), "root writes a read-only directory, so the case runs as another user")
 	r := step(t, steps, "commit")
 	assert.Equal(t, 0, r.code, "the commit stands: %s", r.stderr)
 	assert.Contains(t, r.stderr, "julieta hooks: post-commit stage julieta (snapshot) exited 1\n")

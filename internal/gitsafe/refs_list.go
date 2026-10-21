@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // Ref is a full ref name and the object it points at: one ref ListRefs
@@ -33,18 +35,20 @@ const salvagePrefix = "refs/salvage/"
 // refs/heads/, refs/tags/, refs/notes/, and refs/salvage/<generation>/
 // for one generation per call, each named once; git reads each as a
 // plain prefix, since none holds a pattern character. A name
-// checkDisplayRef refuses, or one outside the namespaces asked for,
-// fails the whole list, and so do more than maxBranches refs.
-func (r *Runner) ListRefs(ctx context.Context, dir string, namespaces []string) ([]Ref, error) {
+// checkDisplayRef refuses is left out of the refs and returned in
+// refused, escaped with termsafe, so a caller keeps every other ref
+// (decided while building T060). A name outside the namespaces asked
+// for, an id that is not a full object id, and more than maxBranches
+// names, the refused ones counted, fail the whole list.
+func (r *Runner) ListRefs(ctx context.Context, dir string, namespaces []string) (refs []Ref, refused []string, err error) {
 	if err := checkRepo(dir); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := checkListNamespaces(namespaces); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	var refs []Ref
 	w := &records{limit: maxStatusRecord, each: func(line string) error {
-		if len(refs) == maxBranches {
+		if len(refs)+len(refused) == maxBranches {
 			return fmt.Errorf("%w: more than %d refs", ErrRefused, maxBranches)
 		}
 		oid, name, ok := strings.Cut(line, " ")
@@ -54,24 +58,25 @@ func (r *Runner) ListRefs(ctx context.Context, dir string, namespaces []string) 
 		if err := checkObjectID(oid); err != nil {
 			return err
 		}
-		if err := checkDisplayRef(name); err != nil {
-			return err
-		}
 		if !slices.ContainsFunc(namespaces, func(ns string) bool { return strings.HasPrefix(name, ns) }) {
 			return fmt.Errorf("%w: ref %q is outside %s", ErrRefused, name, strings.Join(namespaces, ", "))
+		}
+		if checkDisplayRef(name) != nil {
+			refused = append(refused, termsafe.Escape(name))
+			return nil
 		}
 		refs = append(refs, Ref{Name: name, OID: oid})
 		return nil
 	}}
 	args := slices.Concat([]string{"for-each-ref", "--format=%(objectname) %(refname)", "--end-of-options"}, namespaces)
 	if err := r.read(ctx, dir, nil, lines{w}, args...); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := w.close(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	slices.SortFunc(refs, func(a, b Ref) int { return strings.Compare(a.Name, b.Name) })
-	return refs, nil
+	return refs, refused, nil
 }
 
 // checkListNamespaces returns ErrRefused for a list ListRefs does not

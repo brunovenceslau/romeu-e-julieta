@@ -6,6 +6,7 @@
 package salvage_test
 
 import (
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -71,7 +72,7 @@ func TestPairsNamesWhatASnapshotBundles(t *testing.T) {
 	git(t, dir, "worktree", "add", "-q", "--detach", wt, c1)
 	d1 := commit(t, wt, "d1")
 
-	plan, err := salvage.Pairs(t.Context(), runner(t), dir, generation)
+	plan, err := salvage.Pairs(t.Context(), runner(t), dir, generation, nil)
 	require.NoError(t, err)
 	assert.Empty(t, plan.Skipped)
 	h1n := reflogIndex(t, dir, "HEAD", h1)
@@ -98,25 +99,84 @@ func TestPairsNamesWhatASnapshotBundles(t *testing.T) {
 // TestPairsOfARepositoryWithNoRefIsEmpty: a new repository has no ref
 // and an unborn HEAD, so there is nothing to bundle, and no error.
 func TestPairsOfARepositoryWithNoRefIsEmpty(t *testing.T) {
-	plan, err := salvage.Pairs(t.Context(), runner(t), repo(t), generation)
+	plan, err := salvage.Pairs(t.Context(), runner(t), repo(t), generation, nil)
 	require.NoError(t, err)
 	assert.Empty(t, plan.Pairs)
 	assert.Empty(t, plan.Skipped)
 }
 
-// TestPairsSkipsWhatGitsafeRefusesWhole: a tag whose name holds a
-// character gitsafe refuses fails the whole list of its namespace
-// (gitsafe.ListRefs); the snapshot leaves that namespace out, records
-// it with the reason, and keeps every other ref (decided while building
-// T060).
-func TestPairsSkipsWhatGitsafeRefusesWhole(t *testing.T) {
+// TestPairsSkipsARefusedRefAlone: a tag whose name holds a character
+// gitsafe refuses is left out and recorded, escaped, and every other
+// ref, the other tags among them, is kept (decided on 2026-10-21).
+func TestPairsSkipsARefusedRefAlone(t *testing.T) {
 	dir := repo(t)
 	c1 := commit(t, dir, "one")
 	git(t, dir, "update-ref", "refs/tags/bad\u202etag", c1)
-	plan, err := salvage.Pairs(t.Context(), runner(t), dir, generation)
+	git(t, dir, "tag", "good", c1)
+	plan, err := salvage.Pairs(t.Context(), runner(t), dir, generation, nil)
 	require.NoError(t, err)
-	assert.Equal(t, map[string]string{"refs/heads/main": c1}, pairsOf(plan))
+	assert.Equal(t, map[string]string{"refs/heads/main": c1, "refs/tags/good": c1}, pairsOf(plan))
 	require.Len(t, plan.Skipped, 1)
-	assert.Equal(t, "refs/tags/", plan.Skipped[0].Item)
+	assert.Equal(t, `refs/tags/bad\u202etag`, plan.Skipped[0].Item)
 	assert.ErrorIs(t, plan.Skipped[0].Err, gitsafe.ErrRefused)
+}
+
+// TestPairsSkipsABrokenWorktree: a worktree whose directory is now
+// another repository has its HEAD reflog left out and recorded, one
+// whose .git is gone is prunable and not read, and the snapshot goes on
+// (decided while building T060).
+func TestPairsSkipsABrokenWorktree(t *testing.T) {
+	dir := repo(t)
+	c1 := commit(t, dir, "one")
+	other := filepath.Join(filepath.Dir(dir), "other")
+	gone := filepath.Join(filepath.Dir(dir), "gone")
+	git(t, dir, "worktree", "add", "-q", "-b", "o", other)
+	git(t, dir, "worktree", "add", "-q", "-b", "g", gone)
+	require.NoError(t, os.RemoveAll(other))
+	git(t, filepath.Dir(dir), "init", "-q", other)
+	require.NoError(t, os.Remove(filepath.Join(gone, ".git")))
+
+	plan, err := salvage.Pairs(t.Context(), runner(t), dir, generation, nil)
+	require.NoError(t, err)
+	assert.Equal(t, c1, pairsOf(plan)["refs/heads/main"])
+	var items []string
+	for _, s := range plan.Skipped {
+		items = append(items, s.Item)
+	}
+	assert.Equal(t, []string{"worktree 2"}, items, "other, the second by its id; gone, whose .git is missing, is prunable and not read")
+}
+
+// TestPairsNamesAtMostTheCap: the reflog commits beyond
+// MaxReflogCommits are left out and recorded; a reflog commit another
+// reflog commit reaches needs no name; a base bounds the walk and
+// reaches what it reaches.
+func TestPairsNamesAtMostTheCap(t *testing.T) {
+	dir := repo(t)
+	base := commit(t, dir, "base")
+	tree := git(t, dir, "rev-parse", "HEAD^{tree}")
+	o1 := git(t, dir, "commit-tree", "-m", "o1", tree)
+	o2 := git(t, dir, "commit-tree", "-p", o1, "-m", "o2", tree)
+	o3 := git(t, dir, "commit-tree", "-m", "o3", tree)
+	for _, c := range []string{o1, o2, o3, base} {
+		git(t, dir, "update-ref", "-m", "move", "refs/heads/main", c)
+	}
+	plan, err := salvage.Pairs(t.Context(), runner(t), dir, generation, []string{base})
+	require.NoError(t, err)
+	assert.Empty(t, plan.Skipped)
+	names := map[string]string{}
+	for name, oid := range pairsOf(plan) {
+		names[oid] = name
+	}
+	assert.Contains(t, names, o2)
+	assert.Contains(t, names, o3)
+	assert.NotContains(t, names, o1, "o2 reaches it")
+
+	old := salvage.MaxReflogCommits
+	salvage.MaxReflogCommits = 1
+	t.Cleanup(func() { salvage.MaxReflogCommits = old })
+	plan, err = salvage.Pairs(t.Context(), runner(t), dir, generation, []string{base})
+	require.NoError(t, err)
+	assert.Len(t, plan.Pairs, 2, "main and one reflog commit")
+	require.Len(t, plan.Skipped, 1)
+	assert.Equal(t, "1 reflog commits", plan.Skipped[0].Item)
 }

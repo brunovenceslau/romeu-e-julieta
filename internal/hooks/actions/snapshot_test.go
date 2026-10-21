@@ -6,6 +6,7 @@
 package actions
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore/write"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/salvage"
 )
 
@@ -191,12 +193,21 @@ func TestTwoSnapshotsAreSerializedByTheStoreLock(t *testing.T) {
 			_, err := Snapshot(t.Context(), secondConfig)
 			second <- err
 		}()
-		<-waiting
+		select {
+		case <-waiting:
+		case <-time.After(30 * time.Second):
+			t.Fatal("the second snapshot never waited for the lock")
+		}
 		c2 = commit(t, f.repo, "two")
 	})
 	_, err := Snapshot(t.Context(), f.config(t, clock))
 	require.NoError(t, err)
-	require.NoError(t, <-second)
+	select {
+	case err := <-second:
+		require.NoError(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("the second snapshot never finished")
+	}
 	h := f.heads(t)
 	assert.Equal(t, clock.Add(time.Minute), h.CreatedAt, "the second snapshot wrote last")
 	assert.Equal(t, map[string]string{"refs/heads/main": c2}, h.Refs)
@@ -287,4 +298,77 @@ func TestSnapshotRefusesWhatItCannotWrite(t *testing.T) {
 	require.Error(t, err)
 	_, err = os.Stat(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
 	require.ErrorIs(t, err, os.ErrNotExist, "no heads.json after a failed first write")
+}
+
+// TestAPartialSnapshotNeverRemovesTheBundle (decided while building
+// T060): a plan that left an input out and holds nothing beyond the
+// base writes nothing, so the previous pair stays, and fails.
+func TestAPartialSnapshotNeverRemovesTheBundle(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+	_, err := Snapshot(t.Context(), f.config(t, clock))
+	require.NoError(t, err)
+	before, err := os.ReadFile(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
+	require.NoError(t, err)
+
+	git(t, f.repo, "reset", "-q", "--hard", f.base)
+	git(t, f.repo, "reflog", "expire", "--expire=now", "--all")
+	git(t, f.repo, "update-ref", "refs/tags/bad\u202etag", f.base)
+	_, err = Snapshot(t.Context(), f.config(t, clock.Add(time.Minute)))
+	require.ErrorIs(t, err, ErrSnapshotPartial)
+	assert.Equal(t, []string{salvage.BundleFile, salvage.HeadsFile}, names(t, f.snapshotDir()))
+	after, err := os.ReadFile(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
+	require.NoError(t, err)
+	assert.Equal(t, string(before), string(after))
+}
+
+// TestSnapshotGivesUpTheLockWaitWithItsContext: a snapshot that waits
+// for the store lock another holds ends with its context, here
+// cancelled from the wait's seam (decided while building T060).
+func TestSnapshotGivesUpTheLockWaitWithItsContext(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+	c := f.config(t, clock)
+	unlock, err := write.Lock(c.Lock, nil)
+	require.NoError(t, err)
+	t.Cleanup(unlock)
+	ctx, cancel := context.WithCancel(t.Context())
+	seam(t, &snapshotOnWait, func() { cancel() })
+	_, err = Snapshot(ctx, c)
+	require.ErrorIs(t, err, context.Canceled)
+	_, err = os.Stat(f.snapshotDir())
+	require.ErrorIs(t, err, os.ErrNotExist, "nothing written")
+}
+
+// TestSnapshotKeepsItsWorkDirectoryPrivate: the work directory is made
+// 0700 on each run, whatever mode it had.
+func TestSnapshotKeepsItsWorkDirectoryPrivate(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+	c := f.config(t, clock)
+	require.NoError(t, os.MkdirAll(c.Work, 0o700))
+	require.NoError(t, os.Chmod(c.Work, 0o755))
+	_, err := Snapshot(t.Context(), c)
+	require.NoError(t, err)
+	info, err := os.Stat(c.Work)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o700), info.Mode().Perm())
+}
+
+// TestCopyAtomicCopiesARegularFileOnly: a built bundle that is a
+// symbolic link or a directory is refused before it is opened.
+func TestCopyAtomicCopiesARegularFileOnly(t *testing.T) {
+	root, err := os.OpenRoot(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = root.Close() })
+	dir := t.TempDir()
+	file := filepath.Join(dir, "file")
+	require.NoError(t, os.WriteFile(file, []byte("x"), 0o600))
+	link := filepath.Join(dir, "link")
+	require.NoError(t, os.Symlink(file, link))
+	ulids := newFixture(t).config(t, clock).ULIDs
+	for _, src := range []string{link, dir} {
+		require.ErrorContains(t, copyAtomic(root, "out", src, clock, ulids), "not a regular file", src)
+	}
+	require.NoError(t, copyAtomic(root, "out", file, clock, ulids))
 }
