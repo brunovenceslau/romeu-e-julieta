@@ -13,8 +13,8 @@ under "Work authorized while the operator is away on 2026-10-21"
    and a security audit, then its pull request.
 2. Plan "Readers of formats between binaries ignore unknown members"
    (01m5egnpyfywadcsxpy0naz3hj); ask first to build it.
-3. "One race run, test tags and parallel CI jobs"
-   (01m5drzqsp6zg34xzmywckwb7b): measure the race packages, plan, build.
+3. T155, planned from 01m5drzqsp6zg34xzmywckwb7b; then T150 (step
+   4), then T156 and T157: the build order is T155, T150, T156, T157.
 4. T150, the imports check that refuses `encoding/json` v1.
 5. The e2e cache annotation of 0000000000pz8zh0x006xkqa4w.
 6. The `AGENTS.md` and `CLAUDE.md` of 01m5e1majbx0hq6p710g9dmtr2.

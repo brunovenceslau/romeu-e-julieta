@@ -44,15 +44,34 @@ Approved for planning on 2026-10-20:
    (`tools/ci/internal/coverage`), where `go tool cover -func` needs no
    dependency.
 
-Open:
+Measured on 2026-10-21 (10 cores, linux/arm64, Go 1.27.3, warm build
+cache, a second builder compiling on the same machine): the race run
+took 226 s, 47 s of it building the test binaries. Two packages held
+most of the rest, for reasons of their tests:
+`tools/release/internal/build` (94 s; gzip under the race
+instrumentation) and `tools/ci/internal/drift` (92 s; a child built with
+`-race` sleeps 1 s before it exits, 4.2 s with
+`GORACE=atexit_sleep_ms=0`). No other package took more than 19 s. The
+table is in T155.
 
-- Which packages hold the 232s of the race run, measured before the
-  pre-push hook runs the race (about 4m30 instead of 50s).
-- The required checks of `main` are "all on ubuntu-26.04-arm" and "all
-  on macos-26"; new job names need the operator to change that rule at
-  merge.
-- The surfaces: `checks` (`tools/ci`), `dependencies` and `approvals`
-  (`.github/workflows/**`), and the 10 10.2 rows.
+Planned on 2026-10-21 as three tasks:
 
-Reopen: when the task is planned, after the `gitsafe` question of
-now.md.
+- T155, the race run's slow tests and the 28 `context.Background()` of
+  the tests.
+- T156, after T155 and T150: one list of tags, the `-count=1` reasons,
+  one argv for the race and e2e steps, one `ModuleRoot`, the cover
+  profile.
+- T157, after T155 and T156: `unit` leaves `fast` and `all`, the jobs
+  `static`, `race` and `e2e` with `all` their union, and one aggregator
+  per host that keeps the required check names; a skipped job is a
+  success for GitHub, so each aggregator needs one `if` that fails it
+  unless every needed job succeeded, which the workflow grammar admits
+  for that form only.
+
+The build order is T155, T150, T156, T157.
+
+Open questions, each in its task: whether the e2e job keeps
+`./e2e/...` (T156), and whether `fast` runs the race once it fits the
+budget (T157).
+
+Reopen: closed when T157 merges; this note then gets its Done record.
