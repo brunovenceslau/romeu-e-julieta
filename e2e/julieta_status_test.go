@@ -16,9 +16,18 @@ import (
 // statusJSON is the --json document of julieta status, every field,
 // read strictly.
 type statusJSON struct {
-	Egress  []string `json:"egress"`
-	Errors  []string `json:"errors"`
-	Project string   `json:"project"`
+	Egress       []string `json:"egress"`
+	Errors       []string `json:"errors"`
+	HookFailures []struct {
+		At       string `json:"at"`
+		ExitCode int    `json:"exitCode"`
+		Hook     string `json:"hook"`
+		Message  string `json:"message"`
+		Path     string `json:"path"`
+		Repo     string `json:"repo"`
+		Stage    string `json:"stage"`
+	} `json:"hookFailures"`
+	Project string `json:"project"`
 	Repos   []struct {
 		Branch   string `json:"branch"`
 		Branches []struct {
@@ -114,4 +123,44 @@ step tip git -C /tmp/srv/api.git rev-parse main
 	assert.True(t, strings.HasPrefix(r.stdout, "project  shop\nspec     "+strings.Repeat("ab", 20)+"\negress   dl.google.com github.com\nrepo api  "+primaryPath+"\n"), r.stdout)
 	assert.Contains(t, r.stdout, "  dirty      untracked\n")
 	assert.True(t, strings.HasPrefix(r.stderr, "warning default-branch-moved: api "), "warnings go to stderr: %q", r.stderr)
+}
+
+// TestJulietaStatusHookFailures lists a failing git hook in julieta
+// status, in --json and in text, from the store the dispatcher records
+// it in, until the same hook passes (08 8.2, REQ-0675).
+func TestJulietaStatusHookFailures(t *testing.T) {
+	steps := scenario(t, strings.Replace(hooksScript, "%s", manifestEnv(t, 1, originURL+"api.git"), 1)+`
+touch /tmp/stop
+step stopped git commit -q --allow-empty -m first
+step failed "$J" status --json
+step text "$J" status
+rm /tmp/stop
+step recovered git commit -q --allow-empty -m first
+step cleared "$J" status --json
+`)
+	require.Equal(t, 0, step(t, steps, "setup").code, step(t, steps, "setup").stderr)
+	require.NotEqual(t, 0, step(t, steps, "stopped").code, "git stops the commit on the hook's status")
+
+	r := step(t, steps, "failed")
+	require.Equal(t, 0, r.code, r.stderr)
+	var rep statusJSON
+	decodeStrict(t, r.stdout, &rep)
+	require.Len(t, rep.HookFailures, 1)
+	f := rep.HookFailures[0]
+	assert.Equal(t, "pre-commit", f.Hook)
+	assert.Equal(t, primaryPath, f.Repo)
+	assert.Equal(t, "tracked", f.Stage)
+	assert.Equal(t, 3, f.ExitCode)
+	assert.Equal(t, primaryPath+"/.githooks/pre-commit", f.Path)
+
+	r = step(t, steps, "text")
+	require.Equal(t, 0, r.code, r.stderr)
+	assert.Contains(t, r.stdout, "hook failure  pre-commit  repo "+primaryPath+"  stage tracked  exit 3  at ")
+
+	require.Equal(t, 0, step(t, steps, "recovered").code, step(t, steps, "recovered").stderr)
+	r = step(t, steps, "cleared")
+	require.Equal(t, 0, r.code, r.stderr)
+	rep = statusJSON{}
+	decodeStrict(t, r.stdout, &rep)
+	assert.Empty(t, rep.HookFailures, "the passing run cleared it")
 }
