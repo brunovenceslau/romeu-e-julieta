@@ -15,6 +15,8 @@ owns:
   - internal/hooks/hooks.go
   - internal/hooks/hooks_test.go
   - internal/hooks/system*.go
+  - internal/cmd/julieta/hooks/run.go
+  - internal/cmd/julieta/hooks/run_test.go
   - internal/cmd/julieta/setup/hooks_path*.go
   - internal/cmd/julieta/handoff/facts*.go
   - internal/handoff/handoff.go
@@ -74,9 +76,11 @@ approved for planning).
    count", 01m5d7v43hd4hsw60e4bhek3pw), and the system hooks path the
    sandbox kit sets keeps running (option (a), picked on 2026-10-21):
    - `SetGlobalHooksPath`, sandbox mode only, writes the key with `git
-     config --global`, runs in no repository, takes an absolute path
-     that `unsafeRune` accepts, and leaves the key alone when it already
-     holds that path (REQ-0396). Host mode refuses it (I2). julieta's
+     config --global`, runs in no repository, and takes an absolute path
+     that `unsafeRune` accepts. It first reads the global key and returns
+     the value it found: it leaves the key alone when it already holds
+     that path (REQ-0396), and writes nothing when it holds another
+     value. Host mode refuses it (I2). julieta's
      own git calls keep `-c core.hooksPath=/dev/null`, so the global key
      does not make them call the dispatcher.
    - `SystemHooksPath` reads the system config's `core.hooksPath`
@@ -87,8 +91,12 @@ approved for planning).
      REQ-0408's chain gains a first `system` stage: the hook of the
      recorded path, when one is set and the hook is executable, with
      the hook's arguments and the same stdin rule; the failure line
-     names it as stage `system`. A global value found that is neither
-     julieta's path nor empty is reported by `setup`, not overwritten.
+     names it as stage `system`, and the help of `julieta hooks run`
+     lists it. A recorded path that is not absolute is ignored, and one
+     equal to julieta's own dispatcher path is not run, so the chain
+     never calls itself. A global value `SetGlobalHooksPath` returns that
+     is neither julieta's path nor empty is reported by `setup`, not
+     overwritten.
    T054's `installDispatcher` calls both verbs, which closes its
    acceptance row 3, and the e2e case drops the line that set the key
    in its place (`e2e/julieta_hooks_test.go`).
@@ -126,16 +134,21 @@ needs a word it is amended the same way (05 is owned by T039).
     with the bases present restores them.
   - `SetGlobalHooksPath` sets the key, leaves every other key of the
     global config as it was, is a no-op on a second run, and is refused
-    in host mode; `SystemHooksPath` reads a planted system value; the
+    in host mode; with another global value planted, it writes nothing,
+    returns that value, and `julieta setup` reports it and leaves it as
+    it was; `SystemHooksPath` reads a planted system value; the
     argv and environment tests pin both commands, with
     `-c core.hooksPath=/dev/null` present.
   - In the container e2e, after `julieta setup` and with no line that
     sets the key by hand, a commit runs `julieta hooks run`, and with a
     system `core.hooksPath` planted, its hook runs first, as stage
-    `system`, and a failure there stops the chain and names the stage.
+    `system`, and a failure there stops the chain and names the stage;
+    a recorded path that is relative, or equal to julieta's own, runs
+    nothing.
   - `Status.Changed` counts paths: two unstaged files, one of them also
     staged, one untracked file and one assume-unchanged entry read as
-    4; a new test of `internal/cmd/julieta/handoff` pins the count in
+    4 (the hidden entry's path read from `git ls-files -v`); a new test
+    of `internal/cmd/julieta/handoff` pins the count in
     the facts it writes.
   - REQ-0397, REQ-0408 and the 03 3.10 sentence say what the code does;
     `go run ./tools/ci reqs` passes.
