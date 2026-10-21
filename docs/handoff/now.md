@@ -8,8 +8,8 @@ and records ADR 0040 and the CI plan.
 
 ## Next steps
 
-1. Build T153 (`gitsafe` verbs) once its option (a) or (b) is picked;
-   then re-plan and build T060.
+1. Build T153 (`gitsafe` verbs and the `system` stage of the hooks
+   chain); then re-plan and build T060.
 2. Plan "One race run, test tags and parallel CI jobs"
    (01m5drzqsp6zg34xzmywckwb7b), measuring the slow race packages first.
 3. A `julieta status` task for "julieta status reads the hook failure
@@ -47,10 +47,6 @@ One block, a recommendation each.
 5. Decide the scheduled run of the pin-freshness check, whose deferral
    fired with GO-2026-6809 (01m5e14094yhqhsxq2g941pwrf). Recommended:
    with the bump tool, one plan.
-6. Pick option (a) or (b) of T153: julieta's dispatcher gains a
-   `system` stage for the sandbox kit's system `core.hooksPath`, or the
-   kit's dispatcher calls julieta. Recommended: (a), so the names gate of
-   T112 keeps running once the global key points at julieta.
 
 ## In flight
 
