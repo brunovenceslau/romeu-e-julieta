@@ -3,8 +3,9 @@
 
 // Package imports is the imports check of 10 10.2 (REQ-0839): the
 // table of module boundaries of 10 10.7 over the packages that exist,
-// the rule of REQ-0971 for tools/** and e2e/**, and the guards of I1,
-// I2, I11 and I24 of 05 5.2. It reads the import graph from
+// the rule of REQ-0971 for tools/** and e2e/**, the rule of REQ-0960
+// that no package, its tests included, imports encoding/json (v1), and
+// the guards of I1, I2, I11 and I24 of 05 5.2. It reads the import graph from
 // "go list -json", once for each target of lint.Targets, without build
 // tags and with the tags of the tagged suites (tagSets), and judges the
 // union, so a file that builds on one platform alone, or only in the
