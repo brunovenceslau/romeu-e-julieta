@@ -30,9 +30,11 @@ var systemHooksPath = func(ctx context.Context, git *gitsafe.Runner) (string, bo
 //
 // Each failure leaves the sandbox unusable, since git then does not run
 // the dispatcher, or runs it without the system hooks: a script that
-// cannot be written, a system value that cannot be read or recorded,
-// which also leaves the global key unset, and a global key that holds
-// another value, which setup reports and does not overwrite.
+// cannot be written; a system value that cannot be read or recorded, or
+// that is not an absolute path, read as git reads a path (~ expanded),
+// each of which also leaves the global key unset; and a global key that
+// names another directory once cleaned, which setup reports with its
+// fix and does not overwrite.
 func installDispatcher(ctx context.Context, r *run) {
 	if _, err := hooks.Install(r.home, filepath.Join(r.home, linkPath)); err != nil {
 		r.fail("the hook dispatcher: %v", err)
@@ -41,6 +43,10 @@ func installDispatcher(ctx context.Context, r *run) {
 	system, _, err := systemHooksPath(ctx, r.git)
 	if err != nil {
 		r.fail("the system core.hooksPath: %v", err)
+		return
+	}
+	if system != "" && !filepath.IsAbs(system) {
+		r.fail("the system core.hooksPath %q is not an absolute path, which the dispatcher cannot run: setup leaves the global key unset", system)
 		return
 	}
 	if err := hooks.RecordSystem(StateDir(r.home), system); err != nil {
@@ -52,7 +58,8 @@ func installDispatcher(ctx context.Context, r *run) {
 	switch {
 	case err != nil:
 		r.fail("the global core.hooksPath: %v", err)
-	case found != "" && found != dir:
-		r.fail("the global core.hooksPath is %q, not the dispatcher %s: setup leaves it as it is, and git does not run the dispatcher", found, dir)
+	case found != "" && filepath.Clean(found) != dir:
+		r.fail("the global core.hooksPath is %q, not the dispatcher %s: setup leaves it as it is, and git does not run the dispatcher; "+
+			"run git config --global --unset core.hooksPath, then julieta setup", found, dir)
 	}
 }

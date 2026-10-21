@@ -27,7 +27,8 @@ const noRepo = "/"
 // (REQ-0396), and when it holds another value, which the caller
 // reports. The read follows the includes of the global config, as git
 // does when it runs a hook, so a value set in an included file is seen
-// and kept. Every other key of the global config stays as it was, git
+// and kept, and reads the value as a path (--type=path), so a leading ~
+// is expanded to the HOME of the mode, as git expands it. Every other key of the global config stays as it was, git
 // config itself rewriting only the line of the key.
 //
 // The global config is the sandbox's own (05 5.1, REQ-0463), and the
@@ -43,7 +44,7 @@ func (r *Runner) SetGlobalHooksPath(ctx context.Context, path string) (string, e
 	if err := checkHooksPathValue(path); err != nil {
 		return "", err
 	}
-	found, set, err := r.readHooksPath(ctx, noRepo, "--global", "--includes")
+	found, set, err := r.readHooksPath(ctx, noRepo, "--global", "--includes", "--type=path")
 	if err != nil {
 		return "", err
 	}
@@ -59,13 +60,15 @@ func (r *Runner) SetGlobalHooksPath(ctx context.Context, path string) (string, e
 // which a global value hides from git, so julieta setup records it for
 // the dispatcher's system stage (04 4.3, REQ-0408). The read follows
 // the includes of the system config, as git does when it runs a hook,
-// and has the checks of HooksPath; the value is returned raw. Host
+// and has the checks of HooksPath. The value is read as a path
+// (--type=path): a leading ~ is expanded to the HOME of the mode, and a
+// relative value is returned as it is, for the caller to report. Host
 // mode reads no system config (05 5.1), so it refuses the read.
 func (r *Runner) SystemHooksPath(ctx context.Context) (string, bool, error) {
 	if r.mode != Sandbox {
 		return "", false, fmt.Errorf("%w: the system core.hooksPath in %s mode", ErrRefused, r.mode)
 	}
-	return r.readHooksPath(ctx, noRepo, "--system", "--includes")
+	return r.readHooksPath(ctx, noRepo, "--system", "--includes", "--type=path")
 }
 
 // checkHooksPathValue returns ErrRefused for a hooks path gitsafe does

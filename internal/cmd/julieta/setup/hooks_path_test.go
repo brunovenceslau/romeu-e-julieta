@@ -80,6 +80,8 @@ func TestSetupReportsAForeignGlobalHooksPath(t *testing.T) {
 	require.Len(t, rep.Unusable, 1)
 	assert.Contains(t, rep.Unusable[0], `"/opt/other/hooks"`)
 	assert.Contains(t, rep.Unusable[0], hooks.DispatcherDir(s.home))
+	assert.Contains(t, rep.Unusable[0], "git config --global --unset core.hooksPath", "the fix")
+	assert.Contains(t, rep.Unusable[0], "julieta setup")
 	kept, err := os.ReadFile(filepath.Join(s.home, ".gitconfig"))
 	require.NoError(t, err)
 	assert.Equal(t, planted, kept)
@@ -97,5 +99,40 @@ func TestSetupLeavesTheGlobalKeyWhenTheSystemReadFails(t *testing.T) {
 	require.Len(t, rep.Unusable, 1)
 	assert.Contains(t, rep.Unusable[0], "planted failure")
 	_, err := os.Stat(filepath.Join(s.home, ".gitconfig"))
+	assert.ErrorIs(t, err, os.ErrNotExist, "no global config written")
+}
+
+// TestSetupTakesTheDispatcherWithATrailingSlash: a global value that
+// names the dispatcher dir with a trailing slash is the dispatcher, not
+// a foreign value, and is left as it is.
+func TestSetupTakesTheDispatcherWithATrailingSlash(t *testing.T) {
+	s := newSandbox(t)
+	systemAnswers(t, "", false, nil)
+	planted := []byte("[core]\n\thooksPath = " + hooks.DispatcherDir(s.home) + "/\n")
+	require.NoError(t, os.WriteFile(filepath.Join(s.home, ".gitconfig"), planted, 0o600))
+	code, rep, stderr := setupJSON(t)
+	require.Equal(t, 0, code, stderr)
+	assert.Empty(t, rep.Unusable)
+	kept, err := os.ReadFile(filepath.Join(s.home, ".gitconfig"))
+	require.NoError(t, err)
+	assert.Equal(t, planted, kept)
+}
+
+// TestSetupReportsARelativeSystemHooksPath: a system core.hooksPath that
+// is set and not absolute, which the dispatcher would ignore, is
+// reported, the sandbox unusable, and neither recorded nor hidden by
+// the global key.
+func TestSetupReportsARelativeSystemHooksPath(t *testing.T) {
+	s := newSandbox(t)
+	systemAnswers(t, "kit/hooks", true, nil)
+	code, rep, _ := setupJSON(t)
+	assert.Equal(t, 1, code)
+	require.Len(t, rep.Unusable, 1)
+	assert.Contains(t, rep.Unusable[0], `"kit/hooks"`)
+	assert.Contains(t, rep.Unusable[0], "not an absolute path")
+	recorded, err := hooks.ReadSystem(setup.StateDir(s.home))
+	require.NoError(t, err)
+	assert.Empty(t, recorded)
+	_, err = os.Stat(filepath.Join(s.home, ".gitconfig"))
 	assert.ErrorIs(t, err, os.ErrNotExist, "no global config written")
 }

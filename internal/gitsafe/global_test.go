@@ -127,6 +127,18 @@ func TestSystemHooksPathRealGit(t *testing.T) {
 	assert.True(t, set)
 	assert.Equal(t, "/opt/kit/hooks", path)
 
+	require.NoError(t, os.WriteFile(system, []byte("[core]\n\thooksPath = ~/kit/hooks\n"), 0o600))
+	path, set, err = r.SystemHooksPath(t.Context())
+	require.NoError(t, err)
+	assert.True(t, set)
+	assert.Equal(t, filepath.Join(home(t, r), "kit/hooks"), path, "~ expands to the HOME of the mode, as git expands it")
+
+	require.NoError(t, os.WriteFile(system, []byte("[core]\n\thooksPath = kit/hooks\n"), 0o600))
+	path, set, err = r.SystemHooksPath(t.Context())
+	require.NoError(t, err)
+	assert.True(t, set)
+	assert.Equal(t, "kit/hooks", path, "a relative value is returned as it is, for the caller to report")
+
 	require.NoError(t, os.WriteFile(system, []byte("[user]\n\tname = kit\n"), 0o600))
 	path, set, err = r.SystemHooksPath(t.Context())
 	require.NoError(t, err)
@@ -176,9 +188,9 @@ func TestGlobalArgv(t *testing.T) {
 		flags int
 		args  []string
 	}{
-		{readFlags, []string{"config", "--global", "--includes", "-z", "--get", "core.hooksPath"}},
+		{readFlags, []string{"config", "--global", "--includes", "--type=path", "-z", "--get", "core.hooksPath"}},
 		{writeFlags, []string{"config", "--global", "core.hooksPath", "/h/hooks"}},
-		{readFlags, []string{"config", "--system", "--includes", "-z", "--get", "core.hooksPath"}},
+		{readFlags, []string{"config", "--system", "--includes", "--type=path", "-z", "--get", "core.hooksPath"}},
 	}
 	require.Len(t, commands, len(want))
 	for i, c := range commands {
@@ -195,4 +207,25 @@ func TestGlobalArgv(t *testing.T) {
 		}
 		assert.Subset(t, c.Env, r.env)
 	}
+}
+
+// home returns the HOME the runner's git runs with.
+func home(t *testing.T, r *Runner) string {
+	t.Helper()
+	for _, kv := range r.env {
+		if v, ok := strings.CutPrefix(kv, "HOME="); ok {
+			return v
+		}
+	}
+	require.FailNow(t, "no HOME")
+	return ""
+}
+
+// TestSetGlobalHooksPathExpandsATilde: a global value written with ~ is
+// read expanded, so it compares equal to the path it names.
+func TestSetGlobalHooksPathExpandsATilde(t *testing.T) {
+	r, _ := globalRunner(t, Sandbox, "[core]\n\thooksPath = ~/.local/share/julieta/hooks\n")
+	found, err := r.SetGlobalHooksPath(t.Context(), filepath.Join(home(t, r), ".local/share/julieta/hooks"))
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(home(t, r), ".local/share/julieta/hooks"), found)
 }
