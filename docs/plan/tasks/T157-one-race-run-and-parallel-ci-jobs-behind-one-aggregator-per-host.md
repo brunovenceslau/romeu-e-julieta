@@ -25,8 +25,13 @@ owns:
   - .github/workflows/x64.yml
   - docs/spec/10-testing-style.md
   - docs/spec/12-engineering.md
+  - docs/reference/checks.md
+  - docs/plan/tasks/T001-hygiene-the-denylist-fast-and-the-pre-push-hook.md
   - docs/plan/tasks/T002-tools-ci-workflows-tools-ci-all-coverage.md
+  - docs/plan/tasks/T003-the-ask-first-list-tools-new-adr-and-tools-ci.md
   - docs/plan/tasks/T013-the-container-e2e-on-the-workload-s-base.md
+  - docs/plan/tasks/T132-step-durations-and-the-fast-budget.md
+  - docs/plan/tasks/T139-the-lint-split-and-the-lint-set.md
 needs: []
 after:
   - T155
@@ -35,6 +40,7 @@ ask_first:
   - checks
   - dependencies
   - approvals
+  - spec
 sitting: none
 ---
 
@@ -55,7 +61,9 @@ runs.
 1. **One test run.** The `unit` step leaves `fast` and `all`
    (`tools/ci/internal/unit/unit.go`, REQ-0824, retired with a row of
    the retired table, 12 12.11); the race step (REQ-0833) is the one
-   run of the tests, with `-race`, over `./...`.
+   run of the tests, with `-race`, over `./...`. The rows that order a
+   step before `unit` (REQ-0822, REQ-0831, REQ-0847) and the order of
+   `all` (REQ-0860) name the race step instead.
 2. **Jobs.** Each registered check names the job it runs in: `static`
    (the default, so a check that names none is static), `race` (the
    race step and the coverage check after it) or `e2e` (the container
@@ -68,29 +76,76 @@ runs.
 3. **Workflow.** On Linux (`ubuntu-26.04-arm`) three jobs, `static`,
    `race` and `e2e`; on macOS (`macos-26`) one, `race`, since lint and
    fix cover the darwin targets from Linux and license runs on Linux
-   only. Each job builds `tools/ci` and runs its subcommand, as the job
-   of today runs `all`. `x64.yml` keeps the same shape on its two
-   labels. Every job that installs mise keeps a matrix of `os` and
-   `mise_sha256`, one sha256 per label, so `mise.ReadPin` and the
-   `version` read of `tools/ci/internal/mise`, owned by T053, read the
-   files as they do now; if they do not, the builder stops and asks.
-4. **Aggregators.** Two jobs, one per host, named exactly `all on
-   ubuntu-26.04-arm` and `all on macos-26`, the required checks of
-   `main` today, each `needs` the jobs of its host. A job whose needed
-   job fails is skipped, and GitHub reports a skipped job as a success,
-   also for a required check (GitHub's "About status checks", read on
-   2026-10-21): an aggregator with `needs` alone would let a red job
-   merge. So each aggregator runs only when a needed job failed or was
-   cancelled, and then fails, and is skipped, a success, when every
-   needed job passed. That takes one `if` per aggregator, which the
-   grammar refuses today (REQ-0803, REQ-0809): the grammar admits it
-   for that form only (`needs`, one fixed `if` expression, a step that
-   fails), with a fixture each way. Each aggregator is a job of its own,
-   not a matrix, since GitHub names a skipped matrix job with its
-   expression unexpanded, and a required check would then never match.
-   The step that fails is the smallest one the grammar can admit (a
-   `tools/ci` subcommand after checkout and mise, or one fixed `run`
-   word); the builder picks and records it with what reopens it.
+   only. macOS so drops `vet` too: no file of the module builds on
+   darwin alone today (measured on 2026-10-21: the constraints in use
+   are `e2e`, `unix`, `linux || darwin` and `linux`). Reopened by the
+   first file whose constraint selects darwin and not linux, which puts
+   a darwin `vet` back. Each job builds `tools/ci` and runs its
+   subcommand, as the job of today runs `all`. `x64.yml` keeps the same
+   shape on its two labels. Every job that installs mise keeps a matrix
+   of `os` and `mise_sha256`, one sha256 per label: `matrixShas`
+   (`tools/ci/internal/mise/pin.go:121`) reads the matrix of every job
+   and keeps one sha256 per label, and `stepVersions`
+   (`misefiles.go:460`) reads the mise version of every job's step
+   once, so `tools/ci/internal/mise`, owned by T053, needs no change.
+4. **Aggregators.** Two jobs, named exactly `all on ubuntu-26.04-arm`
+   and `all on macos-26`, the required checks of `main` today. GitHub
+   reports a skipped job as a success, also for a required check
+   (GitHub's "About status checks", read on 2026-10-21), and a job is
+   skipped when a job it needs fails: an aggregator with `needs` alone
+   would let a red job merge. So each aggregator `needs` every other
+   job of its file that is not an aggregator, runs on
+   `ubuntu-26.04-arm`, holds this `if`, verbatim:
+
+   ```yaml
+   if: ${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')) }}
+   ```
+
+   and one step, `run: exit 1`. A needed job's result is one of
+   `success`, `failure`, `cancelled` and `skipped`, so the aggregator
+   runs, and fails, unless every needed job's result is `success`, a
+   job cancelled by its own `timeout-minutes` or skipped included; when
+   every result is `success` it is skipped, which GitHub reports as a
+   success. `always()` also runs it when the whole run is cancelled (a
+   newer push to the pull request), so a superseded commit shows a red
+   aggregator, which blocks nothing. Both aggregators need every job, so
+   a red Linux job turns both red: the per-host name is the one the
+   ruleset requires, not a promise about which host failed. Each
+   aggregator is a job of its own, not a matrix, since GitHub names a
+   skipped matrix job with its expression unexpanded, and a required
+   check would then never match.
+5. **Grammar.** Three rows of 10 10.2 change, each with a fixture each
+   way in `tools/ci/internal/workflows`:
+   - REQ-0803 (job): the keys gain `if`, admitted only in an aggregator
+     job: a job whose `name` is a literal (no `${{`), whose `runs-on` is
+     a literal label, with no `strategy`, whose `needs` lists every
+     other job of the same file that is not an aggregator, whose `if` is
+     the text above byte for byte, and whose one step is `run: exit 1`.
+   - REQ-0806 (`run` step): a fifth form, `exit 1`, admitted only as
+     the one step of an aggregator job.
+   - REQ-0809: "a workflow has no `if`" becomes "no `if` but the
+     aggregator's", and the rule that the text between the braces is one
+     context path gains its one exception, that `if`, compared as a
+     whole string, so no other operator or function call is admitted.
+   - Fixtures that fail: an `if` on a job that is not an aggregator; an
+     aggregator whose `needs` omits a job; an aggregator with a
+     `strategy` matrix; an aggregator whose `name` holds `${{`; an
+     aggregator `if` that differs by one character; `exit 1` in another
+     job. Fixtures that pass: `ci.yml` and `x64.yml` as this task writes
+     them.
+6. **Other text.** 05 5.3 lists the steps that decide whether `all`
+   passes as "coverage, license, vulnerabilities, race, unit, vet and
+   lint" (`docs/spec/05-security.md:420`, in REQ-0543): `unit` leaves
+   that list. The row of the index's Deferred decisions on "running the
+   change's tests in a job (a virtual machine) separate from the job
+   that judges the commit" (`docs/spec.md:364`) is amended to say that
+   in CI the `static` job judges the commit and the `race` and `e2e`
+   jobs run the tests, each on its own runner, while a local `all`
+   still runs both in one process tree, so the row stays open for the
+   local run. `docs/spec/05-security.md` and `docs/spec.md` are owned by
+   the open tasks T039 and T126: this task amends those two passages
+   without owning the files, as T151 did with 05 5.1, and does not wait
+   for them; `owns` does not list them.
 
 The measurement of T155 says what the race job costs: about 47 s of
 the 226 s of a local race run of 2026-10-21 is the build of the test
@@ -101,16 +156,19 @@ still the slowest after this task.
 
 - Implements: REQ-0800 (10 10.2), REQ-0803 (10 10.2), REQ-0806 (10
   10.2), REQ-0809 (10 10.2), REQ-0812 (10 10.2), REQ-0833 (10 10.2),
-  REQ-0824 (10 10.2), REQ-0856 (10 10.2).
+  REQ-0824 (10 10.2), REQ-0856 (10 10.2), REQ-0860 (10 10.2), REQ-0822
+  (10 10.2), REQ-0831 (10 10.2), REQ-0847 (10 10.2), REQ-0543 (05 5.3).
 - Operator: no action at merge: the aggregators keep the names of the
   required checks, so the ruleset of `main` does not change. The
-  approval lines of `checks`, `dependencies` and `approvals` are the
-  operator's, as for any change to `tools/ci` and the workflows.
+  approval lines of `checks`, `dependencies`, `approvals` and `spec`
+  are the operator's, as for any change to `tools/ci`, the workflows
+  and 05.
 - Acceptance:
   - `fast` and `all` run no `unit` step; `go test` runs once in `all`,
-    with `-race`; REQ-0824 is retired and REQ-0856 lists the command
-    steps of `fast` without it; a test holds that no step but race and
-    e2e runs `go test`.
+    with `-race`; REQ-0824 is retired; REQ-0856 lists the command steps
+    of `fast` without it; REQ-0822, REQ-0831, REQ-0847 and REQ-0860
+    order their steps against the race step; a test holds that no step
+    but race and e2e runs `go test`.
   - Each registered check names its job, a test holds that `static`,
     `race` and `e2e` are the only jobs and that `all` runs their union
     in the order of today, and `docs/reference/checks.md` lists the job
@@ -122,33 +180,39 @@ still the slowest after this task.
     not run on that class.
   - `ci.yml` has the Linux jobs `static`, `race` and `e2e`, the macOS
     job `race`, and the two aggregators named `all on ubuntu-26.04-arm`
-    and `all on macos-26`, each needing exactly its host's jobs;
-    `x64.yml` has the same shape on its labels; `go run ./tools/ci
-    workflows` passes on both and fails each fixture of an `if`,
-    `needs` or step outside the aggregator form.
-  - On the pull request itself: a run where every job passes shows both
-    aggregators skipped and the pull request mergeable; a pushed commit
-    that makes one Linux job fail shows `all on ubuntu-26.04-arm` red
-    and `all on macos-26` skipped; that commit is then reverted. The
-    pull request body links both runs.
+    and `all on macos-26`, each needing every other job and holding the
+    `if` above; `x64.yml` has the same shape on its labels; `go run
+    ./tools/ci workflows` passes on both and fails each fixture of item
+    5.
+  - On the pull request itself, three proofs, each run linked in the
+    pull request body with the aggregators' results:
+    1. every job passes: both aggregators are skipped and the pull
+       request is mergeable;
+    2. a pushed commit makes one Linux job fail: both aggregators run
+       and are red;
+    3. a pushed commit gives one job a `timeout-minutes` it cannot meet,
+       so that job alone is cancelled: both aggregators run and are
+       red.
+    The two commits are then reverted, and the last run is the green
+    one of proof 1.
   - The job times of the green run, per job, are in the pull request
     body, beside the 13 to 25 minutes of the macOS job of 2026-10-20.
-  - REQ-0800, REQ-0803, REQ-0806, REQ-0809, REQ-0812 and REQ-0833 say
-    what the code does; the task files that cite a changed id (T002,
-    T013) are updated (12 12.11); `go run ./tools/ci reqs` passes.
+  - The 05 5.3 list and the Deferred decisions row say what item 6
+    says; REQ-0800, REQ-0803, REQ-0806, REQ-0809, REQ-0812 and REQ-0833
+    say what the code does; the task files that cite a changed id (T001,
+    T002, T003, T013, T132, T139) are updated (12 12.11); `go run
+    ./tools/ci reqs` passes.
 - Verify: `go run ./tools/ci all`, `go run ./tools/ci static`, `go run
-  ./tools/ci race`, `go run ./tools/ci workflows`, and the two CI runs
-  of the pull request above.
+  ./tools/ci race`, `go run ./tools/ci workflows`, the `pr` check of the
+  pull request green on the new job names (REQ-1154: a head job's name
+  that matches the pr job's name, or holds `${{`, outside the pr job's
+  file is refused), and the three CI proofs above.
 
-Questions for the maintainer:
-
-1. With `unit` gone, the pre-push hook's `fast` runs no test at all.
-   The note named the other reading, the race in the hook, about 4m30
-   then and 226 s on 2026-10-21, against the 3 minutes `fast` targets.
-   Recommended: `fast` runs no test until T155's numbers are in; then
-   the race joins `fast` if the whole race run fits the budget on a
-   warm cache.
-2. The aggregator's failing step: a `tools/ci` subcommand, which needs
-   checkout and mise on a run that has already failed, or one fixed
-   `run` word the grammar admits for the aggregator only. Recommended:
-   the `run` word, since it reads nothing and starts no tool.
+Question for the maintainer: with `unit` gone, the pre-push hook's
+`fast` runs no test at all. The note named the other reading, the race
+in the hook, about 4m30 then and 226 s on 2026-10-21. Recommended: the
+race joins `fast` only if, after T155, a warm `go test -race -count=1
+./...` stays under `fastBudget` (`tools/ci/fast.go:24`, 3 minutes) on
+the reference machine; until then `fast` runs no test. `fast` has no
+`After` step, so the race in `fast` writes no cover profile and checks
+no coverage; coverage stays in the `race` job and in `all`.

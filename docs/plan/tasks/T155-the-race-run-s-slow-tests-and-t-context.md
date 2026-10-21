@@ -22,6 +22,7 @@ owns:
   - tools/ci/git/gittest/gittest_test.go
   - tools/mutants/main_test.go
   - tools/mutants/signal_test.go
+  - internal/racechild/**
 needs: []
 after: []
 ask_first:
@@ -96,9 +97,12 @@ not to the code under test. Sharding and GOCACHE stay deferred
 - Acceptance:
   - Every test that starts the test binary, or another program built
     with `-race`, as a child gives the child `GORACE=atexit_sleep_ms=0`,
-    through one helper per package or one shared test helper, with a
-    comment that names the option and its default; the child's
-    environment is otherwise as it was.
+    through one shared helper, `internal/racechild`, a new package under
+    the root `internal/` that every package above may import (no open
+    task owns that path, measured on 2026-10-21), or one helper per
+    package where the imports check refuses that import; the helper's
+    doc names the option and its default, and the child's environment
+    is otherwise as it was.
   - The archive tests keep what they check, the bytes of a reproducible
     archive among them, and stop paying the instrumented gzip once per
     test: the archive is built once per package run and shared by the
