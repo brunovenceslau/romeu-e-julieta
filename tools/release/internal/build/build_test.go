@@ -17,41 +17,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// buildFixture builds the fixture module as a dry run into a new
-// directory and returns the root and the result.
-func buildFixture(t *testing.T, root string) Result {
-	t.Helper()
-	goBin, err := ResolveGo(t.Context())
-	require.NoError(t, err)
-	res, err := Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: t.TempDir(), DryRun: true, GoBin: goBin})
-	require.NoError(t, err)
-	return res
-}
-
 // TestDryRunBuild: the two archives and checksums.txt are written; each
 // archive holds romeu, COPYING and the notices in that order, with the
 // fixed times and owners; the romeu binary is a darwin Mach-O that
-// carries the julieta binary of the same arch and the version stamp.
+// carries the julieta binary of the same arch and the version stamp. It
+// reads the shared dry run (shared).
 func TestDryRunBuild(t *testing.T) {
-	root := fixtureModule(t)
-	res := buildFixture(t, root)
+	t.Parallel()
+	dry := shared(t).dry
+	res, archives := dry.res, dry.archives
 
 	require.Len(t, res.Archives, 2)
 	assert.Equal(t, "romeu_v1.0.0_darwin_amd64.tar.gz", filepath.Base(res.Archives[0]))
 	assert.Equal(t, "romeu_v1.0.0_darwin_arm64.tar.gz", filepath.Base(res.Archives[1]))
+	assert.Equal(t, string(Checksums(archives)), string(dry.sums))
 
-	sums, err := os.ReadFile(res.Checksums)
-	require.NoError(t, err)
-	archives := map[string][]byte{}
-	for _, path := range res.Archives {
-		data, err := os.ReadFile(path)
-		require.NoError(t, err)
-		archives[filepath.Base(path)] = data
-	}
-	assert.Equal(t, string(Checksums(archives)), string(sums))
-
-	head, err := git(t.Context(), root, "rev-parse", "HEAD")
-	require.NoError(t, err)
+	head := shared(t).head
 	for name, data := range archives {
 		t.Run(name, func(t *testing.T) {
 			headers, content := members(t, data)
@@ -78,7 +59,7 @@ func TestDryRunBuild(t *testing.T) {
 			assert.True(t, bytes.HasPrefix(romeu, []byte{0xcf, 0xfa, 0xed, 0xfe}), "a 64-bit Mach-O")
 			assert.Contains(t, string(romeu), markerJulieta, "romeu embeds julieta")
 			assert.Contains(t, string(romeu), "v1.0.0")
-			assert.Contains(t, string(romeu), strings.TrimSpace(string(head)), "the commit stamp")
+			assert.Contains(t, string(romeu), head, "the commit stamp")
 			assert.Contains(t, string(romeu), "2026-03-04T05:06:07Z", "the commit time is the build date")
 		})
 	}
@@ -86,17 +67,17 @@ func TestDryRunBuild(t *testing.T) {
 
 // TestBuildIsReproducible: two builds of one commit write the same
 // archives, so the contract of REQ-0905 holds as far as this tool
-// controls it (nothing compares them in the release itself).
+// controls it (nothing compares them in the release itself). The two
+// are the shared builds (shared), made at once from one root: a dry run
+// and a release, which differ in the gate alone.
 func TestBuildIsReproducible(t *testing.T) {
-	root := fixtureModule(t)
-	first, second := buildFixture(t, root), buildFixture(t, root)
-	for i := range first.Archives {
-		a, err := os.ReadFile(first.Archives[i])
-		require.NoError(t, err)
-		b, err := os.ReadFile(second.Archives[i])
-		require.NoError(t, err)
-		assert.True(t, bytes.Equal(a, b), first.Archives[i])
+	t.Parallel()
+	both := shared(t)
+	require.Len(t, both.dry.archives, 2)
+	for name, a := range both.dry.archives {
+		assert.True(t, bytes.Equal(a, both.release.archives[name]), name)
 	}
+	assert.Equal(t, string(both.dry.sums), string(both.release.sums))
 }
 
 // TestBuildRefusesAnotherVersion: the tag must be a build of VERSION.
@@ -109,8 +90,13 @@ func TestBuildRefusesAnotherVersion(t *testing.T) {
 // TestDryRunBuildMakesNoNetworkRead is the fixture "dry-run build makes
 // no network read": a server counts every request, the gate points at
 // it, and a dry run sends none, while the same build without --dry-run
-// sends one.
+// sends one. The dry run is the shared one, whose gate counts its requests
+// (shared); the build without --dry-run stops at the gate, so it makes no
+// archive.
 func TestDryRunBuildMakesNoNetworkRead(t *testing.T) {
+	t.Parallel()
+	assert.Zero(t, shared(t).asked, "a dry run reads no network")
+
 	var requests atomic.Int32
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requests.Add(1)
@@ -123,10 +109,6 @@ func TestDryRunBuildMakesNoNetworkRead(t *testing.T) {
 	gate := &FuzzGate{API: server.URL, Repo: "owner/romeu-e-julieta", Token: "token",
 		Client: server.Client(), AllowHost: strings.TrimPrefix(server.URL, "https://")}
 	tag(t, root, "v1.0.0")
-
-	_, err = Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: t.TempDir(), DryRun: true, GoBin: goBin, Gate: gate})
-	require.NoError(t, err)
-	assert.Zero(t, requests.Load(), "a dry run reads no network")
 
 	_, err = Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: t.TempDir(), GoBin: goBin, Gate: gate})
 	require.ErrorContains(t, err, "the fuzz run")
@@ -196,6 +178,7 @@ func readReplace(t *testing.T, root string) string {
 // the same, since the overlay key must be the real path the go command
 // sees.
 func TestBuildBehindSymlinks(t *testing.T) {
+	// Not parallel: it sets TMPDIR, which every build reads.
 	target := t.TempDir()
 	link := filepath.Join(t.TempDir(), "tmp-link")
 	require.NoError(t, os.Symlink(target, link))
@@ -224,15 +207,13 @@ func goBinOf(t *testing.T) string {
 // internal/embedded/julieta a dry run builds and says Embedded is false;
 // with one, it says it is embedded.
 func TestEmbeddingDoesNotPassSilently(t *testing.T) {
+	t.Parallel()
 	bare := fixtureModuleWith(t, false)
 	res, err := Build(t.Context(), Options{Root: bare, Version: "v1.0.0", Out: filepath.Join(t.TempDir(), "out"), DryRun: true, GoBin: goBinOf(t)})
 	require.NoError(t, err)
 	assert.False(t, res.Embedded)
 
-	root := fixtureModule(t)
-	res, err = Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: filepath.Join(t.TempDir(), "out"), DryRun: true, GoBin: goBinOf(t)})
-	require.NoError(t, err)
-	assert.True(t, res.Embedded)
+	assert.True(t, shared(t).dry.res.Embedded, "the shared dry run of the fixture with the consumer")
 }
 
 // fuzzedGate answers success for the head of root, so the gate passes.
@@ -244,6 +225,7 @@ func fuzzedGate(t *testing.T, root string) *FuzzGate {
 }
 
 func TestReleaseBuildRefusesWhenNothingEmbedsJulieta(t *testing.T) {
+	t.Parallel()
 	bare := fixtureModuleWith(t, false)
 	tag(t, bare, "v1.0.0")
 	out := filepath.Join(t.TempDir(), "out")
@@ -252,11 +234,11 @@ func TestReleaseBuildRefusesWhenNothingEmbedsJulieta(t *testing.T) {
 	assert.NoDirExists(t, out)
 }
 
+// TestReleaseBuildWithTheTagAtHead reads the shared release build, made
+// with the tag at HEAD (shared).
 func TestReleaseBuildWithTheTagAtHead(t *testing.T) {
-	root := fixtureModule(t)
-	tag(t, root, "v1.0.0")
-	res, err := Build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: filepath.Join(t.TempDir(), "out"), GoBin: goBinOf(t), Gate: fuzzedGate(t, root)})
-	require.NoError(t, err)
+	t.Parallel()
+	res := shared(t).release.res
 	assert.True(t, res.Embedded)
 	assert.Len(t, res.Archives, 2)
 }
@@ -278,6 +260,7 @@ func TestReleaseBuildChecksTheTag(t *testing.T) {
 // release build and a dry run without --allow-dirty; a dry run with it
 // stamps the commit dirty.
 func TestDirtyTree(t *testing.T) {
+	t.Parallel()
 	root := fixtureModule(t)
 	tag(t, root, "v1.0.0")
 	write(t, root, map[string]string{"untracked.txt": "x\n"})
@@ -302,6 +285,7 @@ func TestDirtyTree(t *testing.T) {
 // TestOutput: a non-empty --out is refused, an empty one is replaced, and
 // a failed build leaves nothing, not even a staging directory.
 func TestOutput(t *testing.T) {
+	t.Parallel()
 	root := fixtureModule(t)
 	parent := t.TempDir()
 
