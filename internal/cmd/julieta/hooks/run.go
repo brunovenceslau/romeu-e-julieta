@@ -25,8 +25,8 @@ import (
 // recorded failures of the hooks (REQ-0154, REQ-0675).
 const failuresDir = "hook-failures"
 
-// The process the command runs in: the stdin the hook's first repo
-// stage reads, the environment the stages get, and the exit that ends
+// The process the command runs in: the stdin the hook's stages read a
+// copy of, the environment the stages get, and the exit that ends
 // the process with the status of a stage. Tests replace them, and a
 // test that does must not run in parallel with another. stdin is read
 // once per run: procgroup.Run does not wait for the copy of a reader
@@ -53,7 +53,8 @@ var _ = cli.Register(func() cli.Command {
 				"A flag before the hook name, such as --help, is read by julieta; whatever follows the name is the hook's.\n\n" +
 				"The stages, in order: system, the hook of the system core.hooksPath that julieta setup recorded before it set the global one " +
 				"(an absolute path other than the dispatcher's own); julieta, julieta's own action; tracked, the repo's .githooks/<hook>; " +
-				"and local, $GIT_DIR/hooks/<hook>. A hook stage runs only when its file is executable, and the first hook that runs gets the stdin.\n\n" +
+				"and local, $GIT_DIR/hooks/<hook>. A hook stage runs only when its file is executable, and each hook gets its own copy of the stdin (proc-receive's goes to the first hook that runs). " +
+				"The system hook runs with JULIETA_HOOKS_SYSTEM=1, and a run that starts with it set skips the system stage.\n\n" +
 				"The stages run with pipes for standard input, output and error, not the terminal, and each in a process group of its own. " +
 				"A job a hook leaves running in the background is ended when the hook ends, which plain git does not do. " +
 				"Their output goes through the CLI writer, so terminal controls in it are escaped.",
@@ -92,7 +93,7 @@ func run(cmd *cobra.Command, env *cli.Env, hook string, args []string) error {
 	// hook rather than skip the sandbox's own hook unseen.
 	system, err := hooks.ReadSystem(setup.StateDir(home))
 	if err != nil {
-		return fmt.Errorf("the recorded system hooks path: %w", err)
+		return fmt.Errorf("the system hooks path recorded in julieta state cannot be read, and julieta setup records it again: %w", err)
 	}
 	status, err := hooks.Run(cmd.Context(), hooks.Options{
 		Hook: hook, Args: args, Dir: dir, Env: environ(), Stdin: stdin(),

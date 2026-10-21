@@ -97,3 +97,8 @@ func sameDir(a, b string) bool {
 	rb, errB := filepath.EvalSymlinks(b)
 	return errA == nil && errB == nil && ra == rb
 }
+
+// SystemMarker is the variable the system stage runs with. A dispatcher
+// started with it set, by a system hook that leads back to julieta
+// hooks run, skips the system stage, so the chain cannot loop.
+const SystemMarker = "JULIETA_HOOKS_SYSTEM=1"

@@ -50,7 +50,7 @@ chmod +x .githooks/* .git/hooks/post-rewrite .git/hooks/post-commit
 // TestJulietaHooks runs the hook dispatcher in the workload (04 4.3;
 // I21): a git commit runs the tracked pre-commit and the local
 // post-commit through it, with the hook's arguments, and the stdin of
-// post-rewrite reaches the tracked hook alone; the first non-zero
+// post-rewrite reaches both the tracked and the local hook; the first non-zero
 // status stops the chain and is git's failure, the stage line names the
 // stage and its status, and the failure is in julieta state until the
 // same hook passes; a stage a signal ended is "exited 128+15".
@@ -85,7 +85,7 @@ step signalstate sh -c 'cat "$HOME"/.local/state/julieta/hook-failures/*.json'
 	rewrite := step(t, steps, "rewrite").stdout
 	assert.Contains(t, rewrite, "tracked post-rewrite amend stdin=")
 	assert.Regexp(t, `tracked post-rewrite amend stdin=[0-9a-f]{40} [0-9a-f]{40}\n`, rewrite, "the tracked hook reads git's stdin")
-	assert.Contains(t, rewrite, "local post-rewrite amend stdin=\n", "the local hook gets none: the tracked one took it")
+	assert.Regexp(t, `local post-rewrite amend stdin=[0-9a-f]{40} [0-9a-f]{40}\n`, rewrite, "the local hook gets its own copy of the stdin")
 
 	r = step(t, steps, "stopped")
 	assert.NotEqual(t, 0, r.code, "git stops the commit on the hook's status")
@@ -123,7 +123,11 @@ echo "system pre-commit $*" >>/tmp/hooklog
 [ ! -e /tmp/sysstop ] || { echo "the system hook says no" >&2; exit 4; }
 EOF2
 printf '#!/bin/sh\necho "relative pre-commit" >>/tmp/hooklog\n' >syshooks/pre-commit
-chmod +x /tmp/syshooks/pre-commit syshooks/pre-commit
+printf '#!/bin/sh\nexit 0\n' >/tmp/syshooks/pre-push
+printf '#!/bin/sh\ngrep -q refs/heads/main && { echo "the tracked pre-push saw main" >&2; exit 1; }\nexit 0\n' >.githooks/pre-push
+mkdir -p /tmp/loop
+cp "$HOME/.local/share/julieta/hooks/pre-commit" /tmp/loop/pre-commit
+chmod +x /tmp/syshooks/pre-commit /tmp/syshooks/pre-push .githooks/pre-push syshooks/pre-commit
 record() { printf '{"path":"%s"}\n' "$1" >"$HOME/.local/state/julieta/system-hooks-path.json"; }
 `
 
@@ -133,7 +137,11 @@ record() { printf '{"path":"%s"}\n' "$1" >"$HOME/.local/state/julieta/system-hoo
 // its pre-commit runs first, with the hook's arguments, and a failure
 // there stops the chain, is git's failure and names the stage system; a
 // recorded path that is relative, or that is julieta's own dispatcher
-// dir, runs nothing in that stage and the chain goes on.
+// dir, runs nothing in that stage and the chain goes on. A system
+// pre-push that reads no stdin leaves the ref lines to the tracked one,
+// which refuses the push, and a system pre-commit that is a copy of the
+// dispatcher's script runs the chain once more without its system
+// stage, then ends.
 func TestJulietaHooksSystemStage(t *testing.T) {
 	script := strings.Replace(hooksScript, "%s", manifestEnv(t, 1, originURL+"api.git"), 1) + systemScript + `
 record /tmp/syshooks
@@ -153,6 +161,12 @@ step relativelog cat /tmp/hooklog
 record "$HOME/.local/share/julieta/hooks"
 step own git commit -q --allow-empty -m fourth
 step ownlog cat /tmp/hooklog
+record /tmp/syshooks
+step push git push -q /tmp/srv/api.git HEAD:refs/heads/main
+: >/tmp/hooklog
+record /tmp/loop
+step loop git commit -q --allow-empty -m fifth
+step looplog cat /tmp/hooklog
 `
 	steps := scenario(t, script)
 	require.Equal(t, 0, step(t, steps, "setup").code, step(t, steps, "setup").stderr)
@@ -180,4 +194,14 @@ step ownlog cat /tmp/hooklog
 	assert.Equal(t, 0, r.code, r.stderr)
 	assert.Equal(t, "tracked pre-commit \nlocal post-commit\n", step(t, steps, "ownlog").stdout,
 		"julieta's own dispatcher dir is not a system stage, so the chain does not call itself")
+
+	r = step(t, steps, "push")
+	assert.NotEqual(t, 0, r.code, "the system pre-push read no stdin, and the tracked one still got the ref lines")
+	assert.Contains(t, r.stderr, "the tracked pre-push saw main\n")
+	assert.Contains(t, r.stderr, "stage tracked ("+primaryPath+"/.githooks/pre-push) exited 1\n")
+
+	r = step(t, steps, "loop")
+	assert.Equal(t, 0, r.code, r.stderr)
+	assert.Equal(t, "tracked pre-commit \ntracked pre-commit \nlocal post-commit\n", step(t, steps, "looplog").stdout,
+		"a system hook that runs the dispatcher again: the inner run skips the system stage, so the chain ends")
 }

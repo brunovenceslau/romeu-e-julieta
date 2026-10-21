@@ -107,8 +107,8 @@ func TestRunChainOrderArgumentsAndStdin(t *testing.T) {
 		".githooks/pre-commit args=one two",
 		".githooks/pre-commit stdin=refs",
 		".git/hooks/pre-commit args=one two",
-		".git/hooks/pre-commit stdin=",
-	}, r.logged(), "stdin goes to the first repo hook only")
+		".git/hooks/pre-commit stdin=refs",
+	}, r.logged(), "each hook gets its own copy of the stdin")
 	assert.Empty(t, r.failures())
 }
 
@@ -121,10 +121,10 @@ func TestRunStdinGoesToTheFirstHookThatRuns(t *testing.T) {
 	assert.Equal(t, []string{".git/hooks/post-rewrite args=one two", ".git/hooks/post-rewrite stdin=abc def"}, r.logged())
 }
 
-// A file is handed to a stage as it is, as git's own stdin is, so the
-// stage that does not read it leaves it for the next one unless the
-// dispatcher stops offering it.
-func TestRunStdinIsNotOfferedAgainToTheSecondHook(t *testing.T) {
+// Each hook gets its own copy of the stdin, so a hook that reads none
+// leaves the whole of it to the next one: a file is read once by the
+// dispatcher, not handed on as it is.
+func TestRunStdinIsGivenToEveryHook(t *testing.T) {
 	r := newRepo(t)
 	require.NoError(t, os.WriteFile(filepath.Join(r.dir, ".githooks/pre-push"), []byte("#!/bin/sh\nexit 0\n"), 0o755)) // reads nothing
 	r.hook(".git/hooks/pre-push", 0o755, "")
@@ -136,8 +136,8 @@ func TestRunStdinIsNotOfferedAgainToTheSecondHook(t *testing.T) {
 		Stdout: &out, Stderr: &out, StateDir: r.state, Now: func() time.Time { return clock }})
 	require.NoError(t, err)
 	assert.Equal(t, 0, status)
-	assert.Equal(t, []string{".git/hooks/pre-push args=", ".git/hooks/pre-push stdin="}, r.logged(),
-		"the first hook that ran took the stdin, whether it read it or not")
+	assert.Equal(t, []string{".git/hooks/pre-push args=", ".git/hooks/pre-push stdin=refs/heads/main abc"}, r.logged(),
+		"the second hook reads the whole stdin, though the first read none")
 }
 
 func writeFile(t *testing.T, text string) string {

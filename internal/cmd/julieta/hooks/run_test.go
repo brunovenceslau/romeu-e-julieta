@@ -184,3 +184,21 @@ func TestRunRunsTheRecordedSystemHookFirst(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "tracked\n", string(b))
 }
+
+// TestRunAnUnreadableSystemRecordFailsTheHook: a record of the system
+// hooks path the dispatcher cannot read fails the hook, rather than
+// skip the sandbox's own hook unseen, and the error names julieta setup,
+// which records it again.
+func TestRunAnUnreadableSystemRecordFailsTheHook(t *testing.T) {
+	s := newSandbox(t, "")
+	out := filepath.Join(s.repo, "out")
+	s.hook(t, ".githooks/pre-commit", "echo tracked >>"+out)
+	state := filepath.Join(s.home, ".local/state/julieta")
+	require.NoError(t, os.MkdirAll(state, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(state, ihooks.SystemFile), []byte("not json"), 0o600))
+	code, _, stderr := julieta(t, "hooks", "run", "pre-commit")
+	assert.NotEqual(t, 0, code)
+	assert.Contains(t, stderr, "julieta setup")
+	_, err := os.Stat(out)
+	assert.ErrorIs(t, err, os.ErrNotExist, "no stage ran")
+}

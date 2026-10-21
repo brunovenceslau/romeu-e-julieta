@@ -13,8 +13,12 @@
 // which the global key hides from git; julieta's own action
 // (internal/hooks/actions); the repo's tracked .githooks/<hook>; and
 // $GIT_DIR/hooks/<hook>; each hook only if it exists and is executable.
-// The arguments of the hook go to each; its stdin goes to the first of
-// the three hooks that runs. The first non-zero status stops the chain
+// The arguments of the hook go to each, and so does a copy of its
+// stdin, read once and bounded (readStdin), except for proc-receive,
+// whose stdin goes to the first hook that runs. The system hook runs
+// with SystemMarker in its environment, and a run that starts with it
+// set skips the system stage, so a system hook that leads back to the
+// dispatcher cannot loop. The first non-zero status stops the chain
 // and is the status of the dispatcher, except for an action that
 // continues (the snapshot), whose failure is recorded and does not stop
 // the chain.
@@ -28,6 +32,7 @@
 package hooks
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -88,8 +93,8 @@ type Options struct {
 	Dir string
 	// Env is the environment of the stages, as git gave it.
 	Env []string
-	// Stdin is the stdin of the hook, given to the first hook that runs,
-	// system or repo. Nil means an empty one.
+	// Stdin is the stdin of the hook, read once and given to every hook
+	// stage as a copy (readStdin). Nil means an empty one.
 	Stdin io.Reader
 	// Stdout and Stderr receive the output of every stage and the line
 	// the dispatcher prints on a failure.
@@ -150,18 +155,20 @@ func Run(ctx context.Context, o Options) (int, error) {
 		note("the failure could not be recorded", Record(o.StateDir, f))
 		return f.ExitCode, nil
 	}
-	stdin := o.Stdin
-	// runHook runs one hook stage, if its hook is executable, and
-	// reports whether it stopped the chain, with its status.
-	runHook := func(stage, path string) (bool, int, error) {
+	stdin, err := readStdin(o.Hook, o.Stdin)
+	if err != nil {
+		return 0, err
+	}
+	// runHook runs one hook stage, if its hook is executable, with env,
+	// and reports whether it stopped the chain, with its status.
+	runHook := func(stage, path string, env []string) (bool, int, error) {
 		if !executable(path) {
 			return false, 0, nil
 		}
 		err := procgroup.Run(ctx, procgroup.Command{
-			Class: procgroup.Unbounded, Argv: append([]string{path}, o.Args...), Dir: o.Dir, Env: o.Env,
-			Stdin: stdin, Stdout: o.Stdout, Stderr: o.Stderr,
+			Class: procgroup.Unbounded, Argv: append([]string{path}, o.Args...), Dir: o.Dir, Env: env,
+			Stdin: stdin(), Stdout: o.Stdout, Stderr: o.Stderr,
 		})
-		stdin = nil // the first hook that ran took it; later ones get /dev/null
 		if cerr := ctx.Err(); cerr != nil {
 			return false, 0, cerr
 		}
@@ -178,8 +185,8 @@ func Run(ctx context.Context, o Options) (int, error) {
 		status, err = stop(fail(stage, path, status))
 		return true, status, err
 	}
-	if path := systemHook(o.System, o.Dispatcher, o.Hook); path != "" {
-		if stopped, status, err := runHook(StageSystem, path); stopped || err != nil {
+	if path := systemHook(o.System, o.Dispatcher, o.Hook); path != "" && !slices.Contains(o.Env, SystemMarker) {
+		if stopped, status, err := runHook(StageSystem, path, append(slices.Clone(o.Env), SystemMarker)); stopped || err != nil {
 			return status, err
 		}
 	}
@@ -215,7 +222,7 @@ func Run(ctx context.Context, o Options) (int, error) {
 		repoHooks = append(repoHooks, repoHook{StageLocal, filepath.Join(dir, o.Hook)})
 	}
 	for _, s := range repoHooks {
-		if stopped, status, err := runHook(s.stage, s.path); stopped || err != nil {
+		if stopped, status, err := runHook(s.stage, s.path, o.Env); stopped || err != nil {
 			return status, err
 		}
 	}
@@ -252,4 +259,43 @@ func statusOf(err error) (int, string) {
 func executable(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
+}
+
+// maxStdin is the bound of the stdin the dispatcher reads once and
+// gives each hook a copy of: git writes ref lines there, about a hundred
+// bytes each, so 8 MiB holds some eighty thousand. It is a variable so
+// the tests can lower it.
+var maxStdin = 8 << 20
+
+// streamedStdin are the hooks whose stdin is a protocol with git, which
+// keeps it open while the hook answers (githooks(5), proc-receive):
+// reading it to its end first would wait for ever, so it goes as it is
+// to the first hook that runs, and the later ones get none.
+var streamedStdin = []string{"proc-receive"}
+
+// readStdin returns the stdin of each hook stage of hook: a new reader
+// of one copy of in for every call, so a stage that reads none leaves
+// all of it to the next (REQ-0408), and procgroup.Run, which does not
+// wait for the copy of a reader that is not a file, never shares a
+// reader between two stages. A stdin longer than maxStdin is an error
+// before any stage runs. A streamed hook's stdin is in itself, once.
+func readStdin(hook string, in io.Reader) (func() io.Reader, error) {
+	if in == nil {
+		return func() io.Reader { return nil }, nil
+	}
+	if slices.Contains(streamedStdin, hook) {
+		return func() io.Reader {
+			r := in
+			in = nil
+			return r
+		}, nil
+	}
+	data, err := io.ReadAll(io.LimitReader(in, int64(maxStdin)+1))
+	if err != nil {
+		return nil, fmt.Errorf("the stdin of the hook %s: %w", hook, err)
+	}
+	if len(data) > maxStdin {
+		return nil, fmt.Errorf("the stdin of the hook %s is longer than %d bytes", hook, maxStdin)
+	}
+	return func() io.Reader { return bytes.NewReader(data) }, nil
 }

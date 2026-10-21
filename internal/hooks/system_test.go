@@ -7,6 +7,7 @@ package hooks_test
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,8 +61,89 @@ func TestRunSystemStageRunsFirst(t *testing.T) {
 		"system pre-commit stdin=refs",
 		"action act args=one two",
 		".githooks/pre-commit args=one two",
-		".githooks/pre-commit stdin=",
-	}, r.logged())
+		".githooks/pre-commit stdin=refs",
+	}, r.logged(), "each hook gets its own copy of the stdin")
+}
+
+// TestRunASystemHookThatIgnoresStdinLeavesItToTheRepoHook is the
+// audit's case: a system pre-push that reads nothing and exits 0 must
+// not take the ref lines from the tracked pre-push, which refuses the
+// push of main.
+func TestRunASystemHookThatIgnoresStdinLeavesItToTheRepoHook(t *testing.T) {
+	r := newRepo(t)
+	system := filepath.Join(t.TempDir(), "kit")
+	require.NoError(t, os.MkdirAll(system, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(system, "pre-push"), []byte("#!/bin/sh\nexit 0\n"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(r.dir, ".githooks", "pre-push"),
+		[]byte("#!/bin/sh\ngrep -q refs/heads/main && exit 1\nexit 0\n"), 0o755))
+	status, stderr := r.runSystem("pre-push", "refs/heads/main abc refs/heads/main def\n", system, filepath.Join(t.TempDir(), "dispatcher"))
+	assert.Equal(t, 1, status, "the tracked hook saw the ref lines and refused the push")
+	assert.Contains(t, stderr, "stage tracked")
+}
+
+// TestRunStdinOverTheBound: a stdin longer than the bound, lowered for
+// the test, fails the run before any stage starts.
+func TestRunStdinOverTheBound(t *testing.T) {
+	t.Cleanup(hooks.SetMaxStdin(4))
+	r := newRepo(t)
+	r.hook(".githooks/pre-push", 0o755, "")
+	var out bytes.Buffer
+	_, err := hooks.Run(t.Context(), hooks.Options{Hook: "pre-push", Dir: r.dir, Env: []string{"PATH=/usr/bin:/bin"},
+		Stdin: strings.NewReader("12345"), Stdout: &out, Stderr: &out, StateDir: r.state, Now: func() time.Time { return clock }})
+	require.ErrorContains(t, err, "longer than 4 bytes")
+	assert.Empty(t, r.logged(), "no stage ran")
+
+	status, _ := r.run("pre-push", "1234")
+	assert.Equal(t, 0, status, "at the bound")
+}
+
+// TestRunProcReceiveStreamsStdin: proc-receive talks a protocol with
+// git over its stdin, which git keeps open, so its stdin goes as it is
+// to the first hook that runs and is not read to its end first.
+func TestRunProcReceiveStreamsStdin(t *testing.T) {
+	r := newRepo(t)
+	require.NoError(t, os.WriteFile(filepath.Join(r.dir, ".githooks", "proc-receive"),
+		[]byte("#!/bin/sh\nread line\necho \"got $line\" >>"+r.log+"\n"), 0o755))
+	pr, pw, err := os.Pipe()
+	require.NoError(t, err)
+	defer func() { _ = pr.Close(); _ = pw.Close() }()
+	_, err = pw.WriteString("version=1\n") // and the pipe stays open, as git keeps it
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	var out bytes.Buffer
+	status, err := hooks.Run(ctx, hooks.Options{Hook: "proc-receive", Dir: r.dir, Env: []string{"PATH=/usr/bin:/bin"},
+		Stdin: pr, Stdout: &out, Stderr: &out, StateDir: r.state, Now: func() time.Time { return clock }})
+	require.NoError(t, err, "the run did not wait for the end of the stdin")
+	assert.Equal(t, 0, status)
+	assert.Equal(t, []string{"got version=1"}, r.logged())
+}
+
+// TestRunSystemStageMarksItsEnvironment: the system hook runs with
+// JULIETA_HOOKS_SYSTEM=1 in its environment and the other stages do
+// not; a dispatcher started with the marker set, as one the system
+// hook starts would be, skips the system stage, so a system dir that
+// leads back to the dispatcher cannot loop.
+func TestRunSystemStageMarksItsEnvironment(t *testing.T) {
+	r := newRepo(t)
+	system := filepath.Join(t.TempDir(), "kit")
+	require.NoError(t, os.MkdirAll(system, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(system, "pre-commit"),
+		[]byte("#!/bin/sh\necho \"system marker=$JULIETA_HOOKS_SYSTEM\" >>"+r.log+"\n"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(r.dir, ".githooks", "pre-commit"),
+		[]byte("#!/bin/sh\necho \"tracked marker=$JULIETA_HOOKS_SYSTEM\" >>"+r.log+"\n"), 0o755))
+	status, stderr := r.runSystem("pre-commit", "", system, filepath.Join(t.TempDir(), "dispatcher"))
+	assert.Equal(t, 0, status, stderr)
+	assert.Equal(t, []string{"system marker=1", "tracked marker="}, r.logged())
+
+	require.NoError(t, os.Remove(r.log))
+	var out bytes.Buffer
+	status, err := hooks.Run(t.Context(), hooks.Options{Hook: "pre-commit", Dir: r.dir,
+		Env: []string{"PATH=/usr/bin:/bin", hooks.SystemMarker}, Stdout: &out, Stderr: &out, StateDir: r.state,
+		Now: func() time.Time { return clock }, System: system, Dispatcher: filepath.Join(t.TempDir(), "dispatcher")})
+	require.NoError(t, err)
+	assert.Equal(t, 0, status, out.String())
+	assert.Equal(t, []string{"tracked marker=1"}, r.logged(), "the marker skips the system stage, and the repo hooks keep git's environment")
 }
 
 // TestRunSystemStageFailureStopsTheChain: a failing system hook stops
