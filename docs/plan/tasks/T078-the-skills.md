@@ -3,7 +3,7 @@ id: T078
 title: "The skills"
 milestone: M1
 module: skills
-fate: kept
+fate: merged
 owns:
   - skills/**
   - internal/cli/skills_test.go
@@ -14,9 +14,14 @@ after:
 ask_first:
   - kits
 sitting: none
+merged: 2026-10-20
+pr: 217
 ---
 
 # T078 - The skills
+
+Merged on 2026-10-20 in pull request #217. The text below is the one
+written when it was built.
 
 Goal: `skills/julieta/SKILL.md`, `skills/handoff/SKILL.md`, and the test
 that every command a skill names is registered.
