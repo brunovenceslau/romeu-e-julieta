@@ -33,6 +33,17 @@ import (
 // whose effect on the tree the test chooses.
 const fsOpsEnv = "CI_TEST_FSOPS"
 
+// raceEnv is the entry that a test adds to the environment of a helper
+// process, which is this test binary run again. A program built with the
+// race detector sleeps before it exits for the atexit_sleep_ms option of
+// GORACE, 1000 ms by default, and a helper whose environment is built from
+// nothing does not set it: each helper would take a second to exit. 0 ends
+// the sleep, and the rest of the environment is the test's own. The module
+// holds one such constant in each package that starts a helper, because
+// the imports check (REQ-0971, REQ-0972) refuses a shared package below
+// internal/ for tools/** and for a package no row of 10 10.7 names.
+const raceEnv = "GORACE=atexit_sleep_ms=0"
+
 // TestHelperFsOps is not a test: it is the generator of the tests below,
 // when fsOpsEnv is set.
 func TestHelperFsOps(t *testing.T) {
@@ -71,7 +82,7 @@ func fsOps(ops ...string) check.Step {
 	return check.Step{
 		Name:    "go generate",
 		Argv:    []string{os.Args[0], "-test.run=^TestHelperFsOps$"},
-		Environ: []string{"PATH=" + os.Getenv("PATH"), fsOpsEnv + "=" + strings.Join(ops, "\n")},
+		Environ: []string{"PATH=" + os.Getenv("PATH"), raceEnv, fsOpsEnv + "=" + strings.Join(ops, "\n")},
 	}
 }
 

@@ -30,6 +30,17 @@ const (
 	markerEnv  = "PROCGROUP_TEST_MARKER"
 )
 
+// raceEnv is the entry that a test adds to the environment of a helper
+// process, which is this test binary run again. A program built with the
+// race detector sleeps before it exits for the atexit_sleep_ms option of
+// GORACE, 1000 ms by default, and a helper whose environment is built from
+// nothing does not set it: each helper would take a second to exit. 0 ends
+// the sleep, and the rest of the environment is the test's own. The module
+// holds one such constant in each package that starts a helper, because
+// the imports check (REQ-0971, REQ-0972) refuses a shared package below
+// internal/ for tools/** and for a package no row of 10 10.7 names.
+const raceEnv = "GORACE=atexit_sleep_ms=0"
+
 // helperLifetime bounds the life of a helper process.
 const helperLifetime = 2 * time.Minute
 
@@ -67,7 +78,7 @@ func TestHelperProcess(t *testing.T) {
 			holderRole = "chatter"
 		}
 		child := exec.Command(os.Args[0], "-test.run=^TestHelperProcess$")
-		child.Env = append(os.Environ(), helperEnv+"="+holderRole)
+		child.Env = append(os.Environ(), raceEnv, helperEnv+"="+holderRole)
 		child.Stdout, child.Stderr = os.Stdout, os.Stderr
 		child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 		if err := child.Start(); err != nil {
@@ -171,7 +182,7 @@ func helper(t *testing.T, role string) (cmd *exec.Cmd, pidfile, ready string) {
 	ready = filepath.Join(dir, "ready")
 	killAtEnd(t, pidfile)
 	cmd = exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestHelperProcess$")
-	cmd.Env = append(os.Environ(), helperEnv+"="+role, pidfileEnv+"="+pidfile, readyEnv+"="+ready, markerEnv+"="+filepath.Join(dir, "marker"))
+	cmd.Env = append(os.Environ(), raceEnv, helperEnv+"="+role, pidfileEnv+"="+pidfile, readyEnv+"="+ready, markerEnv+"="+filepath.Join(dir, "marker"))
 	return cmd, pidfile, ready
 }
 

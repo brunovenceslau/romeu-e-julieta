@@ -24,6 +24,17 @@ import (
 // helper process; an empty value means it is the test run itself.
 const helperEnv = "MUTANTS_TEST_HELPER"
 
+// raceEnv is the entry that a test adds to the environment of a helper
+// process, which is this test binary run again. A program built with the
+// race detector sleeps before it exits for the atexit_sleep_ms option of
+// GORACE, 1000 ms by default, and a helper whose environment is built from
+// nothing does not set it: each helper would take a second to exit. 0 ends
+// the sleep, and the rest of the environment is the test's own. The module
+// holds one such constant in each package that starts a helper, because
+// the imports check (REQ-0971, REQ-0972) refuses a shared package below
+// internal/ for tools/** and for a package no row of 10 10.7 names.
+const raceEnv = "GORACE=atexit_sleep_ms=0"
+
 // TestHelperProcess is not a test: the signal tests run this binary
 // again with helperEnv set, to get a process with the signal handling
 // of main that they can interrupt. It writes its own pid first, for the
@@ -105,6 +116,7 @@ func startHelper(t *testing.T, inBaseline bool) (fixture, helper) {
 			Argv:  []string{os.Args[0], "-test.run=^TestHelperProcess$"},
 			Env: append(append([]string{}, f.repo.Env...),
 				"GOCACHE="+strings.TrimSpace(gocache.String()),
+				raceEnv,
 				helperEnv+"=main",
 				"MUTANTS_TEST_MAINPID="+h.mainPidfile,
 				"MUTANTS_TEST_DIR="+f.e.dir,
