@@ -237,7 +237,7 @@ func TestSnapshotRecordsARepoLocalHooksPath(t *testing.T) {
 func TestSnapshotOfASkippedInputIsWrittenAndFails(t *testing.T) {
 	f := newFixture(t)
 	c1 := commit(t, f.repo, "one")
-	git(t, f.repo, "update-ref", "refs/tags/bad‮tag", c1)
+	git(t, f.repo, "update-ref", "refs/tags/bad\u202etag", c1)
 	res, err := Snapshot(t.Context(), f.config(t, clock))
 	require.ErrorIs(t, err, ErrSnapshotPartial)
 	assert.Contains(t, err.Error(), "refs/tags/")

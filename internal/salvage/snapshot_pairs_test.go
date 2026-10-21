@@ -112,7 +112,7 @@ func TestPairsOfARepositoryWithNoRefIsEmpty(t *testing.T) {
 func TestPairsSkipsWhatGitsafeRefusesWhole(t *testing.T) {
 	dir := repo(t)
 	c1 := commit(t, dir, "one")
-	git(t, dir, "update-ref", "refs/tags/bad‮tag", c1)
+	git(t, dir, "update-ref", "refs/tags/bad\u202etag", c1)
 	plan, err := salvage.Pairs(t.Context(), runner(t), dir, generation)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"refs/heads/main": c1}, pairsOf(plan))

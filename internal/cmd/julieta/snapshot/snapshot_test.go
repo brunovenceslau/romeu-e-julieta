@@ -155,7 +155,7 @@ func TestSnapshotWritesHeadsJSON(t *testing.T) {
 		"wrote "+heads+" createdAt 2026-10-21T09:30:00Z repo api\n", stdout)
 	data, err := os.ReadFile(heads)
 	require.NoError(t, err)
-	golden(t, "heads.json", data)
+	golden(t, "heads.json.golden", data)
 	h, err := salvage.DecodeHeads(data)
 	require.NoError(t, err)
 	assert.Equal(t, base, h.Refs["refs/tags/v1"], "a ref the base reaches is listed, though the bundle leaves it out")

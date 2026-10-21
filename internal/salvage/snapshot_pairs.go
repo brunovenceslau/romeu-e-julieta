@@ -145,8 +145,7 @@ func Pairs(ctx context.Context, git *gitsafe.Runner, dir, generation string) (Pl
 		if err != nil {
 			return Plan{}, err
 		}
-		for i := len(oids) - 1; i >= 0; i-- {
-			oid := oids[i]
+		for i, oid := range slices.Backward(oids) {
 			if seen[oid] {
 				continue
 			}

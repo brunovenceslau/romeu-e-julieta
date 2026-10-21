@@ -73,7 +73,7 @@ func TestDecodeHeadsIsStrict(t *testing.T) {
 		"bare namespace":   strings.Replace(ok, `refs/heads/main`, `refs/heads/`, 1),
 		"dotdot":           strings.Replace(ok, `refs/heads/main`, `refs/heads/a..b`, 1),
 		"control":          strings.Replace(ok, `refs/heads/main`, `refs/heads/a\u001bb`, 1),
-		"format char":      strings.Replace(ok, `refs/heads/main`, `refs/heads/a‮b`, 1),
+		"format char":      strings.Replace(ok, `refs/heads/main`, `refs/heads/a\u202eb`, 1),
 		"short id":         strings.Replace(ok, sha1A, "abc", 1),
 		"upper id":         strings.Replace(ok, sha1A, strings.Repeat("A", 40), 1),
 		"trailing data":    ok + "{}",
@@ -82,7 +82,7 @@ func TestDecodeHeadsIsStrict(t *testing.T) {
 	} {
 		_, err := salvage.DecodeHeads([]byte(doc))
 		require.Error(t, err, name)
-		assert.ErrorIs(t, err, salvage.ErrInvalid, name)
+		require.ErrorIs(t, err, salvage.ErrInvalid, name)
 	}
 	sha256 := strings.Replace(ok, sha1A, strings.Repeat("c", 64), 1)
 	_, err = salvage.DecodeHeads([]byte(sha256))
