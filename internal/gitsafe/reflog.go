@@ -35,6 +35,8 @@ func (r *Runner) Reflog(ctx context.Context, dir, ref string) ([]string, error) 
 	}
 	// git log -g fails on a ref that does not exist; reflog exists
 	// answers both "no ref" and "no reflog" with exit 1.
+	// No --end-of-options: git 2.53 and 2.47 accept it here, the floor
+	// was not measured, and ref is HEAD or starts with refs/.
 	err := r.read(ctx, dir, nil, nil, "reflog", "exists", ref)
 	switch {
 	case exitedWith(err, 1):

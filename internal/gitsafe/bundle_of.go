@@ -43,12 +43,17 @@ var objectFormats = []string{"sha1", "sha256"}
 //
 // No ref is written into the user's repository. BundleOf reads the
 // object format and the common git dir of dir, makes a temporary bare
-// repository of that format in the directory of file, which borrows
-// the objects of the common git dir, creates the refs there in one
-// transaction (git update-ref --stdin, which fails on an object that
-// does not exist), runs git bundle create there (BundleCreate), and
-// removes the temporary repository on every path, a failure and a
-// cancelled context included.
+// repository of that format in the directory of file, named
+// .gitsafe-bundle-<random>, which borrows the objects of the common git
+// dir, creates the refs there in one transaction (git update-ref
+// --stdin, which fails on an object that does not exist), runs git
+// bundle create there (BundleCreate), and removes the temporary
+// repository on every path, a failure and a cancelled context included.
+// The temporary repository stores its refs in a reftable
+// (--ref-format=reftable, git 2.45.0, below the floor), so no ref name
+// the caller gives becomes a file or directory name. A process killed
+// before it removes the temporary repository leaves it behind: a caller
+// that scans the directory of its bundles ignores .gitsafe-bundle-*.
 //
 // The temporary repository borrows the objects through its own
 // objects/info/alternates file, not GIT_ALTERNATE_OBJECT_DIRECTORIES
@@ -109,7 +114,7 @@ func (r *Runner) BundleOf(ctx context.Context, dir, file string, pairs []Ref, ba
 			err = errors.Join(err, fmt.Errorf("gitsafe: remove the temporary repository of a bundle: %w", rmErr))
 		}
 	}()
-	if err := r.run(ctx, tmp, nil, "init", "--bare", "--quiet", "--template=", "--object-format="+format); err != nil {
+	if err := r.run(ctx, tmp, nil, "init", "--bare", "--quiet", "--template=", "--object-format="+format, "--ref-format=reftable"); err != nil {
 		return err
 	}
 	info := filepath.Join(tmp, "objects", "info")

@@ -302,7 +302,7 @@ func TestBundleOfArgv(t *testing.T) {
 	flags := 1 + 2*len(r.settings)
 	assert.Equal(t, []string{"rev-parse", "--show-object-format", "--path-format=absolute", "--git-common-dir"}, commands[0].Argv[readFlags:])
 	assert.Equal(t, stubRepo, commands[0].Dir)
-	assert.Equal(t, []string{"init", "--bare", "--quiet", "--template=", "--object-format=sha1"}, commands[1].Argv[flags:])
+	assert.Equal(t, []string{"init", "--bare", "--quiet", "--template=", "--object-format=sha1", "--ref-format=reftable"}, commands[1].Argv[flags:])
 	assert.Equal(t, []string{"update-ref", "--stdin", "-z"}, commands[2].Argv[flags:])
 	assert.Equal(t, "create refs/heads/a\x00"+oid+"\x00create refs/tags/t\x00"+oid+"\x00", string(transaction), "every ref in one transaction")
 	assert.Equal(t, []string{"bundle", "create", file, "refs/heads/a", "refs/tags/t", "^" + base}, commands[3].Argv[flags:])
@@ -319,4 +319,33 @@ func TestBundleOfArgv(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestBundleOfKeepsRefNamesOutOfTheFileSystem: the temporary repository
+// stores its refs in a reftable, so no ref name the caller gives
+// becomes a file or directory name: when git bundle create runs, the
+// repository's ref format is reftable and refs/heads holds no entry.
+func TestBundleOfKeepsRefNamesOutOfTheFileSystem(t *testing.T) {
+	dir, head := newRepo(t)
+	r := newRunner(t, Sandbox)
+	var format string
+	var entries []os.DirEntry
+	r.start = func(ctx context.Context, c procgroup.Command) error {
+		if slices.Contains(c.Argv, "bundle") {
+			format = plainGit(t, c.Dir, "rev-parse", "--show-ref-format")
+			// A reftable repository keeps refs/heads a plain file, which
+			// git writes so an older git does not read the directory.
+			if info, err := os.Stat(filepath.Join(c.Dir, "refs", "heads")); err == nil && info.IsDir() {
+				if entries, err = os.ReadDir(filepath.Join(c.Dir, "refs", "heads")); err != nil {
+					return err
+				}
+			}
+		}
+		return procgroup.Run(ctx, c)
+	}
+	out, holds := outDir(t)
+	require.NoError(t, r.BundleOf(t.Context(), dir, filepath.Join(out, "x.bundle"), []Ref{{Name: "refs/heads/feat/a.b", OID: head}}, nil))
+	holds("x.bundle")
+	assert.Equal(t, "reftable", format)
+	assert.Empty(t, entries, "no ref is a file")
 }

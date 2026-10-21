@@ -12,6 +12,7 @@ owns:
   - internal/gitsafe/status*.go
   - internal/gitsafe/gitsafe_test.go
   - internal/gitsafe/helper_test.go
+  - internal/gitsafe/gitsafe.go
   - internal/hooks/hooks.go
   - internal/hooks/hooks_test.go
   - internal/hooks/system*.go
@@ -22,6 +23,7 @@ owns:
   - internal/handoff/handoff.go
   - e2e/julieta_hooks_test.go
   - docs/spec/04-cli.md
+  - docs/spec/02-layouts.md
 needs:
   - T054
   - T059
