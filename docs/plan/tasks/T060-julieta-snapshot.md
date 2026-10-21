@@ -108,20 +108,25 @@ it:
   snapshot skips that item, snapshots the rest, and records the skipped
   item as a hook failure of the repo. `gitsafe.ListRefs` returns the
   names it refuses beside the refs it accepts, at most 100, each clipped
-  to 128 bytes before it is escaped, and the count of the rest; one
-  record over 4 KiB of name fails the list without git's output being
-  read further. `actions.Snapshot` returns `ErrSnapshotPartial` naming
+  to 128 bytes before it is escaped, and the count of the rest; a
+  record over 4 KiB of name is one refused name, counted and not kept,
+  and only more than 10,000 names in all fails the list, with git's
+  output read no further. `actions.Snapshot` returns `ErrSnapshotPartial` naming
   each item, which the dispatcher records (REQ-0409) and `julieta
   snapshot` exits 1 on. The rule, as the reading closest to that
   decision (skip the item, snapshot the rest, lose nothing):
   - a single refused ref name is skipped and the snapshot written;
-  - the loss of a namespace (more refs than `ListRefs` lists) or of a
-    whole source of reflog commits (the worktree list, a worktree whose
+  - the loss of a namespace (`refs/heads/`, `refs/tags/`,
+    `refs/notes/` or `refs/salvage/<generation>/` refused whole by
+    `ListRefs`) does not replace an existing pair: the earlier pair
+    stays, the failure is recorded, and the plan is written only where
+    no earlier pair exists;
+  - the loss of a reflog source (the worktree list, a worktree whose
     common git dir, read with `gitsafe.CommonDir` and compared with its
     links resolved, is not the repository's own, a reflog that cannot
-    be read, a reflog commit git cannot walk) does not replace an
-    existing pair: the earlier pair stays, the failure is recorded, and
-    the plan is written only where no earlier pair exists;
+    be read, a reflog commit git cannot walk) writes the snapshot and
+    records the skip, so a cheap condition never freezes the snapshot
+    and later work is still salvaged;
   - a partial plan with nothing beyond the bases writes nothing, so the
     earlier `heads.json` and bundle stay;
   - the reflog commits over the cap of 1000 are a recorded skip that
@@ -176,7 +181,10 @@ it:
   commits: 1 min 19.9 s with one `AheadBehind` per commit and tip,
   0.24 s with `Unreached`. When git cannot finish the walk of the
   whole set (a commit whose parent is missing), each commit is asked
-  alone and one that fails is a whole-source skip. `Unreached` reads a
+  alone and one that fails is a recorded skip; after 20 failures the
+  rest are not asked and are one recorded skip. Before the first walk
+  the candidates are capped at twice the cap of names, 2000, in source
+  order, the rest a recorded skip. `Unreached` reads a
   line of up to 1 MiB, a merge of about 16,000 parents; a wider one
   fails the walk and falls to that path. `gitsafe.Beyond` answers true
   for a walk git cannot finish, so the bundle meets the failure and it
