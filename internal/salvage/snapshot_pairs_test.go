@@ -119,7 +119,7 @@ func TestPairsSkipsARefusedRefAlone(t *testing.T) {
 	assert.Equal(t, map[string]string{"refs/heads/main": c1, "refs/tags/good": c1}, pairsOf(plan))
 	require.Len(t, plan.Skipped, 1)
 	assert.Equal(t, `refs/tags/bad\u202etag`, plan.Skipped[0].Item)
-	assert.ErrorIs(t, plan.Skipped[0].Err, gitsafe.ErrRefused)
+	require.ErrorIs(t, plan.Skipped[0].Err, gitsafe.ErrRefused)
 	assert.False(t, plan.Whole(), "one ref, not a namespace")
 }
 
