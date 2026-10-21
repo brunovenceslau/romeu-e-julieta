@@ -9,8 +9,8 @@ under "Work authorized while the operator is away on 2026-10-21"
 
 ## Next steps
 
-1. T060 (`julieta snapshot`): its builder's report, then a code review
-   and a security audit, then its pull request.
+1. T060 (`julieta snapshot`) is built and reviewed; its CI, then the
+   maintainer's merge.
 2. Plan "Readers of formats between binaries ignore unknown members"
    (01m5egnpyfywadcsxpy0naz3hj); ask first to build it.
 3. T155, planned from 01m5drzqsp6zg34xzmywckwb7b; then T150 (step
@@ -46,11 +46,15 @@ One block, a recommendation each.
 6. Decide the scheduled pin-freshness run, whose deferral fired with
    GO-2026-6809 (01m5e14094yhqhsxq2g941pwrf). Recommended: with the
    bump plan of next step 9.
+7. Confirm the partial-snapshot rule written in T060's pull request,
+   and answer the two questions of the CI plan's pull request.
+   Recommended: as each recommends.
 
 ## In flight
 
-- `feat/t060-julieta-snapshot`, T060, a builder in its own worktree.
-- `feat/julieta-status-hook-failures`, T154.
+- `feat/t060-julieta-snapshot`, T060.
+- `docs/plan-ci-race-tags-jobs`, the plan of T155, T156 and T157.
+- `docs/checkpoint-2026-10-21-b`, this checkpoint.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
