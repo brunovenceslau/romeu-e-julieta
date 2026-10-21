@@ -17,10 +17,11 @@
 // name and object id pairs from a temporary repository, so no ref is
 // written into the user's; nothing builds a push (I18). Unbundle,
 // verify, fsck, the tree walk, the history reads, the reads of a
-// working tree, the list of refs, the reflog and the global and system
-// hooks paths are the verbs of the files unbundle*.go, verify*.go,
-// fsck*.go, walk*.go, history*.go, status*.go, refs_list*.go,
-// reflog*.go and global*.go; BundleOf is in bundle_of.go.
+// working tree, the list of refs, the reflog, the global and system
+// hooks paths, the reachability of a set of commits and the common git
+// dir are the verbs of the files unbundle*.go, verify*.go, fsck*.go,
+// walk*.go, history*.go, status*.go, refs_list*.go, reflog*.go,
+// global*.go, reach*.go and commondir*.go; BundleOf is in bundle_of.go.
 package gitsafe
 
 import (
