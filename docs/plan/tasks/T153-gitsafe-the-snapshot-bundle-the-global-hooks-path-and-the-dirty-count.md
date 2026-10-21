@@ -176,8 +176,12 @@ it:
   shallow file, so a shallow repository's history is git's error.
   Reopened by a caller that bundles from a shallow repository.
 - `SetGlobalHooksPath` and `SystemHooksPath` read their key with
-  `--includes`, as git reads it when it runs a hook, so a value in an
-  included file is seen and kept. `SystemHooksPath` is sandbox mode
+  `--includes --type=path`, as git reads it when it runs a hook, so a
+  value in an included file is seen and kept and a leading `~` is
+  expanded. `setup` reports a system value that is still not absolute,
+  rather than record one the dispatcher would ignore, and compares the
+  global value with the dispatcher dir once cleaned, so a trailing
+  slash is not foreign. `SystemHooksPath` is sandbox mode
   only, since host mode reads no system config. Reopened by a host
   caller.
 - A global `core.hooksPath` that names another directory leaves the
@@ -197,3 +201,44 @@ it:
   mount that can plant `/etc/gitconfig`.
 - `Reflog` takes `HEAD` as well as a full ref name, so a worktree's
   HEAD reflog can be read from that worktree. Reopened by T060.
+- Every hook stage gets its own copy of the hook's stdin (decided on
+  2026-10-21; REQ-0408 says so): the dispatcher reads it once, up to
+  8 MiB (about eighty thousand ref lines), refuses a longer one before
+  any stage runs, and gives each stage a new reader, so a system hook
+  that reads none cannot hide the ref lines from the tracked
+  `pre-push`. `proc-receive` is the exception: its stdin is a protocol
+  that git keeps open, so it still goes, as it is, to the first hook
+  that runs. Reopened by a hook whose stdin needs more than the bound.
+- `Status.Changed` counts assume-unchanged entries (lowercase tags of
+  `git ls-files -v`) and not skip-worktree ones, which still set
+  `Hidden`, so a clean sparse checkout reads 0 (decided on 2026-10-21;
+  03 3.10 says so). It counts at most 100,000 paths, beyond which
+  `Status` fails with `ErrRefused`, as the other bounds do. Reopened by
+  a working tree that changes more.
+- The system stage runs with `JULIETA_HOOKS_SYSTEM=1`, and a dispatcher
+  started with it set skips the system stage, so a system hook that
+  leads back to the dispatcher, a copy of its script included, ends
+  after one more chain. Reopened by a system hook that must run nested.
+- The system stage runs before julieta's action, so a failing system
+  hook stops the chain before julieta's snapshot, by REQ-0409's rule
+  that the first non-zero status stops. Reopened by a snapshot that
+  must run whatever the system hook says.
+- `BundleOf`'s temporary repository is made with
+  `--ref-format=reftable` (git 2.45.0, inside the 2.45.4 floor;
+  measured with git 2.53.0 here and 2.47.3 in the container image), so
+  no ref name becomes a file name. `reflog exists` takes no
+  `--end-of-options`: git 2.53.0 and 2.47.3 accept it there, 2.45.4 was
+  not measured, and the ref is `HEAD` or starts with `refs/`. Reopened
+  by a measurement at the floor.
+- T153 owns `internal/gitsafe/gitsafe.go`, whose package doc lists the
+  verb files, and `docs/spec/02-layouts.md`, whose REQ-0154 lists the
+  recorded system hooks path; no open task owns either.
+
+Deferred to T060, each with what reopens it:
+
+- `ListRefs` fails whole on one ref name `checkDisplayRef` refuses.
+  Reopened by T060, which decides whether a snapshot skips that ref
+  and records it.
+- A `.gitsafe-bundle-*` directory a killed process left behind is not
+  cleaned up; callers ignore it. Reopened by T060, when it owns the
+  snapshot directory.
