@@ -25,6 +25,8 @@ and records ADR 0040 and the CI plan.
    repositories", 00000000008h7a0ey78frxzgfr).
 8. Plan the bump tool of "Dependency bumps run as a script, not by hand"
    (01m5e14094yhqhsxq2g941pwrf) at its trigger.
+9. "A short CLAUDE.md of pointers for this repository"
+   (01m5e1majbx0hq6p710g9dmtr2), at its trigger.
 
 ## Open for the operator
 
