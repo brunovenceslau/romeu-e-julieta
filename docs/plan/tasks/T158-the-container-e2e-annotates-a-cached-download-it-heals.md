@@ -101,6 +101,39 @@ imported (reopened by that second consumer). The message goes through
 `git.SafeLines` first, which breaks the legacy `##[` marker that the
 runner finds anywhere in a line, and a line that starts `::`.
 
+The reader of the file is bounded, since the code under test writes it:
+`readNotices` (`tools/ci/internal/container`) takes an `Lstat` and
+refuses what is not a regular file (a symlink, a FIFO, a directory) as
+a plain error, not an infrastructure error, since that is the code under
+test acting on the step's files and not a precondition the environment
+could not meet; it reads 64 KiB through an `io.LimitReader`, keeps 10
+notes of 1 KiB each (cut on a rune, ending in `...`), and ends with one
+note, "N more notices not shown", when lines were left out (a line the
+byte limit cut counts as one). The directory of the two files is made
+absolute, so a relative `TMPDIR` cannot send the harness to another
+file. The warning command is `warningCommand`, not exported.
+
+Decisions of this task:
+
+- The harness removes the entry, then records the notice, then fetches.
+  Recording first would leave a notice for a removal that may fail; the
+  order here leaves a failed removal as its own error and a removal
+  whose notice cannot be recorded as a test failure with no fetch.
+- The escaping of workflow commands is written by hand. Trigger to
+  reopen: a second consumer of workflow commands in this repository,
+  when `github.com/sethvargo/go-githubactions` (Apache-2.0, v1.4.0) is
+  worth proposing, as an ask-first dependency.
+
+Follow-up, not done here: the raw output of a failing e2e step is
+printed as it is, and the runner reads a workflow command in it, so a
+test (or a container it runs) that prints `::warning::` or a line with
+`##[` can write an annotation of a failed run. The audit of this task
+rated it Medium; T158 does not worsen it, since the notes come from the
+file alone. The fix is to print that output through `git.SafeLines`, or
+to neutralise the lines that start with `::` or hold `##[`. Trigger: the
+next change to `Printer.Run` or to the output of a step that runs
+code, or the first forged annotation seen in a log.
+
 - Implements: REQ-0798 (10 10.1).
 - Operator: no.
 - Acceptance:
@@ -125,8 +158,17 @@ runner finds anywhere in a line, and a line that starts `::`.
   - The notes print before the verdict as an annotation on a runner and
     as a warning line elsewhere, on a pass and on a failure, with
     `%`, line breaks, `:` and `,` escaped, and the verdict is the same
-    either way (`TestAnnotationEscapes`,
+    either way (`TestWarningCommandEscapes`,
     `TestNotesAreAnnotationsOnARunnerAndWarningsElsewhere`).
+  - The notice file is read bounded and as a regular file only: 64 KiB,
+    10 notes, 1 KiB each, one note that counts the rest
+    (`TestReadNoticesBounds`, `TestReadNoticesReadsAtMost64KiB`); a
+    symlink, a directory and a FIFO are refused, also when the code under
+    test swaps the file (`TestReadNoticesRefusesWhatIsNotARegularFile`,
+    `TestReadNoticesRefusesAFIFO`, `TestAStepWhoseNoticeFileWasReplacedFails`,
+    `TestAStepWhoseNoticeFileIsAFIFOFails`); the paths are absolute under a
+    relative `TMPDIR` (`TestAroundPathsAreAbsolute`); notices recorded at
+    once are whole, distinct lines (`TestNoticesFromManyGoroutines`).
   - Both files are private, of mode 0600 in a directory of 0700, and
     removed after the run (`TestAroundMakesAPrivateFile`); both
     packages name the same variable (`TestTheHarnessNamesTheSameConstants`).
