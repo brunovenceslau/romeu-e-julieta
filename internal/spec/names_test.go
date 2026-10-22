@@ -20,8 +20,15 @@ func TestValidDomain(t *testing.T) {
 		require.NoError(t, spec.ValidDomain(d), d)
 	}
 	for _, d := range []string{"", "*.npmjs.org", "npmjs.org:443", "10.0.0.1", "NPMJS.org", "localhost",
-		"a.localhost", "foo.local", "foo.internal", "0x7f.example", "0x7f000001.com", "a.0xff.example"} {
-		assert.Error(t, spec.ValidDomain(d), d)
+		"a.localhost", "foo.local", "foo.internal", "0x7f.example", "0x7f000001.com", "a.0xff.example",
+		"foo.home.arpa", "home.arpa", "foo.localdomain", "foo.lan", "foo.home", "foo.corp", "foo.intranet", "foo.private",
+		"foo.test", "foo.invalid", "foo.onion"} {
+		require.Error(t, spec.ValidDomain(d), d)
+	}
+	// Only a last label or the suffix home.arpa is special-use: the same
+	// words earlier in a name, and example (RFC 2606), are domains.
+	for _, d := range []string{"lan.example.com", "test.example", "home.arpa.example", "a.arpa", "corp.example.org", "api.example"} {
+		require.NoError(t, spec.ValidDomain(d), d)
 	}
 }
 

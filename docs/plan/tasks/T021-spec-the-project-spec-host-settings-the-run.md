@@ -76,7 +76,7 @@ here, its descriptor validated against a copy of sbx's kit schema
   REQ-1107 (12 12.3), REQ-1117 (12 12.3), REQ-1222 (05 5.2), REQ-1258 (04 4.4),
   REQ-1259 (03 3.1), REQ-1260 (03 3.1), REQ-1261 (03 3.1), REQ-1262 (03
   3.1), REQ-1263 (03 3.1), REQ-1264 (03 3.1), REQ-1265 (03 3.1),
-  REQ-1266 (03 3.1), REQ-1267 (03 3.1).
+  REQ-1266 (03 3.1), REQ-1267 (03 3.1), REQ-1268 (03 3.1).
 - Operator: no.
 - Acceptance:
   - Strict decode: the decoder is `encoding/json/v2` with
