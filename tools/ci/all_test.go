@@ -1017,3 +1017,10 @@ func TestRunChecksRefusesAJobWithNoCheck(t *testing.T) {
 		assert.NotEmpty(t, registered(inJob(job)), "the %s job has checks", job)
 	}
 }
+
+// TestProofRed fails on the hosted Linux runners alone (T157, proof 2):
+// their checkout lives below the runner user's home, a developer's never does, so
+// the local run and the pre-push hook stay green. A proof commit; revert it.
+func TestProofRed(t *testing.T) {
+	assert.False(t, strings.HasPrefix(citest.ModuleRoot(t), filepath.Join("/", "home", "runner")+"/"), "proof 2: one Linux job fails")
+}
