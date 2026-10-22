@@ -1,0 +1,16 @@
+{"session":"lifecycle","sbxVersion":"0.48.0","capturedAt":"2026-10-22","synthetic":true,"source":"hand-written from the sbx reference at https://docs.docker.com/reference/cli/sbx/ (docker/docs commit 09d7cacc), the Docker Sandboxes release notes for v0.48.0 and the maintainer's daily use of v0.48.0; the output shapes are assumed where the reference does not give them, and block A re-measures them","description":"One sandbox from its creation to its removal: plan, create with --clone, julieta calls without and with a terminal, stop, start and remove, with sbx ls --json between the changes."}
+{"argv":["version"],"exit":0,"stdout":"v0.48.0\n","stderr":""}
+{"argv":["ls","--json"],"exit":0,"stdout":"[]\n","stderr":""}
+{"argv":["env","plan","<dir>"],"exit":0,"stdout":"Plan: + sandbox shop\n","stderr":""}
+{"argv":["env","run","-d","--clone","<dir>"],"exit":0,"stdout":"","stderr":"","effects":{"gitRemote":{"name":"sandbox-<name>","url":"<git-url>","fetch":"+refs/heads/*:refs/remotes/sandbox-<name>/*"}}}
+{"argv":["ls","--json"],"exit":0,"stdout":"[{\"id\":\"sbx_0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d\",\"name\":\"shop\",\"agent\":\"claude\",\"status\":\"running\",\"ports\":[],\"socket_path\":\"/tmp/sboxd-501-sandboxes/docker.sock\",\"workspaces\":[\"/abs/root/shop-env/shop-api\"],\"created_at\":\"2026-10-22T09:00:00Z\",\"last_used_at\":\"2026-10-22T09:05:00Z\",\"detached\":true}]\n","stderr":""}
+{"argv":["env","exec","<dir>","--","<command...>"],"exit":0,"stdout":"{\"version\":\"v1.0.0\",\"protocol\":1}\n","stderr":""}
+{"argv":["env","exec","<dir>","--env","<env>","--","<command...>"],"exit":0,"stdout":"{\"ok\":true}\n","stderr":""}
+{"argv":["env","exec","-it","<dir>","--env","<env>","--","<command...>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["env","exec","-it","<dir>","--","<command...>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["stop","<name>"],"exit":0,"stdout":"[{\"action\":\"stopped\",\"resource\":\"sandbox\",\"name\":\"shop\"}]\n","stderr":""}
+{"argv":["ls","--json"],"exit":0,"stdout":"[{\"id\":\"sbx_0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d\",\"name\":\"shop\",\"agent\":\"claude\",\"status\":\"stopped\",\"ports\":[],\"socket_path\":\"/tmp/sboxd-501-sandboxes/docker.sock\",\"workspaces\":[\"/abs/root/shop-env/shop-api\"],\"created_at\":\"2026-10-22T09:00:00Z\",\"last_used_at\":\"2026-10-22T09:05:00Z\",\"detached\":true}]\n","stderr":""}
+{"argv":["env","run","-d","<dir>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["ls","--json"],"exit":0,"stdout":"[{\"id\":\"sbx_0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d\",\"name\":\"shop\",\"agent\":\"claude\",\"status\":\"running\",\"ports\":[],\"socket_path\":\"/tmp/sboxd-501-sandboxes/docker.sock\",\"workspaces\":[\"/abs/root/shop-env/shop-api\"],\"created_at\":\"2026-10-22T09:00:00Z\",\"last_used_at\":\"2026-10-22T09:05:00Z\",\"detached\":true}]\n","stderr":""}
+{"argv":["env","rm","--force","<dir>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["ls","--json"],"exit":0,"stdout":"[]\n","stderr":""}

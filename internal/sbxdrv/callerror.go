@@ -129,7 +129,7 @@ func escapedArgv(argv []string) string {
 	for _, w := range argv {
 		w = termsafe.Escape(w)
 		if w == "" || strings.ContainsAny(w, " \"'") {
-			w = strconv.Quote(w)
+			w = `"` + strings.ReplaceAll(w, `"`, `\"`) + `"`
 		}
 		words = append(words, w)
 	}

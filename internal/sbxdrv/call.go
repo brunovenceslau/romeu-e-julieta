@@ -6,6 +6,7 @@
 package sbxdrv
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
@@ -58,6 +59,43 @@ func (b *argvBuilder) lit(words ...string) *argvBuilder {
 	return b
 }
 
+// slot adds a value of the placeholder p; a value that p refuses is
+// the error of the builder, and nothing is added.
+func (b *argvBuilder) slot(p Placeholder, value string) *argvBuilder {
+	if b.err != nil {
+		return b
+	}
+	if err := p.Check(value); err != nil {
+		b.err = fmt.Errorf("sbxdrv: %s: %w", p.Token, err)
+		return b
+	}
+	b.argv = append(b.argv, value)
+	b.shape = append(b.shape, p.Token)
+	return b
+}
+
+// rest adds the words of a command, after "--", as one placeholder in
+// the shape: a session matches the argv before "--" and forwards the
+// command (10 10.3, Replay only).
+func (b *argvBuilder) rest(words []string) *argvBuilder {
+	if b.err != nil {
+		return b
+	}
+	if len(words) == 0 {
+		b.err = fmt.Errorf("sbxdrv: %s: no command", commandWords.Token)
+		return b
+	}
+	for _, w := range words {
+		if err := commandWords.Check(w); err != nil {
+			b.err = fmt.Errorf("sbxdrv: %s: %w", commandWords.Token, err)
+			return b
+		}
+	}
+	b.argv = append(b.argv, words...)
+	b.shape = append(b.shape, commandWords.Token)
+	return b
+}
+
 // call finishes the builder: the Call, or why its values were refused.
 // The guards of I4 and I25 run on it (guard.go), so no builder can hand
 // out a call they refuse.
@@ -72,12 +110,39 @@ func (b *argvBuilder) call(name string, class procgroup.Class, mode Mode) (Call,
 	return c, nil
 }
 
+// Fixture holds the values the examples of the builders are built from:
+// the tests build them from fixed ones to compare with the sessions, and
+// from the paths and names of a test's own tree to replay the sessions
+// through the fake sbx.
+type Fixture struct {
+	// Dir is the directory that holds sbxenv.yaml.
+	Dir string
+	// Name is the name of a sandbox.
+	Name string
+	// Domain is a domain of a network rule.
+	Domain string
+	// Helper is the host command of a command secret.
+	Helper string
+	// Julieta is the path of the julieta binary inside the sandbox.
+	Julieta string
+}
+
+// defaultFixture is the fixture of the shapes: the values the
+// placeholders of the sessions stand for.
+var defaultFixture = Fixture{
+	Dir:     "/abs/root/shop-env",
+	Name:    "shop",
+	Domain:  "github.com",
+	Helper:  "/usr/bin/security find-generic-password -w -s github-shop",
+	Julieta: "/home/agent/.local/bin/julieta",
+}
+
 // builderEntry is a builder in the registry: its name and one call
 // for each shape it can give. The registry is what the scans and the
 // session tests read (REQ-0996, REQ-0938).
 type builderEntry struct {
 	name     string
-	examples func() []Call
+	examples func(Fixture) []Call
 }
 
 // builders is the registry of the argv builders, filled during
@@ -87,7 +152,7 @@ var builders []builderEntry
 
 // registerBuilder adds a builder to the registry; examples returns a
 // call for each shape of its output, built from fixed values.
-func registerBuilder(name string, examples func() []Call) struct{} {
+func registerBuilder(name string, examples func(Fixture) []Call) struct{} {
 	builders = append(builders, builderEntry{name: name, examples: examples})
 	return struct{}{}
 }
@@ -102,9 +167,10 @@ func mustCall(c Call, err error) Call {
 	return c
 }
 
-// examples returns every call of every registered builder, sorted by
-// builder name and in the order the builder gave them.
-func examples() []Call {
+// examples returns every call of every registered builder, built from
+// the fixture, sorted by builder name and in the order the builder gave
+// them.
+func examples(fx Fixture) []Call {
 	entries := slices.Clone(builders)
 	slices.SortStableFunc(entries, func(a, b builderEntry) int {
 		switch {
@@ -117,7 +183,7 @@ func examples() []Call {
 	})
 	var out []Call
 	for _, e := range entries {
-		out = append(out, e.examples()...)
+		out = append(out, e.examples(fx)...)
 	}
 	return out
 }

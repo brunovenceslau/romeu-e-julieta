@@ -121,7 +121,7 @@ func TestSessionsAreWellFormed(t *testing.T) {
 // shape in a session has a builder (REQ-0996).
 func TestBuildersAndSessionsAgree(t *testing.T) {
 	built := map[string]string{} // shape -> builder name
-	for _, c := range examples() {
+	for _, c := range examples(defaultFixture) {
 		built[shapeKey(c.Shape)] = c.Name
 	}
 	recorded := map[string]string{} // shape -> session file

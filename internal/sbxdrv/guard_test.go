@@ -27,29 +27,29 @@ func call(argv ...string) Call {
 	return Call{Name: "test", Argv: argv, Shape: argv, Class: procgroup.SbxRead, Mode: Captured}
 }
 
+// refusedApprovals are argvs the guard of I4 refuses, and the fake sbx
+// exits 99 on (fake_test.go holds the two together).
+var refusedApprovals = [][]string{
+	{"env", "run", "-d", "--auto-approve", "/d"},
+	{"env", "run", "--auto-approve=true", "/d"},
+	{"stop", "--auto-approve", "shop"},
+	{"env", "run", "-y", "/d"},
+	{"env", "run", "-dy", "/d"},
+	{"env", "rm", "-y", "/d"},
+	{"env", "run", "-d", "--force", "/d"},
+	{"env", "create", "--force", "/d"},
+	{"env", "run", "-f", "/d"},
+	{"env", "run", "-df", "/d"},
+	{"env", "run", "--env-arg", "x=1", "-f", "/d"},
+}
+
 // TestGuardRefusesApproval holds I4: whatever the call, --auto-approve
 // and -y; on env run and env create, the --force and -f that sbx v0.48.0
 // put in their place.
 func TestGuardRefusesApproval(t *testing.T) {
-	tests := []struct {
-		name string
-		argv []string
-	}{
-		{"auto-approve", []string{"env", "run", "-d", "--auto-approve", "/d"}},
-		{"auto-approve with a value", []string{"env", "run", "--auto-approve=true", "/d"}},
-		{"auto-approve on another call", []string{"stop", "--auto-approve", "shop"}},
-		{"-y", []string{"env", "run", "-y", "/d"}},
-		{"-y in a cluster", []string{"env", "run", "-dy", "/d"}},
-		{"-y on rm", []string{"env", "rm", "-y", "/d"}},
-		{"force on run", []string{"env", "run", "-d", "--force", "/d"}},
-		{"force on create", []string{"env", "create", "--force", "/d"}},
-		{"-f on run", []string{"env", "run", "-f", "/d"}},
-		{"-f in a cluster on run", []string{"env", "run", "-df", "/d"}},
-		{"-f after an env value", []string{"env", "run", "--env-arg", "x=1", "-f", "/d"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Error(t, Guard(call(tt.argv...)))
+	for _, argv := range refusedApprovals {
+		t.Run(strings.Join(argv, " "), func(t *testing.T) {
+			require.Error(t, Guard(call(argv...)))
 		})
 	}
 }
@@ -76,31 +76,32 @@ func TestGuardLeavesWhatItDoesNotGuard(t *testing.T) {
 	}
 }
 
+// refusedSecretForms are the forms of sbx secret set that bring a value
+// or take it from anywhere but --command: the guard of I25 refuses them
+// and the fake sbx exits 99 on them.
+var refusedSecretForms = [][]string{
+	{"secret", "set", "github"},
+	{"secret", "set", "github", "-t", "ghp_x"},
+	{"secret", "set", "github", "-tghp_x"},
+	{"secret", "set", "github", "--token", "ghp_x"},
+	{"secret", "set", "github", "--token=ghp_x"},
+	{"secret", "set", "github", "--command", "/bin/true", "--token", "x"},
+	{"secret", "set", "--registry", "ghcr.io", "--password-stdin"},
+	{"secret", "set", "openai", "--oauth"},
+	{"secret", "set", "anthropic", "--ref", "op://a/b/c"},
+	{"secret", "set", "github", "--command", "/bin/true", "--force"},
+	{"secret", "set", "github", "--command", "/bin/true", "-f"},
+	{"secret", "set", "github", "--command", ""},
+	{"secret", "set", "github", "--command"},
+	{"secret", "set", "github", "--command="},
+}
+
 // TestGuardRefusesSecretValueForms holds I25: sbx secret set only with
 // --command, and with no other flag than the three of secretSetFlags.
 func TestGuardRefusesSecretValueForms(t *testing.T) {
-	tests := []struct {
-		name string
-		argv []string
-	}{
-		{"no source", []string{"secret", "set", "github"}},
-		{"-t", []string{"secret", "set", "github", "-t", "ghp_x"}},
-		{"-t joined", []string{"secret", "set", "github", "-tghp_x"}},
-		{"--token", []string{"secret", "set", "github", "--token", "ghp_x"}},
-		{"--token=", []string{"secret", "set", "github", "--token=ghp_x"}},
-		{"--token with a command", []string{"secret", "set", "github", "--command", "/bin/true", "--token", "x"}},
-		{"stdin", []string{"secret", "set", "--registry", "ghcr.io", "--password-stdin"}},
-		{"oauth", []string{"secret", "set", "openai", "--oauth"}},
-		{"reference", []string{"secret", "set", "anthropic", "--ref", "op://a/b/c"}},
-		{"force", []string{"secret", "set", "github", "--command", "/bin/true", "--force"}},
-		{"-f", []string{"secret", "set", "github", "--command", "/bin/true", "-f"}},
-		{"an empty command", []string{"secret", "set", "github", "--command", ""}},
-		{"a command at the end of the argv", []string{"secret", "set", "github", "--command"}},
-		{"an empty command with =", []string{"secret", "set", "github", "--command="}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Error(t, Guard(call(tt.argv...)))
+	for _, argv := range refusedSecretForms {
+		t.Run(strings.Join(argv, " "), func(t *testing.T) {
+			require.Error(t, Guard(call(argv...)))
 		})
 	}
 	assert.NoError(t, Guard(call("secret", "set", "github", "--command", "/usr/bin/true", "--sandbox", "shop", "--refresh", "55m")))

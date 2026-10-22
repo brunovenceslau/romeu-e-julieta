@@ -1,0 +1,8 @@
+{"session":"egress","sbxVersion":"0.48.0","capturedAt":"2026-10-22","synthetic":true,"source":"hand-written from the sbx reference at https://docs.docker.com/reference/cli/sbx/ (docker/docs commit 09d7cacc), the Docker Sandboxes release notes for v0.48.0 and the maintainer's daily use of v0.48.0; the output shapes are assumed where the reference does not give them, and block A re-measures them","description":"The egress calls on a running sandbox: policy ls, allow, check, rm and check again, all scoped to the sandbox."}
+{"argv":["ls","--json"],"exit":0,"stdout":"[{\"id\":\"sbx_0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d\",\"name\":\"shop\",\"agent\":\"claude\",\"status\":\"running\",\"ports\":[],\"socket_path\":\"/tmp/sboxd-501-sandboxes/docker.sock\",\"workspaces\":[\"/abs/root/shop-env/shop-api\"],\"created_at\":\"2026-10-22T09:00:00Z\",\"last_used_at\":\"2026-10-22T09:05:00Z\",\"detached\":true}]\n","stderr":""}
+{"argv":["policy","ls","--json"],"exit":0,"stdout":"[]\n","stderr":""}
+{"argv":["policy","check","network","--sandbox","<name>","<domain>"],"exit":1,"stdout":"denied\n","stderr":""}
+{"argv":["policy","allow","network","--sandbox","<name>","<domain>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["policy","check","network","--sandbox","<name>","<domain>"],"exit":0,"stdout":"allowed\n","stderr":""}
+{"argv":["policy","rm","network","--sandbox","<name>","--resource","<domain>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["policy","check","network","--sandbox","<name>","<domain>"],"exit":1,"stdout":"denied\n","stderr":""}

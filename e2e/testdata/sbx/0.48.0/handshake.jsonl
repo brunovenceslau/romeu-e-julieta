@@ -1,2 +1,5 @@
-{"session":"handshake","sbxVersion":"0.48.0","capturedAt":"2026-10-22","synthetic":true,"source":"hand-written from the sbx reference at https://docs.docker.com/reference/cli/sbx/ and from the maintainer's daily use of v0.48.0; the output shapes are assumed where the reference does not give them","description":"The reads romeu makes before it changes anything: sbx version."}
+{"session":"handshake","sbxVersion":"0.48.0","capturedAt":"2026-10-22","synthetic":true,"source":"hand-written from the sbx reference at https://docs.docker.com/reference/cli/sbx/ (docker/docs commit 09d7cacc), the Docker Sandboxes release notes for v0.48.0 and the maintainer's daily use of v0.48.0; the output shapes are assumed where the reference does not give them, and block A re-measures them","description":"The reads romeu makes before it changes anything, on a host with no sandbox: sbx version, sbx ls --json, sbx policy ls --json and sbx env plan."}
 {"argv":["version"],"exit":0,"stdout":"v0.48.0\n","stderr":""}
+{"argv":["ls","--json"],"exit":0,"stdout":"[]\n","stderr":""}
+{"argv":["policy","ls","--json"],"exit":0,"stdout":"[]\n","stderr":""}
+{"argv":["env","plan","<dir>"],"exit":0,"stdout":"Plan: + sandbox shop\n","stderr":""}

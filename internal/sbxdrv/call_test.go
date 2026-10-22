@@ -20,8 +20,8 @@ import (
 // the shape have the same length, and the shape holds a placeholder
 // only where the argv holds a value.
 func TestBuildersCarryTheirClass(t *testing.T) {
-	require.NotEmpty(t, examples())
-	for _, c := range examples() {
+	require.NotEmpty(t, examples(defaultFixture))
+	for _, c := range examples(defaultFixture) {
 		t.Run(c.Name+" "+shapeKey(c.Shape), func(t *testing.T) {
 			assert.NotEmpty(t, c.Name)
 			assert.NotEmpty(t, c.Argv)
@@ -38,7 +38,7 @@ func TestBuildersCarryTheirClass(t *testing.T) {
 // sbx prompts in (REQ-0270): everything else is captured.
 func TestInteractiveCalls(t *testing.T) {
 	var interactive []string
-	for _, c := range examples() {
+	for _, c := range examples(defaultFixture) {
 		if c.Mode == Interactive {
 			interactive = append(interactive, c.Name)
 		}
@@ -49,4 +49,4 @@ func TestInteractiveCalls(t *testing.T) {
 // wantInteractive are the builders whose calls are interactive (stdio
 // inherited, raw): sbx env run -d [--clone], and the env exec -it of
 // the run layout and the shell.
-var wantInteractive = []string{}
+var wantInteractive = []string{"env-run-create", "env-run-start", "env-exec-tty", "env-exec-tty"}

@@ -11,7 +11,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
-var _ = registerBuilder("version", func() []Call { return []Call{Version()} })
+var _ = registerBuilder("version", func(Fixture) []Call { return []Call{Version()} })
 
 // Version is sbx version: a read (timeout class sbx-read), captured.
 // Its output is read by ParseVersion; gate 1, the floor check and
