@@ -5,7 +5,9 @@ package catalog_test
 
 import (
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -70,6 +72,46 @@ func TestCatalogGoodTreePasses(t *testing.T) {
 // directory is no catalog, as a tree without kits has none to judge.
 func TestCatalogNoDirectoryNothingToJudge(t *testing.T) {
 	assert.Empty(t, catalog.Of(tree{"README.md": "x"}.files()))
+}
+
+// TestCatalogPackageWithoutFiles: the package is there and the embed
+// pattern matches nothing, which is a finding and not "no catalog".
+func TestCatalogPackageWithoutFiles(t *testing.T) {
+	got := catalog.Of(tree{"internal/catalog/catalog.go": "package catalog\n"}.files())
+	require.Len(t, got, 1)
+	assert.Contains(t, messages(got), catalog.Dir)
+	assert.Equal(t, "catalog", got[0].Rule)
+}
+
+// TestCatalogDirIsTheEmbedPattern ties Dir and the extension the check
+// reads to the pattern internal/catalog embeds, so a move of the pattern
+// fails here and not silently in the check.
+func TestCatalogDirIsTheEmbedPattern(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), "internal", "catalog", "catalog.go"))
+	require.NoError(t, err)
+	m := regexp.MustCompile(`(?m)^//go:embed (\S+)$`).FindAllStringSubmatch(string(b), -1)
+	require.Len(t, m, 1, "one embed directive")
+	pattern := m[0][1]
+	assert.Equal(t, catalog.Dir, "internal/catalog/"+path.Dir(pattern)+"/")
+	assert.Equal(t, catalog.Ext, path.Ext(pattern))
+}
+
+// TestCatalogOneFindingPerFault: each fault is one finding, so a run
+// that has two is not read as one.
+func TestCatalogOneFindingPerFault(t *testing.T) {
+	tr := good()
+	tr[catalog.Dir+"go.yaml"] = head + "tools:\n  core:go: [a.example, b.example]\n"
+	assert.Len(t, catalog.Of(tr.files()), 2, "two undeclared domains")
+
+	tr = good()
+	tr[catalog.Dir+"node.yaml"] = head + "nope: 1\n"
+	tr[catalog.Dir+"python.yaml"] = head + "nada: 1\n"
+	assert.Len(t, catalog.Of(tr.files()), 2, "two files that do not decode")
+
+	tr = good()
+	tr[catalog.Dir+"node.yml"] = head
+	tr[catalog.Dir+"more/node.yaml"] = head
+	assert.Len(t, catalog.Of(tr.files()), 2, "two files the glob does not embed")
 }
 
 // TestCatalogRefuses are the fixture lines: one change to the good

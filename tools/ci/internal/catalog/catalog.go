@@ -10,9 +10,10 @@
 // glob egress/*.yaml would not read are findings too. It judges the
 // commit fast and all read, and is the catalog subcommand.
 //
-// A tree without the directory has no catalog to judge, as a tree
-// without kits has none to hold to the kit rules; the embed directive of
-// internal/catalog fails the build of a tree that lost its files.
+// A tree without the directory and without the package has no catalog to
+// judge, as a tree without kits has none to hold to the kit rules. A tree
+// that has the package and no file below the directory is a finding: the
+// embed pattern would match nothing.
 package catalog
 
 import (
@@ -31,6 +32,13 @@ import (
 // repository.
 const Dir = "internal/catalog/egress/"
 
+// Ext is the extension of the files the embed pattern of internal/catalog
+// matches.
+const Ext = ".yaml"
+
+// Package is the file of internal/catalog that holds the embed directive.
+const Package = "internal/catalog/catalog.go"
+
 const rule = "catalog"
 
 // Of applies the rules to the catalog files among files, the tree of one
@@ -41,21 +49,27 @@ func Of(files []check.TreeFile) []check.Finding {
 		findings = append(findings, check.Finding{Where: git.Printable(where), Rule: rule, Msg: fmt.Sprintf(format, args...)})
 	}
 	var sources []all.CatalogSource
-	seen := false
+	seen, hasPackage := false, false
 	for _, f := range files {
+		if f.Path == Package {
+			hasPackage = true
+		}
 		rest, ok := strings.CutPrefix(f.Path, Dir)
 		if !ok || f.Content == nil {
 			continue
 		}
 		seen = true
-		if strings.Contains(rest, "/") || path.Ext(rest) != ".yaml" {
+		if strings.Contains(rest, "/") || path.Ext(rest) != Ext {
 			add(f.Path, "is not embedded: the files of the catalog are %s*.yaml, one directory deep", Dir)
 			continue
 		}
 		sources = append(sources, all.CatalogSource{Name: rest, Data: f.Content})
 	}
 	if !seen {
-		return nil
+		if hasPackage {
+			add(Dir, "no file below %s, so the embed pattern of %s matches nothing", Dir, Package)
+		}
+		return findings
 	}
 	c, err := all.CatalogBuild(sources)
 	if err != nil {
