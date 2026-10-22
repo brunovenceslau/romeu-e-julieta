@@ -31,8 +31,8 @@ it verified. Until T080 lands, I34 is enforced by no code: the host
 socket is the dedicated signing-only agent loaded with `ssh-add -c`, and
 T115 reads `ssh-add -L` in every recreated sandbox (the I34 row accepted
 by name in 05 5.4, linked from Accepted risks in `docs/plan.md`). The
-socket fact of sitting M2 (T113) lands here as
-`kits/git-ssh-sign/testdata/sitting-m2.yaml`, with `source: sitting M2`;
+socket fact of sitting M0 (T113 names M2, before the re-plan) lands here as
+`kits/git-ssh-sign/testdata/sitting-m0.yaml`, with `source: sitting M0`;
 this task needs T113 for it. Its kit e2e file is
 `e2e/kit_git_ssh_sign_test.go` (rule 1).
 

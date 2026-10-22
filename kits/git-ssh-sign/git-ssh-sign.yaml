@@ -3,9 +3,10 @@
 # SPDX-License-Identifier: GPL-3.0-only
 #
 # The git-ssh-sign product kit (06 6.4, REQ-0594): the ssh-agent
-# capability for signing git commits and nothing else, and the git
-# config that makes every commit signed with the one key of the arg
-# signingKey. It is opt-in per project and an ask-first surface.
+# capability for signing git objects only, and the git config that makes
+# every commit signed with the one key of the arg signingKey. The
+# namespace git covers commits and also tags (git tag -s). It is opt-in
+# per project and an ask-first surface.
 #
 # The ssh-agent capability is the one sitting M0 composed on sbx
 # v0.48.0 with unrestricted false and sign [git]: the sandbox lists the
@@ -19,15 +20,27 @@
 # env reaches the hooks that declare the name), never pasted into script
 # text, and the step checks its shape before it writes anything: a type
 # and a base64 body, no comment, no space beyond the one between them.
-# The arg's pattern states the same shape for the person who sets it.
+# The arg's pattern states the same shape for the person who sets it, and
+# a test holds the two equal. FIDO key types (sk-ssh-ed25519@openssh.com
+# and sk-ecdsa-sha2-nistp256@openssh.com) are refused on purpose: the
+# pattern has no @ or dot, and a hardware key needs a touch the signing
+# agent cannot give.
+#
+# The allowed-signers file is written by a step and not by lifecycle.files
+# because an arg is expanded into a files body as it is (sitting M0) with
+# no check of its shape, and a step checks it first.
 #
 # Two steps, both as the agent user, since the files are the agent's own.
-# The first sets the three settings that need no input, so a commit is
-# signed (and fails if it cannot be) even when the second step fails. The
-# second validates the key, writes the allowed-signers file with the
-# principal * limited to the namespace git, and sets user.signingkey as a
-# literal key, which git passes to the agent. The key is never a file
-# path, so no private key file is read.
+# The first makes the config directory and sets the three settings that
+# need no input. If the second step fails, user.signingkey stays unset
+# and, on the workload's git (2.47.3), a commit fails with "either
+# user.signingkey or gpg.ssh.defaultKeyCommand needs to be configured"
+# and makes no commit, even when the agent holds several keys; it is never
+# signed with another key or left unsigned. The second step validates the
+# key, writes the allowed-signers file with the principal * limited to
+# the namespace git, and sets user.signingkey as a literal key, which git
+# passes to the agent. The key is never a file path, so no private key
+# file is read.
 schemaVersion: "3"
 kind: mixin
 displayName: git-ssh-sign
@@ -57,6 +70,7 @@ capabilities:
             - bash
             - -euc
             - |
+              mkdir -p "$HOME/.config/git"
               git config --global gpg.format ssh
               git config --global commit.gpgsign true
               git config --global gpg.ssh.allowedSignersFile "$HOME/.config/git/allowed_signers"
@@ -68,7 +82,7 @@ capabilities:
             - -euc
             - |
               R='^[a-z0-9-]+ [A-Za-z0-9+/]+={0,2}$'
+              export LC_ALL=C
               [[ ${GIT_SSH_SIGN_KEY-} =~ $R ]]
-              mkdir -p "$HOME/.config/git"
               printf '%s\n' "* namespaces=\"git\" $GIT_SSH_SIGN_KEY" > "$HOME/.config/git/allowed_signers"
               git config --global user.signingkey "key::$GIT_SSH_SIGN_KEY"

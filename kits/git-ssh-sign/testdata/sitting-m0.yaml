@@ -11,7 +11,7 @@
 source: sitting M0
 date: "2026-10-19"
 sbx: v0.48.0
-frontend: docker/sandbox-kit:3.0.0-m.8@sha256:e6a39777
+frontend: docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d
 capability:
   type: com.docker.sandbox/ssh-agent@1
   config:
