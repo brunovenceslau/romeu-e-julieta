@@ -55,13 +55,13 @@ Its JSON Schema is [schemas/host-settings.v1.json](../../schemas/host-settings.v
 | `config.ref` | a branch name valid under git check-ref-format --branch, @ refused | is not a branch name | invalid document, exit 2 | romeu only | REQ-0181 |
 | `tools.sbx` | matches `^/.*$`; an absolute, clean path | is not an absolute, clean path | invalid document, exit 2 | romeu only | 03 3.4 |
 | `tools.git` | matches `^/.*$`; an absolute, clean path | is not an absolute, clean path | invalid document, exit 2 | romeu only | 03 3.4 |
-| `tools.gitCredentialHelper` | matches `^(?:[a-z0-9][a-z0-9-]{0,62}\|/[A-Za-z0-9._/+-]+)$`; a git-credential-\<name> helper's name, or an absolute, clean path with no space or shell character, since git runs it through sh | is neither a helper name nor a plain absolute path | invalid document, exit 2 | romeu only | 03 3.4 |
+| `tools.gitCredentialHelper` | matches `^(?:[a-z0-9][a-z0-9-]{0,62}\|/[A-Za-z0-9._/+-]+)$`; a git-credential-\<name> helper's name, or an absolute, clean path with no space or shell character, since git runs it through sh | is neither a helper name nor a plain absolute path | invalid document, exit 2 | romeu only | REQ-1267 |
 | `gitHosts[].host` | a lowercase host name, no port or IP literal | is not a host name | invalid document, exit 2 | romeu only | REQ-0188 |
 | `gitHosts[].caFile` | matches `^/.*$`; an absolute, clean path | is not an absolute, clean path | invalid document, exit 2 | romeu only | 03 3.4 |
 | `workloadRepositories[]` | matches `^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::[0-9]+)?(?:/[a-z0-9]+(?:(?:[._]\|__\|-+)[a-z0-9]+)*)+$` | is not \<registry>/\<repository> | invalid document, exit 2 | romeu only | REQ-0190 |
 | `signing.agentSocket` | matches `^/.*$`; an absolute, clean path | is not an absolute, clean path | invalid document, exit 2 | romeu only | 03 3.4 |
 | `secrets{key}` | matches `^[a-z0-9][a-z0-9_-]{0,62}@[a-z][a-z0-9-]{0,38}[a-z0-9]$` | is not \<secret name>@\<project> | invalid document, exit 2 | romeu only | REQ-0054 |
-| `secrets{}.service` | matches `^[a-z0-9][a-z0-9_-]{0,62}$` | is not an sbx service name | invalid document, exit 2 | romeu only | 03 3.4 |
+| `secrets{}.service` | matches `^[a-z0-9][a-z0-9_-]{0,62}$` | is not an sbx service name | invalid document, exit 2 | romeu only | REQ-1266 |
 | `secrets{}.argv` | at least 1 element; a list, never a shell string | is an empty argv | invalid document, exit 2 | romeu only | REQ-0205 |
 | `secrets{}.argv[0]` | matches `^/.*$`; an absolute, clean path; doctor checks that it exists | is not an absolute, clean path | invalid document, exit 2 | romeu only | REQ-0205 |
 | `secrets{}.argv[]` | matches no `(?:^\|[\s=])(?:ghp_\|gho_\|ghs_\|ghu_\|ghr_\|github_pat_)\|(?:^\|[\s=])[0-9a-fA-F]{40}(?:$\|\s)`; a best-effort guard on the common token shapes, at the start, after whitespace or after =, not a detector | has the shape of a token | `RJ-314` (`secret-in-argv`), exit 2 | romeu only | REQ-0206 |

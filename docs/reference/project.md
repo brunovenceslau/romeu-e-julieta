@@ -81,7 +81,7 @@ The members deliberately left ungated, the committed list of 01 1.4 (I7): `sandb
 | `repos[].dir` | unique within the project, compared case-insensitively | is the dir of another repo of the project | invalid document, exit 2 | both | REQ-0176 |
 | `repos[].ref` | a branch name valid under git check-ref-format --branch, @ refused | is not a branch name | invalid document, exit 2 | both | REQ-0181 |
 | `workload` | matches `^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::[0-9]+)?(?:/[a-z0-9]+(?:(?:[._]\|__\|-+)[a-z0-9]+)*)+@sha256:[0-9a-f]{64}$` | is not \<registry>/\<repository>@sha256:\<64 hex> | invalid document, exit 2 | both | REQ-0189 |
-| `agent` | matches `^[a-z0-9][a-z0-9._-]{0,62}$` | is not an agent handle of lowercase letters, digits, ., _ and - | invalid document, exit 2 | both | 03 3.2 |
+| `agent` | matches `^[a-z0-9][a-z0-9._-]{0,62}$` | is not an agent handle of lowercase letters, digits, ., _ and - | invalid document, exit 2 | both | REQ-1259 |
 | `kits[]` | exactly one of `product`; or `personal` | names not exactly one of product and personal | invalid document, exit 2 | both | 03 3.2 |
 | `kits[].product` | matches `^[a-z0-9][a-z0-9-]{0,62}$` | is not a kit id | invalid document, exit 2 | both | REQ-0182 |
 | `kits[].personal` | matches `^[a-z0-9][a-z0-9-]{0,62}$` | is not a kit id | invalid document, exit 2 | both | REQ-0182 |
@@ -89,12 +89,12 @@ The members deliberately left ungated, the committed list of 01 1.4 (I7): `sandb
 | `kits[].args{}` | at most 1024 bytes; printable UTF-8, no newline | is not printable UTF-8 of at most 1 KiB | invalid document, exit 2 | both | REQ-0183 |
 | `secrets[]` | matches `^[a-z0-9][a-z0-9_-]{0,62}$` | is not a secret name | invalid document, exit 2 | both | REQ-0184 |
 | `egress.extra[]` | lowercase host name, IDNA A-labels, no wildcard, port or IP literal | is not an egress domain | invalid document, exit 2 | both | REQ-0188 |
-| `egress.tools{key}` | matches `^[a-z0-9][a-z0-9-]*:[A-Za-z0-9@][A-Za-z0-9._/@-]*$` | is not a mise backend:tool | invalid document, exit 2 | both | 03 3.2 |
+| `egress.tools{key}` | matches `^[a-z0-9][a-z0-9-]*:[A-Za-z0-9@][A-Za-z0-9._/@-]*$` | is not a mise backend:tool | invalid document, exit 2 | both | REQ-1264 |
 | `egress.tools{}[]` | lowercase host name, IDNA A-labels, no wildcard, port or IP literal | is not an egress domain | invalid document, exit 2 | both | REQ-0188 |
-| `sandboxOptions.cpus` | from 1 to 256 | is outside 1 to 256 | invalid document, exit 2 | both | 03 3.2 |
-| `sandboxOptions.memory` | matches `^[1-9][0-9]{0,6}[kmgKMG]?$`; a whole number of bytes, or of k, m or g | is not a memory limit such as 8g | invalid document, exit 2 | both | 03 3.2 |
-| `ports[]` | matches `^(?:[0-9]{1,5}:)?[0-9]{1,5}(?:/(?:tcp\|udp))?$`; [\<host port>:]\<sandbox port>[/tcp or /udp], each port from 1 to 65535 | is not a port spec such as 8080:8080/tcp | invalid document, exit 2 | both | 03 3.2 |
-| `salvage.excludeIgnored[]` | a clean relative path, an optional trailing /, no .. element, no leading - | is not a relative path inside the repo | invalid document, exit 2 | both | 03 3.2 |
+| `sandboxOptions.cpus` | from 0 to 256; 0 is sbx's default, the host's; that the host has that many CPUs is checked at run time, not here | is outside 0 to 256 | invalid document, exit 2 | both | REQ-1260 |
+| `sandboxOptions.memory` | matches `^[1-9][0-9]{0,6}[mg]$`; a whole number of binary units, m or g, at least 512m, as sbx documents it; the host's maximum is checked at run time | is not a memory limit of at least 512m, such as 8g | invalid document, exit 2 | both | REQ-1261 |
+| `ports[]` | matches `^(?:(?:(?:127\.0\.0\.1\|\[::1\]):)?[0-9]{1,5}:)?[0-9]{1,5}(?:/(?:tcp\|tcp4\|tcp6\|udp\|udp4\|udp6))?$`; [[HOST_IP:]HOST_PORT:]SANDBOX_PORT[/PROTOCOL] as sbx documents it, each port from 1 to 65535; HOST_IP only 127.0.0.1 or [::1], since another address would expose the sandbox's port to the network, and none is loopback | is not a port spec such as 8080:8080/tcp, bound on loopback | invalid document, exit 2 | both | REQ-1262 |
+| `salvage.excludeIgnored[]` | a clean relative path, an optional trailing /, no .. element, no leading - | is not a relative path inside the repo | invalid document, exit 2 | both | REQ-1263 |
 | `run.tabs[].label` | matches `^[a-z0-9][a-z0-9_-]{0,31}$` | is not a tab label | invalid document, exit 2 | both | REQ-0186 |
 | `run.tabs[].root` | exactly one of `pane`; or `split` and `ratio` and `first` and `second` | is neither {pane} nor {split, ratio, first, second} | invalid document, exit 2 | both | 03 3.2 |
 | `run.tabs[].root.pane` | matches `^[a-z0-9][a-z0-9_-]{0,31}$` | is not a pane id | invalid document, exit 2 | both | REQ-0186 |
@@ -106,9 +106,9 @@ The members deliberately left ungated, the committed list of 01 1.4 (I7): `sandb
 | `run.panes[].cwd` | clean, no leading /, no .. element | is not a clean path inside the repo | invalid document, exit 2 | both | REQ-0187 |
 | `run.panes[].env{key}` | matches `^[A-Z_][A-Z0-9_]*$`; matches no `^(?:PATH\|HOME\|BASH_ENV\|ENV\|LD_.*)$` | is not an environment variable name, or is PATH, HOME, BASH_ENV, ENV or LD_* | invalid document, exit 2 | both | REQ-0193 |
 | `run.panes[].steps[]` | at least 1 element; an argv list, run with no shell | is an empty argv | invalid document, exit 2 | both | 03 3.2 |
-| `run.panes[].steps[][0]` | matches `^[^-].*$` | is an empty program name, or one that starts with - | invalid document, exit 2 | both | 03 3.2 |
-| `run.panes[].steps[][]` | no control character | holds a control character | invalid document, exit 2 | both | 03 3.2 |
-| `run.panes[].env{}` | no control character | holds a control character | invalid document, exit 2 | both | REQ-0193 |
+| `run.panes[].steps[][0]` | matches `^[^-].*$` | is an empty program name, or one that starts with - | invalid document, exit 2 | both | REQ-1265 |
+| `run.panes[].steps[][]` | no control character | holds a control character | invalid document, exit 2 | both | REQ-1265 |
+| `run.panes[].env{}` | no control character | holds a control character | invalid document, exit 2 | both | REQ-1265 |
 | `run.panes[].focus` | at most one focused pane per tab | marks a second focused pane in a tab | invalid document, exit 2 | both | 03 3.2 |
 | `projects/` | holds *.yaml files only | is a file under projects/ that is not *.yaml | `RJ-345` (`projects-stray-file`), exit 2 | both | REQ-0178 |
 | `name` | equals the file stem | differs from the file stem | invalid document, exit 2 | both | REQ-0175 |

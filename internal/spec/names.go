@@ -188,14 +188,27 @@ func credentialHelper(v string) error {
 }
 
 // portSpec holds a port spec past its pattern: each port is from 1 to
-// 65535.
+// 65535. The pattern admits a loopback host IP only, which is cut off.
 func portSpec(v string) error {
 	spec, _, _ := strings.Cut(v, "/")
+	for _, ip := range []string{"127.0.0.1:", "[::1]:"} {
+		spec = strings.TrimPrefix(spec, ip)
+	}
 	for p := range strings.SplitSeq(spec, ":") {
 		n, err := strconv.Atoi(p)
 		if err != nil || n < 1 || n > 65535 {
 			return errors.New("has a port outside 1 to 65535")
 		}
+	}
+	return nil
+}
+
+// memoryLimit holds a memory limit past its pattern: at least 512 MiB,
+// sbx's minimum.
+func memoryLimit(v string) error {
+	n, err := strconv.Atoi(v[:len(v)-1])
+	if err != nil || (v[len(v)-1] == 'm' && n < 512) {
+		return errors.New("is below 512m")
 	}
 	return nil
 }

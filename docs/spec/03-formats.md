@@ -116,7 +116,7 @@ naming the host-only rules it did not check.
 | `projects/` | `REQ-0178` holds `*.yaml` files only; a file of another name or extension is an error naming the path (`RJ-345`) | both |
 | the config project | `REQ-0179` exactly one spec's primary repo URL equals `config.url` of host settings; none is an error naming `config.url` (`RJ-346`) | romeu only |
 | repo `url` host | `REQ-0180` `<host>` must be a host-settings `gitHosts` entry | romeu only |
-| repo `ref` | `REQ-0181` a branch name valid under `git check-ref-format --branch` rules, implemented in Go | both |
+| repo `ref` | `REQ-0181` a branch name valid under `git check-ref-format --branch` rules, implemented in Go; `@`, which `--branch` reads as the current branch, is refused (narrowest form, decided on 2026-10-22) | both |
 | kit id | `REQ-0182` `^[a-z0-9][a-z0-9-]{0,62}$` | both |
 | kit `args` | `REQ-0183` key `^[a-z][a-zA-Z0-9_]{0,31}$`; value printable UTF-8, no newline, <= 1 KiB | both |
 | secret name | `REQ-0184` `^[a-z0-9][a-z0-9_-]{0,62}$` | both |
@@ -126,6 +126,15 @@ naming the host-only rules it did not check.
 | egress domain (every source of [07 7.5](07-mise-egress.md#75-egress-derivation-internalegress): `egress.extra`, catalog, lock-derived, kit-declared) | `REQ-0188` lowercase hostname, IDNA A-labels, no wildcard, no port, no IP literal | both |
 | workload reference | `REQ-0189` `<registry>/<repository>@sha256:<64 hex>` | both |
 | workload repository | `REQ-0190` `<registry>/<repository>` must be in host settings `workloadRepositories` | romeu only |
+| `agent` | `REQ-1259` `^[a-z0-9][a-z0-9._-]{0,62}$`: sbx takes a built-in agent's name or a kit's, and publishes no pattern; narrowest form, decided on 2026-10-22 | both |
+| `sandboxOptions.cpus` | `REQ-1260` a whole number from 0 to 256, 0 being sbx's default (the host's); that the host has that many CPUs is checked at run time. Source: [sbx environment files](https://docs.docker.com/ai/sandboxes/configuration/environment-files/), `sandboxOptions` | both |
+| `sandboxOptions.memory` | `REQ-1261` a whole number followed by `m` or `g`, binary units, at least `512m`; the host's maximum is checked at run time. Source: [sbx create](https://docs.docker.com/reference/cli/sbx/create/), `--memory` | both |
+| `ports[]` | `REQ-1262` `[[HOST_IP:]HOST_PORT:]SANDBOX_PORT[/PROTOCOL]`, protocols `tcp`, `tcp4`, `tcp6`, `udp`, `udp4`, `udp6`, each port from 1 to 65535; `HOST_IP` only `127.0.0.1` or `[::1]` (the bracketed form is Docker's, since sbx shows no IPv6 example), because another address would expose the sandbox's port to the network; none is loopback, as in sbx. Source: [sbx ports](https://docs.docker.com/reference/cli/sbx/ports/) | both |
+| `salvage.excludeIgnored[]` | `REQ-1263` a clean relative path, an optional trailing `/`, no `..` element, no leading `-`; narrowest form, decided on 2026-10-22 | both |
+| `egress.tools` key | `REQ-1264` `<backend>:<tool>` as `mise.lock` writes it, `^[a-z0-9][a-z0-9-]*:[A-Za-z0-9@][A-Za-z0-9._/@-]*$`; narrowest form, decided on 2026-10-22 | both |
+| run layout step | `REQ-1265` no argv element holds a control character, and `argv[0]` is not empty and does not start with `-`; a pane's `env` value holds no control character; narrowest form, decided on 2026-10-22 | both |
+| host settings `secrets{}.service` | `REQ-1266` the secret-name pattern of this table; narrowest form, decided on 2026-10-22 | romeu only |
+| host settings `tools.gitCredentialHelper` | `REQ-1267` a `git-credential-<name>` helper's name, `^[a-z0-9][a-z0-9-]{0,62}$`, or an absolute clean path of letters, digits and `._/+-` only, since git runs it through `sh`; narrowest form, decided on 2026-10-22 | romeu only |
 
 ## 3.2 Project spec (`projects/<name>.yaml`, schema `project.v1`)
 
