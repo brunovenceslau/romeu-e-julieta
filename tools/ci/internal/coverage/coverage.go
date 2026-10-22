@@ -5,6 +5,32 @@
 // S9, per package, over the cover profile that the race step of all
 // writes, and over a profile a developer names (the coverage
 // subcommand).
+//
+// The profile is parsed by hand (parseProfile), and the go command's own
+// output replaces it for none of three reasons, measured on 2026-10-21
+// on the profile of a real "go test -race -count=1 -coverprofile=..."
+// run of the module (74 packages with statements):
+//
+//   - "go tool cover -func" reports per function and a total for the
+//     module, not per package, so it cannot give the per-package
+//     percentage of S9. "go tool covdata" reads the binary data of
+//     GOCOVERDIR, not the text profile the race step writes and a
+//     developer names.
+//   - The per-package "coverage: N% of statements" that "go test" prints
+//     is not in the profile: the step reads only the file, and the
+//     coverage subcommand takes only a path. The line is also rounded
+//     to one decimal, so a package at 79.96% prints as 80.0% and passes,
+//     where this check compares statement counts exactly and prints its
+//     own share rounded down. Where this parser and the go command
+//     both gave a percentage (72 packages), the two agreed within the
+//     rounding of the go command's one decimal.
+//   - golang.org/x/tools/cover parses the format, and would be a new
+//     dependency (ask-first; T156 admits none).
+//
+// The format is three fields to a line (https://pkg.go.dev/cmd/cover), so the
+// parser is one loop; it also counts a block listed by several test
+// binaries once, as covered when any of them ran it. A format change
+// of the go command is caught by the mode line and the field checks.
 package coverage
 
 import (

@@ -158,3 +158,54 @@ suite; T157 drops the directory list of the unit step with the step
 itself. Recommended: that reading; the other is one Linux run
 `go test -race -tags e2e ./...` that is both the race and the e2e, which
 changes what the coverage profile holds (REQ-0834).
+
+## Decisions taken while building
+
+Taken on 2026-10-21, each with what reopens it:
+
+- The e2e step keeps `./e2e/...`, as the maintainer decided on
+  2026-10-21 (the question above). Reopened by a decision to run one
+  `go test -race -tags e2e ./...` for both steps.
+- Tags. `taggedsuites.Tags()` joins the tags of `Suites`; `lint.BuildTags`
+  (a variable now), the `tagSets` of `imports` and `license`, and so the
+  fix step read it. The check that each tag of `Suites` is carried by a
+  file, and each `//go:build` tag is in `Suites` or is the toolchain's,
+  is `tags_test.go` of the package, with a fixture tree
+  (`TestTagsOfFixtureTree`) and the module itself
+  (`TestSuitesTagsAreCarried`, `TestEveryTagIsInSuites`), shown red by
+  adding `host` to `Suites` and by removing `e2e` from it. The names of
+  the toolchain are read from `internal/syslist` in GOROOT, as the lint
+  package's tests read them, and not from `go/build`: the call-site scan
+  of 04 4.1 admits `go/build` in `internal/procgroup` alone. Reopened by
+  T075, which adds `host` to `Suites` with its first file.
+- `-count=1`. Kept in the race step for `TestOnlyAllowedDirectives` of
+  the lint package (it lists the tree with `git ls-files`) and in the
+  e2e step for the build of julieta through `go build`
+  (`BuildJulieta`), both subprocesses the test cache does not record;
+  the rows of REQ-0833 and REQ-0837 and the doc of `race` say so. The
+  unit row (REQ-0824) is left to T157. Reopened by a test of the race run
+  that no longer reads the tree through a subprocess, which leaves the
+  flag without a reason in that step.
+- One argv. `race.Argv` builds both; the e2e argv is now `go test -race
+  -count=1 -tags e2e -json -timeout=14m ./e2e/...` (the order of the
+  flags changed, not the set). `ROMEU_E2E_INFRA_FILE` stays: a file the
+  harness writes is the one channel no text a test prints can reach
+  (REQ-0798).
+- The coverage parser stays, with its reasons in the package doc of
+  `tools/ci/internal/coverage`, compared on the profile of a real race
+  run: 72 packages agree with the go command's `coverage:` lines within
+  its one-decimal rounding. Reopened by a profile reader in the standard
+  library or by an approved dependency (`golang.org/x/tools/cover`).
+- `ModuleRoot`. One finder, `moduleroot.Find`, so that `git grep -n
+  'func ModuleRoot'` finds only `citest.ModuleRoot(t)`, the wrapper that
+  keeps its `*testing.T` signature. The probe (a package under the root
+  `internal/` imported from `tools/ci/internal/citest`) was refused
+  twice by `go run ./tools/ci imports`: `imports unnamed` (REQ-0972) and
+  `imports tools` (REQ-0971). The resolution is a row in the table of 10
+  10.7 (REQ-1256, `tools/ci` and `e2e/**` only, no binary links it), an
+  allowance for `tools/ci` and `e2e` in `toolExtra` of
+  `tools/ci/internal/imports/rows.go`, and a test of each side.
+  The module-tree check (`moduletree`) then asked for two more lines, in
+  the tree of 02 2.1 and the module table of 12 12.2, which are not in
+  this task's `owns`. Reopened by a package that tools and e2e share
+  again: it takes a row and an allowance the same way.

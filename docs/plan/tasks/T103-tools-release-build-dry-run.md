@@ -81,3 +81,5 @@ item below is deferred, with the task whose merge reopens it:
     1, F10).
 - Verify: `go test ./tools/release/...`; `go run ./tools/release build
   --version v1.0.0 --dry-run`.
+
+Re-plan (2026-10-21): changed by T156. The row of REQ-0837 states its own reason for `-count=1` (the suite builds julieta through `go build`, a subprocess the test cache does not record), and the step takes its argv from `race.Argv`.
