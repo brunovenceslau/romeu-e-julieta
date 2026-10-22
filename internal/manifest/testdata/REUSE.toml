@@ -7,8 +7,8 @@
 # - valid.json: the example of 03 3.6 with its placeholders filled;
 # - size-32k.json: the fixture of I30, valid.json with a longer egress
 #   list, whose env value is exactly 32 KiB;
-# - invalid-unknown-member.json: valid.json with one member the format
-#   does not name;
+# - valid-unknown-member.json: valid.json with one member the format
+#   does not name, as a newer romeu would write it;
 # - invalid-duplicate-member.json: valid.json with the member agent
 #   written twice.
 

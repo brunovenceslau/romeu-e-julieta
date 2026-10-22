@@ -138,9 +138,9 @@ func TestDecodeRefusesAProtocolOutsideTheWindow(t *testing.T) {
 }
 
 func TestDecodeRefusesANewerSchemaVersion(t *testing.T) {
-	// A newer version may hold members this one does not name: the
-	// version is read before the strict decode, so it is format-newer
-	// and not an unknown member.
+	// A newer version may hold members this one does not name, and a
+	// document that is not canonical: the version is read first, so it is
+	// format-newer and not an invalid document.
 	data := withMember(t, "schema", `"manifest/v2"`)
 	data = bytes.Replace(data, []byte(`{"agent"`), []byte(`{"added":1,"agent"`), 1)
 	_, err := Decode(data)
@@ -148,16 +148,122 @@ func TestDecodeRefusesANewerSchemaVersion(t *testing.T) {
 	assert.Equal(t, FormatNewer, rowOf(t, err))
 }
 
+// TestDecodeIgnoresAnUnknownMember reads a manifest to which a newer
+// romeu added a member at every level the format names, as the manifest
+// without it (03 3.6, REQ-0163): same protocol, a member julieta may
+// safely ignore.
+func TestDecodeIgnoresAnUnknownMember(t *testing.T) {
+	want := valid(t)
+	doc := tree(t)
+	added := func() map[string]any { return map[string]any{"a": []any{1.0}, "b": "x"} }
+	doc["added"] = added()
+	doc["salvage"].(map[string]any)["added"] = added()
+	doc["salvageRun"].(map[string]any)["added"] = added()
+	for _, r := range doc["repos"].([]any) {
+		r.(map[string]any)["added"] = added()
+	}
+	data := canonicalOf(t, doc)
+	require.Contains(t, string(data), `"added"`)
+	got, err := Decode(data)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+
+	// The fixture of one member at the top, and the env value of it.
+	got, err = Decode(fixture(t, "valid-unknown-member.json"))
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+	got, err = DecodeEnv(base64.RawURLEncoding.EncodeToString(data))
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+}
+
+// TestDecodeHostileUnknownMembers holds what a member this build skips
+// may not do, whoever wrote it (03 3.6, REQ-0163): change what a known
+// member says (a name of another case is another name, in either
+// order), pass a duplicate or a nest too deep unseen, loosen the
+// canonical form of the members it does not skip, or put its own text
+// in an error.
+func TestDecodeHostileUnknownMembers(t *testing.T) {
+	want := valid(t)
+	doc := strings.TrimSpace(string(fixture(t, "valid.json")))
+	after := func(members string) []byte { return []byte(strings.TrimSuffix(doc, "}") + "," + members + "}") }
+	before := func(members string) []byte { return []byte("{" + members + "," + strings.TrimPrefix(doc, "{")) }
+	for name, members := range map[string]string{
+		"a case variant of a known name":     `"Schema":"x","SCHEMA":"y"`,
+		"a case variant of a value":          `"Project":"evil","AGENT":"evil","Egress":["evil.example"]`,
+		"an escape in a name and a value":    `"\u001b[31mred":"\u0007\u001b[0m"`,
+		"an unknown member holding an array": `"x":[{"a":[[],{}]},null,1.5e3]`,
+	} {
+		for pos, build := range map[string]func(string) []byte{"after": after, "before": before} {
+			got, err := Decode(build(members))
+			require.NoError(t, err, name+" "+pos)
+			assert.Equal(t, want, got, name+" "+pos)
+		}
+	}
+	// A case variant inside a repository is skipped and the real value wins.
+	nested := bytes.Replace([]byte(doc), []byte(`{"base":["89abc`), []byte(`{"Dir":"evil","URL":"https://evil.example","base":["89abc`), 1)
+	got, err := Decode(nested)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+
+	refused := map[string][]byte{
+		"a duplicate in an unknown member":        after(`"x":{"a":1,"a":2}`),
+		"a nest of 10000 arrays":                  after(`"x":` + strings.Repeat("[", 10000) + strings.Repeat("]", 10000)),
+		"a duplicate known name beside an escape": after(`"\u001b[31mred":1,"schema":"manifest/v1"`),
+		"an unknown member over the size cap":     after(`"x":"` + strings.Repeat("a", MaxJSONSize) + `"`),
+		"a duplicate unknown name":                after(`"x":1,"x":2`),
+		"a known member missing":                  bytes.Replace(after(`"x":1`), []byte(`"agent":"sbx-kit-claude",`), nil, 1),
+		"a known member null":                     bytes.Replace(after(`"x":1`), []byte(`"agent":"sbx-kit-claude"`), []byte(`"agent":null`), 1),
+		"a known member spelled with a space":     bytes.Replace(after(`"x":1`), []byte(`"agent":"`), []byte(`"agent": "`), 1),
+		"a known member spelled with an escape":   bytes.Replace(after(`"x":1`), []byte(`"agent":`), []byte(`"\u0061gent":`), 1),
+		"a space between members":                 bytes.Replace(after(`"x":1`), []byte(`"egress"`), []byte(` "egress"`), 1),
+		"a space before an unknown member":        bytes.Replace(after(`"x":1`), []byte(`,"x"`), []byte(`, "x"`), 1),
+		"a known member only as a case variant":   bytes.Replace(after(`"x":1`), []byte(`"agent":`), []byte(`"Agent":`), 1),
+		"invalid UTF-8 in an unknown member":      after("\"x\":\"\xff\""),
+		"U+FFFD in an unknown name":               after("\"x\ufffd\":1"),
+	}
+	for name, data := range refused {
+		_, err := Decode(data)
+		require.Error(t, err, name)
+		assert.NotContains(t, err.Error(), "\x1b", name)
+		assert.NotContains(t, err.Error(), "red", name)
+	}
+	// The name of a duplicate is in the error, as jsontext quotes it, with
+	// the escape written out and no raw control character.
+	_, err = Decode(after(`"\u001b[31mred":1,"\u001b[31mred":2`))
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "\x1b")
+}
+
+// TestUnknownMemberKeepsTheProtocolWindow holds that a member this
+// build skips does not widen the window of REQ-0219: N-2 and N+1 are
+// still manifest-protocol (RJ-342, exit 2), and N and N-1 are read.
+func TestUnknownMemberKeepsTheProtocolWindow(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		p    int
+	}{{"N-2", Protocol - 2}, {"N+1", Protocol + 1}, {"zero", 0}} {
+		t.Run(c.name, func(t *testing.T) {
+			data := bytes.Replace(withMember(t, "protocol", strconv.Itoa(c.p)), []byte(`"agent"`), []byte(`"added":{"a":1},"agent"`), 1)
+			_, err := Decode(data)
+			require.Error(t, err)
+			assert.Equal(t, ManifestProtocol, rowOf(t, err))
+			assert.Equal(t, 2, rowOf(t, err).Exit)
+		})
+	}
+	data := bytes.Replace(fixture(t, "valid.json"), []byte(`"agent"`), []byte(`"added":{"a":1},"agent"`), 1)
+	_, err := Decode(data)
+	require.NoError(t, err, "N")
+}
+
 func TestDecodeRefuses(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		data []byte
 	}{
-		{"an unknown member", fixture(t, "invalid-unknown-member.json")},
 		{"a duplicate member", fixture(t, "invalid-duplicate-member.json")},
 		{"a duplicate nested member", bytes.Replace(fixture(t, "valid.json"), []byte(`{"id":"01j9`), []byte(`{"id":"x","id":"01j9`), 1)},
 		{"a duplicate member in the run", bytes.Replace(fixture(t, "valid.json"), []byte(`"label":"dev"`), []byte(`"label":"dev","label":"x"`), 1)},
-		{"an unknown nested member", bytes.Replace(fixture(t, "valid.json"), []byte(`{"id":"01j9`), []byte(`{"other":1,"id":"01j9`), 1)},
 		{"a member of another case", bytes.Replace(fixture(t, "valid.json"), []byte(`"agent":`), []byte(`"Agent":`), 1)},
 		{"another format", withMember(t, "schema", `"project/v1"`)},
 		{"an older version", withMember(t, "schema", `"manifest/v0"`)},
@@ -338,7 +444,7 @@ func TestDecodeEnvRefuses(t *testing.T) {
 // document it accepts encodes to canonical JSON that decodes to the
 // same manifest and encodes to the same bytes again.
 func FuzzDecode(f *testing.F) {
-	for _, name := range []string{"valid.json", "invalid-unknown-member.json", "invalid-duplicate-member.json"} {
+	for _, name := range []string{"valid.json", "valid-unknown-member.json", "invalid-duplicate-member.json"} {
 		data, err := os.ReadFile("testdata/" + name)
 		require.NoError(f, err)
 		f.Add(data)
