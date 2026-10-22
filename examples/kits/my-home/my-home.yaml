@@ -1,0 +1,31 @@
+# syntax=docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d
+# yaml-language-server: $schema=https://raw.githubusercontent.com/docker/sandbox-kit-spec/v3.0.0-m.8/schema/kit.schema.json
+#
+# An example personal kit (06 6.1), CC0-1.0, to copy into a config repo's
+# kits/<name>/ and name in a project spec as "personal: <name>". A
+# personal kit may not declare a network, mount, volume, credential or
+# ssh-agent capability (REQ-0574); its install steps are shown in the
+# gate 2 diff. This one sets a few git defaults for the agent user.
+schemaVersion: "3"
+kind: mixin
+displayName: my-home
+description: personal git defaults for the agent user
+args:
+  defaultBranch:
+    required: false
+    description: The branch name git init gives a new repository.
+    pattern: '^[a-z][a-z0-9-]{0,31}$'
+    env: MY_HOME_DEFAULT_BRANCH
+capabilities:
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        - description: git defaults for the agent user
+          user: agent
+          env: [MY_HOME_DEFAULT_BRANCH]
+          command:
+            - bash
+            - -euc
+            - |
+              git config --global pull.rebase true
+              git config --global init.defaultBranch "${MY_HOME_DEFAULT_BRANCH:-main}"

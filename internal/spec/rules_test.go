@@ -151,7 +151,8 @@ func TestNameAndPathRules(t *testing.T) {
 			bad: []string{"", ".", "..", "a/b", "/a", "Shop", "-a", ".hidden", "memory", "MEMORY", "review", "ledger", ".romeu", "SbxEnv.yaml", ".git", strings.Repeat("a", 64)},
 		},
 		"repo-url": {
-			ok: []string{"https://github.com/example/shop-api", "https://github.com/example/shop-api.git", "https://GitHub.com/Example/Shop", "https://ghe.example.com/o/r"},
+			ok: []string{"https://github.com/example/shop-api", "https://github.com/example/shop-api.git", "https://GitHub.com/Example/Shop", "https://ghe.example.com/o/r",
+				"https://git.corp.internal/o/r", "https://git.corp.local/o/r"},
 			bad: []string{"http://github.com/a/b", "git@github.com:a/b", "https://gitlab.com/group/sub/repo", "https://github.com/a", "https://github.com:443/a/b",
 				"https://user@github.com/a/b", "https://github.com/a/b?x=1", "https://github.com/a/b#f", "https://github.com/../b", "https://github.com/a/.git", "https://localhost/a/b", "https://1.2.3.4/a/b", "https://github.com/a/b/"},
 		},
@@ -199,16 +200,25 @@ func TestNameAndPathRules(t *testing.T) {
 			ok:  []string{"osxkeychain", "manager-core", "/usr/local/bin/helper", "/opt/git-credential-x_1.2+b"},
 			bad: []string{"", "Osx", "a b", "rel/path", "/a/../b", "/usr/bin/x y", "/bin/x;rm", "/bin/$(x)", "/bin/x|y", "/bin/`x`", "/bin/x&", "/bin/x'y"},
 		},
-		"agent":           {ok: []string{"sbx-kit-claude", "a", "a.b_c-1"}, bad: []string{"", "-a", "A", "a b", "a\nb", ".a", strings.Repeat("a", 64)}},
-		"port":            {ok: []string{"8080", "8080:8080", "8080:80/tcp", "53:53/udp", "1:65535"}, bad: []string{"", "0", "65536", "8080:0", "a:1", "8080/sctp", "-1", "1:2:3", "8080:8080/tcp\n"}},
-		"memory":          {ok: []string{"8g", "512m", "1024", "2G", "1k"}, bad: []string{"", "0", "08g", "8gb", "8 g", "-8g", "1.5g", "8t"}},
+		"agent": {ok: []string{"sbx-kit-claude", "a", "a.b_c-1"}, bad: []string{"", "-a", "A", "a b", "a\nb", ".a", strings.Repeat("a", 64)}},
+		"port": {
+			ok: []string{"8080", "8080:8080", "3000:8080", "8080:80/tcp", "53:53/udp", "1:65535", "8080/tcp4", "8080/tcp6", "8080/udp4", "8080/udp6",
+				"127.0.0.1:8080:80", "127.0.0.1:8080:80/tcp4"},
+			bad: []string{"", "0", "65536", "8080:0", "a:1", "8080/sctp", "-1", "1:2:3", "8080:8080/tcp\n", "0.0.0.0:8080:80", "192.168.1.2:8080:80",
+				"[::]:8080:80", "127.0.0.1:80", "::1:8080:80", "8080/TCP",
+				"[::1]:8080:80", "[::1]:8080:80/tcp6", "08080", "0080:80", "80:08", "00", "127.0.0.1:08080:80", "100000"},
+		},
+		"memory":          {ok: []string{"8g", "512m", "1g", "1024m", "64g"}, bad: []string{"", "0", "08g", "8gb", "8 g", "-8g", "1.5g", "8t", "511m", "1024", "2G", "8M", "1k", "0g"}},
 		"salvage-exclude": {ok: []string{"node_modules/", ".venv/", "target", "a/b/", "*.log"}, bad: []string{"", "/abs/", "../x", "a/../b", "a//b", "a\nb", "-x"}},
 		"egress-tool":     {ok: []string{"core:go", "aqua:jqlang/jq", "http:internal-cli", "npm:@scope/pkg"}, bad: []string{"", "go", ":go", "core:", "Core:go", "core:go x", "-a:b", "core:go\n"}},
 		"secret-service":  {ok: []string{"github", "npm", "a_b-c"}, bad: []string{"", "-x", "GitHub", "a b", "a\nb"}},
 		"step-arg":        {ok: []string{"npm", "", "--flag=x", "a b", "é"}, bad: []string{"a\nb", "a\x00b", "\x1b[31m", "a\rb"}},
 		"step-argv0":      {ok: []string{"npm", "/usr/bin/env"}, bad: []string{"", "-x"}},
 		"pane-env-value":  {ok: []string{"", "3000", "a b", "é"}, bad: []string{"a\nb", "\x00", "\x1b"}},
-		"git-host":        {ok: []string{"github.com", "ghe.example.com"}, bad: []string{"GitHub.com", "github.com:443", "localhost", "*.github.com"}},
+		"git-host": {
+			ok:  []string{"github.com", "ghe.example.com", "git.corp.internal", "git.corp.local", "git.home.arpa", "git.lan"},
+			bad: []string{"GitHub.com", "github.com:443", "localhost", "*.github.com", "10.0.0.1", "[::1]", "0x7f.example", "git.123"},
+		},
 		"workload-allowlist": {
 			ok:  []string{"docker.io/docker/sbx-kit-claude", "ghcr.io/a/b/c"},
 			bad: []string{"docker/sbx-kit-claude", "docker.io/docker/sbx-kit-claude@sha256:" + strings.Repeat("a", 64), "docker.io/Docker/x", "docker.io"},
@@ -228,7 +238,7 @@ func TestNameAndPathRules(t *testing.T) {
 	for v, ok := range map[float64]bool{0.1: true, 0.5: true, 0.9: true, 0.09: false, 0.91: false, 0: false, 1: false, math.NaN(): false, math.Inf(1): false} {
 		assert.Equal(t, ok, checkOne(ruleBySlug(t, "node-ratio"), reflect.ValueOf(v)), "node-ratio and %v", v)
 	}
-	for v, ok := range map[int]bool{1: true, 4: true, 256: true, 0: false, -1: false, 257: false} {
+	for v, ok := range map[int]bool{0: true, 1: true, 4: true, 256: true, -1: false, 257: false} {
 		assert.Equal(t, ok, checkOne(ruleBySlug(t, "cpus"), reflect.ValueOf(v)), "cpus and %v", v)
 	}
 }

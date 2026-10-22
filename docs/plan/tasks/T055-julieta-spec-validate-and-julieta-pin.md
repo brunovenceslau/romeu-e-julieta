@@ -12,6 +12,7 @@ owns:
   - e2e/julieta_spec_test.go
   - e2e/julieta_pin_test.go
   - e2e/scenarios/j2/step1_*.go
+  - examples/.github/workflows/validate.yml
 needs:
   - T021
   - T032
@@ -32,6 +33,16 @@ Re-plan (2026-10-12): Kept. It feeds the config repo's `validate.yml`.
 Its J2 step lives in its own file, `e2e/scenarios/j2/step1_*.go`, in the
 directory T043 owns, so this task comes `after` T043 (rule 1 of
 `docs/plan.md`).
+
+Re-plan (2026-10-22): Changed, decided by the maintainer. This task
+takes from T021 the example workflow
+`examples/.github/workflows/validate.yml`, which pins a julieta release
+by version and archive sha256, verifies it against `checksums.txt`
+before it runs, and passes `julieta pin check --workflows`; it is the
+fixture of that check's test. It moved because no julieta release
+exists to pin yet and this task builds `julieta pin check`. The file is
+a YAML file under `examples/`, so the hint rule of REQ-0836 applies to
+it; this task settles how it meets it.
 
 - Implements: REQ-0009 (index), REQ-0038 (00 0.4), REQ-0117 (02 2.1),
   REQ-0119 (02 2.1), REQ-0134 (02 2.2), REQ-0135 (02 2.2), REQ-0174 (03

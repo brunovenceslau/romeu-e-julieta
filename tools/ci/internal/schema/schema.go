@@ -6,8 +6,10 @@
 // tools/schemagen generates (REQ-0733), the files under examples/ and
 // the testdata files that name a format validate against its schema
 // (REQ-0734), and each YAML file under examples/ carries the $schema
-// hint of the release VERSION names (REQ-1249, 03 3.2). It also holds
-// the generator that writes schemas/*.json ("go generate ./...").
+// hint of the release VERSION names (REQ-1249, 03 3.2), or, for a kit
+// descriptor, the modeline of the official kit schema (REQ-0836). It
+// also holds the generator that writes schemas/*.json ("go generate
+// ./...").
 //
 // The files it judges are those of the commit's tree, each read once:
 //
@@ -16,6 +18,11 @@
 //   - every YAML file under examples/, which validates against the
 //     schema its hint names, and every JSON file there, which validates
 //     against the format its "schema" field names;
+//   - every v3 kit descriptor (a YAML file whose first line is the
+//     frontend pin) under examples/, which carries the modeline of the
+//     kit schema of sbx at kitSpecTag on its second line, in place of a
+//     hint of ours, and validates against that schema, copied here
+//     (kits.go);
 //   - every YAML or JSON file below a testdata directory whose "schema"
 //     field has the form "<name>/v<n>" (REQ-1250): a format no
 //     registered type generates is a finding; the file validates,
@@ -67,6 +74,9 @@ const (
 	ruleUnknown = "schema unknown"
 	ruleHint    = "schema hint"
 	ruleVersion = "schema version"
+	rulePin     = "schema pin"
+	ruleCopy    = "schema copy"
+	ruleTimeout = "schema timeout"
 )
 
 // hintPrefix is the start of the hint line of 03 3.2, which the
@@ -132,6 +142,9 @@ func compile(outs []check.Output) (compiled, error) {
 	return out, nil
 }
 
+// errNoKitSchema is the error of a kit schema that does not compile.
+var errNoKitSchema = errors.New("the vendored kit schema does not compile")
+
 // Of returns the findings of the check over files, the tree of one
 // commit, for the registered formats schemas, sorted by place. A
 // format the generator cannot express is an error.
@@ -144,13 +157,31 @@ func Of(files []check.TreeFile, schemas []schemagen.Schema) ([]check.Finding, er
 	if err != nil {
 		return nil, err
 	}
+	kit, err := compileKit(files)
 	findings := driftFindings(files, outs)
+	// A copy that holds a file other than the pinned ones, or lacks one,
+	// is reported as such, and the descriptors are not judged against it.
+	ref, refErr := frontendRef(files)
+	broken := false
+	if hasKitCopy(files) {
+		findings = append(findings, pinFindings(ref, refErr)...)
+		copyF := copyFindings(files)
+		findings = append(findings, copyF...)
+		broken = err != nil && len(copyF) > 0
+	}
+	if err != nil && !broken {
+		return nil, fmt.Errorf("%w: %w", errNoKitSchema, err)
+	}
 	hint, hintErr := hintBase(files)
 	for _, f := range files {
 		if f.Mode == "160000" {
 			continue
 		}
 		switch {
+		case isKitDescriptor(f) && broken:
+			continue
+		case isKitDescriptor(f):
+			findings = append(findings, kitFindings(f, kit, ref, refErr)...)
 		case strings.HasPrefix(f.Path, examplesDir):
 			findings = append(findings, exampleFindings(f, sch, hint, hintErr)...)
 		case underTestdata(f.Path):

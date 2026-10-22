@@ -115,6 +115,7 @@
 /tools/ci/internal/askfirst/** @brunovenceslau
 /tools/ci/internal/pr/** @brunovenceslau
 /tools/ci/internal/kits/** @brunovenceslau
+/tools/ci/internal/schema/** @brunovenceslau
 /tools/ci/internal/catalog/** @brunovenceslau
 /tools/ci/internal/callsites/** @brunovenceslau
 /tools/ci/internal/crossbuild/** @brunovenceslau

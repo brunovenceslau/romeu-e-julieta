@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"path"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -60,13 +61,17 @@ func branchName(name string) error {
 // letter or digit at each end, at most 63 bytes.
 var ldhLabel = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
 
-// domainName holds an egress domain or a host name to 03 3.1 (REQ-0188):
-// a lowercase host name of at least two labels, each an LDH label, so
-// an IDNA name is written as its A-labels (xn--); no wildcard, port or
-// IP literal, which the label form already refuses, and no label with
-// hyphens in its third and fourth places but an A-label's, which IDNA
-// reserves. The Punycode of an A-label is not decoded.
-func domainName(name string) error {
+// hostName holds a host name to 03 3.1 (REQ-0188): a lowercase host
+// name of at least two labels, each an LDH label, so an IDNA name is
+// written as its A-labels (xn--); no wildcard, port or IP literal,
+// which the label form already refuses, and no label with hyphens in
+// its third and fourth places but an A-label's, which IDNA reserves;
+// and no label of 0x and hex digits, which some resolvers read as a
+// number, so an address in disguise. The Punycode of an A-label is not
+// decoded. It is the rule of a git host (gitHosts[].host and the host
+// of a repo URL), which may be a self-hosted server under a private
+// suffix, such as git.corp.internal.
+func hostName(name string) error {
 	if len(name) > 253 {
 		return errors.New("is longer than 253 bytes")
 	}
@@ -88,7 +93,45 @@ func domainName(name string) error {
 	if !strings.ContainsFunc(labels[len(labels)-1], func(r rune) bool { return r < '0' || r > '9' }) {
 		return errors.New("ends with a label of digits only")
 	}
+	if slices.ContainsFunc(labels, isHexLabel) {
+		return errors.New("has a label of 0x and hex digits, which a resolver may read as an address")
+	}
 	return nil
+}
+
+// domainName holds an egress domain to 03 3.1 (REQ-0188): a hostName
+// that is not under a special-use name, which a resolver may answer
+// from the host or its local network, so an egress entry could reach
+// it (see specialUse).
+func domainName(name string) error {
+	if err := hostName(name); err != nil {
+		return err
+	}
+	labels := strings.Split(name, ".")
+	if slices.Contains(specialUse, labels[len(labels)-1]) || name == "home.arpa" || strings.HasSuffix(name, ".home.arpa") {
+		return errors.New("ends with a special-use name a resolver may map to the host or its local network (" + specialUseText + ")")
+	}
+	return nil
+}
+
+// specialUse are the last labels domainName refuses, besides the suffix
+// home.arpa: localhost (RFC 6761, 6.3), test and invalid (RFC 6761, 6.1
+// and 6.4), local (multicast DNS, RFC 6762), home.arpa (RFC 8375),
+// onion (RFC 7686), internal (reserved for private use by ICANN, 2024),
+// and the names that home and corporate networks use without a
+// registration (localdomain, lan, home, corp, intranet, private; RFC
+// 6762, appendix G). example (RFC 2606) is not here: it is
+// documentation, and it cannot be registered or resolved.
+var specialUse = []string{"localhost", "local", "internal", "localdomain", "lan", "home", "corp", "intranet", "private", "test", "invalid", "onion"}
+
+// specialUseText lists specialUse and home.arpa for a message.
+var specialUseText = strings.Join(specialUse, ", ") + ", home.arpa"
+
+// isHexLabel reports whether l is 0x followed by at least one hex digit
+// and nothing else.
+func isHexLabel(l string) bool {
+	rest, ok := strings.CutPrefix(l, "0x")
+	return ok && rest != "" && strings.Trim(rest, "0123456789abcdef") == ""
 }
 
 // urlSegment is an owner or a repository name of a repo URL.
@@ -107,7 +150,7 @@ func repoURL(raw string) error {
 	if len(parts) != 3 {
 		return errors.New("is not https://<host>/<owner>/<repo>")
 	}
-	if err := domainName(strings.ToLower(parts[0])); err != nil {
+	if err := hostName(strings.ToLower(parts[0])); err != nil {
 		return errors.New("has a host that " + err.Error())
 	}
 	repo := strings.TrimSuffix(parts[2], ".git")
@@ -188,14 +231,25 @@ func credentialHelper(v string) error {
 }
 
 // portSpec holds a port spec past its pattern: each port is from 1 to
-// 65535.
+// 65535. The pattern admits a loopback host IP only, which is cut off.
 func portSpec(v string) error {
 	spec, _, _ := strings.Cut(v, "/")
+	spec = strings.TrimPrefix(spec, "127.0.0.1:")
 	for p := range strings.SplitSeq(spec, ":") {
 		n, err := strconv.Atoi(p)
-		if err != nil || n < 1 || n > 65535 {
+		if err != nil || n < 1 || n > 65535 || p[0] == '0' {
 			return errors.New("has a port outside 1 to 65535")
 		}
+	}
+	return nil
+}
+
+// memoryLimit holds a memory limit past its pattern: at least 512 MiB,
+// sbx's minimum.
+func memoryLimit(v string) error {
+	n, err := strconv.Atoi(v[:len(v)-1])
+	if err != nil || (v[len(v)-1] == 'm' && n < 512) {
+		return errors.New("is below 512m")
 	}
 	return nil
 }

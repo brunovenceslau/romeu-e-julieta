@@ -50,6 +50,15 @@ meaning of each field. This task's field-table generator also writes
 the manifest's page, from `internal/manifest` and its struct tags, and
 replaces the table of 03 3.6 by a link to it, which is REQ-0173.
 
+Re-plan (2026-10-22): Changed, decided by the maintainer. The row
+"`examples/.github/workflows/validate.yml` pins a julieta release by
+version and archive sha256, verifies it against `checksums.txt` before
+it runs, and passes `julieta pin check --workflows` (T055)" moves to
+T055: no julieta release exists to pin yet, and T055 builds `julieta
+pin check`, whose test fixture the file is. `examples/kits/` is built
+here, its descriptor validated against a copy of sbx's kit schema
+(REQ-0836).
+
 - Implements: REQ-0019 (index), REQ-0038 (00 0.4), REQ-0054 (01 1.3),
   REQ-0066 (01 1.4), REQ-0067 (01 1.4), REQ-0118 (02 2.1), REQ-0119 (02
   2.1), REQ-0133 (02 2.2), REQ-0134 (02 2.2), REQ-0159 (03 (opening)),
@@ -64,7 +73,10 @@ replaces the table of 03 3.6 by a link to it, which is REQ-0173.
   5.2), REQ-0494 (05 5.2), REQ-0495 (05 5.2), REQ-0509 (05 5.2),
   REQ-0576 (06 6.2), REQ-0752 (10 10.1), REQ-0793 (10 10.1), REQ-0836
   (10 10.2), REQ-0960 (10 10.6), REQ-1044 (12 12.1), REQ-1106 (12 12.3),
-  REQ-1107 (12 12.3), REQ-1117 (12 12.3), REQ-1222 (05 5.2).
+  REQ-1107 (12 12.3), REQ-1117 (12 12.3), REQ-1222 (05 5.2), REQ-1258 (04 4.4),
+  REQ-1259 (03 3.1), REQ-1260 (03 3.1), REQ-1261 (03 3.1), REQ-1262 (03
+  3.1), REQ-1263 (03 3.1), REQ-1264 (03 3.1), REQ-1265 (03 3.1),
+  REQ-1266 (03 3.1), REQ-1267 (03 3.1), REQ-1268 (03 3.1).
 - Operator: no.
 - Acceptance:
   - Strict decode: the decoder is `encoding/json/v2` with
