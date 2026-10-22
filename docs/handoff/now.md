@@ -13,7 +13,7 @@ first from 2026-10-22", 01m5gywvgc85vj8k4txzppjz6d).
    `go run ./tools/ci plan --ready`; read its task first.
 2. T077 once A12 is measured ("T077 waits for the A12 measurement",
    01m5gywvj5vj90yfedah9y670b).
-3. T161 once its open questions are answered and T088 is planned
+3. T161 once its open questions are answered and T088 is built (M6)
    (01m5e14094yhqhsxq2g941pwrf).
 4. T111, the cut-over of M1, at sitting M1 in the config repository.
 5. The pending notes 01m5gywvh9pdmte8k85q87wwdc (T060 rule),
