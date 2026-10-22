@@ -4,14 +4,17 @@
 package setup_test
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/salvage"
 )
@@ -130,4 +133,32 @@ func TestSetupSnapshotsDisabledUnreadable(t *testing.T) {
 	data, err := os.ReadFile(s.headsFile())
 	require.NoError(t, err)
 	assert.Equal(t, "{}\n", string(data))
+}
+
+// TestSetupSnapshotsDisabledEscapesTheDir runs the step on a run whose
+// repo dir holds an escape sequence, which no manifest accepts but a
+// step must not trust: neither the warning nor the entry of errors
+// holds a raw ESC. The CLI writer escapes what it prints and termsafe's
+// Escape of an escaped text is that text, so the message escaped
+// beforehand is printed once, not twice.
+func TestSetupSnapshotsDisabledEscapesTheDir(t *testing.T) {
+	s := newSandbox(t)
+	git(t, s.primary(), "config", "core.hooksPath", ".githooks")
+	hostile := "a\x1b[31mb"
+	s.m.Repos = s.m.Repos[:1]
+	s.m.Repos[0].Dir = hostile
+	rep := setup.RecordSnapshotsDisabledForTest(t.Context(), s.home, s.m)
+	require.Len(t, disabledWarnings(rep), 1)
+	assert.NotContains(t, disabledWarnings(rep)[0].Message, "\x1b")
+	assert.Equal(t, `snapshots disabled for a\u001b[31mb`, disabledWarnings(rep)[0].Message)
+	assert.Empty(t, rep.Errors)
+	require.NoError(t, os.MkdirAll(filepath.Join(s.m.Repos[0].Memory, "snapshot"), 0o700))
+	require.NoError(t, os.WriteFile(s.headsFile(), []byte("{}\n"), 0o600))
+	failed := setup.RecordSnapshotsDisabledForTest(t.Context(), s.home, s.m)
+	require.Len(t, failed.Errors, 1)
+	assert.True(t, strings.HasPrefix(failed.Errors[0], `snapshots disabled of a\u001b[31mb: `), failed.Errors[0])
+	assert.NotContains(t, failed.Errors[0], "\x1b")
+	var out bytes.Buffer
+	setup.PrintWarning(cli.NewWriter(&out), disabledWarnings(rep)[0])
+	assert.Equal(t, "warning snapshots-disabled: snapshots disabled for a\\u001b[31mb\n", out.String())
 }

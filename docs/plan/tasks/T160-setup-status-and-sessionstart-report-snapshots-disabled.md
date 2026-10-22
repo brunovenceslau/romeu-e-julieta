@@ -89,3 +89,27 @@ not decode is an entry of the report's `errors`, left as it is.
 - Verify: `go test -race ./internal/cmd/julieta/... ./internal/hooks/...`,
   `go test -tags e2e ./e2e/... -run '^TestJulietaSetupSnapshotsDisabled'
   -v`, and `go run ./tools/ci all`.
+
+Decisions taken while building (2026-10-22), each with what reopens
+it:
+
+- Setup writes `disabled: false` back into an existing heads.json when
+  the key is gone. REQ-0692 asks only for `disabled: true`; the
+  write-back keeps the file true to the config, as a snapshot rewrites
+  `disabled` on every run. Reopened by a reader that wants the file to
+  keep a value setup did not read.
+- A value of `core.hooksPath` that `gitsafe` refuses to read counts as
+  set, the rule `actions.Snapshot` has (T060): `hooksPathSet` serves
+  both, and a test pins it. A dir that is no work tree is an error of
+  `RecordDisabled` and not a refused value, since `gitsafe` refuses it
+  with the same error.
+- `RecordDisabled` reads `core.hooksPath` under the store lock, as
+  `Snapshot` does, so the value read is the one written; a snapshot
+  parked between its writes keeps it out, and a short context ends the
+  wait.
+- Deferred: the warning `snapshots-disabled` is recorded by setup and
+  refreshed at the next setup only, while the repo line of `julieta
+  status` (`snapshots  disabled (core.hooksPath ...)`) is read live, so
+  after a `git config core.hooksPath` the two disagree until setup
+  runs. Reopened by a report of a stale warning, or by a task that
+  makes status compute its warnings from the repos.

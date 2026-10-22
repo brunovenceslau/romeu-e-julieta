@@ -6,6 +6,8 @@
 package actions
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -38,11 +40,18 @@ func TestRecordDisabled(t *testing.T) {
 	before, err := os.ReadFile(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
 	require.NoError(t, err)
 
+	headsFile := filepath.Join(f.snapshotDir(), salvage.HeadsFile)
+	infoBefore, err := os.Stat(headsFile)
+	require.NoError(t, err)
 	_, err = RecordDisabled(t.Context(), f.config(t, later))
 	require.NoError(t, err)
-	after, err := os.ReadFile(filepath.Join(f.snapshotDir(), salvage.HeadsFile))
+	after, err := os.ReadFile(headsFile)
 	require.NoError(t, err)
 	assert.Equal(t, before, after, "a file that says so is left alone")
+	infoAfter, err := os.Stat(headsFile)
+	require.NoError(t, err)
+	assert.True(t, os.SameFile(infoBefore, infoAfter), "the file was not replaced by a rename")
+	assert.Equal(t, infoBefore.ModTime(), infoAfter.ModTime(), "the file was not rewritten")
 
 	git(t, f.repo, "config", "--unset", "core.hooksPath")
 	_, err = RecordDisabled(t.Context(), f.config(t, later))
@@ -76,4 +85,82 @@ func TestRecordDisabledRefusals(t *testing.T) {
 	data, err := os.ReadFile(bad)
 	require.NoError(t, err)
 	assert.Equal(t, "{}\n", string(data))
+}
+
+// TestRecordDisabledRefusedHooksPath counts a core.hooksPath that
+// gitsafe refuses to read, an empty value or one with a control
+// character, as set, as Snapshot does: the repo bypasses the dispatcher
+// all the same, so heads.json says disabled (08 8.4, REQ-0692).
+func TestRecordDisabledRefusedHooksPath(t *testing.T) {
+	for _, tt := range []struct{ name, value string }{
+		{"empty", ""},
+		{"control character", "hooks\x1b[31m"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t)
+			git(t, f.repo, "config", "core.hooksPath", tt.value)
+			_, set, err := f.config(t, clock).Git.HooksPath(t.Context(), f.repo)
+			require.Error(t, err, "the control: gitsafe refuses the value")
+			require.False(t, set)
+
+			disabled, err := RecordDisabled(t.Context(), f.config(t, clock))
+			require.NoError(t, err)
+			assert.True(t, disabled)
+			assert.True(t, f.heads(t).Disabled)
+		})
+	}
+}
+
+// TestRecordDisabledOfNoRepository is an error and writes nothing for a
+// dir that is no work tree, which gitsafe refuses and which is no value
+// of core.hooksPath.
+func TestRecordDisabledOfNoRepository(t *testing.T) {
+	f := newFixture(t)
+	c := f.config(t, clock)
+	c.Dir = filepath.Join(f.home, "missing")
+	_, err := RecordDisabled(t.Context(), c)
+	require.Error(t, err)
+	assert.NoDirExists(t, f.snapshotDir())
+}
+
+// TestRecordDisabledWaitsForASnapshot parks a snapshot between its two
+// writes, holding the store lock, and calls RecordDisabled with a
+// short context: it returns the context's error and heads.json is as
+// the snapshot left it (08 8.4, REQ-0690).
+func TestRecordDisabledWaitsForASnapshot(t *testing.T) {
+	f := newFixture(t)
+	commit(t, f.repo, "one")
+	_, err := Snapshot(t.Context(), f.config(t, clock))
+	require.NoError(t, err)
+	headsFile := filepath.Join(f.snapshotDir(), salvage.HeadsFile)
+	before, err := os.ReadFile(headsFile)
+	require.NoError(t, err)
+	git(t, f.repo, "config", "core.hooksPath", ".githooks")
+
+	parked, release := make(chan struct{}), make(chan struct{})
+	seam(t, &snapshotBetweenWrites, func() error {
+		close(parked)
+		<-release
+		return errors.New("stopped")
+	})
+	done := make(chan error, 1)
+	go func() {
+		_, err := Snapshot(t.Context(), f.config(t, clock.Add(time.Minute)))
+		done <- err
+	}()
+	<-parked
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	_, err = RecordDisabled(ctx, f.config(t, clock.Add(time.Hour)))
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	after, err := os.ReadFile(headsFile)
+	require.NoError(t, err)
+	assert.Equal(t, before, after, "heads.json is as the parked snapshot left it")
+
+	close(release)
+	require.Error(t, <-done)
+	disabled, err := RecordDisabled(t.Context(), f.config(t, clock.Add(time.Hour)))
+	require.NoError(t, err)
+	assert.True(t, disabled)
+	assert.True(t, f.heads(t).Disabled, "the lock is free again")
 }

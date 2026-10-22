@@ -3,7 +3,15 @@
 
 package setup
 
-import "os"
+import (
+	"context"
+	"crypto/rand"
+	"os"
+	"time"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
+)
 
 // SetExecutable makes f find the running binary until the returned
 // function restores os.Executable.
@@ -25,3 +33,16 @@ func SetStateOnWait(f func()) (restore func()) {
 
 // RecordState exposes recordState to the external tests.
 var RecordState = recordState
+
+// RecordSnapshotsDisabledForTest runs the step recordSnapshotsDisabled
+// alone on the manifest m, its repos left as they are, and returns the
+// report it filled.
+func RecordSnapshotsDisabledForTest(ctx context.Context, home string, m manifest.Manifest) Report {
+	git, err := NewGit(home)
+	if err != nil {
+		panic(err)
+	}
+	r := &run{home: home, m: m, git: git, now: time.Now, ulids: canon.NewULIDSource(rand.Reader)}
+	recordSnapshotsDisabled(ctx, r)
+	return r.report
+}
