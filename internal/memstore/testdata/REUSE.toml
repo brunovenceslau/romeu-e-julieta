@@ -6,9 +6,10 @@
 # 3.9) written for these tests:
 # - valid.md: the example of 03 3.9, byte for byte;
 # - invalid-anchor.md, invalid-alias.md, invalid-merge-key.md,
-#   invalid-include.md, invalid-duplicate-key.md and
-#   invalid-unknown-key.md: an entry like valid.md with one construct
-#   the strict decoder refuses;
+#   invalid-include.md and invalid-duplicate-key.md: an entry like
+#   valid.md with one construct the strict decoder refuses;
+# - unknown-key.md: valid.md with one key a newer writer adds, read as
+#   the entry without it (REQ-0163);
 # - newer.md: a memory-entry/v2, refused with format-newer;
 # - fuzz/FuzzDecode/*: the committed seeds of the fuzz target of the
 #   decoder: each fixture above, and deep flow nesting, a key of 500

@@ -191,13 +191,15 @@ func Encode(f File) ([]byte, error) {
 // first line "---" and the next, of one YAML mapping with no anchor,
 // alias, merge key, tag outside YAML's core schema (an include among
 // them) or duplicate key, nested at most maxDepth levels; then
-// go.yaml.in/yaml/v3 with KnownFields(true) into Front, every key
-// required; then the rules of 03 3.10 (File.Check). The schema field is
-// read from the parsed mapping before the keys are judged, so a newer
-// version is format-newer (RJ-311) though it holds keys v1 does not
-// know; a front matter that does not parse, or that the subset grammar
-// refuses, is format-newer too when the text of its schema line names a
-// newer version. Every other refusal wraps ErrInvalid.
+// go.yaml.in/yaml/v3 into Front, every key of v1 required and a key
+// this build does not know skipped, in the front matter and in a repo,
+// as a newer writer of the same version may add one (REQ-0163); then
+// the rules of 03 3.10 (File.Check). The schema field is read from the
+// parsed mapping before the keys are judged, so a newer version is
+// format-newer (RJ-311) though it holds keys v1 does not know; a front
+// matter that does not parse, or that the subset grammar refuses, is
+// format-newer too when the text of its schema line names a newer
+// version. Every other refusal wraps ErrInvalid.
 func Decode(data []byte) (File, error) {
 	if len(data) > memstore.MaxFileSize {
 		return File{}, fmt.Errorf("%w: the file has %d bytes, over %d", ErrInvalid, len(data), memstore.MaxFileSize)
@@ -234,7 +236,6 @@ func Decode(data []byte) (File, error) {
 	}
 	var f File
 	dec := yaml.NewDecoder(bytes.NewReader(front))
-	dec.KnownFields(true)
 	if err := dec.Decode(&f.Front); err != nil {
 		return File{}, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
@@ -315,10 +316,10 @@ func checkTree(n *yaml.Node, depth int) error {
 	return nil
 }
 
-// checkKeys returns why the keys of the front matter m are not exactly
-// frontKeys, and those of each repo not exactly repoKeys.
+// checkKeys returns why the front matter m lacks a key of frontKeys, and
+// a repo lacks one of repoKeys; a key in none of them is skipped.
 func checkKeys(m *yaml.Node) error {
-	if err := exactKeys(m, frontKeys, "the front matter"); err != nil {
+	if err := requireKeys(m, frontKeys, "the front matter"); err != nil {
 		return err
 	}
 	for i := 0; i < len(m.Content); i += 2 {
@@ -336,7 +337,7 @@ func checkKeys(m *yaml.Node) error {
 			if r.Kind != yaml.MappingNode {
 				return errors.New("a repo is not a mapping")
 			}
-			if err := exactKeys(r, repoKeys, "a repo"); err != nil {
+			if err := requireKeys(r, repoKeys, "a repo"); err != nil {
 				return err
 			}
 		}
@@ -344,16 +345,12 @@ func checkKeys(m *yaml.Node) error {
 	return nil
 }
 
-// exactKeys returns why the keys of the mapping m are not exactly want
-// (its keys are distinct, checkTree having passed).
-func exactKeys(m *yaml.Node, want []string, what string) error {
+// requireKeys returns why the mapping m lacks a key of want (its keys
+// are distinct, checkTree having passed).
+func requireKeys(m *yaml.Node, want []string, what string) error {
 	have := map[string]bool{}
 	for i := 0; i < len(m.Content); i += 2 {
-		key := m.Content[i].Value
-		if !slices.Contains(want, key) {
-			return fmt.Errorf("the key \"%s\" is not a field of %s in %s", clip(key), Field, what)
-		}
-		have[key] = true
+		have[m.Content[i].Value] = true
 	}
 	for _, key := range want {
 		if !have[key] {

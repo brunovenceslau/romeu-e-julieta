@@ -5,15 +5,21 @@ Back to [index](../spec.md). Reader: implementers of `spec`, `render`,
 
 `REQ-0159` Every format in the schema list of
 [02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public) has a
-version field, strict decoding (unknown keys are errors), a JSON Schema
-in `schemas/`, and examples in `examples/` validated in CI; the formats
-without a schema are listed, each with its reason, in 3.13.
+version field, strict decoding (a duplicate key is an error, and so is an
+unknown key in a file a person writes; the versions rule below says what
+a reader between binaries does with one, except the manifest, which stays
+strict while the maintainer decides, [ADR 0041](../adr/0041-readers-of-formats-between-binaries-ignore-unknown-members.md)),
+a JSON Schema in `schemas/`, and examples in `examples/` validated in CI;
+the formats without a schema are listed, each with its reason, in 3.13.
 
 `REQ-0160` JSON is decoded with `encoding/json/v2` (in the standard library of the
-pinned Go; the v1 package is implemented over it): an owned format with
-`json.RejectUnknownMembers(true)`, an upstream output without it. v2's
-defaults, a duplicate member name is an error and member names match
-exactly, are the strictness this page means by strict.
+pinned Go; the v1 package is implemented over it): an owned format that a
+person writes with `json.RejectUnknownMembers(true)`, an upstream output
+and an owned format between binaries without it (the versions rule
+below), except the manifest (3.6), which stays strict while the
+maintainer decides (ADR 0041). v2's defaults, a duplicate member name
+is an error and member names match exactly, are the strictness this
+page means by strict.
 
 `REQ-0161` Each format the product owns names itself and its version in one form,
 `schema: <name>/v<n>`, where `<name>` is its schema name in 02 2.1; the
@@ -21,7 +27,20 @@ generated schemas carry the field as a constant. `sbxenv.yaml`'s
 `schemaVersion` belongs to sbx and stays. `REQ-0162` A timestamp is RFC 3339 UTC
 and is named `<past participle>At` (`createdAt`, `updatedAt`).
 
-`REQ-0163` Versions: any change to a format's fields bumps its version. A reader
+`REQ-0163` Versions: formats evolve by the rules of protobuf
+([ADR 0041](../adr/0041-readers-of-formats-between-binaries-ignore-unknown-members.md)).
+Adding a member does not change a format's version; removing or
+renaming a member, or changing its type or meaning, is a new version,
+and the name of a removed member is never used again. A reader of a
+format one binary writes and another reads (the `--json` documents of
+`julieta`, `snapshot/heads.json`, the memory entry and the handoff
+file) skips a member it does not know, at any depth, and keeps every
+other rule of strict decoding; a reader of a file a person writes (the
+project spec, host settings, the catalog, the files of `tools/ci`)
+refuses an unknown key, since one there is most often a typing error.
+The manifest (3.6) is the exception: it is written by romeu and read
+by julieta, and it stays strict, with its own window, while the
+maintainer decides which rule holds for it (ADR 0041). A reader
 refuses a version newer than its own with the error `format-newer`
 (`RJ-311`, [04 4.4](04-cli.md#44-error-ids)) and the fix hint "install
 the release that wrote it". `REQ-0164` The release that bumps a stored format reads
@@ -380,7 +399,9 @@ at `$HOME/.local/state/julieta/manifest.json`. `REQ-0216` romeu checks the encod
 size at `sync`, before the gate, and refuses a manifest over 32 KiB with
 the error `manifest-size` (`RJ-313`); `julieta spec validate` reports
 the same rule. `REQ-0217` The Go type lives in `internal/manifest`, the one
-package both binaries import for it.
+package both binaries import for it. An unknown member in `manifest.v1`
+is an error, unlike the other formats between binaries (the opening of
+this page; ADR 0041).
 
 ```json
 {
@@ -690,7 +711,7 @@ Formats without a schema, each with its reason:
 
 | Format | Reason |
 |---|---|
-| `snapshot/heads.json` | `REQ-0261` read by romeu alone, decoded strictly under the opening's rules, and pinned by a golden |
+| `snapshot/heads.json` | `REQ-0261` read by romeu alone, decoded under the opening's rules (an unknown member is skipped, per the versions rule of the opening), and pinned by a golden |
 | `.romeu/bin/SHA256SUMS` | `REQ-0262` the `sha256sum` line format, which external tools read |
 | `e2e/scenarios/<journey>/commands.yaml` | read by one program, the scenario runner, and pinned by its test |
 | `kits/pins.yaml` | written by `tools/kitpin` and read by the product's own consumers, pinned by their tests |
