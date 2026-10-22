@@ -64,7 +64,7 @@ func TestRecordDisabledRefusals(t *testing.T) {
 	require.Error(t, err)
 
 	c = f.config(t, clock)
-	c.Lock = filepath.Join(f.home, "no", "such", "dir", "lock")
+	c.Lock = f.home // a directory
 	_, err = RecordDisabled(t.Context(), c)
 	require.Error(t, err)
 
