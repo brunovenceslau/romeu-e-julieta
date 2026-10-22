@@ -3,7 +3,56 @@
   "approval": {
     "wideningDigest": "1111111111111111111111111111111111111111111111111111111111111111",
     "set": {
-      "project": "shop"
+      "project": "shop",
+      "repos": [
+        {
+          "dir": "shop-api",
+          "url": "https://github.com/example/shop-api",
+          "primary": true,
+          "ref": "main"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "github",
+          "service": "github.com",
+          "argvDigest": "3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      ],
+      "workload": {
+        "repository": "docker.io/example/dev",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "capabilities": {
+          "network": [
+            "registry.example"
+          ]
+        }
+      },
+      "kits": [
+        {
+          "id": "tools",
+          "source": "personal",
+          "contentDigest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "args": {
+            "level": "1"
+          },
+          "capabilities": {}
+        }
+      ],
+      "egressGated": [
+        {
+          "domain": "github.com",
+          "reason": "upload"
+        }
+      ],
+      "ports": [
+        "8080:8080/tcp"
+      ],
+      "agent": "claude",
+      "salvageExcludes": [
+        "node_modules"
+      ],
+      "renderDigest": "5555555555555555555555555555555555555555555555555555555555555555"
     },
     "renderDigest": "2222222222222222222222222222222222222222222222222222222222222222",
     "specCommit": "0123456789abcdef0123456789abcdef01234567",

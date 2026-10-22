@@ -22,6 +22,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
 )
 
 // readTestdata returns a file of testdata.
@@ -78,6 +79,12 @@ func TestDecodeProject(t *testing.T) {
 		{"a generation with no id", func(s string) string { return strings.Replace(s, `"id": "01j9zc2q8x7w4t6y3r5e1v9k0p",`, "", 1) }},
 		{"a time that is not a time", func(s string) string { return strings.Replace(s, "2026-10-02T09:14:07Z", "yesterday", 1) }},
 		{"text that is not JSON", func(string) string { return "{" }},
+		{"a widening set with an unknown member", func(s string) string {
+			return strings.Replace(s, `"project": "shop",`, `"project": "shop", "devices": [],`, 1)
+		}},
+		{"a widening set with a digest that is no digest", func(s string) string {
+			return strings.Replace(s, `"renderDigest": "5555555555555555555555555555555555555555555555555555555555555555"`, `"renderDigest": "55"`, 1)
+		}},
 		{"trailing data", func(s string) string { return s + "{}" }},
 		{"a result no salvage has", func(s string) string { return strings.Replace(s, `"result": "complete"`, `"result": "fine"`, 1) }},
 		{"a second open generation", func(s string) string {
@@ -299,6 +306,15 @@ func TestEncode_refusesWhatNoReaderWouldTake(t *testing.T) {
 		_, err := EncodeProject(p)
 		require.Error(t, err)
 	})
+	t.Run("an approval whose widening set names no project", func(t *testing.T) {
+		p := NewProject()
+		p.Approval = &Approval{
+			WideningDigest: canon.Sum[canon.WideningKind]{1}, RenderDigest: canon.Sum[canon.RenderKind]{2},
+			SpecCommit: "0123456789abcdef0123456789abcdef01234567", CandidateID: canon.ULID{1}, ApprovedAt: time.Now(),
+		}
+		_, err := EncodeProject(p)
+		require.Error(t, err)
+	})
 	t.Run("a retiring with no attic", func(t *testing.T) {
 		p := NewProject()
 		p.Retiring = &Retiring{}
@@ -439,7 +455,7 @@ func TestEncode_timestampsAreUTCWholeSeconds(t *testing.T) {
 		s := testSeams()
 		p, id := projectIn(t, s, GenerationClosedRemoved)
 		p.Approval = &Approval{
-			WideningDigest: canon.Sum[canon.WideningKind]{1}, Set: WideningSet{}, RenderDigest: canon.Sum[canon.RenderKind]{2},
+			WideningDigest: canon.Sum[canon.WideningKind]{1}, Set: gate.Set{Project: "shop"}, RenderDigest: canon.Sum[canon.RenderKind]{2},
 			SpecCommit: "0123456789abcdef0123456789abcdef01234567", CandidateID: id, ApprovedAt: at,
 		}
 		p.LastRunAt = at

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
 )
 
 // SHA256 is a plain sha256, the one of a file's bytes, which is none of
@@ -46,11 +47,6 @@ func (s *SHA256) UnmarshalText(text []byte) error {
 // the catalog (T-catalog); until then the record holds it as the JSON
 // object it is, as manifest.Run holds the run layout.
 type Catalog map[string]any
-
-// WideningSet is the full widening set of an approval (03 3.8,
-// REQ-0229), as the JSON object gate 2 digested; its Go type lands with
-// the gate package.
-type WideningSet map[string]any
 
 // Capabilities is the parsed, normalized capability set of one
 // descriptor (REQ-0240); its Go type lands with internal/oci.
@@ -127,8 +123,10 @@ type Project struct {
 type Approval struct {
 	// WideningDigest is the digest of the widening set approved.
 	WideningDigest canon.Sum[canon.WideningKind] `json:"wideningDigest"`
-	// Set is the full widening set.
-	Set WideningSet `json:"set"`
+	// Set is the full widening set (03 3.8, REQ-0229). Its digest is
+	// never computed again from the record, only compared: the digest
+	// of a candidate comes from the set gate.Build returns.
+	Set gate.Set `json:"set"`
 	// RenderDigest is the digest of the normalized render approved.
 	RenderDigest canon.Sum[canon.RenderKind] `json:"renderDigest"`
 	// SpecCommit is the config repo commit of the spec approved.

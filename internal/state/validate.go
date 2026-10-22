@@ -61,7 +61,7 @@ func (p *Project) validate() error {
 	var errs []error
 	if a := p.Approval; a != nil {
 		if a.WideningDigest == (canon.Sum[canon.WideningKind]{}) || a.RenderDigest == (canon.Sum[canon.RenderKind]{}) ||
-			a.CandidateID == (canon.ULID{}) || a.ApprovedAt.IsZero() || a.Set == nil || !commitForm.MatchString(a.SpecCommit) {
+			a.CandidateID == (canon.ULID{}) || a.ApprovedAt.IsZero() || a.Set.Project == "" || !commitForm.MatchString(a.SpecCommit) {
 			errs = append(errs, errors.New("approval is not whole: it needs both digests, the set, a spec commit, a candidate id and a time"))
 		}
 	}

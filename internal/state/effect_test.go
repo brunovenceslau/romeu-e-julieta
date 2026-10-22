@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
 )
 
 // effectKey is the key an Effect case registers (REQ-0080).
@@ -84,7 +85,7 @@ func TestEffects(t *testing.T) {
 func init() {
 	approval := func(c *Candidate) Approval {
 		return Approval{
-			WideningDigest: canon.Sum[canon.WideningKind]{1}, Set: WideningSet{"project": "shop"},
+			WideningDigest: canon.Sum[canon.WideningKind]{1}, Set: gate.Set{Project: "shop"},
 			RenderDigest: canon.Sum[canon.RenderKind]{2}, SpecCommit: "0123456789abcdef0123456789abcdef01234567",
 			CandidateID: c.ID(), ApprovedAt: testNow,
 		}

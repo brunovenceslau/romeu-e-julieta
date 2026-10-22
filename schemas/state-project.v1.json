@@ -17,7 +17,167 @@
           "type": "string"
         },
         "set": {
-          "additionalProperties": {},
+          "additionalProperties": false,
+          "properties": {
+            "agent": {
+              "type": "string"
+            },
+            "egressGated": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "domain": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "domain",
+                  "reason"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "kits": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "capabilities": {
+                    "additionalProperties": {},
+                    "type": "object"
+                  },
+                  "contentDigest": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "args",
+                  "capabilities",
+                  "contentDigest",
+                  "id",
+                  "source"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "ports": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "project": {
+              "type": "string"
+            },
+            "renderDigest": {
+              "type": "string"
+            },
+            "repos": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "dir": {
+                    "type": "string"
+                  },
+                  "primary": {
+                    "type": "boolean"
+                  },
+                  "ref": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "dir",
+                  "primary",
+                  "ref",
+                  "url"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "salvageExcludes": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "secrets": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "argvDigest": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "service": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "argvDigest",
+                  "name",
+                  "service"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "workload": {
+              "additionalProperties": false,
+              "properties": {
+                "capabilities": {
+                  "additionalProperties": {},
+                  "type": "object"
+                },
+                "digest": {
+                  "type": "string"
+                },
+                "repository": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "capabilities",
+                "digest",
+                "repository"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "agent",
+            "egressGated",
+            "kits",
+            "ports",
+            "project",
+            "renderDigest",
+            "repos",
+            "salvageExcludes",
+            "secrets",
+            "workload"
+          ],
           "type": "object"
         },
         "specCommit": {
