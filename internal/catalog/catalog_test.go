@@ -13,6 +13,9 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/catalog"
 )
 
+// head opens every fixture file.
+const head = "schema: catalog/v1\n"
+
 // family is a family file that holds one tool and the domains it needs.
 const family = `schema: catalog/v1
 domains:
@@ -35,7 +38,6 @@ func TestDecode(t *testing.T) {
 }
 
 func TestDecode_refuses(t *testing.T) {
-	head := "schema: catalog/v1\n"
 	tests := []struct {
 		name string
 		doc  string
@@ -48,13 +50,24 @@ func TestDecode_refuses(t *testing.T) {
 		{"no schema", "domains: {}\n", "schema"},
 		{"other schema", "schema: catalog/v2\n", "schema"},
 		{"no upload flag", head + "domains:\n  a.example: {}\n", "upload"},
-		{"null upload flag", head + "domains:\n  a.example: {upload: null}\n", "upload"},
-		{"upload not a boolean", head + "domains:\n  a.example: {upload: maybe}\n", "wrong kind"},
-		{"null tool", head + "tools:\n  core:go:\n", "core:go"},
+		{"null upload flag", head + "domains:\n  a.example: {upload: null}\n", "null"},
+		{"upload not a boolean", head + "domains:\n  a.example: {upload: maybe}\n", "upload"},
+		{"null tool", head + "tools:\n  core:go:\n", "null"},
+		{"null meta", head + "meta:\n", "null"},
+		{"null domains", head + "domains: ~\n", "null"},
+		{"yes for upload", head + "domains:\n  a.example: {upload: yes}\n", "upload"},
+		{"on for upload", head + "domains:\n  a.example: {upload: on}\n", "upload"},
+		{"True for upload", head + "domains:\n  a.example: {upload: True}\n", "upload"},
+		{"quoted true for upload", head + "domains:\n  a.example: {upload: 'true'}\n", "upload"},
+		{"an anchor", head + "meta: &m [a.example]\n", "anchor"},
+		{"an anchor and an alias", head + "meta: &m [a.example]\nbase: *m\n", "anchor"},
+		{"a merge key", head + "domains:\n  a.example: &e {upload: true}\n  b.example:\n    <<: *e\n", "anchor"},
+		{"a merge key alone", head + "domains:\n  a.example:\n    <<: {upload: true}\n", "merge"},
+		{"a custom tag", head + "meta: [!foo a.example]\n", "tag"},
 		{"not one mapping", "- a\n", "mapping"},
 		{"two documents", head + "---\n" + head, "more than one document"},
 		{"not UTF-8", head + "meta: [\xff]\n", "UTF-8"},
-		{"over the cap", head + "# " + strings.Repeat("a", catalog.MaxFileSize), "cap"},
+		{"one byte over the cap", head + strings.Repeat("#", catalog.MaxFileSize-len(head)+1), "cap"},
 		{"domain with a wildcard", head + "domains:\n  '*.example.com': {upload: false}\n", "domain"},
 		{"domain with a port", head + "meta: ['a.example:443']\n", "domain"},
 		{"domain in base", head + "base: [Example.COM]\n", "domain"},
@@ -72,6 +85,17 @@ func TestDecode_refuses(t *testing.T) {
 			assert.Contains(t, err.Error(), tt.want)
 		})
 	}
+}
+
+// TestDecode_cap: a file of exactly MaxFileSize bytes is read, one more
+// byte is refused.
+func TestDecode_cap(t *testing.T) {
+	exact := head + strings.Repeat("#", catalog.MaxFileSize-len(head))
+	require.Len(t, exact, catalog.MaxFileSize)
+	_, err := catalog.Decode([]byte(exact))
+	require.NoError(t, err)
+	_, err = catalog.Decode([]byte(exact + "#"))
+	require.ErrorIs(t, err, catalog.ErrInvalid)
 }
 
 func TestValidTool(t *testing.T) {
@@ -108,14 +132,9 @@ func TestBuild(t *testing.T) {
 	assert.Empty(t, got)
 	_, ok = c.Tool("core:go")
 	assert.False(t, ok)
-	up, declared := c.Upload("github.com")
-	assert.True(t, up)
-	assert.True(t, declared)
-	up, declared = c.Upload("nodejs.org")
-	assert.False(t, up)
-	assert.True(t, declared)
-	_, declared = c.Upload("unknown.example")
-	assert.False(t, declared)
+	assert.True(t, c.Gated("github.com"), "an upload domain is gated")
+	assert.False(t, c.Gated("nodejs.org"), "a declared domain without upload is not")
+	assert.True(t, c.Gated("unknown.example"), "a domain without an entry is gated (07 7.5, step 7)")
 	assert.Equal(t, []string{"aqua:jqlang/jq", "core:node"}, c.Tools())
 	assert.Empty(t, c.Undeclared())
 }
@@ -151,11 +170,24 @@ func TestBuild_baseFile(t *testing.T) {
 	require.ErrorIs(t, err, catalog.ErrInvalid)
 	assert.Contains(t, err.Error(), "base.yaml")
 
-	stray := "schema: catalog/v1\nmeta: [nodejs.org]\n"
-	_, err = catalog.Build([]catalog.Source{source("base.yaml", base), source("node.yaml", stray)})
-	require.ErrorIs(t, err, catalog.ErrInvalid)
-	assert.Contains(t, err.Error(), "node.yaml")
-	assert.Contains(t, err.Error(), "meta")
+	for _, set := range []string{"meta", "base"} {
+		stray := "schema: catalog/v1\n" + set + ": [x.example]\n"
+		_, err = catalog.Build([]catalog.Source{source("base.yaml", base), source("node.yaml", stray)})
+		require.ErrorIs(t, err, catalog.ErrInvalid, set)
+		assert.Contains(t, err.Error(), "node.yaml", set)
+		assert.Contains(t, err.Error(), "meta and base belong in base.yaml", set)
+	}
+}
+
+// TestBuild_dedupe: a domain listed twice is one in the sets.
+func TestBuild_dedupe(t *testing.T) {
+	doc := "schema: catalog/v1\nmeta: [a.example, a.example]\nbase: [b.example, b.example]\ndomains:\n  a.example: {upload: false}\n  b.example: {upload: false}\ntools:\n  core:go: [a.example, a.example]\n"
+	c, err := catalog.Build([]catalog.Source{source("base.yaml", doc)})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"a.example"}, c.Meta())
+	assert.Equal(t, []string{"b.example"}, c.Base())
+	got, _ := c.Tool("core:go")
+	assert.Equal(t, []string{"a.example"}, got)
 }
 
 func TestBuild_namesTheFileOfADecodeError(t *testing.T) {
@@ -194,9 +226,10 @@ func TestEmbedded(t *testing.T) {
 		"github.com": true, "api.github.com": true, "storage.googleapis.com": true, "registry.npmjs.org": true,
 		"dl.google.com": false, "proxy.golang.org": false, "nodejs.org": false, "pypi.org": false, "mise-versions.jdx.dev": false,
 	} {
-		up, declared := c.Upload(domain)
+		up, declared := c.UploadFlag(domain)
 		assert.True(t, declared, domain)
 		assert.Equal(t, want, up, domain)
+		assert.Equal(t, want, c.Gated(domain), domain)
 	}
 	assert.Empty(t, c.Undeclared())
 }

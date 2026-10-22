@@ -13,7 +13,12 @@
 // catalog is in the group of files a person writes, whose readers stay
 // strict; a program never writes it, so no newer writer can add a member
 // an older reader must skip). Every domain, from any source of the
-// file, passes the one domain rule of internal/spec (REQ-0188).
+// file, passes the one domain rule of internal/spec (REQ-0188). The
+// reader also refuses what hides a value from a reviewer: an anchor, an
+// alias, a merge key, a null, a tag outside YAML's core schema, and an
+// upload flag that is not written true or false (yes and on are
+// refused). Whether a domain is gated is Gated: a missing entry is
+// gated, so no caller reads the flag of a domain the catalog lacks.
 //
 // Decode reads one file and Build merges the files: a domain, or a tool,
 // that two files declare with different entries is a decode error. That
@@ -118,6 +123,12 @@ func Decode(data []byte) (File, error) {
 	if doc.Kind != yaml.DocumentNode || len(doc.Content) != 1 || doc.Content[0].Kind != yaml.MappingNode {
 		return File{}, fmt.Errorf("%w: the file is not one mapping", ErrInvalid)
 	}
+	if err := checkTree(doc.Content[0]); err != nil {
+		return File{}, fmt.Errorf("%w: %w", ErrInvalid, err)
+	}
+	if err := checkUpload(doc.Content[0]); err != nil {
+		return File{}, fmt.Errorf("%w: %w", ErrInvalid, err)
+	}
 	var f File
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
@@ -131,6 +142,53 @@ func Decode(data []byte) (File, error) {
 		return File{}, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	return f, nil
+}
+
+// coreTags are the tags of YAML's core schema a value may resolve to.
+var coreTags = []string{"!!str", "!!int", "!!bool", "!!float", "!!seq", "!!map"}
+
+// checkTree returns why the node n, or one below it, is outside the
+// subset a reviewer can read at a glance: no anchor, alias or merge key,
+// no null (leave the key out) and no tag outside YAML's core schema.
+func checkTree(n *yaml.Node) error {
+	switch {
+	case n.Kind == yaml.AliasNode:
+		return fmt.Errorf("line %d: an alias", n.Line)
+	case n.Anchor != "":
+		return fmt.Errorf("line %d: an anchor", n.Line)
+	case n.Tag == "!!null":
+		return fmt.Errorf("line %d: a null value; leave the key out instead", n.Line)
+	case n.Tag == "!!merge":
+		return fmt.Errorf("line %d: a merge key", n.Line)
+	case !slices.Contains(coreTags, n.Tag):
+		return fmt.Errorf("line %d: a tag outside YAML's core schema", n.Line)
+	}
+	for _, c := range n.Content {
+		if err := checkTree(c); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkUpload returns why an upload flag of the file's domains is not the
+// plain true or false (a quoted one included): go.yaml.in/yaml/v3 reads yes, on and the like as
+// booleans too (YAML 1.1), and a reviewer reads those as words.
+func checkUpload(root *yaml.Node) error {
+	for i := 0; i+1 < len(root.Content); i += 2 {
+		if root.Content[i].Value != "domains" {
+			continue
+		}
+		for _, entry := range root.Content[i+1].Content {
+			for j := 0; j+1 < len(entry.Content); j += 2 {
+				if v := entry.Content[j+1]; entry.Content[j].Value == "upload" &&
+					(v.Kind != yaml.ScalarNode || v.Tag != "!!bool" || v.Value != "true" && v.Value != "false") {
+					return fmt.Errorf("line %d: the upload flag is written true or false", v.Line)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // yamlLine finds the line number in an error of go.yaml.in/yaml/v3.
@@ -299,11 +357,12 @@ func (c Catalog) Tool(key string) ([]string, bool) {
 // Tools returns the tool keys, sorted.
 func (c Catalog) Tools() []string { return slices.Sorted(maps.Keys(c.tools)) }
 
-// Upload returns the upload flag of a domain, and whether the catalog
-// declares it: a domain it does not declare is gated (07 7.5, step 7).
-func (c Catalog) Upload(domain string) (upload, declared bool) {
-	upload, declared = c.upload[domain]
-	return upload, declared
+// Gated reports whether a domain is gated: its upload flag is true, or
+// the catalog has no entry for it (07 7.5, step 7). The flag alone is not
+// public, so no caller can read a missing entry as "no upload".
+func (c Catalog) Gated(domain string) bool {
+	upload, declared := c.upload[domain]
+	return upload || !declared
 }
 
 // Undeclared returns the domains used by the meta and base sets or by a
