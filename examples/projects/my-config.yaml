@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/brunovenceslau/romeu-e-julieta/v1.0.0/schemas/project.v1.json
+#
+# The config repo's own spec: its primary repo is the config repo, whose
+# URL host settings name as config.url (03 3.1). Edit the specs of your
+# projects in its sandbox and push them; romeu reads what you pushed.
+schema: project/v1
+name: my-config
+repos:
+  - url: https://github.com/example/my-config
+    primary: true
+workload: docker.io/docker/sbx-kit-claude@sha256:c0132e89a89d94ddca3984513afdb36be57bd087fcc75823a4d14064b6a39ea5
+agent: sbx-kit-claude
+kits:
+  - product: julieta
+  - product: julieta-claude
+secrets: [github]
+run:
+  tabs:
+    - label: main
+      root: {pane: agent}
+  panes:
+    - id: agent
+      repo: my-config
+      steps: [[claude]]
+      focus: true

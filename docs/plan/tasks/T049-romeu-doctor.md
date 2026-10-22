@@ -36,6 +36,11 @@ reads as T046 does. T103 stays in `needs` for its e2e. `doctor/rows.go`
 holds the registered rows (rule 14 of `docs/plan.md`); T080 and T134 add
 theirs by one file each.
 
+Re-plan (2026-10-22): the sweep of leftover temporary files in the state
+directory is deferred to this task: `doctor` lists the leftover temporary
+files (the dotfiles an interrupted atomic write leaves) for the operator
+to clean up, and deletes none.
+
 - Implements: REQ-0056 (01 1.3), REQ-0057 (01 1.3), REQ-0059 (01 1.4),
   REQ-0062 (01 1.4), REQ-0136 (02 2.3), REQ-0141 (02 2.3), REQ-0148 (02
   2.4), REQ-0207 (03 3.4), REQ-0209 (03 3.4), REQ-0330 (04 4.2),

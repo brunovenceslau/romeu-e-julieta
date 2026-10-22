@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/brunovenceslau/romeu-e-julieta/v1.0.0/schemas/project.v1.json
+#
+# A project of two repositories, as in 03 3.2: an agent pane beside a
+# shell, and the web app's dev server below it. The secret github
+# resolves through the host settings entry github@shop.
+schema: project/v1
+name: shop
+repos:
+  - url: https://github.com/example/shop-api
+    primary: true             # exactly one
+    ref: main                 # the branch egress derives from
+  - url: https://github.com/example/shop-web
+workload: docker.io/docker/sbx-kit-claude@sha256:c0132e89a89d94ddca3984513afdb36be57bd087fcc75823a4d14064b6a39ea5
+agent: sbx-kit-claude
+kits:
+  - product: julieta
+  - product: julieta-claude
+sandboxOptions:
+  cpus: 4
+  memory: 8g
+secrets: [github]
+egress:
+  extra: [api.stripe.com]     # always gated
+salvage:
+  excludeIgnored: [node_modules/, .venv/, target/]
+run:
+  tabs:
+    - label: main
+      root:
+        split: row            # row = side by side, column = stacked
+        ratio: 0.6
+        first: {pane: agent}
+        second:
+          split: column
+          ratio: 0.5
+          first: {pane: shell}
+          second: {pane: web}
+  panes:
+    - id: agent
+      repo: shop-api
+      steps: [[claude]]
+      focus: true
+    - id: shell
+      repo: shop-api          # no steps: a login shell
+    - id: web
+      repo: shop-web
+      cwd: app
+      env: {PORT: "3000"}
+      steps: [[npm, ci], [npm, run, dev]]

@@ -12,8 +12,9 @@
 // of every owned format (REQ-0160), and its strictness: an object
 // admits no member its struct does not name. Every format has a
 // "schema" string field, which the document holds as a constant
-// (REQ-0161). The rules of internal/spec/rules.go join the documents
-// with the task that writes them.
+// (REQ-0161). A format's Keywords add the constraints of its validation
+// rules that JSON Schema can say, such as the patterns of
+// internal/spec/rules.go (keywords.go).
 //
 // Of the interfaces encoding/json/v2 reads, a type that implements
 // encoding.TextMarshaler or encoding.TextUnmarshaler is a string, and
@@ -21,9 +22,11 @@
 // MarshalJSONTo, UnmarshalJSONFrom) is refused, since its form is its
 // code's. time.Time is a date-time string, []byte and [N]byte (named or
 // not) a base64 string, and time.Duration, which v2 has no default form
-// for, is refused. A pointer field has the schema of what it points to
-// and does not admit null: the decoder reads null as the zero value,
-// and a document that means "absent" leaves the member out.
+// for, is refused. A struct type reached again on its own path, the node
+// of a tree, is a $ref to its first place. A pointer field has the
+// schema of what it points to and does not admit null: the decoder
+// reads null as the zero value, and a document that means "absent"
+// leaves the member out.
 package schemagen
 
 import (
@@ -47,6 +50,10 @@ const Draft = "https://json-schema.org/draft/2020-12/schema"
 type Schema struct {
 	Name string
 	Type reflect.Type
+	// Keywords are the constraints of the format's validation rules
+	// that JSON Schema can say, each added at the place its path names
+	// (keywords.go).
+	Keywords []Keyword
 }
 
 // Path is the slash-separated path of the committed schema, from the
@@ -107,9 +114,12 @@ func Registered() []Schema {
 // document is the same on every run (12 12.3). A type the generator
 // cannot express is an error that names the field.
 func Generate(s Schema, comment string) ([]byte, error) {
-	g := generator{seen: map[reflect.Type]bool{}}
-	doc, err := g.of(s.Type, s.Type.Name())
+	g := generator{seen: map[reflect.Type]string{}}
+	doc, err := g.of(s.Type, s.Type.Name(), "#")
 	if err != nil {
+		return nil, fmt.Errorf("%s: %w", s.Name, err)
+	}
+	if err := addKeywords(doc, s.Keywords); err != nil {
 		return nil, fmt.Errorf("%s: %w", s.Name, err)
 	}
 	prop, _ := doc["properties"].(map[string]any)
@@ -135,10 +145,12 @@ func Generate(s Schema, comment string) ([]byte, error) {
 }
 
 // generator walks one type; seen holds the named types on the path
-// from the root, so a recursive type (a struct, or a named map, slice,
-// array or pointer) is an error rather than an endless walk.
+// from the root, each with the JSON pointer of its place. A struct type
+// reached again on its own path is a $ref to that place, so a tree
+// type such as the run layout's node has one schema; a recursive named
+// map, slice, array or pointer is an error rather than an endless walk.
 type generator struct {
-	seen map[reflect.Type]bool
+	seen map[reflect.Type]string
 }
 
 // The types the generator knows by name.
@@ -172,8 +184,9 @@ const errUnsupported = "is not supported by the generator"
 var jsonOptions = []string{"omitempty", "omitzero", "embed"}
 
 // of returns the schema of t, reached at where (a Go path such as
-// "Manifest.Repos[]").
-func (g generator) of(t reflect.Type, where string) (map[string]any, error) {
+// "Manifest.Repos[]") and placed at ptr (a JSON pointer such as
+// "#/properties/repos/items").
+func (g generator) of(t reflect.Type, where, ptr string) (map[string]any, error) {
 	switch {
 	case t == timeType:
 		return map[string]any{"type": "string", "format": "date-time"}, nil
@@ -187,10 +200,10 @@ func (g generator) of(t reflect.Type, where string) (map[string]any, error) {
 		return map[string]any{"type": "string", "contentEncoding": "base64"}, nil
 	}
 	if t.Name() != "" && slices.Contains([]reflect.Kind{reflect.Map, reflect.Slice, reflect.Array, reflect.Pointer}, t.Kind()) {
-		if g.seen[t] {
+		if _, ok := g.seen[t]; ok {
 			return nil, fmt.Errorf("%s: the recursive type %s %s", where, t, errUnsupported)
 		}
-		g.seen[t] = true
+		g.seen[t] = ptr
 		defer delete(g.seen, t)
 	}
 	switch t.Kind() {
@@ -205,14 +218,14 @@ func (g generator) of(t reflect.Type, where string) (map[string]any, error) {
 	case reflect.Float32, reflect.Float64:
 		return map[string]any{"type": "number"}, nil
 	case reflect.Pointer:
-		return g.of(t.Elem(), where)
+		return g.of(t.Elem(), where, ptr)
 	case reflect.Interface:
 		if t.NumMethod() != 0 {
 			return nil, fmt.Errorf("%s: an interface with methods %s", where, errUnsupported)
 		}
 		return map[string]any{}, nil
 	case reflect.Slice, reflect.Array:
-		items, err := g.of(t.Elem(), where+"[]")
+		items, err := g.of(t.Elem(), where+"[]", ptr+"/items")
 		if err != nil {
 			return nil, err
 		}
@@ -225,29 +238,30 @@ func (g generator) of(t reflect.Type, where string) (map[string]any, error) {
 		if t.Key().Kind() != reflect.String {
 			return nil, fmt.Errorf("%s: a map whose key is not a string %s", where, errUnsupported)
 		}
-		values, err := g.of(t.Elem(), where+"[key]")
+		values, err := g.of(t.Elem(), where+"[key]", ptr+"/additionalProperties")
 		if err != nil {
 			return nil, err
 		}
 		return map[string]any{"type": "object", "additionalProperties": values}, nil
 	case reflect.Struct:
-		return g.object(t, where)
+		return g.object(t, where, ptr)
 	default:
 		return nil, fmt.Errorf("%s: the kind %s %s", where, t.Kind(), errUnsupported)
 	}
 }
 
 // object returns the schema of the struct t: its members by JSON name,
-// those without omitempty or omitzero required, and no other member.
-func (g generator) object(t reflect.Type, where string) (map[string]any, error) {
-	if g.seen[t] {
-		return nil, fmt.Errorf("%s: the recursive type %s %s", where, t, errUnsupported)
+// those without omitempty or omitzero required, and no other member; or,
+// for a struct type on its own path, a $ref to the place it has there.
+func (g generator) object(t reflect.Type, where, ptr string) (map[string]any, error) {
+	if first, ok := g.seen[t]; ok {
+		return map[string]any{"$ref": first}, nil
 	}
-	g.seen[t] = true
+	g.seen[t] = ptr
 	defer delete(g.seen, t)
 	props := map[string]any{}
 	required := []string{}
-	if err := g.fields(t, where, props, &required); err != nil {
+	if err := g.fields(t, where, ptr, props, &required); err != nil {
 		return nil, err
 	}
 	out := map[string]any{"type": "object", "properties": props, "additionalProperties": false}
@@ -259,10 +273,43 @@ func (g generator) object(t reflect.Type, where string) (map[string]any, error) 
 }
 
 // fields adds the members of the struct t to props and the names of
-// the required ones to required. A Go embedded struct without a JSON
-// name, or a field with the embed option, adds its members in place,
-// as encoding/json/v2 decodes them.
-func (g generator) fields(t reflect.Type, where string, props map[string]any, required *[]string) error {
+// the required ones to required.
+func (g generator) fields(t reflect.Type, where, ptr string, props map[string]any, required *[]string) error {
+	ms, err := members(t, where)
+	if err != nil {
+		return err
+	}
+	for _, m := range ms {
+		s, err := g.of(m.Field.Type, where+"."+m.Field.Name, ptr+"/properties/"+pointerToken(m.Name))
+		if err != nil {
+			return err
+		}
+		props[m.Name] = s
+		if m.Required {
+			*required = append(*required, m.Name)
+		}
+	}
+	return nil
+}
+
+// member is one member of a struct type's JSON object.
+type member struct {
+	// Name is the member's JSON name.
+	Name string
+	// Field is the struct field it comes from, and Owner the struct type
+	// that declares it.
+	Field reflect.StructField
+	Owner reflect.Type
+	// Required says the field has neither omitempty nor omitzero.
+	Required bool
+}
+
+// members returns the members of the struct t, in the order of its
+// fields. A Go embedded struct without a JSON name, or a field with the
+// embed option, adds its members in place, as encoding/json/v2 decodes
+// them.
+func members(t reflect.Type, where string) ([]member, error) {
+	var out []member
 	for f := range t.Fields() {
 		if !f.IsExported() && !f.Anonymous {
 			continue
@@ -278,7 +325,7 @@ func (g generator) fields(t reflect.Type, where string, props map[string]any, re
 		}
 		for _, o := range options {
 			if !slices.Contains(jsonOptions, o) {
-				return fmt.Errorf("%s.%s: the json option %q %s", where, f.Name, o, errUnsupported)
+				return nil, fmt.Errorf("%s.%s: the json option %q %s", where, f.Name, o, errUnsupported)
 			}
 		}
 		ft := f.Type
@@ -288,11 +335,13 @@ func (g generator) fields(t reflect.Type, where string, props map[string]any, re
 		embed := slices.Contains(options, "embed") || (f.Anonymous && name == "" && ft.Kind() == reflect.Struct)
 		if embed {
 			if ft.Kind() != reflect.Struct {
-				return fmt.Errorf("%s.%s: embed on a field that is not a struct %s", where, f.Name, errUnsupported)
+				return nil, fmt.Errorf("%s.%s: embed on a field that is not a struct %s", where, f.Name, errUnsupported)
 			}
-			if err := g.fields(ft, where, props, required); err != nil {
-				return err
+			inner, err := members(ft, where)
+			if err != nil {
+				return nil, err
 			}
+			out = append(out, inner...)
 			continue
 		}
 		if !f.IsExported() {
@@ -301,17 +350,15 @@ func (g generator) fields(t reflect.Type, where string, props map[string]any, re
 		if !hasTag || name == "" {
 			name = f.Name
 		}
-		if _, dup := props[name]; dup {
-			return fmt.Errorf("%s.%s: the JSON name %q is used twice", where, f.Name, name)
-		}
-		s, err := g.of(f.Type, where+"."+f.Name)
-		if err != nil {
-			return err
-		}
-		props[name] = s
-		if !slices.Contains(options, "omitempty") && !slices.Contains(options, "omitzero") {
-			*required = append(*required, name)
-		}
+		out = append(out, member{Name: name, Field: f, Owner: t,
+			Required: !slices.Contains(options, "omitempty") && !slices.Contains(options, "omitzero")})
 	}
-	return nil
+	seen := map[string]bool{}
+	for _, m := range out {
+		if seen[m.Name] {
+			return nil, fmt.Errorf("%s.%s: the JSON name %q is used twice", where, m.Field.Name, m.Name)
+		}
+		seen[m.Name] = true
+	}
+	return out, nil
 }

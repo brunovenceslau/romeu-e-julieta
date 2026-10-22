@@ -12,9 +12,12 @@
 # --cached" must report "unset" for every output, nested files included.
 .github/CODEOWNERS -text
 docs/adr/README.md -text
+docs/diagrams/candidate.md -text
+docs/diagrams/generation.md -text
 docs/reference/checks.md -text
 docs/reference/errors.md -text
 docs/reference/exit-codes.md -text
+docs/reference/host-settings.md -text
 docs/reference/julieta.md -text
 docs/reference/julieta/completion.md -text
 docs/reference/julieta/completion/bash.md -text
@@ -36,6 +39,8 @@ docs/reference/julieta/setup.md -text
 docs/reference/julieta/snapshot.md -text
 docs/reference/julieta/status.md -text
 docs/reference/julieta/version.md -text
+docs/reference/manifest.md -text
+docs/reference/project.md -text
 docs/reference/romeu.md -text
 docs/reference/romeu/completion.md -text
 docs/reference/romeu/completion/bash.md -text
@@ -44,9 +49,14 @@ docs/reference/romeu/completion/zsh.md -text
 docs/reference/romeu/version.md -text
 internal/cli/exitcodes_gen.go -text
 schemas/handoff.v1.json -text
+schemas/host-settings.v1.json -text
 schemas/julieta-handoff.v1.json -text
 schemas/julieta-memory.v1.json -text
 schemas/julieta-setup.v1.json -text
 schemas/julieta-status.v1.json -text
 schemas/manifest.v1.json -text
 schemas/memory-entry.v1.json -text
+schemas/project.v1.json -text
+schemas/state-descriptor.v1.json -text
+schemas/state-project.v1.json -text
+schemas/state-toolchain.v1.json -text

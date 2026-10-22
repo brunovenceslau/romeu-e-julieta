@@ -25,6 +25,13 @@ Re-plan (2026-10-12): Kept as written before the re-plan; `after: T123`,
 since the record of the two gates is a review order (12 12.5):
 [ADR 0018, gate toolchain changes per machine and project widening per project](../../adr/0018-gate-toolchain-changes-per-machine-and-project-widening-per-project.md).
 
+Re-plan (2026-10-22): `internal/state` keeps the full widening set of an
+approval as `map[string]any` (`state.WideningSet`) for now. This task
+replaces the map with the real type of the set. The widening digest is
+never recomputed from the stored map, since a large integer goes through
+a float64 in it; it is computed from the typed set, and the stored digest
+is only compared.
+
 - Implements: REQ-0055 (01 1.3), REQ-0059 (01 1.4), REQ-0066 (01 1.4),
   REQ-0067 (01 1.4), REQ-0071 (01 1.4), REQ-0191 (03 3.2), REQ-0192 (03
   3.2), REQ-0272 (04 4.1), REQ-0488 (05 5.2), REQ-0518 (05 5.2),

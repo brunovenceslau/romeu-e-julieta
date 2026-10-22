@@ -12,6 +12,7 @@ needs:
 after: []
 ask_first:
   - gates
+  - contracts
 sitting: none
 ---
 

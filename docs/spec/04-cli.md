@@ -536,6 +536,7 @@ test collects is the source, and this section is a link to
 | `RJ-347` | `sandbox-stopped` | 2 | `REQ-0445` `pull` on a primary whose sandbox is stopped; the hint is `romeu run --no-attach <name>` |
 | `RJ-348` | `internal` | 1 | `REQ-0446` `main` of either binary, for an error a command returns whose chain holds no `*cli.Error` (10 10.1, Error ids): a defect of the code; an error of the command-line parser is `usage` (`RJ-349`) instead; the hint is `decide: open an issue with the details` |
 | `RJ-349` | `usage` | 2 | `REQ-1244` `cli.Main` of either binary, for every error the command-line parser returns: a command, subcommand or flag the definitions do not have, or an argument count a command refuses (4.1, Parsing); the hint is the `--help` line of the binary or of the command named |
+| `RJ-350` | `illegal-transition` | 2 | every command that drives a state machine of [01 1.6](01-system-model.md#16-state-machines), for a `(from, event)` pair no row of its transition table has; the record is left as it was; the hint is `decide: run romeu status to read the state the record is in, and report the command that raised the event as an issue` |
 
 ### `fingerprint-unstable` (`RJ-338`)
 

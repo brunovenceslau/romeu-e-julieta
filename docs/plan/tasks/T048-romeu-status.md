@@ -28,6 +28,11 @@ in `needs`: its e2e runs the `--dry-run` build. `status/sections.go`
 holds the registered report sections (rule 14 of `docs/plan.md`), the
 seam T066 and T080 plug into.
 
+Re-plan (2026-10-22): the sweep of leftover temporary files in the state
+directory (the dotfiles an interrupted atomic write leaves, such as
+`.shop.json123`) is deferred. `status` ignores dotfiles in the state
+directory and its `projects/` and `descriptors/` subdirectories.
+
 - Implements: REQ-0061 (01 1.4), REQ-0062 (01 1.4), REQ-0063 (01 1.4),
   REQ-0065 (01 1.4), REQ-0087 (01 1.6), REQ-0107 (01 1.6), REQ-0327 (04
   4.2), REQ-0328 (04 4.2), REQ-0329 (04 4.2), REQ-0334 (04 4.2),

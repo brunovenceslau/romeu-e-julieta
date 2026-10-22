@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# valid-host-settings.yaml with an argv element of the shape gho_<...>, refused with secret-in-argv (REQ-0206, I25).
+schema: host-settings/v1
+root: /srv/dev
+config:
+  project: my-config
+  url: https://github.com/example/my-config
+  ref: main
+tools:
+  sbx: /opt/homebrew/bin/sbx
+  git: /usr/bin/git
+  gitCredentialHelper: osxkeychain
+gitHosts:
+  - host: github.com
+workloadRepositories:
+  - docker.io/docker/sbx-kit-claude
+signing:
+  agentSocket: /srv/romeu/signing-agent.sock
+secrets:
+  github@my-config:
+    service: github
+    argv: [/usr/bin/security, find-generic-password, -s, romeu/my-config/github, -w]
+  github@shop:
+    service: github
+    argv: [/usr/bin/security, find-generic-password, -s, romeu/shop/github, -w]
+  npm@shop:
+    service: npm
+    argv: [/bin/echo, gho_EXAMPLEEXAMPLEEXAMPLEEXAMPLE0000]
