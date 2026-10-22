@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Conformance fixture: the parts of the workload's own descriptor that
+# kits/julieta follows, copied by hand from the annotation
+# vnd.docker.sandbox.kit.descriptor of the linux/arm64 manifest
+# (sha256:2860597f5cac179fdb25683f72024ae71e27f07ef3eb044817b1cdaaa2f6a776)
+# of the workload in kits/pins.yaml, docker.io/docker/sbx-kit-claude@
+# sha256:c0132e89a89d94ddca3984513afdb36be57bd087fcc75823a4d14064b6a39ea5,
+# read with "docker buildx imagetools inspect --raw". The annotation is
+# 14878 bytes with sha256
+# 86e9133cbd2f31279b61ec638276c26102389d7de2e044ae6166fffa310c35a2, the
+# size and hash that docs/handoff/decisions/00000000005z9f102d4ptbtjbm-
+# sitting-m0-the-kit-frontend-is-a-go.md recorded; both were checked again
+# on 2026-10-22. The linux/amd64 manifest was not read.
+source: sitting M0, read again on 2026-10-22
+networkPolicy:
+  type: com.docker.sandbox/network-policy@1
+  config:
+    runtime:
+      allow:
+        - api.anthropic.com:443
+        - platform.claude.com:443
+        - downloads.claude.ai:443
+        - claude.com:443
+        - mcp-proxy.anthropic.com:443
+        - bridge.claudeusercontent.com:443
+# A lifecycle@1 install hook declares the environment names it reads and
+# runs as a user named by uid or by name.
+installHooks:
+  - user: "0"
+    env: [WORKSPACE_DIR]
+  - user: agent
+    env: [SBX_CRED_ANTHROPIC_MODE]
+# An arg may carry pattern and env; the workload's own hook relies on a
+# pattern to keep a quote out of the value it expands into script text.
+args:
+  model:
+    default: ""
+    pattern: "^[A-Za-z0-9._-]*$"
+    env: CLAUDE_MODEL
+# The provides list names no deb/tzdata and no deb/zsh.
+providesTzdata: false
+providesZsh: false
