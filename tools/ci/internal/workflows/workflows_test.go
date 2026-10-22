@@ -32,7 +32,6 @@ func TestWorkflowsGrammar(t *testing.T) {
 	}{
 		{"the good workflow", "", "", ""},
 		{"an if on a step", "      - name: All checks\n", "      - name: All checks\n        if: always()\n", `"if" is outside the grammar of a run step`},
-		{"an if on a job", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    if: true\n", `"if" is outside the grammar of a job`},
 		{"a shell", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci all\n        shell: bash\n", `"shell" is outside the grammar of a run step`},
 		{"continue-on-error", "      - name: All checks\n", "      - name: All checks\n        continue-on-error: true\n", `"continue-on-error"`},
 		{"a container", "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    container: alpine\n", `"container" is outside the grammar of a job`},
@@ -181,7 +180,7 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"a strategy with max-parallel", "      fail-fast: false\n", "      fail-fast: false\n      max-parallel: 2\n", ""},
 		{"a uses path segment of a single underscore", "uses: actions/checkout@" + citest.Sha, "uses: actions/checkout/_x@" + citest.Sha, ""},
 		{"a uses path segment that starts with two dots", "uses: actions/checkout@" + citest.Sha, "uses: actions/checkout/..x@" + citest.Sha, "40-hex commit SHA"},
-		{"a job key written quoted", "    timeout-minutes: 60\n", "    \"if\": true\n", `"if" is outside the grammar of a job`},
+		{"a job key written quoted", "    timeout-minutes: 60\n", "    \"continue-on-error\": true\n", `"continue-on-error" is outside the grammar of a job`},
 		{"a quoted key that is allowed", "    timeout-minutes: 60\n", "    \"timeout-minutes\": 60\n", ""},
 		{"a strategy in flow style", "    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n", "    strategy: {fail-fast: false, matrix: {include: [{os: ubuntu-26.04, mise_sha256: aa}]}}\n", ""},
 		{"a strategy in flow style with a latest label", "    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - os: ubuntu-26.04\n            mise_sha256: aa\n", "    strategy: {matrix: {include: [{os: ubuntu-latest, mise_sha256: aa}]}}\n", "never *-latest"},
@@ -320,12 +319,13 @@ func TestWorkflowsRepository(t *testing.T) {
 }
 
 // TestWorkflowsCIFile reads the repository's ci.yml and x64.yml as
-// data and holds them to what T002 asks of them: the pinned runners,
-// arm64 on every pull request and x64 on a schedule (10 10.2, Runners),
-// mise installed by a pinned version and a sha256 per platform before
-// setup, and setup before all. Past the header, the trigger and the
-// matrix, the two files are the same, so the scheduled job is the job a
-// pull request runs.
+// data and holds them to what T002 and T157 ask of them: the pinned
+// runners, arm64 on every pull request and x64 on a schedule (10 10.2,
+// Runners), the jobs static, race and e2e, each with mise installed by a
+// pinned version and a sha256 per platform before setup, and setup before
+// the subcommand of the job, and the two aggregators that every other job
+// feeds. Past the header, the trigger and the matrix, the two files are
+// the same, so the scheduled jobs are the jobs a pull request runs.
 func TestWorkflowsCIFile(t *testing.T) {
 	read := func(name string) []byte {
 		src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(Dir), name))
@@ -333,8 +333,9 @@ func TestWorkflowsCIFile(t *testing.T) {
 		return src
 	}
 	for name, want := range map[string]struct {
-		events, runners []string
-		concurrency     map[string]any
+		events      []string
+		runners     []string // the linux label, then the macOS one
+		concurrency map[string]any
 	}{
 		// x64.yml runs no event a pull request waits for. ci.yml cancels
 		// the run in progress of a pull request alone; a push has a
@@ -346,13 +347,14 @@ func TestWorkflowsCIFile(t *testing.T) {
 		"x64.yml": {[]string{"schedule", "workflow_dispatch"}, []string{"ubuntu-26.04", "macos-26-intel"},
 			map[string]any{"group": "${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}", "cancel-in-progress": false}},
 	} {
-		t.Run(name, func(t *testing.T) { checkCIJob(t, read(name), want.events, want.runners, want.concurrency) })
+		t.Run(name, func(t *testing.T) { checkCIJobs(t, read(name), want.events, want.runners, want.concurrency) })
 	}
-	assert.Equal(t, jobBody(t, read("ci.yml")), jobBody(t, read("x64.yml")), "the job of x64.yml is the job of ci.yml")
+	assert.Equal(t, jobBody(t, read("ci.yml")), jobBody(t, read("x64.yml")), "the jobs of x64.yml are the jobs of ci.yml")
 }
 
 // jobBody returns the lines of a workflow from "permissions:" on, without the
-// matrix entries and the comments: what ci.yml and x64.yml share.
+// matrix entries, the aggregators' runners and the comments: what ci.yml
+// and x64.yml share.
 func jobBody(t *testing.T, src []byte) []string {
 	t.Helper()
 	_, body, found := strings.Cut(string(src), "\npermissions:\n")
@@ -360,7 +362,8 @@ func jobBody(t *testing.T, src []byte) []string {
 	var lines []string
 	for line := range strings.SplitSeq(body, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "- os: ") || strings.HasPrefix(trimmed, "mise_sha256: ") {
+		if strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "- os: ") || strings.HasPrefix(trimmed, "mise_sha256: ") ||
+			strings.HasPrefix(trimmed, "name: all on ") || (strings.HasPrefix(trimmed, "runs-on: ") && !strings.Contains(trimmed, "matrix.os")) {
 			continue
 		}
 		lines = append(lines, line)
@@ -382,72 +385,99 @@ func cacheKey(t *testing.T) string {
 	return container.CacheKey(lock, p)
 }
 
-// checkCIJob holds a workflow to the events it runs on, and its one
-// job to the runners want, in order, and to the mise, setup and all
-// steps.
-func checkCIJob(t *testing.T, src []byte, events, want []string, concurrency map[string]any) {
+// checkCIJobs holds a workflow to the events it runs on, its three jobs
+// to the runners they run on (static and e2e on the Linux label alone,
+// race on both), to the mise, setup, build and subcommand steps, and its
+// two aggregators to the names of the required checks and to the jobs
+// they need.
+func checkCIJobs(t *testing.T, src []byte, events, runners []string, concurrency map[string]any) {
 	t.Helper()
+	type job struct {
+		Name     string   `yaml:"name"`
+		RunsOn   string   `yaml:"runs-on"`
+		Needs    []string `yaml:"needs"`
+		If       string   `yaml:"if"`
+		Timeout  int      `yaml:"timeout-minutes"`
+		Strategy struct {
+			Matrix struct {
+				Include []map[string]string `yaml:"include"`
+			} `yaml:"matrix"`
+		} `yaml:"strategy"`
+		Steps []struct {
+			Uses string         `yaml:"uses"`
+			Run  string         `yaml:"run"`
+			With map[string]any `yaml:"with"`
+		} `yaml:"steps"`
+	}
 	var wf struct {
 		On          map[string]yaml.Node `yaml:"on"`
 		Concurrency map[string]any       `yaml:"concurrency"`
-		Jobs        map[string]struct {
-			RunsOn   string `yaml:"runs-on"`
-			Strategy struct {
-				Matrix struct {
-					Include []map[string]string `yaml:"include"`
-				} `yaml:"matrix"`
-			} `yaml:"strategy"`
-			Steps []struct {
-				Uses string         `yaml:"uses"`
-				Run  string         `yaml:"run"`
-				With map[string]any `yaml:"with"`
-			} `yaml:"steps"`
-		} `yaml:"jobs"`
+		Jobs        map[string]job       `yaml:"jobs"`
 	}
 	require.NoError(t, yaml.Unmarshal(src, &wf))
 	assert.Equal(t, concurrency, wf.Concurrency, "the concurrency of the file")
 	got := slices.Sorted(maps.Keys(wf.On))
 	assert.Equal(t, slices.Sorted(slices.Values(events)), got, "the events")
-	require.Len(t, wf.Jobs, 1)
-	job, ok := wf.Jobs["all"]
-	require.True(t, ok, "the job is named all")
-	assert.Equal(t, matrixRunner, job.RunsOn)
+	linux, mac := runners[0], runners[1]
+	assert.ElementsMatch(t, []string{"static", "race", "e2e", "all_linux", "all_macos"}, slices.Collect(maps.Keys(wf.Jobs)), "the jobs")
 
-	var labels []string
-	for _, entry := range job.Strategy.Matrix.Include {
-		labels = append(labels, entry["os"])
-		assert.Regexp(t, `^[0-9a-f]{64}$`, entry["mise_sha256"], "the mise sha256 of %s", entry["os"])
-	}
-	assert.Equal(t, want, labels)
-
-	index := map[string]int{}
-	for i, s := range job.Steps {
-		switch {
-		case strings.HasPrefix(s.Uses, "jdx/mise-action@"):
-			index["mise"] = i
-			assert.Equal(t, "2026.10.3", s.With["version"])
-			assert.Equal(t, "${{ matrix.mise_sha256 }}", s.With["sha256"])
-			assert.Equal(t, false, s.With["cache"])
-			assert.Equal(t, false, s.With["env"])
-			assert.Equal(t, false, s.With["persist_github_token"])
-		case strings.HasPrefix(s.Uses, "actions/cache@"):
-			index["cache"] = i
-			assert.Equal(t, map[string]any{"path": container.CacheDir, "key": cacheKey(t)}, s.With, "the cache of the container e2e")
-		case s.Run == "go run ./tools/ci setup":
-			index["setup"] = i
-		case s.Run == BuildLine:
-			index["build"] = i
-		case s.Run == BuiltCI+" all":
-			index["all"] = i
+	labelsOf := map[string][]string{"static": {linux}, "race": {linux, mac}, "e2e": {linux}}
+	for id, wantLabels := range labelsOf {
+		j := wf.Jobs[id]
+		assert.Equal(t, id+" on ${{ matrix.os }}", j.Name)
+		assert.Equal(t, matrixRunner, j.RunsOn)
+		assert.Positive(t, j.Timeout, "the job %s has a timeout", id)
+		var labels []string
+		for _, entry := range j.Strategy.Matrix.Include {
+			labels = append(labels, entry["os"])
+			assert.Regexp(t, `^[0-9a-f]{64}$`, entry["mise_sha256"], "the mise sha256 of %s in %s", entry["os"], id)
 		}
+		assert.Equal(t, wantLabels, labels, "the runners of %s", id)
+
+		index := map[string]int{}
+		for i, s := range j.Steps {
+			switch {
+			case strings.HasPrefix(s.Uses, "jdx/mise-action@"):
+				index["mise"] = i
+				assert.Equal(t, "2026.10.3", s.With["version"])
+				assert.Equal(t, "${{ matrix.mise_sha256 }}", s.With["sha256"])
+				assert.Equal(t, false, s.With["cache"])
+				assert.Equal(t, false, s.With["env"])
+				assert.Equal(t, false, s.With["persist_github_token"])
+			case strings.HasPrefix(s.Uses, "actions/cache@"):
+				index["cache"] = i
+				assert.Equal(t, map[string]any{"path": container.CacheDir, "key": cacheKey(t)}, s.With, "the cache of the container e2e")
+			case s.Run == "go run ./tools/ci setup":
+				index["setup"] = i
+			case s.Run == BuildLine:
+				index["build"] = i
+			case s.Run == BuiltCI+" "+id:
+				index["run"] = i
+			}
+		}
+		if id == "e2e" {
+			require.Len(t, index, 5, "the mise, cache, setup, build and subcommand steps of %s: %v", id, index)
+			assert.Less(t, index["mise"], index["cache"])
+			assert.Less(t, index["cache"], index["setup"])
+		} else {
+			require.Len(t, index, 4, "the mise, setup, build and subcommand steps of %s, and no cache of the container e2e: %v", id, index)
+		}
+		assert.Less(t, index["mise"], index["setup"])
+		assert.Less(t, index["setup"], index["build"])
+		assert.Less(t, index["build"], index["run"], "%s runs the built tools/ci, so its exit status reaches the job", id)
 	}
-	require.Len(t, index, 5, "the mise, cache, setup, build and all steps: %v", index)
-	assert.Less(t, index["setup"], index["build"])
-	assert.Less(t, index["build"], index["all"], "all runs the built tools/ci, so its exit status reaches the job")
-	assert.Less(t, index["mise"], index["cache"])
-	assert.Less(t, index["cache"], index["setup"])
-	assert.Less(t, index["mise"], index["setup"])
-	assert.Less(t, index["setup"], index["all"])
+
+	aggregators := map[string]string{"all_linux": "all on " + linux, "all_macos": "all on " + mac}
+	for id, name := range aggregators {
+		j := wf.Jobs[id]
+		assert.Equal(t, name, j.Name, "the aggregator %s is a required check by its name", id)
+		assert.Equal(t, linux, j.RunsOn, "the aggregator %s runs on the Linux label of its file", id)
+		assert.ElementsMatch(t, []string{"static", "race", "e2e"}, j.Needs, "%s needs every other job", id)
+		assert.Equal(t, AggregatorIf, j.If)
+		assert.Empty(t, j.Strategy.Matrix.Include, "an aggregator is not a matrix")
+		require.Len(t, j.Steps, 1)
+		assert.Equal(t, AggregatorStep, j.Steps[0].Run)
+	}
 }
 
 const (
@@ -628,4 +658,113 @@ func TestWorkflowsCommand(t *testing.T) {
 	code, out = citest.Run(t, r, nil, Run)
 	assert.Equal(t, check.ExitFail, code, out)
 	assert.Equal(t, ".github/workflows/extra.yaml: workflows: a file here ends in .yml\nworkflows: 1 finding(s)\n", out)
+}
+
+// aggregators are the two jobs that end the fixture, in the shape the
+// grammar admits (AggregatorIf): they need the one job of GoodWorkflow,
+// run on a literal label, and have one step that fails.
+const aggregators = `  aggregate_linux:
+    name: all on ubuntu-26.04-arm
+    runs-on: ubuntu-26.04-arm
+    needs: [all]
+    if: ` + AggregatorIf + `
+    steps:
+      - run: exit 1
+  aggregate_macos:
+    name: all on macos-26
+    runs-on: ubuntu-26.04-arm
+    needs:
+      - all
+    if: ` + AggregatorIf + `
+    timeout-minutes: 5
+    steps:
+      - name: Fail
+        run: exit 1
+`
+
+// TestWorkflowsAggregator holds the aggregator job of 10 10.2: the fixture
+// with two of them passes, and each fixture that changes one part of one
+// of them fails with the finding for that part alone, so each rule has a
+// positive control.
+func TestWorkflowsAggregator(t *testing.T) {
+	good := citest.GoodWorkflow + aggregators
+	assert.Empty(t, workflowFindings(".github/workflows/x.yml", []byte(good)), "the fixture with two aggregators")
+	assert.Equal(t, "${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')) }}", AggregatorIf)
+
+	tests := []struct {
+		name     string
+		old, new string // the text of the fixture to replace, once, and its replacement
+		want     string
+		// several is set for a fixture that breaks two rules at once, each
+		// with a finding of its own: the one named is among them.
+		several bool
+	}{
+		{"an if that differs by one character: result", "'failure'", "'failures'", "holds this if, byte for byte", false},
+		{"an if that differs by one character: && for ||", "&& (contains(needs.*.result, 'failure')", "|| (contains(needs.*.result, 'failure')", "holds this if, byte for byte", false},
+		{"an if without always()", "${{ always() && (", "${{ (", "holds this if, byte for byte", false},
+		{"an if that is a plain expression", "if: " + AggregatorIf + "\n    steps:\n      - run: exit 1\n  aggregate_macos", "if: ${{ failure() }}\n    steps:\n      - run: exit 1\n  aggregate_macos", "holds this if, byte for byte", false},
+		{"an if that is a boolean", "if: " + AggregatorIf + "\n    steps:\n      - run: exit 1\n  aggregate_macos", "if: true\n    steps:\n      - run: exit 1\n  aggregate_macos", "holds this if, byte for byte", false},
+		{"an if with a trailing space, quoted", "if: " + AggregatorIf + "\n    steps:\n      - run: exit 1\n  aggregate_macos", "if: \"" + AggregatorIf + " \"\n    steps:\n      - run: exit 1\n  aggregate_macos", "holds this if, byte for byte", false},
+		{"an aggregator whose needs omits a job", "needs: [all]", "needs: []", `missing "all"`, false},
+		{"an aggregator with no needs", "    needs: [all]\n", "", `missing "all"`, false},
+		{"an aggregator whose needs names a job that is not there", "needs: [all]", "needs: [all, other]", `unknown "other"`, false},
+		{"an aggregator that needs the other aggregator", "needs: [all]", "needs: [all, aggregate_macos]", `unknown "aggregate_macos"`, false},
+		{"an aggregator with a matrix", "    runs-on: ubuntu-26.04-arm\n    needs: [all]\n", "    runs-on: ubuntu-26.04-arm\n    needs: [all]\n    strategy:\n      matrix:\n        include:\n          - os: ubuntu-26.04-arm\n            mise_sha256: aa\n", "has no strategy", false},
+		{"an aggregator whose name holds an expression", "name: all on ubuntu-26.04-arm", "name: all on ${{ matrix.os }}", "has a literal name", false},
+		{"an aggregator whose runs-on is the matrix", "    runs-on: ubuntu-26.04-arm\n    needs: [all]\n", "    runs-on: ${{ matrix.os }}\n    needs: [all]\n", "runs on one literal runner label", true},
+		{"an aggregator with no runs-on", "    runs-on: ubuntu-26.04-arm\n    needs: [all]\n", "    needs: [all]\n", "runs on one literal runner label", false},
+		{"an aggregator on a floating label", "    runs-on: ubuntu-26.04-arm\n    needs: [all]\n", "    runs-on: ubuntu-latest\n    needs: [all]\n", "never *-latest", false},
+		{"an aggregator with another command", "      - run: exit 1\n  aggregate_macos", "      - run: go run ./tools/ci all\n  aggregate_macos", "has one step, run: exit 1", false},
+		{"an aggregator with exit 0", "      - run: exit 1\n  aggregate_macos", "      - run: exit 0\n  aggregate_macos", "run is one line", true},
+		{"an aggregator with a second step", "      - run: exit 1\n  aggregate_macos", "      - run: exit 1\n      - run: exit 1\n  aggregate_macos", "has one step, run: exit 1", true},
+		{"an aggregator with a uses step", "      - run: exit 1\n  aggregate_macos", "      - uses: actions/checkout@" + citest.Sha + "\n        with:\n          persist-credentials: false\n  aggregate_macos", "has one step, run: exit 1", false},
+		{"an aggregator with no steps", "    steps:\n      - run: exit 1\n  aggregate_macos", "  aggregate_macos", "has one step, run: exit 1", false},
+		{"an aggregator with exit 1 and a condition on the step", "      - run: exit 1\n  aggregate_macos", "      - run: exit 1\n        if: always()\n  aggregate_macos", `"if" is outside the grammar of a run step`, false},
+		{"an aggregator with a shell on the step", "      - run: exit 1\n  aggregate_macos", "      - run: exit 1\n        shell: bash\n  aggregate_macos", `"shell" is outside the grammar of a run step`, false},
+		{"an aggregator with an env", "    needs: [all]\n", "    needs: [all]\n    env:\n      A: b\n", `"env" is outside the grammar of a job`, false},
+		{"an aggregator with continue-on-error", "    needs: [all]\n", "    needs: [all]\n    continue-on-error: true\n", `"continue-on-error" is outside the grammar of a job`, false},
+		{"an if written twice", "    needs: [all]\n", "    needs: [all]\n    if: " + AggregatorIf + "\n", "written twice", true},
+		{"exit 1 in a job with no if", "        run: go run ./tools/ci all\n", "        run: exit 1\n", "run is one line", false},
+		{"exit 1 as the step of a job with no if, beside others", "      - name: All checks\n        run: go run ./tools/ci all\n", "      - name: All checks\n        run: go run ./tools/ci all\n      - run: exit 1\n", "run is one line", false},
+		{"exit 1 in a job whose if is not an aggregator's but that has more steps", "      - run: exit 1\n  aggregate_macos", "      - run: exit 1\n      - run: exit 1\n  aggregate_macos", "run is one line", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src := good
+			require.Contains(t, src, tt.old, "the fixture's text to replace")
+			src = strings.Replace(src, tt.old, tt.new, 1)
+			got := workflowFindings(".github/workflows/x.yml", []byte(src))
+			if tt.several {
+				wantAny(t, got, tt.want)
+				return
+			}
+			require.Len(t, got, 1, "%v", got)
+			assert.Contains(t, got[0].Msg, tt.want)
+			assert.Equal(t, "workflows", got[0].Rule)
+		})
+	}
+}
+
+// TestWorkflowsIfOnAnotherJob holds that an if is the aggregator's alone:
+// on a job that builds, with a matrix and many steps, even the exact text
+// fails, for what such a job is not, and so does any other text.
+func TestWorkflowsIfOnAnotherJob(t *testing.T) {
+	for _, value := range []string{"true", "always()", "${{ github.event_name == 'push' }}", AggregatorIf} {
+		src := strings.Replace(citest.GoodWorkflow, "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    if: "+value+"\n", 1)
+		got := workflowFindings(".github/workflows/x.yml", []byte(src))
+		wantAny(t, got, "has a literal name")
+		wantAny(t, got, "has no strategy")
+		wantAny(t, got, "has one step, run: exit 1")
+		if value != AggregatorIf {
+			wantAny(t, got, "holds this if, byte for byte")
+		}
+	}
+	src := strings.Replace(citest.GoodWorkflow, "    timeout-minutes: 60\n", "    timeout-minutes: 60\n    \"if\": true\n", 1)
+	wantAny(t, workflowFindings(".github/workflows/x.yml", []byte(src)), "an aggregator job (the only job with an if)")
+	// A step's if stays outside the grammar, and so does an if expression
+	// elsewhere than on a job.
+	src = strings.Replace(citest.GoodWorkflow, "      - name: All checks\n", "      - name: All checks\n        if: ${{ always() }}\n", 1)
+	wantAny(t, workflowFindings(".github/workflows/x.yml", []byte(src)), `"if" is outside the grammar of a run step`)
+	src = strings.Replace(citest.GoodWorkflow, "group: ci-${{ github.ref }}", "group: ci-"+AggregatorIf, 1)
+	wantAny(t, workflowFindings(".github/workflows/x.yml", []byte(src)), "one context path")
 }

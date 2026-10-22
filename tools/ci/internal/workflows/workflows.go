@@ -36,7 +36,7 @@ const (
 // Threat model of the workflows check. It guards against two things:
 //
 //  1. A hosted run that differs from a local one: check logic written
-//     in a workflow (an if, a shell, continue-on-error, a container, a
+//     in a workflow (an if other than the aggregator's, a shell, continue-on-error, a container, a
 //     called workflow, an expression that computes), a step that starts
 //     a program other than tools/ci or tools/release, an action named
 //     by a tag or a branch, which can move, a local action (a path in
@@ -74,7 +74,7 @@ const (
 var (
 	fileKeys     = []string{"name", "on", "permissions", "concurrency", "env", "jobs"}
 	eventNames   = []string{"pull_request", "push", "schedule", "workflow_dispatch"}
-	jobKeys      = []string{"name", "runs-on", "needs", "strategy", "permissions", "timeout-minutes", "steps"}
+	jobKeys      = []string{"name", "runs-on", "needs", "if", "strategy", "permissions", "timeout-minutes", "steps"}
 	usesStepKeys = []string{"name", "uses", "with"}
 	runStepKeys  = []string{"name", "run"}
 	strategyKeys = []string{"matrix", "fail-fast", "max-parallel"}
@@ -155,6 +155,23 @@ var runPrograms = [][]string{
 	{"go", "run", "./tools/release"},
 }
 
+// The aggregator job (10 10.2): the required checks of main are two jobs,
+// "all on <label>", that every other job of the file feeds. GitHub reports
+// a skipped job as a success, also for a required check, and a job is
+// skipped when a job it needs fails, so an aggregator with needs alone
+// would let a red job merge. An aggregator therefore runs, and fails,
+// unless every job it needs succeeded (always() makes it run after a
+// failed need, and the if reads each result, the skipped and the cancelled
+// ones included), and is skipped, which GitHub reports as a success, when
+// all did. It holds the one if of the grammar, compared as a whole string,
+// and the one step that fails.
+const (
+	// AggregatorIf is the if of an aggregator, byte for byte.
+	AggregatorIf = "${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')) }}"
+	// AggregatorStep is the run line of the one step of an aggregator.
+	AggregatorStep = "exit 1"
+)
+
 // workflows applies the grammar to every file below .github/workflows
 // in the tree at head, as hygiene does: the tree that is committed is
 // the one a runner checks out.
@@ -190,7 +207,7 @@ func workflowFindings(path string, src []byte) []check.Finding {
 	if err != nil {
 		return []check.Finding{{Where: where, Rule: "workflows", Msg: err.Error()}}
 	}
-	c := &grammar{where: where, exempt: prOnlyCancel(doc), rel: readRelease(path, doc)}
+	c := &grammar{where: where, exempt: exempted(doc), rel: readRelease(path, doc)}
 	c.walk(doc)
 	c.file(doc)
 	if strings.TrimPrefix(path, Dir) == releaseFile {
@@ -224,10 +241,14 @@ func parseWorkflow(src []byte) (*yaml.Node, error) {
 type grammar struct {
 	where    string
 	findings []check.Finding
-	// exempt is the one node whose expression is not a context path:
-	// the cancel-in-progress of the file's concurrency, when it is
-	// prOnlyExpression (prOnlyCancel).
-	exempt *yaml.Node
+	// exempt are the nodes whose expression is not a context path: the
+	// cancel-in-progress of the file's concurrency, when it is
+	// prOnlyExpression (prOnlyCancel), and the if of a job, which
+	// aggregator compares as a whole string.
+	exempt []*yaml.Node
+	// plain are the ids of the jobs of the file that are not aggregators
+	// (jobs): what the needs of an aggregator lists.
+	plain []string
 	// rel is what a release.yml grants its publish job (release.go), and
 	// nil in every other file.
 	rel *release
@@ -248,6 +269,23 @@ func prOnlyCancel(doc *yaml.Node) *yaml.Node {
 		return v
 	}
 	return nil
+}
+
+// exempted returns the nodes whose expression walk does not hold to a
+// context path (grammar.exempt): the cancel-in-progress that is
+// prOnlyExpression, and the if of every job, which the aggregator rule
+// reads as a whole string.
+func exempted(doc *yaml.Node) []*yaml.Node {
+	var out []*yaml.Node
+	if n := prOnlyCancel(doc); n != nil {
+		out = append(out, n)
+	}
+	for _, job := range pairs(field(doc, "jobs")) {
+		if v := field(job, "if"); v != nil && v.Kind == yaml.ScalarNode {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func (c *grammar) add(n *yaml.Node, msg string) {
@@ -271,7 +309,7 @@ func (c *grammar) walk(n *yaml.Node) {
 	case !slices.Contains(plainTags, n.Tag):
 		c.add(n, "the tag "+strconv.Quote(n.Tag)+" is outside the grammar")
 	case n.Kind == yaml.ScalarNode:
-		if n != c.exempt && !c.rel.isToken(n) {
+		if !slices.Contains(c.exempt, n) && !c.rel.isToken(n) {
 			c.expressions(n)
 		}
 	}
@@ -427,6 +465,12 @@ func (c *grammar) jobs(n *yaml.Node) {
 		c.add(n, "jobs is a mapping")
 		return
 	}
+	c.plain = nil
+	for id, job := range pairs(n) {
+		if field(job, "if") == nil {
+			c.plain = append(c.plain, id.Value)
+		}
+	}
 	for _, job := range pairs(n) {
 		c.job(job)
 	}
@@ -438,6 +482,7 @@ func (c *grammar) job(n *yaml.Node) {
 		return
 	}
 	osKnown := false
+	aggregator := field(n, "if") != nil
 	for key, value := range pairs(n) {
 		switch key.Value {
 		case "runs-on":
@@ -454,7 +499,7 @@ func (c *grammar) job(n *yaml.Node) {
 				c.permissions(value)
 			}
 		case "steps":
-			c.steps(value, field(n, "strategy"))
+			c.steps(value, field(n, "strategy"), aggregator && len(seqContent(value)) == 1)
 		}
 		if !slices.Contains(jobKeys, key.Value) {
 			c.add(key, "the key "+strconv.Quote(key.Value)+" is outside the grammar of a job")
@@ -462,6 +507,71 @@ func (c *grammar) job(n *yaml.Node) {
 	}
 	if runsOn := field(n, "runs-on"); runsOn != nil && runsOn.Value == matrixRunner && !osKnown {
 		c.add(runsOn, "runs-on is "+matrixRunner+", so the matrix names os, in every include entry or as a key")
+	}
+	if aggregator {
+		c.aggregator(n)
+	}
+}
+
+// aggregator holds a job with an if to the shape of the aggregator job
+// (AggregatorIf): a literal name, one literal runner label, no strategy,
+// a needs that lists every job of the file that is not an aggregator, the
+// if of AggregatorIf byte for byte, and the one step AggregatorStep. A job
+// with an if that is not this is a finding for each part it breaks, so an
+// if on any other job fails.
+func (c *grammar) aggregator(n *yaml.Node) {
+	const shape = "an aggregator job (the only job with an if) "
+	if name := field(n, "name"); name == nil || !literal(name) {
+		c.add(n, shape+"has a literal name, with no ${{ }}: a required check is matched by its name")
+	}
+	if runsOn := field(n, "runs-on"); runsOn == nil || runsOn.Value == matrixRunner {
+		c.add(n, shape+"runs on one literal runner label, not "+matrixRunner)
+	}
+	if s := field(n, "strategy"); s != nil {
+		c.add(s, shape+"has no strategy: a matrix job is named with its expression unexpanded when skipped")
+	}
+	c.aggregatorNeeds(n)
+	if v := field(n, "if"); v.Kind != yaml.ScalarNode || v.Tag != "!!str" || v.Value != AggregatorIf {
+		c.add(v, shape+"holds this if, byte for byte: "+AggregatorIf)
+	}
+	steps := seqContent(field(n, "steps"))
+	if len(steps) != 1 || field(steps[0], "uses") != nil || field(steps[0], "run") == nil || field(steps[0], "run").Value != AggregatorStep {
+		c.add(n, shape+"has one step, run: "+AggregatorStep)
+	}
+}
+
+// aggregatorNeeds holds the needs of an aggregator to the jobs of the
+// file that are not aggregators (grammar.plain): every one of them, and
+// no other name.
+func (c *grammar) aggregatorNeeds(n *yaml.Node) {
+	needs := field(n, "needs")
+	var listed []string
+	switch {
+	case needs == nil:
+	case needs.Kind == yaml.ScalarNode:
+		listed = []string{needs.Value}
+	case needs.Kind == yaml.SequenceNode:
+		for _, item := range needs.Content {
+			listed = append(listed, item.Value)
+		}
+	}
+	var wrong []string
+	for _, id := range c.plain {
+		if !slices.Contains(listed, id) {
+			wrong = append(wrong, "missing "+strconv.Quote(id))
+		}
+	}
+	for _, id := range listed {
+		if !slices.Contains(c.plain, id) {
+			wrong = append(wrong, "unknown "+strconv.Quote(id))
+		}
+	}
+	if len(wrong) > 0 {
+		at := needs
+		if at == nil {
+			at = n
+		}
+		c.add(at, "an aggregator job (the only job with an if) needs every other job of the file that is not an aggregator, no more and no fewer: "+strings.Join(wrong, ", "))
 	}
 }
 
@@ -591,19 +701,23 @@ func seqContent(n *yaml.Node) []*yaml.Node {
 	return n.Content
 }
 
-func (c *grammar) steps(n, strategy *yaml.Node) {
+// steps checks the steps of a job. exitOK says that the job is an
+// aggregator with one step, the only place the run line AggregatorStep
+// is admitted.
+func (c *grammar) steps(n, strategy *yaml.Node, exitOK bool) {
 	if n.Kind != yaml.SequenceNode {
 		c.add(n, "steps is a list")
 		return
 	}
 	for _, s := range n.Content {
-		c.step(s, strategy)
+		c.step(s, strategy, exitOK)
 	}
 }
 
 // step checks one step: a uses step or a run step, never both, each
-// with its own keys and the form of its one command.
-func (c *grammar) step(n, strategy *yaml.Node) {
+// with its own keys and the form of its one command. exitOK is set for
+// the one step of an aggregator job (steps).
+func (c *grammar) step(n, strategy *yaml.Node, exitOK bool) {
 	if n.Kind != yaml.MappingNode {
 		c.add(n, "a step is a mapping")
 		return
@@ -634,7 +748,8 @@ func (c *grammar) step(n, strategy *yaml.Node) {
 		case "env":
 			c.stepEnv(value)
 		case "run":
-			if value.Kind != yaml.ScalarNode || !runLine(value.Value) {
+			allowed := value.Kind == yaml.ScalarNode && (runLine(value.Value) || (exitOK && value.Value == AggregatorStep && value.Tag == "!!str"))
+			if !allowed {
 				c.add(value, "run is one line: go run ./tools/ci or ./tools/release, a subcommand, and plain words")
 			}
 		}
@@ -818,7 +933,7 @@ func (c *grammar) concurrency(n *yaml.Node) {
 		switch {
 		case !slices.Contains(concurrencyKeys, key.Value):
 			c.add(key, "the concurrency key "+strconv.Quote(key.Value)+" is outside the grammar: group and cancel-in-progress")
-		case key.Value == "cancel-in-progress" && value != c.exempt && !reportedByWalk(value) && (value.Kind != yaml.ScalarNode || value.Tag != "!!bool"):
+		case key.Value == "cancel-in-progress" && !slices.Contains(c.exempt, value) && !reportedByWalk(value) && (value.Kind != yaml.ScalarNode || value.Tag != "!!bool"):
 			c.add(value, "cancel-in-progress is true, false or "+prOnlyExpression)
 		}
 	}

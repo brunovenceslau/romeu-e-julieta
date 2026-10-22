@@ -45,8 +45,60 @@ env:
   GOTOOLCHAIN: local
 
 jobs:
-  all:
-    name: all on ${{ matrix.os }}
+  # The checks that judge the commit and the tree and run none of its tests
+  # (tools/ci static); on Linux alone, since lint and fix cover the darwin
+  # targets from Linux, and license runs on Linux only.
+  static:
+    name: static on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      # Each runner reports on its own, so one red platform does not
+      # hide the state of the others.
+      fail-fast: false
+      matrix:
+        # mise_sha256 is the sha256 of the mise binary of that platform,
+        # mise 2026.10.3, as its signed SHASUMS256.txt lists it.
+        include:
+          - os: ubuntu-26.04-arm
+            mise_sha256: 357260e28904569a6e7124d33b65cef6d043846c07bb8f4906ddf22cc353d61d
+    steps:
+      - name: Check out
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install mise and the tools of mise.lock
+        # jdx/mise-action v5.1.1
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca
+        with:
+          version: 2026.10.3
+          sha256: ${{ matrix.mise_sha256 }}
+          # No actions cache: an install restored from a cache is not
+          # checked again against the checksums of mise.lock.
+          cache: false
+          # No export of the mise environment: the steps reach go
+          # through the mise shims, and tools/ci builds the environment
+          # of each check itself.
+          env: false
+          # The token the action reads stays in the action: no later
+          # step holds it (10 10.2).
+          persist_github_token: false
+      - name: Trust mise.toml and fill the module cache
+        run: go run ./tools/ci setup
+      # tools/ci is built and then run, not started by "go run", which
+      # reaches the job with every exit status other than 0 as 1: so the
+      # job ends with the status tools/ci returns, 3 for an
+      # infrastructure error among them.
+      - name: Build tools/ci
+        run: go build -o "$RUNNER_TEMP/ci" ./tools/ci
+      - name: Static checks
+        run: '"$RUNNER_TEMP/ci" static'
+
+  # The one test run, with the race detector, and the coverage check after
+  # it (tools/ci race), on every runner.
+  race:
+    name: race on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -83,6 +135,54 @@ jobs:
           # The token the action reads stays in the action: no later
           # step holds it (10 10.2).
           persist_github_token: false
+      - name: Trust mise.toml and fill the module cache
+        run: go run ./tools/ci setup
+      # tools/ci is built and then run, not started by "go run", which
+      # reaches the job with every exit status other than 0 as 1: so the
+      # job ends with the status tools/ci returns, 3 for an
+      # infrastructure error among them.
+      - name: Build tools/ci
+        run: go build -o "$RUNNER_TEMP/ci" ./tools/ci
+      - name: Race run and coverage
+        run: '"$RUNNER_TEMP/ci" race'
+
+  # The container e2e (tools/ci e2e); it runs on Linux alone.
+  e2e:
+    name: e2e on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      # Each runner reports on its own, so one red platform does not
+      # hide the state of the others.
+      fail-fast: false
+      matrix:
+        # mise_sha256 is the sha256 of the mise binary of that platform,
+        # mise 2026.10.3, as its signed SHASUMS256.txt lists it.
+        include:
+          - os: ubuntu-26.04-arm
+            mise_sha256: 357260e28904569a6e7124d33b65cef6d043846c07bb8f4906ddf22cc353d61d
+    steps:
+      - name: Check out
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install mise and the tools of mise.lock
+        # jdx/mise-action v5.1.1
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca
+        with:
+          version: 2026.10.3
+          sha256: ${{ matrix.mise_sha256 }}
+          # No actions cache: an install restored from a cache is not
+          # checked again against the checksums of mise.lock.
+          cache: false
+          # No export of the mise environment: the steps reach go
+          # through the mise shims, and tools/ci builds the environment
+          # of each check itself.
+          env: false
+          # The token the action reads stays in the action: no later
+          # step holds it (10 10.2).
+          persist_github_token: false
       - name: Restore the downloads of the container e2e
         # actions/cache v6.1.0
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -93,8 +193,7 @@ jobs:
           # for being cached. The image of the workload is not cached:
           # every run pulls it by its digest. The key names the runner's
           # OS and architecture, so each architecture keeps its own
-          # entry and a macOS runner, which runs no container e2e,
-          # finds none to restore and saves none, and then one hash of
+          # entry, and then one hash of
           # the fixture mise.lock and the herdr and mise pins, so a pin
           # that changes is a new entry (CacheKey of
           # tools/ci/internal/container, which the workflows test holds
@@ -109,5 +208,33 @@ jobs:
       # infrastructure error among them.
       - name: Build tools/ci
         run: go build -o "$RUNNER_TEMP/ci" ./tools/ci
-      - name: All checks
-        run: '"$RUNNER_TEMP/ci" all'
+      - name: Container e2e
+        run: '"$RUNNER_TEMP/ci" e2e'
+
+  # The required checks of main, one per host: all on ubuntu-26.04-arm and
+  # all on macos-26. GitHub reports a skipped job as a success, also for a
+  # required check, and a job is skipped when a job it needs fails, so an
+  # aggregator with needs alone would let a red job merge. Each one needs
+  # every other job and runs only when one of them did not succeed (the
+  # if, which the workflows check compares byte for byte), and then fails;
+  # when every job succeeded it is skipped, which GitHub reports as a
+  # success. Both need every job, so a red job turns both red: the name
+  # is the one the ruleset requires, not a promise about which host failed.
+  # Each is a job of its own, not a matrix, since GitHub names a skipped
+  # matrix job with its expression unexpanded and a required check would
+  # never match.
+  all_linux:
+    name: all on ubuntu-26.04-arm
+    runs-on: ubuntu-26.04-arm
+    needs: [static, race, e2e]
+    if: ${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')) }}
+    steps:
+      - run: exit 1
+
+  all_macos:
+    name: all on macos-26
+    runs-on: ubuntu-26.04-arm
+    needs: [static, race, e2e]
+    if: ${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')) }}
+    steps:
+      - run: exit 1
