@@ -822,6 +822,7 @@ func TestWorkflowsHostedFilesKeepTheirJobs(t *testing.T) {
 			want   string
 		}{
 			{"the race job deleted and removed from both needs", func(t *testing.T) string {
+				t.Helper()
 				return strings.ReplaceAll(cut(t, good, "  # The one test run", "  # The container e2e"), "needs: [static, race, e2e]", "needs: [static, e2e]")
 			}, "the jobs of this file are static, race, e2e besides the aggregators, missing race"},
 			{"the static job renamed", func(*testing.T) string {
@@ -840,7 +841,7 @@ func TestWorkflowsHostedFilesKeepTheirJobs(t *testing.T) {
 			{"the e2e job running all", func(*testing.T) string {
 				return strings.Replace(good, run+`e2e'`, run+`all'`, 1)
 			}, "the job e2e runs the built tools/ci with its own subcommand"},
-			{"the macOS aggregator removed", func(t *testing.T) string {
+			{"the macOS aggregator removed", func(*testing.T) string {
 				return good[:strings.Index(good, "  all_macos:\n")]
 			}, "exactly two aggregators"},
 			{"a third aggregator", func(*testing.T) string {
