@@ -46,8 +46,9 @@ env:
 
 jobs:
   # The checks that judge the commit and the tree and run none of its tests
-  # (tools/ci static); on Linux alone, since lint and fix cover the darwin
-  # targets from Linux, and license runs on Linux only.
+  # (tools/ci static); on Linux alone, since lint, fix, vet and
+  # vulnerabilities run once per target of the lint list, the darwin ones
+  # included, and license runs on Linux only.
   static:
     name: static on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -229,6 +230,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [static, race, e2e]
     if: ${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')) }}
+    timeout-minutes: 5
     steps:
       - run: exit 1
 
@@ -237,5 +239,6 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [static, race, e2e]
     if: ${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')) }}
+    timeout-minutes: 5
     steps:
       - run: exit 1

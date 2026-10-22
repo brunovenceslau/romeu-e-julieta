@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -229,7 +230,7 @@ func TestWorkflowsStepEnvRefusesEventText(t *testing.T) {
 	src := strings.Replace(goodRelease, "      - name: Notes\n", "      - run: go run ./tools/release notes\n"+env+"      - name: Notes\n", 1)
 	wantAny(t, workflowFindings(releasePath, []byte(src)), "the env of a release step")
 	grouped := strings.Replace(citest.GoodWorkflow, "group: ci-${{ github.ref }}", "group: ci-${{ github.event.head_commit.id }}", 1)
-	assert.Empty(t, workflowFindings(".github/workflows/ci.yml", []byte(grouped)), "the group keeps its event expression")
+	assert.Empty(t, workflowFindings(".github/workflows/other.yml", []byte(grouped)), "the group keeps its event expression")
 }
 
 // TestWorkflowsFile fails what the grammar refuses as a whole file: a
@@ -254,7 +255,7 @@ func TestWorkflowsFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := workflowFindings(tt.path, []byte(tt.src))
+			got := withoutHosted(workflowFindings(tt.path, []byte(tt.src)))
 			require.Len(t, got, 1, "%v", got)
 			assert.Contains(t, got[0].Msg, tt.want)
 		})
@@ -264,8 +265,22 @@ func TestWorkflowsFile(t *testing.T) {
 		assert.Empty(t, workflowFindings(".github/workflows/fuzz.yml", []byte(src)))
 	})
 	t.Run("a ci.yml with edited", func(t *testing.T) {
-		assert.Empty(t, workflowFindings(".github/workflows/ci.yml", []byte(citest.GoodWorkflow)))
+		assert.Empty(t, withoutHosted(workflowFindings(".github/workflows/ci.yml", []byte(citest.GoodWorkflow))))
 	})
+}
+
+// withoutHosted drops the findings of the rules that ci.yml and x64.yml
+// alone are held to (hosted), for the tests that use the one-job fixture
+// under the name ci.yml to reach a rule of the file.
+func withoutHosted(findings []check.Finding) []check.Finding {
+	var out []check.Finding
+	for _, f := range findings {
+		if !strings.Contains(f.Msg, "the jobs of this file") && !strings.Contains(f.Msg, "with its own subcommand") &&
+			!strings.Contains(f.Msg, "the matrix of the job") && !strings.Contains(f.Msg, "aggregators") {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // TestWorkflowsEvents reads the forms YAML gives "on": one name, a
@@ -286,14 +301,14 @@ func TestWorkflowsEvents(t *testing.T) {
 // those under .github/workflows.
 func TestWorkflowsCommitted(t *testing.T) {
 	r := citest.NewTree(t)
-	r.Write(".github/workflows/ci.yml", citest.GoodWorkflow)
+	r.Write(".github/workflows/build.yml", citest.GoodWorkflow)
 	r.Write("docs/example.yml", "jobs: {x: {if: true}}\n")
 	r.Commit("fixture")
 	got, err := workflows(t.Context(), r.Repo, "HEAD")
 	require.NoError(t, err)
 	assert.Empty(t, got)
 
-	r.Write(".github/workflows/ci.yml", strings.Replace(citest.GoodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1))
+	r.Write(".github/workflows/build.yml", strings.Replace(citest.GoodWorkflow, "${{ matrix.os }}\n    needs", "ubuntu-latest\n    needs", 1))
 	got, err = workflows(t.Context(), r.Repo, "HEAD")
 	require.NoError(t, err)
 	assert.Empty(t, got, "a change that is not committed is in no push")
@@ -301,7 +316,7 @@ func TestWorkflowsCommitted(t *testing.T) {
 	got, err = workflows(t.Context(), r.Repo, "HEAD")
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	assert.Equal(t, ".github/workflows/ci.yml:29", got[0].Where)
+	assert.Equal(t, ".github/workflows/build.yml:29", got[0].Where)
 }
 
 // TestWorkflowsRepository checks the workflows of this repository, as
@@ -474,6 +489,7 @@ func checkCIJobs(t *testing.T, src []byte, events, runners []string, concurrency
 		assert.Equal(t, linux, j.RunsOn, "the aggregator %s runs on the Linux label of its file", id)
 		assert.ElementsMatch(t, []string{"static", "race", "e2e"}, j.Needs, "%s needs every other job", id)
 		assert.Equal(t, AggregatorIf, j.If)
+		assert.Equal(t, 5, j.Timeout, "an aggregator has a short timeout")
 		assert.Empty(t, j.Strategy.Matrix.Include, "an aggregator is not a matrix")
 		require.Len(t, j.Steps, 1)
 		assert.Equal(t, AggregatorStep, j.Steps[0].Run)
@@ -647,7 +663,7 @@ func TestWorkflowsMatrixRunnerNeedsOS(t *testing.T) {
 // repository: exit 0 with a workflow inside the grammar, 1 outside it.
 func TestWorkflowsCommand(t *testing.T) {
 	r := citest.NewTree(t)
-	r.Write(".github/workflows/ci.yml", citest.GoodWorkflow)
+	r.Write(".github/workflows/build.yml", citest.GoodWorkflow)
 	r.Commit("fixture")
 	code, out := citest.Run(t, r, nil, Run)
 	assert.Equal(t, check.ExitOK, code, out)
@@ -668,6 +684,7 @@ const aggregators = `  aggregate_linux:
     runs-on: ubuntu-26.04-arm
     needs: [all]
     if: ` + AggregatorIf + `
+    timeout-minutes: 5
     steps:
       - run: exit 1
   aggregate_macos:
@@ -702,9 +719,11 @@ func TestWorkflowsAggregator(t *testing.T) {
 		{"an if that differs by one character: result", "'failure'", "'failures'", "holds this if, byte for byte", false},
 		{"an if that differs by one character: && for ||", "&& (contains(needs.*.result, 'failure')", "|| (contains(needs.*.result, 'failure')", "holds this if, byte for byte", false},
 		{"an if without always()", "${{ always() && (", "${{ (", "holds this if, byte for byte", false},
-		{"an if that is a plain expression", "if: " + AggregatorIf + "\n    steps:\n      - run: exit 1\n  aggregate_macos", "if: ${{ failure() }}\n    steps:\n      - run: exit 1\n  aggregate_macos", "holds this if, byte for byte", false},
-		{"an if that is a boolean", "if: " + AggregatorIf + "\n    steps:\n      - run: exit 1\n  aggregate_macos", "if: true\n    steps:\n      - run: exit 1\n  aggregate_macos", "holds this if, byte for byte", false},
-		{"an if with a trailing space, quoted", "if: " + AggregatorIf + "\n    steps:\n      - run: exit 1\n  aggregate_macos", "if: \"" + AggregatorIf + " \"\n    steps:\n      - run: exit 1\n  aggregate_macos", "holds this if, byte for byte", false},
+		{"an if that is a plain expression", "if: " + AggregatorIf + "\n    timeout-minutes: 5\n    steps:\n      - run: exit 1\n  aggregate_macos", "if: ${{ failure() }}\n    timeout-minutes: 5\n    steps:\n      - run: exit 1\n  aggregate_macos", "holds this if, byte for byte", false},
+		{"an if that is a boolean", "if: " + AggregatorIf + "\n    timeout-minutes: 5\n    steps:\n      - run: exit 1\n  aggregate_macos", "if: true\n    timeout-minutes: 5\n    steps:\n      - run: exit 1\n  aggregate_macos", "holds this if, byte for byte", false},
+		{"an if with a trailing space, quoted", "if: " + AggregatorIf + "\n    timeout-minutes: 5\n    steps:\n      - run: exit 1\n  aggregate_macos", "if: \"" + AggregatorIf + " \"\n    timeout-minutes: 5\n    steps:\n      - run: exit 1\n  aggregate_macos", "holds this if, byte for byte", false},
+		{"an aggregator with no timeout", "    timeout-minutes: 5\n    steps:\n      - run: exit 1\n  aggregate_macos", "    steps:\n      - run: exit 1\n  aggregate_macos", "has timeout-minutes: 5", false},
+		{"an aggregator with a longer timeout", "    timeout-minutes: 5\n    steps:\n      - run: exit 1\n  aggregate_macos", "    timeout-minutes: 360\n    steps:\n      - run: exit 1\n  aggregate_macos", "has timeout-minutes: 5", false},
 		{"an aggregator whose needs omits a job", "needs: [all]", "needs: []", `missing "all"`, false},
 		{"an aggregator with no needs", "    needs: [all]\n", "", `missing "all"`, false},
 		{"an aggregator whose needs names a job that is not there", "needs: [all]", "needs: [all, other]", `unknown "other"`, false},
@@ -767,4 +786,89 @@ func TestWorkflowsIfOnAnotherJob(t *testing.T) {
 	wantAny(t, workflowFindings(".github/workflows/x.yml", []byte(src)), `"if" is outside the grammar of a run step`)
 	src = strings.Replace(citest.GoodWorkflow, "group: ci-${{ github.ref }}", "group: ci-"+AggregatorIf, 1)
 	wantAny(t, workflowFindings(".github/workflows/x.yml", []byte(src)), "one context path")
+}
+
+// TestWorkflowsHostedFilesKeepTheirJobs holds ci.yml and x64.yml to the
+// jobs of 10 10.2, whatever the rest of the grammar admits: besides the
+// aggregators the jobs are exactly check.Jobs, each runs its own
+// subcommand of the built tools/ci, the race job's matrix holds both the
+// Linux and the macOS label of the file and the other two the Linux
+// label alone, and there are exactly two aggregators, named for those
+// labels. Each fixture changes the real file in one way, so it is a
+// positive control for one rule; a job removed from the file and from
+// both needs lists passes every other rule of the grammar.
+func TestWorkflowsHostedFilesKeepTheirJobs(t *testing.T) {
+	files := map[string]struct{ linux, mac string }{
+		"ci.yml":  {"ubuntu-26.04-arm", "macos-26"},
+		"x64.yml": {"ubuntu-26.04", "macos-26-intel"},
+	}
+	cut := func(t *testing.T, src, from, to string) string {
+		t.Helper()
+		i, j := strings.Index(src, from), strings.Index(src, to)
+		require.True(t, i >= 0 && j > i, "%q to %q", from, to)
+		return src[:i] + src[j:]
+	}
+	for name, f := range files {
+		raw, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(Dir), name))
+		require.NoError(t, err)
+		good := string(raw)
+		assert.Empty(t, workflowFindings(Dir+name, raw), "%s as it is", name)
+		macEntry := regexp.MustCompile(`(?m)^          - os: ` + regexp.QuoteMeta(f.mac) + `\n            mise_sha256: [0-9a-f]{64}\n`)
+		linuxEntry := regexp.MustCompile(`(?m)^          - os: ` + regexp.QuoteMeta(f.linux) + `\n            mise_sha256: ([0-9a-f]{64})\n`)
+		const run = `run: '"$RUNNER_TEMP/ci" `
+		tests := []struct {
+			name   string
+			mutate func(t *testing.T) string
+			want   string
+		}{
+			{"the race job deleted and removed from both needs", func(t *testing.T) string {
+				return strings.ReplaceAll(cut(t, good, "  # The one test run", "  # The container e2e"), "needs: [static, race, e2e]", "needs: [static, e2e]")
+			}, "the jobs of this file are static, race, e2e besides the aggregators, missing race"},
+			{"the static job renamed", func(*testing.T) string {
+				return strings.Replace(strings.ReplaceAll(good, "needs: [static, race, e2e]", "needs: [lint, race, e2e]"), "\n  static:\n", "\n  lint:\n", 1)
+			}, `missing static, unknown lint`},
+			{"a fourth job", func(*testing.T) string {
+				return strings.ReplaceAll(good, "needs: [static, race, e2e]", "needs: [static, race, e2e, extra]") +
+					"\n  extra:\n    name: extra\n    runs-on: " + f.linux + "\n    timeout-minutes: 5\n    steps:\n      - run: go run ./tools/ci hygiene\n"
+			}, `unknown extra`},
+			{"the race job running the static subcommand", func(*testing.T) string {
+				return strings.Replace(good, run+`race'`, run+`static'`, 1)
+			}, "the job race runs the built tools/ci with its own subcommand"},
+			{"the static job building tools/ci and running nothing", func(*testing.T) string {
+				return strings.Replace(good, "        "+run+`static'`, "        run: "+BuildLine, 1)
+			}, "the job static runs the built tools/ci with its own subcommand"},
+			{"the e2e job running all", func(*testing.T) string {
+				return strings.Replace(good, run+`e2e'`, run+`all'`, 1)
+			}, "the job e2e runs the built tools/ci with its own subcommand"},
+			{"the macOS aggregator removed", func(t *testing.T) string {
+				return good[:strings.Index(good, "  all_macos:\n")]
+			}, "exactly two aggregators"},
+			{"a third aggregator", func(*testing.T) string {
+				i := strings.Index(good, "  all_linux:\n")
+				block := good[i:strings.Index(good, "  all_macos:\n")]
+				return good + "\n" + strings.Replace(strings.Replace(block, "all_linux", "all_third", 1), "all on "+f.linux, "all on third", 1)
+			}, "exactly two aggregators"},
+			{"an aggregator named for the other file's label", func(*testing.T) string {
+				return strings.Replace(good, "name: all on "+f.linux+"\n", "name: all on ubuntu-latest\n", 1)
+			}, `the aggregators are named "all on ` + f.linux + `" and "all on ` + f.mac + `"`},
+			{"the race matrix without the macOS label", func(*testing.T) string {
+				require.Len(t, macEntry.FindAllString(good, -1), 1)
+				return macEntry.ReplaceAllString(good, "")
+			}, "the matrix of the job race holds " + f.linux + " and " + f.mac},
+			{"the e2e matrix with the macOS label", func(*testing.T) string {
+				i := strings.Index(good, "  e2e:\n")
+				tail := linuxEntry.ReplaceAllString(good[i:], "${0}          - os: "+f.mac+"\n            mise_sha256: "+strings.Repeat("a", 64)+"\n")
+				return good[:i] + tail
+			}, "the matrix of the job e2e holds " + f.linux + " alone"},
+		}
+		for _, tt := range tests {
+			t.Run(name+": "+tt.name, func(t *testing.T) {
+				wantAny(t, workflowFindings(Dir+name, []byte(tt.mutate(t))), tt.want)
+			})
+		}
+		t.Run(name+": the race job without its macOS leg is a valid file for any other file", func(t *testing.T) {
+			// The same text in a file of another name is outside these rules.
+			assert.Empty(t, workflowFindings(Dir+"other.yml", []byte(strings.ReplaceAll(macEntry.ReplaceAllString(good, ""), "name: all on "+f.linux, "name: all on third"))))
+		})
+	}
 }

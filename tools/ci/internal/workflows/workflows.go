@@ -170,6 +170,8 @@ const (
 	AggregatorIf = "${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')) }}"
 	// AggregatorStep is the run line of the one step of an aggregator.
 	AggregatorStep = "exit 1"
+	// AggregatorTimeout is the timeout-minutes of an aggregator.
+	AggregatorTimeout = "5"
 )
 
 // workflows applies the grammar to every file below .github/workflows
@@ -216,7 +218,18 @@ func workflowFindings(path string, src []byte) []check.Finding {
 	if strings.TrimPrefix(path, Dir) == "ci.yml" {
 		c.edited(doc)
 	}
+	if labels, ok := hostedFiles[strings.TrimPrefix(path, Dir)]; ok {
+		c.hosted(doc, labels)
+	}
 	return c.findings
+}
+
+// hostedFiles are the two files that run the jobs of 10 10.2, by name,
+// with the runner labels each one runs on: the Linux label that the three
+// jobs and the aggregators use, and the macOS one that the race job adds.
+var hostedFiles = map[string]struct{ linux, mac string }{
+	"ci.yml":  {"ubuntu-26.04-arm", "macos-26"},
+	"x64.yml": {"ubuntu-26.04", "macos-26-intel"},
 }
 
 // parseWorkflow reads exactly one YAML document whose root is a
@@ -533,6 +546,9 @@ func (c *grammar) aggregator(n *yaml.Node) {
 	c.aggregatorNeeds(n)
 	if v := field(n, "if"); v.Kind != yaml.ScalarNode || v.Tag != "!!str" || v.Value != AggregatorIf {
 		c.add(v, shape+"holds this if, byte for byte: "+AggregatorIf)
+	}
+	if v := field(n, "timeout-minutes"); v == nil || v.Kind != yaml.ScalarNode || v.Value != AggregatorTimeout {
+		c.add(n, shape+"has timeout-minutes: "+AggregatorTimeout+", so a stuck runner does not hold a required check")
 	}
 	steps := seqContent(field(n, "steps"))
 	if len(steps) != 1 || field(steps[0], "uses") != nil || field(steps[0], "run") == nil || field(steps[0], "run").Value != AggregatorStep {
@@ -1043,4 +1059,85 @@ func Run(ctx context.Context, e check.Env, args []string) (bool, error) {
 // any step (Of).
 func Judge(_ context.Context, c check.Commit) ([]check.Verdict, error) {
 	return []check.Verdict{{Name: "workflows", Findings: Of(c.Files)}}, nil
+}
+
+// hosted holds ci.yml and x64.yml to the jobs of 10 10.2, which the rest
+// of the grammar would let a change delete together with its needs: the
+// jobs that are not aggregators are exactly check.Jobs, each runs the
+// built tools/ci with its own subcommand, the matrix of the race job
+// holds the Linux and the macOS label and the other two the Linux label
+// alone, and the aggregators are exactly two, named for the two labels.
+func (c *grammar) hosted(doc *yaml.Node, labels struct{ linux, mac string }) {
+	jobs := field(doc, "jobs")
+	var missing, unknown []string
+	for _, id := range check.Jobs {
+		if !slices.Contains(c.plain, id) {
+			missing = append(missing, id)
+		}
+	}
+	for _, id := range c.plain {
+		if !slices.Contains(check.Jobs, id) {
+			unknown = append(unknown, id)
+		}
+	}
+	if len(missing) > 0 || len(unknown) > 0 {
+		c.add(jobs, "the jobs of this file are "+strings.Join(check.Jobs, ", ")+" besides the aggregators"+
+			listed(", missing ", missing)+listed(", unknown ", unknown))
+	}
+	for _, id := range check.Jobs {
+		job := field(jobs, id)
+		if job == nil {
+			continue
+		}
+		want := BuiltCI + " " + id
+		if !slices.ContainsFunc(seqContent(field(job, "steps")), func(s *yaml.Node) bool {
+			run := field(s, "run")
+			return run != nil && run.Value == want
+		}) {
+			c.add(job, "the job "+id+" runs the built tools/ci with its own subcommand: "+want)
+		}
+		wantLabels := []string{labels.linux}
+		if id == check.JobRace {
+			wantLabels = []string{labels.linux, labels.mac}
+		}
+		if got := matrixLabelsOf(job); !slices.Equal(got, wantLabels) {
+			if id == check.JobRace {
+				c.add(job, "the matrix of the job race holds "+labels.linux+" and "+labels.mac)
+			} else {
+				c.add(job, "the matrix of the job "+id+" holds "+labels.linux+" alone")
+			}
+		}
+	}
+	var names []string
+	for _, job := range pairs(jobs) {
+		if field(job, "if") != nil {
+			names = append(names, field(job, "name").Value)
+		}
+	}
+	wantNames := []string{"all on " + labels.linux, "all on " + labels.mac}
+	if len(names) != 2 {
+		c.add(jobs, "this file has exactly two aggregators, named "+strconv.Quote(wantNames[0])+" and "+strconv.Quote(wantNames[1]))
+	} else if slices.Sort(names); !slices.Equal(names, slices.Sorted(slices.Values(wantNames))) {
+		c.add(jobs, "the aggregators are named "+strconv.Quote(wantNames[0])+" and "+strconv.Quote(wantNames[1]))
+	}
+}
+
+// listed returns prefix and the names joined, or nothing for none.
+func listed(prefix string, names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	return prefix + strings.Join(names, ", ")
+}
+
+// matrixLabelsOf returns the os values of the include entries of a job's
+// matrix, in order.
+func matrixLabelsOf(job *yaml.Node) []string {
+	var labels []string
+	for _, entry := range seqContent(field(field(field(job, "strategy"), "matrix"), "include")) {
+		if os := field(entry, "os"); os != nil {
+			labels = append(labels, os.Value)
+		}
+	}
+	return labels
 }
