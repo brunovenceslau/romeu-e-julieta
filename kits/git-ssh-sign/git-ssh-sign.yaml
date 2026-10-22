@@ -1,0 +1,88 @@
+# syntax=docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# The git-ssh-sign product kit (06 6.4, REQ-0594): the ssh-agent
+# capability for signing git objects only, and the git config that makes
+# every commit signed with the one key of the arg signingKey. The
+# namespace git covers commits and also tags (git tag -s). It is opt-in
+# per project and an ask-first surface.
+#
+# The ssh-agent capability is the one sitting M0 composed on sbx
+# v0.48.0 with unrestricted false and sign [git]: the sandbox lists the
+# keys of the socket it is given and signs in the namespace git only
+# (testdata/sitting-m0.yaml). That the socket holds exactly one key,
+# equal to signingKey, is the check of romeu sync (I34, T080); until
+# T080 lands no code enforces it.
+#
+# signingKey is a public key, never a private one. It reaches the steps
+# as an environment variable the step declares (sitting M0: an arg with
+# env reaches the hooks that declare the name), never pasted into script
+# text, and the step checks its shape before it writes anything: a type
+# and a base64 body, no comment, no space beyond the one between them.
+# The arg's pattern states the same shape for the person who sets it, and
+# a test holds the two equal. FIDO key types (sk-ssh-ed25519@openssh.com
+# and sk-ecdsa-sha2-nistp256@openssh.com) are refused on purpose: the
+# pattern has no @ or dot, and a hardware key needs a touch the signing
+# agent cannot give.
+#
+# The allowed-signers file is written by a step and not by lifecycle.files
+# because an arg is expanded into a files body as it is (sitting M0) with
+# no check of its shape, and a step checks it first.
+#
+# Two steps, both as the agent user, since the files are the agent's own.
+# The first makes the config directory and sets the three settings that
+# need no input. If the second step fails, user.signingkey stays unset
+# and, on the workload's git (2.47.3), a commit fails with "either
+# user.signingkey or gpg.ssh.defaultKeyCommand needs to be configured"
+# and makes no commit, even when the agent holds several keys; it is never
+# signed with another key or left unsigned. The second step validates the
+# key, writes the allowed-signers file with the principal * limited to
+# the namespace git, and sets user.signingkey as a literal key, which git
+# passes to the agent. The key is never a file path, so no private key
+# file is read.
+schemaVersion: "3"
+kind: mixin
+displayName: git-ssh-sign
+description: SSH signing of git commits through the signing-only agent socket, with the one key of the arg signingKey
+args:
+  signingKey:
+    required: true
+    description: |
+      The public key commits are signed with: the type, a space and the
+      base64 body, as the first two fields of a .pub file. It must be
+      the one key of the dedicated signing agent and registered on GitHub
+      as a signing key, never as an authentication key.
+    pattern: '^[a-z0-9-]+ [A-Za-z0-9+/]+={0,2}$'
+    env: GIT_SSH_SIGN_KEY
+capabilities:
+  - type: com.docker.sandbox/ssh-agent@1
+    config:
+      unrestricted: false
+      sign:
+        - git
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        - description: git signs every commit with ssh, checking against the allowed-signers file
+          user: agent
+          command:
+            - bash
+            - -euc
+            - |
+              mkdir -p "$HOME/.config/git"
+              git config --global gpg.format ssh
+              git config --global commit.gpgsign true
+              git config --global gpg.ssh.allowedSignersFile "$HOME/.config/git/allowed_signers"
+        - description: the allowed-signers file and user.signingkey, from the checked arg signingKey
+          user: agent
+          env: [GIT_SSH_SIGN_KEY]
+          command:
+            - bash
+            - -euc
+            - |
+              R='^[a-z0-9-]+ [A-Za-z0-9+/]+={0,2}$'
+              export LC_ALL=C
+              [[ ${GIT_SSH_SIGN_KEY-} =~ $R ]]
+              printf '%s\n' "* namespaces=\"git\" $GIT_SSH_SIGN_KEY" > "$HOME/.config/git/allowed_signers"
+              git config --global user.signingkey "key::$GIT_SSH_SIGN_KEY"
