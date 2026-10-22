@@ -32,7 +32,7 @@ func fixture(t *testing.T, name string) []byte {
 }
 
 // TestParseListOK reads the documents the parser accepts, and skips the
-// members it does not know, at any depth (ADR 0041).
+// members it does not know, at any depth (REQ-0160; the acceptance of T029).
 func TestParseListOK(t *testing.T) {
 	list, err := ParseList(fixture(t, "ok-empty.json"))
 	require.NoError(t, err)
@@ -43,20 +43,57 @@ func TestParseListOK(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	assert.Equal(t, Sandbox{
-		Name: "shop", Status: "running", Workspaces: []string{"/abs/root/shop-env/shop-api"},
-		ID: "sbx_0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d", CreatedAt: time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC), Detached: true,
-	}, list[0])
+		Name: "shop", Status: "running", Workspaces: []string{"/abs/root/shop-env/shop-api", "/abs/root/other/repo"},
+		ID: "00000000-0000-4000-8000-000000000001", CreatedAt: time.Date(2026, 10, 20, 23, 59, 38, 0, time.UTC),
+	}, list[0], "the list of sbx v0.49.2: ports, cpus and memory are skipped, and there is no detached member")
 	assert.True(t, list[0].Running())
 	assert.False(t, list[0].Stopped())
 	assert.Equal(t, "/abs/root/shop-env/shop-api", list[0].PrimaryWorkspace())
 
+	list, err = ParseList(fixture(t, "ok-two.json"))
+	require.NoError(t, err)
+	require.Len(t, list, 2)
+	assert.True(t, list[1].Stopped(), "a stopped sandbox has no ports member")
+
 	list, err = ParseList(fixture(t, "ok-unknown-members.json"))
 	require.NoError(t, err)
 	require.Len(t, list, 2)
-	assert.True(t, list[0].Stopped())
-	assert.Equal(t, []string{"/abs/root/shop-env/shop-api", "/abs/root/shop-env/.romeu/bin"}, list[0].Workspaces)
-	assert.Empty(t, list[1].PrimaryWorkspace(), "a sandbox with no workspace has no primary one")
-	assert.False(t, list[1].Detached)
+	assert.Equal(t, "shop", list[0].Name)
+
+	list, err = ParseList(fixture(t, "ok-no-detached-and-detached.json"))
+	require.NoError(t, err)
+	assert.False(t, list[0].Detached)
+	assert.True(t, list[1].Detached, "detached is read when sbx says it")
+}
+
+// TestParseListMarksAForeignName holds that the list of every sandbox of
+// the host does not fail for one that romeu did not create: its name is
+// not a project name, and it is marked, not refused.
+func TestParseListMarksAForeignName(t *testing.T) {
+	list, err := ParseList(fixture(t, "ok-foreign-name.json"))
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.True(t, list[0].Foreign)
+	list, err = ParseList(fixture(t, "ok-two.json"))
+	require.NoError(t, err)
+	assert.False(t, list[0].Foreign)
+	assert.False(t, list[1].Foreign)
+}
+
+// TestParseListErrorDoesNotEchoTheOutput holds that no value of the
+// output of sbx enters the error: a time that does not parse is named by
+// its place alone.
+func TestParseListErrorDoesNotEchoTheOutput(t *testing.T) {
+	_, err := ParseList(fixture(t, "bad-mistyped-created-at.json"))
+	testsupport.RequireID(t, "RJ-310", err)
+	e := cli.Of(err)
+	text := e.Error()
+	for _, d := range e.Details {
+		text += " " + d.Key + "=" + d.Value
+	}
+	assert.NotContains(t, text, "SECRETVALUE")
+	assert.NotContains(t, text, "yesterday")
+	assert.Contains(t, text, "/0/created_at")
 }
 
 // TestParseListShape holds the acceptance of T029: a list with a read
@@ -67,7 +104,7 @@ func TestParseListOK(t *testing.T) {
 func TestParseListShape(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join("testdata", "ls", "bad-*.json"))
 	require.NoError(t, err)
-	require.GreaterOrEqual(t, len(files), 25)
+	require.GreaterOrEqual(t, len(files), 35)
 	for _, f := range files {
 		t.Run(strings.TrimSuffix(filepath.Base(f), ".json"), func(t *testing.T) {
 			list, err := ParseList(fixture(t, filepath.Base(f)))
@@ -84,7 +121,7 @@ func TestParseListShape(t *testing.T) {
 // TestParseListRefusesWhatFilesCannotHold covers the inputs a fixture
 // file cannot: bytes that are not UTF-8 and output over the cap.
 func TestParseListRefusesWhatFilesCannotHold(t *testing.T) {
-	_, err := ParseList([]byte("[{\"name\":\"sh\xffop\",\"status\":\"running\",\"workspaces\":[]}]"))
+	_, err := ParseList([]byte("[{\"name\":\"sh\xffop\",\"id\":\"i\",\"created_at\":\"2026-10-20T23:59:38Z\",\"status\":\"running\",\"workspaces\":[]}]"))
 	testsupport.RequireID(t, "RJ-310", err)
 
 	big := "[" + strings.Repeat(`{"name":"a","status":"running","workspaces":[]},`, maxListOutput/40) + `{"name":"a","status":"running","workspaces":[]}]`

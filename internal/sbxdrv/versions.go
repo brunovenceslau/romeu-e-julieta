@@ -15,9 +15,12 @@ import (
 )
 
 // Floor is the lowest sbx version romeu runs against (12 12.1,
-// REQ-1056), as sbx prints it without the leading v. A test holds it
-// to the page.
-const Floor = "0.46.0"
+// REQ-1056), as sbx prints it without the leading v: the lowest one the
+// parsers and the sessions model. Before v0.48.0 sbx ls --json was the
+// object {"sandboxes": [...]} and the approval of a plan was
+// --auto-approve, so nothing here reads them. A test holds it to the
+// page and to the lowest recorded version.
+const Floor = "0.48.0"
 
 // RecordedVersions are the sbx versions with a session set under
 // e2e/testdata/sbx/<version>/: the tested window (10 10.3, REQ-0932),
@@ -68,18 +71,22 @@ func boolInt(b bool) int {
 	return 0
 }
 
-// versionLine is a version as sbx prints it: an optional label that sbx
-// -D puts before it, the version with an optional v, an optional
-// prerelease and optional build metadata, and nothing else.
-var versionLine = regexp.MustCompile(`^(?:Client Version:\s*)?v?([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z][0-9A-Za-z.-]*))?(?:\+[0-9A-Za-z.-]+)?$`)
+// versionLine is a version as sbx prints it: an optional label (the
+// "sbx version " of sbx v0.49.2, or the "Client Version:" that sbx -D
+// puts before it), the version with an optional v and no leading zero in
+// a number, an optional prerelease and optional build metadata, and an
+// optional commit of hex digits, and nothing else.
+var versionLine = regexp.MustCompile(`^(?:sbx version |Client Version:\s*)?v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z][0-9A-Za-z.-]*))?(?:\+[0-9A-Za-z.-]+)?(?: [0-9a-f]{7,64})?$`)
 
 // ParseVersion reads the standard output of sbx version: the first
 // non-empty line is the version. Any other output is the error
 // upstream-shape (RJ-310) and the zero Release.
 //
 // The shape is documented by Docker only as a command with a --format
-// flag (https://docs.docker.com/reference/cli/sbx/version/); the
-// one-line form is what daily use showed, and probe A1 records it.
+// flag (https://docs.docker.com/reference/cli/sbx/version/). The form
+// sbx v0.49.2 printed on 2026-10-22 is "sbx version v0.49.2 <commit>"; a
+// bare version is read too, and probe A1 records what the pinned sbx
+// prints.
 func ParseVersion(out []byte) (Release, error) {
 	if len(out) > maxVersionOutput {
 		return Release{}, upstreamShape("version", "the output is longer than a version line can be")
@@ -128,7 +135,7 @@ func CheckFloor(v Release) error {
 // sbx call what: it names sbx and the recorded versions (REQ-0064). A
 // caller that knows the live version adds it with withLive.
 func upstreamShape(what, why string) *cli.Error {
-	return UpstreamShape.New("the output of sbx "+what+" is not a shape romeu reads: "+why,
+	return cli.UpstreamShape.New("the output of sbx "+what+" is not a shape romeu reads: "+why,
 		cli.Detail{Key: "upstream", Value: "sbx"},
 		cli.Detail{Key: "recorded sbx versions", Value: strings.Join(RecordedVersions, ", ")})
 }

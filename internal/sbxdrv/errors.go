@@ -19,19 +19,6 @@ var (
 		RecoveredIn: "none: nothing was changed, and the rerun reads sbx again",
 	}
 
-	// UpstreamShape is the error upstream-shape (RJ-310): an output of
-	// sbx, a tool the product does not own, does not decode, or lacks a
-	// field romeu reads or has it mistyped. No parser returns an absent
-	// sandbox or an empty list for a shape it did not recognize (03,
-	// opening, REQ-0170; 01 1.4, REQ-0064).
-	UpstreamShape = cli.Row{
-		ID:          "RJ-310",
-		Slug:        "upstream-shape",
-		Exit:        2,
-		Fix:         "decide: run sbx version and compare it with the recorded versions in the details; an sbx outside them is reported as an issue with the details",
-		RecoveredIn: "none: the command stops before it changes any state, and a release that records the new shape reads it",
-	}
-
 	// SbxFloor is the error sbx-floor (RJ-343): the sbx on the host is
 	// below the floor of 12 12.1, checked before gate 1 (REQ-0441).
 	SbxFloor = cli.Row{

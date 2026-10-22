@@ -274,13 +274,13 @@ func TestRunnerVersion(t *testing.T) {
 // TestRequireFloor is the sbx floor check before gate 1 (REQ-0441): a
 // version below the floor is sbx-floor, and one at it passes.
 func TestRequireFloor(t *testing.T) {
-	v, err := runner(script(t, `echo v0.46.0`)).RequireFloor(context.Background(), Opts{})
+	v, err := runner(script(t, `echo v0.48.0`)).RequireFloor(context.Background(), Opts{})
 	require.NoError(t, err)
-	assert.Equal(t, "0.46.0", v.String())
+	assert.Equal(t, "0.48.0", v.String())
 
-	v, err = runner(script(t, `echo v0.45.3`)).RequireFloor(context.Background(), Opts{})
+	v, err = runner(script(t, `echo v0.47.9`)).RequireFloor(context.Background(), Opts{})
 	testsupport.RequireID(t, "RJ-343", err)
-	assert.Equal(t, "0.45.3", v.String(), "the version found is returned with the error")
+	assert.Equal(t, "0.47.9", v.String(), "the version found is returned with the error")
 	assert.Equal(t, 2, cli.ExitCode(err))
 
 	_, err = runner(script(t, `exit 1`)).RequireFloor(context.Background(), Opts{})

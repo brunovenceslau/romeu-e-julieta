@@ -24,6 +24,10 @@ func TestParseVersion(t *testing.T) {
 		want string
 	}{
 		{"one line", "v0.48.0\n", "0.48.0"},
+		{"the form of v0.49.2", "sbx version v0.49.2 5d40fd43027b33ed1f1a39c14fb07e2503d6998f\n", "0.49.2"},
+		{"the label and no commit", "sbx version v0.48.0\n", "0.48.0"},
+		{"a short commit", "sbx version v0.48.0 5d40fd4\n", "0.48.0"},
+		{"a zero number", "v0.0.0\n", "0.0.0"},
 		{"no v", "0.46.0", "0.46.0"},
 		{"labelled", "Client Version:  v0.48.0\nServer Version:  v0.48.0\n", "0.48.0"},
 		{"leading blank line", "\n\nv0.49.1\n", "0.49.1"},
@@ -56,6 +60,12 @@ func TestParseVersionShape(t *testing.T) {
 		{"a version and more on the line", "v0.48.0 (abc)\n"},
 		{"too large", "v0.48.0" + strings.Repeat("\n", maxVersionOutput)},
 		{"overflow", "v0.99999999999999999999.0\n"},
+		{"a leading zero in the minor", "v0.048.0\n"},
+		{"a leading zero in the major", "v00.48.0\n"},
+		{"a leading zero in the patch", "v0.48.01\n"},
+		{"a commit that is not hex", "sbx version v0.48.0 zzzzzzz\n"},
+		{"a commit that is too short", "sbx version v0.48.0 5d40\n"},
+		{"the label and no version", "sbx version\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -83,13 +93,13 @@ func TestCheckFloor(t *testing.T) {
 		out   string
 		below bool
 	}{
-		{"the floor", "v0.46.0", false},
-		{"above", "v0.48.0", false},
+		{"the floor", "v0.48.0", false},
+		{"above", "v0.49.2", false},
 		{"a later major", "v1.0.0", false},
-		{"one patch below", "v0.45.9", true},
+		{"one patch below", "v0.47.9", true},
 		{"far below", "v0.9.0", true},
-		{"a release candidate of the floor", "v0.46.0-rc.1", true},
-		{"a release candidate above the floor", "v0.47.0-rc.1", false},
+		{"a release candidate of the floor", "v0.48.0-rc.1", true},
+		{"a release candidate above the floor", "v0.49.0-rc.1", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -112,6 +122,14 @@ func TestFloorIsTheSpecs(t *testing.T) {
 	src, err := os.ReadFile("../../docs/spec/12-engineering.md")
 	require.NoError(t, err)
 	assert.Contains(t, string(src), "`sbx` (host, >= v"+Floor+";")
+}
+
+// TestFloorIsTheLowestRecordedVersion holds the floor to the lowest
+// version the parsers and the sessions model: a floor below it would
+// promise a version nothing here reads, and one above it leaves a
+// recorded version that the runner never drives.
+func TestFloorIsTheLowestRecordedVersion(t *testing.T) {
+	assert.Equal(t, Floor, RecordedVersions[0])
 }
 
 // TestRecordedVersions holds the list to the directories under

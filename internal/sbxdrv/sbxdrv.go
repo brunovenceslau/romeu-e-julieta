@@ -16,7 +16,8 @@
 // I25 (sbx secret set is only called with --command) are in guard.go.
 //
 // The output of sbx is a format between binaries that romeu does not
-// own: a parser skips a member it does not know, requires every member
-// it reads, and returns the error upstream-shape (RJ-310) for a shape
-// it does not recognize, never an empty result (03, opening; ADR 0041).
+// own: a parser skips a member it does not know, requires the members
+// it needs, and returns the error upstream-shape (RJ-310) for a shape
+// it does not recognize, never an empty result (03, opening, REQ-0160 and
+// REQ-0170; the acceptance of T029).
 package sbxdrv

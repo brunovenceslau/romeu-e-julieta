@@ -47,7 +47,7 @@ func (r *Runner) List(ctx context.Context, o Opts) ([]Sandbox, error) {
 // withLive adds the live sbx version to the details of an error
 // upstream-shape, when the runner knows it.
 func (r *Runner) withLive(err error) error {
-	if e, ok := errors.AsType[*cli.Error](err); ok && e.ID == UpstreamShape.ID && r.Versions.Sbx != "" {
+	if e, ok := errors.AsType[*cli.Error](err); ok && e.ID == cli.UpstreamShape.ID && r.Versions.Sbx != "" {
 		e.Details = append(e.Details, cli.Detail{Key: "sbx version", Value: r.Versions.Sbx})
 	}
 	return err
