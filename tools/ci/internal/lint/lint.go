@@ -14,6 +14,7 @@ import (
 	"errors"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/taggedsuites"
 )
 
 // Args are the arguments of every golangci-lint run, the one list
@@ -38,11 +39,12 @@ import (
 //     suites are linted with the rest.
 var Args = []string{"run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners", "--build-tags", BuildTags}
 
-// BuildTags are the tags of the tagged suites of 10 10.1, e2e and host,
-// which every lint run sets: a file of either suite builds only with
-// its tag, and a file no run builds is a file whose findings nobody
-// sees. No file of the module builds only without one of them.
-const BuildTags = "e2e,host"
+// BuildTags are the tags of taggedsuites.Suites, the one source of the
+// tags in use (REQ-1254), which every lint run sets: a file of a suite
+// builds only with its tag, and a file no run builds is a file whose
+// findings nobody sees. No file of the module builds only without one
+// of them.
+var BuildTags = taggedsuites.Tags()
 
 // Argv returns the command line of a golangci-lint run: the path of
 // the linter, then Args.

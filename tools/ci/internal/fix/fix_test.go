@@ -31,7 +31,7 @@ func TestSteps(t *testing.T) {
 		s := steps[i]
 		assert.Equal(t, "fix "+target.String(), s.Name)
 		// Spelled out, not read from lint.BuildTags: this test pins the list.
-		assert.Equal(t, []string{"/pinned/bin/go", "fix", "-diff", "-tags", "e2e,host", "./..."}, s.Argv)
+		assert.Equal(t, []string{"/pinned/bin/go", "fix", "-diff", "-tags", "e2e", "./..."}, s.Argv)
 		assert.Equal(t, lint.Env(target, "/pinned/bin"), s.Environ)
 		require.NotNil(t, s.Around, "%s reads the diff", s.Name)
 		env, read, err := s.Around()
@@ -39,7 +39,7 @@ func TestSteps(t *testing.T) {
 		assert.Nil(t, env)
 		_, err = read([]byte("--- /src/a.go (old)\n+++ /src/a.go (new)\n"), nil)
 		require.Error(t, err)
-		assert.Equal(t, fmt.Sprintf("go fix would change 1 file(s) for %s; run \"GOOS=%s GOARCH=%s CGO_ENABLED=0 go fix -tags e2e,host ./...\" and commit what it writes",
+		assert.Equal(t, fmt.Sprintf("go fix would change 1 file(s) for %s; run \"GOOS=%s GOARCH=%s CGO_ENABLED=0 go fix -tags e2e ./...\" and commit what it writes",
 			target, target.GOOS, target.GOARCH), err.Error())
 	}
 }
@@ -53,7 +53,7 @@ func TestRead(t *testing.T) {
 	hint := func(n int) string { return Hint(target, n) }
 	diff := "--- /src/a.go (old)\n+++ /src/a.go (new)\n@@ -1 +1 @@\n-x\n+y\n"
 	t.Run("the hint counts the files and names the command", func(t *testing.T) {
-		assert.Equal(t, `go fix would change 2 file(s) for linux/amd64; run "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go fix -tags e2e,host ./..." and commit what it writes`, hint(2))
+		assert.Equal(t, `go fix would change 2 file(s) for linux/amd64; run "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go fix -tags e2e ./..." and commit what it writes`, hint(2))
 	})
 	t.Run("a diff fails with the hint, even on exit status 0", func(t *testing.T) {
 		out, err := Read([]byte(diff), nil, target)

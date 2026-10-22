@@ -14,7 +14,7 @@ func init() {
 		Guards:   "the e2e suite passes on the runners the runner-class table selects, with at least one test, and a precondition it cannot meet exits as an infrastructure error",
 		Row:      "e2e",
 		Req:      "REQ-0837",
-		Usage:    "go test -json -race -count=1 -timeout=14m -tags e2e ./e2e/... (Linux)",
+		Usage:    "go test -race -count=1 -tags e2e -json -timeout=14m ./e2e/... (Linux)",
 		All:      true,
 		RunsCode: true,
 		Order:    85,

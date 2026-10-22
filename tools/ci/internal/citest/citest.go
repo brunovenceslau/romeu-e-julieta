@@ -18,6 +18,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/moduleroot"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
@@ -105,19 +106,14 @@ func MustEval(t *testing.T, p string) string {
 }
 
 // ModuleRoot returns the root of this repository: the nearest directory
-// above the test's own that holds go.mod.
+// above the test's own that holds go.mod (moduleroot.Find).
 func ModuleRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
 	require.NoError(t, err)
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		require.NotEqual(t, dir, parent, "no go.mod above the test's directory")
-		dir = parent
-	}
+	root, err := moduleroot.Find(dir)
+	require.NoError(t, err, "the test's directory")
+	return root
 }
 
 // Sha is a made-up commit id, 40 hex digits.

@@ -928,8 +928,8 @@ func TestFastSteps(t *testing.T) {
 	goCmd := filepath.Join(goDir, "go")
 	tools := check.Tools{Linter: "/pinned/golangci-lint", GoDir: goDir}
 	// Spelled out, not read from lint.Args: this test pins the list.
-	wantLint := []string{"/pinned/golangci-lint", "run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners", "--build-tags", "e2e,host"}
-	wantBoundary := []string{"/pinned/golangci-lint", "run", "--config", "tools/ci/internal/lint/forbidigo.yml", "-j", "1", "--allow-parallel-runners", "--build-tags", "e2e,host", "./tools/other"}
+	wantLint := []string{"/pinned/golangci-lint", "run", "--config", ".golangci.yml", "-j", "1", "--allow-parallel-runners", "--build-tags", "e2e"}
+	wantBoundary := []string{"/pinned/golangci-lint", "run", "--config", "tools/ci/internal/lint/forbidigo.yml", "-j", "1", "--allow-parallel-runners", "--build-tags", "e2e", "./tools/other"}
 	lintSteps := func(targets ...lint.Target) []check.Step {
 		var steps []check.Step
 		for _, target := range targets {
@@ -945,7 +945,7 @@ func TestFastSteps(t *testing.T) {
 		{Name: "vet", Argv: []string{goCmd, "vet", "./..."}, Environ: check.StepEnv(goDir)},
 	}
 	for _, target := range lint.Targets {
-		want = append(want, check.Step{Name: "fix " + target.String(), Argv: []string{goCmd, "fix", "-diff", "-tags", "e2e,host", "./..."}, Environ: lint.Env(target, goDir)})
+		want = append(want, check.Step{Name: "fix " + target.String(), Argv: []string{goCmd, "fix", "-diff", "-tags", "e2e", "./..."}, Environ: lint.Env(target, goDir)})
 	}
 	want = append(want, []check.Step{
 		{Name: "generated", Argv: []string{goCmd, "run", "./tools/ci", "generated"}, Environ: check.StepEnv(goDir)},

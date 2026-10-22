@@ -13,6 +13,7 @@ owns:
   - tools/ci/check_fix.go
   - tools/ci/internal/imports/imports.go
   - tools/ci/internal/imports/imports_test.go
+  - tools/ci/internal/imports/rows.go
   - tools/ci/internal/license/modules.go
   - tools/ci/internal/license/modules_test.go
   - tools/ci/internal/race/**
@@ -28,17 +29,23 @@ owns:
   - e2e/internal/container/**
   - e2e/container_test.go
   - docs/spec/10-testing-style.md
+  - docs/spec/02-layouts.md
+  - docs/spec/12-engineering.md
   - docs/reference/checks.md
   - docs/plan/tasks/T002-tools-ci-workflows-tools-ci-all-coverage.md
   - docs/plan/tasks/T013-the-container-e2e-on-the-workload-s-base.md
   - docs/plan/tasks/T103-tools-release-build-dry-run.md
   - docs/plan/tasks/T152-the-go-fix-gate.md
+  - go.mod
+  - go.sum
 needs: []
 after:
+  - T060
   - T155
   - T150
 ask_first:
   - checks
+  - dependencies
 sitting: none
 ---
 
@@ -118,7 +125,7 @@ every untagged test too. So the e2e step keeps its one directory,
 below), and the race run keeps `./...`.
 
 - Implements: REQ-0832 (10 10.2), REQ-1254 (10 10.2), REQ-0833 (10
-  10.2), REQ-0837 (10 10.2), REQ-0834 (10 10.2).
+  10.2), REQ-0837 (10 10.2), REQ-0834 (10 10.2), REQ-1256 (10 10.7).
 - Operator: no.
 - Acceptance:
   - `Suites` names `e2e` and not `host`; the fix, lint, imports and
@@ -158,3 +165,57 @@ suite; T157 drops the directory list of the unit step with the step
 itself. Recommended: that reading; the other is one Linux run
 `go test -race -tags e2e ./...` that is both the race and the e2e, which
 changes what the coverage profile holds (REQ-0834).
+
+## Decisions taken while building
+
+Taken on 2026-10-21, each with what reopens it:
+
+- The e2e step keeps `./e2e/...`, as the maintainer decided on
+  2026-10-21 (the question above). Reopened by a decision to run one
+  `go test -race -tags e2e ./...` for both steps.
+- Tags. `taggedsuites.Tags()` joins the tags of `Suites`; `lint.BuildTags`
+  (a variable now), the `tagSets` of `imports` and `license`, and so the
+  fix step read it. The check that each tag of `Suites` is carried by a
+  file, and each `//go:build` tag is in `Suites` or is the toolchain's,
+  is `tags_test.go` of the package, with a fixture tree
+  (`TestTagsOfFixtureTree`) and the module itself
+  (`TestSuitesTagsAreCarried`, `TestEveryTagIsInSuites`), shown red by
+  adding `host` to `Suites` and by removing `e2e` from it. The names of
+  the toolchain are read from `internal/syslist` in GOROOT, as the lint
+  package's tests read them, and not from `go/build`: the call-site scan
+  of 04 4.1 admits `go/build` in `internal/procgroup` alone. Reopened by
+  T075, which adds `host` to `Suites` with its first file.
+- `-count=1`. Kept in the race step for `TestOnlyAllowedDirectives` of
+  the lint package (it lists the tree with `git ls-files`) and in the
+  e2e step for the build of julieta through `go build`
+  (`BuildJulieta`), both subprocesses the test cache does not record;
+  the rows of REQ-0833 and REQ-0837 and the doc of `race` say so. The
+  unit row (REQ-0824) is left to T157. Reopened by a test of the race run
+  that no longer reads the tree through a subprocess, which leaves the
+  flag without a reason in that step.
+- One argv. `race.Argv` builds both; the e2e argv is now `go test -race
+  -count=1 -tags e2e -json -timeout=14m ./e2e/...` (the order of the
+  flags changed, not the set). `ROMEU_E2E_INFRA_FILE` stays: a file the
+  harness writes is the one channel no text a test prints can reach
+  (REQ-0798).
+- The coverage parser. `golang.org/x/tools/cover` reads the profile in
+  place of the hand parser, as the maintainer approved on 2026-10-21; it
+  merges a block several test binaries list. The version is v0.51.0,
+  the one `golang.org/x/text` v0.43.0 already required, though it was
+  in neither `go.mod` nor `go.sum`; no other requirement moves. The check of the mode line stays, since the library reads an
+  empty profile as no profile and no error. Compared on the profile of
+  a real race run, and on a copy of it with every second block's count
+  set to 0: the findings of the hand parser and of the library are the
+  same (the pull request shows both). Reopened by a profile reader in
+  the standard library.
+- `ModuleRoot` (part 4). The imports check refused a package under the
+  root `internal/` imported from `tools/ci` (`imports unnamed`,
+  REQ-0972; `imports tools`, REQ-0971), so `internal/moduleroot` has a
+  row of its own in 10 10.7 (REQ-1256), an allowance in `toolExtra` of
+  `tools/ci/internal/imports/rows.go` for `tools/ci` and the e2e suite,
+  and a test of each side. The module-tree check also asks for its line
+  in the tree of 02 2.1 and its row in the module table of 12 12.2; the
+  maintainer added both files and `rows.go` to `owns` on 2026-10-21, and
+  `after` names T060, which owns 02 2.1 too. The function is
+  `moduleroot.Find`; `citest.ModuleRoot(t)` keeps its signature over
+  it. Reopened by a second consumer outside `tools/ci` and `e2e`.

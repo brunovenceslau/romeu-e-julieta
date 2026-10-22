@@ -110,3 +110,5 @@ list for the steps it adds, after T105, which moves that check.
 - Verify: `go test -tags e2e ./e2e/... -run '^TestContainer' -v` on a
   Linux runner. The pattern names the `TestContainer*` functions this
   task adds, and the reviewer reads them in the `-v` output (10 10.8).
+
+Re-plan (2026-10-21): changed by T156. The `e2e` step builds its `go test` argv with the function of the race step (`race.Argv`), and keeps `-count=1` for the build of julieta that its tests run through `go build`; the "build the tagged suites" step vets the suites of `taggedsuites.Suites`, `e2e` alone until T075.

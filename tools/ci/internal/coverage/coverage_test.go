@@ -119,6 +119,10 @@ func TestCoverageProfile(t *testing.T) {
 		"a negative":      "mode: set\n" + citest.FixtureModule + "/tools/ci/f.go:1.2,3.4 10 -1\n",
 		"no file name":    "mode: set\nnothing 10 1\n",
 		"text, not a run": "PASS\nok\n",
+		"a blank line":    "mode: set\n\n" + citest.FixtureModule + "/tools/ci/f.go:1.2,3.4 10 1\n",
+		"two statement counts of one block": "mode: set\n" +
+			citest.FixtureModule + "/tools/ci/f.go:1.2,3.4 10 1\n" +
+			citest.FixtureModule + "/tools/ci/f.go:1.2,3.4 9 1\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := coverage([]byte(bad), citest.FixtureModule)

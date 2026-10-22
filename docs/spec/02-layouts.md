@@ -20,6 +20,7 @@ romeu-e-julieta/
 │  ├─ canon/                   canonical JSON and typed, domain-separated digests
 │  ├─ termsafe/                escaping of control, bidi, zero-width, tag and default-ignorable characters for host output
 │  ├─ gitsafe/                 hardened git runner, bundle, create-only refs, validated tree walk
+│  ├─ moduleroot/              the finder of the module root that the tests of tools/ci and of e2e/ share, linked by no binary (10 10.7)
 │  ├─ procgroup/               every subprocess start: a process group per child, its kill on a timeout, a cancellation or a signal, the signal handler (04 4.1)
 │  ├─ oci/                     read and verify v3 descriptors by digest (stdlib net/http); the one descriptor grammar, which render calls for local kits
 │  ├─ catalog/                 embedded catalog: egress/<family>.yaml beside the package (schema catalog.v1, 03 3.5), embedded by //go:embed egress/*.yaml, and the lookups

@@ -14,7 +14,7 @@ func init() {
 		Guards:  "go fix would change no Go file of the module, for each lint target",
 		Row:     "fix",
 		Req:     "REQ-1254",
-		Usage:   "go fix -diff -tags e2e,host ./..., once per lint target",
+		Usage:   "go fix -diff -tags <tags> ./..., once per lint target",
 		Fast:    true,
 		All:     true,
 		Order:   25,

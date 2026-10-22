@@ -5,10 +5,19 @@
 // S9, per package, over the cover profile that the race step of all
 // writes, and over a profile a developer names (the coverage
 // subcommand).
+//
+// The profile is read by golang.org/x/tools/cover (approved on
+// 2026-10-21), which parses the format of the go command
+// (https://pkg.go.dev/cmd/cover) and merges a block that several test
+// binaries list into one. The go command's own output gives no
+// per-package share from the profile: "go tool cover -func" reports per
+// function and a total, and the "coverage: N%" line of "go test" is not
+// in the profile and is rounded to one decimal, where this check
+// compares statement counts exactly and prints its own share rounded
+// down.
 package coverage
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -18,8 +27,9 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
+
+	"golang.org/x/tools/cover"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
@@ -38,14 +48,6 @@ var coverTrees = []string{"cmd", "internal", "tools", "e2e/probes", "e2e/fakesbx
 // package internal/<module> and every package below it.
 var coverStrictModules = []string{"gitsafe", "gate", "spec", "render", "egress", "termsafe", "state", "canon"}
 
-// coverBlock is one statement block of a cover profile: how many
-// statements it holds, and whether a test ran it. The profile's
-// "<file>:<range>" is its key.
-type coverBlock struct {
-	stmts   int
-	covered bool
-}
-
 // coverPackage is the count of one package.
 type coverPackage struct {
 	stmts, covered int
@@ -58,18 +60,21 @@ type coverPackage struct {
 //
 // A block that the profile lists more than once (one test binary per
 // package can each list a package they share) counts once, as covered
-// when any listing ran it. A package with no test file is in the
-// profile with every block at 0, so it fails instead of being left out.
+// when any listing ran it: cover merges the listings. A package with no
+// test file is in the profile with every block at 0, so it fails
+// instead of being left out.
 // A package with no statement has nothing to measure and passes.
 func coverage(profile []byte, module string) ([]check.Finding, error) {
-	blocks, err := parseProfile(profile)
+	if !bytes.HasPrefix(profile, []byte("mode: ")) {
+		return nil, errors.New("the cover profile does not start with a mode line")
+	}
+	profiles, err := cover.ParseProfilesFromReader(bytes.NewReader(profile))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("the cover profile: %w", err)
 	}
 	packages := map[string]*coverPackage{}
-	for key, b := range blocks {
-		file, _, _ := strings.Cut(key, ":")
-		rel, ok := strings.CutPrefix(path.Dir(file), module+"/")
+	for _, prof := range profiles {
+		rel, ok := strings.CutPrefix(path.Dir(prof.FileName), module+"/")
 		if !ok || !inCoverTrees(rel) {
 			continue
 		}
@@ -78,9 +83,11 @@ func coverage(profile []byte, module string) ([]check.Finding, error) {
 			p = &coverPackage{}
 			packages[rel] = p
 		}
-		p.stmts += b.stmts
-		if b.covered {
-			p.covered += b.stmts
+		for _, b := range prof.Blocks {
+			p.stmts += b.NumStmt
+			if b.Count > 0 {
+				p.covered += b.NumStmt
+			}
 		}
 	}
 	var findings []check.Finding
@@ -94,40 +101,6 @@ func coverage(profile []byte, module string) ([]check.Finding, error) {
 		findings = append(findings, check.Finding{Where: rel, Rule: "coverage", Msg: msg})
 	}
 	return findings, nil
-}
-
-// parseProfile reads the blocks of a cover profile: a "mode:" line,
-// then one line per block, "<file>:<start>,<end> <statements> <count>".
-func parseProfile(profile []byte) (map[string]coverBlock, error) {
-	sc := bufio.NewScanner(bytes.NewReader(profile))
-	sc.Buffer(nil, 1<<20)
-	if !sc.Scan() || !strings.HasPrefix(sc.Text(), "mode: ") {
-		return nil, errors.New("the cover profile does not start with a mode line")
-	}
-	blocks := map[string]coverBlock{}
-	for n := 2; sc.Scan(); n++ {
-		line := sc.Text()
-		if line == "" {
-			continue
-		}
-		f := strings.Fields(line)
-		if len(f) != 3 || !strings.Contains(f[0], ":") {
-			return nil, fmt.Errorf("cover profile line %d: want <file>:<range> <statements> <count>", n)
-		}
-		stmts, err1 := strconv.Atoi(f[1])
-		count, err2 := strconv.Atoi(f[2])
-		if err1 != nil || err2 != nil || stmts < 0 || count < 0 {
-			return nil, fmt.Errorf("cover profile line %d: the counts are not numbers", n)
-		}
-		b := blocks[f[0]]
-		b.stmts = stmts
-		b.covered = b.covered || count > 0
-		blocks[f[0]] = b
-	}
-	if err := sc.Err(); err != nil {
-		return nil, err
-	}
-	return blocks, nil
 }
 
 // inCoverTrees reports whether the package at rel, relative to the

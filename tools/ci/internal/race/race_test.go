@@ -12,6 +12,13 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
+// TestArgv pins the command line both race-detector steps are built
+// from: with and without tags, the flags before the packages.
+func TestArgv(t *testing.T) {
+	assert.Equal(t, []string{"/g/go", "test", "-race", "-count=1", "./..."}, Argv("/g", "", nil, "./..."))
+	assert.Equal(t, []string{"/g/go", "test", "-race", "-count=1", "-tags", "e2e", "-json", "-x", "./a/...", "./b"}, Argv("/g", "e2e", []string{"-json", "-x"}, "./a/...", "./b"))
+}
+
 // TestSteps checks the race step: every test with the race detector,
 // the cover profile at the path of the plan, under the class of the
 // race run.

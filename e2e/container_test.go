@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/e2e/internal/container"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/moduleroot"
 )
 
 // The workload the container cases share, prepared by the first case
@@ -62,7 +63,7 @@ func config(t *testing.T) container.Config {
 	t.Helper()
 	wd, err := os.Getwd()
 	require.NoError(t, err)
-	root, err := container.ModuleRoot(wd)
+	root, err := moduleroot.Find(wd)
 	require.NoError(t, err)
 	c, err := container.Load(root, runtime.GOARCH)
 	require.NoError(t, err)

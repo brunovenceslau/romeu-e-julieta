@@ -64,7 +64,7 @@ that command and commit what it writes.
 
 The step reads the module as the lint step does: once per lint target
 (`lint.Targets`, linux and darwin on amd64 and arm64, cgo off) and with
-the tags of the tagged suites (`e2e,host`). The test of the lint
+the tags of the tagged suites (`e2e`, from `taggedsuites.Suites`). The test of the lint
 package over the targets holds that every Go file builds for one of
 them with those tags, so a change go fix would make in a darwin file,
 or in a file of the e2e suite, fails on every machine, and a run on
@@ -86,13 +86,13 @@ The commit that applies go fix lands after the pull requests open on
 - Operator: no.
 - Acceptance:
   - `tools/ci fast` and `tools/ci all` run one fix step per lint
-    target, after vet: `go fix -diff -tags e2e,host ./...` with the
+    target, after vet: `go fix -diff -tags e2e ./...` with the
     pinned go, in the environment of the lint step for that target.
   - A step whose run prints a diff fails, whatever its exit status, with
     the diff sorted by file (go fix prints the files in an order that
     changes from run to run), clipped to 200 lines and then the list
     of the files it changes, and the line that names
-    `GOOS=<os> GOARCH=<arch> CGO_ENABLED=0 go fix -tags e2e,host ./...`;
+    `GOOS=<os> GOARCH=<arch> CGO_ENABLED=0 go fix -tags e2e ./...`;
     what go printed outside the diff (a build error, a line of the fix
     tool) comes first, whole, and a run that fails without a diff keeps
     what go printed.
@@ -103,6 +103,8 @@ The commit that applies go fix lands after the pull requests open on
     fails, and passes a run without the tags (the positive control);
     a module that does not build fails without the line.
   - The tree passes the step: one commit, `style: apply go fix`, holds
-    what `go fix -tags e2e,host ./...` writes, and no hand edit.
+    what `go fix -tags e2e ./...` writes, and no hand edit.
 - Verify: `go test ./tools/ci/... -run 'TestSteps|TestRead|TestFastSteps|TestAllSteps'`;
   `go run ./tools/ci all` exits 0.
+
+Re-plan (2026-10-21): changed by T156. The tags of the step are the ones of `taggedsuites.Suites`, the one source the lint, fix, imports and license steps read; `host` left the list because no file carries it until T075.

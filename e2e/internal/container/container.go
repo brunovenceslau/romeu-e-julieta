@@ -585,18 +585,3 @@ func Prepare(ctx context.Context, c Config, bin string) (*Workload, error) {
 	}
 	return &Workload{Config: c, Julieta: julieta, Bin: bin, Herdr: herdr, Mise: mise}, nil
 }
-
-// ModuleRoot returns the nearest directory at or above dir that holds
-// go.mod.
-func ModuleRoot(dir string) (string, error) {
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", errors.New("no go.mod above the test's directory")
-		}
-		dir = parent
-	}
-}

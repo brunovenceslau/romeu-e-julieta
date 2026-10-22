@@ -101,3 +101,5 @@ written before the re-plan.
 - Verify: `go test ./tools/ci/... -run '^Test(Workflows|Coverage)'` runs
   the fixture tests named here; the run id of the green workflow, under
   the pull request's Evidence.
+
+Re-plan (2026-10-21): changed by T156. The row of REQ-0833 states why the race run keeps `-count=1` (a test lists the tree through `git ls-files`, a subprocess the test cache does not record); the race and e2e argv come from `race.Argv`.
