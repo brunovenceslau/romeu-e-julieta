@@ -29,6 +29,12 @@ func TestSteps(t *testing.T) {
 	// A directory of a suite not in Suites gets no step.
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "e2e", "host"), 0o755))
 	assert.Equal(t, []check.Step{e2e}, Steps(t.Context(), p))
+
+	// Two suites give two steps, in the order of Suites.
+	defer func(old []Suite) { Suites = old }(Suites)
+	Suites = []Suite{{"e2e", "e2e"}, {"host", "e2e/host"}}
+	host := check.Step{Name: "tagged suites host", Argv: []string{"/pinned/bin/go", "vet", "-tags", "host", "./e2e/host/..."}, Environ: check.StepEnv("/pinned/bin")}
+	assert.Equal(t, []check.Step{e2e, host}, Steps(t.Context(), p))
 }
 
 // TestTags pins the value the lint, fix, imports and license steps

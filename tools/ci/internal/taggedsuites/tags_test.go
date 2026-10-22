@@ -151,10 +151,12 @@ func syslist(t *testing.T) map[string]bool {
 var releaseTag = regexp.MustCompile(`^go1\.[0-9]+$`)
 
 // toolchainTag reports whether the toolchain names the tag as its own:
-// a GOOS or GOARCH name (syslist), unix, cgo, a compiler, a release tag
+// a GOOS or GOARCH name (syslist), unix, cgo, a compiler, a tag the go
+// command sets for a sanitizer (race, msan, asan), a release tag
 // (go1.N) or an experiment (goexperiment.*).
 func toolchainTag(tag string, known map[string]bool) bool {
 	return known[tag] || tag == "unix" || tag == "cgo" || tag == "gc" || tag == "gccgo" ||
+		tag == "race" || tag == "msan" || tag == "asan" ||
 		releaseTag.MatchString(tag) || strings.HasPrefix(tag, "goexperiment.")
 }
 

@@ -201,8 +201,8 @@ Taken on 2026-10-21, each with what reopens it:
 - The coverage parser. `golang.org/x/tools/cover` reads the profile in
   place of the hand parser, as the maintainer approved on 2026-10-21; it
   merges a block several test binaries list. The version is v0.51.0,
-  the one the module graph already selected, so no other requirement
-  moves. The check of the mode line stays, since the library reads an
+  the one `golang.org/x/text` v0.43.0 already required, though it was
+  in neither `go.mod` nor `go.sum`; no other requirement moves. The check of the mode line stays, since the library reads an
   empty profile as no profile and no error. Compared on the profile of
   a real race run, and on a copy of it with every second block's count
   set to 0: the findings of the hand parser and of the library are the

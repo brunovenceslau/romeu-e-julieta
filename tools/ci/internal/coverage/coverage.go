@@ -60,8 +60,9 @@ type coverPackage struct {
 //
 // A block that the profile lists more than once (one test binary per
 // package can each list a package they share) counts once, as covered
-// when any listing ran it: cover merges the listings. A package with no test file is in the
-// profile with every block at 0, so it fails instead of being left out.
+// when any listing ran it: cover merges the listings. A package with no
+// test file is in the profile with every block at 0, so it fails
+// instead of being left out.
 // A package with no statement has nothing to measure and passes.
 func coverage(profile []byte, module string) ([]check.Finding, error) {
 	if !bytes.HasPrefix(profile, []byte("mode: ")) {
