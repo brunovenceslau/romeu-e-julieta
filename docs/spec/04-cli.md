@@ -480,7 +480,10 @@ holds these and every other error. `REQ-0428` `RJ-101`, `RJ-203`, `RJ-204` and
 numbers; the sequence goes on from `RJ-302`. This list stands until the
 errors are declared in code (4.1, Error ids); from then the union one
 test collects is the source, and this section is a link to
-`docs/reference/errors.md`.
+`docs/reference/errors.md`. `REQ-1258` A finding of a plain validation rule of
+`internal/spec/rules.go`, one with no row in this table, has no id of
+its own: it is an invalid document, exit 2, named by the rule's slug
+(decided on 2026-10-22).
 
 | Id | Slug | Exit | Raised by |
 |---|---|---|---|
