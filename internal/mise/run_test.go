@@ -195,6 +195,16 @@ func TestInstallBlockedHostRule(t *testing.T) {
 	}
 }
 
+// TestInstallBlockedSandboxRule holds the sandbox name to the form of a
+// project name (03 3.1) before the command names it: a name that is not
+// one gets no command, as a host that is no domain does.
+func TestInstallBlockedSandboxRule(t *testing.T) {
+	for _, bad := range []string{"", "Shop", "a;b", "a b", "-shop", "shop-", "a", "$(id)", "a'b", strings.Repeat("a", 41)} {
+		e := mise.InstallBlockedError(mise.Block{Tool: "gh", Host: "github.com"}, mise.Target{Sandbox: bad})
+		assert.Contains(t, e.Details, cli.Detail{Key: "approve once", Value: "not offered: the sandbox name is not a project name"}, bad)
+	}
+}
+
 // TestInstallBlocked proves a blocked download is install-blocked
 // (RJ-341), exit 1, with the details of 04 4.3: the tool, the host, the
 // sbx command that approves it once, that the approval is lost at

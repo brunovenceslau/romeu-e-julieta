@@ -406,6 +406,8 @@ func InstallBlockedError(b Block, t Target) *cli.Error {
 		e.Details = append(e.Details, cli.Detail{Key: "approve once", Value: "not offered: mise named no host, so read the sbx approval queue"})
 	case spec.ValidDomain(host) != nil:
 		e.Details = append(e.Details, cli.Detail{Key: "approve once", Value: "not offered: the host is not a plain domain name"})
+	case !projectForm.MatchString(t.Sandbox):
+		e.Details = append(e.Details, cli.Detail{Key: "approve once", Value: "not offered: the sandbox name is not a project name"})
 	default:
 		set := "is not in the egress set of the manifest, so romeu never applied it"
 		if slices.Contains(t.Egress, host) {
@@ -418,6 +420,10 @@ func InstallBlockedError(b Block, t Target) *cli.Error {
 	}
 	return withTail(e, shown)
 }
+
+// projectForm is the form of a project name, which names the sandbox
+// (03 3.1, REQ-0175), checked before the name is put in a command.
+var projectForm = regexp.MustCompile(`^[a-z][a-z0-9-]{0,38}[a-z0-9]$`)
 
 // withTail adds the details every install-blocked error holds: that the
 // approval is lost at recreate and the durable fix.
