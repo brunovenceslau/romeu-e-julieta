@@ -127,10 +127,10 @@ handoff `--json` decoder has no fixture file.
     error. `TestDecodeHostileUnknownMembers` in the four `--json`
     packages, `TestDecodeHeadsHostileUnknownMembers` and
     `TestDecodeHostileUnknownKeys` in `internal/handoff` and
-    `internal/memstore` hold it. Measured and left: the memory entry
-    decoder does not refuse a duplicate key inside an unknown nested key
-    (the handoff decoder does), and the `--json` decoders have no size
-    cap of their own.
+    `internal/memstore` hold it. The memory entry decoder refused a
+    duplicate at the top level only; it now refuses one at any depth, as
+    the handoff decoder does. Measured and left: the `--json` decoders
+    have no size cap of their own.
   - The readers of files a person writes still refuse an unknown key, by
     the tests named above, and the manifest decoder still refuses one
     (`internal/manifest/manifest_test.go:156`).

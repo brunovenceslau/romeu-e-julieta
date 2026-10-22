@@ -123,6 +123,7 @@ func TestDecodeHostileUnknownKeys(t *testing.T) {
 		}
 	}
 	for name, keys := range map[string]string{
+		"a duplicate in an unknown key":          "x:\n  a: 1\n  a: 2\n",
 		"a nest past the depth cap":              "x: " + strings.Repeat("[", 12) + strings.Repeat("]", 12) + "\n",
 		"a duplicate known key beside an escape": "\"\\e[31mred\": 1\ntitle: twice\n",
 		"the excess over the file cap":           "x: " + strings.Repeat("y", memstore.MaxFileSize) + "\n",

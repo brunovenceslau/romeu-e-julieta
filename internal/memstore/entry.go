@@ -346,8 +346,9 @@ func checkKeys(m *yaml.Node) error {
 const maxDepth = 4
 
 // checkTree returns why the node n or one below it is outside the
-// subset grammar: an anchor, a merge key, a tag outside coreTags, or a
-// nesting deeper than maxDepth. An alias needs an anchor before it,
+// subset grammar: an anchor, a merge key, a tag outside coreTags, a
+// key written twice in one mapping at any depth, or a nesting deeper
+// than maxDepth. An alias needs an anchor before it,
 // which is refused first, and the parser refuses an alias to an anchor
 // it has not seen, so no alias reaches past this check.
 func checkTree(n *yaml.Node, depth int) error {
@@ -360,6 +361,16 @@ func checkTree(n *yaml.Node, depth int) error {
 		return errors.New("the front matter holds a merge key")
 	case !slices.Contains(coreTags, n.Tag):
 		return fmt.Errorf("the front matter holds the tag \"%s\", outside YAML's core schema", clip(n.Tag))
+	}
+	if n.Kind == yaml.MappingNode {
+		seen := map[string]bool{}
+		for i := 0; i < len(n.Content); i += 2 {
+			k := n.Content[i].Value
+			if seen[k] {
+				return fmt.Errorf("the key \"%s\" is written twice", clip(k))
+			}
+			seen[k] = true
+		}
 	}
 	for _, c := range n.Content {
 		if err := checkTree(c, depth+1); err != nil {
