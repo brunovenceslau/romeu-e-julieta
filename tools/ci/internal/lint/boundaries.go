@@ -30,6 +30,9 @@ const BoundaryConfig = "tools/ci/internal/lint/forbidigo.yml"
 //     which hand
 //     os.Stdout and os.Stderr to the writer of their tool and hold the
 //     dispatcher and nothing else.
+//   - e2e/fakesbx: the fake sbx, a main package whose output is sbx's
+//     own, replayed from a session, which no CLI writer of the product
+//     is in the way of.
 //   - internal/procgroup: whose tests run helper processes that write to
 //     the streams of the process they are.
 //
@@ -38,6 +41,7 @@ const BoundaryConfig = "tools/ci/internal/lint/forbidigo.yml"
 var Allowed = []string{
 	"cmd/julieta",
 	"cmd/romeu",
+	"e2e/fakesbx",
 	"internal/cli",
 	"internal/procgroup",
 	"tools/ci",
