@@ -12,6 +12,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"go.yaml.in/yaml/v3"
@@ -47,6 +48,22 @@ const (
 // references resolve to the copies and no other location is read. A
 // tree without the copy has none: nil and no error.
 func compileKit(files []check.TreeFile) (*jsonschema.Schema, error) {
+	type result struct {
+		sch *jsonschema.Schema
+		err error
+	}
+	r, ok := within(kitDeadline, func() result {
+		sch, err := compileKitFiles(files)
+		return result{sch, err}
+	})
+	if !ok {
+		return nil, fmt.Errorf("compiling the kit schema takes more than %s", kitDeadline)
+	}
+	return r.sch, r.err
+}
+
+// compileKitFiles is compileKit without the deadline.
+func compileKitFiles(files []check.TreeFile) (*jsonschema.Schema, error) {
 	c := jsonschema.NewCompiler()
 	c.UseLoader(jsonschema.SchemeURLLoader{})
 	c.AssertFormat()
@@ -83,6 +100,29 @@ func isKitDescriptor(f check.TreeFile) bool {
 		return false
 	}
 	return bytes.HasPrefix(f.Content, []byte(kitSyntaxPrefix))
+}
+
+// kitDeadline is how long compiling the kit schema, or validating one
+// descriptor against it, may take. The jsonschema library takes no
+// context, so the work runs in a goroutine the check stops waiting for:
+// a schema or a document that makes it loop fails closed, in seconds,
+// and the process, which ends after the check, drops the goroutine.
+const kitDeadline = 10 * time.Second
+
+// within runs fn and returns its result, or false when fn has not
+// returned after d.
+func within[T any](d time.Duration, fn func() T) (T, bool) {
+	done := make(chan T, 1)
+	go func() { done <- fn() }()
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case v := <-done:
+		return v, true
+	case <-timer.C:
+		var zero T
+		return zero, false
+	}
 }
 
 // hasKitCopy reports whether the tree holds a file of the copy of the
@@ -173,5 +213,9 @@ func kitFindings(f check.TreeFile, sch *jsonschema.Schema, ref string, refErr er
 	if err != nil {
 		return []check.Finding{{Where: f.Path, Rule: ruleParse, Msg: err.Error()}}
 	}
-	return validate(f.Path, kitName, doc, compiled{kitName: sch})
+	findings, ok := within(kitDeadline, func() []check.Finding { return validate(f.Path, kitName, doc, compiled{kitName: sch}) })
+	if !ok {
+		return []check.Finding{{Where: f.Path, Rule: ruleTimeout, Msg: "is not validated against " + kitName + " within " + kitDeadline.String() + ", and the check stops there"}}
+	}
+	return findings
 }

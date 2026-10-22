@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -150,6 +151,24 @@ func TestKitSchemaCopyIsPinned(t *testing.T) {
 			assert.Equal(t, c.want, got)
 		})
 	}
+}
+
+// TestWithin stops waiting for work that does not return: a hostile
+// schema or document that loops fails closed, in time. The library
+// takes no context, and the vendored schema is pinned by digest, so no
+// pathological schema is fed to it here; the timer is what is tested.
+func TestWithin(t *testing.T) {
+	got, ok := within(time.Minute, func() int { return 7 })
+	assert.True(t, ok)
+	assert.Equal(t, 7, got)
+
+	stuck := make(chan struct{})
+	defer close(stuck)
+	start := time.Now()
+	got, ok = within(10*time.Millisecond, func() int { <-stuck; return 7 })
+	assert.False(t, ok)
+	assert.Zero(t, got)
+	assert.Less(t, time.Since(start), 5*time.Second)
 }
 
 // TestAKitWithoutTheSchemaCopy fails a kit descriptor of a tree that

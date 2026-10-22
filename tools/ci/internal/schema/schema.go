@@ -76,6 +76,7 @@ const (
 	ruleVersion = "schema version"
 	rulePin     = "schema pin"
 	ruleCopy    = "schema copy"
+	ruleTimeout = "schema timeout"
 )
 
 // hintPrefix is the start of the hint line of 03 3.2, which the
