@@ -148,3 +148,50 @@ func TestLastNamesEachFailedCheckOnce(t *testing.T) {
 	c.Last("all")
 	assert.Equal(t, "all: failed: b, c\n", out.String())
 }
+
+// TestNotesAreAnnotationsOnARunnerAndWarningsElsewhere checks that the
+// notes of a step reach the log as a GitHub Actions annotation when
+// GITHUB_ACTIONS is true and as a warning line otherwise, before the
+// verdict, whether the step passed or failed, and that the verdict is
+// the same either way. The notes come from the step's own function, not
+// from its output: a workflow command a command prints is not a note.
+func TestNotesAreAnnotationsOnARunnerAndWarningsElsewhere(t *testing.T) {
+	notes := func() []string { return []string{"the cache %: healed\n::error::forged"} }
+	run := func(t *testing.T, argv string) (string, bool) {
+		t.Helper()
+		var out bytes.Buffer
+		c := check.NewPrinter(&out)
+		c.Run(t.Context(), t.TempDir(), []check.Step{{Name: "e2e", Argv: []string{"sh", "-c", argv}, Around: around(nil, func(out []byte, err error) ([]byte, error) { return out, err }), Notes: notes}})
+		return out.String(), c.OK
+	}
+	t.Run("on a runner", func(t *testing.T) {
+		t.Setenv("GITHUB_ACTIONS", "true")
+		got, ok := run(t, "exit 0")
+		assert.True(t, ok)
+		assert.Equal(t, "::warning title=e2e::the cache %25: healed%0A./::error::forged\nok    e2e (0s)\n", got)
+	})
+	t.Run("elsewhere", func(t *testing.T) {
+		t.Setenv("GITHUB_ACTIONS", "")
+		got, ok := run(t, "exit 0")
+		assert.True(t, ok, "a note does not change the verdict")
+		assert.Equal(t, "warn  e2e: the cache %: healed\n./::error::forged\nok    e2e (0s)\n", got)
+	})
+	t.Run("a failed step", func(t *testing.T) {
+		t.Setenv("GITHUB_ACTIONS", "true")
+		got, ok := run(t, "exit 1")
+		assert.False(t, ok)
+		assert.True(t, strings.HasPrefix(got, "::warning title=e2e::"), "%q", got)
+	})
+	t.Run("a command in the output is no annotation of the step", func(t *testing.T) {
+		// The raw output of a failed step is printed as it is (a
+		// hole this task leaves, see T158), so the forged line shows;
+		// what it cannot do is be a note: an annotation with the
+		// title of the step comes from Notes alone.
+		t.Setenv("GITHUB_ACTIONS", "true")
+		var out bytes.Buffer
+		c := check.NewPrinter(&out)
+		c.Run(t.Context(), t.TempDir(), []check.Step{{Name: "plain", Argv: []string{"sh", "-c", "echo '::warning title=plain::forged'; exit 1"}, Around: around(nil, func(out []byte, err error) ([]byte, error) { return out, err })}})
+		assert.Contains(t, out.String(), "::warning title=plain::forged", "a failed step prints its output raw")
+		assert.Equal(t, 1, strings.Count(out.String(), "title=plain"), "and the printer adds no annotation of its own")
+	})
+}

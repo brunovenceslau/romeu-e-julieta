@@ -227,7 +227,8 @@ func TestAllSteps(t *testing.T) {
 	vulnSteps, licenseStep, modulesStep, raceStep, e2e := steps[race:race+4], steps[race+4], steps[race+5], steps[race+11], steps[race+12]
 	wantE2E := container.Steps(t.Context(), check.Plan{Root: root, Tools: tools})[0]
 	assert.Equal(t, wantE2E.Around == nil, e2e.Around == nil)
-	wantE2E.Around, e2e.Around = nil, nil
+	assert.Equal(t, wantE2E.Notes == nil, e2e.Notes == nil)
+	wantE2E.Around, e2e.Around, wantE2E.Notes, e2e.Notes = nil, nil, nil, nil
 	assert.Equal(t, wantE2E, e2e, "the e2e step comes last, after race")
 	for i, target := range lint.Targets {
 		assert.Equal(t, check.Step{Name: "vulnerabilities " + target.String(), Argv: []string{evalOrSelf(vuln), "./..."}, Environ: check.WithProcessEnv(lint.Env(target, tools.GoDir), check.NetworkPassThrough),

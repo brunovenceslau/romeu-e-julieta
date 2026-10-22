@@ -165,8 +165,15 @@ Rules:
   mismatch is a test failure. The one exception is the container
   e2e's download cache: a cached file that fails its pin is removed and
   fetched once, and the fetched file is held to the pin. The removal
-  writes no log line, so a corrupted or tampered cache entry leaves no
-  trace in the run.
+  is a notice the harness appends to a private file the e2e step makes
+  (`ROMEU_E2E_NOTICE_FILE`), which names the file and the pin; after the
+  run the step prints each notice as a warning, whether the run passed
+  or failed: a GitHub Actions annotation on a runner, and off a runner a
+  warning line, not an annotation. A removal whose notice cannot be
+  recorded is a test failure, and the step reads the file bounded (64
+  KiB, 10 notes of 1 KiB, and a note that counts the rest) and refuses
+  one that is not a regular file. A test prints nothing for it, and no
+  text a test prints reaches the annotation or changes the verdict.
 - `REQ-0799` Flaky tests are fixed, never skipped: `TestTestStyle` (10.6) fails on
   a skip.
 

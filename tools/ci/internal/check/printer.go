@@ -118,6 +118,11 @@ func (c *Printer) Run(ctx context.Context, root string, steps []Step) {
 		}
 		start := c.now()
 		out, err := s.Run(ctx, root)
+		if s.Notes != nil {
+			for _, note := range s.Notes() {
+				c.warn(s.Name, note)
+			}
+		}
 		detail := ""
 		if err != nil {
 			// out is the step's own output, which is printed as it is, for

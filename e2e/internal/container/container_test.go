@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -111,6 +112,53 @@ func TestFailRecordsAnInfrastructureError(t *testing.T) {
 	require.NoError(t, recordInfra("TestD"), "a run without the step records nothing")
 }
 
+// TestNoticeIsRecordedInTheStepsFile checks that notice appends one line
+// to the file of NoticeFileEnv, with the line breaks of the message
+// turned into spaces, that it never makes the file, and that a run
+// without the step records nothing.
+func TestNoticeIsRecordedInTheStepsFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "notices")
+	require.NoError(t, os.WriteFile(path, nil, 0o600))
+	t.Setenv(NoticeFileEnv, path)
+	require.NoError(t, notice("first\n::warning::forged\r\nsecond"))
+	require.NoError(t, notice("third"))
+	got, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "first ::warning::forged second\nthird\n", string(got), "one line for each notice")
+
+	t.Setenv(NoticeFileEnv, filepath.Join(t.TempDir(), "missing"))
+	require.Error(t, notice("lost"), "the file is the step's, never the harness's")
+
+	t.Setenv(NoticeFileEnv, "")
+	require.NoError(t, notice("local"), "a run without the step records nothing")
+}
+
+// TestNoticesFromManyGoroutines checks that notices recorded at the same
+// time are whole lines, none lost or cut by another: the tests of the
+// suite run in one process, and a download may heal in several.
+func TestNoticesFromManyGoroutines(t *testing.T) {
+	path := noticeFile(t)
+	const n = 64
+	var wg sync.WaitGroup
+	errs := make(chan error, n)
+	for i := range n {
+		wg.Go(func() { errs <- notice(fmt.Sprintf("notice %02d %s", i, strings.Repeat("x", 200))) })
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
+	}
+	got := readNotices(t, path)
+	require.Len(t, got, n)
+	seen := map[string]bool{}
+	for _, line := range got {
+		assert.Regexp(t, "^notice [0-9]{2} x{200}$", line)
+		seen[line] = true
+	}
+	assert.Len(t, seen, n, "every line is distinct")
+}
+
 // TestCheckDaemonUnreachable is the fault test of the daemon: a
 // DOCKER_HOST with no daemon behind it is an infrastructure error. Where
 // the docker command is not installed, the error is one too.
@@ -132,6 +180,24 @@ func release(t *testing.T, code int, body []byte) *httptest.Server {
 	}))
 	t.Cleanup(srv.Close)
 	return srv
+}
+
+// noticeFile makes the step's file of notices, as tools/ci does, names
+// it in NoticeFileEnv for the test, and returns its path.
+func noticeFile(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "notices")
+	require.NoError(t, os.WriteFile(path, nil, 0o600))
+	t.Setenv(NoticeFileEnv, path)
+	return path
+}
+
+// readNotices returns the lines of the file of notices.
+func readNotices(t *testing.T, path string) []string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return strings.Split(strings.TrimSuffix(string(b), "\n"), "\n")
 }
 
 func hexSum(b []byte) string {
@@ -183,6 +249,7 @@ func TestDownloadFails(t *testing.T) {
 // installed under the program's own name, and read by the release's own
 // asset names.
 func TestDownloadChecksTheSHA256(t *testing.T) {
+	notices := noticeFile(t)
 	var paths []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.URL.Path)
@@ -210,6 +277,8 @@ func TestDownloadChecksTheSHA256(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"/v1.2.3/herdr-linux-aarch64", "/v1.2.3/mise-v1.2.3-linux-x64"}, paths, "the second herdr is read from the cache")
 
+	assert.Equal(t, []string{""}, readNotices(t, notices), "a download and a cached read leave no notice")
+
 	// A corrupt entry is deleted and fetched once more.
 	require.NoError(t, os.WriteFile(cached, []byte("substituted"), 0o755))
 	c.GOARCH = "arm64"
@@ -224,6 +293,9 @@ func TestDownloadChecksTheSHA256(t *testing.T) {
 	got, err = os.ReadFile(cached)
 	require.NoError(t, err)
 	assert.Equal(t, "binary", string(got), "the cache holds the fetched file")
+	assert.Equal(t, []string{
+		Herdr + ": the cached file " + cached + " has the sha256 " + hexSum([]byte("substituted")) + ", not the pinned " + hexSum([]byte("binary")) + "; it was removed and fetched once more",
+	}, readNotices(t, notices), "the removal names the file and the pin")
 
 	other := fixtureConfig(t, srv.URL, []byte("another binary"))
 	_, err = other.MiseBinary(t.Context(), t.TempDir())
@@ -236,6 +308,7 @@ func TestDownloadChecksTheSHA256(t *testing.T) {
 // entry whose fetched replacement also fails the pin stays a test
 // failure, after one fetch, and installs nothing.
 func TestCorruptEntryFetchedOnceStillChecked(t *testing.T) {
+	noticeFile(t)
 	var fetches int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fetches++
@@ -259,7 +332,8 @@ func TestCorruptEntryFetchedOnceStillChecked(t *testing.T) {
 // TestCorruptEntryRetryFails checks the two ways the second look at a
 // corrupt entry can go wrong: the entry cannot be removed, which is a
 // test failure that says so, and the fetch that follows fails at
-// transport, which is the infrastructure error of the download.
+// transport, which is the infrastructure error of the download; and the
+// removal cannot be recorded, which is a test failure before any fetch.
 func TestCorruptEntryRetryFails(t *testing.T) {
 	corrupt := func(t *testing.T, c Config) string {
 		t.Helper()
@@ -280,7 +354,21 @@ func TestCorruptEntryRetryFails(t *testing.T) {
 		assert.NotErrorAs(t, err, new(*InfraError))
 		assert.Contains(t, err.Error(), "could not be removed")
 	})
+	t.Run("the removal cannot be recorded", func(t *testing.T) {
+		t.Setenv(NoticeFileEnv, filepath.Join(t.TempDir(), "missing"))
+		var fetches int
+		srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { fetches++ }))
+		t.Cleanup(srv.Close)
+		c := fixtureConfig(t, srv.URL, []byte("binary"))
+		corrupt(t, c)
+		_, err := c.HerdrBinary(t.Context(), t.TempDir())
+		require.Error(t, err)
+		assert.NotErrorAs(t, err, new(*InfraError))
+		assert.Contains(t, err.Error(), "could not be recorded")
+		assert.Zero(t, fetches, "a heal nobody can see is not made")
+	})
 	t.Run("the fetch fails at transport", func(t *testing.T) {
+		noticeFile(t)
 		closed := httptest.NewServer(http.NotFoundHandler())
 		closed.Close()
 		c := fixtureConfig(t, closed.URL, []byte("binary"))

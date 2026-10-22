@@ -22,7 +22,12 @@
 // output, so no text a test prints (a registry's answer, a container's
 // output) can turn a failure into an infrastructure error. A digest or
 // a checksum that differs from its pin is a test failure, always: the
-// harness never names a test for one.
+// harness never names a test for one. A cached download that fails its
+// pin is removed and fetched once more, and the harness notes it in a
+// second private file, NoticeFileEnv; the step prints each line of it
+// after the run as a warning (an annotation on a GitHub runner), a
+// channel the output of a test does not reach and that does not touch
+// the verdict.
 //
 // Until tools/release builds romeu (REQ-0131), the e2e tests are the
 // julieta cases of the container e2e, which need no romeu build.
@@ -37,12 +42,15 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/race"
@@ -54,6 +62,14 @@ import (
 // infrastructure error in. It equals the constant of the same name in
 // e2e/internal/container, which a test of this package holds.
 const InfraFileEnv = "ROMEU_E2E_INFRA_FILE"
+
+// NoticeFileEnv names the variable that gives the e2e tests the path of
+// the file they append a notice to, one line each, when the harness
+// healed a cached download that failed its pin (REQ-0798). The step
+// prints each line as a warning of its own after the run (Step.Notes),
+// never from the output. It equals the constant of the same name in
+// e2e/internal/container, which a test of this package holds.
+const NoticeFileEnv = "ROMEU_E2E_NOTICE_FILE"
 
 // InfraPrefix starts the line the harness prints for an infrastructure
 // error. It equals the constant of the same name in
@@ -135,33 +151,129 @@ func stepsFor(goos, goarch string, p check.Plan) []check.Step {
 	default:
 		s.Argv = race.Argv(p.Tools.GoDir, "e2e", []string{"-json", "-timeout=" + testTimeout}, "./e2e/...")
 		s.Environ = check.WithProcessEnv(check.WithProcessEnv(check.StepEnv(p.Tools.GoDir), check.NetworkPassThrough), check.DockerPassThrough)
-		s.Around = around
+		r := new(run)
+		s.Around, s.Notes = r.around, r.notes
 	}
 	return []check.Step{s}
 }
 
-// around makes a directory of this user alone with an empty file of
-// mode 0600 in it, which the tests name their infrastructure errors in,
-// and returns the variable that names it and the reader of the run,
-// which reads the file and then removes the directory.
-func around() ([]string, check.Read, error) {
+// run is what one e2e step keeps between its Around and its Notes: the
+// notices of the last run.
+type run struct{ noted []string }
+
+// notes returns the notices the harness left in the last run.
+func (r *run) notes() []string { return r.noted }
+
+// around makes a directory of this user alone with two empty files of
+// mode 0600 in it, one the tests name their infrastructure errors in and
+// one they leave their notices in, and returns the variables that name
+// them and the reader of the run, which reads both files and then
+// removes the directory.
+func (r *run) around() ([]string, check.Read, error) {
+	r.noted = nil
 	dir, err := os.MkdirTemp("", "ci-e2e-")
 	if err != nil {
 		return nil, nil, err
 	}
-	path := filepath.Join(dir, "infra")
-	if err := os.WriteFile(path, nil, 0o600); err != nil {
-		_ = os.RemoveAll(dir)
+	// The tests run in the directory of their package: a path below a
+	// relative TMPDIR would name another file there.
+	if dir, err = filepath.Abs(dir); err != nil {
 		return nil, nil, err
 	}
-	return []string{InfraFileEnv + "=" + path}, func(out []byte, runErr error) ([]byte, error) {
+	infra, notices := filepath.Join(dir, "infra"), filepath.Join(dir, "notices")
+	for _, path := range []string{infra, notices} {
+		if err := os.WriteFile(path, nil, 0o600); err != nil {
+			_ = os.RemoveAll(dir)
+			return nil, nil, err
+		}
+	}
+	return []string{InfraFileEnv + "=" + infra, NoticeFileEnv + "=" + notices}, func(out []byte, runErr error) ([]byte, error) {
 		defer func() { _ = os.RemoveAll(dir) }()
-		names, err := os.ReadFile(path)
+		names, err := os.ReadFile(infra)
 		if err != nil {
 			return out, fmt.Errorf("read the infrastructure errors of the e2e: %w", err)
 		}
+		noted, err := readNotices(notices)
+		if err != nil {
+			return out, fmt.Errorf("read the notices of the e2e: %w", err)
+		}
+		r.noted = noted
 		return read(out, runErr, strings.Fields(string(names)))
 	}, nil
+}
+
+// The bounds of the notice file, which the code under test writes: at
+// most maxNoticeBytes are read, at most maxNotices lines kept, each cut
+// to maxNoticeLine bytes.
+const (
+	maxNoticeBytes = 64 << 10
+	maxNotices     = 10
+	maxNoticeLine  = 1 << 10
+)
+
+// readNotices returns the notes of the notice file at path, which must
+// be a regular file of the step (Lstat, then the open handle is held to
+// the same file): a symlink, a FIFO or a directory is an error, a plain
+// one and no infrastructure error, since it is the code under test
+// acting on the step's files and not a precondition the environment
+// could not meet. It reads maxNoticeBytes at most, drops blank lines,
+// keeps maxNotices lines of maxNoticeLine bytes at most (a cut ends in
+// "..." and falls on a rune), and ends with the one note "N more
+// notices not shown" when lines were left out; a line the byte limit
+// cut in two counts as one left out, and so does what lies past it.
+func readNotices(path string) ([]string, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("the notice file %s is not a regular file (%s)", path, info.Mode().Type())
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	if opened, err := f.Stat(); err != nil || !os.SameFile(info, opened) {
+		return nil, fmt.Errorf("the notice file %s changed while it was opened", path)
+	}
+	data, err := io.ReadAll(io.LimitReader(f, maxNoticeBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	dropped := 0
+	if len(data) > maxNoticeBytes {
+		data = data[:maxNoticeBytes]
+		dropped = 1
+		// The last line may be cut in two: it is the one left out.
+		if i := bytes.LastIndexByte(data, '\n'); i >= 0 {
+			data = data[:i+1]
+		} else {
+			data = nil
+		}
+	}
+	var notes []string
+	for line := range strings.Lines(string(data)) {
+		if line = strings.TrimSpace(line); line == "" {
+			continue
+		}
+		if len(notes) == maxNotices {
+			dropped++
+			continue
+		}
+		if len(line) > maxNoticeLine {
+			line = line[:maxNoticeLine-3]
+			for r, size := utf8.DecodeLastRuneInString(line); r == utf8.RuneError && size <= 1 && line != ""; r, size = utf8.DecodeLastRuneInString(line) {
+				line = line[:len(line)-1] // half a rune
+			}
+			line += "..."
+		}
+		notes = append(notes, line)
+	}
+	if dropped > 0 {
+		notes = append(notes, strconv.Itoa(dropped)+" more notices not shown")
+	}
+	return notes, nil
 }
 
 // reportLine matches the one line Fail prints through tb.Fatal: the
