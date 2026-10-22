@@ -8,7 +8,6 @@ owns:
   - AGENTS.md
   - CLAUDE.md
   - REUSE.toml
-  - docs/spec/02-layouts.md
 needs: []
 after: []
 ask_first: []
@@ -40,7 +39,9 @@ same text through the import.
    session, and outside it the file does not exist.
 2. `CLAUDE.md` at the root: the line `@AGENTS.md`.
 3. `REUSE.toml` gains both files in its first annotation, as for
-   `README.md`; the tree of 02 2.1 lists both.
+   `README.md`; the tree of 02 2.1 lists both (the file is owned by
+   other open tasks, so this task amends two lines without owning it,
+   as T157 did for 05).
 
 - Implements: none (a file for agents; no requirement row).
 - Operator: no action at merge. Whether the product's adopters get such
