@@ -213,6 +213,15 @@ func (r *registry) fetch(ctx context.Context, w spec.Workload, p Platform) (Fetc
 	if err != nil {
 		return Fetched{}, err
 	}
+	c := kit.Capabilities
+	switch {
+	case c.Kind != "workload":
+		return Fetched{}, invalid("the descriptor of %s is not a workload", quote(w.Repository))
+	case c.Build != "" || c.Dockerfile != "":
+		return Fetched{}, invalid("the descriptor of a workload carries a recipe, which the set does not read")
+	case len(c.Kits) > 0:
+		return Fetched{}, invalid("the descriptor of a workload lists kits, whose capabilities the set does not hold")
+	}
 	return Fetched{Workload: w, ManifestDigest: digest, Kit: kit}, nil
 }
 

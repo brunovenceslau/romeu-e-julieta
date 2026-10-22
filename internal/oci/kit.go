@@ -13,8 +13,6 @@ import (
 
 // Kit is a parsed descriptor: the part of it the gate reads.
 type Kit struct {
-	// Kind is "workload", "mixin" or "set".
-	Kind string
 	// DisplayName is the name humans read; it is not an identity.
 	DisplayName string
 	// Capabilities is the normalized capability set.
@@ -40,7 +38,7 @@ func ParseDescriptor(data []byte) (Kit, error) {
 	if err != nil {
 		return Kit{}, err
 	}
-	return fromTree(tree)
+	return fromTree(tree, true)
 }
 
 // ParseAnnotation reads the descriptor an image carries in its manifest
@@ -56,12 +54,13 @@ func ParseAnnotation(data []byte) (Kit, error) {
 	if err != nil {
 		return Kit{}, err
 	}
-	return fromTree(tree)
+	return fromTree(tree, false)
 }
 
 // fromTree decodes a checked tree into the kit schema's types and
-// normalizes its capabilities.
-func fromTree(tree map[string]any) (Kit, error) {
+// normalizes its capabilities. localFile says the tree is a file of the
+// maintainer's repository.
+func fromTree(tree map[string]any, localFile bool) (Kit, error) {
 	raw, err := jsonv2.Marshal(tree, jsonv2.Deterministic(true))
 	if err != nil {
 		return Kit{}, invalid("the descriptor cannot be read as JSON data")
@@ -73,11 +72,11 @@ func fromTree(tree map[string]any) (Kit, error) {
 	if err := d.validate(); err != nil {
 		return Kit{}, err
 	}
-	caps, err := normalize(d)
+	caps, err := normalize(d, localFile)
 	if err != nil {
 		return Kit{}, err
 	}
-	return Kit{Kind: d.Kind, DisplayName: d.DisplayName, Capabilities: caps}, nil
+	return Kit{DisplayName: d.DisplayName, Capabilities: caps}, nil
 }
 
 // shapeReason says why encoding/json/v2 refused a descriptor, with the

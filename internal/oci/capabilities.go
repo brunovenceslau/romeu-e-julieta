@@ -17,6 +17,23 @@ package oci
 // sbx adds later has none and is refused (REQ-0573). A request marked
 // optional keeps Optional: the gate shows it all the same.
 type Capabilities struct {
+	// Kind is "workload", "mixin" or "set".
+	Kind string `json:"kind"`
+	// Args are the arg declarations of the descriptor, by name. A
+	// request may name an arg, ${{ kit.args.host }}, and the arg's
+	// default and its limits decide what the request reaches, so they
+	// are part of the set: two descriptors that differ only in a default
+	// are two sets.
+	Args map[string]Arg `json:"args,omitempty"`
+	// Relations are what the kit provides, requires, integrates with and
+	// conflicts with, and its fallback version.
+	Relations *Relations `json:"relations,omitempty"`
+	// Kits are the kits a set lists, in order.
+	Kits []KitRef `json:"kits,omitempty"`
+	// Build is the inline recipe, as written.
+	Build string `json:"build,omitempty"`
+	// Dockerfile names the companion recipe, as written.
+	Dockerfile string `json:"dockerfile,omitempty"`
 	// Network is the egress policy, by phase.
 	Network *Network `json:"network,omitempty"`
 	// Volumes are the volume and host-mount requests, by path.
@@ -44,6 +61,47 @@ type Capabilities struct {
 	// the sandbox-agent platform, a long-running workload, the git
 	// identity and the kit registry.
 	Flags []Flag `json:"flags,omitempty"`
+}
+
+// Arg is an installer-supplied value of the kit. Its description, which
+// is for the installer to read, is not kept.
+type Arg struct {
+	// Default is used when the caller supplies nothing; nil means none.
+	Default *string `json:"default,omitempty"`
+	// Required says the caller must supply a value.
+	Required bool `json:"required,omitzero"`
+	// Enum are the exact values allowed, sorted.
+	Enum []string `json:"enum,omitempty"`
+	// Pattern is the RE2 expression the whole value must match.
+	Pattern *string `json:"pattern,omitempty"`
+	// Env opts the value into the container environment under this name.
+	Env string `json:"env,omitempty"`
+	// BuildArg resolves the arg at build under this name.
+	BuildArg string `json:"buildArg,omitempty"`
+}
+
+// Relations are the composition members of a descriptor.
+type Relations struct {
+	// Version is the fallback version of the provides entries.
+	Version string `json:"version,omitempty"`
+	// Provides are the capabilities the kit offers, sorted.
+	Provides []string `json:"provides,omitempty"`
+	// Requires are the capabilities the resolved set must satisfy.
+	Requires []string `json:"requires,omitempty"`
+	// Integrates are the capabilities the kit works with when present.
+	Integrates []string `json:"integrates,omitempty"`
+	// Conflicts are the capability names that must be absent.
+	Conflicts []string `json:"conflicts,omitempty"`
+}
+
+// KitRef is a kit a set lists.
+type KitRef struct {
+	// Ref is the registry reference.
+	Ref string `json:"ref"`
+	// Digest pins the kit's manifest.
+	Digest string `json:"digest,omitempty"`
+	// Args are the kit's create-phase args.
+	Args map[string]string `json:"args,omitempty"`
 }
 
 // Network is the phase-scoped egress policy (network-policy@1 and @2,
@@ -187,9 +245,9 @@ type ResponseFields struct {
 
 // SSHAgent is the use of an ssh agent in a phase.
 type SSHAgent struct {
-	// Phases are "install" and "runtime", sorted. The sitting M0
-	// descriptor of git-ssh-sign names none.
-	Phases []string `json:"phases,omitempty"`
+	// Phases are "install" and "runtime", sorted. A local file that
+	// names none reads as both.
+	Phases []string `json:"phases"`
 	// Unrestricted is as written; absent means true.
 	Unrestricted string `json:"unrestricted,omitempty"`
 	// Sign are the namespaces the agent may sign in, sorted.

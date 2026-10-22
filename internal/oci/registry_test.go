@@ -45,6 +45,7 @@ func TestFetchWorkloadReadsTheDescriptorOfAnIndex(t *testing.T) {
 	require.NoError(t, err)
 	want, err := ParseDescriptor(file)
 	require.NoError(t, err)
+	want.Capabilities.Kind = "workload"
 	assert.Equal(t, want, got.Kit, "the annotation and the file are one grammar")
 	assert.Equal(t, amd, got.ManifestDigest)
 	assert.Equal(t, index, got.Workload.Digest)
@@ -256,6 +257,33 @@ func TestFetchWorkloadRefusesADescriptorTheGrammarRefuses(t *testing.T) {
 	assert.Contains(t, err.Error(), strings.TrimPrefix(f.srv.URL, "https://"))
 	_, isRow := errors.AsType[*cli.Error](err)
 	assert.False(t, isRow, "the grammar's refusal has no row of the table of its own")
+}
+
+func TestFetchWorkloadReadsAWorkloadOnly(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("c", 64)
+	tests := []struct {
+		name string
+		ann  string
+		want string
+	}{
+		{"a mixin", `{"schemaVersion":"3","kind":"mixin"}`, "not a workload"},
+		{"a set", `{"schemaVersion":"3","kind":"set","kits":[{"ref":"example.com/a/b","digest":"` + digest + `"}]}`, "not a workload"},
+		{"a workload with an inline recipe", `{"schemaVersion":"3","kind":"workload","build":"FROM scratch"}`, "recipe"},
+		{"a workload with a companion recipe", `{"schemaVersion":"3","kind":"workload","dockerfile":"x"}`, "recipe"},
+		{"a workload with kits", `{"schemaVersion":"3","kind":"workload","kits":[{"ref":"example.com/a/b"}]}`, "kits"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFakeRegistry(t)
+			m := f.add(mediaOCIManifest, manifestJSON(t, tt.ann))
+
+			_, err := f.client().FetchWorkload(t.Context(), f.ref(m), amd64)
+
+			require.ErrorIs(t, err, ErrInvalid)
+			assert.Contains(t, err.Error(), tt.want)
+			assert.Contains(t, err.Error(), strings.TrimPrefix(f.srv.URL, "https://"))
+		})
+	}
 }
 
 func TestFetchWorkloadRegistryUnreachable(t *testing.T) {

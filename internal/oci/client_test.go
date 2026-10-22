@@ -236,14 +236,14 @@ func TestGuardCapsEveryResponse(t *testing.T) {
 	t.Run("a manifest at the cap is read", func(t *testing.T) {
 		f := newFakeRegistry(t)
 		pad := strings.Repeat("a", MaxManifestSize-200)
-		body := `{"schemaVersion":2,"pad":"` + pad + `","annotations":{"` + DescriptorAnnotation + `":"{\"schemaVersion\":\"3\",\"kind\":\"mixin\"}"}}`
+		body := `{"schemaVersion":2,"pad":"` + pad + `","annotations":{"` + DescriptorAnnotation + `":"{\"schemaVersion\":\"3\",\"kind\":\"workload\"}"}}`
 		require.LessOrEqual(t, len(body), MaxManifestSize)
 		m := f.add(mediaOCIManifest, []byte(body))
 
 		got, err := f.client().FetchWorkload(t.Context(), f.ref(m), amd64)
 
 		require.NoError(t, err)
-		assert.Equal(t, "mixin", got.Kit.Kind)
+		assert.Equal(t, "workload", got.Kit.Capabilities.Kind)
 	})
 }
 

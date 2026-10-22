@@ -6,6 +6,39 @@
     "capabilities": {
       "additionalProperties": false,
       "properties": {
+        "args": {
+          "additionalProperties": {
+            "additionalProperties": false,
+            "properties": {
+              "buildArg": {
+                "type": "string"
+              },
+              "default": {
+                "type": "string"
+              },
+              "enum": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "env": {
+                "type": "string"
+              },
+              "pattern": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "build": {
+          "type": "string"
+        },
         "context": {
           "items": {
             "additionalProperties": false,
@@ -191,6 +224,9 @@
           },
           "type": "array"
         },
+        "dockerfile": {
+          "type": "string"
+        },
         "flags": {
           "items": {
             "additionalProperties": false,
@@ -204,6 +240,33 @@
             },
             "required": [
               "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "kits": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "digest": {
+                "type": "string"
+              },
+              "ref": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ref"
             ],
             "type": "object"
           },
@@ -501,6 +564,39 @@
           },
           "type": "array"
         },
+        "relations": {
+          "additionalProperties": false,
+          "properties": {
+            "conflicts": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "integrates": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "provides": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "requires": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "resources": {
           "additionalProperties": false,
           "properties": {
@@ -617,6 +713,9 @@
                 "type": "string"
               }
             },
+            "required": [
+              "phases"
+            ],
             "type": "object"
           },
           "type": "array"
@@ -653,6 +752,9 @@
           "type": "array"
         }
       },
+      "required": [
+        "kind"
+      ],
       "type": "object"
     },
     "digest": {

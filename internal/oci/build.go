@@ -41,14 +41,21 @@ type builder struct {
 	caps Capabilities
 	// kind is the descriptor's kind; sbx@1 is a workload's alone.
 	kind string
+	// localFile says the descriptor is a file the maintainer's repository
+	// holds, which may leave the phase of an ssh-agent out.
+	localFile bool
 	// at names the capability being added, for a message.
 	at string
 }
 
 // normalize flattens the groups of the descriptor, decodes the config of
 // each capability by its type and returns the set in its canonical form.
-func normalize(d kitDoc) (Capabilities, error) {
-	b := &builder{kind: d.Kind}
+func normalize(d kitDoc, localFile bool) (Capabilities, error) {
+	b := &builder{kind: d.Kind, localFile: localFile}
+	b.caps.Kind = d.Kind
+	b.caps.Build = d.Build
+	b.caps.Dockerfile = d.Dockerfile
+	b.members(d)
 	for i, it := range d.Capabilities {
 		at := "capabilities[" + strconv.Itoa(i) + "]"
 		if it.Group == nil {
@@ -76,6 +83,31 @@ func normalize(d kitDoc) (Capabilities, error) {
 	}
 	b.caps.sort()
 	return b.caps, nil
+}
+
+// members records the members of the descriptor besides its capability
+// list that decide what it grants: the arg declarations, the relations
+// and the kits of a set. The members that only say who made the kit or
+// label a request (displayName, author, description, sourceUrl, iconUrl,
+// licenses, the name, description and source of a capability or a group,
+// the description of an arg) are not kept; the test of kit_test.go holds
+// the list.
+func (b *builder) members(d kitDoc) {
+	if len(d.Args) > 0 {
+		b.caps.Args = make(map[string]Arg, len(d.Args))
+		for name, a := range d.Args {
+			b.caps.Args[name] = Arg{Default: a.Default, Required: a.Required, Enum: sortedSet(a.Enum),
+				Pattern: a.Pattern, Env: a.Env, BuildArg: a.BuildArg}
+		}
+	}
+	r := Relations{Version: d.Version, Provides: sortedSet(d.Provides), Requires: sortedSet(d.Requires),
+		Integrates: sortedSet(d.Integrates), Conflicts: sortedSet(d.Conflicts)}
+	if r.Version != "" || len(r.Provides)+len(r.Requires)+len(r.Integrates)+len(r.Conflicts) > 0 {
+		b.caps.Relations = &r
+	}
+	for _, k := range d.Kits {
+		b.caps.Kits = append(b.caps.Kits, KitRef(k))
+	}
 }
 
 // item adds one capability. inherited is its group's optional flag.
@@ -167,11 +199,10 @@ func (b *builder) scalar(name string, v jsontext.Value) (string, error) {
 		}
 		return s, nil
 	case '0':
-		var f float64
-		if err := jsonv2.Unmarshal(v, &f); err != nil {
-			return "", invalid("%s: %s is not a number", b.at, name)
-		}
-		return strconv.FormatFloat(f, 'f', -1, 64), nil
+		// The text the tree was written with: a whole number is exact
+		// (the tree refuses one past 2^53), a fraction is the shortest
+		// text of its float64.
+		return string(v), nil
 	case 't', 'f':
 		return string(v), nil
 	}
@@ -480,16 +511,23 @@ func (b *builder) sshAgent(cfg jsontext.Value, optional bool) error {
 	if err := strict(b, cfg, &d); err != nil {
 		return err
 	}
-	// The kit schema of the pinned frontend requires a phase, but the
-	// sitting M0 descriptor of git-ssh-sign, the conformance fixture
-	// that sbx v0.48.0 accepted, has none: an absent phase is read as
-	// no phase named, and the gate shows it so.
+	// The kit schema of the pinned frontend requires a phase. The sitting
+	// M0 descriptor of git-ssh-sign, which sbx v0.48.0 accepted, has
+	// none (no document of sbx says what it reads then). A local file is
+	// read as the widest phases, so the gate shows the most it can
+	// mean; the annotation of an image, written by a third party, is
+	// refused.
 	var phases []string
-	if len(d.Phase) > 0 {
+	switch {
+	case len(d.Phase) > 0:
 		var err error
 		if phases, err = b.phases(d.Phase); err != nil {
 			return err
 		}
+	case b.localFile:
+		phases = []string{"install", "runtime"}
+	default:
+		return invalid("%s has no phase", b.at)
 	}
 	unrestricted, err := b.scalar("unrestricted", d.Unrestricted)
 	if err != nil {

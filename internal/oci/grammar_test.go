@@ -30,7 +30,7 @@ func TestParseDescriptorSittingFixture(t *testing.T) {
 	kit, err := ParseDescriptor(data)
 	require.NoError(t, err)
 
-	assert.Equal(t, "mixin", kit.Kind)
+	assert.Equal(t, "mixin", kit.Capabilities.Kind)
 	assert.Equal(t, "git-ssh-sign", kit.DisplayName)
 	require.Len(t, kit.Capabilities.SSHAgent, 1)
 	agent := kit.Capabilities.SSHAgent[0]
@@ -139,7 +139,7 @@ func FuzzParseDescriptor(f *testing.F) {
 			return
 		}
 		// What the grammar accepts is a descriptor of the version it reads.
-		assert.Contains(t, []string{"workload", "mixin", "set"}, kit.Kind)
+		assert.Contains(t, []string{"workload", "mixin", "set"}, kit.Capabilities.Kind)
 		again, err := ParseDescriptor(data)
 		require.NoError(t, err)
 		assert.Equal(t, kit, again, "parsing twice gives the same set")
@@ -179,6 +179,71 @@ func FuzzParseAnnotation(f *testing.F) {
 			require.ErrorIs(t, err, ErrInvalid)
 			return
 		}
-		assert.Contains(t, []string{"workload", "mixin", "set"}, kit.Kind)
+		assert.Contains(t, []string{"workload", "mixin", "set"}, kit.Capabilities.Kind)
+	})
+}
+
+func TestNumbersPastTwoToTheFiftyThreeAreRefused(t *testing.T) {
+	port := func(n string) string {
+		return `{"schemaVersion":"3","kind":"mixin","capabilities":[{"type":"com.docker.sandbox/port@1","config":{"container":` + n + `}}]}`
+	}
+	yamlPort := func(n string) []byte {
+		return []byte(minimal + "capabilities:\n  - type: com.docker.sandbox/port@1\n    config: {container: " + n + "}\n")
+	}
+	for _, n := range []string{"9007199254740993", "-9007199254740993", "18446744073709551616", "123456789012345678901234567890"} {
+		t.Run(n, func(t *testing.T) {
+			_, err := ParseAnnotation([]byte(port(n)))
+			require.ErrorIs(t, err, ErrInvalid)
+			assert.Contains(t, err.Error(), "2^53")
+
+			_, err = ParseDescriptor(yamlPort(n))
+			require.ErrorIs(t, err, ErrInvalid)
+		})
+	}
+	t.Run("two to the fifty-three is read exactly", func(t *testing.T) {
+		kit, err := ParseAnnotation([]byte(port("9007199254740992")))
+		require.NoError(t, err)
+		assert.Equal(t, "9007199254740992", kit.Capabilities.Ports[0].Container)
+		kit, err = ParseDescriptor(yamlPort("9007199254740992"))
+		require.NoError(t, err)
+		assert.Equal(t, "9007199254740992", kit.Capabilities.Ports[0].Container)
+	})
+	t.Run("a number keeps its digits", func(t *testing.T) {
+		kit, err := ParseDescriptor(capability(typeResources, "{cpu: 0.1}"))
+		require.NoError(t, err)
+		assert.Equal(t, "0.1", kit.Capabilities.Resources.CPU)
+		kit, err = ParseAnnotation([]byte(`{"schemaVersion":"3","kind":"mixin","capabilities":[{"type":"com.docker.sandbox/resources@1","config":{"cpu":0.1}}]}`))
+		require.NoError(t, err)
+		assert.Equal(t, "0.1", kit.Capabilities.Resources.CPU)
+	})
+}
+
+func TestSSHAgentWithoutAPhase(t *testing.T) {
+	const cfg = "{unrestricted: false, sign: [git]}"
+	t.Run("a local file is read as the widest phases", func(t *testing.T) {
+		// The sitting M0 descriptor of git-ssh-sign names no phase and sbx
+		// v0.48.0 accepted it; the kit schema of the pinned frontend
+		// requires one. The set shows both phases, the widest reading.
+		kit, err := ParseDescriptor(capability(typeSSHAgent, cfg))
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"install", "runtime"}, kit.Capabilities.SSHAgent[0].Phases)
+	})
+	t.Run("the sitting fixture", func(t *testing.T) {
+		data, err := os.ReadFile(fixturePath)
+		require.NoError(t, err)
+
+		kit, err := ParseDescriptor(data)
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"install", "runtime"}, kit.Capabilities.SSHAgent[0].Phases)
+	})
+	t.Run("an annotation is refused", func(t *testing.T) {
+		doc := `{"schemaVersion":"3","kind":"workload","capabilities":[{"type":"com.docker.sandbox/ssh-agent@1","config":{"unrestricted":false,"sign":["git"]}}]}`
+
+		_, err := ParseAnnotation([]byte(doc))
+
+		require.ErrorIs(t, err, ErrInvalid)
+		assert.Contains(t, err.Error(), "no phase")
 	})
 }

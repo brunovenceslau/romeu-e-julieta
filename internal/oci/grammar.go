@@ -21,6 +21,8 @@
 package oci
 
 import (
+	"bytes"
+	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
@@ -39,6 +41,11 @@ import (
 // MaxDescriptorSize is the cap of a descriptor read from a file or an
 // annotation: the file cap of 07 7.5, step 1 (REQ-0168).
 const MaxDescriptorSize = spec.MaxFileSize
+
+// maxExactInt is 2^53, the largest whole number a float64 holds exactly.
+// A number past it is refused, so that a value read through a float64
+// is the value written (the JSON road reads numbers as float64).
+const maxExactInt = 1 << 53
 
 // maxDepth and maxNodes bound the nesting and the node count of a
 // descriptor, so one under the size cap cannot make the walks long.
@@ -121,6 +128,9 @@ func jsonTree(data []byte) (map[string]any, error) {
 	if len(data) > MaxDescriptorSize {
 		return nil, invalid("the descriptor has %d bytes, over the cap of %d", len(data), MaxDescriptorSize)
 	}
+	if err := checkNumbers(data); err != nil {
+		return nil, invalid("%s", err)
+	}
 	var tree map[string]any
 	if err := jsonv2.Unmarshal(data, &tree); err != nil {
 		return nil, invalid("the descriptor is not one JSON object without a repeated name")
@@ -130,6 +140,33 @@ func jsonTree(data []byte) (map[string]any, error) {
 		return nil, invalid("%s", err)
 	}
 	return tree, nil
+}
+
+// checkNumbers returns why a number of the JSON document is past 2^53:
+// the tree reads numbers as float64, which would round a whole number
+// beyond it to another one.
+func checkNumbers(data []byte) error {
+	dec := jsontext.NewDecoder(bytes.NewReader(data))
+	for {
+		tok, err := dec.ReadToken()
+		if err != nil {
+			// The decoder of the document judges its syntax.
+			return nil
+		}
+		if tok.Kind() != '0' {
+			continue
+		}
+		text := tok.String()
+		if strings.ContainsAny(text, ".eE") {
+			if f, err := strconv.ParseFloat(text, 64); err != nil || math.Abs(f) > maxExactInt {
+				return errors.New("a number out of range or past 2^53")
+			}
+			continue
+		}
+		if i, err := strconv.ParseInt(text, 10, 64); err != nil || i > maxExactInt || i < -maxExactInt {
+			return errors.New("a whole number past 2^53")
+		}
+	}
 }
 
 // checkJSON returns why the value v, or one below it, is outside the
@@ -253,14 +290,14 @@ func toValue(n *yaml.Node) (any, error) {
 	switch n.Tag {
 	case "!!int":
 		var i int64
-		if err := n.Decode(&i); err != nil {
-			return nil, fmt.Errorf("line %d: a whole number out of range", n.Line)
+		if err := n.Decode(&i); err != nil || i > maxExactInt || i < -maxExactInt {
+			return nil, fmt.Errorf("line %d: a whole number past 2^53", n.Line)
 		}
 		return i, nil
 	case "!!float":
 		var f float64
-		if err := n.Decode(&f); err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
-			return nil, fmt.Errorf("line %d: a number out of range", n.Line)
+		if err := n.Decode(&f); err != nil || math.IsNaN(f) || math.Abs(f) > maxExactInt {
+			return nil, fmt.Errorf("line %d: a number out of range or past 2^53", n.Line)
 		}
 		return f, nil
 	case "!!bool":
