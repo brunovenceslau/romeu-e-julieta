@@ -114,3 +114,37 @@ func TestRegister(t *testing.T) {
 	require.Len(t, contributions, len(saved)+1)
 	assert.Equal(t, "x", contributions[len(contributions)-1].name)
 }
+
+// TestEnvironmentRefusesABadBase refuses a HOME that is not an absolute
+// path or holds a control character, a TERM that holds one, and a
+// contribution with no name.
+func TestEnvironmentRefusesABadBase(t *testing.T) {
+	ok := contribution{name: "x", vars: func(EnvInput) []string { return nil }}
+	tests := []struct {
+		name, home, term string
+		regs             []contribution
+	}{
+		{"an empty HOME", "", "xterm", nil},
+		{"a relative HOME", "home/x", "xterm", nil},
+		{"an unclean HOME", "/srv/../x", "xterm", nil},
+		{"a newline in HOME", "/home/x\ny", "xterm", nil},
+		{"a C1 control in HOME", "/home/x\u0085y", "xterm", nil},
+		{"a newline in TERM", "/h", "xterm\nB=1", nil},
+		{"a C1 control in TERM", "/h", "xterm\u009b", nil},
+		{"a contribution with no name", "/h", "xterm", []contribution{{name: "", vars: ok.vars}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := environment(tt.home, tt.term, EnvInput{Call: Call{Mode: Interactive}}, tt.regs)
+			testsupport.RequireID(t, "RJ-348", err)
+		})
+	}
+}
+
+// TestEnvironmentRefusesAC1ControlInAValue holds noControl to
+// unicode.IsControl, the C1 controls included.
+func TestEnvironmentRefusesAC1ControlInAValue(t *testing.T) {
+	give := contribution{name: "x", vars: func(EnvInput) []string { return []string{"A_VAR=1\u009b2"} }}
+	_, err := environment("/h", "", EnvInput{Call: Call{Mode: Captured}}, []contribution{give})
+	testsupport.RequireID(t, "RJ-348", err)
+}

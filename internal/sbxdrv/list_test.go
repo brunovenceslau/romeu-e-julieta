@@ -6,10 +6,9 @@
 package sbxdrv
 
 import (
+	"bytes"
 	"context"
-	"crypto/sha256"
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +21,6 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli/testsupport"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
-	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
 
 // fixture reads testdata/ls/<name>.
@@ -180,44 +178,21 @@ func TestRunnerListShape(t *testing.T) {
 	}
 }
 
-// snapshot returns the sha256 of every file under dir, by path.
-func snapshot(t *testing.T, dir string) map[string][32]byte {
-	t.Helper()
-	out := map[string][32]byte{}
-	require.NoError(t, filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		data, err := os.ReadFile(p)
-		out[p] = sha256.Sum256(data)
-		return err
-	}))
-	return out
-}
-
-// TestNoStateChangesOnAShapeError holds the acceptance of T029: a parser
-// that refuses an output changes no state record. The runner and the
-// parsers hold no state; the test makes that a fact by keeping a store
-// with a record and comparing every file of it before and after.
-func TestNoStateChangesOnAShapeError(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "romeu")
-	store, err := state.Open(dir)
+// TestThePackageHoldsNoState makes the acceptance of T029 that a parser
+// which refuses an output changes no state record a fact of the build:
+// internal/sbxdrv, with everything it links, does not import
+// internal/state, so no call of it can write a record. A test that
+// compared a store before and after could not fail, since nothing here
+// knows the store. The positive control is a package the list does hold.
+func TestThePackageHoldsNoState(t *testing.T) {
+	goBin, err := procgroup.LookPath("go")
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = store.Close() })
-	lk, err := store.Lock()
-	require.NoError(t, err)
-	require.NoError(t, store.UpdateProject(lk, "shop", func(*state.Project) error { return nil }))
-	lk.Unlock()
-	before := snapshot(t, dir)
-	require.NotEmpty(t, before)
-
-	files, err := filepath.Glob(filepath.Join("testdata", "ls", "bad-*.json"))
-	require.NoError(t, err)
-	for _, f := range files {
-		_, err := listRunner(t, filepath.Base(f), 0).List(context.Background(), Opts{})
-		require.Error(t, err, f)
-	}
-	_, err = listRunner(t, "ok-empty.json", 1).List(context.Background(), Opts{})
-	require.Error(t, err)
-	assert.Equal(t, before, snapshot(t, dir), "no record of the state directory changed")
+	var out, errOut bytes.Buffer
+	require.NoError(t, procgroup.Run(context.Background(), procgroup.Command{
+		Class: procgroup.ToolStep, Argv: []string{goBin, "list", "-deps", "-f", "{{.ImportPath}}", "."},
+		Env: os.Environ(), Stdout: &out, Stderr: &errOut,
+	}), errOut.String())
+	deps := strings.Fields(out.String())
+	assert.Contains(t, deps, "github.com/brunovenceslau/romeu-e-julieta/internal/procgroup", "the list is the dependencies of this package")
+	assert.NotContains(t, deps, "github.com/brunovenceslau/romeu-e-julieta/internal/state")
 }

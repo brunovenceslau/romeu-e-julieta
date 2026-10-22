@@ -132,6 +132,9 @@ func newFakeRig(t *testing.T, sessionPath string) *fakeRig {
 
 	out := &bytes.Buffer{}
 	r := &Runner{Sbx: sbx, Home: root, Term: "xterm", Terminal: Terminal{Out: out, Err: out}}
+	// Not every session begins with sbx version, and the tests of the
+	// rig are about the replay, not the floor.
+	r.floorOK.Store(true)
 	fx := defaultFixture
 	fx.Dir = envDir
 	return &fakeRig{runner: r, fx: fx, root: root, state: state, session: sessionPath, stdout: out}

@@ -6,12 +6,14 @@ package sbxdrv
 import (
 	"fmt"
 	"strings"
+	"unicode"
 )
 
-// noControl refuses a value with a control character, a newline among
-// them, which no argv element or environment value of romeu holds.
+// noControl refuses a value with a control character (unicode.IsControl:
+// C0, DEL and C1), a newline among them, which no argv element or
+// environment value of romeu holds.
 func noControl(v string) error {
-	if i := strings.IndexFunc(v, func(r rune) bool { return r < 0x20 || r == 0x7f }); i >= 0 {
+	if i := strings.IndexFunc(v, unicode.IsControl); i >= 0 {
 		return fmt.Errorf("holds a control character at byte %d", i)
 	}
 	return nil

@@ -7,6 +7,7 @@ package sbxdrv
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -68,12 +69,21 @@ var reserved = []string{"PATH", "HOME", "LANG", "TERM"}
 // and the entries of the contributions, sorted by the name they were
 // registered under, so that the same input gives the same environment.
 func environment(home, term string, in EnvInput, regs []contribution) ([]string, error) {
+	if !filepath.IsAbs(home) || filepath.Clean(home) != home || noControl(home) != nil {
+		return nil, cli.Internal.New(fmt.Sprintf("sbxdrv: HOME is a clean absolute path without a control character, and the runner has %q", home))
+	}
+	if noControl(term) != nil {
+		return nil, cli.Internal.New("sbxdrv: TERM holds a control character")
+	}
 	env := []string{"PATH=" + scrubbedPath, "HOME=" + home, "LANG=" + scrubbedLang}
 	if in.Call.Mode == Interactive && term != "" {
 		env = append(env, "TERM="+term)
 	}
 	seen := map[string]string{}
 	for _, r := range slices.SortedStableFunc(slices.Values(regs), func(a, b contribution) int { return strings.Compare(a.name, b.name) }) {
+		if r.name == "" {
+			return nil, cli.Internal.New("sbxdrv: an environment contribution has no name")
+		}
 		for _, entry := range r.vars(in) {
 			name, value, ok := strings.Cut(entry, "=")
 			switch {

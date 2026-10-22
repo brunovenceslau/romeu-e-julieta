@@ -22,6 +22,10 @@ import (
 // its details (04 4.1, Output, REQ-0270).
 const StderrHead = 4 << 10
 
+// argvWordMax is the longest word of the argv that enters the details of
+// a failed call; a longer one is cut and ends in "...".
+const argvWordMax = 256
+
 // Versions are the versions the details of a failed call carry
 // (04 4.1, Error ids, item 7); a version the caller does not know is
 // left empty and printed as unknown.
@@ -92,7 +96,7 @@ func newCallError(c Call, err error, stderr []byte, step string, v Versions, s S
 	return &CallError{
 		Call:     c,
 		Err:      err,
-		argv:     escapedArgv(c.Argv),
+		argv:     escapedArgv(c.Argv, s),
 		status:   statusOf(err),
 		stderr:   head(stderr, s),
 		step:     step,
@@ -121,12 +125,41 @@ func statusOf(err error) string {
 func signalName(s syscall.Signal) string { return s.String() }
 
 // escapedArgv renders the argv for the details: sbx, then each word
-// escaped by termsafe, and quoted when it is empty or holds a space or a
-// quotation mark.
-func escapedArgv(argv []string) string {
+// with the host's names replaced, cut at argvWordMax, escaped by termsafe
+// and quoted when it is empty or holds a space or a quotation mark. The
+// value of --command, a command that may hold a secret, and of --env is
+// replaced whole by <command> and <env>, in both the "--flag value" and
+// the "--flag=value" form; the words after "--" are the command of an
+// env exec and are scrubbed, not read as flags.
+func escapedArgv(argv []string, s Scrubber) string {
 	words := make([]string, 0, len(argv)+1)
 	words = append(words, "sbx")
+	redact := ""
+	dash := false
 	for _, w := range argv {
+		done := false // the word is a token, not a value of the host's
+		switch {
+		case dash:
+		case w == "--":
+			dash = true
+		case redact != "":
+			w, redact, done = redact, "", true
+		default:
+			if flag, _, eq := strings.Cut(w, "="); flag == "--command" || flag == "--env" {
+				token := PlaceholderCommand
+				if flag == "--env" {
+					token = PlaceholderEnv
+				}
+				if eq {
+					w, done = flag+"="+token, true
+				} else {
+					redact = token
+				}
+			}
+		}
+		if !done {
+			w = capWord(s.Replace(w))
+		}
 		w = termsafe.Escape(w)
 		if w == "" || strings.ContainsAny(w, " \"'") {
 			w = `"` + strings.ReplaceAll(w, `"`, `\"`) + `"`
@@ -134,6 +167,19 @@ func escapedArgv(argv []string) string {
 		words = append(words, w)
 	}
 	return strings.Join(words, " ")
+}
+
+// capWord cuts a word at argvWordMax bytes, on the start of a character,
+// and ends it in "...".
+func capWord(w string) string {
+	if len(w) <= argvWordMax {
+		return w
+	}
+	i := argvWordMax
+	for i > 0 && !utf8.RuneStart(w[i]) {
+		i--
+	}
+	return w[:i] + "..."
 }
 
 // head returns the first StderrHead bytes of stderr, with the host's

@@ -39,3 +39,27 @@ func TestScrubberEmptyValues(t *testing.T) {
 	assert.Equal(t, "agent at /home/agent", Scrubber{}.Replace("agent at /home/agent"))
 	assert.Equal(t, "agent at <home>", Scrubber{Home: "/home/agent"}.Replace("agent at /home/agent"))
 }
+
+// TestScrubberLeavesItsPlaceholdersAlone holds that a replacement is
+// never read again: a user named home or root, or a home of /, does not
+// turn <home> and <root> into something else.
+func TestScrubberLeavesItsPlaceholdersAlone(t *testing.T) {
+	tests := []struct {
+		name string
+		s    Scrubber
+		in   string
+		want string
+	}{
+		{"a user named home", Scrubber{Home: "/srv/home", User: "home"}, "home owns /srv/home/x", "<user> owns <home>/x"},
+		{"a user named root", Scrubber{Root: "/srv/r", User: "root"}, "root wrote /srv/r/a", "<user> wrote <root>/a"},
+		{"a host named user", Scrubber{Host: "user", User: "bob"}, "user and bob", "<host> and <user>"},
+		{"a home of /", Scrubber{Home: "/", User: "bob"}, "/usr/bin and bob", "/usr/bin and <user>"},
+		{"a root of /", Scrubber{Root: "/"}, "/etc/x", "/etc/x"},
+		{"a user that is a placeholder's word", Scrubber{Host: "host", User: "user"}, "host user", "<host> <user>"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.s.Replace(tt.in))
+		})
+	}
+}

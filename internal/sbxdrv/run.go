@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
@@ -53,6 +54,11 @@ type Runner struct {
 	Versions Versions
 	// Terminal is the terminal of the Interactive calls.
 	Terminal Terminal
+
+	// floorOK is set once RequireFloor has seen an sbx at or above the
+	// floor (REQ-0441); until then Run starts the call of sbx version and
+	// no other, so that an sbx too old to be driven is never driven.
+	floorOK atomic.Bool
 }
 
 // Opts are what a call knows about the command that makes it.
@@ -79,8 +85,9 @@ type Result struct {
 // (subprocess-timeout, RJ-323) of a timeout; a call the context ended
 // returns the cancellation, not a CallError, since the signal rule of
 // 04 4.1 owns it. A call that breaks a guard (I4, I25) or whose
-// environment is wrong, or that no builder of this package made, is the
-// error internal (RJ-348), and nothing is started.
+// environment is wrong, that no builder of this package made, or that
+// comes before the floor check is the error internal (RJ-348), and
+// nothing is started.
 func (r *Runner) Run(ctx context.Context, c Call, o Opts) (Result, error) {
 	if !filepath.IsAbs(r.Sbx) || filepath.Clean(r.Sbx) != r.Sbx {
 		return Result{}, cli.Internal.New("sbxdrv: sbx is run by a clean absolute path from host settings, and the runner has " + fmt.Sprintf("%q", r.Sbx))
@@ -94,6 +101,9 @@ func (r *Runner) Run(ctx context.Context, c Call, o Opts) (Result, error) {
 	if err := Guard(c); err != nil {
 		return Result{}, err
 	}
+	if !r.floorOK.Load() && parseArgv(c.Argv).verb != "version" {
+		return Result{}, cli.Internal.New("sbxdrv: the call " + c.Name + " ran before the sbx floor check; a command runs RequireFloor first")
+	}
 	env, err := environment(r.Home, r.Term, EnvInput{Call: c, Host: r.Host, Project: o.Project}, contributions)
 	if err != nil {
 		return Result{}, err
@@ -104,7 +114,9 @@ func (r *Runner) Run(ctx context.Context, c Call, o Opts) (Result, error) {
 	if c.Mode == Interactive {
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = r.Terminal.In, r.Terminal.Out, r.Terminal.Err
 	} else {
-		cmd.Stdout, cmd.Stderr = &stdout, &stderr
+		// A nil Stdin is an empty one: a captured call reads EOF and never
+		// the terminal's reader.
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, &stdout, &stderr
 	}
 	if err := procgroup.Run(ctx, cmd); err != nil {
 		if ctx.Err() != nil {

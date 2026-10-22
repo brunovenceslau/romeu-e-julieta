@@ -33,9 +33,13 @@ func script(t *testing.T, body string) string {
 	return path
 }
 
-// runner returns a Runner for the script.
+// runner returns a Runner for the script, past the floor check: the
+// tests that are not about the floor start from a runner that has
+// passed it (the ones that are build a Runner of their own).
 func runner(sbx string) *Runner {
-	return &Runner{Sbx: sbx, Home: "/home/test", Term: "xterm-test"}
+	r := &Runner{Sbx: sbx, Home: "/home/test", Term: "xterm-test"}
+	r.floorOK.Store(true)
+	return r
 }
 
 // TestRunPassesTheArgvAndTheScrubbedEnvironment holds 04 4.1: sbx runs
@@ -111,7 +115,7 @@ func TestRunFailureDetails(t *testing.T) {
 	ce, ok := errors.AsType[*CallError](err)
 	require.True(t, ok, "%v", err)
 	assert.Equal(t, []cli.Detail{
-		{Key: "argv", Value: `sbx env rm --force "/home/agent/dev/shop env"`},
+		{Key: "argv", Value: `sbx env rm --force "<root>/shop env"`},
 		{Key: "status", Value: "exit 3"},
 		{Key: "stderr", Value: `open <root>/shop-env: permission denied for <user> on <host>\n\u001b[31mred\n`},
 		{Key: "step", Value: "run step 3"},
@@ -282,4 +286,56 @@ func TestRequireFloor(t *testing.T) {
 	_, err = runner(script(t, `exit 1`)).RequireFloor(context.Background(), Opts{})
 	require.Error(t, err)
 	assert.NotEqual(t, "RJ-343", cli.Of(err).ID)
+}
+
+// TestRunClosesTheStdinOfACapturedCall holds 04 4.1, Output: a captured
+// call reads an empty stdin, whatever the terminal's reader holds.
+func TestRunClosesTheStdinOfACapturedCall(t *testing.T) {
+	sbx := script(t, `if read line; then echo "read:$line"; else echo "eof"; fi`)
+	r := runner(sbx)
+	r.Terminal = Terminal{In: strings.NewReader("typed by the user\n")}
+	res, err := r.Run(context.Background(), Version(), Opts{})
+	require.NoError(t, err)
+	assert.Equal(t, "eof\n", string(res.Stdout))
+}
+
+// TestRunnerRefusesEveryCallButVersionBeforeTheFloor holds the sbx floor
+// check before gate 1 (REQ-0441): until RequireFloor has succeeded once,
+// the runner starts the call of sbx version and nothing else.
+func TestRunnerRefusesEveryCallButVersionBeforeTheFloor(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), "ran")
+	sbx := script(t, `if [ "$1" = version ]; then echo v0.48.0; else touch `+marker+`; fi`)
+	r := &Runner{Sbx: sbx, Home: "/home/test"}
+	stop := mustCall(Stop("shop"))
+	_, err := r.Run(context.Background(), stop, Opts{})
+	testsupport.RequireID(t, "RJ-348", err)
+	assert.NoFileExists(t, marker)
+	_, err = r.List(context.Background(), Opts{})
+	testsupport.RequireID(t, "RJ-348", err)
+	named := stop
+	named.Name = "version"
+	_, err = r.Run(context.Background(), named, Opts{})
+	testsupport.RequireID(t, "RJ-348", err)
+	assert.NoFileExists(t, marker, "the verb in the argv decides, not the name of the call")
+
+	_, err = r.Run(context.Background(), Version(), Opts{})
+	require.NoError(t, err, "the version call is the one that runs")
+	_, err = r.Run(context.Background(), stop, Opts{})
+	testsupport.RequireID(t, "RJ-348", err)
+
+	_, err = r.RequireFloor(context.Background(), Opts{})
+	require.NoError(t, err)
+	_, err = r.Run(context.Background(), stop, Opts{})
+	require.NoError(t, err)
+	assert.FileExists(t, marker)
+}
+
+// TestRunnerStaysClosedBelowTheFloor keeps the runner closed when the
+// version found is below the floor.
+func TestRunnerStaysClosedBelowTheFloor(t *testing.T) {
+	r := &Runner{Sbx: script(t, `echo v0.45.0`), Home: "/home/test"}
+	_, err := r.RequireFloor(context.Background(), Opts{})
+	testsupport.RequireID(t, "RJ-343", err)
+	_, err = r.Run(context.Background(), mustCall(Stop("shop")), Opts{})
+	testsupport.RequireID(t, "RJ-348", err)
 }

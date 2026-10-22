@@ -1,0 +1,3 @@
+{"session":"onechange","sbxVersion":"0.48.0","capturedAt":"2026-10-22","synthetic":true,"source":"hand-written test data of the fake, in the shapes of the sessions of e2e/testdata/sbx","description":"One change, a stop, and a read after it: the session a second change runs past."}
+{"argv":["stop","<name>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["ls","--json"],"exit":0,"stdout":"[]\n","stderr":""}

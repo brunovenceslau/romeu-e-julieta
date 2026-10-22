@@ -40,5 +40,9 @@ func (r *Runner) RequireFloor(ctx context.Context, o Opts) (Release, error) {
 	if err != nil {
 		return Release{}, err
 	}
-	return v, CheckFloor(v)
+	if err := CheckFloor(v); err != nil {
+		return v, err
+	}
+	r.floorOK.Store(true)
+	return v, nil
 }

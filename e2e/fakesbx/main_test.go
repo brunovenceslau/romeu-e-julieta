@@ -514,3 +514,40 @@ func TestLoadConfigRefuses(t *testing.T) {
 		})
 	}
 }
+
+// TestAllTheRecordedChangesAreMade fails a change after the last one the
+// session recorded, with the number of changes it has: the branch that
+// is not the out-of-order one.
+func TestAllTheRecordedChangesAreMade(t *testing.T) {
+	r := newRig(t, "onechange")
+	code, _, _ := r.call("stop", "shop")
+	require.Equal(t, 0, code)
+	code, _, errOut := r.call("stop", "shop")
+	assert.Equal(t, 97, code)
+	assert.Contains(t, errOut, "has recorded 1 changes, all made")
+	st := r.readState()
+	require.Len(t, st.Failures, 1)
+	assert.Equal(t, 1, st.Mutations, "a refused change moves nothing on")
+	code, out, _ := r.call("ls", "--json")
+	assert.Equal(t, 0, code, "a read is still answered")
+	assert.Equal(t, "[]\n", out)
+}
+
+// TestAFailedCreateWritesNoStanza holds that the effects of an entry are
+// made for an exit of 0 and not for another: the answer is the failure,
+// and the config of the clone is as it was.
+func TestAFailedCreateWritesNoStanza(t *testing.T) {
+	r := newRig(t, "failedcreate")
+	dir := t.TempDir()
+	setUpEnv(t, dir, "shop", "shop-api")
+	r.cfg.GitURL = "git://127.0.0.1:9418/shop"
+	r.write()
+	before, err := os.ReadFile(filepath.Join(dir, "shop-api", ".git", "config"))
+	require.NoError(t, err)
+	code, _, errOut := r.call("env", "run", "-d", "--clone", dir)
+	assert.Equal(t, 1, code)
+	assert.Contains(t, errOut, "did not start")
+	after, err := os.ReadFile(filepath.Join(dir, "shop-api", ".git", "config"))
+	require.NoError(t, err)
+	assert.Equal(t, string(before), string(after))
+}

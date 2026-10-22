@@ -18,6 +18,14 @@ const (
 	PlaceholderRoot = "<root>"
 )
 
+// The words that stand for a value the details of a failed call never
+// show: the host command of a command secret, and the value of --env.
+// They are the tokens of placeholders.go.
+const (
+	PlaceholderCommand = "<command>"
+	PlaceholderEnv     = "<env>"
+)
+
 // Scrubber replaces the home path, the user name, the host name and the
 // root path of the host tree, as the recorder of 10 10.3 does, so that
 // text from sbx can be pasted into an issue. A value left empty replaces
@@ -29,45 +37,51 @@ type Scrubber struct {
 	Root string // the root of the host tree, $ROMEU_ROOT
 }
 
-// Replace returns text with the four values replaced. Paths are replaced
-// first, the longest first, since the root usually lies in the home;
-// the user and host names are replaced where they stand as a whole word,
-// so that a short name does not cut up other words.
+// Replace returns text with the four values replaced. The text is read
+// once, left to right, and what a replacement writes is never read
+// again, so a user named home or root does not change <home> or <root>.
+// At each place the paths go first, the longest first, since the root
+// usually lies in the home; the host and user names are replaced where
+// they stand as a whole word, so that a short name does not cut up other
+// words. A value left empty replaces nothing, and so does "/", which is
+// the start of every path and not a name of the host's.
 func (s Scrubber) Replace(text string) string {
-	paths := []struct{ value, placeholder string }{{s.Root, PlaceholderRoot}, {s.Home, PlaceholderHome}}
-	slices.SortStableFunc(paths, func(a, b struct{ value, placeholder string }) int { return len(b.value) - len(a.value) })
-	for _, p := range paths {
-		if p.value != "" {
-			text = strings.ReplaceAll(text, p.value, p.placeholder)
+	type rule struct {
+		value, placeholder string
+		word               bool
+	}
+	var rules []rule
+	for _, p := range []rule{{s.Root, PlaceholderRoot, false}, {s.Home, PlaceholderHome, false}} {
+		if p.value != "" && p.value != "/" {
+			rules = append(rules, p)
 		}
 	}
-	for _, w := range []struct{ value, placeholder string }{{s.Host, PlaceholderHost}, {s.User, PlaceholderUser}} {
+	slices.SortStableFunc(rules, func(a, b rule) int { return len(b.value) - len(a.value) })
+	for _, w := range []rule{{s.Host, PlaceholderHost, true}, {s.User, PlaceholderUser, true}} {
 		if w.value != "" {
-			text = replaceWord(text, w.value, w.placeholder)
+			rules = append(rules, w)
 		}
 	}
-	return text
-}
-
-// replaceWord replaces each occurrence of word in text that no letter,
-// digit, underscore or hyphen touches.
-func replaceWord(text, word, repl string) string {
 	var b strings.Builder
-	for {
-		i := strings.Index(text, word)
-		if i < 0 {
+	for i := 0; i < len(text); {
+		matched := false
+		for _, r := range rules {
+			if !strings.HasPrefix(text[i:], r.value) {
+				continue
+			}
+			end := i + len(r.value)
+			if r.word && ((i > 0 && wordByte(text[i-1])) || (end < len(text) && wordByte(text[end]))) {
+				continue
+			}
+			b.WriteString(r.placeholder)
+			i, matched = end, true
 			break
 		}
-		end := i + len(word)
-		if (i == 0 || !wordByte(text[i-1])) && (end == len(text) || !wordByte(text[end])) {
-			b.WriteString(text[:i])
-			b.WriteString(repl)
-		} else {
-			b.WriteString(text[:end])
+		if !matched {
+			b.WriteByte(text[i])
+			i++
 		}
-		text = text[end:]
 	}
-	b.WriteString(text)
 	return b.String()
 }
 
