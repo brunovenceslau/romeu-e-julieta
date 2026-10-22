@@ -43,4 +43,7 @@ Its JSON Schema is [schemas/catalog.v1.json](../../schemas/catalog.v1.json).
 | `base[]` | lowercase host name, IDNA A-labels, no wildcard, port or IP literal | is not an egress domain | invalid document, exit 2 | both | REQ-0188 |
 | `domains{key}` | lowercase host name, IDNA A-labels, no wildcard, port or IP literal | is not an egress domain | invalid document, exit 2 | both | REQ-0188 |
 | `tools{key}` | matches `^[a-z][a-z0-9_-]*:[A-Za-z0-9@][A-Za-z0-9._/@+~-]*$` | is not a backend:tool of mise.lock | invalid document, exit 2 | both | REQ-0842 |
+| `meta, base` | only in `base.yaml`, which every catalog has | meta and base belong in base.yaml | invalid document, exit 2 | both | REQ-0212 |
+| `domains{}.upload` | the plain `true` or `false`, not `yes`, `on` or a quoted value | the upload flag is written true or false | invalid document, exit 2 | both | REQ-0641 |
+| `domains{}, tools{}` | a domain or a tool declared by two files has the same entry in both | is declared with different entries in two files | invalid document, exit 2 | both | REQ-0212 |
 | `tools{}[]` | lowercase host name, IDNA A-labels, no wildcard, port or IP literal | is not an egress domain | invalid document, exit 2 | both | REQ-0188 |

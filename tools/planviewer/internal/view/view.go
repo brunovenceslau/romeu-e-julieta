@@ -36,7 +36,8 @@ const TasksDir = "docs/plan/tasks"
 
 // TemplateFile is the page with two placeholders, from the repository
 // root. It is read when the tool runs and not embedded: the lint step
-// admits no go:embed directive (tools/ci/internal/lint, directives).
+// admits the embed directive only below internal/catalog/
+// (tools/ci/internal/lint, directives).
 const TemplateFile = "tools/planviewer/template.html"
 
 // Task is one task file as the page needs it.

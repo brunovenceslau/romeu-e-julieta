@@ -34,6 +34,9 @@ func init() {
 			{Field: "base[]", Rule: domain, Message: "is not an egress domain", Error: "invalid document, exit 2", Scope: "both", Source: "REQ-0188"},
 			{Field: "domains{key}", Rule: domain, Message: "is not an egress domain", Error: "invalid document, exit 2", Scope: "both", Source: "REQ-0188"},
 			{Field: "tools{key}", Rule: "matches `" + all.CatalogToolKeyPattern + "`", Message: "is not a backend:tool of mise.lock", Error: "invalid document, exit 2", Scope: "both", Source: "REQ-0842"},
+			{Field: "meta, base", Rule: "only in `base.yaml`, which every catalog has", Message: "meta and base belong in base.yaml", Error: "invalid document, exit 2", Scope: "both", Source: "REQ-0212"},
+			{Field: "domains{}.upload", Rule: "the plain `true` or `false`, not `yes`, `on` or a quoted value", Message: "the upload flag is written true or false", Error: "invalid document, exit 2", Scope: "both", Source: "REQ-0641"},
+			{Field: "domains{}, tools{}", Rule: "a domain or a tool declared by two files has the same entry in both", Message: "is declared with different entries in two files", Error: "invalid document, exit 2", Scope: "both", Source: "REQ-0212"},
 			{Field: "tools{}[]", Rule: domain, Message: "is not an egress domain", Error: "invalid document, exit 2", Scope: "both", Source: "REQ-0188"},
 		},
 	})
