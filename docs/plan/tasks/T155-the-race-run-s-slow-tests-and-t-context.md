@@ -3,7 +3,7 @@ id: T155
 title: "The race run's slow tests and t.Context"
 milestone: M1
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - tools/ci/internal/drift/drift_test.go
   - tools/ci/internal/drift/generate_test.go
@@ -31,9 +31,14 @@ ask_first:
   - release
   - gitsafe
 sitting: none
+merged: 2026-10-21
+pr: 232
 ---
 
 # T155 - The race run's slow tests and t.Context
+
+Merged on 2026-10-21 in pull request #232. The text below is the one
+written when it was built.
 
 Goal: the first part of "One race run, test tags and parallel CI jobs"
 (01m5drzqsp6zg34xzmywckwb7b), approved for planning on 2026-10-20:

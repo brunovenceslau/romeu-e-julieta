@@ -3,7 +3,7 @@ id: T060
 title: "`julieta snapshot`"
 milestone: M1
 module: salvage
-fate: kept
+fate: merged
 owns:
   - internal/salvage/snapshot*.go
   - internal/cmd/julieta/snapshot/**
@@ -30,9 +30,14 @@ after: []
 ask_first:
   - gitsafe
 sitting: none
+merged: 2026-10-21
+pr: 228
 ---
 
 # T060 - `julieta snapshot`
+
+Merged on 2026-10-21 in pull request #228. The text below is the one
+written when it was built.
 
 Goal: `julieta snapshot`: the bundle after `post-commit`, `post-rewrite`
 and `post-merge`, the two atomic writes, `disabled` on a repo-local

@@ -3,7 +3,7 @@ id: T159
 title: "An AGENTS.md of pointers and a CLAUDE.md that imports it"
 milestone: none
 module: none
-fate: new
+fate: merged
 owns:
   - AGENTS.md
   - CLAUDE.md
@@ -12,9 +12,14 @@ needs: []
 after: []
 ask_first: []
 sitting: none
+merged: 2026-10-22
+pr: 236
 ---
 
 # T159 - An AGENTS.md of pointers and a CLAUDE.md that imports it
+
+Merged on 2026-10-22 in pull request #236. The text below is the one
+written when it was built.
 
 Goal: the file of "A short CLAUDE.md of pointers for this repository"
 (01m5e1majbx0hq6p710g9dmtr2), with the decision of 2026-10-21 ("Work

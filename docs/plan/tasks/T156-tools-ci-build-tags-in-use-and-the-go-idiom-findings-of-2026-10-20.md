@@ -3,7 +3,7 @@ id: T156
 title: "tools/ci: build tags in use and the Go idiom findings of 2026-10-20"
 milestone: M1
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - tools/ci/internal/taggedsuites/**
   - tools/ci/check_taggedsuites.go
@@ -47,9 +47,14 @@ ask_first:
   - checks
   - dependencies
 sitting: none
+merged: 2026-10-22
+pr: 233
 ---
 
 # T156 - tools/ci: build tags in use and the Go idiom findings of 2026-10-20
+
+Merged on 2026-10-22 in pull request #233. The text below is the one
+written when it was built.
 
 Goal: the second part of "One race run, test tags and parallel CI jobs"
 (01m5drzqsp6zg34xzmywckwb7b): the findings of the Go idiom audit of

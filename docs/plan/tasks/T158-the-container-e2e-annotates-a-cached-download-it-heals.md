@@ -3,7 +3,7 @@ id: T158
 title: "The container e2e annotates a cached download it heals"
 milestone: M1
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - e2e/internal/container/container.go
   - e2e/internal/container/container_test.go
@@ -24,9 +24,14 @@ after:
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-22
+pr: 235
 ---
 
 # T158 - The container e2e annotates a cached download it heals
+
+Merged on 2026-10-22 in pull request #235. The text below is the one
+written when it was built.
 
 Goal: the one question left open by the pending note "The spec catches
 up with the hardening of T127, T143 and T144"

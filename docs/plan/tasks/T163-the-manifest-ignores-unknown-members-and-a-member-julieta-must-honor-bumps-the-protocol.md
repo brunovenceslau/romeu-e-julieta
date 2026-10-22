@@ -3,7 +3,7 @@ id: T163
 title: "The manifest ignores unknown members, and a member julieta must honor bumps the protocol"
 milestone: M1
 module: julieta-core
-fate: new
+fate: merged
 owns:
   - internal/manifest/manifest.go
   - internal/manifest/manifest_test.go
@@ -20,9 +20,14 @@ after:
 ask_first:
   - decisions
 sitting: none
+merged: 2026-10-22
+pr: 242
 ---
 
 # T163 - The manifest ignores unknown members, and a member julieta must honor bumps the protocol
+
+Merged on 2026-10-22 in pull request #242. The text below is the one
+written when it was built.
 
 Goal: julieta's reader of `manifest.v1` skips a member it does not know,
 as the other seven readers of formats between binaries do (T162), and

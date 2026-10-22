@@ -3,7 +3,7 @@ id: T150
 title: "The imports check refuses encoding/json v1"
 milestone: M1
 module: none
-fate: new
+fate: merged
 owns:
   - tools/ci/internal/imports/imports.go
   - tools/ci/internal/imports/imports_test.go
@@ -14,9 +14,14 @@ after: []
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-21
+pr: 231
 ---
 
 # T150 - The imports check refuses encoding/json v1
+
+Merged on 2026-10-21 in pull request #231. The text below is the one
+written when it was built.
 
 Goal: keep `encoding/json/v2` the default once T148 and T149 have moved
 every package to it. The imports check of `tools/ci` (REQ-0839) gains a

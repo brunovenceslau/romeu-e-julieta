@@ -3,7 +3,7 @@ id: T160
 title: "setup, status and SessionStart report snapshots disabled"
 milestone: M1
 module: julieta-core
-fate: new
+fate: merged
 owns:
   - internal/cmd/julieta/setup/snapshots_disabled*.go
   - internal/cmd/julieta/setup/setup.go
@@ -28,9 +28,14 @@ after:
   - T155
 ask_first: []
 sitting: none
+merged: 2026-10-22
+pr: 237
 ---
 
 # T160 - setup, status and SessionStart report snapshots disabled
+
+Merged on 2026-10-22 in pull request #237. The text below is the one
+written when it was built.
 
 Goal: the part of T060's `disabled` acceptance item that T060 left
 (decided on 2026-10-21): `julieta setup` writes `disabled` into a

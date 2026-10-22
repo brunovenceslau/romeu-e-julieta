@@ -9,8 +9,10 @@ first from 2026-10-22", 01m5gywvgc85vj8k4txzppjz6d).
 
 ## Next steps
 
-1. T021 (M3, the project spec's host settings), ready by
-   `go run ./tools/ci plan --ready`; read its task first.
+1. The queue of 2026-10-22, third part, critical path first: T021;
+   T033, T031, T029 and T032 stacked on T021; T053; T040 on T033; T036
+   on T031 after T053. Every other id in the `needs` and `after` of
+   the four on T021 is merged (measured 2026-10-22).
 2. T077 once A12 is measured ("T077 waits for the A12 measurement",
    01m5gywvj5vj90yfedah9y670b).
 3. T161 once its open questions are answered and T088 is built (M6)
