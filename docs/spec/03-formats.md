@@ -123,7 +123,7 @@ naming the host-only rules it did not check.
 | secret binding | `REQ-0185` a `name@project` entry in host settings for every spec secret name (3.4) | romeu only |
 | run layout pane id / tab label | `REQ-0186` `^[a-z0-9][a-z0-9_-]{0,31}$` | both |
 | relative `cwd` in the run layout | `REQ-0187` cleaned path, no leading `/`, no `..` element | both |
-| egress domain (every source of [07 7.5](07-mise-egress.md#75-egress-derivation-internalegress): `egress.extra`, catalog, lock-derived, kit-declared) | `REQ-0188` lowercase hostname, IDNA A-labels, no wildcard, no port, no IP literal | both |
+| egress domain (every source of [07 7.5](07-mise-egress.md#75-egress-derivation-internalegress): `egress.extra`, catalog, lock-derived, kit-declared) | `REQ-0188` lowercase hostname, IDNA A-labels, no wildcard, no port, no IP literal; not under `localhost` (RFC 6761), `local` (RFC 6762) or `internal`, and no label of `0x` and hex digits, since a resolver may map those to the host or its local network (decided on 2026-10-22) | both |
 | workload reference | `REQ-0189` `<registry>/<repository>@sha256:<64 hex>` | both |
 | workload repository | `REQ-0190` `<registry>/<repository>` must be in host settings `workloadRepositories` | romeu only |
 | `agent` | `REQ-1259` `^[a-z0-9][a-z0-9._-]{0,62}$`: sbx takes a built-in agent's name or a kit's, and publishes no pattern; narrowest form, decided on 2026-10-22 | both |

@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"path"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -65,7 +66,9 @@ var ldhLabel = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
 // an IDNA name is written as its A-labels (xn--); no wildcard, port or
 // IP literal, which the label form already refuses, and no label with
 // hyphens in its third and fourth places but an A-label's, which IDNA
-// reserves. The Punycode of an A-label is not decoded.
+// reserves; not under localhost, local or internal, and no label of 0x
+// and hex digits, names a resolver may map to the host or its local
+// network. The Punycode of an A-label is not decoded.
 func domainName(name string) error {
 	if len(name) > 253 {
 		return errors.New("is longer than 253 bytes")
@@ -88,7 +91,28 @@ func domainName(name string) error {
 	if !strings.ContainsFunc(labels[len(labels)-1], func(r rune) bool { return r < '0' || r > '9' }) {
 		return errors.New("ends with a label of digits only")
 	}
+	// The special-use names a resolver may answer from the host or its
+	// local network: localhost (RFC 6761, 6.3), local (multicast DNS,
+	// RFC 6762) and internal (reserved for private use by ICANN, 2024).
+	if slices.Contains(specialUse, labels[len(labels)-1]) {
+		return errors.New("ends with a special-use name a resolver may map to the host or its local network (localhost, local, internal)")
+	}
+	// A label of 0x and hex digits, which some resolvers read as a
+	// number, so an address in disguise.
+	if slices.ContainsFunc(labels, isHexLabel) {
+		return errors.New("has a label of 0x and hex digits, which a resolver may read as an address")
+	}
 	return nil
+}
+
+// specialUse are the last labels domainName refuses.
+var specialUse = []string{"localhost", "local", "internal"}
+
+// isHexLabel reports whether l is 0x followed by at least one hex digit
+// and nothing else.
+func isHexLabel(l string) bool {
+	rest, ok := strings.CutPrefix(l, "0x")
+	return ok && rest != "" && strings.Trim(rest, "0123456789abcdef") == ""
 }
 
 // urlSegment is an owner or a repository name of a repo URL.

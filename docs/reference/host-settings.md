@@ -56,7 +56,7 @@ Its JSON Schema is [schemas/host-settings.v1.json](../../schemas/host-settings.v
 | `tools.sbx` | matches `^/.*$`; an absolute, clean path | is not an absolute, clean path | invalid document, exit 2 | romeu only | 03 3.4 |
 | `tools.git` | matches `^/.*$`; an absolute, clean path | is not an absolute, clean path | invalid document, exit 2 | romeu only | 03 3.4 |
 | `tools.gitCredentialHelper` | matches `^(?:[a-z0-9][a-z0-9-]{0,62}\|/[A-Za-z0-9._/+-]+)$`; a git-credential-\<name> helper's name, or an absolute, clean path with no space or shell character, since git runs it through sh | is neither a helper name nor a plain absolute path | invalid document, exit 2 | romeu only | REQ-1267 |
-| `gitHosts[].host` | a lowercase host name, no port or IP literal | is not a host name | invalid document, exit 2 | romeu only | REQ-0188 |
+| `gitHosts[].host` | a lowercase host name, no port or IP literal, not under localhost, local or internal, no label of 0x and hex digits | is not a host name | invalid document, exit 2 | romeu only | REQ-0188 |
 | `gitHosts[].caFile` | matches `^/.*$`; an absolute, clean path | is not an absolute, clean path | invalid document, exit 2 | romeu only | 03 3.4 |
 | `workloadRepositories[]` | matches `^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::[0-9]+)?(?:/[a-z0-9]+(?:(?:[._]\|__\|-+)[a-z0-9]+)*)+$` | is not \<registry>/\<repository> | invalid document, exit 2 | romeu only | REQ-0190 |
 | `signing.agentSocket` | matches `^/.*$`; an absolute, clean path | is not an absolute, clean path | invalid document, exit 2 | romeu only | 03 3.4 |
