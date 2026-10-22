@@ -7,6 +7,17 @@ import "github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 
 // The rows of the error table (04 4.4) that this package raises.
 var (
+	// LockMissing is the error lock-missing (RJ-340): a repo has a
+	// mise.toml and no mise.lock (07 7.3, REQ-0438). julieta install
+	// raises it; the hint is julieta lock --repo <dir>.
+	LockMissing = cli.Row{
+		ID:          "RJ-340",
+		Slug:        "lock-missing",
+		Exit:        2,
+		Fix:         "julieta lock --repo <dir>",
+		RecoveredIn: "none: the hint locks the repo and the install runs again",
+	}
+
 	// InstallBlocked is the error install-blocked (RJ-341): a download
 	// of mise install that the sandbox's egress policy blocked (04 4.3,
 	// REQ-0439). Its details name the tool, the host, the sbx command

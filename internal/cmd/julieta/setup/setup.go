@@ -184,6 +184,8 @@ func PrintWarning(out *cli.Writer, w Warning) {
 		cli.Warn(out, "snapshots-disabled", w.Message)
 	case AgentMemoryWritable:
 		cli.Warn(out, "agent-memory-writable", w.Message)
+	case VersionOnlyTool:
+		cli.Warn(out, "version-only-tool", w.Message)
 	default:
 		_, _ = fmt.Fprintf(out, "julieta state holds a warning this julieta does not know, %q: %s\n", w.Slug, w.Message)
 	}
