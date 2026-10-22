@@ -12,6 +12,8 @@
 # --cached" must report "unset" for every output, nested files included.
 .github/CODEOWNERS -text
 docs/adr/README.md -text
+docs/diagrams/candidate.md -text
+docs/diagrams/generation.md -text
 docs/reference/checks.md -text
 docs/reference/errors.md -text
 docs/reference/exit-codes.md -text

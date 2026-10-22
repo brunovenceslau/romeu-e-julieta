@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -706,7 +707,8 @@ func TestGeneratedOutputsAreNotConverted(t *testing.T) {
 	t.Cleanup(func() { _ = r.Close() })
 	// The files the generators of the registry of this test write, the
 	// inventory of the checks, and the schemas of the formats registered
-	// with tools/schemagen and their reference pages.
+	// with tools/schemagen and their reference pages, and the diagrams of
+	// the state machines.
 	outs, err := generateOutputs(r)
 	require.NoError(t, err)
 	checks, err := check.ChecksPageOutput(r)
@@ -716,7 +718,9 @@ func TestGeneratedOutputsAreNotConverted(t *testing.T) {
 	require.NoError(t, err)
 	pages, err := schema.PageOutputs(r)
 	require.NoError(t, err)
-	for _, o := range append(schemas, pages...) {
+	diagrams, err := schema.DiagramOutputs(r)
+	require.NoError(t, err)
+	for _, o := range slices.Concat(schemas, pages, diagrams) {
 		outs = append(outs, output{o.Path, o.Content})
 	}
 	findings, err := attributeProblems(t.Context(), git.Repo{Dir: root}, outs)
