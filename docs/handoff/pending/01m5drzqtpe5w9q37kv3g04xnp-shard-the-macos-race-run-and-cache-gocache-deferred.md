@@ -1,8 +1,8 @@
 # Shard the macOS race run and cache GOCACHE, deferred
 
-What is at stake: small until "One race run, test tags and parallel CI
-jobs" (01m5drzqsp6zg34xzmywckwb7b) lands; then the macOS race, about 9
-minutes on 2026-10-20, is the gate's floor.
+What is at stake: small. The macOS race, about 9 minutes on 2026-10-20
+and 9m43 in the green run of T157 (#234, merged 2026-10-22), is the
+gate's floor.
 
 Scope: this repository.
 
