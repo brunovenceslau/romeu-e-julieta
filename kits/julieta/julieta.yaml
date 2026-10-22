@@ -1,0 +1,138 @@
+# syntax=docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# The julieta product kit (06 6.4): mise and herdr at the pins of
+# kits/pins.yaml, the PATH lines for a non-interactive shell and the
+# herdr config. TZ is os-base's (kits/os-base, REQ-0593), since A12 found
+# packages the workload lacks.
+#
+# Every install step is a bash script of at most five lines. bash is
+# named on purpose: its HOSTTYPE (x86_64 or aarch64) picks the
+# architecture with no command substitution, which tools/ci kits bars.
+# -e stops a step at its first failure, so a failed sha256sum -c never
+# reaches install; -u makes a version arg that did not arrive an error.
+# No arg is pasted into script text: the version args reach the steps as
+# environment variables the step declares, and each step checks the value
+# before it uses it.
+#
+# The download directory is a root-only directory made with mkdir -m 0700
+# at a fixed path, not a mktemp -d one: the kits check bars the command
+# substitution that would name it, and mkdir fails if the path exists.
+# The last step checks the files once more, since a hook that failed may
+# not stop the build, then installs them and removes the directory; a
+# build that fails earlier leaves nothing anyone else can read.
+#
+# SHA256SUMS is a file of this directory, which sbx stages beside the
+# descriptor (the workload's own agent-context@1 reads
+# /usr/share/sandbox/kit/claude/claude-context.md, a file of its kit).
+# That mixin kits are staged the same way is read again by the first
+# build of this kit (B2, or sitting M2).
+#
+# The capability names, the lifecycle@1 hook keys and the args keys are
+# those of sitting M0 and of the workload descriptor (e2e/testdata/
+# workload-descriptor.yaml). network-policy@1 takes a map from a phase to
+# {allow: [host:port]}; the workload uses the phase runtime. The phase
+# install is not measured: no descriptor read so far uses it, and the
+# first build of this kit reads it again. It is named on purpose, since
+# the phase runtime would open github.com to the agent for the whole
+# life of the sandbox (REQ-0592 asks for the install phase only).
+schemaVersion: "3"
+kind: mixin
+displayName: julieta
+description: mise and herdr at the pins, the PATH lines and the herdr config for julieta
+args:
+  miseVersion:
+    default: "2026.10.3"
+    description: The pinned mise release (kits/pins.yaml).
+    pattern: '^[0-9]+(\.[0-9]+)*$'
+    env: JULIETA_MISE_VERSION
+  herdrVersion:
+    default: "0.9.5"
+    description: The pinned herdr release (kits/pins.yaml).
+    pattern: '^[0-9]+(\.[0-9]+)*$'
+    env: JULIETA_HERDR_VERSION
+capabilities:
+  - type: com.docker.sandbox/network-policy@1
+    config:
+      install:
+        allow:
+          - github.com:443
+          - objects.githubusercontent.com:443
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        - description: the private download directory
+          user: "0"
+          command:
+            - bash
+            - -euc
+            - |
+              mkdir -m 0700 /var/lib/julieta-kit-install
+        - description: mise, downloaded and checked against the pin
+          user: "0"
+          env: [JULIETA_MISE_VERSION]
+          command:
+            - bash
+            - -euc
+            - |
+              [[ ${JULIETA_MISE_VERSION-} =~ ^[0-9]+(\.[0-9]+)*$ ]]
+              cd /var/lib/julieta-kit-install
+              A=${HOSTTYPE/x86_64/x64}
+              curl --proto '=https' --proto-redir '=https' -fsSL --retry 3 --max-time 120 -o "mise-$HOSTTYPE" "https://github.com/jdx/mise/releases/download/v${JULIETA_MISE_VERSION}/mise-v${JULIETA_MISE_VERSION}-linux-${A/aarch64/arm64}"
+              sha256sum -c --ignore-missing /usr/share/sandbox/kit/julieta/SHA256SUMS
+        - description: herdr, downloaded and checked against the pin
+          user: "0"
+          env: [JULIETA_HERDR_VERSION]
+          command:
+            - bash
+            - -euc
+            - |
+              [[ ${JULIETA_HERDR_VERSION-} =~ ^[0-9]+(\.[0-9]+)*$ ]]
+              cd /var/lib/julieta-kit-install
+              curl --proto '=https' --proto-redir '=https' -fsSL --retry 3 --max-time 120 -o "herdr-$HOSTTYPE" "https://github.com/herdrdev/herdr/releases/download/v${JULIETA_HERDR_VERSION}/herdr-linux-$HOSTTYPE"
+              sha256sum -c --ignore-missing /usr/share/sandbox/kit/julieta/SHA256SUMS
+        - description: mise and herdr checked once more, into /usr/local/bin, and the download directory removed
+          user: "0"
+          command:
+            - bash
+            - -euc
+            - |
+              cd /var/lib/julieta-kit-install
+              sha256sum -c --ignore-missing /usr/share/sandbox/kit/julieta/SHA256SUMS
+              install -m 0755 "mise-$HOSTTYPE" /usr/local/bin/mise
+              install -m 0755 "herdr-$HOSTTYPE" /usr/local/bin/herdr
+              rm -rf /var/lib/julieta-kit-install
+        - description: the PATH line of a non-interactive bash, appended once to the file BASH_ENV names
+          user: "0"
+          command:
+            - bash
+            - -euc
+            - |
+              L='export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"'
+              if ! grep -qxF "$L" /etc/sandbox-persistent.sh
+              then
+              printf '%s\n' "$L" >> /etc/sandbox-persistent.sh
+              fi
+        - description: the PATH line of zsh, appended once
+          user: agent
+          command:
+            - bash
+            - -euc
+            - |
+              L='export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"'
+              if ! grep -qxF "$L" "$HOME/.zshenv"
+              then
+              printf '%s\n' "$L" >> "$HOME/.zshenv"
+              fi
+        - description: the herdr config, written only when there is none
+          user: agent
+          command:
+            - bash
+            - -euc
+            - |
+              mkdir -p "$HOME/.config/herdr"
+              if [ ! -e "$HOME/.config/herdr/config.toml" ]
+              then
+              printf '%s\n' '[update]' 'version_check = false' 'manifest_check = false' '' '[keys]' 'prefix = "ctrl+b"' > "$HOME/.config/herdr/config.toml"
+              fi
