@@ -4,6 +4,10 @@
 package gate
 
 import (
+	"fmt"
+	"reflect"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -55,8 +59,8 @@ func baseInputs() inputs {
 		r: Resolved{
 			WorkloadCapabilities: Capabilities{"network": []any{"registry.example"}},
 			Kits: []ResolvedKit{
-				{Files: []File{{Path: "spec.yaml", Mode: ModeRegular, Data: []byte("kind: kit\n")}}},
-				{Files: []File{{Path: "bin/run", Mode: ModeExecutable, Data: []byte("#!/bin/sh\n")}}, Capabilities: Capabilities{"lifecycle": []any{"postCreate"}}},
+				{Source: SourceProduct, ID: "julieta", Files: []File{{Path: "spec.yaml", Mode: ModeRegular, Data: []byte("kind: kit\n")}}},
+				{Source: SourcePersonal, ID: "tools", Files: []File{{Path: "bin/run", Mode: ModeExecutable, Data: []byte("#!/bin/sh\n")}}, Capabilities: Capabilities{"lifecycle": []any{"postCreate"}}},
 			},
 			EgressGated: []GatedDomain{{Domain: "github.com", Reason: ReasonUpload}},
 			Render:      Render{"kits": []any{"julieta", "tools"}, "sandboxOptions": map[string]any{"cpus": 4, "memory": "8g"}},
@@ -196,6 +200,14 @@ func TestBuildRefusesWhatItCannotAccountFor(t *testing.T) {
 		}},
 		{"a secret with an empty argv", func(in *inputs) { in.hs.Secrets["github@shop"] = spec.Secret{Service: "github.com"} }},
 		{"a workload without a digest", func(in *inputs) { in.p.Workload = "docker.io/example/dev" }},
+		{"a workload pinned by a tag", func(in *inputs) { in.p.Workload = "docker.io/example/dev@latest" }},
+		{"a workload with a short digest", func(in *inputs) { in.p.Workload = "docker.io/example/dev@sha256:abc" }},
+		{"resolved kits in another order", func(in *inputs) { in.r.Kits[0], in.r.Kits[1] = in.r.Kits[1], in.r.Kits[0] }},
+		{"a resolved kit of another source", func(in *inputs) { in.r.Kits[0].Source = SourcePersonal }},
+		{"a capability integer a float64 cannot hold", func(in *inputs) {
+			in.r.WorkloadCapabilities = Capabilities{"user": map[string]any{"uid": int64(1)<<60 + 1}}
+		}},
+
 		{"a kit naming both sources", func(in *inputs) { in.p.Kits[0].Personal = "x" }},
 		{"a kit naming no source", func(in *inputs) { in.p.Kits[0] = spec.Kit{} }},
 		{"fewer resolved kits than kits", func(in *inputs) { in.r.Kits = in.r.Kits[:1] }},
@@ -225,4 +237,134 @@ func TestBuildAddsTheSpecDomainsWithTheirReasons(t *testing.T) {
 		{Domain: "github.com", Reason: ReasonUpload},
 		{Domain: "x.example", Reason: ReasonSpecExtra},
 	}, s.EgressGated)
+}
+
+func TestRecreateDigestRefusesTheSetOfAnotherProject(t *testing.T) {
+	t.Parallel()
+	in := baseInputs()
+	s, err := Build(in.p, in.hs, in.r)
+	require.NoError(t, err)
+	other := in.p
+	other.Name = "other"
+	_, err = RecreateDigest(other, s)
+	assert.Error(t, err)
+}
+
+// TestEveryGatedLeafReachesTheSet changes, one at a time, every leaf
+// below a gated field of spec.Project (a string, a bool or an int, at
+// any depth, in each element of a list and each value of a map) and
+// requires that the widening digest flips or that Build refuses the
+// change: a new member of spec.Repo, spec.Kit or spec.Egress that Build
+// does not read fails here (I7).
+//
+//romeu:invariant I7 test
+func TestEveryGatedLeafReachesTheSet(t *testing.T) {
+	t.Parallel()
+	base, _ := digests(t, baseInputs())
+	for _, field := range wideningFields {
+		count := leafCount(t, field)
+		require.Positive(t, count, "the fixture sets no leaf of %s", field)
+		for i := range count {
+			in := baseInputs()
+			path := mutateLeaf(t, &in.p, field, i)
+			t.Run(path, func(t *testing.T) {
+				s, err := Build(in.p, in.hs, in.r)
+				if err != nil {
+					return // Build reads the leaf: it refuses the change.
+				}
+				got, err := Digest(s)
+				require.NoError(t, err)
+				assert.NotEqual(t, base, got.String(), "a change of %s leaves the widening digest as it was", path)
+			})
+		}
+	}
+}
+
+// leafCount returns how many leaves the base fixture holds below the
+// top-level field of spec.Project.
+func leafCount(t *testing.T, field string) int {
+	t.Helper()
+	in := baseInputs()
+	n := 0
+	walkLeaves(fieldValue(t, &in.p, field), field, func(string, reflect.Value) { n++ })
+	return n
+}
+
+// mutateLeaf changes the leaf number i below field in p and returns its
+// path.
+func mutateLeaf(t *testing.T, p *spec.Project, field string, i int) string {
+	t.Helper()
+	n, path := 0, ""
+	walkLeaves(fieldValue(t, p, field), field, func(at string, v reflect.Value) {
+		if n == i {
+			path = at
+			switch v.Kind() {
+			case reflect.String:
+				if v.Len() == 0 {
+					v.SetString("x")
+				} else {
+					b := []byte(v.String())
+					b[0]++
+					v.SetString(string(b))
+				}
+			case reflect.Bool:
+				v.SetBool(!v.Bool())
+			case reflect.Int:
+				v.SetInt(v.Int() + 1)
+			default:
+				t.Fatalf("%s: a leaf of the kind %s", at, v.Kind())
+			}
+		}
+		n++
+	})
+	return path
+}
+
+// fieldValue returns the field of p whose JSON name is name, settable.
+func fieldValue(t *testing.T, p *spec.Project, name string) reflect.Value {
+	t.Helper()
+	v := reflect.ValueOf(p).Elem()
+	for i := range v.NumField() {
+		tag, _, _ := strings.Cut(v.Type().Field(i).Tag.Get("json"), ",")
+		if tag == name {
+			return v.Field(i)
+		}
+	}
+	t.Fatalf("spec.Project has no field %s", name)
+	return reflect.Value{}
+}
+
+// walkLeaves calls visit with each settable leaf below v, in a fixed
+// order; a map's values are copied out, changed and stored back, since
+// a map value is not settable.
+func walkLeaves(v reflect.Value, at string, visit func(string, reflect.Value)) {
+	switch v.Kind() {
+	case reflect.Pointer:
+		if !v.IsNil() {
+			walkLeaves(v.Elem(), at, visit)
+		}
+	case reflect.Struct:
+		for i := range v.NumField() {
+			tag, _, _ := strings.Cut(v.Type().Field(i).Tag.Get("json"), ",")
+			walkLeaves(v.Field(i), at+"."+tag, visit)
+		}
+	case reflect.Slice:
+		for i := range v.Len() {
+			walkLeaves(v.Index(i), fmt.Sprintf("%s[%d]", at, i), visit)
+		}
+	case reflect.Map:
+		for _, k := range slices.SortedFunc(slices.Values(v.MapKeys()), func(a, b reflect.Value) int { return strings.Compare(a.String(), b.String()) }) {
+			elem := reflect.New(v.Type().Elem()).Elem()
+			elem.Set(v.MapIndex(k))
+			if elem.Kind() == reflect.Slice {
+				elem.Set(reflect.AppendSlice(reflect.MakeSlice(elem.Type(), 0, elem.Len()), elem))
+			}
+			walkLeaves(elem, at+"{"+k.String()+"}", func(path string, leaf reflect.Value) {
+				visit(path, leaf)
+				v.SetMapIndex(k, elem)
+			})
+		}
+	default:
+		visit(at, v)
+	}
 }

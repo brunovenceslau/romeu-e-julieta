@@ -4,6 +4,7 @@
 package gate
 
 import (
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"maps"
@@ -50,6 +51,9 @@ type Resolved struct {
 
 // ResolvedKit is the content of one kit.
 type ResolvedKit struct {
+	// Source and ID name the kit the content was resolved for; Build
+	// requires them to be the spec kit's at the same place.
+	Source, ID string
 	// Files are the kit's files.
 	Files []File
 	// Capabilities is the normalized capability set of the kit's
@@ -61,9 +65,10 @@ type ResolvedKit struct {
 // the secret commands of the host settings hs and the resolved inputs
 // r, in its normal form. It fails, rather than leave a member out, on a
 // secret with no host-settings entry <name>@<project>, a workload that
-// is not pinned by digest, a kit that is not exactly one of product and
-// personal, a count of resolved kits other than the spec's, and a repo
-// without a dir.
+// is not <registry>/<repository>@sha256:<64 hex> (spec.ParseWorkload),
+// a kit that is not exactly one of product and personal, resolved kits
+// that are not the spec's kits in its order, a repo without a dir, and
+// a set that would read back from JSON as another (checkRoundTrip).
 //
 //romeu:invariant I7 guard
 func Build(p spec.Project, hs spec.HostSettings, r Resolved) (Set, error) {
@@ -86,11 +91,11 @@ func Build(p spec.Project, hs spec.HostSettings, r Resolved) (Set, error) {
 		}
 		s.Secrets = append(s.Secrets, Secret{Name: name, Service: entry.Service, ArgvDigest: sum})
 	}
-	repository, digest, ok := strings.Cut(p.Workload, "@")
-	if !ok || repository == "" || digest == "" {
-		return Set{}, fmt.Errorf("gate: the workload %q is not pinned by digest", p.Workload)
+	w, err := spec.ParseWorkload(p.Workload)
+	if err != nil {
+		return Set{}, fmt.Errorf("gate: %w", err)
 	}
-	s.Workload = Workload{Repository: repository, Digest: digest, Capabilities: r.WorkloadCapabilities}
+	s.Workload = Workload{Repository: w.Repository, Digest: w.Digest, Capabilities: r.WorkloadCapabilities}
 	if len(r.Kits) != len(p.Kits) {
 		return Set{}, fmt.Errorf("gate: the spec has %d kits and %d were resolved", len(p.Kits), len(r.Kits))
 	}
@@ -119,7 +124,42 @@ func Build(p spec.Project, hs spec.HostSettings, r Resolved) (Set, error) {
 		return Set{}, err
 	}
 	s.RenderDigest = sum
-	return normal(s)
+	n, err := normal(s)
+	if err != nil {
+		return Set{}, err
+	}
+	if err := checkRoundTrip(n); err != nil {
+		return Set{}, err
+	}
+	return n, nil
+}
+
+// checkRoundTrip refuses a set whose digest would change once the set is
+// written as JSON and read back, as the approval record does: an
+// integer of a capability set beyond 2^53 reads back as a float64. So
+// the digest of a recorded set can be computed again from the record
+// and compared, and a set that could not be is never approved.
+func checkRoundTrip(n Set) error {
+	data, err := json.Marshal(n)
+	if err != nil {
+		return fmt.Errorf("gate: the widening set: %w", err)
+	}
+	var back Set
+	if err := json.Unmarshal(data, &back); err != nil {
+		return fmt.Errorf("gate: the widening set: %w", err)
+	}
+	want, err := Digest(n)
+	if err != nil {
+		return err
+	}
+	got, err := Digest(back)
+	if err != nil {
+		return err
+	}
+	if got != want {
+		return errors.New("gate: the widening set reads back from JSON as another set: a capability holds a number a float64 cannot hold")
+	}
+	return nil
 }
 
 // buildKit returns the kit of the set for the spec kit k and its
@@ -133,6 +173,9 @@ func buildKit(k spec.Kit, r ResolvedKit) (Kit, error) {
 		kit.ID, kit.Source = k.Personal, SourcePersonal
 	default:
 		return Kit{}, fmt.Errorf("gate: a kit names product %q and personal %q; it names exactly one", k.Product, k.Personal)
+	}
+	if r.Source != kit.Source || r.ID != kit.ID {
+		return Kit{}, fmt.Errorf("gate: the kit %s was resolved as %s:%s", kit.key(), r.Source, r.ID)
 	}
 	sum, err := KitTreeDigest(r.Files)
 	if err != nil {
@@ -187,6 +230,9 @@ func (recreateInput) CanonKind() canon.RecreateKind { return canon.Recreate }
 // capabilities needs a recreate too, and an ungated one, such as
 // sandboxOptions, as the spec holds it.
 func RecreateDigest(p spec.Project, s Set) (canon.Sum[canon.RecreateKind], error) {
+	if p.Name != s.Project {
+		return canon.Sum[canon.RecreateKind]{}, fmt.Errorf("gate: the spec of %q and the widening set of %q", p.Name, s.Project)
+	}
 	n, err := normal(s)
 	if err != nil {
 		return canon.Sum[canon.RecreateKind]{}, err
