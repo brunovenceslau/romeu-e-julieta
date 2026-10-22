@@ -404,12 +404,22 @@ keeps every other rule: a duplicate member, the size cap, the canonical
 form of the members it knows, and the protocol window below. The one
 exception is the must-understand rule: a member that an older julieta
 could not safely ignore, one that restricts, denies or changes what
-julieta must do (for example a new limit, a narrower egress or a
-refusal), is not added as an optional member; it bumps the protocol
-number (`protocol`, below), and the window refuses a julieta that is too
-old. A member julieta may safely ignore (an informational one, or an
-addition that a newer julieta uses for a new feature) is added without a
-bump.
+julieta must do, is not added as an optional member; it bumps the
+protocol number (`protocol`, below), and the window refuses a julieta
+that is too old. Today julieta acts on `repos[].path` and
+`repos[].memory` (where it clones, fetches and writes), `repos[].dir`
+(names, locks and work directories), `repos[].url`, `repos[].primary`,
+`repos[].base`, `generation`, `agent` and `project`, so a new member
+that restricts or gates one of those uses, and any new behaviour
+julieta must enforce, bumps the protocol. It only reads or prints
+`egress` (romeu enforces it on the host), `specCommit`, `run`,
+`runDigest`, `repos[].ref`, `salvage` and `salvageRun`; a feature that
+makes julieta honor one of these is a new behaviour in this sense. A
+member julieta may safely ignore (an informational one, or an addition
+that a newer julieta uses for a new feature) is added without a bump.
+`internal/manifest` holds a test of the shape of `Manifest`, so adding,
+removing or retyping a member fails it until the author updates it and
+says in the pull request which kind the member is.
 
 ```json
 {

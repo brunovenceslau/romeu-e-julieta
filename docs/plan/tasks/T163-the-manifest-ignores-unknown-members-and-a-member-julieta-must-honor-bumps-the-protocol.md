@@ -8,6 +8,7 @@ owns:
   - internal/manifest/manifest.go
   - internal/manifest/manifest_test.go
   - internal/manifest/testdata/**
+  - internal/cmd/julieta/setup/state.go
   - docs/spec/03-formats.md
   - docs/adr/0041-readers-of-formats-between-binaries-ignore-unknown-members.md
   - docs/plan/tasks/T162-readers-of-formats-between-binaries-ignore-unknown-members.md
@@ -27,7 +28,7 @@ Goal: julieta's reader of `manifest.v1` skips a member it does not know,
 as the other seven readers of formats between binaries do (T162), and
 the spec states the one exception: a member that an older julieta could
 not safely ignore bumps the protocol number, so the window of REQ-0219
-refuses a julieta that is too old. Decided by the maintainer on
+refuses a julieta that is too old. Decided on
 2026-10-22, scope this repository, written in
 [ADR 0041](../../adr/0041-readers-of-formats-between-binaries-ignore-unknown-members.md)
 (Decision) and in 03 3.6. It closes the open question that T162 left in
@@ -70,6 +71,18 @@ and `Decode` now reads it.
     N-2, N+1 and zero are `manifest-protocol` (`RJ-342`, exit 2), N is
     read (`TestUnknownMemberKeepsTheProtocolWindow`; the table of
     `TestProtocolWindow` is unchanged).
+  - A test of the shape of `Manifest` (every field's JSON tag and Go
+    type, recursively) fails on an added, removed or retyped member and
+    tells the author to update it and to state in the pull request
+    whether the member is must-understand or ignorable
+    (`TestManifestShapeIsFingerprinted`). The expected shape is in the
+    test file, so `internal/manifest/versions.go` (the `contracts`
+    surface) is not touched.
+  - The hook for the rule is two things: the doc comment of the
+    `Manifest` type, which says that a member an older julieta must
+    honor bumps `Protocol` (REQ-1257) and that review asks which kind
+    each new member is, and the fingerprint test above, which forces the
+    question.
   - 03 3.6 states the must-understand rule (REQ-1257), REQ-0159,
     REQ-0160 and REQ-0163 no longer except the manifest, and ADR 0041
     records the decision, its date and scope, and what it costs.

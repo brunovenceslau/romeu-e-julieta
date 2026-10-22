@@ -17,8 +17,8 @@ Scope: this repository, for every format the product writes.
 Built by T162 on 2026-10-22: REQ-0163 says it, and the readers of the
 formats between binaries skip an unknown member
 ([ADR 0041, readers of formats between binaries ignore unknown members](../../adr/0041-readers-of-formats-between-binaries-ignore-unknown-members.md)).
-The manifest is written by romeu and read by julieta. The maintainer
-decided on 2026-10-22 (T163, ADR 0041) that julieta's reader skips an
+The manifest is written by romeu and read by julieta. Decided on
+2026-10-22 (T163, ADR 0041): julieta's reader skips an
 unknown member of `manifest.v1` too, with one exception: a member an
 older julieta could not safely ignore (one that restricts, denies or
 changes what julieta must do) bumps the protocol number, and the window

@@ -97,8 +97,8 @@ Measured and left strict:
   `internal/cmd/julieta/setup/state.go:74`): romeu writes it and julieta
   reads it, so it is a format between binaries, but it has its own
   protocol window (REQ-0219) and the decision note lists it with the
-  strict readers. Stopped on and left strict here; the maintainer
-  decided on 2026-10-22 that it skips an unknown member too, with the
+  strict readers. Stopped on and left strict here; it was decided on
+  2026-10-22 that it skips an unknown member too, with the
   must-understand exception, and T163 built it.
 
 The JSON Schemas in `schemas/` keep `additionalProperties: false`: they

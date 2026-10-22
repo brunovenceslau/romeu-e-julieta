@@ -3,7 +3,7 @@
 
 // Package manifest is the romeu/julieta contract of 03 3.6, the format
 // manifest.v1: the one Go type both binaries import for it (REQ-0217),
-// its strict decoder with the protocol window N and N-1 (REQ-0219), its
+// its canonical decoder, which skips an unknown member, with the protocol window N and N-1 (REQ-0219), its
 // canonical encoder and the size rule of the env value.
 //
 // romeu passes a manifest on every sbx env exec as
@@ -49,7 +49,9 @@ const (
 // Manifest is a manifest.v1 document (03 3.6). The fields of every type
 // of the format are declared in the order of their JSON names, sorted,
 // so the type reads in the order Encode writes; Encode sorts them
-// itself.
+// itself. A member added here that an older julieta must honor bumps
+// Protocol (REQ-1257); review asks which kind each new member is, and
+// TestManifestShapeIsFingerprinted forces the question.
 type Manifest struct {
 	// Agent names the agent profile of the sandbox.
 	Agent string `json:"agent"`
@@ -136,7 +138,7 @@ var Field = "manifest/v" + strconv.Itoa(Version)
 var schemaField = regexp.MustCompile(`^manifest/v([1-9][0-9]{0,8})$`)
 
 // ErrInvalid is the error of a document that is not a manifest this
-// build reads: it does not decode strictly, is not in the canonical
+// build reads: it does not decode, is not in the canonical
 // form Encode writes, holds a value of the wrong form, names another
 // format or an older version, or passes the size cap.
 var ErrInvalid = errors.New("manifest: not a manifest")
@@ -160,7 +162,10 @@ var (
 // the protocol (REQ-0218), and the window of REQ-0219 refuses the
 // julieta that is too old. A duplicate member name, a member name of
 // another case (another name, so skipped, and the known member is then
-// missing unless it is also there), text that is not UTF-8 or holds
+// missing unless it is also there; the comparison below is safe because
+// Unmarshal and memberTypes both match names exactly, and a
+// case-insensitive match in either would break that, though it would
+// still fail closed), text that is not UTF-8 or holds
 // U+FFFD, and trailing data are each an error. The schema field is read
 // first, so a newer version is format-newer (RJ-311) even where it
 // holds members this build does not know. Then the document, without

@@ -193,6 +193,8 @@ func TestDecodeHostileUnknownMembers(t *testing.T) {
 		"a case variant of a value":          `"Project":"evil","AGENT":"evil","Egress":["evil.example"]`,
 		"an escape in a name and a value":    `"\u001b[31mred":"\u0007\u001b[0m"`,
 		"an unknown member holding an array": `"x":[{"a":[[],{}]},null,1.5e3]`,
+		// A known name inside an unknown member is only text there.
+		"a known name inside an unknown member": `"x":{"agent":"evil","protocol":9,"repos":[{"dir":"evil"}]}`,
 	} {
 		for pos, build := range map[string]func(string) []byte{"after": after, "before": before} {
 			got, err := Decode(build(members))
@@ -206,7 +208,20 @@ func TestDecodeHostileUnknownMembers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
 
+	// An unknown member of a repository that is not the first is skipped too.
+	second := bytes.Replace([]byte(doc), []byte(`{"base":[],"dir":"shop-web"`), []byte(`{"added":{"a":[1]},"base":[],"dir":"shop-web"`), 1)
+	require.NotEqual(t, doc, string(second))
+	got, err = Decode(second)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+
 	refused := map[string][]byte{
+		// run is open content, not a set of named members: an extra member
+		// changes the run, and runDigest, which is not recomputed here, no
+		// longer matches it.
+		"an extra member in the run": bytes.Replace([]byte(doc), []byte(`"run":{"panes"`), []byte(`"run":{"extra":1,"panes"`), 1),
+		// salvageRun names id, so a salvageRun without it is a missing member.
+		"a salvageRun without its id":             bytes.Replace([]byte(doc), []byte(`"salvageRun":{"id":"01j9zd0a1b2c3d4e5f6g7h8j9k"}`), []byte(`"salvageRun":{"x":1}`), 1),
 		"a duplicate in an unknown member":        after(`"x":{"a":1,"a":2}`),
 		"a nest of 10000 arrays":                  after(`"x":` + strings.Repeat("[", 10000) + strings.Repeat("]", 10000)),
 		"a duplicate known name beside an escape": after(`"\u001b[31mred":1,"schema":"manifest/v1"`),
@@ -222,6 +237,8 @@ func TestDecodeHostileUnknownMembers(t *testing.T) {
 		"invalid UTF-8 in an unknown member":      after("\"x\":\"\xff\""),
 		"U+FFFD in an unknown name":               after("\"x\ufffd\":1"),
 	}
+	// The nest is refused for its depth, not for the size cap.
+	require.Less(t, len(refused["a nest of 10000 arrays"]), MaxJSONSize)
 	for name, data := range refused {
 		_, err := Decode(data)
 		require.Error(t, err, name)
@@ -467,4 +484,69 @@ func FuzzDecode(f *testing.F) {
 		require.NoError(t, err)
 		assert.Equal(t, string(enc), string(again))
 	})
+}
+
+// shapeOf returns one line per field of t, recursively through its
+// struct types: the path of the field in the document, its JSON tag and
+// its Go type. A slice is written with [] after its name.
+func shapeOf(t reflect.Type, prefix string) []string {
+	var lines []string
+	for f := range t.Fields() {
+		path := prefix + strings.Split(f.Tag.Get("json"), ",")[0]
+		lines = append(lines, path+` json:"`+f.Tag.Get("json")+`" `+f.Type.String())
+		ft := f.Type
+		for ft.Kind() == reflect.Slice || ft.Kind() == reflect.Pointer {
+			if ft.Kind() == reflect.Slice {
+				path += "[]"
+			}
+			ft = ft.Elem()
+		}
+		if ft.Kind() == reflect.Struct {
+			lines = append(lines, shapeOf(ft, path+".")...)
+		}
+	}
+	return lines
+}
+
+// manifestShape is the shape of Manifest that this build and its tests
+// know. TestManifestShapeIsFingerprinted compares it with the type.
+const manifestShape = `agent json:"agent" string
+egress json:"egress" []string
+generation json:"generation" string
+project json:"project" string
+protocol json:"protocol" int
+repos json:"repos" []manifest.Repo
+repos[].base json:"base" []string
+repos[].dir json:"dir" string
+repos[].memory json:"memory" string
+repos[].path json:"path" string
+repos[].primary json:"primary" bool
+repos[].ref json:"ref" string
+repos[].url json:"url" string
+run json:"run" manifest.Run
+runDigest json:"runDigest" string
+salvage json:"salvage" manifest.Salvage
+salvage.capBytes json:"capBytes" int64
+salvage.excludeIgnored json:"excludeIgnored" []string
+salvageRun json:"salvageRun,omitzero" *manifest.SalvageRun
+salvageRun.id json:"id" string
+schema json:"schema" string
+specCommit json:"specCommit" string`
+
+// TestManifestShapeIsFingerprinted holds that no member of manifest.v1
+// is added, removed or retyped without a decision about the protocol
+// number (REQ-0218, REQ-1257). julieta skips a member it does not know,
+// so an older julieta would ignore a new member silently; a member that
+// one must honor bumps Protocol, and nothing in the code can tell it
+// from one that may be ignored, so this test makes the author say.
+func TestManifestShapeIsFingerprinted(t *testing.T) {
+	got := strings.Join(shapeOf(reflect.TypeFor[Manifest](), ""), "\n")
+	assert.Equal(t, manifestShape, got,
+		"the shape of manifest.Manifest changed.\n"+
+			"1. Update manifestShape in this test to the Actual value of the diff above.\n"+
+			"2. State in the PR whether the change is must-understand or ignorable (03 3.6, REQ-1257, ADR 0041):\n"+
+			"   a member that restricts or gates what julieta does with repos[].path, memory, dir, url, primary,\n"+
+			"   base, generation, agent or project, or any new behaviour julieta must enforce, bumps Protocol\n"+
+			"   in versions.go (REQ-0218); a member julieta may safely ignore does not.\n"+
+			"   Removing, renaming or retyping a member is a new format version (REQ-0163).")
 }

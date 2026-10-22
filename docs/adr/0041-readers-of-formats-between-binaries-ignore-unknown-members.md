@@ -44,8 +44,8 @@ The manifest is written by romeu and read by julieta, and it has its own
 window of the protocol number N and N-1 (REQ-0219) with an error for
 what falls outside it. The decision note of 2026-10-21 listed it with the
 strict readers, wrongly, since romeu writes it. The first version of
-this record left it strict as an open question; the maintainer decided
-it on 2026-10-22, see Decision.
+this record left it strict as an open question; it was decided on
+2026-10-22, see Decision.
 
 ### Alternatives considered
 
@@ -55,7 +55,7 @@ it on 2026-10-22, see Decision.
 - **Keep the manifest strict, and bump the protocol number for every
   added member.** Not taken: an optional member would force a paired
   upgrade of a romeu on the host and the julieta in a sandbox, which is
-  built from a host bin dir and is not upgraded with it.
+  can lag the host romeu.
 - **Ignore unknown members in every reader.** Not taken: a person's typo
   (`pulll: true`) would be accepted and ignored with no message.
 - **Keep the strict readers and warn on an unknown member.** Not taken:
@@ -83,12 +83,19 @@ Decided on 2026-10-22, from the decision of 2026-10-21:
 
 - The manifest (`manifest.v1`) follows the same rule: julieta's reader
   skips a member it does not know, as the other readers do. Decided on
-  2026-10-22 by the maintainer, scope this repository, written in this
+  2026-10-22, scope this repository, written in this
   record and in 03 3.6. One exception, the must-understand rule: a
   member that an older julieta could not safely ignore, one that
-  restricts, denies or changes what julieta must do (for example a new
-  limit, a narrower egress, a refusal), is not added as an optional
-  member. It bumps the protocol number (REQ-0218), and the window of
+  restricts, denies or changes what julieta must do, is not added as an
+  optional member. Measured on 2026-10-22 in the code, julieta acts on
+  `repos[].path` and `repos[].memory` (it clones, fetches and writes
+  there), `repos[].dir`, `repos[].url`, `repos[].primary`,
+  `repos[].base`, `generation`, `agent` and `project`; it only reads or
+  prints `egress` (romeu enforces it on the host), `specCommit`, `run`,
+  `runDigest`, `repos[].ref`, `salvage` and `salvageRun`. A new member
+  that restricts or gates one of the first group, and any new behaviour
+  julieta must enforce (including one that makes it honor a member of
+  the second), is must-understand. It bumps the protocol number (REQ-0218), and the window of
   N and N-1 (REQ-0219) refuses a julieta that is too old with
   `manifest-protocol` (RJ-342). A member julieta may safely ignore (an
   informational one, or an addition that a newer julieta uses for a new
@@ -121,8 +128,12 @@ the manifest's and states the must-understand rule.
   responsible for the must-understand rule: a romeu that adds a member an
   older julieta must honor, and does not bump the protocol number, makes
   that julieta ignore a restriction without an error. Nothing in the code
-  can tell the two kinds of member apart, so a review of a change to the
-  manifest type asks which kind it adds. A skipped member is also lost
+  can tell the two kinds of member apart, so a change to the manifest
+  type is held by a test of its shape (`TestManifestShapeIsFingerprinted`
+  in `internal/manifest`), which fails on an added, removed or retyped
+  member until the author updates it and states in the pull request
+  which kind the member is; the test cannot decide the kind, and review
+  still does. A skipped member is also lost
   where julieta caches the manifest (`cacheManifest` in
   `internal/cmd/julieta/setup/state.go` writes `manifest.Encode` of the
   decoded value), as in the rewrites above; a cached manifest therefore
