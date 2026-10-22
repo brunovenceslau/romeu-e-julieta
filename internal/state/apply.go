@@ -16,7 +16,8 @@ import (
 
 // Seams are the values the package takes from outside, so a test fixes
 // them (10 10.4, REQ-0940): the clock, and the source of the random
-// bits of ULIDs. Every ULID the package writes comes from canon.NewULID
+// bits of ULIDs. Neither may be nil: a nil Now panics at the first
+// timestamp, and a nil IDs is the error canon.ErrULIDSource. Every ULID the package writes comes from canon.NewULID
 // over IDs.
 type Seams struct {
 	// Now returns the time; romeu passes time.Now.

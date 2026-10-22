@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
@@ -31,18 +32,17 @@ const MaxRecordSize = 16 << 20
 // form. A reader of a file turns it into record-unreadable (RJ-334).
 var ErrInvalid = errors.New("state: not a record this build reads")
 
-// The decoding rule of the state formats, on the side of ADR 0041 that
-// their writer says. romeu writes every state record and romeu reads it,
-// never a person, so no one is there to fix a typing error, and the
-// binary that reads a record can be a release other than the one that
-// wrote it: a record written by a newer romeu with an added member must
-// still read (REQ-0163). So a reader skips a member it does not know, at
-// any depth, and keeps every other rule of strict decoding: a duplicate
-// member name, text that is not UTF-8, trailing data, the size cap, the
-// schema field (a newer version is format-newer, RJ-311), and every
-// value of a member it knows having its form (canon's ULID and digest
-// types, the checks of validate). The cost is the one ADR 0041 accepts:
-// a record rewritten by an older romeu loses the member it skipped.
+// The decoding rule of the state formats, on the strict side of ADR 0041.
+// romeu writes every state record and the same binary reads it back, so
+// the Consequences of the ADR keep it strict, and REQ-0163 does not list
+// these files among the formats between binaries: an unknown member, a
+// duplicate member name, text that is not UTF-8, trailing data, the size
+// cap and a value of the wrong form each make the record unreadable
+// (RJ-334), and the file is never written over. A newer version is read
+// first from the schema field and is format-newer (RJ-311), also before
+// any other check, so a record a newer romeu wrote says so instead of
+// failing on its new members. The schemas keep additionalProperties:
+// false for the same reason.
 func decodeRecord[T any](data []byte, name string, version int, into *T) error {
 	if len(data) > MaxRecordSize {
 		return fmt.Errorf("%w: %d bytes pass the cap of %d", ErrInvalid, len(data), MaxRecordSize)
@@ -59,7 +59,7 @@ func decodeRecord[T any](data []byte, name string, version int, into *T) error {
 	if err := acceptSchema(*head.Schema, name, version); err != nil {
 		return err
 	}
-	if err := jsonv2.Unmarshal(data, into); err != nil {
+	if err := jsonv2.Unmarshal(data, into, jsonv2.RejectUnknownMembers(true)); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	return nil
@@ -84,10 +84,17 @@ func acceptSchema(got, name string, version int) error {
 	return nil
 }
 
+// versionDigits is the n of a schema field, without a leading zero.
+var versionDigits = regexp.MustCompile(`^([1-9][0-9]{0,8})$`)
+
 // versionOf reads the n of a schema field "<name>/v<n>", n without a
 // leading zero.
 func versionOf(field, name string) (int, bool) {
-	sub := regexp.MustCompile(`^` + regexp.QuoteMeta(name) + `/v([1-9][0-9]{0,8})$`).FindStringSubmatch(field)
+	rest, ok := strings.CutPrefix(field, name+"/v")
+	if !ok {
+		return 0, false
+	}
+	sub := versionDigits.FindStringSubmatch(rest)
 	if sub == nil {
 		return 0, false
 	}
@@ -129,8 +136,10 @@ func DecodeToolchain(data []byte) (*Toolchain, error) {
 }
 
 // EncodeToolchain writes toolchain.json, after the checks a reader
-// makes.
+// makes. Every timestamp of the record is set to UTC at whole seconds
+// first (REQ-0162), in the record the caller passed.
 func EncodeToolchain(t *Toolchain) ([]byte, error) {
+	t.AcknowledgedAt = stamp(t.AcknowledgedAt)
 	if err := t.validate(); err != nil {
 		return nil, fmt.Errorf("state: a toolchain record that would not read: %w", err)
 	}
@@ -150,8 +159,10 @@ func DecodeProject(data []byte) (*Project, error) {
 }
 
 // EncodeProject writes projects/<name>.json, after the checks a reader
-// makes.
+// makes. Every timestamp of the record is set to UTC at whole seconds
+// first (REQ-0162), in the record the caller passed.
 func EncodeProject(p *Project) ([]byte, error) {
+	p.stampTimes()
 	if err := p.validate(); err != nil {
 		return nil, fmt.Errorf("state: a project record that would not read: %w", err)
 	}

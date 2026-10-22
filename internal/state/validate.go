@@ -151,4 +151,25 @@ func (d *Descriptor) validate() error {
 
 // stamp returns t in UTC at whole seconds, the form of every timestamp
 // romeu writes (REQ-0162).
-func stamp(t time.Time) time.Time { return t.UTC().Truncate(time.Second) }
+func stamp(t time.Time) time.Time {
+	if t.IsZero() {
+		return t
+	}
+	return t.UTC().Truncate(time.Second)
+}
+
+// stampTimes sets every timestamp of the record to UTC at whole seconds
+// (REQ-0162), whoever set it.
+func (p *Project) stampTimes() {
+	if p.Approval != nil {
+		p.Approval.ApprovedAt = stamp(p.Approval.ApprovedAt)
+	}
+	p.LastRunAt = stamp(p.LastRunAt)
+	for i := range p.Generations {
+		g := &p.Generations[i]
+		g.CreatedAt, g.ClosedAt = stamp(g.CreatedAt), stamp(g.ClosedAt)
+		for j := range g.Salvage {
+			g.Salvage[j].CreatedAt = stamp(g.Salvage[j].CreatedAt)
+		}
+	}
+}

@@ -6,10 +6,12 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,6 +27,9 @@ import (
 const (
 	lockHelperEnv = "STATE_TEST_LOCK_DIR"
 	lockOutEnv    = "STATE_TEST_LOCK_OUT"
+	// lockHoldEnv names the file a helper that holds the lock creates
+	// once it holds it; the helper then waits to be killed.
+	lockHoldEnv = "STATE_TEST_LOCK_HOLD"
 )
 
 // TestLockHelperProcess is not a test: lockAnother runs this binary again
@@ -40,6 +45,13 @@ func TestLockHelperProcess(t *testing.T) {
 		os.Exit(2)
 	}
 	unlock, err := s.Lock()
+	if err == nil && os.Getenv(lockHoldEnv) != "" {
+		if os.WriteFile(os.Getenv(lockHoldEnv), nil, 0o600) != nil {
+			os.Exit(2)
+		}
+		time.Sleep(time.Minute)
+		os.Exit(3)
+	}
 	if err != nil {
 		if os.WriteFile(os.Getenv(lockOutEnv), []byte(cli.Of(err).ID), 0o600) != nil {
 			os.Exit(2)
@@ -105,5 +117,30 @@ func TestStore_Lock(t *testing.T) {
 		require.NoError(t, s.Close())
 		_, err := s.Lock()
 		require.Error(t, err)
+	})
+	t.Run("a holder that is killed leaves no lock behind", func(t *testing.T) {
+		s := openTemp(t)
+		ready := filepath.Join(t.TempDir(), "ready")
+		ctx, kill := context.WithCancel(t.Context())
+		defer kill()
+		ended := make(chan struct{})
+		go func() {
+			defer close(ended)
+			_ = procgroup.Run(ctx, procgroup.Command{
+				Class: procgroup.ToolProbe,
+				Argv:  []string{os.Args[0], "-test.run=^TestLockHelperProcess$"},
+				Env:   append(os.Environ(), "GORACE=atexit_sleep_ms=0", lockHelperEnv+"="+s.Dir(), lockHoldEnv+"="+ready),
+			})
+		}()
+		require.Eventually(t, func() bool { _, err := os.Stat(ready); return err == nil }, 20*time.Second, 10*time.Millisecond)
+		_, err := s.Lock()
+		require.Error(t, err, "the holder has it")
+		assert.Equal(t, "RJ-101", cli.Of(err).ID)
+
+		kill()
+		<-ended
+		unlock, err := s.Lock()
+		require.NoError(t, err, "the kernel released the lock with the process (REQ-0283)")
+		unlock()
 	})
 }

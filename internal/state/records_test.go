@@ -6,11 +6,14 @@
 package state
 
 import (
+	"bytes"
 	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -40,14 +43,14 @@ func TestDecodeProject(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, string(want), string(got))
 	})
-	t.Run("a member it does not know is skipped, at any depth (ADR 0041)", func(t *testing.T) {
-		data := string(readTestdata(t, "project.json"))
-		data = strings.Replace(data, `"lastRunAt"`, `"newMember": {"deep": [1, {"x": 2}]}, "lastRunAt"`, 1)
-		data = strings.Replace(data, `"primary": true`, `"primary": true, "added": "v"`, 1)
-		p, err := DecodeProject([]byte(data))
-		require.NoError(t, err)
-		assert.True(t, p.Generations[0].Repos[0].Primary)
-		assert.Len(t, p.EgressApplied, 2)
+	t.Run("a member it does not know is refused, at any depth (ADR 0041, Consequences)", func(t *testing.T) {
+		base := string(readTestdata(t, "project.json"))
+		top := strings.Replace(base, `"lastRunAt"`, `"newMember": {"deep": [1, {"x": 2}]}, "lastRunAt"`, 1)
+		deep := strings.Replace(base, `"primary": true`, `"primary": true, "added": "v"`, 1)
+		for name, doc := range map[string]string{"top level": top, "nested": deep} {
+			_, err := DecodeProject([]byte(doc))
+			require.ErrorIs(t, err, ErrInvalid, name)
+		}
 	})
 	t.Run("a newer version is format-newer, RJ-311", func(t *testing.T) {
 		data := strings.Replace(string(readTestdata(t, "project.json")), "state-project/v1", "state-project/v2", 1)
@@ -92,6 +95,16 @@ func TestDecodeProject(t *testing.T) {
 			assert.ErrorIs(t, err, ErrInvalid)
 		})
 	}
+	t.Run("the cap is exact: MaxRecordSize bytes read, one more is refused", func(t *testing.T) {
+		doc := readTestdata(t, "project.json")
+		at := append(slices.Clone(doc), bytes.Repeat([]byte(" "), MaxRecordSize-len(doc))...)
+		require.Len(t, at, MaxRecordSize)
+		_, err := DecodeProject(at)
+		require.NoError(t, err)
+		_, err = DecodeProject(append(at, ' '))
+		require.ErrorIs(t, err, ErrInvalid)
+		assert.Contains(t, err.Error(), "cap")
+	})
 	t.Run("a document over the cap is refused", func(t *testing.T) {
 		_, err := DecodeProject([]byte(`{"schema": "state-project/v1", "x": "` + strings.Repeat("a", MaxRecordSize) + `"}`))
 		assert.ErrorIs(t, err, ErrInvalid)
@@ -139,6 +152,7 @@ func TestStore_UpdateProject(t *testing.T) {
 			assert.Equal(t, "RJ-334", e.ID)
 			assert.Equal(t, 2, e.Exit)
 			assert.Contains(t, e.Details, cli.Detail{Key: "file", Value: path})
+			assert.Contains(t, e.Hint(), "romeu salvage --from-host shop", "the project's name is in the hint")
 			after, rerr := os.ReadFile(path)
 			require.NoError(t, rerr)
 			assert.Equal(t, bad, string(after), "byte-identical")
@@ -194,7 +208,9 @@ func TestStore_UpdateToolchain(t *testing.T) {
 	t.Run("a record that does not decode is never written over", func(t *testing.T) {
 		path := filepath.Join(s.Dir(), "toolchain.json")
 		require.NoError(t, os.WriteFile(path, []byte("garbage"), 0o600))
-		require.Error(t, s.UpdateToolchain(func(*Toolchain) error { return nil }))
+		err := s.UpdateToolchain(func(*Toolchain) error { return nil })
+		require.Error(t, err)
+		assert.Equal(t, "RJ-334", cli.Of(err).ID)
 		after, err := os.ReadFile(path)
 		require.NoError(t, err)
 		assert.Equal(t, "garbage", string(after))
@@ -343,9 +359,9 @@ func TestDecodeToolchain(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, string(data), string(again))
 	})
-	t.Run("skips a member it does not know", func(t *testing.T) {
+	t.Run("refuses a member it does not know", func(t *testing.T) {
 		_, err := DecodeToolchain([]byte(strings.Replace(string(data), `"sbxVersion"`, `"added": [1], "sbxVersion"`, 1)))
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrInvalid)
 	})
 	t.Run("a document with members missing is unreadable", func(t *testing.T) {
 		_, err := DecodeToolchain([]byte(`{"schema": "state-toolchain/v1"}`))
@@ -358,6 +374,8 @@ func TestDecodeToolchain(t *testing.T) {
 }
 
 func TestDecodeDescriptor(t *testing.T) {
+	_, err0 := DecodeDescriptor([]byte(`{"schema": "state-descriptor/v1", "digest": "sha256:` + strings.Repeat("5", 64) + `", "capabilities": {}, "added": 1}`))
+	require.ErrorIs(t, err0, ErrInvalid, "an unknown member")
 	_, err := DecodeDescriptor([]byte(`{"schema": "state-descriptor/v1", "digest": "x", "capabilities": {}}`))
 	require.ErrorIs(t, err, ErrInvalid)
 }
@@ -401,4 +419,73 @@ func TestStore_readErrors(t *testing.T) {
 		require.Error(t, s.UpdateToolchain(func(*Toolchain) error { return nil }), "a record with members missing is not written")
 		assert.NoFileExists(t, filepath.Join(s.Dir(), "toolchain.json"))
 	})
+}
+
+func TestEncode_timestampsAreUTCWholeSeconds(t *testing.T) {
+	// 2026-10-02T06:14:07.987654321-03:00 is 09:14:07Z and a fraction
+	// (REQ-0162): every timestamp a record holds is written in UTC at
+	// whole seconds, whoever set it.
+	zone := time.FixedZone("minus3", -3*3600)
+	at := time.Date(2026, 10, 2, 6, 14, 7, 987654321, zone)
+	const want = "2026-10-02T09:14:07Z"
+	t.Run("toolchain", func(t *testing.T) {
+		tc := validToolchain()
+		tc.AcknowledgedAt = at
+		data, err := EncodeToolchain(tc)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), `"acknowledgedAt": "`+want+`"`)
+	})
+	t.Run("project", func(t *testing.T) {
+		s := testSeams()
+		p, id := projectIn(t, s, GenerationClosedRemoved)
+		p.Approval = &Approval{
+			WideningDigest: canon.Sum[canon.WideningKind]{1}, Set: WideningSet{}, RenderDigest: canon.Sum[canon.RenderKind]{2},
+			SpecCommit: "0123456789abcdef0123456789abcdef01234567", CandidateID: id, ApprovedAt: at,
+		}
+		p.LastRunAt = at
+		p.Generations[0].CreatedAt = at
+		p.Generations[0].ClosedAt = at
+		p.Generations[0].Salvage[0].CreatedAt = at
+		data, err := EncodeProject(p)
+		require.NoError(t, err)
+		assert.Equal(t, 5, strings.Count(string(data), want), "approvedAt, lastRunAt, createdAt, closedAt and the salvage createdAt")
+		assert.NotContains(t, string(data), "987654321")
+		assert.NotContains(t, string(data), "-03:00")
+	})
+	t.Run("a clock in another zone with a fraction stamps the same way", func(t *testing.T) {
+		s := Seams{Now: func() time.Time { return at }, IDs: testSeams().IDs}
+		p := NewProject()
+		_, err := p.Apply(s, GenCreate, testInput())
+		require.NoError(t, err)
+		g := p.Generations[0]
+		assert.True(t, g.CreatedAt.Equal(time.Date(2026, 10, 2, 9, 14, 7, 0, time.UTC)), "whole seconds")
+		assert.Equal(t, time.UTC, g.CreatedAt.Location())
+	})
+}
+
+func TestStore_nonRegularRecord(t *testing.T) {
+	s := openTemp(t)
+	fifo := filepath.Join(s.Dir(), "projects", "shop.json")
+	require.NoError(t, syscall.Mkfifo(fifo, 0o600))
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.LoadProject("shop")
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		require.Error(t, err)
+		assert.Equal(t, "RJ-334", cli.Of(err).ID, "a record that is no regular file is unreadable, and does not hang the reader")
+	case <-time.After(10 * time.Second):
+		t.Fatal("reading a FIFO as a record hangs")
+	}
+}
+
+func TestStore_PutDescriptor_comparesValues(t *testing.T) {
+	s := openTemp(t)
+	d := Descriptor{Digest: "sha256:" + strings.Repeat("9", 64), Capabilities: Capabilities{"ports": []any{1, 2}}}
+	require.NoError(t, s.PutDescriptor(d))
+	require.NoError(t, s.PutDescriptor(d), "the same content again, whatever its Go types, writes nothing")
+	changed := Descriptor{Digest: d.Digest, Capabilities: Capabilities{"ports": []any{1, 3}}}
+	require.ErrorIs(t, s.PutDescriptor(changed), ErrImmutable)
 }

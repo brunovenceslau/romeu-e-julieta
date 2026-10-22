@@ -11,7 +11,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
+	"syscall"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 )
@@ -28,11 +30,21 @@ var ErrImmutable = errors.New("state: a descriptor entry is immutable")
 // bytes (one more tells the reader it is over the cap). A file that is
 // absent is an error that wraps fs.ErrNotExist.
 func readRecord(root *os.Root, name string) ([]byte, error) {
-	f, err := root.Open(name)
+	// O_NONBLOCK keeps the open of a FIFO from waiting for a writer, and
+	// the Stat refuses anything but a regular file: a record is a file
+	// romeu wrote, and a device or a pipe in its place is damage.
+	f, err := root.OpenFile(name, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("state: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("%w: %s is %s, not a regular file", ErrInvalid, name, info.Mode().Type())
+	}
 	data, err := io.ReadAll(io.LimitReader(f, MaxRecordSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("state: %w", err)
@@ -56,7 +68,7 @@ func unreadable(path string, err error) error {
 func load[T any](root *os.Root, name, path string, decode func([]byte) (*T, error)) (*T, error) {
 	data, err := readRecord(root, name)
 	if err != nil {
-		return nil, err
+		return nil, unreadable(path, err)
 	}
 	v, err := decode(data)
 	if err != nil {
@@ -197,12 +209,22 @@ func (s *Store) PutDescriptor(d Descriptor) error {
 		return err
 	}
 	have, err := readRecord(s.descriptors, file)
+	if errors.Is(err, ErrInvalid) {
+		return unreadable(filepath.Join(s.dir, descriptorsDir, file), err)
+	}
 	switch {
 	case err == nil:
-		if _, derr := DecodeDescriptor(have); derr != nil {
+		old, derr := DecodeDescriptor(have)
+		if derr != nil {
 			return unreadable(filepath.Join(s.dir, descriptorsDir, file), derr)
 		}
-		if string(have) != string(data) {
+		// The values are compared, not the bytes, so a Go type that
+		// spells the same capability another way is the same content.
+		want, derr := DecodeDescriptor(data)
+		if derr != nil {
+			return derr
+		}
+		if !reflect.DeepEqual(old, want) {
 			return fmt.Errorf("%w: %s holds other content", ErrImmutable, strings.TrimSuffix(file, ".json"))
 		}
 		return nil
