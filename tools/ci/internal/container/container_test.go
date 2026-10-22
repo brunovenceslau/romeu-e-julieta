@@ -325,7 +325,7 @@ func TestNoticesComeFromTheFileAlone(t *testing.T) {
 		s := fakeRun(t, `echo noted >> "$`+NoticeFileEnv+`"; `+events+`'{"Action":"fail","Test":"TestA"}' '{"Action":"fail"}'; exit 1`)
 		_, err := s.Run(t.Context(), t.TempDir())
 		require.Error(t, err)
-		assert.NotErrorIs(t, err, check.ErrInfrastructure, "the forged infrastructure line is still no infrastructure error")
+		require.NotErrorIs(t, err, check.ErrInfrastructure, "the forged infrastructure line is still no infrastructure error")
 		assert.Contains(t, err.Error(), "TestA")
 		assert.Equal(t, []string{"noted"}, s.Notes())
 	})

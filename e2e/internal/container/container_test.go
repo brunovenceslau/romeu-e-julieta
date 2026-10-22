@@ -4,13 +4,11 @@
 package container
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -116,7 +114,7 @@ func TestFailRecordsAnInfrastructureError(t *testing.T) {
 // TestNoticeIsRecordedInTheStepsFile checks that notice appends one line
 // to the file of NoticeFileEnv, with the line breaks of the message
 // turned into spaces, that it never makes the file, and that a run
-// without the step prints the line to the standard error instead.
+// without the step records nothing.
 func TestNoticeIsRecordedInTheStepsFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "notices")
 	require.NoError(t, os.WriteFile(path, nil, 0o600))
@@ -131,11 +129,7 @@ func TestNoticeIsRecordedInTheStepsFile(t *testing.T) {
 	require.Error(t, notice("lost"), "the file is the step's, never the harness's")
 
 	t.Setenv(NoticeFileEnv, "")
-	var stderr bytes.Buffer
-	defer func(w io.Writer) { noticeFallback = w }(noticeFallback)
-	noticeFallback = &stderr
-	require.NoError(t, notice("local"))
-	assert.Equal(t, "container e2e: notice: local\n", stderr.String())
+	require.NoError(t, notice("local"), "a run without the step records nothing")
 }
 
 // TestCheckDaemonUnreachable is the fault test of the daemon: a

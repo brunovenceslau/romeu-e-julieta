@@ -70,10 +70,6 @@ const InfraFileEnv = "ROMEU_E2E_INFRA_FILE"
 // annotation. A test there holds the constant equal to this one.
 const NoticeFileEnv = "ROMEU_E2E_NOTICE_FILE"
 
-// noticeFallback is where notice writes when no step gave it a file,
-// a run of go test by hand.
-var noticeFallback io.Writer = os.Stderr
-
 // The preconditions of 10 10.1, as an InfraError names them.
 const (
 	Daemon = "the Docker daemon"
@@ -143,14 +139,13 @@ func recordInfra(name string) error {
 // notice appends msg to the file of NoticeFileEnv as one line, with its
 // line breaks turned into spaces, which must exist: the harness never
 // makes it. A run without the variable (go test by hand, with no step
-// of tools/ci around it) writes the line to the standard error, where
-// nothing classifies it.
+// of tools/ci around it) records nothing, as recordInfra does: all
+// output goes through the CLI writer (04 4.1), which a harness has not.
 func notice(msg string) error {
 	line := strings.Join(strings.Fields(msg), " ")
 	path := os.Getenv(NoticeFileEnv)
 	if path == "" {
-		_, err := fmt.Fprintf(noticeFallback, "container e2e: notice: %s\n", line)
-		return err
+		return nil
 	}
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
 	if err != nil {

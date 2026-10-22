@@ -18,7 +18,9 @@ owns:
 needs:
   - T013
   - T144
-after: []
+after:
+  - T156
+  - T157
 ask_first:
   - checks
 sitting: none
@@ -76,8 +78,10 @@ process of `tools/ci`, which is the one process that knows, and as a
 `warn  e2e: <message>` line elsewhere. The verdict does not change: a
 note is not an output event and not a name in the infrastructure file.
 A harness run by hand (`go test -tags e2e ./e2e/...`, no step around
-it) has no file and writes the line to its standard error, where
-nothing classifies it. A missing file fails the removal, as a missing
+it) has no file and records nothing, as `recordInfra` does (all output
+goes through the CLI writer, 04 4.1, which forbids the standard error
+here); a local run of `go run ./tools/ci all` prints the `warn` line.
+A missing file fails the removal, as a missing
 infrastructure file fails `Fail`: a heal nobody can see is not made.
 
 The notice names the file and the pin: "the herdr download: the
@@ -97,7 +101,7 @@ imported (reopened by that second consumer). The message goes through
 `git.SafeLines` first, which breaks the legacy `##[` marker that the
 runner finds anywhere in a line, and a line that starts `::`.
 
-- Implements: REQ-0798 (10 10.1), the exception for the download cache.
+- Implements: REQ-0798 (10 10.1).
 - Operator: no.
 - Acceptance:
   - A cached download whose file fails its pin, with the step's file
@@ -108,8 +112,8 @@ runner finds anywhere in a line, and a line that starts `::`.
   - A removal that cannot be recorded (the file is missing) is a test
     failure before any fetch, and a fetch that fails after a removal is
     still the infrastructure error of the download
-    (`TestCorruptEntryRetryFails`); a run without the step writes the
-    line to the standard error (`TestNoticeIsRecordedInTheStepsFile`).
+    (`TestCorruptEntryRetryFails`); a run without the
+    variable records nothing (`TestNoticeIsRecordedInTheStepsFile`).
   - The notes of the step are the lines of the notice file alone: a run
     whose tests print a forged `::warning::`, a forged notice line and a
     forged infrastructure line has no note, and a run that fails keeps

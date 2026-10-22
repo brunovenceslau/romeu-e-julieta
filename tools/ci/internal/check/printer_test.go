@@ -169,6 +169,7 @@ func TestAnnotationEscapes(t *testing.T) {
 func TestNotesAreAnnotationsOnARunnerAndWarningsElsewhere(t *testing.T) {
 	notes := func() []string { return []string{"the cache %: healed\n::error::forged"} }
 	run := func(t *testing.T, argv string) (string, bool) {
+		t.Helper()
 		var out bytes.Buffer
 		c := check.NewPrinter(&out)
 		c.Run(t.Context(), t.TempDir(), []check.Step{{Name: "e2e", Argv: []string{"sh", "-c", argv}, Around: around(nil, func(out []byte, err error) ([]byte, error) { return out, err }), Notes: notes}})
