@@ -35,6 +35,7 @@ after:
   - T156
 ask_first:
   - checks
+  - contracts
   - dependencies
 sitting: none
 ---
@@ -64,8 +65,14 @@ through `internal/procgroup` (T137).
   REQ-0617 (07 7.3), REQ-0618 (07 7.3), REQ-0619 (07 7.3), REQ-0620 (07
   7.3), REQ-0621 (07 7.3), REQ-0625 (07 7.4), REQ-0637 (07 7.5),
   REQ-0740 (10 10.1), REQ-0791 (10 10.1), REQ-0845 (10 10.2), REQ-0960
-  (10 10.6), REQ-1045 (12 12.1), REQ-1049 (12 12.1).
+  (10 10.6), REQ-1045 (12 12.1), REQ-1049 (12 12.1), REQ-1269 (04 4.4),
+  REQ-1270 (05 5.4), REQ-1271 (07 7.3), REQ-1272 (07 7.4).
 - Operator: no.
+- Re-plan (2026-10-22): the maintainer decided that a lock entry without a
+  checksum is a finding with an exceptions file (REQ-0407, REQ-0620,
+  REQ-1271), that the mise environment holds `MISE_PARANOID=1`, no token
+  and no configuration of the caller (REQ-0426, REQ-0621), and that the
+  sigstore host is allowed (REQ-1272); `install` runs the check itself.
 - Acceptance:
   - `install` runs with the environment of 04 4.3 and skips when the
     `lock-set` digest equals the last success; `--force` overrides; a

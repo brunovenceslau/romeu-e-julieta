@@ -57,19 +57,58 @@ via shims and `mise exec -C`.
   files after a success and does nothing when unchanged (`--force`
   overrides).
 - `REQ-0619` Freshness is checked deterministically, not remembered: `julieta lock
-  --check` (the lock parses with the pinned mise; every tool in
-  `mise.toml` has a lock entry; every lockable entry covers the two
-  linux platforms) runs in the git hook dispatcher's `pre-commit` when
-  `mise.toml` or `mise.lock` is staged, and in the product repo's CI
-  (`tools/ci mise`). `REQ-0620` It also warns on a lockable entry without a
-  checksum (`lock-no-checksum`), and looks up each `backend:tool` in the
-  embedded catalog: an unknown one is the warning `lock-unknown-tool`,
-  naming the two fixes of 7.5 step 2, at commit time rather than at the
-  next `romeu sync`. It does not fail on it, since a spec `egress.tools`
-  entry is a valid fix outside the repo.
+  --check` (the lock parses with the pinned layout, `lockfile_version`
+  3; every tool in `mise.toml` has a lock entry; every lockable entry
+  covers the two linux platforms) runs in the git hook dispatcher's
+  `pre-commit` when `mise.toml`, `mise.lock` or the exceptions file is
+  staged, on what the commit records, and in the product repo's CI
+  (`tools/ci mise`); `julieta install` runs the same check on each repo
+  before it installs and refuses on its findings. `REQ-0620` Every
+  platform of a lockable entry also holds a checksum of the form
+  `sha256:` and 64 lowercase hexadecimal digits: a lockable entry
+  without one is the finding `lock-no-checksum` and one of another
+  form (`md5:zz`, `sha256:` alone) the finding `lock-bad-checksum`,
+  each exit 6, not a warning (decided on 2026-10-22: a lock without
+  checksums names what mise downloads and proves nothing about it). A
+  lockable entry is one whose tool is not version-only, judged by the
+  key of `mise.toml`, never by the backend the lock claims. `lock
+  --check` looks up each `backend:tool` in the embedded catalog: an
+  unknown one is the warning `lock-unknown-tool`, naming the two fixes of
+  7.5 step 2, at commit time rather than at the next `romeu sync`. It
+  does not fail on it, since a spec `egress.tools` entry is a valid fix
+  outside the repo.
+- `REQ-1271` **The exceptions file.** A tool whose vendor publishes no
+  checksum, so that mise cannot record one, is excused from the missing
+  checksum by a line "`<key of mise.toml> <reason>`" in
+  `.julieta/lock-exceptions` at the top of its repo (decided on
+  2026-10-22). The file is the narrowest place the specification can
+  hold: it is tracked, so the exception is reviewed in the diff that adds
+  it; it is per tool, so one URL-only tool excuses no other; and it is
+  at hand where the check runs, in the pre-commit action and in CI,
+  where the project spec, which lives in the config repo, is not. It
+  excuses a missing checksum only: a checksum of the wrong form, a
+  missing platform and a missing entry stay findings, and a reason is
+  required. The file stays a file of the repo (decided on 2026-10-22):
+  its format is one line for each tool, the key of `mise.toml`, one
+  space and a reason, with blank lines and lines that start with `#`
+  left out, a tool at most once, and at most the size cap of the mise
+  files; its location is `.julieta/lock-exceptions` at the top of the
+  repo that uses the tool. It is reviewed on two paths: in the review of
+  the pull request that adds the line, since the file is tracked, and by
+  the pre-commit check, which reads the file from the index of the
+  commit and judges the lock against it, so a line that does not parse
+  is a finding before the commit exists. The file is one of the mise
+  files of the ask-first `dependencies` surface of the repo that uses it.
 - `REQ-0621` julieta trusts mise config only in the manifest's repo paths
-  (`MISE_TRUSTED_CONFIG_PATHS`, 04 4.3), so a config file planted
-  anywhere else in the sandbox is never read.
+  (`MISE_TRUSTED_CONFIG_PATHS`, 04 4.3) and runs mise with
+  `MISE_PARANOID=1`, so a config file planted anywhere else in the
+  sandbox, a parent directory of a repo included, is refused as not
+  trusted, and with the global and the system configuration pointed at
+  `/dev/null` and the data, cache and state dirs set by julieta, no
+  configuration of the caller reaches mise. What this does not do is
+  judge the trusted files: mise runs the `exec()` templates, tasks and
+  hooks of a trusted repo's `mise.toml` as that repo's own code, by
+  design (the residual of [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1)).
 
 ## 7.4 mise bootstrap and its own egress
 
@@ -78,9 +117,10 @@ via shims and `mise exec -C`.
 | Version | `REQ-0622` pinned in the `julieta` kit (`tools/kitpin mise <version>` rewrites version + both linux sha256 values from the release `SHASUMS256.txt`) |
 | Verification | `REQ-0623` sha256 at kit build; minisign verification of `SHASUMS256.txt` is done by `tools/kitpin` at pin time (maintainer machine or CI), not in the sandbox, against mise's minisign public key committed in the repository (`kits/mise-minisign.pub`, committed beside `kits/pins.yaml`); `REQ-0624` `tools/kitpin` commits the signed `SHASUMS256.txt` and its signature as `kits/mise/SHASUMS256.txt` and `kits/mise/SHASUMS256.txt.minisig`, beside the pin, so `tools/ci kits` verifies them again offline on every change to the pin file ([10 10.2](10-testing-style.md#102-ci)) |
 | Update checks | off (04 4.3): `REQ-0625` no self-update check and no update warning; the versions host is still read for version lists and attestations (the Versions host row) |
+| Attestation verification | `REQ-1272` on, with `MISE_PARANOID=1` (04 4.3): mise verifies the attestation of an aqua or github download, which contacts `tuf-repo-cdn.sigstore.dev` for the sigstore trust root (measured with mise 2026.10.3, through a proxy that logs each host an install of `gh` reaches: `github.com`, `release-assets.githubusercontent.com`, `mise-versions.jdx.dev`, and with the variable also `tuf-repo-cdn.sigstore.dev`). Decided on 2026-10-22: the host is allowed. It is in the catalog `meta` set, an entry that lands with the catalog (`internal/catalog`, T031), and the egress derivation adds it with that set (7.5, step 4); a sandbox without it cannot install an attested tool |
 | Tracking | off (04 4.3) |
 | Versions host | `REQ-0626` kept on (`mise-versions.jdx.dev` serves version lists and attestation bundles); it is in the catalog `meta` set |
-| GitHub rate limit | `REQ-0627` aqua/github downloads fall back to `api.github.com`; mise reads `GITHUB_TOKEN`. How sbx exposes the project's `github` secret (by name) as that variable is a fact probe B4 records, measuring behavior with and without it. The sandbox holds whatever `github@<project>` binds ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), [J1](09-journeys.md#j1-onboarding-new-machine-first-time) step 5); in the development sandbox of this repository that is the operator's own token until the token narrowing row of the index's [Deferred decisions](../spec.md#in-how-this-repository-is-run) fires ([ADR 0008, let the sandbox act as the maintainer on GitHub](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md)), so this download path carries its reach |
+| GitHub rate limit | `REQ-0627` aqua/github downloads fall back to `api.github.com`; julieta's mise environment holds no token (decided on 2026-10-22): the proxy of the sandbox authenticates the requests to `api.github.com`, which probe B4 records, measuring a download with and without a `GITHUB_TOKEN` set. The sandbox holds whatever `github@<project>` binds ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), [J1](09-journeys.md#j1-onboarding-new-machine-first-time) step 5); in the development sandbox of this repository that is the operator's own token until the token narrowing row of the index's [Deferred decisions](../spec.md#in-how-this-repository-is-run) fires ([ADR 0008, let the sandbox act as the maintainer on GitHub](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md)), so this download path carries its reach |
 
 ## 7.5 Egress derivation (`internal/egress`)
 
@@ -110,7 +150,7 @@ Input per repo: `(url, egressCommit)`. Output: `auto` and `gated` sets.
    egress domain rule of [03 3.1](03-formats.md#31-name-and-path-rules-shared);
    one that fails is the sync error `lock-host-invalid` naming the lock
    entry.
-4. `REQ-0632` Add `meta` and `base` sets.
+4. `REQ-0632` Add `meta` and `base` sets, `tuf-repo-cdn.sigstore.dev` of 7.4 among the `meta` domains.
 5. Add spec `egress.extra` to `gated`.
 6. Add kit-declared network domains (from the normalized capability
    sets, [06](06-kits.md#61-decisions)).
