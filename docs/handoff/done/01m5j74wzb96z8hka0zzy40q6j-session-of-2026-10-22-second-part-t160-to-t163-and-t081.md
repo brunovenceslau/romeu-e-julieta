@@ -6,7 +6,7 @@ below passed a code review before it opened, `go run ./tools/ci all` on
 the committed tree and the hosted CI.
 
 - #237 T160, setup, status and SessionStart report snapshots disabled;
-  merge f740ed77. #238, the previous checkpoint, merge f84fdebb.
+  merge f740ed77.
 - #239 T161, the plan of "Dependency bumps run as a script, not by
   hand" (01m5e14094yhqhsxq2g941pwrf), docs only; merge d7034cce. Its
   open questions are the maintainer's; the pending note stays open.
