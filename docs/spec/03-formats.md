@@ -615,8 +615,16 @@ reader learns:
 `REQ-0239` Every file the product writes in place is written as a temp file in the
 same dir, fsync of the file, rename, fsync of the dir; host state files
 have mode 0600. `REQ-0240` `descriptors/<digest>.json` holds the parsed, normalized
-capability set of one workload or kit descriptor, keyed by its OCI
-digest; entries are immutable.
+capability set of one workload or kit descriptor; entries are immutable.
+A workload's descriptor is keyed by the digest of the platform manifest
+its annotation was read from, which is the digest `internal/oci`
+verified last, and the record also holds the digest of the workload
+reference (the index) and the platform it was chosen for; a local
+kit's is keyed by the sha256 of its descriptor file, with neither. The
+record's `capabilities` member is required: a record without it, or
+with `null`, is unreadable and is never read as an empty set. When a
+second index lists a manifest already cached, the entry keeps the first
+index.
 
 ## 3.9 Memory entry (schema `memory-entry.v1`)
 

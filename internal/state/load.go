@@ -239,6 +239,9 @@ func (s *Store) PutDescriptor(lk *Lock, d Descriptor) error {
 		if derr != nil {
 			return derr
 		}
+		// The workload is where the manifest was first reached from; another
+		// index that lists the same manifest is not other content.
+		want.Workload = old.Workload
 		if !reflect.DeepEqual(old, want) {
 			return fmt.Errorf("%w: %s holds other content", ErrImmutable, strings.TrimSuffix(file, ".json"))
 		}

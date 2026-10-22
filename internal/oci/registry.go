@@ -52,6 +52,15 @@ type Platform struct {
 	Variant string
 }
 
+// String returns the platform as os/arch or os/arch/variant, the form
+// the descriptor cache stores.
+func (p Platform) String() string {
+	if p.Variant == "" {
+		return p.OS + "/" + p.Architecture
+	}
+	return p.OS + "/" + p.Architecture + "/" + p.Variant
+}
+
 // Fetched is a workload's descriptor, read and verified.
 type Fetched struct {
 	// Workload is the reference that was read.

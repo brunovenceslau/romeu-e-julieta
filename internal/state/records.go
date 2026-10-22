@@ -222,9 +222,20 @@ type Salvage struct {
 type Descriptor struct {
 	// Schema is "state-descriptor/v1".
 	Schema string `json:"schema"`
-	// Digest is the OCI digest of the descriptor, sha256:<64 hex>.
+	// Digest is the OCI digest of the manifest the descriptor was read from
+	// (a workload's platform manifest), or the sha256 of a local kit's
+	// descriptor file; sha256:<64 hex>. It is the key of the cache.
 	Digest string `json:"digest"`
+	// Workload is the digest of the workload reference (the index) the
+	// manifest was reached from, and Platform the os/arch[/variant] it
+	// was chosen for; both are absent for a local kit. When another index
+	// lists the same manifest the first one is kept.
+	Workload string `json:"workload,omitzero"`
+	// Platform is the platform of the manifest, with Workload.
+	Platform string `json:"platform,omitzero"`
 	// Capabilities is the normalized capability set, the type of
-	// internal/oci, the one parser of descriptors (REQ-0570).
-	Capabilities oci.Capabilities `json:"capabilities"`
+	// internal/oci, the one parser of descriptors (REQ-0570). A pointer,
+	// so that a record without the member, or with null, is not read as
+	// an empty set.
+	Capabilities *oci.Capabilities `json:"capabilities"`
 }

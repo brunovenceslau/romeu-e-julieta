@@ -760,8 +760,14 @@
     "digest": {
       "type": "string"
     },
+    "platform": {
+      "type": "string"
+    },
     "schema": {
       "const": "state-descriptor/v1",
+      "type": "string"
+    },
+    "workload": {
       "type": "string"
     }
   },

@@ -502,3 +502,8 @@ func TestEveryCapabilityTypeIsOfTheTypeForm(t *testing.T) {
 	}
 	assert.Len(t, capabilityTypes, 19)
 }
+
+func TestPlatformString(t *testing.T) {
+	assert.Equal(t, "linux/amd64", amd64.String())
+	assert.Equal(t, "linux/arm64/v8", Platform{OS: "linux", Architecture: "arm64", Variant: "v8"}.String())
+}
