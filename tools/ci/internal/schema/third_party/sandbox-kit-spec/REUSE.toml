@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The license of the copy of docker/sandbox-kit-spec's schema/ at the tag
+# v3.0.0-m.8 (commit 129be2ff45e8f9463450eb3cf04ddcb52c2b76e5), from
+# https://github.com/docker/sandbox-kit-spec, whose JSON files cannot carry
+# an SPDX header (REUSE 3.3); README.md is this repository's.
+
+version = 1
+
+[[annotations]]
+path = ["schema/**"]
+SPDX-FileCopyrightText = "2026 Docker, Inc."
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = ["README.md"]
+SPDX-FileCopyrightText = "2026 Bruno Venceslau"
+SPDX-License-Identifier = "GPL-3.0-only"

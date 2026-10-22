@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "com.docker.sandbox/agent-skills@1",
+  "description": "Config schema for an agent's skills discovery directory: the runtime exposes selected agent-skill@1 bundles here and includes the host's shared skills when available and enabled. Instance-shaped, keyed by path. Mode bounds access to the host store only; a missing, empty, or disabled host store never makes this request unsatisfiable. The @1 in the type names this schema; it moves when the schema does.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "path"
+  ],
+  "properties": {
+    "path": {
+      "type": "string",
+      "anyOf": [
+        {
+          "pattern": "^(/([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+))+$"
+        },
+        {
+          "$ref": "../../definitions/kit-arg.schema.json#/definitions/bearing"
+        }
+      ],
+      "description": "Absolute, canonical in-container path where the agent reads skills, for example /home/agent/.claude/skills. No . or .. segments, no trailing slash, no doubled separator, and not the root itself: an alias for a path already declared would evade the duplicate check. May embed ${{ kit.args.* }}."
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "readonly",
+            "readwrite"
+          ]
+        },
+        {
+          "$ref": "../../definitions/kit-arg.schema.json#/definitions/bearing"
+        }
+      ],
+      "description": "The most access the kit is willing to take; defaults to readonly. The host may narrow it but never exceed it."
+    }
+  }
+}

@@ -6,8 +6,10 @@
 // tools/schemagen generates (REQ-0733), the files under examples/ and
 // the testdata files that name a format validate against its schema
 // (REQ-0734), and each YAML file under examples/ carries the $schema
-// hint of the release VERSION names (REQ-1249, 03 3.2). It also holds
-// the generator that writes schemas/*.json ("go generate ./...").
+// hint of the release VERSION names (REQ-1249, 03 3.2), or, for a kit
+// descriptor, the modeline of the official kit schema (REQ-0836). It
+// also holds the generator that writes schemas/*.json ("go generate
+// ./...").
 //
 // The files it judges are those of the commit's tree, each read once:
 //
@@ -16,6 +18,11 @@
 //   - every YAML file under examples/, which validates against the
 //     schema its hint names, and every JSON file there, which validates
 //     against the format its "schema" field names;
+//   - every v3 kit descriptor (a YAML file whose first line is the
+//     frontend pin) under examples/, which carries the modeline of the
+//     kit schema of sbx at kitSpecTag on its second line, in place of a
+//     hint of ours, and validates against that schema, copied here
+//     (kits.go);
 //   - every YAML or JSON file below a testdata directory whose "schema"
 //     field has the form "<name>/v<n>" (REQ-1250): a format no
 //     registered type generates is a finding; the file validates,
@@ -144,6 +151,10 @@ func Of(files []check.TreeFile, schemas []schemagen.Schema) ([]check.Finding, er
 	if err != nil {
 		return nil, err
 	}
+	kit, err := compileKit(files)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errNoKitSchema, err)
+	}
 	findings := driftFindings(files, outs)
 	hint, hintErr := hintBase(files)
 	for _, f := range files {
@@ -151,6 +162,8 @@ func Of(files []check.TreeFile, schemas []schemagen.Schema) ([]check.Finding, er
 			continue
 		}
 		switch {
+		case isKitDescriptor(f):
+			findings = append(findings, kitFindings(f, kit)...)
 		case strings.HasPrefix(f.Path, examplesDir):
 			findings = append(findings, exampleFindings(f, sch, hint, hintErr)...)
 		case underTestdata(f.Path):

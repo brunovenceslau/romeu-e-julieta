@@ -129,8 +129,9 @@ Rules of this tree, one item per obligation:
   ([04 4.1](04-cli.md#41-conventions-both-binaries)).
 - `REQ-1249` `VERSION` names the next release, `<major>.<minor>.<patch>`
   and a newline, and is the one file that does: the `$schema` hint of
-  each YAML file under `examples/` names that release as `v` and the
-  version ([03 3.2](03-formats.md#32-project-spec-projectsnameyaml-schema-projectv1)),
+  each YAML file of an owned format under `examples/` names that
+  release as `v` and the version (a kit descriptor's names the tag of
+  sbx's kit schema instead, 10 10.2) ([03 3.2](03-formats.md#32-project-spec-projectsnameyaml-schema-projectv1)),
   and `tools/release` reads it.
 - `REQ-0119` `examples/` is the example config repo (`projects/*.yaml`,
   `kits/`, `.github/workflows/validate.yml`): the adopter's starter (J1
