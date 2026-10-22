@@ -23,6 +23,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 )
 
 // readTestdata returns a file of testdata.
@@ -262,7 +263,7 @@ func TestStore_UpdateToolchain(t *testing.T) {
 
 func TestStore_Descriptors(t *testing.T) {
 	const digest = "sha256:5555555555555555555555555555555555555555555555555555555555555555"
-	d := Descriptor{Digest: digest, Capabilities: Capabilities{"network": []any{"example.com"}}}
+	d := Descriptor{Digest: digest, Capabilities: oci.Capabilities{Ports: []oci.Port{{Container: "80"}}}}
 	t.Run("a descriptor is cached by its digest and read back", func(t *testing.T) {
 		s := openTemp(t)
 		_, err := s.GetDescriptor(digest)
@@ -280,7 +281,7 @@ func TestStore_Descriptors(t *testing.T) {
 		s := openTemp(t)
 		require.NoError(t, s.PutDescriptor(held(t, s), d))
 		require.NoError(t, s.PutDescriptor(held(t, s), d), "the same content again is a no-op")
-		other := Descriptor{Digest: digest, Capabilities: Capabilities{"network": []any{"other.example"}}}
+		other := Descriptor{Digest: digest, Capabilities: oci.Capabilities{Ports: []oci.Port{{Container: "81"}}}}
 		require.ErrorIs(t, s.PutDescriptor(held(t, s), other), ErrImmutable)
 		got, err := s.GetDescriptor(digest)
 		require.NoError(t, err)
@@ -575,9 +576,29 @@ func TestStore_nonRegularRecord(t *testing.T) {
 
 func TestStore_PutDescriptor_comparesValues(t *testing.T) {
 	s := openTemp(t)
-	d := Descriptor{Digest: "sha256:" + strings.Repeat("9", 64), Capabilities: Capabilities{"ports": []any{1, 2}}}
+	d := Descriptor{Digest: "sha256:" + strings.Repeat("9", 64), Capabilities: oci.Capabilities{Ports: []oci.Port{{Container: "1"}, {Container: "2"}}}}
 	require.NoError(t, s.PutDescriptor(held(t, s), d))
-	require.NoError(t, s.PutDescriptor(held(t, s), d), "the same content again, whatever its Go types, writes nothing")
-	changed := Descriptor{Digest: d.Digest, Capabilities: Capabilities{"ports": []any{1, 3}}}
+	require.NoError(t, s.PutDescriptor(held(t, s), d), "the same content again writes nothing")
+	changed := Descriptor{Digest: d.Digest, Capabilities: oci.Capabilities{Ports: []oci.Port{{Container: "1"}, {Container: "3"}}}}
 	require.ErrorIs(t, s.PutDescriptor(held(t, s), changed), ErrImmutable)
+}
+
+func TestStore_Descriptors_holdTheNormalizedSetOfTheSittingKit(t *testing.T) {
+	data, err := os.ReadFile("../../kits/git-ssh-sign/git-ssh-sign.yaml")
+	require.NoError(t, err)
+	kit, err := oci.ParseDescriptor(data)
+	require.NoError(t, err)
+	kit.Capabilities.Credentials = []oci.Credential{{
+		Service: "svc", Phases: []string{"runtime"},
+		OAuth: &oci.OAuth{CredentialFile: &oci.CredentialFile{Path: "/a.json", Structure: map[string]any{"a": 1.0, "b": map[string]any{"c": "d"}}}},
+	}}
+	d := Descriptor{Digest: "sha256:" + strings.Repeat("7", 64), Capabilities: kit.Capabilities}
+	s := openTemp(t)
+
+	require.NoError(t, s.PutDescriptor(held(t, s), d))
+	require.NoError(t, s.PutDescriptor(held(t, s), d), "the same set again writes nothing")
+	got, err := s.GetDescriptor(d.Digest)
+
+	require.NoError(t, err)
+	assert.Equal(t, d.Capabilities, got.Capabilities, "the set reads back as it was written")
 }

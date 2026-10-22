@@ -4,7 +4,6 @@
 package oci
 
 import (
-	"bytes"
 	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"slices"
@@ -454,9 +453,8 @@ func (b *builder) credential(cfg jsontext.Value, optional bool) error {
 			}
 			cf := &CredentialFile{Path: f.Path, Format: f.Format}
 			if len(f.Structure) > 0 {
-				cf.Structure = bytes.Clone(f.Structure)
-				if err := cf.Structure.Canonicalize(); err != nil {
-					return invalid("%s: the credential file structure is not JSON data", b.at)
+				if err := jsonv2.Unmarshal(f.Structure, &cf.Structure); err != nil {
+					return invalid("%s: the credential file structure is not a mapping", b.at)
 				}
 			}
 			out.CredentialFile = cf

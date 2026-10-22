@@ -206,9 +206,6 @@ func (d *Descriptor) validate() error {
 	if !ociDigest.MatchString(d.Digest) {
 		errs = append(errs, fmt.Errorf("digest %q is not sha256:<64 lowercase hex>", clip(d.Digest)))
 	}
-	if d.Capabilities == nil {
-		errs = append(errs, errors.New("capabilities is missing"))
-	}
 	return errors.Join(errs...)
 }
 

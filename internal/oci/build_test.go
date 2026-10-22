@@ -4,7 +4,6 @@
 package oci
 
 import (
-	"encoding/json/jsontext"
 	"strings"
 	"testing"
 
@@ -55,7 +54,7 @@ func TestNormalizeEachCapabilityType(t *testing.T) {
 			t.Helper()
 			o := c.Credentials[0].OAuth
 			assert.Equal(t, []string{"a", "b"}, o.ResourceHosts)
-			assert.Equal(t, jsontext.Value(`{"a":{"k":"v"},"z":1}`), o.CredentialFile.Structure, "the structure is canonical")
+			assert.Equal(t, map[string]any{"a": map[string]any{"k": "v"}, "z": float64(1)}, o.CredentialFile.Structure)
 			assert.Equal(t, "false", o.Passthrough)
 		}},
 		{"ssh-agent@1", typeSSHAgent, `{phase: runtime, unrestricted: false, authenticate: [github.com], sign: [git, file]}`, func(t *testing.T, c Capabilities) {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 )
 
 // SHA256 is a plain sha256, the one of a file's bytes, which is none of
@@ -47,10 +48,6 @@ func (s *SHA256) UnmarshalText(text []byte) error {
 // the catalog (T-catalog); until then the record holds it as the JSON
 // object it is, as manifest.Run holds the run layout.
 type Catalog map[string]any
-
-// Capabilities is the parsed, normalized capability set of one
-// descriptor (REQ-0240); its Go type lands with internal/oci.
-type Capabilities map[string]any
 
 // Toolchain is toolchain.json, the record of gate 1 (03 3.8, REQ-0228):
 // what the operator acknowledged on this machine. The format is
@@ -227,6 +224,7 @@ type Descriptor struct {
 	Schema string `json:"schema"`
 	// Digest is the OCI digest of the descriptor, sha256:<64 hex>.
 	Digest string `json:"digest"`
-	// Capabilities is the normalized capability set.
-	Capabilities Capabilities `json:"capabilities"`
+	// Capabilities is the normalized capability set, the type of
+	// internal/oci, the one parser of descriptors (REQ-0570).
+	Capabilities oci.Capabilities `json:"capabilities"`
 }

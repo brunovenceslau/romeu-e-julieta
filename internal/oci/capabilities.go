@@ -3,8 +3,6 @@
 
 package oci
 
-import "encoding/json/jsontext"
-
 // Capabilities is the normalized capability set of one descriptor
 // (REQ-0068, REQ-0240): what the descriptor asks of the host, in the
 // groups the gate shows and the personal-kit rule judges. Two
@@ -170,8 +168,9 @@ type Sentinels struct {
 type CredentialFile struct {
 	// Path is the file's path.
 	Path string `json:"path"`
-	// Structure is the nested map written to the file, in canonical JSON.
-	Structure jsontext.Value `json:"structure,omitempty"`
+	// Structure is the nested map written to the file. A whole number
+	// of it is read as a float64, which holds it exactly to 2^53.
+	Structure map[string]any `json:"structure,omitempty"`
 	// Format is "json" or "toml", as written.
 	Format string `json:"format,omitempty"`
 }
@@ -188,8 +187,9 @@ type ResponseFields struct {
 
 // SSHAgent is the use of an ssh agent in a phase.
 type SSHAgent struct {
-	// Phases are "install" and "runtime", sorted.
-	Phases []string `json:"phases"`
+	// Phases are "install" and "runtime", sorted. The sitting M0
+	// descriptor of git-ssh-sign names none.
+	Phases []string `json:"phases,omitempty"`
 	// Unrestricted is as written; absent means true.
 	Unrestricted string `json:"unrestricted,omitempty"`
 	// Sign are the namespaces the agent may sign in, sorted.

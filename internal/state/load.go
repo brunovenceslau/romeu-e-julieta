@@ -215,9 +215,6 @@ func (s *Store) PutDescriptor(lk *Lock, d Descriptor) error {
 		return err
 	}
 	d.Schema = DescriptorField
-	if d.Capabilities == nil {
-		d.Capabilities = Capabilities{}
-	}
 	file, err := descriptorFile(d.Digest)
 	if err != nil {
 		return err
