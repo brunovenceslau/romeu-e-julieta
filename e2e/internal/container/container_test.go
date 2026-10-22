@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -130,6 +131,32 @@ func TestNoticeIsRecordedInTheStepsFile(t *testing.T) {
 
 	t.Setenv(NoticeFileEnv, "")
 	require.NoError(t, notice("local"), "a run without the step records nothing")
+}
+
+// TestNoticesFromManyGoroutines checks that notices recorded at the same
+// time are whole lines, none lost or cut by another: the tests of the
+// suite run in one process, and a download may heal in several.
+func TestNoticesFromManyGoroutines(t *testing.T) {
+	path := noticeFile(t)
+	const n = 64
+	var wg sync.WaitGroup
+	errs := make(chan error, n)
+	for i := range n {
+		wg.Go(func() { errs <- notice(fmt.Sprintf("notice %02d %s", i, strings.Repeat("x", 200))) })
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
+	}
+	got := readNotices(t, path)
+	require.Len(t, got, n)
+	seen := map[string]bool{}
+	for _, line := range got {
+		assert.Regexp(t, "^notice [0-9]{2} x{200}$", line)
+		seen[line] = true
+	}
+	assert.Len(t, seen, n, "every line is distinct")
 }
 
 // TestCheckDaemonUnreachable is the fault test of the daemon: a
