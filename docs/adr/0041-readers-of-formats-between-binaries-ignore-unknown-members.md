@@ -11,8 +11,8 @@ Proposed
 REQ-0163 said that any change to a format's fields bumps its version,
 and the readers of the formats the product owns decoded strictly, an
 unknown member being an error. On 2026-10-21, while T154 added a member
-to `julieta-status/v1`, the maintainer decided that formats evolve by
-the rules of protobuf (the note "Formats evolve by the rules of
+to `julieta-status/v1`, it was decided that formats evolve by the
+rules of protobuf (the note "Formats evolve by the rules of
 protobuf" under `docs/handoff/decisions/`): adding a member is backward
 compatible and keeps the version.
 
