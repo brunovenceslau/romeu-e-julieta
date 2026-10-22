@@ -28,11 +28,14 @@ owns:
 needs:
   - T051
   - T054
-  - T057
+  - T035
   - T059
   - T060
   - T154
-after: []
+after:
+  - T021
+  - T155
+  - T160
 ask_first:
   - decisions
 sitting: none
@@ -99,8 +102,7 @@ describe the document this version writes and the examples CI validates.
 The fixtures `invalid-unknown-member.json` under the three `--json`
 packages stay for that check, and no longer for the decoder.
 
-- Implements: REQ-0159 (03 (opening)), REQ-0160 (03 (opening)),
-  REQ-0163 (03 (opening)), REQ-0261 (03 3.13), REQ-0271 (04 4.1).
+- Implements: REQ-0159 (03 (opening)), REQ-0163 (03 (opening)), REQ-0261 (03 3.13), REQ-0271 (04 4.1).
 - Operator: no.
 - Acceptance:
   - For each of the seven readers above, a test gives it a document or
