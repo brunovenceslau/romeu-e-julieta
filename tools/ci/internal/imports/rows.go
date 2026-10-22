@@ -51,7 +51,7 @@ type Row struct {
 }
 
 // Rows is the table of 10 10.7 (REQ-0968, REQ-1233, REQ-0969, REQ-1247,
-// REQ-1248), in its order. The tools/ci of the second column of the
+// REQ-1248, REQ-1256), in its order. The tools/ci of the second column of the
 // first row and the "tools/ci only" of the fourth are read through
 // REQ-0971, which the tools rule (toolFindings) holds: the rows govern
 // the two binaries.
@@ -94,6 +94,12 @@ var Rows = []Row{
 		LinkedBy: 0,
 		MustNot:  []string{"sbxdrv", "layout"},
 		TestOnly: true,
+	},
+	{
+		Req:      "REQ-1256",
+		Names:    []string{"moduleroot"},
+		LinkedBy: 0,
+		MustNot:  []string{"sbxdrv", "layout"},
 	},
 }
 
@@ -147,11 +153,13 @@ var toolImports = []string{"procgroup", "cmd/romeu/all", "cmd/julieta/all"}
 // no binary links, and the manifest package, for the type of the
 // manifest schema its generator writes; tools/new the cli package, for
 // the command list and the error table its command and error kinds
-// read; and tools/planviewer the gitsafe package, for the read-only
-// history its Trends view shows.
+// read; tools/planviewer the gitsafe package, for the read-only
+// history its Trends view shows; and tools/ci and e2e the moduleroot
+// package, which finds the module root for their tests (REQ-1256).
 // A tree is the directory and every package below it.
 var toolExtra = map[string][]string{
-	"tools/ci":         {"cli/clidoc", "manifest"},
+	"tools/ci":         {"cli/clidoc", "manifest", "moduleroot"},
+	"e2e":              {"moduleroot"},
 	"tools/new":        {"cli"},
 	"tools/planviewer": {"gitsafe"},
 }

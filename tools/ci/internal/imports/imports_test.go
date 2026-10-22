@@ -48,6 +48,7 @@ func baseTree() map[string]pkg {
 		"internal/cli/testsupport": {imports: []string{"internal/cli"}},
 		"internal/termsafe":        {},
 		"internal/procgroup":       {},
+		"internal/moduleroot":      {},
 		"internal/canon":           {},
 		"internal/signing":         {imports: []string{"internal/canon"}},
 		"internal/render":          {imports: []string{"encoding/json/v2"}},
@@ -58,10 +59,10 @@ func baseTree() map[string]pkg {
 		"internal/memstore/write":  {imports: []string{"internal/memstore"}},
 		"internal/agent/claude":    {imports: []string{"internal/hooks"}},
 		"tools/ci": {imports: []string{"internal/procgroup", "internal/cli/clidoc", "internal/cmd/romeu/all", "internal/cmd/julieta/all"},
-			testImports: []string{"internal/procgroup"}},
+			testImports: []string{"internal/procgroup", "internal/moduleroot"}},
 		"tools/ci/internal/x": {testImports: []string{"internal/cli/clidoc"}},
 		"tools/new":           {imports: []string{"internal/cli", "internal/procgroup"}},
-		"e2e/x":               {testImports: []string{"internal/cmd/julieta/all", "internal/procgroup"}},
+		"e2e/x":               {testImports: []string{"internal/cmd/julieta/all", "internal/procgroup", "internal/moduleroot"}},
 	}
 }
 
@@ -235,6 +236,19 @@ func TestImportsTable(t *testing.T) {
 			name:   "tools/new imports what only tools/ci may import",
 			change: map[string]pkg{"tools/new": {imports: []string{"internal/cli/clidoc"}}},
 			want:   []string{"tools/new: imports tools: imports internal/cli/clidoc directly; tools/** and e2e/** reach internal/ through internal/cmd/<binary>/all (REQ-0971)"},
+		},
+		{
+			name:   "tools/new imports what only tools/ci and e2e may import",
+			change: map[string]pkg{"tools/new": {imports: []string{"internal/moduleroot"}}},
+			want:   []string{"tools/new: imports tools: imports internal/moduleroot directly; tools/** and e2e/** reach internal/ through internal/cmd/<binary>/all (REQ-0971)"},
+		},
+		{
+			name:   "a binary links moduleroot",
+			change: map[string]pkg{"cmd/julieta": {imports: []string{"internal/cmd/julieta/all", "internal/cli", "internal/moduleroot"}}},
+			want: []string{
+				"cmd/julieta: imports link: imports internal/moduleroot, which julieta may not link, and julieta may link this package (10 10.7, second column)",
+				"cmd/julieta: imports binary: links internal/moduleroot, which the row of REQ-1256 does not let julieta link (10 10.7, second column)",
+			},
 		},
 		{
 			name:   "an e2e test imports a package directly",
@@ -488,6 +502,7 @@ func TestImportsRowOf(t *testing.T) {
 		"procgroup":         "REQ-0969",
 		"cli/clidoc":        "REQ-1247",
 		"cli/testsupport":   "REQ-1248",
+		"moduleroot":        "REQ-1256",
 	} {
 		row, ok := RowOf(name)
 		if assert.True(t, ok, name) {
@@ -509,11 +524,12 @@ func TestImportsRowsAreTheTableOf107(t *testing.T) {
 	_, rest, found := strings.Cut(string(b), "\n| Package | May be imported by | Must not import |\n|---|---|---|\n")
 	require.True(t, found, "the header of the table of 10 10.7")
 	binaries := map[string]Binaries{
-		"`cmd/romeu`, `tools/ci`": Romeu,
-		"`cmd/julieta` only":      Julieta,
-		"both":                    Romeu | Julieta,
-		"`tools/ci` only":         0,
-		"test packages only":      0,
+		"`cmd/romeu`, `tools/ci`":      Romeu,
+		"`cmd/julieta` only":           Julieta,
+		"both":                         Romeu | Julieta,
+		"`tools/ci` only":              0,
+		"`tools/ci` and `e2e/**` only": 0,
+		"test packages only":           0,
 	}
 	span := regexp.MustCompile("`([^`]+)`")
 	spans := func(cell string) []string {

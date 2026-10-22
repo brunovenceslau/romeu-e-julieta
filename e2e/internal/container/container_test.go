@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/moduleroot"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
@@ -307,7 +308,7 @@ func TestCacheOfThisUserAlone(t *testing.T) {
 func TestLoad(t *testing.T) {
 	wd, err := os.Getwd()
 	require.NoError(t, err)
-	root, err := ModuleRoot(wd)
+	root, err := moduleroot.Find(wd)
 	require.NoError(t, err)
 	c, err := Load(root, "arm64")
 	require.NoError(t, err)

@@ -1300,6 +1300,7 @@ deferred function, which is why the cleanup stands between the two).
 | `REQ-0969` `gitsafe`, `spec`, `canon`, `catalog`, `oci`, `manifest`, `memstore`, `handoff`, `salvage`, `shquote`, `termsafe`, `cli`, `procgroup` | both | `sbxdrv`, `layout` |
 | `REQ-1247` `cli/clidoc` (ADR 0015) | `tools/ci` only | `sbxdrv`, `layout` |
 | `REQ-1248` `cli/testsupport` | test packages only | `sbxdrv`, `layout` |
+| `REQ-1256` `moduleroot` | `tools/ci` and `e2e/**` only | `sbxdrv`, `layout` |
 
 `REQ-0970` Names are packages under `internal/`; a command package under
 `internal/cmd/romeu/` or `internal/cmd/julieta/` follows the row of its
@@ -1324,7 +1325,9 @@ list and the error table its `command` and `error` kinds read, and
 `tools/planviewer` imports `internal/gitsafe` directly, for the plan
 files of past commits its trends read. `tools/ci` imports
 `internal/manifest` directly too, for the type of the manifest schema
-its generator writes. The
+its generator writes, and `tools/ci` and the test packages under `e2e/**`
+import `internal/moduleroot` directly (REQ-1256), the one finder of
+the module root that their tests share; no binary links it. The
 rows govern the two binaries, and a subpackage follows its own row,
 never its parent's.
 

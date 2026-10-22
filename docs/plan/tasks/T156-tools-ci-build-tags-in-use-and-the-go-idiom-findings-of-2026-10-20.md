@@ -13,6 +13,7 @@ owns:
   - tools/ci/check_fix.go
   - tools/ci/internal/imports/imports.go
   - tools/ci/internal/imports/imports_test.go
+  - tools/ci/internal/imports/rows.go
   - tools/ci/internal/license/modules.go
   - tools/ci/internal/license/modules_test.go
   - tools/ci/internal/race/**
@@ -28,6 +29,8 @@ owns:
   - e2e/internal/container/**
   - e2e/container_test.go
   - docs/spec/10-testing-style.md
+  - docs/spec/02-layouts.md
+  - docs/spec/12-engineering.md
   - docs/reference/checks.md
   - docs/plan/tasks/T002-tools-ci-workflows-tools-ci-all-coverage.md
   - docs/plan/tasks/T013-the-container-e2e-on-the-workload-s-base.md
@@ -118,7 +121,7 @@ every untagged test too. So the e2e step keeps its one directory,
 below), and the race run keeps `./...`.
 
 - Implements: REQ-0832 (10 10.2), REQ-1254 (10 10.2), REQ-0833 (10
-  10.2), REQ-0837 (10 10.2), REQ-0834 (10 10.2).
+  10.2), REQ-0837 (10 10.2), REQ-0834 (10 10.2), REQ-1256 (10 10.7).
 - Operator: no.
 - Acceptance:
   - `Suites` names `e2e` and not `host`; the fix, lint, imports and
