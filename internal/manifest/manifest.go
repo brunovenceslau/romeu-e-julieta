@@ -3,7 +3,7 @@
 
 // Package manifest is the romeu/julieta contract of 03 3.6, the format
 // manifest.v1: the one Go type both binaries import for it (REQ-0217),
-// its strict decoder with the protocol window N and N-1 (REQ-0219), its
+// its canonical decoder, which skips an unknown member, with the protocol window N and N-1 (REQ-0219), its
 // canonical encoder and the size rule of the env value.
 //
 // romeu passes a manifest on every sbx env exec as
@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -48,7 +49,9 @@ const (
 // Manifest is a manifest.v1 document (03 3.6). The fields of every type
 // of the format are declared in the order of their JSON names, sorted,
 // so the type reads in the order Encode writes; Encode sorts them
-// itself.
+// itself. A member added here that an older julieta must honor bumps
+// Protocol (REQ-1257); review asks which kind each new member is, and
+// TestManifestShapeIsFingerprinted forces the question.
 type Manifest struct {
 	// Agent names the agent profile of the sandbox.
 	Agent string `json:"agent"`
@@ -135,7 +138,7 @@ var Field = "manifest/v" + strconv.Itoa(Version)
 var schemaField = regexp.MustCompile(`^manifest/v([1-9][0-9]{0,8})$`)
 
 // ErrInvalid is the error of a document that is not a manifest this
-// build reads: it does not decode strictly, is not in the canonical
+// build reads: it does not decode, is not in the canonical
 // form Encode writes, holds a value of the wrong form, names another
 // format or an older version, or passes the size cap.
 var ErrInvalid = errors.New("manifest: not a manifest")
@@ -152,19 +155,26 @@ var (
 	digestForm = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
-// Decode reads the canonical JSON of a manifest, strictly (03,
-// opening, REQ-0160). The manifest is the one format between binaries
-// that refuses an unknown member, an exception the maintainer has yet
-// to decide (03 3.6, ADR 0041). An unknown member, a duplicate member
-// name, a member name of another case, text that is not UTF-8 or holds U+FFFD,
-// and trailing data are each an error. The schema field is read first,
-// so a newer version is format-newer (RJ-311) even where it holds
-// members this build does not know. Then the document must be the
-// bytes Encode writes for it, exactly, so a missing member, a null,
-// another key order, whitespace, another escape or number spelling, and
-// a trailing newline are each refused. Then a protocol outside N and
-// N-1 is manifest-protocol (RJ-342), and the values must have their
-// forms (check). Every other refusal wraps ErrInvalid.
+// Decode reads the canonical JSON of a manifest (03, opening,
+// REQ-0160). Like every format between binaries it skips a member it
+// does not know, at any depth (REQ-0163, ADR 0041): a member an older
+// julieta could not safely ignore is not added to manifest.v1 but bumps
+// the protocol (REQ-0218), and the window of REQ-0219 refuses the
+// julieta that is too old. A duplicate member name, a member name of
+// another case (another name, so skipped, and the known member is then
+// missing unless it is also there; the comparison below is safe because
+// Unmarshal and memberTypes both match names exactly, and a
+// case-insensitive match in either would break that, though it would
+// still fail closed), text that is not UTF-8 or holds
+// U+FFFD, and trailing data are each an error. The schema field is read
+// first, so a newer version is format-newer (RJ-311) even where it
+// holds members this build does not know. Then the document, without
+// the members it skips, must be the bytes Encode writes for it,
+// exactly, so a missing member, a null, another key order, whitespace,
+// another escape or number spelling, and a trailing newline are each
+// refused. Then a protocol outside N and N-1 is manifest-protocol
+// (RJ-342), and the values must have their forms (check). Every other
+// refusal wraps ErrInvalid.
 func Decode(data []byte) (Manifest, error) {
 	if len(data) > MaxJSONSize {
 		return Manifest{}, fmt.Errorf("%w: %d bytes of JSON pass the cap of %d", ErrInvalid, len(data), MaxJSONSize)
@@ -192,14 +202,20 @@ func Decode(data []byte) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("%w: the schema %s is older than %s", ErrInvalid, *head.Schema, Field)
 	}
 	var m Manifest
-	if err := jsonv2.Unmarshal(data, &m, jsonv2.RejectUnknownMembers(true)); err != nil {
+	// A member this build does not name is skipped; the duplicates and
+	// the depth of what it holds are still checked by the decoder.
+	if err := jsonv2.Unmarshal(data, &m); err != nil {
 		return Manifest{}, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	enc, err := Encode(m)
 	if err != nil {
 		return Manifest{}, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
-	if !bytes.Equal(enc, data) {
+	known, err := withoutUnknownMembers(data, reflect.TypeFor[Manifest]())
+	if err != nil {
+		return Manifest{}, fmt.Errorf("%w: %w", ErrInvalid, err)
+	}
+	if !bytes.Equal(enc, known) {
 		return Manifest{}, fmt.Errorf("%w: the document is not the canonical JSON Encode writes for it (a member missing or null, another order, spacing or spelling)", ErrInvalid)
 	}
 	if !acceptsProtocol(m.Protocol, Protocol) {
@@ -212,6 +228,139 @@ func Decode(data []byte) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	return m, nil
+}
+
+// withoutUnknownMembers returns raw, a JSON value that decoded as a
+// value of type t, with every member that t, or a struct type inside
+// it, does not name left out, so that what remains is compared with
+// the bytes Encode writes. It keeps the text of every other byte, so a
+// known member in another spelling still differs from Encode. Where the
+// text between members is not what Encode writes, it returns raw as it
+// is, and the comparison refuses it. The content of Run is open and is
+// not looked into: its members are part of the value, not unknown ones.
+func withoutUnknownMembers(raw []byte, t reflect.Type) ([]byte, error) {
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if len(raw) == 0 {
+		return raw, nil
+	}
+	switch {
+	case t.Kind() == reflect.Struct && raw[0] == '{':
+		return keepKnownMembers(raw, t)
+	case t.Kind() == reflect.Slice && raw[0] == '[' && elemIsStruct(t.Elem()):
+		return keepKnownElements(raw, t.Elem())
+	}
+	return raw, nil
+}
+
+// separator is the text Encode writes before a member or an element:
+// none before the first, a comma before each other.
+func separator(first bool) string {
+	if first {
+		return ""
+	}
+	return ","
+}
+
+// elemIsStruct reports whether t, or what it points to, is a struct.
+func elemIsStruct(t reflect.Type) bool {
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	return t.Kind() == reflect.Struct
+}
+
+// memberTypes returns the type of each member struct type t names, by
+// its exact JSON name.
+func memberTypes(t reflect.Type) map[string]reflect.Type {
+	out := map[string]reflect.Type{}
+	for f := range t.Fields() {
+		if name, _, _ := strings.Cut(f.Tag.Get("json"), ","); f.IsExported() && name != "" && name != "-" {
+			out[name] = f.Type
+		}
+	}
+	return out
+}
+
+// keepKnownMembers is withoutUnknownMembers for the JSON object raw of
+// the struct type t.
+func keepKnownMembers(raw []byte, t reflect.Type) ([]byte, error) {
+	known := memberTypes(t)
+	dec := jsontext.NewDecoder(bytes.NewReader(raw))
+	if _, err := dec.ReadToken(); err != nil {
+		return nil, fmt.Errorf("manifest: %w", err)
+	}
+	prev := dec.InputOffset()
+	var kept [][]byte
+	for first := true; dec.PeekKind() != '}'; first = false {
+		name, err := dec.ReadValue()
+		if err != nil {
+			return nil, fmt.Errorf("manifest: %w", err)
+		}
+		nameStart := dec.InputOffset() - int64(len(name))
+		val, err := dec.ReadValue()
+		if err != nil {
+			return nil, fmt.Errorf("manifest: %w", err)
+		}
+		// The decoder may reuse the memory of what ReadValue returned, so
+		// the text is read from raw, by the offsets.
+		valEnd := dec.InputOffset()
+		valStart := valEnd - int64(len(val))
+		val = raw[valStart:valEnd]
+		name = raw[nameStart : nameStart+int64(len(name))]
+		if string(raw[prev:nameStart]) != separator(first) {
+			return raw, nil
+		}
+		prev = valEnd
+		var key string
+		if jsonv2.Unmarshal(name, &key) != nil {
+			return raw, nil
+		}
+		if ft, ok := known[key]; ok {
+			inner, err := withoutUnknownMembers(val, ft)
+			if err != nil {
+				return nil, err
+			}
+			kept = append(kept, slices.Concat(raw[nameStart:valStart], inner))
+		}
+	}
+	if prev != int64(len(raw))-1 {
+		return raw, nil
+	}
+	return slices.Concat([]byte("{"), bytes.Join(kept, []byte(",")), []byte("}")), nil
+}
+
+// keepKnownElements is withoutUnknownMembers for the JSON array raw
+// whose elements are of the struct type elem.
+func keepKnownElements(raw []byte, elem reflect.Type) ([]byte, error) {
+	dec := jsontext.NewDecoder(bytes.NewReader(raw))
+	if _, err := dec.ReadToken(); err != nil {
+		return nil, fmt.Errorf("manifest: %w", err)
+	}
+	prev := dec.InputOffset()
+	var kept [][]byte
+	for first := true; dec.PeekKind() != ']'; first = false {
+		val, err := dec.ReadValue()
+		if err != nil {
+			return nil, fmt.Errorf("manifest: %w", err)
+		}
+		valEnd := dec.InputOffset()
+		val = raw[valEnd-int64(len(val)) : valEnd]
+		if string(raw[prev:valEnd-int64(len(val))]) != separator(first) {
+			return raw, nil
+		}
+		prev = valEnd
+		inner, err := withoutUnknownMembers(val, elem)
+		if err != nil {
+			return nil, err
+		}
+		kept = append(kept, inner)
+	}
+	if prev != int64(len(raw))-1 {
+		return raw, nil
+	}
+	return slices.Concat([]byte("["), bytes.Join(kept, []byte(",")), []byte("]")), nil
 }
 
 // check returns why a value of m does not have its form: the

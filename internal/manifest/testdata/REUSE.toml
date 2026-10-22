@@ -8,7 +8,9 @@
 # - size-32k.json: the fixture of I30, valid.json with a longer egress
 #   list, whose env value is exactly 32 KiB;
 # - invalid-unknown-member.json: valid.json with one member the format
-#   does not name;
+#   does not name, as a newer romeu would write it. It is invalid
+#   against the schema, which describes what this build writes, and
+#   Decode reads it;
 # - invalid-duplicate-member.json: valid.json with the member agent
 #   written twice.
 

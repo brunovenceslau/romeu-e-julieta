@@ -50,7 +50,7 @@ func StateDir(home string) string { return filepath.Join(home, stateDir) }
 
 // LoadManifest returns the manifest of $JULIETA_MANIFEST, or, when the
 // variable is unset or empty, the one cached in julieta state, through
-// the strict decoder of internal/manifest (03 3.6). fromEnv says which.
+// the canonical decoder of internal/manifest (03 3.6). fromEnv says which.
 // A manifest that is missing or that the decoder refuses stops every
 // command whose Reads cell names the manifest with exit 2 (04 4.3,
 // REQ-0425): a refusal that carries an id of the error table keeps it
