@@ -26,7 +26,6 @@ owns:
   - docs/plan/tasks/T154-julieta-status-lists-the-recorded-hook-failures.md
   - internal/manifest/manifest.go
   - docs/handoff/decisions/01m5egnpxhheh7197j08zdr618-formats-evolve-by-the-rules-of-protobuf.md
-  - docs/handoff/pending/01m5egnpyfywadcsxpy0naz3hj-readers-of-formats-between-binaries-ignore-unknown-members.md
 needs:
   - T051
   - T054

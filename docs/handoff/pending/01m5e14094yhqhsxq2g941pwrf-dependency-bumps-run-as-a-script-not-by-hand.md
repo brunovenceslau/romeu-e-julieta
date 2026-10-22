@@ -43,3 +43,7 @@ Reopen: now, for the scheduled run, whose trigger fired with
 GO-2026-6809; otherwise at the next pin bump, or when T088 is planned.
 A `vulnerabilities` step turned red by a published fix is that same
 event, not a second one.
+
+Planned on 2026-10-22 in T161 (#239): the bot coverage measured, the
+`tools/ci` subcommand proposed, and the scheduled run's options listed
+as open questions in that task file, for the maintainer to answer.
