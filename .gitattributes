@@ -30,6 +30,7 @@ docs/reference/julieta/handoff/show.md -text
 docs/reference/julieta/handoff/write.md -text
 docs/reference/julieta/hooks.md -text
 docs/reference/julieta/hooks/run.md -text
+docs/reference/julieta/lock.md -text
 docs/reference/julieta/memory.md -text
 docs/reference/julieta/memory/add.md -text
 docs/reference/julieta/memory/check.md -text

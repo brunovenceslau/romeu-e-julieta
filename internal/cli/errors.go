@@ -33,6 +33,20 @@ var (
 		RecoveredIn: "none: the command runs again once the sandbox is idle",
 	}
 
+	// LockUnparsed is the error lock-unparsed (RJ-325): a mise.lock or a
+	// mise.toml that does not parse with the pinned layout, an unknown
+	// top-level key among them (07 7.5, step 1, REQ-0629). romeu sync
+	// raises it for a lock it reads from a commit, julieta install for the
+	// files of a repo; julieta lock --check reports the same reading as a
+	// finding. The hint is filled with the repo's dir.
+	LockUnparsed = Row{
+		ID:          "RJ-325",
+		Slug:        "lock-unparsed",
+		Exit:        2,
+		Fix:         "julieta lock --repo <dir>",
+		RecoveredIn: "none: relocking writes a lock of the pinned layout",
+	}
+
 	// Internal is the error internal (RJ-348): an error chain that holds
 	// no *Error, a defect of the code (10 10.1, Error ids).
 	Internal = Row{

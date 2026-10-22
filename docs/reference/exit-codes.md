@@ -23,7 +23,7 @@ of [errors.md](errors.md) names its own.
 |---|---|---|
 | 0 | ok |  |
 | 1 | the operation failed | `RJ-101`, `RJ-323`, `RJ-341`, `RJ-348`, `RJ-351` |
-| 2 | usage or precondition | `RJ-311`, `RJ-314`, `RJ-334`, `RJ-337`, `RJ-342`, `RJ-345`, `RJ-346`, `RJ-349`, `RJ-350` |
+| 2 | usage or precondition | `RJ-311`, `RJ-314`, `RJ-325`, `RJ-334`, `RJ-337`, `RJ-342`, `RJ-345`, `RJ-346`, `RJ-349`, `RJ-350` |
 | 3 | approval required |  |
 | 4 | drift detected, or an interrupted promotion abandoned |  |
 | 5 | refused to protect data |  |
