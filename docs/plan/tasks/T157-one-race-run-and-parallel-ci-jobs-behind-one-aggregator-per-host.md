@@ -216,3 +216,45 @@ race joins `fast` only if, after T155, a warm `go test -race -count=1
 the reference machine; until then `fast` runs no test. `fast` has no
 `After` step, so the race in `fast` writes no cover profile and checks
 no coverage; coverage stays in the `race` job and in `all`.
+
+## Decisions taken while building
+
+Taken on 2026-10-21, each with what reopens it:
+
+- The race joins `fast`, by the maintainer's rule of 2026-10-21. A warm
+  `go test -race -count=1 ./...` measured 118 s, 116 s and 116 s on this
+  machine (10 cores, linux/arm64, after T155 and with the build cache
+  warm), against the 180 s of `fastBudget`; `fast` without `unit` took
+  about 10 s on top (format, vet, fix, generated, lint, hygiene, plan),
+  so the whole `fast` is about 130 s. The race step run by `fast` itself
+  took 47 s on a second run in the same session; the larger figure is
+  the one the rule is applied to. The race step in `fast` has no
+  `-coverprofile`, since `fast` has no step after it to read one
+  (`race.Steps` omits the flag when the plan has no profile). Reopened
+  when a warm run no longer fits the budget: the check then drops
+  `Fast: true` and `fast` runs no test.
+- The row `unit + golden + race` is now `race` (it has no unit or golden
+  part), with `In fast` yes. REQ-0824 is retired, row in the retired
+  table of 12 12.11.
+- An aggregator is a job that holds an `if`. That one mark makes every
+  rule of the shape apply to it, so an `if` on any other job fails for
+  what the job is not (a literal name, no strategy, one step `exit 1`),
+  and `exit 1` is admitted only as the one step of such a job. A job
+  that has the step but no `if` fails as a run line outside the grammar.
+  Reopened by a second kind of job that needs an `if`.
+- The aggregators of `x64.yml` run on `ubuntu-26.04`, the Linux label of
+  that file, and are named `all on ubuntu-26.04` and `all on
+  macos-26-intel`; those of `ci.yml` run on `ubuntu-26.04-arm`. The task
+  gives the arm label for the aggregators and says x64 follows its labels;
+  reopened if the maintainer wants the x64 aggregators on the arm runner.
+- Job ids are `static`, `race`, `e2e`, `all_linux` and `all_macos`; the
+  names of the three jobs are `<id> on ${{ matrix.os }}`. Timeouts: 30
+  minutes for `static` and `e2e` and 60 for `race` (the race step has a
+  40-minute budget, which a test holds below the race job's timeout).
+  The 30-minute values are not measured: reopened by the job times of
+  the green run, in the pull request body.
+- Not changed, since the task does not own them: the reason text and the
+  `tools/ci/internal/unit/**` glob of `.github/ask-first.yaml` (the glob
+  matches nothing now), `docs/plan.md` and the handoff notes that still
+  say `unit` or that `fast` runs no race. Reopened by the tasks that
+  own those files.
