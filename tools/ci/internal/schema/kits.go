@@ -5,7 +5,6 @@ package schema
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -88,8 +87,8 @@ func kitFindings(f check.TreeFile, sch *jsonschema.Schema) []check.Finding {
 		return []check.Finding{{Where: f.Path, Rule: ruleUnknown, Msg: "is a v3 kit descriptor, and the tree holds no copy of the kit schema at " + kitSpecRoot}}
 	}
 	lines := strings.SplitN(string(f.Content), "\n", 3)
-	if len(lines) < 3 || strings.TrimSuffix(lines[1], "\r") != kitModeline {
-		return []check.Finding{{Where: f.Path, Rule: ruleHint, Msg: "is a v3 kit descriptor, and its second line is not \"" + kitModeline + "\" (03 3.2)"}}
+	if len(lines) < 2 || strings.TrimSuffix(lines[1], "\r") != kitModeline {
+		return []check.Finding{{Where: f.Path, Rule: ruleHint, Msg: "is a v3 kit descriptor, and its second line is not \"" + kitModeline + "\" (10 10.2, REQ-0836)"}}
 	}
 	doc, err := parse(f)
 	if err != nil {
@@ -97,6 +96,3 @@ func kitFindings(f check.TreeFile, sch *jsonschema.Schema) []check.Finding {
 	}
 	return validate(f.Path, kitName, doc, compiled{kitName: sch})
 }
-
-// errNoKitSchema is the error of a kit schema that does not compile.
-var errNoKitSchema = errors.New("the vendored kit schema does not compile")

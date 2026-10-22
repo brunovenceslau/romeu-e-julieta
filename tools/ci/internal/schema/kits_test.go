@@ -42,9 +42,11 @@ func TestKitDescriptors(t *testing.T) {
 		name, path, content, rule, msg string
 	}{
 		{"no modeline", "examples/kits/k/k.yaml", kitSyntax + kitBody, "schema hint",
-			"is a v3 kit descriptor, and its second line is not \"" + strings.TrimSuffix(kitHint, "\n") + "\" (03 3.2)"},
+			"is a v3 kit descriptor, and its second line is not \"" + strings.TrimSuffix(kitHint, "\n") + "\" (10 10.2, REQ-0836)"},
 		{"a modeline of another tag", "examples/kits/k/k.yaml", kitSyntax + strings.Replace(kitHint, "m.8", "m.7", 1) + kitBody, "schema hint",
-			"is a v3 kit descriptor, and its second line is not \"" + strings.TrimSuffix(kitHint, "\n") + "\" (03 3.2)"},
+			"is a v3 kit descriptor, and its second line is not \"" + strings.TrimSuffix(kitHint, "\n") + "\" (10 10.2, REQ-0836)"},
+		{"a file of the two lines only", "examples/kits/k/k.yaml", kitSyntax + strings.TrimSuffix(kitHint, "\n"), "schema parse",
+			"does not decode as one YAML document, or repeats a key"},
 		{"an unknown key", "examples/kits/k/k.yaml", good + "extra: 1\n", "schema invalid",
 			`does not validate against kit.schema.json at v3.0.0-m.8 at "/ (additionalProperties)"`},
 		{"a missing member", "examples/kits/k/k.yaml", kitSyntax + kitHint + "kind: mixin\n", "schema invalid",

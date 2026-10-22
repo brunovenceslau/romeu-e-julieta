@@ -7,7 +7,8 @@ the tag `v3.0.0-m.8` (commit
 `0cfa5d261ab6d159a92deac3ec66b6edf524a3eb`), fetched from
 `https://raw.githubusercontent.com/docker/sandbox-kit-spec/v3.0.0-m.8/schema/`
 on 2026-10-22. It is Apache-2.0, `Copyright 2026 Docker, Inc.`;
-`REUSE.toml` here records it. One change was made: in
+`REUSE.toml` here records it. This product includes software developed
+at Docker, Inc. One change was made: in
 `schema/capabilities/com.docker.sandbox/network-policy@2.schema.json`
 the one U+2014 of a description is written as the JSON escape
 `\u2014`, which decodes to the same value, because `tools/ci hygiene`

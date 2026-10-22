@@ -139,6 +139,9 @@ func compile(outs []check.Output) (compiled, error) {
 	return out, nil
 }
 
+// errNoKitSchema is the error of a kit schema that does not compile.
+var errNoKitSchema = errors.New("the vendored kit schema does not compile")
+
 // Of returns the findings of the check over files, the tree of one
 // commit, for the registered formats schemas, sorted by place. A
 // format the generator cannot express is an error.
