@@ -55,7 +55,7 @@ func TestStepsSelectFromTheRunner(t *testing.T) {
 		require.Len(t, steps, 1, class)
 		s := steps[0]
 		assert.Equal(t, "e2e", s.Name)
-		assert.Equal(t, []string{"/pinned/bin/go", "test", "-json", "-race", "-count=1", "-timeout=" + testTimeout, "-tags", "e2e", "./e2e/..."}, s.Argv)
+		assert.Equal(t, []string{"/pinned/bin/go", "test", "-race", "-count=1", "-tags", "e2e", "-json", "-timeout=" + testTimeout, "./e2e/..."}, s.Argv)
 		assert.Equal(t, check.WithProcessEnv(check.WithProcessEnv(check.StepEnv("/pinned/bin"), check.NetworkPassThrough), check.DockerPassThrough), s.Environ)
 		assert.NotNil(t, s.Around, "the private file and the reader of the events")
 		assert.Empty(t, s.Skip)

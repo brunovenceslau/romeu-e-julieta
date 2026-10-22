@@ -8,7 +8,10 @@
 // runners alone, native, since the workload's base is a Linux image and
 // julieta has no darwin build (10 10.1).
 //
-// The step runs "go test -json" and reads its events (read): a run in
+// The step runs "go test -json" (the argv is race.Argv's, the race
+// step's, and its "-count=1" is there for the build of julieta that a
+// test runs through "go build", a subprocess the test cache does not
+// see) and reads its events (read): a run in
 // which no test ran or passed fails, so a selection that runs nothing is
 // red; a skipped test fails, since a precondition never ends as a skip
 // (REQ-0798); and a run whose every failed test met a precondition the
@@ -42,6 +45,7 @@ import (
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/race"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/kitpin/pins"
 )
 
@@ -129,7 +133,7 @@ func stepsFor(goos, goarch string, p check.Plan) []check.Step {
 	case !slices.Contains(selected, "e2e"):
 		s.Skip = "not run on " + class + ": the container e2e runs on the Linux runners, native (the runner-class table of tools/ci/internal/container)"
 	default:
-		s.Argv = []string{filepath.Join(p.Tools.GoDir, "go"), "test", "-json", "-race", "-count=1", "-timeout=" + testTimeout, "-tags", "e2e", "./e2e/..."}
+		s.Argv = race.Argv(p.Tools.GoDir, "e2e", []string{"-json", "-timeout=" + testTimeout}, "./e2e/...")
 		s.Environ = check.WithProcessEnv(check.WithProcessEnv(check.StepEnv(p.Tools.GoDir), check.NetworkPassThrough), check.DockerPassThrough)
 		s.Around = around
 	}
