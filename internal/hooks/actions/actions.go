@@ -15,9 +15,8 @@
 // snapshot_post_rewrite.go, snapshot_post_merge.go); each runs the
 // handler the package of julieta snapshot sets with HandleSnapshot
 // (snapshot_action.go), which calls the writer Snapshot (snapshot.go).
-// The file that lands with a later task is lock_check.go (pre-commit,
-// T053); until it lands, pre-commit has no action and its chain starts
-// at the tracked hook.
+// The action of pre-commit is lock_check.go (T053): julieta lock
+// --check when mise.toml or mise.lock is staged.
 package actions
 
 import (
