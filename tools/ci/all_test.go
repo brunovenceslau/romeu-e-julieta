@@ -895,11 +895,13 @@ func TestOnlyRaceAndE2ERunGoTest(t *testing.T) {
 			}
 			assert.NotEqual(t, "unit", s.Name, "%s has no unit step", name)
 		}
-		if name == "fast" {
-			assert.Equal(t, []string{"race"}, tests)
-		} else {
-			assert.Equal(t, []string{"race", "e2e"}, tests)
+		want := []string{"race"}
+		// The e2e step runs go test only on a class of the runner-class
+		// table that runs it; elsewhere it is a step not run (10 10.2).
+		if name == "all" && slices.Contains(container.Classes[runtime.GOOS+"/"+runtime.GOARCH], "e2e") {
+			want = append(want, "e2e")
 		}
+		assert.Equal(t, want, tests, name)
 	}
 	_, err := os.Stat(filepath.Join(root, "tools", "ci", "internal", "unit"))
 	assert.ErrorIs(t, err, os.ErrNotExist, "the package of the unit step is gone")
