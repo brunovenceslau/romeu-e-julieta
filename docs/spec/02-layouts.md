@@ -91,6 +91,8 @@ romeu-e-julieta/
 ├─ .github/pull_request_template.md   Why / What changed / Evidence / Middleware / Lessons
 ├─ .github/ISSUE_TEMPLATE/     two issue forms: a bug, a catalog gap; the label `deferred` lands with them (12 12.7)
 ├─ COPYING (with the first code change), REUSE.toml, LICENSES/, README.md, SECURITY.md
+├─ AGENTS.md                   pointers for an agent working in this repository: where each rule lives, no rule restated
+├─ CLAUDE.md                   one line, `@AGENTS.md`, which Claude Code expands
 ```
 
 Rules of this tree, one item per obligation:
