@@ -357,3 +357,9 @@ func TestVerifyFails(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "dir has been modified")
 }
+
+// TestTagSets pins the listings' tags: none, and those of
+// taggedsuites.Suites (REQ-1254), spelled out here.
+func TestTagSets(t *testing.T) {
+	assert.Equal(t, [][]string{nil, {"-tags", "e2e"}}, tagSets)
+}

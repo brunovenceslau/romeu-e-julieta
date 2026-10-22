@@ -34,6 +34,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/lint"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/taggedsuites"
 )
 
 // Package is one package of the module as the check reads it, every
@@ -72,9 +73,9 @@ type listError struct{ Err string }
 const listFields = "ImportPath,Imports,TestImports,XTestImports,Deps,Module,Error,DepsErrors"
 
 // tagSets are the build tags each listing runs with: none, and those of
-// the tagged suites of 10 10.2, e2e and host, whose test files a listing
+// the tagged suites (taggedsuites.Tags), whose test files a listing
 // without tags leaves out.
-var tagSets = [][]string{nil, {"-tags", "e2e,host"}}
+var tagSets = [][]string{nil, {"-tags", taggedsuites.Tags()}}
 
 // Load lists the packages of the module at dir with the go command
 // goBin, once for each of lint.Targets and each of tagSets, and returns

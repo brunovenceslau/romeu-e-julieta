@@ -26,7 +26,16 @@ func TestSteps(t *testing.T) {
 	e2e := check.Step{Name: "tagged suites e2e", Argv: []string{"/pinned/bin/go", "vet", "-tags", "e2e", "./e2e/..."}, Environ: check.StepEnv("/pinned/bin")}
 	assert.Equal(t, []check.Step{e2e}, Steps(t.Context(), p))
 
+	// A directory of a suite not in Suites gets no step.
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "e2e", "host"), 0o755))
-	host := check.Step{Name: "tagged suites host", Argv: []string{"/pinned/bin/go", "vet", "-tags", "host", "./e2e/host/..."}, Environ: check.StepEnv("/pinned/bin")}
-	assert.Equal(t, []check.Step{e2e, host}, Steps(t.Context(), p))
+	assert.Equal(t, []check.Step{e2e}, Steps(t.Context(), p))
+}
+
+// TestTags pins the value the lint, fix, imports and license steps
+// read: the tags of Suites, comma separated.
+func TestTags(t *testing.T) {
+	assert.Equal(t, "e2e", Tags())
+	defer func(old []Suite) { Suites = old }(Suites)
+	Suites = []Suite{{"a", "a"}, {"b", "b"}}
+	assert.Equal(t, "a,b", Tags())
 }

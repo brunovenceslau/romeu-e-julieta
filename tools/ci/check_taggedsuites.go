@@ -11,10 +11,10 @@ import (
 func init() {
 	check.Register(check.Check{
 		Name:    "tagged suites",
-		Guards:  "the e2e and host suites build with their tags on every runner",
+		Guards:  "the tagged suites build with their tags on every runner",
 		Row:     "build the tagged suites",
 		Req:     "REQ-0832",
-		Usage:   "go vet -tags e2e ./e2e/... and go vet -tags host ./e2e/host/...",
+		Usage:   "go vet -tags <tag> ./<dir>/..., for each suite of taggedsuites.Suites",
 		All:     true,
 		Order:   75,
 		Package: "tools/ci/internal/taggedsuites",

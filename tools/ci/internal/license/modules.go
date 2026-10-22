@@ -27,6 +27,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/lint"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/taggedsuites"
 )
 
 // AllowlistPath is the committed allowlist of the licenses of the
@@ -166,7 +167,7 @@ type listed struct {
 // tagSets are the build tags of the listings: none, and those of the
 // tagged suites of 10 10.2, whose test files a listing without tags
 // leaves out (as the imports check lists them).
-var tagSets = [][]string{nil, {"-tags", "e2e,host"}}
+var tagSets = [][]string{nil, {"-tags", taggedsuites.Tags()}}
 
 // CompiledModules returns, as "path@version" and sorted, the modules
 // whose packages some build of the module at dir compiles: "go list

@@ -2,17 +2,23 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 // Package taggedsuites is the step "build the tagged suites" of 10 10.2
-// (REQ-0832): go vet of the e2e suite with the tag e2e and of the host
-// suite with the tag host, on every runner, so that a suite that does
-// not build fails here and not when it first runs (the host suite at
-// block B). A suite whose directory does not exist yet is left out,
-// which go vet would take as an error.
+// (REQ-0832): go vet of each tagged suite with its tag, on every
+// runner, so that a suite that does not build fails here and not when
+// it first runs. A suite whose directory does not exist yet is left
+// out, which go vet would take as an error.
+//
+// Suites is also the one source of the tags that the lint, fix,
+// imports and license steps pass (REQ-1254), through Tags. The host
+// suite of 10 10.1 enters Suites in the pull request that writes its
+// first file (T075): a tag no file carries is refused by
+// TestSuitesTagsAreCarried.
 package taggedsuites
 
 import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
@@ -23,10 +29,20 @@ type Suite struct {
 	Tag, Dir string
 }
 
-// Suites are the two tagged suites of 10 10.1.
+// Suites are the tagged suites in use: those with at least one file in
+// the module. The host suite of 10 10.1 is not here until T075.
 var Suites = []Suite{
 	{"e2e", "e2e"},
-	{"host", "e2e/host"},
+}
+
+// Tags returns the tags of Suites, comma separated, as the go command's
+// -tags flag and golangci-lint's --build-tags take them.
+func Tags() string {
+	tags := make([]string, len(Suites))
+	for i, s := range Suites {
+		tags[i] = s.Tag
+	}
+	return strings.Join(tags, ",")
 }
 
 // Steps returns one go vet step per suite whose directory exists below

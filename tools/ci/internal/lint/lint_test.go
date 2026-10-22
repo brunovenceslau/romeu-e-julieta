@@ -47,7 +47,7 @@ func TestSteps(t *testing.T) {
 	for i, target := range Targets {
 		assert.Equal(t, "lint "+target.String(), steps[2*i].Name)
 		assert.Equal(t, "lint boundaries "+target.String(), steps[2*i+1].Name)
-		assert.Equal(t, []string{"/pinned/golangci-lint", "run", "--config", "tools/ci/internal/lint/forbidigo.yml", "-j", "1", "--allow-parallel-runners", "--build-tags", "e2e,host", "./internal/other"}, steps[2*i+1].Argv)
+		assert.Equal(t, []string{"/pinned/golangci-lint", "run", "--config", "tools/ci/internal/lint/forbidigo.yml", "-j", "1", "--allow-parallel-runners", "--build-tags", "e2e", "./internal/other"}, steps[2*i+1].Argv)
 		assert.Equal(t, steps[2*i].Environ, steps[2*i+1].Environ)
 	}
 
