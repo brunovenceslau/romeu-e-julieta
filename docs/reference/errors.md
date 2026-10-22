@@ -23,6 +23,8 @@ exit codes are in [exit-codes.md](exit-codes.md).
 | Id | Slug | Exit | Fix | Declared in | Recovered in |
 |---|---|---|---|---|---|
 | `RJ-101` | `locked` | 1 | `decide: wait for the other romeu to end, then run the command again` | [internal/state](../../internal/state/errors.go) | none: the lock is released when the other romeu ends, and the rerun takes it |
+| `RJ-308` | `sbx-unknown` | 1 | `decide: run sbx ls --json yourself; when the daemon is down, start it with sbx daemon start, then run the command again` | [internal/sbxdrv](../../internal/sbxdrv/errors.go) | none: nothing was changed, and the rerun reads sbx again |
+| `RJ-310` | `upstream-shape` | 2 | `decide: run sbx version and compare it with the recorded versions in the details; an sbx outside them is reported as an issue with the details` | [internal/sbxdrv](../../internal/sbxdrv/errors.go) | none: the command stops before it changes any state, and a release that records the new shape reads it |
 | `RJ-311` | `format-newer` | 2 | `decide: install the release that wrote it` | [internal/manifest](../../internal/manifest/errors.go) | none: the release that wrote the file reads it |
 | `RJ-314` | `secret-in-argv` | 2 | `decide: replace the value in settings.yaml with a command that fetches it, such as one that reads a Keychain item` | [internal/spec](../../internal/spec/errors.go) | none: the edit of the hint fixes the settings, and no value was used |
 | `RJ-323` | `subprocess-timeout` | 1 | `decide: the sandbox or the daemon may still be busy, so look at sbx ls --json and run the command again once it is idle` | [internal/cli](../../internal/cli/errors.go) | none: the command runs again once the sandbox is idle |
@@ -33,6 +35,7 @@ exit codes are in [exit-codes.md](exit-codes.md).
 | `RJ-340` | `lock-missing` | 2 | `julieta lock --repo <dir>` | [internal/mise](../../internal/mise/errors.go) | none: the hint locks the repo and the install runs again |
 | `RJ-341` | `install-blocked` | 1 | `decide: approve the host once for this sandbox with the sbx command named, or add the host to the spec's egress and run gate 2` | [internal/mise](../../internal/mise/errors.go) | none: the details name the approval and the spec edit that fix it |
 | `RJ-342` | `manifest-protocol` | 2 | `decide: run romeu run <name> on the host, which passes a manifest of the current protocol` | [internal/manifest](../../internal/manifest/errors.go) | none: the run of the hint replaces the manifest |
+| `RJ-343` | `sbx-floor` | 2 | `decide: install sbx at or above the floor of 12 12.1` | [internal/sbxdrv](../../internal/sbxdrv/errors.go) | none: the command stops before it runs any other sbx call |
 | `RJ-345` | `projects-stray-file` | 2 | `decide: move or remove <path>` | [internal/spec](../../internal/spec/errors.go) | none: the config repo holds the file, and the edit of the hint removes it |
 | `RJ-346` | `config-project-missing` | 2 | `decide: add the config repository's own spec under projects/, or fix config.url in settings.yaml` | [internal/spec](../../internal/spec/errors.go) | none: the edit of the hint adds the spec or fixes the settings |
 | `RJ-348` | `internal` | 1 | `decide: open an issue with the details` | [internal/cli](../../internal/cli/errors.go) | none: a defect of the code, fixed in a release |

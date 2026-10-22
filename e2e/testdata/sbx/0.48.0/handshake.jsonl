@@ -1,0 +1,2 @@
+{"session":"handshake","sbxVersion":"0.48.0","capturedAt":"2026-10-22","synthetic":true,"source":"hand-written from the sbx reference at https://docs.docker.com/reference/cli/sbx/ and from the maintainer's daily use of v0.48.0; the output shapes are assumed where the reference does not give them","description":"The reads romeu makes before it changes anything: sbx version."}
+{"argv":["version"],"exit":0,"stdout":"v0.48.0\n","stderr":""}
