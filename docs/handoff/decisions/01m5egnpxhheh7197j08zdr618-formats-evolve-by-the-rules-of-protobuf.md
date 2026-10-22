@@ -13,6 +13,9 @@ Scope: this repository, for every format the product writes.
   project spec, host settings, the manifest) stays strict, since an
   unknown member there is most often a typing error.
 
-REQ-0163 and the strict readers between binaries still say otherwise
-until "Readers of formats between binaries ignore unknown members"
-(01m5egnpyfywadcsxpy0naz3hj) is built.
+Built by T162 on 2026-10-22: REQ-0163 says it, and the readers of the
+formats between binaries skip an unknown member
+([ADR 0041, readers of formats between binaries ignore unknown members](../../adr/0041-readers-of-formats-between-binaries-ignore-unknown-members.md)).
+The manifest is written by romeu and read by julieta, and stays strict
+under its own protocol window until the maintainer decides which rule
+holds for it.

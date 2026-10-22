@@ -56,3 +56,4 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 38 | [Search for a maintained library before writing one](0038-search-for-a-maintained-library-before-writing-one.md) | Accepted |
 | 39 | [State the scope of every decision record](0039-state-the-scope-of-every-decision-record.md) | Accepted |
 | 40 | [Author every skill with skill-creator and progressive disclosure](0040-author-every-skill-with-skill-creator-and-progressive-disclosure.md) | Accepted |
+| 41 | [Readers of formats between binaries ignore unknown members](0041-readers-of-formats-between-binaries-ignore-unknown-members.md) | Proposed |
