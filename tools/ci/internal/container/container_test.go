@@ -438,7 +438,7 @@ func TestAStepWhoseNoticeFileWasReplacedFails(t *testing.T) {
 		`printf '%s\n' '{"Action":"run","Test":"TestA"}' '{"Action":"pass","Test":"TestA"}' '{"Action":"pass"}'`)
 	_, err := s.Run(t.Context(), t.TempDir())
 	require.Error(t, err)
-	assert.NotErrorIs(t, err, check.ErrInfrastructure)
+	require.NotErrorIs(t, err, check.ErrInfrastructure)
 	assert.Contains(t, err.Error(), "not a regular file")
 	assert.Empty(t, s.Notes())
 }

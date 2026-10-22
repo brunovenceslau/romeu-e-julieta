@@ -23,7 +23,7 @@ func TestReadNoticesRefusesAFIFO(t *testing.T) {
 	require.NoError(t, syscall.Mkfifo(path, 0o600))
 	_, err := readNotices(path)
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "not a regular file")
+	require.ErrorContains(t, err, "not a regular file")
 	assert.NotErrorIs(t, err, check.ErrInfrastructure)
 }
 
