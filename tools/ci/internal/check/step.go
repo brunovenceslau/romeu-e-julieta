@@ -53,6 +53,15 @@ type Step struct {
 	// an infrastructure error. An error of Around fails the step, which
 	// then starts nothing.
 	Around func() (env []string, read Read, err error)
+	// Notes, when set, is called after the run, whether the step
+	// passed or failed, and returns what the step wants shown though
+	// its output is not (Printer.Run prints each as an annotation on a
+	// runner and as a warning line elsewhere, before the verdict, and
+	// the verdict does not change). It is the channel of the e2e
+	// step's notices: they come from a private file the tests write
+	// through the harness, never from the output, which a test
+	// controls.
+	Notes func() []string
 }
 
 // Read reads the output and the error of a step's run (Step.Around).

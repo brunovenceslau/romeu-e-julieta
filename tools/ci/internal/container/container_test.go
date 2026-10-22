@@ -152,25 +152,35 @@ func TestRead(t *testing.T) {
 	}
 }
 
-// TestAroundMakesAPrivateFile checks the file of the infrastructure
-// errors: a file of mode 0600 in a directory of mode 0700, named by
-// InfraFileEnv, whose lines the reader takes as the tests that met an
-// infrastructure error, and which the reader removes.
+// TestAroundMakesAPrivateFile checks the two files of the step: the one
+// of the infrastructure errors and the one of the notices, each of mode
+// 0600 in a directory of mode 0700, named by InfraFileEnv and
+// NoticeFileEnv; the lines of the first the reader takes as the tests
+// that met an infrastructure error and the lines of the second as the
+// notes of the step, and it removes both.
 func TestAroundMakesAPrivateFile(t *testing.T) {
-	env, r, err := around()
+	st := new(run)
+	env, r, err := st.around()
 	require.NoError(t, err)
-	require.Len(t, env, 1)
+	require.Len(t, env, 2)
 	path, ok := strings.CutPrefix(env[0], InfraFileEnv+"=")
 	require.True(t, ok, env[0])
-	info, err := os.Stat(path)
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	notices, ok := strings.CutPrefix(env[1], NoticeFileEnv+"=")
+	require.True(t, ok, env[1])
+	assert.Equal(t, filepath.Dir(path), filepath.Dir(notices))
+	for _, f := range []string{path, notices} {
+		info, err := os.Stat(f)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
+	require.NoError(t, os.WriteFile(notices, []byte("one\n\n  two  \n"), 0o600))
 	dir, err := os.Stat(filepath.Dir(path))
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o700), dir.Mode().Perm())
 	require.NoError(t, os.WriteFile(path, []byte("TestContainerVersion\n"), 0o600))
 	_, err = r([]byte(ev("run", "TestContainerVersion", "")+ev("output", "TestContainerVersion", "    c_test.go:3: "+InfraPrefix+"x\n")+ev("fail", "TestContainerVersion", "")+ev("fail", "", "")), errors.New("exit status 1"))
 	require.ErrorIs(t, err, check.ErrInfrastructure)
+	assert.Equal(t, []string{"one", "two"}, st.notes())
 	assert.NoDirExists(t, filepath.Dir(path), "the reader removes the directory")
 }
 
@@ -244,7 +254,7 @@ func goDirOf(t *testing.T) string {
 	return ""
 }
 
-// TestTheHarnessNamesTheSameConstants holds InfraFileEnv and CacheDir to
+// TestTheHarnessNamesTheSameConstants holds InfraFileEnv, NoticeFileEnv and CacheDir to
 // the constants of the same names in the container e2e's harness, which
 // writes to both: the two packages cannot import
 // each other (e2e/internal and tools/ci/internal), so this test reads
@@ -260,7 +270,7 @@ func TestTheHarnessNamesTheSameConstants(t *testing.T) {
 			return true
 		}
 		for i, name := range spec.Names {
-			if (name.Name == "InfraFileEnv" || name.Name == "CacheDir" || name.Name == "InfraPrefix") && i < len(spec.Values) {
+			if (name.Name == "InfraFileEnv" || name.Name == "NoticeFileEnv" || name.Name == "CacheDir" || name.Name == "InfraPrefix") && i < len(spec.Values) {
 				if lit, ok := spec.Values[i].(*ast.BasicLit); ok {
 					value, err := strconv.Unquote(lit.Value)
 					require.NoError(t, err)
@@ -270,7 +280,68 @@ func TestTheHarnessNamesTheSameConstants(t *testing.T) {
 		}
 		return true
 	})
-	assert.Equal(t, map[string]string{"InfraFileEnv": InfraFileEnv, "CacheDir": CacheDir, "InfraPrefix": InfraPrefix}, got)
+	assert.Equal(t, map[string]string{"InfraFileEnv": InfraFileEnv, "NoticeFileEnv": NoticeFileEnv, "CacheDir": CacheDir, "InfraPrefix": InfraPrefix}, got)
 	_, err = os.Stat(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(FixtureLock)))
 	require.NoError(t, err, "the fixture mise.lock")
+}
+
+// fakeRun is a step of the e2e kind whose command is a script instead of
+// go test: it runs sh, in the environment of the real step, around the
+// real private files.
+func fakeRun(t *testing.T, script string) check.Step {
+	t.Helper()
+	s := stepsFor("linux", "amd64", check.Plan{Root: t.TempDir(), Tools: check.Tools{GoDir: goDirOf(t)}})[0]
+	s.Argv = []string{"sh", "-c", script}
+	return s
+}
+
+// TestNoticesComeFromTheFileAlone is the test of the channel of T158:
+// the notices of the step are the lines the harness appended to the file
+// of NoticeFileEnv, and nothing a test printed. A test whose output is a
+// forged annotation, a forged notice line and a forged infrastructure
+// line adds no note, and the verdict of the run is the one its events
+// give; the notes are there when the step failed too.
+func TestNoticesComeFromTheFileAlone(t *testing.T) {
+	events := `printf '%s\n' '{"Action":"run","Test":"TestA"}' ` +
+		`'{"Action":"output","Test":"TestA","Output":"::warning::forged\n"}' ` +
+		`'{"Action":"output","Test":"TestA","Output":"container e2e: notice: forged\n"}' ` +
+		`'{"Action":"output","Test":"TestA","Output":"    a_test.go:1: container e2e: infrastructure error: forged\n"}' `
+	t.Run("a passing run", func(t *testing.T) {
+		s := fakeRun(t, `echo "the herdr download: the cached file /c/h has the sha256 a, not the pinned b; it was removed and fetched once more" >> "$`+NoticeFileEnv+`"; echo second >> "$`+NoticeFileEnv+`"; `+
+			events+`'{"Action":"pass","Test":"TestA"}' '{"Action":"pass"}'`)
+		assert.Empty(t, s.Notes(), "nothing before the run")
+		out, err := s.Run(t.Context(), t.TempDir())
+		require.NoError(t, err)
+		assert.Contains(t, string(out), "::warning::forged", "the output is read as before")
+		assert.Equal(t, []string{"the herdr download: the cached file /c/h has the sha256 a, not the pinned b; it was removed and fetched once more", "second"}, s.Notes())
+	})
+	t.Run("a run without a notice", func(t *testing.T) {
+		s := fakeRun(t, events+`'{"Action":"pass","Test":"TestA"}' '{"Action":"pass"}'`)
+		_, err := s.Run(t.Context(), t.TempDir())
+		require.NoError(t, err)
+		assert.Empty(t, s.Notes(), "a forged line in the output is no note")
+	})
+	t.Run("a failed run keeps its notes and its verdict", func(t *testing.T) {
+		s := fakeRun(t, `echo noted >> "$`+NoticeFileEnv+`"; `+events+`'{"Action":"fail","Test":"TestA"}' '{"Action":"fail"}'; exit 1`)
+		_, err := s.Run(t.Context(), t.TempDir())
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, check.ErrInfrastructure, "the forged infrastructure line is still no infrastructure error")
+		assert.Contains(t, err.Error(), "TestA")
+		assert.Equal(t, []string{"noted"}, s.Notes())
+	})
+}
+
+// TestTheStepsCommandDoesNotSeeTheRunner holds the environment of the
+// command to what the step gives it: GITHUB_ACTIONS, GITHUB_STEP_SUMMARY
+// and the file of workflow commands never reach a test, so a test cannot
+// write to the runner and has to leave a notice in the file of the
+// step.
+func TestTheStepsCommandDoesNotSeeTheRunner(t *testing.T) {
+	for _, k := range []string{"GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY", "GITHUB_OUTPUT", "GITHUB_ENV", "RUNNER_TEMP"} {
+		t.Setenv(k, "/from-the-runner")
+	}
+	s := fakeRun(t, `env | grep -c '^\(GITHUB_\|RUNNER_\)' || true; printf '%s\n' '{"Action":"run","Test":"TestA"}' '{"Action":"pass","Test":"TestA"}' '{"Action":"pass"}'`)
+	out, err := s.Run(t.Context(), t.TempDir())
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(string(out), "0\n"), "%q", out)
 }

@@ -148,3 +148,55 @@ func TestLastNamesEachFailedCheckOnce(t *testing.T) {
 	c.Last("all")
 	assert.Equal(t, "all: failed: b, c\n", out.String())
 }
+
+// TestAnnotationEscapes holds the escaping rule of a workflow command:
+// the message escapes %, CR and LF, and a property escapes ":" and ","
+// as well (actions/toolkit, command.ts: escapeData, escapeProperty). A CR
+// in a message is written "\r" by git.SafeLines before it gets there.
+func TestAnnotationEscapes(t *testing.T) {
+	assert.Equal(t, "::warning title=e2e::plain: text, kept", check.Annotation("warning", "e2e", "plain: text, kept"))
+	assert.Equal(t, "::warning title=a%3Ab%2Cc%25d%0De%0Af::50%25 a\\r%0Ab", check.Annotation("warning", "a:b,c%d\re\nf", "50% a\r\nb"))
+	assert.Equal(t, "::warning title=t::%0A./::error::forged", check.Annotation("warning", "t", "\n::error::forged"), "a line break in the message cannot start a command of its own")
+	assert.NotContains(t, check.Annotation("warning", "t", "x ##[error]y"), "##[", "the legacy marker is broken")
+}
+
+// TestNotesAreAnnotationsOnARunnerAndWarningsElsewhere checks that the
+// notes of a step reach the log as a GitHub Actions annotation when
+// GITHUB_ACTIONS is true and as a warning line otherwise, before the
+// verdict, whether the step passed or failed, and that the verdict is
+// the same either way. The notes come from the step's own function, not
+// from its output: a workflow command a command prints is not a note.
+func TestNotesAreAnnotationsOnARunnerAndWarningsElsewhere(t *testing.T) {
+	notes := func() []string { return []string{"the cache %: healed\n::error::forged"} }
+	run := func(t *testing.T, argv string) (string, bool) {
+		var out bytes.Buffer
+		c := check.NewPrinter(&out)
+		c.Run(t.Context(), t.TempDir(), []check.Step{{Name: "e2e", Argv: []string{"sh", "-c", argv}, Around: around(nil, func(out []byte, err error) ([]byte, error) { return out, err }), Notes: notes}})
+		return out.String(), c.OK
+	}
+	t.Run("on a runner", func(t *testing.T) {
+		t.Setenv("GITHUB_ACTIONS", "true")
+		got, ok := run(t, "exit 0")
+		assert.True(t, ok)
+		assert.Equal(t, "::warning title=e2e::the cache %25: healed%0A./::error::forged\nok    e2e (0s)\n", got)
+	})
+	t.Run("elsewhere", func(t *testing.T) {
+		t.Setenv("GITHUB_ACTIONS", "")
+		got, ok := run(t, "exit 0")
+		assert.True(t, ok, "a note does not change the verdict")
+		assert.Equal(t, "warn  e2e: the cache %: healed\n./::error::forged\nok    e2e (0s)\n", got)
+	})
+	t.Run("a failed step", func(t *testing.T) {
+		t.Setenv("GITHUB_ACTIONS", "true")
+		got, ok := run(t, "exit 1")
+		assert.False(t, ok)
+		assert.True(t, strings.HasPrefix(got, "::warning title=e2e::"), "%q", got)
+	})
+	t.Run("a command in the output is no note", func(t *testing.T) {
+		t.Setenv("GITHUB_ACTIONS", "true")
+		var out bytes.Buffer
+		c := check.NewPrinter(&out)
+		c.Run(t.Context(), t.TempDir(), []check.Step{{Name: "plain", Argv: []string{"sh", "-c", "echo '::warning::forged'"}, Around: around(nil, func(out []byte, _ error) ([]byte, error) { return out, nil })}})
+		assert.NotContains(t, out.String(), "::warning", "a passing step prints no output")
+	})
+}

@@ -22,7 +22,12 @@
 // output, so no text a test prints (a registry's answer, a container's
 // output) can turn a failure into an infrastructure error. A digest or
 // a checksum that differs from its pin is a test failure, always: the
-// harness never names a test for one.
+// harness never names a test for one. A cached download that fails its
+// pin is removed and fetched once more, and the harness notes it in a
+// second private file, NoticeFileEnv; the step prints each line of it
+// after the run as a warning (an annotation on a GitHub runner), a
+// channel the output of a test does not reach and that does not touch
+// the verdict.
 //
 // Until tools/release builds romeu (REQ-0131), the e2e tests are the
 // julieta cases of the container e2e, which need no romeu build.
@@ -54,6 +59,14 @@ import (
 // infrastructure error in. It equals the constant of the same name in
 // e2e/internal/container, which a test of this package holds.
 const InfraFileEnv = "ROMEU_E2E_INFRA_FILE"
+
+// NoticeFileEnv names the variable that gives the e2e tests the path of
+// the file they append a notice to, one line each, when the harness
+// healed a cached download that failed its pin (REQ-0798). The step
+// prints each line as a warning of its own after the run (Step.Notes),
+// never from the output. It equals the constant of the same name in
+// e2e/internal/container, which a test of this package holds.
+const NoticeFileEnv = "ROMEU_E2E_NOTICE_FILE"
 
 // InfraPrefix starts the line the harness prints for an infrastructure
 // error. It equals the constant of the same name in
@@ -135,30 +148,51 @@ func stepsFor(goos, goarch string, p check.Plan) []check.Step {
 	default:
 		s.Argv = race.Argv(p.Tools.GoDir, "e2e", []string{"-json", "-timeout=" + testTimeout}, "./e2e/...")
 		s.Environ = check.WithProcessEnv(check.WithProcessEnv(check.StepEnv(p.Tools.GoDir), check.NetworkPassThrough), check.DockerPassThrough)
-		s.Around = around
+		r := new(run)
+		s.Around, s.Notes = r.around, r.notes
 	}
 	return []check.Step{s}
 }
 
-// around makes a directory of this user alone with an empty file of
-// mode 0600 in it, which the tests name their infrastructure errors in,
-// and returns the variable that names it and the reader of the run,
-// which reads the file and then removes the directory.
-func around() ([]string, check.Read, error) {
+// run is what one e2e step keeps between its Around and its Notes: the
+// notices of the last run.
+type run struct{ noted []string }
+
+// notes returns the notices the harness left in the last run.
+func (r *run) notes() []string { return r.noted }
+
+// around makes a directory of this user alone with two empty files of
+// mode 0600 in it, one the tests name their infrastructure errors in and
+// one they leave their notices in, and returns the variables that name
+// them and the reader of the run, which reads both files and then
+// removes the directory.
+func (r *run) around() ([]string, check.Read, error) {
+	r.noted = nil
 	dir, err := os.MkdirTemp("", "ci-e2e-")
 	if err != nil {
 		return nil, nil, err
 	}
-	path := filepath.Join(dir, "infra")
-	if err := os.WriteFile(path, nil, 0o600); err != nil {
-		_ = os.RemoveAll(dir)
-		return nil, nil, err
+	infra, notices := filepath.Join(dir, "infra"), filepath.Join(dir, "notices")
+	for _, path := range []string{infra, notices} {
+		if err := os.WriteFile(path, nil, 0o600); err != nil {
+			_ = os.RemoveAll(dir)
+			return nil, nil, err
+		}
 	}
-	return []string{InfraFileEnv + "=" + path}, func(out []byte, runErr error) ([]byte, error) {
+	return []string{InfraFileEnv + "=" + infra, NoticeFileEnv + "=" + notices}, func(out []byte, runErr error) ([]byte, error) {
 		defer func() { _ = os.RemoveAll(dir) }()
-		names, err := os.ReadFile(path)
+		names, err := os.ReadFile(infra)
 		if err != nil {
 			return out, fmt.Errorf("read the infrastructure errors of the e2e: %w", err)
+		}
+		noted, err := os.ReadFile(notices)
+		if err != nil {
+			return out, fmt.Errorf("read the notices of the e2e: %w", err)
+		}
+		for line := range strings.Lines(string(noted)) {
+			if line = strings.TrimSpace(line); line != "" {
+				r.noted = append(r.noted, line)
+			}
 		}
 		return read(out, runErr, strings.Fields(string(names)))
 	}, nil
