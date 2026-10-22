@@ -3,7 +3,7 @@ id: T081
 title: "The `git-ssh-sign` kit"
 milestone: M2
 module: kits
-fate: kept
+fate: merged
 owns:
   - kits/git-ssh-sign/**
   - e2e/kit_git_ssh_sign_test.go
@@ -15,9 +15,14 @@ ask_first:
   - kits
   - signing
 sitting: none
+merged: 2026-10-22
+pr: 240
 ---
 
 # T081 - The `git-ssh-sign` kit
+
+Merged on 2026-10-22 in pull request #240. The text below is the one
+written when it was built.
 
 Goal: The `git-ssh-sign` kit: the descriptor, the git config files, the
 allowed-signers file from the `signingKey` arg.

@@ -3,7 +3,7 @@ id: T162
 title: "Readers of formats between binaries ignore unknown members"
 milestone: M1
 module: julieta-core
-fate: new
+fate: merged
 owns:
   - internal/handoff/decode.go
   - internal/handoff/decode_test.go
@@ -41,9 +41,14 @@ after:
 ask_first:
   - decisions
 sitting: none
+merged: 2026-10-22
+pr: 241
 ---
 
 # T162 - Readers of formats between binaries ignore unknown members
+
+Merged on 2026-10-22 in pull request #241. The text below is the one
+written when it was built.
 
 Goal: the readers of the formats that one binary writes and another
 reads skip a member they do not know, as the decision of 2026-10-21

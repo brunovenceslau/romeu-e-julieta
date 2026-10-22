@@ -3,7 +3,7 @@ id: T157
 title: "One race run and parallel CI jobs behind one aggregator per host"
 milestone: M1
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - tools/ci/all.go
   - tools/ci/all_test.go
@@ -47,9 +47,14 @@ ask_first:
   - approvals
   - spec
 sitting: none
+merged: 2026-10-22
+pr: 234
 ---
 
 # T157 - One race run and parallel CI jobs behind one aggregator per host
+
+Merged on 2026-10-22 in pull request #234. The text below is the one
+written when it was built.
 
 Goal: the last part of "One race run, test tags and parallel CI jobs"
 (01m5drzqsp6zg34xzmywckwb7b), approved for planning on 2026-10-20,
