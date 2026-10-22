@@ -79,11 +79,14 @@ type Result struct {
 // (subprocess-timeout, RJ-323) of a timeout; a call the context ended
 // returns the cancellation, not a CallError, since the signal rule of
 // 04 4.1 owns it. A call that breaks a guard (I4, I25) or whose
-// environment is wrong is the error internal (RJ-348), and nothing is
-// started.
+// environment is wrong, or that no builder of this package made, is the
+// error internal (RJ-348), and nothing is started.
 func (r *Runner) Run(ctx context.Context, c Call, o Opts) (Result, error) {
 	if !filepath.IsAbs(r.Sbx) || filepath.Clean(r.Sbx) != r.Sbx {
 		return Result{}, cli.Internal.New("sbxdrv: sbx is run by a clean absolute path from host settings, and the runner has " + fmt.Sprintf("%q", r.Sbx))
+	}
+	if !c.validated {
+		return Result{}, cli.Internal.New("sbxdrv: the call " + c.Name + " was not built by a builder of this package")
 	}
 	if c.Mode != Captured && c.Mode != Interactive {
 		return Result{}, cli.Internal.New("sbxdrv: the call " + c.Name + " has no mode")

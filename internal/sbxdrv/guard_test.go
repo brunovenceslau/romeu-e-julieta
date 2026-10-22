@@ -6,6 +6,8 @@
 package sbxdrv
 
 import (
+	"bytes"
+	jsonv2 "encoding/json/v2"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -19,6 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
@@ -27,84 +30,81 @@ func call(argv ...string) Call {
 	return Call{Name: "test", Argv: argv, Shape: argv, Class: procgroup.SbxRead, Mode: Captured}
 }
 
-// refusedApprovals are argvs the guard of I4 refuses, and the fake sbx
-// exits 99 on (fake_test.go holds the two together).
-var refusedApprovals = [][]string{
-	{"env", "run", "-d", "--auto-approve", "/d"},
-	{"env", "run", "--auto-approve=true", "/d"},
-	{"stop", "--auto-approve", "shop"},
-	{"env", "run", "-y", "/d"},
-	{"env", "run", "-dy", "/d"},
-	{"env", "rm", "-y", "/d"},
-	{"env", "run", "-d", "--force", "/d"},
-	{"env", "create", "--force", "/d"},
-	{"env", "run", "-f", "/d"},
-	{"env", "run", "-df", "/d"},
-	{"env", "run", "--env-arg", "x=1", "-f", "/d"},
+// guardCase is one row of the table both guards are held to
+// (e2e/testdata/sbx/guard-cases.jsonl): the argv, and what the guard of
+// this package says of it. Want is I4 or I25 when both this guard and
+// the fake sbx refuse it (the fake exits 99), "shape" when this guard
+// refuses a call that is not one of the shapes romeu drives and the fake
+// has no rule for it, and "ok" when this guard lets it through and the
+// fake does not exit 99 on it.
+type guardCase struct {
+	Want string   `json:"want"`
+	Argv []string `json:"argv"`
+	Note string   `json:"note"`
 }
 
-// TestGuardRefusesApproval holds I4: whatever the call, --auto-approve
-// and -y; on env run and env create, the --force and -f that sbx v0.48.0
-// put in their place.
-func TestGuardRefusesApproval(t *testing.T) {
-	for _, argv := range refusedApprovals {
-		t.Run(strings.Join(argv, " "), func(t *testing.T) {
-			require.Error(t, Guard(call(argv...)))
+// guardCasesPath is the table, from this package.
+const guardCasesPath = "../../e2e/testdata/sbx/guard-cases.jsonl"
+
+// loadGuardCases reads the table.
+func loadGuardCases(t *testing.T) []guardCase {
+	t.Helper()
+	data, err := os.ReadFile(guardCasesPath)
+	require.NoError(t, err)
+	var out []guardCase
+	for i, line := range slices.Collect(bytes.Lines(data)) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		var c guardCase
+		require.NoError(t, jsonv2.Unmarshal(line, &c), "line %d", i+1)
+		require.Contains(t, []string{"I4", "I25", "shape", "ok"}, c.Want, "line %d", i+1)
+		out = append(out, c)
+	}
+	require.NotEmpty(t, out)
+	return out
+}
+
+// invariantOf returns the invariant a guard error names.
+func invariantOf(err error) string {
+	for _, d := range cli.Of(err).Details {
+		if d.Key == "invariant" {
+			return d.Value
+		}
+	}
+	return ""
+}
+
+// TestGuardCases holds the guard to the shared table: I4 wherever an
+// approval is, found after the global flags and for the flags of the
+// verb it is on (the -t of env exec is a boolean, the -t of secret set a
+// value); I25 for every form of secret set but the exact one; a shape
+// romeu does not drive is refused; the rest passes.
+func TestGuardCases(t *testing.T) {
+	for _, tt := range loadGuardCases(t) {
+		t.Run(tt.Want+" "+strings.Join(tt.Argv, " "), func(t *testing.T) {
+			err := Guard(call(tt.Argv...))
+			if tt.Want == "ok" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Equal(t, tt.Want, invariantOf(err), err.Error())
 		})
 	}
 }
 
-// TestGuardLeavesWhatItDoesNotGuard holds the other side: the words
-// of a command after "--", the value of a flag, --force on env rm, and
-// the calls the table builds.
-func TestGuardLeavesWhatItDoesNotGuard(t *testing.T) {
-	tests := []struct {
-		name string
-		argv []string
-	}{
-		{"a command after the double dash", []string{"env", "exec", "/d", "--", "tool", "--auto-approve", "-y", "--force"}},
-		{"the value of --env", []string{"env", "exec", "-it", "--env", "-y", "/d", "--", "sh"}},
-		{"the value of --command", []string{"secret", "set", "github", "--command", "-f"}},
-		{"force on rm", []string{"env", "rm", "--force", "/d"}},
-		{"a cluster for a terminal", []string{"env", "exec", "-it", "/d", "--", "sh"}},
-		{"detach", []string{"env", "run", "-d", "--clone", "/d"}},
+// TestGuardTableHasTheRowsThatKilledMutants holds the table to the rows
+// a review found surviving: the fake sbx with --token among its secret
+// flags, and the fake with create dropped from the force rule.
+func TestGuardTableHasTheRowsThatKilledMutants(t *testing.T) {
+	cases := loadGuardCases(t)
+	has := func(want string, argv ...string) bool {
+		return slices.ContainsFunc(cases, func(c guardCase) bool { return c.Want == want && slices.Equal(c.Argv, argv) })
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.NoError(t, Guard(call(tt.argv...)))
-		})
-	}
-}
-
-// refusedSecretForms are the forms of sbx secret set that bring a value
-// or take it from anywhere but --command: the guard of I25 refuses them
-// and the fake sbx exits 99 on them.
-var refusedSecretForms = [][]string{
-	{"secret", "set", "github"},
-	{"secret", "set", "github", "-t", "ghp_x"},
-	{"secret", "set", "github", "-tghp_x"},
-	{"secret", "set", "github", "--token", "ghp_x"},
-	{"secret", "set", "github", "--token=ghp_x"},
-	{"secret", "set", "github", "--command", "/bin/true", "--token", "x"},
-	{"secret", "set", "--registry", "ghcr.io", "--password-stdin"},
-	{"secret", "set", "openai", "--oauth"},
-	{"secret", "set", "anthropic", "--ref", "op://a/b/c"},
-	{"secret", "set", "github", "--command", "/bin/true", "--force"},
-	{"secret", "set", "github", "--command", "/bin/true", "-f"},
-	{"secret", "set", "github", "--command", ""},
-	{"secret", "set", "github", "--command"},
-	{"secret", "set", "github", "--command="},
-}
-
-// TestGuardRefusesSecretValueForms holds I25: sbx secret set only with
-// --command, and with no other flag than the three of secretSetFlags.
-func TestGuardRefusesSecretValueForms(t *testing.T) {
-	for _, argv := range refusedSecretForms {
-		t.Run(strings.Join(argv, " "), func(t *testing.T) {
-			require.Error(t, Guard(call(argv...)))
-		})
-	}
-	assert.NoError(t, Guard(call("secret", "set", "github", "--command", "/usr/bin/true", "--sandbox", "shop", "--refresh", "55m")))
+	assert.True(t, has("I25", "secret", "set", "github", "--command", "/bin/true", "--token", "x"))
+	assert.True(t, has("I25", "secret", "set", "github", "--token", "ghp_x"))
+	assert.True(t, has("I4", "env", "create", "--force", "/abs/shop-env"))
 }
 
 // forbiddenWords are the words no builder source may hold outside

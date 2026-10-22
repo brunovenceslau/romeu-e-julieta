@@ -6,6 +6,9 @@
 package sbxdrv
 
 import (
+	"bytes"
+	jsonv2 "encoding/json/v2"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -217,4 +220,32 @@ func TestNoCallCarriesAnApproval(t *testing.T) {
 			assert.Equal(t, "env-rm", c.Name, "--force is on env rm alone")
 		}
 	}
+}
+
+// TestPlaceholderTypesAgreeWithTheFake runs the one table of values
+// (e2e/testdata/sbx/placeholder-cases.jsonl) through the placeholder
+// types of this package; the fake sbx runs the same table through its
+// own matchers and imports nothing from here, so the table is what holds
+// the two lists of types equal.
+func TestPlaceholderTypesAgreeWithTheFake(t *testing.T) {
+	data, err := os.ReadFile("../../e2e/testdata/sbx/placeholder-cases.jsonl")
+	require.NoError(t, err)
+	byToken := map[string]Placeholder{}
+	for _, p := range placeholders {
+		byToken[p.Token] = p
+	}
+	n := 0
+	for line := range bytes.Lines(data) {
+		var c struct {
+			Token string `json:"token"`
+			Value string `json:"value"`
+			Valid bool   `json:"valid"`
+		}
+		require.NoError(t, jsonv2.Unmarshal(line, &c))
+		p, ok := byToken[c.Token]
+		require.True(t, ok, c.Token)
+		n++
+		assert.Equal(t, c.Valid, p.Check(c.Value) == nil, "%s %q", c.Token, c.Value)
+	}
+	assert.Greater(t, n, 50)
 }

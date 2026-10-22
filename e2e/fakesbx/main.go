@@ -10,8 +10,13 @@
 // env exec, the argv before "--" is matched and the command after it is
 // forwarded when the configuration names a command to forward to.
 //
-// It exits 99 on --auto-approve (I4) and on a value form of sbx secret
-// set (I25), whatever its recording holds, 97 for a call it will not
+// It exits 99 on an approval (I4: --auto-approve, -y, and --force on env
+// run and env create), on any form of sbx secret set that is not the
+// command form (I25), and on a child environment that holds a name
+// outside PATH, HOME, LANG, TERM and the contributions its configuration
+// declares or a value that is a secret sentinel (04 4.1), whatever its
+// recording holds, and it records each refusal in its state file before
+// it exits; it exits 97 for a call it will not
 // replay (the reason is on its stderr and in the failures of its state
 // file, which the test reads even when romeu hides the exit), and 98
 // when its own configuration or session is unusable.
@@ -47,13 +52,24 @@ func main() {
 // it.
 func run(args, environ []string, stdin io.Reader, stdout, stderr io.Writer, hang func()) int {
 	argv := args[1:]
-	if why := refusal(argv); why != "" {
-		_, _ = fmt.Fprintf(stderr, "fakesbx: refused %q: %s\n", argv, why)
+	cfg, cfgErr := loadConfig(args[0], environ)
+	why := refusal(argv)
+	if why != "" {
+		why = "refused " + fmt.Sprintf("%q", argv) + ": " + why
+	} else if cfgErr == nil {
+		if bad := envRefusal(environ, cfg); bad != "" {
+			why = "refused the environment of " + fmt.Sprintf("%q", argv) + ": " + bad
+		}
+	}
+	if why != "" {
+		if cfgErr == nil {
+			recordRefusal(cfg, argv, why)
+		}
+		_, _ = fmt.Fprintf(stderr, "fakesbx: %s\n", why)
 		return exitGuard
 	}
-	cfg, err := loadConfig(args[0], environ)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "fakesbx: %v\n", err)
+	if cfgErr != nil {
+		_, _ = fmt.Fprintf(stderr, "fakesbx: %v\n", cfgErr)
 		return exitBroken
 	}
 	sess, err := loadSession(cfg.Session)

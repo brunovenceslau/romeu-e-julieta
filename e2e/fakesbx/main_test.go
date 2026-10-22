@@ -97,9 +97,56 @@ func TestExit99OnApprovalAndValueForms(t *testing.T) {
 			assert.Contains(t, errOut, "refused")
 		})
 	}
-	assert.NoFileExists(t, r.state, "a refusal reads and writes no state")
-	code, _, _ := r.call("secret", "set", "github", "--command", "/usr/bin/true")
+	st := r.readState()
+	require.Len(t, st.Failures, len(tests), "each refusal is in the state file, written before the exit")
+	assert.Contains(t, st.Failures[0].Reason, "I4")
+	assert.Equal(t, tests[0].argv, st.Failures[0].Argv)
+	assert.Len(t, st.Calls, len(tests))
+	code, _, _ := r.call("secret", "set", "github", "--sandbox", "shop", "--command", "/usr/bin/true")
 	assert.Equal(t, 0, code, "the form romeu calls is replayed")
+}
+
+// TestExit99WithoutAConfiguration refuses an approval even when the
+// fake has no configuration to record it in.
+func TestExit99WithoutAConfiguration(t *testing.T) {
+	var out, errOut bytes.Buffer
+	code := run([]string{filepath.Join(t.TempDir(), "sbx"), "env", "run", "-y", "/abs/d"}, nil, nil, &out, &errOut, func() {})
+	assert.Equal(t, 99, code)
+}
+
+// TestExit99OnTheEnvironment holds 04 4.1 from the fake's side: the
+// child environment is PATH, HOME, LANG, TERM and the contributions the
+// configuration declares, and none of its values is a secret.
+func TestExit99OnTheEnvironment(t *testing.T) {
+	r := newRig(t, "replay")
+	r.cfg.AllowEnv = []string{"SSH_AUTH_SOCK"}
+	r.cfg.Sentinels = []string{"SENTINEL-1f3a"}
+	r.write()
+	call := func(environ ...string) (int, string) {
+		var out, errOut bytes.Buffer
+		code := run([]string{r.sbx, "version"}, environ, nil, &out, &errOut, func() {})
+		return code, errOut.String()
+	}
+	code, _ := call("PATH=/usr/bin:/bin", "HOME=/h", "LANG=C", "TERM=xterm", "SSH_AUTH_SOCK=/run/agent.sock")
+	assert.Equal(t, 0, code, "the base and a declared contribution")
+
+	for _, tt := range []struct{ name, kv, reason string }{
+		{"a name outside the list", "FOO=1", "FOO"},
+		{"a name that is the host's", "SSH_CONNECTION=1", "SSH_CONNECTION"},
+		{"a sentinel in a declared variable", "SSH_AUTH_SOCK=/x/SENTINEL-1f3a", "holds a secret"},
+		{"a sentinel in HOME", "HOME=SENTINEL-1f3a", "holds a secret"},
+		{"a GitHub token", "LANG=ghp_abcdefghijklmnop", "holds a secret"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			code, errOut := call("PATH=/usr/bin:/bin", tt.kv)
+			assert.Equal(t, 99, code)
+			assert.Contains(t, errOut, tt.reason)
+		})
+	}
+	st := r.readState()
+	require.Len(t, st.Failures, 5, "each refusal is recorded before the exit")
+	assert.Equal(t, []string{"version"}, st.Failures[0].Argv)
+	assert.Contains(t, st.Failures[0].Reason, "FOO")
 }
 
 // TestExit99LeavesTheCommandOfAnExec holds that the words after "--" are
@@ -441,7 +488,7 @@ func TestConfigFromTheEnvironment(t *testing.T) {
 	require.NoError(t, os.WriteFile(elsewhere, data, 0o600))
 	require.NoError(t, os.Remove(r.sbx+".json"))
 	var out, errOut bytes.Buffer
-	code := run([]string{r.sbx, "version"}, []string{"X=1", configEnv + "=" + elsewhere}, nil, &out, &errOut, func() {})
+	code := run([]string{r.sbx, "version"}, []string{"LANG=C", configEnv + "=" + elsewhere}, nil, &out, &errOut, func() {})
 	assert.Equal(t, 0, code)
 	assert.Equal(t, "v0.48.0\n", out.String())
 }

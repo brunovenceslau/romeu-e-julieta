@@ -36,6 +36,13 @@ type config struct {
 	// an answer: the recording holds fixed example values, the test its
 	// own paths and names.
 	Replace []replacement `json:"replace"`
+	// AllowEnv are the names of the environment contributions the test
+	// declares (04 4.1): the child environment may hold these besides
+	// PATH, HOME, LANG and TERM.
+	AllowEnv []string `json:"allowEnv"`
+	// Sentinels are values that must appear in no variable of the child
+	// environment: a variable whose value holds one is refused.
+	Sentinels []string `json:"sentinels"`
 	// Forward is the command that runs, with the words after "--" of an
 	// env exec added, in place of the recorded answer (10 10.3, Replay
 	// only; the hybrid level forwards into the julieta container).
@@ -73,6 +80,9 @@ func loadConfig(argv0 string, environ []string) (config, error) {
 		if r.From == "" {
 			return config{}, errors.New(path + ": a replacement has an empty from")
 		}
+	}
+	if slices.Contains(c.Sentinels, "") {
+		return config{}, errors.New(path + ": a sentinel is empty")
 	}
 	if slices.Contains(c.Forward, "") {
 		return config{}, errors.New(path + ": the forward command has an empty word")

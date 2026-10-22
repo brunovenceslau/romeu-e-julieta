@@ -59,7 +59,7 @@ func TestRunInteractive(t *testing.T) {
 	var out, errOut bytes.Buffer
 	r := runner(sbx)
 	r.Terminal = Terminal{In: strings.NewReader("hello\n"), Out: &out, Err: &errOut}
-	c := Call{Name: "test", Argv: []string{"x"}, Class: procgroup.SbxStart, Mode: Interactive}
+	c := mustCall(EnvStart("/abs/root/shop-env"))
 	res, err := r.Run(context.Background(), c, Opts{})
 	require.NoError(t, err)
 	assert.Equal(t, "got:hello TERM=xterm-test\n", out.String())
@@ -80,8 +80,14 @@ func TestRunRefusesWhatItCannotRun(t *testing.T) {
 		{"a relative path", runner("sbx"), Version()},
 		{"an unclean path", runner(sbx + "/../sbx"), Version()},
 		{"no mode", runner(sbx), Call{Name: "x", Argv: []string{"x"}, Class: procgroup.SbxRead}},
-		{"auto-approve", runner(sbx), Call{Name: "x", Argv: []string{"env", "run", "--auto-approve"}, Class: procgroup.SbxStart, Mode: Interactive}},
-		{"a secret by value", runner(sbx), Call{Name: "x", Argv: []string{"secret", "set", "github", "-t", "x"}, Class: procgroup.SbxChange, Mode: Captured}},
+		{"auto-approve", runner(sbx), Call{Name: "x", Argv: []string{"env", "run", "--auto-approve"}, Class: procgroup.SbxStart, Mode: Interactive, validated: true}},
+		{"a secret by value", runner(sbx), Call{Name: "x", Argv: []string{"secret", "set", "github", "-t", "x"}, Class: procgroup.SbxChange, Mode: Captured, validated: true}},
+		{"a call no builder made", runner(sbx), Call{Name: "x", Argv: []string{"stop", "shop"}, Class: procgroup.SbxChange, Mode: Captured}},
+		{"a call a builder made and a caller changed", runner(sbx), func() Call {
+			c := mustCall(EnvStart("/abs/root/shop-env"))
+			c.Argv = append(slices.Clone(c.Argv[:len(c.Argv)-1]), "--force", "/abs/root/shop-env")
+			return c
+		}()},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -100,12 +106,12 @@ func TestRunFailureDetails(t *testing.T) {
 	r := runner(sbx)
 	r.Scrub = Scrubber{Home: "/home/agent", User: "agent", Host: "agent-mbp", Root: "/home/agent/dev"}
 	r.Versions = Versions{Romeu: "v1.2.3", Julieta: "v1.2.4", Sbx: "0.48.0"}
-	c := Call{Name: "test", Argv: []string{"env", "rm", "/home/agent/dev/shop env"}, Class: procgroup.SbxChange, Mode: Captured}
+	c := mustCall(EnvRm("/home/agent/dev/shop env"))
 	_, err := r.Run(context.Background(), c, Opts{Step: "run step 3"})
 	ce, ok := errors.AsType[*CallError](err)
 	require.True(t, ok, "%v", err)
 	assert.Equal(t, []cli.Detail{
-		{Key: "argv", Value: `sbx env rm "/home/agent/dev/shop env"`},
+		{Key: "argv", Value: `sbx env rm --force "/home/agent/dev/shop env"`},
 		{Key: "status", Value: "exit 3"},
 		{Key: "stderr", Value: `open <root>/shop-env: permission denied for <user> on <host>\n\u001b[31mred\n`},
 		{Key: "step", Value: "run step 3"},
@@ -113,7 +119,7 @@ func TestRunFailureDetails(t *testing.T) {
 		{Key: "julieta version", Value: "v1.2.4"},
 		{Key: "sbx version", Value: "0.48.0"},
 	}, ce.Details())
-	assert.Equal(t, "sbx test failed: exit 3", ce.Error())
+	assert.Equal(t, "sbx env-rm failed: exit 3", ce.Error())
 	_, isExit := errors.AsType[*procgroup.ExitError](err)
 	assert.True(t, isExit, "the error of procgroup is in the chain")
 }
@@ -187,7 +193,7 @@ func TestRunTimeout(t *testing.T) {
 func TestRunTimeoutClasses(t *testing.T) {
 	sbx := script(t, `sleep 1`)
 	ctx := procgroup.WithTestTimeout(context.Background(), procgroup.SbxRead, 100*time.Millisecond)
-	create := Call{Name: "create", Argv: []string{"x"}, Class: procgroup.SbxCreate, Mode: Captured}
+	create := mustCall(EnvCreate("/abs/root/shop-env"))
 	_, err := runner(sbx).Run(ctx, create, Opts{})
 	assert.NoError(t, err, "the limit of sbx-read does not reach a call of sbx-create")
 }

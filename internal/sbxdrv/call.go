@@ -44,6 +44,11 @@ type Call struct {
 	Class procgroup.Class
 	// Mode says whether the call is interactive or captured.
 	Mode Mode
+
+	// validated is set by the builders alone, after their values passed
+	// the placeholders and the guards (argvBuilder.call). Run refuses a
+	// Call without it, so that a Call built by hand never reaches sbx.
+	validated bool
 }
 
 // argvBuilder builds the argv and the shape of a call side by side.
@@ -107,6 +112,7 @@ func (b *argvBuilder) call(name string, class procgroup.Class, mode Mode) (Call,
 	if err := Guard(c); err != nil {
 		return Call{}, err
 	}
+	c.validated = true
 	return c, nil
 }
 

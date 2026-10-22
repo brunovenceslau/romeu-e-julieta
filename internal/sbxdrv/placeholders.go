@@ -61,8 +61,8 @@ var (
 	// envDir is the directory that holds sbxenv.yaml, which sbx env
 	// commands take as PATH.
 	envDir = Placeholder{Token: "<dir>", What: "the absolute path of the directory that holds sbxenv.yaml", Check: func(v string) error {
-		if !filepath.IsAbs(v) || filepath.Clean(v) != v {
-			return errors.New("is not a clean absolute path")
+		if !filepath.IsAbs(v) || filepath.Clean(v) != v || v == "/" {
+			return errors.New("is not a clean absolute path below the root of the file system")
 		}
 		return noControl(v)
 	}}

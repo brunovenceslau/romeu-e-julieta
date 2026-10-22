@@ -256,22 +256,34 @@ func TestFakeFailsAnOutOfOrderCall(t *testing.T) {
 }
 
 // TestFakeExits99WhereTheGuardsRefuse holds that the guard of this
-// package and the fake agree: every argv the guard refuses, the fake
-// exits 99 on, whatever the session holds.
+// package and the fake agree on the shared table (the differential
+// test): where the table says I4 or I25 the fake exits 99, whatever the
+// session holds, and where it says ok the fake does not.
 func TestFakeExits99WhereTheGuardsRefuse(t *testing.T) {
 	abs, err := filepath.Abs(filepath.Join(sessionsDir, "0.48.0", "lifecycle.jsonl"))
 	require.NoError(t, err)
 	rig := newFakeRig(t, abs)
-	for _, argv := range append(append([][]string{}, refusedApprovals...), refusedSecretForms...) {
-		t.Run(strings.Join(argv, " "), func(t *testing.T) {
-			require.Error(t, Guard(call(argv...)), "the guard refuses it")
+	for _, tt := range loadGuardCases(t) {
+		if tt.Want == "shape" {
+			continue // the fake has no rule for a shape; it replays or fails with 97
+		}
+		t.Run(tt.Want+" "+strings.Join(tt.Argv, " "), func(t *testing.T) {
+			guardErr := Guard(call(tt.Argv...))
 			var out bytes.Buffer
 			err := procgroup.Run(context.Background(), procgroup.Command{
-				Class: procgroup.SbxChange, Argv: append([]string{rig.runner.Sbx}, argv...), Env: []string{"PATH=/usr/bin:/bin"}, Stdout: &out, Stderr: &out,
+				Class: procgroup.SbxChange, Argv: append([]string{rig.runner.Sbx}, tt.Argv...), Env: []string{"PATH=/usr/bin:/bin"}, Stdout: &out, Stderr: &out,
 			})
-			ee, ok := errors.AsType[*procgroup.ExitError](err)
-			require.True(t, ok, "%v", err)
-			assert.Equal(t, 99, ee.Code, out.String())
+			code := 0
+			if ee, ok := errors.AsType[*procgroup.ExitError](err); ok {
+				code = ee.Code
+			}
+			if tt.Want == "ok" {
+				require.NoError(t, guardErr, "the guard lets it through")
+				assert.NotEqual(t, 99, code, out.String())
+				return
+			}
+			require.Error(t, guardErr, "the guard refuses it")
+			assert.Equal(t, 99, code, out.String())
 		})
 	}
 }

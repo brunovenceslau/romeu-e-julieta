@@ -52,13 +52,40 @@ var isName = matchRegexp(`^[a-z][a-z0-9-]{0,38}[a-z0-9]$`)
 
 // isAbsolute accepts a clean absolute path with no control character.
 func isAbsolute(v string) bool {
-	return filepath.IsAbs(v) && filepath.Clean(v) == v && !hasControl(v)
+	return filepath.IsAbs(v) && filepath.Clean(v) == v && v != "/" && !hasControl(v)
 }
 
-// isDomain accepts the resource of a network rule as sbx takes it: a
-// host name, with the wildcards, port suffix and CIDR forms of
-// "sbx policy allow network".
-var isDomain = matchRegexp(`^[A-Za-z0-9*?.:\[\]!/-]{1,253}$`)
+// isDomain accepts the resource of a network rule as romeu writes it
+// (03 3.1): a lowercase host name of two labels or more, each a letter
+// or digit at each end with letters, digits and hyphens between, a last
+// label that is not all digits, no label of 0x and hex digits, no label
+// with hyphens in the third and fourth places but an A-label's, and no
+// special-use last label. No wildcard, port or address: sbx takes those
+// forms, and romeu never writes them. The rule is written here from the
+// spec, and a table both this fake and internal/sbxdrv run
+// (e2e/testdata/sbx/placeholder-cases.jsonl) holds it to the driver's.
+func isDomain(v string) bool {
+	if len(v) > 253 || strings.HasPrefix(v, ".") {
+		return false
+	}
+	labels := strings.Split(v, ".")
+	if len(labels) < 2 || strings.Trim(labels[len(labels)-1], "0123456789") == "" {
+		return false
+	}
+	for _, l := range labels {
+		if !domainLabel.MatchString(l) || hexLabel.MatchString(l) || (len(l) >= 4 && l[2:4] == "--" && !strings.HasPrefix(l, "xn--")) {
+			return false
+		}
+	}
+	last := labels[len(labels)-1]
+	return !slices.Contains(specialUse, last) && v != "home.arpa" && !strings.HasSuffix(v, ".home.arpa")
+}
+
+var (
+	domainLabel = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
+	hexLabel    = regexp.MustCompile(`^0x[0-9a-f]+$`)
+	specialUse  = []string{"localhost", "local", "internal", "localdomain", "lan", "home", "corp", "intranet", "private", "test", "invalid", "onion"}
+)
 
 // isHostCommand accepts the command of a command secret: an absolute
 // path first, with no control character.
