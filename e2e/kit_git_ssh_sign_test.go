@@ -19,7 +19,6 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/e2e/internal/container"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/kitpin/pins"
 )
 
 // The git-ssh-sign kit (06 6.4, REQ-0594), read from kits/git-ssh-sign/:
@@ -136,11 +135,14 @@ func TestKitGitSSHSignDescriptor(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal(raw, &fact))
 	assert.Equal(t, "sitting M0", fact.Source, "the evidence is sitting M0's, not sitting M2's")
 	assert.NotEmpty(t, fact.SBX)
-	pinSrc, err := os.ReadFile(filepath.Join(config(t).Root, filepath.FromSlash(pins.Path)))
+	pinSrc, err := os.ReadFile(filepath.Join(config(t).Root, "kits", "pins.yaml"))
 	require.NoError(t, err)
-	pinned, err := pins.Parse(pinSrc)
-	require.NoError(t, err)
-	require.NotNil(t, pinned.Frontend)
+	var pinned struct {
+		Frontend struct {
+			Ref string `yaml:"ref"`
+		} `yaml:"frontend"`
+	}
+	require.NoError(t, yaml.Unmarshal(pinSrc, &pinned))
 	name, short, _ := strings.Cut(fact.Frontend, "@sha256:")
 	assert.True(t, strings.HasPrefix(pinned.Frontend.Ref, name+"@sha256:"+short), "the fixture names the pinned frontend")
 	assert.Equal(t, "allowed", fact.Observed.SignNamespaceGit)
