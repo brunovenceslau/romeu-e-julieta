@@ -196,16 +196,15 @@ Taken on 2026-10-21, each with what reopens it:
   run: 72 packages agree with the go command's `coverage:` lines within
   its one-decimal rounding. Reopened by a profile reader in the standard
   library or by an approved dependency (`golang.org/x/tools/cover`).
-- `ModuleRoot`. One finder, `moduleroot.Find`, so that `git grep -n
-  'func ModuleRoot'` finds only `citest.ModuleRoot(t)`, the wrapper that
-  keeps its `*testing.T` signature. The probe (a package under the root
-  `internal/` imported from `tools/ci/internal/citest`) was refused
-  twice by `go run ./tools/ci imports`: `imports unnamed` (REQ-0972) and
-  `imports tools` (REQ-0971). The resolution is a row in the table of 10
-  10.7 (REQ-1256, `tools/ci` and `e2e/**` only, no binary links it), an
-  allowance for `tools/ci` and `e2e` in `toolExtra` of
-  `tools/ci/internal/imports/rows.go`, and a test of each side.
-  The module-tree check (`moduletree`) then asked for two more lines, in
-  the tree of 02 2.1 and the module table of 12 12.2, which are not in
-  this task's `owns`. Reopened by a package that tools and e2e share
-  again: it takes a row and an allowance the same way.
+- `ModuleRoot` (part 4) is not built on this branch. The probe (a package
+  under the root `internal/` imported from `tools/ci/internal/citest`)
+  was refused twice by `go run ./tools/ci imports`: `imports unnamed`
+  (REQ-0972) and `imports tools` (REQ-0971). The way the check intends
+  is a row in the table of 10 10.7, an allowance in `toolExtra` of
+  `tools/ci/internal/imports/rows.go` and a test of each side, and
+  that is built, but the module-tree check then also asks for a line in
+  the tree of 02 2.1 and a row in the module table of 12 12.2, two files
+  outside this task's `owns`. The work stands whole in the local commit
+  of the branch `wip/t156-part4` (`moduleroot.Find`; a new id, REQ-1256),
+  waiting for the maintainer to add those two files to `owns`. Reopened
+  by that decision.
