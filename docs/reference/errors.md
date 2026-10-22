@@ -23,7 +23,11 @@ exit codes are in [exit-codes.md](exit-codes.md).
 | Id | Slug | Exit | Fix | Declared in | Recovered in |
 |---|---|---|---|---|---|
 | `RJ-311` | `format-newer` | 2 | `decide: install the release that wrote it` | [internal/manifest](../../internal/manifest/errors.go) | none: the release that wrote the file reads it |
+| `RJ-314` | `secret-in-argv` | 2 | `decide: replace the value in settings.yaml with a command that fetches it, such as one that reads a Keychain item` | [internal/spec](../../internal/spec/errors.go) | none: the edit of the hint fixes the settings, and no value was used |
 | `RJ-328` | `check-findings` | 6 | `decide: fix each finding the details name, then run the check again` | [internal/cli](../../internal/cli/errors.go) | none: the findings name the paths to fix |
+| `RJ-337` | `format-unsupported` | 2 | `decide: apply the edit in the release notes of each skipped release` | [internal/spec](../../internal/spec/errors.go) | none: the edit of the hint brings the file to a version this build reads |
 | `RJ-342` | `manifest-protocol` | 2 | `decide: run romeu run <name> on the host, which passes a manifest of the current protocol` | [internal/manifest](../../internal/manifest/errors.go) | none: the run of the hint replaces the manifest |
+| `RJ-345` | `projects-stray-file` | 2 | `decide: move or remove <path>` | [internal/spec](../../internal/spec/errors.go) | none: the config repo holds the file, and the edit of the hint removes it |
+| `RJ-346` | `config-project-missing` | 2 | `decide: add the config repository's own spec under projects/, or fix config.url in settings.yaml` | [internal/spec](../../internal/spec/errors.go) | none: the edit of the hint adds the spec or fixes the settings |
 | `RJ-348` | `internal` | 1 | `decide: open an issue with the details` | [internal/cli](../../internal/cli/errors.go) | none: a defect of the code, fixed in a release |
 | `RJ-349` | `usage` | 2 | `<binary> <command> --help` | [internal/cli](../../internal/cli/errors.go) | none: the help the hint names lists the commands and flags |

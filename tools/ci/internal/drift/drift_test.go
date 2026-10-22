@@ -706,7 +706,7 @@ func TestGeneratedOutputsAreNotConverted(t *testing.T) {
 	t.Cleanup(func() { _ = r.Close() })
 	// The files the generators of the registry of this test write, the
 	// inventory of the checks, and the schemas of the formats registered
-	// with tools/schemagen.
+	// with tools/schemagen and their reference pages.
 	outs, err := generateOutputs(r)
 	require.NoError(t, err)
 	checks, err := check.ChecksPageOutput(r)
@@ -714,7 +714,9 @@ func TestGeneratedOutputsAreNotConverted(t *testing.T) {
 	outs = append(outs, output{checks[0].Path, checks[0].Content})
 	schemas, err := schema.Outputs(schemagen.Registered())
 	require.NoError(t, err)
-	for _, o := range schemas {
+	pages, err := schema.PageOutputs(r)
+	require.NoError(t, err)
+	for _, o := range append(schemas, pages...) {
 		outs = append(outs, output{o.Path, o.Content})
 	}
 	findings, err := attributeProblems(t.Context(), git.Repo{Dir: root}, outs)

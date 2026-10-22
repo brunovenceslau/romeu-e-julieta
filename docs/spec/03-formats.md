@@ -194,21 +194,26 @@ one `VERSION` names ([02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-publ
 as `v` and the version.
 
 `REQ-0191` The classification is the struct tags on the spec types
-(`gate:"widening"`, `apply:"recreate|live"`, 01 1.4);
-`docs/reference/project.md`, generated from them, replaces this table
-(opening).
+(`gate:"widening"`, `apply:"recreate|live"`, 01 1.4). The field table,
+with each field's tags, and the rule table are generated in
+[docs/reference/project.md](../reference/project.md), from the types
+and `rules.go`, beside [schemas/project.v1.json](../../schemas/project.v1.json).
+What the tags decide:
 
-| Field | `gate` | `apply` | Notes |
-|---|---|---|---|
-| `repos` (incl. `ref`) | widening | recreate | `ref` decides which commit egress derives from |
-| `workload`, `kits` | widening (with capabilities) | recreate | |
-| `agent` | widening | recreate | |
-| `ports` | widening | recreate | |
-| `secrets` | widening | recreate; `live` if probe A10 confirms (Q18) | |
-| `egress.extra`, `egress.tools` | widening | live | |
-| `salvage.excludeIgnored` | widening | live | it defines acknowledged loss |
-| `sandboxOptions` (`cpus`, `memory` only) | `REQ-0192` - | recreate | `status` reports recreate needed; stripped from `renderDigest`; on the list of deliberately ungated fields (01 1.4), an accepted risk of [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1) |
-| `run` | - | live | pane commands run only inside the sandbox; on the list of deliberately ungated fields (01 1.4) |
+- `ref` decides which commit egress derives from, so it is widening
+  with the rest of `repos`.
+- `workload` and `kits` are widening with their capabilities.
+- `secrets` applies at recreate; it becomes `live` if probe A10
+  confirms it (Q18).
+- `salvage.excludeIgnored` is widening, since it defines acknowledged
+  loss.
+- `REQ-0192` `sandboxOptions` (`cpus` and `memory` only) is ungated and
+  applies at recreate: `status` reports recreate needed, it is stripped
+  from `renderDigest`, and it is on the list of deliberately ungated
+  fields (01 1.4), an accepted risk of
+  [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1).
+- `run` is ungated and applies live: pane commands run only inside the
+  sandbox, and it is on the same list.
 
 `REQ-0193` There is no field for a host command, an absolute path, a mount, or an
 env var for the sandbox as a whole or for sbx; a pane's `env` reaches
@@ -222,10 +227,9 @@ The run layout is romeu's own format, which julieta renders for herdr,
 the one renderer; a second renderer is a row of
 [Deferred decisions](../spec.md#in-the-product).
 
-| Key | Meaning |
-|---|---|
-| `tabs[]` | `REQ-0194` `label` + `root`; a node is `{pane: <id>}` or `{split: row\|column, ratio: 0.1..0.9, first, second}` (binary tree) |
-| `panes[]` | `REQ-0195` `id`, `repo` (a project `dir`), `cwd` (relative to the repo), `env` (keys `^[A-Z_][A-Z0-9_]*$`, not `PATH`, `HOME`, `LD_*`, `BASH_ENV`, `ENV`), `steps` (list of argv lists; no shell), `focus` (at most one per tab) |
+The fields of `run` (`tabs[]`, a binary tree of nodes per tab, and
+`panes[]`) and their rules are in the field and rule tables of
+[docs/reference/project.md](../reference/project.md).
 
 `REQ-0196` Execution rule: every step runs as `mise exec -C <pane dir> -- <argv>`;
 steps run in order; each must exit 0 before the next; the last step is
@@ -322,6 +326,11 @@ secrets:
     argv: [/opt/homebrew/bin/op, read, "op://dev/npm/token"]
 ```
 
+The field table and the rule table are generated in
+[docs/reference/host-settings.md](../reference/host-settings.md), from
+the types and `rules.go`, beside
+[schemas/host-settings.v1.json](../../schemas/host-settings.v1.json).
+
 `REQ-0204` Values you set: `romeu init` writes `root`, `config` and `tools`; the
 operator fills `gitHosts`, `workloadRepositories`, `signing` when a
 project uses `git-ssh-sign`, and `secrets`
@@ -329,8 +338,10 @@ project uses `git-ssh-sign`, and `secrets`
 
 `REQ-0205` Rules: every `argv[0]` is absolute and exists; no shell strings; an argv
 is a command that fetches the value and never carries it. `REQ-0206` An
-argv element that starts with `ghp_`, `gho_`, `ghs_`, `ghu_`, `ghr_` or
-`github_pat_`, or matches `^[0-9a-f]{40}$`, is refused with the error
+argv element that holds, at its start or after whitespace or `=` (so
+`--token=<t>` and `Bearer <t>` too), `ghp_`, `gho_`, `ghs_`, `ghu_`,
+`ghr_` or `github_pat_`, or 40 hex digits of either case that end the
+element or a word, is refused with the error
 `secret-in-argv` (`RJ-314`; a best-effort guard against the common token
 shapes, not a detector); a spec secret name without a matching `name@project`
 entry is exit 2 naming the key; `REQ-0207` a `name@other-project` entry never
@@ -443,14 +454,34 @@ says in the pull request which kind the member is.
 }
 ```
 
-| Field | Meaning |
-|---|---|
-| `protocol` | `REQ-0218` the romeu/julieta contract number; `REQ-0219` julieta accepts a manifest of protocol N (its own) or N-1 (a cached manifest written before a romeu upgrade) and refuses anything else with the error `manifest-protocol` (`RJ-342`, exit 2) |
-| `specCommit` | `REQ-0220` the config repo commit of the live spec, fresh at each exec; the agent compares it with the commit it pushed (01 1.2) |
-| `repos[].path` | `REQ-0221` the primary's host path (clone mode keeps it); a secondary's `<home>/src/<project>/<dir>`, where `<home>` is the workload user's home, measured by probe A4 and stored with the workload pin in `kits/pins.yaml` |
-| `repos[].base` | `REQ-0222` origin SHAs the host clone already has, each held by the create-only ref `refs/romeu/base/<name>/<generation>/<dir>` ([02 2.3](02-layouts.md#23-host-tree)); snapshot and salvage bundles exclude objects reachable from them (08) |
-| `salvageRun` | `REQ-0223` present only on salvage calls: the salvage id romeu expects back |
-| `egress` | `REQ-0224` the domains romeu applied to this sandbox, `auto` plus approved `gated` ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)); the pending gated set lives on the host and is not carried. `julieta status` prints it |
+The field table is generated in
+[docs/reference/manifest.md](../reference/manifest.md), from the Go
+types of `internal/manifest`. The rules of its fields that are design
+decisions:
+
+1. `REQ-0218` `protocol` is the romeu/julieta contract number;
+   `REQ-0219` julieta accepts a manifest of protocol N (its own) or N-1
+   (a cached manifest written before a romeu upgrade) and refuses
+   anything else with the error `manifest-protocol` (`RJ-342`, exit 2).
+2. `REQ-0220` `specCommit` is the config repo commit of the live spec,
+   fresh at each exec; the agent compares it with the commit it pushed
+   (01 1.2).
+3. `REQ-0221` `repos[].path` is the primary's host path (clone mode
+   keeps it); a secondary's is `<home>/src/<project>/<dir>`, where
+   `<home>` is the workload user's home, measured by probe A4 and
+   stored with the workload pin in `kits/pins.yaml`.
+4. `REQ-0222` `repos[].base` are origin SHAs the host clone already
+   has, each held by the create-only ref
+   `refs/romeu/base/<name>/<generation>/<dir>`
+   ([02 2.3](02-layouts.md#23-host-tree)); snapshot and salvage bundles
+   exclude objects reachable from them (08).
+5. `REQ-0223` `salvageRun` is present only on salvage calls: the
+   salvage id romeu expects back.
+6. `REQ-0224` `egress` holds the domains romeu applied to this sandbox,
+   `auto` plus approved `gated`
+   ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress));
+   the pending gated set lives on the host and is not carried.
+   `julieta status` prints it.
 
 `REQ-0225` The compatibility check that precedes every romeu command that execs
 julieta, and in which romeu accepts julieta protocols N and N-1 the way

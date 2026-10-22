@@ -252,9 +252,6 @@ type (
 	withEmbedOption struct {
 		S string `json:",embed"`
 	}
-	recursive struct {
-		Next *recursive `json:"next,omitempty"`
-	}
 	withBadElem        struct{ L []chan int }
 	withDuration       struct{ D time.Duration }
 	withUnmarshaler    struct{ U fixtureUnmarshaler }
@@ -286,7 +283,6 @@ func TestGenerateRefuses(t *testing.T) {
 		{"option", reflect.TypeFor[withOption](), `withOption.N: the json option "string"`},
 		{"duplicate", reflect.TypeFor[withDup](), `withDup.B: the JSON name "B" is used twice`},
 		{"embed option", reflect.TypeFor[withEmbedOption](), "withEmbedOption.S: embed on a field that is not a struct"},
-		{"recursive", reflect.TypeFor[recursive](), "recursive.Next: the recursive type"},
 		{"element", reflect.TypeFor[withBadElem](), "withBadElem.L[]: the kind chan"},
 		{"map value", reflect.TypeFor[withBadValue](), "withBadValue.M[key]: the kind chan"},
 		{"inner", reflect.TypeFor[withBadInner](), "withBadInner.E.C: the kind chan"},
