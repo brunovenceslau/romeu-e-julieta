@@ -5,8 +5,10 @@ package schema
 
 import (
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -124,6 +126,32 @@ func TestKitPin(t *testing.T) {
 	}
 }
 
+// TestKitSchemaCopyIsPinned holds the vendored copy to the digests of
+// kitSpecDigests: a file edited, added or removed is a finding.
+func TestKitSchemaCopyIsPinned(t *testing.T) {
+	const port = kitSpecRoot + "/capabilities/com.docker.sandbox/port@1.schema.json"
+	for _, c := range []struct {
+		name   string
+		change func(m map[string]string)
+		want   []check.Finding
+	}{
+		{"an edited file", func(m map[string]string) { m[port] = strings.Replace(m[port], "\"type\"", "\"type\" ", 1) },
+			[]check.Finding{{Where: port, Rule: "schema copy", Msg: "differs from the digest pinned for it in kits_digests.go: the copy of the kit schema at v3.0.0-m.8 changes only with its pin"}}},
+		{"an added file", func(m map[string]string) { m[kitSpecRoot+"/extra.schema.json"] = "{}" },
+			[]check.Finding{{Where: kitSpecRoot + "/extra.schema.json", Rule: "schema copy", Msg: "is no file of the copy of the kit schema at v3.0.0-m.8 that kits_digests.go pins"}}},
+		{"a removed file", func(m map[string]string) { delete(m, port) },
+			[]check.Finding{{Where: port, Rule: "schema copy", Msg: "is pinned in kits_digests.go and is not in the tree"}}},
+	} {
+		t.Run(strings.ReplaceAll(c.name, " ", "_"), func(t *testing.T) {
+			m := withKit(t, tree(t))
+			c.change(m)
+			got, err := Of(files(m), fixture)
+			require.NoError(t, err)
+			assert.Equal(t, c.want, got)
+		})
+	}
+}
+
 // TestAKitWithoutTheSchemaCopy fails a kit descriptor of a tree that
 // holds no copy of the kit schema to validate it against.
 func TestAKitWithoutTheSchemaCopy(t *testing.T) {
@@ -145,6 +173,7 @@ func TestTheKitSchemaIsTheTagsCopy(t *testing.T) {
 		names = append(names, strings.TrimPrefix(p, kitSpecRoot+"/"))
 	}
 	assert.Len(t, names, 21)
+	assert.ElementsMatch(t, slices.Collect(maps.Keys(kitSpecDigests)), names)
 	assert.Contains(t, names, "kit.schema.json")
 	assert.Contains(t, names, "definitions/kit-arg.schema.json")
 	assert.Contains(t, m[kitSpecRoot+"/kit.schema.json"], `"$schema": "http://json-schema.org/draft-07/schema#"`)

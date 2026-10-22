@@ -75,6 +75,7 @@ const (
 	ruleHint    = "schema hint"
 	ruleVersion = "schema version"
 	rulePin     = "schema pin"
+	ruleCopy    = "schema copy"
 )
 
 // hintPrefix is the start of the hint line of 03 3.2, which the
@@ -156,13 +157,19 @@ func Of(files []check.TreeFile, schemas []schemagen.Schema) ([]check.Finding, er
 		return nil, err
 	}
 	kit, err := compileKit(files)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errNoKitSchema, err)
-	}
 	findings := driftFindings(files, outs)
+	// A copy that holds a file other than the pinned ones, or lacks one,
+	// is reported as such, and the descriptors are not judged against it.
 	ref, refErr := frontendRef(files)
-	if kit != nil {
+	broken := false
+	if hasKitCopy(files) {
 		findings = append(findings, pinFindings(ref, refErr)...)
+		copyF := copyFindings(files)
+		findings = append(findings, copyF...)
+		broken = err != nil && len(copyF) > 0
+	}
+	if err != nil && !broken {
+		return nil, fmt.Errorf("%w: %w", errNoKitSchema, err)
 	}
 	hint, hintErr := hintBase(files)
 	for _, f := range files {
@@ -170,6 +177,8 @@ func Of(files []check.TreeFile, schemas []schemagen.Schema) ([]check.Finding, er
 			continue
 		}
 		switch {
+		case isKitDescriptor(f) && broken:
+			continue
 		case isKitDescriptor(f):
 			findings = append(findings, kitFindings(f, kit, ref, refErr)...)
 		case strings.HasPrefix(f.Path, examplesDir):

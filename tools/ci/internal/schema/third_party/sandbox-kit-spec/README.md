@@ -26,6 +26,11 @@ ssh-agent capability has no `phase`); a separate task, decided on
 fails when they differ: a new frontend milestone copies the new tag's
 `schema/` here and changes `kitSpecTag` in `../../kits.go`.
 
+`tools/ci schema` also holds this copy to the SHA-256 of each of its
+files, pinned in `../../kits_digests.go`, so a file edited, added or
+removed fails unless the table changes with it; the table is under the
+`checks` surface of `.github/ask-first.yaml`.
+
 The upstream tests of these files, `spec/schema_test.go`, pin the
 schemas' constants to the upstream Go types of package `spec`, which
 this repository does not have, so they are not copied.

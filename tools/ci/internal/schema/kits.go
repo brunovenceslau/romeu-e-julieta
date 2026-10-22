@@ -5,9 +5,12 @@ package schema
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -80,6 +83,42 @@ func isKitDescriptor(f check.TreeFile) bool {
 		return false
 	}
 	return bytes.HasPrefix(f.Content, []byte(kitSyntaxPrefix))
+}
+
+// hasKitCopy reports whether the tree holds a file of the copy of the
+// kit schema.
+func hasKitCopy(files []check.TreeFile) bool {
+	return slices.ContainsFunc(files, func(f check.TreeFile) bool { return strings.HasPrefix(f.Path, kitSpecRoot+"/") })
+}
+
+// copyFindings holds the copy of the kit schema in the tree to the
+// digests of kitSpecDigests: each file of the copy is pinned and has
+// its digest, and each pinned file is there. A tree with no file of the
+// copy has none to hold.
+func copyFindings(files []check.TreeFile) []check.Finding {
+	var findings []check.Finding
+	seen := map[string]bool{}
+	for _, f := range files {
+		name, ok := strings.CutPrefix(f.Path, kitSpecRoot+"/")
+		if !ok {
+			continue
+		}
+		seen[name] = true
+		want, pinned := kitSpecDigests[name]
+		sum := sha256.Sum256(f.Content)
+		switch {
+		case !pinned:
+			findings = append(findings, check.Finding{Where: f.Path, Rule: ruleCopy, Msg: "is no file of the copy of the kit schema at " + kitSpecTag + " that kits_digests.go pins"})
+		case hex.EncodeToString(sum[:]) != want:
+			findings = append(findings, check.Finding{Where: f.Path, Rule: ruleCopy, Msg: "differs from the digest pinned for it in kits_digests.go: the copy of the kit schema at " + kitSpecTag + " changes only with its pin"})
+		}
+	}
+	for name := range kitSpecDigests {
+		if !seen[name] {
+			findings = append(findings, check.Finding{Where: kitSpecRoot + "/" + name, Rule: ruleCopy, Msg: "is pinned in kits_digests.go and is not in the tree"})
+		}
+	}
+	return findings
 }
 
 // frontendRef returns the frontend ref of kits/pins.yaml (02 2.1,
