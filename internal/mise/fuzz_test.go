@@ -39,7 +39,7 @@ func FuzzParseConfig(f *testing.F) {
 		if err != nil {
 			return
 		}
-		if mise.CheckDepth(data) != nil {
+		if mise.CheckShape(data) != nil {
 			t.Fatalf("a mise.toml nested past the cap was read")
 		}
 		again, err := mise.ParseConfig(data)

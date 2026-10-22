@@ -13,9 +13,9 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/mise"
 )
 
-// TestCheckDepth counts the nesting of brackets and braces outside
+// TestCheckShape counts the nesting of brackets and braces outside
 // strings and comments, and refuses what passes MaxDepth.
-func TestCheckDepth(t *testing.T) {
+func TestCheckShape(t *testing.T) {
 	deep := func(n int) string { return "x = " + strings.Repeat("[", n) + strings.Repeat("]", n) + "\n" }
 	tests := []struct {
 		name string
@@ -40,13 +40,51 @@ func TestCheckDepth(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := mise.CheckDepth([]byte(tt.src))
+			err := mise.CheckShape([]byte(tt.src))
 			if tt.ok {
 				require.NoError(t, err)
 				return
 			}
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "nesting")
+		})
+	}
+}
+
+// TestCheckShapeKeyParts counts the parts of a key by its dots outside
+// strings and comments, in a key-value line, a table header and an
+// inline table, and refuses what passes MaxKeyParts.
+func TestCheckShapeKeyParts(t *testing.T) {
+	parts := func(n int) string { return strings.TrimSuffix(strings.Repeat("a.", n), ".") }
+	tests := []struct {
+		name string
+		src  string
+		ok   bool
+	}{
+		{"the keys mise writes", "[[tools.gh]]\n[tools.gh.\"platforms.linux-x64\"]\nchecksum = \"sha256:1.2\"\n", true},
+		{"a dotted key at the cap", parts(mise.MaxKeyParts) + " = 1\n", true},
+		{"a dotted key past the cap", parts(mise.MaxKeyParts+1) + " = 1\n", false},
+		{"a header past the cap", "[" + parts(mise.MaxKeyParts+1) + "]\n", false},
+		{"a table array past the cap", "[[" + parts(mise.MaxKeyParts+1) + "]]\n", false},
+		{"an inline table key past the cap", "x = {" + parts(mise.MaxKeyParts+1) + " = 1}\n", false},
+		{"dots in a quoted key", "\"" + parts(100) + "\" = 1\n", true},
+		{"dots in a literal key", "'" + parts(100) + "' = 1\n", true},
+		{"dots in a comment", "# " + parts(100) + "\n", true},
+		{"dots in a value string", "x = \"" + parts(100) + "\"\n", true},
+		{"floats in an array over lines", "x = [\n" + strings.Repeat("1.5,\n", 100) + "]\n", true},
+		{"floats on one line", "x = [" + strings.Repeat("1.5, ", 100) + "]\n", true},
+		{"a count that restarts at each line", strings.Repeat(parts(mise.MaxKeyParts)+" = 1\n", 100), true},
+		{"quoted parts and bare ones", parts(mise.MaxKeyParts-1) + ".\"" + parts(100) + "\" = 1\n", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := mise.CheckShape([]byte(tt.src))
+			if tt.ok {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "key parts")
 		})
 	}
 }

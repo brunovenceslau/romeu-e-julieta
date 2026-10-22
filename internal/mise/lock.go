@@ -95,7 +95,7 @@ func ParseLock(data []byte) (Lock, error) {
 	if len(data) > MaxFileSize {
 		return Lock{}, fmt.Errorf("mise.lock: %d bytes pass the cap of %d", len(data), MaxFileSize)
 	}
-	if err := CheckDepth(data); err != nil {
+	if err := CheckShape(data); err != nil {
 		return Lock{}, fmt.Errorf("mise.lock: %w", err)
 	}
 	var raw rawLock

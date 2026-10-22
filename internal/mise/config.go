@@ -38,7 +38,7 @@ func ParseConfig(data []byte) (Config, error) {
 	if len(data) > MaxFileSize {
 		return Config{}, fmt.Errorf("mise.toml: %d bytes pass the cap of %d", len(data), MaxFileSize)
 	}
-	if err := CheckDepth(data); err != nil {
+	if err := CheckShape(data); err != nil {
 		return Config{}, fmt.Errorf("mise.toml: %w", err)
 	}
 	var raw rawConfig

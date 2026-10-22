@@ -57,6 +57,10 @@ func TestParseLockRefuses(t *testing.T) {
 		{"an unknown layout version", []byte("lockfile_version = 4\n"), "lockfile_version"},
 		{"no layout version", []byte("[[tools.go]]\nversion = \"1\"\n"), "lockfile_version"},
 		{"nesting past the cap", []byte("lockfile_version = 3\nx = " + strings.Repeat("[", 64) + strings.Repeat("]", 64) + "\n"), "nesting"},
+		{"a dotted key of too many parts", []byte("lockfile_version = 3\n" + strings.Repeat("a.", 10000) + "b = 1\n"), "key parts"},
+		{"a table header of too many parts", []byte("lockfile_version = 3\n[" + strings.Repeat("a.", 10000) + "b]\n"), "key parts"},
+		{"a table array header of too many parts", []byte("lockfile_version = 3\n[[" + strings.Repeat("a.", 10000) + "b]]\n"), "key parts"},
+		{"an inline table key of too many parts", []byte("lockfile_version = 3\nx = {" + strings.Repeat("a.", 10000) + "b = 1}\n"), "key parts"},
 		{"a tool that is not a list of entries", []byte("lockfile_version = 3\n[tools]\ngo = 1\n"), "go"},
 	}
 	for _, tt := range tests {
@@ -89,6 +93,36 @@ func TestParseConfigRefuses(t *testing.T) {
 	require.Error(t, err)
 	_, err = mise.ParseConfig([]byte("[settings]\nlockfile_platforms = \"linux-x64\"\n"))
 	require.Error(t, err, "lockfile_platforms is a list")
+}
+
+// TestParseConfigRefusesLongKeys: a key of more than MaxKeyParts parts,
+// dotted in a key-value line, a table header, a table array header or
+// an inline table, is refused before the decoder reads it; the decoder
+// allocates for each part of a key once more for every part before it,
+// so a file of 20 KB took 7.7 GB (the audit of 2026-10-22). A key at the
+// cap, quoted segments with dots in them, and floats are read.
+func TestParseConfigRefusesLongKeys(t *testing.T) {
+	long := strings.Repeat("a.", 10000) + "b"
+	for name, doc := range map[string]string{
+		"a dotted key":    "[tools]\n" + long + " = 1\n",
+		"a header":        "[" + long + "]\n",
+		"a table array":   "[[" + long + "]]\n",
+		"an inline table": "[tools]\nx = {" + long + " = 1}\n",
+		"spaced dots":     "[tools]\n" + strings.Repeat("a . ", 10000) + "b = 1\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := mise.ParseConfig([]byte(doc))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "key parts")
+		})
+	}
+	atCap := strings.TrimSuffix(strings.Repeat("a.", mise.MaxKeyParts), ".")
+	_, err := mise.ParseConfig([]byte("[" + atCap + "]\nx = 1\n"))
+	require.NoError(t, err, "a header of MaxKeyParts parts is read")
+	_, err = mise.ParseConfig([]byte("[" + atCap + ".b]\nx = 1\n"))
+	require.Error(t, err, "one part past the cap")
+	_, err = mise.ParseConfig([]byte("[tools]\n\"" + strings.Repeat("a.", 5000) + "b\" = \"1\"\nf = [1.5, 2.5, 3.5]\ng = 1.5\n"))
+	require.NoError(t, err, "dots in a quoted key and in numbers are not parts")
 }
 
 // TestParseConfigRefusesDeepNesting: a mise.toml of inline tables
