@@ -25,10 +25,10 @@ reader fail on a file that is valid for its version. Undoing the rule is
 a spec edit and the return of the strict option on each reader.
 
 Scope: this repository, for every format the product writes. It is
-written in this record, in REQ-0163 (`docs/spec/03-formats.md`), in the
-decoders listed in T162, in `schemas/` (which keep their strict form,
-see Decision) and in the decision note named above; no other home
-carries it.
+written in this record, in REQ-0163 and the must-understand rule of 3.6
+(`docs/spec/03-formats.md`), in the decoders listed in T162 and T163,
+in `schemas/` (which keep their strict form, see Decision) and in the
+decision note named above; no other home carries it.
 
 The readers fall in two groups:
 
@@ -42,14 +42,20 @@ The readers fall in two groups:
 
 The manifest is written by romeu and read by julieta, and it has its own
 window of the protocol number N and N-1 (REQ-0219) with an error for
-what falls outside it. The decision note lists it with the strict
-readers, and this record leaves it strict; see Consequences.
+what falls outside it. The decision note of 2026-10-21 listed it with the
+strict readers, wrongly, since romeu writes it. The first version of
+this record left it strict as an open question; the maintainer decided
+it on 2026-10-22, see Decision.
 
 ### Alternatives considered
 
 - **Bump the version on every added member.** The state before this
   record. Taken away: it forces both binaries to move in step for a
   change that breaks nobody.
+- **Keep the manifest strict, and bump the protocol number for every
+  added member.** Not taken: an optional member would force a paired
+  upgrade of a romeu on the host and the julieta in a sandbox, which is
+  built from a host bin dir and is not upgraded with it.
 - **Ignore unknown members in every reader.** Not taken: a person's typo
   (`pulll: true`) would be accepted and ignored with no message.
 - **Keep the strict readers and warn on an unknown member.** Not taken:
@@ -75,8 +81,24 @@ Decided on 2026-10-22, from the decision of 2026-10-21:
   false`: it describes the document the version of this build writes,
   and the examples that CI validates against it.
 
+- The manifest (`manifest.v1`) follows the same rule: julieta's reader
+  skips a member it does not know, as the other readers do. Decided on
+  2026-10-22 by the maintainer, scope this repository, written in this
+  record and in 03 3.6. One exception, the must-understand rule: a
+  member that an older julieta could not safely ignore, one that
+  restricts, denies or changes what julieta must do (for example a new
+  limit, a narrower egress, a refusal), is not added as an optional
+  member. It bumps the protocol number (REQ-0218), and the window of
+  N and N-1 (REQ-0219) refuses a julieta that is too old with
+  `manifest-protocol` (RJ-342). A member julieta may safely ignore (an
+  informational one, or an addition that a newer julieta uses for a new
+  feature) is added without a bump. The window protects what is
+  security-relevant; optional members stop forcing a paired upgrade of a
+  sandbox's julieta.
+
 REQ-0159, REQ-0160, REQ-0163, REQ-0261 and REQ-0271 are amended to say
-it, and T162 changes the readers.
+it, T162 changes the readers of the other formats, and T163 changes
+the manifest's and states the must-understand rule.
 
 ## Consequences
 
@@ -95,12 +117,18 @@ it, and T162 changes the readers.
   `maxDepth`, 4) and of the handoff file (`internal/handoff/decode.go`,
   5) also bounds what a newer writer may add: a member nested deeper is
   refused, as it is today.
-- The manifest is still strict, and a member added to `manifest.v1` is
-  still a new protocol number. This is an open question: the decision
-  note of 2026-10-21 lists the manifest among the files a person writes,
-  which it is not, and the choice between the protocol window and the
-  rule above is the maintainer's. The spec says so (03, opening and
-  3.6). Reopened when the maintainer decides.
+- The manifest reader skips an unknown member, and the writer is
+  responsible for the must-understand rule: a romeu that adds a member an
+  older julieta must honor, and does not bump the protocol number, makes
+  that julieta ignore a restriction without an error. Nothing in the code
+  can tell the two kinds of member apart, so a review of a change to the
+  manifest type asks which kind it adds. A skipped member is also lost
+  where julieta caches the manifest (`cacheManifest` in
+  `internal/cmd/julieta/setup/state.go` writes `manifest.Encode` of the
+  decoded value), as in the rewrites above; a cached manifest therefore
+  never holds a member this julieta does not know. Reopened when a
+  second writer of the manifest exists, or when a restriction is found
+  to have been ignored.
 - The state files of julieta (`setup.json`, the hooks record, the hook
   failures and the system hooks path) are written and read by the same
   binary, and stay strict. Reopened if a second program reads one.

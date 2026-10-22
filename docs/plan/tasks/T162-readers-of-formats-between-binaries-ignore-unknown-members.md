@@ -97,8 +97,9 @@ Measured and left strict:
   `internal/cmd/julieta/setup/state.go:74`): romeu writes it and julieta
   reads it, so it is a format between binaries, but it has its own
   protocol window (REQ-0219) and the decision note lists it with the
-  strict readers. Stopped on and left strict; the maintainer decides
-  (ADR 0041, Consequences).
+  strict readers. Stopped on and left strict here; the maintainer
+  decided on 2026-10-22 that it skips an unknown member too, with the
+  must-understand exception, and T163 built it.
 
 The JSON Schemas in `schemas/` keep `additionalProperties: false`: they
 describe the document this version writes and the examples CI validates.
@@ -132,8 +133,8 @@ handoff `--json` decoder has no fixture file.
     the handoff decoder does. Measured and left: the `--json` decoders
     have no size cap of their own.
   - The readers of files a person writes still refuse an unknown key, by
-    the tests named above, and the manifest decoder still refuses one
-    (`internal/manifest/manifest_test.go:156`).
+    the tests named above. The manifest decoder refused one when T162
+    merged; T163 changed it.
   - REQ-0163 states the rule and names the two groups; the ADR states
     its scope and what it left strict.
 - Verify: `go test ./internal/handoff/... ./internal/memstore/...

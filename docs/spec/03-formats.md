@@ -7,8 +7,8 @@ Back to [index](../spec.md). Reader: implementers of `spec`, `render`,
 [02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public) has a
 version field, strict decoding (a duplicate key is an error, and so is an
 unknown key in a file a person writes; the versions rule below says what
-a reader between binaries does with one, except the manifest, which stays
-strict while the maintainer decides, [ADR 0041](../adr/0041-readers-of-formats-between-binaries-ignore-unknown-members.md)),
+a reader between binaries does with one,
+[ADR 0041](../adr/0041-readers-of-formats-between-binaries-ignore-unknown-members.md)),
 a JSON Schema in `schemas/`, and examples in `examples/` validated in CI;
 the formats without a schema are listed, each with its reason, in 3.13.
 
@@ -16,8 +16,7 @@ the formats without a schema are listed, each with its reason, in 3.13.
 pinned Go; the v1 package is implemented over it): an owned format that a
 person writes with `json.RejectUnknownMembers(true)`, an upstream output
 and an owned format between binaries without it (the versions rule
-below), except the manifest (3.6), which stays strict while the
-maintainer decides (ADR 0041). v2's defaults, a duplicate member name
+below). v2's defaults, a duplicate member name
 is an error and member names match exactly, are the strictness this
 page means by strict.
 
@@ -33,14 +32,13 @@ Adding a member does not change a format's version; removing or
 renaming a member, or changing its type or meaning, is a new version,
 and the name of a removed member is never used again. A reader of a
 format one binary writes and another reads (the `--json` documents of
-`julieta`, `snapshot/heads.json`, the memory entry and the handoff
-file) skips a member it does not know, at any depth, and keeps every
+`julieta`, `snapshot/heads.json`, the memory entry, the handoff file and
+the manifest) skips a member it does not know, at any depth, and keeps every
 other rule of strict decoding; a reader of a file a person writes (the
 project spec, host settings, the catalog, the files of `tools/ci`)
 refuses an unknown key, since one there is most often a typing error.
-The manifest (3.6) is the exception: it is written by romeu and read
-by julieta, and it stays strict, with its own window, while the
-maintainer decides which rule holds for it (ADR 0041). A reader
+The manifest (3.6) is written by romeu and read by julieta, so it
+follows the first rule, with the must-understand exception of 3.6. A reader
 refuses a version newer than its own with the error `format-newer`
 (`RJ-311`, [04 4.4](04-cli.md#44-error-ids)) and the fix hint "install
 the release that wrote it". `REQ-0164` The release that bumps a stored format reads
@@ -399,9 +397,19 @@ at `$HOME/.local/state/julieta/manifest.json`. `REQ-0216` romeu checks the encod
 size at `sync`, before the gate, and refuses a manifest over 32 KiB with
 the error `manifest-size` (`RJ-313`); `julieta spec validate` reports
 the same rule. `REQ-0217` The Go type lives in `internal/manifest`, the one
-package both binaries import for it. An unknown member in `manifest.v1`
-is an error, unlike the other formats between binaries (the opening of
-this page; ADR 0041).
+package both binaries import for it. `REQ-1257` julieta's reader skips a
+member of `manifest.v1` it does not know, at any depth, as the other
+readers between binaries do (the opening of this page; ADR 0041), and
+keeps every other rule: a duplicate member, the size cap, the canonical
+form of the members it knows, and the protocol window below. The one
+exception is the must-understand rule: a member that an older julieta
+could not safely ignore, one that restricts, denies or changes what
+julieta must do (for example a new limit, a narrower egress or a
+refusal), is not added as an optional member; it bumps the protocol
+number (`protocol`, below), and the window refuses a julieta that is too
+old. A member julieta may safely ignore (an informational one, or an
+addition that a newer julieta uses for a new feature) is added without a
+bump.
 
 ```json
 {
