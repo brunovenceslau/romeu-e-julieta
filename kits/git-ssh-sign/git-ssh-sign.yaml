@@ -1,0 +1,74 @@
+# syntax=docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# The git-ssh-sign product kit (06 6.4, REQ-0594): the ssh-agent
+# capability for signing git commits and nothing else, and the git
+# config that makes every commit signed with the one key of the arg
+# signingKey. It is opt-in per project and an ask-first surface.
+#
+# The ssh-agent capability is the one sitting M0 composed on sbx
+# v0.48.0 with unrestricted false and sign [git]: the sandbox lists the
+# keys of the socket it is given and signs in the namespace git only
+# (testdata/sitting-m0.yaml). That the socket holds exactly one key,
+# equal to signingKey, is the check of romeu sync (I34, T080); until
+# T080 lands no code enforces it.
+#
+# signingKey is a public key, never a private one. It reaches the steps
+# as an environment variable the step declares (sitting M0: an arg with
+# env reaches the hooks that declare the name), never pasted into script
+# text, and the step checks its shape before it writes anything: a type
+# and a base64 body, no comment, no space beyond the one between them.
+# The arg's pattern states the same shape for the person who sets it.
+#
+# Two steps, both as the agent user, since the files are the agent's own.
+# The first sets the three settings that need no input, so a commit is
+# signed (and fails if it cannot be) even when the second step fails. The
+# second validates the key, writes the allowed-signers file with the
+# principal * limited to the namespace git, and sets user.signingkey as a
+# literal key, which git passes to the agent. The key is never a file
+# path, so no private key file is read.
+schemaVersion: "3"
+kind: mixin
+displayName: git-ssh-sign
+description: SSH signing of git commits through the signing-only agent socket, with the one key of the arg signingKey
+args:
+  signingKey:
+    required: true
+    description: |
+      The public key commits are signed with: the type, a space and the
+      base64 body, as the first two fields of a .pub file. It must be
+      the one key of the dedicated signing agent and registered on GitHub
+      as a signing key, never as an authentication key.
+    pattern: '^[a-z0-9-]+ [A-Za-z0-9+/]+={0,2}$'
+    env: GIT_SSH_SIGN_KEY
+capabilities:
+  - type: com.docker.sandbox/ssh-agent@1
+    config:
+      unrestricted: false
+      sign:
+        - git
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        - description: git signs every commit with ssh, checking against the allowed-signers file
+          user: agent
+          command:
+            - bash
+            - -euc
+            - |
+              git config --global gpg.format ssh
+              git config --global commit.gpgsign true
+              git config --global gpg.ssh.allowedSignersFile "$HOME/.config/git/allowed_signers"
+        - description: the allowed-signers file and user.signingkey, from the checked arg signingKey
+          user: agent
+          env: [GIT_SSH_SIGN_KEY]
+          command:
+            - bash
+            - -euc
+            - |
+              R='^[a-z0-9-]+ [A-Za-z0-9+/]+={0,2}$'
+              [[ ${GIT_SSH_SIGN_KEY-} =~ $R ]]
+              mkdir -p "$HOME/.config/git"
+              printf '%s\n' "* namespaces=\"git\" $GIT_SSH_SIGN_KEY" > "$HOME/.config/git/allowed_signers"
+              git config --global user.signingkey "key::$GIT_SSH_SIGN_KEY"
