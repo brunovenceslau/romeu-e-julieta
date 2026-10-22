@@ -57,11 +57,11 @@ package doc and the help of `julieta status` name the failures.
 `julieta-status/v1` gains the member without a new version: decided on
 2026-10-21, formats evolve by the rules of protobuf, where adding a
 member is backward compatible ("Formats evolve by the rules of
-protobuf", 01m5egnpxhheh7197j08zdr618). REQ-0163 still says any change
-to a format's fields bumps its version until "Readers of formats
-between binaries ignore unknown members" (01m5egnpyfywadcsxpy0naz3hj)
-amends it. The generated schema, the valid fixture and the e2e decoder of
-every field gain the member.
+protobuf", 01m5egnpxhheh7197j08zdr618). REQ-0163 said that any change
+to a format's fields bumps its version; T162 ("Readers of formats
+between binaries ignore unknown members") amended it. The generated
+schema, the valid fixture and the e2e decoder of every field gain the
+member.
 
 - Implements: REQ-0424 (04 4.3), REQ-0675 (08 8.2).
 - Operator: no.

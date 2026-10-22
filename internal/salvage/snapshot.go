@@ -117,9 +117,9 @@ func EncodeHeads(h Heads) ([]byte, error) {
 // member this build does not know is skipped, as a newer julieta of the
 // same version may add one (REQ-0163). The schema is read first, so a
 // newer version is format-newer (RJ-311) even where it holds members
-// this build does not know. Then createdAt is a UTC time, each ref is under
-// BundleNamespaces with a name git and the terminal accept, and each
-// object id is full and lowercase. Every other refusal wraps
+// this build does not know. Then createdAt is a UTC time, each ref is
+// under BundleNamespaces with a name git and the terminal accept, and
+// each object id is full and lowercase. Every other refusal wraps
 // ErrInvalid.
 func DecodeHeads(data []byte) (Heads, error) {
 	if len(data) > memstore.MaxFileSize {

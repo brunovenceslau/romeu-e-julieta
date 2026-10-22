@@ -8,7 +8,7 @@
 # - invalid-duplicate-member.json: valid.json with the member repo
 #   written twice;
 # - invalid-unknown-member.json: valid.json with one member the format
-#   does not name.
+#   does not name (refused by the schema, not by the decoder).
 
 version = 1
 

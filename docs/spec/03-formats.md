@@ -7,16 +7,19 @@ Back to [index](../spec.md). Reader: implementers of `spec`, `render`,
 [02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public) has a
 version field, strict decoding (a duplicate key is an error, and so is an
 unknown key in a file a person writes; the versions rule below says what
-a reader between binaries does with one), a JSON Schema in `schemas/`, and examples in `examples/` validated in CI; the formats
-without a schema are listed, each with its reason, in 3.13.
+a reader between binaries does with one, except the manifest, which stays
+strict while the maintainer decides, [ADR 0041](../adr/0041-readers-of-formats-between-binaries-ignore-unknown-members.md)),
+a JSON Schema in `schemas/`, and examples in `examples/` validated in CI;
+the formats without a schema are listed, each with its reason, in 3.13.
 
 `REQ-0160` JSON is decoded with `encoding/json/v2` (in the standard library of the
 pinned Go; the v1 package is implemented over it): an owned format that a
 person writes with `json.RejectUnknownMembers(true)`, an upstream output
 and an owned format between binaries without it (the versions rule
-below). v2's
-defaults, a duplicate member name is an error and member names match
-exactly, are the strictness this page means by strict.
+below), except the manifest (3.6), which stays strict while the
+maintainer decides (ADR 0041). v2's defaults, a duplicate member name
+is an error and member names match exactly, are the strictness this
+page means by strict.
 
 `REQ-0161` Each format the product owns names itself and its version in one form,
 `schema: <name>/v<n>`, where `<name>` is its schema name in 02 2.1; the
@@ -35,7 +38,9 @@ file) skips a member it does not know, at any depth, and keeps every
 other rule of strict decoding; a reader of a file a person writes (the
 project spec, host settings, the catalog, the files of `tools/ci`)
 refuses an unknown key, since one there is most often a typing error.
-The manifest keeps its own window (3.6). A reader
+The manifest (3.6) is the exception: it is written by romeu and read
+by julieta, and it stays strict, with its own window, while the
+maintainer decides which rule holds for it (ADR 0041). A reader
 refuses a version newer than its own with the error `format-newer`
 (`RJ-311`, [04 4.4](04-cli.md#44-error-ids)) and the fix hint "install
 the release that wrote it". `REQ-0164` The release that bumps a stored format reads
@@ -394,7 +399,9 @@ at `$HOME/.local/state/julieta/manifest.json`. `REQ-0216` romeu checks the encod
 size at `sync`, before the gate, and refuses a manifest over 32 KiB with
 the error `manifest-size` (`RJ-313`); `julieta spec validate` reports
 the same rule. `REQ-0217` The Go type lives in `internal/manifest`, the one
-package both binaries import for it.
+package both binaries import for it. An unknown member in `manifest.v1`
+is an error, unlike the other formats between binaries (the opening of
+this page; ADR 0041).
 
 ```json
 {

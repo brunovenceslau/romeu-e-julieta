@@ -7,9 +7,11 @@
 # - valid-clear.md, valid-final.md and valid-facts.md: the example of 03
 #   3.10 with one repo, for each kind;
 # - invalid-anchor.md, invalid-alias.md, invalid-merge-key.md,
-#   invalid-include.md, invalid-duplicate-key.md, invalid-unknown-key.md
-#   and invalid-repo-unknown-key.md: valid-clear.md with one construct
-#   the strict decoder refuses;
+#   invalid-include.md and invalid-duplicate-key.md: valid-clear.md with
+#   one construct the strict decoder refuses;
+# - unknown-key.md and unknown-repo-key.md: valid-clear.md with one key
+#   a newer writer adds, in the front matter and in a repo, read as the
+#   file without it (REQ-0163);
 # - invalid-missing-headings.md, invalid-final-five-headings.md and
 #   invalid-facts-body.md: a body that breaks REQ-0245;
 # - newer.md and newer-anchor.md: a handoff/v2, refused with

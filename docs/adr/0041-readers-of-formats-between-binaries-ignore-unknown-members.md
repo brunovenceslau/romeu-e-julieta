@@ -25,8 +25,10 @@ reader fail on a file that is valid for its version. Undoing the rule is
 a spec edit and the return of the strict option on each reader.
 
 Scope: this repository, for every format the product writes. It is
-written in REQ-0163 (`docs/spec/03-formats.md`), in the decoders listed
-in T162, and in the decision note named above; no other home carries it.
+written in this record, in REQ-0163 (`docs/spec/03-formats.md`), in the
+decoders listed in T162, in `schemas/` (which keep their strict form,
+see Decision) and in the decision note named above; no other home
+carries it.
 
 The readers fall in two groups:
 
@@ -79,17 +81,26 @@ it, and T162 changes the readers.
 ## Consequences
 
 - A newer writer can add a member without a new version. A reader that
-  skips a member and then rewrites the file drops it: `julieta memory
-  edit` rewrites an entry whole, so an older julieta that edits an
-  entry a newer julieta wrote loses the member. This is the cost of
+  skips a member and then rewrites the file drops it, and this is
+  accepted at two places: `julieta memory edit` rewrites an entry
+  whole, so an older julieta that edits an entry a newer julieta wrote
+  loses the member; and the hooks that record a disabled snapshot
+  (`internal/hooks/actions/disabled.go`) read `snapshot/heads.json` and
+  write it back without the members they do not know. A handoff file is
+  never rewritten: `julieta handoff write` only creates a new one. It is the cost of
   skipping rather than keeping unknown members, as a protobuf runtime
   that does not keep unknown fields has it. Reopened when a member of
   such a format holds data that must survive a rewrite.
+- The YAML depth cap of the memory entry (`internal/memstore/entry.go`,
+  `maxDepth`, 4) and of the handoff file (`internal/handoff/decode.go`,
+  5) also bounds what a newer writer may add: a member nested deeper is
+  refused, as it is today.
 - The manifest is still strict, and a member added to `manifest.v1` is
-  still a new protocol number. Reopened by the maintainer: the decision
+  still a new protocol number. This is an open question: the decision
   note of 2026-10-21 lists the manifest among the files a person writes,
   which it is not, and the choice between the protocol window and the
-  rule above is theirs.
+  rule above is the maintainer's. The spec says so (03, opening and
+  3.6). Reopened when the maintainer decides.
 - The state files of julieta (`setup.json`, the hooks record, the hook
   failures and the system hooks path) are written and read by the same
   binary, and stay strict. Reopened if a second program reads one.

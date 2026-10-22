@@ -221,11 +221,10 @@ func Encode(e Entry) ([]byte, error) {
 // 03 3.9, with the tags sorted on the way in. The schema field is read
 // from the parsed mapping before the keys are judged, so a newer
 // version is format-newer (RJ-311) though it holds keys v1 does not
-// know; a front
-// matter that does not parse, or that the subset grammar refuses, is
-// format-newer when the text of its schema line names a newer version
-// (checkNewer), so a v2 file with an anchor or a syntax error is too.
-// Every other refusal wraps ErrInvalid.
+// know; a front matter that does not parse, or that the subset grammar
+// refuses, is format-newer when the text of its schema line names a
+// newer version (checkNewer), so a v2 file with an anchor or a syntax
+// error is too. Every other refusal wraps ErrInvalid.
 func Decode(data []byte) (Entry, error) {
 	if len(data) > MaxFileSize {
 		return Entry{}, fmt.Errorf("%w: the file has %d bytes, over %d", ErrInvalid, len(data), MaxFileSize)

@@ -196,9 +196,10 @@ func Encode(f File) ([]byte, error) {
 // as a newer writer of the same version may add one (REQ-0163); then
 // the rules of 03 3.10 (File.Check). The schema field is read from the
 // parsed mapping before the keys are judged, so a newer version is
-// format-newer (RJ-311) though it holds keys v1 does not know; a front matter that does not parse, or that the subset grammar
-// refuses, is format-newer too when the text of its schema line names a
-// newer version. Every other refusal wraps ErrInvalid.
+// format-newer (RJ-311) though it holds keys v1 does not know; a front
+// matter that does not parse, or that the subset grammar refuses, is
+// format-newer too when the text of its schema line names a newer
+// version. Every other refusal wraps ErrInvalid.
 func Decode(data []byte) (File, error) {
 	if len(data) > memstore.MaxFileSize {
 		return File{}, fmt.Errorf("%w: the file has %d bytes, over %d", ErrInvalid, len(data), memstore.MaxFileSize)

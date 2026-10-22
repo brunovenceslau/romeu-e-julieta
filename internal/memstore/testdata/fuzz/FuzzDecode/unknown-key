@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("---\nschema: memory-entry/v1\nid: 01j9z3k8m6t2q4w5e7r9y1v3k5\ntitle: Flaky integration test on arm64\nstatus: open            # open | done\ntags: [ci, arm64]       # the tag \"lesson\" makes SessionStart print the entry\ncreatedAt: 2026-10-02T09:20:00Z\nupdatedAt: 2026-10-02T09:20:00Z\nagent: claude\n---\nFree-form markdown body.\n")

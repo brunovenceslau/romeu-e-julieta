@@ -153,8 +153,10 @@ var (
 )
 
 // Decode reads the canonical JSON of a manifest, strictly (03,
-// opening, REQ-0160): an unknown member, a duplicate member name, a
-// member name of another case, text that is not UTF-8 or holds U+FFFD,
+// opening, REQ-0160). The manifest is the one format between binaries
+// that refuses an unknown member, an exception the maintainer has yet
+// to decide (03 3.6, ADR 0041). An unknown member, a duplicate member
+// name, a member name of another case, text that is not UTF-8 or holds U+FFFD,
 // and trailing data are each an error. The schema field is read first,
 // so a newer version is format-newer (RJ-311) even where it holds
 // members this build does not know. Then the document must be the

@@ -23,6 +23,8 @@ owns:
   - internal/cmd/julieta/memory/memory_test.go
   - docs/spec/03-formats.md
   - docs/spec/04-cli.md
+  - docs/plan/tasks/T154-julieta-status-lists-the-recorded-hook-failures.md
+  - internal/manifest/manifest.go
   - docs/handoff/decisions/01m5egnpxhheh7197j08zdr618-formats-evolve-by-the-rules-of-protobuf.md
   - docs/handoff/pending/01m5egnpyfywadcsxpy0naz3hj-readers-of-formats-between-binaries-ignore-unknown-members.md
 needs:
@@ -34,6 +36,7 @@ needs:
   - T154
 after:
   - T021
+  - T135
   - T155
   - T160
 ask_first:
@@ -99,8 +102,9 @@ Measured and left strict:
 
 The JSON Schemas in `schemas/` keep `additionalProperties: false`: they
 describe the document this version writes and the examples CI validates.
-The fixtures `invalid-unknown-member.json` under the three `--json`
-packages stay for that check, and no longer for the decoder.
+The fixtures `invalid-unknown-member.json` under the status, setup and
+memory packages stay for that check, and no longer for the decoder; the
+handoff `--json` decoder has no fixture file.
 
 - Implements: REQ-0159 (03 (opening)), REQ-0163 (03 (opening)), REQ-0261 (03 3.13), REQ-0271 (04 4.1).
 - Operator: no.
@@ -115,6 +119,18 @@ packages stay for that check, and no longer for the decoder.
   - Each of them still refuses a duplicate member or key, another
     schema, and, for the files, a missing key; a newer version is still
     `format-newer`.
+  - A member a reader skips cannot change a known member (a name of
+    another case is another name, before or after the real one), carries
+    an escape or control character without effect, and cannot hide a
+    duplicate, a nest past the depth cap or an excess over the file cap
+    from the rules that still apply; no raw control character reaches an
+    error. `TestDecodeHostileUnknownMembers` in the four `--json`
+    packages, `TestDecodeHeadsHostileUnknownMembers` and
+    `TestDecodeHostileUnknownKeys` in `internal/handoff` and
+    `internal/memstore` hold it. Measured and left: the memory entry
+    decoder does not refuse a duplicate key inside an unknown nested key
+    (the handoff decoder does), and the `--json` decoders have no size
+    cap of their own.
   - The readers of files a person writes still refuse an unknown key, by
     the tests named above, and the manifest decoder still refuses one
     (`internal/manifest/manifest_test.go:156`).

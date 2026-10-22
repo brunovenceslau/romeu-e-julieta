@@ -260,9 +260,49 @@ func TestDecodeIgnoresAnUnknownMember(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
+// TestDecodeHostileUnknownMembers holds what a member this build skips
+// may not do, whoever wrote it (03, opening, REQ-0163): change what a
+// known member says (a name of another case is another name, in either
+// order), pass a duplicate or a nest too deep unseen, or put its own text
+// in an error.
+func TestDecodeHostileUnknownMembers(t *testing.T) {
+	valid, err := os.ReadFile(filepath.Join("testdata", "valid.json"))
+	require.NoError(t, err)
+	want, err := setup.Decode(valid)
+	require.NoError(t, err)
+	doc := strings.TrimSpace(string(valid))
+	after := func(members string) []byte { return []byte(strings.TrimSuffix(doc, "}") + "," + members + "}") }
+	before := func(members string) []byte { return []byte("{" + members + "," + strings.TrimPrefix(doc, "{")) }
+	for name, members := range map[string]string{
+		"a case variant of a known name":  `"Schema":"x","SCHEMA":"y"`,
+		"an escape in a name and a value": `"\u001b[31mred":"\u0007\u001b[0m"`,
+	} {
+		for pos, build := range map[string]func(string) []byte{"after": after, "before": before} {
+			got, err := setup.Decode(build(members))
+			require.NoError(t, err, name+" "+pos)
+			assert.Equal(t, want, got, name+" "+pos)
+		}
+	}
+	for name, members := range map[string]string{
+		"a duplicate in an unknown member":        `"x":{"a":1,"a":2}`,
+		"a nest of 20000 arrays":                  `"x":` + strings.Repeat("[", 20000) + strings.Repeat("]", 20000),
+		"a duplicate known name beside an escape": `"\u001b[31mred":1,"schema":"julieta-setup/v1"`,
+	} {
+		_, err := setup.Decode(after(members))
+		require.Error(t, err, name)
+		assert.NotContains(t, err.Error(), "\x1b", name)
+		assert.NotContains(t, err.Error(), "red", name)
+	}
+	// The name of a duplicate is in the error, as jsontext quotes it, with
+	// the escape written out and no raw control character.
+	_, err = setup.Decode(after(`"\u001b[31mred":1,"\u001b[31mred":2`))
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "\x1b")
+}
+
 // TestDecodeIsStrict reads the --json document strictly: the fixture
-// with a duplicate member is refused, the valid one is read, and so is
-// no other schema.
+// with a duplicate member is refused, the valid one is read, and a
+// document of another schema is refused.
 func TestDecodeIsStrict(t *testing.T) {
 	for name, valid := range map[string]bool{"valid.json": true, "invalid-duplicate-member.json": false} {
 		data, err := os.ReadFile(filepath.Join("testdata", name))

@@ -93,8 +93,50 @@ func TestDecodeIgnoresAnUnknownKey(t *testing.T) {
 	require.NoError(t, err)
 	got, err := memstore.Decode(fixture(t, "unknown-key.md"))
 	require.NoError(t, err)
-	got.Body = want.Body // the fixture's own body
 	assert.Equal(t, want, got)
+}
+
+// TestDecodeHostileUnknownKeys holds what a key this build skips may not
+// do, whoever wrote it (03, opening, REQ-0163): change what a known key
+// says (a key of another case is another key, in either order), pass a
+// duplicate, a nest past the depth cap or a file over the size cap
+// unseen, or put its own text in an error.
+func TestDecodeHostileUnknownKeys(t *testing.T) {
+	valid := string(fixture(t, "valid.md"))
+	want, err := memstore.Decode([]byte(valid))
+	require.NoError(t, err)
+	// Keys go in the front matter, before and after the known ones.
+	after := func(keys string) []byte {
+		return []byte(strings.Replace(valid, "updatedAt: 2026-10-02T09:20:00Z\n", "updatedAt: 2026-10-02T09:20:00Z\n"+keys, 1))
+	}
+	before := func(keys string) []byte {
+		return []byte(strings.Replace(valid, "schema: memory-entry/v1\n", "schema: memory-entry/v1\n"+keys, 1))
+	}
+	for name, keys := range map[string]string{
+		"a case variant of a known key":  "Title: x\nSTATUS: done\nSchema: y\n",
+		"an escape in a key and a value": "\"\\e[31mred\": \"\\a\\e[0m\"\n",
+	} {
+		for pos, build := range map[string]func(string) []byte{"after": after, "before": before} {
+			got, err := memstore.Decode(build(keys))
+			require.NoError(t, err, name+" "+pos)
+			assert.Equal(t, want, got, name+" "+pos)
+		}
+	}
+	for name, keys := range map[string]string{
+		"a nest past the depth cap":              "x: " + strings.Repeat("[", 12) + strings.Repeat("]", 12) + "\n",
+		"a duplicate known key beside an escape": "\"\\e[31mred\": 1\ntitle: twice\n",
+		"the excess over the file cap":           "x: " + strings.Repeat("y", memstore.MaxFileSize) + "\n",
+	} {
+		_, err := memstore.Decode(after(keys))
+		require.ErrorIs(t, err, memstore.ErrInvalid, name)
+		assert.NotContains(t, err.Error(), "\x1b", name)
+		assert.NotContains(t, err.Error(), "red", name)
+	}
+	// The name of a duplicate is in the error, escaped by termsafe: no raw
+	// control character reaches the output.
+	_, err = memstore.Decode(after("\"\\e[31mred\": 1\n\"\\e[31mred\": 2\n"))
+	require.ErrorIs(t, err, memstore.ErrInvalid)
+	assert.NotContains(t, err.Error(), "\x1b")
 }
 
 // TestDecodeRefusesAnAliasAlone refuses an alias whose anchor is

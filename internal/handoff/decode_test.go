@@ -68,6 +68,24 @@ func TestDecodeRefuses(t *testing.T) {
 	}
 }
 
+// TestDecodeRefusesAMissingKey refuses a file that lacks one key of v1,
+// in the front matter or in a repo: skipping an unknown key does not
+// relax the requirement of the known ones (03, opening, REQ-0163).
+func TestDecodeRefusesAMissingKey(t *testing.T) {
+	valid := string(fixture(t, "valid-clear.md"))
+	for name, doc := range map[string]string{
+		"a front matter key": strings.Replace(valid, "project: shop\n", "", 1),
+		"a repo key":         strings.Replace(valid, "    stashes: 0\n", "", 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.NotEqual(t, valid, doc, "the fixture no longer holds the line this case removes")
+			_, err := handoff.Decode([]byte(doc))
+			require.ErrorIs(t, err, handoff.ErrInvalid)
+			assert.Contains(t, err.Error(), "is missing from")
+		})
+	}
+}
+
 // TestDecodeIgnoresAnUnknownKey reads a handoff file that a newer writer
 // gave a key, in the front matter and in a repo, as the same file
 // without it (03, opening, REQ-0163).
@@ -81,6 +99,50 @@ func TestDecodeIgnoresAnUnknownKey(t *testing.T) {
 			assert.Equal(t, want, got)
 		})
 	}
+}
+
+// TestDecodeHostileUnknownKeys holds what a key this build skips may not
+// do, whoever wrote it (03, opening, REQ-0163): change what a known key
+// says (a key of another case is another key, in either order), pass a
+// duplicate, a nest past the depth cap or a file over the size cap
+// unseen, or put its own text in an error.
+func TestDecodeHostileUnknownKeys(t *testing.T) {
+	valid := string(fixture(t, "valid-clear.md"))
+	want, err := handoff.Decode([]byte(valid))
+	require.NoError(t, err)
+	// Keys go in the front matter, before and after the known ones.
+	after := func(keys string) []byte {
+		return []byte(strings.Replace(valid, "agent: sbx-kit-claude\n", "agent: sbx-kit-claude\n"+keys, 1))
+	}
+	before := func(keys string) []byte {
+		return []byte(strings.Replace(valid, "schema: handoff/v1\n", "schema: handoff/v1\n"+keys, 1))
+	}
+	for name, keys := range map[string]string{
+		"a case variant of a known key":  "Project: x\nKIND: final\nSchema: y\n",
+		"an escape in a key and a value": "\"\\e[31mred\": \"\\a\\e[0m\"\n",
+	} {
+		for pos, build := range map[string]func(string) []byte{"after": after, "before": before} {
+			got, err := handoff.Decode(build(keys))
+			require.NoError(t, err, name+" "+pos)
+			assert.Equal(t, want, got, name+" "+pos)
+		}
+	}
+	for name, keys := range map[string]string{
+		"a duplicate in an unknown key":          "x:\n  a: 1\n  a: 2\n",
+		"a nest past the depth cap":              "x: " + strings.Repeat("[", 12) + strings.Repeat("]", 12) + "\n",
+		"a duplicate known key beside an escape": "\"\\e[31mred\": 1\nproject: twice\n",
+		"the excess over the file cap":           "x: " + strings.Repeat("y", memstore.MaxFileSize) + "\n",
+	} {
+		_, err := handoff.Decode(after(keys))
+		require.ErrorIs(t, err, handoff.ErrInvalid, name)
+		assert.NotContains(t, err.Error(), "\x1b", name)
+		assert.NotContains(t, err.Error(), "red", name)
+	}
+	// The name of a duplicate is in the error, escaped by termsafe: no raw
+	// control character reaches the output.
+	_, err = handoff.Decode(after("\"\\e[31mred\": 1\n\"\\e[31mred\": 2\n"))
+	require.ErrorIs(t, err, handoff.ErrInvalid)
+	assert.NotContains(t, err.Error(), "\x1b")
 }
 
 // TestDecodeRefusesAFileOverTheCap refuses a file over the file cap of
