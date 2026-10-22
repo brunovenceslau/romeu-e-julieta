@@ -1,0 +1,1 @@
+[{"name":"shop","status":"stopped","workspaces":["/abs/root/shop-env/shop-api","/abs/root/shop-env/.romeu/bin"],"future":{"nested":[1,2,{"x":null}]},"ports":[{"host_ip":"127.0.0.1","host_port":8080,"sandbox_port":3000,"protocol":"tcp4","new":1}]},{"name":"blog","status":"running","workspaces":[],"detached":false}]

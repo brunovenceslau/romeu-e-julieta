@@ -1,0 +1,2 @@
+SANDBOX   AGENT    STATUS      PORTS   WORKSPACE
+shop      claude   running             /abs/root/shop-env/shop-api

@@ -14,9 +14,13 @@ import (
 
 // TestParsersRunOverTheRecordedSessions holds REQ-0930: the parsers run
 // over the sessions of every recorded version, and each version has
-// sessions that exercise each of them.
+// sessions that exercise each of them. A value a session holds in place
+// of a real one parses as the type it replaces: the names are project
+// names and the workspaces clean absolute paths (T018 round-trips the
+// placeholders of its recordings the same way).
 func TestParsersRunOverTheRecordedSessions(t *testing.T) {
 	versions := map[string]int{}
+	lists := map[string]int{}
 	for _, s := range loadSessions(t) {
 		require.Contains(t, RecordedVersions, s.Version)
 		for _, e := range s.Entries {
@@ -30,11 +34,22 @@ func TestParsersRunOverTheRecordedSessions(t *testing.T) {
 				assert.Equal(t, s.Version, v.String(), "a session reports the version it was written for")
 				require.NoError(t, CheckFloor(v))
 				versions[s.Version]++
+			case shapeKey(List().Shape):
+				list, err := ParseList([]byte(e.Stdout))
+				require.NoError(t, err, s.Path)
+				for _, sb := range list {
+					require.NoError(t, sandboxName.Check(sb.Name), "the name of a placeholder sandbox is a name")
+					for _, w := range sb.Workspaces {
+						require.NoError(t, envDir.Check(w), "the workspace of a placeholder sandbox is a path")
+					}
+				}
+				lists[s.Version]++
 			}
 		}
 	}
 	for _, v := range RecordedVersions {
 		assert.Positive(t, versions[v], "no session of %s has sbx version", v)
+		assert.Positive(t, lists[v], "no session of %s has sbx ls --json", v)
 	}
 }
 
