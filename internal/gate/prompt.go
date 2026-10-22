@@ -24,22 +24,32 @@ const maxAnswer = 4096
 
 // Ask writes the diff d, its summary repeated right above the prompt,
 // and PromptLine to stderr, so a piped stdout keeps them visible, and
-// reads one answer line from stdin, which must be a terminal
-// (REQ-0272). It approves on "y" or "Y" followed by a newline; any
-// other line, an end of input before a newline, and a line longer than
+// reads one answer line from stdin (REQ-0272). Both must be a terminal,
+// so the operator reads the diff where the answer is typed. Once the
+// diff is written, Ask drops the terminal's input queue, so a line
+// typed or pasted before the diff was on the screen is not an answer
+// to it. It approves on "y" or "Y" followed by a newline; any other
+// line, an end of input before a newline, and a line longer than
 // maxAnswer decline (01 1.6, REQ-1208). Without a terminal it writes
 // nothing and returns ErrNoTerminal.
 //
 //romeu:invariant I7 guard
 func Ask(stdin io.Reader, stderr io.Writer, d Diff) (bool, error) {
-	f, ok := stdin.(*os.File)
-	if !ok || !term.IsTerminal(int(f.Fd())) {
+	in, ok := stdin.(*os.File)
+	if !ok || !term.IsTerminal(int(in.Fd())) {
 		return false, ErrNoTerminal
 	}
-	if _, err := d.WriteTo(stderr); err != nil {
+	out, ok := stderr.(*os.File)
+	if !ok || !term.IsTerminal(int(out.Fd())) {
+		return false, ErrNoTerminal
+	}
+	if _, err := d.WriteTo(out); err != nil {
 		return false, fmt.Errorf("gate: write the diff: %w", err)
 	}
-	line, err := readAnswer(f)
+	if err := flushInput(int(in.Fd())); err != nil {
+		return false, fmt.Errorf("gate: drop what was typed before the prompt: %w", err)
+	}
+	line, err := readAnswer(in)
 	if err != nil {
 		return false, fmt.Errorf("gate: read the answer: %w", err)
 	}
@@ -48,18 +58,25 @@ func Ask(stdin io.Reader, stderr io.Writer, d Diff) (bool, error) {
 
 // readAnswer reads one line from r a byte at a time, so it takes
 // nothing past the newline, and returns it without the newline. A line
-// that ends without a newline, at the end of input, or that passes
-// maxAnswer bytes is returned as "", which declines.
+// that ends without a newline, at the end of input, is returned as "",
+// which declines; so is a line longer than maxAnswer bytes, whose rest
+// is read up to its newline and dropped, so it never becomes the next
+// answer.
 func readAnswer(r io.Reader) (string, error) {
 	var line []byte
 	var b [1]byte
-	for len(line) <= maxAnswer {
+	for {
 		n, err := r.Read(b[:])
 		if n == 1 {
 			if b[0] == '\n' {
+				if len(line) > maxAnswer {
+					return "", nil
+				}
 				return string(line), nil
 			}
-			line = append(line, b[0])
+			if len(line) <= maxAnswer {
+				line = append(line, b[0])
+			}
 		}
 		if errors.Is(err, io.EOF) {
 			return "", nil
@@ -68,5 +85,4 @@ func readAnswer(r io.Reader) (string, error) {
 			return "", err
 		}
 	}
-	return "", nil
 }
