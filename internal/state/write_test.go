@@ -8,11 +8,30 @@ package state
 import (
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// held returns the lock of s, taken once and released with the test:
+// the writers of the store need it (REQ-0283).
+func held(t *testing.T, s *Store) *Lock {
+	t.Helper()
+	if lk, ok := heldLocks.Load(s); ok {
+		return lk.(*Lock)
+	}
+	lk, err := s.Lock()
+	require.NoError(t, err)
+	heldLocks.Store(s, lk)
+	t.Cleanup(func() { lk.Unlock(); heldLocks.Delete(s) })
+	return lk
+}
+
+// heldLocks are the locks held for the tests, by store.
+var heldLocks sync.Map
 
 // openTemp opens a store in a new directory.
 func openTemp(t *testing.T) *Store {
@@ -67,4 +86,24 @@ func TestWriteFile(t *testing.T) {
 		require.Error(t, writeFile(s.projects, "a.json", []byte("x")))
 		require.Error(t, syncDir(s.projects))
 	})
+}
+
+func TestStore_writersNeedTheHeldLock(t *testing.T) {
+	s := openTemp(t)
+	other := openTemp(t)
+	otherLock, err := other.Lock()
+	require.NoError(t, err)
+	defer otherLock.Unlock()
+	lk, err := s.Lock()
+	require.NoError(t, err)
+	lk.Unlock()
+	lk.Unlock() // twice is safe
+
+	noop := func(*Project) error { return nil }
+	for name, l := range map[string]*Lock{"none": nil, "released": lk, "another store's": otherLock} {
+		require.ErrorIs(t, s.UpdateProject(l, "shop", noop), ErrNotLocked, name)
+		require.ErrorIs(t, s.UpdateToolchain(l, func(*Toolchain) error { return nil }), ErrNotLocked, name)
+		require.ErrorIs(t, s.PutDescriptor(l, Descriptor{Digest: "sha256:" + strings.Repeat("a", 64)}), ErrNotLocked, name)
+	}
+	assert.NoFileExists(t, filepath.Join(s.Dir(), "projects", "shop.json"))
 }

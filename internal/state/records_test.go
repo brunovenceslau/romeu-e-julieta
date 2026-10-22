@@ -122,7 +122,7 @@ func seedProject(t *testing.T, s *Store, name string, data []byte) string {
 func TestStore_UpdateProject(t *testing.T) {
 	t.Run("an absent record is a new one, written 0600", func(t *testing.T) {
 		s := openTemp(t)
-		require.NoError(t, s.UpdateProject("shop", func(p *Project) error {
+		require.NoError(t, s.UpdateProject(held(t, s), "shop", func(p *Project) error {
 			assert.Equal(t, "state-project/v1", p.Schema)
 			assert.Empty(t, p.Generations)
 			p.EgressApplied = []string{"github.com"}
@@ -145,7 +145,7 @@ func TestStore_UpdateProject(t *testing.T) {
 			s := openTemp(t)
 			path := seedProject(t, s, "shop", []byte(bad))
 			called := false
-			err := s.UpdateProject("shop", func(*Project) error { called = true; return nil })
+			err := s.UpdateProject(held(t, s), "shop", func(*Project) error { called = true; return nil })
 			require.Error(t, err, bad)
 			assert.False(t, called, "fn runs on a record that decoded")
 			e := cli.Of(err)
@@ -163,12 +163,12 @@ func TestStore_UpdateProject(t *testing.T) {
 	t.Run("a failing fn writes nothing", func(t *testing.T) {
 		s := openTemp(t)
 		boom := errors.New("boom")
-		require.ErrorIs(t, s.UpdateProject("shop", func(*Project) error { return boom }), boom)
+		require.ErrorIs(t, s.UpdateProject(held(t, s), "shop", func(*Project) error { return boom }), boom)
 		assert.NoFileExists(t, filepath.Join(s.Dir(), "projects", "shop.json"))
 	})
 	t.Run("a fn that leaves an invalid record writes nothing", func(t *testing.T) {
 		s := openTemp(t)
-		err := s.UpdateProject("shop", func(p *Project) error {
+		err := s.UpdateProject(held(t, s), "shop", func(p *Project) error {
 			p.Generations = append(p.Generations, Generation{State: "nonsense"})
 			return nil
 		})
@@ -178,7 +178,7 @@ func TestStore_UpdateProject(t *testing.T) {
 	t.Run("a name that is no project name is refused", func(t *testing.T) {
 		s := openTemp(t)
 		for _, name := range []string{"", "../x", "Shop", "a/b", ".hidden", "x", strings.Repeat("a", 41)} {
-			err := s.UpdateProject(name, func(*Project) error { return nil })
+			err := s.UpdateProject(held(t, s), name, func(*Project) error { return nil })
 			assert.ErrorIs(t, err, ErrInvalidName, name)
 		}
 	})
@@ -187,7 +187,7 @@ func TestStore_UpdateProject(t *testing.T) {
 func TestStore_UpdateToolchain(t *testing.T) {
 	s := openTemp(t)
 	at := time.Date(2026, 10, 2, 9, 0, 0, 0, time.UTC)
-	require.NoError(t, s.UpdateToolchain(func(tc *Toolchain) error {
+	require.NoError(t, s.UpdateToolchain(held(t, s), func(tc *Toolchain) error {
 		tc.SbxVersion = "0.46.0"
 		tc.Romeu = Binary{Version: "v1.0.0", SHA256: SHA256{1}}
 		tc.Julieta = JulietaBinary{Version: "v1.0.0", Protocol: 1, SHA256: SHA256{2}}
@@ -208,7 +208,7 @@ func TestStore_UpdateToolchain(t *testing.T) {
 	t.Run("a record that does not decode is never written over", func(t *testing.T) {
 		path := filepath.Join(s.Dir(), "toolchain.json")
 		require.NoError(t, os.WriteFile(path, []byte("garbage"), 0o600))
-		err := s.UpdateToolchain(func(*Toolchain) error { return nil })
+		err := s.UpdateToolchain(held(t, s), func(*Toolchain) error { return nil })
 		require.Error(t, err)
 		assert.Equal(t, "RJ-334", cli.Of(err).ID)
 		after, err := os.ReadFile(path)
@@ -224,7 +224,7 @@ func TestStore_Descriptors(t *testing.T) {
 		s := openTemp(t)
 		_, err := s.GetDescriptor(digest)
 		require.ErrorIs(t, err, fs.ErrNotExist)
-		require.NoError(t, s.PutDescriptor(d))
+		require.NoError(t, s.PutDescriptor(held(t, s), d))
 		got, err := s.GetDescriptor(digest)
 		require.NoError(t, err)
 		assert.Equal(t, "state-descriptor/v1", got.Schema)
@@ -235,10 +235,10 @@ func TestStore_Descriptors(t *testing.T) {
 	})
 	t.Run("entries are immutable", func(t *testing.T) {
 		s := openTemp(t)
-		require.NoError(t, s.PutDescriptor(d))
-		require.NoError(t, s.PutDescriptor(d), "the same content again is a no-op")
+		require.NoError(t, s.PutDescriptor(held(t, s), d))
+		require.NoError(t, s.PutDescriptor(held(t, s), d), "the same content again is a no-op")
 		other := Descriptor{Digest: digest, Capabilities: Capabilities{"network": []any{"other.example"}}}
-		require.ErrorIs(t, s.PutDescriptor(other), ErrImmutable)
+		require.ErrorIs(t, s.PutDescriptor(held(t, s), other), ErrImmutable)
 		got, err := s.GetDescriptor(digest)
 		require.NoError(t, err)
 		assert.Equal(t, d.Capabilities, got.Capabilities)
@@ -248,14 +248,14 @@ func TestStore_Descriptors(t *testing.T) {
 		for _, bad := range []string{"", "../x", "sha256:zz", "md5:" + strings.Repeat("a", 32), "sha256:" + strings.Repeat("A", 64)} {
 			_, err := s.GetDescriptor(bad)
 			require.ErrorIs(t, err, ErrInvalidDigest, bad)
-			require.ErrorIs(t, s.PutDescriptor(Descriptor{Digest: bad}), ErrInvalidDigest, bad)
+			require.ErrorIs(t, s.PutDescriptor(held(t, s), Descriptor{Digest: bad}), ErrInvalidDigest, bad)
 		}
 	})
 	t.Run("a descriptor that does not decode is never written over", func(t *testing.T) {
 		s := openTemp(t)
 		path := filepath.Join(s.Dir(), "descriptors", strings.Repeat("5", 64)+".json")
 		require.NoError(t, os.WriteFile(path, []byte("garbage"), 0o600))
-		err := s.PutDescriptor(d)
+		err := s.PutDescriptor(held(t, s), d)
 		assert.Equal(t, "RJ-334", cli.Of(err).ID)
 		after, rerr := os.ReadFile(path)
 		require.NoError(t, rerr)
@@ -383,7 +383,7 @@ func TestDecodeDescriptor(t *testing.T) {
 func TestStore_GetDescriptor_otherDigestThanItsName(t *testing.T) {
 	s := openTemp(t)
 	d := Descriptor{Digest: "sha256:" + strings.Repeat("6", 64)}
-	require.NoError(t, s.PutDescriptor(d))
+	require.NoError(t, s.PutDescriptor(held(t, s), d))
 	// A file of the name of one digest that holds another is damage.
 	data, err := os.ReadFile(filepath.Join(s.Dir(), "descriptors", strings.Repeat("6", 64)+".json"))
 	require.NoError(t, err)
@@ -401,9 +401,9 @@ func TestStore_readErrors(t *testing.T) {
 		_, err := s.LoadProject("shop")
 		require.Error(t, err)
 		require.NotErrorIs(t, err, fs.ErrNotExist)
-		require.Error(t, s.UpdateProject("shop", func(*Project) error { return nil }))
+		require.Error(t, s.UpdateProject(held(t, s), "shop", func(*Project) error { return nil }))
 		require.NoError(t, os.Mkdir(filepath.Join(s.Dir(), "descriptors", strings.Repeat("8", 64)+".json"), 0o700))
-		require.Error(t, s.PutDescriptor(Descriptor{Digest: "sha256:" + strings.Repeat("8", 64)}))
+		require.Error(t, s.PutDescriptor(held(t, s), Descriptor{Digest: "sha256:" + strings.Repeat("8", 64)}))
 	})
 	t.Run("a name that is no project name is refused by the reader too", func(t *testing.T) {
 		_, err := openTemp(t).LoadProject("../x")
@@ -414,9 +414,9 @@ func TestStore_readErrors(t *testing.T) {
 		_, err := s.LoadToolchain()
 		require.ErrorIs(t, err, fs.ErrNotExist)
 		boom := errors.New("boom")
-		require.ErrorIs(t, s.UpdateToolchain(func(*Toolchain) error { return boom }), boom)
+		require.ErrorIs(t, s.UpdateToolchain(held(t, s), func(*Toolchain) error { return boom }), boom)
 		assert.NoFileExists(t, filepath.Join(s.Dir(), "toolchain.json"))
-		require.Error(t, s.UpdateToolchain(func(*Toolchain) error { return nil }), "a record with members missing is not written")
+		require.Error(t, s.UpdateToolchain(held(t, s), func(*Toolchain) error { return nil }), "a record with members missing is not written")
 		assert.NoFileExists(t, filepath.Join(s.Dir(), "toolchain.json"))
 	})
 }
@@ -484,8 +484,8 @@ func TestStore_nonRegularRecord(t *testing.T) {
 func TestStore_PutDescriptor_comparesValues(t *testing.T) {
 	s := openTemp(t)
 	d := Descriptor{Digest: "sha256:" + strings.Repeat("9", 64), Capabilities: Capabilities{"ports": []any{1, 2}}}
-	require.NoError(t, s.PutDescriptor(d))
-	require.NoError(t, s.PutDescriptor(d), "the same content again, whatever its Go types, writes nothing")
+	require.NoError(t, s.PutDescriptor(held(t, s), d))
+	require.NoError(t, s.PutDescriptor(held(t, s), d), "the same content again, whatever its Go types, writes nothing")
 	changed := Descriptor{Digest: d.Digest, Capabilities: Capabilities{"ports": []any{1, 3}}}
-	require.ErrorIs(t, s.PutDescriptor(changed), ErrImmutable)
+	require.ErrorIs(t, s.PutDescriptor(held(t, s), changed), ErrImmutable)
 }

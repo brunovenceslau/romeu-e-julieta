@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"golang.org/x/sys/unix"
 
@@ -28,7 +29,7 @@ import (
 // new module: the standard library has no public file lock, and what
 // github.com/gofrs/flock adds (Windows, shared locks) romeu does not
 // need.
-func (s *Store) Lock() (unlock func(), err error) {
+func (s *Store) Lock() (*Lock, error) {
 	lf, err := s.root.OpenFile(lockName, os.O_RDWR|os.O_CREATE, FileMode)
 	if err != nil {
 		return nil, fmt.Errorf("state: %w", err)
@@ -46,8 +47,44 @@ func (s *Store) Lock() (unlock func(), err error) {
 		}
 		return nil, fmt.Errorf("state: the lock %s: %w", lockName, err)
 	}
-	return func() {
-		_ = unix.Flock(int(lf.Fd()), unix.LOCK_UN)
-		_ = lf.Close()
-	}, nil
+	return &Lock{store: s, file: lf}, nil
+}
+
+// Lock is a held romeu.lock. Every writer of the store takes one, so a
+// command that writes a record without the lock does not compile
+// (REQ-0283); the writers also check that it is held, and of this
+// store.
+type Lock struct {
+	store *Store
+	mu    sync.Mutex
+	file  *os.File
+}
+
+// Unlock releases the lock. It is safe to call more than once.
+func (l *Lock) Unlock() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.file == nil {
+		return
+	}
+	_ = unix.Flock(int(l.file.Fd()), unix.LOCK_UN)
+	_ = l.file.Close()
+	l.file = nil
+}
+
+// ErrNotLocked is the error of a write given no lock, a lock that was
+// released, or the lock of another store: a defect of the caller.
+var ErrNotLocked = errors.New("state: a write needs the held lock of its store")
+
+// check returns ErrNotLocked unless l is held and is the lock of s.
+func (l *Lock) check(s *Store) error {
+	if l == nil || l.store != s {
+		return ErrNotLocked
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.file == nil {
+		return ErrNotLocked
+	}
+	return nil
 }

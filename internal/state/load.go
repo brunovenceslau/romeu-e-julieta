@@ -88,8 +88,11 @@ func (s *Store) LoadToolchain() (*Toolchain, error) {
 // record (a new one when it is absent), calls fn, and writes the result
 // atomically. A record that does not decode stops it before fn runs
 // and before any write, so it is never written over (REQ-0165). The
-// caller holds the lock (REQ-0283).
-func (s *Store) UpdateToolchain(fn func(*Toolchain) error) error {
+// lock lk is held (REQ-0283).
+func (s *Store) UpdateToolchain(lk *Lock, fn func(*Toolchain) error) error {
+	if err := lk.check(s); err != nil {
+		return err
+	}
 	t, err := s.LoadToolchain()
 	switch {
 	case errors.Is(err, os.ErrNotExist):
@@ -136,9 +139,12 @@ func (s *Store) LoadProject(name string) (*Project, error) {
 // record (a new one when it is absent), calls fn, and writes the result
 // atomically. A record that does not decode stops it before fn runs and
 // before any write, so it is never written over (REQ-0165); neither is
-// a record fn leaves in a form no reader would take. The caller holds
-// the lock (REQ-0283).
-func (s *Store) UpdateProject(name string, fn func(*Project) error) error {
+// a record fn leaves in a form no reader would take. The lock lk is
+// held (REQ-0283).
+func (s *Store) UpdateProject(lk *Lock, name string, fn func(*Project) error) error {
+	if err := lk.check(s); err != nil {
+		return err
+	}
 	file, err := projectFile(name)
 	if err != nil {
 		return err
@@ -195,7 +201,10 @@ func (s *Store) GetDescriptor(digest string) (*Descriptor, error) {
 // immutable: the same content again writes nothing, other content is
 // ErrImmutable, and an entry that does not decode is never written over
 // (RJ-334). The schema field is set to this build's.
-func (s *Store) PutDescriptor(d Descriptor) error {
+func (s *Store) PutDescriptor(lk *Lock, d Descriptor) error {
+	if err := lk.check(s); err != nil {
+		return err
+	}
 	d.Schema = DescriptorField
 	if d.Capabilities == nil {
 		d.Capabilities = Capabilities{}

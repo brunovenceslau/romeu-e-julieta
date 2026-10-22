@@ -44,7 +44,7 @@ func TestLockHelperProcess(t *testing.T) {
 	if err != nil {
 		os.Exit(2)
 	}
-	unlock, err := s.Lock()
+	lk, err := s.Lock()
 	if err == nil && os.Getenv(lockHoldEnv) != "" {
 		if os.WriteFile(os.Getenv(lockHoldEnv), nil, 0o600) != nil {
 			os.Exit(2)
@@ -58,7 +58,7 @@ func TestLockHelperProcess(t *testing.T) {
 		}
 		os.Exit(cli.ExitCode(err))
 	}
-	unlock()
+	lk.Unlock()
 	os.Exit(0)
 }
 
@@ -83,21 +83,21 @@ func lockAnother(t *testing.T, dir string) (status int, id string) {
 func TestStore_Lock(t *testing.T) {
 	t.Run("a second process exits 1 with RJ-101", func(t *testing.T) {
 		s := openTemp(t)
-		unlock, err := s.Lock()
+		lk, err := s.Lock()
 		require.NoError(t, err)
 		status, id := lockAnother(t, s.Dir())
 		assert.Equal(t, 1, status)
 		assert.Equal(t, "RJ-101", id)
 
-		unlock()
+		lk.Unlock()
 		status, _ = lockAnother(t, s.Dir())
 		assert.Equal(t, 0, status, "the lock is free after unlock")
 	})
 	t.Run("the error is the row locked, exit 1", func(t *testing.T) {
 		s := openTemp(t)
-		unlock, err := s.Lock()
+		lk, err := s.Lock()
 		require.NoError(t, err)
-		defer unlock()
+		defer lk.Unlock()
 		_, err = s.Lock()
 		require.Error(t, err)
 		assert.Equal(t, "RJ-101", cli.Of(err).ID)
@@ -105,9 +105,9 @@ func TestStore_Lock(t *testing.T) {
 	})
 	t.Run("the lock file is 0600", func(t *testing.T) {
 		s := openTemp(t)
-		unlock, err := s.Lock()
+		lk, err := s.Lock()
 		require.NoError(t, err)
-		defer unlock()
+		defer lk.Unlock()
 		info, err := os.Stat(s.Dir() + "/romeu.lock")
 		require.NoError(t, err)
 		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
@@ -139,8 +139,8 @@ func TestStore_Lock(t *testing.T) {
 
 		kill()
 		<-ended
-		unlock, err := s.Lock()
+		lk, err := s.Lock()
 		require.NoError(t, err, "the kernel released the lock with the process (REQ-0283)")
-		unlock()
+		lk.Unlock()
 	})
 }

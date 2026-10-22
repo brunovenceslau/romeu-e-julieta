@@ -51,7 +51,7 @@ func TestProject_liveGenerationIsTheLast(t *testing.T) {
 		_, err = st.LoadProject("shop")
 		require.ErrorIs(t, err, ErrInvalid)
 		assert.Equal(t, "RJ-334", cli.Of(err).ID)
-		err = st.UpdateProject("shop", func(*Project) error { return nil })
+		err = st.UpdateProject(held(t, st), "shop", func(*Project) error { return nil })
 		assert.Equal(t, "RJ-334", cli.Of(err).ID)
 		after, rerr := os.ReadFile(path)
 		require.NoError(t, rerr)
