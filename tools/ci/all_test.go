@@ -920,9 +920,9 @@ func TestJobSubcommands(t *testing.T) {
 		job         string
 		ran, absent []string
 	}{
-		{"static", []string{"ok    hygiene", "ok    workflows", "ok    kits", "ok    schema", "ok    reqs", "ok    plan"}, []string{"coverage"}},
-		{"race", []string{"ok    coverage"}, []string{"hygiene", "workflows", "kits", "schema", "reqs", "plan"}},
-		{"e2e", nil, []string{"hygiene", "workflows", "kits", "schema", "reqs", "plan", "coverage"}},
+		{"static", []string{"ok    hygiene", "ok    workflows", "ok    kits", "ok    schema", "ok    catalog", "ok    reqs", "ok    plan"}, []string{"coverage"}},
+		{"race", []string{"ok    coverage"}, []string{"hygiene", "workflows", "kits", "schema", "catalog", "reqs", "plan"}},
+		{"e2e", nil, []string{"hygiene", "workflows", "kits", "schema", "catalog", "reqs", "plan", "coverage"}},
 	}
 	skipped := check.Step{Name: "e2e", Argv: []string{"false"}, Skip: "not run on darwin/arm64: the container e2e runs on the Linux runners"}
 	for _, tt := range jobs {

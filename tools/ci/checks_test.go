@@ -70,6 +70,7 @@ func TestRegisteredChecks(t *testing.T) {
 		{"workflows", true, false, true, false, "judge"},
 		{"kits", true, false, true, false, "judge"},
 		{"schema", false, false, true, false, "judge"},
+		{"catalog", false, false, true, false, "judge"},
 		{"reqs", true, false, true, false, "judge"},
 		{"plan", true, false, true, false, "judge"},
 		{"pushed range", false, true, false, false, "judge"},
