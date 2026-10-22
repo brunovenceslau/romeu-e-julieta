@@ -215,11 +215,13 @@ func Encode(e Entry) ([]byte, error) {
 // at most MaxFileSize bytes of UTF-8; a front matter between a first
 // line "---" and the next, of one YAML mapping with no anchor, alias,
 // merge key, tag outside YAML's core schema (an include among them) or
-// duplicate key; then go.yaml.in/yaml/v3 with KnownFields(true) into
-// Entry, every key required; then the rules of 03 3.9, with the tags
-// sorted on the way in. The schema field is read from the parsed
-// mapping before the keys are judged, so a newer version is
-// format-newer (RJ-311) though it holds keys v1 does not know; a front
+// duplicate key; then go.yaml.in/yaml/v3 into Entry, every key of v1
+// required and a key this build does not know skipped, as a newer
+// writer of the same version may add one (REQ-0163); then the rules of
+// 03 3.9, with the tags sorted on the way in. The schema field is read
+// from the parsed mapping before the keys are judged, so a newer
+// version is format-newer (RJ-311) though it holds keys v1 does not
+// know; a front
 // matter that does not parse, or that the subset grammar refuses, is
 // format-newer when the text of its schema line names a newer version
 // (checkNewer), so a v2 file with an anchor or a syntax error is too.
@@ -260,7 +262,6 @@ func Decode(data []byte) (Entry, error) {
 	}
 	var e Entry
 	dec := yaml.NewDecoder(bytes.NewReader(front))
-	dec.KnownFields(true)
 	if err := dec.Decode(&e); err != nil {
 		return Entry{}, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
@@ -322,8 +323,8 @@ func checkNode(doc *yaml.Node) error {
 	return checkTree(doc.Content[0], 0)
 }
 
-// checkKeys returns why the keys of the mapping m are not exactly
-// frontKeys, each once.
+// checkKeys returns why the mapping m has a key twice or lacks a key of
+// frontKeys; a key not in frontKeys is skipped.
 func checkKeys(m *yaml.Node) error {
 	seen := map[string]bool{}
 	for i := 0; i < len(m.Content); i += 2 {
@@ -332,9 +333,6 @@ func checkKeys(m *yaml.Node) error {
 			return fmt.Errorf("the key \"%s\" is written twice", clip(key))
 		}
 		seen[key] = true
-		if !slices.Contains(frontKeys, key) {
-			return fmt.Errorf("the key \"%s\" is not a field of %s", clip(key), Field)
-		}
 	}
 	for _, key := range frontKeys {
 		if !seen[key] {

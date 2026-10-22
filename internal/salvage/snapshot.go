@@ -111,12 +111,13 @@ func EncodeHeads(h Heads) ([]byte, error) {
 }
 
 // DecodeHeads reads snapshot/heads.json strictly (03, opening,
-// REQ-0160, REQ-0168): at most the file cap (memstore.MaxFileSize), an
-// unknown member, a duplicate member name, text that is not UTF-8 and
-// trailing data are each an error, and every member must be present
-// and not null. The schema is read first, so a newer version is
-// format-newer (RJ-311) even where it holds members this build does not
-// know. Then createdAt is a UTC time, each ref is under
+// REQ-0160, REQ-0168): at most the file cap (memstore.MaxFileSize), a
+// duplicate member name, text that is not UTF-8 and trailing data are
+// each an error, and every member must be present and not null. A
+// member this build does not know is skipped, as a newer julieta of the
+// same version may add one (REQ-0163). The schema is read first, so a
+// newer version is format-newer (RJ-311) even where it holds members
+// this build does not know. Then createdAt is a UTC time, each ref is under
 // BundleNamespaces with a name git and the terminal accept, and each
 // object id is full and lowercase. Every other refusal wraps
 // ErrInvalid.
@@ -149,7 +150,7 @@ func DecodeHeads(data []byte) (Heads, error) {
 		Refs      *map[string]string `json:"refs"`
 		Schema    string             `json:"schema"`
 	}
-	if err := json.Unmarshal(data, &doc, json.RejectUnknownMembers(true)); err != nil {
+	if err := json.Unmarshal(data, &doc); err != nil {
 		return Heads{}, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	if doc.CreatedAt == nil || doc.Disabled == nil || doc.Refs == nil || *doc.Refs == nil {

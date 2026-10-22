@@ -50,8 +50,7 @@ func TestEncodeHeadsRefusesWhatDecodeRefuses(t *testing.T) {
 }
 
 // TestDecodeHeadsIsStrict: romeu's reader of snapshot/heads.json (03
-// 3.13, REQ-0261) refuses an unknown member, a duplicate one, a missing
-// one, another schema, a time that is not UTC, a ref outside the
+// 3.13, REQ-0261) refuses a duplicate member, a missing one, another schema, a time that is not UTC, a ref outside the
 // namespaces of the bundle or with a character git refuses, an object
 // id of another form, trailing data and a document over the file cap.
 func TestDecodeHeadsIsStrict(t *testing.T) {
@@ -59,7 +58,6 @@ func TestDecodeHeadsIsStrict(t *testing.T) {
 	_, err := salvage.DecodeHeads([]byte(ok))
 	require.NoError(t, err)
 	for name, doc := range map[string]string{
-		"unknown member":   strings.Replace(ok, `"disabled"`, `"extra":1,"disabled"`, 1),
 		"duplicate member": strings.Replace(ok, `"disabled":false`, `"disabled":false,"disabled":true`, 1),
 		"missing refs":     strings.Replace(ok, `"refs":{"refs/heads/main":"`+sha1A+`"},`, ``, 1),
 		"missing disabled": strings.Replace(ok, `"disabled":false,`, ``, 1),
@@ -87,6 +85,20 @@ func TestDecodeHeadsIsStrict(t *testing.T) {
 	sha256 := strings.Replace(ok, sha1A, strings.Repeat("c", 64), 1)
 	_, err = salvage.DecodeHeads([]byte(sha256))
 	require.NoError(t, err, "a SHA-256 repository's object ids")
+}
+
+// TestDecodeHeadsIgnoresAnUnknownMember: a member a newer julieta adds to
+// snapshot/heads.json is skipped, whatever its value (03, opening,
+// REQ-0163).
+func TestDecodeHeadsIgnoresAnUnknownMember(t *testing.T) {
+	ok := `{"createdAt":"2026-10-21T09:30:00Z","disabled":false,"refs":{"refs/heads/main":"` + sha1A + `"},"schema":"snapshot/v1"}`
+	want, err := salvage.DecodeHeads([]byte(ok))
+	require.NoError(t, err)
+	for name, extra := range map[string]string{"a number": `1`, "an object": `{"a":[1,{"b":null}]}`, "a string": `"x"`} {
+		got, err := salvage.DecodeHeads([]byte(strings.Replace(ok, `"disabled"`, `"extra":`+extra+`,"disabled"`, 1)))
+		require.NoError(t, err, name)
+		assert.Equal(t, want, got, name)
+	}
 }
 
 func TestDecodeHeadsOfANewerVersionIsFormatNewer(t *testing.T) {

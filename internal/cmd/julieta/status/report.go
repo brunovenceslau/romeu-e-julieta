@@ -143,12 +143,13 @@ type Worktree struct {
 	Prunable bool   `json:"prunable"`
 }
 
-// Decode reads a --json document of julieta status strictly: an
-// unknown member, a duplicate one and another schema are each an
-// error.
+// Decode reads a --json document of julieta status: a duplicate member and
+// another schema are each an error, and a member this build does not
+// know is skipped, as a newer julieta of the same schema may add one
+// (REQ-0163).
 func Decode(data []byte) (Report, error) {
 	var r Report
-	if err := json.Unmarshal(data, &r, json.RejectUnknownMembers(true)); err != nil {
+	if err := json.Unmarshal(data, &r); err != nil {
 		return Report{}, err
 	}
 	if r.Schema != Schema {

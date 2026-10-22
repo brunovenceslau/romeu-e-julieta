@@ -387,10 +387,26 @@ func TestCheckFindings(t *testing.T) {
 	assert.Contains(t, stderr, "dotfile, fifo, symlink, top-level, git")
 }
 
-// TestDecodeIsStrict refuses a duplicate and an unknown member, one
-// fixture each, and another schema.
+// TestDecodeIgnoresAnUnknownMember reads a document to which a newer
+// julieta added a member, at every level, as the document without it
+// (03, opening, REQ-0163).
+func TestDecodeIgnoresAnUnknownMember(t *testing.T) {
+	valid, err := os.ReadFile(filepath.Join("testdata", "valid.json"))
+	require.NoError(t, err)
+	want, err := memory.Decode(valid)
+	require.NoError(t, err)
+	// Every object of the document gains a member, as a newer julieta
+	// that added one would write it.
+	newer := strings.ReplaceAll(strings.ReplaceAll(string(valid), "{", `{"added":{"a":[1]},`), ",}", "}")
+	got, err := memory.Decode([]byte(newer))
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+}
+
+// TestDecodeIsStrict refuses a duplicate member, by a fixture, and
+// another schema.
 func TestDecodeIsStrict(t *testing.T) {
-	for name, valid := range map[string]bool{"valid.json": true, "invalid-duplicate-member.json": false, "invalid-unknown-member.json": false} {
+	for name, valid := range map[string]bool{"valid.json": true, "invalid-duplicate-member.json": false} {
 		data, err := os.ReadFile(filepath.Join("testdata", name))
 		require.NoError(t, err)
 		_, err = memory.Decode(data)

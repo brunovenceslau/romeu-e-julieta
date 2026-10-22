@@ -170,11 +170,10 @@ func tree(t *testing.T, dir string) []string {
 	return paths
 }
 
-// TestDecodeIsStrict reads the --json document strictly: the fixtures
-// with a duplicate member and with an unknown one are refused, and the
-// valid one is read.
+// TestDecodeIsStrict reads the --json document strictly: the fixture
+// with a duplicate member is refused, and the valid one is read.
 func TestDecodeIsStrict(t *testing.T) {
-	for name, valid := range map[string]bool{"valid.json": true, "invalid-duplicate-member.json": false, "invalid-unknown-member.json": false} {
+	for name, valid := range map[string]bool{"valid.json": true, "invalid-duplicate-member.json": false} {
 		data, err := os.ReadFile(filepath.Join("testdata", name))
 		require.NoError(t, err)
 		_, err = status.Decode(data)
@@ -184,4 +183,20 @@ func TestDecodeIsStrict(t *testing.T) {
 			require.Error(t, err, name)
 		}
 	}
+}
+
+// TestDecodeIgnoresAnUnknownMember reads a document to which a newer
+// julieta added a member, at every level, as the document without it
+// (03, opening, REQ-0163).
+func TestDecodeIgnoresAnUnknownMember(t *testing.T) {
+	valid, err := os.ReadFile(filepath.Join("testdata", "valid.json"))
+	require.NoError(t, err)
+	want, err := status.Decode(valid)
+	require.NoError(t, err)
+	// Every object of the document gains a member, as a newer julieta
+	// that added one would write it.
+	newer := strings.ReplaceAll(strings.ReplaceAll(string(valid), "{", `{"added":{"a":[1]},`), ",}", "}")
+	got, err := status.Decode([]byte(newer))
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
 }

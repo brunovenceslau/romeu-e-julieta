@@ -69,7 +69,7 @@ func TestEncodeSortsTags(t *testing.T) {
 
 // TestDecodeRefusesTheSubsetGrammar refuses, one fixture each, a front
 // matter with an anchor, an alias, a merge key, an include, a
-// duplicate key and an unknown key (03, opening, REQ-0168; 10 10.1).
+// duplicate key (03, opening, REQ-0168; 10 10.1).
 func TestDecodeRefusesTheSubsetGrammar(t *testing.T) {
 	for name, why := range map[string]string{
 		"invalid-anchor.md":        "anchor",
@@ -77,7 +77,6 @@ func TestDecodeRefusesTheSubsetGrammar(t *testing.T) {
 		"invalid-merge-key.md":     "merge key",
 		"invalid-include.md":       `the tag "!include"`,
 		"invalid-duplicate-key.md": `the key "status" is written twice`,
-		"invalid-unknown-key.md":   `the key "agent" is not a field`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := memstore.Decode(fixture(t, name))
@@ -85,6 +84,17 @@ func TestDecodeRefusesTheSubsetGrammar(t *testing.T) {
 			assert.Contains(t, err.Error(), why)
 		})
 	}
+}
+
+// TestDecodeIgnoresAnUnknownKey reads an entry that a newer writer gave
+// a key as the same entry without it (03, opening, REQ-0163).
+func TestDecodeIgnoresAnUnknownKey(t *testing.T) {
+	want, err := memstore.Decode(fixture(t, "valid.md"))
+	require.NoError(t, err)
+	got, err := memstore.Decode(fixture(t, "unknown-key.md"))
+	require.NoError(t, err)
+	got.Body = want.Body // the fixture's own body
+	assert.Equal(t, want, got)
 }
 
 // TestDecodeRefusesAnAliasAlone refuses an alias whose anchor is

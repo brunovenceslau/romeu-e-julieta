@@ -244,11 +244,27 @@ func TestSetupCachesTheManifest(t *testing.T) {
 	assert.Equal(t, 0, code, stderr)
 }
 
-// TestDecodeIsStrict reads the --json document strictly: the fixtures
-// with a duplicate member and with an unknown one are refused, and the
-// valid one is read.
+// TestDecodeIgnoresAnUnknownMember reads a document to which a newer
+// julieta added a member, at every level, as the document without it
+// (03, opening, REQ-0163).
+func TestDecodeIgnoresAnUnknownMember(t *testing.T) {
+	valid, err := os.ReadFile(filepath.Join("testdata", "valid.json"))
+	require.NoError(t, err)
+	want, err := setup.Decode(valid)
+	require.NoError(t, err)
+	// Every object of the document gains a member, as a newer julieta
+	// that added one would write it.
+	newer := strings.ReplaceAll(strings.ReplaceAll(string(valid), "{", `{"added":{"a":[1]},`), ",}", "}")
+	got, err := setup.Decode([]byte(newer))
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+}
+
+// TestDecodeIsStrict reads the --json document strictly: the fixture
+// with a duplicate member is refused, the valid one is read, and so is
+// no other schema.
 func TestDecodeIsStrict(t *testing.T) {
-	for name, valid := range map[string]bool{"valid.json": true, "invalid-duplicate-member.json": false, "invalid-unknown-member.json": false} {
+	for name, valid := range map[string]bool{"valid.json": true, "invalid-duplicate-member.json": false} {
 		data, err := os.ReadFile(filepath.Join("testdata", name))
 		require.NoError(t, err)
 		_, err = setup.Decode(data)

@@ -48,8 +48,7 @@ func TestDecodeValid(t *testing.T) {
 
 // TestDecodeRefuses reads one fixture for each construct the strict
 // subset grammar refuses (REQ-0168): an anchor, an alias, a merge key,
-// an include, a duplicate key and an unknown key, in the front matter
-// and in a repo; and the bodies that break REQ-0245.
+// an include and a duplicate key; and the bodies that break REQ-0245.
 func TestDecodeRefuses(t *testing.T) {
 	for name, why := range map[string]string{
 		"invalid-anchor.md":              "anchor",
@@ -57,8 +56,6 @@ func TestDecodeRefuses(t *testing.T) {
 		"invalid-merge-key.md":           "merge key",
 		"invalid-include.md":             "tag",
 		"invalid-duplicate-key.md":       "written twice",
-		"invalid-unknown-key.md":         "not a field",
-		"invalid-repo-unknown-key.md":    "not a field",
 		"invalid-missing-headings.md":    `the heading "## Decisions"`,
 		"invalid-final-five-headings.md": `the heading "## What would be lost"`,
 		"invalid-facts-body.md":          "no body",
@@ -67,6 +64,21 @@ func TestDecodeRefuses(t *testing.T) {
 			_, err := handoff.Decode(fixture(t, name))
 			require.ErrorIs(t, err, handoff.ErrInvalid)
 			assert.Contains(t, err.Error(), why)
+		})
+	}
+}
+
+// TestDecodeIgnoresAnUnknownKey reads a handoff file that a newer writer
+// gave a key, in the front matter and in a repo, as the same file
+// without it (03, opening, REQ-0163).
+func TestDecodeIgnoresAnUnknownKey(t *testing.T) {
+	want, err := handoff.Decode(fixture(t, "valid-clear.md"))
+	require.NoError(t, err)
+	for _, name := range []string{"unknown-key.md", "unknown-repo-key.md"} {
+		t.Run(name, func(t *testing.T) {
+			got, err := handoff.Decode(fixture(t, name))
+			require.NoError(t, err)
+			assert.Equal(t, want, got)
 		})
 	}
 }
