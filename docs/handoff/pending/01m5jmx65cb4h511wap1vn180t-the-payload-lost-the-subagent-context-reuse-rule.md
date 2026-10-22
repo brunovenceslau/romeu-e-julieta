@@ -18,9 +18,10 @@ its usage is at or below 30% of its model's context window, otherwise
 spawn a fresh one with a self-contained brief), but the bullet lived in
 the retired house agreement and the current `~/.claude/CLAUDE.md` does
 not carry it. In this repository's session of 2026-10-22, builders were
-resumed at 40% to 53%.
+resumed at 40% to 53%, measured with `ctx-usage`.
 
 To do: put the bullet back in the payload, naming `ctx-usage` as the
-measurement, and decide whether a hook enforces it on SendMessage.
+measurement. Open question: whether a hook should also run the
+measurement before a subagent is resumed.
 
 Reopen: the next session on the sandbox kit's repository.
