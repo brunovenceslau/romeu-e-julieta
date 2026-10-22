@@ -42,12 +42,15 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/race"
@@ -172,6 +175,11 @@ func (r *run) around() ([]string, check.Read, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	// The tests run in the directory of their package: a path below a
+	// relative TMPDIR would name another file there.
+	if dir, err = filepath.Abs(dir); err != nil {
+		return nil, nil, err
+	}
 	infra, notices := filepath.Join(dir, "infra"), filepath.Join(dir, "notices")
 	for _, path := range []string{infra, notices} {
 		if err := os.WriteFile(path, nil, 0o600); err != nil {
@@ -185,17 +193,87 @@ func (r *run) around() ([]string, check.Read, error) {
 		if err != nil {
 			return out, fmt.Errorf("read the infrastructure errors of the e2e: %w", err)
 		}
-		noted, err := os.ReadFile(notices)
+		noted, err := readNotices(notices)
 		if err != nil {
 			return out, fmt.Errorf("read the notices of the e2e: %w", err)
 		}
-		for line := range strings.Lines(string(noted)) {
-			if line = strings.TrimSpace(line); line != "" {
-				r.noted = append(r.noted, line)
-			}
-		}
+		r.noted = noted
 		return read(out, runErr, strings.Fields(string(names)))
 	}, nil
+}
+
+// The bounds of the notice file, which the code under test writes: at
+// most maxNoticeBytes are read, at most maxNotices lines kept, each cut
+// to maxNoticeLine bytes.
+const (
+	maxNoticeBytes = 64 << 10
+	maxNotices     = 10
+	maxNoticeLine  = 1 << 10
+)
+
+// readNotices returns the notes of the notice file at path, which must
+// be a regular file of the step (Lstat, then the open handle is held to
+// the same file): a symlink, a FIFO or a directory is an error, a plain
+// one and no infrastructure error, since it is the code under test
+// acting on the step's files and not a precondition the environment
+// could not meet. It reads maxNoticeBytes at most, drops blank lines,
+// keeps maxNotices lines of maxNoticeLine bytes at most (a cut ends in
+// "..." and falls on a rune), and ends with the one note "N more
+// notices not shown" when lines were left out; a line the byte limit
+// cut in two counts as one left out, and so does what lies past it.
+func readNotices(path string) ([]string, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("the notice file %s is not a regular file (%s)", path, info.Mode().Type())
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	if opened, err := f.Stat(); err != nil || !os.SameFile(info, opened) {
+		return nil, fmt.Errorf("the notice file %s changed while it was opened", path)
+	}
+	data, err := io.ReadAll(io.LimitReader(f, maxNoticeBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	dropped := 0
+	if len(data) > maxNoticeBytes {
+		data = data[:maxNoticeBytes]
+		dropped = 1
+		// The last line may be cut in two: it is the one left out.
+		if i := bytes.LastIndexByte(data, '\n'); i >= 0 {
+			data = data[:i+1]
+		} else {
+			data = nil
+		}
+	}
+	var notes []string
+	for line := range strings.Lines(string(data)) {
+		if line = strings.TrimSpace(line); line == "" {
+			continue
+		}
+		if len(notes) == maxNotices {
+			dropped++
+			continue
+		}
+		if len(line) > maxNoticeLine {
+			line = line[:maxNoticeLine-3]
+			for r, size := utf8.DecodeLastRuneInString(line); r == utf8.RuneError && size <= 1 && line != ""; r, size = utf8.DecodeLastRuneInString(line) {
+				line = line[:len(line)-1] // half a rune
+			}
+			line += "..."
+		}
+		notes = append(notes, line)
+	}
+	if dropped > 0 {
+		notes = append(notes, strconv.Itoa(dropped)+" more notices not shown")
+	}
+	return notes, nil
 }
 
 // reportLine matches the one line Fail prints through tb.Fatal: the

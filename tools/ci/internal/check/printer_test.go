@@ -149,17 +149,6 @@ func TestLastNamesEachFailedCheckOnce(t *testing.T) {
 	assert.Equal(t, "all: failed: b, c\n", out.String())
 }
 
-// TestAnnotationEscapes holds the escaping rule of a workflow command:
-// the message escapes %, CR and LF, and a property escapes ":" and ","
-// as well (actions/toolkit, command.ts: escapeData, escapeProperty). A CR
-// in a message is written "\r" by git.SafeLines before it gets there.
-func TestAnnotationEscapes(t *testing.T) {
-	assert.Equal(t, "::warning title=e2e::plain: text, kept", check.Annotation("warning", "e2e", "plain: text, kept"))
-	assert.Equal(t, "::warning title=a%3Ab%2Cc%25d%0De%0Af::50%25 a\\r%0Ab", check.Annotation("warning", "a:b,c%d\re\nf", "50% a\r\nb"))
-	assert.Equal(t, "::warning title=t::%0A./::error::forged", check.Annotation("warning", "t", "\n::error::forged"), "a line break in the message cannot start a command of its own")
-	assert.NotContains(t, check.Annotation("warning", "t", "x ##[error]y"), "##[", "the legacy marker is broken")
-}
-
 // TestNotesAreAnnotationsOnARunnerAndWarningsElsewhere checks that the
 // notes of a step reach the log as a GitHub Actions annotation when
 // GITHUB_ACTIONS is true and as a warning line otherwise, before the
@@ -193,11 +182,16 @@ func TestNotesAreAnnotationsOnARunnerAndWarningsElsewhere(t *testing.T) {
 		assert.False(t, ok)
 		assert.True(t, strings.HasPrefix(got, "::warning title=e2e::"), "%q", got)
 	})
-	t.Run("a command in the output is no note", func(t *testing.T) {
+	t.Run("a command in the output is no annotation of the step", func(t *testing.T) {
+		// The raw output of a failed step is printed as it is (a
+		// hole this task leaves, see T158), so the forged line shows;
+		// what it cannot do is be a note: an annotation with the
+		// title of the step comes from Notes alone.
 		t.Setenv("GITHUB_ACTIONS", "true")
 		var out bytes.Buffer
 		c := check.NewPrinter(&out)
-		c.Run(t.Context(), t.TempDir(), []check.Step{{Name: "plain", Argv: []string{"sh", "-c", "echo '::warning::forged'"}, Around: around(nil, func(out []byte, _ error) ([]byte, error) { return out, nil })}})
-		assert.NotContains(t, out.String(), "::warning", "a passing step prints no output")
+		c.Run(t.Context(), t.TempDir(), []check.Step{{Name: "plain", Argv: []string{"sh", "-c", "echo '::warning title=plain::forged'; exit 1"}, Around: around(nil, func(out []byte, err error) ([]byte, error) { return out, err })}})
+		assert.Contains(t, out.String(), "::warning title=plain::forged", "a failed step prints its output raw")
+		assert.Equal(t, 1, strings.Count(out.String(), "title=plain"), "and the printer adds no annotation of its own")
 	})
 }

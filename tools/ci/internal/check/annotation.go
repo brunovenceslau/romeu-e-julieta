@@ -25,23 +25,23 @@ var (
 	propertyEscaper = strings.NewReplacer("%", "%25", "\r", "%0D", "\n", "%0A", ":", "%3A", ",", "%2C")
 )
 
-// Annotation returns the workflow command that shows msg on the run as
-// an annotation of the level ("warning", "notice" or "error") with the
-// title title: "::<level> title=<title>::<msg>", with the escaping of
+// warningCommand returns the workflow command that shows msg on the run
+// as a warning annotation with the title title:
+// "::warning title=<title>::<msg>", with the escaping of
 // actions/toolkit, command.ts: the message escapes "%", CR and LF, the
 // title ":" and "," as well. The message goes through git.SafeLines
 // first, which breaks the legacy "##[" marker the runner finds anywhere
 // in a line (actions/runner, ActionCommand.cs), so the result is one
 // line that starts a command of its own and holds no other.
-func Annotation(level, title, msg string) string {
-	return "::" + level + " title=" + propertyEscaper.Replace(title) + "::" + dataEscaper.Replace(git.SafeLines(msg))
+func warningCommand(title, msg string) string {
+	return "::warning title=" + propertyEscaper.Replace(title) + "::" + dataEscaper.Replace(git.SafeLines(msg))
 }
 
 // warn prints msg, a note of the step name: an annotation on a runner,
 // and a line that starts with "warn" elsewhere, through git.SafeLines.
 func (c *Printer) warn(name, msg string) {
 	if onRunner() {
-		Say(c.out, "%s\n", Annotation("warning", name, msg))
+		Say(c.out, "%s\n", warningCommand(name, msg))
 		return
 	}
 	Say(c.out, "warn  %s: %s\n", name, git.SafeLines(msg))

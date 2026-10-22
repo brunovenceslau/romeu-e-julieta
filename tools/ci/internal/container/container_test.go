@@ -11,11 +11,13 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -344,4 +346,115 @@ func TestTheStepsCommandDoesNotSeeTheRunner(t *testing.T) {
 	out, err := s.Run(t.Context(), t.TempDir())
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(string(out), "0\n"), "%q", out)
+}
+
+// writeNotices writes content to a file of the test and returns its path.
+func writeNotices(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "notices")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+	return path
+}
+
+// TestReadNoticesBounds holds each bound of the notice file, which the
+// code under test writes: 64 KiB are read, 10 notes are kept, each cut
+// to 1 KiB, and one note says how many lines were left out.
+func TestReadNoticesBounds(t *testing.T) {
+	lines := func(n int) string { return strings.Repeat("n\n", n) }
+	more := func(n int) []string {
+		return append(slices.Repeat([]string{"n"}, maxNotices), strconv.Itoa(n)+" more notices not shown")
+	}
+	tests := []struct {
+		name    string
+		content string
+		want    []string
+	}{
+		{"an empty file", "", nil},
+		{"blank lines are no notice", "\n  \n\t\n a \n", []string{"a"}},
+		{"ten notices", lines(10), slices.Repeat([]string{"n"}, 10)},
+		{"eleven notices", lines(11), more(1)},
+		{"fifteen notices", lines(15), more(5)},
+		{"a line is cut to a KiB", strings.Repeat("a", 5000) + "\n", []string{strings.Repeat("a", maxNoticeLine-3) + "..."}},
+		{"a line of two-byte runes is cut on a rune", strings.Repeat("\u00e9", 700) + "\n", []string{strings.Repeat("\u00e9", (maxNoticeLine-3)/2) + "..."}},
+		{"an invalid byte early in a cut line stays", "\xff" + strings.Repeat("a", 5000) + "\n", []string{"\xff" + strings.Repeat("a", maxNoticeLine-4) + "..."}},
+		{"a file past 64 KiB is read to 64 KiB", "a\nb\nc\n" + strings.Repeat("x", 3*maxNoticeBytes), []string{"a", "b", "c", "1 more notices not shown"}},
+		{"many short lines past 64 KiB", strings.Repeat("x\n", maxNoticeBytes), append(slices.Repeat([]string{"x"}, maxNotices), strconv.Itoa(maxNoticeBytes/2-maxNotices+1)+" more notices not shown")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readNotices(writeNotices(t, tt.content))
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+			for _, n := range got {
+				assert.LessOrEqual(t, len(n), maxNoticeLine)
+				assert.True(t, utf8.ValidString(n) || strings.HasPrefix(n, "\xff"))
+			}
+		})
+	}
+}
+
+// TestReadNoticesReadsAtMost64KiB holds the read, and not only the
+// result, to the limit: a sparse file of half a gigabyte makes the
+// reader allocate a few buffers of 64 KiB, not the file.
+func TestReadNoticesReadsAtMost64KiB(t *testing.T) {
+	path := writeNotices(t, "")
+	require.NoError(t, os.Truncate(path, 512<<20))
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	got, err := readNotices(path)
+	runtime.ReadMemStats(&after)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"1 more notices not shown"}, got, "NUL bytes with no line break are one line")
+	assert.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(8<<20))
+}
+
+// TestReadNoticesRefusesWhatIsNotARegularFile holds the notice file to a
+// regular file of the step: the code under test could replace it with a
+// link to another file or a FIFO that blocks the reader. It is a plain
+// error and no infrastructure error, since an infrastructure error is a
+// precondition the environment could not meet and this is the code
+// under test acting on the step's files.
+func TestReadNoticesRefusesWhatIsNotARegularFile(t *testing.T) {
+	dir := t.TempDir()
+	target := writeNotices(t, "a\n")
+	link := filepath.Join(dir, "link")
+	require.NoError(t, os.Symlink(target, link))
+	for name, path := range map[string]string{"a symlink to a regular file": link, "a directory": dir, "a missing file": filepath.Join(dir, "missing")} {
+		t.Run(name, func(t *testing.T) {
+			_, err := readNotices(path)
+			require.Error(t, err)
+			assert.NotErrorIs(t, err, check.ErrInfrastructure)
+		})
+	}
+	_, err := readNotices(link)
+	assert.ErrorContains(t, err, "not a regular file")
+}
+
+// TestAStepWhoseNoticeFileWasReplacedFails runs the step over a command
+// that replaces the notice file with a symlink: the step fails, with
+// no note.
+func TestAStepWhoseNoticeFileWasReplacedFails(t *testing.T) {
+	s := fakeRun(t, `rm "$`+NoticeFileEnv+`"; ln -s /dev/null "$`+NoticeFileEnv+`"; `+
+		`printf '%s\n' '{"Action":"run","Test":"TestA"}' '{"Action":"pass","Test":"TestA"}' '{"Action":"pass"}'`)
+	_, err := s.Run(t.Context(), t.TempDir())
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, check.ErrInfrastructure)
+	assert.Contains(t, err.Error(), "not a regular file")
+	assert.Empty(t, s.Notes())
+}
+
+// TestAroundPathsAreAbsolute holds the files of the step to absolute
+// paths: the tests run in the directory of their package, so a path
+// made below a relative TMPDIR would name another file there.
+func TestAroundPathsAreAbsolute(t *testing.T) {
+	t.Chdir(t.TempDir())
+	require.NoError(t, os.Mkdir("tmp", 0o700))
+	t.Setenv("TMPDIR", "tmp")
+	env, _, err := new(run).around()
+	require.NoError(t, err)
+	require.Len(t, env, 2)
+	for _, kv := range env {
+		_, path, _ := strings.Cut(kv, "=")
+		assert.True(t, filepath.IsAbs(path), "%s", kv)
+	}
 }
