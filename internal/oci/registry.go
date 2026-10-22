@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -81,6 +82,7 @@ func (c *Client) FetchWorkload(ctx context.Context, ref string, p Platform) (Fet
 	host, repo, _ := strings.Cut(w.Repository, "/")
 	r := &registry{c: c, host: host}
 	r.endpoint, r.repo = endpoint(host, repo)
+	ctx = trusted(ctx, registryAddr(r.endpoint))
 	f, err := r.fetch(ctx, w, p)
 	if err != nil {
 		return Fetched{}, r.classify(err)
@@ -100,6 +102,14 @@ func endpoint(host, repo string) (string, string) {
 		repo = "library/" + repo
 	}
 	return "registry-1.docker.io", repo
+}
+
+// hostOf returns the host of a host or host:port.
+func hostOf(hostport string) string {
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		return h
+	}
+	return hostport
 }
 
 // registry is one registry and repository, and the token a request to
@@ -136,7 +146,7 @@ func (r *registry) classify(err error) error {
 	if se, ok := errors.AsType[*shapeError](err); ok {
 		return cli.UpstreamShape.New("registry "+r.host+": "+se.reason, source)
 	}
-	for _, guard := range []error{ErrInsecure, ErrRedirect, ErrTooLarge, ErrDigestMismatch} {
+	for _, guard := range []error{ErrInsecure, ErrRedirect, ErrTooLarge, ErrDigestMismatch, ErrForeignRealm, ErrPrivateAddress} {
 		if errors.Is(err, guard) {
 			return cli.UpstreamShape.Wrap(err, "registry "+r.host+": a guard of the client refused the response", source)
 		}
@@ -145,7 +155,7 @@ func (r *registry) classify(err error) error {
 		return fmt.Errorf("registry %s: %w", r.host, err)
 	}
 	if rc, ok := errors.AsType[*reachError](err); ok {
-		return RegistryUnreachable.New("registry "+r.host+": "+rc.Error(), detail)
+		return RegistryUnreachable.Wrap(rc.error, "registry "+r.host, detail)
 	}
 	return RegistryUnreachable.Wrap(err, "registry "+r.host+" did not answer", detail)
 }
@@ -335,6 +345,12 @@ func (r *registry) authenticate(ctx context.Context, challenge string) error {
 	realm, err := url.Parse(params["realm"])
 	if err != nil {
 		return shape("the realm of the challenge is not a URL")
+	}
+	// The registry names where its tokens come from, and a hostile one
+	// could name a service of the user's network: the realm stays on the
+	// registry's site (REQ-0515).
+	if !sameSite(realm.Hostname(), r.host) && !sameSite(realm.Hostname(), hostOf(r.endpoint)) {
+		return fmt.Errorf("%w: %s", ErrForeignRealm, quote(realm.Hostname()))
 	}
 	q := realm.Query()
 	if s := params["service"]; s != "" {

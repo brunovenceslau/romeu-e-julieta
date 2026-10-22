@@ -13,9 +13,14 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
+	"slices"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -47,6 +52,13 @@ var (
 	// ErrDigestMismatch is content whose sha256 is not the digest it was
 	// asked for by.
 	ErrDigestMismatch = errors.New("oci: content does not match its digest")
+	// ErrForeignRealm is a token realm outside the site of the registry.
+	ErrForeignRealm = errors.New("oci: token realm outside the registry's site")
+	// ErrPrivateAddress is a connection to an address that is not a
+	// public one (a loopback, private, link-local or reserved address),
+	// which only the registry the reference names, and a proxy the
+	// environment names, may be.
+	ErrPrivateAddress = errors.New("oci: address is not a public one")
 	// ErrCredentials is a registry that asks for credentials.
 	ErrCredentials = errors.New("oci: the registry asks for credentials")
 )
@@ -59,26 +71,155 @@ var (
 // response. A Client is safe for concurrent use.
 type Client struct {
 	http *http.Client
+	// proxies are the host:port of the proxies the environment named for
+	// a request: a connection to one is a connection the user chose.
+	proxies sync.Map
 }
 
 // NewClient returns a Client with the guards on. The proxy of the
 // environment is used, as for any HTTPS client, and the server's
 // certificate is verified against the system roots.
 func NewClient() *Client {
+	c := &Client{}
 	tr := &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
-		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
-		TLSHandshakeTimeout:   10 * time.Second,
-		ResponseHeaderTimeout: 30 * time.Second,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          4,
-		IdleConnTimeout:       30 * time.Second,
+		Proxy:                  c.proxy,
+		DialContext:            c.dial,
+		TLSClientConfig:        &tls.Config{MinVersion: tls.VersionTLS12},
+		TLSHandshakeTimeout:    10 * time.Second,
+		ResponseHeaderTimeout:  30 * time.Second,
+		MaxResponseHeaderBytes: maxHeaderBytes,
+		ForceAttemptHTTP2:      true,
+		MaxIdleConns:           4,
+		IdleConnTimeout:        30 * time.Second,
 	}
-	return &Client{http: &http.Client{
-		Transport:     tr,
-		Timeout:       requestTimeout,
-		CheckRedirect: checkRedirect,
-	}}
+	c.http = &http.Client{Transport: tr, Timeout: requestTimeout, CheckRedirect: checkRedirect}
+	return c
+}
+
+// maxHeaderBytes caps the headers of a response, which no other cap
+// reaches.
+const maxHeaderBytes = 64 << 10
+
+// proxy is the proxy of the environment, remembered so that dial can tell
+// a connection to it from one to a target.
+func (c *Client) proxy(req *http.Request) (*url.URL, error) {
+	u, err := http.ProxyFromEnvironment(req)
+	if u != nil && err == nil {
+		port := u.Port()
+		if port == "" {
+			port = map[string]string{"http": "80", "https": "443", "socks5": "1080", "socks5h": "1080"}[u.Scheme]
+		}
+		c.proxies.Store(net.JoinHostPort(u.Hostname(), port), true)
+	}
+	return u, err
+}
+
+// trustKey is the context key of the address a request may reach even
+// if it is not a public one.
+type trustKey struct{}
+
+// trusted returns ctx with addr, a host:port, as the one address its
+// request may reach whatever it resolves to: the registry the reference
+// names (a private registry on the user's network is the user's
+// choice).
+func trusted(ctx context.Context, addr string) context.Context {
+	return context.WithValue(ctx, trustKey{}, addr)
+}
+
+// registryAddr returns the host:port a dial to the registry host has,
+// 443 when it names no port.
+func registryAddr(host string) string {
+	if _, _, err := net.SplitHostPort(host); err == nil {
+		return host
+	}
+	return net.JoinHostPort(host, "443")
+}
+
+// dial connects to addr and refuses an address that is not a public one,
+// unless it is the registry's own or a proxy's. The check is on the
+// address the name resolved to, at connect time, for each address tried,
+// so a name that resolves to a loopback address (DNS rebinding) is
+// refused the same as the address written out. Behind a proxy, the
+// target's address is the proxy's to judge (REQ-0515).
+func (c *Client) dial(ctx context.Context, network, addr string) (net.Conn, error) {
+	_, isProxy := c.proxies.Load(addr)
+	d := &net.Dialer{Timeout: 10 * time.Second}
+	if want, _ := ctx.Value(trustKey{}).(string); !isProxy && want != addr {
+		d.Control = func(_, address string, _ syscall.RawConn) error { return checkPublic(address) }
+	}
+	return d.DialContext(ctx, network, addr)
+}
+
+// checkPublic returns ErrPrivateAddress unless address, an ip:port, is a
+// public unicast address.
+func checkPublic(address string) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return fmt.Errorf("%w: %s", ErrPrivateAddress, quote(address))
+	}
+	ip, err := netip.ParseAddr(host)
+	if err != nil {
+		return fmt.Errorf("%w: %s", ErrPrivateAddress, quote(address))
+	}
+	ip = ip.Unmap()
+	if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() ||
+		ip.IsMulticast() || reserved.Contains(ip) || ip == netip.AddrFrom4([4]byte{255, 255, 255, 255}) {
+		return fmt.Errorf("%w: %s", ErrPrivateAddress, ip)
+	}
+	return nil
+}
+
+// reserved are the ranges of public-looking space that are not the
+// internet's: carrier-grade NAT (RFC 6598) and the benchmarking range
+// (RFC 2544), where a cloud's internal services can sit.
+var reserved = prefixes{netip.MustParsePrefix("100.64.0.0/10"), netip.MustParsePrefix("198.18.0.0/15")}
+
+// prefixes is a list of address ranges.
+type prefixes []netip.Prefix
+
+// Contains reports whether any range holds ip.
+func (ps prefixes) Contains(ip netip.Addr) bool {
+	return slices.ContainsFunc(ps, func(p netip.Prefix) bool { return p.Contains(ip) })
+}
+
+// sameSite reports whether two host names belong to one site: they are
+// equal, or they share their registrable domain, so a registry may name a
+// token service of its own (registry-1.docker.io and auth.docker.io are
+// docker.io). It is a heuristic without the public suffix list, which
+// would be a new dependency: the last two labels, or three where the
+// second to last is co, com, org, net, gov, edu or ac under a two-letter
+// top level (example.co.uk). An address literal is its own site.
+func sameSite(a, b string) bool {
+	a, b = strings.TrimSuffix(strings.ToLower(a), "."), strings.TrimSuffix(strings.ToLower(b), ".")
+	if a == "" || b == "" {
+		return false
+	}
+	if a == b {
+		return true
+	}
+	if _, err := netip.ParseAddr(a); err == nil {
+		return false
+	}
+	if _, err := netip.ParseAddr(b); err == nil {
+		return false
+	}
+	sa, sb := site(a), site(b)
+	return sa != "" && sa == sb
+}
+
+// site returns the registrable domain of a name, or "" when it has
+// fewer than two labels.
+func site(name string) string {
+	labels := strings.Split(name, ".")
+	n := 2
+	if len(labels) >= 3 && len(labels[len(labels)-1]) == 2 &&
+		slices.Contains([]string{"co", "com", "org", "net", "gov", "edu", "ac"}, labels[len(labels)-2]) {
+		n = 3
+	}
+	if len(labels) < n {
+		return ""
+	}
+	return strings.Join(labels[len(labels)-n:], ".")
 }
 
 // checkRedirect lets a request follow https redirects, a few of them
