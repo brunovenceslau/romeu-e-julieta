@@ -15,8 +15,11 @@
 // one in the private file InfraFileEnv names, which the e2e step of
 // tools/ci makes and reads, and ends the job with an exit status of its
 // own; the step reads no marker from the output, which a registry or a
-// container could write. A manifest digest, or a download's
-// sha256, that differs from its pin is a test failure, always: it is
+// container could write. A cached download that fails its pin is
+// removed and fetched once more, and the removal is a notice, a line in
+// the private file NoticeFileEnv names, which the same step prints as
+// an annotation: a channel no test output reaches. A manifest digest, or
+// a download's sha256, that differs from its pin is a test failure, always: it is
 // the one signal that a pinned artifact was substituted, and a security
 // gate is hardened, not retried.
 package container
@@ -54,6 +57,22 @@ const InfraPrefix = "container e2e: infrastructure error: "
 // the file, of mode 0600, and a test there holds its constant equal to
 // this one. A run of go test with no such variable records nothing.
 const InfraFileEnv = "ROMEU_E2E_INFRA_FILE"
+
+// NoticeFileEnv names the variable that gives the path of the file a
+// notice is appended to, one line for each, when the harness did
+// something a person reading the run should see though no test failed:
+// a cached download that failed its pin and was fetched again (Download;
+// REQ-0798). The e2e step of tools/ci makes the file, of mode 0600,
+// reads it after the run and prints each line as a warning of its own,
+// as a GitHub Actions annotation on a runner; a test prints no line for
+// it, so the classifier of that step, which counts the lines a test
+// printed, never reads one, and no line a test prints can reach the
+// annotation. A test there holds the constant equal to this one.
+const NoticeFileEnv = "ROMEU_E2E_NOTICE_FILE"
+
+// noticeFallback is where notice writes when no step gave it a file,
+// a run of go test by hand.
+var noticeFallback io.Writer = os.Stderr
 
 // The preconditions of 10 10.1, as an InfraError names them.
 const (
@@ -115,6 +134,29 @@ func recordInfra(name string) error {
 		return err
 	}
 	if _, err := f.WriteString(name + "\n"); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
+}
+
+// notice appends msg to the file of NoticeFileEnv as one line, with its
+// line breaks turned into spaces, which must exist: the harness never
+// makes it. A run without the variable (go test by hand, with no step
+// of tools/ci around it) writes the line to the standard error, where
+// nothing classifies it.
+func notice(msg string) error {
+	line := strings.Join(strings.Fields(msg), " ")
+	path := os.Getenv(NoticeFileEnv)
+	if path == "" {
+		_, err := fmt.Fprintf(noticeFallback, "container e2e: notice: %s\n", line)
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+	if err != nil {
+		return err
+	}
+	if _, err := f.WriteString(line + "\n"); err != nil {
 		_ = f.Close()
 		return err
 	}
@@ -326,7 +368,9 @@ func (c Config) platformDir() (string, error) {
 // error; a file whose sha256 is not want is a test failure, the
 // downloaded one and the cached one alike, except that a cached file
 // that fails its check is deleted and fetched once more: a corrupt entry
-// heals, and the fetched file must still match want.
+// heals, and the fetched file must still match want. The removal is
+// recorded as a notice (notice) that names the file and the pin, so a
+// corrupted or tampered entry leaves a trace in the run (REQ-0798).
 func (c Config) Download(ctx context.Context, what, name, url, want, dst string) (string, error) {
 	cached, err := c.cache(ctx, what, name, url, want)
 	if err != nil {
@@ -338,6 +382,9 @@ func (c Config) Download(ctx context.Context, what, name, url, want, dst string)
 	}
 	if rerr := os.Remove(cached); rerr != nil && !errors.Is(rerr, os.ErrNotExist) {
 		return "", fmt.Errorf("%w; and it could not be removed: %w", err, rerr)
+	}
+	if nerr := notice(err.Error() + "; it was removed and fetched once more"); nerr != nil {
+		return "", fmt.Errorf("%w; and the removal could not be recorded: %w", err, nerr)
 	}
 	if cached, err = c.cache(ctx, what, name, url, want); err != nil {
 		return "", err
