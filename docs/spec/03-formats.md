@@ -560,6 +560,13 @@ says which states persist; the candidate states do not):
 }
 ```
 
+A member that holds nothing may be absent from the file: an empty list
+(`generations`, `egressApplied`, `salvage`, `reasons`, `acceptedLoss`), an
+absent object (`approval`, `retiring`) and an absent time (`lastRunAt`,
+`closedAt`), and so may `createdWith` and `fingerprint`, where the example
+above writes `null` or `[]`. romeu writes them absent, and a reader accepts
+both forms.
+
 | Field | Values |
 |---|---|
 | `retiring` | `REQ-0230` `null`, or `{"attic": "<UTC-ts>"}` while the retire steps of 01 1.6 run |

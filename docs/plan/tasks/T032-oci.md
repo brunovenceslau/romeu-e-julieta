@@ -22,6 +22,11 @@ conformance fixture.
 
 Re-plan (2026-10-12): Kept as written before the re-plan.
 
+Re-plan (2026-10-22): `internal/state` keeps the descriptor cache's
+capability set as `map[string]any` (`state.Capabilities`) for now. This
+task replaces the map with the normalized capability type, which
+`state.Descriptor` then holds.
+
 - Implements: REQ-0064 (01 1.4), REQ-0068 (01 1.4), REQ-0074 (01 1.5),
   REQ-0083 (01 1.6), REQ-0102 (01 1.6), REQ-0160 (03 (opening)),
   REQ-0168 (03 (opening)), REQ-0170 (03 (opening)), REQ-0210 (03 3.4),
