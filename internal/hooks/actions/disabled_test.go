@@ -144,8 +144,9 @@ func TestRecordDisabledWaitsForASnapshot(t *testing.T) {
 		return errors.New("stopped")
 	})
 	done := make(chan error, 1)
+	snap := f.config(t, clock.Add(time.Minute))
 	go func() {
-		_, err := Snapshot(t.Context(), f.config(t, clock.Add(time.Minute)))
+		_, err := Snapshot(t.Context(), snap)
 		done <- err
 	}()
 	<-parked
