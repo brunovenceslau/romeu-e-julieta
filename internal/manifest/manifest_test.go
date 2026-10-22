@@ -169,7 +169,7 @@ func TestDecodeIgnoresAnUnknownMember(t *testing.T) {
 	assert.Equal(t, want, got)
 
 	// The fixture of one member at the top, and the env value of it.
-	got, err = Decode(fixture(t, "valid-unknown-member.json"))
+	got, err = Decode(fixture(t, "invalid-unknown-member.json"))
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
 	got, err = DecodeEnv(base64.RawURLEncoding.EncodeToString(data))
@@ -444,7 +444,7 @@ func TestDecodeEnvRefuses(t *testing.T) {
 // document it accepts encodes to canonical JSON that decodes to the
 // same manifest and encodes to the same bytes again.
 func FuzzDecode(f *testing.F) {
-	for _, name := range []string{"valid.json", "valid-unknown-member.json", "invalid-duplicate-member.json"} {
+	for _, name := range []string{"valid.json", "invalid-unknown-member.json", "invalid-duplicate-member.json"} {
 		data, err := os.ReadFile("testdata/" + name)
 		require.NoError(f, err)
 		f.Add(data)

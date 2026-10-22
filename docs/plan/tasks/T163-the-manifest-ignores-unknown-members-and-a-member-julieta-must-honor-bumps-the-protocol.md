@@ -14,7 +14,6 @@ owns:
   - docs/handoff/decisions/01m5egnpxhheh7197j08zdr618-formats-evolve-by-the-rules-of-protobuf.md
 needs:
   - T135
-  - T162
 after:
   - T162
 ask_first:
@@ -49,11 +48,12 @@ the value, covered by `runDigest`.
 
 The JSON Schema `schemas/manifest.v1.json` is generated from the Go type
 and keeps `additionalProperties: false`: it describes the manifest this
-build writes, as T162 left the other schemas. No example or fixture of
-the manifest is validated against it with an extra member. The fixture
-`invalid-unknown-member.json` became `valid-unknown-member.json`.
+build writes, as T162 left the other schemas. The fixture
+`invalid-unknown-member.json` stays under that name, as T162 left the
+others: the schema check requires a fixture so named not to validate,
+and `Decode` now reads it.
 
-- Implements: REQ-0159 (03 (opening)), REQ-0160 (03 (opening)), REQ-0163 (03 (opening)), REQ-1257 (03 3.6).
+- Implements: REQ-0163 (03 (opening)), REQ-1257 (03 3.6).
 - Operator: no
 - Acceptance:
   - A manifest with a member the format does not name at every level of
