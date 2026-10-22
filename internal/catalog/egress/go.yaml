@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The Go family: the toolchain and the tools the mise go backend builds
+# from source, whose modules come through the proxy and the checksum
+# database (mise.toml of this repository).
+schema: catalog/v1
+domains:
+  dl.google.com: {upload: false}
+  proxy.golang.org: {upload: false}
+  sum.golang.org: {upload: false}
+  storage.googleapis.com: {upload: true}      # multi-tenant object store
+tools:
+  core:go: [dl.google.com, proxy.golang.org, sum.golang.org, storage.googleapis.com]
+  go:golang.org/x/tools/gopls: [proxy.golang.org, sum.golang.org]
+  go:golang.org/x/vuln/cmd/govulncheck: [proxy.golang.org, sum.golang.org]

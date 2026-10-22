@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+schema: catalog/v1
+domains:
+  pypi.org: {upload: false}
+  files.pythonhosted.org: {upload: false}
+tools:
+  core:python: [pypi.org, files.pythonhosted.org]

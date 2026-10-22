@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Tools the aqua backend installs from their GitHub release: the release
+# host is in the base set, so these need no domain of their own.
+schema: catalog/v1
+tools:
+  aqua:jqlang/jq: []
+  aqua:koalaman/shellcheck: []
+  aqua:gohugoio/hugo: []
+  aqua:cli/cli: []
+  aqua:golangci/golangci-lint: []
