@@ -20,10 +20,11 @@ every v3 kit descriptor under `examples/` against
 reference, and requires those descriptors to carry its modeline at the
 same tag (REQ-0836). The product kits under `kits/` are not judged yet:
 `kits/git-ssh-sign` does not validate against this tag's schema (its
-ssh-agent capability has no `phase`). The frontend pin of
-`kits/pins.yaml` and this tag move together: a new frontend milestone
-copies the new tag's `schema/` here and changes `kitSpecTag` in
-`../../kits.go`.
+ssh-agent capability has no `phase`); a separate task, decided on
+2026-10-22, fixes the kit and judges `kits/`. The frontend pin of
+`kits/pins.yaml` and this tag move together, and `tools/ci schema`
+fails when they differ: a new frontend milestone copies the new tag's
+`schema/` here and changes `kitSpecTag` in `../../kits.go`.
 
 The upstream tests of these files, `spec/schema_test.go`, pin the
 schemas' constants to the upstream Go types of package `spec`, which

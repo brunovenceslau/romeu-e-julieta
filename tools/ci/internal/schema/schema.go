@@ -74,6 +74,7 @@ const (
 	ruleUnknown = "schema unknown"
 	ruleHint    = "schema hint"
 	ruleVersion = "schema version"
+	rulePin     = "schema pin"
 )
 
 // hintPrefix is the start of the hint line of 03 3.2, which the
@@ -159,6 +160,10 @@ func Of(files []check.TreeFile, schemas []schemagen.Schema) ([]check.Finding, er
 		return nil, fmt.Errorf("%w: %w", errNoKitSchema, err)
 	}
 	findings := driftFindings(files, outs)
+	ref, refErr := frontendRef(files)
+	if kit != nil {
+		findings = append(findings, pinFindings(ref, refErr)...)
+	}
 	hint, hintErr := hintBase(files)
 	for _, f := range files {
 		if f.Mode == "160000" {
@@ -166,7 +171,7 @@ func Of(files []check.TreeFile, schemas []schemagen.Schema) ([]check.Finding, er
 		}
 		switch {
 		case isKitDescriptor(f):
-			findings = append(findings, kitFindings(f, kit)...)
+			findings = append(findings, kitFindings(f, kit, ref, refErr)...)
 		case strings.HasPrefix(f.Path, examplesDir):
 			findings = append(findings, exampleFindings(f, sch, hint, hintErr)...)
 		case underTestdata(f.Path):

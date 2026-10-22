@@ -22,6 +22,7 @@ import (
 const (
 	kitSyntax = "# syntax=docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d\n"
 	kitHint   = "# yaml-language-server: $schema=https://raw.githubusercontent.com/docker/sandbox-kit-spec/v3.0.0-m.8/schema/kit.schema.json\n"
+	kitPins   = "frontend:\n  ref: docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d\n"
 	kitBody   = "schemaVersion: \"3\"\nkind: mixin\ndisplayName: k\ndescription: a kit\n"
 )
 
@@ -31,7 +32,7 @@ const (
 // kit under kits/ is not judged.
 func TestKitDescriptors(t *testing.T) {
 	good := kitSyntax + kitHint + kitBody
-	m := withKitSchema(t, tree(t))
+	m := withKit(t, tree(t))
 	m["examples/kits/k/k.yaml"] = good
 	m["kits/k/k.yaml"] = kitSyntax + "kind: nothing\n"
 	got, err := Of(files(m), fixture)
@@ -53,13 +54,22 @@ func TestKitDescriptors(t *testing.T) {
 			`does not validate against kit.schema.json at v3.0.0-m.8 at "/ (required)"`},
 	} {
 		t.Run(strings.ReplaceAll(c.name, " ", "_"), func(t *testing.T) {
-			m := withKitSchema(t, tree(t))
+			m := withKit(t, tree(t))
 			m[c.path] = c.content
 			got, err := Of(files(m), fixture)
 			require.NoError(t, err)
 			assert.Equal(t, []check.Finding{{Where: c.path, Rule: c.rule, Msg: c.msg}}, got)
 		})
 	}
+}
+
+// withKit returns m with the copy of the kit schema and a kits/pins.yaml
+// whose frontend ref the descriptors' first line follows.
+func withKit(t *testing.T, m map[string]string) map[string]string {
+	t.Helper()
+	m = withKitSchema(t, m)
+	m[pinsFile] = kitPins
+	return m
 }
 
 // withKitSchema returns m with the copy of the kit schema of this
@@ -81,6 +91,37 @@ func withKitSchema(t *testing.T, m map[string]string) map[string]string {
 	})
 	require.NoError(t, err)
 	return m
+}
+
+// TestKitPin holds the first line of a descriptor and kitSpecTag to the
+// frontend ref of kits/pins.yaml (REQ-0117).
+func TestKitPin(t *testing.T) {
+	const path = "examples/kits/k/k.yaml"
+	first := strings.TrimSuffix(kitSyntax, "\n")
+	pinsAt := func(ref string) string { return "frontend:\n  ref: " + ref + "\n" }
+	for _, c := range []struct {
+		name, pins string
+		want       []check.Finding
+	}{
+		{"the pin and the tag agree", kitPins, nil},
+		{"another digest", strings.Replace(kitPins, "e6a3", "e6a4", 1), []check.Finding{{Where: path, Rule: "schema pin",
+			Msg: "is a v3 kit descriptor, and its first line is not \"" + strings.Replace(first, "e6a3", "e6a4", 1) + "\", the frontend ref of kits/pins.yaml (02 2.1)"}}},
+		{"another tag", pinsAt("docker/sandbox-kit:3.0.0-m.9@sha256:aa"), []check.Finding{
+			{Where: path, Rule: "schema pin", Msg: "is a v3 kit descriptor, and its first line is not \"# syntax=docker/sandbox-kit:3.0.0-m.9@sha256:aa\", the frontend ref of kits/pins.yaml (02 2.1)"},
+			{Where: "kits/pins.yaml", Rule: "schema pin", Msg: "pins the frontend at tag \"3.0.0-m.9\", and the vendored kit schema is v3.0.0-m.8 (kitSpecTag, tools/ci/internal/schema/kits.go); copy the schema of the pinned tag and change kitSpecTag together"},
+		}},
+		{"no frontend ref", "workload:\n  ref: x\n", []check.Finding{{Where: "kits/pins.yaml", Rule: "schema pin",
+			Msg: "kits/pins.yaml holds no frontend ref, so the vendored kit schema at v3.0.0-m.8 follows no pin"}}},
+	} {
+		t.Run(strings.ReplaceAll(c.name, " ", "_"), func(t *testing.T) {
+			m := withKit(t, tree(t))
+			m["kits/pins.yaml"] = c.pins
+			m[path] = kitSyntax + kitHint + kitBody
+			got, err := Of(files(m), fixture)
+			require.NoError(t, err)
+			assert.ElementsMatch(t, c.want, got)
+		})
+	}
 }
 
 // TestAKitWithoutTheSchemaCopy fails a kit descriptor of a tree that
