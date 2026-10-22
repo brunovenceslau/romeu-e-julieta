@@ -152,3 +152,5 @@ behind it.
     (10 10.2, Runners).
 - Verify: `go run ./tools/ci all` exits 0; `go test ./tools/ci/... -run
   '^TestLint'`.
+
+Re-plan (2026-10-21): changed by T157. The `generated` row (REQ-0822) names the race step in place of `unit` in the order it holds against the steps that run code of the change.

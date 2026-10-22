@@ -11,10 +11,10 @@ import (
 func init() {
 	check.Register(check.Check{
 		Name:    "vet",
-		Guards:  "go vet finds nothing in the module",
+		Guards:  "go vet finds nothing in the module, for each lint target",
 		Row:     "format, vet",
 		Req:     "REQ-0820",
-		Usage:   "go vet ./...",
+		Usage:   "go vet ./..., once per lint target",
 		Fast:    true,
 		All:     true,
 		Order:   20,

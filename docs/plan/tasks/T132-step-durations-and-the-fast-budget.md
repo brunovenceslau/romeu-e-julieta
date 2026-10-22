@@ -62,3 +62,5 @@ and not a data dependency (rule 2).
 - Acceptance:
   - The four behaviours, one test each, the clock injected (10 10.4).
 - Verify: `go test ./tools/ci/... -run '^TestProgress'`.
+
+Re-plan (2026-10-21): changed by T157. `fast` runs the race run (REQ-0833) in place of `unit`, and `vulnerabilities` (REQ-0831) runs before `race`; the budget warning of `fast` is unchanged, and the race run joined `fast` on a warm measurement of 118 s against the three minutes of `fastBudget`.

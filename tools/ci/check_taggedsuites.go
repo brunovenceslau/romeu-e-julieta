@@ -11,7 +11,7 @@ import (
 func init() {
 	check.Register(check.Check{
 		Name:    "tagged suites",
-		Guards:  "the tagged suites build with their tags on every runner",
+		Guards:  "the tagged suites build with their tags on the Linux runner of the static job",
 		Row:     "build the tagged suites",
 		Req:     "REQ-0832",
 		Usage:   "go vet -tags <tag> ./<dir>/..., for each suite of taggedsuites.Suites",

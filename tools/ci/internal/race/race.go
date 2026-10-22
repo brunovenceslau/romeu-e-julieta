@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Package race is the race step of 10 10.2, the row "unit + golden +
-// race": every test of the module with the race detector, writing the
-// cover profile that the coverage check reads after the steps. It runs
+// Package race is the race step of 10 10.2, the row "race": every test
+// of the module, the one test run of fast and all, with the race
+// detector, writing in all the cover profile that the coverage check
+// reads after the steps. It runs
 // code of the change, which can game its own result: a test can write
 // the cover profile itself, or exercise less than it claims; the review
 // of the diff covers that.
@@ -45,11 +46,16 @@ func Argv(goDir, tags string, flags []string, pkgs ...string) []string {
 }
 
 // Steps returns the race step, which writes the cover profile to
-// p.Profile.
+// p.Profile. With no profile, as in fast, which has no step after the
+// run to read one, it writes none.
 func Steps(_ context.Context, p check.Plan) []check.Step {
+	var flags []string
+	if p.Profile != "" {
+		flags = []string{"-coverprofile=" + p.Profile}
+	}
 	return []check.Step{{
 		Name:    "race",
-		Argv:    Argv(p.Tools.GoDir, "", []string{"-coverprofile=" + p.Profile}, "./..."),
+		Argv:    Argv(p.Tools.GoDir, "", flags, "./..."),
 		Environ: check.StepEnv(p.Tools.GoDir),
 		Class:   procgroup.ToolRace,
 	}}

@@ -417,7 +417,7 @@ code (the `pr` invariant of this section); running the base branch's
 [Deferred decisions](../spec.md#in-how-this-repository-is-run).
 `checks` holds the runner of the gates (`tools/ci/*.go` and
 `tools/ci/internal/check/**`), the steps whose result decides whether
-`all` passes (coverage, license, vulnerabilities, race, unit, vet and
+`all` passes (coverage, license, vulnerabilities, race, vet and
 lint) with the fixtures their tests share (`tools/ci/internal/citest`),
 the packages a security rule rests on, the mutation runner
 (`tools/mutants/**`), the hooks, the linter configuration and the

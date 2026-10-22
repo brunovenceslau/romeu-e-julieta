@@ -112,3 +112,5 @@ list for the steps it adds, after T105, which moves that check.
   task adds, and the reviewer reads them in the `-v` output (10 10.8).
 
 Re-plan (2026-10-21): changed by T156. The `e2e` step builds its `go test` argv with the function of the race step (`race.Argv`), and keeps `-count=1` for the build of julieta that its tests run through `go build`; the "build the tagged suites" step vets the suites of `taggedsuites.Suites`, `e2e` alone until T075.
+
+Re-plan (2026-10-21): changed by T157. The `e2e` step is the check of the `e2e` job (`tools/ci e2e`), which `ci.yml` runs on Linux alone, and `tools/ci all` still runs it in its union; REQ-0812 says that the `e2e` subcommand prints the line of a step not run on a class.

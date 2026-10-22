@@ -27,7 +27,7 @@ written before the re-plan.
   (10 10.2), REQ-0806 (10 10.2), REQ-0807 (10 10.2), REQ-0808 (10 10.2),
   REQ-0809 (10 10.2), REQ-0810 (10 10.2), REQ-0811 (10 10.2), REQ-0813
   (10 10.2), REQ-0814 (10 10.2), REQ-0820 (10 10.2), REQ-0823 (10 10.2),
-  REQ-0824 (10 10.2), REQ-0828 (10 10.2), REQ-0831 (10 10.2), REQ-0833
+  REQ-0828 (10 10.2), REQ-0831 (10 10.2), REQ-0833
   (10 10.2), REQ-0834 (10 10.2), REQ-0840 (10 10.2), REQ-0841 (10 10.2),
   REQ-0847 (10 10.2), REQ-0848 (10 10.2), REQ-0849 (10 10.2), REQ-0851
   (10 10.2), REQ-0856 (10 10.2), REQ-0857 (10 10.2), REQ-0859 (10 10.2),
@@ -66,7 +66,7 @@ written before the re-plan.
     race run, and an architecture verdict (`uname -m` against the Go
     binary).
   - `go run ./tools/ci all` runs the steps of 10 10.2 that have code to
-    check at this point: format and vet, lint, unit, hygiene, workflows,
+    check at this point: format and vet, lint, hygiene, workflows,
     `govulncheck`, the race run with its cover profile, `coverage`,
     `reuse lint`. The lint row of this task moved to the change that
     adopted testify in tests ([ADR 0007, adopt testify assert and require in tests](../../adr/0007-adopt-testify-assert-and-require-in-tests.md)):
@@ -103,3 +103,5 @@ written before the re-plan.
   the pull request's Evidence.
 
 Re-plan (2026-10-21): changed by T156. The row of REQ-0833 states why the race run keeps `-count=1` (a test lists the tree through `git ls-files`, a subprocess the test cache does not record); the race and e2e argv come from `race.Argv`.
+
+Re-plan (2026-10-21): changed by T157. REQ-0824 (the `unit` step) is retired: the race run, REQ-0833, is the one run of the tests, in `fast` and in `all`. `ci.yml` runs the jobs `static`, `race` and `e2e` with two aggregators in place of the one job that ran `all`, and the grammar admits the aggregator's `if` and its step `exit 1` (REQ-0800, REQ-0803, REQ-0806, REQ-0809); REQ-0856 and REQ-0860 name the race step in place of `unit`.

@@ -61,9 +61,8 @@ func TestRegisteredChecks(t *testing.T) {
 		{"lint", true, false, true, false, "steps"},
 		{"vulnerabilities", false, false, true, false, "steps"},
 		{"license", false, false, true, false, "steps"},
-		{"unit", true, false, true, true, "steps"},
 		{"tagged suites", false, false, true, false, "steps"},
-		{"race", false, false, true, true, "steps"},
+		{"race", true, false, true, true, "steps"},
 		{"container", false, false, true, true, "steps"},
 		{"cross build", false, false, true, false, "steps"},
 		{"imports", false, false, true, false, "steps"},
@@ -91,11 +90,11 @@ func TestRegisteredChecksAreRowsOfTheStepTable(t *testing.T) {
 	assert.Empty(t, stepTableProblems(rows, check.Registered()))
 	rows["no id"] = nil
 	assert.Equal(t, []string{
-		`a: REQ-0824 is not an id of the row "lint"`,
+		`a: REQ-0833 is not an id of the row "lint"`,
 		`b: the row "no id" holds no id, and the check names REQ-0882`,
 		`c: "nonesuch" is no row of the step table`,
 	}, stepTableProblems(rows, []check.Check{
-		{Name: "a", Row: "lint", Req: "REQ-0824"},
+		{Name: "a", Row: "lint", Req: "REQ-0833"},
 		{Name: "b", Row: "no id", Req: "REQ-0882"},
 		{Name: "c", Row: "nonesuch", Req: "REQ-0823"},
 		{Name: "d", Row: "lint", Req: "REQ-0823"},
@@ -153,7 +152,7 @@ func TestChecksPageIsCurrent(t *testing.T) {
 
 // fixtureCheck and fixturePackage are the two files that add the check
 // of TestAFixtureCheckIsAddedByTwoPaths. The check judges the tree, and
-// its order key puts it after unit; it also adds a subcommand that
+// its order key puts it after license; it also adds a subcommand that
 // prints the checks of the registry and the steps of fast, by name.
 const (
 	fixtureCheck = `package main
@@ -210,9 +209,9 @@ func Steps(context.Context, check.Plan) []check.Step {
 // added, tools/ci/check_fixture.go and tools/ci/internal/fixture/, and
 // no file edited: the go command reads them through an overlay
 // (https://pkg.go.dev/cmd/go#hdr-Build_and_test_caching, -overlay). The
-// check they add is in the registry by its order key, between unit and
-// race, and in the usage text, and as a check that judges the tree it
-// runs before unit in fast, whatever its key says.
+// check they add is in the registry by its order key, between license and
+// tagged suites, and in the usage text, and as a check that judges the tree it
+// runs before race in fast, whatever its key says.
 func TestAFixtureCheckIsAddedByTwoPaths(t *testing.T) {
 	root := citest.ModuleRoot(t)
 	goBin, err := procgroup.LookPath("go")
@@ -261,10 +260,10 @@ func TestAFixtureCheckIsAddedByTwoPaths(t *testing.T) {
 	for _, c := range check.Registered() {
 		registered = append(registered, c.Name)
 	}
-	unit := slices.Index(registered, "unit")
-	require.GreaterOrEqual(t, unit, 0)
-	assert.Equal(t, append(append(registered[:unit+1:unit+1], "fixture"), registered[unit+1:]...), checks, "the fixture's key puts it between unit and race")
-	assert.Equal(t, []string{"format", "vet", "fix linux/amd64", "fix linux/arm64", "fix darwin/amd64", "fix darwin/arm64", "generated", "lint linux/amd64", "lint boundaries linux/amd64", "lint linux/arm64", "lint boundaries linux/arm64", "lint darwin/amd64", "lint boundaries darwin/amd64", "lint darwin/arm64", "lint boundaries darwin/arm64", "fixture", "unit"}, steps, "a check that judges the tree runs before unit")
+	license := slices.Index(registered, "license")
+	require.GreaterOrEqual(t, license, 0)
+	assert.Equal(t, append(append(registered[:license+1:license+1], "fixture"), registered[license+1:]...), checks, "the fixture's key puts it between license and tagged suites")
+	assert.Equal(t, []string{"format", "vet linux/amd64", "vet linux/arm64", "vet darwin/amd64", "vet darwin/arm64", "fix linux/amd64", "fix linux/arm64", "fix darwin/amd64", "fix darwin/arm64", "generated", "lint linux/amd64", "lint boundaries linux/amd64", "lint linux/arm64", "lint boundaries linux/arm64", "lint darwin/amd64", "lint boundaries darwin/amd64", "lint darwin/arm64", "lint boundaries darwin/arm64", "fixture", "race"}, steps, "a check that judges the tree runs before race")
 
 	out, err = procgroup.CombinedOutput(t.Context(), procgroup.Command{
 		Class: procgroup.ToolStep,
