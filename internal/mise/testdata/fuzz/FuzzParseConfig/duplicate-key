@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("[tools]\ngo = \"1\"\ngo = \"2\"\n")

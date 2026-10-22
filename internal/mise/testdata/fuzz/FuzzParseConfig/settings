@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("[settings]\nlockfile_platforms = [\"macos-arm64\", \"linux-x64\"]\n[tools]\nnode = { version = \"22\" }\n")
