@@ -24,7 +24,7 @@ kit files:
   personal:tools (changed):
     M 100644 README
     = 100755 bin/run
-      --- README
+    diff README:
       @@ -2,1 +2,1 @@
       -two
       +2
@@ -33,6 +33,9 @@ kit files:
 
 workload repository:
   !!! changed: docker.io/example/dev -> docker.io/other/dev !!!
+
+render (sbxenv.yaml without the ungated keys run, sandboxOptions):
+  (unchanged)
 
 secret argv (host settings):
   github@shop (service github.com): ["/usr/bin/env","-i","/usr/local/bin/gh","auth","token"]

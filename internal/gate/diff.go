@@ -32,6 +32,8 @@ type Side struct {
 	// by name. It is read on the candidate side only: the host settings
 	// hold the current argv, and the approval its digest.
 	SecretArgv map[string][]string
+	// Render is the rendered sbxenv.yaml, decoded.
+	Render Render
 }
 
 // Diff is the gate 2 diff of 01 1.4 (REQ-0071): a summary, then every
@@ -51,8 +53,9 @@ const PromptLine = "approve this widening? [y/N] "
 // is added. It fails, rather than show less than the set holds, when a
 // kit of a set has no files or files whose kit-tree digest is not the
 // set's, when a secret of the candidate has no argv or one whose digest
-// is not the set's, and when a side names a kit or a secret its set
-// does not hold.
+// is not the set's, when a side's render has no digest or another one
+// than its set's, and when a side names a kit or a secret its set does
+// not hold.
 func NewDiff(approved *Side, candidate Side) (Diff, error) {
 	newSet, err := checkSide(candidate, true)
 	if err != nil {
@@ -60,15 +63,17 @@ func NewDiff(approved *Side, candidate Side) (Diff, error) {
 	}
 	var oldSet Set
 	oldKits := map[string][]File{}
+	var oldRender Render
 	first := approved == nil
 	if !first {
 		if oldSet, err = checkSide(*approved, false); err != nil {
 			return Diff{}, fmt.Errorf("gate: the approval: %w", err)
 		}
-		oldKits = approved.KitFiles
+		oldKits, oldRender = approved.KitFiles, approved.Render
 	}
 	d := Diff{project: newSet.Project}
-	c := comparison{old: oldSet, new: newSet, first: first, oldKits: oldKits, newKits: candidate.KitFiles, argv: candidate.SecretArgv}
+	c := comparison{old: oldSet, new: newSet, first: first, oldKits: oldKits, newKits: candidate.KitFiles, argv: candidate.SecretArgv,
+		oldRender: oldRender, newRender: candidate.Render}
 	d.summary = c.summary()
 	d.body = c.body()
 	return d, nil
@@ -80,6 +85,13 @@ func checkSide(s Side, withArgv bool) (Set, error) {
 	n, err := normal(s.Set)
 	if err != nil {
 		return Set{}, err
+	}
+	render, err := RenderDigest(s.Render)
+	if err != nil {
+		return Set{}, err
+	}
+	if render != n.RenderDigest {
+		return Set{}, fmt.Errorf("the render has the digest %s, and the set holds %s", render, n.RenderDigest)
 	}
 	keys := map[string]bool{}
 	for _, k := range n.Kits {
@@ -133,6 +145,9 @@ type comparison struct {
 	first            bool
 	oldKits, newKits map[string][]File
 	argv             map[string][]string
+	// oldRender and newRender are the renders, each checked against its
+	// set's renderDigest.
+	oldRender, newRender Render
 }
 
 // mark opens each line of the summary that names a widening of the
@@ -181,7 +196,7 @@ func (c comparison) summary() []string {
 			continue
 		}
 		files := fileChanges(c.oldKits[key], c.newKits[key])
-		var nAdded, nRemoved, nChanged, plus, minus int
+		var nAdded, nRemoved, nChanged, plus, minus, binary int
 		for _, f := range files {
 			switch {
 			case f.same():
@@ -193,18 +208,68 @@ func (c comparison) summary() []string {
 			default:
 				nChanged++
 			}
-			p, m := f.lineCounts()
-			plus, minus = plus+p, minus+m
+			p, m, b := f.lineCounts()
+			plus, minus, binary = plus+p, minus+m, binary+b
 		}
-		out = append(out, fmt.Sprintf("kit content %s: %d file(s) changed, %d added, %d removed; +%d -%d lines",
-			key, nChanged, nAdded, nRemoved, plus, minus))
+		line := fmt.Sprintf("kit content %s: %d file(s) changed, %d added, %d removed; +%d -%d lines",
+			key, nChanged, nAdded, nRemoved, plus, minus)
+		if binary > 0 {
+			line += fmt.Sprintf(", %d binary side", binary)
+			if binary > 1 {
+				line += "s"
+			}
+		}
+		out = append(out, line)
 	}
+	out = append(out, c.otherWidenings()...)
 	if names := c.changedMembers(); len(names) > 0 {
 		out = append(out, "changed: "+strings.Join(names, ", "))
 	} else {
 		out = append(out, "changed: nothing")
 	}
 	return out
+}
+
+// otherWidenings returns the marked lines of the repos, ports and agent
+// the candidate adds, removes or changes, which the summary lists after
+// the classes of 01 1.4.
+func (c comparison) otherWidenings() []string {
+	var out []string
+	added, removed := listDiff(c.old.Repos, c.new.Repos)
+	for _, r := range added {
+		out = append(out, mark+"repo added: "+repoLine(r))
+	}
+	for _, r := range removed {
+		out = append(out, mark+"repo removed: "+repoLine(r))
+	}
+	addedPorts, removedPorts := listDiff(c.old.Ports, c.new.Ports)
+	for _, p := range addedPorts {
+		out = append(out, mark+"port added: "+p)
+	}
+	for _, p := range removedPorts {
+		out = append(out, mark+"port removed: "+p)
+	}
+	if c.first || c.old.Agent != c.new.Agent {
+		old := c.old.Agent
+		if c.first {
+			old = "(none)"
+		}
+		out = append(out, mark+"agent: "+old+" -> "+c.new.Agent)
+	}
+	return out
+}
+
+// repoLine names a repo of the set in the summary: its dir, its URL,
+// and its ref and primary mark when it has them.
+func repoLine(r Repo) string {
+	line := r.Dir + " " + r.URL
+	if r.Ref != "" {
+		line += " ref " + r.Ref
+	}
+	if r.Primary {
+		line += " (primary)"
+	}
+	return line
 }
 
 // workloadChange returns "<old> -> <new>", or "(none) -> <new>" on a
@@ -272,7 +337,7 @@ func (c comparison) body() []string {
 		}
 		for _, f := range files {
 			if !f.same() {
-				out = append(out, indent("      ", f.diffLines())...)
+				out = append(out, indent("    ", f.diffLines())...)
 			}
 		}
 	}
@@ -284,12 +349,51 @@ func (c comparison) body() []string {
 		out = append(out, "  "+c.new.Workload.Repository+" (unchanged)")
 	}
 
+	out = append(out, "", "render (sbxenv.yaml without the ungated keys "+strings.Join(ungatedFields, ", ")+"):")
+	out = append(out, c.renderLines()...)
+
 	out = append(out, "", "secret argv (host settings):")
 	if len(c.new.Secrets) == 0 {
 		out = append(out, "  (no secrets)")
 	}
 	for _, s := range c.new.Secrets {
 		out = append(out, "  "+s.Name+"@"+c.new.Project+" (service "+s.Service+"): "+canonical(c.argv[s.Name]))
+	}
+	return out
+}
+
+// renderLines returns the top-level keys of the render, without the
+// ungated ones, that the candidate adds, removes or changes, each with
+// its value as canonical JSON; every key on a first approval.
+func (c comparison) renderLines() []string {
+	strip := func(r Render) Render {
+		out := maps.Clone(r)
+		for _, f := range ungatedFields {
+			delete(out, f)
+		}
+		return out
+	}
+	old, new := strip(c.oldRender), strip(c.newRender)
+	if c.first {
+		old = nil
+	}
+	var out []string
+	for _, k := range unionKeys(old, new) {
+		o, inOld := old[k]
+		n, inNew := new[k]
+		if inOld && inNew && canonical(o) == canonical(n) {
+			continue
+		}
+		out = append(out, "  "+k+":")
+		if inOld {
+			out = append(out, "    - "+canonical(o))
+		}
+		if inNew {
+			out = append(out, "    + "+canonical(n))
+		}
+	}
+	if len(out) == 0 {
+		out = append(out, "  (unchanged)")
 	}
 	return out
 }
@@ -454,11 +558,13 @@ func (f fileChange) listLine() string {
 	return "M " + f.new.Mode + " " + f.path
 }
 
-// lineCounts returns the lines the diff of the file adds and removes; a
-// binary file counts none.
-func (f fileChange) lineCounts() (plus, minus int) {
-	if f.binary() {
-		return 0, 0
+// lineCounts returns the lines the diff of the file adds and removes,
+// counted on its text sides, and how many of its sides are binary.
+func (f fileChange) lineCounts() (plus, minus, binary int) {
+	for _, side := range []*File{f.old, f.new} {
+		if side != nil && !textual(side) {
+			binary++
+		}
 	}
 	for _, l := range f.textDiff() {
 		switch l[0] {
@@ -468,58 +574,69 @@ func (f fileChange) lineCounts() (plus, minus int) {
 			minus++
 		}
 	}
-	return plus, minus
+	return plus, minus, binary
 }
 
-// binary reports whether either side of the file is binary: not UTF-8,
-// or holding a NUL byte.
-func (f fileChange) binary() bool {
-	return isBinary(f.old) || isBinary(f.new)
-}
-
-// isBinary reports whether the file is present and binary.
-func isBinary(f *File) bool {
-	return f != nil && (!utf8.Valid(f.Data) || bytes.IndexByte(f.Data, 0) >= 0)
-}
-
-// diffLines returns the lines that show the change of the file: for a
-// binary file, the size and sha256 of each side, flagged binary; for a
-// text file, its full text diff.
-func (f fileChange) diffLines() []string {
-	out := []string{"--- " + f.path}
-	if f.binary() {
-		for _, side := range []struct {
-			sign string
-			file *File
-		}{{"-", f.old}, {"+", f.new}} {
-			if side.file == nil {
-				continue
-			}
-			sum := sha256.Sum256(side.file.Data)
-			out = append(out, side.sign+" binary, "+strconv.Itoa(len(side.file.Data))+" bytes, sha256 "+hex.EncodeToString(sum[:]))
-		}
-		return out
+// textual reports whether the file is shown as text: an executable
+// file, a file that starts with "#!", and a file of which at most one
+// byte in ten is a NUL or not part of UTF-8. Its bytes that are not
+// text are escaped on the way out (termsafe), so a stray byte never
+// hides a script; any other file is binary.
+func textual(f *File) bool {
+	if f.Mode == ModeExecutable || bytes.HasPrefix(f.Data, []byte("#!")) {
+		return true
 	}
-	return append(out, f.textDiff()...)
+	bad := 0
+	for b := f.Data; len(b) > 0; {
+		r, size := utf8.DecodeRune(b)
+		if r == 0 || (r == utf8.RuneError && size == 1) {
+			bad++
+		}
+		b = b[size:]
+	}
+	return bad*10 <= len(f.Data)
 }
 
-// textDiff returns the full line diff of a text file: the lines both
-// sides share at the start and at the end are left out, and every line
-// between is shown, removed then added, under a hunk header. Each line
-// keeps its end, so a change of the last newline alone is shown, as
-// "(no newline at end of file)".
+// diffLines returns the lines that show the change of the file under
+// its header: a binary side as its size and sha256, flagged binary, and
+// the text sides as a full text diff.
+func (f fileChange) diffLines() []string {
+	out := []string{"diff " + f.path + ":"}
+	for _, side := range []struct {
+		name string
+		file *File
+	}{{"old", f.old}, {"new", f.new}} {
+		if side.file != nil && !textual(side.file) {
+			sum := sha256.Sum256(side.file.Data)
+			out = append(out, "  binary "+side.name+": "+strconv.Itoa(len(side.file.Data))+" bytes, sha256 "+hex.EncodeToString(sum[:]))
+		}
+	}
+	return append(out, indent("  ", f.textDiff())...)
+}
+
+// textDiff returns the full line diff of the text sides of the file (a
+// binary side counts as no lines): the lines both sides share at the
+// start and at the end are left out, and every line between is shown,
+// removed then added, under a hunk header. Each line keeps its end, so
+// a change of the last newline alone is shown, as "(no newline at end
+// of file)".
 //
 // It is not a minimal diff: two changes far apart show every line
 // between them, as removed and added. It never leaves a changed line
 // out, which is what the gate needs (REQ-0071).
 func (f fileChange) textDiff() []string {
 	var old, new []string
-	if f.old != nil {
+	if f.old != nil && textual(f.old) {
 		old = splitLines(f.old.Data)
 	}
-	if f.new != nil {
+	if f.new != nil && textual(f.new) {
 		new = splitLines(f.new.Data)
 	}
+	return lineDiff(old, new)
+}
+
+// lineDiff is the line diff of textDiff.
+func lineDiff(old, new []string) []string {
 	prefix := 0
 	for prefix < len(old) && prefix < len(new) && old[prefix] == new[prefix] {
 		prefix++
