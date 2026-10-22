@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/all"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
@@ -708,7 +709,7 @@ func TestGeneratedOutputsAreNotConverted(t *testing.T) {
 	// The files the generators of the registry of this test write, the
 	// inventory of the checks, and the schemas of the formats registered
 	// with tools/schemagen and their reference pages, and the diagrams of
-	// the state machines.
+	// the state machines, and the generated files of internal/gate.
 	outs, err := generateOutputs(r)
 	require.NoError(t, err)
 	checks, err := check.ChecksPageOutput(r)
@@ -722,6 +723,11 @@ func TestGeneratedOutputsAreNotConverted(t *testing.T) {
 	require.NoError(t, err)
 	for _, o := range slices.Concat(schemas, pages, diagrams) {
 		outs = append(outs, output{o.Path, o.Content})
+	}
+	gate, err := all.GateGenerated()
+	require.NoError(t, err)
+	for _, f := range gate {
+		outs = append(outs, output{f.Path, f.Content})
 	}
 	findings, err := attributeProblems(t.Context(), git.Repo{Dir: root}, outs)
 	require.NoError(t, err)
