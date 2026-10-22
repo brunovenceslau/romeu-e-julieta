@@ -35,6 +35,29 @@ T053 lands `lock --check` without the catalog lookup, which T036 adds
 after T053 (decision of the stage B pass), so M2 does not wait for this
 task.
 
+Re-plan (2026-10-22): The entries of the fourth acceptance row are
+half confirmed. Measured in this repository's `mise.lock`: the backends
+`core:go`, `aqua:cli/cli`, `aqua:golangci/golangci-lint` and the two
+`go:` tools, and the lock hosts `github.com`, `api.github.com` and
+`dl.google.com`. Not measured: the domains of the `go:` tools
+(`proxy.golang.org`, `sum.golang.org`, from the way the mise go backend
+builds from source) and the other examples of 03 3.5, which are taken as
+written. The reference config repo's locks were not read in a sandbox.
+Deferred to T102, whose handover confirms every entry from those locks;
+the trigger is that handover.
+
+Re-plan (2026-10-22): `internal/state` (T033, PR #246) stores the
+catalog in its records as `map[string]any` until this package's type
+exists. Replacing that map with the catalog type is this task's or a
+follow-up's. Nothing may recompute a digest from the stored map: a
+large integer goes through `float64` and changes.
+
+Re-plan (2026-10-22, maintainer decision): `tuf-repo-cdn.sigstore.dev`
+(`upload: false`) joins the `meta` set in `base.yaml`. mise runs with
+`MISE_PARANOID=1` (T053) and verifies the GitHub artifact attestations
+of the aqua tools through sigstore's TUF repository, so every sandbox
+that installs an attested aqua tool needs it.
+
 - Implements: REQ-0009 (index), REQ-0040 (01 1.1), REQ-0128 (02 2.1),
   REQ-0129 (02 2.1), REQ-0188 (03 3.1), REQ-0211 (03 3.5), REQ-0212 (03
   3.5), REQ-0617 (07 7.3), REQ-0620 (07 7.3), REQ-0626 (07 7.4),

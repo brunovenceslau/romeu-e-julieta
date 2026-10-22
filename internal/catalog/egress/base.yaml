@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The sets every project gets (03 3.5) and the upload flag of the domains
+# they name. Only this file holds meta and base.
+#
+# tuf-repo-cdn.sigstore.dev is in meta by a decision of the maintainer of
+# 2026-10-22 (T053): mise runs with MISE_PARANOID=1 and verifies the
+# GitHub artifact attestations of the aqua tools through sigstore's TUF
+# repository, so every sandbox that installs an attested aqua tool
+# reaches it.
+schema: catalog/v1
+meta: [mise-versions.jdx.dev, github.com, objects.githubusercontent.com, api.github.com, tuf-repo-cdn.sigstore.dev]   # mise itself, every project
+base: [github.com, api.github.com, codeload.github.com]                                    # git over HTTPS, every project
+domains:
+  mise-versions.jdx.dev: {upload: false}
+  objects.githubusercontent.com: {upload: false}
+  codeload.github.com: {upload: false}
+  tuf-repo-cdn.sigstore.dev: {upload: false}
+  github.com: {upload: true}
+  api.github.com: {upload: true}

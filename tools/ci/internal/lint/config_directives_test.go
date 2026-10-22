@@ -25,12 +25,37 @@ import (
 
 // allowedDirectives are the directives a comment of any Go file of this
 // repository may hold, as "tool:name". go:build is the build
-// constraint (tools/ci/internal/hygiene/add_test.go); romeu:invariant tags a guard or its test
-// with the invariant it holds (05 5.2), read by the invariants check
-// when it lands. Every other directive, of any tool, is a decision to
+// constraint (tools/ci/internal/hygiene/add_test.go); romeu:invariant
+// tags a guard or its test with the invariant it holds (05 5.2), read by
+// the invariants check when it lands. Every other directive, of any tool, is a decision to
 // review here first, because the readers of directives include the
 // linters, and theirs turn findings off.
 var allowedDirectives = []string{"go:build", "romeu:invariant"}
+
+// scopedDirectives are the directives only the files below a path may
+// hold, from the root of the repository: a directory, with its slash.
+// The embed directive is internal/catalog's, for its entries (03 3.5,
+// ADR 0007, Consequences). T077 adds the package that embeds the julieta
+// binary, whose directory joins the list when its task names it.
+var scopedDirectives = map[string][]string{
+	"go:embed": {"internal/catalog/"},
+}
+
+// allowedIn returns the directives the Go file at file, a path from the
+// root of the repository, may hold: allowedDirectives, the ones scoped to
+// a directory it is below, and go:generate at its one site.
+func allowedIn(file string) []string {
+	allowed := slices.Clone(allowedDirectives)
+	for directive, dirs := range scopedDirectives {
+		if slices.ContainsFunc(dirs, func(d string) bool { return strings.HasPrefix(file, d) }) {
+			allowed = append(allowed, directive)
+		}
+	}
+	if file == drift.Site {
+		allowed = append(allowed, "go:generate")
+	}
+	return allowed
+}
 
 // toolDirective matches the start of a directive of the "tool:name"
 // form after directiveText has normalised the line: the shape go/ast
@@ -182,6 +207,18 @@ func TestDisallowed(t *testing.T) {
 	}
 }
 
+// TestAllowedIn: go:embed is allowed below internal/catalog/ and
+// nowhere else, go:generate at its one site, and the rest everywhere.
+func TestAllowedIn(t *testing.T) {
+	assert.Equal(t, allowedDirectives, allowedIn("internal/spec/spec.go"))
+	assert.Contains(t, allowedIn("internal/catalog/catalog.go"), "go:embed")
+	assert.NotContains(t, allowedIn("internal/catalogue/x.go"), "go:embed", "the prefix is a directory")
+	assert.NotContains(t, allowedIn("internal/spec/spec.go"), "go:embed")
+	assert.NotContains(t, allowedIn("tools/ci/x.go"), "go:embed")
+	assert.Contains(t, allowedIn(drift.Site), "go:generate")
+	assert.NotContains(t, allowedIn("tools/ci/x.go"), "go:generate")
+}
+
 // TestOnlyAllowedDirectives checks that each directive in the Go files
 // of the repository, the tracked ones and the ones not yet added, is one
 // of allowedDirectives (ADR 0007, rule 8): a finding is fixed in the
@@ -191,11 +228,7 @@ func TestOnlyAllowedDirectives(t *testing.T) {
 	files := repoFiles(t, root, "*.go")
 	require.NotEmpty(t, files, "the Go files of the repository")
 	for _, f := range files {
-		allowed := allowedDirectives
-		if f == drift.Site {
-			allowed = append(slices.Clone(allowed), "go:generate")
-		}
-		bad, err := disallowed(filepath.Join(root, f), allowed)
+		bad, err := disallowed(filepath.Join(root, f), allowedIn(f))
 		require.NoError(t, err, "read %s", f)
 		assert.Empty(t, bad, "%s holds what makes the linters skip a finding", f)
 	}

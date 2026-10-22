@@ -14,6 +14,7 @@
 docs/adr/README.md -text
 docs/diagrams/candidate.md -text
 docs/diagrams/generation.md -text
+docs/reference/catalog.md -text
 docs/reference/checks.md -text
 docs/reference/errors.md -text
 docs/reference/exit-codes.md -text
@@ -48,6 +49,7 @@ docs/reference/romeu/completion/fish.md -text
 docs/reference/romeu/completion/zsh.md -text
 docs/reference/romeu/version.md -text
 internal/cli/exitcodes_gen.go -text
+schemas/catalog.v1.json -text
 schemas/handoff.v1.json -text
 schemas/host-settings.v1.json -text
 schemas/julieta-handoff.v1.json -text
