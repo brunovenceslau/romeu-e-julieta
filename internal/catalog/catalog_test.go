@@ -210,7 +210,7 @@ func TestCatalog_Undeclared(t *testing.T) {
 func TestEmbedded(t *testing.T) {
 	c, err := catalog.Embedded()
 	require.NoError(t, err)
-	assert.Equal(t, []string{"api.github.com", "github.com", "mise-versions.jdx.dev", "objects.githubusercontent.com"}, c.Meta())
+	assert.Equal(t, []string{"api.github.com", "github.com", "mise-versions.jdx.dev", "objects.githubusercontent.com", "tuf-repo-cdn.sigstore.dev"}, c.Meta())
 	assert.Equal(t, []string{"api.github.com", "codeload.github.com", "github.com"}, c.Base())
 	for tool, want := range map[string][]string{
 		"core:go":      {"dl.google.com", "proxy.golang.org", "storage.googleapis.com", "sum.golang.org"},
@@ -224,7 +224,7 @@ func TestEmbedded(t *testing.T) {
 	}
 	for domain, want := range map[string]bool{
 		"github.com": true, "api.github.com": true, "storage.googleapis.com": true, "registry.npmjs.org": true,
-		"dl.google.com": false, "proxy.golang.org": false, "nodejs.org": false, "pypi.org": false, "mise-versions.jdx.dev": false,
+		"dl.google.com": false, "proxy.golang.org": false, "tuf-repo-cdn.sigstore.dev": false, "nodejs.org": false, "pypi.org": false, "mise-versions.jdx.dev": false,
 	} {
 		up, declared := c.UploadFlag(domain)
 		assert.True(t, declared, domain)
