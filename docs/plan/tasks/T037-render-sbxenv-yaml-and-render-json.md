@@ -31,6 +31,11 @@ sitting: none
 Goal: `render`: `sbxenv.yaml`, `render.json`, the workspace files, the
 types, the goldens, `shquote`, `tools/ci golden`.
 
+Re-plan (2026-10-22): Changed. `ports` of `sbxenv.yaml` is a list of
+objects (`sandbox`, `host`, `protocol`, `hostIP`), so render parses the
+project spec's port string (03 3.1, `[[HOST_IP:]HOST_PORT:]SANDBOX_PORT[/PROTOCOL]`)
+into that shape; an omitted protocol is `tcp4` in sbx.
+
 Re-plan (2026-10-12): Kept. `render` is one package in three file sets
 (T037, T038, T039), each owning its own files and testdata, ordered by
 `needs`. The goldens are written by this task and confirmed by the
