@@ -130,6 +130,27 @@ func TestStatusShowsAFailedFetch(t *testing.T) {
 	assert.Contains(t, stdout, "  snapshots  enabled\n")
 }
 
+// TestStatusShowsSnapshotsDisabled shows the warning snapshots-disabled
+// setup recorded for a repo whose own config sets core.hooksPath: in the
+// warnings of --json and on stderr in the text form (08 8.4, REQ-0692).
+func TestStatusShowsSnapshotsDisabled(t *testing.T) {
+	s := newSandbox(t)
+	code, _, stderr := julieta(t.Context(), "setup")
+	require.Equal(t, 0, code, stderr)
+	code, _, stderr = julieta(t.Context(), "status")
+	require.Equal(t, 0, code, stderr)
+	assert.NotContains(t, stderr, "snapshots-disabled", "no repo sets core.hooksPath")
+
+	git(t, s.primary(), "config", "core.hooksPath", ".githooks")
+	code, _, stderr = julieta(t.Context(), "setup")
+	require.Equal(t, 0, code, stderr)
+	assert.Equal(t, []setup.Warning{{Slug: setup.SnapshotsDisabled, Message: "snapshots disabled for api"}}, statusJSON(t).Warnings)
+	code, stdout, stderr := julieta(t.Context(), "status")
+	require.Equal(t, 0, code, stderr)
+	assert.Equal(t, "warning snapshots-disabled: snapshots disabled for api\n", stderr)
+	assert.NotContains(t, stdout, "snapshots-disabled")
+}
+
 // TestStatusWritesNothing leaves HOME as it found it.
 func TestStatusWritesNothing(t *testing.T) {
 	s := newSandbox(t)

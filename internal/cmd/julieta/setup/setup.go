@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
@@ -34,6 +35,7 @@ type run struct {
 	git    *gitsafe.Runner
 	start  time.Time
 	now    func() time.Time
+	ulids  *canon.ULIDSource
 	report Report
 }
 
@@ -79,7 +81,7 @@ func setup(ctx context.Context, env *cli.Env) error {
 	if err != nil {
 		return err
 	}
-	r := &run{home: home, m: m, git: git, start: env.Now(), now: env.Now,
+	r := &run{home: home, m: m, git: git, start: env.Now(), now: env.Now, ulids: env.ULIDs,
 		report: Report{Schema: Schema, Version: env.Version.Version, Errors: []string{}, Repos: []Repo{}, Unusable: []string{}, Warnings: []Warning{}}}
 	if fromEnv {
 		if err := cacheManifest(home, m); err != nil {
@@ -178,6 +180,8 @@ func PrintWarning(out *cli.Writer, w Warning) {
 		cli.Warn(out, "fetch-failed", w.Message)
 	case DefaultBranchMoved:
 		cli.Warn(out, "default-branch-moved", w.Message)
+	case SnapshotsDisabled:
+		cli.Warn(out, "snapshots-disabled", w.Message)
 	case AgentMemoryWritable:
 		cli.Warn(out, "agent-memory-writable", w.Message)
 	default:
