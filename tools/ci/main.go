@@ -5,7 +5,10 @@
 // the pre-push hook, a developer and the hosted workflow all run this
 // code, so there is no second list of checks to keep in step (10 10.2).
 //
-//	go run ./tools/ci all                     every check, as the hosted workflow runs it
+//	go run ./tools/ci all                     every check: the union of the three jobs below
+//	go run ./tools/ci static                  the job of the checks that run none of the tests
+//	go run ./tools/ci race                    the job of the one test run, with the race detector, and the coverage after it
+//	go run ./tools/ci e2e                     the job of the container e2e
 //	go run ./tools/ci fast [<remote> <url>]   the fast checks; with the
 //	                                          hook's arguments, the pushed range too
 //	go run ./tools/ci setup                   trust mise.toml, install the tools, fill the module cache
@@ -47,6 +50,9 @@ import (
 
 func init() {
 	check.RegisterCommand(check.Command{Name: "all", Usage: []string{"all"}, Run: runAll})
+	for _, job := range check.Jobs {
+		check.RegisterCommand(check.Command{Name: job, Usage: []string{job}, Run: runJob(job)})
+	}
 	check.RegisterCommand(check.Command{Name: "fast", Usage: []string{"fast [<remote> <url>]"}, Run: runFast})
 	check.RegisterCommand(check.Command{Name: "setup", Usage: []string{"setup"}, Run: setup.Run})
 }

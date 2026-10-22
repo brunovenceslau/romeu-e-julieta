@@ -16,6 +16,7 @@ func init() {
 		Req:     "REQ-0834",
 		Usage:   "go run ./tools/ci coverage <profile>",
 		All:     true,
+		Job:     check.JobRace,
 		Order:   140,
 		Package: "tools/ci/internal/coverage",
 		Commands: []check.Command{

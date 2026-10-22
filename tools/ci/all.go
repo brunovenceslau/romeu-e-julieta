@@ -22,18 +22,24 @@ import (
 // working tree.
 const coverFile = "cover.out"
 
+// inJob returns whether a check runs in all as part of job, one of
+// check.Jobs: the checks that the subcommand of that name runs.
+func inJob(job string) func(check.Check) bool {
+	return func(c check.Check) bool { return c.All && c.JobName() == job }
+}
+
 // allSteps returns the command steps of all (stepsOf): the steps of
 // fast and the rows of 10 10.2 that have code to check today and are not
-// in fast, vulnerabilities, license and the race run that writes the
-// cover profile to profile. The coverage check reads that profile in
-// this process, after them (runAll).
+// in fast, vulnerabilities, license and the other steps, with the race
+// run that writes the cover profile to profile. The coverage check reads
+// that profile in this process, after them (runChecks).
 //
 // The order keeps every step that judges the tree before the first
-// one that runs the change's tests, unit: vulnerabilities and license
+// one that runs the change's tests, race: vulnerabilities and license
 // read the tree and run none of its code, so they run after lint and
-// before unit, and a test of the change cannot rewrite a file they
+// before race, and a test of the change cannot rewrite a file they
 // read (a test that prepends an SPDX header to a file without one
-// passed license when it ran after unit: measured at cab976e). That is
+// passed license when it ran after the tests: measured at cab976e). That is
 // all the order guarantees: it closes the file channel. A test runs in
 // the same process tree and account as tools/ci, so it can reach the
 // tools/ci process itself (ptrace, root on a hosted runner) and forge
@@ -42,18 +48,34 @@ const coverFile = "cover.out"
 // covered). race and coverage come last, and they measure code of the
 // change, which can game its own result: a test can write the cover
 // profile itself, or exercise less than it claims. The review covers
-// that too; runAll fails a run whose steps left a file changed.
+// that too; runChecks fails a run whose steps left a file changed.
 func allSteps(ctx context.Context, root string, tools check.Tools, profile string) []check.Step {
 	return stepsOf(ctx, inAll, check.Plan{Root: root, Tools: tools, Profile: profile})
 }
 
-// runAll runs every check of 10 10.2 that has code to check today: the
-// command steps (allSteps) on the working tree as it is, then hygiene
-// and workflows on the commit HEAD names, read and judged before any
-// step starts (commitChecks, as in runFast), then coverage on the
-// profile of the race step. It is what the hosted workflow runs, and
-// what a developer runs before a pull request. The pr step joins with
-// tools/ci pr.
+// runAll runs every check of 10 10.2 that has code to check today, the
+// union of the three jobs of the hosted workflow in the order of
+// today (runChecks). It is what a developer runs before a pull request;
+// the hosted workflow runs one job per runner, the static, race and e2e
+// subcommands (runJob). The pr step joins with tools/ci pr.
+func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
+	return runChecks(ctx, e, args, "all", inAll)
+}
+
+// runJob returns the subcommand that runs the checks of job alone
+// (inJob), with the reports and the exit status of all.
+func runJob(job string) func(ctx context.Context, e check.Env, args []string) (bool, error) {
+	return func(ctx context.Context, e check.Env, args []string) (bool, error) {
+		return runChecks(ctx, e, args, job, inJob(job))
+	}
+}
+
+// runChecks runs the checks that in holds, for the command named name,
+// all or one job: the command steps (stepsOf) on the working tree as
+// it is, then the checks of the commit HEAD names, read and judged
+// before any step starts (commitChecks, as in runFast), then the checks
+// that judge what the steps left, as coverage reads the profile of the
+// race step.
 //
 // It reads HEAD, the index and the working tree before mise and the
 // steps run (treeState), and the "working tree" check fails when they
@@ -69,9 +91,9 @@ func allSteps(ctx context.Context, root string, tools check.Tools, profile strin
 // It first prints the platform it runs on, as the go command and "uname
 // -m" name it, so that a run's log shows which machine each runner
 // label gave (10 10.2, Runners).
-func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
+func runChecks(ctx context.Context, e check.Env, args []string, name string, in func(check.Check) bool) (bool, error) {
 	if len(args) != 0 {
-		return false, fmt.Errorf("all takes no argument\n%s", check.Usage())
+		return false, fmt.Errorf("%s takes no argument\n%s", name, check.Usage())
 	}
 	root, err := check.RepoRoot(ctx, e)
 	if err != nil {
@@ -89,7 +111,7 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 	}
 	// The commit is read and judged before mise or any step runs code
 	// of the change (commitChecks).
-	verdicts, err := commitChecks(ctx, repo, head, nil, inAll, now)
+	verdicts, err := commitChecks(ctx, repo, head, nil, in, now)
 	if err != nil {
 		return false, err
 	}
@@ -123,7 +145,7 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		steps = allSteps(ctx, root, tools, profile)
+		steps = stepsOf(ctx, in, check.Plan{Root: root, Tools: tools, Profile: profile})
 	}
 	c := check.NewPrinterAt(e.Stdout, now)
 	translated := e.Translated
@@ -150,7 +172,7 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 
 	// The checks that judge what the steps left, the cover profile of
 	// the race step, come last (check.Check.After).
-	for _, ch := range registered(inAll) {
+	for _, ch := range registered(in) {
 		if ch.After != nil {
 			start := now()
 			v := ch.After(root, profile)
@@ -158,9 +180,9 @@ func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 		}
 	}
 	printTimed(c, verdicts)
-	c.Last("all")
+	c.Last(name)
 	if c.InfraOnly() {
-		return false, fmt.Errorf("all: %s: %w", strings.Join(c.Infra, ", "), check.ErrInfrastructure)
+		return false, fmt.Errorf("%s: %s: %w", name, strings.Join(c.Infra, ", "), check.ErrInfrastructure)
 	}
 	return c.OK, nil
 }

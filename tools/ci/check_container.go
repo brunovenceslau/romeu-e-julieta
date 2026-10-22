@@ -16,6 +16,7 @@ func init() {
 		Req:      "REQ-0837",
 		Usage:    "go test -race -count=1 -tags e2e -json -timeout=14m ./e2e/... (Linux)",
 		All:      true,
+		Job:      check.JobE2E,
 		RunsCode: true,
 		Order:    85,
 		Package:  "tools/ci/internal/container",

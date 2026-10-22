@@ -45,3 +45,5 @@ written before the re-plan.
     Proposed (12 12.3; ADR 0001 rule 6).
   - `.github/pull_request_template.md` has the five sections of 12 12.7.
 - Verify: `go run ./tools/ci generated`; `go test ./tools/new/...`.
+
+Re-plan (2026-10-21): changed by T157. The `generated` row (REQ-0822) names the race step in place of `unit`, and the list of 05 5.3 (REQ-0543) drops `unit`, which is retired with REQ-0824.

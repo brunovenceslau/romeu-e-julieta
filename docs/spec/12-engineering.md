@@ -948,4 +948,5 @@ row.
 | `REQ-0560` | 2026-10-12 | the row of Deferred decisions on `tools/ci pr`, with its trigger; the forbidden-name check over pull request text runs in the agents' own pre-PR gate and the maintainer's read until then | none: a pointer to a deferred row, which carries no id |
 | `REQ-0561` | 2026-10-12 | the row of Deferred decisions on `tools/ci sequences`, with its trigger | none: a pointer to a deferred row, which carries no id |
 | `REQ-0562` | 2026-10-12 | the row of Deferred decisions on `tools/ci invariants` and `mutate`, with its trigger | none: a pointer to a deferred row, which carries no id |
+| `REQ-0824` | 2026-10-21 | `go test -count=1 ./internal/... ./tools/...`, the pinned go command, in the environment of the steps of `fast` (below); `-count=1` because tests that scan the repository would otherwise pass from the test cache | REQ-0833, the race run, which runs every test of the module once |
 | `REQ-1195` | 2026-10-12 | No file belongs to a person or to the agent that wrote it; anyone changes any code through a pull request. | none: review alone judges it (12.9) |

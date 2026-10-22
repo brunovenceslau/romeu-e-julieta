@@ -951,21 +951,13 @@ func TestFastSteps(t *testing.T) {
 		{Name: "generated", Argv: []string{goCmd, "run", "./tools/ci", "generated"}, Environ: check.StepEnv(goDir)},
 	}...)
 	want = append(want, lintSteps(lint.Targets...)...)
-	want = append(want, check.Step{Name: "unit", Argv: []string{goCmd, "test", "-count=1", "./tools/..."}, Environ: check.StepEnv(goDir)})
+	// The one test run is the race run, over the whole module and with
+	// no cover profile: fast has no step after it to read one.
+	want = append(want, check.Step{Name: "race", Argv: []string{goCmd, "test", "-race", "-count=1", "./..."}, Environ: check.StepEnv(goDir), Class: procgroup.ToolRace})
 	assert.Equal(t, want, withoutAround(t, fastSteps(t.Context(), root, tools)))
 	for _, s := range fastSteps(t.Context(), root, tools) {
 		assert.Contains(t, s.Environ, "GOPROXY=off", "%s never reaches the network", s.Name)
 	}
-
-	require.NoError(t, os.MkdirAll(filepath.Join(root, "internal"), 0o755))
-	var unit []string
-	for _, s := range fastSteps(t.Context(), root, tools) {
-		if s.Name == "unit" {
-			unit = s.Argv
-		}
-	}
-	assert.Equal(t, []string{goCmd, "test", "-count=1", "./internal/...", "./tools/..."}, unit, "unit")
-
 }
 
 // withoutAround returns steps with the Around hook of each fix step
@@ -999,7 +991,7 @@ func TestGeneratedRunsBeforeTheTests(t *testing.T) {
 		}
 		generated := slices.Index(names, "generated")
 		require.GreaterOrEqual(t, generated, 0, "%s: %v", name, names)
-		for _, tests := range []string{"unit", "race"} {
+		for _, tests := range []string{"race"} {
 			if i := slices.Index(names, tests); i >= 0 {
 				assert.Less(t, generated, i, "%s: generated runs before %s: %v", name, tests, names)
 			}

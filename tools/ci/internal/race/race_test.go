@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
@@ -29,4 +30,14 @@ func TestSteps(t *testing.T) {
 		Environ: check.StepEnv("/pinned/bin"),
 		Class:   procgroup.ToolRace,
 	}}, Steps(t.Context(), check.Plan{Root: "/src", Tools: check.Tools{GoDir: "/pinned/bin"}, Profile: "/tmp/p/cover.out"}))
+}
+
+// TestStepsWithoutAProfile checks the race step of fast, which has no
+// check after the steps to read a profile: the same run, with no
+// -coverprofile flag.
+func TestStepsWithoutAProfile(t *testing.T) {
+	got := Steps(t.Context(), check.Plan{Root: "/src", Tools: check.Tools{GoDir: "/pinned/bin"}})
+	require.Len(t, got, 1)
+	assert.Equal(t, []string{"/pinned/bin/go", "test", "-race", "-count=1", "./..."}, got[0].Argv)
+	assert.Equal(t, procgroup.ToolRace, got[0].Class)
 }

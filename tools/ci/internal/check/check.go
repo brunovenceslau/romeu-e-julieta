@@ -42,6 +42,11 @@ type Check struct {
 	// Fast, Hook and All say where the check runs: in every run of
 	// fast, in the pre-push run of fast alone, and in all.
 	Fast, Hook, All bool
+	// Job is the job of the hosted workflow the check runs in, and of
+	// the subcommand of the same name: JobStatic, JobRace or JobE2E.
+	// Empty means JobStatic. all runs the checks of every job
+	// (10 10.2).
+	Job string
 	// Order is the order key. The runner sorts by it, but places every
 	// check that judges the tree before the first one that runs code of
 	// the change (RunOrder).
@@ -62,6 +67,29 @@ type Check struct {
 	// After judges what the steps left, as coverage reads the profile
 	// of the race step.
 	After func(root, profile string) Verdict
+}
+
+// The jobs of the hosted workflow (10 10.2), each also a subcommand of
+// tools/ci that runs the checks of that job alone: static judges the
+// commit and the tree and runs none of its tests, race is the one test
+// run with the race detector and the coverage check after it, and e2e
+// is the container e2e.
+const (
+	JobStatic = "static"
+	JobRace   = "race"
+	JobE2E    = "e2e"
+)
+
+// Jobs are the three jobs, in the order all starts them.
+var Jobs = []string{JobStatic, JobRace, JobE2E}
+
+// JobName returns the job the check runs in: its Job, or JobStatic
+// when it names none.
+func (c Check) JobName() string {
+	if c.Job == "" {
+		return JobStatic
+	}
+	return c.Job
 }
 
 // GeneratedHeader returns the lines of the header every generated file
@@ -181,6 +209,9 @@ func (r *Registry) Add(c Check) {
 	}
 	if slices.ContainsFunc(r.checks, func(o Check) bool { return o.Name == c.Name }) {
 		panic(fmt.Sprintf("check: %q is registered twice", c.Name))
+	}
+	if !slices.Contains(Jobs, c.JobName()) {
+		panic(fmt.Sprintf("check: %q names the job %q, which is none of %s", c.Name, c.Job, strings.Join(Jobs, ", ")))
 	}
 	if c.Req != "" && !validReq(c.Req) {
 		panic(fmt.Sprintf("check: %q names %q, which is not a requirement id", c.Name, c.Req))

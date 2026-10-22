@@ -57,3 +57,5 @@ written before the re-plan.
   - `.githooks/pre-push` is the one line of 12 12.1, mode 100755.
 - Verify: `go run ./tools/ci fast` exits 0 after block O1 adds the
   denylist entries, and exits non-zero before.
+
+Re-plan (2026-10-21): changed by T157. REQ-0800 says that `ci.yml` runs the jobs `static`, `race` and `e2e` and two aggregators, in place of one job that ran `all`; `fast` runs the race run in place of `unit`, REQ-0824 retired.
