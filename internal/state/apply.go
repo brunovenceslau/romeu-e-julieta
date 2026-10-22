@@ -106,6 +106,11 @@ func (p *Project) Current() State {
 // command's, named by the row. The caller writes the record by
 // Store.UpdateProject, which refuses one in a form no reader would take.
 func (p *Project) Apply(seams Seams, event Event, in Input) (Applied, error) {
+	// current() reads the last generation, so a record with a live one
+	// elsewhere is refused before an event can create a second sandbox.
+	if err := p.validate(); err != nil {
+		return Applied{}, fmt.Errorf("state: Apply on a record that would not read: %w", err)
+	}
 	g, from := p.current()
 	row, err := GenerationMachine.Transition(from, event)
 	if err != nil {
@@ -135,9 +140,9 @@ func (p *Project) Apply(seams Seams, event Event, in Input) (Applied, error) {
 		if out.SalvageID, err = seams.newID(); err != nil {
 			return Applied{}, err
 		}
-		g.State = row.To
+		g.State, g.SalvageID = row.To, out.SalvageID
 	case EffectRecordIncomplete:
-		if err = g.addSalvage(seams, in.SalvageID, SalvageIncomplete, []string{ReasonSandboxHalfFailed}, in); err == nil {
+		if err = g.endSalvage(seams, in, SalvageIncomplete, []string{ReasonSandboxHalfFailed}); err == nil {
 			g.State = row.To
 		}
 	case EffectImportLost:
@@ -148,11 +153,11 @@ func (p *Project) Apply(seams Seams, event Event, in Input) (Applied, error) {
 			g.State = row.To
 		}
 	case EffectRecordComplete:
-		if err = g.addSalvage(seams, in.SalvageID, SalvageComplete, nil, in); err == nil {
+		if err = g.endSalvage(seams, in, SalvageComplete, nil); err == nil {
 			g.State = row.To
 		}
 	case EffectRecordIncompleteExit5:
-		if err = g.addSalvage(seams, in.SalvageID, SalvageIncomplete, in.Reasons, in); err == nil {
+		if err = g.endSalvage(seams, in, SalvageIncomplete, in.Reasons); err == nil {
 			g.State = row.To
 		}
 	case EffectWriteRemoving:
@@ -180,7 +185,7 @@ func (p *Project) Apply(seams Seams, event Event, in Input) (Applied, error) {
 // close sets the state of a generation to a closed one, at the time of
 // the event.
 func (g *Generation) close(seams Seams, to State) {
-	g.State = to
+	g.State, g.SalvageID = to, canon.ULID{}
 	g.ClosedAt = seams.now()
 }
 
@@ -202,25 +207,51 @@ func (g *Generation) addSalvage(seams Seams, id canon.ULID, result string, reaso
 	return nil
 }
 
-// writeRemoving is the effect of the row that moves a generation to
-// removing (REQ-0096): the fingerprint goes into the salvage entry of
-// the salvage that ended, in the same whole-file write as the state
-// (REQ-0236). The entry is the newest one when it is the one of
-// Input.SalvageID; otherwise this is the first write of the salvage's
-// record, which the command made no earlier row write, and it is
-// complete, or incomplete with the reasons the accepted loss names.
-func (g *Generation) writeRemoving(seams Seams, in Input) error {
+// errSalvageMismatch is the error of an event that ends a salvage and
+// names another than the one in progress, a defect of the caller.
+var errSalvageMismatch = errors.New("state: Input.SalvageID is not the salvage in progress")
+
+// ends checks that in names the salvage in progress, the one the state
+// salvaging was written with.
+func (g *Generation) ends(in Input) error {
 	if in.SalvageID == (canon.ULID{}) {
 		return errNoSalvageID
 	}
-	if n := len(g.Salvage); n == 0 || g.Salvage[n-1].ID != in.SalvageID {
-		result := SalvageComplete
-		if len(in.Reasons) > 0 {
-			result = SalvageIncomplete
-		}
-		if err := g.addSalvage(seams, in.SalvageID, result, in.Reasons, in); err != nil {
-			return err
-		}
+	if in.SalvageID != g.SalvageID {
+		return errSalvageMismatch
+	}
+	return nil
+}
+
+// endSalvage ends the salvage in progress: its entry is written with the
+// result and reasons the row names, and the id of the salvage in
+// progress is cleared.
+func (g *Generation) endSalvage(seams Seams, in Input, result string, reasons []string) error {
+	if err := g.ends(in); err != nil {
+		return err
+	}
+	if err := g.addSalvage(seams, in.SalvageID, result, reasons, in); err != nil {
+		return err
+	}
+	g.SalvageID = canon.ULID{}
+	return nil
+}
+
+// writeRemoving is the effect of the row that moves a generation to
+// removing (REQ-0096): the salvage in progress ends with its entry,
+// complete, or incomplete with the reasons the accepted loss names, and
+// the fingerprint goes into that entry in the same whole-file write as
+// the state (REQ-0236).
+func (g *Generation) writeRemoving(seams Seams, in Input) error {
+	if in.Fingerprint == (canon.Sum[canon.FingerprintKind]{}) {
+		return errors.New("state: the removing write needs the fingerprint of REQ-0236")
+	}
+	result := SalvageComplete
+	if len(in.Reasons) > 0 {
+		result = SalvageIncomplete
+	}
+	if err := g.endSalvage(seams, in, result, in.Reasons); err != nil {
+		return err
 	}
 	e := &g.Salvage[len(g.Salvage)-1]
 	e.Fingerprint = in.Fingerprint

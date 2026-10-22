@@ -71,6 +71,11 @@ func (p *Project) validate() error {
 	live := 0
 	var seen []canon.ULID
 	for i := range p.Generations {
+		// current() takes the last generation as the one that lives, so a
+		// live generation anywhere else would hide behind a closed one.
+		if slices.Contains(liveStates, p.Generations[i].State) && i != len(p.Generations)-1 {
+			errs = append(errs, fmt.Errorf("generations[%d]: a generation that is not closed is the last of the list", i))
+		}
 		g := &p.Generations[i]
 		if err := g.validate(); err != nil {
 			errs = append(errs, fmt.Errorf("generations[%d]: %w", i, err))
@@ -107,6 +112,24 @@ func (g *Generation) validate() error {
 	if len(g.Repos) == 0 {
 		errs = append(errs, errors.New("repos is empty"))
 	}
+	if (g.State == GenerationSalvaging) != (g.SalvageID != canon.ULID{}) {
+		errs = append(errs, errors.New("salvageId is set exactly when the state is salvaging"))
+	}
+	if g.State == GenerationRemoving {
+		if n := len(g.Salvage); n == 0 || g.Salvage[n-1].Fingerprint == (canon.Sum[canon.FingerprintKind]{}) {
+			errs = append(errs, errors.New("a removing generation's newest salvage entry has a fingerprint (REQ-0236)"))
+		}
+	}
+	ids := []canon.ULID{}
+	for _, e := range g.Salvage {
+		if slices.Contains(ids, e.ID) {
+			errs = append(errs, fmt.Errorf("the salvage id %s is the id of an earlier entry", e.ID))
+		}
+		ids = append(ids, e.ID)
+	}
+	if g.SalvageID != (canon.ULID{}) && slices.Contains(ids, g.SalvageID) {
+		errs = append(errs, errors.New("the salvage in progress has an entry already"))
+	}
 	closed := !slices.Contains(liveStates, g.State)
 	if closed != !g.ClosedAt.IsZero() && slices.Contains(generationStates, g.State) {
 		errs = append(errs, errors.New("closedAt is set exactly when the state is closed"))
@@ -130,6 +153,9 @@ func (s *Salvage) validate() error {
 	}
 	if !slices.Contains([]string{SalvageComplete, SalvageIncomplete, SalvageLost}, s.Result) {
 		errs = append(errs, fmt.Errorf("result %q is none of complete, incomplete and lost", clip(s.Result)))
+	}
+	if s.Result != SalvageLost && s.ManifestSHA256 == (SHA256{}) {
+		errs = append(errs, errors.New("manifestSha256 is missing, and only a lost salvage has no manifest"))
 	}
 	if s.RefsPrefix == "" {
 		errs = append(errs, errors.New("refsPrefix is missing"))

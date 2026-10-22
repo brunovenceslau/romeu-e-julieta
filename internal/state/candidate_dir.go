@@ -8,6 +8,7 @@ package state
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -35,12 +36,34 @@ func RenderCandidate(root string, seams Seams) (*Candidate, error) {
 	if err != nil {
 		return nil, err
 	}
-	entries, err := os.ReadDir(root)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	// The candidates directory is a real directory, never a link that
+	// would send the deletions below somewhere else; it is made when
+	// absent. Every step after goes through an os.Root on it.
+	switch info, err := os.Lstat(root); {
+	case errors.Is(err, os.ErrNotExist):
+		if err := os.MkdirAll(root, DirMode); err != nil {
+			return nil, fmt.Errorf("state: %w", err)
+		}
+	case err != nil:
+		return nil, fmt.Errorf("state: %w", err)
+	case !info.IsDir():
+		return nil, fmt.Errorf("state: %s is not a directory, and a candidate is made in a directory of its own", root)
+	}
+	r, err := os.OpenRoot(root)
+	if err != nil {
+		return nil, fmt.Errorf("state: %w", err)
+	}
+	defer func() { _ = r.Close() }()
+	entries, err := fs.ReadDir(r.FS(), ".")
+	if err != nil {
 		return nil, fmt.Errorf("state: %w", err)
 	}
 	for _, e := range entries {
-		if err := os.RemoveAll(filepath.Join(root, e.Name())); err != nil {
+		// Only what romeu made, a dir named by a ULID, is deleted.
+		if _, err := canon.ParseULID(e.Name()); err != nil {
+			continue
+		}
+		if err := r.RemoveAll(e.Name()); err != nil {
 			return nil, fmt.Errorf("state: %w", err)
 		}
 	}
@@ -49,7 +72,7 @@ func RenderCandidate(root string, seams Seams) (*Candidate, error) {
 		return nil, err
 	}
 	c := &Candidate{id: id, state: row.To, root: root}
-	if err := os.MkdirAll(c.Path(), DirMode); err != nil {
+	if err := r.Mkdir(id.String(), DirMode); err != nil {
 		return nil, fmt.Errorf("state: %w", err)
 	}
 	return c, nil
@@ -86,10 +109,24 @@ func (c *Candidate) Apply(event Event, p *Project, a Approval) (Row, error) {
 		}
 		p.Approval = &a
 	case EffectDeleteCandidateDir, EffectPrintDigestExit3:
-		if err := os.RemoveAll(c.Path()); err != nil {
-			return Row{}, fmt.Errorf("state: %w", err)
+		if err := c.remove(); err != nil {
+			return Row{}, err
 		}
 	}
 	c.state = row.To
 	return row, nil
+}
+
+// remove deletes the candidate's dir, through an os.Root on the
+// candidates directory.
+func (c *Candidate) remove() error {
+	r, err := os.OpenRoot(c.root)
+	if err != nil {
+		return fmt.Errorf("state: %w", err)
+	}
+	defer func() { _ = r.Close() }()
+	if err := r.RemoveAll(c.id.String()); err != nil {
+		return fmt.Errorf("state: %w", err)
+	}
+	return nil
 }

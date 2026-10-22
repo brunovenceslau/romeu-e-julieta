@@ -134,6 +134,9 @@
             },
             "type": "array"
           },
+          "salvageId": {
+            "type": "string"
+          },
           "state": {
             "type": "string"
           },

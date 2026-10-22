@@ -100,7 +100,7 @@ func init() {
 		t, s := ec.T, ec.Seams
 		root := filepath.Join(t.TempDir(), ".romeu", "candidates")
 		// A dir a killed command left is deleted: at most one candidate.
-		require.NoError(t, os.MkdirAll(filepath.Join(root, "01j9z0000000000000000left0"), 0o700))
+		require.NoError(t, os.MkdirAll(filepath.Join(root, "01j9z00000000000000000abcd"), 0o700))
 		c, err := RenderCandidate(root, s)
 		require.NoError(t, err)
 		assert.Equal(t, CandidateRendered, c.State())

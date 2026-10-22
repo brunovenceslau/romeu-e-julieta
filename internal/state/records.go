@@ -165,6 +165,10 @@ type Generation struct {
 	// State is one of the five states of the generation machine
 	// (REQ-0232).
 	State State `json:"state"`
+	// SalvageID is the id of the salvage in progress, written with the
+	// state salvaging (01 1.6, "the state salvaging with the new salvage
+	// id") and absent in every other state.
+	SalvageID canon.ULID `json:"salvageId,omitzero"`
 	// Adopted says the generation was adopted, not created (REQ-0090).
 	Adopted bool `json:"adopted"`
 	// CreatedAt is when the record was written.
