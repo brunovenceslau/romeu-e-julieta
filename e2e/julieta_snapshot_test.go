@@ -172,3 +172,50 @@ step heads cat $snap/heads.json
 	require.Equal(t, 0, step(t, steps, "snap").code, step(t, steps, "snap").stderr)
 	assert.True(t, heads(t, step(t, steps, "heads")).Disabled)
 }
+
+// TestJulietaSetupSnapshotsDisabled (08 8.4, REQ-0692): with a
+// repo-local core.hooksPath, julieta setup writes disabled: true into
+// the repo's heads.json, no commit having run a snapshot, and
+// reports "snapshots disabled for api"; julieta status, in text and in
+// --json, and the SessionStart print report it; a second setup leaves
+// heads.json as it is.
+func TestJulietaSetupSnapshotsDisabled(t *testing.T) {
+	steps := snapshotScenario(t, `
+step before sh -c 'ls -A /tmp/memory/api | grep -c snapshot || true'
+git config core.hooksPath .husky
+step again "$J" setup
+step heads cat $snap/heads.json
+step sum sha256sum $snap/heads.json
+step third "$J" setup
+step sum2 sha256sum $snap/heads.json
+step status "$J" status
+step json "$J" status --json
+step hook "$J" handoff show --hook
+git config --unset core.hooksPath
+step enabled "$J" setup
+step heads2 cat $snap/heads.json
+`)
+	assert.Equal(t, "0", strings.TrimSpace(step(t, steps, "before").stdout))
+	r := step(t, steps, "again")
+	require.Equal(t, 0, r.code, r.stderr)
+	assert.Contains(t, r.stderr, "warning snapshots-disabled: snapshots disabled for api\n")
+	h := heads(t, step(t, steps, "heads"))
+	assert.True(t, h.Disabled)
+	assert.Empty(t, h.Refs)
+	require.Equal(t, 0, step(t, steps, "third").code)
+	assert.Equal(t, step(t, steps, "sum").stdout, step(t, steps, "sum2").stdout, "a second setup leaves heads.json as it is")
+
+	r = step(t, steps, "status")
+	require.Equal(t, 0, r.code, r.stderr)
+	assert.Contains(t, r.stderr, "warning snapshots-disabled: snapshots disabled for api\n")
+	assert.Contains(t, r.stdout, "  snapshots  disabled (core.hooksPath .husky)\n")
+	var rep statusJSON
+	decodeStrict(t, step(t, steps, "json").stdout, &rep)
+	assert.Contains(t, rep.Warnings, warningJSON{Slug: "snapshots-disabled", Message: "snapshots disabled for api"})
+	r = step(t, steps, "hook")
+	require.Equal(t, 0, r.code, r.stderr)
+	assert.Contains(t, r.stdout, "warning snapshots-disabled: snapshots disabled for api\n")
+
+	require.Equal(t, 0, step(t, steps, "enabled").code)
+	assert.False(t, heads(t, step(t, steps, "heads2")).Disabled)
+}

@@ -85,6 +85,18 @@ func TestShowHookPrintsInOrder(t *testing.T) {
 	assert.Contains(t, plain, "the newest facts differ")
 }
 
+// TestShowHookPrintsSnapshotsDisabled prints the warning
+// snapshots-disabled setup recorded, as every warning of julieta state,
+// and keeps it: only default-branch-moved is cleared (REQ-0665).
+func TestShowHookPrintsSnapshotsDisabled(t *testing.T) {
+	s := newSandbox(t)
+	s.setupState(t, setup.Warning{Slug: setup.SnapshotsDisabled, Message: "snapshots disabled for api"})
+	for range 2 {
+		out := s.ok(t, "", "handoff", "show", "--hook")
+		assert.True(t, strings.HasPrefix(out, "warning snapshots-disabled: snapshots disabled for api\n"), out)
+	}
+}
+
 // TestShowHookClearsDefaultBranchMoved prints default-branch-moved on
 // the first SessionStart after the move and clears it; the second does
 // not print it (REQ-0399, REQ-0665).

@@ -20,5 +20,6 @@ var steps = []step{
 	linkBinary,
 	syncRepos,
 	checkMemory,
+	recordSnapshotsDisabled,
 	installDispatcher,
 }

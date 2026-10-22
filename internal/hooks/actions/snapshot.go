@@ -154,11 +154,7 @@ func Snapshot(ctx context.Context, c SnapshotConfig) (res SnapshotResult, err er
 		return SnapshotResult{}, err
 	}
 
-	_, disabled, err := c.Git.HooksPath(ctx, c.Dir)
-	if errors.Is(err, gitsafe.ErrRefused) {
-		// A value gitsafe refuses to read is set all the same.
-		disabled, err = true, nil
-	}
+	disabled, err := hooksPathSet(ctx, c.Git, c.Dir)
 	if err != nil {
 		return SnapshotResult{}, err
 	}

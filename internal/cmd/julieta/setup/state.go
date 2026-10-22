@@ -112,6 +112,10 @@ const (
 	// DefaultBranchMoved is a fast-forward of a default branch:
 	// "<repo> <old>..<new>".
 	DefaultBranchMoved = "default-branch-moved"
+	// SnapshotsDisabled is a repo whose own config sets core.hooksPath,
+	// so no commit takes a snapshot (08 8.4, REQ-0692): "snapshots
+	// disabled for <dir>".
+	SnapshotsDisabled = "snapshots-disabled"
 )
 
 // State is what setup records in julieta state for status and the next

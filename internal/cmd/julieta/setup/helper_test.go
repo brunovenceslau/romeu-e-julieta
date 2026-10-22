@@ -35,7 +35,8 @@ var (
 func julieta(ctx context.Context, args ...string) (int, string, string) {
 	var stdout, stderr bytes.Buffer
 	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&stdout), Stderr: cli.NewWriter(&stderr),
-		Now: func() time.Time { return clock }, Version: stamp}
+		Now: func() time.Time { return clock }, Version: stamp,
+		ULIDs: canon.NewULIDSource(bytes.NewReader(bytes.Repeat([]byte{7}, 1<<12)))}
 	code := cli.Main(ctx, args, env)
 	return code, stdout.String(), stderr.String()
 }

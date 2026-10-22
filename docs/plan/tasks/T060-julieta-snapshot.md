@@ -61,7 +61,12 @@ removal of a `.gitsafe-bundle-*` directory that a killed process left
 in the snapshot directory, which callers otherwise ignore. Its
 `disabled` acceptance item reaches `setup`, `status` and the
 SessionStart print, outside its owns: settled when the task is built,
-by an `after` edge or a narrower item.
+by a narrower item (re-plan 2026-10-22: the rest of that item is T160).
+
+Re-plan (2026-10-22): Kept, narrowed. The `disabled` item keeps what
+`julieta snapshot` does; that `julieta setup` writes it and that
+`setup`, `status` and SessionStart report "snapshots disabled for
+<dir>" is T160.
 
 - Implements: REQ-0157 (02 2.6), REQ-0168 (03 (opening)), REQ-0222 (03
   3.6), REQ-0239 (03 3.8), REQ-0261 (03 3.13), REQ-0278 (04 4.1),
@@ -89,7 +94,7 @@ by an `after` edge or a narrower item.
   - With a repo-local `core.hooksPath`, `julieta snapshot` writes
     `disabled: true`. That `julieta setup` writes it, and that `setup`,
     `julieta status` and SessionStart report "snapshots disabled for
-    <dir>", belongs to a later task (decided on 2026-10-21).
+    <dir>", belongs to T160 (decided on 2026-10-21).
   - A snapshot that races a commit leaves a valid bundle (10 10.1), with
     the interleaving forced through a test seam and never by sleeping;
     two snapshots of one repo at once are serialized by the store lock
@@ -198,7 +203,7 @@ it:
 - `disabled` is what `julieta snapshot` reads itself: the repo's own
   config sets `core.hooksPath`, as `julieta status` reads it. The
   `setup`, `status` and SessionStart part of the acceptance row is a
-  task of its own after T060 (decided on 2026-10-21).
+  task of its own after T060, T160 (decided on 2026-10-21).
 - The snapshot handler of the dispatcher is set by
   `internal/cmd/julieta/snapshot` with `actions.HandleSnapshot`, since
   `internal/hooks/actions` cannot import a package that imports
