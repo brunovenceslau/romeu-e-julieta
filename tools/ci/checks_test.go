@@ -263,7 +263,7 @@ func TestAFixtureCheckIsAddedByTwoPaths(t *testing.T) {
 	license := slices.Index(registered, "license")
 	require.GreaterOrEqual(t, license, 0)
 	assert.Equal(t, append(append(registered[:license+1:license+1], "fixture"), registered[license+1:]...), checks, "the fixture's key puts it between license and tagged suites")
-	assert.Equal(t, []string{"format", "vet", "fix linux/amd64", "fix linux/arm64", "fix darwin/amd64", "fix darwin/arm64", "generated", "lint linux/amd64", "lint boundaries linux/amd64", "lint linux/arm64", "lint boundaries linux/arm64", "lint darwin/amd64", "lint boundaries darwin/amd64", "lint darwin/arm64", "lint boundaries darwin/arm64", "fixture", "race"}, steps, "a check that judges the tree runs before race")
+	assert.Equal(t, []string{"format", "vet linux/amd64", "vet linux/arm64", "vet darwin/amd64", "vet darwin/arm64", "fix linux/amd64", "fix linux/arm64", "fix darwin/amd64", "fix darwin/arm64", "generated", "lint linux/amd64", "lint boundaries linux/amd64", "lint linux/arm64", "lint boundaries linux/arm64", "lint darwin/amd64", "lint boundaries darwin/amd64", "lint darwin/arm64", "lint boundaries darwin/arm64", "fixture", "race"}, steps, "a check that judges the tree runs before race")
 
 	out, err = procgroup.CombinedOutput(t.Context(), procgroup.Command{
 		Class: procgroup.ToolStep,

@@ -942,7 +942,9 @@ func TestFastSteps(t *testing.T) {
 	}
 	want := []check.Step{
 		{Name: "format", Argv: []string{filepath.Join(goDir, "gofmt"), "-l", "."}, Quiet: true, Environ: check.StepEnv(goDir)},
-		{Name: "vet", Argv: []string{goCmd, "vet", "./..."}, Environ: check.StepEnv(goDir)},
+	}
+	for _, target := range lint.Targets {
+		want = append(want, check.Step{Name: "vet " + target.String(), Argv: []string{goCmd, "vet", "./..."}, Environ: lint.Env(target, goDir)})
 	}
 	for _, target := range lint.Targets {
 		want = append(want, check.Step{Name: "fix " + target.String(), Argv: []string{goCmd, "fix", "-diff", "-tags", "e2e", "./..."}, Environ: lint.Env(target, goDir)})
@@ -991,11 +993,9 @@ func TestGeneratedRunsBeforeTheTests(t *testing.T) {
 		}
 		generated := slices.Index(names, "generated")
 		require.GreaterOrEqual(t, generated, 0, "%s: %v", name, names)
-		for _, tests := range []string{"race"} {
-			if i := slices.Index(names, tests); i >= 0 {
-				assert.Less(t, generated, i, "%s: generated runs before %s: %v", name, tests, names)
-			}
-		}
+		race := slices.Index(names, "race")
+		require.GreaterOrEqual(t, race, 0, "%s: %v", name, names)
+		assert.Less(t, generated, race, "%s: generated runs before race: %v", name, names)
 	}
 }
 

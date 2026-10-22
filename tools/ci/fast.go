@@ -78,8 +78,8 @@ func stepsOf(ctx context.Context, in func(check.Check) bool, p check.Plan) []che
 }
 
 // fastSteps returns the command steps of fast, from the In fast column
-// of 10 10.2: format, vet, generated, lint (once per lint target) and
-// unit. The other rows of that column join with the code they check.
+// of 10 10.2: format, vet and fix (once per lint target), generated, lint
+// (once per lint target) and race. The other rows of that column join with the code they check.
 func fastSteps(ctx context.Context, root string, tools check.Tools) []check.Step {
 	return stepsOf(ctx, inFast, check.Plan{Root: root, Tools: tools})
 }

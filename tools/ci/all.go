@@ -95,6 +95,9 @@ func runChecks(ctx context.Context, e check.Env, args []string, name string, in 
 	if len(args) != 0 {
 		return false, fmt.Errorf("%s takes no argument\n%s", name, check.Usage())
 	}
+	if len(registered(in)) == 0 {
+		return false, fmt.Errorf("%s: no check runs in this job, so a pass would judge nothing", name)
+	}
 	root, err := check.RepoRoot(ctx, e)
 	if err != nil {
 		return false, err

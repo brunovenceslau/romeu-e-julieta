@@ -31,6 +31,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/hygiene"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/imports"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/license"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/lint"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/workflows"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/names"
@@ -218,18 +219,20 @@ func TestAllSteps(t *testing.T) {
 	race := len(fast) - 1
 	require.Equal(t, "race", fast[race].Name, "the one test run is the last step of fast")
 	assert.Equal(t, []string{goCmd, "test", "-race", "-count=1", "./..."}, fast[race].Argv, "fast has no step after the run to read a cover profile")
-	require.Len(t, steps, len(fast)+9, "no e2e directory, so no tagged suite to vet")
+	require.Len(t, steps, len(fast)+12, "no e2e directory, so no tagged suite to vet")
 	assert.Equal(t, withoutAround(t, fast[:race]), withoutAround(t, steps[:race]))
-	assert.Equal(t, crossbuild.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[race+3:race+7])
-	assert.Equal(t, imports.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[race+7:race+8])
+	assert.Equal(t, crossbuild.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[race+6:race+10])
+	assert.Equal(t, imports.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[race+10:race+11])
 
-	vulnStep, licenseStep, modulesStep, raceStep, e2e := steps[race], steps[race+1], steps[race+2], steps[race+8], steps[race+9]
+	vulnSteps, licenseStep, modulesStep, raceStep, e2e := steps[race:race+4], steps[race+4], steps[race+5], steps[race+11], steps[race+12]
 	wantE2E := container.Steps(t.Context(), check.Plan{Root: root, Tools: tools})[0]
 	assert.Equal(t, wantE2E.Around == nil, e2e.Around == nil)
 	wantE2E.Around, e2e.Around = nil, nil
 	assert.Equal(t, wantE2E, e2e, "the e2e step comes last, after race")
-	assert.Equal(t, check.Step{Name: "vulnerabilities", Argv: []string{evalOrSelf(vuln), "./..."}, Environ: check.WithProcessEnv(env, check.NetworkPassThrough),
-		NoticeOn: "govulncheck: fetching vulnerabilities:", Notice: "vulnerabilities: could not fetch the vulnerability database, so this all is not the equivalent run (10 10.2)"}, vulnStep, "govulncheck runs by the path mise resolves, and not through mise exec")
+	for i, target := range lint.Targets {
+		assert.Equal(t, check.Step{Name: "vulnerabilities " + target.String(), Argv: []string{evalOrSelf(vuln), "./..."}, Environ: check.WithProcessEnv(lint.Env(target, tools.GoDir), check.NetworkPassThrough),
+			NoticeOn: "govulncheck: fetching vulnerabilities:", Notice: "vulnerabilities: could not fetch the vulnerability database, so this all is not the equivalent run (10 10.2)"}, vulnSteps[i], "govulncheck runs by the path mise resolves, and not through mise exec, once per target")
+	}
 	assert.Equal(t, 40*time.Minute, procgroup.ToolRace.Timeout())
 	assert.Less(t, procgroup.ToolRace.Timeout(), ciJobTimeout(t), "the race run ends before the race job of ci.yml does")
 	assert.Equal(t, check.Step{Name: "race", Argv: []string{goCmd, "test", "-race", "-count=1", "-coverprofile=/tmp/p/cover.out", "./..."}, Environ: env, Class: procgroup.ToolRace}, raceStep)
@@ -250,7 +253,7 @@ func TestAllSteps(t *testing.T) {
 	e2eRuns := e2e.Skip == "" && e2e.Unavailable == nil
 	for _, s := range steps {
 		for _, key := range check.NetworkPassThrough {
-			assert.Equal(t, s.Name == "vulnerabilities" || (s.Name == "e2e" && e2eRuns), slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
+			assert.Equal(t, strings.HasPrefix(s.Name, "vulnerabilities ") || (s.Name == "e2e" && e2eRuns), slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
 		}
 		for _, key := range check.DockerPassThrough {
 			assert.Equal(t, (s.Name == "license" && runtime.GOOS == "linux") || (s.Name == "e2e" && e2eRuns), slices.Contains(keys(s), key), "%s keeps %s", s.Name, key)
@@ -332,7 +335,7 @@ func TestAllStepsVulnFailsClosed(t *testing.T) {
 			root := citest.LockedRoot(t, citest.LockFixture)
 			var got check.Step
 			for _, s := range allSteps(t.Context(), root, tools, "/tmp/p/cover.out") {
-				if s.Name == "vulnerabilities" {
+				if strings.HasPrefix(s.Name, "vulnerabilities ") {
 					got = s
 				}
 			}
@@ -529,7 +532,7 @@ func TestAllWiring(t *testing.T) {
 			}
 		}
 	}
-	want := []string{"gofmt -l", "go vet", "go fix", "go fix", "go fix", "go fix", "go run", "lint run", "lint run", "lint run", "lint run", "govulncheck ./..."}
+	want := []string{"gofmt -l", "go vet", "go vet", "go vet", "go vet", "go fix", "go fix", "go fix", "go fix", "go run", "lint run", "lint run", "lint run", "lint run", "govulncheck ./...", "govulncheck ./...", "govulncheck ./...", "govulncheck ./..."}
 	if runtime.GOOS == "linux" {
 		want = append(want, "docker run")
 	}
@@ -990,5 +993,25 @@ func TestJobSubcommandsAreRegistered(t *testing.T) {
 		_, ok := check.Lookup(name)
 		assert.True(t, ok, name)
 		assert.Contains(t, check.Usage(), "go run ./tools/ci "+name+"\n")
+	}
+}
+
+// TestRunChecksRefusesAJobWithNoCheck holds that a job that selects no
+// check is an error and not a green run: a typo in a Job field, or a
+// check moved out of a job, would otherwise leave a job that passes
+// having judged nothing.
+func TestRunChecksRefusesAJobWithNoCheck(t *testing.T) {
+	r := newSchemaTree(t)
+	r.Write("go.mod", "module "+citest.FixtureModule+"\n\ngo 1.27.0\n")
+	r.Commit("fixture")
+	var out bytes.Buffer
+	e := check.Env{Dir: r.Dir, GitEnv: r.Env, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &out, Steps: []check.Step{citest.Passing}, Now: frozen}
+	ok, err := runChecks(t.Context(), e, nil, "nothing", inJob("nothing"))
+	require.Error(t, err)
+	assert.False(t, ok)
+	assert.Contains(t, err.Error(), "nothing: no check runs in this job")
+	assert.Empty(t, out.String(), "nothing ran")
+	for _, job := range check.Jobs {
+		assert.NotEmpty(t, registered(inJob(job)), "the %s job has checks", job)
 	}
 }
