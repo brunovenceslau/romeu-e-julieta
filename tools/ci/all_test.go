@@ -219,12 +219,13 @@ func TestAllSteps(t *testing.T) {
 	race := len(fast) - 1
 	require.Equal(t, "race", fast[race].Name, "the one test run is the last step of fast")
 	assert.Equal(t, []string{goCmd, "test", "-race", "-count=1", "./..."}, fast[race].Argv, "fast has no step after the run to read a cover profile")
-	require.Len(t, steps, len(fast)+12, "no e2e directory, so no tagged suite to vet")
+	require.Len(t, steps, len(fast)+13, "no e2e directory, so no tagged suite to vet")
 	assert.Equal(t, withoutAround(t, fast[:race]), withoutAround(t, steps[:race]))
 	assert.Equal(t, crossbuild.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[race+6:race+10])
 	assert.Equal(t, imports.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[race+10:race+11])
 
-	vulnSteps, licenseStep, modulesStep, raceStep, e2e := steps[race:race+4], steps[race+4], steps[race+5], steps[race+11], steps[race+12]
+	assert.Equal(t, mise.Steps(t.Context(), check.Plan{Root: root, Tools: tools}), steps[race+11:race+12])
+	vulnSteps, licenseStep, modulesStep, raceStep, e2e := steps[race:race+4], steps[race+4], steps[race+5], steps[race+12], steps[race+13]
 	wantE2E := container.Steps(t.Context(), check.Plan{Root: root, Tools: tools})[0]
 	assert.Equal(t, wantE2E.Around == nil, e2e.Around == nil)
 	assert.Equal(t, wantE2E.Notes == nil, e2e.Notes == nil)
@@ -537,7 +538,7 @@ func TestAllWiring(t *testing.T) {
 	if runtime.GOOS == "linux" {
 		want = append(want, "docker run")
 	}
-	want = append(want, "go run", "go build", "go build", "go build", "go build", "go run", "go test")
+	want = append(want, "go run", "go build", "go build", "go build", "go build", "go run", "go run", "go test")
 	if slices.Contains(container.Classes[runtime.GOOS+"/"+runtime.GOARCH], "e2e") {
 		want = append(want, "go test")
 	}
