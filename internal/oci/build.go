@@ -36,6 +36,14 @@ const (
 	typeGitIdentity = "com.docker.sandbox/git-identity@1"
 )
 
+// capabilityTypes are the capability types the grammar models: the
+// closed list of the kit schema of the pinned frontend (REQ-0516).
+var capabilityTypes = []string{
+	typeNetwork1, typeNetwork2, typeCredential, typeSSHAgent, typeSkills, typeSkill,
+	typeVolume, typeHostMount, typePort, typeUSB, typeResources, typePrivileged, typeSbx,
+	typeKitRegistry, typeSessions, typeLifecycle, typeContext, typeLongRunning, typeGitIdentity,
+}
+
 // builder collects the capabilities of one descriptor.
 type builder struct {
 	caps Capabilities

@@ -144,23 +144,35 @@ func TestFetchWorkloadUpstreamShape(t *testing.T) {
 		}, "typed members"},
 		{"a manifest without the annotation", func(t *testing.T, f *fakeRegistry) string {
 			t.Helper()
-			return f.add(mediaOCIManifest, []byte(`{"schemaVersion":2,"annotations":{"other":"x"}}`))
+			return f.add(mediaOCIManifest, []byte(`{"schemaVersion":2,"mediaType":"`+mediaOCIManifest+`","annotations":{"other":"x"}}`))
 		}, DescriptorAnnotation},
 		{"a manifest without annotations", func(t *testing.T, f *fakeRegistry) string {
 			t.Helper()
-			return f.add(mediaOCIManifest, []byte(`{"schemaVersion":2}`))
+			return f.add(mediaOCIManifest, []byte(`{"schemaVersion":2,"mediaType":"`+mediaOCIManifest+`"}`))
 		}, DescriptorAnnotation},
 		{"an annotation that is not a string", func(t *testing.T, f *fakeRegistry) string {
 			t.Helper()
-			return f.add(mediaOCIManifest, []byte(`{"schemaVersion":2,"annotations":{"`+DescriptorAnnotation+`":{"a":1}}}`))
+			return f.add(mediaOCIManifest, []byte(`{"schemaVersion":2,"mediaType":"`+mediaOCIManifest+`","annotations":{"`+DescriptorAnnotation+`":{"a":1}}}`))
 		}, "typed members"},
+		{"a manifest without mediaType", func(t *testing.T, f *fakeRegistry) string {
+			t.Helper()
+			return f.add(mediaOCIManifest, []byte(`{"schemaVersion":2,"annotations":{"`+DescriptorAnnotation+`":"{}"}}`))
+		}, "no mediaType"},
+		{"an index without mediaType", func(t *testing.T, f *fakeRegistry) string {
+			t.Helper()
+			return f.add(mediaOCIIndex, []byte(`{"schemaVersion":2,"manifests":[]}`))
+		}, "no mediaType"},
+		{"an index that carries a descriptor itself", func(t *testing.T, f *fakeRegistry) string {
+			t.Helper()
+			return f.add(mediaOCIIndex, []byte(`{"schemaVersion":2,"mediaType":"`+mediaOCIIndex+`","manifests":[],"annotations":{"`+DescriptorAnnotation+`":"{}"}}`))
+		}, "index carries"},
 		{"a manifest that is not JSON", func(t *testing.T, f *fakeRegistry) string {
 			t.Helper()
 			return f.add(mediaOCIManifest, []byte(`<html>`))
 		}, "does not decode"},
 		{"a manifest with a duplicate member name", func(t *testing.T, f *fakeRegistry) string {
 			t.Helper()
-			return f.add(mediaOCIManifest, []byte(`{"schemaVersion":2,"schemaVersion":2,"annotations":{"`+DescriptorAnnotation+`":"{}"}}`))
+			return f.add(mediaOCIManifest, []byte(`{"schemaVersion":2,"mediaType":"`+mediaOCIManifest+`","schemaVersion":2,"annotations":{"`+DescriptorAnnotation+`":"{}"}}`))
 		}, "does not decode"},
 		{"a manifest of a type that is not read", func(t *testing.T, f *fakeRegistry) string {
 			t.Helper()
@@ -176,7 +188,7 @@ func TestFetchWorkloadUpstreamShape(t *testing.T) {
 		}, "Content-Type"},
 		{"an index without manifests", func(t *testing.T, f *fakeRegistry) string {
 			t.Helper()
-			return f.add(mediaOCIIndex, []byte(`{"schemaVersion":2}`))
+			return f.add(mediaOCIIndex, []byte(`{"schemaVersion":2,"mediaType":"`+mediaOCIIndex+`"}`))
 		}, "no manifests"},
 		{"an index without schemaVersion", func(t *testing.T, f *fakeRegistry) string {
 			t.Helper()
@@ -184,11 +196,11 @@ func TestFetchWorkloadUpstreamShape(t *testing.T) {
 		}, "schemaVersion"},
 		{"an index entry without a digest", func(t *testing.T, f *fakeRegistry) string {
 			t.Helper()
-			return f.add(mediaOCIIndex, []byte(`{"schemaVersion":2,"manifests":[{"mediaType":"`+mediaOCIManifest+`"}]}`))
+			return f.add(mediaOCIIndex, []byte(`{"schemaVersion":2,"mediaType":"`+mediaOCIIndex+`","manifests":[{"mediaType":"`+mediaOCIManifest+`"}]}`))
 		}, "no mediaType or no digest"},
 		{"an index entry with a platform without architecture", func(t *testing.T, f *fakeRegistry) string {
 			t.Helper()
-			return f.add(mediaOCIIndex, []byte(`{"schemaVersion":2,"manifests":[{"mediaType":"`+mediaOCIManifest+`","digest":"sha256:`+strings.Repeat("a", 64)+`","platform":{"os":"linux"}}]}`))
+			return f.add(mediaOCIIndex, []byte(`{"schemaVersion":2,"mediaType":"`+mediaOCIIndex+`","manifests":[{"mediaType":"`+mediaOCIManifest+`","digest":"sha256:`+strings.Repeat("a", 64)+`","platform":{"os":"linux"}}]}`))
 		}, "without os or architecture"},
 		{"an index with no manifest for the platform", func(t *testing.T, f *fakeRegistry) string {
 			t.Helper()
@@ -407,4 +419,86 @@ func TestParseChallenge(t *testing.T) {
 		}
 		assert.Empty(t, scheme, bad)
 	}
+}
+
+func TestFetchWorkloadPicksOneManifestPerPlatform(t *testing.T) {
+	ann := annotationOf(t, fixturePath)
+	other := strings.Replace(ann, `"displayName":"git-ssh-sign"`, `"displayName":"other"`, 1)
+	require.NotEqual(t, ann, other)
+	variant := func(digest, arch, v string) map[string]any {
+		e := entry(digest, "linux", arch)
+		if v == "" {
+			delete(e["platform"].(map[string]any), "variant")
+		} else {
+			e["platform"].(map[string]any)["variant"] = v
+		}
+		return e
+	}
+	t.Run("two entries for one platform are refused", func(t *testing.T) {
+		f := newFakeRegistry(t)
+		a := f.add(mediaOCIManifest, manifestJSON(t, ann))
+		b := f.add(mediaOCIManifest, manifestJSON(t, other))
+		index := f.add(mediaOCIIndex, indexJSON(t, variant(a, "amd64", ""), variant(b, "amd64", "")))
+
+		_, err := f.client().FetchWorkload(t.Context(), f.ref(index), amd64)
+
+		ce := shapeOf(t, err, f)
+		assert.Contains(t, ce.Error(), "more than one manifest")
+	})
+	t.Run("two variants and a host with none are refused", func(t *testing.T) {
+		f := newFakeRegistry(t)
+		a := f.add(mediaOCIManifest, manifestJSON(t, ann))
+		b := f.add(mediaOCIManifest, manifestJSON(t, other))
+		index := f.add(mediaOCIIndex, indexJSON(t, variant(a, "arm64", "v8"), variant(b, "arm64", "v7")))
+
+		_, err := f.client().FetchWorkload(t.Context(), f.ref(index), Platform{OS: "linux", Architecture: "arm64"})
+
+		ce := shapeOf(t, err, f)
+		assert.Contains(t, ce.Error(), "more than one manifest")
+	})
+	t.Run("a host with a variant takes its own", func(t *testing.T) {
+		f := newFakeRegistry(t)
+		a := f.add(mediaOCIManifest, manifestJSON(t, ann))
+		b := f.add(mediaOCIManifest, manifestJSON(t, other))
+		index := f.add(mediaOCIIndex, indexJSON(t, variant(a, "arm64", "v8"), variant(b, "arm64", "v7")))
+
+		got, err := f.client().FetchWorkload(t.Context(), f.ref(index), Platform{OS: "linux", Architecture: "arm64", Variant: "v7"})
+
+		require.NoError(t, err)
+		assert.Equal(t, b, got.ManifestDigest)
+	})
+	t.Run("a host with a variant does not take an entry without one", func(t *testing.T) {
+		f := newFakeRegistry(t)
+		a := f.add(mediaOCIManifest, manifestJSON(t, ann))
+		index := f.add(mediaOCIIndex, indexJSON(t, variant(a, "arm64", "")))
+
+		_, err := f.client().FetchWorkload(t.Context(), f.ref(index), Platform{OS: "linux", Architecture: "arm64", Variant: "v8"})
+
+		ce := shapeOf(t, err, f)
+		assert.Contains(t, ce.Error(), "no manifest for")
+	})
+	t.Run("one entry per platform is read", func(t *testing.T) {
+		f := newFakeRegistry(t)
+		a := f.add(mediaOCIManifest, manifestJSON(t, ann))
+		b := f.add(mediaOCIManifest, manifestJSON(t, other))
+		index := f.add(mediaOCIIndex, indexJSON(t, variant(a, "amd64", ""), variant(b, "arm64", "v8")))
+
+		got, err := f.client().FetchWorkload(t.Context(), f.ref(index), amd64)
+
+		require.NoError(t, err)
+		assert.Equal(t, a, got.ManifestDigest)
+	})
+}
+
+func TestEveryCapabilityTypeIsOfTheTypeForm(t *testing.T) {
+	for _, typ := range capabilityTypes {
+		assert.Regexp(t, typePattern, typ)
+		// And the dispatch knows it: a type with no config is read, one with
+		// a required config is refused for the config, never as unmodeled.
+		_, err := ParseDescriptor(capability(typ, ""))
+		if err != nil {
+			assert.NotContains(t, err.Error(), "does not model", typ)
+		}
+	}
+	assert.Len(t, capabilityTypes, 19)
 }

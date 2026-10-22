@@ -46,6 +46,10 @@ type Platform struct {
 	// Architecture is the CPU architecture in Go's names, such as
 	// "amd64" and "arm64".
 	Architecture string
+	// Variant is the CPU variant, such as "v8"; when set, only an entry
+	// with that variant matches, and when empty an entry of any variant
+	// does, so two variants of the platform are ambiguous.
+	Variant string
 }
 
 // Fetched is a workload's descriptor, read and verified.
@@ -166,9 +170,10 @@ func (r *registry) classify(err error) error {
 // member name refused by the decoder (REQ-0170, ADR 0041). A pointer
 // field is one that is required.
 type indexDoc struct {
-	SchemaVersion *int       `json:"schemaVersion"`
-	MediaType     *string    `json:"mediaType"`
-	Manifests     []entryDoc `json:"manifests"`
+	SchemaVersion *int              `json:"schemaVersion"`
+	MediaType     *string           `json:"mediaType"`
+	Manifests     []entryDoc        `json:"manifests"`
+	Annotations   map[string]string `json:"annotations"`
 }
 
 type entryDoc struct {
@@ -180,6 +185,7 @@ type entryDoc struct {
 type platformDoc struct {
 	OS           *string `json:"os"`
 	Architecture *string `json:"architecture"`
+	Variant      *string `json:"variant"`
 }
 
 type manifestDoc struct {
@@ -250,6 +256,10 @@ func (r *registry) platformManifest(ctx context.Context, body []byte, ctype stri
 	if ix.Manifests == nil {
 		return "", nil, "", shape("the index has no manifests list")
 	}
+	if _, ok := ix.Annotations[DescriptorAnnotation]; ok {
+		return "", nil, "", shape("the index carries the annotation %s, which only a platform manifest does", DescriptorAnnotation)
+	}
+	var chosen *entryDoc
 	for i, e := range ix.Manifests {
 		if e.MediaType == nil || e.Digest == nil {
 			return "", nil, "", shape("manifests[%d] of the index has no mediaType or no digest", i)
@@ -265,23 +275,39 @@ func (r *registry) platformManifest(ctx context.Context, body []byte, ctype stri
 		if *e.Platform.OS != p.OS || *e.Platform.Architecture != p.Architecture {
 			continue
 		}
+		if p.Variant != "" && (e.Platform.Variant == nil || *e.Platform.Variant != p.Variant) {
+			continue
+		}
 		if *e.MediaType != mediaOCIManifest && *e.MediaType != mediaDockerManifest {
 			continue
 		}
-		body, got, err := r.manifest(ctx, *e.Digest)
-		if err != nil {
-			return "", nil, "", err
+		// The first match is what the image spec says to use, but an
+		// index that lists two for one platform is an index whose
+		// reading the product would be choosing: it fails closed.
+		if chosen != nil {
+			return "", nil, "", shape("the index lists more than one manifest for %s/%s", quote(p.OS), quote(p.Architecture))
 		}
-		return *e.Digest, body, got, nil
+		chosen = &ix.Manifests[i]
 	}
-	return "", nil, "", shape("the index lists no manifest for %s/%s", quote(p.OS), quote(p.Architecture))
+	if chosen == nil {
+		return "", nil, "", shape("the index lists no manifest for %s/%s", quote(p.OS), quote(p.Architecture))
+	}
+	body, got, err := r.manifest(ctx, *chosen.Digest)
+	if err != nil {
+		return "", nil, "", err
+	}
+	return *chosen.Digest, body, got, nil
 }
 
-// sameType refuses a manifest whose mediaType member names a type other
-// than the Content-Type it was served as (distribution spec: a client
-// should reject a manifest whose mediaType does not match).
+// sameType refuses a manifest with no mediaType member, and one whose
+// member names a type other than the Content-Type it was served as
+// (distribution spec: a client should reject a manifest whose mediaType
+// does not match), so the header alone never picks what is read.
 func sameType(member *string, ctype string) error {
-	if member != nil && *member != ctype {
+	if member == nil {
+		return shape("the document has no mediaType member")
+	}
+	if *member != ctype {
 		return shape("the mediaType of the document is %s and it was served as %s", quote(*member), quote(ctype))
 	}
 	return nil

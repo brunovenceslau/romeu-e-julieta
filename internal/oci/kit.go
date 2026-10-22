@@ -82,15 +82,15 @@ func fromTree(tree map[string]any, localFile bool) (Kit, error) {
 // shapeReason says why encoding/json/v2 refused a descriptor, with the
 // path of the value and no text of it.
 func shapeReason(err error) string {
-	msg := err.Error()
 	what := "a value the grammar does not read"
+	se, isSemantic := errors.AsType[*jsonv2.SemanticError](err)
 	switch {
-	case strings.Contains(msg, "unknown"):
+	case errors.Is(err, jsonv2.ErrUnknownName):
 		what = "an unknown key"
-	case strings.Contains(msg, "cannot unmarshal"):
+	case isSemantic && se.GoType != nil:
 		what = "a value of the wrong kind"
 	}
-	if se, ok := errors.AsType[*jsonv2.SemanticError](err); ok && se.JSONPointer != "" {
+	if isSemantic && se.JSONPointer != "" {
 		return what + " at " + quote(string(se.JSONPointer))
 	}
 	return what
