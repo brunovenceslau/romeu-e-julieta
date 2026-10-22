@@ -1,0 +1,213 @@
+// SPDX-FileCopyrightText: 2026 Bruno Venceslau
+// SPDX-License-Identifier: GPL-3.0-only
+
+//go:build unix
+
+package state
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+)
+
+// ErrInvalidDigest is the error of a descriptor digest that is not
+// sha256:<64 lowercase hex>: it would be a path in descriptors/.
+var ErrInvalidDigest = errors.New("state: not an OCI sha256 digest")
+
+// ErrImmutable is the error of a descriptor entry written again with
+// other content: entries are immutable (REQ-0240).
+var ErrImmutable = errors.New("state: a descriptor entry is immutable")
+
+// readRecord reads the file name below root, at most MaxRecordSize
+// bytes (one more tells the reader it is over the cap). A file that is
+// absent is an error that wraps fs.ErrNotExist.
+func readRecord(root *os.Root, name string) ([]byte, error) {
+	f, err := root.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	data, err := io.ReadAll(io.LimitReader(f, MaxRecordSize+1))
+	if err != nil {
+		return nil, fmt.Errorf("state: %w", err)
+	}
+	return data, nil
+}
+
+// unreadable returns the error record-unreadable (RJ-334) for the file
+// at path whose content failed with err, or err itself when it is the
+// error format-newer or no decode error at all. The file is never
+// written over: the details name it (REQ-0165).
+func unreadable(path string, err error) error {
+	if _, ok := errors.AsType[*cli.Error](err); ok || !errors.Is(err, ErrInvalid) {
+		return err
+	}
+	return RecordUnreadable.Wrap(err, "the record does not decode", cli.Detail{Key: "file", Value: path})
+}
+
+// load reads and decodes the record name below root, whose path for a
+// message is path.
+func load[T any](root *os.Root, name, path string, decode func([]byte) (*T, error)) (*T, error) {
+	data, err := readRecord(root, name)
+	if err != nil {
+		return nil, err
+	}
+	v, err := decode(data)
+	if err != nil {
+		return nil, unreadable(path, err)
+	}
+	return v, nil
+}
+
+// LoadToolchain reads toolchain.json. A record that is absent is an
+// error that wraps fs.ErrNotExist; one that does not decode is
+// record-unreadable (RJ-334).
+func (s *Store) LoadToolchain() (*Toolchain, error) {
+	return load(s.root, toolchainName, filepath.Join(s.dir, toolchainName), DecodeToolchain)
+}
+
+// UpdateToolchain is the one writer of toolchain.json: it reads the
+// record (a new one when it is absent), calls fn, and writes the result
+// atomically. A record that does not decode stops it before fn runs
+// and before any write, so it is never written over (REQ-0165). The
+// caller holds the lock (REQ-0283).
+func (s *Store) UpdateToolchain(fn func(*Toolchain) error) error {
+	t, err := s.LoadToolchain()
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		t = &Toolchain{Schema: ToolchainField}
+	case err != nil:
+		return err
+	}
+	if err := fn(t); err != nil {
+		return err
+	}
+	data, err := EncodeToolchain(t)
+	if err != nil {
+		return err
+	}
+	return writeFile(s.root, toolchainName, data)
+}
+
+// projectFile returns the file name of a project's record, after the
+// name has passed the rule of 03 3.1.
+func projectFile(name string) (string, error) {
+	if err := checkName(name); err != nil {
+		return "", err
+	}
+	return name + ".json", nil
+}
+
+// LoadProject reads projects/<name>.json. A record that is absent is an
+// error that wraps fs.ErrNotExist; one that does not decode is
+// record-unreadable (RJ-334), with the project's name filled into the
+// hint.
+func (s *Store) LoadProject(name string) (*Project, error) {
+	file, err := projectFile(name)
+	if err != nil {
+		return nil, err
+	}
+	p, err := load(s.projects, file, filepath.Join(s.dir, projectsDir, file), DecodeProject)
+	if e, ok := errors.AsType[*cli.Error](err); ok && e.ID == RecordUnreadable.ID {
+		e.Fill = map[string]string{"<name>": name}
+	}
+	return p, err
+}
+
+// UpdateProject is the one writer of projects/<name>.json: it reads the
+// record (a new one when it is absent), calls fn, and writes the result
+// atomically. A record that does not decode stops it before fn runs and
+// before any write, so it is never written over (REQ-0165); neither is
+// a record fn leaves in a form no reader would take. The caller holds
+// the lock (REQ-0283).
+func (s *Store) UpdateProject(name string, fn func(*Project) error) error {
+	file, err := projectFile(name)
+	if err != nil {
+		return err
+	}
+	p, err := s.LoadProject(name)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		p = NewProject()
+	case err != nil:
+		return err
+	}
+	if err := fn(p); err != nil {
+		return err
+	}
+	data, err := EncodeProject(p)
+	if err != nil {
+		return err
+	}
+	return writeFile(s.projects, file, data)
+}
+
+// descriptorFile returns the file name of a descriptor, the hex of its
+// OCI digest, after the digest has passed its form.
+func descriptorFile(digest string) (string, error) {
+	sub := ociDigest.FindStringSubmatch(digest)
+	if sub == nil {
+		return "", fmt.Errorf("%w: %q", ErrInvalidDigest, clip(digest))
+	}
+	return sub[1] + ".json", nil
+}
+
+// GetDescriptor reads the descriptor cached under an OCI digest. An
+// entry that is absent is an error that wraps fs.ErrNotExist (the
+// descriptor cache is read first by sync, step 6, which then fetches);
+// one that does not decode, or that holds another digest than its name
+// says, is record-unreadable (RJ-334).
+func (s *Store) GetDescriptor(digest string) (*Descriptor, error) {
+	file, err := descriptorFile(digest)
+	if err != nil {
+		return nil, err
+	}
+	d, err := load(s.descriptors, file, filepath.Join(s.dir, descriptorsDir, file), DecodeDescriptor)
+	if err != nil {
+		return nil, err
+	}
+	if d.Digest != digest {
+		return nil, unreadable(filepath.Join(s.dir, descriptorsDir, file),
+			fmt.Errorf("%w: the entry holds the digest %s", ErrInvalid, clip(d.Digest)))
+	}
+	return d, nil
+}
+
+// PutDescriptor caches a descriptor under its digest. Entries are
+// immutable: the same content again writes nothing, other content is
+// ErrImmutable, and an entry that does not decode is never written over
+// (RJ-334). The schema field is set to this build's.
+func (s *Store) PutDescriptor(d Descriptor) error {
+	d.Schema = DescriptorField
+	if d.Capabilities == nil {
+		d.Capabilities = Capabilities{}
+	}
+	file, err := descriptorFile(d.Digest)
+	if err != nil {
+		return err
+	}
+	data, err := EncodeDescriptor(&d)
+	if err != nil {
+		return err
+	}
+	have, err := readRecord(s.descriptors, file)
+	switch {
+	case err == nil:
+		if _, derr := DecodeDescriptor(have); derr != nil {
+			return unreadable(filepath.Join(s.dir, descriptorsDir, file), derr)
+		}
+		if string(have) != string(data) {
+			return fmt.Errorf("%w: %s holds other content", ErrImmutable, strings.TrimSuffix(file, ".json"))
+		}
+		return nil
+	case !errors.Is(err, os.ErrNotExist):
+		return err
+	}
+	return writeFile(s.descriptors, file, data)
+}
