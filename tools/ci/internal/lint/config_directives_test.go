@@ -32,6 +32,26 @@ import (
 // linters, and theirs turn findings off.
 var allowedDirectives = []string{"go:build", "romeu:invariant"}
 
+// embedSites are the files that may hold a go:embed directive (02 2.1,
+// REQ-0129; ADR 0007: a new directive is a reviewed line here), each
+// named by path, and no other file may: kits/embed.go is the embed.FS of
+// the product kits. The catalog's file joins this list in T031. A
+// pattern in a site may not take the all: prefix, which would embed
+// dotfiles and files whose names begin with an underscore.
+var embedSites = []string{"kits/embed.go"}
+
+// embedPatterns returns the patterns of the //go:embed lines of src,
+// each line split on spaces.
+func embedPatterns(src []byte) []string {
+	var out []string
+	for line := range strings.SplitSeq(string(src), "\n") {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "//go:embed "); ok {
+			out = append(out, strings.Fields(rest)...)
+		}
+	}
+	return out
+}
+
 // toolDirective matches the start of a directive of the "tool:name"
 // form after directiveText has normalised the line: the shape go/ast
 // reads (isDirective in go/ast/ast.go, Go 1.27: "[a-z0-9]+:[a-z0-9]"),
@@ -182,6 +202,24 @@ func TestDisallowed(t *testing.T) {
 	}
 }
 
+// TestEmbedSites holds the embed allowance both ways: a go:embed in a
+// file that is not an embed site is reported, and the all: prefix is
+// read from the line.
+func TestEmbedSites(t *testing.T) {
+	src := "package p\n\nimport \"embed\"\n\n//go:embed julieta\nvar FS embed.FS\n"
+	path := filepath.Join(t.TempDir(), "elsewhere.go")
+	require.NoError(t, os.WriteFile(path, []byte(src), 0o644))
+	got, err := disallowed(path, allowedDirectives)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"directive go:embed"}, got, "go:embed outside embedSites is reported")
+	assert.Equal(t, []string{"julieta"}, embedPatterns([]byte(src)))
+	assert.Equal(t, []string{"all:julieta", "x"}, embedPatterns([]byte("//go:embed all:julieta x\n")))
+	assert.Empty(t, embedPatterns([]byte("// go:embed julieta\n")), "only the directive form is a pattern line")
+	for _, site := range embedSites {
+		assert.False(t, strings.HasPrefix(site, "/") || strings.Contains(site, "*"), "%s is a path, not a pattern", site)
+	}
+}
+
 // TestOnlyAllowedDirectives checks that each directive in the Go files
 // of the repository, the tracked ones and the ones not yet added, is one
 // of allowedDirectives (ADR 0007, rule 8): a finding is fixed in the
@@ -194,6 +232,14 @@ func TestOnlyAllowedDirectives(t *testing.T) {
 		allowed := allowedDirectives
 		if f == drift.Site {
 			allowed = append(slices.Clone(allowed), "go:generate")
+		}
+		if slices.Contains(embedSites, f) {
+			allowed = append(slices.Clone(allowed), "go:embed")
+			src, err := os.ReadFile(filepath.Join(root, f))
+			require.NoError(t, err)
+			for _, pattern := range embedPatterns(src) {
+				assert.False(t, strings.HasPrefix(pattern, "all:"), "%s embeds %s: the all: prefix takes dotfiles and underscore files", f, pattern)
+			}
 		}
 		bad, err := disallowed(filepath.Join(root, f), allowed)
 		require.NoError(t, err, "read %s", f)
