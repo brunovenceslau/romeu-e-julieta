@@ -3,7 +3,7 @@ id: T154
 title: "julieta status lists the recorded hook failures"
 milestone: M1
 module: julieta-core
-fate: new
+fate: merged
 owns:
   - internal/cmd/julieta/status/section_failures*.go
   - internal/cmd/julieta/status/report.go
@@ -25,9 +25,14 @@ needs:
 after: []
 ask_first: []
 sitting: none
+merged: 2026-10-21
+pr: 227
 ---
 
 # T154 - julieta status lists the recorded hook failures
+
+Merged on 2026-10-21 in pull request #227. The text below is the one
+written when it was built.
 
 Goal: `julieta status` lists the hook failures recorded in julieta
 state, as REQ-0424 and REQ-0675 say: SessionStart, `julieta status` and

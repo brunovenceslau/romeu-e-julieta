@@ -11,9 +11,10 @@ first from 2026-10-22", 01m5gywvgc85vj8k4txzppjz6d).
 
 1. The queue chosen for the session of 2026-10-22, third part, at
    most eight tasks, the critical path first: T021; then T033, T031,
-   T029 and T032, each stacked on the T021 branch; then T150, T154
-   and T053. T021 alone unblocks the four stacked ones: every other
-   need of theirs is merged (measured 2026-10-22).
+   T029 and T032, each stacked on the T021 branch; then T053; then
+   T040 stacked on T033, and T036 stacked on T031 after T053. T021
+   alone unblocks the four stacked on it: every other id in their
+   `needs` and `after` is merged (measured 2026-10-22).
 2. T077 once A12 is measured ("T077 waits for the A12 measurement",
    01m5gywvj5vj90yfedah9y670b).
 3. T161 once its open questions are answered and T088 is built (M6)
