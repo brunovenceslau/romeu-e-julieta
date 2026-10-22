@@ -36,12 +36,16 @@ owns:
   - docs/plan/tasks/T013-the-container-e2e-on-the-workload-s-base.md
   - docs/plan/tasks/T103-tools-release-build-dry-run.md
   - docs/plan/tasks/T152-the-go-fix-gate.md
+  - go.mod
+  - go.sum
 needs: []
 after:
+  - T060
   - T155
   - T150
 ask_first:
   - checks
+  - dependencies
 sitting: none
 ---
 
@@ -194,20 +198,24 @@ Taken on 2026-10-21, each with what reopens it:
   flags changed, not the set). `ROMEU_E2E_INFRA_FILE` stays: a file the
   harness writes is the one channel no text a test prints can reach
   (REQ-0798).
-- The coverage parser stays, with its reasons in the package doc of
-  `tools/ci/internal/coverage`, compared on the profile of a real race
-  run: 72 packages agree with the go command's `coverage:` lines within
-  its one-decimal rounding. Reopened by a profile reader in the standard
-  library or by an approved dependency (`golang.org/x/tools/cover`).
-- `ModuleRoot` (part 4) is not built on this branch. The probe (a package
-  under the root `internal/` imported from `tools/ci/internal/citest`)
-  was refused twice by `go run ./tools/ci imports`: `imports unnamed`
-  (REQ-0972) and `imports tools` (REQ-0971). The way the check intends
-  is a row in the table of 10 10.7, an allowance in `toolExtra` of
-  `tools/ci/internal/imports/rows.go` and a test of each side, and
-  that is built, but the module-tree check then also asks for a line in
-  the tree of 02 2.1 and a row in the module table of 12 12.2, two files
-  outside this task's `owns`. The work stands whole in the local commit
-  of the branch `wip/t156-part4` (`moduleroot.Find`; a new id, REQ-1256),
-  waiting for the maintainer to add those two files to `owns`. Reopened
-  by that decision.
+- The coverage parser. `golang.org/x/tools/cover` reads the profile in
+  place of the hand parser, as the maintainer approved on 2026-10-21; it
+  merges a block several test binaries list. The version is v0.51.0,
+  the one the module graph already selected, so no other requirement
+  moves. The check of the mode line stays, since the library reads an
+  empty profile as no profile and no error. Compared on the profile of
+  a real race run, and on a copy of it with every second block's count
+  set to 0: the findings of the hand parser and of the library are the
+  same (the pull request shows both). Reopened by a profile reader in
+  the standard library.
+- `ModuleRoot` (part 4). The imports check refused a package under the
+  root `internal/` imported from `tools/ci` (`imports unnamed`,
+  REQ-0972; `imports tools`, REQ-0971), so `internal/moduleroot` has a
+  row of its own in 10 10.7 (REQ-1256), an allowance in `toolExtra` of
+  `tools/ci/internal/imports/rows.go` for `tools/ci` and the e2e suite,
+  and a test of each side. The module-tree check also asks for its line
+  in the tree of 02 2.1 and its row in the module table of 12 12.2; the
+  maintainer added both files and `rows.go` to `owns` on 2026-10-21, and
+  `after` names T060, which owns 02 2.1 too. The function is
+  `moduleroot.Find`; `citest.ModuleRoot(t)` keeps its signature over
+  it. Reopened by a second consumer outside `tools/ci` and `e2e`.
