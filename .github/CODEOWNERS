@@ -12,6 +12,8 @@
 /internal/gate/** @brunovenceslau
 /internal/state/** @brunovenceslau
 /internal/spec/project.go @brunovenceslau
+/internal/spec/run.go @brunovenceslau
+/internal/spec/rules.go @brunovenceslau
 
 # gitsafe
 /internal/gitsafe/** @brunovenceslau
