@@ -33,7 +33,7 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 15 | [Adopt spf13/cobra for the command line of romeu and julieta](0015-adopt-spf13-cobra-for-the-command-line-of-romeu-and-julieta.md) | Accepted |
 | 16 | [Lint generated files and give each one the full generated header](0016-lint-generated-files-and-give-each-one-the-full-generated-header.md) | Accepted |
 | 17 | [Clone a secondary repo inside the sandbox with julieta](0017-clone-a-secondary-repo-inside-the-sandbox-with-julieta.md) | Proposed |
-| 18 | [Gate toolchain changes per machine and project widening per project](0018-gate-toolchain-changes-per-machine-and-project-widening-per-project.md) | Proposed |
+| 18 | [Gate toolchain changes per machine and project widening per project](0018-gate-toolchain-changes-per-machine-and-project-widening-per-project.md) | Accepted |
 | 19 | [Support kit schema v3 only](0019-support-kit-schema-v3-only.md) | Proposed |
 | 20 | [Render run layouts with herdr as the one renderer](0020-render-run-layouts-with-herdr-as-the-one-renderer.md) | Proposed |
 | 21 | [Keep memory as plain per-repo files](0021-keep-memory-as-plain-per-repo-files.md) | Accepted |
