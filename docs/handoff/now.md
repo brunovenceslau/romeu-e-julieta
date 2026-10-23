@@ -10,8 +10,8 @@ pull request and pushing to an open one on 2026-10-23
 
 ## Next steps
 
-1. Land #263 (T042, gate 1) once its CI is green; the e2e hang was a
-   prompt that dropped an answer typed at the question, fixed in gate.
+1. Land #263 (T042, gate 1), then re-run the failed macOS jobs of the
+   other pull requests (01m5n920r5d5hr6v48qch6mzns).
 2. Land #265 (T164), then the docs pull request of 03 3.4 and 05
    REQ-0464 (01m5n79kc411gxevqamd508scw).
 3. Land #264 and build T170; T161 once T088 is built
@@ -19,7 +19,7 @@ pull request and pushing to an open one on 2026-10-23
 4. The next tasks of `plan --ready` and `--critical-path`, with T038
    waiting on T077, which waits on A12
    (01m5gywvj5vj90yfedah9y670b).
-5. The pending notes, each when its trigger fires: 01m5n79kdbtk9dpq7y87sfkkaq,
+5. The pending notes, each when its trigger fires: 01m5n920q50b79dxxqe5ghss4r, 01m5n79kdbtk9dpq7y87sfkkaq,
    01m5gywvh9pdmte8k85q87wwdc, 01m5gywvk15asanh438p4mmwfs, 01m5gywvkw8rp4jj2cvctvzg57,
    01m5gz0rpmzwvmwqt9ebd95rfq, 01m5kfnpybcnf22gpxwws14g7x, 01m5kfnpzsnmv53xtkkhenqkz1,
    01m5kfnq16e2agrcfmg2e5qhh8, 01m5kgfdf3t5hd41trsv35dss5 (in T043).
