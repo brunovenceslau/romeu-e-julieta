@@ -19,7 +19,7 @@ lock the tools of a repo's mise.toml, or check that its mise.lock is fresh
 
 ### Synopsis
 
-Runs mise lock for the repo of the working directory, or of --repo, with --platform linux-x64,linux-arm64 and the platforms of the repo's lockfile_platforms setting, and rewrites mise.lock. With --check it writes nothing: it fails with exit 6 on a tool of mise.toml with no lock entry, on a lockable entry that lacks linux-x64 or linux-arm64, on an entry without a well-formed sha256 checksum (unless .julieta/lock-exceptions excuses its tool) and on a file that does not parse.
+Runs mise lock for the repo of the working directory, or of --repo, with --platform linux-x64,linux-arm64 and the platforms of the repo's lockfile_platforms setting, and rewrites mise.lock. With --check it writes nothing: it fails with exit 6 on a tool of mise.toml with no lock entry, on a lockable entry that lacks linux-x64 or linux-arm64, on an entry without a well-formed sha256 checksum (unless .julieta/lock-exceptions excuses its tool) and on a file that does not parse. It warns lock-unknown-tool, and still passes, for a backend:tool the embedded egress catalog does not have.
 
 ```
 julieta lock [flags]

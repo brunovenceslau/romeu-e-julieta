@@ -41,7 +41,10 @@ step checksums grep -c 'checksum = "sha256:' mise.lock
 	r = step(t, steps, "check")
 	require.Equal(t, 0, r.code, r.stderr)
 	assert.Equal(t, "lock api ok\n", r.stdout)
-	assert.Empty(t, r.stderr)
+	// The tool http:hello is in no catalog entry: the one warning, which does not
+	// fail the check (07 7.3, REQ-0620).
+	assert.Equal(t, 1, strings.Count(r.stderr, "\n"), r.stderr)
+	assert.True(t, strings.HasPrefix(r.stderr, "warning lock-unknown-tool: http:hello "), r.stderr)
 	assert.Equal(t, "3", strings.TrimSpace(step(t, steps, "checksums").stdout), "mise records the checksum the mise.toml names on each platform")
 }
 
