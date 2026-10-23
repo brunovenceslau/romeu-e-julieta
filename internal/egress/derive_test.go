@@ -178,6 +178,15 @@ func TestDeriveSteps(t *testing.T) {
 			gated: []egress.Gate{gate("api.github.com", egress.ReasonUpload), gate("github.com", egress.ReasonUpload), gate("nodejs.org", egress.ReasonUpload)},
 		},
 		{
+			// A platform table that records no url (a version-only entry
+			// with a checksum) adds no host and is no error.
+			name: "a platform with no url adds no host",
+			repos: []egress.Repo{repoOf("api", map[string]string{"mise.toml": toml,
+				"mise.lock": "lockfile_version = 3\n\n[[tools.go]]\nversion = \"1.0.0\"\nbackend = \"core:go\"\n\n[tools.go.\"platforms.linux-x64\"]\nchecksum = \"sha256:" + strings.Repeat("a", 64) + "\"\n"})},
+			auto:  append([]string{"dl.google.com", "proxy.golang.org"}, metaAuto...),
+			gated: []egress.Gate{gate("api.github.com", egress.ReasonUpload), gate("github.com", egress.ReasonUpload), gate("storage.googleapis.com", egress.ReasonUpload)},
+		},
+		{
 			name: "a lock without a mise.toml is still read",
 			repos: []egress.Repo{repoOf("api", map[string]string{
 				"mise.lock": lockOf([3]string{"go", "core:go", "https://mirror.acme.dev/go.tar.gz"})})},
@@ -330,6 +339,7 @@ func TestDeriveLockHostInvalid(t *testing.T) {
 		{"no host", "https:///go.tar.gz"},
 		{"not a url", "://x"},
 		{"a wildcard", "https://*.google.com/go.tar.gz"},
+		{"user information", "https://user@dl.google.com/x"},
 		{"a backslash", `https://dl.google.com\\@evil.example/go.tar.gz`},
 	}
 	for _, tt := range tests {

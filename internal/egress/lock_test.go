@@ -62,6 +62,7 @@ func TestParseLockRefuses(t *testing.T) {
 		{"an unknown top-level table", []byte(head + "[surprise]\nx = 1\n"), "surprise"},
 		{"not toml", []byte("lockfile_version = \n"), "mise.lock"},
 		{"over the cap", []byte("# " + strings.Repeat("x", egress.MaxFileSize) + "\n"), "cap"},
+		{"one byte over the cap", lockOfSize(egress.MaxFileSize + 1), "cap"},
 		{"an unknown layout version", []byte("lockfile_version = 4\n"), "lockfile_version"},
 		{"no layout version", []byte("[[tools.go]]\nversion = \"1\"\n"), "lockfile_version"},
 		{"nesting past the cap", []byte(head + "x = " + strings.Repeat("[", 64) + strings.Repeat("]", 64) + "\n"), "nesting"},
@@ -81,6 +82,21 @@ func TestParseLockRefuses(t *testing.T) {
 			assert.Empty(t, lock.Tools, "no partial result")
 		})
 	}
+}
+
+// TestParseLockAtTheCap: a lock of exactly MaxFileSize bytes is read; one
+// byte more is refused (TestParseLockRefuses).
+func TestParseLockAtTheCap(t *testing.T) {
+	data := lockOfSize(egress.MaxFileSize)
+	require.Len(t, data, egress.MaxFileSize)
+	_, err := egress.ParseLock(data)
+	require.NoError(t, err)
+}
+
+// lockOfSize is a valid empty lock padded with a comment to n bytes.
+func lockOfSize(n int) []byte {
+	const head = "lockfile_version = 3\n"
+	return []byte("#" + strings.Repeat("x", n-len(head)-2) + "\n" + head)
 }
 
 // TestFixtureIsTheMiseOne: 10 10.7 forbids egress to import mise, so
