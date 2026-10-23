@@ -102,23 +102,25 @@ func TestInitRefusesToOverwriteSettings(t *testing.T) {
 // REQ-0375): no settings, no state directory, no root.
 func TestInitRefusesAnUnsafeRoot(t *testing.T) {
 	cases := []struct {
-		name string
-		root func(e *romeu.Env) string
+		name   string
+		root   func(e *romeu.Env) string
+		reason string
 	}{
 		{"inside a git repository", func(e *romeu.Env) string {
 			require.NoError(t, os.MkdirAll(filepath.Join(e.Home, "dotfiles", ".git"), 0o700))
 			return filepath.Join(e.Home, "dotfiles", "dev")
-		}},
-		{"equal to HOME", func(e *romeu.Env) string { return e.Home }},
-		{"holding the settings", func(e *romeu.Env) string { return e.ConfigHome }},
-		{"holding the state", func(e *romeu.Env) string { return e.StateHome }},
-		{"not absolute", func(*romeu.Env) string { return "dev" }},
+		}, "the root is inside the git repository at"},
+		{"equal to HOME", func(e *romeu.Env) string { return e.Home }, "the root is $HOME"},
+		{"holding the settings", func(e *romeu.Env) string { return e.ConfigHome }, "the root holds the host settings"},
+		{"holding the state", func(e *romeu.Env) string { return e.StateHome }, "the root holds the host state"},
+		{"not absolute", func(*romeu.Env) string { return "dev" }, "the root is not an absolute, clean path"},
 	}
 	if os.Geteuid() != 0 { // root owns /usr
 		cases = append(cases, struct {
-			name string
-			root func(e *romeu.Env) string
-		}{"not owned by the user", func(*romeu.Env) string { return "/usr" }})
+			name   string
+			root   func(e *romeu.Env) string
+			reason string
+		}{"not owned by the user", func(*romeu.Env) string { return "/usr" }, "the root is not owned by the user"})
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -129,6 +131,7 @@ func TestInitRefusesAnUnsafeRoot(t *testing.T) {
 
 			assert.Equal(t, 2, res.Code, res.Stderr)
 			assert.Contains(t, res.Stderr, "root-unsafe")
+			assert.Contains(t, res.Stderr, tc.reason)
 			assert.NoFileExists(t, e.Settings())
 			assert.NoDirExists(t, e.StateDir())
 			if filepath.IsAbs(root) && root != "/usr" {
@@ -220,8 +223,9 @@ func TestInitConfigProjectMissing(t *testing.T) {
 			assert.Equal(t, 2, res.Code, res.Stderr)
 			assert.Contains(t, res.Stderr, "RJ-346")
 			assert.NoFileExists(t, e.Settings())
-			entries, _ := os.ReadDir(filepath.Join(e.Root, "cfg-env"))
-			assert.Empty(t, entries)
+			envs, err := filepath.Glob(filepath.Join(e.Root, "*-env", "*"))
+			require.NoError(t, err)
+			assert.Empty(t, envs, "no clone and no staging directory")
 		})
 	}
 }

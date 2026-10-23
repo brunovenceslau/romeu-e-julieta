@@ -114,3 +114,15 @@ func runGit(t *testing.T, e *romeu.Env, dir string, args ...string) string {
 	require.NoError(t, err, string(out))
 	return string(out)
 }
+
+// TestEnvRunStdin hands the input to the command: romeu reads none of it
+// yet, so the run ends as it does without one, and Run is RunStdin with
+// an empty input.
+func TestEnvRunStdin(t *testing.T) {
+	e := romeu.New(t, nil)
+
+	res := e.RunStdin(t, "yes\n", []string{"version"})
+
+	assert.Equal(t, 0, res.Code, res.Stderr)
+	assert.Contains(t, res.Stdout, "protocol")
+}

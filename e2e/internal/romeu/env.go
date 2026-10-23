@@ -19,8 +19,10 @@ package romeu
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/moduleroot"
@@ -143,12 +145,24 @@ func (e *Env) Environ(extra ...string) []string {
 // start is a failure of the test; a non-zero exit is the Result's Code.
 func (e *Env) Run(tb testing.TB, args []string, extra ...string) Result {
 	tb.Helper()
+	return e.RunStdin(tb, "", args, extra...)
+}
+
+// RunStdin is Run with stdin as the standard input of romeu, for a
+// command that reads an answer; an empty stdin is an empty input.
+func (e *Env) RunStdin(tb testing.TB, stdin string, args []string, extra ...string) Result {
+	tb.Helper()
+	var in io.Reader
+	if stdin != "" {
+		in = strings.NewReader(stdin)
+	}
 	var stdout, stderr bytes.Buffer
 	err := procgroup.Run(tb.Context(), procgroup.Command{
 		Class:  procgroup.ToolStep,
 		Argv:   append([]string{e.Romeu}, args...),
 		Dir:    e.Home,
 		Env:    e.Environ(extra...),
+		Stdin:  in,
 		Stdout: &stdout, Stderr: &stderr,
 	})
 	res := Result{Stdout: stdout.String(), Stderr: stderr.String()}
