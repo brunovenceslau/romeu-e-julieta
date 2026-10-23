@@ -13,11 +13,12 @@
 package golden
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"regexp"
 	"strconv"
@@ -40,13 +41,9 @@ const workflowsDir = ".github/workflows/"
 // toolsCIDir holds tools/ci, whose steps are the commands CI runs.
 const toolsCIDir = "tools/ci/"
 
-// updateWord finds the flag in a workflow line: -update or --update,
-// alone or with a value, as a word of a command.
-var updateWord = regexp.MustCompile(`(?:^|[\s'"])--?update(?:[=\s'"]|$)`)
-
-// updateLiteral finds the flag as a Go string literal in the source of
-// tools/ci, an argument of a step it runs.
-var updateLiteral = regexp.MustCompile(`"--?update(?:=[^"]*)?"`)
+// updateWord finds the flag as a word of a command: -update, --update
+// or the -test.update form go test passes on, alone or with a value.
+var updateWord = regexp.MustCompile(`(?:^|[\s'"])--?(?:test\.)?update(?:[=\s'"]|$)`)
 
 // bases are the refs whose merge base with the commit the changed
 // goldens are listed against, the first that resolves.
@@ -134,31 +131,50 @@ func Dirs(files []check.TreeFile) ([]string, error) {
 	return nil, fmt.Errorf("golden: %s has no Golden row", SpecPath)
 }
 
-// UpdateFindings returns a finding for each line of a workflow, and each
-// string literal of the source of tools/ci outside its tests, that
-// passes -update: CI never rewrites a golden (REQ-0942).
+// UpdateFindings returns a finding for each command line of a workflow,
+// and each string literal of the source of tools/ci outside its tests,
+// that passes -update: CI never rewrites a golden (REQ-0942). These are
+// the two places a CI invocation is written: the workflows call
+// tools/ci, and tools/ci builds every command a step runs. A comment
+// line of a workflow, or a Go comment, is prose and is not judged.
 func UpdateFindings(files []check.TreeFile) []check.Finding {
 	var out []check.Finding
+	add := func(path string, line int) {
+		out = append(out, check.Finding{
+			Where: path + ":" + strconv.Itoa(line),
+			Rule:  "update-in-ci",
+			Msg:   "a CI invocation passes the flag that rewrites the goldens; they change only locally (REQ-0942)",
+		})
+	}
 	for _, f := range files {
-		var re *regexp.Regexp
 		switch {
 		case strings.HasPrefix(f.Path, workflowsDir) && (strings.HasSuffix(f.Path, ".yml") || strings.HasSuffix(f.Path, ".yaml")):
-			re = updateWord
-		case strings.HasPrefix(f.Path, toolsCIDir) && strings.HasSuffix(f.Path, ".go") && !strings.HasSuffix(f.Path, "_test.go"):
-			re = updateLiteral
-		default:
-			continue
-		}
-		sc := bufio.NewScanner(bytes.NewReader(f.Content))
-		sc.Buffer(nil, len(f.Content)+1)
-		for n := 1; sc.Scan(); n++ {
-			if re.Match(sc.Bytes()) {
-				out = append(out, check.Finding{
-					Where: f.Path + ":" + strconv.Itoa(n),
-					Rule:  "update-in-ci",
-					Msg:   "a CI invocation passes the flag that rewrites the goldens; they change only locally (REQ-0942)",
-				})
+			n := 0
+			for line := range strings.Lines(string(f.Content)) {
+				n++
+				if !strings.HasPrefix(strings.TrimSpace(line), "#") && updateWord.MatchString(line) {
+					add(f.Path, n)
+				}
 			}
+		case strings.HasPrefix(f.Path, toolsCIDir) && strings.HasSuffix(f.Path, ".go") && !strings.HasSuffix(f.Path, "_test.go"):
+			fset := token.NewFileSet()
+			file, err := parser.ParseFile(fset, f.Path, f.Content, parser.SkipObjectResolution)
+			if err != nil {
+				// A file that does not parse fails vet and the build; the
+				// line holds the place to look.
+				add(f.Path, 1)
+				continue
+			}
+			ast.Inspect(file, func(n ast.Node) bool {
+				lit, ok := n.(*ast.BasicLit)
+				if !ok || lit.Kind != token.STRING {
+					return true
+				}
+				if v, err := strconv.Unquote(lit.Value); err == nil && updateWord.MatchString(v) {
+					add(f.Path, fset.Position(lit.Pos()).Line)
+				}
+				return true
+			})
 		}
 	}
 	return out

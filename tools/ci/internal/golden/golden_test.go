@@ -62,11 +62,13 @@ func TestDirsOfThisRepository(t *testing.T) {
 // longer word is not.
 func TestUpdateFindings(t *testing.T) {
 	files := tree(map[string]string{
-		".github/workflows/ci.yml":         "jobs:\n  a:\n    steps:\n      - run: go test ./... -update\n      - run: go test -run X --update=true ./x\n      - run: ./update-checker -updated\n",
+		".github/workflows/ci.yml": "jobs:\n  a:\n    steps:\n      - run: go test ./... -update\n      - run: go test -run X --update=true ./x\n" +
+			"      - run: ./update-checker -updated\n      # never pass -update here\n      - run: go test -test.update ./x\n",
 		".github/workflows/x64.yaml":       "      - run: 'go test \"-update\" ./...'\n",
 		".github/workflows/README.md":      "go test -update\n",
 		"tools/ci/internal/race/race.go":   "package race\n\nvar argv = []string{\"test\", \"-update\"}\nvar ok = []string{\"-updated\"}\n",
-		"tools/ci/internal/race/x.go":      "package race\n\nvar v = []string{\"--update=1\"}\n",
+		"tools/ci/internal/race/x.go":      "package race\n\n// go test -update is never run here.\nvar v = []string{\"--update=1\"}\nvar line = \"go test -update ./...\"\nvar raw = `-test.update`\n",
+		"tools/ci/internal/race/bad.go":    "package race\n\nfunc {\n",
 		"tools/ci/internal/race/x_test.go": "package race\n\nvar argv = []string{\"-update\"}\n",
 		"internal/render/render_test.go":   "var update = flag.Bool(\"update\", false, \"\")\n// go test -update\n",
 	})
@@ -78,9 +80,13 @@ func TestUpdateFindings(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		".github/workflows/ci.yml:4",
 		".github/workflows/ci.yml:5",
+		".github/workflows/ci.yml:8",
 		".github/workflows/x64.yaml:1",
 		"tools/ci/internal/race/race.go:3",
-		"tools/ci/internal/race/x.go:3",
+		"tools/ci/internal/race/x.go:4",
+		"tools/ci/internal/race/x.go:5",
+		"tools/ci/internal/race/x.go:6",
+		"tools/ci/internal/race/bad.go:1",
 	}, where)
 }
 
