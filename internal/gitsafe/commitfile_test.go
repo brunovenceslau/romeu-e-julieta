@@ -7,6 +7,7 @@ package gitsafe
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -108,17 +109,18 @@ func TestCommitFileRefuses(t *testing.T) {
 	tests := []struct {
 		name, commit, path string
 		want               string
+		file               bool // the refusal is of the file, ErrFileRefused
 	}{
-		{"a branch name", "HEAD", "big", "not a full object id"},
-		{"an empty path", c, "", "not a literal path"},
-		{"a pathspec", c, ":(top)big", "not a literal path"},
-		{"a glob", c, "b*", "not a literal path"},
-		{"a parent path", c, "../big", "not a clean relative path"},
-		{"a negative limit", c, "big", "negative limit"},
-		{"a file over the limit", c, "big", "more than 10 bytes"},
-		{"a symbolic link", c, "link", "not a regular file"},
-		{"a gitlink", c, "module", "not a regular file"},
-		{"a directory", c, "dir", "not a regular file"},
+		{"a branch name", "HEAD", "big", "not a full object id", false},
+		{"an empty path", c, "", "not a literal path", false},
+		{"a pathspec", c, ":(top)big", "not a literal path", false},
+		{"a glob", c, "b*", "not a literal path", false},
+		{"a parent path", c, "../big", "not a clean relative path", false},
+		{"a negative limit", c, "big", "negative limit", false},
+		{"a file over the limit", c, "big", "more than 10 bytes", true},
+		{"a symbolic link", c, "link", "not a regular file", true},
+		{"a gitlink", c, "module", "not a regular file", true},
+		{"a directory", c, "dir", "not a regular file", true},
 	}
 	for _, tt := range tests {
 		t.Run(strings.ReplaceAll(tt.name, " ", "_"), func(t *testing.T) {
@@ -129,6 +131,7 @@ func TestCommitFileRefuses(t *testing.T) {
 			_, _, err := r.CommitFile(t.Context(), dir, tt.commit, tt.path, limit)
 			require.ErrorIs(t, err, ErrRefused)
 			assert.Contains(t, err.Error(), tt.want)
+			assert.Equal(t, tt.file, errors.Is(err, ErrFileRefused))
 		})
 	}
 }

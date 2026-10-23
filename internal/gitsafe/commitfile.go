@@ -5,11 +5,24 @@ package gitsafe
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 )
+
+// ErrFileRefused is wrapped, with ErrRefused, by CommitFile for a refusal
+// of the file itself (not a regular file, over the limit), as opposed to
+// one of its arguments (the repository, the commit, the path or the
+// limit). A caller that reads a file a repo may or may not shape as
+// expected tells the two apart with it.
+var ErrFileRefused = errors.New("gitsafe: the file is refused")
+
+// fileRefused is the error of a file CommitFile refuses.
+func fileRefused(format string, args ...any) error {
+	return fmt.Errorf("%w: %w: %s", ErrRefused, ErrFileRefused, fmt.Sprintf(format, args...))
+}
 
 // CommitFile returns the bytes of the regular file name in the tree of
 // commit in the repository in dir, and whether the commit holds one: a
@@ -20,7 +33,7 @@ import (
 // it; commit is a full object id. A file that is a symbolic link, a
 // gitlink or a directory is refused, and so is one of more than limit
 // bytes, which is refused by the size ls-tree reports, before git reads
-// the blob; each is ErrRefused.
+// the blob; each is ErrRefused, and ErrFileRefused as well.
 func (r *Runner) CommitFile(ctx context.Context, dir, commit, name string, limit int) ([]byte, bool, error) {
 	if err := checkRepo(dir); err != nil {
 		return nil, false, err
@@ -56,17 +69,17 @@ func (r *Runner) CommitFile(ctx context.Context, dir, commit, name string, limit
 			return nil, false, fmt.Errorf("%w: ls-tree entry %q", ErrRefused, rec)
 		}
 		if (f[0] != modeFile && f[0] != modeExecutable) || f[1] != "blob" {
-			return nil, false, fmt.Errorf("%w: %s is not a regular file in the commit (mode %s %s)", ErrRefused, name, f[0], f[1])
+			return nil, false, fileRefused("%s is not a regular file in the commit (mode %s %s)", name, f[0], f[1])
 		}
 		if err := checkObjectID(f[2]); err != nil {
 			return nil, false, err
 		}
 		size, err := strconv.Atoi(f[3])
 		if err != nil || size < 0 {
-			return nil, false, fmt.Errorf("%w: %s has the size %q", ErrRefused, name, f[3])
+			return nil, false, fileRefused("%s has the size %q", name, f[3])
 		}
 		if size > limit {
-			return nil, false, fmt.Errorf("%w: %s is more than %d bytes in the commit", ErrRefused, name, limit)
+			return nil, false, fileRefused("%s is more than %d bytes in the commit", name, limit)
 		}
 		oid = f[2]
 	}
@@ -81,7 +94,7 @@ func (r *Runner) CommitFile(ctx context.Context, dir, commit, name string, limit
 		return nil, false, err
 	}
 	if out.truncated || out.buf.Len() > limit {
-		return nil, false, fmt.Errorf("%w: %s is more than %d bytes in the commit", ErrRefused, name, limit)
+		return nil, false, fileRefused("%s is more than %d bytes in the commit", name, limit)
 	}
 	return slices.Clone(out.buf.Bytes()), true, nil
 }
