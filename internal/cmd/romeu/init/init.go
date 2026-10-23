@@ -181,23 +181,56 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 	if err := os.Chmod(envDir, dirMode); err != nil {
 		return fmt.Errorf("init: %w", err)
 	}
-	dest, err := cloneConfig(ctx, cmd, g, h, envDir)
-	if err != nil {
-		return err
-	}
-
+	// The settings are encoded and their directory and temporary file
+	// made before the clone, so that a settings directory init cannot
+	// write fails here, with nothing cloned.
 	data, err := spec.EncodeHostSettings(h)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(settings), dirMode); err != nil {
-		return fmt.Errorf("init: %w", err)
+	pending, err := prepareSettings(cmd, settings)
+	if err != nil {
+		return err
 	}
-	if err := renameio.WriteFile(settings, data, 0o600); err != nil {
-		return fmt.Errorf("init: the settings: %w", err)
+	defer func() { _ = pending.Cleanup() }()
+	dest, err := cloneConfig(ctx, cmd, g, h, envDir)
+	if err != nil {
+		return err
+	}
+	if err := commitSettings(cmd, pending, data); err != nil {
+		// dest is this run's clone: absent proved <envDir>/<dir> did not
+		// exist, so nothing of the operator's goes with it.
+		return errors.Join(err, os.RemoveAll(dest))
 	}
 	_, err = fmt.Fprintf(env.Stdout, "settings  %s\nroot      %s\nconfig    %s\n", termsafe.Escape(settings), termsafe.Escape(h.Root), termsafe.Escape(dest))
 	return err
+}
+
+// prepareSettings makes the directory of settings, mode 0700, and the
+// temporary file the settings are written to, mode 0600. A directory or
+// a file init cannot make is settings-unwritable: a precondition (exit
+// 2, as usage, since 04 4.4 has no row for it) and not an internal error.
+func prepareSettings(cmd *cobra.Command, settings string) (*renameio.PendingFile, error) {
+	if err := os.MkdirAll(filepath.Dir(settings), dirMode); err != nil {
+		return nil, refuse(cmd, "settings-unwritable", err.Error())
+	}
+	pf, err := renameio.NewPendingFile(settings, renameio.WithStaticPermissions(0o600))
+	if err != nil {
+		return nil, refuse(cmd, "settings-unwritable", err.Error())
+	}
+	return pf, nil
+}
+
+// commitSettings writes data to the pending file and moves it to its
+// place, atomically.
+func commitSettings(cmd *cobra.Command, pf *renameio.PendingFile, data []byte) error {
+	if _, err := pf.Write(data); err != nil {
+		return refuse(cmd, "settings-unwritable", err.Error())
+	}
+	if err := pf.CloseAtomicallyReplace(); err != nil {
+		return refuse(cmd, "settings-unwritable", err.Error())
+	}
+	return nil
 }
 
 // absent refuses settings that exist: init never overwrites them.
@@ -229,7 +262,8 @@ func build(cmd *cobra.Command, o options, home string) (spec.HostSettings, error
 	if o.root == "" {
 		o.root = filepath.Join(home, "dev")
 	}
-	if !filepath.IsAbs(o.root) || filepath.Clean(o.root) != o.root {
+	o.root = filepath.Clean(o.root) // a trailing slash is no fault
+	if !filepath.IsAbs(o.root) {
 		return zero, refuse(cmd, "root-unsafe", "the root is not an absolute, clean path")
 	}
 	root, err := realPath(o.root)
@@ -285,7 +319,9 @@ func tools(cmd *cobra.Command, h *spec.HostSettings, home string) (*gitsafe.Runn
 // cloneConfig clones the config repo under envDir, reads the config
 // project's spec at the ref, and moves the clone to <envDir>/<dir>, dir
 // being the config repo's own entry under repos (03 3.2). It returns
-// the path of the clone. Nothing is left behind on a failure.
+// the path of the clone. A failure of its own leaves nothing behind; once
+// it returns the path, the clone is in place and removing it, if a later
+// step fails, is the caller's.
 func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h spec.HostSettings, envDir string) (string, error) {
 	stage, err := os.MkdirTemp(envDir, ".init-")
 	if err != nil {

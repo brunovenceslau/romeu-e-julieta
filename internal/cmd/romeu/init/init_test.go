@@ -287,3 +287,87 @@ func TestRootProblem(t *testing.T) {
 		assert.Contains(t, rootProblem("/usr", home, settings, state), "not owned")
 	}
 }
+
+// TestInitSettingsDirUnwritable: a settings directory init cannot write
+// leaves no clone and no settings, is a precondition (exit 2,
+// settings-unwritable) and not an internal error, and the retry after the
+// mode is fixed succeeds.
+func TestInitSettingsDirUnwritable(t *testing.T) {
+	if os.Geteuid() == 0 {
+		return // root writes into a 0500 directory
+	}
+	m := newMachine(t, projectSpec)
+	dir := filepath.Dir(m.settings())
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	require.NoError(t, os.Chmod(dir, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	args := []string{"--config-url", "https://github.com/owner/cfg"}
+
+	code, _, stderr := m.init(t, args...)
+
+	assert.Equal(t, 2, code, stderr)
+	assert.Contains(t, stderr, "settings-unwritable")
+	assert.NotContains(t, stderr, "RJ-348")
+	assert.NoFileExists(t, m.settings())
+	assert.NoDirExists(t, filepath.Join(m.home, "dev", "cfg-env", "cfg"))
+	entries, err := os.ReadDir(filepath.Join(m.home, "dev", "cfg-env"))
+	require.NoError(t, err)
+	assert.Empty(t, entries, "no clone and no staging directory")
+
+	require.NoError(t, os.Chmod(dir, 0o700))
+	code, _, stderr = m.init(t, args...)
+
+	require.Equal(t, 0, code, stderr)
+	assert.FileExists(t, m.settings())
+	assert.DirExists(t, filepath.Join(m.home, "dev", "cfg-env", "cfg", ".git"))
+}
+
+// TestInitSettingsWriteFailsAfterTheClone: when the settings cannot be
+// moved into place once the clone is in place (here a directory appears
+// at their path meanwhile), the clone this run made is removed, and the
+// error is a precondition, not an internal one.
+func TestInitSettingsWriteFailsAfterTheClone(t *testing.T) {
+	m := newMachine(t, projectSpec)
+	clone := cloneRepo
+	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest string) error {
+		if err := clone(ctx, g, url, dest); err != nil {
+			return err
+		}
+		return os.MkdirAll(filepath.Join(m.settings(), "x"), 0o700)
+	}
+
+	code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/cfg")
+
+	assert.Equal(t, 2, code, stderr)
+	assert.Contains(t, stderr, "settings-unwritable")
+	assert.NoDirExists(t, filepath.Join(m.home, "dev", "cfg-env", "cfg"))
+}
+
+// TestInitRootWithTrailingSlash: a trailing slash is cleaned, not refused.
+func TestInitRootWithTrailingSlash(t *testing.T) {
+	m := newMachine(t, projectSpec)
+	root := filepath.Join(m.home, "tree") + "/"
+
+	code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/cfg", "--root", root)
+
+	require.Equal(t, 0, code, stderr)
+	assert.DirExists(t, filepath.Join(m.home, "tree", "cfg-env", "cfg", ".git"))
+}
+
+// TestRootProblemUnreadableParent: a directory the root's path cannot be
+// searched in is unsafe, not "no repository" (a .git it cannot see).
+func TestRootProblemUnreadableParent(t *testing.T) {
+	if os.Geteuid() == 0 {
+		return // root reads every directory
+	}
+	tmp, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	locked := filepath.Join(tmp, "locked")
+	require.NoError(t, os.Mkdir(locked, 0o700))
+	require.NoError(t, os.Chmod(locked, 0o000))
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o700) })
+
+	got := rootProblem(filepath.Join(locked, "dev"), filepath.Join(tmp, "home"), "/s/settings.yaml", "/s/state")
+
+	assert.Contains(t, got, "cannot be checked for a git repository")
+}

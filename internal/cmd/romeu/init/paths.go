@@ -81,8 +81,12 @@ func rootProblem(root, home, settings, state string) string {
 		return "the root holds the host state"
 	}
 	for dir := root; ; dir = filepath.Dir(dir) {
-		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
+		_, err := os.Lstat(filepath.Join(dir, ".git"))
+		switch {
+		case err == nil:
 			return "the root is inside the git repository at " + dir
+		case !errors.Is(err, fs.ErrNotExist):
+			return "the root cannot be checked for a git repository: " + err.Error()
 		}
 		if filepath.Dir(dir) == dir {
 			break
