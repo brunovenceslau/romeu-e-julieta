@@ -17,13 +17,15 @@ Scope: this repository.
 - The volumes the workload declares are
   `/home/agent/.claude/projects` (2g), `sessions`, `todos`,
   `shell-snapshots` and `statsig` below `/home/agent/.claude` (512m
-  each), and `/var/lib/docker`; none survived `sbx rm` and a recreate of
-  the same name (markers absent after the recreate). The volume list of
-  06 6.2 (REQ-0580) and the volume row of 01 1.2 say what a recreate
-  keeps is the A12 record; the list `rm` and `recreate` print and the
-  word `retire` says are to be written from this result. The probe ran
-  `sbx rm`, where 11 11.1 names `sbx env rm`.
+  each), and `/var/lib/docker`. Measured: no volume survives `sbx rm`
+  and a same-name `sbx create` (plain sandboxes made by `sbx create`, no
+  `sbxenv.yaml`, removed with `sbx rm -f`; markers absent after the
+  create). Not measured: what survives `sbx env rm` and a recreate,
+  which A12 (11 11.1) asks for and which 06 6.2 (REQ-0580) and the
+  volume row of 01 1.2 read. No conclusion about those rules is drawn
+  from the `sbx rm` result.
 
 Reopen: a kit with an ssh-agent capability built at a sitting (T081, or
-B2), for the first part; the first task that prints the volume list of
+B2), for the first part; the next sitting that can run `sbx env rm` and
+a recreate on an env, or the first task that prints the volume list of
 `rm`, `recreate` or `retire` (04 4.2), for the second.
