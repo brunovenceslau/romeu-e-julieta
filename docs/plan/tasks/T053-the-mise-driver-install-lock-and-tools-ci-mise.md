@@ -3,7 +3,7 @@ id: T053
 title: "The mise driver: `install`, `lock` and `tools/ci mise`"
 milestone: M2
 module: julieta-core
-fate: kept
+fate: merged
 owns:
   - internal/mise/**
   - internal/cmd/julieta/install/**
@@ -38,9 +38,14 @@ ask_first:
   - contracts
   - dependencies
 sitting: none
+merged: 2026-10-23
+pr: 250
 ---
 
 # T053 - The mise driver: `install`, `lock` and `tools/ci mise`
+
+Merged on 2026-10-23 in pull request #250. The text below is the one
+written when it was built.
 
 Goal: The mise driver: `install`, `lock`, `lock --check`, the mise
 environment of 04 4.3, `tools/ci mise`, and the `pre-commit` action

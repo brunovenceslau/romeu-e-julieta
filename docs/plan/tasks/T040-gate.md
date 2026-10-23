@@ -3,7 +3,7 @@ id: T040
 title: "`gate`"
 milestone: M3
 module: gate
-fate: kept
+fate: merged
 owns:
   - internal/gate/**
 needs:
@@ -15,9 +15,14 @@ after:
 ask_first:
   - gates
 sitting: none
+merged: 2026-10-23
+pr: 253
 ---
 
 # T040 - `gate`
+
+Merged on 2026-10-23 in pull request #253. The text below is the one
+written when it was built.
 
 Goal: `gate`.
 

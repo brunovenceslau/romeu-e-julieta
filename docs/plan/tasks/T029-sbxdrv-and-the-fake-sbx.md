@@ -3,7 +3,7 @@ id: T029
 title: "`sbxdrv` and the fake `sbx`"
 milestone: M3
 module: sbxdrv
-fate: kept
+fate: merged
 owns:
   - internal/sbxdrv/**
   - e2e/fakesbx/**
@@ -18,9 +18,14 @@ ask_first:
   - sbxdrv
   - contracts
 sitting: none
+merged: 2026-10-23
+pr: 251
 ---
 
 # T029 - `sbxdrv` and the fake `sbx`
+
+Merged on 2026-10-23 in pull request #251. The text below is the one
+written when it was built.
 
 Earlier title: `sbxdrv`.
 
