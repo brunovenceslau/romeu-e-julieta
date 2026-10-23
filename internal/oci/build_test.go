@@ -169,6 +169,19 @@ func TestNormalizeGroupsAndOptional(t *testing.T) {
 	}, kit.Capabilities.Ports)
 }
 
+func TestNormalizeFlagsAreASet(t *testing.T) {
+	one := minimal + "capabilities:\n  - type: " + typePrivileged + "\n  - type: " + typeLongRunning + "\n"
+	other := minimal + "capabilities:\n  - type: " + typeLongRunning + "\n  - type: " + typePrivileged + "\n  - type: " + typeLongRunning + "\n"
+
+	a, err := ParseDescriptor([]byte(one))
+	require.NoError(t, err)
+	b, err := ParseDescriptor([]byte(other))
+	require.NoError(t, err)
+
+	assert.Equal(t, []Flag{{Type: typeLongRunning}, {Type: typePrivileged}}, a.Capabilities.Flags)
+	assert.Equal(t, a.Capabilities.Flags, b.Capabilities.Flags, "the order and a repeat move nothing")
+}
+
 func TestNormalizeKeepsReferencesAsWritten(t *testing.T) {
 	kit, err := ParseDescriptor(capability(typePort, `{container: "${{ kit.args.port }}", transport: "${{ kit.args.t }}"}`))
 

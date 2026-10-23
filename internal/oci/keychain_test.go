@@ -36,6 +36,11 @@ var allowedFromLibrary = []string{
 	ggcr + "pkg/v1/remote", ggcr + "pkg/v1/remote/transport",
 }
 
+// credentialModules are the modules the library links for its keychain:
+// the Docker config and the credential helpers. No package of the module
+// imports them.
+var credentialModules = []string{"github.com/docker/cli/", "github.com/docker/docker-credential-helpers"}
+
 // keychainNames are the selectors that bring credentials into a request.
 var keychainNames = []string{"DefaultKeychain", "NewMultiKeychain", "WithAuthFromKeychain", "NewKeychainFromHelper", "Basic", "Bearer", "FromConfig"}
 
@@ -61,6 +66,10 @@ func findCredentialUse(t *testing.T, root string) []string {
 			names := map[string]string{} // local name -> import path
 			for _, imp := range file.Imports {
 				path, _ := strconv.Unquote(imp.Path.Value)
+				if slices.ContainsFunc(credentialModules, func(m string) bool { return strings.HasPrefix(path, m) }) {
+					out = append(out, rel+" imports "+path)
+					continue
+				}
 				if !strings.HasPrefix(path, ggcr) {
 					continue
 				}
@@ -86,7 +95,7 @@ func findCredentialUse(t *testing.T, root string) []string {
 				if !ok || !slices.Contains(keychainNames, sel.Sel.Name) {
 					return true
 				}
-				if path, ok := names[pkg.Name]; ok && strings.HasSuffix(path, "/authn") || path == ggcr+"pkg/v1/remote" {
+				if path, ok := names[pkg.Name]; ok && (strings.HasSuffix(path, "/authn") || path == ggcr+"pkg/v1/remote") {
 					out = append(out, rel+" uses "+pkg.Name+"."+sel.Sel.Name)
 				}
 				return true
@@ -117,15 +126,19 @@ func TestTheScannerFindsCredentialUse(t *testing.T) {
 	write("internal/c/crane.go", "package c\nimport _ \"github.com/google/go-containerregistry/pkg/crane\"\n")
 	write("internal/d/remote.go", "package d\nimport \"github.com/google/go-containerregistry/pkg/v1/remote\"\nvar _ = remote.Get\n")
 	write("tools/e/helper.go", "package e\nimport _ \"github.com/google/go-containerregistry/pkg/authn/github\"\n")
+	write("internal/f/config.go", "package f\nimport _ \"github.com/docker/cli/cli/config\"\n")
+	write("cmd/g/helper.go", "package g\nimport _ \"github.com/docker/docker-credential-helpers/client\"\n")
 	write("internal/oci/fromkeychain.go", "package oci\nimport \"github.com/google/go-containerregistry/pkg/v1/remote\"\nvar _ = remote.WithAuthFromKeychain\n")
 
 	got := findCredentialUse(t, root)
 
 	assert.Equal(t, []string{
+		"cmd/g/helper.go imports github.com/docker/docker-credential-helpers/client",
 		"internal/a/keychain.go uses authn.DefaultKeychain",
 		"internal/b/renamed.go uses k.NewMultiKeychain",
 		"internal/c/crane.go imports github.com/google/go-containerregistry/pkg/crane",
 		"internal/d/remote.go imports the remote client outside internal/oci",
+		"internal/f/config.go imports github.com/docker/cli/cli/config",
 		"internal/oci/fromkeychain.go uses remote.WithAuthFromKeychain",
 		"tools/e/helper.go imports github.com/google/go-containerregistry/pkg/authn/github",
 	}, got)
