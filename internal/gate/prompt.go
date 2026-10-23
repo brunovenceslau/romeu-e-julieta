@@ -56,6 +56,34 @@ func Ask(stdin io.Reader, stderr io.Writer, d Diff) (bool, error) {
 	return line == "y" || line == "Y", nil
 }
 
+// Confirm is the prompt of gate 1 (01 1.4, REQ-0061): it writes text,
+// which ends with its question, to stderr and reads one answer line from
+// stdin, by the rules of Ask: once text is written it drops the
+// terminal's input queue, and "y" or "Y" followed by a newline approves
+// while any other line, or an end of input, declines. Only stdin must be
+// a terminal, since stdin decides the TTY (04 4.1, REQ-0272); stderr is
+// the command's CLI writer, which escapes what it is given. Without a
+// terminal on stdin it writes nothing and returns ErrNoTerminal.
+//
+//romeu:invariant I7 guard
+func Confirm(stdin io.Reader, stderr io.Writer, text string) (bool, error) {
+	in, ok := stdin.(*os.File)
+	if !ok || !term.IsTerminal(int(in.Fd())) {
+		return false, ErrNoTerminal
+	}
+	if _, err := io.WriteString(stderr, text); err != nil {
+		return false, fmt.Errorf("gate: write the prompt: %w", err)
+	}
+	if err := flushInput(int(in.Fd())); err != nil {
+		return false, fmt.Errorf("gate: drop what was typed before the prompt: %w", err)
+	}
+	line, err := readAnswer(in)
+	if err != nil {
+		return false, fmt.Errorf("gate: read the answer: %w", err)
+	}
+	return line == "y" || line == "Y", nil
+}
+
 // readAnswer reads one line from r a byte at a time, so it takes
 // nothing past the newline, and returns it without the newline. A line
 // that ends without a newline, at the end of input, is returned as "",

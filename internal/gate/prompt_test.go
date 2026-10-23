@@ -225,3 +225,102 @@ func TestReadAnswerDrainsALongLine(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "next\n", string(rest))
 }
+
+// TestConfirmOnATerminal: Confirm, the prompt of gate 1, needs a
+// terminal on stdin only, since stdin decides the TTY (04 4.1,
+// REQ-0272); its text goes to stderr, whatever writer that is, and "y"
+// or "Y" typed once the text is shown approves.
+//
+//romeu:invariant I7 test
+func TestConfirmOnATerminal(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		early string
+		typed string
+		want  bool
+	}{
+		{"y approves", "", "y\n", true},
+		{"Y approves", "", "Y\n", true},
+		{"an empty line declines", "", "\n", false},
+		{"yes declines", "", "yes\n", false},
+		{"a y typed before the text is dropped", "y\n", "n\n", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			master, terminal := openPTY(t)
+			read := screen(t, master)
+			if tt.early != "" {
+				_, err := io.WriteString(master, tt.early)
+				require.NoError(t, err)
+				waitFor(t, read, strings.TrimSuffix(tt.early, "\n"))
+			}
+			var shown syncBuilder
+			done := make(chan error, 1)
+			var got bool
+			go func() {
+				var err error
+				got, err = Confirm(terminal, &shown, "gate 1: a change\nacknowledge? [y/N] ")
+				done <- err
+			}()
+			waitFor(t, shown.String, "acknowledge? [y/N] ")
+			_, err := io.WriteString(master, tt.typed)
+			require.NoError(t, err)
+			require.NoError(t, <-done)
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, "gate 1: a change\nacknowledge? [y/N] ", shown.String())
+		})
+	}
+}
+
+// TestConfirmWithoutATerminal: without a terminal on stdin Confirm
+// approves nothing and writes nothing.
+//
+//romeu:invariant I7 test
+func TestConfirmWithoutATerminal(t *testing.T) {
+	t.Parallel()
+	pipeRead, pipeWrite, err := os.Pipe()
+	require.NoError(t, err)
+	closeAtEnd(t, pipeRead)
+	closeAtEnd(t, pipeWrite)
+	_, err = io.WriteString(pipeWrite, "y\n")
+	require.NoError(t, err)
+	for _, tt := range []struct {
+		name  string
+		stdin io.Reader
+	}{
+		{"a pipe on stdin", pipeRead},
+		{"a reader that is no file on stdin", strings.NewReader("y\n")},
+		{"no reader on stdin", nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var shown strings.Builder
+			got, err := Confirm(tt.stdin, &shown, "acknowledge? [y/N] ")
+			require.ErrorIs(t, err, ErrNoTerminal)
+			assert.False(t, got)
+			assert.Empty(t, shown.String())
+		})
+	}
+}
+
+// syncBuilder is a strings.Builder a test reads while another goroutine
+// writes it.
+type syncBuilder struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+// Write appends p.
+func (s *syncBuilder) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+// String returns what was written so far.
+func (s *syncBuilder) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
+}
