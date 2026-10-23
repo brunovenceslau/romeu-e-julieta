@@ -36,7 +36,14 @@ Decisions of the session, each with its date:
   pull request; the lock is held across the prompt (REQ-0284); a damaged
   project record blocks approval; promotion recovery is not run until it
   exists; `golang.org/x/mod/semver` v0.41.0 orders prereleases in
-  `sbxdrv.Release.Compare`.
+  `sbxdrv.Release.Compare`; both prompts (gate 1's `Confirm` and gate
+  2's `Ask`) drop typed-ahead input before the question is written,
+  never after, approved inside #263.
+- 2026-10-23: opening a pull request and pushing to an open one need no
+  approval in this session ("Pushes to the branch of an open pull
+  request need no approval in the session of 2026-10-23",
+  01m5n7net1v4sgs10t0nvwvyka), replacing the narrower record of the
+  same day.
 - 2026-10-23: dependencies approved for this session:
   `github.com/tailscale/hujson` (pseudo-version
   v0.0.0-20260727124030-b80ff77dac4f, no tagged release) and
