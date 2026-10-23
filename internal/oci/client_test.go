@@ -182,6 +182,34 @@ func TestGuardFollowsAnHTTPSRedirectAFewTimes(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestGuardFollowsFiveRedirectsAndNotSix(t *testing.T) {
+	for redirects, ok := range map[int]bool{maxRedirects: true, maxRedirects + 1: false} {
+		t.Run(strconv.Itoa(redirects), func(t *testing.T) {
+			f := newFakeRegistry(t)
+			index, _ := publish(t, f)
+			var hops atomic.Int32
+			f.override = func(w http.ResponseWriter, r *http.Request) bool {
+				if strings.HasSuffix(r.URL.Path, index) {
+					if n := hops.Add(1); int(n) <= redirects {
+						http.Redirect(w, r, "/v2/org/kit/manifests/"+index+"?hop="+strconv.Itoa(int(n)), http.StatusFound)
+						return true
+					}
+				}
+				return false
+			}
+
+			_, err := f.client().FetchWorkload(t.Context(), f.ref(index), amd64)
+
+			if ok {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, ErrRedirect)
+		})
+	}
+	assert.Equal(t, 5, maxRedirects, "the limit the PR states")
+}
+
 func TestGuardRefusesTooManyRedirects(t *testing.T) {
 	f := newFakeRegistry(t)
 	f.override = func(w http.ResponseWriter, r *http.Request) bool {
