@@ -135,7 +135,8 @@ it:
   `providesTzdata` and `providesZsh` false) agrees and is unchanged. The
   rest of A12 that sitting measured is not this task's: the handle
   `sbx-kit-claude`, kind sandbox, schema v3; the volumes the workload
-  declares, of which none survives `sbx rm` and a same-name recreate; the
+  declares, of which none survives `sbx rm` and a same-name `sbx create`
+  (what survives `sbx env rm` and a recreate is not measured); the
   skills path, a read-only host mount; and the agent memory dir,
   `~/.claude/projects`. The ssh-agent part of A12 was not measured: the
   workload declares no ssh-agent capability, so `SSH_AUTH_SOCK` was unset
