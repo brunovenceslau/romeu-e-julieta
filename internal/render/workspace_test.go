@@ -51,6 +51,8 @@ func decodeFolders(t *testing.T, data []byte) []string {
 // decodes to the key set {folders}; no memory dir is a folder of
 // either, and a review checkout is a folder of review.code-workspace
 // alone.
+//
+//romeu:invariant I13 test
 func TestWorkspaceGolden(t *testing.T) {
 	dev, err := render.DevWorkspace(hostClones)
 	require.NoError(t, err)

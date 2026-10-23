@@ -76,6 +76,8 @@ func TestEncodeRecordGolden(t *testing.T) {
 
 // What EncodeRecord writes DecodeRecord reads back as the same record,
 // its schema set.
+//
+//romeu:invariant I11 test
 func TestRecordRoundTrip(t *testing.T) {
 	want := shopRecord(t)
 	data, err := render.EncodeRecord(want)

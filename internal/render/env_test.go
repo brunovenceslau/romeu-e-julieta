@@ -53,6 +53,8 @@ func TestEnvGolden(t *testing.T) {
 // env-file schema alone, no x-* key and no lifecycle hook (REQ-0200),
 // the fixed read-only mount of ./.romeu/bin (REQ-0583), paths of the
 // form ./x (REQ-0142), and a secret that is a command alone (I8).
+//
+//romeu:invariant I8 test
 func TestEnvShape(t *testing.T) {
 	got, err := render.Env(shopInput(t))
 	require.NoError(t, err)
@@ -95,6 +97,8 @@ func TestEnvIsDeterministic(t *testing.T) {
 
 // A string that YAML would read as another type is quoted, so the file
 // reads back as what was meant.
+//
+//romeu:invariant I11 test
 func TestEnvQuotesStringsThatLookTyped(t *testing.T) {
 	in := shopInput(t)
 	in.Project.Kits[2].Args = map[string]string{"tz": "yes", "port": "8080", "empty": "", "null": "null", "comment": "# x"}
@@ -173,6 +177,8 @@ func TestEnvErrors(t *testing.T) {
 // of host settings under /usr/bin/env -i with HOME and PATH alone, each
 // word quoted by internal/shquote, so no word of the argv reaches sh as
 // anything but itself.
+//
+//romeu:invariant I8 test
 func TestSecretCommand(t *testing.T) {
 	tests := []struct {
 		name string
@@ -222,4 +228,33 @@ func TestSecretCommandErrors(t *testing.T) {
 			require.ErrorContains(t, err, tt.want)
 		})
 	}
+}
+
+// Every string of the spec that reaches sbxenv.yaml reads back as
+// itself, whatever its bytes: Env refuses or writes a file that decodes
+// to what was meant, never one that means another thing (I11, REQ-0494).
+//
+//romeu:invariant I11 test
+func FuzzEnvRoundTrip(f *testing.F) {
+	for _, s := range []string{"Etc/UTC", "yes", "8080", "", "null", "# x", "a: b", "- a", "'\"", "{x}", " ", "\x00", "~"} {
+		f.Add(s, s)
+	}
+	f.Fuzz(func(t *testing.T, arg, agent string) {
+		in := shopInput(t)
+		in.Project.Kits[2].Args = map[string]string{"tz": arg}
+		in.Project.Agent = agent
+		got, err := render.Env(in)
+		if err != nil {
+			return
+		}
+		var doc struct {
+			Agent string `yaml:"agent"`
+			Kits  []struct {
+				Args map[string]string `yaml:"args"`
+			} `yaml:"kits"`
+		}
+		require.NoError(t, yaml.Unmarshal(got, &doc))
+		assert.Equal(t, agent, doc.Agent)
+		assert.Equal(t, arg, doc.Kits[3].Args["tz"])
+	})
 }
