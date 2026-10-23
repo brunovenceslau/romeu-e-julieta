@@ -6,6 +6,7 @@
 package romeu
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,9 +26,7 @@ func (o *Origins) PushConfigRepo(t testing.TB, owner, name string, files map[str
 	}
 	spec := strings.NewReplacer("{{owner}}", owner, "{{name}}", name).Replace(string(tmpl))
 	all := map[string]string{"projects/" + name + ".yaml": spec}
-	for p, c := range files {
-		all[p] = c
-	}
+	maps.Copy(all, files)
 	o.Push(t, owner+"/"+name, "main", all)
 	return o.URL(owner + "/" + name)
 }
