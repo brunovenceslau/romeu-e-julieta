@@ -1,0 +1,2 @@
+# synthetic: true - hand-written for T046; probe A9 re-records the real listing, a row of a kind not recorded
+[{"scope":"global","kind":"mystery","effect":"allow","resource":"example.test"}]

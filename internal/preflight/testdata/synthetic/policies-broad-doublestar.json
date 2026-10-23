@@ -1,0 +1,2 @@
+# synthetic: true - hand-written for T046; probe A9 re-records the real listing, a global allow rule of **
+[{"scope":"global","kind":"rule","effect":"allow","resource":"**"}]

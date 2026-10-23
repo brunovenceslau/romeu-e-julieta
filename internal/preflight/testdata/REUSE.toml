@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The license of the synthetic fixtures of the preflight, none of which
+# can carry an SPDX header of its own without changing what it parses.
+# Each is hand-written, says so in its first line, and shows a listing of
+# sbx secrets or policies that no recording of a well-kept host holds
+# (Q29), until probe A9 records the real ones.
+
+version = 1
+
+[[annotations]]
+path = ["synthetic/*"]
+SPDX-FileCopyrightText = "2026 Bruno Venceslau"
+SPDX-License-Identifier = "GPL-3.0-only"

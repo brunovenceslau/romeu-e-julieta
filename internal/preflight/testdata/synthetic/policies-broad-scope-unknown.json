@@ -1,0 +1,2 @@
+# synthetic: true - hand-written for T046; probe A9 re-records the real listing, a broad rule whose scope is of a shape not recorded
+[{"scope":"team","kind":"rule","effect":"allow","resource":"**"}]

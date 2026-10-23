@@ -1,0 +1,6 @@
+# synthetic: true - hand-written for T046; probe A9 re-records the real listing, rules of one sandbox and a deny default
+[
+  {"scope":"global","kind":"default","effect":"deny","resource":""},
+  {"scope":"sandbox:shop","kind":"rule","effect":"allow","resource":"example.test"},
+  {"scope":"sandbox:shop","kind":"rule","effect":"allow","resource":"**","extra":{"ignored":true}}
+]
