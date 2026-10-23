@@ -28,7 +28,8 @@ const (
 
 // ErrUnreadable is wrapped by a Reader for a file it refuses to give: one
 // over the cap of MaxFileSize, or one that is not a regular file. Derive
-// reports it as lock-unparsed.
+// reports it as lock-unparsed. A refusal of the repository, the commit or
+// the name is not this error: it is a defect of the caller.
 var ErrUnreadable = errors.New("egress: a file of the repo cannot be read as one")
 
 // Reader returns the bytes of the file name of a repo, a path from the
@@ -43,7 +44,7 @@ type Reader func(ctx context.Context, name string) (data []byte, found bool, err
 func GitReader(g *gitsafe.Runner, dir, commit string) Reader {
 	return func(ctx context.Context, name string) ([]byte, bool, error) {
 		data, found, err := g.CommitFile(ctx, dir, commit, name, MaxFileSize)
-		if errors.Is(err, gitsafe.ErrRefused) {
+		if errors.Is(err, gitsafe.ErrFileRefused) {
 			err = fmt.Errorf("%w: %w", ErrUnreadable, err)
 		}
 		return data, found, err

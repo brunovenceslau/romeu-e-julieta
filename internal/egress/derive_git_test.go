@@ -124,15 +124,28 @@ func TestDeriveGitStates(t *testing.T) {
 	}
 }
 
-// TestGitReaderFailure: a commit the repository does not hold is an
-// error that is not lock-unparsed, and a refused file is ErrUnreadable.
+// TestGitReaderFailure: a commit the repository does not hold, a name of
+// a commit, a directory that is not a repository and a file that is a
+// link are errors, and only the link is ErrUnreadable (lock-unparsed).
 func TestGitReaderFailure(t *testing.T) {
 	dir, _ := commitFiles(t, map[string]string{"mise.lock": "x"})
 	_, _, err := egress.GitReader(runner(t), dir, strings.Repeat("a", 40))(t.Context(), "mise.lock")
 	require.Error(t, err)
 	require.NotErrorIs(t, err, egress.ErrUnreadable)
 	_, _, err = egress.GitReader(runner(t), dir, "HEAD")(t.Context(), "mise.lock")
-	assert.ErrorIs(t, err, egress.ErrUnreadable, "a name of a commit is not a full object id")
+	require.Error(t, err)
+	require.NotErrorIs(t, err, egress.ErrUnreadable, "a name of a commit is not a full object id")
+	_, _, err = egress.GitReader(runner(t), "relative", strings.Repeat("a", 40))(t.Context(), "mise.lock")
+	require.Error(t, err)
+	require.NotErrorIs(t, err, egress.ErrUnreadable, "a directory that is not a repository")
+	linked := t.TempDir()
+	gitIn(t, linked, "init", "-q")
+	require.NoError(t, os.Symlink("elsewhere", filepath.Join(linked, "mise.lock")))
+	gitIn(t, linked, "add", "-A")
+	gitIn(t, linked, "commit", "-q", "-m", "link")
+	commit := gitIn(t, linked, "rev-parse", "HEAD")
+	_, _, err = egress.GitReader(runner(t), linked, commit)(t.Context(), "mise.lock")
+	assert.ErrorIs(t, err, egress.ErrUnreadable, "a link is not a regular file")
 }
 
 // TestNoProcessIsStarted: no file of the package imports os/exec,
