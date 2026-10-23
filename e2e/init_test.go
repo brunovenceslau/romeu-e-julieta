@@ -467,7 +467,7 @@ func TestInitRefusesAHelperOthersCanWrite(t *testing.T) {
 	res := e.Run(t, append(args, "--git-credential-helper", helper))
 
 	assert.Equal(t, 2, res.Code, res.Stderr)
-	assert.Contains(t, res.Stderr, "is writable by its group or others")
+	assert.Contains(t, res.Stderr, "is writable by its group or others; fix it with: chmod g-w "+helper)
 	assert.NoFileExists(t, e.Settings())
 	assert.NoDirExists(t, e.StateDir())
 	assert.NoDirExists(t, e.Root)

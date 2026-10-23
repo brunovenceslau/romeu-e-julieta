@@ -82,6 +82,10 @@ func newMachine(t *testing.T, spec string) *machine {
 		if strings.HasSuffix(url, "/refused") {
 			return fmt.Errorf("%w: a refusal of gitsafe", gitsafe.ErrRefused)
 		}
+		if strings.HasSuffix(url, "/badhead") {
+			// As gitsafe returns a HEAD of the remote it refuses.
+			return fmt.Errorf("%w: %w: object id %q", gitsafe.ErrRemoteContent, gitsafe.ErrRefused, "not-an-oid")
+		}
 		if err := os.MkdirAll(dest, 0o700); err != nil {
 			return err
 		}
@@ -470,6 +474,27 @@ func TestInitCloneErrors(t *testing.T) {
 		assert.NotContains(t, stderr, "RJ-348")
 		assert.NotContains(t, stderr, "config-clone-failed")
 	})
+	t.Run("a refusal of what the remote sent is config-clone-failed", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/badhead")
+
+		assert.Equal(t, 1, code, stderr)
+		assert.Contains(t, stderr, "RJ-356 config-clone-failed")
+		assert.Contains(t, stderr, `object id "not-an-oid"`, "the reason is in the details")
+		assert.NotContains(t, stderr, "RJ-349")
+		assert.NoDirExists(t, filepath.Join(m.home, "dev"))
+	})
+	t.Run("the levels above the root stay, the root this run made goes", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+		root := filepath.Join(m.home, "a", "b", "dev")
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing", "--root", root)
+
+		assert.Equal(t, 1, code, stderr)
+		assert.NoDirExists(t, root)
+		assert.DirExists(t, filepath.Dir(root))
+	})
 	t.Run("the root and the env dir this run made are removed", func(t *testing.T) {
 		m := newMachine(t, projectSpec)
 
@@ -549,7 +574,7 @@ func TestInitRefusesAHelperOthersCanWrite(t *testing.T) {
 		name, rule string
 		helper     func(m *machine) string
 	}{
-		{"writable by the group", "is writable by its group or others", func(m *machine) string { return m.helperScript(t, 0o770) }},
+		{"writable by the group", "is writable by its group or others; fix it with: chmod g-w ", func(m *machine) string { return m.helperScript(t, 0o770) }},
 		{"not executable", "is not executable", func(m *machine) string { return m.helperScript(t, 0o600) }},
 		{"missing", "cannot be resolved", func(m *machine) string { return filepath.Join(m.bin, "none") }},
 		{"in a directory others can write", "is writable by its group or others", func(m *machine) string {

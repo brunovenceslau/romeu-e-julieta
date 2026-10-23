@@ -198,7 +198,7 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 		// this run made them and they are empty (a decision of
 		// 2026-10-23).
 		made.undo(rt, filepath.Base(envDir), h.Root)
-		return refusal(cmd, err)
+		return err
 	}
 	if err := commitSettings(cmd, pending, settings, data); err != nil {
 		// dest is this run's clone: absent proved <envDir>/<dir> did not
@@ -358,11 +358,14 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 	defer func() { _ = os.RemoveAll(stage) }()
 	clone := filepath.Join(stage, "clone")
 	if err := cloneRepo(ctx, g, h.Config.URL, clone, h.Tools.GitCredentialHelper); err != nil {
-		return "", cloneError(err, h.Config.URL)
+		return "", cloneError(cmd, err, h.Config.URL, false)
 	}
 	dir, err := configDir(ctx, cmd, g, h, clone)
 	if err != nil {
-		return "", err
+		// The clone is the remote's content: what gitsafe refuses in it
+		// (a default branch, a ref, a file) is the remote's, not the
+		// operator's input.
+		return "", cloneError(cmd, err, h.Config.URL, true)
 	}
 	if !filepath.IsLocal(dir) || strings.ContainsRune(dir, filepath.Separator) {
 		return "", usage(cmd, "the config repo's dir is not a plain name")
@@ -388,10 +391,14 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 // followed out of the root.
 func openTree(cmd *cobra.Command, root, envName string) (*os.Root, string, made, error) {
 	var m made
-	if _, err := os.Lstat(root); errors.Is(err, fs.ErrNotExist) {
-		m.root = true
+	// The levels above the root are made as they are needed and stay;
+	// the root's last element is this run's when its Mkdir succeeds.
+	if err := os.MkdirAll(filepath.Dir(root), dirMode); err != nil {
+		return nil, "", m, fmt.Errorf("init: the root: %w", err)
 	}
-	if err := os.MkdirAll(root, dirMode); err != nil {
+	if err := os.Mkdir(root, dirMode); err == nil {
+		m.root = true
+	} else if !errors.Is(err, fs.ErrExist) {
 		return nil, "", m, fmt.Errorf("init: the root: %w", err)
 	}
 	if why := dirProblem(os.Lstat, root); why != "" {
@@ -420,23 +427,33 @@ func openTree(cmd *cobra.Command, root, envName string) (*os.Root, string, made,
 	return rt, filepath.Join(root, envName), m, nil
 }
 
-// made says which directories of the tree this run of init created: the
-// root (the last element of its path only) and the env dir.
+// made says which directories of the tree this run of init created, by
+// a Mkdir that succeeded: the last element of the root, and the env dir.
 type made struct {
 	root, env bool
 }
 
 // undo removes the env dir and then the root, each only when this run
-// made it and it is empty: os.Remove refuses a directory that is not,
-// so nothing that appeared meanwhile goes with it. The env dir goes
-// through rt, so a link planted in its place is not followed. Its
-// failures are not the command's: the error that led here is.
+// made it, it is still a directory (Lstat, so a link is never followed
+// or removed) and it is empty: os.Remove refuses a directory that is
+// not, so nothing that appeared in it meanwhile goes with it. The env
+// dir goes through rt. Its failures are not the command's: the error
+// that led here is.
+//
+// A race remains between the Lstat and the Remove: a process of the
+// user's could replace the directory with another empty directory or a
+// link in between. Remove takes an empty directory, which holds nothing
+// to lose, or the link itself, never its target.
 func (m made) undo(rt *os.Root, envName, root string) {
 	if m.env {
-		_ = rt.Remove(envName)
+		if fi, err := rt.Lstat(envName); err == nil && fi.IsDir() {
+			_ = rt.Remove(envName)
+		}
 	}
 	if m.root {
-		_ = os.Remove(root)
+		if fi, err := os.Lstat(root); err == nil && fi.IsDir() {
+			_ = os.Remove(root)
+		}
 	}
 }
 
@@ -492,35 +509,34 @@ func configDir(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h spe
 	return "", missing(name + " has no primary repo at config.url")
 }
 
-// cloneError returns config-clone-failed (RJ-356) for a git clone that
-// exited non-zero, with git's output, which gitsafe escaped and cut to
-// its first 4 KiB, in the details; any other error passes through: an
-// error of the table, a timeout, a cancellation, a refusal of gitsafe
-// (refusal). Git itself prints no credential a helper gave it, and the
-// URL holds none (CheckURL refuses user information); what a helper
-// writes to its own standard error is git's standard error too, and is
-// not filtered.
-func cloneError(err error, configURL string) error {
+// cloneError sorts an error of the clone of the config repo, or of the
+// reads of the clone when remote is true:
+//
+//   - an error of the table, a timeout, a cancellation passes through;
+//   - a git that exited non-zero, and what gitsafe refuses in what the
+//     remote sent (gitsafe.ErrRemoteContent, or any refusal when remote
+//     is true), is config-clone-failed (RJ-356), with git's output or
+//     the reason, which gitsafe escaped and cut to its first 4 KiB, in
+//     the details;
+//   - a refusal of the operator's input before git ran (the URL, the
+//     helper: gitsafe.ErrRefused, gitsafe.ErrConfig) is usage (RJ-349),
+//     an input init cannot take, never internal.
+//
+// Git itself prints no credential a helper gave it, and the URL holds
+// none (CheckURL refuses user information); what a helper writes to its
+// own standard error is git's standard error too, and is not filtered.
+func cloneError(cmd *cobra.Command, err error, configURL string, remote bool) error {
 	if _, ok := errors.AsType[*cli.Error](err); ok {
 		return err
 	}
-	if _, ok := errors.AsType[*procgroup.ExitError](err); !ok {
-		return err
-	}
-	return ConfigCloneFailed.New("git could not clone the config repo",
-		cli.Detail{Key: "config.url", Value: termsafe.Escape(configURL)},
-		cli.Detail{Key: "git", Value: termsafe.Escape(err.Error())})
-}
-
-// refusal returns the error usage (RJ-349) for an error of the clone or
-// of the reads of the config repo that gitsafe refused before git ran
-// (ErrRefused, ErrConfig): an input init cannot take, not a defect.
-// Any other error passes through.
-func refusal(cmd *cobra.Command, err error) error {
-	if _, ok := errors.AsType[*cli.Error](err); ok {
-		return err
-	}
-	if errors.Is(err, gitsafe.ErrRefused) || errors.Is(err, gitsafe.ErrConfig) {
+	refused := errors.Is(err, gitsafe.ErrRefused) || errors.Is(err, gitsafe.ErrConfig)
+	_, exited := errors.AsType[*procgroup.ExitError](err)
+	switch {
+	case errors.Is(err, gitsafe.ErrRemoteContent) || (remote && refused) || (!remote && exited):
+		return ConfigCloneFailed.New("git could not clone the config repo",
+			cli.Detail{Key: "config.url", Value: termsafe.Escape(configURL)},
+			cli.Detail{Key: "git", Value: termsafe.Escape(err.Error())})
+	case refused:
 		return usage(cmd, termsafe.Escape(err.Error()))
 	}
 	return err
