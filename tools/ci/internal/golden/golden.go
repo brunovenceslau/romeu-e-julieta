@@ -189,10 +189,14 @@ type Change struct {
 
 // Changed returns the files under dirs that differ between the commit
 // and its base: the merge base with the remote's default branch, or
-// else the commit's parent. With neither in the clone, a shallow one,
-// it returns a note that says so and lists nothing.
+// else the commit's parent. Whenever the list can be short, the note
+// says why, so the log and the job summary never read a short list as a
+// whole one: against the parent only, a change in an earlier commit of
+// the branch is not listed; a commit that is its own merge base, a push
+// to the default branch, has no base to compare against; and a clone
+// that holds neither, a shallow one, lists nothing.
 func Changed(ctx context.Context, repo git.Repo, commit string, dirs []string) ([]Change, string, error) {
-	base := ""
+	base, note := "", ""
 	for _, ref := range bases {
 		out, err := repo.Run(ctx, nil, "merge-base", "--end-of-options", ref, commit)
 		if err == nil {
@@ -200,12 +204,21 @@ func Changed(ctx context.Context, repo git.Repo, commit string, dirs []string) (
 			break
 		}
 	}
-	if base == "" {
+	if base != "" {
+		id, err := check.CommitOf(ctx, repo, commit)
+		if err != nil {
+			return nil, "", err
+		}
+		if base == id {
+			return nil, "the changed goldens are not listed: the commit is its own merge base with origin, so there is no base to compare against", nil
+		}
+	} else {
 		out, err := repo.Run(ctx, nil, "rev-parse", "--verify", "--quiet", "--end-of-options", commit+"^1^{commit}")
 		if err != nil {
 			return nil, "the changed goldens are not listed: this clone holds neither a merge base with origin nor the parent of the commit", nil
 		}
 		base = strings.TrimSpace(string(out))
+		note = "the changed goldens are listed against the parent only: this clone holds no merge base with origin, so a golden an earlier commit of the branch changed is not listed"
 	}
 	args := []string{"diff", "--name-status", "-z", "--no-renames", base, commit, "--"}
 	for _, d := range dirs {
@@ -217,7 +230,7 @@ func Changed(ctx context.Context, repo git.Repo, commit string, dirs []string) (
 	}
 	fields := strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
 	if len(fields) == 1 && fields[0] == "" {
-		return nil, "", nil
+		return nil, note, nil
 	}
 	if len(fields)%2 != 0 {
 		return nil, "", errors.New("golden: git diff wrote an odd number of fields")
@@ -226,18 +239,21 @@ func Changed(ctx context.Context, repo git.Repo, commit string, dirs []string) (
 	for i := 0; i < len(fields); i += 2 {
 		changes = append(changes, Change{Status: fields[i], Path: fields[i+1]})
 	}
-	return changes, "", nil
+	return changes, note, nil
 }
 
-// Info returns the lines that list the changed goldens, or the note.
+// Info returns the note, when there is one, and the lines that list the
+// changed goldens.
 func Info(changes []Change, note string) string {
+	var b strings.Builder
 	if note != "" {
-		return note + "\n"
-	}
-	if len(changes) == 0 {
+		b.WriteString(note + "\n")
+	} else if len(changes) == 0 {
 		return "no golden changed\n"
 	}
-	var b strings.Builder
+	if len(changes) == 0 {
+		return b.String()
+	}
 	fmt.Fprintf(&b, "%d changed golden(s), each to be listed under Evidence and reviewed:\n", len(changes))
 	for _, c := range changes {
 		fmt.Fprintf(&b, "  %s %s\n", c.Status, git.Printable(c.Path))
@@ -254,10 +270,11 @@ func writeSummary(path string, changes []Change, note string) error {
 	}
 	var b strings.Builder
 	b.WriteString("### Changed goldens\n\n")
+	if note != "" {
+		b.WriteString(git.SafeLines(note) + "\n\n")
+	}
 	switch {
-	case note != "":
-		b.WriteString(git.SafeLines(note) + "\n")
-	case len(changes) == 0:
+	case len(changes) == 0 && note == "":
 		b.WriteString("None.\n")
 	default:
 		for _, c := range changes {

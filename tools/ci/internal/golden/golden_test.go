@@ -132,8 +132,15 @@ func TestChangedWithoutOrigin(t *testing.T) {
 	r, head := fixture(t)
 	got, note, err := golden.Changed(t.Context(), r.Repo, head, []string{"internal/render/testdata/"})
 	require.NoError(t, err)
-	assert.Empty(t, note)
+	assert.Contains(t, note, "listed against the parent only")
 	assert.Empty(t, got, "the last commit touches no golden")
+
+	r.Write("internal/render/testdata/env/a.yaml", "a: 3\n")
+	head = r.Commit("three")
+	got, note, err = golden.Changed(t.Context(), r.Repo, head, []string{"internal/render/testdata/"})
+	require.NoError(t, err)
+	assert.Contains(t, note, "listed against the parent only")
+	assert.Equal(t, []golden.Change{{Status: "M", Path: "internal/render/testdata/env/a.yaml"}}, got)
 
 	root := r.Git("rev-list", "--max-parents=0", "HEAD")
 	got, note, err = golden.Changed(t.Context(), r.Repo, root, []string{"internal/render/testdata/"})
@@ -142,11 +149,26 @@ func TestChangedWithoutOrigin(t *testing.T) {
 	assert.Contains(t, note, "the changed goldens are not listed")
 }
 
+// A commit that is its own merge base with origin, a push to main, has
+// no base to compare against, and the note says so rather than "no
+// golden changed".
+func TestChangedOnTheDefaultBranch(t *testing.T) {
+	r, head := fixture(t)
+	r.Git("update-ref", "refs/remotes/origin/main", head)
+	got, note, err := golden.Changed(t.Context(), r.Repo, head, []string{"internal/render/testdata/"})
+	require.NoError(t, err)
+	assert.Empty(t, got)
+	assert.Contains(t, note, "no base to compare against")
+	assert.NotContains(t, golden.Info(got, note), "no golden changed")
+}
+
 // The listing names each change with its status, and says so when there
 // is none or when it could not list.
 func TestInfo(t *testing.T) {
 	assert.Equal(t, "no golden changed\n", golden.Info(nil, ""))
-	assert.Equal(t, "a note\n", golden.Info([]golden.Change{{Status: "M", Path: "x"}}, "a note"))
+	assert.Equal(t, "a note\n", golden.Info(nil, "a note"))
+	assert.Equal(t, "a note\n1 changed golden(s), each to be listed under Evidence and reviewed:\n  M x\n",
+		golden.Info([]golden.Change{{Status: "M", Path: "x"}}, "a note"))
 	assert.Equal(t, "1 changed golden(s), each to be listed under Evidence and reviewed:\n  M \"a\\nb\"\n",
 		golden.Info([]golden.Change{{Status: "M", Path: "a\nb"}}, ""))
 }
@@ -222,4 +244,21 @@ func TestRun(t *testing.T) {
 	r.Commit("no Golden row")
 	_, err = golden.Run(t.Context(), e, nil)
 	require.ErrorContains(t, err, "has no Golden row")
+}
+
+// The job summary carries the note too, so a list against the parent
+// alone never reads as the whole change.
+func TestJudgeSummaryCarriesTheNote(t *testing.T) {
+	r, head := fixture(t)
+	summary := filepath.Join(t.TempDir(), "summary.md")
+	t.Setenv("GITHUB_STEP_SUMMARY", summary)
+	files, err := check.HeadTree(t.Context(), r.Repo, head)
+	require.NoError(t, err)
+	vs, err := golden.Judge(t.Context(), check.Commit{Repo: r.Repo, ID: head, Files: files})
+	require.NoError(t, err)
+	require.NoError(t, vs[0].Err)
+	got, err := os.ReadFile(summary)
+	require.NoError(t, err)
+	assert.Contains(t, string(got), "listed against the parent only")
+	assert.NotContains(t, string(got), "None.")
 }
