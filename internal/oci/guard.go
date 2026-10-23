@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -156,35 +155,29 @@ func verifyManifest(digest string, body []byte, header string) error {
 	return nil
 }
 
-// challengeStart finds where a challenge of a WWW-Authenticate value
-// begins: a scheme followed by a parameter. A header may carry several
-// challenges, and the library chooses the first it can handle, so each is
-// judged.
-var challengeStart = regexp.MustCompile(`(?i)(?:^|,)\s*([a-z][a-z0-9._~+-]*)\s+[a-z][a-z0-9_-]*\s*=`)
-
-// realmParam finds the realm of a challenge, quoted or bare.
-var realmParam = regexp.MustCompile(`(?i)\brealm\s*=\s*(?:"([^"]*)"|([^\s,"]+))`)
-
 // checkRealms judges the challenges of a 401. A Bearer challenge names the
 // realm, the token endpoint, and a hostile registry could name a service
 // of the user's network: the realm must be https, with no user name, on the
 // registry's site (ErrForeignRealm), and, if it is an address, a public one
-// (ErrPrivateAddress); a Bearer challenge without a realm, and a 401 that
-// offers neither Bearer nor Basic, are of a shape the product does not
-// read. It remembers the realms it let through, which are the URLs of the
-// token requests (REQ-0515).
+// (ErrPrivateAddress); a challenge the guard cannot read exactly as the
+// library does, a Bearer challenge without a realm or with two, and a 401
+// that offers neither Bearer nor Basic, are of a shape the product does
+// not read. It remembers the realms it let through, which are the URLs of
+// the token requests (REQ-0515).
 func (g *guard) checkRealms(headers []string) error {
 	var known bool
 	for _, h := range headers {
-		for _, c := range splitChallenges(h) {
-			switch strings.ToLower(c.scheme) {
-			case "basic":
-				known = true
-			case "bearer":
-				known = true
-				if err := g.checkRealm(c.params); err != nil {
-					return err
-				}
+		c, ok := parseChallenge(h)
+		if !ok {
+			return shape("a WWW-Authenticate challenge of the 401 is not of a form the product reads")
+		}
+		switch c.scheme {
+		case "basic":
+			known = true
+		case "bearer":
+			known = true
+			if err := g.checkRealm(c.params); err != nil {
+				return err
 			}
 		}
 	}
@@ -194,64 +187,136 @@ func (g *guard) checkRealms(headers []string) error {
 	return nil
 }
 
-// challenge is one challenge of a WWW-Authenticate value.
-type challenge struct{ scheme, params string }
-
-// splitChallenges cuts a WWW-Authenticate value into its challenges.
-func splitChallenges(h string) []challenge {
-	starts := challengeStart.FindAllStringSubmatchIndex(h, -1)
-	if len(starts) == 0 {
-		// A scheme alone, such as "Basic" or "Negotiate".
-		if f := strings.Fields(h); len(f) > 0 {
-			return []challenge{{scheme: strings.TrimRight(f[0], ",")}}
-		}
-		return nil
-	}
-	out := make([]challenge, 0, len(starts))
-	for i, m := range starts {
-		end := len(h)
-		if i+1 < len(starts) {
-			end = starts[i+1][0]
-		}
-		out = append(out, challenge{scheme: h[m[2]:m[3]], params: h[m[3]:end]})
-	}
-	return out
+// challenge is one challenge of a WWW-Authenticate value: its scheme in
+// lower case, and its parameters in order, names in lower case.
+type challenge struct {
+	scheme string
+	params []param
 }
 
-// checkRealm judges the realm of one Bearer challenge.
-func (g *guard) checkRealm(params string) error {
-	found := realmParam.FindAllStringSubmatch(params, -1)
-	if len(found) == 0 {
+// param is one auth-param of a challenge.
+type param struct{ name, value string }
+
+// parseChallenge reads one WWW-Authenticate value as go-containerregistry
+// v0.22.1 reads it (parseValueAndParams in
+// pkg/v1/remote/internal/authchallenge), which is what decides the realm
+// the library asks for a token: one challenge per value, a scheme token,
+// then auth-params separated by commas, each a token, "=", and a token or
+// a quoted-string in which a backslash escapes the next octet (RFC 9110
+// 11.2 and 5.6.4, without the optional spaces around "="; 11.6.1 warns
+// that two challenges on one line are not interoperable). The library
+// stops at the first octet it cannot read, ignores the rest, and keeps
+// the last value of a repeated parameter; ok is false when the value is
+// not read to its end or holds an empty value, so the guard never judges
+// a header the library reads otherwise.
+func parseChallenge(h string) (c challenge, ok bool) {
+	scheme, s := httpToken(h)
+	if scheme == "" {
+		return c, false
+	}
+	c.scheme = strings.ToLower(scheme)
+	s = skipSpace(s)
+	if s == "" {
+		return c, true
+	}
+	for s = "," + s; s != ""; s = skipSpace(s) {
+		if s[0] != ',' {
+			return c, false
+		}
+		var name, value string
+		name, s = httpToken(skipSpace(s[1:]))
+		if name == "" || !strings.HasPrefix(s, "=") {
+			return c, false
+		}
+		value, s, ok = tokenOrQuoted(s[1:])
+		if !ok || value == "" {
+			return c, false
+		}
+		c.params = append(c.params, param{name: strings.ToLower(name), value: value})
+	}
+	return c, true
+}
+
+// skipSpace drops the spaces, tabs and line breaks s starts with.
+func skipSpace(s string) string { return strings.TrimLeft(s, " \t\r\n") }
+
+// httpToken cuts the token s starts with (RFC 9110 5.6.2): ASCII that is
+// neither a control nor a delimiter.
+func httpToken(s string) (token, rest string) {
+	i := 0
+	for i < len(s) && s[i] > ' ' && s[i] < 0x7f && !strings.ContainsRune(`"(),/:;<=>?@[\]{}`, rune(s[i])) {
+		i++
+	}
+	return s[:i], s[i:]
+}
+
+// tokenOrQuoted cuts the token or the quoted-string s starts with, a
+// quoted-string unescaped; ok is false for a quoted-string without its
+// closing quote.
+func tokenOrQuoted(s string) (value, rest string, ok bool) {
+	if !strings.HasPrefix(s, `"`) {
+		value, rest = httpToken(s)
+		return value, rest, true
+	}
+	var b strings.Builder
+	for i := 1; i < len(s); i++ {
+		switch s[i] {
+		case '"':
+			return b.String(), s[i+1:], true
+		case '\\':
+			i++
+			if i == len(s) {
+				return "", "", false
+			}
+		}
+		b.WriteByte(s[i])
+	}
+	return "", "", false
+}
+
+// checkRealm judges the realm of one Bearer challenge. The library keeps
+// the last realm of a challenge that names two, and RFC 9110 11.2 allows
+// a name once per challenge, so a challenge that names more than one is
+// refused, whichever would be judged.
+func (g *guard) checkRealm(params []param) error {
+	var found []string
+	for _, p := range params {
+		if p.name == "realm" {
+			found = append(found, p.value)
+		}
+	}
+	switch {
+	case len(found) == 0:
 		return shape("the Bearer challenge has no realm")
+	case len(found) > 1:
+		return shape("the Bearer challenge names more than one realm")
 	}
-	for _, m := range found {
-		raw := m[1] + m[2]
-		realm, err := url.Parse(raw)
-		if err != nil || realm.Host == "" {
-			return shape("the realm of the challenge is not a URL")
-		}
-		if realm.Scheme != "https" || realm.User != nil {
-			return fmt.Errorf("%w: the token realm %s", ErrInsecure, quote(raw))
-		}
-		if !sameSite(realm.Hostname(), g.host) {
-			return fmt.Errorf("%w: %s", ErrForeignRealm, quote(realm.Hostname()))
-		}
-		// An address on the registry's site is the registry's own only if
-		// it is the registry's host and port: another port of a loopback
-		// address is another service.
-		if _, err := netip.ParseAddr(realm.Hostname()); err == nil && realm.Host != g.addr {
-			port := realm.Port()
-			if port == "" {
-				port = "443"
-			}
-			if err := checkPublic(net.JoinHostPort(realm.Hostname(), port)); err != nil {
-				return err
-			}
-		}
-		g.mu.Lock()
-		g.realms[realmKey(realm)] = true
-		g.mu.Unlock()
+	raw := found[0]
+	realm, err := url.Parse(raw)
+	if err != nil || realm.Host == "" {
+		return shape("the realm of the challenge is not a URL")
 	}
+	if realm.Scheme != "https" || realm.User != nil {
+		return fmt.Errorf("%w: the token realm %s", ErrInsecure, quote(raw))
+	}
+	if !sameSite(realm.Hostname(), g.host) {
+		return fmt.Errorf("%w: %s", ErrForeignRealm, quote(realm.Hostname()))
+	}
+	// An address on the registry's site is the registry's own only if
+	// it is the registry's host and port: another port of a loopback
+	// address is another service.
+	if _, err := netip.ParseAddr(realm.Hostname()); err == nil && realm.Host != g.addr {
+		port := realm.Port()
+		if port == "" {
+			port = "443"
+		}
+		if err := checkPublic(net.JoinHostPort(realm.Hostname(), port)); err != nil {
+			return err
+		}
+	}
+	g.mu.Lock()
+	g.realms[realmKey(realm)] = true
+	g.mu.Unlock()
 	return nil
 }
 

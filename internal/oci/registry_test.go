@@ -390,7 +390,8 @@ func TestCheckRealms(t *testing.T) {
 		wantShape  bool
 	}{
 		{"a realm on the registry's site", []string{`Bearer realm="https://auth.docker.io/token",service="registry.docker.io"`}, nil, false},
-		{"a bare realm", []string{`bearer realm=https://auth.docker.io/t, service=x`}, nil, false},
+		{"a bare realm", []string{`bearer realm=registry, service=x`}, nil, true},
+		{"a bare realm the library cuts at its colon", []string{`bearer realm=https://auth.docker.io/t, service=x`}, nil, true},
 		{"a realm in the second challenge", []string{`Negotiate`, `Bearer realm="https://evil.example/t"`}, ErrForeignRealm, false},
 		{"a realm in the second header", []string{`Basic realm="https://auth.docker.io/t"`, `Bearer realm="https://169.254.169.254/t"`}, ErrForeignRealm, false},
 		{"a realm over http", []string{`Bearer realm="http://auth.docker.io/t"`}, ErrInsecure, false},
@@ -398,8 +399,9 @@ func TestCheckRealms(t *testing.T) {
 		{"a realm that is not a URL", []string{`Bearer realm="::"`}, nil, true},
 		{"a challenge with no realm", []string{`Bearer service="x"`}, nil, true},
 		{"a Basic realm that is not a URL", []string{`Basic realm="the registry"`}, nil, false},
-		{"a Basic and then a Bearer challenge in one value", []string{`Basic realm="x", Bearer realm="https://evil.example/t",service="s"`}, ErrForeignRealm, false},
+		{"a Basic and then a Bearer challenge in one value", []string{`Basic realm="x", Bearer realm="https://evil.example/t",service="s"`}, nil, true},
 		{"a scheme alone", []string{`Basic`}, nil, false},
+		{"a value without a scheme", []string{`="x"`, `Basic`}, nil, true},
 		{"a scheme the product does not read", []string{`Negotiate`}, nil, true},
 		{"no challenge", nil, nil, true},
 		{"another port of the registry's own address", []string{`Bearer realm="https://127.0.0.1:2/t"`}, ErrPrivateAddress, false},

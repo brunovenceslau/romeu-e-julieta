@@ -4,9 +4,11 @@
 package oci
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -224,4 +226,84 @@ func TestFetchWorkloadStopsAfterASecondUnauthorized(t *testing.T) {
 
 	require.ErrorIs(t, err, ErrCredentials)
 	assert.Equal(t, int32(3), manifests.Load(), "the ping, the manifest, the one after the token, and no more")
+}
+
+// The challenges of a 401, judged as go-containerregistry v0.22.1 reads
+// them (pkg/v1/remote/internal/authchallenge): one challenge per header
+// value, quoted strings with backslash escapes, and the last value of a
+// repeated parameter wins.
+func TestGuardJudgesTheChallengeTheLibraryReads(t *testing.T) {
+	const reg = "registry.example.com"
+	refused := []struct {
+		name, header string
+	}{
+		{
+			// A quoted comma hides a second realm from a reader that
+			// splits on commas; the library reads one Bearer challenge
+			// whose last realm, the evil one, wins.
+			name:   "a second realm after a quoted comma",
+			header: `Bearer realm="https://` + reg + `/token", service="a, Basic z=1", realm="https://evil.example.invalid/token"`,
+		},
+		{
+			name:   "two realms",
+			header: `Bearer realm="https://` + reg + `/token", realm="https://evil.example.invalid/token"`,
+		},
+		{
+			name:   "a second realm after an escaped quote",
+			header: `Bearer realm="https://` + reg + `/token", service="a\", Basic z=1", realm="https://evil.example.invalid/token"`,
+		},
+		{name: "text left over", header: `Bearer realm="https://` + reg + `/token" junk`},
+		{name: "a bare realm the library cuts at its colon", header: `Bearer realm=https://` + reg + `/token`},
+		{name: "an empty realm", header: `Bearer realm="", service="x"`},
+		// The library stops at an empty value and reads no realm after it.
+		{name: "an empty value before the realm", header: `Bearer service="", realm="https://` + reg + `/token"`},
+		{name: "an unterminated quote", header: `Bearer realm="https://` + reg + `/token`},
+		{name: "a trailing comma", header: `Bearer realm="https://` + reg + `/token",`},
+		{name: "a second challenge in one value", header: `Basic realm="a", Bearer realm="https://evil.example.invalid/token"`},
+	}
+	for _, tt := range refused {
+		t.Run(tt.name, func(t *testing.T) {
+			g := newGuard(nil, reg)
+
+			err := g.checkRealms([]string{tt.header})
+
+			require.Error(t, err)
+			_, isShape := errors.AsType[*shapeError](err)
+			assert.True(t, isShape || errors.Is(err, ErrForeignRealm), "a shape or a foreign realm: %v", err)
+			assert.False(t, g.isRealm(mustURL(t, "https://evil.example.invalid/token")), "the evil realm is never remembered as a token endpoint")
+		})
+	}
+	accepted := []struct {
+		name, header, realm string
+	}{
+		{name: "the form of a real registry", header: `Bearer realm="https://` + reg + `/token",service="` + reg + `",scope="repository:org/kit:pull"`, realm: "https://" + reg + "/token"},
+		{
+			// The escaped quotes keep the text after them inside the
+			// value of service: the one realm is the registry's.
+			name:   "a realm-like text inside an escaped value",
+			header: `Bearer realm="https://` + reg + `/token", service="x\", realm=\"https://evil.example.invalid/token"`,
+			realm:  "https://" + reg + "/token",
+		},
+		{name: "an escape inside the realm", header: `Bearer realm="https://` + reg + `/to\ken"`, realm: "https://" + reg + "/token"},
+		{name: "a scheme alone", header: `Basic`},
+		{name: "a Basic challenge", header: `Basic realm="registry"`},
+	}
+	for _, tt := range accepted {
+		t.Run(tt.name, func(t *testing.T) {
+			g := newGuard(nil, reg)
+
+			require.NoError(t, g.checkRealms([]string{tt.header}))
+
+			if tt.realm != "" {
+				assert.True(t, g.isRealm(mustURL(t, tt.realm)))
+			}
+		})
+	}
+}
+
+func mustURL(t *testing.T, raw string) *url.URL {
+	t.Helper()
+	u, err := url.Parse(raw)
+	require.NoError(t, err)
+	return u
 }
