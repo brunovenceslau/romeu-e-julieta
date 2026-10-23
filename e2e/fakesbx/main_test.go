@@ -14,6 +14,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
 // rig is a fake sbx configured for one test: a session copied from
@@ -308,11 +310,15 @@ func TestEnvExecForwards(t *testing.T) {
 // TestEnvExecForwardFailsWithoutACommand and a forward command that cannot run
 // are the fake's own failures.
 func TestEnvExecForwardFailures(t *testing.T) {
+	// macOS has /usr/bin/true and no /bin/true, so the program is found
+	// the way the host finds it.
+	yes, err := procgroup.LookPath("true")
+	require.NoError(t, err)
 	var out, errOut bytes.Buffer
-	assert.Equal(t, 98, forward(t.Context(), config{Forward: []string{"/bin/true"}}, []string{"env", "exec", "/d", "--"}, nil, nil, &out, &errOut))
-	assert.Equal(t, 98, forward(t.Context(), config{Forward: []string{"/bin/true"}}, []string{"env", "exec", "/d"}, nil, nil, &out, &errOut))
+	assert.Equal(t, 98, forward(t.Context(), config{Forward: []string{yes}}, []string{"env", "exec", "/d", "--"}, nil, nil, &out, &errOut))
+	assert.Equal(t, 98, forward(t.Context(), config{Forward: []string{yes}}, []string{"env", "exec", "/d"}, nil, nil, &out, &errOut))
 	assert.Equal(t, 98, forward(t.Context(), config{Forward: []string{"/nonexistent/forwarder"}}, []string{"env", "exec", "/d", "--", "x"}, nil, nil, &out, &errOut))
-	assert.Equal(t, 0, forward(t.Context(), config{Forward: []string{"/bin/true"}}, []string{"env", "exec", "/d", "--", "x"}, nil, nil, &out, &errOut))
+	assert.Equal(t, 0, forward(t.Context(), config{Forward: []string{yes}}, []string{"env", "exec", "/d", "--", "x"}, nil, nil, &out, &errOut))
 }
 
 // TestCreateWritesTheRemoteStanza holds REQ-0929: on create the fake

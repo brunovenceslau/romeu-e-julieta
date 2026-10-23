@@ -42,17 +42,59 @@ func runner(sbx string) *Runner {
 	return r
 }
 
+// envHelperSource is the sbx of the test that must read the exact
+// environment of the child: a shell script would report what the shell
+// adds (macOS's sh sets TERM to dumb when it is unset), not what the
+// driver passed. It prints the argv and the sorted environment.
+const envHelperSource = `package main
+
+import (
+	"fmt"
+	"os"
+	"sort"
+)
+
+func main() {
+	for _, a := range os.Args[1:] {
+		fmt.Println("arg:" + a)
+	}
+	env := os.Environ()
+	sort.Strings(env)
+	for _, kv := range env {
+		fmt.Println("env:" + kv)
+	}
+}
+`
+
+// buildEnvHelper builds envHelperSource into a directory of the test and
+// returns the path of the program.
+func buildEnvHelper(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	src := filepath.Join(dir, "main.go")
+	require.NoError(t, os.WriteFile(src, []byte(envHelperSource), 0o600))
+	goBin, err := procgroup.LookPath("go")
+	require.NoError(t, err)
+	path := filepath.Join(dir, "sbx")
+	var out bytes.Buffer
+	require.NoError(t, procgroup.Run(context.Background(), procgroup.Command{
+		Class: procgroup.ToolStep, Argv: []string{goBin, "build", "-o", path, src},
+		Dir: dir, Env: os.Environ(), Stdout: &out, Stderr: &out,
+	}), out.String())
+	return path
+}
+
 // TestRunPassesTheArgvAndTheScrubbedEnvironment holds 04 4.1: sbx runs
 // by the absolute path with the argv of the call, and with nothing of
 // this process's environment.
 func TestRunPassesTheArgvAndTheScrubbedEnvironment(t *testing.T) {
 	t.Setenv("FOO", "leaks")
 	t.Setenv("SSH_AUTH_SOCK", "/leaks")
-	sbx := script(t, `for a in "$@"; do echo "arg:$a"; done
-echo "PATH=$PATH HOME=$HOME LANG=$LANG FOO=${FOO-unset} SOCK=${SSH_AUTH_SOCK-unset} TERM=${TERM-unset}"`)
+	t.Setenv("TERM", "leaks")
+	sbx := buildEnvHelper(t)
 	res, err := runner(sbx).Run(context.Background(), Version(), Opts{})
 	require.NoError(t, err)
-	assert.Equal(t, "arg:version\nPATH=/usr/bin:/bin HOME=/home/test LANG=C FOO=unset SOCK=unset TERM=unset\n", string(res.Stdout))
+	assert.Equal(t, "arg:version\nenv:HOME=/home/test\nenv:LANG=C\nenv:PATH=/usr/bin:/bin\n", string(res.Stdout))
 	assert.False(t, res.Truncated)
 }
 
