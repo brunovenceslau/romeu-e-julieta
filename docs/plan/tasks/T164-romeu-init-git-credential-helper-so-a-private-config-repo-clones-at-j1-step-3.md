@@ -32,27 +32,25 @@ that records the decisions of that day, so it is ready to start.
 `init` clones the config repository before the operator can edit host
 settings (J1 step 5), so a private one fails at the clone: the hardened
 git of 05 5.1 uses only the helper that `tools.gitCredentialHelper`
-names (REQ-0464), and the settings do not exist yet. Reproduced on
-2026-10-23 on a real private repository on macOS: the failure surfaces
-as RJ-348 `internal`, which is for a defect of the code and not for a
-clone that git refused.
+names (REQ-0464), and the settings do not exist yet. Reported on 2026-10-23 from a private config repository on macOS: the
+failure surfaces as RJ-348 `internal`, which is for a defect of the code
+and not for a clone that git refused.
 
 The flag takes the value `tools.gitCredentialHelper` takes (03 3.4,
 REQ-1267), refuses a value that rule refuses, records it in the
 `settings.yaml` that `init` writes, and the clone uses it for the config
-repository's host only (a `credential.<url>.helper` scoped to that
-host, not the global key of REQ-0464, so no other host sees the
-helper). If gitsafe has no such scoped form yet, the task adds it, which
-is why `gitsafe` is in `ask_first`.
+repository's host only. Scoping it with `credential.<url>.helper`, in
+place of the global key of REQ-0464, is a proposal that the task settles
+against REQ-0464 (it amends that requirement if it changes it, and
+`gitsafe` is in `ask_first` for that reason).
 
 A clone that fails is the new error `config-clone-failed`, exit 1, with
 the git output (escaped, bounded) in the details and the hint `decide:
 check the URL and your access; a private config repo needs
---git-credential-helper`. The id is the next free `RJ-` number after
-those declared in 04 4.4 when the task starts (`RJ-355` was free on
-2026-10-23, and the task of `approve --toolchain` may take it first; the
-task reads 04 4.4 and `errors.go` files and takes the next one). The
-spec amendments (the `init` row of 04 4.2, J1 step 3, the 04 4.4 row)
+--git-credential-helper`. The id is the next free `RJ-` number when the
+task starts, read from 04 4.4 and the `errors.go` files. The task
+creates `internal/cmd/romeu/init/errors.go`, to which T165 then adds its
+rows. The spec amendments (the `init` row of 04 4.2, J1 step 3, the 04 4.4 row)
 are made in this task, with the ids `go run ./tools/ci reqs allocate`
 hands out, which the Implements line then cites.
 

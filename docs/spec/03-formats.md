@@ -528,7 +528,7 @@ julieta accepts manifests, is described in
 `REQ-1273` A member that has no value is omitted and never written as
 `null`: `promoting` outside a promotion commit, and `lockSha256` of a
 repo with no `mise.lock`. The schema generator admits no `null` for a
-pointer (decided on 2026-10-23).
+pointer.
 `REQ-0227` `previousFiles` is the `files` map before the promotion, which
 recovery writes back when the candidate no longer verifies. The julieta
 binary digest here is what the compatibility check compares against.

@@ -24,9 +24,13 @@ sitting: none
 Goal: one place for the host paths and the root check, used by `init`,
 `approve` and `doctor`, in place of the copies each command grows.
 Decided on 2026-10-23, scope this repository; no existing task covers
-it (T041 wrote `settingsPath`, `realPath` and `rootProblem` in
-`internal/cmd/romeu/init/paths.go`, and T042 reads the settings in
-`internal/cmd/romeu/approve/settings.go`).
+it.
+
+Main has, in `internal/cmd/romeu/init/paths.go` (T041, #259),
+`settingsPath`, `realPath`, `within`, `rootProblem` and `dirProblem`.
+T042, when merged, carries a copy of the settings path in
+`internal/cmd/romeu/approve/settings.go`, which this task replaces; so
+it needs T042.
 
 The package (`internal/hostpaths`, a row the task adds to the tree of
 02 2.1) holds the settings path (`ROMEU_SETTINGS`, `XDG_CONFIG_HOME`,

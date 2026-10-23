@@ -30,17 +30,19 @@ and no id of its own (`refuse` in `internal/cmd/romeu/init/init.go`,
 REQ-1258). The three rows of 04 4.4 were added on 2026-10-23 without code
 because `docs/reference/errors.md` is generated from the `errors.go` of
 the package that raises an id, and `errors.go` is on the `contracts`
-surface. This task writes `internal/cmd/romeu/init/errors.go` with the
-three rows and their hints, switches `refuse` to them, and regenerates
-the reference page.
+surface. T164 creates `internal/cmd/romeu/init/errors.go` first, and
+this task adds the three rows and their hints to it, switches `refuse`
+to them, and regenerates the reference page.
 
-The second part is the `--config-ref` rule of the `init` row of 04 4.2:
-v1 reads a config repository from its default branch only, so `init`
-asks the remote for its default branch and refuses a ref that is another
-branch or a tag (slug `config-ref-not-default`) and a remote with no
-default branch (slug `config-no-default-branch`), exit 2, before it
-writes anything. These two are plain rule findings with no id of their
-own (REQ-1258).
+The second part is a rename. #259 already refuses a `--config-ref`
+that is not the remote's default branch, and a remote with no default
+branch, but both findings carry the slug `config-ref-not-default`
+(`internal/cmd/romeu/init/init.go`, about lines 413 and 416). The
+decision of 2026-10-23 is two slugs: `config-ref-not-default` for a ref
+other than the default branch and `config-no-default-branch` for a
+remote with no default branch (04 4.2). This task renames the second
+finding and updates the e2e (`e2e/init_test.go`, about lines 246 and
+266). Both stay plain rule findings with no id of their own (REQ-1258).
 
 - Implements: REQ-1275 (04 4.2), REQ-1278 (04 4.4), REQ-1279 (04 4.4),
   REQ-1280 (04 4.4).
@@ -51,11 +53,10 @@ own (REQ-1258).
     `docs/reference/errors.md` listing them.
   - The e2e cases that assert the three slugs (`e2e/init_test.go`) also
     assert the ids.
-  - `init --config-ref <a tag>` and `init --config-ref <another branch>`
-    against an origin whose default branch is `main` exit 2 with
-    `config-ref-not-default`; against an origin with no default branch
-    exit 2 with `config-no-default-branch`; neither writes settings.
-  - `init --config-ref main` and no flag, against that origin, succeed.
+  - A remote with no default branch exits 2 with
+    `config-no-default-branch`, and a ref that is not the default
+    branch still exits 2 with `config-ref-not-default`; the e2e asserts
+    each slug.
 - Verify: `go test -tags e2e ./e2e/... -run '^TestInit' -v`; the
   reviewer reads the `TestInit*` functions this task adds in the `-v`
   output (10 10.8).

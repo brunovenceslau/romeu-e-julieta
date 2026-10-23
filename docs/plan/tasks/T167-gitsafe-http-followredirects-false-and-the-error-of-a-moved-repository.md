@@ -34,6 +34,10 @@ gitsafe turns that failure into an error that names the URL it was given
 and asks for the new one (the fix is the operator's: the spec's or the
 settings' URL).
 
+The task is `after` T039 because both own `docs/spec/05-security.md`
+(the plan check refuses an overlap that nothing orders), and after T164
+because T164 may add a gitsafe file this task also touches.
+
 The task reads the fixed config of 05 5.1 and REQ-0468 first: the key
 belongs to host mode; whether the sandbox mode (which leaves the `http.*`
 keys to the sandbox) and the local config of a review checkout (REQ-0468

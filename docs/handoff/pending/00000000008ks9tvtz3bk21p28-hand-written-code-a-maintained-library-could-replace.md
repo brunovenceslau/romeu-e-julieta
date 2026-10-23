@@ -23,7 +23,8 @@ library was not checked online. In the order of ADR 0038, decision 5:
    (03-formats says "no dependency"; read again under ADR 0038, 3).
    Planned on 2026-10-23 as T166, with the question of `null` for a
    pointer: a member with no value is omitted (REQ-1273, 03 3.7). The
-   dependency is approved with that task.
+   dependency is proposed with that task and approved on its pull
+   request.
 6. The glob matcher of `tools/ci/internal/askfirst`:
    `github.com/bmatcuk/doublestar/v4`, if its dialect fits 12 12.4.
 7. Done by T149 on 2026-10-20: the canonical JSON of REQ-0254 is
