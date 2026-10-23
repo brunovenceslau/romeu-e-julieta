@@ -122,6 +122,7 @@ type parsed struct {
 	dash     bool
 	command  []string // the words after "--"
 	badStart string   // a flag before the verb that is not a global flag
+	lead     []string // the approvals found before the verb, by long name
 }
 
 // parseArgv reads an argv: the global flags, the verb, and its flags
@@ -130,6 +131,7 @@ func parseArgv(argv []string) parsed {
 	var p parsed
 	i := 0
 	for ; i < len(argv) && strings.HasPrefix(argv[i], "-"); i++ {
+		p.lead = append(p.lead, leadApprovals(argv[i])...)
 		if g, ok := lookup(nil, argv[i]); ok && g.long != "--auto-approve" {
 			p.global = append(p.global, argv[i])
 		} else {
@@ -201,6 +203,31 @@ func parseArgv(argv []string) parsed {
 	return p
 }
 
+// leadApprovals returns the approvals a word before the verb holds, by
+// long name: --auto-approve and -y are one, --force and -f the other,
+// in a cluster of letters as well. Whether --force approves depends on
+// the verb that follows.
+func leadApprovals(w string) []string {
+	switch {
+	case strings.HasPrefix(w, "--"):
+		if name, _, _ := strings.Cut(w, "="); name == "--auto-approve" || name == "--force" {
+			return []string{name}
+		}
+	case len(w) > 1 && w[1] != '-':
+		var out []string
+		for _, c := range w[1:] {
+			switch c {
+			case 'y':
+				out = append(out, "--auto-approve")
+			case 'f':
+				out = append(out, "--force")
+			}
+		}
+		return out
+	}
+	return nil
+}
+
 // lookup finds a flag of the verb by its long name or, with one dash and
 // one letter, its short; the common flags are on every verb.
 func lookup(flags []flagSpec, name string) (flagSpec, bool) {
@@ -257,10 +284,10 @@ func approvesPlan(argv []string) bool {
 //romeu:invariant I25 guard
 func Guard(c Call) error {
 	p := parseArgv(c.Argv)
-	if p.has("--auto-approve") {
+	if p.has("--auto-approve") || slices.Contains(p.lead, "--auto-approve") {
 		return guardRefusal(c, "I4", "--auto-approve approves for sbx")
 	}
-	if approvesPlan(c.Argv) && p.has("--force") {
+	if approvesPlan(c.Argv) && (p.has("--force") || slices.Contains(p.lead, "--force")) {
 		return guardRefusal(c, "I4", "--force approves the plan of the environment without asking")
 	}
 	if p.verb == "secret set" {

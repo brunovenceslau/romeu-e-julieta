@@ -88,7 +88,7 @@ The table is written by hand; generating it is a row of
 
 `REQ-0059` There are two romeu-level approvals, both TTY-only, plus sbx's own
 native approval of host commands, which romeu never bypasses (never
-the flag that applies a plan without asking (`--auto-approve` before sbx v0.48.0, `-f`/`--force` on `env run` and `env create` since); `romeu doctor` recommends
+the flag that applies a plan without asking (`--auto-approve` or `-y`; `-f`/`--force` on `env run`, `env create`, `run` or `create`); `romeu doctor` recommends
 `sbx settings set env.rememberHostCommands true`). `sbx env plan` output
 is not part of romeu's gates: sbx shows its own plan and prompts during
 `sbx env run`. *Why for us:* sbx already re-asks when a host command

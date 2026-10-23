@@ -15,12 +15,12 @@ import (
 )
 
 // Floor is the lowest sbx version romeu runs against (12 12.1,
-// REQ-1056), as sbx prints it without the leading v: the lowest one the
-// parsers and the sessions model: the shapes were checked against the
-// help and ls output of v0.49.2. Before v0.48.0 sbx ls --json was the
-// object {"sandboxes": [...]} and the approval of a plan was
-// --auto-approve, so nothing here reads them. A test holds it to the
-// page and to the lowest recorded version.
+// REQ-1056), as sbx prints it without the leading v. The parsers and
+// the sessions model the shapes of v0.49.2: its help and its ls output
+// were checked. Before v0.48.0 sbx ls --json was the object
+// {"sandboxes": [...]} and the approval of a plan was --auto-approve,
+// so nothing here reads them. A test holds it to the page and to the
+// lowest recorded version.
 const Floor = "0.49.2"
 
 // RecordedVersions are the sbx versions with a session set under

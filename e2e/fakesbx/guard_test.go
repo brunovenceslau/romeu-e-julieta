@@ -60,3 +60,35 @@ func TestRefusalCases(t *testing.T) {
 		})
 	}
 }
+
+// TestRefusalFlagsBeforeAndBetweenTheVerbWords holds the fake to the
+// approvals placed before the verb or between its words, where sbx
+// takes a flag of the verb as well; the shared table has the ones the
+// guard of sbxdrv labels alike.
+func TestRefusalFlagsBeforeAndBetweenTheVerbWords(t *testing.T) {
+	for _, tt := range []struct {
+		argv []string
+		want string
+	}{
+		{[]string{"-y", "ls", "--json"}, "I4"},
+		{[]string{"--auto-approve", "env", "run", "-d", "/abs/x"}, "I4"},
+		{[]string{"-f", "env", "run", "/abs/x"}, "I4"},
+		{[]string{"--force", "run", "/abs/x"}, "I4"},
+		{[]string{"-D", "-y", "stop", "a"}, "I4"},
+		{[]string{"env", "-D", "run", "-f", "/x"}, "I4"},
+		{[]string{"env", "-y", "run", "/x"}, "I4"},
+		{[]string{"-D", "secret", "set", "github", "--sandbox", "shop", "--command", "/bin/x"}, "I25"},
+		{[]string{"secret", "-D", "set", "github", "--sandbox", "shop", "--command", "/bin/x"}, "I25"},
+		{[]string{"-D", "env", "rm", "--force", "/abs/x"}, ""},
+		{[]string{"--force", "stop", "a"}, ""},
+	} {
+		t.Run(strings.Join(tt.argv, " "), func(t *testing.T) {
+			why := refusal(tt.argv)
+			if tt.want == "" {
+				assert.Empty(t, why)
+				return
+			}
+			assert.True(t, strings.HasPrefix(why, tt.want+":"), "got %q", why)
+		})
+	}
+}

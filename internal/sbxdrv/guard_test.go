@@ -105,6 +105,13 @@ func TestGuardTableHasTheRowsThatKilledMutants(t *testing.T) {
 	assert.True(t, has("I25", "secret", "set", "github", "--command", "/bin/true", "--token", "x"))
 	assert.True(t, has("I25", "secret", "set", "github", "--token", "ghp_x"))
 	assert.True(t, has("I4", "env", "create", "--force", "/abs/shop-env"))
+	// The guard with a secret set check dropped, and the fake with a
+	// flag before the verb unscanned.
+	assert.True(t, has("I25", "secret", "set", "github", "--refresh", "1h", "--command", "/bin/x"))
+	assert.True(t, has("I25", "secret", "set", "github", "--sandbox", "shop", "--refresh", "1h"))
+	assert.True(t, has("I25", "secret", "set", "github", "--command", "/bin/x", "--sandbox", "shop"))
+	assert.True(t, has("I4", "-f", "env", "run", "/abs/shop-env"))
+	assert.True(t, has("shape", "env", "-D", "run", "-f", "/x"))
 }
 
 // forbiddenWords are the words no builder source may hold outside

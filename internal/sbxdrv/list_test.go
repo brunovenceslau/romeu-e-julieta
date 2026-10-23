@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -124,10 +125,34 @@ func TestParseListRefusesWhatFilesCannotHold(t *testing.T) {
 	_, err := ParseList([]byte("[{\"name\":\"sh\xffop\",\"id\":\"i\",\"created_at\":\"2026-10-20T23:59:38Z\",\"status\":\"running\",\"workspaces\":[]}]"))
 	testsupport.RequireID(t, "RJ-310", err)
 
-	big := "[" + strings.Repeat(`{"name":"a","status":"running","workspaces":[]},`, maxListOutput/40) + `{"name":"a","status":"running","workspaces":[]}]`
+	// A document of valid, distinct sandboxes, so that only the cap can
+	// refuse it: the same document under the cap is a list.
+	element := strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(string(fixture(t, "ok-one.json"))), "["), "]")
+	require.Contains(t, element, `"name":"shop"`)
+	document := func(n int) []byte {
+		var b strings.Builder
+		b.WriteByte('[')
+		for i := range n {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			b.WriteString(strings.Replace(element, `"name":"shop"`, fmt.Sprintf(`"name":"s%d"`, i), 1))
+		}
+		b.WriteByte(']')
+		return []byte(b.String())
+	}
+	count := maxListOutput/len(element) + 1
+	small := document(10)
+	require.Less(t, len(small), maxListOutput)
+	list, err := ParseList(small)
+	require.NoError(t, err)
+	assert.Len(t, list, 10)
+
+	big := document(count)
 	require.Greater(t, len(big), maxListOutput)
-	_, err = ParseList([]byte(big))
+	_, err = ParseList(big)
 	testsupport.RequireID(t, "RJ-310", err)
+	assert.Contains(t, err.Error(), "longer than")
 }
 
 // TestParseListIsNeverEmptyForShapes lists every document that is a

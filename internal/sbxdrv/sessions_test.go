@@ -141,3 +141,25 @@ func TestBuildersAndSessionsAgree(t *testing.T) {
 		assert.Contains(t, built, shape, "%s holds a shape no builder gives: %q", file, strings.Split(shape, "\x00"))
 	}
 }
+
+// TestRecordingsHoldNoPrivateName keeps every session, every ls
+// fixture, the sessions of the fake and the guard table free of a home directory or an address: they are public, and
+// a path or a name of the maintainer's must not enter them.
+func TestRecordingsHoldNoPrivateName(t *testing.T) {
+	sessions, err := filepath.Glob(filepath.Join(sessionsDir, "*", "*.jsonl"))
+	require.NoError(t, err)
+	fixtures, err := filepath.Glob(filepath.Join("testdata", "ls", "*.json"))
+	require.NoError(t, err)
+	fakeSessions, err := filepath.Glob(filepath.Join("..", "..", "e2e", "fakesbx", "testdata", "*.jsonl"))
+	require.NoError(t, err)
+	files := slices.Concat(sessions, fixtures, fakeSessions, []string{guardCasesPath})
+	require.NotEmpty(t, sessions)
+	require.NotEmpty(t, fixtures)
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		require.NoError(t, err)
+		for _, bad := range []string{"/Users/", "/home/", "@"} {
+			assert.NotContains(t, string(data), bad, "%s", f)
+		}
+	}
+}
