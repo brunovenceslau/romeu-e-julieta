@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 )
 
@@ -57,10 +58,10 @@ func baseInputs() inputs {
 			"github@shop": {Service: "github.com", Argv: []string{"/usr/bin/env", "-i", "/opt/homebrew/bin/gh", "auth", "token"}},
 		}},
 		r: Resolved{
-			WorkloadCapabilities: Capabilities{"network": []any{"registry.example"}},
+			WorkloadCapabilities: oci.Capabilities{Kind: "workload", Network: &oci.Network{Runtime: oci.Rules{Allow: []oci.NetEntry{{Hosts: []string{"registry.example"}}}}}},
 			Kits: []ResolvedKit{
 				{Source: SourceProduct, ID: "julieta", Files: []File{{Path: "spec.yaml", Mode: ModeRegular, Data: []byte("kind: kit\n")}}},
-				{Source: SourcePersonal, ID: "tools", Files: []File{{Path: "bin/run", Mode: ModeExecutable, Data: []byte("#!/bin/sh\n")}}, Capabilities: Capabilities{"lifecycle": []any{"postCreate"}}},
+				{Source: SourcePersonal, ID: "tools", Files: []File{{Path: "bin/run", Mode: ModeExecutable, Data: []byte("#!/bin/sh\n")}}, Capabilities: oci.Capabilities{Kind: "mixin", Lifecycle: &oci.Lifecycle{Interactive: []string{"bash"}}}},
 			},
 			EgressGated: []GatedDomain{{Domain: "github.com", Reason: ReasonUpload}},
 			Render:      Render{"kits": []any{"julieta", "tools"}, "sandboxOptions": map[string]any{"cpus": 4, "memory": "8g"}},
@@ -146,10 +147,14 @@ func TestFlipTableOfTheResolvedMembers(t *testing.T) {
 			in.hs.Secrets["github@shop"] = spec.Secret{Service: "ghe.example", Argv: in.hs.Secrets["github@shop"].Argv}
 		}, true},
 		{"the workload repository", func(in *inputs) { in.p.Workload = "docker.io/other/dev@sha256:" + hex64('a') }, true},
-		{"the workload capabilities", func(in *inputs) { in.r.WorkloadCapabilities = Capabilities{"network": []any{"other.example"}} }, true},
+		{"the workload capabilities", func(in *inputs) {
+			in.r.WorkloadCapabilities = oci.Capabilities{Kind: "workload", Network: &oci.Network{Runtime: oci.Rules{Allow: []oci.NetEntry{{Hosts: []string{"other.example"}}}}}}
+		}, true},
 		{"a kit's content", func(in *inputs) { in.r.Kits[1].Files[0].Data = []byte("#!/bin/sh\nexit 1\n") }, true},
 		{"a kit file's mode", func(in *inputs) { in.r.Kits[1].Files[0].Mode = ModeRegular }, true},
-		{"a kit's capabilities", func(in *inputs) { in.r.Kits[1].Capabilities = Capabilities{"lifecycle": []any{"postStart"}} }, true},
+		{"a kit's capabilities", func(in *inputs) {
+			in.r.Kits[1].Capabilities = oci.Capabilities{Kind: "mixin", Lifecycle: &oci.Lifecycle{Interactive: []string{"zsh"}}}
+		}, true},
 		{"the order of the kits", func(in *inputs) {
 			in.p.Kits[0], in.p.Kits[1] = in.p.Kits[1], in.p.Kits[0]
 			in.r.Kits[0], in.r.Kits[1] = in.r.Kits[1], in.r.Kits[0]
@@ -205,7 +210,18 @@ func TestBuildRefusesWhatItCannotAccountFor(t *testing.T) {
 		{"resolved kits in another order", func(in *inputs) { in.r.Kits[0], in.r.Kits[1] = in.r.Kits[1], in.r.Kits[0] }},
 		{"a resolved kit of another source", func(in *inputs) { in.r.Kits[0].Source = SourcePersonal }},
 		{"a capability integer a float64 cannot hold", func(in *inputs) {
-			in.r.WorkloadCapabilities = Capabilities{"user": map[string]any{"uid": int64(1)<<60 + 1}}
+			// The structure of a credential file is the one member that
+			// holds any JSON value.
+			in.r.WorkloadCapabilities = oci.Capabilities{Kind: "workload", Credentials: []oci.Credential{{
+				Service: "svc", Phases: []string{"runtime"},
+				OAuth: &oci.OAuth{CredentialFile: &oci.CredentialFile{Path: "/a.json", Structure: map[string]any{"uid": int64(1)<<60 + 1}}},
+			}}}
+		}},
+		{"a kit capability integer a float64 cannot hold", func(in *inputs) {
+			in.r.Kits[1].Capabilities = oci.Capabilities{Kind: "mixin", Credentials: []oci.Credential{{
+				Service: "svc", Phases: []string{"runtime"},
+				OAuth: &oci.OAuth{CredentialFile: &oci.CredentialFile{Path: "/a.json", Structure: map[string]any{"n": map[string]any{"m": uint64(1)<<63 + 1}}}},
+			}}}
 		}},
 
 		{"a kit naming both sources", func(in *inputs) { in.p.Kits[0].Personal = "x" }},

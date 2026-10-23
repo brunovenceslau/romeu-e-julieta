@@ -8,6 +8,8 @@ import (
 	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"maps"
@@ -18,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
@@ -457,9 +460,11 @@ func canonical(v any) string {
 	return string(data)
 }
 
-// capabilityChanges returns a line for each capability type that the
-// capability set of owner gains, loses or changes.
-func capabilityChanges(owner string, old, new Capabilities) []string {
+// capabilityChanges returns a line for each member of the capability
+// set of owner (network, volumes, credentials, lifecycle and the others
+// of oci.Capabilities) that it gains, loses or changes.
+func capabilityChanges(owner string, oldSet, newSet oci.Capabilities) []string {
+	old, new := members(oldSet), members(newSet)
 	var out []string
 	for _, k := range unionKeys(old, new) {
 		o, inOld := old[k]
@@ -469,9 +474,31 @@ func capabilityChanges(owner string, old, new Capabilities) []string {
 			out = append(out, owner+": "+k+" added")
 		case !inNew:
 			out = append(out, owner+": "+k+" removed")
-		case canonical(o) != canonical(n):
+		case o != n:
 			out = append(out, owner+": "+k+" changed")
 		}
+	}
+	return out
+}
+
+// members returns the members of a capability set as they are written in
+// the widening set, by name, each in canonical JSON; an empty kind, the
+// one member always written, counts as absent.
+func members(c oci.Capabilities) map[string]string {
+	data, err := canon.CanonicalJSON(c)
+	if err != nil {
+		return map[string]string{"(unreadable)": "(" + err.Error() + ")"}
+	}
+	var raw map[string]jsontext.Value
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return map[string]string{"(unreadable)": "(" + err.Error() + ")"}
+	}
+	out := make(map[string]string, len(raw))
+	for k, v := range raw {
+		if k == "kind" && string(v) == `""` {
+			continue
+		}
+		out[k] = string(v)
 	}
 	return out
 }

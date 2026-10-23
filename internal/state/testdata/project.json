@@ -1,7 +1,7 @@
 {
   "schema": "state-project/v1",
   "approval": {
-    "wideningDigest": "43bf1a6187ca4a12db90ea196eba079ca267f571eabee4bb139ee91540f895e0",
+    "wideningDigest": "5648016dd24b762bb7cb530d055be770c0b364045b8c63bcb0eede13f025cbad",
     "set": {
       "project": "shop",
       "repos": [
@@ -23,9 +23,18 @@
         "repository": "docker.io/example/dev",
         "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "capabilities": {
-          "network": [
-            "registry.example"
-          ]
+          "kind": "workload",
+          "network": {
+            "runtime": {
+              "allow": [
+                {
+                  "hosts": [
+                    "registry.example"
+                  ]
+                }
+              ]
+            }
+          }
         }
       },
       "kits": [
@@ -36,7 +45,9 @@
           "args": {
             "level": "1"
           },
-          "capabilities": {}
+          "capabilities": {
+            "kind": "mixin"
+          }
         }
       ],
       "egressGated": [

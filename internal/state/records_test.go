@@ -74,7 +74,7 @@ func TestDecodeProject(t *testing.T) {
 			return strings.Replace(s, "01j9zc2q8x7w4t6y3r5e1v9k0p", "01J9ZC2Q8X7W4T6Y3R5E1V9K0P", 1)
 		}},
 		{"a digest of another length", func(s string) string {
-			return strings.Replace(s, "43bf1a6187ca4a12db90ea196eba079ca267f571eabee4bb139ee91540f895e0", "43", 1)
+			return strings.Replace(s, "5648016dd24b762bb7cb530d055be770c0b364045b8c63bcb0eede13f025cbad", "43", 1)
 		}},
 		{"a widening set changed after its digest", func(s string) string {
 			return strings.Replace(s, `"domain": "github.com"`, `"domain": "github.co"`, 1)

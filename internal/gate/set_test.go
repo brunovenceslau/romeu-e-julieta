@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 )
 
 // sampleSet is a widening set with an entry in every list.
@@ -26,7 +27,7 @@ func sampleSet() Set {
 			{Name: "npm", Service: "npmjs.org", ArgvDigest: canon.Sum[canon.SecretArgvKind]{2}},
 			{Name: "github", Service: "github.com", ArgvDigest: canon.Sum[canon.SecretArgvKind]{1}},
 		},
-		Workload: Workload{Repository: "docker.io/example/dev", Digest: "sha256:" + hex64('a'), Capabilities: Capabilities{"network": []any{"x.example"}}},
+		Workload: Workload{Repository: "docker.io/example/dev", Digest: "sha256:" + hex64('a'), Capabilities: oci.Capabilities{Kind: "workload", Network: &oci.Network{Runtime: oci.Rules{Allow: []oci.NetEntry{{Hosts: []string{"x.example"}}}}}}},
 		Kits: []Kit{
 			{ID: "julieta", Source: SourceProduct, ContentDigest: canon.Sum[canon.KitTreeKind]{3}},
 			{ID: "tools", Source: SourcePersonal, ContentDigest: canon.Sum[canon.KitTreeKind]{4}, Args: map[string]string{"a": "b"}},
@@ -73,7 +74,7 @@ func TestDigestSortsTheSortedListsAndKeepsTheKitOrder(t *testing.T) {
 func TestDigestTakesAnEmptyListAndNoListAlike(t *testing.T) {
 	t.Parallel()
 	empty := Set{Project: "shop", Repos: []Repo{}, Secrets: []Secret{}, Kits: []Kit{}, EgressGated: []GatedDomain{},
-		Ports: []string{}, SalvageExcludes: []string{}, Workload: Workload{Capabilities: Capabilities{}}}
+		Ports: []string{}, SalvageExcludes: []string{}, Workload: Workload{Capabilities: oci.Capabilities{}}}
 	none := Set{Project: "shop"}
 	a, err := Digest(empty)
 	require.NoError(t, err)

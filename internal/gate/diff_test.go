@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 )
 
@@ -80,7 +81,7 @@ func TestDiffGolden(t *testing.T) {
 	cand.p.Secrets = append(cand.p.Secrets, "npm")
 	cand.hs.Secrets["npm@shop"] = spec.Secret{Service: "registry.npmjs.org", Argv: []string{"/usr/bin/false"}}
 	cand.r.Kits[1].Files = append(cand.r.Kits[1].Files, File{Path: "README", Mode: ModeRegular, Data: []byte("one\n2\nthree\n")})
-	cand.r.WorkloadCapabilities = Capabilities{"network": []any{"registry.example"}, "mounts": []any{"/var/run/docker.sock"}}
+	cand.r.WorkloadCapabilities = oci.Capabilities{Kind: "workload", Network: &oci.Network{Runtime: oci.Rules{Allow: []oci.NetEntry{{Hosts: []string{"registry.example"}}}}}, Volumes: []oci.Volume{{Kind: "host-mount", Path: "/var/run/docker.sock"}}}
 	cand.p.Egress.Extra = append(cand.p.Egress.Extra, "upload.example")
 	cand.hs.Secrets["github@shop"] = spec.Secret{Service: "github.com", Argv: []string{"/usr/bin/env", "-i", "/usr/local/bin/gh", "auth", "token"}}
 	cand.p.Workload = "docker.io/other/dev@sha256:" + hex64('a')
