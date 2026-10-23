@@ -21,9 +21,10 @@ type Port struct {
 	// Protocol is one of the protocols of 03 3.1; DefaultProtocol when
 	// the spec names none.
 	Protocol string `yaml:"protocol"`
-	// HostIP is the host address, 127.0.0.1 or left out, which sbx
-	// reads as loopback too.
-	HostIP string `yaml:"hostIP,omitempty"`
+	// HostIP is the host address: 127.0.0.1 always, written out even
+	// when the spec names none, so that the file itself says the port
+	// binds loopback alone rather than resting on the default of sbx.
+	HostIP string `yaml:"hostIP"`
 }
 
 // DefaultProtocol is the protocol sbx gives a port spec that names none
@@ -58,14 +59,13 @@ func ParsePort(s string) (Port, error) {
 		return Port{}, fmt.Errorf("the port spec %q names a protocol that is none of %s", s, strings.Join(protocols, ", "))
 	}
 	fields := strings.Split(spec, ":")
-	var p Port
+	p := Port{HostIP: loopback}
 	var err error
 	switch len(fields) {
 	case 3:
 		if fields[0] != loopback {
 			return Port{}, fmt.Errorf("the port spec %q binds a host address other than %s", s, loopback)
 		}
-		p.HostIP = loopback
 		fields = fields[1:]
 		fallthrough
 	case 2:

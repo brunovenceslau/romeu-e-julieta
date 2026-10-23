@@ -14,19 +14,20 @@ import (
 
 // The port spec of 03 3.1 (REQ-1262) and the object sbxenv.yaml holds
 // for it; an omitted protocol is tcp4, as sbx reads it (T037, re-plan
-// of 2026-10-22).
+// of 2026-10-22), and an omitted host address is 127.0.0.1, written out
+// so that the file itself says the port binds loopback alone.
 func TestParsePort(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string
 		want render.Port
 	}{
-		{"the sandbox port alone", "3000", render.Port{Sandbox: 3000, Protocol: "tcp4"}},
-		{"host and sandbox ports", "8080:80", render.Port{Sandbox: 80, Host: 8080, Protocol: "tcp4"}},
+		{"the sandbox port alone", "3000", render.Port{Sandbox: 3000, Protocol: "tcp4", HostIP: "127.0.0.1"}},
+		{"host and sandbox ports", "8080:80", render.Port{Sandbox: 80, Host: 8080, Protocol: "tcp4", HostIP: "127.0.0.1"}},
 		{"the loopback host address", "127.0.0.1:8080:80", render.Port{Sandbox: 80, Host: 8080, Protocol: "tcp4", HostIP: "127.0.0.1"}},
-		{"a protocol", "53/udp", render.Port{Sandbox: 53, Protocol: "udp"}},
+		{"a protocol", "53/udp", render.Port{Sandbox: 53, Protocol: "udp", HostIP: "127.0.0.1"}},
 		{"every field", "127.0.0.1:5353:53/udp6", render.Port{Sandbox: 53, Host: 5353, Protocol: "udp6", HostIP: "127.0.0.1"}},
-		{"tcp named", "1:65535/tcp", render.Port{Sandbox: 65535, Host: 1, Protocol: "tcp"}},
+		{"tcp named", "1:65535/tcp", render.Port{Sandbox: 65535, Host: 1, Protocol: "tcp", HostIP: "127.0.0.1"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -81,7 +82,7 @@ func FuzzParsePort(f *testing.F) {
 		assert.LessOrEqual(t, p.Sandbox, 65535)
 		assert.GreaterOrEqual(t, p.Host, 0)
 		assert.LessOrEqual(t, p.Host, 65535)
-		assert.Contains(t, []string{"", "127.0.0.1"}, p.HostIP)
+		assert.Equal(t, "127.0.0.1", p.HostIP, "every port binds loopback alone, in the file itself")
 		assert.Contains(t, []string{"tcp", "tcp4", "tcp6", "udp", "udp4", "udp6"}, p.Protocol)
 	})
 }

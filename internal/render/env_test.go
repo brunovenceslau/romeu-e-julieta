@@ -47,6 +47,15 @@ func TestEnvGolden(t *testing.T) {
 	got, err = render.Env(ports)
 	require.NoError(t, err)
 	golden(t, "env/ports.sbxenv.yaml", got)
+
+	var doc struct {
+		Ports []map[string]any `yaml:"ports"`
+	}
+	require.NoError(t, yaml.Unmarshal(got, &doc))
+	require.Len(t, doc.Ports, 3)
+	for _, p := range doc.Ports {
+		assert.Equal(t, "127.0.0.1", p["hostIP"], "the port %v binds loopback alone, in the file itself", p)
+	}
 }
 
 // The shape rules of 03 3.3 on the decoded file: the keys of the sbx

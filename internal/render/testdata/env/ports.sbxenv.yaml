@@ -11,9 +11,11 @@ kits:
 ports:
   - sandbox: 3000
     protocol: tcp4
+    hostIP: 127.0.0.1
   - sandbox: 80
     host: 8080
     protocol: tcp
+    hostIP: 127.0.0.1
   - sandbox: 53
     host: 5353
     protocol: udp
