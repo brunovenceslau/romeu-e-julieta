@@ -10,13 +10,11 @@ the limits that record names (01m5nbzfb4p92djhp10c92jprp).
 
 ## Next steps
 
-1. Review T077, open its pull request and land it
-   (01m5nedwa9kff3b724ytw2xay2).
-2. Then T038 and T079, the next of the critical path, both waiting on
-   T077 only; T165 is ready after T164.
-3. Build T170; T161 once T088 is built
+1. Land T077's pull request; then T038 and T079, the next of the
+   critical path, both waiting on T077 only; T165 is ready after T164.
+2. Build T170; T161 once T088 is built
    (01m5e14094yhqhsxq2g941pwrf); T111 at sitting M1.
-4. The pending notes, each when its trigger fires: 01m5ndjpzgf0rmwkr7gc1j6wdh, 01m5n920q50b79dxxqe5ghss4r, 01m5n79kdbtk9dpq7y87sfkkaq,
+3. The pending notes, each when its trigger fires: 01m5ngx0cy47r560n6hqjh4y1c, 01m5ngabwa6akgjr9eetw78kq7, 01m5ndjpzgf0rmwkr7gc1j6wdh, 01m5n920q50b79dxxqe5ghss4r, 01m5n79kdbtk9dpq7y87sfkkaq,
    01m5gywvh9pdmte8k85q87wwdc, 01m5gywvk15asanh438p4mmwfs, 01m5gywvkw8rp4jj2cvctvzg57,
    01m5gz0rpmzwvmwqt9ebd95rfq, 01m5kfnpybcnf22gpxwws14g7x, 01m5kfnpzsnmv53xtkkhenqkz1,
    01m5kfnq16e2agrcfmg2e5qhh8, 01m5kgfdf3t5hd41trsv35dss5 (in T043).
