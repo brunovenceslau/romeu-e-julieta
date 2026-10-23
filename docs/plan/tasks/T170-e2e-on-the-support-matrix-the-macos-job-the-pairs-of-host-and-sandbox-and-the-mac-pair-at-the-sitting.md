@@ -14,6 +14,7 @@ after: []
 ask_first:
   - approvals
   - checks
+  - dependencies
 sitting: none
 ---
 
