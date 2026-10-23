@@ -69,7 +69,8 @@ func within(p, dir string) bool {
 // rootProblem returns why root, a real path, is not a safe root (the
 // check root-unsafe of doctor, 04 4.2, REQ-0375; I20), or "" when it
 // is: equal to home, inside a git repository, not owned by the user or
-// not a directory, or holding the settings file or the state directory.
+// not a directory, holding the settings file or the state directory, or
+// inside the settings directory or the state directory.
 // settings and state are real paths too.
 func rootProblem(root, home, settings, state string) string {
 	switch {
@@ -79,6 +80,10 @@ func rootProblem(root, home, settings, state string) string {
 		return "the root holds the host settings"
 	case within(state, root) || holds(root, state):
 		return "the root holds the host state"
+	case within(root, filepath.Dir(settings)) || holds(filepath.Dir(settings), root):
+		return "the root is inside the host settings directory"
+	case within(root, state) || holds(state, root):
+		return "the root is inside the host state directory"
 	}
 	for dir := root; ; dir = filepath.Dir(dir) {
 		_, err := os.Lstat(filepath.Join(dir, ".git"))

@@ -113,6 +113,8 @@ func TestInitRefusesAnUnsafeRoot(t *testing.T) {
 		{"equal to HOME", func(e *romeu.Env) string { return e.Home }, "the root is $HOME"},
 		{"holding the settings", func(e *romeu.Env) string { return e.ConfigHome }, "the root holds the host settings"},
 		{"holding the state", func(e *romeu.Env) string { return e.StateHome }, "the root holds the host state"},
+		{"inside the settings directory", func(e *romeu.Env) string { return filepath.Join(e.ConfigHome, "romeu", "dev") }, "the root is inside the host settings directory"},
+		{"inside the state directory", func(e *romeu.Env) string { return filepath.Join(e.StateDir(), "dev") }, "the root is inside the host state directory"},
 		{"not absolute", func(*romeu.Env) string { return "dev" }, "the root is not an absolute, clean path"},
 	}
 	if os.Geteuid() != 0 { // root owns /usr

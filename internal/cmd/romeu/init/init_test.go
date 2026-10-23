@@ -196,7 +196,8 @@ func fileExists(p string) bool { _, err := os.Lstat(p); return err == nil }
 // it, wins over the environment.
 func TestInitUsesEnvSettingsPath(t *testing.T) {
 	m := newMachine(t, projectSpec)
-	path := filepath.Join(m.home, "s.yaml")
+	path := filepath.Join(filepath.Dir(m.home), "elsewhere", "s.yaml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
 	var stdout, stderr bytes.Buffer
 	env := &cli.Env{Binary: "romeu", Stdout: cli.NewWriter(&stdout), Stderr: cli.NewWriter(&stderr), SettingsPath: path}
 
@@ -272,6 +273,10 @@ func TestRootProblem(t *testing.T) {
 		{"home", home, "$HOME"},
 		{"holds the settings", filepath.Join(home, ".config"), "holds the host settings"},
 		{"holds the state", filepath.Join(home, ".local"), "holds the host state"},
+		{"inside the settings directory", filepath.Join(home, ".config", "romeu", "dev"), "inside the host settings directory"},
+		{"the settings directory", filepath.Join(home, ".config", "romeu"), "host settings"},
+		{"inside the state directory", filepath.Join(state, "dev"), "inside the host state directory"},
+		{"the state directory", state, "host state"},
 		{"in a repository", filepath.Join(home, "repo", "dev"), "git repository"},
 		{"a repository", filepath.Join(home, "repo"), "git repository"},
 		{"a file", filepath.Join(home, "file"), "not a directory"},
@@ -436,4 +441,24 @@ func TestRootProblemUnreadableParent(t *testing.T) {
 	got := rootProblem(filepath.Join(locked, "dev"), filepath.Join(tmp, "home"), "/s/settings.yaml", "/s/state")
 
 	assert.Contains(t, got, "cannot be checked for a git repository")
+}
+
+// TestRootProblemInsideByIdentity: a root below the settings or the state
+// directory through a link is inside it, which a string comparison of
+// the paths misses.
+func TestRootProblemInsideByIdentity(t *testing.T) {
+	tmp, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	home := filepath.Join(tmp, "home")
+	cfgDir := filepath.Join(home, ".config", "romeu")
+	stateDir := filepath.Join(home, ".local", "state", "romeu")
+	require.NoError(t, os.MkdirAll(cfgDir, 0o700))
+	require.NoError(t, os.MkdirAll(stateDir, 0o700))
+	settings := filepath.Join(cfgDir, "settings.yaml")
+	cfgAlias, stateAlias := filepath.Join(tmp, "cfgalias"), filepath.Join(tmp, "statealias")
+	require.NoError(t, os.Symlink(cfgDir, cfgAlias))
+	require.NoError(t, os.Symlink(stateDir, stateAlias))
+
+	assert.Contains(t, rootProblem(filepath.Join(cfgAlias, "dev"), filepath.Join(tmp, "other"), settings, stateDir), "inside the host settings directory")
+	assert.Contains(t, rootProblem(filepath.Join(stateAlias, "dev"), filepath.Join(tmp, "other"), settings, stateDir), "inside the host state directory")
 }
