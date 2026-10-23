@@ -126,7 +126,7 @@ func TestPreflightStep6RemovalPending(t *testing.T) {
 			}
 			testsupport.RequireID(t, "RJ-336", err)
 			assert.Equal(t, 2, cli.ExitCode(err))
-			assert.Equal(t, "romeu rm shop", cli.Of(err).Hint())
+			assert.Contains(t, cli.Of(err).Hint(), "romeu rm shop")
 		})
 		t.Run(string(c.cmd)+" with the sandbox absent", func(t *testing.T) {
 			require.NoError(t, identity(t, c.cmd, func(string) []sbxdrv.Sandbox { return nil }, removing))

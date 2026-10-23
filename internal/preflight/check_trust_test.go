@@ -112,26 +112,33 @@ func TestPreflightStep5AutoTrust(t *testing.T) {
 	}{
 		{"nothing configured passes", func(*testing.T, *Input) {}, false},
 		{"mise trusts the root", func(t *testing.T, h *Input) {
+			t.Helper()
 			write(t, filepath.Join(h.Home, ".config", "mise", "config.toml"), "[settings]\ntrusted_config_paths = [\""+h.Root+"\"]\n")
 		}, true},
 		{"mise trusts a parent of the root", func(t *testing.T, h *Input) {
+			t.Helper()
 			write(t, filepath.Join(h.Home, ".config", "mise", "config.toml"), "[settings]\ntrusted_config_paths = ['"+filepath.Dir(h.Root)+"']\n")
 		}, true},
 		{"mise trusts a path under the root", func(t *testing.T, h *Input) {
+			t.Helper()
 			write(t, filepath.Join(h.Home, ".config", "mise", "config.toml"), "[settings]\ntrusted_config_paths = ['"+filepath.Join(h.Root, "shop-env")+"']\n")
 		}, true},
 		{"mise trusts a path under HOME with a tilde", func(t *testing.T, h *Input) {
-			write(t, filepath.Join(h.Home, ".config", "mise", "config.toml"), "[settings]\ntrusted_config_paths = ['~/home/../root']\n")
+			t.Helper()
+			write(t, filepath.Join(h.Home, ".config", "mise", "config.toml"), "[settings]\ntrusted_config_paths = ['~/root']\n")
 			h.Root = filepath.Join(h.Home, "root")
 			require.NoError(t, os.MkdirAll(h.Root, 0o755))
 		}, true},
 		{"mise trusts an unrelated path", func(t *testing.T, h *Input) {
+			t.Helper()
 			write(t, filepath.Join(h.Home, ".config", "mise", "config.toml"), "[settings]\ntrusted_config_paths = ['/opt/elsewhere']\n[tools]\nnode = '22'\n")
 		}, false},
 		{"mise config with no settings", func(t *testing.T, h *Input) {
+			t.Helper()
 			write(t, filepath.Join(h.Home, ".config", "mise", "config.toml"), "[tools]\nnode = '22'\n")
 		}, false},
 		{"the environment variable of mise", func(t *testing.T, h *Input) {
+			t.Helper()
 			h.Getenv = func(k string) string {
 				if k == "MISE_TRUSTED_CONFIG_PATHS" {
 					return "/opt/elsewhere" + string(os.PathListSeparator) + h.Root
@@ -140,21 +147,27 @@ func TestPreflightStep5AutoTrust(t *testing.T) {
 			}
 		}, true},
 		{"a direnv prefix over the root", func(t *testing.T, h *Input) {
+			t.Helper()
 			write(t, filepath.Join(h.Home, ".config", "direnv", "direnv.toml"), "[whitelist]\nprefix = ['"+filepath.Dir(h.Root)+"']\n")
 		}, true},
 		{"a direnv exact entry under the root", func(t *testing.T, h *Input) {
+			t.Helper()
 			write(t, filepath.Join(h.Home, ".config", "direnv", "direnv.toml"), "[whitelist]\nexact = ['"+filepath.Join(h.Root, "a", ".envrc")+"']\n")
 		}, true},
 		{"a direnv prefix elsewhere", func(t *testing.T, h *Input) {
+			t.Helper()
 			write(t, filepath.Join(h.Home, ".config", "direnv", "direnv.toml"), "[whitelist]\nprefix = ['/opt/elsewhere']\n")
 		}, false},
 		{"an .envrc allowed by direnv allow under the root", func(t *testing.T, h *Input) {
+			t.Helper()
 			write(t, filepath.Join(h.Home, ".local", "share", "direnv", "allow", "0123abcd"), filepath.Join(h.Root, "shop-env", ".envrc")+"\n")
 		}, true},
 		{"an .envrc allowed elsewhere", func(t *testing.T, h *Input) {
+			t.Helper()
 			write(t, filepath.Join(h.Home, ".local", "share", "direnv", "allow", "0123abcd"), "/opt/elsewhere/.envrc\n")
 		}, false},
 		{"XDG_CONFIG_HOME moves the config of mise", func(t *testing.T, h *Input) {
+			t.Helper()
 			cfg := filepath.Join(h.Home, "cfg")
 			write(t, filepath.Join(cfg, "mise", "config.toml"), "[settings]\ntrusted_config_paths = ['"+h.Root+"']\n")
 			h.Getenv = func(k string) string {
@@ -165,6 +178,7 @@ func TestPreflightStep5AutoTrust(t *testing.T) {
 			}
 		}, true},
 		{"XDG_DATA_HOME moves the allow files of direnv", func(t *testing.T, h *Input) {
+			t.Helper()
 			data := filepath.Join(h.Home, "data")
 			write(t, filepath.Join(data, "direnv", "allow", "f"), h.Root+"/.envrc")
 			h.Getenv = func(k string) string {

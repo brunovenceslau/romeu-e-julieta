@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
@@ -108,7 +109,7 @@ func stripJSONC(in []byte) []byte {
 			out = append(out, '\n')
 		case c == '/' && i+1 < len(in) && in[i+1] == '*':
 			i += 2
-			for i+1 < len(in) && !(in[i] == '*' && in[i+1] == '/') {
+			for i+1 < len(in) && (in[i] != '*' || in[i+1] != '/') {
 				i++
 			}
 			i++
@@ -125,8 +126,8 @@ func stripJSONC(in []byte) []byte {
 
 // dropTrailingComma removes a comma that ends out, white space aside.
 func dropTrailingComma(out []byte) []byte {
-	for i := len(out) - 1; i >= 0; i-- {
-		switch out[i] {
+	for i, o := range slices.Backward(out) {
+		switch o {
 		case ' ', '\t', '\r', '\n':
 			continue
 		case ',':

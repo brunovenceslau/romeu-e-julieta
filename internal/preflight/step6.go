@@ -56,10 +56,10 @@ func identityStep(ctx context.Context, d *Deps, in *Input) error {
 
 // liveGeneration returns the newest generation that is not closed.
 func liveGeneration(gens []state.Generation) (state.Generation, bool) {
-	for i := len(gens) - 1; i >= 0; i-- {
-		switch gens[i].State {
+	for _, gen := range slices.Backward(gens) {
+		switch gen.State {
 		case state.GenerationOpen, state.GenerationSalvaging, state.GenerationRemoving:
-			return gens[i], true
+			return gen, true
 		}
 	}
 	return state.Generation{}, false

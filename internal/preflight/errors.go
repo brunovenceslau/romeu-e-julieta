@@ -87,7 +87,7 @@ var (
 		ID:          "RJ-336",
 		Slug:        "removal-pending",
 		Exit:        2,
-		Fix:         "romeu rm <name>",
+		Fix:         "decide: run romeu rm <name>, which finishes the removal an earlier command began",
 		RecoveredIn: "none: the hint finishes the removal that an earlier command began",
 	}
 )
