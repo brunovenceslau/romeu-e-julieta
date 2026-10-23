@@ -136,20 +136,24 @@ var (
 	buildInfo = debug.ReadBuildInfo
 )
 
-// placeholderSHA256 is the sha256 of the julieta a source build embeds:
-// the empty placeholder of 02 2.1 (REQ-0130).
-var placeholderSHA256 = state.SHA256(sha256.Sum256(nil))
+// The julieta a source build embeds: the empty placeholder of 02 2.1
+// (REQ-0130), with a version of its own. Its version is fixed, not
+// romeu's, so that two dev builds share their julieta and the second
+// one's prompt is the one line of REQ-0065.
+var (
+	placeholderSHA256  = state.SHA256(sha256.Sum256(nil))
+	placeholderVersion = "v0.0.0-placeholder"
+)
 
 // embeddedJulieta returns the julieta this binary embeds. No package
 // reads the embedded julieta yet (tools/release build maps it with an
 // overlay, and the package that consumes it lands with sync, T043), so
-// every build holds the placeholder of a source build (REQ-0130): its
-// sha256 is the one of the empty file, and its version and protocol are
-// romeu's own, since one build stamps both binaries and the two
-// protocol constants are held equal (cmd/romeu, TestProtocolIsJulietas).
-// The embed package replaces this function.
+// every build holds the placeholder of a source build (REQ-0130), with
+// romeu's protocol, since the two protocol constants are held equal
+// (cmd/romeu, TestProtocolIsJulietas). The embed package replaces this
+// function.
 var embeddedJulieta = func(v cli.Version) state.JulietaBinary {
-	return state.JulietaBinary{Version: Version(v), Protocol: v.Protocol, SHA256: placeholderSHA256}
+	return state.JulietaBinary{Version: placeholderVersion, Protocol: v.Protocol, SHA256: placeholderSHA256}
 }
 
 // develVersion is the version stamp of a build that tools/release did

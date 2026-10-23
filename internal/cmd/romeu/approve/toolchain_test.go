@@ -258,7 +258,7 @@ func TestMeasure(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "0.49.2", live.Sbx)
 	assert.Equal(t, state.Binary{Version: "v1.0.0", SHA256: sha256.Sum256([]byte("a build"))}, live.Romeu)
-	assert.Equal(t, state.JulietaBinary{Version: "v1.0.0", Protocol: 1, SHA256: sha256.Sum256(nil)}, live.Julieta,
+	assert.Equal(t, state.JulietaBinary{Version: "v0.0.0-placeholder", Protocol: 1, SHA256: sha256.Sum256(nil)}, live.Julieta,
 		"a build embeds the placeholder until the embed package lands")
 	want, err := canon.Digest(canon.Catalog, live.Catalog)
 	require.NoError(t, err)
