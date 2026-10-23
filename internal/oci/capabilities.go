@@ -27,7 +27,7 @@ type Capabilities struct {
 	Args map[string]Arg `json:"args,omitempty"`
 	// Relations are what the kit provides, requires, integrates with and
 	// conflicts with, and its fallback version.
-	Relations *Relations `json:"relations,omitempty"`
+	Relations *Relations `json:"relations,omitzero"`
 	// Kits are the kits a set lists, in order.
 	Kits []KitRef `json:"kits,omitempty"`
 	// Build is the inline recipe, as written.
@@ -35,7 +35,7 @@ type Capabilities struct {
 	// Dockerfile names the companion recipe, as written.
 	Dockerfile string `json:"dockerfile,omitempty"`
 	// Network is the egress policy, by phase.
-	Network *Network `json:"network,omitempty"`
+	Network *Network `json:"network,omitzero"`
 	// Volumes are the volume and host-mount requests, by path.
 	Volumes []Volume `json:"volumes,omitempty"`
 	// Credentials are the credential requests, by service.
@@ -44,19 +44,19 @@ type Capabilities struct {
 	SSHAgent []SSHAgent `json:"sshAgent,omitempty"`
 	// Lifecycle is what the engine runs for the kit: install and startup
 	// hooks, files and the interactive argv.
-	Lifecycle *Lifecycle `json:"lifecycle,omitempty"`
+	Lifecycle *Lifecycle `json:"lifecycle,omitzero"`
 	// Ports are the container ports to publish.
 	Ports []Port `json:"ports,omitempty"`
 	// Devices are the USB passthrough requests.
 	Devices []Device `json:"devices,omitempty"`
 	// Resources are the CPU, memory and GPU limits.
-	Resources *Resources `json:"resources,omitempty"`
+	Resources *Resources `json:"resources,omitzero"`
 	// Context is the instruction content the agent reads.
 	Context []Context `json:"context,omitempty"`
 	// Skills are the agent-skill and agent-skills requests.
 	Skills []Skill `json:"skills,omitempty"`
 	// Sessions is the argv shapes that drive the agent's sessions.
-	Sessions *Sessions `json:"sessions,omitempty"`
+	Sessions *Sessions `json:"sessions,omitzero"`
 	// Flags are the requests that take no config: privileged execution,
 	// the sandbox-agent platform, a long-running workload, the git
 	// identity and the kit registry.
@@ -67,13 +67,13 @@ type Capabilities struct {
 // is for the installer to read, is not kept.
 type Arg struct {
 	// Default is used when the caller supplies nothing; nil means none.
-	Default *string `json:"default,omitempty"`
+	Default *string `json:"default,omitzero"`
 	// Required says the caller must supply a value.
 	Required bool `json:"required,omitzero"`
 	// Enum are the exact values allowed, sorted.
 	Enum []string `json:"enum,omitempty"`
 	// Pattern is the RE2 expression the whole value must match.
-	Pattern *string `json:"pattern,omitempty"`
+	Pattern *string `json:"pattern,omitzero"`
 	// Env opts the value into the container environment under this name.
 	Env string `json:"env,omitempty"`
 	// BuildArg resolves the arg at build under this name.
@@ -159,9 +159,9 @@ type Credential struct {
 	// Phases are "install" and "runtime", sorted.
 	Phases []string `json:"phases"`
 	// APIKey is the api-key presentation.
-	APIKey *APIKey `json:"apiKey,omitempty"`
+	APIKey *APIKey `json:"apiKey,omitzero"`
 	// OAuth is the oauth presentation.
-	OAuth *OAuth `json:"oauth,omitempty"`
+	OAuth *OAuth `json:"oauth,omitzero"`
 	// Optional is the request's optional flag.
 	Optional bool `json:"optional,omitzero"`
 }
@@ -193,15 +193,15 @@ type Inject struct {
 // OAuth is the oauth form of a credential.
 type OAuth struct {
 	// TokenEndpoint is where tokens are issued.
-	TokenEndpoint *Endpoint `json:"tokenEndpoint,omitempty"`
+	TokenEndpoint *Endpoint `json:"tokenEndpoint,omitzero"`
 	// ResourceHosts are the hosts the token is presented to, sorted.
 	ResourceHosts []string `json:"resourceHosts,omitempty"`
 	// Sentinels are the placeholder values the container sees.
-	Sentinels *Sentinels `json:"sentinels,omitempty"`
+	Sentinels *Sentinels `json:"sentinels,omitzero"`
 	// CredentialFile is the file the container reads the token from.
-	CredentialFile *CredentialFile `json:"credentialFile,omitempty"`
+	CredentialFile *CredentialFile `json:"credentialFile,omitzero"`
 	// ResponseFields name the fields of the token response.
-	ResponseFields *ResponseFields `json:"responseFields,omitempty"`
+	ResponseFields *ResponseFields `json:"responseFields,omitzero"`
 	// Passthrough returns the real token to the container, as written.
 	Passthrough string `json:"passthrough,omitempty"`
 }
@@ -228,7 +228,7 @@ type CredentialFile struct {
 	Path string `json:"path"`
 	// Structure is the nested map written to the file. A whole number
 	// of it is read as a float64, which holds it exactly to 2^53.
-	Structure map[string]any `json:"structure,omitempty"`
+	Structure map[string]any `json:"structure,omitzero"`
 	// Format is "json" or "toml", as written.
 	Format string `json:"format,omitempty"`
 }
@@ -384,7 +384,7 @@ type Sessions struct {
 	// Continue reopens the latest session.
 	Continue []string `json:"continue,omitempty"`
 	// List enumerates the resumable sessions.
-	List *Command `json:"list,omitempty"`
+	List *Command `json:"list,omitzero"`
 	// Optional is the request's optional flag.
 	Optional bool `json:"optional,omitzero"`
 }

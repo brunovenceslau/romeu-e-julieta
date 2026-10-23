@@ -675,21 +675,50 @@ func TestStore_PutDescriptor_comparesValues(t *testing.T) {
 }
 
 func TestStore_Descriptors_holdTheNormalizedSetOfTheSittingKit(t *testing.T) {
+	empty := ""
+	tests := []struct {
+		name string
+		edit func(c *oci.Capabilities)
+	}{
+		{"a credential file with a structure", func(c *oci.Capabilities) {
+			c.Credentials = []oci.Credential{{
+				Service: "svc", Phases: []string{"runtime"},
+				OAuth: &oci.OAuth{CredentialFile: &oci.CredentialFile{Path: "/a.json", Structure: map[string]any{"a": 1.0, "b": map[string]any{"c": "d"}}}},
+			}}
+		}},
+		// A member present but empty is not a member absent: each reads
+		// back as it was written.
+		{"an empty default and pattern", func(c *oci.Capabilities) {
+			c.Args = map[string]oci.Arg{"host": {Default: &empty, Pattern: &empty}}
+		}},
+		{"an empty oauth", func(c *oci.Capabilities) {
+			c.Credentials = []oci.Credential{{Service: "svc", Phases: []string{"runtime"}, OAuth: &oci.OAuth{}}}
+		}},
+		{"an empty structure", func(c *oci.Capabilities) {
+			c.Credentials = []oci.Credential{{
+				Service: "svc", Phases: []string{"runtime"},
+				OAuth: &oci.OAuth{CredentialFile: &oci.CredentialFile{Path: "/a.json", Structure: map[string]any{}}},
+			}}
+		}},
+		{"an empty network", func(c *oci.Capabilities) { c.Network = &oci.Network{} }},
+		{"an empty resources", func(c *oci.Capabilities) { c.Resources = &oci.Resources{} }},
+	}
 	data, err := os.ReadFile("../../kits/git-ssh-sign/git-ssh-sign.yaml")
 	require.NoError(t, err)
-	kit, err := oci.ParseDescriptor(data)
-	require.NoError(t, err)
-	kit.Capabilities.Credentials = []oci.Credential{{
-		Service: "svc", Phases: []string{"runtime"},
-		OAuth: &oci.OAuth{CredentialFile: &oci.CredentialFile{Path: "/a.json", Structure: map[string]any{"a": 1.0, "b": map[string]any{"c": "d"}}}},
-	}}
-	d := Descriptor{Digest: "sha256:" + strings.Repeat("7", 64), Capabilities: &kit.Capabilities}
-	s := openTemp(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kit, err := oci.ParseDescriptor(data)
+			require.NoError(t, err)
+			tt.edit(&kit.Capabilities)
+			d := Descriptor{Digest: "sha256:" + strings.Repeat("7", 64), Capabilities: &kit.Capabilities}
+			s := openTemp(t)
 
-	require.NoError(t, s.PutDescriptor(held(t, s), d))
-	require.NoError(t, s.PutDescriptor(held(t, s), d), "the same set again writes nothing")
-	got, err := s.GetDescriptor(d.Digest)
+			require.NoError(t, s.PutDescriptor(held(t, s), d))
+			require.NoError(t, s.PutDescriptor(held(t, s), d), "the same set again writes nothing")
+			got, err := s.GetDescriptor(d.Digest)
 
-	require.NoError(t, err)
-	assert.Equal(t, d.Capabilities, got.Capabilities, "the set reads back as it was written")
+			require.NoError(t, err)
+			assert.Equal(t, d.Capabilities, got.Capabilities, "the set reads back as it was written")
+		})
+	}
 }
