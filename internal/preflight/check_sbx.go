@@ -54,19 +54,17 @@ func checkBroadAllow(ctx context.Context, h *hostEnv) error {
 		if _, one := scopeOf(r.scope); one || r.effect != "allow" {
 			continue
 		}
-		switch {
-		case r.kind == "default":
+		if r.kind == "default" {
 			return SbxBroadAllow.New("the default network policy of sbx allows every destination",
 				cli.Detail{Key: "rule", Value: "default network policy: allow"})
-		default:
-			broad, err := broadPattern(r.resource)
-			if err != nil {
-				return err
-			}
-			if broad {
-				return SbxBroadAllow.New("a global allow rule of sbx is broad: "+r.resource,
-					cli.Detail{Key: "rule", Value: r.resource})
-			}
+		}
+		broad, err := broadPattern(r.resource)
+		if err != nil {
+			return err
+		}
+		if broad {
+			return SbxBroadAllow.New("a global allow rule of sbx is broad: "+r.resource,
+				cli.Detail{Key: "rule", Value: r.resource})
 		}
 	}
 	return nil
