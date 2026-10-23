@@ -156,18 +156,58 @@ func checkPublic(address string) error {
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrPrivateAddress, quote(address))
 	}
-	ip = ip.Unmap()
-	if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() ||
-		ip.IsMulticast() || reserved.Contains(ip) || ip == netip.AddrFrom4([4]byte{255, 255, 255, 255}) {
-		return fmt.Errorf("%w: %s", ErrPrivateAddress, ip)
+	if !public(ip) {
+		return fmt.Errorf("%w: %s", ErrPrivateAddress, ip.Unmap())
 	}
 	return nil
 }
 
+// public reports whether ip is a public unicast address. An IPv6 address
+// that carries an IPv4 one for the network to translate (NAT64, 6to4) is
+// as public as the IPv4 address it carries.
+func public(ip netip.Addr) bool {
+	ip = ip.Unmap()
+	if ip.Is6() {
+		b := ip.As16()
+		switch {
+		case nat64.Contains(ip):
+			return public(netip.AddrFrom4([4]byte(b[12:16])))
+		case sixToFour.Contains(ip):
+			return public(netip.AddrFrom4([4]byte(b[2:6])))
+		}
+	}
+	return ip.IsGlobalUnicast() && !ip.IsPrivate() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast() && !ip.IsUnspecified() &&
+		!ip.IsMulticast() && !reserved.Contains(ip) && ip != netip.AddrFrom4([4]byte{255, 255, 255, 255})
+}
+
+// The translation prefixes whose addresses carry an IPv4 address: the
+// well-known NAT64 prefix (RFC 6052), the last four bytes, and 6to4 (RFC
+// 3056), the two bytes after the prefix.
+var (
+	nat64     = netip.MustParsePrefix("64:ff9b::/96")
+	sixToFour = netip.MustParsePrefix("2002::/16")
+)
+
 // reserved are the ranges of public-looking space that are not the
-// internet's: carrier-grade NAT (RFC 6598) and the benchmarking range
-// (RFC 2544), where a cloud's internal services can sit.
-var reserved = prefixes{netip.MustParsePrefix("100.64.0.0/10"), netip.MustParsePrefix("198.18.0.0/15")}
+// internet's (RFC 6890 and its updates): "this network" (0.0.0.0/8),
+// carrier-grade NAT (RFC 6598), the IETF protocol assignments, the
+// documentation ranges of IPv4 and IPv6 (RFC 5737, RFC 3849, RFC 9637),
+// the benchmarking range (RFC 2544), the former class E (240.0.0.0/4),
+// and the local-use NAT64 prefix (RFC 8215), whose translation is the
+// network's own. A cloud's internal services can sit in any of them.
+var reserved = prefixes{
+	netip.MustParsePrefix("0.0.0.0/8"),
+	netip.MustParsePrefix("100.64.0.0/10"),
+	netip.MustParsePrefix("192.0.0.0/24"),
+	netip.MustParsePrefix("192.0.2.0/24"),
+	netip.MustParsePrefix("198.18.0.0/15"),
+	netip.MustParsePrefix("198.51.100.0/24"),
+	netip.MustParsePrefix("203.0.113.0/24"),
+	netip.MustParsePrefix("240.0.0.0/4"),
+	netip.MustParsePrefix("2001:db8::/32"),
+	netip.MustParsePrefix("3fff::/20"),
+	netip.MustParsePrefix("64:ff9b:1::/48"),
+}
 
 // prefixes is a list of address ranges.
 type prefixes []netip.Prefix
