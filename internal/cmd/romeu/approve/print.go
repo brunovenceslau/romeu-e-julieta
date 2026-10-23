@@ -10,8 +10,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/sbxdrv"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // Question is the question gate 1 asks after its text.
@@ -37,7 +39,8 @@ const shortLen = 12
 // applied egress holds one of its domains. A change to the meta or base
 // set, and one to a tool the record lists with no domain or not at all,
 // affects every project, since nothing on the host tells which projects
-// use that tool. The text is escaped by the CLI writer it is written to.
+// use that tool. Text escapes what it returns (I29), whatever writer it
+// is written to.
 func Text(rec *state.Toolchain, live Live, projects map[string][]string) (string, error) {
 	var r state.Toolchain
 	if rec != nil {
@@ -48,7 +51,7 @@ func Text(rec *state.Toolchain, live Live, projects map[string][]string) (string
 	romeu := versionChange(r.Romeu.Version, live.Romeu.Version) + ", sha256 " +
 		change(short(sumText(r.Romeu.SHA256)), short(live.Romeu.SHA256.String()))
 	if rec != nil && r.Julieta == live.Julieta && r.CatalogDigest == live.CatalogDigest {
-		return "gate 1: " + sbx + ", romeu " + romeu + "; julieta and the catalog are unchanged; " + Question, nil
+		return escapeLines("gate 1: " + sbx + ", romeu " + romeu + "; julieta and the catalog are unchanged; " + Question), nil
 	}
 
 	var b strings.Builder
@@ -67,7 +70,8 @@ func Text(rec *state.Toolchain, live Live, projects map[string][]string) (string
 		if rec != nil {
 			var err error
 			if old, err = recordedCatalog(r.Catalog); err != nil {
-				return "", fmt.Errorf("gate 1: the catalog of toolchain.json: %w", err)
+				return "", state.RecordUnreadable.Wrap(err, "the acknowledged catalog of toolchain.json does not decode",
+					cli.Detail{Key: "file", Value: "toolchain.json, in the state directory"})
 			}
 		}
 		line("  catalog %s", change(short(digestText(r.CatalogDigest)), short(live.CatalogDigest.String())))
@@ -76,12 +80,28 @@ func Text(rec *state.Toolchain, live Live, projects map[string][]string) (string
 		}
 	}
 	b.WriteString(Question)
-	return b.String(), nil
+	return escapeLines(b.String()), nil
+}
+
+// escapeLines escapes each line of s (termsafe, I29), keeping the line
+// feeds that end them. Every value is escaped where it enters the text
+// too, so a line feed in a value never starts a line; escaping is
+// idempotent, so the CLI writer the text is written to leaves it as it
+// is, and the prompt is safe whatever writer it goes to.
+//
+//romeu:invariant I29 guard
+func escapeLines(s string) string {
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		lines[i] = termsafe.Escape(l)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // change returns "old -> new", "new" when they are equal, and
 // "new (none recorded)" when nothing was recorded.
 func change(old, new string) string {
+	old, new = termsafe.Escape(old), termsafe.Escape(new)
 	switch old {
 	case new:
 		return new
@@ -154,7 +174,7 @@ func newestRecorded() string {
 func window(live string) string {
 	s := strings.Join(sbxdrv.RecordedVersions, ", ")
 	if !slices.Contains(sbxdrv.RecordedVersions, live) {
-		s += "; " + live + " is outside it, untested"
+		s += "; " + termsafe.Escape(live) + " is outside it, untested"
 	}
 	return s
 }
@@ -177,7 +197,11 @@ func catalogDiff(old, new Catalog, projects map[string][]string) []string {
 	add := func(what string, delta string, ps []string) {
 		names := "none"
 		if len(ps) > 0 {
-			names = strings.Join(ps, ", ")
+			escaped := make([]string, len(ps))
+			for i, p := range ps {
+				escaped[i] = termsafe.Escape(p)
+			}
+			names = strings.Join(escaped, ", ")
 		}
 		lines = append(lines, what+": "+delta+"; projects: "+names)
 	}
@@ -193,7 +217,7 @@ func catalogDiff(old, new Catalog, projects map[string][]string) []string {
 		o, inOld := old.Tools[k]
 		n, inNew := new.Tools[k]
 		d := domainsDelta(o, n, new)
-		what := "tool " + k
+		what := "tool " + termsafe.Escape(k)
 		switch {
 		case !inOld:
 			what += " (new)"
@@ -215,7 +239,7 @@ func catalogDiff(old, new Catalog, projects map[string][]string) []string {
 	for _, dom := range sortedKeys(new.Domains) {
 		o, ok := old.Domains[dom]
 		if ok && o.Upload != new.Domains[dom].Upload {
-			add("upload flag of "+dom, fmt.Sprintf("%t -> %t", o.Upload, new.Domains[dom].Upload), affected([]string{dom}))
+			add("upload flag of "+termsafe.Escape(dom), fmt.Sprintf("%t -> %t", o.Upload, new.Domains[dom].Upload), affected([]string{dom}))
 		}
 	}
 	return lines
@@ -228,7 +252,7 @@ func domainsDelta(old, new []string, c Catalog) string {
 	var parts []string
 	for _, d := range new {
 		if !slices.Contains(old, d) {
-			p := "+ " + d
+			p := "+ " + termsafe.Escape(d)
 			if c.Domains[d].Upload {
 				p += " (upload)"
 			}
@@ -237,7 +261,7 @@ func domainsDelta(old, new []string, c Catalog) string {
 	}
 	for _, d := range old {
 		if !slices.Contains(new, d) {
-			parts = append(parts, "- "+d)
+			parts = append(parts, "- "+termsafe.Escape(d))
 		}
 	}
 	return strings.Join(parts, ", ")

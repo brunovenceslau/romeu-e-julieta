@@ -13,7 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli/testsupport"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // text returns Text for rec and live, with no project.
@@ -151,4 +154,59 @@ func TestTextFirstAcknowledgement(t *testing.T) {
 	assert.Contains(t, got, "    base: + git.example (upload); projects: shop\n")
 	assert.Contains(t, got, "    tool aqua:jqlang/jq (new): no domain; projects: shop\n")
 	assert.Contains(t, got, "    tool core:go (new): + dl.example, + up.example (upload); projects: shop\n")
+}
+
+// TestTextAffectsAProjectByAnAddedDomain: a project whose applied
+// egress holds only a domain the tool gains is affected too.
+func TestTextAffectsAProjectByAnAddedDomain(t *testing.T) {
+	t.Parallel()
+	old := DecodeCatalog(fixtureCatalog(t, sampleFamily))
+	next := DecodeCatalog(fixtureCatalog(t, "schema: catalog/v1\n"+
+		"domains:\n  dl.example: {upload: false}\n  up.example: {upload: true}\n  new.example: {upload: false}\n"+
+		"tools:\n  core:go: [dl.example, up.example, new.example]\n  aqua:jqlang/jq: []\n"))
+	got := catalogDiff(old, next, map[string][]string{"fresh": {"new.example"}, "other": {"x.example"}})
+	assert.Equal(t, []string{"tool core:go: + new.example; projects: fresh"}, got)
+}
+
+// TestTextUnreadableCatalog: a record whose stored catalog does not
+// decode is record-unreadable (RJ-334), never a bare error.
+func TestTextUnreadableCatalog(t *testing.T) {
+	t.Parallel()
+	live := sampleLive(t)
+	rec := recordOf(t, live)
+	rec.Catalog = state.Catalog{"tools": "not a map"}
+	live.CatalogDigest = canon.Sum[canon.CatalogKind]{9}
+	_, err := Text(rec, live, nil)
+	testsupport.RequireID(t, "RJ-334", err)
+}
+
+// TestTextEscapes: a control character in a version, a catalog domain or
+// a project name comes out escaped (I29), from Text itself and through
+// the CLI writer, which leaves Text's output as it is.
+//
+//romeu:invariant I29 test
+func TestTextEscapes(t *testing.T) {
+	t.Parallel()
+	live := sampleLive(t)
+	rec := recordOf(t, live)
+	live.Romeu.Version = "v1.1.0\x1b[2J\nforged line"
+	live.Julieta.Version = "v1.1.0\a"
+	live.Catalog.Tools["core:go"] = []string{"dl.example", "up.example", "bad\x1b]0;x\x07.example"}
+	live.CatalogDigest = canon.Sum[canon.CatalogKind]{9}
+	projects := map[string][]string{"shop\x1b[31m": {"dl.example"}}
+
+	got, err := Text(rec, live, projects)
+	require.NoError(t, err)
+	for _, r := range strings.TrimSuffix(got, Question) {
+		if r != '\n' {
+			require.False(t, r < 0x20 || r == 0x7f, "a raw control %q in %q", r, got)
+		}
+	}
+	assert.NotContains(t, got, "\nforged line", "a line feed in a value does not start a line")
+	assert.Contains(t, got, termsafe.Escape("shop\x1b[31m"))
+
+	var through strings.Builder
+	_, err = cli.NewWriter(&through).Write([]byte(got))
+	require.NoError(t, err)
+	assert.Equal(t, got, through.String())
 }
