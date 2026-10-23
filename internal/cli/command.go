@@ -105,6 +105,13 @@ type Command struct {
 	// Deprecated, Version, help or json flag; Register refuses those.
 	New func(env *Env) *cobra.Command
 
+	// NoJourney is the reason no journey of 09 runs the command, or
+	// empty when one does: a romeu command with no line in any
+	// e2e/scenarios/<journey>/commands.yaml declares it here, and the
+	// test of e2e/scenarios fails a command with neither (T041, rule 5
+	// of docs/plan.md).
+	NoJourney string
+
 	effects Effects
 }
 
