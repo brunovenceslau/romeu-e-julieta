@@ -180,11 +180,17 @@ first, marked, the changed capabilities, gated domains, secret argv and
 the workload repository, then content-only kit changes with file and
 line counts (a golden holds that order); then it shows every changed
 field, a file-level diff of kit sources (added, removed, changed paths
-with modes; full text diffs; a binary or non-UTF-8 file as size and
-sha256, flagged `binary`), the workload repository highlighted if it
-changed, and the host-settings argv behind each secret name; the summary
-is repeated right above the prompt, so a long diff cannot push it out of
-view. All text passes through `termsafe`.
+with modes; full text diffs; each side of a file judged on its own, an
+executable file, a file that starts with `#!` and a file of which at
+most one byte in ten is a NUL or not UTF-8 shown as text, its other
+bytes escaped, so a stray byte never hides a script, and any other side
+as its size and sha256, flagged `binary`; decided on 2026-10-23), the
+workload repository highlighted if it changed, and the host-settings
+argv behind each secret name; the summary is repeated right above the
+prompt, so a long diff cannot push it out of view. The whole diff, its
+summary and the prompt are written to stderr, so a piped stdout cannot
+hide what the operator approves (decided on 2026-10-23). All text
+passes through `termsafe`.
 
 `REQ-0072` Approvals are per machine by design. *Why for us:* Codespaces
 authorizes extra repo access at create, per user; ours is per machine

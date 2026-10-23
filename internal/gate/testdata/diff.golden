@@ -1,0 +1,66 @@
+gate 2: widening of the project shop
+summary:
+  ! capability workload: mounts added
+  ! gated domain added: upload.example (spec extra)
+  ! gated domain removed: gone.example (spec extra)
+  ! secret argv changed: github
+  ! secret argv changed: npm
+  ! workload repository: docker.io/example/dev -> docker.io/other/dev
+  kit content personal:tools: 1 file(s) changed, 0 added, 0 removed; +1 -1 lines
+  ! repo removed: shop-web https://github.com/example/shop-web
+  ! port removed: 9090:9090/tcp
+  changed: repos, secrets, workload, kits, egressGated, ports
+
+changed members of the widening set:
+  repos:
+    - {"dir":"shop-web","primary":false,"ref":"","url":"https://github.com/example/shop-web"}
+  secrets:
+    - {"argvDigest":"f6c541a8f52f370346803ed5aac3e294b1c3a234b2b071031b015534228c1849","name":"github","service":"github.com"}
+    - {"argvDigest":"73f386bb388b41293711593a8f353d2c9c11d825944adc75dd1d7c69feb55190","name":"npm","service":"npmjs.org"}
+    + {"argvDigest":"dfe31cdc45b15bcf49b02dccaeb7529154a842a2cb64072055ed92dcae5688bf","name":"github","service":"github.com"}
+    + {"argvDigest":"73f386bb388b41293711593a8f353d2c9c11d825944adc75dd1d7c69feb55190","name":"npm","service":"registry.npmjs.org"}
+  workload:
+    - {"capabilities":{"network":["registry.example"]},"digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","repository":"docker.io/example/dev"}
+    + {"capabilities":{"mounts":["/var/run/docker.sock"],"network":["registry.example"]},"digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","repository":"docker.io/other/dev"}
+  kits:
+    - {"args":{"level":"1"},"capabilities":{"lifecycle":["postCreate"]},"contentDigest":"1efc270eedd517ad0d68c28a4d4caf87c8100bf4942e69403643a978410e074c","id":"tools","source":"personal"}
+    + {"args":{"level":"1"},"capabilities":{"lifecycle":["postCreate"]},"contentDigest":"4367a0c7108c9bf02de240aa378bd96973b787c2f3b3e2656ff9e880a49fb1c1","id":"tools","source":"personal"}
+  egressGated:
+    - {"domain":"gone.example","reason":"spec extra"}
+    + {"domain":"upload.example","reason":"spec extra"}
+  ports:
+    - "9090:9090/tcp"
+
+kit files:
+  personal:tools (changed):
+    M 100644 README
+    = 100755 bin/run
+    diff README:
+      @@ -2,1 +2,1 @@
+      -two
+      +2
+  product:julieta (unchanged):
+    = 100644 spec.yaml
+
+workload repository:
+  !!! changed: docker.io/example/dev -> docker.io/other/dev !!!
+
+render (sbxenv.yaml without the ungated keys run, sandboxOptions):
+  (unchanged)
+
+secret argv (host settings):
+  github@shop (service github.com): ["/usr/bin/env","-i","/usr/local/bin/gh","auth","token"]
+  npm@shop (service registry.npmjs.org): ["/usr/bin/false"]
+
+summary, again (gate 2: widening of the project shop):
+  ! capability workload: mounts added
+  ! gated domain added: upload.example (spec extra)
+  ! gated domain removed: gone.example (spec extra)
+  ! secret argv changed: github
+  ! secret argv changed: npm
+  ! workload repository: docker.io/example/dev -> docker.io/other/dev
+  kit content personal:tools: 1 file(s) changed, 0 added, 0 removed; +1 -1 lines
+  ! repo removed: shop-web https://github.com/example/shop-web
+  ! port removed: 9090:9090/tcp
+  changed: repos, secrets, workload, kits, egressGated, ports
+approve this widening? [y/N] 

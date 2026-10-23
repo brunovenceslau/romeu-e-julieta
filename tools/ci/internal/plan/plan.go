@@ -68,6 +68,8 @@ var Generated = []string{
 	"docs/adr/README.md",
 	"docs/diagrams/**",
 	"internal/cli/*_gen.go",
+	"internal/gate/*_gen.go",
+	"internal/gate/*_gen_test.go",
 }
 
 // The fields of a task's front matter, in the order the plan writes

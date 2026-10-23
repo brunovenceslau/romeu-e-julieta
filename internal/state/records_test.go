@@ -22,6 +22,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
 )
 
 // readTestdata returns a file of testdata.
@@ -72,12 +73,26 @@ func TestDecodeProject(t *testing.T) {
 			return strings.Replace(s, "01j9zc2q8x7w4t6y3r5e1v9k0p", "01J9ZC2Q8X7W4T6Y3R5E1V9K0P", 1)
 		}},
 		{"a digest of another length", func(s string) string {
-			return strings.Replace(s, "1111111111111111111111111111111111111111111111111111111111111111", "11", 1)
+			return strings.Replace(s, "43bf1a6187ca4a12db90ea196eba079ca267f571eabee4bb139ee91540f895e0", "43", 1)
+		}},
+		{"a widening set changed after its digest", func(s string) string {
+			return strings.Replace(s, `"domain": "github.com"`, `"domain": "github.co"`, 1)
+		}},
+		{"an approval whose renderDigest is not its set's", func(s string) string {
+			return strings.Replace(s, `"renderDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+    "specCommit"`, `"renderDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+    "specCommit"`, 1)
 		}},
 		{"a state that is no generation state", func(s string) string { return strings.Replace(s, `"state": "open"`, `"state": "none"`, 1) }},
 		{"a generation with no id", func(s string) string { return strings.Replace(s, `"id": "01j9zc2q8x7w4t6y3r5e1v9k0p",`, "", 1) }},
 		{"a time that is not a time", func(s string) string { return strings.Replace(s, "2026-10-02T09:14:07Z", "yesterday", 1) }},
 		{"text that is not JSON", func(string) string { return "{" }},
+		{"a widening set with an unknown member", func(s string) string {
+			return strings.Replace(s, `"project": "shop",`, `"project": "shop", "devices": [],`, 1)
+		}},
+		{"a widening set with a digest that is no digest", func(s string) string {
+			return strings.Replace(s, `"renderDigest": "5555555555555555555555555555555555555555555555555555555555555555"`, `"renderDigest": "55"`, 1)
+		}},
 		{"trailing data", func(s string) string { return s + "{}" }},
 		{"a result no salvage has", func(s string) string { return strings.Replace(s, `"result": "complete"`, `"result": "fine"`, 1) }},
 		{"a second open generation", func(s string) string {
@@ -159,6 +174,34 @@ func TestStore_UpdateProject(t *testing.T) {
 			_, lerr := s.LoadProject("shop")
 			assert.Equal(t, "RJ-334", cli.Of(lerr).ID, "a reader reports it too")
 		}
+	})
+	t.Run("a record whose approval is another project's is never written over", func(t *testing.T) {
+		s := openTemp(t)
+		doc := readTestdata(t, "project.json")
+		path := seedProject(t, s, "other", doc)
+		_, err := s.LoadProject("other")
+		assert.Equal(t, "RJ-334", cli.Of(err).ID)
+		called := false
+		err = s.UpdateProject(held(t, s), "other", func(*Project) error { called = true; return nil })
+		assert.Equal(t, "RJ-334", cli.Of(err).ID)
+		assert.False(t, called)
+		after, rerr := os.ReadFile(path)
+		require.NoError(t, rerr)
+		assert.Equal(t, doc, after, "byte-identical")
+	})
+	t.Run("a fn that records the approval of another project writes nothing", func(t *testing.T) {
+		s := openTemp(t)
+		err := s.UpdateProject(held(t, s), "shop", func(p *Project) error {
+			a := approvalFor("other", canon.ULID{1})
+			p.Approval = &a
+			return nil
+		})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "the project check", "the message names the check")
+		require.NotErrorIs(t, err, ErrInvalid, "a refused write is no unreadable record")
+		_, isCLI := errors.AsType[*cli.Error](err)
+		assert.False(t, isCLI, "RJ-334 is for the read path only")
+		assert.NoFileExists(t, filepath.Join(s.Dir(), "projects", "shop.json"))
 	})
 	t.Run("a failing fn writes nothing", func(t *testing.T) {
 		s := openTemp(t)
@@ -299,6 +342,23 @@ func TestEncode_refusesWhatNoReaderWouldTake(t *testing.T) {
 		_, err := EncodeProject(p)
 		require.Error(t, err)
 	})
+	t.Run("an approval whose widening set names no project", func(t *testing.T) {
+		p := NewProject()
+		a := approvalFor("", canon.ULID{1})
+		p.Approval = &a
+		_, err := EncodeProject(p)
+		require.Error(t, err)
+	})
+	t.Run("an approval whose digest is not its set's", func(t *testing.T) {
+		p := NewProject()
+		a := approvalFor("shop", canon.ULID{1})
+		a.WideningDigest = canon.Sum[canon.WideningKind]{1}
+		p.Approval = &a
+		_, err := EncodeProject(p)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "the widening set check", "the message names the check")
+		require.NotErrorIs(t, err, ErrInvalid, "a refused write is no unreadable record")
+	})
 	t.Run("a retiring with no attic", func(t *testing.T) {
 		p := NewProject()
 		p.Retiring = &Retiring{}
@@ -338,6 +398,21 @@ func TestEncode_refusesWhatNoReaderWouldTake(t *testing.T) {
 	})
 }
 
+// approvalFor returns a whole approval of the project whose digests are
+// those of its widening set.
+func approvalFor(project string, candidate canon.ULID) Approval {
+	set := gate.Set{Project: project, RenderDigest: canon.Sum[canon.RenderKind]{2}}
+	sum, err := gate.Digest(set)
+	if err != nil {
+		panic(err)
+	}
+	return Approval{
+		WideningDigest: sum, Set: set, RenderDigest: set.RenderDigest,
+		SpecCommit: "0123456789abcdef0123456789abcdef01234567", CandidateID: candidate,
+		ApprovedAt: time.Date(2026, 10, 2, 9, 10, 0, 0, time.UTC),
+	}
+}
+
 // validToolchain returns a toolchain record whole enough to write.
 func validToolchain() *Toolchain {
 	return &Toolchain{
@@ -347,6 +422,24 @@ func validToolchain() *Toolchain {
 		CatalogDigest: canon.Sum[canon.CatalogKind]{3}, Catalog: Catalog{},
 		AcknowledgedAt: testNow,
 	}
+}
+
+// TestApprovalSetIsWrittenInItsNormalForm: the set of an approval is
+// recorded in the normal form of gate.Normal, its sorted lists sorted,
+// whatever order the caller gave.
+func TestApprovalSetIsWrittenInItsNormalForm(t *testing.T) {
+	p := NewProject()
+	a := approvalFor("shop", canon.ULID{1})
+	a.Set.Ports = []string{"9090:9090/tcp", "8080:8080/tcp"}
+	sum, err := gate.Digest(a.Set)
+	require.NoError(t, err)
+	a.WideningDigest = sum
+	p.Approval = &a
+	data, err := EncodeProject(p)
+	require.NoError(t, err)
+	got, err := DecodeProject(data)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"8080:8080/tcp", "9090:9090/tcp"}, got.Approval.Set.Ports)
 }
 
 func TestDecodeToolchain(t *testing.T) {
@@ -438,10 +531,9 @@ func TestEncode_timestampsAreUTCWholeSeconds(t *testing.T) {
 	t.Run("project", func(t *testing.T) {
 		s := testSeams()
 		p, id := projectIn(t, s, GenerationClosedRemoved)
-		p.Approval = &Approval{
-			WideningDigest: canon.Sum[canon.WideningKind]{1}, Set: WideningSet{}, RenderDigest: canon.Sum[canon.RenderKind]{2},
-			SpecCommit: "0123456789abcdef0123456789abcdef01234567", CandidateID: id, ApprovedAt: at,
-		}
+		a := approvalFor("shop", id)
+		a.ApprovedAt = at
+		p.Approval = &a
 		p.LastRunAt = at
 		p.Generations[0].CreatedAt = at
 		p.Generations[0].ClosedAt = at

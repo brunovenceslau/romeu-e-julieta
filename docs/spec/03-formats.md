@@ -754,7 +754,7 @@ decoders refuse uppercase.
 | Kind | Input | Used by |
 |---|---|---|
 | `widening` | the widening set | gate 2 |
-| `recreate` | every field tagged `apply:"recreate"` | "recreate needed" |
+| `recreate` | every field tagged `apply:"recreate"`: a gated one in its resolved form, the member of the widening set that holds it (so kit content, workload capabilities and secret argv count), and an ungated one (`sandboxOptions`) as the spec holds it; decided on 2026-10-23 | "recreate needed" |
 | `render` | the normalized render (01 1.4) | the widening set's `renderDigest` |
 | `egress` | the sorted effective domain union | `render.json` |
 | `catalog` | the decoded catalog | gate 1 |

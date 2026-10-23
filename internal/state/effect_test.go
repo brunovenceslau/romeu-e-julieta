@@ -83,11 +83,9 @@ func TestEffects(t *testing.T) {
 // Candidate rows (01 1.6, Candidate).
 func init() {
 	approval := func(c *Candidate) Approval {
-		return Approval{
-			WideningDigest: canon.Sum[canon.WideningKind]{1}, Set: WideningSet{"project": "shop"},
-			RenderDigest: canon.Sum[canon.RenderKind]{2}, SpecCommit: "0123456789abcdef0123456789abcdef01234567",
-			CandidateID: c.ID(), ApprovedAt: testNow,
-		}
+		a := approvalFor("shop", c.ID())
+		a.ApprovedAt = testNow
+		return a
 	}
 	rendered := func(t *testing.T, s Seams) (*Candidate, string) {
 		t.Helper()
