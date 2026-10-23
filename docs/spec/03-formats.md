@@ -138,7 +138,7 @@ naming the host-only rules it did not check.
 | `egress.tools` key | `REQ-1264` `<backend>:<tool>` as `mise.lock` writes it, `^[a-z0-9][a-z0-9-]*:[A-Za-z0-9@][A-Za-z0-9._/@-]*$`; narrowest form, decided on 2026-10-22 | both |
 | run layout step | `REQ-1265` no argv element holds a control character, and `argv[0]` is not empty and does not start with `-`; a pane's `env` value holds no control character; narrowest form, decided on 2026-10-22 | both |
 | host settings `secrets{}.service` | `REQ-1266` the secret-name pattern of this table; narrowest form, decided on 2026-10-22 | romeu only |
-| host settings `tools.gitCredentialHelper` | `REQ-1267` a `git-credential-<name>` helper's name, `^[a-z0-9][a-z0-9-]{0,62}$`, or an absolute clean path of letters, digits and `._/+-` only, since git runs it through `sh`; narrowest form, decided on 2026-10-22 | romeu only |
+| host settings `tools.gitCredentialHelper` | `REQ-1267` a `git-credential-<name>` helper's name, `^[a-z0-9][a-z0-9-]{0,62}$`, or an absolute clean path of letters, digits and `._/+-` only, since git runs it through `sh`; narrowest form, decided on 2026-10-22. It answers the host of `config.url` only (05 5.1, REQ-0464), and an absolute path names a file only the user or root can write (04 4.2, `romeu init`), decided on 2026-10-23 | romeu only |
 
 ## 3.2 Project spec (`projects/<name>.yaml`, schema `project.v1`)
 
@@ -319,7 +319,7 @@ config:
 tools:                                  # absolute paths, resolved by `romeu init`, re-checked by doctor
   sbx: /abs/path/sbx
   git: /abs/path/git
-  gitCredentialHelper: osxkeychain      # optional; a git-credential-<name> helper on /usr/bin:/bin, or an absolute path; hardened git uses this helper and no other
+  gitCredentialHelper: osxkeychain      # optional; a git-credential-<name> helper on git's exec-path or /usr/bin:/bin, or an absolute path; hardened git uses this helper and no other, for the host of config.url only
 gitHosts:
   - host: github.com
     caFile: ""                          # optional absolute path to a CA bundle (private hosts)
