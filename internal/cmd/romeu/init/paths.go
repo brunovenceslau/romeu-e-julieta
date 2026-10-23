@@ -7,39 +7,12 @@ package initcmd
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 )
-
-// settingsEnv is the one romeu-specific override of a path: the path of
-// settings.yaml, used by tests (02 2.4, REQ-0150). No other ROMEU_*
-// variable moves a path, and the root comes only from the settings file.
-const settingsEnv = "ROMEU_SETTINGS"
-
-// settingsPath returns the path of settings.yaml for the environment
-// getenv reads: ROMEU_SETTINGS, or $XDG_CONFIG_HOME/romeu/settings.yaml,
-// or $HOME/.config/romeu/settings.yaml (REQ-0148). A XDG variable that
-// is not an absolute path counts as unset, as the XDG specification
-// says; a ROMEU_SETTINGS that is not absolute is refused.
-func settingsPath(getenv func(string) string) (string, error) {
-	if p := getenv(settingsEnv); p != "" {
-		if !filepath.IsAbs(p) {
-			return "", fmt.Errorf("%s is not an absolute path", settingsEnv)
-		}
-		return filepath.Clean(p), nil
-	}
-	if x := getenv("XDG_CONFIG_HOME"); filepath.IsAbs(x) {
-		return filepath.Join(x, "romeu", "settings.yaml"), nil
-	}
-	if h := getenv("HOME"); filepath.IsAbs(h) {
-		return filepath.Join(h, ".config", "romeu", "settings.yaml"), nil
-	}
-	return "", errors.New("neither ROMEU_SETTINGS, XDG_CONFIG_HOME nor HOME names an absolute path")
-}
 
 // realPath returns p with its symbolic links resolved once. p need not
 // exist: the links of its longest existing prefix are resolved and the

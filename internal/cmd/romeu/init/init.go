@@ -115,7 +115,7 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 	settings := env.SettingsPath
 	if settings == "" {
 		var err error
-		if settings, err = settingsPath(getenv); err != nil {
+		if settings, err = spec.SettingsPath(getenv); err != nil {
 			return usage(cmd, err.Error())
 		}
 	}
