@@ -81,6 +81,16 @@ which names each step's command and output path.
      to pass another root; then writes host settings (root default
      `$HOME/dev`, absolute tool paths) and clones the config repo to
      `$ROMEU_ROOT/<cfg>-env/<dir>`.
+   - [O] A private config repo (the recommended kind,
+     [02 2.2](02-layouts.md#22-config-repo)) needs
+     `--git-credential-helper <name-or-path>` on the same line: a
+     `git-credential-<name>` helper's name, such as `osxkeychain`, or
+     the absolute path of a helper script (for `gh`, a script that runs
+     `gh auth git-credential "$@"`, since git's `!` shell form is
+     refused). init records it as `tools.gitCredentialHelper` and hands
+     it to the clone for the config repo's host only. Without it, the
+     clone fails with `config-clone-failed` and the hint names the flag;
+     nothing is written.
 4. [O] `romeu doctor`; fix every failure; apply its recommendations
    (`sbx settings set env.rememberHostCommands true`);
    `romeu approve --toolchain` (gate 1).

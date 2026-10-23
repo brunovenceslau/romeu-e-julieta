@@ -38,16 +38,22 @@ var (
 	lookPath   = procgroup.LookPath
 	defaultRef = "main"
 
-	// cloneRepo is the hardened clone of the config repo; a unit test
-	// replaces it with a fixture, since the e2e covers the real one.
-	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest string) error {
-		return g.Clone(ctx, url, dest)
+	// cloneRepo is the hardened clone of the config repo, with the
+	// credential helper for its host only when helper is not empty; a
+	// unit test replaces it with a fixture, since the e2e covers the
+	// real one.
+	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest, helper string) error {
+		return g.CloneWithCredentialHelper(ctx, url, dest, helper)
 	}
 )
 
 // dirMode is the mode of the directories init creates: the root and
 // <cfg>-env/ (02 2.3, REQ-0141).
 const dirMode = 0o700
+
+// maxHelper bounds --git-credential-helper: PATH_MAX of macOS, the
+// shorter of the two systems romeu runs on (gitsafe holds the same cap).
+const maxHelper = 1024
 
 // configFileLimit bounds the config project's spec read from the clone.
 const configFileLimit = spec.MaxFileSize
@@ -61,7 +67,8 @@ var _ = cli.Register(func() cli.Command {
 			Use:   "init --config-url <url>",
 			Short: "write the host settings and clone the config repo",
 			Example: "romeu init --config-url https://github.com/<owner>/<config-repo>\n" +
-				"romeu init --config-url https://github.com/<owner>/<config-repo> --root /abs/dev",
+				"romeu init --config-url https://github.com/<owner>/<config-repo> --root /abs/dev\n" +
+				"romeu init --config-url https://github.com/<owner>/<config-repo> --git-credential-helper osxkeychain",
 			Args: cobra.NoArgs,
 			RunE: func(c *cobra.Command, _ []string) error {
 				return run(c, env, o)
@@ -72,6 +79,7 @@ var _ = cli.Register(func() cli.Command {
 		f.StringVar(&o.project, "config-project", "", "the config project's name (default: the repo's name)")
 		f.StringVar(&o.root, "root", "", "the absolute root of the host tree (default: $HOME/dev)")
 		f.StringVar(&o.ref, "config-ref", defaultRef, "the branch that holds projects/<name>.yaml")
+		f.StringVar(&o.helper, "git-credential-helper", "", "the git credential helper of a private config repo: a git-credential-<name> helper's name or an absolute path; recorded as tools.gitCredentialHelper")
 		_ = cmd.MarkFlagRequired("config-url")
 		return cmd
 	}
@@ -80,7 +88,7 @@ var _ = cli.Register(func() cli.Command {
 
 // options are the flags of the command.
 type options struct {
-	configURL, project, root, ref string
+	configURL, project, root, ref, helper string
 }
 
 // usage returns the error usage (RJ-349) for an input init refuses,
@@ -278,6 +286,13 @@ func build(cmd *cobra.Command, o options, home string) (spec.HostSettings, error
 		Root:   root,
 		Config: spec.ConfigRepo{Project: o.project, URL: o.configURL, Ref: o.ref},
 	}
+	// The helper is validated with the rest of the settings (REQ-1267),
+	// before anything is written; maxHelper bounds it first, so a long
+	// value is never echoed back.
+	if len(o.helper) > maxHelper {
+		return zero, usage(cmd, fmt.Sprintf("tools.gitCredentialHelper: the value has %d bytes, over the cap of %d", len(o.helper), maxHelper))
+	}
+	h.Tools.GitCredentialHelper = o.helper
 	return h, nil
 }
 
@@ -333,8 +348,8 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 	}
 	defer func() { _ = os.RemoveAll(stage) }()
 	clone := filepath.Join(stage, "clone")
-	if err := cloneRepo(ctx, g, h.Config.URL, clone); err != nil {
-		return "", err
+	if err := cloneRepo(ctx, g, h.Config.URL, clone, h.Tools.GitCredentialHelper); err != nil {
+		return "", cloneError(err, h.Config.URL)
 	}
 	dir, err := configDir(ctx, cmd, g, h, clone)
 	if err != nil {
@@ -443,6 +458,24 @@ func configDir(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h spe
 		}
 	}
 	return "", missing(name + " has no primary repo at config.url")
+}
+
+// cloneError returns config-clone-failed (RJ-356) for a git clone that
+// exited non-zero, with git's output, which gitsafe escaped and cut to
+// its first 4 KiB, in the details; any other error passes through: an
+// error of the table, a timeout, a cancellation, a refusal of gitsafe.
+// Git prints no credential a helper gave it, and the URL holds none
+// (CheckURL refuses user information).
+func cloneError(err error, configURL string) error {
+	if _, ok := errors.AsType[*cli.Error](err); ok {
+		return err
+	}
+	if _, ok := errors.AsType[*procgroup.ExitError](err); !ok {
+		return err
+	}
+	return ConfigCloneFailed.New("git could not clone the config repo",
+		cli.Detail{Key: "config.url", Value: termsafe.Escape(configURL)},
+		cli.Detail{Key: "git", Value: termsafe.Escape(err.Error())})
 }
 
 // floorError returns the error git-floor (RJ-344) as the row of the

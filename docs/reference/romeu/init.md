@@ -26,16 +26,18 @@ romeu init --config-url <url> [flags]
 ```
 romeu init --config-url https://github.com/<owner>/<config-repo>
 romeu init --config-url https://github.com/<owner>/<config-repo> --root /abs/dev
+romeu init --config-url https://github.com/<owner>/<config-repo> --git-credential-helper osxkeychain
 ```
 
 ### Options
 
 ```
-      --config-project string   the config project's name (default: the repo's name)
-      --config-ref string       the branch that holds projects/<name>.yaml (default "main")
-      --config-url string       the https URL of the config repo (required)
-  -h, --help                    help for init
-      --root string             the absolute root of the host tree (default: $HOME/dev)
+      --config-project string          the config project's name (default: the repo's name)
+      --config-ref string              the branch that holds projects/<name>.yaml (default "main")
+      --config-url string              the https URL of the config repo (required)
+      --git-credential-helper string   the git credential helper of a private config repo: a git-credential-<name> helper's name or an absolute path; recorded as tools.gitCredentialHelper
+  -h, --help                           help for init
+      --root string                    the absolute root of the host tree (default: $HOME/dev)
 ```
 
 ### SEE ALSO

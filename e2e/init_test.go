@@ -8,6 +8,7 @@ package e2e
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -340,4 +341,118 @@ func TestInitNeedsTheConfigURL(t *testing.T) {
 
 	assert.Equal(t, 2, res.Code)
 	assert.Contains(t, res.Stderr, "RJ-349")
+}
+
+// privateSetup is an Env whose origins hold the config repo owner/cfg
+// behind basic authentication, as a private repository of a forge is,
+// and the line of J1 step 3 that initializes it.
+func privateSetup(t *testing.T) (*romeu.Env, []string) {
+	t.Helper()
+	o := romeu.NewAuthOrigins(t, "operator", "s3cret-token")
+	url := o.PushConfigRepo(t, "owner", "cfg", nil)
+	return romeu.New(t, o), []string{"init", "--config-url", url}
+}
+
+// assertNothingLeft holds that init wrote no settings and left no clone
+// and no staging directory under the root.
+func assertNothingLeft(t *testing.T, e *romeu.Env) {
+	t.Helper()
+	assert.NoFileExists(t, e.Settings())
+	envs, err := filepath.Glob(filepath.Join(e.Root, "*-env", "*"))
+	require.NoError(t, err)
+	assert.Empty(t, envs, "no clone and no staging directory")
+}
+
+// TestInitPrivateConfigRepoWithoutAHelper reproduces the failure of
+// 2026-10-23: a config repo that needs credentials, and no
+// --git-credential-helper. Hardened git has no helper and no prompt, so
+// the clone fails; init reports config-clone-failed, exit 1, with git's
+// output in the details and the flag in the hint, never internal
+// (RJ-348), and leaves nothing behind.
+func TestInitPrivateConfigRepoWithoutAHelper(t *testing.T) {
+	e, args := privateSetup(t)
+
+	res := e.Run(t, args)
+
+	assert.Equal(t, 1, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "RJ-356")
+	assert.Contains(t, res.Stderr, "config-clone-failed")
+	assert.NotContains(t, res.Stderr, "RJ-348")
+	assert.Contains(t, res.Stderr, "terminal prompts disabled", "git's output is in the details")
+	assert.Contains(t, res.Stderr, "--git-credential-helper", "the hint names the flag")
+	assertNothingLeft(t, e)
+}
+
+// TestInitPrivateConfigRepoWithAHelper: --git-credential-helper with an
+// absolute path clones the private config repo, and the settings record
+// the helper. The helper reaches the clone only, scoped to the config
+// repo's host as git connects to it: no other git call of init carries
+// it, and no call sets a helper for every host.
+func TestInitPrivateConfigRepoWithAHelper(t *testing.T) {
+	e, args := privateSetup(t)
+	helper := e.WriteCredentialHelper(t, "operator", "s3cret-token")
+	calls := e.RecordGit(t)
+
+	res := e.Run(t, append(args, "--git-credential-helper", helper))
+
+	require.Equal(t, 0, res.Code, res.Stderr)
+	assert.FileExists(t, filepath.Join(e.Root, "cfg-env", "cfg", "projects", "cfg.yaml"))
+	assert.Equal(t, helper, e.ReadSettings(t).Tools.GitCredentialHelper)
+	var with [][]string
+	for _, argv := range calls() {
+		for _, a := range argv {
+			assert.NotEqual(t, "credential.helper="+helper, a, "no helper for every host")
+			if strings.HasPrefix(a, "credential.https://") && strings.HasSuffix(a, ".helper="+helper) {
+				with = append(with, argv)
+			}
+		}
+	}
+	require.Len(t, with, 1, "one git call carries the helper")
+	assert.Contains(t, with[0], "clone")
+	assert.NotContains(t, res.Stdout+res.Stderr, "s3cret-token")
+}
+
+// TestInitPrivateConfigRepoWithAWrongCredential: a helper whose
+// credentials the origin refuses is config-clone-failed too, and the
+// password the helper gave is printed nowhere.
+func TestInitPrivateConfigRepoWithAWrongCredential(t *testing.T) {
+	e, args := privateSetup(t)
+	helper := e.WriteCredentialHelper(t, "operator", "wrong-token")
+
+	res := e.Run(t, append(args, "--git-credential-helper", helper))
+
+	assert.Equal(t, 1, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "config-clone-failed")
+	assert.NotContains(t, res.Stdout+res.Stderr, "wrong-token")
+	assertNothingLeft(t, e)
+}
+
+// TestInitRefusesACredentialHelperGitRunsAsShell: a value of
+// tools.gitCredentialHelper that REQ-1267 refuses is refused before any
+// write, exit 2: git runs a helper through sh, so a shell snippet (the
+// "!" form), a relative path, a path with a space or a shell character,
+// and a value with a newline are never handed to it.
+func TestInitRefusesACredentialHelperGitRunsAsShell(t *testing.T) {
+	for name, value := range map[string]string{
+		"a shell snippet":         "!gh auth git-credential",
+		"a shell snippet by path": "!/opt/homebrew/bin/gh auth git-credential",
+		"a relative path":         "bin/git-credential-x",
+		"a path with a space":     "/opt/my helper",
+		"a command substitution":  "/bin/$(id)",
+		"a newline":               "osxkeychain\nstore",
+		"an upper-case name":      "OSXKeychain",
+		"a path too long":         "/" + strings.Repeat("a", 4096),
+	} {
+		t.Run(name, func(t *testing.T) {
+			e, args := privateSetup(t)
+
+			res := e.Run(t, append(args, "--git-credential-helper", value))
+
+			assert.Equal(t, 2, res.Code, res.Stderr)
+			assert.Contains(t, res.Stderr, "gitCredentialHelper")
+			assert.NoFileExists(t, e.Settings())
+			assert.NoDirExists(t, e.StateDir())
+			assert.NoDirExists(t, e.Root)
+		})
+	}
 }

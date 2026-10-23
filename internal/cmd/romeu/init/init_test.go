@@ -8,7 +8,7 @@ package initcmd
 import (
 	"bytes"
 	"context"
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +34,9 @@ type machine struct {
 	home, bin string
 	env       map[string]string
 	path      map[string]string
+	// helpers are the credential helpers the clones were given, one per
+	// clone.
+	helpers []string
 }
 
 // gitIn runs the machine's git in dir.
@@ -70,9 +73,14 @@ func newMachine(t *testing.T, spec string) *machine {
 		}
 		return "", procgroup.ErrNotFound
 	}
-	cloneRepo = func(ctx context.Context, _ *gitsafe.Runner, url, dest string) error {
+	cloneRepo = func(ctx context.Context, _ *gitsafe.Runner, url, dest, helper string) error {
+		m.helpers = append(m.helpers, helper)
 		if strings.HasSuffix(url, "/missing") {
-			return errors.New("repository not found")
+			// As gitsafe returns a git that exited 128.
+			return fmt.Errorf("gitsafe: git clone: %w: fatal: repository 'https://github.com/owner/missing/' not found", &procgroup.ExitError{Argv0: "git", Code: 128})
+		}
+		if strings.HasSuffix(url, "/refused") {
+			return fmt.Errorf("%w: a refusal of gitsafe", gitsafe.ErrRefused)
 		}
 		if err := os.MkdirAll(dest, 0o700); err != nil {
 			return err
@@ -159,7 +167,9 @@ func TestInitRefusals(t *testing.T) {
 		{"the clone exists", projectSpec, []string{"--config-url", url}, func(m *machine) {
 			require.NoError(t, os.MkdirAll(filepath.Join(m.home, "dev", "cfg-env", "cfg"), 0o700))
 		}, 2, "clone-exists"},
-		{"an origin that is not there", projectSpec, []string{"--config-url", "https://github.com/owner/missing"}, nil, 1, "error"},
+		{"an origin that is not there", projectSpec, []string{"--config-url", "https://github.com/owner/missing"}, nil, 1, "RJ-356 config-clone-failed"},
+		{"a credential helper git runs as shell", projectSpec, []string{"--config-url", url, "--git-credential-helper", "!gh auth git-credential"}, nil, 2, "tools.gitCredentialHelper"},
+		{"a credential helper over the cap", projectSpec, []string{"--config-url", url, "--git-credential-helper", "/" + strings.Repeat("a", maxHelper)}, nil, 2, "over the cap"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := newMachine(t, tc.spec)
@@ -306,8 +316,8 @@ func TestInitSettingsDirUnwritable(t *testing.T) {
 func TestInitSettingsAppearAfterTheClone(t *testing.T) {
 	m := newMachine(t, projectSpec)
 	clone := cloneRepo
-	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest string) error {
-		if err := clone(ctx, g, url, dest); err != nil {
+	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest, helper string) error {
+		if err := clone(ctx, g, url, dest, helper); err != nil {
 			return err
 		}
 		return os.WriteFile(m.settings(), []byte("theirs"), 0o600)
@@ -370,8 +380,8 @@ func TestDirProblem(t *testing.T) {
 func TestInitNoDefaultBranch(t *testing.T) {
 	m := newMachine(t, projectSpec)
 	clone := cloneRepo
-	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest string) error {
-		if err := clone(ctx, g, url, dest); err != nil {
+	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest, helper string) error {
+		if err := clone(ctx, g, url, dest, helper); err != nil {
 			return err
 		}
 		return os.Remove(filepath.Join(dest, ".git", "refs", "remotes", "origin", "HEAD"))
@@ -431,4 +441,57 @@ func TestRootProblemInsideByIdentity(t *testing.T) {
 
 	assert.Contains(t, rootProblem(filepath.Join(cfgAlias, "dev"), filepath.Join(tmp, "other"), settings, stateDir), "inside the host settings directory")
 	assert.Contains(t, rootProblem(filepath.Join(stateAlias, "dev"), filepath.Join(tmp, "other"), settings, stateDir), "inside the host state directory")
+}
+
+// TestInitCloneErrors: a git clone that exits non-zero is
+// config-clone-failed (RJ-356), exit 1, with git's output in the details
+// and the flag in the hint; any other error of the clone is not, so a
+// defect still reads as one.
+func TestInitCloneErrors(t *testing.T) {
+	t.Run("git exited non-zero", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing")
+
+		assert.Equal(t, 1, code, stderr)
+		assert.Contains(t, stderr, "RJ-356 config-clone-failed")
+		assert.Contains(t, stderr, "repository 'https://github.com/owner/missing/' not found")
+		assert.Contains(t, stderr, "a private config repo needs --git-credential-helper")
+		assert.NotContains(t, stderr, "RJ-348")
+	})
+	t.Run("a refusal of gitsafe", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/refused")
+
+		assert.Equal(t, 1, code, stderr)
+		assert.NotContains(t, stderr, "config-clone-failed")
+	})
+}
+
+// TestInitRecordsTheCredentialHelper: the helper of the flag reaches
+// the clone and the settings as tools.gitCredentialHelper; without the
+// flag the clone has none and the settings name none.
+func TestInitRecordsTheCredentialHelper(t *testing.T) {
+	for name, helper := range map[string]string{"none": "", "a name": "osxkeychain", "a path": "/opt/homebrew/bin/git-credential-gh"} {
+		t.Run(name, func(t *testing.T) {
+			m := newMachine(t, projectSpec)
+			args := []string{"--config-url", "https://github.com/owner/cfg"}
+			if helper != "" {
+				args = append(args, "--git-credential-helper", helper)
+			}
+
+			code, _, stderr := m.init(t, args...)
+
+			require.Equal(t, 0, code, stderr)
+			assert.Equal(t, []string{helper}, m.helpers)
+			data, err := os.ReadFile(m.settings())
+			require.NoError(t, err)
+			if helper == "" {
+				assert.NotContains(t, string(data), "gitCredentialHelper")
+			} else {
+				assert.Contains(t, string(data), "gitCredentialHelper: "+helper)
+			}
+		})
+	}
 }

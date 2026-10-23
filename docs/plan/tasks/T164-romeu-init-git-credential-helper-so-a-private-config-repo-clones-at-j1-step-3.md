@@ -54,8 +54,9 @@ rows. The spec amendments (the `init` row of 04 4.2, J1 step 3, the 04 4.4 row)
 are made in this task, with the ids `go run ./tools/ci reqs allocate`
 hands out, which the Implements line then cites.
 
-- Implements: none: the requirement ids are allocated by this task with
-  its spec amendment (12 12.11).
+- Implements: REQ-1283 (04 4.2), REQ-1284 (04 4.2), REQ-1285 (04 4.2),
+  REQ-1286 (04 4.4), allocated by this task with its spec amendment
+  (12 12.11).
 - Operator: no.
 - Acceptance:
   - In the e2e, against an origin served over TLS that requires
