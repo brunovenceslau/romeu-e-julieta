@@ -17,7 +17,6 @@ import (
 	"io/fs"
 	"net/url"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -27,6 +26,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
@@ -35,8 +35,14 @@ import (
 // The environment and lookups of the command; a test replaces them.
 var (
 	getenv     = os.Getenv
-	lookPath   = exec.LookPath
+	lookPath   = procgroup.LookPath
 	defaultRef = "main"
+
+	// cloneRepo is the hardened clone of the config repo; a unit test
+	// replaces it with a fixture, since the e2e covers the real one.
+	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest string) error {
+		return g.Clone(ctx, url, dest)
+	}
 )
 
 // dirMode is the mode of the directories init creates: the root and
@@ -287,7 +293,7 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 	}
 	defer func() { _ = os.RemoveAll(stage) }()
 	clone := filepath.Join(stage, "clone")
-	if err := g.Clone(ctx, h.Config.URL, clone); err != nil {
+	if err := cloneRepo(ctx, g, h.Config.URL, clone); err != nil {
 		return "", err
 	}
 	dir, err := configDir(ctx, cmd, g, h, clone)

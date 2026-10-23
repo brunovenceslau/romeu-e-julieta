@@ -7,7 +7,6 @@ package romeu_test
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/e2e/internal/romeu"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/all"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
 // TestEnvRunsRomeuInItsOwnTree runs the built binary with the Env's
@@ -107,10 +107,10 @@ func TestOriginsPushAddsACommit(t *testing.T) {
 // returns its output.
 func runGit(t *testing.T, e *romeu.Env, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.CommandContext(t.Context(), e.Git, args...)
-	cmd.Dir = dir
-	cmd.Env = e.Environ("GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0")
-	out, err := cmd.CombinedOutput()
+	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolGit, Argv: append([]string{e.Git}, args...), Dir: dir,
+		Env: e.Environ("GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0"),
+	})
 	require.NoError(t, err, string(out))
 	return string(out)
 }

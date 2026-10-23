@@ -18,15 +18,13 @@ package romeu
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/moduleroot"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
 // Env is one machine for a test: every path is below one temporary
@@ -104,14 +102,14 @@ func repoRoot(tb testing.TB) string {
 // build compiles the package pkg of the module at root into out.
 func build(tb testing.TB, root, pkg, out string) string {
 	tb.Helper()
-	ctx, cancel := context.WithTimeout(tb.Context(), 5*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", out, pkg)
-	cmd.Dir = root
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		tb.Fatalf("go build %s: %v\n%s", pkg, err, stderr.String())
+	b, err := procgroup.CombinedOutput(tb.Context(), procgroup.Command{
+		Class: procgroup.ToolStep,
+		Argv:  []string{"go", "build", "-trimpath", "-o", out, pkg},
+		Dir:   root,
+		Env:   os.Environ(),
+	})
+	if err != nil {
+		tb.Fatalf("go build %s: %v\n%s", pkg, err, b)
 	}
 	return out
 }
@@ -145,20 +143,20 @@ func (e *Env) Environ(extra ...string) []string {
 // start is a failure of the test; a non-zero exit is the Result's Code.
 func (e *Env) Run(tb testing.TB, args []string, extra ...string) Result {
 	tb.Helper()
-	ctx, cancel := context.WithTimeout(tb.Context(), 2*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, e.Romeu, args...)
-	cmd.Dir = e.Home
-	cmd.Env = e.Environ(extra...)
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := cmd.Run()
+	err := procgroup.Run(tb.Context(), procgroup.Command{
+		Class:  procgroup.ToolStep,
+		Argv:   append([]string{e.Romeu}, args...),
+		Dir:    e.Home,
+		Env:    e.Environ(extra...),
+		Stdout: &stdout, Stderr: &stderr,
+	})
 	res := Result{Stdout: stdout.String(), Stderr: stderr.String()}
 	if err == nil {
 		return res
 	}
-	if exit, ok := errors.AsType[*exec.ExitError](err); ok {
-		res.Code = exit.ExitCode()
+	if exit, ok := errors.AsType[*procgroup.ExitError](err); ok {
+		res.Code = exit.Code
 		return res
 	}
 	tb.Fatalf("romeu %v: %v", args, err)

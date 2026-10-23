@@ -6,17 +6,21 @@
 package romeu
 
 import (
+	"bufio"
 	"bytes"
-	"context"
 	"encoding/pem"
-	"net/http/cgi"
+	"errors"
+	"io"
+	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
 // LogicalHost is the host of the origins' URLs, the one the lines of a
@@ -42,13 +46,7 @@ type Origins struct {
 // NewOrigins starts the server and stops it with the test.
 func NewOrigins(tb testing.TB) *Origins {
 	tb.Helper()
-	git, err := exec.LookPath("git")
-	if err != nil {
-		tb.Fatal(err)
-	}
-	if git, err = filepath.Abs(git); err != nil {
-		tb.Fatal(err)
-	}
+	git := lookGit(tb)
 	tmp := tb.TempDir()
 	o := &Origins{git: git, root: filepath.Join(tmp, "bare"), work: filepath.Join(tmp, "work")}
 	for _, d := range []string{o.root, o.work} {
@@ -56,16 +54,13 @@ func NewOrigins(tb testing.TB) *Origins {
 			tb.Fatal(err)
 		}
 	}
-	out, err := exec.Command(git, "--exec-path").Output()
+	out, err := procgroup.CombinedOutput(tb.Context(), procgroup.Command{
+		Class: procgroup.ToolProbe, Argv: []string{git, "--exec-path"}, Env: []string{"PATH=/usr/bin:/bin"},
+	})
 	if err != nil {
-		tb.Fatal(err)
+		tb.Fatalf("git --exec-path: %v: %s", err, out)
 	}
-	backend := &cgi.Handler{
-		Path:       filepath.Join(strings.TrimSpace(string(out)), "git-http-backend"),
-		Root:       "/",
-		Env:        []string{"GIT_PROJECT_ROOT=" + o.root, "GIT_HTTP_EXPORT_ALL=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1"},
-		InheritEnv: []string{"PATH"},
-	}
+	backend := cgiBackend{path: filepath.Join(strings.TrimSpace(string(out)), "git-http-backend"), root: o.root}
 	o.srv = httptest.NewTLSServer(backend)
 	tb.Cleanup(o.srv.Close)
 	o.ca = filepath.Join(tmp, "ca.pem")
@@ -123,18 +118,19 @@ func (o *Origins) Push(tb testing.TB, ownerRepo, branch string, files map[string
 // git: romeu never runs through it.
 func (o *Origins) Git(tb testing.TB, dir string, args ...string) string {
 	tb.Helper()
-	ctx, cancel := context.WithTimeout(tb.Context(), time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, o.git, args...)
-	cmd.Dir = dir
-	cmd.Env = []string{
-		"PATH=/usr/bin:/bin", "HOME=" + o.work, "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_AUTHOR_NAME=fixture", "GIT_AUTHOR_EMAIL=fixture@example.com",
-		"GIT_COMMITTER_NAME=fixture", "GIT_COMMITTER_EMAIL=fixture@example.com",
-	}
 	var out, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &stderr
-	if err := cmd.Run(); err != nil {
+	err := procgroup.Run(tb.Context(), procgroup.Command{
+		Class: procgroup.ToolGit,
+		Argv:  append([]string{o.git}, args...),
+		Dir:   dir,
+		Env: []string{
+			"PATH=/usr/bin:/bin", "HOME=" + o.work, "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
+			"GIT_AUTHOR_NAME=fixture", "GIT_AUTHOR_EMAIL=fixture@example.com",
+			"GIT_COMMITTER_NAME=fixture", "GIT_COMMITTER_EMAIL=fixture@example.com",
+		},
+		Stdout: &out, Stderr: &stderr,
+	})
+	if err != nil {
 		tb.Fatalf("git %v in %s: %v\n%s", args, dir, err, stderr.String())
 	}
 	return out.String()
@@ -150,13 +146,7 @@ func (o *Origins) Git(tb testing.TB, dir string, args ...string) string {
 // Without origins it is a link to the machine's git.
 func installGit(tb testing.TB, bin string, o *Origins) string {
 	tb.Helper()
-	git, err := exec.LookPath("git")
-	if err != nil {
-		tb.Fatal(err)
-	}
-	if git, err = filepath.Abs(git); err != nil {
-		tb.Fatal(err)
-	}
+	git := lookGit(tb)
 	path := filepath.Join(bin, "git")
 	if o == nil {
 		if err := os.Symlink(git, path); err != nil {
@@ -174,4 +164,70 @@ func installGit(tb testing.TB, bin string, o *Origins) string {
 		tb.Fatal(err)
 	}
 	return path
+}
+
+// lookGit returns the absolute path of the machine's git.
+func lookGit(tb testing.TB) string {
+	tb.Helper()
+	git, err := procgroup.LookPath("git")
+	if err != nil {
+		tb.Fatal(err)
+	}
+	if git, err = filepath.Abs(git); err != nil {
+		tb.Fatal(err)
+	}
+	return git
+}
+
+// cgiBackend serves a request by running git http-backend as a CGI
+// program (RFC 3875) under procgroup. The standard library has
+// net/http/cgi for this, and the call-site scan of 04 4.1 (Subprocesses)
+// keeps that import to internal/procgroup, so this is the small part of
+// it that git needs: the request line, the body and the git headers in,
+// the status, the headers and the body out.
+type cgiBackend struct{ path, root string }
+
+func (b cgiBackend) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	env := []string{
+		"GIT_PROJECT_ROOT=" + b.root, "GIT_HTTP_EXPORT_ALL=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
+		"PATH=" + os.Getenv("PATH"),
+		"GATEWAY_INTERFACE=CGI/1.1", "SERVER_PROTOCOL=HTTP/1.1", "REMOTE_ADDR=127.0.0.1",
+		"REQUEST_METHOD=" + r.Method, "PATH_INFO=" + r.URL.Path, "QUERY_STRING=" + r.URL.RawQuery,
+		"CONTENT_TYPE=" + r.Header.Get("Content-Type"), "CONTENT_LENGTH=" + strconv.Itoa(len(body)),
+		"HTTP_GIT_PROTOCOL=" + r.Header.Get("Git-Protocol"), "HTTP_CONTENT_ENCODING=" + r.Header.Get("Content-Encoding"),
+	}
+	var out, stderr bytes.Buffer
+	if err := procgroup.Run(r.Context(), procgroup.Command{
+		Class: procgroup.ToolGit, Argv: []string{b.path}, Env: env,
+		Stdin: bytes.NewReader(body), Stdout: &out, Stderr: &stderr,
+	}); err != nil {
+		http.Error(w, err.Error()+"\n"+stderr.String(), http.StatusInternalServerError)
+		return
+	}
+	br := bufio.NewReader(&out)
+	head, err := textproto.NewReader(br).ReadMIMEHeader()
+	if err != nil && !errors.Is(err, io.EOF) {
+		http.Error(w, "git http-backend: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	status := http.StatusOK
+	if s := head.Get("Status"); s != "" {
+		code, _, _ := strings.Cut(s, " ")
+		if n, err := strconv.Atoi(code); err == nil {
+			status = n
+		}
+		head.Del("Status")
+	}
+	for k, vs := range head {
+		for _, v := range vs {
+			w.Header().Add(k, v)
+		}
+	}
+	w.WriteHeader(status)
+	_, _ = io.Copy(w, br)
 }

@@ -104,23 +104,24 @@ func TestInitRefusesAnUnsafeRoot(t *testing.T) {
 	cases := []struct {
 		name string
 		root func(e *romeu.Env) string
-		skip bool
 	}{
 		{"inside a git repository", func(e *romeu.Env) string {
 			require.NoError(t, os.MkdirAll(filepath.Join(e.Home, "dotfiles", ".git"), 0o700))
 			return filepath.Join(e.Home, "dotfiles", "dev")
-		}, false},
-		{"equal to HOME", func(e *romeu.Env) string { return e.Home }, false},
-		{"holding the settings", func(e *romeu.Env) string { return e.ConfigHome }, false},
-		{"holding the state", func(e *romeu.Env) string { return e.StateHome }, false},
-		{"not absolute", func(*romeu.Env) string { return "dev" }, false},
-		{"not owned by the user", func(*romeu.Env) string { return "/usr" }, os.Geteuid() == 0},
+		}},
+		{"equal to HOME", func(e *romeu.Env) string { return e.Home }},
+		{"holding the settings", func(e *romeu.Env) string { return e.ConfigHome }},
+		{"holding the state", func(e *romeu.Env) string { return e.StateHome }},
+		{"not absolute", func(*romeu.Env) string { return "dev" }},
+	}
+	if os.Geteuid() != 0 { // root owns /usr
+		cases = append(cases, struct {
+			name string
+			root func(e *romeu.Env) string
+		}{"not owned by the user", func(*romeu.Env) string { return "/usr" }})
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.skip {
-				t.Skip("the user owns /usr")
-			}
 			e, _, args := initSetup(t, nil)
 			root := tc.root(e)
 

@@ -6,8 +6,11 @@
 // function builds from it, and the world a scenario runs in. A journey
 // is a package of its own, e2e/scenarios/<journey>, with a commands.yaml
 // (REQ-0730) and a function that reads its lines from that table; this
-// package embeds every such file by a glob, so a new journey adds a
-// directory and edits no import list.
+// package finds every such file by a glob of the directory, so a new
+// journey adds a directory and edits no import list. It reads the files
+// from the tree, not from an embed: go:embed is allowed below
+// internal/catalog only (ADR 0007, rule 8). A test runs in a directory
+// of the module, which is where the tree is found from.
 //
 // A scenario is run by the host suite against real sbx and by the CI
 // suite against the fake (REQ-0931): both call the same function, and
@@ -16,31 +19,47 @@
 package scenarios
 
 import (
-	"embed"
 	"errors"
 	"fmt"
-	"io/fs"
 	"maps"
-	"path"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/moduleroot"
 )
 
-//go:embed */commands.yaml
-var tables embed.FS
+// dir returns the directory of this package in the tree the process
+// runs in.
+func dir() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	root, err := moduleroot.Find(wd)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, "e2e", "scenarios"), nil
+}
 
 // Journeys returns the names of the journeys that have a commands.yaml,
 // sorted: the directories of this package.
 func Journeys() ([]string, error) {
-	files, err := fs.Glob(tables, "*/commands.yaml")
+	d, err := dir()
+	if err != nil {
+		return nil, err
+	}
+	files, err := filepath.Glob(filepath.Join(d, "*", "commands.yaml"))
 	if err != nil {
 		return nil, err
 	}
 	names := make([]string, len(files))
 	for i, f := range files {
-		names[i] = path.Dir(f)
+		names[i] = filepath.Base(filepath.Dir(f))
 	}
 	slices.Sort(names)
 	return names, nil
@@ -58,7 +77,11 @@ type Table struct {
 
 // Load reads the commands.yaml of a journey (a name Journeys returns).
 func Load(journey string) (*Table, error) {
-	data, err := tables.ReadFile(path.Join(journey, "commands.yaml"))
+	d, err := dir()
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(filepath.Join(d, journey, "commands.yaml"))
 	if err != nil {
 		return nil, err
 	}

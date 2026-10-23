@@ -7,11 +7,9 @@ package initcmd
 
 import (
 	"bytes"
-	"encoding/pem"
-	"net/http/cgi"
-	"net/http/httptest"
+	"context"
+	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,82 +19,79 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
-// The unit tests run init through cli.Main against a config repo on a
-// local TLS server (git http-backend), the way the e2e does with its
-// harness, which internal/ cannot import.
+// The unit tests run init through cli.Main with a fixture in place of
+// the clone (cloneRepo): the real clone, over TLS, is the e2e's.
 
 const projectSpec = "schema: project/v1\nname: cfg\nrepos:\n  - url: https://github.com/owner/cfg\n    primary: true\n" +
 	"workload: docker.io/docker/sbx-kit-claude@sha256:c0132e89a89d94ddca3984513afdb36be57bd087fcc75823a4d14064b6a39ea5\nagent: sbx-kit-claude\n"
 
-// machine is a temporary home, a git that reaches the origin and an sbx
-// that exists.
+// machine is a temporary home, a git and an sbx that exist.
 type machine struct {
 	home, bin string
 	env       map[string]string
 	path      map[string]string
 }
 
-// newMachine serves a config repo owner/cfg holding spec at
-// projects/cfg.yaml (none when spec is empty) and returns the machine.
+// gitIn runs the machine's git in dir.
+func gitIn(t *testing.T, git, dir string, args ...string) {
+	t.Helper()
+	out, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{
+		Class: procgroup.ToolGit, Argv: append([]string{git}, args...), Dir: dir,
+		Env: []string{"PATH=/usr/bin:/bin", "HOME=" + dir, "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
+			"GIT_AUTHOR_NAME=f", "GIT_AUTHOR_EMAIL=f@example.com", "GIT_COMMITTER_NAME=f", "GIT_COMMITTER_EMAIL=f@example.com"},
+	})
+	require.NoError(t, err, string(out))
+}
+
+// newMachine makes a machine whose clone holds spec at projects/cfg.yaml
+// (no file when spec is empty) on the branch main of origin.
 func newMachine(t *testing.T, spec string) *machine {
 	t.Helper()
 	tmp, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
-	git, err := exec.LookPath("git")
+	git, err := procgroup.LookPath("git")
 	require.NoError(t, err)
-	execPath, err := exec.Command(git, "--exec-path").Output()
-	require.NoError(t, err)
-	bare := filepath.Join(tmp, "origin", "owner", "cfg")
-	require.NoError(t, os.MkdirAll(bare, 0o700))
-	gitEnv := []string{"HOME=" + tmp, "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_AUTHOR_NAME=f", "GIT_AUTHOR_EMAIL=f@example.com", "GIT_COMMITTER_NAME=f", "GIT_COMMITTER_EMAIL=f@example.com"}
-	run := func(dir string, args ...string) {
-		c := exec.CommandContext(t.Context(), git, args...)
-		c.Dir, c.Env = dir, append(gitEnv, "PATH=/usr/bin:/bin")
-		out, err := c.CombinedOutput()
-		require.NoError(t, err, string(out))
-	}
-	work := filepath.Join(tmp, "work")
-	require.NoError(t, os.MkdirAll(filepath.Join(work, "projects"), 0o700))
-	run(bare, "init", "-q", "--bare", "-b", "main")
-	run(work, "init", "-q", "-b", "main")
-	if spec != "" {
-		require.NoError(t, os.WriteFile(filepath.Join(work, "projects", "cfg.yaml"), []byte(spec), 0o600))
-	}
-	run(work, "add", "-A")
-	run(work, "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "x")
-	run(work, "push", "-q", bare, "HEAD:refs/heads/main")
-
-	srv := httptest.NewTLSServer(&cgi.Handler{
-		Path: filepath.Join(strings.TrimSpace(string(execPath)), "git-http-backend"), Root: "/",
-		Env:        []string{"GIT_PROJECT_ROOT=" + filepath.Join(tmp, "origin"), "GIT_HTTP_EXPORT_ALL=1", "GIT_CONFIG_GLOBAL=/dev/null"},
-		InheritEnv: []string{"PATH"},
-	})
-	t.Cleanup(srv.Close)
-	ca := filepath.Join(tmp, "ca.pem")
-	require.NoError(t, os.WriteFile(ca, certPEM(srv), 0o600))
-
-	m := &machine{home: filepath.Join(tmp, "home"), bin: filepath.Join(tmp, "bin"), path: map[string]string{}}
+	m := &machine{home: filepath.Join(tmp, "home"), bin: filepath.Join(tmp, "bin"), path: map[string]string{"git": git}}
 	require.NoError(t, os.MkdirAll(m.home, 0o700))
 	require.NoError(t, os.MkdirAll(m.bin, 0o700))
-	script := "#!/bin/sh\nexec '" + git + "' -c 'url." + srv.URL + "/.insteadOf=https://github.com/' -c 'http.sslCAInfo=" + ca + "' \"$@\"\n"
-	m.path["git"] = filepath.Join(m.bin, "git")
-	require.NoError(t, os.WriteFile(m.path["git"], []byte(script), 0o700))
 	m.path["sbx"] = filepath.Join(m.bin, "sbx")
 	require.NoError(t, os.WriteFile(m.path["sbx"], []byte("#!/bin/sh\n"), 0o700))
 	m.env = map[string]string{"HOME": m.home, "XDG_CONFIG_HOME": filepath.Join(tmp, "cfg"), "XDG_STATE_HOME": filepath.Join(tmp, "state")}
 
-	oldGetenv, oldLook := getenv, lookPath
+	oldGetenv, oldLook, oldClone := getenv, lookPath, cloneRepo
 	getenv = func(k string) string { return m.env[k] }
 	lookPath = func(name string) (string, error) {
 		if p, ok := m.path[name]; ok {
 			return p, nil
 		}
-		return "", exec.ErrNotFound
+		return "", procgroup.ErrNotFound
 	}
-	t.Cleanup(func() { getenv, lookPath = oldGetenv, oldLook })
+	cloneRepo = func(ctx context.Context, _ *gitsafe.Runner, url, dest string) error {
+		if strings.HasSuffix(url, "/missing") {
+			return errors.New("repository not found")
+		}
+		if err := os.MkdirAll(dest, 0o700); err != nil {
+			return err
+		}
+		gitIn(t, git, dest, "init", "-q", "-b", "main")
+		if spec != "" {
+			if err := os.MkdirAll(filepath.Join(dest, "projects"), 0o700); err != nil {
+				return err
+			}
+			if err := os.WriteFile(filepath.Join(dest, "projects", "cfg.yaml"), []byte(spec), 0o600); err != nil {
+				return err
+			}
+		}
+		gitIn(t, git, dest, "add", "-A")
+		gitIn(t, git, dest, "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "x")
+		gitIn(t, git, dest, "update-ref", "refs/remotes/origin/main", "HEAD")
+		return nil
+	}
+	t.Cleanup(func() { getenv, lookPath, cloneRepo = oldGetenv, oldLook, oldClone })
 	return m
 }
 
@@ -153,6 +148,7 @@ func TestInitRefusals(t *testing.T) {
 		{"no sbx", projectSpec, []string{"--config-url", url}, func(m *machine) { delete(m.path, "sbx") }, 2, "sbx is not on PATH"},
 		{"no git", projectSpec, []string{"--config-url", url}, func(m *machine) { delete(m.path, "git") }, 2, "git is not on PATH"},
 		{"git below the floor", projectSpec, []string{"--config-url", url}, func(m *machine) {
+			m.path["git"] = filepath.Join(m.bin, "oldgit")
 			require.NoError(t, os.WriteFile(m.path["git"], []byte("#!/bin/sh\necho git version 2.0.0\n"), 0o700))
 		}, 2, "git-floor"},
 		{"no spec", "", []string{"--config-url", url}, nil, 2, "RJ-346"},
@@ -290,9 +286,4 @@ func TestRootProblem(t *testing.T) {
 	if os.Geteuid() != 0 {
 		assert.Contains(t, rootProblem("/usr", home, settings, state), "not owned")
 	}
-}
-
-// certPEM returns the certificate of srv as a CA bundle.
-func certPEM(srv *httptest.Server) []byte {
-	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw})
 }
