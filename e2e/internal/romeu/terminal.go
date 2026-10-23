@@ -7,6 +7,7 @@ package romeu
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"strings"
@@ -37,20 +38,31 @@ func (l *lockedBuffer) String() string {
 	return l.b.String()
 }
 
-// promptWait is how long RunTerminal waits for the prompt, and for the
-// screen to settle once romeu ended.
-const promptWait = 30 * time.Second
+// TerminalDeadline is how long RunTerminal and RunStdinTerminal let
+// romeu run: a romeu still running then is ended (its process group is
+// killed), and the test fails with the screen so far. It is far above
+// what any prompt of the e2e takes, and far below the test timeout.
+const TerminalDeadline = 60 * time.Second
 
 // RunTerminal is Run with the standard input and the standard error of
 // romeu on the terminal of a /dev/ptmx pair (10 10.1, REQ-0790: a test
 // helper over x/sys/unix, no pty dependency), as an operator runs it,
 // and its standard output captured apart, so a test sees which stream a
 // prompt went to. Result.Stderr is the screen: what romeu wrote to the
-// terminal, with the echo of what was typed, line ends as "\n". Once the
-// screen holds prompt, it types answer; an empty prompt types nothing.
+// terminal, with the echo of what was typed, line ends as "\n". It types
+// answer only once the screen shows prompt, the question romeu writes
+// after it drops what was typed before (internal/gate), so the answer is
+// never dropped; an empty prompt types nothing. A romeu that has not
+// ended by TerminalDeadline fails the test.
 func (e *Env) RunTerminal(tb testing.TB, prompt, answer string, args []string, extra ...string) Result {
 	tb.Helper()
-	return e.runOnTerminal(tb, true, prompt, answer, args, extra...)
+	return e.RunTerminalWithin(tb, TerminalDeadline, prompt, answer, args, extra...)
+}
+
+// RunTerminalWithin is RunTerminal with the deadline given.
+func (e *Env) RunTerminalWithin(tb testing.TB, deadline time.Duration, prompt, answer string, args []string, extra ...string) Result {
+	tb.Helper()
+	return e.runOnTerminal(tb, deadline, true, prompt, answer, args, extra...)
 }
 
 // RunStdinTerminal is Run with only the standard input of romeu on a
@@ -58,12 +70,12 @@ func (e *Env) RunTerminal(tb testing.TB, prompt, answer string, args []string, e
 // line romeu ... 2>log. It types nothing.
 func (e *Env) RunStdinTerminal(tb testing.TB, args []string, extra ...string) Result {
 	tb.Helper()
-	return e.runOnTerminal(tb, false, "", "", args, extra...)
+	return e.runOnTerminal(tb, TerminalDeadline, false, "", "", args, extra...)
 }
 
 // runOnTerminal runs romeu with stdin on a terminal, and stderr too when
-// stderrOnTerminal is set.
-func (e *Env) runOnTerminal(tb testing.TB, stderrOnTerminal bool, prompt, answer string, args []string, extra ...string) Result {
+// stderrOnTerminal is set, for at most deadline.
+func (e *Env) runOnTerminal(tb testing.TB, deadline time.Duration, stderrOnTerminal bool, prompt, answer string, args []string, extra ...string) Result {
 	tb.Helper()
 	master, terminal := openPTY(tb)
 	// The screen is everything the terminal shows; reading it also keeps
@@ -83,30 +95,26 @@ func (e *Env) runOnTerminal(tb testing.TB, stderrOnTerminal bool, prompt, answer
 		errOut = terminal
 		shown = screen.String
 	}
-	done := make(chan struct{})
+	ctx, cancel := context.WithTimeout(tb.Context(), deadline)
+	defer cancel()
 	typed := make(chan error, 1)
 	go func() {
 		if prompt == "" {
 			typed <- nil
 			return
 		}
-		deadline := time.Now().Add(promptWait)
 		for !strings.Contains(shown(), prompt) {
 			select {
-			case <-done:
-				typed <- errors.New("romeu ended before it showed the prompt")
+			case <-ctx.Done():
+				typed <- nil // the run ends, and reports why
 				return
 			case <-time.After(5 * time.Millisecond):
-			}
-			if time.Now().After(deadline) {
-				typed <- errors.New("the prompt never came")
-				return
 			}
 		}
 		_, err := io.WriteString(master, answer)
 		typed <- err
 	}()
-	err := procgroup.Run(tb.Context(), procgroup.Command{
+	err := procgroup.Run(ctx, procgroup.Command{
 		Class:  procgroup.ToolStep,
 		Argv:   append([]string{e.Romeu}, args...),
 		Dir:    e.Home,
@@ -114,20 +122,27 @@ func (e *Env) runOnTerminal(tb testing.TB, stderrOnTerminal bool, prompt, answer
 		Stdin:  terminal,
 		Stdout: &stdout, Stderr: errOut,
 	})
-	close(done)
+	expired := ctx.Err() != nil
+	cancel()
 	terr := <-typed
 	_ = terminal.Close()
+	// After the terminal is closed the read ends once the queue is read.
+	// A master that never reports the end is closed, and the screen is
+	// what was read by then; the run never waits on the read for long.
 	select {
 	case <-drained:
-	case <-time.After(promptWait):
-		tb.Fatalf("romeu %v: the terminal never drained", args)
+	case <-time.After(5 * time.Second):
+		_ = master.Close()
 	}
 	res := Result{Stdout: stdout.String(), Stderr: stderr.String()}
 	if stderrOnTerminal {
 		res.Stderr = strings.ReplaceAll(screen.String(), "\r\n", "\n")
 	}
-	if terr != nil {
-		tb.Fatalf("romeu %v: %v; stderr: %q", args, terr, res.Stderr)
+	switch {
+	case expired:
+		tb.Fatalf("romeu %v did not end in %s and was killed; the screen shows %q, stdout %q", args, deadline, res.Stderr, res.Stdout)
+	case terr != nil:
+		tb.Fatalf("romeu %v: type the answer: %v; the screen shows %q", args, terr, res.Stderr)
 	}
 	if err == nil {
 		return res

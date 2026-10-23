@@ -7,10 +7,13 @@ package e2e
 
 import (
 	"encoding/json/v2"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -251,4 +254,48 @@ func buildRomeu(t *testing.T, ldflags string) string {
 	})
 	require.NoError(t, err, "%s", b)
 	return out
+}
+
+// fatalRecorder is a testing.TB whose Fatalf records the failure and
+// ends the goroutine, as testing.T's does, without failing the test that
+// holds it.
+type fatalRecorder struct {
+	testing.TB
+	failure string
+}
+
+// Helper does nothing.
+func (r *fatalRecorder) Helper() {}
+
+// Fatalf records the failure and ends the goroutine.
+func (r *fatalRecorder) Fatalf(format string, args ...any) {
+	r.failure = fmt.Sprintf(format, args...)
+	runtime.Goexit()
+}
+
+// TestApproveTerminalDeadline: a prompt nobody answers fails the run at
+// the harness's deadline, with the screen so far, and romeu is killed:
+// never the package timeout (the hang of 2026-10-23 lasted until it).
+func TestApproveTerminalDeadline(t *testing.T) {
+	t.Parallel()
+	e := approveSetup(t)
+	rec := &fatalRecorder{TB: t}
+	const deadline = 3 * time.Second
+
+	start := time.Now()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		e.RunTerminalWithin(rec, deadline, "", "", approveArgs)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * deadline):
+		t.Fatal("the harness did not end the run")
+	}
+
+	assert.Less(t, time.Since(start), 5*deadline)
+	assert.Contains(t, rec.failure, "did not end in 3s and was killed")
+	assert.Contains(t, rec.failure, question, "the failure shows the screen")
+	assert.NoFileExists(t, filepath.Join(e.StateDir(), "toolchain.json"))
 }
