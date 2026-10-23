@@ -13,6 +13,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/tailscale/hujson"
+
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 )
 
@@ -46,7 +48,11 @@ func checkVSCodeTrust(_ context.Context, h *hostEnv) error {
 	}
 	if present {
 		var s vscodeSettings
-		if err := jsonv2.Unmarshal(stripJSONC(data), &s); err != nil {
+		std, err := standardJSON(data)
+		if err == nil {
+			err = jsonv2.Unmarshal(std, &s)
+		}
+		if err != nil {
 			return VSCodeTrust.New("the VS Code settings in "+path+" do not parse, so they cannot be checked: "+describe(err),
 				cli.Detail{Key: "file", Value: path})
 		}
@@ -83,60 +89,14 @@ func folderPath(f string) string {
 	return f
 }
 
-// stripJSONC turns the JSON with comments and trailing commas that VS
-// Code reads into JSON: line and block comments are blanked and a comma
-// before a closing bracket is dropped, outside strings. It is written by
-// hand because the module has no JSONC reader, and the candidate,
-// github.com/tailscale/hujson, is a new dependency, which is ask-first.
-func stripJSONC(in []byte) []byte {
+// standardJSON turns the JSON with comments and trailing commas that VS
+// Code reads (JSONC) into standard JSON, through
+// github.com/tailscale/hujson (ADR 0038). A leading UTF-8 byte order
+// mark, which an editor may write, is dropped first, and a newline is
+// added at the end, because hujson refuses a line comment that ends the
+// file without one and VS Code reads it. A text hujson cannot read is an
+// error, so the row fails rather than guess.
+func standardJSON(in []byte) ([]byte, error) {
 	in = bytes.TrimPrefix(in, []byte("\xef\xbb\xbf"))
-	out := make([]byte, 0, len(in))
-	for i := 0; i < len(in); i++ {
-		c := in[i]
-		switch {
-		case c == '"':
-			j := i + 1
-			for j < len(in) && in[j] != '"' {
-				if in[j] == '\\' {
-					j++
-				}
-				j++
-			}
-			j = min(j, len(in)-1)
-			out = append(out, in[i:j+1]...)
-			i = j
-		case c == '/' && i+1 < len(in) && in[i+1] == '/':
-			for i < len(in) && in[i] != '\n' {
-				i++
-			}
-			out = append(out, '\n')
-		case c == '/' && i+1 < len(in) && in[i+1] == '*':
-			i += 2
-			for i+1 < len(in) && (in[i] != '*' || in[i+1] != '/') {
-				i++
-			}
-			i++
-			out = append(out, ' ')
-		case c == '}' || c == ']':
-			out = dropTrailingComma(out)
-			out = append(out, c)
-		default:
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
-// dropTrailingComma removes a comma that ends out, white space aside.
-func dropTrailingComma(out []byte) []byte {
-	for i, o := range slices.Backward(out) {
-		switch o {
-		case ' ', '\t', '\r', '\n':
-			continue
-		case ',':
-			return append(out[:i], out[i+1:]...)
-		}
-		break
-	}
-	return out
+	return hujson.Standardize(append(slices.Clip(in), '\n'))
 }

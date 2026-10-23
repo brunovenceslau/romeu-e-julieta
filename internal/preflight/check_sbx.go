@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	"golang.org/x/net/publicsuffix"
+
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 )
 
@@ -71,14 +73,13 @@ func checkBroadAllow(ctx context.Context, h *hostEnv) error {
 }
 
 // broadPattern reports whether an allow pattern covers a whole class of
-// hosts: **, *, a wildcard over a whole top-level domain (*.com), a
-// pattern whose top-level label is a wildcard (example.*). A trailing
-// dot (the root label) and a port suffix are ignored. A resource that is
-// not host[:port], a URL among them, is not a shape romeu reads, and the
-// error is upstream-shape (RJ-310): a pattern it cannot judge is never
-// read as narrow. A wildcard over a public suffix of two labels
-// (*.co.uk) is not caught: that needs the public suffix list, which is
-// not a dependency of the module (deferred with the dependency).
+// hosts: **, *, a wildcard over a public suffix of any length (*.com,
+// *.co.uk, *.github.io, by the public suffix list of
+// golang.org/x/net/publicsuffix), a pattern whose top-level label is a
+// wildcard (example.*). A trailing dot (the root label) and a port
+// suffix are ignored. A resource that is not host[:port], a URL among
+// them, is not a shape romeu reads, and the error is upstream-shape
+// (RJ-310): a pattern it cannot judge is never read as narrow.
 func broadPattern(resource string) (bool, error) {
 	p := strings.ToLower(strings.TrimSpace(resource))
 	if host, port, ok := strings.Cut(p, ":"); ok {
@@ -99,5 +100,13 @@ func broadPattern(resource string) (bool, error) {
 	for len(rest) > 0 && strings.Trim(rest[0], "*") == "" {
 		rest = rest[1:]
 	}
-	return len(rest) < len(labels) && len(rest) <= 1, nil
+	if len(rest) == len(labels) {
+		return false, nil
+	}
+	if len(rest) <= 1 {
+		return true, nil
+	}
+	suffix := strings.Join(rest, ".")
+	ps, _ := publicsuffix.PublicSuffix(suffix)
+	return ps == suffix, nil
 }

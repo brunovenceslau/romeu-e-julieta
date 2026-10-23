@@ -4,6 +4,7 @@
 package preflight
 
 import (
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"net/url"
 	"path/filepath"
@@ -113,27 +114,39 @@ func TestPreflightStep5VSCodeTrustedFolders(t *testing.T) {
 	})
 }
 
-// TestPreflightStripJSONC shows the reading of the comments and commas
-// of the settings of VS Code.
-func TestPreflightStripJSONC(t *testing.T) {
+// TestPreflightStandardJSON shows the reading of the comments and commas
+// of the settings of VS Code: each text reads as the value VS Code reads,
+// and a text that is not JSONC is an error, never a guess.
+func TestPreflightStandardJSON(t *testing.T) {
 	tests := []struct {
-		name, in, want string
+		name, in string
+		want     map[string]any
+		invalid  bool
 	}{
-		{"plain", `{"a": 1}`, `{"a": 1}`},
-		{"line comment", "{\"a\": 1} // x", "{\"a\": 1} \n"},
-		{"block comment", `{/* x */"a": 1}`, `{ "a": 1}`},
-		{"trailing comma in an object", `{"a": 1,}`, `{"a": 1}`},
-		{"trailing comma in an array with a space", `[1, 2, ]`, `[1, 2 ]`},
-		{"comma kept between members", `{"a": 1, "b": 2}`, `{"a": 1, "b": 2}`},
-		{"slashes in a string", `{"a": "//x"}`, `{"a": "//x"}`},
-		{"an escaped quote in a string", `{"a": "q\" // not a comment"}`, `{"a": "q\" // not a comment"}`},
-		{"an unterminated string is left alone", `{"a": "x`, `{"a": "x`},
-		{"a byte order mark", "\xef\xbb\xbf{\"a\": 1}", `{"a": 1}`},
-		{"an unterminated block comment ends the text", `{"a": 1} /* x`, `{"a": 1}  `},
+		{name: "plain", in: `{"a": "1"}`, want: map[string]any{"a": "1"}},
+		{name: "line comment", in: "{\"a\": \"1\"} // x", want: map[string]any{"a": "1"}},
+		{name: "block comment", in: `{/* x */"a": "1"}`, want: map[string]any{"a": "1"}},
+		{name: "trailing comma in an object", in: `{"a": "1",}`, want: map[string]any{"a": "1"}},
+		{name: "trailing comma after a comment and CRLF", in: "{\"a\": \"1\", // x\r\n}", want: map[string]any{"a": "1"}},
+		{name: "two members", in: `{"a": "1", "b": "2"}`, want: map[string]any{"a": "1", "b": "2"}},
+		{name: "slashes in a string", in: `{"a": "//x"}`, want: map[string]any{"a": "//x"}},
+		{name: "an escaped quote in a string", in: `{"a": "q\" // not a comment"}`, want: map[string]any{"a": `q" // not a comment`}},
+		{name: "a byte order mark", in: "\xef\xbb\xbf{\"a\": \"1\"}", want: map[string]any{"a": "1"}},
+		{name: "an unterminated string", in: `{"a": "x`, invalid: true},
+		{name: "an unterminated block comment", in: `{"a": "1"} /* x`, invalid: true},
+		{name: "not JSON at all", in: `a = 1`, invalid: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, string(stripJSONC([]byte(tt.in))))
+			std, err := standardJSON([]byte(tt.in))
+			if tt.invalid {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			var got map[string]any
+			require.NoError(t, jsonv2.Unmarshal(std, &got))
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
