@@ -567,6 +567,7 @@ its own: it is an invalid document, exit 2, named by the rule's slug
 | `RJ-352` | `root-unsafe` | 2 | `REQ-1278` `romeu init`, for a root `doctor`'s check `root-unsafe` fails (04 4.2, the root checks; I20), the message naming which rule; hint: `decide: pass another root with --root` |
 | `RJ-353` | `settings-exist` | 2 | `REQ-1279` `romeu init`, when host settings already exist at the settings path, or appear there while init runs; init never overwrites them; hint: `decide: keep the settings that exist, or move them aside and run init again` |
 | `RJ-354` | `settings-unwritable` | 2 | `REQ-1280` `romeu init`, when the settings directory or file cannot be made or written; the details hold the system's message; hint: `decide: make the settings directory writable, or point ROMEU_SETTINGS at a path that is, then run init again` |
+| `RJ-355` | `toolchain-declined` | 1 | `romeu approve --toolchain` on a terminal, when the answer to gate 1 is anything but `y` ([01 1.4](01-system-model.md#gate-1-toolchain-acknowledgement-per-machine)); `toolchain.json` is unchanged, so a command chained after it does not run; hint: `romeu approve --toolchain`. `RJ-352` to `RJ-354` are kept for the rows of `romeu init` decided on 2026-10-23 |
 
 ### `fingerprint-unstable` (`RJ-338`)
 
