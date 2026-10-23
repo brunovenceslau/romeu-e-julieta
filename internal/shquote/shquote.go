@@ -13,8 +13,8 @@
 // and opens them again. The safe characters are letters, digits and
 // _-./:,+@% of ASCII: none of them is an operator, a quote, an
 // expansion, a glob, a comment or a tilde to sh, and = is left out, so
-// that no word reads as an assignment at the head of a command. A NUL byte cannot be carried by
-// any word of sh, and is refused.
+// that no word reads as an assignment at the head of a command. A NUL
+// byte cannot be carried by any word of sh, and is refused.
 //
 // Written by hand (ADR 0038): the rule is the few lines above, and the
 // maintained quoters found (github.com/kballard/go-shellquote,

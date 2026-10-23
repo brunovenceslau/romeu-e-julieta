@@ -203,6 +203,9 @@ func secretsOf(p spec.Project, hs spec.HostSettings, home string) (map[string]en
 		if !ok {
 			return nil, fmt.Errorf("render: the secret %q has no host-settings entry %q", name, key)
 		}
+		if entry.Service == "" {
+			return nil, fmt.Errorf("render: the host-settings entry %q names no sbx service", key)
+		}
 		if _, dup := out[entry.Service]; dup {
 			return nil, fmt.Errorf("render: two secrets of the spec name the sbx service %q", entry.Service)
 		}
@@ -272,7 +275,9 @@ func specRule(slug string) spec.Rule {
 // writes some strings in a form it reads back as another (03 3.3).
 func readsBack(data []byte, want envFile) error {
 	var got envFile
-	if err := yaml.Unmarshal(data, &got); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&got); err != nil {
 		return fmt.Errorf("render: sbxenv.yaml does not read back: %w", err)
 	}
 	for i, w := range got.AdditionalWorkspaces {

@@ -119,6 +119,7 @@ func TestEncodeRecordErrors(t *testing.T) {
 		{"an absolute file path", func(r *render.Record) { r.Files["/etc/passwd"] = strings.Repeat("0", 64) }, `"/etc/passwd" is not a clean relative path`},
 		{"a file path that leaves <name>-env/", func(r *render.Record) { r.Files["../x"] = strings.Repeat("0", 64) }, `"../x" is not a clean relative path`},
 		{"an unclean file path", func(r *render.Record) { r.Files["a//b"] = strings.Repeat("0", 64) }, `"a//b" is not a clean relative path`},
+		{"a control character in a path", func(r *render.Record) { r.Files["a\nb"] = strings.Repeat("0", 64) }, `"a\nb" is not a clean relative path`},
 		{"the dir itself", func(r *render.Record) { r.Files["."] = strings.Repeat("0", 64) }, `"." is not a clean relative path`},
 		{"a file digest out of form", func(r *render.Record) { r.Files["sbxenv.yaml"] = "0" }, `the digest of "sbxenv.yaml"`},
 		{"a previous file out of form", func(r *render.Record) {

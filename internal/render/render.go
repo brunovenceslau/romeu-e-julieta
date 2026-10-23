@@ -63,6 +63,9 @@ func Render(ctx context.Context, c Candidate, in Input, m Materializer) (Rendere
 
 // writeFile writes data to name in the candidate dir, through an
 // os.Root on it, so no name can leave it.
+// It truncates in place, with no atomic rename: a candidate dir is new
+// and no live file references it (01 1.6); a live path is written by
+// the promotion commit, never here.
 func writeFile(c Candidate, name string, data []byte) error {
 	r, err := os.OpenRoot(c.Dir)
 	if err != nil {

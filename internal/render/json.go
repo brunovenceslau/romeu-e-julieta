@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 // MaxRecordSize is the most bytes of render.json DecodeRecord takes:
@@ -111,10 +112,11 @@ func (r Record) check() error {
 }
 
 // checkFiles holds a files map to its form: each key a clean relative
-// slash path inside <name>-env/, each value a digest.
+// slash path inside <name>-env/ with no control character, each value
+// a digest.
 func checkFiles(name string, files map[string]string) error {
 	for _, p := range slices.Sorted(maps.Keys(files)) {
-		if p == "" || p == "." || path.IsAbs(p) || path.Clean(p) != p || p == ".." || strings.HasPrefix(p, "../") || strings.Contains(p, `\`) {
+		if p == "" || p == "." || path.IsAbs(p) || path.Clean(p) != p || p == ".." || strings.HasPrefix(p, "../") || strings.Contains(p, `\`) || strings.ContainsFunc(p, unicode.IsControl) {
 			return fmt.Errorf("render: %s: %q is not a clean relative path", name, p)
 		}
 		if !hexDigest.MatchString(files[p]) {

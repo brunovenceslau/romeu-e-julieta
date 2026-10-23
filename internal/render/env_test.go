@@ -134,6 +134,11 @@ func TestEnvErrors(t *testing.T) {
 			in.Host.Secrets["npm@shop"] = e
 			in.Project.Secrets = []string{"github", "npm"}
 		}, `two secrets of the spec name the sbx service "github"`},
+		{"a host-settings entry with no service", func(in *render.EnvInput) {
+			e := in.Host.Secrets["github@shop"]
+			e.Service = ""
+			in.Host.Secrets["github@shop"] = e
+		}, `the host-settings entry "github@shop" names no sbx service`},
 		{"a secret argv that is not absolute", func(in *render.EnvInput) {
 			e := in.Host.Secrets["github@shop"]
 			e.Argv = []string{"security", "-w"}
