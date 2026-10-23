@@ -105,3 +105,13 @@
 {"want":"ok","argv":["policy","rm","network","--sandbox","shop","--resource","github.com"],"note":""}
 {"want":"ok","argv":["policy","ls","--json"],"note":""}
 {"want":"ok","argv":["settings","set","env.rememberHostCommands","true"],"note":""}
+{"want":"I4","argv":["-y","env","run","-d","/abs/shop-env"],"note":"an approval before the verb"}
+{"want":"I4","argv":["--auto-approve","ls"],"note":"an approval before the verb"}
+{"want":"I4","argv":["-y","ls","--json"],"note":"an approval before the verb"}
+{"want":"I4","argv":["-f","env","run","/abs/shop-env"],"note":"-f before the verb is still on env run"}
+{"want":"I4","argv":["--force","run","/abs/shop-env"],"note":"--force before the verb is still on run"}
+{"want":"I4","argv":["-D","-y","stop","shop"],"note":"an approval after a global flag"}
+{"want":"I25","argv":["-D","secret","set","github","--sandbox","shop","--command","/bin/x"],"note":"a global flag before secret set"}
+{"want":"I25","argv":["secret","set","github","-t","ghp_x","--command","/bin/x"],"note":"--sandbox is the second word"}
+{"want":"I25","argv":["secret","set","github","--sandbox","shop","-t","ghp_x"],"note":"--command is the fourth word"}
+{"want":"I25","argv":["secret","set","github","--sandbox","shop","--command","/bin/x","--sandbox","other"],"note":"the sixth word is --refresh or nothing"}

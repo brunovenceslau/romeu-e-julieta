@@ -33,31 +33,37 @@ var valueFlagsOf = map[string][]string{
 
 // verbOf returns the verb of an argv, found after the global flags (-D,
 // --debug, --cloud: every word that starts with a dash before it), as
-// "word" or, for the verbs that have subcommands, "word word"; and the
-// words after it. Top-level run and create are env run and env create:
-// they apply the same plan.
-func verbOf(argv []string) (verb string, rest []string) {
+// "word" or, for the verbs that have subcommands, "word word"; the
+// dashed words before it (and between its words, which sbx takes as
+// flags of the verb too); and the words after it. Top-level run and
+// create are env run and env create: they apply the same plan.
+func verbOf(argv []string) (verb string, lead, rest []string) {
 	i := 0
 	for i < len(argv) && strings.HasPrefix(argv[i], "-") {
+		lead = append(lead, argv[i])
 		i++
 	}
 	if i >= len(argv) {
-		return "", nil
+		return "", lead, nil
 	}
 	verb, i = argv[i], i+1
 	switch verb {
 	case "run", "create":
-		return "env " + verb, argv[i:]
+		return "env " + verb, lead, argv[i:]
 	case "env", "secret", "settings", "policy":
+		for i < len(argv) && strings.HasPrefix(argv[i], "-") && argv[i] != "--" {
+			lead = append(lead, argv[i])
+			i++
+		}
 		if i < len(argv) {
 			sub := argv[i]
 			if verb == "policy" {
-				return "policy", argv[i:]
+				return "policy", lead, argv[i:]
 			}
-			return verb + " " + sub, argv[i+1:]
+			return verb + " " + sub, lead, argv[i+1:]
 		}
 	}
-	return verb, argv[i:]
+	return verb, lead, argv[i:]
 }
 
 // scan returns what an approval would be in the words of a verb: the
@@ -96,8 +102,10 @@ func scan(verb string, rest []string) (long []string, short []rune) {
 
 // refusal returns why the argv breaks I4 or I25, or "".
 func refusal(argv []string) string {
-	verb, rest := verbOf(argv)
+	verb, lead, rest := verbOf(argv)
 	long, short := scan(verb, rest)
+	leadLong, leadShort := scan("", lead)
+	long, short = append(long, leadLong...), append(short, leadShort...)
 	if slices.Contains(long, "--auto-approve") || slices.Contains(short, 'y') {
 		return "I4: --auto-approve approves for sbx"
 	}
@@ -106,7 +114,7 @@ func refusal(argv []string) string {
 			return "I4: --force approves the plan of the environment without asking"
 		}
 	}
-	if verb == "secret set" && !isCommandForm(rest) {
+	if verb == "secret set" && (len(lead) > 0 || !isCommandForm(rest)) {
 		return "I25: sbx secret set is only <service> --sandbox <name> --command <command> [--refresh <duration>], and this call is not"
 	}
 	return ""
