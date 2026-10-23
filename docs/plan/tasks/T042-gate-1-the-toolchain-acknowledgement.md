@@ -3,7 +3,7 @@ id: T042
 title: "Gate 1: the toolchain acknowledgement"
 milestone: M3
 module: romeu-cli
-fate: kept
+fate: merged
 owns:
   - internal/cmd/romeu/approve/**
   - internal/cmd/romeu/all/import_approve.go
@@ -17,9 +17,14 @@ after: []
 ask_first:
   - contracts
 sitting: none
+merged: 2026-10-23
+pr: 263
 ---
 
 # T042 - Gate 1: the toolchain acknowledgement
+
+Merged on 2026-10-23 in pull request #263. The text below is the one
+written when it was built.
 
 Goal: Gate 1, `approve --toolchain`.
 

@@ -3,7 +3,7 @@ id: T164
 title: "`romeu init --git-credential-helper`, so a private config repo clones at J1 step 3"
 milestone: M3
 module: romeu-cli
-fate: new
+fate: merged
 owns:
   - internal/cmd/romeu/init/**
   - internal/gitsafe/credential*.go
@@ -22,9 +22,14 @@ ask_first:
   - contracts
   - gitsafe
 sitting: none
+merged: 2026-10-23
+pr: 265
 ---
 
 # T164 - `romeu init --git-credential-helper`, so a private config repo clones at J1 step 3
+
+Merged on 2026-10-23 in pull request #265. The text below is the one
+written when it was built.
 
 Goal: `romeu init --git-credential-helper <name-or-path>`, so a private
 config repository can be cloned at J1 step 3, and the error
