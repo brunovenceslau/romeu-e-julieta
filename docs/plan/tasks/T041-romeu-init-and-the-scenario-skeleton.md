@@ -3,7 +3,7 @@ id: T041
 title: "`romeu init` and the scenario skeleton"
 milestone: M3
 module: romeu-cli
-fate: kept
+fate: merged
 owns:
   - internal/cmd/romeu/init/**
   - internal/cmd/romeu/all/import_init.go
@@ -20,20 +20,31 @@ needs:
 after: []
 ask_first: []
 sitting: none
+merged: 2026-10-23
+pr: 259
 ---
 
 # T041 - `romeu init` and the scenario skeleton
+
+Merged on 2026-10-23 in pull request #259. The text below is the one
+written when it was built.
 
 Earlier title: `romeu init`.
 
 Goal: `romeu init`, the scenario skeleton and the romeu e2e harness.
 
+Re-plan (2026-10-23): the e2e runs the host-native `romeu`, built with
+`go build`, since the `--dry-run` build of `tools/release` is a darwin
+cross-build that the Linux runner cannot run (10 10.2, the e2e row).
+`init` needs no embedded julieta. T103 stays in `needs`: the
+`--dry-run` build stays the one that embeds julieta, and a later
+command's case that needs it extends that build to a host-native one.
+
 Re-plan (2026-10-12): Kept, changed. One directory per journey under
 `e2e/scenarios/<journey>/`, each with its own `commands.yaml`; the e2e
 harness `e2e/internal/romeu` (the temporary root, the TLS origins over
 `git http-backend`, the fake sbx process, the settings writer) with its
-own tests; T103 stays in `needs`, since the e2e runs the `--dry-run`
-build. A later command task owns its own scenario directory and e2e
+own tests. A later command task owns its own scenario directory and e2e
 file, so no task appends to another's.
 
 - Implements: REQ-0136 (02 2.3), REQ-0150 (02 2.4), REQ-0204 (03 3.4),

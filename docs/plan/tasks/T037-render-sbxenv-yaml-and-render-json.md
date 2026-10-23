@@ -3,7 +3,7 @@ id: T037
 title: "`render`: `sbxenv.yaml` and `render.json`"
 milestone: M3
 module: render
-fate: kept
+fate: merged
 owns:
   - internal/render/render*.go
   - internal/render/env*.go
@@ -24,9 +24,14 @@ after: []
 ask_first:
   - checks
 sitting: none
+merged: 2026-10-23
+pr: 260
 ---
 
 # T037 - `render`: `sbxenv.yaml` and `render.json`
+
+Merged on 2026-10-23 in pull request #260. The text below is the one
+written when it was built.
 
 Goal: `render`: `sbxenv.yaml`, `render.json`, the workspace files, the
 types, the goldens, `shquote`, `tools/ci golden`.
