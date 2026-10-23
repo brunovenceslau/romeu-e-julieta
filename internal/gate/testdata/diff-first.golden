@@ -1,8 +1,6 @@
 gate 2: widening of the project shop
 summary:
-  ! capability workload: kind added
   ! capability workload: network added
-  ! capability kit personal:tools: kind added
   ! capability kit personal:tools: lifecycle added
   ! gated domain added: foo.example (spec tool override)
   ! gated domain added: github.com (upload)
@@ -64,9 +62,7 @@ secret argv (host settings):
   github@shop (service github.com): ["/usr/bin/env","-i","/opt/homebrew/bin/gh","auth","token"]
 
 summary, again (gate 2: widening of the project shop):
-  ! capability workload: kind added
   ! capability workload: network added
-  ! capability kit personal:tools: kind added
   ! capability kit personal:tools: lifecycle added
   ! gated domain added: foo.example (spec tool override)
   ! gated domain added: github.com (upload)

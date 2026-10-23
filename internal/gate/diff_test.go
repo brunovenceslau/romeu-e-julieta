@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -430,4 +431,117 @@ func TestDiffSummaryMarksReposPortsAndAgent(t *testing.T) {
 	} {
 		assert.Contains(t, got, want)
 	}
+}
+
+// nonZero returns a value of t with every field, element and pointer
+// filled, so that it is never the zero value nor encodes as empty.
+func nonZero(t reflect.Type) reflect.Value {
+	v := reflect.New(t).Elem()
+	switch t.Kind() {
+	case reflect.String:
+		v.SetString("x")
+	case reflect.Bool:
+		v.SetBool(true)
+	case reflect.Int, reflect.Int64:
+		v.SetInt(1)
+	case reflect.Float64:
+		v.SetFloat(1)
+	case reflect.Interface:
+		v.Set(reflect.ValueOf("x"))
+	case reflect.Pointer:
+		p := reflect.New(t.Elem())
+		p.Elem().Set(nonZero(t.Elem()))
+		v.Set(p)
+	case reflect.Slice:
+		v.Set(reflect.Append(reflect.MakeSlice(t, 0, 1), nonZero(t.Elem())))
+	case reflect.Map:
+		v.Set(reflect.MakeMap(t))
+		v.SetMapIndex(reflect.ValueOf("k").Convert(t.Key()), nonZero(t.Elem()))
+	case reflect.Struct:
+		for i := range t.NumField() {
+			if t.Field(i).IsExported() {
+				v.Field(i).Set(nonZero(t.Field(i).Type))
+			}
+		}
+	default:
+		panic("nonZero: no value for " + t.String())
+	}
+	return v
+}
+
+// TestEveryCapabilityMemberIsInTheDigestAndTheDiff walks oci.Capabilities:
+// a set that differs in any one member has another widening digest, and
+// the diff names that member by its JSON key. A new member of the type
+// is covered here without a new line (I29, REQ-0071).
+func TestEveryCapabilityMemberIsInTheDigestAndTheDiff(t *testing.T) {
+	t.Parallel()
+	base := oci.Capabilities{Kind: "workload"}
+	set := func(c oci.Capabilities) Set {
+		return Set{Project: "shop", Workload: Workload{Repository: "docker.io/example/dev", Digest: "sha256:" + hex64('a'), Capabilities: c}}
+	}
+	want, err := Digest(set(base))
+	require.NoError(t, err)
+	typ := reflect.TypeFor[oci.Capabilities]()
+	for i := range typ.NumField() {
+		f := typ.Field(i)
+		key, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		t.Run(f.Name, func(t *testing.T) {
+			changed := base
+			line := "workload: " + key + " added"
+			if f.Name == "Kind" {
+				changed.Kind = "mixin"
+				line = "workload: kind changed"
+			} else {
+				reflect.ValueOf(&changed).Elem().Field(i).Set(nonZero(f.Type))
+			}
+
+			got, err := Digest(set(changed))
+
+			require.NoError(t, err)
+			assert.NotEqual(t, want, got, "the member %s is in the widening digest", f.Name)
+			assert.Equal(t, []string{line}, capabilityChanges("workload", base, changed))
+		})
+	}
+}
+
+func TestCapabilityChangesNamesWhatChangedAndWhatWasRemoved(t *testing.T) {
+	t.Parallel()
+	old := oci.Capabilities{
+		Kind:    "workload",
+		Network: &oci.Network{Runtime: oci.Rules{Allow: []oci.NetEntry{{Hosts: []string{"a.example"}}}}},
+		Ports:   []oci.Port{{Container: "80"}},
+	}
+	new := oci.Capabilities{
+		Kind:    "mixin",
+		Network: &oci.Network{Runtime: oci.Rules{Allow: []oci.NetEntry{{Hosts: []string{"b.example"}}}}},
+		Devices: []oci.Device{{VendorID: "1"}},
+	}
+
+	got := capabilityChanges("kit personal:tools", old, new)
+
+	assert.Equal(t, []string{
+		"kit personal:tools: devices added",
+		"kit personal:tools: kind changed",
+		"kit personal:tools: network changed",
+		"kit personal:tools: ports removed",
+	}, got)
+}
+
+func TestCapabilityChangesLeavesOutAKindWithNothingBeside(t *testing.T) {
+	t.Parallel()
+	assert.Empty(t, capabilityChanges("workload", oci.Capabilities{}, oci.Capabilities{Kind: "workload"}), "a first kind is no change to show")
+	assert.Empty(t, capabilityChanges("workload", oci.Capabilities{Kind: "workload"}, oci.Capabilities{}))
+}
+
+func TestCapabilityChangesFailsClosedOnASetThatDoesNotEncode(t *testing.T) {
+	t.Parallel()
+	bad := oci.Capabilities{Kind: "workload", Credentials: []oci.Credential{{
+		Service: "svc", Phases: []string{"runtime"},
+		OAuth: &oci.OAuth{CredentialFile: &oci.CredentialFile{Path: "/a.json", Structure: map[string]any{"f": func() {}}}},
+	}}}
+
+	got := capabilityChanges("workload", bad, bad)
+
+	require.Len(t, got, 1, "two sides that do not encode are never the same set")
+	assert.Contains(t, got[0], "workload: the capability set does not encode")
 }

@@ -462,14 +462,22 @@ func canonical(v any) string {
 
 // capabilityChanges returns a line for each member of the capability
 // set of owner (network, volumes, credentials, lifecycle and the others
-// of oci.Capabilities) that it gains, loses or changes.
+// of oci.Capabilities) that it gains, loses or changes. The kind is shown
+// only when it changes from one kind to another: a kind on one side
+// alone is the first or the last of the set, which its other members
+// show. A side that does not encode is never taken as unchanged.
 func capabilityChanges(owner string, oldSet, newSet oci.Capabilities) []string {
-	old, new := members(oldSet), members(newSet)
+	old, errOld := members(oldSet)
+	new, errNew := members(newSet)
+	if err := cmp.Or(errOld, errNew); err != nil {
+		return []string{owner + ": the capability set does not encode (" + err.Error() + ")"}
+	}
 	var out []string
 	for _, k := range unionKeys(old, new) {
 		o, inOld := old[k]
 		n, inNew := new[k]
 		switch {
+		case k == "kind" && (!inOld || !inNew):
 		case !inOld:
 			out = append(out, owner+": "+k+" added")
 		case !inNew:
@@ -484,14 +492,14 @@ func capabilityChanges(owner string, oldSet, newSet oci.Capabilities) []string {
 // members returns the members of a capability set as they are written in
 // the widening set, by name, each in canonical JSON; an empty kind, the
 // one member always written, counts as absent.
-func members(c oci.Capabilities) map[string]string {
+func members(c oci.Capabilities) (map[string]string, error) {
 	data, err := canon.CanonicalJSON(c)
 	if err != nil {
-		return map[string]string{"(unreadable)": "(" + err.Error() + ")"}
+		return nil, err
 	}
 	var raw map[string]jsontext.Value
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return map[string]string{"(unreadable)": "(" + err.Error() + ")"}
+		return nil, err
 	}
 	out := make(map[string]string, len(raw))
 	for k, v := range raw {
@@ -500,7 +508,7 @@ func members(c oci.Capabilities) map[string]string {
 		}
 		out[k] = string(v)
 	}
-	return out
+	return out, nil
 }
 
 // kitsByKey returns the kits by "<source>:<id>".

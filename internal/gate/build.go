@@ -139,9 +139,9 @@ func Build(p spec.Project, hs spec.HostSettings, r Resolved) (Set, error) {
 // written as JSON and read back, as the approval record does: a whole
 // number beyond 2^53 in the structure of a credential file, the one
 // member of oci.Capabilities that holds any JSON value, reads back as a
-// float64. So
-// the digest of a recorded set can be computed again from the record
-// and compared, and a set that could not be is never approved.
+// float64. So the digest of a recorded set can be computed again from
+// the record and compared, and a set that could not be is never
+// approved.
 func checkRoundTrip(n Set) error {
 	data, err := json.Marshal(n)
 	if err != nil {
