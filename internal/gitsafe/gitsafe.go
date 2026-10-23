@@ -150,8 +150,14 @@ type Config struct {
 	// workload user's in the sandbox.
 	Home string
 	// CredentialHelper is tools.gitCredentialHelper: a helper name or
-	// an absolute path, the one helper host mode passes. Host mode only.
+	// an absolute path (CheckCredentialHelper), the one helper host mode
+	// passes, and only for CredentialHost. Host mode only.
 	CredentialHelper string
+	// CredentialHost is the host of config.url, with its port when the
+	// URL has one: the one host CredentialHelper answers, as
+	// credential.https://<host>.helper (05 5.1, REQ-0464). It is set
+	// exactly when CredentialHelper is.
+	CredentialHost string
 	// GitHosts are the gitHosts of host settings. Host mode only.
 	GitHosts []GitHost
 }
@@ -176,15 +182,8 @@ var ErrConfig = errors.New("gitsafe: invalid config")
 // that gitsafe refuses before git runs.
 var ErrRefused = errors.New("gitsafe: refused")
 
-// The shapes of a credential helper: a name of a git-credential-<name>
-// on /usr/bin:/bin, or an absolute path. Git runs a helper through the
-// shell, so neither shape may hold a character the shell reads.
-var (
-	helperName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
-	helperPath = regexp.MustCompile(`^/[A-Za-z0-9._/+-]+$`)
-	// hostPattern is a host name or IPv4 address with an optional port.
-	hostPattern = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$`)
-)
+// hostPattern is a host name or IPv4 address with an optional port.
+var hostPattern = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$`)
 
 // noLazyFetch stops git from fetching a missing object from a promisor
 // remote the repository's own config names, which would bypass CheckURL
@@ -213,9 +212,10 @@ func New(c Config) (*Runner, error) {
 		r.settings = slices.Clone(hostSettings)
 		if c.CredentialHelper != "" {
 			// After the empty value, which resets the multi-valued key:
-			// this helper and no other (03 3.4).
+			// this helper and no other, for the config repo's host only
+			// (03 3.4, REQ-0464).
 			i := slices.IndexFunc(r.settings, func(s setting) bool { return s.key == "credential.helper" })
-			r.settings = slices.Insert(r.settings, i+1, setting{"credential.helper", c.CredentialHelper})
+			r.settings = slices.Insert(r.settings, i+1, helperFor(c.CredentialHost, c.CredentialHelper))
 		}
 		r.hosts = slices.Clone(c.GitHosts)
 	case Sandbox:
@@ -249,8 +249,12 @@ func (c Config) check() error {
 		return fmt.Errorf("%w: home %q is not an absolute path", ErrConfig, c.Home)
 	case c.Mode == Sandbox && (c.CredentialHelper != "" || len(c.GitHosts) > 0):
 		return fmt.Errorf("%w: sandbox mode takes no host credentials", ErrConfig)
-	case c.CredentialHelper != "" && !helperName.MatchString(c.CredentialHelper) && !helperPath.MatchString(c.CredentialHelper):
-		return fmt.Errorf("%w: credential helper %q is neither a helper name nor an absolute path", ErrConfig, c.CredentialHelper)
+	case c.CredentialHelper != "" && CheckCredentialHelperFile(c.CredentialHelper) != nil:
+		return fmt.Errorf("%w: %w", ErrConfig, CheckCredentialHelperFile(c.CredentialHelper))
+	case (c.CredentialHelper != "") != (c.CredentialHost != ""):
+		return fmt.Errorf("%w: a credential helper and its host go together", ErrConfig)
+	case c.CredentialHost != "" && !hostPattern.MatchString(c.CredentialHost):
+		return fmt.Errorf("%w: credential host %q", ErrConfig, c.CredentialHost)
 	}
 	for _, h := range c.GitHosts {
 		if !hostPattern.MatchString(h.Host) {
