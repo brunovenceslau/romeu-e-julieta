@@ -115,3 +115,10 @@
 {"want":"I25","argv":["secret","set","github","-t","ghp_x","--command","/bin/x"],"note":"--sandbox is the second word"}
 {"want":"I25","argv":["secret","set","github","--sandbox","shop","-t","ghp_x"],"note":"--command is the fourth word"}
 {"want":"I25","argv":["secret","set","github","--sandbox","shop","--command","/bin/x","--sandbox","other"],"note":"the sixth word is --refresh or nothing"}
+{"want":"shape","argv":["env","-D","run","-f","/x"],"note":"a flag between the verb words is no verb of romeu"}
+{"want":"shape","argv":["env","-f","run","/x"],"note":"a flag between the verb words is no verb of romeu"}
+{"want":"shape","argv":["secret","-D","set","github","--sandbox","shop","--command","/bin/x"],"note":"a flag between the verb words is no verb of romeu"}
+{"want":"I25","argv":["secret","set","github","--refresh","1h","--command","/bin/x"],"note":"--sandbox is the second word, though --command is the fourth"}
+{"want":"I25","argv":["secret","set","github","--sandbox","shop","--refresh","1h"],"note":"--command is the fourth word, though --sandbox is the second"}
+{"want":"I25","argv":["secret","set","github","--command","/bin/x","--sandbox","shop"],"note":"driven flags swapped"}
+{"want":"I25","argv":["secret","set","github","--refresh","1h","--sandbox","shop","--command","/bin/x"],"note":"--refresh in an earlier slot"}

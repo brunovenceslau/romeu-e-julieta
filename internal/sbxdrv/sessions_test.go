@@ -142,15 +142,17 @@ func TestBuildersAndSessionsAgree(t *testing.T) {
 	}
 }
 
-// TestRecordingsHoldNoPrivateName keeps every session and every ls
-// fixture free of a home directory or an address: they are public, and
+// TestRecordingsHoldNoPrivateName keeps every session, every ls
+// fixture, the sessions of the fake and the guard table free of a home directory or an address: they are public, and
 // a path or a name of the maintainer's must not enter them.
 func TestRecordingsHoldNoPrivateName(t *testing.T) {
 	sessions, err := filepath.Glob(filepath.Join(sessionsDir, "*", "*.jsonl"))
 	require.NoError(t, err)
 	fixtures, err := filepath.Glob(filepath.Join("testdata", "ls", "*.json"))
 	require.NoError(t, err)
-	files := slices.Concat(sessions, fixtures)
+	fakeSessions, err := filepath.Glob(filepath.Join("..", "..", "e2e", "fakesbx", "testdata", "*.jsonl"))
+	require.NoError(t, err)
+	files := slices.Concat(sessions, fixtures, fakeSessions, []string{guardCasesPath})
 	require.NotEmpty(t, sessions)
 	require.NotEmpty(t, fixtures)
 	for _, f := range files {
