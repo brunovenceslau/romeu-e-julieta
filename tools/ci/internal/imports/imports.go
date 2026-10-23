@@ -500,7 +500,7 @@ func renderFindings(pkgs []Package) []check.Finding {
 	}
 	var out []check.Finding
 	for _, q := range p.TemplateImporters {
-		if q == cobraModule || strings.HasPrefix(q, cobraModule+"/") {
+		if isCobra(pkgs, q) {
 			continue
 		}
 		via := ""
@@ -511,6 +511,14 @@ func renderFindings(pkgs []Package) []check.Finding {
 			Msg: "links " + renderForbidden + via + ": YAML and JSON are written only through marshallers (I11)"})
 	}
 	return out
+}
+
+// isCobra reports whether q is a package of the cobra module: its path
+// is the module's or below it, and it is not a package of this module,
+// whose paths the listing keeps relative, so a directory of this module
+// named github.com/spf13/cobra is not exempt.
+func isCobra(pkgs []Package, q string) bool {
+	return (q == cobraModule || strings.HasPrefix(q, cobraModule+"/")) && find(pkgs, q) == nil
 }
 
 // Notes returns the lines the subcommand prints above its summary for a

@@ -655,6 +655,14 @@ func TestRenderI11ExemptsCobraByName(t *testing.T) {
 			want:   []string{"internal/render: imports I11: links text/template, imported by html/template" + msg},
 		},
 		{
+			name: "a package of this module at a cobra path is not cobra",
+			change: map[string]pkg{
+				"github.com/spf13/cobra/x": {imports: []string{"text/template"}},
+				"internal/render":          {imports: []string{citest.FixtureModule + "/github.com/spf13/cobra/x"}},
+			},
+			want: []string{"internal/render: imports I11: links text/template, imported by github.com/spf13/cobra/x" + msg},
+		},
+		{
 			name:   "render itself",
 			change: map[string]pkg{"internal/render": {imports: []string{"text/template", cobra}}},
 			want:   []string{"internal/render: imports I11: links text/template" + msg},
