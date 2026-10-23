@@ -60,15 +60,20 @@ func Ask(stdin io.Reader, stderr io.Writer, d Diff) (bool, error) {
 // which ends with its question, to stderr and reads one answer line from
 // stdin, by the rules of Ask: once text is written it drops the
 // terminal's input queue, and "y" or "Y" followed by a newline approves
-// while any other line, or an end of input, declines. Only stdin must be
-// a terminal, since stdin decides the TTY (04 4.1, REQ-0272); stderr is
-// the command's CLI writer, which escapes what it is given. Without a
-// terminal on stdin it writes nothing and returns ErrNoTerminal.
+// while any other line, or an end of input, declines. Like Ask, it needs
+// a terminal on stdin and on the process's standard error, the file
+// descriptor stderrFD, so the operator sees the text where the answer is
+// typed (decided on 2026-10-23); stderr is the command's CLI writer over
+// that standard error, which escapes what it is given. Without both
+// terminals it writes nothing and returns ErrNoTerminal.
 //
 //romeu:invariant I7 guard
-func Confirm(stdin io.Reader, stderr io.Writer, text string) (bool, error) {
+func Confirm(stdin io.Reader, stderrFD int, stderr io.Writer, text string) (bool, error) {
 	in, ok := stdin.(*os.File)
 	if !ok || !term.IsTerminal(int(in.Fd())) {
+		return false, ErrNoTerminal
+	}
+	if !term.IsTerminal(stderrFD) {
 		return false, ErrNoTerminal
 	}
 	if _, err := io.WriteString(stderr, text); err != nil {

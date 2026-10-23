@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -30,10 +31,13 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
-// The process's environment and standard input; a test replaces them.
+// The process's environment, standard input and the file descriptor of
+// its standard error, which the CLI writer env.Stderr writes to; a test
+// replaces them.
 var (
-	getenv = os.Getenv
-	stdin  = func() io.Reader { return os.Stdin }
+	getenv   = os.Getenv
+	stdin    = func() io.Reader { return os.Stdin }
+	stderrFD = func() int { return syscall.Stderr }
 )
 
 var _ = cli.Register(func() cli.Command {
@@ -69,11 +73,12 @@ func usage(slug, message string) error {
 	return e
 }
 
-// noTerminal is the refusal without a terminal on stdin (exit 2, 04
-// 4.2): gate 1 is TTY-only (01 1.4, REQ-0059), and stdin decides the
-// TTY (04 4.1, REQ-0272).
+// noTerminal is the refusal without a terminal on stdin or on stderr
+// (exit 2, 04 4.2): gate 1 is TTY-only (01 1.4, REQ-0059), and the
+// operator must see its text where the answer is typed (decided on
+// 2026-10-23).
 func noTerminal() error {
-	return usage("no-tty", "romeu approve --toolchain needs a terminal on its standard input; run it in one")
+	return usage("no-tty", "romeu approve --toolchain needs a terminal on its standard input and its standard error; run it in one, without redirecting either")
 }
 
 // run is the command.
@@ -83,7 +88,7 @@ func run(cmd *cobra.Command, env *cli.Env) error {
 		return err
 	}
 	in := stdin()
-	if f, ok := in.(*os.File); !ok || !term.IsTerminal(int(f.Fd())) {
+	if f, ok := in.(*os.File); !ok || !term.IsTerminal(int(f.Fd())) || !term.IsTerminal(stderrFD()) {
 		return noTerminal()
 	}
 	h, err := loadSettings(env)
@@ -134,15 +139,14 @@ func run(cmd *cobra.Command, env *cli.Env) error {
 	if err != nil {
 		return err
 	}
-	ok, err := gate.Confirm(in, env.Stderr, text)
+	ok, err := gate.Confirm(in, stderrFD(), env.Stderr, text)
 	switch {
 	case errors.Is(err, gate.ErrNoTerminal):
 		return noTerminal()
 	case err != nil:
 		return err
 	case !ok:
-		_, err := fmt.Fprintln(env.Stderr, "declined: toolchain.json is unchanged")
-		return err
+		return ToolchainDeclined.New("gate 1 was declined; toolchain.json is unchanged")
 	}
 	if err := ctx.Err(); err != nil {
 		return err

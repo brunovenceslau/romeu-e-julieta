@@ -227,9 +227,10 @@ func TestReadAnswerDrainsALongLine(t *testing.T) {
 }
 
 // TestConfirmOnATerminal: Confirm, the prompt of gate 1, needs a
-// terminal on stdin only, since stdin decides the TTY (04 4.1,
-// REQ-0272); its text goes to stderr, whatever writer that is, and "y"
-// or "Y" typed once the text is shown approves.
+// terminal on stdin and on the stderr the text goes to, like Ask, so the
+// operator sees the text before answering (decided on 2026-10-23); the
+// text goes through the writer over that stderr, and "y" or "Y" typed
+// once the text is shown approves.
 //
 //romeu:invariant I7 test
 func TestConfirmOnATerminal(t *testing.T) {
@@ -261,7 +262,7 @@ func TestConfirmOnATerminal(t *testing.T) {
 			var got bool
 			go func() {
 				var err error
-				got, err = Confirm(terminal, &shown, "gate 1: a change\nacknowledge? [y/N] ")
+				got, err = Confirm(terminal, int(terminal.Fd()), &shown, "gate 1: a change\nacknowledge? [y/N] ")
 				done <- err
 			}()
 			waitFor(t, shown.String, "acknowledge? [y/N] ")
@@ -274,8 +275,8 @@ func TestConfirmOnATerminal(t *testing.T) {
 	}
 }
 
-// TestConfirmWithoutATerminal: without a terminal on stdin Confirm
-// approves nothing and writes nothing.
+// TestConfirmWithoutATerminal: without a terminal on stdin, or on
+// stderr, Confirm approves nothing and writes nothing.
 //
 //romeu:invariant I7 test
 func TestConfirmWithoutATerminal(t *testing.T) {
@@ -286,17 +287,25 @@ func TestConfirmWithoutATerminal(t *testing.T) {
 	closeAtEnd(t, pipeWrite)
 	_, err = io.WriteString(pipeWrite, "y\n")
 	require.NoError(t, err)
+	file, err := os.CreateTemp(t.TempDir(), "log")
+	require.NoError(t, err)
+	closeAtEnd(t, file)
+	_, terminal := openPTY(t)
 	for _, tt := range []struct {
-		name  string
-		stdin io.Reader
+		name     string
+		stdin    io.Reader
+		stderrFD int
 	}{
-		{"a pipe on stdin", pipeRead},
-		{"a reader that is no file on stdin", strings.NewReader("y\n")},
-		{"no reader on stdin", nil},
+		{"a pipe on stdin", pipeRead, int(terminal.Fd())},
+		{"a reader that is no file on stdin", strings.NewReader("y\n"), int(terminal.Fd())},
+		{"no reader on stdin", nil, int(terminal.Fd())},
+		{"a pipe on stderr", terminal, int(pipeWrite.Fd())},
+		{"a file on stderr", terminal, int(file.Fd())},
+		{"no stderr", terminal, -1},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var shown strings.Builder
-			got, err := Confirm(tt.stdin, &shown, "acknowledge? [y/N] ")
+			got, err := Confirm(tt.stdin, tt.stderrFD, &shown, "acknowledge? [y/N] ")
 			require.ErrorIs(t, err, ErrNoTerminal)
 			assert.False(t, got)
 			assert.Empty(t, shown.String())

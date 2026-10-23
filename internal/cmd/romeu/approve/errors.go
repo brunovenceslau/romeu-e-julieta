@@ -18,4 +18,16 @@ var (
 		Fix:         "romeu approve --toolchain",
 		RecoveredIn: "none: nothing was changed, and the acknowledgement of the hint records the toolchain",
 	}
+
+	// ToolchainDeclined is the error toolchain-declined (RJ-355): the
+	// operator answered gate 1 with anything but y, so the toolchain is
+	// not acknowledged and the command fails, which stops a command line
+	// chained after it (decided on 2026-10-23).
+	ToolchainDeclined = cli.Row{
+		ID:          "RJ-355",
+		Slug:        "toolchain-declined",
+		Exit:        1,
+		Fix:         "romeu approve --toolchain",
+		RecoveredIn: "none: toolchain.json is unchanged, and the rerun of the hint asks again",
+	}
 )

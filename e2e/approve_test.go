@@ -87,20 +87,31 @@ func approve(t *testing.T, e *romeu.Env) romeu.Result {
 	return res
 }
 
-// TestApproveNeedsATerminal: gate 1 is TTY-only and stdin decides the
-// TTY (01 1.4, REQ-0059; 04 4.1, REQ-0272): with a pipe on stdin, a "y"
-// in it, the command exits 2 before it calls sbx, and writes nothing.
+// TestApproveNeedsATerminal: gate 1 is TTY-only (01 1.4, REQ-0059):
+// with a pipe on stdin, a "y" in it, or with stdin on a terminal and
+// stderr not (2>log; decided on 2026-10-23), the command exits 2 before
+// it calls sbx, and writes nothing.
 func TestApproveNeedsATerminal(t *testing.T) {
 	t.Parallel()
-	e := approveSetup(t)
+	for _, tt := range []struct {
+		name string
+		run  func(*romeu.Env) romeu.Result
+	}{
+		{"a pipe on stdin", func(e *romeu.Env) romeu.Result { return e.RunStdin(t, "y\n", approveArgs) }},
+		{"stderr not on the terminal", func(e *romeu.Env) romeu.Result { return e.RunStdinTerminal(t, approveArgs) }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			e := approveSetup(t)
 
-	res := e.RunStdin(t, "y\n", approveArgs)
+			res := tt.run(e)
 
-	assert.Equal(t, 2, res.Code, res.Stderr)
-	assert.Contains(t, res.Stderr, "no-tty")
-	assert.NotContains(t, res.Stderr, question)
-	assert.Empty(t, e.SbxCalls(t), "no sbx call without a terminal")
-	assert.NoFileExists(t, filepath.Join(e.StateDir(), "toolchain.json"))
+			assert.Equal(t, 2, res.Code, res.Stderr)
+			assert.Contains(t, res.Stderr, "no-tty")
+			assert.NotContains(t, res.Stderr, question)
+			assert.Empty(t, e.SbxCalls(t), "no sbx call without a terminal")
+			assert.NoFileExists(t, filepath.Join(e.StateDir(), "toolchain.json"))
+		})
+	}
 }
 
 // TestApproveWritesToolchainJSON: on a terminal, gate 1 prints the
@@ -118,7 +129,7 @@ func TestApproveWritesToolchainJSON(t *testing.T) {
 	assert.Contains(t, res.Stderr, "  sbx 0.49.2 (none recorded) (newest recorded 0.49.2; tested window 0.49.2)\n")
 	assert.Contains(t, res.Stderr, "\n  julieta v0.0.0-placeholder (none recorded), protocol 1 (none recorded), sha256 e3b0c44298fc (none recorded)\n")
 	assert.Contains(t, res.Stderr, "\n    tool core:go (new): ")
-	assert.True(t, strings.HasSuffix(res.Stderr, question), "the prompt comes last, on stderr: %q", res.Stderr)
+	assert.True(t, strings.HasSuffix(res.Stderr, question+"y\n"), "the prompt comes last on the terminal, then the typed answer: %q", res.Stderr)
 	assert.NotContains(t, res.Stdout, question)
 	assert.Contains(t, res.Stdout, "acknowledged  "+filepath.Join(e.StateDir(), "toolchain.json"))
 
@@ -135,16 +146,16 @@ func TestApproveWritesToolchainJSON(t *testing.T) {
 	}
 }
 
-// TestApproveDeclined: any answer but y declines, and toolchain.json is
-// not written.
+// TestApproveDeclined: any answer but y declines: the command exits 1
+// and toolchain.json is not written.
 func TestApproveDeclined(t *testing.T) {
 	t.Parallel()
 	e := approveSetup(t)
 
 	res := e.RunTerminal(t, question, "yes\n", approveArgs)
 
-	assert.Equal(t, 0, res.Code, res.Stderr)
-	assert.Contains(t, res.Stderr, "declined: toolchain.json is unchanged")
+	assert.Equal(t, 1, res.Code, "a declined prompt fails, so approve --toolchain && next stops: %s", res.Stderr)
+	assert.Contains(t, res.Stderr, "error RJ-355 toolchain-declined: ")
 	assert.NoFileExists(t, filepath.Join(e.StateDir(), "toolchain.json"))
 }
 

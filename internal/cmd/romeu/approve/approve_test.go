@@ -117,16 +117,18 @@ type outcome struct {
 }
 
 // approveOn runs romeu approve --toolchain on m with in as its standard
-// input. When answer is not empty, it is typed on master once the
-// question is on stderr.
-func approveOn(t *testing.T, m machine, in io.Reader, master *os.File, answer string) outcome {
+// input and errFD as the file descriptor of its standard error, whose
+// text the test reads from the CLI writer. When answer is not empty, it
+// is typed on master once the question is on stderr.
+func approveOn(t *testing.T, m machine, in io.Reader, errFD int, master *os.File, answer string) outcome {
 	t.Helper()
-	oldEnv, oldIn := getenv, stdin
+	oldEnv, oldIn, oldErr := getenv, stdin, stderrFD
 	getenv = func(k string) string {
 		return map[string]string{"HOME": m.home, "XDG_STATE_HOME": m.stateHome}[k]
 	}
 	stdin = func() io.Reader { return in }
-	t.Cleanup(func() { getenv, stdin = oldEnv, oldIn })
+	stderrFD = func() int { return errFD }
+	t.Cleanup(func() { getenv, stdin, stderrFD = oldEnv, oldIn, oldErr })
 
 	var stdout, stderr lockedBuffer
 	env := &cli.Env{
@@ -152,9 +154,9 @@ func approveOn(t *testing.T, m machine, in io.Reader, master *os.File, answer st
 	return outcome{code: code, stdout: stdout.String(), stderr: stderr.String()}
 }
 
-// TestApproveNeedsATerminal: without a terminal on stdin the command
-// exits 2 before it calls sbx or writes anything (04 4.2, REQ-0310);
-// stdin decides the TTY, so a terminal elsewhere does not count.
+// TestApproveNeedsATerminal: without a terminal on stdin, or on stderr
+// (2>/dev/null, 2>log), the command exits 2 before it calls sbx or
+// writes anything (04 4.2, REQ-0310; stderr decided on 2026-10-23).
 //
 //romeu:invariant I7 test
 func TestApproveNeedsATerminal(t *testing.T) {
@@ -164,19 +166,27 @@ func TestApproveNeedsATerminal(t *testing.T) {
 	closeAtEnd(t, pipeWrite)
 	_, err = io.WriteString(pipeWrite, "y\n")
 	require.NoError(t, err)
+	log, err := os.CreateTemp(t.TempDir(), "log")
+	require.NoError(t, err)
+	closeAtEnd(t, log)
+	_, terminal := openPTY(t)
 	for _, tt := range []struct {
-		name string
-		in   io.Reader
+		name  string
+		in    io.Reader
+		errFD int
 	}{
-		{"a pipe", pipeRead},
-		{"a reader that is no file", strings.NewReader("y\n")},
+		{"a pipe on stdin", pipeRead, int(terminal.Fd())},
+		{"a reader that is no file on stdin", strings.NewReader("y\n"), int(terminal.Fd())},
+		{"a pipe on stderr", terminal, int(pipeWrite.Fd())},
+		{"a file on stderr", terminal, int(log.Fd())},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			m := newMachine(t)
-			got := approveOn(t, m, tt.in, nil, "")
+			got := approveOn(t, m, tt.in, tt.errFD, nil, "")
 			assert.Equal(t, 2, got.code)
 			assert.Contains(t, got.stderr, "RJ-349")
 			assert.Contains(t, got.stderr, "no-tty")
+			assert.NotContains(t, got.stderr, Question)
 			assert.Empty(t, m.sbxCalls(t), "no sbx call without a terminal")
 			assert.Nil(t, m.record(t))
 		})
@@ -192,16 +202,16 @@ func TestApproveOnATerminal(t *testing.T) {
 	t.Run("declined", func(t *testing.T) {
 		m := newMachine(t)
 		master, terminal := openPTY(t)
-		got := approveOn(t, m, terminal, master, "n\n")
-		assert.Equal(t, 0, got.code, got.stderr)
+		got := approveOn(t, m, terminal, int(terminal.Fd()), master, "n\n")
+		assert.Equal(t, 1, got.code, "a declined prompt fails, so approve --toolchain && next stops: %s", got.stderr)
 		assert.Contains(t, got.stderr, "gate 1: the toolchain of this machine\n")
-		assert.Contains(t, got.stderr, "declined: toolchain.json is unchanged")
+		assert.Contains(t, got.stderr, "error RJ-355 toolchain-declined: ")
 		assert.Nil(t, m.record(t))
 	})
 	t.Run("approved, then acknowledged already", func(t *testing.T) {
 		m := newMachine(t)
 		master, terminal := openPTY(t)
-		got := approveOn(t, m, terminal, master, "y\n")
+		got := approveOn(t, m, terminal, int(terminal.Fd()), master, "y\n")
 		require.Equal(t, 0, got.code, got.stderr)
 		assert.Contains(t, got.stderr, "  sbx 0.49.2 (none recorded) (newest recorded 0.49.2; tested window 0.49.2)\n")
 		assert.Contains(t, got.stdout, "acknowledged  "+filepath.Join(m.stateHome, "romeu", "toolchain.json"))
@@ -214,7 +224,7 @@ func TestApproveOnATerminal(t *testing.T) {
 		assert.Equal(t, time.Date(2026, 10, 23, 9, 0, 0, 0, time.UTC), rec.AcknowledgedAt)
 		assert.Equal(t, []string{"version"}, m.sbxCalls(t), "gate 1 reads sbx version and calls nothing else")
 
-		again := approveOn(t, m, terminal, master, "")
+		again := approveOn(t, m, terminal, int(terminal.Fd()), master, "")
 		assert.Equal(t, 0, again.code, again.stderr)
 		assert.Contains(t, again.stdout, "acknowledged already")
 		assert.Equal(t, rec, m.record(t), "a second run writes nothing")
@@ -240,7 +250,7 @@ func TestCheckFunc(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, "RJ-302", cli.Of(err).ID, "no record")
 
-	got := approveOn(t, m, terminal, master, "y\n")
+	got := approveOn(t, m, terminal, int(terminal.Fd()), master, "y\n")
 	require.Equal(t, 0, got.code, got.stderr)
 	require.NoError(t, check(t.Context()), "the acknowledged toolchain")
 
@@ -256,4 +266,33 @@ func mustRead(t *testing.T, path string) []byte {
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	return data
+}
+
+// TestCheckFuncFailsClosed: a seam whose sbx call fails, or whose sbx
+// is below the floor, returns that error and never nil (I7).
+//
+//romeu:invariant I7 test
+func TestCheckFuncFailsClosed(t *testing.T) {
+	for _, tt := range []struct {
+		name, script, id string
+	}{
+		{"a failed sbx call", "#!/bin/sh\necho 'daemon down' >&2\nexit 1\n", ""},
+		{"an sbx below the floor", "#!/bin/sh\necho 'sbx version v0.40.0 0123456789abcdef'\n", "RJ-343"},
+		{"an output that is no version", "#!/bin/sh\necho 'hello'\n", "RJ-310"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			sbx := filepath.Join(dir, "sbx")
+			require.NoError(t, os.WriteFile(sbx, []byte(tt.script), 0o700))
+			st, err := state.Open(filepath.Join(dir, "state"))
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = st.Close() })
+			err = CheckFunc(st, &sbxdrv.Runner{Sbx: sbx, Home: dir}, cli.Version{Version: "v1.0.0", Protocol: 1})(t.Context())
+			require.Error(t, err)
+			if tt.id != "" {
+				assert.Equal(t, tt.id, cli.Of(err).ID)
+			}
+			assert.NotEqual(t, "RJ-302", cli.Of(err).ID, "the check stops before it compares")
+		})
+	}
 }

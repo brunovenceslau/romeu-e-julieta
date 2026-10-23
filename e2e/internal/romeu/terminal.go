@@ -37,22 +37,52 @@ func (l *lockedBuffer) String() string {
 	return l.b.String()
 }
 
-// promptWait is how long RunTerminal waits for the prompt.
+// promptWait is how long RunTerminal waits for the prompt, and for the
+// screen to settle once romeu ended.
 const promptWait = 30 * time.Second
 
-// RunTerminal is Run with the standard input of romeu on the terminal of
-// a /dev/ptmx pair (10 10.1, REQ-0790: a test helper over x/sys/unix, no
-// pty dependency), and its standard output and error captured apart, so
-// a test sees which stream a prompt went to. Once stderr holds prompt,
-// it types answer on the terminal; an empty prompt types nothing.
+// RunTerminal is Run with the standard input and the standard error of
+// romeu on the terminal of a /dev/ptmx pair (10 10.1, REQ-0790: a test
+// helper over x/sys/unix, no pty dependency), as an operator runs it,
+// and its standard output captured apart, so a test sees which stream a
+// prompt went to. Result.Stderr is the screen: what romeu wrote to the
+// terminal, with the echo of what was typed, line ends as "\n". Once the
+// screen holds prompt, it types answer; an empty prompt types nothing.
 func (e *Env) RunTerminal(tb testing.TB, prompt, answer string, args []string, extra ...string) Result {
 	tb.Helper()
+	return e.runOnTerminal(tb, true, prompt, answer, args, extra...)
+}
+
+// RunStdinTerminal is Run with only the standard input of romeu on a
+// terminal, and its standard output and error captured apart: the shell
+// line romeu ... 2>log. It types nothing.
+func (e *Env) RunStdinTerminal(tb testing.TB, args []string, extra ...string) Result {
+	tb.Helper()
+	return e.runOnTerminal(tb, false, "", "", args, extra...)
+}
+
+// runOnTerminal runs romeu with stdin on a terminal, and stderr too when
+// stderrOnTerminal is set.
+func (e *Env) runOnTerminal(tb testing.TB, stderrOnTerminal bool, prompt, answer string, args []string, extra ...string) Result {
+	tb.Helper()
 	master, terminal := openPTY(tb)
-	// The terminal echoes what is typed to the master; draining it keeps
-	// the echo from filling the terminal's output queue.
-	go func() { _, _ = io.Copy(io.Discard, master) }()
+	// The screen is everything the terminal shows; reading it also keeps
+	// the terminal's output queue from filling. The read ends when the
+	// terminal is closed and the queue is drained.
+	var screen lockedBuffer
+	drained := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(&screen, master)
+		close(drained)
+	}()
 
 	var stdout, stderr lockedBuffer
+	var errOut io.Writer = &stderr
+	shown := stderr.String
+	if stderrOnTerminal {
+		errOut = terminal
+		shown = screen.String
+	}
 	done := make(chan struct{})
 	typed := make(chan error, 1)
 	go func() {
@@ -61,7 +91,7 @@ func (e *Env) RunTerminal(tb testing.TB, prompt, answer string, args []string, e
 			return
 		}
 		deadline := time.Now().Add(promptWait)
-		for !strings.Contains(stderr.String(), prompt) {
+		for !strings.Contains(shown(), prompt) {
 			select {
 			case <-done:
 				typed <- errors.New("romeu ended before it showed the prompt")
@@ -82,11 +112,21 @@ func (e *Env) RunTerminal(tb testing.TB, prompt, answer string, args []string, e
 		Dir:    e.Home,
 		Env:    e.Environ(extra...),
 		Stdin:  terminal,
-		Stdout: &stdout, Stderr: &stderr,
+		Stdout: &stdout, Stderr: errOut,
 	})
 	close(done)
+	terr := <-typed
+	_ = terminal.Close()
+	select {
+	case <-drained:
+	case <-time.After(promptWait):
+		tb.Fatalf("romeu %v: the terminal never drained", args)
+	}
 	res := Result{Stdout: stdout.String(), Stderr: stderr.String()}
-	if terr := <-typed; terr != nil {
+	if stderrOnTerminal {
+		res.Stderr = strings.ReplaceAll(screen.String(), "\r\n", "\n")
+	}
+	if terr != nil {
 		tb.Fatalf("romeu %v: %v; stderr: %q", args, terr, res.Stderr)
 	}
 	if err == nil {

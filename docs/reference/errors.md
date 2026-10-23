@@ -53,3 +53,4 @@ exit codes are in [exit-codes.md](exit-codes.md).
 | `RJ-349` | `usage` | 2 | `<binary> <command> --help` | [internal/cli](../../internal/cli/errors.go) | none: the help the hint names lists the commands and flags |
 | `RJ-350` | `illegal-transition` | 2 | `decide: run romeu status to read the state the record is in, and report the command that raised the event as an issue` | [internal/state](../../internal/state/errors.go) | none: the transition is refused and the record is left as it was |
 | `RJ-351` | `mise-failed` | 1 | `decide: read the stderr in the details, fix what mise reports, then run the command again` | [internal/mise](../../internal/mise/errors.go) | none: the details name what mise reported |
+| `RJ-355` | `toolchain-declined` | 1 | `romeu approve --toolchain` | [internal/cmd/romeu/approve](../../internal/cmd/romeu/approve/errors.go) | none: toolchain.json is unchanged, and the rerun of the hint asks again |
