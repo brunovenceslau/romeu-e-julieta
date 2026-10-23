@@ -117,6 +117,12 @@ func entryOf(m map[string]any) (Entry, error) {
 		return Entry{}, errors.New("an entry has no backend")
 	}
 	for key, v := range m {
+		// The pinned layout has no entry-level url and no table named
+		// platforms; a URL in another place would be a host this reader
+		// does not see, so it is refused and not skipped.
+		if key == "url" || key == "platforms" {
+			return Entry{}, fmt.Errorf("an entry holds %q, which the layout of the pinned mise does not have", key)
+		}
 		name, ok := strings.CutPrefix(key, platformPrefix)
 		if !ok {
 			continue

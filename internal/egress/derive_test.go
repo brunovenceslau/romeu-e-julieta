@@ -357,6 +357,8 @@ func TestDeriveRefusesADomainOfAnotherSource(t *testing.T) {
 	for name, in := range map[string]egress.Input{
 		"extra": {Repos: repos, Spec: &spec.Egress{Extra: []string{"*.acme.dev"}}},
 		"kit":   {Repos: repos, Kit: []string{"10.0.0.1"}},
+		"tools": {Repos: []egress.Repo{repoOf("api", map[string]string{"mise.toml": "[tools]\nx = \"1\"\n",
+			"mise.lock": lockOf([3]string{"x", "aqua:acme/tool", ""})})}, Spec: &spec.Egress{Tools: map[string][]string{"aqua:acme/tool": {"10.0.0.1"}}}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			in.Catalog = testCatalog(t)
@@ -381,4 +383,42 @@ func TestDeriveReadFailure(t *testing.T) {
 	}}
 	_, err = egress.Derive(t.Context(), egress.Input{Repos: []egress.Repo{refused}, Catalog: testCatalog(t)})
 	assert.Equal(t, "RJ-325", rowOf(t, err).ID)
+}
+
+// TestDeriveReasonPrecedence: a domain several sources gate keeps the
+// first reason of upload, extra, spec-tool and lock-host, and Auto and
+// Gated share no domain.
+func TestDeriveReasonPrecedence(t *testing.T) {
+	files := map[string]string{"mise.toml": "[tools]\nx = \"1\"\ngo = \"1\"\n", "mise.lock": lockOf(
+		[3]string{"x", "aqua:acme/tool", "https://both.acme.dev/x.tar.gz"},
+		[3]string{"go", "core:go", "https://only.acme.dev/go.tar.gz"},
+	)}
+	sp := &spec.Egress{
+		Extra: []string{"both.acme.dev", "dl.google.com", "storage.googleapis.com"},
+		Tools: map[string][]string{"aqua:acme/tool": {"both.acme.dev", "tool.acme.dev", "only.acme.dev"}},
+	}
+	got, err := egress.Derive(t.Context(), egress.Input{Repos: []egress.Repo{repoOf("api", files)}, Spec: sp, Catalog: testCatalog(t)})
+	require.NoError(t, err)
+	reasons := map[string]egress.Reason{}
+	for _, g := range got.Gated {
+		reasons[g.Domain] = g.Reason
+		assert.NotContains(t, got.Auto, g.Domain, "disjoint")
+	}
+	assert.Equal(t, egress.ReasonExtra, reasons["both.acme.dev"], "extra over spec-tool and lock-host")
+	assert.Equal(t, egress.ReasonSpecTool, reasons["only.acme.dev"], "spec-tool over lock-host")
+	assert.Equal(t, egress.ReasonSpecTool, reasons["tool.acme.dev"])
+	assert.Equal(t, egress.ReasonUpload, reasons["storage.googleapis.com"], "the catalog produced it and it can upload")
+	assert.Contains(t, got.Auto, "dl.google.com", "extra repeats a domain the catalog allows")
+}
+
+// TestDeriveLockHostOfAKit: a lock host that a kit declares, with an
+// entry and no upload, is allowed by the kit and stays auto.
+func TestDeriveLockHostOfAKit(t *testing.T) {
+	files := map[string]string{"mise.toml": toml, "mise.lock": lockOf([3]string{"go", "core:go", "https://proxy.golang.org/go.tar.gz"})}
+	got, err := egress.Derive(t.Context(), egress.Input{Repos: []egress.Repo{repoOf("api", files)}, Kit: []string{"proxy.golang.org"}, Catalog: testCatalog(t)})
+	require.NoError(t, err)
+	assert.Contains(t, got.Auto, "proxy.golang.org")
+	for _, g := range got.Gated {
+		assert.NotEqual(t, "proxy.golang.org", g.Domain)
+	}
 }

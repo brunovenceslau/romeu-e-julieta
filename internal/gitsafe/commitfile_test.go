@@ -78,6 +78,7 @@ func TestCommitFileRefuses(t *testing.T) {
 		{"a pathspec", c, ":(top)big", "not a literal path"},
 		{"a glob", c, "b*", "not a literal path"},
 		{"a parent path", c, "../big", "not a clean relative path"},
+		{"a negative limit", c, "big", "negative limit"},
 		{"a file over the limit", c, "big", "more than 10 bytes"},
 		{"a symbolic link", c, "link", "not a regular file"},
 		{"a gitlink", c, "module", "not a regular file"},
@@ -85,7 +86,11 @@ func TestCommitFileRefuses(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(strings.ReplaceAll(tt.name, " ", "_"), func(t *testing.T) {
-			_, _, err := r.CommitFile(t.Context(), dir, tt.commit, tt.path, 10)
+			limit := 10
+			if tt.name == "a negative limit" {
+				limit = -1
+			}
+			_, _, err := r.CommitFile(t.Context(), dir, tt.commit, tt.path, limit)
 			require.ErrorIs(t, err, ErrRefused)
 			assert.Contains(t, err.Error(), tt.want)
 		})

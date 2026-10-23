@@ -28,6 +28,9 @@ func (r *Runner) CommitFile(ctx context.Context, dir, commit, name string, limit
 	if err := checkObjectID(commit); err != nil {
 		return nil, false, err
 	}
+	if limit < 0 {
+		return nil, false, fmt.Errorf("%w: a negative limit", ErrRefused)
+	}
 	if err := checkLiteralPath(name); err != nil {
 		return nil, false, err
 	}

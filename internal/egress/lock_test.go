@@ -69,6 +69,8 @@ func TestParseLockRefuses(t *testing.T) {
 		{"a version that is not a string", []byte(head + "[[tools.gh]]\nversion = 1\nbackend = \"aqua:cli/cli\"\n"), "version is not a string"},
 		{"an entry without a backend", []byte(head + "[[tools.gh]]\nversion = \"1\"\n"), "no backend"},
 		{"a platform that is not a table", entry("\"platforms.linux-x64\" = \"x\"\n"), "not a table"},
+		{"a url on the entry", entry("url = \"https://a.example/x\"\n"), "does not have"},
+		{"a table named platforms", entry("[tools.gh.platforms.linux-x64]\nurl = \"https://a.example/x\"\n"), "does not have"},
 		{"a url that is not a string", entry("[tools.gh.\"platforms.linux-x64\"]\nurl = 3\n"), "url is not a string"},
 	}
 	for _, tt := range tests {
