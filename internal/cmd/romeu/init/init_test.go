@@ -324,25 +324,89 @@ func TestInitSettingsDirUnwritable(t *testing.T) {
 	assert.DirExists(t, filepath.Join(m.home, "dev", "cfg-env", "cfg", ".git"))
 }
 
-// TestInitSettingsWriteFailsAfterTheClone: when the settings cannot be
-// moved into place once the clone is in place (here a directory appears
-// at their path meanwhile), the clone this run made is removed, and the
-// error is a precondition, not an internal one.
-func TestInitSettingsWriteFailsAfterTheClone(t *testing.T) {
+// TestInitSettingsAppearAfterTheClone: a file that appears at the
+// settings path once the clone is in place is not replaced: init exits 2
+// with settings-exist, leaves that file as it was, and removes the clone
+// this run made.
+func TestInitSettingsAppearAfterTheClone(t *testing.T) {
 	m := newMachine(t, projectSpec)
 	clone := cloneRepo
 	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest string) error {
 		if err := clone(ctx, g, url, dest); err != nil {
 			return err
 		}
-		return os.MkdirAll(filepath.Join(m.settings(), "x"), 0o700)
+		return os.WriteFile(m.settings(), []byte("theirs"), 0o600)
 	}
 
 	code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/cfg")
 
 	assert.Equal(t, 2, code, stderr)
-	assert.Contains(t, stderr, "settings-unwritable")
+	assert.Contains(t, stderr, "settings-exist")
+	got, err := os.ReadFile(m.settings())
+	require.NoError(t, err)
+	assert.Equal(t, "theirs", string(got))
 	assert.NoDirExists(t, filepath.Join(m.home, "dev", "cfg-env", "cfg"))
+	left, _ := filepath.Glob(filepath.Join(filepath.Dir(m.settings()), ".settings.yaml*"))
+	assert.Empty(t, left, "the temporary file is removed")
+}
+
+// TestRootProblemByIdentity: a root that is $HOME through a link, or a
+// parent of the settings through one, is caught by os.SameFile and not
+// by a string (a case variant on a case-insensitive volume is the same).
+func TestRootProblemByIdentity(t *testing.T) {
+	tmp, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	home := filepath.Join(tmp, "home")
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".config", "romeu"), 0o700))
+	alias := filepath.Join(tmp, "alias")
+	require.NoError(t, os.Symlink(home, alias))
+	settings := filepath.Join(home, ".config", "romeu", "settings.yaml")
+	state := filepath.Join(home, ".local", "state", "romeu")
+
+	assert.Contains(t, rootProblem(alias, home, settings, state), "$HOME")
+	cfgAlias := filepath.Join(tmp, "cfgalias")
+	require.NoError(t, os.Symlink(filepath.Join(home, ".config"), cfgAlias))
+	assert.Contains(t, rootProblem(cfgAlias, filepath.Join(tmp, "other"), settings, state), "holds the host settings")
+}
+
+// TestDirProblem names each fault of a directory of the tree.
+func TestDirProblem(t *testing.T) {
+	tmp, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	ok := filepath.Join(tmp, "ok")
+	require.NoError(t, os.Mkdir(ok, 0o700))
+	open := filepath.Join(tmp, "open")
+	require.NoError(t, os.Mkdir(open, 0o700))
+	require.NoError(t, os.Chmod(open, 0o770))
+	file := filepath.Join(tmp, "file")
+	require.NoError(t, os.WriteFile(file, nil, 0o600))
+	link := filepath.Join(tmp, "link")
+	require.NoError(t, os.Symlink(ok, link))
+
+	assert.Empty(t, dirProblem(os.Lstat, ok))
+	assert.Contains(t, dirProblem(os.Lstat, open), "writable by its group or others")
+	assert.Contains(t, dirProblem(os.Lstat, file), "not a directory")
+	assert.Contains(t, dirProblem(os.Lstat, link), "symbolic link")
+	assert.Contains(t, dirProblem(os.Lstat, filepath.Join(tmp, "none")), "cannot be read")
+}
+
+// TestInitNoDefaultBranch: a remote whose HEAD names no branch fails
+// closed, whatever ref is asked.
+func TestInitNoDefaultBranch(t *testing.T) {
+	m := newMachine(t, projectSpec)
+	clone := cloneRepo
+	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest string) error {
+		if err := clone(ctx, g, url, dest); err != nil {
+			return err
+		}
+		return os.Remove(filepath.Join(dest, ".git", "refs", "remotes", "origin", "HEAD"))
+	}
+
+	code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/cfg")
+
+	assert.Equal(t, 2, code, stderr)
+	assert.Contains(t, stderr, "no default branch")
+	assert.NoFileExists(t, m.settings())
 }
 
 // TestInitRootWithTrailingSlash: a trailing slash is cleaned, not refused.

@@ -171,16 +171,11 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 		return err
 	}
 
-	if err := os.MkdirAll(h.Root, dirMode); err != nil {
-		return fmt.Errorf("init: the root: %w", err)
+	rt, envDir, err := openTree(cmd, h.Root, h.Config.Project+"-env")
+	if err != nil {
+		return err
 	}
-	envDir := filepath.Join(h.Root, h.Config.Project+"-env")
-	if err := os.MkdirAll(envDir, dirMode); err != nil {
-		return fmt.Errorf("init: %w", err)
-	}
-	if err := os.Chmod(envDir, dirMode); err != nil {
-		return fmt.Errorf("init: %w", err)
-	}
+	defer func() { _ = rt.Close() }()
 	// The settings are encoded and their directory and temporary file
 	// made before the clone, so that a settings directory init cannot
 	// write fails here, with nothing cloned.
@@ -193,11 +188,11 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 		return err
 	}
 	defer func() { _ = pending.Cleanup() }()
-	dest, err := cloneConfig(ctx, cmd, g, h, envDir)
+	dest, err := cloneConfig(ctx, cmd, g, h, rt, envDir)
 	if err != nil {
 		return err
 	}
-	if err := commitSettings(cmd, pending, data); err != nil {
+	if err := commitSettings(cmd, pending, settings, data); err != nil {
 		// dest is this run's clone: absent proved <envDir>/<dir> did not
 		// exist, so nothing of the operator's goes with it.
 		return errors.Join(err, os.RemoveAll(dest))
@@ -221,13 +216,21 @@ func prepareSettings(cmd *cobra.Command, settings string) (*renameio.PendingFile
 	return pf, nil
 }
 
-// commitSettings writes data to the pending file and moves it to its
-// place, atomically.
-func commitSettings(cmd *cobra.Command, pf *renameio.PendingFile, data []byte) error {
+// commitSettings writes data to the pending file and links it to its
+// place, which fails if a file appeared there meanwhile (settings-exist),
+// where a rename would silently replace it. The temporary file is
+// removed by the caller's Cleanup.
+func commitSettings(cmd *cobra.Command, pf *renameio.PendingFile, settings string, data []byte) error {
 	if _, err := pf.Write(data); err != nil {
 		return refuse(cmd, "settings-unwritable", err.Error())
 	}
-	if err := pf.CloseAtomicallyReplace(); err != nil {
+	if err := pf.Sync(); err != nil {
+		return refuse(cmd, "settings-unwritable", err.Error())
+	}
+	if err := os.Link(pf.Name(), settings); err != nil {
+		if errors.Is(err, fs.ErrExist) {
+			return refuse(cmd, "settings-exist", "the host settings appeared at "+termsafe.Escape(settings)+" meanwhile; init never overwrites them")
+		}
 		return refuse(cmd, "settings-unwritable", err.Error())
 	}
 	return nil
@@ -319,10 +322,11 @@ func tools(cmd *cobra.Command, h *spec.HostSettings, home string) (*gitsafe.Runn
 // cloneConfig clones the config repo under envDir, reads the config
 // project's spec at the ref, and moves the clone to <envDir>/<dir>, dir
 // being the config repo's own entry under repos (03 3.2). It returns
-// the path of the clone. A failure of its own leaves nothing behind; once
-// it returns the path, the clone is in place and removing it, if a later
-// step fails, is the caller's.
-func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h spec.HostSettings, envDir string) (string, error) {
+// the path of the clone. The move goes through rt, the handle of the
+// root, so a link planted under it cannot redirect it. A failure of its
+// own leaves nothing behind; once it returns the path, the clone is in
+// place and removing it, if a later step fails, is the caller's.
+func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h spec.HostSettings, rt *os.Root, envDir string) (string, error) {
 	stage, err := os.MkdirTemp(envDir, ".init-")
 	if err != nil {
 		return "", fmt.Errorf("init: %w", err)
@@ -336,14 +340,57 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 	if err != nil {
 		return "", err
 	}
+	if !filepath.IsLocal(dir) || strings.ContainsRune(dir, filepath.Separator) {
+		return "", usage(cmd, "the config repo's dir is not a plain name")
+	}
+	env := filepath.Base(envDir)
 	dest := filepath.Join(envDir, dir)
-	if _, err := os.Lstat(dest); err == nil {
+	if _, err := rt.Lstat(filepath.Join(env, dir)); err == nil {
 		return "", refuse(cmd, "clone-exists", dest+" exists already; move it away and run init again")
 	}
-	if err := os.Rename(clone, dest); err != nil {
+	if err := rt.Rename(filepath.Join(env, filepath.Base(stage), "clone"), filepath.Join(env, dir)); err != nil {
 		return "", fmt.Errorf("init: %w", err)
 	}
 	return dest, nil
+}
+
+// openTree makes the root and <root>/<envName>, and returns a handle of
+// the root and the path of the env dir. A root or an env dir that is a
+// symbolic link, not a directory, not owned by the user or writable by
+// its group or others is root-unsafe: it is checked after it is made,
+// not only before (rootProblem), so a directory or a link created in
+// between is caught. A directory init made is 0700; one that was there
+// is chmod'ed through the handle only when the checks passed, and never
+// followed out of the root.
+func openTree(cmd *cobra.Command, root, envName string) (*os.Root, string, error) {
+	if err := os.MkdirAll(root, dirMode); err != nil {
+		return nil, "", fmt.Errorf("init: the root: %w", err)
+	}
+	if why := dirProblem(os.Lstat, root); why != "" {
+		return nil, "", refuse(cmd, "root-unsafe", "the root "+why)
+	}
+	rt, err := os.OpenRoot(root)
+	if err != nil {
+		return nil, "", fmt.Errorf("init: the root: %w", err)
+	}
+	created := false
+	if err := rt.Mkdir(envName, dirMode); err == nil {
+		created = true
+	} else if !errors.Is(err, fs.ErrExist) {
+		_ = rt.Close()
+		return nil, "", fmt.Errorf("init: %w", err)
+	}
+	if why := dirProblem(rt.Lstat, envName); why != "" {
+		_ = rt.Close()
+		return nil, "", refuse(cmd, "root-unsafe", envName+" "+why)
+	}
+	if !created {
+		if err := rt.Chmod(envName, dirMode); err != nil {
+			_ = rt.Close()
+			return nil, "", fmt.Errorf("init: %w", err)
+		}
+	}
+	return rt, filepath.Join(root, envName), nil
 }
 
 // configDir reads projects/<cfg>.yaml at the config ref of the clone
@@ -362,7 +409,10 @@ func configDir(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h spe
 	if err != nil {
 		return "", err
 	}
-	if def != "" && def != h.Config.Ref {
+	if def == "" {
+		return "", refuse(cmd, "config-ref-not-default", "the config repo has no default branch: its HEAD names no branch")
+	}
+	if def != h.Config.Ref {
 		return "", refuse(cmd, "config-ref-not-default", "--config-ref "+termsafe.Escape(h.Config.Ref)+" is not the default branch of the config repo ("+termsafe.Escape(def)+"); init takes the default branch only")
 	}
 	oid, ok, err := g.RefOID(ctx, clone, "refs/remotes/origin/"+h.Config.Ref)
