@@ -5,8 +5,8 @@ milestone: M3
 module: sbxdrv
 fate: new
 owns:
-  - internal/sbxdrv/**
-  - e2e/fakesbx/**
+  - internal/sbxdrv/secret*.go
+  - e2e/fakesbx/secret*.go
   - internal/preflight/sbx*.go
   - internal/preflight/listings*.go
 needs:
@@ -15,7 +15,6 @@ needs:
 after: []
 ask_first:
   - sbxdrv
-  - contracts
 sitting: O3
 ---
 
