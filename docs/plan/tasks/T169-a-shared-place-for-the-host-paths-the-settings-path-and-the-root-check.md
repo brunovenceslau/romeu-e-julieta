@@ -15,7 +15,8 @@ needs:
 after:
   - T164
   - T165
-ask_first: []
+ask_first:
+  - contracts
 sitting: none
 ---
 

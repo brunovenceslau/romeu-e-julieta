@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"golang.org/x/term"
 )
@@ -26,9 +27,9 @@ const maxAnswer = 4096
 // and PromptLine to stderr, so a piped stdout keeps them visible, and
 // reads one answer line from stdin (REQ-0272). Both must be a terminal,
 // so the operator reads the diff where the answer is typed. Once the
-// diff is written, Ask drops the terminal's input queue, so a line
-// typed or pasted before the diff was on the screen is not an answer
-// to it. It approves on "y" or "Y" followed by a newline; any other
+// diff is written, and before PromptLine, Ask drops the terminal's
+// input queue (show), so a line typed or pasted before the diff was on
+// the screen is not an answer to it. It approves on "y" or "Y" followed by a newline; any other
 // line, an end of input before a newline, and a line longer than
 // maxAnswer decline (01 1.6, REQ-1208). Without a terminal it writes
 // nothing and returns ErrNoTerminal.
@@ -43,17 +44,72 @@ func Ask(stdin io.Reader, stderr io.Writer, d Diff) (bool, error) {
 	if !ok || !term.IsTerminal(int(out.Fd())) {
 		return false, ErrNoTerminal
 	}
-	if _, err := d.WriteTo(out); err != nil {
+	var b strings.Builder
+	if _, err := d.WriteTo(&b); err != nil {
 		return false, fmt.Errorf("gate: write the diff: %w", err)
 	}
-	if err := flushInput(int(in.Fd())); err != nil {
-		return false, fmt.Errorf("gate: drop what was typed before the prompt: %w", err)
+	if err := show(int(in.Fd()), out, b.String()); err != nil {
+		return false, err
 	}
 	line, err := readAnswer(in)
 	if err != nil {
 		return false, fmt.Errorf("gate: read the answer: %w", err)
 	}
 	return line == "y" || line == "Y", nil
+}
+
+// Confirm is the prompt of gate 1 (01 1.4, REQ-0061): it writes text,
+// which ends with its question, to stderr and reads one answer line from
+// stdin, by the rules of Ask: once the lines above its question are
+// written, and before the question, it drops the terminal's input queue
+// (show), and "y" or "Y" followed by a newline approves while any other
+// line, or an end of input, declines. Like Ask, it needs
+// a terminal on stdin and on the process's standard error, the file
+// descriptor stderrFD, so the operator sees the text where the answer is
+// typed (decided on 2026-10-23); stderr is the command's CLI writer over
+// that standard error, which escapes what it is given. Without both
+// terminals it writes nothing and returns ErrNoTerminal.
+//
+//romeu:invariant I7 guard
+func Confirm(stdin io.Reader, stderrFD int, stderr io.Writer, text string) (bool, error) {
+	in, ok := stdin.(*os.File)
+	if !ok || !term.IsTerminal(int(in.Fd())) {
+		return false, ErrNoTerminal
+	}
+	if !term.IsTerminal(stderrFD) {
+		return false, ErrNoTerminal
+	}
+	if err := show(int(in.Fd()), stderr, text); err != nil {
+		return false, err
+	}
+	line, err := readAnswer(in)
+	if err != nil {
+		return false, fmt.Errorf("gate: read the answer: %w", err)
+	}
+	return line == "y" || line == "Y", nil
+}
+
+// show writes text, whose last line is the question, to w, and drops
+// the input queue of the terminal in between: after the lines above the
+// question and before the question itself. What was typed before the
+// text was on the screen is dropped, and an answer typed once the
+// question shows can never be, so the prompt never waits for an answer
+// the operator already gave (a dropped answer hung the e2e on
+// 2026-10-23).
+func show(in int, w io.Writer, text string) error {
+	cut := strings.LastIndexByte(text, '\n') + 1
+	if cut > 0 {
+		if _, err := io.WriteString(w, text[:cut]); err != nil {
+			return fmt.Errorf("gate: write the prompt: %w", err)
+		}
+	}
+	if err := flushInput(in); err != nil {
+		return fmt.Errorf("gate: drop what was typed before the prompt: %w", err)
+	}
+	if _, err := io.WriteString(w, text[cut:]); err != nil {
+		return fmt.Errorf("gate: write the prompt: %w", err)
+	}
+	return nil
 }
 
 // readAnswer reads one line from r a byte at a time, so it takes

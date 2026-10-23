@@ -29,6 +29,7 @@ romeu <command> [flags]
 
 ### SEE ALSO
 
+* [romeu approve](romeu/approve.md) - acknowledge the toolchain of this machine (gate 1)
 * [romeu completion](romeu/completion.md) - print the shell completion script
 * [romeu init](romeu/init.md) - write the host settings and clone the config repo
 * [romeu version](romeu/version.md) - print the version of romeu

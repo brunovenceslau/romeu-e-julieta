@@ -45,6 +45,7 @@ docs/reference/julieta/version.md -text
 docs/reference/manifest.md -text
 docs/reference/project.md -text
 docs/reference/romeu.md -text
+docs/reference/romeu/approve.md -text
 docs/reference/romeu/completion.md -text
 docs/reference/romeu/completion/bash.md -text
 docs/reference/romeu/completion/fish.md -text
