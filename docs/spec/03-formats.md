@@ -507,9 +507,8 @@ julieta accepts manifests, is described in
 {
   "schema": "render/v1",
   "romeuVersion": "v1.0.0",
-  "promoting": null,
   "specSource": {"kind": "origin", "ref": "refs/romeu/origin/my-config/main", "commit": "<sha>"},
-  "repos": [{"dir": "shop-api", "url": "...", "egressRef": "refs/romeu/origin/shop-api/main", "egressCommit": "<sha>", "lockSha256": "<hex|null>"}],
+  "repos": [{"dir": "shop-api", "url": "...", "egressRef": "refs/romeu/origin/shop-api/main", "egressCommit": "<sha>", "lockSha256": "<hex>"}],
   "files": {
     "sbxenv.yaml": "<sha256>",
     ".romeu/kits/julieta-3f9a1c2b7d4e": "<kit-tree digest>",
@@ -523,9 +522,13 @@ julieta accepts manifests, is described in
 }
 ```
 
-`REQ-0226` `promoting` is `null` except inside a promotion commit
+`REQ-0226` `promoting` is omitted except inside a promotion commit
 ([01 1.6](01-system-model.md#promotion-commit)), when it is
 `{"candidateId": "<ULID>", "filesDigest": "<hex>", "previousFiles": {...}}`.
+`REQ-1273` A member that has no value is omitted and never written as
+`null`: `promoting` outside a promotion commit, and `lockSha256` of a
+repo with no `mise.lock`. The schema generator admits no `null` for a
+pointer (decided on 2026-10-23).
 `REQ-0227` `previousFiles` is the `files` map before the promotion, which
 recovery writes back when the candidate no longer verifies. The julieta
 binary digest here is what the compatibility check compares against.
