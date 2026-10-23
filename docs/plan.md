@@ -224,7 +224,8 @@ New or changed, each proposed on 2026-10-12:
    generator registered under rule 4 writes: the pages under
    `docs/reference/`, `schemas/*.json`, `.github/CODEOWNERS`,
    `docs/adr/README.md`, `docs/diagrams/`, the Go files
-   `internal/cli/*_gen.go`) is owned by no task: each
+   `internal/cli/*_gen.go`, `internal/gate/*_gen.go` and
+   `internal/gate/*_gen_test.go`) is owned by no task: each
    pull request regenerates it on its merged tree, which is 12 12.3's
    merge rule, and `tools/ci plan` leaves it out of the overlap check.
    Where two tasks share a directory (`render` in three file sets;

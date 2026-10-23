@@ -32,6 +32,17 @@ never recomputed from the stored map, since a large integer goes through
 a float64 in it; it is computed from the typed set, and the stored digest
 is only compared.
 
+Re-plan (2026-10-23): the last sentence of the 2026-10-22 re-plan no
+longer holds. `Build` refuses a set that would not read back from JSON
+as itself, so the widening digest is computed again from the stored set
+whenever a project record is read or written, and must equal the stored
+digest; the stored set's render digest must equal the approval's, and
+its project the record's. A record that fails these checks is refused
+on read as record-unreadable (RJ-334) and left untouched, and refused on
+write before anything is written. The generated `internal/gate/*_gen.go`
+and `internal/gate/*_gen_test.go` are outputs of rule 1, owned by no
+task.
+
 - Implements: REQ-0055 (01 1.3), REQ-0059 (01 1.4), REQ-0066 (01 1.4),
   REQ-0067 (01 1.4), REQ-0071 (01 1.4), REQ-0191 (03 3.2), REQ-0192 (03
   3.2), REQ-0272 (04 4.1), REQ-0488 (05 5.2), REQ-0518 (05 5.2),
