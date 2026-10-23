@@ -14,7 +14,8 @@ needs:
   - T031
   - T103
 after: []
-ask_first: []
+ask_first:
+  - contracts
 sitting: none
 ---
 
