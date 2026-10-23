@@ -3,7 +3,7 @@ id: T046
 title: "The preflight"
 milestone: M3
 module: romeu-cli
-fate: kept
+fate: merged
 owns:
   - internal/preflight/**
 needs:
@@ -13,9 +13,14 @@ after: []
 ask_first:
   - contracts
 sitting: none
+merged: 2026-10-23
+pr: 261
 ---
 
 # T046 - The preflight
+
+Merged on 2026-10-23 in pull request #261. The text below is the one
+written when it was built.
 
 Goal: The preflight, one function per step.
 
