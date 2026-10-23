@@ -1,0 +1,2 @@
+# synthetic: true - hand-written for T046; probe A9 re-records the real listing, a permissive default network policy
+[{"scope":"global","kind":"default","effect":"allow","resource":""}]

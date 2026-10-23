@@ -1,0 +1,5 @@
+# synthetic: true - hand-written for T046; probe A9 re-records the real listing, a global row of placeholder values
+[
+  {"scope":"global","kind":"rule","effect":"allow","resource":"placeholder.example.test"},
+  {"scope":"global","kind":"rule","effect":"deny","resource":"**"}
+]

@@ -1,0 +1,2 @@
+# synthetic: true - hand-written for T046; probe A9 re-records the real listing, a row with a duplicate member
+[{"scope":"global","scope":"sandbox:shop","kind":"rule","effect":"allow","resource":"example.test"}]
