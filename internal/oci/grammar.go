@@ -8,7 +8,7 @@
 // by digest, anonymously, over HTTPS only, verifying the digest of every
 // hop and capping every response (REQ-0515).
 //
-// Two rules of decoding meet here, and ADR 0041 decides which applies to
+// Two rules of decoding meet here, and REQ-0160 says which applies to
 // each document. The descriptor is read by the strict subset grammar of
 // REQ-0168 whatever its origin, a local file or the annotation of an
 // image a third party built: it is the input of a gate, so a key or a

@@ -185,7 +185,7 @@ func (r *registry) classify(err error) error {
 // The documents of a registry are outputs of a tool the product does not
 // own: decoded tolerantly, an unknown member skipped, and checked
 // strictly, a member that is read being required and typed, a duplicate
-// member name refused by the decoder (REQ-0170, ADR 0041). A pointer
+// member name refused by the decoder (REQ-0170). A pointer
 // field is one that is required.
 type indexDoc struct {
 	SchemaVersion *int              `json:"schemaVersion"`

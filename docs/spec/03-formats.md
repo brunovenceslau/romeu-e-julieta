@@ -18,7 +18,10 @@ person writes with `json.RejectUnknownMembers(true)`, an upstream output
 and an owned format between binaries without it (the versions rule
 below). v2's defaults, a duplicate member name
 is an error and member names match exactly, are the strictness this
-page means by strict.
+page means by strict. A third-party kit descriptor carried in an image
+annotation is not an upstream output in this sense: it is the input of
+a gate, decoded strictly by the descriptor grammar, and an unknown
+member or capability type fails closed (I28, REQ-0573).
 
 `REQ-0161` Each format the product owns names itself and its version in one form,
 `schema: <name>/v<n>`, where `<name>` is its schema name in 02 2.1; the
