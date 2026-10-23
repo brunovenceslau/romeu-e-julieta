@@ -303,7 +303,7 @@ dir`, see J13).
 3. Compare the recreate digest of the live render with the open
    generation's, then act on the sandbox's state:
    - `REQ-0350` absent: record a new generation first (01 1.6), then `sbx env run
-     -d --clone <dir>` (never the flag that applies a plan without asking (`--auto-approve` or `-y`, ever; `-f`/`--force` on `env run`, `env create`, `run` or `create`); the call is interactive
+     -d --clone <dir>` (never the flag that applies a plan without asking (`--auto-approve` or `-y`; `-f`/`--force` on `env run`, `env create`, `run` or `create`); the call is interactive
      and raw, as 4.1 Output says, so sbx's own prompt appears in this
      terminal when needed). If sbx returns non-zero on that create, read
      `sbx ls --json`: with the sandbox absent, remove the record just
