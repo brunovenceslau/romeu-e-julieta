@@ -4,9 +4,8 @@
 
 Checkpoint of 2026-10-23, second part: "Session of 2026-10-23, second
 part: T041, T037, T046 and the decisions PR" (01m5n79k6qmv157kqxnsvk737w).
-Pushes stay asked first (01m5gywvgc85vj8k4txzppjz6d), except opening a
-pull request and pushing to an open one on 2026-10-23
-(01m5n7net1v4sgs10t0nvwvyka).
+Pushes and pull requests need no approval in this repository, within
+the limits that record names (01m5nbzfb4p92djhp10c92jprp).
 
 ## Next steps
 
