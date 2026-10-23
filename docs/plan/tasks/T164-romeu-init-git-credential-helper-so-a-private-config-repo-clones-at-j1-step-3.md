@@ -12,6 +12,9 @@ owns:
   - e2e/scenarios/j1/**
   - docs/spec/04-cli.md
   - docs/spec/09-journeys.md
+  - internal/gitsafe/gitsafe.go
+  - internal/gitsafe/gitsafe_test.go
+  - internal/gitsafe/clone.go
 needs:
   - T041
 after: []

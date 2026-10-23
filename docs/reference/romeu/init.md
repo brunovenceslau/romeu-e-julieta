@@ -35,7 +35,7 @@ romeu init --config-url https://github.com/<owner>/<config-repo> --git-credentia
       --config-project string          the config project's name (default: the repo's name)
       --config-ref string              the branch that holds projects/<name>.yaml (default "main")
       --config-url string              the https URL of the config repo (required)
-      --git-credential-helper string   the git credential helper of a private config repo: a git-credential-<name> helper's name or an absolute path; recorded as tools.gitCredentialHelper
+      --git-credential-helper string   the git credential helper of a private config repo, for its host only: a git-credential-<name> helper's name, or the absolute path of an executable only you or root can write; recorded as tools.gitCredentialHelper. Git may send it erase when the origin refuses a credential, which deletes what a storing helper (osxkeychain, store) holds
   -h, --help                           help for init
       --root string                    the absolute root of the host tree (default: $HOME/dev)
 ```
