@@ -43,7 +43,7 @@ func TestTheAllowlist(t *testing.T) {
 			disallowed = append(disallowed, l.ID)
 		}
 	}
-	assert.Equal(t, []string{"Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT"}, allowed)
+	assert.Equal(t, []string{"Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT", "CC-BY-SA-4.0"}, allowed)
 	assert.Equal(t, []string{"BSD-4-Clause", "GPL-2.0", "CDDL-1.0", "EPL-1.0"}, disallowed)
 	var riders []string
 	for _, r := range a.Riders {
