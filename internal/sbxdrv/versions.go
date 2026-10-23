@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/mod/semver"
+
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 )
 
@@ -52,16 +54,26 @@ func (v Release) String() string {
 	return s
 }
 
-// Compare orders versions by their numbers; a prerelease comes before
-// its release, and two prereleases of one release are equal, since
-// romeu has no use for their order.
+// Compare orders versions in the order of Semantic Versioning 2.0.0: by
+// their numbers, a prerelease before its release, and two prereleases
+// of one release by golang.org/x/mod/semver (ADR 0038). A prerelease
+// that semver does not accept (a numeric identifier with a leading
+// zero, which the version grammar of sbx reads) is equal to the other
+// prereleases of its release, since nothing orders it.
 func (v Release) Compare(w Release) int {
-	return cmp.Or(
+	if c := cmp.Or(
 		cmp.Compare(v.Major, w.Major),
 		cmp.Compare(v.Minor, w.Minor),
 		cmp.Compare(v.Patch, w.Patch),
 		cmp.Compare(boolInt(v.Pre == ""), boolInt(w.Pre == "")),
-	)
+	); c != 0 || v.Pre == "" {
+		return c
+	}
+	a, b := "v0.0.0-"+v.Pre, "v0.0.0-"+w.Pre
+	if !semver.IsValid(a) || !semver.IsValid(b) {
+		return 0
+	}
+	return semver.Compare(a, b)
 }
 
 // boolInt is 1 for true.

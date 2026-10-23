@@ -146,8 +146,9 @@ func TestRecordedVersions(t *testing.T) {
 	assert.Equal(t, dirs, RecordedVersions)
 }
 
-// TestVersionCompare orders versions by their numbers, and a
-// prerelease before its release.
+// TestVersionCompare orders versions in the order of Semantic
+// Versioning 2.0.0: by their numbers, a prerelease before its release,
+// and two prereleases of one release by their identifiers.
 func TestVersionCompare(t *testing.T) {
 	parse := func(s string) Release {
 		v, err := ParseVersion([]byte(s))
@@ -159,5 +160,12 @@ func TestVersionCompare(t *testing.T) {
 	assert.Equal(t, 0, parse("v0.46.0").Compare(parse("0.46.0")))
 	assert.Equal(t, -1, parse("v0.46.0-rc.1").Compare(parse("v0.46.0")))
 	assert.Equal(t, 1, parse("v0.46.0").Compare(parse("v0.46.0-rc.1")))
-	assert.Equal(t, 0, parse("v0.46.0-rc.1").Compare(parse("v0.46.0-rc.2")), "prereleases of one release are not ordered")
+	assert.Equal(t, -1, parse("v0.46.0-rc.1").Compare(parse("v0.46.0-rc.2")), "prereleases of one release are ordered")
+	assert.Equal(t, 1, parse("v0.46.0-rc.2").Compare(parse("v0.46.0-rc.1")))
+	assert.Equal(t, -1, parse("v0.46.0-rc.2").Compare(parse("v0.46.0-rc.10")), "numeric identifiers compare as numbers")
+	assert.Equal(t, -1, parse("v0.46.0-alpha").Compare(parse("v0.46.0-beta")))
+	assert.Equal(t, -1, parse("v0.46.0-1").Compare(parse("v0.46.0-alpha")), "a numeric identifier comes before an alphanumeric one")
+	assert.Equal(t, 0, parse("v0.46.0-rc.1").Compare(parse("v0.46.0-rc.1+abc")), "build metadata does not order")
+	assert.Equal(t, 1, parse("v0.47.0-rc.01").Compare(parse("v0.46.9")), "a prerelease semver does not accept still orders by its numbers")
+	assert.Equal(t, -1, parse("v0.46.0-rc.01").Compare(parse("v0.46.0")), "and before its release")
 }
