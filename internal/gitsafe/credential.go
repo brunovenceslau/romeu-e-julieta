@@ -101,7 +101,7 @@ func checkHelperFile(helper string, uid int) error {
 	case fi.Mode().Perm()&0o111 == 0:
 		return refuse("is not executable", real)
 	}
-	if why := ownership(fi, uid, false); why != "" {
+	if why := ownership(fi, real, uid, false); why != "" {
 		return refuse(why, real)
 	}
 	for _, p := range []string{helper, real} {
@@ -109,7 +109,7 @@ func checkHelperFile(helper string, uid int) error {
 			// The link itself, when an element is one: its owner can
 			// point it elsewhere.
 			if li, err := os.Lstat(d); err == nil && li.Mode()&fs.ModeSymlink != 0 {
-				if why := ownership(li, uid, true); why != "" {
+				if why := ownership(li, d, uid, true); why != "" {
 					return refuse(why, d)
 				}
 			}
@@ -117,7 +117,7 @@ func checkHelperFile(helper string, uid int) error {
 			if err != nil {
 				return refuse("cannot be read", d)
 			}
-			if why := ownership(di, uid, !first); why != "" {
+			if why := ownership(di, d, uid, !first); why != "" {
 				return refuse(why, d)
 			}
 			if d == "/" {
@@ -128,11 +128,13 @@ func checkHelperFile(helper string, uid int) error {
 	return nil
 }
 
-// ownership returns the rule fi breaks, or "": owned by uid or root, and
-// not writable by the group or others, but for a root-owned sticky
-// directory when sticky is allowed, and for a symbolic link, whose mode
-// git never reads.
-func ownership(fi fs.FileInfo, uid int, sticky bool) string {
+// ownership returns the rule fi, the file at p, breaks, or "": owned by
+// uid or root, and not writable by the group or others, but for a
+// root-owned sticky directory when sticky is allowed, and for a symbolic
+// link, whose mode git never reads. A write bit is refused even for a
+// group that holds the user alone (umask 002), and the rule names the
+// chmod that fixes it.
+func ownership(fi fs.FileInfo, p string, uid int, sticky bool) string {
 	st, ok := fi.Sys().(*syscall.Stat_t)
 	if !ok {
 		return "has no owner the system reports"
@@ -148,7 +150,8 @@ func ownership(fi fs.FileInfo, uid int, sticky bool) string {
 	case sticky && fi.IsDir() && fi.Mode()&fs.ModeSticky != 0 && owner == 0:
 		return ""
 	}
-	return "is writable by its group or others"
+	who := map[fs.FileMode]string{0o020: "g", 0o002: "o", 0o022: "go"}[fi.Mode().Perm()&0o022]
+	return "is writable by its group or others; fix it with: chmod " + who + "-w " + p
 }
 
 // CloneWithCredentialHelper is Clone with helper, a value

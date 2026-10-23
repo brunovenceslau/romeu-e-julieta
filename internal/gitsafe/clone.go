@@ -89,11 +89,18 @@ func (r *Runner) clone(ctx context.Context, url, dest, helper string) error {
 	if err := r.checkout(ctx, dest); err != nil {
 		// checkCloneDest proved dest absent, so all of it is this
 		// clone's: a clone with no checkout would read as an existing
-		// repository with every file deleted.
-		return errors.Join(err, os.RemoveAll(dest))
+		// repository with every file deleted. What fails here fails on
+		// what the remote sent (ErrRemoteContent).
+		return errors.Join(fmt.Errorf("%w: %w", ErrRemoteContent, err), os.RemoveAll(dest))
 	}
 	return nil
 }
+
+// ErrRemoteContent marks an error of a clone that comes from what the
+// remote sent, once git clone has run: a HEAD gitsafe refuses, a filter
+// listing or a checkout that fails. A caller tells it from a refusal of
+// its own input, which comes before git runs.
+var ErrRemoteContent = errors.New("gitsafe: the remote's content")
 
 // checkout checks out HEAD in the new clone in dest with the filter
 // drivers of its config emptied, or does nothing when HEAD names no

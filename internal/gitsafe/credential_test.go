@@ -280,3 +280,62 @@ func TestCheckCredentialHelperFile(t *testing.T) {
 		assert.Contains(t, err.Error(), fmt.Sprintf("is owned by uid %d, neither the user nor root", uid))
 	})
 }
+
+// TestCheckCredentialHelperFileNamesTheFix: a write bit of the group, of
+// others or of both is refused, a group that holds the user alone
+// included (umask 002), and the message names the path and the chmod
+// that fixes it.
+func TestCheckCredentialHelperFileNamesTheFix(t *testing.T) {
+	for mode, fix := range map[os.FileMode]string{0o770: "chmod g-w ", 0o707: "chmod o-w ", 0o777: "chmod go-w "} {
+		t.Run(fix, func(t *testing.T) {
+			p := helperScript(t)
+			require.NoError(t, os.Chmod(p, mode))
+
+			err := checkHelperFile(p, os.Getuid())
+
+			require.ErrorIs(t, err, ErrRefused)
+			assert.Contains(t, err.Error(), "fix it with: "+fix+p)
+		})
+	}
+	t.Run("a directory", func(t *testing.T) {
+		p := helperScript(t)
+		require.NoError(t, os.Chmod(filepath.Dir(p), 0o770))
+
+		err := checkHelperFile(p, os.Getuid())
+
+		require.ErrorIs(t, err, ErrRefused)
+		assert.Contains(t, err.Error(), "fix it with: chmod g-w "+filepath.Dir(p))
+	})
+}
+
+// TestCloneMarksTheRemotesContent: once git clone has run, a HEAD that
+// gitsafe refuses is an error of the remote's content, and the clone is
+// removed; a refusal of the input, before git runs, is not.
+func TestCloneMarksTheRemotesContent(t *testing.T) {
+	r, err := New(Config{Mode: Host, Git: "/usr/bin/git", Home: "/h"})
+	require.NoError(t, err)
+	var rec recorder
+	rec.install(r)
+	record := r.start
+	r.start = func(ctx context.Context, c procgroup.Command) error {
+		if slices.Contains(c.Argv, "HEAD^{commit}") {
+			_, err := io.WriteString(c.Stdout, "not-an-object-id\n")
+			return err
+		}
+		if slices.Contains(c.Argv, "clone") {
+			return os.MkdirAll(c.Argv[len(c.Argv)-1], 0o700)
+		}
+		return record(ctx, c)
+	}
+	dest := filepath.Join(t.TempDir(), "r")
+
+	err = r.Clone(t.Context(), "https://github.com/owner/cfg", dest)
+
+	require.ErrorIs(t, err, ErrRemoteContent)
+	require.ErrorIs(t, err, ErrRefused)
+	assert.NoDirExists(t, dest)
+
+	err = r.CloneWithCredentialHelper(t.Context(), "https://github.com/owner/cfg", filepath.Join(t.TempDir(), "r"), "!sh")
+	require.ErrorIs(t, err, ErrRefused)
+	assert.NotErrorIs(t, err, ErrRemoteContent)
+}

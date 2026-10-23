@@ -249,12 +249,15 @@ func (c Config) check() error {
 		return fmt.Errorf("%w: home %q is not an absolute path", ErrConfig, c.Home)
 	case c.Mode == Sandbox && (c.CredentialHelper != "" || len(c.GitHosts) > 0):
 		return fmt.Errorf("%w: sandbox mode takes no host credentials", ErrConfig)
-	case c.CredentialHelper != "" && CheckCredentialHelperFile(c.CredentialHelper) != nil:
-		return fmt.Errorf("%w: %w", ErrConfig, CheckCredentialHelperFile(c.CredentialHelper))
 	case (c.CredentialHelper != "") != (c.CredentialHost != ""):
 		return fmt.Errorf("%w: a credential helper and its host go together", ErrConfig)
 	case c.CredentialHost != "" && !hostPattern.MatchString(c.CredentialHost):
 		return fmt.Errorf("%w: credential host %q", ErrConfig, c.CredentialHost)
+	}
+	if c.CredentialHelper != "" {
+		if err := CheckCredentialHelperFile(c.CredentialHelper); err != nil {
+			return fmt.Errorf("%w: %w", ErrConfig, err)
+		}
 	}
 	for _, h := range c.GitHosts {
 		if !hostPattern.MatchString(h.Host) {
