@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The command lines of J1, onboarding (09, REQ-0730): scenario id to its
+# ordered lines. A <placeholder> is bound by the journey function.
+J1:
+  - romeu init --config-url https://github.com/<owner>/<config-repo>

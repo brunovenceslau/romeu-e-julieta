@@ -1,0 +1,264 @@
+// SPDX-FileCopyrightText: 2026 Bruno Venceslau
+// SPDX-License-Identifier: GPL-3.0-only
+
+//go:build unix
+
+package romeu
+
+import (
+	"bufio"
+	"bytes"
+	"encoding/pem"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/textproto"
+	"os"
+	"path"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"testing"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+)
+
+// LogicalHost is the host of the origins' URLs, the one the lines of a
+// journey show (https://github.com/<owner>/<config-repo>). The rules of
+// 03 3.1 refuse the address and the port of the test server in a URL, so
+// a test never reaches the real host: the git of the Env rewrites it to
+// the server (installGit).
+const LogicalHost = "github.com"
+
+// Origins serves git repositories over TLS, the origins of 10 10.1:
+// git http-backend (net/http/cgi) behind an httptest TLS server. They
+// are the remote of a config repo and, for later tasks, of the repos of
+// a project. The standard library does the serving; the repositories
+// are made with the machine's git.
+type Origins struct {
+	srv  *httptest.Server
+	root string // the directory of the bare repositories
+	work string // the working copies Push commits in
+	ca   string // the server's certificate as a CA bundle
+	git  string // the machine's git, absolute
+}
+
+// NewOrigins starts the server and stops it with the test.
+func NewOrigins(tb testing.TB) *Origins {
+	tb.Helper()
+	git := lookGit(tb)
+	tmp := tb.TempDir()
+	o := &Origins{git: git, root: filepath.Join(tmp, "bare"), work: filepath.Join(tmp, "work")}
+	for _, d := range []string{o.root, o.work} {
+		if err := os.Mkdir(d, 0o700); err != nil {
+			tb.Fatal(err)
+		}
+	}
+	out, err := procgroup.CombinedOutput(tb.Context(), procgroup.Command{
+		Class: procgroup.ToolProbe, Argv: []string{git, "--exec-path"}, Env: []string{"PATH=/usr/bin:/bin"},
+	})
+	if err != nil {
+		tb.Fatalf("git --exec-path: %v: %s", err, out)
+	}
+	backend := cgiBackend{path: filepath.Join(strings.TrimSpace(string(out)), "git-http-backend"), root: o.root}
+	o.srv = httptest.NewTLSServer(backend)
+	tb.Cleanup(o.srv.Close)
+	o.ca = filepath.Join(tmp, "ca.pem")
+	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: o.srv.Certificate().Raw})
+	if err := os.WriteFile(o.ca, pemBytes, 0o600); err != nil {
+		tb.Fatal(err)
+	}
+	return o
+}
+
+// URL returns the URL of the repository owner/repo as a project spec
+// names it: https://github.com/owner/repo, valid by 03 3.1.
+func (o *Origins) URL(ownerRepo string) string {
+	return "https://" + LogicalHost + "/" + ownerRepo
+}
+
+// CAFile returns the path of the server's CA bundle.
+func (o *Origins) CAFile() string { return o.ca }
+
+// Push commits files (path to content) on the branch of the repository
+// owner/repo, creating the repository, bare and served, on the first
+// call, and pushes the commit to it. It is how a test makes a config
+// repo, and how a later task replays an agent's commit on an origin.
+func (o *Origins) Push(tb testing.TB, ownerRepo, branch string, files map[string]string) {
+	tb.Helper()
+	bare := filepath.Join(o.root, filepath.FromSlash(ownerRepo))
+	work := filepath.Join(o.work, filepath.FromSlash(ownerRepo))
+	if _, err := os.Stat(bare); err != nil {
+		for _, d := range []string{bare, work} {
+			if err := os.MkdirAll(d, 0o700); err != nil {
+				tb.Fatal(err)
+			}
+		}
+		o.Git(tb, bare, "init", "-q", "--bare", "-b", "main")
+		o.Git(tb, work, "init", "-q", "-b", branch)
+		o.Git(tb, work, "remote", "add", "origin", bare)
+	}
+	for name, content := range files {
+		p := filepath.Join(work, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+			tb.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+			tb.Fatal(err)
+		}
+	}
+	o.Git(tb, work, "add", "-A")
+	o.Git(tb, work, "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "fixture")
+	o.Git(tb, work, "push", "-q", "origin", "HEAD:refs/heads/"+branch)
+}
+
+// Git runs the machine's git in dir with the arguments, under an
+// environment that reads no configuration and names a fixed author, and
+// returns its output; a failure fails the test. It is the test's own
+// git: romeu never runs through it.
+func (o *Origins) Git(tb testing.TB, dir string, args ...string) string {
+	tb.Helper()
+	var out, stderr bytes.Buffer
+	err := procgroup.Run(tb.Context(), procgroup.Command{
+		Class: procgroup.ToolGit,
+		Argv:  append([]string{o.git}, args...),
+		Dir:   dir,
+		Env: []string{
+			"PATH=/usr/bin:/bin", "HOME=" + o.work, "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
+			"GIT_AUTHOR_NAME=fixture", "GIT_AUTHOR_EMAIL=fixture@example.com",
+			"GIT_COMMITTER_NAME=fixture", "GIT_COMMITTER_EMAIL=fixture@example.com",
+		},
+		Stdout: &out, Stderr: &stderr,
+	})
+	if err != nil {
+		tb.Fatalf("git %v in %s: %v\n%s", args, dir, err, stderr.String())
+	}
+	return out.String()
+}
+
+// installGit writes the git of the Env into bin and returns its path.
+// With origins it is a script that runs the machine's git with two
+// settings of its own before the caller's: the URLs of LogicalHost
+// rewritten to the TLS server, and the server's CA trusted. Host
+// settings name an absolute tools.git (03 3.4), so this is the one
+// place a test reaches its origins without a gitsafe override (there is
+// none) and without a port in a URL, which the rules of 03 3.1 refuse.
+// Without origins it is a link to the machine's git.
+func installGit(tb testing.TB, bin string, o *Origins) string {
+	tb.Helper()
+	git := lookGit(tb)
+	path := filepath.Join(bin, "git")
+	if o == nil {
+		if err := os.Symlink(git, path); err != nil {
+			tb.Fatal(err)
+		}
+		return path
+	}
+	for _, s := range []string{git, o.srv.URL, o.ca} {
+		if strings.ContainsAny(s, "'\n") {
+			tb.Fatalf("%q cannot be quoted in the git script", s)
+		}
+	}
+	script := "#!/bin/sh\nexec '" + git + "' -c 'url." + o.srv.URL + "/.insteadOf=https://" + LogicalHost + "/' -c 'http.sslCAInfo=" + o.ca + "' \"$@\"\n"
+	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
+		tb.Fatal(err)
+	}
+	return path
+}
+
+// lookGit returns the absolute path of the machine's git.
+func lookGit(tb testing.TB) string {
+	tb.Helper()
+	git, err := procgroup.LookPath("git")
+	if err != nil {
+		tb.Fatal(err)
+	}
+	if git, err = filepath.Abs(git); err != nil {
+		tb.Fatal(err)
+	}
+	return git
+}
+
+// cgiBackend serves a request by running git http-backend as a CGI
+// program (RFC 3875) under procgroup. The standard library has
+// net/http/cgi for this, and the call-site scan of 04 4.1 (Subprocesses)
+// keeps that import to internal/procgroup, so this is the small part of
+// it that git needs: the request line, the body and the git headers in,
+// the status, the headers and the body out.
+type cgiBackend struct {
+	path, root string
+	// limit caps the request body; zero is maxBody.
+	limit int64
+}
+
+// maxBody caps a request body: a push of a fixture is small.
+const maxBody = 32 << 20
+
+// requestOK reports whether p is /owner/repo or below it, clean, with
+// no .. element: the one shape of a git request, so that the path handed
+// to the backend cannot leave GIT_PROJECT_ROOT.
+func requestOK(p string) bool {
+	if path.Clean(p) != p || !strings.HasPrefix(p, "/") {
+		return false
+	}
+	parts := strings.Split(p[1:], "/")
+	if len(parts) < 3 || slices.Contains(parts, "..") {
+		return false
+	}
+	return parts[0] != "" && parts[1] != ""
+}
+
+func (b cgiBackend) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !requestOK(r.URL.Path) {
+		http.Error(w, "not a repository path", http.StatusBadRequest)
+		return
+	}
+	limit := b.limit
+	if limit == 0 {
+		limit = maxBody
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	env := []string{
+		"GIT_PROJECT_ROOT=" + b.root, "GIT_HTTP_EXPORT_ALL=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
+		"PATH=" + os.Getenv("PATH"),
+		"GATEWAY_INTERFACE=CGI/1.1", "SERVER_PROTOCOL=HTTP/1.1", "REMOTE_ADDR=127.0.0.1",
+		"REQUEST_METHOD=" + r.Method, "PATH_INFO=" + r.URL.Path, "QUERY_STRING=" + r.URL.RawQuery,
+		"CONTENT_TYPE=" + r.Header.Get("Content-Type"), "CONTENT_LENGTH=" + strconv.Itoa(len(body)),
+		"HTTP_GIT_PROTOCOL=" + r.Header.Get("Git-Protocol"), "HTTP_CONTENT_ENCODING=" + r.Header.Get("Content-Encoding"),
+	}
+	var out, stderr bytes.Buffer
+	if err := procgroup.Run(r.Context(), procgroup.Command{
+		Class: procgroup.ToolGit, Argv: []string{b.path}, Env: env,
+		Stdin: bytes.NewReader(body), Stdout: &out, Stderr: &stderr,
+	}); err != nil {
+		http.Error(w, err.Error()+"\n"+stderr.String(), http.StatusInternalServerError)
+		return
+	}
+	br := bufio.NewReader(&out)
+	head, err := textproto.NewReader(br).ReadMIMEHeader()
+	if err != nil && !errors.Is(err, io.EOF) {
+		http.Error(w, "git http-backend: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	status := http.StatusOK
+	if s := head.Get("Status"); s != "" {
+		code, _, _ := strings.Cut(s, " ")
+		if n, err := strconv.Atoi(code); err == nil {
+			status = n
+		}
+		head.Del("Status")
+	}
+	for k, vs := range head {
+		for _, v := range vs {
+			w.Header().Add(k, v)
+		}
+	}
+	w.WriteHeader(status)
+	_, _ = io.Copy(w, br)
+}

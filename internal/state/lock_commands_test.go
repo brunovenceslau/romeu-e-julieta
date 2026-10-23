@@ -32,7 +32,7 @@ var (
 // map after its package is linked in is a stale line. The map only
 // shrinks.
 var notDefinedYet = map[string]string{
-	"init": "T041", "approve": "T042", "sync": "T043", "run": "T066", "adopt": "T050",
+	"approve": "T042", "sync": "T043", "run": "T066", "adopt": "T050",
 	"stop": "T067", "pull": "T067", "salvage": "T068", "rm": "T068", "recreate": "T068",
 	"retire": "T069", "status": "T048", "doctor": "T049", "handoff": "T070",
 }

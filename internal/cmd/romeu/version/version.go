@@ -43,6 +43,7 @@ type report struct {
 var _ = cli.Register(func() cli.Command {
 	c := cli.Define(cli.PreflightNone, cli.LockNone, cli.AppendsNothing(), cli.SnapshotNone, cli.ReadsOnly)
 	c.Binary, c.Name, c.JSON = "romeu", "version", true
+	c.NoJourney = "no step of a journey runs it; its own tests assert its output"
 	c.New = func(env *cli.Env) *cobra.Command {
 		return &cobra.Command{
 			Use:     "version",
