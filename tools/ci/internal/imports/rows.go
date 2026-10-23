@@ -176,3 +176,8 @@ var (
 // renderForbidden is the one package internal/render must not reach
 // (I11): YAML and JSON are written only through marshallers.
 const renderForbidden = "text/template"
+
+// cobraModule is the module whose packages the I11 rule exempts by
+// name: internal/cli links cobra, and cobra's template help is not used
+// (ADR 0015, rule 5).
+const cobraModule = "github.com/spf13/cobra"
