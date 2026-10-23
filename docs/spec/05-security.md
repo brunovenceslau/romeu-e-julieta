@@ -102,8 +102,14 @@ the gitHosts allowlist did not see.
   them, and julieta runs at the agent's trust, so a program they name
   gains the agent nothing. CheckURL still admits only `https://` and
   `git://127.0.0.1` URLs.
-- `REQ-0464` Credentials: only `-c credential.helper=<host settings value>` when
-  `tools.gitCredentialHelper` is set; a `gitHosts[].caFile` becomes
+- `REQ-0464` Credentials: when `tools.gitCredentialHelper` is set, only
+  `-c credential.https://<host>.helper=<host settings value>` after the
+  empty `credential.helper`, `<host>` being the host of `config.url`, so
+  the helper answers the config repo's host and no other (decided on
+  2026-10-23); an absolute-path helper is checked as `romeu init`
+  checks it ([04 4.2](04-cli.md#42-romeu-host)) before git runs.
+  Deferred: a helper for a second private host; trigger: a project
+  needs a second private host. A `gitHosts[].caFile` becomes
   `-c http.sslCAInfo=<path>` for that host only (also how the E2E
   origins of [10 10.1](10-testing-style.md#101-test-levels) trust their
   test CA).
