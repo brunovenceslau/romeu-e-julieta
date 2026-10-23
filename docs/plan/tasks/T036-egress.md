@@ -14,6 +14,7 @@ after:
   - T053
 ask_first:
   - catalog
+  - contracts
 sitting: none
 ---
 
