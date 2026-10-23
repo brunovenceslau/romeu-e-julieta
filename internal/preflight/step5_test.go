@@ -74,10 +74,11 @@ func TestPreflightStep5SbxGlobals(t *testing.T) {
 		host.UsedServices = []string{"svc-beta"}
 		require.NoError(t, hostStepWith(t, "secrets-global-used.txt", "policies-recorded.json", host))
 	})
-	t.Run("the hint names the per-sandbox form and the service", func(t *testing.T) {
+	t.Run("the hint names the per-sandbox form and the service, with no placeholder left", func(t *testing.T) {
 		err := hostStepWith(t, "secrets-global-used.txt", "policies-recorded.json", quietHost(t))
 		hint := cli.Of(err).Hint()
-		assert.Contains(t, hint, "sbx secret set svc-alpha --sandbox shop --command")
+		assert.Contains(t, hint, "sbx secret set svc-alpha --sandbox shop and the --command that uses it")
+		assert.NotRegexp(t, `<[a-z]+>`, hint)
 	})
 	t.Run("the upstream-shape error names sbx and the recorded versions", func(t *testing.T) {
 		err := hostStepWith(t, "secrets-unparseable.txt", "policies-recorded.json", quietHost(t))
@@ -94,22 +95,52 @@ func TestPreflightStep5SbxGlobals(t *testing.T) {
 	})
 }
 
-// TestPreflightBroadPattern shows the patterns of sbx-broad-allow.
+// TestPreflightBroadPattern shows the patterns of sbx-broad-allow, the
+// spellings that must not slip past it, and the resources it refuses.
 func TestPreflightBroadPattern(t *testing.T) {
 	tests := []struct {
 		pattern string
 		broad   bool
+		invalid bool
 	}{
-		{"**", true}, {"*", true}, {"*.*", true}, {"*.com", true}, {"**.io", true}, {"*.COM", true},
-		{" *.com ", true}, {"*.com:443", true}, {"example.*", true}, {"", true},
-		{"*.example.com", false}, {"example.com", false}, {"example.test:443", false}, {"api.example.test", false},
-		{"com", false}, {"localhost", false},
+		{pattern: "**", broad: true}, {pattern: "*", broad: true}, {pattern: "*.*", broad: true}, {pattern: "*.com", broad: true},
+		{pattern: "**.io", broad: true}, {pattern: "*.COM", broad: true}, {pattern: " *.com ", broad: true},
+		{pattern: "*.com:443", broad: true}, {pattern: "example.*", broad: true}, {pattern: "", broad: true},
+		{pattern: "*.com.", broad: true}, {pattern: "**.", broad: true}, {pattern: "*.com.:443", broad: true},
+		{pattern: "*.example.com"}, {pattern: "example.com"}, {pattern: "example.com."}, {pattern: "example.test:443"},
+		{pattern: "api.example.test"}, {pattern: "com"}, {pattern: "localhost"},
+		{pattern: "https://*.com", invalid: true}, {pattern: "https://**", invalid: true}, {pattern: "*.com/path", invalid: true},
+		{pattern: "*.com:", invalid: true}, {pattern: "*.com:https", invalid: true}, {pattern: "a b.com", invalid: true},
+		{pattern: "[::1]", invalid: true}, {pattern: "user@*.com", invalid: true},
 	}
 	for _, tt := range tests {
 		t.Run(strconv.Quote(tt.pattern), func(t *testing.T) {
-			assert.Equal(t, tt.broad, broadPattern(tt.pattern))
+			broad, err := broadPattern(tt.pattern)
+			if tt.invalid {
+				testsupport.RequireID(t, "RJ-310", err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.broad, broad)
 		})
 	}
+}
+
+// TestPreflightStep5RefusesAResourceItCannotJudge shows that a global
+// allow rule that is not host[:port] fails the step with upstream-shape
+// (RJ-310), not with a pass.
+func TestPreflightStep5RefusesAResourceItCannotJudge(t *testing.T) {
+	sbx := passingSbx(t)
+	sbx.policies = []byte(`[{"scope":"global","kind":"rule","effect":"allow","resource":"https://*.com"}]`)
+	d := (&trace{}).deps(t)
+	d.Sbx = sbx
+	_, err := RunSteps(t.Context(), d, quietHost(t), 5, 5)
+	testsupport.RequireID(t, "RJ-310", err)
+	t.Run("a rule of one sandbox is not judged", func(t *testing.T) {
+		sbx.policies = []byte(`[{"scope":"sandbox:shop","kind":"rule","effect":"allow","resource":"https://*.com"}]`)
+		_, err := RunSteps(t.Context(), d, quietHost(t), 5, 5)
+		require.NoError(t, err)
+	})
 }
 
 // TestPreflightHostFindings shows that doctor's reading returns every
@@ -122,10 +153,12 @@ func TestPreflightHostFindings(t *testing.T) {
 	d := (&trace{}).deps(t)
 	d.Sbx = sbx
 	var ids []string
-	for _, err := range HostFindings(t.Context(), d, host) {
+	findings, unchecked := HostFindings(t.Context(), d, host)
+	for _, err := range findings {
 		ids = append(ids, cli.Of(err).ID)
 	}
 	assert.Equal(t, []string{"RJ-329", "RJ-331"}, ids)
+	assert.Equal(t, []string{UncheckedVSCodeFolders}, unchecked, "the folders of VS Code were not given, and the report says so")
 	assert.Equal(t, []string{"sbx-global-secret", "sbx-broad-allow", "home-symlink", "auto-trust", "vscode-trust"},
 		func() (slugs []string) {
 			for _, c := range hostChecks {
@@ -152,4 +185,20 @@ func TestPreflightTouchesNoNetwork(t *testing.T) {
 				"%s imports %s", f, path)
 		}
 	}
+}
+
+// TestPreflightStep5SaysWhatItDidNotCheck shows that a pass with no seam
+// for the trusted folders of VS Code is reported as unchecked, and that
+// a pass with the seam is not.
+func TestPreflightStep5SaysWhatItDidNotCheck(t *testing.T) {
+	d := (&trace{}).deps(t)
+	res, err := Run(t.Context(), d, quietHost(t))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"vscode-trusted-folders"}, res.Unchecked)
+	d.VSCodeTrustedFolders = func() ([]string, error) { return nil, nil }
+	res, err = Run(t.Context(), d, quietHost(t))
+	require.NoError(t, err)
+	assert.Empty(t, res.Unchecked)
+	_, unchecked := HostFindings(t.Context(), d, quietHost(t))
+	assert.Empty(t, unchecked)
 }

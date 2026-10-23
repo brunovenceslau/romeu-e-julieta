@@ -30,7 +30,7 @@ var (
 		ID:          "RJ-329",
 		Slug:        "sbx-global-secret",
 		Exit:        2,
-		Fix:         "decide: bind the service <service> to this sandbox only with sbx secret set <service> --sandbox <name> --command <command>, then remove the global secret of that service with sbx secret rm",
+		Fix:         "decide: bind the service <service> to this sandbox only with sbx secret set <service> --sandbox <name> and the --command that uses it, then remove the global secret of that service with sbx secret rm",
 		RecoveredIn: "none: nothing was changed, and the next run reads the secret listing again",
 	}
 

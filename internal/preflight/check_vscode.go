@@ -4,6 +4,7 @@
 package preflight
 
 import (
+	"bytes"
 	"context"
 	jsonv2 "encoding/json/v2"
 	"fmt"
@@ -55,6 +56,7 @@ func checkVSCodeTrust(_ context.Context, h *hostEnv) error {
 		}
 	}
 	if h.deps.VSCodeTrustedFolders == nil {
+		*h.unchecked = append(*h.unchecked, UncheckedVSCodeFolders)
 		return nil
 	}
 	folders, err := h.deps.VSCodeTrustedFolders()
@@ -87,6 +89,7 @@ func folderPath(f string) string {
 // hand because the module has no JSONC reader, and the candidate,
 // github.com/tailscale/hujson, is a new dependency, which is ask-first.
 func stripJSONC(in []byte) []byte {
+	in = bytes.TrimPrefix(in, []byte("\xef\xbb\xbf"))
 	out := make([]byte, 0, len(in))
 	for i := 0; i < len(in); i++ {
 		c := in[i]

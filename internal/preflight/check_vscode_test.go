@@ -38,6 +38,8 @@ func TestPreflightStep5VSCodeSettings(t *testing.T) {
 			"// my settings\n{\n  /* block */ \"editor.fontSize\": 14, // size\n  \"files.exclude\": {\"**/.git\": true,},\n  \"security.workspace.trust.enabled\": false,\n}\n", true, true},
 		{"a comment marker inside a string is no comment", "linux", ".config/Code/User/settings.json",
 			`{"http.proxy": "http://host//path", "x": "a/*b*/c", "security.workspace.trust.enabled": false}`, true, true},
+		{"settings after a byte order mark that leave trust on pass", "linux", ".config/Code/User/settings.json", "\xef\xbb\xbf{\"editor.fontSize\": 14}", false, true},
+		{"trust off after a byte order mark", "linux", ".config/Code/User/settings.json", "\xef\xbb\xbf{\"security.workspace.trust.enabled\": false}", true, true},
 		{"a settings file that does not parse cannot be checked", "linux", ".config/Code/User/settings.json", `{"a": `, true, true},
 		{"a mistyped trust member cannot be checked", "linux", ".config/Code/User/settings.json", `{"security.workspace.trust.enabled": "no"}`, true, true},
 	}
@@ -126,6 +128,7 @@ func TestPreflightStripJSONC(t *testing.T) {
 		{"slashes in a string", `{"a": "//x"}`, `{"a": "//x"}`},
 		{"an escaped quote in a string", `{"a": "q\" // not a comment"}`, `{"a": "q\" // not a comment"}`},
 		{"an unterminated string is left alone", `{"a": "x`, `{"a": "x`},
+		{"a byte order mark", "\xef\xbb\xbf{\"a\": 1}", `{"a": 1}`},
 		{"an unterminated block comment ends the text", `{"a": 1} /* x`, `{"a": 1}  `},
 	}
 	for _, tt := range tests {

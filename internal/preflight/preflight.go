@@ -16,6 +16,7 @@ package preflight
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/sbxdrv"
@@ -83,7 +84,11 @@ type Sbx interface {
 type Deps struct {
 	// Toolchain is step 1, gate 1: the toolchain acknowledgement
 	// (REQ-0075, exit 3). The check function of romeu approve
-	// --toolchain (T042) is this function.
+	// --toolchain (T042) is this function. It returns nil, or an error
+	// of the table that the preflight passes on unchanged, whatever its
+	// row: toolchain-approval-required (RJ-302), sbx-floor (RJ-343), the
+	// failure of an sbx call, upstream-shape (RJ-310), record-unreadable
+	// (RJ-334) or internal (RJ-348).
 	Toolchain func(ctx context.Context) error
 	// Promotion is step 2: an interrupted promotion is finished or
 	// reported (REQ-1203, exit 4).
@@ -148,6 +153,11 @@ type Result struct {
 	// Printed are the failures of steps 1, 4 and 5 that a protective
 	// command prints and goes on from, in the order of the steps.
 	Printed []Printed
+	// Unchecked names the host checks that could not run in full because
+	// a seam was not given, so that a pass does not read as a complete
+	// check: "vscode-trusted-folders" when Deps.VSCodeTrustedFolders is
+	// nil. A caller that reports (doctor, status) says so.
+	Unchecked []string
 }
 
 // step is one step of 01 1.5.
@@ -156,15 +166,15 @@ type step struct {
 	// printed says that a protective command prints the failure of the
 	// step and goes on (steps 1, 4 and 5, REQ-0078).
 	printed bool
-	run     func(ctx context.Context, d *Deps, in *Input) error
+	run     func(ctx context.Context, d *Deps, in *Input, res *Result) error
 }
 
 // steps are the six steps of 01 1.5 in their order (REQ-0073).
 var steps = []step{
-	{1, true, func(ctx context.Context, d *Deps, _ *Input) error { return d.Toolchain(ctx) }},
-	{2, false, func(ctx context.Context, d *Deps, _ *Input) error { return d.Promotion(ctx) }},
-	{3, false, func(ctx context.Context, d *Deps, _ *Input) error { return d.Drift(ctx) }},
-	{4, true, func(ctx context.Context, d *Deps, _ *Input) error { return d.Widening(ctx) }},
+	{1, true, func(ctx context.Context, d *Deps, _ *Input, _ *Result) error { return d.Toolchain(ctx) }},
+	{2, false, func(ctx context.Context, d *Deps, _ *Input, _ *Result) error { return d.Promotion(ctx) }},
+	{3, false, func(ctx context.Context, d *Deps, _ *Input, _ *Result) error { return d.Drift(ctx) }},
+	{4, true, func(ctx context.Context, d *Deps, _ *Input, _ *Result) error { return d.Widening(ctx) }},
 	{5, true, hostStep},
 	{6, false, identityStep},
 }
@@ -187,7 +197,7 @@ func RunSteps(ctx context.Context, d Deps, in Input, from, to int) (Result, erro
 	protective := in.Command.protective() || in.SalvageHalf
 	var res Result
 	for _, s := range steps[from-1 : to] {
-		err := s.run(ctx, &d, &in)
+		err := s.run(ctx, &d, &in, &res)
 		if err == nil {
 			continue
 		}
@@ -209,6 +219,12 @@ func validate(d *Deps, in *Input, from, to int) error {
 		return cli.Internal.New(fmt.Sprintf("the preflight does not know the command %q", in.Command))
 	case in.SalvageHalf && !in.Command.removes():
 		return cli.Internal.New(fmt.Sprintf("only rm, recreate and retire have a salvage half, not %q", in.Command))
+	case !filepath.IsAbs(in.Root) || !filepath.IsAbs(in.Home):
+		return cli.Internal.New("the preflight was given a root or a home that is not an absolute path")
+	case in.Project == "" || in.Primary == "":
+		return cli.Internal.New("the preflight was given no project or no primary repo")
+	case in.UsedServices == nil:
+		return cli.Internal.New("the preflight was given no list of used services (an empty list is []string{})")
 	case d.Toolchain == nil || d.Promotion == nil || d.Drift == nil || d.Widening == nil || d.Sbx == nil:
 		return cli.Internal.New("the preflight was given a nil step")
 	}

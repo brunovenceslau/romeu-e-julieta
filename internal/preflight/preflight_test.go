@@ -236,12 +236,27 @@ func TestPreflightRefusesWhatACallerGotWrong(t *testing.T) {
 	salvageHalfOfSync.SalvageHalf = true
 	unknown := quietHost(t)
 	unknown.Command = "frobnicate"
+	relative := quietHost(t)
+	relative.Root = "root"
+	relativeHome := quietHost(t)
+	relativeHome.Home = "home"
+	noProject := quietHost(t)
+	noProject.Project = ""
+	noPrimary := quietHost(t)
+	noPrimary.Primary = ""
+	noServices := quietHost(t)
+	noServices.UsedServices = nil
 	tests := []struct {
 		name     string
 		deps     Deps
 		in       Input
 		from, to int
 	}{
+		{"a relative root", tr.deps(t), relative, 1, 6},
+		{"a relative home", tr.deps(t), relativeHome, 1, 6},
+		{"no project", tr.deps(t), noProject, 1, 6},
+		{"no primary", tr.deps(t), noPrimary, 1, 6},
+		{"no list of used services", tr.deps(t), noServices, 1, 6},
 		{"a nil step", nilStep, quietHost(t), 1, 6},
 		{"an unknown command", tr.deps(t), unknown, 1, 6},
 		{"a salvage half of sync", tr.deps(t), salvageHalfOfSync, 1, 6},
@@ -253,6 +268,37 @@ func TestPreflightRefusesWhatACallerGotWrong(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := RunSteps(t.Context(), tt.deps, tt.in, tt.from, tt.to)
 			testsupport.RequireID(t, cli.Internal.ID, err)
+			assert.Empty(t, tr.ran)
+		})
+	}
+}
+
+// TestPreflightStep1PassesItsErrorOn shows the contract of the gate 1
+// seam: any error of the table it returns reaches the caller unchanged,
+// with its row, its exit and its details, and no later step runs.
+func TestPreflightStep1PassesItsErrorOn(t *testing.T) {
+	rows := []struct {
+		name string
+		err  error
+		id   string
+		exit int
+	}{
+		{"toolchain-approval-required", cli.Row{ID: "RJ-302", Slug: "toolchain-approval-required", Exit: 3}.New("x"), "RJ-302", 3},
+		{"sbx-floor", sbxdrv.SbxFloor.New("sbx is below the floor", cli.Detail{Key: "found", Value: "0.1.0"}), "RJ-343", 2},
+		{"an sbx call failure", sbxdrv.SbxUnknown.New("sbx failed"), "RJ-308", 1},
+		{"upstream-shape", cli.UpstreamShape.New("shape"), "RJ-310", 2},
+		{"record-unreadable", cli.Row{ID: "RJ-334", Slug: "record-unreadable", Exit: 2}.New("record"), "RJ-334", 2},
+		{"internal", cli.Internal.New("defect"), "RJ-348", 1},
+	}
+	for _, r := range rows {
+		t.Run(r.name, func(t *testing.T) {
+			tr := &trace{}
+			d := tr.deps(t)
+			d.Toolchain = func(context.Context) error { return r.err }
+			_, err := Run(t.Context(), d, quietHost(t))
+			assert.Same(t, r.err, err, "the error is returned as it is")
+			testsupport.RequireID(t, r.id, err)
+			assert.Equal(t, r.exit, cli.ExitCode(err))
 			assert.Empty(t, tr.ran)
 		})
 	}

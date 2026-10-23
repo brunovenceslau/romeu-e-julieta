@@ -58,9 +58,15 @@ func checkBroadAllow(ctx context.Context, h *hostEnv) error {
 		case r.kind == "default":
 			return SbxBroadAllow.New("the default network policy of sbx allows every destination",
 				cli.Detail{Key: "rule", Value: "default network policy: allow"})
-		case broadPattern(r.resource):
-			return SbxBroadAllow.New("a global allow rule of sbx is broad: "+r.resource,
-				cli.Detail{Key: "rule", Value: r.resource})
+		default:
+			broad, err := broadPattern(r.resource)
+			if err != nil {
+				return err
+			}
+			if broad {
+				return SbxBroadAllow.New("a global allow rule of sbx is broad: "+r.resource,
+					cli.Detail{Key: "rule", Value: r.resource})
+			}
 		}
 	}
 	return nil
@@ -68,26 +74,32 @@ func checkBroadAllow(ctx context.Context, h *hostEnv) error {
 
 // broadPattern reports whether an allow pattern covers a whole class of
 // hosts: **, *, a wildcard over a whole top-level domain (*.com), a
-// pattern whose top-level label is a wildcard (example.*), or an empty
-// one, which cannot be told from all of them. A port suffix is ignored.
-// A wildcard over a public suffix of two labels (*.co.uk) is not caught:
-// that needs the public suffix list, which is not a dependency of the
-// module.
-func broadPattern(resource string) bool {
+// pattern whose top-level label is a wildcard (example.*). A trailing
+// dot (the root label) and a port suffix are ignored. A resource that is
+// not host[:port], a URL among them, is not a shape romeu reads, and the
+// error is upstream-shape (RJ-310): a pattern it cannot judge is never
+// read as narrow. A wildcard over a public suffix of two labels
+// (*.co.uk) is not caught: that needs the public suffix list, which is
+// not a dependency of the module (deferred with the dependency).
+func broadPattern(resource string) (bool, error) {
 	p := strings.ToLower(strings.TrimSpace(resource))
-	if i := strings.LastIndex(p, ":"); i >= 0 {
-		p = p[:i]
+	if host, port, ok := strings.Cut(p, ":"); ok {
+		if port == "" || strings.Trim(port, "0123456789") != "" {
+			return false, upstreamShape("policy ls --json", "a rule resource is not host[:port]")
+		}
+		p = host
 	}
-	if p == "" {
-		return true
+	p = strings.TrimSuffix(p, ".")
+	if strings.Trim(p, "abcdefghijklmnopqrstuvwxyz0123456789.*-") != "" {
+		return false, upstreamShape("policy ls --json", "a rule resource is not host[:port]")
 	}
 	labels := strings.Split(p, ".")
 	if strings.Contains(labels[len(labels)-1], "*") {
-		return true
+		return true, nil
 	}
 	rest := labels
 	for len(rest) > 0 && strings.Trim(rest[0], "*") == "" {
 		rest = rest[1:]
 	}
-	return len(rest) < len(labels) && len(rest) <= 1
+	return len(rest) < len(labels) && len(rest) <= 1, nil
 }

@@ -27,7 +27,7 @@ import (
 // The id or creation time of the sandbox is not compared: probe A4 has
 // not shown that sbx reports one, and until then a sandbox recreated by
 // hand under the same name and path passes (REQ-0511).
-func identityStep(ctx context.Context, d *Deps, in *Input) error {
+func identityStep(ctx context.Context, d *Deps, in *Input, _ *Result) error {
 	list, err := d.Sbx.List(ctx)
 	if err != nil {
 		return err

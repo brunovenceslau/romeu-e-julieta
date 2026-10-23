@@ -6,6 +6,7 @@ package preflight
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -217,9 +218,14 @@ func TestPreflightStep5AutoTrust(t *testing.T) {
 		write(t, filepath.Join(host.Home, ".config", "mise", "config.toml"), "#"+string(make([]byte, maxSettingsFile)))
 		testsupport.RequireID(t, "RJ-332", hostChecksOnly(t, host, nil))
 	})
-	t.Run("an allow file over its cap is not a path", func(t *testing.T) {
+	t.Run("an allow file of exactly its cap is a path", func(t *testing.T) {
 		host := quietHost(t)
-		write(t, filepath.Join(host.Home, ".local", "share", "direnv", "allow", "big"), host.Root+string(make([]byte, maxAllowFile)))
+		write(t, filepath.Join(host.Home, ".local", "share", "direnv", "allow", "edge"), host.Root+strings.Repeat(" ", maxAllowFile-len(host.Root)))
+		testsupport.RequireID(t, "RJ-332", hostChecksOnly(t, host, nil))
+	})
+	t.Run("an allow file one byte over its cap is not a path", func(t *testing.T) {
+		host := quietHost(t)
+		write(t, filepath.Join(host.Home, ".local", "share", "direnv", "allow", "big"), host.Root+strings.Repeat(" ", maxAllowFile-len(host.Root)+1))
 		require.NoError(t, hostChecksOnly(t, host, nil))
 	})
 }
