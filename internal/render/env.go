@@ -10,6 +10,7 @@ import (
 	"maps"
 	"path"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -245,7 +246,10 @@ func SecretCommand(home string, argv []string) (string, error) {
 
 // oneElement holds a name that render joins into a path: one element,
 // not a name romeu reserves inside <name>-env/, so neither a repo dir
-// nor a kit dir can reach a memory dir or .romeu (03 3.1).
+// nor a kit dir can reach a memory dir or .romeu, and of the repo dir
+// form of 03 3.1, so that a name read from host state carries no ":"
+// that sbx could read as a mount option, no control character and no
+// leading "-" (a kit id's form is narrower still).
 func oneElement(name string) error {
 	if name == "" || strings.ContainsAny(name, "/\\") || name == "." || name == ".." {
 		return fmt.Errorf("%q is not one path element", name)
@@ -253,8 +257,15 @@ func oneElement(name string) error {
 	if slices.ContainsFunc(reservedDirs(), func(r string) bool { return strings.EqualFold(r, name) }) {
 		return fmt.Errorf("%q is a name romeu reserves inside <name>-env/", name)
 	}
+	if !repoDir.MatchString(name) {
+		return fmt.Errorf("%q is not a repo dir of the form %s", name, repoDir)
+	}
 	return nil
 }
+
+// repoDir is the repo dir rule of 03 3.1, from internal/spec, the one
+// place it is written.
+var repoDir = regexp.MustCompile(specRule("repo-dir").Pattern)
 
 // reservedDirs returns the names romeu reserves inside <name>-env/, the
 // one list of the repo dir rule (03 3.1).

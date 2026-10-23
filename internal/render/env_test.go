@@ -163,6 +163,7 @@ func TestEnvErrors(t *testing.T) {
 			in.Project.Kits[1].Args = map[string]string{"julietaBin": "/elsewhere"}
 		}, `the spec sets the arg "julietaBin", which romeu renders`},
 		{"a repo dir that is not one element", func(in *render.EnvInput) { in.Project.Repos[1].Dir = "a/b" }, `"a/b" is not one path element`},
+		{"a repo dir with a mount option suffix", func(in *render.EnvInput) { in.Project.Repos[1].Dir = "shop-web:ro" }, `"shop-web:ro" is not a repo dir`},
 		{"a repo dir romeu reserves", func(in *render.EnvInput) { in.Project.Repos[1].Dir = "Memory" }, `"Memory" is a name romeu reserves`},
 		{"a kit id romeu reserves", func(in *render.EnvInput) {
 			in.Project.Kits[0].Product = "review"
