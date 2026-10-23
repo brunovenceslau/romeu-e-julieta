@@ -398,7 +398,6 @@ func TestEncode_refusesWhatNoReaderWouldTake(t *testing.T) {
 	})
 }
 
-// validToolchain returns a toolchain record whole enough to write.
 // approvalFor returns a whole approval of the project whose digests are
 // those of its widening set.
 func approvalFor(project string, candidate canon.ULID) Approval {
@@ -414,6 +413,7 @@ func approvalFor(project string, candidate canon.ULID) Approval {
 	}
 }
 
+// validToolchain returns a toolchain record whole enough to write.
 func validToolchain() *Toolchain {
 	return &Toolchain{
 		Schema: ToolchainField, SbxVersion: "0.46.0",
@@ -422,6 +422,24 @@ func validToolchain() *Toolchain {
 		CatalogDigest: canon.Sum[canon.CatalogKind]{3}, Catalog: Catalog{},
 		AcknowledgedAt: testNow,
 	}
+}
+
+// TestApprovalSetIsWrittenInItsNormalForm: the set of an approval is
+// recorded in the normal form of gate.Normal, its sorted lists sorted,
+// whatever order the caller gave.
+func TestApprovalSetIsWrittenInItsNormalForm(t *testing.T) {
+	p := NewProject()
+	a := approvalFor("shop", canon.ULID{1})
+	a.Set.Ports = []string{"9090:9090/tcp", "8080:8080/tcp"}
+	sum, err := gate.Digest(a.Set)
+	require.NoError(t, err)
+	a.WideningDigest = sum
+	p.Approval = &a
+	data, err := EncodeProject(p)
+	require.NoError(t, err)
+	got, err := DecodeProject(data)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"8080:8080/tcp", "9090:9090/tcp"}, got.Approval.Set.Ports)
 }
 
 func TestDecodeToolchain(t *testing.T) {
