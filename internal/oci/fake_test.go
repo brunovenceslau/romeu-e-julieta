@@ -64,6 +64,15 @@ func (f *fakeRegistry) serve(w http.ResponseWriter, r *http.Request) {
 	if override != nil && override(w, r) {
 		return
 	}
+	if r.URL.Path == "/v2/" {
+		// The ping of the library: a registry that wants a token says so
+		// here, as the distribution spec's token flow has it.
+		if needToken {
+			w.Header().Set("Www-Authenticate", `Bearer realm="`+f.srv.URL+`/token",service="fake",scope="repository:org/kit:pull"`)
+			w.WriteHeader(http.StatusUnauthorized)
+		}
+		return
+	}
 	if r.URL.Path == "/token" {
 		_, _ = w.Write([]byte(tokenBody))
 		return
@@ -132,7 +141,7 @@ func trust(t *testing.T, c *Client, srv *httptest.Server) {
 	t.Helper()
 	pool := x509.NewCertPool()
 	pool.AddCert(srv.Certificate())
-	c.http.Transport.(*http.Transport).TLSClientConfig.RootCAs = pool
+	c.transport.TLSClientConfig.RootCAs = pool
 }
 
 // sha256Digest returns the OCI digest of data.

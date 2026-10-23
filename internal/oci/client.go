@@ -5,14 +5,9 @@ package oci
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/subtle"
 	"crypto/tls"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
-	"maps"
 	"net"
 	"net/http"
 	"net/netip"
@@ -30,12 +25,15 @@ const (
 	// MaxManifestSize is the most bytes of an index or a manifest: the 4
 	// MiB the distribution spec says a registry supports (a manifest
 	// push of at least that size), which no real image comes near.
+	// go-containerregistry reads up to 100 MiB, so the guard holds this
+	// cap itself.
 	MaxManifestSize = 4 << 20
 	// MaxTokenSize is the most bytes of a token response.
 	MaxTokenSize = 64 << 10
 	// maxRedirects is the most redirects a request follows.
 	maxRedirects = 5
-	// requestTimeout bounds one request, the body read included.
+	// requestTimeout bounds a whole fetch, every hop and body read
+	// included.
 	requestTimeout = 60 * time.Second
 )
 
@@ -61,6 +59,10 @@ var (
 	ErrPrivateAddress = errors.New("oci: address is not a public one")
 	// ErrCredentials is a registry that asks for credentials.
 	ErrCredentials = errors.New("oci: the registry asks for credentials")
+	// errHTTPFallback is the plain-HTTP ping go-containerregistry tries
+	// beside the HTTPS one for a registry on a local or private name:
+	// refused, and not a guard's refusal of the registry's answer.
+	errHTTPFallback = errors.New("oci: plain HTTP is never used")
 )
 
 // Client is the guarded client of the registries (REQ-0515, I28). It
@@ -68,9 +70,13 @@ var (
 // runs no credential helper, whatever DOCKER_CONFIG or the home
 // directory hold (REQ-0210); it speaks HTTPS only and follows only HTTPS
 // redirects; it verifies the digest of every hop; and it caps every
-// response. A Client is safe for concurrent use.
+// response. The registry protocol (the ping, the token exchange, the
+// fetch of a manifest by digest) is go-containerregistry's; the guards
+// are the transport it is given (NewClient) and the guard that wraps it
+// for one fetch (guard.go). A Client is safe for concurrent use.
 type Client struct {
-	http *http.Client
+	// transport is the one connection pool and the dial guard.
+	transport *http.Transport
 	// proxies are the host:port of the proxies the environment named for
 	// a request: a connection to one is a connection the user chose.
 	proxies sync.Map
@@ -81,7 +87,7 @@ type Client struct {
 // certificate is verified against the system roots.
 func NewClient() *Client {
 	c := &Client{}
-	tr := &http.Transport{
+	c.transport = &http.Transport{
 		Proxy:                  c.proxy,
 		DialContext:            c.dial,
 		TLSClientConfig:        &tls.Config{MinVersion: tls.VersionTLS12},
@@ -92,7 +98,6 @@ func NewClient() *Client {
 		MaxIdleConns:           4,
 		IdleConnTimeout:        30 * time.Second,
 	}
-	c.http = &http.Client{Transport: tr, Timeout: requestTimeout, CheckRedirect: checkRedirect}
 	return c
 }
 
@@ -220,77 +225,4 @@ func site(name string) string {
 		return ""
 	}
 	return strings.Join(labels[len(labels)-n:], ".")
-}
-
-// checkRedirect lets a request follow https redirects, a few of them
-// (REQ-0515).
-func checkRedirect(req *http.Request, via []*http.Request) error {
-	switch {
-	case len(via) >= maxRedirects:
-		return fmt.Errorf("%w: more than %d redirects", ErrRedirect, maxRedirects)
-	case req.URL.Scheme != "https":
-		return fmt.Errorf("%w: to a URL that is not https", ErrRedirect)
-	case req.URL.User != nil:
-		return fmt.Errorf("%w: to a URL with credentials", ErrRedirect)
-	}
-	return nil
-}
-
-// reply is a response read through its cap.
-type reply struct {
-	status int
-	header http.Header
-	body   []byte
-}
-
-// get makes one GET to rawURL, which must be https, and reads at most
-// limit bytes of the body. It adds no header of its own: the caller's
-// header is all the request carries besides Go's defaults, and the
-// caller sets Authorization only on a registry request, with a token
-// (never on the request for the token).
-func (c *Client) get(ctx context.Context, rawURL string, header http.Header, limit int64) (*reply, error) {
-	u, err := url.Parse(rawURL)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
-		return nil, fmt.Errorf("%w: %s", ErrInsecure, quote(rawURL))
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrInsecure, quote(rawURL))
-	}
-	maps.Copy(req.Header, header)
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.ContentLength > limit {
-		return nil, fmt.Errorf("%w: the response says %d bytes, over the cap of %d", ErrTooLarge, resp.ContentLength, limit)
-	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
-	if err != nil {
-		return nil, err
-	}
-	if int64(len(body)) > limit {
-		return nil, fmt.Errorf("%w: the body passes the cap of %d", ErrTooLarge, limit)
-	}
-	return &reply{status: resp.StatusCode, header: resp.Header, body: body}, nil
-}
-
-// verifyDigest returns nil when body is the content that digest, a
-// "sha256:<64 hex>", names (REQ-0515). A digest of another algorithm is
-// refused: the product pins sha256 only (03 3.1, REQ-0189).
-func verifyDigest(digest string, body []byte) error {
-	hexSum, ok := strings.CutPrefix(digest, "sha256:")
-	if !ok || !digestForm.MatchString(digest) {
-		return fmt.Errorf("%w: %s is not sha256:<64 hex>", ErrDigestMismatch, quote(digest))
-	}
-	want, err := hex.DecodeString(hexSum)
-	if err != nil {
-		return fmt.Errorf("%w: %s is not hex", ErrDigestMismatch, quote(digest))
-	}
-	got := sha256.Sum256(body)
-	if subtle.ConstantTimeCompare(got[:], want) != 1 {
-		return fmt.Errorf("%w: the content is sha256:%s, and %s was asked for", ErrDigestMismatch, hex.EncodeToString(got[:]), digest)
-	}
-	return nil
 }

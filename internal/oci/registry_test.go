@@ -309,7 +309,7 @@ func TestFetchWorkloadRegistryUnreachable(t *testing.T) {
 		{"a 401 that asks for a password", func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Www-Authenticate", `Basic realm="x"`)
 			w.WriteHeader(401)
-		}, "user name"},
+		}, "anonymous"},
 		{"a 401 again after the token", func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/token" {
 				_, _ = w.Write([]byte(`{"token":"t"}`))
@@ -382,42 +382,48 @@ func TestFetchWorkloadRefusesWhatIsNotAWorkloadReference(t *testing.T) {
 	}
 }
 
-func TestEndpoint(t *testing.T) {
+func TestCheckRealms(t *testing.T) {
 	tests := []struct {
-		name                           string
-		host, repo, wantHost, wantRepo string
+		name       string
+		challenges []string
+		wantErr    error
+		wantShape  bool
 	}{
-		{"docker hub", "docker.io", "docker/sbx-kit-claude", "registry-1.docker.io", "docker/sbx-kit-claude"},
-		{"docker hub official image", "docker.io", "debian", "registry-1.docker.io", "library/debian"},
-		{"index.docker.io", "index.docker.io", "a/b", "registry-1.docker.io", "a/b"},
-		{"another registry", "ghcr.io", "a/b", "ghcr.io", "a/b"},
+		{"a realm on the registry's site", []string{`Bearer realm="https://auth.docker.io/token",service="registry.docker.io"`}, nil, false},
+		{"a bare realm", []string{`bearer realm=https://auth.docker.io/t, service=x`}, nil, false},
+		{"a realm in the second challenge", []string{`Negotiate`, `Bearer realm="https://evil.example/t"`}, ErrForeignRealm, false},
+		{"a realm in the second header", []string{`Basic realm="https://auth.docker.io/t"`, `Bearer realm="https://169.254.169.254/t"`}, ErrForeignRealm, false},
+		{"a realm over http", []string{`Bearer realm="http://auth.docker.io/t"`}, ErrInsecure, false},
+		{"a realm with a user name", []string{`Bearer realm="https://u:p@auth.docker.io/t"`}, ErrInsecure, false},
+		{"a realm that is not a URL", []string{`Bearer realm="::"`}, nil, true},
+		{"a challenge with no realm", []string{`Bearer service="x"`}, nil, true},
+		{"a Basic realm that is not a URL", []string{`Basic realm="the registry"`}, nil, false},
+		{"a Basic and then a Bearer challenge in one value", []string{`Basic realm="x", Bearer realm="https://evil.example/t",service="s"`}, ErrForeignRealm, false},
+		{"a scheme alone", []string{`Basic`}, nil, false},
+		{"a scheme the product does not read", []string{`Negotiate`}, nil, true},
+		{"no challenge", nil, nil, true},
+		{"another port of the registry's own address", []string{`Bearer realm="https://127.0.0.1:2/t"`}, ErrPrivateAddress, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			host, repo := endpoint(tt.host, tt.repo)
+			host := "registry-1.docker.io"
+			if errors.Is(tt.wantErr, ErrPrivateAddress) {
+				host = "127.0.0.1:1"
+			}
+			g := newGuard(nil, host)
 
-			assert.Equal(t, tt.wantHost, host)
-			assert.Equal(t, tt.wantRepo, repo)
+			err := g.checkRealms(tt.challenges)
+
+			switch {
+			case tt.wantErr != nil:
+				require.ErrorIs(t, err, tt.wantErr)
+			case tt.wantShape:
+				_, ok := errors.AsType[*shapeError](err)
+				assert.True(t, ok, "%v", err)
+			default:
+				require.NoError(t, err)
+			}
 		})
-	}
-}
-
-func TestParseChallenge(t *testing.T) {
-	scheme, p := parseChallenge(`Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:docker/sbx-kit-claude:pull"`)
-	assert.Equal(t, "Bearer", scheme)
-	assert.Equal(t, map[string]string{"realm": "https://auth.docker.io/token", "service": "registry.docker.io", "scope": "repository:docker/sbx-kit-claude:pull"}, p)
-
-	scheme, p = parseChallenge(`bearer realm=https://a.example/t, service=x`)
-	assert.Equal(t, "bearer", scheme)
-	assert.Equal(t, map[string]string{"realm": "https://a.example/t", "service": "x"}, p)
-
-	for _, bad := range []string{`Bearer realm`, `Bearer realm="unterminated`, ``} {
-		scheme, _ := parseChallenge(bad)
-		if bad == `` {
-			assert.Empty(t, scheme)
-			continue
-		}
-		assert.Empty(t, scheme, bad)
 	}
 }
 

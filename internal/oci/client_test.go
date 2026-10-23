@@ -88,25 +88,39 @@ func TestGuardDigestMismatchAtEachHop(t *testing.T) {
 	})
 }
 
-func TestVerifyDigest(t *testing.T) {
+func TestVerifyManifest(t *testing.T) {
 	body := []byte("hello")
-	require.NoError(t, verifyDigest(sha256Digest(body), body))
-	for _, bad := range []string{"", "sha256:", "sha256:zz", "sha512:" + strings.Repeat("a", 128), strings.ToUpper(sha256Digest(body)), sha256Digest(body)[:20]} {
-		require.ErrorIs(t, verifyDigest(bad, body), ErrDigestMismatch, bad)
+	require.NoError(t, verifyManifest(sha256Digest(body), body, ""))
+	require.NoError(t, verifyManifest(sha256Digest(body), body, sha256Digest(body)))
+	for _, bad := range []string{"", "sha256:", "sha256:zz", "sha512:" + strings.Repeat("a", 128), strings.ToUpper(sha256Digest(body)), sha256Digest(body)[:20], sha256Digest([]byte("other"))} {
+		require.ErrorIs(t, verifyManifest(bad, body, ""), ErrDigestMismatch, bad)
 	}
+	require.ErrorIs(t, verifyManifest(sha256Digest(body), body, sha256Digest([]byte("other"))), ErrDigestMismatch, "the registry's header names other content")
 }
 
 func TestGuardRefusesAnHTTPURL(t *testing.T) {
 	var hits atomic.Int32
 	plain := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { hits.Add(1) }))
 	t.Cleanup(plain.Close)
-	for _, u := range []string{plain.URL + "/v2/", "ftp://example.com/a", "https://user:pw@example.com/a", "https:///a", "//example.com/a", "%"} {
+	g := newGuard(NewClient().transport, "example.com")
+	for _, u := range []string{plain.URL + "/x", "ftp://example.com/a", "https://user:pw@example.com/a", "https:///a", "//example.com/a"} {
 		t.Run(u, func(t *testing.T) {
-			_, err := NewClient().get(t.Context(), u, nil, 10)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, u, nil)
+			require.NoError(t, err)
+
+			_, err = g.RoundTrip(req)
 
 			require.ErrorIs(t, err, ErrInsecure)
 		})
 	}
+	t.Run("the plain ping the library also sends", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, plain.URL+"/v2/", nil)
+		require.NoError(t, err)
+
+		_, err = g.RoundTrip(req)
+
+		require.ErrorIs(t, err, errHTTPFallback)
+	})
 	assert.Zero(t, hits.Load(), "nothing reached the plain server")
 }
 

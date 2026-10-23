@@ -223,5 +223,5 @@ func TestFetchWorkloadStopsAfterASecondUnauthorized(t *testing.T) {
 	_, err := f.client().FetchWorkload(t.Context(), f.ref("sha256:"+strings.Repeat("a", 64)), amd64)
 
 	require.ErrorIs(t, err, ErrCredentials)
-	assert.Equal(t, int32(2), manifests.Load(), "one request, one after the token, and no third")
+	assert.Equal(t, int32(3), manifests.Load(), "the ping, the manifest, the one after the token, and no more")
 }

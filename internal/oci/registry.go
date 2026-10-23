@@ -11,8 +11,11 @@ import (
 	"mime"
 	"net"
 	"net/http"
-	"net/url"
-	"strings"
+
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
@@ -33,11 +36,6 @@ const (
 	mediaDockerList     = "application/vnd.docker.distribution.manifest.list.v2+json"
 	mediaDockerManifest = "application/vnd.docker.distribution.manifest.v2+json"
 )
-
-// accept is the Accept header of a manifest request: the distribution
-// spec's "client SHOULD include an Accept header indicating which
-// manifest content types it supports".
-var accept = strings.Join([]string{mediaOCIIndex, mediaDockerList, mediaOCIManifest, mediaDockerManifest}, ", ")
 
 // Platform selects a manifest of an index.
 type Platform struct {
@@ -79,7 +77,8 @@ type Fetched struct {
 // (REQ-0515): the index by the digest of ref, the platform manifest by
 // the digest the index lists, and the annotation with it, being a
 // member of that manifest. The registry is read anonymously over HTTPS
-// (REQ-0210).
+// (REQ-0210), through go-containerregistry, whose requests all pass the
+// guard of guard.go.
 //
 // A registry that does not answer, or answers with a status that is not
 // a manifest, is registry-unreachable (RJ-322). A document that does not
@@ -92,29 +91,35 @@ func (c *Client) FetchWorkload(ctx context.Context, ref string, p Platform) (Fet
 	if err != nil {
 		return Fetched{}, fmt.Errorf("oci: %w", err)
 	}
-	host, repo, _ := strings.Cut(w.Repository, "/")
-	r := &registry{c: c, host: host}
-	r.endpoint, r.repo = endpoint(host, repo)
-	ctx = trusted(ctx, registryAddr(r.endpoint))
-	f, err := r.fetch(ctx, w, p)
+	// The reference is checked twice, by the form of the spec and by the
+	// library's strict names, which also say where the registry is.
+	digest, err := name.NewDigest(w.Repository+"@"+w.Digest, name.StrictValidation)
+	if err != nil {
+		return Fetched{}, fmt.Errorf("oci: %w", err)
+	}
+	where := digest.Context().RegistryStr()
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+	g := newGuard(c.transport, where)
+	r := &registry{host: where, ref: digest, guard: g, opts: []remote.Option{
+		// Anonymous only. Not remote.WithAuthFromKeychain, and never the
+		// library's default keychain, which reads the Docker config and
+		// runs credential helpers (a test holds the rule, REQ-0210).
+		remote.WithAuth(authn.Anonymous),
+		remote.WithTransport(g),
+		// The registry the reference names may be on a private network.
+		remote.WithContext(trusted(ctx, registryAddr(where))),
+		// One attempt: a retry of a refusal would be a second request to
+		// a registry that said no, and the caller can rerun the command.
+		remote.WithRetryBackoff(remote.Backoff{Steps: 1}),
+		remote.WithRetryStatusCodes(),
+		remote.WithJobs(1),
+	}}
+	f, err := r.fetch(w, p)
 	if err != nil {
 		return Fetched{}, r.classify(err)
 	}
 	return f, nil
-}
-
-// endpoint returns where requests for the repository repo of the
-// registry host go, and the repository's name there: Docker Hub is
-// served from registry-1.docker.io, and its official images live under
-// library/.
-func endpoint(host, repo string) (string, string) {
-	if host != "docker.io" && host != "index.docker.io" {
-		return host, repo
-	}
-	if !strings.Contains(repo, "/") {
-		repo = "library/" + repo
-	}
-	return "registry-1.docker.io", repo
 }
 
 // hostOf returns the host of a host or host:port.
@@ -125,14 +130,13 @@ func hostOf(hostport string) string {
 	return hostport
 }
 
-// registry is one registry and repository, and the token a request to
-// it got.
+// registry is one fetch from one repository.
 type registry struct {
-	c        *Client
-	host     string // the name in the reference, for messages
-	endpoint string // where requests go
-	repo     string
-	token    string
+	host string // the registry, as the library names it, for messages
+	ref  name.Digest
+	// guard is the guard of the fetch, which knows the token endpoints.
+	guard *guard
+	opts  []remote.Option
 }
 
 // shapeError is the error of a document or a guard: upstream-shape. It
@@ -146,12 +150,10 @@ func shape(format string, args ...any) error {
 	return &shapeError{reason: fmt.Sprintf(format, args...)}
 }
 
-// reachError is the error of a registry that did not answer a manifest.
-type reachError struct{ error }
-
 // classify gives err its row: a shape or a guard is upstream-shape, a
 // transport failure or a status is registry-unreachable, and a
-// descriptor refused by the grammar stays an error of ErrInvalid.
+// descriptor refused by the grammar stays an error of ErrInvalid. The
+// text of a registry's error body is never repeated.
 func (r *registry) classify(err error) error {
 	detail := cli.Detail{Key: "registry", Value: r.host}
 	// upstream-shape names its source in the detail "upstream" (04 4.4).
@@ -167,8 +169,15 @@ func (r *registry) classify(err error) error {
 	if errors.Is(err, ErrInvalid) {
 		return fmt.Errorf("registry %s: %w", r.host, err)
 	}
-	if rc, ok := errors.AsType[*reachError](err); ok {
-		return RegistryUnreachable.Wrap(rc.error, "registry "+r.host, detail)
+	if te, ok := errors.AsType[*transport.Error](err); ok {
+		if te.StatusCode == http.StatusUnauthorized {
+			return RegistryUnreachable.Wrap(ErrCredentials, "registry "+r.host+": it refuses an anonymous read of the repository", detail)
+		}
+		who := "it"
+		if te.Request != nil && r.guard.isRealm(te.Request.URL) {
+			who = "its token service"
+		}
+		return RegistryUnreachable.New(fmt.Sprintf("registry %s: %s answered %d", r.host, who, te.StatusCode), detail)
 	}
 	return RegistryUnreachable.Wrap(err, "registry "+r.host+" did not answer", detail)
 }
@@ -204,15 +213,15 @@ type manifestDoc struct {
 }
 
 // fetch walks the hops.
-func (r *registry) fetch(ctx context.Context, w spec.Workload, p Platform) (Fetched, error) {
-	body, ctype, err := r.manifest(ctx, w.Digest)
+func (r *registry) fetch(w spec.Workload, p Platform) (Fetched, error) {
+	body, ctype, err := r.manifest(w.Digest)
 	if err != nil {
 		return Fetched{}, err
 	}
 	digest := w.Digest
 	switch ctype {
 	case mediaOCIIndex, mediaDockerList:
-		digest, body, ctype, err = r.platformManifest(ctx, body, ctype, p)
+		digest, body, ctype, err = r.platformManifest(body, ctype, p)
 		if err != nil {
 			return Fetched{}, err
 		}
@@ -251,7 +260,7 @@ func (r *registry) fetch(ctx context.Context, w spec.Workload, p Platform) (Fetc
 }
 
 // platformManifest picks the manifest of the index for p and reads it.
-func (r *registry) platformManifest(ctx context.Context, body []byte, ctype string, p Platform) (digest string, out []byte, outType string, err error) {
+func (r *registry) platformManifest(body []byte, ctype string, p Platform) (digest string, out []byte, outType string, err error) {
 	var ix indexDoc
 	if err := jsonv2.Unmarshal(body, &ix); err != nil {
 		return "", nil, "", shape("the index does not decode as JSON with typed members")
@@ -301,7 +310,7 @@ func (r *registry) platformManifest(ctx context.Context, body []byte, ctype stri
 	if chosen == nil {
 		return "", nil, "", shape("the index lists no manifest for %s/%s", quote(p.OS), quote(p.Architecture))
 	}
-	body, got, err := r.manifest(ctx, *chosen.Digest)
+	body, got, err := r.manifest(*chosen.Digest)
 	if err != nil {
 		return "", nil, "", err
 	}
@@ -322,132 +331,22 @@ func sameType(member *string, ctype string) error {
 	return nil
 }
 
-// manifest reads the manifest digest names, with the token flow of a
-// registry, and returns its body, verified, and its media type.
-func (r *registry) manifest(ctx context.Context, digest string) ([]byte, string, error) {
+// manifest reads the manifest digest names, through the library, which
+// verifies it again by that digest, and returns its body and its media
+// type.
+func (r *registry) manifest(digest string) ([]byte, string, error) {
 	// The digest of an index entry is the registry's text and becomes
 	// part of a URL: only the one form the product pins gets through.
 	if !digestForm.MatchString(digest) {
 		return nil, "", shape("a digest of the document is not sha256:<64 hex>: %s", quote(digest))
 	}
-	u := "https://" + r.endpoint + "/v2/" + r.repo + "/manifests/" + digest
-	for attempt := 0; ; attempt++ {
-		h := http.Header{"Accept": {accept}}
-		if r.token != "" {
-			h.Set("Authorization", "Bearer "+r.token)
-		}
-		resp, err := r.c.get(ctx, u, h, MaxManifestSize)
-		if err != nil {
-			return nil, "", err
-		}
-		switch {
-		case resp.status == http.StatusUnauthorized && attempt == 0:
-			if err := r.authenticate(ctx, resp.header.Get("Www-Authenticate")); err != nil {
-				return nil, "", err
-			}
-			continue
-		case resp.status == http.StatusUnauthorized:
-			return nil, "", &reachError{fmt.Errorf("%w: it refuses an anonymous read of the repository", ErrCredentials)}
-		case resp.status != http.StatusOK:
-			return nil, "", &reachError{fmt.Errorf("it answered %d to the request for %s", resp.status, digest)}
-		}
-		if err := verifyDigest(digest, resp.body); err != nil {
-			return nil, "", err
-		}
-		if h := resp.header.Get("Docker-Content-Digest"); h != "" && h != digest {
-			return nil, "", fmt.Errorf("%w: the header Docker-Content-Digest is %s", ErrDigestMismatch, quote(h))
-		}
-		ctype, _, err := mime.ParseMediaType(resp.header.Get("Content-Type"))
-		if err != nil {
-			return nil, "", shape("the response has no usable Content-Type")
-		}
-		return resp.body, ctype, nil
-	}
-}
-
-// authenticate answers a 401 as the token-authentication specification
-// of distribution describes: the challenge names a realm, a service and
-// a scope; the token is asked for anonymously, with no Authorization
-// header, and presented to the registry after (REQ-0210).
-func (r *registry) authenticate(ctx context.Context, challenge string) error {
-	scheme, params := parseChallenge(challenge)
-	switch {
-	case strings.EqualFold(scheme, "basic"):
-		return &reachError{fmt.Errorf("%w: it asks for a user name and a password", ErrCredentials)}
-	case !strings.EqualFold(scheme, "bearer") || params["realm"] == "":
-		return shape("the 401 has no Bearer challenge with a realm")
-	}
-	realm, err := url.Parse(params["realm"])
+	d, err := remote.Get(r.ref.Context().Digest(digest), r.opts...)
 	if err != nil {
-		return shape("the realm of the challenge is not a URL")
+		return nil, "", err
 	}
-	// The registry names where its tokens come from, and a hostile one
-	// could name a service of the user's network: the realm stays on the
-	// registry's site (REQ-0515).
-	if !sameSite(realm.Hostname(), r.host) && !sameSite(realm.Hostname(), hostOf(r.endpoint)) {
-		return fmt.Errorf("%w: %s", ErrForeignRealm, quote(realm.Hostname()))
-	}
-	q := realm.Query()
-	if s := params["service"]; s != "" {
-		q.Set("service", s)
-	}
-	if s := params["scope"]; s != "" {
-		q.Set("scope", s)
-	}
-	realm.RawQuery = q.Encode()
-	resp, err := r.c.get(ctx, realm.String(), http.Header{}, MaxTokenSize)
+	ctype, _, err := mime.ParseMediaType(string(d.MediaType))
 	if err != nil {
-		return err
+		return nil, "", shape("the response has no usable Content-Type")
 	}
-	if resp.status != http.StatusOK {
-		return &reachError{fmt.Errorf("its token service answered %d", resp.status)}
-	}
-	var t struct {
-		Token       *string `json:"token"`
-		AccessToken *string `json:"access_token"`
-	}
-	if err := jsonv2.Unmarshal(resp.body, &t); err != nil {
-		return shape("the token response does not decode as JSON with typed members")
-	}
-	switch {
-	case t.Token != nil && *t.Token != "":
-		r.token = *t.Token
-	case t.AccessToken != nil && *t.AccessToken != "":
-		r.token = *t.AccessToken
-	default:
-		return shape("the token response has neither token nor access_token")
-	}
-	if strings.ContainsAny(r.token, "\r\n") {
-		r.token = ""
-		return shape("the token holds a line break")
-	}
-	return nil
-}
-
-// parseChallenge reads a WWW-Authenticate value: a scheme and its
-// key="value" parameters. A value it cannot read gives an empty scheme.
-func parseChallenge(h string) (scheme string, params map[string]string) {
-	params = map[string]string{}
-	scheme, rest, _ := strings.Cut(strings.TrimSpace(h), " ")
-	for rest = strings.TrimSpace(rest); rest != ""; {
-		key, after, ok := strings.Cut(rest, "=")
-		if !ok {
-			return "", nil
-		}
-		key = strings.ToLower(strings.TrimSpace(key))
-		after = strings.TrimSpace(after)
-		var val string
-		if strings.HasPrefix(after, `"`) {
-			end := strings.Index(after[1:], `"`)
-			if end < 0 {
-				return "", nil
-			}
-			val, after = after[1:1+end], after[2+end:]
-		} else {
-			val, after, _ = strings.Cut(after, ",")
-		}
-		params[key] = val
-		rest = strings.TrimLeft(after, ", ")
-	}
-	return scheme, params
+	return d.Manifest, ctype, nil
 }
