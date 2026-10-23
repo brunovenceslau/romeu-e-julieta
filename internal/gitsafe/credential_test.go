@@ -197,33 +197,46 @@ func TestCheckCredentialHelperFile(t *testing.T) {
 		name, rule string
 		change     func(t *testing.T, p string) string
 	}{
-		{"missing", "cannot be resolved", func(t *testing.T, p string) string { return p + "-missing" }},
-		{"a directory", "is not a regular file", func(t *testing.T, p string) string { return filepath.Dir(p) }},
+		{"missing", "cannot be resolved", func(t *testing.T, p string) string {
+			t.Helper()
+			return p + "-missing"
+		}},
+		{"a directory", "is not a regular file", func(t *testing.T, p string) string {
+			t.Helper()
+			return filepath.Dir(p)
+		}},
 		{"not executable", "is not executable", func(t *testing.T, p string) string {
+			t.Helper()
 			require.NoError(t, os.Chmod(p, 0o600))
 			return p
 		}},
 		{"writable by the group", "is writable by its group or others", func(t *testing.T, p string) string {
+			t.Helper()
 			require.NoError(t, os.Chmod(p, 0o770))
 			return p
 		}},
 		{"writable by others", "is writable by its group or others", func(t *testing.T, p string) string {
+			t.Helper()
 			require.NoError(t, os.Chmod(p, 0o702))
 			return p
 		}},
 		{"a parent writable by others", "is writable by its group or others", func(t *testing.T, p string) string {
+			t.Helper()
 			require.NoError(t, os.Chmod(filepath.Dir(p), 0o707))
 			return p
 		}},
 		{"a sticky parent writable by others", "is writable by its group or others", func(t *testing.T, p string) string {
+			t.Helper()
 			require.NoError(t, os.Chmod(filepath.Dir(p), os.ModeSticky|0o777))
 			return p
 		}},
 		{"a grandparent writable by the group", "is writable by its group or others", func(t *testing.T, p string) string {
+			t.Helper()
 			require.NoError(t, os.Chmod(filepath.Dir(filepath.Dir(p)), 0o770))
 			return p
 		}},
 		{"a link through a directory others can write", "is writable by its group or others", func(t *testing.T, p string) string {
+			t.Helper()
 			open := filepath.Join(t.TempDir(), "open")
 			require.NoError(t, os.Mkdir(open, 0o700))
 			require.NoError(t, os.Chmod(open, 0o777))
@@ -232,6 +245,7 @@ func TestCheckCredentialHelperFile(t *testing.T) {
 			return link
 		}},
 		{"a target in a directory others can write", "is writable by its group or others", func(t *testing.T, p string) string {
+			t.Helper()
 			require.NoError(t, os.Chmod(filepath.Dir(p), 0o777))
 			link := filepath.Join(t.TempDir(), "link")
 			require.NoError(t, os.Symlink(p, link))

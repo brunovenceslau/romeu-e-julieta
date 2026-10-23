@@ -20,7 +20,7 @@ import (
 var helperCorpus = []string{
 	"osxkeychain", "store", "cache", "libsecret", "manager", "manager-core", "a", "0", "x-1",
 	strings.Repeat("a", 63), strings.Repeat("a", 64), "OSXKeychain", "-x", "a_b", "a.b", ".hidden", "a b",
-	"/usr/local/bin/git-credential-manager", "/Users/me/bin/git-credential-gh", "/opt/a+b/c-d_e.f",
+	"/usr/local/bin/git-credential-manager", "/opt/me/bin/git-credential-gh", "/opt/a+b/c-d_e.f",
 	"/", "/a/", "/a//b", "/a/./b", "/a/../b", "/a b", "/a$(id)", "/a;id", "/a`id`", "/a'b", `/a"b`, "/a\\b",
 	"/a\nb", "/a\x00b", "/a\tb", "/é", "a/b", "./a", "~/bin/h", "!gh auth git-credential",
 	"!/opt/homebrew/bin/gh auth git-credential", "!f() { cat; }; f", "store --file=/x", "",
