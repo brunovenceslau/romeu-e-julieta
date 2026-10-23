@@ -284,17 +284,21 @@ func TestCheckCredentialHelperFile(t *testing.T) {
 // TestCheckCredentialHelperFileNamesTheFix: a write bit of the group, of
 // others or of both is refused, a group that holds the user alone
 // included (umask 002), and the message names the path and the chmod
-// that fixes it.
+// that fixes it. The file's own mode is read through its resolved path,
+// so the message names that path: on macOS the temporary directory
+// is under /var, a link to /private/var.
 func TestCheckCredentialHelperFileNamesTheFix(t *testing.T) {
 	for mode, fix := range map[os.FileMode]string{0o770: "chmod g-w ", 0o707: "chmod o-w ", 0o777: "chmod go-w "} {
 		t.Run(fix, func(t *testing.T) {
 			p := helperScript(t)
 			require.NoError(t, os.Chmod(p, mode))
+			real, err := filepath.EvalSymlinks(p)
+			require.NoError(t, err)
 
-			err := checkHelperFile(p, os.Getuid())
+			err = checkHelperFile(p, os.Getuid())
 
 			require.ErrorIs(t, err, ErrRefused)
-			assert.Contains(t, err.Error(), "fix it with: "+fix+p)
+			assert.Contains(t, err.Error(), "fix it with: "+fix+real)
 		})
 	}
 	t.Run("a directory", func(t *testing.T) {
