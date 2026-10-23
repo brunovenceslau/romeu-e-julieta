@@ -116,10 +116,36 @@ type outcome struct {
 	stdout, stderr string
 }
 
+// typingBuffer is the stderr under the CLI writer: it records what the
+// command writes and, in the Write that shows the question, types the
+// answer on the terminal through master before it returns, as the
+// fastest operator would. No answer is typed when answer is empty.
+type typingBuffer struct {
+	lockedBuffer
+	master *os.File
+	answer string
+	err    error
+}
+
+// Write records p and types the answer when p holds the question.
+func (b *typingBuffer) Write(p []byte) (int, error) {
+	n, err := b.lockedBuffer.Write(p)
+	if b.answer != "" && strings.Contains(string(p), Question) {
+		_, b.err = io.WriteString(b.master, b.answer)
+	}
+	return n, err
+}
+
+// promptDeadline is how long approveOn waits for the command to end.
+const promptDeadline = 10 * time.Second
+
 // approveOn runs romeu approve --toolchain on m with in as its standard
 // input and errFD as the file descriptor of its standard error, whose
 // text the test reads from the CLI writer. When answer is not empty, it
-// is typed on master once the question is on stderr.
+// is typed on master in the same write that shows the question. A
+// command that has not ended by promptDeadline fails the test with what
+// it wrote; the terminal is closed at the end of the test, which ends
+// its read.
 func approveOn(t *testing.T, m machine, in io.Reader, errFD int, master *os.File, answer string) outcome {
 	t.Helper()
 	oldEnv, oldIn, oldErr := getenv, stdin, stderrFD
@@ -130,28 +156,26 @@ func approveOn(t *testing.T, m machine, in io.Reader, errFD int, master *os.File
 	stderrFD = func() int { return errFD }
 	t.Cleanup(func() { getenv, stdin, stderrFD = oldEnv, oldIn, oldErr })
 
-	var stdout, stderr lockedBuffer
+	var stdout lockedBuffer
+	stderr := &typingBuffer{master: master, answer: answer}
 	env := &cli.Env{
 		Binary:       "romeu",
 		Stdout:       cli.NewWriter(&stdout),
-		Stderr:       cli.NewWriter(&stderr),
+		Stderr:       cli.NewWriter(stderr),
 		Now:          func() time.Time { return time.Date(2026, 10, 23, 9, 0, 0, 0, time.UTC) },
 		Version:      cli.Version{Version: "v1.0.0", Commit: "abc", Protocol: 1},
 		SettingsPath: m.settings,
 	}
 	done := make(chan int, 1)
 	go func() { done <- cli.Main(t.Context(), []string{"approve", "--toolchain"}, env) }()
-	if answer != "" {
-		deadline := time.Now().Add(10 * time.Second)
-		for !strings.Contains(stderr.String(), Question) {
-			require.True(t, time.Now().Before(deadline), "the question never came; stderr: %q", stderr.String())
-			time.Sleep(5 * time.Millisecond)
-		}
-		_, err := io.WriteString(master, answer)
-		require.NoError(t, err)
+	select {
+	case code := <-done:
+		require.NoError(t, stderr.err, "type the answer")
+		return outcome{code: code, stdout: stdout.String(), stderr: stderr.String()}
+	case <-time.After(promptDeadline):
+		t.Fatalf("romeu approve --toolchain did not end in %s; stderr: %q", promptDeadline, stderr.String())
+		return outcome{}
 	}
-	code := <-done
-	return outcome{code: code, stdout: stdout.String(), stderr: stderr.String()}
 }
 
 // TestApproveNeedsATerminal: without a terminal on stdin, or on stderr
