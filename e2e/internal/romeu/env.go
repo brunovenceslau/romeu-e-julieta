@@ -59,11 +59,11 @@ type Result struct {
 // reaches, or nil for the machine's git as it is. The binaries are built
 // into the test's temporary directory, so each Env builds its own: the
 // compiler's cache keeps that to a link.
-func New(t testing.TB, origins *Origins) *Env {
-	t.Helper()
-	tmp, err := filepath.EvalSymlinks(t.TempDir())
+func New(tb testing.TB, origins *Origins) *Env {
+	tb.Helper()
+	tmp, err := filepath.EvalSymlinks(tb.TempDir())
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	e := &Env{
 		Home:       filepath.Join(tmp, "home"),
@@ -74,44 +74,44 @@ func New(t testing.TB, origins *Origins) *Env {
 	e.Root = filepath.Join(e.Home, "dev")
 	for _, d := range []string{e.Home, e.ConfigHome, e.StateHome, e.Bin} {
 		if err := os.Mkdir(d, 0o700); err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 	}
-	root := repoRoot(t)
-	e.Romeu = build(t, root, "./cmd/romeu", filepath.Join(tmp, "romeu"))
-	e.Sbx = build(t, root, "./e2e/fakesbx", filepath.Join(e.Bin, "sbx"))
+	root := repoRoot(tb)
+	e.Romeu = build(tb, root, "./cmd/romeu", filepath.Join(tmp, "romeu"))
+	e.Sbx = build(tb, root, "./e2e/fakesbx", filepath.Join(e.Bin, "sbx"))
 	if err := writeFakeSbxConfig(e.Sbx, tmp); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
-	e.Git = installGit(t, e.Bin, origins)
+	e.Git = installGit(tb, e.Bin, origins)
 	return e
 }
 
 // repoRoot returns the module root of this tree.
-func repoRoot(t testing.TB) string {
-	t.Helper()
+func repoRoot(tb testing.TB) string {
+	tb.Helper()
 	wd, err := os.Getwd()
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	root, err := moduleroot.Find(wd)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return root
 }
 
 // build compiles the package pkg of the module at root into out.
-func build(t testing.TB, root, pkg, out string) string {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
+func build(tb testing.TB, root, pkg, out string) string {
+	tb.Helper()
+	ctx, cancel := context.WithTimeout(tb.Context(), 5*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", out, pkg)
 	cmd.Dir = root
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		t.Fatalf("go build %s: %v\n%s", pkg, err, stderr.String())
+		tb.Fatalf("go build %s: %v\n%s", pkg, err, stderr.String())
 	}
 	return out
 }
@@ -143,9 +143,9 @@ func (e *Env) Environ(extra ...string) []string {
 // Run runs romeu with args in the Env's environment, and extra
 // environment entries after it, and returns its outcome. A failure to
 // start is a failure of the test; a non-zero exit is the Result's Code.
-func (e *Env) Run(t testing.TB, args []string, extra ...string) Result {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+func (e *Env) Run(tb testing.TB, args []string, extra ...string) Result {
+	tb.Helper()
+	ctx, cancel := context.WithTimeout(tb.Context(), 2*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, e.Romeu, args...)
 	cmd.Dir = e.Home
@@ -161,6 +161,6 @@ func (e *Env) Run(t testing.TB, args []string, extra ...string) Result {
 		res.Code = exit.ExitCode()
 		return res
 	}
-	t.Fatalf("romeu %v: %v", args, err)
+	tb.Fatalf("romeu %v: %v", args, err)
 	return res
 }

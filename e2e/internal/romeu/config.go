@@ -18,15 +18,15 @@ import (
 // with itself as the primary repo (e2e/testdata/origins/
 // config-project.yaml). It returns the repo's URL. files are added to
 // the commit, and a file of the same path replaces the spec.
-func (o *Origins) PushConfigRepo(t testing.TB, owner, name string, files map[string]string) string {
-	t.Helper()
-	tmpl, err := os.ReadFile(filepath.Join(repoRoot(t), "e2e", "testdata", "origins", "config-project.yaml"))
+func (o *Origins) PushConfigRepo(tb testing.TB, owner, name string, files map[string]string) string {
+	tb.Helper()
+	tmpl, err := os.ReadFile(filepath.Join(repoRoot(tb), "e2e", "testdata", "origins", "config-project.yaml"))
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	spec := strings.NewReplacer("{{owner}}", owner, "{{name}}", name).Replace(string(tmpl))
 	all := map[string]string{"projects/" + name + ".yaml": spec}
 	maps.Copy(all, files)
-	o.Push(t, owner+"/"+name, "main", all)
+	o.Push(tb, owner+"/"+name, "main", all)
 	return o.URL(owner + "/" + name)
 }

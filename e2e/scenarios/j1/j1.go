@@ -16,7 +16,7 @@ import (
 	"path/filepath"
 
 	"github.com/brunovenceslau/romeu-e-julieta/e2e/scenarios"
-	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/all"
 )
 
 // ID is the scenario's id in commands.yaml.
@@ -46,7 +46,7 @@ func initWrote(v Vars) func(scenarios.World) error {
 		if err != nil {
 			return fmt.Errorf("the host settings: %w", err)
 		}
-		h, err := spec.DecodeHostSettings(data)
+		h, err := all.DecodeHostSettings(data)
 		if err != nil {
 			return fmt.Errorf("the host settings: %w", err)
 		}

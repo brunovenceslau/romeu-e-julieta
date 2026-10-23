@@ -40,25 +40,25 @@ type Origins struct {
 }
 
 // NewOrigins starts the server and stops it with the test.
-func NewOrigins(t testing.TB) *Origins {
-	t.Helper()
+func NewOrigins(tb testing.TB) *Origins {
+	tb.Helper()
 	git, err := exec.LookPath("git")
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	if git, err = filepath.Abs(git); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
-	tmp := t.TempDir()
+	tmp := tb.TempDir()
 	o := &Origins{git: git, root: filepath.Join(tmp, "bare"), work: filepath.Join(tmp, "work")}
 	for _, d := range []string{o.root, o.work} {
 		if err := os.Mkdir(d, 0o700); err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 	}
 	out, err := exec.Command(git, "--exec-path").Output()
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	backend := &cgi.Handler{
 		Path:       filepath.Join(strings.TrimSpace(string(out)), "git-http-backend"),
@@ -67,11 +67,11 @@ func NewOrigins(t testing.TB) *Origins {
 		InheritEnv: []string{"PATH"},
 	}
 	o.srv = httptest.NewTLSServer(backend)
-	t.Cleanup(o.srv.Close)
+	tb.Cleanup(o.srv.Close)
 	o.ca = filepath.Join(tmp, "ca.pem")
 	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: o.srv.Certificate().Raw})
 	if err := os.WriteFile(o.ca, pemBytes, 0o600); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return o
 }
@@ -89,41 +89,41 @@ func (o *Origins) CAFile() string { return o.ca }
 // owner/repo, creating the repository, bare and served, on the first
 // call, and pushes the commit to it. It is how a test makes a config
 // repo, and how a later task replays an agent's commit on an origin.
-func (o *Origins) Push(t testing.TB, ownerRepo, branch string, files map[string]string) {
-	t.Helper()
+func (o *Origins) Push(tb testing.TB, ownerRepo, branch string, files map[string]string) {
+	tb.Helper()
 	bare := filepath.Join(o.root, filepath.FromSlash(ownerRepo))
 	work := filepath.Join(o.work, filepath.FromSlash(ownerRepo))
 	if _, err := os.Stat(bare); err != nil {
 		for _, d := range []string{bare, work} {
 			if err := os.MkdirAll(d, 0o700); err != nil {
-				t.Fatal(err)
+				tb.Fatal(err)
 			}
 		}
-		o.Git(t, bare, "init", "-q", "--bare", "-b", "main")
-		o.Git(t, work, "init", "-q", "-b", branch)
-		o.Git(t, work, "remote", "add", "origin", bare)
+		o.Git(tb, bare, "init", "-q", "--bare", "-b", "main")
+		o.Git(tb, work, "init", "-q", "-b", branch)
+		o.Git(tb, work, "remote", "add", "origin", bare)
 	}
 	for name, content := range files {
 		p := filepath.Join(work, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 	}
-	o.Git(t, work, "add", "-A")
-	o.Git(t, work, "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "fixture")
-	o.Git(t, work, "push", "-q", "origin", "HEAD:refs/heads/"+branch)
+	o.Git(tb, work, "add", "-A")
+	o.Git(tb, work, "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "fixture")
+	o.Git(tb, work, "push", "-q", "origin", "HEAD:refs/heads/"+branch)
 }
 
 // Git runs the machine's git in dir with the arguments, under an
 // environment that reads no configuration and names a fixed author, and
 // returns its output; a failure fails the test. It is the test's own
 // git: romeu never runs through it.
-func (o *Origins) Git(t testing.TB, dir string, args ...string) string {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+func (o *Origins) Git(tb testing.TB, dir string, args ...string) string {
+	tb.Helper()
+	ctx, cancel := context.WithTimeout(tb.Context(), time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, o.git, args...)
 	cmd.Dir = dir
@@ -135,7 +135,7 @@ func (o *Origins) Git(t testing.TB, dir string, args ...string) string {
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	if err := cmd.Run(); err != nil {
-		t.Fatalf("git %v in %s: %v\n%s", args, dir, err, stderr.String())
+		tb.Fatalf("git %v in %s: %v\n%s", args, dir, err, stderr.String())
 	}
 	return out.String()
 }
@@ -148,30 +148,30 @@ func (o *Origins) Git(t testing.TB, dir string, args ...string) string {
 // place a test reaches its origins without a gitsafe override (there is
 // none) and without a port in a URL, which the rules of 03 3.1 refuse.
 // Without origins it is a link to the machine's git.
-func installGit(t testing.TB, bin string, o *Origins) string {
-	t.Helper()
+func installGit(tb testing.TB, bin string, o *Origins) string {
+	tb.Helper()
 	git, err := exec.LookPath("git")
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	if git, err = filepath.Abs(git); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	path := filepath.Join(bin, "git")
 	if o == nil {
 		if err := os.Symlink(git, path); err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 		return path
 	}
 	for _, s := range []string{git, o.srv.URL, o.ca} {
 		if strings.ContainsAny(s, "'\n") {
-			t.Fatalf("%q cannot be quoted in the git script", s)
+			tb.Fatalf("%q cannot be quoted in the git script", s)
 		}
 	}
 	script := "#!/bin/sh\nexec '" + git + "' -c 'url." + o.srv.URL + "/.insteadOf=https://" + LogicalHost + "/' -c 'http.sslCAInfo=" + o.ca + "' \"$@\"\n"
 	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return path
 }

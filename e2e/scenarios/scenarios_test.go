@@ -12,9 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/e2e/scenarios"
-	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	_ "github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/all"
-	_ "github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/all"
+	all "github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/all"
 )
 
 // TestParseTable reads the lines of a journey and refuses a line that
@@ -40,8 +39,8 @@ func TestTableUnread(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "romeu version", tbl.Line("J9", 0))
-	assert.Equal(t, "", tbl.Line("J9", 5), "a line the table lacks")
-	assert.Equal(t, "", tbl.Line("J8", 0), "a scenario the table lacks")
+	assert.Empty(t, tbl.Line("J9", 5), "a line the table lacks")
+	assert.Empty(t, tbl.Line("J8", 0), "a scenario the table lacks")
 
 	assert.Equal(t, []string{"J9 2: romeu init --config-url <u>"}, tbl.Unread())
 }
@@ -110,7 +109,7 @@ func TestScenarioRun(t *testing.T) {
 
 	err := s.Run(w)
 
-	assert.ErrorContains(t, err, "J9 step 2: wrong record")
+	require.ErrorContains(t, err, "J9 step 2: wrong record")
 	assert.Equal(t, []string{"romeu version", "romeu version --json"}, w.ran)
 	assert.Equal(t, 1, asserted)
 	assert.Equal(t, []string{"romeu version", "romeu version --json", "romeu never"}, s.Lines())
@@ -122,11 +121,11 @@ func TestScenarioRunExitStatus(t *testing.T) {
 	step := scenarios.Step{N: "1", Kind: scenarios.Julieta, Line: "romeu version", Want: 2}
 	s := scenarios.Scenario{ID: "J9", Steps: []scenarios.Step{step}}
 
-	assert.ErrorContains(t, s.Run(&fakeWorld{out: scenarios.Outcome{Code: 0, Stderr: "boom"}}), "ended with 0, want 2")
-	assert.NoError(t, s.Run(&fakeWorld{out: scenarios.Outcome{Code: 2}}))
-	assert.ErrorContains(t, s.Run(&fakeWorld{fail: errors.New("no binary")}), "no binary")
+	require.ErrorContains(t, s.Run(&fakeWorld{out: scenarios.Outcome{Code: 0, Stderr: "boom"}}), "ended with 0, want 2")
+	require.NoError(t, s.Run(&fakeWorld{out: scenarios.Outcome{Code: 2}}))
+	require.ErrorContains(t, s.Run(&fakeWorld{fail: errors.New("no binary")}), "no binary")
 	bad := scenarios.Scenario{ID: "J9", Steps: []scenarios.Step{{N: "1", Kind: scenarios.Sbx}}}
-	assert.ErrorContains(t, bad.Run(&fakeWorld{}), "no assertion")
+	require.ErrorContains(t, bad.Run(&fakeWorld{}), "no assertion")
 }
 
 // TestJourneysAreTheDirectories finds every journey that has a table.
@@ -156,8 +155,8 @@ func TestEveryRomeuCommandHasAJourneyLine(t *testing.T) {
 		for _, l := range tbl.Commands() {
 			f := strings.Fields(l)
 			bin := f[0]
-			var def *cli.Command
-			for _, c := range cli.Commands(bin) {
+			var def *all.Command
+			for _, c := range all.Commands(bin) {
 				if f[1] == c.Name && (c.Sub == "" || (len(f) > 2 && f[2] == c.Sub)) {
 					def = &c
 					break
@@ -169,7 +168,7 @@ func TestEveryRomeuCommandHasAJourneyLine(t *testing.T) {
 			lines[bin+" "+def.Line()] = true
 		}
 	}
-	for _, c := range cli.Commands("romeu") {
+	for _, c := range all.Commands("romeu") {
 		key := "romeu " + c.Line()
 		switch {
 		case lines[key] && c.NoJourney != "":

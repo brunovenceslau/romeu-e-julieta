@@ -23,6 +23,6 @@ func TestJ1ReadsEveryLine(t *testing.T) {
 	s := j1.J1(tbl, j1.Vars{Owner: "owner", ConfigRepo: "cfg"})
 
 	assert.Empty(t, tbl.Unread(), "a commands.yaml line no function of J1 reads")
-	assert.NoError(t, s.Check())
+	require.NoError(t, s.Check())
 	assert.Equal(t, []string{"romeu init --config-url https://github.com/owner/cfg"}, s.Lines())
 }

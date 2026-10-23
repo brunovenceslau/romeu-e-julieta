@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/e2e/internal/romeu"
-	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/all"
 )
 
 // TestEnvRunsRomeuInItsOwnTree runs the built binary with the Env's
@@ -49,7 +49,7 @@ func TestEnvExitCode(t *testing.T) {
 func TestEnvWriteSettings(t *testing.T) {
 	e := romeu.New(t, nil)
 
-	e.WriteSettings(t, spec.HostSettings{Config: spec.ConfigRepo{Project: "cfg", URL: "https://github.com/o/cfg", Ref: "main"}})
+	e.WriteSettings(t, all.HostSettings{Config: all.ConfigRepo{Project: "cfg", URL: "https://github.com/o/cfg", Ref: "main"}})
 
 	fi, err := os.Stat(e.Settings())
 	require.NoError(t, err)

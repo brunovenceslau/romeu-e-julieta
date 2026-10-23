@@ -10,15 +10,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/all"
 )
 
 // WriteSettings writes h as the host settings of the Env, mode 0600,
 // after it fills what h leaves empty: the schema, the Root of the Env
 // and the two tools of Bin. It decodes what it wrote by the rules of
 // 03 3.4, so a test never starts from settings romeu would refuse.
-func (e *Env) WriteSettings(t testing.TB, h spec.HostSettings) {
-	t.Helper()
+func (e *Env) WriteSettings(tb testing.TB, h all.HostSettings) {
+	tb.Helper()
 	if h.Schema == "" {
 		h.Schema = "host-settings/v1"
 	}
@@ -31,31 +31,31 @@ func (e *Env) WriteSettings(t testing.TB, h spec.HostSettings) {
 	if h.Tools.Git == "" {
 		h.Tools.Git = e.Git
 	}
-	data, err := spec.EncodeHostSettings(h)
+	data, err := all.EncodeHostSettings(h)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
-	if _, err := spec.DecodeHostSettings(data); err != nil {
-		t.Fatalf("the settings the test wrote are invalid: %v", err)
+	if _, err := all.DecodeHostSettings(data); err != nil {
+		tb.Fatalf("the settings the test wrote are invalid: %v", err)
 	}
 	if err := os.MkdirAll(filepath.Dir(e.Settings()), 0o700); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	if err := os.WriteFile(e.Settings(), data, 0o600); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 }
 
 // ReadSettings returns the host settings of the Env as romeu reads them.
-func (e *Env) ReadSettings(t testing.TB) spec.HostSettings {
-	t.Helper()
+func (e *Env) ReadSettings(tb testing.TB) all.HostSettings {
+	tb.Helper()
 	data, err := os.ReadFile(e.Settings())
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
-	h, err := spec.DecodeHostSettings(data)
+	h, err := all.DecodeHostSettings(data)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return h
 }
