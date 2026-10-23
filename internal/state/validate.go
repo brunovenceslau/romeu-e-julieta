@@ -64,27 +64,28 @@ func (t *Toolchain) validate() error {
 func (a *Approval) checkSet() error {
 	n, err := gate.Normal(a.Set)
 	if err != nil {
-		return fmt.Errorf("approval: %w", err)
+		return fmt.Errorf("approval: the widening set check: %w", err)
 	}
 	sum, err := gate.Digest(n)
 	if err != nil {
-		return fmt.Errorf("approval: %w", err)
+		return fmt.Errorf("approval: the widening set check: %w", err)
 	}
 	if sum != a.WideningDigest {
-		return fmt.Errorf("approval: the widening set has the digest %s, and the approval holds %s", sum, a.WideningDigest)
+		return fmt.Errorf("approval: the widening set check: the set has the digest %s, and the approval holds %s", sum, a.WideningDigest)
 	}
 	if n.RenderDigest != a.RenderDigest {
-		return fmt.Errorf("approval: the widening set holds the renderDigest %s, and the approval %s", n.RenderDigest, a.RenderDigest)
+		return fmt.Errorf("approval: the widening set check: the set holds the renderDigest %s, and the approval %s", n.RenderDigest, a.RenderDigest)
 	}
 	a.Set = n
 	return nil
 }
 
 // checkProject refuses a record of the project name whose approval is
-// another project's.
+// another project's. Its error wraps no ErrInvalid: the read path makes
+// it record-unreadable, and a write is refused with it.
 func (p *Project) checkProject(name string) error {
 	if p.Approval != nil && p.Approval.Set.Project != name {
-		return fmt.Errorf("%w: the approval of the record of %s is the approval of %q", ErrInvalid, name, p.Approval.Set.Project)
+		return fmt.Errorf("the project check: the approval of the record of %s is the approval of %q", name, p.Approval.Set.Project)
 	}
 	return nil
 }

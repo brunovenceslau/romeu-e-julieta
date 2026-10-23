@@ -132,7 +132,7 @@ func (s *Store) LoadProject(name string) (*Project, error) {
 	p, err := load(s.projects, file, path, DecodeProject)
 	if err == nil {
 		if err = p.checkProject(name); err != nil {
-			p, err = nil, unreadable(path, err)
+			p, err = nil, unreadable(path, fmt.Errorf("%w: %w", ErrInvalid, err))
 		}
 	}
 	if e, ok := errors.AsType[*cli.Error](err); ok && e.ID == RecordUnreadable.ID {
@@ -166,7 +166,7 @@ func (s *Store) UpdateProject(lk *Lock, name string, fn func(*Project) error) er
 		return err
 	}
 	if err := p.checkProject(name); err != nil {
-		return fmt.Errorf("state: a project record that would not read: %w", err)
+		return fmt.Errorf("state: refused to write the record of %s, which would not read: %w", name, err)
 	}
 	data, err := EncodeProject(p)
 	if err != nil {

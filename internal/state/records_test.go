@@ -197,6 +197,10 @@ func TestStore_UpdateProject(t *testing.T) {
 			return nil
 		})
 		require.Error(t, err)
+		require.ErrorContains(t, err, "the project check", "the message names the check")
+		require.NotErrorIs(t, err, ErrInvalid, "a refused write is no unreadable record")
+		_, isCLI := errors.AsType[*cli.Error](err)
+		assert.False(t, isCLI, "RJ-334 is for the read path only")
 		assert.NoFileExists(t, filepath.Join(s.Dir(), "projects", "shop.json"))
 	})
 	t.Run("a failing fn writes nothing", func(t *testing.T) {
@@ -352,6 +356,8 @@ func TestEncode_refusesWhatNoReaderWouldTake(t *testing.T) {
 		p.Approval = &a
 		_, err := EncodeProject(p)
 		require.Error(t, err)
+		require.ErrorContains(t, err, "the widening set check", "the message names the check")
+		require.NotErrorIs(t, err, ErrInvalid, "a refused write is no unreadable record")
 	})
 	t.Run("a retiring with no attic", func(t *testing.T) {
 		p := NewProject()

@@ -164,7 +164,7 @@ func DecodeProject(data []byte) (*Project, error) {
 func EncodeProject(p *Project) ([]byte, error) {
 	p.stampTimes()
 	if err := p.validate(); err != nil {
-		return nil, fmt.Errorf("state: a project record that would not read: %w", err)
+		return nil, fmt.Errorf("state: refused to write a project record that would not read, by the check a reader makes: %w", err)
 	}
 	return encodeRecord(p)
 }
