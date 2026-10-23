@@ -55,8 +55,7 @@ are made in this task, with the ids `go run ./tools/ci reqs allocate`
 hands out, which the Implements line then cites.
 
 - Implements: REQ-1283 (04 4.2), REQ-1284 (04 4.2), REQ-1285 (04 4.2),
-  REQ-1286 (04 4.4), allocated by this task with its spec amendment
-  (12 12.11).
+  REQ-1286 (04 4.4).
 - Operator: no.
 - Acceptance:
   - In the e2e, against an origin served over TLS that requires
