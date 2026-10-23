@@ -12,11 +12,11 @@ import (
 	"golang.org/x/term"
 )
 
-// ErrNoTerminal is the error of Ask when standard input is not a
-// terminal: an approval needs one (01 1.4, REQ-0059). sync then
+// ErrNoTerminal is the error of Ask when standard input or standard
+// error is not a terminal: an approval needs both (01 1.4, REQ-0059). sync then
 // declines the candidate, prints the widening digest and exits 3 with
 // project-approval-required (01 1.6, REQ-1210).
-var ErrNoTerminal = errors.New("gate: an approval needs a terminal on standard input")
+var ErrNoTerminal = errors.New("gate: an approval needs a terminal on standard input and standard error")
 
 // maxAnswer is the most bytes of an answer Ask reads: a longer line is
 // no "y" and declines.

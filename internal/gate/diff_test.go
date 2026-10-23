@@ -69,7 +69,16 @@ func TestDiffGolden(t *testing.T) {
 	t.Parallel()
 	old := baseInputs()
 	old.r.Kits[1].Files = append(old.r.Kits[1].Files, File{Path: "README", Mode: ModeRegular, Data: []byte("one\ntwo\nthree\n")})
+	// What the candidate narrows: a gated domain, a repo and a port, and
+	// a secret whose service alone changes.
+	old.p.Egress.Extra = append(old.p.Egress.Extra, "gone.example")
+	old.p.Repos = append(old.p.Repos, spec.Repo{URL: "https://github.com/example/shop-web", Dir: "shop-web"})
+	old.p.Ports = append(old.p.Ports, "9090:9090/tcp")
+	old.p.Secrets = append(old.p.Secrets, "npm")
+	old.hs.Secrets["npm@shop"] = spec.Secret{Service: "npmjs.org", Argv: []string{"/usr/bin/false"}}
 	cand := baseInputs()
+	cand.p.Secrets = append(cand.p.Secrets, "npm")
+	cand.hs.Secrets["npm@shop"] = spec.Secret{Service: "registry.npmjs.org", Argv: []string{"/usr/bin/false"}}
 	cand.r.Kits[1].Files = append(cand.r.Kits[1].Files, File{Path: "README", Mode: ModeRegular, Data: []byte("one\n2\nthree\n")})
 	cand.r.WorkloadCapabilities = Capabilities{"network": []any{"registry.example"}, "mounts": []any{"/var/run/docker.sock"}}
 	cand.p.Egress.Extra = append(cand.p.Egress.Extra, "upload.example")
@@ -235,6 +244,20 @@ func TestDiffShowsATextSideInFull(t *testing.T) {
 			"+1 -0 lines", []string{"binary"},
 		},
 		{
+			"a script of the regular mode with more than one byte in ten not text",
+			File{Path: "bin/run", Mode: ModeRegular, Data: []byte("#!/bin/sh\n")},
+			File{Path: "bin/run", Mode: ModeRegular, Data: []byte("#!/bin/sh\n\xff\xff\xff\xff\xff\xff\n")},
+			[]string{`      +\xff\xff\xff\xff\xff\xff` + "\n"},
+			"+1 -0 lines", []string{"binary"},
+		},
+		{
+			"an executable file with more than one byte in ten not text",
+			File{Path: "bin/run", Mode: ModeExecutable, Data: []byte("run\n")},
+			File{Path: "bin/run", Mode: ModeExecutable, Data: []byte("run\n\xff\xff\xff\xff\xff\xff\n")},
+			[]string{`      +\xff\xff\xff\xff\xff\xff` + "\n"},
+			"+1 -0 lines", []string{"binary"},
+		},
+		{
 			"a binary replaced by a script",
 			elf, script,
 			[]string{"      binary old: 64 bytes, sha256 " + hex.EncodeToString(elfSum[:]) + "\n", "      +echo hi\n"},
@@ -330,6 +353,64 @@ func TestNewDiffRefusesARenderTheSetDoesNotDigest(t *testing.T) {
 	cand.Render = nil
 	_, err = NewDiff(nil, cand)
 	require.Error(t, err)
+}
+
+// TestDiffSummaryMarksWhatTheCandidateRemoves: a removed gated domain,
+// repo and port, and a secret whose service alone changes, are marked
+// lines of the summary.
+func TestDiffSummaryMarksWhatTheCandidateRemoves(t *testing.T) {
+	t.Parallel()
+	old, cand := baseInputs(), baseInputs()
+	old.p.Egress.Extra = append(old.p.Egress.Extra, "gone.example")
+	old.p.Repos = append(old.p.Repos, spec.Repo{URL: "https://github.com/example/shop-web", Dir: "shop-web"})
+	old.p.Ports = append(old.p.Ports, "9090:9090/tcp")
+	cand.hs.Secrets["github@shop"] = spec.Secret{Service: "ghe.example", Argv: cand.hs.Secrets["github@shop"].Argv}
+	approved := side(t, old)
+	got := text(t, &approved, side(t, cand))
+	for _, want := range []string{
+		"  ! gated domain removed: gone.example (spec extra)\n",
+		"  ! repo removed: shop-web https://github.com/example/shop-web\n",
+		"  ! port removed: 9090:9090/tcp\n",
+		"  ! secret argv changed: github\n",
+	} {
+		assert.Contains(t, got, want)
+	}
+}
+
+// TestDiffSummaryMarksAChangedImageDigest: a new image of the same
+// repository is a marked line of the summary too.
+func TestDiffSummaryMarksAChangedImageDigest(t *testing.T) {
+	t.Parallel()
+	old, cand := baseInputs(), baseInputs()
+	cand.p.Workload = "docker.io/example/dev@sha256:" + hex64('b')
+	approved := side(t, old)
+	got := text(t, &approved, side(t, cand))
+	assert.Contains(t, got, "  ! workload digest: sha256:"+hex64('a')+" -> sha256:"+hex64('b')+"\n")
+	assert.NotContains(t, got, "! workload repository:")
+}
+
+// TestDiffShowsAModeOnlyChange: a kit file whose mode alone changes is
+// listed as changed, with both modes.
+func TestDiffShowsAModeOnlyChange(t *testing.T) {
+	t.Parallel()
+	data := []byte("#!/bin/sh\n")
+	got := kitFileDiff(t,
+		File{Path: "bin/run", Mode: ModeExecutable, Data: data},
+		File{Path: "bin/run", Mode: ModeRegular, Data: data})
+	assert.Contains(t, got, "    M 100755 -> 100644 bin/run\n")
+	assert.Contains(t, got, "  personal:tools (changed):\n")
+}
+
+// TestNewDiffRefusesAnApprovalOfAnotherProject: the approved side and
+// the candidate are of one project, or there is no diff to show.
+func TestNewDiffRefusesAnApprovalOfAnotherProject(t *testing.T) {
+	t.Parallel()
+	other := baseInputs()
+	other.p.Name = "other"
+	other.hs.Secrets["github@other"] = other.hs.Secrets["github@shop"]
+	approved := side(t, other)
+	_, err := NewDiff(&approved, side(t, baseInputs()))
+	require.ErrorContains(t, err, "other")
 }
 
 func TestDiffSummaryMarksReposPortsAndAgent(t *testing.T) {

@@ -69,6 +69,9 @@ func NewDiff(approved *Side, candidate Side) (Diff, error) {
 		if oldSet, err = checkSide(*approved, false); err != nil {
 			return Diff{}, fmt.Errorf("gate: the approval: %w", err)
 		}
+		if oldSet.Project != newSet.Project {
+			return Diff{}, fmt.Errorf("gate: the approval is of the project %q, and the candidate of %q", oldSet.Project, newSet.Project)
+		}
 		oldKits, oldRender = approved.KitFiles, approved.Render
 	}
 	d := Diff{project: newSet.Project}
@@ -156,7 +159,7 @@ const mark = "! "
 
 // summary returns the lines of the summary, in the order of 01 1.4:
 // the changed capabilities, gated domains, secret argv and workload
-// repository, marked; then the content changes of the kits with file
+// repository (and its image digest), marked; then the content changes of the kits with file
 // and line counts; then the name of every changed member of the set.
 func (c comparison) summary() []string {
 	var out []string
@@ -190,6 +193,9 @@ func (c comparison) summary() []string {
 	}
 	if c.first || c.old.Workload.Repository != c.new.Workload.Repository {
 		out = append(out, mark+"workload repository: "+c.workloadChange())
+	}
+	if !c.first && c.old.Workload.Digest != c.new.Workload.Digest {
+		out = append(out, mark+"workload digest: "+c.old.Workload.Digest+" -> "+c.new.Workload.Digest)
 	}
 	for _, key := range unionKeys(oldKits, newKits) {
 		if oldKits[key].ContentDigest == newKits[key].ContentDigest {
