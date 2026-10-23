@@ -167,7 +167,33 @@ func TestDeriveSteps(t *testing.T) {
 			repos: []egress.Repo{repoOf("api", nil)},
 			kit:   []string{"proxy.golang.org", "storage.googleapis.com", "kit.acme.dev"},
 			auto:  append([]string{"proxy.golang.org"}, metaAuto...),
-			gated: []egress.Gate{gate("api.github.com", egress.ReasonUpload), gate("github.com", egress.ReasonUpload), gate("kit.acme.dev", egress.ReasonUpload), gate("storage.googleapis.com", egress.ReasonUpload)},
+			gated: []egress.Gate{gate("api.github.com", egress.ReasonUpload), gate("github.com", egress.ReasonUpload), gate("kit.acme.dev", egress.ReasonKit), gate("storage.googleapis.com", egress.ReasonKit)},
+		},
+		{
+			// I10: a kit declaring x.example gates it, and says so.
+			name:  "a kit that declares x.example gates it as kit-declared",
+			repos: []egress.Repo{repoOf("api", nil)},
+			kit:   []string{"x.example"},
+			auto:  metaAuto,
+			gated: []egress.Gate{gate("api.github.com", egress.ReasonUpload), gate("github.com", egress.ReasonUpload), gate("x.example", egress.ReasonKit)},
+		},
+		{
+			// A domain the base set produced keeps upload when a kit
+			// repeats it: the catalog said it first.
+			name:  "a kit that repeats a base domain leaves the reason upload",
+			repos: []egress.Repo{repoOf("api", nil)},
+			kit:   []string{"github.com"},
+			auto:  metaAuto,
+			gated: []egress.Gate{gate("api.github.com", egress.ReasonUpload), gate("github.com", egress.ReasonUpload)},
+		},
+		{
+			// A kit domain that is also a spec extra is kit-declared.
+			name:  "a kit domain that egress.extra repeats is kit-declared",
+			repos: []egress.Repo{repoOf("api", nil)},
+			spec:  &spec.Egress{Extra: []string{"x.example"}},
+			kit:   []string{"x.example"},
+			auto:  metaAuto,
+			gated: []egress.Gate{gate("api.github.com", egress.ReasonUpload), gate("github.com", egress.ReasonUpload), gate("x.example", egress.ReasonKit)},
 		},
 		{
 			// Step 7 for a catalog domain without a domains entry.
@@ -396,8 +422,8 @@ func TestDeriveReadFailure(t *testing.T) {
 }
 
 // TestDeriveReasonPrecedence: a domain several sources gate keeps the
-// first reason of upload, extra, spec-tool and lock-host, and Auto and
-// Gated share no domain.
+// first reason of upload, kit, extra, spec-tool and lock-host, and Auto
+// and Gated share no domain.
 func TestDeriveReasonPrecedence(t *testing.T) {
 	files := map[string]string{"mise.toml": "[tools]\nx = \"1\"\ngo = \"1\"\n", "mise.lock": lockOf(
 		[3]string{"x", "aqua:acme/tool", "https://both.acme.dev/x.tar.gz"},
@@ -431,4 +457,16 @@ func TestDeriveLockHostOfAKit(t *testing.T) {
 	for _, g := range got.Gated {
 		assert.NotEqual(t, "proxy.golang.org", g.Domain)
 	}
+}
+
+// TestDeriveEmptyIsNotNil: with nothing to allow or to gate, Auto and
+// Gated are empty lists and not nil, so a caller that encodes them
+// writes [] and not null.
+func TestDeriveEmptyIsNotNil(t *testing.T) {
+	got, err := egress.Derive(t.Context(), egress.Input{Repos: []egress.Repo{repoOf("api", nil)}})
+	require.NoError(t, err)
+	assert.NotNil(t, got.Auto)
+	assert.NotNil(t, got.Gated)
+	assert.Empty(t, got.Auto)
+	assert.Empty(t, got.Gated)
 }

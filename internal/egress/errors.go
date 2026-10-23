@@ -23,8 +23,9 @@ var (
 
 	// CatalogUnknownTool is the error catalog-unknown-tool (RJ-327): an
 	// entry of a mise.lock names a backend:tool that is in no entry of the
-	// catalog and in no egress.tools entry of the spec (07 7.5, step 2). The message names
-	// the tools and the two fixes, the details each tool and its repo.
+	// catalog and in no egress.tools entry of the spec (07 7.5, step 2).
+	// The message names the tools and the two fixes, the details each
+	// tool and its repo.
 	CatalogUnknownTool = cli.Row{
 		ID:          "RJ-327",
 		Slug:        "catalog-unknown-tool",

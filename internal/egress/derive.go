@@ -70,21 +70,31 @@ type Input struct {
 	Catalog catalog.Catalog
 }
 
-// Reason says why a domain is gated. A domain that the catalog, the base
-// and meta sets or a kit produced, and that step 7 moves because it can
-// upload or has no upload entry, is ReasonUpload. A domain a source gates
-// by itself keeps the reason of the source, the first of ReasonExtra,
-// ReasonSpecTool and ReasonLockHost when it has several: the catalog does
-// not say whether such a domain can upload or only lacks an entry, and the
-// approval it waits for is the same.
+// Reason says why a domain is gated. A domain with several reasons keeps
+// the first of this list:
+//
+//  1. ReasonUpload: the catalog, the base set or the meta set produced it,
+//     and step 7 moves it because it can upload or has no upload entry.
+//  2. ReasonKit: a kit declared it and no catalog set did, and step 7
+//     moves it for the same cause.
+//  3. ReasonExtra: egress.extra of the spec names it.
+//  4. ReasonSpecTool: an egress.tools entry of the spec names it.
+//  5. ReasonLockHost: it is the host of an artifact URL of a lock that
+//     the catalog did not produce.
+//
+// The catalog does not say whether a domain can upload or only lacks an
+// entry, and the approval it waits for is the same, so a domain that step
+// 7 moves has one reason for both.
 type Reason string
 
-// The reasons a domain is gated.
+// The reasons a domain is gated (01 1.3, egressGated).
 const (
-	// ReasonUpload is a domain a catalog set or a kit produced that can
-	// take data out, or that the catalog has no upload entry for (07 7.5,
-	// step 7).
+	// ReasonUpload is a domain a catalog set produced that can take data
+	// out, or that the catalog has no upload entry for (07 7.5, step 7).
 	ReasonUpload Reason = "upload"
+	// ReasonKit is a domain a kit declared that step 7 moves, and that no
+	// catalog set produced (06 6.1, I10).
+	ReasonKit Reason = "kit"
 	// ReasonExtra is a domain of egress.extra of the spec (step 5).
 	ReasonExtra Reason = "extra"
 	// ReasonSpecTool is a domain of an egress.tools entry of the spec
@@ -96,7 +106,7 @@ const (
 )
 
 // reasonOrder ranks the reasons: the lowest wins.
-var reasonOrder = []Reason{ReasonUpload, ReasonExtra, ReasonSpecTool, ReasonLockHost}
+var reasonOrder = []Reason{ReasonUpload, ReasonKit, ReasonExtra, ReasonSpecTool, ReasonLockHost}
 
 // Gate is a gated domain and why.
 type Gate struct {
@@ -157,7 +167,7 @@ func (r Result) Digest() (canon.Sum[canon.EgressKind], error) {
 // the install error names it (REQ-0637). It never allows more than the
 // lock names.
 func Derive(ctx context.Context, in Input) (Result, error) {
-	d := derivation{in: in, auto: map[string]bool{}, produced: map[string]bool{}, gated: map[string]Reason{}}
+	d := derivation{in: in, auto: map[string]bool{}, produced: map[string]bool{}, kit: map[string]bool{}, gated: map[string]Reason{}}
 	for _, repo := range in.Repos {
 		if err := d.repo(ctx, repo); err != nil {
 			return Result{}, err
@@ -180,6 +190,7 @@ func Derive(ctx context.Context, in Input) (Result, error) {
 			return Result{}, fmt.Errorf("a kit domain: %w", err)
 		}
 		d.auto[dom] = true
+		d.kit[dom] = true
 	}
 	for _, h := range d.hosts {
 		if !d.produced[h] {
@@ -194,6 +205,7 @@ type derivation struct {
 	in       Input
 	auto     map[string]bool   // domains allowed unless step 7 gates them
 	produced map[string]bool   // domains the catalog produced
+	kit      map[string]bool   // domains a kit declared
 	gated    map[string]Reason // domains gated by their source
 	hosts    []string          // lock hosts, judged once every repo is read
 }
@@ -228,11 +240,14 @@ func firstReason(a, b Reason) Reason {
 // result applies step 7 and sorts.
 func (d *derivation) result() Result {
 	gated := map[string]Reason{}
-	var res Result
+	res := Result{Auto: []string{}, Gated: []Gate{}}
 	for dom := range d.auto {
-		if d.in.Catalog.Gated(dom) {
+		switch {
+		case d.in.Catalog.Gated(dom) && d.kit[dom] && !d.produced[dom]:
+			gated[dom] = ReasonKit
+		case d.in.Catalog.Gated(dom):
 			gated[dom] = ReasonUpload
-		} else {
+		default:
 			res.Auto = append(res.Auto, dom)
 		}
 	}
@@ -240,7 +255,7 @@ func (d *derivation) result() Result {
 		switch {
 		case gated[dom] != "":
 			// The catalog, base, meta or kit produced it and step 7 moved
-			// it: the reason upload stays.
+			// it: that reason stays.
 		case d.auto[dom] && !d.in.Catalog.Gated(dom):
 			// Already allowed by its source: the spec repeats it.
 		default:
