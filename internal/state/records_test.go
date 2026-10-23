@@ -23,6 +23,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 )
 
 // readTestdata returns a file of testdata.
@@ -73,7 +74,7 @@ func TestDecodeProject(t *testing.T) {
 			return strings.Replace(s, "01j9zc2q8x7w4t6y3r5e1v9k0p", "01J9ZC2Q8X7W4T6Y3R5E1V9K0P", 1)
 		}},
 		{"a digest of another length", func(s string) string {
-			return strings.Replace(s, "43bf1a6187ca4a12db90ea196eba079ca267f571eabee4bb139ee91540f895e0", "43", 1)
+			return strings.Replace(s, "5648016dd24b762bb7cb530d055be770c0b364045b8c63bcb0eede13f025cbad", "43", 1)
 		}},
 		{"a widening set changed after its digest", func(s string) string {
 			return strings.Replace(s, `"domain": "github.com"`, `"domain": "github.co"`, 1)
@@ -262,7 +263,7 @@ func TestStore_UpdateToolchain(t *testing.T) {
 
 func TestStore_Descriptors(t *testing.T) {
 	const digest = "sha256:5555555555555555555555555555555555555555555555555555555555555555"
-	d := Descriptor{Digest: digest, Capabilities: Capabilities{"network": []any{"example.com"}}}
+	d := Descriptor{Digest: digest, Capabilities: &oci.Capabilities{Ports: []oci.Port{{Container: "80"}}}}
 	t.Run("a descriptor is cached by its digest and read back", func(t *testing.T) {
 		s := openTemp(t)
 		_, err := s.GetDescriptor(digest)
@@ -280,7 +281,7 @@ func TestStore_Descriptors(t *testing.T) {
 		s := openTemp(t)
 		require.NoError(t, s.PutDescriptor(held(t, s), d))
 		require.NoError(t, s.PutDescriptor(held(t, s), d), "the same content again is a no-op")
-		other := Descriptor{Digest: digest, Capabilities: Capabilities{"network": []any{"other.example"}}}
+		other := Descriptor{Digest: digest, Capabilities: &oci.Capabilities{Ports: []oci.Port{{Container: "81"}}}}
 		require.ErrorIs(t, s.PutDescriptor(held(t, s), other), ErrImmutable)
 		got, err := s.GetDescriptor(digest)
 		require.NoError(t, err)
@@ -473,9 +474,100 @@ func TestDecodeDescriptor(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalid)
 }
 
+func TestDecodeDescriptor_capabilitiesAreRequired(t *testing.T) {
+	head := `{"schema": "state-descriptor/v1", "digest": "sha256:` + strings.Repeat("5", 64) + `"`
+	for name, doc := range map[string]string{
+		"absent": head + `}`,
+		"null":   head + `, "capabilities": null}`,
+	} {
+		t.Run(name+" is not an empty set", func(t *testing.T) {
+			_, err := DecodeDescriptor([]byte(doc))
+
+			require.ErrorIs(t, err, ErrInvalid)
+			assert.Contains(t, err.Error(), "capabilities is missing")
+		})
+	}
+	t.Run("an empty set is a set", func(t *testing.T) {
+		d, err := DecodeDescriptor([]byte(head + `, "capabilities": {"kind": "workload"}}`))
+
+		require.NoError(t, err)
+		require.NotNil(t, d.Capabilities)
+	})
+	t.Run("a record that would not read is not written", func(t *testing.T) {
+		s := openTemp(t)
+
+		err := s.PutDescriptor(held(t, s), Descriptor{Digest: "sha256:" + strings.Repeat("4", 64)})
+
+		require.Error(t, err)
+		assert.NoFileExists(t, filepath.Join(s.Dir(), "descriptors", strings.Repeat("4", 64)+".json"))
+	})
+}
+
+func TestDescriptor_keyedByThePlatformManifest(t *testing.T) {
+	manifest := "sha256:" + strings.Repeat("a", 64)
+	index := "sha256:" + strings.Repeat("b", 64)
+	otherIndex := "sha256:" + strings.Repeat("c", 64)
+	caps := &oci.Capabilities{Ports: []oci.Port{{Container: "80"}}}
+	d := Descriptor{Digest: manifest, Workload: index, Platform: "linux/amd64", Capabilities: caps}
+
+	t.Run("the workload and the platform are stored with the manifest digest", func(t *testing.T) {
+		s := openTemp(t)
+		require.NoError(t, s.PutDescriptor(held(t, s), d))
+
+		got, err := s.GetDescriptor(manifest)
+
+		require.NoError(t, err)
+		assert.Equal(t, index, got.Workload)
+		assert.Equal(t, "linux/amd64", got.Platform)
+	})
+	t.Run("another index that lists the same manifest keeps the first", func(t *testing.T) {
+		s := openTemp(t)
+		require.NoError(t, s.PutDescriptor(held(t, s), d))
+		again := d
+		again.Workload = otherIndex
+
+		require.NoError(t, s.PutDescriptor(held(t, s), again))
+
+		got, err := s.GetDescriptor(manifest)
+		require.NoError(t, err)
+		assert.Equal(t, index, got.Workload)
+	})
+	t.Run("another platform for the same manifest is other content", func(t *testing.T) {
+		s := openTemp(t)
+		require.NoError(t, s.PutDescriptor(held(t, s), d))
+		other := d
+		other.Platform = "linux/arm64"
+
+		require.ErrorIs(t, s.PutDescriptor(held(t, s), other), ErrImmutable)
+	})
+	t.Run("the pair is checked on a read", func(t *testing.T) {
+		for name, mutate := range map[string]func(*Descriptor){
+			"a workload without a platform":  func(d *Descriptor) { d.Platform = "" },
+			"a platform without a workload":  func(d *Descriptor) { d.Workload = "" },
+			"a workload that is no digest":   func(d *Descriptor) { d.Workload = "latest" },
+			"a platform that is no platform": func(d *Descriptor) { d.Platform = "amd64" },
+		} {
+			bad := d
+			mutate(&bad)
+
+			_, err := EncodeDescriptor(&bad)
+
+			require.Error(t, err, name)
+		}
+	})
+	t.Run("a local kit has neither", func(t *testing.T) {
+		local := Descriptor{Digest: manifest, Capabilities: caps}
+
+		data, err := EncodeDescriptor(&local)
+
+		require.NoError(t, err)
+		assert.NotContains(t, string(data), "workload")
+	})
+}
+
 func TestStore_GetDescriptor_otherDigestThanItsName(t *testing.T) {
 	s := openTemp(t)
-	d := Descriptor{Digest: "sha256:" + strings.Repeat("6", 64)}
+	d := Descriptor{Digest: "sha256:" + strings.Repeat("6", 64), Capabilities: &oci.Capabilities{}}
 	require.NoError(t, s.PutDescriptor(held(t, s), d))
 	// A file of the name of one digest that holds another is damage.
 	data, err := os.ReadFile(filepath.Join(s.Dir(), "descriptors", strings.Repeat("6", 64)+".json"))
@@ -496,7 +588,7 @@ func TestStore_readErrors(t *testing.T) {
 		require.NotErrorIs(t, err, fs.ErrNotExist)
 		require.Error(t, s.UpdateProject(held(t, s), "shop", func(*Project) error { return nil }))
 		require.NoError(t, os.Mkdir(filepath.Join(s.Dir(), "descriptors", strings.Repeat("8", 64)+".json"), 0o700))
-		require.Error(t, s.PutDescriptor(held(t, s), Descriptor{Digest: "sha256:" + strings.Repeat("8", 64)}))
+		require.Error(t, s.PutDescriptor(held(t, s), Descriptor{Digest: "sha256:" + strings.Repeat("8", 64), Capabilities: &oci.Capabilities{}}))
 	})
 	t.Run("a name that is no project name is refused by the reader too", func(t *testing.T) {
 		_, err := openTemp(t).LoadProject("../x")
@@ -575,9 +667,58 @@ func TestStore_nonRegularRecord(t *testing.T) {
 
 func TestStore_PutDescriptor_comparesValues(t *testing.T) {
 	s := openTemp(t)
-	d := Descriptor{Digest: "sha256:" + strings.Repeat("9", 64), Capabilities: Capabilities{"ports": []any{1, 2}}}
+	d := Descriptor{Digest: "sha256:" + strings.Repeat("9", 64), Capabilities: &oci.Capabilities{Ports: []oci.Port{{Container: "1"}, {Container: "2"}}}}
 	require.NoError(t, s.PutDescriptor(held(t, s), d))
-	require.NoError(t, s.PutDescriptor(held(t, s), d), "the same content again, whatever its Go types, writes nothing")
-	changed := Descriptor{Digest: d.Digest, Capabilities: Capabilities{"ports": []any{1, 3}}}
+	require.NoError(t, s.PutDescriptor(held(t, s), d), "the same content again writes nothing")
+	changed := Descriptor{Digest: d.Digest, Capabilities: &oci.Capabilities{Ports: []oci.Port{{Container: "1"}, {Container: "3"}}}}
 	require.ErrorIs(t, s.PutDescriptor(held(t, s), changed), ErrImmutable)
+}
+
+func TestStore_Descriptors_holdTheNormalizedSetOfTheSittingKit(t *testing.T) {
+	empty := ""
+	tests := []struct {
+		name string
+		edit func(c *oci.Capabilities)
+	}{
+		{"a credential file with a structure", func(c *oci.Capabilities) {
+			c.Credentials = []oci.Credential{{
+				Service: "svc", Phases: []string{"runtime"},
+				OAuth: &oci.OAuth{CredentialFile: &oci.CredentialFile{Path: "/a.json", Structure: map[string]any{"a": 1.0, "b": map[string]any{"c": "d"}}}},
+			}}
+		}},
+		// A member present but empty is not a member absent: each reads
+		// back as it was written.
+		{"an empty default and pattern", func(c *oci.Capabilities) {
+			c.Args = map[string]oci.Arg{"host": {Default: &empty, Pattern: &empty}}
+		}},
+		{"an empty oauth", func(c *oci.Capabilities) {
+			c.Credentials = []oci.Credential{{Service: "svc", Phases: []string{"runtime"}, OAuth: &oci.OAuth{}}}
+		}},
+		{"an empty structure", func(c *oci.Capabilities) {
+			c.Credentials = []oci.Credential{{
+				Service: "svc", Phases: []string{"runtime"},
+				OAuth: &oci.OAuth{CredentialFile: &oci.CredentialFile{Path: "/a.json", Structure: map[string]any{}}},
+			}}
+		}},
+		{"an empty network", func(c *oci.Capabilities) { c.Network = &oci.Network{} }},
+		{"an empty resources", func(c *oci.Capabilities) { c.Resources = &oci.Resources{} }},
+	}
+	data, err := os.ReadFile("../../kits/git-ssh-sign/git-ssh-sign.yaml")
+	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kit, err := oci.ParseDescriptor(data)
+			require.NoError(t, err)
+			tt.edit(&kit.Capabilities)
+			d := Descriptor{Digest: "sha256:" + strings.Repeat("7", 64), Capabilities: &kit.Capabilities}
+			s := openTemp(t)
+
+			require.NoError(t, s.PutDescriptor(held(t, s), d))
+			require.NoError(t, s.PutDescriptor(held(t, s), d), "the same set again writes nothing")
+			got, err := s.GetDescriptor(d.Digest)
+
+			require.NoError(t, err)
+			assert.Equal(t, d.Capabilities, got.Capabilities, "the set reads back as it was written")
+		})
+	}
 }

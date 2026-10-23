@@ -52,7 +52,757 @@
                     "type": "object"
                   },
                   "capabilities": {
-                    "additionalProperties": {},
+                    "additionalProperties": false,
+                    "properties": {
+                      "args": {
+                        "additionalProperties": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "buildArg": {
+                              "type": "string"
+                            },
+                            "default": {
+                              "type": "string"
+                            },
+                            "enum": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "env": {
+                              "type": "string"
+                            },
+                            "pattern": {
+                              "type": "string"
+                            },
+                            "required": {
+                              "type": "boolean"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "type": "object"
+                      },
+                      "build": {
+                        "type": "string"
+                      },
+                      "context": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "content": {
+                              "type": "string"
+                            },
+                            "contentFile": {
+                              "type": "string"
+                            },
+                            "directory": {
+                              "type": "string"
+                            },
+                            "filename": {
+                              "type": "string"
+                            },
+                            "optional": {
+                              "type": "boolean"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "credentials": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "apiKey": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "inject": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "domain": {
+                                        "type": "string"
+                                      },
+                                      "format": {
+                                        "type": "string"
+                                      },
+                                      "header": {
+                                        "type": "string"
+                                      },
+                                      "scheme": {
+                                        "type": "string"
+                                      },
+                                      "username": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "domain"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "type": "array"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "proxyManaged": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "oauth": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "credentialFile": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "format": {
+                                      "type": "string"
+                                    },
+                                    "path": {
+                                      "type": "string"
+                                    },
+                                    "structure": {
+                                      "additionalProperties": {},
+                                      "type": "object"
+                                    }
+                                  },
+                                  "required": [
+                                    "path"
+                                  ],
+                                  "type": "object"
+                                },
+                                "passthrough": {
+                                  "type": "string"
+                                },
+                                "resourceHosts": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                },
+                                "responseFields": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "accessToken": {
+                                      "type": "string"
+                                    },
+                                    "expiresIn": {
+                                      "type": "string"
+                                    },
+                                    "refreshToken": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "type": "object"
+                                },
+                                "sentinels": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "accessToken": {
+                                      "type": "string"
+                                    },
+                                    "refreshToken": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "type": "object"
+                                },
+                                "tokenEndpoint": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "host": {
+                                      "type": "string"
+                                    },
+                                    "path": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "host"
+                                  ],
+                                  "type": "object"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "optional": {
+                              "type": "boolean"
+                            },
+                            "phases": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "service": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "phases",
+                            "service"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "devices": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "class": {
+                              "type": "string"
+                            },
+                            "optional": {
+                              "type": "boolean"
+                            },
+                            "productId": {
+                              "type": "string"
+                            },
+                            "vendorId": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "dockerfile": {
+                        "type": "string"
+                      },
+                      "flags": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "optional": {
+                              "type": "boolean"
+                            },
+                            "type": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "kits": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "args": {
+                              "additionalProperties": {
+                                "type": "string"
+                              },
+                              "type": "object"
+                            },
+                            "digest": {
+                              "type": "string"
+                            },
+                            "ref": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "ref"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "lifecycle": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "files": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "content": {
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "type": "string"
+                                },
+                                "mode": {
+                                  "type": "string"
+                                },
+                                "overwrite": {
+                                  "type": "string"
+                                },
+                                "path": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "content",
+                                "path"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "install": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "background": {
+                                  "type": "string"
+                                },
+                                "command": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "argv": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "shell": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "type": "object"
+                                },
+                                "description": {
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                },
+                                "user": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "command"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "interactive": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "startup": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "background": {
+                                  "type": "string"
+                                },
+                                "command": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "argv": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "shell": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "type": "object"
+                                },
+                                "description": {
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                },
+                                "user": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "command"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "network": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "install": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "allow": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "hosts": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "methods": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "paths": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "hosts"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "deny": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "hosts": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "methods": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "paths": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "hosts"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "runtime": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "allow": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "hosts": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "methods": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "paths": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "hosts"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "deny": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "hosts": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "methods": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "paths": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "hosts"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "ports": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "container": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "optional": {
+                              "type": "boolean"
+                            },
+                            "transport": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "container"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "relations": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "conflicts": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "integrates": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "provides": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "requires": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "version": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "resources": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cpu": {
+                            "type": "string"
+                          },
+                          "gpu": {
+                            "type": "string"
+                          },
+                          "memory": {
+                            "type": "string"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sessions": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "continue": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "list": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "argv": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "shell": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "prompt": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "resume": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "skills": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "discovery": {
+                              "type": "boolean"
+                            },
+                            "mode": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "optional": {
+                              "type": "boolean"
+                            },
+                            "path": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "path"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "sshAgent": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "authenticate": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "optional": {
+                              "type": "boolean"
+                            },
+                            "phases": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "sign": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "unrestricted": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "phases"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "volumes": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "type": "string"
+                            },
+                            "mode": {
+                              "type": "string"
+                            },
+                            "optional": {
+                              "type": "boolean"
+                            },
+                            "path": {
+                              "type": "string"
+                            },
+                            "size": {
+                              "type": "string"
+                            },
+                            "tmpfs": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "path"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
                     "type": "object"
                   },
                   "contentDigest": {
@@ -148,7 +898,757 @@
               "additionalProperties": false,
               "properties": {
                 "capabilities": {
-                  "additionalProperties": {},
+                  "additionalProperties": false,
+                  "properties": {
+                    "args": {
+                      "additionalProperties": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "buildArg": {
+                            "type": "string"
+                          },
+                          "default": {
+                            "type": "string"
+                          },
+                          "enum": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "env": {
+                            "type": "string"
+                          },
+                          "pattern": {
+                            "type": "string"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "object"
+                    },
+                    "build": {
+                      "type": "string"
+                    },
+                    "context": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "content": {
+                            "type": "string"
+                          },
+                          "contentFile": {
+                            "type": "string"
+                          },
+                          "directory": {
+                            "type": "string"
+                          },
+                          "filename": {
+                            "type": "string"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "credentials": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "apiKey": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "inject": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "domain": {
+                                      "type": "string"
+                                    },
+                                    "format": {
+                                      "type": "string"
+                                    },
+                                    "header": {
+                                      "type": "string"
+                                    },
+                                    "scheme": {
+                                      "type": "string"
+                                    },
+                                    "username": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "domain"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "proxyManaged": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "oauth": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "credentialFile": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "format": {
+                                    "type": "string"
+                                  },
+                                  "path": {
+                                    "type": "string"
+                                  },
+                                  "structure": {
+                                    "additionalProperties": {},
+                                    "type": "object"
+                                  }
+                                },
+                                "required": [
+                                  "path"
+                                ],
+                                "type": "object"
+                              },
+                              "passthrough": {
+                                "type": "string"
+                              },
+                              "resourceHosts": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "responseFields": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "accessToken": {
+                                    "type": "string"
+                                  },
+                                  "expiresIn": {
+                                    "type": "string"
+                                  },
+                                  "refreshToken": {
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              "sentinels": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "accessToken": {
+                                    "type": "string"
+                                  },
+                                  "refreshToken": {
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              "tokenEndpoint": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "host": {
+                                    "type": "string"
+                                  },
+                                  "path": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "host"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "phases": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "service": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "phases",
+                          "service"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "devices": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "class": {
+                            "type": "string"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "productId": {
+                            "type": "string"
+                          },
+                          "vendorId": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "dockerfile": {
+                      "type": "string"
+                    },
+                    "flags": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "kits": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "args": {
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "type": "object"
+                          },
+                          "digest": {
+                            "type": "string"
+                          },
+                          "ref": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "lifecycle": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "files": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "content": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "mode": {
+                                "type": "string"
+                              },
+                              "overwrite": {
+                                "type": "string"
+                              },
+                              "path": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "content",
+                              "path"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "install": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "background": {
+                                "type": "string"
+                              },
+                              "command": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "argv": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "shell": {
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "env": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "user": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "command"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "interactive": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "optional": {
+                          "type": "boolean"
+                        },
+                        "startup": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "background": {
+                                "type": "string"
+                              },
+                              "command": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "argv": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "shell": {
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "env": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "user": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "command"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "network": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "install": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "allow": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "hosts": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "methods": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "paths": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  }
+                                },
+                                "required": [
+                                  "hosts"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "deny": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "hosts": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "methods": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "paths": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  }
+                                },
+                                "required": [
+                                  "hosts"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "optional": {
+                          "type": "boolean"
+                        },
+                        "runtime": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "allow": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "hosts": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "methods": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "paths": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  }
+                                },
+                                "required": [
+                                  "hosts"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "deny": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "hosts": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "methods": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "paths": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  }
+                                },
+                                "required": [
+                                  "hosts"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "type": "object"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "ports": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "container": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "transport": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "container"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "relations": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "conflicts": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "integrates": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "provides": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "requires": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "version": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "resources": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": "string"
+                        },
+                        "gpu": {
+                          "type": "string"
+                        },
+                        "memory": {
+                          "type": "string"
+                        },
+                        "optional": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "sessions": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "continue": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "list": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "argv": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "shell": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "optional": {
+                          "type": "boolean"
+                        },
+                        "prompt": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "resume": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "skills": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "discovery": {
+                            "type": "boolean"
+                          },
+                          "mode": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "path": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "sshAgent": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "authenticate": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "phases": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "sign": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "unrestricted": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "phases"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "volumes": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "mode": {
+                            "type": "string"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "path": {
+                            "type": "string"
+                          },
+                          "size": {
+                            "type": "string"
+                          },
+                          "tmpfs": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "path"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
                   "type": "object"
                 },
                 "digest": {

@@ -22,10 +22,10 @@ changed members of the widening set:
   secrets:
     + {"argvDigest":"f6c541a8f52f370346803ed5aac3e294b1c3a234b2b071031b015534228c1849","name":"github","service":"github.com"}
   workload:
-    + {"capabilities":{"network":["registry.example"]},"digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","repository":"docker.io/example/dev"}
+    + {"capabilities":{"kind":"workload","network":{"runtime":{"allow":[{"hosts":["registry.example"]}]}}},"digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","repository":"docker.io/example/dev"}
   kits:
-    + {"args":{},"capabilities":{},"contentDigest":"7b465ea6f310a0549eb6614001d66785e495da50d458e27e904866fa6f6eeddb","id":"julieta","source":"product"}
-    + {"args":{"level":"1"},"capabilities":{"lifecycle":["postCreate"]},"contentDigest":"831b8ece07ab60f9d2f590a80ac8ca1c92b20db69fc0db5d5b954d74d1c3e78c","id":"tools","source":"personal"}
+    + {"args":{},"capabilities":{"kind":""},"contentDigest":"7b465ea6f310a0549eb6614001d66785e495da50d458e27e904866fa6f6eeddb","id":"julieta","source":"product"}
+    + {"args":{"level":"1"},"capabilities":{"kind":"mixin","lifecycle":{"interactive":["bash"]}},"contentDigest":"831b8ece07ab60f9d2f590a80ac8ca1c92b20db69fc0db5d5b954d74d1c3e78c","id":"tools","source":"personal"}
   egressGated:
     + {"domain":"foo.example","reason":"spec tool override"}
     + {"domain":"github.com","reason":"upload"}

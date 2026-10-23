@@ -12,6 +12,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 )
 
 // SHA256 is a plain sha256, the one of a file's bytes, which is none of
@@ -47,10 +48,6 @@ func (s *SHA256) UnmarshalText(text []byte) error {
 // the catalog (T-catalog); until then the record holds it as the JSON
 // object it is, as manifest.Run holds the run layout.
 type Catalog map[string]any
-
-// Capabilities is the parsed, normalized capability set of one
-// descriptor (REQ-0240); its Go type lands with internal/oci.
-type Capabilities map[string]any
 
 // Toolchain is toolchain.json, the record of gate 1 (03 3.8, REQ-0228):
 // what the operator acknowledged on this machine. The format is
@@ -225,8 +222,20 @@ type Salvage struct {
 type Descriptor struct {
 	// Schema is "state-descriptor/v1".
 	Schema string `json:"schema"`
-	// Digest is the OCI digest of the descriptor, sha256:<64 hex>.
+	// Digest is the OCI digest of the manifest the descriptor was read from
+	// (a workload's platform manifest), or the sha256 of a local kit's
+	// descriptor file; sha256:<64 hex>. It is the key of the cache.
 	Digest string `json:"digest"`
-	// Capabilities is the normalized capability set.
-	Capabilities Capabilities `json:"capabilities"`
+	// Workload is the digest of the workload reference (the index) the
+	// manifest was reached from, and Platform the os/arch[/variant] it
+	// was chosen for; both are absent for a local kit. When another index
+	// lists the same manifest the first one is kept.
+	Workload string `json:"workload,omitzero"`
+	// Platform is the platform of the manifest, with Workload.
+	Platform string `json:"platform,omitzero"`
+	// Capabilities is the normalized capability set, the type of
+	// internal/oci, the one parser of descriptors (REQ-0570). A pointer,
+	// so that a record without the member, or with null, is not read as
+	// an empty set.
+	Capabilities *oci.Capabilities `json:"capabilities"`
 }

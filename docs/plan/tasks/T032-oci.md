@@ -6,11 +6,18 @@ module: oci
 fate: kept
 owns:
   - internal/oci/**
+  - internal/state/load.go
+  - internal/state/records.go
+  - internal/state/records_test.go
+  - internal/state/validate.go
 needs:
   - T021
   - T113
-after: []
-ask_first: []
+after:
+  - T033
+ask_first:
+  - contracts
+  - gates
 sitting: none
 ---
 

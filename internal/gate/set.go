@@ -27,6 +27,7 @@ import (
 	"slices"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 )
 
 // Set is the widening set of 01 1.4: what gate 2 compares with the
@@ -93,7 +94,7 @@ type Workload struct {
 	Digest string `json:"digest"`
 	// Capabilities is the normalized capability set read from the
 	// workload descriptor.
-	Capabilities Capabilities `json:"capabilities"`
+	Capabilities oci.Capabilities `json:"capabilities"`
 }
 
 // The sources of a kit.
@@ -116,18 +117,11 @@ type Kit struct {
 	Args map[string]string `json:"args"`
 	// Capabilities is the normalized capability set of the kit's
 	// descriptor.
-	Capabilities Capabilities `json:"capabilities"`
+	Capabilities oci.Capabilities `json:"capabilities"`
 }
 
 // key is what names a kit in the set and in a diff: its source and id.
 func (k Kit) key() string { return k.Source + ":" + k.ID }
-
-// Capabilities is a normalized capability set (01 1.4): the network
-// domains per phase, mounts and volumes, credentials, ssh-agent use,
-// privileges and lifecycle hooks of one descriptor, keyed by type. Its
-// typed form lands with internal/oci, which parses the descriptors;
-// until then the set holds it as the JSON object it is.
-type Capabilities map[string]any
 
 // The reasons a domain is gated (01 1.4).
 const (
@@ -175,14 +169,12 @@ func normal(s Set) (Set, error) {
 	})
 	n.Ports = sortedCopy(s.Ports, cmp.Compare[string])
 	n.SalvageExcludes = sortedCopy(s.SalvageExcludes, cmp.Compare[string])
-	n.Workload.Capabilities = mapCopy(s.Workload.Capabilities)
 	n.Kits = make([]Kit, len(s.Kits))
 	for i, k := range s.Kits {
 		if k.Source != SourceProduct && k.Source != SourcePersonal {
 			return Set{}, fmt.Errorf("gate: the kit %q has the source %q; it is %q or %q", k.ID, k.Source, SourceProduct, SourcePersonal)
 		}
 		k.Args = mapCopy(k.Args)
-		k.Capabilities = mapCopy(k.Capabilities)
 		n.Kits[i] = k
 	}
 	dups := []struct {

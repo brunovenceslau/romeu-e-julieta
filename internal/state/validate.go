@@ -209,8 +209,21 @@ func (d *Descriptor) validate() error {
 	if d.Capabilities == nil {
 		errs = append(errs, errors.New("capabilities is missing"))
 	}
+	if (d.Workload == "") != (d.Platform == "") {
+		errs = append(errs, errors.New("workload and platform are set together or not at all"))
+	}
+	if d.Workload != "" && !ociDigest.MatchString(d.Workload) {
+		errs = append(errs, fmt.Errorf("workload %q is not sha256:<64 lowercase hex>", clip(d.Workload)))
+	}
+	if d.Platform != "" && !platformForm.MatchString(d.Platform) {
+		errs = append(errs, fmt.Errorf("platform %q is not os/arch or os/arch/variant", clip(d.Platform)))
+	}
 	return errors.Join(errs...)
 }
+
+// platformForm is os/arch or os/arch/variant, in the names of an OCI
+// image index.
+var platformForm = regexp.MustCompile(`^[a-z0-9]+/[a-z0-9]+(/[a-z0-9]+)?$`)
 
 // stamp returns t in UTC at whole seconds, the form of every timestamp
 // romeu writes (REQ-0162).

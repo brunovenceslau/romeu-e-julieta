@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 )
 
@@ -37,7 +38,7 @@ var setMembers = map[string]string{
 type Resolved struct {
 	// WorkloadCapabilities is the normalized capability set of the
 	// workload descriptor.
-	WorkloadCapabilities Capabilities
+	WorkloadCapabilities oci.Capabilities
 	// Kits are the files and capabilities of each kit of the spec, in
 	// the spec's order.
 	Kits []ResolvedKit
@@ -58,7 +59,7 @@ type ResolvedKit struct {
 	Files []File
 	// Capabilities is the normalized capability set of the kit's
 	// descriptor.
-	Capabilities Capabilities
+	Capabilities oci.Capabilities
 }
 
 // Build returns the widening set of the validated project spec p, with
@@ -135,10 +136,12 @@ func Build(p spec.Project, hs spec.HostSettings, r Resolved) (Set, error) {
 }
 
 // checkRoundTrip refuses a set whose digest would change once the set is
-// written as JSON and read back, as the approval record does: an
-// integer of a capability set beyond 2^53 reads back as a float64. So
-// the digest of a recorded set can be computed again from the record
-// and compared, and a set that could not be is never approved.
+// written as JSON and read back, as the approval record does: a whole
+// number beyond 2^53 in the structure of a credential file, the one
+// member of oci.Capabilities that holds any JSON value, reads back as a
+// float64. So the digest of a recorded set can be computed again from
+// the record and compared, and a set that could not be is never
+// approved.
 func checkRoundTrip(n Set) error {
 	data, err := json.Marshal(n)
 	if err != nil {
