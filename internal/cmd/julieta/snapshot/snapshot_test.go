@@ -19,6 +19,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli/testsupport"
 	_ "github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/hooks"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	_ "github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/snapshot"
@@ -128,6 +129,7 @@ func commit(t *testing.T, dir, msg string) string {
 // golden compares got with testdata/name, or rewrites it with -update.
 func golden(t *testing.T, name string, got []byte) {
 	t.Helper()
+	testsupport.FailOnUpdateInCI(t, *update)
 	p := filepath.Join(testdata, name)
 	if *update {
 		require.NoError(t, os.WriteFile(p, got, 0o644))

@@ -50,6 +50,10 @@ type Package struct {
 	// Deps are the packages it links, directly or through another,
 	// test files left out: what "go list -deps" lists.
 	Deps []string
+	// TemplateImporters are the packages among it and its Deps that
+	// import text/template themselves, of this module or another, the
+	// standard library included: what the I11 rule judges.
+	TemplateImporters []string
 }
 
 // listed is the part of the output of "go list -json" the check reads.
@@ -59,9 +63,12 @@ type listed struct {
 	TestImports  []string
 	XTestImports []string
 	Deps         []string
-	Module       *struct{ Path string }
+	// DepOnly marks a package "./..." does not match, which -deps
+	// lists because a package of the module links it.
+	DepOnly bool
+	Module  *struct{ Path string }
 	// Error and DepsErrors say that the package or one it imports does
-	// not load: in JSON mode go list reports them here and exits 0.
+	// not load: with -e, go list reports them here and exits 0.
 	Error      *listError
 	DepsErrors []*listError
 }
@@ -70,7 +77,7 @@ type listed struct {
 type listError struct{ Err string }
 
 // listFields are the fields of listed, for "go list -json=...".
-const listFields = "ImportPath,Imports,TestImports,XTestImports,Deps,Module,Error,DepsErrors"
+const listFields = "ImportPath,Imports,TestImports,XTestImports,Deps,DepOnly,Module,Error,DepsErrors"
 
 // tagSets are the build tags each listing runs with: none, and those of
 // the tagged suites (taggedsuites.Tags), whose test files a listing
@@ -79,16 +86,20 @@ var tagSets = [][]string{nil, {"-tags", taggedsuites.Tags()}}
 
 // Load lists the packages of the module at dir with the go command
 // goBin, once for each of lint.Targets and each of tagSets, and returns
-// their union, sorted by path. A package that does not load is an error.
+// their union, sorted by path. Each listing holds the dependencies too
+// (-deps), so the I11 rule sees which package, of any module, imports
+// text/template. A package of the module that does not load, or imports
+// one that does not, is an error.
 func Load(ctx context.Context, goBin, dir string) ([]Package, error) {
 	byPath := map[string]*Package{}
+	importers := map[string]bool{}
 	for _, tags := range tagSets {
 		for _, target := range lint.Targets {
 			what := strings.Join(slices.Concat([]string{"go list"}, tags, []string{"for", target.String()}), " ")
 			var stdout, stderr bytes.Buffer
 			err := procgroup.Run(ctx, procgroup.Command{
 				Class:  procgroup.ToolStep,
-				Argv:   slices.Concat([]string{goBin, "list"}, tags, []string{"-json=" + listFields, "./..."}),
+				Argv:   slices.Concat([]string{goBin, "list"}, tags, []string{"-e", "-deps", "-json=" + listFields, "./..."}),
 				Dir:    dir,
 				Env:    lint.Env(target, filepath.Dir(goBin)),
 				Stdout: &stdout,
@@ -97,21 +108,29 @@ func Load(ctx context.Context, goBin, dir string) ([]Package, error) {
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w\n%s", what, err, bytes.TrimSpace(stderr.Bytes()))
 			}
-			if err := merge(byPath, &stdout); err != nil {
+			if err := merge(byPath, importers, &stdout); err != nil {
 				return nil, fmt.Errorf("%s: %w", what, err)
 			}
 		}
 	}
 	var pkgs []Package
 	for _, p := range slices.Sorted(maps.Keys(byPath)) {
-		pkgs = append(pkgs, *byPath[p])
+		pkg := byPath[p]
+		for _, q := range append([]string{p}, pkg.Deps...) {
+			if importers[q] {
+				pkg.TemplateImporters = append(pkg.TemplateImporters, q)
+			}
+		}
+		pkgs = append(pkgs, *pkg)
 	}
 	return pkgs, nil
 }
 
-// merge decodes the stream of JSON objects "go list -json" prints and
-// adds each package to byPath, the union of what each target lists.
-func merge(byPath map[string]*Package, r io.Reader) error {
+// merge decodes the stream of JSON objects "go list -deps -json" prints
+// and adds each package of the module to byPath, the union of what each
+// target lists; of every package, of the module or not, that imports
+// text/template it adds the path to importers.
+func merge(byPath map[string]*Package, importers map[string]bool, r io.Reader) error {
 	dec := jsontext.NewDecoder(r)
 	for {
 		var l listed
@@ -119,6 +138,14 @@ func merge(byPath map[string]*Package, r io.Reader) error {
 			return nil
 		} else if err != nil {
 			return err
+		}
+		if l.DepOnly {
+			// A dependency that does not load is reported by the package
+			// of the module that imports it, in its DepsErrors.
+			if slices.Contains(l.Imports, renderForbidden) {
+				importers[l.ImportPath] = true
+			}
+			continue
 		}
 		if l.Error != nil {
 			return fmt.Errorf("%s: %s", l.ImportPath, l.Error.Err)
@@ -145,6 +172,9 @@ func merge(byPath map[string]*Package, r io.Reader) error {
 		p.Imports = union(p.Imports, rel(l.Imports))
 		p.TestImports = union(p.TestImports, rel(l.TestImports, l.XTestImports))
 		p.Deps = union(p.Deps, rel(l.Deps))
+		if slices.Contains(l.Imports, renderForbidden) {
+			importers[path] = true
+		}
 	}
 }
 
@@ -455,16 +485,40 @@ func hostMemWriteFindings(pkgs []Package) []check.Finding {
 // renderPath is the package the I11 rule judges.
 const renderPath = "internal/render"
 
-// renderFindings holds internal/render to I11: it links no
-// text/template, so YAML and JSON are written only through marshallers.
+// renderFindings holds internal/render to I11: no package it links, of
+// this module or another, imports text/template, so YAML and JSON are
+// written only through marshallers. One exception, by name: the cobra
+// packages, which internal/cli links for the command tree; their help
+// and usage templates are not used, since internal/cli sets its own
+// (ADR 0015, rule 5). Any other importer is a finding that names it.
 // The package does not exist before its task lands; Notes says so, as
 // the rule then judges nothing.
 func renderFindings(pkgs []Package) []check.Finding {
-	if p := find(pkgs, renderPath); p != nil && slices.Contains(p.Deps, renderForbidden) {
-		return []check.Finding{{Where: p.Path, Rule: ruleI11,
-			Msg: "links " + renderForbidden + ": YAML and JSON are written only through marshallers (I11)"}}
+	p := find(pkgs, renderPath)
+	if p == nil {
+		return nil
 	}
-	return nil
+	var out []check.Finding
+	for _, q := range p.TemplateImporters {
+		if isCobra(pkgs, q) {
+			continue
+		}
+		via := ""
+		if q != p.Path {
+			via = ", imported by " + q
+		}
+		out = append(out, check.Finding{Where: p.Path, Rule: ruleI11,
+			Msg: "links " + renderForbidden + via + ": YAML and JSON are written only through marshallers (I11)"})
+	}
+	return out
+}
+
+// isCobra reports whether q is a package of the cobra module: its path
+// is the module's or below it, and it is not a package of this module,
+// whose paths the listing keeps relative, so a directory of this module
+// named github.com/spf13/cobra is not exempt.
+func isCobra(pkgs []Package, q string) bool {
+	return (q == cobraModule || strings.HasPrefix(q, cobraModule+"/")) && find(pkgs, q) == nil
 }
 
 // Notes returns the lines the subcommand prints above its summary for a

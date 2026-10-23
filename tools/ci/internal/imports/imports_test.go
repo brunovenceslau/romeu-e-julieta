@@ -561,3 +561,122 @@ func TestImportsRowsAreTheTableOf107(t *testing.T) {
 func TestTagSets(t *testing.T) {
 	assert.Equal(t, [][]string{nil, {"-tags", "e2e"}}, tagSets)
 }
+
+// withModules adds modules outside the fixture module to the module at
+// dir, each replaced by a directory below _mods, which "./..." leaves
+// out: mods maps the import path of each package to what it imports, and
+// modules names the module each package belongs to.
+func withModules(t *testing.T, dir string, modules []string, mods map[string][]string) {
+	t.Helper()
+	gomod := "\nrequire (\n"
+	replace := "\nreplace (\n"
+	for _, m := range modules {
+		gomod += "\t" + m + " v0.0.0\n"
+		local := "./_mods/" + strings.ReplaceAll(m, "/", "_")
+		replace += "\t" + m + " => " + local + "\n"
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, filepath.FromSlash(local)), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, filepath.FromSlash(local), "go.mod"), []byte("module "+m+"\n\ngo 1.22\n"), 0o600))
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "go.mod"), os.O_APPEND|os.O_WRONLY, 0)
+	require.NoError(t, err)
+	_, err = f.WriteString(gomod + ")\n" + replace + ")\n")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	for p, imports := range mods {
+		var mod string
+		for _, m := range modules {
+			if p == m || strings.HasPrefix(p, m+"/") {
+				mod = m
+			}
+		}
+		require.NotEmpty(t, mod, "the module of %s", p)
+		rel := strings.TrimPrefix(strings.TrimPrefix(p, mod), "/")
+		pkgDir := filepath.Join(dir, "_mods", strings.ReplaceAll(mod, "/", "_"), filepath.FromSlash(rel))
+		require.NoError(t, os.MkdirAll(pkgDir, 0o755))
+		src := "package " + path.Base(p) + "\n\n"
+		for _, imp := range imports {
+			src += importLine(imp)
+		}
+		require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "p.go"), []byte(src), 0o600))
+	}
+}
+
+// The I11 rule judges every package internal/render links, of this
+// module or another, and exempts by name the cobra packages alone, whose
+// template help internal/cli does not use (ADR 0015, rule 5): each path
+// to text/template through another importer is a finding that names it.
+//
+//romeu:invariant I11 test
+func TestRenderI11ExemptsCobraByName(t *testing.T) {
+	const (
+		cobra = "github.com/spf13/cobra"
+		tmpl  = "example.com/tmpl"
+		wrap  = "example.com/wrap"
+	)
+	mods := map[string][]string{
+		cobra:          {"text/template"},
+		cobra + "/doc": {"text/template", cobra},
+		tmpl:           {"text/template"},
+		wrap:           {cobra},
+	}
+	const msg = ": YAML and JSON are written only through marshallers (I11)"
+	tests := []struct {
+		name   string
+		change map[string]pkg
+		want   []string
+	}{
+		{
+			name: "cobra, linked through internal/cli",
+			change: map[string]pkg{
+				"internal/cli":    {imports: []string{"internal/termsafe", cobra, cobra + "/doc"}},
+				"internal/render": {imports: []string{"encoding/json/v2", "internal/cli"}},
+			},
+		},
+		{
+			name:   "another module that reaches text/template only through cobra",
+			change: map[string]pkg{"internal/render": {imports: []string{wrap}}},
+		},
+		{
+			name:   "another module that imports text/template",
+			change: map[string]pkg{"internal/render": {imports: []string{tmpl}}},
+			want:   []string{"internal/render: imports I11: links text/template, imported by " + tmpl + msg},
+		},
+		{
+			name: "a package of this module that imports text/template",
+			change: map[string]pkg{
+				"internal/canon":  {imports: []string{"text/template"}},
+				"internal/render": {imports: []string{"internal/canon"}},
+			},
+			want: []string{"internal/render: imports I11: links text/template, imported by internal/canon" + msg},
+		},
+		{
+			name:   "the standard library's html/template",
+			change: map[string]pkg{"internal/render": {imports: []string{"html/template"}}},
+			want:   []string{"internal/render: imports I11: links text/template, imported by html/template" + msg},
+		},
+		{
+			name: "a package of this module at a cobra path is not cobra",
+			change: map[string]pkg{
+				"github.com/spf13/cobra/x": {imports: []string{"text/template"}},
+				"internal/render":          {imports: []string{citest.FixtureModule + "/github.com/spf13/cobra/x"}},
+			},
+			want: []string{"internal/render: imports I11: links text/template, imported by github.com/spf13/cobra/x" + msg},
+		},
+		{
+			name:   "render itself",
+			change: map[string]pkg{"internal/render": {imports: []string{"text/template", cobra}}},
+			want:   []string{"internal/render: imports I11: links text/template" + msg},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tree := baseTree()
+			maps.Copy(tree, tt.change)
+			dir := writeTree(t, tree)
+			withModules(t, dir, []string{cobra, "example.com/tmpl", "example.com/wrap"}, mods)
+			pkgs, err := Load(t.Context(), goCommand(t), dir)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, findings(pkgs))
+		})
+	}
+}

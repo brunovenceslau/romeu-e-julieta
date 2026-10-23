@@ -1,0 +1,29 @@
+schemaVersion: "1"
+name: shop
+agent: sbx-kit-claude
+workspace: ./shop-api
+additionalWorkspaces:
+  - ./memory/shop-api
+  - ./memory/shop-web
+  - path: ./.romeu/bin
+    readOnly: true
+kits:
+  - source: docker.io/docker/sbx-kit-claude@sha256:c0132e89a89d94ddca3984513afdb36be57bd087fcc75823a4d14064b6a39ea5
+  - source: ./.romeu/kits/julieta-111111111111
+  - source: ./.romeu/kits/julieta-claude-222222222222
+    args:
+      julietaBin: /home/agent/dev/shop-env/.romeu/bin
+  - source: ./.romeu/kits/os-base-333333333333
+    args:
+      tz: Etc/UTC
+  - source: ./.romeu/kits/git-ssh-sign-444444444444
+    args:
+      signingKey: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyOnly
+  - source: ./.romeu/kits/my-home-555555555555
+sandboxOptions:
+  cpus: 4
+  memory: 8g
+secrets:
+  github:
+    command: /usr/bin/env -i HOME=/home/agent PATH=/usr/bin:/bin /usr/bin/security find-generic-password -s romeu/shop/github -w
+ports: []
