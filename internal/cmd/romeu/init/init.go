@@ -51,10 +51,6 @@ var (
 // <cfg>-env/ (02 2.3, REQ-0141).
 const dirMode = 0o700
 
-// maxHelper bounds --git-credential-helper: PATH_MAX of macOS, the
-// shorter of the two systems romeu runs on (gitsafe holds the same cap).
-const maxHelper = 1024
-
 // configFileLimit bounds the config project's spec read from the clone.
 const configFileLimit = spec.MaxFileSize
 
@@ -79,7 +75,7 @@ var _ = cli.Register(func() cli.Command {
 		f.StringVar(&o.project, "config-project", "", "the config project's name (default: the repo's name)")
 		f.StringVar(&o.root, "root", "", "the absolute root of the host tree (default: $HOME/dev)")
 		f.StringVar(&o.ref, "config-ref", defaultRef, "the branch that holds projects/<name>.yaml")
-		f.StringVar(&o.helper, "git-credential-helper", "", "the git credential helper of a private config repo: a git-credential-<name> helper's name or an absolute path; recorded as tools.gitCredentialHelper")
+		f.StringVar(&o.helper, "git-credential-helper", "", "the git credential helper of a private config repo, for its host only: a git-credential-<name> helper's name, or the absolute path of an executable only you or root can write; recorded as tools.gitCredentialHelper. Git may send it erase when the origin refuses a credential, which deletes what a storing helper (osxkeychain, store) holds")
 		_ = cmd.MarkFlagRequired("config-url")
 		return cmd
 	}
@@ -179,7 +175,7 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 		return err
 	}
 
-	rt, envDir, err := openTree(cmd, h.Root, h.Config.Project+"-env")
+	rt, envDir, made, err := openTree(cmd, h.Root, h.Config.Project+"-env")
 	if err != nil {
 		return err
 	}
@@ -198,12 +194,18 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 	defer func() { _ = pending.Cleanup() }()
 	dest, err := cloneConfig(ctx, cmd, g, h, rt, envDir)
 	if err != nil {
-		return err
+		// Nothing of this run is left: the env dir and the root, when
+		// this run made them and they are empty (a decision of
+		// 2026-10-23).
+		made.undo(rt, filepath.Base(envDir), h.Root)
+		return refusal(cmd, err)
 	}
 	if err := commitSettings(cmd, pending, settings, data); err != nil {
 		// dest is this run's clone: absent proved <envDir>/<dir> did not
 		// exist, so nothing of the operator's goes with it.
-		return errors.Join(err, os.RemoveAll(dest))
+		err = errors.Join(err, os.RemoveAll(dest))
+		made.undo(rt, filepath.Base(envDir), h.Root)
+		return err
 	}
 	_, err = fmt.Fprintf(env.Stdout, "settings  %s\nroot      %s\nconfig    %s\n", termsafe.Escape(settings), termsafe.Escape(h.Root), termsafe.Escape(dest))
 	return err
@@ -287,10 +289,10 @@ func build(cmd *cobra.Command, o options, home string) (spec.HostSettings, error
 		Config: spec.ConfigRepo{Project: o.project, URL: o.configURL, Ref: o.ref},
 	}
 	// The helper is validated with the rest of the settings (REQ-1267),
-	// before anything is written; maxHelper bounds it first, so a long
+	// before anything is written; gitsafe's cap bounds it first, so a long
 	// value is never echoed back.
-	if len(o.helper) > maxHelper {
-		return zero, usage(cmd, fmt.Sprintf("tools.gitCredentialHelper: the value has %d bytes, over the cap of %d", len(o.helper), maxHelper))
+	if len(o.helper) > gitsafe.MaxCredentialHelper {
+		return zero, usage(cmd, fmt.Sprintf("tools.gitCredentialHelper: the value has %d bytes, over the cap of %d", len(o.helper), gitsafe.MaxCredentialHelper))
 	}
 	h.Tools.GitCredentialHelper = o.helper
 	return h, nil
@@ -326,6 +328,13 @@ func tools(cmd *cobra.Command, h *spec.HostSettings, home string) (*gitsafe.Runn
 	}
 	if err := validate(cmd, *h); err != nil {
 		return nil, err
+	}
+	// A helper at a path that someone else could write is refused here,
+	// before anything is written, as every command that runs it does.
+	if h.Tools.GitCredentialHelper != "" {
+		if err := gitsafe.CheckCredentialHelperFile(h.Tools.GitCredentialHelper); err != nil {
+			return nil, usage(cmd, "tools.gitCredentialHelper: "+termsafe.Escape(err.Error()))
+		}
 	}
 	g, err := gitsafe.New(gitsafe.Config{Mode: gitsafe.Host, Git: h.Tools.Git, Home: home})
 	if err != nil {
@@ -377,35 +386,58 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 // between is caught. A directory init made is 0700; one that was there
 // is chmod'ed through the handle only when the checks passed, and never
 // followed out of the root.
-func openTree(cmd *cobra.Command, root, envName string) (*os.Root, string, error) {
+func openTree(cmd *cobra.Command, root, envName string) (*os.Root, string, made, error) {
+	var m made
+	if _, err := os.Lstat(root); errors.Is(err, fs.ErrNotExist) {
+		m.root = true
+	}
 	if err := os.MkdirAll(root, dirMode); err != nil {
-		return nil, "", fmt.Errorf("init: the root: %w", err)
+		return nil, "", m, fmt.Errorf("init: the root: %w", err)
 	}
 	if why := dirProblem(os.Lstat, root); why != "" {
-		return nil, "", refuse(cmd, "root-unsafe", "the root "+why)
+		return nil, "", m, refuse(cmd, "root-unsafe", "the root "+why)
 	}
 	rt, err := os.OpenRoot(root)
 	if err != nil {
-		return nil, "", fmt.Errorf("init: the root: %w", err)
+		return nil, "", m, fmt.Errorf("init: the root: %w", err)
 	}
-	created := false
 	if err := rt.Mkdir(envName, dirMode); err == nil {
-		created = true
+		m.env = true
 	} else if !errors.Is(err, fs.ErrExist) {
 		_ = rt.Close()
-		return nil, "", fmt.Errorf("init: %w", err)
+		return nil, "", m, fmt.Errorf("init: %w", err)
 	}
 	if why := dirProblem(rt.Lstat, envName); why != "" {
 		_ = rt.Close()
-		return nil, "", refuse(cmd, "root-unsafe", envName+" "+why)
+		return nil, "", m, refuse(cmd, "root-unsafe", envName+" "+why)
 	}
-	if !created {
+	if !m.env {
 		if err := rt.Chmod(envName, dirMode); err != nil {
 			_ = rt.Close()
-			return nil, "", fmt.Errorf("init: %w", err)
+			return nil, "", m, fmt.Errorf("init: %w", err)
 		}
 	}
-	return rt, filepath.Join(root, envName), nil
+	return rt, filepath.Join(root, envName), m, nil
+}
+
+// made says which directories of the tree this run of init created: the
+// root (the last element of its path only) and the env dir.
+type made struct {
+	root, env bool
+}
+
+// undo removes the env dir and then the root, each only when this run
+// made it and it is empty: os.Remove refuses a directory that is not,
+// so nothing that appeared meanwhile goes with it. The env dir goes
+// through rt, so a link planted in its place is not followed. Its
+// failures are not the command's: the error that led here is.
+func (m made) undo(rt *os.Root, envName, root string) {
+	if m.env {
+		_ = rt.Remove(envName)
+	}
+	if m.root {
+		_ = os.Remove(root)
+	}
 }
 
 // configDir reads projects/<cfg>.yaml at the config ref of the clone
@@ -463,9 +495,11 @@ func configDir(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h spe
 // cloneError returns config-clone-failed (RJ-356) for a git clone that
 // exited non-zero, with git's output, which gitsafe escaped and cut to
 // its first 4 KiB, in the details; any other error passes through: an
-// error of the table, a timeout, a cancellation, a refusal of gitsafe.
-// Git prints no credential a helper gave it, and the URL holds none
-// (CheckURL refuses user information).
+// error of the table, a timeout, a cancellation, a refusal of gitsafe
+// (refusal). Git itself prints no credential a helper gave it, and the
+// URL holds none (CheckURL refuses user information); what a helper
+// writes to its own standard error is git's standard error too, and is
+// not filtered.
 func cloneError(err error, configURL string) error {
 	if _, ok := errors.AsType[*cli.Error](err); ok {
 		return err
@@ -476,6 +510,20 @@ func cloneError(err error, configURL string) error {
 	return ConfigCloneFailed.New("git could not clone the config repo",
 		cli.Detail{Key: "config.url", Value: termsafe.Escape(configURL)},
 		cli.Detail{Key: "git", Value: termsafe.Escape(err.Error())})
+}
+
+// refusal returns the error usage (RJ-349) for an error of the clone or
+// of the reads of the config repo that gitsafe refused before git ran
+// (ErrRefused, ErrConfig): an input init cannot take, not a defect.
+// Any other error passes through.
+func refusal(cmd *cobra.Command, err error) error {
+	if _, ok := errors.AsType[*cli.Error](err); ok {
+		return err
+	}
+	if errors.Is(err, gitsafe.ErrRefused) || errors.Is(err, gitsafe.ErrConfig) {
+		return usage(cmd, termsafe.Escape(err.Error()))
+	}
+	return err
 }
 
 // floorError returns the error git-floor (RJ-344) as the row of the

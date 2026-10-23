@@ -353,14 +353,13 @@ func privateSetup(t *testing.T) (*romeu.Env, []string) {
 	return romeu.New(t, o), []string{"init", "--config-url", url}
 }
 
-// assertNothingLeft holds that init wrote no settings and left no clone
-// and no staging directory under the root.
+// assertNothingLeft holds that init wrote no settings and left nothing
+// under the root: no clone, no staging directory, and neither the env
+// dir nor the root, which this run made.
 func assertNothingLeft(t *testing.T, e *romeu.Env) {
 	t.Helper()
 	assert.NoFileExists(t, e.Settings())
-	envs, err := filepath.Glob(filepath.Join(e.Root, "*-env", "*"))
-	require.NoError(t, err)
-	assert.Empty(t, envs, "no clone and no staging directory")
+	assert.NoDirExists(t, e.Root, "the root this run made is removed")
 }
 
 // TestInitPrivateConfigRepoWithoutAHelper reproduces the failure of
@@ -455,4 +454,21 @@ func TestInitRefusesACredentialHelperGitRunsAsShell(t *testing.T) {
 			assert.NoDirExists(t, e.Root)
 		})
 	}
+}
+
+// TestInitRefusesAHelperOthersCanWrite: a helper script that its group
+// can write is refused with exit 2 and the rule, before anything is
+// written; git never runs it.
+func TestInitRefusesAHelperOthersCanWrite(t *testing.T) {
+	e, args := privateSetup(t)
+	helper := e.WriteCredentialHelper(t, "operator", "s3cret-token")
+	require.NoError(t, os.Chmod(helper, 0o770))
+
+	res := e.Run(t, append(args, "--git-credential-helper", helper))
+
+	assert.Equal(t, 2, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "is writable by its group or others")
+	assert.NoFileExists(t, e.Settings())
+	assert.NoDirExists(t, e.StateDir())
+	assert.NoDirExists(t, e.Root)
 }

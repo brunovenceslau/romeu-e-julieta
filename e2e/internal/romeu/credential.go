@@ -26,6 +26,11 @@ func NewAuthOrigins(tb testing.TB, user, password string) *Origins {
 	open := NewOrigins(tb)
 	o := *open
 	o.srv = httptest.NewTLSServer(basicAuth{next: open.srv.Config.Handler, user: user, password: password})
+	// The open server would serve the same repositories without the
+	// credentials; nothing reaches it, and closing it makes sure. Its
+	// handler lives on in the new server, and its own cleanup closes it
+	// again, which httptest allows.
+	open.srv.Close()
 	tb.Cleanup(o.srv.Close)
 	o.ca = filepath.Join(filepath.Dir(open.ca), "auth-ca.pem")
 	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: o.srv.Certificate().Raw})

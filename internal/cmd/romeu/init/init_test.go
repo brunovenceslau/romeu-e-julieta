@@ -169,7 +169,7 @@ func TestInitRefusals(t *testing.T) {
 		}, 2, "clone-exists"},
 		{"an origin that is not there", projectSpec, []string{"--config-url", "https://github.com/owner/missing"}, nil, 1, "RJ-356 config-clone-failed"},
 		{"a credential helper git runs as shell", projectSpec, []string{"--config-url", url, "--git-credential-helper", "!gh auth git-credential"}, nil, 2, "tools.gitCredentialHelper"},
-		{"a credential helper over the cap", projectSpec, []string{"--config-url", url, "--git-credential-helper", "/" + strings.Repeat("a", maxHelper)}, nil, 2, "over the cap"},
+		{"a credential helper over the cap", projectSpec, []string{"--config-url", url, "--git-credential-helper", "/" + strings.Repeat("a", gitsafe.MaxCredentialHelper)}, nil, 2, "over the cap"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := newMachine(t, tc.spec)
@@ -459,13 +459,44 @@ func TestInitCloneErrors(t *testing.T) {
 		assert.Contains(t, stderr, "a private config repo needs --git-credential-helper")
 		assert.NotContains(t, stderr, "RJ-348")
 	})
-	t.Run("a refusal of gitsafe", func(t *testing.T) {
+	t.Run("a refusal of gitsafe is usage, not internal", func(t *testing.T) {
 		m := newMachine(t, projectSpec)
 
 		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/refused")
 
-		assert.Equal(t, 1, code, stderr)
+		assert.Equal(t, 2, code, stderr)
+		assert.Contains(t, stderr, "RJ-349")
+		assert.Contains(t, stderr, "a refusal of gitsafe")
+		assert.NotContains(t, stderr, "RJ-348")
 		assert.NotContains(t, stderr, "config-clone-failed")
+	})
+	t.Run("the root and the env dir this run made are removed", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing")
+
+		assert.Equal(t, 1, code, stderr)
+		assert.NoDirExists(t, filepath.Join(m.home, "dev"))
+	})
+	t.Run("a root that was there stays, and so does a non-empty env dir", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+		keep := filepath.Join(m.home, "dev", "cfg-env", "keep")
+		require.NoError(t, os.MkdirAll(keep, 0o700))
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing")
+
+		assert.Equal(t, 1, code, stderr)
+		assert.DirExists(t, keep)
+	})
+	t.Run("an empty root that was there stays", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+		require.NoError(t, os.Mkdir(filepath.Join(m.home, "dev"), 0o700))
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing")
+
+		assert.Equal(t, 1, code, stderr)
+		assert.DirExists(t, filepath.Join(m.home, "dev"))
+		assert.NoDirExists(t, filepath.Join(m.home, "dev", "cfg-env"))
 	})
 }
 
@@ -473,9 +504,12 @@ func TestInitCloneErrors(t *testing.T) {
 // the clone and the settings as tools.gitCredentialHelper; without the
 // flag the clone has none and the settings name none.
 func TestInitRecordsTheCredentialHelper(t *testing.T) {
-	for name, helper := range map[string]string{"none": "", "a name": "osxkeychain", "a path": "/opt/homebrew/bin/git-credential-gh"} {
+	for name, helper := range map[string]string{"none": "", "a name": "osxkeychain", "a path": "@script"} {
 		t.Run(name, func(t *testing.T) {
 			m := newMachine(t, projectSpec)
+			if helper == "@script" {
+				helper = m.helperScript(t, 0o700)
+			}
 			args := []string{"--config-url", "https://github.com/owner/cfg"}
 			if helper != "" {
 				args = append(args, "--git-credential-helper", helper)
@@ -492,6 +526,51 @@ func TestInitRecordsTheCredentialHelper(t *testing.T) {
 			} else {
 				assert.Contains(t, string(data), "gitCredentialHelper: "+helper)
 			}
+		})
+	}
+}
+
+// helperScript writes an executable credential helper of the given mode
+// in the machine's bin and returns its path.
+func (m *machine) helperScript(t *testing.T, mode os.FileMode) string {
+	t.Helper()
+	p := filepath.Join(m.bin, "git-credential-test")
+	require.NoError(t, os.WriteFile(p, []byte("#!/bin/sh\n"), 0o700))
+	require.NoError(t, os.Chmod(p, mode))
+	return p
+}
+
+// TestInitRefusesAHelperOthersCanWrite: an absolute-path helper that is
+// not a regular executable file of the user's or root's, or that sits in
+// a directory others can write, is a usage error naming the rule, before
+// anything is written and before any clone.
+func TestInitRefusesAHelperOthersCanWrite(t *testing.T) {
+	for _, tc := range []struct {
+		name, rule string
+		helper     func(m *machine) string
+	}{
+		{"writable by the group", "is writable by its group or others", func(m *machine) string { return m.helperScript(t, 0o770) }},
+		{"not executable", "is not executable", func(m *machine) string { return m.helperScript(t, 0o600) }},
+		{"missing", "cannot be resolved", func(m *machine) string { return filepath.Join(m.bin, "none") }},
+		{"in a directory others can write", "is writable by its group or others", func(m *machine) string {
+			p := m.helperScript(t, 0o700)
+			require.NoError(t, os.Chmod(m.bin, 0o777))
+			return p
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newMachine(t, projectSpec)
+			helper := tc.helper(m)
+
+			code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/cfg", "--git-credential-helper", helper)
+
+			assert.Equal(t, 2, code, stderr)
+			assert.Contains(t, stderr, "RJ-349")
+			assert.Contains(t, stderr, tc.rule)
+			assert.Empty(t, m.helpers, "no clone ran")
+			assert.NoFileExists(t, m.settings())
+			assert.NoDirExists(t, filepath.Join(m.home, "dev"))
+			assert.NoDirExists(t, m.env["XDG_STATE_HOME"])
 		})
 	}
 }
