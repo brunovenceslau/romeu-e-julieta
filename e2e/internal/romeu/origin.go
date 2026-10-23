@@ -15,7 +15,9 @@ import (
 	"net/http/httptest"
 	"net/textproto"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -185,10 +187,39 @@ func lookGit(tb testing.TB) string {
 // keeps that import to internal/procgroup, so this is the small part of
 // it that git needs: the request line, the body and the git headers in,
 // the status, the headers and the body out.
-type cgiBackend struct{ path, root string }
+type cgiBackend struct {
+	path, root string
+	// limit caps the request body; zero is maxBody.
+	limit int64
+}
+
+// maxBody caps a request body: a push of a fixture is small.
+const maxBody = 32 << 20
+
+// requestOK reports whether p is /owner/repo or below it, clean, with
+// no .. element: the one shape of a git request, so that the path handed
+// to the backend cannot leave GIT_PROJECT_ROOT.
+func requestOK(p string) bool {
+	if path.Clean(p) != p || !strings.HasPrefix(p, "/") {
+		return false
+	}
+	parts := strings.Split(p[1:], "/")
+	if len(parts) < 3 || slices.Contains(parts, "..") {
+		return false
+	}
+	return parts[0] != "" && parts[1] != ""
+}
 
 func (b cgiBackend) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
+	if !requestOK(r.URL.Path) {
+		http.Error(w, "not a repository path", http.StatusBadRequest)
+		return
+	}
+	limit := b.limit
+	if limit == 0 {
+		limit = maxBody
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

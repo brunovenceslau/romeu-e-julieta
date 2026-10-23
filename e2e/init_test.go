@@ -250,6 +250,68 @@ func TestInitRefusesARefThatIsNotTheDefaultBranch(t *testing.T) {
 	assert.Equal(t, 0, e.Run(t, append(args, "--config-ref", "main")).Code)
 }
 
+// TestInitRefusesARemoteWithoutADefaultBranch: a remote whose HEAD names
+// no branch has no default branch, so no ref is the default one; init
+// fails closed, whatever branch exists, and writes nothing.
+func TestInitRefusesARemoteWithoutADefaultBranch(t *testing.T) {
+	e, o, args := initSetup(t, nil)
+	o.Push(t, "owner/cfg", "release", map[string]string{"extra": "1"})
+	o.Git(t, o.Bare("owner/cfg"), "symbolic-ref", "HEAD", "refs/heads/gone")
+
+	res := e.Run(t, append(args, "--config-ref", "release"))
+
+	assert.Equal(t, 2, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "config-ref-not-default")
+	assert.Contains(t, res.Stderr, "no default branch")
+	assert.NoFileExists(t, e.Settings())
+	envs, err := filepath.Glob(filepath.Join(e.Root, "*-env", "*"))
+	require.NoError(t, err)
+	assert.Empty(t, envs, "no clone and no staging directory")
+}
+
+// TestInitDoesNotFollowALinkedEnvDir: a <cfg>-env that is a symbolic link
+// is refused (root-unsafe, exit 2); its target is not chmod'ed and holds
+// no clone.
+func TestInitDoesNotFollowALinkedEnvDir(t *testing.T) {
+	e, _, args := initSetup(t, nil)
+	victim := filepath.Join(e.Home, "victim")
+	require.NoError(t, os.Mkdir(victim, 0o755))
+	require.NoError(t, os.Chmod(victim, 0o755))
+	require.NoError(t, os.MkdirAll(e.Root, 0o700))
+	require.NoError(t, os.Symlink(victim, filepath.Join(e.Root, "cfg-env")))
+
+	res := e.Run(t, args)
+
+	assert.Equal(t, 2, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "root-unsafe")
+	assert.Contains(t, res.Stderr, "symbolic link")
+	fi, err := os.Stat(victim)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o755), fi.Mode().Perm(), "the target is not chmod'ed")
+	entries, err := os.ReadDir(victim)
+	require.NoError(t, err)
+	assert.Empty(t, entries)
+	assert.NoFileExists(t, e.Settings())
+}
+
+// TestInitRefusesAGroupWritableRoot: a root that exists and is writable
+// by its group is refused after it is made, with nothing written in it.
+func TestInitRefusesAGroupWritableRoot(t *testing.T) {
+	e, _, args := initSetup(t, nil)
+	require.NoError(t, os.MkdirAll(e.Root, 0o700))
+	require.NoError(t, os.Chmod(e.Root, 0o770))
+
+	res := e.Run(t, args)
+
+	assert.Equal(t, 2, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "root-unsafe")
+	assert.Contains(t, res.Stderr, "writable by its group or others")
+	entries, err := os.ReadDir(e.Root)
+	require.NoError(t, err)
+	assert.Empty(t, entries)
+	assert.NoFileExists(t, e.Settings())
+}
+
 // TestInitTakesTheLock: init holds romeu.lock (04 4.1, Locking), so
 // another romeu running is locked (RJ-101), exit 1, and nothing is
 // written.
