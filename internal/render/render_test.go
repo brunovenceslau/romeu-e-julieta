@@ -180,3 +180,16 @@ func TestMaterializedKitDir(t *testing.T) {
 	assert.Equal(t, "julieta-aaaaaaaaaaaa", k.Dir())
 	assert.Equal(t, ".romeu/kits/julieta-aaaaaaaaaaaa", k.LivePath())
 }
+
+// readFile returns the bytes of name in the candidate dir, and holds
+// its mode to FileMode.
+func readFile(t *testing.T, c render.Candidate, name string) []byte {
+	t.Helper()
+	p := filepath.Join(c.Dir, filepath.FromSlash(name))
+	info, err := os.Stat(p)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(render.FileMode), info.Mode().Perm())
+	data, err := os.ReadFile(p)
+	require.NoError(t, err)
+	return data
+}

@@ -8,6 +8,7 @@ import (
 	"path"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/egress"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 )
@@ -86,4 +87,114 @@ func (k MaterializedKit) LivePath() string { return path.Join(LiveKitsDir, k.Dir
 // promotion commit (T039) copies those dirs to LiveKitsDir.
 type Materializer interface {
 	Materialize(ctx context.Context, c Candidate, p spec.Project) ([]MaterializedKit, error)
+}
+
+// RecordSchema is the schema field of render.json (03 3.7, REQ-0161).
+const RecordSchema = "render/v1"
+
+// Record is render.json (03 3.7, schema render.v1): where the spec of
+// the render came from, the commit each repo's egress was derived at,
+// the digest of each file render wrote, the derived egress and the
+// digests the gate compares. A candidate holds one; the live one sits
+// at LiveRecord, and the drift check reads its Files (01 1.5).
+type Record struct {
+	// Schema is RecordSchema.
+	Schema string `json:"schema"`
+	// RomeuVersion is the version stamp of the romeu that rendered it.
+	RomeuVersion string `json:"romeuVersion"`
+	// Promoting is set inside a promotion commit alone (REQ-0226), and
+	// absent otherwise.
+	Promoting *Promoting `json:"promoting,omitzero"`
+	// SpecSource is the config commit the spec was read at.
+	SpecSource SpecSource `json:"specSource"`
+	// Repos are the spec's repos, in its order.
+	Repos []RecordRepo `json:"repos"`
+	// Files maps the path of each file or kit dir render wrote,
+	// relative to <name>-env/, to its digest: the plain sha256 of a
+	// file (REQ-0256), the kit-tree digest of a kit dir.
+	Files map[string]string `json:"files"`
+	// Egress is the derived egress (07 7.5).
+	Egress RecordEgress `json:"egress"`
+	// WideningDigest is the digest of the widening set (01 1.4).
+	WideningDigest canon.Sum[canon.WideningKind] `json:"wideningDigest"`
+	// RecreateDigest is the digest of the fields that need a recreate.
+	RecreateDigest canon.Sum[canon.RecreateKind] `json:"recreateDigest"`
+	// CatalogDigest is the digest of the egress catalog (gate 1).
+	CatalogDigest canon.Sum[canon.CatalogKind] `json:"catalogDigest"`
+}
+
+// Promoting is the promotion marker of render.json (REQ-0226): the
+// candidate being promoted, the digest of its files, and the files map
+// before the promotion, which recovery writes back (REQ-0227).
+type Promoting struct {
+	// CandidateID is the id of the candidate being promoted.
+	CandidateID canon.ULID `json:"candidateId"`
+	// FilesDigest is the digest of the candidate dir's files.
+	FilesDigest canon.Sum[canon.CandidateFilesKind] `json:"filesDigest"`
+	// PreviousFiles is the Files of the record before the promotion.
+	PreviousFiles map[string]string `json:"previousFiles"`
+}
+
+// SpecSourceOrigin is the kind of a spec read from the config repo's
+// origin, at a romeu-owned ref.
+const SpecSourceOrigin = "origin"
+
+// SpecSource is the commit of the config repo a render read the spec at.
+type SpecSource struct {
+	// Kind is where the commit came from: SpecSourceOrigin.
+	Kind string `json:"kind"`
+	// Ref is the romeu-owned ref the commit was read from.
+	Ref string `json:"ref"`
+	// Commit is the commit's object id.
+	Commit string `json:"commit"`
+}
+
+// RecordRepo is one repo of render.json: the commit its egress was
+// derived at (07 7.5) and the sha256 of its mise.lock there.
+type RecordRepo struct {
+	// Dir is the repo's dir in <name>-env/.
+	Dir string `json:"dir"`
+	// URL is the repo's url in the spec.
+	URL string `json:"url"`
+	// EgressRef is the romeu-owned ref egressCommit was resolved from.
+	EgressRef string `json:"egressRef"`
+	// EgressCommit is the commit the egress was derived at.
+	EgressCommit string `json:"egressCommit"`
+	// LockSha256 is the sha256 of mise.lock at EgressCommit, absent
+	// when the repo has none.
+	LockSha256 string `json:"lockSha256,omitzero"`
+}
+
+// RecordEgress is the derived egress of render.json: the domains allowed
+// at once, those that wait for an approval, and the egress digest of
+// their union (REQ-0633).
+type RecordEgress struct {
+	// Auto are the domains allowed at once, sorted.
+	Auto []string `json:"auto"`
+	// Gated are the domains that wait for an approval, sorted.
+	Gated []GatedDomain `json:"gated"`
+	// EffectiveDigest is canon.Digest(canon.Egress, the sorted union).
+	EffectiveDigest canon.Sum[canon.EgressKind] `json:"effectiveDigest"`
+}
+
+// GatedDomain is one gated domain and why it is gated.
+type GatedDomain struct {
+	// Domain is the domain.
+	Domain string `json:"domain"`
+	// Reason is why the domain waits for an approval.
+	Reason egress.Reason `json:"reason"`
+}
+
+// EgressOf returns the egress of render.json for the derived egress r,
+// with its effective digest.
+func EgressOf(r egress.Result) (RecordEgress, error) {
+	d, err := r.Digest()
+	if err != nil {
+		return RecordEgress{}, err
+	}
+	out := RecordEgress{Auto: r.Auto, Gated: make([]GatedDomain, 0, len(r.Gated)), EffectiveDigest: d}
+	for _, g := range r.Gated {
+		out.Gated = append(out.Gated, GatedDomain{Domain: g.Domain, Reason: g.Reason})
+	}
+	return out, nil
 }
