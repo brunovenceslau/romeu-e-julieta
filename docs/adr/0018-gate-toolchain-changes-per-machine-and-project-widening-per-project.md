@@ -43,6 +43,9 @@ as authority.
 
 ## Decision
 
+Accepted on 2026-10-23, from the decisions of the specification of
+2026-09-30 and of round 8 on 2026-10-08 that the context names.
+
 There are two romeu-level approvals, both at a terminal. Gate 1 is the
 toolchain acknowledgement, once per machine and per change.
 Gate 2 is the widening of a project, once per project. What each gate
