@@ -229,3 +229,29 @@ func TestPreflightStep5AutoTrust(t *testing.T) {
 		require.NoError(t, hostChecksOnly(t, host, nil))
 	})
 }
+
+// TestPreflightResolveThroughALinkedParent shows that a path that does
+// not exist yet is resolved through the links of the part of it that
+// does, as macOS needs: its /var is a link to /private/var, so a root
+// resolved through the link must match a trust entry or a link target
+// spelled through it, or the trust checks pass when they must not.
+func TestPreflightResolveThroughALinkedParent(t *testing.T) {
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	real := filepath.Join(base, "private", "var")
+	require.NoError(t, os.MkdirAll(real, 0o700))
+	link := filepath.Join(base, "var")
+	require.NoError(t, os.Symlink(real, link))
+
+	assert.Equal(t, real, resolve(link), "a path that exists")
+	assert.Equal(t, filepath.Join(real, "dev", "shop"), resolve(filepath.Join(link, "dev", "shop")), "a path not there yet")
+	assert.Equal(t, filepath.Join(real, "dev"), resolve(filepath.Join(link, "x", "..", "dev")), "a path cleaned first")
+
+	dangling := filepath.Join(base, "dangling")
+	require.NoError(t, os.Symlink(filepath.Join(link, "dev", "shop"), dangling))
+	assert.Equal(t, filepath.Join(real, "dev", "shop"), linkTarget(dangling), "a link to a root not there yet")
+
+	h := &hostEnv{in: &Input{Root: filepath.Join(real, "dev"), Home: base}}
+	assert.True(t, h.covers(filepath.Join(link, "dev", "shop")), "an entry under the root, spelled through the link")
+	assert.True(t, h.covers(link), "a parent of the root, spelled through the link")
+}

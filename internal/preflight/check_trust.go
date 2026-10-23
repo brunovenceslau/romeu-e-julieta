@@ -51,13 +51,22 @@ func (h *hostEnv) getenv(key string) string {
 	return h.in.Getenv(key)
 }
 
-// resolve returns p with its links resolved, or p cleaned when it cannot
-// be (a path that does not exist).
+// resolve returns p with its links resolved. For a path that does not
+// exist yet, the longest part of it that exists is resolved and the rest
+// is joined on, so two spellings of one place compare equal even when
+// the place is not there: on macOS /var is a link to /private/var, and
+// a root resolved through it must still match a trust entry that names
+// a folder not created yet.
 func resolve(p string) string {
+	p = filepath.Clean(p)
 	if r, err := filepath.EvalSymlinks(p); err == nil {
 		return r
 	}
-	return filepath.Clean(p)
+	dir := filepath.Dir(p)
+	if dir == p {
+		return p
+	}
+	return filepath.Join(resolve(dir), filepath.Base(p))
 }
 
 // within reports whether child is parent or below it.
@@ -164,7 +173,7 @@ func linkTarget(p string) string {
 	if !filepath.IsAbs(t) {
 		t = filepath.Join(filepath.Dir(p), t)
 	}
-	return filepath.Clean(t)
+	return resolve(t)
 }
 
 // miseConfig is the part of mise's global configuration the check reads.
