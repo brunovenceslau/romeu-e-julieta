@@ -65,7 +65,7 @@ type MaterializedKit struct {
 	Digest canon.Sum[canon.KitTreeKind]
 	// Rendered are the args romeu renders into the kit, such as
 	// julietaBin (06 6.4), beside the args of the spec; a spec arg of
-	// the same name is an error of RenderEnv.
+	// the same name is an error of Env.
 	Rendered map[string]string
 	// Capabilities is the normalized capability set of the kit's
 	// descriptor, which the gate shows.

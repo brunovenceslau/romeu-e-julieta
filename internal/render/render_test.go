@@ -88,7 +88,7 @@ ports: []
 
 // hostSettings is the example of 03 3.4 with its paths filled in.
 const hostSettings = `schema: host-settings/v1
-root: /home/dev/dev
+root: /home/agent/dev
 config:
   project: my-config
   url: https://github.com/example/my-config
@@ -118,7 +118,7 @@ func shopKits(t *testing.T) []render.MaterializedKit {
 	t.Helper()
 	return []render.MaterializedKit{
 		{ID: "julieta", Digest: sum(t, 1)},
-		{ID: "julieta-claude", Digest: sum(t, 2), Rendered: map[string]string{"julietaBin": "/home/dev/dev/shop-env/.romeu/bin"}},
+		{ID: "julieta-claude", Digest: sum(t, 2), Rendered: map[string]string{"julietaBin": "/home/agent/dev/shop-env/.romeu/bin"}},
 		{ID: "os-base", Digest: sum(t, 3)},
 		{ID: "git-ssh-sign", Digest: sum(t, 4)},
 		{ID: "my-home", Digest: sum(t, 5)},
@@ -135,11 +135,11 @@ func (f fakeMaterializer) Materialize(context.Context, render.Candidate, spec.Pr
 	return f.kits, f.err
 }
 
-// Render writes the candidate's sbxenv.yaml, which RenderEnv returns,
+// Render writes the candidate's sbxenv.yaml, which Env returns,
 // into the candidate dir, and returns the kits.
 func TestRender(t *testing.T) {
 	c := render.Candidate{Dir: t.TempDir()}
-	in := render.Input{Project: project(t, shopSpec), Host: host(t, hostSettings), Home: "/home/dev"}
+	in := render.Input{Project: project(t, shopSpec), Host: host(t, hostSettings), Home: "/home/agent"}
 	got, err := render.Render(t.Context(), c, in, fakeMaterializer{kits: shopKits(t)})
 	require.NoError(t, err)
 	written, err := os.ReadFile(filepath.Join(c.Dir, render.CandidateEnvFile))
@@ -155,7 +155,7 @@ func TestRender(t *testing.T) {
 // written.
 func TestRenderMaterializerFails(t *testing.T) {
 	c := render.Candidate{Dir: t.TempDir()}
-	in := render.Input{Project: project(t, shopSpec), Host: host(t, hostSettings), Home: "/home/dev"}
+	in := render.Input{Project: project(t, shopSpec), Host: host(t, hostSettings), Home: "/home/agent"}
 	boom := errors.New("boom")
 	_, err := render.Render(t.Context(), c, in, fakeMaterializer{err: boom})
 	require.ErrorIs(t, err, boom)
@@ -163,10 +163,10 @@ func TestRenderMaterializerFails(t *testing.T) {
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
-// A render that RenderEnv refuses writes nothing, and a candidate dir
+// A render that Env refuses writes nothing, and a candidate dir
 // that does not exist is an error.
 func TestRenderErrors(t *testing.T) {
-	in := render.Input{Project: project(t, shopSpec), Host: host(t, hostSettings), Home: "/home/dev"}
+	in := render.Input{Project: project(t, shopSpec), Host: host(t, hostSettings), Home: "/home/agent"}
 	_, err := render.Render(t.Context(), render.Candidate{Dir: t.TempDir()}, in, fakeMaterializer{})
 	require.ErrorContains(t, err, "5 kits and 0 were materialized")
 	_, err = render.Render(t.Context(), render.Candidate{Dir: filepath.Join(t.TempDir(), "absent")}, in, fakeMaterializer{kits: shopKits(t)})

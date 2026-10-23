@@ -51,7 +51,7 @@ func Render(ctx context.Context, c Candidate, in Input, m Materializer) (Rendere
 	if err != nil {
 		return Rendered{}, fmt.Errorf("render: materialize the kits: %w", err)
 	}
-	env, err := RenderEnv(EnvInput{Input: in, Kits: kits})
+	env, err := Env(EnvInput{Input: in, Kits: kits})
 	if err != nil {
 		return Rendered{}, err
 	}

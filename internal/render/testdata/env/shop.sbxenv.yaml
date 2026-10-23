@@ -12,7 +12,7 @@ kits:
   - source: ./.romeu/kits/julieta-111111111111
   - source: ./.romeu/kits/julieta-claude-222222222222
     args:
-      julietaBin: /home/dev/dev/shop-env/.romeu/bin
+      julietaBin: /home/agent/dev/shop-env/.romeu/bin
   - source: ./.romeu/kits/os-base-333333333333
     args:
       tz: Etc/UTC
@@ -25,5 +25,5 @@ sandboxOptions:
   memory: 8g
 secrets:
   github:
-    command: /usr/bin/env -i HOME=/home/dev PATH=/usr/bin:/bin /usr/bin/security find-generic-password -s romeu/shop/github -w
+    command: /usr/bin/env -i HOME=/home/agent PATH=/usr/bin:/bin /usr/bin/security find-generic-password -s romeu/shop/github -w
 ports: []

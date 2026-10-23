@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"maps"
 	"path"
 	"reflect"
 	"slices"
@@ -76,7 +77,7 @@ type envSecret struct {
 	Command string `yaml:"command"`
 }
 
-// RenderEnv returns sbxenv.yaml for in (03 3.3), written through the
+// Env returns sbxenv.yaml for in (03 3.3), written through the
 // YAML marshaller alone (REQ-0198, I11). The paths in it are ./x,
 // relative to the file: the primary repo's host clone is the workspace,
 // and each repo's memory dir and the fixed mount ./.romeu/bin,
@@ -90,7 +91,7 @@ type envSecret struct {
 //
 //romeu:invariant I8 guard
 //romeu:invariant I11 guard
-func RenderEnv(in EnvInput) ([]byte, error) {
+func Env(in EnvInput) ([]byte, error) {
 	f, err := envOf(in)
 	if err != nil {
 		return nil, err
@@ -172,9 +173,7 @@ func kitsOf(p spec.Project, kits []MaterializedKit) ([]envKit, error) {
 		if len(k.Args)+len(m.Rendered) > 0 {
 			args = make(map[string]string, len(k.Args)+len(m.Rendered))
 		}
-		for name, v := range k.Args {
-			args[name] = v
-		}
+		maps.Copy(args, k.Args)
 		for name, v := range m.Rendered {
 			if _, ok := k.Args[name]; ok {
 				return nil, fmt.Errorf("render: the kit %q: the spec sets the arg %q, which romeu renders", m.ID, name)

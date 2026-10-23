@@ -18,8 +18,8 @@ import (
 func shopInput(t *testing.T) render.EnvInput {
 	t.Helper()
 	return render.EnvInput{
-		Input: render.Input{Project: project(t, shopSpec), Host: host(t, hostSettings), Home: "/home/dev"},
-		Kits:  shopKits(t),
+		Project: project(t, shopSpec), Host: host(t, hostSettings), Home: "/home/agent",
+		Kits: shopKits(t),
 	}
 }
 
@@ -38,13 +38,13 @@ ports: ["3000", "8080:80/tcp", "127.0.0.1:5353:53/udp"]
 // The goldens of sbxenv.yaml (03 3.3, REQ-0732): the project of 03 3.2
 // with every kind of kit, and a project with ports. Each is the raw
 // output of the marshaller; A5 hashes its normalized form (T019).
-func TestRenderEnvGolden(t *testing.T) {
-	got, err := render.RenderEnv(shopInput(t))
+func TestEnvGolden(t *testing.T) {
+	got, err := render.Env(shopInput(t))
 	require.NoError(t, err)
 	golden(t, "env/shop.sbxenv.yaml", got)
 
-	ports := render.EnvInput{Input: render.Input{Project: project(t, portsSpec), Host: host(t, hostSettings), Home: "/home/dev"}}
-	got, err = render.RenderEnv(ports)
+	ports := render.EnvInput{Project: project(t, portsSpec), Host: host(t, hostSettings), Home: "/home/agent"}
+	got, err = render.Env(ports)
 	require.NoError(t, err)
 	golden(t, "env/ports.sbxenv.yaml", got)
 }
@@ -53,8 +53,8 @@ func TestRenderEnvGolden(t *testing.T) {
 // env-file schema alone, no x-* key and no lifecycle hook (REQ-0200),
 // the fixed read-only mount of ./.romeu/bin (REQ-0583), paths of the
 // form ./x (REQ-0142), and a secret that is a command alone (I8).
-func TestRenderEnvShape(t *testing.T) {
-	got, err := render.RenderEnv(shopInput(t))
+func TestEnvShape(t *testing.T) {
+	got, err := render.Env(shopInput(t))
 	require.NoError(t, err)
 	var doc map[string]any
 	require.NoError(t, yaml.Unmarshal(got, &doc))
@@ -77,17 +77,17 @@ func TestRenderEnvShape(t *testing.T) {
 		assert.True(t, strings.HasPrefix(src, "./.romeu/kits/") || strings.HasPrefix(src, "docker.io/"), "the source %s", src)
 	}
 	assert.Equal(t, map[string]any{"github": map[string]any{
-		"command": "/usr/bin/env -i HOME=/home/dev PATH=/usr/bin:/bin /usr/bin/security find-generic-password -s romeu/shop/github -w",
+		"command": "/usr/bin/env -i HOME=/home/agent PATH=/usr/bin:/bin /usr/bin/security find-generic-password -s romeu/shop/github -w",
 	}}, doc["secrets"])
 	assert.Equal(t, []any{}, doc["ports"])
 }
 
 // The same input renders the same bytes.
-func TestRenderEnvIsDeterministic(t *testing.T) {
-	a, err := render.RenderEnv(shopInput(t))
+func TestEnvIsDeterministic(t *testing.T) {
+	a, err := render.Env(shopInput(t))
 	require.NoError(t, err)
 	for range 20 {
-		b, err := render.RenderEnv(shopInput(t))
+		b, err := render.Env(shopInput(t))
 		require.NoError(t, err)
 		require.Equal(t, a, b)
 	}
@@ -95,10 +95,10 @@ func TestRenderEnvIsDeterministic(t *testing.T) {
 
 // A string that YAML would read as another type is quoted, so the file
 // reads back as what was meant.
-func TestRenderEnvQuotesStringsThatLookTyped(t *testing.T) {
+func TestEnvQuotesStringsThatLookTyped(t *testing.T) {
 	in := shopInput(t)
 	in.Project.Kits[2].Args = map[string]string{"tz": "yes", "port": "8080", "empty": "", "null": "null", "comment": "# x"}
-	got, err := render.RenderEnv(in)
+	got, err := render.Env(in)
 	require.NoError(t, err)
 	var doc struct {
 		Kits []struct {
@@ -110,7 +110,7 @@ func TestRenderEnvQuotesStringsThatLookTyped(t *testing.T) {
 }
 
 // Each input render refuses, with the reason it names.
-func TestRenderEnvErrors(t *testing.T) {
+func TestEnvErrors(t *testing.T) {
 	tests := []struct {
 		name   string
 		change func(in *render.EnvInput)
@@ -136,7 +136,7 @@ func TestRenderEnvErrors(t *testing.T) {
 			in.Host.Secrets["github@shop"] = e
 		}, "does not start with an absolute path"},
 		{"a relative HOME", func(in *render.EnvInput) { in.Home = "home/dev" }, `HOME "home/dev" is not an absolute clean path`},
-		{"an unclean HOME", func(in *render.EnvInput) { in.Home = "/home/dev/" }, `HOME "/home/dev/" is not an absolute clean path`},
+		{"an unclean HOME", func(in *render.EnvInput) { in.Home = "/home/agent/" }, `HOME "/home/agent/" is not an absolute clean path`},
 		{"fewer kits materialized than the spec has", func(in *render.EnvInput) { in.Kits = in.Kits[:4] }, "the spec has 5 kits and 4 were materialized"},
 		{"a materialized kit out of the spec's order", func(in *render.EnvInput) {
 			in.Kits[0], in.Kits[1] = in.Kits[1], in.Kits[0]
@@ -163,7 +163,7 @@ func TestRenderEnvErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			in := shopInput(t)
 			tt.change(&in)
-			_, err := render.RenderEnv(in)
+			_, err := render.Env(in)
 			require.ErrorContains(t, err, tt.want)
 		})
 	}
@@ -180,18 +180,18 @@ func TestSecretCommand(t *testing.T) {
 		argv []string
 		want string
 	}{
-		{"the Keychain form", "/Users/dev", []string{"/usr/bin/security", "find-generic-password", "-s", "romeu/shop/github", "-w"},
-			"/usr/bin/env -i HOME=/Users/dev PATH=/usr/bin:/bin /usr/bin/security find-generic-password -s romeu/shop/github -w"},
-		{"a word with a space and a quote", "/home/dev", []string{"/opt/bin/op", "read", "op://dev/it's a token"},
-			`/usr/bin/env -i HOME=/home/dev PATH=/usr/bin:/bin /opt/bin/op read 'op://dev/it'\''s a token'`},
-		{"a word that sh would expand", "/home/dev", []string{"/bin/echo", "$(id)", "`id`", "$HOME", "a;b", "*"},
-			"/usr/bin/env -i HOME=/home/dev PATH=/usr/bin:/bin /bin/echo '$(id)' '`id`' '$HOME' 'a;b' '*'"},
-		{"a HOME with a space", "/home/a dev", []string{"/bin/true"},
-			"/usr/bin/env -i HOME='/home/a dev' PATH=/usr/bin:/bin /bin/true"},
-		{"an empty argument stays one word", "/home/dev", []string{"/bin/printf", ""},
-			"/usr/bin/env -i HOME=/home/dev PATH=/usr/bin:/bin /bin/printf ''"},
-		{"an equals sign past argv[0] is quoted", "/home/dev", []string{"/bin/tool", "A=b"},
-			"/usr/bin/env -i HOME=/home/dev PATH=/usr/bin:/bin /bin/tool 'A=b'"},
+		{"the Keychain form", "/Users/agent", []string{"/usr/bin/security", "find-generic-password", "-s", "romeu/shop/github", "-w"},
+			"/usr/bin/env -i HOME=/Users/agent PATH=/usr/bin:/bin /usr/bin/security find-generic-password -s romeu/shop/github -w"},
+		{"a word with a space and a quote", "/home/agent", []string{"/opt/bin/op", "read", "op://dev/it's a token"},
+			`/usr/bin/env -i HOME=/home/agent PATH=/usr/bin:/bin /opt/bin/op read 'op://dev/it'\''s a token'`},
+		{"a word that sh would expand", "/home/agent", []string{"/bin/echo", "$(id)", "`id`", "$HOME", "a;b", "*"},
+			"/usr/bin/env -i HOME=/home/agent PATH=/usr/bin:/bin /bin/echo '$(id)' '`id`' '$HOME' 'a;b' '*'"},
+		{"a HOME with a space", "/home/a b", []string{"/bin/true"},
+			"/usr/bin/env -i HOME='/home/a b' PATH=/usr/bin:/bin /bin/true"},
+		{"an empty argument stays one word", "/home/agent", []string{"/bin/printf", ""},
+			"/usr/bin/env -i HOME=/home/agent PATH=/usr/bin:/bin /bin/printf ''"},
+		{"an equals sign past argv[0] is quoted", "/home/agent", []string{"/bin/tool", "A=b"},
+			"/usr/bin/env -i HOME=/home/agent PATH=/usr/bin:/bin /bin/tool 'A=b'"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -210,10 +210,10 @@ func TestSecretCommandErrors(t *testing.T) {
 		argv []string
 		want string
 	}{
-		{"no argv", "/home/dev", nil, "does not start with an absolute path"},
-		{"a relative argv[0]", "/home/dev", []string{"security"}, "does not start with an absolute path"},
-		{"an argv[0] env reads as a variable", "/home/dev", []string{"/bin/A=b"}, "argv[0] holds an ="},
-		{"a NUL in an argument", "/home/dev", []string{"/bin/true", "a\x00b"}, "argv: word 2"},
+		{"no argv", "/home/agent", nil, "does not start with an absolute path"},
+		{"a relative argv[0]", "/home/agent", []string{"security"}, "does not start with an absolute path"},
+		{"an argv[0] env reads as a variable", "/home/agent", []string{"/bin/A=b"}, "argv[0] holds an ="},
+		{"a NUL in an argument", "/home/agent", []string{"/bin/true", "a\x00b"}, "argv: word 2"},
 		{"a NUL in HOME", "/home/\x00", []string{"/bin/true"}, "HOME: "},
 	}
 	for _, tt := range tests {
