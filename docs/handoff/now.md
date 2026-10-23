@@ -2,27 +2,24 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-22, second part: "Session of 2026-10-22, second
-part, T160 to T163 and T081" (01m5j74wzb96z8hka0zzy40q6j). Pushes and
-pull requests stay asked first ("Pushes and pull requests are asked
-first from 2026-10-22", 01m5gywvgc85vj8k4txzppjz6d).
+Checkpoint of 2026-10-23: "Session of 2026-10-22 and 2026-10-23, the M3
+core: T021, T029, T031, T032, T033, T036, T040, T053" (01m5mre3vz48a3n74a11ataacn).
+Pushes and pull requests stay asked first (01m5gywvgc85vj8k4txzppjz6d).
 
 ## Next steps
 
-1. The queue of 2026-10-22, third part, critical path first: T021;
-   T033, T031, T029 and T032 stacked on T021; T053; T040 on T033; T036
-   on T031 after T053. Every other id in the `needs` and `after` of
-   the four on T021 is merged (measured 2026-10-22).
+1. The next tasks of `plan --ready` (T037, T041, T042, T046, T077, T111,
+   T112, T126) and `--critical-path` (T037 render, then T038, T039, T043, T048).
 2. T077 once A12 is measured ("T077 waits for the A12 measurement",
    01m5gywvj5vj90yfedah9y670b).
-3. T161 once its open questions are answered and T088 is built (M6)
+3. T161 once its open questions are answered and T088 is built
    (01m5e14094yhqhsxq2g941pwrf).
 4. T111, the cut-over of M1, at sitting M1 in the config repository.
-5. The pending notes 01m5gywvh9pdmte8k85q87wwdc (T060 rule),
-   01m5gywvk15asanh438p4mmwfs (e2e output),
-   01m5gywvkw8rp4jj2cvctvzg57 (stale unit mentions) and
-   01m5gz0rpmzwvmwqt9ebd95rfq (the T159 record's name), each when its
-   trigger fires.
+5. The pending notes, each when its trigger fires: 01m5gywvh9pdmte8k85q87wwdc,
+   01m5gywvk15asanh438p4mmwfs, 01m5gywvkw8rp4jj2cvctvzg57,
+   01m5gz0rpmzwvmwqt9ebd95rfq and the egress notes 01m5kfnpybcnf22gpxwws14g7x,
+   01m5kfnpzsnmv53xtkkhenqkz1, 01m5kfnq16e2agrcfmg2e5qhh8, and the
+   registry note 01m5kgfdf3t5hd41trsv35dss5 (in T043).
 
 ## Open for the operator
 
@@ -51,11 +48,14 @@ first from 2026-10-22", 01m5gywvgc85vj8k4txzppjz6d).
 8. Change the payload's handoff check so the T159 Done record can take
    its canonical name (01m5gz0rpmzwvmwqt9ebd95rfq). Recommended: in the
    payload's next session.
+9. Review the pending note on rules that can push the model to
+    over-optimize (01m5jc2v5gfyxyrbjv7wymbr9a). Recommended: in the next
+    session on the sandbox kit's repository.
 
 ## In flight
 
-- `feat/t077-julieta-kit` (T077, pushed, no PR).
-- `docs/checkpoint-2026-10-22b` (this checkpoint).
+- `feat/t077-julieta-kit` (T077, pushed, no PR),
+  `docs/checkpoint-2026-10-23` (this checkpoint).
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.

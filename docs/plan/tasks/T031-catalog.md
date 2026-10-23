@@ -3,7 +3,7 @@ id: T031
 title: "`catalog`"
 milestone: M3
 module: catalog
-fate: kept
+fate: merged
 owns:
   - internal/catalog/**
   - tools/ci/internal/catalog/**
@@ -17,9 +17,14 @@ ask_first:
   - catalog
   - checks
 sitting: none
+merged: 2026-10-22
+pr: 247
 ---
 
 # T031 - `catalog`
+
+Merged on 2026-10-22 in pull request #247. The text below is the one
+written when it was built.
 
 Goal: `catalog`: the entries, the lookups and `tools/ci catalog`.
 

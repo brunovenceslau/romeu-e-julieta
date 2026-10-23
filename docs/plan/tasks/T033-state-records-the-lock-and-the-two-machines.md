@@ -3,7 +3,7 @@ id: T033
 title: "`state`: records, the lock and the two machines"
 milestone: M3
 module: state
-fate: kept
+fate: merged
 owns:
   - internal/state/**
 needs:
@@ -14,9 +14,14 @@ ask_first:
   - gates
   - contracts
 sitting: none
+merged: 2026-10-22
+pr: 246
 ---
 
 # T033 - `state`: records, the lock and the two machines
+
+Merged on 2026-10-22 in pull request #246. The text below is the one
+written when it was built.
 
 Earlier title: `state`: records, atomic writes and the lock.
 

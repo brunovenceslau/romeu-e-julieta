@@ -3,7 +3,7 @@ id: T036
 title: "`egress`"
 milestone: M3
 module: egress
-fate: kept
+fate: merged
 owns:
   - internal/egress/**
   - internal/cmd/julieta/lock/catalog_check.go
@@ -22,9 +22,14 @@ ask_first:
   - contracts
   - gitsafe
 sitting: none
+merged: 2026-10-23
+pr: 255
 ---
 
 # T036 - `egress`
+
+Merged on 2026-10-23 in pull request #255. The text below is the one
+written when it was built.
 
 Goal: `egress`: the split, `egress.extra`, `egress.tools`, kit-declared
 domains, upload flags, derivation from locks with the TOML parser; the

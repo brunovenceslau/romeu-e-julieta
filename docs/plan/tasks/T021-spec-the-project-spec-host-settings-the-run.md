@@ -3,7 +3,7 @@ id: T021
 title: "`spec`: the project spec, host settings, the run layout and the examples"
 milestone: M3
 module: spec
-fate: kept
+fate: merged
 owns:
   - internal/spec/**
   - examples/**
@@ -20,9 +20,14 @@ ask_first:
   - contracts
   - spec
 sitting: none
+merged: 2026-10-22
+pr: 245
 ---
 
 # T021 - `spec`: the project spec, host settings, the run layout and the examples
+
+Merged on 2026-10-22 in pull request #245. The text below is the one
+written when it was built.
 
 Earlier title: `spec`: the project spec and host settings.
 

@@ -3,7 +3,7 @@ id: T032
 title: "`oci`"
 milestone: M3
 module: oci
-fate: kept
+fate: merged
 owns:
   - internal/oci/**
   - internal/state/load.go
@@ -19,9 +19,14 @@ ask_first:
   - contracts
   - gates
 sitting: none
+merged: 2026-10-23
+pr: 257
 ---
 
 # T032 - `oci`
+
+Merged on 2026-10-23 in pull request #257. The text below is the one
+written when it was built.
 
 Goal: `oci`: the guarded client, the strict descriptor grammar, the
 normalized capability set, with the sitting M2 descriptor as the
