@@ -121,11 +121,13 @@ func (f *fakeRegistry) ref(digest string) string {
 	return strings.TrimPrefix(f.srv.URL, "https://") + "/org/kit@" + digest
 }
 
-// client returns a Client that trusts this registry's certificate.
+// client returns a Client that trusts this registry's certificate and
+// lets its loopback address through, as no Client of NewClient does.
 func (f *fakeRegistry) client() *Client {
 	f.t.Helper()
 	c := NewClient()
 	trust(f.t, c, f.srv)
+	c.testAddr = strings.TrimPrefix(f.srv.URL, "https://")
 	return c
 }
 

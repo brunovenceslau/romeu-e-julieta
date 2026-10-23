@@ -54,8 +54,9 @@ var (
 	ErrForeignRealm = errors.New("oci: token realm outside the registry's site")
 	// ErrPrivateAddress is a connection to an address that is not a
 	// public one (a loopback, private, link-local or reserved address),
-	// which only the registry the reference names, and a proxy the
-	// environment names, may be.
+	// which only a proxy the environment names may be: a registry on a
+	// private network is not read in v1, whatever the reference names
+	// (RJ-322).
 	ErrPrivateAddress = errors.New("oci: address is not a public one")
 	// ErrCredentials is a registry that asks for credentials.
 	ErrCredentials = errors.New("oci: the registry asks for credentials")
@@ -80,13 +81,21 @@ type Client struct {
 	// proxies are the host:port of the proxies the environment named for
 	// a request: a connection to one is a connection the user chose.
 	proxies sync.Map
+	// proxyOf names the proxy of a request: http.ProxyFromEnvironment,
+	// which reads the environment once per process, so a test sets its
+	// own.
+	proxyOf func(*http.Request) (*url.URL, error)
+	// testAddr is the one host:port a dial and the guard let through
+	// whatever its address: the fake registry of a test, on the
+	// loopback. A Client of NewClient leaves it empty.
+	testAddr string
 }
 
 // NewClient returns a Client with the guards on. The proxy of the
 // environment is used, as for any HTTPS client, and the server's
 // certificate is verified against the system roots.
 func NewClient() *Client {
-	c := &Client{}
+	c := &Client{proxyOf: http.ProxyFromEnvironment}
 	c.transport = &http.Transport{
 		Proxy:                  c.proxy,
 		DialContext:            c.dial,
@@ -108,7 +117,7 @@ const maxHeaderBytes = 64 << 10
 // proxy is the proxy of the environment, remembered so that dial can tell
 // a connection to it from one to a target.
 func (c *Client) proxy(req *http.Request) (*url.URL, error) {
-	u, err := http.ProxyFromEnvironment(req)
+	u, err := c.proxyOf(req)
 	if u != nil && err == nil {
 		port := u.Port()
 		if port == "" {
@@ -119,37 +128,18 @@ func (c *Client) proxy(req *http.Request) (*url.URL, error) {
 	return u, err
 }
 
-// trustKey is the context key of the address a request may reach even
-// if it is not a public one.
-type trustKey struct{}
-
-// trusted returns ctx with addr, a host:port, as the one address its
-// request may reach whatever it resolves to: the registry the reference
-// names (a private registry on the user's network is the user's
-// choice).
-func trusted(ctx context.Context, addr string) context.Context {
-	return context.WithValue(ctx, trustKey{}, addr)
-}
-
-// registryAddr returns the host:port a dial to the registry host has,
-// 443 when it names no port.
-func registryAddr(host string) string {
-	if _, _, err := net.SplitHostPort(host); err == nil {
-		return host
-	}
-	return net.JoinHostPort(host, "443")
-}
-
 // dial connects to addr and refuses an address that is not a public one,
-// unless it is the registry's own or a proxy's. The check is on the
+// unless it is a proxy's. The registry the reference names is no
+// exception: its name may resolve to anything. The check is on the
 // address the name resolved to, at connect time, for each address tried,
 // so a name that resolves to a loopback address (DNS rebinding) is
 // refused the same as the address written out. Behind a proxy, the
-// target's address is the proxy's to judge (REQ-0515).
+// address a target name resolves to is the proxy's to judge, and an
+// address literal is the guard's (REQ-0515).
 func (c *Client) dial(ctx context.Context, network, addr string) (net.Conn, error) {
 	_, isProxy := c.proxies.Load(addr)
 	d := &net.Dialer{Timeout: 10 * time.Second}
-	if want, _ := ctx.Value(trustKey{}).(string); !isProxy && want != addr {
+	if !isProxy && (c.testAddr == "" || addr != c.testAddr) {
 		d.Control = func(_, address string, _ syscall.RawConn) error { return checkPublic(address) }
 	}
 	return d.DialContext(ctx, network, addr)

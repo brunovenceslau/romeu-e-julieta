@@ -5,11 +5,13 @@ package oci
 
 import (
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -136,7 +138,7 @@ func TestGuardRefusesARedirectToAPrivateAddress(t *testing.T) {
 	}
 }
 
-func TestDialTrustsTheRegistryAndAProxyOnly(t *testing.T) {
+func TestDialTrustsATestAddressAndAProxyOnly(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = ln.Close() })
@@ -155,13 +157,16 @@ func TestDialTrustsTheRegistryAndAProxyOnly(t *testing.T) {
 	_, err = c.dial(t.Context(), "tcp", addr)
 	require.ErrorIs(t, err, ErrPrivateAddress, "an untrusted loopback address")
 
-	conn, err := c.dial(trusted(t.Context(), addr), "tcp", addr)
-	require.NoError(t, err, "the registry's own address")
+	c.testAddr = addr
+	conn, err := c.dial(t.Context(), "tcp", addr)
+	require.NoError(t, err, "the address a test sets")
 	_ = conn.Close()
 
-	_, err = c.dial(trusted(t.Context(), "127.0.0.1:1"), "tcp", addr)
-	require.ErrorIs(t, err, ErrPrivateAddress, "trust is for one address")
+	c.testAddr = "127.0.0.1:1"
+	_, err = c.dial(t.Context(), "tcp", addr)
+	require.ErrorIs(t, err, ErrPrivateAddress, "the test address is one address")
 
+	c.testAddr = ""
 	c.proxies.Store(addr, true)
 	conn, err = c.dial(t.Context(), "tcp", addr)
 	require.NoError(t, err, "a proxy the environment names")
@@ -181,19 +186,13 @@ func TestTransportCapsTheResponseHeaders(t *testing.T) {
 	assert.Contains(t, err.Error(), "exceeded")
 }
 
-func TestDialIsGivenTheTrustedAddressOfTheRegistry(t *testing.T) {
+func TestDialReachesTheFakeRegistryOnlyThroughTheTestAddress(t *testing.T) {
 	f := newFakeRegistry(t)
 	index, _ := publish(t, f)
 
 	_, err := f.client().FetchWorkload(t.Context(), f.ref(index), amd64)
 
-	require.NoError(t, err, "the registry on a loopback address is reached because the reference names it")
-}
-
-func TestRegistryAddress(t *testing.T) {
-	assert.Equal(t, "ghcr.io:443", registryAddr("ghcr.io"))
-	assert.Equal(t, "127.0.0.1:5000", registryAddr("127.0.0.1:5000"))
-	assert.Equal(t, "registry-1.docker.io:443", registryAddr("registry-1.docker.io"))
+	require.NoError(t, err, "the fake registry on the loopback is reached because the test sets its address")
 }
 
 func TestGuardRefusesARedirectWithAUserName(t *testing.T) {
@@ -306,4 +305,166 @@ func mustURL(t *testing.T, raw string) *url.URL {
 	u, err := url.Parse(raw)
 	require.NoError(t, err)
 	return u
+}
+
+// connectProxy is an HTTP proxy on the loopback that tunnels a CONNECT
+// to the one address it may reach, refuses any other, and records the
+// targets it was asked for.
+type connectProxy struct {
+	srv     *httptest.Server
+	mu      sync.Mutex
+	targets []string
+}
+
+func newConnectProxy(t *testing.T, reach string) *connectProxy {
+	t.Helper()
+	p := &connectProxy{}
+	p.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p.mu.Lock()
+		p.targets = append(p.targets, r.Host)
+		p.mu.Unlock()
+		if r.Method != http.MethodConnect || r.Host != reach {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		up, err := net.Dial("tcp", reach)
+		if err != nil {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		conn, buf, err := http.NewResponseController(w).Hijack()
+		if err != nil {
+			_ = up.Close()
+			return
+		}
+		go func() { _, _ = io.Copy(up, buf); _ = up.Close() }()
+		_, _ = io.Copy(conn, up)
+		_ = conn.Close()
+	}))
+	t.Cleanup(p.srv.Close)
+	return p
+}
+
+// asked returns the targets the proxy was asked for.
+func (p *connectProxy) asked() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]string(nil), p.targets...)
+}
+
+// use makes c send its requests through the proxy.
+func (p *connectProxy) use(c *Client) {
+	u, _ := url.Parse(p.srv.URL)
+	c.proxyOf = func(*http.Request) (*url.URL, error) { return u, nil }
+}
+
+func TestGuardRefusesARedirectToAPrivateAddressBehindAProxy(t *testing.T) {
+	for _, target := range []string{"10.1.2.3", "169.254.169.254", "[fd00::1]", "127.0.0.1:9"} {
+		t.Run(target, func(t *testing.T) {
+			f := newFakeRegistry(t)
+			registry := strings.TrimPrefix(f.srv.URL, "https://")
+			proxy := newConnectProxy(t, registry)
+			f.override = func(w http.ResponseWriter, r *http.Request) bool {
+				http.Redirect(w, r, "https://"+target+"/v2/", http.StatusFound)
+				return true
+			}
+			c := f.client()
+			proxy.use(c)
+
+			_, err := c.FetchWorkload(t.Context(), f.ref("sha256:"+strings.Repeat("a", 64)), amd64)
+
+			require.ErrorIs(t, err, ErrPrivateAddress)
+			assert.Equal(t, []string{registry}, proxy.asked(), "the proxy is asked for the registry only")
+		})
+	}
+	t.Run("a public address is the proxy's to reach", func(t *testing.T) {
+		f := newFakeRegistry(t)
+		registry := strings.TrimPrefix(f.srv.URL, "https://")
+		proxy := newConnectProxy(t, registry)
+		f.override = func(w http.ResponseWriter, r *http.Request) bool {
+			http.Redirect(w, r, "https://8.8.8.8/v2/", http.StatusFound)
+			return true
+		}
+		c := f.client()
+		proxy.use(c)
+
+		_, err := c.FetchWorkload(t.Context(), f.ref("sha256:"+strings.Repeat("a", 64)), amd64)
+
+		require.Error(t, err, "the fake proxy refuses it")
+		assert.Equal(t, []string{registry, "8.8.8.8:443"}, proxy.asked())
+	})
+}
+
+func TestProxyIsRememberedForTheDial(t *testing.T) {
+	for raw, want := range map[string]string{
+		"http://proxy.example":      "proxy.example:80",
+		"https://proxy.example":     "proxy.example:443",
+		"http://proxy.example:3128": "proxy.example:3128",
+		"socks5://[fd00::1]":        "[fd00::1]:1080",
+	} {
+		t.Run(raw, func(t *testing.T) {
+			c := NewClient()
+			u := mustURL(t, raw)
+			c.proxyOf = func(*http.Request) (*url.URL, error) { return u, nil }
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://registry.example/v2/", nil)
+			require.NoError(t, err)
+
+			got, err := c.proxy(req)
+
+			require.NoError(t, err)
+			assert.Equal(t, u, got)
+			_, ok := c.proxies.Load(want)
+			assert.True(t, ok, "%s is remembered", want)
+		})
+	}
+	t.Run("no proxy", func(t *testing.T) {
+		c := NewClient()
+		c.proxyOf = func(*http.Request) (*url.URL, error) { return nil, nil }
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://registry.example/v2/", nil)
+		require.NoError(t, err)
+
+		got, err := c.proxy(req)
+
+		require.NoError(t, err)
+		assert.Nil(t, got)
+		n := 0
+		c.proxies.Range(func(any, any) bool { n++; return true })
+		assert.Zero(t, n)
+	})
+}
+
+func TestARegistryOnAPrivateAddressIsRefused(t *testing.T) {
+	f := newFakeRegistry(t)
+	index, _ := publish(t, f)
+	registry := strings.TrimPrefix(f.srv.URL, "https://")
+	_, port, err := net.SplitHostPort(registry)
+	require.NoError(t, err)
+	t.Run("an address literal the reference names", func(t *testing.T) {
+		c := NewClient()
+		trust(t, c, f.srv)
+		before := len(f.requests())
+
+		_, err := c.FetchWorkload(t.Context(), registry+"/org/kit@"+index, amd64)
+
+		require.ErrorIs(t, err, ErrPrivateAddress)
+		assert.Len(t, f.requests(), before, "the registry was never reached")
+	})
+	t.Run("an address literal behind a proxy", func(t *testing.T) {
+		proxy := newConnectProxy(t, registry)
+		c := NewClient()
+		proxy.use(c)
+
+		_, err := c.FetchWorkload(t.Context(), "169.254.169.254/org/kit@"+index, amd64)
+
+		require.ErrorIs(t, err, ErrPrivateAddress)
+		assert.Empty(t, proxy.asked(), "the proxy is never asked for it")
+	})
+	t.Run("a name that resolves to it", func(t *testing.T) {
+		// The reference form wants a dotted name, which a test cannot
+		// resolve without the network: the dial is asked directly.
+		_, err := NewClient().dial(t.Context(), "tcp", "localhost:"+port)
+
+		require.ErrorIs(t, err, ErrPrivateAddress)
+	})
 }

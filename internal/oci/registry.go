@@ -101,14 +101,14 @@ func (c *Client) FetchWorkload(ctx context.Context, ref string, p Platform) (Fet
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	g := newGuard(c.transport, where)
+	g.testAddr = c.testAddr
 	r := &registry{host: where, ref: digest, guard: g, opts: []remote.Option{
 		// Anonymous only. Not remote.WithAuthFromKeychain, and never the
 		// library's default keychain, which reads the Docker config and
 		// runs credential helpers (a test holds the rule, REQ-0210).
 		remote.WithAuth(authn.Anonymous),
 		remote.WithTransport(g),
-		// The registry the reference names may be on a private network.
-		remote.WithContext(trusted(ctx, registryAddr(where))),
+		remote.WithContext(ctx),
 		// One attempt: a retry of a refusal would be a second request to
 		// a registry that said no, and the caller can rerun the command.
 		remote.WithRetryBackoff(remote.Backoff{Steps: 1}),

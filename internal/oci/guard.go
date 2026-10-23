@@ -34,6 +34,9 @@ type guard struct {
 	// host is the registry's name, the site its token realm must be on;
 	// addr is its host:port as the library names it.
 	host, addr string
+	// testAddr is the Client's: the one host:port of a test that is let
+	// through whatever its address.
+	testAddr string
 
 	mu sync.Mutex
 	// realms are the token realms the registry's 401 named, which were
@@ -66,6 +69,9 @@ func (g *guard) RoundTrip(req *http.Request) (*http.Response, error) {
 	case u.Scheme != "https" || u.Host == "" || u.User != nil:
 		return nil, fmt.Errorf("%w: %s", ErrInsecure, quote(u.Redacted()))
 	}
+	if err := g.checkLiteral(u); err != nil {
+		return nil, err
+	}
 	resp, err := g.inner.RoundTrip(req)
 	if err != nil {
 		return nil, err
@@ -76,6 +82,22 @@ func (g *guard) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	resp.Body = io.NopCloser(bytes.NewReader(body))
 	return resp, nil
+}
+
+// checkLiteral refuses a request to an address literal that is not a
+// public one, on every hop. The dial guard holds the same rule, but behind
+// a proxy the dial is to the proxy, which would be asked to reach the
+// address (CONNECT 10.1.2.3:443): the literal is judged here, before the
+// proxy is. A name is left to the dial, or to the proxy.
+func (g *guard) checkLiteral(u *url.URL) error {
+	if _, err := netip.ParseAddr(u.Hostname()); err != nil || (g.testAddr != "" && u.Host == g.testAddr) {
+		return nil
+	}
+	port := u.Port()
+	if port == "" {
+		port = "443"
+	}
+	return checkPublic(net.JoinHostPort(u.Hostname(), port))
 }
 
 // redirects returns how many redirects led to req.
