@@ -7,7 +7,9 @@
 // is resolved to the path of its pinned install (WhichPinned), the
 // files mise reads as its configuration, and the version of mise that
 // ci.yml pins, with the one path every mise command starts (Path). It
-// is a helper of the checks and registers no check.
+// is a helper of the checks, and the package of the mise check of 10
+// 10.2 (check.go): the logic of julieta lock --check on this
+// repository's mise files and on the examples'.
 package mise
 
 import (

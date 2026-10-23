@@ -19,6 +19,7 @@ type step func(ctx context.Context, r *run)
 var steps = []step{
 	linkBinary,
 	syncRepos,
+	installTools,
 	checkMemory,
 	recordSnapshotsDisabled,
 	installDispatcher,

@@ -62,6 +62,7 @@ func TestRegisteredChecks(t *testing.T) {
 		{"vulnerabilities", false, false, true, false, "steps"},
 		{"license", false, false, true, false, "steps"},
 		{"tagged suites", false, false, true, false, "steps"},
+		{"mise", false, false, true, true, "steps"},
 		{"race", true, false, true, true, "steps"},
 		{"container", false, false, true, true, "steps"},
 		{"cross build", false, false, true, false, "steps"},

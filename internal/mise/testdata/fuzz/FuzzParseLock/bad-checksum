@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("lockfile_version = 3\n[[tools.gh]]\nversion = \"1\"\nbackend = \"aqua:cli/cli\"\n[tools.gh.\"platforms.linux-x64\"]\nchecksum = \"md5:zz\"\n")

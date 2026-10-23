@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Dev tools for this repository. Each version is exact. mise.lock holds
+# the checksums for linux-x64, linux-arm64, macos-x64 and macos-arm64 of
+# each tool mise downloads; the mise go backend builds the go: tools from
+# source, so their integrity rests on the Go checksum database.
+
+[settings]
+lockfile = true
+
+[tools]
+go = "1.27.3"
+gh = "2.102.0"
+golangci-lint = "2.14.0"
+"go:golang.org/x/tools/gopls" = "0.23.0"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.8.0"

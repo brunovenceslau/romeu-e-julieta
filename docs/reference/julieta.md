@@ -32,6 +32,8 @@ julieta <command> [flags]
 * [julieta completion](julieta/completion.md) - print the shell completion script
 * [julieta handoff](julieta/handoff.md) - the handoff commands
 * [julieta hooks](julieta/hooks.md) - the hooks commands
+* [julieta install](julieta/install.md) - install the locked tools of every repo with mise
+* [julieta lock](julieta/lock.md) - lock the tools of a repo's mise.toml, or check that its mise.lock is fresh
 * [julieta memory](julieta/memory.md) - the memory commands
 * [julieta setup](julieta/setup.md) - prepare the sandbox: the PATH link, the repos and their default branches
 * [julieta snapshot](julieta/snapshot.md) - bundle the unpushed work of a repo into its memory dir's snapshot/

@@ -35,6 +35,7 @@ after:
   - T156
 ask_first:
   - checks
+  - contracts
   - dependencies
 sitting: none
 ---
@@ -64,8 +65,14 @@ through `internal/procgroup` (T137).
   REQ-0617 (07 7.3), REQ-0618 (07 7.3), REQ-0619 (07 7.3), REQ-0620 (07
   7.3), REQ-0621 (07 7.3), REQ-0625 (07 7.4), REQ-0637 (07 7.5),
   REQ-0740 (10 10.1), REQ-0791 (10 10.1), REQ-0845 (10 10.2), REQ-0960
-  (10 10.6), REQ-1045 (12 12.1), REQ-1049 (12 12.1).
+  (10 10.6), REQ-1045 (12 12.1), REQ-1049 (12 12.1), REQ-1269 (04 4.4),
+  REQ-1270 (05 5.4), REQ-1271 (07 7.3), REQ-1272 (07 7.4).
 - Operator: no.
+- Re-plan (2026-10-22): the maintainer decided that a lock entry without a
+  checksum is a finding with an exceptions file (REQ-0407, REQ-0620,
+  REQ-1271), that the mise environment holds `MISE_PARANOID=1`, no token
+  and no configuration of the caller (REQ-0426, REQ-0621), and that the
+  sigstore host is allowed (REQ-1272); `install` runs the check itself.
 - Acceptance:
   - `install` runs with the environment of 04 4.3 and skips when the
     `lock-set` digest equals the last success; `--force` overrides; a
@@ -75,11 +82,14 @@ through `internal/procgroup` (T137).
   - `lock` runs `mise lock --platform` with `linux-x64`, `linux-arm64`
     and the platforms of the repo's `lockfile_platforms`, and rewrites
     `mise.lock`; `lock --check` writes nothing and exits 6
-    (`check-findings`) on a tool without a lock entry or a lockable
-    entry without both linux platforms; it warns `lock-no-checksum` for
-    an entry without a checksum, naming the fix of 07 7.5 step 2; `lock
-    --check` lands without the catalog lookup, and the
-    `lock-unknown-tool` warning is T036's.
+    (`check-findings`) on a tool without a lock entry, a lockable
+    entry without both linux platforms, a platform of a lockable entry
+    without a checksum (`lock-no-checksum`, excused tool by tool in
+    `.julieta/lock-exceptions`, REQ-0407, REQ-1271) or with one that is
+    not `sha256:` and 64 lowercase hexadecimal digits
+    (`lock-bad-checksum`), and on a file that does not parse
+    (`lock-unparsed`); `lock --check` lands without the catalog lookup,
+    and the `lock-unknown-tool` warning is T036's.
   - `install` warns `version-only-tool` once per version-only tool (07
     7.3); the version-only backend list is read again at a mise pin bump
     and named in that pull request's Evidence.

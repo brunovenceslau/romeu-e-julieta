@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("[tools]\na.a.a.a.a.a.a.a = 1\n")

@@ -77,3 +77,9 @@ the v3-kits record is merged before the first kit lands (12 12.5):
   '^TestKitJulieta' -v`. The pattern names the `TestKitJulieta*`
   functions this task adds, and the reviewer reads them in the `-v`
   output (10 10.8).
+
+Re-plan (2026-10-22): resolving `mise` by a fixed path is deferred to
+this task. The manifest carries the path of the kit's mise, and julieta
+runs mise by that path instead of finding `mise` on `PATH`. Reopened by:
+T077 defining where the kit installs mise. Until then julieta runs the
+`mise` that `PATH` resolves (T053).

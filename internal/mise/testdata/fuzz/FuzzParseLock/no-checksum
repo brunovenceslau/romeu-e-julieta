@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("lockfile_version = 3\n[[tools.go]]\nversion = \"1\"\nbackend = \"core:go\"\n[tools.go.\"platforms.linux-x64\"]\nurl = \"https://x\"\n")

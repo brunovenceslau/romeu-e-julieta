@@ -3,6 +3,7 @@ module github.com/brunovenceslau/romeu-e-julieta
 go 1.27.3
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/google/renameio/v2 v2.0.2
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
