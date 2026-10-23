@@ -4,12 +4,14 @@
 package shquote_test
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/shquote"
 )
 
@@ -160,3 +162,49 @@ func split(t *testing.T, line string) []string {
 
 // safe are the bytes a bare word may hold.
 const safe = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-./:,+@%"
+
+// shWords are words a quoted line must carry through a real shell:
+// every class of byte sh reads as syntax, whitespace of each kind, an
+// empty word, text outside ASCII and the single quote in each place.
+var shWords = []string{
+	"", "abc", "/usr/bin/security", "-n", "-e", "--", "a b", "a\tb", "a\nb", "\n", " ",
+	"it's", "'", "''", "'a'", `a\b`, `\`, `a"b`, "$HOME", "${HOME}", "$(id)", "`id`", "$((1+1))",
+	"a;b", "a&b", "a|b", "a>b", "a<b", "(a)", "{a,b}", "*", "*.go", "a?", "[a]", "~", "~root", "#x", "a#b",
+	"A=b", "!", "%s", `\0`, "é", "日本", "\x7f", "\x01", "op://dev/it's a token",
+}
+
+// shPrint runs line through /bin/sh, as the arguments of a printf that
+// writes each one followed by a NUL, and returns the words it wrote. The
+// shell is started through internal/procgroup, under the class of a
+// secret argv, which is the line this package quotes for (03 3.3). Only
+// a test runs sh -c: REQ-0959 holds romeu to never run it.
+func shPrint(t *testing.T, line string) []string {
+	t.Helper()
+	require.FileExists(t, "/bin/sh", "this test reads the quoted words back through a real /bin/sh, which every supported host has")
+	var out, errOut bytes.Buffer
+	err := procgroup.Run(t.Context(), procgroup.Command{
+		Class:  procgroup.Secret,
+		Argv:   []string{"/bin/sh", "-c", `printf '%s\0' ` + line},
+		Env:    []string{"PATH=/usr/bin:/bin", "HOME=/nonexistent", "LC_ALL=C"},
+		Stdout: &out,
+		Stderr: &errOut,
+	})
+	require.NoError(t, err, "sh: %s", errOut.String())
+	got := strings.Split(out.String(), "\x00")
+	require.Empty(t, got[len(got)-1], "printf ends each word with a NUL")
+	return got[:len(got)-1]
+}
+
+// A real /bin/sh reads each word Quote writes, and the line Join writes,
+// back as the words given, byte for byte: what the hand-written split of
+// FuzzQuote models is what the shell does.
+func TestQuoteThroughARealShell(t *testing.T) {
+	for _, w := range shWords {
+		q, err := shquote.Quote(w)
+		require.NoError(t, err)
+		assert.Equal(t, []string{w}, shPrint(t, q), "the word %q quoted as %s", w, q)
+	}
+	line, err := shquote.Join(shWords)
+	require.NoError(t, err)
+	assert.Equal(t, shWords, shPrint(t, line))
+}
