@@ -38,12 +38,19 @@ const SpecPath = "docs/spec/10-testing-style.md"
 // workflowsDir holds the workflows, the invocations of CI.
 const workflowsDir = ".github/workflows/"
 
+// actionsDir holds the local actions a workflow may call: every file of
+// it, action.yml and the scripts it runs alike, is judged line by line.
+const actionsDir = ".github/actions/"
+
 // toolsCIDir holds tools/ci, whose steps are the commands CI runs.
 const toolsCIDir = "tools/ci/"
 
 // updateWord finds the flag as a word of a command: -update, --update
-// or the -test.update form go test passes on, alone or with a value.
-var updateWord = regexp.MustCompile(`(?:^|[\s'"])--?(?:test\.)?update(?:[=\s'"]|$)`)
+// or the -test.update form go test passes on, alone or with a value,
+// after a space, a quote, an "=" (a variable that holds flags), a ","
+// (a flow list) or a "(", and ended by the end of the word, of the
+// list or of the group.
+var updateWord = regexp.MustCompile(`(?:^|[\s'"=,(])--?(?:test\.)?update(?:[=\s'",)\]]|$)`)
 
 // bases are the refs whose merge base with the commit the changed
 // goldens are listed against, the first that resolves.
@@ -131,12 +138,15 @@ func Dirs(files []check.TreeFile) ([]string, error) {
 	return nil, fmt.Errorf("golden: %s has no Golden row", SpecPath)
 }
 
-// UpdateFindings returns a finding for each command line of a workflow,
-// and each string literal of the source of tools/ci outside its tests,
-// that passes -update: CI never rewrites a golden (REQ-0942). These are
-// the two places a CI invocation is written: the workflows call
-// tools/ci, and tools/ci builds every command a step runs. A comment
-// line of a workflow, or a Go comment, is prose and is not judged.
+// UpdateFindings returns a finding for each command line of a workflow
+// or of a file of a local action, and each string literal of the source
+// of tools/ci outside its tests, that passes -update: CI never rewrites
+// a golden (REQ-0942). These are the places a CI invocation is written:
+// the workflows call tools/ci and the local actions, and tools/ci
+// builds every command a step runs. A comment line of a workflow or an
+// action, or a Go comment, is prose and is not judged. A runtime guard
+// stands behind this scan: a golden test refuses -update in CI itself
+// (FailOnUpdateInCI).
 func UpdateFindings(files []check.TreeFile) []check.Finding {
 	var out []check.Finding
 	add := func(path string, line int) {
@@ -148,7 +158,8 @@ func UpdateFindings(files []check.TreeFile) []check.Finding {
 	}
 	for _, f := range files {
 		switch {
-		case strings.HasPrefix(f.Path, workflowsDir) && (strings.HasSuffix(f.Path, ".yml") || strings.HasSuffix(f.Path, ".yaml")):
+		case strings.HasPrefix(f.Path, workflowsDir) && (strings.HasSuffix(f.Path, ".yml") || strings.HasSuffix(f.Path, ".yaml")),
+			strings.HasPrefix(f.Path, actionsDir):
 			n := 0
 			for line := range strings.Lines(string(f.Content)) {
 				n++
