@@ -25,52 +25,61 @@ import (
 
 // The julieta kit (06 6.4), read from kits/julieta/ of the repository:
 // its descriptor, and its install steps run once in the workload's base
-// as a smoke test (10 10.1). A kit build is what probe B2 measures; the
-// steps here are the descriptor's own commands, run by docker exec in
-// the order and as the user the descriptor names, with the environment
-// the hook declares and nothing else of the kit's args.
+// as a smoke test (10 10.1), composed with os-base
+// (kit_os_base_test.go), as a project spec lists both. A kit build is
+// what probe B2 measures; the steps here are the descriptor's own
+// commands, run by docker exec in the order and as the user the
+// descriptor names, with the environment the hook declares and nothing
+// else of the kit's args.
 
-// The paths the steps use, which the cases assert against.
+// The paths the steps use, which the cases assert against. kitStageRoot
+// is where sbx stages each kit's directory, by its name.
 const (
-	kitStage   = "/usr/share/sandbox/kit/julieta"
-	kitWorkDir = "/var/lib/julieta-kit-install"
-	bashEnvRel = "/etc/sandbox-persistent.sh"
-	pathLine   = `export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"`
+	kitStageRoot = "/usr/share/sandbox/kit/"
+	kitStage     = kitStageRoot + "julieta"
+	kitWorkDir   = "/var/lib/julieta-kit-install"
+	bashEnvRel   = "/etc/sandbox-persistent.sh"
+	pathLine     = `export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"`
 )
 
 // kitDescriptor is the part of the descriptor these cases read, decoded
 // with no unknown key.
 type kitDescriptor struct {
-	SchemaVersion string `yaml:"schemaVersion"`
-	Kind          string `yaml:"kind"`
-	DisplayName   string `yaml:"displayName"`
-	Description   string `yaml:"description"`
-	Args          map[string]struct {
-		Default     string `yaml:"default"`
-		Description string `yaml:"description"`
-		Pattern     string `yaml:"pattern"`
-		Env         string `yaml:"env"`
-	} `yaml:"args"`
-	Capabilities []struct {
+	SchemaVersion string            `yaml:"schemaVersion"`
+	Kind          string            `yaml:"kind"`
+	DisplayName   string            `yaml:"displayName"`
+	Description   string            `yaml:"description"`
+	Args          map[string]kitArg `yaml:"args"`
+	Capabilities  []struct {
 		Type   string    `yaml:"type"`
 		Config yaml.Node `yaml:"config"`
 	} `yaml:"capabilities"`
 }
 
-// kitHook is one install hook.
-type kitHook struct {
-	Description string   `yaml:"description"`
-	User        string   `yaml:"user"`
-	Env         []string `yaml:"env"`
-	Command     []string `yaml:"command"`
+// kitArg is one arg of a descriptor.
+type kitArg struct {
+	Default     string `yaml:"default"`
+	Description string `yaml:"description"`
+	Pattern     string `yaml:"pattern"`
+	Env         string `yaml:"env"`
 }
 
-// readKit returns the kit's directory and descriptor source, and its
-// descriptor decoded.
-func readKit(t *testing.T) (dir string, d kitDescriptor, src []byte) {
+// kitHook is one install hook, with the args of the kit it belongs to,
+// from which it takes the environment it declares.
+type kitHook struct {
+	Description string            `yaml:"description"`
+	User        string            `yaml:"user"`
+	Env         []string          `yaml:"env"`
+	Command     []string          `yaml:"command"`
+	args        map[string]kitArg `yaml:"-"`
+}
+
+// readKit returns the directory and descriptor source of the kit name,
+// and its descriptor decoded.
+func readKit(t *testing.T, name string) (dir string, d kitDescriptor, src []byte) {
 	t.Helper()
-	dir = filepath.Join(config(t).Root, "kits", "julieta")
-	src, err := os.ReadFile(filepath.Join(dir, "julieta.yaml"))
+	dir = filepath.Join(config(t).Root, "kits", name)
+	src, err := os.ReadFile(filepath.Join(dir, name+".yaml"))
 	require.NoError(t, err)
 	dec := yaml.NewDecoder(bytes.NewReader(src))
 	dec.KnownFields(true)
@@ -107,6 +116,9 @@ func (d kitDescriptor) hooks(t *testing.T) []kitHook {
 				Install []kitHook `yaml:"install"`
 			}
 			require.NoError(t, c.Config.Decode(&cfg))
+			for i := range cfg.Install {
+				cfg.Install[i].args = d.Args
+			}
 			return cfg.Install
 		}
 	}
@@ -132,10 +144,10 @@ const (
 // the shape the workload's own descriptor uses (the fixture), naming the
 // install phase and the two domains of REQ-0592 and no other host; args
 // with a pattern and an environment name, and no arg pasted into any
-// script; and TZ from the arg tz with the default Etc/UTC, since the kit
-// has no os-base (REQ-0593).
+// script; and no arg tz, since TZ is os-base's now that A12 found
+// packages the workload lacks (REQ-0593, 02 2.1).
 func TestKitJulietaDescriptor(t *testing.T) {
-	_, d, src := readKit(t)
+	_, d, src := readKit(t, "julieta")
 	assert.Equal(t, "3", d.SchemaVersion)
 	assert.Equal(t, "mixin", d.Kind)
 	first, _, _ := strings.Cut(string(src), "\n")
@@ -178,8 +190,7 @@ func TestKitJulietaDescriptor(t *testing.T) {
 		assert.NotEmpty(t, a.Pattern, "%s has a pattern", name)
 		assert.NotEmpty(t, a.Env, "%s reaches the steps as an environment variable", name)
 	}
-	assert.Equal(t, "Etc/UTC", d.Args["tz"].Default, "TZ is set from the arg tz, whose default is Etc/UTC")
-	assert.Equal(t, "TZ", d.Args["tz"].Env)
+	assert.NotContains(t, d.Args, "tz", "TZ is os-base's (REQ-0593)")
 	assert.NotContains(t, d.Args, "bashEnv", "the BASH_ENV file is the workload's, at a fixed path")
 
 	hooks := d.hooks(t)
@@ -197,12 +208,13 @@ func TestKitJulietaDescriptor(t *testing.T) {
 }
 
 // kitSandbox is a container of the workload that outlives its commands,
-// so the install hooks run in it one after the other.
+// so the install hooks run in it one after the other. d is the julieta
+// kit's descriptor, and base os-base's.
 type kitSandbox struct {
-	t   *testing.T
-	id  string
-	d   kitDescriptor
-	dir string
+	t    *testing.T
+	id   string
+	d    kitDescriptor
+	base kitDescriptor
 }
 
 // dockerOut runs one docker command of the case and returns its output,
@@ -220,22 +232,26 @@ func dockerOut(t *testing.T, args ...string) (string, error) {
 	return out.String(), err
 }
 
-// startKit starts a container of the workload with the kit directory
-// mounted read-only where sbx stages it, and removes it at the end of the
-// case.
-func startKit(t *testing.T) kitSandbox {
+// startKit starts a container of the workload with the directories of
+// the julieta and os-base kits mounted read-only where sbx stages them,
+// and extra docker run options, and removes it at the end of the case.
+func startKit(t *testing.T, extra ...string) kitSandbox {
 	t.Helper()
-	dir, d, _ := readKit(t)
+	dir, d, _ := readKit(t, "julieta")
+	baseDir, base, _ := readKit(t, "os-base")
 	w := workload(t)
-	require.False(t, strings.ContainsAny(dir, ",="), "a bind mount cannot name %s", dir)
-	out, err := dockerOut(t, "run", "-d", "--rm", "--pull=never",
-		"--security-opt=no-new-privileges", "--pids-limit=256", "--memory=1g",
-		"--mount", "type=bind,source="+dir+",target="+kitStage+",readonly",
-		"--entrypoint", "sleep", w.Pins.Workload.Ref, "3600")
+	args := []string{"run", "-d", "--rm", "--pull=never",
+		"--security-opt=no-new-privileges", "--pids-limit=256", "--memory=1g"}
+	for _, m := range [][2]string{{dir, kitStage}, {baseDir, kitStageRoot + "os-base"}} {
+		require.False(t, strings.ContainsAny(m[0], ",="), "a bind mount cannot name %s", m[0])
+		args = append(args, "--mount", "type=bind,source="+m[0]+",target="+m[1]+",readonly")
+	}
+	args = append(args, extra...)
+	out, err := dockerOut(t, append(args, "--entrypoint", "sleep", w.Pins.Workload.Ref, "3600")...)
 	require.NoError(t, err, "%s", out)
 	id := strings.TrimSpace(out)
 	t.Cleanup(func() { _, _ = dockerOut(t, "rm", "-f", id) })
-	return kitSandbox{t: t, id: id, d: d, dir: dir}
+	return kitSandbox{t: t, id: id, d: d, base: base}
 }
 
 // exec runs argv in the container as user, with extra environment, and
@@ -261,13 +277,13 @@ func (k kitSandbox) sh(user, script string) (string, int) {
 	return k.exec(user, nil, "bash", "-c", script)
 }
 
-// hookEnv returns the environment a hook gets from the kit's args: each
+// hookEnv returns the environment a hook gets from its kit's args: each
 // name it declares that an arg carries as env, with the arg's default.
 // An undeclared name is not passed, as with sbx.
-func (k kitSandbox) hookEnv(h kitHook) []string {
+func hookEnv(h kitHook) []string {
 	var env []string
 	for _, name := range h.Env {
-		for _, a := range k.d.Args {
+		for _, a := range h.args {
 			if a.Env == name {
 				env = append(env, name+"="+a.Default)
 			}
@@ -286,7 +302,7 @@ var transport = []int{6, 7, 28, 35, 52, 56}
 // of its download ends the case as an infrastructure error.
 func (k kitSandbox) run(h kitHook, env ...string) (string, int) {
 	k.t.Helper()
-	out, code := k.exec(h.User, append(k.hookEnv(h), env...), h.Command...)
+	out, code := k.exec(h.User, append(hookEnv(h), env...), h.Command...)
 	if slices.Contains(transport, code) {
 		container.Fail(k.t, &container.InfraError{Precondition: "the download of an install step of the julieta kit", Err: fmt.Errorf("exit %d: %s", code, strings.TrimSpace(out))})
 	}
@@ -308,16 +324,18 @@ func withSums(h kitHook, path string) kitHook {
 	c := slices.Clone(h.Command)
 	last := len(c) - 1
 	c[last] = strings.ReplaceAll(c[last], kitStage+"/SHA256SUMS", path)
-	return kitHook{Description: h.Description, User: h.User, Env: h.Env, Command: c}
+	return kitHook{Description: h.Description, User: h.User, Env: h.Env, Command: c, args: h.args}
 }
 
 // TestKitJulietaInstall runs the install steps once, in the order of the
 // descriptor, in a container of the workload (network by the rule of
-// 10 10.1 and Q27), then asserts what they leave: mise and herdr at the
+// 10 10.1 and Q27), followed by those of os-base, as the project spec of
+// 03 lists the kits; then asserts what they leave: mise and herdr at the
 // pinned versions (REQ-0589), the PATH lines in ~/.zshenv and in the
-// BASH_ENV file, so a non-interactive bash finds julieta and the shims
-// (REQ-0590), the herdr config that herdr itself accepts (REQ-0591), the
-// download directory gone, and TZ.
+// BASH_ENV file, so a non-interactive bash and zsh find julieta and the
+// shims (REQ-0590), the herdr config that herdr itself accepts
+// (REQ-0591), the download directory gone, and that TZ from os-base's
+// arg names a real zone.
 func TestKitJulietaInstall(t *testing.T) {
 	k := startKit(t)
 	w := workload(t)
@@ -332,6 +350,7 @@ func TestKitJulietaInstall(t *testing.T) {
 	require.Zero(t, code, ownerBefore)
 
 	k.runAll(hooks...)
+	k.runBase()
 
 	out, code := k.exec("1000", nil, "mise", "--version")
 	require.Zero(t, code, out)
@@ -361,6 +380,10 @@ chmod +x "$HOME/.local/bin/e2e-julieta" "$HOME/.local/share/mise/shims/e2e-shim"
 	for _, name := range []string{"e2e-julieta", "e2e-shim"} {
 		out, code = k.exec("1000", nil, "env", "-i", "HOME=/home/agent", "PATH=/usr/bin:/bin", "BASH_ENV="+bashEnvRel, "bash", "-c", "command -v "+name)
 		assert.Zero(t, code, "a non-interactive bash does not find %s: %s", name, out)
+		// zsh, which os-base brings, reads ~/.zshenv in every shell,
+		// interactive or not.
+		out, code = k.exec("1000", nil, "env", "-i", "HOME=/home/agent", "PATH=/usr/bin:/bin", "zsh", "-c", "whence -p "+name)
+		assert.Zero(t, code, "a non-interactive zsh does not find %s: %s", name, out)
 	}
 
 	cfg, code := k.sh("1000", `cat "$HOME/.config/herdr/config.toml"`)
@@ -377,17 +400,11 @@ printf '[update]\nbogus = false\n' > /tmp/h2/.config/herdr/config.toml
 HOME=/tmp/h2 herdr config check`)
 	assert.NotZero(t, code, "herdr config check accepted an unknown key: %s", out)
 
-	// TZ: the arg's default gives the offset 0. The workload carries no
-	// tzdata, so libc reads "Etc/UTC" as an unknown zone, prints the
-	// abbreviation "Etc" and uses offset 0; the arg tz is inert for any
-	// real zone until a package brings the database. This assertion fails
-	// the day /usr/share/zoneinfo appears, and then the case and the task
-	// are read again (os-base waits for the measurement of A12).
-	_, code = k.sh("1000", "test ! -e /usr/share/zoneinfo")
-	assert.Zero(t, code, "the workload carries tzdata now: the arg tz is no longer inert")
-	out, code = k.exec("1000", nil, "env", "TZ="+k.d.Args["tz"].Default, "date", "+%z")
-	require.Zero(t, code, out)
-	assert.Equal(t, "+0000\n", out)
+	// TZ: os-base's tzdata makes the arg tz name a real zone. Its default
+	// is UTC by name, and a zone with summer time resolves to one of its
+	// two abbreviations; without the database libc would print "Etc" and
+	// "Europe" with offset 0.
+	assertZones(t, k)
 }
 
 // TestKitJulietaKeepsWhatIsThere holds the appends: a ~/.zshenv, a

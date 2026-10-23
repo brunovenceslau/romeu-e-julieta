@@ -1,0 +1,57 @@
+# syntax=docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# The os-base product kit (06 6.4, REQ-0593): the apt packages the
+# workload lacks, and TZ. A12, measured on 2026-10-23 on the pinned
+# workload (kits/pins.yaml) on sbx v0.49.2, linux/arm64, found two:
+# tzdata (no /usr/share/zoneinfo, so no zone but UTC resolves) and zsh.
+# The set is that minimum; a package joins it only by a measurement.
+#
+# The apt delta is not pinned: the versions are those of the Debian
+# mirror on the day of the build, a residual risk of 05 5.4, with pinning
+# a row of the deferred decisions of the spec. apt checks the signature
+# of the mirror's index against the keyring of the workload, which is
+# what holds the packages; the transport is the workload's own, plain
+# HTTP to deb.debian.org.
+#
+# apt reads only the workload's Debian sources
+# (/etc/apt/sources.list.d/debian.sources: deb.debian.org/debian and
+# deb.debian.org/debian-security, one host), not its other source file,
+# so the install phase opens that one host and nothing else. apt-get
+# update ends with status 0 when an index fails to download, so it runs
+# with --error-on=any; a failed install then stops the step through -e.
+# The lists are removed at the end, as the workload's image ships none.
+#
+# TZ is this kit's (02 2.1: os-base carries the TZ arg; REQ-0593): the
+# arg tz reaches the sandbox as the environment variable TZ, and with
+# tzdata a real zone resolves.
+schemaVersion: "3"
+kind: mixin
+displayName: os-base
+description: tzdata and zsh from the Debian mirror at build, unpinned (05 5.4), and TZ from the arg tz
+args:
+  tz:
+    default: Etc/UTC
+    description: The time zone of the sandbox, a name of the tz database, such as Europe/Lisbon.
+    pattern: '^[A-Za-z0-9._/+-]+$'
+    env: TZ
+capabilities:
+  - type: com.docker.sandbox/network-policy@1
+    config:
+      install:
+        allow:
+          - deb.debian.org:80
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        - description: tzdata and zsh, from the Debian sources of the workload
+          user: "0"
+          command:
+            - bash
+            - -euc
+            - |
+              S=(-o Dir::Etc::SourceList=/etc/apt/sources.list.d/debian.sources -o Dir::Etc::SourceParts=/dev/null)
+              apt-get "${S[@]}" --error-on=any update
+              DEBIAN_FRONTEND=noninteractive apt-get "${S[@]}" install -y --no-install-recommends tzdata zsh
+              rm -rf /var/lib/apt/lists/*

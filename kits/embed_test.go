@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 )
 
 // hasDescriptor reports whether dir, in fsys, holds a .yaml descriptor
@@ -29,24 +31,30 @@ func hasDescriptor(t *testing.T, fsys fs.FS, dir string) bool {
 	return false
 }
 
-// filesBelow returns every file below dir in fsys, the whole tree.
+// filesBelow returns every file below dir in fsys, the whole tree but
+// the testdata/ directories, which are a kit's tests and not its content.
 func filesBelow(t *testing.T, fsys fs.FS, dir string) []string {
 	t.Helper()
 	var files []string
 	require.NoError(t, fs.WalkDir(fsys, dir, func(p string, d fs.DirEntry, err error) error {
-		if err == nil && !d.IsDir() {
+		switch {
+		case err != nil:
+			return err
+		case d.IsDir() && d.Name() == "testdata":
+			return fs.SkipDir
+		case !d.IsDir():
 			files = append(files, p)
 		}
-		return err
+		return nil
 	}))
 	return files
 }
 
 // TestFSHoldsEveryProductKit holds the embed both ways: each kit
 // directory of kits/ (a directory with a descriptor) is in FS with its
-// files, and FS holds nothing else, so neither pins.yaml nor the
-// material of the mise bootstrap (kits/mise has no descriptor) is
-// embedded.
+// files but its testdata/, and FS holds nothing else, so neither
+// pins.yaml nor the material of the mise bootstrap (kits/mise has no
+// descriptor) nor a kit's tests is embedded.
 func TestFSHoldsEveryProductKit(t *testing.T) {
 	disk := os.DirFS(".")
 	top, err := fs.ReadDir(disk, ".")
@@ -57,7 +65,7 @@ func TestFSHoldsEveryProductKit(t *testing.T) {
 			onDisk = append(onDisk, e.Name())
 		}
 	}
-	require.Contains(t, onDisk, "julieta")
+	require.Subset(t, onDisk, []string{"julieta", "os-base", "git-ssh-sign"})
 
 	var embedded []string
 	entries, err := fs.ReadDir(FS, ".")
@@ -71,6 +79,24 @@ func TestFSHoldsEveryProductKit(t *testing.T) {
 
 	for _, name := range onDisk {
 		assert.ElementsMatch(t, filesBelow(t, disk, name), filesBelow(t, FS, name), "the files of %s", name)
+	}
+}
+
+// TestEveryKitParses reads each embedded descriptor with the product's
+// one descriptor grammar (internal/oci, REQ-0570), the gate a rendered
+// kit passes, so a kit of this directory that the gate would refuse
+// fails here first.
+func TestEveryKitParses(t *testing.T) {
+	entries, err := fs.ReadDir(FS, ".")
+	require.NoError(t, err)
+	require.NotEmpty(t, entries)
+	for _, e := range entries {
+		src, err := fs.ReadFile(FS, path.Join(e.Name(), e.Name()+".yaml"))
+		require.NoError(t, err, "the descriptor of %s is <name>/<name>.yaml", e.Name())
+		kit, err := oci.ParseDescriptor(src)
+		require.NoError(t, err, e.Name())
+		assert.Equal(t, e.Name(), kit.DisplayName)
+		assert.Equal(t, "mixin", kit.Capabilities.Kind, "%s: a product kit is a mixin (06 6.4)", e.Name())
 	}
 }
 
