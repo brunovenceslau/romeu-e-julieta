@@ -6,11 +6,14 @@
 package gitsafe
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
 // TestCommitFileRealGit reads a file of a commit by its path from the
@@ -54,13 +57,46 @@ func TestCommitFileRealGit(t *testing.T) {
 	}
 }
 
+// TestCommitFileAtTheLimit: a file of exactly limit bytes is read, and
+// one of limit+1 bytes is refused (TestCommitFileRefuses).
+func TestCommitFileAtTheLimit(t *testing.T) {
+	dir, _ := newRepo(t)
+	exact := writeBlob(t, dir, strings.Repeat("x", 10))
+	c := commitTree(t, dir, writeTree(t, dir, rawEntry{"100644", "exact", exact}))
+	data, found, err := newRunner(t, Host).CommitFile(t.Context(), dir, c, "exact", 10)
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, strings.Repeat("x", 10), string(data))
+}
+
+// TestCommitFileOverTheLimitReadsNoBlob: the size ls-tree reports refuses a
+// file of limit+1 bytes, before git cat-file reads it.
+func TestCommitFileOverTheLimitReadsNoBlob(t *testing.T) {
+	dir, _ := newRepo(t)
+	big := writeBlob(t, dir, strings.Repeat("x", 11))
+	c := commitTree(t, dir, writeTree(t, dir, rawEntry{"100644", "big", big}))
+	r := newRunner(t, Host)
+	var started [][]string
+	run := r.start
+	r.start = func(ctx context.Context, cmd procgroup.Command) error {
+		started = append(started, cmd.Argv)
+		return run(ctx, cmd)
+	}
+	_, _, err := r.CommitFile(t.Context(), dir, c, "big", 10)
+	require.ErrorIs(t, err, ErrRefused)
+	require.NotEmpty(t, started)
+	for _, argv := range started {
+		assert.NotContains(t, argv, "cat-file")
+	}
+}
+
 // TestCommitFileRefuses: a path, a commit, a mode and a size gitsafe
 // does not accept are each ErrRefused, and git never reads the blob of
 // a file over the limit.
 func TestCommitFileRefuses(t *testing.T) {
 	dir, head := newRepo(t)
 	blob := writeBlob(t, dir, "x\n")
-	big := writeBlob(t, dir, strings.Repeat("x", 11))
+	big := writeBlob(t, dir, strings.Repeat("x", 11)) // limit + 1
 	nested := writeTree(t, dir, rawEntry{"100644", "f", blob})
 	c := commitTree(t, dir, writeTree(t, dir,
 		rawEntry{"100644", "big", big},
