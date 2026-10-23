@@ -13,6 +13,10 @@
 //   - the zero-width characters U+200B to U+200D, U+2060 and U+FEFF;
 //   - the tag characters, U+E0000 to U+E007F;
 //   - U+2028 and U+2029, the line and paragraph separators;
+//   - the spaces that look like U+0020, U+00A0, U+2000 to U+200A,
+//     U+205F and U+3000, and U+2800, the braille pattern blank, which
+//     looks like nothing: two lines that differ only in them would
+//     print alike;
 //   - the Unicode property Default_Ignorable_Code_Point, which adds
 //     among others U+00AD, U+034F, U+2061 to U+2064, U+206A to U+206F,
 //     the variation selectors, the Hangul fillers and the unassigned
@@ -58,13 +62,18 @@ import (
 var escapedRanges = []struct{ lo, hi rune }{
 	{0x0000, 0x001F},   // C0 controls
 	{0x007F, 0x009F},   // delete and the C1 controls
+	{0x00A0, 0x00A0},   // no-break space (look-alike space)
 	{0x061C, 0x061C},   // arabic letter mark (bidi)
+	{0x2000, 0x200A},   // en quad to hair space (look-alike spaces)
 	{0x200B, 0x200D},   // zero width space, non-joiner and joiner
 	{0x200E, 0x200F},   // left-to-right and right-to-left marks (bidi)
 	{0x2028, 0x2029},   // line and paragraph separators
 	{0x202A, 0x202E},   // embeddings, pop and overrides (bidi)
+	{0x205F, 0x205F},   // medium mathematical space (look-alike space)
 	{0x2060, 0x2060},   // word joiner (zero width)
 	{0x2066, 0x2069},   // isolates and their pop (bidi)
+	{0x2800, 0x2800},   // braille pattern blank (looks like nothing)
+	{0x3000, 0x3000},   // ideographic space (look-alike space)
 	{0xFEFF, 0xFEFF},   // zero width no-break space, the byte order mark
 	{0xE0000, 0xE007F}, // tag characters
 }
