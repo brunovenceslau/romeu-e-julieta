@@ -47,6 +47,23 @@ var (
 		RecoveredIn: "none: relocking writes a lock of the pinned layout",
 	}
 
+	// UpstreamShape is the error upstream-shape (RJ-310): an output of a
+	// tool or a registry the product does not own (sbx, an OCI registry)
+	// does not decode, or lacks a field romeu reads or has it mistyped.
+	// No decoder returns an absent object or an empty list for a shape it
+	// did not recognize (03, opening, REQ-0170; 01 1.4, REQ-0064). It is
+	// declared here, once, since every decoder of such an output raises
+	// it (internal/sbxdrv, internal/oci); the details name the source
+	// (the detail "upstream": "sbx", or the registry host) and the
+	// versions this release recorded.
+	UpstreamShape = Row{
+		ID:          "RJ-310",
+		Slug:        "upstream-shape",
+		Exit:        2,
+		Fix:         "decide: compare the version of the upstream tool or registry named in the details with the one pinned and the recorded versions; one outside them is reported as an issue with the details",
+		RecoveredIn: "none: the command stops before it changes any state, and a release that records the new shape reads it",
+	}
+
 	// Internal is the error internal (RJ-348): an error chain that holds
 	// no *Error, a defect of the code (10 10.1, Error ids).
 	Internal = Row{

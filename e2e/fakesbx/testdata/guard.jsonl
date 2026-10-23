@@ -1,0 +1,7 @@
+{"session":"guard","sbxVersion":"0.49.2","capturedAt":"2026-10-22","synthetic":true,"source":"hand-written test data of the fake: shapes that the guards refuse, which a recording must not make the fake accept","description":"The first call is the one form of sbx secret set romeu makes; every other call here is a form the fake exits 99 on, with an exit 0 recorded."}
+{"argv":["secret","set","<service>","--sandbox","<name>","--command","<command>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["env","run","-d","--auto-approve","<dir>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["env","run","-d","--force","<dir>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["secret","set","<service>","-t","<value>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["secret","set","<service>","--token","<value>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["secret","set","<service>"],"exit":0,"stdout":"","stderr":""}

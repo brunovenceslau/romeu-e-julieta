@@ -114,7 +114,7 @@ holds already; the host binaries link two modules for them, cobra and
 pflag, and the document generator stays in `internal/cli/clidoc`,
 which no binary imports (ADR 0015).
 
-`REQ-1056` External tools at runtime: `sbx` (host, >= v0.46.0; `REQ-1057` the versions with a
+`REQ-1056` External tools at runtime: `sbx` (host, >= v0.49.2; `REQ-1057` the versions with a
 recording set are the tested window,
 [10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract)), `git`
 (host and sandbox, floor in

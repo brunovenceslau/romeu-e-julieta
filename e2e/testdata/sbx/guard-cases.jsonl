@@ -1,0 +1,107 @@
+{"want":"I4","argv":["env","run","-d","--auto-approve","/abs/shop-env"],"note":""}
+{"want":"I4","argv":["env","run","--auto-approve=true","/abs/shop-env"],"note":""}
+{"want":"I4","argv":["stop","--auto-approve","shop"],"note":""}
+{"want":"I4","argv":["env","run","-y","/abs/shop-env"],"note":""}
+{"want":"I4","argv":["env","run","-dy","/abs/shop-env"],"note":""}
+{"want":"I4","argv":["env","rm","-y","/abs/shop-env"],"note":""}
+{"want":"I4","argv":["env","run","-d","--force","/abs/shop-env"],"note":""}
+{"want":"I4","argv":["env","create","--force","/abs/shop-env"],"note":""}
+{"want":"I4","argv":["env","run","-f","/abs/shop-env"],"note":""}
+{"want":"I4","argv":["env","run","-df","/abs/shop-env"],"note":""}
+{"want":"I4","argv":["env","run","--env-arg","x=1","-f","/abs/shop-env"],"note":""}
+{"want":"I4","argv":["env","create","-f","/abs/shop-env"],"note":""}
+{"want":"I4","argv":["env","create","-df","/abs/shop-env"],"note":""}
+{"want":"I4","argv":["-D","env","run","-d","--force","/abs/shop-env"],"note":"a global flag before the verb"}
+{"want":"I4","argv":["--debug","env","run","-d","--force","/abs/shop-env"],"note":"a global flag before the verb"}
+{"want":"I4","argv":["--cloud","-D","env","create","--force","/abs/shop-env"],"note":"two global flags before the verb"}
+{"want":"I4","argv":["-D","env","run","-y","/abs/shop-env"],"note":"a global flag before the verb"}
+{"want":"I4","argv":["run","--force","x"],"note":"top-level run is env run"}
+{"want":"I4","argv":["create","--force","x"],"note":"top-level create is env create"}
+{"want":"I4","argv":["run","-f","x"],"note":"top-level run is env run"}
+{"want":"I4","argv":["env","exec","-t","-y","/abs/shop-env","--","x"],"note":"-t is a boolean on env exec, so -y is a flag"}
+{"want":"I4","argv":["env","exec","-ty","/abs/shop-env","--","x"],"note":"-t is a boolean on env exec, so -y is a flag"}
+{"want":"I4","argv":["env","exec","-it","--auto-approve","/abs/shop-env","--","x"],"note":""}
+{"want":"I4","argv":["policy","allow","network","--sandbox","shop","-y","github.com"],"note":""}
+{"want":"I4","argv":["-D","--debug","ls","--json","-y"],"note":""}
+{"want":"I25","argv":["secret","set","github"],"note":""}
+{"want":"I25","argv":["secret","set","github","-t","ghp_x"],"note":""}
+{"want":"I25","argv":["secret","set","github","-tghp_x"],"note":""}
+{"want":"I25","argv":["secret","set","github","--token","ghp_x"],"note":""}
+{"want":"I25","argv":["secret","set","github","--token=ghp_x"],"note":""}
+{"want":"I25","argv":["secret","set","github","--command","/bin/true","--token","x"],"note":""}
+{"want":"I25","argv":["secret","set","--registry","ghcr.io","--password-stdin"],"note":""}
+{"want":"I25","argv":["secret","set","openai","--oauth"],"note":""}
+{"want":"I25","argv":["secret","set","anthropic","--ref","op://a/b/c"],"note":""}
+{"want":"I25","argv":["secret","set","github","--command","/bin/true","--force"],"note":""}
+{"want":"I25","argv":["secret","set","github","--command","/bin/true","-f"],"note":""}
+{"want":"I25","argv":["secret","set","github","--command",""],"note":""}
+{"want":"I25","argv":["secret","set","github","--command"],"note":""}
+{"want":"I25","argv":["secret","set","github","--command="],"note":""}
+{"want":"I25","argv":["secret","set","github","--command","/bin/x","-t","v"],"note":""}
+{"want":"I25","argv":["secret","set","github","--command","/bin/x","-tv"],"note":""}
+{"want":"I25","argv":["secret","set","github","ghp_TOKEN","--sandbox","shop","--command","/bin/x"],"note":""}
+{"want":"I25","argv":["secret","set","github","--sandbox","shop","--command","/bin/x","--","--token","abc"],"note":""}
+{"want":"I25","argv":["-D","secret","set","github","-t","ghp_x"],"note":""}
+{"want":"I25","argv":["--debug","secret","set","github","--token","abc"],"note":""}
+{"want":"I25","argv":["--cloud","secret","set","github","-t","x"],"note":""}
+{"want":"I25","argv":["secret","set","github","--sandbox","shop","--command","/bin/x","--show-error"],"note":""}
+{"want":"I25","argv":["secret","set","github","--sandbox","shop","--command","/bin/x","--all-sandboxes"],"note":""}
+{"want":"I25","argv":["secret","set","github","--sandbox","shop","--command","/bin/x","--ref","op://a/b/c"],"note":""}
+{"want":"I25","argv":["secret","set","github","--sandbox","shop","--command","/bin/x","--refresh","1h","--refresh","2h"],"note":""}
+{"want":"I25","argv":["secret","set","--sandbox","shop","--command","/bin/x"],"note":""}
+{"want":"I25","argv":["secret","set","github","--command","/bin/x","--sandbox","shop"],"note":""}
+{"want":"I25","argv":["secret","set","github","--sandbox","shop","--command=/bin/x"],"note":""}
+{"want":"I25","argv":["secret","set","github","--sandbox","","--command","/bin/x"],"note":""}
+{"want":"I25","argv":["secret","set","github","--command","-f"],"note":""}
+{"want":"I25","argv":["secret","set","github","--sandbox","shop","--command","/bin/x","--refresh"],"note":""}
+{"want":"I25","argv":["secret","set","github","--sandbox","shop","--command","/bin/x","--username","u"],"note":""}
+{"want":"shape","argv":[],"note":"no argv"}
+{"want":"shape","argv":["run","x"],"note":"top-level run is not driven"}
+{"want":"shape","argv":["create","x"],"note":"top-level create is not driven"}
+{"want":"shape","argv":["frobnicate"],"note":"unknown verb"}
+{"want":"shape","argv":["-X","ls","--json"],"note":"unknown global flag"}
+{"want":"shape","argv":["-D","ls","--json"],"note":"a global flag is never passed"}
+{"want":"shape","argv":["ls","--json","-D"],"note":"a global flag is never passed"}
+{"want":"shape","argv":["env"],"note":"no subcommand"}
+{"want":"shape","argv":["env","frob","/abs/shop-env"],"note":"unknown subcommand"}
+{"want":"shape","argv":["env","exec","--privileged","/abs/shop-env","--","x"],"note":"not a flag romeu passes"}
+{"want":"shape","argv":["env","exec","-e","A=1","/abs/shop-env","--","x"],"note":"only --env"}
+{"want":"shape","argv":["env","exec","-u","root","/abs/shop-env","--","x"],"note":""}
+{"want":"shape","argv":["env","exec","-w","/","/abs/shop-env","--","x"],"note":""}
+{"want":"shape","argv":["env","exec","--env-file","f","/abs/shop-env","--","x"],"note":""}
+{"want":"shape","argv":["env","exec","/abs/shop-env"],"note":"no command"}
+{"want":"shape","argv":["env","exec","/abs/shop-env","--"],"note":"empty command"}
+{"want":"shape","argv":["env","run","-d","--skip-host-commands","/abs/shop-env"],"note":""}
+{"want":"shape","argv":["env","run","-d","--kit-arg","x","/abs/shop-env"],"note":""}
+{"want":"shape","argv":["env","run","-d","/abs/shop-env","extra"],"note":"extra positional"}
+{"want":"shape","argv":["ls","--json","extra"],"note":""}
+{"want":"shape","argv":["ls"],"note":"ls needs --json"}
+{"want":"shape","argv":["stop"],"note":"no name"}
+{"want":"shape","argv":["env","rm","/abs/shop-env"],"note":"env rm needs --force"}
+{"want":"shape","argv":["env","rm","--force","--prune-bindings","/abs/shop-env"],"note":""}
+{"want":"shape","argv":["stop","shop","--"],"note":"a double dash on a call that has no command"}
+{"want":"shape","argv":["policy","allow","network","--sandbox","shop"],"note":"no domain"}
+{"want":"shape","argv":["policy","allow","network","github.com"],"note":"not scoped to a sandbox"}
+{"want":"shape","argv":["policy","allow","network","--sandbox=shop","github.com"],"note":"a = form"}
+{"want":"shape","argv":["settings","set","k"],"note":"one word"}
+{"want":"shape","argv":["version","--format","json"],"note":""}
+{"want":"ok","argv":["version"],"note":""}
+{"want":"ok","argv":["ls","--json"],"note":""}
+{"want":"ok","argv":["stop","shop"],"note":""}
+{"want":"ok","argv":["env","plan","/abs/shop-env"],"note":""}
+{"want":"ok","argv":["env","run","-d","--clone","/abs/shop-env"],"note":""}
+{"want":"ok","argv":["env","run","-d","/abs/shop-env"],"note":""}
+{"want":"ok","argv":["env","rm","--force","/abs/shop-env"],"note":"--force on rm is the builder's own choice"}
+{"want":"ok","argv":["env","exec","/abs/shop-env","--","x"],"note":""}
+{"want":"ok","argv":["env","exec","/abs/shop-env","--env","A=1","--","x"],"note":""}
+{"want":"ok","argv":["env","exec","-it","/abs/shop-env","--","sh"],"note":""}
+{"want":"ok","argv":["env","exec","-it","--env","-y","/abs/shop-env","--","sh"],"note":"the value of --env is not a flag"}
+{"want":"ok","argv":["env","exec","/abs/shop-env","--","tool","--auto-approve","-y","--force","-t","ghp_x"],"note":"the command after the double dash is not scanned"}
+{"want":"ok","argv":["secret","set","github","--sandbox","shop","--command","/usr/bin/true"],"note":""}
+{"want":"ok","argv":["secret","set","github","--sandbox","shop","--command","/usr/bin/true","--refresh","55m"],"note":""}
+{"want":"ok","argv":["secret","set","github","--sandbox","shop","--command","-f"],"note":"the value of --command is not a flag"}
+{"want":"ok","argv":["policy","allow","network","--sandbox","shop","github.com"],"note":""}
+{"want":"ok","argv":["policy","check","network","--sandbox","shop","github.com"],"note":""}
+{"want":"ok","argv":["policy","rm","network","--sandbox","shop","--resource","github.com"],"note":""}
+{"want":"ok","argv":["policy","ls","--json"],"note":""}
+{"want":"ok","argv":["settings","set","env.rememberHostCommands","true"],"note":""}

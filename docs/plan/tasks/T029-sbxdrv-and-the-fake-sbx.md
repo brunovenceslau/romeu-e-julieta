@@ -16,6 +16,7 @@ after:
   - T107
 ask_first:
   - sbxdrv
+  - contracts
 sitting: none
 ---
 

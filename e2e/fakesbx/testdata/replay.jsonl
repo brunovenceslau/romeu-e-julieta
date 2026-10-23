@@ -1,0 +1,16 @@
+{"session":"replay","sbxVersion":"0.49.2","capturedAt":"2026-10-22","synthetic":true,"source":"hand-written test data of the fake, in the shapes of the sessions of e2e/testdata/sbx","description":"One sandbox created, listed twice, stopped, started, listed and removed, with the calls the fake's tests need."}
+{"argv":["version"],"exit":0,"stdout":"sbx version v0.49.2 0123456789abcdef0123456789abcdef01234567\n","stderr":""}
+{"argv":["ls","--json"],"exit":0,"stdout":"[]\n","stderr":""}
+{"argv":["env","run","-d","--clone","<dir>"],"exit":0,"stdout":"","stderr":"created at /abs/root\n","effects":{"gitRemote":{"name":"sandbox-<name>","url":"<git-url>","fetch":"+refs/heads/*:refs/remotes/sandbox-<name>/*"}}}
+{"argv":["ls","--json"],"exit":0,"stdout":"[{\"name\":\"shop\",\"status\":\"running\"}]\n","stderr":""}
+{"argv":["ls","--json"],"exit":0,"stdout":"[{\"name\":\"shop\",\"status\":\"running\",\"second\":true}]\n","stderr":""}
+{"argv":["env","exec","<dir>","--","<command...>"],"exit":0,"stdout":"{\"recorded\":true}\n","stderr":""}
+{"argv":["env","exec","<dir>","--env","<env>","--","<command...>"],"exit":0,"stdout":"{\"recorded\":\"env\"}\n","stderr":""}
+{"argv":["stop","<name>"],"exit":1,"stdout":"","stderr":"stop failed\n"}
+{"argv":["ls","--json"],"exit":0,"stdout":"[{\"name\":\"shop\",\"status\":\"running\"}]\n","stderr":""}
+{"argv":["stop","<name>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["ls","--json"],"exit":0,"stdout":"[{\"name\":\"shop\",\"status\":\"stopped\"}]\n","stderr":""}
+{"argv":["policy","allow","network","--sandbox","<name>","<domain>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["env","rm","--force","<dir>"],"hang":true}
+{"argv":["env","rm","--force","<dir>"],"exit":0,"stdout":"","stderr":""}
+{"argv":["ls","--json"],"exit":0,"stdout":"[]\n","stderr":""}

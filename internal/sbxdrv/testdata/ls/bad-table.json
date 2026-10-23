@@ -1,0 +1,2 @@
+NAME   AGENT         STATUS    WORKSPACE
+shop   claude-base   running   /abs/root/shop-env/shop-api

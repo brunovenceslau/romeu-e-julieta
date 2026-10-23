@@ -1,0 +1,2 @@
+{"session":"failedcreate","sbxVersion":"0.49.2","capturedAt":"2026-10-22","synthetic":true,"source":"hand-written test data of the fake, in the shapes of the sessions of e2e/testdata/sbx","description":"A create that fails and records an effect: the effect is the stanza of a create that worked, so a failed one writes nothing."}
+{"argv":["env","run","-d","--clone","<dir>"],"exit":1,"stdout":"","stderr":"Error: the virtual machine did not start\n","effects":{"gitRemote":{"name":"sandbox-<name>","url":"<git-url>","fetch":"+refs/heads/*:refs/remotes/sandbox-<name>/*"}}}
