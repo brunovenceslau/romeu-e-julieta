@@ -247,7 +247,8 @@ func TestSandboxGitUsesTheProxy(t *testing.T) {
 
 // TestCredentialFlags covers the credentials of 05 5.1: the empty
 // helper resets the list, the configured helper follows it in host
-// mode only, and a caFile reaches its own host only.
+// mode only and for the config repo's host only (REQ-0464), and a
+// caFile reaches its own host only.
 func TestCredentialFlags(t *testing.T) {
 	const caFile = "/etc/ca/private.pem"
 	r, err := New(Config{
@@ -255,6 +256,7 @@ func TestCredentialFlags(t *testing.T) {
 		Git:              "/usr/bin/git",
 		Home:             "/h",
 		CredentialHelper: "osxkeychain",
+		CredentialHost:   "GitHub.com",
 		GitHosts:         []GitHost{{Host: "git.example.com", CAFile: caFile}, {Host: "github.com"}},
 	})
 	require.NoError(t, err)
@@ -266,9 +268,9 @@ func TestCredentialFlags(t *testing.T) {
 	require.NoError(t, r.CreateRef(ctx, stubRepo, "refs/romeu/salvage/shop/g/s/r/main", strings.Repeat("b", 40)))
 	for _, c := range rec.commands {
 		args := strings.Join(c.Argv, " ")
-		assert.Contains(t, args, "-c credential.helper= -c credential.helper=osxkeychain -c fetch.prune=false",
-			"the empty value resets the list, then the one helper: %s", args)
-		assert.Equal(t, 1, strings.Count(args, "credential.helper=osxkeychain"))
+		assert.Contains(t, args, "-c credential.helper= -c credential.https://github.com.helper=osxkeychain -c fetch.prune=false",
+			"the empty value resets the list, then the one helper for its host: %s", args)
+		assert.Equal(t, 1, strings.Count(args, "helper=osxkeychain"), "no helper for every host")
 		ca := "-c http.https://git.example.com/.sslCAInfo=" + caFile
 		if strings.Contains(args, "https://GIT.example.com/") {
 			assert.Contains(t, args, ca)
@@ -297,7 +299,11 @@ func TestNew(t *testing.T) {
 		{"empty home", func(c *Config) { c.Home = "" }},
 		{"shell helper", func(c *Config) { c.CredentialHelper = "!f() { cat; }; f" }},
 		{"helper with a space", func(c *Config) { c.CredentialHelper = "/opt/my helper" }},
-		{"helper option", func(c *Config) { c.CredentialHelper = "-x" }},
+		{"helper option", func(c *Config) { c.CredentialHelper, c.CredentialHost = "-x", "github.com" }},
+		{"helper without a host", func(c *Config) { c.CredentialHelper = "osxkeychain" }},
+		{"helper path that does not exist", func(c *Config) { c.CredentialHelper, c.CredentialHost = "/nonexistent/git-credential-x", "github.com" }},
+		{"host without a helper", func(c *Config) { c.CredentialHost = "github.com" }},
+		{"helper host outside the pattern", func(c *Config) { c.CredentialHelper, c.CredentialHost = "osxkeychain", "exa=mple.com" }},
 		{"relative ca file", func(c *Config) { c.GitHosts = []GitHost{{Host: "h.example", CAFile: "ca.pem"}} }},
 		{"ca file with a newline", func(c *Config) { c.GitHosts = []GitHost{{Host: "h.example", CAFile: "/ca\n.pem"}} }},
 		{"host with a path", func(c *Config) { c.GitHosts = []GitHost{{Host: "h.example/x"}} }},
@@ -312,9 +318,9 @@ func TestNew(t *testing.T) {
 			require.ErrorIs(t, err, ErrConfig)
 		})
 	}
-	for _, helper := range []string{"osxkeychain", "store", "/usr/local/bin/git-credential-manager"} {
+	for _, helper := range []string{"osxkeychain", "store", helperScript(t)} {
 		c := ok
-		c.CredentialHelper = helper
+		c.CredentialHelper, c.CredentialHost = helper, "github.com"
 		c.GitHosts = []GitHost{{Host: "127.0.0.1:8443", CAFile: "/ca.pem"}}
 		_, err := New(c)
 		require.NoError(t, err, helper)

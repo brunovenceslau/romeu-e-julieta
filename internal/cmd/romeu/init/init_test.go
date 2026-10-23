@@ -8,7 +8,7 @@ package initcmd
 import (
 	"bytes"
 	"context"
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +34,9 @@ type machine struct {
 	home, bin string
 	env       map[string]string
 	path      map[string]string
+	// helpers are the credential helpers the clones were given, one per
+	// clone.
+	helpers []string
 }
 
 // gitIn runs the machine's git in dir.
@@ -70,9 +73,18 @@ func newMachine(t *testing.T, spec string) *machine {
 		}
 		return "", procgroup.ErrNotFound
 	}
-	cloneRepo = func(ctx context.Context, _ *gitsafe.Runner, url, dest string) error {
+	cloneRepo = func(ctx context.Context, _ *gitsafe.Runner, url, dest, helper string) error {
+		m.helpers = append(m.helpers, helper)
 		if strings.HasSuffix(url, "/missing") {
-			return errors.New("repository not found")
+			// As gitsafe returns a git that exited 128.
+			return fmt.Errorf("gitsafe: git clone: %w: fatal: repository 'https://github.com/owner/missing/' not found", &procgroup.ExitError{Argv0: "git", Code: 128})
+		}
+		if strings.HasSuffix(url, "/refused") {
+			return fmt.Errorf("%w: a refusal of gitsafe", gitsafe.ErrRefused)
+		}
+		if strings.HasSuffix(url, "/badhead") {
+			// As gitsafe returns a HEAD of the remote it refuses.
+			return fmt.Errorf("%w: %w: object id %q", gitsafe.ErrRemoteContent, gitsafe.ErrRefused, "not-an-oid")
 		}
 		if err := os.MkdirAll(dest, 0o700); err != nil {
 			return err
@@ -159,7 +171,9 @@ func TestInitRefusals(t *testing.T) {
 		{"the clone exists", projectSpec, []string{"--config-url", url}, func(m *machine) {
 			require.NoError(t, os.MkdirAll(filepath.Join(m.home, "dev", "cfg-env", "cfg"), 0o700))
 		}, 2, "clone-exists"},
-		{"an origin that is not there", projectSpec, []string{"--config-url", "https://github.com/owner/missing"}, nil, 1, "error"},
+		{"an origin that is not there", projectSpec, []string{"--config-url", "https://github.com/owner/missing"}, nil, 1, "RJ-356 config-clone-failed"},
+		{"a credential helper git runs as shell", projectSpec, []string{"--config-url", url, "--git-credential-helper", "!gh auth git-credential"}, nil, 2, "tools.gitCredentialHelper"},
+		{"a credential helper over the cap", projectSpec, []string{"--config-url", url, "--git-credential-helper", "/" + strings.Repeat("a", gitsafe.MaxCredentialHelper)}, nil, 2, "over the cap"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := newMachine(t, tc.spec)
@@ -306,8 +320,8 @@ func TestInitSettingsDirUnwritable(t *testing.T) {
 func TestInitSettingsAppearAfterTheClone(t *testing.T) {
 	m := newMachine(t, projectSpec)
 	clone := cloneRepo
-	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest string) error {
-		if err := clone(ctx, g, url, dest); err != nil {
+	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest, helper string) error {
+		if err := clone(ctx, g, url, dest, helper); err != nil {
 			return err
 		}
 		return os.WriteFile(m.settings(), []byte("theirs"), 0o600)
@@ -370,8 +384,8 @@ func TestDirProblem(t *testing.T) {
 func TestInitNoDefaultBranch(t *testing.T) {
 	m := newMachine(t, projectSpec)
 	clone := cloneRepo
-	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest string) error {
-		if err := clone(ctx, g, url, dest); err != nil {
+	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest, helper string) error {
+		if err := clone(ctx, g, url, dest, helper); err != nil {
 			return err
 		}
 		return os.Remove(filepath.Join(dest, ".git", "refs", "remotes", "origin", "HEAD"))
@@ -431,4 +445,157 @@ func TestRootProblemInsideByIdentity(t *testing.T) {
 
 	assert.Contains(t, rootProblem(filepath.Join(cfgAlias, "dev"), filepath.Join(tmp, "other"), settings, stateDir), "inside the host settings directory")
 	assert.Contains(t, rootProblem(filepath.Join(stateAlias, "dev"), filepath.Join(tmp, "other"), settings, stateDir), "inside the host state directory")
+}
+
+// TestInitCloneErrors: a git clone that exits non-zero is
+// config-clone-failed (RJ-356), exit 1, with git's output in the details
+// and the flag in the hint; any other error of the clone is not, so a
+// defect still reads as one.
+func TestInitCloneErrors(t *testing.T) {
+	t.Run("git exited non-zero", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing")
+
+		assert.Equal(t, 1, code, stderr)
+		assert.Contains(t, stderr, "RJ-356 config-clone-failed")
+		assert.Contains(t, stderr, "repository 'https://github.com/owner/missing/' not found")
+		assert.Contains(t, stderr, "a private config repo needs --git-credential-helper")
+		assert.NotContains(t, stderr, "RJ-348")
+	})
+	t.Run("a refusal of gitsafe is usage, not internal", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/refused")
+
+		assert.Equal(t, 2, code, stderr)
+		assert.Contains(t, stderr, "RJ-349")
+		assert.Contains(t, stderr, "a refusal of gitsafe")
+		assert.NotContains(t, stderr, "RJ-348")
+		assert.NotContains(t, stderr, "config-clone-failed")
+	})
+	t.Run("a refusal of what the remote sent is config-clone-failed", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/badhead")
+
+		assert.Equal(t, 1, code, stderr)
+		assert.Contains(t, stderr, "RJ-356 config-clone-failed")
+		assert.Contains(t, stderr, `object id "not-an-oid"`, "the reason is in the details")
+		assert.NotContains(t, stderr, "RJ-349")
+		assert.NoDirExists(t, filepath.Join(m.home, "dev"))
+	})
+	t.Run("the levels above the root stay, the root this run made goes", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+		root := filepath.Join(m.home, "a", "b", "dev")
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing", "--root", root)
+
+		assert.Equal(t, 1, code, stderr)
+		assert.NoDirExists(t, root)
+		assert.DirExists(t, filepath.Dir(root))
+	})
+	t.Run("the root and the env dir this run made are removed", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing")
+
+		assert.Equal(t, 1, code, stderr)
+		assert.NoDirExists(t, filepath.Join(m.home, "dev"))
+	})
+	t.Run("a root that was there stays, and so does a non-empty env dir", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+		keep := filepath.Join(m.home, "dev", "cfg-env", "keep")
+		require.NoError(t, os.MkdirAll(keep, 0o700))
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing")
+
+		assert.Equal(t, 1, code, stderr)
+		assert.DirExists(t, keep)
+	})
+	t.Run("an empty root that was there stays", func(t *testing.T) {
+		m := newMachine(t, projectSpec)
+		require.NoError(t, os.Mkdir(filepath.Join(m.home, "dev"), 0o700))
+
+		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing")
+
+		assert.Equal(t, 1, code, stderr)
+		assert.DirExists(t, filepath.Join(m.home, "dev"))
+		assert.NoDirExists(t, filepath.Join(m.home, "dev", "cfg-env"))
+	})
+}
+
+// TestInitRecordsTheCredentialHelper: the helper of the flag reaches
+// the clone and the settings as tools.gitCredentialHelper; without the
+// flag the clone has none and the settings name none.
+func TestInitRecordsTheCredentialHelper(t *testing.T) {
+	for name, helper := range map[string]string{"none": "", "a name": "osxkeychain", "a path": "@script"} {
+		t.Run(name, func(t *testing.T) {
+			m := newMachine(t, projectSpec)
+			if helper == "@script" {
+				helper = m.helperScript(t, 0o700)
+			}
+			args := []string{"--config-url", "https://github.com/owner/cfg"}
+			if helper != "" {
+				args = append(args, "--git-credential-helper", helper)
+			}
+
+			code, _, stderr := m.init(t, args...)
+
+			require.Equal(t, 0, code, stderr)
+			assert.Equal(t, []string{helper}, m.helpers)
+			data, err := os.ReadFile(m.settings())
+			require.NoError(t, err)
+			if helper == "" {
+				assert.NotContains(t, string(data), "gitCredentialHelper")
+			} else {
+				assert.Contains(t, string(data), "gitCredentialHelper: "+helper)
+			}
+		})
+	}
+}
+
+// helperScript writes an executable credential helper of the given mode
+// in the machine's bin and returns its path.
+func (m *machine) helperScript(t *testing.T, mode os.FileMode) string {
+	t.Helper()
+	p := filepath.Join(m.bin, "git-credential-test")
+	require.NoError(t, os.WriteFile(p, []byte("#!/bin/sh\n"), 0o700))
+	require.NoError(t, os.Chmod(p, mode))
+	return p
+}
+
+// TestInitRefusesAHelperOthersCanWrite: an absolute-path helper that is
+// not a regular executable file of the user's or root's, or that sits in
+// a directory others can write, is a usage error naming the rule, before
+// anything is written and before any clone.
+func TestInitRefusesAHelperOthersCanWrite(t *testing.T) {
+	for _, tc := range []struct {
+		name, rule string
+		helper     func(m *machine) string
+	}{
+		{"writable by the group", "is writable by its group or others; fix it with: chmod g-w ", func(m *machine) string { return m.helperScript(t, 0o770) }},
+		{"not executable", "is not executable", func(m *machine) string { return m.helperScript(t, 0o600) }},
+		{"missing", "cannot be resolved", func(m *machine) string { return filepath.Join(m.bin, "none") }},
+		{"in a directory others can write", "is writable by its group or others", func(m *machine) string {
+			p := m.helperScript(t, 0o700)
+			require.NoError(t, os.Chmod(m.bin, 0o777))
+			return p
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newMachine(t, projectSpec)
+			helper := tc.helper(m)
+
+			code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/cfg", "--git-credential-helper", helper)
+
+			assert.Equal(t, 2, code, stderr)
+			assert.Contains(t, stderr, "RJ-349")
+			assert.Contains(t, stderr, tc.rule)
+			assert.Empty(t, m.helpers, "no clone ran")
+			assert.NoFileExists(t, m.settings())
+			assert.NoDirExists(t, filepath.Join(m.home, "dev"))
+			assert.NoDirExists(t, m.env["XDG_STATE_HOME"])
+		})
+	}
 }

@@ -38,10 +38,12 @@ var (
 	lookPath   = procgroup.LookPath
 	defaultRef = "main"
 
-	// cloneRepo is the hardened clone of the config repo; a unit test
-	// replaces it with a fixture, since the e2e covers the real one.
-	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest string) error {
-		return g.Clone(ctx, url, dest)
+	// cloneRepo is the hardened clone of the config repo, with the
+	// credential helper for its host only when helper is not empty; a
+	// unit test replaces it with a fixture, since the e2e covers the
+	// real one.
+	cloneRepo = func(ctx context.Context, g *gitsafe.Runner, url, dest, helper string) error {
+		return g.CloneWithCredentialHelper(ctx, url, dest, helper)
 	}
 )
 
@@ -61,7 +63,8 @@ var _ = cli.Register(func() cli.Command {
 			Use:   "init --config-url <url>",
 			Short: "write the host settings and clone the config repo",
 			Example: "romeu init --config-url https://github.com/<owner>/<config-repo>\n" +
-				"romeu init --config-url https://github.com/<owner>/<config-repo> --root /abs/dev",
+				"romeu init --config-url https://github.com/<owner>/<config-repo> --root /abs/dev\n" +
+				"romeu init --config-url https://github.com/<owner>/<config-repo> --git-credential-helper osxkeychain",
 			Args: cobra.NoArgs,
 			RunE: func(c *cobra.Command, _ []string) error {
 				return run(c, env, o)
@@ -72,6 +75,7 @@ var _ = cli.Register(func() cli.Command {
 		f.StringVar(&o.project, "config-project", "", "the config project's name (default: the repo's name)")
 		f.StringVar(&o.root, "root", "", "the absolute root of the host tree (default: $HOME/dev)")
 		f.StringVar(&o.ref, "config-ref", defaultRef, "the branch that holds projects/<name>.yaml")
+		f.StringVar(&o.helper, "git-credential-helper", "", "the git credential helper of a private config repo, for its host only: a git-credential-<name> helper's name, or the absolute path of an executable only you or root can write; recorded as tools.gitCredentialHelper. Git may send it erase when the origin refuses a credential, which deletes what a storing helper (osxkeychain, store) holds")
 		_ = cmd.MarkFlagRequired("config-url")
 		return cmd
 	}
@@ -80,7 +84,7 @@ var _ = cli.Register(func() cli.Command {
 
 // options are the flags of the command.
 type options struct {
-	configURL, project, root, ref string
+	configURL, project, root, ref, helper string
 }
 
 // usage returns the error usage (RJ-349) for an input init refuses,
@@ -171,7 +175,7 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 		return err
 	}
 
-	rt, envDir, err := openTree(cmd, h.Root, h.Config.Project+"-env")
+	rt, envDir, made, err := openTree(cmd, h.Root, h.Config.Project+"-env")
 	if err != nil {
 		return err
 	}
@@ -190,12 +194,18 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 	defer func() { _ = pending.Cleanup() }()
 	dest, err := cloneConfig(ctx, cmd, g, h, rt, envDir)
 	if err != nil {
+		// Nothing of this run is left: the env dir and the root, when
+		// this run made them and they are empty (a decision of
+		// 2026-10-23).
+		made.undo(rt, filepath.Base(envDir), h.Root)
 		return err
 	}
 	if err := commitSettings(cmd, pending, settings, data); err != nil {
 		// dest is this run's clone: absent proved <envDir>/<dir> did not
 		// exist, so nothing of the operator's goes with it.
-		return errors.Join(err, os.RemoveAll(dest))
+		err = errors.Join(err, os.RemoveAll(dest))
+		made.undo(rt, filepath.Base(envDir), h.Root)
+		return err
 	}
 	_, err = fmt.Fprintf(env.Stdout, "settings  %s\nroot      %s\nconfig    %s\n", termsafe.Escape(settings), termsafe.Escape(h.Root), termsafe.Escape(dest))
 	return err
@@ -278,6 +288,13 @@ func build(cmd *cobra.Command, o options, home string) (spec.HostSettings, error
 		Root:   root,
 		Config: spec.ConfigRepo{Project: o.project, URL: o.configURL, Ref: o.ref},
 	}
+	// The helper is validated with the rest of the settings (REQ-1267),
+	// before anything is written; gitsafe's cap bounds it first, so a long
+	// value is never echoed back.
+	if len(o.helper) > gitsafe.MaxCredentialHelper {
+		return zero, usage(cmd, fmt.Sprintf("tools.gitCredentialHelper: the value has %d bytes, over the cap of %d", len(o.helper), gitsafe.MaxCredentialHelper))
+	}
+	h.Tools.GitCredentialHelper = o.helper
 	return h, nil
 }
 
@@ -312,6 +329,13 @@ func tools(cmd *cobra.Command, h *spec.HostSettings, home string) (*gitsafe.Runn
 	if err := validate(cmd, *h); err != nil {
 		return nil, err
 	}
+	// A helper at a path that someone else could write is refused here,
+	// before anything is written, as every command that runs it does.
+	if h.Tools.GitCredentialHelper != "" {
+		if err := gitsafe.CheckCredentialHelperFile(h.Tools.GitCredentialHelper); err != nil {
+			return nil, usage(cmd, "tools.gitCredentialHelper: "+termsafe.Escape(err.Error()))
+		}
+	}
 	g, err := gitsafe.New(gitsafe.Config{Mode: gitsafe.Host, Git: h.Tools.Git, Home: home})
 	if err != nil {
 		return nil, usage(cmd, err.Error())
@@ -333,12 +357,15 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 	}
 	defer func() { _ = os.RemoveAll(stage) }()
 	clone := filepath.Join(stage, "clone")
-	if err := cloneRepo(ctx, g, h.Config.URL, clone); err != nil {
-		return "", err
+	if err := cloneRepo(ctx, g, h.Config.URL, clone, h.Tools.GitCredentialHelper); err != nil {
+		return "", cloneError(cmd, err, h.Config.URL, false)
 	}
 	dir, err := configDir(ctx, cmd, g, h, clone)
 	if err != nil {
-		return "", err
+		// The clone is the remote's content: what gitsafe refuses in it
+		// (a default branch, a ref, a file) is the remote's, not the
+		// operator's input.
+		return "", cloneError(cmd, err, h.Config.URL, true)
 	}
 	if !filepath.IsLocal(dir) || strings.ContainsRune(dir, filepath.Separator) {
 		return "", usage(cmd, "the config repo's dir is not a plain name")
@@ -362,35 +389,72 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 // between is caught. A directory init made is 0700; one that was there
 // is chmod'ed through the handle only when the checks passed, and never
 // followed out of the root.
-func openTree(cmd *cobra.Command, root, envName string) (*os.Root, string, error) {
-	if err := os.MkdirAll(root, dirMode); err != nil {
-		return nil, "", fmt.Errorf("init: the root: %w", err)
+func openTree(cmd *cobra.Command, root, envName string) (*os.Root, string, made, error) {
+	var m made
+	// The levels above the root are made as they are needed and stay;
+	// the root's last element is this run's when its Mkdir succeeds.
+	if err := os.MkdirAll(filepath.Dir(root), dirMode); err != nil {
+		return nil, "", m, fmt.Errorf("init: the root: %w", err)
+	}
+	if err := os.Mkdir(root, dirMode); err == nil {
+		m.root = true
+	} else if !errors.Is(err, fs.ErrExist) {
+		return nil, "", m, fmt.Errorf("init: the root: %w", err)
 	}
 	if why := dirProblem(os.Lstat, root); why != "" {
-		return nil, "", refuse(cmd, "root-unsafe", "the root "+why)
+		return nil, "", m, refuse(cmd, "root-unsafe", "the root "+why)
 	}
 	rt, err := os.OpenRoot(root)
 	if err != nil {
-		return nil, "", fmt.Errorf("init: the root: %w", err)
+		return nil, "", m, fmt.Errorf("init: the root: %w", err)
 	}
-	created := false
 	if err := rt.Mkdir(envName, dirMode); err == nil {
-		created = true
+		m.env = true
 	} else if !errors.Is(err, fs.ErrExist) {
 		_ = rt.Close()
-		return nil, "", fmt.Errorf("init: %w", err)
+		return nil, "", m, fmt.Errorf("init: %w", err)
 	}
 	if why := dirProblem(rt.Lstat, envName); why != "" {
 		_ = rt.Close()
-		return nil, "", refuse(cmd, "root-unsafe", envName+" "+why)
+		return nil, "", m, refuse(cmd, "root-unsafe", envName+" "+why)
 	}
-	if !created {
+	if !m.env {
 		if err := rt.Chmod(envName, dirMode); err != nil {
 			_ = rt.Close()
-			return nil, "", fmt.Errorf("init: %w", err)
+			return nil, "", m, fmt.Errorf("init: %w", err)
 		}
 	}
-	return rt, filepath.Join(root, envName), nil
+	return rt, filepath.Join(root, envName), m, nil
+}
+
+// made says which directories of the tree this run of init created, by
+// a Mkdir that succeeded: the last element of the root, and the env dir.
+type made struct {
+	root, env bool
+}
+
+// undo removes the env dir and then the root, each only when this run
+// made it, it is still a directory (Lstat, so a link is never followed
+// or removed) and it is empty: os.Remove refuses a directory that is
+// not, so nothing that appeared in it meanwhile goes with it. The env
+// dir goes through rt. Its failures are not the command's: the error
+// that led here is.
+//
+// A race remains between the Lstat and the Remove: a process of the
+// user's could replace the directory with another empty directory or a
+// link in between. Remove takes an empty directory, which holds nothing
+// to lose, or the link itself, never its target.
+func (m made) undo(rt *os.Root, envName, root string) {
+	if m.env {
+		if fi, err := rt.Lstat(envName); err == nil && fi.IsDir() {
+			_ = rt.Remove(envName)
+		}
+	}
+	if m.root {
+		if fi, err := os.Lstat(root); err == nil && fi.IsDir() {
+			_ = os.Remove(root)
+		}
+	}
 }
 
 // configDir reads projects/<cfg>.yaml at the config ref of the clone
@@ -443,6 +507,39 @@ func configDir(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h spe
 		}
 	}
 	return "", missing(name + " has no primary repo at config.url")
+}
+
+// cloneError sorts an error of the clone of the config repo, or of the
+// reads of the clone when remote is true:
+//
+//   - an error of the table, a timeout, a cancellation passes through;
+//   - a git that exited non-zero, and what gitsafe refuses in what the
+//     remote sent (gitsafe.ErrRemoteContent, or any refusal when remote
+//     is true), is config-clone-failed (RJ-356), with git's output or
+//     the reason, which gitsafe escaped and cut to its first 4 KiB, in
+//     the details;
+//   - a refusal of the operator's input before git ran (the URL, the
+//     helper: gitsafe.ErrRefused, gitsafe.ErrConfig) is usage (RJ-349),
+//     an input init cannot take, never internal.
+//
+// Git itself prints no credential a helper gave it, and the URL holds
+// none (CheckURL refuses user information); what a helper writes to its
+// own standard error is git's standard error too, and is not filtered.
+func cloneError(cmd *cobra.Command, err error, configURL string, remote bool) error {
+	if _, ok := errors.AsType[*cli.Error](err); ok {
+		return err
+	}
+	refused := errors.Is(err, gitsafe.ErrRefused) || errors.Is(err, gitsafe.ErrConfig)
+	_, exited := errors.AsType[*procgroup.ExitError](err)
+	switch {
+	case errors.Is(err, gitsafe.ErrRemoteContent) || (remote && refused) || (!remote && exited):
+		return ConfigCloneFailed.New("git could not clone the config repo",
+			cli.Detail{Key: "config.url", Value: termsafe.Escape(configURL)},
+			cli.Detail{Key: "git", Value: termsafe.Escape(err.Error())})
+	case refused:
+		return usage(cmd, termsafe.Escape(err.Error()))
+	}
+	return err
 }
 
 // floorError returns the error git-floor (RJ-344) as the row of the
