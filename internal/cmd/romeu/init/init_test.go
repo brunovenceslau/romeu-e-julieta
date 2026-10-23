@@ -89,6 +89,7 @@ func newMachine(t *testing.T, spec string) *machine {
 		gitIn(t, git, dest, "add", "-A")
 		gitIn(t, git, dest, "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "x")
 		gitIn(t, git, dest, "update-ref", "refs/remotes/origin/main", "HEAD")
+		gitIn(t, git, dest, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
 		return nil
 	}
 	t.Cleanup(func() { getenv, lookPath, cloneRepo = oldGetenv, oldLook, oldClone })
@@ -151,6 +152,7 @@ func TestInitRefusals(t *testing.T) {
 			m.path["git"] = filepath.Join(m.bin, "oldgit")
 			require.NoError(t, os.WriteFile(m.path["git"], []byte("#!/bin/sh\necho git version 2.0.0\n"), 0o700))
 		}, 2, "git-floor"},
+		{"a ref that is not the default branch", projectSpec, []string{"--config-url", url, "--config-ref", "dev"}, nil, 2, "config-ref-not-default"},
 		{"no spec", "", []string{"--config-url", url}, nil, 2, "RJ-346"},
 		{"a spec that does not decode", "schema: project/v1\nname: [\n", []string{"--config-url", url}, nil, 2, "does not decode"},
 		{"a spec of another project", strings.Replace(projectSpec, "name: cfg", "name: other", 1), []string{"--config-url", url}, nil, 2, "RJ-346"},

@@ -213,7 +213,6 @@ func TestInitConfigProjectMissing(t *testing.T) {
 	}{
 		"no spec file":    {map[string]string{"projects/cfg.yaml": ""}, []string{"--config-project", "nothere"}},
 		"another primary": {map[string]string{"projects/cfg.yaml": other}, nil},
-		"no such branch":  {nil, []string{"--config-ref", "nobranch"}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			e, _, args := initSetup(t, tc.files)
@@ -228,6 +227,27 @@ func TestInitConfigProjectMissing(t *testing.T) {
 			assert.Empty(t, envs, "no clone and no staging directory")
 		})
 	}
+}
+
+// TestInitRefusesARefThatIsNotTheDefaultBranch: in v1 init takes the
+// default branch of the config repo only. A second branch of the origin
+// is refused with exit 2 and the slug, whether or not it holds the spec,
+// and nothing is written; the default branch is still accepted.
+func TestInitRefusesARefThatIsNotTheDefaultBranch(t *testing.T) {
+	e, o, args := initSetup(t, nil)
+	o.Push(t, "owner/cfg", "release", map[string]string{"extra": "1"})
+
+	for _, ref := range []string{"release", "nobranch"} {
+		res := e.Run(t, append(args, "--config-ref", ref))
+
+		assert.Equal(t, 2, res.Code, res.Stderr)
+		assert.Contains(t, res.Stderr, "config-ref-not-default")
+		assert.NoFileExists(t, e.Settings())
+		envs, err := filepath.Glob(filepath.Join(e.Root, "*-env", "*"))
+		require.NoError(t, err)
+		assert.Empty(t, envs, "no clone and no staging directory")
+	}
+	assert.Equal(t, 0, e.Run(t, append(args, "--config-ref", "main")).Code)
 }
 
 // TestInitTakesTheLock: init holds romeu.lock (04 4.1, Locking), so

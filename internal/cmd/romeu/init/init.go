@@ -349,10 +349,21 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 // configDir reads projects/<cfg>.yaml at the config ref of the clone
 // and returns the dir of the repo whose URL is config.url, the primary.
 // A ref with no such file, or a spec that does not name the config repo
-// as its primary, is config-project-missing (RJ-346).
+// as its primary, is config-project-missing (RJ-346). A ref other than the
+// remote's default branch is config-ref-not-default.
 func configDir(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h spec.HostSettings, clone string) (string, error) {
 	missing := func(why string) error {
 		return spec.ConfigProjectMissing.New(why, cli.Detail{Key: "config.url", Value: termsafe.Escape(h.Config.URL)})
+	}
+	// In v1 only the default branch of the remote is a config ref: the
+	// clone checks that branch out, and the settings name the ref the
+	// spec is read from (a decision of 2026-10-23).
+	def, err := g.DefaultBranch(ctx, clone)
+	if err != nil {
+		return "", err
+	}
+	if def != "" && def != h.Config.Ref {
+		return "", refuse(cmd, "config-ref-not-default", "--config-ref "+termsafe.Escape(h.Config.Ref)+" is not the default branch of the config repo ("+termsafe.Escape(def)+"); init takes the default branch only")
 	}
 	oid, ok, err := g.RefOID(ctx, clone, "refs/remotes/origin/"+h.Config.Ref)
 	if err != nil {
