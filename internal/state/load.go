@@ -120,15 +120,21 @@ func projectFile(name string) (string, error) {
 }
 
 // LoadProject reads projects/<name>.json. A record that is absent is an
-// error that wraps fs.ErrNotExist; one that does not decode is
-// record-unreadable (RJ-334), with the project's name filled into the
-// hint.
+// error that wraps fs.ErrNotExist; one that does not decode, or whose
+// approval is another project's, is record-unreadable (RJ-334), with
+// the project's name filled into the hint.
 func (s *Store) LoadProject(name string) (*Project, error) {
 	file, err := projectFile(name)
 	if err != nil {
 		return nil, err
 	}
-	p, err := load(s.projects, file, filepath.Join(s.dir, projectsDir, file), DecodeProject)
+	path := filepath.Join(s.dir, projectsDir, file)
+	p, err := load(s.projects, file, path, DecodeProject)
+	if err == nil {
+		if err = p.checkProject(name); err != nil {
+			p, err = nil, unreadable(path, err)
+		}
+	}
 	if e, ok := errors.AsType[*cli.Error](err); ok && e.ID == RecordUnreadable.ID {
 		e.Fill = map[string]string{"<name>": name}
 	}
@@ -158,6 +164,9 @@ func (s *Store) UpdateProject(lk *Lock, name string, fn func(*Project) error) er
 	}
 	if err := fn(p); err != nil {
 		return err
+	}
+	if err := p.checkProject(name); err != nil {
+		return fmt.Errorf("state: a project record that would not read: %w", err)
 	}
 	data, err := EncodeProject(p)
 	if err != nil {

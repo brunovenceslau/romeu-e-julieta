@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
 )
 
 // The forms of the values validate checks.
@@ -55,6 +56,39 @@ func (t *Toolchain) validate() error {
 	return errors.Join(errs...)
 }
 
+// checkSet puts the widening set of the approval in its normal form
+// (gate.Normal) and requires its digest to be the approval's widening
+// digest and its renderDigest the approval's: a set changed after it
+// was approved, by hand or by damage, is not the set the operator saw,
+// so the record does not read.
+func (a *Approval) checkSet() error {
+	n, err := gate.Normal(a.Set)
+	if err != nil {
+		return fmt.Errorf("approval: %w", err)
+	}
+	sum, err := gate.Digest(n)
+	if err != nil {
+		return fmt.Errorf("approval: %w", err)
+	}
+	if sum != a.WideningDigest {
+		return fmt.Errorf("approval: the widening set has the digest %s, and the approval holds %s", sum, a.WideningDigest)
+	}
+	if n.RenderDigest != a.RenderDigest {
+		return fmt.Errorf("approval: the widening set holds the renderDigest %s, and the approval %s", n.RenderDigest, a.RenderDigest)
+	}
+	a.Set = n
+	return nil
+}
+
+// checkProject refuses a record of the project name whose approval is
+// another project's.
+func (p *Project) checkProject(name string) error {
+	if p.Approval != nil && p.Approval.Set.Project != name {
+		return fmt.Errorf("%w: the approval of the record of %s is the approval of %q", ErrInvalid, name, p.Approval.Set.Project)
+	}
+	return nil
+}
+
 // validate checks a project record: each generation, and that at most
 // one of them is not closed, since a project has one sandbox.
 func (p *Project) validate() error {
@@ -63,6 +97,8 @@ func (p *Project) validate() error {
 		if a.WideningDigest == (canon.Sum[canon.WideningKind]{}) || a.RenderDigest == (canon.Sum[canon.RenderKind]{}) ||
 			a.CandidateID == (canon.ULID{}) || a.ApprovedAt.IsZero() || a.Set.Project == "" || !commitForm.MatchString(a.SpecCommit) {
 			errs = append(errs, errors.New("approval is not whole: it needs both digests, the set, a spec commit, a candidate id and a time"))
+		} else if err := a.checkSet(); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	if p.Retiring != nil && p.Retiring.Attic == "" {

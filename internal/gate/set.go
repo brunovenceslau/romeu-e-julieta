@@ -156,6 +156,10 @@ func Digest(s Set) (canon.Sum[canon.WideningKind], error) {
 	return canon.Digest(canon.Widening, n)
 }
 
+// Normal returns a copy of s in its normal form (normal), the form
+// Digest digests and the approval record holds.
+func Normal(s Set) (Set, error) { return normal(s) }
+
 // normal returns a copy of s in its one form: the sorted lists sorted,
 // an absent list, map or capability set as an empty one, so that two
 // sets that mean the same have one digest. It refuses a set that names

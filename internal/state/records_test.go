@@ -73,7 +73,15 @@ func TestDecodeProject(t *testing.T) {
 			return strings.Replace(s, "01j9zc2q8x7w4t6y3r5e1v9k0p", "01J9ZC2Q8X7W4T6Y3R5E1V9K0P", 1)
 		}},
 		{"a digest of another length", func(s string) string {
-			return strings.Replace(s, "1111111111111111111111111111111111111111111111111111111111111111", "11", 1)
+			return strings.Replace(s, "43bf1a6187ca4a12db90ea196eba079ca267f571eabee4bb139ee91540f895e0", "43", 1)
+		}},
+		{"a widening set changed after its digest", func(s string) string {
+			return strings.Replace(s, `"domain": "github.com"`, `"domain": "github.co"`, 1)
+		}},
+		{"an approval whose renderDigest is not its set's", func(s string) string {
+			return strings.Replace(s, `"renderDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+    "specCommit"`, `"renderDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+    "specCommit"`, 1)
 		}},
 		{"a state that is no generation state", func(s string) string { return strings.Replace(s, `"state": "open"`, `"state": "none"`, 1) }},
 		{"a generation with no id", func(s string) string { return strings.Replace(s, `"id": "01j9zc2q8x7w4t6y3r5e1v9k0p",`, "", 1) }},
@@ -166,6 +174,30 @@ func TestStore_UpdateProject(t *testing.T) {
 			_, lerr := s.LoadProject("shop")
 			assert.Equal(t, "RJ-334", cli.Of(lerr).ID, "a reader reports it too")
 		}
+	})
+	t.Run("a record whose approval is another project's is never written over", func(t *testing.T) {
+		s := openTemp(t)
+		doc := readTestdata(t, "project.json")
+		path := seedProject(t, s, "other", doc)
+		_, err := s.LoadProject("other")
+		assert.Equal(t, "RJ-334", cli.Of(err).ID)
+		called := false
+		err = s.UpdateProject(held(t, s), "other", func(*Project) error { called = true; return nil })
+		assert.Equal(t, "RJ-334", cli.Of(err).ID)
+		assert.False(t, called)
+		after, rerr := os.ReadFile(path)
+		require.NoError(t, rerr)
+		assert.Equal(t, doc, after, "byte-identical")
+	})
+	t.Run("a fn that records the approval of another project writes nothing", func(t *testing.T) {
+		s := openTemp(t)
+		err := s.UpdateProject(held(t, s), "shop", func(p *Project) error {
+			a := approvalFor("other", canon.ULID{1})
+			p.Approval = &a
+			return nil
+		})
+		require.Error(t, err)
+		assert.NoFileExists(t, filepath.Join(s.Dir(), "projects", "shop.json"))
 	})
 	t.Run("a failing fn writes nothing", func(t *testing.T) {
 		s := openTemp(t)
@@ -308,10 +340,16 @@ func TestEncode_refusesWhatNoReaderWouldTake(t *testing.T) {
 	})
 	t.Run("an approval whose widening set names no project", func(t *testing.T) {
 		p := NewProject()
-		p.Approval = &Approval{
-			WideningDigest: canon.Sum[canon.WideningKind]{1}, RenderDigest: canon.Sum[canon.RenderKind]{2},
-			SpecCommit: "0123456789abcdef0123456789abcdef01234567", CandidateID: canon.ULID{1}, ApprovedAt: time.Now(),
-		}
+		a := approvalFor("", canon.ULID{1})
+		p.Approval = &a
+		_, err := EncodeProject(p)
+		require.Error(t, err)
+	})
+	t.Run("an approval whose digest is not its set's", func(t *testing.T) {
+		p := NewProject()
+		a := approvalFor("shop", canon.ULID{1})
+		a.WideningDigest = canon.Sum[canon.WideningKind]{1}
+		p.Approval = &a
 		_, err := EncodeProject(p)
 		require.Error(t, err)
 	})
@@ -355,6 +393,21 @@ func TestEncode_refusesWhatNoReaderWouldTake(t *testing.T) {
 }
 
 // validToolchain returns a toolchain record whole enough to write.
+// approvalFor returns a whole approval of the project whose digests are
+// those of its widening set.
+func approvalFor(project string, candidate canon.ULID) Approval {
+	set := gate.Set{Project: project, RenderDigest: canon.Sum[canon.RenderKind]{2}}
+	sum, err := gate.Digest(set)
+	if err != nil {
+		panic(err)
+	}
+	return Approval{
+		WideningDigest: sum, Set: set, RenderDigest: set.RenderDigest,
+		SpecCommit: "0123456789abcdef0123456789abcdef01234567", CandidateID: candidate,
+		ApprovedAt: time.Date(2026, 10, 2, 9, 10, 0, 0, time.UTC),
+	}
+}
+
 func validToolchain() *Toolchain {
 	return &Toolchain{
 		Schema: ToolchainField, SbxVersion: "0.46.0",
@@ -454,10 +507,9 @@ func TestEncode_timestampsAreUTCWholeSeconds(t *testing.T) {
 	t.Run("project", func(t *testing.T) {
 		s := testSeams()
 		p, id := projectIn(t, s, GenerationClosedRemoved)
-		p.Approval = &Approval{
-			WideningDigest: canon.Sum[canon.WideningKind]{1}, Set: gate.Set{Project: "shop"}, RenderDigest: canon.Sum[canon.RenderKind]{2},
-			SpecCommit: "0123456789abcdef0123456789abcdef01234567", CandidateID: id, ApprovedAt: at,
-		}
+		a := approvalFor("shop", id)
+		a.ApprovedAt = at
+		p.Approval = &a
 		p.LastRunAt = at
 		p.Generations[0].CreatedAt = at
 		p.Generations[0].ClosedAt = at
