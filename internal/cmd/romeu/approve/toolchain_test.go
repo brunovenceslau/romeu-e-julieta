@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -315,7 +316,11 @@ const moduleRoot = "../../../.."
 
 // julietaEmbedders returns the Go files of fsys that embed the file at
 // embedPath: a //go:embed directive in a file of its directory, or one
-// whose patterns name its base name.
+// with a pattern that, read from the file's directory as go:embed reads
+// it, names the file or a directory above it, or is a glob that matches
+// either. A pattern cannot climb with "..", so a file elsewhere whose
+// pattern only shares the base name (kits/embed.go embeds the kit
+// directory kits/julieta) does not embed it.
 func julietaEmbedders(t *testing.T, fsys fs.FS, embedPath string) []string {
 	t.Helper()
 	var out []string
@@ -337,11 +342,13 @@ func julietaEmbedders(t *testing.T, fsys fs.FS, embedPath string) []string {
 			return err
 		}
 		for line := range strings.Lines(string(data)) {
-			patterns, ok := strings.CutPrefix(strings.TrimSpace(line), "//go:embed ")
-			if !ok {
+			args, ok := strings.CutPrefix(strings.TrimSpace(line), "//go:embed")
+			if !ok || args != "" && args[0] != ' ' && args[0] != '\t' {
 				continue
 			}
-			if path.Dir(p) == path.Dir(embedPath) || slices.Contains(strings.Fields(patterns), path.Base(embedPath)) {
+			if path.Dir(p) == path.Dir(embedPath) || slices.ContainsFunc(embedPatterns(args), func(pattern string) bool {
+				return embedsPath(path.Dir(p), pattern, embedPath)
+			}) {
 				out = append(out, p)
 				break
 			}
@@ -350,6 +357,58 @@ func julietaEmbedders(t *testing.T, fsys fs.FS, embedPath string) []string {
 	})
 	require.NoError(t, err)
 	return out
+}
+
+// embedPatterns splits the arguments of a //go:embed directive as
+// go/build reads them: words separated by spaces or tabs, each bare or a
+// Go string literal, double-quoted or raw. A literal that does not parse
+// is kept as it is; the compiler refuses it anyway.
+func embedPatterns(args string) []string {
+	var out []string
+	for {
+		args = strings.TrimLeft(args, " \t")
+		if args == "" {
+			return out
+		}
+		var word string
+		if q := args[0]; q == '"' || q == '`' {
+			end := 1
+			for end < len(args) && args[end] != q {
+				if q == '"' && args[end] == '\\' {
+					end++
+				}
+				end++
+			}
+			if end >= len(args) {
+				return append(out, args)
+			}
+			word, args = args[:end+1], args[end+1:]
+			if unquoted, err := strconv.Unquote(word); err == nil {
+				word = unquoted
+			}
+		} else {
+			end := strings.IndexAny(args, " \t")
+			if end < 0 {
+				end = len(args)
+			}
+			word, args = args[:end], args[end:]
+		}
+		out = append(out, word)
+	}
+}
+
+// embedsPath reports whether the go:embed pattern of a file in dir takes
+// the file at target: the pattern, ignoring any all: prefix and read
+// from dir, names target or a directory above it, or is a glob that
+// matches either (go:embed takes a matched directory whole).
+func embedsPath(dir, pattern, target string) bool {
+	joined := path.Join(dir, strings.TrimPrefix(pattern, "all:"))
+	for name := target; name != "." && name != "/"; name = path.Dir(name) {
+		if ok, err := path.Match(joined, name); name == joined || err == nil && ok {
+			return true
+		}
+	}
+	return false
 }
 
 // TestPlaceholderJulietaUntilEmbedded is the guard of the placeholder:
@@ -368,8 +427,23 @@ func TestPlaceholderJulietaUntilEmbedded(t *testing.T) {
 	fixture := fstest.MapFS{
 		"internal/embedded/embedded.go": {Data: []byte("package embedded\n\nimport _ \"embed\"\n\n//go:embed julieta\nvar Julieta []byte\n")},
 		"internal/catalog/catalog.go":   {Data: []byte("package catalog\n\n//go:embed egress/*.yaml\nvar files embed.FS\n")},
+		"internal/above.go":             {Data: []byte("package internal\n\n//go:embed embedded/julieta\nvar J []byte\n")},
+		"internal/tree.go":              {Data: []byte("package internal\n\n//go:embed all:embedded\nvar T embed.FS\n")},
+		"internal/glob.go":              {Data: []byte("package internal\n\n//go:embed embedded/j*\nvar G embed.FS\n")},
+		"internal/allfile.go":           {Data: []byte("package internal\n\n//go:embed all:embedded/julieta\nvar A []byte\n")},
+		"internal/parent.go":            {Data: []byte("package internal\n\n//go:embed emb*\nvar P embed.FS\n")},
+		"internal/quoted.go":            {Data: []byte("package internal\n\n//go:embed \"embedded/julieta\"\nvar Q []byte\n")},
+		"internal/raw.go":               {Data: []byte("package internal\n\n//go:embed `embedded/julieta`\nvar R []byte\n")},
+		"internal/tab.go":               {Data: []byte("package internal\n\n//go:embed\tembedded/julieta\nvar B []byte\n")},
+		"internal/many.go":              {Data: []byte("package internal\n\n//go:embed README.md\n//go:embed x.txt embedded/julieta\nvar M embed.FS\n")},
+		"internal/near.go":              {Data: []byte("package internal\n\n//go:embed embedded/juli embedded/julieta2 \"embedded/julieta \"\n// go:embed embedded/julieta\n//go:embeddedjulieta\nvar N embed.FS\n")},
+		"root.go":                       {Data: []byte("package root\n\n//go:embed internal\nvar I embed.FS\n")},
+		"kits/embed.go":                 {Data: []byte("package kits\n\n//go:embed julieta os-base\nvar FS embed.FS\n")},
 	}
-	require.Equal(t, []string{"internal/embedded/embedded.go"}, julietaEmbedders(t, fixture, releaseEmbedPath), "the guard finds an embedder")
+	require.Equal(t, []string{
+		"internal/above.go", "internal/allfile.go", "internal/embedded/embedded.go", "internal/glob.go", "internal/many.go",
+		"internal/parent.go", "internal/quoted.go", "internal/raw.go", "internal/tab.go", "internal/tree.go", "root.go",
+	}, julietaEmbedders(t, fixture, releaseEmbedPath), "the guard finds every embedder, and not the kit directory of the same name or a name that only begins like it")
 
 	if embeddedJulieta(cli.Version{Protocol: 1}).SHA256 == placeholderSHA256 {
 		assert.Empty(t, julietaEmbedders(t, os.DirFS(moduleRoot), releaseEmbedPath),
