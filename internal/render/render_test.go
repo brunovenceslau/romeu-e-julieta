@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli/testsupport"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/render"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 )
@@ -26,6 +27,7 @@ var update = flag.Bool("update", false, "rewrite the golden files of testdata")
 // (10 10.4: a golden changes only with -update, locally).
 func golden(t *testing.T, name string, got []byte) {
 	t.Helper()
+	testsupport.FailOnUpdateInCI(t, *update)
 	p := filepath.Join("testdata", filepath.FromSlash(name))
 	if *update {
 		require.NoError(t, os.WriteFile(p, got, 0o644))

@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli/testsupport"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 )
@@ -26,6 +27,7 @@ var update = flag.Bool("update", false, "rewrite the golden files of testdata")
 // golden compares got with testdata/name, or rewrites it with -update.
 func golden(t *testing.T, name string, got []byte) {
 	t.Helper()
+	testsupport.FailOnUpdateInCI(t, *update)
 	p := filepath.Join("testdata", name)
 	if *update {
 		require.NoError(t, os.WriteFile(p, got, 0o644))
