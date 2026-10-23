@@ -6,6 +6,7 @@
 package approve
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json/v2"
 	"errors"
@@ -354,6 +355,29 @@ func Check(st *state.Store, live Live) error {
 		details = append(details, cli.Detail{Key: c.Member, Value: c.Recorded + " -> " + c.Live})
 	}
 	return ToolchainApprovalRequired.New("the toolchain changed since it was acknowledged (gate 1): "+strings.Join(names, ", "), details...)
+}
+
+// CheckFunc returns gate 1's check in the form of the preflight's seam
+// (Deps.Toolchain of internal/preflight, step 1 of 01 1.5) and of sync,
+// which runs step 1 before its first sbx read: it runs the sbx floor
+// check through sbx (REQ-0441, before gate 1), measures the live
+// toolchain with the version stamp v and checks it against the record
+// in st. It returns nil, toolchain-approval-required (RJ-302, exit 3),
+// or the error that stopped it first: sbx-floor (RJ-343), a failed sbx
+// call, upstream-shape (RJ-310), record-unreadable (RJ-334) or internal
+// (RJ-348).
+func CheckFunc(st *state.Store, sbx *sbxdrv.Runner, v cli.Version) func(context.Context) error {
+	return func(ctx context.Context) error {
+		release, err := sbx.RequireFloor(ctx, sbxdrv.Opts{Step: "preflight step 1"})
+		if err != nil {
+			return err
+		}
+		live, err := Measure(release, v)
+		if err != nil {
+			return err
+		}
+		return Check(st, live)
+	}
 }
 
 // sortedKeys returns the keys of m, sorted.

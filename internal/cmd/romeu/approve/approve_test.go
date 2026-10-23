@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/sbxdrv"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
@@ -75,7 +76,7 @@ func newMachine(t *testing.T) machine {
 	require.NoError(t, os.Mkdir(m.home, 0o700))
 	sbx := filepath.Join(dir, "sbx")
 	script := "#!/bin/sh\necho \"$*\" >> " + m.calls + "\necho 'sbx version v0.49.2 0123456789abcdef'\n"
-	require.NoError(t, os.WriteFile(sbx, []byte(script), 0o700)) //nolint:gosec // the fake sbx of the test is executable
+	require.NoError(t, os.WriteFile(sbx, []byte(script), 0o700))
 	data, err := spec.EncodeHostSettings(spec.HostSettings{
 		Schema: "host-settings/v1",
 		Root:   filepath.Join(m.home, "dev"),
@@ -218,4 +219,41 @@ func TestApproveOnATerminal(t *testing.T) {
 		assert.Contains(t, again.stdout, "acknowledged already")
 		assert.Equal(t, rec, m.record(t), "a second run writes nothing")
 	})
+}
+
+// TestCheckFunc: the seam the preflight and sync call checks the live
+// toolchain, sbx version read through the runner, against the record.
+//
+//romeu:invariant I7 test
+func TestCheckFunc(t *testing.T) {
+	m := newMachine(t)
+	master, terminal := openPTY(t)
+	h, err := spec.DecodeHostSettings(mustRead(t, m.settings))
+	require.NoError(t, err)
+	st, err := state.Open(filepath.Join(m.stateHome, "romeu"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = st.Close() })
+	v := cli.Version{Version: "v1.0.0", Commit: "abc", Protocol: 1}
+	check := CheckFunc(st, &sbxdrv.Runner{Sbx: h.Tools.Sbx, Home: m.home, Host: &h}, v)
+
+	err = check(t.Context())
+	require.Error(t, err)
+	assert.Equal(t, "RJ-302", cli.Of(err).ID, "no record")
+
+	got := approveOn(t, m, terminal, master, "y\n")
+	require.Equal(t, 0, got.code, got.stderr)
+	require.NoError(t, check(t.Context()), "the acknowledged toolchain")
+
+	other := CheckFunc(st, &sbxdrv.Runner{Sbx: h.Tools.Sbx, Home: m.home, Host: &h}, cli.Version{Version: "v1.1.0", Protocol: 1})
+	err = other(t.Context())
+	require.Error(t, err)
+	assert.Equal(t, "RJ-302", cli.Of(err).ID, "another romeu version")
+}
+
+// mustRead returns the bytes of the file at path.
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return data
 }
