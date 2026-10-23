@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "path": "my-config-env/my-config"
+    },
+    {
+      "path": "shop-env/shop-api"
+    },
+    {
+      "path": "shop-env/shop-web"
+    }
+  ]
+}

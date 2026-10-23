@@ -256,13 +256,17 @@ func oneElement(name string) error {
 
 // reservedDirs returns the names romeu reserves inside <name>-env/, the
 // one list of the repo dir rule (03 3.1).
-func reservedDirs() []string {
+func reservedDirs() []string { return specRule("repo-dir").Reserved }
+
+// specRule returns the rule of internal/spec of the slug; that it has
+// one is a fact of this build, which the tests hold.
+func specRule(slug string) spec.Rule {
 	for _, r := range spec.Rules() {
-		if r.Slug == "repo-dir" {
-			return r.Reserved
+		if r.Slug == slug {
+			return r
 		}
 	}
-	panic("render: internal/spec has no repo-dir rule")
+	panic("render: internal/spec has no rule " + slug)
 }
 
 // readsBack decodes data and requires it to be want: the marshaller
