@@ -8,10 +8,16 @@ package approve
 import (
 	"crypto/sha256"
 	"errors"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
+	"slices"
+	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -250,9 +256,9 @@ func TestVersion(t *testing.T) {
 func TestMeasure(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "romeu")
 	require.NoError(t, os.WriteFile(bin, []byte("a build"), 0o600))
-	old := executable
-	executable = func() (string, error) { return bin, nil }
-	t.Cleanup(func() { executable = old })
+	old := romeuSHA256
+	romeuSHA256 = func() (state.SHA256, error) { return fileSHA256(func() (string, error) { return bin, nil }) }
+	t.Cleanup(func() { romeuSHA256 = old })
 
 	live, err := Measure(sbxdrv.Release{Major: 0, Minor: 49, Patch: 2}, cli.Version{Version: "v1.0.0", Protocol: 1})
 	require.NoError(t, err)
@@ -264,7 +270,109 @@ func TestMeasure(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, want, live.CatalogDigest)
 
-	executable = func() (string, error) { return "", errors.New("no path") }
+	romeuSHA256 = func() (state.SHA256, error) {
+		return fileSHA256(func() (string, error) { return "", errors.New("no path") })
+	}
 	_, err = Measure(sbxdrv.Release{}, cli.Version{})
 	testsupport.RequireID(t, "RJ-348", err)
+}
+
+// TestRomeuSHA256IsTheRunningImage: on Linux the sha256 is read from
+// /proc/self/exe, the image that runs, not from the path os.Executable
+// names, which a replaced file would change; elsewhere from
+// os.Executable. The hash is read once per process.
+func TestRomeuSHA256IsTheRunningImage(t *testing.T) {
+	t.Parallel()
+	path, err := selfPath()
+	require.NoError(t, err)
+	if runtime.GOOS == "linux" {
+		assert.Equal(t, "/proc/self/exe", path)
+	} else {
+		want, err := os.Executable()
+		require.NoError(t, err)
+		assert.Equal(t, want, path)
+	}
+	exe, err := os.Executable()
+	require.NoError(t, err)
+	data, err := os.ReadFile(exe)
+	require.NoError(t, err)
+	got, err := romeuSHA256()
+	require.NoError(t, err)
+	assert.Equal(t, state.SHA256(sha256.Sum256(data)), got)
+	again, err := romeuSHA256()
+	require.NoError(t, err)
+	assert.Equal(t, got, again)
+}
+
+// releaseEmbedPath is build.EmbedPath of tools/release
+// (tools/release/internal/build/build.go), the file a release build maps
+// the real julieta into; a test of internal/ cannot import tools/, so
+// TestPlaceholderJulietaUntilEmbedded holds this copy to the source.
+const releaseEmbedPath = "internal/embedded/julieta"
+
+// moduleRoot is the repository, from this package's directory.
+const moduleRoot = "../../../.."
+
+// julietaEmbedders returns the Go files of fsys that embed the file at
+// embedPath: a //go:embed directive in a file of its directory, or one
+// whose patterns name its base name.
+func julietaEmbedders(t *testing.T, fsys fs.FS, embedPath string) []string {
+	t.Helper()
+	var out []string
+	err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if p != "." && (d.Name() == "testdata" || d.Name() == "vendor" || strings.HasPrefix(d.Name(), ".")) {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(p, ".go") {
+			return nil
+		}
+		data, err := fs.ReadFile(fsys, p)
+		if err != nil {
+			return err
+		}
+		for line := range strings.Lines(string(data)) {
+			patterns, ok := strings.CutPrefix(strings.TrimSpace(line), "//go:embed ")
+			if !ok {
+				continue
+			}
+			if path.Dir(p) == path.Dir(embedPath) || slices.Contains(strings.Fields(patterns), path.Base(embedPath)) {
+				out = append(out, p)
+				break
+			}
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	return out
+}
+
+// TestPlaceholderJulietaUntilEmbedded is the guard of the placeholder:
+// once a package embeds the julieta tools/release maps in (T043, T066),
+// embeddedJulieta must read it, or gate 1 would record the placeholder
+// for a real julieta and show "julieta unchanged" for a changed one.
+// The test fails until embeddedJulieta stops returning the placeholder.
+//
+//romeu:invariant I7 test
+func TestPlaceholderJulietaUntilEmbedded(t *testing.T) {
+	t.Parallel()
+	src, err := os.ReadFile(filepath.Join(moduleRoot, "tools", "release", "internal", "build", "build.go"))
+	require.NoError(t, err)
+	require.Contains(t, string(src), `const EmbedPath = "`+releaseEmbedPath+`"`, "build.EmbedPath moved: update releaseEmbedPath")
+
+	fixture := fstest.MapFS{
+		"internal/embedded/embedded.go": {Data: []byte("package embedded\n\nimport _ \"embed\"\n\n//go:embed julieta\nvar Julieta []byte\n")},
+		"internal/catalog/catalog.go":   {Data: []byte("package catalog\n\n//go:embed egress/*.yaml\nvar files embed.FS\n")},
+	}
+	require.Equal(t, []string{"internal/embedded/embedded.go"}, julietaEmbedders(t, fixture, releaseEmbedPath), "the guard finds an embedder")
+
+	if embeddedJulieta(cli.Version{Protocol: 1}).SHA256 == placeholderSHA256 {
+		assert.Empty(t, julietaEmbedders(t, os.DirFS(moduleRoot), releaseEmbedPath),
+			"a package embeds the julieta of tools/release now, and embeddedJulieta still returns the placeholder: make it read the embedded julieta")
+	}
 }

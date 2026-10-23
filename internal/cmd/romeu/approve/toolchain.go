@@ -15,9 +15,11 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"runtime"
 	"runtime/debug"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
@@ -129,13 +131,24 @@ type Live struct {
 
 // The seams of Measure; a test replaces them.
 var (
-	// executable returns the path of the running binary.
-	executable = os.Executable
+	// romeuSHA256 returns the sha256 of the running binary, read once
+	// per process.
+	romeuSHA256 = sync.OnceValues(func() (state.SHA256, error) { return fileSHA256(selfPath) })
 	// embeddedCatalog returns the catalog this binary embeds.
 	embeddedCatalog = catalog.Embedded
 	// buildInfo returns the build information of the binary.
 	buildInfo = debug.ReadBuildInfo
 )
+
+// selfPath returns the path the running binary is read from: on Linux
+// /proc/self/exe, the image the process runs even when the file at its
+// path was replaced since it started; elsewhere os.Executable.
+func selfPath() (string, error) {
+	if runtime.GOOS == "linux" {
+		return "/proc/self/exe", nil
+	}
+	return os.Executable()
+}
 
 // The julieta a source build embeds: the empty placeholder of 02 2.1
 // (REQ-0130), with a version of its own. Its version is fixed, not
@@ -193,7 +206,7 @@ func Version(v cli.Version) string {
 // or a catalog that does not build, is the error internal (RJ-348): no
 // healthy build reaches either.
 func Measure(sbx sbxdrv.Release, v cli.Version) (Live, error) {
-	sum, err := executableSHA256()
+	sum, err := romeuSHA256()
 	if err != nil {
 		return Live{}, cli.Internal.Wrap(err, "gate 1: romeu cannot read its own file")
 	}
@@ -215,13 +228,13 @@ func Measure(sbx sbxdrv.Release, v cli.Version) (Live, error) {
 	}, nil
 }
 
-// executableSHA256 returns the sha256 of the file of the running binary.
-func executableSHA256() (state.SHA256, error) {
-	path, err := executable()
+// fileSHA256 returns the sha256 of the file whose path path returns.
+func fileSHA256(path func() (string, error)) (state.SHA256, error) {
+	p, err := path()
 	if err != nil {
 		return state.SHA256{}, err
 	}
-	f, err := os.Open(path)
+	f, err := os.Open(p)
 	if err != nil {
 		return state.SHA256{}, err
 	}
