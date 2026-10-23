@@ -303,7 +303,7 @@ dir`, see J13).
 3. Compare the recreate digest of the live render with the open
    generation's, then act on the sandbox's state:
    - `REQ-0350` absent: record a new generation first (01 1.6), then `sbx env run
-     -d --clone <dir>` (never `--auto-approve`; the call is interactive
+     -d --clone <dir>` (never the flag that applies a plan without asking (`--auto-approve` before sbx v0.48.0, `-f`/`--force` on `env run` and `env create` since); the call is interactive
      and raw, as 4.1 Output says, so sbx's own prompt appears in this
      terminal when needed). If sbx returns non-zero on that create, read
      `sbx ls --json`: with the sandbox absent, remove the record just
@@ -329,6 +329,12 @@ dir`, see J13).
    configuration from the workspace tree is recorded by probe A5, and
    if it does, the drift check refuses one
    ([03 3.3](03-formats.md#33-rendered-sbxenvyaml-sbx-env-file-schemaversion-1)).
+
+   `sbx env rm` carries `--force`, because romeu's calls have stdin
+   closed and sbx fails a confirmation without a terminal (exit 1);
+   romeu's own confirmation and salvage come before the call, and this
+   `--force` approves no plan (I4 is about the plan of `env run` and
+   `env create`).
 4. `REQ-0354` Reconcile egress: `sbx policy allow network --sandbox <name> <d>` for
    missing domains; `sbx policy rm network --sandbox <name> --resource
    <d>` for domains romeu applied that left the set; verify with `sbx
