@@ -8,8 +8,7 @@
 // or of --repo, with the platforms of 07 7.3, and with --check the
 // freshness check of the lock, which reads and writes nothing but
 // reports. The check is internal/mise's Check; the catalog lookup of
-// the warning lock-unknown-tool is the task of internal/egress and is
-// not here.
+// the warning lock-unknown-tool is catalog_check.go.
 package lock
 
 import (
@@ -46,7 +45,8 @@ var _ = cli.Register(func() cli.Command {
 				"and the platforms of the repo's lockfile_platforms setting, and rewrites mise.lock. " +
 				"With --check it writes nothing: it fails with exit 6 on a tool of mise.toml with no lock entry, " +
 				"on a lockable entry that lacks linux-x64 or linux-arm64, on an entry without a well-formed sha256 checksum " +
-				"(unless .julieta/lock-exceptions excuses its tool) and on a file that does not parse.",
+				"(unless .julieta/lock-exceptions excuses its tool) and on a file that does not parse. " +
+				"It warns lock-unknown-tool, and still passes, for a backend:tool the embedded egress catalog does not have.",
 			Args: cobra.NoArgs,
 			RunE: func(c *cobra.Command, _ []string) error {
 				return run(c.Context(), env, repo, check)
@@ -111,6 +111,9 @@ func runCheck(env *cli.Env, r manifest.Repo) error {
 		}
 		details = append(details, cli.Detail{Key: dir + " " + termsafe.Escape(line), Value: f.Slug})
 		slugs = append(slugs, f.Slug)
+	}
+	if err := warnUnknownTools(env.Stderr, r.Dir, raw); err != nil {
+		return err
 	}
 	if len(details) > 0 {
 		return cli.CheckFindings.New(fmt.Sprintf("the mise.lock of %s is not fresh: %d findings: %s", dir, len(details), strings.Join(slugs, ", ")), details...)

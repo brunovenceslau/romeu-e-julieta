@@ -64,6 +64,19 @@ var (
 		RecoveredIn: "none: the command stops before it changes any state, and a release that records the new shape reads it",
 	}
 
+	// LockMissing is the error lock-missing (RJ-340): a repo has a
+	// mise.toml and no mise.lock (07 7.3, REQ-0438). julieta install
+	// and romeu sync (internal/egress) raise it, so it is declared here,
+	// once, since internal/egress must not import internal/mise (10 10.7);
+	// the hint is julieta lock --repo <dir>.
+	LockMissing = Row{
+		ID:          "RJ-340",
+		Slug:        "lock-missing",
+		Exit:        2,
+		Fix:         "julieta lock --repo <dir>",
+		RecoveredIn: "none: the hint locks the repo and the install runs again",
+	}
+
 	// Internal is the error internal (RJ-348): an error chain that holds
 	// no *Error, a defect of the code (10 10.1, Error ids).
 	Internal = Row{

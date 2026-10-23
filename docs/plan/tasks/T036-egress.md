@@ -7,6 +7,11 @@ fate: kept
 owns:
   - internal/egress/**
   - internal/cmd/julieta/lock/catalog_check.go
+  - internal/gitsafe/commitfile*.go
+  - internal/cli/errors.go
+  - internal/mise/errors.go
+  - internal/cmd/julieta/setup/install.go
+  - e2e/julieta_lock_test.go
 needs:
   - T031
   - T024
@@ -14,6 +19,8 @@ after:
   - T053
 ask_first:
   - catalog
+  - contracts
+  - gitsafe
 sitting: none
 ---
 

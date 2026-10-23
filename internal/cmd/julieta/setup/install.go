@@ -195,7 +195,7 @@ func readRepo(r manifest.Repo) (mise.Files, error) {
 		return f, nil
 	}
 	if !f.HasLock {
-		e := mise.LockMissing.New(fmt.Sprintf("%s has a mise.toml and no mise.lock", dir))
+		e := cli.LockMissing.New(fmt.Sprintf("%s has a mise.toml and no mise.lock", dir))
 		e.Fill = map[string]string{"<dir>": r.Dir}
 		return mise.Files{}, e
 	}
