@@ -17,8 +17,8 @@ import (
 // (10 10.3): the header on the first line, then one call of sbx on
 // each line, in the order it was made.
 //
-//	{"session":"lifecycle","sbxVersion":"0.48.0","capturedAt":"2026-10-22","synthetic":true,"source":"...","description":"..."}
-//	{"argv":["version"],"exit":0,"stdout":"v0.48.0\n","stderr":""}
+//	{"session":"lifecycle","sbxVersion":"0.49.2","capturedAt":"2026-10-22","synthetic":true,"source":"...","description":"..."}
+//	{"argv":["version"],"exit":0,"stdout":"sbx version v0.49.2 0123456789abcdef0123456789abcdef01234567\n","stderr":""}
 //	{"argv":["env","run","-d","--clone","<dir>"],"exit":0,"stdout":"","stderr":"","effects":{"gitRemote":{...}}}
 //	{"argv":["env","exec","<dir>","--","<command...>"],"hang":true}
 //

@@ -181,7 +181,7 @@ which widening the tested window records (11.4), sits at
   "block": "A",
   "kind": "observe",
   "commit": "<product repo commit the harness ran from>",
-  "host": {"os": "darwin", "arch": "arm64", "sbxVersion": "0.46.0", "gitVersion": "2.51.0",
+  "host": {"os": "darwin", "arch": "arm64", "sbxVersion": "0.49.2", "gitVersion": "2.51.0",
            "upstream": {}},
   "startedAt": "2026-10-03T10:00:00Z",
   "expect": "live-set secret is kept by the next env run without a prompt",
@@ -191,7 +191,7 @@ which widening the tested window records (11.4), sits at
   "affects": [{"path": "internal/spec/project.go", "anchor": "Secrets"},
               {"path": "docs/spec/03-formats.md", "anchor": "32-project-spec-projectsnameyaml-schema-projectv1"}],
   "resolvedBy": null,
-  "artifacts": [{"path": "e2e/testdata/sbx/0.46.0/secret-set.jsonl", "sha256": "<hex>"}]
+  "artifacts": [{"path": "e2e/testdata/sbx/0.49.2/secret-set.jsonl", "sha256": "<hex>"}]
 }
 ```
 

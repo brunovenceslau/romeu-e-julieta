@@ -200,13 +200,16 @@ func TestRunnerListTimeout(t *testing.T) {
 }
 
 // TestRunnerListShape adds the live version to the details of the
-// error upstream-shape.
+// error upstream-shape. The document it reads,
+// bad-object-with-sandboxes-list.json, is bad because its top level is
+// an object holding the list under "sandboxes", the shape sbx printed
+// before v0.48.0, where an array is read.
 func TestRunnerListShape(t *testing.T) {
-	_, err := listRunner(t, "bad-before-0.48.json", 0).List(context.Background(), Opts{})
+	_, err := listRunner(t, "bad-object-with-sandboxes-list.json", 0).List(context.Background(), Opts{})
 	testsupport.RequireID(t, "RJ-310", err)
 	assert.Contains(t, cli.Of(err).Details, cli.Detail{Key: "sbx version", Value: "0.99.0"})
 
-	r := listRunner(t, "bad-before-0.48.json", 0)
+	r := listRunner(t, "bad-object-with-sandboxes-list.json", 0)
 	r.Versions = Versions{}
 	_, err = r.List(context.Background(), Opts{})
 	testsupport.RequireID(t, "RJ-310", err)

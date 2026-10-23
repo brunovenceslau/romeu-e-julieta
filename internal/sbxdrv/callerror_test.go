@@ -25,7 +25,7 @@ import (
 // host name and the root path replaced, the step and the three versions.
 func TestCallErrorDetailsTable(t *testing.T) {
 	scrub := Scrubber{Home: "/home/agent", User: "agent", Host: "agent-mbp", Root: "/home/agent/dev"}
-	versions := Versions{Romeu: "v1.2.3", Julieta: "v1.2.4", Sbx: "0.48.0"}
+	versions := Versions{Romeu: "v1.2.3", Julieta: "v1.2.4", Sbx: "0.49.2"}
 	call := Call{Name: "stop", Argv: []string{"stop", "shop"}}
 	exit := func(code int) error { return &procgroup.ExitError{Argv0: "sbx", Code: code} }
 	tests := []struct {
@@ -41,7 +41,7 @@ func TestCallErrorDetailsTable(t *testing.T) {
 			want: []cli.Detail{
 				{Key: "argv", Value: "sbx stop shop"}, {Key: "status", Value: "exit 1"}, {Key: "stderr", Value: `Error: no sandbox shop\n`},
 				{Key: "step", Value: "stop step 2"},
-				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.48.0"},
+				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.49.2"},
 			},
 		},
 		{
@@ -51,7 +51,7 @@ func TestCallErrorDetailsTable(t *testing.T) {
 				{Key: "argv", Value: "sbx stop shop"}, {Key: "status", Value: "exit 2"},
 				{Key: "stderr", Value: "mkdir <root>/shop-env/.romeu: denied; user <user> on <host>, config <home>/.config/sbx"},
 				{Key: "step", Value: "run step 3"},
-				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.48.0"},
+				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.49.2"},
 			},
 		},
 		{
@@ -59,7 +59,7 @@ func TestCallErrorDetailsTable(t *testing.T) {
 			want: []cli.Detail{
 				{Key: "argv", Value: "sbx stop shop"}, {Key: "status", Value: "ended by signal 9 (killed)"}, {Key: "stderr", Value: ""},
 				{Key: "step", Value: "stop step 2"},
-				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.48.0"},
+				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.49.2"},
 			},
 		},
 		{
@@ -67,28 +67,28 @@ func TestCallErrorDetailsTable(t *testing.T) {
 			want: []cli.Detail{
 				{Key: "argv", Value: "sbx stop shop"}, {Key: "status", Value: "sbx was not found"}, {Key: "stderr", Value: ""},
 				{Key: "step", Value: "preflight step 1"},
-				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.48.0"},
+				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.49.2"},
 			},
 		},
 		{
 			name: "no step", call: call, err: exit(1),
 			want: []cli.Detail{
 				{Key: "argv", Value: "sbx stop shop"}, {Key: "status", Value: "exit 1"}, {Key: "stderr", Value: ""},
-				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.48.0"},
+				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.49.2"},
 			},
 		},
 		{
 			name: "an argv with a control character and a space", call: Call{Name: "x", Argv: []string{"env", "rm", "/a b/\x1b[31m"}}, err: exit(1),
 			want: []cli.Detail{
 				{Key: "argv", Value: `sbx env rm "/a b/\u001b[31m"`}, {Key: "status", Value: "exit 1"}, {Key: "stderr", Value: ""},
-				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.48.0"},
+				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.49.2"},
 			},
 		},
 		{
 			name: "an stderr with a control character", call: call, err: exit(1), stderr: "\x1b]0;title\x07 bell",
 			want: []cli.Detail{
 				{Key: "argv", Value: "sbx stop shop"}, {Key: "status", Value: "exit 1"}, {Key: "stderr", Value: `\u001b]0;title\u0007 bell`},
-				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.48.0"},
+				{Key: "romeu version", Value: "v1.2.3"}, {Key: "julieta version", Value: "v1.2.4"}, {Key: "sbx version", Value: "0.49.2"},
 			},
 		},
 	}

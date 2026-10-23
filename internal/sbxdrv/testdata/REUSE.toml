@@ -3,11 +3,11 @@
 
 # The license of the fixtures of the parsers of internal/sbxdrv, none of
 # which can carry an SPDX header of its own (REUSE 3.3). Each is the
-# output of sbx ls --json as the shape of v0.48.0 is documented, or
+# output of sbx ls --json as sbx v0.49.2 printed it (checked on 2026-10-22), or
 # a variation of it written by hand:
 # - ls/ok-*.json: documents the parser reads;
 # - ls/bad-*.json: documents it refuses with upstream-shape (RJ-310): a
-#   shape of sbx before v0.48.0, a renamed list, a member that is read
+#   shape of sbx before v0.48.0 (the object with a sandboxes list), a renamed list, a member that is read
 #   missing, null, empty or mistyped, a document cut short, a duplicate
 #   member name, trailing text, a table, an empty output.
 

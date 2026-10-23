@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const goodHeader = `{"session":"s","sbxVersion":"0.48.0","capturedAt":"2026-10-22","synthetic":true,"source":"x","description":"y"}` + "\n"
+const goodHeader = `{"session":"s","sbxVersion":"0.49.2","capturedAt":"2026-10-22","synthetic":true,"source":"x","description":"y"}` + "\n"
 
 // TestLoadSession reads a session and refuses what a session may not be.
 func TestLoadSession(t *testing.T) {

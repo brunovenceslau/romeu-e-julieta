@@ -23,6 +23,10 @@ import (
 // sessionsDir is the root of the sessions, from this package.
 const sessionsDir = "../../e2e/testdata/sbx"
 
+// recordedDir is the directory of the sessions the tests replay by name:
+// the lowest recorded version, which is the floor.
+var recordedDir = RecordedVersions[0]
+
 // sessionHeader is the first line of a session file (10 10.3).
 type sessionHeader struct {
 	Session     string `json:"session"`

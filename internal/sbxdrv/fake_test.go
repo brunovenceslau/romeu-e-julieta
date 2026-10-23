@@ -220,7 +220,7 @@ func loadSessionFile(t *testing.T, path string) session {
 // of the lifecycle session writes the recorded remote.sandbox-<name>
 // stanza into the config of the primary clone.
 func TestFakeWritesTheStanzaOfACreate(t *testing.T) {
-	abs, err := filepath.Abs(filepath.Join(sessionsDir, "0.48.0", "lifecycle.jsonl"))
+	abs, err := filepath.Abs(filepath.Join(sessionsDir, recordedDir, "lifecycle.jsonl"))
 	require.NoError(t, err)
 	rig := newFakeRig(t, abs)
 	_, err = rig.runner.Run(context.Background(), List(), Opts{})
@@ -238,7 +238,7 @@ func TestFakeWritesTheStanzaOfACreate(t *testing.T) {
 // fails a call out of the recorded order, and a shape that was not
 // recorded, with a status the runner reports.
 func TestFakeFailsAnOutOfOrderCall(t *testing.T) {
-	abs, err := filepath.Abs(filepath.Join(sessionsDir, "0.48.0", "lifecycle.jsonl"))
+	abs, err := filepath.Abs(filepath.Join(sessionsDir, recordedDir, "lifecycle.jsonl"))
 	require.NoError(t, err)
 	rig := newFakeRig(t, abs)
 	stop, err := Stop("shop")
@@ -263,7 +263,7 @@ func TestFakeFailsAnOutOfOrderCall(t *testing.T) {
 // test): where the table says I4 or I25 the fake exits 99, whatever the
 // session holds, and where it says ok the fake does not.
 func TestFakeExits99WhereTheGuardsRefuse(t *testing.T) {
-	abs, err := filepath.Abs(filepath.Join(sessionsDir, "0.48.0", "lifecycle.jsonl"))
+	abs, err := filepath.Abs(filepath.Join(sessionsDir, recordedDir, "lifecycle.jsonl"))
 	require.NoError(t, err)
 	rig := newFakeRig(t, abs)
 	for _, tt := range loadGuardCases(t) {

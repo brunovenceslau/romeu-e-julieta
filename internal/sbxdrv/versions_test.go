@@ -93,13 +93,13 @@ func TestCheckFloor(t *testing.T) {
 		out   string
 		below bool
 	}{
-		{"the floor", "v0.48.0", false},
-		{"above", "v0.49.2", false},
+		{"the floor", "v0.49.2", false},
+		{"above", "v0.49.3", false},
 		{"a later major", "v1.0.0", false},
-		{"one patch below", "v0.47.9", true},
+		{"one patch below", "v0.49.1", true},
 		{"far below", "v0.9.0", true},
-		{"a release candidate of the floor", "v0.48.0-rc.1", true},
-		{"a release candidate above the floor", "v0.49.0-rc.1", false},
+		{"a release candidate of the floor", "v0.49.2-rc.1", true},
+		{"a release candidate above the floor", "v0.50.0-rc.1", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

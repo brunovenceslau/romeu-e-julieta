@@ -534,7 +534,7 @@ binary digest here is what the compatibility check compares against.
 ```json
 {
   "schema": "state-toolchain/v1",
-  "sbxVersion": "0.46.0",
+  "sbxVersion": "0.49.2",
   "romeu": {"version": "v1.0.0", "sha256": "<hex>"},
   "julieta": {"version": "v1.0.0", "protocol": 1, "sha256": "<hex>"},
   "catalogDigest": "<hex>",

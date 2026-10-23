@@ -173,7 +173,7 @@ func TestReplayIsStateful(t *testing.T) {
 
 	code, out, _ := r.call("version")
 	assert.Equal(t, 0, code)
-	assert.Equal(t, "v0.48.0\n", out)
+	assert.Equal(t, "sbx version v0.49.2 0123456789abcdef0123456789abcdef01234567\n", out)
 
 	_, out, _ = r.call("ls", "--json")
 	assert.Equal(t, "[]\n", out, "before the create")
@@ -496,7 +496,7 @@ func TestConfigFromTheEnvironment(t *testing.T) {
 	var out, errOut bytes.Buffer
 	code := run([]string{r.sbx, "version"}, []string{"LANG=C", configEnv + "=" + elsewhere}, nil, &out, &errOut, func() {})
 	assert.Equal(t, 0, code)
-	assert.Equal(t, "v0.48.0\n", out.String())
+	assert.Equal(t, "sbx version v0.49.2 0123456789abcdef0123456789abcdef01234567\n", out.String())
 }
 
 // TestLoadConfigRefuses refuses a configuration with a relative path or

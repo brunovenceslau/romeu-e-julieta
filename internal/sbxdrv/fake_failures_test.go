@@ -23,7 +23,7 @@ import (
 // failureRig is a rig on the failure session of 01 1.6 named.
 func failureRig(t *testing.T, name string) *fakeRig {
 	t.Helper()
-	abs, err := filepath.Abs(filepath.Join(sessionsDir, "0.48.0", name+".jsonl"))
+	abs, err := filepath.Abs(filepath.Join(sessionsDir, recordedDir, name+".jsonl"))
 	require.NoError(t, err)
 	return newFakeRig(t, abs)
 }

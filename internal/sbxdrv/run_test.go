@@ -151,7 +151,7 @@ func TestRunFailureDetails(t *testing.T) {
 	sbx := script(t, `echo "open /home/agent/dev/shop-env: permission denied for agent on agent-mbp" >&2; echo "\033[31mred" >&2; exit 3`)
 	r := runner(sbx)
 	r.Scrub = Scrubber{Home: "/home/agent", User: "agent", Host: "agent-mbp", Root: "/home/agent/dev"}
-	r.Versions = Versions{Romeu: "v1.2.3", Julieta: "v1.2.4", Sbx: "0.48.0"}
+	r.Versions = Versions{Romeu: "v1.2.3", Julieta: "v1.2.4", Sbx: "0.49.2"}
 	c := mustCall(EnvRm("/home/agent/dev/shop env"))
 	_, err := r.Run(context.Background(), c, Opts{Step: "run step 3"})
 	ce, ok := errors.AsType[*CallError](err)
@@ -163,7 +163,7 @@ func TestRunFailureDetails(t *testing.T) {
 		{Key: "step", Value: "run step 3"},
 		{Key: "romeu version", Value: "v1.2.3"},
 		{Key: "julieta version", Value: "v1.2.4"},
-		{Key: "sbx version", Value: "0.48.0"},
+		{Key: "sbx version", Value: "0.49.2"},
 	}, ce.Details())
 	assert.Equal(t, "sbx env-rm failed: exit 3", ce.Error())
 	_, isExit := errors.AsType[*procgroup.ExitError](err)
@@ -301,9 +301,9 @@ func TestRunContributionsReachTheCall(t *testing.T) {
 
 // TestRunnerVersion reads the version through the runner.
 func TestRunnerVersion(t *testing.T) {
-	v, err := runner(script(t, `echo v0.48.0`)).Version(context.Background(), Opts{})
+	v, err := runner(script(t, `echo v0.49.2`)).Version(context.Background(), Opts{})
 	require.NoError(t, err)
-	assert.Equal(t, "0.48.0", v.String())
+	assert.Equal(t, "0.49.2", v.String())
 
 	_, err = runner(script(t, `echo not a version`)).Version(context.Background(), Opts{})
 	testsupport.RequireID(t, "RJ-310", err)
@@ -316,13 +316,13 @@ func TestRunnerVersion(t *testing.T) {
 // TestRequireFloor is the sbx floor check before gate 1 (REQ-0441): a
 // version below the floor is sbx-floor, and one at it passes.
 func TestRequireFloor(t *testing.T) {
-	v, err := runner(script(t, `echo v0.48.0`)).RequireFloor(context.Background(), Opts{})
+	v, err := runner(script(t, `echo v0.49.2`)).RequireFloor(context.Background(), Opts{})
 	require.NoError(t, err)
-	assert.Equal(t, "0.48.0", v.String())
+	assert.Equal(t, "0.49.2", v.String())
 
-	v, err = runner(script(t, `echo v0.47.9`)).RequireFloor(context.Background(), Opts{})
+	v, err = runner(script(t, `echo v0.49.1`)).RequireFloor(context.Background(), Opts{})
 	testsupport.RequireID(t, "RJ-343", err)
-	assert.Equal(t, "0.47.9", v.String(), "the version found is returned with the error")
+	assert.Equal(t, "0.49.1", v.String(), "the version found is returned with the error")
 	assert.Equal(t, 2, cli.ExitCode(err))
 
 	_, err = runner(script(t, `exit 1`)).RequireFloor(context.Background(), Opts{})
@@ -346,7 +346,7 @@ func TestRunClosesTheStdinOfACapturedCall(t *testing.T) {
 // the runner starts the call of sbx version and nothing else.
 func TestRunnerRefusesEveryCallButVersionBeforeTheFloor(t *testing.T) {
 	marker := filepath.Join(t.TempDir(), "ran")
-	sbx := script(t, `if [ "$1" = version ]; then echo v0.48.0; else touch `+marker+`; fi`)
+	sbx := script(t, `if [ "$1" = version ]; then echo v0.49.2; else touch `+marker+`; fi`)
 	r := &Runner{Sbx: sbx, Home: "/home/test"}
 	stop := mustCall(Stop("shop"))
 	_, err := r.Run(context.Background(), stop, Opts{})
