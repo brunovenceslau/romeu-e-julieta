@@ -53,17 +53,37 @@ var cloneFlags = []string{"--no-tags", "--no-recurse-submodules", "--template=",
 // other process writes the config between the listing and the
 // checkout.
 func (r *Runner) Clone(ctx context.Context, url, dest string) error {
+	return r.clone(ctx, url, dest, "")
+}
+
+// clone is Clone with helper, when it is not empty, as the credential
+// helper of the git clone command alone (CloneWithCredentialHelper).
+func (r *Runner) clone(ctx context.Context, url, dest, helper string) error {
 	if err := CheckURL(url); err != nil {
 		return err
 	}
 	if err := checkCloneDest(dest); err != nil {
 		return err
 	}
-	if _, err := r.resolveURL(ctx, "/", url); err != nil {
+	if helper != "" {
+		if err := r.checkScopedHelper(helper); err != nil {
+			return err
+		}
+	}
+	resolved, err := r.resolveURL(ctx, "/", url)
+	if err != nil {
 		return err
 	}
+	extra := r.hostSettings(url)
+	if helper != "" {
+		s, err := scopedHelper(resolved, helper)
+		if err != nil {
+			return err
+		}
+		extra = append(extra, s)
+	}
 	args := slices.Concat([]string{"clone"}, cloneFlags, []string{"--", url, dest})
-	if err := r.runWith(ctx, filepath.Dir(dest), r.hostSettings(url), nil, args...); err != nil {
+	if err := r.runWith(ctx, filepath.Dir(dest), extra, nil, args...); err != nil {
 		return err
 	}
 	if err := r.checkout(ctx, dest); err != nil {
