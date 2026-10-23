@@ -142,7 +142,7 @@ every project. Gate 1 makes it visible before any project uses it;
 | `secrets` | sorted `{name, service, argvDigest}` (argv from host settings) |
 | `workload` | `{repository, digest, capabilities}`; `capabilities` = the normalized capability set read from the workload descriptor (below) |
 | `kits` | ordered `{id, source: product\|personal, contentDigest, args, capabilities}` |
-| `egressGated` | sorted gated domains, each with its reason (upload, non-catalog lock host, spec extra, spec tool override, kit-declared) |
+| `egressGated` | sorted gated domains, each with one reason; a domain two reasons apply to keeps the first in this order: upload, kit-declared, spec extra, spec tool override, non-catalog lock host |
 | `ports` | sorted port specs |
 | `agent` | the agent handle |
 | `salvageExcludes` | `salvage.excludeIgnored` (it defines acknowledged loss) |
