@@ -9,10 +9,13 @@ owns:
   - docs/spec/05-security.md
 needs:
   - T151
-after: []
+after:
+  - T039
+  - T164
 ask_first:
   - gitsafe
   - spec
+  - contracts
 sitting: none
 ---
 

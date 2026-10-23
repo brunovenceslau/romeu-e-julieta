@@ -7,14 +7,15 @@ fate: new
 owns:
   - internal/sbxdrv/**
   - e2e/fakesbx/**
-  - internal/preflight/**
-  - internal/cmd/romeu/all/**
+  - internal/preflight/sbx*.go
+  - internal/preflight/listings*.go
 needs:
   - T029
   - T046
 after: []
 ask_first:
   - sbxdrv
+  - contracts
 sitting: O3
 ---
 

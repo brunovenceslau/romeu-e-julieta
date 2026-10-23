@@ -6,9 +6,9 @@ module: romeu-cli
 fate: new
 owns:
   - internal/cmd/romeu/init/**
-  - internal/gitsafe/**
+  - internal/gitsafe/credential*.go
   - e2e/init_test.go
-  - e2e/internal/romeu/**
+  - e2e/internal/romeu/credential*.go
   - e2e/scenarios/j1/**
   - docs/spec/04-cli.md
   - docs/spec/09-journeys.md

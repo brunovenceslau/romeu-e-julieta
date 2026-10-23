@@ -11,7 +11,8 @@ owns:
   - docs/reference/errors.md
 needs:
   - T041
-after: []
+after:
+  - T164
 ask_first:
   - contracts
 sitting: none
