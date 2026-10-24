@@ -3,7 +3,7 @@ id: T077
 title: "The `julieta` kit, embedded"
 milestone: M2
 module: kits
-fate: kept
+fate: merged
 owns:
   - kits/julieta/**
   - kits/os-base/**
@@ -21,9 +21,14 @@ after:
 ask_first:
   - kits
 sitting: none
+merged: 2026-10-23
+pr: 273
 ---
 
 # T077 - The `julieta` kit, embedded
+
+Merged on 2026-10-23 in pull request #273. The text below is the one
+written when it was built.
 
 Earlier title: The `julieta` and `os-base` kits, embedded.
 
