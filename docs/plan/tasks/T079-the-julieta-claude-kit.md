@@ -1,7 +1,7 @@
 ---
 id: T079
 title: "The `julieta-claude` kit"
-milestone: M2
+milestone: M1
 module: kits
 fate: kept
 owns:
@@ -34,11 +34,13 @@ closed, the skills, the agent memory directory made non-writable;
 file each in those packages; `julieta hooks guard`.
 
 Re-plan (2026-10-12): Kept. Acceptance added: it replaces the hook lines
-of the interim kit (T111) in a daily sandbox; each refusal has a
+of the interim kit (T111) in a daily sandbox (amended on 2026-10-23:
+there is no interim kit, and this kit is the bridge's from sitting M1
+on); each refusal has a
 container e2e case, in `e2e/kit_julieta_claude_test.go` (rule 1 of
 `docs/plan.md`). The hook command takes julieta's path from the
 `julietaBin` arg (06 6.4): until sitting M3 the arg is set in the
-project definition by hand, the fifth edit of rule 9 (T115), and `romeu
+project definition by hand, the third edit of rule 9 (T111), and `romeu
 sync` writes it afterwards. The agent profile of `internal/agent/claude`
 declares the process names and the required state paths and no pane; the
 open-session record `agent-not-matched` reads (T061) comes from the
@@ -88,6 +90,5 @@ seam's earlier editors, and the `guard*.go` files sit in T054's
     measured by B2 (S5).
 - Verify: `go run ./tools/ci kits`; `go test -tags e2e ./e2e/... -run
   '^TestKitJulietaClaude' -v`; `go test ./internal/agent/claude/...`; in
-  the daily sandbox where it replaced the interim kit's hook lines, a
-  test push on a throwaway branch from that sandbox; the hook output
-  names both hooks.
+  the read in a daily sandbox is T111's Verify, after this task
+  merges.

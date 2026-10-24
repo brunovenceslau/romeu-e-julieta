@@ -300,16 +300,16 @@ New or changed, each proposed on 2026-10-12:
    and its removal is deferred with a trigger.
 9. **The bridge is outside the product.** Running julieta in a
    sandbox that romeu does not render yet (M1 and M2) is four edits per
-   project definition (three that supply julieta and one that removes
-   the store's writer kit and the mount of the store), one change of
-   the sandbox agent payload that removes the inbox skill from every
-   sandbox at once, an interim personal kit in the kit format the daily
-   sandboxes accept today (the pinned frontend of 06 6.1 is first
-   exercised at the kit-frontend go/no-go, T113) and a host build in M1
-   (T111) and, in M2, a fifth edit: the kit entries with their args,
-   `julietaBin` set to the bin mount's path and `signingKey` to the
-   public key, by hand until `romeu sync` writes them at sitting M3
-   (T115); all recorded in the config repository's runbook with each
+   project definition (three that supply julieta: the bin mount, the
+   memory mount, and the manifest with the entry of the `julieta-claude`
+   kit of T079, pinned at a SHA of this repository and its `julietaBin`
+   arg set to the bin mount's path; and one that removes the store's
+   writer kit and the mount of the store), one change of the sandbox
+   agent payload that removes the inbox skill from every sandbox at
+   once, and a host build in M1 (T111) and, in M2, a fifth edit: the
+   other kit entries with their args, `signingKey` set to the public
+   key, by hand until `romeu sync` writes them at sitting M3 (T115);
+   all recorded in the config repository's runbook with each
    step's undo, never in a spec section or a product command. Each of
    those steps is an ask-first change of the config repository, under
    that repository's own rules, since it changes what enters every
@@ -386,7 +386,7 @@ covers a command for them).
 | M | Name | Ends when (observable, on `main` and on the host) | Delivers |
 |---|---|---|---|
 | M0 | Shape the work | the kit-frontend go/no-go read (T113); `tools/ci all` green with checks registered by file; the requirement ids in the specification and `tools/ci reqs` green; the plan as task files, checked by `tools/ci plan`; one source for the ask-first list; the re-plan record Accepted; `internal/procgroup` and the hook settings merged (T137, T138) | the shape that lets M1 to M4 run in parallel |
-| M1 | julieta in daily use | sitting M1: every daily sandbox runs `julieta memory`, `handoff show --hook` at SessionStart, `hooks run` on every commit and `snapshot` after it, from a read-only bin mount and a hand-written manifest; the names gate of the config repository runs through the dispatcher on every push (T112) | memory, handoff, hooks and snapshots in every sandbox the maintainer works in; julieta as the one path for new items; the store's open items entered into `julieta memory`, counted on both sides (T111) |
+| M1 | julieta in daily use | sitting M1: every daily sandbox runs `julieta setup` once after it is created, `julieta memory`, `handoff show --hook` at SessionStart, `hooks run` on every commit and `snapshot` after it, from a read-only bin mount and a hand-written manifest; the names gate of the config repository runs through the dispatcher on every push (T112) | memory, handoff, hooks and snapshots in every sandbox the maintainer works in; julieta as the one path for new items; the store's open items entered into `julieta memory`, counted on both sides (T111) |
 | M2 | Kits in daily use | sitting M2: recreate wave 1, one project per slot, each sandbox built from the `julieta`, `julieta-claude` and `git-ssh-sign` product kits plus one personal kit from the config repository | every daily sandbox built from the product kits plus one personal kit; mise per repository through `julieta install` and `lock`; commits signed with the one key of `git-ssh-sign` |
 | M3 | romeu renders and runs | sitting M3: J1 for real on the config project from a `--dry-run` build of `main` (`init`, `doctor`, `approve --toolchain`, `sync`, `run`), then one project per slot until every project definition is rendered by `romeu sync` | every project definition rendered under gate 2, its egress derived and its secrets bound in host settings, the kit pins in one file, and `romeu run` as the one way into a sandbox |
 | M4 | Nothing lost | sitting M4: one `romeu recreate` rehearsal with a planted dirty worktree, stash and ignored file; J6 and J10 pass in CI with the fake sbx; on the host, the rehearsal's `romeu recreate` transcript and salvage listing, read by the maintainer, are the Evidence | recreate, rm and retire with a complete salvage; `romeu pull` and `romeu handoff` |
@@ -694,7 +694,8 @@ its front matter until the task merges; the file's fate then reads
 | T063, T064, T065, T071, T072 | left v1 (unchanged) | ADR 0006's row |
 | T073, T074 | kept, M4 | after the last command |
 | T075 | deferred to M6 | the host suite and the remaining scenario functions; the CI journeys cover J2, J3b, J6, J7, J10, J11 |
-| T076, T077, T079, T081 | kept, M2 | kits in daily use before `sync` |
+| T076, T077, T081 | kept, M2 | kits in daily use before `sync` |
+| T079 | kept, M1 (moved from M2 on 2026-10-23) | the bridge of sitting M1 carries the skills and hooks through it |
 | T078 | kept, M1 | sitting M1 needs the skills |
 | T080 | kept, M3 | with the signing kit already in use |
 | T082 | deferred to M6 | release only |
@@ -811,7 +812,7 @@ phase" fired and is gone, and so is the row of the timeout classes of
 | a check that fails a diff changing the mise pin unless `miseFiles` of the mise package was re-measured in the same pull request | the sentence of 05 5.3 and review | the first mise pin bump merged without the re-measure named in its Evidence |
 | the four-runner matrix on every pull request | kept | the median pull request wall time passes 20 minutes over one month, or the Actions quota runs out |
 | a Go port of the names gate of the config repository | the script as it is | closes when T112 lands the sandbox gate of [ADR 0036, keep the forbidden names as a convenience list in the config repository](adr/0036-keep-the-forbidden-names-as-a-convenience-list-in-the-config-repository.md) |
-| the interim personal kit of the bridge (T111) | it installs the hooks and skills into every daily sandbox | T079 and T114 merged: then it is removed |
+| keeping the sandbox agent payload's own `handoff` skill in step with `skills/handoff` | not kept in step: in a bridged sandbox the `julieta-claude` kit, listed after the payload's kit, installs this repository's skills over the payload's (decided on 2026-10-23) | T114 merged: the personal kit replaces the payload, and the payload's `handoff` skill goes with it |
 | the live secret path (`apply:"live"`, T047 timing) | recreate-class | the first secret rotation that costs an unwanted recreate |
 | a public home for the public part of the personal kit | the whole kit lives in the config repository (T114) | sitting M5 |
 | the frontend milestone, the workload digest and the herdr version | none chosen | T012, which writes the pin file |

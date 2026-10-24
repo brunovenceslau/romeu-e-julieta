@@ -46,18 +46,17 @@ that period:
   every sandbox at once, so `julieta memory` is the route for open
   items, and a runbook in the maintainer's config repository records
   each edit and that change with its undo (plan task T111);
-- an interim personal kit, in the kit format the daily sandboxes accept
-  today,
-  installs the SessionStart and SessionEnd hook lines of
+- the `julieta-claude` kit (T079), pinned at a SHA of this repository
+  with its `julietaBin` arg set to the bin mount's path, installs the
+  SessionStart and SessionEnd hook lines of
   [08 8.2](../spec/08-memory-handoff-salvage.md), each as a wrapper
-  that exits 0 when the bin mount is absent, and pins the two skills of
-  `skills/` from this repository at a SHA;
-- the `julieta-claude` kit (T079) and the personal kit (T114)
-  replace that interim kit at sitting M2, with a fifth edit per
-  definition: the kit entries with their args, `julietaBin` set to the
-  bin mount's path and `signingKey` to the public key, by hand until
-  `romeu sync` writes them (plan task T115); a deferred row of the plan
-  holds the trigger for the interim kit's removal;
+  that exits 0 when the bin mount is absent, and the two skills of
+  `skills/`, which are the official ones (decided on 2026-10-23; there
+  is no interim kit);
+- the personal kit (T114) joins at sitting M2, with a fifth edit per
+  definition: the other kit entries with their args, `signingKey` set
+  to the public key, by hand until `romeu sync` writes them (plan task
+  T115);
 - `romeu sync` writes every manifest from sitting M3 on, one project
   per slot, and the runbook sections close.
 

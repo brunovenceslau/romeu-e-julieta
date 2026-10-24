@@ -13,7 +13,8 @@ the limits that record names (01m5nbzfb4p92djhp10c92jprp).
 1. T038 and T079, the next of the critical path, ready now that T077
    is merged (#273); T165 is ready after T164.
 2. Build T170; T161 once T088 is built
-   (01m5e14094yhqhsxq2g941pwrf); T111 at sitting M1.
+   (01m5e14094yhqhsxq2g941pwrf); T111 at sitting M1, which now needs T079,
+   first wave romeu-e-julieta and verona (01m5nw2x1dw37z6sc6tebk991e).
 3. The pending notes, each when its trigger fires: 01m5ngx0cy47r560n6hqjh4y1c, 01m5ngabwa6akgjr9eetw78kq7, 01m5ndjpzgf0rmwkr7gc1j6wdh, 01m5n920q50b79dxxqe5ghss4r, 01m5n79kdbtk9dpq7y87sfkkaq,
    01m5gywvh9pdmte8k85q87wwdc, 01m5gywvk15asanh438p4mmwfs, 01m5gywvkw8rp4jj2cvctvzg57,
    01m5gz0rpmzwvmwqt9ebd95rfq, 01m5kfnpybcnf22gpxwws14g7x, 01m5kfnpzsnmv53xtkkhenqkz1,
@@ -43,9 +44,10 @@ the limits that record names (01m5nbzfb4p92djhp10c92jprp).
 
 ## In flight
 
-- The pull request that ticks T077. The branches `feat/t077-os-base`
-  and `feat/t077-julieta-kit` are superseded by #273 and left as they
-  were.
+- The pull request that re-plans T111 onto the `julieta-claude` kit
+  and moves the default root to `$HOME/Developer`
+  (01m5nw2x0e32pvh43k5kpw5pjx). The branches `feat/t077-os-base` and
+  `feat/t077-julieta-kit` are superseded by #273 and left as they were.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.

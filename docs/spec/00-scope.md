@@ -11,9 +11,9 @@ organizer for all their environments:
 - agents, inside a sandbox, author and maintain **project specs** in a
   config repo (repos, kits, sandbox options, secret names, run layout);
 - `romeu` **materializes** those specs into one host tree
-  (`$ROMEU_ROOT`, default `$HOME/dev`): plain clones (never submodules),
-  generated `sbxenv.yaml`, per-repo memory directories, generated VS Code
-  workspace files;
+  (`$ROMEU_ROOT`, default `$HOME/Developer`): plain clones (never
+  submodules), generated `sbxenv.yaml`, per-repo memory directories,
+  generated VS Code workspace files;
 - `romeu run <project>` opens the project's sandbox, with its tools
   installed, straight into its run layout;
 - anything that widens what a sandbox can do goes through an approval

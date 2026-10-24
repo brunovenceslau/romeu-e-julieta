@@ -79,7 +79,7 @@ func newMachine(t *testing.T) machine {
 	require.NoError(t, os.WriteFile(sbx, []byte(script), 0o700))
 	data, err := spec.EncodeHostSettings(spec.HostSettings{
 		Schema: "host-settings/v1",
-		Root:   filepath.Join(m.home, "dev"),
+		Root:   filepath.Join(m.home, "Developer"),
 		Config: spec.ConfigRepo{Project: "cfg", URL: "https://github.com/owner/cfg", Ref: "main"},
 		Tools:  spec.Tools{Sbx: sbx, Git: "/usr/bin/git"},
 	})

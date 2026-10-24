@@ -35,7 +35,7 @@ import (
 type Env struct {
 	// Home is HOME, and the base of Root.
 	Home string
-	// Root is $HOME/dev, the default root of init. It does not exist
+	// Root is $HOME/Developer, the default root of init. It does not exist
 	// until a command creates it.
 	Root string
 	// ConfigHome and StateHome are XDG_CONFIG_HOME and XDG_STATE_HOME.
@@ -71,7 +71,7 @@ func New(tb testing.TB, origins *Origins) *Env {
 		StateHome:  filepath.Join(tmp, "state"),
 		Bin:        filepath.Join(tmp, "bin"),
 	}
-	e.Root = filepath.Join(e.Home, "dev")
+	e.Root = filepath.Join(e.Home, "Developer")
 	for _, d := range []string{e.Home, e.ConfigHome, e.StateHome, e.Bin} {
 		if err := os.Mkdir(d, 0o700); err != nil {
 			tb.Fatal(err)

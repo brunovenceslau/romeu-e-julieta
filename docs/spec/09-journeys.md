@@ -79,7 +79,7 @@ which names each step's command and output path.
      refuses a root inside a git repository (a `$HOME` that holds
      dotfiles in git, for example) with that check's error id and a hint
      to pass another root; then writes host settings (root default
-     `$HOME/dev`, absolute tool paths) and clones the config repo to
+     `$HOME/Developer`, absolute tool paths) and clones the config repo to
      `$ROMEU_ROOT/<cfg>-env/<dir>`.
    - [O] A private config repo (the recommended kind,
      [02 2.2](02-layouts.md#22-config-repo)) needs
