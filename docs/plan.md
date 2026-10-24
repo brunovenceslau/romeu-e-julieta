@@ -812,7 +812,6 @@ phase" fired and is gone, and so is the row of the timeout classes of
 | the four-runner matrix on every pull request | kept | the median pull request wall time passes 20 minutes over one month, or the Actions quota runs out |
 | a Go port of the names gate of the config repository | the script as it is | closes when T112 lands the sandbox gate of [ADR 0036, keep the forbidden names as a convenience list in the config repository](adr/0036-keep-the-forbidden-names-as-a-convenience-list-in-the-config-repository.md) |
 | the interim personal kit of the bridge (T111) | it installs the hooks and skills into every daily sandbox | T079 and T114 merged: then it is removed |
-| `os-base` | absent | the first real `julieta` kit build shows a missing package (sitting M2) |
 | the live secret path (`apply:"live"`, T047 timing) | recreate-class | the first secret rotation that costs an unwanted recreate |
 | a public home for the public part of the personal kit | the whole kit lives in the config repository (T114) | sitting M5 |
 | the frontend milestone, the workload digest and the herdr version | none chosen | T012, which writes the pin file |

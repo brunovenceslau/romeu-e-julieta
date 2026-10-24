@@ -32,22 +32,36 @@ import (
 // linters, and theirs turn findings off.
 var allowedDirectives = []string{"go:build", "romeu:invariant"}
 
-// scopedDirectives are the directives only the files below a path may
-// hold, from the root of the repository: a directory, with its slash.
-// The embed directive is internal/catalog's, for its entries (03 3.5,
-// ADR 0007, Consequences). T077 adds the package that embeds the julieta
-// binary, whose directory joins the list when its task names it.
+// scopedDirectives are the directives only some files may hold, each
+// named from the root of the repository: a directory, with its slash,
+// covers the files below it, and a path with no trailing slash names
+// that one file. The embed directive is internal/catalog's, for its
+// entries (03 3.5, ADR 0007, Consequences), and that of kits/embed.go,
+// the one embed.FS of the product kits (02 2.1, REQ-0129), the file and
+// not the rest of kits/. A go:embed pattern may not take the all:
+// prefix, which would embed dotfiles and files whose names begin with an
+// underscore (TestOnlyAllowedDirectives).
 var scopedDirectives = map[string][]string{
-	"go:embed": {"internal/catalog/"},
+	"go:embed": {"internal/catalog/", "kits/embed.go"},
+}
+
+// inScope reports whether file, a path from the root of the repository,
+// is in the scope entry: below it when it ends with a slash, the same
+// path otherwise.
+func inScope(file, scope string) bool {
+	if strings.HasSuffix(scope, "/") {
+		return strings.HasPrefix(file, scope)
+	}
+	return file == scope
 }
 
 // allowedIn returns the directives the Go file at file, a path from the
 // root of the repository, may hold: allowedDirectives, the ones scoped to
-// a directory it is below, and go:generate at its one site.
+// it or to a directory it is below, and go:generate at its one site.
 func allowedIn(file string) []string {
 	allowed := slices.Clone(allowedDirectives)
-	for directive, dirs := range scopedDirectives {
-		if slices.ContainsFunc(dirs, func(d string) bool { return strings.HasPrefix(file, d) }) {
+	for directive, scopes := range scopedDirectives {
+		if slices.ContainsFunc(scopes, func(s string) bool { return inScope(file, s) }) {
 			allowed = append(allowed, directive)
 		}
 	}
@@ -55,6 +69,23 @@ func allowedIn(file string) []string {
 		allowed = append(allowed, "go:generate")
 	}
 	return allowed
+}
+
+// embedPatterns returns the patterns of the //go:embed lines of src,
+// each line split on spaces and tabs, with the quotes of a quoted
+// pattern dropped, so a quoted all: prefix is read as one.
+func embedPatterns(src []byte) []string {
+	var out []string
+	for line := range strings.SplitSeq(string(src), "\n") {
+		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "//go:embed")
+		if !ok || rest != "" && rest[0] != ' ' && rest[0] != '\t' {
+			continue
+		}
+		for pattern := range strings.FieldsSeq(rest) {
+			out = append(out, strings.Trim(pattern, "\"`"))
+		}
+	}
+	return out
 }
 
 // toolDirective matches the start of a directive of the "tool:name"
@@ -207,16 +238,32 @@ func TestDisallowed(t *testing.T) {
 	}
 }
 
-// TestAllowedIn: go:embed is allowed below internal/catalog/ and
-// nowhere else, go:generate at its one site, and the rest everywhere.
+// TestAllowedIn: go:embed is allowed below internal/catalog/ and in
+// kits/embed.go and nowhere else, go:generate at its one site, and the
+// rest everywhere.
 func TestAllowedIn(t *testing.T) {
 	assert.Equal(t, allowedDirectives, allowedIn("internal/spec/spec.go"))
 	assert.Contains(t, allowedIn("internal/catalog/catalog.go"), "go:embed")
 	assert.NotContains(t, allowedIn("internal/catalogue/x.go"), "go:embed", "the prefix is a directory")
+	assert.Contains(t, allowedIn("kits/embed.go"), "go:embed")
+	assert.NotContains(t, allowedIn("kits/other.go"), "go:embed", "kits/embed.go is a file, not kits/")
+	assert.NotContains(t, allowedIn("kits/embed.go.bak/x.go"), "go:embed", "a file entry is not a prefix")
+	assert.NotContains(t, allowedIn("internal/kits/embed.go"), "go:embed", "the path is from the root")
 	assert.NotContains(t, allowedIn("internal/spec/spec.go"), "go:embed")
 	assert.NotContains(t, allowedIn("tools/ci/x.go"), "go:embed")
 	assert.Contains(t, allowedIn(drift.Site), "go:generate")
 	assert.NotContains(t, allowedIn("tools/ci/x.go"), "go:generate")
+}
+
+// TestEmbedPatterns holds how the all: prefix is read: each pattern of
+// a //go:embed line, and nothing from a comment that is not the
+// directive.
+func TestEmbedPatterns(t *testing.T) {
+	assert.Equal(t, []string{"julieta"}, embedPatterns([]byte("package p\n\nimport \"embed\"\n\n//go:embed julieta\nvar FS embed.FS\n")))
+	assert.Equal(t, []string{"all:julieta", "x"}, embedPatterns([]byte("//go:embed all:julieta x\n")))
+	assert.Empty(t, embedPatterns([]byte("// go:embed julieta\n")), "only the directive form is a pattern line")
+	assert.Equal(t, []string{"all:julieta", "all:x"}, embedPatterns([]byte("//go:embed \"all:julieta\"\n//go:embed\t`all:x`\n")), "a quoted pattern and a tab after the directive")
+	assert.Empty(t, embedPatterns([]byte("//go:embedded julieta\n")), "a longer directive is not go:embed")
 }
 
 // TestOnlyAllowedDirectives checks that each directive in the Go files
@@ -228,7 +275,15 @@ func TestOnlyAllowedDirectives(t *testing.T) {
 	files := repoFiles(t, root, "*.go")
 	require.NotEmpty(t, files, "the Go files of the repository")
 	for _, f := range files {
-		bad, err := disallowed(filepath.Join(root, f), allowedIn(f))
+		allowed := allowedIn(f)
+		if slices.Contains(allowed, "go:embed") {
+			src, err := os.ReadFile(filepath.Join(root, f))
+			require.NoError(t, err)
+			for _, pattern := range embedPatterns(src) {
+				assert.False(t, strings.HasPrefix(pattern, "all:"), "%s embeds %s: the all: prefix takes dotfiles and underscore files", f, pattern)
+			}
+		}
+		bad, err := disallowed(filepath.Join(root, f), allowed)
 		require.NoError(t, err, "read %s", f)
 		assert.Empty(t, bad, "%s holds what makes the linters skip a finding", f)
 	}
