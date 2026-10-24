@@ -131,10 +131,10 @@ func TestInitWritesSettingsAndClones(t *testing.T) {
 	require.Equal(t, 0, code, stderr)
 	data, err := os.ReadFile(m.settings())
 	require.NoError(t, err)
-	assert.Contains(t, string(data), "root: "+filepath.Join(m.home, "dev"))
+	assert.Contains(t, string(data), "root: "+filepath.Join(m.home, "Developer"))
 	assert.Contains(t, string(data), "git: "+m.path["git"])
 	assert.Contains(t, stdout, "settings  "+m.settings())
-	assert.FileExists(t, filepath.Join(m.home, "dev", "cfg-env", "cfg", "projects", "cfg.yaml"))
+	assert.FileExists(t, filepath.Join(m.home, "Developer", "cfg-env", "cfg", "projects", "cfg.yaml"))
 }
 
 // TestInitRefusals: each refusal exits with its code and writes nothing.
@@ -169,7 +169,7 @@ func TestInitRefusals(t *testing.T) {
 		{"a spec that does not decode", "schema: project/v1\nname: [\n", []string{"--config-url", url}, nil, 2, "does not decode"},
 		{"a spec of another project", strings.Replace(projectSpec, "name: cfg", "name: other", 1), []string{"--config-url", url}, nil, 2, "RJ-346"},
 		{"the clone exists", projectSpec, []string{"--config-url", url}, func(m *machine) {
-			require.NoError(t, os.MkdirAll(filepath.Join(m.home, "dev", "cfg-env", "cfg"), 0o700))
+			require.NoError(t, os.MkdirAll(filepath.Join(m.home, "Developer", "cfg-env", "cfg"), 0o700))
 		}, 2, "clone-exists"},
 		{"an origin that is not there", projectSpec, []string{"--config-url", "https://github.com/owner/missing"}, nil, 1, "RJ-356 config-clone-failed"},
 		{"a credential helper git runs as shell", projectSpec, []string{"--config-url", url, "--git-credential-helper", "!gh auth git-credential"}, nil, 2, "tools.gitCredentialHelper"},
@@ -194,7 +194,7 @@ func TestInitRefusals(t *testing.T) {
 			assert.Contains(t, stderr, tc.want)
 			assert.Equal(t, had, fileExists(m.settings()), "the settings are as they were")
 			if tc.name != "the clone exists" {
-				entries, _ := os.ReadDir(filepath.Join(m.home, "dev", "cfg-env"))
+				entries, _ := os.ReadDir(filepath.Join(m.home, "Developer", "cfg-env"))
 				for _, e := range entries {
 					assert.NotEqual(t, "cfg", e.Name())
 					assert.False(t, strings.HasPrefix(e.Name(), ".init-"), "no staging directory is left")
@@ -300,8 +300,8 @@ func TestInitSettingsDirUnwritable(t *testing.T) {
 	assert.Contains(t, stderr, "settings-unwritable")
 	assert.NotContains(t, stderr, "RJ-348")
 	assert.NoFileExists(t, m.settings())
-	assert.NoDirExists(t, filepath.Join(m.home, "dev", "cfg-env", "cfg"))
-	entries, err := os.ReadDir(filepath.Join(m.home, "dev", "cfg-env"))
+	assert.NoDirExists(t, filepath.Join(m.home, "Developer", "cfg-env", "cfg"))
+	entries, err := os.ReadDir(filepath.Join(m.home, "Developer", "cfg-env"))
 	require.NoError(t, err)
 	assert.Empty(t, entries, "no clone and no staging directory")
 
@@ -310,7 +310,7 @@ func TestInitSettingsDirUnwritable(t *testing.T) {
 
 	require.Equal(t, 0, code, stderr)
 	assert.FileExists(t, m.settings())
-	assert.DirExists(t, filepath.Join(m.home, "dev", "cfg-env", "cfg", ".git"))
+	assert.DirExists(t, filepath.Join(m.home, "Developer", "cfg-env", "cfg", ".git"))
 }
 
 // TestInitSettingsAppearAfterTheClone: a file that appears at the
@@ -334,7 +334,7 @@ func TestInitSettingsAppearAfterTheClone(t *testing.T) {
 	got, err := os.ReadFile(m.settings())
 	require.NoError(t, err)
 	assert.Equal(t, "theirs", string(got))
-	assert.NoDirExists(t, filepath.Join(m.home, "dev", "cfg-env", "cfg"))
+	assert.NoDirExists(t, filepath.Join(m.home, "Developer", "cfg-env", "cfg"))
 	left, _ := filepath.Glob(filepath.Join(filepath.Dir(m.settings()), ".settings.yaml*"))
 	assert.Empty(t, left, "the temporary file is removed")
 }
@@ -483,7 +483,7 @@ func TestInitCloneErrors(t *testing.T) {
 		assert.Contains(t, stderr, "RJ-356 config-clone-failed")
 		assert.Contains(t, stderr, `object id "not-an-oid"`, "the reason is in the details")
 		assert.NotContains(t, stderr, "RJ-349")
-		assert.NoDirExists(t, filepath.Join(m.home, "dev"))
+		assert.NoDirExists(t, filepath.Join(m.home, "Developer"))
 	})
 	t.Run("the levels above the root stay, the root this run made goes", func(t *testing.T) {
 		m := newMachine(t, projectSpec)
@@ -501,11 +501,11 @@ func TestInitCloneErrors(t *testing.T) {
 		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing")
 
 		assert.Equal(t, 1, code, stderr)
-		assert.NoDirExists(t, filepath.Join(m.home, "dev"))
+		assert.NoDirExists(t, filepath.Join(m.home, "Developer"))
 	})
 	t.Run("a root that was there stays, and so does a non-empty env dir", func(t *testing.T) {
 		m := newMachine(t, projectSpec)
-		keep := filepath.Join(m.home, "dev", "cfg-env", "keep")
+		keep := filepath.Join(m.home, "Developer", "cfg-env", "keep")
 		require.NoError(t, os.MkdirAll(keep, 0o700))
 
 		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing")
@@ -515,13 +515,13 @@ func TestInitCloneErrors(t *testing.T) {
 	})
 	t.Run("an empty root that was there stays", func(t *testing.T) {
 		m := newMachine(t, projectSpec)
-		require.NoError(t, os.Mkdir(filepath.Join(m.home, "dev"), 0o700))
+		require.NoError(t, os.Mkdir(filepath.Join(m.home, "Developer"), 0o700))
 
 		code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/missing")
 
 		assert.Equal(t, 1, code, stderr)
-		assert.DirExists(t, filepath.Join(m.home, "dev"))
-		assert.NoDirExists(t, filepath.Join(m.home, "dev", "cfg-env"))
+		assert.DirExists(t, filepath.Join(m.home, "Developer"))
+		assert.NoDirExists(t, filepath.Join(m.home, "Developer", "cfg-env"))
 	})
 }
 
@@ -594,7 +594,7 @@ func TestInitRefusesAHelperOthersCanWrite(t *testing.T) {
 			assert.Contains(t, stderr, tc.rule)
 			assert.Empty(t, m.helpers, "no clone ran")
 			assert.NoFileExists(t, m.settings())
-			assert.NoDirExists(t, filepath.Join(m.home, "dev"))
+			assert.NoDirExists(t, filepath.Join(m.home, "Developer"))
 			assert.NoDirExists(t, m.env["XDG_STATE_HOME"])
 		})
 	}

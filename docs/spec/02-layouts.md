@@ -242,7 +242,7 @@ built from (03 3.5).
 ## 2.3 Host tree
 
 ```
-$ROMEU_ROOT/                            default $HOME/dev; never a VS Code trusted folder; never inside a git repo
+$ROMEU_ROOT/                            default $HOME/Developer; never a VS Code trusted folder; never inside a git repo
 ├─ dev.code-workspace                   derived: folders = every host clone; open in Restricted Mode
 ├─ review.code-workspace                derived: folders = every review checkout; open in Restricted Mode
 ├─ .attic/<name>/<UTC-ts>/              retired projects (moved, never deleted by romeu); .attic/ is mode 0700
@@ -261,7 +261,7 @@ $ROMEU_ROOT/                            default $HOME/dev; never a VS Code trust
 
 Rules of this tree, one item per obligation:
 
-- `REQ-0136` `$ROMEU_ROOT` defaults to `$HOME/dev`; it is never a VS
+- `REQ-0136` `$ROMEU_ROOT` defaults to `$HOME/Developer`; it is never a VS
   Code trusted folder and never inside a git repo.
 - `REQ-0137` `dev.code-workspace` is derived: its folders are every
   host clone, opened in Restricted Mode; `review.code-workspace` is the

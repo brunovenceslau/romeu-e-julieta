@@ -12,6 +12,7 @@ needs:
   - T060
   - T078
   - T035
+  - T079
 after: []
 ask_first: []
 sitting: M1
@@ -25,15 +26,19 @@ of the memory directory in its final host layout, and one environment
 variable holding the hand-written manifest (its `repos[].base` the
 origin SHA each clone started from, 03 3.6, so a snapshot bundles only
 the work since it; its `generation` one ULID per project, kept in the
-runbook); an interim personal kit, in the kit format the daily sandboxes
-accept today (the pinned frontend of 06 6.1 is first exercised at the
-kit-frontend go/no-go, T113), that installs the SessionStart and
+runbook), with beside it the entry of the `julieta-claude` kit of T079,
+pinned at a SHA of this repository and its `julietaBin` arg set to the
+bin mount's path, listed after the sandbox agent payload's kit so its
+skills are the ones installed; the kit brings the SessionStart and
 SessionEnd hook lines of 08 8.2 (each a wrapper that prints one warning
 line and exits 0 when the mount is absent, so a skipped hook is never
-silent; the SessionStart one runs `julieta setup` before `handoff show
---hook`, the order `romeu run` keeps in 04 4.2, so the dispatcher is the
-global `core.hooksPath` before the session's first commit or push) and
-the two skills pinned from this repository at a SHA; a fourth edit that
+silent), the PreToolUse guard of `julieta hooks guard`, the agent's
+own memory directory made non-writable, and the two skills of
+`skills/`; once per created sandbox, a
+runbook step runs `julieta setup` before the first session, the order
+`romeu run` keeps in 04 4.2, so the dispatcher is the global
+`core.hooksPath` before the session's first commit or push; a fourth
+edit that
 removes the store's writer kit and the mount of the store from the
 definition; once, outside the definitions, the removal of the inbox
 skill from the sandbox agent payload, with its own undo, a global change
@@ -61,12 +66,23 @@ its body and writes `merged:` and `pr:` into this file, the one write
 rule 1 allows outside its own file.
 
 Re-plan (2026-10-12): The bridge is outside the product: nothing of it
-enters a spec section or a product command. T079 and T114 remove the
-interim kit (Decisions this plan defers). From sitting M1 on julieta is
+enters a spec section or a product command. T079 and T114 were to
+remove an interim kit; the re-plan of 2026-10-23 below drops it. From sitting M1 on julieta is
 the one path for new items, and the count-verified entry of the store's
 open items is this task's (item 19 of Decisions of the re-plan, amended
 on 2026-10-13); T119 reads at sitting M5 that the store holds no item
 that the open-items list of sitting M1 does not name.
+
+Re-plan (2026-10-23): No interim kit. The skills of `skills/` are the
+official ones and the `julieta-claude` kit of T079 carries them and the
+hook lines into the daily sandboxes from sitting M1 on, so this task
+needs T079; the sandbox agent payload's own `handoff` skill is not kept
+in step with them (Decisions this plan defers). The first wave is
+romeu-e-julieta and verona; T112's sandbox gate lands during the week of
+daily use, before the end-of-sitting read. Wave 1 reads first that a
+daily sandbox's definition loads the `julieta-claude` kit at all, since
+no daily sandbox has loaded a kit of the pinned frontend yet; if it
+does not, this task stops with a decision record before any other step.
 
 - Implements: REQ-0659 (08 8.1), REQ-0673 (08 8.2).
 - Operator: applies the four edits and the host build, two projects
@@ -109,7 +125,8 @@ that the open-items list of sitting M1 does not name.
   - The entry command skips an item whose `source-<id>` tag is present
     and prints the counts on both sides; both counts, from the first run
     and the end-of-sitting run, are in the runbook.
-- Verify: in each daily sandbox, read at sitting M1: `julieta status
+- Verify: in each daily sandbox, read at sitting M1: `gh pr merge` is
+  refused by the guard with the route in its text; `julieta status
   --json` exits 0 and lists the manifest's repositories; `julieta
   handoff show --hook` prints the built-in memory line of 08 8.1 at
   least; the test push's hook output names both hooks; `julieta version

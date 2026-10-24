@@ -21,9 +21,10 @@ sitting: M2
 Goal: One project per slot: `/handoff --final`, push, `julieta snapshot
 --all`, remove, recreate with the product kits and the personal kit in
 the hand-written project definition. The fifth edit of rule 9 lands
-here: the kit entries with their args, `julietaBin` set to the bridge's
-bin mount path and `signingKey` to the public key, each with its undo in
-the runbook; `romeu sync` writes both at sitting M3 (T116). `julieta
+here: the other kit entries with their args, `signingKey` set to the
+public key, each with its undo in the runbook (the `julieta-claude`
+entry and its `julietaBin` arg land at sitting M1, T111); `romeu sync`
+writes both at sitting M3 (T116). `julieta
 install` and `lock` (T053) are in the wave, so each recreated repository
 gets its `mise.toml` and `mise.lock` (the M2 row of `docs/plan.md`). J6
 steps 1, 2 and 5 run by hand, with `julieta snapshot --all` in place of

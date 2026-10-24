@@ -162,7 +162,7 @@ func TestInitRootIsStoredReal(t *testing.T) {
 
 // TestInitPaths: ROMEU_SETTINGS moves the settings path; XDG_CONFIG_HOME
 // and XDG_STATE_HOME move the settings and the state; no other ROMEU_*
-// variable moves a path, and the root is the flag's or $HOME/dev
+// variable moves a path, and the root is the flag's or $HOME/Developer
 // (REQ-0150).
 func TestInitPaths(t *testing.T) {
 	t.Run("ROMEU_SETTINGS", func(t *testing.T) {

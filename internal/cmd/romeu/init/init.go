@@ -73,7 +73,7 @@ var _ = cli.Register(func() cli.Command {
 		f := cmd.Flags()
 		f.StringVar(&o.configURL, "config-url", "", "the https URL of the config repo (required)")
 		f.StringVar(&o.project, "config-project", "", "the config project's name (default: the repo's name)")
-		f.StringVar(&o.root, "root", "", "the absolute root of the host tree (default: $HOME/dev)")
+		f.StringVar(&o.root, "root", "", "the absolute root of the host tree (default: $HOME/Developer)")
 		f.StringVar(&o.ref, "config-ref", defaultRef, "the branch that holds projects/<name>.yaml")
 		f.StringVar(&o.helper, "git-credential-helper", "", "the git credential helper of a private config repo, for its host only: a git-credential-<name> helper's name, or the absolute path of an executable only you or root can write; recorded as tools.gitCredentialHelper. Git may send it erase when the origin refuses a credential, which deletes what a storing helper (osxkeychain, store) holds")
 		_ = cmd.MarkFlagRequired("config-url")
@@ -273,7 +273,7 @@ func build(cmd *cobra.Command, o options, home string) (spec.HostSettings, error
 		o.project = strings.TrimSuffix(path.Base(u.Path), ".git")
 	}
 	if o.root == "" {
-		o.root = filepath.Join(home, "dev")
+		o.root = filepath.Join(home, "Developer")
 	}
 	o.root = filepath.Clean(o.root) // a trailing slash is no fault
 	if !filepath.IsAbs(o.root) {
