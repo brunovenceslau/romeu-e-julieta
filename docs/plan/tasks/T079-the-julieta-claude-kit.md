@@ -89,6 +89,5 @@ seam's earlier editors, and the `guard*.go` files sit in T054's
   - That the hooks and the skills are present in a real sandbox is
     measured by B2 (S5).
 - Verify: `go run ./tools/ci kits`; `go test -tags e2e ./e2e/... -run
-  '^TestKitJulietaClaude' -v`; `go test ./internal/agent/claude/...`; in
-  the read in a daily sandbox is T111's Verify, after this task
-  merges.
+  '^TestKitJulietaClaude' -v`; `go test ./internal/agent/claude/...`; the
+  read in a daily sandbox is T111's Verify, after this task merges.
