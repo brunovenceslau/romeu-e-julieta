@@ -61,7 +61,9 @@ seam's earlier editors, and the `guard*.go` files sit in T054's
     SessionEnd hooks, and makes the agent's own memory directory
     non-writable (Q8).
   - One container e2e case per refusal of 06 6.4 (`gh pr merge`, a `v*`
-    tag push, `gh api` to rulesets and to repository settings), each
+    tag push, `gh api` to rulesets and to repository settings, and, as
+    widened on 2026-10-25, the release, merge and tag routes REQ-0598
+    lists), each
     asserting the refusal text says the action is the maintainer's and
     names the route (an issue, or the handoff).
   - `julieta hooks guard` reads one PreToolUse document on stdin and
