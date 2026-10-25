@@ -11,8 +11,9 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"slices"
 
-	"golang.org/x/sys/unix"
+	"github.com/google/renameio/v2"
 )
 
 // The modes of <name>-env/.romeu/bin (06 6.3): the sandbox mounts it
@@ -31,8 +32,10 @@ const SumsFile = "SHA256SUMS"
 
 var (
 	// ErrJulietaNotEmbedded is NewBin's refusal of an empty binary: a
-	// source build without tools/release build embeds none (REQ-0130),
-	// and the caller maps this error to julieta-not-embedded.
+	// source build without tools/release build embeds a placeholder
+	// (REQ-0130). The embed seam must hand nil or empty bytes for that
+	// placeholder, or the caller maps it to this error itself; the caller
+	// maps this error to the error id julieta-not-embedded.
 	ErrJulietaNotEmbedded = errors.New("render: no julieta binary is embedded")
 	// ErrBinArch is NewBin's refusal of a name that is not a Go
 	// architecture name in form.
@@ -52,7 +55,7 @@ type Bin struct {
 }
 
 // NewBin returns the Bin for the binary data of goarch, romeu's own
-// GOARCH (REQ-0582, REQ-0584). It fails with ErrJulietaNotEmbedded on
+// GOARCH (REQ-0582, REQ-0584). It copies data. It fails with ErrJulietaNotEmbedded on
 // an empty binary and ErrBinArch on a name that is not a GOARCH name.
 func NewBin(goarch string, data []byte) (Bin, error) {
 	if !archName.MatchString(goarch) {
@@ -65,7 +68,7 @@ func NewBin(goarch string, data []byte) (Bin, error) {
 	sum := sha256.Sum256(data)
 	// The text form sha256sum -c reads: digest, two spaces, name.
 	sums := []byte(hex.EncodeToString(sum[:]) + "  " + name + "\n")
-	return Bin{name: name, data: data, sums: sums}, nil
+	return Bin{name: name, data: slices.Clone(data), sums: sums}, nil
 }
 
 // Path returns the binary's path in <name>-env/, the key of its
@@ -84,43 +87,85 @@ func (b Bin) Files() map[string]string {
 }
 
 // Write writes the binary and SHA256SUMS into BinDir under envDir, the
-// absolute path of <name>-env/, through an os.Root on it. Each file is
-// written to a temporary name and renamed into place, so a sandbox that
-// runs the old binary never sees a partial one, and a repeat is
-// idempotent (the promotion's step 2, 01 1.6).
+// absolute path of <name>-env/. It opens an os.Root on envDir and calls
+// WriteTo. It is the simpler entry; WriteTo is for a caller that holds
+// the root of the env dir already.
 func (b Bin) Write(envDir string) error {
 	r, err := os.OpenRoot(envDir)
 	if err != nil {
 		return fmt.Errorf("render: %w", err)
 	}
 	defer func() { _ = r.Close() }()
-	if err := r.MkdirAll(path.Dir(BinDir), 0o700); err != nil {
-		return fmt.Errorf("render: %w", err)
-	}
-	if err := r.MkdirAll(BinDir, binDirMode); err != nil {
-		return fmt.Errorf("render: %w", err)
-	}
-	if err := replaceFile(r, b.Path(), b.data, binFileMode); err != nil {
-		return err
-	}
-	return replaceFile(r, path.Join(BinDir, SumsFile), b.sums, sumsMode)
+	return b.WriteTo(r)
 }
 
-// replaceFile writes data to name in r through a temporary file and a
-// rename. The temporary name is fixed: promotion runs under the
-// project lock, and a file a crash left is truncated and reused.
-func replaceFile(r *os.Root, name string, data []byte, mode os.FileMode) error {
-	tmp := name + ".tmp"
-	f, err := r.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|unix.O_NOFOLLOW, mode)
+// WriteTo writes the binary and SHA256SUMS into BinDir below r, the
+// root of <name>-env/ (the promotion's step 2, 01 1.6). The dirs are
+// created and then set to their modes through r, so the umask and a
+// dir that already exists with another mode are corrected. Each file is
+// replaced by the atomic write rule of 03 3.8 (REQ-0239), through
+// github.com/google/renameio/v2 as internal/state does (ADR 0038): a
+// uniquely named temporary file that is created new, never an existing
+// inode, so a link or a FIFO planted by name is not written through;
+// fsync, rename, then fsync of the dir. A repeat is idempotent.
+//
+// The binary is renamed before SHA256SUMS, so a reader between the two
+// renames sees a sums file that does not match the binary. That fails
+// closed (the digest check of REQ-0585 reads render.json, not this
+// file), and recovery rolls the promotion forward (REQ-0086).
+func (b Bin) WriteTo(r *os.Root) error {
+	for _, d := range []struct {
+		name string
+		mode os.FileMode
+	}{{path.Dir(BinDir), 0o700}, {BinDir, binDirMode}} {
+		if err := r.MkdirAll(d.name, d.mode); err != nil {
+			return fmt.Errorf("render: %w", err)
+		}
+		if err := r.Chmod(d.name, d.mode); err != nil {
+			return fmt.Errorf("render: %w", err)
+		}
+	}
+	bin, err := r.OpenRoot(BinDir)
 	if err != nil {
 		return fmt.Errorf("render: %w", err)
 	}
-	_, werr := f.Write(data)
-	if err := errors.Join(werr, f.Chmod(mode), f.Sync(), f.Close()); err != nil {
-		return fmt.Errorf("render: %w", errors.Join(err, r.Remove(tmp)))
+	defer func() { _ = bin.Close() }()
+	if err := replaceFile(bin, b.name, b.data, binFileMode); err != nil {
+		return err
 	}
-	if err := r.Rename(tmp, name); err != nil {
-		return fmt.Errorf("render: %w", errors.Join(err, r.Remove(tmp)))
+	if err := replaceFile(bin, SumsFile, b.sums, sumsMode); err != nil {
+		return err
+	}
+	return syncDir(bin)
+}
+
+// replaceFile replaces name below root, the bin dir itself, with data.
+func replaceFile(root *os.Root, name string, data []byte, mode os.FileMode) error {
+	t, err := renameio.NewPendingFile(name, renameio.WithRoot(root), renameio.WithStaticPermissions(mode))
+	if err != nil {
+		return fmt.Errorf("render: %w", err)
+	}
+	defer func() { _ = t.Cleanup() }()
+	if _, err := t.Write(data); err != nil {
+		return fmt.Errorf("render: %w", err)
+	}
+	if err := t.CloseAtomicallyReplace(); err != nil {
+		return fmt.Errorf("render: %w", err)
+	}
+	return nil
+}
+
+// syncDir makes the renames durable: fsync of the directory. It is the
+// few lines of syncDir in internal/state/write.go, which is not
+// exported.
+func syncDir(root *os.Root) error {
+	d, err := root.Open(".")
+	if err != nil {
+		return fmt.Errorf("render: %w", err)
+	}
+	defer func() { _ = d.Close() }()
+	if err := d.Sync(); err != nil {
+		return fmt.Errorf("render: sync the directory: %w", err)
 	}
 	return nil
 }
