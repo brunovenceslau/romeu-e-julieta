@@ -103,7 +103,7 @@ step show "$J" handoff show
 
 	r = step(t, steps, "front")
 	assert.Contains(t, r.stdout, "schema: handoff/v1\nkind: clear\ncreatedAt: ")
-	assert.Contains(t, r.stdout, "project: shop\ngeneration: 01j9zc2q8x7w4t6y3r5e1v9k0p\nagent: sbx-kit-claude\nrepos:\n  - dir: api\n    branch: main\n")
+	assert.Contains(t, r.stdout, "project: shop\ngeneration: 01j9zc2q8x7w4t6y3r5e1v9k0p\nagent: no-profile\nrepos:\n  - dir: api\n    branch: main\n")
 	assert.Contains(t, r.stdout, "  - dir: web\n")
 	assert.Contains(t, r.stdout, "## Goal\nText of Goal.\n")
 

@@ -95,7 +95,7 @@ func TestKitDigest(t *testing.T) {
 	for p := range files {
 		assert.True(t, p == claude.SettingsFile || strings.HasPrefix(p, "skills/"), p)
 	}
-	assert.Equal(t, claude.Digest(files), claude.KitDigest, "set KitDigest to the digest of the kit")
+	assert.Equal(t, claude.KitDigest, claude.Digest(files), "set KitDigest to the digest of the kit")
 }
 
 // TestDigestFault holds the digest to every byte and name of the files.
@@ -189,7 +189,7 @@ func TestWiredRefusesWhatIsNotSettings(t *testing.T) {
 		"a hook not a map": `{"hooks":{"SessionEnd":[1]}}`,
 	} {
 		_, err := claude.Wired([]byte(src))
-		assert.Error(t, err, name)
+		require.Error(t, err, name)
 	}
 	w, err := claude.Wired([]byte(`{"model":"x","hooks":{"Stop":[{"hooks":[{"type":"command","command":"c","async":true}]}]}}`))
 	require.NoError(t, err)

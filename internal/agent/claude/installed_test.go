@@ -179,7 +179,7 @@ func TestDecodePreToolUse(t *testing.T) {
 		"invalid UTF-8 in a value": "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"\xff\"}}",
 	} {
 		_, err := claude.DecodePreToolUse([]byte(src))
-		assert.Error(t, err, name)
+		require.Error(t, err, name)
 	}
 	_, err = claude.DecodePreToolUse(bytes.Repeat([]byte(" "), claude.MaxPreToolUse+1))
 	assert.ErrorContains(t, err, "bytes")
