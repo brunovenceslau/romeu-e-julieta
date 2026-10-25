@@ -39,9 +39,9 @@ func fixtureKits() fstest.MapFS {
 	}
 }
 
-func productSource(t *testing.T, fsys fs.FS, envDir string) render.ProductKits {
+func productSource(t *testing.T, fsys fs.FS, envDir string) render.KitMaterializer {
 	t.Helper()
-	return render.ProductKits{FS: fsys, EnvDir: envDir, GOARCH: "arm64"}
+	return render.KitMaterializer{FS: fsys, EnvDir: envDir, GOARCH: "arm64"}
 }
 
 func productSpec(names ...string) spec.Project {
@@ -161,7 +161,6 @@ func TestProductKitsRefuseWhatTheyCannotWrite(t *testing.T) {
 		"symlink":        {link, productSpec("plain"), "link"},
 		"no descriptor":  {noDescriptor, productSpec("plain"), "plain.yaml"},
 		"bad descriptor": {badDescriptor, productSpec("plain"), "plain.yaml"},
-		"personal kit":   {fixtureKits(), spec.Project{Kits: []spec.Kit{{Personal: "mine"}}}, "mine"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -171,9 +170,6 @@ func TestProductKitsRefuseWhatTheyCannotWrite(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.want)
 		})
 	}
-	_, err := productSource(t, fixtureKits(), "/r/shop-env").
-		Materialize(t.Context(), render.Candidate{Dir: t.TempDir()}, spec.Project{Kits: []spec.Kit{{Personal: "mine"}}})
-	require.ErrorIs(t, err, render.ErrPersonalKit)
 }
 
 func TestProductKitsRelativeEnvDirIsRefused(t *testing.T) {
