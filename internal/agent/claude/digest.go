@@ -82,6 +82,8 @@ func Installed(home, dropIn, julieta string) (map[string][]byte, error) {
 	case errors.Is(err, fs.ErrNotExist):
 	case err != nil:
 		return nil, err
+	case julieta == "":
+		files[SettingsFile] = b // no path to give back: the digest differs
 	default:
 		files[SettingsFile] = bytes.ReplaceAll(b, []byte(julieta), []byte(Placeholder))
 	}

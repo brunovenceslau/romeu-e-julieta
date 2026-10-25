@@ -184,7 +184,8 @@ func checkAPI(args []string) *refusal {
 	if len(pos) < 2 {
 		return nil
 	}
-	endpoint := strings.Trim(pos[1], "/")
+	endpoint, _, _ := strings.Cut(pos[1], "?")
+	endpoint = strings.Trim(endpoint, "/")
 	if endpoint == "graphql" {
 		text := strings.Join(args, " ")
 		if strings.Contains(text, "mutation") && graphqlSettings.MatchString(text) {
@@ -220,7 +221,10 @@ func apiMethod(args []string) string {
 		case strings.HasPrefix(a, "-X") && len(a) > 2:
 			method = a[2:]
 		case slices.Contains(ghFields, a) || slices.ContainsFunc(ghFields, func(f string) bool {
-			return strings.HasPrefix(f, "--") && strings.HasPrefix(a, f+"=")
+			if strings.HasPrefix(f, "--") {
+				return strings.HasPrefix(a, f+"=")
+			}
+			return strings.HasPrefix(a, f) // -fname=x, the value attached
 		}):
 			fields = true
 		}
@@ -320,7 +324,8 @@ func vTag(ref string) bool {
 
 // splitCommands splits shell text into simple commands, each a list of
 // words, by the quoting of sh: outside single quotes a backslash
-// escapes the next character; ; & | ( ) and a newline end a command
+// escapes the next character, and a backslash before a newline is a
+// line continuation; ; & | ( ) and a newline end a command
 // outside quotes; and a command substitution, $( or a backquote, starts
 // one, inside double quotes too, since sh runs it there. An unclosed
 // quote runs to the end of the text.
@@ -349,6 +354,8 @@ func splitCommands(text string) [][]string {
 	for i := 0; i < len(text); i++ {
 		c := text[i]
 		switch {
+		case c == '\\' && i+1 < len(text) && text[i+1] == '\n':
+			i++ // a line continuation, which sh drops
 		case c == '\\' && i+1 < len(text):
 			i++
 			word.WriteByte(text[i])
