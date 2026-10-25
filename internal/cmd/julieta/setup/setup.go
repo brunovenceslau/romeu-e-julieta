@@ -186,6 +186,12 @@ func PrintWarning(out *cli.Writer, w Warning) {
 		cli.Warn(out, "agent-memory-writable", w.Message)
 	case VersionOnlyTool:
 		cli.Warn(out, "version-only-tool", w.Message)
+	case AgentPathMissing:
+		cli.Warn(out, "agent-path-missing", w.Message)
+	case SkillsStale:
+		cli.Warn(out, "skills-stale", w.Message)
+	case AgentHooksMissing:
+		cli.Warn(out, "agent-hooks-missing", w.Message)
 	default:
 		_, _ = fmt.Fprintf(out, "julieta state holds a warning this julieta does not know, %q: %s\n", w.Slug, w.Message)
 	}

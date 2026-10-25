@@ -30,6 +30,7 @@ julieta hooks <command> [flags]
 ### SEE ALSO
 
 * [julieta](../julieta.md) - the commands that run inside a sandbox
+* [julieta hooks guard](hooks/guard.md) - the PreToolUse hook: refuse gh pr merge, a push of a v* tag and gh api changes to rulesets or repository settings
 * [julieta hooks run](hooks/run.md) - run the chain of a git hook: the system hook, julieta's action, .githooks/<hook>, then the local hook
 
 ### Exit codes

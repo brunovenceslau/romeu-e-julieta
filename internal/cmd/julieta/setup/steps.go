@@ -23,4 +23,6 @@ var steps = []step{
 	checkMemory,
 	recordSnapshotsDisabled,
 	installDispatcher,
+	checkAgentPaths,
+	checkSkillsStale,
 }

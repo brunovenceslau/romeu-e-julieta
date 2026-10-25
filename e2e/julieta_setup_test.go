@@ -146,7 +146,7 @@ func manifestEnv(t *testing.T, protocol int, apiURL string) string {
 			"primary": primary, "ref": "main", "url": url}
 	}
 	doc := map[string]any{
-		"agent":      "sbx-kit-claude",
+		"agent":      "no-profile", // no agent profile: kit_julieta_claude_test.go sets one up
 		"egress":     []string{"dl.google.com", "github.com"},
 		"generation": "01j9zc2q8x7w4t6y3r5e1v9k0p",
 		"project":    "shop",

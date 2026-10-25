@@ -15,5 +15,5 @@ import "embed"
 // FS holds one directory per product kit, each with its descriptor and
 // the files the descriptor names.
 //
-//go:embed julieta os-base git-ssh-sign/git-ssh-sign.yaml
+//go:embed julieta julieta-claude os-base git-ssh-sign/git-ssh-sign.yaml
 var FS embed.FS
