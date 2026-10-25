@@ -17,7 +17,8 @@ another repository goes into an issue there
    pinned at 26d49d75 (01m5nw2x1dw37z6sc6tebk991e); its runbook and
    cut-over are merged there, and its issue #287 keeps the atomic
    replace of the host-built julieta open.
-2. T038, the next of the critical path (issue #271); T165 after T164.
+2. T038, the next of the critical path (issue #271): review or rebuild
+   the branch feat/t038-render-kits first (01m5rq1wpvm2vxfgq7ns3zjwjk); T165 after T164.
 3. Build T170; T161 once T088 is built
    (01m5e14094yhqhsxq2g941pwrf).
 4. The pending notes, each when its trigger fires: 01m5rpbjkc62s2c7qecj7wf9bk, 01m5rjz3n7588xgx1xhfn56wmk, 01m5rjz3p5x27yebkayt1hjydb, 01m5ngx0cy47r560n6hqjh4y1c, 01m5ngabwa6akgjr9eetw78kq7, 01m5ndjpzgf0rmwkr7gc1j6wdh, 01m5n920q50b79dxxqe5ghss4r, 01m5n79kdbtk9dpq7y87sfkkaq,
