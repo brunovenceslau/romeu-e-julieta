@@ -13,8 +13,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/shquote"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
@@ -38,20 +40,23 @@ const JulietaBinArg = "julietaBin"
 // first's.
 var goarchForm = regexp.MustCompile(`^[a-z0-9]+$`)
 
-// ErrPersonalKit is the error of a spec kit that names a personal kit,
-// which this source does not materialize: personal kits come from the
-// config commit's tree through gitsafe.WalkTree (I27), a source that
-// joins ProductKits.Materialize beside the product one.
-var ErrPersonalKit = errors.New("render: a personal kit is not materialized yet")
+// ConfigKitsDir is the dir of the config repo's tree that holds the
+// personal kits, one dir per kit, each with its descriptor <kit>.yaml
+// (02 2.2).
+const ConfigKitsDir = "kits"
 
-// ProductKits is the product-kit half of the Materializer seam (06
-// 6.1, REQ-0568): it writes each product kit of the spec from FS, the
-// one embed.FS of kits/embed.go in production (kits.FS, T077) and a
-// fixture in a test, into the candidate's kits dir. A personal kit of
-// the spec is ErrPersonalKit until the personal source lands.
-type ProductKits struct {
+// ErrPersonalCapability is the error of a personal kit that declares a
+// network, mount, volume, credential or ssh-agent capability, which a
+// personal kit may not (06 6.1, REQ-0574; I28, REQ-0514): a sync error.
+var ErrPersonalCapability = errors.New("render: a capability a personal kit may not declare")
+
+// KitMaterializer is the Materializer of kits/ (06 6.1, REQ-0568): it
+// writes each kit of the spec into the candidate's kits dir, a product
+// kit from FS and a personal kit from the config commit's tree.
+type KitMaterializer struct {
 	// FS holds one directory per product kit, each with its descriptor
-	// <kit>.yaml.
+	// <kit>.yaml: the one embed.FS of kits/embed.go in production
+	// (kits.FS, T077) and a fixture in a test.
 	FS fs.FS
 	// EnvDir is the absolute path of <name>-env/, the root of the
 	// .romeu/bin julieta lives in.
@@ -59,6 +64,16 @@ type ProductKits struct {
 	// GOARCH is romeu's own GOARCH, which names the binary
 	// (REQ-0584).
 	GOARCH string
+	// Git reads the config repo, hardened for the host. It, ConfigDir
+	// and ConfigCommit are needed only when the spec names a personal
+	// kit.
+	Git *gitsafe.Runner
+	// ConfigDir is the absolute path of the root of the config repo's
+	// clone.
+	ConfigDir string
+	// ConfigCommit is the full object id of the config commit the spec
+	// was read at (Record.SpecSource.Commit).
+	ConfigCommit string
 }
 
 // Materialize writes each kit of p into the candidate c, under the name
@@ -67,7 +82,8 @@ type ProductKits struct {
 // 3.12), parses the descriptor's capability set (oci.ParseDescriptor,
 // REQ-0569), and, when the descriptor declares the arg julietaBin,
 // renders it as the absolute path of the project's .romeu/bin julieta,
-// quoted through internal/shquote (REQ-0584, REQ-0596). The files are
+// quoted through internal/shquote (REQ-0584, REQ-0596). Every kit is
+// read and checked before any file is written, and the files are
 // written through an os.Root on the candidate.
 //
 // A file of FS is a regular file: a link or a device is refused. An
@@ -75,10 +91,23 @@ type ProductKits struct {
 // written and digested as regular; a kit that needs an executable file
 // needs another carrier. Only a fixture FS can say a file is executable.
 //
-// A failure leaves the files already written in the candidate. The
-// caller discards the candidate: internal/state deletes a leftover one
-// at the next sync.
-func (s ProductKits) Materialize(_ context.Context, c Candidate, p spec.Project) ([]MaterializedKit, error) {
+// A personal kit is the dir kits/<kit>/ of the config commit's tree.
+// When the spec names one, the commit gets two independent checks
+// first (05 5.1, REQ-0465; I27): git fsck --strict, then the validated
+// walk of the whole tree (gitsafe.WalkTree); a tree that either refuses
+// fails the sync before anything is written. The bytes of the kit's
+// files are read with gitsafe.ReadDir, one dir at a time, which holds
+// a file to 1 MiB and a dir to 64 MiB, and must list exactly the files
+// the walk listed. A personal kit that declares a capability of
+// refusedCapability is ErrPersonalCapability; any other capability is
+// kept in its set, for the gate.
+//
+// A failure while writing leaves the files already written in the
+// candidate. The caller discards the candidate: internal/state deletes
+// a leftover one at the next sync.
+//
+//romeu:invariant I27 guard
+func (s KitMaterializer) Materialize(ctx context.Context, c Candidate, p spec.Project) ([]MaterializedKit, error) {
 	if !path.IsAbs(s.EnvDir) || path.Clean(s.EnvDir) != s.EnvDir {
 		return nil, fmt.Errorf("render: the env dir %q is not an absolute clean path", s.EnvDir)
 	}
@@ -90,18 +119,23 @@ func (s ProductKits) Materialize(_ context.Context, c Candidate, p spec.Project)
 	if err != nil {
 		return nil, fmt.Errorf("render: the path of julieta: %w", err)
 	}
-	r, err := os.OpenRoot(c.Dir)
-	if err != nil {
-		return nil, fmt.Errorf("render: %w", err)
+	var tree []gitsafe.TreeEntry
+	if slices.ContainsFunc(p.Kits, func(k spec.Kit) bool { return k.Personal != "" }) {
+		if tree, err = s.configTree(ctx); err != nil {
+			return nil, err
+		}
 	}
-	defer func() { _ = r.Close() }()
 
 	out := make([]MaterializedKit, 0, len(p.Kits))
+	files := make([][]gate.File, 0, len(p.Kits))
 	for _, k := range p.Kits {
+		var m MaterializedKit
+		var f []gate.File
 		if k.Personal != "" {
-			return nil, fmt.Errorf("%w: %q", ErrPersonalKit, k.Personal)
+			m, f, err = s.personal(ctx, tree, k.Personal)
+		} else {
+			m, f, err = s.product(k.Product)
 		}
-		m, files, err := s.read(k.Product)
 		if err != nil {
 			return nil, err
 		}
@@ -111,10 +145,19 @@ func (s ProductKits) Materialize(_ context.Context, c Candidate, p spec.Project)
 			}
 			m.Rendered = map[string]string{JulietaBinArg: quoted}
 		}
-		if err := writeKit(r, m.Dir(), files); err != nil {
+		out = append(out, m)
+		files = append(files, f)
+	}
+
+	r, err := os.OpenRoot(c.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("render: %w", err)
+	}
+	defer func() { _ = r.Close() }()
+	for i, m := range out {
+		if err := writeKit(r, m.Dir(), files[i]); err != nil {
 			return nil, fmt.Errorf("render: the kit %q: %w", m.ID, err)
 		}
-		out = append(out, m)
 	}
 	return out, nil
 }
@@ -140,9 +183,9 @@ func checkArg(kit, name, value string, a oci.Arg) error {
 	return nil
 }
 
-// read returns the product kit id of FS, without its Rendered args, and
-// its files.
-func (s ProductKits) read(id string) (MaterializedKit, []gate.File, error) {
+// product returns the product kit id of FS, without its Rendered args,
+// and its files.
+func (s KitMaterializer) product(id string) (MaterializedKit, []gate.File, error) {
 	if err := oneElement(id); err != nil {
 		return MaterializedKit{}, nil, fmt.Errorf("render: the product kit %q: %w", id, err)
 	}
@@ -154,19 +197,115 @@ func (s ProductKits) read(id string) (MaterializedKit, []gate.File, error) {
 	if err != nil {
 		return MaterializedKit{}, nil, fmt.Errorf("render: the product kit %q: %w", id, err)
 	}
-	i := slices.IndexFunc(files, func(f gate.File) bool { return f.Path == id+".yaml" })
-	if i < 0 {
-		return MaterializedKit{}, nil, fmt.Errorf("render: the product kit %q has no descriptor %s.yaml", id, id)
-	}
-	kit, err := oci.ParseDescriptor(files[i].Data)
-	if err != nil {
-		return MaterializedKit{}, nil, fmt.Errorf("render: the product kit %q: %s.yaml: %w", id, id, err)
-	}
-	digest, err := gate.KitTreeDigest(files)
+	m, err := kitOf(id, files)
 	if err != nil {
 		return MaterializedKit{}, nil, fmt.Errorf("render: the product kit %q: %w", id, err)
 	}
-	return MaterializedKit{ID: id, Digest: digest, Capabilities: kit.Capabilities}, files, nil
+	return m, files, nil
+}
+
+// configTree checks the config commit with fsck and then the walk, and
+// returns the files the walk listed.
+func (s KitMaterializer) configTree(ctx context.Context) ([]gitsafe.TreeEntry, error) {
+	if s.Git == nil || s.ConfigDir == "" || s.ConfigCommit == "" {
+		return nil, errors.New("render: the spec names a personal kit and there is no config commit to read it from")
+	}
+	if err := s.Git.Fsck(ctx, s.ConfigDir, s.ConfigCommit); err != nil {
+		return nil, fmt.Errorf("render: the config commit %s: %w", s.ConfigCommit, err)
+	}
+	tree, err := s.Git.WalkTree(ctx, s.ConfigDir, s.ConfigCommit)
+	if err != nil {
+		return nil, fmt.Errorf("render: the config commit %s: %w", s.ConfigCommit, err)
+	}
+	return tree, nil
+}
+
+// personal returns the personal kit id of the config commit, whose tree
+// the walk listed, without its Rendered args, and its files.
+func (s KitMaterializer) personal(ctx context.Context, tree []gitsafe.TreeEntry, id string) (MaterializedKit, []gate.File, error) {
+	if err := oneElement(id); err != nil {
+		return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: %w", id, err)
+	}
+	prefix := ConfigKitsDir + "/" + id + "/"
+	modes := map[string]string{} // the walk's files of the kit, by path in the kit
+	var dirs []string
+	for _, e := range tree {
+		rel, ok := strings.CutPrefix(e.Path, prefix)
+		if !ok {
+			continue
+		}
+		modes[rel] = e.Mode
+		if d := path.Dir(e.Path); !slices.Contains(dirs, d) {
+			dirs = append(dirs, d)
+		}
+	}
+	if len(modes) == 0 {
+		return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q is not in the config commit (no %s)", id, prefix)
+	}
+	files := make([]gate.File, 0, len(modes))
+	for _, d := range dirs {
+		got, err := s.Git.ReadDir(ctx, s.ConfigDir, s.ConfigCommit, d)
+		if err != nil {
+			return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: %w", id, err)
+		}
+		for _, f := range got {
+			rel := strings.TrimPrefix(d+"/"+f.Name, prefix)
+			if mode, ok := modes[rel]; !ok || mode != f.Mode {
+				return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: the read of %q is not the file the walk listed", id, rel)
+			}
+			delete(modes, rel)
+			files = append(files, gate.File{Path: rel, Mode: f.Mode, Data: f.Data})
+		}
+	}
+	for rel := range modes {
+		return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: the walk listed %q and the read did not", id, rel)
+	}
+	m, err := kitOf(id, files)
+	if err != nil {
+		return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: %w", id, err)
+	}
+	if typ := refusedCapability(m.Capabilities); typ != "" {
+		return MaterializedKit{}, nil, fmt.Errorf("%w: the personal kit %q declares a %s capability", ErrPersonalCapability, id, typ)
+	}
+	return m, files, nil
+}
+
+// refusedCapability returns the first capability type of c a personal
+// kit may not declare, in the order of REQ-0574, or "" when c declares
+// none: network, mount (a host mount), volume, credential and
+// ssh-agent.
+func refusedCapability(c oci.Capabilities) string {
+	switch {
+	case c.Network != nil:
+		return "network"
+	case slices.ContainsFunc(c.Volumes, func(v oci.Volume) bool { return v.Kind != "volume" }):
+		return "mount"
+	case len(c.Volumes) > 0:
+		return "volume"
+	case len(c.Credentials) > 0:
+		return "credential"
+	case len(c.SSHAgent) > 0:
+		return "ssh-agent"
+	}
+	return ""
+}
+
+// kitOf returns the kit id of files, its digest and the capability set
+// of its descriptor <id>.yaml.
+func kitOf(id string, files []gate.File) (MaterializedKit, error) {
+	i := slices.IndexFunc(files, func(f gate.File) bool { return f.Path == id+".yaml" })
+	if i < 0 {
+		return MaterializedKit{}, fmt.Errorf("no descriptor %s.yaml", id)
+	}
+	kit, err := oci.ParseDescriptor(files[i].Data)
+	if err != nil {
+		return MaterializedKit{}, fmt.Errorf("%s.yaml: %w", id, err)
+	}
+	digest, err := gate.KitTreeDigest(files)
+	if err != nil {
+		return MaterializedKit{}, err
+	}
+	return MaterializedKit{ID: id, Digest: digest, Capabilities: kit.Capabilities}, nil
 }
 
 // kitFiles reads every file below the root of fsys, in the walk's
