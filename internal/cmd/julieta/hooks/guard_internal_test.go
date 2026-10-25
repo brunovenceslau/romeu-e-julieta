@@ -6,6 +6,7 @@
 package hooks
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -81,6 +82,15 @@ func TestGuardRules(t *testing.T) {
 		{"git push -u origin feat/v2-thing", ""},
 		{"git push origin vendor-update", ""},
 		{"git push origin refs/tags/release-1", ""},
+		{"git push origin v2-fix", ""},
+		{"git push origin HEAD:v2-fix", ""},
+		{"git push origin v2-fix:refs/tags/v2-fix", ruleTag},
+		{"git push origin 'refs/tags/*'", ruleTag},
+		{"git push origin 'refs/tags/*:refs/tags/*'", ruleTag},
+		{"git push origin v1", ruleTag},
+		{"git push origin v1.2.3-rc.1", ruleTag},
+		{"git push origin v1.2.3+build.5", ruleTag},
+		{"git push origin \"v${VERSION}\"", ruleTag},
 		{"git push origin tag release-1", ""},
 		{"git tag v1.0", ""},
 		{"git push --force-with-lease origin HEAD", ""},
@@ -106,6 +116,34 @@ func TestGuardRules(t *testing.T) {
 		{"gh api graphql -f query='mutation { createRepositoryRuleset(input: {}) { ruleset { id } } }'", ruleSettings},
 		{"gh api graphql -F query=@m.graphql -f q='mutation{updateBranchProtectionRule(input:{}){clientMutationId}}'", ruleSettings},
 		{"gh api graphql -f query='mutation { updateRepository(input: {}) { repository { id } } }'", ruleSettings},
+		{"gh api -X PUT repos/o/r/actions/variables/X -f value=1", ruleSettings},
+		{"gh api -X POST repos/o/r/actions/runners/registration-token", ruleSettings},
+		{"gh api -X PUT repos/o/r/actions/oidc/customization/sub --input s.json", ruleSettings},
+		{"gh api -X POST repos/o/r/actions/runs/1/rerun", ""},
+		{"gh api -X POST repos/o/r/actions/workflows/ci.yml/dispatches -f ref=main", ""},
+
+		// merging, tagging and releasing by another route (decided on 2026-10-25)
+		{"gh release create v1.2.0 --notes x", ruleRelease},
+		{"gh release delete v1.2.0 --yes", ruleRelease},
+		{"gh -R o/r release create v1", ruleRelease},
+		{"gh release view v1.2.0", ""},
+		{"gh release list", ""},
+		{"gh api -X PUT repos/o/r/pulls/5/merge -f merge_method=squash", ruleMerge},
+		{"gh api --method PUT /repos/{owner}/{repo}/pulls/5/merge", ruleMerge},
+		{"gh api repos/o/r/pulls/5/merge", ""},
+		{"gh api graphql -f query='mutation { mergePullRequest(input: {pullRequestId: \"x\"}) { clientMutationId } }'", ruleMerge},
+		{"gh api graphql -f query='mutation { enablePullRequestAutoMerge(input: {pullRequestId: \"x\"}) { clientMutationId } }'", ruleMerge},
+		{"gh api -X POST repos/o/r/git/refs -f ref=refs/tags/v1.2.0 -f sha=abc", ruleTag},
+		{"gh api repos/o/r/git/refs -f ref=refs/tags/v1.2.0 -f sha=abc", ruleTag},
+		{"gh api -X DELETE repos/o/r/git/refs/tags/v1.2.0", ruleTag},
+		{"gh api -X POST repos/o/r/git/refs -f ref=refs/heads/feat -f sha=abc", ""},
+		{"gh api repos/o/r/git/refs/tags/v1.2.0", ""},
+		{"gh api -X POST repos/o/r/releases -f tag_name=v1.2.0", ruleRelease},
+		{"gh api -X DELETE repos/o/r/releases/42", ruleRelease},
+		{"gh api -X PATCH repos/o/r/releases/42 -F draft=false", ruleRelease},
+		{"gh api repos/o/r/releases/latest", ""},
+		{"echo 1 | xargs -I{} gh api -X PUT repos/o/r/pulls/{}/merge", ruleMerge},
+
 		{"gh api repos/o/r", ""},
 		{"gh api repos/o/r/rulesets", ""},
 		{"gh api -X GET repos/o/r/rulesets -f includes_parents=true", ""},
@@ -126,14 +164,65 @@ func TestGuardRules(t *testing.T) {
 	}
 }
 
-// TestGuardSplitHoldsQuotes holds the word splitter to the quoting of
-// sh: a quoted separator is part of a word, a backslash escapes, and an
-// unclosed quote ends the input.
-func TestGuardSplitHoldsQuotes(t *testing.T) {
-	assert.Equal(t, [][]string{{"a", "b;c", "d|e"}}, splitCommands(`a "b;c" 'd|e'`))
-	assert.Equal(t, [][]string{{"a", "b c"}, {"d"}}, splitCommands("a b\\ c;d"))
-	assert.Equal(t, [][]string{{"echo", "it's"}}, splitCommands(`echo "it's"`))
-	assert.Equal(t, [][]string{{"echo", "x", "unclosed"}}, splitCommands(`echo x 'unclosed`))
-	assert.Equal(t, [][]string{{"a"}, {"b"}, {"c"}}, splitCommands("a &\nb & c"))
-	assert.Equal(t, [][]string{{"a", ""}}, splitCommands(`a ""`))
+// TestGuardReadsEveryCommand holds the walk of the parsed script
+// (mvdan.cc/sh/v3/syntax): each refused command is refused wherever a
+// shell runs it, in a command substitution, in backquotes, in a
+// subshell, in a function body, after a heredoc whose body holds an
+// apostrophe, after a comment that holds one, and behind a leading
+// redirection; a heredoc body or a comment that only names it is no
+// command.
+func TestGuardReadsEveryCommand(t *testing.T) {
+	refused := map[string]string{
+		"gh pr merge 1":                         ruleMerge,
+		"git push origin v1.2.0":                ruleTag,
+		"gh api -X DELETE repos/o/r/rulesets/1": ruleSettings,
+		"gh release create v1.2.0":              ruleRelease,
+	}
+	wraps := []string{
+		`echo "$(%s)"`,
+		"echo `%s`",
+		"(%s)",
+		"f() { %s; }; f",
+		`echo "$(date)"; %s`,
+		`X="$(git rev-parse HEAD)" && %s`,
+		`echo "a" "$(true)" ; %s`,
+		"cat <<EOF\nit's here\nEOF\n%s",
+		"cat <<'EOF'\nit's here\nEOF\n%s",
+		"# don't\n%s",
+		"true # don't do it\n%s",
+		">/dev/null %s",
+		"2>&1 %s | cat",
+		"cat <<EOF\n$(%s)\nEOF",
+	}
+	for cmd, rule := range refused {
+		for _, w := range wraps {
+			text := strings.ReplaceAll(w, "%s", cmd)
+			r := guardCheck(text)
+			if assert.NotNil(t, r, "%q", text) {
+				assert.Equal(t, rule, r.rule, "%q", text)
+			}
+		}
+	}
+	for _, text := range []string{
+		"cat <<EOF\ngh pr merge 1\nEOF",
+		"cat <<'EOF' >notes.md\ngit push origin v1.2.0\nEOF",
+		"# gh pr merge 1",
+		"true # gh pr merge 1",
+		"echo hi\n# gh release create v1",
+	} {
+		assert.Nil(t, guardCheck(text), "%q", text)
+	}
+}
+
+// TestGuardFailsClosedOnAParseError holds a command the parser refuses
+// to a refusal that says so.
+func TestGuardFailsClosedOnAParseError(t *testing.T) {
+	for _, text := range []string{"echo 'unclosed", "if then fi (", "bash -c 'echo \"x'"} {
+		r := guardCheck(text)
+		if assert.NotNil(t, r, "%q", text) {
+			assert.Equal(t, ruleUnparsable, r.rule, "%q", text)
+			assert.Contains(t, r.text, "cannot be parsed", "%q", text)
+			assert.Contains(t, r.text, "fails closed", "%q", text)
+		}
+	}
 }

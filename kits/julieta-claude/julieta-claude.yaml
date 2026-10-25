@@ -25,7 +25,9 @@
 # is a wrapper: when julieta cannot run, as with the mount absent, the
 # session hooks print one line naming the failure and julieta status
 # and exit 0, and the PreToolUse guard exits 2, so it fails closed
-# (REQ-0673). The step checks the value before it uses it; the pattern
+# (REQ-0673). So with the bin mount absent every Bash call of the agent
+# is refused, on purpose: the maintainer restores the mount from the
+# host, by the sandbox's recreate. The step checks the value before it uses it; the pattern
 # of the arg admits the empty default, which the check refuses, so a kit
 # entry without the arg fails its install rather than wire hooks to
 # nowhere. The value holds no character that sed or sh treat as
@@ -36,11 +38,19 @@
 # empty one that the agent cannot write, outside $HOME so the agent
 # cannot remove it.
 #
+# The managed-settings directories and the drop-in are set root-owned
+# and not writable by the agent, whatever was there before.
+#
 # The skills are those of skills/ at the root of the repository, copied
 # whole into skills/ here, since a kit holds its files in its own
 # directory; a test of internal/agent/claude holds the copy equal to
-# skills/. They are installed root-owned, so the agent reads them and
-# julieta setup reports skills-stale when they differ. That sbx stages a
+# skills/. ~/.claude and ~/.claude/skills are made by the agent, never
+# by root, so Claude Code still writes ~/.claude/projects and todos.
+# The skill directories are installed root-owned, so the agent reads
+# them and cannot edit them; since ~/.claude/skills is the agent's, it
+# can still rename or remove a skill directory, which julieta setup
+# reports as skills-stale, a residual risk of the guard against
+# mistakes (05 5.4). That sbx stages a
 # subdirectory of a kit's directory, and what a mount of the workload's
 # agent-skills capability at ~/.claude/skills does to the step, are read
 # by the first build of this kit (B2, S5).
@@ -62,7 +72,7 @@ capabilities:
   - type: com.docker.sandbox/lifecycle@1
     config:
       install:
-        - description: the hooks and the memory settings, a managed-settings drop-in of Claude Code with the path of julieta
+        - description: the hooks and the memory settings, a managed-settings drop-in of Claude Code with the path of julieta, root-owned
           user: "0"
           env: [JULIETA_BIN]
           command:
@@ -70,8 +80,9 @@ capabilities:
             - -euc
             - |
               [[ ${JULIETA_BIN-} =~ ^(/[A-Za-z0-9._-]+)+$ ]]
-              mkdir -p /etc/claude-code/managed-settings.d
+              install -d -o root -g root -m 0755 /etc/claude-code /etc/claude-code/managed-settings.d
               sed "s#@JULIETA_BIN@#${JULIETA_BIN}#g" /usr/share/sandbox/kit/julieta-claude/managed-settings.json >/etc/claude-code/managed-settings.d/50-julieta-claude.json
+              chown root:root /etc/claude-code/managed-settings.d/50-julieta-claude.json
               chmod 0644 /etc/claude-code/managed-settings.d/50-julieta-claude.json
         - description: the agent's own memory dir, empty and not writable
           user: "0"
@@ -81,13 +92,21 @@ capabilities:
             - |
               mkdir -p -m 0755 /var/lib/julieta-claude
               install -d -m 0555 /var/lib/julieta-claude/agent-memory
-        - description: the skills julieta and handoff, each whole directory, into ~/.claude/skills
+        - description: ~/.claude/skills, made by the agent when missing, not writable by others
+          user: agent
+          command:
+            - bash
+            - -euc
+            - |
+              umask 022
+              mkdir -p "$HOME/.claude/skills"
+        - description: the skills julieta and handoff, each whole directory, root-owned, into ~/.claude/skills
           user: "0"
           command:
             - bash
             - -euc
             - |
-              mkdir -p /home/agent/.claude/skills
+              test -d /home/agent/.claude/skills
               rm -rf /home/agent/.claude/skills/julieta /home/agent/.claude/skills/handoff
               cp -R /usr/share/sandbox/kit/julieta-claude/skills/julieta /usr/share/sandbox/kit/julieta-claude/skills/handoff /home/agent/.claude/skills/
               chmod -R u=rwX,go=rX /home/agent/.claude/skills/julieta /home/agent/.claude/skills/handoff

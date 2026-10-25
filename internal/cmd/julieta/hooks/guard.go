@@ -29,16 +29,19 @@ var _ = cli.Register(func() cli.Command {
 	c.New = func(env *cli.Env) *cobra.Command {
 		return &cobra.Command{
 			Use:   "guard",
-			Short: "the PreToolUse hook: refuse gh pr merge, a push of a v* tag and gh api changes to rulesets or repository settings",
+			Short: "the PreToolUse hook: refuse a merge, a v* tag, a release, and gh api changes to rulesets or repository settings",
 			Example: "julieta hooks guard <pre-tool-use.json\n" +
 				"julieta hooks guard --json <pre-tool-use.json",
 			Long: "The agent runs this as its PreToolUse hook, with the document of the tool call on stdin.\n" +
-				"It exits 2, which refuses the call, when the Bash command merges a pull request (gh pr merge), pushes a v* tag " +
-				"(a ref or bare name of one, after tag, or every tag by --tags, --follow-tags or --mirror), or changes a ruleset " +
-				"or a repository's settings through gh api; the refusal on stderr says the action is the maintainer's and names " +
-				"the route, an issue or the handoff. It exits 0 for any other call.\n\n" +
-				"A document it cannot decode exits 2 as well: the guard fails closed. It is a guard against mistakes, " +
-				"not against an agent that hides a command or edits its own hook.",
+				"It exits 2, which refuses the call, when the Bash command merges a pull request (gh pr merge, gh api to pulls/<n>/merge, " +
+				"or the GraphQL mergePullRequest or enablePullRequestAutoMerge), pushes a v* tag (a ref of refs/tags/v or a glob of refs/tags/, " +
+				"a bare release version, after tag, or every tag by --tags, --follow-tags or --mirror, or a tag ref made through gh api), " +
+				"creates or deletes a release (gh release create or delete, or gh api to releases), or changes a ruleset or a repository's " +
+				"settings through gh api; the refusal on stderr says the action is the maintainer's and names the route, an issue or the handoff. " +
+				"It exits 0 for any other call.\n\n" +
+				"The command is parsed as bash parses it, so a command inside a list, a pipeline, a subshell, a function or a command " +
+				"substitution counts, and a heredoc's text or a comment does not. A document it cannot decode, and a command it cannot parse, " +
+				"exit 2 as well: the guard fails closed. It is a guard against mistakes, not against an agent that hides a command or edits its own hook.",
 			Args: cobra.NoArgs,
 			RunE: func(*cobra.Command, []string) error {
 				return runGuard(env)

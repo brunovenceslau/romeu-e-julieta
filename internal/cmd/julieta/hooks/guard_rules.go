@@ -6,18 +6,23 @@
 package hooks
 
 import (
+	"fmt"
 	"path"
 	"regexp"
 	"slices"
 	"strings"
+
+	"mvdan.cc/sh/v3/syntax"
 )
 
-// The three patterns of julieta hooks guard (06 6.4, REQ-0598), each a
-// rule by name.
+// The patterns of julieta hooks guard (06 6.4, REQ-0598), each a rule
+// by name, and the verdict on a command the parser refuses.
 const (
-	ruleMerge    = "gh-pr-merge"
-	ruleTag      = "tag-push"
-	ruleSettings = "gh-api-settings"
+	ruleMerge      = "gh-pr-merge"
+	ruleTag        = "tag-push"
+	ruleSettings   = "gh-api-settings"
+	ruleRelease    = "gh-release"
+	ruleUnparsable = "unparsable"
 )
 
 // refusal is the verdict of the guard on a command: the rule it hit and
@@ -32,19 +37,30 @@ const route = " Ask the maintainer for it in an issue, or write it into the hand
 
 // The refusals, by rule.
 var refusals = map[string]refusal{
-	ruleMerge:    {ruleMerge, "julieta hooks guard refused gh pr merge: merging a pull request is the maintainer's action, not the agent's." + route},
+	ruleMerge:    {ruleMerge, "julieta hooks guard refused a merge of a pull request (gh pr merge, or gh api): merging is the maintainer's action, not the agent's." + route},
 	ruleTag:      {ruleTag, "julieta hooks guard refused a push of a v* tag: tagging a release is the maintainer's action, not the agent's." + route},
 	ruleSettings: {ruleSettings, "julieta hooks guard refused a gh api call that changes rulesets or repository settings: that change is the maintainer's action, not the agent's." + route},
+	ruleRelease:  {ruleRelease, "julieta hooks guard refused the creation or deletion of a release: releasing is the maintainer's action, not the agent's." + route},
 }
 
-// guardCheck returns the refusal of the first command of the shell text
-// command that hits a rule, or nil.
+// refuse returns the refusal of rule.
+func refuse(rule string) *refusal {
+	r := refusals[rule]
+	return &r
+}
+
+// guardCheck returns the refusal of the first simple command of the
+// shell text command that hits a rule, or nil. A text the parser
+// refuses is refused too: the guard fails closed.
 //
-// The patterns are matched on the words of each simple command, split
-// by the quoting of sh, as a guard against mistakes and not against an
-// agent that hides a command (05 5.4): a maintained shell parser,
-// mvdan.cc/sh, would read more of the grammar, and is a dependency the
-// three patterns do not need.
+// The text is parsed with mvdan.cc/sh/v3/syntax, as bash reads it, and
+// every simple command of the tree is checked: those of a list, a
+// pipeline, a subshell, a function body, a command substitution or
+// backquotes, and one inside an unquoted heredoc's substitution, which
+// runs; a heredoc's text and a comment are no command. The words of a
+// wrapper (sudo, env, xargs, timeout, ...) are followed, and the string
+// of sh -c and of eval is parsed again. It is a guard against mistakes,
+// not against an agent that hides a command (05 5.4).
 func guardCheck(command string) *refusal {
 	return checkText(command, 0)
 }
@@ -52,14 +68,75 @@ func guardCheck(command string) *refusal {
 // maxDepth bounds the nesting of sh -c and eval the check follows.
 const maxDepth = 4
 
-// checkText checks each simple command of text.
+// checkText parses text and checks each simple command of it.
 func checkText(text string, depth int) *refusal {
-	for _, words := range splitCommands(text) {
-		if r := checkWords(words, depth); r != nil {
-			return r
-		}
+	f, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(text), "")
+	if err != nil {
+		return &refusal{ruleUnparsable, fmt.Sprintf("julieta hooks guard refused the tool call: its command cannot be parsed as a shell script (%v), and the guard fails closed.", err)}
 	}
-	return nil
+	var found *refusal
+	syntax.Walk(f, func(n syntax.Node) bool {
+		if found != nil {
+			return false
+		}
+		if call, ok := n.(*syntax.CallExpr); ok && len(call.Args) > 0 {
+			words := make([]string, len(call.Args))
+			for i, w := range call.Args {
+				words[i] = wordText(w)
+			}
+			found = checkWords(words, depth)
+		}
+		return found == nil
+	})
+	return found
+}
+
+// expansion stands in a word for a part the shell expands at run time:
+// a parameter, a command substitution, an arithmetic expansion.
+const expansion = "\x00"
+
+// wordText returns the text of a word as the command receives it,
+// quotes removed and escapes applied, each expansion written as
+// expansion.
+func wordText(w *syntax.Word) string {
+	var b strings.Builder
+	for _, p := range w.Parts {
+		partText(&b, p, false)
+	}
+	return b.String()
+}
+
+// partText writes the text of one part of a word to b; dq says the part
+// is inside double quotes.
+func partText(b *strings.Builder, p syntax.WordPart, dq bool) {
+	switch p := p.(type) {
+	case *syntax.Lit:
+		b.WriteString(unescape(p.Value, dq))
+	case *syntax.SglQuoted:
+		b.WriteString(p.Value)
+	case *syntax.DblQuoted:
+		for _, q := range p.Parts {
+			partText(b, q, true)
+		}
+	default:
+		b.WriteString(expansion)
+	}
+}
+
+// unescape removes the backslashes the shell removes from a literal:
+// before any character outside double quotes, and before $ ` " \ inside.
+func unescape(s string, dq bool) string {
+	if !strings.Contains(s, "\\") {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' && i+1 < len(s) && (!dq || strings.IndexByte("$`\"\\", s[i+1]) >= 0) {
+			i++
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
 }
 
 // prefixes are the words that run the command after them: the
@@ -159,8 +236,9 @@ func checkGh(args []string) *refusal {
 	pos := positional(args, ghValued)
 	switch {
 	case len(pos) >= 2 && pos[0] == "pr" && pos[1] == "merge":
-		r := refusals[ruleMerge]
-		return &r
+		return refuse(ruleMerge)
+	case len(pos) >= 2 && pos[0] == "release" && (pos[1] == "create" || pos[1] == "delete"):
+		return refuse(ruleRelease)
 	case len(pos) >= 1 && pos[0] == "api":
 		return checkAPI(args)
 	}
@@ -176,9 +254,10 @@ var ghValued = []string{"-R", "--repo", "-X", "--method", "-H", "--header", "-f"
 // POST.
 var ghFields = []string{"-f", "--raw-field", "-F", "--field", "--input"}
 
-// checkAPI checks a call of gh api: one that changes a ruleset or a
-// repository's settings, by a method other than GET, or a GraphQL
-// mutation of them.
+// checkAPI checks a call of gh api, by a method other than GET: a merge
+// of a pull request, a tag ref or a release created, changed or deleted,
+// or a change of a ruleset or a repository's settings; or a GraphQL
+// mutation of one of them.
 func checkAPI(args []string) *refusal {
 	pos := positional(args, ghValued)
 	if len(pos) < 2 {
@@ -188,22 +267,44 @@ func checkAPI(args []string) *refusal {
 	endpoint = strings.Trim(endpoint, "/")
 	if endpoint == "graphql" {
 		text := strings.Join(args, " ")
-		if strings.Contains(text, "mutation") && graphqlSettings.MatchString(text) {
-			r := refusals[ruleSettings]
-			return &r
+		switch {
+		case !strings.Contains(text, "mutation"):
+		case graphqlMerge.MatchString(text):
+			return refuse(ruleMerge)
+		case graphqlSettings.MatchString(text):
+			return refuse(ruleSettings)
 		}
 		return nil
 	}
-	if apiMethod(args) == "GET" || !settingsPath(endpoint) {
+	if apiMethod(args) == "GET" {
 		return nil
 	}
-	r := refusals[ruleSettings]
-	return &r
+	segs := strings.Split(endpoint, "/")
+	if len(segs) >= 4 && segs[0] == "repos" {
+		switch rest := segs[3:]; {
+		case len(rest) == 3 && rest[0] == "pulls" && rest[2] == "merge":
+			return refuse(ruleMerge)
+		case rest[0] == "releases":
+			return refuse(ruleRelease)
+		case len(rest) >= 2 && rest[0] == "git" && rest[1] == "refs" &&
+			(len(rest) >= 4 && rest[2] == "tags" && strings.HasPrefix(rest[3], "v") ||
+				slices.ContainsFunc(args, func(a string) bool { return strings.Contains(a, "refs/tags/v") })):
+			return refuse(ruleTag)
+		}
+	}
+	if settingsPath(endpoint) {
+		return refuse(ruleSettings)
+	}
+	return nil
 }
 
 // graphqlSettings names the GraphQL mutations of rulesets, branch
-// protection and a repository's settings.
-var graphqlSettings = regexp.MustCompile(`(?i)ruleset|BranchProtectionRule|updateRepository\b`)
+// protection and a repository's settings; graphqlMerge those that merge
+// a pull request or arm its auto-merge.
+var (
+	graphqlSettings = regexp.MustCompile(`(?i)ruleset|BranchProtectionRule|updateRepository\b`)
+	graphqlMerge    = regexp.MustCompile(`mergePullRequest|enablePullRequestAutoMerge`)
+)
 
 // apiMethod returns the method of a gh api call: the one -X or
 // --method names, else POST when it sends a field, else GET.
@@ -241,10 +342,14 @@ func apiMethod(args []string) string {
 // settingsSegments are the first segments, after repos/<owner>/<repo>,
 // of the endpoints that hold a repository's settings.
 var settingsSegments = []string{
-	"rulesets", "actions", "environments", "collaborators", "hooks", "keys", "pages", "topics", "transfer",
+	"rulesets", "environments", "collaborators", "hooks", "keys", "pages", "topics", "transfer",
 	"vulnerability-alerts", "automated-security-fixes", "private-vulnerability-reporting", "interaction-limits",
 	"autolinks", "dependabot", "code-scanning", "secret-scanning", "immutable-releases", "properties",
 }
+
+// actionsSettings are the segments after actions/ that hold settings,
+// not runs: a rerun or a workflow dispatch is the agent's.
+var actionsSettings = []string{"secrets", "variables", "permissions", "runners", "oidc"}
 
 // settingsPath reports whether the endpoint is a ruleset, of a
 // repository or an organization, or a repository's settings: the
@@ -263,6 +368,8 @@ func settingsPath(endpoint string) bool {
 		return true
 	case rest[0] == "branches":
 		return len(rest) >= 3 && rest[2] == "protection"
+	case rest[0] == "actions":
+		return len(rest) >= 2 && slices.Contains(actionsSettings, rest[1])
 	}
 	return slices.Contains(settingsSegments, rest[0])
 }
@@ -276,21 +383,21 @@ var gitValued = []string{"-C", "-c", "--git-dir", "--work-tree", "--namespace", 
 var pushValued = []string{"-o", "--push-option", "--receive-pack", "--exec", "--repo"}
 
 // checkGit checks the arguments of git: a push of a v* tag, named as a
-// ref, after tag, or as a bare name of v and a digit, which reads as a
-// tag; or of every tag, by --tags, --follow-tags or --mirror.
+// ref of refs/tags/ (a glob there too), after tag, or as a bare name of
+// the form of a release version; or of every tag, by --tags,
+// --follow-tags or --mirror.
 func checkGit(args []string) *refusal {
 	rest := skipFlags(args, gitValued)
 	if len(rest) == 0 || rest[0] != "push" {
 		return nil
 	}
-	refused := refusals[ruleTag]
 	push := rest[1:]
 	for _, a := range push {
 		if a == "--" {
 			break
 		}
 		if a == "--tags" || a == "--follow-tags" || a == "--mirror" {
-			return &refused
+			return refuse(ruleTag)
 		}
 	}
 	pos := positional(push, pushValued)
@@ -301,94 +408,32 @@ func checkGit(args []string) *refusal {
 	for i := 0; i < len(refs); i++ {
 		if refs[i] == "tag" && i+1 < len(refs) {
 			if strings.HasPrefix(refs[i+1], "v") {
-				return &refused
+				return refuse(ruleTag)
 			}
 			i++
 			continue
 		}
 		src, dst, _ := strings.Cut(strings.TrimPrefix(refs[i], "+"), ":")
 		if vTag(src) || vTag(dst) {
-			return &refused
+			return refuse(ruleTag)
 		}
 	}
 	return nil
 }
 
-// bareVTag is a bare name that reads as a release tag.
-var bareVTag = regexp.MustCompile(`^v[0-9]`)
+// releaseVersion is a bare name of the form of a release tag: v and a
+// version, v1, v1.2.3, v1.2.3-rc.1 or v1.2.3+build, and not a branch
+// such as v2-fix.
+var releaseVersion = regexp.MustCompile(`^v[0-9]+((\.[0-9]+)+([-+][0-9A-Za-z.-]+)?)?$`)
 
-// vTag reports whether one side of a refspec names a v* tag.
+// vTag reports whether one side of a refspec names a v* tag: a ref of
+// refs/tags/v, or a glob of refs/tags/, which may match one; a bare
+// release version; or a bare v followed by an expansion, a version the
+// shell fills in.
 func vTag(ref string) bool {
-	return strings.HasPrefix(ref, "refs/tags/v") || bareVTag.MatchString(ref)
-}
-
-// splitCommands splits shell text into simple commands, each a list of
-// words, by the quoting of sh: outside single quotes a backslash
-// escapes the next character, and a backslash before a newline is a
-// line continuation; ; & | ( ) and a newline end a command
-// outside quotes; and a command substitution, $( or a backquote, starts
-// one, inside double quotes too, since sh runs it there. An unclosed
-// quote runs to the end of the text.
-func splitCommands(text string) [][]string {
-	var (
-		cmds  [][]string
-		words []string
-		word  strings.Builder
-		inW   bool // a word is open, maybe empty ("")
-		dq    bool // inside double quotes
-	)
-	endWord := func() {
-		if inW {
-			words = append(words, word.String())
-		}
-		word.Reset()
-		inW = false
+	if tag, ok := strings.CutPrefix(ref, "refs/tags/"); ok {
+		return strings.HasPrefix(tag, "v") || strings.ContainsAny(tag, "*?[")
 	}
-	endCmd := func() {
-		endWord()
-		if len(words) > 0 {
-			cmds = append(cmds, words)
-		}
-		words = nil
-	}
-	for i := 0; i < len(text); i++ {
-		c := text[i]
-		switch {
-		case c == '\\' && i+1 < len(text) && text[i+1] == '\n':
-			i++ // a line continuation, which sh drops
-		case c == '\\' && i+1 < len(text):
-			i++
-			word.WriteByte(text[i])
-			inW = true
-		case c == '`' || (c == '$' && i+1 < len(text) && text[i+1] == '('):
-			endCmd()
-			dq = false
-			if c == '$' {
-				i++
-			}
-		case dq && c == '"':
-			dq = false
-		case dq:
-			word.WriteByte(c)
-		case c == '"':
-			dq, inW = true, true
-		case c == '\'':
-			j := strings.IndexByte(text[i+1:], '\'')
-			if j < 0 {
-				j = len(text) - i - 1
-			}
-			word.WriteString(text[i+1 : i+1+j])
-			inW = true
-			i += j + 1
-		case c == ';' || c == '&' || c == '|' || c == '(' || c == ')' || c == '\n':
-			endCmd()
-		case c == ' ' || c == '\t':
-			endWord()
-		default:
-			word.WriteByte(c)
-			inW = true
-		}
-	}
-	endCmd()
-	return cmds
+	return releaseVersion.MatchString(ref) ||
+		strings.HasPrefix(ref, "v") && strings.Contains(ref, expansion)
 }

@@ -48,6 +48,7 @@ const (
 const (
 	claudeHookSettings = iota
 	claudeHookMemory
+	claudeHookSkillsDir
 	claudeHookSkills
 	claudeHookCount
 )
@@ -73,7 +74,11 @@ func TestKitJulietaClaudeDescriptor(t *testing.T) {
 	for i, h := range hooks {
 		assert.Equal(t, []string{"bash", "-euc"}, h.Command[:2], "hook %d", i)
 		assert.NotContains(t, h.Command[len(h.Command)-1], "${{", "hook %d", i)
-		assert.Equal(t, "0", h.User, "hook %d", i)
+		want := "0"
+		if i == claudeHookSkillsDir {
+			want = "agent" // ~/.claude is never made by root
+		}
+		assert.Equal(t, want, h.User, "hook %d", i)
 	}
 	assert.Equal(t, []string{"JULIETA_BIN"}, hooks[claudeHookSettings].Env)
 }
@@ -214,6 +219,19 @@ func guardDocs(t *testing.T) map[string]string {
 		"rulesets.json": "gh api -X POST repos/o/r/rulesets --input r.json",
 		"settings.json": "gh api -X PATCH repos/o/r -f allow_auto_merge=true",
 		"allowed.json":  "gh pr view 1",
+		// widened on 2026-10-25 (REQ-0598)
+		"release-create.json":    "gh release create v1.2.0 --notes x",
+		"release-delete.json":    "gh release delete v1.2.0 --yes",
+		"api-merge.json":         "gh api -X PUT repos/o/r/pulls/5/merge",
+		"graphql-merge.json":     `gh api graphql -f query='mutation { mergePullRequest(input: {pullRequestId: "x"}) { clientMutationId } }'`,
+		"graphql-automerge.json": `gh api graphql -f query='mutation { enablePullRequestAutoMerge(input: {pullRequestId: "x"}) { clientMutationId } }'`,
+		"api-tag-ref.json":       "gh api -X POST repos/o/r/git/refs -f ref=refs/tags/v1.2.0 -f sha=abc",
+		"api-release.json":       "gh api -X POST repos/o/r/releases -f tag_name=v1.2.0",
+		// a refused command after a command substitution in quotes
+		"after-subst.json": `echo "$(date)"; gh pr merge 1`,
+		// a heredoc body that only names one is no command
+		"heredoc.json":    "cat <<'EOF'\ngh pr merge 1\nEOF",
+		"unparsable.json": "echo 'unclosed",
 	} {
 		var doc map[string]any
 		require.NoError(t, json.Unmarshal(raw, &doc))
@@ -227,7 +245,9 @@ func guardDocs(t *testing.T) map[string]string {
 
 // The refusals of 06 6.4, by document: each case asserts that the text
 // says the action is the maintainer's and names the route.
-var refusalDocs = []string{"merge.json", "tag.json", "rulesets.json", "settings.json"}
+var refusalDocs = []string{"merge.json", "tag.json", "rulesets.json", "settings.json",
+	"release-create.json", "release-delete.json", "api-merge.json", "graphql-merge.json", "graphql-automerge.json",
+	"api-tag-ref.json", "api-release.json", "after-subst.json"}
 
 // assertRefusal holds a refusal's text to 06 6.4 (REQ-0598).
 func assertRefusal(t *testing.T, stderr, doc string) {
@@ -299,6 +319,17 @@ func TestKitJulietaClaudeInstall(t *testing.T) {
 	} {
 		assert.True(t, strings.HasPrefix(c, w.Julieta+" "), "julieta by its absolute path: %s", c)
 	}
+
+	// The owners and modes: the managed settings are root's and not the
+	// agent's to write; ~/.claude and ~/.claude/skills are the agent's;
+	// each skill directory is root's.
+	modes, code := k.sh("0", "stat -c '%n %U %a' /etc/claude-code /etc/claude-code/managed-settings.d "+claudeDropIn+
+		" "+agentHome+"/.claude "+claudeSkills+" "+claudeSkills+"/julieta "+claudeSkills+"/handoff")
+	require.Zero(t, code, modes)
+	assert.Equal(t, "/etc/claude-code root 755\n/etc/claude-code/managed-settings.d root 755\n"+claudeDropIn+" root 644\n"+
+		agentHome+"/.claude agent 755\n"+claudeSkills+" agent 755\n"+claudeSkills+"/julieta root 755\n"+claudeSkills+"/handoff root 755\n", modes)
+	_, code = k.sh("agent", "touch /etc/claude-code/managed-settings.d/60-agent.json")
+	assert.NotZero(t, code, "the agent cannot add a managed drop-in")
 
 	k.install(w.Julieta)
 	assert.Equal(t, want, sums(), "a second run")
@@ -439,9 +470,15 @@ func TestKitJulietaClaudeGuard(t *testing.T) {
 	_, stderr, code := k.hookRun(pre, "undecodable.json")
 	assert.Equal(t, 2, code, stderr)
 
-	stdout, stderr, code := k.hookRun(pre, "allowed.json")
-	assert.Zero(t, code, stderr)
-	assert.Empty(t, stdout+stderr)
+	out, code = k.exec("agent", nil, "sh", "-c", `"$0" hooks guard <"$1"`, w.Julieta, docsDir+"/unparsable.json")
+	assert.Equal(t, 2, code, out)
+	assert.Contains(t, out, "cannot be parsed")
+
+	for _, doc := range []string{"allowed.json", "heredoc.json"} {
+		stdout, stderr, code := k.hookRun(pre, doc)
+		assert.Zero(t, code, "%s: %s", doc, stderr)
+		assert.Empty(t, stdout+stderr, doc)
+	}
 }
 
 // TestKitJulietaClaudeMountAbsent holds the wrappers to REQ-0673 when
@@ -489,4 +526,21 @@ func TestKitJulietaClaudeHostileArg(t *testing.T) {
 		_, absent := k.sh("0", "test ! -e "+claudeDropIn+" && test ! -e /tmp/pwned")
 		assert.Zero(t, absent, "%q wrote the drop-in or ran its command", bad)
 	}
+}
+
+// TestKitJulietaClaudeOwners holds the steps to the owners they set
+// whatever was there: a ~/.claude that is missing is made by the agent,
+// so Claude Code can still write its projects and todos below it, and
+// an /etc/claude-code the agent could write before is root's after.
+func TestKitJulietaClaudeOwners(t *testing.T) {
+	w := workload(t)
+	k := startClaudeKit(t, true, nil)
+	out, code := k.sh("0", "rm -rf "+agentHome+"/.claude && install -d -o agent -m 0777 /etc/claude-code /etc/claude-code/managed-settings.d")
+	require.Zero(t, code, out)
+	k.install(w.Julieta)
+	modes, code := k.sh("0", "stat -c '%n %U %a' /etc/claude-code /etc/claude-code/managed-settings.d "+agentHome+"/.claude "+claudeSkills)
+	require.Zero(t, code, modes)
+	assert.Equal(t, "/etc/claude-code root 755\n/etc/claude-code/managed-settings.d root 755\n"+agentHome+"/.claude agent 755\n"+claudeSkills+" agent 755\n", modes)
+	out, code = k.sh("agent", "mkdir -p "+agentHome+"/.claude/projects "+agentHome+"/.claude/todos")
+	assert.Zero(t, code, "the agent still writes its state below ~/.claude: %s", out)
 }
