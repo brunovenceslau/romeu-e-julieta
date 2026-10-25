@@ -3,7 +3,7 @@ id: T079
 title: "The `julieta-claude` kit"
 milestone: M1
 module: kits
-fate: kept
+fate: merged
 owns:
   - kits/julieta-claude/**
   - internal/agent/claude/**
@@ -23,9 +23,14 @@ after:
 ask_first:
   - kits
 sitting: none
+merged: 2026-10-25
+pr: 277
 ---
 
 # T079 - The `julieta-claude` kit
+
+Merged on 2026-10-25 in pull request #277. The text below is the one
+written when it was built.
 
 Goal: The `julieta-claude` kit: the two hooks for every source as
 wrappers on the `.romeu/bin` path, the PreToolUse guard that fails
