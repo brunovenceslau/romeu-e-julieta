@@ -62,6 +62,25 @@ func TestEncodeRoundTrips(t *testing.T) {
 	assert.Equal(t, sum.String(), m.RunDigest)
 }
 
+func TestEncodeAccepts(t *testing.T) {
+	sum, err := canon.Digest(canon.Run, manifest.Run{})
+	require.NoError(t, err)
+	for _, tc := range []struct{ name, body string }{
+		{"run left out", strings.Replace(handWritten, `"run": {},`, ``, 1)},
+		{"run null", strings.Replace(handWritten, `"run": {}`, `"run": null`, 1)},
+		{"the right runDigest", strings.Replace(handWritten, `"run": {}`, `"run": {}, "runDigest": "`+sum.String()+`"`, 1)},
+		{"a salvageRun", strings.Replace(handWritten, `"run": {}`, `"run": {}, "salvageRun": {"id": "01j9zd0a1b2c3d4e5f6g7h8j9k"}`, 1)},
+		{"a run with panes", strings.Replace(handWritten, `"run": {}`, `"run": {"tabs": [{"label": "dev"}]}`, 1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			code, out, errs := run(t, "", "encode", write(t, tc.body))
+			require.Equal(t, exitOK, code, errs)
+			_, err := manifest.DecodeEnv(strings.TrimSuffix(out, "\n"))
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func TestEncodeReadsStdin(t *testing.T) {
 	code, out, errs := run(t, handWritten, "encode", "-")
 	require.Equal(t, exitOK, code, errs)
@@ -74,7 +93,11 @@ func TestEncodeRefuses(t *testing.T) {
 		{"a wrong runDigest", strings.Replace(handWritten, `"run": {}`, `"run": {}, "runDigest": "00"`, 1), "runDigest"},
 		{"two primaries", strings.Replace(handWritten, `"repos": [{`, `"repos": [{"dir": "x", "primary": true, "ref": "main", "url": "u", "path": "p", "memory": "m", "base": []}, {`, 1), "primary"},
 		{"a bad generation", strings.Replace(handWritten, "01j9zc2q8x7w4t6y3r5e1v9k0p", "nope", 1), "generation"},
-		{"not JSON", "{", "manifest"},
+		{"not JSON", "{", "jsontext"},
+		{"an unknown member in a repo", strings.Replace(handWritten, `"dir": "romeu-e-julieta"`, `"dri": "x", "dir": "romeu-e-julieta"`, 1), "dri"},
+		{"an unknown member in salvage", strings.Replace(handWritten, `"capBytes": 0`, `"cap": 1, "capBytes": 0`, 1), "cap"},
+		{"a duplicate member", strings.Replace(handWritten, `"agent": "claude"`, `"agent": "claude", "agent": "x"`, 1), "duplicate"},
+		{"a document over the cap", strings.Replace(handWritten, `"run": {}`, `"run": {"x": "`+strings.Repeat("a", manifest.MaxJSONSize)+`"}`, 1), "more than a manifest can hold"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			code, out, errs := run(t, "", "encode", write(t, tc.body))

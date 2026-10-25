@@ -50,11 +50,12 @@ the route for anything worth keeping and the handoff skill the route for
 handoffs; a runbook with each step and its undo. The open-items
 cut-over, per project: the one-off entry of the store's open items into
 `julieta memory` is a command of the config repository that reads the
-item files of the mounted store and writes each
-item's source id as a tag of its entry (`source-` and the id's
-timestamp digits and hash, since a store id is not of the tag form of
-03 3.9; 03 3.9 gives tags no behaviour but `lesson`), skips an item whose tag is already present
-and prints the counts on both sides, with one recorded list that gives
+item files of the mounted store and writes each item's source tag on
+its entry (`source-<14 digits>-<8 hex>`: the date and time digits and
+the hash of a store id such as `20261008T121616.161637Z-9cc0513a`, 30
+bytes within the 32 of the tag form of 03 3.9, which a store id itself
+does not fit; 03 3.9 gives tags no behaviour but `lesson`), skips an
+item whose tag is already present and prints the counts on both sides, with one recorded list that gives
 each item its destination (a memory entry id, or closed); it runs again
 at the end of the sitting, after the store's writer has left every
 sandbox (the fourth edit and the payload change), and both counts are in
@@ -132,7 +133,7 @@ left; the mount leaves at the recreate of T115.
     change.
   - One list per project, each open item of the store with its
     destination: a memory entry id, or closed.
-  - The entry command skips an item whose `source-` tag is present
+  - The entry command skips an item whose source tag is present
     and prints the counts on both sides; both counts, from the first run
     and the end-of-sitting run, are in the runbook.
 - Verify: in each daily sandbox, read at sitting M1: `gh pr merge` is

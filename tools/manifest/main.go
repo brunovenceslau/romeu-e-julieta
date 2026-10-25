@@ -70,19 +70,31 @@ func start(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 // encode returns the env value of the document at path, or of stdin
 // when path is "-".
 func encode(path string, stdin io.Reader) (string, error) {
-	var data []byte
-	var err error
-	if path == "-" {
-		data, err = io.ReadAll(io.LimitReader(stdin, manifest.MaxJSONSize*4))
-	} else {
-		data, err = os.ReadFile(path)
+	r := stdin
+	if path != "-" {
+		f, err := os.Open(path)
+		if err != nil {
+			return "", err
+		}
+		defer func() { _ = f.Close() }()
+		r = f
 	}
+	// A document past the JSON cap can never encode under the env cap,
+	// so it is refused here, before it is decoded.
+	data, err := io.ReadAll(io.LimitReader(r, manifest.MaxJSONSize+1))
 	if err != nil {
 		return "", err
+	}
+	if len(data) > manifest.MaxJSONSize {
+		return "", fmt.Errorf("the document passes %d bytes, more than a manifest can hold", manifest.MaxJSONSize)
 	}
 	var m manifest.Manifest
 	if err := jsonv2.Unmarshal(data, &m, jsonv2.RejectUnknownMembers(true)); err != nil {
 		return "", err
+	}
+	// Encode writes an absent or null run as {}, so the digest is of {}.
+	if m.Run == nil {
+		m.Run = manifest.Run{}
 	}
 	sum, err := canon.Digest(canon.Run, m.Run)
 	if err != nil {
