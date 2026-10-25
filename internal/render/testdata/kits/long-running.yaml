@@ -1,0 +1,11 @@
+# syntax=docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# source: sitting M2
+schemaVersion: "3"
+kind: mixin
+displayName: long-running-fixture
+description: conformance fixture for long-running capability
+capabilities:
+  - type: com.docker.sandbox/long-running@1

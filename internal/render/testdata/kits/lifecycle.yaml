@@ -1,0 +1,28 @@
+# syntax=docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# source: sitting M2
+schemaVersion: "3"
+kind: mixin
+displayName: lifecycle-fixture
+description: conformance fixture for lifecycle capability
+capabilities:
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        - command: echo install
+          user: "0"
+          env:
+            - WORKSPACE_DIR
+      startup:
+        - command:
+            - serve
+          background: true
+      files:
+        - path: /opt/config.txt
+          content: hello
+          mode: "0600"
+          overwrite: false
+      interactive:
+        - --tty
