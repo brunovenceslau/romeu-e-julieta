@@ -23,7 +23,8 @@ sitting: M1
 Goal: Per project definition: a read-only mount of one shared bin
 directory holding the host-built linux julieta and `SHA256SUMS`, a mount
 of the memory directory in its final host layout, and one environment
-variable holding the hand-written manifest (its `repos[].base` the
+variable holding the hand-written manifest, encoded with `go run
+./tools/manifest encode` (its `repos[].base` the
 origin SHA each clone started from, 03 3.6, so a snapshot bundles only
 the work since it; its `generation` one ULID per project, kept in the
 runbook), with beside it the entry of the `julieta-claude` kit of T079,
@@ -48,8 +49,9 @@ the route for anything worth keeping and the handoff skill the route for
 handoffs; a runbook with each step and its undo. The open-items
 cut-over, per project: the one-off entry of the store's open items into
 `julieta memory` is a command of the config repository that writes each
-item's source id as a tag of its entry (`source-<id>`; 03 3.9 gives tags
-no behaviour but `lesson`), skips an item whose tag is already present
+item's source id as a tag of its entry (`source-` and the id's
+timestamp digits and hash, since a store id is not of the tag form of
+03 3.9; 03 3.9 gives tags no behaviour but `lesson`), skips an item whose tag is already present
 and prints the counts on both sides, with one recorded list that gives
 each item its destination (a memory entry id, or closed); it runs again
 at the end of the sitting, after the store's writer has left every
@@ -122,7 +124,7 @@ does not, this task stops with a decision record before any other step.
     change.
   - One list per project, each open item of the store with its
     destination: a memory entry id, or closed.
-  - The entry command skips an item whose `source-<id>` tag is present
+  - The entry command skips an item whose `source-` tag is present
     and prints the counts on both sides; both counts, from the first run
     and the end-of-sitting run, are in the runbook.
 - Verify: in each daily sandbox, read at sitting M1: `gh pr merge` is
