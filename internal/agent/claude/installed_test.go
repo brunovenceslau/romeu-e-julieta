@@ -64,6 +64,7 @@ func TestInstalledDigest(t *testing.T) {
 	gone, err := claude.Installed(home, dropIn, julieta)
 	require.NoError(t, err)
 	assert.NotContains(t, strings.Join(keys(gone), " "), "skills/handoff/")
+	assert.NotEqual(t, claude.KitDigest, claude.Digest(gone), "a missing skill")
 
 	// A skills dir that is a file cannot be read: an error, not a pass.
 	require.NoError(t, os.RemoveAll(filepath.Join(home, claude.SkillsDir, "julieta")))

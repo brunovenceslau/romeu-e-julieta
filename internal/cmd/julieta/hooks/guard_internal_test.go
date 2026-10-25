@@ -34,6 +34,8 @@ func TestGuardRules(t *testing.T) {
 		{"timeout -s KILL 30 gh pr merge 1", ruleMerge},
 		{"nice -n 5 nohup gh pr merge 1", ruleMerge},
 		{"command gh pr merge 1", ruleMerge},
+		{"echo 1 | xargs gh pr merge", ruleMerge},
+		{"gh pr list -q .[].number | xargs -n 1 gh pr merge --squash", ruleMerge},
 		{"(gh pr merge 1)", ruleMerge},
 		{"{ gh pr merge 1; }", ruleMerge},
 		{"if true; then gh pr merge 1; fi", ruleMerge},

@@ -72,6 +72,7 @@ var prefixes = map[string][]string{
 	"env":     {"-u", "-C", "-S"},
 	"nice":    {"-n"},
 	"timeout": {"-s", "-k"},
+	"xargs":   {"-n", "-I", "-L", "-P", "-d", "-E", "-s", "-a"},
 }
 
 // assignment is a word that sets a variable before a command.
