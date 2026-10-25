@@ -33,7 +33,9 @@ const (
 // REQ-0596).
 const JulietaBinArg = "julietaBin"
 
-// goarchForm is the form of a Go architecture name.
+// goarchForm is the form of a Go architecture name. PR #285 (bin.go)
+// has the same regexp as archName; the second PR to land reuses the
+// first's.
 var goarchForm = regexp.MustCompile(`^[a-z0-9]+$`)
 
 // ErrPersonalKit is the error of a spec kit that names a personal kit,
@@ -69,8 +71,13 @@ type ProductKits struct {
 // written through an os.Root on the candidate.
 //
 // A file of FS is a regular file: a link or a device is refused. An
-// embed.FS holds no executable bit, so a product kit file is executable
-// only in a fixture FS that says so.
+// embed.FS reports no executable bit, so a product kit file is always
+// written and digested as regular; a kit that needs an executable file
+// needs another carrier. Only a fixture FS can say a file is executable.
+//
+// A failure leaves the files already written in the candidate. The
+// caller discards the candidate: internal/state deletes a leftover one
+// at the next sync.
 func (s ProductKits) Materialize(_ context.Context, c Candidate, p spec.Project) ([]MaterializedKit, error) {
 	if !path.IsAbs(s.EnvDir) || path.Clean(s.EnvDir) != s.EnvDir {
 		return nil, fmt.Errorf("render: the env dir %q is not an absolute clean path", s.EnvDir)
@@ -98,7 +105,10 @@ func (s ProductKits) Materialize(_ context.Context, c Candidate, p spec.Project)
 		if err != nil {
 			return nil, err
 		}
-		if _, ok := m.Capabilities.Args[JulietaBinArg]; ok {
+		if a, ok := m.Capabilities.Args[JulietaBinArg]; ok {
+			if err := checkArg(m.ID, JulietaBinArg, quoted, a); err != nil {
+				return nil, err
+			}
 			m.Rendered = map[string]string{JulietaBinArg: quoted}
 		}
 		if err := writeKit(r, m.Dir(), files); err != nil {
@@ -107,6 +117,27 @@ func (s ProductKits) Materialize(_ context.Context, c Candidate, p spec.Project)
 		out = append(out, m)
 	}
 	return out, nil
+}
+
+// checkArg holds the value rendered into the arg name of kit to the
+// arg's declaration, so a value the install would refuse fails the
+// sync, naming the cause. oci keeps the pattern as the descriptor
+// writes it, and the sandbox matches the whole value, so it is
+// anchored here.
+func checkArg(kit, name, value string, a oci.Arg) error {
+	if a.Pattern != nil {
+		re, err := regexp.Compile(`\A(?:` + *a.Pattern + `)\z`)
+		if err != nil {
+			return fmt.Errorf("render: the kit %q: the pattern of the arg %q: %w", kit, name, err)
+		}
+		if !re.MatchString(value) {
+			return fmt.Errorf("render: the kit %q: the value %q of the arg %q does not match its pattern %s", kit, value, name, *a.Pattern)
+		}
+	}
+	if len(a.Enum) > 0 && !slices.Contains(a.Enum, value) {
+		return fmt.Errorf("render: the kit %q: the value %q of the arg %q is not one of %q", kit, value, name, a.Enum)
+	}
+	return nil
 }
 
 // read returns the product kit id of FS, without its Rendered args, and
@@ -186,6 +217,8 @@ func writeKit(r *os.Root, dir string, files []gate.File) error {
 		if err != nil {
 			return err
 		}
+		// Chmod follows OpenFile because the umask lowers the mode
+		// OpenFile asked for.
 		_, werr := h.Write(f.Data)
 		if err := errors.Join(werr, h.Chmod(mode), h.Close()); err != nil {
 			return err

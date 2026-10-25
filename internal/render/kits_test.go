@@ -16,6 +16,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/render"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/shquote"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/kits"
 )
@@ -99,16 +100,49 @@ func TestProductKitsRenderJulietaBinWhereDeclared(t *testing.T) {
 	assert.Empty(t, got[1].Rendered, "a kit that does not declare the arg gets none")
 }
 
-func TestProductKitsQuoteJulietaBin(t *testing.T) {
+func TestProductKitsRenderACleanPathBare(t *testing.T) {
 	t.Parallel()
-	got, err := productSource(t, fixtureKits(), "/r/my shop-env").
-		Materialize(t.Context(), render.Candidate{Dir: t.TempDir()}, productSpec("withbin"))
+	got, err := productSource(t, kits.FS, "/r/shop-env").
+		Materialize(t.Context(), render.Candidate{Dir: t.TempDir()}, productSpec("julieta-claude"))
 	require.NoError(t, err)
-	assert.Equal(t, "'/r/my shop-env/.romeu/bin/julieta-linux-arm64'", got[0].Rendered["julietaBin"])
+	assert.Equal(t, "/r/shop-env/.romeu/bin/julieta-linux-arm64", got[0].Rendered["julietaBin"])
+}
 
-	_, err = productSource(t, fixtureKits(), "/r/a\x00b").
-		Materialize(t.Context(), render.Candidate{Dir: t.TempDir()}, productSpec("withbin"))
-	require.Error(t, err)
+// TestProductKitsRefuseAPathTheArgPatternRefuses: shquote's safe set is
+// wider than the pattern of the julieta-claude arg, and a space is
+// quoted, so the check names the cause at sync and not at install.
+func TestProductKitsRefuseAPathTheArgPatternRefuses(t *testing.T) {
+	t.Parallel()
+	for _, env := range []string{"/r/my shop-env", "/r/shop+env", "/r/shop@env"} {
+		t.Run(env, func(t *testing.T) {
+			t.Parallel()
+			cand := render.Candidate{Dir: t.TempDir()}
+			_, err := productSource(t, kits.FS, env).
+				Materialize(t.Context(), cand, productSpec("julieta-claude"))
+			require.Error(t, err)
+			for _, want := range []string{`"julieta-claude"`, `"julietaBin"`, "does not match its pattern", `^(/[A-Za-z0-9._-]+)*$`, "shop"} {
+				assert.Contains(t, err.Error(), want)
+			}
+			assertNothingWritten(t, cand)
+		})
+	}
+}
+
+func TestProductKitsRefuseANULInTheEnvDir(t *testing.T) {
+	t.Parallel()
+	cand := render.Candidate{Dir: t.TempDir()}
+	_, err := productSource(t, fixtureKits(), "/r/a\x00b").
+		Materialize(t.Context(), cand, productSpec("withbin"))
+	require.ErrorIs(t, err, shquote.ErrNUL)
+	assertNothingWritten(t, cand)
+}
+
+// assertNothingWritten holds that the candidate dir is still empty.
+func assertNothingWritten(t *testing.T, c render.Candidate) {
+	t.Helper()
+	entries, err := os.ReadDir(c.Dir)
+	require.NoError(t, err)
+	assert.Empty(t, entries)
 }
 
 func TestProductKitsRefuseWhatTheyCannotWrite(t *testing.T) {
@@ -144,9 +178,11 @@ func TestProductKitsRefuseWhatTheyCannotWrite(t *testing.T) {
 
 func TestProductKitsRelativeEnvDirIsRefused(t *testing.T) {
 	t.Parallel()
+	cand := render.Candidate{Dir: t.TempDir()}
 	_, err := productSource(t, fixtureKits(), "shop-env").
-		Materialize(t.Context(), render.Candidate{Dir: t.TempDir()}, productSpec("plain"))
-	require.Error(t, err)
+		Materialize(t.Context(), cand, productSpec("plain"))
+	require.ErrorContains(t, err, `the env dir "shop-env" is not an absolute clean path`)
+	assertNothingWritten(t, cand)
 }
 
 // TestProductKitsFromTheEmbed is the embed and materialization row of
