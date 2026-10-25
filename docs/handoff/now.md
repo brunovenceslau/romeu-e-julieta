@@ -2,8 +2,8 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-25, second part: T111 wave 1 merged in the sandbox
-kit repository; T038 to be rebuilt from main (01m5rtp0fp919zpq1f3gs67ngy).
+Checkpoint of 2026-10-25, third part: T038 slices 1 to 3
+(01m5rzc40en5qkgrhsgvd9ykqt).
 Pushes and pull requests need no approval here, within the limits of
 01m5nbzfb4p92djhp10c92jprp. Work for another repository goes into an
 issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
@@ -12,10 +12,11 @@ issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
 
 1. T111 sitting M1: the runbook's steps 6 and 7 after the recreate
    (did the kit load; then `julieta setup`), and its Record lines.
-2. T038 (issue #271): rebuild from main, never consulting
-   `feat/t038-render-kits` (01m5rtp0fp919zpq1f3gs67ngy); T165 after T164.
-3. Build T170; T161 once T088 is built
-   (01m5e14094yhqhsxq2g941pwrf).
+2. T038 (issue #271, 01m5rzc40en5qkgrhsgvd9ykqt): slice 3 on
+   `feat/t038-personal-kits` first takes the kinds decision
+   (01m5rzc41dqzdqkkfb4f88xfyj), then review, audit and a stacked PR on
+   #286; then the A11/A12 fixtures of I28. T165 after T164.
+3. Build T170; T161 once T088 is built (01m5e14094yhqhsxq2g941pwrf).
 4. The pending notes, each when its trigger fires: 01m5rtp0hjczzy9f66ez7rxvna,
    01m5rtp0kfzjckbdct0y77531j, 01m5rpbjkc62s2c7qecj7wf9bk, 01m5rjz3n7588xgx1xhfn56wmk,
    01m5rjz3p5x27yebkayt1hjydb, 01m5ngx0cy47r560n6hqjh4y1c, 01m5ngabwa6akgjr9eetw78kq7,
@@ -46,16 +47,16 @@ issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
    (01m5gz0rpmzwvmwqt9ebd95rfq). Recommended: the payload's next session.
 8. Review the over-optimizing rules note (01m5jc2v5gfyxyrbjv7wymbr9a).
    Recommended: the next session on the kit's repository.
-9. On the host, for sitting M1: the runbook's steps 1 to 3 (bin
-   `~/.local/share/julieta/bin`). Recommended: before the recreate.
+9. Host steps 1 to 3 of the runbook. Recommended: before the recreate.
 10. Decide memory per repository and per project, and its durability
     (01m5rtp0hjczzy9f66ez7rxvna). Recommended: before multi-repo work.
+11. Decide which kinds a personal kit may declare
+    (01m5rzc41dqzdqkkfb4f88xfyj). Recommended: mixin only, now.
 
 ## In flight
 
-- The pull request of this checkpoint. `feat/t077-os-base`,
-  `feat/t077-julieta-kit` (superseded by #273) and
-  `feat/t038-render-kits` (ignored) are left as they were.
+- #285, #286, `feat/t038-personal-kits` (no PR yet), and the
+  checkpoint PR. Older branches are left as they were.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
