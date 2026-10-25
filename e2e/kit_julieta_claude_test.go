@@ -34,14 +34,17 @@ import (
 // 2.1.296 of the pinned workload, run against a stub of the API that
 // answered with one Bash call; the cases replace its command.
 
-// The paths the kit's steps write.
+// The paths the kit's steps read and write. claudeKitContent is where
+// the overlay of julieta-claude.dockerfile puts the kit's files; sbx
+// stages only kit.yaml and kit.dockerfile at kitStageRoot (B2,
+// 2026-10-25), so the cases mount the kit's directory there instead.
 const (
-	claudeKitStage = kitStageRoot + "julieta-claude"
-	claudeDropIn   = "/etc/claude-code/managed-settings.d/50-julieta-claude.json"
-	claudeMemory   = "/var/lib/julieta-claude/agent-memory"
-	claudeSkills   = "/home/agent/.claude/skills"
-	agentHome      = "/home/agent"
-	docsDir        = "/e2e-docs"
+	claudeKitContent = "/usr/share/julieta-claude"
+	claudeDropIn     = "/etc/claude-code/managed-settings.d/50-julieta-claude.json"
+	claudeMemory     = "/var/lib/julieta-claude/agent-memory"
+	claudeSkills     = "/home/agent/.claude/skills"
+	agentHome        = "/home/agent"
+	docsDir          = "/e2e-docs"
 )
 
 // The install hooks of julieta-claude by position.
@@ -83,6 +86,29 @@ func TestKitJulietaClaudeDescriptor(t *testing.T) {
 	assert.Equal(t, []string{"JULIETA_BIN"}, hooks[claudeHookSettings].Env)
 }
 
+// TestKitJulietaClaudeRecipe holds the overlay to what the steps read:
+// the recipe copies the settings template and the skills, and nothing
+// else, to claudeKitContent, and no step reads a file of the kit at
+// kitStageRoot, where sbx stages no file of it but the descriptor and
+// the recipe.
+func TestKitJulietaClaudeRecipe(t *testing.T) {
+	dir, _, src := readKit(t, "julieta-claude")
+	recipe, err := os.ReadFile(filepath.Join(dir, "julieta-claude.dockerfile"))
+	require.NoError(t, err)
+	var steps []string
+	for line := range strings.SplitSeq(string(recipe), "\n") {
+		if line != "" && !strings.HasPrefix(line, "#") {
+			steps = append(steps, line)
+		}
+	}
+	assert.Equal(t, []string{
+		"FROM scratch",
+		"COPY managed-settings.json " + claudeKitContent + "/managed-settings.json",
+		"COPY skills/ " + claudeKitContent + "/skills/",
+	}, steps)
+	assert.NotContains(t, string(src), kitStageRoot+"julieta-claude")
+}
+
 // keysOf returns the keys of m.
 func keysOf[V any](m map[string]V) []string {
 	var out []string
@@ -106,7 +132,7 @@ func startClaudeKit(t *testing.T, bin bool, docs map[string]string) kitSandbox {
 	for name, body := range docs {
 		require.NoError(t, os.WriteFile(filepath.Join(docDir, name), []byte(body), 0o644))
 	}
-	mounts := [][2]string{{dir, claudeKitStage}, {docDir, docsDir}}
+	mounts := [][2]string{{dir, claudeKitContent}, {docDir, docsDir}}
 	if bin {
 		mounts = append(mounts, [2]string{w.Bin, w.Bin})
 	}

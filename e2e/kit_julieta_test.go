@@ -33,10 +33,13 @@ import (
 // else of the kit's args.
 
 // The paths the steps use, which the cases assert against. kitStageRoot
-// is where sbx stages each kit's directory, by its name.
+// is where sbx stages each kit's kit.yaml and kit.dockerfile, by its
+// name, and no other file of it (B2, 2026-10-25); kitContent is where
+// the overlay of julieta.dockerfile puts SHA256SUMS, so the cases mount
+// the kit's directory there.
 const (
 	kitStageRoot = "/usr/share/sandbox/kit/"
-	kitStage     = kitStageRoot + "julieta"
+	kitContent   = "/usr/share/julieta-kit"
 	kitWorkDir   = "/var/lib/julieta-kit-install"
 	bashEnvRel   = "/etc/sandbox-persistent.sh"
 	pathLine     = `export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"`
@@ -232,8 +235,9 @@ func dockerOut(t *testing.T, args ...string) (string, error) {
 	return out.String(), err
 }
 
-// startKit starts a container of the workload with the directories of
-// the julieta and os-base kits mounted read-only where sbx stages them,
+// startKit starts a container of the workload with the directory of the
+// julieta kit mounted read-only where its overlay puts its files, and
+// that of os-base where sbx stages it,
 // and extra docker run options, and removes it at the end of the case.
 func startKit(t *testing.T, extra ...string) kitSandbox {
 	t.Helper()
@@ -242,7 +246,7 @@ func startKit(t *testing.T, extra ...string) kitSandbox {
 	w := workload(t)
 	args := []string{"run", "-d", "--rm", "--pull=never",
 		"--security-opt=no-new-privileges", "--pids-limit=256", "--memory=1g"}
-	for _, m := range [][2]string{{dir, kitStage}, {baseDir, kitStageRoot + "os-base"}} {
+	for _, m := range [][2]string{{dir, kitContent}, {baseDir, kitStageRoot + "os-base"}} {
 		require.False(t, strings.ContainsAny(m[0], ",="), "a bind mount cannot name %s", m[0])
 		args = append(args, "--mount", "type=bind,source="+m[0]+",target="+m[1]+",readonly")
 	}
@@ -323,8 +327,29 @@ func (k kitSandbox) runAll(hooks ...kitHook) {
 func withSums(h kitHook, path string) kitHook {
 	c := slices.Clone(h.Command)
 	last := len(c) - 1
-	c[last] = strings.ReplaceAll(c[last], kitStage+"/SHA256SUMS", path)
+	c[last] = strings.ReplaceAll(c[last], kitContent+"/SHA256SUMS", path)
 	return kitHook{Description: h.Description, User: h.User, Env: h.Env, Command: c, args: h.args}
+}
+
+// TestKitJulietaRecipe holds the overlay to what the steps read: the
+// recipe copies SHA256SUMS, and nothing else, to kitContent, and no step
+// reads a file of the kit at kitStageRoot, where sbx stages no file of
+// it but the descriptor and the recipe.
+func TestKitJulietaRecipe(t *testing.T) {
+	dir, _, src := readKit(t, "julieta")
+	recipe, err := os.ReadFile(filepath.Join(dir, "julieta.dockerfile"))
+	require.NoError(t, err)
+	var steps []string
+	for line := range strings.SplitSeq(string(recipe), "\n") {
+		if line != "" && !strings.HasPrefix(line, "#") {
+			steps = append(steps, line)
+		}
+	}
+	assert.Equal(t, []string{
+		"FROM scratch",
+		"COPY SHA256SUMS " + kitContent + "/SHA256SUMS",
+	}, steps)
+	assert.NotContains(t, string(src), kitStageRoot+"julieta")
 }
 
 // TestKitJulietaInstall runs the install steps once, in the order of the

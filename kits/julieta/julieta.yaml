@@ -23,11 +23,10 @@
 # not stop the build, then installs them and removes the directory; a
 # build that fails earlier leaves nothing anyone else can read.
 #
-# SHA256SUMS is a file of this directory, which sbx stages beside the
-# descriptor (the workload's own agent-context@1 reads
-# /usr/share/sandbox/kit/claude/claude-context.md, a file of its kit).
-# That mixin kits are staged the same way is read again by the first
-# build of this kit (B2, or sitting M2).
+# SHA256SUMS is a file of this directory, which the overlay of
+# julieta.dockerfile puts at /usr/share/julieta-kit/: sbx stages only
+# kit.yaml and kit.dockerfile of a kit, so a file of this directory is
+# not in the sandbox unless the recipe copies it (B2, 2026-10-25).
 #
 # The capability names, the lifecycle@1 hook keys and the args keys are
 # those of sitting M0 and of the workload descriptor (e2e/testdata/
@@ -80,7 +79,7 @@ capabilities:
               cd /var/lib/julieta-kit-install
               A=${HOSTTYPE/x86_64/x64}
               curl --proto '=https' --proto-redir '=https' -fsSL --retry 3 --max-time 120 -o "mise-$HOSTTYPE" "https://github.com/jdx/mise/releases/download/v${JULIETA_MISE_VERSION}/mise-v${JULIETA_MISE_VERSION}-linux-${A/aarch64/arm64}"
-              sha256sum -c --ignore-missing /usr/share/sandbox/kit/julieta/SHA256SUMS
+              sha256sum -c --ignore-missing /usr/share/julieta-kit/SHA256SUMS
         - description: herdr, downloaded and checked against the pin
           user: "0"
           env: [JULIETA_HERDR_VERSION]
@@ -91,7 +90,7 @@ capabilities:
               [[ ${JULIETA_HERDR_VERSION-} =~ ^[0-9]+(\.[0-9]+)*$ ]]
               cd /var/lib/julieta-kit-install
               curl --proto '=https' --proto-redir '=https' -fsSL --retry 3 --max-time 120 -o "herdr-$HOSTTYPE" "https://github.com/herdrdev/herdr/releases/download/v${JULIETA_HERDR_VERSION}/herdr-linux-$HOSTTYPE"
-              sha256sum -c --ignore-missing /usr/share/sandbox/kit/julieta/SHA256SUMS
+              sha256sum -c --ignore-missing /usr/share/julieta-kit/SHA256SUMS
         - description: mise and herdr checked once more, into /usr/local/bin, and the download directory removed
           user: "0"
           command:
@@ -99,7 +98,7 @@ capabilities:
             - -euc
             - |
               cd /var/lib/julieta-kit-install
-              sha256sum -c --ignore-missing /usr/share/sandbox/kit/julieta/SHA256SUMS
+              sha256sum -c --ignore-missing /usr/share/julieta-kit/SHA256SUMS
               install -m 0755 "mise-$HOSTTYPE" /usr/local/bin/mise
               install -m 0755 "herdr-$HOSTTYPE" /usr/local/bin/herdr
               rm -rf /var/lib/julieta-kit-install

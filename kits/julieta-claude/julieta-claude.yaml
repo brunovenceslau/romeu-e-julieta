@@ -50,10 +50,15 @@
 # them and cannot edit them; since ~/.claude/skills is the agent's, it
 # can still rename or remove a skill directory, which julieta setup
 # reports as skills-stale, a residual risk of the guard against
-# mistakes (05 5.4). That sbx stages a
-# subdirectory of a kit's directory, and what a mount of the workload's
-# agent-skills capability at ~/.claude/skills does to the step, are read
-# by the first build of this kit (B2, S5).
+# mistakes (05 5.4). What a mount of the workload's agent-skills
+# capability at ~/.claude/skills does to the step is read by the first
+# build of this kit (B2, S5).
+#
+# The steps read the settings template and the skills from
+# /usr/share/julieta-claude/, where the overlay of
+# julieta-claude.dockerfile puts them: sbx stages only kit.yaml and
+# kit.dockerfile of a kit, so a file of this directory is not in the
+# sandbox unless the recipe copies it (B2, 2026-10-25).
 #
 # Every step keeps the rules of tools/ci kits, as the julieta kit does:
 # bash with -e and -u, at most five lines, no arg pasted into script
@@ -81,7 +86,7 @@ capabilities:
             - |
               [[ ${JULIETA_BIN-} =~ ^(/[A-Za-z0-9._-]+)+$ ]]
               install -d -o root -g root -m 0755 /etc/claude-code /etc/claude-code/managed-settings.d
-              sed "s#@JULIETA_BIN@#${JULIETA_BIN}#g" /usr/share/sandbox/kit/julieta-claude/managed-settings.json >/etc/claude-code/managed-settings.d/50-julieta-claude.json
+              sed "s#@JULIETA_BIN@#${JULIETA_BIN}#g" /usr/share/julieta-claude/managed-settings.json >/etc/claude-code/managed-settings.d/50-julieta-claude.json
               chown root:root /etc/claude-code/managed-settings.d/50-julieta-claude.json
               chmod 0644 /etc/claude-code/managed-settings.d/50-julieta-claude.json
         - description: the agent's own memory dir, empty and not writable
@@ -108,5 +113,5 @@ capabilities:
             - |
               test -d /home/agent/.claude/skills
               rm -rf /home/agent/.claude/skills/julieta /home/agent/.claude/skills/handoff
-              cp -R /usr/share/sandbox/kit/julieta-claude/skills/julieta /usr/share/sandbox/kit/julieta-claude/skills/handoff /home/agent/.claude/skills/
+              cp -R /usr/share/julieta-claude/skills/julieta /usr/share/julieta-claude/skills/handoff /home/agent/.claude/skills/
               chmod -R u=rwX,go=rX /home/agent/.claude/skills/julieta /home/agent/.claude/skills/handoff
