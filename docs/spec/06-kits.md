@@ -115,10 +115,17 @@ obligation of the row above:
    ([04 4.3](04-cli.md#43-julieta-sandbox)), a guard against mistakes
    and not against an agent that edits its own hook
    ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1)).
-5. `REQ-0598` Its three refusals: `gh pr merge`, a push of a `v*` tag, and `gh api`
-   calls to rulesets and repository settings; the refusal text says the
-   action is the maintainer's and names the route (an issue, or the
-   handoff), asserted by a container e2e case per refusal.
+5. `REQ-0598` Its refusals, widened on 2026-10-25 beyond the first three:
+   `gh pr merge`; a push of a `v*` tag; `gh api` calls that change
+   rulesets or repository settings; `gh release create` and `gh release
+   delete`; `gh api` to `pulls/<n>/merge`; the GraphQL mutations
+   `mergePullRequest` and `enablePullRequestAutoMerge`; and `gh api`
+   calls that create a tag ref (`git/refs` with `refs/tags/v...`) or a
+   release (`releases`). The refusal text says the action is the
+   maintainer's and names the route (an issue, or the handoff), asserted
+   by a container e2e case per refusal. The guard reads the command as
+   bash parses it (`mvdan.cc/sh/v3/syntax`), and a command it cannot
+   parse is refused.
 6. `REQ-0599` The case "PreToolUse with the `.romeu/bin` mount absent refuses `gh
    pr merge`": the guard fails closed
    ([08 8.2](08-memory-handoff-salvage.md#82-session-hooks-user-side-middleware)).

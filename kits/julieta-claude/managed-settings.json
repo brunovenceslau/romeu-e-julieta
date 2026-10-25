@@ -1,0 +1,65 @@
+{
+  "autoMemoryEnabled": false,
+  "autoMemoryDirectory": "/var/lib/julieta-claude/agent-memory",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "@JULIETA_BIN@ handoff show --hook || [ $? -lt 126 ] || echo 'julieta handoff show --hook failed: @JULIETA_BIN@ could not run, the .romeu/bin mount may be absent; run julieta status'; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "@JULIETA_BIN@ handoff show --hook || [ $? -lt 126 ] || echo 'julieta handoff show --hook failed: @JULIETA_BIN@ could not run, the .romeu/bin mount may be absent; run julieta status'; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "@JULIETA_BIN@ handoff show --hook || [ $? -lt 126 ] || echo 'julieta handoff show --hook failed: @JULIETA_BIN@ could not run, the .romeu/bin mount may be absent; run julieta status'; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "@JULIETA_BIN@ handoff show --hook || [ $? -lt 126 ] || echo 'julieta handoff show --hook failed: @JULIETA_BIN@ could not run, the .romeu/bin mount may be absent; run julieta status'; exit 0"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "@JULIETA_BIN@ handoff write --facts || [ $? -lt 126 ] || echo 'julieta handoff write --facts failed: @JULIETA_BIN@ could not run, the .romeu/bin mount may be absent; run julieta status'; exit 0"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "@JULIETA_BIN@ hooks guard || { [ $? -eq 2 ] || echo 'julieta hooks guard failed: @JULIETA_BIN@ could not run, so the tool call is refused (the guard fails closed); the .romeu/bin mount may be absent; run julieta status' >&2; exit 2; }"
+          }
+        ]
+      }
+    ]
+  }
+}

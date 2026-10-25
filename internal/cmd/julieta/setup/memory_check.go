@@ -74,13 +74,10 @@ func checkMemoryDir(r *run, dir string) error {
 	return nil
 }
 
-// agentMemoryDir returns the agent's own memory dir below home for the
-// agent profile the manifest names, and false when this build knows
-// none. The location is a field of the agent profile, which lands with
-// internal/agent and the julieta-claude kit (T079) after probe A12
-// records it (11 11.1); until then no profile names a dir and the
-// check does not run.
-var agentMemoryDir = func(home, agent string) (string, bool) { return "", false }
+// agentMemoryDir returns the agent's own memory dir for the agent
+// profile the manifest names, and false when this build knows none: a
+// field of the agent profile (agent_paths.go).
+var agentMemoryDir = profileMemoryDir
 
 // agentMemoryOpen returns why the agent's memory dir dir lets the agent
 // remember outside julieta: it is writable, or it holds an entry; ""

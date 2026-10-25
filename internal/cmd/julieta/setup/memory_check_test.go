@@ -87,7 +87,7 @@ func TestSetupAgentMemoryDir(t *testing.T) {
 	dir := filepath.Join(s.home, ".agent", "memory")
 	defer setup.SetAgentMemoryDir(func(home, agent string) (string, bool) {
 		assert.Equal(t, s.home, home)
-		assert.Equal(t, "sbx-kit-claude", agent)
+		assert.Equal(t, "no-profile", agent)
 		return dir, true
 	})()
 	warnings := func() []setup.Warning {

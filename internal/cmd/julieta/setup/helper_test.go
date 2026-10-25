@@ -172,8 +172,11 @@ func newSandbox(t *testing.T) *sandbox {
 	for _, dir := range []string{"api", "web"} {
 		require.NoError(t, os.Mkdir(filepath.Join(mem, dir), 0o700))
 	}
+	// The agent handle names no agent profile, so the checks of a
+	// profile (agent_paths.go, skills_stale.go) stay out of the cases
+	// that do not set one up.
 	s.m = manifest.Manifest{
-		Agent: "sbx-kit-claude", Egress: []string{"github.com", "dl.google.com"}, Generation: "01j9zc2q8x7w4t6y3r5e1v9k0p",
+		Agent: "no-profile", Egress: []string{"github.com", "dl.google.com"}, Generation: "01j9zc2q8x7w4t6y3r5e1v9k0p",
 		Project: "shop", Protocol: manifest.Protocol, Run: manifest.Run{}, RunDigest: run.String(), Schema: manifest.Field,
 		SpecCommit: strings.Repeat("ab", 20),
 		Repos: []manifest.Repo{

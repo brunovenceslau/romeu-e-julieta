@@ -1,0 +1,112 @@
+# syntax=docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# The julieta-claude product kit (06 6.4), the one agent-aware kit: the
+# numbered list "What the julieta-claude kit installs and refuses". Its
+# Claude-aware code is internal/agent/claude (REQ-0114), which holds the
+# hook commands this kit's managed-settings.json carries and the digest
+# julieta compares the installed files with (skills-stale, REQ-0587).
+#
+# The hooks and the memory settings go into a drop-in of Claude Code's
+# managed settings, /etc/claude-code/managed-settings.d/, a file of this
+# kit alone: the workload rewrites ~/.claude/settings.json at every
+# create (its own install hook), and Claude Code merges the hooks of
+# every settings source. That the pinned Claude Code reads the drop-in
+# and fires its SessionStart and SessionEnd hooks was measured on
+# 2026-10-24 in the pinned workload, offline (claude -p with no
+# login), and that a PreToolUse hook that exits 2 blocks the call, with
+# its stderr reaching the agent, with a stub of the API.
+#
+# Every hook command invokes julieta by the absolute path the arg
+# julietaBin holds, julieta on the read-only .romeu/bin mount
+# (<abs .romeu/bin>/julieta-linux-<GOARCH>, 06 6.3), which romeu renders
+# (REQ-0596) and which the bridge sets by hand until then. Each command
+# is a wrapper: when julieta cannot run, as with the mount absent, the
+# session hooks print one line naming the failure and julieta status
+# and exit 0, and the PreToolUse guard exits 2, so it fails closed
+# (REQ-0673). So with the bin mount absent every Bash call of the agent
+# is refused, on purpose: the maintainer restores the mount from the
+# host, by the sandbox's recreate. The step checks the value before it uses it; the pattern
+# of the arg admits the empty default, which the check refuses, so a kit
+# entry without the arg fails its install rather than wire hooks to
+# nowhere. The value holds no character that sed or sh treat as
+# special, so the sed replacement writes it as internal/shquote would.
+#
+# Claude Code's own memory is turned off (08 8.1, Q8): the setting
+# autoMemoryEnabled false, and its directory, autoMemoryDirectory, an
+# empty one that the agent cannot write, outside $HOME so the agent
+# cannot remove it.
+#
+# The managed-settings directories and the drop-in are set root-owned
+# and not writable by the agent, whatever was there before.
+#
+# The skills are those of skills/ at the root of the repository, copied
+# whole into skills/ here, since a kit holds its files in its own
+# directory; a test of internal/agent/claude holds the copy equal to
+# skills/. ~/.claude and ~/.claude/skills are made by the agent, never
+# by root, so Claude Code still writes ~/.claude/projects and todos.
+# The skill directories are installed root-owned, so the agent reads
+# them and cannot edit them; since ~/.claude/skills is the agent's, it
+# can still rename or remove a skill directory, which julieta setup
+# reports as skills-stale, a residual risk of the guard against
+# mistakes (05 5.4). That sbx stages a
+# subdirectory of a kit's directory, and what a mount of the workload's
+# agent-skills capability at ~/.claude/skills does to the step, are read
+# by the first build of this kit (B2, S5).
+#
+# Every step keeps the rules of tools/ci kits, as the julieta kit does:
+# bash with -e and -u, at most five lines, no arg pasted into script
+# text.
+schemaVersion: "3"
+kind: mixin
+displayName: julieta-claude
+description: the julieta skills, julieta's SessionStart, SessionEnd and PreToolUse hooks, and Claude Code's own memory turned off
+args:
+  julietaBin:
+    default: ""
+    description: The absolute path of julieta on the read-only .romeu/bin mount, which romeu renders (REQ-0596); empty fails the install.
+    pattern: '^(/[A-Za-z0-9._-]+)*$'
+    env: JULIETA_BIN
+capabilities:
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        - description: the hooks and the memory settings, a managed-settings drop-in of Claude Code with the path of julieta, root-owned
+          user: "0"
+          env: [JULIETA_BIN]
+          command:
+            - bash
+            - -euc
+            - |
+              [[ ${JULIETA_BIN-} =~ ^(/[A-Za-z0-9._-]+)+$ ]]
+              install -d -o root -g root -m 0755 /etc/claude-code /etc/claude-code/managed-settings.d
+              sed "s#@JULIETA_BIN@#${JULIETA_BIN}#g" /usr/share/sandbox/kit/julieta-claude/managed-settings.json >/etc/claude-code/managed-settings.d/50-julieta-claude.json
+              chown root:root /etc/claude-code/managed-settings.d/50-julieta-claude.json
+              chmod 0644 /etc/claude-code/managed-settings.d/50-julieta-claude.json
+        - description: the agent's own memory dir, empty and not writable
+          user: "0"
+          command:
+            - bash
+            - -euc
+            - |
+              mkdir -p -m 0755 /var/lib/julieta-claude
+              install -d -m 0555 /var/lib/julieta-claude/agent-memory
+        - description: ~/.claude/skills, made by the agent when missing, not writable by others
+          user: agent
+          command:
+            - bash
+            - -euc
+            - |
+              umask 022
+              mkdir -p "$HOME/.claude/skills"
+        - description: the skills julieta and handoff, each whole directory, root-owned, into ~/.claude/skills
+          user: "0"
+          command:
+            - bash
+            - -euc
+            - |
+              test -d /home/agent/.claude/skills
+              rm -rf /home/agent/.claude/skills/julieta /home/agent/.claude/skills/handoff
+              cp -R /usr/share/sandbox/kit/julieta-claude/skills/julieta /usr/share/sandbox/kit/julieta-claude/skills/handoff /home/agent/.claude/skills/
+              chmod -R u=rwX,go=rX /home/agent/.claude/skills/julieta /home/agent/.claude/skills/handoff

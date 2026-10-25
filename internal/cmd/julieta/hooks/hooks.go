@@ -5,6 +5,6 @@
 
 // Package hooks holds the commands of julieta hooks (04 4.3): run, the
 // dispatcher that git's hooks run through in a sandbox (REQ-0408), on
-// the chain of internal/hooks. The other command of the group, guard
-// (REQ-0410), has a file of its own when it lands.
+// the chain of internal/hooks, and guard (REQ-0410), the PreToolUse
+// hook of the julieta-claude kit, in guard.go.
 package hooks
