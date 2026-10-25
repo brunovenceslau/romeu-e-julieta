@@ -44,22 +44,26 @@ func start(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	switch {
 	case len(args) == 2 && args[0] == "encode":
 		v, err := encode(args[1], stdin)
+		if err == nil {
+			_, err = fmt.Fprintln(stdout, v)
+		}
 		if err != nil {
-			fmt.Fprintln(stderr, "manifest:", err)
+			_, _ = fmt.Fprintln(stderr, "manifest:", err)
 			return exitError
 		}
-		fmt.Fprintln(stdout, v)
 		return exitOK
 	case len(args) == 1 && args[0] == "ulid":
 		id, err := canon.NewULID(time.Now(), canon.NewULIDSource(rand.Reader))
+		if err == nil {
+			_, err = fmt.Fprintln(stdout, id)
+		}
 		if err != nil {
-			fmt.Fprintln(stderr, "manifest:", err)
+			_, _ = fmt.Fprintln(stderr, "manifest:", err)
 			return exitError
 		}
-		fmt.Fprintln(stdout, id)
 		return exitOK
 	}
-	fmt.Fprintln(stderr, usage)
+	_, _ = fmt.Fprintln(stderr, usage)
 	return exitUsage
 }
 
