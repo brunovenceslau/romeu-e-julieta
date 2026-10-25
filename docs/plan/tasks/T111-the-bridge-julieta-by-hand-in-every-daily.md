@@ -124,8 +124,9 @@ left; the mount leaves at the recreate of T115.
   - In each daily sandbox a snapshot after one commit holds that commit
     and not the history reachable from `base`, read with `git bundle
     list-heads`, the bundle's size in the runbook.
-  - With the bin mount absent, each wrapper prints its warning line and
-    exits 0.
+  - With the bin mount absent, the SessionStart and SessionEnd
+    wrappers each print their warning line and exit 0, and the
+    PreToolUse guard refuses the call (it fails closed, REQ-0673).
   - The runbook holds the undo of each step, the fourth edit's and the
     payload change's included.
   - No daily sandbox holds the store's writer kit, a writable mount of
