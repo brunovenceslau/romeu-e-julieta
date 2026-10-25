@@ -154,7 +154,9 @@ var toolImports = []string{"procgroup", "cmd/romeu/all", "cmd/julieta/all"}
 // manifest schema its generator writes; tools/new the cli package, for
 // the command list and the error table its command and error kinds
 // read; tools/planviewer the gitsafe package, for the read-only
-// history its Trends view shows; and tools/ci and e2e the moduleroot
+// history its Trends view shows; tools/manifest the manifest and canon
+// packages, for the env value and the run digest of the manifest the
+// bridge of T111 writes by hand; and tools/ci and e2e the moduleroot
 // package, which finds the module root for their tests (REQ-1256).
 // A tree is the directory and every package below it.
 var toolExtra = map[string][]string{
@@ -162,6 +164,7 @@ var toolExtra = map[string][]string{
 	"e2e":              {"moduleroot"},
 	"tools/new":        {"cli"},
 	"tools/planviewer": {"gitsafe"},
+	"tools/manifest":   {"manifest", "canon"},
 }
 
 // The packages below internal/ that cmd/romeu links none of: the three

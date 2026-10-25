@@ -41,13 +41,14 @@ sync` renders every project definition and writes every manifest. In
 that period:
 
 - each project definition gains the three edits above and a fourth
-  that removes the store's writer kit and the mount of the store, and
+  that removes the store's writer kit and turns the mount of the store
+  read-only until the recreate of T115, and
   one change of the sandbox agent payload removes the inbox skill from
   every sandbox at once, so `julieta memory` is the route for open
   items, and a runbook in the maintainer's config repository records
   each edit and that change with its undo (plan task T111);
 - the `julieta-claude` kit (T079), pinned at a SHA of this repository
-  with its `julietaBin` arg set to the bin mount's path, installs the
+  with its `julietaBin` arg set to the path of the julieta binary in the bin mount, installs the
   SessionStart and SessionEnd hook lines of
   [08 8.2](../spec/08-memory-handoff-salvage.md), each as a wrapper
   that exits 0 when the bin mount is absent, and the two skills of

@@ -23,12 +23,13 @@ sitting: M1
 Goal: Per project definition: a read-only mount of one shared bin
 directory holding the host-built linux julieta and `SHA256SUMS`, a mount
 of the memory directory in its final host layout, and one environment
-variable holding the hand-written manifest (its `repos[].base` the
+variable holding the hand-written manifest, encoded with `go run
+./tools/manifest encode` (its `repos[].base` the
 origin SHA each clone started from, 03 3.6, so a snapshot bundles only
 the work since it; its `generation` one ULID per project, kept in the
 runbook), with beside it the entry of the `julieta-claude` kit of T079,
 pinned at a SHA of this repository and its `julietaBin` arg set to the
-bin mount's path, listed after the sandbox agent payload's kit so its
+path of the julieta binary in the bin mount, listed after the sandbox agent payload's kit so its
 skills are the ones installed; the kit brings the SessionStart and
 SessionEnd hook lines of 08 8.2 (each a wrapper that prints one warning
 line and exits 0 when the mount is absent, so a skipped hook is never
@@ -39,18 +40,22 @@ runbook step runs `julieta setup` before the first session, the order
 `romeu run` keeps in 04 4.2, so the dispatcher is the global
 `core.hooksPath` before the session's first commit or push; a fourth
 edit that
-removes the store's writer kit and the mount of the store from the
-definition; once, outside the definitions, the removal of the inbox
+removes the store's writer kit from the definition and turns the mount
+of the store read-only, so the end-of-sitting entry still reads the
+store (the mount leaves at the recreate of T115); once, outside the definitions, the removal of the inbox
 skill from the sandbox agent payload, with its own undo, a global change
 that lands before the first wave and reaches every sandbox at once. In a
 daily sandbox the julieta skill of T078 (`julieta memory add`) is then
 the route for anything worth keeping and the handoff skill the route for
 handoffs; a runbook with each step and its undo. The open-items
 cut-over, per project: the one-off entry of the store's open items into
-`julieta memory` is a command of the config repository that writes each
-item's source id as a tag of its entry (`source-<id>`; 03 3.9 gives tags
-no behaviour but `lesson`), skips an item whose tag is already present
-and prints the counts on both sides, with one recorded list that gives
+`julieta memory` is a command of the config repository that reads the
+item files of the mounted store and writes each item's source tag on
+its entry (`source-<14 digits>-<8 hex>`: the date and time digits and
+the hash of a store id such as `20261008T121616.161637Z-9cc0513a`, 30
+bytes within the 32 of the tag form of 03 3.9, which a store id itself
+does not fit; 03 3.9 gives tags no behaviour but `lesson`), skips an
+item whose tag is already present and prints the counts on both sides, with one recorded list that gives
 each item its destination (a memory entry id, or closed); it runs again
 at the end of the sitting, after the store's writer has left every
 sandbox (the fourth edit and the payload change), and both counts are in
@@ -83,6 +88,12 @@ daily use, before the end-of-sitting read. Wave 1 reads first that a
 daily sandbox's definition loads the `julieta-claude` kit at all, since
 no daily sandbox has loaded a kit of the pinned frontend yet; if it
 does not, this task stops with a decision record before any other step.
+
+Re-plan (2026-10-25): The fourth edit turns the mount of the store
+read-only instead of removing it, and the entry command reads the
+store's item files instead of calling the store's tool, so the
+end-of-sitting entry runs in the daily sandbox after the writer has
+left; the mount leaves at the recreate of T115.
 
 - Implements: REQ-0659 (08 8.1), REQ-0673 (08 8.2).
 - Operator: applies the four edits and the host build, two projects
@@ -117,12 +128,12 @@ does not, this task stops with a decision record before any other step.
     exits 0.
   - The runbook holds the undo of each step, the fourth edit's and the
     payload change's included.
-  - No daily sandbox holds the store's writer kit, the mount of the
-    store or the inbox skill after the fourth edit and the payload
+  - No daily sandbox holds the store's writer kit, a writable mount of
+    the store or the inbox skill after the fourth edit and the payload
     change.
   - One list per project, each open item of the store with its
     destination: a memory entry id, or closed.
-  - The entry command skips an item whose `source-<id>` tag is present
+  - The entry command skips an item whose source tag is present
     and prints the counts on both sides; both counts, from the first run
     and the end-of-sitting run, are in the runbook.
 - Verify: in each daily sandbox, read at sitting M1: `gh pr merge` is
@@ -134,5 +145,5 @@ does not, this task stops with a decision record before any other step.
   line names; `julieta memory list` in each project's sandbox shows the
   entries the open-items list names; the runbook holds the two count
   pairs of each project, from the first run and the end-of-sitting run;
-  in each daily sandbox, the store's writer kit, the mount of the store
-  and the inbox skill are absent.
+  in each daily sandbox, the store's writer kit, a writable mount of the
+  store and the inbox skill are absent.

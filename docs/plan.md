@@ -303,8 +303,9 @@ New or changed, each proposed on 2026-10-12:
    project definition (three that supply julieta: the bin mount, the
    memory mount, and the manifest with the entry of the `julieta-claude`
    kit of T079, pinned at a SHA of this repository and its `julietaBin`
-   arg set to the bin mount's path; and one that removes the store's
-   writer kit and the mount of the store), one change of the sandbox
+   arg set to the path of the julieta binary in the bin mount; and one that removes the store's
+   writer kit and turns the mount of the store read-only until T115's
+   recreate), one change of the sandbox
    agent payload that removes the inbox skill from every sandbox at
    once, and a host build in M1 (T111) and, in M2, a fifth edit: the
    other kit entries with their args, `signingKey` set to the public
@@ -989,6 +990,11 @@ records these answers again with the rules they decide (T108).
     the store, outside every sandbox, so T119 reads at sitting M5 that
     the store holds no item that the open-items list of sitting M1 does
     not name. The alternative not taken: the cut-over at T119 (M5).
+    Amended on 2026-10-25: the fourth edit turns the mount of the store
+    read-only instead of removing it, and the entry command reads the
+    store's item files, so the end-of-sitting entry runs in the daily
+    sandbox after the writer has left; the mount leaves at the recreate
+    of T115.
 20. **The render types slice.** A deferred decision: it is decided at
     sitting M2, the sitting that opens M3, from the measured lane, and
     nothing is decided now. The options: a slice, with the next free

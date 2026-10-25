@@ -20,7 +20,8 @@ sitting: M2
 
 Goal: One project per slot: `/handoff --final`, push, `julieta snapshot
 --all`, remove, recreate with the product kits and the personal kit in
-the hand-written project definition. The fifth edit of rule 9 lands
+the hand-written project definition, without the read-only mount of the
+store that T111's fourth edit left. The fifth edit of rule 9 lands
 here: the other kit entries with their args, `signingKey` set to the
 public key, each with its undo in the runbook (the `julieta-claude`
 entry and its `julietaBin` arg land at sitting M1, T111); `romeu sync`

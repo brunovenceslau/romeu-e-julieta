@@ -1349,7 +1349,10 @@ links every command in (one blank-import file per command, 02 2.1);
 links, `tools/new` imports `internal/cli` directly, for the command
 list and the error table its `command` and `error` kinds read, and
 `tools/planviewer` imports `internal/gitsafe` directly, for the plan
-files of past commits its trends read. `tools/ci` imports
+files of past commits its trends read. `tools/manifest` imports
+`internal/manifest` and `internal/canon` directly, for the env value and
+the run digest of the manifest the bridge of plan task T111 writes by
+hand until `romeu sync` writes it. `tools/ci` imports
 `internal/manifest` directly too, for the type of the manifest schema
 its generator writes, and `tools/ci` and the test packages under `e2e/**`
 import `internal/moduleroot` directly (REQ-1256), the one finder of
