@@ -2,20 +2,22 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-23, third part: "Session of 2026-10-23, third
-part: the rebases after T042, the helper text, A12 and T077"
-(01m5nedw9bac71zj6peq15kfzy).
+Checkpoint of 2026-10-25: "Session of 2026-10-25: T111 re-planned onto
+the julieta-claude kit, tools/manifest and T079"
+(01m5rnxnxm3xt38f3jewy56g1w).
 Pushes and pull requests need no approval in this repository, within
-the limits that record names (01m5nbzfb4p92djhp10c92jprp).
+the limits that record names (01m5nbzfb4p92djhp10c92jprp). Work for
+another repository goes into an issue there
+(01m5rnxnykc2nbn1d2dvyyxmsw).
 
 ## Next steps
 
-1. T038, the next of the critical path; T165 is ready after T164.
-2. T111 at sitting M1, ready now that T079 is merged (#277): the
-   runbook and cut-over landed in the sandbox kit repository (its #285
-   and #286); its issue #287 keeps one item open, the atomic replace of the host-built
-   julieta; then the wave 1 edits of romeu-e-julieta and verona
-   (01m5nw2x1dw37z6sc6tebk991e), the kit pinned at 26d49d7.
+1. T111 at sitting M1, ready now that T079 is merged: the wave 1 edits
+   of romeu-e-julieta and verona in the sandbox kit repository, the kit
+   pinned at 26d49d75 (01m5nw2x1dw37z6sc6tebk991e); its runbook and
+   cut-over are merged there, and its issue #287 keeps the atomic
+   replace of the host-built julieta open.
+2. T038, the next of the critical path (issue #271); T165 after T164.
 3. Build T170; T161 once T088 is built
    (01m5e14094yhqhsxq2g941pwrf).
 4. The pending notes, each when its trigger fires: 01m5rjz3n7588xgx1xhfn56wmk, 01m5rjz3p5x27yebkayt1hjydb, 01m5ngx0cy47r560n6hqjh4y1c, 01m5ngabwa6akgjr9eetw78kq7, 01m5ndjpzgf0rmwkr7gc1j6wdh, 01m5n920q50b79dxxqe5ghss4r, 01m5n79kdbtk9dpq7y87sfkkaq,
@@ -38,17 +40,22 @@ the limits that record names (01m5nbzfb4p92djhp10c92jprp).
 5. Paste the payload prompts left from 2026-10-21, report the kit pull
    request for T112 (00000000008h7a0ey78frxzgfr), and say when the
    GitHub App of ADR 0011 changes authentication. Recommended: later.
-6. Plan the product skill mechanism (01m5gywvmtxk1kppkg3k1e1ae0) now or
-   after the kit's measurement. Recommended: wait, then plan with T079.
+6. Plan the product skill mechanism (01m5gywvmtxk1kppkg3k1e1ae0); its
+   trigger, the build of T079, fired with #277. Recommended: plan it
+   before T114, with 01m5jmx65egty4eh39y8sqewhe.
 7. Let the payload's handoff check accept the T159 Done record name
    (01m5gz0rpmzwvmwqt9ebd95rfq). Recommended: the payload's next session.
 8. Review the over-optimizing rules note (01m5jc2v5gfyxyrbjv7wymbr9a).
    Recommended: the next session on the kit's repository.
+9. On the host, for sitting M1: pick the shared bin directory outside
+   every read-write mount and `$HOME/Developer`, then the runbook's
+   host steps. Recommended: after the wave 1 pull request is open.
 
 ## In flight
 
-- The pull request that ticks T079. The branches `feat/t077-os-base` and
-  `feat/t077-julieta-kit` are superseded by #273 and left as they were.
+- The pull request of this checkpoint. The branches
+  `feat/t077-os-base` and `feat/t077-julieta-kit` are superseded by
+  #273 and left as they were.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
