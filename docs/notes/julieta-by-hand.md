@@ -48,7 +48,7 @@ that period:
   items, and a runbook in the maintainer's config repository records
   each edit and that change with its undo (plan task T111);
 - the `julieta-claude` kit (T079), pinned at a SHA of this repository
-  with its `julietaBin` arg set to the bin mount's path, installs the
+  with its `julietaBin` arg set to the path of the julieta binary in the bin mount, installs the
   SessionStart and SessionEnd hook lines of
   [08 8.2](../spec/08-memory-handoff-salvage.md), each as a wrapper
   that exits 0 when the bin mount is absent, and the two skills of

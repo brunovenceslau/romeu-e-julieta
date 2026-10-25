@@ -303,7 +303,7 @@ New or changed, each proposed on 2026-10-12:
    project definition (three that supply julieta: the bin mount, the
    memory mount, and the manifest with the entry of the `julieta-claude`
    kit of T079, pinned at a SHA of this repository and its `julietaBin`
-   arg set to the bin mount's path; and one that removes the store's
+   arg set to the path of the julieta binary in the bin mount; and one that removes the store's
    writer kit and turns the mount of the store read-only until T115's
    recreate), one change of the sandbox
    agent payload that removes the inbox skill from every sandbox at

@@ -29,7 +29,7 @@ origin SHA each clone started from, 03 3.6, so a snapshot bundles only
 the work since it; its `generation` one ULID per project, kept in the
 runbook), with beside it the entry of the `julieta-claude` kit of T079,
 pinned at a SHA of this repository and its `julietaBin` arg set to the
-bin mount's path, listed after the sandbox agent payload's kit so its
+path of the julieta binary in the bin mount, listed after the sandbox agent payload's kit so its
 skills are the ones installed; the kit brings the SessionStart and
 SessionEnd hook lines of 08 8.2 (each a wrapper that prints one warning
 line and exits 0 when the mount is absent, so a skipped hook is never
