@@ -59,7 +59,9 @@
 # where the other steps read them. In a sandbox of a v2 agent with v3
 # mixins, sbx puts no file of a mixin's directory and no layer of its
 # recipe into the sandbox, and /usr/share/sandbox/kit does not exist
-# (B2, 2026-10-25, and a probe of 2026-10-27). The files of this
+# (B2, 2026-10-25, and a probe of 2026-10-27). The payload is interim,
+# until a recipe reaches the sandbox (pending note
+# 01m5zg2f63219nwpzb9d52aecg). The files of this
 # directory stay the source: TestKitPayloadIsTheKitFiles of
 # internal/agent/claude holds the payload to them, and its -update
 # writes it again.

@@ -17,7 +17,7 @@ issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
    (01m5rzc41dqzdqkkfb4f88xfyj), then review, audit and a stacked PR on
    #286; then the A11/A12 fixtures of I28. T165 after T164.
 3. Build T170; T161 once T088 is built (01m5e14094yhqhsxq2g941pwrf).
-4. The pending notes, each when its trigger fires: 01m5rtp0hjczzy9f66ez7rxvna,
+4. The pending notes, each when its trigger fires: 01m5zg2f63219nwpzb9d52aecg, 01m5rtp0hjczzy9f66ez7rxvna,
    01m5rtp0kfzjckbdct0y77531j, 01m5rpbjkc62s2c7qecj7wf9bk, 01m5rjz3n7588xgx1xhfn56wmk,
    01m5rjz3p5x27yebkayt1hjydb, 01m5ngx0cy47r560n6hqjh4y1c, 01m5ngabwa6akgjr9eetw78kq7,
    01m5ndjpzgf0rmwkr7gc1j6wdh, 01m5n920q50b79dxxqe5ghss4r, 01m5n79kdbtk9dpq7y87sfkkaq,

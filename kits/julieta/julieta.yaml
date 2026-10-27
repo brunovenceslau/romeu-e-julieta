@@ -28,7 +28,9 @@
 # to kits/pins.yaml. No step reads a file of this directory: in a
 # sandbox of a v2 agent with v3 mixins, sbx puts no file of a mixin's
 # directory and no layer of its recipe into the sandbox, and
-# /usr/share/sandbox/kit does not exist (probe of 2026-10-27).
+# /usr/share/sandbox/kit does not exist (probe of 2026-10-27). The
+# printf is interim, until a recipe reaches the sandbox (pending note
+# 01m5zg2f63219nwpzb9d52aecg).
 #
 # The capability names, the lifecycle@1 hook keys and the args keys are
 # those of sitting M0 and of the workload descriptor (e2e/testdata/
