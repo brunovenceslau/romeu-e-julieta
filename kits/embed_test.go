@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -110,21 +111,29 @@ type pinned struct {
 	}
 }
 
-// TestJulietaSumsEqualThePins holds the sums file the install steps of
-// the julieta kit check against to the pin file: one line per tool and
-// architecture, named as the step names its download, with the pinned
-// sha256. The steps read the version from args that tools/ci kits
-// already holds to the pin file; this closes the hashes.
+// sumsLine is the line of the first install step of the julieta kit
+// that writes the sums file, one quoted operand per line of it.
+var sumsLine = regexp.MustCompile(`(?m)^\s*printf '%s\\n'((?: '[^']*')+) >/var/lib/julieta-kit-install/SHA256SUMS$`)
+
+// TestJulietaSumsEqualThePins holds the sums the install steps of the
+// julieta kit check against, which its first step writes, to the pin
+// file: one line per tool and architecture, named as the step names its
+// download, with the pinned sha256. The steps read the version from
+// args that tools/ci kits already holds to the pin file; this closes
+// the hashes.
 func TestJulietaSumsEqualThePins(t *testing.T) {
 	src, err := os.ReadFile("pins.yaml")
 	require.NoError(t, err)
 	var p pinned
 	require.NoError(t, yaml.Unmarshal(src, &p))
 
-	sums, err := fs.ReadFile(FS, "julieta/SHA256SUMS")
+	src, err = fs.ReadFile(FS, "julieta/julieta.yaml")
 	require.NoError(t, err)
+	m := sumsLine.FindAllSubmatch(src, -1)
+	require.Len(t, m, 1, "the julieta kit writes its sums file on one printf line")
 	got := map[string]string{} // file -> sha256
-	for line := range strings.SplitSeq(strings.TrimSpace(string(sums)), "\n") {
+	for q := range strings.SplitSeq(strings.TrimSpace(string(m[0][1])), " '") {
+		line := strings.Trim(q, "'")
 		sum, file, ok := strings.Cut(line, "  ")
 		require.True(t, ok, "the line %q is not '<sha256>  <file>'", line)
 		got[file] = sum

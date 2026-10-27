@@ -34,19 +34,21 @@ import (
 // 2.1.296 of the pinned workload, run against a stub of the API that
 // answered with one Bash call; the cases replace its command.
 
-// The paths the kit's steps write.
+// The paths the kit's steps write. No case mounts the kit's directory:
+// the first step carries the kit's files, since sbx puts none of them
+// into a sandbox of a v2 agent (probe of 2026-10-27).
 const (
-	claudeKitStage = kitStageRoot + "julieta-claude"
-	claudeDropIn   = "/etc/claude-code/managed-settings.d/50-julieta-claude.json"
-	claudeMemory   = "/var/lib/julieta-claude/agent-memory"
-	claudeSkills   = "/home/agent/.claude/skills"
-	agentHome      = "/home/agent"
-	docsDir        = "/e2e-docs"
+	claudeDropIn = "/etc/claude-code/managed-settings.d/50-julieta-claude.json"
+	claudeMemory = "/var/lib/julieta-claude/agent-memory"
+	claudeSkills = "/home/agent/.claude/skills"
+	agentHome    = "/home/agent"
+	docsDir      = "/e2e-docs"
 )
 
 // The install hooks of julieta-claude by position.
 const (
-	claudeHookSettings = iota
+	claudeHookPayload = iota
+	claudeHookSettings
 	claudeHookMemory
 	claudeHookSkillsDir
 	claudeHookSkills
@@ -93,20 +95,20 @@ func keysOf[V any](m map[string]V) []string {
 }
 
 // startClaudeKit starts a container of the workload with no network,
-// the kit's directory where sbx stages it, the documents docs at
+// no file of the kit, the documents docs at
 // docsDir, and, with bin, the bin directory of julieta at its own
 // path, which the kit's arg names: without it, the .romeu/bin mount is
 // absent.
 func startClaudeKit(t *testing.T, bin bool, docs map[string]string) kitSandbox {
 	t.Helper()
-	dir, d, _ := readKit(t, "julieta-claude")
+	_, d, _ := readKit(t, "julieta-claude")
 	w := workload(t)
 	docDir := t.TempDir()
 	require.NoError(t, os.Chmod(docDir, 0o755))
 	for name, body := range docs {
 		require.NoError(t, os.WriteFile(filepath.Join(docDir, name), []byte(body), 0o644))
 	}
-	mounts := [][2]string{{dir, claudeKitStage}, {docDir, docsDir}}
+	mounts := [][2]string{{docDir, docsDir}}
 	if bin {
 		mounts = append(mounts, [2]string{w.Bin, w.Bin})
 	}
