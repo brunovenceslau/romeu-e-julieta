@@ -32,17 +32,16 @@ import (
 // descriptor names, with the environment the hook declares and nothing
 // else of the kit's args.
 
-// The paths the steps use, which the cases assert against. kitStageRoot
-// is where sbx stages each kit's kit.yaml and kit.dockerfile, by its
-// name, and no other file of it (B2, 2026-10-25); kitContent is where
-// the overlay of julieta.dockerfile puts SHA256SUMS, so the cases mount
-// the kit's directory there.
+// The paths the steps use, which the cases assert against. No case
+// mounts a kit's directory: in a sandbox of a v2 agent with v3 mixins,
+// sbx puts no file of a mixin's directory and no layer of its recipe
+// into the sandbox (probe of 2026-10-27), so a kit's steps carry what
+// they need. kitSums is the sums file the first step writes.
 const (
-	kitStageRoot = "/usr/share/sandbox/kit/"
-	kitContent   = "/usr/share/julieta-kit"
-	kitWorkDir   = "/var/lib/julieta-kit-install"
-	bashEnvRel   = "/etc/sandbox-persistent.sh"
-	pathLine     = `export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"`
+	kitSums    = "/var/lib/julieta-kit-install/SHA256SUMS"
+	kitWorkDir = "/var/lib/julieta-kit-install"
+	bashEnvRel = "/etc/sandbox-persistent.sh"
+	pathLine   = `export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"`
 )
 
 // kitDescriptor is the part of the descriptor these cases read, decoded
@@ -235,21 +234,16 @@ func dockerOut(t *testing.T, args ...string) (string, error) {
 	return out.String(), err
 }
 
-// startKit starts a container of the workload with the directory of the
-// julieta kit mounted read-only where its overlay puts its files, and
-// that of os-base where sbx stages it,
-// and extra docker run options, and removes it at the end of the case.
+// startKit starts a container of the workload with extra docker run
+// options, and no file of the julieta or os-base kit in it, and removes
+// it at the end of the case.
 func startKit(t *testing.T, extra ...string) kitSandbox {
 	t.Helper()
-	dir, d, _ := readKit(t, "julieta")
-	baseDir, base, _ := readKit(t, "os-base")
+	_, d, _ := readKit(t, "julieta")
+	_, base, _ := readKit(t, "os-base")
 	w := workload(t)
 	args := []string{"run", "-d", "--rm", "--pull=never",
 		"--security-opt=no-new-privileges", "--pids-limit=256", "--memory=1g"}
-	for _, m := range [][2]string{{dir, kitContent}, {baseDir, kitStageRoot + "os-base"}} {
-		require.False(t, strings.ContainsAny(m[0], ",="), "a bind mount cannot name %s", m[0])
-		args = append(args, "--mount", "type=bind,source="+m[0]+",target="+m[1]+",readonly")
-	}
 	args = append(args, extra...)
 	out, err := dockerOut(t, append(args, "--entrypoint", "sleep", w.Pins.Workload.Ref, "3600")...)
 	require.NoError(t, err, "%s", out)
@@ -327,29 +321,22 @@ func (k kitSandbox) runAll(hooks ...kitHook) {
 func withSums(h kitHook, path string) kitHook {
 	c := slices.Clone(h.Command)
 	last := len(c) - 1
-	c[last] = strings.ReplaceAll(c[last], kitContent+"/SHA256SUMS", path)
+	c[last] = strings.ReplaceAll(c[last], kitSums, path)
 	return kitHook{Description: h.Description, User: h.User, Env: h.Env, Command: c, args: h.args}
 }
 
-// TestKitJulietaRecipe holds the overlay to what the steps read: the
-// recipe copies SHA256SUMS, and nothing else, to kitContent, and no step
-// reads a file of the kit at kitStageRoot, where sbx stages no file of
-// it but the descriptor and the recipe.
-func TestKitJulietaRecipe(t *testing.T) {
-	dir, _, src := readKit(t, "julieta")
-	recipe, err := os.ReadFile(filepath.Join(dir, "julieta.dockerfile"))
+// TestKitJulietaSelfContained holds that the julieta kit's directory
+// is its descriptor alone: sbx puts no other file of it into the
+// sandbox, so a step that read one would fail there and pass here.
+func TestKitJulietaSelfContained(t *testing.T) {
+	dir, _, _ := readKit(t, "julieta")
+	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
-	var steps []string
-	for line := range strings.SplitSeq(string(recipe), "\n") {
-		if line != "" && !strings.HasPrefix(line, "#") {
-			steps = append(steps, line)
-		}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
 	}
-	assert.Equal(t, []string{
-		"FROM scratch",
-		"COPY SHA256SUMS " + kitContent + "/SHA256SUMS",
-	}, steps)
-	assert.NotContains(t, string(src), kitStageRoot+"julieta")
+	assert.Equal(t, []string{"julieta.yaml"}, names)
 }
 
 // TestKitJulietaInstall runs the install steps once, in the order of the
@@ -530,7 +517,8 @@ func TestKitJulietaHostileArg(t *testing.T) {
 			assert.Equal(t, 1, code, "%s=%q was not stopped by the check of the value: %s", tc.name, bad, out)
 			left, lcode := k.sh("0", "ls -A "+kitWorkDir)
 			require.Zero(t, lcode, left)
-			assert.Empty(t, strings.TrimSpace(left), "%s=%q left a file in the download directory", tc.name, bad)
+			// The sums file is the first step's; nothing else is there.
+			assert.Equal(t, "SHA256SUMS", strings.TrimSpace(left), "%s=%q left a file in the download directory", tc.name, bad)
 			_, absent := k.sh("0", "test ! -e /tmp/pwned")
 			assert.Zero(t, absent, "%s=%q ran the command it holds", tc.name, bad)
 		}
