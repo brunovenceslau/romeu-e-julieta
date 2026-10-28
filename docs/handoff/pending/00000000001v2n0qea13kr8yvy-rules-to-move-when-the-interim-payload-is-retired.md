@@ -33,15 +33,21 @@ repository (REQ-0608) unless named otherwise:
 - An edit waits for its skill: a Go file for
   `cc-skills-golang:golang-how-to`, a spec for `agent-skills:spec`, a
   plan for `agent-skills:plan`, a skill for
-  `anthropic-skills:skill-creator` (the skill row is this repository's
-  ADR 0040 made a check). Sent: that repository's ADR-0040 and section
-  15 of its `docs/intent/brief-guard-spec.md`, merged on 2026-10-28 in
-  its pull requests #307 (Go) and #308 (the table of rows). Open, split
-  as decided on 2026-10-28: the mechanism goes to `julieta hooks guard`
-  (it reads a table of path globs and the skills that satisfy each, and
-  fails open everywhere but that rule), and the rows go to the personal
-  kit (REQ-0608), because the skills they name are the maintainer's
-  choice and an adopter may not have those plugins. Losing either rule
+  `anthropic-skills:skill-creator` (the skill-file row is this
+  repository's ADR 0040 made a check). Sent: the sandbox definitions
+  repository's ADR-0040 and section 15 of its
+  `docs/intent/brief-guard-spec.md`, merged on 2026-10-28 in that
+  repository's pull requests #307 (Go) and #308 (the table of rows).
+  Open, split as decided on 2026-10-28: the mechanism goes to the
+  product, `julieta hooks guard` (it reads a table of path globs and the
+  skills that satisfy each, refuses an edit a row names until one of its
+  skills is loaded, and passes every other edit when it cannot tell, while
+  its Bash refusals of REQ-0598 stay fail-closed as REQ-0599 says); the
+  rows go to the personal kit (REQ-0608, T114), because the skills they
+  name are the maintainer's choice and an adopter may not have those
+  plugins. The spec must grow first: REQ-0410 and REQ-0598 read only a
+  Bash call's `tool_input.command`, and the rule needs the file tools'
+  inputs and the Skill calls. Losing either rule
   is silent: no check fails when the payload's guard goes.
 
 The payload holds other rules that came from elsewhere; listing them
