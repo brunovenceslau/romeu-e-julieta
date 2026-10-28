@@ -16,9 +16,9 @@ Anything kept only in the conversation is gone after `/clear`.
 
 ## Keep something for later
 
-At the start of every session you see the open entries, one line each:
-the index, not the bodies. When the work touches one, read it in full
-with `julieta memory show <id>` (several ids at once are fine).
+At the start of every session you see the open entries, each by its id
+and title. When the work touches one, read it in full with
+`julieta memory show <id>` (several ids at once are fine).
 
 Search before you add, with `julieta memory list --query <text>`: an
 entry that already holds the thing is better changed than repeated (see

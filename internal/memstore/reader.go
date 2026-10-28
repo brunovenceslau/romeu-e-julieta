@@ -139,8 +139,8 @@ const (
 // memory list (04 4.3, REQ-1293; 08 8.1, REQ-0653). Query matches an
 // entry whose title, body or a tag holds it, ignoring case; Status,
 // when set, is the status the entry has; Tags must each be a tag of
-// the entry, and an entry without a type tag is never matched by them
-// (REQ-1292); Since, when set, is the earliest updatedAt. Walk applies
+// the entry, so an entry without a type tag (REQ-1292) is still found
+// by its free tags and never by a type tag; Since, when set, is the earliest updatedAt. Walk applies
 // these; List also applies Sort, SortUpdated when empty, and Limit, the
 // most entries it returns when above zero. The zero Filter selects
 // every entry.
@@ -156,9 +156,6 @@ type Filter struct {
 // match reports whether e is selected by f.
 func (f Filter) match(e Entry) bool {
 	if f.Status != "" && e.Status != f.Status {
-		return false
-	}
-	if len(f.Tags) > 0 && Type(e.Tags) == NoType {
 		return false
 	}
 	for _, t := range f.Tags {
@@ -214,9 +211,9 @@ func (r *Reader) List(f Filter) ([]Entry, error) {
 
 // Walk calls visit with each entry f selects, oldest first (by id),
 // one entry in memory at a time, until visit returns false; f.Sort and
-// f.Limit are List's and Walk leaves them. A memory
-// dir without entries/ has none. A temporary name of julieta is never
-// read (REQ-0654); entries/ that is no directory (a symlink among
+// f.Limit are List's and Walk leaves them. A memory dir without
+// entries/ has none. A temporary name of julieta is never read
+// (REQ-0654); entries/ that is no directory (a symlink among
 // them), any other member of it that is not a file <ULID>.md, and more
 // than MaxEntries entries are ErrLayout, and an entry that does not
 // decode is its error, which names its file: no entry is skipped.

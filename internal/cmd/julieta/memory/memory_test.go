@@ -267,7 +267,8 @@ func TestTypeTagRule(t *testing.T) {
 // --limit narrow, and a bad --since, --sort or --limit is the error
 // usage (REQ-1293); the --json document holds the same entries in
 // full, in the same order. An entry file without a type tag is listed
-// with the type - and left byte for byte as it was by list and show
+// with the type -, found by --tag on its free tags, and left byte for
+// byte as it was by list and show
 // (REQ-1292); an edit that names no tag cannot close it, since it
 // would leave no type tag, and the edit that names one types it.
 func TestListIndexAndFilters(t *testing.T) {
@@ -299,7 +300,7 @@ func TestListIndexAndFilters(t *testing.T) {
 	}{
 		{nil, []string{lineC, lineB, lineA}},
 		{[]string{"--sort", "created"}, []string{lineA, lineC, lineB}},
-		{[]string{"--tag", "ci"}, []string{lineA}},
+		{[]string{"--tag", "ci"}, []string{lineC, lineA}},
 		{[]string{"--tag", "ci", "--tag", "feedback"}, []string{lineA}},
 		{[]string{"--tag", "ci", "--tag", "user"}, nil},
 		{[]string{"--since", "2026-10-28"}, []string{lineC, lineB}},

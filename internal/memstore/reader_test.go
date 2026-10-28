@@ -215,7 +215,7 @@ func TestErrorsEscapeNames(t *testing.T) {
 // TestListFilters runs each narrowing of julieta memory list alone and
 // all together (04 4.3, REQ-1293; REQ-0653), on three entries whose
 // updatedAt and createdAt orders differ: every given tag must hold, an
-// entry without a type tag is never matched by a tag (REQ-1292), since
+// entry without a type tag is found by its free tags (REQ-1292), since
 // is the earliest updatedAt, the sort is updatedAt or createdAt newest
 // first (REQ-1288), and the limit cuts after the sort.
 func TestListFilters(t *testing.T) {
@@ -240,7 +240,7 @@ func TestListFilters(t *testing.T) {
 		"none":                   {memstore.Filter{}, []memstore.Entry{old, pr, fb}},
 		"sort updated":           {memstore.Filter{Sort: memstore.SortUpdated}, []memstore.Entry{old, pr, fb}},
 		"sort created":           {memstore.Filter{Sort: memstore.SortCreated}, []memstore.Entry{fb, old, pr}},
-		"a free tag":             {memstore.Filter{Tags: []string{"ci"}}, []memstore.Entry{fb}},
+		"a free tag":             {memstore.Filter{Tags: []string{"ci"}}, []memstore.Entry{old, fb}},
 		"a type tag":             {memstore.Filter{Tags: []string{"project"}}, []memstore.Entry{pr}},
 		"two tags that hold":     {memstore.Filter{Tags: []string{"ci", "feedback"}}, []memstore.Entry{fb}},
 		"two tags, one missing":  {memstore.Filter{Tags: []string{"feedback", "project"}}, nil},

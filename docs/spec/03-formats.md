@@ -673,9 +673,10 @@ tag with a reading (below). `REQ-1287` Every entry carries exactly one type tag,
 note of the agent's own memory carries its kind: `add` without one,
 `add` or `edit` with two, and an `edit` that would leave none, is a
 usage error (exit 2) that names the five. `REQ-1292` An entry file written before this rule,
-whose tags hold none, is read as it is: listed with the type `-`, never
-matched by `list --tag`, and typed by the first `edit` that gives it a
-type tag; no entry file is rewritten for the rule.
+whose tags hold none, is read as it is: listed with the type `-`,
+matched by `list --tag` on its free tags and never on a type tag, and
+typed by the first `edit` that gives it a type tag; no entry file is
+rewritten for the rule.
 
 `REQ-1295` An entry is filed in the memory dir of one repo, or, with
 `--shared`, in the project's shared dir `_shared/` (08 8.1), for what
