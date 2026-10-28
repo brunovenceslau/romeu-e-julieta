@@ -3,7 +3,7 @@ id: T166
 title: "`tools/schemagen` on a maintained library, and the null of a pointer"
 milestone: M3
 module: spec
-fate: new
+fate: merged
 owns:
   - tools/schemagen/**
   - schemas/**
@@ -19,6 +19,8 @@ after: []
 ask_first:
   - dependencies
 sitting: none
+merged: 2026-10-28
+pr: 296
 ---
 
 # T166 - `tools/schemagen` on a maintained library, and the null of a pointer
