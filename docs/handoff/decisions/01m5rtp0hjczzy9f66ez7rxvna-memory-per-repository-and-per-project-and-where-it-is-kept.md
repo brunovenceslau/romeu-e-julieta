@@ -30,13 +30,12 @@ memory holds cross-repository decisions, ordering and the handoff.
 
 Q4 (one repository in two projects) stays as it was: forbidden in v1.
 
-Durability was not decided here. It is the row "a durable home for
-memory" of the index's Deferred decisions (a private git repository
-per project, its `.git` outside every mount, pushed by romeu on the
-host; task T175, deferred), and until it is built a project that moves
-its state into memory keeps a versioned copy in its repository
-(T176, deferred).
+Durability, decided the same day (ADR 0043): a private git repository
+per project, named by the project spec as `memory.remote`, its `.git`
+kept outside every mount, committed (signed) and pushed by romeu on
+the host after each of its commands (task T175, milestone M2). This
+repository's state moves into memory only once that copy is in use
+(T176, which needs T175).
 
 Reopened by: the first project with two repositories, which measures
-whether the shared directory is enough; the durability row by its own
-event.
+whether the shared directory is enough.

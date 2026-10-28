@@ -58,3 +58,4 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 40 | [Author every skill with skill-creator and progressive disclosure](0040-author-every-skill-with-skill-creator-and-progressive-disclosure.md) | Accepted |
 | 41 | [Readers of formats between binaries ignore unknown members](0041-readers-of-formats-between-binaries-ignore-unknown-members.md) | Proposed |
 | 42 | [A handoff is a memory entry of the project's shared directory](0042-a-handoff-is-a-memory-entry-of-the-project-s-shared-directory.md) | Proposed |
+| 43 | [Keep the durable copy of memory in a private git repository per project](0043-keep-the-durable-copy-of-memory-in-a-private-git-repository-per-project.md) | Proposed |

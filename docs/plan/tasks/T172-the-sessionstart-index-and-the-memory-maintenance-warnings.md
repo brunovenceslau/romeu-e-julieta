@@ -19,6 +19,7 @@ needs:
   - T059
   - T171
   - T174
+  - T175
 after: []
 ask_first:
   - kits
@@ -38,8 +39,10 @@ on 2026-10-28, with the specification amended in the same pull request
 as T171: 08 8.1 (REQ-0659), 08 8.2 (REQ-0663, REQ-0664, REQ-0665,
 REQ-0667, REQ-0669, REQ-1291, REQ-1294), 08 8.3 (REQ-0681, REQ-0682),
 08 8.6 (four starting values), 04 4.1 (the slugs) and 04 4.3
-(REQ-0414). The hook lines of the kit and the `handoff` skill (06 6.3,
-REQ-0595; ask-first `kits`) change with the command, and
+(REQ-0414). The hook lines of the kit and the `handoff` skill (06 6.4,
+REQ-0595; ask-first `kits`) change with the command, and the kit's pin
+moves to this build only after T175 is in use on the host (ADR 0043),
+which `needs` holds, and
 `internal/handoff` and `internal/cmd/julieta/handoff` are removed once
 T174 and this task carry what they did. The generated pages
 `docs/reference/julieta/memory/*.md` are regenerated (rule 1).

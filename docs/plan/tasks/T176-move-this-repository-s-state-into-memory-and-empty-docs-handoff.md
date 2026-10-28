@@ -1,9 +1,9 @@
 ---
 id: T176
 title: "move this repository's state into memory and empty docs/handoff"
-milestone: M5
+milestone: M3
 module: none
-fate: deferred
+fate: new
 owns: []
 needs:
   - T175
@@ -16,15 +16,13 @@ sitting: none
 
 # T176 - move this repository's state into memory and empty docs/handoff
 
-Deferred on 2026-10-28, the day it was written, by the row "a durable
-home for memory" of the index: a project that moves its state into
-memory keeps a versioned copy in its repository until memory has a
-durable home, and no task removes that copy before then. Reopened by:
-T175 merged and in use for this project. `owns` is written when it
-reopens (`docs/handoff/**`, `AGENTS.md`, the payload's handoff checker
-is the kit repository's).
+Goal: this repository's state leaves `docs/handoff/` for julieta
+memory, once the durable copy of T175 is in use for this project and
+the handoff type of T174 and the index of T172 are in its sandbox
+(ADR 0042, ADR 0043). Owns `docs/handoff/**` and `AGENTS.md` when it
+starts; the payload's handoff checker is the kit repository's.
 
-What it does when it reopens: `now.md` becomes the open `handoff`
+What it does: `now.md` becomes the open `handoff`
 entry; each note of `pending/` a `project` entry whose first body line
 is `reopen when: ...`; each `gotchas/` note a `feedback` or `reference`
 entry; `decisions/` notes that are the product's become ADRs and the
@@ -34,5 +32,11 @@ handoffs. `AGENTS.md` points at `julieta memory index` instead of
 
 - Implements: none: a documentation move.
 - Operator: yes, the public repository loses its handoff tree.
-- Acceptance: written when it reopens.
-- Verify: written when it reopens.
+- Acceptance:
+  - Every open pending note and gotcha is an entry (`julieta memory
+    list --status open` names each by title); `now.md`'s next steps and
+    operator items are the open handoff; `docs/handoff/` holds only
+    `about.md`, which says where the state went, and `done/`.
+  - `AGENTS.md` names `julieta memory index` as the current state, and
+    `tools/ci docs` passes.
+- Verify: `julieta memory index`, `go run ./tools/ci docs`.
