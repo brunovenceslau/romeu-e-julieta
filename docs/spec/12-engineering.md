@@ -762,10 +762,10 @@ Evidence).
   <reason>", checked by `tools/ci lessons`; a lesson that can become a
   deterministic check becomes one in the same PR.
 - A lesson in `docs/lessons/` holds what building romeu taught; it is
-  read through `CONTRIBUTING.md` and by review, and it is not memory. A
-  memory entry tagged `lesson` ([08 8.1](08-memory-handoff-salvage.md#81-memory-store))
-  belongs to a user's project and is shown at SessionStart. The two
-  share a word and nothing else.
+  read through `CONTRIBUTING.md` and by review, and it is not memory.
+  What a session taught in a user's project is a memory entry of type
+  `feedback` ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1)),
+  listed at SessionStart.
 
 ## 12.8 Contributor docs (outlines)
 

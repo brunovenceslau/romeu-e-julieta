@@ -39,13 +39,19 @@ backend possible later.
 - `REQ-0658` The `julieta-claude` kit makes the agent's own memory directory
   non-writable, and sets the disabling setting when the pinned agent
   version has one (Q8).
-- `REQ-0659` The SessionStart hook (8.2) prints the open memory entries, so the
-  agent consumes memory instead of remembering to read it, and one
+- `REQ-0659` The SessionStart hook (8.2) prints the index of the open memory
+  entries, one line each, so the agent sees what is kept and reads an
+  entry with `julieta memory show <id>` when the work touches it, and one
   fixed line every session: `built-in memory is disabled, use julieta
-  memory add`.
+  memory add`. The index, not the bodies, is what the agent's own memory
+  loads at a session's start, and it is what fits the bound of 8.6.
 - `REQ-0660` The skill rule (`skills/julieta/SKILL.md`) tells the agent to use
-  `julieta memory` for anything worth keeping, and to tag an entry
-  `lesson` when it records what a session taught. `REQ-0661` Something worth
+  `julieta memory` for anything worth keeping, which type tag of 03 3.9
+  each case takes (`user`, `feedback`, `project`, `reference`), and to
+  keep out what the code, the git history or an instruction file
+  (`CLAUDE.md`, `AGENTS.md`, `.claude/rules/`) already holds; `add`
+  warns `memory-derivable` on the part of that rule a check can judge
+  (04 4.3). `REQ-0661` Something worth
   keeping that no memory entry fits, and that a runtime event would
   carry once the ledger is built, goes into the handoff, and the agent
   opens an issue labelled `deferred` that names the free-text note row
@@ -62,14 +68,14 @@ run every time, never remembered.
 
 | Hook | Command | Prints or writes |
 |---|---|---|
-| `REQ-0663` SessionStart, for every source the pinned Claude Code fires (startup, resume, clear, compact) | `julieta handoff show --hook` | `REQ-0664` in this order: (1) julieta's warnings, each by its slug of 04 4.1, one line each: `REQ-0665` `lock-stale`, `snapshots-disabled`, `agent-memory-writable`, `agent-path-missing` (8.5 step 5), `skills-stale`, `layout-stale`, `default-branch-moved` (`<repo> <old>..<new>`, shown by the first SessionStart after the move and then cleared), `agent-hooks-missing`, and every recorded hook failure (one line per hook and repo, the newest failure of each, shown until a later run of the same hook succeeds, below); (2) the fixed built-in memory line (8.1); (3) the latest narrative handoff over every manifest repo's memory dir (8.3), or the gap line of 8.3; (4) the facts that changed since it (branch moved, new commits, dirty count); (5) open entries not tagged `lesson`, newest first; (6) open entries tagged `lesson`, newest first. `REQ-0666` It reads every manifest repo's memory dir and labels each item with its repo. `REQ-0667` The whole output is bounded (8.6); when it is cut, the last line is `<n> more entries: julieta memory list`. The warnings are never cut; the bound of 8.6 applies to parts (2) to (6) |
+| `REQ-0663` SessionStart, for every source the pinned Claude Code fires (startup, resume, clear, compact) | `julieta handoff show --hook` | `REQ-0664` in this order: (1) julieta's warnings, each by its slug of 04 4.1, one line each: `REQ-0665` `lock-stale`, `snapshots-disabled`, `agent-memory-writable`, `agent-path-missing` (8.5 step 5), `memory-open-count`, `memory-stale`, `skills-stale`, `layout-stale`, `default-branch-moved` (`<repo> <old>..<new>`, shown by the first SessionStart after the move and then cleared), `agent-hooks-missing`, and every recorded hook failure (one line per hook and repo, the newest failure of each, shown until a later run of the same hook succeeds, below); (2) the fixed built-in memory line (8.1); (3) the latest narrative handoff over every manifest repo's memory dir (8.3), or the gap line of 8.3; (4) the facts that changed since it (branch moved, new commits, dirty count); (5) the index of the open entries, the line of `memory list` (04 4.3) per entry, newest `updatedAt` first, under a line that says how to read one: `read an entry: julieta memory show <id>`. `REQ-0666` It reads every manifest repo's memory dir and labels each item with its repo. `REQ-0667` The whole output is bounded (8.6) and cut at a line: the index holds every whole line that fits before the bound, as the agent's own memory loads its index, never a partial line, and when it is cut the last line is `<n> more entries: julieta memory list`. The warnings are never cut; the bound of 8.6 applies to parts (2) to (5). `REQ-1291` Two warnings keep the index small without a hand: `memory-open-count` when the open entries of the project exceed the count of 8.6, and `memory-stale`, one line naming the id and title, for each open entry whose `updatedAt` is older than the days of 8.6; both are printed in part (1), and both are hints to close or update, since julieta deletes nothing (8.1) |
 | SessionEnd | `julieta handoff write --facts` | `REQ-0668` a `facts` handoff, so a session that ends without `/handoff` still leaves stamped git facts; whether it raises the gap line is decided by the facts it carries (8.3), not by its time |
 
 `REQ-0669` julieta records in its state the time of the last SessionStart hook run
 (`handoff show --hook`) and of the last SessionEnd run (`handoff write
 --facts`); 8.5 step 1 reads them.
 
-`REQ-0670` Memory, handoff and lesson text is written by agents. SessionStart
+`REQ-0670` Memory and handoff text is written by agents. SessionStart
 shows it to the next session as data, under a line that says so; the
 bound limits its volume, not its content
 ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1)).
@@ -357,4 +363,6 @@ one place they are written.
 | files in `handoff/` | 1 000 |
 | facts files julieta keeps in `handoff/` | the newest 50 |
 | SessionStart output | 8 KiB |
+| open entries of a project before `memory-open-count` | 200 |
+| days without an update before an open entry is `memory-stale` | 90 |
 | salvage cap, per salvage (the manifest's `salvage.capBytes`, 03 3.6) | 1 GiB |

@@ -432,7 +432,7 @@ generated glossary page is a row of
 | retire | the inverse of sync: rm, then move `<name>-env/` to `$ROMEU_ROOT/.attic/`; never deletes. What it moves is the owner's to delete by hand (J7 step 4) | - |
 | orphaned | a project or repo dir in the host tree that no spec names (J7, J13) | - |
 | handoff | agent narrative (`clear`, `final`) or julieta-stamped git facts (`facts`), a plain file in the memory dir | - |
-| lesson | in a user's project, a memory entry tagged `lesson` ([08 8.1](08-memory-handoff-salvage.md#81-memory-store)), shown at SessionStart; in this repository, a file under `docs/lessons/` ([12 12.7](12-engineering.md#127-text-standard-and-lessons)), read by contributors and review. The two share the word only | - |
+| lesson | a file under `docs/lessons/` of this repository ([12 12.7](12-engineering.md#127-text-standard-and-lessons)), read by contributors and review; what a session taught in a user's project is a memory entry of type `feedback` ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1)) and is not called a lesson | - |
 | widening set | gate 2's digested content | - |
 | recreate-class | fields tagged `apply:"recreate"`: name (the sandbox's name derives from the project's, so a renamed project is a new sandbox; decided on 2026-10-22), repos, kits, workload, ports, sandbox options, agent, and (until probe A10 says otherwise) secrets | - |
 | recreate needed | the live sandbox's recreate digest differs from the approved one; `status` reports it, and `run` raises `recreate-needed` ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3) | stale (for the recreate digest) |

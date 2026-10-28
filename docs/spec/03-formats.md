@@ -645,15 +645,26 @@ schema: memory-entry/v1
 id: 01j9z3k8m6t2q4w5e7r9y1v3k5
 title: Flaky integration test on arm64
 status: open            # open | done
-tags: [ci, arm64]       # the tag "lesson" makes SessionStart print the entry
+tags: [feedback, ci]    # one type tag (user, feedback, project, reference) plus free tags
 createdAt: 2026-10-02T09:20:00Z
 updatedAt: 2026-10-02T09:20:00Z
 ---
 Free-form markdown body.
 ```
 
-`REQ-0242` Tags with behaviour are a closed set: `lesson` (SessionStart prints the
-entry). `REQ-0243` An entry file is self-contained: copying `memory/<dir>/entries/`
+`REQ-0242` Tags with behaviour are a closed set, the four type tags, which are
+the kinds of note the pinned agent's own memory records and are used in
+the same cases: `user` (the operator's role, expertise and working
+preferences), `feedback` (a correction the operator gave or an approach
+the operator confirmed, and what the work taught), `project` (ongoing
+work, decisions and ordering that the code and the git history do not
+hold) and `reference` (where to find something outside the repository).
+`REQ-1287` Every entry carries exactly one type tag, as every note of the
+agent's own memory carries its kind: `add` without one, and `add` or
+`edit` with two, is a usage error (exit 2) that names the four. An entry
+file written before this rule, whose tags hold none, is listed with the
+type `-` until an `edit` gives it one; `list --tag` never matches it. No
+other tag has behaviour. `REQ-0243` An entry file is self-contained: copying `memory/<dir>/entries/`
 whole is a complete move, and the store lock is recreated on first use.
 
 ## 3.10 Handoff file (schema `handoff.v1`)

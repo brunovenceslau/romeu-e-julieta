@@ -179,7 +179,7 @@ TTY, after which `run`, `salvage` and `rm` work as usual.
 3. [O] `/clear`: [J] the `SessionEnd` hook writes a `facts` handoff,
    then the new session's `SessionStart` hook prints the latest
    narrative (the one from step 2, never displaced by the facts file),
-   the facts that changed since, open memory entries, `lesson` entries
+   the facts that changed since, the index of the open memory entries
    and julieta's warnings; the agent resumes. Without `/handoff`, the
    facts handoff is still there. The container e2e runs the two hooks in
    both orders, so the rule does not wait for Q22; the guide describes
