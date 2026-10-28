@@ -6,7 +6,13 @@ module: julieta-core
 fate: new
 owns:
   - internal/cmd/julieta/setup/repo_setup*.go
-  - internal/cmd/julieta/setup/install.go
+  - internal/cmd/julieta/setup/install*.go
+  - internal/cmd/julieta/setup/steps.go
+  - internal/cmd/julieta/setup/setup.go
+  - internal/cmd/julieta/setup/*_test.go
+  - e2e/julieta_setup_test.go
+  - docs/spec/04-cli.md
+  - docs/spec/08-memory-handoff-salvage.md
   - mise.toml
   - docs/handoff/gotchas/0000000000k5wq4gpchaf1ydgt-a-recreated-sandbox-needs-mise-install-and-tools-ci-setup.md
 needs:
@@ -29,13 +35,16 @@ SessionStart list of 08 8.2 with the code (`TestWarningSlugs`).
 `after: T177` for the shared e2e file of `setup`.
 
 1. Trust (REQ-1306): before `install`, `setup` runs `mise trust` on each
-   repo's `mise.toml` (the files `install` already reads), inside the
-   sandbox only, with the mise environment of `install` (REQ-0403). A
-   repo with no mise configuration is skipped. The host side of I23 is
+   configuration file `install` reads, inside the sandbox only, with the
+   mise environment of `install` (REQ-0403) but `MISE_TRUSTED_CONFIG_PATHS`
+   and `MISE_PARANOID` unset, as the agent's shell has them, so the trust
+   is recorded where that shell reads it. A repo with no mise
+   configuration is skipped. The host side of I23 is
    untouched: no host command trusts anything.
 2. The repo's task (REQ-1307): after `install`, in each repo whose mise
-   configuration defines the task `setup`, `mise run setup` with the
-   same environment and the timeout of 04 4.1's budget table; a non-zero
+   configuration defines the task `setup` (as `mise tasks ls --json`
+   lists it), `mise run setup` with the same environment and the 30 min
+   budget 04 4.1 gives it beside `mise install`; a non-zero
    exit or a timeout is the warning `repo-setup-failed` (`<repo> exit
    <n>`) and `setup` goes on; a repo without the task is skipped
    silently.
@@ -55,9 +64,14 @@ SessionStart list of 08 8.2 with the code (`TestWarningSlugs`).
     is under the sandbox's mise state, not the repo.
   - A repo whose task `setup` writes a marker file has it after `setup`;
     a task that exits 3 warns `repo-setup-failed` naming the repo and
-    `exit 3`, and `setup` exits 0; a repo without the task, or without
-    mise configuration, warns nothing.
-  - In this repository's sandbox, after `julieta setup` alone,
-    `go run ./tools/ci fast` passes with no other setup command.
+    `exit 3`, and `setup` exits 0; a task past its budget (a test seam
+    shortens it) warns the same with the timeout named; a repo without
+    the task, or without mise configuration, warns nothing.
+  - `repo-setup-failed` joins the warnings list of 04 4.1 and the
+    SessionStart list of 08 8.2, the lag sentence under REQ-0276 goes;
+    `TestWarningSlugs` passes.
+  - Operator evidence: in this repository's sandbox, after `julieta
+    setup` alone, `go run ./tools/ci fast` passes with no other setup
+    command.
 - Verify: `go test -race ./internal/cmd/julieta/setup/...`,
   `go test ./e2e -run JulietaSetup` and `go run ./tools/ci fast`.
