@@ -50,6 +50,16 @@ const ConfigKitsDir = "kits"
 // personal kit may not (06 6.1, REQ-0574; I28, REQ-0514): a sync error.
 var ErrPersonalCapability = errors.New("render: a capability a personal kit may not declare")
 
+// ErrPersonalKind is the error of a personal kit whose descriptor kind
+// is not mixin (06 6.1, REQ-0574): a set lists other kits whose
+// capabilities are not in its own descriptor, so the check of
+// ErrPersonalCapability would not see them, and a workload is the base
+// image, not a kit added to one. A sync error.
+var ErrPersonalKind = errors.New("render: a kind a personal kit may not be")
+
+// personalKind is the one descriptor kind a personal kit may be.
+const personalKind = "mixin"
+
 // KitMaterializer is the Materializer of kits/ (06 6.1, REQ-0568): it
 // writes each kit of the spec into the candidate's kits dir, a product
 // kit from FS and a personal kit from the config commit's tree.
@@ -98,7 +108,8 @@ type KitMaterializer struct {
 // fails the sync before anything is written. The bytes of the kit's
 // files are read with gitsafe.ReadDir, one dir at a time, which holds
 // a file to 1 MiB and a dir to 64 MiB, and must list exactly the files
-// the walk listed. A personal kit that declares a capability of
+// the walk listed. A personal kit whose kind is not mixin is
+// ErrPersonalKind, and one that declares a capability of
 // refusedCapability is ErrPersonalCapability; any other capability is
 // kept in its set, for the gate.
 //
@@ -263,6 +274,9 @@ func (s KitMaterializer) personal(ctx context.Context, tree []gitsafe.TreeEntry,
 	m, err := kitOf(id, files)
 	if err != nil {
 		return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: %w", id, err)
+	}
+	if k := m.Capabilities.Kind; k != personalKind {
+		return MaterializedKit{}, nil, fmt.Errorf("%w: the personal kit %q is a %s; a personal kit is a %s", ErrPersonalKind, id, k, personalKind)
 	}
 	if typ := refusedCapability(m.Capabilities); typ != "" {
 		return MaterializedKit{}, nil, fmt.Errorf("%w: the personal kit %q declares a %s capability", ErrPersonalCapability, id, typ)

@@ -240,6 +240,37 @@ func TestPersonalKitsRefuseTheFiveCapabilities(t *testing.T) {
 	}
 }
 
+// TestPersonalKitsAreMixins: a personal kit whose kind is set or
+// workload is a sync error naming the kit and the kind, and nothing is
+// written (REQ-0574): a set's listed kits carry capabilities its own
+// descriptor does not, and a workload is the base image.
+func TestPersonalKitsAreMixins(t *testing.T) {
+	t.Parallel()
+	descriptors := map[string]string{
+		"set": "schemaVersion: \"3\"\nkind: set\nkits:\n  - ref: example.com/org/kit:1\n    digest: sha256:" +
+			strings.Repeat("a", 64) + "\n",
+		"workload": "schemaVersion: \"3\"\nkind: workload\ndockerfile: kit.dockerfile\n",
+	}
+	files := map[string]string{"kits/workload/kit.dockerfile": "FROM scratch\n"}
+	for kind, d := range descriptors {
+		files["kits/"+kind+"/"+kind+".yaml"] = d
+	}
+	dir, commit := configRepo(t, files)
+	m := personalSource(t, dir, commit)
+	for kind := range descriptors {
+		t.Run(kind, func(t *testing.T) {
+			t.Parallel()
+			parent, cand := candidateIn(t)
+			p := spec.Project{Kits: []spec.Kit{{Product: "plain"}, {Personal: kind}}}
+			_, err := m.Materialize(t.Context(), cand, p)
+			require.ErrorIs(t, err, render.ErrPersonalKind)
+			assert.Contains(t, err.Error(), `the personal kit "`+kind+`" is a `+kind+`; a personal kit is a mixin`)
+			assertNothingWritten(t, cand)
+			assertOnlyCandidate(t, parent)
+		})
+	}
+}
+
 // TestPersonalKitsKeepTheOtherCapabilities: an install step and a
 // privilege are not refused; they stay in the capability set the gate
 // shows.

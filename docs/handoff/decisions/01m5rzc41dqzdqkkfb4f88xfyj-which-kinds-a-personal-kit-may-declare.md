@@ -22,3 +22,11 @@ separate decision.
 
 Reopen: the review of the slice 3 pull request, or the next edit of
 06 6.1.
+
+Decided on 2026-10-28, the recommendation: a personal kit is a `mixin`,
+and `render` refuses a `set` or a `workload` with ErrPersonalKind,
+naming the kit and the kind, before any file is written (T038, slice 3).
+06 6.1 states it in REQ-0574.
+
+Reopened by: a personal kit that needs to bundle other kits, which
+would make a set whose listed kits are each checked as a personal kit.
