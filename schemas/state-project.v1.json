@@ -54,6 +54,49 @@
                   "capabilities": {
                     "additionalProperties": false,
                     "properties": {
+                      "acp": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "agent": {
+                              "type": "string"
+                            },
+                            "command": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "argv": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                },
+                                "shell": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "env": {
+                              "additionalProperties": {
+                                "type": "string"
+                              },
+                              "type": "object"
+                            },
+                            "optional": {
+                              "type": "boolean"
+                            },
+                            "protocolVersion": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "agent",
+                            "command"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
                       "args": {
                         "additionalProperties": {
                           "additionalProperties": false,
@@ -105,6 +148,9 @@
                             },
                             "optional": {
                               "type": "boolean"
+                            },
+                            "version": {
+                              "type": "integer"
                             }
                           },
                           "type": "object"
@@ -292,6 +338,60 @@
                           "type": "object"
                         },
                         "type": "array"
+                      },
+                      "interactiveSessions": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "continue": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "list": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "argv": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "shell": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "newSession": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "prompt": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "resume": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "sessionPicker": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "type": "object"
                       },
                       "kind": {
                         "type": "string"
@@ -593,6 +693,9 @@
                           "additionalProperties": false,
                           "properties": {
                             "container": {
+                              "type": "string"
+                            },
+                            "family": {
                               "type": "string"
                             },
                             "name": {
@@ -900,6 +1003,49 @@
                 "capabilities": {
                   "additionalProperties": false,
                   "properties": {
+                    "acp": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "agent": {
+                            "type": "string"
+                          },
+                          "command": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "argv": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "shell": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "env": {
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "type": "object"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "protocolVersion": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "agent",
+                          "command"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
                     "args": {
                       "additionalProperties": {
                         "additionalProperties": false,
@@ -951,6 +1097,9 @@
                           },
                           "optional": {
                             "type": "boolean"
+                          },
+                          "version": {
+                            "type": "integer"
                           }
                         },
                         "type": "object"
@@ -1138,6 +1287,60 @@
                         "type": "object"
                       },
                       "type": "array"
+                    },
+                    "interactiveSessions": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "continue": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "list": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "argv": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "shell": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "newSession": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "optional": {
+                          "type": "boolean"
+                        },
+                        "prompt": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "resume": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "sessionPicker": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "type": "object"
                     },
                     "kind": {
                       "type": "string"
@@ -1439,6 +1642,9 @@
                         "additionalProperties": false,
                         "properties": {
                           "container": {
+                            "type": "string"
+                          },
+                          "family": {
                             "type": "string"
                           },
                           "name": {

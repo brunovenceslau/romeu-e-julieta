@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -508,7 +509,16 @@ func TestEveryCapabilityTypeIsOfTheTypeForm(t *testing.T) {
 			assert.NotContains(t, err.Error(), "does not model", typ)
 		}
 	}
-	assert.Len(t, capabilityTypes, 19)
+	// The closed list is the kit schema of the pinned frontend
+	// (REQ-0516): one type per capability file of the vendored copy.
+	files, err := filepath.Glob("../../tools/ci/internal/schema/third_party/sandbox-kit-spec/schema/capabilities/com.docker.sandbox/*.schema.json")
+	require.NoError(t, err)
+	var schemaTypes []string
+	for _, f := range files {
+		schemaTypes = append(schemaTypes, "com.docker.sandbox/"+strings.TrimSuffix(filepath.Base(f), ".schema.json"))
+	}
+	require.NotEmpty(t, schemaTypes)
+	assert.ElementsMatch(t, schemaTypes, capabilityTypes, "the grammar models every type of the vendored schema, and no other")
 }
 
 func TestPlatformString(t *testing.T) {

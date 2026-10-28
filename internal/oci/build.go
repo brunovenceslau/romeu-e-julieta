@@ -30,6 +30,9 @@ const (
 	typeSbx         = "com.docker.sandbox/sbx@1"
 	typeKitRegistry = "com.docker.sandbox/kit-registry@1"
 	typeSessions    = "com.docker.sandbox/agent-sessions@1"
+	typeInteractive = "com.docker.sandbox/agent-interactive-sessions@1"
+	typeACP         = "com.docker.sandbox/acp@1"
+	typeContext2    = "com.docker.sandbox/agent-context@2"
 	typeLifecycle   = "com.docker.sandbox/lifecycle@1"
 	typeContext     = "com.docker.sandbox/agent-context@1"
 	typeLongRunning = "com.docker.sandbox/long-running@1"
@@ -42,6 +45,7 @@ var capabilityTypes = []string{
 	typeNetwork1, typeNetwork2, typeCredential, typeSSHAgent, typeSkills, typeSkill,
 	typeVolume, typeHostMount, typePort, typeUSB, typeResources, typePrivileged, typeSbx,
 	typeKitRegistry, typeSessions, typeLifecycle, typeContext, typeLongRunning, typeGitIdentity,
+	typeInteractive, typeACP, typeContext2,
 }
 
 // builder collects the capabilities of one descriptor.
@@ -157,6 +161,12 @@ func (b *builder) item(at string, it itemDoc, inherited bool) error {
 		return b.lifecycle(it.Config, optional)
 	case typeContext:
 		return b.agentContext(it.Config, optional)
+	case typeContext2:
+		return b.agentContext2(it.Config, optional)
+	case typeInteractive:
+		return b.interactiveSessions(it.Config, optional)
+	case typeACP:
+		return b.acp(it.Config, optional)
 	case typePrivileged, typeSbx, typeKitRegistry, typeLongRunning, typeGitIdentity:
 		if len(it.Config) > 0 {
 			return invalid("%s takes no config", b.at)
@@ -647,6 +657,7 @@ type portDoc struct {
 	Name      string         `json:"name"`
 	Container jsontext.Value `json:"container"`
 	Transport string         `json:"transport"`
+	Family    string         `json:"family"`
 }
 
 // port adds a port@1.
@@ -662,7 +673,7 @@ func (b *builder) port(cfg jsontext.Value, optional bool) error {
 	if err := b.need("container port", c); err != nil {
 		return err
 	}
-	b.caps.Ports = append(b.caps.Ports, Port{Name: d.Name, Container: c, Transport: d.Transport, Optional: optional})
+	b.caps.Ports = append(b.caps.Ports, Port{Name: d.Name, Container: c, Transport: d.Transport, Family: d.Family, Optional: optional})
 	return nil
 }
 
@@ -824,4 +835,84 @@ func (c *Capabilities) sort() {
 	c.Context = sortedSet2(c.Context)
 	c.Skills = sortedSet2(c.Skills)
 	c.Flags = sortedSet2(c.Flags)
+}
+
+// interactiveSessions adds an agent-interactive-sessions@1.
+func (b *builder) interactiveSessions(cfg jsontext.Value, optional bool) error {
+	if err := b.singleton(b.caps.InteractiveSessions != nil); err != nil {
+		return err
+	}
+	var d struct {
+		Prompt        []string       `json:"prompt"`
+		Resume        []string       `json:"resume"`
+		Continue      []string       `json:"continue"`
+		NewSession    []string       `json:"newSession"`
+		SessionPicker []string       `json:"sessionPicker"`
+		List          jsontext.Value `json:"list"`
+	}
+	if err := strict(b, cfg, &d); err != nil {
+		return err
+	}
+	if len(d.Prompt) == 0 && len(d.Resume) == 0 && len(d.Continue) == 0 && len(d.NewSession) == 0 &&
+		len(d.SessionPicker) == 0 && len(d.List) == 0 {
+		return invalid("%s declares no verb", b.at)
+	}
+	s := &InteractiveSessions{Prompt: d.Prompt, Resume: d.Resume, Continue: d.Continue, NewSession: d.NewSession,
+		SessionPicker: d.SessionPicker, Optional: optional}
+	if len(d.List) > 0 {
+		c, err := b.command(d.List)
+		if err != nil {
+			return err
+		}
+		s.List = &c
+	}
+	b.caps.InteractiveSessions = s
+	return nil
+}
+
+// acp adds an acp@1: an agent and its command are required.
+func (b *builder) acp(cfg jsontext.Value, optional bool) error {
+	var d struct {
+		Agent           string            `json:"agent"`
+		Command         jsontext.Value    `json:"command"`
+		Env             map[string]string `json:"env"`
+		ProtocolVersion jsontext.Value    `json:"protocolVersion"`
+	}
+	if err := strict(b, cfg, &d); err != nil {
+		return err
+	}
+	if err := b.need("agent", d.Agent); err != nil {
+		return err
+	}
+	c, err := b.command(d.Command)
+	if err != nil {
+		return err
+	}
+	v, err := b.scalar("protocolVersion", d.ProtocolVersion)
+	if err != nil {
+		return err
+	}
+	b.caps.ACP = append(b.caps.ACP, ACP{Agent: d.Agent, Command: c, Env: d.Env, ProtocolVersion: v, Optional: optional})
+	return nil
+}
+
+// agentContext2 adds an agent-context@2: inline content, a filename, or
+// both, and a directory only with a filename.
+func (b *builder) agentContext2(cfg jsontext.Value, optional bool) error {
+	var d struct {
+		Filename  string `json:"filename"`
+		Content   string `json:"content"`
+		Directory string `json:"directory"`
+	}
+	if err := strict(b, cfg, &d); err != nil {
+		return err
+	}
+	if d.Filename == "" && d.Content == "" {
+		return invalid("%s declares neither a filename nor content", b.at)
+	}
+	if d.Directory != "" && d.Filename == "" {
+		return invalid("%s sets a directory without a filename", b.at)
+	}
+	b.caps.Context = append(b.caps.Context, Context{Filename: d.Filename, Content: d.Content, Directory: d.Directory, Version: 2, Optional: optional})
+	return nil
 }
