@@ -44,7 +44,9 @@ var _ = cli.Register(func() cli.Command {
 
 // add adds an entry of the content in, or prints the open entry whose
 // memory-content digest is the same and writes nothing (04 4.1,
-// Idempotency); either way it prints the id, the path and the repo.
+// Idempotency); either way it prints the id, the path and the repo,
+// and warns memory-derivable on stderr when the body repeats a line of
+// the repo's instruction files (REQ-1290).
 func add(env *cli.Env, repo string, in memstore.Content) error {
 	t, err := resolve(repo)
 	if err != nil {
@@ -60,6 +62,9 @@ func add(env *cli.Env, repo string, in memstore.Content) error {
 		return readErr(err, t)
 	}
 	rep := Report{Schema: Schema, Repo: t.repo.Dir, Wrote: wrote, Entries: []Entry{entryOf(s.Reader, e)}}
+	for _, m := range derivable(t.repo.Path, in.Body) {
+		cli.Warn(env.Stderr, "memory-derivable", m)
+	}
 	return output(env, rep, func(out *cli.Writer) error {
 		if wrote {
 			return written(out, "added", rep.Entries[0], rep.Repo)
