@@ -1,0 +1,16 @@
+# Conformance fixture of probe A11 (11 11.1, REQ-0989; I28), one per
+# capability type the probe exercised. source: sitting M0, reconstructed.
+# Sitting M0 (2026-10-19, sbx v0.48.0, frontend
+# docker/sandbox-kit:3.0.0-m.8) built the kit rj-probe from seven one-file
+# fixtures; their bytes were not kept. These are rebuilt from its record,
+# docs/handoff/decisions/00000000005z9f102d4ptbtjbm-sitting-m0-the-kit-frontend-is-a-go.md,
+# which names the types sbx composed and the one it does not support; the
+# formal probes of M6 measure them again from real bytes.
+# sbx v0.48.0: unsupported: required, create refuses it ("unsupported capability type")
+schemaVersion: "3"
+kind: mixin
+displayName: a11-host-mount
+description: an A11 conformance fixture
+capabilities:
+  - type: com.docker.sandbox/host-mount@1
+    config: {path: /m}
