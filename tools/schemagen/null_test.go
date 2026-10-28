@@ -132,7 +132,7 @@ func TestRenderRecordValidates(t *testing.T) {
 
 	withNull := strings.Replace(string(rest), `"repos":`, `"promoting":null,"repos":`, 1)
 	require.NotEqual(t, string(rest), withNull)
-	assert.Error(t, validate([]byte(withNull)), "promoting: null")
+	require.Error(t, validate([]byte(withNull)), "promoting: null")
 
 	var rec map[string]jsontext.Value
 	require.NoError(t, jsonv2.Unmarshal(rest, &rec))
