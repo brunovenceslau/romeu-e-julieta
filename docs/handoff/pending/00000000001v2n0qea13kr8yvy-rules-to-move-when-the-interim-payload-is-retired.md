@@ -29,18 +29,26 @@ repository (REQ-0608) unless named otherwise:
 - A brief names its skills, or is refused (the sandbox definitions
   repository's ADR-0035, its brief guard hook). Sent: in the payload
   since 2026-10-13. Open: `julieta hooks guard` (REQ-0597 to REQ-0599),
-  which carries no brief rule today; the destination is the product's
-  guard, not the personal kit.
+  which carries no brief rule today.
 - An edit waits for its skill: a Go file for
-  `cc-skills-golang:golang-how-to`, and, in a follow-up pull request of
-  that repository, a spec, plan or skill file for `agent-skills:spec`,
-  `agent-skills:plan` or `anthropic-skills:skill-creator` (the skill row
-  is this repository's ADR 0040 made a check). Recorded in that
+  `cc-skills-golang:golang-how-to`, a spec for `agent-skills:spec`, a
+  plan for `agent-skills:plan`, a skill for
+  `anthropic-skills:skill-creator` (the skill-file row is this
+  repository's ADR 0040 made a check). Sent: the sandbox definitions
   repository's ADR-0040 and section 15 of its
-  `docs/intent/brief-guard-spec.md`, decided on 2026-10-28 in its pull
-  request #307. Open: `julieta hooks guard`, which carries no edit rule
-  today. Losing either rule is silent: no check fails when the payload's
-  guard goes.
+  `docs/intent/brief-guard-spec.md`, merged on 2026-10-28 in that
+  repository's pull requests #307 (Go) and #308 (the table of rows).
+  Open, split as decided on 2026-10-28: the mechanism goes to the
+  product, `julieta hooks guard` (it reads a table of path globs and the
+  skills that satisfy each, refuses an edit a row names until one of its
+  skills is loaded, and passes every other edit when it cannot tell, while
+  its Bash refusals of REQ-0598 stay fail-closed as REQ-0599 says); the
+  rows go to the personal kit (REQ-0608, T114), because the skills they
+  name are the maintainer's choice and an adopter may not have those
+  plugins. The spec must grow first: REQ-0410 and REQ-0598 read only a
+  Bash call's `tool_input.command`, and the rule needs the file tools'
+  inputs and the Skill calls. Losing either rule
+  is silent: no check fails when the payload's guard goes.
 
 The payload holds other rules that came from elsewhere; listing them
 belongs to the payload's own repository.
