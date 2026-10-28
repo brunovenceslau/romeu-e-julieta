@@ -3,7 +3,7 @@ id: T173
 title: "memory add warns on a derivable body"
 milestone: M2
 module: memstore
-fate: new
+fate: merged
 owns:
   - internal/cmd/julieta/memory/derivable*.go
 needs:
@@ -12,6 +12,8 @@ after:
   - T171
 ask_first: []
 sitting: none
+merged: 2026-10-28
+pr: 294
 ---
 
 # T173 - memory add warns on a derivable body
