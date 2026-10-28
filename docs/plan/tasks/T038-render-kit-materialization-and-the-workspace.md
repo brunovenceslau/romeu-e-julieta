@@ -3,7 +3,7 @@ id: T038
 title: "`render`: kit materialization and `.romeu/bin`"
 milestone: M3
 module: render
-fate: kept
+fate: merged
 owns:
   - internal/render/kits*.go
   - internal/render/bin*.go
@@ -16,6 +16,8 @@ needs:
 after: []
 ask_first: []
 sitting: none
+merged: 2026-10-28
+pr: 301
 ---
 
 # T038 - `render`: kit materialization and `.romeu/bin`
