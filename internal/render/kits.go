@@ -8,13 +8,16 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/oci"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/shquote"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
@@ -38,20 +41,39 @@ const JulietaBinArg = "julietaBin"
 // first's.
 var goarchForm = regexp.MustCompile(`^[a-z0-9]+$`)
 
-// ErrPersonalKit is the error of a spec kit that names a personal kit,
-// which this source does not materialize: personal kits come from the
-// config commit's tree through gitsafe.WalkTree (I27), a source that
-// joins ProductKits.Materialize beside the product one.
-var ErrPersonalKit = errors.New("render: a personal kit is not materialized yet")
+// ConfigKitsDir is the dir of the config repo's tree that holds the
+// personal kits, one dir per kit, each with its descriptor <kit>.yaml
+// (02 2.2).
+const ConfigKitsDir = "kits"
 
-// ProductKits is the product-kit half of the Materializer seam (06
-// 6.1, REQ-0568): it writes each product kit of the spec from FS, the
-// one embed.FS of kits/embed.go in production (kits.FS, T077) and a
-// fixture in a test, into the candidate's kits dir. A personal kit of
-// the spec is ErrPersonalKit until the personal source lands.
-type ProductKits struct {
+// ErrPersonalCapability is the error of a personal kit that declares a
+// network, mount, volume, credential or ssh-agent capability, which a
+// personal kit may not (06 6.1, REQ-0574; I28, REQ-0514): a sync error.
+var ErrPersonalCapability = errors.New("render: a capability a personal kit may not declare")
+
+// ErrPersonalKind is the error of a personal kit whose descriptor kind
+// is not mixin (06 6.1, REQ-0574): a set lists other kits whose
+// capabilities are not in its own descriptor, so the check of
+// ErrPersonalCapability would not see them, and a workload is the base
+// image, not a kit added to one. A sync error.
+var ErrPersonalKind = errors.New("render: a kind a personal kit may not be")
+
+// MaxPersonalKit is the most bytes the files of one personal kit hold
+// in all, 64 MiB, the most gitsafe.ReadDir reads of one dir (06 6.1,
+// REQ-0568): a kit of many dirs is refused once its reads pass it, so
+// a sync holds a bounded copy before it writes.
+const MaxPersonalKit = 64 << 20
+
+// personalKind is the one descriptor kind a personal kit may be.
+const personalKind = "mixin"
+
+// KitMaterializer is the Materializer of kits/ (06 6.1, REQ-0568): it
+// writes each kit of the spec into the candidate's kits dir, a product
+// kit from FS and a personal kit from the config commit's tree.
+type KitMaterializer struct {
 	// FS holds one directory per product kit, each with its descriptor
-	// <kit>.yaml.
+	// <kit>.yaml: the one embed.FS of kits/embed.go in production
+	// (kits.FS, T077) and a fixture in a test.
 	FS fs.FS
 	// EnvDir is the absolute path of <name>-env/, the root of the
 	// .romeu/bin julieta lives in.
@@ -59,6 +81,19 @@ type ProductKits struct {
 	// GOARCH is romeu's own GOARCH, which names the binary
 	// (REQ-0584).
 	GOARCH string
+	// Git reads the config repo, hardened for the host. It, ConfigDir
+	// and ConfigCommit are needed only when the spec names a personal
+	// kit.
+	Git *gitsafe.Runner
+	// ConfigDir is the absolute path of the root of the config repo's
+	// clone.
+	ConfigDir string
+	// ConfigCommit is the full object id of the config commit the spec
+	// was read at (Record.SpecSource.Commit).
+	ConfigCommit string
+	// MaxPersonal is the most bytes one personal kit holds in all, or
+	// zero for MaxPersonalKit; a test lowers it.
+	MaxPersonal int
 }
 
 // Materialize writes each kit of p into the candidate c, under the name
@@ -67,7 +102,8 @@ type ProductKits struct {
 // 3.12), parses the descriptor's capability set (oci.ParseDescriptor,
 // REQ-0569), and, when the descriptor declares the arg julietaBin,
 // renders it as the absolute path of the project's .romeu/bin julieta,
-// quoted through internal/shquote (REQ-0584, REQ-0596). The files are
+// quoted through internal/shquote (REQ-0584, REQ-0596). Every kit is
+// read and checked before any file is written, and the files are
 // written through an os.Root on the candidate.
 //
 // A file of FS is a regular file: a link or a device is refused. An
@@ -75,10 +111,24 @@ type ProductKits struct {
 // written and digested as regular; a kit that needs an executable file
 // needs another carrier. Only a fixture FS can say a file is executable.
 //
-// A failure leaves the files already written in the candidate. The
-// caller discards the candidate: internal/state deletes a leftover one
-// at the next sync.
-func (s ProductKits) Materialize(_ context.Context, c Candidate, p spec.Project) ([]MaterializedKit, error) {
+// A personal kit is the dir kits/<kit>/ of the config commit's tree.
+// When the spec names one, the commit gets two independent checks
+// first (05 5.1, REQ-0465; I27): git fsck --strict, then the validated
+// walk of the whole tree (gitsafe.WalkTree); a tree that either refuses
+// fails the sync before anything is written. The bytes of the kit's
+// files are read with gitsafe.ReadDir, one dir at a time, which holds
+// a file to 1 MiB and a dir to 64 MiB, and must list exactly the files
+// the walk listed. A personal kit whose kind is not mixin is
+// ErrPersonalKind, and one that declares a capability of
+// refusedCapability is ErrPersonalCapability; any other capability is
+// kept in its set, for the gate.
+//
+// A failure while writing leaves the files already written in the
+// candidate. The caller discards the candidate: internal/state deletes
+// a leftover one at the next sync.
+//
+//romeu:invariant I27 guard
+func (s KitMaterializer) Materialize(ctx context.Context, c Candidate, p spec.Project) ([]MaterializedKit, error) {
 	if !path.IsAbs(s.EnvDir) || path.Clean(s.EnvDir) != s.EnvDir {
 		return nil, fmt.Errorf("render: the env dir %q is not an absolute clean path", s.EnvDir)
 	}
@@ -90,18 +140,23 @@ func (s ProductKits) Materialize(_ context.Context, c Candidate, p spec.Project)
 	if err != nil {
 		return nil, fmt.Errorf("render: the path of julieta: %w", err)
 	}
-	r, err := os.OpenRoot(c.Dir)
-	if err != nil {
-		return nil, fmt.Errorf("render: %w", err)
+	var tree []gitsafe.TreeEntry
+	if slices.ContainsFunc(p.Kits, func(k spec.Kit) bool { return k.Personal != "" }) {
+		if tree, err = s.configTree(ctx); err != nil {
+			return nil, err
+		}
 	}
-	defer func() { _ = r.Close() }()
 
 	out := make([]MaterializedKit, 0, len(p.Kits))
+	files := make([][]gate.File, 0, len(p.Kits))
 	for _, k := range p.Kits {
+		var m MaterializedKit
+		var f []gate.File
 		if k.Personal != "" {
-			return nil, fmt.Errorf("%w: %q", ErrPersonalKit, k.Personal)
+			m, f, err = s.personal(ctx, tree, k.Personal)
+		} else {
+			m, f, err = s.product(k.Product)
 		}
-		m, files, err := s.read(k.Product)
 		if err != nil {
 			return nil, err
 		}
@@ -111,10 +166,19 @@ func (s ProductKits) Materialize(_ context.Context, c Candidate, p spec.Project)
 			}
 			m.Rendered = map[string]string{JulietaBinArg: quoted}
 		}
-		if err := writeKit(r, m.Dir(), files); err != nil {
+		out = append(out, m)
+		files = append(files, f)
+	}
+
+	r, err := os.OpenRoot(c.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("render: %w", err)
+	}
+	defer func() { _ = r.Close() }()
+	for i, m := range out {
+		if err := writeKit(r, m.Dir(), files[i]); err != nil {
 			return nil, fmt.Errorf("render: the kit %q: %w", m.ID, err)
 		}
-		out = append(out, m)
 	}
 	return out, nil
 }
@@ -140,9 +204,9 @@ func checkArg(kit, name, value string, a oci.Arg) error {
 	return nil
 }
 
-// read returns the product kit id of FS, without its Rendered args, and
-// its files.
-func (s ProductKits) read(id string) (MaterializedKit, []gate.File, error) {
+// product returns the product kit id of FS, without its Rendered args,
+// and its files.
+func (s KitMaterializer) product(id string) (MaterializedKit, []gate.File, error) {
 	if err := oneElement(id); err != nil {
 		return MaterializedKit{}, nil, fmt.Errorf("render: the product kit %q: %w", id, err)
 	}
@@ -154,19 +218,158 @@ func (s ProductKits) read(id string) (MaterializedKit, []gate.File, error) {
 	if err != nil {
 		return MaterializedKit{}, nil, fmt.Errorf("render: the product kit %q: %w", id, err)
 	}
-	i := slices.IndexFunc(files, func(f gate.File) bool { return f.Path == id+".yaml" })
-	if i < 0 {
-		return MaterializedKit{}, nil, fmt.Errorf("render: the product kit %q has no descriptor %s.yaml", id, id)
-	}
-	kit, err := oci.ParseDescriptor(files[i].Data)
-	if err != nil {
-		return MaterializedKit{}, nil, fmt.Errorf("render: the product kit %q: %s.yaml: %w", id, id, err)
-	}
-	digest, err := gate.KitTreeDigest(files)
+	m, err := kitOf(id, files)
 	if err != nil {
 		return MaterializedKit{}, nil, fmt.Errorf("render: the product kit %q: %w", id, err)
 	}
-	return MaterializedKit{ID: id, Digest: digest, Capabilities: kit.Capabilities}, files, nil
+	return m, files, nil
+}
+
+// maxPersonalKit returns MaxPersonal, or MaxPersonalKit when
+// MaxPersonal is not above zero.
+func (s KitMaterializer) maxPersonalKit() int {
+	if s.MaxPersonal > 0 {
+		return s.MaxPersonal
+	}
+	return MaxPersonalKit
+}
+
+// configTree checks the config commit with fsck and then the walk, and
+// returns the files the walk listed.
+func (s KitMaterializer) configTree(ctx context.Context) ([]gitsafe.TreeEntry, error) {
+	if s.Git == nil || s.ConfigDir == "" || s.ConfigCommit == "" {
+		return nil, errors.New("render: the spec names a personal kit and there is no config commit to read it from")
+	}
+	if err := s.Git.Fsck(ctx, s.ConfigDir, s.ConfigCommit); err != nil {
+		return nil, fmt.Errorf("render: the config commit %s: %w", s.ConfigCommit, err)
+	}
+	tree, err := s.Git.WalkTree(ctx, s.ConfigDir, s.ConfigCommit)
+	if err != nil {
+		return nil, fmt.Errorf("render: the config commit %s: %w", s.ConfigCommit, err)
+	}
+	return tree, nil
+}
+
+// personal returns the personal kit id of the config commit, whose tree
+// the walk listed, without its Rendered args, and its files.
+func (s KitMaterializer) personal(ctx context.Context, tree []gitsafe.TreeEntry, id string) (MaterializedKit, []gate.File, error) {
+	if err := oneElement(id); err != nil {
+		return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: %w", id, err)
+	}
+	prefix := ConfigKitsDir + "/" + id + "/"
+	modes := map[string]string{} // the walk's files of the kit, by path in the kit
+	var dirs []string
+	seen := map[string]bool{}
+	for _, e := range tree {
+		rel, ok := strings.CutPrefix(e.Path, prefix)
+		if !ok {
+			continue
+		}
+		modes[rel] = e.Mode
+		if d := path.Dir(e.Path); !seen[d] {
+			seen[d] = true
+			dirs = append(dirs, d)
+		}
+	}
+	if len(modes) == 0 {
+		return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q is not in the config commit (no %s)", id, prefix)
+	}
+	reads := make(map[string][]gitsafe.File, len(dirs))
+	size := 0
+	for _, d := range dirs {
+		got, err := s.Git.ReadDir(ctx, s.ConfigDir, s.ConfigCommit, d)
+		if err != nil {
+			return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: %w", id, err)
+		}
+		for _, f := range got {
+			size += len(f.Data)
+		}
+		if limit := s.maxPersonalKit(); size > limit {
+			return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q holds more than %d bytes", id, limit)
+		}
+		reads[d] = got
+	}
+	files, err := crossCheck(prefix, modes, dirs, reads)
+	if err != nil {
+		return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: %w", id, err)
+	}
+	m, err := kitOf(id, files)
+	if err != nil {
+		return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: %w", id, err)
+	}
+	if k := m.Capabilities.Kind; k != personalKind {
+		return MaterializedKit{}, nil, fmt.Errorf("%w: the personal kit %q is a %s; a personal kit is a %s", ErrPersonalKind, id, k, personalKind)
+	}
+	if typ := refusedCapability(m.Capabilities); typ != "" {
+		return MaterializedKit{}, nil, fmt.Errorf("%w: the personal kit %q declares a %s capability", ErrPersonalCapability, id, typ)
+	}
+	return m, files, nil
+}
+
+// crossCheck returns the files of a kit as the reads of its dirs hold
+// them, each dir of dirs read under the kit's prefix, once every read
+// matches the walk: modes holds the walk's files of the kit by their
+// path in it, and a read of a file the walk did not list, of another
+// mode, or of one file twice is an error, and so is a file the walk
+// listed that no read holds, the first of them by name. modes is left
+// as it was. The walk and the reads are two looks at one commit; this
+// is the check that they saw the same files (I27).
+func crossCheck(prefix string, modes map[string]string, dirs []string, reads map[string][]gitsafe.File) ([]gate.File, error) {
+	left := maps.Clone(modes)
+	files := make([]gate.File, 0, len(modes))
+	for _, d := range dirs {
+		for _, f := range reads[d] {
+			rel := strings.TrimPrefix(d+"/"+f.Name, prefix)
+			if mode, ok := left[rel]; !ok || mode != f.Mode {
+				return nil, fmt.Errorf("the read of %q is not the file the walk listed", rel)
+			}
+			delete(left, rel)
+			files = append(files, gate.File{Path: rel, Mode: f.Mode, Data: f.Data})
+		}
+	}
+	if len(left) > 0 {
+		missing := slices.Sorted(maps.Keys(left))
+		return nil, fmt.Errorf("the walk listed %q and the read did not", missing[0])
+	}
+	return files, nil
+}
+
+// refusedCapability returns the first capability type of c a personal
+// kit may not declare, in the order of REQ-0574, or "" when c declares
+// none: network, mount (a host mount), volume, credential and
+// ssh-agent.
+func refusedCapability(c oci.Capabilities) string {
+	switch {
+	case c.Network != nil:
+		return "network"
+	case slices.ContainsFunc(c.Volumes, func(v oci.Volume) bool { return v.Kind != "volume" }):
+		return "mount"
+	case len(c.Volumes) > 0:
+		return "volume"
+	case len(c.Credentials) > 0:
+		return "credential"
+	case len(c.SSHAgent) > 0:
+		return "ssh-agent"
+	}
+	return ""
+}
+
+// kitOf returns the kit id of files, its digest and the capability set
+// of its descriptor <id>.yaml.
+func kitOf(id string, files []gate.File) (MaterializedKit, error) {
+	i := slices.IndexFunc(files, func(f gate.File) bool { return f.Path == id+".yaml" })
+	if i < 0 {
+		return MaterializedKit{}, fmt.Errorf("no descriptor %s.yaml", id)
+	}
+	kit, err := oci.ParseDescriptor(files[i].Data)
+	if err != nil {
+		return MaterializedKit{}, fmt.Errorf("%s.yaml: %w", id, err)
+	}
+	digest, err := gate.KitTreeDigest(files)
+	if err != nil {
+		return MaterializedKit{}, err
+	}
+	return MaterializedKit{ID: id, Digest: digest, Capabilities: kit.Capabilities}, nil
 }
 
 // kitFiles reads every file below the root of fsys, in the walk's

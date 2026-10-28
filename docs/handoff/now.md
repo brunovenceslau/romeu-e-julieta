@@ -2,22 +2,21 @@
 
 ## Where we stopped
 
-The spec and plan of memory (ADR 0042 and 0043, T171 to T176) are in
-review, none built; T111 sitting M1 (01m5zx3gp7wp1twg6rn6f63jd2) waits.
+T038 slice 3 (personal kits, mixin only) in review. T171, T173 and
+T166 are merged; T111 sitting M1 (01m5zx3gp7wp1twg6rn6f63jd2) waits.
 Pushes and pull requests need no approval here, within the limits of
 01m5nbzfb4p92djhp10c92jprp. Work for another repository goes into an
 issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
 
 ## Next steps
 
-1. Build T171, T174, T175 in that order, one PR each (T171, T172 and
-   T175 are ask-first); T172 after T174 and T175, T173 after T171.
+1. Memory: T174 waits on T043, T175 on T153 and T167, T172 on both;
+   T038, T039 and T043 come first, and are the critical path's head.
 2. T111 sitting M1, after operator item 9: verona's steps 2, 6, 7 and 8;
    in both, the acceptance reads still open; then the week of daily use.
 3. T038 (issue #271, 01m5rzc40en5qkgrhsgvd9ykqt): slice 3 on
-   `feat/t038-personal-kits` first takes the kinds decision
-   (01m5rzc41dqzdqkkfb4f88xfyj), then review, audit and a stacked PR on
-   #286; then the A11/A12 fixtures of I28. T165 after T164.
+   `feat/t038-personal-kits-slice3`, then the A11/A12 fixtures of I28.
+   T165 after T164.
 4. Build T170; T161 once T088 is built (01m5e14094yhqhsxq2g941pwrf).
 5. The pending notes, each when its trigger fires: 01m5zg2f63219nwpzb9d52aecg,
    01m5rtp0kfzjckbdct0y77531j, 01m5rpbjkc62s2c7qecj7wf9bk, 01m5rjz3n7588xgx1xhfn56wmk,
@@ -51,12 +50,12 @@ issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
    Recommended: the next session on the kit's repository.
 9. Recreate the verona sandbox for #299 and #300 of the sandbox
    definitions; romeu-e-julieta was done 2026-10-28. Recommended: now.
-10. Decide which kinds a personal kit may declare
-    (01m5rzc41dqzdqkkfb4f88xfyj). Recommended: mixin only, now.
 
 ## In flight
 
-- `feat/t038-personal-kits` (no PR yet); older branches as they were.
+- `feat/t038-personal-kits-slice3` (slice 3 carried from
+  `feat/t038-personal-kits`, which stays unpushed-over); older branches
+  as they were.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
