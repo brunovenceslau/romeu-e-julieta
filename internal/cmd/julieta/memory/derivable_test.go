@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -121,4 +123,39 @@ func TestDerivableWithoutFiles(t *testing.T) {
 	code, _, stderr := s.julieta(t, "memory", "add", "--title", "t", "--tag", "user", "--body", line40)
 	require.Equal(t, 0, code, stderr)
 	assert.Empty(t, stderr)
+}
+
+// TestDerivableEdges counts bytes, not runes: a 40-byte line of 20 runes
+// warns and a 39-byte one does not; an import is followed one level
+// only; an import through an in-repo symlink out of the repo is skipped;
+// and a CLAUDE.md or a .claude/rules that is a FIFO neither blocks add
+// nor is read (REQ-1290).
+func TestDerivableEdges(t *testing.T) {
+	s := newSandbox(t)
+	wide, short := strings.Repeat("é", 20), strings.Repeat("é", 19)+"a"
+	outside := filepath.Join(t.TempDir(), "out.md")
+	require.NoError(t, os.WriteFile(outside, []byte(line40+"\n"), 0o600))
+	writeRepo(t, s, map[string]string{
+		"CLAUDE.md":  wide + "\n" + short + "\n@a.md\n@docs/l.md\n",
+		"a.md":       "@b.md\n",
+		"b.md":       line40 + "\n",
+		"docs/x.txt": "",
+	})
+	repo := s.m.Repos[0].Path
+	require.NoError(t, os.Symlink(outside, filepath.Join(repo, "docs", "l.md")))
+	require.NoError(t, syscall.Mkfifo(filepath.Join(repo, "AGENTS.md"), 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(repo, ".claude"), 0o700))
+	require.NoError(t, syscall.Mkfifo(filepath.Join(repo, ".claude", "rules"), 0o600))
+	done := make(chan []string, 1)
+	go func() {
+		code, _, stderr := s.julieta(t, "memory", "add", "--title", "t", "--tag", "project", "--body", wide+"\n"+short+"\n"+line40+"\n")
+		assert.Equal(t, 0, code, stderr)
+		done <- derivableLines(stderr)
+	}()
+	select {
+	case got := <-done:
+		assert.Equal(t, []string{"warning memory-derivable: CLAUDE.md:1 holds a line of the body; keep out what an instruction file already holds"}, got)
+	case <-time.After(10 * time.Second):
+		t.Fatal("memory add blocked on a FIFO")
+	}
 }

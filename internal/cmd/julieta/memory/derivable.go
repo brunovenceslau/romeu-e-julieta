@@ -24,6 +24,9 @@ const (
 	maxInstruction = 1 << 20
 	// maxDerivableLines is the most matches the warning names.
 	maxDerivableLines = 10
+	// maxInstructionFiles is the most files the check reads, imports
+	// among them, so a file of many imports keeps add quick.
+	maxInstructionFiles = 64
 )
 
 // instructionFiles are the instruction files of a repo the check reads,
@@ -42,7 +45,7 @@ const rulesDir = ".claude/rules"
 // bytes, which is not compared. The files are CLAUDE.md, AGENTS.md,
 // CLAUDE.local.md and .claude/rules/*.md at the working tree, then each
 // file one of them imports with a line "@<path>" alone, resolved from
-// the importing file's directory. Every read goes through an os.Root on
+// the importing file's directory, at most maxInstructionFiles in all. Every read goes through an os.Root on
 // the repo, so neither a symlink nor an import reaches out of it; an
 // import out of the repo, a missing file and any file that cannot be
 // read are skipped. A string comparison: no model call.
@@ -67,7 +70,7 @@ func derivable(repo, body string) []string {
 	direct := len(queue)
 	seen := map[string]bool{}
 	var matches, notes []string
-	for i := 0; i < len(queue); i++ {
+	for i := 0; i < len(queue) && len(seen) < maxInstructionFiles; i++ {
 		name := queue[i]
 		if seen[name] {
 			continue
@@ -104,7 +107,7 @@ func derivable(repo, body string) []string {
 
 // ruleFiles returns the names of the *.md files of .claude/rules, sorted.
 func ruleFiles(root *os.Root) []string {
-	d, err := root.Open(rulesDir)
+	d, err := root.OpenFile(rulesDir, os.O_RDONLY|syscall.O_DIRECTORY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil
 	}
