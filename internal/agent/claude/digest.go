@@ -21,7 +21,7 @@ import (
 // kits/julieta-claude, which a test of this package holds it to.
 // julieta setup compares it with the digest of the installed ones and
 // reports skills-stale when they differ.
-const KitDigest = "sha256:daf53b2981ab9d3ad9229c432053915f50cf78f52375e9cf26f9864e74e196c5"
+const KitDigest = "sha256:0d4931eda8f618b8e3aee41812f96a5b8016b2ba73b1c131874a52ae5778dd4b"
 
 // Digest returns the digest of a set of files by their slash-separated
 // names: the sha256 of one line per file, in name order, of its name
