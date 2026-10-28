@@ -19,21 +19,27 @@ library was not checked online. In the order of ADR 0038, decision 5:
    their reasons, are in T146.
 4. Decided on 2026-10-20: not a swap. The store lock of T035 stays on
    `golang.org/x/sys/unix` flock; no task.
-5. The schema generator, `tools/schemagen`: `github.com/invopop/jsonschema`
-   (03-formats says "no dependency"; read again under ADR 0038, 3).
-   Planned on 2026-10-23 as T166, with the question of `null` for a
-   pointer: a member with no value is omitted (REQ-1273, 03 3.7). Kept
-   by T166 (#PRNUM) on 2026-10-28, measured against
-   `github.com/invopop/jsonschema` v0.14.0: without references it
-   recurses without end on the run layout's tree type, and with them
-   every named struct moves to `$defs`, which changes every schema and
-   the paths the keywords are placed at; a `TextMarshaler` such as the
-   ULID comes out as an array of integers; and the refusals the
-   generator holds (`time.Duration`, a type with its own JSON methods,
-   the `string` option, a JSON name used twice) would stay a walk of
-   their own. Most of the hand-written code would stay beside three new
-   modules. Reopen when a library maps encoding/json/v2's rules (embed,
-   omitzero, text marshalers) and references only a recursive type.
+5. The schema generator, `tools/schemagen`:
+   `github.com/invopop/jsonschema` (03-formats says "no dependency";
+   read again under ADR 0038, 3). Planned on 2026-10-23 as T166, with
+   the question of `null` for a pointer: a member with no value is
+   omitted (REQ-1273, 03 3.7). Kept by T166 (#PRNUM) on 2026-10-28,
+   measured against `github.com/invopop/jsonschema` v0.14.0. It reads
+   pointers without null and `omitempty`/`omitzero` as not required, as
+   REQ-1273 wants, and of the nine schemas it wrote before it stopped on
+   the tree type, eight matched ours but for the keywords the generator
+   adds after; but without references it recurses without end on the run
+   layout's tree type, and with them every named struct moves to
+   `$defs`, which changes every schema and the paths the keywords are
+   placed at; a `TextMarshaler` such as the ULID comes out as an array
+   of integers unless a `Mapper` of our own names each such type; and
+   the refusals the generator holds (`time.Duration`, a type with its
+   own JSON methods, the `string` option, a JSON name used twice) would
+   stay a walk of their own. Most of the hand-written code would stay
+   beside three new modules (the library, `pb33f/ordered-map/v2` and
+   `go.yaml.in/yaml/v4`, a release candidate). Reopen when a library
+   maps encoding/json/v2's rules (embed, omitzero, text marshalers) and
+   references only a recursive type.
 6. The glob matcher of `tools/ci/internal/askfirst`:
    `github.com/bmatcuk/doublestar/v4`, if its dialect fits 12 12.4.
 7. Done by T149 on 2026-10-20: the canonical JSON of REQ-0254 is

@@ -68,11 +68,13 @@ func admitsNull(v any, ptr string) []string {
 // omitted, never written as null. A pointer field has the schema of
 // what it points to; the probe shows the walk finds a null.
 func TestNoSchemaAdmitsNull(t *testing.T) {
-	assert.Equal(t, []string{"#/properties/a/type", "#/properties/b/type", "#/properties/c/const", "#/properties/d/enum"},
+	assert.Equal(t, []string{"#/properties/a/type", "#/properties/b/type", "#/properties/c/const", "#/properties/d/enum",
+		"#/properties/e/allOf/0/prefixItems/0/type"},
 		admitsNull(map[string]any{"properties": map[string]any{
 			"a": map[string]any{"type": "null"}, "b": map[string]any{"type": []any{"string", "null"}},
 			"c": map[string]any{"const": nil}, "d": map[string]any{"enum": []any{"x", nil}},
-		}}, "#"), "the probe")
+			"e": map[string]any{"allOf": []any{map[string]any{"prefixItems": []any{map[string]any{"type": "null"}}}}},
+		}}, "#"), "the probe reaches every keyword, those keywords.go adds among them")
 
 	files, err := filepath.Glob(filepath.Join(repoRoot, "schemas", "*.json"))
 	require.NoError(t, err)
