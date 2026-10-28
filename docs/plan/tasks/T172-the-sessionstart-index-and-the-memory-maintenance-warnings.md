@@ -36,23 +36,26 @@ and 04 4.3 (REQ-0414). The generated pages
    `read an entry: julieta memory show <id>`. No body is printed and no
    tag is printed apart. `handoff show` without `--hook` prints the same
    index in place of the open entries.
-2. The cut (REQ-0667). The bound of 8.6 cuts at a line: every whole line
-   that fits before the bound is printed, never a partial one, and the
-   last line is `<n> more entries: julieta memory list` when any is
-   left out. `internal/handoff/print.go` has the footer and cuts the
+2. The cut (REQ-0667). Two bounds of 8.6, each cut at a line: parts (2)
+   to (4) by the narrative bound (4 KiB), the narrative cut by whole
+   lines with `read the rest: julieta handoff show` last, and the index
+   by its own bound (24 KiB), every whole line that fits, never a
+   partial one, with `<n> more entries: julieta memory list` last when
+   any is left out. `internal/handoff/print.go` has the footer and cuts the
    entries today by whole entry and the narrative by line; the index is
    a new block cut by line, and its `reserve` arithmetic changes with
    it.
 3. The warnings (REQ-1291, REQ-1294, REQ-0665, 04 4.1).
    `memory-open-count`, one line, when the open entries of the project
-   exceed the count of 8.6 (200), and `memory-stale`, one line naming id
+   exceed the count of 8.6 (100, below what the index bound holds), and
+   `memory-stale`, one line naming id
    and escaped title for each open entry whose `updatedAt` is older than
    the days of 8.6 (90), oldest first, at most ten lines and then `<n>
    more stale entries: julieta memory list --status open`. Both are
    computed from the entries the hook already reads and printed in part
    (1) with julieta's other warnings, never cut; `julieta status` is not
-   changed by this task. The two values are constants beside the 8 KiB
-   bound, with the 8.6 row cited.
+   changed by this task. The four values are constants with their 8.6
+   rows cited.
 
 - Implements: REQ-0659 (08 8.1), REQ-0664 (08 8.2), REQ-0665 (08 8.2),
   REQ-0667 (08 8.2), REQ-1291 (08 8.2), REQ-1294 (08 8.2), REQ-0414
@@ -64,13 +67,15 @@ and 04 4.3 (REQ-0414). The generated pages
     the facts and then the `read an entry` line followed by three index
     lines, newest `updatedAt` first, each labelled with its repo, and
     no body; the done entry is absent; a golden file pins the output.
-  - With enough entries that the index passes 8 KiB, the output ends in
+  - With enough entries that the index passes 24 KiB, the output ends in
     a whole index line and the footer `<n> more entries: julieta memory
     list`, `n` equal to the lines left out, and the warnings above are
     complete; the test plants a title that would straddle the bound and
-    reads it absent, not cut.
-  - With 201 open entries, `memory-open-count` is printed, once; with
-    200, it is not. An open entry whose `updatedAt` is 91 days before
+    reads it absent, not cut. A narrative over 4 KiB is cut at a line
+    and ends in `read the rest: julieta handoff show`, and the index
+    after it is whole.
+  - With 101 open entries, `memory-open-count` is printed, once; with
+    100, it is not. An open entry whose `updatedAt` is 91 days before
     the clock the test injects prints one `memory-stale` line with its
     id and title; one of 89 days prints none; a done entry prints none;
     eleven stale entries print ten lines, oldest first, and `1 more
