@@ -225,8 +225,8 @@ func (s KitMaterializer) product(id string) (MaterializedKit, []gate.File, error
 	return m, files, nil
 }
 
-// maxPersonalKit is the bound of MaxPersonal, or MaxPersonalKit when it
-// is zero.
+// maxPersonalKit returns MaxPersonal, or MaxPersonalKit when
+// MaxPersonal is not above zero.
 func (s KitMaterializer) maxPersonalKit() int {
 	if s.MaxPersonal > 0 {
 		return s.MaxPersonal
