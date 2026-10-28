@@ -26,6 +26,21 @@ repository (REQ-0608) unless named otherwise:
   builder brief for such work (ADR 0040, decided on 2026-10-20). Sent:
   the payload's #278, merged on 2026-10-20, with a brief guard row as its
   check. Open: the personal kit, T114.
+- A brief names its skills, or is refused (the sandbox definitions
+  repository's ADR-0035, its brief guard hook). Sent: in the payload
+  since 2026-10-13. Open: `julieta hooks guard` (REQ-0597 to REQ-0599),
+  which carries no brief rule today; the destination is the product's
+  guard, not the personal kit.
+- An edit waits for its skill: a Go file for
+  `cc-skills-golang:golang-how-to`, and, in a follow-up pull request of
+  that repository, a spec, plan or skill file for `agent-skills:spec`,
+  `agent-skills:plan` or `anthropic-skills:skill-creator` (the skill row
+  is this repository's ADR 0040 made a check). Recorded in that
+  repository's ADR-0040 and section 15 of its
+  `docs/intent/brief-guard-spec.md`, decided on 2026-10-28 in its pull
+  request #307. Open: `julieta hooks guard`, which carries no edit rule
+  today. Losing either rule is silent: no check fails when the payload's
+  guard goes.
 
 The payload holds other rules that came from elsewhere; listing them
 belongs to the payload's own repository.
