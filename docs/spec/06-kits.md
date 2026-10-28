@@ -129,6 +129,28 @@ obligation of the row above:
 6. `REQ-0599` The case "PreToolUse with the `.romeu/bin` mount absent refuses `gh
    pr merge`": the guard fails closed
    ([08 8.2](08-memory-handoff-salvage.md#82-session-hooks-user-side-middleware)).
+7. `REQ-1308` A `lifecycle.startup` hook that runs `<julietaBin> setup` as the
+   agent user at every boot, in the foreground, so a session starts
+   with the `PATH` link, the hook dispatcher, the trusted mise
+   configuration, the locked tools and each repo's `setup` task done
+   ([04 4.3](04-cli.md#43-julieta-sandbox)). It declares only the
+   environment `setup` reads (`HOME`, `JULIETA_MANIFEST`), and it runs at
+   every boot rather than once at create, because an install step does
+   not see the clone (probe A14). Running it again changes no code and
+   no tool version: `setup` moves no branch (REQ-0399) and `install`
+   follows the locks. The session waits for it, and a failure never
+   stops the boot: the hook prints one line that says the sandbox did
+   not come up clean and names the log, exits 0, and records the run
+   as a hook failure of the stage `julieta setup` (08 8.2), which every
+   SessionStart shows until a later `setup` succeeds. The log is
+   `$HOME/.local/state/julieta/setup.log`, the whole report of the last
+   run (its unusable lines, warnings and errors, escaped), rewritten by
+   every run: sandbox-local state, never in a memory dir, never synced
+   or pushed (08 8.1). `romeu run` step 6 (REQ-0357) still runs `setup`
+   and is where a sandbox left unusable stops the run. Until
+   romeu renders the sandboxes, this hook replaces step 7 of the sandbox
+   definitions repository's julieta runbook, which the operator ran by
+   hand after each recreate (decided on 2026-10-28).
 
 `julieta-claude` replaces the agent's built-in memory with
 `julieta memory` on purpose
