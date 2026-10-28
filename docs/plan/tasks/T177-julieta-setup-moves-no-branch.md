@@ -11,7 +11,8 @@ owns:
   - internal/cmd/julieta/status/section_warnings.go
 needs:
   - T051
-after: []
+after:
+  - T172
 ask_first: []
 sitting: none
 ---
@@ -21,9 +22,10 @@ sitting: none
 Goal: `julieta setup` fetches origin in every repo and moves no branch,
 so a checkout stays at the code and locks it was cloned at and `setup`
 can run at every boot (T179) without changing the code under a session.
-Decided on 2026-10-28 with the specification amended first: REQ-0399
-(04 4.3), the warnings list of 04 4.1 and the SessionStart list of 08
-8.2 lose `default-branch-moved`.
+Decided on 2026-10-28 with REQ-0399 (04 4.3) amended first; this
+task's pull request removes `default-branch-moved` from the warnings
+list of 04 4.1 and the SessionStart list of 08 8.2, in the same diff as
+the code, since `TestWarningSlugs` holds the list to the code.
 
 1. `setup` drops the fast-forward of the local default branch and the
    warning `default-branch-moved`: its report, the state it records, the

@@ -15,6 +15,7 @@ needs:
   - T177
 after:
   - T178
+  - T172
 ask_first:
   - kits
 sitting: none

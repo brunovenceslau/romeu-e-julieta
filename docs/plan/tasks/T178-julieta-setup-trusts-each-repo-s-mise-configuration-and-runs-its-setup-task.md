@@ -23,8 +23,10 @@ sitting: none
 Goal: after `setup`, `mise` works in the agent's shell without asking
 and each repo has run what its own checks need, so a recreated sandbox
 needs no command by hand. Decided on 2026-10-28 with the specification
-amended first: REQ-1306 and REQ-1307 (04 4.3), `repo-setup-failed` in
-04 4.1 and 08 8.2. `after: T177` for the shared e2e file of `setup`.
+amended first: REQ-1306 and REQ-1307 (04 4.3); this task's pull
+request adds `repo-setup-failed` to the warnings list of 04 4.1 and the
+SessionStart list of 08 8.2 with the code (`TestWarningSlugs`).
+`after: T177` for the shared e2e file of `setup`.
 
 1. Trust (REQ-1306): before `install`, `setup` runs `mise trust` on each
    repo's `mise.toml` (the files `install` already reads), inside the
