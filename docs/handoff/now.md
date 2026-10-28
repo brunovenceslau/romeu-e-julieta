@@ -2,16 +2,15 @@
 
 ## Where we stopped
 
-Checkpoint of 2026-10-25, third part: T038 slices 1 to 3
-(01m5rzc40en5qkgrhsgvd9ykqt).
+T111 sitting M1 in this sandbox (01m5zx3gp7wp1twg6rn6f63jd2).
 Pushes and pull requests need no approval here, within the limits of
 01m5nbzfb4p92djhp10c92jprp. Work for another repository goes into an
 issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
 
 ## Next steps
 
-1. T111 sitting M1: the runbook's steps 6 and 7 after the recreate
-   (did the kit load; then `julieta setup`), and its Record lines.
+1. T111 sitting M1, after operator item 9: verona's steps 2, 6, 7 and 8;
+   in both, the acceptance reads still open; then the week of daily use.
 2. T038 (issue #271, 01m5rzc40en5qkgrhsgvd9ykqt): slice 3 on
    `feat/t038-personal-kits` first takes the kinds decision
    (01m5rzc41dqzdqkkfb4f88xfyj), then review, audit and a stacked PR on
@@ -47,7 +46,8 @@ issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
    (01m5gz0rpmzwvmwqt9ebd95rfq). Recommended: the payload's next session.
 8. Review the over-optimizing rules note (01m5jc2v5gfyxyrbjv7wymbr9a).
    Recommended: the next session on the kit's repository.
-9. Host steps 1 to 3 of the runbook. Recommended: before the recreate.
+9. Recreate the romeu-e-julieta and verona sandboxes, so that #299 and
+   #300 of the sandbox definitions take effect. Recommended: now.
 10. Decide memory per repository and per project, and its durability
     (01m5rtp0hjczzy9f66ez7rxvna). Recommended: before multi-repo work.
 11. Decide which kinds a personal kit may declare
@@ -55,8 +55,7 @@ issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
 
 ## In flight
 
-- #285, #286, `feat/t038-personal-kits` (no PR yet), and the
-  checkpoint PR. Older branches are left as they were.
+- `feat/t038-personal-kits` (no PR yet); older branches as they were.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
