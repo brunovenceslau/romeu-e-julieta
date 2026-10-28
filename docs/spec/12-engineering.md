@@ -291,7 +291,7 @@ module whose id is no directory name owns the paths its row gives.
 | `memstore` | the memory store in two packages (08 8.1): the shared readers on `os.Root` with the layout allowlist, and julieta's `memstore/write` with the `Store` and the `fs` backend's writes | spec, canon |
 | `julieta-core` | setup, repos, install/lock (mise), hooks and recorded failures, status, spec and catalog validation, `pin workload` and `pin check`, version and compatibility (its directories: `internal/manifest`, `internal/mise`, `internal/hooks`, `internal/agent/claude` and the command packages under `internal/cmd/julieta/`) | spec, gitsafe, catalog, oci, cli |
 | `layout` | run layout to herdr `layout.apply`, pane step runner | spec |
-| `handoff` | the stamp of 03 3.10, `julieta stamp`, `memory index` and its SessionStart output; the package keeps its name until T174 renames it `stamp` | memstore, gitsafe |
+| `handoff` | the stamp of 03 3.10, `julieta stamp`, `memory index` and its SessionStart output; the package keeps its name until T172 renames it `stamp` | memstore, gitsafe |
 | `salvage` | julieta snapshot/salvage; romeu verification and ref import | gitsafe, memstore, state |
 | `kits` | `kits/*` sources and their embedding | kitpin, julieta-core |
 | `skills` | `skills/julieta`, `skills/handoff` | handoff, memstore |
@@ -314,7 +314,7 @@ lock), `handoff`, `salvage` (snapshot) in julieta's daily use -> `kits`,
 `sbxdrv` (hand-written sessions), the preflight, `gate`, `render`,
 `romeu-cli` (init, approve, sync, status, doctor, run) and the
 `--dry-run` build of `tools/release` -> `romeu-cli` (stop, pull,
-salvage, rm, recreate, retire, handoff), `salvage` (the host half) ->
+salvage, rm, recreate, retire, memory), `salvage` (the host half) ->
 `probes` and block A, `layout`, `ci-release`, `docs` -> the release
 checklist below. Block A is the last word on every sbx fact: the facts
 arrive first from the maintainer's daily use and from the kit-frontend
@@ -955,14 +955,14 @@ row.
 
 | Id | Retired on | Last text | Replaced by |
 |---|---|---|---|
-| `REQ-0245` | 2026-10-28 | Kinds `clear` and `final` require the headings (six for `final`); `facts` has no body. julieta stamps everything in the front matter | REQ-1297 (03 3.9): the headings of a `handoff` entry and of a `tombstone` one; a stamp file has no body by its schema (03 3.10) |
-| `REQ-0415` | 2026-10-28 | list handoffs | REQ-1293 (04 4.3): `julieta memory list --tag handoff` |
 | `REQ-0033` | 2026-10-12 | `romeu` materializes those specs into one host tree (`$ROMEU_ROOT`, default `$HOME/dev`): plain clones (never submodules), generated `sbxenv.yaml`, per-repo memory directories, generated VS Code workspace files | none: an objective of 00 0.1, which explains; the obligations are the tree rules of 02 2.3 |
 | `REQ-0036` | 2026-10-12 | Every file carries an SPDX header (`SPDX-License-Identifier` plus `SPDX-FileCopyrightText`) or is covered by `REUSE.toml`; the repo is REUSE 3.3 compliant and `reuse lint` runs in `tools/ci` | REQ-0016, the S11 row of the index, which 00 0.4 cites |
 | `REQ-0139` | 2026-10-12 | at most one unapproved candidate (`sbxenv.yaml`, `render.json`, `kits/`); never referenced by a live file | REQ-0084 (01 1.6), which the tree rules of 02 2.3 cite |
 | `REQ-0194` | 2026-10-22 | `label` + `root`; a node is `{pane: <id>}` or `{split: row or column, ratio: 0.1..0.9, first, second}` (binary tree) | `docs/reference/project.md`, the field and rule tables of the run layout generated from `internal/spec` |
 | `REQ-0195` | 2026-10-22 | `id`, `repo` (a project `dir`), `cwd` (relative to the repo), `env` (keys `^[A-Z_][A-Z0-9_]*$`, not `PATH`, `HOME`, `LD_*`, `BASH_ENV`, `ENV`), `steps` (list of argv lists; no shell), `focus` (at most one per tab) | `docs/reference/project.md`, the field and rule tables of the run layout generated from `internal/spec` |
 | `REQ-0213` | 2026-10-12 | The entries above are examples; the v1 catalog was built from the reference config repo's locks (S4) and measured in probe B4 | none: explanation |
+| `REQ-0245` | 2026-10-28 | Kinds `clear` and `final` require the headings (six for `final`); `facts` has no body. julieta stamps everything in the front matter | REQ-1297 (03 3.9): the headings of a `handoff` entry and of a `tombstone` one; a stamp file has no body by its schema (03 3.10) |
+| `REQ-0415` | 2026-10-28 | list handoffs | REQ-1293 (04 4.3): `julieta memory list --tag handoff` |
 | `REQ-0560` | 2026-10-12 | the row of Deferred decisions on `tools/ci pr`, with its trigger; the forbidden-name check over pull request text runs in the agents' own pre-PR gate and the maintainer's read until then | none: a pointer to a deferred row, which carries no id |
 | `REQ-0561` | 2026-10-12 | the row of Deferred decisions on `tools/ci sequences`, with its trigger | none: a pointer to a deferred row, which carries no id |
 | `REQ-0562` | 2026-10-12 | the row of Deferred decisions on `tools/ci invariants` and `mutate`, with its trigger | none: a pointer to a deferred row, which carries no id |

@@ -47,8 +47,12 @@ the harness of T041 is `e2e/internal/romeu/sync_helpers.go`.
 
 
 Re-plan (2026-10-28): `sync` also creates the project's shared memory
-directory, `memory/_shared/`, 0700, and writes it into the manifest as
-`sharedMemory` (REQ-0646, 03 3.6; ADR 0042, T174).
+directory, `memory/_shared/`, 0700, writes it into the manifest as
+`sharedMemory` and renders its mount beside the repo dirs (REQ-0646,
+REQ-0140, 03 3.3, 03 3.6; ADR 0042, T174); acceptance: after `sync` the
+dir exists at 0700, the manifest holds the member, the render golden
+lists `./memory/_shared`, and a repo dir with a `handoff/` of before
+warns `handoff-legacy` and is not refused.
 
 - Implements: REQ-0012 (index), REQ-0042 (01 1.1), REQ-0044 (01 1.2),
   REQ-0054 (01 1.3), REQ-0055 (01 1.3), REQ-0056 (01 1.3), REQ-0059 (01
@@ -114,7 +118,7 @@ directory, `memory/_shared/`, 0700, and writes it into the manifest as
   - A memory directory with a symlink, a FIFO or a `..` name, or any
     other layout violation of 08 8.1, makes `sync` exit 2 naming the
     offending path and is not followed (I12, I24); a leftover
-    `.tmp-<ULID>` makes it warn and not refuse; a `handoff/` over its
+    `.tmp-<ULID>` makes it warn and not refuse; a `stamps/` over its
     cap makes the command warn and not refuse.
   - A personal kit with each hostile entry of I27 fails `sync` before a
     file is written outside `.romeu/candidates/`, on the macOS runners

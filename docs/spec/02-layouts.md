@@ -33,7 +33,7 @@ romeu-e-julieta/
 │  ├─ sbxdrv/                  sbx argv builders and output parsing
 │  ├─ memstore/                memory readers on os.Root, layout allowlist, caps
 │  ├─ memstore/write/          the Store interface with Put and Delete, fs backend writes, store lock
-│  ├─ handoff/                 the stamp of 03 3.10 and the SessionStart renderer (renamed stamp/ by T174)
+│  ├─ handoff/                 the stamp of 03 3.10 and the SessionStart renderer (renamed stamp/ by T172)
 │  ├─ salvage/                 snapshot/salvage (julieta side) and verify/import (romeu side)
 │  ├─ manifest/                the julieta manifest type (03 3.6), marshalled by romeu and decoded by julieta
 │  ├─ mise/                    mise driver
@@ -256,7 +256,8 @@ $ROMEU_ROOT/                            default $HOME/Developer; never a VS Code
    │  └─ bin/                           julieta-linux-<GOARCH>, SHA256SUMS; mounted read-only into the sandbox
    ├─ <dir>/                            host clone of each repo (primary is the sbx workspace, clone mode)
    ├─ review/<dir>/                     hardened review checkout (created by `romeu pull`)
-   └─ memory/<dir>/                     per-repo memory, mounted rw into this project's sandbox only; sync creates it 0700, julieta writes its files 0600
+   ├─ memory/<dir>/                     per-repo memory, mounted rw into this project's sandbox only; sync creates it 0700, julieta writes its files 0600
+   └─ memory/_shared/                   the project's shared memory (08 8.1): handoffs, shared entries, stamps; mounted and created the same way
 ```
 
 Rules of this tree, one item per obligation:
@@ -273,7 +274,7 @@ Rules of this tree, one item per obligation:
   candidate, the rule REQ-0084 of
   [01 1.6](01-system-model.md#16-state-machines), which no live file
   references.
-- `REQ-0140` `memory/<dir>/` is per-repo memory, mounted read-write
+- `REQ-0140` `memory/<dir>/` is per-repo memory, and `memory/_shared/` the project's shared memory (08 8.1), each mounted read-write
   into this project's sandbox only; `sync` creates it 0700 and julieta
   writes its files 0600.
 
@@ -290,7 +291,7 @@ behind a closed parent, and `doctor` fails when either is group- or
 world-accessible.
 
 `REQ-0142` Mounts: the sandbox sees `./<primary>` (clone mode: sbx clones it; the
-host clone is read-only from the sandbox), `./memory/<dir>` for every
+host clone is read-only from the sandbox), `./memory/_shared` and `./memory/<dir>` for every
 repo (direct, rw) and `./.romeu/bin` (direct, read-only). `.romeu/bin`
 is a fixed mount: no spec field names it and each project has it.
 `sbxenv.yaml` and the rest of `.romeu/` sit outside every mount; paths

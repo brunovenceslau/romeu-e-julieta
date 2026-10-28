@@ -76,7 +76,8 @@ changes the kit they run.
 
 - One store, one reader, one index; the bodies the agent reads are the
   ones it asks for. The decision "memory per repository and per
-  project" of 2026-10-25 is taken by rule 2 (option 2 of that note).
+  project" of 2026-10-25 is taken by rule 2, the shared directory that
+  note proposed.
 - Each sandbox gains one mount at its next recreate, and the manifest
   one member; a manifest without it refuses `--shared` and a handoff
   with a usage error, so nothing is filed in the wrong place.

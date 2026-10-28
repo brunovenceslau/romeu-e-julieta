@@ -20,8 +20,9 @@ sitting: none
 
 Earlier title: `romeu handoff`.
 
-Goal: the host read of a project's memory, `romeu memory list|show
-[--repo <dir>|--shared] [--json] <name>`.
+Goal: the host read of a project's memory, `romeu memory list [--repo
+<dir>|--shared] [--json] <name>` and `romeu memory show [--json] <name>
+<id>...`.
 
 Re-plan (2026-10-28): `romeu handoff` leaves with ADR 0042, and this
 task becomes the host read path of the one store: `list` prints the
@@ -43,8 +44,8 @@ the table with this re-plan.
     line per open entry over the project's memory dirs, `shared` for
     the shared dir, with `--tag`, `--since`, `--limit`, `--sort`,
     `--status` and `--query` as `julieta memory list` has them; `show
-    <id> <id>` prints both in order and exits 1 after the known ones
-    when one is unknown.
+    <name> <id> <id>` prints both in order and exits 1 after the known
+    ones when one is unknown.
   - A body, a title and a branch name with ESC sequences print escaped
     (I29); nothing is written under the memory dirs (compared byte for
     byte before and after).

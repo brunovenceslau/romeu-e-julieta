@@ -47,8 +47,8 @@ T174 and this task carry what they did. The generated pages
 1. The output (REQ-0659, REQ-0664, REQ-0414). In order: (1) the
    warnings; (2) the fixed line; (3) the open `handoff` of the shared
    dir: its index line, the gap line of REQ-0681 when the newest stamp
-   differs from its stamp, and its body, or the gap line alone when no
-   handoff is open; (4) `read an entry: julieta memory show <id>` and
+   differs from its stamp, and its body, or the one line of REQ-0681 for
+   no open handoff; (4) `read an entry: julieta memory show <id>` and
    one line per other open entry over every memory dir of the project,
    the line of `memory list` (T171), newest `updatedAt` first, `shared`
    in the repo column for the shared dir. Without `--hook`, parts (3)
@@ -99,13 +99,17 @@ T174 and this task carry what they did. The generated pages
     labelled with its repo or `shared`, no body; the done entry is
     absent; a golden file pins the output. With a newer stamp whose
     head moved, the gap line names the commits, the branch and the
-    dirty count (REQ-0681, REQ-0682); with no open handoff, the gap
-    line stands alone in part (3).
+    dirty count (REQ-0681, REQ-0682); with no open handoff, part (3) is
+    `no handoff is open; the newest stamp is of <time>`, and before any
+    stamp `no handoff and no stamp yet`. With a manifest lacking
+    `sharedMemory`, `--hook` exits 0 and warns `shared-memory-missing`.
   - A handoff body over 4 KiB is cut at a line and ends in `read the
     rest: julieta memory show <id>`; with enough entries that the index
     passes 24 KiB, the output ends in a whole index line and the footer
     with `n` equal to the lines left out; a title that would straddle
-    the bound is absent, not cut; the warnings above are complete.
+    the bound is absent, not cut; the warnings above are complete; the
+    whole output, warnings included, fits the hook-output size probe C5
+    records for the pinned agent (REQ-0674), read from the probe file.
   - With 101 open entries besides the handoff, `memory-open-count` is
     printed once; with 100, it is not. An entry 91 days old by the
     injected clock prints one `memory-stale` line; 89 days prints

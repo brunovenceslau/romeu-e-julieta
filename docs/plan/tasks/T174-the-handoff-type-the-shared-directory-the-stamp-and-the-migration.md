@@ -14,7 +14,7 @@ owns:
   - internal/cmd/julieta/all/import_stamp.go
   - internal/cmd/julieta/memory/add*.go
   - internal/cmd/julieta/setup/migrate*.go
-  - internal/manifest/shared*.go
+  - internal/manifest/**
   - e2e/julieta_stamp_test.go
 needs:
   - T035
@@ -39,15 +39,19 @@ REQ-1301), 08 8.1 (REQ-0642, REQ-0645, REQ-0646, REQ-0648 to REQ-0650)
 and 08 8.3 (REQ-0676 to REQ-0680, REQ-0683, REQ-0685). `schemas/` is
 owned by T166 and the `_shared/` creation of `sync` by T043; this task
 amends `schemas/stamp.v1.json` and waits for both (`after`), and T043
-gains the one sentence of REQ-0646 below. `internal/manifest` gains the
-member in a file of its own.
+gains the one sentence of REQ-0646 below. `internal/manifest` (T135,
+merged) gains the optional member `sharedMemory`, with the shape test of
+03 3.6 saying it bumps no protocol.
 
 1. The shared directory (REQ-0642, REQ-0645, REQ-0646, REQ-1295).
    `memstore` knows two layouts, the repo dir (`entries/`, `snapshot/`,
    `salvage/`) and the shared dir (`entries/`, `stamps/`); the manifest
    names the shared dir as `sharedMemory`, an optional member (03 3.6),
    and a manifest without it makes `--shared` and a `handoff` a usage
-   error naming the member. `memory add|list|show|edit --shared` act on
+   error naming the member, and `stamp` and `memory index --hook` warn
+   `shared-memory-missing` and exit 0 (REQ-1302). A `handoff/` of
+   before is admitted as the warning `handoff-legacy` until migrated
+   (REQ-0645), never refused. `memory add|list|show|edit --shared` act on
    it; the index line shows `shared`.
 2. The `handoff` type (REQ-1296 to REQ-1299, REQ-0676 to REQ-0679).
    Always shared; `--repo` with it is a usage error. `memstore/write`
@@ -57,7 +61,8 @@ member in a file of its own.
    lock before it writes, and refuses every `edit` of a done `handoff`.
    `add --body-file <path|->` reads the body from a file or stdin
    (REQ-0411). `add` warns `handoff-long` above the narrative bound of
-   8.6 (04 4.1).
+   8.6 (04 4.1); the duplicate rule runs first, and a duplicate closes
+   nothing.
 3. The stamp (REQ-0244, REQ-1300, REQ-0413, REQ-0668, REQ-0648 to
    REQ-0650). One type in `internal/handoff` (renamed `internal/stamp`
    with the module row of 12 12.2 and the tree of 02 2.1 when the
@@ -78,11 +83,15 @@ member in a file of its own.
    `handoff/<ULID>-clear|final.md` of a memory dir into a `handoff`
    entry of the shared dir with the file's ULID, tagged `tombstone` for
    `final`, its front matter the `stamp`; each `facts` file into
-   `stamps/<ULID>.yaml`; then removes `handoff/`. A second run finds
-   nothing. Idempotent and under the store lock of both dirs.
+   `stamps/<ULID>.yaml`, over every repo dir of the manifest; only the
+   newest migrated narrative is open; a ULID that already exists is
+   skipped, so a run cut short resumes; a file that does not parse or
+   fails the heading rule stays and is warned `handoff-legacy`; the
+   directory is removed only once empty. A second run finds nothing.
+   Under the store lock of both dirs.
 
 - Implements: REQ-1295 (03 3.9), REQ-1296 (03 3.9), REQ-1297 (03 3.9),
-  REQ-1298 (03 3.9), REQ-1299 (03 3.9), REQ-0244 (03 3.10), REQ-1300
+  REQ-1298 (03 3.9), REQ-1299 (03 3.9), REQ-1302 (03 3.9), REQ-0237 (03 3.8), REQ-0244 (03 3.10), REQ-1300
   (03 3.10), REQ-0259 (03 3.12), REQ-0411 (04 4.3), REQ-0413 (04 4.3),
   REQ-1301 (04 4.3), REQ-0642 (08 8.1), REQ-0645 (08 8.1), REQ-0648
   (08 8.1), REQ-0649 (08 8.1), REQ-0650 (08 8.1), REQ-0668 (08 8.2),
@@ -97,7 +106,9 @@ member in a file of its own.
     in the repo column; `memory check` accepts a repo dir with
     `entries/`, `snapshot/`, `salvage/` and a shared dir with
     `entries/`, `stamps/`, and refuses `stamps/` in a repo dir and
-    `snapshot/` in the shared one.
+    `snapshot/` in the shared one; a repo dir with a `handoff/` of
+    before warns `handoff-legacy` in `memory check` and is not refused;
+    `--shared --repo x` exits 2.
   - `add --tag handoff --body-file -` with the five headings in order
     writes the entry in the shared dir, with a `stamp` whose repos are
     the manifest's and whose generation is the manifest's; a body
@@ -107,8 +118,10 @@ member in a file of its own.
     exits 2; a front matter `stamp` in the body file is refused.
   - A second `add --tag handoff` leaves the first `done` and the second
     `open`, under the lock (two concurrent adds leave exactly one
-    open); `edit` of the open one changes its body; `edit` of a done
-    one exits 2.
+    open); a duplicate of the open handoff prints its id and closes
+    nothing; `edit` of the open one changes its body; `edit` of a done
+    one exits 2. With a manifest lacking `sharedMemory`, `stamp` exits 0
+    and warns `shared-memory-missing`.
   - A body one byte over 4 KiB warns `handoff-long` and is written.
   - `julieta stamp` writes `_shared/stamps/<ULID>.yaml` matching the
     schema, with the dirty count of T153; 51 stamps leave the newest
@@ -117,11 +130,17 @@ member in a file of its own.
     equal but for the stamp are duplicates (REQ-0259).
   - The reader returns the open handoff and the newest stamp; a stamp
     file newer than the handoff never hides it (REQ-0685).
-  - `setup` on a memory dir holding one `clear`, one `final` and three
-    `facts` files leaves two `handoff` entries in `_shared/entries/`
-    with the files' ULIDs, the `final` one tagged `tombstone` and
-    `open`, the `clear` one `done`, three stamps, and no `handoff/`
-    dir; a second `setup` changes nothing (compared byte for byte).
+  - `setup` on two repo dirs holding, between them, one `clear`, one
+    newer `final`, three `facts` files and one file that does not parse
+    leaves two `handoff` entries in `_shared/entries/` with the files'
+    ULIDs and titles `handoff of <createdAt>`, the `final` one tagged
+    `tombstone` and `open`, the older `clear` one `done`, three stamps,
+    the unparsed file in place with `handoff-legacy` warned, and the
+    other `handoff/` dir gone; a `setup` killed after the entries are
+    written and run again finishes with the same result; a second
+    `setup` changes nothing (compared byte for byte); the salvage
+    reasons read `dirty-at-last-stamp:<n>` (REQ-0237; T061 owns the
+    writer and reads this field).
   - The container e2e of `julieta stamp` and of `memory add --tag
     handoff` run the SessionEnd command and a handoff add in a real
     sandbox.
