@@ -112,7 +112,7 @@ Additional required tests:
   neutralized keys, all three read from one Go slice.
 - `REQ-0790` **TTY**: `approve --toolchain`, `adopt`, `sync` (the gate 2 prompt:
   `y` or `Y` approves, any other line declines, 01 1.6), `rm` (the
-  final-handoff question), `retire` (the confirmation) and `tools/ci
+  tombstone question), `retire` (the confirmation) and `tools/ci
   hygiene add` are driven through a `/dev/ptmx` pair created with
   `x/sys/unix` (test helper; no pty dependency).
 - `REQ-0791` **S8 timing**: `julieta setup` no-op in the container e2e, median of
@@ -133,7 +133,7 @@ Additional required tests:
 - `REQ-0793` **Fuzz**: `REQ-0794` validators, `termsafe`, ref-name checks, YAML round-trip,
   descriptor grammar, and every strict decoder of a document read from a
   sandbox or a mount (julieta's `--json` output read over `sbx env
-  exec`, `snapshot/heads.json`, the memory entry, the handoff file and
+  exec`, `snapshot/heads.json`, the memory entry, the stamp file and
   the `mise.lock` parser); `REQ-0795` the seed corpus of each target runs as a unit
   test in every CI; long runs in the scheduled `fuzz.yml`, which calls
   `go run ./tools/ci fuzz` once a day on `main`, from a `schedule` cron.

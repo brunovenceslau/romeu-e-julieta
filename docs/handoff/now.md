@@ -2,21 +2,24 @@
 
 ## Where we stopped
 
-T111 sitting M1 in this sandbox (01m5zx3gp7wp1twg6rn6f63jd2).
+The spec and plan of memory (ADR 0042 and 0043, T171 to T176) are in
+review, none built; T111 sitting M1 (01m5zx3gp7wp1twg6rn6f63jd2) waits.
 Pushes and pull requests need no approval here, within the limits of
 01m5nbzfb4p92djhp10c92jprp. Work for another repository goes into an
 issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
 
 ## Next steps
 
-1. T111 sitting M1, after operator item 9: verona's steps 2, 6, 7 and 8;
+1. Build T171, T174, T175 in that order, one PR each (T171, T172 and
+   T175 are ask-first); T172 after T174 and T175, T173 after T171.
+2. T111 sitting M1, after operator item 9: verona's steps 2, 6, 7 and 8;
    in both, the acceptance reads still open; then the week of daily use.
-2. T038 (issue #271, 01m5rzc40en5qkgrhsgvd9ykqt): slice 3 on
+3. T038 (issue #271, 01m5rzc40en5qkgrhsgvd9ykqt): slice 3 on
    `feat/t038-personal-kits` first takes the kinds decision
    (01m5rzc41dqzdqkkfb4f88xfyj), then review, audit and a stacked PR on
    #286; then the A11/A12 fixtures of I28. T165 after T164.
-3. Build T170; T161 once T088 is built (01m5e14094yhqhsxq2g941pwrf).
-4. The pending notes, each when its trigger fires: 01m5zg2f63219nwpzb9d52aecg, 01m5rtp0hjczzy9f66ez7rxvna,
+4. Build T170; T161 once T088 is built (01m5e14094yhqhsxq2g941pwrf).
+5. The pending notes, each when its trigger fires: 01m5zg2f63219nwpzb9d52aecg,
    01m5rtp0kfzjckbdct0y77531j, 01m5rpbjkc62s2c7qecj7wf9bk, 01m5rjz3n7588xgx1xhfn56wmk,
    01m5rjz3p5x27yebkayt1hjydb, 01m5ngx0cy47r560n6hqjh4y1c, 01m5ngabwa6akgjr9eetw78kq7,
    01m5ndjpzgf0rmwkr7gc1j6wdh, 01m5n920q50b79dxxqe5ghss4r, 01m5n79kdbtk9dpq7y87sfkkaq,
@@ -46,11 +49,9 @@ issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
    (01m5gz0rpmzwvmwqt9ebd95rfq). Recommended: the payload's next session.
 8. Review the over-optimizing rules note (01m5jc2v5gfyxyrbjv7wymbr9a).
    Recommended: the next session on the kit's repository.
-9. Recreate the romeu-e-julieta and verona sandboxes, so that #299 and
-   #300 of the sandbox definitions take effect. Recommended: now.
-10. Decide memory per repository and per project, and its durability
-    (01m5rtp0hjczzy9f66ez7rxvna). Recommended: before multi-repo work.
-11. Decide which kinds a personal kit may declare
+9. Recreate the verona sandbox for #299 and #300 of the sandbox
+   definitions; romeu-e-julieta was done 2026-10-28. Recommended: now.
+10. Decide which kinds a personal kit may declare
     (01m5rzc41dqzdqkkfb4f88xfyj). Recommended: mixin only, now.
 
 ## In flight

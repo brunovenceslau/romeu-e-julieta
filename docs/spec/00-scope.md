@@ -113,16 +113,15 @@ rows after the commands are features that are not commands.
 | `romeu status` | J7, J10, J11 |
 | `romeu doctor` | I14, I22, I23 and the host checks in 04 (the same checks run in the preflight) |
 | `romeu pull` | J4: an agent's work reviewed on the host before it is pushed |
-| `romeu handoff` | the sanctioned host read path of memory (I24) |
+| `romeu memory list`, `romeu memory show` | the sanctioned host read path of memory (I24): the index, the open handoff first, and entries in full |
 | `romeu version` | J9: the installed release, which a bug report names |
 | `julieta setup` | J3: the project's tools installed when its sandbox starts (0.1) |
 | `julieta install` | J8: a tool bump installed inside the sandbox |
 | `julieta lock` | J8: every tool locked for both sandbox arches (pin determinism) |
 | `julieta hooks run` | I21: each repo's own hooks run inside the sandbox |
-| `julieta memory add\|list\|show\|edit` | the per-repo memory of [08 8.1](08-memory-handoff-salvage.md#81-memory-store), which survives the sandbox |
+| `julieta memory add\|list\|show\|edit` | the per-repo and shared memory of [08 8.1](08-memory-handoff-salvage.md#81-memory-store), which survives the sandbox |
 | `julieta memory check` | I24: every memory dir mounted and within the layout allowlist |
-| `julieta handoff write`, `julieta handoff show` | J5, J6: a session's narrative and facts reach the next session |
-| `julieta handoff list` | resuming a session in a new sandbox: seeing which handoffs the repository has before choosing which one to resume |
+| `julieta memory index`, `julieta stamp` | J5, J6: a session's narrative, as a `handoff` entry, and the stamp of where the trees were reach the next session |
 | `julieta snapshot` | J4, J10: unpushed work bundled into memory after every commit |
 | `julieta salvage` | J6 step 3: the sandbox half of salvage |
 | `julieta layout up`, `julieta pane run` | J1 step 7, J3: the run layout; `layout up --dry-run` gives the golden tests of the herdr requests |

@@ -174,14 +174,15 @@ TTY, after which `run`, `salvage` and `rm` work as usual.
 ## J5 Handoff before `/clear` (sandbox survives)
 
 1. [O] `/handoff` in the agent pane.
-2. [A] writes the narrative -> [J] `julieta handoff write` stamps facts,
-   writes `handoff/<ULID>-clear.md`.
-3. [O] `/clear`: [J] the `SessionEnd` hook writes a `facts` handoff,
-   then the new session's `SessionStart` hook prints the latest
-   narrative (the one from step 2, never displaced by the facts file),
-   the facts that changed since, open memory entries, `lesson` entries
-   and julieta's warnings; the agent resumes. Without `/handoff`, the
-   facts handoff is still there. The container e2e runs the two hooks in
+2. [A] writes the narrative -> [J] `julieta memory add --tag handoff
+   --body-file -` closes the open handoff, measures the stamp and
+   writes the entry in the shared dir.
+3. [O] `/clear`: [J] the `SessionEnd` hook writes a stamp file, then
+   the new session's `SessionStart` hook prints julieta's warnings, the
+   open handoff (the one from step 2, never displaced by the stamp),
+   the gap line when the trees moved since it, and the index of the
+   other open memory entries; the agent resumes. Without `/handoff`,
+   the stamp is still there. The container e2e runs the two hooks in
    both orders, so the rule does not wait for Q22; the guide describes
    the order probe C5 records.
 
@@ -192,8 +193,8 @@ TTY, after which `run`, `salvage` and `rm` work as usual.
    stopped agent for one.
 2. [O] `romeu recreate foo` (or `romeu rm foo`).
 3. [H] `romeu salvage foo` (mandatory, deterministic): [H] preflight;
-   the handoff reader checks for a `final` handoff of the generation
-   before anything is stopped: on a TTY romeu asks whether to continue
+   the memory reader checks for an open `handoff` tagged `tombstone`
+   of the generation before anything is stopped: on a TTY romeu asks whether to continue
    without one, and without a TTY it warns and continues; generation
    `open -> salvaging`, new salvage id and host base SHAs for the
    generation's recorded repo set; [X->J] `julieta salvage

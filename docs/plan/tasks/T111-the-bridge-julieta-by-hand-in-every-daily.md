@@ -111,7 +111,9 @@ left; the mount leaves at the recreate of T115.
   repository, applied by a script of that repository that takes the
   project name, so the wave is one approval and one undo.
 - Acceptance:
-  - `julieta handoff show --hook` prints in each daily sandbox.
+  - `julieta handoff show --hook` (the command of the kit pinned for
+    the wave; `memory index --hook` after ADR 0042) prints in each daily
+    sandbox.
   - `julieta status` exits 0 in each.
   - A commit in a daily sandbox runs `.githooks/pre-commit` through the
     dispatcher.

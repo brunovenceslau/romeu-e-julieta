@@ -166,6 +166,8 @@ sandboxOptions:
   cpus: 4
   memory: 8g
 secrets: [github]             # names only; resolved via host settings "github@shop"
+memory:
+  remote: https://github.com/example/shop-memory   # the private repository that keeps <name>-env/memory/ (08 8.1); `none` opts out
 egress:
   extra: [api.stripe.com]     # always gated
   tools:                      # domains for a backend:tool the catalog lacks; always gated
@@ -274,6 +276,7 @@ name: shop
 agent: sbx-kit-claude
 workspace: ./shop-api
 additionalWorkspaces:
+  - ./memory/_shared
   - ./memory/shop-api
   - ./memory/shop-web
   - path: ./.romeu/bin
@@ -431,7 +434,11 @@ could not safely ignore, one that restricts, denies or changes what
 julieta must do, is not added as an optional member; it bumps the
 protocol number (`protocol`, below), and the window refuses a julieta
 that is too old. Today julieta acts on `repos[].path` and
-`repos[].memory` (where it clones, fetches and writes), `repos[].dir`
+`repos[].memory` (where it clones, fetches and writes), `sharedMemory`
+(the project's shared memory dir, 08 8.1; an optional member and no
+protocol bump, since a julieta that does not know it loses a feature and
+breaks nothing: it keeps writing the handoff files of before, which the
+host warns about and never refuses, 08 8.1), `repos[].dir`
 (names, locks and work directories), `repos[].url`, `repos[].primary`,
 `repos[].base`, `generation`, `agent` and `project`, so a new member
 that restricts or gates one of those uses, and any new behaviour
@@ -452,6 +459,7 @@ says in the pull request which kind the member is.
   "project": "shop",
   "specCommit": "<sha>",
   "generation": "01j9zc2q8x7w4t6y3r5e1v9k0p",
+  "sharedMemory": "/abs/root/shop-env/memory/_shared",
   "repos": [
     {"dir": "shop-api", "url": "https://github.com/example/shop-api", "primary": true, "ref": "main",
      "path": "/abs/root/shop-env/shop-api", "memory": "/abs/root/shop-env/memory/shop-api", "base": ["<sha>"]},
@@ -592,7 +600,7 @@ both forms.
 | `salvage[].manifestSha256` | `REQ-0234` plain sha256 of the salvage `manifest.json` bytes (3.12, raw) |
 | `salvage[].id` | `REQ-0235` a ULID, as the generation's id is ([01 1.6](01-system-model.md#generation)); 01 1.6 appends one entry per salvage, so the newest entry is the last of `salvage[]` |
 | `salvage[].fingerprint` | `REQ-0236` `null`, or, written in the same whole-file write as the state `removing` (01 1.6), the `fingerprint` digest (3.12) of the values the list **Fingerprint** after this table names, not read again at that write. That list is the one home of what a fingerprint is; the pages that compare one cite it. A field of the state format, under the version rule of the opening of this page |
-| `salvage[].result` | `REQ-0237` `complete`, `incomplete`, `lost`; `reasons[]` lists each skipped item, `sandbox-half-failed`, or `sandbox-lost`, and for a generation `run` closed as lost, `dirty-at-last-facts:<n>` and `stashes-at-last-facts:<n>` from the newest facts ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), run step 2); `acceptedLoss[]` lists the reasons `--accept-loss` named |
+| `salvage[].result` | `REQ-0237` `complete`, `incomplete`, `lost`; `reasons[]` lists each skipped item, `sandbox-half-failed`, or `sandbox-lost`, and for a generation `run` closed as lost, `dirty-at-last-stamp:<n>` and `stashes-at-last-stamp:<n>` from the newest stamp (03 3.10; [04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), run step 2); `acceptedLoss[]` lists the reasons `--accept-loss` named |
 
 **Fingerprint.** What `salvage[].fingerprint` digests, and what its
 reader learns:
@@ -645,27 +653,73 @@ schema: memory-entry/v1
 id: 01j9z3k8m6t2q4w5e7r9y1v3k5
 title: Flaky integration test on arm64
 status: open            # open | done
-tags: [ci, arm64]       # the tag "lesson" makes SessionStart print the entry
+tags: [ci, feedback]    # one type tag (user, feedback, project, reference, handoff) plus free tags, sorted
 createdAt: 2026-10-02T09:20:00Z
 updatedAt: 2026-10-02T09:20:00Z
 ---
 Free-form markdown body.
 ```
 
-`REQ-0242` Tags with behaviour are a closed set: `lesson` (SessionStart prints the
-entry). `REQ-0243` An entry file is self-contained: copying `memory/<dir>/entries/`
+`REQ-0242` Tags with behaviour are a closed set, the five type tags. Four
+are the kinds of note the pinned agent's own memory records, used in
+the same cases: `user` (the operator's role, expertise and working
+preferences), `feedback` (a correction the operator gave or an approach
+the operator confirmed, and what the work taught), `project` (ongoing
+work, decisions and ordering that the code and the git history do not
+hold) and `reference` (where to find something outside the repository).
+The fifth, `handoff`, is the narrative a session leaves for the next
+(08 8.3); `tombstone`, which only a `handoff` carries, is the one free
+tag with a reading (below). `REQ-1287` Every entry carries exactly one type tag, as every
+note of the agent's own memory carries its kind: `add` without one,
+`add` or `edit` with two, and an `edit` that would leave none, is a
+usage error (exit 2) that names the five. `REQ-1292` An entry file written before this rule,
+whose tags hold none, is read as it is: listed with the type `-`, never
+matched by `list --tag`, and typed by the first `edit` that gives it a
+type tag; no entry file is rewritten for the rule.
+
+`REQ-1295` An entry is filed in the memory dir of one repo, or, with
+`--shared`, in the project's shared dir `_shared/` (08 8.1), for what
+holds for the project as a whole; the index of 08 8.2 shows `shared` in
+place of the repo; `--shared` with `--repo` is a usage error. `REQ-1302`
+A manifest without `sharedMemory` (3.6) makes `--shared` and a `handoff`
+a usage error (exit 2) naming the member, so nothing is filed in the
+wrong place, and makes `julieta stamp` and `memory index --hook` warn
+`shared-memory-missing` and exit 0, since a hook must not fail the
+session. `REQ-1296` A `handoff` entry is always shared: `add`
+files it there without the flag, and `--repo` with it is a usage error.
+`REQ-1297` A `handoff` body holds the headings the `handoff` skill names,
+`## Goal`, `## State`, `## Decisions`, `## Next steps` and `## Open
+questions`, in that order, and `## What would be lost` last when the
+entry also carries the tag `tombstone`, the handoff written before the
+sandbox is destroyed (08 8.5); `add` and `edit` refuse a body without
+them (exit 2), and `tombstone` on any other type is refused the same
+way. `REQ-1298` A `handoff` entry's front matter carries one more key,
+`stamp`, the stamp of 3.10 julieta measures at `add`: a caller cannot
+supply it, `edit` leaves it, and the key is refused on any other type.
+`REQ-1299` One `handoff` is open at a time: `add` of a `handoff` first
+closes the open one of the shared dir (status `done`), after the
+duplicate rule of 04 4.1 (a duplicate prints the existing id and closes
+nothing); an open `handoff` is edited as any entry, and a done one
+refuses every `edit`, so a closed narrative is the record of its moment. `REQ-0243` An entry file is self-contained: copying `memory/<dir>/entries/`
 whole is a complete move, and the store lock is recreated on first use.
 
-## 3.10 Handoff file (schema `handoff.v1`)
+## 3.10 Stamp (schema `stamp.v1`)
 
-`REQ-0244` `memory/<dir>/handoff/<ULID>-<kind>.md`, where `<kind>` is `clear`,
-`final` or `facts`. The kind is in the file name so the handoff reader
-selects files without parsing them; there is no pointer file.
+`REQ-0244` A stamp is the position of every manifest repo at one moment,
+measured by julieta and never written by an agent: for each repo its
+branch, head, upstream, the commits ahead of and behind it, the dirty
+count defined below and the stashes, with the project, the generation,
+the agent and the time. `REQ-1300` It is written in two places by the
+same code: inside a `handoff` entry, under the `stamp` key of its front
+matter, when the entry is added (3.9), and as a file
+`memory/_shared/stamps/<ULID>.yaml` by `julieta stamp`, the SessionEnd
+hook (08 8.2), so the newest file says where the trees were when the
+last session ended and the entry says where they were when the
+narrative was written; the gap between the two is the resume line of
+08 8.3. There is no narrative in a stamp file and no pointer file.
 
-```markdown
----
-schema: handoff/v1
-kind: clear            # clear | final | facts   (facts = written by the SessionEnd hook, no narrative)
+```yaml
+schema: stamp/v1
 createdAt: 2026-10-02T18:30:00Z
 project: shop
 generation: 01j9zc2q8x7w4t6y3r5e1v9k0p
@@ -679,17 +733,7 @@ repos:
     behind: 0
     dirty: 3
     stashes: 0
----
-## Goal
-## State
-## Decisions
-## Next steps
-## Open questions
-## What would be lost   (kind: final only)
 ```
-
-`REQ-0245` Kinds `clear` and `final` require the headings (six for `final`);
-`facts` has no body. julieta stamps everything in the front matter.
 
 `dirty` is the number of distinct paths the working tree changes:
 staged, unstaged, unmerged, untracked, or marked assume-unchanged. Each
@@ -777,7 +821,7 @@ decoders refuse uppercase.
 | `run` | the validated run layout | stale layout detection |
 | `lock-set` | sorted `{dir, mise.lock sha256}` | `julieta install` skip rule |
 | `secret-argv` | one secret's argv | widening set |
-| `memory-content` | `REQ-0259` an entry's `title`, `body`, `tags` and `status` | `julieta memory add` duplicate rule (04 4.1) |
+| `memory-content` | `REQ-0259` an entry's `title`, `body`, `tags` and `status`, never its `stamp` | `julieta memory add` duplicate rule (04 4.1) |
 | `fingerprint` | `REQ-0260` the fingerprint object of 3.8 | the `removing` write and its rerun |
 
 ## 3.13 Other schemas

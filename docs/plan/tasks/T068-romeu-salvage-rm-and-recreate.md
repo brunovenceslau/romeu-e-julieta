@@ -85,9 +85,10 @@ T041 is `e2e/internal/romeu/salvage_helpers.go` (rule 1 of
   - Each row of the generation table has its Effect test, by event title
     (01 1.6).
   - `--accept-loss` removes the sandbox after an incomplete salvage;
-    `rm` without a `final` handoff of the generation asks on a TTY
+    `rm` without an open `handoff` entry tagged `tombstone` whose stamp
+    names the generation (ADR 0042; the reader of T174) asks on a TTY
     whether to go on (a no exits before `julieta salvage` is called) and
-    without a TTY warns `no-final-handoff` and goes on; in both, the
+    without a TTY warns `no-tombstone` and goes on; in both, the
     check runs after the preflight and before the sandbox half (04 4.2,
     08 8.3). The `rm` and `retire` confirmations go to stderr and stdin
     decides the TTY; the `/dev/ptmx` case of `rm` drives stdin and reads
@@ -96,7 +97,7 @@ T041 is `e2e/internal/romeu/salvage_helpers.go` (rule 1 of
     `--stop-agents` and says so; `rm` passes it. A stopped sandbox is
     started for the sandbox half and stopped again. A failed start or
     sandbox half exits 1 naming `--from-host` and the four kinds of work
-    it does not recover. `rm` on a terminal asks when no `final` handoff
+    it does not recover. `rm` on a terminal asks when no `tombstone`
     exists, and prints the workload volumes salvage does not cover.
   - With the fake sbx failing the create after a complete salvage,
     `recreate` exits 1 with `kit-build-failed`, the generation is

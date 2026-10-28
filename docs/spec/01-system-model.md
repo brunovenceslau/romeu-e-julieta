@@ -11,7 +11,7 @@ model is wrong.
 | Component | Single responsibility | Runs where | Language |
 |---|---|---|---|
 | **romeu** | Turns reviewed specs into host state: materializes the tree, owns the gates, drives `sbx`, delivers julieta, verifies and imports salvage. Deterministic; never an agent; never executes repository content. | macOS host | Go |
-| **julieta** | Does chores inside a sandbox: secondary clones, tools (mise), git hooks, memory, handoff, snapshot/salvage, run layout, pin bumps and checks, spec and catalog validation. `REQ-0039` Never widens what the sandbox can do. | sandbox (linux amd64/arm64); also the config repo's CI | Go |
+| **julieta** | Does chores inside a sandbox: secondary clones, tools (mise), git hooks, memory (handoffs among its entries), stamps, snapshot/salvage, run layout, pin bumps and checks, spec and catalog validation. `REQ-0039` Never widens what the sandbox can do. | sandbox (linux amd64/arm64); also the config repo's CI | Go |
 | **product repo** (`romeu-e-julieta`, public) | Source of both binaries, product kits, egress catalog, skills, schemas, docs | GitHub | Go, YAML, Markdown |
 | **config repo** (for example `my-config`) | `projects/<name>.yaml` specs and personal kits. Agents author it; merges are reviewed. It is also a project like any other (the config project). | GitHub; cloned into the host tree | YAML |
 | **worked-on repos** | The code being developed; each may carry `mise.toml` + `mise.lock` | GitHub; plain clones in the host tree ([02 2.3](02-layouts.md#23-host-tree)). v1 supports GitHub-shaped URLs (one owner segment) on the hosts in `gitHosts`; repos, CI and releases assume GitHub ([03 3.1](03-formats.md#31-name-and-path-rules-shared)) | - |
@@ -20,7 +20,7 @@ model is wrong.
 | **host settings** | Machine-local, operator-owned: root path, config repo, absolute tool paths, git hosts, workload repository allowlist, secret bindings `name@project -> argv`, signing agent socket | `$XDG_CONFIG_HOME/romeu/settings.yaml` | YAML |
 | **host state** | Machine-local trust and lifecycle records: the toolchain acknowledgement and one record per project (approval, generations, applied egress), a descriptor cache, a lock | `$XDG_STATE_HOME/romeu/` | JSON |
 | **sandbox** | `REQ-0041` One sbx microVM per project, named after the project, clone mode on the primary repo | sbx | - |
-| **memory** | `REQ-0042` One directory per repo per project: memory entries, handoffs, snapshots and salvage payloads, in a fixed layout. Plain files, format owned by julieta, agent-neutral. | host disk, mounted read-write into its sandbox only | - |
+| **memory** | `REQ-0042` One directory per repo per project, and one shared directory per project: memory entries (handoffs among them), stamps, snapshots and salvage payloads, in a fixed layout. Plain files, format owned by julieta, agent-neutral. | host disk, mounted read-write into its sandbox only | - |
 | **kits** | `REQ-0043` v3 kit sources built locally by sbx at create: product kits (embedded in romeu) and personal kits (from the config repo) plus a workload pinned by digest | host tree `.romeu/kits/` | v3 descriptors, sh |
 | **run layout** | Panes and command steps per project; rendered by julieta into herdr `layout.apply` | spec `run:` | YAML |
 
@@ -59,7 +59,7 @@ layouts are in [02 2.3](02-layouts.md#23-host-tree) and
 | host clones | `<name>-env/<dir>/` | the repository owner's; origin content agents can push | the host user, in Restricted Mode; sbx clones the primary | `REQ-0052` until `retire`; never moved, re-cloned or deleted by `sync`, `run` or `rm` | kept / moved |
 | refs in romeu namespaces | `refs/romeu/*` and `refs/sandboxes/<name>/*` in each host clone | the operator's; salvage commits can hold untracked files | the host user | the clone's: deleting or re-cloning it loses them | kept / moved |
 | review checkouts | `<name>-env/review/<dir>/` | sandbox work | the host user, in Restricted Mode | until `retire` | kept / moved |
-| memory dirs | `<name>-env/memory/<dir>/` (entries, handoffs, snapshots, salvage payloads) | agent-written | the host user; the project's sandbox, read-write | until `retire` | kept / moved |
+| memory dirs | `<name>-env/memory/<dir>/` and `memory/_shared/` (entries, stamps, snapshots, salvage payloads) | agent-written | the host user; the project's sandbox, read-write | until `retire` | kept / moved |
 | workspace files | `$ROMEU_ROOT/dev.code-workspace`, `review.code-workspace` | derived | the host user, in VS Code | rewritten from host state | rewritten |
 | `.attic` | `$ROMEU_ROOT/.attic/<name>/<UTC-ts>/` | the operator's | the host user | until the owner deletes it (J7 step 4) | - / created |
 | host settings | `$XDG_CONFIG_HOME/romeu/settings.yaml` | the operator's | romeu; never mounted | until the operator deletes it | kept / kept |
@@ -367,8 +367,8 @@ it is complete or accepted.
 
 `REQ-0106` Salvage always uses the generation's recorded repo set, not the current
 spec, so a repo removed from the spec (J13) is still salvaged. `REQ-0107` Whether
-a generation has a final handoff is computed when `rm` runs, by the
-handoff reader ([08 8.3](08-memory-handoff-salvage.md#83-handoff)), not
+a generation has a tombstone handoff is computed when `rm` runs, by the
+memory reader ([08 8.3](08-memory-handoff-salvage.md#83-handoff)), not
 stored. `status` is a projection of these records.
 
 ### Retire
@@ -431,8 +431,9 @@ generated glossary page is a row of
 | recreate | rm, then run | - |
 | retire | the inverse of sync: rm, then move `<name>-env/` to `$ROMEU_ROOT/.attic/`; never deletes. What it moves is the owner's to delete by hand (J7 step 4) | - |
 | orphaned | a project or repo dir in the host tree that no spec names (J7, J13) | - |
-| handoff | agent narrative (`clear`, `final`) or julieta-stamped git facts (`facts`), a plain file in the memory dir | - |
-| lesson | in a user's project, a memory entry tagged `lesson` ([08 8.1](08-memory-handoff-salvage.md#81-memory-store)), shown at SessionStart; in this repository, a file under `docs/lessons/` ([12 12.7](12-engineering.md#127-text-standard-and-lessons)), read by contributors and review. The two share the word only | - |
+| handoff | the narrative a session leaves for the next: a memory entry of type `handoff` in the project's shared dir, tagged `tombstone` when written before the sandbox is destroyed ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1)) | - |
+| stamp | where every manifest repo's tree was at one moment, measured by julieta: inside a handoff entry, and as a file written at each session's end ([03 3.10](03-formats.md#310-stamp-schema-stampv1)) | - |
+| lesson | a file under `docs/lessons/` of this repository ([12 12.7](12-engineering.md#127-text-standard-and-lessons)), read by contributors and review; what a session taught in a user's project is a memory entry of type `feedback` ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1)) and is not called a lesson | - |
 | widening set | gate 2's digested content | - |
 | recreate-class | fields tagged `apply:"recreate"`: name (the sandbox's name derives from the project's, so a renamed project is a new sandbox; decided on 2026-10-22), repos, kits, workload, ports, sandbox options, agent, and (until probe A10 says otherwise) secrets | - |
 | recreate needed | the live sandbox's recreate digest differs from the approved one; `status` reports it, and `run` raises `recreate-needed` ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3) | stale (for the recreate digest) |
