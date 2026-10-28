@@ -36,7 +36,7 @@ julieta memory edit 01j9z3k8m6t2q4w5e7r9y1v3k5 --title 'Flaky test on arm64 runn
       --json              print one JSON document
       --repo string       the repo dir to file under, instead of the repo of the working directory
       --status string     open or done; done closes the entry
-      --tag stringArray   a tag; the tags given replace the entry's
+      --tag stringArray   a tag; the tags given replace the entry's, and exactly one of them is a type tag: user, feedback, project, reference, handoff
       --title string      the new title
 ```
 

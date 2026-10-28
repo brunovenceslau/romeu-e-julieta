@@ -43,7 +43,8 @@ const Schema = "julieta-memory/v1"
 // 4.1, Idempotency: add and edit print the entry they wrote, or the
 // entry that made the write needless, with wrote unset).
 type Report struct {
-	// Entries are the entries the command printed, oldest first.
+	// Entries are the entries the command printed, in its order: list
+	// newest first, show in the order of its ids.
 	Entries []Entry `json:"entries"`
 	// Repo is the dir of the repo, as the manifest names it.
 	Repo string `json:"repo"`
@@ -247,6 +248,9 @@ func checkChange(ch write.Change) error {
 // cannot forge a line of the output (I29): the CLI writer keeps a line
 // feed, so every value is escaped before it is formatted.
 func esc(s string) string { return termsafe.Escape(s) }
+
+// typeTags names the five type tags of 03 3.9 for the help of --tag.
+var typeTags = strings.Join(memstore.TypeTags, ", ")
 
 // repoFlag adds --repo to c.
 func repoFlag(c *cobra.Command, repo *string) {

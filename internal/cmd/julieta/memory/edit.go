@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore/write"
 )
 
@@ -43,12 +44,17 @@ var _ = cli.Register(func() cli.Command {
 				if err := checkChange(ch); err != nil {
 					return usage(cmd, err.Error())
 				}
-				return edit(env, repo, args[0], ch)
+				if ch.Tags != nil {
+					if err := memstore.CheckType(*ch.Tags); err != nil {
+						return usage(cmd, err.Error())
+					}
+				}
+				return edit(env, cmd, repo, args[0], ch)
 			},
 		}
 		cmd.Flags().StringVar(&title, "title", "", "the new title")
 		cmd.Flags().StringVar(&body, "body", "", "the new body")
-		cmd.Flags().StringArrayVar(&tags, "tag", nil, "a tag; the tags given replace the entry's")
+		cmd.Flags().StringArrayVar(&tags, "tag", nil, "a tag; the tags given replace the entry's, and exactly one of them is a type tag: "+typeTags)
 		cmd.Flags().StringVar(&status, "status", "", "open or done; done closes the entry")
 		repoFlag(cmd, &repo)
 		return cmd
@@ -57,8 +63,11 @@ var _ = cli.Register(func() cli.Command {
 }())
 
 // edit applies ch to the entry id and prints it; an edit that changes
-// nothing writes nothing and says so.
-func edit(env *cli.Env, repo, id string, ch write.Change) error {
+// nothing writes nothing and says so. An edit that names no tag keeps
+// the entry's, so on an entry whose tags hold no type tag, or two, it
+// is the error usage too (03 3.9, REQ-1287): the edit that types such
+// an entry names its tags (REQ-1292).
+func edit(env *cli.Env, cmd *cobra.Command, repo, id string, ch write.Change) error {
 	t, err := resolve(repo)
 	if err != nil {
 		return err
@@ -68,6 +77,13 @@ func edit(env *cli.Env, repo, id string, ch write.Change) error {
 		return readErr(err, t)
 	}
 	defer func() { _ = s.Close() }()
+	if ch.Tags == nil {
+		if have, err := s.Get(id); err == nil {
+			if err := memstore.CheckType(have.Tags); err != nil {
+				return usage(cmd, err.Error()+"; name the tags with --tag")
+			}
+		}
+	}
 	e, wrote, err := s.Edit(id, ch)
 	if err != nil {
 		return readErr(err, t)

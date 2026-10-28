@@ -19,11 +19,14 @@ var _ = cli.Register(func() cli.Command {
 		cmd := &cobra.Command{
 			Use:   "add",
 			Short: "add a memory entry to the repo's memory dir",
-			Example: "julieta memory add --title 'Flaky test on arm64' --tag ci\n" +
-				"julieta memory add --title 'Signing waits' --body 'Ask the operator.' --tag lesson --json",
+			Example: "julieta memory add --title 'Flaky test on arm64' --tag project --tag ci\n" +
+				"julieta memory add --title 'Signing waits' --body 'Ask the operator.' --tag feedback --json",
 			Args: cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, _ []string) error {
 				if err := in.Normal().Check(); err != nil {
+					return usage(cmd, err.Error())
+				}
+				if err := memstore.CheckType(in.Tags); err != nil {
 					return usage(cmd, err.Error())
 				}
 				return add(env, repo, in)
@@ -31,7 +34,7 @@ var _ = cli.Register(func() cli.Command {
 		}
 		cmd.Flags().StringVar(&in.Title, "title", "", "the entry's title, one line")
 		cmd.Flags().StringVar(&in.Body, "body", "", "the entry's markdown body")
-		cmd.Flags().StringArrayVar(&in.Tags, "tag", nil, "a tag of the entry; repeat for more (lesson makes SessionStart print it)")
+		cmd.Flags().StringArrayVar(&in.Tags, "tag", nil, "a tag of the entry; repeat for more; exactly one is a type tag: "+typeTags)
 		cmd.Flags().StringVar(&in.Status, "status", memstore.StatusOpen, "open or done")
 		repoFlag(cmd, &repo)
 		return cmd

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,7 +59,8 @@ func two(t *testing.T) (dir string, a, b memstore.Entry) {
 	return dir, a, b
 }
 
-// TestListAndGet lists the entries oldest first, filters by query and
+// TestListAndGet lists the entries newest first, an equal updatedAt
+// ordered by id, filters by query and
 // status, and gets one by id; a dir with no entries/ has none, and a
 // temporary file is never read (REQ-0654).
 func TestListAndGet(t *testing.T) {
@@ -67,8 +69,8 @@ func TestListAndGet(t *testing.T) {
 	r := open(t, dir)
 	all, err := r.List(memstore.Filter{})
 	require.NoError(t, err)
-	assert.Equal(t, []memstore.Entry{a, b}, all)
-	for q, want := range map[string][]memstore.Entry{"ARM64": {a}, "operator": {b}, "less": {b}, "nothing": nil, "": {a, b}} {
+	assert.Equal(t, []memstore.Entry{b, a}, all)
+	for q, want := range map[string][]memstore.Entry{"ARM64": {a}, "operator": {b}, "less": {b}, "nothing": nil, "": {b, a}} {
 		got, err := r.List(memstore.Filter{Query: q})
 		require.NoError(t, err)
 		assert.Equal(t, want, got, q)
@@ -208,4 +210,54 @@ func TestErrorsEscapeNames(t *testing.T) {
 	require.ErrorIs(t, err, memstore.ErrLayout)
 	assert.NotContains(t, err.Error(), "\n")
 	assert.NotContains(t, err.Error(), "\x1b")
+}
+
+// TestListFilters runs each narrowing of julieta memory list alone and
+// all together (04 4.3, REQ-1293; REQ-0653), on three entries whose
+// updatedAt and createdAt orders differ: every given tag must hold, an
+// entry without a type tag is found by its free tags (REQ-1292), since
+// is the earliest updatedAt, the sort is updatedAt or createdAt newest
+// first (REQ-1288), and the limit cuts after the sort.
+func TestListFilters(t *testing.T) {
+	dir := t.TempDir()
+	day := func(d, h int) time.Time { return time.Date(2026, 10, d, h, 0, 0, 0, time.UTC) }
+	mk := func(id, title, status string, tags []string, created, updated time.Time) memstore.Entry {
+		e := example(t)
+		u, err := canon.ParseULID(id)
+		require.NoError(t, err)
+		e.ID, e.Title, e.Status, e.Tags, e.CreatedAt, e.UpdatedAt = u, title, status, tags, created, updated
+		plant(t, dir, e)
+		return e
+	}
+	fb := mk(idA, "feedback on ci", memstore.StatusOpen, []string{"ci", "feedback"}, day(3, 0), day(27, 12))
+	pr := mk(idB, "a project note", memstore.StatusDone, []string{"project"}, day(1, 0), day(28, 9))
+	old := mk("01j9z3k8m6t2q4w5e7r9y1v3k8", "an entry of before the rule", memstore.StatusOpen, []string{"ci"}, day(2, 0), day(28, 11))
+	r := open(t, dir)
+	for name, c := range map[string]struct {
+		f    memstore.Filter
+		want []memstore.Entry
+	}{
+		"none":                   {memstore.Filter{}, []memstore.Entry{old, pr, fb}},
+		"sort updated":           {memstore.Filter{Sort: memstore.SortUpdated}, []memstore.Entry{old, pr, fb}},
+		"sort created":           {memstore.Filter{Sort: memstore.SortCreated}, []memstore.Entry{fb, old, pr}},
+		"a free tag":             {memstore.Filter{Tags: []string{"ci"}}, []memstore.Entry{old, fb}},
+		"a type tag":             {memstore.Filter{Tags: []string{"project"}}, []memstore.Entry{pr}},
+		"two tags that hold":     {memstore.Filter{Tags: []string{"ci", "feedback"}}, []memstore.Entry{fb}},
+		"two tags, one missing":  {memstore.Filter{Tags: []string{"feedback", "project"}}, nil},
+		"since a date":           {memstore.Filter{Since: day(28, 0)}, []memstore.Entry{old, pr}},
+		"since a timestamp":      {memstore.Filter{Since: day(28, 10)}, []memstore.Entry{old}},
+		"since exactly updated":  {memstore.Filter{Since: day(28, 9)}, []memstore.Entry{old, pr}},
+		"limit":                  {memstore.Filter{Limit: 1}, []memstore.Entry{old}},
+		"limit over the entries": {memstore.Filter{Limit: 9}, []memstore.Entry{old, pr, fb}},
+		"status":                 {memstore.Filter{Status: memstore.StatusOpen}, []memstore.Entry{old, fb}},
+		"query":                  {memstore.Filter{Query: "NOTE"}, []memstore.Entry{pr}},
+		"all together": {memstore.Filter{Query: "o", Status: memstore.StatusOpen, Tags: []string{"feedback"},
+			Since: day(27, 0), Limit: 1, Sort: memstore.SortCreated}, []memstore.Entry{fb}},
+	} {
+		got, err := r.List(c.f)
+		require.NoError(t, err, name)
+		assert.Equal(t, c.want, got, name)
+	}
+	_, err := r.List(memstore.Filter{Sort: "title"})
+	require.Error(t, err)
 }

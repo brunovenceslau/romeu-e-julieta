@@ -37,9 +37,60 @@ const (
 	StatusDone = "done"
 )
 
-// TagLesson is the one tag with behaviour (REQ-0242): SessionStart
-// prints an entry that carries it.
+// The five type tags, the closed set of tags with behaviour (03 3.9,
+// REQ-0242): the four kinds of note the agent's own memory records,
+// and the handoff a session leaves for the next.
+const (
+	TypeUser      = "user"
+	TypeFeedback  = "feedback"
+	TypeProject   = "project"
+	TypeReference = "reference"
+	TypeHandoff   = "handoff"
+)
+
+// TypeTags are the five type tags, in the order of 03 3.9.
+var TypeTags = []string{TypeUser, TypeFeedback, TypeProject, TypeReference, TypeHandoff}
+
+// NoType is the type the index line shows for an entry whose tags hold
+// no type tag, one written before the rule (REQ-1292).
+const NoType = "-"
+
+// TagLesson is a free tag since REQ-0242 gave it no behaviour; the
+// SessionStart of julieta handoff show still prints the entries that
+// carry it until T172 replaces it with the index.
 const TagLesson = "lesson"
+
+// Type returns the type tag of tags, the first in TypeTags order when a
+// planted file holds more than one, or NoType when they hold none.
+func Type(tags []string) string {
+	for _, t := range TypeTags {
+		if slices.Contains(tags, t) {
+			return t
+		}
+	}
+	return NoType
+}
+
+// CheckType returns why tags do not hold exactly one type tag (03 3.9,
+// REQ-1287), naming the five. Decode does not call it, so an entry
+// file written before the rule is still read (REQ-1292); add and edit
+// do, on the tags they would write.
+func CheckType(tags []string) error {
+	var held []string
+	for _, t := range TypeTags {
+		if slices.Contains(tags, t) {
+			held = append(held, t)
+		}
+	}
+	if len(held) == 1 {
+		return nil
+	}
+	what := "no type tag"
+	if len(held) > 1 {
+		what = "the type tags " + strings.Join(held, " and ")
+	}
+	return fmt.Errorf("%w: the tags hold %s; an entry carries exactly one of %s", ErrInvalid, what, strings.Join(TypeTags, ", "))
+}
 
 // The bounds of the fields an agent supplies.
 const (
@@ -69,7 +120,7 @@ type Entry struct {
 	Title string `json:"title" yaml:"title"`
 	// Status is open or done.
 	Status string `json:"status" yaml:"status"`
-	// Tags are sorted and distinct; lesson is the one with behaviour.
+	// Tags are sorted and distinct; one of them is a type tag (Type).
 	Tags []string `json:"tags" yaml:"tags,flow"`
 	// CreatedAt is when julieta added the entry, in UTC, to the second.
 	CreatedAt time.Time `json:"createdAt" yaml:"createdAt"`

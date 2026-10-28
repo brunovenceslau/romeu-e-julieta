@@ -16,16 +16,22 @@ changed than repeated.
 ```sh
 julieta memory list --query 'signing'
 julieta memory list
-julieta memory show <id>
+julieta memory show <id> [<id>...]
 ```
 
-`--query` matches an entry whose title, body or a tag holds the text,
-ignoring case, so try a word or two the entry would use before you
-conclude there is none. `--status open` or `--status done` narrows the
-list:
+`list` prints one line per entry, newest change first: the id, the
+repo, the status, the type tag (`-` for an entry written before type
+tags), the date of the last change and the title. `--query` matches an
+entry whose title, body or a tag holds the text, ignoring case, so try a
+word or two the entry would use before you conclude there is none. These
+narrow the list, and combine:
 
 ```sh
-julieta memory list --query 'signing' --status open
+julieta memory list --status open
+julieta memory list --tag feedback --tag ci   # every tag given must hold
+julieta memory list --since 2026-10-28        # changed on or after; a timestamp works too
+julieta memory list --limit 20
+julieta memory list --sort created            # newest added first
 ```
 
 ## Change or close an entry
@@ -37,9 +43,15 @@ julieta memory edit <id> --title 'Signing waits on the host'
 julieta memory edit <id> --status done
 ```
 
-The tags you give with `--tag` replace the entry's tags, so repeat
-`--tag lesson` when you change the tags of a lesson, or it stops being
-printed at session start.
+The tags you give with `--tag` replace the entry's tags, so give the
+type tag again with them; an edit whose tags hold no type tag, or two,
+is refused. An entry written before type tags (listed with the type
+`-`) has none, so every edit of it, closing it too, names its tags and
+gives it one:
+
+```sh
+julieta memory edit <id> --tag project --tag ci --status done
+```
 
 Close an entry once it no longer holds, so a later session does not act
 on it.
@@ -50,5 +62,5 @@ Every command prints the repo it used. If that is not the repo you meant,
 run it again with `--repo <dir>`:
 
 ```sh
-julieta memory add --repo <dir> --title 'Signing waits on the host' --body 'Ask the operator.'
+julieta memory add --repo <dir> --title 'Signing waits on the host' --body 'Ask the operator.' --tag feedback
 ```

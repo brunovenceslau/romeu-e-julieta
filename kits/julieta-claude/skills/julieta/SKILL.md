@@ -1,6 +1,6 @@
 ---
 name: julieta
-description: How to work with julieta, the tool inside the sandbox. Use it whenever something is worth keeping for a later session (a lesson, a decision, a fact you had to dig for, a promise to come back to something), since built-in memory is off and julieta memory is the only place it survives. Use it too the moment a git commit's signing fails, hangs or waits on a confirmation that does not come, before trying anything else.
+description: How to work with julieta, the tool inside the sandbox. Use it whenever something is worth keeping for a later session (a correction, a decision, a fact you had to dig for, a promise to come back to something), since built-in memory is off and julieta memory is the only place it survives. Use it too the moment a git commit's signing fails, hangs or waits on a confirmation that does not come, before trying anything else.
 ---
 
 <!--
@@ -16,17 +16,37 @@ Anything kept only in the conversation is gone after `/clear`.
 
 ## Keep something for later
 
-Search first with `julieta memory list --query <text>`: an entry that
-already holds the thing is better changed than repeated (see
+At the start of every session you see the open entries, each by its id
+and title. When the work touches one, read it in full with
+`julieta memory show <id>` (several ids at once are fine).
+
+Search before you add, with `julieta memory list --query <text>`: an
+entry that already holds the thing is better changed than repeated (see
 [references/memory.md](references/memory.md)). Then add one entry per
-thing, with a one-line title a later session can scan:
+thing, with a one-line title a later session can scan from the index:
 
 ```sh
-julieta memory add --title 'Signing waits on the host' --body 'Ask the operator.' --tag lesson
+julieta memory add --title 'Signing waits on the host' --body 'Ask the operator.' --tag feedback
 ```
 
-Tag it `lesson` when it records what the work taught: lessons are printed
-at the start of every session, which is how a mistake is not repeated.
+Every entry carries exactly one type tag, so a later session knows how
+to weigh it; `add` refuses none or two. Pick by what the note is:
+
+- `user`: the operator's role, expertise and working preferences.
+- `feedback`: a correction the operator gave, an approach the operator
+  confirmed, or what the work taught, so the mistake is not repeated.
+- `project`: ongoing work, decisions and ordering that the code and
+  the git history do not hold.
+- `reference`: where to find something outside the repository.
+- `handoff`: the narrative a session leaves for the next; write it with
+  the `handoff` skill, never by hand.
+
+Free tags (`ci`, `signing`) may sit beside the type tag.
+
+Keep out what is already kept elsewhere: anything the code, the git
+history or an instruction file (`CLAUDE.md`, `AGENTS.md`,
+`.claude/rules/`) holds. A copy goes stale while the original moves on,
+and the index has room for what lives nowhere else.
 
 Never put a secret in an entry: every later session reads memory, and it
 may be shared. Write what happened and why, not orders, since a later
@@ -35,10 +55,9 @@ entry, put it in the handoff and open an issue labelled `deferred`, so it
 is tracked where people look.
 
 The command prints the repo it filed the entry under. Read that line: an
-entry under the wrong repo is never shown where it is needed. To find
-entries (search before you add something that may be there already),
-change or close them, or to file under another repo, read
-[references/memory.md](references/memory.md).
+entry under the wrong repo is never shown where it is needed. To narrow
+the list (by tag, date or count), change or close entries, or file under
+another repo, read [references/memory.md](references/memory.md).
 
 ## When signing a commit fails or waits
 

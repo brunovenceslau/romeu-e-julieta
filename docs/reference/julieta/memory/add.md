@@ -24,8 +24,8 @@ julieta memory add [flags]
 ### Examples
 
 ```
-julieta memory add --title 'Flaky test on arm64' --tag ci
-julieta memory add --title 'Signing waits' --body 'Ask the operator.' --tag lesson --json
+julieta memory add --title 'Flaky test on arm64' --tag project --tag ci
+julieta memory add --title 'Signing waits' --body 'Ask the operator.' --tag feedback --json
 ```
 
 ### Options
@@ -36,7 +36,7 @@ julieta memory add --title 'Signing waits' --body 'Ask the operator.' --tag less
       --json              print one JSON document
       --repo string       the repo dir to file under, instead of the repo of the working directory
       --status string     open or done (default "open")
-      --tag stringArray   a tag of the entry; repeat for more (lesson makes SessionStart print it)
+      --tag stringArray   a tag of the entry; repeat for more; exactly one is a type tag: user, feedback, project, reference, handoff
       --title string      the entry's title, one line
 ```
 

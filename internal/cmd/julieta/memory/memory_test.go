@@ -111,13 +111,13 @@ func errorID(t *testing.T, stderr string) string {
 // and the repo, in text and with --json (REQ-0280, REQ-0677).
 func TestAddStampsAndPrints(t *testing.T) {
 	s := newSandbox(t)
-	rep := s.report(t, "memory", "add", "--title", "Flaky test", "--body", "On arm64.\n", "--tag", "ci", "--tag", "arm64")
+	rep := s.report(t, "memory", "add", "--title", "Flaky test", "--body", "On arm64.\n", "--tag", "ci", "--tag", "arm64", "--tag", "feedback")
 	want, err := canon.NewULID(clock, canon.NewULIDSource(bytes.NewReader(bytes.Repeat([]byte{7}, 16))))
 	require.NoError(t, err)
 	path := filepath.Join(s.mem(0), "entries", want.String()+".md")
 	assert.Equal(t, memory.Report{Schema: memory.Schema, Repo: "api", Wrote: true, Entries: []memory.Entry{{
 		Body: "On arm64.\n", CreatedAt: clock, ID: want.String(), Path: path, Status: "open",
-		Tags: []string{"arm64", "ci"}, Title: "Flaky test", UpdatedAt: clock,
+		Tags: []string{"arm64", "ci", "feedback"}, Title: "Flaky test", UpdatedAt: clock,
 	}}}, rep)
 	info, err := os.Stat(path)
 	require.NoError(t, err)
@@ -126,7 +126,7 @@ func TestAddStampsAndPrints(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fs.FileMode(0o700), info.Mode().Perm())
 
-	code, stdout, stderr := s.julieta(t, "memory", "add", "--title", "Second")
+	code, stdout, stderr := s.julieta(t, "memory", "add", "--title", "Second", "--tag", "user")
 	require.Equal(t, 0, code, stderr)
 	assert.Regexp(t, `^added [0-9a-hjkmnp-tv-z]{26} `+s.mem(0)+`/entries/[0-9a-hjkmnp-tv-z]{26}\.md repo api\n$`, stdout)
 }
@@ -136,7 +136,7 @@ func TestAddStampsAndPrints(t *testing.T) {
 // 4.1, Idempotency), so a rerun after a timeout adds nothing.
 func TestAddDuplicate(t *testing.T) {
 	s := newSandbox(t)
-	args := []string{"memory", "add", "--title", "t", "--body", "b", "--tag", "x"}
+	args := []string{"memory", "add", "--title", "t", "--body", "b", "--tag", "x", "--tag", "project"}
 	first := s.report(t, args...)
 	again := s.report(t, args...)
 	assert.False(t, again.Wrote)
@@ -168,28 +168,35 @@ func TestCallersCannotStamp(t *testing.T) {
 	require.ErrorIs(t, err, fs.ErrNotExist)
 }
 
-// TestListShowEdit filters with list --query, shows an entry, and
-// closes one with edit --status done (04 4.3, REQ-0411); an edit that
-// changes nothing writes nothing.
+// TestListShowEdit filters with list --query, prints one index line
+// per entry, newest first (REQ-1288), shows entries in full in the
+// order given (REQ-1289), and closes one with edit --status done (04
+// 4.3, REQ-0411); an edit that changes nothing writes nothing.
 func TestListShowEdit(t *testing.T) {
 	s := newSandbox(t)
-	a := s.report(t, "memory", "add", "--title", "Flaky test on arm64", "--tag", "ci").Entries[0]
-	b := s.report(t, "memory", "add", "--title", "Signing waits", "--body", "Ask the operator.\n", "--tag", "lesson").Entries[0]
+	a := s.report(t, "memory", "add", "--title", "Flaky test on arm64", "--tag", "ci", "--tag", "project").Entries[0]
+	b := s.report(t, "memory", "add", "--title", "Signing waits", "--body", "Ask the operator.\n", "--tag", "feedback").Entries[0]
 
-	assert.Equal(t, []memory.Entry{a, b}, s.report(t, "memory", "list").Entries)
+	assert.Equal(t, []memory.Entry{b, a}, s.report(t, "memory", "list").Entries, "an equal updatedAt, newest id first")
 	assert.Equal(t, []memory.Entry{a}, s.report(t, "memory", "list", "--query", "ARM64").Entries)
 	assert.Equal(t, []memory.Entry{b}, s.report(t, "memory", "list", "--query", "operator").Entries)
 	assert.Empty(t, s.report(t, "memory", "list", "--query", "nothing").Entries)
 
 	code, stdout, stderr := s.julieta(t, "memory", "list")
 	require.Equal(t, 0, code, stderr)
-	assert.Equal(t, a.ID+"  open  Flaky test on arm64  [ci]\n"+b.ID+"  open  Signing waits  [lesson]\n", stdout)
+	assert.Equal(t, b.ID+" api open feedback 2026-10-20 Signing waits\n"+a.ID+" api open project 2026-10-20 Flaky test on arm64\n", stdout)
 
 	assert.Equal(t, []memory.Entry{b}, s.report(t, "memory", "show", b.ID).Entries)
 	code, stdout, stderr = s.julieta(t, "memory", "show", b.ID)
 	require.Equal(t, 0, code, stderr)
-	assert.Equal(t, "id       "+b.ID+"\ntitle    Signing waits\nstatus   open\ntags     lesson\ncreated  2026-10-20T12:00:00Z\n"+
-		"updated  2026-10-20T12:00:00Z\npath     "+b.Path+"\nrepo     api\n\nAsk the operator.\n", stdout)
+	bText := "id       " + b.ID + "\ntitle    Signing waits\nstatus   open\ntags     feedback\ncreated  2026-10-20T12:00:00Z\n" +
+		"updated  2026-10-20T12:00:00Z\npath     " + b.Path + "\nrepo     api\n\nAsk the operator.\n"
+	assert.Equal(t, bText, stdout)
+	assert.Equal(t, []memory.Entry{b, a}, s.report(t, "memory", "show", b.ID, a.ID).Entries)
+	code, stdout, stderr = s.julieta(t, "memory", "show", b.ID, a.ID)
+	require.Equal(t, 0, code, stderr)
+	assert.Equal(t, bText+"\nid       "+a.ID+"\ntitle    Flaky test on arm64\nstatus   open\ntags     ci project\ncreated  2026-10-20T12:00:00Z\n"+
+		"updated  2026-10-20T12:00:00Z\npath     "+a.Path+"\nrepo     api\n\n", stdout)
 
 	done := s.report(t, "memory", "edit", a.ID, "--status", "done")
 	assert.True(t, done.Wrote)
@@ -198,14 +205,158 @@ func TestListShowEdit(t *testing.T) {
 	assert.Equal(t, []memory.Entry{done.Entries[0]}, s.report(t, "memory", "list", "--status", "done").Entries)
 	assert.False(t, s.report(t, "memory", "edit", a.ID, "--status", "done").Wrote)
 
-	code, stdout, stderr = s.julieta(t, "memory", "edit", b.ID, "--title", "Signing waits on the agent", "--tag", "lesson", "--tag", "signing", "--body", "x")
+	code, stdout, stderr = s.julieta(t, "memory", "edit", b.ID, "--title", "Signing waits on the agent", "--tag", "feedback", "--tag", "signing", "--body", "x")
 	require.Equal(t, 0, code, stderr)
 	assert.Equal(t, "edited "+b.ID+" "+b.Path+" repo api\n", stdout)
 	code, stdout, stderr = s.julieta(t, "memory", "edit", b.ID, "--body", "x")
 	require.Equal(t, 0, code, stderr)
 	assert.Equal(t, "unchanged "+b.ID+" "+b.Path+" repo api\n", stdout)
 	got := s.report(t, "memory", "show", b.ID).Entries[0]
-	assert.Equal(t, []string{"lesson", "signing"}, got.Tags)
+	assert.Equal(t, []string{"feedback", "signing"}, got.Tags)
+}
+
+// TestShowAnUnknownID prints the entries it has, in the order given,
+// then fails with exit 1 naming each id with no entry (REQ-1289).
+func TestShowAnUnknownID(t *testing.T) {
+	s := newSandbox(t)
+	a := s.report(t, "memory", "add", "--title", "a", "--tag", "user").Entries[0]
+	const unknown = "01j9z3k8m6t2q4w5e7r9y1v3k5"
+	code, stdout, stderr := s.julieta(t, "memory", "show", a.ID, unknown)
+	assert.Equal(t, 1, code, stderr)
+	assert.True(t, strings.HasPrefix(stdout, "id       "+a.ID+"\n"), stdout)
+	assert.Contains(t, stderr, "has no entry "+unknown)
+	code, stdout, stderr = s.julieta(t, "memory", "show", unknown, a.ID, "--json")
+	assert.Equal(t, 1, code, stderr)
+	rep, err := memory.Decode([]byte(stdout))
+	require.NoError(t, err, stdout)
+	assert.Equal(t, []memory.Entry{a}, rep.Entries)
+	code, _, stderr = s.julieta(t, "memory", "show", a.ID, "..", "--json")
+	assert.Equal(t, 2, code, stderr)
+	assert.Equal(t, "RJ-349", errorID(t, stderr))
+}
+
+// TestTypeTagRule refuses add without a type tag, add or edit with two,
+// and an edit whose tags hold none, as the error usage (RJ-349, exit
+// 2) naming the five, and writes nothing (03 3.9, REQ-1287); an edit
+// that names no tag keeps the entry's, and the tags of a typed add are
+// stored sorted.
+func TestTypeTagRule(t *testing.T) {
+	s := newSandbox(t)
+	e := s.report(t, "memory", "add", "--title", "t", "--tag", "feedback", "--tag", "ci").Entries[0]
+	assert.Equal(t, []string{"ci", "feedback"}, e.Tags)
+	for _, args := range [][]string{
+		{"memory", "add", "--title", "u"},
+		{"memory", "add", "--title", "u", "--tag", "ci"},
+		{"memory", "add", "--title", "u", "--tag", "lesson"},
+		{"memory", "add", "--title", "u", "--tag", "user", "--tag", "project"},
+		{"memory", "edit", e.ID, "--tag", "ci"},
+		{"memory", "edit", e.ID, "--tag", "feedback", "--tag", "reference"},
+	} {
+		code, _, stderr := s.julieta(t, args...)
+		assert.Equal(t, 2, code, "%q: %s", args, stderr)
+		assert.True(t, strings.HasPrefix(stderr, "error RJ-349 usage: "), stderr)
+		assert.Contains(t, stderr, "user, feedback, project, reference, handoff", args)
+	}
+	assert.Equal(t, []memory.Entry{e}, s.report(t, "memory", "list").Entries, "nothing written")
+	assert.True(t, s.report(t, "memory", "edit", e.ID, "--status", "done").Wrote)
+}
+
+// TestListIndexAndFilters lists planted entries whose updatedAt and
+// createdAt orders differ: the index line per entry, newest updatedAt
+// first, and --sort created reorders (REQ-1288); --tag, --since and
+// --limit narrow, and a bad --since, --sort or --limit is the error
+// usage (REQ-1293); the --json document holds the same entries in
+// full, in the same order. An entry file without a type tag is listed
+// with the type -, found by --tag on its free tags, and left byte for
+// byte as it was by list and show
+// (REQ-1292); an edit that names no tag cannot close it, since it
+// would leave no type tag, and the edit that names one types it.
+func TestListIndexAndFilters(t *testing.T) {
+	s := newSandbox(t)
+	day := func(d, h int) time.Time { return time.Date(2026, 10, d, h, 0, 0, 0, time.UTC) }
+	plant := func(id, title string, tags []string, created, updated time.Time) string {
+		u, err := canon.ParseULID(id)
+		require.NoError(t, err)
+		data, err := memstore.Encode(memstore.Entry{Schema: memstore.Field, ID: u, Title: title, Status: memstore.StatusOpen,
+			Tags: tags, CreatedAt: created, UpdatedAt: updated, Body: "b\n"})
+		require.NoError(t, err)
+		p := filepath.Join(s.mem(0), "entries", id+".md")
+		require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o700))
+		require.NoError(t, os.WriteFile(p, data, 0o600))
+		return p
+	}
+	const idA, idB, idC = "01j9z3k8m6t2q4w5e7r9y1v3k5", "01j9z3k8m6t2q4w5e7r9y1v3k6", "01j9z3k8m6t2q4w5e7r9y1v3k7"
+	plant(idA, "feedback on ci", []string{"ci", "feedback"}, day(3, 0), day(27, 12))
+	plant(idB, "a user note", []string{"user"}, day(1, 0), day(28, 9))
+	oldPath := plant(idC, "before the rule", []string{"ci"}, day(2, 0), day(28, 11))
+	before, err := os.ReadFile(oldPath)
+	require.NoError(t, err)
+
+	lineA, lineB := idA+" api open feedback 2026-10-27 feedback on ci", idB+" api open user 2026-10-28 a user note"
+	lineC := idC + " api open - 2026-10-28 before the rule"
+	for _, c := range []struct {
+		args []string
+		want []string
+	}{
+		{nil, []string{lineC, lineB, lineA}},
+		{[]string{"--sort", "created"}, []string{lineA, lineC, lineB}},
+		{[]string{"--tag", "ci"}, []string{lineC, lineA}},
+		{[]string{"--tag", "ci", "--tag", "feedback"}, []string{lineA}},
+		{[]string{"--tag", "ci", "--tag", "user"}, nil},
+		{[]string{"--since", "2026-10-28"}, []string{lineC, lineB}},
+		{[]string{"--since", "2026-10-28T10:00:00Z"}, []string{lineC}},
+		{[]string{"--since", "2026-10-28T07:00:00-03:00"}, []string{lineC}},
+		{[]string{"--limit", "1"}, []string{lineC}},
+		{[]string{"--tag", "feedback", "--since", "2026-10-27", "--limit", "1", "--sort", "created", "--status", "open"}, []string{lineA}},
+	} {
+		code, stdout, stderr := s.julieta(t, append([]string{"memory", "list"}, c.args...)...)
+		require.Equal(t, 0, code, "%q: %s", c.args, stderr)
+		want := ""
+		for _, l := range c.want {
+			want += l + "\n"
+		}
+		assert.Equal(t, want, stdout, c.args)
+		rep := s.report(t, append([]string{"memory", "list"}, c.args...)...)
+		var ids []string
+		for _, e := range rep.Entries {
+			ids = append(ids, e.ID)
+			assert.Equal(t, "b\n", e.Body, "the --json entries are in full")
+		}
+		var wantIDs []string
+		for _, l := range c.want {
+			wantIDs = append(wantIDs, l[:26])
+		}
+		assert.Equal(t, wantIDs, ids, c.args)
+	}
+	for _, args := range [][]string{
+		{"--since", "28/10/2026"}, {"--since", "2026-10-28 10:00"}, {"--since", ""},
+		{"--sort", "title"}, {"--limit", "0"}, {"--limit", "-1"},
+	} {
+		code, _, stderr := s.julieta(t, append(append([]string{"memory", "list"}, args...), "--json")...)
+		assert.Equal(t, 2, code, "%q: %s", args, stderr)
+		assert.Equal(t, "RJ-349", errorID(t, stderr), args)
+	}
+
+	code, _, stderr := s.julieta(t, "memory", "show", idC)
+	require.Equal(t, 0, code, stderr)
+	code, _, stderr = s.julieta(t, "memory", "edit", idC, "--status", "done", "--json")
+	assert.Equal(t, 2, code, "an edit that leaves no type tag: %s", stderr)
+	assert.Equal(t, "RJ-349", errorID(t, stderr))
+	after, err := os.ReadFile(oldPath)
+	require.NoError(t, err)
+	assert.Equal(t, before, after, "list, show and a refused edit leave an entry of before the rule as it was")
+	typed := s.report(t, "memory", "edit", idC, "--tag", "ci", "--tag", "project").Entries[0]
+	assert.Equal(t, []string{"ci", "project"}, typed.Tags, "the first edit that gives a type tag is the migration")
+}
+
+// TestIndexLineEscapes prints a repo and a title that hold a line feed
+// and an escape sequence in termsafe's form, on one line (REQ-1288,
+// REQ-0670): the store refuses such a title, so the line is built from
+// an entry given to it.
+func TestIndexLineEscapes(t *testing.T) {
+	e := memory.Entry{ID: "01j9z3k8m6t2q4w5e7r9y1v3k5", Status: "open", Tags: []string{"user"}, Title: "a\nb\x1b[2J",
+		UpdatedAt: time.Date(2026, 10, 28, 23, 0, 0, 0, time.FixedZone("x", -3*3600))}
+	assert.Equal(t, "01j9z3k8m6t2q4w5e7r9y1v3k5 we\\nb open user 2026-10-29 a\\nb\\u001b[2J", memory.IndexLine(e, "we\nb"))
 }
 
 // TestNoRemoveNoSearch has no memory rm and no memory search: each is
@@ -227,10 +378,10 @@ func TestRepoOfTheWorkingDirectory(t *testing.T) {
 	sub := filepath.Join(s.m.Repos[1].Path, "pkg")
 	require.NoError(t, os.Mkdir(sub, 0o700))
 	t.Chdir(sub)
-	rep := s.report(t, "memory", "add", "--title", "in web")
+	rep := s.report(t, "memory", "add", "--title", "in web", "--tag", "project")
 	assert.Equal(t, "web", rep.Repo)
 	assert.True(t, strings.HasPrefix(rep.Entries[0].Path, s.mem(1)+"/entries/"), rep.Entries[0].Path)
-	assert.Equal(t, "api", s.report(t, "memory", "add", "--title", "in api", "--repo", "api").Repo)
+	assert.Equal(t, "api", s.report(t, "memory", "add", "--title", "in api", "--tag", "project", "--repo", "api").Repo)
 
 	code, _, _ := s.julieta(t, "memory", "list", "--repo", "nope")
 	assert.Equal(t, 1, code)
@@ -255,7 +406,7 @@ func TestRepoThroughALink(t *testing.T) {
 func TestWithoutManifest(t *testing.T) {
 	s := newSandbox(t)
 	t.Setenv(setup.ManifestEnv, "")
-	for _, args := range [][]string{{"memory", "add", "--title", "t"}, {"memory", "list"}, {"memory", "check"}} {
+	for _, args := range [][]string{{"memory", "add", "--title", "t", "--tag", "user"}, {"memory", "list"}, {"memory", "check"}} {
 		code, _, stderr := s.julieta(t, append(args, "--json")...)
 		if args[1] == "check" {
 			code, _, stderr = s.julieta(t, args...)
@@ -281,7 +432,7 @@ func TestReadersRefuse(t *testing.T) {
 	code, _, stderr := s.julieta(t, "memory", "list", "--json")
 	assert.Equal(t, 2, code, stderr)
 	assert.Equal(t, "RJ-311", errorID(t, stderr))
-	code, _, stderr = s.julieta(t, "memory", "add", "--title", "t", "--json")
+	code, _, stderr = s.julieta(t, "memory", "add", "--title", "t", "--tag", "user", "--json")
 	assert.Equal(t, 2, code, stderr)
 	assert.Equal(t, "RJ-311", errorID(t, stderr))
 
@@ -314,6 +465,8 @@ func TestBadValuesAreUsage(t *testing.T) {
 		{"memory", "edit", "01j9z3k8m6t2q4w5e7r9y1v3k5", "--status", "closed"},
 		{"memory", "edit", "01j9z3k8m6t2q4w5e7r9y1v3k5", "--tag", ""},
 		{"memory", "edit", "../x", "--status", "done"},
+		{"memory", "add", "--title", "t", "--tag", "ci"},
+		{"memory", "edit", "01j9z3k8m6t2q4w5e7r9y1v3k5", "--tag", "user", "--tag", "handoff"},
 	} {
 		code, _, stderr := s.julieta(t, append(args, "--json")...)
 		assert.Equal(t, 2, code, "%q: %s", args, stderr)
@@ -464,7 +617,7 @@ func TestDecodeIsStrict(t *testing.T) {
 // the entry the command printed.
 func TestEntryFileIsTheFormat(t *testing.T) {
 	s := newSandbox(t)
-	e := s.report(t, "memory", "add", "--title", "t", "--body", "b\n").Entries[0]
+	e := s.report(t, "memory", "add", "--title", "t", "--body", "b\n", "--tag", "user").Entries[0]
 	data, err := os.ReadFile(e.Path)
 	require.NoError(t, err)
 	got, err := memstore.Decode(data)

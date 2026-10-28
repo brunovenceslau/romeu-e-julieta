@@ -41,7 +41,7 @@ are regenerated (rule 1).
    a `handoff` entry requires beyond that (its headings, its `stamp`,
    its shared location, one open at a time) is T174's. An entry file
    whose tags hold none is read as it is, listed with the type `-`, and
-   never matched by `list --tag`; the first `edit` that gives it a type
+   matched by `list --tag` on its free tags, never on a type tag; the first `edit` that gives it a type
    tag is its migration, so no entry file is rewritten by this task. The `memory-content` digest (03 3.12) is
    unchanged: the tags are already in it.
 2. The index line (REQ-1288, REQ-1293, REQ-0653). `list` prints one
