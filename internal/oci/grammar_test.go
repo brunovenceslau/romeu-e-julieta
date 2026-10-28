@@ -220,14 +220,14 @@ func TestNumbersPastTwoToTheFiftyThreeAreRefused(t *testing.T) {
 
 func TestSSHAgentWithoutAPhase(t *testing.T) {
 	const cfg = "{unrestricted: false, sign: [git]}"
-	t.Run("a local file is read as the widest phases", func(t *testing.T) {
-		// The sitting M0 descriptor of git-ssh-sign names no phase and sbx
-		// v0.48.0 accepted it; the kit schema of the pinned frontend
-		// requires one. The set shows both phases, the widest reading.
-		kit, err := ParseDescriptor(capability(typeSSHAgent, cfg))
+	t.Run("a descriptor file is refused", func(t *testing.T) {
+		// The kit schema requires a phase and the frontend refuses a
+		// descriptor without one at build; the grammar holds a file to
+		// the same, so the gate never shows what the frontend refuses.
+		_, err := ParseDescriptor(capability(typeSSHAgent, cfg))
 
-		require.NoError(t, err)
-		assert.Equal(t, []string{"install", "runtime"}, kit.Capabilities.SSHAgent[0].Phases)
+		require.ErrorIs(t, err, ErrInvalid)
+		assert.Contains(t, err.Error(), "no phase")
 	})
 	t.Run("the git-ssh-sign kit names the runtime phase", func(t *testing.T) {
 		data, err := os.ReadFile(fixturePath)

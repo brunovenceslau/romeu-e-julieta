@@ -409,7 +409,9 @@ type InteractiveSessions struct {
 	// Resume reopens a named session.
 	Resume []string `json:"resume,omitempty"`
 	// Continue reopens the latest session; an empty list is the launch
-	// argv alone, and nil is a verb not offered.
+	// argv alone, and nil is left to the schema's default: newSession
+	// falls back to lifecycle@1's interactive launch, the other two are
+	// not offered.
 	Continue *[]string `json:"continue,omitzero"`
 	// NewSession opens a new session, kept as Continue is.
 	NewSession *[]string `json:"newSession,omitzero"`

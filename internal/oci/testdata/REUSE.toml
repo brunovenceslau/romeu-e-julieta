@@ -12,7 +12,8 @@
 # 2026-10-28: 14878 bytes, sha256
 # 86e9133cbd2f31279b61ec638276c26102389d7de2e044ae6166fffa310c35a2, the
 # size and hash sitting M0 recorded. The other members (displayName,
-# description, sourceUrl, licenses and the provides list) are left out. source: measured on 2026-10-28.
+# description, sourceUrl, licenses and the provides list) are left out.
+# Source: measured on 2026-10-28.
 
 version = 1
 

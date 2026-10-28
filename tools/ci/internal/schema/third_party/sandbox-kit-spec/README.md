@@ -20,10 +20,10 @@ refuses the character in a tracked file.
 every v3 kit descriptor under `examples/` against
 `schema/kit.schema.json`, which composes the files below it by
 reference, and requires those descriptors to carry its modeline at the
-same tag (REQ-0836). The product kits under `kits/` are not judged yet:
-`kits/git-ssh-sign` does not validate against this tag's schema (its
-ssh-agent capability has no `phase`); a separate task, decided on
-2026-10-22, fixes the kit and judges `kits/`. The frontend pin of
+same tag (REQ-0836). The product kits under `kits/` are not judged yet;
+a separate task, decided on 2026-10-22, judges `kits/`
+(`kits/git-ssh-sign` builds on the pinned frontend since its ssh-agent
+capability names a phase). The frontend pin of
 `kits/pins.yaml` and this tag move together, and `tools/ci schema`
 fails when they differ: a new frontend milestone copies the new tag's
 `schema/` here and changes `kitSpecTag` in `../../kits.go`.

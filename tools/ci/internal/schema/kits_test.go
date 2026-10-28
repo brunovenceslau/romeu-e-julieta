@@ -18,6 +18,8 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/all"
 )
 
 // The lines that open a v3 kit descriptor under examples/: the frontend
@@ -199,4 +201,70 @@ func TestTheKitSchemaIsTheTagsCopy(t *testing.T) {
 	sch, err := compileKit(files(m))
 	require.NoError(t, err)
 	assert.NotNil(t, sch)
+}
+
+// TestTheGrammarAcceptsOnlyWhatTheKitSchemaAdmits holds internal/oci's
+// grammar to the vendored kit schema, document by document: a descriptor
+// the grammar accepts validates against the schema, and one the schema
+// refuses is refused by the grammar. The grammar may refuse what the
+// schema admits (REQ-0573: an unmodeled type or key is refused on
+// purpose), and each such row says so, so the two cannot drift apart
+// unseen when the pin moves.
+func TestTheGrammarAcceptsOnlyWhatTheKitSchemaAdmits(t *testing.T) {
+	sch, err := compileKit(files(withKitSchema(t, map[string]string{})))
+	require.NoError(t, err)
+	const (
+		interactive = "com.docker.sandbox/agent-interactive-sessions@1"
+		acp         = "com.docker.sandbox/acp@1"
+		context2    = "com.docker.sandbox/agent-context@2"
+		port        = "com.docker.sandbox/port@1"
+		sshAgent    = "com.docker.sandbox/ssh-agent@1"
+		privileged  = "com.docker.sandbox/privileged@1"
+	)
+	one := func(typ, config string) string {
+		return kitBody + "capabilities:\n  - type: " + typ + "\n    config: " + config + "\n"
+	}
+	tests := []struct {
+		name string
+		doc  string
+		// accepted says the grammar accepts the document; stricter says
+		// the schema admits a document the grammar refuses on purpose.
+		accepted, stricter bool
+	}{
+		{"interactive sessions", one(interactive, `{prompt: ["--", "{{.Prompt}}"], continue: [], list: [node, ls.mjs]}`), true, false},
+		{"acp", one(acp, `{agent: claude, command: [claude-acp], env: {MODE: x}, protocolVersion: 2}`), true, false},
+		{"acp with kit args", one(acp, `{agent: "${{ kit.args.a }}", command: x, protocolVersion: "${{ kit.args.v }}"}`), true, false},
+		{"acp with a provider", one(acp, `{agent: deb/claude-code, command: x}`), true, false},
+		{"context@2", one(context2, `{filename: CLAUDE.md, content: hello, directory: /home/agent/.claude}`), true, false},
+		{"port family", one(port, `{container: 8080, family: dual}`), true, false},
+		{"ssh-agent bounded", one(sshAgent, `{phase: runtime, unrestricted: false, sign: [git]}`), true, false},
+		{"interactive sessions without a verb", one(interactive, `{}`), false, false},
+		{"a prompt without its placeholder", one(interactive, `{prompt: ["--"]}`), false, false},
+		{"acp without a command", one(acp, `{agent: claude}`), false, false},
+		{"acp with a quoted protocol version", one(acp, `{agent: claude, command: x, protocolVersion: "2"}`), false, false},
+		{"acp with an agent that is not a provides name", one(acp, `{agent: "Bad Name/", command: x}`), false, false},
+		{"context@2 with an empty directory", one(context2, `{filename: f, directory: ""}`), false, false},
+		{"context@2 with a relative directory", one(context2, `{filename: f, directory: a/b}`), false, false},
+		{"a port family that is not one", one(port, `{container: 1, family: bogus}`), false, false},
+		{"ssh-agent without a phase", one(sshAgent, `{unrestricted: false, sign: [git]}`), false, false},
+		{"ssh-agent unrestricted with a sign list", one(sshAgent, `{phase: runtime, sign: [git]}`), false, false},
+		{"a type of another namespace", one("example.com/thing@1", `{a: 1}`), false, true},
+		{"declarationBlocks", kitBody + "capabilities:\n  - type: " + privileged + "\n    declarationBlocks: [b1]\n", false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc, err := parse(check.TreeFile{Path: "k.yaml", Content: []byte(tt.doc)})
+			require.NoError(t, err)
+			findings := validate("k.yaml", kitName, doc, compiled{kitName: sch})
+			valid := findings == nil
+			_, err = all.ParseDescriptor([]byte(tt.doc))
+			if tt.accepted {
+				require.NoError(t, err, "the grammar accepts it")
+				assert.True(t, valid, "the schema admits what the grammar accepts: %v", findings)
+				return
+			}
+			require.Error(t, err, "the grammar refuses it")
+			assert.Equal(t, tt.stricter, valid, "the schema's verdict (true admits) against the row's stricter flag: %v", findings)
+		})
+	}
 }

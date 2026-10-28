@@ -31,7 +31,7 @@ func TestA12WorkloadConformance(t *testing.T) {
 	assert.Equal(t, []string{"--", "{{.Prompt}}"}, c.InteractiveSessions.Prompt)
 	assert.Equal(t, &[]string{"--resume"}, c.InteractiveSessions.SessionPicker)
 	assert.Equal(t, &[]string{"--continue"}, c.InteractiveSessions.Continue)
-	assert.Nil(t, c.InteractiveSessions.NewSession, "a verb the workload does not offer")
+	assert.Nil(t, c.InteractiveSessions.NewSession, "left out: the schema falls back to the lifecycle launch")
 	require.NotNil(t, c.Sessions)
 	assert.False(t, c.Sessions.Optional)
 	assert.Equal(t, []Volume{

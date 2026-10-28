@@ -510,7 +510,10 @@ func TestEveryCapabilityTypeIsOfTheTypeForm(t *testing.T) {
 		}
 	}
 	// The closed list is the kit schema of the pinned frontend
-	// (REQ-0516): one type per capability file of the vendored copy.
+	// (REQ-0516): one type per capability file of the vendored copy. The
+	// path couples this package's test to the copy under tools/ci on
+	// purpose: the next frontend milestone fails here until the grammar
+	// models what it adds.
 	files, err := filepath.Glob("../../tools/ci/internal/schema/third_party/sandbox-kit-spec/schema/capabilities/com.docker.sandbox/*.schema.json")
 	require.NoError(t, err)
 	var schemaTypes []string

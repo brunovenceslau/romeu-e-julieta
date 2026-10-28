@@ -152,10 +152,12 @@ type signFact struct {
 	Capability struct {
 		Type   string `yaml:"type"`
 		Config struct {
+			Phase        string   `yaml:"phase"`
 			Unrestricted bool     `yaml:"unrestricted"`
 			Sign         []string `yaml:"sign"`
 		} `yaml:"config"`
 	} `yaml:"capability"`
+	Date     string `yaml:"date"`
 	Observed struct {
 		SignNamespaceGit  string `yaml:"signNamespaceGit"`
 		SignNamespaceFile string `yaml:"signNamespaceFile"`
@@ -194,6 +196,7 @@ func TestKitGitSSHSignDescriptor(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal(raw, &fact))
 	assert.Equal(t, "sitting M0", fact.Source, "the evidence is sitting M0's, not sitting M2's")
 	assert.NotEmpty(t, fact.SBX)
+	assert.NotEmpty(t, fact.Date, "the fixture dates its latest measurement")
 	assert.Equal(t, pinned.Frontend.Ref, fact.Frontend, "the fixture names the pinned frontend, digest included")
 	assert.Equal(t, "allowed", fact.Observed.SignNamespaceGit)
 	assert.Equal(t, "refused", fact.Observed.SignNamespaceFile)
@@ -216,6 +219,7 @@ func TestKitGitSSHSignDescriptor(t *testing.T) {
 	assert.Equal(t, []string{"git"}, got.Sign, "signing in the namespace git only")
 	assert.Equal(t, fact.Capability.Config.Sign, got.Sign)
 	assert.Equal(t, fact.Capability.Config.Unrestricted, got.Unrestricted)
+	assert.Equal(t, fact.Capability.Config.Phase, got.Phase, "the fixture names the phase the kit declares")
 
 	require.Contains(t, d.Args, "signingKey")
 	a := d.Args["signingKey"]
