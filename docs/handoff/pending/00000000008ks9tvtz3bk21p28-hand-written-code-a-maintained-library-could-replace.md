@@ -22,9 +22,18 @@ library was not checked online. In the order of ADR 0038, decision 5:
 5. The schema generator, `tools/schemagen`: `github.com/invopop/jsonschema`
    (03-formats says "no dependency"; read again under ADR 0038, 3).
    Planned on 2026-10-23 as T166, with the question of `null` for a
-   pointer: a member with no value is omitted (REQ-1273, 03 3.7). The
-   dependency is proposed with that task and approved on its pull
-   request.
+   pointer: a member with no value is omitted (REQ-1273, 03 3.7). Kept
+   by T166 (#PRNUM) on 2026-10-28, measured against
+   `github.com/invopop/jsonschema` v0.14.0: without references it
+   recurses without end on the run layout's tree type, and with them
+   every named struct moves to `$defs`, which changes every schema and
+   the paths the keywords are placed at; a `TextMarshaler` such as the
+   ULID comes out as an array of integers; and the refusals the
+   generator holds (`time.Duration`, a type with its own JSON methods,
+   the `string` option, a JSON name used twice) would stay a walk of
+   their own. Most of the hand-written code would stay beside three new
+   modules. Reopen when a library maps encoding/json/v2's rules (embed,
+   omitzero, text marshalers) and references only a recursive type.
 6. The glob matcher of `tools/ci/internal/askfirst`:
    `github.com/bmatcuk/doublestar/v4`, if its dialect fits 12 12.4.
 7. Done by T149 on 2026-10-20: the canonical JSON of REQ-0254 is
