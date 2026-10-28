@@ -26,7 +26,7 @@ import (
 // which the descriptors' modeline names. The check reads the copy from
 // the commit it judges, as it reads every other file.
 const (
-	kitSpecTag  = "v3.0.0-m.8"
+	kitSpecTag  = "v3.0.0-m.11"
 	kitSpecRoot = "tools/ci/internal/schema/third_party/sandbox-kit-spec/schema"
 	kitSpecURL  = "https://raw.githubusercontent.com/docker/sandbox-kit-spec/" + kitSpecTag + "/schema/"
 	kitSchema   = "kit.schema.json"

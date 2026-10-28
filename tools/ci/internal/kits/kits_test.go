@@ -140,7 +140,7 @@ func TestKitsRules(t *testing.T) {
 	}{
 		{"a second frontend pin in another kit", func(tr tree) {
 			ref := frontendRef(tr)
-			tr["kits/other/other.yaml"] = goodKit(strings.Replace(ref, "m.8", "m.9", 1), goodStep)
+			tr["kits/other/other.yaml"] = goodKit(strings.Replace(ref, "@sha256:", "-other@sha256:", 1), goodStep)
 		}, "a second frontend pin"},
 		{"a second frontend line in one descriptor", func(tr tree) {
 			tr["kits/probe/probe.yaml"] += "# syntax=" + frontendRef(tr) + "\n"
@@ -149,7 +149,7 @@ func TestKitsRules(t *testing.T) {
 			tr["kits/probe/probe.dockerfile"] = "FROM scratch\n# syntax=" + frontendRef(tr) + "\n"
 		}, "below line 1: a second frontend pin"},
 		{"a frontend that is not the pin", func(tr tree) {
-			tr["kits/probe/probe.yaml"] = strings.Replace(tr["kits/probe/probe.yaml"], "m.8", "m.9", 1)
+			tr["kits/probe/probe.yaml"] = strings.Replace(tr["kits/probe/probe.yaml"], "@sha256:", "-other@sha256:", 1)
 		}, "the frontend differs from the pin"},
 		{"a descriptor without the frontend line", func(tr tree) {
 			tr["kits/probe/probe.yaml"] = strings.TrimPrefix(tr["kits/probe/probe.yaml"], "# syntax="+frontendRef(tr)+"\n")
