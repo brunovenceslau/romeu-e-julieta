@@ -199,9 +199,30 @@
         }
       },
       "description": "com.docker.sandbox/sbx@1 is workload-only: a mixin's image config never becomes the composed image's, so the identity it would promise is not the one a host reads."
+    },
+    {
+      "$ref": "#/definitions/noNul"
     }
   ],
   "definitions": {
+    "noNul": {
+      "description": "No string anywhere in the descriptor, key or value, holds NUL (U+0000). Applied once at the root and recursively, so it covers every field, including the config of capability types this schema does not know.",
+      "not": {
+        "type": "string",
+        "pattern": "\u0000"
+      },
+      "propertyNames": {
+        "not": {
+          "pattern": "\u0000"
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/noNul"
+      },
+      "items": {
+        "$ref": "#/definitions/noNul"
+      }
+    },
     "kit": {
       "type": "object",
       "additionalProperties": false,
@@ -251,7 +272,7 @@
         "type": {
           "type": "string",
           "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?/[a-z0-9]([a-z0-9-]*[a-z0-9])?@[1-9][0-9]*$",
-          "description": "<namespace>/<name>@<config-schema-version>. The namespace admits host-specific capability types; the version moves when the type's config schema does."
+          "description": "<namespace>/<name>@<capability-contract-version>. The namespace admits host-specific capability types. The version covers the config schema and observable behavior, including composition and persistent-state transitions. RELEASES.md defines when versions move and the maintainer-approved draft-stage exception."
         },
         "name": {
           "type": "string",
@@ -271,6 +292,9 @@
         },
         "source": {
           "$ref": "#/definitions/capabilitySource"
+        },
+        "declarationBlocks": {
+          "$ref": "#/definitions/declarationBlocks"
         }
       },
       "allOf": [
@@ -531,6 +555,28 @@
           "if": {
             "properties": {
               "type": {
+                "const": "com.docker.sandbox/acp@1"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "config"
+            ],
+            "properties": {
+              "config": {
+                "$ref": "capabilities/com.docker.sandbox/acp@1.schema.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
                 "const": "com.docker.sandbox/agent-sessions@1"
               }
             },
@@ -542,6 +588,28 @@
             "properties": {
               "config": {
                 "$ref": "capabilities/com.docker.sandbox/agent-sessions@1.schema.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "com.docker.sandbox/agent-interactive-sessions@1"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "config"
+            ],
+            "properties": {
+              "config": {
+                "$ref": "capabilities/com.docker.sandbox/agent-interactive-sessions@1.schema.json"
               }
             }
           }
@@ -580,6 +648,28 @@
             "properties": {
               "config": {
                 "$ref": "capabilities/com.docker.sandbox/agent-context@1.schema.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "com.docker.sandbox/agent-context@2"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "config"
+            ],
+            "properties": {
+              "config": {
+                "$ref": "capabilities/com.docker.sandbox/agent-context@2.schema.json"
               }
             }
           }
@@ -750,6 +840,13 @@
               "optional"
             ]
           }
+        },
+        {
+          "not": {
+            "required": [
+              "declarationBlocks"
+            ]
+          }
         }
       ]
     },
@@ -796,10 +893,47 @@
             },
             "source": {
               "$ref": "#/definitions/capabilitySource"
+            },
+            "declarationBlocks": {
+              "$ref": "#/definitions/declarationBlocks"
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "declarationBlocks"
+                ],
+                "properties": {
+                  "declarationBlocks": {
+                    "minItems": 1
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "group": {
+                    "properties": {
+                      "capabilities": {
+                        "maxItems": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
         }
       ]
+    },
+    "declarationBlocks": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Descriptor-local declaration block IDs for duplicate validation before selection. Shared IDs retain the original ordinary block across independently selected one-member groups. Reconciled concrete requests retain every contributing ID. These IDs are structural constraints, not source attribution or trust inputs."
     }
   }
 }

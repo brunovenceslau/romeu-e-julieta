@@ -1,24 +1,35 @@
 # SPDX-FileCopyrightText: 2026 Bruno Venceslau
 # SPDX-License-Identifier: GPL-3.0-only
 #
-# Conformance fixture: the facts of sitting M0 about the ssh-agent
-# capability that kits/git-ssh-sign follows, copied by hand from
+# Conformance fixture: the facts about the ssh-agent capability that
+# kits/git-ssh-sign follows. First measured at sitting M0 (2026-10-19,
 # docs/handoff/decisions/00000000005z9f102d4ptbtjbm-sitting-m0-the-kit-
-# frontend-is-a-go.md. T081's text and T113's name sitting M2; the
-# measurement was made at sitting M0 (2026-10-19), before the re-plan
-# moved the go/no-go there, and this file records the source the
-# evidence names. Nothing here was measured again.
+# frontend-is-a-go.md; T081's text and T113's name sitting M2, since the
+# measurement came before the re-plan moved the go/no-go to M0), and
+# measured again on 2026-10-28 with the fields below: the same
+# composition (the v3 workload by the digest kits/pins.yaml pins, plus
+# this kit built by the pinned frontend, in a throwaway environment of
+# the sandbox definitions), a host agent of two keys, and `ssh-keygen -Y
+# sign` in the namespaces git and file with each key. The three facts
+# held unchanged; `first` keeps where they were first measured.
 source: sitting M0
-date: "2026-10-19"
-sbx: v0.48.0
-frontend: docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d
+date: "2026-10-28"
+sbx: v0.50.1
+frontend: docker/sandbox-kit:3.0.0-m.11@sha256:adbc0d1ea63451871d5d78111120bb29f2fd2b265e63d39c664ae2c3d722c805
+first:
+  date: "2026-10-19"
+  sbx: v0.48.0
+  frontend: docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d
 capability:
   type: com.docker.sandbox/ssh-agent@1
   config:
+    phase: runtime
     unrestricted: false
     sign:
       - git
 # What the sandbox saw with that capability and a host agent of two keys.
+# The refusal of 2026-10-28 reads "agent refused operation", for each
+# of the two keys; the signature in the namespace git is made for each.
 observed:
   keysListedInSandbox: 2
   signNamespaceGit: allowed

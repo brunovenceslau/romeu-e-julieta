@@ -57,6 +57,10 @@ type Capabilities struct {
 	Skills []Skill `json:"skills,omitempty"`
 	// Sessions is the argv shapes that drive the agent's sessions.
 	Sessions *Sessions `json:"sessions,omitzero"`
+	// InteractiveSessions is the agent-interactive-sessions@1 request.
+	InteractiveSessions *InteractiveSessions `json:"interactiveSessions,omitzero"`
+	// ACP are the acp@1 requests, one per agent.
+	ACP []ACP `json:"acp,omitempty"`
 	// Flags are the requests that take no config: privileged execution,
 	// the sandbox-agent platform, a long-running workload, the git
 	// identity and the kit registry.
@@ -318,6 +322,9 @@ type Port struct {
 	Container string `json:"container"`
 	// Transport is "tcp" or "udp"; absent means tcp.
 	Transport string `json:"transport,omitempty"`
+	// Family is "ipv4", "ipv6" or "dual", as written; absent is the
+	// frontend's default.
+	Family string `json:"family,omitempty"`
 	// Optional is the request's optional flag.
 	Optional bool `json:"optional,omitzero"`
 }
@@ -356,6 +363,9 @@ type Context struct {
 	Content string `json:"content,omitempty"`
 	// Directory is the in-sandbox profile directory.
 	Directory string `json:"directory,omitempty"`
+	// Version is 2 for an agent-context@2, inline guidance kept in every
+	// effective profile, and absent for an agent-context@1.
+	Version int `json:"version,omitzero"`
 	// Optional is the request's optional flag.
 	Optional bool `json:"optional,omitzero"`
 }
@@ -385,6 +395,46 @@ type Sessions struct {
 	Continue []string `json:"continue,omitempty"`
 	// List enumerates the resumable sessions.
 	List *Command `json:"list,omitzero"`
+	// Optional is the request's optional flag.
+	Optional bool `json:"optional,omitzero"`
+}
+
+// InteractiveSessions is an agent-interactive-sessions@1: the argv
+// tails a host appends to the launch command to put the agent's
+// terminal UI in front of a person, and the command that lists the
+// resumable sessions.
+type InteractiveSessions struct {
+	// Prompt opens the UI on one prompt.
+	Prompt []string `json:"prompt,omitempty"`
+	// Resume reopens a named session.
+	Resume []string `json:"resume,omitempty"`
+	// Continue reopens the latest session; an empty list is the launch
+	// argv alone, and nil is left to the schema's default: newSession
+	// falls back to lifecycle@1's interactive launch, the other two are
+	// not offered.
+	Continue *[]string `json:"continue,omitzero"`
+	// NewSession opens a new session, kept as Continue is.
+	NewSession *[]string `json:"newSession,omitzero"`
+	// SessionPicker opens the agent's own session picker, kept as
+	// Continue is.
+	SessionPicker *[]string `json:"sessionPicker,omitzero"`
+	// List enumerates the resumable sessions.
+	List *Command `json:"list,omitzero"`
+	// Optional is the request's optional flag.
+	Optional bool `json:"optional,omitzero"`
+}
+
+// ACP is an acp@1: how to run an Agent Client Protocol agent inside the
+// sandbox. It grants no permission.
+type ACP struct {
+	// Agent is the provides name of the agent.
+	Agent string `json:"agent"`
+	// Command runs the agent.
+	Command Command `json:"command"`
+	// Env is the environment of the command.
+	Env map[string]string `json:"env,omitempty"`
+	// ProtocolVersion is the protocol version, as written; absent is 1.
+	ProtocolVersion string `json:"protocolVersion,omitempty"`
 	// Optional is the request's optional flag.
 	Optional bool `json:"optional,omitzero"`
 }

@@ -288,7 +288,7 @@ func (j *judge) frontendLines(where, content string, descriptor bool, frontends 
 }
 
 // The keys the v3 descriptor, an arg, a lifecycle@1 config and a hook may
-// hold (SPEC-v3 §4, §6, lifecycle@1 at tag v3.0.0-m.8); sbx refuses a key
+// hold (SPEC-v3 §4, §6, lifecycle@1 at tag v3.0.0-m.11, unchanged since m.8); sbx refuses a key
 // outside the first (sitting M0), and the others are held to the same.
 var (
 	descriptorKeys = []string{"schemaVersion", "kind", "displayName", "author", "description", "sourceUrl", "iconUrl", "version", "licenses", "provides", "requires", "integrates", "conflicts", "capabilities", "args", "build", "dockerfile", "kits"}

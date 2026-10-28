@@ -18,14 +18,16 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/all"
 )
 
 // The lines that open a v3 kit descriptor under examples/: the frontend
 // pin, then the modeline of the official kit schema at the vendored tag.
 const (
-	kitSyntax = "# syntax=docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d\n"
-	kitHint   = "# yaml-language-server: $schema=https://raw.githubusercontent.com/docker/sandbox-kit-spec/v3.0.0-m.8/schema/kit.schema.json\n"
-	kitPins   = "frontend:\n  ref: docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d\n"
+	kitSyntax = "# syntax=docker/sandbox-kit:3.0.0-m.11@sha256:adbc0d1ea63451871d5d78111120bb29f2fd2b265e63d39c664ae2c3d722c805\n"
+	kitHint   = "# yaml-language-server: $schema=https://raw.githubusercontent.com/docker/sandbox-kit-spec/v3.0.0-m.11/schema/kit.schema.json\n"
+	kitPins   = "frontend:\n  ref: docker/sandbox-kit:3.0.0-m.11@sha256:adbc0d1ea63451871d5d78111120bb29f2fd2b265e63d39c664ae2c3d722c805\n"
 	kitBody   = "schemaVersion: \"3\"\nkind: mixin\ndisplayName: k\ndescription: a kit\n"
 )
 
@@ -47,14 +49,14 @@ func TestKitDescriptors(t *testing.T) {
 	}{
 		{"no modeline", "examples/kits/k/k.yaml", kitSyntax + kitBody, "schema hint",
 			"is a v3 kit descriptor, and its second line is not \"" + strings.TrimSuffix(kitHint, "\n") + "\" (10 10.2, REQ-0836)"},
-		{"a modeline of another tag", "examples/kits/k/k.yaml", kitSyntax + strings.Replace(kitHint, "m.8", "m.7", 1) + kitBody, "schema hint",
+		{"a modeline of another tag", "examples/kits/k/k.yaml", kitSyntax + strings.Replace(kitHint, "m.11", "m.7", 1) + kitBody, "schema hint",
 			"is a v3 kit descriptor, and its second line is not \"" + strings.TrimSuffix(kitHint, "\n") + "\" (10 10.2, REQ-0836)"},
 		{"a file of the two lines only", "examples/kits/k/k.yaml", kitSyntax + strings.TrimSuffix(kitHint, "\n"), "schema parse",
 			"does not decode as one YAML document, or repeats a key"},
 		{"an unknown key", "examples/kits/k/k.yaml", good + "extra: 1\n", "schema invalid",
-			`does not validate against kit.schema.json at v3.0.0-m.8 at "/ (additionalProperties)"`},
+			`does not validate against kit.schema.json at v3.0.0-m.11 at "/ (additionalProperties)"`},
 		{"a missing member", "examples/kits/k/k.yaml", kitSyntax + kitHint + "kind: mixin\n", "schema invalid",
-			`does not validate against kit.schema.json at v3.0.0-m.8 at "/ (required)"`},
+			`does not validate against kit.schema.json at v3.0.0-m.11 at "/ (required)"`},
 	} {
 		t.Run(strings.ReplaceAll(c.name, " ", "_"), func(t *testing.T) {
 			m := withKit(t, tree(t))
@@ -107,14 +109,14 @@ func TestKitPin(t *testing.T) {
 		want       []check.Finding
 	}{
 		{"the pin and the tag agree", kitPins, nil},
-		{"another digest", strings.Replace(kitPins, "e6a3", "e6a4", 1), []check.Finding{{Where: path, Rule: "schema pin",
-			Msg: "is a v3 kit descriptor, and its first line is not \"" + strings.Replace(first, "e6a3", "e6a4", 1) + "\", the frontend ref of kits/pins.yaml (02 2.1)"}}},
+		{"another digest", strings.Replace(kitPins, "adbc", "adbd", 1), []check.Finding{{Where: path, Rule: "schema pin",
+			Msg: "is a v3 kit descriptor, and its first line is not \"" + strings.Replace(first, "adbc", "adbd", 1) + "\", the frontend ref of kits/pins.yaml (02 2.1)"}}},
 		{"another tag", pinsAt("docker/sandbox-kit:3.0.0-m.9@sha256:aa"), []check.Finding{
 			{Where: path, Rule: "schema pin", Msg: "is a v3 kit descriptor, and its first line is not \"# syntax=docker/sandbox-kit:3.0.0-m.9@sha256:aa\", the frontend ref of kits/pins.yaml (02 2.1)"},
-			{Where: "kits/pins.yaml", Rule: "schema pin", Msg: "pins the frontend at tag \"3.0.0-m.9\", and the vendored kit schema is v3.0.0-m.8 (kitSpecTag, tools/ci/internal/schema/kits.go); copy the schema of the pinned tag and change kitSpecTag together"},
+			{Where: "kits/pins.yaml", Rule: "schema pin", Msg: "pins the frontend at tag \"3.0.0-m.9\", and the vendored kit schema is v3.0.0-m.11 (kitSpecTag, tools/ci/internal/schema/kits.go); copy the schema of the pinned tag and change kitSpecTag together"},
 		}},
 		{"no frontend ref", "workload:\n  ref: x\n", []check.Finding{{Where: "kits/pins.yaml", Rule: "schema pin",
-			Msg: "kits/pins.yaml holds no frontend ref, so the vendored kit schema at v3.0.0-m.8 follows no pin"}}},
+			Msg: "kits/pins.yaml holds no frontend ref, so the vendored kit schema at v3.0.0-m.11 follows no pin"}}},
 	} {
 		t.Run(strings.ReplaceAll(c.name, " ", "_"), func(t *testing.T) {
 			m := withKit(t, tree(t))
@@ -137,9 +139,9 @@ func TestKitSchemaCopyIsPinned(t *testing.T) {
 		want   []check.Finding
 	}{
 		{"an edited file", func(m map[string]string) { m[port] = strings.Replace(m[port], "\"type\"", "\"type\" ", 1) },
-			[]check.Finding{{Where: port, Rule: "schema copy", Msg: "differs from the digest pinned for it in kits_digests.go: the copy of the kit schema at v3.0.0-m.8 changes only with its pin"}}},
+			[]check.Finding{{Where: port, Rule: "schema copy", Msg: "differs from the digest pinned for it in kits_digests.go: the copy of the kit schema at v3.0.0-m.11 changes only with its pin"}}},
 		{"an added file", func(m map[string]string) { m[kitSpecRoot+"/extra.schema.json"] = "{}" },
-			[]check.Finding{{Where: kitSpecRoot + "/extra.schema.json", Rule: "schema copy", Msg: "is no file of the copy of the kit schema at v3.0.0-m.8 that kits_digests.go pins"}}},
+			[]check.Finding{{Where: kitSpecRoot + "/extra.schema.json", Rule: "schema copy", Msg: "is no file of the copy of the kit schema at v3.0.0-m.11 that kits_digests.go pins"}}},
 		{"a removed file", func(m map[string]string) { delete(m, port) },
 			[]check.Finding{{Where: port, Rule: "schema copy", Msg: "is pinned in kits_digests.go and is not in the tree"}}},
 	} {
@@ -183,7 +185,7 @@ func TestAKitWithoutTheSchemaCopy(t *testing.T) {
 }
 
 // TestTheKitSchemaIsTheTagsCopy pins the copy of the kit schema in this
-// repository: the 21 files of schema/ at v3.0.0-m.8, the top one a
+// repository: the 24 files of schema/ at v3.0.0-m.11, the top one a
 // draft-07 document, so a partial copy or another draft fails here.
 func TestTheKitSchemaIsTheTagsCopy(t *testing.T) {
 	m := withKitSchema(t, map[string]string{})
@@ -191,7 +193,7 @@ func TestTheKitSchemaIsTheTagsCopy(t *testing.T) {
 	for p := range m {
 		names = append(names, strings.TrimPrefix(p, kitSpecRoot+"/"))
 	}
-	assert.Len(t, names, 21)
+	assert.Len(t, names, 24)
 	assert.ElementsMatch(t, slices.Collect(maps.Keys(kitSpecDigests)), names)
 	assert.Contains(t, names, "kit.schema.json")
 	assert.Contains(t, names, "definitions/kit-arg.schema.json")
@@ -199,4 +201,70 @@ func TestTheKitSchemaIsTheTagsCopy(t *testing.T) {
 	sch, err := compileKit(files(m))
 	require.NoError(t, err)
 	assert.NotNil(t, sch)
+}
+
+// TestTheGrammarAcceptsOnlyWhatTheKitSchemaAdmits holds internal/oci's
+// grammar to the vendored kit schema, document by document: a descriptor
+// the grammar accepts validates against the schema, and one the schema
+// refuses is refused by the grammar. The grammar may refuse what the
+// schema admits (REQ-0573: an unmodeled type or key is refused on
+// purpose), and each such row says so, so the two cannot drift apart
+// unseen when the pin moves.
+func TestTheGrammarAcceptsOnlyWhatTheKitSchemaAdmits(t *testing.T) {
+	sch, err := compileKit(files(withKitSchema(t, map[string]string{})))
+	require.NoError(t, err)
+	const (
+		interactive = "com.docker.sandbox/agent-interactive-sessions@1"
+		acp         = "com.docker.sandbox/acp@1"
+		context2    = "com.docker.sandbox/agent-context@2"
+		port        = "com.docker.sandbox/port@1"
+		sshAgent    = "com.docker.sandbox/ssh-agent@1"
+		privileged  = "com.docker.sandbox/privileged@1"
+	)
+	one := func(typ, config string) string {
+		return kitBody + "capabilities:\n  - type: " + typ + "\n    config: " + config + "\n"
+	}
+	tests := []struct {
+		name string
+		doc  string
+		// accepted says the grammar accepts the document; stricter says
+		// the schema admits a document the grammar refuses on purpose.
+		accepted, stricter bool
+	}{
+		{"interactive sessions", one(interactive, `{prompt: ["--", "{{.Prompt}}"], continue: [], list: [node, ls.mjs]}`), true, false},
+		{"acp", one(acp, `{agent: claude, command: [claude-acp], env: {MODE: x}, protocolVersion: 2}`), true, false},
+		{"acp with kit args", one(acp, `{agent: "${{ kit.args.a }}", command: x, protocolVersion: "${{ kit.args.v }}"}`), true, false},
+		{"acp with a provider", one(acp, `{agent: deb/claude-code, command: x}`), true, false},
+		{"context@2", one(context2, `{filename: CLAUDE.md, content: hello, directory: /home/agent/.claude}`), true, false},
+		{"port family", one(port, `{container: 8080, family: dual}`), true, false},
+		{"ssh-agent bounded", one(sshAgent, `{phase: runtime, unrestricted: false, sign: [git]}`), true, false},
+		{"interactive sessions without a verb", one(interactive, `{}`), false, false},
+		{"a prompt without its placeholder", one(interactive, `{prompt: ["--"]}`), false, false},
+		{"acp without a command", one(acp, `{agent: claude}`), false, false},
+		{"acp with a quoted protocol version", one(acp, `{agent: claude, command: x, protocolVersion: "2"}`), false, false},
+		{"acp with an agent that is not a provides name", one(acp, `{agent: "Bad Name/", command: x}`), false, false},
+		{"context@2 with an empty directory", one(context2, `{filename: f, directory: ""}`), false, false},
+		{"context@2 with a relative directory", one(context2, `{filename: f, directory: a/b}`), false, false},
+		{"a port family that is not one", one(port, `{container: 1, family: bogus}`), false, false},
+		{"ssh-agent without a phase", one(sshAgent, `{unrestricted: false, sign: [git]}`), false, false},
+		{"ssh-agent unrestricted with a sign list", one(sshAgent, `{phase: runtime, sign: [git]}`), false, false},
+		{"a type of another namespace", one("example.com/thing@1", `{a: 1}`), false, true},
+		{"declarationBlocks", kitBody + "capabilities:\n  - type: " + privileged + "\n    declarationBlocks: [b1]\n", false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc, err := parse(check.TreeFile{Path: "k.yaml", Content: []byte(tt.doc)})
+			require.NoError(t, err)
+			findings := validate("k.yaml", kitName, doc, compiled{kitName: sch})
+			valid := findings == nil
+			_, err = all.ParseDescriptor([]byte(tt.doc))
+			if tt.accepted {
+				require.NoError(t, err, "the grammar accepts it")
+				assert.True(t, valid, "the schema admits what the grammar accepts: %v", findings)
+				return
+			}
+			require.Error(t, err, "the grammar refuses it")
+			assert.Equal(t, tt.stricter, valid, "the schema's verdict (true admits) against the row's stricter flag: %v", findings)
+		})
+	}
 }

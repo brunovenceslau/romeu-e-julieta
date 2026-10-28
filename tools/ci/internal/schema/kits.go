@@ -26,7 +26,7 @@ import (
 // which the descriptors' modeline names. The check reads the copy from
 // the commit it judges, as it reads every other file.
 const (
-	kitSpecTag  = "v3.0.0-m.8"
+	kitSpecTag  = "v3.0.0-m.11"
 	kitSpecRoot = "tools/ci/internal/schema/third_party/sandbox-kit-spec/schema"
 	kitSpecURL  = "https://raw.githubusercontent.com/docker/sandbox-kit-spec/" + kitSpecTag + "/schema/"
 	kitSchema   = "kit.schema.json"
@@ -90,10 +90,9 @@ func compileKitFiles(files []check.TreeFile) (*jsonschema.Schema, error) {
 
 // isKitDescriptor reports whether f is a v3 kit descriptor the check
 // judges: a YAML file under examples/ whose first line is the frontend
-// pin. The product kits under kits/ are not judged yet:
-// kits/git-ssh-sign does not validate against the schema at kitSpecTag
-// (its ssh-agent capability has no phase); a separate task, decided on
-// 2026-10-22, fixes the kit and judges kits/.
+// pin. The product kits under kits/ are not judged yet; a separate task,
+// decided on 2026-10-22, judges kits/ (kits/git-ssh-sign builds on the
+// pinned frontend since its ssh-agent capability names a phase).
 func isKitDescriptor(f check.TreeFile) bool {
 	ext := path.Ext(f.Path)
 	if ext != ".yaml" && ext != ".yml" || !strings.HasPrefix(f.Path, examplesDir) {

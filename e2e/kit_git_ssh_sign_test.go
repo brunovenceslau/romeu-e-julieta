@@ -152,10 +152,12 @@ type signFact struct {
 	Capability struct {
 		Type   string `yaml:"type"`
 		Config struct {
+			Phase        string   `yaml:"phase"`
 			Unrestricted bool     `yaml:"unrestricted"`
 			Sign         []string `yaml:"sign"`
 		} `yaml:"config"`
 	} `yaml:"capability"`
+	Date     string `yaml:"date"`
 	Observed struct {
 		SignNamespaceGit  string `yaml:"signNamespaceGit"`
 		SignNamespaceFile string `yaml:"signNamespaceFile"`
@@ -166,7 +168,8 @@ type signFact struct {
 // mixin of schema 3 on the pinned frontend line; the capabilities of
 // sitting M0 and no other (so no network, mount, volume or credential
 // grant), the ssh-agent one as the fixture records it (unrestricted
-// false, signing in the namespace git only); the arg signingKey required,
+// false, signing in the namespace git only) in the runtime phase, which
+// the fixture of sitting M0 does not name; the arg signingKey required,
 // with a pattern and an environment name; and steps that paste no kit arg
 // into their script (REQ-0594).
 func TestKitGitSSHSignDescriptor(t *testing.T) {
@@ -193,6 +196,7 @@ func TestKitGitSSHSignDescriptor(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal(raw, &fact))
 	assert.Equal(t, "sitting M0", fact.Source, "the evidence is sitting M0's, not sitting M2's")
 	assert.NotEmpty(t, fact.SBX)
+	assert.NotEmpty(t, fact.Date, "the fixture dates its latest measurement")
 	assert.Equal(t, pinned.Frontend.Ref, fact.Frontend, "the fixture names the pinned frontend, digest included")
 	assert.Equal(t, "allowed", fact.Observed.SignNamespaceGit)
 	assert.Equal(t, "refused", fact.Observed.SignNamespaceFile)
@@ -205,14 +209,17 @@ func TestKitGitSSHSignDescriptor(t *testing.T) {
 
 	agent := d.capability(t, fact.Capability.Type)
 	var got struct {
+		Phase        string   `yaml:"phase"`
 		Unrestricted bool     `yaml:"unrestricted"`
 		Sign         []string `yaml:"sign"`
 	}
 	signStrict(t, &agent, &got)
+	assert.Equal(t, "runtime", got.Phase, "the agent is reachable in the runtime phase only; the schema requires a phase")
 	assert.False(t, got.Unrestricted, "the agent is not unrestricted")
 	assert.Equal(t, []string{"git"}, got.Sign, "signing in the namespace git only")
 	assert.Equal(t, fact.Capability.Config.Sign, got.Sign)
 	assert.Equal(t, fact.Capability.Config.Unrestricted, got.Unrestricted)
+	assert.Equal(t, fact.Capability.Config.Phase, got.Phase, "the fixture names the phase the kit declares")
 
 	require.Contains(t, d.Args, "signingKey")
 	a := d.Args["signingKey"]

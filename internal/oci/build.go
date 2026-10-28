@@ -6,6 +6,7 @@ package oci
 import (
 	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,6 +31,9 @@ const (
 	typeSbx         = "com.docker.sandbox/sbx@1"
 	typeKitRegistry = "com.docker.sandbox/kit-registry@1"
 	typeSessions    = "com.docker.sandbox/agent-sessions@1"
+	typeInteractive = "com.docker.sandbox/agent-interactive-sessions@1"
+	typeACP         = "com.docker.sandbox/acp@1"
+	typeContext2    = "com.docker.sandbox/agent-context@2"
 	typeLifecycle   = "com.docker.sandbox/lifecycle@1"
 	typeContext     = "com.docker.sandbox/agent-context@1"
 	typeLongRunning = "com.docker.sandbox/long-running@1"
@@ -42,6 +46,7 @@ var capabilityTypes = []string{
 	typeNetwork1, typeNetwork2, typeCredential, typeSSHAgent, typeSkills, typeSkill,
 	typeVolume, typeHostMount, typePort, typeUSB, typeResources, typePrivileged, typeSbx,
 	typeKitRegistry, typeSessions, typeLifecycle, typeContext, typeLongRunning, typeGitIdentity,
+	typeInteractive, typeACP, typeContext2,
 }
 
 // builder collects the capabilities of one descriptor.
@@ -49,17 +54,14 @@ type builder struct {
 	caps Capabilities
 	// kind is the descriptor's kind; sbx@1 is a workload's alone.
 	kind string
-	// localFile says the descriptor is a file the maintainer's repository
-	// holds, which may leave the phase of an ssh-agent out.
-	localFile bool
 	// at names the capability being added, for a message.
 	at string
 }
 
 // normalize flattens the groups of the descriptor, decodes the config of
 // each capability by its type and returns the set in its canonical form.
-func normalize(d kitDoc, localFile bool) (Capabilities, error) {
-	b := &builder{kind: d.Kind, localFile: localFile}
+func normalize(d kitDoc) (Capabilities, error) {
+	b := &builder{kind: d.Kind}
 	b.caps.Kind = d.Kind
 	b.caps.Build = d.Build
 	b.caps.Dockerfile = d.Dockerfile
@@ -157,6 +159,12 @@ func (b *builder) item(at string, it itemDoc, inherited bool) error {
 		return b.lifecycle(it.Config, optional)
 	case typeContext:
 		return b.agentContext(it.Config, optional)
+	case typeContext2:
+		return b.agentContext2(it.Config, optional)
+	case typeInteractive:
+		return b.interactiveSessions(it.Config, optional)
+	case typeACP:
+		return b.acp(it.Config, optional)
 	case typePrivileged, typeSbx, typeKitRegistry, typeLongRunning, typeGitIdentity:
 		if len(it.Config) > 0 {
 			return invalid("%s takes no config", b.at)
@@ -191,7 +199,16 @@ func (b *builder) need(name string, values ...string) error {
 // isRef reports whether s holds a ${{ kit.args.* }} or ${{ kit.env.* }}
 // reference, which a field that is an enum or a number may carry
 // in place of its value.
-func isRef(s string) bool { return strings.Contains(s, "${{") }
+func isRef(s string) bool { return bearingRef.MatchString(s) }
+
+// bearingRef is the form of a value that carries a kit arg or kit env
+// reference (the kit-arg schema's bearing); text with a bare "${{" is
+// not one.
+var bearingRef = regexp.MustCompile(`\$\{\{\s*kit\.(args|env)\.[A-Za-z_][A-Za-z0-9_]*\s*\}\}`)
+
+// wholeRef is the form of a value that is exactly one kit arg reference
+// (the kit-arg schema's whole), which adopts the arg's type at create.
+var wholeRef = regexp.MustCompile(`^\$\{\{\s*kit\.args\.[A-Za-z_][A-Za-z0-9_]*\s*\}\}$`)
 
 // scalar reads a value that is a string, a number or a boolean and
 // returns its text.
@@ -519,23 +536,15 @@ func (b *builder) sshAgent(cfg jsontext.Value, optional bool) error {
 	if err := strict(b, cfg, &d); err != nil {
 		return err
 	}
-	// The kit schema of the pinned frontend requires a phase. The sitting
-	// M0 descriptor of git-ssh-sign, which sbx v0.48.0 accepted, has
-	// none (no document of sbx says what it reads then). A local file is
-	// read as the widest phases, so the gate shows the most it can
-	// mean; the annotation of an image, written by a third party, is
-	// refused.
-	var phases []string
-	switch {
-	case len(d.Phase) > 0:
-		var err error
-		if phases, err = b.phases(d.Phase); err != nil {
-			return err
-		}
-	case b.localFile:
-		phases = []string{"install", "runtime"}
-	default:
+	// The kit schema requires a phase, and the frontend refuses a
+	// descriptor without one at build, so a file and an annotation are
+	// held to the same.
+	if len(d.Phase) == 0 {
 		return invalid("%s has no phase", b.at)
+	}
+	phases, err := b.phases(d.Phase)
+	if err != nil {
+		return err
 	}
 	unrestricted, err := b.scalar("unrestricted", d.Unrestricted)
 	if err != nil {
@@ -647,6 +656,7 @@ type portDoc struct {
 	Name      string         `json:"name"`
 	Container jsontext.Value `json:"container"`
 	Transport string         `json:"transport"`
+	Family    string         `json:"family"`
 }
 
 // port adds a port@1.
@@ -662,7 +672,10 @@ func (b *builder) port(cfg jsontext.Value, optional bool) error {
 	if err := b.need("container port", c); err != nil {
 		return err
 	}
-	b.caps.Ports = append(b.caps.Ports, Port{Name: d.Name, Container: c, Transport: d.Transport, Optional: optional})
+	if d.Family != "" && !isRef(d.Family) && !slices.Contains([]string{"ipv4", "ipv6", "dual"}, d.Family) {
+		return invalid("%s: family is not ipv4, ipv6 or dual", b.at)
+	}
+	b.caps.Ports = append(b.caps.Ports, Port{Name: d.Name, Container: c, Transport: d.Transport, Family: d.Family, Optional: optional})
 	return nil
 }
 
@@ -822,6 +835,193 @@ func (c *Capabilities) sort() {
 	c.Ports = sortedSet2(c.Ports)
 	c.Devices = sortedSet2(c.Devices)
 	c.Context = sortedSet2(c.Context)
+	c.ACP = sortedSet2(c.ACP)
 	c.Skills = sortedSet2(c.Skills)
 	c.Flags = sortedSet2(c.Flags)
+}
+
+// interactiveSessions adds an agent-interactive-sessions@1. A present
+// empty continue, newSession or sessionPicker is the launch argv alone,
+// and an absent one is left to the schema's default (newSession falls
+// back to lifecycle@1's interactive launch; the other two are not
+// offered), so the set keeps the two apart; prompt and resume, when present, hold the
+// {{.Prompt}} or {{.SessionID}} placeholder, or a kit arg in its place.
+// The schema's rule across types, that newSession equals the tail of
+// lifecycle@1's interactive command, is not modeled: the set shows each
+// verb as declared, and the frontend holds the two equal at build.
+func (b *builder) interactiveSessions(cfg jsontext.Value, optional bool) error {
+	if err := b.singleton(b.caps.InteractiveSessions != nil); err != nil {
+		return err
+	}
+	var d struct {
+		Prompt        *[]string      `json:"prompt"`
+		Resume        *[]string      `json:"resume"`
+		Continue      *[]string      `json:"continue"`
+		NewSession    *[]string      `json:"newSession"`
+		SessionPicker *[]string      `json:"sessionPicker"`
+		List          jsontext.Value `json:"list"`
+	}
+	if err := strict(b, cfg, &d); err != nil {
+		return err
+	}
+	if d.Prompt == nil && d.Resume == nil && d.Continue == nil && d.NewSession == nil && d.SessionPicker == nil && len(d.List) == 0 {
+		return invalid("%s declares no verb", b.at)
+	}
+	for _, v := range []struct {
+		name, placeholder string
+		argv              *[]string
+	}{{"prompt", "{{.Prompt}}", d.Prompt}, {"resume", "{{.SessionID}}", d.Resume}} {
+		if v.argv == nil {
+			continue
+		}
+		if !slices.ContainsFunc(*v.argv, func(a string) bool { return strings.Contains(a, v.placeholder) || isRef(a) }) {
+			return invalid("%s: %s holds no %s", b.at, v.name, v.placeholder)
+		}
+	}
+	s := &InteractiveSessions{Continue: d.Continue, NewSession: d.NewSession, SessionPicker: d.SessionPicker, Optional: optional}
+	if d.Prompt != nil {
+		s.Prompt = *d.Prompt
+	}
+	if d.Resume != nil {
+		s.Resume = *d.Resume
+	}
+	if len(d.List) > 0 {
+		c, err := b.runnable("list", d.List)
+		if err != nil {
+			return err
+		}
+		s.List = &c
+	}
+	b.caps.InteractiveSessions = s
+	return nil
+}
+
+// runnable reads a command that must run something: a shell string that
+// is not blank, or an argv whose first element is not.
+func (b *builder) runnable(name string, v jsontext.Value) (Command, error) {
+	c, err := b.command(v)
+	if err != nil {
+		return Command{}, err
+	}
+	if strings.TrimSpace(c.Shell) == "" && (len(c.Argv) == 0 || strings.TrimSpace(c.Argv[0]) == "") {
+		return Command{}, invalid("%s: %s runs nothing", b.at, name)
+	}
+	return c, nil
+}
+
+// envName is the form of an environment variable's name.
+var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// providesName is the form of an unversioned provides name (acp@1's
+// agent): an optional provider (deb, apk, or a dotted lowercase domain)
+// before a slash, then a lowercase name. A bare name normalizes into the
+// provider com.docker.kit (the schema's description), which acpKey does
+// for the once-per-agent rule.
+var providesName = regexp.MustCompile(`^(?:(?:deb|apk|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+)/)?[a-z0-9]([a-z0-9+.-]{0,62}[a-z0-9+])?$`)
+
+// longProvider is the provider length the schema refuses.
+var longProvider = regexp.MustCompile(`^[^/]{254,}/`)
+
+// acpKey is the agent name an acp@1 is keyed on: a bare name under the
+// provider com.docker.kit.
+func acpKey(agent string) string {
+	if strings.Contains(agent, "/") {
+		return agent
+	}
+	return "com.docker.kit/" + agent
+}
+
+// acp adds an acp@1: an agent and its command are required, the agent a
+// provides name (or a kit arg) once per descriptor, since the type is
+// keyed on it; the protocol version is a whole number above zero or one
+// whole kit arg, as the schema admits no other text.
+func (b *builder) acp(cfg jsontext.Value, optional bool) error {
+	var d struct {
+		Agent           string            `json:"agent"`
+		Command         jsontext.Value    `json:"command"`
+		Env             map[string]string `json:"env"`
+		ProtocolVersion jsontext.Value    `json:"protocolVersion"`
+	}
+	if err := strict(b, cfg, &d); err != nil {
+		return err
+	}
+	if err := b.need("agent", d.Agent); err != nil {
+		return err
+	}
+	if !isRef(d.Agent) && (!providesName.MatchString(d.Agent) || longProvider.MatchString(d.Agent)) {
+		return invalid("%s: the agent %s is not a provides name", b.at, quote(d.Agent))
+	}
+	if slices.ContainsFunc(b.caps.ACP, func(a ACP) bool { return acpKey(a.Agent) == acpKey(d.Agent) }) {
+		return invalid("%s: the agent %s is declared twice", b.at, quote(d.Agent))
+	}
+	c, err := b.runnable("command", d.Command)
+	if err != nil {
+		return err
+	}
+	for k := range d.Env {
+		if !envName.MatchString(k) {
+			return invalid("%s: the env name %s is not of the form [A-Za-z_][A-Za-z0-9_]*", b.at, quote(k))
+		}
+	}
+	var v string
+	switch {
+	case len(d.ProtocolVersion) == 0:
+	case d.ProtocolVersion.Kind() == '"':
+		var err error
+		if v, err = b.scalar("protocolVersion", d.ProtocolVersion); err != nil {
+			return err
+		}
+		if !wholeRef.MatchString(v) {
+			return invalid("%s: protocolVersion is text that is not one whole kit arg", b.at)
+		}
+	default:
+		var err error
+		if v, err = b.scalar("protocolVersion", d.ProtocolVersion); err != nil {
+			return err
+		}
+		if n, err := strconv.Atoi(v); err != nil || n < 1 {
+			return invalid("%s: protocolVersion is not a whole number above zero", b.at)
+		}
+	}
+	b.caps.ACP = append(b.caps.ACP, ACP{Agent: d.Agent, Command: c, Env: d.Env, ProtocolVersion: v, Optional: optional})
+	return nil
+}
+
+// profileDir is the form of an agent-context@2 directory: an absolute
+// path with no empty, "." or ".." element.
+var profileDir = regexp.MustCompile(`^(/|(/([^./][^/]*|\.[^./][^/]*|\.\.[^/]+))+)$`)
+
+// agentContext2 adds an agent-context@2: inline content, a filename, or
+// both; a directory only with a filename, and then an absolute clean
+// path, with a filename that is one name (or a kit arg in either place).
+func (b *builder) agentContext2(cfg jsontext.Value, optional bool) error {
+	var d struct {
+		Filename  string  `json:"filename"`
+		Content   string  `json:"content"`
+		Directory *string `json:"directory"`
+	}
+	if err := strict(b, cfg, &d); err != nil {
+		return err
+	}
+	if d.Filename == "" && d.Content == "" {
+		return invalid("%s declares neither a filename nor content", b.at)
+	}
+	var dir string
+	if d.Directory != nil {
+		dir = *d.Directory
+		if dir == "" {
+			return invalid("%s: the directory is empty", b.at)
+		}
+		if d.Filename == "" {
+			return invalid("%s sets a directory without a filename", b.at)
+		}
+		if strings.Contains(dir, "\\") || !isRef(dir) && !profileDir.MatchString(dir) {
+			return invalid("%s: the directory is not an absolute path with no ., .. or empty element", b.at)
+		}
+		if !isRef(d.Filename) && (strings.ContainsAny(d.Filename, "/\\") || d.Filename == "." || d.Filename == "..") {
+			return invalid("%s: the filename is not one name", b.at)
+		}
+	}
+	b.caps.Context = append(b.caps.Context, Context{Filename: d.Filename, Content: d.Content, Directory: dir, Version: 2, Optional: optional})
+	return nil
 }

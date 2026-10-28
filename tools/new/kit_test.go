@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const kitFrontend = "docker/sandbox-kit:3.0.0-m.8@sha256:e6a397771e865625047cf84256a914c7974b3e749d858259b5bc9c653ddb6f0d"
+const kitFrontend = "docker/sandbox-kit:3.0.0-m.11@sha256:adbc0d1ea63451871d5d78111120bb29f2fd2b265e63d39c664ae2c3d722c805"
 
 // kitFixture is newFixture with a pin file that pins the frontend.
 func kitFixture(t *testing.T, pinFile string) fixture {

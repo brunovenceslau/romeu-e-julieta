@@ -2,11 +2,13 @@
 
 A copy of the directory `schema/` of
 [docker/sandbox-kit-spec](https://github.com/docker/sandbox-kit-spec) at
-the tag `v3.0.0-m.8` (commit
-`129be2ff45e8f9463450eb3cf04ddcb52c2b76e5`; the annotated tag object is
-`0cfa5d261ab6d159a92deac3ec66b6edf524a3eb`), fetched from
-`https://raw.githubusercontent.com/docker/sandbox-kit-spec/v3.0.0-m.8/schema/`
-on 2026-10-22. It is Apache-2.0, `Copyright 2026 Docker, Inc.`;
+the tag `v3.0.0-m.11` (commit
+`92835bb7934a3e2e2bbb7e85b1d72dee24a0f00c`; the annotated tag object is
+`589ed3603a865e0de3d41af361b7aff166108155`), fetched from
+`https://github.com/docker/sandbox-kit-spec/tarball/v3.0.0-m.11`
+on 2026-10-28; the schema hint of a descriptor still names the files at
+`https://raw.githubusercontent.com/docker/sandbox-kit-spec/v3.0.0-m.11/schema/`
+(kitSpecURL), the same bytes. It is Apache-2.0, `Copyright 2026 Docker, Inc.`;
 `REUSE.toml` here records it. This product includes software developed
 at Docker, Inc. One change was made: in
 `schema/capabilities/com.docker.sandbox/network-policy@2.schema.json`
@@ -18,10 +20,10 @@ refuses the character in a tracked file.
 every v3 kit descriptor under `examples/` against
 `schema/kit.schema.json`, which composes the files below it by
 reference, and requires those descriptors to carry its modeline at the
-same tag (REQ-0836). The product kits under `kits/` are not judged yet:
-`kits/git-ssh-sign` does not validate against this tag's schema (its
-ssh-agent capability has no `phase`); a separate task, decided on
-2026-10-22, fixes the kit and judges `kits/`. The frontend pin of
+same tag (REQ-0836). The product kits under `kits/` are not judged yet;
+a separate task, decided on 2026-10-22, judges `kits/`
+(`kits/git-ssh-sign` builds on the pinned frontend since its ssh-agent
+capability names a phase). The frontend pin of
 `kits/pins.yaml` and this tag move together, and `tools/ci schema`
 fails when they differ: a new frontend milestone copies the new tag's
 `schema/` here and changes `kitSpecTag` in `../../kits.go`.

@@ -38,7 +38,7 @@ func ParseDescriptor(data []byte) (Kit, error) {
 	if err != nil {
 		return Kit{}, err
 	}
-	return fromTree(tree, true)
+	return fromTree(tree)
 }
 
 // ParseAnnotation reads the descriptor an image carries in its manifest
@@ -54,13 +54,12 @@ func ParseAnnotation(data []byte) (Kit, error) {
 	if err != nil {
 		return Kit{}, err
 	}
-	return fromTree(tree, false)
+	return fromTree(tree)
 }
 
 // fromTree decodes a checked tree into the kit schema's types and
-// normalizes its capabilities. localFile says the tree is a file of the
-// maintainer's repository.
-func fromTree(tree map[string]any, localFile bool) (Kit, error) {
+// normalizes its capabilities.
+func fromTree(tree map[string]any) (Kit, error) {
 	raw, err := jsonv2.Marshal(tree, jsonv2.Deterministic(true))
 	if err != nil {
 		return Kit{}, invalid("the descriptor cannot be read as JSON data")
@@ -72,7 +71,7 @@ func fromTree(tree map[string]any, localFile bool) (Kit, error) {
 	if err := d.validate(); err != nil {
 		return Kit{}, err
 	}
-	caps, err := normalize(d, localFile)
+	caps, err := normalize(d)
 	if err != nil {
 		return Kit{}, err
 	}
