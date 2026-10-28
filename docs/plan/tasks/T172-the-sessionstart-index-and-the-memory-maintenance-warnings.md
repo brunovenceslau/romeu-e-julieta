@@ -25,8 +25,9 @@ one line each, as the agent's own memory loads its index at a session's
 start, and two warnings keep that index small without a hand. Decided
 on 2026-10-28, with the specification amended in the same pull request
 as T171: 08 8.1 (REQ-0659), 08 8.2 (REQ-0664, REQ-0665, REQ-0667,
-REQ-1291), 08 8.6 (two starting values), 04 4.1 (two slugs) and 04 4.3
-(REQ-0414).
+REQ-1291, REQ-1294), 08 8.6 (two starting values), 04 4.1 (two slugs)
+and 04 4.3 (REQ-0414). The generated pages
+`docs/reference/julieta/handoff/*.md` are regenerated (rule 1).
 
 1. The index (REQ-0659, REQ-0664, REQ-0414). Parts (5) and (6) of the
    hook output become one part: the line of `memory list` (T171,
@@ -38,19 +39,24 @@ REQ-1291), 08 8.6 (two starting values), 04 4.1 (two slugs) and 04 4.3
 2. The cut (REQ-0667). The bound of 8.6 cuts at a line: every whole line
    that fits before the bound is printed, never a partial one, and the
    last line is `<n> more entries: julieta memory list` when any is
-   left out. `internal/handoff/print.go` already has the footer and a
-   line-wise cut for bodies; the index reuses them.
-3. The warnings (REQ-1291, REQ-0665, 04 4.1). `memory-open-count` when
-   the open entries of the project exceed the count of 8.6 (200), and
-   `memory-stale`, one line naming id and title, for each open entry
-   whose `updatedAt` is older than the days of 8.6 (90). Both are
-   computed from the entries the hook already reads, printed in part
-   (1) with julieta's other warnings, never cut, and shown by `julieta
-   status` as the other warnings of 04 4.1 are. The two values are
-   constants beside the 8 KiB bound, with the 8.6 row cited.
+   left out. `internal/handoff/print.go` has the footer and cuts the
+   entries today by whole entry and the narrative by line; the index is
+   a new block cut by line, and its `reserve` arithmetic changes with
+   it.
+3. The warnings (REQ-1291, REQ-1294, REQ-0665, 04 4.1).
+   `memory-open-count`, one line, when the open entries of the project
+   exceed the count of 8.6 (200), and `memory-stale`, one line naming id
+   and escaped title for each open entry whose `updatedAt` is older than
+   the days of 8.6 (90), oldest first, at most ten lines and then `<n>
+   more stale entries: julieta memory list --status open`. Both are
+   computed from the entries the hook already reads and printed in part
+   (1) with julieta's other warnings, never cut; `julieta status` is not
+   changed by this task. The two values are constants beside the 8 KiB
+   bound, with the 8.6 row cited.
 
 - Implements: REQ-0659 (08 8.1), REQ-0664 (08 8.2), REQ-0665 (08 8.2),
-  REQ-0667 (08 8.2), REQ-1291 (08 8.2), REQ-0414 (04 4.3).
+  REQ-0667 (08 8.2), REQ-1291 (08 8.2), REQ-1294 (08 8.2), REQ-0414
+  (04 4.3).
 - Operator: no.
 - Acceptance:
   - With three open entries of two repos and one done entry, `handoff
@@ -66,12 +72,14 @@ REQ-1291), 08 8.6 (two starting values), 04 4.1 (two slugs) and 04 4.3
   - With 201 open entries, `memory-open-count` is printed, once; with
     200, it is not. An open entry whose `updatedAt` is 91 days before
     the clock the test injects prints one `memory-stale` line with its
-    id and title; one of 89 days prints none; a done entry prints none.
-    `julieta status` lists both warnings when they hold.
+    id and title; one of 89 days prints none; a done entry prints none;
+    eleven stale entries print ten lines, oldest first, and `1 more
+    stale entries: julieta memory list --status open`.
   - The container e2e of the hooks reads the `read an entry` line and
     an index line after `/clear`'s SessionStart (J, 09 step 3).
-  - REQ-0659, REQ-0664, REQ-0665, REQ-0667, REQ-1291 and REQ-0414 say
-    what the code does; `go run ./tools/ci reqs` passes.
+  - REQ-0659, REQ-0664, REQ-0665, REQ-0667, REQ-1291, REQ-1294 and
+    REQ-0414 say what the code does; `go run ./tools/ci reqs` passes,
+    and `go generate` leaves `docs/reference` unchanged.
 - Verify: `go test -race ./internal/handoff/... ./internal/cmd/julieta/handoff/... ./internal/cmd/julieta/setup/...`,
   `go test -tags e2e ./e2e/... -run '^TestJulietaHandoff|^TestJulietaHooks' -v`
   (10 10.8), and `go run ./tools/ci reqs`.

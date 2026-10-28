@@ -51,8 +51,9 @@ same pull request as T171: 04 4.3 (REQ-1290) and 04 4.1 (the slug).
     `.claude/rules/x.md` out of the repo is skipped; eleven matches
     print ten lines and `1 more`.
   - `add` exits 0 with the warning on stderr and the `--json` document
-    unchanged but for the warning list, as the other warnings of 04 4.1
-    are carried.
+    unchanged; a body that is also the duplicate of an open entry
+    (REQ-0279) warns too and writes nothing; a `CLAUDE.md` of 1 MiB plus
+    one byte is skipped and named in the warning's place.
   - REQ-1290 says what the code does; `go run ./tools/ci reqs` passes.
 - Verify: `go test -race ./internal/cmd/julieta/memory/...` and
   `go run ./tools/ci reqs`.
