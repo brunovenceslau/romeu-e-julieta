@@ -71,4 +71,9 @@ that runs romeu; written in [08 8.1](../spec/08-memory-handoff-salvage.md#81-mem
   private, and `doctor` shows the URL.
 - The kit's pin moves to a julieta that files handoffs in memory only
   after the durable copy is in use on the host (T172 needs T175).
+- The signature on a memory commit uses the project's one key, the one
+  the sandbox signs code with (I34), so it says the key was used, not
+  that romeu made the commit; a key of the host's own is a row of the
+  index's Deferred decisions, and the intent recorded here is integrity
+  of the copy, not attribution.
 - Each project costs one private repository.
