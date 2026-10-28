@@ -166,6 +166,8 @@ sandboxOptions:
   cpus: 4
   memory: 8g
 secrets: [github]             # names only; resolved via host settings "github@shop"
+memory:
+  remote: https://github.com/example/shop-memory   # the private repository that keeps <name>-env/memory/ (08 8.1); `none` opts out
 egress:
   extra: [api.stripe.com]     # always gated
   tools:                      # domains for a backend:tool the catalog lacks; always gated

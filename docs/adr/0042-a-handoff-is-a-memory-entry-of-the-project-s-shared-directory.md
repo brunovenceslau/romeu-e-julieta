@@ -81,11 +81,12 @@ changes the kit they run.
 - Each sandbox gains one mount at its next recreate, and the manifest
   one member; a manifest without it refuses `--shared` and a handoff
   with a usage error, so nothing is filed in the wrong place.
-- The project's state leaves git when it moves into memory. Until
-  memory has a durable home (the deferred row of the index, Q14), a
-  project that moves its state keeps a versioned copy in its
-  repository, as `docs/handoff/` of this repository is, and no task
-  removes that copy before then.
+- The project's state leaves the code repository when it moves into
+  memory, so memory gets a durable home in the same change: the private
+  git repository per project of [08 8.1](../spec/08-memory-handoff-salvage.md#81-memory-store),
+  pushed by romeu after each host command (Q14, decided on 2026-10-28).
+  A project moves its state into memory only once that copy exists, and
+  `docs/handoff/` of this repository stays until then.
 - [ADR 0021](0021-keep-memory-as-plain-per-repo-files.md) stands: plain
   files, one directory per repo per project, plus the shared one; the
   entry format gains a key julieta writes, and still no field that

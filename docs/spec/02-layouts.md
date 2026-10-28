@@ -257,7 +257,8 @@ $ROMEU_ROOT/                            default $HOME/Developer; never a VS Code
    ├─ <dir>/                            host clone of each repo (primary is the sbx workspace, clone mode)
    ├─ review/<dir>/                     hardened review checkout (created by `romeu pull`)
    ├─ memory/<dir>/                     per-repo memory, mounted rw into this project's sandbox only; sync creates it 0700, julieta writes its files 0600
-   └─ memory/_shared/                   the project's shared memory (08 8.1): handoffs, shared entries, stamps; mounted and created the same way
+   ├─ memory/_shared/                   the project's shared memory (08 8.1): handoffs, shared entries, stamps; mounted and created the same way
+   └─ memory.git/                       the git dir of the durable copy of memory/ (08 8.1), never mounted; romeu commits and pushes it
 ```
 
 Rules of this tree, one item per obligation:
