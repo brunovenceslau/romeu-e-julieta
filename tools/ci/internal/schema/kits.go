@@ -90,10 +90,9 @@ func compileKitFiles(files []check.TreeFile) (*jsonschema.Schema, error) {
 
 // isKitDescriptor reports whether f is a v3 kit descriptor the check
 // judges: a YAML file under examples/ whose first line is the frontend
-// pin. The product kits under kits/ are not judged yet:
-// kits/git-ssh-sign does not validate against the schema at kitSpecTag
-// (its ssh-agent capability has no phase); a separate task, decided on
-// 2026-10-22, fixes the kit and judges kits/.
+// pin. The product kits under kits/ are not judged yet; a separate task,
+// decided on 2026-10-22, judges kits/ (kits/git-ssh-sign builds on the
+// pinned frontend since its ssh-agent capability names a phase).
 func isKitDescriptor(f check.TreeFile) bool {
 	ext := path.Ext(f.Path)
 	if ext != ".yaml" && ext != ".yml" || !strings.HasPrefix(f.Path, examplesDir) {

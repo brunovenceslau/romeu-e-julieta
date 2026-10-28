@@ -229,14 +229,14 @@ func TestSSHAgentWithoutAPhase(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"install", "runtime"}, kit.Capabilities.SSHAgent[0].Phases)
 	})
-	t.Run("the sitting fixture", func(t *testing.T) {
+	t.Run("the git-ssh-sign kit names the runtime phase", func(t *testing.T) {
 		data, err := os.ReadFile(fixturePath)
 		require.NoError(t, err)
 
 		kit, err := ParseDescriptor(data)
 
 		require.NoError(t, err)
-		assert.Equal(t, []string{"install", "runtime"}, kit.Capabilities.SSHAgent[0].Phases)
+		assert.Equal(t, []string{"runtime"}, kit.Capabilities.SSHAgent[0].Phases)
 	})
 	t.Run("an annotation is refused", func(t *testing.T) {
 		doc := `{"schemaVersion":"3","kind":"workload","capabilities":[{"type":"com.docker.sandbox/ssh-agent@1","config":{"unrestricted":false,"sign":["git"]}}]}`

@@ -58,6 +58,11 @@ args:
 capabilities:
   - type: com.docker.sandbox/ssh-agent@1
     config:
+      # The agent is reachable in the runtime phase only: the two install
+      # steps below write git config and need no key, and the kit schema
+      # requires a phase (a descriptor without one is refused by the
+      # frontend at build).
+      phase: runtime
       unrestricted: false
       sign:
         - git

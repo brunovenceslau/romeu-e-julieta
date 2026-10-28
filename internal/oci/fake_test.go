@@ -160,15 +160,8 @@ func annotationOf(t *testing.T, path string) string {
 	require.NoError(t, err)
 	var tree map[string]any
 	require.NoError(t, yaml.Unmarshal(data, &tree))
-	// As an image carries it: a workload, with the phase the kit schema
-	// requires of an ssh-agent capability.
+	// As an image carries it: a workload.
 	tree["kind"] = "workload"
-	for _, c := range tree["capabilities"].([]any) {
-		item := c.(map[string]any)
-		if item["type"] == typeSSHAgent {
-			item["config"].(map[string]any)["phase"] = []any{"install", "runtime"}
-		}
-	}
 	out, err := jsonv2.Marshal(tree, jsonv2.Deterministic(true))
 	require.NoError(t, err)
 	return string(out)
