@@ -248,6 +248,9 @@ func checkChange(ch write.Change) error {
 // feed, so every value is escaped before it is formatted.
 func esc(s string) string { return termsafe.Escape(s) }
 
+// typeTags names the five type tags of 03 3.9 for the help of --tag.
+var typeTags = strings.Join(memstore.TypeTags, ", ")
+
 // repoFlag adds --repo to c.
 func repoFlag(c *cobra.Command, repo *string) {
 	c.Flags().StringVar(repo, "repo", "", "the repo dir to file under, instead of the repo of the working directory")

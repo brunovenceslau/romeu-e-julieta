@@ -233,7 +233,7 @@ func TestMoveAStore(t *testing.T) {
 	moved, _ := storeAt(t, dir, home)
 	all, err := moved.List(memstore.Filter{})
 	require.NoError(t, err)
-	assert.Equal(t, []memstore.Entry{a, b}, all)
+	assert.Equal(t, []memstore.Entry{b, a}, all, "newest first, an equal updatedAt by id")
 	_, err = os.Stat(moved.lock)
 	require.ErrorIs(t, err, fs.ErrNotExist)
 	_, wrote, err := moved.Add(memstore.Content{Title: "c"})

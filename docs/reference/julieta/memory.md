@@ -33,8 +33,8 @@ julieta memory <command> [flags]
 * [julieta memory add](memory/add.md) - add a memory entry to the repo's memory dir
 * [julieta memory check](memory/check.md) - check that every memory dir is mounted, writable and in its layout
 * [julieta memory edit](memory/edit.md) - change a memory entry; --status done closes it
-* [julieta memory list](memory/list.md) - list the memory entries of the repo; --query filters
-* [julieta memory show](memory/show.md) - print one memory entry
+* [julieta memory list](memory/list.md) - list the memory entries of the repo, one index line each, newest first
+* [julieta memory show](memory/show.md) - print memory entries in full, in the order given
 
 ### Exit codes
 

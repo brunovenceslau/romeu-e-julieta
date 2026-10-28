@@ -35,13 +35,12 @@ func example(t *testing.T) memstore.Entry {
 	require.NoError(t, err)
 	at := time.Date(2026, 10, 2, 9, 20, 0, 0, time.UTC)
 	return memstore.Entry{Schema: memstore.Field, ID: u, Title: "Flaky integration test on arm64", Status: memstore.StatusOpen,
-		Tags: []string{"arm64", "ci"}, CreatedAt: at, UpdatedAt: at, Body: "Free-form markdown body.\n"}
+		Tags: []string{"ci", "feedback"}, CreatedAt: at, UpdatedAt: at, Body: "Free-form markdown body.\n"}
 }
 
 // TestDecodeExample reads the example of 03 3.9, byte for byte, whose
-// tags are not sorted and whose lines carry comments: the decoder sorts
-// the tags, and Encode writes the entry in julieta's one spelling,
-// which decodes to the same entry.
+// lines carry comments: Encode writes the entry in julieta's one
+// spelling, which decodes to the same entry.
 func TestDecodeExample(t *testing.T) {
 	e, err := memstore.Decode(fixture(t, "valid.md"))
 	require.NoError(t, err)
@@ -49,7 +48,7 @@ func TestDecodeExample(t *testing.T) {
 	enc, err := memstore.Encode(e)
 	require.NoError(t, err)
 	assert.Equal(t, "---\nschema: memory-entry/v1\nid: 01j9z3k8m6t2q4w5e7r9y1v3k5\ntitle: Flaky integration test on arm64\n"+
-		"status: open\ntags: [arm64, ci]\ncreatedAt: 2026-10-02T09:20:00Z\nupdatedAt: 2026-10-02T09:20:00Z\n---\n"+
+		"status: open\ntags: [ci, feedback]\ncreatedAt: 2026-10-02T09:20:00Z\nupdatedAt: 2026-10-02T09:20:00Z\n---\n"+
 		"Free-form markdown body.\n", string(enc))
 	again, err := memstore.Decode(enc)
 	require.NoError(t, err)
@@ -60,11 +59,11 @@ func TestDecodeExample(t *testing.T) {
 // their order, and leaves the entry it was given as it was.
 func TestEncodeSortsTags(t *testing.T) {
 	e := example(t)
-	e.Tags = []string{"ci", "arm64"}
+	e.Tags = []string{"feedback", "ci"}
 	enc, err := memstore.Encode(e)
 	require.NoError(t, err)
-	assert.Contains(t, string(enc), "\ntags: [arm64, ci]\n")
-	assert.Equal(t, []string{"ci", "arm64"}, e.Tags)
+	assert.Contains(t, string(enc), "\ntags: [ci, feedback]\n")
+	assert.Equal(t, []string{"feedback", "ci"}, e.Tags)
 }
 
 // TestDecodeRefusesTheSubsetGrammar refuses, one fixture each, a front
@@ -143,7 +142,7 @@ func TestDecodeHostileUnknownKeys(t *testing.T) {
 // TestDecodeRefusesAnAliasAlone refuses an alias whose anchor is
 // elsewhere: the check names the alias when it meets it first.
 func TestDecodeRefusesAnAliasAlone(t *testing.T) {
-	data := strings.Replace(string(fixture(t, "valid.md")), "tags: [ci, arm64]", "tags: *x", 1)
+	data := strings.Replace(string(fixture(t, "valid.md")), "tags: [ci, feedback]", "tags: *x", 1)
 	_, err := memstore.Decode([]byte(data))
 	require.ErrorIs(t, err, memstore.ErrInvalid)
 }
@@ -184,7 +183,7 @@ func TestDecodeNewerInAScalar(t *testing.T) {
 	valid := string(fixture(t, "valid.md"))
 	for name, data := range map[string]string{
 		"a quoted title":       strings.Replace(valid, "title: Flaky integration test on arm64", "title: \"a\nschema: memory-entry/v9\"", 1),
-		"a flow sequence":      strings.Replace(valid, "tags: [ci, arm64]", "tags: [ci,\nschema: memory-entry/v9,\n arm64]", 1),
+		"a flow sequence":      strings.Replace(valid, "tags: [ci, feedback]", "tags: [ci,\nschema: memory-entry/v9,\n feedback]", 1),
 		"before the real line": strings.Replace(valid, "schema: memory-entry/v1\n", "title2: \"x\nschema: memory-entry/v9\"\nschema: memory-entry/v1\n", 1),
 	} {
 		_, err := memstore.Decode([]byte(data))
@@ -217,22 +216,22 @@ func TestDecodeRefuses(t *testing.T) {
 		"another format":       strings.Replace(valid, "memory-entry/v1", "handoff/v1", 1),
 		"no schema":            strings.Replace(valid, "schema: memory-entry/v1\n", "", 1),
 		"an older version":     strings.Replace(valid, "memory-entry/v1", "memory-entry/v0", 1),
-		"a wrong type":         strings.Replace(valid, "tags: [ci, arm64]", "tags: ci", 1),
+		"a wrong type":         strings.Replace(valid, "tags: [ci, feedback]", "tags: ci", 1),
 		"an uppercase id":      strings.Replace(valid, "01j9z3k8m6t2q4w5e7r9y1v3k5", "01J9Z3K8M6T2Q4W5E7R9Y1V3K5", 1),
 		"a zero id":            strings.Replace(valid, "01j9z3k8m6t2q4w5e7r9y1v3k5", "00000000000000000000000000", 1),
 		"another status":       strings.Replace(valid, "status: open", "status: closed", 1),
 		"an empty title":       strings.Replace(valid, "title: Flaky integration test on arm64", "title: ''", 1),
 		"a long title":         strings.Replace(valid, "title: Flaky integration test on arm64", "title: "+strings.Repeat("t", 201), 1),
 		"a control in a title": strings.Replace(valid, "title: Flaky integration test on arm64", `title: "a\tb"`, 1),
-		"a bad tag":            strings.Replace(valid, "[ci, arm64]", "[ARM]", 1),
-		"duplicate tags":       strings.Replace(valid, "[ci, arm64]", "[ci, ci]", 1),
-		"null tags":            strings.Replace(valid, "[ci, arm64]", "null", 1),
-		"too many tags":        strings.Replace(valid, "[ci, arm64]", "["+strings.Repeat("a,", 33)+"a]", 1),
+		"a bad tag":            strings.Replace(valid, "[ci, feedback]", "[ARM]", 1),
+		"duplicate tags":       strings.Replace(valid, "[ci, feedback]", "[ci, ci]", 1),
+		"null tags":            strings.Replace(valid, "[ci, feedback]", "null", 1),
+		"too many tags":        strings.Replace(valid, "[ci, feedback]", "["+strings.Repeat("a,", 33)+"a]", 1),
 		"an offset time":       strings.Replace(valid, "createdAt: 2026-10-02T09:20:00Z", "createdAt: 2026-10-02T09:20:00+02:00", 1),
 		"a fraction":           strings.Replace(valid, "createdAt: 2026-10-02T09:20:00Z", "createdAt: 2026-10-02T09:20:00.5Z", 1),
 		"created after":        strings.Replace(valid, "createdAt: 2026-10-02T09:20:00Z", "createdAt: 2026-10-03T09:20:00Z", 1),
 		"two documents":        strings.Replace(valid, "updatedAt: 2026-10-02T09:20:00Z\n", "updatedAt: 2026-10-02T09:20:00Z\n...\n--- x\n", 1),
-		"too deep":             strings.Replace(valid, "[ci, arm64]", "[[[[[[a]]]]]]", 1),
+		"too deep":             strings.Replace(valid, "[ci, feedback]", "[[[[[[a]]]]]]", 1),
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := memstore.Decode([]byte(data))
@@ -295,5 +294,25 @@ func TestTempTime(t *testing.T) {
 	assert.Equal(t, at, got)
 	for _, name := range []string{".tmp-", ".tmp-x", "tmp-" + u.String(), ".tmp-" + strings.ToUpper(u.String()), u.String()} {
 		assert.False(t, memstore.IsTemp(name), name)
+	}
+}
+
+// TestType names the type tag of a set of tags, - for none, and
+// CheckType refuses none and two, naming the five (03 3.9, REQ-0242,
+// REQ-1287, REQ-1292).
+func TestType(t *testing.T) {
+	for tags, want := range map[string]string{"ci feedback": "feedback", "user": "user", "ci": "-", "": "-",
+		"handoff tombstone": "handoff", "lesson reference": "reference", "project user": "user"} {
+		assert.Equal(t, want, memstore.Type(strings.Fields(tags)), tags)
+	}
+	for _, typ := range memstore.TypeTags {
+		require.NoError(t, memstore.CheckType([]string{"ci", typ}), typ)
+	}
+	for tags, held := range map[string]string{"": "no type tag", "ci lesson": "no type tag",
+		"feedback project": "the type tags feedback and project"} {
+		err := memstore.CheckType(strings.Fields(tags))
+		require.ErrorIs(t, err, memstore.ErrInvalid, tags)
+		assert.Contains(t, err.Error(), held, tags)
+		assert.Contains(t, err.Error(), "user, feedback, project, reference, handoff", tags)
 	}
 }

@@ -39,7 +39,10 @@ var ulidForm = regexp.MustCompile(`^[0-9a-hjkmnp-tv-z]{26}$`)
 // TestJulietaMemory runs the memory commands in the workload (04 4.3;
 // 10 10.1, memory: stamping, allowlist): after setup, add stamps the id
 // and both times and prints the id, the path and the repo; a supplied
-// id is the error usage; the same content again writes nothing; the
+// id is the error usage, and so are an add without a type tag and one
+// with two (03 3.9, REQ-1287), while each of the five types adds; list
+// --tag user lists the user entry alone; the same content again writes
+// nothing; the
 // entry is 0600 in a dir 0700 and the store lock is outside the memory
 // dir; two julieta processes writing one store lose no entry; list
 // --query filters and edit --status done closes; memory check passes,
@@ -50,17 +53,21 @@ func TestJulietaMemory(t *testing.T) {
 export JULIETA_MANIFEST=`+manifestEnv(t, 1, originURL+"api.git")+`
 step setup "$J" setup
 cd `+primaryPath+`
-step add "$J" memory add --title "Flaky test on arm64" --body "On the arm64 runner." --tag ci --json
-step stamp "$J" memory add --title x --id 01j9z3k8m6t2q4w5e7r9y1v3k5 --json
-step dup "$J" memory add --title "Flaky test on arm64" --body "On the arm64 runner." --tag ci --json
+step add "$J" memory add --title "Flaky test on arm64" --body "On the arm64 runner." --tag ci --tag project --json
+step stamp "$J" memory add --title x --tag user --id 01j9z3k8m6t2q4w5e7r9y1v3k5 --json
+step untyped "$J" memory add --title x --tag ci
+step twotypes "$J" memory add --title x --tag user --tag feedback
+step dup "$J" memory add --title "Flaky test on arm64" --body "On the arm64 runner." --tag ci --tag project --json
+step types sh -c 'for t in user feedback reference handoff; do "$1" memory add --title "a $t entry" --tag "$t" >/dev/null || exit 1; done' sh "$J"
+step bytag "$J" memory list --tag user
 step modes sh -c 'stat -c "%a %n" /tmp/memory/api/entries /tmp/memory/api/entries/*; ls -A /tmp/memory/api; stat -c "%a" "$HOME/.local/state/julieta/locks/api.lock"'
 # Two adds at a time, as T035's acceptance row says: 40 at once ran
 # past the container's --pids-limit, which counts threads. The two of a
 # round overlap as far as the runner lets them.
 step adds sh -c 'i=0; failed=0
 while [ "$i" -lt 20 ]; do
-	"$1" memory add --title "a$i" >/dev/null & a=$!
-	"$1" memory add --title "b$i" >/dev/null & b=$!
+	"$1" memory add --title "a$i" --tag project >/dev/null & a=$!
+	"$1" memory add --title "b$i" --tag project >/dev/null & b=$!
 	wait "$a" || failed=$((failed+1))
 	wait "$b" || failed=$((failed+1))
 	i=$((i+1))
@@ -97,11 +104,18 @@ step setup-unusable "$J" setup --json
 	assert.Equal(t, "/tmp/memory/api/entries/"+e.ID+".md", e.Path)
 	assert.Equal(t, e.CreatedAt, e.UpdatedAt)
 	assert.WithinDuration(t, time.Now(), e.CreatedAt, time.Hour)
-	assert.Equal(t, []string{"ci"}, e.Tags)
+	assert.Equal(t, []string{"ci", "project"}, e.Tags)
 
 	r = step(t, steps, "stamp")
 	assert.Equal(t, 2, r.code, r.stderr)
 	assert.True(t, strings.HasPrefix(r.stderr, "error RJ-349 usage: unknown flag: --id\n"), r.stderr)
+
+	for _, name := range []string{"untyped", "twotypes"} {
+		r = step(t, steps, name)
+		assert.Equal(t, 2, r.code, r.stderr)
+		assert.True(t, strings.HasPrefix(r.stderr, "error RJ-349 usage: "), r.stderr)
+		assert.Contains(t, r.stderr, "user, feedback, project, reference, handoff", name)
+	}
 
 	r = step(t, steps, "dup")
 	require.Equal(t, 0, r.code, r.stderr)
@@ -110,10 +124,17 @@ step setup-unusable "$J" setup --json
 	assert.False(t, dup.Wrote)
 	assert.Equal(t, rep.Entries, dup.Entries)
 
+	r = step(t, steps, "types")
+	require.Equal(t, 0, r.code, r.stderr)
+	r = step(t, steps, "bytag")
+	require.Equal(t, 0, r.code, r.stderr)
+	assert.Regexp(t, `^[0-9a-hjkmnp-tv-z]{26} api open user [0-9]{4}-[0-9]{2}-[0-9]{2} a user entry\n$`, r.stdout)
+
 	r = step(t, steps, "modes")
 	require.Equal(t, 0, r.code, r.stderr)
-	assert.Equal(t, "700 /tmp/memory/api/entries\n600 "+e.Path+"\nentries\n600\n", r.stdout,
-		"one entry file, 0600 in a dir 0700, and the store lock outside the memory dir")
+	assert.Regexp(t, `^700 /tmp/memory/api/entries\n(600 /tmp/memory/api/entries/[0-9a-z]{26}\.md\n){5}entries\n600\n$`, r.stdout,
+		"the entry files, 0600 in a dir 0700, and the store lock outside the memory dir")
+	assert.Contains(t, r.stdout, "600 "+e.Path+"\n")
 
 	r = step(t, steps, "adds")
 	require.Equal(t, 0, r.code, "the number of failed adds out of 40 (two at a time); their stderr:\n%s", r.stderr)
@@ -121,7 +142,7 @@ step setup-unusable "$J" setup --json
 
 	r = step(t, steps, "count")
 	require.Equal(t, 0, r.code, r.stderr)
-	assert.Equal(t, "41", strings.TrimSpace(r.stdout), "two julieta processes at a time lose no entry")
+	assert.Equal(t, "45", strings.TrimSpace(r.stdout), "two julieta processes at a time lose no entry")
 
 	r = step(t, steps, "query")
 	require.Equal(t, 0, r.code, r.stderr)
@@ -136,7 +157,7 @@ step setup-unusable "$J" setup --json
 	require.Len(t, done.Entries, 1)
 	assert.Equal(t, "done", done.Entries[0].Status)
 	assert.Equal(t, e.CreatedAt, done.Entries[0].CreatedAt)
-	assert.Equal(t, "40", strings.TrimSpace(step(t, steps, "open").stdout))
+	assert.Equal(t, "44", strings.TrimSpace(step(t, steps, "open").stdout))
 	assert.Equal(t, 2, step(t, steps, "rm").code, "there is no memory rm")
 
 	r = step(t, steps, "check")

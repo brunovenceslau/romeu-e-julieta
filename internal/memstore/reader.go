@@ -4,6 +4,7 @@
 package memstore
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 )
@@ -125,18 +127,46 @@ func (r *Reader) readFile(p string) ([]byte, error) {
 	return data, nil
 }
 
-// Filter selects the entries List returns: Query, the text of julieta
-// memory list --query, matches an entry whose title, body or a tag
-// holds it, ignoring case; Status, when set, is the status the entry
-// has. The zero Filter selects every entry.
+// The orders of List (julieta memory list --sort, REQ-1288).
+const (
+	// SortUpdated orders by updatedAt, newest first; the zero Sort.
+	SortUpdated = "updated"
+	// SortCreated orders by createdAt, newest first.
+	SortCreated = "created"
+)
+
+// Filter selects the entries List returns, the narrowing of julieta
+// memory list (04 4.3, REQ-1293; 08 8.1, REQ-0653). Query matches an
+// entry whose title, body or a tag holds it, ignoring case; Status,
+// when set, is the status the entry has; Tags must each be a tag of
+// the entry, and an entry without a type tag is never matched by them
+// (REQ-1292); Since, when set, is the earliest updatedAt. Walk applies
+// these; List also applies Sort, SortUpdated when empty, and Limit, the
+// most entries it returns when above zero. The zero Filter selects
+// every entry.
 type Filter struct {
 	Query  string
 	Status string
+	Tags   []string
+	Since  time.Time
+	Limit  int
+	Sort   string
 }
 
 // match reports whether e is selected by f.
 func (f Filter) match(e Entry) bool {
 	if f.Status != "" && e.Status != f.Status {
+		return false
+	}
+	if len(f.Tags) > 0 && Type(e.Tags) == NoType {
+		return false
+	}
+	for _, t := range f.Tags {
+		if !slices.Contains(e.Tags, t) {
+			return false
+		}
+	}
+	if !f.Since.IsZero() && e.UpdatedAt.Before(f.Since) {
 		return false
 	}
 	if f.Query == "" {
@@ -149,9 +179,19 @@ func (f Filter) match(e Entry) bool {
 	return slices.ContainsFunc(e.Tags, func(t string) bool { return strings.Contains(t, q) })
 }
 
-// List returns the entries f selects, oldest first (by id), as Walk
-// reads them.
+// List returns the entries f selects, newest first by the time f.Sort
+// names, an equal time ordered by id, newest first too, and at most
+// f.Limit of them when it is above zero. A Sort other than SortUpdated,
+// SortCreated and empty is an error.
 func (r *Reader) List(f Filter) ([]Entry, error) {
+	at := func(e Entry) time.Time { return e.UpdatedAt }
+	switch f.Sort {
+	case "", SortUpdated:
+	case SortCreated:
+		at = func(e Entry) time.Time { return e.CreatedAt }
+	default:
+		return nil, fmt.Errorf("memstore: the sort \"%s\" is not %s or %s", clip(f.Sort), SortUpdated, SortCreated)
+	}
 	var out []Entry
 	err := r.Walk(f, func(e Entry) bool {
 		out = append(out, e)
@@ -160,11 +200,21 @@ func (r *Reader) List(f Filter) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	slices.SortFunc(out, func(a, b Entry) int {
+		if c := at(b).Compare(at(a)); c != 0 {
+			return c
+		}
+		return bytes.Compare(b.ID[:], a.ID[:])
+	})
+	if f.Limit > 0 && len(out) > f.Limit {
+		out = out[:f.Limit]
+	}
 	return out, nil
 }
 
 // Walk calls visit with each entry f selects, oldest first (by id),
-// one entry in memory at a time, until visit returns false. A memory
+// one entry in memory at a time, until visit returns false; f.Sort and
+// f.Limit are List's and Walk leaves them. A memory
 // dir without entries/ has none. A temporary name of julieta is never
 // read (REQ-0654); entries/ that is no directory (a symlink among
 // them), any other member of it that is not a file <ULID>.md, and more
