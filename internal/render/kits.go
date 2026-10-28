@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -57,6 +58,12 @@ var ErrPersonalCapability = errors.New("render: a capability a personal kit may 
 // image, not a kit added to one. A sync error.
 var ErrPersonalKind = errors.New("render: a kind a personal kit may not be")
 
+// MaxPersonalKit is the most bytes the files of one personal kit hold
+// in all, 64 MiB, the most gitsafe.ReadDir reads of one dir (06 6.1,
+// REQ-0568): a kit of many dirs is refused once its reads pass it, so
+// a sync holds a bounded copy before it writes.
+const MaxPersonalKit = 64 << 20
+
 // personalKind is the one descriptor kind a personal kit may be.
 const personalKind = "mixin"
 
@@ -84,6 +91,9 @@ type KitMaterializer struct {
 	// ConfigCommit is the full object id of the config commit the spec
 	// was read at (Record.SpecSource.Commit).
 	ConfigCommit string
+	// MaxPersonal is the most bytes one personal kit holds in all, or
+	// zero for MaxPersonalKit; a test lowers it.
+	MaxPersonal int
 }
 
 // Materialize writes each kit of p into the candidate c, under the name
@@ -215,6 +225,15 @@ func (s KitMaterializer) product(id string) (MaterializedKit, []gate.File, error
 	return m, files, nil
 }
 
+// maxPersonalKit is the bound of MaxPersonal, or MaxPersonalKit when it
+// is zero.
+func (s KitMaterializer) maxPersonalKit() int {
+	if s.MaxPersonal > 0 {
+		return s.MaxPersonal
+	}
+	return MaxPersonalKit
+}
+
 // configTree checks the config commit with fsck and then the walk, and
 // returns the files the walk listed.
 func (s KitMaterializer) configTree(ctx context.Context) ([]gitsafe.TreeEntry, error) {
@@ -240,36 +259,39 @@ func (s KitMaterializer) personal(ctx context.Context, tree []gitsafe.TreeEntry,
 	prefix := ConfigKitsDir + "/" + id + "/"
 	modes := map[string]string{} // the walk's files of the kit, by path in the kit
 	var dirs []string
+	seen := map[string]bool{}
 	for _, e := range tree {
 		rel, ok := strings.CutPrefix(e.Path, prefix)
 		if !ok {
 			continue
 		}
 		modes[rel] = e.Mode
-		if d := path.Dir(e.Path); !slices.Contains(dirs, d) {
+		if d := path.Dir(e.Path); !seen[d] {
+			seen[d] = true
 			dirs = append(dirs, d)
 		}
 	}
 	if len(modes) == 0 {
 		return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q is not in the config commit (no %s)", id, prefix)
 	}
-	files := make([]gate.File, 0, len(modes))
+	reads := make(map[string][]gitsafe.File, len(dirs))
+	size := 0
 	for _, d := range dirs {
 		got, err := s.Git.ReadDir(ctx, s.ConfigDir, s.ConfigCommit, d)
 		if err != nil {
 			return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: %w", id, err)
 		}
 		for _, f := range got {
-			rel := strings.TrimPrefix(d+"/"+f.Name, prefix)
-			if mode, ok := modes[rel]; !ok || mode != f.Mode {
-				return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: the read of %q is not the file the walk listed", id, rel)
-			}
-			delete(modes, rel)
-			files = append(files, gate.File{Path: rel, Mode: f.Mode, Data: f.Data})
+			size += len(f.Data)
 		}
+		if limit := s.maxPersonalKit(); size > limit {
+			return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q holds more than %d bytes", id, limit)
+		}
+		reads[d] = got
 	}
-	for rel := range modes {
-		return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: the walk listed %q and the read did not", id, rel)
+	files, err := crossCheck(prefix, modes, dirs, reads)
+	if err != nil {
+		return MaterializedKit{}, nil, fmt.Errorf("render: the personal kit %q: %w", id, err)
 	}
 	m, err := kitOf(id, files)
 	if err != nil {
@@ -282,6 +304,34 @@ func (s KitMaterializer) personal(ctx context.Context, tree []gitsafe.TreeEntry,
 		return MaterializedKit{}, nil, fmt.Errorf("%w: the personal kit %q declares a %s capability", ErrPersonalCapability, id, typ)
 	}
 	return m, files, nil
+}
+
+// crossCheck returns the files of a kit as the reads of its dirs hold
+// them, each dir of dirs read under the kit's prefix, once every read
+// matches the walk: modes holds the walk's files of the kit by their
+// path in it, and a read of a file the walk did not list, of another
+// mode, or of one file twice is an error, and so is a file the walk
+// listed that no read holds, the first of them by name. modes is left
+// as it was. The walk and the reads are two looks at one commit; this
+// is the check that they saw the same files (I27).
+func crossCheck(prefix string, modes map[string]string, dirs []string, reads map[string][]gitsafe.File) ([]gate.File, error) {
+	left := maps.Clone(modes)
+	files := make([]gate.File, 0, len(modes))
+	for _, d := range dirs {
+		for _, f := range reads[d] {
+			rel := strings.TrimPrefix(d+"/"+f.Name, prefix)
+			if mode, ok := left[rel]; !ok || mode != f.Mode {
+				return nil, fmt.Errorf("the read of %q is not the file the walk listed", rel)
+			}
+			delete(left, rel)
+			files = append(files, gate.File{Path: rel, Mode: f.Mode, Data: f.Data})
+		}
+	}
+	if len(left) > 0 {
+		missing := slices.Sorted(maps.Keys(left))
+		return nil, fmt.Errorf("the walk listed %q and the read did not", missing[0])
+	}
+	return files, nil
 }
 
 // refusedCapability returns the first capability type of c a personal

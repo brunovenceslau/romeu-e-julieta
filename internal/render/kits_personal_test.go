@@ -8,6 +8,7 @@ package render_test
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -129,6 +130,12 @@ func personalSource(t *testing.T, dir, commit string) render.KitMaterializer {
 	m.Git = hostRunner(t)
 	m.ConfigDir = dir
 	m.ConfigCommit = commit
+	return m
+}
+
+// without returns m with the change f made to it.
+func without(m render.KitMaterializer, f func(*render.KitMaterializer)) render.KitMaterializer {
+	f(&m)
 	return m
 }
 
@@ -360,6 +367,9 @@ func TestPersonalKitsRefuseWhatTheyCannotRead(t *testing.T) {
 		"no descriptor":  {personalSource(t, dir, commit), "nodesc", "nodesc.yaml"},
 		"not one name":   {personalSource(t, dir, commit), "../mine", "../mine"},
 		"no config repo": {productSource(t, fixtureKits(), "/r/shop-env"), "mine", "no config commit"},
+		"no runner":      {without(personalSource(t, dir, commit), func(m *render.KitMaterializer) { m.Git = nil }), "mine", "no config commit"},
+		"no config dir":  {without(personalSource(t, dir, commit), func(m *render.KitMaterializer) { m.ConfigDir = "" }), "mine", "no config commit"},
+		"no commit":      {without(personalSource(t, dir, commit), func(m *render.KitMaterializer) { m.ConfigCommit = "" }), "mine", "no config commit"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -370,4 +380,65 @@ func TestPersonalKitsRefuseWhatTheyCannotRead(t *testing.T) {
 			assertNothingWritten(t, cand)
 		})
 	}
+}
+
+// TestPersonalKitBound refuses a personal kit whose files pass the
+// bound in all, across its dirs, and writes nothing (REQ-0568); a kit
+// at the bound is written.
+func TestPersonalKitBound(t *testing.T) {
+	t.Parallel()
+	dir, commit := configRepo(t, map[string]string{
+		"kits/big/big.yaml": plainDescriptor, "kits/big/a/x.txt": strings.Repeat("x", 100),
+		"kits/big/b/y.txt": strings.Repeat("y", 100),
+	})
+	size := len(plainDescriptor) + 200
+	for limit, ok := range map[int]bool{size: true, size - 1: false} {
+		m := personalSource(t, dir, commit)
+		m.MaxPersonal = limit
+		cand := render.Candidate{Dir: t.TempDir()}
+		_, err := m.Materialize(t.Context(), cand, spec.Project{Kits: []spec.Kit{{Personal: "big"}}})
+		if ok {
+			require.NoError(t, err, limit)
+			continue
+		}
+		require.Error(t, err, limit)
+		assert.Contains(t, err.Error(), fmt.Sprintf(`the personal kit "big" holds more than %d bytes`, limit))
+		assertNothingWritten(t, cand)
+	}
+}
+
+// TestCrossCheck holds the walk and the reads of a kit to the same
+// files (I27): a file the walk did not list, one of another mode, one
+// read twice, and one the walk listed that no read holds are each an
+// error naming the file; the walk's modes are left as they were.
+func TestCrossCheck(t *testing.T) {
+	t.Parallel()
+	const prefix = "kits/k/"
+	modes := map[string]string{"k.yaml": "100644", "bin/run.sh": "100755"}
+	dirs := []string{"kits/k", "kits/k/bin"}
+	good := map[string][]gitsafe.File{
+		"kits/k":     {{Name: "k.yaml", Mode: "100644", Data: []byte("d")}},
+		"kits/k/bin": {{Name: "run.sh", Mode: "100755", Data: []byte("r")}},
+	}
+	files, err := render.CrossCheck(prefix, modes, dirs, good)
+	require.NoError(t, err)
+	assert.Equal(t, []gate.File{{Path: "k.yaml", Mode: "100644", Data: []byte("d")}, {Path: "bin/run.sh", Mode: "100755", Data: []byte("r")}}, files)
+	for name, tc := range map[string]struct {
+		reads map[string][]gitsafe.File
+		want  string
+	}{
+		"an extra file": {map[string][]gitsafe.File{"kits/k": append(slices.Clone(good["kits/k"]), gitsafe.File{Name: "x", Mode: "100644"}),
+			"kits/k/bin": good["kits/k/bin"]}, `the read of "x" is not the file the walk listed`},
+		"another mode": {map[string][]gitsafe.File{"kits/k": good["kits/k"],
+			"kits/k/bin": {{Name: "run.sh", Mode: "100644"}}}, `the read of "bin/run.sh" is not the file the walk listed`},
+		"read twice": {map[string][]gitsafe.File{"kits/k": append(slices.Clone(good["kits/k"]), good["kits/k"][0]),
+			"kits/k/bin": good["kits/k/bin"]}, `the read of "k.yaml" is not the file the walk listed`},
+		"a missing file": {map[string][]gitsafe.File{"kits/k": good["kits/k"]}, `the walk listed "bin/run.sh" and the read did not`},
+		"no read":        {map[string][]gitsafe.File{}, `the walk listed "bin/run.sh" and the read did not`},
+	} {
+		_, err := render.CrossCheck(prefix, modes, dirs, tc.reads)
+		require.Error(t, err, name)
+		assert.Equal(t, tc.want, err.Error(), name)
+	}
+	assert.Len(t, modes, 2, "the walk's modes are left as they were")
 }
