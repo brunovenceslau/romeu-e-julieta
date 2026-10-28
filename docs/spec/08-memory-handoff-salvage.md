@@ -17,11 +17,11 @@ the rule of 8.5.
 
 | Aspect | Decision |
 |---|---|
-| Unit | `REQ-0642` one memory directory per repo per project: `$ROMEU_ROOT/<name>-env/memory/<dir>/`; `REQ-0643` a repo URL belongs to one project (Q4) |
+| Unit | `REQ-0642` one memory directory per repo per project, `$ROMEU_ROOT/<name>-env/memory/<dir>/`, and one shared directory per project, `memory/_shared/`, for the entries that hold for the project as a whole (03 3.9, `--shared`; every `handoff`) and the stamps (03 3.10); the name cannot collide with a repo dir, whose pattern (REQ-0176) starts with a letter or a digit; `REQ-0643` a repo URL belongs to one project (Q4) |
 | Mount | `REQ-0644` direct rw into that project's sandbox only; never mounted by two sandboxes; never a VS Code folder |
-| Layout allowlist | the one home of this list (I24 and `memstore` cite it): `REQ-0645` the top level contains only `entries/`, `handoff/`, `snapshot/`, `salvage/`; regular files only (checked with Lstat); no dotfiles except julieta's temporary names (below), no `.git`, no symlinks, FIFOs or devices. `REQ-0646` `sync` creates each memory dir 0700 and julieta writes its files 0600 |
+| Layout allowlist | the one home of this list (I24 and `memstore` cite it): `REQ-0645` the top level of a repo dir contains only `entries/`, `snapshot/`, `salvage/`, and of the shared dir only `entries/`, `stamps/`; regular files only (checked with Lstat); no dotfiles except julieta's temporary names (below), no `.git`, no symlinks, FIFOs or devices. `REQ-0646` `sync` creates each memory dir, the shared one too, 0700, and julieta writes its files 0600 |
 | Moving a store | `REQ-0647` a memory entry file is self-contained: copying `memory/<dir>/entries/` whole is a complete move, and the store lock is recreated on first use (the J13 rule, whose home is this row) |
-| Caps | `REQ-0648` the starting values of 8.6: per entry or handoff file, entries, handoff files; snapshot and salvage payloads are bounded by the salvage cap, which is per salvage (8.5 step 4). `REQ-0649` after each facts write, `handoff write --facts` keeps `handoff/` under its cap by removing the facts files beyond the newest ones julieta keeps (8.6), never the newest facts file and never a narrative file; `REQ-0650` a `handoff/` over its cap warns in `sync` and `run` and never refuses |
+| Caps | `REQ-0648` the starting values of 8.6: per entry or stamp file, entries, stamp files; snapshot and salvage payloads are bounded by the salvage cap, which is per salvage (8.5 step 4). `REQ-0649` after each write, `julieta stamp` keeps `stamps/` under its cap by removing the files beyond the newest ones julieta keeps (8.6), never the newest; `REQ-0650` a `stamps/` over its cap warns `stamps-over-cap` in `sync`, `run` and `memory index --hook` and never refuses |
 | Enforcement | `REQ-0651` `julieta memory check` fails on a violation; romeu `sync` and `run` refuse (exit 2) and name the offending path; `REQ-0652` romeu reads memory only through `memstore`'s `os.Root` readers and never extracts archives from it (I24) |
 | Interface | `REQ-0653` two packages, split by what each side needs. `memstore`, linked by both binaries, holds the readers on `os.Root`, `List(filter)`, whose filter carries the narrowing of `memory list` (04 4.3: the query text, the status, the tags, the since bound, the limit and the sort), and `Get(id)`, with the layout allowlist and the caps. `memstore/write`, linked by julieta only, holds `Store`, which adds `Put(entry)` and the store lock. julieta never deletes a memory entry: `edit --status done` closes one, and backups of memory are the owner's |
 | v1 backend | `fs` on `os.Root`; every write follows the atomic write rule of [03 3.8](03-formats.md#38-host-state-schemas-state-v1). `REQ-0654` A temporary file is named `.tmp-<ULID>` in the target's own directory; a name of that grammar is never read, is not an allowlist violation (`memory check` and `sync` warn, never refuse), and `julieta setup` removes any older than its own start. `REQ-0655` The store lock is a sandbox-local file, `$HOME/.local/state/julieta/locks/<dir>.lock`, never in the memory dir, because a memory dir is mounted into one sandbox only. `Put` takes it, and so does `handoff write` for the whole command, git reads included, on the lock of its target dir |
@@ -47,7 +47,8 @@ backend possible later.
   loads at a session's start, and it is what fits the bound of 8.6.
 - `REQ-0660` The skill rule (`skills/julieta/SKILL.md`) tells the agent to use
   `julieta memory` for anything worth keeping, which type tag of 03 3.9
-  each case takes (`user`, `feedback`, `project`, `reference`), and to
+  each case takes (`user`, `feedback`, `project`, `reference`; `handoff`
+  through the `handoff` skill, 8.3), when `--shared` is right, and to
   keep out what the code, the git history or an instruction file
   (`CLAUDE.md`, `AGENTS.md`, `.claude/rules/`) already holds; `add`
   warns `memory-derivable` on the part of that rule a check can judge
@@ -68,12 +69,12 @@ run every time, never remembered.
 
 | Hook | Command | Prints or writes |
 |---|---|---|
-| `REQ-0663` SessionStart, for every source the pinned Claude Code fires (startup, resume, clear, compact) | `julieta handoff show --hook` | `REQ-0664` in this order: (1) julieta's warnings, each by its slug of 04 4.1, one line each: `REQ-0665` `lock-stale`, `snapshots-disabled`, `agent-memory-writable`, `agent-path-missing` (8.5 step 5), `memory-open-count`, `memory-stale`, `skills-stale`, `layout-stale`, `default-branch-moved` (`<repo> <old>..<new>`, shown by the first SessionStart after the move and then cleared), `agent-hooks-missing`, and every recorded hook failure (one line per hook and repo, the newest failure of each, shown until a later run of the same hook succeeds, below); (2) the fixed built-in memory line (8.1); (3) the latest narrative handoff over every manifest repo's memory dir (8.3), or the gap line of 8.3; (4) the facts that changed since it (branch moved, new commits, dirty count); (5) the index of the open entries, the line of `memory list` (04 4.3) per entry, newest `updatedAt` first, under a line that says how to read one: `read an entry: julieta memory show <id>`. `REQ-0666` It reads every manifest repo's memory dir and labels each item with its repo. `REQ-0667` The output is bounded by the two values of 8.6, each cut at a line: parts (2) to (4) by the narrative bound, the narrative cut by whole lines with the last line `read the rest: julieta handoff show`, and part (5) by the index bound, the index holding every whole line that fits, as the agent's own memory loads its index, never a partial line, with the last line `<n> more entries: julieta memory list` when any is left out. The warnings are never cut. `REQ-1291` Two warnings keep the index small without a hand, both printed in part (1), both hints to close or update, since julieta deletes nothing (8.1): `memory-open-count`, one line, when the open entries of the project exceed the count of 8.6. `REQ-1294` `memory-stale`, one line naming the id and the escaped title of each open entry whose `updatedAt` is older than the days of 8.6, oldest first, at most ten lines and then `<n> more stale entries: julieta memory list --status open`, so the part that is never cut stays small |
-| SessionEnd | `julieta handoff write --facts` | `REQ-0668` a `facts` handoff, so a session that ends without `/handoff` still leaves stamped git facts; whether it raises the gap line is decided by the facts it carries (8.3), not by its time |
+| `REQ-0663` SessionStart, for every source the pinned Claude Code fires (startup, resume, clear, compact) | `julieta memory index --hook` | `REQ-0664` in this order: (1) julieta's warnings, each by its slug of 04 4.1, one line each: `REQ-0665` `lock-stale`, `snapshots-disabled`, `agent-memory-writable`, `agent-path-missing` (8.5 step 5), `memory-open-count`, `memory-stale`, `skills-stale`, `layout-stale`, `default-branch-moved` (`<repo> <old>..<new>`, shown by the first SessionStart after the move and then cleared), `agent-hooks-missing`, and every recorded hook failure (one line per hook and repo, the newest failure of each, shown until a later run of the same hook succeeds, below); (2) the fixed built-in memory line (8.1); (3) the open `handoff` entry of the project's shared dir (8.3): its index line, then the gap line of 8.3 when the newest stamp differs from its stamp, then its body, or the gap line of 8.3 alone when no `handoff` is open; (4) the index of the other open entries over every memory dir of the project, the line of `memory list` (04 4.3) per entry, newest `updatedAt` first, under a line that says how to read one: `read an entry: julieta memory show <id>`. `REQ-0666` It reads every manifest repo's memory dir and labels each item with its repo. `REQ-0667` The output is bounded by the two values of 8.6, each cut at a line: part (3) by the narrative bound, the body cut by whole lines with the last line `read the rest: julieta memory show <id>`, and part (4) by the index bound, the index holding every whole line that fits, as the agent's own memory loads its index, never a partial line, with the last line `<n> more entries: julieta memory list` when any is left out. The warnings are never cut. `REQ-1291` Two warnings keep the index small without a hand, both printed in part (1), both hints to close or update, since julieta deletes nothing (8.1): `memory-open-count`, one line, when the open entries of the project, the `handoff` apart, exceed the count of 8.6. `REQ-1294` `memory-stale`, one line naming the id and the escaped title of each open entry whose `updatedAt` is older than the days of 8.6, oldest first, at most ten lines and then `<n> more stale entries: julieta memory list --status open`, so the part that is never cut stays small |
+| SessionEnd | `julieta stamp` | `REQ-0668` a stamp file (03 3.10), so a session that ends without `/handoff` still leaves where the trees were; whether it raises the gap line is decided by what it holds (8.3), not by its time |
 
 `REQ-0669` julieta records in its state the time of the last SessionStart hook run
-(`handoff show --hook`) and of the last SessionEnd run (`handoff write
---facts`); 8.5 step 1 reads them.
+(`memory index --hook`) and of the last SessionEnd run (`stamp`); 8.5
+step 1 reads them.
 
 `REQ-0670` Memory and handoff text is written by agents. SessionStart
 shows it to the next session as data, under a line that says so; the
@@ -110,20 +111,21 @@ surface them until a later run of the same hook succeeds.
 
 | Aspect | Decision |
 |---|---|
-| Narrative handoff | `REQ-0676` the operator types `/handoff` (before `/clear`) or `/handoff --final` (before recreate/rm); the skill has the agent write the required headings and pipe them to `julieta handoff write [--final]` |
-| Facts handoff | written by the SessionEnd hook (8.2) |
-| Location | `REQ-0677` the memory dir of the repo containing the agent's cwd, or of `--repo`; never a question. `julieta memory add` and `julieta handoff write` print the repo they filed under, so work across repos is filed where the agent meant |
-| File name | `REQ-0678` `handoff/<ULID>-<kind>.md` (03 3.10); ULIDs sort by time |
-| Stamping | `REQ-0679` julieta writes all front matter (3.10) with git facts for every repo in the manifest |
-| Handoff reader | `REQ-0680` one function in `internal/handoff`, used by julieta and romeu: "latest narrative" = the greatest ULID among `clear` and `final` files over every memory dir of the manifest, labelled with the dir it was read from, and "newest facts" the same; "newest facts" = the greatest ULID among `facts` files; a facts file never hides a narrative |
-| Resume | `REQ-0681` SessionStart prints the latest narrative plus the difference between its facts and the newest facts. The gap line `the newest facts differ from the latest narrative of <time>: <changes>`, where `<changes>` lists the count of new commits, a moved branch and a changed dirty count, prints first only when the newest facts file's git facts differ from the facts stamped in the latest narrative; a newer facts file with the same git facts, such as the one SessionEnd writes at `/clear` after `/handoff`, prints no gap line. The line names what is measured, not how the session ended: it also prints when `/handoff` ran and a commit followed before `/clear`. `REQ-0682` Three goldens pin it: `/handoff` then `/clear` (no line), a facts-only end with new commits (the line), and `/handoff`, a commit, then `/clear` (the line) |
-| Before destruction | `REQ-0683` after the preflight and before the salvage half, `romeu rm` asks the handoff reader whether the open generation has a `final` handoff; on a TTY it asks whether to go on without one, and without a TTY it warns (`no-final-handoff`) and goes on (04 4.2). The narrative handoff is the operator's step: romeu cannot ask a stopped agent for one (J6) |
-| Host | `REQ-0684` `romeu handoff <name>` prints the latest narrative and newest facts (escaped), labelled as text an agent wrote |
+| Narrative handoff | `REQ-0676` the operator types `/handoff` (before `/clear`) or `/handoff --final` (before recreate/rm); the skill has the agent write the required headings (03 3.9) and pipe them to `julieta memory add --tag handoff --body-file -`, with `--tag tombstone` for `--final`; a handoff is a memory entry, and nothing else holds one |
+| Stamp | measured by julieta into the entry at `add`, and written as a file by the SessionEnd hook (8.2; 03 3.10) |
+| Location | `REQ-0677` the project's shared dir, whatever the agent's cwd; the command prints `shared`. Every other entry is filed under the repo containing the cwd, or `--repo`, and the command prints it, so work across repos is filed where the agent meant |
+| One open | `REQ-0678` `add` of a `handoff` closes the open one first (03 3.9), so the project has one open narrative, the newest `createdAt` when a migration left two |
+| Stamping | `REQ-0679` julieta writes the `stamp` key of the entry at `add` and refuses one supplied by the caller (03 3.9) |
+| Reader | `REQ-0680` one function in `memstore`, used by julieta and romeu: "the open handoff" = the open `handoff` entry of the shared dir; "newest stamp" = the greatest ULID among the files of `stamps/`; no file hides an entry |
+| Resume | `REQ-0681` SessionStart prints the open handoff plus the difference between its stamp and the newest stamp. The gap line `the newest stamp differs from the handoff of <time>: <changes>`, where `<changes>` lists the count of new commits, a moved branch and a changed dirty count, prints only when the newest stamp file differs from the stamp of the open handoff; a newer stamp with the same positions, such as the one SessionEnd writes at `/clear` after `/handoff`, prints no gap line. The line names what is measured, not how the session ended. `REQ-0682` The container e2e asserts both: `/handoff` then `/clear` with no commit (no line), and `/handoff`, a commit, then `/clear` (the line) |
+| Before destruction | `REQ-0683` after the preflight and before the salvage half, `romeu rm` asks the reader whether the shared dir holds an open `handoff` tagged `tombstone` whose stamp names the open generation; on a TTY it asks whether to go on without one, and without a TTY it warns (`no-tombstone`) and goes on (04 4.2). The narrative handoff is the operator's step: romeu cannot ask a stopped agent for one (J6) |
+| Host | `REQ-0684` `romeu memory list\|show <name>` prints the index, the open handoff first, and entries in full, escaped and labelled as text an agent wrote (04 4.2) |
 
 Claude Code fires SessionEnd when `/clear` ends a session, then
-SessionStart for the new one (Q22). `REQ-0685` With the rules above, the facts file
-written at `/clear` never displaces the narrative written by `/handoff`
-just before it, whatever the order of the two hooks.
+SessionStart for the new one (Q22). `REQ-0685` With the rules above, the stamp file
+written at `/clear` never displaces the handoff written by `/handoff`
+just before it, whatever the order of the two hooks: a stamp is a file
+and a handoff an entry.
 
 *Why for us:* agent state kept in git notes is invisible to a heads-only
 refspec; a plain file on a host mount survives the sandbox without git
@@ -185,17 +187,17 @@ manifest.
 1. `REQ-0695` `--stop-agents`: SIGTERM to the agent's processes (names from
    `internal/agent/<agent>`), wait up to 10 s, then SIGKILL; record it
    in the manifest's `agentStop` (3.11). `REQ-0696` Zero matched while a session is
-   open, read from julieta state (a SessionStart recorded by `handoff
-   show --hook` with no later SessionEnd from `handoff write --facts`,
-   8.2), is the skipped item `agent-not-matched`; zero matched with no
+   open, read from julieta state (a SessionStart recorded by `memory
+   index --hook` with no later SessionEnd from `stamp`, 8.2), is the
+   skipped item `agent-not-matched`; zero matched with no
    open session is recorded in the manifest's `agentStop` (3.11) and is
    no item. `REQ-0697` Then salvage waits on the store lock of every manifest
    memory dir (8.1), so a SessionEnd hook already running finishes
    first; `REQ-0698` while it waits more than 10 s on a lock it prints the lock's
    path on stderr and in its `--json` progress, and the wait has no
-   bound, since a facts handoff must finish and the signal rule of 04
-   4.1 is the way out; `REQ-0699` a facts handoff written during salvage is allowed
-   and not counted for completeness. `cmd/julieta` passes the agent
+   bound, since a stamp must finish and the signal rule of 04 4.1 is
+   the way out; `REQ-0699` a stamp written during salvage is allowed and
+   not counted for completeness. `cmd/julieta` passes the agent
    profile (process names, state paths) to `salvage`; the `salvage`
    package, which romeu links too, does not import `agent/*`.
 2. For each repo in the manifest, and for each nested repository found
@@ -358,12 +360,11 @@ one place they are written.
 
 | Value | Default |
 |---|---|
-| size of one entry or handoff file | 1 MiB |
+| size of one entry or stamp file | 1 MiB |
 | entries per memory dir | 10 000 |
-| files in `handoff/` | 1 000 |
-| facts files julieta keeps in `handoff/` | the newest 50 |
-| SessionStart narrative and facts, parts (2) to (4) of REQ-0664 | 4 KiB |
-| SessionStart index, part (5) of REQ-0664 | 24 KiB (about 130 lines of 180 bytes; the agent's own memory loads 25 KB) |
+| stamp files julieta keeps in `stamps/` | the newest 50 |
+| SessionStart handoff, part (3) of REQ-0664, and the `handoff-long` warning of `add` | 4 KiB |
+| SessionStart index, part (4) of REQ-0664 | 24 KiB (about 130 lines of 180 bytes; the agent's own memory loads 25 KB) |
 | open entries of a project before `memory-open-count` | 100, below what the index bound holds, so the warning comes before the cut |
 | days without an update before an open entry is `memory-stale` | 90 |
 | salvage cap, per salvage (the manifest's `salvage.capBytes`, 03 3.6) | 1 GiB |

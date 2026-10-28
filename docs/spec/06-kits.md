@@ -100,8 +100,8 @@ obligation of the row above:
    `~/.claude/skills/`, each skill's whole directory, so the files its
    `SKILL.md` links (REQ-1255) arrive with it.
 2. `REQ-0596` The Claude Code hooks `SessionStart`, for every source the pinned
-   version fires (startup, resume, clear, compact), -> `julieta handoff
-   show --hook`, and `SessionEnd` -> `julieta handoff write --facts`,
+   version fires (startup, resume, clear, compact), -> `julieta memory
+   index --hook`, and `SessionEnd` -> `julieta stamp`,
    each invoking julieta by the absolute path of the read-only
    `.romeu/bin` mount, which romeu renders as a reserved kit arg,
    `julietaBin` (a spec that sets it is a sync error), written into the
@@ -190,6 +190,6 @@ mise's pin, which has a signed checksum file, is in
 | language and registry egress | derived by romeu from locks and the catalog | egress is derived, never hand-written in kits |
 | git commit signing | `git-ssh-sign` | stricter agent forwarding; the key stays an argument |
 | git hooks | `julieta hooks` (sandbox only) | hooks never run on the host |
-| memory and handoff | `julieta memory`, `julieta handoff` | one agent-neutral store |
+| memory, handoffs among it | `julieta memory`, `julieta stamp` | one agent-neutral store |
 | personal agent context (instructions, plugins) | `REQ-0608` a personal kit in the config repo; it may add to the agent's settings and never removes `julieta-claude`'s hooks, which `julieta status` reports if it does (04 4.3) | personal, not product |
 | OS packages tied to libc/root (git, curl, ca-certificates, sudo) | the workload base; gaps, if A12 finds any, in `os-base` | rarely change |

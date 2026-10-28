@@ -291,10 +291,10 @@ module whose id is no directory name owns the paths its row gives.
 | `memstore` | the memory store in two packages (08 8.1): the shared readers on `os.Root` with the layout allowlist, and julieta's `memstore/write` with the `Store` and the `fs` backend's writes | spec, canon |
 | `julieta-core` | setup, repos, install/lock (mise), hooks and recorded failures, status, spec and catalog validation, `pin workload` and `pin check`, version and compatibility (its directories: `internal/manifest`, `internal/mise`, `internal/hooks`, `internal/agent/claude` and the command packages under `internal/cmd/julieta/`) | spec, gitsafe, catalog, oci, cli |
 | `layout` | run layout to herdr `layout.apply`, pane step runner | spec |
-| `handoff` | handoff write/show/list, the handoff reader, SessionStart output | memstore, gitsafe |
+| `stamp` | `julieta stamp`, the stamp of 03 3.10, `memory index` and its SessionStart output | memstore, gitsafe |
 | `salvage` | julieta snapshot/salvage; romeu verification and ref import | gitsafe, memstore, state |
 | `kits` | `kits/*` sources and their embedding | kitpin, julieta-core |
-| `skills` | `skills/julieta`, `skills/handoff` | handoff, memstore |
+| `skills` | `skills/julieta`, `skills/handoff` | stamp, memstore |
 | `ci-release` | `REQ-1087` the remaining `tools/ci` checks, workflows, `tools/release` and release notes, except `tools/release build --dry-run`, which lands with the sync slice for smoke step 1; `SECURITY.md`, in or before the pull request that lands the rule 20 check of `tools/ci docs`, whose rule 20 check needs the page, and the `README.md` skeleton with the heading order of rule 12, since both put their heading lists in `tools/ci/headings.yaml`, which the rule of 11 11.2 does not let change after the candidate | all |
 | `docs` | `REQ-1088` README text and guides before the release candidate, so block B runs each guide as written; then the ADRs this specification still owes (12.5); reference pages are generated | all |
 
@@ -410,8 +410,8 @@ merged tree. `REQ-1105` This table is the one inventory of generated files;
 
 `REQ-1115` Every julieta command and flag a `SKILL.md` names exists in the command
 definitions, and the headings the handoff skill names are the headings
-`julieta handoff write` requires for each kind, both checked by one
-test (the docs row of [10 10.2](10-testing-style.md#102-ci)).
+`julieta memory add` requires of a `handoff` entry, and of a `tombstone`
+one (03 3.9), both checked by one test (the docs row of [10 10.2](10-testing-style.md#102-ci)).
 
 `REQ-1255` Each skill under `skills/` follows the progressive disclosure
 of skill-creator
@@ -955,6 +955,8 @@ row.
 
 | Id | Retired on | Last text | Replaced by |
 |---|---|---|---|
+| `REQ-0245` | 2026-10-28 | Kinds `clear` and `final` require the headings (six for `final`); `facts` has no body. julieta stamps everything in the front matter | REQ-1297 (03 3.9): the headings of a `handoff` entry and of a `tombstone` one; a stamp file has no body by its schema (03 3.10) |
+| `REQ-0415` | 2026-10-28 | list handoffs | REQ-1293 (04 4.3): `julieta memory list --tag handoff` |
 | `REQ-0033` | 2026-10-12 | `romeu` materializes those specs into one host tree (`$ROMEU_ROOT`, default `$HOME/dev`): plain clones (never submodules), generated `sbxenv.yaml`, per-repo memory directories, generated VS Code workspace files | none: an objective of 00 0.1, which explains; the obligations are the tree rules of 02 2.3 |
 | `REQ-0036` | 2026-10-12 | Every file carries an SPDX header (`SPDX-License-Identifier` plus `SPDX-FileCopyrightText`) or is covered by `REUSE.toml`; the repo is REUSE 3.3 compliant and `reuse lint` runs in `tools/ci` | REQ-0016, the S11 row of the index, which 00 0.4 cites |
 | `REQ-0139` | 2026-10-12 | at most one unapproved candidate (`sbxenv.yaml`, `render.json`, `kits/`); never referenced by a live file | REQ-0084 (01 1.6), which the tree rules of 02 2.3 cite |
