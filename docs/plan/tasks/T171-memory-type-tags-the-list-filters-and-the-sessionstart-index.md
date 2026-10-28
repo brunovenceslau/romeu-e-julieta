@@ -34,10 +34,12 @@ not wait for T166. The generated pages `docs/reference/julieta/memory/*.md`
 are regenerated (rule 1).
 
 1. Type tags (REQ-0242, REQ-1287, REQ-1292). `user`, `feedback`,
-   `project` and `reference` are the closed set of tags with behaviour;
-   `lesson` has none from now on. Every entry carries exactly one: `add`
-   without one, `add` or `edit` with two, and an `edit` that would leave
-   none, is a usage error (exit 2) that names the four. An entry file
+   `project`, `reference` and `handoff` are the closed set of tags with
+   behaviour; `lesson` has none from now on. Every entry carries exactly
+   one: `add` without one, `add` or `edit` with two, and an `edit` that
+   would leave none, is a usage error (exit 2) that names the five. What
+   a `handoff` entry requires beyond that (its headings, its `stamp`,
+   its shared location, one open at a time) is T174's. An entry file
    whose tags hold none is read as it is, listed with the type `-`, and
    never matched by `list --tag`; the first `edit` that gives it a type
    tag is its migration, so no entry file is rewritten by this task. The `memory-content` digest (03 3.12) is
@@ -76,7 +78,7 @@ are regenerated (rule 1).
   skill text once, since it is what every session follows.
 - Acceptance:
   - `add` with no type tag, `add` or `edit` with two, and an `edit`
-    that would leave none, exit 2 and name the four tags; `add --tag
+    that would leave none, exit 2 and name the five tags; `add --tag
     feedback --tag ci` writes an entry
     whose tags are `[ci, feedback]`; an entry file without a type tag,
     planted in `entries/`, is listed with `-` and is left byte for byte

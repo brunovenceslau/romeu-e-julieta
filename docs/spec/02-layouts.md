@@ -33,7 +33,7 @@ romeu-e-julieta/
 │  ├─ sbxdrv/                  sbx argv builders and output parsing
 │  ├─ memstore/                memory readers on os.Root, layout allowlist, caps
 │  ├─ memstore/write/          the Store interface with Put and Delete, fs backend writes, store lock
-│  ├─ stamp/                   the stamp of 03 3.10 and the SessionStart renderer
+│  ├─ handoff/                 the stamp of 03 3.10 and the SessionStart renderer (renamed stamp/ by T174)
 │  ├─ salvage/                 snapshot/salvage (julieta side) and verify/import (romeu side)
 │  ├─ manifest/                the julieta manifest type (03 3.6), marshalled by romeu and decoded by julieta
 │  ├─ mise/                    mise driver

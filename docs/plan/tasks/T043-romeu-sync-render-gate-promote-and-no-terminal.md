@@ -45,6 +45,11 @@ ordered step list and `sync/rules.go` the registered render-time rules
 encoder and the size function come from T135. The helper file it adds to
 the harness of T041 is `e2e/internal/romeu/sync_helpers.go`.
 
+
+Re-plan (2026-10-28): `sync` also creates the project's shared memory
+directory, `memory/_shared/`, 0700, and writes it into the manifest as
+`sharedMemory` (REQ-0646, 03 3.6; ADR 0042, T174).
+
 - Implements: REQ-0012 (index), REQ-0042 (01 1.1), REQ-0044 (01 1.2),
   REQ-0054 (01 1.3), REQ-0055 (01 1.3), REQ-0056 (01 1.3), REQ-0059 (01
   1.4), REQ-0074 (01 1.5), REQ-0082 (01 1.6), REQ-0084 (01 1.6),

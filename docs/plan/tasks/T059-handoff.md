@@ -34,6 +34,10 @@ pr: 213
 Merged on 2026-10-20 in pull request #213. The text below is the one
 written when it was built.
 
+REQ-0245 and REQ-0415, which this task also implemented, were retired on
+2026-10-28 (12 12.11) when the handoff became a memory entry (ADR 0042;
+T174 and T172 carry what they said).
+
 Goal: `handoff write|show|list`, the reader, the SessionStart print and
 its bound, the three gap-line goldens, SessionEnd and SessionStart in
 both orders.
@@ -48,9 +52,8 @@ of `handoff write`, with the store lock, lives in
 `internal/cmd/julieta/handoff`.
 
 - Implements: REQ-0154 (02 2.5), REQ-0168 (03 (opening)), REQ-0242 (03
-  3.9), REQ-0244 (03 3.10), REQ-0245 (03 3.10), REQ-0278 (04 4.1),
-  REQ-0399 (04 4.3), REQ-0413 (04 4.3), REQ-0414 (04 4.3), REQ-0415 (04
-  4.3), REQ-0655 (08 8.1), REQ-0659 (08 8.1), REQ-0664 (08 8.2),
+  3.9), REQ-0244 (03 3.10), REQ-0278 (04 4.1),
+  REQ-0399 (04 4.3), REQ-0413 (04 4.3), REQ-0414 (04 4.3), REQ-0655 (08 8.1), REQ-0659 (08 8.1), REQ-0664 (08 8.2),
   REQ-0667 (08 8.2), REQ-0668 (08 8.2), REQ-0669 (08 8.2), REQ-0670 (08
   8.2), REQ-0677 (08 8.3), REQ-0678 (08 8.3), REQ-0679 (08 8.3),
   REQ-0680 (08 8.3), REQ-0681 (08 8.3), REQ-0682 (08 8.3), REQ-0685 (08

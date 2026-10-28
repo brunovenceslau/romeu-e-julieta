@@ -122,7 +122,7 @@ holds them.
   - `egressApplied` is written before the `allow` calls, and the
     reconcile converges after a kill between two calls.
   - A memory directory that violates the layout allowlist makes `run`
-    exit 2 (I24); a `handoff/` over its cap makes the command warn and
+    exit 2 (I24); a `stamps/` over its cap makes the command warn and
     not refuse.
   - A protocol mismatch, a `SHA256SUMS` mismatch and a writable bin
     mount each stop `run` with exit 2 and `julieta-protocol`,

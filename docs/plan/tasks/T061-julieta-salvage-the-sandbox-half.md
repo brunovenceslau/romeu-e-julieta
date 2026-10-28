@@ -71,7 +71,7 @@ yet.
   - Salvage commits carry no signature with `commit.gpgsign=true` set
     (I18).
   - After `--stop-agents`, salvage waits on the store lock of every
-    manifest memory dir; a facts handoff written while it waits is in
+    manifest memory dir; a stamp written while it waits is in
     the dir and is not counted for completeness; while it waits more
     than 10 s on a store lock it prints the lock's path on stderr and in
     `--json` progress; the wait has no bound.
