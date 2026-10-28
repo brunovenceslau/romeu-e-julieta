@@ -3,7 +3,7 @@ id: T171
 title: "memory type tags, the list filters and the SessionStart index"
 milestone: M2
 module: memstore
-fate: new
+fate: merged
 owns:
   - internal/memstore/entry*.go
   - internal/memstore/memstore.go
@@ -19,6 +19,8 @@ after: []
 ask_first:
   - kits
 sitting: none
+merged: 2026-10-28
+pr: 292
 ---
 
 # T171 - memory type tags, the list filters and the SessionStart index
