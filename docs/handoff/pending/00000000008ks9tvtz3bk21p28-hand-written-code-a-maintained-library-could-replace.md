@@ -23,7 +23,7 @@ library was not checked online. In the order of ADR 0038, decision 5:
    `github.com/invopop/jsonschema` (03-formats says "no dependency";
    read again under ADR 0038, 3). Planned on 2026-10-23 as T166, with
    the question of `null` for a pointer: a member with no value is
-   omitted (REQ-1273, 03 3.7). Kept by T166 (#PRNUM) on 2026-10-28,
+   omitted (REQ-1273, 03 3.7). Kept by T166 (#296) on 2026-10-28,
    measured against `github.com/invopop/jsonschema` v0.14.0. It reads
    pointers without null and `omitempty`/`omitzero` as not required, as
    REQ-1273 wants, and of the nine schemas it wrote before it stopped on
