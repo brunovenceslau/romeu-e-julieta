@@ -408,12 +408,14 @@ type InteractiveSessions struct {
 	Prompt []string `json:"prompt,omitempty"`
 	// Resume reopens a named session.
 	Resume []string `json:"resume,omitempty"`
-	// Continue reopens the latest session.
-	Continue []string `json:"continue,omitempty"`
-	// NewSession opens a new session.
-	NewSession []string `json:"newSession,omitempty"`
-	// SessionPicker opens the agent's own session picker.
-	SessionPicker []string `json:"sessionPicker,omitempty"`
+	// Continue reopens the latest session; an empty list is the launch
+	// argv alone, and nil is a verb not offered.
+	Continue *[]string `json:"continue,omitzero"`
+	// NewSession opens a new session, kept as Continue is.
+	NewSession *[]string `json:"newSession,omitzero"`
+	// SessionPicker opens the agent's own session picker, kept as
+	// Continue is.
+	SessionPicker *[]string `json:"sessionPicker,omitzero"`
 	// List enumerates the resumable sessions.
 	List *Command `json:"list,omitzero"`
 	// Optional is the request's optional flag.

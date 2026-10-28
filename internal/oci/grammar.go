@@ -118,6 +118,9 @@ func parseTree(data []byte) (map[string]any, error) {
 	if err != nil {
 		return nil, invalid("%s", err)
 	}
+	if err := checkNul(tree); err != nil {
+		return nil, invalid("%s", err)
+	}
 	return tree.(map[string]any), nil
 }
 
@@ -139,7 +142,39 @@ func jsonTree(data []byte) (map[string]any, error) {
 	if err := checkJSON(tree, 0, &nodes); err != nil {
 		return nil, invalid("%s", err)
 	}
+	if err := checkNul(tree); err != nil {
+		return nil, invalid("%s", err)
+	}
 	return tree, nil
+}
+
+// checkNul returns why the tree v holds U+0000 in a key or a string, at
+// any depth: the kit schema's root rule noNul, which covers the config of
+// every capability type (kit.schema.json at kitSpecTag), so no field's
+// own rule needs to say it.
+func checkNul(v any) error {
+	switch v := v.(type) {
+	case string:
+		if strings.ContainsRune(v, 0) {
+			return errors.New("a string holds NUL (U+0000)")
+		}
+	case map[string]any:
+		for k, c := range v {
+			if strings.ContainsRune(k, 0) {
+				return errors.New("a key holds NUL (U+0000)")
+			}
+			if err := checkNul(c); err != nil {
+				return err
+			}
+		}
+	case []any:
+		for _, c := range v {
+			if err := checkNul(c); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // checkNumbers returns why a number of the JSON document is past 2^53:

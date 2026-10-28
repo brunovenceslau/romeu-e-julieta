@@ -6,6 +6,7 @@ package oci
 import (
 	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -673,6 +674,9 @@ func (b *builder) port(cfg jsontext.Value, optional bool) error {
 	if err := b.need("container port", c); err != nil {
 		return err
 	}
+	if d.Family != "" && !isRef(d.Family) && !slices.Contains([]string{"ipv4", "ipv6", "dual"}, d.Family) {
+		return invalid("%s: family is not ipv4, ipv6 or dual", b.at)
+	}
 	b.caps.Ports = append(b.caps.Ports, Port{Name: d.Name, Container: c, Transport: d.Transport, Family: d.Family, Optional: optional})
 	return nil
 }
@@ -837,30 +841,49 @@ func (c *Capabilities) sort() {
 	c.Flags = sortedSet2(c.Flags)
 }
 
-// interactiveSessions adds an agent-interactive-sessions@1.
+// interactiveSessions adds an agent-interactive-sessions@1. A present
+// empty continue, newSession or sessionPicker is the launch argv alone,
+// and an absent one is a verb the workload does not offer, so the set
+// keeps the two apart; prompt and resume, when present, hold the
+// {{.Prompt}} or {{.SessionID}} placeholder, or a kit arg in its place.
 func (b *builder) interactiveSessions(cfg jsontext.Value, optional bool) error {
 	if err := b.singleton(b.caps.InteractiveSessions != nil); err != nil {
 		return err
 	}
 	var d struct {
-		Prompt        []string       `json:"prompt"`
-		Resume        []string       `json:"resume"`
-		Continue      []string       `json:"continue"`
-		NewSession    []string       `json:"newSession"`
-		SessionPicker []string       `json:"sessionPicker"`
+		Prompt        *[]string      `json:"prompt"`
+		Resume        *[]string      `json:"resume"`
+		Continue      *[]string      `json:"continue"`
+		NewSession    *[]string      `json:"newSession"`
+		SessionPicker *[]string      `json:"sessionPicker"`
 		List          jsontext.Value `json:"list"`
 	}
 	if err := strict(b, cfg, &d); err != nil {
 		return err
 	}
-	if len(d.Prompt) == 0 && len(d.Resume) == 0 && len(d.Continue) == 0 && len(d.NewSession) == 0 &&
-		len(d.SessionPicker) == 0 && len(d.List) == 0 {
+	if d.Prompt == nil && d.Resume == nil && d.Continue == nil && d.NewSession == nil && d.SessionPicker == nil && len(d.List) == 0 {
 		return invalid("%s declares no verb", b.at)
 	}
-	s := &InteractiveSessions{Prompt: d.Prompt, Resume: d.Resume, Continue: d.Continue, NewSession: d.NewSession,
-		SessionPicker: d.SessionPicker, Optional: optional}
+	for _, v := range []struct {
+		name, placeholder string
+		argv              *[]string
+	}{{"prompt", "{{.Prompt}}", d.Prompt}, {"resume", "{{.SessionID}}", d.Resume}} {
+		if v.argv == nil {
+			continue
+		}
+		if !slices.ContainsFunc(*v.argv, func(a string) bool { return strings.Contains(a, v.placeholder) || isRef(a) }) {
+			return invalid("%s: %s holds no %s", b.at, v.name, v.placeholder)
+		}
+	}
+	s := &InteractiveSessions{Continue: d.Continue, NewSession: d.NewSession, SessionPicker: d.SessionPicker, Optional: optional}
+	if d.Prompt != nil {
+		s.Prompt = *d.Prompt
+	}
+	if d.Resume != nil {
+		s.Resume = *d.Resume
+	}
 	if len(d.List) > 0 {
-		c, err := b.command(d.List)
+		c, err := b.runnable("list", d.List)
 		if err != nil {
 			return err
 		}
@@ -870,7 +893,25 @@ func (b *builder) interactiveSessions(cfg jsontext.Value, optional bool) error {
 	return nil
 }
 
-// acp adds an acp@1: an agent and its command are required.
+// runnable reads a command that must run something: a shell string that
+// is not blank, or an argv whose first element is not.
+func (b *builder) runnable(name string, v jsontext.Value) (Command, error) {
+	c, err := b.command(v)
+	if err != nil {
+		return Command{}, err
+	}
+	if strings.TrimSpace(c.Shell) == "" && (len(c.Argv) == 0 || strings.TrimSpace(c.Argv[0]) == "") {
+		return Command{}, invalid("%s: %s runs nothing", b.at, name)
+	}
+	return c, nil
+}
+
+// envName is the form of an environment variable's name.
+var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// acp adds an acp@1: an agent and its command are required, the agent
+// once per descriptor, since the type is keyed on it; the protocol
+// version is a whole number above zero or a kit arg.
 func (b *builder) acp(cfg jsontext.Value, optional bool) error {
 	var d struct {
 		Agent           string            `json:"agent"`
@@ -884,20 +925,38 @@ func (b *builder) acp(cfg jsontext.Value, optional bool) error {
 	if err := b.need("agent", d.Agent); err != nil {
 		return err
 	}
-	c, err := b.command(d.Command)
+	if slices.ContainsFunc(b.caps.ACP, func(a ACP) bool { return a.Agent == d.Agent }) {
+		return invalid("%s: the agent %s is declared twice", b.at, quote(d.Agent))
+	}
+	c, err := b.runnable("command", d.Command)
 	if err != nil {
 		return err
+	}
+	for k := range d.Env {
+		if !envName.MatchString(k) {
+			return invalid("%s: the env name %s is not of the form [A-Za-z_][A-Za-z0-9_]*", b.at, quote(k))
+		}
 	}
 	v, err := b.scalar("protocolVersion", d.ProtocolVersion)
 	if err != nil {
 		return err
 	}
+	if v != "" && !isRef(v) {
+		if n, err := strconv.Atoi(v); err != nil || n < 1 {
+			return invalid("%s: protocolVersion is not a whole number above zero", b.at)
+		}
+	}
 	b.caps.ACP = append(b.caps.ACP, ACP{Agent: d.Agent, Command: c, Env: d.Env, ProtocolVersion: v, Optional: optional})
 	return nil
 }
 
+// profileDir is the form of an agent-context@2 directory: an absolute
+// path with no empty, "." or ".." element.
+var profileDir = regexp.MustCompile(`^(/|(/([^./][^/]*|\.[^./][^/]*|\.\.[^/]+))+)$`)
+
 // agentContext2 adds an agent-context@2: inline content, a filename, or
-// both, and a directory only with a filename.
+// both; a directory only with a filename, and then an absolute clean
+// path, with a filename that is one name (or a kit arg in either place).
 func (b *builder) agentContext2(cfg jsontext.Value, optional bool) error {
 	var d struct {
 		Filename  string `json:"filename"`
@@ -910,8 +969,16 @@ func (b *builder) agentContext2(cfg jsontext.Value, optional bool) error {
 	if d.Filename == "" && d.Content == "" {
 		return invalid("%s declares neither a filename nor content", b.at)
 	}
-	if d.Directory != "" && d.Filename == "" {
-		return invalid("%s sets a directory without a filename", b.at)
+	if d.Directory != "" {
+		if d.Filename == "" {
+			return invalid("%s sets a directory without a filename", b.at)
+		}
+		if !isRef(d.Directory) && (!profileDir.MatchString(d.Directory) || strings.Contains(d.Directory, "\\")) {
+			return invalid("%s: the directory is not an absolute path with no ., .. or empty element", b.at)
+		}
+		if !isRef(d.Filename) && (strings.ContainsAny(d.Filename, "/\\") || d.Filename == "." || d.Filename == "..") {
+			return invalid("%s: the filename is not one name", b.at)
+		}
 	}
 	b.caps.Context = append(b.caps.Context, Context{Filename: d.Filename, Content: d.Content, Directory: d.Directory, Version: 2, Optional: optional})
 	return nil

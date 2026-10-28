@@ -6,7 +6,9 @@ the tag `v3.0.0-m.11` (commit
 `92835bb7934a3e2e2bbb7e85b1d72dee24a0f00c`; the annotated tag object is
 `589ed3603a865e0de3d41af361b7aff166108155`), fetched from
 `https://github.com/docker/sandbox-kit-spec/tarball/v3.0.0-m.11`
-on 2026-10-28. It is Apache-2.0, `Copyright 2026 Docker, Inc.`;
+on 2026-10-28; the schema hint of a descriptor still names the files at
+`https://raw.githubusercontent.com/docker/sandbox-kit-spec/v3.0.0-m.11/schema/`
+(kitSpecURL), the same bytes. It is Apache-2.0, `Copyright 2026 Docker, Inc.`;
 `REUSE.toml` here records it. This product includes software developed
 at Docker, Inc. One change was made: in
 `schema/capabilities/com.docker.sandbox/network-policy@2.schema.json`
