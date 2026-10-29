@@ -11,6 +11,7 @@ needs:
 after: []
 ask_first:
   - checks
+  - formats
 sitting: none
 ---
 
