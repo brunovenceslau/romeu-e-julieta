@@ -33,7 +33,7 @@ T043's last slice calls Split before the derivation.
    host allowed at install only (the julieta kit chose the install phase
    so the runtime would not open `github.com`) is open at runtime too.
 
-- Implements: REQ-0069 (01 1.3).
+- Implements: REQ-0069 (01 1.4).
 - Operator: no.
 - Acceptance:
   - A table test of Split: a port stripped, upper case lowered, a
