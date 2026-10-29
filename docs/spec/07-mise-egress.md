@@ -157,7 +157,8 @@ Input per repo: `(url, egressCommit)`. Output: `auto` and `gated` sets.
    `egress.Split`, which strips a numeric port, lowers the case and
    refuses a host that is no egress domain, naming the kit
    (REQ-0069). `REQ-1315` Only the hosts of the runtime phase enter the
-   derivation; the hosts of the install phase stay apart, since the
+   derivation, for every descriptor step 6 reads (the workload's and
+   each kit's); the hosts of the install phase stay apart, since the
    rules of this derivation last the life of the sandbox and an install
    host in them would stay open to the agent: `github.com`, which the
    `julieta` kit needs at install alone (REQ-0592), takes gists,
@@ -167,10 +168,12 @@ Input per repo: `(url, egressCommit)`. Output: `auto` and `gated` sets.
    (REQ-0569). Measured at sitting M0 (sbx v0.48.0): the install
    steps run inside the sandbox, once at create and before the agent,
    and the proxy refuses an undeclared host there. Not measured yet:
-   that sbx allows a host of the install phase during the install and
-   closes it before the agent starts. The first real `sbx` build of
-   the `julieta` or `os-base` kit measures all three on the sbx it runs
-   (the host ran v0.50.1 on 2026-10-29, after M0); if the install
+   that sbx reads the install phase of `network-policy@1`, that it
+   allows a host of that phase during the install, and that it closes
+   it before the agent starts. The first real `sbx` build of the
+   `julieta` or `os-base` kit measures these three, and the facts of
+   M0 again, on the sbx it runs (the host ran v0.50.1 on 2026-10-29,
+   after M0); until then this rule is provisional, and if the install
    cannot reach its hosts, or a host still answers at runtime, this
    rule and the kits are revisited (decided on 2026-10-29, scope this
    repository).

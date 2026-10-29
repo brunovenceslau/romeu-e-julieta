@@ -171,7 +171,9 @@ parsed with the strict subset grammar of
 [03](03-formats.md) (opening), and any key or capability type the model
 does not know is a sync error (fail closed); a capability type sbx adds
 after v1 is a row of [Deferred decisions](../spec.md#in-the-product). `REQ-0069` Kit-declared network domains go through `egress.Split`,
-so upload-capable ones appear in `egressGated`. `REQ-0070` A personal kit that
+so upload-capable ones of the runtime phase appear in `egressGated`;
+those of the install phase stay out of the derivation
+([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress), step 6). `REQ-0070` A personal kit that
 declares a network, mount, volume, credential or ssh-agent capability
 is refused (sync error). Its other capabilities (install steps,
 privileges, lifecycle hooks) are not refused: they are shown in the
