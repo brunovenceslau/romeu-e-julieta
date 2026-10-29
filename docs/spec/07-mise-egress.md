@@ -153,7 +153,33 @@ Input per repo: `(url, egressCommit)`. Output: `auto` and `gated` sets.
 4. `REQ-0632` Add `meta` and `base` sets, `tuf-repo-cdn.sigstore.dev` of 7.4 among the `meta` domains.
 5. Add spec `egress.extra` to `gated`.
 6. Add kit-declared network domains (from the normalized capability
-   sets, [06](06-kits.md#61-decisions)).
+   sets, [06](06-kits.md#61-decisions)), each host through
+   `egress.Split`, which strips a numeric port, lowers the case and
+   refuses a host that is no egress domain, naming the kit
+   (REQ-0069). `REQ-1315` Only the hosts of the runtime phase enter the
+   derivation, for every descriptor step 6 reads (the workload's and
+   each kit's); the hosts of the install phase stay apart. sbx opens
+   them for the install alone: the install steps run inside the
+   sandbox, once at create and before the agent, and the agent's
+   requests to an install host are refused. A host the kit needs at
+   runtime too is declared in the runtime phase. The install hosts
+   still go through `egress.Split` and are shown in gate 2 with the
+   capability set (REQ-0569). sbx applies the runtime hosts of the
+   descriptors itself, with their ports, as a rule of the sandbox that
+   no `sbx policy` call made or can edit, so gate 2, which approves
+   the capability set, is what lets one in; the derivation keeps them
+   for the gate's upload flag (step 7), the digest (step 8) and the
+   applied set the manifest lists, and romeu does not apply a domain
+   that only a descriptor declared (REQ-1316).
+   Measured on 2026-10-29 with sbx v0.50.1 (a probe kit with
+   `example.com:443` in its install phase and `example.org:443` in its
+   runtime phase): during the install both answered and an undeclared
+   host was refused; at runtime the install host and the undeclared
+   host were refused, and the runtime host answered through the rule
+   `kit:<sandbox>` that sbx provisioned (`editable: false`). Sitting
+   M0 (sbx v0.48.0) measured the same refusal at install. Reopened by
+   an sbx version whose recording shows another behaviour (decided on
+   2026-10-29, scope this repository).
 7. Move every domain with `upload: true`, or without a `domains` entry,
    to `gated`.
 8. `REQ-0633` `effectiveDigest` = `canon.Digest(canon.Egress, sorted union)`; recorded
@@ -181,7 +207,11 @@ would mean running mise on the host.
 approved `gated`; removal via `sbx policy rm network --sandbox <name>
 --resource <domain>` for domains romeu applied earlier and that left the set;
 verification with `sbx policy check network --sandbox <name> <domain>`
-(exact argv from the block A recordings).
+(exact argv from the block A recordings). `REQ-1316` The domains that
+only the descriptors declared (step 6) are not applied, removed or
+checked by romeu: sbx applies them from the descriptor, and a rule
+romeu added for one would widen it, since a rule with no port opens
+every port of the domain (measured on 2026-10-29, sbx v0.50.1).
 `REQ-0635` Applied on create (before `julieta setup`), on every `run` (re-applies
 after an `sbx reset`), and on `sync` for a running sandbox. `REQ-0636` The
 manifest carries the applied set

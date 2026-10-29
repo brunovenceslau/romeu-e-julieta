@@ -102,7 +102,11 @@ row of REQ-0048 say so in place of the write of each promotion
 `gate.Confirm` and `Diff.WriteTo`, is deleted with its tests, and the
 mentions of it in `prompt.go` and `diff.go` go with it. The promotion
 failing closed on the candidate digest, and an edited kit dir under
-`--overwrite-drift`, are T189's, after this task.
+`--overwrite-drift`, are T189's, after this task. From T184
+(2026-10-29): `declared` in `step6_render.go` passes each kit's hosts
+through `egress.Split` and gives the derivation the runtime phase alone
+(REQ-1315, 07 7.5); a test holds that a host of the install phase is not
+in the derived set.
 
 Re-plan (2026-10-28): `sync` also creates the project's shared memory
 directory, `memory/_shared/`, 0700 (REQ-0646, REQ-0140, 03 3.3; ADR
@@ -135,7 +139,8 @@ member and the mount this note gave this task).
   6.4), REQ-0642 (08 8.1), REQ-0643 (08 8.1), REQ-0646 (08 8.1),
   REQ-0736 (10 10.1), REQ-0775 (10 10.1), REQ-1109 (12 12.3), REQ-1207
   (01 1.6), REQ-1208 (01 1.6), REQ-1209 (01 1.6), REQ-1210 (01 1.6),
-  REQ-1211 (01 1.6), REQ-1221 (04 4.2), REQ-1222 (05 5.2).
+  REQ-1211 (01 1.6), REQ-1221 (04 4.2), REQ-1222 (05 5.2), REQ-1315
+  (07 7.5).
 - Operator: no.
 - Acceptance:
   - In the e2e with the fake `sbx`, a first `sync` on a terminal
