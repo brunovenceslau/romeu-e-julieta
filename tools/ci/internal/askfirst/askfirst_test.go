@@ -312,6 +312,13 @@ func TestApprovalsSurface(t *testing.T) {
 // against a name of thirty segments, both ways. Before the table it
 // tried every split of the name, and the run did not end; no clock
 // bounds the test, since a hang fails it at go test's own timeout.
+func TestGlobMatchOfManyDoubleStars(t *testing.T) {
+	glob := strings.Repeat("**/", 30) + "zzz"
+	name := strings.TrimSuffix(strings.Repeat("d/", 30), "/")
+	assert.False(t, GlobMatch(glob, name))
+	assert.True(t, GlobMatch(glob, name+"/zzz"))
+}
+
 // TestGlobsMeet holds GlobsMeet to GlobMatch: two globs meet when some
 // name matches both, and the pairs below name one (or say why none is).
 func TestGlobsMeet(t *testing.T) {
@@ -364,11 +371,4 @@ func TestGlobsMeetOfManyDoubleStars(t *testing.T) {
 	b := strings.Repeat("d/**/", 30) + "yyy"
 	assert.False(t, GlobsMeet(a, b))
 	assert.True(t, GlobsMeet(a, b+"/zzz"))
-}
-
-func TestGlobMatchOfManyDoubleStars(t *testing.T) {
-	glob := strings.Repeat("**/", 30) + "zzz"
-	name := strings.TrimSuffix(strings.Repeat("d/", 30), "/")
-	assert.False(t, GlobMatch(glob, name))
-	assert.True(t, GlobMatch(glob, name+"/zzz"))
 }

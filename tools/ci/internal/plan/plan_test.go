@@ -157,11 +157,24 @@ func TestFindings(t *testing.T) {
 			want:  []string{"T001 and T002 both own internal/b/new.go, and no needs or after orders them"}},
 		{name: "two unordered open tasks own globs that meet in a file neither has made",
 			tasks: []spec{{id: "T001", owns: []string{"internal/c/migrate*.go"}}, {id: "T002", owns: []string{"internal/c/*_test.go"}}},
-			want:  []string{"T001 and T002 both own a path of both internal/c/migrate*.go and internal/c/*_test.go, and no needs or after orders them"}},
+			want:  []string{"T001 and T002 both own a path that internal/c/migrate*.go and internal/c/*_test.go both match, and no needs or after orders them"}},
 		{name: "two globs that no path matches both are no overlap",
 			tasks: []spec{{id: "T001", owns: []string{"internal/c/kits*.go"}}, {id: "T002", owns: []string{"internal/c/promote*.go", "internal/d/*_test.go"}}}},
 		{name: "a glob that names a generated output meets no other",
 			tasks: []spec{{id: "T001", owns: []string{"docs/reference/**"}}, {id: "T002", owns: []string{"docs/reference/*.md"}}}},
+		{name: "a generated glob on the first side meets no other",
+			tasks: []spec{{id: "T001", owns: []string{"docs/reference/**"}}, {id: "T002", owns: []string{"docs/**"}}}},
+		{name: "a generated glob on the second side meets no other",
+			tasks: []spec{{id: "T001", owns: []string{"docs/**"}}, {id: "T002", owns: []string{"docs/reference/**"}}}},
+		{name: "a literal of the first task that a glob of the second matches",
+			tasks: []spec{{id: "T001", owns: []string{"internal/b/new.go"}}, {id: "T002", owns: []string{"internal/b/**"}}},
+			want:  []string{"T001 and T002 both own internal/b/new.go, and no needs or after orders them"}},
+		{name: "a literal is named before two globs that meet earlier in the pair",
+			tasks: []spec{{id: "T001", owns: []string{"internal/c/x_*.go", "internal/e/f.go"}}, {id: "T002", owns: []string{"internal/c/*_test.go", "internal/e/*.go"}}},
+			want:  []string{"T001 and T002 both own internal/e/f.go, and no needs or after orders them"}},
+		{name: "an owns entry longer than the bound",
+			tasks: []spec{{id: "T001", owns: []string{"internal/" + strings.Repeat("a", 260) + ".go"}}},
+			want:  []string{"an owns entry is longer than 256 bytes"}},
 		{name: "an edge orders two globs that meet",
 			tasks: []spec{{id: "T001", owns: []string{"internal/c/migrate*.go"}}, {id: "T002", after: []string{"T001"}, owns: []string{"internal/c/*_test.go"}}}},
 		{name: "an edge through another task orders the pair",
@@ -403,4 +416,15 @@ func TestOverlapOfManyDoubleStars(t *testing.T) {
 	deep := strings.TrimSuffix(strings.Repeat("d/", 30), "/")
 	got := messages(t, tree([]spec{{id: "T001", owns: []string{strings.Repeat("**/", 16) + "zzz"}}, {id: "T002", owns: []string{deep + "/zzz"}}}))
 	assert.Equal(t, []string{"T001 and T002 both own " + deep + "/zzz, and no needs or after orders them"}, got)
+}
+
+// TestGeneratedHasNoLoneStarSegment holds the skip of rule 3 to what
+// it means: shared leaves out an owns entry that a Generated glob
+// matches as text, and a lone "*" segment of a Generated glob would
+// match an entry's "**" (gen/* against gen/**), skipping an entry that
+// also covers paths deeper than any generated output.
+func TestGeneratedHasNoLoneStarSegment(t *testing.T) {
+	for _, g := range Generated {
+		assert.NotContains(t, strings.Split(g, "/"), "*", g)
+	}
 }

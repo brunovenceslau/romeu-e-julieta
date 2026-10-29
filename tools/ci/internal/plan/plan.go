@@ -43,6 +43,11 @@ const maxImplements = 40
 // a re-plan.
 var OverCap = []string{"T001", "T002", "T005", "T008", "T021", "T033", "T043", "T049", "T051", "T061", "T066", "T068", "T069"}
 
+// maxOwns is the longest owns entry, in bytes: rule 3 compares two
+// entries in time and memory that grow with the product of their
+// lengths, so an entry is bounded; the longest of 2026-10-28 is 108.
+const maxOwns = 256
+
 // Fates of the plan's field table. open are the fates of a task that
 // is still to be built; read are the fates whose Implements line counts
 // (the coverage half of reqs reads the same ones).
@@ -200,6 +205,10 @@ func parse(p string, content []byte) (*Task, []check.Finding) {
 				// An owns entry is a glob of the dialect of the ask-first
 				// list; one that is not is a finding and matches nothing.
 				for _, g := range list {
+					if len(g) > maxOwns {
+						findings = append(findings, find(where, fmt.Sprintf("an owns entry is longer than %d bytes", maxOwns)))
+						continue
+					}
 					if err := askfirst.CheckGlob(g); err != nil {
 						findings = append(findings, find(where, "an owns entry is not a glob of "+askFirstPath+": "+err.Error()))
 						continue
@@ -650,7 +659,7 @@ func shared(a, b Task, owned map[string][]string, isGenerated func(string) bool)
 			case literal(h):
 				return h, true
 			case globs == "":
-				globs = fmt.Sprintf("a path of both %s and %s", g, h)
+				globs = fmt.Sprintf("a path that %s and %s both match", g, h)
 			}
 		}
 	}

@@ -215,6 +215,7 @@ func meet[T comparable](x, y []T, star T, compatible func(T, T) bool) bool {
 		for j := len(y); j >= 0; j-- {
 			switch {
 			case i == len(x) && j == len(y):
+				// Set above: both lists are matched to their ends.
 			case i < len(x) && x[i] == star:
 				// The star matches nothing more, or the element y[j]
 				// matches (or y[j] is a star that matches nothing).
