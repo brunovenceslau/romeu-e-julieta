@@ -179,11 +179,11 @@ func TestFromDefaultsToOrigin(t *testing.T) {
 
 func TestAStepNotBuiltStopsTheRun(t *testing.T) {
 	list := slices.Clone(steps)
-	for i := range 4 {
+	for i := range 5 {
 		list[i].do = func(context.Context, *run) error { return nil }
 	}
 	err := runSteps(context.Background(), newRun(&cli.Env{}, flags{}), list)
-	if !errors.Is(err, errNotBuilt) || !strings.Contains(err.Error(), "step 5") {
-		t.Fatalf("got %v, want step 5 not built", err)
+	if !errors.Is(err, errNotBuilt) || !strings.Contains(err.Error(), "step 6") {
+		t.Fatalf("got %v, want step 6 not built", err)
 	}
 }

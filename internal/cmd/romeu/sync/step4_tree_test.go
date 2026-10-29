@@ -204,8 +204,8 @@ func TestMakeTreeAgainChangesNothing(t *testing.T) {
 func TestMakeTreeKeepsWhatExists(t *testing.T) {
 	h := treeRun(t)
 	files := map[string]fs.FileMode{
-		"memory/shop-api/entries/01JAAAAAAAAAAAAAAAAAAAAAAA.md": 0o644,
-		"memory/shop-api/handoff/01JAAAAAAAAAAAAAAAAAAAAAAB-clear.md": 0o600,
+		"memory/shop-api/entries/01j9z3k8m6t2q4w5e7r9y1v3k5.md": 0o644,
+		"memory/shop-api/handoff/01j9z3k8m6t2q4w5e7r9y1v3k6-clear.md": 0o600,
 		"memory/shop-api/snapshot/repo.bundle": 0o600,
 		neverIndex: 0o644,
 	}
