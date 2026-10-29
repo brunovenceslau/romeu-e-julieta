@@ -102,11 +102,7 @@ func (l Live) Promote(c Candidate) error {
 	if found && live.Promoting != nil {
 		return ErrPromotionInterrupted
 	}
-	data, err := root.ReadFile(path.Join(candidateDir(id), CandidateRecord))
-	if err != nil {
-		return fmt.Errorf("render: read the candidate's render.json: %w", err)
-	}
-	rec, err := DecodeRecord(data)
+	next, err := readCandidateRecord(root, candidateDir(id))
 	if err != nil {
 		return err
 	}
@@ -114,29 +110,36 @@ func (l Live) Promote(c Candidate) error {
 	if err != nil {
 		return err
 	}
-	previous := map[string]string{}
-	if found {
-		previous = live.Files
+	// Step 1 keeps the live record whole and adds the marker, so an
+	// abandoned promotion leaves nothing of the candidate live. Before
+	// the first promotion there is no live record: the candidate's
+	// stands in with no files, since nothing is live to describe.
+	marker := live
+	if !found {
+		marker = next
+		marker.Files = map[string]string{}
 	}
-	rec.Promoting = &Promoting{CandidateID: id, FilesDigest: digest, PreviousFiles: previous}
-	if err := writeLiveRecord(root, rec); err != nil {
+	marker.Promoting = &Promoting{CandidateID: id, FilesDigest: digest, PreviousFiles: maps.Clone(marker.Files)}
+	if err := writeLiveRecord(root, marker); err != nil {
 		return err
 	}
 	if err := l.step(1); err != nil {
 		return err
 	}
-	return l.finish(root, rec)
+	return l.finish(root, next, candidateDir(id))
 }
 
 // Recover finishes or abandons a promotion that render.json says was
 // interrupted (REQ-0087). It runs after the lock in every mutating
-// command. A candidate that still verifies against its filesDigest, or
-// a live sbxenv.yaml that is already the new one (the commit point
-// passed), is finished by repeating steps 2 to 4, each idempotent.
-// Otherwise render.json is written back with the previous digests plus
-// the digests of what step 2 had written, and the result is
-// ErrPromotionAbandoned; the old live sbxenv.yaml and its kit dirs are
-// intact.
+// command. A candidate that still verifies against its filesDigest is
+// finished by repeating steps 2 to 4, each idempotent, with the record
+// the candidate holds, which the digest covers. Otherwise the live
+// record, which step 1 kept whole, is written back without promoting
+// and with the digests of what step 2 had written, and the result is
+// ErrPromotionAbandoned. Before the commit point the old live
+// sbxenv.yaml and its kit dirs are intact; after it, the live
+// sbxenv.yaml is the approved candidate's, and the next drift check
+// names it, since no trusted digest of it is left.
 func (l Live) Recover() (Recovery, error) {
 	root, err := os.OpenRoot(l.EnvDir)
 	if err != nil {
@@ -147,21 +150,22 @@ func (l Live) Recover() (Recovery, error) {
 	if err != nil || !found || rec.Promoting == nil {
 		return RecoveryNone, err
 	}
+	cand := candidateDir(rec.Promoting.CandidateID)
 	verifies, err := candidateVerifies(root, *rec.Promoting)
 	if err != nil {
 		return RecoveryNone, err
 	}
-	committed, err := liveMatches(root, LiveEnvFile, rec.Files[LiveEnvFile])
-	if err != nil {
-		return RecoveryNone, err
-	}
-	if verifies || committed {
-		if err := l.finish(root, rec); err != nil {
+	if verifies {
+		next, err := readCandidateRecord(root, cand)
+		if err != nil {
+			return RecoveryNone, err
+		}
+		if err := l.finish(root, next, cand); err != nil {
 			return RecoveryNone, err
 		}
 		return RecoveryFinished, nil
 	}
-	if err := abandon(root, rec); err != nil {
+	if err := l.abandon(root, rec); err != nil {
 		return RecoveryNone, err
 	}
 	return RecoveryAbandoned, ErrPromotionAbandoned
@@ -179,29 +183,29 @@ func Interrupted(envDir string) (bool, error) {
 	return found && rec.Promoting != nil, err
 }
 
-// finish runs steps 2 to 4 for rec, the record step 1 wrote.
-func (l Live) finish(root *os.Root, rec Record) error {
-	cand := candidateDir(rec.Promoting.CandidateID)
-	if err := l.writeDerived(root, rec, cand); err != nil {
+// finish runs steps 2 to 4 for next, the candidate's record, whose dir
+// is cand.
+func (l Live) finish(root *os.Root, next Record, cand string) error {
+	if err := l.writeDerived(root, next, cand); err != nil {
 		return err
 	}
 	if err := l.step(2); err != nil {
 		return err
 	}
-	if err := commitEnv(root, rec, cand); err != nil {
+	if err := commitEnv(root, next, cand); err != nil {
 		return err
 	}
 	if err := l.step(3); err != nil {
 		return err
 	}
-	rec.Promoting = nil
-	if err := writeLiveRecord(root, rec); err != nil {
+	next.Promoting = nil
+	if err := writeLiveRecord(root, next); err != nil {
 		return err
 	}
 	if err := removeCandidateDir(root, cand); err != nil {
 		return err
 	}
-	return pruneKitDirs(root, rec.Files)
+	return pruneKitDirs(root, next.Files)
 }
 
 // writeDerived is step 2: each kit dir rec names, copied from the
@@ -254,23 +258,41 @@ func commitEnv(root *os.Root, rec Record, cand string) error {
 	return syncDir(root)
 }
 
-// abandon writes render.json back without promoting: the previous
-// digests, plus each path of the new files whose live content step 2
-// had already written, then deletes the candidate dir.
-func abandon(root *os.Root, rec Record) error {
+// abandon writes the live record back without promoting: the previous
+// digests, plus the digests of what step 2 had written, each read from
+// the live file and trusted without the candidate: the bin files whose
+// content is the julieta this romeu embeds, and each kit dir whose
+// kit-tree digest begins with the 12 hex digits of its own name. Then
+// it deletes the candidate dir.
+func (l Live) abandon(root *os.Root, rec Record) error {
 	files := maps.Clone(rec.Promoting.PreviousFiles)
 	if files == nil {
 		files = map[string]string{}
 	}
-	for p, d := range rec.Files {
-		if p == LiveEnvFile {
-			continue
-		}
+	for p, d := range l.Bin.Files() {
 		ok, err := liveMatches(root, p, d)
 		if err != nil {
 			return err
 		}
 		if ok {
+			files[p] = d
+		}
+	}
+	entries, err := fs.ReadDir(root.FS(), LiveKitsDir)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("render: %w", err)
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if !e.IsDir() || strings.HasPrefix(name, ".tmp-") || !kitDirName.MatchString(name) {
+			continue
+		}
+		p := path.Join(LiveKitsDir, name)
+		d, err := kitDirDigest(root, p)
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(d, name[len(name)-12:]) {
 			files[p] = d
 		}
 	}
@@ -468,6 +490,15 @@ func readLiveRecord(root *os.Root) (rec Record, found bool, err error) {
 		return Record{}, false, err
 	}
 	return rec, true, nil
+}
+
+// readCandidateRecord reads the render.json of the candidate dir cand.
+func readCandidateRecord(root *os.Root, cand string) (Record, error) {
+	data, err := root.ReadFile(path.Join(cand, CandidateRecord))
+	if err != nil {
+		return Record{}, fmt.Errorf("render: read the candidate's render.json: %w", err)
+	}
+	return DecodeRecord(data)
 }
 
 // candidateVerifies reports whether the candidate dir of p still holds

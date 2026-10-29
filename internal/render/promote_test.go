@@ -60,6 +60,12 @@ func candidateFixture(t *testing.T, envDir string, idByte byte, env string, bin 
 	require.NoError(t, os.WriteFile(filepath.Join(dir, render.CandidateEnvFile), []byte(env), 0o600))
 	rec := shopRecord(t)
 	rec.Files = files
+	// Each candidate carries its own metadata, so a test can tell whose
+	// record is live.
+	c0 := "0123456789abcdef"[idByte%16]
+	rec.SpecSource.Commit = strings.Repeat(string(c0), 40)
+	rec.WideningDigest = hexSum[canon.WideningKind](t, c0)
+	rec.RecreateDigest = hexSum[canon.RecreateKind](t, c0)
 	require.NoError(t, render.WriteRecord(c, rec))
 	return c, id
 }
@@ -280,6 +286,12 @@ func TestRecoverAbandonsAPromotionWhoseCandidateNoLongerVerifies(t *testing.T) {
 			for p, d := range before.Files {
 				assert.Equal(t, d, rec.Files[p], p)
 			}
+			// Nothing of the candidate's record is live.
+			assert.Equal(t, before.SpecSource, rec.SpecSource)
+			assert.Equal(t, before.Egress, rec.Egress)
+			assert.Equal(t, before.WideningDigest, rec.WideningDigest)
+			assert.Equal(t, before.RecreateDigest, rec.RecreateDigest)
+			assert.Equal(t, before.CatalogDigest, rec.CatalogDigest)
 			drifted, err := render.CheckDrift(e.envDir)
 			require.NoError(t, err)
 			assert.Empty(t, drifted)
@@ -288,11 +300,18 @@ func TestRecoverAbandonsAPromotionWhoseCandidateNoLongerVerifies(t *testing.T) {
 	}
 }
 
-// After the commit point the new sbxenv.yaml is live: a candidate that
-// no longer verifies cannot undo it, so recovery finishes step 4.
-func TestRecoverFinishesAfterTheCommitPointEvenWhenTheCandidateChanged(t *testing.T) {
+// A double fault: killed after the commit point, then the candidate
+// changed. No trusted digest of the new sbxenv.yaml is left, so the
+// promotion is abandoned and the next drift check names sbxenv.yaml,
+// which a re-sync or --overwrite-drift resolves. The live file is the
+// approved candidate's, so nothing unapproved is live.
+func TestRecoverAbandonsAfterTheCommitPointWhenTheCandidateChanged(t *testing.T) {
 	e := newPromoEnv(t)
-	c, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
+	c0, _ := candidateFixture(t, e.envDir, 1, "env: zero\n", e.bin, kitB("v: 0\n"))
+	require.NoError(t, e.live().Promote(c0))
+	before := readRecord(t, e.envDir)
+
+	c, _ := candidateFixture(t, e.envDir, 2, "env: one\n", e.bin, kitA())
 	l := e.live()
 	render.SetAfterStep(&l, func(n int) error {
 		if n == 3 {
@@ -304,13 +323,46 @@ func TestRecoverFinishesAfterTheCommitPointEvenWhenTheCandidateChanged(t *testin
 	require.NoError(t, os.WriteFile(filepath.Join(c.Dir, render.CandidateEnvFile), []byte("env: tampered\n"), 0o600))
 
 	got, err := e.live().Recover()
-	require.NoError(t, err)
-	assert.Equal(t, render.RecoveryFinished, got)
+	require.ErrorIs(t, err, render.ErrPromotionAbandoned)
+	assert.Equal(t, render.RecoveryAbandoned, got)
 	rec := readRecord(t, e.envDir)
 	assert.Nil(t, rec.Promoting)
+	assert.Equal(t, before.WideningDigest, rec.WideningDigest)
 	drifted, err := render.CheckDrift(e.envDir)
 	require.NoError(t, err)
-	assert.Empty(t, drifted)
+	assert.Equal(t, []string{render.LiveEnvFile}, drifted)
+}
+
+// The first promotion has no live record: step 1 writes the
+// candidate's with no files. Abandoned before the commit point, nothing
+// is live, and the record names only what step 2 wrote.
+func TestRecoverAbandonsTheFirstPromotion(t *testing.T) {
+	for step := 1; step <= 2; step++ {
+		t.Run(stepName(step), func(t *testing.T) {
+			e := newPromoEnv(t)
+			c, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
+			l := e.live()
+			render.SetAfterStep(&l, func(n int) error {
+				if n == step {
+					return errKilled
+				}
+				return nil
+			})
+			require.ErrorIs(t, l.Promote(c), errKilled)
+			require.NoError(t, os.WriteFile(filepath.Join(c.Dir, render.CandidateEnvFile), []byte("env: tampered\n"), 0o600))
+
+			got, err := e.live().Recover()
+			require.ErrorIs(t, err, render.ErrPromotionAbandoned)
+			assert.Equal(t, render.RecoveryAbandoned, got)
+			assert.NoFileExists(t, filepath.Join(e.envDir, render.LiveEnvFile))
+			rec := readRecord(t, e.envDir)
+			assert.Nil(t, rec.Promoting)
+			assert.NotContains(t, rec.Files, render.LiveEnvFile)
+			drifted, err := render.CheckDrift(e.envDir)
+			require.NoError(t, err)
+			assert.Empty(t, drifted)
+		})
+	}
 }
 
 func TestPromoteVerifiesAnExistingKitDirAndNeverRewritesIt(t *testing.T) {
