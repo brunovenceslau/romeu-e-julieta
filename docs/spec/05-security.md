@@ -81,7 +81,13 @@ the gitHosts allowlist did not see.
   idempotency rule of 04 4.1 needs). `REQ-0462` Destination prefixes
   are allowlisted: `refs/romeu/origin/<dir>/`, `refs/sandboxes/<name>/`,
   `refs/romeu/snapshots/<name>/`; salvage refs are created only with
-  `CreateRef` (create-only `update-ref`).
+  `CreateRef` (create-only `update-ref`). On the host a fetch may name
+  the source `HEAD`, the origin's HEAD, into `refs/romeu/origin/<dir>/HEAD`
+  alone, after `ls-remote --symref` shows the origin advertises one;
+  every fetch into `refs/romeu/origin/` carries a negative refspec for
+  each name git could read `HEAD` as, and a pattern destination there has
+  its `*` as its whole last component, so that ref is written only from
+  the origin's HEAD (decided on 2026-10-29, T183).
 - `REQ-0463` One key is not neutralized: a host clone's local `url.<base>.insteadOf`
   rewrites an explicit fetch URL, and `-c` cannot remove it, because it
   appends to a multi-valued key. A host clone's local config is written

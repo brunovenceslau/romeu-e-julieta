@@ -65,7 +65,11 @@ host-native `tools/release` build, since only that build embeds
 julieta (REQ-0131, the e2e row of 10 10.2): this task adds that build
 to `tools/release` (`host*.go`, a flag in `main.go`) and has the e2e
 harness of T041 (`env.go`) build romeu through it, so it asks first for
-`release` too.
+`release` too. Deferred (2026-10-29): step 4 creates the fixed
+subdirectories of each memory dir before step 5 checks its layout, the
+order of 04 4.2, so a `sync` that step 5 refuses leaves the empty
+allowlisted dirs step 4 made, and nothing that existed changes; kept as
+it is, reopened by the first operator who trips on it.
 
 Re-plan (2026-10-28): `sync` also creates the project's shared memory
 directory, `memory/_shared/`, 0700, writes it into the manifest as
