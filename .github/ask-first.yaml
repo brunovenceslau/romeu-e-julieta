@@ -44,6 +44,9 @@ surfaces:
   - id: contracts
     globs: [internal/*/errors.go, internal/cmd/*/*/errors.go, internal/spec/versions.go, internal/manifest/versions.go]
     reason: exit codes and error ids, declared per package, the file format versions and the manifest's protocol window
+  - id: formats
+    globs: [schemas/**]
+    reason: the generated schema of each format one binary writes and another reads or a person writes; a member added, deprecated or given values, and its meaning, are fixed once merged (03, REQ-0163 and REQ-1310), so the maintainer approves each change
   - id: ledger
     globs: [internal/ledger/**]
     reason: the runtime ledger's code, its event schema, and the tags that decide which fields cross projects

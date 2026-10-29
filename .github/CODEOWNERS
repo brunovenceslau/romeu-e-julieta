@@ -74,6 +74,9 @@
 /internal/spec/versions.go @brunovenceslau
 /internal/manifest/versions.go @brunovenceslau
 
+# formats
+/schemas/** @brunovenceslau
+
 # ledger
 /internal/ledger/** @brunovenceslau
 
