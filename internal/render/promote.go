@@ -269,7 +269,7 @@ func (l Live) finish(root *os.Root, snap snapshot, cand string) error {
 	next := snap.record
 	for _, p := range slices.Sorted(maps.Keys(next.Files)) {
 		if isKitPath(p) {
-			if err := ensureKitDir(root, p, snap.kits[path.Base(p)]); err != nil {
+			if err := ensureKitDir(root, p, next.Files[p], snap.kits[path.Base(p)]); err != nil {
 				return err
 			}
 		}
@@ -364,13 +364,22 @@ func (l Live) abandon(root *os.Root, rec Record) error {
 	return removeCandidateDir(root, cand)
 }
 
-// ensureKitDir makes the live kit dir p hold files: a dir that exists,
-// which preflight verified under the lock, is never rewritten; a
-// missing one is written into a temporary dir and renamed to its new
-// name.
-func ensureKitDir(root *os.Root, p string, files []gate.File) error {
-	if ok, err := liveExists(root, p); err != nil || ok {
+// ensureKitDir makes the live kit dir p hold files, whose kit-tree
+// digest is want: a dir that exists is verified again here, since
+// preflight's check may be stale by now, and never rewritten; a missing
+// one is written into a temporary dir and renamed to its new name.
+func ensureKitDir(root *os.Root, p, want string, files []gate.File) error {
+	if ok, err := liveExists(root, p); err != nil {
 		return err
+	} else if ok {
+		got, err := kitDirDigest(root, p)
+		if err != nil {
+			return err
+		}
+		if got != want {
+			return fmt.Errorf("%w: %s", ErrKitDirDiffers, p)
+		}
+		return nil
 	}
 	tmp := path.Join(LiveKitsDir, ".tmp-"+path.Base(p))
 	if err := removeKitTemp(root, tmp); err != nil {
@@ -495,7 +504,9 @@ func (l Live) writeWorkspace() error {
 	}
 	defer func() { _ = dir.Close() }()
 	for _, w := range l.Workspace {
-		// preflight held each name to the two workspace files.
+		if w.Name != DevWorkspaceFile && w.Name != ReviewWorkspaceFile {
+			return fmt.Errorf("render: %q is not a workspace file", w.Name)
+		}
 		if err := replaceFile(dir, w.Name, w.Data, FileMode); err != nil {
 			return err
 		}
