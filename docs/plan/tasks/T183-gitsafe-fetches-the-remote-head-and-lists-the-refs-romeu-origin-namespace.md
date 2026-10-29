@@ -7,6 +7,7 @@ fate: new
 owns:
   - internal/gitsafe/refs*.go
   - internal/gitsafe/fetch*.go
+  - internal/gitsafe/gitsafe_test.go
 needs:
   - T023
 after: []
