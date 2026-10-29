@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 // Package setup holds the command julieta setup (04 4.3): it links the
-// binary on PATH, clones the missing secondary repos, fetches origin in
-// every repo and fast-forwards the clean default branches, recording
-// the warnings in julieta state for julieta status and the next
-// SessionStart. Its steps are the slice of steps.go. Every git call
+// binary on PATH, clones the missing secondary repos and fetches origin
+// in every repo, moving no branch (REQ-0399), and records the warnings
+// in julieta state for julieta status and the next SessionStart. Its steps are the slice of steps.go. Every git call
 // runs through gitsafe in sandbox mode (05 5.1).
 //
 // The package also holds what julieta's commands share about the

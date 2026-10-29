@@ -97,6 +97,10 @@ parts (3) and (5) use, and T175 is the release order of ADR 0043 for the
 kit's pin. Splitting the kit step out would not start this task sooner,
 since T174 and T175 both wait on T039.
 
+Re-plan (2026-10-28, T177): no caller passes `runHook`'s `after` since
+T177, so it and its branch in `internal/cmd/julieta/handoff/hook.go`
+leave with this task's rework of the handoff commands.
+
 - Implements: REQ-0659 (08 8.1), REQ-0663 (08 8.2), REQ-0664 (08 8.2),
   REQ-0665 (08 8.2), REQ-0667 (08 8.2), REQ-0669 (08 8.2), REQ-1291
   (08 8.2), REQ-1294 (08 8.2), REQ-0681 (08 8.3), REQ-0682 (08 8.3),

@@ -242,3 +242,21 @@ func TestDecodeIgnoresAnUnknownMember(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
 }
+
+// TestStatusOmitsTheRetiredSlug: a setup.json written before setup
+// moved no branch may hold default-branch-moved (REQ-0399); status
+// reports its other warnings and not that one, in --json and in text.
+func TestStatusOmitsTheRetiredSlug(t *testing.T) {
+	s := newSandbox(t)
+	code, _, stderr := julieta(t.Context(), "setup")
+	require.Equal(t, 0, code, stderr)
+	path := filepath.Join(setup.StateDir(s.home), "setup.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"at":"2026-10-27T00:00:00Z","version":"v0","warnings":[`+
+		`{"message":"api a..b","slug":"default-branch-moved"},{"message":"web: offline","slug":"fetch-failed"}]}`), 0o600))
+
+	rep := statusJSON(t)
+	assert.Equal(t, []setup.Warning{{Slug: setup.FetchFailed, Message: "web: offline"}}, rep.Warnings)
+	code, _, stderr = julieta(t.Context(), "status")
+	require.Equal(t, 0, code, stderr)
+	assert.Equal(t, "warning fetch-failed: web: offline\n", stderr)
+}

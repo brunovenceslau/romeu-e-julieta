@@ -80,9 +80,10 @@ func cloneMissing(ctx context.Context, r *run, m manifest.Repo) (bool, error) {
 	return true, r.git.Clone(ctx, m.URL, m.Path)
 }
 
-// branchState reports the default branch of the repo m against
-// origin's tip: current, behind with nothing of its own, ahead,
-// diverged, or why it was not compared. It moves nothing.
+// branchState reports the local default branch of the repo m against
+// origin's tip, whatever the work tree holds or HEAD names: current,
+// behind with nothing of its own, ahead, diverged, or why it was not
+// compared. It moves nothing.
 func branchState(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
 	failed := func(err error) {
 		rep.BranchState, rep.Error = ffFailed, err.Error()
@@ -107,22 +108,20 @@ func branchState(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
 		rep.BranchState = ffNoDefault
 		return
 	}
-	st, err := r.git.Status(ctx, m.Path)
+	local := "refs/heads/" + def
+	oid, ok, err := r.git.RefOID(ctx, m.Path, local)
 	switch {
 	case err != nil:
 		failed(err)
 		return
-	case st.Branch != "refs/heads/"+def || st.OID == "":
-		rep.BranchState = ffNotCheckedOut
+	case !ok:
+		rep.BranchState = ffNoBranch
 		return
-	case !st.Clean():
-		rep.BranchState = ffNotClean
-		return
-	case st.OID == tip:
+	case oid == tip:
 		rep.BranchState = ffCurrent
 		return
 	}
-	ahead, behind, err := r.git.AheadBehind(ctx, m.Path, "HEAD", remote)
+	ahead, behind, err := r.git.AheadBehind(ctx, m.Path, local, remote)
 	switch {
 	case err != nil:
 		failed(err)

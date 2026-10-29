@@ -60,8 +60,13 @@ before T172 removes the command.
 Re-plan (2026-10-28): the `--json` report keeps `julieta-setup/v1` the
 way protobuf retires a field (REQ-1310, added to the opening of 03 by this task):
 `fastForward`, `from` and `to` stay, deprecated and always empty, and
-the new member `branchState` carries the state of the default branch.
-03 joins `owns`; no open task owns it.
+the new member `branchState` carries the state of the local default
+branch against origin's, whatever the work tree holds or HEAD names
+(`not-clean` and `not-checked-out` were reasons not to move, and leave
+with the move; `no-branch` names a repo without the local branch). 03
+joins `owns`; no open task owns it, nor the hooks and install e2e files,
+which relied on the fast-forward. `gitsafe.FastForward` has no caller
+left; its removal is pending note 01m62prsqzjgsdv1dnjacqvffd.
 
 - Implements: REQ-0399 (04 4.3), REQ-1310 (03 (opening)).
 - Operator: no.
@@ -77,7 +82,9 @@ the new member `branchState` carries the state of the default branch.
     SessionStart list of 08 8.2, with the lag sentence under REQ-0276
     reduced to `repo-setup-failed`; `TestWarningSlugs` passes.
   - `grep -rn default-branch-moved internal e2e docs/reference` finds
-    nothing but the reader's test of the old state file;
+    nothing but the reader that drops it, the tests that it is dropped
+    and not printed, and the decode fixtures of `julieta-setup/v1`
+    documents an older julieta wrote (amended on 2026-10-28);
     `go run ./tools/ci reqs` passes.
 - Verify: `go test -race ./internal/cmd/julieta/setup/... ./internal/cmd/julieta/handoff/... ./internal/cmd/julieta/status/...`,
   `go test ./e2e -run 'JulietaSetup|JulietaStatus|JulietaHandoff'` and

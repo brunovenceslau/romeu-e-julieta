@@ -34,11 +34,12 @@ and is named `<past participle>At` (`createdAt`, `updatedAt`).
 Adding a member does not change a format's version; removing or
 renaming a member, or changing its type or meaning, is a new version,
 and the name of a removed member is never used again. `REQ-1310` A
-member whose meaning would change is not changed within a version:
-it stays in the format, its writer writes it as its zero value from
-then on, it is marked deprecated where its type is declared, and a new
-member carries the new meaning; the next version removes it, and its
-name is never used again (decided on 2026-10-28, `julieta-setup/v1`'s
+member that is retired, or whose meaning would change, is not changed
+within a version: it stays in the format, its writer writes it as its
+zero value from that release on, it is marked deprecated where its
+type is declared, and a new optional member carries the new meaning,
+whose absence a reader takes as unknown; the next version removes the
+old member, and its name is never used again (decided on 2026-10-28, `julieta-setup/v1`'s
 `fastForward`, `from` and `to` the first case). A reader of a
 format one binary writes and another reads (the `--json` documents of
 `julieta`, `snapshot/heads.json`, the memory entry, the handoff file and

@@ -117,15 +117,24 @@ func TestSetupWritesTheDeprecatedMembersEmpty(t *testing.T) {
 	push(t, filepath.Join(s.base, "api.git"), "two")
 	code, stdout, stderr := julieta(t.Context(), "setup", "--json")
 	require.Equal(t, 0, code, stderr)
+	deprecatedEmpty(t, stdout)
+}
+
+// deprecatedEmpty asserts that every repo of the --json document stdout
+// holds fastForward, from and to as empty strings, not null and not
+// absent, and a branchState.
+func deprecatedEmpty(t *testing.T, stdout string) {
+	t.Helper()
 	var doc struct {
 		Repos []map[string]any `json:"repos"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(stdout), &doc))
-	require.Len(t, doc.Repos, 2)
+	require.NotEmpty(t, doc.Repos)
 	for _, r := range doc.Repos {
 		for _, m := range []string{"fastForward", "from", "to"} {
 			v, ok := r[m]
 			assert.True(t, ok, "%v holds %s", r["dir"], m)
+			assert.IsType(t, "", v, "%v: %s is a string", r["dir"], m)
 			assert.Empty(t, v, "%v: %s", r["dir"], m)
 		}
 		assert.NotEmpty(t, r["branchState"], r["dir"])
@@ -164,21 +173,25 @@ func TestSetupText(t *testing.T) {
 		"repo  web  cloned, fetched, main current\n", stdout)
 }
 
-// TestSetupReportsWhatItDoesNotMove leaves a default branch that is not
-// clean, one that is not checked out, and one with commits of its own
-// where they are, and reports each; none is a warning.
+// TestSetupReportsWhatItDoesNotMove compares the local default branch
+// with origin's whatever the work tree holds or HEAD names: a dirty
+// tree, another branch checked out, a detached HEAD, commits of its own,
+// a diverged history and no local branch at all are each reported and
+// left where they are; none is a warning, and every repo carries the
+// deprecated members empty (REQ-1310).
 func TestSetupReportsWhatItDoesNotMove(t *testing.T) {
 	for name, tc := range map[string]struct {
 		dirty  bool
 		noPush bool
-		args   []string
+		args   [][]string
 		want   string
 	}{
-		"dirty":    {dirty: true, want: "not-clean"},
-		"ahead":    {noPush: true, args: []string{"commit", "-q", "--allow-empty", "-m", "mine"}, want: "ahead"},
-		"branch":   {args: []string{"switch", "-q", "-c", "topic"}, want: "not-checked-out"},
-		"detached": {args: []string{"switch", "-q", "--detach"}, want: "not-checked-out"},
-		"diverged": {args: []string{"commit", "-q", "--allow-empty", "-m", "mine"}, want: "diverged"},
+		"dirty":     {dirty: true, want: "behind"},
+		"ahead":     {noPush: true, args: [][]string{{"commit", "-q", "--allow-empty", "-m", "mine"}}, want: "ahead"},
+		"branch":    {args: [][]string{{"switch", "-q", "-c", "topic"}}, want: "behind"},
+		"detached":  {args: [][]string{{"switch", "-q", "--detach"}}, want: "behind"},
+		"diverged":  {args: [][]string{{"commit", "-q", "--allow-empty", "-m", "mine"}}, want: "diverged"},
+		"no-branch": {args: [][]string{{"switch", "-q", "-c", "topic"}, {"branch", "-q", "-D", "main"}}, want: "no-branch"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			s := newSandbox(t)
@@ -187,15 +200,19 @@ func TestSetupReportsWhatItDoesNotMove(t *testing.T) {
 			}
 			if tc.dirty {
 				require.NoError(t, os.WriteFile(filepath.Join(s.primary(), "new"), nil, 0o600))
-			} else {
-				git(t, s.primary(), tc.args...)
+			}
+			for _, a := range tc.args {
+				git(t, s.primary(), a...)
 			}
 			head := git(t, s.primary(), "rev-parse", "HEAD")
-			code, rep, stderr := setupJSON(t)
+			code, stdout, stderr := julieta(t.Context(), "setup", "--json")
 			require.Equal(t, 0, code, stderr)
+			rep, err := setup.Decode([]byte(stdout))
+			require.NoError(t, err)
 			assert.Equal(t, tc.want, rep.Repos[0].BranchState)
 			assert.Empty(t, rep.Warnings)
 			assert.Equal(t, head, git(t, s.primary(), "rev-parse", "HEAD"))
+			deprecatedEmpty(t, stdout)
 		})
 	}
 }
@@ -362,7 +379,7 @@ func TestDecodeIsStrict(t *testing.T) {
 }
 
 // TestSetupWithoutADefaultBranch reports a repo whose origin/HEAD is
-// missing, and fast-forwards nothing in it.
+// missing, and moves nothing in it.
 func TestSetupWithoutADefaultBranch(t *testing.T) {
 	s := newSandbox(t)
 	git(t, s.primary(), "remote", "set-head", "origin", "-d")

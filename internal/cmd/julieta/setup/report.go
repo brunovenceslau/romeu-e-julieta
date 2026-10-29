@@ -48,15 +48,14 @@ type Link struct {
 
 // The states of a default branch against origin's (Repo.BranchState).
 const (
-	ffBehind        = "behind"          // behind origin's tip, with nothing of its own
-	ffCurrent       = "current"         // already at origin's tip
-	ffNotFetched    = "not-fetched"     // the fetch failed
-	ffNoDefault     = "no-default"      // origin/HEAD is missing or dangling
-	ffNotCheckedOut = "not-checked-out" // HEAD is another branch, detached or unborn
-	ffNotClean      = "not-clean"       // the working tree holds a change
-	ffAhead         = "ahead"           // the branch has commits origin's lacks, and lacks none of origin's
-	ffDiverged      = "diverged"        // each has commits the other lacks
-	ffFailed        = "failed"          // a read failed: Error says why
+	ffBehind     = "behind"      // behind origin's tip, with nothing of its own
+	ffCurrent    = "current"     // at origin's tip
+	ffAhead      = "ahead"       // has commits origin's lacks, and lacks none of origin's
+	ffDiverged   = "diverged"    // each has commits the other lacks
+	ffNotFetched = "not-fetched" // the fetch failed
+	ffNoDefault  = "no-default"  // origin/HEAD is missing or dangling
+	ffNoBranch   = "no-branch"   // the repo has no local branch of that name
+	ffFailed     = "failed"      // a read failed: Error says why
 )
 
 // Repo is what setup did in one repo.
@@ -69,10 +68,11 @@ type Repo struct {
 	Dir string `json:"dir"`
 	// Error is why a step failed in the repo, empty when none did.
 	Error string `json:"error"`
-	// BranchState is the state of the default branch against origin's:
-	// behind, current, not-fetched, no-default, not-checked-out,
-	// not-clean, ahead, diverged or failed. setup moves no branch
-	// (REQ-0399). A document an older julieta wrote has none.
+	// BranchState is the state of the local default branch against
+	// origin's, whatever the work tree holds or HEAD names: behind,
+	// current, ahead, diverged, not-fetched, no-default, no-branch or
+	// failed. setup moves no branch (REQ-0399). A document an older
+	// julieta wrote has none, which a reader takes as unknown.
 	BranchState string `json:"branchState,omitzero"`
 	// FastForward was the outcome of the fast-forward of the default
 	// branch, when setup made one.

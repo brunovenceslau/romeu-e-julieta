@@ -147,6 +147,7 @@ func TestJulietaHooksSystemStage(t *testing.T) {
 # setup moves no branch (REQ-0399): main is brought to origin's tip by
 # hand, so the push at the end is a fast-forward.
 git merge -q --ff-only origin/main
+# The merge's own hook lines are not what this test reads.
 : >/tmp/hooklog
 record /tmp/syshooks
 step ok git commit -q --allow-empty -m first
