@@ -1,14 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Package salvage holds what both binaries know of the bundles that
-// carry a sandbox's unpushed work to the host (08 8.4 and 8.5): the
-// refs a snapshot bundles (Pairs, REQ-0688) and the format of
-// snapshot/heads.json, its writer's encoder and romeu's strict reader
-// (EncodeHeads, DecodeHeads; 03 3.13, REQ-0261). It writes nothing to
-// a memory dir: julieta's writer, which takes the store lock, is
-// internal/hooks/actions (snapshot.go), since this package is linked by
-// romeu too (10 10.7) and so imports no julieta-only package.
 package salvage
 
 import (

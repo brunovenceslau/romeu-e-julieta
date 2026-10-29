@@ -9,10 +9,15 @@ owns:
   - internal/salvage/fingerprint*.go
   - internal/salvage/manifest*.go
   - internal/salvage/doc.go
+  - internal/salvage/snapshot.go
   - internal/salvage/testdata/**
   - internal/cmd/julieta/salvage/**
   - internal/cmd/julieta/all/import_salvage.go
   - e2e/julieta_salvage_test.go
+  - internal/gitsafe/capture*.go
+  - internal/gitsafe/gitsafe.go
+  - tools/ci/internal/schema/salvage.go
+  - .gitattributes
 needs:
   - T060
   - T059
@@ -20,6 +25,8 @@ needs:
 after: []
 ask_first:
   - formats
+  - gitsafe
+  - checks
 sitting: none
 ---
 
@@ -41,6 +48,17 @@ alternatives were weighed and not taken: reading the pane process of
 `julieta pane run`, which needs `layout` (deferred), and reading the
 agent's open files, which no measurement on the pinned agent supports
 yet.
+
+Re-plan (2026-10-29, provisional until the maintainer reviews it):
+`owns` grows by the verb file `internal/gitsafe/capture*.go` (the
+capture commit through a temporary index and the lists of changed,
+untracked, ignored and submodule paths, which no task owned and every
+git call of the sandbox half needs in gitsafe's sandbox mode, REQ-0694),
+the one line of the package doc of `internal/gitsafe/gitsafe.go` that
+lists the verb files, the schema registration
+`tools/ci/internal/schema/salvage.go`, and `internal/salvage/snapshot.go`,
+whose package doc moves to `doc.go`; `ask_first` gains `gitsafe` and
+`checks`.
 
 - Implements: REQ-0103 (01 1.6), REQ-0157 (02 2.6), REQ-0223 (03 3.6),
   REQ-0236 (03 3.8), REQ-0246 (03 3.11), REQ-0248 (03 3.11), REQ-0401
