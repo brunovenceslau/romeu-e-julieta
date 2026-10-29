@@ -97,4 +97,29 @@ var (
 		Fix:         "<binary> <command> --help",
 		RecoveredIn: "none: the help the hint names lists the commands and flags",
 	}
+
+	// DriftDetected is the error drift-detected (RJ-303): a live derived
+	// file differs from the current render.json. Preflight step 3 (01
+	// 1.5) and romeu sync step 7 (04 4.2, REQ-0342) raise it, so it is
+	// declared here, once; the details name the file.
+	DriftDetected = Row{
+		ID:          "RJ-303",
+		Slug:        "drift-detected",
+		Exit:        4,
+		Fix:         "decide: move the edit of the file the details name into the spec, or run romeu sync --overwrite-drift <name>, which loses that edit",
+		RecoveredIn: "none: the edited file is left as it is, and the hint chooses what replaces it",
+	}
+
+	// JulietaNotEmbedded is the error julieta-not-embedded (RJ-312): a
+	// romeu built without tools/release build holds a placeholder for
+	// julieta, so romeu run, romeu sync and promotion refuse before they
+	// write (02 2.1, REQ-0130). They all raise it, so it is declared
+	// here, once.
+	JulietaNotEmbedded = Row{
+		ID:          "RJ-312",
+		Slug:        "julieta-not-embedded",
+		Exit:        2,
+		Fix:         "decide: install a released romeu, or build one with tools/release build",
+		RecoveredIn: "none: nothing was changed, and a romeu that embeds julieta runs the command",
+	}
 )
