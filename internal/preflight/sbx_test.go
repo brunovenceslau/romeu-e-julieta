@@ -93,6 +93,8 @@ func TestHostSbxReadsThePolicies(t *testing.T) {
 func TestHostSbxFailedListingIsSbxUnknown(t *testing.T) {
 	h := hostSbx(t, nil, nil)
 	dir := filepath.Dir(h.Runner.Sbx)
+	// The runner has passed the floor check, so it does not read sbx
+	// version again: the script is replaced by one that fails the listings.
 	failing := filepath.Join(dir, "sbx")
 	require.NoError(t, os.WriteFile(failing, []byte("#!/bin/sh\n[ \"$*\" = version ] && { echo 'sbx version v"+sbxdrv.Floor+" 0123456789abcdef0123456789abcdef01234567'; exit 0; }\necho down >&2\nexit 1\n"), 0o755))
 	for _, call := range []func() ([]byte, error){

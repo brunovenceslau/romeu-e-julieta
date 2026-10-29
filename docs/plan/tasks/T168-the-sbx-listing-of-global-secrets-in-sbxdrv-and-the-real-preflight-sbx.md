@@ -12,6 +12,7 @@ owns:
   - internal/sbxdrv/guard.go
   - internal/sbxdrv/builders_test.go
   - e2e/testdata/sbx/0.49.2/secrets-settings.jsonl
+  - e2e/testdata/sbx/guard-cases.jsonl
 needs:
   - T029
   - T046

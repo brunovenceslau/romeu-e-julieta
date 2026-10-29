@@ -11,9 +11,9 @@ var _ = registerBuilder("secret-ls", func(Fixture) []Call { return []Call{Secret
 
 // SecretList is sbx secret ls: the secrets sbx holds, the global ones
 // included, which the check sbx-global-secret of I22 reads. It is a read
-// (timeout class sbx-read), captured, and it takes no flag: it prints
-// the names of the services, never a value (I25), and romeu does not ask
-// it for more.
+// (timeout class sbx-read), captured, and it takes no flag: it is
+// assumed to print the names of the services and never a value (I25),
+// and romeu does not ask it for more.
 //
 // The argv is the one of the sbx reference
 // (https://docs.docker.com/reference/cli/sbx/secret/ls/). Probe A9 has

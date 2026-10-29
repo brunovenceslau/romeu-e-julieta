@@ -52,6 +52,9 @@ func (h *HostSbx) read(ctx context.Context, c sbxdrv.Call, why string) ([]byte, 
 		}
 		return nil, err
 	}
+	if res.Truncated {
+		return nil, upstreamShape(c.Name, "the output is longer than romeu reads")
+	}
 	return res.Stdout, nil
 }
 
