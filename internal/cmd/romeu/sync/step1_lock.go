@@ -31,11 +31,11 @@ var (
 	getenv = os.Getenv
 	// embeddedJulieta returns the julieta linux binary of romeu's
 	// GOARCH that this build embeds, or nil for a source build, whose
-	// placeholder (02 2.1, REQ-0130) holds no binary. No package embeds
-	// it yet: tools/release build maps internal/embedded/julieta with an
-	// overlay, and the package that reads it replaces this function.
-	// Until then every build is a source build, and sync stops at step 1
-	// with julieta-not-embedded.
+	// placeholder (02 2.1, REQ-0130) holds no binary. The package that
+	// embeds it is internal/embedded (embedded.Julieta, T186); slice E of
+	// T043 replaces this nil seam with it. Until then sync treats every
+	// build as a source build and stops at step 1 with
+	// julieta-not-embedded.
 	embeddedJulieta = func() []byte { return nil }
 )
 

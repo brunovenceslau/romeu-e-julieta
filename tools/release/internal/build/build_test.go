@@ -235,6 +235,58 @@ func TestReleaseBuildRefusesWhenNothingEmbedsJulieta(t *testing.T) {
 	assert.NoDirExists(t, out)
 }
 
+// TestReleaseBuildRefusesThePlaceholder: with the placeholder in the
+// tree, go list names the file with or without the overlay, so only the
+// bytes of the romeu binary tell a build whose overlay key matched no
+// file: it carries the empty placeholder, a dry run says so, and a
+// release refuses.
+func TestReleaseBuildRefusesThePlaceholder(t *testing.T) {
+	t.Parallel()
+	root := fixtureModule(t)
+	tag(t, root, "v1.0.0")
+	elsewhere := func(root string) string { return filepath.Join(root, "elsewhere", "julieta") }
+
+	res, err := build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: filepath.Join(t.TempDir(), "out"), DryRun: true, GoBin: goBinOf(t)}, elsewhere)
+	require.NoError(t, err)
+	assert.False(t, res.Embedded, "a dry run whose overlay missed the placeholder")
+
+	out := filepath.Join(t.TempDir(), "out")
+	_, err = build(t.Context(), Options{Root: root, Version: "v1.0.0", Out: out, GoBin: goBinOf(t), Gate: fuzzedGate(t, root)}, elsewhere)
+	require.ErrorContains(t, err, "embeds no julieta")
+	assert.NoDirExists(t, out)
+}
+
+// TestCarries: the romeu bytes carry a julieta only when they hold all
+// of its bytes, and an empty julieta is never carried.
+func TestCarries(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	julieta := filepath.Join(dir, "julieta")
+	empty := filepath.Join(dir, "empty")
+	require.NoError(t, os.WriteFile(julieta, []byte("the julieta bytes"), 0o600))
+	require.NoError(t, os.WriteFile(empty, nil, 0o600))
+
+	for _, tt := range []struct {
+		name    string
+		romeu   string
+		julieta string
+		want    bool
+	}{
+		{"holds them", "head the julieta bytes tail", julieta, true},
+		{"holds a part", "head the julieta tail", julieta, false},
+		{"an empty julieta", "head", empty, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := carries([]byte(tt.romeu), tt.julieta)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+	_, err := carries(nil, filepath.Join(dir, "absent"))
+	require.Error(t, err)
+}
+
 // TestReleaseBuildWithTheTagAtHead reads the shared release build, made
 // with the tag at HEAD (shared).
 func TestReleaseBuildWithTheTagAtHead(t *testing.T) {

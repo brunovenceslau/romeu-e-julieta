@@ -24,6 +24,7 @@ romeu-e-julieta/
 │  ├─ procgroup/               every subprocess start: a process group per child, its kill on a timeout, a cancellation or a signal, the signal handler (04 4.1)
 │  ├─ oci/                     read and verify v3 descriptors by digest (stdlib net/http); the one descriptor grammar, which render calls for local kits
 │  ├─ catalog/                 embedded catalog: egress/<family>.yaml beside the package (schema catalog.v1, 03 3.5), embedded by //go:embed egress/*.yaml, and the lookups
+│  ├─ embedded/                the julieta linux binary romeu delivers: julieta, a checked-in empty placeholder that a source build embeds as zero bytes, which tools/release build replaces with a go build overlay, writing nothing into the tree; romeu only (10 10.7)
 │  ├─ egress/                  derivation from mise files at pinned SHAs
 │  ├─ render/                  candidates, promotion commit, workspace files, render.json, kit materialization via os.Root
 │  ├─ state/                   host state records, the candidate and generation state machines, descriptor cache, flock
@@ -184,8 +185,9 @@ embeds the catalog (`internal/catalog/egress/*.yaml`, from
 `internal/catalog`), the product kit directories through `kits/embed.go`
 (package `kits`, one `embed.FS`, `pins.yaml` excluded) and, at release
 time, the `julieta` linux binary of romeu's own `GOARCH`, which
-`tools/release build` writes into the embed directory under `internal/`
-that its task names (the release builds both, one per romeu archive);
+`tools/release build` maps onto the empty placeholder
+`internal/embedded/julieta` with a `go build` overlay, writing nothing
+into the tree (the release builds both, one per romeu archive);
 `julieta` embeds the catalog too (for `spec validate --catalog`). `REQ-0130` A
 source build without `tools/release build` embeds a placeholder: romeu
 built that way refuses `run`, `sync` and promotion with exit 2 and the

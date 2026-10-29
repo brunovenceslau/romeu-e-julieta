@@ -41,9 +41,9 @@ import (
 
 // EmbedPath is the file, from the root of the repository, that the
 // romeu build finds the julieta linux binary of its own GOARCH at. The
-// build does not write it into the tree: it maps it to the binary with a
-// go build overlay, so a source build without this tool finds no file
-// there and embeds a placeholder (REQ-0130).
+// tree holds an empty placeholder there, which a source build embeds
+// (REQ-0130); the build does not write the binary into the tree: it
+// maps the file to it with a go build overlay.
 const EmbedPath = "internal/embedded/julieta"
 
 // Arches are the architectures of the romeu archives, and of the julieta
@@ -65,9 +65,11 @@ type Options struct {
 type Result struct {
 	Archives  []string // paths, in the order of Arches
 	Checksums string   // path of checksums.txt
-	// Embedded reports that a package of romeu consumes EmbedPath, so the
-	// julieta binary is in the romeu binary. False means the build
-	// carried no julieta: nothing in the tree reads the file yet.
+	// Embedded reports that each romeu binary carries the julieta binary
+	// of its arch: a package of romeu consumes EmbedPath, and the romeu
+	// binary holds the julieta bytes. False means the build carried no
+	// julieta: nothing reads the file, or the overlay did not replace
+	// the placeholder.
 	Embedded bool
 	// Dirty reports that the tree had changes (AllowDirty) and the commit
 	// stamp says so.
@@ -78,6 +80,17 @@ type Result struct {
 // directory first; the archives and checksums.txt reach Out in one
 // rename, so a failure leaves no partial set.
 func Build(ctx context.Context, o Options) (Result, error) {
+	return build(ctx, o, embedKey)
+}
+
+// embedKey returns the overlay key of EmbedPath under the resolved root.
+func embedKey(root string) string {
+	return filepath.Join(root, filepath.FromSlash(EmbedPath))
+}
+
+// build is Build with the function that names the overlay key, which a
+// test replaces to see a key that matches no file refused.
+func build(ctx context.Context, o Options, key func(root string) string) (Result, error) {
 	// The go command resolves the directory it runs in to its real path,
 	// so the overlay key, which must equal that path, is built from the
 	// resolved root: a root or a TMPDIR behind a symlink (macOS keeps
@@ -136,7 +149,7 @@ func Build(ctx context.Context, o Options) (Result, error) {
 	}
 	defer func() { _ = os.RemoveAll(stage) }()
 
-	b := builder{o: o, stage: stage, ldflags: strings.Join([]string{
+	b := builder{o: o, stage: stage, key: key(o.Root), ldflags: strings.Join([]string{
 		"-buildid=",
 		"-X main.version=" + o.Version,
 		"-X main.commit=" + commit,
@@ -156,7 +169,7 @@ func Build(ctx context.Context, o Options) (Result, error) {
 		names = append(names, name)
 	}
 	if !o.DryRun && !res.Embedded {
-		return Result{}, fmt.Errorf("no package of romeu consumes %s, so the build embeds no julieta; a release refuses", EmbedPath)
+		return Result{}, fmt.Errorf("a romeu binary does not carry its julieta: no package of romeu consumes %s, or the overlay did not replace it, so the build embeds no julieta; a release refuses", EmbedPath)
 	}
 	out, err := publish(o.Out, archives)
 	if err != nil {
@@ -285,6 +298,7 @@ func commitOf(ctx context.Context, root string) (string, time.Time, error) {
 type builder struct {
 	o       Options
 	stage   string
+	key     string // the overlay key the julieta binary replaces
 	ldflags string
 }
 
@@ -296,7 +310,7 @@ func (b builder) archive(ctx context.Context, arch string, copying []byte, when 
 		return nil, false, err
 	}
 	overlay, err := json.Marshal(map[string]map[string]string{
-		"Replace": {filepath.Join(b.o.Root, filepath.FromSlash(EmbedPath)): julieta},
+		"Replace": {b.key: julieta},
 	})
 	if err != nil {
 		return nil, false, err
@@ -309,7 +323,7 @@ func (b builder) archive(ctx context.Context, arch string, copying []byte, when 
 	if err := b.goBuild(ctx, "romeu", "darwin", arch, romeu, overlayFile); err != nil {
 		return nil, false, err
 	}
-	embedded, err := b.embeds(ctx, arch, overlayFile)
+	consumed, err := b.embeds(ctx, arch, overlayFile)
 	if err != nil {
 		return nil, false, err
 	}
@@ -317,6 +331,11 @@ func (b builder) archive(ctx context.Context, arch string, copying []byte, when 
 	if err != nil {
 		return nil, false, err
 	}
+	embedded, err := carries(binary, julieta)
+	if err != nil {
+		return nil, false, err
+	}
+	embedded = embedded && consumed
 	notices, err := Notices(ctx, b.o.Root, b.o.GoBin, []Target{{"romeu", "darwin", arch}, {"julieta", "linux", arch}})
 	if err != nil {
 		return nil, false, err
@@ -327,6 +346,18 @@ func (b builder) archive(ctx context.Context, arch string, copying []byte, when 
 		{Name: NoticesName, Mode: 0o644, Data: notices},
 	}, when)
 	return data, embedded, err
+}
+
+// carries reports whether the romeu binary holds the bytes of the
+// julieta binary at julieta. go:embed stores a []byte as it is, so a
+// romeu built from the placeholder, because the overlay key matched no
+// file, does not hold them, even though go list names the file.
+func carries(romeu []byte, julieta string) (bool, error) {
+	data, err := os.ReadFile(julieta)
+	if err != nil {
+		return false, err
+	}
+	return len(data) > 0 && bytes.Contains(romeu, data), nil
 }
 
 // embeds reports whether a package romeu links has EmbedPath among its
