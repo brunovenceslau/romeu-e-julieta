@@ -7,8 +7,12 @@ package sync
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -196,13 +200,14 @@ func TestLockAndCheck(t *testing.T) {
 	}
 }
 
-// TestLockAndCheckRunsRecoveryOnEveryEnvDir: step 1 runs promotion
-// recovery (REQ-0087) on each <name>-env/ under the root before gate 1,
+// TestLockAndCheckExitsOneOnAnAbandonedPromotionUntilRJ304: step 1
+// runs promotion recovery (REQ-0087) on each <name>-env/ under the root,
 // whatever the targets: a first promotion killed after its step 1,
 // whose candidate is gone, is abandoned, so its render.json is removed,
-// and the command stops naming the dir. A dir that is not <name>-env/
-// is not read.
-func TestLockAndCheckRunsRecoveryOnEveryEnvDir(t *testing.T) {
+// and the command stops naming the dir with exit 1, the interim exit
+// until interrupted-promotion-abandoned (RJ-304, exit 4) is declared.
+// A dir that is not <name>-env/ is not read.
+func TestLockAndCheckExitsOneOnAnAbandonedPromotionUntilRJ304(t *testing.T) {
 	h := newHost(t)
 	h.acknowledge(t)
 	record := h.interrupt(t, "shop")
@@ -215,7 +220,88 @@ func TestLockAndCheckRunsRecoveryOnEveryEnvDir(t *testing.T) {
 	err := lockAndCheck(t.Context(), r)
 
 	require.ErrorIs(t, err, render.ErrPromotionAbandoned)
+	assert.Equal(t, 1, cli.ExitCode(err))
 	assert.Contains(t, err.Error(), "shop-env")
 	assert.NoFileExists(t, record, "recovery left the render.json of the abandoned first promotion")
 	assert.FileExists(t, other)
+}
+
+// promoting writes into <root>/<name>-env/ a first promotion killed
+// after its step 1 whose candidate still verifies, which recovery
+// finishes, and returns the candidate's sbxenv.yaml.
+func (h *host) promoting(t *testing.T, name string) []byte {
+	t.Helper()
+	envDir := filepath.Join(h.root, name+"-env")
+	id, err := canon.ParseULID("01m5mre3vz48a3n74a11ataacn")
+	require.NoError(t, err)
+	cand := filepath.Join(envDir, render.CandidatesDir, id.String())
+	require.NoError(t, os.MkdirAll(cand, 0o700))
+	env := []byte("schema: \"1\"\n")
+	require.NoError(t, os.WriteFile(filepath.Join(cand, render.CandidateEnvFile), env, 0o600))
+	bin, err := render.NewBin(runtime.GOARCH, embeddedJulieta())
+	require.NoError(t, err)
+	sum := sha256.Sum256(env)
+	rec := render.Record{
+		Schema:     render.RecordSchema,
+		SpecSource: render.SpecSource{Kind: render.SpecSourceOrigin, Ref: "refs/romeu/origin/cfg/main", Commit: strings.Repeat("c", 40)},
+		Files:      map[string]string{render.LiveEnvFile: hex.EncodeToString(sum[:])},
+	}
+	maps.Copy(rec.Files, bin.Files())
+	require.NoError(t, render.WriteRecord(render.Candidate{Dir: cand}, rec))
+	digest, err := render.CandidateFilesDigest(cand)
+	require.NoError(t, err)
+	rec.Files = map[string]string{}
+	rec.Promoting = &render.Promoting{CandidateID: id, FilesDigest: digest, PreviousFiles: map[string]string{}}
+	data, err := render.EncodeRecord(rec)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(envDir, render.LiveRecord), data, 0o600))
+	return env
+}
+
+// TestLockAndCheckFinishesAPromotionWhoseCandidateVerifies: recovery
+// finishes an interrupted promotion whose candidate still verifies
+// against its filesDigest (REQ-0087): the live sbxenv.yaml is the
+// candidate's, .romeu/bin holds the julieta this romeu embeds, the live
+// render.json holds no promoting, the candidate dir is gone, and a line
+// on stderr says so.
+func TestLockAndCheckFinishesAPromotionWhoseCandidateVerifies(t *testing.T) {
+	h := newHost(t)
+	h.acknowledge(t)
+	env := h.promoting(t, "shop")
+	envDir := filepath.Join(h.root, "shop-env")
+	r := h.run(flags{names: []string{"blog"}})
+	t.Cleanup(r.release)
+
+	require.NoError(t, lockAndCheck(t.Context(), r))
+
+	assert.Equal(t, env, mustRead(t, filepath.Join(envDir, render.LiveEnvFile)))
+	assert.Equal(t, embeddedJulieta(), mustRead(t, filepath.Join(envDir, ".romeu", "bin", "julieta-linux-"+runtime.GOARCH)))
+	rec, err := render.DecodeRecord(mustRead(t, filepath.Join(envDir, render.LiveRecord)))
+	require.NoError(t, err)
+	assert.Nil(t, rec.Promoting)
+	assert.NoDirExists(t, filepath.Join(envDir, render.CandidatesDir, "01m5mre3vz48a3n74a11ataacn"))
+	assert.Contains(t, h.stderr.String(), "finished the interrupted promotion of shop")
+}
+
+// TestLockAndCheckRecoversBeforeGate1: REQ-0335 orders step 1 as the
+// lock with promotion recovery, then gate 1, so with no acknowledged
+// toolchain an interrupted promotion is finished first, and then the
+// command stops with toolchain-approval-required (RJ-302, exit 3).
+//
+//romeu:invariant I7 test
+func TestLockAndCheckRecoversBeforeGate1(t *testing.T) {
+	h := newHost(t)
+	h.promoting(t, "shop")
+	r := h.run(flags{all: true})
+	t.Cleanup(r.release)
+
+	err := lockAndCheck(t.Context(), r)
+
+	require.Error(t, err)
+	assert.Equal(t, "RJ-302", cli.Of(err).ID)
+	assert.Equal(t, 3, cli.ExitCode(err))
+	rec, rerr := render.DecodeRecord(mustRead(t, filepath.Join(h.root, "shop-env", render.LiveRecord)))
+	require.NoError(t, rerr)
+	assert.Nil(t, rec.Promoting, "recovery did not run before gate 1")
+	assert.Contains(t, h.stderr.String(), "finished the interrupted promotion of shop")
 }

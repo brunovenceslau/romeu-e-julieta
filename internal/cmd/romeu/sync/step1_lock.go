@@ -91,9 +91,12 @@ func lockAndCheck(ctx context.Context, r *run) error {
 // finished promotion writes. A root that does not exist yet holds no
 // promotion, and an entry that is not a directory, a link among them,
 // is not one. A finished promotion is reported on stderr. An abandoned
-// one stops the command with render.ErrPromotionAbandoned: its row,
-// interrupted-promotion-abandoned (RJ-304, exit 4), is not declared
-// yet, so the error passes as it is.
+// one stops the command at the first such dir with
+// render.ErrPromotionAbandoned, which exits 1 as an error of no row:
+// that is the interim exit until interrupted-promotion-abandoned
+// (RJ-304, exit 4) is declared, with the slice that links sync into
+// the binary. The dirs after it are not recovered by this run; the
+// rerun recovers them, since recovery runs on every one each time.
 func recoverPromotions(stderr io.Writer, root string, bin render.Bin) error {
 	entries, err := os.ReadDir(root)
 	if errors.Is(err, fs.ErrNotExist) {
