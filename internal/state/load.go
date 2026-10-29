@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -204,6 +205,85 @@ func (s *Store) GetDescriptor(digest string) (*Descriptor, error) {
 			fmt.Errorf("%w: the entry holds the digest %s", ErrInvalid, clip(d.Digest)))
 	}
 	return d, nil
+}
+
+// FindDescriptor returns the cached entry reached from the workload for
+// the platform. REQ-0341 gives the digest of the workload (the index of
+// a multi-arch image), while an entry is keyed by the digest of the
+// platform manifest, so the lookup reads every entry of descriptors/.
+//
+// By design an entry is skipped when it is not a regular file (a
+// symlink, a FIFO), does not decode, or holds another digest than its
+// name says: GetDescriptor of it is still record-unreadable (RJ-334),
+// and one bad entry does not fail every sync. Any other fault is
+// returned, not read as a miss: an I/O error, or an entry of a newer
+// format (format-newer), as GetDescriptor gives them, so that an offline
+// sync does not report registry-unreachable for a cache it could not
+// read (REQ-0165).
+//
+// An index digest names one manifest per platform, so two entries of
+// one pair with different digests are damage or a planted entry, and
+// the lookup is record-unreadable rather than let a file name pick the
+// capability set that gate 2 shows. A pair with no entry is an error
+// that wraps fs.ErrNotExist, as GetDescriptor gives an absent digest. A
+// local kit's entry has no workload and never matches, and neither does
+// an empty workload or platform.
+func (s *Store) FindDescriptor(workload, platform string) (*Descriptor, error) {
+	if workload == "" || platform == "" {
+		return nil, descriptorAbsent(workload, platform)
+	}
+	dir := filepath.Join(s.dir, descriptorsDir)
+	entries, err := fs.ReadDir(s.descriptors.FS(), ".")
+	if err != nil {
+		return nil, fmt.Errorf("state: reading %s: %w", dir, err)
+	}
+	var found *Descriptor
+	for _, e := range entries {
+		hex, ok := strings.CutSuffix(e.Name(), ".json")
+		if !ok || !e.Type().IsRegular() {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		data, err := readRecord(s.descriptors, e.Name())
+		if err != nil {
+			if skippable(err) {
+				continue
+			}
+			return nil, unreadable(path, err)
+		}
+		d, err := DecodeDescriptor(data)
+		if err != nil {
+			if skippable(err) {
+				continue
+			}
+			return nil, unreadable(path, err)
+		}
+		if d.Digest != "sha256:"+hex || d.Workload != workload || d.Platform != platform {
+			continue
+		}
+		if found != nil && found.Digest != d.Digest {
+			return nil, unreadable(dir, fmt.Errorf("%w: two entries hold the workload %s on %s",
+				ErrInvalid, clip(workload), clip(platform)))
+		}
+		found = d
+	}
+	if found == nil {
+		return nil, descriptorAbsent(workload, platform)
+	}
+	return found, nil
+}
+
+// skippable reports whether err is the damage of one entry that
+// FindDescriptor leaves to GetDescriptor: an invalid record, and not a
+// format-newer error or an I/O fault.
+func skippable(err error) bool {
+	_, typed := errors.AsType[*cli.Error](err)
+	return !typed && errors.Is(err, ErrInvalid)
+}
+
+// descriptorAbsent is the error of a pair with no cached entry.
+func descriptorAbsent(workload, platform string) error {
+	return fmt.Errorf("state: no descriptor for %s on %s: %w", clip(workload), clip(platform), fs.ErrNotExist)
 }
 
 // PutDescriptor caches a descriptor under its digest. Entries are
