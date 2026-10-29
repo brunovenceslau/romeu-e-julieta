@@ -17,6 +17,8 @@ owns:
   - e2e/julieta_setup_test.go
   - e2e/julieta_handoff_test.go
   - e2e/julieta_status_test.go
+  - e2e/julieta_hooks_test.go
+  - e2e/julieta_install_test.go
   - docs/spec/03-formats.md
   - docs/spec/04-cli.md
   - docs/spec/08-memory-handoff-salvage.md

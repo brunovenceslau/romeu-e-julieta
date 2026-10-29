@@ -144,6 +144,10 @@ record() { printf '{"path":"%s"}\n' "$1" >"$HOME/.local/state/julieta/system-hoo
 // stage, then ends.
 func TestJulietaHooksSystemStage(t *testing.T) {
 	script := strings.Replace(hooksScript, "%s", manifestEnv(t, 1, originURL+"api.git"), 1) + systemScript + `
+# setup moves no branch (REQ-0399): main is brought to origin's tip by
+# hand, so the push at the end is a fast-forward.
+git merge -q --ff-only origin/main
+: >/tmp/hooklog
 record /tmp/syshooks
 step ok git commit -q --allow-empty -m first
 step log cat /tmp/hooklog
