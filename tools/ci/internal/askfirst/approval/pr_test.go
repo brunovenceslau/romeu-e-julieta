@@ -445,11 +445,35 @@ func TestPRStackGuard(t *testing.T) {
 		pr.BaseRef = "main"
 		assert.Empty(t, judge(t, r, pr))
 	})
+	t.Run("a base that merged a main that moved the judge passes", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{"notes.txt": "x\n"})
+		r.Git("checkout", "--quiet", "main")
+		r.Write("judge/y.go", "package judge\n")
+		moved := r.Commit("main moves the judge")
+		r.Git("update-ref", "refs/remotes/origin/main", moved)
+		r.Git("checkout", "--quiet", "below")
+		r.Git("merge", "--quiet", "--no-edit", "main")
+		pr.BaseSHA = strings.TrimSpace(r.Git("rev-parse", "HEAD"))
+		assert.Empty(t, judge(t, r, pr))
+	})
+	t.Run("a local run names no base ref and is not a stack", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{"judge/x.go": "package judge\n"})
+		pr.BaseRef, pr.DefaultBranch = "", ""
+		assert.Empty(t, judge(t, r, pr))
+	})
 	t.Run("a clone without the default branch is an error", func(t *testing.T) {
 		r, pr := stack(t, map[string]string{"notes.txt": "x\n"})
 		r.Git("update-ref", "-d", "refs/remotes/origin/main")
 		_, err := Judge(context.Background(), r.Repo, pr, false)
-		require.ErrorContains(t, err, "the default branch main")
+		require.ErrorContains(t, err, "no remote branch origin/main")
+	})
+	t.Run("a default branch without the list is an error", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{"notes.txt": "x\n"})
+		r.Git("checkout", "--quiet", "main")
+		r.Git("rm", "--quiet", Path)
+		r.Git("update-ref", "refs/remotes/origin/main", r.Commit("drop the list"))
+		_, err := Judge(context.Background(), r.Repo, pr, false)
+		require.ErrorContains(t, err, Path+" is missing at the default branch main")
 	})
 }
 

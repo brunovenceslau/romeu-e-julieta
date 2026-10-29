@@ -305,26 +305,32 @@ const approvalsSurface = "approvals"
 // and on the grants, or the pull request below changes the judge and
 // merges first. The default branch is read from the clone's remote
 // branch (fetchRemote), which the pr job's checkout of the whole
-// history holds; a clone without it is an error, not a pass. The globs
-// are the default branch's list's, the trusted one, so a base that
-// rewrites the list cannot hide the paths it changes. A local run (no
-// payload) names no base ref and is not a stack.
+// history holds; a clone without it, or without the list there, is an
+// error, not a pass. The globs are the default branch's list's, the
+// trusted one, so a base that rewrites the list cannot hide the paths
+// it changes. A local run (no payload) names no base ref and is not a
+// stack. The guard runs in the base branch's code, so it is a courtesy
+// to the reviewer and not the gate: the pr run of the bottom pull
+// request, judged by the default branch's code, is.
 func stackFindings(ctx context.Context, r git.Repo, pr PR, base string) ([]Finding, error) {
 	if pr.BaseRef == "" || pr.DefaultBranch == "" || pr.BaseRef == pr.DefaultBranch {
 		return nil, nil
 	}
 	tip, err := commit(ctx, r, "refs/remotes/"+fetchRemote+"/"+pr.DefaultBranch)
 	if err != nil {
-		return nil, fmt.Errorf("the default branch %s, which the stack guard compares the base with: %w", git.Printable(pr.DefaultBranch), err)
+		return nil, fmt.Errorf("the clone has no remote branch %s/%s, which the stack guard compares the base with: the pr job's checkout fetches the whole history (fetch-depth: 0)", fetchRemote, git.Printable(pr.DefaultBranch))
+	}
+	list, err := readList(ctx, r, tip)
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		return nil, fmt.Errorf("%s is missing at the default branch %s, which the stack guard reads", Path, git.Printable(pr.DefaultBranch))
 	}
 	globs := []string{Path, GrantsPath}
-	if list, err := readList(ctx, r, tip); err != nil {
-		return nil, err
-	} else if list != nil {
-		for _, s := range list.Surfaces {
-			if s.ID == approvalsSurface {
-				globs = append(globs, s.Globs...)
-			}
+	for _, s := range list.Surfaces {
+		if s.ID == approvalsSurface {
+			globs = append(globs, s.Globs...)
 		}
 	}
 	paths, err := diffPaths(ctx, r, tip, base)
