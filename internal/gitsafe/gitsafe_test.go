@@ -330,8 +330,10 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, "mode-9", Mode(9).String())
 }
 
-// TestRunRefusesPush proves the one runner builds no push argv (I18):
-// no verb names push, and the runner refuses it if one ever did.
+// TestRunRefusesPush proves the runner builds no push argv but Push's
+// (I18): runInput, every other verb's way in, refuses push and
+// send-pack in both modes (TestNoOtherPush holds that no other code
+// names one).
 //
 //romeu:invariant I18 test
 func TestRunRefusesPush(t *testing.T) {

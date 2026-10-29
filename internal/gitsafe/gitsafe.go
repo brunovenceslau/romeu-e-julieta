@@ -15,7 +15,10 @@
 // new directory; CreateRef is create-only (I6);
 // BundleCreate writes a bundle of named refs, and BundleOf a bundle of
 // name and object id pairs from a temporary repository, so no ref is
-// written into the user's; nothing builds a push (I18). Unbundle,
+// written into the user's; Push, of push.go, is the one push, of the
+// memory repository's main to memory.remote (I18), and Separate, of
+// separate.go, the verbs of that repository, whose git dir and work
+// tree are apart (08 8.1). Unbundle,
 // verify, fsck, the tree walk, the history reads, the reads of a
 // working tree, the list of refs, the reflog, the global and system
 // hooks paths, the reachability of a set of commits, the common git
@@ -296,9 +299,10 @@ func isControl(r rune) bool {
 	return r < 0x20 || r == 0x7f
 }
 
-// refusedSubcommands are the git subcommands the runner never starts:
-// romeu pushes no salvage commit, and julieta signs and pushes none
-// (I18).
+// refusedSubcommands are the git subcommands no verb starts through
+// runInput: romeu pushes no salvage commit, and julieta signs and
+// pushes none (I18). The one push romeu builds, that of the memory
+// repository, is Push in push.go, which is host mode only.
 var refusedSubcommands = []string{"push", "send-pack"}
 
 // run runs git in dir with the flags of the mode, the extra flags
@@ -327,11 +331,20 @@ func (r *Runner) runInput(ctx context.Context, dir string, extra []setting, env 
 	if slices.Contains(refusedSubcommands, args[0]) {
 		return fmt.Errorf("%w: git subcommand %q", ErrRefused, args[0])
 	}
-	argv := make([]string, 0, 1+2*(len(r.settings)+len(extra))+len(args))
+	return r.exec(ctx, dir, nil, extra, env, stdin, stdout, args...)
+}
+
+// exec runs git as runInput does, with global, git's own options, between
+// the flags of the mode and the subcommand, and without the refusal of
+// refusedSubcommands: runInput is every verb's way in, and the one push
+// of push.go (I18) is the only other caller that names a subcommand.
+func (r *Runner) exec(ctx context.Context, dir string, global []string, extra []setting, env []string, stdin io.Reader, stdout io.Writer, args ...string) error {
+	argv := make([]string, 0, 1+2*(len(r.settings)+len(extra))+len(global)+len(args))
 	argv = append(argv, r.git)
 	for _, s := range slices.Concat(r.settings, extra) {
 		argv = append(argv, "-c", s.key+"="+s.value)
 	}
+	argv = append(argv, global...)
 	argv = append(argv, args...)
 	stderr := limitedBuffer{limit: stderrLimit}
 	err := r.start(ctx, procgroup.Command{
