@@ -100,25 +100,48 @@ func (t *tree) closure(entry string) map[string]bool {
 	return linked
 }
 
-// importNames returns the name each import of the file has in it, to
-// the path of the import. A version suffix ("/v2") is not a name.
-func importNames(file *ast.File) map[string]string {
-	names := map[string]string{}
+// importName returns the path an import spec names and the name the
+// file gives it: the explicit name, or the last element of the path
+// with a version suffix ("/v2") skipped, since it is no name. ok is
+// false for a path that does not unquote.
+func importName(spec *ast.ImportSpec) (imported, name string, ok bool) {
+	imported, err := strconv.Unquote(spec.Path.Value)
+	if err != nil {
+		return "", "", false
+	}
+	name = path.Base(imported)
+	if isVersion(name) {
+		name = path.Base(path.Dir(imported))
+	}
+	if spec.Name != nil {
+		name = spec.Name.Name
+	}
+	return imported, name, true
+}
+
+// fileImports are the imports of one file: the name each has in it, to
+// its path, and the paths imported with "." whose identifiers need no
+// package name.
+type fileImports struct {
+	names map[string]string
+	dots  []string
+}
+
+// importsOf reads the imports of the file.
+func importsOf(file *ast.File) fileImports {
+	imports := fileImports{names: map[string]string{}}
 	for _, spec := range file.Imports {
-		imported, err := strconv.Unquote(spec.Path.Value)
-		if err != nil {
+		imported, name, ok := importName(spec)
+		if !ok {
 			continue
 		}
-		name := path.Base(imported)
-		if isVersion(name) {
-			name = path.Base(path.Dir(imported))
+		if name == "." {
+			imports.dots = append(imports.dots, imported)
+			continue
 		}
-		if spec.Name != nil {
-			name = spec.Name.Name
-		}
-		names[name] = imported
+		imports.names[name] = imported
 	}
-	return names
+	return imports
 }
 
 // isVersion reports whether a path element is a major version, "v2".

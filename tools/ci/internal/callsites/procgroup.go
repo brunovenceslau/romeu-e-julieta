@@ -5,9 +5,7 @@ package callsites
 
 import (
 	"go/ast"
-	"path"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
@@ -83,13 +81,9 @@ func fileFindings(rel string, file *ast.File, module string) []string {
 	inTools := inside(rel, []string{toolsTree})
 	names := map[string]string{} // the name a file gives an import, to its path
 	for _, spec := range file.Imports {
-		imported, err := strconv.Unquote(spec.Path.Value)
-		if err != nil {
+		imported, name, ok := importName(spec)
+		if !ok {
 			continue
-		}
-		name := path.Base(imported)
-		if spec.Name != nil {
-			name = spec.Name.Name
 		}
 		names[name] = imported
 		_, starts := startCalls[imported]

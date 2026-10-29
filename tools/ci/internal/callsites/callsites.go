@@ -16,12 +16,24 @@
 //     process or map a signal around internal/procgroup (the scan of
 //     procgroup.go).
 //
-// What it does not see: a package a binary links through a build
-// constraint it does not read is read anyway, which only widens the
-// scan; a call through an argv built from variables; a deletion that
-// the argument of "update-ref --stdin" carries; the truncation of
-// os.Create and os.WriteFile, which name no flag; a method of another
-// type whose name is one of methodHits, which is a false finding.
+// Raw system calls (syscall and unix Syscall, Syscall6, RawSyscall and
+// RawSyscall6) are a kind of their own: the scan cannot read what a
+// trap number does, so one outside the table fails. A dot import of a
+// package whose names the lists hold makes its bare identifiers count.
+//
+// What it does not see:
+//   - a package a binary links through a build constraint it does not
+//     read is read anyway, which only widens the scan;
+//   - a call through an argv built from variables;
+//   - a deletion that the argument of "update-ref --stdin" carries;
+//   - the git deletions 05 5.2 does not list: tag -d, push --delete,
+//     symbolic-ref --delete, reflog expire, worktree remove and prune;
+//   - the truncation of os.Create, os.WriteFile and (*os.Root).WriteFile,
+//     which name no flag and which the tree uses widely for new files,
+//     and of the Truncate method of an os.File, whose name a time.Time
+//     shares;
+//   - a method of another type whose name is one of methodHits (the
+//     Remove of container/list), which is a false finding.
 package callsites
 
 import (
@@ -47,7 +59,7 @@ const (
 
 // i16Kinds are the kinds the scan of I16 reads in the packages romeu
 // links.
-var i16Kinds = []Kind{KindRemove, KindRename, KindTruncate, KindUpdateRefDelete, KindBranchDelete, KindGCPrune, KindEnvRm}
+var i16Kinds = []Kind{KindRemove, KindRename, KindTruncate, KindSyscall, KindUpdateRefDelete, KindBranchDelete, KindGCPrune, KindEnvRm}
 
 // Scan judges the module at root, whose path is module, against the
 // table, and returns the findings sorted by place.

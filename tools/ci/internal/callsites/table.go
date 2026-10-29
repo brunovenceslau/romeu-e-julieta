@@ -18,8 +18,14 @@ const (
 	// atomic replace of renameio (WriteFile, Symlink and
 	// CloseAtomicallyReplace), which ends in a rename.
 	KindRename Kind = "rename-over"
-	// KindTruncate is the O_TRUNC flag.
-	KindTruncate Kind = "O_TRUNC"
+	// KindTruncate is the O_TRUNC flag and the truncating calls: the
+	// Truncate and Ftruncate of os, syscall and unix.
+	KindTruncate Kind = "truncate"
+	// KindSyscall is a raw system call: syscall and unix Syscall,
+	// Syscall6, RawSyscall and RawSyscall6, and the unix calls that
+	// return no error. Its trap is a number the scan does not read, so
+	// it may delete, rename or truncate.
+	KindSyscall Kind = "raw syscall"
 	// KindUpdateRefDelete is git update-ref with -d or --delete.
 	KindUpdateRefDelete Kind = "update-ref -d"
 	// KindBranchDelete is git branch with -D, -d or --delete.

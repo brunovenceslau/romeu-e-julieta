@@ -38,16 +38,24 @@ var (
 		"os":                            {"Rename"},
 		"syscall":                       {"Rename", "Renameat"},
 		"golang.org/x/sys/unix":         {"Rename", "Renameat", "Renameat2"},
+		"github.com/google/renameio":    {"WriteFile", "Symlink"},
 		"github.com/google/renameio/v2": {"WriteFile", "Symlink"},
 	}
-	truncPackages = []string{"os", "syscall", "golang.org/x/sys/unix"}
+	truncNames = map[string][]string{
+		"os":                    {"Truncate"},
+		"syscall":               {"Truncate", "Ftruncate"},
+		"golang.org/x/sys/unix": {"Truncate", "Ftruncate"},
+	}
+	// truncFlagPackages are the packages whose O_TRUNC flag is read.
+	truncFlagPackages = []string{"os", "syscall", "golang.org/x/sys/unix"}
 )
 
 // methodHits are the methods, on a receiver the scan cannot type, that
 // do what a listed function does: the Remove, RemoveAll and Rename of
-// an os.Root, and the atomic replace of a renameio pending file. A
-// method of another type with the same name is a false finding, and the
-// fix is a name that differs.
+// an os.Root and the atomic replace of a
+// renameio pending file. A method of another type with the same name,
+// such as the Remove of container/list, is a false finding, and the fix
+// is a name that differs.
 var methodHits = map[string]Kind{
 	"Remove":                 KindRemove,
 	"RemoveAll":              KindRemove,
@@ -63,14 +71,49 @@ var runnerNames = []string{"Run", "CombinedOutput"}
 // admits.
 var execNames = []string{"Command", "CommandContext"}
 
+// kindOf returns the kind of the function name of the package imported,
+// and ok false for a name no kind lists.
+func kindOf(imported, name, module string) (Kind, bool) {
+	switch {
+	case slices.Contains(removeNames[imported], name):
+		return KindRemove, true
+	case slices.Contains(renameNames[imported], name):
+		return KindRename, true
+	case slices.Contains(truncNames[imported], name),
+		name == "O_TRUNC" && slices.Contains(truncFlagPackages, imported):
+		return KindTruncate, true
+	case slices.Contains(rawCalls[imported], name):
+		return KindSyscall, true
+	case imported == "os/exec" && slices.Contains(execNames, name):
+		return KindExec, true
+	case imported == module+"/"+procgroupPath && slices.Contains(runnerNames, name):
+		return KindRunner, true
+	}
+	return "", false
+}
+
 // hitsOf returns the listed calls the node n makes. A selector counts
 // whether it is called or taken as a value, so a listed function cannot
-// hide in a variable; the string arguments of a call or a composite
-// literal are read as an argv.
-func hitsOf(n ast.Node, names map[string]string, module string) []hit {
+// hide in a variable; a bare identifier counts when the file
+// dot-imports a package that lists it; the string arguments of a call
+// or a composite literal are read as an argv. selectors holds the names
+// of the selectors already seen, which are no bare identifiers.
+func hitsOf(n ast.Node, imports fileImports, module string, selectors map[*ast.Ident]bool) []hit {
 	switch n := n.(type) {
 	case *ast.SelectorExpr:
-		return selectorHits(n, names, module)
+		selectors[n.Sel] = true
+		return selectorHits(n, imports, module)
+	case *ast.Ident:
+		if selectors[n] {
+			return nil
+		}
+		var hits []hit
+		for _, dot := range imports.dots {
+			if kind, ok := kindOf(dot, n.Name, module); ok {
+				hits = append(hits, hit{kind, label(kind, dot, n.Name) + " (dot-imported)"})
+			}
+		}
+		return hits
 	case *ast.CallExpr:
 		return argvHits(n.Args)
 	case *ast.CompositeLit:
@@ -80,12 +123,12 @@ func hitsOf(n ast.Node, names map[string]string, module string) []hit {
 }
 
 // selectorHits judges one selector.
-func selectorHits(sel *ast.SelectorExpr, names map[string]string, module string) []hit {
+func selectorHits(sel *ast.SelectorExpr, imports fileImports, module string) []hit {
 	name := sel.Sel.Name
 	x, isIdent := sel.X.(*ast.Ident)
 	imported, qualified := "", false
 	if isIdent {
-		imported, qualified = names[x.Name]
+		imported, qualified = imports.names[x.Name]
 	}
 	if !qualified {
 		if kind, ok := methodHits[name]; ok {
@@ -93,21 +136,19 @@ func selectorHits(sel *ast.SelectorExpr, names map[string]string, module string)
 		}
 		return nil
 	}
-	pkg := imported + "." + name
-	var hits []hit
-	switch {
-	case slices.Contains(removeNames[imported], name):
-		hits = append(hits, hit{KindRemove, pkg})
-	case slices.Contains(renameNames[imported], name):
-		hits = append(hits, hit{KindRename, pkg})
-	case name == "O_TRUNC" && slices.Contains(truncPackages, imported):
-		hits = append(hits, hit{KindTruncate, pkg})
-	case imported == "os/exec" && slices.Contains(execNames, name):
-		hits = append(hits, hit{KindExec, pkg})
-	case imported == module+"/"+procgroupPath && slices.Contains(runnerNames, name):
-		hits = append(hits, hit{KindRunner, "procgroup." + name})
+	if kind, ok := kindOf(imported, name, module); ok {
+		return []hit{{kind, label(kind, imported, name)}}
 	}
-	return hits
+	return nil
+}
+
+// label names a call in a finding: the import path and the name, and
+// "procgroup" for the runner, whose import path is the module's.
+func label(kind Kind, imported, name string) string {
+	if kind == KindRunner {
+		return "procgroup." + name
+	}
+	return imported + "." + name
 }
 
 // argvHits reads the string literals among args, in order, as the argv
@@ -128,10 +169,10 @@ func argvHits(args []ast.Expr) []hit {
 		i := slices.Index(words, first)
 		return i >= 0 && slices.ContainsFunc(words[i+1:], match)
 	}
-	if after("update-ref", func(w string) bool { return w == "-d" || w == "--delete" }) {
+	if after("update-ref", func(w string) bool { return w == "--delete" || hasShort(w, "d") }) {
 		hits = append(hits, hit{KindUpdateRefDelete, "update-ref -d"})
 	}
-	if after("branch", func(w string) bool { return w == "-D" || w == "-d" || w == "--delete" }) {
+	if after("branch", func(w string) bool { return w == "--delete" || hasShort(w, "Dd") }) {
 		hits = append(hits, hit{KindBranchDelete, "branch -D"})
 	}
 	if after("gc", func(w string) bool { return strings.HasPrefix(w, "--prune") }) {
@@ -144,6 +185,12 @@ func argvHits(args []ast.Expr) []hit {
 		}
 	}
 	return hits
+}
+
+// hasShort reports whether w is a short-flag cluster ("-d", "-fD",
+// "-Dr") that holds one of the letters.
+func hasShort(w, letters string) bool {
+	return len(w) > 1 && w[0] == '-' && w[1] != '-' && strings.ContainsAny(w[1:], letters)
 }
 
 // funcName returns the name the table gives a declaration: "name", or
@@ -192,11 +239,12 @@ func siteFindings(t *tree, dirs map[string]bool, kinds []Kind, table []Site) []c
 			if s.isTest {
 				continue
 			}
-			names := importNames(s.file)
+			imports := importsOf(s.file)
+			selectors := map[*ast.Ident]bool{}
 			for _, decl := range s.file.Decls {
 				fn := funcName(decl)
 				ast.Inspect(decl, func(n ast.Node) bool {
-					for _, h := range hitsOf(n, names, t.module) {
+					for _, h := range hitsOf(n, imports, t.module, selectors) {
 						if !slices.Contains(kinds, h.kind) || admitted(table, h.kind, dir, fn) {
 							continue
 						}
