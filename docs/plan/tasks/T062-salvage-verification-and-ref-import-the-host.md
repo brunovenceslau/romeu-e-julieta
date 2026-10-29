@@ -7,13 +7,15 @@ fate: kept
 owns:
   - internal/salvage/verify*.go
   - internal/salvage/import*.go
+  - internal/salvage/errors.go
 needs:
   - T061
   - T033
   - T035
   - T024
 after: []
-ask_first: []
+ask_first:
+  - contracts
 sitting: none
 ---
 
@@ -23,6 +25,11 @@ Goal: Salvage verification and ref import, the host half, dark.
 
 Re-plan (2026-10-12): Kept as written before the re-plan; its files are
 the two globs above, in the package T061 owns by glob.
+
+Re-plan (2026-10-29): `owns` gains `internal/salvage/errors.go`, and
+`ask_first` gains `contracts`: the rows `salvage-path` (`RJ-307`) and
+`salvage-id-mismatch` (`RJ-339`) this task raises are declared in the
+package's `errors.go`, the one file name the error table reads.
 
 - Implements: REQ-0050 (01 1.2), REQ-0157 (02 2.6), REQ-0234 (03 3.8),
   REQ-0247 (03 3.11), REQ-0248 (03 3.11), REQ-0249 (03 3.11), REQ-0250
