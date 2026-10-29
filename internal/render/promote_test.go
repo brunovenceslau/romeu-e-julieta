@@ -6,6 +6,7 @@ package render_test
 import (
 	"errors"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -40,9 +41,7 @@ func candidateFixture(t *testing.T, envDir string, idByte byte, env string, bin 
 	require.NoError(t, os.MkdirAll(dir, 0o700))
 	c := render.Candidate{Dir: dir}
 	files := map[string]string{"sbxenv.yaml": sumOf([]byte(env))}
-	for k, v := range bin.Files() {
-		files[k] = v
-	}
+	maps.Copy(files, bin.Files())
 	for _, k := range kits {
 		digest, err := gate.KitTreeDigest(k.files)
 		require.NoError(t, err)
@@ -170,7 +169,7 @@ func TestPromoteWritesTheLiveFilesAndDeletesTheCandidate(t *testing.T) {
 	assert.NoDirExists(t, c.Dir)
 	ws, err := os.ReadFile(e.ws)
 	require.NoError(t, err)
-	assert.Equal(t, "{\"folders\": []}\n", string(ws))
+	assert.JSONEq(t, `{"folders": []}`, string(ws))
 
 	drifted, err := render.CheckDrift(e.envDir)
 	require.NoError(t, err)
@@ -344,10 +343,12 @@ func TestPromoteVerifiesAnExistingKitDirAndNeverRewritesIt(t *testing.T) {
 func TestCheckDriftNamesEachHandEditedFile(t *testing.T) {
 	cases := map[string]func(t *testing.T, envDir string, rec render.Record) string{
 		"sbxenv.yaml": func(t *testing.T, envDir string, _ render.Record) string {
+			t.Helper()
 			require.NoError(t, os.WriteFile(filepath.Join(envDir, render.LiveEnvFile), []byte("env: widened\n"), 0o600))
 			return render.LiveEnvFile
 		},
 		"a kit file": func(t *testing.T, envDir string, rec render.Record) string {
+			t.Helper()
 			for p := range rec.Files {
 				if strings.HasPrefix(p, render.LiveKitsDir+"/") {
 					require.NoError(t, os.WriteFile(filepath.Join(envDir, filepath.FromSlash(p), "julieta.yaml"), []byte("x\n"), 0o600))
@@ -358,11 +359,13 @@ func TestCheckDriftNamesEachHandEditedFile(t *testing.T) {
 			return ""
 		},
 		"SHA256SUMS": func(t *testing.T, envDir string, _ render.Record) string {
+			t.Helper()
 			p := path.Join(render.BinDir, render.SumsFile)
 			require.NoError(t, os.WriteFile(filepath.Join(envDir, filepath.FromSlash(p)), []byte("0  x\n"), 0o644))
 			return p
 		},
 		"a deleted file": func(t *testing.T, envDir string, _ render.Record) string {
+			t.Helper()
 			require.NoError(t, os.Remove(filepath.Join(envDir, render.LiveEnvFile)))
 			return render.LiveEnvFile
 		},

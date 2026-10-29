@@ -39,13 +39,13 @@ var (
 type Recovery int
 
 const (
-	// RecoveryNone: render.json held no promoting, so there was
+	// RecoveryNone means render.json held no promoting, so there was
 	// nothing to recover.
 	RecoveryNone Recovery = iota
-	// RecoveryFinished: the promotion was finished by repeating steps 2
+	// RecoveryFinished means the promotion was finished by repeating steps 2
 	// to 4.
 	RecoveryFinished
-	// RecoveryAbandoned: the promotion was abandoned (ErrPromotionAbandoned).
+	// RecoveryAbandoned means the promotion was abandoned (ErrPromotionAbandoned).
 	RecoveryAbandoned
 )
 
@@ -474,11 +474,10 @@ func candidateVerifies(root *os.Root, p Promoting) (bool, error) {
 		return false, fmt.Errorf("render: %w", err)
 	}
 	defer func() { _ = sub.Close() }()
+	// A candidate that cannot be read, or holds what is not a regular
+	// file, does not verify.
 	got, err := candidateFilesDigest(sub.FS())
-	if err != nil {
-		return false, nil //nolint:nilerr // a candidate that cannot be read does not verify.
-	}
-	return got == p.FilesDigest, nil
+	return err == nil && got == p.FilesDigest, nil
 }
 
 // candidateDir returns the path of the candidate id in <name>-env/.
