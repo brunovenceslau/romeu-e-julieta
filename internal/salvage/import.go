@@ -23,8 +23,8 @@ import (
 // set, in this order, each step only once the one before passed:
 //
 //  1. every ref m names in b passes CheckRef, and each salvage ref is
-//     below the prefix of this generation and salvage id, so a salvage
-//     ref of an earlier generation is not taken for this one's;
+//     below refs/salvage/<generation>/ of this generation, so a salvage
+//     ref of an earlier generation is not taken for this one's (I17);
 //  2. b is copied out of the salvage dir through the root into the
 //     work dir, its size and sha256 checked on the way (payload-mismatch);
 //  3. git bundle verify reads the copy; when it fails and the repo has
@@ -122,12 +122,14 @@ func (v *verifier) importBundle(ctx context.Context, root *os.Root, r VerifyRepo
 
 // checkBundleRef returns an error for a ref name a salvage bundle may
 // not carry: one CheckRef refuses, or a salvage ref (refs/salvage/)
-// outside RefPrefix of this generation and salvage id (REQ-0704).
+// outside refs/salvage/<generation>/ of this generation, the salvage
+// refs the bundle carries (REQ-0704): this salvage's and those of an
+// earlier salvage of the same generation.
 func (v *verifier) checkBundleRef(name string) error {
 	if err := CheckRef(name); err != nil {
 		return err
 	}
-	if prefix := RefPrefix(v.c.Generation, v.c.SalvageID); strings.HasPrefix(name, "refs/salvage/") && !strings.HasPrefix(name, prefix) {
+	if prefix := "refs/salvage/" + v.c.Generation + "/"; strings.HasPrefix(name, "refs/salvage/") && !strings.HasPrefix(name, prefix) {
 		return fmt.Errorf("the salvage ref %q is not below %s", clip(name), prefix)
 	}
 	return nil
