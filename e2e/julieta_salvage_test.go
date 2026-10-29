@@ -8,6 +8,7 @@ package e2e
 import (
 	"encoding/base64"
 	"encoding/json/v2"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -387,7 +388,9 @@ step agent tar -tzf `+salvageDir+`/agent/claude.tar.gz
 	require.NotNil(t, m.AgentStop)
 	assert.Equal(t, 1, m.AgentStop.Matched)
 	assert.Equal(t, 1, m.AgentStop.Killed, "it ignored SIGTERM")
-	assert.GreaterOrEqual(t, strings.TrimSpace(step(t, steps, "waited").stdout), "10", "SIGKILL after the 10 s wait")
+	waited, err := strconv.Atoi(strings.TrimSpace(step(t, steps, "waited").stdout))
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, waited, 10, "SIGKILL after the 10 s wait")
 	assert.Contains(t, step(t, steps, "gone").stdout, "gone")
 	assert.Equal(t, []string{"transcript-excluded .claude/projects/p/s.jsonl"}, m.reasons())
 	assert.True(t, m.Complete)
