@@ -28,6 +28,12 @@ type PR struct {
 	BaseSHA, BaseRef, DefaultBranch string
 }
 
+// JobName is the name of the pr job and of the check it posts: the
+// grammar of tools/ci workflows holds pr.yml's one job to it, and pr
+// refuses a job of the head outside that file that could post a check of
+// the same name (REQ-1154).
+const JobName = "pr"
+
 // tasksDir is the directory of the task files of the plan, whose names
 // start with the task id.
 const tasksDir = "docs/plan/tasks"
@@ -165,7 +171,10 @@ func ReadPayload(name string) (PR, error) {
 
 // Judge reads from git what the approval rules need and judges the
 // pull request: the walk from base.sha to head.sha finds a commit
-// (REQ-0819), and the body carries the approval lines its diff needs.
+// (REQ-0819), the head holds no file the go command would read from the
+// pr job's checkout and no job that could post the pr job's check
+// (headFindings), and the body carries the approval lines its diff
+// needs.
 // With fetch set, which only the pr job sets (cmd/pr), a head.sha the
 // clone lacks is fetched first (fetchHead); without it, a missing
 // commit is an error, so a local run reads no network (REQ-0816).
@@ -193,6 +202,10 @@ func Judge(ctx context.Context, r git.Repo, pr PR, fetch bool) ([]Finding, error
 	if len(bytes.TrimSpace(out)) == 0 {
 		return []Finding{{Where: "pull request", Msg: "the walk from base.sha to head.sha finds no commit"}}, nil
 	}
+	findings, err := headFindings(ctx, r, head)
+	if err != nil {
+		return nil, err
+	}
 	changed, err := changedPaths(ctx, r, base, head)
 	if err != nil {
 		return nil, err
@@ -215,7 +228,6 @@ func Judge(ctx context.Context, r git.Repo, pr PR, fetch bool) ([]Finding, error
 	if err != nil {
 		grants = nil
 	}
-	var findings []Finding
 	if _, err := readGrants(ctx, r, head); err != nil {
 		findings = append(findings, Finding{Where: GrantsPath, Msg: "at the head: " + err.Error()})
 	}

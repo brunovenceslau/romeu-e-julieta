@@ -448,7 +448,8 @@ func TestPRTemplateHasNoApprovalLine(t *testing.T) {
 // the one reader, Parse of this package (the generator through the Parse
 // of the askfirst package, which calls it), and pr reads docs/grants.yaml
 // with ParseGrants (no generator reads the grants); no other function of
-// either package decodes YAML. A reader inlined into either caller turns
+// either package decodes YAML but parseWorkflow, which reads the head's
+// workflow files (REQ-1154). A reader inlined into either caller turns
 // it red.
 func TestPROneReader(t *testing.T) {
 	calls := map[string]map[string]bool{}
@@ -471,7 +472,7 @@ func TestPROneReader(t *testing.T) {
 }
 
 // yamlReaders are the functions that decode YAML (TestPROneReader).
-var yamlReaders = []string{"approval.Parse", "approval.ParseGrants"}
+var yamlReaders = []string{"approval.Parse", "approval.ParseGrants", "approval.parseWorkflow"}
 
 // callsOf returns, for each function of the non-test files of dir, the
 // names it calls: a bare name, or "<package>.<name>".
