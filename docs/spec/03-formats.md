@@ -666,9 +666,10 @@ the same cases: `user` (the operator's role, expertise and working
 preferences), `feedback` (the session's own feedback on how the session
 itself is going: friction, a tool that misbehaved, a gap in a check, a
 process that slowed the work, written so that another session can triage
-it and implement the improvement in parallel, which is why SessionStart
-lists the open entries (08 8.2); also a correction the operator gave or an approach the
-operator confirmed), `project` (ongoing
+it and implement the improvement in parallel; SessionStart lists the
+open entries of every type (08 8.1, REQ-0659), so that session sees it.
+It also holds a correction the operator gave or an approach the operator
+confirmed), `project` (ongoing
 work, decisions and ordering that the code and the git history do not
 hold) and `reference` (where to find something outside the repository).
 The fifth, `handoff`, is the narrative a session leaves for the next
