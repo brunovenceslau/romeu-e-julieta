@@ -4,6 +4,7 @@
 package callsites
 
 import (
+	"go/ast"
 	"maps"
 	"os"
 	"path/filepath"
@@ -62,6 +63,13 @@ func binaries(romeuImports, julietaImports []string) map[string]string {
 	}
 }
 
+// siteOnly keeps the findings of the scan against the table. The scan
+// of os/exec and raw system calls (procgroup.go) reports some of the
+// same calls under its own rule.
+func siteOnly(findings []check.Finding) []check.Finding {
+	return slices.DeleteFunc(slices.Clone(findings), func(f check.Finding) bool { return f.Rule != ruleSite })
+}
+
 // scanFixture scans the files plus the two entry packages.
 func scanFixture(t *testing.T, files map[string]string, romeuImports, julietaImports []string, table []Site) []check.Finding {
 	t.Helper()
@@ -98,6 +106,17 @@ func TestCallsitesListedCallsOutsideTheTable(t *testing.T) {
 		{"update-ref -d", ``, `run("update-ref", "-d", "refs/x")`, KindUpdateRefDelete},
 		{"update-ref --delete", ``, `run("-C", "d", "update-ref", "--delete", "refs/x")`, KindUpdateRefDelete},
 		{"branch -D", ``, `run("branch", "-D", "x")`, KindBranchDelete},
+		{"update-ref cluster", ``, `run("update-ref", "-md", "refs/x")`, KindUpdateRefDelete},
+		{"branch cluster", ``, `run("branch", "-fD", "x")`, KindBranchDelete},
+		{"branch cluster with r", ``, `run("branch", "-Dr", "x")`, KindBranchDelete},
+		{"os.Truncate", `"os"`, `_ = os.Truncate("a", 0)`, KindTruncate},
+		{"syscall.Ftruncate", `"syscall"`, `_ = syscall.Ftruncate(3, 0)`, KindTruncate},
+		{"unix.Truncate", `"golang.org/x/sys/unix"`, `_ = unix.Truncate("a", 0)`, KindTruncate},
+		{"renameio v1 WriteFile", `"github.com/google/renameio"`, `_ = renameio.WriteFile("a", nil, 0o600)`, KindRename},
+		{"syscall.Syscall", `"syscall"`, `_, _, _ = syscall.Syscall(87, 0, 0, 0)`, KindSyscall},
+		{"syscall.RawSyscall6", `"syscall"`, `_, _, _ = syscall.RawSyscall6(87, 0, 0, 0, 0, 0, 0)`, KindSyscall},
+		{"unix.Syscall", `"golang.org/x/sys/unix"`, `_, _, _ = unix.Syscall(unix.SYS_UNLINK, 0, 0, 0)`, KindSyscall},
+		{"unix.RawSyscallNoError", `"golang.org/x/sys/unix"`, `_, _ = unix.RawSyscallNoError(0, 0, 0, 0)`, KindSyscall},
 		{"gc --prune", ``, `_ = []string{"gc", "--prune=now"}`, KindGCPrune},
 		{"sbx env rm", ``, `run("env", "rm", "--force", "dir")`, KindEnvRm},
 	}
@@ -108,7 +127,7 @@ func TestCallsitesListedCallsOutsideTheTable(t *testing.T) {
 				src = strings.Replace(src, "import \n\n", "", 1)
 			}
 			files := map[string]string{"internal/x/x.go": src}
-			findings := scanFixture(t, files, []string{"internal/x"}, nil, nil)
+			findings := siteOnly(scanFixture(t, files, []string{"internal/x"}, nil, nil))
 			require.Len(t, findings, 2, "both functions fail with an empty table: %v", whereMsgs(findings))
 			for _, f := range findings {
 				assert.Equal(t, ruleSite, f.Rule)
@@ -116,7 +135,7 @@ func TestCallsitesListedCallsOutsideTheTable(t *testing.T) {
 				assert.Contains(t, f.Msg, "which the admitted-call-site table does not name")
 			}
 
-			admitted := scanFixture(t, files, []string{"internal/x"}, nil, []Site{{tt.kind, "internal/x", "Do"}})
+			admitted := siteOnly(scanFixture(t, files, []string{"internal/x"}, nil, []Site{{tt.kind, "internal/x", "Do"}}))
 			require.Len(t, admitted, 1, "only Other is left: %v", whereMsgs(admitted))
 			assert.Contains(t, admitted[0].Msg, "in Other of internal/x")
 		})
@@ -182,6 +201,87 @@ func TestCallsitesI16ReadsPackagesRomeuLinks(t *testing.T) {
 	findings := scanFixture(t, files, []string{"internal/via"}, []string{"internal/jonly"}, nil)
 	assert.Equal(t, []string{
 		"internal/shared/shared.go:5: os.Remove (os.Remove*) in F of internal/shared, which the admitted-call-site table does not name",
+	}, whereMsgs(findings))
+}
+
+// TestCallsitesDotImports holds that an identifier of a dot-imported
+// package counts as a call of that package, and that a selector on a
+// value with the same name does not count twice.
+func TestCallsitesDotImports(t *testing.T) {
+	files := map[string]string{
+		"internal/x/x.go": `package x
+
+import (
+	. "os"
+	. "syscall"
+)
+
+func Drop() { _ = Remove("a"); _ = Rename("a", "b"); _ = Truncate("a", 0) }
+
+func Flag() int { return O_TRUNC }
+
+func Raw() { _, _, _ = Syscall(87, 0, 0, 0) }
+
+func Quiet(r interface{ Name() string }) string { return r.Name() }
+`,
+	}
+	findings := siteOnly(scanFixture(t, files, []string{"internal/x"}, nil, nil))
+	assert.ElementsMatch(t, []string{
+		"internal/x/x.go:10: os.O_TRUNC (dot-imported) (truncate) in Flag of internal/x, which the admitted-call-site table does not name",
+		"internal/x/x.go:12: syscall.Syscall (dot-imported) (raw syscall) in Raw of internal/x, which the admitted-call-site table does not name",
+		"internal/x/x.go:8: os.Remove (dot-imported) (os.Remove*) in Drop of internal/x, which the admitted-call-site table does not name",
+		"internal/x/x.go:8: os.Rename (dot-imported) (rename-over) in Drop of internal/x, which the admitted-call-site table does not name",
+		"internal/x/x.go:8: os.Truncate (dot-imported) (truncate) in Drop of internal/x, which the admitted-call-site table does not name",
+		"internal/x/x.go:8: syscall.Rename (dot-imported) (rename-over) in Drop of internal/x, which the admitted-call-site table does not name",
+		"internal/x/x.go:8: syscall.Truncate (dot-imported) (truncate) in Drop of internal/x, which the admitted-call-site table does not name",
+		"internal/x/x.go:10: syscall.O_TRUNC (dot-imported) (truncate) in Flag of internal/x, which the admitted-call-site table does not name",
+	}, whereMsgs(findings))
+}
+
+// TestCallsitesGitKindsOutsideTheSpec holds the edge of the listed git
+// kinds: 05 5.2 lists update-ref -d, branch -D and gc --prune, so a tag
+// delete, a push delete, a symbolic-ref delete, reflog expire, worktree
+// remove and prune are not seen (the doc of the package says so), and a
+// flag cluster that holds no deleting letter is not a finding.
+func TestCallsitesGitKindsOutsideTheSpec(t *testing.T) {
+	files := map[string]string{
+		"internal/x/x.go": `package x
+
+func run(args ...string) {}
+
+func Unlisted() {
+	run("tag", "-d", "v1")
+	run("push", "--delete", "origin", "x")
+	run("symbolic-ref", "--delete", "HEAD")
+	run("reflog", "expire", "--all")
+	run("worktree", "remove", "w")
+	run("prune")
+	run("branch", "-vv")
+	run("branch", "--list", "-r")
+	run("update-ref", "-m", "msg", "refs/x", "oid")
+	run("gc", "--auto")
+}
+`,
+	}
+	assert.Empty(t, scanFixture(t, files, []string{"internal/x"}, nil, nil))
+}
+
+// TestCallsitesMethodsOfOtherTypesAreKnownFalseFindings holds a limit
+// the scan states: it reads no types, so the Remove method of any value
+// counts as a Remove of an os.Root. The fix for the code is a name that
+// differs.
+func TestCallsitesMethodsOfOtherTypesAreKnownFalseFindings(t *testing.T) {
+	files := map[string]string{
+		"internal/x/x.go": `package x
+
+import "container/list"
+
+func Drop(l *list.List, e *list.Element) { l.Remove(e) }
+`,
+	}
+	findings := scanFixture(t, files, []string{"internal/x"}, nil, nil)
+	assert.Equal(t, []string{
+		"internal/x/x.go:5: .Remove (os.Remove*) in Drop of internal/x, which the admitted-call-site table does not name",
 	}, whereMsgs(findings))
 }
 
@@ -274,10 +374,10 @@ func TestCallsitesNeedsBothBinaries(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// TestCallsitesTree runs the check over this module with the admitted
-// table. The scan is proved not inert on the real code first: with an
-// empty table it must find a call of every kind this module makes today.
-func TestCallsitesTree(t *testing.T) {
+// TestCallsitesTreeIsNotInert proves the scan of the real code reads
+// it: with a table that names only the os/exec call, it finds a call of
+// every kind this module makes today.
+func TestCallsitesTreeIsNotInert(t *testing.T) {
 	root := citest.ModuleRoot(t)
 	module, err := modulePath(root)
 	require.NoError(t, err)
@@ -288,4 +388,89 @@ func TestCallsitesTree(t *testing.T) {
 		assert.True(t, slices.ContainsFunc(bare, func(f check.Finding) bool { return strings.Contains(f.Msg, want) }),
 			"an empty table must fail a call of kind %s", want)
 	}
+}
+
+// pendingTree are the call sites of this module that the table does not
+// admit and 05 5.2 has no row for, each as "file message" without its
+// line. They are reported to the operator, not admitted (T039); the
+// list only shrinks, and the test below fails both on a new call site
+// and on one of these that is gone or admitted, so it must then leave
+// the list. An empty list is the end state: the tree with Admitted
+// yields no finding.
+var pendingTree = []string{
+	"internal/cmd/romeu/init/init.go os.RemoveAll (os.Remove*) in run of internal/cmd/romeu/init, which the admitted-call-site table does not name",
+	"internal/cmd/romeu/init/init.go .Rename (rename-over) in cloneConfig of internal/cmd/romeu/init, which the admitted-call-site table does not name",
+	"internal/cmd/romeu/init/init.go .Remove (os.Remove*) in made.undo of internal/cmd/romeu/init, which the admitted-call-site table does not name",
+	"internal/cmd/romeu/init/init.go os.Remove (os.Remove*) in made.undo of internal/cmd/romeu/init, which the admitted-call-site table does not name",
+	"internal/gitsafe/clone.go os.RemoveAll (os.Remove*) in Runner.clone of internal/gitsafe, which the admitted-call-site table does not name",
+	"internal/render/promote.go .Rename (rename-over) in ensureKitDir of internal/render, which the admitted-call-site table does not name",
+	"internal/state/write.go .CloseAtomicallyReplace (rename-over) in writeFile of internal/state, which the admitted-call-site table does not name",
+}
+
+// TestCallsitesTreeWithAdmitted runs the check over this module with the
+// admitted table: it yields no finding but the pending ones.
+func TestCallsitesTreeWithAdmitted(t *testing.T) {
+	root := citest.ModuleRoot(t)
+	module, err := modulePath(root)
+	require.NoError(t, err)
+
+	findings, err := Scan(root, module, Admitted)
+	require.NoError(t, err)
+	var got []string
+	for _, f := range findings {
+		file, _, _ := strings.Cut(f.Where, ":")
+		got = append(got, file+" "+f.Msg)
+	}
+	assert.ElementsMatch(t, pendingTree, got)
+}
+
+// rowExists reports whether the row names a function of a non-test file
+// of its package in the tree; a row of AnyFunc needs the package to have
+// one such file.
+func rowExists(tr *tree, row Site) bool {
+	for _, s := range tr.dirs[row.Package] {
+		if s.isTest {
+			continue
+		}
+		if row.Func == AnyFunc {
+			return true
+		}
+		if slices.ContainsFunc(s.file.Decls, func(d ast.Decl) bool { return funcName(d) == row.Func }) {
+			return true
+		}
+	}
+	return false
+}
+
+// TestCallsitesAdmittedRowsExist holds that each row of the table names
+// a function that exists, so a row outlives neither its function nor
+// its package.
+func TestCallsitesAdmittedRowsExist(t *testing.T) {
+	root := citest.ModuleRoot(t)
+	module, err := modulePath(root)
+	require.NoError(t, err)
+	tr, err := parseModule(root, module)
+	require.NoError(t, err)
+
+	for _, row := range Admitted {
+		assert.True(t, rowExists(tr, row), "%s: %s in %s names no function of the tree", row.Kind, row.Func, row.Package)
+	}
+}
+
+// TestCallsitesStaleRowFails is the positive control of the test above:
+// a row for a function or a package that does not exist is found
+// missing, and one that exists is found.
+func TestCallsitesStaleRowFails(t *testing.T) {
+	root := writeTree(t, map[string]string{
+		"internal/x/x.go":      "package x\n\nfunc Real() {}\n\ntype T struct{}\n\nfunc (t *T) Method() {}\n",
+		"internal/x/x_test.go": "package x\n\nfunc OnlyInTests() {}\n",
+	})
+	tr, err := parseModule(root, fixtureModule)
+	require.NoError(t, err)
+	assert.True(t, rowExists(tr, Site{KindRemove, "internal/x", "Real"}))
+	assert.True(t, rowExists(tr, Site{KindRemove, "internal/x", "T.Method"}))
+	assert.True(t, rowExists(tr, Site{KindRunner, "internal/x", AnyFunc}))
+	assert.False(t, rowExists(tr, Site{KindRemove, "internal/x", "Gone"}))
+	assert.False(t, rowExists(tr, Site{KindRemove, "internal/x", "OnlyInTests"}))
+	assert.False(t, rowExists(tr, Site{KindRemove, "internal/gone", "Real"}))
 }
