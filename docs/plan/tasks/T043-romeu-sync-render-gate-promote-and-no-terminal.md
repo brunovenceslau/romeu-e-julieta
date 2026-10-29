@@ -35,6 +35,7 @@ needs:
 after: []
 ask_first:
   - contracts
+  - gates
   - release
   - spec
 sitting: none

@@ -43,8 +43,8 @@ in `internal/render/promote.go`, which T043 does not own:
    REQ-0086 gains the sentence, and the drift row of REQ-0342 (04 4.2
    step 7) says the flag covers a kit dir.
 
-- Implements: REQ-0086 (01 1.6) and REQ-0342 (04 4.2), the two
-  sentences; the rest of both is T039's and T043's.
+- Implements: REQ-0086 (01 1.6), REQ-0342 (04 4.2): the two sentences
+  above; the rest of both ids is T039's and T043's.
 - Operator: approves the `spec` surface for the sentence of REQ-0086.
 - Acceptance:
   - A candidate dir rewritten between the answer and the promotion (a
