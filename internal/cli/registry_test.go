@@ -232,3 +232,66 @@ func TestLockField(t *testing.T) {
 		}
 	}
 }
+
+// wrapped is a julieta fixture command with a step around it: the step
+// prints before and after the command, and passes on the command's
+// error when --fail is given, adding its own when --step-fails is.
+var _ = cli.Register(func() cli.Command {
+	c := cli.Define(cli.PreflightNone, cli.LockNone, cli.AppendsNothing(), cli.SnapshotNone, cli.ReadsOnly)
+	c.Binary, c.Name = "julieta", "wrapped"
+	c.NoJourney = "a fixture of the registry tests"
+	c.New = func(env *cli.Env) *cobra.Command {
+		var fail bool
+		cmd := &cobra.Command{Use: "wrapped", Args: cobra.NoArgs, RunE: func(*cobra.Command, []string) error {
+			_, _ = env.Stdout.Write([]byte("work\n"))
+			if fail {
+				return cli.Internal.New("the work failed")
+			}
+			return nil
+		}}
+		cmd.Flags().BoolVar(&fail, "fail", false, "fail the work")
+		cmd.Flags().Bool("step-fails", false, "fail the step")
+		return cmd
+	}
+	return c
+}())
+
+var _ = cli.Wrap("julieta", "wrapped", func(env *cli.Env, cmd *cobra.Command, args []string, run func() error) error {
+	_, _ = env.Stdout.Write([]byte("before\n"))
+	if err := run(); err != nil {
+		return err
+	}
+	cli.Warn(env.Stderr, "sbx-untested", "after the work")
+	if f, _ := cmd.Flags().GetBool("step-fails"); f {
+		return cli.Internal.New("the step failed")
+	}
+	return nil
+})
+
+// TestWrap runs the step around its command: before the work, the work,
+// then the step's warning; a command that fails ends the step, and a
+// step that fails fails the command.
+func TestWrap(t *testing.T) {
+	code, stdout, stderr := run(t, "julieta", "wrapped")
+	assert.Equal(t, 0, code)
+	assert.Equal(t, "before\nwork\n", stdout)
+	assert.Equal(t, "warning sbx-untested: after the work\n", stderr)
+
+	code, stdout, stderr = run(t, "julieta", "wrapped", "--fail")
+	assert.Equal(t, 1, code)
+	assert.Equal(t, "before\nwork\n", stdout)
+	assert.NotContains(t, stderr, "after the work", "no step after a failed command")
+
+	code, _, stderr = run(t, "julieta", "wrapped", "--step-fails")
+	assert.Equal(t, 1, code)
+	assert.Contains(t, stderr, "the step failed")
+}
+
+// TestWrapRefuses panics on a second step for one command line, on a
+// nil step and on a binary that is not one.
+func TestWrapRefuses(t *testing.T) {
+	step := func(*cli.Env, *cobra.Command, []string, func() error) error { return nil }
+	assert.PanicsWithError(t, "cli: a second step around julieta wrapped", func() { cli.Wrap("julieta", "wrapped", step) })
+	assert.PanicsWithError(t, "cli: a nil step around julieta other", func() { cli.Wrap("julieta", "other", nil) })
+	assert.Panics(t, func() { cli.Wrap("sbx", "run", step) })
+}

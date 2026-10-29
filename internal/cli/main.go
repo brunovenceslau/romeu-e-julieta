@@ -98,8 +98,8 @@ func captureStderr(w io.Writer) func() {
 
 // Tree returns a new cobra tree of env.Binary: the root, a group command
 // above each set of subcommands, the command of each registered
-// definition, the help command and the completion command (ADR 0015,
-// decisions 2, 4 and 5). Each call builds every command anew, so no
+// definition, with the step Wrap registered around it, the help command
+// and the completion command (ADR 0015, decisions 2, 4 and 5). Each call builds every command anew, so no
 // package holds a command of the tree and nothing is written to the
 // registry after main starts. Its output and error streams are
 // env.Stdout and env.Stderr, its help is this package's, and its errors
@@ -125,6 +125,12 @@ func Tree(env *Env) *cobra.Command {
 	for _, def := range commands.list(env.Binary) {
 		c := def.New(env)
 		run := c.RunE
+		if around := commands.around(def); around != nil {
+			inner := run
+			run = func(c *cobra.Command, args []string) error {
+				return around(env, c, args, func() error { return inner(c, args) })
+			}
+		}
 		c.RunE = func(c *cobra.Command, args []string) error {
 			if err := run(c, args); err != nil {
 				return Of(err)

@@ -69,7 +69,7 @@ func TestValidateMemoryRemote(t *testing.T) {
 	require.NoError(t, p.Validate(), "a spec without memory stays valid")
 	for _, ok := range []string{"none", "https://github.com/example/shop-memory", "https://git.corp.internal:8443/a/b.git", "git://127.0.0.1:9418/m"} {
 		p := memoryProject(&spec.Memory{Remote: ok})
-		assert.NoError(t, p.Validate(), ok)
+		require.NoError(t, p.Validate(), ok)
 	}
 	for _, bad := range []string{"", "None", "file:///tmp/m", "/tmp/m", "ssh://git@github.com/a/b", "git@github.com:a/b",
 		"git://example.com/m", "https://user:pw@github.com/a/b", "https://github.com/a b", "https://", "https:///a", "http://github.com/a/b"} {

@@ -61,7 +61,7 @@ func TestInitSeparate(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(config), "worktree")
 	_, err = os.Stat(filepath.Join(s.GitDir, "hooks"))
-	assert.ErrorIs(t, err, os.ErrNotExist, "no template")
+	require.ErrorIs(t, err, os.ErrNotExist, "no template")
 
 	require.ErrorIs(t, r.InitSeparate(t.Context(), s), ErrRefused, "the git dir exists")
 	require.ErrorIs(t, newRunner(t, Sandbox).InitSeparate(t.Context(), newSeparate(t)), ErrRefused)
