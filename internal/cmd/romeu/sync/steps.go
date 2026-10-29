@@ -27,9 +27,9 @@ type step struct {
 // docs/plan.md): a task that adds a step edits this slice by one line.
 // Step 9 (live changes) stays dark until T047.
 var steps = []step{
-	{n: 1, name: "lock, settings and gate 1", do: notBuilt},
-	{n: 2, name: "fetch the config repo", do: notBuilt},
-	{n: 3, name: "read and validate the specs", do: notBuilt},
+	{n: 1, name: "lock, settings and gate 1", do: lockAndCheck},
+	{n: 2, name: "fetch the config repo", do: fetchConfig},
+	{n: 3, name: "read and validate the specs", do: readSpecs},
 	{n: 4, name: "create the tree and fetch the repos", do: notBuilt},
 	{n: 5, name: "check the memory dirs", do: notBuilt},
 	{n: 6, name: "read descriptors and render the candidate", do: notBuilt},

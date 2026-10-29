@@ -8,6 +8,7 @@ package sync
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -144,19 +145,28 @@ func TestUsageNamesTheRuleAndExitsTwo(t *testing.T) {
 }
 
 func TestTheCommandParsesItsFlagsAndRunsTheSteps(t *testing.T) {
-	var got flags
-	saved := steps
-	t.Cleanup(func() { steps = saved })
-	steps = []step{{n: 1, name: "step", do: func(_ context.Context, r *run) error { got = r.flags; return nil }}}
-	cmd := definition.New(&cli.Env{})
-	cmd.SetArgs([]string{"--all", "--from", "abc123", "--overwrite-drift", "shop", "blog"})
-	cmd.SetContext(context.Background())
-	if err := cmd.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	want := flags{all: true, from: "abc123", overwriteDrift: true, names: []string{"shop", "blog"}}
-	if got.all != want.all || got.from != want.from || got.overwriteDrift != want.overwriteDrift || strings.Join(got.names, ",") != "shop,blog" {
-		t.Errorf("got %+v, want %+v", got, want)
+	sha := strings.Repeat("a", 40)
+	for _, tc := range []struct {
+		args []string
+		want flags
+	}{
+		{[]string{"--from", sha, "--overwrite-drift", "shop", "blog"}, flags{from: sha, overwriteDrift: true, names: []string{"shop", "blog"}}},
+		{[]string{"--all"}, flags{all: true, from: "origin"}},
+	} {
+		var got flags
+		saved := steps
+		t.Cleanup(func() { steps = saved })
+		steps = []step{{n: 1, name: "step", do: func(_ context.Context, r *run) error { got = r.flags; return nil }}}
+		cmd := definition.New(&cli.Env{})
+		cmd.SetArgs(tc.args)
+		cmd.SetContext(context.Background())
+		if err := cmd.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		if got.all != tc.want.all || got.from != tc.want.from || got.overwriteDrift != tc.want.overwriteDrift ||
+			strings.Join(got.names, ",") != strings.Join(tc.want.names, ",") {
+			t.Errorf("%v: got %+v, want %+v", tc.args, got, tc.want)
+		}
 	}
 }
 
@@ -168,8 +178,12 @@ func TestFromDefaultsToOrigin(t *testing.T) {
 }
 
 func TestAStepNotBuiltStopsTheRun(t *testing.T) {
-	err := runSteps(context.Background(), newRun(&cli.Env{}, flags{}), steps)
-	if !errors.Is(err, errNotBuilt) || !strings.Contains(err.Error(), "step 1") {
-		t.Fatalf("got %v, want step 1 not built", err)
+	list := slices.Clone(steps)
+	for i := range 3 {
+		list[i].do = func(context.Context, *run) error { return nil }
+	}
+	err := runSteps(context.Background(), newRun(&cli.Env{}, flags{}), list)
+	if !errors.Is(err, errNotBuilt) || !strings.Contains(err.Error(), "step 4") {
+		t.Fatalf("got %v, want step 4 not built", err)
 	}
 }
