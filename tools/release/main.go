@@ -17,16 +17,16 @@
 // the build asks the latest scheduled fuzz.yml run first, through the
 // GitHub API, with GH_TOKEN and GITHUB_REPOSITORY (owner/name) in its
 // environment; --dry-run reads no network and makes no such check. The
-// API is https and api.github.com unless --api-host names another
-// host:port. The tree must be clean; a dry run builds a dirty one only
-// with --allow-dirty and stamps it dirty. A release build also needs
+// API is https and api.github.com unless --api-host names another one,
+// as host:port. The tree must be clean; a dry run builds a dirty one
+// only with --allow-dirty and stamps it dirty. A release build also needs
 // the tag to name HEAD and each romeu binary to carry the bytes of its
 // julieta, which a package of romeu consumes, and a dry run says
 // plainly when one does not. --out must be absent or empty and is
 // written in one rename; it defaults to a new temporary directory. The
 // commands are in tools/release/internal/build, whose doc comment says
-// what the build does; this package parses the command line and calls it, under
-// procgroup.Main. The exit status is 0 when the archives, or the host
+// what the build does; this package parses the command line and calls
+// it, under procgroup.Main. The exit status is 0 when the archives, or the host
 // build's binary, are written, 1 when the build refuses or fails, and 2
 // for a wrong command line.
 package main
