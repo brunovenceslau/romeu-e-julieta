@@ -21,7 +21,6 @@ import (
 const goodPR = `name: pr
 on:
   pull_request_target:
-    branches: [main]
     types: [opened, synchronize, reopened, edited]
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -67,8 +66,8 @@ func TestWorkflowsPRAdmitted(t *testing.T) {
 }
 
 // TestWorkflowsPRRefused fails each change the pr job row refuses: one
-// fixture per refusal of T181's acceptance (the event without
-// branches: [main], a permission other than contents: read, a step
+// fixture per refusal of T181's acceptance (the event with a branches
+// filter, a permission other than contents: read, a step
 // naming a secret or github.token, a checkout of another ref, one of
 // pull_request.base.sha, a checkout without persist-credentials: false,
 // the file without edited), then the rest of the row.
@@ -79,9 +78,9 @@ func TestWorkflowsPRRefused(t *testing.T) {
 		old, new string
 		want     string
 	}{
-		{"the event without branches", "    branches: [main]\n", "", "holds branches: [main]"},
-		{"the event for another branch", "    branches: [main]\n", "    branches: [dev]\n", "holds branches: [main]"},
-		{"the event for main and another branch", "    branches: [main]\n", "    branches: [main, dev]\n", "holds branches: [main]"},
+		{"the event filtered to main", "    types: [opened, synchronize, reopened, edited]\n", "    branches: [main]\n    types: [opened, synchronize, reopened, edited]\n", "the filter branches"},
+		{"the event filtered to another branch", "    types: [opened, synchronize, reopened, edited]\n", "    branches: [dev]\n    types: [opened, synchronize, reopened, edited]\n", "the filter branches"},
+		{"the event filtered by branches-ignore", "    types: [opened, synchronize, reopened, edited]\n", "    branches-ignore: [dev]\n    types: [opened, synchronize, reopened, edited]\n", "the filter branches-ignore"},
 		{"a permission other than contents: read, at the top", "permissions:\n  contents: read\nenv", "permissions:\n  contents: read\n  pull-requests: read\nenv", "the permissions of pr.yml is contents: read"},
 		{"a write permission in the job", "    permissions:\n      contents: read\n", "    permissions:\n      contents: write\n", "the permissions of the job of pr.yml"},
 		{"no permissions in the job", "    permissions:\n      contents: read\n", "", "the permissions of the job of pr.yml"},
@@ -100,7 +99,8 @@ func TestWorkflowsPRRefused(t *testing.T) {
 		{"the file without types", "    types: [opened, synchronize, reopened, edited]\n", "", "lists edited"},
 		{"a second event", "on:\n  pull_request_target:\n", "on:\n  push:\n  pull_request_target:\n", "runs on pull_request_target alone"},
 		{"another event alone", "  pull_request_target:\n", "  pull_request:\n", "runs on pull_request_target alone"},
-		{"another filter", "    branches: [main]\n", "    branches: [main]\n    paths: [docs/**]\n", "the filter paths"},
+		{"another filter", "    types: [opened, synchronize, reopened, edited]\n", "    paths: [docs/**]\n    types: [opened, synchronize, reopened, edited]\n", "the filter paths"},
+		{"a paths-ignore filter", "    types: [opened, synchronize, reopened, edited]\n", "    paths-ignore: [docs/**]\n    types: [opened, synchronize, reopened, edited]\n", "the filter paths-ignore"},
 		{"a checkout of part of the history", "          fetch-depth: 0\n", "          fetch-depth: 1\n", "fetch-depth: 0"},
 		{"a checkout of the default depth", "          fetch-depth: 0\n", "", "fetch-depth: 0"},
 		{"a second job", "jobs:\n", "jobs:\n  other:\n    runs-on: ubuntu-26.04-arm\n    steps:\n      - run: go run ./tools/ci static\n", "holds one job"},

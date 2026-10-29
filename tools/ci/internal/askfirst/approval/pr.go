@@ -207,6 +207,11 @@ func Judge(ctx context.Context, r git.Repo, pr PR, fetch bool) ([]Finding, error
 	if err != nil {
 		return nil, err
 	}
+	stack, err := stackFindings(ctx, r, pr, base)
+	if err != nil {
+		return nil, err
+	}
+	findings = append(findings, stack...)
 	changed, err := changedPaths(ctx, r, base, head)
 	if err != nil {
 		return nil, err
@@ -251,8 +256,8 @@ var runGit = func(ctx context.Context, r git.Repo, args []string) ([]byte, error
 }
 
 // fetchRemote is the remote the pr job fetches a missing head from: the
-// one actions/checkout names, the repository of the default branch,
-// which serves the head of a pull request from a fork too.
+// one actions/checkout names, this repository (the base branch's), which
+// serves the head of a pull request from a fork too.
 const fetchRemote = "origin"
 
 // noCredentials are the settings the fetch of the head runs with, so it
@@ -287,6 +292,61 @@ func fetchHead(ctx context.Context, r git.Repo, sha string) error {
 		return fmt.Errorf("fetching head.sha %s: %w", sha, err)
 	}
 	return nil
+}
+
+// approvalsSurface is the id of the surface that holds the code pr
+// builds and the files that choose what runs (05 5.3, REQ-0539).
+const approvalsSurface = "approvals"
+
+// stackFindings is the guard of a stacked pull request (12 12.4,
+// REQ-1314): when the base is not the default branch, the judge that
+// runs is the base branch's, so the base's tree must equal the default
+// branch's on every path of the approvals surface, on the ask-first list
+// and on the grants, or the pull request below changes the judge and
+// merges first. The default branch is read from the clone's remote
+// branch (fetchRemote), which the pr job's checkout of the whole
+// history holds; a clone without it, or without the list there, is an
+// error, not a pass. The globs are the default branch's list's, the
+// trusted one, so a base that rewrites the list cannot hide the paths
+// it changes. A local run (no payload) names no base ref and is not a
+// stack. The guard runs in the base branch's code, so it is a courtesy
+// to the reviewer and not the gate: the pr run of the bottom pull
+// request, judged by the default branch's code, is.
+func stackFindings(ctx context.Context, r git.Repo, pr PR, base string) ([]Finding, error) {
+	if pr.BaseRef == "" || pr.DefaultBranch == "" || pr.BaseRef == pr.DefaultBranch {
+		return nil, nil
+	}
+	tip, err := commit(ctx, r, "refs/remotes/"+fetchRemote+"/"+pr.DefaultBranch)
+	if err != nil {
+		return nil, fmt.Errorf("the clone has no remote branch %s/%s, which the stack guard compares the base with: the pr job's checkout fetches the whole history (fetch-depth: 0)", fetchRemote, git.Printable(pr.DefaultBranch))
+	}
+	list, err := readList(ctx, r, tip)
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		return nil, fmt.Errorf("%s is missing at the default branch %s, which the stack guard reads", Path, git.Printable(pr.DefaultBranch))
+	}
+	globs := []string{Path, GrantsPath}
+	for _, s := range list.Surfaces {
+		if s.ID == approvalsSurface {
+			globs = append(globs, s.Globs...)
+		}
+	}
+	paths, err := diffPaths(ctx, r, tip, base)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range paths {
+		for _, g := range globs {
+			if GlobMatch(g, p) {
+				return []Finding{{Where: "pull request", Msg: fmt.Sprintf(
+					"the base %s differs from the default branch %s on %s, which the judge reads: the pull request below changes the judge, so it merges first, or the stack is rebuilt on the current %s (REQ-1314)",
+					git.Printable(pr.BaseRef), git.Printable(pr.DefaultBranch), git.Printable(p), git.Printable(pr.DefaultBranch))}}, nil
+			}
+		}
+	}
+	return nil, nil
 }
 
 // commit returns the full id of the commit rev names, or an error that

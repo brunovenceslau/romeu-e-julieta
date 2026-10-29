@@ -14,21 +14,23 @@ import (
 
 // The pr job row of 10 10.2 (REQ-0807, REQ-0813) and 12 12.4 (REQ-1149,
 // REQ-1150). Under pull_request_target GitHub runs the workflow file of
-// the default branch with a token that may write, so prFile alone may
-// name that event, and it is held to one shape:
+// the pull request's base branch with a token that may write, so prFile
+// alone may name that event, and it is held to one shape:
 //
-//   - on is the one event pull_request_target, filtered to pull requests
-//     into main (branches: [main]), whose types list edited, so a change
-//     to the title or the body runs pr again (REQ-0813), with opened,
+//   - on is the one event pull_request_target, with no branches filter,
+//     so a pull request into a stack branch is judged too (the ruleset
+//     of main requires the check on every pull request of a stack;
+//     decided on 2026-10-29), whose types list edited, so a change to
+//     the title or the body runs pr again (REQ-0813), with opened,
 //     synchronize and reopened and no other, and no other filter;
 //   - permissions, at the top and in the job, is contents: read and
 //     nothing else; no step names a secret or github.token (the
 //     expression rules of every file);
 //   - one job, approval.JobName, named so, with no strategy, no needs
 //     and timeout-minutes: 10, whose steps are one checkout
-//     of the default branch's commit, which names no ref and no
+//     of the base branch's commit, which names no ref and no
 //     repository (actions/checkout then checks out github.sha, the
-//     default branch's commit under this event: src/input-helper.ts at
+//     base branch's commit under this event: src/input-helper.ts at
 //     the pinned commit 3d3c42e, lines 79 to 82, read on 2026-10-29),
 //     with persist-credentials: false and the whole history of that
 //     branch (fetch-depth: 0, so the base and the merge base are in the
@@ -138,8 +140,9 @@ func (c *grammar) prWorkflow(doc *yaml.Node) {
 	c.prSteps(job)
 }
 
-// prTrigger holds the on of pr.yml: the one event prEvent, with
-// branches: [main] and types that list edited, and no other filter.
+// prTrigger holds the on of pr.yml: the one event prEvent, with types
+// that list edited, and no other filter: no branches, so a pull request
+// into a stack branch is judged too.
 func (c *grammar) prTrigger(doc *yaml.Node) {
 	on := field(doc, "on")
 	if on == nil || on.Kind != yaml.MappingNode || len(on.Content) != 2 || on.Content[0].Value != prEvent {
@@ -152,13 +155,9 @@ func (c *grammar) prTrigger(doc *yaml.Node) {
 	}
 	event := on.Content[1]
 	for key := range pairs(event) {
-		if key.Value != "branches" && key.Value != "types" {
-			c.add(key, "the filter "+key.Value+" of "+prEvent+" is outside the pr job row: branches and types")
+		if key.Value != "types" {
+			c.add(key, "the filter "+key.Value+" of "+prEvent+" is outside the pr job row: types alone, so pr runs for a pull request into any branch, a stack branch among them")
 		}
-	}
-	branches := field(event, "branches")
-	if b := seqContent(branches); len(b) != 1 || b[0].Kind != yaml.ScalarNode || b[0].Value != "main" {
-		c.add(on, prEvent+" of "+prFile+" holds branches: [main], so it runs for pull requests into main (the pr job row)")
 	}
 	var types []string
 	for _, t := range seqContent(field(event, "types")) {
@@ -202,10 +201,10 @@ func (c *grammar) prCheckout(step *yaml.Node) {
 	with := field(step, "with")
 	for _, key := range []string{"ref", "repository"} {
 		if v := field(with, key); v != nil {
-			c.add(v, "the pr job checks out the default branch's commit, github.sha, so its checkout names no "+key+", never pull_request.base.sha or the head (the pr job row)")
+			c.add(v, "the pr job checks out the base branch's commit, github.sha, so its checkout names no "+key+", never pull_request.base.sha or the head (the pr job row)")
 		}
 	}
 	if v := field(with, prDepth); v == nil || v.Kind != yaml.ScalarNode || v.Tag != "!!int" || v.Value != prDepthNone {
-		c.add(step, "the checkout of the pr job sets "+prDepth+": "+prDepthNone+", the whole history of the default branch (the pr job row)")
+		c.add(step, "the checkout of the pr job sets "+prDepth+": "+prDepthNone+", the whole history of the base branch (the pr job row)")
 	}
 }

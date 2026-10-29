@@ -478,7 +478,7 @@ or produced this, and does it exist now?" is answered mechanically:
 |---|---|---|
 | before push | `REQ-1128` tracked `.githooks/pre-push` runs `go run ./tools/ci fast` with git's pre-push arguments and stdin (contributors enable it with `git config core.hooksPath .githooks`; inside a sandbox, julieta's dispatcher runs it automatically and passes both through) | the steps marked in the `In fast` column of [10 10.2](10-testing-style.md#102-ci), the forbidden-name check over the pushed ref names and commits, and the never-tracked names of the hygiene rules over the paths they add |
 | every PR | `REQ-1129` `tools/ci all`, built and run in CI ([10 10.2](10-testing-style.md#102-ci)) | the full list in [10 10.2](10-testing-style.md#102-ci) |
-| every PR | `REQ-1130` `tools/ci pr` reads the pull request event payload, or, before the pull request exists, a title, a body file and the local base..HEAD range | `REQ-1131` the body has non-empty **Why**, **What changed** and **Evidence** sections, and a **Lessons** section that holds a lesson or the word `none`; `REQ-1132` a **Middleware** line of the form `check: <tools/ci subcommand or test>`, `generator: <tools/new kind or go:generate source>`, or `none: <reason>`; `REQ-1133` every changed golden listed under Evidence; `REQ-1134` an approval line (below) for each ask-first surface the diff touches, ADRs included (ADR 0001 rule 8); `REQ-1135` the title and the commit subjects in Conventional Commit form; `REQ-1136` the prose rules of ADR 0001 (rule 4) in the title, the body and the commit messages; `REQ-1137` the base is the default branch (12.9); `REQ-1138` a `Fixes-release:` trailer has the form of 12.10, and after the first release a pull request with a commit of type `fix` carries one, or the line `Fixes-release: none`; `REQ-1139` the forbidden-name check ([10 10.2](10-testing-style.md#forbidden-names)) over the title, the body, the head ref name, and the four readings of each commit (the message, the author and committer identities, the paths it adds or renames to, and the lines it adds) |
+| every PR | `REQ-1130` `tools/ci pr` reads the pull request event payload, or, before the pull request exists, a title, a body file and the local base..HEAD range | `REQ-1131` the body has non-empty **Why**, **What changed** and **Evidence** sections, and a **Lessons** section that holds a lesson or the word `none`; `REQ-1132` a **Middleware** line of the form `check: <tools/ci subcommand or test>`, `generator: <tools/new kind or go:generate source>`, or `none: <reason>`; `REQ-1133` every changed golden listed under Evidence; `REQ-1134` an approval line (below) for each ask-first surface the diff touches, ADRs included (ADR 0001 rule 8); `REQ-1135` the title and the commit subjects in Conventional Commit form; `REQ-1136` the prose rules of ADR 0001 (rule 4) in the title, the body and the commit messages; `REQ-1137` the base is the default branch or, in a stack, a branch whose tree equals `main`'s on the `approvals` surface, the ask-first list and the grants (12.9, the guard of 12.4); `REQ-1138` a `Fixes-release:` trailer has the form of 12.10, and after the first release a pull request with a commit of type `fix` carries one, or the line `Fixes-release: none`; `REQ-1139` the forbidden-name check ([10 10.2](10-testing-style.md#forbidden-names)) over the title, the body, the head ref name, and the four readings of each commit (the message, the author and committer identities, the paths it adds or renames to, and the lines it adds) |
 | merge | `REQ-1140` the default-branch ruleset (below) | CI green and a merge commit, the one merge method (12.9); the merge requirements, and what they are worth, are in [05 5.4](05-security.md#risks-of-how-this-repository-is-developed) |
 
 `REQ-1141` The first three rows run locally, from the same `tools/ci` code; how
@@ -549,16 +549,20 @@ U+2033, U+301D to U+301F and U+FF02. Single quotation marks are allowed,
 because U+2019 is also the apostrophe, and other look-alikes, such as
 U+275D and U+275E, are left to review. `REQ-1148` No code that a pull request
 changes judges that pull request: `pr` runs from a workflow defined in
-the default branch, builds the default branch's commit, and reads the
-head only as data (decided on 2026-10-09; the invariant and what the
+the pull request's base branch, a branch of this repository, builds that
+branch's commit, and reads the head only as data (decided on 2026-10-09;
+the base branch in place of the default branch on 2026-10-29, so a pull
+request into a stack branch is judged too; the invariant and what the
 task that builds `pr` must show for it are in
 [05 5.3](05-security.md#53-ask-first-surfaces)). `REQ-1149` The shape of the `pr`
-job is decided: it runs on `pull_request_target` for pull requests into
-`main` (`branches: [main]`), under which GitHub runs the workflow file
-of the default branch, with `permissions: contents: read` and no secret.
-It checks out the default branch's commit (`github.sha`), with its
-`go.mod`, `go.sum`, `mise.toml` and `mise.lock`, and builds `pr` there;
-it never checks out `pull_request.base.sha`. `REQ-1150` The code of `pr` is
+job is decided: it runs on `pull_request_target` for every pull request,
+with no `branches` filter, under which GitHub runs the workflow file of
+the base branch, with `permissions: contents: read` and no secret. It
+checks out the base branch's commit (`github.sha`), with its `go.mod`,
+`go.sum`, `mise.toml` and `mise.lock`, and builds `pr` there; it never
+checks out `pull_request.base.sha`. The ruleset of `main` requires the
+check on every pull request of a stack, as if each targeted `main`, so
+the stack's branches need a base that holds this workflow. `REQ-1150` The code of `pr` is
 the approval package of `tools/ci` (`tools/ci/internal/askfirst/approval`),
 which imports the standard library, `tools/ci/git`, `internal/procgroup`
 and the YAML library, and not the framework of `tools/ci`. The step of
@@ -572,12 +576,35 @@ no grant covers a change to the code that judges a pull request; a test
 of the approval package lists those packages and holds it (05 5.3).
 `approvalLine` is in the approval package of `tools/ci`; a pull request
 that moves it updates the glob and this page with it.
-The check that the base is the default branch (12.9) stays, but it is
-not what makes the code trusted. So a run
-judges a pull request with the current `main`, and a pull request opened
-before a fix to `pr` is judged by the fixed `pr` on its next run, which
-a new event starts: a push to the head, an `edited` event from a change
-to the title or body, or a close and reopen. `REQ-1151` A re-run of an old run
+The rule that the base is the default branch (12.9) is a review rule,
+not what makes the code trusted. So a run judges a pull request with the
+current code of its base: `main` for most, and for a pull request into a
+stack branch that branch's code and lists (`.github/ask-first.yaml`,
+`docs/grants.yaml`, the denylist), which may hold the unmerged changes
+of the pull request below, so that `pr` result is advisory for the
+surfaces the lower pull request changes, and the `pr` run of a pull
+request whose base is `main` (the bottom of a stack, or one retargeted
+to `main` when the one below merges) is the gate; a retargeted pull
+request is merged after the run its retarget starts, never on the green
+of the run against the old base, and a base force-pushed between the
+event and the run leaves `base.sha` out of the clone, so `pr` exits 2
+and the next event judges again (decided on 2026-10-29). `REQ-1314` For
+a pull request whose base is not the default branch, `pr` exits 2 with
+a finding when the base's tree differs from the default branch's on a
+path of the `approvals` surface, on `.github/ask-first.yaml` or on
+`docs/grants.yaml` (the globs are the default branch's list's), naming
+the first such path: the pull request below changes the judge, so it
+merges first, or the stack is rebuilt on the current `main`; the
+default branch is read from the clone's `origin/<default_branch>`,
+which the checkout's whole history holds, and a clone without it, or
+without the list there, is an error. The guard runs in the base
+branch's code, so it is a courtesy to the reviewer and not the gate:
+the `pr` run of the bottom pull request, judged by `main`'s code, is;
+for the same reason the inputs of what runs that sit on `dependencies`
+(`go.mod`, `mise.toml`, `mise.lock`) stay outside the guard. A pull request
+opened before a fix to `pr` is judged by the fixed `pr` on its next run,
+which a new event starts: a push to the head, an `edited` event from a
+change to the title, the body or the base, or a close and reopen. `REQ-1151` A re-run of an old run
 keeps the `GITHUB_SHA` of the original event, so it judges with the old
 code
 ([re-running workflows and jobs](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs),
@@ -837,8 +864,8 @@ or is tagged **[review]**: a reviewer, human or agent, judges it.
 
 | Rule | Enforced by |
 |---|---|
-| `REQ-1189` Every pull request targets `main` | `tools/ci pr`: the payload's `base.ref` equals its `base.repo.default_branch` |
-| A branch carries one pull request and ends when it merges. v1 has no stack of pull requests: a change that depends on an unmerged pull request waits for it, or is part of it; consecutive dependent tasks of one chain, written by one agent, may ship as one pull request | **[review]**; the first half is how GitHub works, the second is a judgment. Stacking is a [deferred decision](../spec.md#deferred-decisions) |
+| `REQ-1189` A pull request targets `main`, or, in a stack, the branch of the pull request below it, whose tree equals `main`'s on every path of the `approvals` surface, on `.github/ask-first.yaml` and on `docs/grants.yaml`; the bottom of a stack targets `main` | `tools/ci pr`: the payload's `base.ref` equals its `base.repo.default_branch`, or the base's tree differs from `main`'s on no path of the `approvals` surface, the list or the grants (the guard of 12.4) |
+| A branch carries one pull request and ends when it merges. A stack of pull requests (GitHub's, opened with `gh stack`) is opened from a `main` that holds `pr.yml`, rebuilt when `pr` or the lists it reads change, and landed from the bottom: the bottom pull request's `pr` is the gate, and a pull request retargeted to `main` is merged after the run its retarget starts (12.4). Consecutive dependent tasks of one chain, written by one agent, may still ship as one pull request. Decided on 2026-10-29, closing the deferred decision on stacking; ADR 0002 predates it and says v1 has no stack | **[review]** for the shape of the stack; the guard of 12.4 for the judge; the ruleset of `main` requires the checks on every pull request of a stack |
 | A green pull request with its approval lines is merged at the maintainer's next sitting, and at least one merge happens each business day | **[review]**; a sitting with more than three pull requests waiting reopens the [deferred decision](../spec.md#in-how-this-repository-is-run) on whether the maintainer's merge stays a manual checkpoint |
 | A branch is short-lived. Our sources give two ceilings, a couple of days and a few hours (ADR 0002); we adopt neither as a gate | **[review]**, from the pull requests' dates on GitHub |
 | `REQ-1190` `main` is releasable at every merge | CI green on the full list of [10 10.2](10-testing-style.md#102-ci) before every merge, by working agreement; `release.yml` runs the same list on the commit the tag names before it builds. The commits a merge brings in were gated together, as that merge, and not one by one. The merge requirements, and what they are worth, are in [05 5.4](05-security.md#risks-of-how-this-repository-is-developed) |

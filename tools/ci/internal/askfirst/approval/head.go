@@ -32,7 +32,7 @@ const (
 )
 
 // goModeFiles are the paths at the top of the tree that change what the
-// go command builds in the pr job's checkout of the default branch: a
+// go command builds in the pr job's checkout of the base branch: a
 // workspace file and its sums, which take other modules in, and a vendor
 // directory, which replaces the module cache. The hygiene rule of 10
 // 10.2 refuses them, but it runs from the head's own tools/ci, which the
@@ -88,7 +88,7 @@ func headGoFiles(ctx context.Context, r git.Repo, head string) ([]Finding, error
 //     name of GitHub differs from that reading, or when the maintainer
 //     prefers the literal rule of REQ-1154 with jobs renamed);
 //   - the head's pr.yml names no event but pull_request_target, under
-//     which GitHub runs the default branch's file and never the head's;
+//     which GitHub runs the base branch's file and never the head's;
 //   - a workflow file that does not parse as one YAML mapping fails, as
 //     what pr cannot read it cannot clear.
 //

@@ -45,6 +45,9 @@ surfaces:
   - id: zero
     globs: [z/**/f.txt]
     reason: zero segments
+  - id: approvals
+    globs: [judge/**]
+    reason: the code of pr
 `
 
 // prListWithoutDecisions is prList with the decisions surface removed,
@@ -378,6 +381,99 @@ func TestPRReadsTheRangeFromGit(t *testing.T) {
 		got = judge(t, r, PR{BaseSHA: base, HeadSHA: head, Body: alert(
 			"> - [x] Approval: ask-first - fix the grants", "> - [x] Approval: checks - a check")})
 		assert.Empty(t, got)
+	})
+}
+
+// TestPRStackGuard holds REQ-1314: a pull request whose base is not the
+// default branch is judged only when the base's tree equals the default
+// branch's on the approvals surface, the ask-first list and the grants;
+// the default branch is the clone's remote branch, and a clone without
+// it is an error.
+func TestPRStackGuard(t *testing.T) {
+	// stack makes the default branch's remote ref at main, a branch
+	// below with the given files changed, and a head on top of it that
+	// changes README; it returns the PR of the head into below.
+	stack := func(t *testing.T, below map[string]string) (*gittest.Repo, PR) {
+		t.Helper()
+		r, base := prRepo(t)
+		r.Git("update-ref", "refs/remotes/origin/main", base)
+		r.Git("checkout", "--quiet", "-b", "below")
+		for path, content := range below {
+			r.Write(path, content)
+		}
+		belowSHA := r.Commit("below")
+		r.Git("checkout", "--quiet", "-b", "top")
+		r.Write("README.md", "top\n")
+		head := r.Commit("top")
+		return r, PR{BaseSHA: belowSHA, HeadSHA: head, BaseRef: "below", DefaultBranch: "main"}
+	}
+	t.Run("a base equal to main on the judge passes", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{"notes.txt": "x\n"})
+		assert.Empty(t, judge(t, r, pr))
+	})
+	t.Run("a base that changes the approvals surface fails", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{"judge/x.go": "package judge\n"})
+		got := judge(t, r, pr)
+		require.Len(t, got, 1, "%q", got)
+		assert.Contains(t, got[0], `the base below differs from the default branch main on judge/x.go`)
+		assert.Contains(t, got[0], "REQ-1314")
+	})
+	t.Run("a base that changes the list fails, by main's globs", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{Path: prListWithoutDecisions})
+		got := judge(t, r, pr)
+		require.Len(t, got, 1, "%q", got)
+		assert.Contains(t, got[0], "differs from the default branch main on "+Path)
+	})
+	t.Run("a base that changes the grants fails", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{GrantsPath: strings.Replace(prGrants, "[T013]", "[T013, T021]", 1)})
+		got := judge(t, r, pr)
+		require.Len(t, got, 1, "%q", got)
+		assert.Contains(t, got[0], "differs from the default branch main on "+GrantsPath)
+	})
+	t.Run("a base behind a main that moved the judge fails", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{"notes.txt": "x\n"})
+		r.Git("checkout", "--quiet", "main")
+		r.Write("judge/y.go", "package judge\n")
+		moved := r.Commit("main moves the judge")
+		r.Git("update-ref", "refs/remotes/origin/main", moved)
+		got := judge(t, r, pr)
+		require.Len(t, got, 1, "%q", got)
+		assert.Contains(t, got[0], "on judge/y.go")
+	})
+	t.Run("a base that is the default branch is not a stack", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{"judge/x.go": "package judge\n"})
+		pr.BaseRef = "main"
+		assert.Empty(t, judge(t, r, pr))
+	})
+	t.Run("a base that merged a main that moved the judge passes", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{"notes.txt": "x\n"})
+		r.Git("checkout", "--quiet", "main")
+		r.Write("judge/y.go", "package judge\n")
+		moved := r.Commit("main moves the judge")
+		r.Git("update-ref", "refs/remotes/origin/main", moved)
+		r.Git("checkout", "--quiet", "below")
+		r.Git("merge", "--quiet", "--no-edit", "main")
+		pr.BaseSHA = strings.TrimSpace(r.Git("rev-parse", "HEAD"))
+		assert.Empty(t, judge(t, r, pr))
+	})
+	t.Run("a local run names no base ref and is not a stack", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{"judge/x.go": "package judge\n"})
+		pr.BaseRef, pr.DefaultBranch = "", ""
+		assert.Empty(t, judge(t, r, pr))
+	})
+	t.Run("a clone without the default branch is an error", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{"notes.txt": "x\n"})
+		r.Git("update-ref", "-d", "refs/remotes/origin/main")
+		_, err := Judge(context.Background(), r.Repo, pr, false)
+		require.ErrorContains(t, err, "no remote branch origin/main")
+	})
+	t.Run("a default branch without the list is an error", func(t *testing.T) {
+		r, pr := stack(t, map[string]string{"notes.txt": "x\n"})
+		r.Git("checkout", "--quiet", "main")
+		r.Git("rm", "--quiet", Path)
+		r.Git("update-ref", "refs/remotes/origin/main", r.Commit("drop the list"))
+		_, err := Judge(context.Background(), r.Repo, pr, false)
+		require.ErrorContains(t, err, Path+" is missing at the default branch main")
 	})
 }
 
