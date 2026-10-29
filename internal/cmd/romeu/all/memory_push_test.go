@@ -427,3 +427,72 @@ func TestTreeRunsTheStep(t *testing.T) {
 	assert.Equal(t, "work\n", stdout.String())
 	assert.True(t, strings.HasPrefix(stderr.String(), "warning memory-local: "), stderr.String())
 }
+
+// TestStepHostSettings reads a credential helper and gitHosts from host
+// settings, finds the config repo's clone through the config project's
+// live render, and fails without readable settings.
+func TestStepHostSettings(t *testing.T) {
+	h := newHost(t, "url", false)
+	// The config repo's clone moves to the dir its own render names.
+	moved := filepath.Join(h.root, "cfg-env", "config")
+	require.NoError(t, os.Rename(filepath.Join(h.root, "cfg-env", "cfg"), moved))
+	commit := git(t, moved, "rev-parse", "HEAD")
+	record, err := render.EncodeRecord(render.Record{
+		SpecSource: render.SpecSource{Kind: render.SpecSourceOrigin, Ref: "refs/romeu/origin/config/main", Commit: commit},
+		Repos:      []render.RecordRepo{{Dir: "config", URL: "https://github.com/owner/cfg.git", EgressRef: "refs/romeu/origin/config/main", EgressCommit: commit}},
+	})
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Join(h.root, "cfg-env", ".romeu"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(h.root, "cfg-env", filepath.FromSlash(render.LiveRecord)), record, 0o600))
+
+	data, err := os.ReadFile(h.settings)
+	require.NoError(t, err)
+	settings, err := spec.DecodeHostSettings(data)
+	require.NoError(t, err)
+	settings.Tools.GitCredentialHelper = "store"
+	settings.GitHosts = []spec.GitHost{{Host: "github.com"}}
+	data, err = spec.EncodeHostSettings(settings)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(h.settings, data, 0o600))
+	code, _, stderr := h.step(t, "run", nil, "shop")
+	assert.Equal(t, 0, code, stderr)
+	assert.NotEmpty(t, h.remoteMain(t))
+
+	// No projects/<name>.yaml at the commit: an error of the step.
+	code, _, stderr = h.step(t, "run", nil, "cfg")
+	assert.Equal(t, 1, code, stderr)
+
+	for name, path := range map[string]string{"absent": filepath.Join(t.TempDir(), "none.yaml"), "a directory": t.TempDir()} {
+		var stdout, stderr bytes.Buffer
+		code := RunMemoryStep(t.Context(), path, &stdout, &stderr, "run", []string{"shop"}, func() error { return nil })
+		assert.Equal(t, 1, code, name)
+	}
+}
+
+// TestRunMemoryStepRefuses refuses a command line with no step and a
+// flag the probe does not take.
+func TestRunMemoryStepRefuses(t *testing.T) {
+	h := newHost(t, "url", false)
+	code, _, _ := h.step(t, "status", nil, "shop")
+	assert.Equal(t, 1, code)
+	code, _, _ = h.step(t, "run", nil, "--nope")
+	assert.Equal(t, 2, code)
+}
+
+// TestStepTargetsOfTheWorkingDirectory resolves pull with no -C to the
+// project of the working directory, and refuses a retire with no tree
+// in the attic.
+func TestStepTargetsOfTheWorkingDirectory(t *testing.T) {
+	h := newHost(t, "url", false)
+	t.Chdir(filepath.Join(h.envDir, "memory"))
+	code, _, stderr := h.step(t, "pull", nil)
+	assert.Equal(t, 0, code, stderr)
+	assert.NotEmpty(t, h.remoteMain(t))
+
+	require.NoError(t, os.MkdirAll(filepath.Join(h.root, ".attic", "shop"), 0o700))
+	code, _, _ = h.step(t, "retire", nil, "shop")
+	assert.Equal(t, 1, code, "an attic with no tree")
+	t.Chdir(h.root)
+	code, _, _ = h.step(t, "pull", nil)
+	assert.Equal(t, 1, code, "the root is in no project's tree")
+}
