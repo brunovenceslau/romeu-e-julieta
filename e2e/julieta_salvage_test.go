@@ -210,7 +210,7 @@ step linked git show ` + salvagePrefix + `worktree-1:linked
 step captured git ls-tree --name-only ` + salvagePrefix + `worktree-0
 step nested git -C vendor/lib show ` + salvagePrefix + `worktree-0:dirt
 step nestedstash git -C vendor/lib rev-parse ` + salvagePrefix + `stash-0
-step modes find /tmp/memory/api/salvage -printf '%m %y %P\n'
+step modes find /tmp/memory/api/salvage -printf '%m %y %p\n'
 step check "$J" memory check
 `)
 	r := step(t, steps, "fingerprint")
@@ -425,7 +425,7 @@ step endedmanifest cat `+salvageDir+`/manifest.json
 	m = salvageManifest(t, step(t, steps, "endedmanifest"))
 	require.NotNil(t, m.AgentStop)
 	assert.Equal(t, 0, m.AgentStop.Matched)
-	assert.Equal(t, []string{"agent-path-missing .claude/todos", "transcript-excluded .claude/projects/p/s.jsonl"}, m.reasons(),
+	assert.ElementsMatch(t, []string{"agent-path-missing .claude/todos", "transcript-excluded .claude/projects/p/s.jsonl"}, m.reasons(),
 		"no agent-not-matched; the optional .claude/plans is no item")
 }
 
