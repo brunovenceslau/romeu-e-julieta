@@ -66,7 +66,18 @@ type renderFixture struct {
 // workloadRef and the product kit plain.
 func renderRun(t *testing.T) *renderFixture {
 	t.Helper()
+	return renderRunOf(t, nil)
+}
+
+// renderRunOf is renderRun with setup, when not nil, run on the host
+// tree before step 4, as addTarget is; every target has the workload of
+// workloadRef and the product kit plain.
+func renderRunOf(t *testing.T, setup func(h *hostTree)) *renderFixture {
+	t.Helper()
 	f := &renderFixture{hostTree: treeRun(t)}
+	if setup != nil {
+		setup(f.hostTree)
+	}
 	require.NoError(t, makeTree(t.Context(), f.r))
 	tmp := t.TempDir()
 	st, err := state.Open(filepath.Join(tmp, "state"))
@@ -81,8 +92,10 @@ func renderRun(t *testing.T) *renderFixture {
 	require.NoError(t, os.MkdirAll(f.cfg, 0o700))
 	gitIn(t, f.cfg, "init", "-q", "-b", "main")
 	f.r.configClone, f.r.specCommit = f.cfg, commitFiles(t, f.cfg, map[string]string{"README": "cfg"})
-	p := &f.r.targets[0]
-	p.Workload, p.Agent, p.Kits = workloadRef, "sbx-kit-claude", []spec.Kit{{Product: "plain"}}
+	for i := range f.r.targets {
+		p := &f.r.targets[i]
+		p.Workload, p.Agent, p.Kits = workloadRef, "sbx-kit-claude", []spec.Kit{{Product: "plain"}}
+	}
 
 	oldFetch, oldKits := fetchWorkload, productKits
 	fetchWorkload = func(_ context.Context, ref string, _ oci.Platform) (oci.Fetched, error) {

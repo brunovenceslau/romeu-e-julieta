@@ -69,12 +69,15 @@ type candidate struct {
 	egress egress.Result
 
 	// The rest is filled once the rules pass: the widening set, its
-	// digest, the candidate side of the gate 2 diff and the record
-	// written as the candidate's render.json.
+	// digest, the candidate side of the gate 2 diff, the record
+	// written as the candidate's render.json, and the digest of the
+	// candidate dir as rendered, which step 8 checks again right before
+	// it promotes, so the bytes promoted are those the diff showed.
 	set      gate.Set
 	widening canon.Sum[canon.WideningKind]
 	side     gate.Side
 	record   render.Record
+	filesSum canon.Sum[canon.CandidateFilesKind]
 }
 
 // renderCandidates is step 6 of 04 4.2 (REQ-0341), for each target:
@@ -445,7 +448,11 @@ func finish(ctx context.Context, r *run, p spec.Project, t tree, c *candidate, c
 	if err := render.WriteRecord(cand, rec); err != nil {
 		return err
 	}
-	c.side, c.record = side, rec
+	sum, err := render.CandidateFilesDigest(c.dir.Path())
+	if err != nil {
+		return err
+	}
+	c.side, c.record, c.filesSum = side, rec, sum
 	return nil
 }
 

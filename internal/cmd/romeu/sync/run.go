@@ -55,6 +55,11 @@ type run struct {
 	// step 8 reads.
 	candidates []candidate
 
+	// Step 7: the drifted live files --overwrite-drift lets step 8's
+	// promotion replace, in the order of targets, which step 8 adds to
+	// the warnings as lost edits once their project is promoted.
+	overwritten []lostEdit
+
 	// Steps 4 and 5 (and each later step that warns): the warnings of
 	// the run, in the order they were found. Each is a print to the CLI
 	// writer of stderr, which step 10 makes after its own output (04 4.2:
