@@ -20,6 +20,7 @@
 
 # procgroup
 /internal/procgroup/** @brunovenceslau
+/tools/ci/internal/callsites/** @brunovenceslau
 
 # termsafe
 /internal/termsafe/** @brunovenceslau
