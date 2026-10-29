@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/release/internal/build"
 )
 
@@ -34,6 +35,26 @@ func TestRunDryRun(t *testing.T) {
 	assert.NotContains(t, stdout.String(), "note: the archives carry no julieta")
 	assert.FileExists(t, filepath.Join(out, "checksums.txt"))
 	assert.Empty(t, stderr.String())
+}
+
+// TestRunHost builds the repository's romeu for this platform through
+// run: the binary is named on stdout and runs here, and a second run to
+// the same path refuses.
+func TestRunHost(t *testing.T) {
+	chdirRoot(t)
+	out := filepath.Join(t.TempDir(), "romeu")
+	var stdout, stderr bytes.Buffer
+	require.Equal(t, exitOK, run(t.Context(), []string{"build", "--host", "--out", out}, &stdout, &stderr), stderr.String())
+	assert.Equal(t, out+"\n", stdout.String())
+	assert.Empty(t, stderr.String())
+	printed, err := procgroup.CombinedOutput(t.Context(), procgroup.Command{Class: procgroup.ToolStep, Argv: []string{out, "version"}})
+	require.NoError(t, err, "%s", printed)
+	assert.Contains(t, string(printed), "protocol")
+
+	stdout.Reset()
+	stderr.Reset()
+	assert.Equal(t, exitError, run(t.Context(), []string{"build", "--host", "--out", out}, &stdout, &stderr))
+	assert.Contains(t, stderr.String(), "exists")
 }
 
 func TestRunRefusals(t *testing.T) {
@@ -73,6 +94,9 @@ func TestRunUsage(t *testing.T) {
 		{"no_version", []string{"build", "--dry-run"}},
 		{"extra_argument", []string{"build", "--version", "v1.0.0", "extra"}},
 		{"unknown_flag", []string{"build", "--version", "v1.0.0", "--now"}},
+		{"host_without_out", []string{"build", "--host"}},
+		{"host_with_a_version", []string{"build", "--host", "--out", "x", "--version", "v1.0.0"}},
+		{"host_dry_run", []string{"build", "--host", "--out", "x", "--dry-run"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

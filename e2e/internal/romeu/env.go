@@ -12,8 +12,8 @@
 //
 // A later task extends the harness by adding a file of its own to this
 // directory and edits none of the existing ones (rule 1 of docs/plan.md);
-// the pieces it builds on are Env (New, Run, WriteSettings, Settings,
-// StateDir) and Origins (NewOrigins, URL, Push, Git).
+// the pieces it builds on are Env (New, NewEmbedded, Run, WriteSettings,
+// Settings, StateDir) and Origins (NewOrigins, URL, Push, Git).
 package romeu
 
 import (
@@ -59,7 +59,27 @@ type Result struct {
 // reaches, or nil for the machine's git as it is. The binaries are built
 // into the test's temporary directory, so each Env builds its own: the
 // compiler's cache keeps that to a link.
+//
+// Its romeu is a plain go build, which embeds no julieta (REQ-0130), so
+// sync and run refuse it with julieta-not-embedded; NewEmbedded is the
+// Env of a case that needs julieta.
 func New(tb testing.TB, origins *Origins) *Env {
+	tb.Helper()
+	return newEnv(tb, origins, false)
+}
+
+// NewEmbedded is New with the romeu of the host-native embedded build of
+// tools/release (go run ./tools/release build --host), which embeds the
+// julieta linux binary of romeu's own GOARCH as a release does (REQ-0131,
+// the e2e row of 10 10.2): the Env of a case of sync or run.
+func NewEmbedded(tb testing.TB, origins *Origins) *Env {
+	tb.Helper()
+	return newEnv(tb, origins, true)
+}
+
+// newEnv is New, with romeu built by tools/release when embedded is
+// set.
+func newEnv(tb testing.TB, origins *Origins, embedded bool) *Env {
 	tb.Helper()
 	tmp, err := filepath.EvalSymlinks(tb.TempDir())
 	if err != nil {
@@ -78,7 +98,11 @@ func New(tb testing.TB, origins *Origins) *Env {
 		}
 	}
 	root := repoRoot(tb)
-	e.Romeu = build(tb, root, "./cmd/romeu", filepath.Join(tmp, "romeu"))
+	if embedded {
+		e.Romeu = buildEmbedded(tb, root, filepath.Join(tmp, "romeu"))
+	} else {
+		e.Romeu = build(tb, root, "./cmd/romeu", filepath.Join(tmp, "romeu"))
+	}
 	e.Sbx = build(tb, root, "./e2e/fakesbx", filepath.Join(e.Bin, "sbx"))
 	if err := writeFakeSbxConfig(e.Sbx, tmp); err != nil {
 		tb.Fatal(err)
@@ -112,6 +136,24 @@ func build(tb testing.TB, root, pkg, out string) string {
 	})
 	if err != nil {
 		tb.Fatalf("go build %s: %v\n%s", pkg, err, b)
+	}
+	return out
+}
+
+// buildEmbedded builds romeu with the host build of tools/release into
+// out, which must not exist. tools/release runs the go command that mise
+// resolves, or the first on PATH, with GOPROXY=off, so the module cache
+// must hold go.sum's modules, as the build of the other binaries needs.
+func buildEmbedded(tb testing.TB, root, out string) string {
+	tb.Helper()
+	b, err := procgroup.CombinedOutput(tb.Context(), procgroup.Command{
+		Class: procgroup.ToolStep,
+		Argv:  []string{"go", "run", "./tools/release", "build", "--host", "--out", out},
+		Dir:   root,
+		Env:   os.Environ(),
+	})
+	if err != nil {
+		tb.Fatalf("tools/release build --host: %v\n%s", err, b)
 	}
 	return out
 }
