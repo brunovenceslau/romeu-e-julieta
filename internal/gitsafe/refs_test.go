@@ -6,7 +6,10 @@
 package gitsafe
 
 import (
+	"context"
 	"errors"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -126,8 +129,47 @@ func TestCheckRefspec(t *testing.T) {
 		{Host, "refs/heads/main:refs/romeu/origin/app/*", false},
 		{Host, "refs/heads/*:refs/romeu/origin/app/main", false},
 		{Host, "refs/heads/*:refs/romeu/origin/*/x", false},
-		{Host, "refs/heads/*:refs/romeu/origin/app/x/*/y", true},
-		{Host, "HEAD:refs/romeu/origin/app/HEAD", false},
+		{Host, "refs/heads/*:refs/romeu/origin/app/x/*/y", false},
+		{Host, "refs/heads/*:refs/romeu/origin/app/x/*", true},
+		{Host, "+refs/heads/H*:refs/romeu/origin/app/*", true},
+		{Host, "+refs/heads/*:refs/romeu/origin/app/HE*", false},
+		{Host, "+refs/heads/*:refs/romeu/origin/app/x/a*", false},
+		{Host, "+refs/heads/*:refs/sandboxes/shop/H*", true},
+		{Host, "HEAD:refs/romeu/origin/app/HEAD", true},
+		{Host, "+HEAD:refs/romeu/origin/app/HEAD", true},
+		{Host, "HEAD:refs/romeu/origin/app/main", false},
+		{Host, "HEAD:refs/romeu/origin/app/x/HEAD", false},
+		{Host, "HEAD:refs/romeu/origin/HEAD", false},
+		{Host, "HEAD:refs/romeu/origin//HEAD", false},
+		{Host, "HEAD:refs/romeu/origin/*/HEAD", false},
+		{Host, "HEAD:refs/romeu/origin/app/*", false},
+		{Host, "HEAD:refs/sandboxes/shop/HEAD", false},
+		{Host, "HEAD:refs/romeu/snapshots/shop/HEAD", false},
+		{Host, "HEAD:HEAD", false},
+		{Host, "HEAD:refs/heads/HEAD", false},
+		{Host, "head:refs/romeu/origin/app/HEAD", false},
+		{Host, "FETCH_HEAD:refs/romeu/origin/app/HEAD", false},
+		{Host, "ORIG_HEAD:refs/romeu/origin/app/HEAD", false},
+		{Host, "HEAD*:refs/romeu/origin/app/*", false},
+		{Host, "++HEAD:refs/romeu/origin/app/HEAD", false},
+		{Host, "^HEAD:refs/romeu/origin/app/HEAD", false},
+		{Host, "^refs/heads/HEAD", false},
+		{Host, ":refs/romeu/origin/app/HEAD", false},
+		{Host, "HEAD:", false},
+		{Host, "HEAD", false},
+		{Host, "+refs/heads/H*:refs/romeu/origin/app/H*", false},
+		{Host, "+refs/heads/*D:refs/romeu/origin/app/*D", false},
+		{Host, "+refs/heads/*:refs/romeu/origin/app/H*", false},
+		{Host, "+refs/heads/*:refs/romeu/origin/app/*D", false},
+		{Host, "refs/heads/HEAD:refs/romeu/origin/app/HEAD", false},
+		{Host, "refs/heads/main:refs/romeu/origin/app/HEAD", false},
+		{Host, "+refs/heads/main:refs/romeu/origin/app/HEAD", false},
+		{Host, "refs/heads/main:refs/romeu/origin/app/x/HEAD", true},
+		{Host, "refs/heads/main:refs/romeu/origin/app/head", false},
+		{Host, "+refs/heads/main:refs/romeu/origin/app/Head", false},
+		{Host, "HEAD:refs/romeu/origin/app/head", false},
+		{Host, "refs/heads/main:refs/romeu/origin/app/heads", true},
+		{Host, "refs/heads/main:refs/sandboxes/shop/HEAD", true},
 		{Host, "-x:refs/romeu/origin/app/main", false},
 		{Host, "refs/heads/a..b:refs/romeu/origin/app/main", false},
 		{Host, "refs/heads/main:refs/romeu/origin/app/main:x", false},
@@ -139,6 +181,8 @@ func TestCheckRefspec(t *testing.T) {
 		{Sandbox, "+refs/heads/*:refs/romeu/origin/app/*", false},
 		{Sandbox, "refs/heads/main:refs/salvage/g/s/stash-0", false},
 		{Sandbox, "refs/heads/main:refs/remotes/origin", false},
+		{Sandbox, "HEAD:refs/remotes/origin/HEAD", false},
+		{Sandbox, "HEAD:refs/romeu/origin/app/HEAD", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.mode.String()+"/"+tt.spec, func(t *testing.T) {
@@ -163,6 +207,121 @@ func TestFetchRefusesRefspec(t *testing.T) {
 	require.ErrorIs(t, r.Fetch(t.Context(), stubRepo, "https://github.com/o/r.git",
 		[]string{"refs/heads/main:refs/romeu/origin/r/main", "+refs/heads/*:refs/heads/*"}), ErrRefused)
 	assert.Empty(t, rec.commands)
+}
+
+// TestFetchRefspecRemoteHEAD fetches, over the loopback daemon, the
+// remote's HEAD into refs/romeu/origin/<dir>/HEAD with the branches
+// beside it: the ref is the commit the remote's HEAD names, not the
+// clone's own refs/remotes/origin/HEAD (I9), and nothing outside the
+// namespace moves. A ref of the remote that git would read HEAD as, a
+// branch or a tag named HEAD among them, never lands in <dir>/HEAD,
+// and an origin whose HEAD is unborn is refused before any fetch runs,
+// so nothing is written and a <dir>/HEAD of an earlier fetch stays.
+//
+//romeu:invariant I5 test
+func TestFetchRefspecRemoteHEAD(t *testing.T) {
+	const (
+		head     = "+HEAD:refs/romeu/origin/app/HEAD"
+		branches = "+refs/heads/*:refs/romeu/origin/app/*"
+		tags     = "+refs/tags/*:refs/romeu/origin/app/tags/*"
+	)
+	tests := []struct {
+		name    string
+		specs   []string
+		planted string // a ref of the remote git would read HEAD as
+		unborn  bool   // the remote's HEAD names a missing branch
+		stale   bool   // <dir>/HEAD holds a commit of an earlier fetch
+	}{
+		{name: "head first", specs: []string{head, branches}},
+		{name: "branches first", specs: []string{branches, head}},
+		{name: "head alone", specs: []string{head}},
+		{name: "a pattern only, a branch named HEAD", specs: []string{branches}, planted: "refs/heads/HEAD"},
+		{name: "a pattern only, a tag named HEAD", specs: []string{branches, tags}, planted: "refs/tags/HEAD"},
+		{name: "a pattern of another prefix, its HEAD", specs: []string{branches, "+refs/foo/*:refs/romeu/origin/app/*"}, planted: "refs/foo/HEAD"},
+		{name: "a pattern of another prefix, its HEAD, head too", specs: []string{head, "+refs/foo/*:refs/romeu/origin/app/*", branches}, planted: "refs/foo/HEAD"},
+		{name: "a branch named HEAD, head first", specs: []string{head, branches}, planted: "refs/heads/HEAD"},
+		{name: "a branch named HEAD, branches first", specs: []string{branches, head}, planted: "refs/heads/HEAD"},
+		{name: "a tag named HEAD", specs: []string{head, branches, tags}, planted: "refs/tags/HEAD"},
+		{name: "refs/HEAD", specs: []string{head, branches}, planted: "refs/HEAD"},
+		{name: "refs/remotes/HEAD", specs: []string{head, branches}, planted: "refs/remotes/HEAD"},
+		{name: "refs/remotes/HEAD/HEAD", specs: []string{head, branches}, planted: "refs/remotes/HEAD/HEAD"},
+		{name: "unborn", specs: []string{head, branches}, unborn: true},
+		{name: "unborn, head alone", specs: []string{head}, unborn: true},
+		{name: "unborn, a stale HEAD", specs: []string{head, branches}, unborn: true, stale: true},
+		{name: "unborn, a branch named HEAD", specs: []string{head, branches}, planted: "refs/heads/HEAD", unborn: true},
+		{name: "unborn, a branch named HEAD, a stale HEAD", specs: []string{head, branches}, planted: "refs/heads/HEAD", unborn: true, stale: true},
+		{name: "unborn, a tag named HEAD", specs: []string{head, tags}, planted: "refs/tags/HEAD", unborn: true},
+		{name: "unborn, refs/HEAD", specs: []string{head}, planted: "refs/HEAD", unborn: true},
+		{name: "unborn, refs/remotes/HEAD", specs: []string{head}, planted: "refs/remotes/HEAD", unborn: true},
+		{name: "unborn, refs/remotes/HEAD/HEAD", specs: []string{head}, planted: "refs/remotes/HEAD/HEAD", unborn: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src, one := newRepo(t)
+			two := commit(t, src, "two")
+			plainGit(t, src, "checkout", "-q", "-b", "planted")
+			three := commit(t, src, "three")
+			plainGit(t, src, "checkout", "-q", "main")
+			plainGit(t, src, "branch", "side", one)
+			base := bareCopy(t, src, "repo.git")
+			bare := filepath.Join(base, "repo.git")
+			if tt.planted != "" {
+				plainGit(t, bare, "update-ref", tt.planted, three)
+			}
+			if strings.HasPrefix(tt.planted, "refs/foo/") {
+				plainGit(t, bare, "update-ref", "refs/foo/other", two)
+			}
+			plainGit(t, bare, "update-ref", "-d", "refs/heads/planted")
+			plainGit(t, bare, "symbolic-ref", "HEAD", map[bool]string{false: "refs/heads/side", true: "refs/heads/missing"}[tt.unborn])
+			url := serveGit(t, base) + "repo.git"
+
+			dir := filepath.Join(t.TempDir(), "clone")
+			plainGit(t, src, "clone", "-q", src, dir)
+			plainGit(t, dir, "update-ref", "--no-deref", "refs/remotes/origin/HEAD", two)
+			outside := func() string {
+				return plainGit(t, dir, "for-each-ref", "--format=%(refname) %(objectname)", "--exclude=refs/romeu/origin/") +
+					plainGit(t, dir, "rev-parse", "HEAD")
+			}
+			if tt.stale {
+				plainGit(t, dir, "update-ref", "refs/romeu/origin/app/HEAD", two)
+			}
+			before := outside()
+			staleRefs := plainGit(t, dir, "for-each-ref", "--format=%(refname) %(objectname)", "refs/romeu/origin/")
+			r := newRunner(t, Host)
+			fetchRan := false
+			run := r.start
+			r.start = func(ctx context.Context, c procgroup.Command) error {
+				fetchRan = fetchRan || slices.Contains(c.Argv, "fetch")
+				return run(ctx, c)
+			}
+			err := r.Fetch(t.Context(), dir, url, tt.specs)
+			assert.Equal(t, before, outside(), "nothing outside the namespace moved")
+			fetched := plainGit(t, dir, "for-each-ref", "--format=%(refname) %(objectname)", "refs/romeu/origin/")
+			assert.NotContains(t, fetched, three, "the planted ref landed in the namespace")
+			if tt.unborn {
+				require.ErrorIs(t, err, ErrRefused)
+				assert.Contains(t, err.Error(), url)
+				assert.False(t, fetchRan, "refused before any fetch ran")
+				assert.Equal(t, staleRefs, fetched, "nothing written")
+				return
+			}
+			require.NoError(t, err)
+			assert.True(t, fetchRan)
+			if strings.HasPrefix(tt.planted, "refs/foo/") {
+				assert.Equal(t, two, refOf(t, dir, "refs/romeu/origin/app/other"), "the pattern of refs/foo/ fetched")
+			}
+			if !slices.Contains(tt.specs, head) {
+				assert.Empty(t, refOf(t, dir, "refs/romeu/origin/app/HEAD"), "no fetch of the remote's HEAD, no <dir>/HEAD")
+				assert.Equal(t, two, refOf(t, dir, "refs/romeu/origin/app/main"))
+				return
+			}
+			assert.Equal(t, one, refOf(t, dir, "refs/romeu/origin/app/HEAD"), "the remote's HEAD, not refs/remotes/origin/HEAD")
+			if len(tt.specs) > 1 {
+				assert.Equal(t, two, refOf(t, dir, "refs/romeu/origin/app/main"))
+				assert.Equal(t, one, refOf(t, dir, "refs/romeu/origin/app/side"))
+			}
+		})
+	}
 }
 
 // TestCreateRef: a create-only ref is created once, and a second

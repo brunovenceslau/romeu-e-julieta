@@ -70,6 +70,40 @@ func TestListRefsRealGit(t *testing.T) {
 	check()
 }
 
+// TestListRefsOriginRealGit lists one repo dir of refs/romeu/origin/ on
+// the host, after a fetch of the remote's HEAD and its branches into
+// it: the fetched refs, HEAD among them, and not the refs of another
+// dir. The list writes nothing.
+func TestListRefsOriginRealGit(t *testing.T) {
+	src, one := newRepo(t)
+	two := commit(t, src, "two")
+	plainGit(t, src, "branch", "side", one)
+	url := serveGit(t, bareCopy(t, src, "repo.git")) + "repo.git"
+	dir, _ := newRepo(t)
+	r := newRunner(t, Host)
+	require.NoError(t, r.Fetch(t.Context(), dir, url, []string{"+HEAD:refs/romeu/origin/app/HEAD", "+refs/heads/*:refs/romeu/origin/app/*"}))
+	plainGit(t, dir, "update-ref", "refs/romeu/origin/cfg/main", one)
+	plainGit(t, dir, "update-ref", "refs/romeu/origin/appx/main", one)
+	check := noWrite(t, dir)
+
+	got, refused, err := r.ListRefs(t.Context(), dir, []string{"refs/romeu/origin/app/"})
+	require.NoError(t, err)
+	assert.Equal(t, Refused{}, refused)
+	assert.Equal(t, []Ref{
+		{Name: "refs/romeu/origin/app/HEAD", OID: two},
+		{Name: "refs/romeu/origin/app/main", OID: two},
+		{Name: "refs/romeu/origin/app/side", OID: one},
+	}, got)
+
+	got, _, err = r.ListRefs(t.Context(), dir, []string{"refs/heads/", "refs/romeu/origin/cfg/"})
+	require.NoError(t, err)
+	assert.Equal(t, []Ref{
+		{Name: "refs/heads/main", OID: refOf(t, dir, "refs/heads/main")},
+		{Name: "refs/romeu/origin/cfg/main", OID: one},
+	}, got)
+	check()
+}
+
 // TestListRefsRefuses: a namespace outside the closed list, the whole
 // of refs/salvage/, two generations in one call, a namespace named
 // twice and no namespace are refused before git starts.
@@ -91,6 +125,17 @@ func TestListRefsRefuses(t *testing.T) {
 		{"refs/salvage/../"},
 		{"refs/salvage/gen1/", "refs/salvage/gen2/"},
 		{"refs/heads/", "refs/heads/"},
+		{"refs/romeu/origin/"},
+		{"refs/romeu/origin/app"},
+		{"refs/romeu/origin/app/heads/"},
+		{"refs/romeu/origin/*/"},
+		{"refs/romeu/origin/../"},
+		{"refs/romeu/origin/.app/"},
+		{"refs/romeu/origin/app.lock/"},
+		{"refs/romeu/originx/app/"},
+		{"refs/romeu/"},
+		{"refs/romeu/origin/app/", "refs/romeu/origin/cfg/"},
+		{"refs/romeu/origin/app/", "refs/romeu/origin/app/"},
 	} {
 		_, _, err := r.ListRefs(t.Context(), stubRepo, ns)
 		require.ErrorIs(t, err, ErrRefused, "%q", ns)
@@ -133,6 +178,11 @@ func TestListRefsArgvAndBound(t *testing.T) {
 		r.start = answer(out, &commands)
 		_, _, err = r.ListRefs(t.Context(), stubRepo, []string{"refs/heads/"})
 		require.ErrorIs(t, err, ErrRefused, "%q", out)
+	}
+	for _, out := range []string{oid + " refs/romeu/origin/cfg/main\n", oid + " refs/romeu/origin/appx/main\n", oid + " refs/heads/main\n"} {
+		r.start = answer(out, &commands)
+		_, _, err = r.ListRefs(t.Context(), stubRepo, []string{"refs/romeu/origin/app/"})
+		require.ErrorIs(t, err, ErrRefused, "%q is outside refs/romeu/origin/app/", out)
 	}
 	assert.True(t, slices.IsSortedFunc(got, func(a, b Ref) int { return strings.Compare(a.Name, b.Name) }))
 }
