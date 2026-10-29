@@ -8,11 +8,13 @@ owns:
   - internal/cmd/romeu/init/marker*.go
   - internal/cmd/romeu/init/init.go
   - docs/spec/02-layouts.md
+  - docs/spec/04-cli.md
   - internal/cmd/romeu/sync/step2_fetch.go
 needs:
   - T041
 after:
   - T169
+  - T178
 ask_first: []
 sitting: none
 ---
@@ -29,11 +31,18 @@ breaks once the config project has a second repo. Decided on
    `git status` in it does not show the marker, holding the clone's dir
    name, mode 0600, create only.
 2. 02 2.3 lists the marker in the host tree.
-3. `sync` step 2 reads the marker and refuses a missing or malformed
+3. `sync` step 2 reads the marker and refuses a malformed
    one with the rule slug `config-marker`, exit 2, through `usage`
    (a rule with no row of 04 4.4, REQ-1258, so no new error row), in
    place of T043's guess (the one dir under `<cfg>-env/` that holds a
    `.git`).
+4. A config project made before this task has no marker: when it is
+   missing and exactly one dir under `<cfg>-env/` holds a `.git`, step
+   2 takes that dir, as T043 does, and warns `config-marker-missing`
+   (a slug added to 04 4.1), whose hint names the marker to write;
+   with none or several such dirs it refuses as T043 does. Decided on
+   2026-10-29, scope this repository: an existing project keeps
+   working with no step of the operator, and the guess fails closed.
 
 - Implements: none: a layout rule of 02 2.3 that this task writes.
 - Operator: no.
@@ -42,6 +51,8 @@ breaks once the config project has a second repo. Decided on
     holds the clone's dir; a second init refuses as it does today.
   - `sync` with two repo dirs under `<cfg>-env/` finds the config clone
     by the marker.
+  - With no marker and one clone, `sync` goes on and warns
+    `config-marker-missing`; with no marker and two clones it refuses.
   - `sync` reads the marker without following a link, bounded in size,
     checks its value against the repo `dir` pattern of 03 3.1
     (REQ-0176: no `/`, no `..`, not reserved), and checks that the dir
