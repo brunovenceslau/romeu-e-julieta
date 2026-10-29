@@ -72,11 +72,17 @@ type repoTree struct {
 // changed when present (create only); a hardened clone of each missing
 // repo; the hardened fetch of each origin into
 // refs/romeu/origin/<dir>/*; and the egress commit of each repo, the
-// tip of refs/romeu/origin/<dir>/<ref>. A node of the tree that is not
-// a plain directory is refused (exit 2) and nothing is made below it,
-// so no link is followed (I12). It writes no ref of a clone outside
-// refs/romeu/origin/ (I5). A repo memory dir that still holds a
-// handoff/ warns handoff-legacy. It fills trees and warnings.
+// tip of refs/romeu/origin/<dir>/<ref>. It writes no ref of a clone
+// outside refs/romeu/origin/ (I5). A repo memory dir that still holds
+// a handoff/ warns handoff-legacy. It fills trees and warnings; a
+// refusal leaves the targets before it as it made them.
+//
+// What it guarantees against links (I12): the env dir must be a plain
+// directory, and every other name is made and judged through an
+// os.Root opened on it, so nothing is made or read outside the env
+// dir; each level of the tree, the clone dirs included, is judged with
+// Lstat before anything is made below it or handed to git, and one
+// that is not a plain directory, a link included, is refused (exit 2).
 func makeTree(ctx context.Context, r *run) error {
 	for _, p := range r.targets {
 		t, err := makeTarget(ctx, r, p)
@@ -90,48 +96,65 @@ func makeTree(ctx context.Context, r *run) error {
 
 // makeTarget is step 4 for the target p.
 func makeTarget(ctx context.Context, r *run, p spec.Project) (tree, error) {
-	env := filepath.Join(r.settings.Root, p.Name+"-env")
-	memory := filepath.Join(env, memoryDir)
-	for _, d := range []string{env, memory} {
-		if err := makeDir(d, "tree-unsafe"); err != nil {
-			return tree{}, err
-		}
-	}
-	if err := makeMarker(filepath.Join(env, neverIndex)); err != nil {
+	name := p.Name + "-env"
+	env := filepath.Join(r.settings.Root, name)
+	if err := makeDir(os.Mkdir, os.Lstat, env, env, "tree-unsafe"); err != nil {
 		return tree{}, err
 	}
-	t := tree{env: env, shared: filepath.Join(memory, sharedDir)}
-	if err := makeMemory(t.shared, sharedLayout); err != nil {
+	rt, err := os.OpenRoot(env)
+	if err != nil {
+		return tree{}, fmt.Errorf("the host tree: %w", err)
+	}
+	defer func() { _ = rt.Close() }()
+	in := func(rel string) string { return filepath.Join(env, rel) }
+	if err := makeDir(rt.Mkdir, rt.Lstat, memoryDir, in(memoryDir), "tree-unsafe"); err != nil {
 		return tree{}, err
 	}
+	if err := makeMarker(rt); err != nil {
+		return tree{}, err
+	}
+	shared := filepath.Join(memoryDir, sharedDir)
+	if err := makeMemory(rt, env, shared, sharedLayout); err != nil {
+		return tree{}, err
+	}
+	t := tree{env: env, shared: in(shared)}
 	for _, repo := range p.Repos {
-		rt := repoTree{dir: repo.Dir, clone: filepath.Join(env, repo.Dir), memory: filepath.Join(memory, repo.Dir)}
-		if err := makeMemory(rt.memory, repoLayout); err != nil {
+		mem := filepath.Join(memoryDir, repo.Dir)
+		rp := repoTree{dir: repo.Dir, clone: in(repo.Dir), memory: in(mem)}
+		if err := makeMemory(rt, env, mem, repoLayout); err != nil {
 			return tree{}, err
 		}
-		if legacy(rt.memory) {
+		if legacy(rt, mem) {
 			r.warnings = append(r.warnings, func(w *cli.Writer) {
-				cli.Warn(w, "handoff-legacy", termsafe.Escape(rt.memory)+" holds a handoff/ of before the stamp of 03 3.10, which julieta setup migrates")
+				cli.Warn(w, "handoff-legacy", termsafe.Escape(rp.memory)+" holds a handoff/ of before the stamp of 03 3.10, which julieta setup migrates")
 			})
 		}
-		var err error
-		if rt.egressRef, rt.egressCommit, err = fetchRepo(ctx, r.git, repo, rt.clone); err != nil {
+		missing, err := cloneMissing(rt, repo.Dir, rp.clone)
+		if err != nil {
 			return tree{}, err
 		}
-		t.repos = append(t.repos, rt)
+		if missing {
+			if err := cloneRepo(ctx, r.git, repo.URL, rp.clone); err != nil {
+				return tree{}, err
+			}
+		}
+		if rp.egressRef, rp.egressCommit, err = fetchRepo(ctx, r.git, repo, rp.clone); err != nil {
+			return tree{}, err
+		}
+		t.repos = append(t.repos, rp)
 	}
 	return t, nil
 }
 
-// makeDir makes the directory at path, mode 0700, when nothing is
-// there, and leaves one that is there as it is. Either way it must then
-// be a plain directory, never a link: anything else is usage with the
-// slug, naming the path.
-func makeDir(path, slug string) error {
-	if err := os.Mkdir(path, dirMode); err != nil && !errors.Is(err, fs.ErrExist) {
+// makeDir makes the directory name, mode 0700, with mkdir when nothing
+// is there, and leaves one that is there as it is. Either way lstat
+// must then find a plain directory, never a link: anything else is
+// usage with the slug, naming path, the absolute path of name.
+func makeDir(mkdir func(string, fs.FileMode) error, lstat func(string) (fs.FileInfo, error), name, path, slug string) error {
+	if err := mkdir(name, dirMode); err != nil && !errors.Is(err, fs.ErrExist) {
 		return fmt.Errorf("the host tree: %w", err)
 	}
-	info, err := os.Lstat(path)
+	info, err := lstat(name)
 	if err != nil {
 		return fmt.Errorf("the host tree: %w", err)
 	}
@@ -141,10 +164,11 @@ func makeDir(path, slug string) error {
 	return nil
 }
 
-// makeMarker makes the empty file at path, mode 0600, when nothing is
-// there; it never opens what is there, a link included.
-func makeMarker(path string) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+// makeMarker makes the empty marker of the env dir of rt, mode 0600,
+// when nothing is there; it never opens what is there, a link
+// included.
+func makeMarker(rt *os.Root) error {
+	f, err := rt.OpenFile(neverIndex, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if errors.Is(err, fs.ErrExist) {
 		return nil
 	}
@@ -154,43 +178,62 @@ func makeMarker(path string) error {
 	return f.Close()
 }
 
-// makeMemory makes the memory dir at dir and its subdirectories sub,
-// each with makeDir: a node of them that is not a plain directory is
-// memory-layout (I24), and step 5 checks the rest of the layout.
-func makeMemory(dir string, sub []string) error {
-	if err := makeDir(dir, "memory-layout"); err != nil {
+// makeMemory makes the memory dir dir of the env dir env, open as rt,
+// and its subdirectories sub, each with makeDir: a node of them that
+// is not a plain directory is memory-layout (I24), and step 5 checks
+// the rest of the layout.
+func makeMemory(rt *os.Root, env, dir string, sub []string) error {
+	if err := makeDir(rt.Mkdir, rt.Lstat, dir, filepath.Join(env, dir), "memory-layout"); err != nil {
 		return err
 	}
 	for _, s := range sub {
-		if err := makeDir(filepath.Join(dir, s), "memory-layout"); err != nil {
+		d := filepath.Join(dir, s)
+		if err := makeDir(rt.Mkdir, rt.Lstat, d, filepath.Join(env, d), "memory-layout"); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// legacy reports whether the memory dir holds a handoff/ directory of
-// before the stamp of 03 3.10 (08 8.1): julieta setup migrates it, and
-// until then it is a warning, never a refusal (REQ-0645).
-func legacy(dir string) bool {
-	info, err := os.Lstat(filepath.Join(dir, memstore.HandoffDir))
+// legacy reports whether the memory dir dir of rt holds a handoff/
+// directory of before the stamp of 03 3.10 (08 8.1): julieta setup
+// migrates it, and until then it is a warning, never a refusal
+// (REQ-0645).
+func legacy(rt *os.Root, dir string) bool {
+	info, err := rt.Lstat(filepath.Join(dir, memstore.HandoffDir))
 	return err == nil && info.IsDir()
 }
 
-// fetchRepo clones repo into clone when nothing is there, fetches its
-// origin into refs/romeu/origin/<dir>/* and returns the egress ref,
-// refs/romeu/origin/<dir>/<ref>, and its commit (I9). With no ref in
-// the spec, <ref> is the origin's HEAD as the clone recorded it,
-// refs/remotes/origin/HEAD; its commit is still read from
-// refs/romeu/origin/ alone.
-func fetchRepo(ctx context.Context, g *gitsafe.Runner, repo spec.Repo, clone string) (string, string, error) {
-	if _, err := os.Lstat(clone); errors.Is(err, fs.ErrNotExist) {
-		if err := cloneRepo(ctx, g, repo.URL, clone); err != nil {
-			return "", "", err
-		}
-	} else if err != nil {
-		return "", "", fmt.Errorf("the clone of %s: %w", termsafe.Escape(repo.URL), err)
+// cloneMissing reports whether the clone dir name of rt, at the
+// absolute path, is missing, so step 4 clones it. One that is there
+// must be a plain directory: a link is tree-unsafe, so no fetch
+// writes refs/romeu/origin/ into the repository it points at.
+func cloneMissing(rt *os.Root, name, path string) (bool, error) {
+	info, err := rt.Lstat(name)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return true, nil
+	case err != nil:
+		return false, fmt.Errorf("the clone %s: %w", termsafe.Escape(path), err)
+	case !info.IsDir():
+		return false, usage("tree-unsafe", termsafe.Escape(path)+" is not a directory: romeu clones the repo there, and follows no link in the host tree")
 	}
+	return false, nil
+}
+
+// fetchRepo fetches the origin of repo into refs/romeu/origin/<dir>/*
+// of clone and returns the egress ref, refs/romeu/origin/<dir>/<ref>,
+// and its commit (I9).
+//
+// With no ref in the spec, <ref> is the origin's HEAD as the clone
+// records it, the local refs/remotes/origin/HEAD, since gitsafe has no
+// read of the remote's HEAD: its refspec check refuses a source outside
+// refs/, so +HEAD:refs/romeu/origin/<dir>/HEAD cannot be fetched. The
+// commit is still read from refs/romeu/origin/ alone, but a local
+// rewrite of refs/remotes/origin/HEAD changes which branch it is. So
+// I9 holds only for a repo whose spec names its ref, until gitsafe
+// reads the remote's HEAD.
+func fetchRepo(ctx context.Context, g *gitsafe.Runner, repo spec.Repo, clone string) (string, string, error) {
 	prefix := "refs/romeu/origin/" + repo.Dir + "/"
 	if err := fetch(ctx, g, clone, repo.URL, []string{"+refs/heads/*:" + prefix + "*"}); err != nil {
 		return "", "", err

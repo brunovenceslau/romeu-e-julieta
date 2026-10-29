@@ -359,3 +359,113 @@ func TestMakeTreeRefuses(t *testing.T) {
 		})
 	}
 }
+
+// TestMakeTreeRefusesALinkedClone: a link at a clone dir, to another
+// git repository, is tree-unsafe (exit 2) before any clone or fetch, so
+// the repository it points at gets no ref of refs/romeu/origin/.
+func TestMakeTreeRefusesALinkedClone(t *testing.T) {
+	h := treeRun(t)
+	other := t.TempDir()
+	gitIn(t, other, "init", "-q", "-b", "main")
+	commitFiles(t, other, map[string]string{"README": "another repository"})
+	require.NoError(t, os.MkdirAll(h.env, 0o700))
+	require.NoError(t, os.Symlink(other, h.in("shop-api")))
+
+	err := makeTree(t.Context(), h.r)
+
+	require.Error(t, err)
+	assert.Equal(t, 2, cli.ExitCode(err), err.Error())
+	assert.Contains(t, err.Error(), "tree-unsafe: "+h.in("shop-api"))
+	assert.Empty(t, gitIn(t, other, "for-each-ref", "refs/romeu"))
+}
+
+// addTarget adds to the fixture a target name of one primary repo dir,
+// whose origin's branch main holds one commit, after the others.
+func (h *hostTree) addTarget(t *testing.T, name, dir string) {
+	t.Helper()
+	url := "https://github.com/owner/" + dir
+	o := filepath.Join(t.TempDir(), dir)
+	require.NoError(t, os.MkdirAll(o, 0o700))
+	gitIn(t, o, "init", "-q", "-b", "main")
+	commitFiles(t, o, map[string]string{"README": url})
+	h.origins[url] = o
+	h.r.targets = append(h.r.targets, spec.Project{Name: name, Repos: []spec.Repo{{URL: url, Primary: true, Dir: dir, Ref: "main"}}})
+}
+
+// TestMakeTreeOfTwoTargets: steps 4 and 5 on two targets keep the
+// order of targets in trees and add the warnings of both, and a
+// refusal on the second leaves the first as step 4 made it.
+func TestMakeTreeOfTwoTargets(t *testing.T) {
+	t.Run("both pass", func(t *testing.T) {
+		h := treeRun(t)
+		h.addTarget(t, "blog", "blog-site")
+		blog := filepath.Join(h.root, "blog-env")
+		for _, d := range []string{h.in("memory/shop-api/handoff"), filepath.Join(blog, "memory/blog-site/handoff")} {
+			require.NoError(t, os.MkdirAll(d, 0o700))
+		}
+
+		require.NoError(t, makeTree(t.Context(), h.r))
+		require.NoError(t, checkMemory(t.Context(), h.r))
+
+		require.Len(t, h.r.trees, 2)
+		assert.Equal(t, h.env, h.r.trees[0].env)
+		assert.Equal(t, blog, h.r.trees[1].env)
+		var out bytes.Buffer
+		for _, w := range h.r.warnings {
+			w(cli.NewWriter(&out))
+		}
+		assert.Equal(t, "warning handoff-legacy: "+h.in("memory/shop-api")+" holds a handoff/ of before the stamp of 03 3.10, which julieta setup migrates\n"+
+			"warning handoff-legacy: "+filepath.Join(blog, "memory/blog-site")+" holds a handoff/ of before the stamp of 03 3.10, which julieta setup migrates\n", out.String())
+	})
+	t.Run("step 4 refuses the second", func(t *testing.T) {
+		h := treeRun(t)
+		h.addTarget(t, "blog", "blog-site")
+		blog := filepath.Join(h.root, "blog-env")
+		require.NoError(t, os.MkdirAll(filepath.Join(blog, "memory"), 0o700))
+		require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(blog, "memory/blog-site")))
+
+		err := makeTree(t.Context(), h.r)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "memory-layout: "+filepath.Join(blog, "memory/blog-site"))
+		require.Len(t, h.r.trees, 1)
+		assert.Equal(t, h.env, h.r.trees[0].env)
+		assert.DirExists(t, h.in("memory/shop-web/salvage"))
+		assert.Equal(t, gitIn(t, h.origins[webURL], "rev-parse", "HEAD"), gitIn(t, h.in("shop-web"), "rev-parse", "refs/romeu/origin/shop-web/trunk"))
+	})
+	t.Run("step 5 refuses the second", func(t *testing.T) {
+		h := treeRun(t)
+		h.addTarget(t, "blog", "blog-site")
+		require.NoError(t, makeTree(t.Context(), h.r))
+		before := snapshot(t, h.env)
+		require.NoError(t, os.Mkdir(filepath.Join(h.root, "blog-env/memory/blog-site/notes"), 0o700))
+
+		err := checkMemory(t.Context(), h.r)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "top-level "+filepath.Join(h.root, "blog-env/memory/blog-site/notes"))
+		assert.Equal(t, before, snapshot(t, h.env), "the first target is as step 4 made it")
+	})
+}
+
+// TestTheWarningsEscapeOnce: a path is escaped once (termsafe.Escape)
+// before the CLI writer, which escapes again; termsafe escapes no
+// backslash, so an escape is printed as it is and never doubled (I29).
+func TestTheWarningsEscapeOnce(t *testing.T) {
+	h := treeRun(t)
+	h.r.targets[0].Name = "sh\x1bop"
+	h.env = filepath.Join(h.root, "sh\x1bop-env")
+	require.NoError(t, os.MkdirAll(h.in("memory/shop-api/handoff"), 0o700))
+	require.NoError(t, makeTree(t.Context(), h.r))
+	require.NoError(t, os.WriteFile(h.in("memory/shop-api/entries/.tmp-01j9z3k8m6t2q4w5e7r9y1v3k5"), nil, 0o600))
+	require.NoError(t, checkMemory(t.Context(), h.r))
+
+	var out bytes.Buffer
+	for _, w := range h.r.warnings {
+		w(cli.NewWriter(&out))
+	}
+
+	escaped := filepath.Join(h.root, `sh\u001bop-env`, "memory/shop-api")
+	assert.Equal(t, "warning handoff-legacy: "+escaped+" holds a handoff/ of before the stamp of 03 3.10, which julieta setup migrates\n"+
+		"note temp-file "+escaped+"/entries/.tmp-01j9z3k8m6t2q4w5e7r9y1v3k5: a leftover julieta temporary file, never read; julieta setup removes it\n", out.String())
+}
