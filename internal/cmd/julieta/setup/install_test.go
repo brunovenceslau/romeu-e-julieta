@@ -57,7 +57,9 @@ func fakeMise(t *testing.T, script string) (calls string) {
 	return calls
 }
 
-// count returns the number of lines of the file, 0 when it is absent.
+// count returns the number of calls of "mise install" the file holds,
+// 0 when it is absent: the other calls of setup (trust, tasks, run) are
+// not what these cases count.
 func count(t *testing.T, path string) int {
 	t.Helper()
 	b, err := os.ReadFile(path)
@@ -65,7 +67,13 @@ func count(t *testing.T, path string) int {
 		return 0
 	}
 	require.NoError(t, err)
-	return len(strings.Split(strings.TrimSpace(string(b)), "\n"))
+	n := 0
+	for line := range strings.Lines(string(b)) {
+		if strings.TrimSpace(line) == "install" {
+			n++
+		}
+	}
+	return n
 }
 
 // TestSetupInstalls: setup runs mise install in a repo that has a
@@ -113,7 +121,7 @@ func TestSetupInstallNothing(t *testing.T) {
 func TestSetupInstallFailureLeavesSandboxUsable(t *testing.T) {
 	s := newSandbox(t)
 	miseFiles(t, s.primary())
-	calls := fakeMise(t, "echo boom >&2; exit 1")
+	calls := fakeMise(t, `[ "$1" = install ] || exit 0; echo boom >&2; exit 1`)
 	code, rep, stderr := setupJSON(t)
 	assert.Equal(t, 0, code, stderr)
 	require.Len(t, rep.Errors, 1)

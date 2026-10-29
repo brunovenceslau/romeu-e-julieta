@@ -287,3 +287,43 @@ step fetch env JULIETA_MANIFEST=`+manifestEnv(t, n, originURL+"gone.git")+` "$J"
 	assert.True(t, strings.HasPrefix(rep.Warnings[0].Message, "api: "), rep.Warnings[0].Message)
 	assert.Contains(t, r.stderr, "warning fetch-failed: api: ")
 }
+
+// TestJulietaSetupMiseTrustAndTask: in a repo with a mise.toml and a
+// task setup, julieta setup records the trust in the sandbox's mise
+// state, so a plain mise (no MISE_YES, MISE_PARANOID or trusted paths)
+// reads the repo without asking, runs the task after install, and a task
+// that exits 3 is the warning repo-setup-failed with exit 0 (04 4.3,
+// REQ-1306, REQ-1307).
+func TestJulietaSetupMiseTrustAndTask(t *testing.T) {
+	steps := scenario(t, miseSetup(t)+`
+put mise.lock '`+helloLock+`'
+put mise.toml '`+helloToml+`
+[tasks.setup]
+run = "touch /tmp/setup-ran"
+'
+step before mise ls
+step setup "$J" setup
+step ls mise ls
+step marker test -f /tmp/setup-ran
+step trusted sh -c 'ls "$HOME/.local/state/mise/trusted-configs" | wc -l'
+step inrepo git status --porcelain
+put mise.toml '`+helloToml+`
+[tasks.setup]
+run = "exit 3"
+'
+step failing "$J" setup
+`)
+	assert.NotEqual(t, 0, step(t, steps, "before").code, "an untrusted mise.toml is refused without the trust")
+	r := step(t, steps, "setup")
+	require.Equal(t, 0, r.code, r.stderr)
+	assert.NotContains(t, r.stderr, "repo-setup-failed")
+	r = step(t, steps, "ls")
+	assert.Equal(t, 0, r.code, r.stderr)
+	assert.NotContains(t, r.stderr, "trust")
+	assert.Equal(t, 0, step(t, steps, "marker").code, "the task ran")
+	assert.NotEqual(t, "0", strings.TrimSpace(step(t, steps, "trusted").stdout), "the trust record is in the mise state")
+	assert.Equal(t, "?? mise.lock\n?? mise.toml\n", step(t, steps, "inrepo").stdout, "the repo holds no trust record")
+	r = step(t, steps, "failing")
+	assert.Equal(t, 0, r.code, r.stderr)
+	assert.Contains(t, r.stderr, "warning repo-setup-failed: api exit 3\n")
+}

@@ -15,3 +15,9 @@ gh = "2.102.0"
 golangci-lint = "2.14.0"
 "go:golang.org/x/tools/gopls" = "0.23.0"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.8.0"
+
+# The task julieta setup runs after mise install (04 4.3, REQ-1307): it
+# fills the Go module cache the checks read with GOPROXY=off.
+[tasks.setup]
+description = "Fill the Go module cache the checks read with GOPROXY=off"
+run = "go mod download"

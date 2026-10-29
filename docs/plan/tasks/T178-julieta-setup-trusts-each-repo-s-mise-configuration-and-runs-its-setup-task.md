@@ -5,6 +5,7 @@ milestone: M2
 module: julieta-core
 fate: new
 owns:
+  - internal/mise/repo_task*.go
   - internal/cmd/julieta/setup/repo_setup*.go
   - internal/cmd/julieta/setup/install*.go
   - internal/cmd/julieta/setup/steps.go

@@ -183,6 +183,8 @@ func PrintWarning(out *cli.Writer, w Warning) {
 		cli.Warn(out, "version-only-tool", w.Message)
 	case AgentPathMissing:
 		cli.Warn(out, "agent-path-missing", w.Message)
+	case RepoSetupFailed:
+		cli.Warn(out, "repo-setup-failed", w.Message)
 	case SkillsStale:
 		cli.Warn(out, "skills-stale", w.Message)
 	case AgentHooksMissing:
