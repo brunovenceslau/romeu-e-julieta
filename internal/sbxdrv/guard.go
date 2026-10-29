@@ -91,6 +91,7 @@ var verbs = map[string]verbSpec{
 	"policy rm network":    {flags: []flagSpec{{long: "--sandbox", value: true, driven: true}, {long: "--resource", value: true, driven: true}}, driven: true},
 	"policy ls":            {flags: []flagSpec{{long: "--json", driven: true}}, driven: true},
 	"settings set":         {min: 2, max: 2, driven: true},
+	"secret ls":            {driven: true},
 	"secret set": {flags: []flagSpec{
 		{long: "--sandbox", value: true, driven: true}, {long: "--command", value: true, driven: true}, {long: "--refresh", value: true, driven: true},
 		{long: "--all-sandboxes"}, {long: "--force", short: 'f'}, {long: "--no-verify"}, {long: "--oauth"}, {long: "--password-stdin"},
