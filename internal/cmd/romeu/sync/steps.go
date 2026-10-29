@@ -34,7 +34,7 @@ var steps = []step{
 	{n: 5, name: "check the memory dirs", do: checkMemory},
 	{n: 6, name: "read descriptors and render the candidate", do: renderCandidates},
 	{n: 7, name: "check the live files for drift", do: notBuilt},
-	{n: 8, name: "gate 2 and promote", do: notBuilt},
+	{n: 8, name: "gate 2 and promote", do: gateAndPromote},
 	{n: 9, name: "apply live changes", do: skipLive},
 	{n: 10, name: "report orphans and the julieta pin", do: notBuilt},
 }
