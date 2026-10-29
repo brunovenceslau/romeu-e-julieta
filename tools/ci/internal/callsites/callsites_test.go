@@ -390,25 +390,8 @@ func TestCallsitesTreeIsNotInert(t *testing.T) {
 	}
 }
 
-// pendingTree are the call sites of this module that the table does not
-// admit and 05 5.2 has no row for, each as "file message" without its
-// line. They are reported to the operator, not admitted (T039); the
-// list only shrinks, and the test below fails both on a new call site
-// and on one of these that is gone or admitted, so it must then leave
-// the list. An empty list is the end state: the tree with Admitted
-// yields no finding.
-var pendingTree = []string{
-	"internal/cmd/romeu/init/init.go os.RemoveAll (os.Remove*) in run of internal/cmd/romeu/init, which the admitted-call-site table does not name",
-	"internal/cmd/romeu/init/init.go .Rename (rename-over) in cloneConfig of internal/cmd/romeu/init, which the admitted-call-site table does not name",
-	"internal/cmd/romeu/init/init.go .Remove (os.Remove*) in made.undo of internal/cmd/romeu/init, which the admitted-call-site table does not name",
-	"internal/cmd/romeu/init/init.go os.Remove (os.Remove*) in made.undo of internal/cmd/romeu/init, which the admitted-call-site table does not name",
-	"internal/gitsafe/clone.go os.RemoveAll (os.Remove*) in Runner.clone of internal/gitsafe, which the admitted-call-site table does not name",
-	"internal/render/promote.go .Rename (rename-over) in ensureKitDir of internal/render, which the admitted-call-site table does not name",
-	"internal/state/write.go .CloseAtomicallyReplace (rename-over) in writeFile of internal/state, which the admitted-call-site table does not name",
-}
-
 // TestCallsitesTreeWithAdmitted runs the check over this module with the
-// admitted table: it yields no finding but the pending ones.
+// admitted table: it yields no finding.
 func TestCallsitesTreeWithAdmitted(t *testing.T) {
 	root := citest.ModuleRoot(t)
 	module, err := modulePath(root)
@@ -421,7 +404,7 @@ func TestCallsitesTreeWithAdmitted(t *testing.T) {
 		file, _, _ := strings.Cut(f.Where, ":")
 		got = append(got, file+" "+f.Msg)
 	}
-	assert.ElementsMatch(t, pendingTree, got)
+	assert.Empty(t, got)
 }
 
 // rowExists reports whether the row names a function of a non-test file
