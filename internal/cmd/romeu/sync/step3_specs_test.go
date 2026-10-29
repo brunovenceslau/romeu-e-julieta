@@ -82,17 +82,6 @@ func TestReadSpecs(t *testing.T) {
 			id:    "RJ-349", mentions: []string{"project-unknown", "shop"},
 		},
 		{
-			name:  "no name and no --all",
-			files: map[string]string{"projects/cfg.yaml": cfg},
-			id:    "RJ-349", mentions: []string{"targets"},
-		},
-		{
-			name:  "--all and a name",
-			files: map[string]string{"projects/cfg.yaml": cfg},
-			flags: flags{all: true, names: []string{"cfg"}},
-			id:    "RJ-349", mentions: []string{"targets"},
-		},
-		{
 			name: "two specs with one name and two with one URL list every error",
 			files: map[string]string{
 				"projects/cfg.yaml":  cfg,

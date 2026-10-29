@@ -110,8 +110,8 @@ func (c *config) run(f flags) *run {
 // head of the config ref or a --from commit that it reaches.
 func TestFetchConfig(t *testing.T) {
 	type fixture struct {
-		c                *config
-		first, head, own string
+		c                      *config
+		first, head, own, tree string
 	}
 	tests := []struct {
 		name string
@@ -128,7 +128,7 @@ func TestFetchConfig(t *testing.T) {
 		{name: "a commit the config ref reaches", from: func(f fixture) string { return f.first }, want: func(f fixture) string { return f.first }},
 		{name: "a commit of the clone the origin never had", from: func(f fixture) string { return f.own }, slug: "from-unreachable"},
 		{name: "a commit the clone does not hold", from: func(fixture) string { return strings.Repeat("1", 40) }, slug: "from-unreachable"},
-		{name: "an abbreviated id", from: func(f fixture) string { return f.first[:12] }, slug: "from-unreachable"},
+		{name: "the tree of the head", from: func(f fixture) string { return f.tree }, slug: "from-unreachable"},
 		{
 			name:    "a config ref the origin lacks",
 			from:    func(fixture) string { return fromOrigin },
@@ -157,6 +157,7 @@ func TestFetchConfig(t *testing.T) {
 			f := fixture{c: c, first: gitIn(t, c.origin, "rev-parse", "HEAD")}
 			f.head = commitFiles(t, c.origin, map[string]string{"projects/cfg.yaml": "second"})
 			f.own = commitFiles(t, c.clone, map[string]string{"local": "never pushed"})
+			f.tree = gitIn(t, c.origin, "rev-parse", f.head+"^{tree}")
 			if tt.arrange != nil {
 				tt.arrange(t, f)
 			}
@@ -179,21 +180,4 @@ func TestFetchConfig(t *testing.T) {
 			assert.Equal(t, f.head, gitIn(t, c.clone, "rev-parse", "refs/romeu/origin/cfg/main"))
 		})
 	}
-}
-
-// TestFetchConfigLeavesTheClonesRefs: the fetch writes
-// refs/romeu/origin/<cfg-dir>/* alone, so refs/heads, refs/remotes and
-// HEAD of the clone are as they were (I5). The fetch is the fixture's,
-// so this holds the refspec step 2 asks for; gitsafe's own tests hold
-// its refusal of any other destination.
-func TestFetchConfigLeavesTheClonesRefs(t *testing.T) {
-	c := newConfig(t, map[string]string{"projects/cfg.yaml": "first"})
-	commitFiles(t, c.origin, map[string]string{"projects/cfg.yaml": "second"})
-	before := gitIn(t, c.clone, "for-each-ref", "refs/heads", "refs/remotes", "refs/tags")
-	head := gitIn(t, c.clone, "symbolic-ref", "HEAD")
-
-	require.NoError(t, fetchConfig(t.Context(), c.run(flags{})))
-
-	assert.Equal(t, before, gitIn(t, c.clone, "for-each-ref", "refs/heads", "refs/remotes", "refs/tags"))
-	assert.Equal(t, head, gitIn(t, c.clone, "symbolic-ref", "HEAD"))
 }

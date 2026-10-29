@@ -14,9 +14,12 @@
 package sync
 
 import (
+	"regexp"
+
 	"github.com/spf13/cobra"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // definition is the command's registered definition.
@@ -32,6 +35,9 @@ var definition = cli.Register(func() cli.Command {
 			Args:    cobra.ArbitraryArgs,
 			RunE: func(c *cobra.Command, names []string) error {
 				f.names = names
+				if err := f.check(); err != nil {
+					return err
+				}
 				return runSteps(c.Context(), newRun(env, f), steps)
 			},
 		}
@@ -43,6 +49,14 @@ var definition = cli.Register(func() cli.Command {
 	return c
 }())
 
+// fromOrigin is the value of --from that names the head of the config
+// ref.
+const fromOrigin = "origin"
+
+// fullObjectID is a full SHA-1 or SHA-256 object id, as --from takes
+// it: gitsafe takes no abbreviated id.
+var fullObjectID = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
+
 // flags are the command line of one run.
 type flags struct {
 	// all is --all.
@@ -53,4 +67,21 @@ type flags struct {
 	overwriteDrift bool
 	// names are the project names given as arguments.
 	names []string
+}
+
+// check refuses, as usage (exit 2), a command line whose shape is wrong
+// whatever the spec holds: no project name and no --all, both together,
+// or a --from that is neither origin nor a full object id. It runs
+// before step 1, so such a line takes no lock and writes nothing; a
+// name the spec lacks is step 3's (project-unknown).
+func (f flags) check() error {
+	switch {
+	case f.all && len(f.names) > 0:
+		return usage("targets", "--all and project names exclude each other")
+	case !f.all && len(f.names) == 0:
+		return usage("targets", "name the projects to sync, or pass --all")
+	case f.from != fromOrigin && !fullObjectID.MatchString(f.from):
+		return usage("from-invalid", "--from "+termsafe.Escape(f.from)+" is neither origin nor a full commit id")
+	}
+	return nil
 }

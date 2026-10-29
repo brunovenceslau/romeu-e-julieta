@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
@@ -29,14 +28,6 @@ import (
 var fetch = func(ctx context.Context, g *gitsafe.Runner, dir, url string, refspecs []string) error {
 	return g.Fetch(ctx, dir, url, refspecs)
 }
-
-// fromOrigin is the value of --from that names the head of the config
-// ref.
-const fromOrigin = "origin"
-
-// fullObjectID is a full SHA-1 or SHA-256 object id, as --from takes
-// it: gitsafe takes no abbreviated id.
-var fullObjectID = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
 
 // fetchConfig is step 2 of 04 4.2 (REQ-0336): the hardened fetch of the
 // config repo's origin into refs/romeu/origin/<cfg-dir>/*, then the
@@ -129,24 +120,32 @@ func configDir(h spec.HostSettings) (string, error) {
 	return "", usage("config-clone-ambiguous", "each of "+termsafe.Escape(strings.Join(dirs, ", "))+" under "+termsafe.Escape(env)+" could be the config repo's clone")
 }
 
-// reachable returns nil when from, the value of --from, is a full
-// object id that head, the tip of ref, the config ref as fetched,
-// reaches, and usage
-// (exit 2) otherwise, a commit the clone does not hold among them. The
-// spec reads any commit reachable from refs/romeu/origin/*; gitsafe
-// lists no ref of that namespace, so a commit only another fetched
-// branch reaches is refused here too.
+// reachable returns nil when from, the value of --from, a full object
+// id, names a commit, and head, the tip of ref, the config
+// ref as fetched, reaches that commit. Otherwise it returns usage (exit
+// 2), a commit the clone does not hold among them. An id that names a
+// tree or a blob is refused too, so step 3 never reads projects/ from
+// an object that is not a commit. The spec reads any commit reachable
+// from refs/romeu/origin/*; gitsafe lists no ref of that namespace, so
+// a commit only another fetched branch reaches is refused here too.
 func reachable(ctx context.Context, g *gitsafe.Runner, clone, from, ref, head string) error {
 	refuse := func(why string) error {
 		return usage("from-unreachable", "--from "+termsafe.Escape(from)+" "+why)
 	}
-	if !fullObjectID.MatchString(from) {
-		return refuse("is not a full commit id")
-	}
-	out, err := g.Unreached(ctx, clone, []string{from}, []string{head})
+	// flags.check took from as a full object id before step 1. With no
+	// exclude, the walk lists from itself exactly when it is a
+	// commit: rev-list lists commits only.
+	commit, err := g.Unreached(ctx, clone, []string{from}, nil)
 	if _, ok := errors.AsType[*procgroup.ExitError](err); ok {
 		return refuse("names no commit of the config repo's clone")
 	}
+	if err != nil {
+		return err
+	}
+	if len(commit) != 1 || commit[0] != from {
+		return refuse("names no commit of the config repo's clone")
+	}
+	out, err := g.Unreached(ctx, clone, []string{from}, []string{head})
 	if err != nil {
 		return err
 	}

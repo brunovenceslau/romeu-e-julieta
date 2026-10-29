@@ -42,18 +42,28 @@ func readSpecs(ctx context.Context, r *run) error {
 		files[i] = spec.File{Path: projectsDir + "/" + f.Name, Data: f.Data}
 	}
 	specs, err := spec.LoadSet(files, &r.settings)
-	if _, ok := errors.AsType[*cli.Error](err); ok {
-		return err
-	}
 	if err != nil {
-		e := cli.Usage.Wrap(err, "spec-invalid: the specs at "+r.specCommit+" do not validate")
-		e.Fill = map[string]string{"<binary>": "romeu", " <command>": " sync"}
-		return e
+		return invalid(err, r.specCommit)
 	}
 	if r.targets, err = targets(specs, r.flags); err != nil {
 		return err
 	}
 	return checkSecrets(r)
+}
+
+// invalid returns the error of LoadSet with its text escaped, since a
+// finding quotes the config repo's content, which is untrusted (I29):
+// an error of a row (projects-stray-file, config-project-missing) keeps
+// its row and details, and the other findings are usage with the slug
+// spec-invalid. Either lists every finding.
+func invalid(err error, commit string) error {
+	text := termsafe.Escape(err.Error())
+	if e, ok := errors.AsType[*cli.Error](err); ok {
+		out := e.New(text, e.Details...)
+		out.Fill = e.Fill
+		return out
+	}
+	return usage("spec-invalid", "the specs at "+commit+" do not validate: "+text)
 }
 
 // refused returns usage, with slug and what, for an error of git on
@@ -69,15 +79,10 @@ func refused(err error, slug, what string) error {
 
 // targets returns the specs the command line names, in the order of
 // specs: every spec with --all, else each one named, which must exist.
-// No name and no --all, or both, is usage.
+// The shape of the line was checked before step 1 (flags.check).
 func targets(specs []spec.Project, f flags) ([]spec.Project, error) {
-	switch {
-	case f.all && len(f.names) > 0:
-		return nil, usage("targets", "--all and project names exclude each other")
-	case f.all:
+	if f.all {
 		return specs, nil
-	case len(f.names) == 0:
-		return nil, usage("targets", "name the projects to sync, or pass --all")
 	}
 	var out []spec.Project
 	for _, p := range specs {
