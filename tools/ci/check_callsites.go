@@ -13,7 +13,7 @@ func init() {
 		Name:    "callsites",
 		Guards:  "romeu deletes nothing outside the admitted-call-site table (I16), and every subprocess starts through internal/procgroup",
 		Row:     "callsites",
-		Req:     "REQ-1310",
+		Req:     "REQ-1311",
 		Usage:   "go run ./tools/ci callsites",
 		All:     true,
 		Order:   96,
