@@ -765,7 +765,7 @@ Evidence).
   read through `CONTRIBUTING.md` and by review, and it is not memory.
   What a session taught in a user's project is a memory entry of type
   `feedback` ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1)),
-  listed at SessionStart.
+  listed at SessionStart so that another session can triage it.
 
 ## 12.8 Contributor docs (outlines)
 

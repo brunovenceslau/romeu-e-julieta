@@ -663,8 +663,12 @@ Free-form markdown body.
 `REQ-0242` Tags with behaviour are a closed set, the five type tags. Four
 are the kinds of note the pinned agent's own memory records, used in
 the same cases: `user` (the operator's role, expertise and working
-preferences), `feedback` (a correction the operator gave or an approach
-the operator confirmed, and what the work taught), `project` (ongoing
+preferences), `feedback` (the session's own feedback on how the session
+itself is going: friction, a tool that misbehaved, a gap in a check, a
+process that slowed the work, written so that another session can triage
+it and implement the improvement in parallel, which is why SessionStart
+lists the open entries (08 8.2); also a correction the operator gave or an approach the
+operator confirmed), `project` (ongoing
 work, decisions and ordering that the code and the git history do not
 hold) and `reference` (where to find something outside the repository).
 The fifth, `handoff`, is the narrative a session leaves for the next
