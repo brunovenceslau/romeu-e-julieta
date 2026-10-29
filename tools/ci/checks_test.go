@@ -67,6 +67,7 @@ func TestRegisteredChecks(t *testing.T) {
 		{"container", false, false, true, true, "steps"},
 		{"cross build", false, false, true, false, "steps"},
 		{"imports", false, false, true, false, "steps"},
+		{"callsites", false, false, true, false, "steps"},
 		{"hygiene", true, false, true, false, "judge"},
 		{"workflows", true, false, true, false, "judge"},
 		{"kits", true, false, true, false, "judge"},
