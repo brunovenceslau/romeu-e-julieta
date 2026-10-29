@@ -3,7 +3,7 @@ id: T039
 title: "`render`: the promotion commit, recovery and drift"
 milestone: M3
 module: render
-fate: kept
+fate: merged
 owns:
   - internal/render/promote*.go
   - internal/render/drift*.go
@@ -24,6 +24,8 @@ ask_first:
   - ask-first
   - spec
 sitting: none
+merged: 2026-10-29
+pr: 315
 ---
 
 # T039 - `render`: the promotion commit, recovery and drift
@@ -39,7 +41,7 @@ Re-plan (2026-10-12): Kept as written before the re-plan.
   REQ-0262 (03 3.13), REQ-0342 (04 4.2), REQ-0385 (04 4.2), REQ-0386 (04
   4.2), REQ-0429 (04 4.4), REQ-0479 (05 5.2), REQ-0481 (05 5.2),
   REQ-0498 (05 5.2), REQ-0499 (05 5.2), REQ-0500 (05 5.2), REQ-0582 (06
-  6.3), REQ-0751 (10 10.1), REQ-1060 (12 12.1).
+  6.3), REQ-0751 (10 10.1), REQ-1060 (12 12.1), REQ-1311 (10 10.2).
 - Operator: no.
 - Acceptance:
   - The four steps run in order; a test hook stops after each, and
