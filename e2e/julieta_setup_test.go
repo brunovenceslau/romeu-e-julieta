@@ -184,6 +184,7 @@ type setupJSON struct {
 		Target  string `json:"target"`
 	} `json:"link"`
 	Repos []struct {
+		BranchState   string `json:"branchState"`
 		Cloned        bool   `json:"cloned"`
 		DefaultBranch string `json:"defaultBranch"`
 		Dir           string `json:"dir"`
@@ -254,9 +255,10 @@ step fetch env JULIETA_MANIFEST=`+manifestEnv(t, n, originURL+"gone.git")+` "$J"
 	assert.Equal(t, w.Julieta, link, "the link points at the running binary")
 	assert.Empty(t, rep.Unusable)
 	require.Len(t, rep.Repos, 2)
-	assert.Equal(t, "behind", rep.Repos[0].FastForward)
-	assert.Empty(t, rep.Repos[0].From, "julieta-setup/v1 keeps from, always empty")
-	assert.Empty(t, rep.Repos[0].To, "julieta-setup/v1 keeps to, always empty")
+	assert.Equal(t, "behind", rep.Repos[0].BranchState)
+	for _, repo := range rep.Repos {
+		assert.Empty(t, repo.FastForward+repo.From+repo.To, "the deprecated members stay, empty (REQ-1310): %s", repo.Dir)
+	}
 	assert.Equal(t, old, head, "the primary's main stays at its commit")
 	assert.NotEqual(t, old, tip)
 	assert.True(t, rep.Repos[1].Cloned, "the missing secondary is cloned")
@@ -270,8 +272,8 @@ step fetch env JULIETA_MANIFEST=`+manifestEnv(t, n, originURL+"gone.git")+` "$J"
 	decodeStrict(t, r.stdout, &rep)
 	assert.False(t, rep.Link.Changed)
 	require.Len(t, rep.Repos, 2)
-	assert.Equal(t, "behind", rep.Repos[0].FastForward)
-	assert.Equal(t, "current", rep.Repos[1].FastForward)
+	assert.Equal(t, "behind", rep.Repos[0].BranchState)
+	assert.Equal(t, "current", rep.Repos[1].BranchState)
 	for _, repo := range rep.Repos {
 		assert.False(t, repo.Cloned, repo.Dir)
 	}

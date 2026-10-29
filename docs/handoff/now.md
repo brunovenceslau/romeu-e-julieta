@@ -11,8 +11,8 @@ issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
 
 ## Next steps
 
-1. Setup: T177 in review, then T178; #309 makes the plan check compare
-   two owns globs. Issue #303 (setup reports an unusable sandbox as
+1. Setup: T177 in review, then T178; since #309 the plan check
+   compares two owns globs. Issue #303 (setup reports an unusable sandbox as
    RJ-348 internal; a Finder `.DS_Store` in the memory dir) is open.
 2. Memory: T039, then T043 and T167, then T174 and T175, then T172,
    then T176 and T179; T039 is the critical path's head.
@@ -55,8 +55,8 @@ issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
 
 ## In flight
 
-- `feat/t177-setup-moves-no-branch` (T177) and `fix/plan-glob-overlap`
-  (#309); older branches as they were.
+- `feat/t177-setup-moves-no-branch` (T177); older branches as they
+  were.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.

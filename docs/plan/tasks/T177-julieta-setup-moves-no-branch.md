@@ -17,6 +17,7 @@ owns:
   - e2e/julieta_setup_test.go
   - e2e/julieta_handoff_test.go
   - e2e/julieta_status_test.go
+  - docs/spec/03-formats.md
   - docs/spec/04-cli.md
   - docs/spec/08-memory-handoff-salvage.md
 needs:
@@ -54,7 +55,13 @@ T051; the file overlap (`internal/cmd/julieta/handoff/show*.go` and
 after T178, so this task removes the one-time line from `handoff show`
 before T172 removes the command.
 
-- Implements: REQ-0399 (04 4.3).
+Re-plan (2026-10-28): the `--json` report keeps `julieta-setup/v1` the
+way protobuf retires a field (REQ-1310, added to the opening of 03 by this task):
+`fastForward`, `from` and `to` stay, deprecated and always empty, and
+the new member `branchState` carries the state of the default branch.
+03 joins `owns`; no open task owns it.
+
+- Implements: REQ-0399 (04 4.3), REQ-1310 (03 (opening)).
 - Operator: no.
 - Acceptance:
   - A clean `main` checked out and behind origin is fetched and stays at

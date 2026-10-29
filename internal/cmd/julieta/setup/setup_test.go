@@ -4,6 +4,7 @@
 package setup_test
 
 import (
+	"encoding/json/v2"
 	"errors"
 	"os"
 	"path/filepath"
@@ -83,9 +84,9 @@ func TestSetupLinksClonesAndMovesNoBranch(t *testing.T) {
 	assert.Empty(t, stderr)
 	require.Len(t, rep.Repos, 2)
 	assert.Equal(t, setup.Repo{Dir: "api", Path: s.primary(), Fetched: true, DefaultBranch: "main",
-		FastForward: "behind"}, rep.Repos[0], "from and to stay empty in julieta-setup/v1")
+		BranchState: "behind"}, rep.Repos[0], "fastForward, from and to stay empty")
 	assert.Equal(t, setup.Repo{Dir: "web", Path: s.m.Repos[1].Path, Cloned: true, Fetched: true, DefaultBranch: "main",
-		FastForward: "current"}, rep.Repos[1])
+		BranchState: "current"}, rep.Repos[1])
 	assert.Equal(t, old, git(t, s.primary(), "rev-parse", "HEAD"), "the branch stays at its commit")
 	assert.Equal(t, tip, git(t, s.primary(), "rev-parse", "origin/main"), "origin's tip is fetched")
 	assert.FileExists(t, filepath.Join(s.m.Repos[1].Path, ".git", "HEAD"))
@@ -101,10 +102,34 @@ func TestSetupLinksClonesAndMovesNoBranch(t *testing.T) {
 	assert.Empty(t, stderr)
 	assert.False(t, rep.Link.Changed, "the link is kept")
 	assert.Empty(t, rep.Warnings)
-	assert.Equal(t, "behind", rep.Repos[0].FastForward)
-	assert.Equal(t, "current", rep.Repos[1].FastForward)
+	assert.Equal(t, "behind", rep.Repos[0].BranchState)
+	assert.Equal(t, "current", rep.Repos[1].BranchState)
 	assert.False(t, rep.Repos[1].Cloned)
 	assert.Equal(t, old, git(t, s.primary(), "rev-parse", "HEAD"))
+}
+
+// TestSetupWritesTheDeprecatedMembersEmpty: every repo of the --json
+// document keeps fastForward, from and to, the members of
+// julieta-setup/v1 that setup no longer fills, each present and empty,
+// and carries branchState instead (REQ-0163, REQ-1310).
+func TestSetupWritesTheDeprecatedMembersEmpty(t *testing.T) {
+	s := newSandbox(t)
+	push(t, filepath.Join(s.base, "api.git"), "two")
+	code, stdout, stderr := julieta(t.Context(), "setup", "--json")
+	require.Equal(t, 0, code, stderr)
+	var doc struct {
+		Repos []map[string]any `json:"repos"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(stdout), &doc))
+	require.Len(t, doc.Repos, 2)
+	for _, r := range doc.Repos {
+		for _, m := range []string{"fastForward", "from", "to"} {
+			v, ok := r[m]
+			assert.True(t, ok, "%v holds %s", r["dir"], m)
+			assert.Empty(t, v, "%v: %s", r["dir"], m)
+		}
+		assert.NotEmpty(t, r["branchState"], r["dir"])
+	}
 }
 
 // TestSetupDropsTheRetiredSlugOfAnOldState: a setup.json written before
@@ -168,7 +193,7 @@ func TestSetupReportsWhatItDoesNotMove(t *testing.T) {
 			head := git(t, s.primary(), "rev-parse", "HEAD")
 			code, rep, stderr := setupJSON(t)
 			require.Equal(t, 0, code, stderr)
-			assert.Equal(t, tc.want, rep.Repos[0].FastForward)
+			assert.Equal(t, tc.want, rep.Repos[0].BranchState)
 			assert.Empty(t, rep.Warnings)
 			assert.Equal(t, head, git(t, s.primary(), "rev-parse", "HEAD"))
 		})
@@ -188,7 +213,7 @@ func TestSetupFetchFailed(t *testing.T) {
 	assert.Equal(t, setup.FetchFailed, rep.Warnings[0].Slug)
 	assert.True(t, strings.HasPrefix(rep.Warnings[0].Message, "api: "), rep.Warnings[0].Message)
 	assert.Contains(t, stderr, "warning fetch-failed: api: ")
-	assert.Equal(t, "not-fetched", rep.Repos[0].FastForward)
+	assert.Equal(t, "not-fetched", rep.Repos[0].BranchState)
 	assert.NotEmpty(t, rep.Repos[0].Error)
 	state, err := setup.ReadState(s.home)
 	require.NoError(t, err)

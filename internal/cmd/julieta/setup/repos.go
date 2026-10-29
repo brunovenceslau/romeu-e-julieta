@@ -26,7 +26,7 @@ const originRefspec = "+refs/heads/*:refs/remotes/origin/*"
 // fetch-failed.
 func syncRepos(ctx context.Context, r *run) {
 	for _, m := range r.m.Repos {
-		rep := Repo{Dir: m.Dir, Path: m.Path, FastForward: ffNotFetched}
+		rep := Repo{Dir: m.Dir, Path: m.Path, BranchState: ffNotFetched}
 		syncRepo(ctx, r, m, &rep)
 		r.report.Repos = append(r.report.Repos, rep)
 	}
@@ -85,7 +85,7 @@ func cloneMissing(ctx context.Context, r *run, m manifest.Repo) (bool, error) {
 // diverged, or why it was not compared. It moves nothing.
 func branchState(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
 	failed := func(err error) {
-		rep.FastForward, rep.Error = ffFailed, err.Error()
+		rep.BranchState, rep.Error = ffFailed, err.Error()
 	}
 	def, err := r.git.DefaultBranch(ctx, m.Path)
 	if err != nil {
@@ -94,7 +94,7 @@ func branchState(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
 	}
 	rep.DefaultBranch = def
 	if def == "" {
-		rep.FastForward = ffNoDefault
+		rep.BranchState = ffNoDefault
 		return
 	}
 	remote := "refs/remotes/origin/" + def
@@ -104,7 +104,7 @@ func branchState(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
 		failed(err)
 		return
 	case !ok:
-		rep.FastForward = ffNoDefault
+		rep.BranchState = ffNoDefault
 		return
 	}
 	st, err := r.git.Status(ctx, m.Path)
@@ -113,13 +113,13 @@ func branchState(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
 		failed(err)
 		return
 	case st.Branch != "refs/heads/"+def || st.OID == "":
-		rep.FastForward = ffNotCheckedOut
+		rep.BranchState = ffNotCheckedOut
 		return
 	case !st.Clean():
-		rep.FastForward = ffNotClean
+		rep.BranchState = ffNotClean
 		return
 	case st.OID == tip:
-		rep.FastForward = ffCurrent
+		rep.BranchState = ffCurrent
 		return
 	}
 	ahead, behind, err := r.git.AheadBehind(ctx, m.Path, "HEAD", remote)
@@ -128,11 +128,11 @@ func branchState(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
 		failed(err)
 		return
 	case ahead > 0 && behind > 0:
-		rep.FastForward = ffDiverged
+		rep.BranchState = ffDiverged
 		return
 	case ahead > 0:
-		rep.FastForward = ffAhead
+		rep.BranchState = ffAhead
 		return
 	}
-	rep.FastForward = ffBehind
+	rep.BranchState = ffBehind
 }

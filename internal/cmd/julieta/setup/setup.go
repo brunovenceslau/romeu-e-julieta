@@ -157,10 +157,10 @@ func repoLine(r Repo) string {
 	if r.Fetched {
 		parts = append(parts, "fetched")
 	}
-	switch r.FastForward {
+	switch r.BranchState {
 	case ffNotFetched:
 	default:
-		parts = append(parts, strings.TrimSpace(r.DefaultBranch+" "+r.FastForward))
+		parts = append(parts, strings.TrimSpace(r.DefaultBranch+" "+r.BranchState))
 	}
 	if r.Error != "" {
 		parts = append(parts, "error: "+r.Error)
