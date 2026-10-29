@@ -84,8 +84,9 @@ func (p listedPackage) files() []string {
 // and is left out (testMain).
 func outsideApprovals(pkgs []listedPackage, root string, globs []string, goSum []byte) []string {
 	var out []string
+	root = resolved(root)
 	for _, p := range pkgs {
-		rel, err := filepath.Rel(root, p.Dir)
+		rel, err := filepath.Rel(root, resolved(p.Dir))
 		inside := err == nil && filepath.IsLocal(rel)
 		switch {
 		case p.Error != nil:
@@ -109,6 +110,17 @@ func outsideApprovals(pkgs []listedPackage, root string, globs []string, goSum [
 		}
 	}
 	return out
+}
+
+// resolved returns path with its symbolic links resolved, or path itself
+// when it cannot be: go list prints the directories it resolves (the
+// temporary directory of macOS, /var, is /private/var), so both sides of
+// a comparison are resolved first.
+func resolved(path string) string {
+	if r, err := filepath.EvalSymlinks(path); err == nil {
+		return r
+	}
+	return path
 }
 
 // testMain reports whether p is the test main the go command writes for
@@ -242,7 +254,12 @@ func TestPRImportsRule(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			top := t.TempDir()
+			// The fixture is reached through a symbolic link, as the
+			// temporary directory of macOS is (/var is /private/var), so a
+			// rule that compares the paths go list resolves with the
+			// path it was given turns red here too.
+			top := filepath.Join(t.TempDir(), "link")
+			require.NoError(t, os.Symlink(t.TempDir(), top))
 			root := filepath.Join(top, "fix")
 			for name, src := range base {
 				writeFile(t, filepath.Join(root, name), src)
