@@ -30,6 +30,14 @@ esac`)
 	return calls, envFile
 }
 
+// realPath resolves the links of p, as a macOS temporary directory has.
+func realPath(t *testing.T, p string) string {
+	t.Helper()
+	real, err := filepath.EvalSymlinks(p)
+	require.NoError(t, err)
+	return real
+}
+
 // warningsOf returns the messages of the warnings of slug.
 func warningsOf(rep setup.Report, slug string) []string {
 	var got []string
@@ -68,7 +76,7 @@ func TestSetupTrustsThenInstallsThenRunsTheTask(t *testing.T) {
 
 	pwd, err := os.ReadFile(marker)
 	require.NoError(t, err, "the task of the repo ran")
-	assert.Equal(t, s.primary(), strings.TrimSpace(string(pwd)), "in the repo")
+	assert.Equal(t, realPath(t, s.primary()), realPath(t, strings.TrimSpace(string(pwd))), "in the repo")
 
 	env, err := os.ReadFile(envFile)
 	require.NoError(t, err)
@@ -199,7 +207,7 @@ func TestSetupRepoTasksInEachRepo(t *testing.T) {
 	assert.Equal(t, []string{"api exit 3"}, warningsOf(rep, setup.RepoSetupFailed))
 	got, err := os.ReadFile(marker)
 	require.NoError(t, err, "the task of web ran after the failure of api")
-	assert.Equal(t, web, strings.TrimSpace(string(got)))
+	assert.Equal(t, realPath(t, web), realPath(t, strings.TrimSpace(string(got))))
 }
 
 // TestSetupRefusedRepoIsNotTrusted: a repo whose mise.toml install
