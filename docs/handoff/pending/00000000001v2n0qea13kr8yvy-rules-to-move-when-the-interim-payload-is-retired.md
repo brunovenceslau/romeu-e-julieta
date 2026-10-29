@@ -49,6 +49,15 @@ repository (REQ-0608) unless named otherwise:
   Bash call's `tool_input.command`, and the rule needs the file tools'
   inputs and the Skill calls. Losing either rule
   is silent: no check fails when the payload's guard goes.
+- Never weaken a check to get green: not the gate (disable, skip, lower
+  a threshold), and not the code it measures; removing or loosening a
+  defensive check, an assertion or a validation in the code under test
+  so that a coverage, lint or mutation gate passes is a weakening too,
+  and ask-first, and the branch gets a test instead (decided on
+  2026-10-29, after two checks of T039 were removed to meet the
+  coverage floor and then restored with tests in #315). Sent: the
+  sandbox definitions repository's issue #309, opened on 2026-10-29.
+  Open: the personal kit in the config repository (REQ-0608, T114).
 
 The payload holds other rules that came from elsewhere; listing them
 belongs to the payload's own repository.
