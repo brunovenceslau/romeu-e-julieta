@@ -526,7 +526,7 @@ body with CR LF line ends reads the same. The alert runs from the line
 `> [!IMPORTANT]`, written alone, to the last line before the first one
 that does not start with `>`; a body with a second such line fails
 `pr`. Inside the alert, an approval line is a line that matches the Go
-regular expression `approvalLine` of the askfirst package of
+regular expression `approvalLine` of the approval package of
 `tools/ci`:
 
 ```text
@@ -558,13 +558,20 @@ job is decided: it runs on `pull_request_target` for pull requests into
 of the default branch, with `permissions: contents: read` and no secret.
 It checks out the default branch's commit (`github.sha`), with its
 `go.mod`, `go.sum`, `mise.toml` and `mise.lock`, and builds `pr` there;
-it never checks out `pull_request.base.sha`. `REQ-1150` Where the code of `pr`
-lives, and the command line of its step, are decided by the task that
-builds it; until then this specification writes `tools/ci pr` for the
-step and `go run ./tools/ci pr` for its command line, and that task's
-pull request updates each where it appears. `approvalLine` is in the
-askfirst package of `tools/ci`, which the `approvals` glob names; a
-pull request that moves it updates the glob and this page with it.
+it never checks out `pull_request.base.sha`. `REQ-1150` The code of `pr` is
+the approval package of `tools/ci` (`tools/ci/internal/askfirst/approval`),
+which imports the standard library, `tools/ci/git`, `internal/procgroup`
+and the YAML library, and not the framework of `tools/ci`. The step of
+the pr job builds and runs its command, with the command line
+`go run ./tools/ci/internal/askfirst/cmd/pr "$GITHUB_EVENT_PATH"`, and
+`go run ./tools/ci pr` is the local command over the same code; the
+name `tools/ci pr` stays for both (decided on 2026-10-29, scope this
+repository). The `approvals` globs name the directory of each package
+that command builds, and a module dependency by its pin, `go.sum`, so
+no grant covers a change to the code that judges a pull request; a test
+of the approval package lists those packages and holds it (05 5.3).
+`approvalLine` is in the approval package of `tools/ci`; a pull request
+that moves it updates the glob and this page with it.
 The check that the base is the default branch (12.9) stays, but it is
 not what makes the code trusted. So a run
 judges a pull request with the current `main`, and a pull request opened
@@ -575,8 +582,9 @@ keeps the `GITHUB_SHA` of the original event, so it judges with the old
 code
 ([re-running workflows and jobs](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs),
 read on 2026-10-09). The job reads the head only as git objects: `REQ-1152` `pr`
-fetches `head.sha` without credentials, only in the pr job and only when
-the object is missing, which relies on the repository being public
+fetches `head.sha` without credentials (no credential helper, no askpass
+program, no extra header and no redirect), only in the pr job and only
+when the object is missing, which relies on the repository being public
 ([10 10.2](10-testing-style.md#102-ci)), and never builds or runs them:
 every git call of `pr` on head objects passes `-c
 core.hooksPath=/dev/null`; `fetch` passes `--no-recurse-submodules`;
@@ -601,11 +609,21 @@ with whitespace before the `::` or in the older `##[` form too; fixture
 "pr escapes a workflow command in a PR body", with a leading space, a
 leading U+00A0 and a `##[` case. `REQ-1154` A required check is matched by name,
 and the head's own `pull_request` workflows run from the head, so `pr`
-compares each head job's check name (its `name`, else its id) with the
-pr job's name and refuses a match outside the pr job's file; refuses a
-head job outside the pr job's file whose `name` holds `${{`, since the
-check name it posts is known only once the run expands the expression,
-with a fixture for a literal expression and one for a matrix value; `REQ-1155` and
+compares each head job's check name (its `name`, else its id, also when
+the `name` is null or empty) with the pr job's name, `pr`, without case
+and spaces around it, and refuses a match outside the pr job's file; refuses a head job outside the pr
+job's file whose `name` holds `${{`, since the check name it posts is
+known only once the run expands the expression, with a fixture for a
+literal expression and one for a matrix value, unless the literal text
+before the first `${{`, without spaces around it, is not empty and is no
+prefix of the pr job's name, since an expansion only adds text after it
+(so `static on ${{ matrix.os }}` stays; decided on 2026-10-29,
+provisional, scope this repository, reopened when a check name GitHub
+posts is measured to differ from that reading, or when the maintainer
+prefers the literal rule with those jobs renamed); reads each file of the head's
+`.github/workflows` that ends in `.yml` or `.yaml` as an object, and
+refuses one it cannot read as one YAML mapping without anchors, aliases,
+merge keys or a key written twice; `REQ-1155` and
 refuses a head whose version of the pr job's file names an event other
 than `pull_request_target`, with a fixture for each. It reads
 `.github/ask-first.yaml` at the base commit and at the head commit and

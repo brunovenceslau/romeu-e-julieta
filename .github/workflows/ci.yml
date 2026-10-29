@@ -9,16 +9,17 @@
 name: ci
 
 on:
+  # A change to the title or the body runs none of these checks again:
+  # pr.yml judges the text of a pull request, and its types list edited.
   pull_request:
-    # edited: a change to the title or the body runs the checks again.
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
   push:
     branches: [main]
 
-# One run in progress per pull request: a new run of a pull request, an
-# edit of its title or body among them, cancels the one in progress, so
-# an edit does not queue a second full run. A push has a group of its
-# own commit and cancels nothing, so every commit of main is checked.
+# One run in progress per pull request: a new run of a pull request
+# cancels the one in progress, so a push does not queue a second full
+# run. A push to main has a group of its own commit and cancels nothing,
+# so every commit of main is checked.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.head_commit.id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

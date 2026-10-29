@@ -4,62 +4,20 @@
 package askfirst
 
 import (
+	"bytes"
+	"context"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
-
-// TestParseAskFirst checks each rule of the file with one source that
-// breaks it: the keys, the version, the owner, the ids, the globs, the
-// reason, and the line that makes the file list itself.
-func TestParseAskFirst(t *testing.T) {
-	tests := []struct {
-		name string
-		src  string
-		want string // a part of the error; empty means it parses
-	}{
-		{"valid", citest.ValidAskFirst, ""},
-		{"two surfaces and a team owner", strings.Replace(citest.ValidAskFirst, "@someone", "@org/team", 1) + "  - id: gates\n    globs: [internal/gate/**, go.mod, a/*/b.go]\n    reason: the gates\n", ""},
-		{"not YAML", "version: [", "ask-first.yaml"},
-		{"an unknown key", citest.ValidAskFirst + "extra: 1\n", "field extra not found"},
-		{"a second document", citest.ValidAskFirst + "---\nversion: 1\n", "more than one YAML document"},
-		{"version 2", strings.Replace(citest.ValidAskFirst, "version: 1", "version: 2", 1), "version is 2"},
-		{"no version", strings.Replace(citest.ValidAskFirst, "version: 1\n", "", 1), "version is 0"},
-		{"owner without @", strings.Replace(citest.ValidAskFirst, "@someone", "someone", 1), "not a GitHub handle"},
-		{"owner with a space", strings.Replace(citest.ValidAskFirst, "@someone", "@some one", 1), "not a GitHub handle"},
-		{"no surface", "version: 1\nowner: \"@o\"\nsurfaces: []\n", "no surface is listed"},
-		{"a bad id", strings.Replace(citest.ValidAskFirst, "id: ask-first", "id: Ask_First", 1), "not lowercase words"},
-		{"a duplicate id", citest.ValidAskFirst + "  - id: ask-first\n    globs: [a]\n    reason: again\n", "listed twice"},
-		{"no glob", citest.ValidAskFirst + "  - id: other\n    globs: []\n    reason: x\n", `surface "other" has no glob`},
-		{"no reason", citest.ValidAskFirst + "  - id: other\n    globs: [a]\n    reason: \" \"\n", "needs a reason"},
-		{"a reason on two lines", citest.ValidAskFirst + "  - id: other\n    globs: [a]\n    reason: |\n      a\n      b\n", "needs a reason written on one line"},
-		{"a leading slash", citest.ValidAskFirst + "  - id: other\n    globs: [/a]\n    reason: x\n", "starts or ends with"},
-		{"a character class", citest.ValidAskFirst + "  - id: other\n    globs: [\"a/[bc]\"]\n    reason: x\n", "holds a character other than"},
-		{"a negation", citest.ValidAskFirst + "  - id: other\n    globs: [\"!a\"]\n    reason: x\n", "holds a character other than"},
-		{"a partial double star", citest.ValidAskFirst + "  - id: other\n    globs: [a**/b]\n    reason: x\n", `"**" must be a whole segment`},
-		{"a dot dot", citest.ValidAskFirst + "  - id: other\n    globs: [a/../b]\n    reason: x\n", "empty, \".\" or \"..\""},
-		{"an empty glob", citest.ValidAskFirst + "  - id: other\n    globs: [\"\"]\n    reason: x\n", "a glob is empty"},
-		{"the file does not list itself", strings.Replace(citest.ValidAskFirst, ".github/ask-first.yaml", "elsewhere", 1), "the file lists itself"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			list, err := Parse([]byte(tt.src))
-			if tt.want == "" {
-				require.NoError(t, err)
-				assert.NotNil(t, list)
-				return
-			}
-			require.ErrorContains(t, err, tt.want)
-		})
-	}
-}
 
 // TestCodeowners checks the lines of CODEOWNERS: the notice, every glob
 // anchored at the root and given to the owner, in the order of the file.
@@ -83,7 +41,7 @@ func TestCodeowners(t *testing.T) {
 /go.mod @someone
 /internal/x/** @someone
 `
-	assert.Equal(t, want, string(list.Codeowners()))
+	assert.Equal(t, want, string(Codeowners(list)))
 }
 
 // TestCodeownersOutput runs the generator on a tree that holds the list
@@ -103,279 +61,117 @@ func TestCodeownersOutput(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, outs, 1)
 	assert.Equal(t, CodeownersPath, outs[0].Path)
-	assert.Equal(t, string(list.Codeowners()), string(outs[0].Content))
+	assert.Equal(t, string(Codeowners(list)), string(outs[0].Content))
 }
 
-// TestPullRequestTemplate checks the five sections of 12 12.7, in order,
-// and the approval hint: the template shows the form of 12 12.4 inside a
-// sentence, so a body that keeps the hint has no line that starts with
-// "Approval: ", which pr would read as a malformed approval line.
-func TestPullRequestTemplate(t *testing.T) {
-	b, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), ".github", "pull_request_template.md"))
-	require.NoError(t, err)
-	var got []string
-	for line := range strings.SplitSeq(string(b), "\n") {
-		if h, ok := strings.CutPrefix(line, "## "); ok {
-			got = append(got, h)
-		}
-		assert.False(t, strings.HasPrefix(line, "Approval: "), "a line that starts with the prefix: %q", line)
+// runList is the ask-first list of TestPRRun: the list itself, and the
+// decisions and kits surfaces.
+const runList = `version: 1
+owner: "@someone"
+surfaces:
+  - id: ask-first
+    globs: [.github/ask-first.yaml]
+    reason: this list
+  - id: decisions
+    globs: [docs/adr/**]
+    reason: records
+  - id: kits
+    globs: [kits/**]
+    reason: kits
+`
+
+// prRepo is a fixture repository whose main holds runList and a record.
+func prRepo(t *testing.T) (*gittest.Repo, string) {
+	t.Helper()
+	r := gittest.New(t)
+	r.Write(Path, runList)
+	r.Write("docs/adr/0001-old.md", "old\n")
+	return r, r.Commit("base")
+}
+
+// alert wraps lines in the approval alert.
+func alert(lines ...string) string {
+	return "> [!IMPORTANT]\n" + strings.Join(lines, "\n") + "\n"
+}
+
+const validLine = "> - [x] Approval: decisions - amend rule 8"
+
+// TestPRRun runs the subcommand as a person does, on a clone whose
+// origin is unreachable, so a network read would fail it: a local run
+// with --title and --body, and a run on a saved payload whose commits
+// the clone holds.
+func TestPRRun(t *testing.T) {
+	r, base := prRepo(t)
+	r.Git("remote", "add", "origin", filepath.Join(t.TempDir(), "gone"))
+	r.Git("update-ref", "refs/remotes/origin/main", base)
+	// Local main moves past origin/main, so a run that took main for the
+	// base instead of origin/main would read a different range.
+	r.Write("kits/k.txt", "k\n")
+	r.Commit("local main moves")
+	r.Git("checkout", "--quiet", "-b", "topic")
+	r.Write("docs/adr/0002-new.md", "new\n")
+	head := r.Commit("a record")
+	dir := t.TempDir()
+	bodyFile := filepath.Join(dir, "body.md")
+	run := func(t *testing.T, body string, args ...string) (bool, string) {
+		t.Helper()
+		require.NoError(t, os.WriteFile(bodyFile, []byte(body), 0o600))
+		var out bytes.Buffer
+		ok, err := RunPR(context.Background(), check.Env{Dir: r.Dir, GitEnv: r.Env, Stdout: &out}, args)
+		require.NoError(t, err)
+		return ok, out.String()
 	}
-	assert.Equal(t, []string{"Why", "What changed", "Evidence", "Middleware", "Lessons"}, got)
-	assert.Contains(t, string(b), approvalForm)
-}
-
-// TestApprovalLineOfTheSpec checks that 12 12.4 shows the form and the
-// regular expression that approvalLine holds, and that the form itself
-// is not an approval line.
-func TestApprovalLineOfTheSpec(t *testing.T) {
-	b, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), "docs", "spec", "12-engineering.md"))
-	require.NoError(t, err)
-	spec := strings.ReplaceAll(string(b), "\r\n", "\n")
-	assert.Contains(t, spec, "```text\n"+approvalForm+"\n```\n")
-	assert.Contains(t, spec, "```text\n"+approvalLine.String()+"\n```\n")
-	assert.False(t, approvalLine.MatchString(approvalForm))
-}
-
-// TestApprovalLine checks approvalLine on one line at a time. How pr
-// reads the lines of a whole body is TestPRApprovalLine's.
-func TestApprovalLine(t *testing.T) {
-	cases := []struct {
-		name, line string
-		match      bool
-	}{
-		{"a valid line", "> - [x] Approval: decisions - amend rule 8", true},
-		{"an apostrophe", "> - [x] Approval: decisions - the record\u2019s rule 8", true},
-		{"a single straight quote", "> - [x] Approval: decisions - the 'rule 8' text", true},
-		{"a phrase that starts with punctuation", "> - [x] Approval: decisions - (amend) rule 8", true},
-		{"a lowercase prefix", "> - [x] approval: decisions - amend rule 8", false},
-		{"no quote marker", "- [x] Approval: decisions - amend rule 8", false},
-		{"a leading space", " > - [x] Approval: decisions - amend rule 8", false},
-		{"text before the prefix", "> - [x] see Approval: decisions - amend rule 8", false},
-		{"an empty box", "> - [ ] Approval: decisions - amend rule 8", true},
-		{"an uppercase X", "> - [X] Approval: decisions - amend rule 8", true},
-		{"another mark in the box", "> - [v] Approval: decisions - amend rule 8", false},
-		{"an empty pair of brackets", "> - [] Approval: decisions - amend rule 8", false},
-		{"an asterisk bullet", "> * [x] Approval: decisions - amend rule 8", false},
-		{"no space after the quote marker", ">- [x] Approval: decisions - amend rule 8", false},
-		{"no box", "> - Approval: decisions - amend rule 8", false},
-		{"the bare line of before", "Approval: decisions - amend rule 8", false},
-		{"an uppercase id", "> - [x] Approval: Decisions - amend rule 8", false},
-		{"an underscore in the id", "> - [x] Approval: a_b - x", false},
-		{"an empty id", "> - [x] Approval:  - x", false},
-		{"two spaces before the separator", "> - [x] Approval: decisions  - x", false},
-		{"an en dash separator", "> - [x] Approval: decisions \u2013 amend rule 8", false},
-		{"an empty phrase", "> - [x] Approval: decisions - ", false},
-		{"a leading no-break space", "> - [x] Approval: decisions - \u00a0amend rule 8", false},
-		{"a leading tab", "> - [x] Approval: decisions - \tamend rule 8", false},
-		{"a leading vertical tab", "> - [x] Approval: decisions - \vamend rule 8", false},
-		{"a leading U+0001", "> - [x] Approval: decisions - \x01amend rule 8", false},
-		{"a leading zero-width space", "> - [x] Approval: decisions - \u200bamend rule 8", false},
-		{"a leading byte order mark", "> - [x] Approval: decisions - \ufeffamend rule 8", false},
-		{"a leading combining mark", "> - [x] Approval: decisions - \u0301amend rule 8", false},
-		{"a leading unassigned code point", "> - [x] Approval: decisions - \u0378amend rule 8", false},
-		{"a leading private-use character", "> - [x] Approval: decisions - \ue000amend rule 8", false},
-		{"a byte order mark inside the phrase", "> - [x] Approval: decisions - amend\ufeffrule 8", false},
-		// Accepted, and left to review by 12 12.4: a separator inside or
-		// after the phrase.
-		{"a line separator inside the phrase", "> - [x] Approval: decisions - amend\u2028rule 8", true},
-		{"a paragraph separator inside the phrase", "> - [x] Approval: decisions - amend\u2029rule 8", true},
-		{"a leading line separator", "> - [x] Approval: decisions - \u2028amend rule 8", false},
-		{"a leading paragraph separator", "> - [x] Approval: decisions - \u2029amend rule 8", false},
-		{"a trailing line separator", "> - [x] Approval: decisions - amend rule 8\u2028", true},
-		{"a trailing paragraph separator", "> - [x] Approval: decisions - amend rule 8\u2029", true},
-		{"a next line inside the phrase", "> - [x] Approval: decisions - amend\u0085rule 8", false},
-		{"a zero-width space inside the phrase", "> - [x] Approval: decisions - amend\u200brule 8", false},
-		{"a trailing CR", "> - [x] Approval: decisions - amend rule 8\r", false},
-		{"an embedded LF", "> - [x] Approval: decisions - amend\nrule 8", false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			assert.Equal(t, c.match, approvalLine.MatchString(c.line))
+	t.Run("a local run that passes", func(t *testing.T) {
+		ok, out := run(t, alert(validLine), "--title", "docs: a record", "--body", bodyFile, "--base", "main")
+		assert.True(t, ok, out)
+		assert.Equal(t, "pr: ok\n", out)
+	})
+	t.Run("the default base is origin/main", func(t *testing.T) {
+		ok, out := run(t, alert(validLine), "--title", "docs: a record", "--body", bodyFile)
+		assert.False(t, ok)
+		assert.Contains(t, out, `the diff touches "kits"`)
+	})
+	t.Run("a local run that fails", func(t *testing.T) {
+		ok, out := run(t, alert("> - [ ] Approval: decisions - "+"amend rule 8"), "--title", "docs: a record", "--body", bodyFile, "--base", "main")
+		assert.False(t, ok)
+		assert.Contains(t, out, "pull request body: pr: the diff touches \"decisions\" and its approval line is not ticked")
+		assert.Contains(t, out, "pr: 1 finding(s)")
+	})
+	t.Run("a saved payload", func(t *testing.T) {
+		payload := filepath.Join(dir, "event.json")
+		src := `{"pull_request":{"title":"t","body":null,"head":{"ref":"topic","sha":"` + head + `"},"base":{"sha":"` + base + `","ref":"main","repo":{"default_branch":"main"}}}}`
+		require.NoError(t, os.WriteFile(payload, []byte(src), 0o600))
+		ok, out := run(t, "", payload)
+		assert.False(t, ok)
+		assert.Contains(t, out, "has no approval line for it")
+	})
+	t.Run("a commit the clone lacks", func(t *testing.T) {
+		var out bytes.Buffer
+		_, err := RunPR(context.Background(), check.Env{Dir: r.Dir, GitEnv: r.Env, Stdout: &out},
+			[]string{"--title", "t", "--body", bodyFile, "--base", strings.Repeat("e", 40)})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "names no commit of this clone")
+	})
+	for _, args := range [][]string{{}, {"a", "b"}, {"--title", "t"}, {"--title", "t", "--body", "b", "extra"}, {"--nosuch"}} {
+		t.Run("usage "+strings.Join(args, " "), func(t *testing.T) {
+			_, err := RunPR(context.Background(), check.Env{Dir: r.Dir, GitEnv: r.Env, Stdout: &bytes.Buffer{}}, args)
+			assert.Error(t, err)
 		})
 	}
 }
 
-// refusedQuotes are the double quotation marks that 12 12.4 lists, each
-// refused anywhere in the phrase.
-var refusedQuotes = []rune{
-	'"', '\u00ab', '\u00bb', '\u201c', '\u201d', '\u201e', '\u201f',
-	'\u2033', '\u301d', '\u301e', '\u301f', '\uff02',
-}
-
-// TestApprovalLineRefusesEachQuote tries each refused quotation mark at
-// the head, in the middle and at the tail of the phrase.
-func TestApprovalLineRefusesEachQuote(t *testing.T) {
-	for _, q := range refusedQuotes {
-		for _, line := range []string{
-			"> - [x] Approval: decisions - " + string(q) + "amend rule 8",
-			"> - [x] Approval: decisions - amend " + string(q) + " rule 8",
-			"> - [x] Approval: decisions - amend rule 8" + string(q),
-		} {
-			assert.False(t, approvalLine.MatchString(line), "%U in %q", q, line)
-		}
-	}
-}
-
-// specSection returns the text under "5.3 Ask-first surfaces" in the
-// security chapter of the specification, up to the next heading.
-func specSection(t *testing.T) string {
-	t.Helper()
-	b, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), "docs", "spec", "05-security.md"))
+// TestWrappers holds the names askfirst keeps for tools/ci to the
+// approval package they wrap.
+func TestWrappers(t *testing.T) {
+	list, err := Parse([]byte(runList))
 	require.NoError(t, err)
-	_, section, found := strings.Cut(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n## 5.3 Ask-first surfaces\n")
-	require.True(t, found, "the heading of 5.3")
-	if end := strings.Index(section, "\n## "); end >= 0 {
-		section = section[:end]
-	}
-	return section
-}
-
-// TestSpecLinksTheCommittedList checks that 05 5.3 links
-// .github/ask-first.yaml and holds no copy of it, so the list has one
-// source, and that it names each path of the approvals surface of the
-// committed list, the paths no checkpoint grant covers.
-func TestSpecLinksTheCommittedList(t *testing.T) {
-	section := specSection(t)
-	assert.Contains(t, section, "[`"+Path+"`](../../"+Path+")")
-	assert.NotContains(t, section, "```yaml", "a copy of the list")
-	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), Path))
-	require.NoError(t, err)
-	list, err := Parse(src)
-	require.NoError(t, err)
-	i := slices.IndexFunc(list.Surfaces, func(s Surface) bool { return s.ID == "approvals" })
-	require.GreaterOrEqual(t, i, 0, "the approvals surface")
-	for _, g := range list.Surfaces[i].Globs {
-		assert.Contains(t, section, "`"+g+"`", "05 5.3 names the approvals path")
-	}
-}
-
-// TestGlobMatch pins the matcher of the ask-first dialect: "**" is zero
-// or more whole segments, "*" a run inside one segment.
-func TestGlobMatch(t *testing.T) {
-	tests := []struct {
-		glob, name string
-		want       bool
-	}{
-		{"go.mod", "go.mod", true},
-		{"go.mod", "x/go.mod", false},
-		{"mise.*.toml", "mise.local.toml", true},
-		{"mise.*.toml", "mise.toml", false},
-		{"mise.*.toml", "mise.a/b.toml", false},
-		{".mise.*.toml", ".mise.ci.local.toml", true},
-		{"mise/**", "mise/config.toml", true},
-		{"mise/**", "mise/conf.d/x.toml", true},
-		{"mise/**", "mise", true},
-		{"mise/**", "x/mise/config.toml", false},
-		{"a/**/b", "a/b", true},
-		{"a/**/b", "a/x/y/b", true},
-		{"a/**/b", "a/x/y/c", false},
-		{"*", ".hidden", true},
-	}
-	for _, tt := range tests {
-		assert.Equal(t, tt.want, GlobMatch(tt.glob, tt.name), "%s ~ %s", tt.glob, tt.name)
-	}
-}
-
-// TestCodeownersAsksFirst holds the ask-first surface of the committed
-// list to the list itself, the CODEOWNERS file generated from it and
-// the checkpoint grants that stand in for approval lines (12 12.4): a
-// change to CODEOWNERS asks for the review even where generated does
-// not judge the commit, as when a step that runs before it rewrote the
-// index (05 5.3), and a grant is itself an ask-first change.
-func TestCodeownersAsksFirst(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), Path))
-	require.NoError(t, err)
-	list, err := Parse(src)
-	require.NoError(t, err)
-	i := slices.IndexFunc(list.Surfaces, func(s Surface) bool { return s.ID == "ask-first" })
-	require.GreaterOrEqual(t, i, 0, "the ask-first surface")
-	assert.Equal(t, []string{Path, CodeownersPath, "docs/grants.yaml"}, list.Surfaces[i].Globs)
-}
-
-// TestApprovalsSurface holds the approvals surface of the committed list
-// to the check of approval lines and grants, the forbidden-name denylist
-// and the workflows, which no checkpoint grant covers, and holds each on
-// the surface it was on before, checks or dependencies (05 5.3).
-func TestApprovalsSurface(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), Path))
-	require.NoError(t, err)
-	list, err := Parse(src)
-	require.NoError(t, err)
-	i := slices.IndexFunc(list.Surfaces, func(s Surface) bool { return s.ID == "approvals" })
-	require.GreaterOrEqual(t, i, 0, "the approvals surface")
-	assert.Equal(t, []string{"tools/ci/internal/askfirst/**", "tools/ci/denylist.yaml", ".github/workflows/**"}, list.Surfaces[i].Globs)
-	for path, id := range map[string]string{
-		"tools/ci/internal/askfirst/askfirst.go": "checks",
-		"tools/ci/denylist.yaml":                 "checks",
-		".github/workflows/ci.yml":               "dependencies",
-	} {
-		j := slices.IndexFunc(list.Surfaces, func(s Surface) bool { return s.ID == id })
-		require.GreaterOrEqual(t, j, 0, "the %s surface", id)
-		assert.True(t, slices.ContainsFunc(list.Surfaces[j].Globs, func(g string) bool { return GlobMatch(g, path) }), "%s on %s", path, id)
-	}
-}
-
-// TestGlobMatchOfManyDoubleStars checks a glob of thirty "**" segments
-// against a name of thirty segments, both ways. Before the table it
-// tried every split of the name, and the run did not end; no clock
-// bounds the test, since a hang fails it at go test's own timeout.
-func TestGlobMatchOfManyDoubleStars(t *testing.T) {
-	glob := strings.Repeat("**/", 30) + "zzz"
-	name := strings.TrimSuffix(strings.Repeat("d/", 30), "/")
-	assert.False(t, GlobMatch(glob, name))
-	assert.True(t, GlobMatch(glob, name+"/zzz"))
-}
-
-// TestGlobsMeet holds GlobsMeet to GlobMatch: two globs meet when some
-// name matches both, and the pairs below name one (or say why none is).
-func TestGlobsMeet(t *testing.T) {
-	tests := []struct {
-		a, b string
-		want bool
-	}{
-		{"internal/setup/migrate*.go", "internal/setup/*_test.go", true},   // migrate_test.go
-		{"internal/render/kits*.go", "internal/render/promote*.go", false}, // kits... and promote... differ at the first character
-		{"internal/handoff/**", "internal/handoff/stamp*.go", true},        // internal/handoff/stamp.go
-		{"e2e/**", "e2e/julieta_setup_test.go", true},                      // the literal
-		{"a/x_*.go", "a/*_test.go", true},                                  // a/x_test.go
-		{"a/b/c.go", "a/**/d.go", false},                                   // c.go is not d.go
-		{"a/**", "a", true},                                                // "**" matches zero segments
-		{"a/*", "a", false},                                                // "*" is one segment
-		{"a/*.go", "a/b/c.go", false},                                      // "*" stays in one segment
-		{"**/x.go", "a/**", true},                                          // a/x.go
-		{"**", "**", true},                                                 // any name
-		{"a/**/b/**/c", "**/b/c", true},                                    // a/b/c
-		{"go.mod", "go.mod", true},                                         // two literals, equal
-		{"go.mod", "go.sum", false},                                        // two literals, different
-		{"*.toml", "mise.*", true},                                         // mise.toml
-		{"*.go", "*.md", false},                                            // no name ends in both
-		{"x*y*z", "*y*", true},                                             // xyz
-		{"internal/cmd/julieta/setup/*_test.go", "internal/cmd/julieta/handoff/show*.go", false}, // another directory
-	}
-	for _, tt := range tests {
-		assert.Equal(t, tt.want, GlobsMeet(tt.a, tt.b), "%s ~ %s", tt.a, tt.b)
-		assert.Equal(t, tt.want, GlobsMeet(tt.b, tt.a), "%s ~ %s", tt.b, tt.a)
-	}
-}
-
-// TestGlobsMeetAgreesWithGlobMatch: a literal is a glob without
-// wildcards, so GlobsMeet of a glob and a literal is GlobMatch of the
-// two, over the cases of TestGlobMatch.
-func TestGlobsMeetAgreesWithGlobMatch(t *testing.T) {
-	for _, tt := range []struct{ glob, name string }{
-		{"go.mod", "go.mod"}, {"go.mod", "x/go.mod"}, {"mise.*.toml", "mise.local.toml"},
-		{"mise.*.toml", "mise.toml"}, {"mise/**", "mise/config.toml"}, {"mise/**", "mise"},
-		{"mise/**", "x/mise/config.toml"}, {"a/**/b", "a/b"}, {"a/**/b", "a/x/y/b"}, {"a/**/b", "a/x/y/c"},
-	} {
-		assert.Equal(t, GlobMatch(tt.glob, tt.name), GlobsMeet(tt.glob, tt.name), "%s ~ %s", tt.glob, tt.name)
-	}
-}
-
-// TestGlobsMeetOfManyDoubleStars: many "**" on both sides cost a table,
-// not a search over every split.
-func TestGlobsMeetOfManyDoubleStars(t *testing.T) {
-	a := strings.Repeat("**/", 30) + "zzz"
-	b := strings.Repeat("d/**/", 30) + "yyy"
-	assert.False(t, GlobsMeet(a, b))
-	assert.True(t, GlobsMeet(a, b+"/zzz"))
+	assert.Len(t, list.Surfaces, 3)
+	_, err = Parse([]byte("version: 2\n"))
+	require.Error(t, err)
+	require.NoError(t, CheckGlob("docs/**"))
+	require.Error(t, CheckGlob("../x"))
+	assert.True(t, GlobMatch("docs/**", "docs/a/b.md"))
+	assert.False(t, GlobMatch("docs/*", "docs/a/b.md"))
+	assert.True(t, GlobsMeet("docs/**", "*/a.md"))
+	assert.False(t, GlobsMeet("docs/*.md", "kits/*.md"))
 }

@@ -397,12 +397,19 @@ checkpoint the maintainer may grant the approval lines of a list of
 tasks on some surfaces, recorded in `docs/grants.yaml`, which is on the
 `ask-first` surface; which surfaces can be granted, and the form of a
 grant, are in 12 12.4. `REQ-0539` The `approvals` surface holds
-`tools/ci/internal/askfirst/**`, `tools/ci/denylist.yaml` and
-`.github/workflows/**`, the check of approval lines and grants, the
+`tools/ci/internal/askfirst/**`, `tools/ci/git/**`,
+`internal/procgroup/**`, `go.sum`, `tools/ci/denylist.yaml` and
+`.github/workflows/**`: the check of approval lines and grants with
+every package the pr job builds (the git runner and the process starter
+it calls, and each module dependency by its pin in `go.sum`), the
 forbidden-name denylist and the files that choose what runs, which no
-checkpoint grant covers. Each path on `approvals` is also on `checks` or
-`dependencies`, and a pull request that touches it carries a line for
-each surface it matches. `REQ-0540` The `pr` job holds one invariant: no code that
+checkpoint grant covers (decided on 2026-10-29, scope this repository).
+`go.mod` stays off it: its `go` line stays a grantable input under
+REQ-0541, and a local `replace` in it is caught by the test that lists
+the packages the pr job builds (12 12.4, REQ-1150). Each path on
+`approvals` is also on `checks`, `dependencies` or `procgroup`, and a
+pull request that touches it carries a line for each surface it
+matches. `REQ-0540` The `pr` job holds one invariant: no code that
 a pull request changes judges that pull request. `pr` runs from a
 workflow defined in the default branch, builds the default branch's
 commit, and reads the head only as data (decided on 2026-10-09). So a
@@ -416,9 +423,14 @@ command reads from the checkout (a `go.work`, `go.work.sum` or
 `vendor/`) are decided by the task that builds `pr`, whose acceptance
 lists the requirements that make the invariant hold (decided on
 2026-10-09,
-[round 11](../reviews/round-11.md#decisions-for-the-operator)): until
-that task lands, the invariant is a requirement, not a property of code
-that exists. `REQ-0541` The toolchain pinned by `mise.toml` and `mise.lock`, on
+[round 11](../reviews/round-11.md#decisions-for-the-operator)). The pr
+job builds the approval package of `tools/ci` and what it imports, each
+package on the `approvals` surface (REQ-0539, REQ-1150); it reads the
+head's YAML with the pinned YAML library, and refuses a head that holds
+a `go.work`, `go.work.sum` or `vendor` at its top. The version-pin rules
+of `mise.toml` and `go.mod` applied to the head from the default
+branch's code are not built yet: until they are, that part of the
+invariant is a requirement, not a property of code that exists. `REQ-0541` The toolchain pinned by `mise.toml` and `mise.lock`, on
 `dependencies`, and the `go` line of `go.mod`, which sets the language
 version `pr` is compiled at, stay grantable inputs under the job, and
 that task lists each of them in 5.4; keeping them off the grantable list

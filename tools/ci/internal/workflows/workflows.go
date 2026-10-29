@@ -209,14 +209,15 @@ func workflowFindings(path string, src []byte) []check.Finding {
 	if err != nil {
 		return []check.Finding{{Where: where, Rule: "workflows", Msg: err.Error()}}
 	}
-	c := &grammar{where: where, exempt: exempted(doc), rel: readRelease(path, doc)}
+	name := strings.TrimPrefix(path, Dir)
+	c := &grammar{where: where, exempt: exempted(doc), rel: readRelease(path, doc), pr: readPR(path, doc), inPR: name == prFile}
 	c.walk(doc)
 	c.file(doc)
-	if strings.TrimPrefix(path, Dir) == releaseFile {
+	if name == releaseFile {
 		c.publish(doc)
 	}
-	if strings.TrimPrefix(path, Dir) == "ci.yml" {
-		c.edited(doc)
+	if c.inPR {
+		c.prWorkflow(doc)
 	}
 	if labels, ok := hostedFiles[strings.TrimPrefix(path, Dir)]; ok {
 		c.hosted(doc, labels)
@@ -265,6 +266,10 @@ type grammar struct {
 	// rel is what a release.yml grants its publish job (release.go), and
 	// nil in every other file.
 	rel *release
+	// pr is what pr.yml grants its job (pr.go), and nil in every other
+	// file; inPR says the file is pr.yml, with a pr job or without.
+	pr   *prRow
+	inPR bool
 }
 
 // prOnlyExpression is the one expression the grammar admits that is no
@@ -467,7 +472,10 @@ func (c *grammar) events(n *yaml.Node) {
 		}
 	}
 	for _, name := range names {
-		if name.Kind != yaml.ScalarNode || !slices.Contains(eventNames, name.Value) {
+		switch {
+		case name.Kind == yaml.ScalarNode && name.Value == prEvent:
+			c.prOnly(name)
+		case name.Kind != yaml.ScalarNode || !slices.Contains(eventNames, name.Value):
 			c.add(name, "the event "+strconv.Quote(name.Value)+" is outside the grammar")
 		}
 	}
@@ -759,12 +767,14 @@ func (c *grammar) step(n, strategy *yaml.Node, exitOK bool) {
 			if value.Kind != yaml.MappingNode {
 				c.add(value, "with is a mapping")
 			} else if uses := field(n, "uses"); uses.Kind == yaml.ScalarNode && usesForm.MatchString(uses.Value) {
-				c.inputs(uses, value, strategy)
+				c.inputs(n, uses, value, strategy)
 			}
 		case "env":
 			c.stepEnv(value)
 		case "run":
-			allowed := value.Kind == yaml.ScalarNode && (runLine(value.Value) || (exitOK && value.Value == AggregatorStep && value.Tag == "!!str"))
+			allowed := value.Kind == yaml.ScalarNode && (runLine(value.Value) ||
+				(exitOK && value.Value == AggregatorStep && value.Tag == "!!str") ||
+				(c.pr.inJob(n) && value.Value == PRLine && value.Tag == "!!str"))
 			if !allowed {
 				c.add(value, "run is one line: go run ./tools/ci or ./tools/release, a subcommand, and plain words")
 			}
@@ -791,12 +801,16 @@ func actionName(uses *yaml.Node) string {
 	return strings.ToLower(action)
 }
 
-// inputs checks the with keys of a uses step against actionInputs, and
+// inputs checks the with keys of a uses step against actionInputs (and,
+// for the checkout of the pr job, prDepth), and
 // each value: a literal, or one ${{ matrix.<key> }} alone whose values
 // are literals, so that nothing an event can write reaches an input.
-func (c *grammar) inputs(uses, with, strategy *yaml.Node) {
+func (c *grammar) inputs(step, uses, with, strategy *yaml.Node) {
 	action := actionName(uses)
 	allowed := actionInputs[action]
+	if action == checkoutAction && c.pr.inJob(step) {
+		allowed = slices.Concat(allowed, []string{prDepth})
+	}
 	for key, value := range pairs(with) {
 		if !slices.Contains(allowed, key.Value) {
 			c.add(key, "the input "+strconv.Quote(key.Value)+" is not one this repository uses for "+action)
@@ -994,26 +1008,6 @@ func runLine(s string) bool {
 		}
 	}
 	return true
-}
-
-// edited fails a ci.yml that a change to a pull request's title or body
-// does not run again: its pull_request event lists the type "edited".
-func (c *grammar) edited(doc *yaml.Node) {
-	on := field(doc, "on")
-	if on == nil {
-		c.add(doc, "ci.yml runs on pull_request, with the type edited")
-		return
-	}
-	pr := field(on, "pull_request")
-	types := field(pr, "types")
-	if types != nil && types.Kind == yaml.SequenceNode {
-		for _, t := range types.Content {
-			if t.Value == "edited" {
-				return
-			}
-		}
-	}
-	c.add(on, "ci.yml lists edited among its pull_request types, so a change to the title or body runs pr again")
 }
 
 // pairs yields the keys and values of a mapping node, in order, and

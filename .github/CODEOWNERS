@@ -92,6 +92,9 @@
 
 # approvals
 /tools/ci/internal/askfirst/** @brunovenceslau
+/tools/ci/git/** @brunovenceslau
+/internal/procgroup/** @brunovenceslau
+/go.sum @brunovenceslau
 /tools/ci/denylist.yaml @brunovenceslau
 /.github/workflows/** @brunovenceslau
 
