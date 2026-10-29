@@ -115,7 +115,7 @@ has no member for the dir (decided on 2026-10-29, in place of the
 member and the mount this note gave this task).
 
 - Implements: REQ-0012 (index), REQ-0042 (01 1.1), REQ-0044 (01 1.2),
-  REQ-0048 (01 1.1), REQ-0054 (01 1.3), REQ-0055 (01 1.3), REQ-0056 (01
+  REQ-0048 (01 1.2), REQ-0054 (01 1.3), REQ-0055 (01 1.3), REQ-0056 (01
   1.3), REQ-0059 (01 1.4), REQ-0074 (01 1.5), REQ-0082 (01 1.6),
   REQ-0084 (01 1.6), REQ-0085 (01 1.6), REQ-0086 (01 1.6), REQ-0087 (01
   1.6), REQ-0130 (02 2.1), REQ-0135 (02 2.2), REQ-0138 (02 2.3),
