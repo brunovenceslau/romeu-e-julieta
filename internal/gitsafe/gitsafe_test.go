@@ -126,10 +126,12 @@ func TestRunnerEnvironmentAndFlags(t *testing.T) {
 			require.NoError(t, err)
 			var rec recorder
 			rec.install(r)
+			advertiseHEAD(r, liveHEAD)
 			ctx := t.Context()
 			require.NoError(t, r.CheckFloor(ctx))
 			dst := map[Mode]string{Host: "refs/romeu/origin/app/*", Sandbox: "refs/remotes/origin/*"}[tt.mode]
-			require.NoError(t, r.Fetch(ctx, dir, "https://example.com/o/r.git", []string{"+refs/heads/*:" + dst}))
+			specs := map[Mode][]string{Host: {"+refs/heads/*:" + dst, "+HEAD:refs/romeu/origin/app/HEAD"}, Sandbox: {"+refs/heads/*:" + dst}}[tt.mode]
+			require.NoError(t, r.Fetch(ctx, dir, "https://example.com/o/r.git", specs))
 			created := map[Mode]string{Host: "refs/romeu/base/shop/g1/app", Sandbox: "refs/salvage/g1/s1/stash-0"}[tt.mode]
 			require.NoError(t, r.CreateRef(ctx, dir, created, oid))
 			require.NoError(t, r.BundleCreate(ctx, dir, "/out/b.bundle", []string{"refs/heads/main"}, []string{oid}))
@@ -512,7 +514,9 @@ func TestConfigProgramsNeverRun(t *testing.T) {
 		plainGit(t, dir, "config", "core.askPass", script)
 		r, err := New(Config{Mode: Host, Git: gitPath(t), Home: t.TempDir(), GitHosts: []GitHost{{Host: host, CAFile: caFile}}})
 		require.NoError(t, err)
-		require.Error(t, r.Fetch(t.Context(), dir, url, []string{"+refs/heads/*:refs/romeu/origin/r/*"}))
+		err = r.Fetch(t.Context(), dir, url, []string{"+refs/heads/*:refs/romeu/origin/r/*"})
+		require.Error(t, err)
+		require.NotErrorIs(t, err, ErrRefused, "git ran and failed")
 		assert.NoFileExists(t, path)
 
 		_, err = plainGitErr(t, dir, []string{"GIT_TERMINAL_PROMPT=0"}, "-c", "http.sslCAInfo="+caFile, "fetch", url)
