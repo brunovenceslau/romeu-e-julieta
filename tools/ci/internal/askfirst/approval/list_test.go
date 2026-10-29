@@ -248,9 +248,11 @@ func TestCodeownersAsksFirst(t *testing.T) {
 }
 
 // TestApprovalsSurface holds the approvals surface of the committed list
-// to the check of approval lines and grants, the forbidden-name denylist
-// and the workflows, which no checkpoint grant covers, and holds each on
-// the surface it was on before, checks or dependencies (05 5.3).
+// to the check of approval lines and grants with every package the pr
+// job builds and the pins of the module dependencies, the forbidden-name
+// denylist and the workflows, which no checkpoint grant covers, and holds
+// each on the surface it was on before, checks, dependencies or
+// procgroup (05 5.3, REQ-0539).
 func TestApprovalsSurface(t *testing.T) {
 	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), Path))
 	require.NoError(t, err)
@@ -258,11 +260,15 @@ func TestApprovalsSurface(t *testing.T) {
 	require.NoError(t, err)
 	i := slices.IndexFunc(list.Surfaces, func(s Surface) bool { return s.ID == "approvals" })
 	require.GreaterOrEqual(t, i, 0, "the approvals surface")
-	assert.Equal(t, []string{"tools/ci/internal/askfirst/**", "tools/ci/denylist.yaml", ".github/workflows/**"}, list.Surfaces[i].Globs)
+	assert.Equal(t, []string{"tools/ci/internal/askfirst/**", "tools/ci/git/**", "internal/procgroup/**", "go.sum", "tools/ci/denylist.yaml", ".github/workflows/**"}, list.Surfaces[i].Globs)
+	assert.False(t, slices.Contains(list.Surfaces[i].Globs, "go.mod"), "the go line of go.mod stays grantable (REQ-0541)")
 	for path, id := range map[string]string{
-		"tools/ci/internal/askfirst/askfirst.go": "checks",
-		"tools/ci/denylist.yaml":                 "checks",
-		".github/workflows/ci.yml":               "dependencies",
+		"tools/ci/internal/askfirst/approval/pr.go": "checks",
+		"tools/ci/git/git.go":                       "checks",
+		"internal/procgroup/procgroup.go":           "procgroup",
+		"go.sum":                                    "dependencies",
+		"tools/ci/denylist.yaml":                    "checks",
+		".github/workflows/ci.yml":                  "dependencies",
 	} {
 		j := slices.IndexFunc(list.Surfaces, func(s Surface) bool { return s.ID == id })
 		require.GreaterOrEqual(t, j, 0, "the %s surface", id)

@@ -558,13 +558,20 @@ job is decided: it runs on `pull_request_target` for pull requests into
 of the default branch, with `permissions: contents: read` and no secret.
 It checks out the default branch's commit (`github.sha`), with its
 `go.mod`, `go.sum`, `mise.toml` and `mise.lock`, and builds `pr` there;
-it never checks out `pull_request.base.sha`. `REQ-1150` Where the code of `pr`
-lives, and the command line of its step, are decided by the task that
-builds it; until then this specification writes `tools/ci pr` for the
-step and `go run ./tools/ci pr` for its command line, and that task's
-pull request updates each where it appears. `approvalLine` is in the
-approval package of `tools/ci`, which the `approvals` glob names; a
-pull request that moves it updates the glob and this page with it.
+it never checks out `pull_request.base.sha`. `REQ-1150` The code of `pr` is
+the approval package of `tools/ci` (`tools/ci/internal/askfirst/approval`),
+which imports the standard library, `tools/ci/git`, `internal/procgroup`
+and the YAML library, and not the framework of `tools/ci`. The step of
+the pr job builds and runs its command, with the command line
+`go run ./tools/ci/internal/askfirst/cmd/pr "$GITHUB_EVENT_PATH"`, and
+`go run ./tools/ci pr` is the local command over the same code; the
+name `tools/ci pr` stays for both (decided on 2026-10-29, scope this
+repository). The `approvals` globs name the directory of each package
+that command builds, and a module dependency by its pin, `go.sum`, so
+no grant covers a change to the code that judges a pull request; a test
+of the approval package lists those packages and holds it (05 5.3).
+`approvalLine` is in the approval package of `tools/ci`; a pull request
+that moves it updates the glob and this page with it.
 The check that the base is the default branch (12.9) stays, but it is
 not what makes the code trusted. So a run
 judges a pull request with the current `main`, and a pull request opened
