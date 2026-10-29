@@ -297,6 +297,7 @@ func TestInitSettingsDirUnwritable(t *testing.T) {
 	code, _, stderr := m.init(t, args...)
 
 	assert.Equal(t, 2, code, stderr)
+	assert.Contains(t, stderr, "RJ-354")
 	assert.Contains(t, stderr, "settings-unwritable")
 	assert.NotContains(t, stderr, "RJ-348")
 	assert.NoFileExists(t, m.settings())
@@ -330,6 +331,7 @@ func TestInitSettingsAppearAfterTheClone(t *testing.T) {
 	code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/cfg")
 
 	assert.Equal(t, 2, code, stderr)
+	assert.Contains(t, stderr, "RJ-353")
 	assert.Contains(t, stderr, "settings-exist")
 	got, err := os.ReadFile(m.settings())
 	require.NoError(t, err)
