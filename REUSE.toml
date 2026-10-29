@@ -22,6 +22,7 @@ path = [
     "mise.lock",
     "VERSION",
     "internal/mise/testdata/**",
+    "internal/embedded/julieta",
 ]
 SPDX-FileCopyrightText = "2026 Bruno Venceslau"
 SPDX-License-Identifier = "GPL-3.0-only"

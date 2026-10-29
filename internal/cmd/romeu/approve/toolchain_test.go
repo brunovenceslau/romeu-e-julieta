@@ -266,7 +266,7 @@ func TestMeasure(t *testing.T) {
 	assert.Equal(t, "0.49.2", live.Sbx)
 	assert.Equal(t, state.Binary{Version: "v1.0.0", SHA256: sha256.Sum256([]byte("a build"))}, live.Romeu)
 	assert.Equal(t, state.JulietaBinary{Version: "v0.0.0-placeholder", Protocol: 1, SHA256: sha256.Sum256(nil)}, live.Julieta,
-		"a build embeds the placeholder until the embed package lands")
+		"a source build embeds the placeholder")
 	want, err := canon.Digest(canon.Catalog, live.Catalog)
 	require.NoError(t, err)
 	assert.Equal(t, want, live.CatalogDigest)
@@ -308,7 +308,7 @@ func TestRomeuSHA256IsTheRunningImage(t *testing.T) {
 // releaseEmbedPath is build.EmbedPath of tools/release
 // (tools/release/internal/build/build.go), the file a release build maps
 // the real julieta into; a test of internal/ cannot import tools/, so
-// TestPlaceholderJulietaUntilEmbedded holds this copy to the source.
+// TestGate1ReadsTheEmbeddedJulieta holds this copy to the source.
 const releaseEmbedPath = "internal/embedded/julieta"
 
 // moduleRoot is the repository, from this package's directory.
@@ -411,15 +411,14 @@ func embedsPath(dir, pattern, target string) bool {
 	return false
 }
 
-// TestPlaceholderJulietaUntilEmbedded is the guard of the placeholder:
-// once a package embeds the julieta tools/release maps in (T043, T066),
-// embeddedJulieta must read it, or gate 1 would record the placeholder
-// for a real julieta and show "julieta unchanged" for a changed one.
-// The test fails until embeddedJulieta stops returning the placeholder.
+// TestGate1ReadsTheEmbeddedJulieta is the guard of the embedded
+// julieta: internal/embedded is the one package that embeds the file
+// tools/release maps in, and gate 1 records what it holds, so a release
+// never records the placeholder for a real julieta and shows "julieta
+// unchanged" for a changed one.
 //
 //romeu:invariant I7 test
-func TestPlaceholderJulietaUntilEmbedded(t *testing.T) {
-	t.Parallel()
+func TestGate1ReadsTheEmbeddedJulieta(t *testing.T) {
 	src, err := os.ReadFile(filepath.Join(moduleRoot, "tools", "release", "internal", "build", "build.go"))
 	require.NoError(t, err)
 	require.Contains(t, string(src), `const EmbedPath = "`+releaseEmbedPath+`"`, "build.EmbedPath moved: update releaseEmbedPath")
@@ -445,8 +444,20 @@ func TestPlaceholderJulietaUntilEmbedded(t *testing.T) {
 		"internal/parent.go", "internal/quoted.go", "internal/raw.go", "internal/tab.go", "internal/tree.go", "root.go",
 	}, julietaEmbedders(t, fixture, releaseEmbedPath), "the guard finds every embedder, and not the kit directory of the same name or a name that only begins like it")
 
-	if embeddedJulieta(cli.Version{Protocol: 1}).SHA256 == placeholderSHA256 {
-		assert.Empty(t, julietaEmbedders(t, os.DirFS(moduleRoot), releaseEmbedPath),
-			"a package embeds the julieta of tools/release now, and embeddedJulieta still returns the placeholder: make it read the embedded julieta")
-	}
+	assert.Equal(t, []string{"internal/embedded/embedded.go"}, julietaEmbedders(t, os.DirFS(moduleRoot), releaseEmbedPath),
+		"internal/embedded is the one package that embeds the julieta of tools/release")
+
+	v := cli.Version{Version: "v1.2.3", Protocol: 1}
+	assert.Equal(t, state.JulietaBinary{Version: "v0.0.0-placeholder", Protocol: 1, SHA256: sha256.Sum256(nil)}, julietaOf(nil, v),
+		"the placeholder of a source build")
+	assert.Equal(t, julietaOf(nil, v), julietaOf([]byte{}, v), "an empty embed is the placeholder too")
+	assert.Equal(t, state.JulietaBinary{Version: "v1.2.3", Protocol: 1, SHA256: sha256.Sum256([]byte("a julieta"))}, julietaOf([]byte("a julieta"), v),
+		"a release's julieta carries romeu's version and its own sha256")
+
+	old := embeddedJulieta
+	embeddedJulieta = func() []byte { return []byte("a julieta") }
+	t.Cleanup(func() { embeddedJulieta = old })
+	live, err := Measure(sbxdrv.Release{}, v)
+	require.NoError(t, err)
+	assert.Equal(t, julietaOf([]byte("a julieta"), v), live.Julieta, "Measure records the julieta the binary embeds")
 }

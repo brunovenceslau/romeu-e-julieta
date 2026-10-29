@@ -25,6 +25,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/catalog"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/embedded"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/sbxdrv"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
@@ -159,15 +160,21 @@ var (
 	placeholderVersion = "v0.0.0-placeholder"
 )
 
-// embeddedJulieta returns the julieta this binary embeds. No package
-// reads the embedded julieta yet (tools/release build maps it with an
-// overlay, and the package that consumes it lands with sync, T043), so
-// every build holds the placeholder of a source build (REQ-0130), with
-// romeu's protocol, since the two protocol constants are held equal
-// (cmd/romeu, TestProtocolIsJulietas). The embed package replaces this
-// function.
-var embeddedJulieta = func(v cli.Version) state.JulietaBinary {
-	return state.JulietaBinary{Version: placeholderVersion, Protocol: v.Protocol, SHA256: placeholderSHA256}
+// embeddedJulieta returns the bytes of the julieta this binary embeds
+// (internal/embedded); a test replaces it.
+var embeddedJulieta = embedded.Julieta
+
+// julietaOf returns the julieta gate 1 records for the embedded bytes
+// bin and romeu's stamp v. A source build embeds the empty placeholder
+// (REQ-0130), recorded with placeholderVersion; a release embeds the
+// julieta tools/release build stamped with romeu's version, so its
+// version is romeu's. The protocol is romeu's, since the two protocol
+// constants are held equal (cmd/romeu, TestProtocolIsJulietas).
+func julietaOf(bin []byte, v cli.Version) state.JulietaBinary {
+	if len(bin) == 0 {
+		return state.JulietaBinary{Version: placeholderVersion, Protocol: v.Protocol, SHA256: placeholderSHA256}
+	}
+	return state.JulietaBinary{Version: Version(v), Protocol: v.Protocol, SHA256: sha256.Sum256(bin)}
 }
 
 // develVersion is the version stamp of a build that tools/release did
@@ -222,7 +229,7 @@ func Measure(sbx sbxdrv.Release, v cli.Version) (Live, error) {
 	return Live{
 		Sbx:           sbx.String(),
 		Romeu:         state.Binary{Version: Version(v), SHA256: sum},
-		Julieta:       embeddedJulieta(v),
+		Julieta:       julietaOf(embeddedJulieta(), v),
 		Catalog:       decoded,
 		CatalogDigest: digest,
 	}, nil

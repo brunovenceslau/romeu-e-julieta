@@ -103,7 +103,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		say(stdout, "note: the tree has changes; the commit stamp is <commit>-dirty, not a clean commit\n")
 	}
 	if !res.Embedded {
-		say(stdout, "note: the archives carry no julieta: no package of romeu consumes %s yet (the embed seam of T043, T066 and T077 adds it), so a romeu from this build cannot pass julieta-not-embedded\n", build.EmbedPath)
+		say(stdout, "note: the archives carry no julieta: no package of romeu consumes %s yet (the embed package of T186 adds it), so a romeu from this build cannot pass julieta-not-embedded\n", build.EmbedPath)
 	}
 	return exitOK
 }
