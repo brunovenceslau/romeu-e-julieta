@@ -39,6 +39,19 @@ type run struct {
 	// Step 3: the specs the command line names, validated, with their
 	// secrets bound, in the order of the config repo's projects/.
 	targets []spec.Project
+
+	// Step 4: the part of the host tree of each target, in the order of
+	// targets: its env dir, its memory dirs, the clone of each repo and
+	// its egress ref and commit.
+	trees []tree
+
+	// Steps 4 and 5 (and each later step that warns): the warnings of
+	// the run, in the order they were found. Each is a print to the CLI
+	// writer of stderr, which step 10 makes after its own output (04 4.2:
+	// the warnings close the output); a print, not a slug and a message,
+	// so each slug stays a literal of its cli.Warn call, as the test of
+	// 04 4.1, Warnings reads it.
+	warnings []func(*cli.Writer)
 }
 
 // newRun returns the run of one command line.
