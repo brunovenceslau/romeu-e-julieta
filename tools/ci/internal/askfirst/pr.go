@@ -6,7 +6,8 @@ package askfirst
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"flag"
 	"fmt"
@@ -50,7 +51,7 @@ const localBase = "origin/main"
 // fails. GitHub writes a pull request with an empty body as "body":
 // null, which reads as an empty body.
 func ParsePayload(src []byte) (PR, error) {
-	var obj map[string]json.RawMessage
+	var obj map[string]jsontext.Value
 	if err := json.Unmarshal(src, &obj); err != nil {
 		return PR{}, fmt.Errorf("the payload is not a JSON object: %w", err)
 	}
@@ -92,7 +93,7 @@ func ParsePayload(src []byte) (PR, error) {
 
 // field reads the string at the dotted path of obj into to. A null is
 // read as "" when nullable is set, and is a missing field otherwise.
-func field(obj map[string]json.RawMessage, path string, to *string, nullable bool) error {
+func field(obj map[string]jsontext.Value, path string, to *string, nullable bool) error {
 	keys := strings.Split(path, ".")
 	for _, k := range keys[:len(keys)-1] {
 		raw, ok := obj[k]
