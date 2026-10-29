@@ -3,7 +3,7 @@ id: T180
 title: "tools/ci pr reads the approval checklist and the grants, run locally"
 milestone: M2
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - tools/ci/check_pr.go
   - tools/ci/checks_test.go
@@ -17,6 +17,8 @@ ask_first:
   - approvals
   - checks
 sitting: none
+merged: 2026-10-29
+pr: 323
 ---
 
 # T180 - tools/ci pr reads the approval checklist and the grants, run locally

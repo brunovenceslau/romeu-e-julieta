@@ -137,49 +137,56 @@ func TestApprovalLineOfTheSpec(t *testing.T) {
 }
 
 // TestApprovalLine checks approvalLine on one line at a time. How pr
-// reads the lines of a whole body is T005's: its TestPRApprovalLine uses
-// the case titles of the table in docs/plan/tasks/T005-tools-ci-pr.md.
+// reads the lines of a whole body is TestPRApprovalLine's.
 func TestApprovalLine(t *testing.T) {
 	cases := []struct {
 		name, line string
 		match      bool
 	}{
-		{"a valid line", "Approval: decisions - amend rule 8", true},
-		{"an apostrophe", "Approval: decisions - the record\u2019s rule 8", true},
-		{"a single straight quote", "Approval: decisions - the 'rule 8' text", true},
-		{"a phrase that starts with punctuation", "Approval: decisions - (amend) rule 8", true},
-		{"a lowercase prefix", "approval: decisions - amend rule 8", false},
-		{"a list item", "- Approval: decisions - amend rule 8", false},
-		{"a leading space", " Approval: decisions - amend rule 8", false},
-		{"text before the prefix", "see Approval: decisions - amend rule 8", false},
-		{"an uppercase id", "Approval: Decisions - amend rule 8", false},
-		{"an underscore in the id", "Approval: a_b - x", false},
-		{"an empty id", "Approval:  - x", false},
-		{"two spaces before the separator", "Approval: decisions  - x", false},
-		{"an en dash separator", "Approval: decisions \u2013 amend rule 8", false},
-		{"an empty phrase", "Approval: decisions - ", false},
-		{"a leading no-break space", "Approval: decisions - \u00a0amend rule 8", false},
-		{"a leading tab", "Approval: decisions - \tamend rule 8", false},
-		{"a leading vertical tab", "Approval: decisions - \vamend rule 8", false},
-		{"a leading U+0001", "Approval: decisions - \x01amend rule 8", false},
-		{"a leading zero-width space", "Approval: decisions - \u200bamend rule 8", false},
-		{"a leading byte order mark", "Approval: decisions - \ufeffamend rule 8", false},
-		{"a leading combining mark", "Approval: decisions - \u0301amend rule 8", false},
-		{"a leading unassigned code point", "Approval: decisions - \u0378amend rule 8", false},
-		{"a leading private-use character", "Approval: decisions - \ue000amend rule 8", false},
-		{"a byte order mark inside the phrase", "Approval: decisions - amend\ufeffrule 8", false},
+		{"a valid line", "> - [x] Approval: decisions - amend rule 8", true},
+		{"an apostrophe", "> - [x] Approval: decisions - the record\u2019s rule 8", true},
+		{"a single straight quote", "> - [x] Approval: decisions - the 'rule 8' text", true},
+		{"a phrase that starts with punctuation", "> - [x] Approval: decisions - (amend) rule 8", true},
+		{"a lowercase prefix", "> - [x] approval: decisions - amend rule 8", false},
+		{"no quote marker", "- [x] Approval: decisions - amend rule 8", false},
+		{"a leading space", " > - [x] Approval: decisions - amend rule 8", false},
+		{"text before the prefix", "> - [x] see Approval: decisions - amend rule 8", false},
+		{"an empty box", "> - [ ] Approval: decisions - amend rule 8", true},
+		{"an uppercase X", "> - [X] Approval: decisions - amend rule 8", true},
+		{"another mark in the box", "> - [v] Approval: decisions - amend rule 8", false},
+		{"an empty pair of brackets", "> - [] Approval: decisions - amend rule 8", false},
+		{"an asterisk bullet", "> * [x] Approval: decisions - amend rule 8", false},
+		{"no space after the quote marker", ">- [x] Approval: decisions - amend rule 8", false},
+		{"no box", "> - Approval: decisions - amend rule 8", false},
+		{"the bare line of before", "Approval: decisions - amend rule 8", false},
+		{"an uppercase id", "> - [x] Approval: Decisions - amend rule 8", false},
+		{"an underscore in the id", "> - [x] Approval: a_b - x", false},
+		{"an empty id", "> - [x] Approval:  - x", false},
+		{"two spaces before the separator", "> - [x] Approval: decisions  - x", false},
+		{"an en dash separator", "> - [x] Approval: decisions \u2013 amend rule 8", false},
+		{"an empty phrase", "> - [x] Approval: decisions - ", false},
+		{"a leading no-break space", "> - [x] Approval: decisions - \u00a0amend rule 8", false},
+		{"a leading tab", "> - [x] Approval: decisions - \tamend rule 8", false},
+		{"a leading vertical tab", "> - [x] Approval: decisions - \vamend rule 8", false},
+		{"a leading U+0001", "> - [x] Approval: decisions - \x01amend rule 8", false},
+		{"a leading zero-width space", "> - [x] Approval: decisions - \u200bamend rule 8", false},
+		{"a leading byte order mark", "> - [x] Approval: decisions - \ufeffamend rule 8", false},
+		{"a leading combining mark", "> - [x] Approval: decisions - \u0301amend rule 8", false},
+		{"a leading unassigned code point", "> - [x] Approval: decisions - \u0378amend rule 8", false},
+		{"a leading private-use character", "> - [x] Approval: decisions - \ue000amend rule 8", false},
+		{"a byte order mark inside the phrase", "> - [x] Approval: decisions - amend\ufeffrule 8", false},
 		// Accepted, and left to review by 12 12.4: a separator inside or
 		// after the phrase.
-		{"a line separator inside the phrase", "Approval: decisions - amend\u2028rule 8", true},
-		{"a paragraph separator inside the phrase", "Approval: decisions - amend\u2029rule 8", true},
-		{"a leading line separator", "Approval: decisions - \u2028amend rule 8", false},
-		{"a leading paragraph separator", "Approval: decisions - \u2029amend rule 8", false},
-		{"a trailing line separator", "Approval: decisions - amend rule 8\u2028", true},
-		{"a trailing paragraph separator", "Approval: decisions - amend rule 8\u2029", true},
-		{"a next line inside the phrase", "Approval: decisions - amend\u0085rule 8", false},
-		{"a zero-width space inside the phrase", "Approval: decisions - amend\u200brule 8", false},
-		{"a trailing CR", "Approval: decisions - amend rule 8\r", false},
-		{"an embedded LF", "Approval: decisions - amend\nrule 8", false},
+		{"a line separator inside the phrase", "> - [x] Approval: decisions - amend\u2028rule 8", true},
+		{"a paragraph separator inside the phrase", "> - [x] Approval: decisions - amend\u2029rule 8", true},
+		{"a leading line separator", "> - [x] Approval: decisions - \u2028amend rule 8", false},
+		{"a leading paragraph separator", "> - [x] Approval: decisions - \u2029amend rule 8", false},
+		{"a trailing line separator", "> - [x] Approval: decisions - amend rule 8\u2028", true},
+		{"a trailing paragraph separator", "> - [x] Approval: decisions - amend rule 8\u2029", true},
+		{"a next line inside the phrase", "> - [x] Approval: decisions - amend\u0085rule 8", false},
+		{"a zero-width space inside the phrase", "> - [x] Approval: decisions - amend\u200brule 8", false},
+		{"a trailing CR", "> - [x] Approval: decisions - amend rule 8\r", false},
+		{"an embedded LF", "> - [x] Approval: decisions - amend\nrule 8", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -200,9 +207,9 @@ var refusedQuotes = []rune{
 func TestApprovalLineRefusesEachQuote(t *testing.T) {
 	for _, q := range refusedQuotes {
 		for _, line := range []string{
-			"Approval: decisions - " + string(q) + "amend rule 8",
-			"Approval: decisions - amend " + string(q) + " rule 8",
-			"Approval: decisions - amend rule 8" + string(q),
+			"> - [x] Approval: decisions - " + string(q) + "amend rule 8",
+			"> - [x] Approval: decisions - amend " + string(q) + " rule 8",
+			"> - [x] Approval: decisions - amend rule 8" + string(q),
 		} {
 			assert.False(t, approvalLine.MatchString(line), "%U in %q", q, line)
 		}
