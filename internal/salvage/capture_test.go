@@ -45,6 +45,16 @@ func put(t *testing.T, dir, name, content string) {
 	require.NoError(t, os.WriteFile(p, []byte(content), 0o600))
 }
 
+// resolved returns dir with its symbolic links resolved, as git names a
+// worktree: on macOS the temporary dirs are below /var, a link to
+// /private/var.
+func resolved(t *testing.T, dir string) string {
+	t.Helper()
+	r, err := filepath.EvalSymlinks(dir)
+	require.NoError(t, err)
+	return r
+}
+
 // sandbox is the fixture of a salvage: a repo with a commit, its memory
 // dir, and a HOME.
 type sandbox struct {
@@ -56,7 +66,7 @@ type sandbox struct {
 // ignores *.log and cache/), a memory dir and a HOME.
 func newSandbox(t *testing.T) sandbox {
 	t.Helper()
-	s := sandbox{repo: repo(t), memory: filepath.Join(t.TempDir(), "api"), home: t.TempDir()}
+	s := sandbox{repo: resolved(t, repo(t)), memory: filepath.Join(t.TempDir(), "api"), home: t.TempDir()}
 	require.NoError(t, os.Mkdir(s.memory, 0o700))
 	put(t, s.repo, "kept", "one\n")
 	put(t, s.repo, ".gitignore", "*.log\ncache/\nbuild/\n")
@@ -153,10 +163,10 @@ func TestSalvage(t *testing.T) {
 	put(t, s.repo, "a.log", "log\n")
 	put(t, s.repo, "cache/big", "excluded\n")
 	put(t, s.repo, "build/out", "out\n")
-	wt := filepath.Join(t.TempDir(), "wt")
+	wt := filepath.Join(resolved(t, t.TempDir()), "wt")
 	git(t, s.repo, "worktree", "add", "-q", wt, "topic")
 	put(t, wt, "kept", "linked\n")
-	detached := filepath.Join(t.TempDir(), "zz-detached")
+	detached := filepath.Join(resolved(t, t.TempDir()), "zz-detached")
 	git(t, s.repo, "worktree", "add", "-q", "--detach", detached)
 	nested := filepath.Join(s.repo, "vendor", "lib")
 	require.NoError(t, os.MkdirAll(nested, 0o700))
