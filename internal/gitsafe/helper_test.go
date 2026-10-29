@@ -198,7 +198,15 @@ func listen(t *testing.T, serve func(ctx context.Context, conn net.Conn)) string
 // the server and the path of a PEM file that holds its certificate.
 func serveHTTPS(t *testing.T, base string) (host, caFile string) {
 	t.Helper()
-	srv := httptest.NewUnstartedServer(http.FileServer(http.Dir(base)))
+	return serveTLS(t, http.FileServer(http.Dir(base)))
+}
+
+// serveTLS serves h over HTTPS on 127.0.0.1 and returns the host and
+// port of the server and the path of a PEM file that holds its
+// certificate, which every server of httptest shares.
+func serveTLS(t *testing.T, h http.Handler) (host, caFile string) {
+	t.Helper()
+	srv := httptest.NewUnstartedServer(h)
 	// A handshake a test makes fail on purpose is not news.
 	srv.Config.ErrorLog = slog.NewLogLogger(slog.DiscardHandler, slog.LevelError)
 	srv.StartTLS()

@@ -43,8 +43,7 @@ belongs to host mode; whether the sandbox mode (which leaves the `http.*`
 keys to the sandbox) and the local config of a review checkout (REQ-0468
 lists its keys as exact) take it is decided there and written in 05 5.1.
 
-- Implements: none: the requirement ids are allocated by this task with
-  its spec amendment (12 12.11).
+- Implements: REQ-1312 (05 5.1), REQ-1313 (05 5.1).
 - Operator: no.
 - Acceptance:
   - Every host-mode git invocation of gitsafe carries

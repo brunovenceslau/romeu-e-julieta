@@ -95,6 +95,7 @@ var hostSettings = []setting{
 	{"maintenance.auto", "false"},
 	{"core.symlinks", "false"},
 	{"advice.detachedHead", "false"},
+	{"http.followRedirects", "false"},
 }
 
 // sandboxSettings is the flag list of sandbox mode (05 5.1). The rest
@@ -344,6 +345,7 @@ func (r *Runner) runInput(ctx context.Context, dir string, extra []setting, env 
 	if err != nil {
 		// A server writes part of git's standard error (remote: lines),
 		// so it reaches the error only escaped (I29).
+		err = withRedirect(err, stderr.String(), stderr.truncated)
 		msg := termsafe.Escape(strings.TrimSpace(stderr.String()))
 		if msg == "" {
 			return fmt.Errorf("gitsafe: git %s: %w", args[0], err)

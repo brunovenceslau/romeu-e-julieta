@@ -33,7 +33,9 @@ var cloneFlags = []string{"--no-tags", "--no-recurse-submodules", "--template=",
 // the same check of what the config rewrites it to. git clone reads no
 // local config of a repository around it, so the rewrite is resolved
 // from the root directory, where only the global config applies: none
-// in host mode, the sandbox's own in sandbox mode.
+// in host mode, the sandbox's own in sandbox mode. A server that
+// answers with a redirect, which host mode does not follow, fails the
+// clone with ErrMoved.
 //
 // The clone is the one call that writes a new repository's HEAD, its
 // default branch, the remote-tracking refs of origin and a checkout;
@@ -84,7 +86,7 @@ func (r *Runner) clone(ctx context.Context, url, dest, helper string) error {
 	}
 	args := slices.Concat([]string{"clone"}, cloneFlags, []string{"--", url, dest})
 	if err := r.runWith(ctx, filepath.Dir(dest), extra, nil, args...); err != nil {
-		return err
+		return movedError(err, url, resolved)
 	}
 	if err := r.checkout(ctx, dest); err != nil {
 		// checkCloneDest proved dest absent, so all of it is this

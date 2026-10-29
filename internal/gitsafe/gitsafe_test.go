@@ -34,7 +34,7 @@ var hostFlags = []string{
 	"-c", "core.sshCommand=false", "-c", "core.gitProxy=", "-c", "core.askPass=", "-c", "core.alternateRefsCommand=", "-c", "diff.external=", "-c", "core.pager=cat", "-c", "credential.helper=",
 	"-c", "fetch.prune=false", "-c", "transfer.fsckObjects=true", "-c", "transfer.bundleURI=false", "-c", "fetch.bundleURI=",
 	"-c", "gc.auto=0", "-c", "maintenance.auto=false", "-c", "core.symlinks=false",
-	"-c", "advice.detachedHead=false",
+	"-c", "advice.detachedHead=false", "-c", "http.followRedirects=false",
 }
 
 // sandboxFlags is the flag list of sandbox mode (05 5.1).
