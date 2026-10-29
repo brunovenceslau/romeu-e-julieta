@@ -21,14 +21,15 @@ var (
 	}
 
 	// SecretUnbound is the error secret-unbound (RJ-315): a spec secret
-	// has no <secret>@<project> entry in the host settings, so step 1
-	// stops (04 4.2, REQ-0335). The hint is filled with the secret's
+	// of a target has no <secret>@<project> entry in the host settings,
+	// so the end of step 3 stops, before step 4 writes (04 4.2,
+	// REQ-0335). The hint is filled with the secret's
 	// name and the project, the entry to paste.
 	SecretUnbound = cli.Row{
 		ID:          "RJ-315",
 		Slug:        "secret-unbound",
 		Exit:        2,
 		Fix:         "decide: add the entry <secret>@<name> to the secrets of the host settings, then run romeu sync <name>",
-		RecoveredIn: "none: nothing was changed, and the sync of the hint reads the settings again",
+		RecoveredIn: "none: nothing was rendered or promoted, and the edit of the hint binds the secret",
 	}
 )

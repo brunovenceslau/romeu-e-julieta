@@ -224,8 +224,11 @@ dir`, see J13).
 ### How `romeu sync` renders, gates and promotes
 
 1. `REQ-0335` Take the lock (runs promotion recovery). Load and validate host
-   settings (exit 2; a missing secret binding is `secret-unbound`,
-   whose fix hint prints the `<name>@<project>` entry to paste). Check
+   settings (exit 2). A spec secret without its `<name>@<project>`
+   binding in the host settings is `secret-unbound`, whose fix hint
+   prints the entry to paste; the check needs the specs, so it runs at
+   the end of step 3, once the specs are read and the targets picked,
+   on the targets only, before step 4 writes. Check
    gate 1 (01 1.4; exit 3): `sbx version` is a read, and 01 1.5 holds
    back only a mutating sbx call, so a stale toolchain stops `sync`
    before it promotes.
@@ -526,7 +529,7 @@ its own: it is an invalid document, exit 2, named by the rule's slug
 | `RJ-312` | `julieta-not-embedded` | 2 | `REQ-0432` `run`, `sync` and promotion in a build without julieta ([02 2.1](02-layouts.md#21-product-repo-romeu-e-julieta-public)) |
 | `RJ-313` | `manifest-size` | 2 | `sync` ([03 3.6](03-formats.md#36-julieta-manifest-schema-manifestv1)); `julieta spec validate` reports the same rule as a finding of `RJ-328` |
 | `RJ-314` | `secret-in-argv` | 2 | host settings load ([03 3.4](03-formats.md#34-host-settings-settingsyaml-schema-host-settingsv1)) |
-| `RJ-315` | `secret-unbound` | 2 | `sync` step 1; the hint prints the entry to paste |
+| `RJ-315` | `secret-unbound` | 2 | `sync` step 3, after the targets are picked, on each target's secrets; the hint prints the entry to paste |
 | `RJ-316` | `julieta-protocol` | 2 | the compatibility check ([06 6.3](06-kits.md#63-julieta-delivery)) |
 | `RJ-317` | `julieta-digest` | 2 | the compatibility check |
 | `RJ-318` | `julieta-bin-writable` | 2 | the compatibility check |
