@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -385,10 +386,16 @@ func removeCandidateDir(root *os.Root, cand string) error {
 	return nil
 }
 
-// pruneKitDirs deletes every dir under LiveKitsDir that files does not
-// name: the kit dirs the live sbxenv.yaml no longer references, and a
-// temporary dir a killed step 2 left. It runs after the commit point
-// alone. It is an admitted call site of the I16 scan (05 5.2).
+// kitDirName is the form of a kit dir's name, <kit>-<digest12>, and of
+// the temporary dir step 2 copies it into, .tmp-<kit>-<digest12>.
+var kitDirName = regexp.MustCompile(`^(?:\.tmp-)?[a-z0-9][a-z0-9-]*-[0-9a-f]{12}$`)
+
+// pruneKitDirs deletes each dir under LiveKitsDir that has the form of
+// a kit dir and that files does not name: the kit dirs the live
+// sbxenv.yaml no longer references, and a temporary dir a killed step 2
+// left. An entry of another name or kind is not romeu's to judge and
+// stays. It runs after the commit point alone. It is an admitted call
+// site of the I16 scan (05 5.2).
 func pruneKitDirs(root *os.Root, files map[string]string) error {
 	entries, err := fs.ReadDir(root.FS(), LiveKitsDir)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -399,7 +406,7 @@ func pruneKitDirs(root *os.Root, files map[string]string) error {
 	}
 	for _, e := range entries {
 		p := path.Join(LiveKitsDir, e.Name())
-		if _, kept := files[p]; kept {
+		if _, kept := files[p]; kept || !e.IsDir() || !kitDirName.MatchString(e.Name()) {
 			continue
 		}
 		if err := root.RemoveAll(p); err != nil {

@@ -405,3 +405,36 @@ func TestCandidateFilesDigestFollowsTheContent(t *testing.T) {
 }
 
 func stepName(n int) string { return "killed after step " + string(rune('0'+n)) }
+
+// A temporary kit dir a killed step 2 left half written is replaced,
+// and an entry of .romeu/kits that is not a kit dir stays.
+func TestPromoteReplacesAStaleTempKitDirAndKeepsWhatIsNotAKitDir(t *testing.T) {
+	e := newPromoEnv(t)
+	c, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
+	rec, err := os.ReadFile(filepath.Join(c.Dir, render.CandidateRecord))
+	require.NoError(t, err)
+	r, err := render.DecodeRecord(rec)
+	require.NoError(t, err)
+	var kit string
+	for p := range r.Files {
+		if strings.HasPrefix(p, render.LiveKitsDir+"/") {
+			kit = path.Base(p)
+		}
+	}
+	kits := filepath.Join(e.envDir, filepath.FromSlash(render.LiveKitsDir))
+	stale := filepath.Join(kits, ".tmp-"+kit)
+	require.NoError(t, os.MkdirAll(stale, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(stale, "half"), []byte("x"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(kits, "notes.txt"), []byte("mine\n"), 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(kits, "not-a-kit"), 0o700))
+
+	require.NoError(t, e.live().Promote(c))
+
+	assert.NoDirExists(t, stale)
+	assert.NoFileExists(t, filepath.Join(kits, kit, "half"))
+	assert.FileExists(t, filepath.Join(kits, "notes.txt"))
+	assert.DirExists(t, filepath.Join(kits, "not-a-kit"))
+	drifted, err := render.CheckDrift(e.envDir)
+	require.NoError(t, err)
+	assert.Empty(t, drifted)
+}
