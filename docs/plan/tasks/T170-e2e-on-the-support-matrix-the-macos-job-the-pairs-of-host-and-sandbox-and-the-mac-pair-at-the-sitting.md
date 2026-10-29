@@ -10,7 +10,8 @@ owns:
   - tools/ci/internal/workflows/**
   - docs/spec/10-testing-style.md
 needs: []
-after: []
+after:
+  - T181
 ask_first:
   - approvals
   - checks
@@ -19,6 +20,9 @@ sitting: none
 ---
 
 # T170 - e2e on the support matrix: the macOS job, the pairs of host and sandbox, and the Mac pair at the sitting
+
+Re-plan (2026-10-29): after T181, which also owns
+`tools/ci/internal/workflows/**` and `.github/workflows/ci.yml`.
 
 Goal: the end-to-end tests run on the pairs of host and sandbox the
 product supports, and each pair the hosted CI cannot run is named with

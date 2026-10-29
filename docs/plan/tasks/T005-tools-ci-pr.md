@@ -7,7 +7,8 @@ fate: deferred
 owns: []
 needs:
   - T003
-after: []
+after:
+  - T181
 ask_first:
   - checks
   - approvals
@@ -35,6 +36,25 @@ with a folded id replaced by the id that absorbed it. When it reopens,
 `docs/spec/05-security.md` (the two pages 12 12.4 assigns this task an
 edit of, rule 6 of `docs/plan.md`), and `ask_first` is the forecast
 above.
+
+Re-plan (2026-10-29): the first slice is planned as T180 (the reader,
+run locally) and T181 (the base-defined pr job), decided on 2026-10-29,
+scope this repository, because the `formats` surface (#314) landed with
+no check behind it; the approval line becomes a checklist the
+maintainer ticks (T180). They take from the acceptance below the
+checklist grammar, `TestPRApprovalLine`, the grants, the changed paths,
+the payload read, the `head.sha` fetch, the pr workflow file and its
+`tools/ci workflows` rows, the hostile and head-job fixtures, and
+invariants (a), (b), (c) and (e), and cite the requirement ids those
+lines implement; this task keeps citing them too, so its Implements
+line and the OverCap ratchet stay as they are. Those lines below stay
+as the record, and T180 and T181 supersede them (the plain approval
+line of the table becomes the checklist). This task keeps the rest,
+REQ-0541 and invariant (d), the 05 5.4 rows on `tools/ci pr` (05 is
+owned by T167 while T180 and T181 run), the template's other hints,
+and stays deferred with its trigger. The operator item below, the
+required check and the edit of open pull request bodies, moves to
+T181.
 
 - Implements: REQ-0022 (index), REQ-0032 (index), REQ-0122 (02 2.1),
   REQ-0262 (03 3.13), REQ-0476 (05 5.2), REQ-0479 (05 5.2), REQ-0483 (05
