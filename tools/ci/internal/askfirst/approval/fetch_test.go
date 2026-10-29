@@ -20,7 +20,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
 )
 
-// jobClone is the pr job's checkout in a fixture: a clone of a remote
+// jobClone is the ask-first job's checkout in a fixture: a clone of a remote
 // that holds main at base, and the head of a pull request only under
 // refs/pull/1/head, which a clone does not fetch, as GitHub serves the
 // head of a pull request from a fork. The remote serves any commit it
@@ -43,9 +43,9 @@ func jobClone(t *testing.T) (job *gittest.Repo, base, head string) {
 	return job, base, head
 }
 
-// TestPRFetchesTheHead holds REQ-1152 and REQ-0816: the pr job fetches
+// TestPRFetchesTheHead holds REQ-1152 and REQ-0816: the ask-first job fetches
 // head.sha when the clone lacks it, and only then; a run without the
-// fetch, which is the local tools/ci pr, fails on a missing head and
+// fetch, which is the local tools/ci ask-first, fails on a missing head and
 // reads no network.
 func TestPRFetchesTheHead(t *testing.T) {
 	body := alert("> - [x] Approval: decisions - add a record")

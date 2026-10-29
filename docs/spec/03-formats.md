@@ -853,8 +853,8 @@ Formats without a schema, each with its reason:
 | `.romeu/bin/SHA256SUMS` | `REQ-0262` the `sha256sum` line format, which external tools read |
 | `e2e/scenarios/<journey>/commands.yaml` | read by one program, the scenario runner, and pinned by its test |
 | `kits/pins.yaml` | written by `tools/kitpin` and read by the product's own consumers, pinned by their tests |
-| `docs/grants.yaml` | read by one program, `tools/ci pr`, and pinned by its test; its form is in [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change) |
-| `.github/ask-first.yaml` | `REQ-0263` `version: 1`; read by `tools/ci pr` and by `go generate`, pinned by their tests (05 5.3) |
+| `docs/grants.yaml` | read by one program, `tools/ci ask-first`, and pinned by its test; its form is in [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change) |
+| `.github/ask-first.yaml` | `REQ-0263` `version: 1`; read by `tools/ci ask-first` and by `go generate`, pinned by their tests (05 5.3) |
 | `tools/ci/denylist.yaml`, `prose.yaml`, `headings.yaml` | `REQ-0264` read by `tools/ci` alone, each pinned by its step's test |
 | `docs/reference/vocabulary.yaml` | `REQ-0265` generated from 01 1.7 and read by `tools/ci vocabulary` |
 | `e2e/testdata/sbx/<version>/*.jsonl` | `REQ-0266` written by the recorder and read by the fake sbx, pinned by their tests (10 10.3) |

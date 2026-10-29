@@ -28,7 +28,7 @@ const quotePrefix = "> "
 
 // rule is the name each finding line carries, as the findings of
 // tools/ci do (check.Finding).
-const rule = "pr"
+const rule = "ask-first"
 
 // String prints a finding as tools/ci prints its own, "<where>: pr:
 // <msg>", passed through git.SafeLines, and then the quoted line, if any.

@@ -28,11 +28,11 @@ type PR struct {
 	BaseSHA, BaseRef, DefaultBranch string
 }
 
-// JobName is the name of the pr job and of the check it posts: the
-// grammar of tools/ci workflows holds pr.yml's one job to it, and pr
+// JobName is the name of the ask-first job and of the check it posts: the
+// grammar of tools/ci workflows holds ask-first.yml's one job to it, and pr
 // refuses a job of the head outside that file that could post a check of
 // the same name (REQ-1154).
-const JobName = "pr"
+const JobName = "ask-first"
 
 // tasksDir is the directory of the task files of the plan, whose names
 // start with the task id.
@@ -129,7 +129,7 @@ func field(obj map[string]jsontext.Value, path string, to *string, nullable bool
 // request exists, --title and --body over the local range from --base to
 // HEAD. usage is the text a wrong set of arguments is answered with.
 func ReadArgs(ctx context.Context, r git.Repo, args []string, usage string) (PR, error) {
-	fs := flag.NewFlagSet("pr", flag.ContinueOnError)
+	fs := flag.NewFlagSet("ask-first", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	title := fs.String("title", "", "")
 	bodyFile := fs.String("body", "", "")
@@ -172,11 +172,11 @@ func ReadPayload(name string) (PR, error) {
 // Judge reads from git what the approval rules need and judges the
 // pull request: the walk from base.sha to head.sha finds a commit
 // (REQ-0819), the head holds no file the go command would read from the
-// pr job's checkout and no job that could post the pr job's check
+// ask-first job's checkout and no job that could post the ask-first job's check
 // (headFindings), and the body carries the approval lines its diff
 // needs.
 //
-// With fetch set, which only the pr job sets (cmd/pr), a head.sha the
+// With fetch set, which only the ask-first job sets (cmd/ask-first), a head.sha the
 // clone lacks is fetched first (fetchHead); without it, a missing
 // commit is an error, so a local run reads no network (REQ-0816).
 func Judge(ctx context.Context, r git.Repo, pr PR, fetch bool) ([]Finding, error) {
@@ -255,7 +255,7 @@ var runGit = func(ctx context.Context, r git.Repo, args []string) ([]byte, error
 	return r.Run(ctx, nil, args...)
 }
 
-// fetchRemote is the remote the pr job fetches a missing head from: the
+// fetchRemote is the remote the ask-first job fetches a missing head from: the
 // one actions/checkout names, this repository (the base branch's), which
 // serves the head of a pull request from a fork too.
 const fetchRemote = "origin"
@@ -304,7 +304,7 @@ const approvalsSurface = "approvals"
 // branch's on every path of the approvals surface, on the ask-first list
 // and on the grants, or the pull request below changes the judge and
 // merges first. The default branch is read from the clone's remote
-// branch (fetchRemote), which the pr job's checkout of the whole
+// branch (fetchRemote), which the ask-first job's checkout of the whole
 // history holds; a clone without it, or without the list there, is an
 // error, not a pass. The globs are the default branch's list's, the
 // trusted one, so a base that rewrites the list cannot hide the paths
@@ -318,7 +318,7 @@ func stackFindings(ctx context.Context, r git.Repo, pr PR, base string) ([]Findi
 	}
 	tip, err := commit(ctx, r, "refs/remotes/"+fetchRemote+"/"+pr.DefaultBranch)
 	if err != nil {
-		return nil, fmt.Errorf("the clone has no remote branch %s/%s, which the stack guard compares the base with: the pr job's checkout fetches the whole history (fetch-depth: 0)", fetchRemote, git.Printable(pr.DefaultBranch))
+		return nil, fmt.Errorf("the clone has no remote branch %s/%s, which the stack guard compares the base with: the ask-first job's checkout fetches the whole history (fetch-depth: 0)", fetchRemote, git.Printable(pr.DefaultBranch))
 	}
 	list, err := readList(ctx, r, tip)
 	if err != nil {

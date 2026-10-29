@@ -25,8 +25,8 @@ const BoundaryConfig = "tools/ci/internal/lint/forbidigo.yml"
 //
 //   - internal/cli: the CLI writer, which owns the output streams, and
 //     the capture of os.Stderr around cobra.
-//   - cmd/romeu, cmd/julieta, tools/ci, tools/ci/internal/askfirst/cmd/pr
-//     (the command of the pr job, which imports no writer of tools/ci),
+//   - cmd/romeu, cmd/julieta, tools/ci, tools/ci/internal/askfirst/cmd/ask-first
+//     (the command of the ask-first job, which imports no writer of tools/ci),
 //     tools/kitpin, tools/manifest, tools/mutants, tools/new,
 //     tools/planviewer and tools/release: the main packages,
 //     which hand
@@ -47,7 +47,7 @@ var Allowed = []string{
 	"internal/cli",
 	"internal/procgroup",
 	"tools/ci",
-	"tools/ci/internal/askfirst/cmd/pr",
+	"tools/ci/internal/askfirst/cmd/ask-first",
 	"tools/kitpin",
 	"tools/manifest",
 	"tools/mutants",

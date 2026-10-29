@@ -254,7 +254,7 @@ func TestWorkflowsFile(t *testing.T) {
 			assert.Contains(t, got[0].Msg, tt.want)
 		})
 	}
-	// The edited rule is pr.yml's (TestWorkflowsPRRefused): a ci.yml
+	// The edited rule is ask-first.yml's (TestWorkflowsPRRefused): a ci.yml
 	// with or without it passes.
 	t.Run("a ci.yml without edited", func(t *testing.T) {
 		src := strings.Replace(citest.GoodWorkflow, ", edited]", "]", 1)

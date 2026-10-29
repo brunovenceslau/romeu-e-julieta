@@ -29,7 +29,7 @@ surfaces:
     reason: records
 `
 
-// TestRun runs the command of the pr job as the job does, in the
+// TestRun runs the command of the ask-first job as the job does, in the
 // checkout, on a saved event: it passes, fails on a finding, and fails
 // to judge on a wrong command line or a payload it cannot read, each
 // with its exit status.
@@ -60,7 +60,7 @@ func TestRun(t *testing.T) {
 		status int
 		out    string
 	}{
-		{"a pull request that passes", []string{payload(`"> [!IMPORTANT]\n> - [x] Approval: decisions - add a record\n"`)}, 0, "pr: ok\n"},
+		{"a pull request that passes", []string{payload(`"> [!IMPORTANT]\n> - [x] Approval: decisions - add a record\n"`)}, 0, "ask-first: ok\n"},
 		{"a pull request with a finding", []string{payload(`null`)}, 1, "has no approval line for it"},
 		{"no argument", nil, 2, ""},
 		{"two arguments", []string{"a", "b"}, 2, ""},

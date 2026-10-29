@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Bruno Venceslau
 # SPDX-License-Identifier: GPL-3.0-only
 
-# The pr job of 12 12.4: it judges the approval lines of every pull
+# The ask-first job of 12 12.4: it judges the approval lines of every pull
 # request, whatever its base, with the code of the base branch. Under
 # pull_request_target GitHub runs this file as the base branch holds
 # it, never as the pull request changes it, so no code that a pull
@@ -11,9 +11,9 @@
 # check too (decided on 2026-10-29). The job checks out the base
 # branch's commit, builds pr from it and reads the head only as git
 # objects, fetched by pr itself without credentials; it runs no other
-# code. "go run ./tools/ci workflows" holds this file to the pr job row
+# code. "go run ./tools/ci workflows" holds this file to the ask-first job row
 # of 10 10.2.
-name: pr
+name: ask-first
 
 on:
   pull_request_target:
@@ -49,8 +49,8 @@ env:
   GOTOOLCHAIN: local
 
 jobs:
-  pr:
-    name: pr
+  ask-first:
+    name: ask-first
     runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
     permissions:
@@ -77,4 +77,4 @@ jobs:
       # The code of pr alone (the approval package and what it imports,
       # every package on the approvals surface), on the event's payload.
       - name: Judge the pull request
-        run: go run ./tools/ci/internal/askfirst/cmd/pr "$GITHUB_EVENT_PATH"
+        run: go run ./tools/ci/internal/askfirst/cmd/ask-first "$GITHUB_EVENT_PATH"

@@ -57,7 +57,7 @@ func allSteps(ctx context.Context, root string, tools check.Tools, profile strin
 // union of the three jobs of the hosted workflow in the order of
 // today (runChecks). It is what a developer runs before a pull request;
 // the hosted workflow runs one job per runner, the static, race and e2e
-// subcommands (runJob). The pr step joins with tools/ci pr.
+// subcommands (runJob). The pr step joins with tools/ci ask-first.
 func runAll(ctx context.Context, e check.Env, args []string) (bool, error) {
 	return runChecks(ctx, e, args, "all", inAll)
 }

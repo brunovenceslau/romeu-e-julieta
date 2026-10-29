@@ -12,7 +12,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst/approval"
 )
 
-// The pr job row of 10 10.2 (REQ-0807, REQ-0813) and 12 12.4 (REQ-1149,
+// The ask-first job row of 10 10.2 (REQ-0807, REQ-0813) and 12 12.4 (REQ-1149,
 // REQ-1150). Under pull_request_target GitHub runs the workflow file of
 // the pull request's base branch with a token that may write, so prFile
 // alone may name that event, and it is held to one shape:
@@ -42,11 +42,11 @@ import (
 // The run line PRLine and the fetch-depth input are refused in any other
 // file or job.
 const (
-	prFile  = "pr.yml"
+	prFile  = "ask-first.yml"
 	prEvent = approval.PREvent
-	// PRLine is the one command of the pr job (REQ-1150).
-	PRLine = `go run ./tools/ci/internal/askfirst/cmd/pr "$GITHUB_EVENT_PATH"`
-	// prDepth is the one fetch-depth of the pr job's checkout: the whole
+	// PRLine is the one command of the ask-first job (REQ-1150).
+	PRLine = `go run ./tools/ci/internal/askfirst/cmd/ask-first "$GITHUB_EVENT_PATH"`
+	// prDepth is the one fetch-depth of the ask-first job's checkout: the whole
 	// history.
 	prDepth     = "fetch-depth"
 	prDepthNone = "0"
@@ -58,7 +58,7 @@ var prTypes = []string{"edited", "opened", "reopened", "synchronize"}
 
 const prTimeout = "10"
 
-// prRow is what pr.yml grants its job. A nil prRow grants nothing,
+// prRow is what ask-first.yml grants its job. A nil prRow grants nothing,
 // which is every other file.
 type prRow struct {
 	job   *yaml.Node
@@ -66,7 +66,7 @@ type prRow struct {
 }
 
 // readPR returns the grants of the workflow at path, or nil when the
-// file is no pr.yml or holds no job approval.JobName.
+// file is no ask-first.yml or holds no job approval.JobName.
 func readPR(path string, doc *yaml.Node) *prRow {
 	if strings.TrimPrefix(path, Dir) != prFile {
 		return nil
@@ -82,18 +82,18 @@ func readPR(path string, doc *yaml.Node) *prRow {
 	return r
 }
 
-// inJob reports whether step is a step of the pr job.
+// inJob reports whether step is a step of the ask-first job.
 func (r *prRow) inJob(step *yaml.Node) bool { return r != nil && r.steps[step] }
 
-// prOnly refuses the event of the pr job in a file other than pr.yml.
+// prOnly refuses the event of the ask-first job in a file other than ask-first.yml.
 func (c *grammar) prOnly(name *yaml.Node) {
 	if !c.inPR {
-		c.add(name, prEvent+" is the event of "+prFile+" alone (the pr job row)")
+		c.add(name, prEvent+" is the event of "+prFile+" alone (the ask-first job row)")
 	}
 }
 
 // prRead holds the one permission the pr row admits, n, at the top of
-// pr.yml or in its job, which owner holds: contents: read, and no other
+// ask-first.yml or in its job, which owner holds: contents: read, and no other
 // scope.
 func (c *grammar) prRead(n, owner *yaml.Node, where string) {
 	ok := n != nil && n.Kind == yaml.MappingNode && len(n.Content) == 2 &&
@@ -103,11 +103,11 @@ func (c *grammar) prRead(n, owner *yaml.Node, where string) {
 		if at == nil {
 			at = owner
 		}
-		c.add(at, where+" of "+prFile+" is contents: read, and nothing else (the pr job row)")
+		c.add(at, where+" of "+prFile+" is contents: read, and nothing else (the ask-first job row)")
 	}
 }
 
-// prWorkflow holds pr.yml to the pr job row: its event, its
+// prWorkflow holds ask-first.yml to the ask-first job row: its event, its
 // permissions, its one job and that job's steps.
 func (c *grammar) prWorkflow(doc *yaml.Node) {
 	c.prTrigger(doc)
@@ -118,29 +118,29 @@ func (c *grammar) prWorkflow(doc *yaml.Node) {
 		if at == nil {
 			at = doc
 		}
-		c.add(at, prFile+" holds one job, "+approval.JobName+", and no other (the pr job row)")
+		c.add(at, prFile+" holds one job, "+approval.JobName+", and no other (the ask-first job row)")
 	}
 	if c.pr == nil {
 		return
 	}
 	job := c.pr.job
 	if name := field(job, "name"); name == nil || name.Kind != yaml.ScalarNode || name.Value != approval.JobName {
-		c.add(job, "the pr job is named "+approval.JobName+", the name of its required check")
+		c.add(job, "the ask-first job is named "+approval.JobName+", the name of its required check")
 	}
 	if s := field(job, "strategy"); s != nil {
-		c.add(s, "the pr job has no strategy (the pr job row)")
+		c.add(s, "the ask-first job has no strategy (the ask-first job row)")
 	}
 	if n := field(job, "needs"); n != nil {
-		c.add(n, "the pr job needs no other job (the pr job row)")
+		c.add(n, "the ask-first job needs no other job (the ask-first job row)")
 	}
 	if v := field(job, "timeout-minutes"); v == nil || v.Kind != yaml.ScalarNode || v.Value != prTimeout {
-		c.add(job, "the pr job has timeout-minutes: "+prTimeout+", so a stuck run does not hold the check (the pr job row)")
+		c.add(job, "the ask-first job has timeout-minutes: "+prTimeout+", so a stuck run does not hold the check (the ask-first job row)")
 	}
 	c.prRead(field(job, "permissions"), job, "the permissions of the job")
 	c.prSteps(job)
 }
 
-// prTrigger holds the on of pr.yml: the one event prEvent, with types
+// prTrigger holds the on of ask-first.yml: the one event prEvent, with types
 // that list edited, and no other filter: no branches, so a pull request
 // into a stack branch is judged too.
 func (c *grammar) prTrigger(doc *yaml.Node) {
@@ -150,13 +150,13 @@ func (c *grammar) prTrigger(doc *yaml.Node) {
 		if at == nil {
 			at = doc
 		}
-		c.add(at, prFile+" runs on "+prEvent+" alone, written as a mapping (the pr job row)")
+		c.add(at, prFile+" runs on "+prEvent+" alone, written as a mapping (the ask-first job row)")
 		return
 	}
 	event := on.Content[1]
 	for key := range pairs(event) {
 		if key.Value != "types" {
-			c.add(key, "the filter "+key.Value+" of "+prEvent+" is outside the pr job row: types alone, so pr runs for a pull request into any branch, a stack branch among them")
+			c.add(key, "the filter "+key.Value+" of "+prEvent+" is outside the ask-first job row: types alone, so pr runs for a pull request into any branch, a stack branch among them")
 		}
 	}
 	var types []string
@@ -166,11 +166,11 @@ func (c *grammar) prTrigger(doc *yaml.Node) {
 	if !slices.Contains(types, "edited") {
 		c.add(on, prFile+" lists edited among its "+prEvent+" types, so a change to the title or body runs pr again (REQ-0813)")
 	} else if slices.Sort(types); !slices.Equal(types, prTypes) {
-		c.add(on, "the "+prEvent+" types of "+prFile+" are opened, synchronize, reopened and edited, so every push to the head is judged (the pr job row)")
+		c.add(on, "the "+prEvent+" types of "+prFile+" are opened, synchronize, reopened and edited, so every push to the head is judged (the ask-first job row)")
 	}
 }
 
-// prSteps holds the steps of the pr job: a checkout, the mise step and
+// prSteps holds the steps of the ask-first job: a checkout, the mise step and
 // the run line PRLine, in this order, and no other.
 func (c *grammar) prSteps(job *yaml.Node) {
 	steps := seqContent(field(job, "steps"))
@@ -189,11 +189,11 @@ func (c *grammar) prSteps(job *yaml.Node) {
 		}
 	}
 	if !slices.Equal(kinds, []string{"checkout", "mise", "pr"}) {
-		c.add(job, "the steps of the pr job are a checkout, the mise step and the run line "+PRLine+", in this order, and no other (the pr job row)")
+		c.add(job, "the steps of the ask-first job are a checkout, the mise step and the run line "+PRLine+", in this order, and no other (the ask-first job row)")
 	}
 }
 
-// prCheckout holds the checkout of the pr job: it names no ref and no
+// prCheckout holds the checkout of the ask-first job: it names no ref and no
 // repository, so it checks out github.sha, and it fetches the whole
 // history (fetch-depth: 0). persist-credentials: false is the rule of
 // every checkout (checkout).
@@ -201,10 +201,10 @@ func (c *grammar) prCheckout(step *yaml.Node) {
 	with := field(step, "with")
 	for _, key := range []string{"ref", "repository"} {
 		if v := field(with, key); v != nil {
-			c.add(v, "the pr job checks out the base branch's commit, github.sha, so its checkout names no "+key+", never pull_request.base.sha or the head (the pr job row)")
+			c.add(v, "the ask-first job checks out the base branch's commit, github.sha, so its checkout names no "+key+", never pull_request.base.sha or the head (the ask-first job row)")
 		}
 	}
 	if v := field(with, prDepth); v == nil || v.Kind != yaml.ScalarNode || v.Tag != "!!int" || v.Value != prDepthNone {
-		c.add(step, "the checkout of the pr job sets "+prDepth+": "+prDepthNone+", the whole history of the base branch (the pr job row)")
+		c.add(step, "the checkout of the ask-first job sets "+prDepth+": "+prDepthNone+", the whole history of the base branch (the ask-first job row)")
 	}
 }
