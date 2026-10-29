@@ -622,9 +622,52 @@ func TestStore_FindDescriptor(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, manifest, got.Digest)
-		_, err = s.GetDescriptor("sha256:" + strings.Repeat("0", 64))
+	})
+	t.Run("GetDescriptor of a skipped entry is still record-unreadable", func(t *testing.T) {
+		s := seed(t)
+		bad := strings.Repeat("0", 64)
+		require.NoError(t, os.WriteFile(filepath.Join(s.Dir(), "descriptors", bad+".json"), []byte("{not json"), 0o600))
+
+		_, err := s.GetDescriptor("sha256:" + bad)
+
 		require.Error(t, err)
 		assert.Equal(t, "RJ-334", cli.Of(err).ID)
+	})
+	t.Run("a symlink or a FIFO named like an entry is skipped", func(t *testing.T) {
+		s := seed(t)
+		dir := filepath.Join(s.Dir(), "descriptors")
+		require.NoError(t, os.Symlink(strings.Repeat("a", 64)+".json", filepath.Join(dir, strings.Repeat("0", 64)+".json")))
+		require.NoError(t, syscall.Mkfifo(filepath.Join(dir, strings.Repeat("1", 64)+".json"), 0o600))
+
+		got, err := s.FindDescriptor(index, "linux/arm64")
+
+		require.NoError(t, err)
+		assert.Equal(t, manifest, got.Digest)
+	})
+	t.Run("two entries of one pair are record-unreadable", func(t *testing.T) {
+		s := seed(t)
+		second := "sha256:" + strings.Repeat("e", 64)
+		require.NoError(t, s.PutDescriptor(held(t, s), Descriptor{Digest: second, Workload: index, Platform: "linux/arm64", Capabilities: caps}))
+
+		got, err := s.FindDescriptor(index, "linux/arm64")
+
+		assert.Nil(t, got)
+		require.Error(t, err)
+		assert.Equal(t, "RJ-334", cli.Of(err).ID)
+		assert.Contains(t, err.Error(), "linux/arm64")
+	})
+	t.Run("an entry of a newer format is returned, not skipped", func(t *testing.T) {
+		s := seed(t)
+		data, err := os.ReadFile(filepath.Join(s.Dir(), "descriptors", strings.Repeat("a", 64)+".json"))
+		require.NoError(t, err)
+		newer := strings.Replace(string(data), "state-descriptor/v1", "state-descriptor/v2", 1)
+		require.NotEqual(t, string(data), newer)
+		require.NoError(t, os.WriteFile(filepath.Join(s.Dir(), "descriptors", strings.Repeat("0", 64)+".json"), []byte(newer), 0o600))
+
+		_, err = s.FindDescriptor(index, "linux/arm64")
+
+		require.Error(t, err)
+		assert.Equal(t, "RJ-311", cli.Of(err).ID)
 	})
 	t.Run("an empty store has no entry", func(t *testing.T) {
 		_, err := openTemp(t).FindDescriptor(index, "linux/arm64")
