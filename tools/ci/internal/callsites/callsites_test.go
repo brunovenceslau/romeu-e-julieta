@@ -4,6 +4,7 @@
 package callsites
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -65,9 +66,7 @@ func binaries(romeuImports, julietaImports []string) map[string]string {
 func scanFixture(t *testing.T, files map[string]string, romeuImports, julietaImports []string, table []Site) []check.Finding {
 	t.Helper()
 	all := binaries(romeuImports, julietaImports)
-	for name, content := range files {
-		all[name] = content
-	}
+	maps.Copy(all, files)
 	findings, err := Scan(writeTree(t, all), fixtureModule, table)
 	require.NoError(t, err)
 	return findings
