@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/catalog"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/egress"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
@@ -27,29 +28,36 @@ func fullRun() *run {
 	t := &target{
 		spec:          spec.Project{},
 		envDir:        "",
+		cloneDirs:     map[string]string{},
+		memoryDirs:    map[string]string{},
+		egressRefs:    map[string]string{},
 		egressCommits: map[string]string{},
 		record:        nil,
 		candidate:     nil,
 		rendered:      render.Rendered{},
 		egress:        egress.Result{},
-		set:           gate.Set{},
-		widening:      canon.Sum[canon.WideningKind]{},
+		side:          gate.Side{},
 		renderRec:     render.Record{},
 		drifted:       nil,
-		promoted:      false,
+		outcome:       "",
 	}
 	return &run{
-		env:        &cli.Env{},
-		flags:      flags{from: "origin"},
-		settings:   spec.HostSettings{},
-		home:       "",
-		store:      (*state.Store)(nil),
-		lock:       nil,
-		git:        nil,
-		configDir:  "",
-		specCommit: "",
-		specs:      nil,
-		targets:    []*target{t},
+		env:           &cli.Env{},
+		flags:         flags{from: "origin"},
+		settings:      spec.HostSettings{},
+		home:          "",
+		store:         nil,
+		lock:          nil,
+		bin:           render.Bin{},
+		catalog:       catalog.Catalog{},
+		catalogDigest: canon.Sum[canon.CatalogKind]{},
+		git:           nil,
+		configDir:     "",
+		specRef:       "",
+		specCommit:    "",
+		specs:         nil,
+		targets:       []*target{t},
+		warnings:      nil,
 	}
 }
 
@@ -110,11 +118,11 @@ func TestCheckRulesRunsInNameOrder(t *testing.T) {
 	rules = nil
 	var order []string
 	add := func(name string) {
-		register(rule{name, func(*run, *target) error { order = append(order, name); return nil }})
+		register(rule{name, func(context.Context, *run, *target) error { order = append(order, name); return nil }})
 	}
 	add("b")
 	add("a")
-	if err := checkRules(nil, nil); err != nil {
+	if err := checkRules(context.Background(), nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Join(order, ",") != "a,b" {
@@ -126,7 +134,7 @@ func TestRegisterPanics(t *testing.T) {
 	saved := rules
 	t.Cleanup(func() { rules = saved })
 	rules = nil
-	ok := rule{"x", func(*run, *target) error { return nil }}
+	ok := rule{"x", func(context.Context, *run, *target) error { return nil }}
 	register(ok)
 	for _, ru := range []rule{ok, {"", ok.check}, {"y", nil}} {
 		func() {
@@ -137,5 +145,55 @@ func TestRegisterPanics(t *testing.T) {
 			}()
 			register(ru)
 		}()
+	}
+}
+
+func TestRunStepsReleasesTheLockAndTheStore(t *testing.T) {
+	dir := t.TempDir()
+	st, err := state.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lk, err := st.Lock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := fullRun()
+	r.store, r.lock = st, lk
+	boom := errors.New("boom")
+	if err := runSteps(context.Background(), r, []step{{n: 1, name: "step", do: func(context.Context, *run) error { return boom }}}); !errors.Is(err, boom) {
+		t.Fatalf("got %v, want boom", err)
+	}
+	if r.lock != nil || r.store != nil {
+		t.Error("runSteps left the lock or the store set")
+	}
+	again, err := state.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer again.Close()
+	lk2, err := again.Lock()
+	if err != nil {
+		t.Fatalf("the lock is still held after runSteps: %v", err)
+	}
+	lk2.Unlock()
+}
+
+func TestWarnKeepsTheOrder(t *testing.T) {
+	r := fullRun()
+	r.warn("a", "first")
+	r.warn("b", "second")
+	if len(r.warnings) != 2 || r.warnings[0] != (warning{"a", "first"}) || r.warnings[1] != (warning{"b", "second"}) {
+		t.Errorf("got %v, want a then b", r.warnings)
+	}
+}
+
+func TestUsageNamesTheRuleAndExitsTwo(t *testing.T) {
+	err := usage("some-rule", "what broke")
+	if got := cli.ExitCode(err); got != 2 {
+		t.Errorf("exit %d, want 2", got)
+	}
+	if !strings.Contains(err.Error(), "some-rule: what broke") {
+		t.Errorf("got %q, want the slug and the message", err)
 	}
 }

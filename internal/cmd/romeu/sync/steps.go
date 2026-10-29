@@ -27,16 +27,16 @@ type step struct {
 // docs/plan.md): a task that adds a step edits this slice by one line.
 // Step 9 (live changes) stays dark until T047.
 var steps = []step{
-	{1, "lock, settings and gate 1", lockAndCheck},
-	{2, "fetch the config repo", fetchConfig},
-	{3, "read and validate the specs", readSpecs},
-	{4, "create the tree and fetch the repos", makeTree},
-	{5, "check the memory dirs", checkMemory},
-	{6, "read descriptors and render the candidate", renderCandidate},
-	{7, "check the live files for drift", checkDrift},
-	{8, "gate 2 and promote", gateAndPromote},
-	{9, "apply live changes", skipLive},
-	{10, "report orphans and the julieta pin", report},
+	{n: 1, name: "lock, settings and gate 1", do: lockAndCheck},
+	{n: 2, name: "fetch the config repo", do: fetchConfig},
+	{n: 3, name: "read and validate the specs", do: readSpecs},
+	{n: 4, name: "create the tree and fetch the repos", do: makeTree},
+	{n: 5, name: "check the memory dirs", do: checkMemory},
+	{n: 6, name: "read descriptors and render the candidate", do: renderCandidate},
+	{n: 7, name: "check the live files for drift", do: checkDrift},
+	{n: 8, name: "gate 2 and promote", do: gateAndPromote},
+	{n: 9, name: "apply live changes", do: skipLive},
+	{n: 10, name: "report orphans and the julieta pin", do: report},
 }
 
 // errNotBuilt is what a step returns until its slice of T043 lands.

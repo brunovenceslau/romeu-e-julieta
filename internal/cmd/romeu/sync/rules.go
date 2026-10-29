@@ -6,6 +6,7 @@
 package sync
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -19,8 +20,9 @@ import (
 type rule struct {
 	// name is the rule's slug, unique in the registry.
 	name string
-	// check returns why t breaks the rule, or nil.
-	check func(r *run, t *target) error
+	// check returns why t breaks the rule, or nil. A rule that only
+	// warns records the warning with r.warn and returns nil.
+	check func(ctx context.Context, r *run, t *target) error
 }
 
 // rules is the registry register fills during initialization; nothing
@@ -43,12 +45,12 @@ func register(ru rule) rule {
 
 // checkRules runs every registered rule on t, in the order of the
 // rules' names, and returns the first error.
-func checkRules(r *run, t *target) error {
+func checkRules(ctx context.Context, r *run, t *target) error {
 	sorted := slices.SortedFunc(slices.Values(rules), func(a, b rule) int {
 		return strings.Compare(a.name, b.name)
 	})
 	for _, ru := range sorted {
-		if err := ru.check(r, t); err != nil {
+		if err := ru.check(ctx, r, t); err != nil {
 			return err
 		}
 	}
