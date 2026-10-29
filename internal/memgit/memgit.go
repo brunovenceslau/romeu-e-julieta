@@ -1,0 +1,268 @@
+// SPDX-FileCopyrightText: 2026 Bruno Venceslau
+// SPDX-License-Identifier: GPL-3.0-only
+
+//go:build unix
+
+// Package memgit keeps the durable copy of a project's memory (08 8.1,
+// REQ-1303, REQ-1304; ADR 0043): the private git repository memory.remote
+// names, whose git dir is <name>-env/memory.git and whose work tree is
+// <name>-env/memory/. romeu runs Sync as the last step of sync, run,
+// pull, salvage, rm, recreate and retire: it fetches the remote,
+// fast-forwards to it, commits entries/ and stamps/ of every memory dir
+// and nothing else, and pushes main with gitsafe's one push (I18). A
+// remote that refuses, or a history that cannot fast-forward, is a
+// warning, never a refusal: the command's work is done, and the next
+// command pushes again. Every git call runs through gitsafe in host
+// mode, with the identity and the key passed per call (I2).
+package memgit
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
+)
+
+// The warnings of 04 4.1 this package returns, by slug.
+const (
+	// SlugLocal: the spec keeps memory on this machine only
+	// (memory.remote: none).
+	SlugLocal = "memory-local"
+	// SlugUnsigned: the commits are unsigned, since host settings hold
+	// no signing socket or the project names no signing key.
+	SlugUnsigned = "memory-unsigned"
+	// SlugDiverged: the remote's main and the local one cannot be
+	// fast-forwarded one to the other; nothing was committed or pushed.
+	SlugDiverged = "memory-diverged"
+	// SlugPushFailed: the fetch or the push of the remote failed.
+	SlugPushFailed = "memory-push-failed"
+)
+
+// Warning is one warning for the command's output: a slug of 04 4.1
+// and its message.
+type Warning struct {
+	Slug, Message string
+}
+
+// Project is what Sync needs of a project: its spec and host settings,
+// resolved by the caller.
+type Project struct {
+	// Name is the project's name, the author of each commit.
+	Name string
+	// EnvDir is the project's tree, <root>/<name>-env.
+	EnvDir string
+	// Remote is memory.remote: a URL gitsafe accepts, or none.
+	Remote string
+	// SigningKey is the project's signing key, an OpenSSH public key
+	// line, or empty.
+	SigningKey string
+	// AgentSocket is signing.agentSocket of host settings, or empty.
+	AgentSocket string
+}
+
+// none is the value of memory.remote that opts out (spec.MemoryNone).
+const none = "none"
+
+// The paths below EnvDir.
+const (
+	gitDirName   = "memory.git"
+	workTreeName = "memory"
+)
+
+// remoteRef is where the fetch writes the remote's branches: a host
+// fetch destination of gitsafe (05 5.1, I5), under the reserved dir
+// name memory, which no repo dir can take (REQ-0176).
+const (
+	remoteRefs = "refs/romeu/origin/memory/"
+	remoteMain = remoteRefs + "main"
+	localMain  = "refs/heads/main"
+)
+
+// exclude is the ignore rule Sync writes into the git dir's
+// info/exclude, never into the memory dir: every path of the work tree
+// but entries/ and stamps/ of each memory dir is left out, and so are
+// julieta's temporary files (08 8.1, REQ-0654). snapshot/ and salvage/
+// are secret-bearing (08 8.5) and never leave the machine this way.
+const exclude = `# Written by romeu (08 8.1): only entries/ and stamps/ of each memory dir.
+/*
+!/*/
+/*/*
+!/*/entries/
+!/*/stamps/
+.tmp-*
+`
+
+// Notices returns the warnings sync, run and doctor print every time
+// for p (REQ-1304, REQ-1305): memory-local when the spec opts out, and
+// memory-unsigned when the commits would be unsigned.
+func Notices(p Project) []Warning {
+	if p.Remote == none {
+		return []Warning{{SlugLocal, "the memory of " + p.Name + " is kept on this machine only (memory.remote: none)"}}
+	}
+	if p.SigningKey == "" || p.AgentSocket == "" {
+		return []Warning{{SlugUnsigned, "the memory commits of " + p.Name + " are unsigned: host settings name no signing.agentSocket, or the project no signing key"}}
+	}
+	return nil
+}
+
+// Separate returns the memory repository of p.
+func (p Project) Separate() gitsafe.Separate {
+	return gitsafe.Separate{GitDir: filepath.Join(p.EnvDir, gitDirName), WorkTree: filepath.Join(p.EnvDir, workTreeName)}
+}
+
+// Sync commits and pushes the memory of p with g, a host-mode runner,
+// and returns the warnings for the command's output. A project whose
+// spec opts out does nothing. An error is a failure of the machine's
+// own repository (the git dir, the excludes, a commit), which the
+// caller reports; what the remote does is a warning.
+//
+// The steps, in order: the git dir is made when absent, and the memory
+// dir too; the excludes are written; the remote is fetched; a remote
+// that moved on is fast-forwarded to, after its tree passes gitsafe's
+// Fsck and WalkTree and holds nothing but entries/ and stamps/ files,
+// and an empty memory dir takes the remote's history so (the clone into
+// place of REQ-1305); a history that cannot fast-forward is
+// memory-diverged and stops Sync; entries/ and stamps/ are staged and,
+// when the index changed, committed; main is pushed when it is not the
+// remote's.
+func Sync(ctx context.Context, g *gitsafe.Runner, p Project) ([]Warning, error) {
+	if p.Remote == none {
+		return nil, nil
+	}
+	s := p.Separate()
+	if err := os.Mkdir(s.WorkTree, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
+		return nil, fmt.Errorf("memgit: the memory dir: %w", err)
+	}
+	switch _, err := os.Lstat(s.GitDir); {
+	case errors.Is(err, fs.ErrNotExist):
+		if err := g.InitSeparate(ctx, s); err != nil {
+			return nil, fmt.Errorf("memgit: %w", err)
+		}
+	case err != nil:
+		return nil, fmt.Errorf("memgit: the git dir: %w", err)
+	}
+	if err := writeExclude(s.GitDir); err != nil {
+		return nil, err
+	}
+	if err := g.Fetch(ctx, s.GitDir, p.Remote, []string{"+refs/heads/*:" + remoteRefs + "*"}); err != nil {
+		return []Warning{{SlugPushFailed, "the fetch of " + p.Remote + " failed, so nothing was committed or pushed: " + err.Error()}}, nil
+	}
+	remote, hasRemote, err := g.RefOID(ctx, s.GitDir, remoteMain)
+	if err != nil {
+		return nil, fmt.Errorf("memgit: %w", err)
+	}
+	local, hasLocal, err := g.RefOID(ctx, s.GitDir, localMain)
+	if err != nil {
+		return nil, fmt.Errorf("memgit: %w", err)
+	}
+	if hasRemote && remote != local {
+		w, err := catchUp(ctx, g, s, p, remote, local, hasLocal)
+		if w != nil || err != nil {
+			return w, err
+		}
+	}
+	if err := g.AddAll(ctx, s); err != nil {
+		return nil, fmt.Errorf("memgit: %w", err)
+	}
+	changed, err := g.StagedChanges(ctx, s)
+	if err != nil {
+		return nil, fmt.Errorf("memgit: %w", err)
+	}
+	if changed {
+		id := gitsafe.Identity{Name: p.Name}
+		if p.SigningKey != "" && p.AgentSocket != "" {
+			id.SigningKey, id.AgentSocket = p.SigningKey, p.AgentSocket
+		}
+		if err := g.Commit(ctx, s, id, "romeu: the memory of "+p.Name); err != nil {
+			return nil, fmt.Errorf("memgit: %w", err)
+		}
+	}
+	head, hasHead, err := g.RefOID(ctx, s.GitDir, localMain)
+	if err != nil {
+		return nil, fmt.Errorf("memgit: %w", err)
+	}
+	if !hasHead || (hasRemote && head == remote) {
+		return nil, nil // nothing to push (REQ-0277)
+	}
+	if err := g.Push(ctx, s.GitDir, p.Remote); err != nil {
+		return []Warning{{SlugPushFailed, "the push to " + p.Remote + " failed; the next command pushes again: " + err.Error()}}, nil
+	}
+	return nil, nil
+}
+
+// catchUp brings the local main to remote when it is behind, or unborn,
+// and leaves it when it is ahead. It returns memory-diverged when
+// neither holds, when the remote's tree holds what the memory dir may
+// not, or when the fast-forward fails; Sync then stops, having
+// committed and pushed nothing and rewritten nothing.
+func catchUp(ctx context.Context, g *gitsafe.Runner, s gitsafe.Separate, p Project, remote, local string, hasLocal bool) ([]Warning, error) {
+	if hasLocal {
+		ahead, err := g.IsAncestor(ctx, s.GitDir, remote, local)
+		if err != nil {
+			return nil, fmt.Errorf("memgit: %w", err)
+		}
+		if ahead {
+			return nil, nil
+		}
+		behind, err := g.IsAncestor(ctx, s.GitDir, local, remote)
+		if err != nil {
+			return nil, fmt.Errorf("memgit: %w", err)
+		}
+		if !behind {
+			return diverged(p, "the local main and the remote's have diverged"), nil
+		}
+	}
+	if err := g.Fsck(ctx, s.GitDir, remote); err != nil {
+		return diverged(p, "the remote's main fails git fsck: "+err.Error()), nil
+	}
+	files, err := g.WalkTree(ctx, s.GitDir, remote)
+	if err != nil {
+		return diverged(p, "the remote's main fails the tree walk: "+err.Error()), nil
+	}
+	for _, f := range files {
+		if !committed(f.Path) {
+			return diverged(p, "the remote's main holds "+f.Path+", which is not a file of entries/ or stamps/ of a memory dir"), nil
+		}
+	}
+	if err := g.FastForwardSeparate(ctx, s, remote); err != nil {
+		return diverged(p, "the memory dir cannot be fast-forwarded to the remote's main: "+err.Error()), nil
+	}
+	return nil, nil
+}
+
+// diverged is the warning memory-diverged for p.
+func diverged(p Project, why string) []Warning {
+	return []Warning{{SlugDiverged, why + "; nothing of " + p.Name + " was committed or pushed, and the operator merges by hand"}}
+}
+
+// committed reports whether path, a slash path of a tree, is one the
+// memory repository holds: <dir>/entries/<file> or <dir>/stamps/<file>,
+// no dotfile.
+func committed(path string) bool {
+	parts := strings.Split(path, "/")
+	return len(parts) == 3 && (parts[1] == "entries" || parts[1] == "stamps") && !strings.HasPrefix(parts[2], ".")
+}
+
+// writeExclude writes the excludes into gitDir/info/exclude when the
+// file does not hold them yet, so a run that changes nothing writes
+// nothing.
+func writeExclude(gitDir string) error {
+	info := filepath.Join(gitDir, "info")
+	if err := os.Mkdir(info, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
+		return fmt.Errorf("memgit: the excludes: %w", err)
+	}
+	path := filepath.Join(info, "exclude")
+	if have, err := os.ReadFile(path); err == nil && bytes.Equal(have, []byte(exclude)) {
+		return nil
+	}
+	if err := os.WriteFile(path, []byte(exclude), 0o600); err != nil {
+		return fmt.Errorf("memgit: the excludes: %w", err)
+	}
+	return nil
+}
