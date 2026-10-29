@@ -125,6 +125,10 @@ func (r review) findings() []string {
 			continue
 		}
 		lineFor[l.id] = true
+		if !r.touched(globs[l.id]) {
+			// An untouched surface's line is accepted as it is (REQ-1157).
+			continue
+		}
 		ok, msg := r.grant(l)
 		if msg != "" {
 			out = append(out, msg)

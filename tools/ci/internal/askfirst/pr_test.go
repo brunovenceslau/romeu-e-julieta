@@ -22,6 +22,9 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
+// The tests of approvals.go, grants.go and pr.go live here, each named
+// TestPR..., so the Verify line of T180, -run '^TestPR', runs them all.
+
 // prList is the ask-first list of the fixtures: the list itself, the
 // decisions and kits surfaces, a grantable one, and one whose glob tests
 // that "**" matches zero segments.
@@ -122,6 +125,7 @@ func TestPRApprovalLine(t *testing.T) {
 		{"a ticked line outside the alert", "Some text.\n\n" + validLine + "\n", "", noLine},
 		{"a line after the alert ends", alert() + "\n" + validLine + "\n", "", noLine},
 		{"two alerts", alert(validLine) + "\n" + alert(), "", twoAlerts},
+		{"text before the prefix", alert("> - [x] see Approval: decisions - " + phrase), "", malformed},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -157,6 +161,7 @@ func TestPRGrantLine(t *testing.T) {
 		name, line, changed, want string
 	}{
 		{"a grant the file holds", "> - [ ] Approval: checks - granted at M0 for T013", "tools/ci/x.go", ""},
+		{"a grant that does not hold on an untouched surface", "> - [ ] Approval: checks - granted at M1 for T013", "README.md", ""},
 		{"a grant the file holds, ticked", "> - [x] Approval: checks - granted at M0 for T013", "tools/ci/x.go", ""},
 		{"a grant the file lacks", "> - [ ] Approval: checks - granted at M1 for T013", "tools/ci/x.go", "which docs/grants.yaml at the base does not hold"},
 		{"a grant the file lacks, ticked", "> - [x] Approval: checks - granted at M0 for T999", "tools/ci/x.go", "which docs/grants.yaml at the base does not hold"},
@@ -299,13 +304,77 @@ func TestPRReadsTheRangeFromGit(t *testing.T) {
 		head := r.Commit("checks")
 		assert.Empty(t, judge(t, r, PR{BaseSHA: base, HeadSHA: head, Body: alert("> - [ ] Approval: checks - granted at M0 for T013")}))
 	})
+	t.Run("a gitlink under a glob touches its surface", func(t *testing.T) {
+		r, base := prRepo(t)
+		r.Git("update-index", "--add", "--cacheinfo", "160000,"+base+",kits/sub")
+		r.Git("commit", "--quiet", "--message", "a gitlink")
+		head := strings.TrimSpace(r.Git("rev-parse", "HEAD"))
+		got := judge(t, r, PR{BaseSHA: base, HeadSHA: head})
+		require.Len(t, got, 1, "%q", got)
+		assert.Contains(t, got[0], `touches "kits"`)
+	})
+	t.Run("a change main made after the fork is not the head's", func(t *testing.T) {
+		r, _ := prRepo(t)
+		r.Git("checkout", "--quiet", "-b", "topic")
+		r.Write("notes.txt", "x\n")
+		head := r.Commit("topic")
+		r.Git("checkout", "--quiet", "main")
+		r.Write("docs/adr/0002-new.md", "new\n")
+		base := r.Commit("main moves")
+		assert.Empty(t, judge(t, r, PR{BaseSHA: base, HeadSHA: head}))
+	})
+	t.Run("a surface the head adds needs its line", func(t *testing.T) {
+		r, base := prRepo(t)
+		r.Write(Path, prList+"  - id: added\n    globs: [new/**]\n    reason: added\n")
+		r.Write("new/x.txt", "x\n")
+		head := r.Commit("add a surface")
+		got := judge(t, r, PR{BaseSHA: base, HeadSHA: head, Body: alert("> - [x] Approval: ask-first - add a surface")})
+		require.Len(t, got, 1, "%q", got)
+		assert.Contains(t, got[0], `touches "added" and the alert has no approval line`)
+		assert.Empty(t, judge(t, r, PR{BaseSHA: base, HeadSHA: head, Body: alert(
+			"> - [x] Approval: ask-first - add a surface", "> - [x] Approval: added - its first file")}))
+	})
+	t.Run("a head that deletes the list is judged by the base's", func(t *testing.T) {
+		r, base := prRepo(t)
+		r.Git("rm", "--quiet", Path)
+		head := r.Commit("delete the list")
+		got := judge(t, r, PR{BaseSHA: base, HeadSHA: head})
+		require.Len(t, got, 1, "%q", got)
+		assert.Contains(t, got[0], `touches "ask-first"`)
+	})
+	t.Run("a head whose grants do not parse fails", func(t *testing.T) {
+		r, base := prRepo(t)
+		r.Write(GrantsPath, strings.Replace(prGrants, "[T013]", "[T999]", 1))
+		head := r.Commit("a grant of no task")
+		got := judge(t, r, PR{BaseSHA: base, HeadSHA: head, Body: alert("> - [x] Approval: ask-first - a grant")})
+		require.Len(t, got, 1, "%q", got)
+		assert.Contains(t, got[0], `at the head: docs/grants.yaml: the grant of M0 on "checks" names "T999"`)
+	})
+	t.Run("a base whose grants do not parse holds none", func(t *testing.T) {
+		r := gittest.New(t)
+		r.Write(Path, prList)
+		r.Write(GrantsPath, "version: 2\n")
+		base := r.Commit("a broken base")
+		r.Write(GrantsPath, prGrants)
+		r.Write("docs/plan/tasks/T013-a-task.md", "x\n")
+		r.Write("tools/ci/x.go", "package main\n")
+		head := r.Commit("fix the grants")
+		got := judge(t, r, PR{BaseSHA: base, HeadSHA: head, Body: alert(
+			"> - [x] Approval: ask-first - fix the grants", "> - [ ] Approval: checks - granted at M0 for T013")})
+		require.Len(t, got, 1, "%q", got)
+		assert.Contains(t, got[0], "which docs/grants.yaml at the base does not hold")
+		got = judge(t, r, PR{BaseSHA: base, HeadSHA: head, Body: alert(
+			"> - [x] Approval: ask-first - fix the grants", "> - [x] Approval: checks - a check")})
+		assert.Empty(t, got)
+	})
 }
 
 // TestPRPayload holds the two shapes of REQ-0817 and each of the seven
 // fields.
 func TestPRPayload(t *testing.T) {
-	const obj = `{"title":"t","body":"b","head":{"ref":"topic","sha":"h"},"base":{"sha":"s","ref":"main","repo":{"default_branch":"main"}}}`
-	want := PR{Title: "t", Body: "b", HeadRef: "topic", HeadSHA: "h", BaseSHA: "s", BaseRef: "main", DefaultBranch: "main"}
+	h, b := strings.Repeat("a", 40), strings.Repeat("b", 64)
+	obj := `{"title":"t","body":"b","head":{"ref":"topic","sha":"` + h + `"},"base":{"sha":"` + b + `","ref":"main","repo":{"default_branch":"main"}}}`
+	want := PR{Title: "t", Body: "b", HeadRef: "topic", HeadSHA: h, BaseSHA: b, BaseRef: "main", DefaultBranch: "main"}
 	t.Run("the pull request object", func(t *testing.T) {
 		got, err := ParsePayload([]byte(obj))
 		require.NoError(t, err)
@@ -326,8 +395,10 @@ func TestPRPayload(t *testing.T) {
 		{"a null title", `"title":"t"`, `"title":null`, "title is not a string"},
 		{"no body", `"body":"b",`, ``, "no body"},
 		{"no head.ref", `"ref":"topic",`, ``, "no head.ref"},
-		{"no head.sha", `,"sha":"h"`, ``, "no head.sha"},
-		{"no base.sha", `"sha":"s",`, ``, "no base.sha"},
+		{"no head.sha", `,"sha":"` + h + `"`, ``, "no head.sha"},
+		{"no base.sha", `"sha":"` + b + `",`, ``, "no base.sha"},
+		{"a revision for head.sha", `"sha":"` + h + `"`, `"sha":"main"`, "head.sha is not a full commit id"},
+		{"a short base.sha", `"sha":"` + b + `"`, `"sha":"` + b[:12] + `"`, "base.sha is not a full commit id"},
 		{"no base.ref", `"ref":"main",`, ``, "no base.ref"},
 		{"no base.repo.default_branch", `{"default_branch":"main"}`, `{}`, "no base.repo.default_branch"},
 		{"a number for a string", `"title":"t"`, `"title":1`, "title is not a string"},
@@ -359,6 +430,10 @@ func TestPRRun(t *testing.T) {
 	r, base := prRepo(t)
 	r.Git("remote", "add", "origin", filepath.Join(t.TempDir(), "gone"))
 	r.Git("update-ref", "refs/remotes/origin/main", base)
+	// Local main moves past origin/main, so a run that took main for the
+	// base instead of origin/main would read a different range.
+	r.Write("kits/k.txt", "k\n")
+	r.Commit("local main moves")
 	r.Git("checkout", "--quiet", "-b", "topic")
 	r.Write("docs/adr/0002-new.md", "new\n")
 	head := r.Commit("a record")
@@ -373,12 +448,17 @@ func TestPRRun(t *testing.T) {
 		return ok, out.String()
 	}
 	t.Run("a local run that passes", func(t *testing.T) {
-		ok, out := run(t, alert(validLine), "--title", "docs: a record", "--body", bodyFile)
+		ok, out := run(t, alert(validLine), "--title", "docs: a record", "--body", bodyFile, "--base", "main")
 		assert.True(t, ok, out)
 		assert.Equal(t, "pr: ok\n", out)
 	})
+	t.Run("the default base is origin/main", func(t *testing.T) {
+		ok, out := run(t, alert(validLine), "--title", "docs: a record", "--body", bodyFile)
+		assert.False(t, ok)
+		assert.Contains(t, out, `the diff touches "kits"`)
+	})
 	t.Run("a local run that fails", func(t *testing.T) {
-		ok, out := run(t, alert("> - [ ] Approval: decisions - "+"amend rule 8"), "--title", "docs: a record", "--body", bodyFile)
+		ok, out := run(t, alert("> - [ ] Approval: decisions - "+"amend rule 8"), "--title", "docs: a record", "--body", bodyFile, "--base", "main")
 		assert.False(t, ok)
 		assert.Contains(t, out, "pull request body: pr: the diff touches \"decisions\" and its approval line is not ticked")
 		assert.Contains(t, out, "pr: 1 finding(s)")
@@ -417,8 +497,9 @@ func TestPRTemplateHasNoApprovalLine(t *testing.T) {
 
 // TestPROneReader holds invariant (e) of T005's acceptance, which T180
 // takes: pr and the CODEOWNERS generator read .github/ask-first.yaml with
-// the one reader, Parse, and pr reads docs/grants.yaml with ParseGrants;
-// no other function of the package decodes YAML. A reader inlined into
+// the one reader, Parse, and pr reads docs/grants.yaml with ParseGrants
+// (no generator reads the grants); no other function of the package
+// decodes YAML. A reader inlined into
 // either caller turns it red.
 func TestPROneReader(t *testing.T) {
 	fset := token.NewFileSet()

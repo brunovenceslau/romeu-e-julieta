@@ -512,13 +512,12 @@ checklist line per touched surface:
 ```
 
 The maintainer approves a line by ticking its box: the tick, not the
-line, is the approval, and only the maintainer ticks. A tick in the
-pull request's page saves the line as `> - [x] ` and starts the
-`edited` event of the pull request (measured on 2026-10-29 on a
-throwaway pull request, for the `pull_request` event).
+line, is the approval, and only the maintainer ticks. Measured on 2026-10-29 on a throwaway pull
+request: a tick in the pull request's page saves the line as `> - [x] `
+and fires the `edited` event of `pull_request`.
 `REQ-1145` The phrase after the dash names what is asked, in a few neutral
-words, and no person: for example `> - [ ] Approval: decisions - amend
-rule 8 of ADR 0001`. `REQ-1146` Before the body is read, each HTML comment is removed, from
+words, and no person: for example
+`> - [ ] Approval: decisions - amend rule 8 of ADR 0001`. `REQ-1146` Before the body is read, each HTML comment is removed, from
 `<!--` to the next `-->`, or to the end of the body when no `-->`
 follows: a reviewer reads the rendered pull request, where a comment
 does not show, so a line inside a comment does not count. `REQ-1147` The body is
@@ -581,9 +580,12 @@ the object is missing, which relies on the repository being public
 ([10 10.2](10-testing-style.md#102-ci)), and never builds or runs them:
 every git call of `pr` on head objects passes `-c
 core.hooksPath=/dev/null`; `fetch` passes `--no-recurse-submodules`;
-`diff`, `log` and `show` pass `--no-ext-diff --no-textconv
---ignore-submodules=all` (git 2.53.0, read on 2026-10-09, rejects
-`--no-recurse-submodules` for `diff` and `log`); `pr` never runs
+`diff`, `log` and `show` pass `--no-ext-diff --no-textconv`, and `log`
+and `show` also `--ignore-submodules=all` (git 2.53.0, read on
+2026-10-09, rejects `--no-recurse-submodules` for `diff` and `log`);
+the diff that lists the changed paths does not pass it, since it drops
+a gitlink entry from that list (git 2.53.0, measured on 2026-10-29),
+and a diff of two trees opens no submodule; `pr` never runs
 `checkout` or `archive` on the head, and its diffs are tree to tree,
 with `.gitattributes` read from the default branch's work tree. `REQ-1153` The job
 runs the runner image's git, which no pin holds, so a `pr` test runs
@@ -647,7 +649,8 @@ surface, so a grant is itself an ask-first change. `REQ-1160` The file is `versi
 1` and `grants:`, a list of entries `{sitting: <sitting id of the plan>,
 surface: <grantable surface id>, tasks: [<task id>, ...]}`; an entry for
 a surface outside the grantable list, or a task id the plan does not
-define, fails `pr`. `REQ-1161` A pull request for one of those tasks carries the
+define, fails `pr` when the head's file holds it; a base whose file
+does not parse holds no grant. `REQ-1161` A pull request for one of those tasks carries the
 approval line with the phrase `granted at <sitting> for <task id>`,
 ticked or not, since the grant is the approval (decided on 2026-10-29);
 `pr` reads `docs/grants.yaml` at the base commit and accepts the line

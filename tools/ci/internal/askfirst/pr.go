@@ -13,7 +13,6 @@ import (
 	"io"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
@@ -33,8 +32,13 @@ type PR struct {
 const tasksDir = "docs/plan/tasks"
 
 // taskFile is the name of a task file under tasksDir: its id, then a
-// slug.
+// slug. The plan numbers tasks with three digits (docs/plan.md, "Where
+// the tasks are"); a fourth digit would need this pattern changed.
 var taskFile = regexp.MustCompile(`^(T[0-9]{3})-[^/]*\.md$`)
+
+// objectID is a full commit id, SHA-1 or SHA-256, as a payload carries
+// it: a payload names commits by id, not by revision.
+var objectID = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
 
 // localBase is the base of a local run with --title and --body when
 // --base names none: the default branch as the last fetch saw it.
@@ -77,6 +81,11 @@ func ParsePayload(src []byte) (PR, error) {
 	}
 	if len(errs) > 0 {
 		return PR{}, fmt.Errorf("the payload is neither a pull request nor its event: %w", errors.Join(errs...))
+	}
+	for _, id := range []struct{ name, value string }{{"head.sha", pr.HeadSHA}, {"base.sha", pr.BaseSHA}} {
+		if !objectID.MatchString(id.value) {
+			return PR{}, fmt.Errorf("the payload's %s is not a full commit id: %q", id.name, id.value)
+		}
 	}
 	return pr, nil
 }
@@ -176,11 +185,11 @@ func judgePR(ctx context.Context, r git.Repo, pr PR) ([]check.Finding, error) {
 	if err != nil {
 		return nil, err
 	}
-	out, err := read(ctx, r, "rev-list", "--count", base+".."+head)
+	out, err := read(ctx, r, "rev-list", "--max-count=1", base+".."+head)
 	if err != nil {
 		return nil, err
 	}
-	if n, err := strconv.Atoi(strings.TrimSpace(string(out))); err != nil || n == 0 {
+	if len(bytes.TrimSpace(out)) == 0 {
 		return []check.Finding{{Where: "pull request", Rule: "pr", Msg: "the walk from base.sha to head.sha finds no commit"}}, nil
 	}
 	changed, err := changedPaths(ctx, r, base, head)
@@ -198,12 +207,18 @@ func judgePR(ctx context.Context, r git.Repo, pr PR) ([]check.Finding, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The grants of the base decide; a base whose file does not parse
+	// holds no grant, so only a line that names one fails. The head's
+	// file is checked, so a pull request cannot merge a file that breaks.
 	grants, err := readGrants(ctx, r, base)
 	if err != nil {
-		return nil, err
+		grants = nil
+	}
+	var findings []check.Finding
+	if _, err := readGrants(ctx, r, head); err != nil {
+		findings = append(findings, check.Finding{Where: GrantsPath, Rule: "pr", Msg: "at the head: " + err.Error()})
 	}
 	rv := review{body: pr.Body, base: baseList, head: headList, changed: changed, grants: grants}
-	var findings []check.Finding
 	for _, msg := range rv.findings() {
 		findings = append(findings, check.Finding{Where: "pull request body", Rule: "pr", Msg: msg})
 	}
@@ -229,14 +244,31 @@ func commit(ctx context.Context, r git.Repo, rev string) (string, error) {
 
 // changedPaths returns the paths that differ between the merge base of
 // base and head, and head, both names of a rename included (REQ-0818):
-// a merge of the default branch into the head adds none.
+// a merge of the default branch into the head adds none. A criss-cross
+// history has more than one best merge base; the paths of each are
+// joined, so a path that differs from any of them counts.
 func changedPaths(ctx context.Context, r git.Repo, base, head string) ([]string, error) {
-	mb, err := read(ctx, r, "merge-base", base, head)
+	out, err := read(ctx, r, "merge-base", "--all", base, head)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("base.sha and head.sha have no merge base in this clone (a shallow clone needs a deeper fetch): %w", err)
 	}
-	out, err := read(ctx, r, "diff", "--name-status", "-z", "-M", "--no-ext-diff", "--no-textconv",
-		"--ignore-submodules=all", strings.TrimSpace(string(mb)), head)
+	var paths []string
+	for mb := range strings.FieldsSeq(string(out)) {
+		p, err := diffPaths(ctx, r, mb, head)
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, p...)
+	}
+	return paths, nil
+}
+
+// diffPaths returns the paths of the tree-to-tree diff from one to two.
+// It passes no --ignore-submodules: that option drops a gitlink entry
+// from the list (git 2.53.0, measured on 2026-10-29), and a diff of two
+// trees opens no submodule.
+func diffPaths(ctx context.Context, r git.Repo, one, two string) ([]string, error) {
+	out, err := read(ctx, r, "diff", "--name-status", "-z", "-M", "--no-ext-diff", "--no-textconv", one, two)
 	if err != nil {
 		return nil, err
 	}
