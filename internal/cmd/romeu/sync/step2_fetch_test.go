@@ -153,7 +153,6 @@ func TestFetchConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			is := assert.New(t)
 			c := newConfig(t, map[string]string{"projects/cfg.yaml": "first"})
 			f := fixture{c: c, first: gitIn(t, c.origin, "rev-parse", "HEAD")}
 			f.head = commitFiles(t, c.origin, map[string]string{"projects/cfg.yaml": "second"})
@@ -167,17 +166,17 @@ func TestFetchConfig(t *testing.T) {
 
 			if tt.slug != "" {
 				require.Error(t, err)
-				is.Equal(2, cli.ExitCode(err))
-				is.Contains(err.Error(), tt.slug+": ")
-				is.Empty(r.specCommit)
+				assert.Equal(t, 2, cli.ExitCode(err))
+				assert.Contains(t, err.Error(), tt.slug+": ")
+				assert.Empty(t, r.specCommit)
 				return
 			}
 			require.NoError(t, err)
-			is.Equal(tt.want(f), r.specCommit)
-			is.Equal(c.clone, r.configClone)
-			is.NotNil(r.git)
-			is.Equal([][]string{{"https://github.com/owner/cfg", "+refs/heads/*:refs/romeu/origin/cfg/*"}}, c.fetched)
-			is.Equal(f.head, gitIn(t, c.clone, "rev-parse", "refs/romeu/origin/cfg/main"))
+			assert.Equal(t, tt.want(f), r.specCommit)
+			assert.Equal(t, c.clone, r.configClone)
+			assert.NotNil(t, r.git)
+			assert.Equal(t, [][]string{{"https://github.com/owner/cfg", "+refs/heads/*:refs/romeu/origin/cfg/*"}}, c.fetched)
+			assert.Equal(t, f.head, gitIn(t, c.clone, "rev-parse", "refs/romeu/origin/cfg/main"))
 		})
 	}
 }

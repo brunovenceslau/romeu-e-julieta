@@ -172,7 +172,6 @@ func TestLockAndCheck(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			is := assert.New(t)
 			h := newHost(t)
 			tt.arrange(t, h)
 			r := h.run(flags{})
@@ -182,16 +181,16 @@ func TestLockAndCheck(t *testing.T) {
 
 			if tt.id == "" {
 				require.NoError(t, err)
-				is.NotNil(r.lock, "step 1 holds the lock")
-				is.Equal(h.root, r.settings.Root)
-				is.Equal(h.home, r.home)
+				assert.NotNil(t, r.lock, "step 1 holds the lock")
+				assert.Equal(t, h.root, r.settings.Root)
+				assert.Equal(t, h.home, r.home)
 			} else {
 				require.Error(t, err)
-				is.Equal(tt.id, cli.Of(err).ID, err.Error())
-				is.Equal(tt.exit, cli.ExitCode(err))
+				assert.Equal(t, tt.id, cli.Of(err).ID, err.Error())
+				assert.Equal(t, tt.exit, cli.ExitCode(err))
 			}
 			if !tt.stateWritten {
-				is.NoDirExists(h.state, "step 1 wrote before it refused")
+				assert.NoDirExists(t, h.state, "step 1 wrote before it refused")
 			}
 		})
 	}
@@ -204,7 +203,6 @@ func TestLockAndCheck(t *testing.T) {
 // and the command stops naming the dir. A dir that is not <name>-env/
 // is not read.
 func TestLockAndCheckRunsRecoveryOnEveryEnvDir(t *testing.T) {
-	is := assert.New(t)
 	h := newHost(t)
 	h.acknowledge(t)
 	record := h.interrupt(t, "shop")
@@ -217,7 +215,7 @@ func TestLockAndCheckRunsRecoveryOnEveryEnvDir(t *testing.T) {
 	err := lockAndCheck(t.Context(), r)
 
 	require.ErrorIs(t, err, render.ErrPromotionAbandoned)
-	is.Contains(err.Error(), "shop-env")
-	is.NoFileExists(record, "recovery left the render.json of the abandoned first promotion")
-	is.FileExists(other)
+	assert.Contains(t, err.Error(), "shop-env")
+	assert.NoFileExists(t, record, "recovery left the render.json of the abandoned first promotion")
+	assert.FileExists(t, other)
 }

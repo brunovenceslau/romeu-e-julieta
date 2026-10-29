@@ -124,19 +124,18 @@ func TestReadSpecs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			is := assert.New(t)
 			r := specRun(t, tt.files, tt.flags)
 
 			err := readSpecs(t.Context(), r)
 
 			if tt.id != "" {
 				require.Error(t, err)
-				is.Equal(tt.id, cli.Of(err).ID, err.Error())
-				is.Equal(2, cli.ExitCode(err))
+				assert.Equal(t, tt.id, cli.Of(err).ID, err.Error())
+				assert.Equal(t, 2, cli.ExitCode(err))
 				for _, m := range tt.mentions {
-					is.Contains(err.Error(), m)
+					assert.Contains(t, err.Error(), m)
 				}
-				is.Nil(r.targets)
+				assert.Nil(t, r.targets)
 				return
 			}
 			require.NoError(t, err)
@@ -144,7 +143,7 @@ func TestReadSpecs(t *testing.T) {
 			for _, p := range r.targets {
 				got = append(got, p.Name)
 			}
-			is.Equal(tt.want, got)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -194,7 +193,6 @@ func TestCheckSecrets(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			is := assert.New(t)
 			r := specRun(t, files, flags{names: tt.names})
 
 			err := readSpecs(t.Context(), r)
@@ -205,13 +203,13 @@ func TestCheckSecrets(t *testing.T) {
 			}
 			require.Error(t, err)
 			e := cli.Of(err)
-			is.Equal("RJ-315", e.ID)
-			is.Equal(2, cli.ExitCode(err))
+			assert.Equal(t, "RJ-315", e.ID)
+			assert.Equal(t, 2, cli.ExitCode(err))
 			for _, k := range tt.unbound {
-				is.Contains(err.Error(), k)
+				assert.Contains(t, err.Error(), k)
 			}
-			is.Contains(e.Hint(), "add the entry github@shop")
-			is.Contains(e.Hint(), "romeu sync shop")
+			assert.Contains(t, e.Hint(), "add the entry github@shop")
+			assert.Contains(t, e.Hint(), "romeu sync shop")
 		})
 	}
 }
