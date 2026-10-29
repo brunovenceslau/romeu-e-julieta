@@ -3,7 +3,7 @@ id: T178
 title: "julieta setup trusts each repo's mise configuration and runs its setup task"
 milestone: M2
 module: julieta-core
-fate: new
+fate: merged
 owns:
   - internal/mise/repo_task*.go
   - internal/cmd/julieta/setup/repo_setup*.go
@@ -23,6 +23,8 @@ after:
 ask_first:
   - dependencies
 sitting: none
+merged: 2026-10-29
+pr: 328
 ---
 
 # T178 - julieta setup trusts each repo's mise configuration and runs its setup task

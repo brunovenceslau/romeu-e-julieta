@@ -3,7 +3,7 @@ id: T181
 title: "the base-defined pr job runs tools/ci pr on every pull request"
 milestone: M2
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - .github/workflows/pr.yml
   - .github/workflows/ci.yml
@@ -25,6 +25,8 @@ ask_first:
   - dependencies
   - spec
 sitting: none
+merged: 2026-10-29
+pr: 335
 ---
 
 # T181 - the base-defined pr job runs tools/ci pr on every pull request

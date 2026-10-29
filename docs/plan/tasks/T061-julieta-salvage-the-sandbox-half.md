@@ -3,7 +3,7 @@ id: T061
 title: "`julieta salvage`, the sandbox half"
 milestone: M4
 module: salvage
-fate: kept
+fate: merged
 owns:
   - internal/salvage/capture*.go
   - internal/salvage/fingerprint*.go
@@ -28,6 +28,8 @@ ask_first:
   - gitsafe
   - checks
 sitting: none
+merged: 2026-10-29
+pr: 331
 ---
 
 # T061 - `julieta salvage`, the sandbox half
