@@ -423,9 +423,14 @@ command reads from the checkout (a `go.work`, `go.work.sum` or
 `vendor/`) are decided by the task that builds `pr`, whose acceptance
 lists the requirements that make the invariant hold (decided on
 2026-10-09,
-[round 11](../reviews/round-11.md#decisions-for-the-operator)): until
-that task lands, the invariant is a requirement, not a property of code
-that exists. `REQ-0541` The toolchain pinned by `mise.toml` and `mise.lock`, on
+[round 11](../reviews/round-11.md#decisions-for-the-operator)). The pr
+job builds the approval package of `tools/ci` and what it imports, each
+package on the `approvals` surface (REQ-0539, REQ-1150); it reads the
+head's YAML with the pinned YAML library, and refuses a head that holds
+a `go.work`, `go.work.sum` or `vendor` at its top. The version-pin rules
+of `mise.toml` and `go.mod` applied to the head from the default
+branch's code are not built yet: until they are, that part of the
+invariant is a requirement, not a property of code that exists. `REQ-0541` The toolchain pinned by `mise.toml` and `mise.lock`, on
 `dependencies`, and the `go` line of `go.mod`, which sets the language
 version `pr` is compiled at, stay grantable inputs under the job, and
 that task lists each of them in 5.4; keeping them off the grantable list

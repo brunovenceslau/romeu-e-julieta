@@ -582,8 +582,9 @@ keeps the `GITHUB_SHA` of the original event, so it judges with the old
 code
 ([re-running workflows and jobs](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs),
 read on 2026-10-09). The job reads the head only as git objects: `REQ-1152` `pr`
-fetches `head.sha` without credentials, only in the pr job and only when
-the object is missing, which relies on the repository being public
+fetches `head.sha` without credentials (no credential helper, no askpass
+program, no extra header and no redirect), only in the pr job and only
+when the object is missing, which relies on the repository being public
 ([10 10.2](10-testing-style.md#102-ci)), and never builds or runs them:
 every git call of `pr` on head objects passes `-c
 core.hooksPath=/dev/null`; `fetch` passes `--no-recurse-submodules`;
@@ -609,10 +610,18 @@ with whitespace before the `::` or in the older `##[` form too; fixture
 leading U+00A0 and a `##[` case. `REQ-1154` A required check is matched by name,
 and the head's own `pull_request` workflows run from the head, so `pr`
 compares each head job's check name (its `name`, else its id) with the
-pr job's name and refuses a match outside the pr job's file; refuses a
-head job outside the pr job's file whose `name` holds `${{`, since the
-check name it posts is known only once the run expands the expression,
-with a fixture for a literal expression and one for a matrix value; `REQ-1155` and
+pr job's name, `pr`, without case and spaces around it, and refuses a
+match outside the pr job's file; refuses a head job outside the pr
+job's file whose `name` holds `${{`, since the check name it posts is
+known only once the run expands the expression, with a fixture for a
+literal expression and one for a matrix value, unless the literal text
+before the first `${{`, without spaces around it, is not empty and is no
+prefix of the pr job's name, since an expansion only adds text after it
+(so `static on ${{ matrix.os }}` stays; decided on 2026-10-29,
+provisional, scope this repository); reads each file of the head's
+`.github/workflows` that ends in `.yml` or `.yaml` as an object, and
+refuses one it cannot read as one YAML mapping without anchors, aliases,
+merge keys or a key written twice; `REQ-1155` and
 refuses a head whose version of the pr job's file names an event other
 than `pull_request_target`, with a fixture for each. It reads
 `.github/ask-first.yaml` at the base commit and at the head commit and
