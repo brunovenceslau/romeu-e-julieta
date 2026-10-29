@@ -66,18 +66,23 @@ type statusJSON struct {
 }
 
 // TestJulietaStatus runs julieta status in the workload (04 4.3): with
-// no manifest it exits 2 (REQ-0425); after a setup that moved the
-// primary's default branch, it reads the cached manifest and reports
-// each repo, the spec commit, the egress set romeu applied (07 7.5) and
-// the warning default-branch-moved, in --json and in text.
+// no manifest it exits 2 (REQ-0425); after a setup that fetched a
+// primary whose origin moved on, it reads the cached manifest and
+// reports each repo, its main still at its commit and one behind
+// (REQ-0399), the spec commit and the egress set romeu applied (07 7.5),
+// in --json and in text, with no warning; after a setup whose fetch
+// failed, the warning fetch-failed goes to stderr.
 func TestJulietaStatus(t *testing.T) {
 	steps := scenario(t, `
 step none env -u JULIETA_MANIFEST "$J" status --json
+step old git -C `+primaryPath+` rev-parse HEAD
 step setup env JULIETA_MANIFEST=`+manifestEnv(t, 1, originURL+"api.git")+` "$J" setup
 echo untracked >`+primaryPath+`/new
 step json env -u JULIETA_MANIFEST "$J" status --json
 step text env -u JULIETA_MANIFEST "$J" status
 step tip git -C /tmp/srv/api.git rev-parse main
+step failed env JULIETA_MANIFEST=`+manifestEnv(t, 1, originURL+"gone.git")+` "$J" setup
+step warned env -u JULIETA_MANIFEST "$J" status
 `)
 	r := step(t, steps, "none")
 	assert.Equal(t, 2, r.code, r.stderr)
@@ -85,6 +90,8 @@ step tip git -C /tmp/srv/api.git rev-parse main
 	assert.Equal(t, "RJ-342", errorID(t, r))
 	require.Equal(t, 0, step(t, steps, "setup").code, step(t, steps, "setup").stderr)
 	tip := strings.TrimSpace(step(t, steps, "tip").stdout)
+	old := strings.TrimSpace(step(t, steps, "old").stdout)
+	assert.NotEqual(t, old, tip)
 
 	r = step(t, steps, "json")
 	require.Equal(t, 0, r.code, r.stderr)
@@ -96,19 +103,18 @@ step tip git -C /tmp/srv/api.git rev-parse main
 	assert.Equal(t, strings.Repeat("ab", 20), rep.SpecCommit)
 	assert.Equal(t, []string{"dl.google.com", "github.com"}, rep.Egress)
 	assert.Empty(t, rep.Errors)
-	require.Len(t, rep.Warnings, 1)
-	assert.Equal(t, "default-branch-moved", rep.Warnings[0].Slug)
+	assert.Empty(t, rep.Warnings)
 	require.Len(t, rep.Repos, 2)
 	api, web := rep.Repos[0], rep.Repos[1]
 	assert.Empty(t, api.Errors)
 	assert.Equal(t, primaryPath, api.Path)
 	assert.Equal(t, "main", api.Branch)
-	assert.Equal(t, tip, api.Head)
+	assert.Equal(t, old, api.Head)
 	assert.Equal(t, []string{"untracked"}, api.Dirty)
 	require.Len(t, api.Branches, 1)
 	assert.Equal(t, "refs/remotes/origin/main", api.Branches[0].Upstream)
 	assert.Zero(t, api.Branches[0].Ahead)
-	assert.Zero(t, api.Branches[0].Behind)
+	assert.Equal(t, 1, api.Branches[0].Behind)
 	require.Len(t, api.Worktrees, 1)
 	assert.Equal(t, primaryPath, api.Worktrees[0].Path)
 	assert.Empty(t, api.Stashes)
@@ -122,7 +128,12 @@ step tip git -C /tmp/srv/api.git rev-parse main
 	require.Equal(t, 0, r.code, r.stderr)
 	assert.True(t, strings.HasPrefix(r.stdout, "project  shop\nspec     "+strings.Repeat("ab", 20)+"\negress   dl.google.com github.com\nrepo api  "+primaryPath+"\n"), r.stdout)
 	assert.Contains(t, r.stdout, "  dirty      untracked\n")
-	assert.True(t, strings.HasPrefix(r.stderr, "warning default-branch-moved: api "), "warnings go to stderr: %q", r.stderr)
+	assert.Empty(t, r.stderr)
+
+	require.Equal(t, 0, step(t, steps, "failed").code, "a failed fetch is a warning: %s", step(t, steps, "failed").stderr)
+	r = step(t, steps, "warned")
+	require.Equal(t, 0, r.code, r.stderr)
+	assert.True(t, strings.HasPrefix(r.stderr, "warning fetch-failed: api: "), "warnings go to stderr: %q", r.stderr)
 }
 
 // TestJulietaStatusHookFailures lists a failing git hook in julieta

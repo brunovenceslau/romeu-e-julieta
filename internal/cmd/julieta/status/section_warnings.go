@@ -11,8 +11,7 @@ import (
 )
 
 // The section of julieta's warnings: those the last setup recorded in
-// julieta state, fetch-failed and default-branch-moved among them (04
-// 4.3, REQ-0399), printed on stderr in the text form as setup prints
+// julieta state, fetch-failed among them (04 4.3, REQ-0399), printed on stderr in the text form as setup prints
 // them; the --json document carries them in its warnings.
 var _ = register(section{
 	name:  "warnings",

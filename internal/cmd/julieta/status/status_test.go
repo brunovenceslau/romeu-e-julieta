@@ -36,10 +36,11 @@ func TestStatusWithoutManifest(t *testing.T) {
 	assert.Equal(t, "RJ-342", errorID(t, stderr))
 }
 
-// TestStatusAfterSetup reports, after a setup that moved the primary's
-// default branch, the manifest's project, spec commit and egress set,
-// each repo's branch, HEAD, branch heads with ahead and behind, worktree
-// and clean state, and the warning default-branch-moved (04 4.3,
+// TestStatusAfterSetup reports, after a setup that fetched a primary
+// whose origin moved on, the manifest's project, spec commit and egress
+// set, each repo's branch, HEAD, branch heads with ahead and behind,
+// worktree and clean state, and no warning: setup moved no branch, so
+// main is still at its commit and one behind (04 4.3, REQ-0399,
 // REQ-0424; 07 7.5).
 func TestStatusAfterSetup(t *testing.T) {
 	s := newSandbox(t)
@@ -53,17 +54,18 @@ func TestStatusAfterSetup(t *testing.T) {
 	assert.Equal(t, s.m.SpecCommit, rep.SpecCommit)
 	assert.Equal(t, []string{"dl.google.com", "github.com"}, rep.Egress)
 	assert.Empty(t, rep.Errors)
-	assert.Equal(t, []setup.Warning{{Slug: setup.DefaultBranchMoved, Message: "api " + old + ".." + tip}}, rep.Warnings)
+	assert.Empty(t, rep.Warnings)
 	require.Len(t, rep.Repos, 2)
 	api := rep.Repos[0]
 	assert.Equal(t, status.Repo{
-		Dir: "api", Path: s.primary(), Branch: "main", Head: tip,
-		Branches:  []status.Branch{{Name: "main", Head: tip, Current: true, Upstream: "refs/remotes/origin/main"}},
+		Dir: "api", Path: s.primary(), Branch: "main", Head: old,
+		Branches:  []status.Branch{{Name: "main", Head: old, Behind: 1, Current: true, Upstream: "refs/remotes/origin/main"}},
 		Dirty:     []string{},
 		Errors:    []string{},
 		Stashes:   []status.Stash{},
-		Worktrees: []status.Worktree{{Path: api.Worktrees[0].Path, Head: tip, Branch: "refs/heads/main"}},
+		Worktrees: []status.Worktree{{Path: api.Worktrees[0].Path, Head: old, Branch: "refs/heads/main"}},
 	}, api)
+	assert.NotEqual(t, old, tip)
 	assert.Equal(t, "web", rep.Repos[1].Dir)
 	assert.Empty(t, rep.Repos[1].Errors)
 }

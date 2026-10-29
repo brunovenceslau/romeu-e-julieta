@@ -109,20 +109,21 @@ const (
 	// FetchFailed is a fetch of setup that failed: the repo and the
 	// git error.
 	FetchFailed = "fetch-failed"
-	// DefaultBranchMoved is a fast-forward of a default branch:
-	// "<repo> <old>..<new>".
-	DefaultBranchMoved = "default-branch-moved"
 	// SnapshotsDisabled is a repo whose own config sets core.hooksPath,
 	// so no commit takes a snapshot (08 8.4, REQ-0692): "snapshots
 	// disabled for <dir>".
 	SnapshotsDisabled = "snapshots-disabled"
 )
 
+// retiredDefaultBranchMoved is the slug setup recorded when it moved a
+// default branch, before REQ-0399 said it moves none. A state file of
+// that time may hold it; ReadState drops it, so the next write leaves
+// it out, and the slug is never recorded again.
+const retiredDefaultBranchMoved = "default-branch-moved"
+
 // State is what setup records in julieta state for status and the next
 // SessionStart (04 4.3): when it last ran, the julieta that ran it, and
-// the warnings to show. A fetch-failed warning holds until the next
-// setup; a default-branch-moved one until the SessionStart that shows
-// it clears it (08 8.2).
+// the warnings to show, each held until the next setup (08 8.2).
 type State struct {
 	At       time.Time `json:"at"`
 	Version  string    `json:"version"`
@@ -143,6 +144,7 @@ func ReadState(home string) (State, error) {
 	if err := json.Unmarshal(data, &s, json.RejectUnknownMembers(true)); err != nil {
 		return State{}, fmt.Errorf("julieta state %s: %w", warningsFile, err)
 	}
+	s.Warnings = slices.DeleteFunc(s.Warnings, func(w Warning) bool { return w.Slug == retiredDefaultBranchMoved })
 	return s, nil
 }
 
@@ -192,19 +194,12 @@ func updateState(home string, replace bool, f func(*State) error) (readErr, err 
 	return readErr, writeState(home, warningsFile, data)
 }
 
-// recordState writes the state of a setup that ran at at: its warnings
-// and the default-branch-moved warnings that no SessionStart has
-// cleared, each once, read under the lock so a clear that happened
-// while setup ran is not undone. It returns the error of a state that
-// could not be read, which this one replaces.
+// recordState writes the state of a setup that ran at at: its
+// warnings, each once, under the lock of the file. It returns the error
+// of a state that could not be read, which this one replaces.
 func recordState(home string, at time.Time, version string, warnings []Warning) (readErr, err error) {
 	return updateState(home, true, func(prev *State) error {
 		s := State{At: at.UTC(), Version: version}
-		for _, w := range prev.Warnings {
-			if w.Slug == DefaultBranchMoved {
-				s.Warnings = append(s.Warnings, w)
-			}
-		}
 		for _, w := range warnings {
 			if !slices.Contains(s.Warnings, w) {
 				s.Warnings = append(s.Warnings, w)

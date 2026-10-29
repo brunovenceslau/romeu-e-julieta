@@ -158,8 +158,6 @@ func repoLine(r Repo) string {
 		parts = append(parts, "fetched")
 	}
 	switch r.FastForward {
-	case ffMoved:
-		parts = append(parts, fmt.Sprintf("%s moved %s..%s", r.DefaultBranch, r.From, r.To))
 	case ffNotFetched:
 	default:
 		parts = append(parts, strings.TrimSpace(r.DefaultBranch+" "+r.FastForward))
@@ -178,8 +176,6 @@ func PrintWarning(out *cli.Writer, w Warning) {
 	switch w.Slug {
 	case FetchFailed:
 		cli.Warn(out, "fetch-failed", w.Message)
-	case DefaultBranchMoved:
-		cli.Warn(out, "default-branch-moved", w.Message)
 	case SnapshotsDisabled:
 		cli.Warn(out, "snapshots-disabled", w.Message)
 	case AgentMemoryWritable:

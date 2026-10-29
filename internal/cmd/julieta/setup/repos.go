@@ -18,12 +18,12 @@ import (
 // the one namespace a sandbox fetch writes (I5).
 const originRefspec = "+refs/heads/*:refs/remotes/origin/*"
 
-// syncRepos clones each missing secondary repo, fetches origin in every
-// repo and fast-forwards each default branch that is checked out, clean
-// and behind origin's (04 4.3, REQ-0398, REQ-0399). A clone that fails
+// syncRepos clones each missing secondary repo and fetches origin in
+// every repo, and moves no branch (04 4.3, REQ-0398, REQ-0399): each
+// checkout stays at its commit, and the state of its default branch
+// against origin's is reported in the repo's entry. A clone that fails
 // leaves the sandbox unusable; a fetch that fails is the warning
-// fetch-failed; a move is the warning default-branch-moved; any other
-// case is reported in the repo's entry.
+// fetch-failed.
 func syncRepos(ctx context.Context, r *run) {
 	for _, m := range r.m.Repos {
 		rep := Repo{Dir: m.Dir, Path: m.Path, FastForward: ffNotFetched}
@@ -56,7 +56,7 @@ func syncRepo(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
 		return
 	}
 	rep.Fetched = true
-	fastForward(ctx, r, m, rep)
+	branchState(ctx, r, m, rep)
 }
 
 // cloneMissing clones the secondary repo m when nothing is at its path,
@@ -80,10 +80,10 @@ func cloneMissing(ctx context.Context, r *run, m manifest.Repo) (bool, error) {
 	return true, r.git.Clone(ctx, m.URL, m.Path)
 }
 
-// fastForward moves the default branch of the repo m to origin's tip
-// when it is checked out, clean, and behind with nothing of its own,
-// and reports why not otherwise.
-func fastForward(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
+// branchState reports the default branch of the repo m against
+// origin's tip: current, behind with nothing of its own, ahead,
+// diverged, or why it was not compared. It moves nothing.
+func branchState(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
 	failed := func(err error) {
 		rep.FastForward, rep.Error = ffFailed, err.Error()
 	}
@@ -134,10 +134,5 @@ func fastForward(ctx context.Context, r *run, m manifest.Repo, rep *Repo) {
 		rep.FastForward = ffAhead
 		return
 	}
-	if err := r.git.FastForward(ctx, m.Path, tip); err != nil {
-		failed(err)
-		return
-	}
-	rep.FastForward, rep.From, rep.To = ffMoved, st.OID, tip
-	r.warn(DefaultBranchMoved, fmt.Sprintf("%s %s..%s", m.Dir, st.OID, tip))
+	rep.FastForward = ffBehind
 }

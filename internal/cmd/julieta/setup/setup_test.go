@@ -58,13 +58,12 @@ func TestSetupProtocols(t *testing.T) {
 	assert.Equal(t, 0, code, stderr)
 }
 
-// TestSetupLinksClonesAndFastForwards is the run of setup on a new
-// sandbox, then again (04 4.3): the PATH link to the running binary,
-// the missing secondary cloned, the primary's clean default branch
-// fast-forwarded and the move recorded in julieta state with the
-// injected clock and version; the second run changes nothing and keeps
-// the move for the next SessionStart.
-func TestSetupLinksClonesAndFastForwards(t *testing.T) {
+// TestSetupLinksClonesAndMovesNoBranch is the run of setup on a new
+// sandbox, then again (04 4.3, REQ-0399): the PATH link to the running
+// binary, the missing secondary cloned, every repo fetched, and the
+// primary's clean default branch, behind origin's, left at its commit
+// and reported behind, with no warning; the second run changes nothing.
+func TestSetupLinksClonesAndMovesNoBranch(t *testing.T) {
 	s := newSandbox(t)
 	old := git(t, s.primary(), "rev-parse", "HEAD")
 	tip := push(t, filepath.Join(s.base, "api.git"), "two")
@@ -80,33 +79,52 @@ func TestSetupLinksClonesAndFastForwards(t *testing.T) {
 	assert.Equal(t, exe, have)
 	assert.Equal(t, "v0.1.0-test", rep.Version)
 	assert.Empty(t, rep.Unusable)
-	moved := setup.Warning{Slug: setup.DefaultBranchMoved, Message: "api " + old + ".." + tip}
-	assert.Equal(t, []setup.Warning{moved}, rep.Warnings)
-	assert.Equal(t, "warning default-branch-moved: api "+old+".."+tip+"\n", stderr)
+	assert.Empty(t, rep.Warnings)
+	assert.Empty(t, stderr)
 	require.Len(t, rep.Repos, 2)
 	assert.Equal(t, setup.Repo{Dir: "api", Path: s.primary(), Fetched: true, DefaultBranch: "main",
-		FastForward: "moved", From: old, To: tip}, rep.Repos[0])
+		FastForward: "behind"}, rep.Repos[0], "from and to stay empty in julieta-setup/v1")
 	assert.Equal(t, setup.Repo{Dir: "web", Path: s.m.Repos[1].Path, Cloned: true, Fetched: true, DefaultBranch: "main",
 		FastForward: "current"}, rep.Repos[1])
-	assert.Equal(t, tip, git(t, s.primary(), "rev-parse", "HEAD"))
+	assert.Equal(t, old, git(t, s.primary(), "rev-parse", "HEAD"), "the branch stays at its commit")
+	assert.Equal(t, tip, git(t, s.primary(), "rev-parse", "origin/main"), "origin's tip is fetched")
 	assert.FileExists(t, filepath.Join(s.m.Repos[1].Path, ".git", "HEAD"))
 
 	state, err := setup.ReadState(s.home)
 	require.NoError(t, err)
-	assert.Equal(t, setup.State{At: clock, Version: "v0.1.0-test", Warnings: []setup.Warning{moved}}, state)
+	assert.Equal(t, clock, state.At)
+	assert.Equal(t, "v0.1.0-test", state.Version)
+	assert.Empty(t, state.Warnings)
 
 	code, rep, stderr = setupJSON(t)
 	require.Equal(t, 0, code, stderr)
 	assert.Empty(t, stderr)
 	assert.False(t, rep.Link.Changed, "the link is kept")
 	assert.Empty(t, rep.Warnings)
-	for _, r := range rep.Repos {
-		assert.Equal(t, "current", r.FastForward, r.Dir)
-		assert.False(t, r.Cloned, r.Dir)
-	}
-	state, err = setup.ReadState(s.home)
+	assert.Equal(t, "behind", rep.Repos[0].FastForward)
+	assert.Equal(t, "current", rep.Repos[1].FastForward)
+	assert.False(t, rep.Repos[1].Cloned)
+	assert.Equal(t, old, git(t, s.primary(), "rev-parse", "HEAD"))
+}
+
+// TestSetupDropsTheRetiredSlugOfAnOldState: a setup.json written before
+// setup moved no branch may hold default-branch-moved; it is read with
+// that entry dropped, and the next setup writes the file without it.
+func TestSetupDropsTheRetiredSlugOfAnOldState(t *testing.T) {
+	s := newSandbox(t)
+	path := filepath.Join(setup.StateDir(s.home), "setup.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+	require.NoError(t, os.WriteFile(path, []byte(`{"at":"2026-10-27T00:00:00Z","version":"v0","warnings":[`+
+		`{"message":"api a..b","slug":"default-branch-moved"},{"message":"web: offline","slug":"fetch-failed"}]}`), 0o600))
+	state, err := setup.ReadState(s.home)
 	require.NoError(t, err)
-	assert.Equal(t, []setup.Warning{moved}, state.Warnings, "the move holds until a SessionStart shows it")
+	assert.Equal(t, []setup.Warning{{Slug: setup.FetchFailed, Message: "web: offline"}}, state.Warnings)
+
+	code, _, stderr := setupJSON(t)
+	require.Equal(t, 0, code, stderr)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "default-branch-moved")
 }
 
 // TestSetupText prints one line for the link and one per repo.
