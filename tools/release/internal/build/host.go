@@ -35,13 +35,15 @@ type HostOptions struct {
 // Unlike a dry run, a romeu that carries no julieta is an error, since
 // embedding it is all this build is for.
 func Host(ctx context.Context, o HostOptions) error {
-	return host(ctx, o, runtime.GOOS, runtime.GOARCH, embedKey)
+	return host(ctx, o, runtime.GOARCH, embedKey)
 }
 
-// host is Host for the platform goos/goarch, with the function that
-// names the overlay key, which a test replaces to see a key that
+// host is Host for a romeu of this GOOS and goarch, which a test
+// replaces to see an arch with no julieta refused, with the function
+// that names the overlay key, which a test replaces to see a key that
 // matches no file refused.
-func host(ctx context.Context, o HostOptions, goos, goarch string, key func(root string) string) error {
+func host(ctx context.Context, o HostOptions, goarch string, key func(root string) string) error {
+	goos := runtime.GOOS
 	if !slices.Contains(Arches, goarch) {
 		return fmt.Errorf("no julieta is built for %s: the release builds %s", goarch, strings.Join(Arches, " and "))
 	}
@@ -100,6 +102,9 @@ func host(ctx context.Context, o HostOptions, goos, goarch string, key func(root
 	if err != nil {
 		return err
 	}
+	// The bytes alone decide: a romeu that holds them consumed the file,
+	// so the go list check the release adds (builder.embeds, which lists
+	// the darwin build) would tell nothing more here.
 	embedded, err := carries(binary, julieta)
 	if err != nil {
 		return err
@@ -110,8 +115,11 @@ func host(ctx context.Context, o HostOptions, goos, goarch string, key func(root
 	return writeNew(o.Out, binary)
 }
 
-// writeNew writes data to the new file path, mode 0755, and refuses a
-// path that exists.
+// writeNew writes data to the new file path, mode 0755 under the
+// umask, and refuses a path that exists, a symbolic link included. It
+// removes nothing, so a failed write leaves the partial file, which a
+// later build refuses as existing; the e2e writes into a new temporary
+// directory each time.
 func writeNew(path string, data []byte) error {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o755)
 	if err != nil {

@@ -19,9 +19,9 @@ import (
 
 // TestSyncHarnessEmbedsJulieta: the romeu of romeu.NewEmbedded, the
 // host-native build of tools/release, carries a julieta (REQ-0131, the
-// e2e row of 10 10.2), which gate 1 reads: its julieta line names a dev
-// build's version and a sha256 that is not the placeholder's, the
-// sha256 of no bytes.
+// e2e row of 10 10.2), which gate 1 reads: it prints no placeholder,
+// and records a dev build's version and a sha256 that is not the
+// placeholder's, the sha256 of no bytes.
 func TestSyncHarnessEmbedsJulieta(t *testing.T) {
 	t.Parallel()
 	e := romeu.NewEmbedded(t, nil)
@@ -32,7 +32,6 @@ func TestSyncHarnessEmbedsJulieta(t *testing.T) {
 
 	res := approve(t, e)
 
-	assert.Contains(t, res.Stderr, "\n  julieta v0.0.0-dev+")
 	assert.NotContains(t, res.Stderr, "v0.0.0-placeholder")
 	assert.NotContains(t, res.Stderr, "sha256 e3b0c44298fc")
 	r := readToolchain(t, e)

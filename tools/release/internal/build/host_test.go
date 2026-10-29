@@ -72,7 +72,7 @@ func TestHostRefusals(t *testing.T) {
 			if out == "" {
 				out = filepath.Join(t.TempDir(), "romeu")
 			}
-			err := host(t.Context(), HostOptions{Root: tt.root, Out: out, GoBin: goBinOf(t)}, runtime.GOOS, tt.goarch, tt.key)
+			err := host(t.Context(), HostOptions{Root: tt.root, Out: out, GoBin: goBinOf(t)}, tt.goarch, tt.key)
 			require.ErrorContains(t, err, tt.want)
 			if tt.out == "" {
 				assert.NoFileExists(t, out)
