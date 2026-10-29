@@ -18,6 +18,7 @@ var flipTable = []flipCase{
 	{field: "agent", widening: true, recreate: true},
 	{field: "egress", widening: true, recreate: false},
 	{field: "kits", widening: true, recreate: true},
+	{field: "memory", widening: false, recreate: false},
 	{field: "name", widening: true, recreate: true},
 	{field: "ports", widening: true, recreate: true},
 	{field: "repos", widening: true, recreate: true},

@@ -88,6 +88,18 @@
       },
       "type": "array"
     },
+    "memory": {
+      "additionalProperties": false,
+      "properties": {
+        "remote": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "remote"
+      ],
+      "type": "object"
+    },
     "name": {
       "pattern": "^[a-z][a-z0-9-]{0,38}[a-z0-9]$",
       "type": "string"

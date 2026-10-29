@@ -21,8 +21,53 @@ var binaries = []string{"romeu", "julieta"}
 // skip them (ADR 0015, decision 2).
 var Builtins = []string{"help", "completion", "__complete", "__completeNoDesc"}
 
-// registry holds definitions in the order of their registrations.
-type registry struct{ cmds []Command }
+// registry holds definitions in the order of their registrations, and
+// the steps around them by "<binary> <command line>".
+type registry struct {
+	cmds    []Command
+	arounds map[string]Around
+}
+
+// Around is a step around the RunE of one command: run runs the
+// command's own RunE and returns its error, and Around returns the
+// error of the whole, which Tree reports as it reports a RunE's. The
+// assembled command set of a binary registers one, as the last step a
+// specification gives several commands (08 8.1: the memory commit and
+// push), so no command's own package changes.
+type Around func(env *Env, cmd *cobra.Command, args []string, run func() error) error
+
+// Wrap registers around for the command line of binary (such as
+// "sync", or "memory list"), from a package-level variable: var _ =
+// cli.Wrap("romeu", "sync", step). The command need not be registered:
+// Tree applies the step to the command when it is. It panics on a
+// binary that is not one, and on a second step for one command line,
+// so the mistake fails at init.
+func Wrap(binary, line string, around Around) bool {
+	commands.wrap(binary, line, around)
+	return true
+}
+
+// wrap adds around, or panics as Wrap says.
+func (r *registry) wrap(binary, line string, around Around) {
+	key := binary + " " + line
+	switch {
+	case !slices.Contains(binaries, binary):
+		panic(fmt.Errorf("cli: a step around %q of the binary %q, which is neither %s", line, binary, strings.Join(binaries, " nor ")))
+	case around == nil:
+		panic(fmt.Errorf("cli: a nil step around %s", key))
+	case r.arounds[key] != nil:
+		panic(fmt.Errorf("cli: a second step around %s", key))
+	}
+	if r.arounds == nil {
+		r.arounds = map[string]Around{}
+	}
+	r.arounds[key] = around
+}
+
+// around returns the step around the definition c, or nil.
+func (r *registry) around(c Command) Around {
+	return r.arounds[c.Binary+" "+c.Line()]
+}
 
 // commands is the registry Register fills from package-level variables
 // at program start; nothing writes it after main starts (REQ-1229).

@@ -157,9 +157,11 @@ which `docs/reference/project.md` replaces once its generator lands.
 Fields deliberately left ungated are listed in one committed list
 beside the tags; `go generate` fails on a field that is on neither, so
 a forgotten tag is a generator failure, not a silent strip (I7). Today
-the list holds `sandboxOptions` and `run`. *Why for us:* resource limits
+the list holds `sandboxOptions`, `memory` and `run`. *Why for us:* resource limits
 change how much of the host the sandbox uses, not what it can reach or
-read, and the run layout's pane commands run only inside the sandbox.
+read; `memory.remote` names where the host pushes the durable copy of
+memory, which the sandbox never reaches ([08 8.1](08-memory-handoff-salvage.md#81-memory-store));
+and the run layout's pane commands run only inside the sandbox.
 
 `REQ-0068` Normalized capability set (from v3 descriptors, parsed by one grammar
 in `internal/oci`, which `internal/render` calls for local kits): network

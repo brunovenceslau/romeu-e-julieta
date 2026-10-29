@@ -65,7 +65,7 @@ type Row struct {
 var Rows = []Row{
 	{
 		Req:      "REQ-0968",
-		Names:    []string{"sbxdrv", "render", "gate", "state", "egress", "signing", "preflight"},
+		Names:    []string{"sbxdrv", "render", "gate", "state", "egress", "signing", "preflight", "memgit"},
 		LinkedBy: Romeu,
 		MustNot:  []string{"mise", "hooks", "layout"},
 	},

@@ -192,6 +192,9 @@ var rules = []Rule{
 		Pattern: `^(?:(?:127\.0\.0\.1:)?[1-9][0-9]{0,4}:)?[1-9][0-9]{0,4}(?:/(?:tcp|tcp4|tcp6|udp|udp4|udp6))?$`, value: portSpec,
 		Text:    "[[HOST_IP:]HOST_PORT:]SANDBOX_PORT[/PROTOCOL] as sbx documents it, each port from 1 to 65535; no port has a leading zero; HOST_IP only 127.0.0.1, since another address would expose the sandbox's port to the network, and none is loopback; the IPv6 loopback form is deferred (03 3.1)",
 		Message: "is not a port spec such as 8080:8080/tcp, bound on loopback", Scope: Both},
+	{Slug: "memory-remote", Format: FormatProject, Field: "memory.remote", Source: "REQ-1305", value: memoryRemote,
+		Text:    "none, or an https:// URL, or git:// on 127.0.0.1, with no user information, space or control character: a URL gitsafe fetches from and pushes to",
+		Message: "is neither none nor a URL gitsafe accepts", Scope: Both},
 	{Slug: "salvage-exclude", Format: FormatProject, Field: "salvage.excludeIgnored[]", Source: "REQ-1263", value: excludePath,
 		Text: "a clean relative path, an optional trailing /, no .. element, no leading -", Message: "is not a relative path inside the repo", Scope: Both},
 

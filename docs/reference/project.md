@@ -45,6 +45,8 @@ Its JSON Schema is [schemas/project.v1.json](../../schemas/project.v1.json).
 | `sandboxOptions.cpus` | integer | no | - | recreate (via sandboxOptions) | CPUs is the number of CPUs. |
 | `sandboxOptions.memory` | string | no | - | recreate (via sandboxOptions) | Memory is the memory limit, such as "8g". |
 | `secrets` | list of string | no | widening | recreate | Secrets are the names of the secrets the sandbox gets; each resolves through the host settings entry \<name>@\<project>. |
+| `memory` | object | no | - | live | Memory names the private repository that keeps the durable copy of the project's memory (08 8.1). It is ungated: the remote is a destination of the host's push that the sandbox never reaches, so it changes nothing the sandbox may reach or read; it applies live, at the next command's push. sync refuses a spec without it (CheckMemoryRemote), which the general validation does not. |
+| `memory.remote` | string | yes | - | live (via memory) | Remote is the URL of the repository, one gitsafe fetches from and pushes to (https://\<host>/..., or git://127.0.0.1 for the tests' daemon), or MemoryNone, which keeps memory on this machine only. |
 | `egress` | object | no | widening | live | Egress holds the domains the spec adds to the derived egress; each is always gated. |
 | `egress.extra` | list of string | no | widening (via egress) | live (via egress) | Extra are domains the sandbox may reach. |
 | `egress.tools` | map of string to list of string | no | widening (via egress) | live (via egress) | Tools maps a mise backend:tool the catalog lacks to the domains it needs. |
@@ -68,7 +70,7 @@ Its JSON Schema is [schemas/project.v1.json](../../schemas/project.v1.json).
 | `run.panes[].steps` | list of list of string | no | - | live (via run) | Steps are the argv lists the pane runs, with no shell; none is a login shell. |
 | `run.panes[].focus` | boolean | no | - | live (via run) | Focus marks the pane focused in its tab; at most one per tab. |
 
-The members deliberately left ungated, the committed list of 01 1.4 (I7): `sandboxOptions`, `sandboxOptions.cpus`, `sandboxOptions.memory`, `run`, `run.tabs`, `run.tabs[].label`, `run.tabs[].root`, `run.tabs[].root.pane`, `run.tabs[].root.split`, `run.tabs[].root.ratio`, `run.tabs[].root.first`, `run.tabs[].root.second`, `run.panes`, `run.panes[].id`, `run.panes[].repo`, `run.panes[].cwd`, `run.panes[].env`, `run.panes[].steps`, `run.panes[].focus`.
+The members deliberately left ungated, the committed list of 01 1.4 (I7): `sandboxOptions`, `sandboxOptions.cpus`, `sandboxOptions.memory`, `memory`, `memory.remote`, `run`, `run.tabs`, `run.tabs[].label`, `run.tabs[].root`, `run.tabs[].root.pane`, `run.tabs[].root.split`, `run.tabs[].root.ratio`, `run.tabs[].root.first`, `run.tabs[].root.second`, `run.panes`, `run.panes[].id`, `run.panes[].repo`, `run.panes[].cwd`, `run.panes[].env`, `run.panes[].steps`, `run.panes[].focus`.
 
 ## Rules
 
@@ -94,6 +96,7 @@ The members deliberately left ungated, the committed list of 01 1.4 (I7): `sandb
 | `sandboxOptions.cpus` | from 0 to 256; 0 is sbx's default, the host's; that the host has that many CPUs is checked at run time, not here | is outside 0 to 256 | invalid document, exit 2 | both | REQ-1260 |
 | `sandboxOptions.memory` | matches `^[1-9][0-9]{0,6}[mg]$`; a whole number of binary units, m or g, at least 512m, as sbx documents it; the host's maximum is checked at run time | is not a memory limit of at least 512m, such as 8g | invalid document, exit 2 | both | REQ-1261 |
 | `ports[]` | matches `^(?:(?:127\.0\.0\.1:)?[1-9][0-9]{0,4}:)?[1-9][0-9]{0,4}(?:/(?:tcp\|tcp4\|tcp6\|udp\|udp4\|udp6))?$`; [[HOST_IP:]HOST_PORT:]SANDBOX_PORT[/PROTOCOL] as sbx documents it, each port from 1 to 65535; no port has a leading zero; HOST_IP only 127.0.0.1, since another address would expose the sandbox's port to the network, and none is loopback; the IPv6 loopback form is deferred (03 3.1) | is not a port spec such as 8080:8080/tcp, bound on loopback | invalid document, exit 2 | both | REQ-1262 |
+| `memory.remote` | none, or an https:// URL, or git:// on 127.0.0.1, with no user information, space or control character: a URL gitsafe fetches from and pushes to | is neither none nor a URL gitsafe accepts | invalid document, exit 2 | both | REQ-1305 |
 | `salvage.excludeIgnored[]` | a clean relative path, an optional trailing /, no .. element, no leading - | is not a relative path inside the repo | invalid document, exit 2 | both | REQ-1263 |
 | `run.tabs[].label` | matches `^[a-z0-9][a-z0-9_-]{0,31}$` | is not a tab label | invalid document, exit 2 | both | REQ-0186 |
 | `run.tabs[].root` | exactly one of `pane`; or `split` and `ratio` and `first` and `second` | is neither {pane} nor {split, ratio, first, second} | invalid document, exit 2 | both | 03 3.2 |

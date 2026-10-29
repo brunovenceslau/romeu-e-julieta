@@ -76,5 +76,5 @@ func TestFieldListsFollowTheTags(t *testing.T) {
 	assert.ElementsMatch(t, widening, wideningFields)
 	assert.ElementsMatch(t, ungated, ungatedFields)
 	assert.ElementsMatch(t, recreate, recreateFields)
-	assert.ElementsMatch(t, []string{"sandboxOptions", "run"}, ungatedFields, "01 1.4: today the list holds sandboxOptions and run")
+	assert.ElementsMatch(t, []string{"sandboxOptions", "memory", "run"}, ungatedFields, "01 1.4: today the list holds sandboxOptions, memory and run")
 }

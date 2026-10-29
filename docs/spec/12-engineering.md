@@ -287,7 +287,7 @@ module whose id is no directory name owns the paths its row gives.
 | `gate` | widening set, diff, TTY prompt | spec, state, termsafe |
 | `render` | render candidates (`sbxenv.yaml`, workspace files, `render.json`), materialize kits via `os.Root`, promotion commit and recovery (its directories: `internal/render` and `internal/shquote`, the shell quoter `julietaBin` is rendered through) | spec, egress, oci, gitsafe, state |
 | `sbxdrv` | the only code that runs `sbx`; argv builders from recordings; output parsing; version floor | spec, probes |
-| `romeu-cli` | romeu commands, under `internal/cmd/romeu/`, and the preflight of 01 1.5 (`internal/preflight`) | all of the above |
+| `romeu-cli` | romeu commands, under `internal/cmd/romeu/`, the preflight of 01 1.5 (`internal/preflight`) and the commit and push of the durable copy of memory of 08 8.1 (`internal/memgit`) | all of the above |
 | `memstore` | the memory store in two packages (08 8.1): the shared readers on `os.Root` with the layout allowlist, and julieta's `memstore/write` with the `Store` and the `fs` backend's writes | spec, canon |
 | `julieta-core` | setup, repos, install/lock (mise), hooks and recorded failures, status, spec and catalog validation, `pin workload` and `pin check`, version and compatibility (its directories: `internal/manifest`, `internal/mise`, `internal/hooks`, `internal/agent/claude` and the command packages under `internal/cmd/julieta/`) | spec, gitsafe, catalog, oci, cli |
 | `layout` | run layout to herdr `layout.apply`, pane step runner | spec |

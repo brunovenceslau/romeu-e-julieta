@@ -65,6 +65,13 @@ gains the two verbs below (`after: T153` for its files).
    output; a command that failed before its work was done runs no
    push.
 
+Whichever of T175 and T043's last slice (slice E, which links `sync`
+into the binary with `import_sync.go`) merges second adds `memory:
+{remote: none}`, or a test URL, to the project specs of `sync`'s
+end-to-end tests, since REQ-1305 makes `sync` refuse a spec without
+`memory.remote`; no `needs` or `after` edge is added (decided on
+2026-10-29).
+
 - Implements: REQ-1303 (08 8.1), REQ-1304 (08 8.1), REQ-1305 (08 8.1),
   REQ-0502 (05 5.2).
 - Operator: creates one private repository per project and names it in

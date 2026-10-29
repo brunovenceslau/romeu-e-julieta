@@ -236,6 +236,12 @@ What the tags decide:
   [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1).
 - `run` is ungated and applies live: pane commands run only inside the
   sandbox, and it is on the same list.
+- `memory` is ungated and applies live: `memory.remote` names where the
+  host pushes the durable copy of memory (08 8.1), which the sandbox
+  never reaches, so a change widens nothing the sandbox may reach or
+  read; it is on the same list. Its shape is checked when present;
+  `sync` refuses a spec without it (`memory-remote-missing`, REQ-1305),
+  which the general validation does not.
 
 `REQ-0193` There is no field for a host command, an absolute path, a mount, or an
 env var for the sandbox as a whole or for sbx; a pane's `env` reaches

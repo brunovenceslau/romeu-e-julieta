@@ -106,6 +106,8 @@ var fieldChanges = map[string]func(*inputs){
 	"ports":   func(in *inputs) { in.p.Ports = append(in.p.Ports, "9090:9090/tcp") },
 	"salvage": func(in *inputs) { in.p.Salvage.ExcludeIgnored = []string{".cache"} },
 	"run":     func(in *inputs) { in.p.Run.Panes[0].ID = "other" },
+	// memory is never rendered (08 8.1): an edit changes the spec only.
+	"memory": func(in *inputs) { in.p.Memory = &spec.Memory{Remote: "https://github.com/example/other-memory"} },
 }
 
 //romeu:invariant I7 test
