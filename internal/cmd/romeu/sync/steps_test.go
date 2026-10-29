@@ -67,7 +67,7 @@ func TestStepsAreTheTenOf0442InOrder(t *testing.T) {
 	}
 }
 
-func TestRunStepsStopsAtTheFirstErrorAndReleases(t *testing.T) {
+func TestRunStepsStopsAtTheFirstError(t *testing.T) {
 	var ran []int
 	mark := func(n int, err error) step {
 		return step{n, "step", func(context.Context, *run) error { ran = append(ran, n); return err }}
