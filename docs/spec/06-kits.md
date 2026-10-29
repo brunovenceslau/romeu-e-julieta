@@ -89,7 +89,7 @@ path, and that root inside the sandbox cannot make it writable with
 | Kit | sbx kind | Contents | Language |
 |---|---|---|---|
 | `julieta` | `mixin` | `REQ-0589` `mise` and `herdr` downloaded at build, version + per-arch sha256 pinned (`tools/kitpin`); `REQ-0590` `~/.zshenv` and `BASH_ENV` add `$HOME/.local/bin` and the mise shims dir; `REQ-0591` herdr config: `[update] version_check=false, manifest_check=false`, and an explicit tmux-style prefix key binding (`ctrl+b`), chosen on purpose: inside a host tmux, press the prefix twice, or override it in a personal kit's herdr config; `REQ-0592` network capability (install phase): `github.com`, `objects.githubusercontent.com` | descriptor + sh install steps (<= 5 lines each: download, `sha256sum -c`, install) |
-| `julieta-claude` | `mixin` | the only agent-aware kit: the skills, the two session hooks and the PreToolUse guard it installs, and the memory dir it makes non-writable, are the numbered list **What the `julieta-claude` kit installs and refuses** after this table, one item per obligation | descriptor + files |
+| `julieta-claude` | `mixin` | the only agent-aware kit: the skills, the two session hooks and the PreToolUse guard it installs, the memory dir it makes non-writable, and the boot hook that runs `julieta setup`, are the numbered list **What the `julieta-claude` kit installs and refuses** after this table, one item per obligation | descriptor + files |
 | `os-base` | `mixin` | `REQ-0593` exists only if A12 reports packages the workload lacks, which it then carries; otherwise the `julieta` kit sets `TZ` (arg `tz`, default `Etc/UTC`) and `os-base` does not exist. Its apt delta is not pinned: a residual risk of [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), with pinning a row of [Deferred decisions](../spec.md#in-the-product) | descriptor + sh |
 | `git-ssh-sign` | `mixin` | `REQ-0594` ssh-agent capability used for git signing only, from the dedicated host signing socket (`signing.agentSocket`); git config `gpg.format=ssh`, `commit.gpgsign=true`, `user.signingkey` from arg `signingKey` (a public key); `gpg.ssh.allowedSignersFile` generated from the same arg; opt-in per project, needed now because the maintainer signs every commit and will not run an agent that cannot ([00 0.5](00-scope.md#05-scope-justification)), so other adopters skip it | descriptor + files; **ask-first surface** |
 
@@ -129,6 +129,40 @@ obligation of the row above:
 6. `REQ-0599` The case "PreToolUse with the `.romeu/bin` mount absent refuses `gh
    pr merge`": the guard fails closed
    ([08 8.2](08-memory-handoff-salvage.md#82-session-hooks-user-side-middleware)).
+7. `REQ-1308` A `lifecycle.startup` hook that runs `<julietaBin> setup` as the
+   agent user at every boot, in the foreground, so a session after a
+   restart starts with the `PATH` link, the hook dispatcher, the trusted
+   mise configuration, the locked tools and each repo's `setup` task
+   done ([04 4.3](04-cli.md#43-julieta-sandbox)). This item is
+   agent-neutral and sits here because this kit already carries
+   `julietaBin`. It declares only `HOME` and `JULIETA_MANIFEST`: the
+   manifest is the env file's value where a definition sets it (the
+   sandbox definitions' bridge until romeu renders the sandboxes), else
+   the cache of REQ-0425, written by the first `setup` that `romeu run`
+   step 6 runs. With neither, as on the first boot after a create, whose
+   egress step 4 has not run yet, the hook prints one line that the
+   sandbox is not set up yet and that `romeu run` sets it up, records
+   nothing and exits 0. It runs at every boot rather than once at create,
+   because an install step does not see the clone (probe A14). Running it
+   again changes no code and no tool version: `setup` moves no branch
+   (REQ-0399), `install` follows the locks, and the lock of REQ-1309
+   (04 4.3) makes it wait for a `setup` already running. The session
+   waits for it, and a failure never stops the boot: the hook prints one
+   line that says the sandbox did not come up clean and names the log,
+   and exits 0. `setup` itself writes `$HOME/.local/state/julieta/setup.log`
+   at every run, the escaped report with no time in it (unusable lines,
+   warnings and errors), sandbox-local, never in a memory dir, never
+   synced or pushed (08 8.1); a run that leaves the sandbox unusable
+   records the hook failure `Setup` (08 8.2, REQ-0675) and a clean run
+   clears it. When julieta cannot run at all (the `.romeu/bin` mount
+   absent), the wrapper rule of REQ-0673 prints its line and nothing is
+   recorded. The hook is outside the digest of REQ-0587: it is no
+   installed file `setup` can read. `romeu run` step 6 (REQ-0357) stays
+   the authoritative run: it is where a sandbox left unusable stops the
+   run. Until
+   romeu renders the sandboxes, this hook replaces step 7 of the sandbox
+   definitions repository's julieta runbook, which the operator ran by
+   hand after each recreate (decided on 2026-10-28).
 
 `julieta-claude` replaces the agent's built-in memory with
 `julieta memory` on purpose
